@@ -13,6 +13,7 @@ The intended founder experience is **one initiation in an existing Codex or Clau
 - [Original requirements](docs/original-brief.md)
 - [One founder conversation: interaction requirement](docs/founder-interface.md)
 - [Founder user stories and immediate scope](docs/user-stories.md)
+- [Company continuity and replaceable AI teams](docs/company-continuity.md)
 - [Generate a Codex or Claude Code workspace](docs/converter.md)
 
 v0.2 and v0.3 remain drafts. Their inclusion does not promote them to the agreed baseline.
@@ -24,6 +25,7 @@ v0.2 and v0.3 remain drafts. Their inclusion does not promote them to the agreed
 - A shared spec board carries authority. Conversation alone does not.
 - Independent acceptance and evidence determine progress.
 - Decisions are checked against outcomes, and agents remain replaceable.
+- Company state outlives team versions and standalone role sessions; team replacement requires a checked handover.
 
 ## Versions and reviews
 

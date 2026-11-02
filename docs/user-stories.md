@@ -22,7 +22,9 @@ US-01 and US-02 are parts of this same initial conversation, not separate onboar
 | **US-06 — Steer and control** | As a founder, I want to change direction, adjust limits, or pause work so the team remains under my control. | Changes are recorded and affected work is reassessed. Pausing stops new assignments and shows work still in progress. Resuming follows current authority and spec versions. |
 | **US-07 — Maintain continuity** | As a founder, I want the team to recover from stalled or replaced agents so I do not reconstruct their context. | Replacements continue from shared records. Blocks and permissions survive replacement. I am involved only when recovery requires a founder-owned decision. |
 | **US-08 — Know when we are ready** | As a founder, I want an evidence-based recommendation about launching or raising funds so I can decide confidently. | Readiness follows independently reviewed gate results. Missing proof and risks are explicit. Readiness and authorization to proceed are recorded separately. |
-| **US-09 — Improve the operating system** | As a founder, I want to adopt better versions of the team's rules without losing the venture's history. | Proposed changes and effects are reviewable. Approved upgrades preserve decisions, evidence, unfinished work, and valid blocks. Existing teams never change silently. |
+| **US-09 — Replace or upgrade my team** | As a founder, I want to adopt an improved AI team, with each role in its own standalone session, while the same company continues without rebriefing or losing its history. | The candidate passes continuity and compatibility checks. A controlled handover preserves company records, obligations, permissions, open work, and blocks; outgoing sessions lose authority. Recovery is tested where reversible. No company upgrades silently. |
+
+Company state, team versions, and role sessions have separate lifecycles. See [the company-continuity contract](company-continuity.md) for replacement and recovery requirements. The target is controlled, recoverable continuity; zero risk is not guaranteed.
 
 ## Deferred: managed environment selection
 

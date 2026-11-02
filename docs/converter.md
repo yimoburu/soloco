@@ -66,6 +66,6 @@ Serialize shared writes and reviews manually for now. Prompts do not enforce own
 
 ## Evolution
 
-Upgrade by generating a fresh workspace from a deliberately chosen spec version, reviewing the differences, and explicitly migrating existing specs, decisions, evidence, and open work. Preserve the records; never regenerate over a running team.
+The current converter can prepare a separate candidate workspace for comparison. It cannot replace a live team safely. Do not point both workspaces at live company state or copy a candidate over running records. The target architecture keeps the company independent of team versions and uses the [checked handover and recovery protocol](company-continuity.md). Existing evidence, decisions, obligations, and open work remain company-owned.
 
 Next milestones are an authoritative board service with identity checks and atomic transitions, a runner with platform adapters for session start/resume and recovery, and the single founder conversation. The runner routes work from accepted board transitions; founder attention is reserved for direction and decision packets. Keep those mechanics separate from domain judgment and the evolving governance spec.

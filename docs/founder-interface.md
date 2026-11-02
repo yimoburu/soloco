@@ -29,6 +29,8 @@ The runner is deterministic coordination software. It does not invent a domain v
 
 Routine work stays on the board. The founder can request status or opt into a digest. Pause, override, replacement, and direction changes are available through the same conversation, subject to the governance rules.
 
+The founder can also request replacement of the entire AI team through this conversation. The company and its history persist independently of team versions and standalone role sessions. Follow the [company-continuity contract](company-continuity.md); a replacement must not require the founder to recreate context or contact each successor role.
+
 ## Preserve domain independence
 
 PM handles ordinary product clarification and synthesis. It does not acquire universal authority or control access to the founder. Any qualifying packet can reach the founder conversation with its author, recommendation, evidence, and dissent intact. PM may add context but cannot suppress or rewrite another role's packet.
