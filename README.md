@@ -4,7 +4,7 @@ A reusable system for a human founder to turn an idea into an early-stage startu
 
 The team progresses toward **public launch** or **funding readiness** through explicit authority, short shared specs, independent review, and evidence-based gates.
 
-The intended founder experience is **one conversation with the team**, with automatic handoffs between standalone role sessions. This repository currently contains the evolving design, review history, and workspace-generator prototype. The automatic runner and unified founder conversation are the next implementation layer.
+The intended founder experience is **one initiation in an existing Codex or Claude Code conversation**, followed by automatic handoffs between standalone role sessions. That conversation stays the founder's interface. Managed platform selection and mixed-platform teams are future requirements. This repository currently contains the evolving design, review history, and workspace-generator prototype; automatic coordination remains to be implemented.
 
 ## Start here
 
@@ -12,6 +12,7 @@ The intended founder experience is **one conversation with the team**, with auto
 - [Agreed baseline: v0.1](specs/v0.1.md)
 - [Original requirements](docs/original-brief.md)
 - [One founder conversation: interaction requirement](docs/founder-interface.md)
+- [Founder user stories and immediate scope](docs/user-stories.md)
 - [Generate a Codex or Claude Code workspace](docs/converter.md)
 
 v0.2 and v0.3 remain drafts. Their inclusion does not promote them to the agreed baseline.

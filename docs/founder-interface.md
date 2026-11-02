@@ -4,6 +4,8 @@
 
 **Implementation status:** The workspace generator exists. The automatic runner and unified founder conversation described here are not implemented yet. Manual role sessions are a development/testing workflow, not the intended founder experience.
 
+**Immediate entry point:** With this framework available in the project, the founder initiates once in their existing Codex or Claude Code conversation: "Start a virtual company for this idea." That conversation remains the founder interface. The first implementation uses the current environment; managed platform selection and mixed-platform teams are deferred. See [US-02 and the founder user stories](user-stories.md).
+
 ## Responsibilities
 
 | Component | Responsibility |
@@ -19,7 +21,7 @@ The runner is deterministic coordination software. It does not invent a domain v
 
 ## Founder experience
 
-1. The founder supplies an idea, constraints, and the initial authority envelope in one conversation.
+1. The founder initiates once with an idea in the current Codex or Claude Code conversation. Necessary constraints and the initial authority envelope are clarified there.
 2. The team prepares its intent, charters, and first experiment. Necessary founder decisions return in that conversation.
 3. Accepted board transitions route work to the next eligible role automatically. The founder never supplies a "continue as QA" or "tell Engineering to fix this" message.
 4. A genuine reserved decision returns as a packet containing the decision, options, recommendation, evidence, and cost of waiting.
@@ -40,6 +42,8 @@ The runner derives eligibility from accepted artifacts, pinned versions, reviewe
 - A scope or exposure decision reaches the one founder conversation with the original role's packet and any dissent.
 - A stalled role is recovered or replaced from its charter and shared records; its block never disappears because the session ended.
 - Pausing stops new dispatch; resumption respects current permissions and versions.
-- Using different execution platforms does not create separate authoritative boards or require the founder to copy context between them.
+- In the first implementation, one initiation in either supported environment prepares the venture and manages role sessions there, without a separate platform-selection step or repeated role setup.
 
 Manual session startup may remain a debugging option. The intended product starts a venture once and manages role sessions as needed. Current generated prompts alone cannot deliver this behavior; a board service and runner are required.
+
+Later mixed-platform support must retain one authoritative board and must not require the founder to transfer context between environments.
