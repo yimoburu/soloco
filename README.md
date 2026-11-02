@@ -1,60 +1,30 @@
 # AI-operated startup
 
-A reusable system for a human founder to turn an idea into an early-stage startup with AI agents filling conventional startup roles.
+Give an idea to a team of AI agents and operate a company through **one founder conversation**. Each role works in its own standalone session. Shared company records let roles collaborate and let the founder replace the team while preserving the company.
 
-The team progresses toward **public launch** or **funding readiness** through explicit authority, short shared specs, independent review, and evidence-based gates.
+The team progresses toward public launch or funding readiness through conventional startup roles, bounded authority, independent review, and evidence.
 
-The intended founder experience is **one initiation in an existing Codex or Claude Code conversation**, followed by automatic handoffs between standalone role sessions. That conversation stays the founder's interface. Managed platform selection and mixed-platform teams are future requirements. This repository currently contains the evolving design, review history, and workspace-generator prototype; automatic coordination remains to be implemented.
+## Read only what you need
 
-## Start here
+- [Current spec](SPEC.md): founder responsibilities, collaboration, evidence gates, learning, and company continuity.
+- [Converter guide](docs/converter.md): what works today and how to generate a developer workspace.
+- [History](history/README.md): original intent, previous versions, and review provenance; not competing current requirements.
 
-- [Latest proposal: v0.3 draft](specs/v0.3-draft.md)
-- [Agreed baseline: v0.1](specs/v0.1.md)
-- [Original requirements](docs/original-brief.md)
-- [One founder conversation: interaction requirement](docs/founder-interface.md)
-- [Founder user stories and immediate scope](docs/user-stories.md)
-- [Company continuity and replaceable AI teams](docs/company-continuity.md)
-- [Generate a Codex or Claude Code workspace](docs/converter.md)
+## What works today
 
-v0.2 and v0.3 remain drafts. Their inclusion does not promote them to the agreed baseline.
+The Python workspace generator produces shared records, proposed charters, and role startup briefs for Codex or Claude Code. It does **not** launch sessions, route handoffs, enforce authority, or replace a live team. Manual session startup is a developer preview.
 
-## Core principles
-
-- Roles earn seats through distinct judgment, an owned spec, and a legitimate blocking right.
-- Agents own execution; the founder handles consequential reserved decisions.
-- A shared spec board carries authority. Conversation alone does not.
-- Independent acceptance and evidence determine progress.
-- Decisions are checked against outcomes, and agents remain replaceable.
-- Company state outlives team versions and standalone role sessions; team replacement requires a checked handover.
-
-## Versions and reviews
-
-| Version | Status | Review and response |
-|---|---|---|
-| [v0.1](specs/v0.1.md) | Agreed design baseline | [Claude review](reviews/claude-v0.1.md) · [Response in v0.2](reviews/v0.2-disposition.md) |
-| [v0.2](specs/v0.2-draft.md) | Draft | [Claude review](reviews/claude-v0.2.md) · [Response in v0.3](reviews/v0.3-disposition.md) |
-| [v0.3](specs/v0.3-draft.md) | Latest draft | Review pending |
-
-The [original review brief](reviews/review-brief-v0.1.md) records the scope of the first review.
-
-## Generate a team workspace
-
-Edit [the venture configuration](examples/venture.json), then run:
+The target product starts once in the founder's existing Codex or Claude Code conversation and coordinates the separate role sessions automatically. Managed platform selection and mixed-platform operation are deferred.
 
 ```sh
-python3 tools/materialize.py --config examples/venture.json --output /tmp/my-venture --target both
+python3 tools/materialize.py --config examples/venture.json --output /tmp/my-venture --target codex
+python3 -m unittest discover -s tests -v
 ```
 
-The converter creates shared specs and board records, project instructions for the selected platforms, and one startup brief per role. Developers can test those briefs in separate Codex or Claude Code sessions. That manual workflow does not yet provide the intended founder experience: a runner must route accepted handoffs and manage sessions automatically. See [the interaction requirement and acceptance checks](docs/founder-interface.md).
+New workspaces pin an exact copy and hash of `SPEC.md`. Existing workspaces are never overwritten or silently upgraded. Generation leaves Frame in Draft and grants no venture-execution authority.
 
-The default pins the agreed v0.1 spec. Select a draft deliberately with `--spec specs/v0.3-draft.md`. Generation grants no venture-execution permission and refuses to overwrite an existing workspace. See [converter usage and limitations](docs/converter.md).
+## Evolve carefully
 
-Run the focused checks with `python3 -m unittest discover -s tests -v`.
+`SPEC.md` is the single current design; the converter guide describes implementation, not additional governance. Change a rule only when it changes a meaningful decision or behavior. Keep review findings separate, preserve historical evidence, and use versioned commits for revisions. Team adoption remains explicit per company.
 
-## Reviewing the current draft
-
-Read `specs/v0.3-draft.md` against `docs/original-brief.md`. Report material contradictions, missing authority, unclear gate conditions, and unnecessary complexity. For each finding, give a concrete failure scenario and the smallest correction. Separate required fixes from preferences. Keep review findings separate from the versioned spec.
-
-## Maintaining the design
-
-Preserve earlier versions and review provenance. Make substantive revisions in a new version, record which review findings were accepted or modified, and label proposals as drafts until explicitly adopted. Add rules only when they change a meaningful decision or behavior.
+For review, read the current spec against the original intent and review history. Report concrete failure scenarios, missing authority, contradictions, or unnecessary complexity, with the smallest correction. Distinguish design acceptance from tested implementation.

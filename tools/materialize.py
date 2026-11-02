@@ -10,7 +10,7 @@ import tempfile
 
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "0.1"
+VERSION = "0.2"
 
 # These are role starters, not extracted or approved interpretations of governance.
 # The pinned spec governs; Frame must review the charters and authority map.
@@ -58,7 +58,7 @@ ROLES = {
         "outputs": "Evaluation plan, reproducible results, independent verdicts.",
         "block": "Failed mandatory checks or invalid evaluations.",
         "success": "Acceptance verdicts are independently reproducible.",
-        "failure": "Rubber-stamping the author's assumptions.", "phase": "Frame review; Solution planning; Build onward.",
+        "failure": "Rubber-stamping the author's assumptions.", "phase": "Brief Frame/Problem reviews; Solution planning; Build onward.",
     },
     "architect": {
         "name": "Tech Lead / Architect", "spec": "technical",
@@ -170,8 +170,9 @@ founder authorization under the pinned spec before those actions.
   review your own work. Attributions are self-reported here, not authentication.
 - Board items live in `team/board/`; specs in `team/specs/`; evidence and outputs
   in `team/artifacts/`; consequential decisions in `team/decisions/`.
-- Use one file per object and unique IDs. Cite governing spec versions and a
-  decision ID. Never overwrite another role's artifact or mutate its verdict.
+- Use one file per object with a unique ID, owner, author instance, status, and
+  version. Cite governing spec versions and a decision ID. Never overwrite
+  another role's artifact or mutate its verdict.
 - The author submits an artifact and a handoff; the designated receiver records
   acceptance or rejection in a separate record. Private chat has no authority.
 - A block names its chartered condition, evidence, owner, affected action, and
@@ -187,6 +188,9 @@ board service: serialize shared writes, and pause if ownership or concurrent
 updates are unclear. A shared Git remote alone is not live shared state.
 Acceptance and gate records require real review; never prefill a Pass.
 Use `team/templates/` as record starters, not as proof of compliance.
+Company records are co-located under `team/` in this prototype. They belong to
+the company and must not be replaced with team instructions. Live team
+replacement and transfer of authority are not implemented.
 
 After each assignment, leave its artifact references, current status, unresolved
 blocks, next receiver, and pending outcome reviews on the board. A fresh instance
@@ -218,7 +222,7 @@ def materialize(config, output, target="both", spec=None):
         raise ValueError("Initial Frame preparation requires an active pm owner")
     if target not in ("codex", "claude", "both"):
         raise ValueError("target must be codex, claude, or both")
-    spec = Path(spec) if spec is not None else ROOT / "specs/v0.1.md"
+    spec = Path(spec) if spec is not None else ROOT / "SPEC.md"
     spec_bytes = spec.read_bytes()
     spec_bytes.decode("utf-8")
     if not spec_bytes.strip():
@@ -263,6 +267,11 @@ def materialize(config, output, target="both", spec=None):
                     "Owned scope: Implementation section of `team/specs/technical.md`; "
                     "Architect is the accountable owner of the full Technical spec."
                 )
+            elif role == "release" and "support" not in roles:
+                ownership += (
+                    " Also owns `team/specs/support-readiness.md` for routine support "
+                    "until a separate Support seat is accepted."
+                )
             (team / "roles" / f"{role}.md").write_text(
                 f"# {charter['name']}\n\nStatus: Proposed; requires Frame acceptance.\n\n"
                 f"Mission: {charter['mission']}\n\n"
@@ -270,9 +279,9 @@ def materialize(config, output, target="both", spec=None):
                 f"Inputs: {charter['inputs']}\n\nOutputs: {charter['outputs']}\n\n"
                 f"Success: {charter['success']}\n\nMay block: {charter['block']}\n\n"
                 f"Main failure mode: {charter['failure']}\n\nActivation: {charter['phase']}\n\n"
-                "Resolver, independent reviewer, delegation approver, authority envelope, and\n"
-                "expiry: Unknown; define at Frame. Apply the pinned governance's override\n"
-                "rules. This starter grants no spending or external-action permission.\n",
+                "Block resolver, non-party arbiter, independent reviewer, charter amendment authority,\n"
+                "delegation approver, authority envelope, and expiry: Unknown; define at Frame. Apply the pinned\n"
+                "governance's override rules. This starter grants no spending or external-action permission.\n",
                 encoding="utf-8")
             (team / "sessions" / f"{role}.md").write_text(
                 f"# Start an independent {charter['name']} session\n\n"
@@ -289,6 +298,7 @@ def materialize(config, output, target="both", spec=None):
                 encoding="utf-8")
         spec_owners = {charter["spec"]: role for role, charter in ROLES.items()}
         spec_owners["technical"] = "architect" if "architect" in roles else "engineer"
+        spec_owners["support-readiness"] = "support" if "support" in roles else "release"
         for spec_id, owner in spec_owners.items():
             (team / "specs" / f"{spec_id}.md").write_text(
                 f"# {spec_id}\n\nOwner: {owner}. Status: {'Draft' if owner in roles else 'Dormant'}. "
@@ -307,7 +317,8 @@ def materialize(config, output, target="both", spec=None):
             "Generation is not founder approval. Preserve unknowns until explicitly resolved.\n",
             encoding="utf-8")
         write_json(team / "board/frame.json", {
-            "id": "FRAME", "owner": "pm", "status": "Draft", "version": 0,
+            "id": "FRAME", "owner": "pm", "author_instance": None,
+            "status": "Draft", "version": 0,
             "permission": "prepare_frame_only", "decision_id": None,
             "contract_approver": None, "founder_authorization": None,
             "missing": ["accepted intent and limits", "approved charters and reviewers",
@@ -315,14 +326,17 @@ def materialize(config, output, target="both", spec=None):
             "next": "Prepare a founder decision packet and independent Frame review.",
         })
         templates = {
-            "decision": {"id": None, "role": None, "instance_id": None, "authority": None,
+            "decision": {"id": None, "owner": None, "author_instance": None,
+                         "status": "Draft", "version": 0, "authority": None,
                          "governing_versions": [], "decision": None, "evidence": [], "rationale": None,
                          "expected_outcome": None, "review_date": None, "reviewer": None, "outcome": None},
-            "handoff": {"id": None, "author_instance": None, "receiver_instance": None,
+            "handoff": {"id": None, "owner": None, "author_instance": None,
+                        "status": "Draft", "version": 0, "receiver_instance": None,
                         "artifact_version": None, "governing_versions": [], "decision_id": None,
                         "acceptance_checks": [], "evidence": [], "limitations": [],
                         "receiver_verdict": None, "review_record": None},
-            "gate": {"id": None, "status": "Draft", "owner": None, "claim": None,
+            "gate": {"id": None, "owner": None, "author_instance": None,
+                     "status": "Draft", "version": 0, "claim": None,
                      "population": None, "method": None, "window": None, "pass_conditions": [],
                      "disqualifiers": [], "evidence_freshness": None, "permits": None,
                      "independent_reviewers": [], "contract_approval": None, "evidence": [],
@@ -332,7 +346,11 @@ def materialize(config, output, target="both", spec=None):
         for name, template in templates.items():
             write_json(team / "templates" / f"{name}.json", template)
         (stage / "START.md").write_text(
-            "# Start this team\n\nThis is a manual-session workspace, not a running team.\n\n"
+            "# Developer preview: manual role sessions\n\n"
+            "This is a generated workspace, not a running company. Use it only after\n"
+            "the generator reports success; an interrupted run may leave incomplete files.\n"
+            "The intended founder experience starts once and routes work automatically;\n"
+            "that runner is not implemented. This manual procedure is for development.\n\n"
             "Start separate sessions from this project root; give each its own startup brief.\n"
             "For the first configured role, use a selected platform command below; substitute another role\n"
             "ID for a different session. Every session must see this same shared filesystem.\n\n"
@@ -359,7 +377,7 @@ def main():
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--target", choices=["codex", "claude", "both"], default="both")
-    parser.add_argument("--spec", type=Path, help="Explicit governance source; defaults to the v0.1 baseline")
+    parser.add_argument("--spec", type=Path, help="Explicit governance source; defaults to the current SPEC.md")
     args = parser.parse_args()
     try:
         config = json.loads(args.config.read_text(encoding="utf-8"))

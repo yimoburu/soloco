@@ -34,14 +34,14 @@ class MaterializeTests(unittest.TestCase):
         materializer.materialize(self.config, output, **kwargs)
         return output
 
-    def test_default_workspace_pins_the_agreed_spec_without_approving_a_gate(self):
+    def test_default_workspace_pins_the_current_spec_without_approving_a_gate(self):
         output = self.generate()
         manifest = json.loads((output / "team/manifest.json").read_text())
-        source = (ROOT / "specs/v0.1.md").read_bytes()
+        source = (ROOT / "SPEC.md").read_bytes()
 
         self.assertEqual((output / "team/governance.md").read_bytes(), source)
         self.assertEqual(manifest["schema_version"], "1")
-        self.assertEqual(manifest["converter_version"], "0.1")
+        self.assertEqual(manifest["converter_version"], "0.2")
         self.assertEqual(manifest["name"], self.config["name"])
         self.assertEqual(manifest["governance"]["file"], "team/governance.md")
         self.assertEqual(
@@ -53,6 +53,8 @@ class MaterializeTests(unittest.TestCase):
         frame = json.loads((output / "team/board/frame.json").read_text())
         self.assertEqual(frame["status"], "Draft")
         self.assertEqual(frame["permission"], "prepare_frame_only")
+        self.assertIsNone(frame["author_instance"])
+        self.assertIsNone(frame["founder_authorization"])
         intent = (output / "team/specs/founder-intent.md").read_text()
         self.assertIn(self.config["idea"], intent)
         self.assertIn("unknown", intent.lower())
@@ -70,10 +72,14 @@ class MaterializeTests(unittest.TestCase):
         self.assertEqual(len(set(prompts)), 3)
         self.assertFalse((output / ".claude/agents").exists())
         for template in ["decision", "handoff", "gate"]:
-            self.assertIsInstance(
-                json.loads((output / f"team/templates/{template}.json").read_text()),
-                dict,
-            )
+            record = json.loads((output / f"team/templates/{template}.json").read_text())
+            self.assertEqual(record["status"], "Draft")
+            self.assertEqual(record["version"], 0)
+            for field in ["id", "owner", "author_instance"]:
+                self.assertIsNone(record[field])
+        gate = json.loads((output / "team/templates/gate.json").read_text())
+        self.assertIsNone(gate["contract_approval"])
+        self.assertIsNone(gate["verdict"])
 
     def test_target_selection_does_not_mix_platform_instruction_files(self):
         for target in ["codex", "claude", "both"]:
@@ -107,6 +113,60 @@ class MaterializeTests(unittest.TestCase):
             materializer.materialize(self.config, output)
         self.assertEqual(sentinel.read_bytes(), before)
         self.assertEqual(list(output.iterdir()), [sentinel])
+
+    def test_dangling_output_symlink_is_refused_without_touching_it(self):
+        output = self.base / "existing-link"
+        target = self.base / "missing-target"
+        output.symlink_to(target, target_is_directory=True)
+        with self.assertRaises(FileExistsError):
+            materializer.materialize(self.config, output)
+        self.assertTrue(output.is_symlink())
+        self.assertEqual(output.readlink(), target)
+        self.assertFalse(target.exists())
+
+    def test_render_failure_removes_staging_and_leaves_no_workspace(self):
+        output = self.base / "render-failure"
+        with patch.object(materializer, "write_json", side_effect=OSError("write failed")):
+            with self.assertRaises(OSError):
+                materializer.materialize(self.config, output)
+        self.assertFalse(output.exists())
+        self.assertEqual(list(self.base.glob(".startup-stage-*")), [])
+
+    def test_publish_failure_removes_partial_output_and_staging(self):
+        output = self.base / "publish-failure"
+        original_move = materializer.shutil.move
+        moved = []
+
+        def fail_after_first_move(source, destination):
+            if moved:
+                raise OSError("move failed")
+            moved.append(destination)
+            return original_move(source, destination)
+
+        with patch.object(materializer.shutil, "move", side_effect=fail_after_first_move):
+            with self.assertRaises(OSError):
+                materializer.materialize(self.config, output)
+        self.assertEqual(len(moved), 1)
+        self.assertFalse(output.exists())
+        self.assertEqual(list(self.base.glob(".startup-stage-*")), [])
+
+    def test_destination_created_during_generation_is_preserved(self):
+        output = self.base / "race"
+        sentinel = output / "existing-decision.json"
+        original_mkdtemp = materializer.tempfile.mkdtemp
+
+        def competing_creator(*args, **kwargs):
+            stage = original_mkdtemp(*args, **kwargs)
+            output.mkdir()
+            sentinel.write_text("preserve this decision")
+            return stage
+
+        with patch.object(materializer.tempfile, "mkdtemp", side_effect=competing_creator):
+            with self.assertRaises(FileExistsError):
+                materializer.materialize(self.config, output)
+        self.assertEqual(sentinel.read_text(), "preserve this decision")
+        self.assertEqual(list(output.iterdir()), [sentinel])
+        self.assertEqual(list(self.base.glob(".startup-stage-*")), [])
 
     def test_invalid_inputs_do_not_create_a_partial_workspace(self):
         cases = [
@@ -149,6 +209,22 @@ class MaterializeTests(unittest.TestCase):
         self.assertNotIn("Owned spec: `team/specs/technical.md`.", engineer)
         self.assertIn("Owned spec: `team/specs/technical.md`.", architect)
         self.assertIn("Owner: architect.", technical)
+
+    def test_support_readiness_has_one_owner_with_or_without_a_support_seat(self):
+        for support_seated in [False, True]:
+            with self.subTest(support_seated=support_seated):
+                self.config["active_roles"] = ["pm", "release", "qa"]
+                if support_seated:
+                    self.config["active_roles"].append("support")
+                output = self.generate(name=f"support-{support_seated}")
+                owner = "support" if support_seated else "release"
+                spec = (output / "team/specs/support-readiness.md").read_text()
+                release = (output / "team/roles/release.md").read_text()
+                self.assertIn(f"Owner: {owner}. Status: Draft.", spec)
+                self.assertEqual("team/specs/support-readiness.md" in release, not support_seated)
+                if support_seated:
+                    support = (output / "team/roles/support.md").read_text()
+                    self.assertIn("Owned spec: `team/specs/support-readiness.md`.", support)
 
 
 if __name__ == "__main__":
