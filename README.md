@@ -4,13 +4,14 @@ A reusable system for a human founder to turn an idea into an early-stage startu
 
 The team progresses toward **public launch** or **funding readiness** through explicit authority, short shared specs, independent review, and evidence-based gates.
 
-This repository contains the evolving design, its review history, and a workspace-generator prototype. Session execution and supervision are manual.
+The intended founder experience is **one conversation with the team**, with automatic handoffs between standalone role sessions. This repository currently contains the evolving design, review history, and workspace-generator prototype. The automatic runner and unified founder conversation are the next implementation layer.
 
 ## Start here
 
 - [Latest proposal: v0.3 draft](specs/v0.3-draft.md)
 - [Agreed baseline: v0.1](specs/v0.1.md)
 - [Original requirements](docs/original-brief.md)
+- [One founder conversation: interaction requirement](docs/founder-interface.md)
 - [Generate a Codex or Claude Code workspace](docs/converter.md)
 
 v0.2 and v0.3 remain drafts. Their inclusion does not promote them to the agreed baseline.
@@ -41,7 +42,7 @@ Edit [the venture configuration](examples/venture.json), then run:
 python3 tools/materialize.py --config examples/venture.json --output /tmp/my-venture --target both
 ```
 
-The converter creates shared specs and board records, project instructions for the selected platforms, and one startup brief per role. Open separate Codex or Claude Code sessions from the generated workspace and give each the corresponding brief. Roles cooperate through artifacts and accepted handoffs; private chat is not synchronized.
+The converter creates shared specs and board records, project instructions for the selected platforms, and one startup brief per role. Developers can test those briefs in separate Codex or Claude Code sessions. That manual workflow does not yet provide the intended founder experience: a runner must route accepted handoffs and manage sessions automatically. See [the interaction requirement and acceptance checks](docs/founder-interface.md).
 
 The default pins the agreed v0.1 spec. Select a draft deliberately with `--spec specs/v0.3-draft.md`. Generation grants no venture-execution permission and refuses to overwrite an existing workspace. See [converter usage and limitations](docs/converter.md).
 

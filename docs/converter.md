@@ -1,6 +1,6 @@
 # Materializing a team
 
-The converter turns a venture configuration and a pinned governance spec into a workspace for independent Codex or Claude Code sessions. It generates instructions and shared artifacts; it does not run the startup team.
+The converter turns a venture configuration and a pinned governance spec into a workspace for independent Codex or Claude Code sessions. It prepares the foundation for [one founder conversation with automatic role handoffs](founder-interface.md). The automatic runner is not implemented yet.
 
 ## Generate a workspace
 
@@ -38,9 +38,9 @@ The configuration accepts `name`, `idea`, and `active_roles`. Roles default to `
 
 The initial Frame record requires actual completion and review. Generation does not pass a gate, authorize spending, or resolve unknowns.
 
-## One session per role
+## Developer testing: one session per role
 
-Open separate sessions from the same generated workspace. For example, after changing your working directory to `/tmp/my-venture`:
+To test the generated role briefs, open separate sessions from the same workspace. This manual procedure is for development; the intended founder workflow does not involve talking to each role. For example, after changing your working directory to `/tmp/my-venture`:
 
 ```sh
 codex "Read team/sessions/pm.md and follow it."
@@ -68,4 +68,4 @@ Serialize shared writes and reviews manually for now. Prompts do not enforce own
 
 Upgrade by generating a fresh workspace from a deliberately chosen spec version, reviewing the differences, and explicitly migrating existing specs, decisions, evidence, and open work. Preserve the records; never regenerate over a running team.
 
-Next milestones are an authoritative board service with identity checks and atomic transitions, followed by platform adapters for session start/resume, notifications, and recovery. Keep those mechanics separate from domain judgment and the evolving governance spec.
+Next milestones are an authoritative board service with identity checks and atomic transitions, a runner with platform adapters for session start/resume and recovery, and the single founder conversation. The runner routes work from accepted board transitions; founder attention is reserved for direction and decision packets. Keep those mechanics separate from domain judgment and the evolving governance spec.
