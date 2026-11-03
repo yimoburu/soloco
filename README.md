@@ -2,7 +2,9 @@
 
 Run a virtual company through **one founder conversation**. Your Chief of Staff coordinates specialist AI agents in separate, resumable sessions. Company records persist in your folder when a session or environment changes.
 
-**Company plugin v0.1.0 is an early preparation-and-review release.** It interviews you, saves company intent, runs specialist planning sessions, and requests independent reviews. It does not execute customer outreach, spending, deployment, or other business actions. The [spec](SPEC.md) describes the complete target.
+The target is a company you can operate and improve over time, including a sustainably profitable one-person business with manageable founder workload. You define success; public launch and fundraising are optional milestones.
+
+**Company plugin v0.2.0 is an early preparation-and-review release.** It interviews you, saves company intent, runs specialist planning sessions, and requests independent reviews. It does not execute customer outreach, spending, deployment, or other business actions. The [spec](SPEC.md) describes the complete target.
 
 ## Install once
 
@@ -43,18 +45,45 @@ The startup hook supplies the Chief of Staff instructions automatically in an em
 
 The Chief of Staff asks focused questions, saves your intent, starts the needed specialist sessions, and brings back reviewed proposals. You do not open each role’s chat or relay messages. A specialist may reject a draft; that does not require a founder decision. Real-world evidence and execution permission remain separate from a planning review.
 
+The [CoS meta rules](SPEC.md#chief-of-staff-meta-rules) define its judgment, delegation, founder communication, accountability, and replaceability.
+
+Updates explain who is doing what, each assignment's verified status, and what happens next. Short tables, examples, or handoff diagrams make the work easy to follow; planned work is clearly distinguished from agents already running.
+
 Use **one active environment at a time**. To switch, pause the company in the old chat, open the same folder in the other app, and ask to continue. The Chief of Staff performs the recorded handover; you do not rebrief the team. Records stay in `.company/`, outside the plugin cache. Uninstalling the plugin does not remove them.
+
+## Upgrade an existing company
+
+Updating the installed plugin makes a candidate available; it does not automatically replace your team. In your existing founder chat, ask the CoS to pause and reconcile active assignments before updating.
+
+For Codex, refresh and install the published package in Terminal:
+
+```sh
+codex plugin marketplace upgrade ai-operated-startup
+codex plugin add company@ai-operated-startup
+```
+
+Then restart the desktop app and reopen the same founder chat. If `codex` is not on your PATH, use your installed Codex executable. Keep Company hooks enabled/trusted. Ask the CoS to check `company_doctor` reports v0.2.0 and that `company_upgrade` is available before proceeding.
+
+After updating/reloading the plugin in your host, tell your Chief of Staff:
+
+> Upgrade this company's team, keep its existing rules and records, and resume after the checks pass.
+
+The CoS inspects compatibility, pauses/reconciles assignments, and starts a fresh CoS rehearsal and independent QA review. After they pass, it adopts the candidate, verifies preserved records, reloads its instructions, and resumes preparation. Specialist sessions restart on demand from company records; you do not rebrief them. If you use a new chat, explicitly ask it to take over this company as part of the upgrade.
+
+This release supports v0.1.0 preparation companies and compatible teams on the current runtime. Governance remains pinned by default; adopting the newer spec requires explicit direction after reviewing its differences. Older governance may block a preparation upgrade on execution-level qualification requirements; the CoS must show that hold and ask before adopting the new, limited preparation-upgrade contract. Failed or stale checks hold the upgrade. Ask the CoS to recover the previous team if needed: recovery retains later company facts and uses the new runtime with the prior definitions, not the old plugin binary. After migration, v0.1.0 cannot resume the schema-2 company. Upgrade checks make two model calls using your normal host account.
 
 ## What is verified
 
-- Both native CLIs installed the plugin from an isolated local marketplace.
-- Live Codex: standalone PM draft, separate QA review, and a second assignment resumed the same PM session.
-- Automated tests cover hooks, records, independent review, concurrent updates, pause, stale-result quarantine, handover, notices, and actual subprocess dispatch.
+- The v0.1.0 package was installed through both native CLIs using isolated marketplaces; v0.2.0 still needs live installation/update acceptance.
+- Live v0.1.0 Codex: standalone PM draft, separate QA review, and a second assignment resumed the same PM session.
+- Live v0.2.0 Codex upgrade in a disposable company: preserved older governance correctly held adoption; explicit adoption of the v0.13 preparation-only contract passed a fresh CoS rehearsal, separate QA review, guarded apply, and post-commit verification. Earlier failed/blocked attempts were retained. This was a CLI runtime check, not a desktop update test.
+- Compatibility smoke test used the actual v0.1.0 source: migration preserved founder intent, and the old runtime rejected writes and controls even with a refreshed epoch.
+- Automated tests cover hooks, records, independent review, concurrent updates, pause, stale-result quarantine, handover, notices, and actual subprocess dispatch. Upgrade tests use synthetic Codex/Claude CLIs to exercise separate rehearsal/reviewer processes, adoption, verification, and recovery; they do not prove live model judgments.
 - Automatic private Node setup was tested on macOS ARM64.
 
 Tested CLIs: Codex `0.166.0-alpha.5.1`, Claude Code `2.1.301`. Claude’s live model test was blocked by its CLI being signed out. Desktop installation/first-chat behavior and other operating systems still need live acceptance; package validation and hook tests do not prove those UI flows.
 
-Required notices are stored durably and presented on an open chat’s next turn. Background delivery, external-action enforcement, arbitrary team-version migration, and automatic placement of specialists in the desktop sidebar are not implemented. Host permissions still apply; the local record store is not a security boundary against software running as you.
+Required notices are stored durably and presented on an open chat’s next turn. Background delivery, external-action enforcement, arbitrary future-version migration, and automatic placement of specialists in the desktop sidebar are not implemented. Host permissions still apply; the local record store is not a security boundary against software running as you.
 
 ## Development
 

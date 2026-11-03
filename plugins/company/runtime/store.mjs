@@ -5,7 +5,8 @@ import { randomUUID, createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 export const PACKAGE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-export const VERSION = '0.1.0';
+export const VERSION = '0.2.0';
+export const SCHEMA = 2;
 export const stamp = () => new Date().toISOString();
 export const id = (prefix) => `${prefix}-${randomUUID()}`;
 export const digest = (text) => createHash('sha256').update(text).digest('hex');
@@ -61,9 +62,20 @@ export function withStore(root, fn, create = false) {
   try { return fn(db); } finally { db.close(); }
 }
 export function owner(state, actor, host, epoch) {
-  if (!state || state.schema !== 1) throw new Error('Unsupported or missing company state; do not reinitialize');
+  if (!state || state.schema !== SCHEMA || state.runtime_version !== VERSION) throw new Error('Company needs a checked runtime upgrade; use company_upgrade inspect, never reinitialize');
   if (state.owner.session_id !== actor || state.owner.host !== host || (epoch !== undefined && state.owner.epoch !== epoch)) throw new Error('This chat does not own the company. Resume the active chat or perform a checked handover.');
-  if (state.plugin_version !== VERSION) throw new Error('Pinned team version differs. Use its matching package; migration is not automatic.');
+  if (!['0.1.0', VERSION].includes(state.plugin_version)) throw new Error('Unsupported pinned team version');
+  if (state.team_sha256 !== teamHash(state)) throw new Error('Pinned team integrity check failed');
+  if (upgradePending(state)) throw new Error('Team upgrade is held; use company_upgrade to inspect, verify, or recover');
+}
+export const upgradePending = state => state?.upgrade && !['completed','recovered'].includes(state.upgrade.status);
+export const skillBody = text => text.replace(/^---[\s\S]*?---\s*/, '');
+export function installedTeam() {
+  const governance = fs.readFileSync(path.join(PACKAGE,'assets/governance.md'),'utf8');
+  return {plugin_version:VERSION, governance, governance_sha256:digest(governance), roles:JSON.parse(fs.readFileSync(path.join(PACKAGE,'assets/roles.json'),'utf8')), cos_instructions:skillBody(fs.readFileSync(path.join(PACKAGE,'skills/company/SKILL.md'),'utf8'))};
+}
+export function teamHash(s) {
+  return digest(JSON.stringify([s.plugin_version,s.governance,s.roles,s.cos_instructions]));
 }
 export function notice(state, kind, summary, reference = null) {
   const item = {id: id('notice'), kind, summary, reference, created_at: stamp(), deliveries: [], seen_at: null, resolution: null};

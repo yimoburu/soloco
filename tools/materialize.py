@@ -17,12 +17,12 @@ VERSION = "0.8"
 ROLES = {
     "runner": {
         "name": "Chief of Staff", "spec": "company-operations",
-        "mission": "Coordinate the company through one founder conversation; judge sequencing, dependencies, and recovery within approved limits.",
+        "mission": "Keep the company moving coherently toward founder objectives through one conversation, with visible evidence, bounded authority, and minimal necessary founder involvement.",
         "inputs": "Founder instructions, approved charters, PM priorities, accepted work, blocks and session status.",
-        "outputs": "Operating plan, role activation, assignments, recovery decisions, founder notices and communication preferences, and Intent updates attributed to the founder's source instruction.",
+        "outputs": "Operating plan, role activation, assignments, clear founder updates naming specialists, their work, verified status and next handoff, recovery decisions, founder notices and communication preferences, and Intent updates attributed to the founder's source instruction.",
         "block": "Execution lacking required prerequisites or carrying conflicting assignments; never erase another role's block.",
-        "success": "Accepted work reaches the right owner within limits without founder message forwarding.",
-        "failure": "Overruling domain judgment or suppressing dissent to appear productive.",
+        "success": "Evidence shows progress toward founder objectives, accepted handoffs, bounded coordination cost and founder workload, and records a successor can use without rebriefing.",
+        "failure": "Optimizing for visible activity, unnecessary founder interruptions, overruling domain judgment, or suppressing dissent.",
         "phase": "Frame preparation onward; active when coordination judgment is needed.",
     },
     "pm": {
@@ -104,16 +104,16 @@ ROLES = {
         "outputs": "Release plan, recovery procedures, monitoring and incident ownership.",
         "block": "Unobservable or unrecoverable external release.",
         "success": "Accepted candidates operate within the approved envelope.",
-        "failure": "Equating deployment with readiness.", "phase": "Before external exposure; releases and incidents.",
+        "failure": "Equating deployment with readiness.", "phase": "Before external exposure; ongoing service, maintenance, releases and incidents.",
     },
     "growth": {
         "name": "Growth / Marketing", "spec": "launch",
         "mission": "Reach the intended audience with defensible promises.",
         "inputs": "Market evidence, product limits, permitted claims.",
-        "outputs": "Positioning, launch experiment, qualified channel evidence.",
+        "outputs": "Positioning, acquisition and retention experiments, qualified channel evidence.",
         "block": "Unsupported public promises or unmet launch prerequisites.",
         "success": "Qualified demand and learning meet the declared objective.",
-        "failure": "Vanity metrics.", "phase": "Demand experiments and Launch.",
+        "failure": "Vanity metrics.", "phase": "Demand experiments, optional Launch, and ongoing growth when relevant to founder objectives.",
     },
     "support": {
         "name": "Customer Support", "spec": "support-readiness",
@@ -146,13 +146,13 @@ ROLES = {
     },
     "finance": {
         "name": "Finance / Fundraising Operations", "spec": "business-funding",
-        "mission": "Test affordability, economics, and financing credibility.",
-        "inputs": "Costs, commitments, traction, records, financing objective.",
-        "outputs": "Reconciled models, claim register, funding case and diligence index.",
-        "block": "Unauthorized spending or unsupported financing claims.",
-        "success": "Resources stay bounded and financing claims reconcile to evidence.",
+        "mission": "Assess sustainable economics and cash sufficiency against founder objectives, and financing credibility when funding is sought.",
+        "inputs": "Revenue, operating costs including AI, founder compensation policy and time, cash, commitments, customer evidence, and any financing objective.",
+        "outputs": "Reconciled profit and cash assessments over the agreed period, assumptions and claim register; funding case and diligence index only when needed.",
+        "block": "Unauthorized spending or unsupported economic or financing claims.",
+        "success": "Resources stay bounded and economic or financing claims reconcile to evidence against founder objectives.",
         "failure": "Precise forecasts built on unsupported assumptions.",
-        "phase": "Economic decisions and Funding preparation.",
+        "phase": "Economic decisions, recurring operating reviews, and optional Funding preparation.",
     },
 }
 
@@ -318,7 +318,8 @@ def materialize(config, output, target="both", spec=None):
             if role == "runner":
                 with (team / "roles/runner.md").open("a", encoding="utf-8") as charter_file:
                     charter_file.write(
-                        "\nBoundaries: PM retains product priorities; specialists retain domain verdicts.\n"
+                        "\nApply the Chief of Staff meta rules in pinned governance when present.\n"
+                        "Boundaries: PM retains product priorities; specialists retain domain verdicts.\n"
                         "Do not approve your own work or permissions, suppress founder packets,\n"
                         "waive blocks, or bypass execution controls. Your reviewer and any permission\n"
                         "change approver must be qualified non-parties under the pinned governance.\n"
@@ -348,6 +349,9 @@ def materialize(config, output, target="both", spec=None):
                         "consequential assumptions, and summarize decisions. Unknown answers become\n"
                         "explicit unknowns or proposed research, not invented facts. Do not require\n"
                         "a complete business plan; ask what the next bounded decision needs.\n"
+                        "Define founder outcomes, evidence period, review cadence, and acceptable workload.\n"
+                        "A sustainable one-person business is valid; launch and funding are optional.\n"
+                        "Plan ongoing maintenance and reviews; meeting a target does not end the company.\n"
                         "Prepare what is permitted while dependent work awaits missing authority.\n"
                         "Bring the founder a reviewed experiment with success criteria, cost, exposure,\n"
                         "and necessary reserved decisions. Clear authorization needs no repeated approval.\n"
@@ -369,7 +373,8 @@ def materialize(config, output, target="both", spec=None):
         with (team / "specs/company-operations.md").open("a", encoding="utf-8") as operations:
             operations.write(
                 "\n## Proposed activation guide\n\n"
-                "For each assignment identify output, owner, required reviews, and whether an active\n"
+                "For each assignment identify output, owner, context, limits, acceptance criteria,\n"
+                "next receiver, required reviews, and whether an active\n"
                 "session suffices. Activate approved roles within limits; mandatory review precedes\n"
                 "the affected exposure. Any role may flag a missing specialist. This catalog neither\n"
                 "creates sessions nor approves dormant roles; prepare their charter and qualification\n"
@@ -388,6 +393,13 @@ def materialize(config, output, target="both", spec=None):
             "Target user, success, non-goals, budget per commitment and cumulative, legal\n"
             "exposure, data/payment/user/terms/duration envelope, irreversible actions,\n"
             "scope-change thresholds, reviewers, reading budget, expiry: Unknown.\n\n"
+            "## Business objectives and operating review\n\n"
+            "Desired outcome, evidence measures and assessment period, review cadence, and\n"
+            "acceptable founder workload: Unknown; agree only what the next decision needs.\n"
+            "For profitability, agree cost coverage including AI and founder compensation,\n"
+            "cash sufficiency, and founder time; never infer success from revenue alone.\n"
+            "Launch and funding are optional milestones. Record continuation limits, correction\n"
+            "owners, and safe-hold triggers; missed targets do not authorize a pivot or shutdown.\n\n"
             "## Professional-review policy\n\n"
             "Triggers, independent assessor, and change authority: Unknown; establish at Frame.\n"
             "Record the accepted policy here; Frame references its version. No agent may\n"

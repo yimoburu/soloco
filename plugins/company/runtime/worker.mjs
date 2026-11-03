@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { withStore, stamp, id, notice, noLink } from './store.mjs';
+import { withStore, stamp, id, notice, noLink, SCHEMA, VERSION, upgradePending } from './store.mjs';
 import { runModel, parseArtifact, roles } from './adapters.mjs';
 import { dataDir } from './engine.mjs';
 
@@ -10,7 +10,7 @@ export async function work(root, jobId, model = runModel) {
   try {
     state=withStore(root,db=>db.transaction('job.started',s=>{
       job=s.jobs[jobId];
-      if(!job || job.status!=='queued' || job.epoch!==s.owner.epoch || s.paused) throw new Error('Assignment is no longer eligible');
+      if(s.schema!==SCHEMA || s.runtime_version!==VERSION || upgradePending(s) || !job || job.status!=='queued' || job.epoch!==s.owner.epoch || s.paused) throw new Error('Assignment is no longer eligible');
       job.status='running';job.started_at=stamp();job.worker_pid=process.pid;
       return s;
     }));

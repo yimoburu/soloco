@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { spawn } from 'node:child_process';
-import { PACKAGE, VERSION, stamp, id, digest, folder, noLink, withStore, owner, notice, requireText } from './store.mjs';
+import { PACKAGE, VERSION, stamp, id, digest, folder, noLink, withStore, owner, notice, requireText, SCHEMA, installedTeam, teamHash, upgradePending } from './store.mjs';
 import { readiness, roles } from './adapters.mjs';
 
 const busy = state => Object.values(state.jobs).filter(j => ['queued','running'].includes(j.status));
@@ -22,8 +22,13 @@ export function binding(args, host) {
   const file = path.join(dataDir(),'bindings',digest(JSON.stringify([folder(args.root),host,args.session_id]))+'.json');
   if (!fs.existsSync(file)) throw new Error('No trusted startup-hook binding for this chat. Enable/trust Company hooks, then reopen this chat.');
 }
+export function upgradeSummary(u) {
+  if (!u) return null;
+  const {checkpoint,previous,candidate,...progress}=u;
+  return {...progress,candidate_version:candidate.plugin_version,previous_version:previous.plugin_version};
+}
 function summary(state) {
-  return {company_id:state.id, name:state.name, idea:state.idea, revision:state.revision, phase:state.phase, mode:state.mode, paused:state.paused, owner:state.owner, plugin_version:state.plugin_version, governance_sha256:state.governance_sha256, records:Object.values(state.records), sessions:state.sessions, jobs:Object.values(state.jobs), notices:state.notices.filter(n=>!n.resolution), messages:state.messages, capabilities:{standalone_sessions:true, external_execution:false, background_founder_delivery:false, automatic_team_migration:false}};
+  return {company_id:state.id, name:state.name, idea:state.idea, revision:state.revision, phase:state.phase, mode:state.mode, paused:state.paused, owner:state.owner, plugin_version:state.plugin_version, runtime_version:state.runtime_version??state.plugin_version, upgrade:upgradeSummary(state.upgrade), governance_sha256:state.governance_sha256, records:Object.values(state.records), sessions:state.sessions, jobs:Object.values(state.jobs), notices:state.notices.filter(n=>!n.resolution), messages:state.messages, capabilities:{standalone_sessions:true, external_execution:false, background_founder_delivery:false, automatic_team_migration:false, explicit_team_upgrade:true}};
 }
 function update(args, host, type, fn) {
   binding(args,host);
@@ -36,10 +41,10 @@ export function open(args, host) {
     const current=db.read();
     if (current) {owner(current,args.session_id,host); return current;}
     if (fs.existsSync(path.join(folder(args.root),'team/manifest.json'))) throw new Error('Legacy workspace detected; explicit migration is required. Existing team records were not changed.');
-    const governance=fs.readFileSync(path.join(PACKAGE,'assets/governance.md'),'utf8');
-    return db.transaction('company.created', () => ({schema:1,id:id('company'),name:requireText(args.name ?? path.basename(args.root),'name',200),idea:requireText(args.idea,'idea'),phase:'Frame',mode:'preparation',paused:false,plugin_version:VERSION,governance,governance_sha256:digest(governance),owner:{host,session_id:args.session_id,epoch:1},roles,records:{},sessions:{},jobs:{},messages:[],notices:[],created_at:stamp()}));
+    const team=installedTeam();
+    return db.transaction('company.created', () => ({schema:SCHEMA,runtime_version:VERSION,id:id('company'),name:requireText(args.name ?? path.basename(args.root),'name',200),idea:requireText(args.idea,'idea'),phase:'Frame',mode:'preparation',paused:false,...team,team_sha256:teamHash(team),owner:{host,session_id:args.session_id,epoch:1},records:{},sessions:{},jobs:{},messages:[],notices:[],created_at:stamp()}));
   }, true);
-  return {...summary(state),governance:state.governance, roles:state.roles};
+  return {...summary(state),governance:state.governance, roles:state.roles, cos_instructions:state.cos_instructions};
 }
 export function status(args, host) {
   binding(args,host);
@@ -51,6 +56,9 @@ export function status(args, host) {
       for (const job of expired) {s.jobs[job.id].status='interrupted'; notice(s,'must_know','A role session did not finish; inspect before retrying.',job.id);}
       return s;
     });
+    if (state.upgrade && ['queued','checking'].includes(state.upgrade.status) && Date.now()-Date.parse(state.upgrade.created_at)>420000) {
+      state=db.transaction('upgrade.interrupted',s=>{s.upgrade.status='failed';s.upgrade.error='Upgrade checks were interrupted or timed out; inspect and recover before retrying';notice(s,'must_know',s.upgrade.error,s.upgrade.id);return s;});
+    }
     // Status is visible to a new founder chat so it can establish a handover.
     return summary(state);
   });
@@ -105,10 +113,18 @@ export function control(args,host) {
   binding(args,host);
   requireText(args.source_instruction,'source_instruction');
   return withStore(args.root,db=>summary(db.transaction(`company.${args.action}`,s=>{
-    if (!s || s.schema!==1 || s.plugin_version!==VERSION) throw new Error('Unsupported company version');
+    if (!s || ![1,SCHEMA].includes(s.schema)) throw new Error('Unsupported company version');
+    if (args.action!=='pause') {
+      if (s.schema!==SCHEMA || s.runtime_version!==VERSION) throw new Error('Use company_upgrade before resuming or handing over this version');
+      if (upgradePending(s)) throw new Error('Finish or recover the pending team upgrade first');
+      if (teamHash(s)!==s.team_sha256) throw new Error('Pinned team integrity check failed');
+    }
     if(args.expected_epoch!==s.owner.epoch) throw new Error('Stale control request; read current status');
     // Pause is always available to a founder chat, even if the old coordinator failed.
-    if(args.action==='pause') {s.paused=true; for(const j of busy(s)) j.status='cancelled';}
+    if(args.action==='pause') {
+      s.paused=true; for(const j of busy(s)) j.status='cancelled';
+      if (s.upgrade && ['queued','checking','ready','applied'].includes(s.upgrade.status)) {s.upgrade.status='failed';s.upgrade.error='Founder paused during upgrade; inspect and recover before retrying';}
+    }
     else if(args.action==='handover') {
       if(busy(s).length) throw new Error('Assignments are active. Pause and reconcile them before handing over.');
       s.owner={host,session_id:args.session_id,epoch:s.owner.epoch+1};
