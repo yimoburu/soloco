@@ -1,83 +1,60 @@
-# Plugin delivery and workspace generation
+# Developer guide
 
-The intended installable product is the Company plugin. The converter is an internal helper that currently generates a developer workspace for standalone Codex or Claude Code role sessions. It implements file preparation only; the [current spec](../SPEC.md) defines the intended once-initiated founder experience and automatic collaboration.
+`tools/materialize.py` prepares files for a **manual developer trial**. It does not install a plugin, start agents, route messages, enforce permissions, or deliver notifications. The [spec](../SPEC.md) defines the product; this guide describes the prototype.
 
-## Founder flow versus developer preview
+## Try it
 
-The target flow is **create project → attach company folder → open a chat and talk**, after one-time Company plugin installation. The first message starts the Chief of Staff and its adaptive interview; company records and specialist sessions are prepared automatically. Existing companies resume without resetting records or creating a competing coordinator. No special startup prompt or configuration file is required from the founder.
-
-The GitHub README is the new-user entry point: register the repository marketplace, install the Company plugin in the chosen app, complete dependencies/permissions, and verify readiness. The catalog, package, and automatic startup are not implemented; do not advertise install commands for this repo yet. The generator below is an internal building block exposed for manual development. It requires a config and a new output path; it cannot initialize an already-attached folder in place. A future initializer must preserve existing files and recover interrupted setup. Do not run the generator over an existing company or copy a generated candidate over its records.
-
-## Planned plugin package and distribution
-
-Ship one Company plugin through a small catalog in this GitHub repository. A separate marketplace service is unnecessary; private distribution requires repository access. Use shared governance, role templates, and engine logic, with host-specific packaging and adapters only where needed. The Chief of Staff skill guides the interview; the engine initializes records, provides standalone session tools, and enforces company actions. Coordination judgment stays with the Chief of Staff. The existing Python helper can remain internal. Installation must handle dependencies without asking founders to run Python or edit configuration files.
-
-Keep installed code/templates separate from company folders. Package updates make candidate versions available; explicit company adoption and compatibility checks govern use. Uninstall must preserve company records, including notices and permissions. Package presence alone proves neither readiness nor successful authority enforcement.
-
-Platform evidence checked 2026-11-02:
-
-- [OpenAI plugin packaging](https://developers.openai.com/plugins/build/plugins) supports repository marketplaces. Lifecycle hooks are documented for manually installed Codex desktop plugins, require trust, and currently exclude a plugin from the public directory. Validate the repository-install route and first-message behavior; do not promise public-directory availability or identical behavior across clients.
-- [Claude plugin installation](https://code.claude.com/docs/en/discover-plugins) supports desktop installation and marketplace registration; [its catalog format](https://code.claude.com/docs/en/plugin-marketplaces) can be hosted in a Git repository. Installing components does not itself implement our session identity, takeover, or company authority rules.
-
-The release readiness check must verify supported host/runtime versions, required dependencies, available company tools, and needed permissions without modifying an existing company. Exercise first-message initialization, resume, independent specialist sessions, and update preservation in integration tests before declaring the founder flow supported.
-
-## Generate for development
-
-Edit [the example](../examples/venture.json), then run from this repository:
+From this repository, edit [the example configuration](../examples/venture.json), then run:
 
 ```sh
-python3 tools/materialize.py --config examples/venture.json --output /tmp/my-venture --target codex
+python3 tools/materialize.py --config examples/venture.json --output /tmp/my-venture --target both
 ```
 
-Use `--target claude` for Claude Code. `both` emits both instruction wrappers for the same company folder. You may open it in Codex and Claude; use one active environment at a time in this prototype. Opening both does not transfer authority or implement mixed-platform orchestration.
+The output must be a new path. The generator refuses existing folders and symlinks; it cannot initialize an attached folder in place or upgrade a company. Use only an output whose generation completed successfully: staging cleans up ordinary failures, but publication is not crash-atomic.
 
-New workspaces pin `SPEC.md` by exact bytes and SHA-256 hash. For an explicit custom source, supply `--spec /path/to/spec.md`. This pins the source but does not adapt the current role templates to older designs; use the matching historical converter commit to reproduce an older design. Pinning a source neither approves it for a company nor proves that starter charters implement every rule. Review charters against the selected source at Frame. The converter never modifies an existing output, including symlinks.
+Open the generated folder in Codex or Claude Code and ask: **Read team/sessions/runner.md and follow it.** This starts Chief of Staff preparation. Each specialist needs its own standalone session with its corresponding brief. All sessions must see the same filesystem; manually route handoffs and serialize writes. A shared Git remote alone is not shared live state. These manual steps are for development, not the intended founder onboarding.
 
-Configuration fields are `name`, `idea`, and optional `active_roles` (default `runner`, `pm`, `research`, `qa`). Initial Frame preparation requires `runner` (Chief of Staff) for operations and `pm` for product scope. Explicit role lists missing either are rejected, not silently expanded. Other IDs: `designer`, `engineer`, `architect`, `frontend`, `backend`, `release`, `growth`, `support`, `legal`, `security`, `finance`. These are proposed seats, not approval to activate the whole roster.
+Use one active environment at a time. `--target codex` or `--target claude` emits only that platform's instructions; `both` emits both for the same company. Role attribution is self-reported, not authenticated, and changing a role label does not create independent review. Project instructions and native subagent definitions alone do not establish standalone company roles.
 
-## Output and authority
+## Configuration and records
 
-| Files | Purpose |
+Configuration accepts `name`, `idea`, and optional `active_roles`. Defaults are `runner` (Chief of Staff), `pm`, `research`, and `qa`. Explicit lists must include `runner` and `pm` for Frame preparation. Other IDs are `designer`, `engineer`, `architect`, `frontend`, `backend`, `release`, `growth`, `support`, `legal`, `security`, and `finance`. Selected roles are proposed, not authorized.
+
+| Output | Purpose |
 |---|---|
-| `AGENTS.md` / `CLAUDE.md` | Selected platform's project instructions; no implicit role assignment |
-| `team/governance.md`, `manifest.json` | Exact pinned rules, source hash, converter version, configuration, prototype status |
-| `team/roles/`, `team/sessions/` | Proposed charters and a distinct startup brief per selected role |
-| `team/specs/`, `board/`, `artifacts/`, `decisions/` | Company spec skeletons, Draft Frame, and locations for durable working records |
-| `team/founder-inbox/`, `founder-preferences.json` | Empty durable inbox and Draft profile with separate explicit/inferred entries |
-| `team/PROTOCOL.md`, `templates/`, `START.md` | Manual development procedure and unapproved record starters |
+| `START.md`, `AGENTS.md` / `CLAUDE.md` | Manual startup and platform instructions; no automatic role assignment |
+| `team/governance.md`, `manifest.json` | Exact pinned spec, SHA-256 hash, generator version, configuration, and prototype status |
+| `team/PROTOCOL.md` | Shared file locations and manual operating procedure |
+| `team/roles/`, `sessions/` | Proposed charters and distinct role startup briefs |
+| `team/specs/`, `board/` | Draft or dormant spec skeletons and Draft Frame |
+| `team/artifacts/`, `decisions/` | Evidence, outputs, and attributable decisions |
+| `team/founder-inbox/`, `founder-preferences.json` | Initially empty notices and Draft explicit/inferred communication preferences |
+| `team/templates/` | Unapproved starters for decisions, packets, handoffs, gates, notices, preferences, and role evaluations |
 
-Converter v0.7 aligns its generated guidance with the v0.9 plugin-delivery design: the Chief of Staff startup brief now includes the focused interview and resume-first behavior; automatic role assignment remains unimplemented. Chief of Staff naming retains role ID `runner`; Company Operations contains a proposed activation guide for all available roles; charters require independent qualification evidence. Record templates cover founder notices, source-attributed communication preferences, and role evaluations. A notice's delivery, seen status, resolution, and authorization are distinct; decision-required notices reference the existing founder packet. Place notice records in `team/founder-inbox/`, qualification evidence in `team/artifacts/`, and preference entries in the profile's `explicit` or `inferred` list. Use `must_know` or `decision_required` for notice kind, and `explicit` or `inferred` for preference basis. Keep superseded entries traceable.
+Frame permits preparation only. No approval, evidence, successful evaluation, delivery receipt, spending permission, or gate Pass is invented. Notification and professional-review policies belong in Founder Intent; Frame references their accepted versions. Release owns Support Readiness until Support is selected; Architect owns Technical when selected, with Engineering retaining implementation.
 
-Notification and professional-review policies each have one home in Founder Intent; Frame references their accepted versions. No preferences, notices, delivery receipts, successful evaluations, or approvals are invented at generation. These are empty locations and unapproved record starters, not automated learning, delivery, activation, or enforcement. Existing workspaces retain their files and pinned rules.
+The default governance source is `SPEC.md`. `--spec /path/to/spec.md` pins another UTF-8 source exactly, but does not adapt the role templates to it; review compatibility at Frame. Use a matching historical generator to reproduce an earlier design. Pinning rules does not approve them.
 
-Frame permits preparation only. Missing constraints remain unknown; no approval, customer evidence, spending permission, or gate Pass is fabricated. Release owns Support Readiness until a Support seat is selected. Architect owns the whole Technical spec when selected; Engineering retains its implementation section.
+Records and team instructions are colocated under `team/` in this prototype. Never copy a generated candidate over company records. Keep company folders outside plugin caches, preserve them when changing apps, and retain pinned rules until explicit adoption. Live migration and authority transfer are unimplemented.
 
-For now, company records and team instructions are colocated under `team/`. There is no persistent company identity service, team-release registry, or live migration mechanism. That prototype layout is not a replacement boundary: never copy a candidate over company records.
+## What remains to build
 
-## Manual developer preview — not founder onboarding
+Ship one Company plugin through a small repository marketplace catalog, with shared guidance/templates and engine logic plus thin host adapters. A separate marketplace service is unnecessary; private distribution requires repository access. Installation must handle dependencies and verify supported host capabilities and permissions without altering companies.
 
-Open the generated company folder in the chosen desktop project, or work from it in the CLI. In the main conversation ask `Read team/sessions/runner.md and follow it.` The following CLI commands do the same preparation:
+The Chief of Staff makes coordination judgments. Supporting software must:
+
+- Initialize or resume company records on the first founder message, recover partial setup, and bind one authorized Chief of Staff.
+- Start, resume, replace, and connect standalone role sessions through the existing app UI, with direct peer communication.
+- Enforce identity, independent review, versions, permissions, and atomic board changes at execution boundaries; prompts alone are insufficient.
+- Deliver founder notices and pause controls independently of the Chief of Staff; preserve unresolved requests and attributed preferences.
+- Preserve company state across app switches and explicit team adoption, revoke outgoing authority, reject stale writes, and reconcile uncertain external actions.
+
+Verify these behaviors in each supported client/version, including installation, interrupted startup, resume, and replacement, before advertising automatic onboarding. Plugin updates make candidate versions available; they must not silently change a company's pinned rules. Uninstall preserves company records. Cross-product switching may require a new chat, recovered from the same records.
+
+## Validation
 
 ```sh
-codex "Read team/sessions/runner.md and follow it."
+python3 -m unittest discover -s tests -v
 ```
 
-```sh
-claude "Read team/sessions/runner.md and follow it."
-```
-
-The Chief of Staff is the founder-facing agent; `runner` remains its stable role ID. Use each other role's brief in its own session. The intended founder workflow does not require these per-role steps. Session attribution here is self-reported, not authentication; changing the role label does not create independent approval.
-
-Every participating session must see the same filesystem. A common Git remote is not live shared state. Manually serialize writes and route handoffs; prompts do not enforce ownership, review independence, atomic transitions, or limits. Generation stages files and cleans up ordinary failures, but publication is not crash-atomic: do not use an interrupted output as a ready workspace.
-
-Platform instruction conventions: [Codex AGENTS.md](https://learn.chatgpt.com/docs/agent-configuration/agents-md), [Claude Code memory](https://code.claude.com/docs/en/memory), and [Claude CLI](https://code.claude.com/docs/en/cli-reference). The generator emits role briefs rather than treating [Claude subagent definitions](https://code.claude.com/docs/en/sub-agents) as standalone role sessions.
-
-## Next implementation boundary
-
-Package the Company plugin and catalog, complete dependency setup and readiness checks, and implement first-message startup: recognize new versus existing company state, bind the founder chat to one Chief of Staff, preserve existing files and pinned governance, recover incomplete setup, and start necessary standalone specialists without founder setup. An ordinary project instruction file alone cannot identify the authorized founder chat or supervise a team.
-
-The remaining runtime work is an authoritative board with identity and atomic state transitions, execution tools for session dispatch/recovery and external-action reconciliation, and connecting the Chief of Staff agent to those tools in the existing founder conversation. The Chief of Staff makes workflow judgments; software independently enforces permissions, prerequisites, and state changes. Direct founder pause and specialist decision packets must remain available if the Chief of Staff fails or disagrees. This requires no separate Founder connection agent or service. The durable founder inbox still needs delivery/retry tracking and enabled notification channels; profile updates need attribution and correction; qualification and mandatory review need execution gates. Preserve one authorized Chief of Staff across interfaces. Team replacement must satisfy the current spec's continuity checks before live use. Generating a separate candidate workspace is only preparation.
-
-Platform adapters must verify standalone session lifecycle, peer messaging, UI visibility, and delivery in the selected client/version; native subagents or team panels alone do not prove these guarantees. A cross-product switch may require a new chat restored from company records.
-
-Tests cover generator behavior. No live end-to-end agent team, automatic founder flow, or replacement has been verified. The generator itself launches no model processes and needs no API keys.
+Tests cover file generation, authority-free starter records, ownership, and preservation of existing outputs. No live agent team, plugin installation, automatic founder flow, or replacement has been verified. The generator launches no model processes and needs no API keys.

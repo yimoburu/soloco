@@ -1,48 +1,28 @@
 # AI-operated startup
 
-Give an idea to a team of AI agents and operate a company through **one founder conversation**. Each role works in its own standalone session. Shared company records let roles collaborate and let the founder replace the team while preserving the company.
+Turn an idea into an early-stage company through **one founder conversation**. A Chief of Staff coordinates specialist AI agents, each in its own standalone session. Shared company records preserve decisions, limits, and unfinished work when agents or the whole team change.
 
-The team progresses toward public launch or funding readiness through conventional startup roles, bounded authority, independent review, and evidence.
+## Intended experience
 
-## Getting started
-
-**The three-step founder experience below is specified, but not available yet.** This repo currently contains the design and a workspace generator. The Company plugin, marketplace catalog, and runtime are not implemented; cloning the repo or attaching a folder does not install automatic company startup.
-
-The planned release path is **add this repo as a marketplace → install the Company plugin in Codex or Claude → complete setup and verify readiness**. It starts with one plugin in a small repository catalog, not a separate marketplace website. Repository access is required. Platform-specific instructions will ship when tested; there is no working install command for this repo yet.
-
-For a **manual developer trial today**, download or clone this repo, open it in Codex or Claude Code, and follow the [converter guide](docs/converter.md). Generate into a new folder before attaching that folder as the company project. The trial still requires explicit role startup and manual coordination; it is not the product onboarding.
-
-## Read only what you need
-
-- [Current spec](SPEC.md): founder responsibilities, collaboration, evidence gates, learning, and company continuity.
-- [Plugin delivery and converter guide](docs/converter.md): the packaging plan, implementation gaps, and manual developer trial.
-- [History](history/README.md): original intent, previous versions, and review provenance; not competing current requirements.
-
-## Founder experience — target
-
-After installing the Company plugin once in the chosen app:
+Install the Company plugin once in Codex or Claude Code, then:
 
 1. Create a project.
 2. Attach a company folder.
-3. Open a chat and talk about your idea.
+3. Open a chat and describe your idea.
 
-Your Chief of Staff starts on the first message, asks focused questions, challenges assumptions, and assembles the necessary specialist sessions. It initializes a new company or resumes an existing one, then brings you a reviewed first experiment to authorize. You do not configure roles, run commands, or forward messages. Company records preserve decisions, obligations, communication preferences, and unresolved notices across agent replacement.
+The Chief of Staff asks focused questions, brings in roles as needed, and presents a reviewed first experiment for authorization. You provide direction and reserved decisions; the team handles coordination. Use one active environment at a time. Switching apps resumes the same company from its records.
 
-## What works today
+## Available today
 
-The internal Python workspace generator produces shared records, proposed charters, and role startup briefs for Codex or Claude Code. It does **not** launch sessions, route handoffs, enforce authority, or replace a live team. Plugin packaging, dependency setup, and automatic first-chat startup are also unimplemented. The commands below and manual session startup are a developer preview, not the intended founder onboarding.
+**This is a design and workspace-generator prototype. The plugin and automatic team runtime are not implemented.** There is no working plugin installation command yet; attaching a folder alone does not start a company.
 
-```sh
-python3 tools/materialize.py --config examples/venture.json --output /tmp/my-venture --target codex
-python3 -m unittest discover -s tests -v
-```
+- [SPEC.md](SPEC.md) — the single current design: constitution, founder experience, roles, collaboration, evidence, and continuity.
+- [Developer guide](docs/converter.md) — try the generator, understand its limits, and see what remains to build.
 
-Use one persistent folder and, where available, one UI project per company. Codex and Claude may open the same folder; `--target both` supplies both instruction wrappers. In this prototype use one active environment at a time and serialize shared writes. Opening a folder creates neither a second company nor new authority.
+The planned distribution is one Company plugin in a small GitHub marketplace catalog. Installation handles dependencies and checks readiness; founders will not run Python or configure roles.
 
-New workspaces pin an exact copy and hash of `SPEC.md`. Existing workspaces are never overwritten or silently upgraded. Company records belong outside the plugin cache; plugin updates must not silently change a company’s pinned rules. Generation leaves Frame in Draft and grants no venture-execution authority.
+## Changes and review
 
-## Evolve carefully
+Keep only rules that change a decision, behavior, or successor's action. Update the spec and affected generator guidance together; use concrete failure scenarios to review changes. Existing companies retain their pinned rules until explicit adoption.
 
-`SPEC.md` is the single current design; the converter guide describes implementation, not additional governance. Change a rule only when it changes a meaningful decision or behavior. Keep review findings separate, preserve historical evidence, and use versioned commits for revisions. Team adoption remains explicit per company.
-
-For review, read the current spec against the original intent and review history. Report concrete failure scenarios, missing authority, contradictions, or unnecessary complexity, with the smallest correction. Distinguish design acceptance from tested implementation.
+Superseded designs, the original brief, and Claude reviews remain in the [archived snapshot](https://github.com/yimoburu/ai-operated-startup/tree/ee3f302f47e82539ca0a40e0268a1e762c47929a/history). They are provenance, not additional current requirements.

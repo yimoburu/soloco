@@ -10,7 +10,7 @@ import tempfile
 
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "0.7"
+VERSION = "0.8"
 
 # These are role starters, not extracted or approved interpretations of governance.
 # The pinned spec governs; Frame must review the charters and authority map.
@@ -158,123 +158,64 @@ ROLES = {
 
 PROTOCOL = """# Shared session protocol
 
-This workspace is a generated starting point. The pinned governance is in
-`team/governance.md`; read applicable sections before acting. If a role starter
-or this protocol conflicts with it, record the conflict and follow governance.
-These files guide agents; they do not enforce permissions or gate transitions.
+`team/governance.md` is the pinned authority. Read the applicable sections before
+acting. If a starter conflicts with governance, record the conflict and follow
+governance. These files provide instructions, not runtime enforcement.
 
-## Target founder startup — not implemented
+## Start and coordinate
 
-The target product is one Company plugin, distributed through the repository's
-marketplace catalog for the chosen app. Installation handles dependencies and
-verifies readiness; the founder does not run this generator or configure roles.
-The package combines Chief of Staff guidance, role templates, a shared company
-engine, and host adapters. This prototype installs none of those runtime tools.
+- Read `team/manifest.json`, your named role brief and charter, current board
+  items, and governing specs. Keep one role and a distinct instance ID per
+  session; changing labels cannot make self-review independent. Attribution in
+  this prototype is self-reported, not authenticated.
+- Frame starts Draft: prepare Intent, charters, reviewer assignments, limits,
+  policies, qualification evidence, and the first gate contract only. Generation
+  authorizes no outreach, spending, deployment, commitments, or experiments.
+  Obtain independent Frame acceptance and founder authorization before execution.
+- The operator starts standalone sessions and routes handoffs manually. All must
+  see the same filesystem. Use one active environment at a time and serialize
+  shared writes; pause on unclear ownership or conflicting updates. A common Git
+  remote is not shared live state. No session supervision is installed.
+- Roles may communicate directly. Chief of Staff coordinates assignments and
+  recovery; PM owns product scope; specialists retain domain judgment. Follow
+  pinned governance for independent review, blocks, gates, escalation, and pauses.
 
-After one-time plugin installation, the founder creates a project, attaches
-a company folder, and starts talking in a chat. The framework starts the Chief
-of Staff on that first message, recovers existing company state or initializes
-missing records without overwriting files, and binds one authorized coordinator.
-Specialists keep their assigned roles; later chats do not become competing
-Chiefs of Staff. The plugin, catalog, chat binding, and automatic session startup
-are not provided by these files. The explicit briefs below are developer preview.
+## Put each record in one place
 
-## Initial authority
+| Location under `team/` | Contents |
+|---|---|
+| `specs/` | Accepted requirements and Draft/Dormant starters; policies live in Founder Intent |
+| `board/` | Work status, owners, blocks, artifact references, next receiver, and due reviews |
+| `artifacts/` | Outputs, source evidence, role evaluations, and independent reviews |
+| `decisions/` | Consequential decisions and founder packets with source attribution |
+| `founder-inbox/` | Must-know and decision-required notices; link packets rather than copying them |
+| `founder-preferences.json` | Useful communication preferences in explicit/inferred lists, with source/date |
+| `templates/` | Unapproved record starters, not completed checks or permission |
 
-Frame is Draft. Only preparation of intent, charters, reviewer assignments,
-limits, and a first gate contract is permitted. Proposed roles and template
-records are not approved authority. Unknown ceilings remain unknown. No customer
-outreach, payments, deployment, binding commitments, or discovery experiments
-are authorized by generating this workspace. Obtain actual Frame acceptance and
-founder authorization under the pinned spec before those actions.
+Use a unique ID, owner, author instance, status, version, governing references,
+and decision reference for each consequential output. Receivers record acceptance
+or rejection separately; never overwrite someone else's artifact or verdict.
+The Chief of Staff records founder direction and updates Intent before dependent
+work. Clarify ambiguity, but do not request repeated approval of clear instructions.
 
-## Shared truth and cooperation
+For notices use `must_know` or `decision_required`; track delivery, seen status,
+resolution, and authorization separately. For preferences use `explicit` or
+`inferred`; explicit directions take precedence and corrections retain lineage.
+Notification delivery, preference learning, and role evaluation are manual here.
+Silence never approves; preferences never suppress required notices. Hold actions
+missing authority while unrelated permitted work continues.
 
-- Read `team/manifest.json`, your role charter, current board items, and relevant
-  governing specs at session start and before accepting new work.
-- Each session has one role and a distinct instance ID. Do not switch roles to
-  review your own work. Attributions are self-reported here, not authentication.
-- Board items live in `team/board/`; specs in `team/specs/`; evidence and outputs
-  in `team/artifacts/`; consequential decisions in `team/decisions/`.
-- Any role may contact another directly; the Chief of Staff is not a message
-  relay. Communication transfers no authority. Tools support all agents and
-  enforce checks at execution and record changes in the target system.
-- Session history and scratch notes are disposable. Publish findings, material
-  uncertainty, unfinished obligations, and next steps needed by others into
-  company records during work and before stopping; do not archive private chats.
-- Use one file per object with a unique ID, owner, author instance, status, and
-  version. Cite governing spec versions and a decision ID. Never overwrite
-  another role's artifact or mutate its verdict.
-- The author submits an artifact and a handoff; the designated receiver records
-  acceptance or rejection in a separate record. Private chat has no authority.
-- A block names its chartered condition, evidence, owner, affected action, and
-  clearing condition. Apply the pinned conflict ladder; never bypass a block.
-- Record uncertainty, stalls, stale evidence, and adverse results. Consequential
-  decisions include rationale, expected outcome, and an outcome review date.
-- The Chief of Staff records founder direction in Intent with its source and attribution before
-  dependent work resumes. Recordkeeping transfers no founder authority.
-  Confirm ambiguity or inferred authority beyond the explicit
-  instruction; clear instructions need no repeated confirmation.
-- Frame must establish the professional-review policy in Founder Intent,
-  including triggers, independent assessor, and change authority. Unknown
-  policy is not permission; no agent may waive the policy or legally required review.
-- Gate contracts name a failure owner, safe hold, and bounded retry authority.
-  Retain failed results. Revised tests need prospective independent approval;
-  unknown retry authority permits no retry. Escalate only reserved changes,
-  not every failed experiment.
-- Founder packets cite a reserved category and authority reference; each option
-  states its trade-offs. Preserve dissent and review escalation quality through
-  the existing outcome process. Do not add a veto over genuine reserved decisions
-  or automatically shrink delegation for unnecessary escalation.
-- The Chief of Staff owns workflow judgment; PM owns product scope/priorities. It may
-  propose assignments and recovery but cannot replace domain verdicts, approve
-  its own work or permissions, or suppress any role's founder packet. Its plans
-  need charter-named non-author review. The target execution software checks
-  every action independently, including the Chief of Staff's, and applies founder
-  pauses without waiting for it. These controls are not installed in this prototype.
-- Use Company Operations' activation guide for ownership and exposure triggers.
-  Before granting execution authority, record a representative role evaluation
-  and boundary check with qualified non-author review. Prepare/evaluate only
-  until approved; no role, including the Chief of Staff, qualifies itself.
-- Founder notification rules live in Intent; notice records live in
-  `team/founder-inbox/`. Use the founder-notice template and link decision requests
-  to founder packets instead of duplicating them. Any role may submit; distinguish
-  must-know from decision-required notices. Delivery, seen, and resolution are
-  separate; silence never approves. Hold affected actions pending authority.
-  The target system retries delivery and handles detectable triggers independently
-  of the Chief of Staff. Agree deadlines, reminders, and enabled channels at Frame.
-- `team/founder-preferences.json` holds only useful communication preferences,
-  with source/date and explicit versus inferred basis. The Chief of Staff records
-  feedback; all roles use relevant entries. Explicit direction wins; inferred
-  preferences remain tentative and correctable. Never suppress required notices,
-  exceed notification deadlines, or change authority based on personalization.
+## Preserve continuity
 
-## Prototype operation
+Publish findings, consequential uncertainty, unfinished obligations, and next
+steps during work and before stopping. Session history and private transcripts
+are not company memory. A fresh instance must continue from shared records.
 
-The session operator starts each independent session and manually routes ready
-handoffs. No session waking or supervision is installed. There is no atomic
-board service: serialize shared writes, and pause if ownership or concurrent
-updates are unclear. A shared Git remote alone is not live shared state.
-Acceptance and gate records require real review; never prefill a Pass.
-Use `team/templates/` as record starters, not as proof of compliance.
-Company records are co-located under `team/` in this prototype. They belong to
-the company and must not be replaced with team instructions. Live team
-replacement and transfer of authority are not implemented.
-Keep company records outside plugin installation/cache directories. Plugin
-updates make candidate versions available, not new company authority; preserve
-pinned rules until explicit adoption and hold incompatible changes for migration.
-Uninstalling a plugin must preserve company records and unresolved notices.
-One company uses one persistent folder. Both platform UIs may open that folder;
-opening it grants no authority and creates no second company. Use one active
-environment at a time in this prototype; overlapping writes and competing Chiefs
-of Staff are unsafe. The `both` target supplies wrappers, not mixed-harness routing.
-Notification delivery, preference learning, and role evaluation are manual here;
-record templates do not perform or certify them. Preserve records when switching
-interfaces; a different product may require a new chat, not a founder rebrief.
-
-After each assignment, leave its artifact references, current status, unresolved
-blocks, next receiver, and pending outcome reviews on the board. A fresh instance
-must be able to continue from these records without your conversation.
+Company records and team instructions are colocated under `team/` in this
+prototype. Never replace them by copying a generated candidate over the folder.
+Keep them outside plugin caches and retain pinned rules until explicit adoption.
+The generator implements no live migration, authority transfer, or notification
+service. A different app may need a new chat; preserve the same company records.
 """
 
 
@@ -526,25 +467,18 @@ def materialize(config, output, target="both", spec=None):
             write_json(team / "templates" / f"{name}.json", template)
         (stage / "START.md").write_text(
             "# Developer preview: manual role sessions\n\n"
-            "This is a generated workspace, not a running company. Use it only after\n"
-            "the generator reports success; an interrupted run may leave incomplete files.\n"
-            "The target product is the Company plugin distributed through a GitHub marketplace\n"
-            "catalog. Its installation handles dependencies and checks readiness; founders do\n"
-            "not run this generator. No installable plugin or catalog is included here.\n\n"
-            "The target founder flow after one-time plugin installation is: create a project, attach\n"
-            "a folder, open a chat, and talk. The Chief of Staff starts on the first message,\n"
-            "interviews the founder, and activates specialists. The installer and startup\n"
-            "automation are not implemented. This manual procedure is for development.\n\n"
-            "Start separate sessions from this project root; give each its own startup brief.\n"
-            "Open this company folder in your chosen project UI, or use a CLI below.\n"
-            "In the main conversation, ask: Read team/sessions/runner.md and follow it.\n"
-            "This starts Chief of Staff preparation only; other sessions still need manual startup.\n"
-            "Both UIs may open the same folder, but use only one active environment at a time.\n"
-            "Use another role's brief for a specialist session. Every session must see this same filesystem.\n\n"
+            "Use this workspace only after generation reports success; an interrupted run\n"
+            "may leave incomplete files. No plugin, automatic startup, or team runtime is installed.\n\n"
+            "Open this company folder in your chosen project UI. In the main conversation ask:\n"
+            "**Read team/sessions/runner.md and follow it.** Or start from this folder using:\n\n"
             + "\n\n".join(f'```sh\n{platform} "Read team/sessions/runner.md and follow it."\n```'
                            for platform in targets)
-            + "\n\nFrame is Draft: prepare and review it before venture execution. Shared writes\n"
-            "and handoff routing are manual. Read `team/PROTOCOL.md` for limits and continuity.\n",
+            + "\n\nThis begins Chief of Staff preparation. Start each specialist in its own\n"
+            "standalone session with its named brief from `team/sessions/`. All sessions must\n"
+            "see this same filesystem. Use one active environment at a time.\n\n"
+            "Frame is Draft and grants preparation only. Read `team/PROTOCOL.md` for shared\n"
+            "records, manual coordination, and continuity limits; pinned governance defines\n"
+            "the acceptance and authorization needed before execution.\n",
             encoding="utf-8")
         # Exclusive creation avoids racing a second generator into the same path.
         output.mkdir()
