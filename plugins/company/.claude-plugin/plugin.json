@@ -1,0 +1,10 @@
+{
+  "name": "company",
+  "version": "0.1.0",
+  "description": "Your Chief of Staff and standalone AI specialists, with persistent company records. Preparation and review preview.",
+  "author": {
+    "name": "yimoburu"
+  },
+  "repository": "https://github.com/yimoburu/ai-operated-startup",
+  "hooks": "./hooks/claude.json"
+}

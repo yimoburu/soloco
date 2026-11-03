@@ -1,0 +1,87 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import readline from 'node:readline';
+import { PACKAGE, VERSION, folder, withStore, stamp } from './store.mjs';
+import * as engine from './engine.mjs';
+import { readiness } from './adapters.mjs';
+
+const string={type:'string'};
+const common={root:{...string,description:'Absolute attached company folder'},session_id:{...string,description:'Current host session_id supplied by Company startup hook'}};
+const definitions=[
+  ['company_open','Initialize or resume the attached company. Preparation only; never overwrites existing project files.',{...common,name:string,idea:string},['root','session_id'],engine.open],
+  ['company_status','Read records, role results, pending notices and peer messages. Also reconciles interrupted jobs.',common,['root','session_id'],engine.status],
+  ['company_save','Save a draft intent, plan, decision, communication preference or artifact. Does not grant authority.',{...common,kind:{enum:['intent','plan','decision','preference','artifact']},content:string,id:string,expected_revision:{type:'integer',minimum:0},source_reference:string,basis:{enum:['explicit','inferred']},epoch:{type:'integer'}},['root','session_id','epoch','kind','content'],engine.save],
+  ['company_dispatch','Start or resume a standalone specialist for a preparation or independent review assignment. Returns a durable job; call company_wait for results.',{...common,role:string,task:string,input_ids:{type:'array',items:string},review_of:string,epoch:{type:'integer'}},['root','session_id','epoch','role','task'],engine.dispatch],
+  ['company_wait','Wait up to 20 seconds for pending assignments, then return durable results and notices.',{...common,seconds:{type:'integer',minimum:0,maximum:20}},['root','session_id'],async (a,h)=>{const until=Date.now()+Math.min(20,Math.max(0,a.seconds??15))*1000;let s;do{s=engine.status(a,h);if(!s.jobs.some(j=>['queued','running'].includes(j.status))||Date.now()>=until)return s;await new Promise(r=>setTimeout(r,500));}while(true);}],
+  ['company_control','Record an explicit founder pause/resume or same-company handover. A handover rejects active jobs and revokes the old coordinator; it never grants external action authority.',{...common,action:{enum:['pause','resume','handover']},expected_epoch:{type:'integer'},source_instruction:string},['root','session_id','action','expected_epoch','source_instruction'],engine.control],
+  ['company_notice','Create a must-know or decision-required founder notice; cannot be suppressed by coordinator preference.',{...common,epoch:{type:'integer'},kind:{enum:['must_know','decision_required']},summary:string,reference:string},['root','session_id','epoch','kind','summary'],engine.notify],
+  ['company_acknowledge','Record that the founder saw or resolved a notice. Delivery/seen/resolution are separate and never count as execution authorization.',{...common,epoch:{type:'integer'},notice_id:string,seen:{type:'boolean'},resolution:string,source_reference:string},['root','session_id','epoch','notice_id'],engine.acknowledge],
+  ['company_message','Put a direct message in a role inbox. The next role turn receives it without founder forwarding.',{...common,epoch:{type:'integer'},to:string,content:string},['root','session_id','epoch','to','content'],engine.message],
+  ['company_doctor','Read-only readiness check; does not create a company or inspect credentials.',{},[],(_a,h)=>({plugin_version:VERSION,node:process.version,host:readiness(h),mode:'preparation',platform:process.platform})],
+];
+export const toolList=definitions.map(([name,description,properties,required])=>({name,description,inputSchema:{type:'object',properties,required,additionalProperties:false}}));
+export async function call(name,args,host) {
+  const def=definitions.find(d=>d[0]===name);if(!def)throw new Error('Unknown tool');
+  if(!args || typeof args!=='object' || Array.isArray(args))throw new Error('Tool arguments must be an object');
+  for(const key of Object.keys(args))if(!Object.hasOwn(def[2],key))throw new Error(`Unknown argument: ${key}`);
+  for(const key of def[3])if(args[key]===undefined)throw new Error(`Missing argument: ${key}`);
+  for(const [key,value] of Object.entries(args)) {
+    const rule=def[2][key];
+    if(rule.type==='string' && typeof value!=='string')throw new Error(`${key} must be text`);
+    if(rule.type==='integer' && (!Number.isInteger(value) || value<(rule.minimum??-Infinity) || value>(rule.maximum??Infinity)))throw new Error(`${key} is outside its range`);
+    if(rule.type==='boolean' && typeof value!=='boolean')throw new Error(`${key} must be boolean`);
+    if(rule.enum && !rule.enum.includes(value))throw new Error(`Invalid ${key}`);
+  }
+  return await def[4](args,host);
+}
+export function hook(input,host) {
+  if(process.env.COMPANY_WORKER==='1' || !input.cwd || !input.session_id) return {};
+  const root=folder(input.cwd);
+  const hasCompany=fs.existsSync(path.join(root,'.company'));
+  const empty=fs.readdirSync(root).every(n=>['.git','.DS_Store'].includes(n));
+  const intent=/\b(start|run|create|resume)\b.{0,60}\b(company|startup|virtual team)\b/i.test(input.prompt??'');
+  if(!hasCompany && !empty && !intent) return {};
+  engine.bind(root,input.session_id,host);
+  let pending='', state=null;
+  if(hasCompany) {
+    state=withStore(root,db=>db.read());
+    if(state && input.hook_event_name==='UserPromptSubmit' && /^(?:please\s+)?pause(?:\s+(?:the\s+)?company)?[.!]?$/i.test((input.prompt??'').trim())) {
+      engine.control({root,session_id:input.session_id,action:'pause',expected_epoch:state.owner.epoch,source_instruction:input.prompt},host);
+    }
+    if(state?.notices.some(n=>!n.resolution)) {
+      const notices=state.notices.filter(n=>!n.resolution);
+      pending='\nRequired founder notices (present them in your next response; delivery is not approval): '+JSON.stringify(notices.map(n=>({id:n.id,kind:n.kind,summary:n.summary})));
+      withStore(root,db=>db.transaction('notices.presented_to_host',s=>{for(const n of s.notices.filter(n=>!n.resolution))n.deliveries.push({at:stamp(),channel:'chat_context',session_id:input.session_id});return s;}));
+    }
+  }
+  const instructions=fs.readFileSync(path.join(PACKAGE,'skills/company/SKILL.md'),'utf8').replace(/^---[\s\S]*?---\s*/, '');
+  return {hookSpecificOutput:{hookEventName:input.hook_event_name,additionalContext:`Company plugin. Host: ${host}. Session ID: ${input.session_id}. Attached folder: ${root}.\n${instructions}${pending}`},...(pending?{systemMessage:`Company: ${state.notices.filter(n=>!n.resolution).length} unresolved founder notice(s). Open company_status for details.`}:{})};
+}
+async function serve(host) {
+  const lines=readline.createInterface({input:process.stdin,crlfDelay:Infinity});
+  for await(const line of lines) {
+    if(!line.trim())continue;
+    let req;
+    try {
+      req=JSON.parse(line);
+      if(!Object.hasOwn(req,'id'))continue;
+      let result;
+      if(req.method==='initialize') result={protocolVersion:'2024-11-05',capabilities:{tools:{}},serverInfo:{name:'company',version:VERSION}};
+      else if(req.method==='ping') result={};
+      else if(req.method==='tools/list') result={tools:toolList};
+      else if(req.method==='tools/call') {
+        try {result={content:[{type:'text',text:JSON.stringify(await call(req.params.name,req.params.arguments??{},host))}]};}
+        catch(error) {result={isError:true,content:[{type:'text',text:error.message}]};}
+      } else {process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:req.id,error:{code:-32601,message:'Method not found'}})+'\n');continue;}
+      process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:req.id,result})+'\n');
+    } catch(error) {process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:req?.id??null,error:{code:-32700,message:error.message}})+'\n');}
+  }
+}
+if(process.argv[1] && path.resolve(process.argv[1])===path.join(PACKAGE,'runtime/main.mjs')) {
+  const [mode,host='codex']=process.argv.slice(2);
+  if(!['codex','claude'].includes(host))throw new Error('Unknown host');
+  if(mode==='serve') await serve(host);
+  else if(mode==='hook') {let text='';for await(const c of process.stdin)text+=c;try{console.log(JSON.stringify(hook(JSON.parse(text),host)));}catch(error){console.log(JSON.stringify({systemMessage:`Company startup needs attention: ${error.message}`}));process.exitCode=1;}}
+  else if(mode==='doctor') console.log(JSON.stringify(await call('company_doctor',{},host),null,2));
+  else throw new Error('Use serve, hook, or doctor');
+}

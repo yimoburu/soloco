@@ -1,12 +1,12 @@
 # An AI-operated startup
 
-**v0.10 · Current reconciled design · 2026-11-02**
+**v0.11 · Current reconciled design · 2026-11-02**
 
 A founder brings an idea. A small team of AI agents, each in its own standalone session, operates a company through one founder conversation. The company persists as its agents and team versions change.
 
 Two evidence-based exits are possible: **out of stealth**, with a public product demonstrating value and operational readiness; or **funding-ready**, with a traceable financing case and diligence records. Neither promises product-market fit or financing.
 
-This is the target contract. The current prototype generates files only; plugin installation, automatic coordination, enforcement, and checked replacement remain unimplemented. Revising this spec does not change an existing company's pinned rules or authorize its work.
+This is the target contract. Plugin v0.1.0 implements conversational preparation, persistent records, standalone specialist dispatch/resume, draft review, and bounded same-version handover. External business execution, full gate/qualification enforcement, background notifications, and arbitrary team upgrades remain unimplemented. Desktop startup still needs live acceptance. The legacy generator remains a separate developer preview. Revising this spec does not change an existing company's pinned rules or authorize its work.
 
 ## 1. Constitution
 

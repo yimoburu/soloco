@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/bin/sh \"${CLAUDE_PLUGIN_ROOT}/scripts/run.sh\" hook claude",
+            "timeout": 150
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/bin/sh \"${CLAUDE_PLUGIN_ROOT}/scripts/run.sh\" hook claude",
+            "timeout": 150
+          }
+        ]
+      }
+    ]
+  }
+}

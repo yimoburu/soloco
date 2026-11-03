@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/bin/sh \"${PLUGIN_ROOT}/scripts/run.sh\" hook codex",
+            "timeout": 150
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/bin/sh \"${PLUGIN_ROOT}/scripts/run.sh\" hook codex",
+            "timeout": 150
+          }
+        ]
+      }
+    ]
+  }
+}

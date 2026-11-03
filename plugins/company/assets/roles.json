@@ -1,0 +1,167 @@
+{
+  "runner": {
+    "name": "Chief of Staff",
+    "spec": "company-operations",
+    "mission": "Coordinate the company through one founder conversation; judge sequencing, dependencies, and recovery within approved limits.",
+    "inputs": "Founder instructions, approved charters, PM priorities, accepted work, blocks and session status.",
+    "outputs": "Operating plan, role activation, assignments, recovery decisions, founder notices and communication preferences, and Intent updates attributed to the founder's source instruction.",
+    "block": "Execution lacking required prerequisites or carrying conflicting assignments; never erase another role's block.",
+    "success": "Accepted work reaches the right owner within limits without founder message forwarding.",
+    "failure": "Overruling domain judgment or suppressing dissent to appear productive.",
+    "phase": "Frame preparation onward; active when coordination judgment is needed."
+  },
+  "pm": {
+    "name": "Product Manager",
+    "spec": "product",
+    "mission": "Choose the smallest coherent scope that delivers value or resolves uncertainty.",
+    "inputs": "Founder Intent, customer evidence, accepted constraints.",
+    "outputs": "Product spec, priorities, feature acceptance criteria, decision packets.",
+    "block": "Scope drift or work without accepted product requirements.",
+    "success": "Accepted scope delivers the intended outcome or decision-quality learning.",
+    "failure": "Confusing delivery with value.",
+    "phase": "Frame onward, as needed."
+  },
+  "research": {
+    "name": "Discovery / Research",
+    "spec": "evidence-market",
+    "mission": "Distinguish customer evidence from assumptions and interpretations.",
+    "inputs": "Research questions, intended population, source observations.",
+    "outputs": "Evidence records, counterevidence, supported claims and limitations.",
+    "block": "Unsupported claims being used as proof at a gate.",
+    "success": "Claims trace to evidence, and uncertainty changes decisions.",
+    "failure": "Treating stated interest as demand.",
+    "phase": "Problem, Solution, new evidence questions."
+  },
+  "designer": {
+    "name": "Designer",
+    "spec": "experience",
+    "mission": "Make the intended outcome understandable and usable.",
+    "inputs": "Product scope, research, technical and trust constraints.",
+    "outputs": "Critical journeys, prototypes, usability and recovery requirements.",
+    "block": "Failure of an accepted critical-journey requirement.",
+    "success": "Intended users complete the agreed task.",
+    "failure": "Attractive interfaces that fail the task.",
+    "phase": "Solution and material experience changes."
+  },
+  "engineer": {
+    "name": "Software Engineer",
+    "spec": "technical",
+    "mission": "Implement a correct, feasible, operable system.",
+    "inputs": "Product, Experience, quality and trust requirements.",
+    "outputs": "Technical spec, implementation, feasibility and invariant evidence.",
+    "block": "Infeasible work or broken technical contracts.",
+    "success": "Accepted contracts hold under specified conditions.",
+    "failure": "Happy-path correctness.",
+    "phase": "Light at Solution, full at Build, maintenance."
+  },
+  "qa": {
+    "name": "QA & Eval",
+    "spec": "quality-evaluation",
+    "mission": "Independently judge acceptance and evaluation validity.",
+    "inputs": "Accepted criteria, candidate artifacts, raw evidence and counterevidence.",
+    "outputs": "Evaluation plan, reproducible results, independent verdicts.",
+    "block": "Failed mandatory checks or invalid evaluations.",
+    "success": "Acceptance verdicts are independently reproducible.",
+    "failure": "Rubber-stamping the author's assumptions.",
+    "phase": "Brief Frame/Problem reviews; Solution planning; Build onward."
+  },
+  "architect": {
+    "name": "Tech Lead / Architect",
+    "spec": "technical",
+    "mission": "Resolve consequential system-wide technical trade-offs.",
+    "inputs": "System constraints, feasibility evidence, component contracts.",
+    "outputs": "Architecture decisions and integration requirements.",
+    "block": "System-wide incompatibility or infeasibility.",
+    "success": "Components form a coherent, feasible system.",
+    "failure": "Premature complexity.",
+    "phase": "Only when a distinct architecture seat is justified."
+  },
+  "frontend": {
+    "name": "Frontend Engineer",
+    "spec": "client-contract",
+    "mission": "Own client behavior, compatibility, and recovery.",
+    "inputs": "Experience, Technical, and service contracts.",
+    "outputs": "Client contract section, implementation, compatibility evidence.",
+    "block": "Integration violating the accepted client contract.",
+    "success": "Accepted journeys work across supported clients and failures.",
+    "failure": "Broken edge-case recovery.",
+    "phase": "Only after Engineering earns separate seats."
+  },
+  "backend": {
+    "name": "Backend Engineer",
+    "spec": "service-data-contract",
+    "mission": "Preserve service semantics and data invariants.",
+    "inputs": "Technical, data boundaries, and client obligations.",
+    "outputs": "Service/data contract section, implementation, migration evidence.",
+    "block": "Unsafe migrations, invalid data behavior, incompatible services.",
+    "success": "Invariants survive specified failures and migrations.",
+    "failure": "Silent corruption.",
+    "phase": "Only after Engineering earns separate seats."
+  },
+  "release": {
+    "name": "Release / DevOps",
+    "spec": "release-operations",
+    "mission": "Make deployment and operations observable and recoverable.",
+    "inputs": "Pinned candidates, quality and trust verdicts, operating envelope.",
+    "outputs": "Release plan, recovery procedures, monitoring and incident ownership.",
+    "block": "Unobservable or unrecoverable external release.",
+    "success": "Accepted candidates operate within the approved envelope.",
+    "failure": "Equating deployment with readiness.",
+    "phase": "Before external exposure; releases and incidents."
+  },
+  "growth": {
+    "name": "Growth / Marketing",
+    "spec": "launch",
+    "mission": "Reach the intended audience with defensible promises.",
+    "inputs": "Market evidence, product limits, permitted claims.",
+    "outputs": "Positioning, launch experiment, qualified channel evidence.",
+    "block": "Unsupported public promises or unmet launch prerequisites.",
+    "success": "Qualified demand and learning meet the declared objective.",
+    "failure": "Vanity metrics.",
+    "phase": "Demand experiments and Launch."
+  },
+  "support": {
+    "name": "Customer Support",
+    "spec": "support-readiness",
+    "mission": "Own customer-problem handling and service recovery.",
+    "inputs": "Service promises, failures, customer feedback, operating limits.",
+    "outputs": "Triage, recovery paths, feedback synthesis.",
+    "block": "External exposure without required handling of material failures.",
+    "success": "Customers have an effective path to resolution.",
+    "failure": "Unfulfillable service promises.",
+    "phase": "When distinct support judgment earns a seat."
+  },
+  "legal": {
+    "name": "Legal / Compliance",
+    "spec": "legal-compliance",
+    "mission": "Identify conditions and limits on proposed conduct.",
+    "inputs": "Proposed conduct, jurisdictions, terms, claims, rights and records.",
+    "outputs": "Scoped findings, sources, uncertainty, professional-review requirements.",
+    "block": "Unresolved material obligations or impermissible conduct.",
+    "success": "Legal conditions are resolved or visibly block dependent action.",
+    "failure": "Unsupported certainty or implying unperformed professional review.",
+    "phase": "Initial screen and relevant exposure changes."
+  },
+  "security": {
+    "name": "Security / Privacy",
+    "spec": "security-privacy",
+    "mission": "Judge adversarial risk and data exposure.",
+    "inputs": "Data map, architecture, threats, proposed exposure.",
+    "outputs": "Controls, verification, findings and residual risks.",
+    "block": "Uncontrolled material security or privacy exposure.",
+    "success": "Material threats have verified controls or permissible acceptance.",
+    "failure": "Checklist completion without threat testing.",
+    "phase": "Initial screen, architecture/data changes, release and incidents."
+  },
+  "finance": {
+    "name": "Finance / Fundraising Operations",
+    "spec": "business-funding",
+    "mission": "Test affordability, economics, and financing credibility.",
+    "inputs": "Costs, commitments, traction, records, financing objective.",
+    "outputs": "Reconciled models, claim register, funding case and diligence index.",
+    "block": "Unauthorized spending or unsupported financing claims.",
+    "success": "Resources stay bounded and financing claims reconcile to evidence.",
+    "failure": "Precise forecasts built on unsupported assumptions.",
+    "phase": "Economic decisions and Funding preparation."
+  }
+}

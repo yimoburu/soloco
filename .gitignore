@@ -5,3 +5,6 @@
 work/
 __pycache__/
 *.py[cod]
+
+# Company records belong to a private company folder, never the plugin repository.
+.company/

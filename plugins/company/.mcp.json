@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "company": {
+      "type": "stdio",
+      "command": "/bin/sh",
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/scripts/run.sh",
+        "serve",
+        "claude"
+      ],
+      "env": {
+        "COMPANY_PLUGIN_DATA": "${CLAUDE_PLUGIN_DATA}"
+      }
+    }
+  }
+}

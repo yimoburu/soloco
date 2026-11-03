@@ -1,0 +1,14 @@
+{
+  "name": "ai-operated-startup",
+  "owner": {
+    "name": "yimoburu"
+  },
+  "plugins": [
+    {
+      "name": "company",
+      "source": "./plugins/company",
+      "description": "A founder-facing Chief of Staff and standalone specialist sessions."
+    }
+  ],
+  "description": "Company: a Chief of Staff, standalone specialist sessions, and durable company records."
+}

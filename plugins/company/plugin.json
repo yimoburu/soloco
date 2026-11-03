@@ -1,0 +1,12 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "company",
+  "version": "0.1.0",
+  "description": "Your Chief of Staff and standalone AI specialists, with persistent company records. Preparation and review preview.",
+  "extensions": {
+    "com.openai": {
+      "onboardingSkill": "./skills/setup/SKILL.md",
+      "hooks": "./hooks/codex.json"
+    }
+  }
+}

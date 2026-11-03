@@ -1,28 +1,61 @@
 # AI-operated startup
 
-Turn an idea into an early-stage company through **one founder conversation**. A Chief of Staff coordinates specialist AI agents, each in its own standalone session. Shared company records preserve decisions, limits, and unfinished work when agents or the whole team change.
+Run a virtual company through **one founder conversation**. Your Chief of Staff coordinates specialist AI agents in separate, resumable sessions. Company records persist in your folder when a session or environment changes.
 
-## Intended experience
+**Company plugin v0.1.0 is an early preparation-and-review release.** It interviews you, saves company intent, runs specialist planning sessions, and requests independent reviews. It does not execute customer outreach, spending, deployment, or other business actions. The [spec](SPEC.md) describes the complete target.
 
-Install the Company plugin once in Codex or Claude Code, then:
+## Install once
 
-1. Create a project.
-2. Attach a company folder.
+You need access to this private repository and the chosen app's CLI installed and signed in. Current local clients with plugin and hook support are required. The launcher handles its Node dependency automatically on macOS/Linux ARM64 or x64; no Python, npm install, or manual configuration is needed.
+
+**Codex** — run in Terminal:
+
+```sh
+codex plugin marketplace add yimoburu/ai-operated-startup
+codex plugin add company@ai-operated-startup
+```
+
+Restart the app. Review and trust Company’s hooks in **Settings → Hooks** or the composer’s **Review hooks** prompt; the CLI also supports `/hooks`. Hook trust is a host requirement for automatic startup. See [OpenAI’s hook instructions](https://learn.chatgpt.com/docs/hooks).
+
+**Claude Code** — run in a Claude chat:
+
+```text
+/plugin install company --marketplace yimoburu/ai-operated-startup
+```
+
+Or in Terminal:
+
+```sh
+claude plugin install company --marketplace yimoburu/ai-operated-startup
+```
+
+Restart the session and keep Company’s hooks enabled. This uses Claude’s [repository marketplace installation](https://code.claude.com/docs/en/plugin-marketplaces). Desktop installation uses the same catalog where supported; the standalone workers still require a signed-in Claude CLI.
+
+Run the plugin’s **setup** skill once to check readiness. It creates no company. If dependency setup is interrupted, rerun setup before starting work.
+
+## Start a company
+
+1. Create a project in your chosen app.
+2. Attach a new company folder.
 3. Open a chat and describe your idea.
 
-The Chief of Staff asks focused questions, brings in roles as needed, and presents a reviewed first experiment for authorization. You provide direction and reserved decisions; the team handles coordination. Use one active environment at a time. Switching apps resumes the same company from its records.
+The startup hook supplies the Chief of Staff instructions automatically in an empty folder or an existing company. In a populated folder without company records, explicitly say you want to start a company so unrelated coding projects are left alone.
 
-## Available today
+The Chief of Staff asks focused questions, saves your intent, starts the needed specialist sessions, and brings back reviewed proposals. You do not open each role’s chat or relay messages. A specialist may reject a draft; that does not require a founder decision. Real-world evidence and execution permission remain separate from a planning review.
 
-**This is a design and workspace-generator prototype. The plugin and automatic team runtime are not implemented.** There is no working plugin installation command yet; attaching a folder alone does not start a company.
+Use **one active environment at a time**. To switch, pause the company in the old chat, open the same folder in the other app, and ask to continue. The Chief of Staff performs the recorded handover; you do not rebrief the team. Records stay in `.company/`, outside the plugin cache. Uninstalling the plugin does not remove them.
 
-- [SPEC.md](SPEC.md) — the single current design: constitution, founder experience, roles, collaboration, evidence, and continuity.
-- [Developer guide](docs/converter.md) — try the generator, understand its limits, and see what remains to build.
+## What is verified
 
-The planned distribution is one Company plugin in a small GitHub marketplace catalog. Installation handles dependencies and checks readiness; founders will not run Python or configure roles.
+- Both native CLIs installed the plugin from an isolated local marketplace.
+- Live Codex: standalone PM draft, separate QA review, and a second assignment resumed the same PM session.
+- Automated tests cover hooks, records, independent review, concurrent updates, pause, stale-result quarantine, handover, notices, and actual subprocess dispatch.
+- Automatic private Node setup was tested on macOS ARM64.
 
-## Changes and review
+Tested CLIs: Codex `0.166.0-alpha.5.1`, Claude Code `2.1.301`. Claude’s live model test was blocked by its CLI being signed out. Desktop installation/first-chat behavior and other operating systems still need live acceptance; package validation and hook tests do not prove those UI flows.
 
-Keep only rules that change a decision, behavior, or successor's action. Update the spec and affected generator guidance together; use concrete failure scenarios to review changes. Existing companies retain their pinned rules until explicit adoption.
+Required notices are stored durably and presented on an open chat’s next turn. Background delivery, external-action enforcement, arbitrary team-version migration, and automatic placement of specialists in the desktop sidebar are not implemented. Host permissions still apply; the local record store is not a security boundary against software running as you.
 
-Superseded designs, the original brief, and Claude reviews remain in the [archived snapshot](https://github.com/yimoburu/ai-operated-startup/tree/ee3f302f47e82539ca0a40e0268a1e762c47929a/history). They are provenance, not additional current requirements.
+## Development
+
+[Developer guide](docs/converter.md) explains the runtime, tests, and legacy generator. [SPEC.md](SPEC.md) is the single current design. Earlier designs and Claude reviews remain in the [archived snapshot](https://github.com/yimoburu/ai-operated-startup/tree/ee3f302f47e82539ca0a40e0268a1e762c47929a/history).
