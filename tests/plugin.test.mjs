@@ -4,10 +4,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { spawn } from 'node:child_process';
-import { withStore, id } from '../plugins/company/runtime/store.mjs';
+import { withStore, id, VERSION, teamHash, digest } from '../plugins/company/runtime/store.mjs';
 import * as engine from '../plugins/company/runtime/engine.mjs';
 import { hook, call } from '../plugins/company/runtime/main.mjs';
 import { work } from '../plugins/company/runtime/worker.mjs';
+import { assignmentContext } from '../plugins/company/runtime/context.mjs';
 import { commandArgs, parseOutput } from '../plugins/company/runtime/adapters.mjs';
 
 const base=fs.mkdtempSync(path.join(os.tmpdir(),'company-test-'));
@@ -150,8 +151,10 @@ else {
   const oldPath=process.env.PATH;process.env.PATH=bin+path.delimiter+oldPath;
   try {
     const a=setup();
+    const intent=engine.save({...a,kind:'intent',content:'Stay within founder limits'},'codex');
     async function run() {
       const j=engine.dispatch({...a,role:'pm',task:'Prepare a proposal'},'codex');
+      assert.ok(j.context_sha256);assert.ok(j.inputs.some(ref=>ref.id===intent.id && ref.revision===1));
       for(let i=0;i<100;i++) {await new Promise(r=>setTimeout(r,30));const s=engine.status(a,'codex');const job=s.jobs.find(x=>x.id===j.id);if(!['queued','running'].includes(job.status))return {job,s};}
       throw new Error('Worker did not finish');
     }
@@ -178,4 +181,119 @@ test('same chat cannot reuse a revoked epoch after a handover',()=>{
   const current=engine.status(a,'codex');
   const saved=engine.save({...a,epoch:current.owner.epoch,kind:'plan',content:'current proposal'},'codex');
   assert.equal(saved.status,'Draft');
+});
+
+
+test('compatible runtime patches preserve pinned team, ownership and native sessions without adoption',async()=>{
+  for(const version of ['0.2.0','0.2.1']) {
+    const a=setup();
+    withStore(a.root,db=>db.transaction('test.old_patch',s=>{
+      s.plugin_version=version;s.runtime_version=version;
+      s.governance='Pinned preparation governance; preserve founder limits';s.governance_sha256=digest(s.governance);
+      s.cos_instructions='PINNED OLD COS';s.team_sha256=teamHash(s);
+      s.sessions.pm={instance_id:'existing-pm',role:'pm',native_id:'persisted-native',host:'codex'};return s;
+    }));
+    const before=withStore(a.root,db=>db.read());
+    const resumed=engine.open(a,'codex');
+    assert.equal(resumed.executing_runtime_version,VERSION);assert.equal(resumed.runtime_version,version);
+    assert.equal(resumed.cos_instructions,'PINNED OLD COS');
+    assert.deepEqual(withStore(a.root,db=>db.read()),before);
+    const injected=hook({cwd:a.root,session_id:a.session_id,hook_event_name:'SessionStart'},'codex').hookSpecificOutput.additionalContext;
+    assert.match(injected,/PINNED OLD COS/);assert.doesNotMatch(injected,/Company requires upgrade maintenance/);
+    engine.save({...a,kind:'intent',content:'Keep the existing budget'},'codex');
+    const j=queued(a);await work(a.root,j,async()=>result());
+    const s=engine.status(a,'codex');assert.equal(s.jobs[0].status,'completed');
+    assert.equal(s.plugin_version,version);assert.equal(s.sessions.pm.native_id,'persisted-native');
+    assert.equal(s.owner.epoch,before.owner.epoch);assert.equal(s.upgrade,null);
+    engine.control({...a,action:'pause',expected_epoch:1,source_instruction:'Pause'},'codex');
+    engine.control({...a,action:'resume',expected_epoch:1,source_instruction:'Resume'},'codex');
+    engine.control({...a,action:'handover',expected_epoch:1,source_instruction:'Replace the coordinator'},'codex');
+    assert.equal(engine.status(a,'codex').owner.epoch,2);
+  }
+});
+
+test('unknown runtimes and tampered teams remain held despite patch compatibility',()=>{
+  const a=setup();withStore(a.root,db=>db.transaction('test.future',s=>{s.runtime_version='0.2.99';return s;}));
+  assert.throws(()=>engine.open(a,'codex'),/checked runtime upgrade/);
+  assert.throws(()=>engine.save({...a,kind:'intent',content:'bypass'},'codex'),/checked runtime upgrade/);
+  assert.throws(()=>engine.control({...a,action:'resume',expected_epoch:1,source_instruction:'resume'},'codex'),/upgrade/);
+  withStore(a.root,db=>db.transaction('test.tamper',s=>{s.runtime_version='0.2.1';s.cos_instructions='tampered';return s;}));
+  assert.throws(()=>engine.open(a,'codex'),/integrity/);
+});
+
+test('assignment packs retain constraints, failed evidence, notices and named inputs without unrelated artifacts',async()=>{
+  const a=setup();
+  const intent=engine.save({...a,kind:'intent',content:'No customer data'},'codex');
+  const evidence=engine.save({...a,kind:'artifact',content:'Relevant source evidence'},'codex');
+  const unrelated=engine.save({...a,kind:'artifact',content:'UNRELATED_CONTENT'},'codex');
+  engine.notify({...a,kind:'decision_required',summary:'Hold paid commitments'},'codex');
+  engine.message({...a,to:'pm',content:'Missing source needs follow-up'},'codex');
+  withStore(a.root,db=>db.transaction('test.failed_review',s=>{s.records.failure={id:'failure',kind:'review',revision:1,content:'Keep the failed check',review:{verdict:'Fail'}};return s;}));
+  const j=queued(a,{inputs:[{id:evidence.id,revision:1}]});
+  await work(a.root,j,async(_host,_native,prompt)=>{
+    assert.match(prompt,/No customer data/);assert.match(prompt,/Relevant source evidence/);
+    assert.match(prompt,/Keep the failed check/);assert.match(prompt,/Hold paid commitments/);
+    assert.match(prompt,/Missing source needs follow-up/);assert.ok(!prompt.includes(unrelated.content));
+    return result();
+  });
+  const job=engine.status(a,'codex').jobs[0];assert.equal(job.status,'completed');
+  assert.ok(job.inputs.some(r=>r.id===intent.id));assert.ok(job.inputs.some(r=>r.id==='failure'));
+  assert.ok(job.context_sha256);
+});
+
+test('new constraints, pending notices and recipient messages quarantine in-flight results',async()=>{
+  for(const change of [
+    a=>engine.save({...a,kind:'intent',content:'New material limit'},'codex'),
+    a=>engine.notify({...a,kind:'must_know',summary:'New material concern'},'codex'),
+    a=>engine.message({...a,to:'pm',content:'Changed requirement'},'codex'),
+  ]) {
+    const a=setup(),j=queued(a);
+    await work(a.root,j,async()=>{change(a);return result();});
+    assert.equal(engine.status(a,'codex').jobs[0].status,'quarantined');
+  }
+});
+
+test('notice presentation and seen bookkeeping do not invalidate an assignment',async()=>{
+  const a=setup(),n=engine.notify({...a,kind:'must_know',summary:'Existing concern'},'codex'),j=queued(a);
+  await work(a.root,j,async()=>{
+    hook({cwd:a.root,session_id:a.session_id,hook_event_name:'UserPromptSubmit',prompt:'status'},'codex');
+    engine.acknowledge({...a,notice_id:n.id,seen:true},'codex');return result();
+  });
+  assert.equal(engine.status(a,'codex').jobs[0].status,'completed');
+});
+
+test('changed queued dependencies are held before spending a model call',async()=>{
+  for(const addConstraint of [false,true]) {
+    const a=setup(),r=engine.save({...a,kind:'plan',content:'Version one'},'codex');
+    const j=queued(a,{inputs:[{id:r.id,revision:1}]});
+    withStore(a.root,db=>db.transaction('test.context_at_dispatch',s=>{s.jobs[j].context_sha256=assignmentContext(s,s.jobs[j]).hash;return s;}));
+    if(addConstraint)engine.save({...a,kind:'decision',content:'New founder limit'},'codex');
+    else engine.save({...a,id:r.id,expected_revision:1,kind:'plan',content:'Version two'},'codex');
+    let calls=0;await work(a.root,j,async()=>{calls++;return result();});
+    assert.equal(calls,0);assert.equal(engine.status(a,'codex').jobs[0].status,'failed');
+  }
+});
+
+test('oversized assignment context is held intact instead of silently truncated',async()=>{
+  const a=setup();for(let i=0;i<3;i++)engine.save({...a,kind:'intent',content:'x'.repeat(80000)},'codex');
+  const j=queued(a);let calls=0;await work(a.root,j,async()=>{calls++;return result();});
+  const s=engine.status(a,'codex');assert.equal(calls,0);assert.equal(s.jobs[0].status,'failed');
+  assert.match(s.jobs[0].error,/Nothing was truncated/);
+  assert.equal(s.records.filter(r=>r.kind==='intent').reduce((n,r)=>n+r.content.length,0),240000);
+});
+
+test('unrelated artifacts do not invalidate the bounded assignment',async()=>{
+  const a=setup(),r=engine.save({...a,kind:'artifact',content:'Unrelated v1'},'codex'),j=queued(a);
+  await work(a.root,j,async()=>{
+    engine.save({...a,id:r.id,expected_revision:1,kind:'artifact',content:'Unrelated v2'},'codex');return result();
+  });
+  assert.equal(engine.status(a,'codex').jobs[0].status,'completed');
+});
+
+test('legacy generator folders remain protected after retiring the generator',()=>{
+  const root=fs.mkdtempSync(path.join(base,'legacy-'));fs.mkdirSync(path.join(root,'team'));
+  const manifest=path.join(root,'team/manifest.json');fs.writeFileSync(manifest,'{"legacy":true}');
+  engine.bind(root,'founder','codex');
+  assert.throws(()=>engine.open({root,session_id:'founder',idea:'Do not overwrite'},'codex'),/Legacy workspace/);
+  assert.equal(fs.readFileSync(manifest,'utf8'),'{"legacy":true}');
 });

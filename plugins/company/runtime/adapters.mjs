@@ -2,7 +2,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { spawn, spawnSync } from 'node:child_process';
-import { PACKAGE } from './store.mjs';
 
 export function executable(host) {
   if (!['codex','claude'].includes(host)) throw new Error('Unsupported host');
@@ -83,4 +82,3 @@ export function parseArtifact(text) {
   }
   return value;
 }
-export const roles = JSON.parse(fs.readFileSync(path.join(PACKAGE,'assets/roles.json'),'utf8'));

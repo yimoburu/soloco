@@ -326,14 +326,14 @@ test('a company checkpoint above 200000 characters upgrades without dropping any
   assert.equal(read(a).records.large.content,content);
 });
 
-test('schema-2 v0.2.0 companies can upgrade and recover their prior definitions on the patch runtime',async()=>{
+test('compatible schema-2 companies can optionally adopt and recover team definitions',async()=>{
   const a=setup();withStore(a.root,db=>db.transaction('test.previous_patch',s=>{
     s.schema=2;s.runtime_version='0.2.0';s.plugin_version='0.2.0';s.cos_instructions='Preserve founder limits and independently review preparation';s.team_sha256=teamHash(s);return s;
   }));
-  assert.throws(()=>engine.open(a,'codex'),/checked runtime upgrade/);
+  assert.doesNotThrow(()=>engine.open(a,'codex'));
   const args=await ready(a),done=applyAndVerify(args);
-  assert.equal(done.runtime_version,'0.2.1');
+  assert.equal(done.runtime_version,VERSION);
   const recovered=upgrade({...a,expected_epoch:done.owner.epoch,upgrade_id:done.upgrade.id,action:'recover',source_instruction:'Recover prior team definitions'},'codex');
-  assert.equal(recovered.plugin_version,'0.2.0');assert.equal(recovered.runtime_version,'0.2.1');
+  assert.equal(recovered.plugin_version,'0.2.0');assert.equal(recovered.runtime_version,VERSION);
   assert.doesNotThrow(()=>engine.open(a,'codex'));
 });

@@ -2,8 +2,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { spawn } from 'node:child_process';
-import { PACKAGE, VERSION, stamp, id, digest, folder, noLink, withStore, owner, notice, requireText, SCHEMA, installedTeam, teamHash, upgradePending } from './store.mjs';
-import { readiness, roles } from './adapters.mjs';
+import { PACKAGE, VERSION, stamp, id, digest, folder, noLink, withStore, owner, notice, requireText, SCHEMA, installedTeam, teamHash, upgradePending, compatibleRuntime } from './store.mjs';
+import { readiness } from './adapters.mjs';
+import { assignmentContext } from './context.mjs';
 
 const busy = state => Object.values(state.jobs).filter(j => ['queued','running'].includes(j.status));
 export function dataDir() {
@@ -28,7 +29,7 @@ export function upgradeSummary(u) {
   return {...progress,candidate_version:candidate.plugin_version,previous_version:previous.plugin_version};
 }
 function summary(state) {
-  return {company_id:state.id, name:state.name, idea:state.idea, revision:state.revision, phase:state.phase, mode:state.mode, paused:state.paused, owner:state.owner, plugin_version:state.plugin_version, runtime_version:state.runtime_version??state.plugin_version, upgrade:upgradeSummary(state.upgrade), governance_sha256:state.governance_sha256, records:Object.values(state.records), sessions:state.sessions, jobs:Object.values(state.jobs), notices:state.notices.filter(n=>!n.resolution), messages:state.messages, capabilities:{standalone_sessions:true, external_execution:false, background_founder_delivery:false, automatic_team_migration:false, explicit_team_upgrade:true}};
+  return {company_id:state.id, name:state.name, idea:state.idea, revision:state.revision, phase:state.phase, mode:state.mode, paused:state.paused, owner:state.owner, plugin_version:state.plugin_version, runtime_version:state.runtime_version??state.plugin_version, executing_runtime_version:VERSION, upgrade:upgradeSummary(state.upgrade), governance_sha256:state.governance_sha256, records:Object.values(state.records), sessions:state.sessions, jobs:Object.values(state.jobs), notices:state.notices.filter(n=>!n.resolution), messages:state.messages, capabilities:{standalone_sessions:true, external_execution:false, background_founder_delivery:false, automatic_team_migration:false, explicit_team_upgrade:true}};
 }
 function update(args, host, type, fn) {
   binding(args,host);
@@ -80,7 +81,7 @@ export function save(args,host) {
 }
 export function dispatch(args,host) {
   requireText(args.task,'task');
-  if (!Object.hasOwn(roles,args.role) || args.role==='runner') throw new Error('Choose a specialist role from company_open');
+  if (args.role==='runner') throw new Error('Choose a specialist role from company_open');
   const check=readiness(host);
   if (!check.available) throw new Error(check.error);
   if (check.authenticated===false) throw new Error(`${host} CLI is not signed in. Complete its normal login before starting specialists.`);
@@ -99,7 +100,9 @@ export function dispatch(args,host) {
     if(session.host!==host) throw new Error('Role belongs to another host; perform company handover first');
     const inputs=args.input_ids??[];
     if(!Array.isArray(inputs) || inputs.some(k=>typeof k!=='string' || !Object.hasOwn(s.records,k))) throw new Error('An input record is missing');
-    s.jobs[jobId]={id:jobId,role:args.role,session_key:key,instance_id:session.instance_id,native_id:session.native_id,host,epoch:s.owner.epoch,status:'queued',task:args.task,inputs:inputs.map(k=>({id:k,revision:s.records[k].revision})),review_of:target?{id:target.id,revision:target.revision}:null,created_at:stamp()};
+    const job={id:jobId,role:args.role,session_key:key,instance_id:session.instance_id,native_id:session.native_id,host,epoch:s.owner.epoch,status:'queued',task:args.task,inputs:inputs.map(k=>({id:k,revision:s.records[k].revision})),review_of:target?{id:target.id,revision:target.revision}:null,created_at:stamp()};
+    const context=assignmentContext(s,job);
+    s.jobs[jobId]={...job,inputs:context.inputs,context_sha256:context.hash};
   });
   try {
     const worker=spawn(process.execPath,['--no-warnings',path.join(PACKAGE,'runtime/worker.mjs'),folder(args.root),jobId],{detached:true,stdio:'ignore',env:{...process.env,COMPANY_WORKER:'1'}});
@@ -115,7 +118,7 @@ export function control(args,host) {
   return withStore(args.root,db=>summary(db.transaction(`company.${args.action}`,s=>{
     if (!s || ![1,SCHEMA].includes(s.schema)) throw new Error('Unsupported company version');
     if (args.action!=='pause') {
-      if (s.schema!==SCHEMA || s.runtime_version!==VERSION) throw new Error('Use company_upgrade before resuming or handing over this version');
+      if (!compatibleRuntime(s)) throw new Error('Use company_upgrade before resuming or handing over this version');
       if (upgradePending(s)) throw new Error('Finish or recover the pending team upgrade first');
       if (teamHash(s)!==s.team_sha256) throw new Error('Pinned team integrity check failed');
     }
@@ -153,7 +156,6 @@ export function acknowledge(args,host) {
 }
 export function message(args,host) {
   requireText(args.content,'content');
-  if(!Object.hasOwn(roles,args.to)) throw new Error('Unknown recipient role');
-  const s=update(args,host,'message.sent',s=>{s.messages.push({id:id('message'),from:'runner',author_instance:s.owner.session_id,to:args.to,content:args.content,at:stamp()});});
+  const s=update(args,host,'message.sent',s=>{if(!Object.hasOwn(s.roles,args.to)) throw new Error('Unknown recipient role');s.messages.push({id:id('message'),from:'runner',author_instance:s.owner.session_id,to:args.to,content:args.content,at:stamp()});});
   return s.messages.at(-1);
 }

@@ -5,9 +5,12 @@ import { randomUUID, createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 export const PACKAGE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-export const VERSION = '0.2.1';
-export const COMPATIBLE_TEAM_VERSIONS = ['0.1.0', '0.2.0', VERSION];
+export const VERSION = '0.2.2';
+// Explicitly tested state producers, not a blanket semver compatibility promise.
+export const COMPATIBLE_RUNTIME_VERSIONS = ['0.2.0', '0.2.1', VERSION];
+export const COMPATIBLE_TEAM_VERSIONS = ['0.1.0', ...COMPATIBLE_RUNTIME_VERSIONS];
 export const SCHEMA = 2;
+export const compatibleRuntime = state => state?.schema === SCHEMA && COMPATIBLE_RUNTIME_VERSIONS.includes(state.runtime_version);
 export const stamp = () => new Date().toISOString();
 export const id = (prefix) => `${prefix}-${randomUUID()}`;
 export const digest = (text) => createHash('sha256').update(text).digest('hex');
@@ -63,7 +66,7 @@ export function withStore(root, fn, create = false) {
   try { return fn(db); } finally { db.close(); }
 }
 export function owner(state, actor, host, epoch) {
-  if (!state || state.schema !== SCHEMA || state.runtime_version !== VERSION) throw new Error('Company needs a checked runtime upgrade; use company_upgrade inspect, never reinitialize');
+  if (!compatibleRuntime(state)) throw new Error('Company needs a checked runtime upgrade; use company_upgrade inspect, never reinitialize');
   if (state.owner.session_id !== actor || state.owner.host !== host || (epoch !== undefined && state.owner.epoch !== epoch)) throw new Error('This chat does not own the company. Resume the active chat or perform a checked handover.');
   if (!COMPATIBLE_TEAM_VERSIONS.includes(state.plugin_version)) throw new Error('Unsupported pinned team version');
   if (state.team_sha256 !== teamHash(state)) throw new Error('Pinned team integrity check failed');

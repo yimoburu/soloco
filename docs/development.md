@@ -18,7 +18,8 @@ The target covers ongoing operation against founder-defined objectives, includin
 | `runtime/engine.mjs` | Coordinator ownership, records, assignments, notices, pause, and handover |
 | `runtime/upgrade.mjs` | Candidate inspection, native CoS/QA continuity checks, explicit adoption, verification, and definition recovery |
 | `runtime/adapters.mjs`, `worker.mjs` | Start/resume native standalone role processes and publish their results |
-| `assets/` | Bundled canonical governance and proposed role catalog |
+| `runtime/context.mjs` | Complete bounded assignment packs and dependency checks |
+| `assets/` | Bundled governance and the canonical proposed role catalog |
 
 The Chief of Staff decides what to assign; software commits records and runs sessions. There is no second coordination agent or founder connection service. Role sessions use explicit native IDs, not `--continue`/`--last` or parent-owned subagents. Peer messages enter durable role inboxes and are included on the recipient's next assignment; a message does not wake a role independently of Chief of Staff scheduling.
 
@@ -26,7 +27,7 @@ The Chief of Staff decides what to assign; software commits records and runs ses
 
 The attached folder contains `.company/company.sqlite` and SQLite's companion files while active. The database stores identity, pinned governance and role definitions, draft intent/plans/preferences, author-attributed artifacts and exact-version reviews, jobs, native session references, messages, notices, and an event index. Use Company tools to inspect or amend it. Keep `.company/` private; back up using SQLite's backup facilities or after all connections close, rather than copying a live database file alone.
 
-Initialization preserves existing project files. A legacy `team/manifest.json` is detected and held for explicit migration; it is never silently imported or overwritten. Company records remain outside install/cache paths. An unsupported runtime version holds ordinary mutation. The explicit upgrade flow supports schema-1 v0.1.0 preparation records and schema-2 records on v0.2.0 or the current runtime; it does not silently adopt definitions or migrate arbitrary formats.
+Initialization preserves existing project files. A legacy `team/manifest.json` is detected and held for explicit migration; it is never silently imported or overwritten. Company records remain outside install/cache paths. An unsupported schema/runtime combination holds ordinary mutation. `runtime_version` records the runtime that created or last migrated the state; `executing_runtime_version` in status identifies the running code. An explicit tested compatibility list lets v0.2.2 operate schema-2 states produced by v0.2.0/v0.2.1 without rewriting pinned definitions or triggering team adoption. No future version is accepted merely because its version number looks compatible. The explicit upgrade flow supports schema-1 v0.1.0 preparation records and schema-2 records produced by v0.2.0, v0.2.1 or v0.2.2; it does not silently adopt definitions or migrate arbitrary formats.
 
 Startup hooks bind the host's session ID and attached folder in private plugin data. Only the current coordinator may mutate ordinary records. A second chat can read status, pause, or perform an explicitly requested handover after active assignments are held. Handover increments the ownership epoch and retires old role instances; successors use company records. Pausing cancels eligibility, not an already-sent model request. Late, outdated, or revoked results are quarantined and cannot become acceptance.
 
@@ -46,16 +47,15 @@ A detached worker runs two fresh native sessions: candidate CoS reconstruction a
 
 `apply` requires a passing exact-checkpoint review and unchanged installed candidate. It atomically pins the adopted definitions, retires specialist references, and revokes the previous ownership epoch. `verify` is a separate post-commit readback of company identity, preserved records, obligations, notices, and other checkpoint fields. Normal work and resume remain held until it passes. The CoS reloads its pinned brief; specialists cold-start on their next assignment. The two probe sessions test preparation continuity; they are not the founder's chat or a claim that every future specialist has been live-tested.
 
-`recover` restores prior definitions under runtime v0.2.1, retires sessions again, and retains later evidence, messages, notices, and upgrade history. It leaves the company paused for a checked resume. No database rollback occurs, and the old v0.1.0 binary cannot operate the migrated schema. Natural-language upgrade/takeover instructions use the same source-attribution boundary as existing controls; they are not independent human authentication or external-action approval. Same-user filesystem access remains outside the security boundary.
+`recover` restores prior definitions under the installed supported runtime, retires sessions again, and retains later evidence, messages, notices, and upgrade history. It leaves the company paused for a checked resume. No database rollback occurs, and the old v0.1.0 binary cannot operate the migrated schema. Natural-language upgrade/takeover instructions use the same source-attribution boundary as existing controls; they are not independent human authentication or external-action approval. Same-user filesystem access remains outside the security boundary.
 
 ## Build and test
 
-The spec and role catalog have one authoring source: `SPEC.md` and `tools/materialize.py`. The CoS meta rules live in the spec; skills and generated role briefs apply them, and existing outcome reviews assess them. Regenerate the package assets after changing either source; the build check detects drift.
+Author governance in `SPEC.md` and roles directly in `plugins/company/assets/roles.json`. The CoS skill applies the canonical meta rules. Bundle governance after a spec change; the check detects drift. Installation, release status and examples live outside the pinned governance, so editing them does not change the team hash.
 
 ```sh
-python3 tools/build_plugin.py
-python3 tools/build_plugin.py --check
-python3 -m unittest discover -s tests -v
+node tools/build-plugin.mjs
+node tools/build-plugin.mjs --check
 node --no-warnings --test tests/*.test.mjs
 claude plugin validate plugins/company --strict
 claude plugin validate . --strict
@@ -72,16 +72,16 @@ Native local installation tests should use temporary host configuration director
 
 Implementation references: [OpenAI plugin packaging](https://developers.openai.com/plugins/build/plugins), [OpenAI hooks](https://learn.chatgpt.com/docs/hooks), [Claude manifest](https://code.claude.com/docs/en/plugins-reference), [Claude hooks](https://code.claude.com/docs/en/hooks), and [Claude programmatic sessions](https://code.claude.com/docs/en/headless). Local CLI help was also checked for the versions in the README. Host capability checks fail visibly rather than implying compatibility with every app/version.
 
-## Legacy workspace generator
+## Assignment context
 
-`tools/materialize.py` remains a manual developer preview, separate from plugin onboarding:
+Dispatch snapshots the input versions and a hash of the full supplied context. The pack includes pinned governance, the assigned role, company identity/mode, all intent/decision/preference records, failed or blocked reviews, unresolved founder notices, the role's inbox and explicitly named inputs/review target. The CoS supplies relevant plans and evidence via `input_ids`; it must not rely on unstated session memory. Prior record revisions are retained in selected records.
 
-```sh
-python3 tools/materialize.py --config examples/venture.json --output /tmp/my-venture --target both
-```
+Unrelated artifacts are not included. New or changed constraints, selected inputs, unresolved notices or incoming messages invalidate the result; notice presentation/seen bookkeeping does not. Queued jobs check their context before invoking a model, and returned results recheck before acceptance. Legacy queued jobs establish their complete context at startup. Packs over 200,000 characters fail visibly; the runtime never silently slices a record. Full continuity rehearsals still retain the independent 300,000-character checkpoint bound.
 
-Configuration accepts `name`, `idea`, and optional `active_roles`, defaulting to `runner`, `pm`, `research`, and `qa`. Explicit lists require `runner` and `pm`. `codex`, `claude`, and `both` select instruction wrappers; `--spec` pins an explicit UTF-8 governance source without adapting templates to it.
+## Model selection
 
-Output includes `START.md`, the selected platform wrappers, and `team/` with pinned governance, manifest, proposed charters, role briefs, draft/dormant specs, Draft Frame, empty record locations, and unapproved templates. It starts no sessions and grants no authority. Follow its generated `START.md` only for manual trials; do not mix it with the plugin's `.company/` state.
+The spec permits task-specific model selection within founder-approved choices and limits. This release does not implement per-assignment model/effort routing: adapters use the selected host's CLI default and do not verify or report a chosen model. The founder chooses the CoS model in the host UI where supported. Do not claim the CoS dynamically selected specialist models until dispatch, adapters and attribution implement it. A future implementation should extend the existing assignment and adapter, not add a routing service. Evaluate task quality, cost and latency as described in the [official model-selection guidance](https://developers.openai.com/api/docs/guides/model-selection); provider guidance does not establish plugin support.
 
-Existing outputs and symlinks are refused. Generation stages files and cleans up ordinary failures, but publication is not crash-atomic; use only successfully completed output. All manual sessions must see the same filesystem, use one active environment, and serialize writes. A Git remote alone is not shared live state.
+## Retired generator
+
+The manual Python generator and its separate tests/configuration were retired in v0.2.2. The [v0.2.1 source snapshot](https://github.com/yimoburu/ai-operated-startup/tree/c346367fb910b88b8a4b908b7531aba081338b4b) remains available for historical trials. Existing `team/manifest.json` workspaces are still detected and held; this release neither imports nor overwrites them. Plugin companies remain in `.company/`.
