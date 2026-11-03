@@ -41,7 +41,7 @@ class MaterializeTests(unittest.TestCase):
 
         self.assertEqual((output / "team/governance.md").read_bytes(), source)
         self.assertEqual(manifest["schema_version"], "1")
-        self.assertEqual(manifest["converter_version"], "0.2")
+        self.assertEqual(manifest["converter_version"], "0.3")
         self.assertEqual(manifest["name"], self.config["name"])
         self.assertEqual(manifest["governance"]["file"], "team/governance.md")
         self.assertEqual(
@@ -71,15 +71,45 @@ class MaterializeTests(unittest.TestCase):
             prompts.append(prompt)
         self.assertEqual(len(set(prompts)), 3)
         self.assertFalse((output / ".claude/agents").exists())
-        for template in ["decision", "handoff", "gate"]:
+        for template in ["decision", "founder-packet", "handoff", "gate"]:
             record = json.loads((output / f"team/templates/{template}.json").read_text())
             self.assertEqual(record["status"], "Draft")
             self.assertEqual(record["version"], 0)
+            self.assertEqual(record["governing_versions"], [])
             for field in ["id", "owner", "author_instance"]:
                 self.assertIsNone(record[field])
         gate = json.loads((output / "team/templates/gate.json").read_text())
         self.assertIsNone(gate["contract_approval"])
         self.assertIsNone(gate["verdict"])
+
+    def test_generation_does_not_invent_review_policy_retry_or_founder_authority(self):
+        output = self.generate()
+        frame = json.loads((output / "team/board/frame.json").read_text())
+        self.assertIsNone(frame["professional_review_policy"])
+        self.assertIsNone(frame["founder_authorization"])
+
+        gate = json.loads((output / "team/templates/gate.json").read_text())
+        self.assertEqual(gate["on_fail"], {
+            "owner": None, "safe_hold": None, "retry_authority": None, "retry_limit": None,
+        })
+        self.assertIsNone(gate["contract_approval"])
+        self.assertIsNone(gate["contract_approval_rationale"])
+        self.assertEqual(gate["prior_gate_records"], [])
+
+        packet = json.loads((output / "team/templates/founder-packet.json").read_text())
+        for field in ["reserved_category", "authority_reference", "decision", "recommendation",
+                      "cost_of_waiting", "founder_decision"]:
+            self.assertIsNone(packet[field])
+        self.assertEqual(packet["options"], [])
+        self.assertEqual(packet["evidence"], [])
+        self.assertEqual(packet["dissent"], [])
+
+        decision = json.loads((output / "team/templates/decision.json").read_text())
+        self.assertEqual(decision["source_instruction"], {
+            "reference": None, "attributed_to": None, "text": None,
+        })
+        self.assertIsNone(decision["authority"])
+        self.assertIsNone(decision["outcome"])
 
     def test_target_selection_does_not_mix_platform_instruction_files(self):
         for target in ["codex", "claude", "both"]:

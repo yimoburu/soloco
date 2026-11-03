@@ -10,6 +10,13 @@ These files preserve original intent and review evidence. They are historical sn
 | [Claude v0.2 review](reviews/claude-v0.2.md), [disposition](reviews/v0.3-disposition.md), [v0.3 draft](specs/v0.3-draft.md) | Second review and proposed corrections |
 | [Review brief](reviews/review-brief-v0.1.md) | Scope of the original review |
 | [Founder interface](docs/founder-interface.md), [user stories](docs/user-stories.md), [company continuity](docs/company-continuity.md) | Subsequent intent clarifications, now consolidated into the current spec |
+| [v0.4 snapshot](https://github.com/yimoburu/ai-operated-startup/blob/c32a20d95f794df0cc435b15d08a758c61dfbacd/SPEC.md), [Claude review](reviews/claude-v0.4.md), [v0.5 disposition](reviews/v0.5-disposition.md) | Reconciled design, external review, and narrowly adopted corrections |
+
+## v0.5 clarification — 2026-11-02
+
+The seven constitutional articles and company-replacement protocol are unchanged. The revision assigns failed-gate disposition and founder-instruction recording, qualifies founder packets, makes the Frame professional-review policy explicit, and strengthens funding approval rationale. The example now shows authorization before payments and distinct author/reviewer instances. [The disposition](reviews/v0.5-disposition.md) records accepted findings, narrower remedies, and deferred preferences.
+
+Converter v0.3 mirrors those requirements in proposed charters and blank record starters. It still prepares files only; existing workspaces are not upgraded. v0.4 remains available at the immutable commit above rather than as another current spec.
 
 ## v0.4 reconciliation — 2026-11-02
 

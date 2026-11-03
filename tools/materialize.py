@@ -10,7 +10,7 @@ import tempfile
 
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "0.2"
+VERSION = "0.3"
 
 # These are role starters, not extracted or approved interpretations of governance.
 # The pinned spec governs; Frame must review the charters and authority map.
@@ -19,7 +19,7 @@ ROLES = {
         "name": "Product Manager", "spec": "product",
         "mission": "Choose the smallest coherent scope that delivers value or resolves uncertainty.",
         "inputs": "Founder Intent, customer evidence, accepted constraints.",
-        "outputs": "Product spec, priorities, feature acceptance criteria, decision packets.",
+        "outputs": "Product spec, priorities, feature acceptance criteria, decision packets; recorded Intent changes attributed to the founder's source instruction.",
         "block": "Scope drift or work without accepted product requirements.",
         "success": "Accepted scope delivers the intended outcome or decision-quality learning.",
         "failure": "Confusing delivery with value.", "phase": "Frame onward, as needed.",
@@ -179,6 +179,21 @@ founder authorization under the pinned spec before those actions.
   clearing condition. Apply the pinned conflict ladder; never bypass a block.
 - Record uncertainty, stalls, stale evidence, and adverse results. Consequential
   decisions include rationale, expected outcome, and an outcome review date.
+- PM records founder direction in Intent with its source and attribution before
+  dependent work resumes. The interface captures the instruction; it gains no
+  domain authority. Confirm ambiguity or inferred authority beyond the explicit
+  instruction; clear instructions need no repeated confirmation.
+- Frame must establish the professional-review policy in Founder Intent,
+  including triggers, independent assessor, and change authority. Unknown
+  policy is not permission; no agent may waive the policy or legally required review.
+- Gate contracts name a failure owner, safe hold, and bounded retry authority.
+  Retain failed results. Revised tests need prospective independent approval;
+  unknown retry authority permits no retry. Escalate only reserved changes,
+  not every failed experiment.
+- Founder packets cite a reserved category and authority reference; each option
+  states its trade-offs. Preserve dissent and review escalation quality through
+  the existing outcome process. Do not add a veto over genuine reserved decisions
+  or automatically shrink delegation for unnecessary escalation.
 
 ## Prototype operation
 
@@ -309,11 +324,18 @@ def materialize(config, output, target="both", spec=None):
                 encoding="utf-8")
         (team / "specs/founder-intent.md").write_text(
             f"# Founder Intent: {config['name']}\n\nOwner: Human founder. Version: 0.0. Status: Draft.\n\n"
+            "Recorder: PM, under founder authority. Preserve the original instruction\n"
+            "and attribution in its decision record; clarify ambiguity or inferred\n"
+            "authority beyond the explicit instruction before applying it.\n\n"
             "## Idea supplied at generation\n\n" + config["idea"] + "\n\n"
             "## Decisions requiring confirmation\n\n"
             "Target user, success, non-goals, budget per commitment and cumulative, legal\n"
             "exposure, data/payment/user/terms/duration envelope, irreversible actions,\n"
             "scope-change thresholds, reviewers, reading budget, expiry: Unknown.\n\n"
+            "## Professional-review policy\n\n"
+            "Triggers, independent assessor, and change authority: Unknown; establish at Frame.\n"
+            "Record the accepted policy here; Frame references its version. No agent may\n"
+            "waive the policy or legally required review.\n\n"
             "Generation is not founder approval. Preserve unknowns until explicitly resolved.\n",
             encoding="utf-8")
         write_json(team / "board/frame.json", {
@@ -321,7 +343,9 @@ def materialize(config, output, target="both", spec=None):
             "status": "Draft", "version": 0,
             "permission": "prepare_frame_only", "decision_id": None,
             "contract_approver": None, "founder_authorization": None,
+            "professional_review_policy": None,
             "missing": ["accepted intent and limits", "approved charters and reviewers",
+                        "accepted professional-review policy with independent assessor and change authority",
                         "risk/exposure screen", "approved first evidence contract", "cold-start acceptance"],
             "next": "Prepare a founder decision packet and independent Frame review.",
         })
@@ -329,18 +353,28 @@ def materialize(config, output, target="both", spec=None):
             "decision": {"id": None, "owner": None, "author_instance": None,
                          "status": "Draft", "version": 0, "authority": None,
                          "governing_versions": [], "decision": None, "evidence": [], "rationale": None,
+                         "source_instruction": {"reference": None, "attributed_to": None, "text": None},
                          "expected_outcome": None, "review_date": None, "reviewer": None, "outcome": None},
+            "founder-packet": {"id": None, "owner": None, "author_instance": None,
+                               "status": "Draft", "version": 0, "reserved_category": None,
+                               "governing_versions": [], "decision_id": None,
+                               "authority_reference": None, "decision": None, "options": [],
+                               "recommendation": None, "evidence": [], "cost_of_waiting": None,
+                               "dissent": [], "founder_decision": None},
             "handoff": {"id": None, "owner": None, "author_instance": None,
                         "status": "Draft", "version": 0, "receiver_instance": None,
                         "artifact_version": None, "governing_versions": [], "decision_id": None,
                         "acceptance_checks": [], "evidence": [], "limitations": [],
                         "receiver_verdict": None, "review_record": None},
             "gate": {"id": None, "owner": None, "author_instance": None,
-                     "status": "Draft", "version": 0, "claim": None,
+                     "status": "Draft", "version": 0, "governing_versions": [], "claim": None,
                      "population": None, "method": None, "window": None, "pass_conditions": [],
                      "disqualifiers": [], "evidence_freshness": None, "permits": None,
-                     "independent_reviewers": [], "contract_approval": None, "evidence": [],
+                     "independent_reviewers": [], "contract_approval": None,
+                     "contract_approval_rationale": None, "evidence": [], "prior_gate_records": [],
                      "verdict": None, "decision_id": None,
+                     "on_fail": {"owner": None, "safe_hold": None,
+                                 "retry_authority": None, "retry_limit": None},
                      "blocked": {"missing": [], "owner": None, "deadline": None, "safe_hold": None}},
         }
         for name, template in templates.items():

@@ -26,6 +26,8 @@ Configuration fields are `name`, `idea`, and optional `active_roles` (default `p
 | `team/specs/`, `board/`, `artifacts/`, `decisions/` | Company spec skeletons, Draft Frame, and locations for durable working records |
 | `team/PROTOCOL.md`, `templates/`, `START.md` | Manual development procedure and unapproved record starters |
 
+Converter v0.3 adds founder-packet fields for the reserved category and authority reference, source-instruction attribution in decision records, and gate failure disposition, prior-result references, and approval rationale. The professional-review policy has one home in Founder Intent; Frame references its accepted version. These are blank record starters, not routing or approval enforcement. Existing workspaces retain their generated files and pinned rules.
+
 Frame permits preparation only. Missing constraints remain unknown; no approval, customer evidence, spending permission, or gate Pass is fabricated. Release owns Support Readiness until a Support seat is selected. Architect owns the whole Technical spec when selected; Engineering retains its implementation section.
 
 For now, company records and team instructions are colocated under `team/`. There is no persistent company identity service, team-release registry, or live migration mechanism. That prototype layout is not a replacement boundary: never copy a candidate over company records.
