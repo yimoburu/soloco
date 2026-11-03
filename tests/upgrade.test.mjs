@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { withStore, id, digest, VERSION, teamHash } from '../plugins/company/runtime/store.mjs';
-import * as engine from '../plugins/company/runtime/engine.mjs';
-import { upgrade, rehearse } from '../plugins/company/runtime/upgrade.mjs';
-import { hook, call } from '../plugins/company/runtime/main.mjs';
+import { withStore, id, digest, VERSION, teamHash } from '../plugins/soloco/runtime/store.mjs';
+import * as engine from '../plugins/soloco/runtime/engine.mjs';
+import { upgrade, rehearse } from '../plugins/soloco/runtime/upgrade.mjs';
+import { hook, call } from '../plugins/soloco/runtime/main.mjs';
 
 const base=fs.mkdtempSync(path.join(os.tmpdir(),'company-upgrade-'));
 process.env.COMPANY_PLUGIN_DATA=path.join(base,'cache');
@@ -234,7 +234,7 @@ test('a new founder chat needs explicit paused takeover, then old chat writes re
 test('parallel prepare attempts cannot acquire the same upgrade epoch',async()=>{
   const {spawn}=await import('node:child_process');
   const a=setup(),inspection=upgrade({...a,action:'inspect'},'codex');
-  const url=new URL('../plugins/company/runtime/upgrade.mjs',import.meta.url).href;
+  const url=new URL('../plugins/soloco/runtime/upgrade.mjs',import.meta.url).href;
   const args={...a,action:'prepare',candidate_hash:inspection.candidate_hash,source_instruction:'Upgrade'};
   const script=`import {upgrade} from ${JSON.stringify(url)};try{upgrade(${JSON.stringify(args)},'codex',{launch:()=>{},check:()=>({available:true,authenticated:true})});}catch{process.exitCode=1;}`;
   const codes=await Promise.all([1,2].map(()=>new Promise(resolve=>{const child=spawn(process.execPath,['--no-warnings','--input-type=module','-e',script],{stdio:'ignore'});child.on('close',resolve);})));
@@ -336,4 +336,11 @@ test('compatible schema-2 companies can optionally adopt and recover team defini
   const recovered=upgrade({...a,expected_epoch:done.owner.epoch,upgrade_id:done.upgrade.id,action:'recover',source_instruction:'Recover prior team definitions'},'codex');
   assert.equal(recovered.plugin_version,'0.2.0');assert.equal(recovered.runtime_version,VERSION);
   assert.doesNotThrow(()=>engine.open(a,'codex'));
+});
+
+
+test('company rename cannot change a pending upgrade checkpoint',()=>{
+  const a=setup(),p=prepare(a),before=read(a);
+  assert.throws(()=>engine.control({...a,action:'rename',expected_epoch:p.owner.epoch,expected_name:before.name,name:'Changed during upgrade',source_instruction:'Rename'},'codex'),/pending team upgrade/);
+  assert.deepEqual(read(a),before);
 });

@@ -5,9 +5,9 @@ import { randomUUID, createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 export const PACKAGE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-export const VERSION = '0.2.2';
+export const VERSION = '0.3.0';
 // Explicitly tested state producers, not a blanket semver compatibility promise.
-export const COMPATIBLE_RUNTIME_VERSIONS = ['0.2.0', '0.2.1', VERSION];
+export const COMPATIBLE_RUNTIME_VERSIONS = ['0.2.0', '0.2.1', '0.2.2', VERSION];
 export const COMPATIBLE_TEAM_VERSIONS = ['0.1.0', ...COMPATIBLE_RUNTIME_VERSIONS];
 export const SCHEMA = 2;
 export const compatibleRuntime = state => state?.schema === SCHEMA && COMPATIBLE_RUNTIME_VERSIONS.includes(state.runtime_version);
@@ -76,7 +76,7 @@ export const upgradePending = state => state?.upgrade && !['completed','recovere
 export const skillBody = text => text.replace(/^---[\s\S]*?---\s*/, '');
 export function installedTeam() {
   const governance = fs.readFileSync(path.join(PACKAGE,'assets/governance.md'),'utf8');
-  return {plugin_version:VERSION, governance, governance_sha256:digest(governance), roles:JSON.parse(fs.readFileSync(path.join(PACKAGE,'assets/roles.json'),'utf8')), cos_instructions:skillBody(fs.readFileSync(path.join(PACKAGE,'skills/company/SKILL.md'),'utf8'))};
+  return {plugin_version:VERSION, governance, governance_sha256:digest(governance), roles:JSON.parse(fs.readFileSync(path.join(PACKAGE,'assets/roles.json'),'utf8')), cos_instructions:skillBody(fs.readFileSync(path.join(PACKAGE,'skills/soloco/SKILL.md'),'utf8'))};
 }
 export function teamHash(s) {
   return digest(JSON.stringify([s.plugin_version,s.governance,s.roles,s.cos_instructions]));

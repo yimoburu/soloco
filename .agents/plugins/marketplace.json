@@ -1,14 +1,14 @@
 {
-  "name": "ai-operated-startup",
+  "name": "soloco",
   "interface": {
-    "displayName": "AI-operated startup"
+    "displayName": "SoloCo"
   },
   "plugins": [
     {
-      "name": "company",
+      "name": "soloco",
       "source": {
         "source": "local",
-        "path": "./plugins/company"
+        "path": "./plugins/soloco"
       },
       "policy": {
         "installation": "AVAILABLE",

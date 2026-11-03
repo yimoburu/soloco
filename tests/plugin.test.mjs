@@ -4,12 +4,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { spawn } from 'node:child_process';
-import { withStore, id, VERSION, teamHash, digest } from '../plugins/company/runtime/store.mjs';
-import * as engine from '../plugins/company/runtime/engine.mjs';
-import { hook, call } from '../plugins/company/runtime/main.mjs';
-import { work } from '../plugins/company/runtime/worker.mjs';
-import { assignmentContext } from '../plugins/company/runtime/context.mjs';
-import { commandArgs, parseOutput } from '../plugins/company/runtime/adapters.mjs';
+import { withStore, id, VERSION, teamHash, digest } from '../plugins/soloco/runtime/store.mjs';
+import * as engine from '../plugins/soloco/runtime/engine.mjs';
+import { hook, call } from '../plugins/soloco/runtime/main.mjs';
+import { work } from '../plugins/soloco/runtime/worker.mjs';
+import { assignmentContext } from '../plugins/soloco/runtime/context.mjs';
+import { commandArgs, parseOutput } from '../plugins/soloco/runtime/adapters.mjs';
 
 const base=fs.mkdtempSync(path.join(os.tmpdir(),'company-test-'));
 process.env.COMPANY_PLUGIN_DATA=path.join(base,'cache');
@@ -125,7 +125,7 @@ test('adapters preserve explicit native IDs without permission bypass flags',()=
   assert.throws(()=>parseOutput('claude','{"is_error":true,"result":"not signed in"}'),/not signed in/);
 });
 test('real stdio MCP initializes and lists tools without creating company state',async()=>{
-  const child=spawn(process.execPath,['--no-warnings','plugins/company/runtime/main.mjs','serve','codex'],{stdio:['pipe','pipe','pipe']});
+  const child=spawn(process.execPath,['--no-warnings','plugins/soloco/runtime/main.mjs','serve','codex'],{stdio:['pipe','pipe','pipe']});
   let output='';child.stdout.on('data',c=>output+=c);
   child.stdin.end('{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05"}}\n{"jsonrpc":"2.0","id":2,"method":"tools/list"}\n');
   const code=await new Promise(resolve=>child.on('close',resolve));assert.equal(code,0);
@@ -168,7 +168,7 @@ else {
 
 test('concurrent processes cannot both commit the same expected record revision',async()=>{
   const a=setup();const r=engine.save({...a,kind:'plan',content:'v1'},'codex');
-  const url=new URL('../plugins/company/runtime/engine.mjs',import.meta.url).href;
+  const url=new URL('../plugins/soloco/runtime/engine.mjs',import.meta.url).href;
   const source=`import {save} from ${JSON.stringify(url)}; try {save(${JSON.stringify({...a,id:r.id,expected_revision:1,kind:'plan',content:'v2'})},'codex');}catch{process.exitCode=1;}`;
   const codes=await Promise.all([1,2].map(()=>new Promise(resolve=>{const p=spawn(process.execPath,['--no-warnings','--input-type=module','-e',source],{stdio:'ignore'});p.on('close',resolve);})));
   assert.deepEqual(codes.sort(),[0,1]);assert.equal(engine.status(a,'codex').records[0].revision,2);
@@ -185,7 +185,7 @@ test('same chat cannot reuse a revoked epoch after a handover',()=>{
 
 
 test('compatible runtime patches preserve pinned team, ownership and native sessions without adoption',async()=>{
-  for(const version of ['0.2.0','0.2.1']) {
+  for(const version of ['0.2.0','0.2.1','0.2.2']) {
     const a=setup();
     withStore(a.root,db=>db.transaction('test.old_patch',s=>{
       s.plugin_version=version;s.runtime_version=version;
@@ -296,4 +296,68 @@ test('legacy generator folders remain protected after retiring the generator',()
   engine.bind(root,'founder','codex');
   assert.throws(()=>engine.open({root,session_id:'founder',idea:'Do not overwrite'},'codex'),/Legacy workspace/);
   assert.equal(fs.readFileSync(manifest,'utf8'),'{"legacy":true}');
+});
+
+
+test('company names are optional display labels independent of stable identity',()=>{
+  const a=setup(),first=engine.open(a,'codex');assert.equal(first.name,'Untitled Venture');
+  const root=fs.mkdtempSync(path.join(base,'named-'));engine.bind(root,'named-founder','codex');
+  const named=engine.open({root,session_id:'named-founder',idea:'Another idea',name:'  BriefLink  '},'codex');
+  assert.equal(named.name,'BriefLink');assert.notEqual(named.company_id,first.company_id);
+  const reopened=engine.open({root,session_id:'named-founder',idea:'Different idea',name:'Do not rename'},'codex');
+  assert.equal(reopened.name,'BriefLink');assert.equal(reopened.idea,'Another idea');
+  assert.equal(reopened.company_id,named.company_id);
+});
+
+test('renaming records founder intent while preserving company state and native sessions',async()=>{
+  const a=setup();engine.save({...a,kind:'intent',content:'Original business boundaries'},'codex');
+  engine.notify({...a,kind:'decision_required',summary:'Open obligation'},'codex');
+  const j=queued(a);await work(a.root,j,async()=>result());
+  engine.control({...a,action:'pause',expected_epoch:1,source_instruction:'Pause'},'codex');
+  const before=withStore(a.root,db=>db.read());
+  const renamed=await call('company_control',{root:a.root,session_id:a.session_id,action:'rename',name:'BriefLink',expected_name:before.name,expected_epoch:1,source_instruction:'Rename my company to BriefLink'},'codex');
+  const after=withStore(a.root,db=>db.read());
+  assert.equal(renamed.name,'BriefLink');
+  for(const key of ['id','idea','owner','sessions','jobs','notices','messages','governance','roles','cos_instructions','team_sha256','paused','phase','mode'])assert.deepEqual(after[key],before[key]);
+  for(const [key,value]of Object.entries(before.records))assert.deepEqual(after.records[key],value);
+  const decision=Object.values(after.records).find(r=>r.action==='rename');
+  assert.equal(decision.previous_name,'Untitled Venture');assert.equal(decision.name,'BriefLink');
+  assert.equal(decision.content,'Rename my company to BriefLink');assert.equal(decision.recorded_by,a.session_id);
+  assert.ok(fs.existsSync(a.root));assert.equal(engine.open(a,'codex').name,'BriefLink');
+});
+
+test('rename requires current owner, current name, valid label and source instruction',()=>{
+  const a=setup(),request={...a,action:'rename',expected_epoch:1,expected_name:'Untitled Venture',name:'BriefLink',source_instruction:'Rename to BriefLink'};
+  engine.bind(a.root,'other','codex');
+  for(const changes of [{session_id:'other'},{expected_epoch:0},{expected_name:'outdated'},{name:'   '},{name:'x'.repeat(201)},{source_instruction:''},{expected_name:undefined}]) {
+    const before=withStore(a.root,db=>db.read());assert.throws(()=>engine.control({...request,...changes},'codex'));
+    assert.deepEqual(withStore(a.root,db=>db.read()),before);
+  }
+  engine.control(request,'codex');
+  assert.throws(()=>engine.control({...request,name:'Stale competing rename'},'codex'),/name changed/);
+  assert.equal(engine.status(a,'codex').name,'BriefLink');
+});
+
+test('rename waits for active assignments and does not resume a held company',()=>{
+  const a=setup(),j=queued(a),request={...a,action:'rename',expected_epoch:1,expected_name:'Untitled Venture',name:'New name',source_instruction:'Rename'};
+  assert.throws(()=>engine.control(request,'codex'),/Assignments are active/);
+  assert.equal(engine.status(a,'codex').jobs[0].status,'queued');
+  engine.control({...a,action:'pause',expected_epoch:1,source_instruction:'Pause'},'codex');
+  const s=engine.control(request,'codex');assert.equal(s.name,'New name');assert.equal(s.paused,true);assert.equal(s.jobs[0].status,'cancelled');
+});
+
+test('SoloCo can rebind the same founder chat after a plugin cache replacement',async()=>{
+  const a=setup();engine.save({...a,kind:'intent',content:'Keep original company intent'},'codex');
+  const j=queued(a);await work(a.root,j,async()=>result());
+  engine.control({...a,action:'pause',expected_epoch:1,source_instruction:'Pause before replacing plugin'},'codex');
+  const before=withStore(a.root,db=>db.read()),oldCache=process.env.COMPANY_PLUGIN_DATA;
+  process.env.COMPANY_PLUGIN_DATA=path.join(base,'new-plugin-cache');
+  try {
+    assert.throws(()=>engine.open(a,'codex'),/binding/);
+    hook({cwd:a.root,session_id:a.session_id,hook_event_name:'SessionStart'},'codex');
+    assert.deepEqual(withStore(a.root,db=>db.read()),before);
+    const current=engine.open(a,'codex');assert.equal(current.company_id,before.id);assert.deepEqual(current.sessions,before.sessions);
+    engine.control({...a,action:'resume',expected_epoch:1,source_instruction:'Continue the same company'},'codex');
+    assert.equal(engine.status(a,'codex').paused,false);
+  } finally {process.env.COMPANY_PLUGIN_DATA=oldCache;}
 });

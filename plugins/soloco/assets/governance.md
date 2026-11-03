@@ -1,6 +1,6 @@
-# An AI-operated startup
+# SoloCo
 
-**v0.15 · Company contract**
+**v0.16 · Company contract**
 
 A founder brings an idea. A small team of AI agents, each in its own standalone session, operates a company through one founder conversation. The company persists as its agents and team versions change.
 
@@ -20,7 +20,9 @@ This is the enduring company contract. Installation, current capabilities and ve
 
 ## 2. What the founder does and knows
 
-The founder installs the **Company plugin** once. Installation handles dependencies, creates no company and needs no manual role assembly. Then the founder creates a project, attaches a company folder, opens a chat and describes the idea.
+The founder installs the **SoloCo plugin** once. Installation handles dependencies, creates no company and needs no manual role assembly. Then the founder creates a project, attaches a company folder, opens a chat and describes the idea.
+
+**SoloCo names the tool; each company has its own name.** Accept a founder-chosen working name at startup, or use `Untitled Venture` while exploring. Each company has a stable internal ID independent of its display name, project and folder. A clear founder request may rename the company without recreating it, changing ownership or losing records, obligations, evidence or history. Record the old/new names and source instruction, reject stale rename requests, and reach a safe assignment boundary first. Renaming is an administrative label change; it does not alter business purpose or perform legal registration. Project/folder labels may match for convenience but are not automatically renamed.
 
 The architecture is **Founder ↔ Chief of Staff ↔ standalone specialists**, supported by shared records and execution software. The CoS owns coordination judgment; software enforces identity, versions, permissions, session lifecycle, messaging and continuity. No extra founder connection agent or marketplace service is needed.
 
@@ -164,7 +166,7 @@ Mistakes follow **contain → disclose → owned postmortem → independent revi
 
 Company records live in the attached company folder, outside plugin installation/cache directories and session histories. Updating or uninstalling the plugin must preserve them. A plugin update makes a candidate available; each company retains its pinned governance and team until explicit adoption. Keep compatible pinned definitions available or hold for an approved migration. A concise checkpoint links current state and necessary history. Publishing an improvement never rewrites company evidence, limits, or blocks. Founder ceilings persist; earned delegation transfers only where comparable evidence supports it, retaining attribution to the team that earned it.
 
-Keep package compatibility separate from team adoption. A tested compatible runtime patch may operate existing records and pinned instructions without changing company governance or requiring a new team rehearsal. Unknown/incompatible formats hold for migration. Installing a package never adopts new role definitions, CoS instructions or governance; material behavioral or authority changes cannot be disguised as compatible patches.
+Keep package compatibility separate from team adoption. A tested compatible runtime patch may operate existing records and pinned instructions without changing company governance or requiring a new team rehearsal. Unknown/incompatible formats hold for migration. A product/plugin rename likewise preserves company identity and pinned definitions; switch installations with work paused and only one plugin active. Installing a package never adopts new role definitions, CoS instructions or governance; material behavioral or authority changes cannot be disguised as compatible patches.
 
 For a **preparation-only team replacement**, use one founder request to inspect changes, pause/reconcile, rehearse recovery with a fresh native CoS session, obtain a separate native QA verdict, apply, verify retained records and resume. The verdict must explicitly permit the exact adoption without unresolved blockers. Governance stays pinned unless its replacement is explicitly adopted. This bounded contract requires runtime continuity checks and independent QA, not execution-role qualification or a full business authority transfer; it grants no business execution permission. A company with older, stricter governance must explicitly adopt this contract before using the exception.
 
@@ -189,6 +191,7 @@ These are required behaviors to test, not claims about a particular release:
 | Scenario | Observable result |
 |---|---|
 | Install and start | Repository instructions lead to installation/readiness, then project → folder → ordinary chat starts CoS without role setup or forwarding; installation creates no company |
+| Name the company | Startup accepts a working name or temporary default; an authorized rename preserves the same identity, ownership, folder and historical records; stale/conflicting requests hold |
 | Guide the founder | Focused questions reuse answers and turn consequential unknowns into research; a reviewed bounded proposal reaches the founder |
 | Resume or switch hosts | Same company records and pinned rules survive; partial initialization recovers safely; a second chat cannot compete for ownership; stale writes are rejected |
 | Delegate and review | Named standalone sessions own work; exact-version independent acceptance, required expertise and domain blocks hold; routine repair stays internal |

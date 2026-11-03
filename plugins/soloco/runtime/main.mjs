@@ -7,14 +7,14 @@ import { readiness } from './adapters.mjs';
 import { upgrade, upgradeGuidance } from './upgrade.mjs';
 
 const string={type:'string'};
-const common={root:{...string,description:'Absolute attached company folder'},session_id:{...string,description:'Current host session_id supplied by Company startup hook'}};
+const common={root:{...string,description:'Absolute attached company folder'},session_id:{...string,description:'Current host session_id supplied by SoloCo startup hook'}};
 const definitions=[
   ['company_open','Initialize or resume the attached company. Preparation only; never overwrites existing project files.',{...common,name:string,idea:string},['root','session_id'],engine.open],
   ['company_status','Read records, role results, pending notices and peer messages. Also reconciles interrupted jobs.',common,['root','session_id'],engine.status],
   ['company_save','Save a draft intent, plan, decision, communication preference or artifact. Does not grant authority.',{...common,kind:{enum:['intent','plan','decision','preference','artifact']},content:string,id:string,expected_revision:{type:'integer',minimum:0},source_reference:string,basis:{enum:['explicit','inferred']},epoch:{type:'integer'}},['root','session_id','epoch','kind','content'],engine.save],
   ['company_dispatch','Start or resume a standalone specialist for a preparation or independent review assignment. Returns a durable job; call company_wait for results.',{...common,role:string,task:string,input_ids:{type:'array',items:string,description:'All relevant plans and evidence IDs; intent, decisions, preferences and failed reviews are included automatically'},review_of:string,epoch:{type:'integer'}},['root','session_id','epoch','role','task'],engine.dispatch],
   ['company_wait','Wait up to 20 seconds for pending assignments, then return durable results and notices.',{...common,seconds:{type:'integer',minimum:0,maximum:20}},['root','session_id'],async (a,h)=>{const until=Date.now()+Math.min(20,Math.max(0,a.seconds??15))*1000;let s;do{s=engine.status(a,h);if((!s.jobs.some(j=>['queued','running'].includes(j.status)) && !['queued','checking'].includes(s.upgrade?.status))||Date.now()>=until)return s;await new Promise(r=>setTimeout(r,500));}while(true);}],
-  ['company_control','Record an explicit founder pause/resume or same-company handover. A handover rejects active jobs and revokes the old coordinator; it never grants external action authority.',{...common,action:{enum:['pause','resume','handover']},expected_epoch:{type:'integer'},source_instruction:string},['root','session_id','action','expected_epoch','source_instruction'],engine.control],
+  ['company_control','Record an explicit founder pause/resume, company rename, or same-company handover. A handover rejects active jobs and revokes the old coordinator; it never grants external action authority.',{...common,action:{enum:['pause','resume','handover','rename']},name:{...string,description:'New display name for rename'},expected_name:{...string,description:'Current display name from status; required for rename'},expected_epoch:{type:'integer'},source_instruction:string},['root','session_id','action','expected_epoch','source_instruction'],engine.control],
   ['company_notice','Create a must-know or decision-required founder notice; cannot be suppressed by coordinator preference.',{...common,epoch:{type:'integer'},kind:{enum:['must_know','decision_required']},summary:string,reference:string},['root','session_id','epoch','kind','summary'],engine.notify],
   ['company_acknowledge','Record that the founder saw or resolved a notice. Delivery/seen/resolution are separate and never count as execution authorization.',{...common,epoch:{type:'integer'},notice_id:string,seen:{type:'boolean'},resolution:string,source_reference:string},['root','session_id','epoch','notice_id'],engine.acknowledge],
   ['company_message','Put a direct message in a role inbox. The next role turn receives it without founder forwarding.',{...common,epoch:{type:'integer'},to:string,content:string},['root','session_id','epoch','to','content'],engine.message],
@@ -58,7 +58,7 @@ export function hook(input,host) {
   }
   const usable=compatibleRuntime(state) && state.team_sha256===teamHash(state) && !upgradePending(state);
   const instructions=state ? (usable ? state.cos_instructions : 'Company requires upgrade maintenance. Do not use installed operational instructions or dispatch ordinary work until checked adoption/recovery.') : installedTeam().cos_instructions;
-  return {hookSpecificOutput:{hookEventName:input.hook_event_name,additionalContext:`Company plugin. Host: ${host}. Session ID: ${input.session_id}. Attached folder: ${root}.\n${instructions}\n${upgradeGuidance}${pending}`},...(pending?{systemMessage:`Company: ${state.notices.filter(n=>!n.resolution).length} unresolved founder notice(s). Open company_status for details.`}:{})};
+  return {hookSpecificOutput:{hookEventName:input.hook_event_name,additionalContext:`SoloCo plugin. Host: ${host}. Session ID: ${input.session_id}. Attached folder: ${root}.\n${instructions}\n${upgradeGuidance}${pending}`},...(pending?{systemMessage:`Company: ${state.notices.filter(n=>!n.resolution).length} unresolved founder notice(s). Open company_status for details.`}:{})};
 }
 async function serve(host) {
   const lines=readline.createInterface({input:process.stdin,crlfDelay:Infinity});
@@ -84,7 +84,7 @@ if(process.argv[1] && path.resolve(process.argv[1])===path.join(PACKAGE,'runtime
   const [mode,host='codex']=process.argv.slice(2);
   if(!['codex','claude'].includes(host))throw new Error('Unknown host');
   if(mode==='serve') await serve(host);
-  else if(mode==='hook') {let text='';for await(const c of process.stdin)text+=c;try{console.log(JSON.stringify(hook(JSON.parse(text),host)));}catch(error){console.log(JSON.stringify({systemMessage:`Company startup needs attention: ${error.message}`}));process.exitCode=1;}}
+  else if(mode==='hook') {let text='';for await(const c of process.stdin)text+=c;try{console.log(JSON.stringify(hook(JSON.parse(text),host)));}catch(error){console.log(JSON.stringify({systemMessage:`SoloCo startup needs attention: ${error.message}`}));process.exitCode=1;}}
   else if(mode==='doctor') console.log(JSON.stringify(await call('company_doctor',{},host),null,2));
   else throw new Error('Use serve, hook, or doctor');
 }

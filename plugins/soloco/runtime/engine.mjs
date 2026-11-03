@@ -8,7 +8,7 @@ import { assignmentContext } from './context.mjs';
 
 const busy = state => Object.values(state.jobs).filter(j => ['queued','running'].includes(j.status));
 export function dataDir() {
-  return process.env.COMPANY_PLUGIN_DATA || process.env.PLUGIN_DATA || process.env.CLAUDE_PLUGIN_DATA || path.join(os.homedir(),'.cache','ai-operated-startup');
+  return process.env.COMPANY_PLUGIN_DATA || process.env.PLUGIN_DATA || process.env.CLAUDE_PLUGIN_DATA || path.join(os.homedir(),'.cache','soloco');
 }
 export function bind(root, session, host) {
   requireText(session,'session_id',200);
@@ -21,7 +21,7 @@ export function bind(root, session, host) {
 export function binding(args, host) {
   requireText(args.session_id,'session_id',200);
   const file = path.join(dataDir(),'bindings',digest(JSON.stringify([folder(args.root),host,args.session_id]))+'.json');
-  if (!fs.existsSync(file)) throw new Error('No trusted startup-hook binding for this chat. Enable/trust Company hooks, then reopen this chat.');
+  if (!fs.existsSync(file)) throw new Error('No trusted startup-hook binding for this chat. Enable/trust SoloCo hooks, then reopen this chat.');
 }
 export function upgradeSummary(u) {
   if (!u) return null;
@@ -43,7 +43,7 @@ export function open(args, host) {
     if (current) {owner(current,args.session_id,host); return current;}
     if (fs.existsSync(path.join(folder(args.root),'team/manifest.json'))) throw new Error('Legacy workspace detected; explicit migration is required. Existing team records were not changed.');
     const team=installedTeam();
-    return db.transaction('company.created', () => ({schema:SCHEMA,runtime_version:VERSION,id:id('company'),name:requireText(args.name ?? path.basename(args.root),'name',200),idea:requireText(args.idea,'idea'),phase:'Frame',mode:'preparation',paused:false,...team,team_sha256:teamHash(team),owner:{host,session_id:args.session_id,epoch:1},records:{},sessions:{},jobs:{},messages:[],notices:[],created_at:stamp()}));
+    return db.transaction('company.created', () => ({schema:SCHEMA,runtime_version:VERSION,id:id('company'),name:requireText(args.name ?? 'Untitled Venture','name',200).trim(),idea:requireText(args.idea,'idea'),phase:'Frame',mode:'preparation',paused:false,...team,team_sha256:teamHash(team),owner:{host,session_id:args.session_id,epoch:1},records:{},sessions:{},jobs:{},messages:[],notices:[],created_at:stamp()}));
   }, true);
   return {...summary(state),governance:state.governance, roles:state.roles, cos_instructions:state.cos_instructions};
 }
@@ -112,7 +112,7 @@ export function dispatch(args,host) {
   return state.jobs[jobId];
 }
 export function control(args,host) {
-  if(!['pause','resume','handover'].includes(args.action)) throw new Error('Unknown control action');
+  if(!['pause','resume','handover','rename'].includes(args.action)) throw new Error('Unknown control action');
   binding(args,host);
   requireText(args.source_instruction,'source_instruction');
   return withStore(args.root,db=>summary(db.transaction(`company.${args.action}`,s=>{
@@ -123,6 +123,7 @@ export function control(args,host) {
       if (teamHash(s)!==s.team_sha256) throw new Error('Pinned team integrity check failed');
     }
     if(args.expected_epoch!==s.owner.epoch) throw new Error('Stale control request; read current status');
+    const previousName=s.name;
     // Pause is always available to a founder chat, even if the old coordinator failed.
     if(args.action==='pause') {
       s.paused=true; for(const j of busy(s)) j.status='cancelled';
@@ -134,9 +135,16 @@ export function control(args,host) {
       // Incoming role instances cold-start from records; old native histories remain attributable.
       s.retired_sessions=[...(s.retired_sessions??[]),...Object.values(s.sessions)]; s.sessions={};
       s.paused=true;
+    } else if(args.action==='rename') {
+      owner(s,args.session_id,host);
+      const name=requireText(args.name,'name',200).trim();
+      requireText(args.expected_name,'expected_name',200);
+      if(args.expected_name!==s.name) throw new Error('Company name changed; read current status before renaming');
+      if(busy(s).length) throw new Error('Assignments are active; wait or pause before renaming');
+      s.name=name;
     } else {owner(s,args.session_id,host);s.paused=false;}
     const decisionId=id('control');
-    s.records[decisionId]={id:decisionId,kind:'decision',author_role:'human_founder',recorded_by:args.session_id,content:args.source_instruction,status:'Recorded',action:args.action,created_at:stamp()};
+    s.records[decisionId]={id:decisionId,kind:'decision',author_role:'human_founder',recorded_by:args.session_id,content:args.source_instruction,status:'Recorded',action:args.action,...(args.action==='rename'?{previous_name:previousName,name:s.name}:{}),created_at:stamp()};
     return s;
   })));
 }

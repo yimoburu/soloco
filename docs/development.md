@@ -6,11 +6,11 @@ The target covers ongoing operation against founder-defined objectives, includin
 
 ## Plugin structure
 
-`plugins/company/` is self-contained. The repository's `.agents/plugins/marketplace.json` and `.claude-plugin/marketplace.json` distribute the same package to Codex and Claude. The portable manifest and MCP configuration serve Codex; `.claude-plugin/plugin.json` and `.mcp.json` supply Claude's format. Host-specific hooks share the runtime.
+`plugins/soloco/` is self-contained. The repository's `.agents/plugins/marketplace.json` and `.claude-plugin/marketplace.json` distribute the same package to Codex and Claude. The portable manifest and MCP configuration serve Codex; `.claude-plugin/plugin.json` and `.mcp.json` supply Claude's format. Host-specific hooks share the runtime. Product, repository, marketplace and plugin are named SoloCo/`soloco`. Internal `company_*` tools, the `company` MCP namespace, `COMPANY_PLUGIN_DATA` and `.company/` remain stable because they describe company entities and preserve pinned instructions. They are not a second product or installable legacy plugin.
 
 | Component | Responsibility |
 |---|---|
-| `skills/company/` | Chief of Staff interview, coordination, reviewed proposals, and founder communication |
+| `skills/soloco/` | Chief of Staff interview, coordination, reviewed proposals, and founder communication |
 | `skills/setup/` | Readiness without creating a company |
 | `scripts/run.sh` | Use compatible Node or install checksum-pinned Node 22.22.0 privately; no npm dependencies |
 | `runtime/main.mjs` | Startup hooks and the stdio MCP tool interface |
@@ -27,7 +27,7 @@ The Chief of Staff decides what to assign; software commits records and runs ses
 
 The attached folder contains `.company/company.sqlite` and SQLite's companion files while active. The database stores identity, pinned governance and role definitions, draft intent/plans/preferences, author-attributed artifacts and exact-version reviews, jobs, native session references, messages, notices, and an event index. Use Company tools to inspect or amend it. Keep `.company/` private; back up using SQLite's backup facilities or after all connections close, rather than copying a live database file alone.
 
-Initialization preserves existing project files. A legacy `team/manifest.json` is detected and held for explicit migration; it is never silently imported or overwritten. Company records remain outside install/cache paths. An unsupported schema/runtime combination holds ordinary mutation. `runtime_version` records the runtime that created or last migrated the state; `executing_runtime_version` in status identifies the running code. An explicit tested compatibility list lets v0.2.2 operate schema-2 states produced by v0.2.0/v0.2.1 without rewriting pinned definitions or triggering team adoption. No future version is accepted merely because its version number looks compatible. The explicit upgrade flow supports schema-1 v0.1.0 preparation records and schema-2 records produced by v0.2.0, v0.2.1 or v0.2.2; it does not silently adopt definitions or migrate arbitrary formats.
+Initialization preserves existing project files. A legacy `team/manifest.json` is detected and held for explicit migration; it is never silently imported or overwritten. Company records remain outside install/cache paths. An unsupported schema/runtime combination holds ordinary mutation. `runtime_version` records the runtime that created or last migrated the state; `executing_runtime_version` in status identifies the running code. An explicit tested compatibility list lets v0.3.0 operate schema-2 states produced by v0.2.0/v0.2.1/v0.2.2 without rewriting pinned definitions or triggering team adoption. No future version is accepted merely because its version number looks compatible. The explicit upgrade flow supports schema-1 v0.1.0 preparation records and schema-2 records produced by v0.2.0, v0.2.1, v0.2.2 or v0.3.0; it does not silently adopt definitions or migrate arbitrary formats.
 
 Startup hooks bind the host's session ID and attached folder in private plugin data. Only the current coordinator may mutate ordinary records. A second chat can read status, pause, or perform an explicitly requested handover after active assignments are held. Handover increments the ownership epoch and retires old role instances; successors use company records. Pausing cancels eligibility, not an already-sent model request. Late, outdated, or revoked results are quarantined and cannot become acceptance.
 
@@ -51,21 +51,21 @@ A detached worker runs two fresh native sessions: candidate CoS reconstruction a
 
 ## Build and test
 
-Author governance in `SPEC.md` and roles directly in `plugins/company/assets/roles.json`. The CoS skill applies the canonical meta rules. Bundle governance after a spec change; the check detects drift. Installation, release status and examples live outside the pinned governance, so editing them does not change the team hash.
+Author governance in `SPEC.md` and roles directly in `plugins/soloco/assets/roles.json`. The CoS skill applies the canonical meta rules. Bundle governance after a spec change; the check detects drift. Installation, release status and examples live outside the pinned governance, so editing them does not change the team hash.
 
 ```sh
 node tools/build-plugin.mjs
 node tools/build-plugin.mjs --check
 node --no-warnings --test tests/*.test.mjs
-claude plugin validate plugins/company --strict
+claude plugin validate plugins/soloco --strict
 claude plugin validate . --strict
 ```
 
 Use the bundled launcher if Node is not already available:
 
 ```sh
-sh plugins/company/scripts/run.sh doctor codex
-sh plugins/company/scripts/run.sh doctor claude
+sh plugins/soloco/scripts/run.sh doctor codex
+sh plugins/soloco/scripts/run.sh doctor claude
 ```
 
 Native local installation tests should use temporary host configuration directories; do not change a user's installed plugins merely to validate packaging. Real model tests use the user's normal host login and may consume their model allowance. The deterministic suite uses synthetic model outputs and exercises subprocess dispatch, not external services. The README records the separately observed live checks.
@@ -84,4 +84,12 @@ The spec permits task-specific model selection within founder-approved choices a
 
 ## Retired generator
 
-The manual Python generator and its separate tests/configuration were retired in v0.2.2. The [v0.2.1 source snapshot](https://github.com/yimoburu/ai-operated-startup/tree/c346367fb910b88b8a4b908b7531aba081338b4b) remains available for historical trials. Existing `team/manifest.json` workspaces are still detected and held; this release neither imports nor overwrites them. Plugin companies remain in `.company/`.
+The manual Python generator and its separate tests/configuration were retired in v0.2.2. The [v0.2.1 source snapshot](https://github.com/yimoburu/soloco/tree/c346367fb910b88b8a4b908b7531aba081338b4b) remains available for historical trials. Existing `team/manifest.json` workspaces are still detected and held; this release neither imports nor overwrites them. Plugin companies remain in `.company/`.
+
+## Company names and installation identity
+
+`company_open` accepts `name` for a new company and defaults to `Untitled Venture`. Reopening ignores proposed name/idea changes so it cannot reset an existing company. Company IDs are independent UUIDs; different company folders may use the same display name.
+
+`company_control` supports `rename` using the owning chat, current `expected_epoch`, current `expected_name`, requested `name` and exact founder `source_instruction`. Names are nonempty trimmed text up to 200 characters. Reject active assignments, incompatible state, pending upgrades and stale name/owner checks. The transaction changes the display name and records the old/new names without changing identity, permissions, sessions, paused state or folder/project labels. No new database schema or naming service is needed.
+
+For the plugin identity change, follow the README's one-time replacement steps. The new plugin uses its own host-managed cache; no binding/cache copy is required because the startup hook rebinds the same host session to the same company folder. Native role IDs and company records live in the database; new working directories can be created as needed. Keep only SoloCo active after the switch. Pinned legacy governance and the immutable compatibility snapshot retain their original wording until explicit team adoption; a branding change never rewrites company history.

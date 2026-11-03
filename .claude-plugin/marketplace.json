@@ -1,14 +1,14 @@
 {
-  "name": "ai-operated-startup",
+  "name": "soloco",
   "owner": {
     "name": "yimoburu"
   },
   "plugins": [
     {
-      "name": "company",
-      "source": "./plugins/company",
+      "name": "soloco",
+      "source": "./plugins/soloco",
       "description": "A founder-facing Chief of Staff and standalone specialist sessions."
     }
   ],
-  "description": "Company: a Chief of Staff, standalone specialist sessions, and durable company records."
+  "description": "SoloCo: one founder, a Chief of Staff, and standalone specialist agents."
 }

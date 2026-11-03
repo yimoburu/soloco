@@ -1,0 +1,10 @@
+{
+  "name": "soloco",
+  "version": "0.3.0",
+  "description": "SoloCo: your Chief of Staff and standalone AI specialists, with persistent company records. Preparation and review preview.",
+  "author": {
+    "name": "yimoburu"
+  },
+  "repository": "https://github.com/yimoburu/soloco",
+  "hooks": "./hooks/claude.json"
+}
