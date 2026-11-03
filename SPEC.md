@@ -1,6 +1,6 @@
 # An AI-operated startup
 
-**v0.7 · Current reconciled design · 2026-11-02**
+**v0.8 · Current reconciled design · 2026-11-02**
 
 A founder brings an idea. A small team of AI agents, each in its own standalone session, operates a company through one founder conversation. The company persists as its agents and team versions change.
 
@@ -20,15 +20,23 @@ This is the target contract. The [converter](docs/converter.md) currently genera
 
 ## 2. What the founder does and knows
 
-With the framework available, the founder initiates once in the Codex or Claude Code conversation already in use:
+A new user starts at the GitHub README. It must provide a supported, versioned installation path for the chosen app, state prerequisites, and verify that the company entry point is available. Installing once must not create a company, modify existing companies, or require the founder to assemble roles. Until that path exists, the README identifies the product flow as unavailable and offers only a clearly labeled developer trial.
 
-> Start a virtual company for this idea: [idea].
+After that one-time installation, the founder:
 
-That conversation becomes the **Chief of Staff agent's session** (technical role ID: `runner`). It interprets founder requests, coordinates the specialist agents, and presents status and decision packets. There is no separate Founder connection agent or service. Specialists retain their own standalone sessions. The target system prepares their workspace and sessions automatically; the founder does not set up roles or forward messages. Managed platform selection and mixed-platform teams are deferred.
+1. Creates a project.
+2. Attaches a company folder.
+3. Opens a chat under that project and starts talking about the idea.
 
-Use one persistent folder and, where supported, one UI project per company. Role sessions share its company records. Codex and Claude may point to the same folder; switching interfaces does not create a new company or transfer authority. Concurrent operation requires shared identity, permission, and write controls with one authorized Chief of Staff. The manual prototype serializes work; mixed-harness orchestration remains deferred.
+The first message starts the **Chief of Staff** automatically (technical role ID: `runner`). No special command, role-selection prompt, configuration file, or manual specialist startup is part of this founder flow. The Chief of Staff interviews the founder, prepares company records, activates needed standalone specialists through the shared tools, and coordinates their reviews. There is no separate Founder connection agent or service. This startup automation and the one-time installer are requirements, not features of the current file generator.
 
-Initialization turns the idea into **Founder Intent → proposed charters and spec skeletons → independently reviewed Frame → founder authorization → first bounded experiment**. Missing direction, constraints, and acceptable commitments are clarified in the same conversation. Generation or silence never counts as approval.
+The interview asks one or a few focused questions at a time about the customer, problem, desired outcome, resources, and boundaries. Use information already supplied, challenge consequential assumptions, and summarize decisions periodically. “I don't know” becomes an explicit unknown or a proposed research task, not a fabricated answer or a demand for a complete business plan. Keep questions proportional to the next decision; preparation may proceed while unanswered questions hold only dependent work. Research involving external activity still requires the applicable authorization.
+
+Startup distinguishes a new company from an existing one. Initialize missing company records without overwriting existing files; resume existing companies from their pinned rules, checkpoint, preferences, and inbox. Partial or conflicting records require recovery, not silent reinitialization. The framework binds the founder conversation to one authorized Chief of Staff; later chats and specialist sessions do not automatically claim that role. A replacement follows the existing handover rules.
+
+Use one persistent folder and, where supported, one UI project per company. Role sessions share its company records. Codex and Claude may point to the same folder; switching interfaces does not create a new company or transfer authority. Concurrent operation requires shared identity, permission, and write controls. The manual prototype serializes work; managed platform selection and mixed-harness orchestration remain deferred.
+
+Initialization turns the conversation into **Founder Intent → proposed charters and spec skeletons → independently reviewed Frame → founder authorization → first bounded experiment**. The Chief of Staff presents a concrete recommendation with success criteria, cost, exposure, and necessary reserved decisions. The founder supplies direction and authorization, not team setup or message forwarding. Generation, opening a chat, or silence never counts as execution approval; clear instructions need no repeated confirmation.
 
 The founder reserves direction/material scope, major money, legal exposure, irreversibility, permissible block overrides, uncovered authority, and unresolved cross-domain deadlocks. Frame makes these boundaries concrete: per-commitment and cumulative limits; scope thresholds; and an exposure envelope covering users, data, payments, terms, duration, and operating limits.
 
@@ -160,7 +168,10 @@ These are required behaviors to test, not claims that the prototype implements t
 
 | Founder story | Observable acceptance |
 |---|---|
-| Start once and delegate | Idea → necessary decisions in the same conversation → authorized experiment → independent result, without specialist setup or forwarding |
+| Begin from the repository | A new user follows the README to install the framework in a supported app and verify readiness; no role setup or company creation is hidden in installation |
+| Start from ordinary conversation | With the framework installed: project → folder → first message starts the Chief of Staff, creates needed records, and activates specialist sessions without commands, setup prompts, role selection, or forwarding |
+| Be guided through the idea | Focused questions reuse known answers, challenge material assumptions, and turn unknowns into proposed research; the founder receives a reviewed, bounded experiment to authorize |
+| Resume without resetting | Opening an existing company preserves records and permissions; partial initialization recovers safely; a second chat cannot create a competing Chief of Staff |
 | Make only reserved decisions | QA rejection and an authorized retry stay internal; exhausted retry authority holds the experiment; a reserved change reaches the founder with its authority reference, author, and dissent intact |
 | Understand and control progress | Chief of Staff records founder instructions and updates Intent before dependent work; ambiguity is clarified; software applies pause even if the Chief of Staff is unavailable |
 | Keep coordination accountable | Reject Chief of Staff self-approval and unauthorized dispatch; deliver a specialist's packet without Chief of Staff permission; recover Chief of Staff from company records with blocks intact |
@@ -174,7 +185,7 @@ These are required behaviors to test, not claims that the prototype implements t
 
 **Illustrative simulation, not observed evidence:** BriefLink lets freelancers send client-brief forms and read answers. Frame verifies initial role qualifications and the notification path. All contracts receive independent approval before collection, including funding minimums approved by a qualified non-Finance reviewer. Reviewers below are charter-named qualified non-authors in separate sessions; suffixes A/R distinguish author/reviewer instances within a role.
 
-1. **Frame/Problem:** The Chief of Staff prepares Frame and an operating plan for independent review. The founder authorizes bounded discovery and adopts a policy requiring professional review of paid-pilot terms, with a review budget and Legal-R as independent policy assessor. The Chief of Staff records the source instruction and Intent, then assigns Research-A. Research-A records six of eight recent workarounds against a five-of-eight threshold; PM independently accepts the evidence and recommends focusing on solo freelancers.
+1. **Frame/Problem:** The founder creates a project, attaches a folder, and describes the idea in a chat. The framework starts the Chief of Staff, which clarifies the intended customer and boundaries, activates the necessary specialists, and prepares Frame and an operating plan for independent review. The founder authorizes bounded discovery and adopts a policy requiring professional review of paid-pilot terms, with a review budget and Legal-R as independent policy assessor. The Chief of Staff records the source instruction and Intent, then assigns Research-A. Research-A records six of eight recent workarounds against a five-of-eight threshold; PM independently accepts the evidence and recommends focusing on solo freelancers.
 2. **Solution:** before paid collection, Legal-A obtains professional review of T1 within the approved budget, recording reviewer provenance; Legal-R checks policy compliance. Security reviews the proposed exposure. The founder packet recommends a focused pilot over wider agency scope (estimated two extra weeks) or more discovery; recruitment waits. The founder authorizes twenty freelancers, ordinary contact/project-brief data excluding sensitive categories, $25/user and $100 total, T1, thirty days. Design then supplies the prototype; four of five finish unaided, three commit real projects, two pay against those predeclared conditions. QA-A verifies task results; Research-R verifies commitments from source records; Engineering confirms feasibility: Pass. QA-A prepares build acceptance; QA-R reviews that plan. Client data remains held until Build Pass.
 3. **Build:** Engineer submits C1. QA-A finds that a submission link reveals prior answers; Security blocks release against the access invariant. Engineering repairs C2; QA-A/Security independently retest. Release authors recovery/support procedures; QA-A verifies them and QA-R checks QA-A's gate contribution. C1 approvals cannot authorize C2. No founder packet is needed. The owned postmortem adds a regression evaluation; independent outcome review assesses the original judgment separately from the defect's consequences.
 4. **Pilot/Launch:** Pilot requires three users, 80% unaided completion, two repeats/two paying, and no critical defect. Research-A reports four users, 10/12 completions, three repeats, two paying, zero critical defects; Research-R verifies usage claims against linked records. Finance-R checks Finance-A's economics; Research-R checks Growth's claims. Launch independently demonstrates an anonymous journey, delivered alert, rollback, substantiated claims, and accepted mandatory reviews: readiness Pass. Legal/Security assess a public envelope of one hundred freelancers, the same data/T1, $25/user and $500 total, thirty days; the founder authorizes it. Software enforces caps/expiry; Release deploys C2 and verifies the live journey. Funding remains unpassed: required channel evidence is missing, even though the gap is disclosed.

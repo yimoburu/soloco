@@ -2,7 +2,13 @@
 
 The converter generates a developer workspace for standalone Codex or Claude Code role sessions. It implements file preparation only; the [current spec](../SPEC.md) defines the intended once-initiated founder experience and automatic collaboration.
 
-## Generate
+## Founder flow versus developer preview
+
+The target flow is **create project → attach company folder → open a chat and talk**, after one-time framework installation. The first message starts the Chief of Staff and its adaptive interview; company records and specialist sessions are prepared automatically. Existing companies resume without resetting records or creating a competing coordinator. No special startup prompt or configuration file is required from the founder.
+
+The GitHub README is the new-user entry point and must eventually provide a versioned installation path and readiness check for the chosen app. That installer and startup automation are not implemented. The generator below is an internal building block exposed for manual development. It requires a config and a new output path; it cannot initialize an already-attached folder in place. A future initializer must preserve existing files and recover interrupted setup. Do not run the generator over an existing company or copy a generated candidate over its records.
+
+## Generate for development
 
 Edit [the example](../examples/venture.json), then run from this repository:
 
@@ -27,7 +33,7 @@ Configuration fields are `name`, `idea`, and optional `active_roles` (default `r
 | `team/founder-inbox/`, `founder-preferences.json` | Empty durable inbox and Draft profile with separate explicit/inferred entries |
 | `team/PROTOCOL.md`, `templates/`, `START.md` | Manual development procedure and unapproved record starters |
 
-Converter v0.5 reconciles the v0.7 design: Chief of Staff naming retains role ID `runner`; Company Operations contains a proposed activation guide for all available roles; charters require independent qualification evidence. New templates cover founder notices, source-attributed communication preferences, and role evaluations. A notice's delivery, seen status, resolution, and authorization are distinct; decision-required notices reference the existing founder packet. Place notice records in `team/founder-inbox/`, qualification evidence in `team/artifacts/`, and preference entries in the profile's `explicit` or `inferred` list. Use `must_know` or `decision_required` for notice kind, and `explicit` or `inferred` for preference basis. Keep superseded entries traceable.
+Converter v0.6 reconciles the v0.8 design: the Chief of Staff startup brief now includes the focused interview and resume-first behavior; automatic role assignment remains unimplemented. Chief of Staff naming retains role ID `runner`; Company Operations contains a proposed activation guide for all available roles; charters require independent qualification evidence. New templates cover founder notices, source-attributed communication preferences, and role evaluations. A notice's delivery, seen status, resolution, and authorization are distinct; decision-required notices reference the existing founder packet. Place notice records in `team/founder-inbox/`, qualification evidence in `team/artifacts/`, and preference entries in the profile's `explicit` or `inferred` list. Use `must_know` or `decision_required` for notice kind, and `explicit` or `inferred` for preference basis. Keep superseded entries traceable.
 
 Notification and professional-review policies each have one home in Founder Intent; Frame references their accepted versions. No preferences, notices, delivery receipts, successful evaluations, or approvals are invented at generation. These are empty locations and unapproved record starters, not automated learning, delivery, activation, or enforcement. Existing workspaces retain their files and pinned rules.
 
@@ -35,7 +41,7 @@ Frame permits preparation only. Missing constraints remain unknown; no approval,
 
 For now, company records and team instructions are colocated under `team/`. There is no persistent company identity service, team-release registry, or live migration mechanism. That prototype layout is not a replacement boundary: never copy a candidate over company records.
 
-## Manual developer preview
+## Manual developer preview — not founder onboarding
 
 Open the generated company folder in the chosen desktop project, or work from it in the CLI. In the main conversation ask `Read team/sessions/runner.md and follow it.` The following CLI commands do the same preparation:
 
@@ -55,7 +61,9 @@ Platform instruction conventions: [Codex AGENTS.md](https://learn.chatgpt.com/do
 
 ## Next implementation boundary
 
-The remaining work is an authoritative board with identity and atomic state transitions, execution tools for session dispatch/recovery and external-action reconciliation, and connecting the Chief of Staff agent to those tools in the existing founder conversation. The Chief of Staff makes workflow judgments; software independently enforces permissions, prerequisites, and state changes. Direct founder pause and specialist decision packets must remain available if the Chief of Staff fails or disagrees. This requires no separate Founder connection agent or service. The durable founder inbox still needs delivery/retry tracking and enabled notification channels; profile updates need attribution and correction; qualification and mandatory review need execution gates. Preserve one authorized Chief of Staff across interfaces. Team replacement must satisfy the current spec's continuity checks before live use. Generating a separate candidate workspace is only preparation.
+Implement the installer and first-message startup first: recognize new versus existing company state, bind the founder chat to one Chief of Staff, preserve existing files and pinned governance, recover incomplete setup, and start necessary standalone specialists without founder setup. An ordinary project instruction file alone cannot identify the authorized founder chat or supervise a team.
+
+The remaining runtime work is an authoritative board with identity and atomic state transitions, execution tools for session dispatch/recovery and external-action reconciliation, and connecting the Chief of Staff agent to those tools in the existing founder conversation. The Chief of Staff makes workflow judgments; software independently enforces permissions, prerequisites, and state changes. Direct founder pause and specialist decision packets must remain available if the Chief of Staff fails or disagrees. This requires no separate Founder connection agent or service. The durable founder inbox still needs delivery/retry tracking and enabled notification channels; profile updates need attribution and correction; qualification and mandatory review need execution gates. Preserve one authorized Chief of Staff across interfaces. Team replacement must satisfy the current spec's continuity checks before live use. Generating a separate candidate workspace is only preparation.
 
 Platform adapters must verify standalone session lifecycle, peer messaging, UI visibility, and delivery in the selected client/version; native subagents or team panels alone do not prove these guarantees. A cross-product switch may require a new chat restored from company records.
 

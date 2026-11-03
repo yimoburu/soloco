@@ -12,6 +12,12 @@ These files preserve original intent and review evidence. They are historical sn
 | [Founder interface](docs/founder-interface.md), [user stories](docs/user-stories.md), [company continuity](docs/company-continuity.md) | Subsequent intent clarifications, now consolidated into the current spec |
 | [v0.4 snapshot](https://github.com/yimoburu/ai-operated-startup/blob/c32a20d95f794df0cc435b15d08a758c61dfbacd/SPEC.md), [Claude review](reviews/claude-v0.4.md), [v0.5 disposition](reviews/v0.5-disposition.md) | Reconciled design, external review, and narrowly adopted corrections |
 
+## v0.8 conversational startup — 2026-11-02
+
+The founder rejected manual initialization prompts and per-role startup as the product experience. The GitHub README must first provide versioned installation and a readiness check; until then it labels the developer trial honestly. After one-time framework installation, the required flow is now create project, attach company folder, open a chat, and talk. The first message starts the Chief of Staff, which interviews adaptively, challenges assumptions, preserves unknowns, prepares records, and activates specialists. Startup resumes existing companies and recovers partial state without overwriting records or creating a competing Chief of Staff. The founder authorizes the bounded experiment; starting a chat grants no execution permission.
+
+The [v0.7 snapshot](https://github.com/yimoburu/ai-operated-startup/blob/6b694e3/SPEC.md) preserves the prior design. Converter v0.6 updates the Chief of Staff brief and labels all manual setup as developer preview; it implements neither the installer nor automatic startup. The constitution, evidence gates, and five-step handover procedure remain unchanged. Existing companies retain their pinned rules.
+
 ## v0.7 founder and collaboration reconciliation — 2026-11-02
 
 The founder accepted the subsequent architecture discussion and requested reconciliation. The coordinator is now named Chief of Staff while retaining technical role ID `runner`. Direct peer communication, software as supporting infrastructure, work/exposure-based activation, independent role qualification, disposable agent memory, and one persistent company folder are explicit. Both interfaces may open the same folder; concurrent execution requires common authority and write controls, and remains outside the manual prototype.

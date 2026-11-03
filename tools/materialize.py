@@ -10,7 +10,7 @@ import tempfile
 
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "0.5"
+VERSION = "0.6"
 
 # These are role starters, not extracted or approved interpretations of governance.
 # The pinned spec governs; Frame must review the charters and authority map.
@@ -162,6 +162,16 @@ This workspace is a generated starting point. The pinned governance is in
 `team/governance.md`; read applicable sections before acting. If a role starter
 or this protocol conflicts with it, record the conflict and follow governance.
 These files guide agents; they do not enforce permissions or gate transitions.
+
+## Target founder startup — not implemented
+
+After one-time framework installation, the founder creates a project, attaches
+a company folder, and starts talking in a chat. The framework starts the Chief
+of Staff on that first message, recovers existing company state or initializes
+missing records without overwriting files, and binds one authorized coordinator.
+Specialists keep their assigned roles; later chats do not become competing
+Chiefs of Staff. The installer, chat binding, and automatic session startup are
+not provided by these files. The explicit briefs below are developer preview.
 
 ## Initial authority
 
@@ -318,12 +328,14 @@ def materialize(config, output, target="both", spec=None):
         if "codex" in targets:
             (stage / "AGENTS.md").write_text(
                 "# Team workspace\n\nRead `team/PROTOCOL.md` and the startup brief named in your initial prompt.\n"
-                "No role is assigned by this file. Do not infer one or impersonate the founder.\n",
+                "Developer preview: this file does not automatically assign a role.\n"
+                "Use the explicitly named brief; do not infer a role or impersonate the founder.\n",
                 encoding="utf-8")
         if "claude" in targets:
             (stage / "CLAUDE.md").write_text(
                 "# Team workspace\n\n@team/PROTOCOL.md\n\n"
-                "Read the startup brief named in your initial prompt. This file does not assign a role.\n",
+                "Developer preview: read the startup brief named in your initial prompt.\n"
+                "This file does not automatically assign a role.\n",
                 encoding="utf-8")
         for role in roles:
             charter = ROLES[role]
@@ -367,13 +379,31 @@ def materialize(config, output, target="both", spec=None):
                 "the current `team/board/` records, and applicable pinned governance sections.\n"
                 "Use a distinct instance ID in every output attribution. Read source artifacts\n"
                 "instead of relying on other sessions' conversation summaries.\n\n"
-                "First state your owned decisions, current permission, blocking conditions,\n"
+                "Before acting, establish your owned decisions, current permission, blocking conditions,\n"
                 "qualification evidence, and next permitted assignment. Read relevant founder\n"
                 "preferences and unresolved notices. If Frame remains Draft, prepare only Frame\n"
                 "artifacts in your domain. Do not manufacture approvals or evidence.\n\n"
                 "On completion, publish an artifact and decision reference plus a handoff\n"
                 "to the named receiver. Leave uncertainty and open blocks visible.\n",
                 encoding="utf-8")
+            if role == "runner":
+                with (team / "sessions/runner.md").open("a", encoding="utf-8") as brief:
+                    brief.write(
+                        "\n## Founder conversation\n\n"
+                        "Recover existing company state first; never reset records or infer that a new\n"
+                        "chat grants authority. Follow the pinned handover requirements when replacing\n"
+                        "an instance. If Frame is Draft, guide preparation through a focused interview.\n"
+                        "Ask one or a few questions at a time, reuse supplied answers, challenge\n"
+                        "consequential assumptions, and summarize decisions. Unknown answers become\n"
+                        "explicit unknowns or proposed research, not invented facts. Do not require\n"
+                        "a complete business plan; ask what the next bounded decision needs.\n"
+                        "Prepare what is permitted while dependent work awaits missing authority.\n"
+                        "Bring the founder a reviewed experiment with success criteria, cost, exposure,\n"
+                        "and necessary reserved decisions. Clear authorization needs no repeated approval.\n"
+                        "In the target product you activate specialists through tools without founder\n"
+                        "setup. This preview has no automatic startup: report that limit honestly and\n"
+                        "never pretend to have started sessions or obtained independent reviews.\n"
+                    )
         spec_owners = {charter["spec"]: role for role, charter in ROLES.items()}
         spec_owners["technical"] = "architect" if "architect" in roles else "engineer"
         spec_owners["support-readiness"] = "support" if "support" in roles else "release"
@@ -488,8 +518,10 @@ def materialize(config, output, target="both", spec=None):
             "# Developer preview: manual role sessions\n\n"
             "This is a generated workspace, not a running company. Use it only after\n"
             "the generator reports success; an interrupted run may leave incomplete files.\n"
-            "The intended founder experience starts once and routes work automatically;\n"
-            "that automation is not implemented. This manual procedure is for development.\n\n"
+            "The target founder flow after one-time installation is: create a project, attach\n"
+            "a folder, open a chat, and talk. The Chief of Staff starts on the first message,\n"
+            "interviews the founder, and activates specialists. The installer and startup\n"
+            "automation are not implemented. This manual procedure is for development.\n\n"
             "Start separate sessions from this project root; give each its own startup brief.\n"
             "Open this company folder in your chosen project UI, or use a CLI below.\n"
             "In the main conversation, ask: Read team/sessions/runner.md and follow it.\n"

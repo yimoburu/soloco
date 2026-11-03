@@ -4,17 +4,33 @@ Give an idea to a team of AI agents and operate a company through **one founder 
 
 The team progresses toward public launch or funding readiness through conventional startup roles, bounded authority, independent review, and evidence.
 
+## Getting started
+
+**The three-step founder experience below is specified, but not available yet.** This repo currently contains the design and a workspace generator. There is no company-framework installer to run in Codex or Claude; cloning the repo or attaching a folder does not install automatic company startup.
+
+The release entry point will be: install the framework once in your chosen app from this README, verify it is ready, then create your company project. Supported versions, prerequisites, and installation instructions must ship with that integration.
+
+For a **manual developer trial today**, download or clone this repo, open it in Codex or Claude Code, and follow the [converter guide](docs/converter.md). Generate into a new folder before attaching that folder as the company project. The trial still requires explicit role startup and manual coordination; it is not the product onboarding.
+
 ## Read only what you need
 
 - [Current spec](SPEC.md): founder responsibilities, collaboration, evidence gates, learning, and company continuity.
 - [Converter guide](docs/converter.md): what works today and how to generate a developer workspace.
 - [History](history/README.md): original intent, previous versions, and review provenance; not competing current requirements.
 
+## Founder experience — target
+
+After installing the company framework once in the chosen app:
+
+1. Create a project.
+2. Attach a company folder.
+3. Open a chat and talk about your idea.
+
+Your Chief of Staff starts on the first message, asks focused questions, challenges assumptions, and assembles the necessary specialist sessions. It initializes a new company or resumes an existing one, then brings you a reviewed first experiment to authorize. You do not configure roles, run commands, or forward messages. Company records preserve decisions, obligations, communication preferences, and unresolved notices across agent replacement.
+
 ## What works today
 
-The Python workspace generator produces shared records, proposed charters, and role startup briefs for Codex or Claude Code. It does **not** launch sessions, route handoffs, enforce authority, or replace a live team. Manual session startup is a developer preview.
-
-The target product makes the founder's existing Codex or Claude Code conversation the Chief of Staff agent's session (`runner`). It coordinates separate specialist sessions; software tools enforce permissions and record changes independently of its judgment. Agents collaborate directly and activate specialists as work requires. Company records retain founder notifications and communication preferences across replacement. Automated delivery, preference learning, qualification, and mixed-platform coordination remain unimplemented.
+The Python workspace generator produces shared records, proposed charters, and role startup briefs for Codex or Claude Code. It does **not** launch sessions, route handoffs, enforce authority, or replace a live team. The installer and automatic first-chat startup are also unimplemented. The commands below and manual session startup are a developer preview, not the intended founder onboarding.
 
 ```sh
 python3 tools/materialize.py --config examples/venture.json --output /tmp/my-venture --target codex
