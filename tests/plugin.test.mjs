@@ -185,7 +185,7 @@ test('same chat cannot reuse a revoked epoch after a handover',()=>{
 
 
 test('compatible runtime patches preserve pinned team, ownership and native sessions without adoption',async()=>{
-  for(const version of ['0.2.0','0.2.1','0.2.2']) {
+  for(const version of ['0.2.0','0.2.1','0.2.2','0.3.0']) {
     const a=setup();
     withStore(a.root,db=>db.transaction('test.old_patch',s=>{
       s.plugin_version=version;s.runtime_version=version;

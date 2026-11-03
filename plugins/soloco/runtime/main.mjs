@@ -4,6 +4,7 @@ import readline from 'node:readline';
 import { PACKAGE, VERSION, folder, withStore, stamp, installedTeam, upgradePending, teamHash, compatibleRuntime } from './store.mjs';
 import * as engine from './engine.mjs';
 import { readiness } from './adapters.mjs';
+import { hooks } from './hooks.mjs';
 import { upgrade, upgradeGuidance } from './upgrade.mjs';
 
 const string={type:'string'};
@@ -19,7 +20,8 @@ const definitions=[
   ['company_acknowledge','Record that the founder saw or resolved a notice. Delivery/seen/resolution are separate and never count as execution authorization.',{...common,epoch:{type:'integer'},notice_id:string,seen:{type:'boolean'},resolution:string,source_reference:string},['root','session_id','epoch','notice_id'],engine.acknowledge],
   ['company_message','Put a direct message in a role inbox. The next role turn receives it without founder forwarding.',{...common,epoch:{type:'integer'},to:string,content:string},['root','session_id','epoch','to','content'],engine.message],
   ['company_upgrade','Inspect or explicitly upgrade a preparation team. Preserve governance by default. Prepare starts independent native continuity checks; apply and verify precede resume. Recover restores definitions without deleting company facts.',{...common,action:{enum:['inspect','prepare','apply','verify','recover']},expected_epoch:{type:'integer'},candidate_hash:string,upgrade_id:string,source_instruction:string,governance:{enum:['preserve','installed']},governance_instruction:string,takeover_instruction:string},['root','session_id','action'],upgrade],
-  ['company_doctor','Read-only readiness check; does not create a company or inspect credentials.',{},[],(_a,h)=>({plugin_version:VERSION,node:process.version,host:readiness(h),mode:'preparation',platform:process.platform})],
+  ['company_hooks','Inspect Codex hook discovery, trust, stale project launchers and binding health. Migrate removes only recognized project hooks after a backed-up preview; never grants trust or creates a binding.',{root:common.root,session_id:common.session_id,action:{enum:['inspect','migrate']},expected_file_sha256:string,source_instruction:string},['root','action'],hooks],
+  ['company_doctor','Read-only readiness check; include root and session_id to diagnose startup hooks. Does not create a company or inspect credentials.',common,[],async(a,h)=>({plugin_version:VERSION,node:process.version,host:readiness(h),mode:'preparation',platform:process.platform,...(a.root?{hooks:await hooks({...a,action:'inspect'},h)}:{})})],
 ];
 export const toolList=definitions.map(([name,description,properties,required])=>({name,description,inputSchema:{type:'object',properties,required,additionalProperties:false}}));
 export async function call(name,args,host) {

@@ -16,12 +16,12 @@ export function bind(root, session, host) {
   fs.mkdirSync(dir,{recursive:true,mode:0o700});
   const file = path.join(dir,digest(JSON.stringify([folder(root),host,session]))+'.json');
   noLink(file);
-  fs.writeFileSync(file,JSON.stringify({root:folder(root),host,session_id:session,at:stamp()}),{mode:0o600});
+  fs.writeFileSync(file,JSON.stringify({root:folder(root),host,session_id:session,at:stamp(),plugin_version:VERSION,plugin_root:PACKAGE,data_directory:dataDir()}),{mode:0o600});
 }
 export function binding(args, host) {
   requireText(args.session_id,'session_id',200);
   const file = path.join(dataDir(),'bindings',digest(JSON.stringify([folder(args.root),host,args.session_id]))+'.json');
-  if (!fs.existsSync(file)) throw new Error('No trusted startup-hook binding for this chat. Enable/trust SoloCo hooks, then reopen this chat.');
+  if (!fs.existsSync(file)) throw new Error('No startup-hook binding in this MCP data directory. Run company_doctor with root and session_id to distinguish missing discovery, stale project hooks, disabled/untrusted hooks, or a data-directory mismatch. Then reopen this chat and send a prompt.');
 }
 export function upgradeSummary(u) {
   if (!u) return null;

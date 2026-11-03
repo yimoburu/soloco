@@ -1,0 +1,9 @@
+{
+  "name": "soloco",
+  "version": "0.3.1",
+  "description": "SoloCo: your Chief of Staff and standalone AI specialists, with persistent company records. Preparation and review preview.",
+  "skills": "./skills/",
+  "hooks": "./hooks/codex.json",
+  "onboardingSkill": "./skills/setup/SKILL.md",
+  "mcpServers": "./.mcp.codex.json"
+}

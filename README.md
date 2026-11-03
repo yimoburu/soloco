@@ -4,7 +4,7 @@ Run a virtual company through **one founder conversation**. Your Chief of Staff 
 
 The target is a company you can operate and improve over time, including a sustainably profitable one-person business with manageable founder workload. You define success; public launch and fundraising are optional milestones.
 
-**SoloCo v0.3.0 is an early preparation-and-review release.** It interviews you, saves company intent, runs specialist planning sessions, and requests independent reviews. It does not execute customer outreach, spending, deployment, or other business actions. The [spec](SPEC.md) describes the complete target.
+**SoloCo v0.3.1 is an early preparation-and-review release.** It interviews you, saves company intent, runs specialist planning sessions, and requests independent reviews. It does not execute customer outreach, spending, deployment, or other business actions. The [spec](SPEC.md) describes the complete target.
 
 ## Install once
 
@@ -72,7 +72,7 @@ claude plugin uninstall company@ai-operated-startup --keep-data
 claude plugin install soloco --marketplace yimoburu/soloco
 ```
 
-Restart the app/session, trust SoloCo hooks, and reopen the **same company folder and founder chat**. Ask to verify SoloCo v0.3.0, open the existing company and resume preparation with its pinned team. Hook bindings are recreated; company records remain in `.company/`. A different chat needs an explicit handover. Schema-1 v0.1.0 companies still require the checked upgrade below; pending upgrades must be verified or recovered before resuming. Do not initialize another company or move records into plugin directories.
+Restart the app/session, trust SoloCo hooks, and reopen the **same company folder and founder chat**. Ask to verify SoloCo v0.3.1, open the existing company and resume preparation with its pinned team. If old project hooks remain, use the hook repair below before resuming. Hook bindings are recreated by an actual trusted lifecycle event; company records remain in `.company/`. A different chat needs an explicit handover. Schema-1 v0.1.0 companies still require the checked upgrade below; pending upgrades must be verified or recovered before resuming. Do not initialize another company or move records into plugin directories.
 
 ## Upgrade an existing company
 
@@ -85,7 +85,7 @@ codex plugin marketplace upgrade soloco
 codex plugin add soloco@soloco
 ```
 
-Then restart the desktop app and reopen the same founder chat. If `codex` is not on your PATH, use your installed Codex executable. Keep SoloCo hooks enabled/trusted. Ask the CoS to check `company_doctor` reports v0.3.0 and that `company_upgrade` is available before proceeding.
+Then restart the desktop app and reopen the same founder chat. If `codex` is not on your PATH, use your installed Codex executable. Keep SoloCo hooks enabled/trusted. Ask the CoS to check `company_doctor` reports v0.3.1 and that `company_upgrade` is available before proceeding.
 
 For a compatible company, ask to resume preparation with its existing pinned team and rules. No adoption rehearsal is needed. To adopt the new team instructions instead, tell your Chief of Staff:
 
@@ -93,11 +93,26 @@ For a compatible company, ask to resume preparation with its existing pinned tea
 
 The CoS inspects compatibility, pauses/reconciles assignments, and starts a fresh CoS rehearsal and independent QA review. After they pass, it adopts the candidate, verifies preserved records, reloads its instructions, and resumes preparation. Specialist sessions restart on demand from company records; you do not rebrief them. If you use a new chat, explicitly ask it to take over this company as part of the upgrade.
 
-This release supports checked upgrades from v0.1.0 preparation companies and operates existing schema-2 companies from v0.2.0/v0.2.1/v0.2.2 without a forced team upgrade. Explicit team adoption still runs the checks, with full checkpoints up to 300,000 characters. Governance remains pinned by default; adopting the v0.16 contract requires explicit direction after reviewing its differences. Older governance may block a preparation upgrade on execution-level qualification requirements; the CoS must show that hold and ask before adopting the new, limited preparation-upgrade contract. Failed or stale checks hold the upgrade. Ask the CoS to recover the previous team if needed: recovery retains later company facts and uses the new runtime with the prior definitions, not the old plugin binary. After migration, v0.1.0 cannot resume the schema-2 company. Upgrade checks make two model calls using your normal host account.
+This release supports checked upgrades from v0.1.0 preparation companies and operates existing schema-2 companies from v0.2.0/v0.2.1/v0.2.2/v0.3.0 without a forced team upgrade. Explicit team adoption still runs the checks, with full checkpoints up to 300,000 characters. Governance remains pinned by default; adopting the v0.16 contract requires explicit direction after reviewing its differences. Older governance may block a preparation upgrade on execution-level qualification requirements; the CoS must show that hold and ask before adopting the new, limited preparation-upgrade contract. Failed or stale checks hold the upgrade. Ask the CoS to recover the previous team if needed: recovery retains later company facts and uses the new runtime with the prior definitions, not the old plugin binary. After migration, v0.1.0 cannot resume the schema-2 company. Upgrade checks make two model calls using your normal host account.
+
+## Repair stale Codex hooks
+
+v0.3.1 fixes [issue #2](https://github.com/yimoburu/soloco/issues/2). Codex `0.166.0-alpha.5.1` loads both hooks from the compatibility manifest; the former portable manifest yielded zero hooks on that client. Updating team instructions does not update project-level hook commands.
+
+After updating the package and restarting, say in your existing founder chat:
+
+> Check SoloCo's startup hooks for this folder. Remove the recognized old Company/SoloCo project hooks using the supported migration, preserve unrelated hooks and company records, and verify the current chat's binding after I review the plugin hooks.
+
+Setup uses `company_hooks` to inspect discovery and preview exactly which entries will be removed. Migration backs up `.codex/hooks.json`, removes only recognized launchers and leaves the two plugin hooks as the source of startup behavior. It never writes a replacement versioned cache path, copies a binding, grants trust, or changes `.company/`. Unknown custom commands and duplicate legacy plugins hold migration for review.
+
+Review and trust the two **SoloCo plugin** hooks in the host Hooks UI, reopen the founder chat, then send a prompt. `company_doctor` with the folder and actual chat ID checks that the lifecycle created a current-runtime binding in the MCP data directory. No binding means invocation is still unverified. The diagnostics distinguish missing discovery, disabled hooks, untrusted/modified definitions, stale commands and mismatched data directories. The read-only configuration probe cannot see unsaved live-chat overrides; compare with the host UI if needed.
+
+Subsequent upgrades use the bundled hooks and a release-generated MCP launcher, with a stable shared data directory. The native test verifies both resolve the new package without project edits. The host may still require renewed hook trust; installation does not bypass that requirement.
 
 ## What is verified
 
-- SoloCo v0.3.0: 58 automated tests pass. Isolated native Codex and Claude CLI tests installed the old Company v0.2.2 package, created a disposable company, replaced the plugin with SoloCo, rebound the same founder chat, resumed with its pinned rules and native session IDs, and renamed the company without losing history. These are runtime/installation checks, not desktop UI or live model acceptance.
+- SoloCo v0.3.1: 65 automated tests pass, including migration preservation, stale previews, missing/disabled hooks, data mismatch and subprocess hook-to-tool binding. Native Codex installation checks verify both plugin hooks are discovered untrusted, the MCP tools connect, and both follow a later package version without editing project paths. A real desktop lifecycle after human trust remains to be verified; the tests do not manufacture trust.
+- Historical v0.3.0: 58 automated tests passed. Isolated native Codex and Claude CLI tests installed the old Company v0.2.2 package, created a disposable company, replaced the plugin with SoloCo, rebound the same founder chat, resumed with its pinned rules and native session IDs, and renamed the company without losing history. These are runtime/installation checks, not desktop UI or live model acceptance.
 
 - The v0.1.0 package was installed through both native CLIs using isolated marketplaces. Published v0.2.1 installation was checked through the Codex CLI in an isolated configuration; desktop update acceptance remains outstanding. v0.2.2 installed through the Codex CLI from a local catalog in an isolated configuration; its Claude manifest validated.
 - Live v0.1.0 Codex: standalone PM draft, separate QA review, and a second assignment resumed the same PM session.

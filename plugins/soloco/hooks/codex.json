@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/bin/sh \"${PLUGIN_ROOT}/scripts/run.sh\" hook codex",
+            "command": "COMPANY_PLUGIN_DATA=\"${CODEX_HOME:-$HOME/.codex}/plugins/data/soloco\" /bin/sh \"${PLUGIN_ROOT}/scripts/run.sh\" hook codex",
             "timeout": 150
           }
         ]
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/bin/sh \"${PLUGIN_ROOT}/scripts/run.sh\" hook codex",
+            "command": "COMPANY_PLUGIN_DATA=\"${CODEX_HOME:-$HOME/.codex}/plugins/data/soloco\" /bin/sh \"${PLUGIN_ROOT}/scripts/run.sh\" hook codex",
             "timeout": 150
           }
         ]

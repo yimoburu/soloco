@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/bin/sh \"${CLAUDE_PLUGIN_ROOT}/scripts/run.sh\" hook claude",
+            "command": "COMPANY_PLUGIN_DATA=\"${CLAUDE_PLUGIN_DATA}\" /bin/sh \"${CLAUDE_PLUGIN_ROOT}/scripts/run.sh\" hook claude",
             "timeout": 150
           }
         ]
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/bin/sh \"${CLAUDE_PLUGIN_ROOT}/scripts/run.sh\" hook claude",
+            "command": "COMPANY_PLUGIN_DATA=\"${CLAUDE_PLUGIN_DATA}\" /bin/sh \"${CLAUDE_PLUGIN_ROOT}/scripts/run.sh\" hook claude",
             "timeout": 150
           }
         ]
