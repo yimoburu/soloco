@@ -14,12 +14,14 @@ The team progresses toward public launch or funding readiness through convention
 
 The Python workspace generator produces shared records, proposed charters, and role startup briefs for Codex or Claude Code. It does **not** launch sessions, route handoffs, enforce authority, or replace a live team. Manual session startup is a developer preview.
 
-The target product makes the founder's existing Codex or Claude Code conversation the Team Runner agent's session. This Operations Lead coordinates separate specialist sessions; software tools enforce permissions and record changes independently of its judgment. Managed platform selection and mixed-platform operation are deferred.
+The target product makes the founder's existing Codex or Claude Code conversation the Chief of Staff agent's session (`runner`). It coordinates separate specialist sessions; software tools enforce permissions and record changes independently of its judgment. Agents collaborate directly and activate specialists as work requires. Company records retain founder notifications and communication preferences across replacement. Automated delivery, preference learning, qualification, and mixed-platform coordination remain unimplemented.
 
 ```sh
 python3 tools/materialize.py --config examples/venture.json --output /tmp/my-venture --target codex
 python3 -m unittest discover -s tests -v
 ```
+
+Use one persistent folder and, where available, one UI project per company. Codex and Claude may open the same folder; `--target both` supplies both instruction wrappers. In this prototype use one active environment at a time and serialize shared writes. Opening a folder creates neither a second company nor new authority.
 
 New workspaces pin an exact copy and hash of `SPEC.md`. Existing workspaces are never overwritten or silently upgraded. Generation leaves Frame in Draft and grants no venture-execution authority.
 

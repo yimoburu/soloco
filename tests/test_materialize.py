@@ -41,7 +41,7 @@ class MaterializeTests(unittest.TestCase):
 
         self.assertEqual((output / "team/governance.md").read_bytes(), source)
         self.assertEqual(manifest["schema_version"], "1")
-        self.assertEqual(manifest["converter_version"], "0.4")
+        self.assertEqual(manifest["converter_version"], "0.5")
         self.assertEqual(manifest["name"], self.config["name"])
         self.assertEqual(manifest["governance"]["file"], "team/governance.md")
         self.assertEqual(
@@ -71,7 +71,8 @@ class MaterializeTests(unittest.TestCase):
             prompts.append(prompt)
         self.assertEqual(len(set(prompts)), 4)
         self.assertFalse((output / ".claude/agents").exists())
-        for template in ["decision", "founder-packet", "handoff", "gate"]:
+        for template in ["decision", "founder-packet", "handoff", "gate",
+                         "founder-notice", "founder-preference", "role-evaluation"]:
             record = json.loads((output / f"team/templates/{template}.json").read_text())
             self.assertEqual(record["status"], "Draft")
             self.assertEqual(record["version"], 0)
@@ -121,6 +122,57 @@ class MaterializeTests(unittest.TestCase):
                 self.assertEqual(
                     (output / "CLAUDE.md").exists(), target in ["claude", "both"]
                 )
+
+    def test_founder_records_start_empty_without_delivery_or_authorization(self):
+        output = self.generate()
+        self.assertEqual(list((output / "team/founder-inbox").iterdir()), [])
+        profile = json.loads((output / "team/founder-preferences.json").read_text())
+        self.assertEqual(profile["owner"], "human_founder")
+        self.assertEqual(profile["explicit"], [])
+        self.assertEqual(profile["inferred"], [])
+        self.assertEqual(profile["status"], "Draft")
+        notice = json.loads((output / "team/templates/founder-notice.json").read_text())
+        self.assertIsNone(notice["kind"])
+        self.assertIsNone(notice["packet_reference"])
+        self.assertEqual(notice["delivery"]["attempts"], [])
+        for value in (notice["delivery"]["delivered_at"], notice["seen_at"],
+                      notice["resolution"], notice["authorization_reference"]):
+            self.assertIsNone(value)
+        frame = json.loads((output / "team/board/frame.json").read_text())
+        self.assertIsNone(frame["notification_policy"])
+        self.assertEqual(frame["permission"], "prepare_frame_only")
+
+    def test_role_catalog_does_not_activate_or_qualify_dormant_roles(self):
+        output = self.generate()
+        operations = (output / "team/specs/company-operations.md").read_text()
+        for role in ("legal", "security", "finance"):
+            self.assertIn(f"| {role} |", operations)
+            self.assertFalse((output / f"team/sessions/{role}.md").exists())
+            self.assertFalse((output / f"team/roles/{role}.md").exists())
+        evaluation = json.loads((output / "team/templates/role-evaluation.json").read_text())
+        self.assertEqual(evaluation["evidence"], [])
+        for field in ("candidate_instance", "reviewer_instance", "verdict", "authority_grant_reference"):
+            self.assertIsNone(evaluation[field])
+        frame = json.loads((output / "team/board/frame.json").read_text())
+        self.assertEqual(frame["role_evaluations"], [])
+        self.assertIsNone(frame["founder_authorization"])
+
+    def test_switching_platform_does_not_reset_existing_company_records(self):
+        output = self.generate(target="both")
+        profile_path = output / "team/founder-preferences.json"
+        profile = json.loads(profile_path.read_text())
+        profile["explicit"] = [{"id": "P1", "preference": "Short updates", "basis": "explicit"}]
+        profile_path.write_text(json.dumps(profile))
+        (output / "team/founder-inbox/N1.json").write_text(
+            '{"id": "N1", "kind": "decision_required", "resolution": null}'
+        )
+        before = {p.relative_to(output): p.read_bytes() for p in output.rglob("*") if p.is_file()}
+        for target in ("codex", "claude"):
+            with self.subTest(target=target):
+                with self.assertRaises(FileExistsError):
+                    materializer.materialize(self.config, output, target=target)
+                after = {p.relative_to(output): p.read_bytes() for p in output.rglob("*") if p.is_file()}
+                self.assertEqual(before, after)
 
     def test_explicit_spec_is_copied_exactly_including_unicode_and_line_endings(self):
         source = self.base / "candidate.md"

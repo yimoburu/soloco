@@ -12,6 +12,14 @@ These files preserve original intent and review evidence. They are historical sn
 | [Founder interface](docs/founder-interface.md), [user stories](docs/user-stories.md), [company continuity](docs/company-continuity.md) | Subsequent intent clarifications, now consolidated into the current spec |
 | [v0.4 snapshot](https://github.com/yimoburu/ai-operated-startup/blob/c32a20d95f794df0cc435b15d08a758c61dfbacd/SPEC.md), [Claude review](reviews/claude-v0.4.md), [v0.5 disposition](reviews/v0.5-disposition.md) | Reconciled design, external review, and narrowly adopted corrections |
 
+## v0.7 founder and collaboration reconciliation — 2026-11-02
+
+The founder accepted the subsequent architecture discussion and requested reconciliation. The coordinator is now named Chief of Staff while retaining technical role ID `runner`. Direct peer communication, software as supporting infrastructure, work/exposure-based activation, independent role qualification, disposable agent memory, and one persistent company folder are explicit. Both interfaces may open the same folder; concurrent execution requires common authority and write controls, and remains outside the manual prototype.
+
+A durable founder inbox separates must-know notices from decision requests and delivery from authorization. A shared communication profile distinguishes explicit preferences from tentative inferences; personalization cannot suppress required notices or alter authority. These records survive replacement. Cross-product continuity preserves the company without promising an identical chat window. The constitution and five-step authority-transfer procedure remain unchanged.
+
+Converter v0.5 emits matching Draft records, instructions, and an activation guide; it still launches no sessions and implements no automatic delivery, learning, or enforcement. The [v0.6 snapshot](https://github.com/yimoburu/ai-operated-startup/blob/f398775/SPEC.md) preserves the previous design. Existing companies are not silently upgraded.
+
 ## v0.6 coordination decision — 2026-11-02
 
 At the founder's direction, Team Runner is now a standalone Operations Lead agent in the existing founder conversation. It owns sequencing, dependencies, Frame preparation, and recovery judgment; PM keeps product priorities and specialists keep domain verdicts. This replaces the earlier software-only coordinator choice, not the constitutional limits on authority. Software still enforces execution checks, direct founder pause, and delivery of specialist decision packets. Runner cannot approve itself or suppress dissent and must be replaceable from company records.

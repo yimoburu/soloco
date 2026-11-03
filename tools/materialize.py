@@ -10,16 +10,16 @@ import tempfile
 
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "0.4"
+VERSION = "0.5"
 
 # These are role starters, not extracted or approved interpretations of governance.
 # The pinned spec governs; Frame must review the charters and authority map.
 ROLES = {
     "runner": {
-        "name": "Team Runner / Operations Lead", "spec": "company-operations",
+        "name": "Chief of Staff", "spec": "company-operations",
         "mission": "Coordinate the company through one founder conversation; judge sequencing, dependencies, and recovery within approved limits.",
         "inputs": "Founder instructions, approved charters, PM priorities, accepted work, blocks and session status.",
-        "outputs": "Operating plan, assignments, recovery decisions, unchanged founder packets, and Intent updates attributed to the founder's source instruction.",
+        "outputs": "Operating plan, role activation, assignments, recovery decisions, founder notices and communication preferences, and Intent updates attributed to the founder's source instruction.",
         "block": "Execution lacking required prerequisites or carrying conflicting assignments; never erase another role's block.",
         "success": "Accepted work reaches the right owner within limits without founder message forwarding.",
         "failure": "Overruling domain judgment or suppressing dissent to appear productive.",
@@ -180,6 +180,12 @@ founder authorization under the pinned spec before those actions.
   review your own work. Attributions are self-reported here, not authentication.
 - Board items live in `team/board/`; specs in `team/specs/`; evidence and outputs
   in `team/artifacts/`; consequential decisions in `team/decisions/`.
+- Any role may contact another directly; the Chief of Staff is not a message
+  relay. Communication transfers no authority. Tools support all agents and
+  enforce checks at execution and record changes in the target system.
+- Session history and scratch notes are disposable. Publish findings, material
+  uncertainty, unfinished obligations, and next steps needed by others into
+  company records during work and before stopping; do not archive private chats.
 - Use one file per object with a unique ID, owner, author instance, status, and
   version. Cite governing spec versions and a decision ID. Never overwrite
   another role's artifact or mutate its verdict.
@@ -189,7 +195,7 @@ founder authorization under the pinned spec before those actions.
   clearing condition. Apply the pinned conflict ladder; never bypass a block.
 - Record uncertainty, stalls, stale evidence, and adverse results. Consequential
   decisions include rationale, expected outcome, and an outcome review date.
-- Runner records founder direction in Intent with its source and attribution before
+- The Chief of Staff records founder direction in Intent with its source and attribution before
   dependent work resumes. Recordkeeping transfers no founder authority.
   Confirm ambiguity or inferred authority beyond the explicit
   instruction; clear instructions need no repeated confirmation.
@@ -204,12 +210,28 @@ founder authorization under the pinned spec before those actions.
   states its trade-offs. Preserve dissent and review escalation quality through
   the existing outcome process. Do not add a veto over genuine reserved decisions
   or automatically shrink delegation for unnecessary escalation.
-- Runner owns workflow judgment; PM owns product scope/priorities. Runner may
+- The Chief of Staff owns workflow judgment; PM owns product scope/priorities. It may
   propose assignments and recovery but cannot replace domain verdicts, approve
   its own work or permissions, or suppress any role's founder packet. Its plans
   need charter-named non-author review. The target execution software checks
-  every action independently, including Runner's, and applies founder pauses
-  without waiting for Runner. These controls are not installed in this prototype.
+  every action independently, including the Chief of Staff's, and applies founder
+  pauses without waiting for it. These controls are not installed in this prototype.
+- Use Company Operations' activation guide for ownership and exposure triggers.
+  Before granting execution authority, record a representative role evaluation
+  and boundary check with qualified non-author review. Prepare/evaluate only
+  until approved; no role, including the Chief of Staff, qualifies itself.
+- Founder notification rules live in Intent; notice records live in
+  `team/founder-inbox/`. Use the founder-notice template and link decision requests
+  to founder packets instead of duplicating them. Any role may submit; distinguish
+  must-know from decision-required notices. Delivery, seen, and resolution are
+  separate; silence never approves. Hold affected actions pending authority.
+  The target system retries delivery and handles detectable triggers independently
+  of the Chief of Staff. Agree deadlines, reminders, and enabled channels at Frame.
+- `team/founder-preferences.json` holds only useful communication preferences,
+  with source/date and explicit versus inferred basis. The Chief of Staff records
+  feedback; all roles use relevant entries. Explicit direction wins; inferred
+  preferences remain tentative and correctable. Never suppress required notices,
+  exceed notification deadlines, or change authority based on personalization.
 
 ## Prototype operation
 
@@ -222,6 +244,13 @@ Use `team/templates/` as record starters, not as proof of compliance.
 Company records are co-located under `team/` in this prototype. They belong to
 the company and must not be replaced with team instructions. Live team
 replacement and transfer of authority are not implemented.
+One company uses one persistent folder. Both platform UIs may open that folder;
+opening it grants no authority and creates no second company. Use one active
+environment at a time in this prototype; overlapping writes and competing Chiefs
+of Staff are unsafe. The `both` target supplies wrappers, not mixed-harness routing.
+Notification delivery, preference learning, and role evaluation are manual here;
+record templates do not perform or certify them. Preserve records when switching
+interfaces; a different product may require a new chat, not a founder rebrief.
 
 After each assignment, leave its artifact references, current status, unresolved
 blocks, next receiver, and pending outcome reviews on the board. A fresh instance
@@ -270,7 +299,7 @@ def materialize(config, output, target="both", spec=None):
     stage = Path(tempfile.mkdtemp(prefix=".startup-stage-", dir=output.parent))
     try:
         team = stage / "team"
-        for folder in ("roles", "sessions", "board", "specs", "artifacts", "decisions", "templates"):
+        for folder in ("roles", "sessions", "board", "specs", "artifacts", "decisions", "templates", "founder-inbox"):
             (team / folder).mkdir(parents=True)
         (team / "governance.md").write_bytes(spec_bytes)
         (team / "PROTOCOL.md").write_text(PROTOCOL, encoding="utf-8")
@@ -281,6 +310,10 @@ def materialize(config, output, target="both", spec=None):
             "governance": {"file": "team/governance.md", "source_name": spec.name,
                            "sha256": hashlib.sha256(spec_bytes).hexdigest()},
             "mode": "manual_standalone_sessions", "runtime_enforcement": False,
+        })
+        write_json(team / "founder-preferences.json", {
+            "owner": "human_founder", "recorder": "runner", "status": "Draft", "version": 0,
+            "explicit": [], "inferred": [],
         })
         if "codex" in targets:
             (stage / "AGENTS.md").write_text(
@@ -314,7 +347,10 @@ def materialize(config, output, target="both", spec=None):
                 f"Main failure mode: {charter['failure']}\n\nActivation: {charter['phase']}\n\n"
                 "Block resolver, non-party arbiter, independent reviewer, charter amendment authority,\n"
                 "delegation approver, authority envelope, and expiry: Unknown; define at Frame. Apply the pinned\n"
-                "governance's override rules. This starter grants no spending or external-action permission.\n",
+                "governance's override rules. This starter grants no spending or external-action permission.\n\n"
+                "Qualification evidence: Unknown. Before execution authority, a qualified non-author\n"
+                "must assess a representative role task and authority-boundary check; record evidence\n"
+                "and verdict using the role-evaluation template. Compatible prior evidence needs a reuse rationale.\n",
                 encoding="utf-8")
             if role == "runner":
                 with (team / "roles/runner.md").open("a", encoding="utf-8") as charter_file:
@@ -332,7 +368,8 @@ def materialize(config, output, target="both", spec=None):
                 "Use a distinct instance ID in every output attribution. Read source artifacts\n"
                 "instead of relying on other sessions' conversation summaries.\n\n"
                 "First state your owned decisions, current permission, blocking conditions,\n"
-                "and next permitted assignment. If Frame remains Draft, prepare only Frame\n"
+                "qualification evidence, and next permitted assignment. Read relevant founder\n"
+                "preferences and unresolved notices. If Frame remains Draft, prepare only Frame\n"
                 "artifacts in your domain. Do not manufacture approvals or evidence.\n\n"
                 "On completion, publish an artifact and decision reference plus a handoff\n"
                 "to the named receiver. Leave uncertainty and open blocks visible.\n",
@@ -348,9 +385,21 @@ def materialize(config, output, target="both", spec=None):
                 "Load-bearing decisions: Unknown. Evidence: Not collected.\n\n"
                 "Independent reviewer, reading/decision budget, and expiry: Unknown; set at Frame.\n",
                 encoding="utf-8")
+        with (team / "specs/company-operations.md").open("a", encoding="utf-8") as operations:
+            operations.write(
+                "\n## Proposed activation guide\n\n"
+                "For each assignment identify output, owner, required reviews, and whether an active\n"
+                "session suffices. Activate approved roles within limits; mandatory review precedes\n"
+                "the affected exposure. Any role may flag a missing specialist. This catalog neither\n"
+                "creates sessions nor approves dormant roles; prepare their charter and qualification\n"
+                "before execution. Charters resolve shared-spec ownership. Record a handoff before stopping.\n\n"
+                "| Role ID | Owned spec | Work or exposure trigger |\n|---|---|---|\n"
+            )
+            for role, charter in ROLES.items():
+                operations.write(f"| {role} | {charter['spec']} | {charter['phase']} |\n")
         (team / "specs/founder-intent.md").write_text(
             f"# Founder Intent: {config['name']}\n\nOwner: Human founder. Version: 0.0. Status: Draft.\n\n"
-            "Recorder: Team Runner, under founder authority. Preserve the original instruction\n"
+            "Recorder: Chief of Staff, under founder authority. Preserve the original instruction\n"
             "and attribution in its decision record; clarify ambiguity or inferred\n"
             "authority beyond the explicit instruction before applying it.\n\n"
             "## Idea supplied at generation\n\n" + config["idea"] + "\n\n"
@@ -362,6 +411,12 @@ def materialize(config, output, target="both", spec=None):
             "Triggers, independent assessor, and change authority: Unknown; establish at Frame.\n"
             "Record the accepted policy here; Frame references its version. No agent may\n"
             "waive the policy or legally required review.\n\n"
+            "## Founder notification policy\n\n"
+            "Must-know and decision-required triggers, delivery deadlines, enabled channels,\n"
+            "reminder/fallback rules, and policy-change authority: Unknown; establish at Frame.\n"
+            "Include reserved decisions, material incidents or broken commitments, significant\n"
+            "adverse findings, and agreed milestones. Frame references this accepted policy;\n"
+            "communication preferences never override it. No delivery service is installed.\n\n"
             "Generation is not founder approval. Preserve unknowns until explicitly resolved.\n",
             encoding="utf-8")
         write_json(team / "board/frame.json", {
@@ -370,12 +425,36 @@ def materialize(config, output, target="both", spec=None):
             "permission": "prepare_frame_only", "decision_id": None,
             "contract_approver": None, "founder_authorization": None,
             "professional_review_policy": None,
+            "notification_policy": None, "role_evaluations": [],
             "missing": ["accepted intent and limits", "approved charters and reviewers",
                         "accepted professional-review policy with independent assessor and change authority",
+                        "accepted notification policy and verified delivery path",
+                        "independent qualification evidence for initial execution roles",
                         "risk/exposure screen", "approved first evidence contract", "cold-start acceptance"],
             "next": "Prepare a founder decision packet and independent Frame review.",
         })
         templates = {
+            "founder-notice": {"id": None, "owner": None, "author_instance": None,
+                               "status": "Draft", "version": 0, "governing_versions": [],
+                               "kind": None, "trigger_reference": None, "summary": None,
+                               "evidence": [], "dissent": [], "packet_reference": None,
+                               "affected_actions": [], "safe_hold": None, "deliver_by": None,
+                               "delivery": {"channel": None, "attempts": [], "delivered_at": None,
+                                            "next_attempt_at": None},
+                               "seen_at": None, "resolution": None,
+                               "authorization_reference": None},
+            "role-evaluation": {"id": None, "owner": None, "author_instance": None,
+                                "status": "Draft", "version": 0, "governing_versions": [],
+                                "role_id": None, "candidate_instance": None,
+                                "role_model_harness_versions": None,
+                                "representative_task": None, "boundary_check": None,
+                                "evidence": [], "reviewer_instance": None, "verdict": None,
+                                "reuse_rationale": None, "authority_grant_reference": None},
+            "founder-preference": {"id": None, "owner": None, "author_instance": None,
+                                   "status": "Draft", "version": 0, "governing_versions": [],
+                                   "topic": None, "preference": None, "basis": None,
+                                   "source_reference": None, "recorded_at": None,
+                                   "supersedes": None},
             "decision": {"id": None, "owner": None, "author_instance": None,
                          "status": "Draft", "version": 0, "authority": None,
                          "governing_versions": [], "decision": None, "evidence": [], "rationale": None,
@@ -412,7 +491,10 @@ def materialize(config, output, target="both", spec=None):
             "The intended founder experience starts once and routes work automatically;\n"
             "that automation is not implemented. This manual procedure is for development.\n\n"
             "Start separate sessions from this project root; give each its own startup brief.\n"
-            "Start Runner for Frame preparation using a selected platform command below.\n"
+            "Open this company folder in your chosen project UI, or use a CLI below.\n"
+            "In the main conversation, ask: Read team/sessions/runner.md and follow it.\n"
+            "This starts Chief of Staff preparation only; other sessions still need manual startup.\n"
+            "Both UIs may open the same folder, but use only one active environment at a time.\n"
             "Use another role's brief for a specialist session. Every session must see this same filesystem.\n\n"
             + "\n\n".join(f'```sh\n{platform} "Read team/sessions/runner.md and follow it."\n```'
                            for platform in targets)
