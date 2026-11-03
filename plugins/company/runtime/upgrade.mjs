@@ -2,14 +2,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { PACKAGE, VERSION, SCHEMA, stamp, id, digest, withStore, requireText, teamHash, installedTeam, skillBody, upgradePending, noLink, notice } from './store.mjs';
+import { PACKAGE, VERSION, SCHEMA, stamp, id, digest, withStore, requireText, teamHash, installedTeam, skillBody, upgradePending, noLink, notice, COMPATIBLE_TEAM_VERSIONS } from './store.mjs';
 import { binding, dataDir, upgradeSummary } from './engine.mjs';
 import { readiness, runModel, parseArtifact } from './adapters.mjs';
 
 const active = s => Object.values(s.jobs).some(j=>['queued','running'].includes(j.status));
-const allowedVersions = ['0.1.0', VERSION];
+export const CHECKPOINT_LIMIT = 300000;
 function compatible(s) {
-  if (!s || ![1,SCHEMA].includes(s.schema) || s.mode!=='preparation' || !allowedVersions.includes(s.plugin_version) || (s.schema===1 && s.plugin_version!=='0.1.0') || (s.schema===SCHEMA && s.runtime_version!==VERSION)) throw new Error('Unsupported company format, runtime, or execution mode; a separate migration is required');
+  if (!s || ![1,SCHEMA].includes(s.schema) || s.mode!=='preparation' || !COMPATIBLE_TEAM_VERSIONS.includes(s.plugin_version) || (s.schema===1 && s.plugin_version!=='0.1.0') || (s.schema===SCHEMA && !['0.2.0',VERSION].includes(s.runtime_version))) throw new Error('Unsupported company format, runtime, or execution mode; a separate migration is required');
   if (digest(s.governance)!==s.governance_sha256) throw new Error('Pinned governance integrity check failed');
   if (s.schema===SCHEMA && teamHash(s)!==s.team_sha256) throw new Error('Pinned team integrity check failed');
   for (const k of ['records','jobs','sessions','roles']) if (!s[k] || typeof s[k]!=='object' || Array.isArray(s[k])) throw new Error(`Invalid company ${k}`);
@@ -87,7 +87,7 @@ export function upgrade(a,host,{launch=launchUpgrade,check=readiness}={}) {
       s.paused=true;s.owner={host,session_id:a.session_id,epoch:s.owner.epoch+1};
       decision(s,a,'prepare_team_upgrade');
       const snapshot=checkpoint(s);
-      if (JSON.stringify(snapshot).length>150000) throw new Error('Checkpoint exceeds the bounded rehearsal size; compact through a separately reviewed migration, never truncate');
+      if (JSON.stringify(snapshot).length>CHECKPOINT_LIMIT) throw new Error('Checkpoint exceeds the bounded rehearsal size; compact through a separately reviewed migration, never truncate');
       s.upgrade={id:id('upgrade'),status:'queued',created_at:stamp(),epoch:s.owner.epoch,host,previous,candidate:next,candidate_hash:teamHash(next),checkpoint:snapshot,checkpoint_sha256:checkpointHash(s),governance_policy:a.governance??'preserve',governance_instruction:a.governance_instruction??null,source_instruction:a.source_instruction,takeover_instruction:a.takeover_instruction??null};
       return s;
     }));
@@ -100,7 +100,7 @@ export function upgrade(a,host,{launch=launchUpgrade,check=readiness}={}) {
     if (a.action==='recover') {
       requireText(a.source_instruction,'source_instruction');
       if (u.status==='recovered') throw new Error('Upgrade already recovered');
-      Object.assign(s,u.previous);s.team_sha256=teamHash(s);retire(s);s.owner={host,session_id:a.session_id,epoch:s.owner.epoch+1};
+      Object.assign(s,u.previous);s.schema=SCHEMA;s.runtime_version=VERSION;s.team_sha256=teamHash(s);retire(s);s.owner={host,session_id:a.session_id,epoch:s.owner.epoch+1};
       u.status='recovered';u.recovered_at=stamp();decision(s,a,'recover_team_definitions');
       return s;
     }

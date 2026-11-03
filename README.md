@@ -4,7 +4,7 @@ Run a virtual company through **one founder conversation**. Your Chief of Staff 
 
 The target is a company you can operate and improve over time, including a sustainably profitable one-person business with manageable founder workload. You define success; public launch and fundraising are optional milestones.
 
-**Company plugin v0.2.0 is an early preparation-and-review release.** It interviews you, saves company intent, runs specialist planning sessions, and requests independent reviews. It does not execute customer outreach, spending, deployment, or other business actions. The [spec](SPEC.md) describes the complete target.
+**Company plugin v0.2.1 is an early preparation-and-review release.** It interviews you, saves company intent, runs specialist planning sessions, and requests independent reviews. It does not execute customer outreach, spending, deployment, or other business actions. The [spec](SPEC.md) describes the complete target.
 
 ## Install once
 
@@ -62,7 +62,7 @@ codex plugin marketplace upgrade ai-operated-startup
 codex plugin add company@ai-operated-startup
 ```
 
-Then restart the desktop app and reopen the same founder chat. If `codex` is not on your PATH, use your installed Codex executable. Keep Company hooks enabled/trusted. Ask the CoS to check `company_doctor` reports v0.2.0 and that `company_upgrade` is available before proceeding.
+Then restart the desktop app and reopen the same founder chat. If `codex` is not on your PATH, use your installed Codex executable. Keep Company hooks enabled/trusted. Ask the CoS to check `company_doctor` reports v0.2.1 and that `company_upgrade` is available before proceeding.
 
 After updating/reloading the plugin in your host, tell your Chief of Staff:
 
@@ -70,11 +70,11 @@ After updating/reloading the plugin in your host, tell your Chief of Staff:
 
 The CoS inspects compatibility, pauses/reconciles assignments, and starts a fresh CoS rehearsal and independent QA review. After they pass, it adopts the candidate, verifies preserved records, reloads its instructions, and resumes preparation. Specialist sessions restart on demand from company records; you do not rebrief them. If you use a new chat, explicitly ask it to take over this company as part of the upgrade.
 
-This release supports v0.1.0 preparation companies and compatible teams on the current runtime. Governance remains pinned by default; adopting the newer spec requires explicit direction after reviewing its differences. Older governance may block a preparation upgrade on execution-level qualification requirements; the CoS must show that hold and ask before adopting the new, limited preparation-upgrade contract. Failed or stale checks hold the upgrade. Ask the CoS to recover the previous team if needed: recovery retains later company facts and uses the new runtime with the prior definitions, not the old plugin binary. After migration, v0.1.0 cannot resume the schema-2 company. Upgrade checks make two model calls using your normal host account.
+This release supports v0.1.0 and v0.2.0 preparation companies and compatible teams on the current runtime, with full checkpoints up to 300,000 characters. Governance remains pinned by default; adopting the newer spec requires explicit direction after reviewing its differences. Older governance may block a preparation upgrade on execution-level qualification requirements; the CoS must show that hold and ask before adopting the new, limited preparation-upgrade contract. Failed or stale checks hold the upgrade. Ask the CoS to recover the previous team if needed: recovery retains later company facts and uses the new runtime with the prior definitions, not the old plugin binary. After migration, v0.1.0 cannot resume the schema-2 company. Upgrade checks make two model calls using your normal host account.
 
 ## What is verified
 
-- The v0.1.0 package was installed through both native CLIs using isolated marketplaces; v0.2.0 still needs live installation/update acceptance.
+- The v0.1.0 package was installed through both native CLIs using isolated marketplaces; v0.2.1 still needs live installation/update acceptance.
 - Live v0.1.0 Codex: standalone PM draft, separate QA review, and a second assignment resumed the same PM session.
 - Live v0.2.0 Codex upgrade in a disposable company: preserved older governance correctly held adoption; explicit adoption of the v0.13 preparation-only contract passed a fresh CoS rehearsal, separate QA review, guarded apply, and post-commit verification. Earlier failed/blocked attempts were retained. This was a CLI runtime check, not a desktop update test.
 - Compatibility smoke test used the actual v0.1.0 source: migration preserved founder intent, and the old runtime rejected writes and controls even with a refreshed epoch.

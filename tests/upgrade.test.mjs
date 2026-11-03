@@ -265,9 +265,9 @@ test('repeated recover and reprepare retains upgrade history and preserves the o
 });
 
 test('oversized checkpoints fail before migration and never get silently truncated',()=>{
-  const a=setup();withStore(a.root,db=>db.transaction('test.large',s=>{s.records.large={id:'large',content:'x'.repeat(160000)};return s;}));
+  const a=setup();withStore(a.root,db=>db.transaction('test.large',s=>{s.records.large={id:'large',content:'x'.repeat(310000)};return s;}));
   assert.throws(()=>prepare(a),/bounded rehearsal size/);
-  assert.equal(read(a).schema,1);assert.equal(read(a).owner.epoch,1);assert.equal(read(a).records.large.content.length,160000);
+  assert.equal(read(a).schema,1);assert.equal(read(a).owner.epoch,1);assert.equal(read(a).records.large.content.length,310000);
 });
 
 test('an interrupted upgrade can be recovered from a replacement founder chat without the old coordinator',()=>{
@@ -315,4 +315,25 @@ test('qualified Pass with blockers or withheld adoption permission never reaches
     assert.ok(read(a).upgrade.reviewer_native_id);
     assert.deepEqual(read(a).upgrade.review.artifact.review,review);
   }
+});
+
+test('a company checkpoint above 200000 characters upgrades without dropping any record content',async()=>{
+  const a=setup(),content='Retain the complete source evidence. '.repeat(5800);
+  withStore(a.root,db=>db.transaction('test.large_supported',s=>{s.records.large={id:'large',content};return s;}));
+  const args=await ready(a);
+  assert.ok(JSON.stringify(read(a).upgrade.checkpoint).length>200000);
+  applyAndVerify(args);
+  assert.equal(read(a).records.large.content,content);
+});
+
+test('schema-2 v0.2.0 companies can upgrade and recover their prior definitions on the patch runtime',async()=>{
+  const a=setup();withStore(a.root,db=>db.transaction('test.previous_patch',s=>{
+    s.schema=2;s.runtime_version='0.2.0';s.plugin_version='0.2.0';s.cos_instructions='Preserve founder limits and independently review preparation';s.team_sha256=teamHash(s);return s;
+  }));
+  assert.throws(()=>engine.open(a,'codex'),/checked runtime upgrade/);
+  const args=await ready(a),done=applyAndVerify(args);
+  assert.equal(done.runtime_version,'0.2.1');
+  const recovered=upgrade({...a,expected_epoch:done.owner.epoch,upgrade_id:done.upgrade.id,action:'recover',source_instruction:'Recover prior team definitions'},'codex');
+  assert.equal(recovered.plugin_version,'0.2.0');assert.equal(recovered.runtime_version,'0.2.1');
+  assert.doesNotThrow(()=>engine.open(a,'codex'));
 });

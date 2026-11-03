@@ -5,7 +5,8 @@ import { randomUUID, createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 export const PACKAGE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-export const VERSION = '0.2.0';
+export const VERSION = '0.2.1';
+export const COMPATIBLE_TEAM_VERSIONS = ['0.1.0', '0.2.0', VERSION];
 export const SCHEMA = 2;
 export const stamp = () => new Date().toISOString();
 export const id = (prefix) => `${prefix}-${randomUUID()}`;
@@ -64,7 +65,7 @@ export function withStore(root, fn, create = false) {
 export function owner(state, actor, host, epoch) {
   if (!state || state.schema !== SCHEMA || state.runtime_version !== VERSION) throw new Error('Company needs a checked runtime upgrade; use company_upgrade inspect, never reinitialize');
   if (state.owner.session_id !== actor || state.owner.host !== host || (epoch !== undefined && state.owner.epoch !== epoch)) throw new Error('This chat does not own the company. Resume the active chat or perform a checked handover.');
-  if (!['0.1.0', VERSION].includes(state.plugin_version)) throw new Error('Unsupported pinned team version');
+  if (!COMPATIBLE_TEAM_VERSIONS.includes(state.plugin_version)) throw new Error('Unsupported pinned team version');
   if (state.team_sha256 !== teamHash(state)) throw new Error('Pinned team integrity check failed');
   if (upgradePending(state)) throw new Error('Team upgrade is held; use company_upgrade to inspect, verify, or recover');
 }
