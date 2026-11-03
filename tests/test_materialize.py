@@ -41,7 +41,7 @@ class MaterializeTests(unittest.TestCase):
 
         self.assertEqual((output / "team/governance.md").read_bytes(), source)
         self.assertEqual(manifest["schema_version"], "1")
-        self.assertEqual(manifest["converter_version"], "0.6")
+        self.assertEqual(manifest["converter_version"], "0.7")
         self.assertEqual(manifest["name"], self.config["name"])
         self.assertEqual(manifest["governance"]["file"], "team/governance.md")
         self.assertEqual(

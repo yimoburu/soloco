@@ -1,6 +1,6 @@
 # An AI-operated startup
 
-**v0.8 · Current reconciled design · 2026-11-02**
+**v0.9 · Current reconciled design · 2026-11-02**
 
 A founder brings an idea. A small team of AI agents, each in its own standalone session, operates a company through one founder conversation. The company persists as its agents and team versions change.
 
@@ -20,15 +20,17 @@ This is the target contract. The [converter](docs/converter.md) currently genera
 
 ## 2. What the founder does and knows
 
-A new user starts at the GitHub README. It must provide a supported, versioned installation path for the chosen app, state prerequisites, and verify that the company entry point is available. Installing once must not create a company, modify existing companies, or require the founder to assemble roles. Until that path exists, the README identifies the product flow as unavailable and offers only a clearly labeled developer trial.
+A new user starts at the GitHub README and installs the **Company plugin** through the chosen app's plugin mechanism. Begin with a small GitHub-hosted marketplace catalog containing this one plugin, available to users with repository access; a separate marketplace website or public-directory listing is not required. The README supplies supported versions, installation instructions, necessary permissions, and a readiness check. Installing once must not create a company, modify existing companies, or require the founder to assemble roles.
 
-After that one-time installation, the founder:
+The package combines Chief of Staff guidance, versioned role templates, a shared company engine, and thin Codex/Claude adapters. The engine provides record initialization, session lifecycle and messaging, authority checks, handover, and notifications; adapters expose these through the host's supported tools. The marketplace distributes the package and is not a coordination layer. Dependency setup belongs to installation: founders do not install Python, edit configuration, or run `materialize.py`. That generator remains an internal helper and developer tool. Packaging alone supplies none of the missing runtime guarantees; test first-message startup in each supported host before advertising the three-step flow. Until the plugin and runtime work, the README offers only a clearly labeled developer trial.
+
+After that one-time plugin installation, the founder:
 
 1. Creates a project.
 2. Attaches a company folder.
 3. Opens a chat under that project and starts talking about the idea.
 
-The first message starts the **Chief of Staff** automatically (technical role ID: `runner`). No special command, role-selection prompt, configuration file, or manual specialist startup is part of this founder flow. The Chief of Staff interviews the founder, prepares company records, activates needed standalone specialists through the shared tools, and coordinates their reviews. There is no separate Founder connection agent or service. This startup automation and the one-time installer are requirements, not features of the current file generator.
+The first message starts the **Chief of Staff** automatically (technical role ID: `runner`). No special command, role-selection prompt, configuration file, or manual specialist startup is part of this founder flow. The Chief of Staff interviews the founder, prepares company records, activates needed standalone specialists through the shared tools, and coordinates their reviews. There is no separate Founder connection agent or service. The plugin package, marketplace catalog, installation, and startup automation are requirements, not features of the current file generator.
 
 The interview asks one or a few focused questions at a time about the customer, problem, desired outcome, resources, and boundaries. Use information already supplied, challenge consequential assumptions, and summarize decisions periodically. “I don't know” becomes an explicit unknown or a proposed research task, not a fabricated answer or a demand for a complete business plan. Keep questions proportional to the next decision; preparation may proceed while unanswered questions hold only dependent work. Research involving external activity still requires the applicable authorization.
 
@@ -148,7 +150,7 @@ Mistakes follow **contain → disclose → owned postmortem → independent revi
 | **Team version** | Replaceable role definitions, collaboration protocol, evaluations, platform adapters, and declared compatibility with company records/governance |
 | **Role sessions** | Independently startable, stoppable, replaceable instances with attributable identity and bounded authority, including the founder-facing Chief of Staff |
 
-Company truth lives outside session histories. A concise checkpoint links current state and necessary history. Each company explicitly adopts a team version; publishing an improvement never silently upgrades companies or rewrites evidence, limits, or blocks. Founder ceilings persist; earned delegation transfers only where comparable evidence supports it, retaining attribution to the team that earned it.
+Company records live in the attached company folder, outside plugin installation/cache directories and session histories. Updating or uninstalling the plugin must preserve them. A plugin update makes a candidate available; each company retains its pinned governance and team until explicit adoption. Keep compatible pinned definitions available or hold for an approved migration. A concise checkpoint links current state and necessary history. Publishing an improvement never rewrites company evidence, limits, or blocks. Founder ceilings persist; earned delegation transfers only where comparable evidence supports it, retaining attribution to the team that earned it.
 
 Whole-team replacement uses five steps:
 
@@ -168,7 +170,8 @@ These are required behaviors to test, not claims that the prototype implements t
 
 | Founder story | Observable acceptance |
 |---|---|
-| Begin from the repository | A new user follows the README to install the framework in a supported app and verify readiness; no role setup or company creation is hidden in installation |
+| Install from the repository | A new user follows the README to register the catalog, install the Company plugin, and verify required capabilities; no Python setup, manual configuration, role assembly, or company creation is hidden in installation |
+| Update without changing the company | Updating or uninstalling the plugin preserves company records, pending notices, and pinned rules; incompatible changes hold for explicit adoption or migration |
 | Start from ordinary conversation | With the framework installed: project → folder → first message starts the Chief of Staff, creates needed records, and activates specialist sessions without commands, setup prompts, role selection, or forwarding |
 | Be guided through the idea | Focused questions reuse known answers, challenge material assumptions, and turn unknowns into proposed research; the founder receives a reviewed, bounded experiment to authorize |
 | Resume without resetting | Opening an existing company preserves records and permissions; partial initialization recovers safely; a second chat cannot create a competing Chief of Staff |

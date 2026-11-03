@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Materialize portable team workspaces without starting agent sessions."""
+"""Internal developer helper: generate company files without installing or running a team."""
 
 import argparse
 import hashlib
@@ -10,7 +10,7 @@ import tempfile
 
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "0.6"
+VERSION = "0.7"
 
 # These are role starters, not extracted or approved interpretations of governance.
 # The pinned spec governs; Frame must review the charters and authority map.
@@ -165,13 +165,19 @@ These files guide agents; they do not enforce permissions or gate transitions.
 
 ## Target founder startup — not implemented
 
-After one-time framework installation, the founder creates a project, attaches
+The target product is one Company plugin, distributed through the repository's
+marketplace catalog for the chosen app. Installation handles dependencies and
+verifies readiness; the founder does not run this generator or configure roles.
+The package combines Chief of Staff guidance, role templates, a shared company
+engine, and host adapters. This prototype installs none of those runtime tools.
+
+After one-time plugin installation, the founder creates a project, attaches
 a company folder, and starts talking in a chat. The framework starts the Chief
 of Staff on that first message, recovers existing company state or initializes
 missing records without overwriting files, and binds one authorized coordinator.
 Specialists keep their assigned roles; later chats do not become competing
-Chiefs of Staff. The installer, chat binding, and automatic session startup are
-not provided by these files. The explicit briefs below are developer preview.
+Chiefs of Staff. The plugin, catalog, chat binding, and automatic session startup
+are not provided by these files. The explicit briefs below are developer preview.
 
 ## Initial authority
 
@@ -254,6 +260,10 @@ Use `team/templates/` as record starters, not as proof of compliance.
 Company records are co-located under `team/` in this prototype. They belong to
 the company and must not be replaced with team instructions. Live team
 replacement and transfer of authority are not implemented.
+Keep company records outside plugin installation/cache directories. Plugin
+updates make candidate versions available, not new company authority; preserve
+pinned rules until explicit adoption and hold incompatible changes for migration.
+Uninstalling a plugin must preserve company records and unresolved notices.
 One company uses one persistent folder. Both platform UIs may open that folder;
 opening it grants no authority and creates no second company. Use one active
 environment at a time in this prototype; overlapping writes and competing Chiefs
@@ -518,7 +528,10 @@ def materialize(config, output, target="both", spec=None):
             "# Developer preview: manual role sessions\n\n"
             "This is a generated workspace, not a running company. Use it only after\n"
             "the generator reports success; an interrupted run may leave incomplete files.\n"
-            "The target founder flow after one-time installation is: create a project, attach\n"
+            "The target product is the Company plugin distributed through a GitHub marketplace\n"
+            "catalog. Its installation handles dependencies and checks readiness; founders do\n"
+            "not run this generator. No installable plugin or catalog is included here.\n\n"
+            "The target founder flow after one-time plugin installation is: create a project, attach\n"
             "a folder, open a chat, and talk. The Chief of Staff starts on the first message,\n"
             "interviews the founder, and activates specialists. The installer and startup\n"
             "automation are not implemented. This manual procedure is for development.\n\n"

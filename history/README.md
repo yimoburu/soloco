@@ -12,6 +12,12 @@ These files preserve original intent and review evidence. They are historical sn
 | [Founder interface](docs/founder-interface.md), [user stories](docs/user-stories.md), [company continuity](docs/company-continuity.md) | Subsequent intent clarifications, now consolidated into the current spec |
 | [v0.4 snapshot](https://github.com/yimoburu/ai-operated-startup/blob/c32a20d95f794df0cc435b15d08a758c61dfbacd/SPEC.md), [Claude review](reviews/claude-v0.4.md), [v0.5 disposition](reviews/v0.5-disposition.md) | Reconciled design, external review, and narrowly adopted corrections |
 
+## v0.9 plugin distribution — 2026-11-02
+
+At the founder's request, installation is now specified as one Company plugin distributed through a small GitHub marketplace catalog for the existing app plugin mechanisms. The package combines shared guidance, templates, company engine, and host adapters; the Python materializer remains an internal helper. Installation owns dependencies and readiness verification. No new marketplace website is required, and no catalog, plugin, runtime, or working installation command is claimed to exist yet.
+
+Company records remain outside plugin installation/cache directories. Updates make candidates available without silently adopting new company rules; uninstall preserves company records. The converter guide records current platform constraints and source links separately from the durable spec. Converter v0.7 updates generated guidance only. The [v0.8 snapshot](https://github.com/yimoburu/ai-operated-startup/blob/6b05ad1/SPEC.md) preserves the prior design; the constitution, evidence gates, and authority-transfer procedure are unchanged.
+
 ## v0.8 conversational startup — 2026-11-02
 
 The founder rejected manual initialization prompts and per-role startup as the product experience. The GitHub README must first provide versioned installation and a readiness check; until then it labels the developer trial honestly. After one-time framework installation, the required flow is now create project, attach company folder, open a chat, and talk. The first message starts the Chief of Staff, which interviews adaptively, challenges assumptions, preserves unknowns, prepares records, and activates specialists. Startup resumes existing companies and recovers partial state without overwriting records or creating a competing Chief of Staff. The founder authorizes the bounded experiment; starting a chat grants no execution permission.

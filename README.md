@@ -6,21 +6,21 @@ The team progresses toward public launch or funding readiness through convention
 
 ## Getting started
 
-**The three-step founder experience below is specified, but not available yet.** This repo currently contains the design and a workspace generator. There is no company-framework installer to run in Codex or Claude; cloning the repo or attaching a folder does not install automatic company startup.
+**The three-step founder experience below is specified, but not available yet.** This repo currently contains the design and a workspace generator. The Company plugin, marketplace catalog, and runtime are not implemented; cloning the repo or attaching a folder does not install automatic company startup.
 
-The release entry point will be: install the framework once in your chosen app from this README, verify it is ready, then create your company project. Supported versions, prerequisites, and installation instructions must ship with that integration.
+The planned release path is **add this repo as a marketplace → install the Company plugin in Codex or Claude → complete setup and verify readiness**. It starts with one plugin in a small repository catalog, not a separate marketplace website. Repository access is required. Platform-specific instructions will ship when tested; there is no working install command for this repo yet.
 
 For a **manual developer trial today**, download or clone this repo, open it in Codex or Claude Code, and follow the [converter guide](docs/converter.md). Generate into a new folder before attaching that folder as the company project. The trial still requires explicit role startup and manual coordination; it is not the product onboarding.
 
 ## Read only what you need
 
 - [Current spec](SPEC.md): founder responsibilities, collaboration, evidence gates, learning, and company continuity.
-- [Converter guide](docs/converter.md): what works today and how to generate a developer workspace.
+- [Plugin delivery and converter guide](docs/converter.md): the packaging plan, implementation gaps, and manual developer trial.
 - [History](history/README.md): original intent, previous versions, and review provenance; not competing current requirements.
 
 ## Founder experience — target
 
-After installing the company framework once in the chosen app:
+After installing the Company plugin once in the chosen app:
 
 1. Create a project.
 2. Attach a company folder.
@@ -30,7 +30,7 @@ Your Chief of Staff starts on the first message, asks focused questions, challen
 
 ## What works today
 
-The Python workspace generator produces shared records, proposed charters, and role startup briefs for Codex or Claude Code. It does **not** launch sessions, route handoffs, enforce authority, or replace a live team. The installer and automatic first-chat startup are also unimplemented. The commands below and manual session startup are a developer preview, not the intended founder onboarding.
+The internal Python workspace generator produces shared records, proposed charters, and role startup briefs for Codex or Claude Code. It does **not** launch sessions, route handoffs, enforce authority, or replace a live team. Plugin packaging, dependency setup, and automatic first-chat startup are also unimplemented. The commands below and manual session startup are a developer preview, not the intended founder onboarding.
 
 ```sh
 python3 tools/materialize.py --config examples/venture.json --output /tmp/my-venture --target codex
@@ -39,7 +39,7 @@ python3 -m unittest discover -s tests -v
 
 Use one persistent folder and, where available, one UI project per company. Codex and Claude may open the same folder; `--target both` supplies both instruction wrappers. In this prototype use one active environment at a time and serialize shared writes. Opening a folder creates neither a second company nor new authority.
 
-New workspaces pin an exact copy and hash of `SPEC.md`. Existing workspaces are never overwritten or silently upgraded. Generation leaves Frame in Draft and grants no venture-execution authority.
+New workspaces pin an exact copy and hash of `SPEC.md`. Existing workspaces are never overwritten or silently upgraded. Company records belong outside the plugin cache; plugin updates must not silently change a company’s pinned rules. Generation leaves Frame in Draft and grants no venture-execution authority.
 
 ## Evolve carefully
 
