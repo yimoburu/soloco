@@ -1,5 +1,5 @@
 {
   "name": "My venture",
   "idea": "Describe the intended user, their problem, and the outcome you want to test.",
-  "active_roles": ["pm", "research", "qa"]
+  "active_roles": ["runner", "pm", "research", "qa"]
 }

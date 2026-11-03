@@ -14,7 +14,7 @@ The team progresses toward public launch or funding readiness through convention
 
 The Python workspace generator produces shared records, proposed charters, and role startup briefs for Codex or Claude Code. It does **not** launch sessions, route handoffs, enforce authority, or replace a live team. Manual session startup is a developer preview.
 
-The target product starts once in the founder's existing Codex or Claude Code conversation and coordinates the separate role sessions automatically. Managed platform selection and mixed-platform operation are deferred.
+The target product makes the founder's existing Codex or Claude Code conversation the Team Runner agent's session. This Operations Lead coordinates separate specialist sessions; software tools enforce permissions and record changes independently of its judgment. Managed platform selection and mixed-platform operation are deferred.
 
 ```sh
 python3 tools/materialize.py --config examples/venture.json --output /tmp/my-venture --target codex

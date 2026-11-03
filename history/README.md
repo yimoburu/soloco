@@ -12,6 +12,12 @@ These files preserve original intent and review evidence. They are historical sn
 | [Founder interface](docs/founder-interface.md), [user stories](docs/user-stories.md), [company continuity](docs/company-continuity.md) | Subsequent intent clarifications, now consolidated into the current spec |
 | [v0.4 snapshot](https://github.com/yimoburu/ai-operated-startup/blob/c32a20d95f794df0cc435b15d08a758c61dfbacd/SPEC.md), [Claude review](reviews/claude-v0.4.md), [v0.5 disposition](reviews/v0.5-disposition.md) | Reconciled design, external review, and narrowly adopted corrections |
 
+## v0.6 coordination decision — 2026-11-02
+
+At the founder's direction, Team Runner is now a standalone Operations Lead agent in the existing founder conversation. It owns sequencing, dependencies, Frame preparation, and recovery judgment; PM keeps product priorities and specialists keep domain verdicts. This replaces the earlier software-only coordinator choice, not the constitutional limits on authority. Software still enforces execution checks, direct founder pause, and delivery of specialist decision packets. Runner cannot approve itself or suppress dissent and must be replaceable from company records.
+
+The seven constitutional articles and company-replacement protocol are unchanged. Converter v0.4 emits the new proposed role and Operations spec but implements no live orchestration. Existing companies are not upgraded. The [v0.5 snapshot](https://github.com/yimoburu/ai-operated-startup/blob/4eb2727e7fcc16fc131077fc93e04710785f802b/SPEC.md) preserves the previous design; historical documents remain evidence rather than current rules.
+
 ## v0.5 clarification — 2026-11-02
 
 The seven constitutional articles and company-replacement protocol are unchanged. The revision assigns failed-gate disposition and founder-instruction recording, qualifies founder packets, makes the Frame professional-review policy explicit, and strengthens funding approval rationale. The example now shows authorization before payments and distinct author/reviewer instances. [The disposition](reviews/v0.5-disposition.md) records accepted findings, narrower remedies, and deferred preferences.

@@ -41,13 +41,13 @@ class MaterializeTests(unittest.TestCase):
 
         self.assertEqual((output / "team/governance.md").read_bytes(), source)
         self.assertEqual(manifest["schema_version"], "1")
-        self.assertEqual(manifest["converter_version"], "0.3")
+        self.assertEqual(manifest["converter_version"], "0.4")
         self.assertEqual(manifest["name"], self.config["name"])
         self.assertEqual(manifest["governance"]["file"], "team/governance.md")
         self.assertEqual(
             manifest["governance"]["sha256"], hashlib.sha256(source).hexdigest()
         )
-        self.assertEqual(manifest["active_roles"], ["pm", "research", "qa"])
+        self.assertEqual(manifest["active_roles"], ["runner", "pm", "research", "qa"])
         self.assertEqual(manifest["targets"], ["codex", "claude"])
 
         frame = json.loads((output / "team/board/frame.json").read_text())
@@ -62,14 +62,14 @@ class MaterializeTests(unittest.TestCase):
     def test_independent_role_prompts_share_the_same_durable_protocol(self):
         output = self.generate()
         prompts = []
-        for role in ["pm", "research", "qa"]:
+        for role in ["runner", "pm", "research", "qa"]:
             charter = output / f"team/roles/{role}.md"
             prompt = (output / f"team/sessions/{role}.md").read_text()
             self.assertTrue(charter.is_file())
             self.assertIn(f"team/roles/{role}.md", prompt)
             self.assertIn("team/PROTOCOL.md", prompt)
             prompts.append(prompt)
-        self.assertEqual(len(set(prompts)), 3)
+        self.assertEqual(len(set(prompts)), 4)
         self.assertFalse((output / ".claude/agents").exists())
         for template in ["decision", "founder-packet", "handoff", "gate"]:
             record = json.loads((output / f"team/templates/{template}.json").read_text())
@@ -221,15 +221,42 @@ class MaterializeTests(unittest.TestCase):
                 output = self.generate()
         self.assertTrue((output / "team/manifest.json").is_file())
 
-    def test_initial_frame_requires_an_active_pm_owner(self):
+    def test_initial_frame_requires_a_pm_for_product_scope(self):
         output = self.base / "no-pm"
-        config = {**self.config, "active_roles": ["research", "qa"]}
+        config = {**self.config, "active_roles": ["runner", "research", "qa"]}
         with self.assertRaises(ValueError):
             materializer.materialize(config, output)
         self.assertFalse(output.exists())
 
+    def test_initial_frame_requires_runner_without_silently_adding_a_seat(self):
+        config = {**self.config, "active_roles": ["pm", "research", "qa"]}
+        output = self.base / "no-runner"
+        with self.assertRaisesRegex(ValueError, "runner"):
+            materializer.materialize(config, output)
+        self.assertFalse(output.exists())
+        self.assertEqual(config["active_roles"], ["pm", "research", "qa"])
+
+    def test_runner_owns_operations_and_frame_but_not_product_or_approval(self):
+        # Input ordering must not change the founder-facing entry role.
+        self.config["active_roles"] = ["pm", "qa", "runner", "research"]
+        output = self.generate()
+        frame = json.loads((output / "team/board/frame.json").read_text())
+        self.assertEqual(frame["owner"], "runner")
+        self.assertEqual(frame["permission"], "prepare_frame_only")
+        self.assertIsNone(frame["contract_approver"])
+        self.assertIsNone(frame["founder_authorization"])
+        self.assertIn("Owner: runner. Status: Draft.", (output / "team/specs/company-operations.md").read_text())
+        self.assertIn("Owner: pm.", (output / "team/specs/product.md").read_text())
+        self.assertTrue((output / "team/roles/runner.md").is_file())
+        self.assertTrue((output / "team/sessions/runner.md").is_file())
+        start = (output / "START.md").read_text()
+        for target in ("codex", "claude"):
+            self.assertIn(f'{target} "Read team/sessions/runner.md and follow it."', start)
+        manifest = json.loads((output / "team/manifest.json").read_text())
+        self.assertFalse(manifest["runtime_enforcement"])
+
     def test_architect_owns_technical_while_engineer_owns_implementation_section(self):
-        self.config["active_roles"] = ["pm", "engineer", "architect", "qa"]
+        self.config["active_roles"] = ["runner", "pm", "engineer", "architect", "qa"]
         output = self.generate()
         engineer = (output / "team/roles/engineer.md").read_text()
         architect = (output / "team/roles/architect.md").read_text()
@@ -243,7 +270,7 @@ class MaterializeTests(unittest.TestCase):
     def test_support_readiness_has_one_owner_with_or_without_a_support_seat(self):
         for support_seated in [False, True]:
             with self.subTest(support_seated=support_seated):
-                self.config["active_roles"] = ["pm", "release", "qa"]
+                self.config["active_roles"] = ["runner", "pm", "release", "qa"]
                 if support_seated:
                     self.config["active_roles"].append("support")
                 output = self.generate(name=f"support-{support_seated}")

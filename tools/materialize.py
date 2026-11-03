@@ -10,16 +10,26 @@ import tempfile
 
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "0.3"
+VERSION = "0.4"
 
 # These are role starters, not extracted or approved interpretations of governance.
 # The pinned spec governs; Frame must review the charters and authority map.
 ROLES = {
+    "runner": {
+        "name": "Team Runner / Operations Lead", "spec": "company-operations",
+        "mission": "Coordinate the company through one founder conversation; judge sequencing, dependencies, and recovery within approved limits.",
+        "inputs": "Founder instructions, approved charters, PM priorities, accepted work, blocks and session status.",
+        "outputs": "Operating plan, assignments, recovery decisions, unchanged founder packets, and Intent updates attributed to the founder's source instruction.",
+        "block": "Execution lacking required prerequisites or carrying conflicting assignments; never erase another role's block.",
+        "success": "Accepted work reaches the right owner within limits without founder message forwarding.",
+        "failure": "Overruling domain judgment or suppressing dissent to appear productive.",
+        "phase": "Frame preparation onward; active when coordination judgment is needed.",
+    },
     "pm": {
         "name": "Product Manager", "spec": "product",
         "mission": "Choose the smallest coherent scope that delivers value or resolves uncertainty.",
         "inputs": "Founder Intent, customer evidence, accepted constraints.",
-        "outputs": "Product spec, priorities, feature acceptance criteria, decision packets; recorded Intent changes attributed to the founder's source instruction.",
+        "outputs": "Product spec, priorities, feature acceptance criteria, decision packets.",
         "block": "Scope drift or work without accepted product requirements.",
         "success": "Accepted scope delivers the intended outcome or decision-quality learning.",
         "failure": "Confusing delivery with value.", "phase": "Frame onward, as needed.",
@@ -179,9 +189,9 @@ founder authorization under the pinned spec before those actions.
   clearing condition. Apply the pinned conflict ladder; never bypass a block.
 - Record uncertainty, stalls, stale evidence, and adverse results. Consequential
   decisions include rationale, expected outcome, and an outcome review date.
-- PM records founder direction in Intent with its source and attribution before
-  dependent work resumes. The interface captures the instruction; it gains no
-  domain authority. Confirm ambiguity or inferred authority beyond the explicit
+- Runner records founder direction in Intent with its source and attribution before
+  dependent work resumes. Recordkeeping transfers no founder authority.
+  Confirm ambiguity or inferred authority beyond the explicit
   instruction; clear instructions need no repeated confirmation.
 - Frame must establish the professional-review policy in Founder Intent,
   including triggers, independent assessor, and change authority. Unknown
@@ -194,6 +204,12 @@ founder authorization under the pinned spec before those actions.
   states its trade-offs. Preserve dissent and review escalation quality through
   the existing outcome process. Do not add a veto over genuine reserved decisions
   or automatically shrink delegation for unnecessary escalation.
+- Runner owns workflow judgment; PM owns product scope/priorities. Runner may
+  propose assignments and recovery but cannot replace domain verdicts, approve
+  its own work or permissions, or suppress any role's founder packet. Its plans
+  need charter-named non-author review. The target execution software checks
+  every action independently, including Runner's, and applies founder pauses
+  without waiting for Runner. These controls are not installed in this prototype.
 
 ## Prototype operation
 
@@ -227,14 +243,16 @@ def materialize(config, output, target="both", spec=None):
     for key in ("name", "idea"):
         if not isinstance(config.get(key), str) or not config[key].strip():
             raise ValueError(f"Configuration requires a non-empty {key!r} string")
-    roles = config.get("active_roles", ["pm", "research", "qa"])
+    roles = config.get("active_roles", ["runner", "pm", "research", "qa"])
     if (not isinstance(roles, list) or not roles
             or any(not isinstance(role, str) or role not in ROLES for role in roles)):
         raise ValueError("active_roles must be a non-empty list of supported role IDs")
     if len(roles) != len(set(roles)):
         raise ValueError("active_roles must not contain duplicates")
     if "pm" not in roles:
-        raise ValueError("Initial Frame preparation requires an active pm owner")
+        raise ValueError("Initial Frame preparation requires a proposed pm role for product scope")
+    if "runner" not in roles:
+        raise ValueError("Initial Frame preparation requires a proposed runner owner; add runner to active_roles")
     if target not in ("codex", "claude", "both"):
         raise ValueError("target must be codex, claude, or both")
     spec = Path(spec) if spec is not None else ROOT / "SPEC.md"
@@ -298,6 +316,14 @@ def materialize(config, output, target="both", spec=None):
                 "delegation approver, authority envelope, and expiry: Unknown; define at Frame. Apply the pinned\n"
                 "governance's override rules. This starter grants no spending or external-action permission.\n",
                 encoding="utf-8")
+            if role == "runner":
+                with (team / "roles/runner.md").open("a", encoding="utf-8") as charter_file:
+                    charter_file.write(
+                        "\nBoundaries: PM retains product priorities; specialists retain domain verdicts.\n"
+                        "Do not approve your own work or permissions, suppress founder packets,\n"
+                        "waive blocks, or bypass execution controls. Your reviewer and any permission\n"
+                        "change approver must be qualified non-parties under the pinned governance.\n"
+                    )
             (team / "sessions" / f"{role}.md").write_text(
                 f"# Start an independent {charter['name']} session\n\n"
                 f"Your role ID is `{role}`. Keep it fixed for this session.\n\n"
@@ -324,7 +350,7 @@ def materialize(config, output, target="both", spec=None):
                 encoding="utf-8")
         (team / "specs/founder-intent.md").write_text(
             f"# Founder Intent: {config['name']}\n\nOwner: Human founder. Version: 0.0. Status: Draft.\n\n"
-            "Recorder: PM, under founder authority. Preserve the original instruction\n"
+            "Recorder: Team Runner, under founder authority. Preserve the original instruction\n"
             "and attribution in its decision record; clarify ambiguity or inferred\n"
             "authority beyond the explicit instruction before applying it.\n\n"
             "## Idea supplied at generation\n\n" + config["idea"] + "\n\n"
@@ -339,7 +365,7 @@ def materialize(config, output, target="both", spec=None):
             "Generation is not founder approval. Preserve unknowns until explicitly resolved.\n",
             encoding="utf-8")
         write_json(team / "board/frame.json", {
-            "id": "FRAME", "owner": "pm", "author_instance": None,
+            "id": "FRAME", "owner": "runner", "author_instance": None,
             "status": "Draft", "version": 0,
             "permission": "prepare_frame_only", "decision_id": None,
             "contract_approver": None, "founder_authorization": None,
@@ -384,11 +410,11 @@ def materialize(config, output, target="both", spec=None):
             "This is a generated workspace, not a running company. Use it only after\n"
             "the generator reports success; an interrupted run may leave incomplete files.\n"
             "The intended founder experience starts once and routes work automatically;\n"
-            "that runner is not implemented. This manual procedure is for development.\n\n"
+            "that automation is not implemented. This manual procedure is for development.\n\n"
             "Start separate sessions from this project root; give each its own startup brief.\n"
-            "For the first configured role, use a selected platform command below; substitute another role\n"
-            "ID for a different session. Every session must see this same shared filesystem.\n\n"
-            + "\n\n".join(f'```sh\n{platform} "Read team/sessions/{roles[0]}.md and follow it."\n```'
+            "Start Runner for Frame preparation using a selected platform command below.\n"
+            "Use another role's brief for a specialist session. Every session must see this same filesystem.\n\n"
+            + "\n\n".join(f'```sh\n{platform} "Read team/sessions/runner.md and follow it."\n```'
                            for platform in targets)
             + "\n\nFrame is Draft: prepare and review it before venture execution. Shared writes\n"
             "and handoff routing are manual. Read `team/PROTOCOL.md` for limits and continuity.\n",
