@@ -116,6 +116,8 @@ Implementation references: [OpenAI plugin packaging](https://developers.openai.c
 
 ## Assignment context
 
+The shared specialist prompt assigns ownership of deliverable quality and completeness to both authors and reviewers. It requires independent domain judgment, evidence, uncertainty and blocker disclosure, and repairs within existing authority and attempt limits. This implements the contract's role accountability without changing pinned governance, granting tools or waiving failed reviews.
+
 Dispatch snapshots the input versions and a hash of the full supplied context. The pack includes pinned governance, the assigned role, company identity/mode, all intent/decision/preference records, failed or blocked reviews, unresolved founder notices, the role's inbox and explicitly named inputs/review target. The CoS supplies relevant plans and evidence via `input_ids`; it must not rely on unstated session memory. Prior record revisions are retained in selected records.
 
 Unrelated artifacts are not included. New or changed constraints, selected inputs, unresolved notices or incoming messages invalidate the result; notice presentation/seen bookkeeping does not. Queued jobs check their context before invoking a model, and returned results recheck before acceptance. Legacy queued jobs establish their complete context at startup. Packs over 200,000 characters fail visibly; the runtime never silently slices a record. Full continuity rehearsals still retain the independent 300,000-character checkpoint bound.

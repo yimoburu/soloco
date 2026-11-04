@@ -78,6 +78,42 @@ test('independent review binds exact author artifact version and does not approv
   const s=engine.status(a,'codex');const review=s.records.find(r=>r.kind==='review');
   assert.notEqual(review.author_instance,r.author_instance);assert.equal(review.review.verdict,'Pass');assert.equal(s.phase,'Frame');assert.equal(s.mode,'preparation');
 });
+test('generation and review prompts assign bounded deliverable ownership on both hosts',async()=>{
+  for(const host of ['codex','claude']) {
+    const a=setup(host),producer=queued(a,{role:'engineer'});
+    let generationPrompt,reviewPrompt;
+    await work(a.root,producer,async(actualHost,_native,prompt)=>{
+      assert.equal(actualHost,host);generationPrompt=prompt;return result('Candidate with evidence and limitations');
+    });
+    let s=engine.status(a,host),generation=s.jobs.find(j=>j.id===producer);
+    assert.equal(generation.status,'completed',generation.error);
+    const artifact=s.records.find(r=>r.id===generation.artifact_id);
+    const reviewer=queued(a,{role:'qa',review_of:{id:artifact.id,revision:artifact.revision}});
+    await work(a.root,reviewer,async(actualHost,_native,prompt)=>{
+      assert.equal(actualHost,host);reviewPrompt=prompt;
+      return result('Evidence is incomplete',{review:{verdict:'Blocked',reason:'Required acceptance evidence is missing'}});
+    });
+    s=engine.status(a,host);const reviewJob=s.jobs.find(j=>j.id===reviewer);
+    assert.equal(reviewJob.status,'completed',reviewJob.error);
+    const review=s.records.find(r=>r.id===reviewJob.artifact_id);
+    assert.equal(review.review.verdict,'Blocked');assert.notEqual(review.author_instance,artifact.author_instance);
+    for(const prompt of [generationPrompt,reviewPrompt]) {
+      assert.match(prompt,/own the quality and completeness.*within your assigned scope/);
+      assert.match(prompt,/independent domain judgment.*unsupported assumptions/);
+      assert.match(prompt,/disclose uncertainty, disagreements, missing evidence and blockers/);
+      assert.match(prompt,/assigned acceptance criteria and evidence/);
+      assert.match(prompt,/pinned governance.*authority and permitted attempts/);
+      assert.match(prompt,/ownership grants no additional authority and cannot waive a failed review/);
+      assert.match(prompt,/Report Fail or Blocked honestly/);
+      assert.match(prompt,/Do not call tools, access external services, execute commands, spend money, or directly alter files/);
+      assert.match(prompt,/Return one JSON object only:/);
+      assert.match(prompt,/Never invent customer evidence, authorization, qualifications, test execution, or a gate Pass/);
+    }
+    assert.match(generationPrompt,/standalone Software Engineer session/);
+    assert.match(reviewPrompt,/standalone QA & Eval session/);
+    assert.ok(reviewPrompt.includes(`Independent review of artifact ${artifact.id}, revision ${artifact.revision}`));
+  }
+});
 test('changed reviewed artifact quarantines late review',async()=>{
   const a=setup(),r=engine.save({...a,kind:'plan',content:'v1'},'codex');
   const j=queued(a,{role:'qa',review_of:{id:r.id,revision:1}});
