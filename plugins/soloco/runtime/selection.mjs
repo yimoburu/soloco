@@ -33,6 +33,35 @@ export function selectionKey(value) {
   if(speed!=='host_default')key.push(speed);
   return JSON.stringify(key);
 }
+// Assignment counts, not tokens, cost, effective model identity or acceptance.
+// Use the complete history, not the eight-row activity window. Never count
+// software tests or cumulative provider modelUsage as specialist model calls.
+export function selectionUsage(state) {
+  const groups=new Map();
+  let assignments=0,missingReasons=0,withAppliedControls=0,withReportedModels=0;
+  for(const job of Object.values(state.jobs??{})) {
+    if(job.kind==='development_test'||job.type==='development_test')continue;
+    assignments++;
+    const request=job.model_selection??{mode:'default'};
+    if(!request.reason?.trim())missingReasons++;
+    if(job.model_evidence?.applied_controls)withAppliedControls++;
+    if(job.model_evidence?.reported_models?.length)withReportedModels++;
+    const dimensions={host:job.host??null,mode:request.mode,
+      model:request.mode==='explicit'?request.model:null,
+      effort:request.effort??null,speed:request.speed??'host_default'};
+    const key=JSON.stringify(dimensions);
+    if(!groups.has(key))groups.set(key,{...dimensions,assignments:0,statuses:{}});
+    const group=groups.get(key);group.assignments++;
+    const status=job.status??'unknown';
+    group.statuses[status]=(group.statuses[status]??0)+1;
+  }
+  return {scope:'specialist_assignments_only',unit:'assignment_count',assignments,
+    missing_reasons:missingReasons,with_applied_controls:withAppliedControls,
+    with_host_reported_models:withReportedModels,
+    coordinator_usage:'not_collected_host_ui_controlled',
+    effective_settings:'not_established_by_requests_or_applied_controls',
+    groups:[...groups.values()].sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)))};
+}
 export function activityFor(state) {
   const jobs=Object.values(state.jobs??{}).sort((a,b)=>(b.created_at??'').localeCompare(a.created_at??''));
   const current=new Set([...jobs.filter(j=>['queued','running'].includes(j.status)),...jobs.slice(0,8)].map(j=>j.id));

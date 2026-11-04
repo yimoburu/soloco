@@ -28,7 +28,7 @@ function harness() {
     requireText:(v,label,max=20000)=>{if(typeof v!=='string'||!v.trim()||v.length>max)throw new Error('Invalid '+label);return v;},
     compatibleRuntime:()=>true,upgradePending:()=>false,teamHash:()=> 'team',installedTeam:()=>({}),
     readiness:()=>({available:true,authenticated:true,version:'test'}),modelCatalog:()=>({}),
-    normalizeSelection:()=>({mode:'default'}),selectionKey:()=> 'default',activityFor:s=>Object.values(s.jobs).map(j=>({job_id:j.id})),
+    normalizeSelection:()=>({mode:'default'}),selectionKey:()=> 'default',selectionUsage:()=>({scope:"test_stub"}),activityFor:s=>Object.values(s.jobs).map(j=>({job_id:j.id})),
     assignmentContext:()=>({hash:'context',inputs:[],text:'fixture context'}),contextMatches:()=>matches,
     developmentAssignment:()=>{if(!scope)throw new Error('Scope revoked');},prototypeAssignment:()=>{},
     developmentCapability:()=>({}),prototypeCapability:()=>({}),developmentAction:()=>{},prototypeAction:()=>{},

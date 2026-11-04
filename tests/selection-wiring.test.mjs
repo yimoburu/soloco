@@ -97,7 +97,7 @@ function harness(host='claude') {
     normalizeSelection:(value,actualHost,metadata)=>{
       normalizations.push({value:structuredClone(value),host:actualHost,catalog:structuredClone(metadata)});
       return normalizeSelection(value,actualHost,metadata);
-    },selectionKey,activityFor:()=>[],
+    },selectionKey,selectionUsage:()=>({scope:"test_stub"}),activityFor:()=>[],
     assignmentContext:(s,job)=>{contexts.push(structuredClone(job));return {hash:'fixture-context',inputs:job.inputs};},
     developmentAction:()=>{},developmentCapability:()=>({}),
     developmentAssignment:()=>{if(!scopeAllowed)throw new Error('Scope revoked');},
