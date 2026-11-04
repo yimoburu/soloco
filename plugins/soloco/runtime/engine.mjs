@@ -29,8 +29,14 @@ export function binding(args, host) {
 }
 export function upgradeSummary(u) {
   if (!u) return null;
-  const {checkpoint,previous,candidate,...progress}=u;
-  return {...progress,candidate_version:candidate.plugin_version,previous_version:previous.plugin_version};
+  const {checkpoint,previous,candidate,calls,deliveries,cos_pages,qa_pages,replays,evidence,...progress}=u;
+  const total=key=>(calls??[]).reduce((sum,call)=>sum+(key==='prompt_characters'?call.budget?.prompt_characters??0:call[key]??0),0);
+  const paging=evidence?{inventory_sha256:evidence.inventory_sha256,counts:evidence.counts,
+    pages:evidence.pages.length,cos_pages:cos_pages?.length??0,qa_pages:qa_pages?.length??0,
+    qa_blocked_pages:qa_pages?.filter(p=>p.artifact.review?.verdict!=='Pass').map(p=>p.page_id)??[],
+    calls:calls?.length??0,replay_batches:replays?.length??0,prompt_characters:total('prompt_characters'),response_characters:total('response_characters'),
+    token_estimate_only:true,context_fit_verified:false}:null;
+  return {...progress,candidate_version:candidate.plugin_version,previous_version:previous.plugin_version,...(paging?{paging}:{})};
 }
 function summary(state) {
   const activity=activityFor(state).map(item=>{
@@ -38,7 +44,7 @@ function summary(state) {
     if(!job || job.kind==='development_test' || job.type==='development_test')return item;
     return {...item,timeout:{policy_version:job.timeout_policy_version??null,timeout_ms:job.timeout_ms??null,reason:job.timeout_reason??null,execution_started_at:job.execution_started_at??null,execution_deadline_at:job.execution_deadline_at??null,state:jobTimeoutState(job,Date.now()),reconciliation:job.timeout_reconciliation??null,failure:job.execution_failure??null}};
   });
-  return {company_id:state.id, name:state.name, idea:state.idea, revision:state.revision, phase:state.phase, mode:state.mode, paused:state.paused, owner:state.owner, plugin_version:state.plugin_version, runtime_version:state.runtime_version??state.plugin_version, executing_runtime_version:VERSION, upgrade:upgradeSummary(state.upgrade), governance_sha256:state.governance_sha256, records:Object.values(state.records), sessions:state.sessions, jobs:Object.values(state.jobs), activity, notices:state.notices.filter(n=>!n.resolution), messages:state.messages, capabilities:{standalone_sessions:true, model_selection:{eligible:['0.6.0',VERSION].includes(state.plugin_version),catalog:'company_doctor.models',coordinator_model:'Host UI controlled; no automatic switching',billing:'Existing host account; no hard spending enforcement'},local_prototype:prototypeCapability(state), local_development:developmentCapability(state), external_execution:false, background_founder_delivery:false, automatic_team_migration:false, explicit_team_upgrade:true}};
+  return {company_id:state.id, name:state.name, idea:state.idea, revision:state.revision, phase:state.phase, mode:state.mode, paused:state.paused, owner:state.owner, plugin_version:state.plugin_version, runtime_version:state.runtime_version??state.plugin_version, executing_runtime_version:VERSION, upgrade:upgradeSummary(state.upgrade), governance_sha256:state.governance_sha256, records:Object.values(state.records), sessions:state.sessions, jobs:Object.values(state.jobs), activity, notices:state.notices.filter(n=>!n.resolution), messages:state.messages, capabilities:{standalone_sessions:true, model_selection:{eligible:['0.6.0','0.6.1',VERSION].includes(state.plugin_version),catalog:'company_doctor.models',coordinator_model:'Host UI controlled; no automatic switching',billing:'Existing host account; no hard spending enforcement'},local_prototype:prototypeCapability(state), local_development:developmentCapability(state), external_execution:false, background_founder_delivery:false, automatic_team_migration:false, explicit_team_upgrade:true}};
 }
 export function develop(args,host) { binding(args,host); return developmentAction(args,host); }
 export function prototype(args,host) { binding(args,host); return prototypeAction(args,host); }
@@ -85,7 +91,7 @@ export function status(args, host) {
       }
       return s;
     });
-    if (state.upgrade && ['queued','checking'].includes(state.upgrade.status) && Date.now()-Date.parse(state.upgrade.created_at)>420000) {
+    if (state.upgrade && ['queued','checking'].includes(state.upgrade.status) && Date.now()>=(state.upgrade.deadline_ms ?? Date.parse(state.upgrade.created_at)+420000)) {
       state=db.transaction('upgrade.interrupted',s=>{s.upgrade.status='failed';s.upgrade.error='Upgrade checks were interrupted or timed out; inspect and recover before retrying';notice(s,'must_know',s.upgrade.error,s.upgrade.id);return s;});
     }
     // Status is visible to a new founder chat so it can establish a handover.
@@ -117,7 +123,7 @@ export function dispatch(args,host) {
   const timeout=normalizeTimeout({timeout_ms:args.timeout_ms,timeout_reason:args.timeout_reason});
   if (args.role==='runner') throw new Error('Choose a specialist role from company_open');
   binding(args,host);
-  withStore(args.root,db=>{const s=db.read();owner(s,args.session_id,host,args.epoch);if(args.model_selection!==undefined&&!['0.6.0',VERSION].includes(s.plugin_version))throw new Error('Explicitly adopt the model-selection team before using model_selection');});
+  withStore(args.root,db=>{const s=db.read();owner(s,args.session_id,host,args.epoch);if(args.model_selection!==undefined&&!['0.6.0','0.6.1',VERSION].includes(s.plugin_version))throw new Error('Explicitly adopt the model-selection team before using model_selection');});
   const catalog=args.model_selection?.mode==='explicit' || args.model_selection?.speed==='fast_disabled'?modelCatalog(host):null;
   const selection=normalizeSelection(args.model_selection,host,catalog);
   const check=readiness(host);

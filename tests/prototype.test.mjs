@@ -186,9 +186,18 @@ test('checked team replacement preserves prototype records but requires fresh au
   const p=plan(a);await authorize(a,p);const b=await generate(a,p),r=await review(a,b),before=read(a);
   const inspection=upgrade({...a,action:'inspect'},'codex');
   const prepared=upgrade({...a,action:'prepare',expected_epoch:1,candidate_hash:inspection.candidate_hash,source_instruction:'Adopt the installed team, preserve records and limits'},'codex',{launch:()=>{},check:()=>({available:true,authenticated:true})});
-  await rehearse(a.root,prepared.upgrade.id,async(_host,_native,prompt)=>{
-    const u=read(a).upgrade,c=u.checkpoint;
-    return output({continuity:{company_id:c.id,checkpoint_sha256:u.checkpoint_sha256,record_ids:Object.keys(c.records),job_ids:Object.keys(c.jobs),notice_ids:c.notices.map(n=>n.id),message_ids:c.messages.map(m=>m.id),constraints:'File-only grants do not transfer across ownership',unresolved_work:'Prototype bundle awaits a new authorized scope; deployment remains prohibited',next_action:'Preserve records and resume preparation without carrying prototype authority'},...(prompt.startsWith('You are an independent')?{review:{verdict:'Pass',reason:'Reconstructed all records and retained limits',permitted_action:'apply_preparation_team',blockers:[]}}:{})});
+  const sessions=new Map(),citations=new Map();
+  await rehearse(a.root,prepared.upgrade.id,async(_host,native,prompt)=>{
+    const task=JSON.parse(prompt),role=task.role,a=task.authority,nativeId=`upgrade-${role}`;
+    assert.equal(native,sessions.has(role)?nativeId:null);sessions.set(role,true);
+    if(task.page) {
+      citations.set(role,{source_id:task.page.source_id,sha256:task.page.sha256,...task.page.citation_ranges[0]});
+    }
+    const refs=[citations.get(role)],field=text=>({text,citations:refs});
+    return {native_id:nativeId,text:JSON.stringify({content:'Reconstructed company constraints and retained prototype evidence; file-only grants do not transfer across ownership',citations:refs,
+      continuity:{company_id:a.company_id,checkpoint_sha256:a.checkpoint_sha256,inventory_sha256:a.inventory_sha256,
+        constraints:field('File-only grants do not transfer across ownership'),unresolved_work:field('Prototype bundle awaits a new authorized scope; deployment remains prohibited'),next_action:field('Preserve records and resume preparation without carrying prototype authority')},
+      ...(role==='qa'?{review:{verdict:'Pass',reason:'Reconstructed all records and retained prototype limits',permitted_action:task.phase==='synthesis'?'apply_preparation_team':'continue_upgrade_review',blockers:[]}}:{})})};
   });
   const args={...a,expected_epoch:prepared.owner.epoch,upgrade_id:prepared.upgrade.id};
   const applied=upgrade({...args,action:'apply'},'codex');

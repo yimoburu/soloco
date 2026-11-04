@@ -181,6 +181,7 @@ export function parseOutput(host, stdout) {
     const event = JSON.parse(line);
     if (event.type === 'thread.started') native_id = event.thread_id;
     if (event.type === 'item.completed' && event.item?.type === 'agent_message') text = event.item.text;
+    if (event.type === 'error') throw new Error(`Codex CLI error: ${JSON.stringify(event.error ?? event.message ?? event.code ?? 'unspecified error').slice(0,500)}`);
     if (event.type === 'turn.failed') throw new Error(`Codex session failed: ${JSON.stringify(event.error).slice(0,500)}`);
   }
   if (!text) throw new Error('Codex returned no completed artifact');
@@ -341,8 +342,9 @@ export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selectio
       if (failure) return finish(failure);
       if (!spawned) return finish(errorFor('Role process closed before spawn', 'ROLE_SPAWN_ERROR'));
       if (code !== 0) {
-        let detail=stderr.slice(-800);
-        try {parseOutput(host,stdout);} catch(error) {detail=error.message;}
+        const safeDetail=value=>String(value).replaceAll(prompt,'[prompt omitted]').replace(/Bearer\s+[^\s"']+|sk-[A-Za-z0-9_-]+/gi,'[credential omitted]').slice(-800);
+        let detail=safeDetail(stderr);
+        try {parseOutput(host,stdout);} catch(error) {detail=detail || safeDetail(error.message);}
         return finish(errorFor(`${host} exited ${code}: ${detail}`, 'ROLE_EXIT_ERROR'));
       }
       try {

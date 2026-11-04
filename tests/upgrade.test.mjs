@@ -5,7 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { withStore, id, digest, VERSION, teamHash } from '../plugins/soloco/runtime/store.mjs';
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
-import { upgrade, rehearse } from '../plugins/soloco/runtime/upgrade.mjs';
+import { upgrade, rehearse, checkpoint } from '../plugins/soloco/runtime/upgrade.mjs';
 import { hook, call } from '../plugins/soloco/runtime/main.mjs';
 
 const base=fs.mkdtempSync(path.join(os.tmpdir(),'company-upgrade-'));
@@ -35,18 +35,31 @@ function prepare(a,host='codex',extra={}) {
   return upgrade({...args,action:'prepare',candidate_hash:inspection.candidate_hash,source_instruction:'Upgrade my company team and resume after successful checks',...extra},host,options);
 }
 function modelFor(a,{verdict='Pass',sameId=false,omit=false}={}) {
-  let count=0;
+  const sessions=new Map();
   return async (_host,native,prompt)=>{
-    assert.equal(native,null);count++;
-    const u=read(a).upgrade,c=u.checkpoint;
-    const continuity={company_id:c.id,checkpoint_sha256:u.checkpoint_sha256,record_ids:Object.keys(c.records),job_ids:Object.keys(c.jobs),notice_ids:c.notices.map(n=>n.id),message_ids:c.messages.map(m=>m.id),constraints:'Preparation only; five founder hours/week; customer data held',unresolved_work:'Failed review lacks evidence; founder notice unresolved',next_action:'Prepare research proposal only'};
-    if(omit)continuity.notice_ids=[];
-    return {native_id:sameId?'same-native':`native-${count}`,text:JSON.stringify({content:'Recovered objectives, limits, failed review and next permitted preparation',continuity,...(prompt.startsWith('You are an independent')?{review:{verdict,reason:'Compared raw records, failed review, limits, notices and proposed next action',permitted_action:verdict==='Pass'?'apply_preparation_team':'hold',blockers:verdict==='Pass'?[]:['Continuity evidence failed']}}:{})})};
+    const task=JSON.parse(prompt),role=task.role;
+    const expected=sameId?'same-native':`native-${role}`;
+    assert.equal(native,sessions.has(role)?expected:null);
+    sessions.set(role,true);
+    let citation;
+    if(task.page) {
+      citation={source_id:task.page.source_id,sha256:task.page.sha256,...task.page.citation_ranges[0]};
+      sessions.set(`${role}-citation`,citation);
+      if(role==='qa') {assert.ok(task.cos_findings);assert.ok(task.proposed_handover);}
+    } else citation=sessions.get(`${role}-citation`);
+    const continuity={company_id:task.authority.company_id,checkpoint_sha256:task.authority.checkpoint_sha256,
+      inventory_sha256:omit?'omitted':task.authority.inventory_sha256,
+      constraints:'Preparation only; five founder hours/week; customer data held',
+      unresolved_work:'Failed review lacks evidence; founder notice unresolved',next_action:'Prepare research proposal only, with no external business execution'};
+    for(const key of ['constraints','unresolved_work','next_action'])continuity[key]={text:continuity[key],citations:[citation]};
+    return {native_id:expected,text:JSON.stringify({content:'Recovered objectives, limits, failed review and next permitted preparation',continuity,
+      citations:[citation],...(role==='qa'?{review:{verdict,reason:'Compared raw records, failed review, limits, notices and proposed next action',permitted_action:verdict==='Pass'?(task.phase==='synthesis'?'apply_preparation_team':'continue_upgrade_review'):'hold',blockers:verdict==='Pass'?[]:['Continuity evidence failed']}}:{})})};
   };
 }
+
 async function ready(a,host='codex') {
   const p=prepare(a,host);await rehearse(a.root,p.upgrade.id,modelFor(a));
-  assert.equal(read(a).upgrade.status,'ready');
+  assert.equal(read(a).upgrade.status,'ready',read(a).upgrade.error);
   return {...a,upgrade_id:p.upgrade.id,expected_epoch:p.owner.epoch};
 }
 function applyAndVerify(a,host='codex') {
@@ -119,7 +132,7 @@ test('active legacy work must reach a safe boundary; pause is available across v
 test('late business changes invalidate rehearsal, but delivery attempts do not',async()=>{
   const a=setup(),p=prepare(a);const model=modelFor(a);
   await rehearse(a.root,p.upgrade.id,async(...args)=>{hook({cwd:a.root,session_id:a.session_id,hook_event_name:'UserPromptSubmit',prompt:'status'},'codex');return model(...args);});
-  assert.equal(read(a).upgrade.status,'ready');
+  assert.equal(read(a).upgrade.status,'ready',read(a).upgrade.error);
   withStore(a.root,db=>db.transaction('test.late',s=>{s.records.late={id:'late',content:'Quarantined old output'};return s;}));
   assert.throws(()=>upgrade({...a,expected_epoch:p.owner.epoch,upgrade_id:p.upgrade.id,action:'apply'},'codex'),/changed after rehearsal/);
 });
@@ -136,7 +149,7 @@ test('recovery restores definitions, retains new facts, and does not restore old
 
 test('crashed checks are held, recoverable, and late model results cannot reactivate them',async()=>{
   const a=setup(),p=prepare(a);
-  withStore(a.root,db=>db.transaction('test.timeout',s=>{s.upgrade.created_at='2000-01-01T00:00:00Z';return s;}));
+  withStore(a.root,db=>db.transaction('test.timeout',s=>{s.upgrade.deadline_ms=1;return s;}));
   assert.equal(engine.status(a,'codex').upgrade.status,'failed');
   await rehearse(a.root,p.upgrade.id,modelFor(a));assert.equal(read(a).upgrade.status,'failed');
   upgrade({...a,action:'recover',upgrade_id:p.upgrade.id,expected_epoch:p.owner.epoch,source_instruction:'Recover interrupted upgrade'},'codex');
@@ -184,12 +197,20 @@ else if(a[0]==='login'||a[0]==='auth')process.exit(0);
 else {
  let p='';for await(const c of process.stdin)p+=c;
  let text;
- if(p.includes('Company checkpoint: ')) {
- const s=JSON.parse(p.split('Company checkpoint: ')[1].split('\\nCheckpoint SHA256: ')[0]);
- const hash=p.split('Checkpoint SHA256: ')[1].split('\\n')[0];
- text=JSON.stringify({content:'Recovered bounded preparation and open obligations',continuity:{company_id:s.id,checkpoint_sha256:hash,record_ids:Object.keys(s.records),job_ids:Object.keys(s.jobs),notice_ids:s.notices.map(n=>n.id),message_ids:s.messages.map(m=>m.id),constraints:'Preserve limits',unresolved_work:'Preserve notices and failed reviews',next_action:'Preparation only'},...(p.startsWith('You are an independent')?{review:{verdict:'Pass',reason:'Fixture checked raw checkpoint',permitted_action:'apply_preparation_team',blockers:[]}}:{})});
+ if(p.includes('soloco-upgrade-pages-v1')) {
+ const task=JSON.parse(p),a=task.authority,role=task.role;
+ const fs=await import('node:fs');
+ const file=role+'.json';
+ let citation;
+ if(task.page) {
+ citation={source_id:task.page.source_id,sha256:task.page.sha256,...task.page.citation_ranges[0]};
+ fs.writeFileSync(file,JSON.stringify(citation));
+ } else citation=JSON.parse(fs.readFileSync(file,'utf8'));
+ const field=text=>({text,citations:[citation]});
+ text=JSON.stringify({content:'Recovered bounded preparation and unresolved historical obligations',citations:[citation],continuity:{company_id:a.company_id,checkpoint_sha256:a.checkpoint_sha256,inventory_sha256:a.inventory_sha256,constraints:field('Preserve preparation limits and founder authority'),unresolved_work:field('Preserve notices and all unresolved failed reviews'),next_action:field('Preparation only; guarded adoption and separate readback')},...(role==='qa'?{review:{verdict:'Pass',reason:'Fixture checked raw semantic pages and proposed reconstruction',permitted_action:task.phase==='synthesis'?'apply_preparation_team':'continue_upgrade_review',blockers:[]}}:{})});
  } else text=JSON.stringify({content:'New specialist recovered company records and prepared the next bounded proposal',messages:[],notices:[]});
- const native=randomUUID();
+ const resumeAt=a.indexOf('--resume');
+ const native=claude?(resumeAt>=0?a[resumeAt+1]:randomUUID()):(a[1]==='resume'?a[a.length-2]:randomUUID());
  if(claude)console.log(JSON.stringify({subtype:'success',session_id:native,result:text}));
  else {console.log(JSON.stringify({type:'thread.started',thread_id:native}));console.log(JSON.stringify({type:'item.completed',item:{type:'agent_message',text}}));}
 }
@@ -264,10 +285,17 @@ test('repeated recover and reprepare retains upgrade history and preserves the o
   assert.notEqual(next.upgrade.id,p.upgrade.id);assert.equal(read(a).records.failed.review.verdict,'Fail');
 });
 
-test('oversized checkpoints fail before migration and never get silently truncated',()=>{
-  const a=setup();withStore(a.root,db=>db.transaction('test.large',s=>{s.records.large={id:'large',content:'x'.repeat(310000)};return s;}));
-  assert.throws(()=>prepare(a),/bounded rehearsal size/);
-  assert.equal(read(a).schema,1);assert.equal(read(a).owner.epoch,1);assert.equal(read(a).records.large.content.length,310000);
+test('large semantic checkpoints page without truncation and preserve exact records through apply',async()=>{
+  const a=setup(),content='UNKNOWN old obligation: never spend without founder approval. '.repeat(22000);
+  withStore(a.root,db=>db.transaction('test.large',s=>{s.records.large={id:'large',content,previous:[{revision:1,content:'Unresolved old founder constraint'}]};return s;}));
+  const args=await ready(a),u=read(a).upgrade;
+  assert.ok(u.evidence.pages.length>10);
+  assert.equal(u.cos_pages.length,u.evidence.pages.length);
+  assert.equal(u.qa_pages.length,u.evidence.pages.length);
+  assert.ok(u.calls.filter(c=>c.role==='cos').reduce((n,c)=>n+c.budget.prompt_characters,0)>1000000);
+  for(const c of u.calls)assert.ok(c.budget.prompt_characters+c.budget.response_reserve<=900000);
+  applyAndVerify(args);
+  assert.equal(read(a).records.large.content,content);
 });
 
 test('an interrupted upgrade can be recovered from a replacement founder chat without the old coordinator',()=>{
@@ -291,9 +319,9 @@ test('continuity explanations accept substantive lists but reject empty explanat
     const a=setup(),p=prepare(a),model=modelFor(a);
     await rehearse(a.root,p.upgrade.id,async(...args)=>{
       const result=await model(...args),artifact=JSON.parse(result.text);
-      artifact.continuity.constraints=valid?['Preparation only','Founder workload and budget remain bounded']:[];
-      artifact.continuity.unresolved_work=['Failed review remains unresolved'];
-      artifact.continuity.next_action=['Prepare a proposal without external execution'];
+      artifact.continuity.constraints.text=valid?['Preparation only','Founder workload and budget remain bounded']:[];
+      artifact.continuity.unresolved_work.text=['Failed review remains unresolved'];
+      artifact.continuity.next_action.text=['Prepare a proposal without external execution'];
       return {...result,text:JSON.stringify(artifact)};
     });
     assert.equal(read(a).upgrade.status,valid?'ready':'failed');
@@ -308,7 +336,7 @@ test('qualified Pass with blockers or withheld adoption permission never reaches
     const a=setup(),p=prepare(a),model=modelFor(a);
     await rehearse(a.root,p.upgrade.id,async(...args)=>{
       const output=await model(...args),value=JSON.parse(output.text);
-      if(value.review)value.review=review;
+      if(value.review && JSON.parse(args[2]).phase==='synthesis')value.review=review;
       return {...output,text:JSON.stringify(value)};
     });
     assert.equal(read(a).upgrade.status,'failed');assert.equal(read(a).plugin_version,'0.1.0');
@@ -326,7 +354,7 @@ test('a company checkpoint above 200000 characters upgrades without dropping any
   assert.equal(read(a).records.large.content,content);
 });
 
-for(const version of ['0.2.0','0.6.0']) test(`compatible ${version} companies can optionally adopt and recover team definitions`,async()=>{
+for(const version of ['0.2.0','0.6.0','0.6.1']) test(`compatible ${version} companies can optionally adopt and recover team definitions`,async()=>{
   const a=setup();withStore(a.root,db=>db.transaction('test.previous_patch',s=>{
     s.schema=2;s.runtime_version=version;s.plugin_version=version;s.cos_instructions='Preserve founder limits and independently review preparation';s.team_sha256=teamHash(s);return s;
   }));
@@ -343,4 +371,378 @@ test('company rename cannot change a pending upgrade checkpoint',()=>{
   const a=setup(),p=prepare(a),before=read(a);
   assert.throws(()=>engine.control({...a,action:'rename',expected_epoch:p.owner.epoch,expected_name:before.name,name:'Changed during upgrade',source_instruction:'Rename'},'codex'),/pending team upgrade/);
   assert.deepEqual(read(a),before);
+});
+
+test('both roles retrieve exact huge frozen source excerpts through JSON requests in their existing sessions',async()=>{
+  const {buildEvidence}=await import('../plugins/soloco/runtime/upgrade-evidence.mjs');
+  const a=setup(),body='frozen-source-line\n'.repeat(130000);
+  withStore(a.root,db=>db.transaction('test.source',s=>{
+    s.records.source={id:'source',kind:'artifact',content:JSON.stringify({file:{path:'src/huge.mjs',content:body},claim:'Source delivery alone does not prove correct implementation'})};
+    s.upgrade_history=[{id:'original-failed',status:'failed',error:'input_too_large actual2254398',checkpoint:checkpoint(s),previous:{plugin_version:'0.1.0',governance:s.governance,governance_sha256:s.governance_sha256,roles:s.roles,cos_instructions:'Original retained CoS instructions'},review:{verdict:'Blocked',reason:'Missing evidence is still unresolved'}}];return s;
+  }));
+  const originalHistory=read(a).upgrade_history;
+  const p=prepare(a),u=read(a).upgrade,subject=buildEvidence(u.checkpoint,originalHistory);
+  const source=Object.values(subject.sources).find(s=>s.reason==='typed-file-body');
+  const model=modelFor(a),pending=new Map(),requested=new Set(),readCounts={cos:0,qa:0};
+  await rehearse(a.root,p.upgrade.id,async(...args)=>{
+    const task=JSON.parse(args[2]),role=task.role;
+    if(task.phase==='retrieval') {
+      assert.equal(args[1],`native-${role}`);
+      assert.equal(task.reads[0].text,body.slice(123,123+32000));
+      assert.equal(task.reads[0].range_sha256,digest(task.reads[0].text));
+      readCounts[role]++;
+      const output=pending.get(role),artifact=JSON.parse(output.text),r=task.reads[0];
+      artifact.citations.push({source_id:r.source_id,sha256:r.sha256,offset:r.offset,length:r.length,range_sha256:r.range_sha256});
+      return {...output,text:JSON.stringify(artifact)};
+    }
+    const output=await model(...args);
+    if(task.phase==='page' && !requested.has(role)) {
+      requested.add(role);pending.set(role,output);
+      return {...output,text:JSON.stringify({reads:[{source_id:source.source_id,sha256:source.sha256,offset:123,length:32000}]})};
+    }
+    return output;
+  });
+  assert.equal(read(a).upgrade.status,'ready',read(a).upgrade.error);
+  assert.deepEqual(readCounts,{cos:1,qa:1});
+  const delivered=read(a).upgrade.deliveries.filter(d=>d.source_id===source.source_id);
+  assert.equal(delivered.length,2);assert.notEqual(delivered[0].session_id,delivered[1].session_id);
+  applyAndVerify({...a,upgrade_id:p.upgrade.id,expected_epoch:p.owner.epoch});
+  assert.equal(read(a).records.source.content,u.checkpoint.records.source.content);
+  assert.deepEqual(read(a).upgrade_history,originalHistory);
+  assert.ok(subject.inventory.entries.some(s=>s.reason==='prior-full-checkpoint-snapshot'));
+  assert.ok(subject.inventory.entries.some(s=>s.reason==='prior-team-snapshot'));
+  assert.ok(JSON.stringify(subject.handover).includes('input_too_large actual2254398'));
+});
+
+test('QA page Blocked cannot be erased by later page and final Pass',async()=>{
+  const a=setup();withStore(a.root,db=>db.transaction('test.pages',s=>{s.records.large={id:'large',content:'old unresolved constraint '.repeat(12000)};return s;}));
+  const p=prepare(a),model=modelFor(a);let blocked=false,finalPass=false;
+  await rehearse(a.root,p.upgrade.id,async(...args)=>{
+    const task=JSON.parse(args[2]),result=await model(...args),artifact=JSON.parse(result.text);
+    if(task.role==='qa' && task.phase==='page' && !blocked){blocked=true;artifact.review={verdict:'Blocked',reason:'Old obligation has no resolution evidence',permitted_action:'hold',blockers:['Unresolved older obligation']};}
+    if(task.role==='qa' && task.phase==='synthesis')finalPass=true;
+    return {...result,text:JSON.stringify(artifact)};
+  });
+  const u=read(a).upgrade;
+  assert.ok(finalPass);assert.equal(u.review.artifact.review.verdict,'Pass');assert.equal(u.qa_pages[0].artifact.review.verdict,'Blocked');
+  assert.equal(u.status,'failed');assert.match(u.error,/page blocker/);
+});
+
+test('history mutation, owner change, checkpoint change and deadline expiry retain late evidence without permission',async()=>{
+  for(const change of ['history','owner','checkpoint','deadline','candidate']) {
+    const a=setup(),p=prepare(a),model=modelFor(a),now=Date.now;
+    let calls=0;
+    try {
+      await rehearse(a.root,p.upgrade.id,async(...args)=>{
+        calls++;const output=await model(...args);
+        if(change==='deadline')Date.now=()=>now()+46*60*1000;
+        else withStore(a.root,db=>db.transaction('test.stale',s=>{
+          if(change==='history')s.upgrade_history=[{id:'late-history',error:'Retained'}];
+          if(change==='owner')s.owner.epoch++;
+          if(change==='checkpoint')s.messages.push({id:'late-message',content:'Founder says hold'});
+          if(change==='candidate')s.upgrade.candidate.cos_instructions+=' late alteration';
+          return s;
+        }));
+        return output;
+      });
+    } finally {Date.now=now;}
+    const u=read(a).upgrade;
+    assert.equal(calls,1);assert.equal(u.status,'failed',change);assert.equal(u.calls.length,1);
+    assert.equal(u.calls[0].native_id,'native-cos');assert.ok(u.calls[0].text.includes('Recovered objectives'));
+    assert.equal(u.cos_pages.length,0);
+  }
+});
+
+test('bound full prior history survives apply and verify and cannot disappear through references',async()=>{
+  for(const phase of ['apply','verify']) {
+    const a=setup();withStore(a.root,db=>db.transaction('test.history',s=>{s.upgrade_history=[{id:'failed-original',error:'input_too_large',review:{verdict:'Blocked',reason:'Never accepted'}}];return s;}));
+    const args=await ready(a);
+    if(phase==='verify')args.expected_epoch=upgrade({...args,action:'apply'},'codex').owner.epoch;
+    withStore(a.root,db=>db.transaction('test.erase-history',s=>{s.upgrade_history=[];return s;}));
+    assert.throws(()=>upgrade({...args,action:phase},'codex'),/history/);
+  }
+});
+
+test('45 minute deadline is consistent with status; old attempts retain seven minute fallback',()=>{
+  for(const legacy of [false,true]) {
+    const a=setup(),p=prepare(a);
+    withStore(a.root,db=>db.transaction('test.old-created',s=>{s.upgrade.created_at=new Date(Date.now()-8*60*1000).toISOString();if(legacy)delete s.upgrade.deadline_ms;return s;}));
+    assert.equal(engine.status(a,'codex').upgrade.status,legacy?'failed':'queued');
+    assert.equal(read(a).upgrade.id,p.upgrade.id);
+  }
+});
+
+test('unexpected native identity changes fail without silent restart',async()=>{
+  const a=setup(),p=prepare(a),model=modelFor(a);let calls=0;
+  await rehearse(a.root,p.upgrade.id,async(...args)=>{const result=await model(...args);return {...result,native_id:++calls===2?'unexpected-native':result.native_id};});
+  const u=read(a).upgrade;assert.equal(u.status,'failed');assert.match(u.error,/identity change/);assert.equal(calls,2);assert.equal(u.calls[1].native_id,'unexpected-native');
+});
+
+test('tool-less protocol copies every citation only from actual prompt metadata and batches small findings into one replay per role',async()=>{
+  const a=setup();withStore(a.root,db=>db.transaction('test.prompt-only',s=>{
+    s.records.large={id:'large',content:'Keep old founder limits and unresolved obligations visible. '.repeat(7000)};return s;
+  }));
+  const p=prepare(a),model=modelFor(a),allowed={cos:[],qa:[]},replayed={cos:[],qa:[]};let fullPage=false;
+  await rehearse(a.root,p.upgrade.id,async(...args)=>{
+    const prompt=JSON.parse(args[2]),role=prompt.role;
+    if(prompt.page) {
+      fullPage ||= prompt.page.length===120000;
+      for(const range of prompt.page.citation_ranges) {
+        assert.ok(range.length<=32768);
+        allowed[role].push({source_id:prompt.page.source_id,sha256:prompt.page.sha256,...range});
+      }
+    }
+    if(prompt.phase==='replay')replayed[role].push(prompt.findings.map(f=>f.page_id));
+    const output=await model(...args),artifact=JSON.parse(output.text);
+    // The fake model above uses only JSON from its prompt and its own memory:
+    // no frozen subject, private read API, hash computation or fixture source IDs.
+    for(const citation of artifact.citations)assert.ok(allowed[role].some(value=>JSON.stringify(value)===JSON.stringify(citation)));
+    if(role==='qa' && prompt.phase==='page') {
+      assert.equal(prompt.required_review.scope,'page');
+      assert.equal(prompt.required_review.pass_permitted_action,'continue_upgrade_review');
+      assert.equal(artifact.review.permitted_action,'continue_upgrade_review');
+      assert.equal(read(a).upgrade.status,'checking');
+    }
+    if(role==='qa' && prompt.phase==='synthesis') {
+      assert.equal(prompt.required_review.scope,'final');
+      assert.equal(artifact.review.permitted_action,'apply_preparation_team');
+    }
+    return output;
+  });
+  const u=read(a).upgrade;
+  assert.equal(u.status,'ready',u.error);assert.ok(fullPage);assert.ok(u.evidence.pages.length>1);
+  for(const role of ['cos','qa']) {
+    assert.equal(replayed[role].length,1);
+    assert.deepEqual(replayed[role][0],u[`${role}_pages`].map(f=>f.page_id));
+    const receipts=u.replays.filter(receipt=>receipt.role===role);
+    assert.equal(receipts.length,1);assert.deepEqual(receipts[0].page_ids,replayed[role][0]);
+    assert.equal(receipts[0].findings_sha256,digest(JSON.stringify(u[`${role}_pages`])));
+  }
+  applyAndVerify({...a,upgrade_id:p.upgrade.id,expected_epoch:p.owner.epoch});
+});
+
+test('QA page adoption permission and final continuation permission both fail closed',async()=>{
+  for(const phase of ['page','synthesis']) {
+    const a=setup(),p=prepare(a),model=modelFor(a);
+    await rehearse(a.root,p.upgrade.id,async(...args)=>{
+      const task=JSON.parse(args[2]),output=await model(...args),artifact=JSON.parse(output.text);
+      if(task.role==='qa' && task.phase===phase)artifact.review.permitted_action=phase==='page'?'apply_preparation_team':'continue_upgrade_review';
+      return {...output,text:JSON.stringify(artifact)};
+    });
+    const u=read(a).upgrade;
+    assert.equal(u.status,'failed');assert.match(u.error,new RegExp(phase==='page'?'continue_upgrade_review':'apply_preparation_team'));
+    assert.throws(()=>upgrade({...a,action:'apply',upgrade_id:p.upgrade.id,expected_epoch:p.owner.epoch},'codex'),/passing continuity/);
+  }
+});
+
+test('apply rechecks QA page permission and complete replay receipts',async()=>{
+  for(const corruption of ['page-permission','replay']) {
+    const a=setup(),args=await ready(a);
+    withStore(a.root,db=>db.transaction('test.corrupt-evidence',s=>{
+      if(corruption==='page-permission')s.upgrade.qa_pages[0].artifact.review.permitted_action='apply_preparation_team';
+      else s.upgrade.replays=s.upgrade.replays.filter(receipt=>receipt.role!=='qa');
+      return s;
+    }));
+    assert.throws(()=>upgrade({...args,action:'apply'},'codex'),corruption==='page-permission'?/continue_upgrade_review/:/replay coverage/);
+    assert.equal(read(a).plugin_version,'0.1.0');
+  }
+});
+
+test('large replay batches deliver every durable finding and preserve the union of QA page blockers',async()=>{
+  const a=setup();withStore(a.root,db=>db.transaction('test.large-replay',s=>{
+    s.records.large={id:'large',content:'Historical founder obligation remains binding. '.repeat(70000)};return s;
+  }));
+  const p=prepare(a),model=modelFor(a);
+  const replayed={cos:[],qa:[]};let qaPages=0;
+  await rehearse(a.root,p.upgrade.id,async(...args)=>{
+    const task=JSON.parse(args[2]),role=task.role;
+    assert.ok(args[2].length+40000<=900000);
+    if(task.phase==='replay')replayed[role].push(task.findings);
+    const output=await model(...args),artifact=JSON.parse(output.text);
+    if(task.phase==='page') {
+      artifact.content+=' Preserve every unresolved founder constraint.'.repeat(350);
+      for(const key of ['constraints','unresolved_work','next_action'])artifact.continuity[key].text+=' Retain this old obligation pending explicit resolution.'.repeat(110);
+      if(role==='qa' && qaPages++<2)artifact.review={verdict:qaPages===1?'Blocked':'Fail',
+        reason:'An older constraint is unresolved',permitted_action:'hold',blockers:[`Unresolved page obligation ${qaPages}`]};
+    }
+    const text=JSON.stringify(artifact);assert.ok(text.length<=40000);
+    return {...output,text};
+  });
+  const u=read(a).upgrade;
+  assert.equal(u.status,'failed');assert.match(u.error,/page blocker/);
+  assert.equal(u.review.artifact.review.verdict,'Pass');
+  assert.deepEqual(u.qa_pages.flatMap(f=>f.artifact.review.blockers),['Unresolved page obligation 1','Unresolved page obligation 2']);
+  for(const role of ['cos','qa']) {
+    assert.ok(replayed[role].length>1,`${role} needed more than one bounded batch`);
+    assert.ok(replayed[role].some(batch=>batch.length>1));
+    assert.deepEqual(replayed[role].flat(),u[`${role}_pages`]);
+    const receipts=u.replays.filter(r=>r.role===role);
+    assert.equal(receipts.length,replayed[role].length);
+    receipts.forEach((receipt,index)=>{
+      assert.deepEqual(receipt.page_ids,replayed[role][index].map(f=>f.page_id));
+      assert.equal(receipt.findings_sha256,digest(JSON.stringify(replayed[role][index])));
+      assert.equal(receipt.native_id,`native-${role}`);
+    });
+  }
+});
+
+function corruptSavedCheckpoint(s,mode='saved') {
+  const u=s.upgrade,intent=Object.values(s.records).find(record=>record.kind==='intent');
+  if(mode!=='pin')delete u.checkpoint.records[intent.id];
+  if(mode==='pin')u.checkpoint_sha256='0'.repeat(64);
+  if(mode==='repinned')u.checkpoint_sha256=digest(JSON.stringify(u.checkpoint));
+  return s;
+}
+
+test('corrupted saved checkpoint is rejected before any native call while authoritative intent remains',async()=>{
+  const a=setup(),p=prepare(a),model=modelFor(a);let calls=0;
+  const original=read(a),intent=Object.values(original.records).find(record=>record.kind==='intent');
+  withStore(a.root,db=>db.transaction('test.saved-checkpoint-corruption',s=>corruptSavedCheckpoint(s)));
+  await rehearse(a.root,p.upgrade.id,async(...args)=>{calls++;return model(...args);});
+  const s=read(a);
+  assert.equal(calls,0);assert.equal(s.upgrade.status,'failed');assert.match(s.upgrade.error,/Saved upgrade checkpoint/);
+  assert.deepEqual(s.records[intent.id],intent);assert.equal(s.upgrade.checkpoint_sha256,original.upgrade.checkpoint_sha256);
+});
+
+test('saved checkpoint corruption and changed pins during calls retain late evidence but never authorize adoption',async()=>{
+  for(const mode of ['saved','pin','repinned']) {
+    const a=setup(),p=prepare(a),model=modelFor(a);let calls=0;
+    await rehearse(a.root,p.upgrade.id,async(...args)=>{
+      calls++;const output=await model(...args);
+      withStore(a.root,db=>db.transaction('test.corrupt-returned-checkpoint',s=>corruptSavedCheckpoint(s,mode)));
+      return output;
+    });
+    const s=read(a),u=s.upgrade;
+    assert.equal(calls,1);assert.equal(u.status,'failed');assert.match(u.error,/Saved upgrade checkpoint/);
+    assert.equal(u.calls.length,1);assert.equal(u.calls[0].native_id,'native-cos');assert.ok(u.calls[0].text.includes('Recovered objectives'));
+    assert.equal(u.cos_pages.length,0);assert.ok(Object.values(s.records).some(record=>record.kind==='intent'));
+    assert.throws(()=>upgrade({...a,action:'apply',upgrade_id:p.upgrade.id,expected_epoch:p.owner.epoch},'codex'),/Saved upgrade checkpoint/);
+  }
+});
+
+test('retrieval return rechecks the saved checkpoint and retains the held source response',async()=>{
+  const a=setup(),p=prepare(a),model=modelFor(a);let calls=0,pending;
+  await rehearse(a.root,p.upgrade.id,async(...args)=>{
+    calls++;const task=JSON.parse(args[2]);
+    if(task.phase==='page') {
+      pending=await model(...args);
+      return {...pending,text:JSON.stringify({reads:[{source_id:task.page.source_id,sha256:task.page.sha256,
+        offset:task.page.offset,length:Math.min(task.page.length,32000)}]})};
+    }
+    assert.equal(task.phase,'retrieval');assert.equal(args[1],'native-cos');assert.ok(task.reads[0].text);
+    withStore(a.root,db=>db.transaction('test.corrupt-during-read',s=>corruptSavedCheckpoint(s)));
+    return pending;
+  });
+  const u=read(a).upgrade;
+  assert.equal(calls,2);assert.equal(u.status,'failed');assert.match(u.error,/Saved upgrade checkpoint/);
+  assert.equal(u.calls.length,2);assert.ok(u.calls[1].text.includes('Recovered objectives'));assert.equal(u.cos_pages.length,0);
+});
+
+test('apply and verify reject saved checkpoint corruption or a repinned checkpoint',async()=>{
+  for(const action of ['apply','verify'])for(const mode of ['saved','pin','repinned']) {
+    const a=setup(),args=await ready(a),original=read(a),intent=Object.values(original.records).find(record=>record.kind==='intent');
+    assert.equal(original.upgrade.evidence.checkpoint_sha256,original.upgrade.checkpoint_sha256);
+    if(action==='verify')args.expected_epoch=upgrade({...args,action:'apply'},'codex').owner.epoch;
+    withStore(a.root,db=>db.transaction('test.corrupt-before-adoption-readback',s=>corruptSavedCheckpoint(s,mode)));
+    assert.throws(()=>upgrade({...args,action},'codex'),/Saved upgrade checkpoint/);
+    assert.deepEqual(read(a).records[intent.id],intent);assert.equal(read(a).paused,true);
+    assert.equal(read(a).upgrade.status,action==='apply'?'ready':'applied');
+  }
+});
+
+test('recovery remains available for a corrupted saved checkpoint and retains later business facts',async()=>{
+  const a=setup(),p=prepare(a),original=read(a);
+  withStore(a.root,db=>db.transaction('test.corrupt-recoverable-checkpoint',s=>corruptSavedCheckpoint(s)));
+  await rehearse(a.root,p.upgrade.id,modelFor(a));
+  withStore(a.root,db=>db.transaction('test.later-fact',s=>{
+    s.records.later={id:'later',kind:'artifact',content:'Late quarantined business evidence',status:'Quarantined'};return s;
+  }));
+  const recovered=upgrade({...a,action:'recover',upgrade_id:p.upgrade.id,expected_epoch:p.owner.epoch,source_instruction:'Recover prior definitions; preserve all later evidence'},'codex');
+  const s=read(a);assert.equal(recovered.upgrade.status,'recovered');
+  assert.equal(s.plugin_version,original.upgrade.previous.plugin_version);assert.equal(s.runtime_version,VERSION);
+  assert.equal(s.records.later.content,'Late quarantined business evidence');assert.match(s.upgrade.error,/Saved upgrade checkpoint/);
+  for(const [key,value]of Object.entries(original.records))assert.deepEqual(s.records[key],value);
+  assert.deepEqual(s.roles,original.upgrade.previous.roles);assert.equal(s.governance,original.governance);
+});
+
+test('actual prompt contracts produce valid page, replay, synthesis and reads-only responses on both roles',async()=>{
+  const a=setup(),p=prepare(a),requested=new Set(),seen=new Set(),contracts=new Map();let calls=0;
+  await rehearse(a.root,p.upgrade.id,async(_host,native,prompt)=>{
+    calls++;
+    const task=JSON.parse(prompt),contract=task.response_contract,phase=task.resume_phase??task.phase,role=task.role;
+    const key=`${role}:${phase}`;seen.add(`${role}:${task.phase}:${phase}`);
+    assert.equal(contract.phase,phase);
+    assert.match(task.instructions,/REQUIRED top-level content must be a string and citations must be an array/);
+    assert.match(task.instructions,/nested findings array cannot replace them/);
+    const expectedFields=['content','citations',...(phase==='synthesis'?['continuity']:[]),...(role==='qa'&&phase!=='replay'?['review']:[])];
+    assert.deepEqual(contract.required_top_level_fields,expectedFields);
+    assert.deepEqual(Object.keys(contract.required_json_shape),expectedFields);
+    assert.deepEqual(Object.keys(contract.reads_only_shape),['reads']);
+    for(const request of contract.reads_only_shape.reads) {
+      assert.deepEqual(Object.keys(request),['source_id','sha256','offset','length']);
+      assert.ok(request.length<=32768);
+    }
+    const nativeId=`contract-native-${role}`;
+    if(native!==null)assert.equal(native,nativeId);
+    if(task.phase!=='retrieval') {
+      assert.ok(!requested.has(key));requested.add(key);contracts.set(key,structuredClone(contract));
+      if(task.page)assert.deepEqual(contract.required_json_shape.citations[0],{
+        source_id:task.page.source_id,sha256:task.page.sha256,...task.page.citation_ranges[0]
+      });
+      return {native_id:nativeId,text:JSON.stringify(contract.reads_only_shape)};
+    }
+    assert.equal(task.resume_phase,phase);assert.ok(task.reads[0].text);
+    assert.deepEqual(contract,contracts.get(key));
+    assert.equal(task.reads[0].range_sha256,contract.required_json_shape.citations[0].range_sha256);
+    // Populate only the supplied contract. Citation IDs/hashes/ranges are copied
+    // from the actual prompt; the fake has no subject, private reads or crypto.
+    const artifact=structuredClone(contract.required_json_shape);
+    artifact.content=phase==='replay'?'Retained every batch finding and unresolved blocker without changing earlier reviews.':
+      'Recovered binding founder limits, unresolved customer-data hold and failed review from the supplied evidence.';
+    if(phase==='synthesis') {
+      assert.equal(artifact.continuity.company_id,task.authority.company_id);
+      assert.equal(artifact.continuity.checkpoint_sha256,task.authority.checkpoint_sha256);
+      assert.equal(artifact.continuity.inventory_sha256,task.authority.inventory_sha256);
+      artifact.continuity.constraints.text='Preparation only; five founder hours per week and the agreed budget remain binding.';
+      artifact.continuity.unresolved_work.text='The failed review and customer-data hold remain unresolved and require evidence.';
+      artifact.continuity.next_action.text='Guarded preparation-team adoption and separate readback may precede any authorized resume; business execution stays prohibited.';
+    }
+    if(role==='qa'&&phase!=='replay') {
+      assert.equal(contract.review_rules.Pass.permitted_action,phase==='page'?'continue_upgrade_review':'apply_preparation_team');
+      for(const verdict of ['Fail','Blocked'])assert.equal(contract.review_rules[verdict].permitted_action,'hold');
+      artifact.review={verdict:'Pass',reason:'Compared the supplied evidence, retained all unresolved limits, and checked this precise review scope.',...contract.review_rules.Pass};
+    } else {assert.equal(artifact.review,undefined);assert.equal(contract.review_rules,undefined);}
+    return {native_id:nativeId,text:JSON.stringify(artifact)};
+  });
+  const u=read(a).upgrade;
+  assert.equal(u.status,'ready',u.error);assert.equal(calls,12);assert.equal(requested.size,6);
+  for(const role of ['cos','qa'])for(const phase of ['page','replay','synthesis']) {
+    assert.ok(seen.has(`${role}:${phase}:${phase}`));assert.ok(seen.has(`${role}:retrieval:${phase}`));
+  }
+  assert.equal(u.replays.length,2);assert.notEqual(u.probe.native_id,u.review.native_id);
+  applyAndVerify({...a,upgrade_id:p.upgrade.id,expected_epoch:p.owner.epoch});
+});
+
+test('nested findings alone, uncited replay and incomplete synthesis remain held with their exact invalid output retained',async()=>{
+  for(const phase of ['page','replay','synthesis']) {
+    const a=setup(),p=prepare(a),model=modelFor(a);let invalid,calls=0;
+    await rehearse(a.root,p.upgrade.id,async(...args)=>{
+      calls++;const task=JSON.parse(args[2]),output=await model(...args),artifact=JSON.parse(output.text);
+      if(task.role==='cos'&&task.phase===phase) {
+        if(phase==='page')invalid={page_id:task.page.page_id,role:task.role,
+          findings:[{text:artifact.content,citations:artifact.citations}],next_action:artifact.continuity.next_action};
+        else {invalid=artifact;delete invalid[phase==='replay'?'citations':'continuity'];}
+        return {...output,text:JSON.stringify(invalid)};
+      }
+      return output;
+    });
+    const u=read(a).upgrade;
+    assert.equal(u.status,'failed');assert.equal(calls,phase==='page'?1:phase==='replay'?2:3);
+    assert.deepEqual(JSON.parse(u.calls.at(-1).text),invalid);
+    assert.equal(u.probe_native_id,'native-cos');assert.equal(u.reviewer_native_id,undefined);
+    assert.match(u.error,phase==='page'?/Role must return nonempty content/:phase==='replay'?/citations must be a nonempty array/:/Incomplete rehearsal coverage/);
+    if(phase==='page')assert.equal(u.cos_pages.length,0);
+    if(phase==='replay')assert.equal(u.replays.length,0);
+    assert.throws(()=>upgrade({...a,action:'apply',upgrade_id:p.upgrade.id,expected_epoch:p.owner.epoch},'codex'),/passing continuity/);
+  }
 });
