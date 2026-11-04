@@ -143,6 +143,14 @@ Timeout policy uses `timeout_ms` and `timeout_reason`: execution defaults to 180
 
 Jobs retain applicable request metadata. Activity derives from active jobs plus the latest eight jobs; task summaries are limited to 160 characters and planned handoffs to 200. Returned results, submitted reviews and acceptance remain distinct. Software test jobs are labeled as such. There is no dashboard or background notification claim. These controls ship in v0.6.1. Pinned v0.6.0 and v0.6.1 teams retain model/effort selection and local development without automatically adopting new instructions.
 
+## Selection decision evidence
+
+CoS must reassess the deliverable, uncertainty, consequence of error and available qualification evidence on each assignment, including resumed roles. Its current chat model and a role title do not justify inheriting maximum settings. New dispatch guidance asks for a task-specific `model_selection.reason`, including deliberate defaults; legacy omission remains supported. Missing capability evidence permits a reasoned default or hold, not an invented explicit choice.
+
+Status and wait return `selection_usage`, derived from the complete durable job history rather than the recent activity window. It groups requested host/model/effort/speed with assignment and lifecycle counts, counts missing rationales and available applied/reported evidence, and excludes software test jobs. Queued, failed and quarantined assignments remain counts of assignments, not successful model calls. Upgrade rehearsals and founder-facing CoS chat usage are not measured. Host defaults are unknown settings; reported cumulative usage is never converted into per-assignment token or model shares. The summary establishes neither effective settings, billing nor waste. Use linked artifacts/reviews to evaluate quality before changing choices; no quotas or automatic routing are introduced.
+
+See [the reproducible selection evaluation](../evals/README.md) for five fictional task-fit cases, a live decision-only baseline, offline scorer tests, and an opt-in runner. Model/effort/session propagation tests remain separate from behavioral choice evaluation. No actual specialist quality or cost improvement is claimed by the decision-only result. Changes to this skill require explicit checked team adoption before an existing company receives them; this repository change does not install or upgrade a team.
+
 ## Retired generator
 
 The manual Python generator and its separate tests/configuration were retired in v0.2.2. The [v0.2.1 source snapshot](https://github.com/yimoburu/soloco/tree/c346367fb910b88b8a4b908b7531aba081338b4b) remains available for historical trials. Existing `team/manifest.json` workspaces are still detected and held; this release neither imports nor overwrites them. Plugin companies remain in `.company/`.

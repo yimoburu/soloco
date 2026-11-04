@@ -505,6 +505,9 @@ test('selected dispatch reaches the host, rotates on model/effort/reset, retains
     assert.ok(!calls[4].args.includes('--model'));assert.ok(!calls[4].args.some(v=>v.startsWith('model_reasoning_effort=')));
     const activity=review.state.activity.find(row=>row.job_id===first.job.id);
     assert.equal(activity.status,'returned');assert.equal(activity.requested_model,'test-small');
+    assert.equal(review.state.selection_usage.scope,'specialist_assignments_only');
+    assert.equal(review.state.selection_usage.assignments,review.state.jobs.length);
+    assert.ok(review.state.selection_usage.groups.some(g=>g.model==='test-small'));
     assert.equal(activity.model_evidence.verification,'unverified');assert.equal(activity.next_handoff.status,'planned');
   } finally {process.env.PATH=oldPath;}
 });

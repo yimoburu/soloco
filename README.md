@@ -72,6 +72,8 @@ The catalog exposes choices, not account entitlement. Claude uses documented `ha
 
 Requests, applied controls and observations are distinct. Host default does not mean Standard. Codex output does not identify the answering model; Claude usage can include earlier turns and internal calls. Missing evidence stays unknown. Identical settings can resume a session with supported controls reapplied; changed settings retire the prior session reference while preserving history. A reason change alone does not rotate the session. Existing host billing applies; hard spending limits and cost savings are not established. These controls ship in v0.6.1; compatible runtime updates preserve existing pinned instructions. Existing companies must explicitly adopt a team supporting model selection; installation alone preserves pinned instructions and rules.
 
+Inspect `company_status.selection_usage` for full-history specialist request counts, missing rationales and outcomes, separate from CoS chat usage. Counts are not tokens, cost, or proof of effective model settings. The [selection-policy evaluation](evals/README.md) checks task-fit decisions on fictional evidence and documents an opt-in live run.
+
 The default execution timeout is 3 minutes. A custom timeout must be 1 second to 10 minutes with a reason. Queue and startup each have a separate 4-minute allowance. The execution timeout starts at real process spawn, allows 3 seconds for termination escalation, and cannot be extended. Tests have separate limits. Pause requests process cancellation through the worker, but provider completion, descendants or worker-death termination are not guaranteed. Late outputs are quarantined. Timeout changes do not reset attempt limits.
 
 ## Develop a local candidate
