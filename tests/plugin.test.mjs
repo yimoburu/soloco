@@ -102,6 +102,23 @@ test('failed or malformed model output creates a notice and grants no success',a
   const a=setup(),j=queued(a);await work(a.root,j,async()=>({native_id:'n',text:'not JSON'}));
   const s=engine.status(a,'codex');assert.equal(s.jobs[0].status,'failed');assert.equal(s.notices.length,1);assert.equal(s.records.length,0);
 });
+test('invalid envelopes retain precise rejected evidence and never partially publish or route',async()=>{
+  const invalid=[
+    {messages:[{to:'pm',content:'valid first'},{to:'Chief of Staff',content:'wrong recipient'}],field:/message\[1\]\.to/},
+    {messages:[{to:'runner',content:4}],field:/message\[0\]\.content/},
+    {messages:[{to:'runner',content:'x'.repeat(20001)}],field:/message\[0\]\.content/},
+    {messages:[{to:'pm',content:'valid'}],notices:[{kind:'unknown',summary:'invalid'}],field:/notice\[0\]\.kind/},
+  ];
+  for(const {field,...payload} of invalid) {
+    const a=setup(),j=queued(a),out=result('Preserve this substantive candidate',payload);
+    await work(a.root,j,async()=>out);
+    const s=engine.status(a,'codex'),job=s.jobs[0];
+    assert.equal(job.status,'failed');assert.match(job.error,field);
+    assert.equal(job.native_id,out.native_id);assert.match(job.rejected_output.text,/Preserve this substantive candidate/);
+    assert.equal(s.messages.length,0);assert.equal(s.records.length,0);assert.equal(s.notices.length,1);
+    assert.equal(Object.values(s.sessions)[0].native_id,null);
+  }
+});
 test('notice delivery, seeing, resolution, and authority remain distinct',()=>{
   const a=setup(),n=engine.notify({...a,kind:'decision_required',summary:'Choose the customer'},'codex');
   hook({cwd:a.root,session_id:a.session_id,hook_event_name:'UserPromptSubmit',prompt:'status'},'codex');
@@ -185,7 +202,7 @@ test('same chat cannot reuse a revoked epoch after a handover',()=>{
 
 
 test('compatible runtime patches preserve pinned team, ownership and native sessions without adoption',async()=>{
-  for(const version of ['0.2.0','0.2.1','0.2.2','0.3.0','0.3.1','0.4.0']) {
+  for(const version of ['0.2.0','0.2.1','0.2.2','0.3.0','0.3.1','0.4.0','0.4.1']) {
     const a=setup();
     withStore(a.root,db=>db.transaction('test.old_patch',s=>{
       s.plugin_version=version;s.runtime_version=version;

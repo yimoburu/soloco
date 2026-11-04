@@ -12,6 +12,13 @@ export function assignmentContext(state, job) {
     if(!state.records[prototypeId]) throw new Error('Prototype scope is missing');
     ids.add(prototypeId);
   }
+  const target=state.records[job.review_of?.id];
+  const developmentId=job.development_id ?? target?.development?.plan_id;
+  if(developmentId) {
+    if(!state.records[developmentId]) throw new Error('Development scope missing');
+    ids.add(developmentId);
+    if(target?.development?.candidate_id)ids.add(target.development.candidate_id);
+  }
   for (const ref of [...job.inputs, ...(job.review_of ? [job.review_of] : [])]) {
     const record = state.records[ref.id];
     if (!record || record.revision !== ref.revision) throw new Error('Assignment input version changed');
@@ -31,6 +38,11 @@ export function assignmentContext(state, job) {
 }
 
 export function contextMatches(state, job, hash) {
-  try { return assignmentContext(state, job).hash === hash; }
+  try {
+    // A job's published notices/messages are outputs, not changes to its inputs.
+    // They remain in the real state and every subsequent assignment's context.
+    const view={...state,notices:state.notices.filter(n=>n.job_id!==job.id),messages:state.messages.filter(m=>m.job_id!==job.id)};
+    return assignmentContext(view, job).hash === hash;
+  }
   catch { return false; }
 }

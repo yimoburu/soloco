@@ -1,7 +1,7 @@
 {
   "name": "soloco",
-  "version": "0.4.1",
-  "description": "SoloCo: your Chief of Staff and standalone AI specialists. Planning, independent review and explicitly authorized local prototype files.",
+  "version": "0.5.0",
+  "description": "SoloCo: your Chief of Staff and standalone AI specialists. Scoped local development candidates, constrained tests and independent review.",
   "author": {
     "name": "yimoburu"
   },

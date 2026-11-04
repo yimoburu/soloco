@@ -5,6 +5,7 @@ import { spawn } from 'node:child_process';
 import { PACKAGE, VERSION, stamp, id, digest, folder, noLink, withStore, owner, notice, requireText, SCHEMA, installedTeam, teamHash, upgradePending, compatibleRuntime } from './store.mjs';
 import { readiness } from './adapters.mjs';
 import { assignmentContext } from './context.mjs';
+import { developmentAction, developmentCapability, developmentAssignment } from './develop.mjs';
 import { prototypeAction, prototypeCapability, prototypeAssignment } from './prototype.mjs';
 
 const busy = state => Object.values(state.jobs).filter(j => ['queued','running'].includes(j.status));
@@ -30,8 +31,9 @@ export function upgradeSummary(u) {
   return {...progress,candidate_version:candidate.plugin_version,previous_version:previous.plugin_version};
 }
 function summary(state) {
-  return {company_id:state.id, name:state.name, idea:state.idea, revision:state.revision, phase:state.phase, mode:state.mode, paused:state.paused, owner:state.owner, plugin_version:state.plugin_version, runtime_version:state.runtime_version??state.plugin_version, executing_runtime_version:VERSION, upgrade:upgradeSummary(state.upgrade), governance_sha256:state.governance_sha256, records:Object.values(state.records), sessions:state.sessions, jobs:Object.values(state.jobs), notices:state.notices.filter(n=>!n.resolution), messages:state.messages, capabilities:{standalone_sessions:true, local_prototype:prototypeCapability(state), external_execution:false, background_founder_delivery:false, automatic_team_migration:false, explicit_team_upgrade:true}};
+  return {company_id:state.id, name:state.name, idea:state.idea, revision:state.revision, phase:state.phase, mode:state.mode, paused:state.paused, owner:state.owner, plugin_version:state.plugin_version, runtime_version:state.runtime_version??state.plugin_version, executing_runtime_version:VERSION, upgrade:upgradeSummary(state.upgrade), governance_sha256:state.governance_sha256, records:Object.values(state.records), sessions:state.sessions, jobs:Object.values(state.jobs), notices:state.notices.filter(n=>!n.resolution), messages:state.messages, capabilities:{standalone_sessions:true, local_prototype:prototypeCapability(state), local_development:developmentCapability(state), external_execution:false, background_founder_delivery:false, automatic_team_migration:false, explicit_team_upgrade:true}};
 }
+export function develop(args,host) { binding(args,host); return developmentAction(args,host); }
 export function prototype(args,host) { binding(args,host); return prototypeAction(args,host); }
 function update(args, host, type, fn) {
   binding(args,host);
@@ -84,6 +86,7 @@ export function save(args,host) {
   if (!/^[a-zA-Z0-9][a-zA-Z0-9:_-]{0,200}$/.test(recordId) || ['constructor','prototype','__proto__'].includes(recordId)) throw new Error('Invalid record ID');
   const state=update(args,host,'record.saved',s=>{
     const old=s.records[recordId];
+    if(old?.development) throw new Error('Development records are immutable; use company_develop');
     if(old?.prototype) throw new Error('Prototype records are immutable; use company_prototype or create a new scope');
     if (old && (old.author_instance!==s.owner.session_id || old.revision!==args.expected_revision)) throw new Error('Record owner or version conflict; create a new proposal instead');
     if (!old && args.expected_revision !== undefined && args.expected_revision !== 0) throw new Error('Record does not exist at expected version');
@@ -105,7 +108,7 @@ export function dispatch(args,host) {
     if(busy(s).length>=3) throw new Error('Three assignments already active; wait for a result');
     const target=args.review_of && Object.hasOwn(s.records,args.review_of) ? s.records[args.review_of] : null;
     if(args.review_of && !target) throw new Error('Review target not found');
-    const key=target ? `${args.role}:review:${target.id}:${target.revision}` : args.prototype_id ? `${args.role}:prototype:${jobId}` : args.role;
+    const key=target ? `${args.role}:review:${target.id}:${target.revision}` : args.prototype_id ? `${args.role}:prototype:${jobId}` : args.development_id ? `${args.role}:development:${jobId}` : args.role;
     let session=s.sessions[key];
     if(!session) session=s.sessions[key]={instance_id:id(args.role),role:args.role,native_id:null,host};
     if(target?.author_instance===session.instance_id) throw new Error('Authors cannot independently review their own artifact');
@@ -113,8 +116,8 @@ export function dispatch(args,host) {
     if(session.host!==host) throw new Error('Role belongs to another host; perform company handover first');
     const inputs=args.input_ids??[];
     if(!Array.isArray(inputs) || inputs.some(k=>typeof k!=='string' || !Object.hasOwn(s.records,k))) throw new Error('An input record is missing');
-    const job={id:jobId,role:args.role,session_key:key,instance_id:session.instance_id,native_id:session.native_id,host,epoch:s.owner.epoch,status:'queued',task:args.task,inputs:inputs.map(k=>({id:k,revision:s.records[k].revision})),review_of:target?{id:target.id,revision:target.revision}:null,...(args.prototype_id?{prototype_id:args.prototype_id}:{}),created_at:stamp()};
-    prototypeAssignment(s,job,true);
+    const job={id:jobId,role:args.role,session_key:key,instance_id:session.instance_id,native_id:session.native_id,host,epoch:s.owner.epoch,status:'queued',task:args.task,inputs:inputs.map(k=>({id:k,revision:s.records[k].revision})),review_of:target?{id:target.id,revision:target.revision}:null,...(args.prototype_id?{prototype_id:args.prototype_id}:{}),...(args.development_id?{development_id:args.development_id}:{}),created_at:stamp()};
+    prototypeAssignment(s,job,true);developmentAssignment(s,job,true);
     const context=assignmentContext(s,job);
     s.jobs[jobId]={...job,inputs:context.inputs,context_sha256:context.hash};
   });
