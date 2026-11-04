@@ -3,7 +3,8 @@ import path from 'node:path';
 import os from 'node:os';
 import { spawn } from 'node:child_process';
 import { PACKAGE, VERSION, stamp, id, digest, folder, noLink, withStore, owner, notice, requireText, SCHEMA, installedTeam, teamHash, upgradePending, compatibleRuntime } from './store.mjs';
-import { readiness } from './adapters.mjs';
+import { readiness, modelCatalog } from './adapters.mjs';
+import { normalizeSelection, selectionKey, activityFor } from './selection.mjs';
 import { assignmentContext } from './context.mjs';
 import { developmentAction, developmentCapability, developmentAssignment } from './develop.mjs';
 import { prototypeAction, prototypeCapability, prototypeAssignment } from './prototype.mjs';
@@ -31,7 +32,7 @@ export function upgradeSummary(u) {
   return {...progress,candidate_version:candidate.plugin_version,previous_version:previous.plugin_version};
 }
 function summary(state) {
-  return {company_id:state.id, name:state.name, idea:state.idea, revision:state.revision, phase:state.phase, mode:state.mode, paused:state.paused, owner:state.owner, plugin_version:state.plugin_version, runtime_version:state.runtime_version??state.plugin_version, executing_runtime_version:VERSION, upgrade:upgradeSummary(state.upgrade), governance_sha256:state.governance_sha256, records:Object.values(state.records), sessions:state.sessions, jobs:Object.values(state.jobs), notices:state.notices.filter(n=>!n.resolution), messages:state.messages, capabilities:{standalone_sessions:true, local_prototype:prototypeCapability(state), local_development:developmentCapability(state), external_execution:false, background_founder_delivery:false, automatic_team_migration:false, explicit_team_upgrade:true}};
+  return {company_id:state.id, name:state.name, idea:state.idea, revision:state.revision, phase:state.phase, mode:state.mode, paused:state.paused, owner:state.owner, plugin_version:state.plugin_version, runtime_version:state.runtime_version??state.plugin_version, executing_runtime_version:VERSION, upgrade:upgradeSummary(state.upgrade), governance_sha256:state.governance_sha256, records:Object.values(state.records), sessions:state.sessions, jobs:Object.values(state.jobs), activity:activityFor(state), notices:state.notices.filter(n=>!n.resolution), messages:state.messages, capabilities:{standalone_sessions:true, model_selection:{eligible:state.plugin_version===VERSION,catalog:'company_doctor.models',coordinator_model:'Host UI controlled; no automatic switching',billing:'Existing host account; no hard spending enforcement'},local_prototype:prototypeCapability(state), local_development:developmentCapability(state), external_execution:false, background_founder_delivery:false, automatic_team_migration:false, explicit_team_upgrade:true}};
 }
 export function develop(args,host) { binding(args,host); return developmentAction(args,host); }
 export function prototype(args,host) { binding(args,host); return prototypeAction(args,host); }
@@ -97,7 +98,14 @@ export function save(args,host) {
 }
 export function dispatch(args,host) {
   requireText(args.task,'task');
+  if (!Number.isInteger(args.epoch)) throw new Error('Supply the current ownership epoch from company_status');
+  if(args.task_summary!==undefined)requireText(args.task_summary,'task_summary',160);
+  if(args.next_handoff!==undefined)requireText(args.next_handoff,'next_handoff',200);
   if (args.role==='runner') throw new Error('Choose a specialist role from company_open');
+  binding(args,host);
+  withStore(args.root,db=>{const s=db.read();owner(s,args.session_id,host,args.epoch);if(args.model_selection!==undefined&&s.plugin_version!==VERSION)throw new Error('Explicitly adopt the model-selection team before using model_selection');});
+  const catalog=args.model_selection?.mode==='explicit'?modelCatalog(host):null;
+  const selection=normalizeSelection(args.model_selection,host,catalog);
   const check=readiness(host);
   if (!check.available) throw new Error(check.error);
   if (check.authenticated===false) throw new Error(`${host} CLI is not signed in. Complete its normal login before starting specialists.`);
@@ -110,16 +118,20 @@ export function dispatch(args,host) {
     if(args.review_of && !target) throw new Error('Review target not found');
     const key=target ? `${args.role}:review:${target.id}:${target.revision}` : args.prototype_id ? `${args.role}:prototype:${jobId}` : args.development_id ? `${args.role}:development:${jobId}` : args.role;
     let session=s.sessions[key];
-    if(!session) session=s.sessions[key]={instance_id:id(args.role),role:args.role,native_id:null,host};
+    if(session && busy(s).some(j=>j.instance_id===session.instance_id)) throw new Error('This role session already has an assignment');
+    if(session && selectionKey(session.model_selection)!==selectionKey(selection)) {
+      (s.retired_sessions??=[]).push({...session,retired_at:stamp(),reason:'model_selection_changed'});session=null;
+    }
+    if(!session) session=s.sessions[key]={instance_id:id(args.role),role:args.role,native_id:null,host,model_selection:selection};
     if(target?.author_instance===session.instance_id) throw new Error('Authors cannot independently review their own artifact');
-    if(busy(s).some(j=>j.instance_id===session.instance_id)) throw new Error('This role session already has an assignment');
     if(session.host!==host) throw new Error('Role belongs to another host; perform company handover first');
     const inputs=args.input_ids??[];
     if(!Array.isArray(inputs) || inputs.some(k=>typeof k!=='string' || !Object.hasOwn(s.records,k))) throw new Error('An input record is missing');
-    const job={id:jobId,role:args.role,session_key:key,instance_id:session.instance_id,native_id:session.native_id,host,epoch:s.owner.epoch,status:'queued',task:args.task,inputs:inputs.map(k=>({id:k,revision:s.records[k].revision})),review_of:target?{id:target.id,revision:target.revision}:null,...(args.prototype_id?{prototype_id:args.prototype_id}:{}),...(args.development_id?{development_id:args.development_id}:{}),created_at:stamp()};
+    const job={id:jobId,role:args.role,session_key:key,instance_id:session.instance_id,native_id:session.native_id,host,epoch:s.owner.epoch,status:'queued',task:args.task,context_format:2,model_selection:selection,cli_version:check.version,task_summary:args.task_summary??null,next_handoff:args.next_handoff??null,...(catalog?{model_catalog:{source:catalog.source,model:catalog.models.find(m=>m.id===selection.model)}}:{}),inputs:inputs.map(k=>({id:k,revision:s.records[k].revision})),review_of:target?{id:target.id,revision:target.revision}:null,...(args.prototype_id?{prototype_id:args.prototype_id}:{}),...(args.development_id?{development_id:args.development_id}:{}),created_at:stamp()};
     prototypeAssignment(s,job,true);developmentAssignment(s,job,true);
     const context=assignmentContext(s,job);
     s.jobs[jobId]={...job,inputs:context.inputs,context_sha256:context.hash};
+    s.runtime_version=VERSION;
   });
   try {
     const worker=spawn(process.execPath,['--no-warnings',path.join(PACKAGE,'runtime/worker.mjs'),folder(args.root),jobId],{detached:true,stdio:'ignore',env:{...process.env,COMPANY_WORKER:'1'}});

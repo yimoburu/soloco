@@ -4,7 +4,9 @@ Run a virtual company through **one founder conversation**. Your Chief of Staff 
 
 The target is a company you can operate and improve over time, including a sustainably profitable one-person business with manageable founder workload. You define success; public launch and fundraising are optional milestones.
 
-**SoloCo v0.5.0 supports planning, review, and a bounded local development loop:** authorize selected source paths → generate candidate edits → execute constrained Node tests → inspect evidence → repair within limits → independent acceptance. Candidates are retained separately; the original checkout is unchanged. The older file-only prototype workflow remains available. Outreach, purchases, private-account access, source integration and production deployment are not supported. [SPEC.md](SPEC.md) remains the high-level contract.
+**SoloCo v0.6.0** adds task-specific specialist model/effort selection and a compact team activity view in your CoS conversation. Installing the package and adopting its team instructions are separate steps.
+
+SoloCo supports planning, review, and a bounded local development loop: authorize selected source paths → generate candidate edits → execute constrained Node tests → inspect evidence → repair within limits → independent acceptance. Candidates are retained separately; the original checkout is unchanged. The older file-only prototype workflow remains available. Outreach, purchases, private-account access, source integration and production deployment are not supported. [SPEC.md](SPEC.md) remains the high-level contract.
 
 ## Install once
 
@@ -53,6 +55,23 @@ Updates explain who is doing what, each assignment's verified status, and what h
 
 Use **one active environment at a time**. To switch, pause the company in the old chat, open the same folder in the other app, and ask to continue. The Chief of Staff performs the recorded handover; you do not rebrief the team. Records stay in `.company/`, outside the plugin cache. Uninstalling the plugin does not remove them.
 
+## See who is working, with the right model for the task
+
+The CoS chooses the lightest available model and reasoning effort that can meet the task's acceptance criteria, within your approved choices and limits. Routine formatting needs less than a difficult design or independent review. Choices consider the cost of retries and review, not just one call. Simple replies need no delegation. You still choose the CoS chat's own model in the host UI.
+
+At the start of substantive work, the CoS gives a compact update like this illustrative example:
+
+| Agent | Task | Status |
+|---|---|---|
+| Engineering | Implement the agreed change | Running |
+| QA | Review the result and test evidence | Planned; waits for Engineering |
+
+Actual updates use recorded runtime state. “Returned” means a result arrived; review and acceptance remain separate. Planned roles have not been started. Changes, failures and the next handoff are shown when useful, without repeating an unchanged roster.
+
+The runtime discovers Codex's advertised model choices; Claude uses documented `haiku`, `sonnet` and `opus` aliases where CLI controls are available. A catalog does not prove account entitlement. Each explicit request records the model, optional effort and reason. Changing model or effort, including a return to host default, starts a fresh specialist session while retaining company records and prior session references. Unsupported requests fail visibly; SoloCo does not silently substitute another model.
+
+Requested settings are separate from execution evidence. Codex's tested output does not identify the exact answering model; Claude can report cumulative session model usage, including internal calls. Effective effort remains unverified. Existing account billing applies; hard spending limits and measured cost savings are not implemented. Existing companies must explicitly adopt the v0.6.0 team to use model selection; installation alone preserves their pinned instructions and rules.
+
 ## Develop a local candidate
 
 Tell the Chief of Staff what you want changed and which project files it may inspect:
@@ -63,7 +82,7 @@ One authorization covers routine attempts in that scope. The company chooses its
 
 The result is an accepted, retained candidate directory under `.company/development/`, with source hashes, changes, actual test output and QA attribution. **Acceptance does not merge the candidate into your repository or update the installed plugin.** Test success is evidence for the reviewed criteria, not proof of all behavior. Pause/revoke requests cancellation; partial or uncertain runs remain held for inspection. Tests must fit the disclosed time/output limits.
 
-Existing companies must explicitly adopt the v0.5.0 team before using this capability. The high-level v0.18 contract is unchanged. Previously authorized file-only prototypes remain usable on supported v0.4.x pinned teams. Budget enforcement for external services, scheduled operations and model routing remain future work. See the [issue #1 follow-up](https://github.com/yimoburu/soloco/issues/1#issuecomment-6619395459) for the broader request.
+Local development requires an adopted v0.5.0 or v0.6.0 team and v0.18 governance. Existing v0.5.0 companies keep this capability without adopting new instructions. The high-level v0.18 contract is unchanged. Previously authorized file-only prototypes remain usable on supported v0.4.x pinned teams. Budget enforcement for external services and scheduled operations remain future work. See the [issue #1 follow-up](https://github.com/yimoburu/soloco/issues/1#issuecomment-6619395459) for the broader request.
 
 ## Create a local prototype
 
@@ -98,7 +117,7 @@ claude plugin uninstall company@ai-operated-startup --keep-data
 claude plugin install soloco --marketplace yimoburu/soloco
 ```
 
-Restart the app/session, trust SoloCo hooks, and reopen the **same company folder and founder chat**. Ask to verify SoloCo v0.5.0, open the existing company and resume preparation with its pinned team. If old project hooks remain, use the hook repair below before resuming. Hook bindings are recreated by an actual trusted lifecycle event; company records remain in `.company/`. A different chat needs an explicit handover. Schema-1 v0.1.0 companies still require the checked upgrade below; pending upgrades must be verified or recovered before resuming. Do not initialize another company or move records into plugin directories.
+Restart the app/session, trust SoloCo hooks, and reopen the **same company folder and founder chat**. Ask to verify the installed SoloCo version, open the existing company and resume preparation with its pinned team. If old project hooks remain, use the hook repair below before resuming. Hook bindings are recreated by an actual trusted lifecycle event; company records remain in `.company/`. A different chat needs an explicit handover. Schema-1 v0.1.0 companies still require the checked upgrade below; pending upgrades must be verified or recovered before resuming. Do not initialize another company or move records into plugin directories.
 
 ## Upgrade an existing company
 
@@ -111,7 +130,7 @@ codex plugin marketplace upgrade soloco
 codex plugin add soloco@soloco
 ```
 
-Then restart the desktop app and reopen the same founder chat. If `codex` is not on your PATH, use your installed Codex executable. Keep SoloCo hooks enabled/trusted. Ask the CoS to check `company_doctor` reports v0.5.0 and that `company_upgrade` is available before proceeding.
+Then restart the desktop app and reopen the same founder chat. If `codex` is not on your PATH, use your installed Codex executable. Keep SoloCo hooks enabled/trusted. Ask the CoS to check `company_doctor` reports the version you installed and that `company_upgrade` is available before proceeding.
 
 For a compatible company, ask to resume preparation with its existing pinned team and rules. No adoption rehearsal is needed. To adopt the new team instructions instead, tell your Chief of Staff:
 
@@ -119,7 +138,7 @@ For a compatible company, ask to resume preparation with its existing pinned tea
 
 The CoS inspects compatibility, pauses/reconciles assignments, and starts a fresh CoS rehearsal and independent QA review. After they pass, it adopts the candidate, verifies preserved records, reloads its instructions, and resumes preparation. Specialist sessions restart on demand from company records; you do not rebrief them. If you use a new chat, explicitly ask it to take over this company as part of the upgrade.
 
-This release supports checked upgrades from v0.1.0 preparation companies and operates existing schema-2 companies from v0.2.0/v0.2.1/v0.2.2/v0.3.0/v0.3.1/v0.4.0/v0.4.1 without a forced team upgrade. Explicit team adoption still runs the checks, with full checkpoints up to 300,000 characters. Governance remains pinned by default; adopting the v0.18 contract requires explicit direction after reviewing its differences. Older governance may block a preparation upgrade on execution-level qualification requirements; the CoS must show that hold and ask before adopting the new, limited preparation-upgrade contract. Failed or stale checks hold the upgrade. Ask the CoS to recover the previous team if needed: recovery retains later company facts and uses the new runtime with the prior definitions, not the old plugin binary. After migration, v0.1.0 cannot resume the schema-2 company. Upgrade checks make two model calls using your normal host account.
+This release supports checked upgrades from v0.1.0 preparation companies and operates existing schema-2 companies from v0.2.0/v0.2.1/v0.2.2/v0.3.0/v0.3.1/v0.4.0/v0.4.1/v0.5.0 without a forced team upgrade. Explicit team adoption still runs the checks, with full checkpoints up to 300,000 characters. Governance remains pinned by default; adopting the v0.18 contract requires explicit direction after reviewing its differences. Older governance may block a preparation upgrade on execution-level qualification requirements; the CoS must show that hold and ask before adopting the new, limited preparation-upgrade contract. Failed or stale checks hold the upgrade. Ask the CoS to recover the previous team if needed: recovery retains later company facts and uses the new runtime with the prior definitions, not the old plugin binary. After migration, v0.1.0 cannot resume the schema-2 company. Upgrade checks make two model calls using your normal host account.
 
 ## Repair stale Codex hooks
 
@@ -137,7 +156,8 @@ Subsequent upgrades use the bundled hooks and a release-generated MCP launcher, 
 
 ## What is verified
 
-- v0.5.0: **114 automated tests pass, zero skips** on the tested macOS host. This includes actual sandbox execution and adversarial isolation checks, scoped repairs, pause/revoke, receipt provenance, stale-result rejection and independent acceptance. Specialist outputs in this suite are synthetic.
+- v0.6.0: **127 automated tests pass, zero skips** on the tested macOS host, including real sandbox isolation, model/effort/default session changes, preserved identities, stale assignment rejection and truthful activity. Selected-model execution tests use synthetic CLIs; live selected-model inference and desktop presentation remain unverified. Read-only discovery returned eight visible Codex model choices. Native Codex hook/version discovery, Claude local package/marketplace validation and CoS skill validation pass. Claude's separate public-directory checks report the repository's missing license and icon; directory submission is outside this update.
+- Historical v0.5.0: **114 automated tests pass, zero skips** on the tested macOS host. This includes actual sandbox execution and adversarial isolation checks, scoped repairs, pause/revoke, receipt provenance, stale-result rejection and independent acceptance. Specialist outputs in this suite are synthetic.
 - Live v0.5.0 Codex: separate native Engineering and QA sessions completed candidate generation → sandboxed Node tests → exact-receipt acceptance in a disposable fixture; the original source stayed unchanged. An earlier incomplete QA response was correctly refused, then the prompt was corrected and a fresh trial passed. Native hook/version discovery and Claude package validation also pass. This does not verify desktop UI flows or live Claude development.
 
 - Historical v0.4.1: **84 automated tests pass**, including deterministic prototype tests for exact authorization, isolated generation/review, path and fixture enforcement, bounded repairs, stale/expired/revoked work, handover, and partial-write recovery. Detached prototype/QA process tests pass on both host adapters using synthetic CLIs and model outputs; live model and desktop prototype acceptance remain unverified. That release did not execute generated tests.
@@ -155,9 +175,9 @@ Subsequent upgrades use the bundled hooks and a release-generated MCP launcher, 
 - Automated tests cover bounded context, compatible runtime patches, hooks, records, independent review, concurrent updates, pause, stale-result quarantine, handover, notices, and actual subprocess dispatch. Upgrade tests use synthetic Codex/Claude CLIs to exercise separate rehearsal/reviewer processes, adoption, verification, and recovery; they do not prove live model judgments.
 - Automatic private Node setup was tested on macOS ARM64.
 
-Tested CLIs: Codex `0.166.0-alpha.5.1`, Claude Code `2.1.301`. Claude’s live model test was blocked by its CLI being signed out. Desktop installation/first-chat behavior and other operating systems still need live acceptance; package validation and hook tests do not prove those UI flows.
+v0.6.0 metadata/package checks used Codex `0.166.0-alpha.5.1` and Claude Code `2.1.318`. Earlier checks used Claude `2.1.301`, whose live model test was blocked by sign-in. No live selected-model inference was run for v0.6.0. Desktop installation/first-chat behavior and other operating systems still need live acceptance; package validation and hook tests do not prove those UI flows.
 
-Required notices are stored durably and presented on an open chat’s next turn. Background delivery, external-action enforcement, per-assignment model selection, arbitrary future-version migration, and automatic placement of specialists in the desktop sidebar are not implemented. Host permissions still apply; the local record store is not a security boundary against software running as you.
+Required notices are stored durably and presented on an open chat’s next turn. Background delivery, external-action enforcement, hard model-spending limits, arbitrary future-version migration, and automatic placement of specialists in the desktop sidebar are not implemented. Host permissions still apply; the local record store is not a security boundary against software running as you.
 
 ## Development
 

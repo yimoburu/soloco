@@ -51,7 +51,7 @@ ${target?`Independent review of artifact ${target.id}, revision ${target.revisio
 Return one JSON object only: {"content":"your substantive artifact or review","messages":[{"to":"role_id","content":"optional direct peer question or handoff"}],"notices":[{"kind":"must_know or decision_required","summary":"only something the founder must receive"}]${target?',"review":'+JSON.stringify(reviewShape):''}${(job.prototype_id||job.development_id)?',"files":[{"path":"permitted non-fixture path","content":"complete file content"}]':''}}. Every review field shown is required, inside review; preserve exact supplied hashes and choose one verdict/action. List unmet conditions in blockers. For blocked generation replace files with blocked:"reason". Messages and notices may be empty arrays. Do not wrap the JSON in prose.`;
     const dir=path.join(dataDir(),'sessions',job.instance_id);
     noLink(dir);fs.mkdirSync(dir,{recursive:true,mode:0o700});
-    output=await model(job.host,job.native_id,prompt,dir);
+    output=await model(job.host,job.native_id,prompt,dir,180000,job.model_selection??null);
     if(!output.native_id) throw new Error('Host returned no resumable session identity');
     artifact=parseArtifact(output.text);
     validateEnvelope(artifact,state.roles);
@@ -68,6 +68,7 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
       const artifactId=id(stale?'quarantined':'artifact');
       s.records[artifactId]={id:artifactId,kind:target?'review':'artifact',content:artifact.content,author_role:job.role,author_instance:job.instance_id,revision:1,status:stale?'Quarantined':'Submitted',job_id:job.id,inputs:job.inputs,review_of:job.review_of,review:artifact.review??null,...(bundle?{prototype:bundle}:{}),...(development?{development}:{}),...(stale && artifact.files?{quarantined_files:artifact.files}:{}),created_at:stamp()};
       current.status=stale?'quarantined':'completed';current.artifact_id=artifactId;current.finished_at=stamp();current.native_id=output.native_id;
+      current.model_evidence=output.model_evidence??{reported_models:[],reported_effort:null,verification:'unverified',source:'not_reported',scope:'unknown'};
       if(stale) {notice(s,'must_know','A late or stale result was quarantined; it grants no approval.',artifactId);return s;}
       s.sessions[job.session_key].native_id=output.native_id;
       for(const m of artifact.messages??[]) {
@@ -86,6 +87,7 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
       if(current && ['queued','running'].includes(current.status)) {
         current.status='failed';current.error=error.message;current.finished_at=stamp();
         if(output?.native_id)current.native_id=output.native_id;
+        if(output?.model_evidence)current.model_evidence=output.model_evidence;
         if(artifact) {
           const rejected=JSON.stringify(artifact);
           current.rejected_output={text:rejected.slice(0,100000),truncated:rejected.length>100000,author_instance:job.instance_id,context_sha256:context?.hash,reason:error.message};

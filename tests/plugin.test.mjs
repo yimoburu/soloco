@@ -8,8 +8,8 @@ import { withStore, id, VERSION, teamHash, digest } from '../plugins/soloco/runt
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
 import { hook, call } from '../plugins/soloco/runtime/main.mjs';
 import { work } from '../plugins/soloco/runtime/worker.mjs';
-import { assignmentContext } from '../plugins/soloco/runtime/context.mjs';
-import { commandArgs, parseOutput } from '../plugins/soloco/runtime/adapters.mjs';
+import { assignmentContext, contextMatches } from '../plugins/soloco/runtime/context.mjs';
+import { commandArgs, parseOutput, modelCatalog } from '../plugins/soloco/runtime/adapters.mjs';
 
 const base=fs.mkdtempSync(path.join(os.tmpdir(),'company-test-'));
 process.env.COMPANY_PLUGIN_DATA=path.join(base,'cache');
@@ -138,7 +138,8 @@ test('adapters preserve explicit native IDs without permission bypass flags',()=
   assert.ok(commandArgs('codex','native-123').includes('native-123'));
   assert.ok(commandArgs('claude','native-123').includes('--resume'));
   assert.ok(!JSON.stringify(commandArgs('codex')).includes('dangerously'));
-  assert.deepEqual(parseOutput('codex','{"type":"thread.started","thread_id":"n"}\n{"type":"item.completed","item":{"type":"agent_message","text":"ok"}}'),{native_id:'n',text:'ok'});
+  const parsed=parseOutput('codex','{"type":"thread.started","thread_id":"n"}\n{"type":"item.completed","item":{"type":"agent_message","text":"ok"}}');
+  assert.equal(parsed.native_id,'n');assert.equal(parsed.text,'ok');assert.equal(parsed.model_evidence.verification,'unverified');
   assert.throws(()=>parseOutput('claude','{"is_error":true,"result":"not signed in"}'),/not signed in/);
 });
 test('real stdio MCP initializes and lists tools without creating company state',async()=>{
@@ -377,4 +378,154 @@ test('SoloCo can rebind the same founder chat after a plugin cache replacement',
     engine.control({...a,action:'resume',expected_epoch:1,source_instruction:'Continue the same company'},'codex');
     assert.equal(engine.status(a,'codex').paused,false);
   } finally {process.env.COMPANY_PLUGIN_DATA=oldCache;}
+});
+
+// Every executable below is a synthetic CLI in a disposable directory; no
+// account or real model is contacted by the model-routing integration checks.
+function selectionHost() {
+  const bin=fs.mkdtempSync(path.join(base,'selection-bin-')),log=path.join(bin,'calls.jsonl');
+  fs.writeFileSync(path.join(bin,'codex'),`#!${process.execPath}
+import fs from 'node:fs';
+import readline from 'node:readline';
+import {randomUUID} from 'node:crypto';
+const args=process.argv.slice(2);
+if(args.includes('--version'))console.log('codex-cli selection-test');
+else if(args.includes('--help'))console.log('--ignore-user-config --json --sandbox --model --config');
+else if(args[0]==='login')console.log('signed in');
+else if(args[0]==='app-server') {
+ const send=value=>process.stdout.write(JSON.stringify(value)+'\\n');
+ const lines=readline.createInterface({input:process.stdin});
+ for await(const line of lines) {
+  const m=JSON.parse(line);
+  if(m.method==='initialize')send({id:m.id,result:{userAgent:'synthetic'}});
+  if(m.method==='model/list')send({id:m.id,result:{data:[
+   {id:'small',model:'test-small',displayName:'Small',hidden:false,supportedReasoningEfforts:[{reasoningEffort:'low'},{reasoningEffort:'medium'}],defaultReasoningEffort:'low',isDefault:true},
+   {id:'review',model:'test-review',displayName:'Review',hidden:false,supportedReasoningEfforts:[{reasoningEffort:'medium'},{reasoningEffort:'high'},{reasoningEffort:'ultra'}],defaultReasoningEffort:'medium'},
+   {id:'denied',model:'test-unavailable',displayName:'Unavailable at inference',hidden:false,supportedReasoningEfforts:[{reasoningEffort:'low'}],defaultReasoningEffort:'low'},
+   {id:'hidden',model:'test-hidden',displayName:'Internal',hidden:true,supportedReasoningEfforts:[{reasoningEffort:'low'}],defaultReasoningEffort:'low'}
+  ],nextCursor:null}});
+ }
+} else {
+ let prompt='';for await(const c of process.stdin)prompt+=c;
+ fs.appendFileSync(${JSON.stringify(log)},JSON.stringify({args,cwd:process.cwd()})+'\\n');
+ if(args[args.indexOf('--model')+1]==='test-unavailable'){console.error('Selected model unavailable');process.exit(1);}
+ const file='.native-id';const native=fs.existsSync(file)?fs.readFileSync(file,'utf8'):randomUUID();fs.writeFileSync(file,native);
+ console.log(JSON.stringify({type:'thread.started',thread_id:native}));
+ const review=prompt.includes('Independent review of artifact')?{review:{verdict:'Pass',reason:'Synthetic review of supplied artifact'}}:{};
+ console.log(JSON.stringify({type:'item.completed',item:{type:'agent_message',text:JSON.stringify({content:'Synthetic selected-model artifact',messages:[],notices:[],...review})}}));
+}
+`,{mode:0o700});
+  return {bin,log};
+}
+async function selectionRun(a,extra={}) {
+  const j=engine.dispatch({...a,role:'pm',task:'Prepare a scope with unchanged authority',task_summary:'Prepare the bounded scope',next_handoff:'Engineering checks the proposal',...extra},'codex');
+  for(let i=0;i<200;i++) {
+    await new Promise(r=>setTimeout(r,30));
+    const s=engine.status(a,'codex'),job=s.jobs.find(v=>v.id===j.id);
+    if(!['queued','running'].includes(job.status))return {job,state:s,artifact:s.records.find(r=>r.id===job.artifact_id)};
+  }
+  throw new Error('Synthetic selection worker did not finish');
+}
+const selected=(extra={})=>({mode:'explicit',model:'test-small',effort:'low',reason:'Clear scoped preparation task',...extra});
+
+test('model catalog uses advertised choices and never offers hidden internal models',()=>{
+  const fake=selectionHost(),oldPath=process.env.PATH;process.env.PATH=fake.bin+path.delimiter+oldPath;
+  try {
+    const catalog=modelCatalog('codex',{refresh:true});
+    assert.equal(catalog.supported,true,catalog.error);assert.equal(catalog.source,'host_catalog');
+    assert.deepEqual(catalog.models.map(m=>m.id).sort(),['test-review','test-small','test-unavailable']);
+    assert.deepEqual(catalog.models.find(m=>m.id==='test-review').supported_efforts,['medium','high','ultra']);
+    assert.equal(catalog.account_availability,'unverified');assert.equal(fs.existsSync(fake.log),false);
+  } finally {process.env.PATH=oldPath;}
+});
+
+test('selected dispatch reaches the host, rotates on model/effort/reset, retains history and keeps reviewers independent',async()=>{
+  const fake=selectionHost(),oldPath=process.env.PATH;process.env.PATH=fake.bin+path.delimiter+oldPath;
+  try {
+    const a=setup(),first=await selectionRun(a,{model_selection:selected()});
+    assert.equal(first.job.status,'completed',first.job.error);assert.equal(first.job.context_format,2);
+    assert.equal(first.job.model_selection.model,'test-small');assert.equal(first.job.cli_version,'codex-cli selection-test');
+    assert.equal(first.job.model_evidence.verification,'unverified');assert.deepEqual(first.job.model_evidence.reported_models,[]);
+    const same=await selectionRun(a,{model_selection:selected({reason:'Different explanation, same settings'})});
+    assert.equal(same.job.status,'completed',same.job.error);assert.equal(same.job.instance_id,first.job.instance_id);assert.equal(same.job.native_id,first.job.native_id);
+    const effort=await selectionRun(a,{model_selection:selected({effort:'medium'})});
+    assert.equal(effort.job.status,'completed',effort.job.error);assert.notEqual(effort.job.instance_id,first.job.instance_id);assert.notEqual(effort.job.native_id,first.job.native_id);
+    const model=await selectionRun(a,{model_selection:selected({model:'test-review',effort:'medium'})});
+    assert.equal(model.job.status,'completed',model.job.error);assert.notEqual(model.job.instance_id,effort.job.instance_id);assert.notEqual(model.job.native_id,effort.job.native_id);
+    const reset=await selectionRun(a,{model_selection:{mode:'default',reason:'Return this role to the host default'}});
+    assert.equal(reset.job.status,'completed',reset.job.error);assert.notEqual(reset.job.instance_id,model.job.instance_id);assert.notEqual(reset.job.native_id,model.job.native_id);
+    const defaultAgain=await selectionRun(a);assert.equal(defaultAgain.job.native_id,reset.job.native_id);
+    const stored=withStore(a.root,db=>db.read());
+    assert.ok(stored.retired_sessions.some(s=>s.native_id===first.job.native_id));
+    assert.ok(stored.retired_sessions.some(s=>s.native_id===effort.job.native_id));
+    assert.ok(stored.retired_sessions.some(s=>s.native_id===model.job.native_id));
+    const review=await selectionRun(a,{role:'qa',review_of:first.artifact.id,model_selection:selected({model:'test-review',effort:'high'})});
+    assert.equal(review.job.status,'completed',review.job.error);assert.notEqual(review.job.native_id,first.job.native_id);assert.notEqual(review.job.instance_id,first.job.instance_id);
+    const calls=fs.readFileSync(fake.log,'utf8').trim().split('\n').map(JSON.parse);
+    assert.equal(calls[0].args[calls[0].args.indexOf('--model')+1],'test-small');
+    assert.ok(calls[0].args.includes('model_reasoning_effort="low"'));
+    assert.ok(calls[1].args.includes('resume'));assert.ok(calls[2].args.includes('model_reasoning_effort="medium"'));
+    assert.equal(calls[3].args[calls[3].args.indexOf('--model')+1],'test-review');
+    assert.ok(!calls[4].args.includes('--model'));assert.ok(!calls[4].args.some(v=>v.startsWith('model_reasoning_effort=')));
+    const activity=review.state.activity.find(row=>row.job_id===first.job.id);
+    assert.equal(activity.status,'returned');assert.equal(activity.requested_model,'test-small');
+    assert.equal(activity.model_evidence.verification,'unverified');assert.equal(activity.next_handoff.status,'planned');
+  } finally {process.env.PATH=oldPath;}
+});
+
+test('unsupported and unavailable selected models fail visibly without fallback or stray calls',async()=>{
+  const fake=selectionHost(),oldPath=process.env.PATH;process.env.PATH=fake.bin+path.delimiter+oldPath;
+  try {
+    const a=setup();
+    for(const model of ['test-hidden','not-advertised'])assert.throws(()=>engine.dispatch({...a,role:'pm',task:'No inference permitted',model_selection:selected({model})},'codex'),/choice|advertised|model/i);
+    assert.equal(fs.existsSync(fake.log),false);assert.equal(engine.status(a,'codex').jobs.length,0);
+    const unavailable=await selectionRun(a,{model_selection:selected({model:'test-unavailable'})});
+    assert.equal(unavailable.job.status,'failed');assert.match(unavailable.job.error,/unavailable|no completed artifact/i);
+    assert.equal(unavailable.state.records.length,0);assert.equal(unavailable.state.notices.length,1);
+    assert.equal(fs.readFileSync(fake.log,'utf8').trim().split('\n').length,1);
+    assert.equal(unavailable.state.activity[0].status,'failed');
+  } finally {process.env.PATH=oldPath;}
+});
+
+test('pinned v0.5.0 preserves prior local capabilities but does not silently adopt selected-model behavior',()=>{
+  const fake=selectionHost(),oldPath=process.env.PATH;process.env.PATH=fake.bin+path.delimiter+oldPath;
+  try {
+    const a=setup();withStore(a.root,db=>db.transaction('test.pin_prior_team',s=>{s.plugin_version='0.5.0';s.runtime_version='0.5.0';s.team_sha256=teamHash(s);return s;}));
+    const before=engine.status(a,'codex');assert.equal(before.capabilities.local_prototype.eligible,true);
+    assert.doesNotMatch(before.capabilities.local_development.blocker??'',/adopt|team|governance/i);
+    assert.throws(()=>engine.dispatch({...a,role:'pm',task:'Must preserve pinned instructions',model_selection:selected()},'codex'),/adopt|pinned|team/i);
+    assert.equal(engine.status(a,'codex').jobs.length,0);assert.equal(fs.existsSync(fake.log),false);
+    assert.equal(engine.open(a,'codex').plugin_version,'0.5.0');
+  } finally {process.env.PATH=oldPath;}
+});
+
+test('worker forwards the exact recorded selection and preserves separately attributed model evidence',async()=>{
+  const a=setup(),j=queued(a),choice=selected();
+  withStore(a.root,db=>db.transaction('test.selected_job',s=>{Object.assign(s.jobs[j],{model_selection:choice,context_format:2,cli_version:'test-cli',task_summary:'Visible task',next_handoff:'QA review'});return s;}));
+  const evidence={reported_models:['provider-model'],reported_effort:null,verification:'host_reported',source:'result.modelUsage',scope:'session_cumulative_including_internal_calls'};
+  await work(a.root,j,async(...args)=>{assert.deepEqual(args[5],choice);return {...result(),model_evidence:evidence};});
+  const s=engine.status(a,'codex'),job=s.jobs.find(v=>v.id===j);
+  assert.equal(job.status,'completed',job.error);assert.deepEqual(job.model_evidence,evidence);
+  assert.equal(job.model_selection.model,'test-small');assert.equal(job.cli_version,'test-cli');
+  const activity=s.activity.find(v=>v.job_id===j);assert.equal(activity.task,'Visible task');assert.equal(activity.requested_model,'test-small');
+  assert.deepEqual(activity.model_evidence.reported_models,['provider-model']);
+});
+
+test('new assignment hashes bind selection and task metadata; legacy hashes remain compatible',async()=>{
+  const a=setup(),j=queued(a),state=withStore(a.root,db=>db.read()),legacy=state.jobs[j];
+  const oldHash=assignmentContext(state,legacy).hash;
+  assert.equal(assignmentContext(state,{...legacy,task:'Changed old task'}).hash,oldHash);
+  const current={...legacy,context_format:2,model_selection:selected(),task_summary:'Short task',next_handoff:'QA review'};
+  state.jobs[j]=current;const hash=assignmentContext(state,current).hash;
+  for(const changes of [{task:'Changed full task'},{task_summary:'Changed display task'},{next_handoff:'Changed handoff'},{model_selection:selected({effort:'medium'})},{model_catalog:{source:'invented',model:{id:'test-small'}}}]) {
+    const changed={...current,...changes},view={...state,jobs:{...state.jobs,[j]:changed}};
+    assert.equal(contextMatches(view,current,hash),false);
+  }
+  assert.equal(contextMatches({...state,jobs:{...state.jobs,[j]:{...current,status:'completed',finished_at:new Date().toISOString(),model_evidence:{verification:'unverified'}}}},current,hash),true);
+  for(const mutate of [job=>job.task='Changed full task',job=>job.model_selection.effort='medium']) {
+    const b=setup(),jid=queued(b);
+    withStore(b.root,db=>db.transaction('test.pin_selection',s=>{Object.assign(s.jobs[jid],{context_format:2,model_selection:selected()});s.jobs[jid].context_sha256=assignmentContext(s,s.jobs[jid]).hash;mutate(s.jobs[jid]);return s;}));
+    let calls=0;await work(b.root,jid,async()=>{calls++;return result();});
+    const job=engine.status(b,'codex').jobs.find(v=>v.id===jid);assert.equal(calls,0);assert.equal(job.status,'failed');
+  }
 });

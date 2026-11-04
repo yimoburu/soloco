@@ -31,6 +31,7 @@ export function assignmentContext(state, job) {
     governance: state.governance, charter: state.roles[job.role], records,
     notices: state.notices.filter(n => !n.resolution).map(({deliveries, seen_at, ...n}) => n),
     messages: state.messages.filter(m => m.to === job.role),
+    ...(job.context_format===2?{assignment:{task:job.task,task_summary:job.task_summary??null,next_handoff:job.next_handoff??null,model_selection:job.model_selection??{mode:'default'},model_catalog:job.model_catalog??null}}:{}),
   };
   const text = JSON.stringify(pack);
   if (text.length > CONTEXT_LIMIT) throw new Error('Assignment context exceeds 200000 characters; narrow the assignment or review and compact records. Nothing was truncated');
@@ -42,7 +43,7 @@ export function contextMatches(state, job, hash) {
     // A job's published notices/messages are outputs, not changes to its inputs.
     // They remain in the real state and every subsequent assignment's context.
     const view={...state,notices:state.notices.filter(n=>n.job_id!==job.id),messages:state.messages.filter(m=>m.job_id!==job.id)};
-    return assignmentContext(view, job).hash === hash;
+    return assignmentContext(view, state.jobs[job.id]??job).hash === hash;
   }
   catch { return false; }
 }
