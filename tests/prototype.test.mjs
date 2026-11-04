@@ -8,7 +8,7 @@ import { id, withStore, teamHash, digest, installedTeam } from '../plugins/soloc
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
 import { call, hook } from '../plugins/soloco/runtime/main.mjs';
 import { work } from '../plugins/soloco/runtime/worker.mjs';
-import { prototypeAssignment } from '../plugins/soloco/runtime/prototype.mjs';
+import { prototypeAssignment, prototypeCapability } from '../plugins/soloco/runtime/prototype.mjs';
 import { assignmentContext } from '../plugins/soloco/runtime/context.mjs';
 import { upgrade, rehearse } from '../plugins/soloco/runtime/upgrade.mjs';
 
@@ -210,7 +210,16 @@ test('old pinned teams or preserved governance disclose blockers rather than sil
     assert.throws(()=>plan(a),/Pinned/);assert.deepEqual(read(a).records,before.records);
     assert.match(hook({cwd:a.root,session_id:a.session_id,hook_event_name:'SessionStart'},'codex').hookSpecificOutput.additionalContext,/blocker/);
   }
-  assert.ok(installedTeam().governance.includes('Bounded local prototype files'));
+});
+test('contract simplification retains known prototype governance without allowing unknown rules or teams',()=>{
+  const previous='5f0699c046128d71a42731acdfddaaab4b911361521015def133adcfbdb8fcb9';
+  for(const plugin_version of ['0.4.0',installedTeam().plugin_version]) {
+    for(const governance_sha256 of [previous,installedTeam().governance_sha256])
+      assert.equal(prototypeCapability({plugin_version,governance_sha256}).eligible,true);
+    assert.equal(prototypeCapability({plugin_version,governance_sha256:digest('Unknown rules')}).eligible,false);
+  }
+  for(const plugin_version of ['0.3.1','99.0.0'])
+    assert.equal(prototypeCapability({plugin_version,governance_sha256:previous}).eligible,false);
 });
 test('MCP prototype endpoint validates scope and preserves startup binding and ownership checks',async()=>{
   const a=setup();const s=await call('company_prototype',{...a,action:'inspect'},'codex');assert.equal(s.capability.eligible,true);

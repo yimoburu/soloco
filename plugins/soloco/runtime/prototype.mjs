@@ -12,9 +12,11 @@ export const prototypeLimits = Object.freeze({
   max_files:32, max_total_bytes:LIMIT,
 });
 export function prototypeCapability(s) {
-  const blocker = !s ? null : s.plugin_version !== '0.4.0'
-    ? 'Pinned team is preparation-only. Explicitly adopt the installed team and governance before requesting prototype authorization.'
-    : s.governance_sha256 !== installedTeam().governance_sha256
+  // v0.17 shipped with 0.4.0; this contract-only update preserves its file workflow.
+  const supportedGovernance=[installedTeam().governance_sha256,'5f0699c046128d71a42731acdfddaaab4b911361521015def133adcfbdb8fcb9'];
+  const blocker = !s ? null : !['0.4.0',VERSION].includes(s.plugin_version)
+    ? 'Pinned team does not support this prototype workflow. Explicitly adopt a supported team and governance before requesting prototype authorization.'
+    : !supportedGovernance.includes(s.governance_sha256)
       ? 'Pinned governance does not support this prototype contract. Review and explicitly adopt the installed governance; more reviews cannot enable it.' : null;
   return {supported:true, eligible:s ? !blocker : null, blocker, limits:prototypeLimits};
 }
