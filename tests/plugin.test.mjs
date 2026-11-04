@@ -239,7 +239,7 @@ test('same chat cannot reuse a revoked epoch after a handover',()=>{
 
 
 test('compatible runtime patches preserve pinned team, ownership and native sessions without adoption',async()=>{
-  for(const version of ['0.2.0','0.2.1','0.2.2','0.3.0','0.3.1','0.4.0','0.4.1']) {
+  for(const version of ['0.2.0','0.2.1','0.2.2','0.3.0','0.3.1','0.4.0','0.4.1','0.5.0','0.6.0']) {
     const a=setup();
     withStore(a.root,db=>db.transaction('test.old_patch',s=>{
       s.plugin_version=version;s.runtime_version=version;
@@ -532,6 +532,23 @@ test('pinned v0.5.0 preserves prior local capabilities but does not silently ado
     assert.throws(()=>engine.dispatch({...a,role:'pm',task:'Must preserve pinned instructions',model_selection:selected()},'codex'),/adopt|pinned|team/i);
     assert.equal(engine.status(a,'codex').jobs.length,0);assert.equal(fs.existsSync(fake.log),false);
     assert.equal(engine.open(a,'codex').plugin_version,'0.5.0');
+  } finally {process.env.PATH=oldPath;}
+});
+
+test('pinned v0.6.0 retains selection and local capabilities after a compatible runtime update',async()=>{
+  const fake=selectionHost(),oldPath=process.env.PATH;process.env.PATH=fake.bin+path.delimiter+oldPath;
+  try {
+    const a=setup();withStore(a.root,db=>db.transaction('test.pin_v060',s=>{s.plugin_version='0.6.0';s.runtime_version='0.6.0';s.cos_instructions='Preserve pinned v0.6.0 instructions';s.team_sha256=teamHash(s);return s;}));
+    const before=engine.open(a,'codex');
+    assert.equal(before.capabilities.model_selection.eligible,true);
+    assert.equal(before.capabilities.local_prototype.eligible,true);
+    assert.doesNotMatch(before.capabilities.local_development.blocker??'',/adopt|team|governance/i);
+    const run=await selectionRun(a,{model_selection:selected()});
+    assert.equal(run.job.status,'completed',run.job.error);
+    const after=engine.open(a,'codex');
+    assert.equal(after.company_id,before.company_id);assert.equal(after.plugin_version,'0.6.0');
+    assert.equal(after.cos_instructions,before.cos_instructions);assert.equal(after.governance,before.governance);
+    assert.equal(after.owner.epoch,before.owner.epoch);
   } finally {process.env.PATH=oldPath;}
 });
 

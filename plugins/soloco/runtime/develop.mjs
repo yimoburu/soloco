@@ -9,7 +9,7 @@ import { sandboxCapability, runLocalTests } from './local-sandbox.mjs';
 // A supported local executor, not a general permission to operate a business.
 export function developmentCapability(s) {
   const executor=sandboxCapability();
-  const blocker=!executor.supported ? executor.blocker : s && (!['0.5.0',VERSION].includes(s.plugin_version) || s.governance_sha256!==installedTeam().governance_sha256)
+  const blocker=!executor.supported ? executor.blocker : s && (!['0.5.0','0.6.0',VERSION].includes(s.plugin_version) || s.governance_sha256!==installedTeam().governance_sha256)
     ? 'Explicitly adopt the installed development-capable team and compatible governance first' : null;
   return {supported:executor.supported,eligible:s ? !blocker : null,blocker,executor,
     output:'Retained, independently reviewable local candidate; original source is unchanged',

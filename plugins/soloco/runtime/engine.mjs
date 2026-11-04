@@ -8,6 +8,7 @@ import { normalizeSelection, selectionKey, activityFor } from './selection.mjs';
 import { assignmentContext } from './context.mjs';
 import { developmentAction, developmentCapability, developmentAssignment } from './develop.mjs';
 import { prototypeAction, prototypeCapability, prototypeAssignment } from './prototype.mjs';
+import { TIMEOUT_POLICY_VERSION, normalizeTimeout, jobTimeoutState } from './timeout.mjs';
 
 const busy = state => Object.values(state.jobs).filter(j => ['queued','running'].includes(j.status));
 export function dataDir() {
@@ -32,7 +33,12 @@ export function upgradeSummary(u) {
   return {...progress,candidate_version:candidate.plugin_version,previous_version:previous.plugin_version};
 }
 function summary(state) {
-  return {company_id:state.id, name:state.name, idea:state.idea, revision:state.revision, phase:state.phase, mode:state.mode, paused:state.paused, owner:state.owner, plugin_version:state.plugin_version, runtime_version:state.runtime_version??state.plugin_version, executing_runtime_version:VERSION, upgrade:upgradeSummary(state.upgrade), governance_sha256:state.governance_sha256, records:Object.values(state.records), sessions:state.sessions, jobs:Object.values(state.jobs), activity:activityFor(state), notices:state.notices.filter(n=>!n.resolution), messages:state.messages, capabilities:{standalone_sessions:true, model_selection:{eligible:state.plugin_version===VERSION,catalog:'company_doctor.models',coordinator_model:'Host UI controlled; no automatic switching',billing:'Existing host account; no hard spending enforcement'},local_prototype:prototypeCapability(state), local_development:developmentCapability(state), external_execution:false, background_founder_delivery:false, automatic_team_migration:false, explicit_team_upgrade:true}};
+  const activity=activityFor(state).map(item=>{
+    const job=state.jobs[item.job_id];
+    if(!job || job.kind==='development_test' || job.type==='development_test')return item;
+    return {...item,timeout:{policy_version:job.timeout_policy_version??null,timeout_ms:job.timeout_ms??null,reason:job.timeout_reason??null,execution_started_at:job.execution_started_at??null,execution_deadline_at:job.execution_deadline_at??null,state:jobTimeoutState(job,Date.now()),reconciliation:job.timeout_reconciliation??null,failure:job.execution_failure??null}};
+  });
+  return {company_id:state.id, name:state.name, idea:state.idea, revision:state.revision, phase:state.phase, mode:state.mode, paused:state.paused, owner:state.owner, plugin_version:state.plugin_version, runtime_version:state.runtime_version??state.plugin_version, executing_runtime_version:VERSION, upgrade:upgradeSummary(state.upgrade), governance_sha256:state.governance_sha256, records:Object.values(state.records), sessions:state.sessions, jobs:Object.values(state.jobs), activity, notices:state.notices.filter(n=>!n.resolution), messages:state.messages, capabilities:{standalone_sessions:true, model_selection:{eligible:['0.6.0',VERSION].includes(state.plugin_version),catalog:'company_doctor.models',coordinator_model:'Host UI controlled; no automatic switching',billing:'Existing host account; no hard spending enforcement'},local_prototype:prototypeCapability(state), local_development:developmentCapability(state), external_execution:false, background_founder_delivery:false, automatic_team_migration:false, explicit_team_upgrade:true}};
 }
 export function develop(args,host) { binding(args,host); return developmentAction(args,host); }
 export function prototype(args,host) { binding(args,host); return prototypeAction(args,host); }
@@ -57,9 +63,16 @@ export function status(args, host) {
   return withStore(args.root, db => {
     let state=db.read();
     if (!state) throw new Error('Company initialization is incomplete; use company_open');
-    const expired=busy(state).filter(j=>Date.now()-Date.parse(j.created_at)>240000);
-    if (expired.length) state=db.transaction('jobs.interrupted', s=>{
-      for (const job of expired) {s.jobs[job.id].status='interrupted'; notice(s,'must_know','A role session did not finish; inspect before retrying.',job.id);}
+    const needsReconciliation=j=>['overdue','inspection'].includes(jobTimeoutState(j,Date.now()).state);
+    if (busy(state).some(needsReconciliation)) state=db.transaction('jobs.interrupted', s=>{
+      for (const job of busy(s)) {
+        const timing=jobTimeoutState(job,Date.now());
+        if(!['overdue','inspection'].includes(timing.state))continue;
+        job.status='interrupted';job.finished_at=stamp();
+        job.timeout_reconciliation={...timing,at:stamp(),termination_confirmed:false};
+        job.error=timing.state==='inspection'?'Assignment timing requires inspection: '+timing.reason:`Assignment ${timing.phase} deadline exceeded; process termination is unverified`;
+        notice(s,'must_know',job.error+'; inspect before retrying.',job.id);
+      }
       return s;
     });
     const interruptedExports=Object.values(state.records).filter(r=>r.prototype?.export?.status==='writing' && Date.now()-Date.parse(r.prototype.export.started_at)>60000);
@@ -101,10 +114,11 @@ export function dispatch(args,host) {
   if (!Number.isInteger(args.epoch)) throw new Error('Supply the current ownership epoch from company_status');
   if(args.task_summary!==undefined)requireText(args.task_summary,'task_summary',160);
   if(args.next_handoff!==undefined)requireText(args.next_handoff,'next_handoff',200);
+  const timeout=normalizeTimeout({timeout_ms:args.timeout_ms,timeout_reason:args.timeout_reason});
   if (args.role==='runner') throw new Error('Choose a specialist role from company_open');
   binding(args,host);
-  withStore(args.root,db=>{const s=db.read();owner(s,args.session_id,host,args.epoch);if(args.model_selection!==undefined&&s.plugin_version!==VERSION)throw new Error('Explicitly adopt the model-selection team before using model_selection');});
-  const catalog=args.model_selection?.mode==='explicit'?modelCatalog(host):null;
+  withStore(args.root,db=>{const s=db.read();owner(s,args.session_id,host,args.epoch);if(args.model_selection!==undefined&&!['0.6.0',VERSION].includes(s.plugin_version))throw new Error('Explicitly adopt the model-selection team before using model_selection');});
+  const catalog=args.model_selection?.mode==='explicit' || args.model_selection?.speed==='fast_disabled'?modelCatalog(host):null;
   const selection=normalizeSelection(args.model_selection,host,catalog);
   const check=readiness(host);
   if (!check.available) throw new Error(check.error);
@@ -127,7 +141,7 @@ export function dispatch(args,host) {
     if(session.host!==host) throw new Error('Role belongs to another host; perform company handover first');
     const inputs=args.input_ids??[];
     if(!Array.isArray(inputs) || inputs.some(k=>typeof k!=='string' || !Object.hasOwn(s.records,k))) throw new Error('An input record is missing');
-    const job={id:jobId,role:args.role,session_key:key,instance_id:session.instance_id,native_id:session.native_id,host,epoch:s.owner.epoch,status:'queued',task:args.task,context_format:2,model_selection:selection,cli_version:check.version,task_summary:args.task_summary??null,next_handoff:args.next_handoff??null,...(catalog?{model_catalog:{source:catalog.source,model:catalog.models.find(m=>m.id===selection.model)}}:{}),inputs:inputs.map(k=>({id:k,revision:s.records[k].revision})),review_of:target?{id:target.id,revision:target.revision}:null,...(args.prototype_id?{prototype_id:args.prototype_id}:{}),...(args.development_id?{development_id:args.development_id}:{}),created_at:stamp()};
+    const job={id:jobId,role:args.role,session_key:key,instance_id:session.instance_id,native_id:session.native_id,host,epoch:s.owner.epoch,status:'queued',task:args.task,context_format:2,timeout_policy_version:TIMEOUT_POLICY_VERSION,...timeout,model_selection:selection,cli_version:check.version,task_summary:args.task_summary??null,next_handoff:args.next_handoff??null,...(catalog?{model_catalog:{source:catalog.source,...(selection.mode==='explicit'?{model:catalog.models.find(m=>m.id===selection.model)}:{}),speed_support:catalog.speed_support}}:{}),inputs:inputs.map(k=>({id:k,revision:s.records[k].revision})),review_of:target?{id:target.id,revision:target.revision}:null,...(args.prototype_id?{prototype_id:args.prototype_id}:{}),...(args.development_id?{development_id:args.development_id}:{}),created_at:stamp()};
     prototypeAssignment(s,job,true);developmentAssignment(s,job,true);
     const context=assignmentContext(s,job);
     s.jobs[jobId]={...job,inputs:context.inputs,context_sha256:context.hash};
