@@ -4,7 +4,7 @@ Run a virtual company through **one founder conversation**. Your Chief of Staff 
 
 The target is a company you can operate and improve over time, including a sustainably profitable one-person business with manageable founder workload. You define success; public launch and fundraising are optional milestones.
 
-**SoloCo v0.3.1 is an early preparation-and-review release.** It interviews you, saves company intent, runs specialist planning sessions, and requests independent reviews. It does not execute customer outreach, spending, deployment, or other business actions. The [spec](SPEC.md) describes the complete target.
+**SoloCo v0.4.0 supports preparation, independent review, and explicitly authorized local prototype code/test files.** It interviews you, saves company intent, and coordinates standalone specialists. Prototype tests are authored, not executed; existing project files are never edited. It does not execute customer outreach, spending, deployment, or other business actions. The [spec](SPEC.md) describes the complete target.
 
 ## Install once
 
@@ -53,6 +53,20 @@ Updates explain who is doing what, each assignment's verified status, and what h
 
 Use **one active environment at a time**. To switch, pause the company in the old chat, open the same folder in the other app, and ask to continue. The Chief of Staff performs the recorded handover; you do not rebrief the team. Records stay in `.company/`, outside the plugin cache. Uninstalling the plugin does not remove them.
 
+## Create a local prototype
+
+This opt-in implements [issue #1](https://github.com/yimoburu/soloco/issues/1).
+
+Say to your Chief of Staff:
+
+> Help me build a small offline prototype using fictional fixtures I supply. Show me the exact new files, acceptance criteria and limits before I authorize it. Have Engineering generate the code and tests, then QA review them before creating the files. Do not run code, use real data, install dependencies or deploy anything.
+
+The CoS checks support, prepares a concrete scope and gets QA review. You confirm the fictional fixtures and authorize that scope once. Engineering produces the files in a standalone session; separate QA reviews the exact result. SoloCo then creates the reviewed files under a **new `prototypes/<name>/` folder**, with a durable receipt. The CoS handles the tool calls and handoffs.
+
+This is intentionally **file generation only**: tests are included but not run, so a review Pass is not proof of a working product. If acceptance requires execution evidence, that remains blocked. There is no private-data access, live account access, network capture, external service use, new spending, outreach or deployment. Normal specialist calls consume your existing host model allowance. Existing files are never overwritten; expired, revoked, stale or partially written work holds for inspection.
+
+Existing companies remain preparation-only until you explicitly adopt the new team **and v0.17 governance** through the checked upgrade below. Ask the CoS to show those differences first. Installation or an ordinary approval cannot bypass this capability blocker. Team adoption preserves records and does not itself authorize a prototype; the exact scope still needs your instruction. Handover or team replacement preserves prototype records/files but invalidates outstanding prototype grants.
+
 ## Move from the old Company plugin
 
 If you already installed `company@ai-operated-startup`, first ask its CoS to pause and reconcile assignments. Then replace that installation once; do not run both plugins together.
@@ -72,7 +86,7 @@ claude plugin uninstall company@ai-operated-startup --keep-data
 claude plugin install soloco --marketplace yimoburu/soloco
 ```
 
-Restart the app/session, trust SoloCo hooks, and reopen the **same company folder and founder chat**. Ask to verify SoloCo v0.3.1, open the existing company and resume preparation with its pinned team. If old project hooks remain, use the hook repair below before resuming. Hook bindings are recreated by an actual trusted lifecycle event; company records remain in `.company/`. A different chat needs an explicit handover. Schema-1 v0.1.0 companies still require the checked upgrade below; pending upgrades must be verified or recovered before resuming. Do not initialize another company or move records into plugin directories.
+Restart the app/session, trust SoloCo hooks, and reopen the **same company folder and founder chat**. Ask to verify SoloCo v0.4.0, open the existing company and resume preparation with its pinned team. If old project hooks remain, use the hook repair below before resuming. Hook bindings are recreated by an actual trusted lifecycle event; company records remain in `.company/`. A different chat needs an explicit handover. Schema-1 v0.1.0 companies still require the checked upgrade below; pending upgrades must be verified or recovered before resuming. Do not initialize another company or move records into plugin directories.
 
 ## Upgrade an existing company
 
@@ -85,7 +99,7 @@ codex plugin marketplace upgrade soloco
 codex plugin add soloco@soloco
 ```
 
-Then restart the desktop app and reopen the same founder chat. If `codex` is not on your PATH, use your installed Codex executable. Keep SoloCo hooks enabled/trusted. Ask the CoS to check `company_doctor` reports v0.3.1 and that `company_upgrade` is available before proceeding.
+Then restart the desktop app and reopen the same founder chat. If `codex` is not on your PATH, use your installed Codex executable. Keep SoloCo hooks enabled/trusted. Ask the CoS to check `company_doctor` reports v0.4.0 and that `company_upgrade` is available before proceeding.
 
 For a compatible company, ask to resume preparation with its existing pinned team and rules. No adoption rehearsal is needed. To adopt the new team instructions instead, tell your Chief of Staff:
 
@@ -93,7 +107,7 @@ For a compatible company, ask to resume preparation with its existing pinned tea
 
 The CoS inspects compatibility, pauses/reconciles assignments, and starts a fresh CoS rehearsal and independent QA review. After they pass, it adopts the candidate, verifies preserved records, reloads its instructions, and resumes preparation. Specialist sessions restart on demand from company records; you do not rebrief them. If you use a new chat, explicitly ask it to take over this company as part of the upgrade.
 
-This release supports checked upgrades from v0.1.0 preparation companies and operates existing schema-2 companies from v0.2.0/v0.2.1/v0.2.2/v0.3.0 without a forced team upgrade. Explicit team adoption still runs the checks, with full checkpoints up to 300,000 characters. Governance remains pinned by default; adopting the v0.16 contract requires explicit direction after reviewing its differences. Older governance may block a preparation upgrade on execution-level qualification requirements; the CoS must show that hold and ask before adopting the new, limited preparation-upgrade contract. Failed or stale checks hold the upgrade. Ask the CoS to recover the previous team if needed: recovery retains later company facts and uses the new runtime with the prior definitions, not the old plugin binary. After migration, v0.1.0 cannot resume the schema-2 company. Upgrade checks make two model calls using your normal host account.
+This release supports checked upgrades from v0.1.0 preparation companies and operates existing schema-2 companies from v0.2.0/v0.2.1/v0.2.2/v0.3.0/v0.3.1 without a forced team upgrade. Explicit team adoption still runs the checks, with full checkpoints up to 300,000 characters. Governance remains pinned by default; adopting the v0.17 contract requires explicit direction after reviewing its differences. Older governance may block a preparation upgrade on execution-level qualification requirements; the CoS must show that hold and ask before adopting the new, limited preparation-upgrade contract. Failed or stale checks hold the upgrade. Ask the CoS to recover the previous team if needed: recovery retains later company facts and uses the new runtime with the prior definitions, not the old plugin binary. After migration, v0.1.0 cannot resume the schema-2 company. Upgrade checks make two model calls using your normal host account.
 
 ## Repair stale Codex hooks
 
@@ -111,7 +125,9 @@ Subsequent upgrades use the bundled hooks and a release-generated MCP launcher, 
 
 ## What is verified
 
-- SoloCo v0.3.1: 65 automated tests pass, including migration preservation, stale previews, missing/disabled hooks, data mismatch and subprocess hook-to-tool binding. Native Codex installation checks verify both plugin hooks are discovered untrusted, the MCP tools connect, and both follow a later package version without editing project paths. A real desktop lifecycle after human trust remains to be verified; the tests do not manufacture trust.
+- v0.4.0: **83 automated tests pass**, including deterministic prototype tests for exact authorization, isolated generation/review, path and fixture enforcement, bounded repairs, stale/expired/revoked work, handover, and partial-write recovery. Detached prototype/QA process tests pass on both host adapters using synthetic CLIs and model outputs; live model and desktop prototype acceptance remain unverified. The runtime never executes generated tests.
+
+- Historical v0.3.1: 65 automated tests passed, including migration preservation, stale previews, missing/disabled hooks, data mismatch and subprocess hook-to-tool binding. Native Codex installation checks verify both plugin hooks are discovered untrusted, the MCP tools connect, and both follow a later package version without editing project paths. A real desktop lifecycle after human trust remains to be verified; the tests do not manufacture trust.
 - Historical v0.3.0: 58 automated tests passed. Isolated native Codex and Claude CLI tests installed the old Company v0.2.2 package, created a disposable company, replaced the plugin with SoloCo, rebound the same founder chat, resumed with its pinned rules and native session IDs, and renamed the company without losing history. These are runtime/installation checks, not desktop UI or live model acceptance.
 
 - The v0.1.0 package was installed through both native CLIs using isolated marketplaces. Published v0.2.1 installation was checked through the Codex CLI in an isolated configuration; desktop update acceptance remains outstanding. v0.2.2 installed through the Codex CLI from a local catalog in an isolated configuration; its Claude manifest validated.

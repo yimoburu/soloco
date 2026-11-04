@@ -1,6 +1,6 @@
 # SoloCo
 
-**v0.16 · Company contract**
+**v0.17 · Company contract**
 
 A founder brings an idea. A small team of AI agents, each in its own standalone session, operates a company through one founder conversation. The company persists as its agents and team versions change.
 
@@ -139,6 +139,18 @@ Operating reviews use the cadence and measures in Founder Intent: customer value
 
 Within existing authority, the team continues service, maintenance, support, and bounded improvements. Reviews can trigger a delegated correction, a safe hold, or a reserved founder decision under the existing rules. Missing a business target does not itself authorize a pivot or shutdown; a successful review does not renew expired permissions or expand limits.
 
+### Bounded local prototype files
+
+A harness may support this narrow opt-in before business execution: create code and test files from manually supplied fictional fixtures in a new local prototype folder. Disclose the installed capability and company eligibility first. If unsupported, name the capability blocker and supported upgrade or manual path; additional approvals cannot enable missing software. Offline prototypes are excluded from preparation-only releases unless this capability is explicitly supported and adopted.
+
+The CoS prepares one immutable scope: exact new folder and permitted file/test paths, supplied fixture contents and provenance, acceptance criteria, stop conditions, expiry, bounded implementation attempts, and fixed restrictions. Independent QA reviews that scope before the founder authorizes its exact version and confirms the fixtures are fictional. Authorization is recorded from the founder's actual instruction, never inferred from a notice receipt or review Pass. A prior instruction may cover this step only if it unambiguously covers the displayed scope. This limited contract permits file generation and materialization without accepting Frame or granting execution-role authority.
+
+Engineering produces complete code/test contents in a standalone session with no filesystem, command or external-service tools. The runtime preserves supplied fixtures unchanged, rejects undeclared paths and oversized output, and requires separate native QA review of the exact bundle before creating files. Review must explicitly permit file materialization, identify the scope and bundle, and retain any failures. A review does not prove functional correctness or executed tests. If acceptance needs that proof, it remains Blocked. Tests can be authored here; automatic test execution is unsupported and must be disclosed before handoff.
+
+No existing-file edits, private data, live accounts, network capture, external-service calls, new spending, outreach or deployment are included. Normal host model calls consume the existing model allowance; this is not a promise of free inference. Do not run generated files or install dependencies as part of materialization. Code contents still require review; disabling specialist tools does not prove generated code harmless if someone later executes it. Running, integrating or deploying the artifact requires separately supported authority and controls.
+
+Company mode and unrelated permissions stay unchanged. Enforce path boundaries, exact-version reviews, expiry, attempt limits, revocation, current ownership and unchanged company constraints. Repairs may use remaining authorized attempts; retain previous failures. New scope needs new review and authorization. Pause holds pending work; ownership/team replacement invalidates old prototype grants instead of silently transferring them. Preserve company records, obligations, evidence and notices. File creation records a durable intent and readback receipt; a partial or uncertain write is held for inspection and never retried or overwritten automatically.
+
 ## 6. Staying reliable without growing bureaucracy
 
 Keep only truth that changes a decision, behavior, or successor's action. Agent session history and scratch notes are disposable working memory. Publish findings, consequential uncertainty, unfinished obligations, and next steps that another role or successor needs into company records during work and before a handoff; no separate per-agent memory service is required. One fact has one home; cite its section/version and link detail in code, evidence, dashboards, or logs. A feature spec references domain specs instead of copying them. A **governing pack** contains the exact sections and normative references needed for an assignment.
@@ -195,6 +207,7 @@ These are required behaviors to test, not claims about a particular release:
 | Guide the founder | Focused questions reuse answers and turn consequential unknowns into research; a reviewed bounded proposal reaches the founder |
 | Resume or switch hosts | Same company records and pinned rules survive; partial initialization recovers safely; a second chat cannot compete for ownership; stale writes are rejected |
 | Delegate and review | Named standalone sessions own work; exact-version independent acceptance, required expertise and domain blocks hold; routine repair stays internal |
+| Opt into a local prototype | Disclose capability; independently review exact paths, fictional fixtures, acceptance and limits; record founder authorization; review the exact code/test bundle before creating new files; no test-run claim, existing-file edits or external authority; stale/expired/revoked/partial work holds |
 | Make reserved decisions | Packets retain authority reference, author and dissent; clear founder instructions are recorded; ambiguities hold dependent commitments; pauses apply without CoS discretion |
 | Communicate honestly | Updates identify actual specialists, assignments and next handoffs; planned work is not shown as running and returned work is not automatically approved |
 | Receive what matters | Required notices reach enabled channels without CoS permission; failures retry; delivery, seen and authorization remain distinct; pending notices survive replacement |

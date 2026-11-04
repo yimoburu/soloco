@@ -3,7 +3,7 @@ name: setup
 description: Check the SoloCo plugin's local runtime and selected Codex or Claude CLI after installation, and diagnose or migrate stale Codex startup hooks without creating a company.
 ---
 
-Call `company_doctor`; include the attached `root` and the actual host `session_id` when available (never invent one). Report whether the SoloCo tools and selected host CLI are available, and the preparation/review-only scope of this release. Do not read credentials. A missing CLI or sign-in requires the host's normal setup, not copied secrets or bypassed permissions.
+Call `company_doctor`; include the attached `root` and the actual host `session_id` when available (never invent one). Report whether the SoloCo tools and selected host CLI are available. This release prepares/reviews work and can create explicitly authorized local prototype code/test files, but cannot run tests, edit existing project files or perform external business actions. Installed capability does not adopt it for an existing company: `company_status` reports pinned-team/governance eligibility. Do not read credentials. A missing CLI or sign-in requires the host's normal setup, not copied secrets or bypassed permissions.
 
 The bundled launcher uses an existing compatible Node runtime or downloads a checksum-pinned private runtime on macOS/Linux. No Python, npm packages, or manual config files are needed. If SoloCo tools fail to load, report the actual failure; do not claim setup succeeded.
 

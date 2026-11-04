@@ -7,6 +7,11 @@ const required = record => ['intent', 'decision', 'preference'].includes(record.
 // Every supplied fact is a dependency. Never silently trim a constraint or input.
 export function assignmentContext(state, job) {
   const ids = new Set(Object.values(state.records).filter(required).map(r => r.id));
+  const prototypeId=job.prototype_id ?? state.records[job.review_of?.id]?.prototype?.plan_id;
+  if(prototypeId) {
+    if(!state.records[prototypeId]) throw new Error('Prototype scope is missing');
+    ids.add(prototypeId);
+  }
   for (const ref of [...job.inputs, ...(job.review_of ? [job.review_of] : [])]) {
     const record = state.records[ref.id];
     if (!record || record.revision !== ref.revision) throw new Error('Assignment input version changed');
