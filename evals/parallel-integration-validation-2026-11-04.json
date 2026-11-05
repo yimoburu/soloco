@@ -1,0 +1,73 @@
+{
+  "fixture_policy": "Fictional scratch companies and retained local candidates only; no actual company, installation, adoption or publication.",
+  "branch": "codex/parallel-scalability-integration",
+  "runtime_commit": "65b00e4d376c9c237fd4e98bc7c8ca93b52ab70e",
+  "main_ancestor": "37e82eb",
+  "package_metadata_version": "0.6.8",
+  "original_feature_commits": {
+    "issue_16": "e6b3b15",
+    "issue_18": "b8eb62c",
+    "issue_23": "394730e",
+    "issue_13": "af453f446c323e0589235efc1b5e3e2e36fad955"
+  },
+  "minimum_runtime_archive": {
+    "platform": "darwin-arm64",
+    "node": "22.13.0",
+    "official_archive_sha256": "bc1e374e7393e2f4b20e5bbc157d02e9b1fb2c634b2f992136b38fb8ca2023b7",
+    "installed": false
+  },
+  "focused": {
+    "tests": 89,
+    "pass": 89,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "duration_ms": 44151.418125,
+    "actual_macos_sandbox": true,
+    "log_sha256": "9a8ec6bead1b32826b446ff37d4e17c155ab88c5204b407e8078dfec8458997e"
+  },
+  "initial_unprivileged_focused": {
+    "tests": 89,
+    "pass": 51,
+    "skipped": 38,
+    "fail": 0,
+    "qualification": "Not used as sandbox validation; repeated with actual isolation",
+    "log_sha256": "ae3b53f977d6a39f2f197b3f82061f83f354c39e230b2a1a1e96b9b9ab568bb4"
+  },
+  "full_runs": [
+    {
+      "node_version": "25.2.1",
+      "actual_macos_sandbox": true,
+      "tests": 392,
+      "pass": 392,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 65267.873542,
+      "log": "parallel-integration-node25-tests.log",
+      "log_sha256": "4204c5723886f3769b35d700978d73435b36425875a4a151b4e794060b056b4f"
+    },
+    {
+      "node_version": "22.13.0",
+      "actual_macos_sandbox": true,
+      "tests": 392,
+      "pass": 392,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 71015.909041,
+      "log": "parallel-integration-node22-tests.log",
+      "log_sha256": "e80e45f8b60c047f20922ffbb27bab1cc5d5e82f98bd400c5d2b93da99db4bb3"
+    }
+  ],
+  "checks": [
+    "node tools/build-plugin.mjs --check",
+    "git diff --check"
+  ],
+  "independent_seam_review": "A separate agent inspected merged develop/context/worker/main invariants and reported no concrete remaining merge defect.",
+  "limits": [
+    "Model quality, effective provider settings, billing savings, production latency and quality noninferiority are not established by these deterministic tests.",
+    "Ordinary handover still holds at its complete single frozen-subject 200000-character ceiling; everyday bounded retrieval does not remove that limit.",
+    "A coherent new runtime release/version fence is required before operational use; installed stock 0.6.8 does not contain these branch features."
+  ]
+}

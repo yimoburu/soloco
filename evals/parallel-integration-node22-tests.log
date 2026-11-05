@@ -1,0 +1,2004 @@
+TAP version 13
+# (node:13606) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: actual store and worker admit concurrent disjoint roles and retain independent output lineage
+ok 1 - actual store and worker admit concurrent disjoint roles and retain independent output lineage
+  ---
+  duration_ms: 895.857042
+  ...
+# Subtest: format-3 supplemental failure keeps exclusive resources until that invocation closes
+ok 2 - format-3 supplemental failure keeps exclusive resources until that invocation closes
+  ---
+  duration_ms: 35.894875
+  ...
+# Subtest: format-3 dependency artifacts remain explicit inputs and coordination stays immutable
+ok 3 - format-3 dependency artifacts remain explicit inputs and coordination stays immutable
+  ---
+  duration_ms: 0.921875
+  ...
+# (node:13610) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: legacy dispatch stays compatible; bounded identifiers reject ambiguous declarations
+ok 4 - legacy dispatch stays compatible; bounded identifiers reject ambiguous declarations
+  ---
+  duration_ms: 2.581
+  ...
+# Subtest: dependencies bind completed producer, epoch, output bytes and mandatory context input
+ok 5 - dependencies bind completed producer, epoch, output bytes and mandatory context input
+  ---
+  duration_ms: 2.650291
+  ...
+# Subtest: review readiness requires exact subject and independent Pass but does not grant acceptance
+ok 6 - review readiness requires exact subject and independent Pass but does not grant acceptance
+  ---
+  duration_ms: 1.164542
+  ...
+# Subtest: software-test prerequisites require real canonical receipt/candidate producer bindings
+ok 7 - software-test prerequisites require real canonical receipt/candidate producer bindings
+  ---
+  duration_ms: 4.3275
+  ...
+# Subtest: disjoint resources run concurrently; cancelled uncertain work continues to hold claims
+ok 8 - disjoint resources run concurrently; cancelled uncertain work continues to hold claims
+  ---
+  duration_ms: 0.670209
+  ...
+# Subtest: resource conflict arising after admission invalidates dependent launch/publication
+ok 9 - resource conflict arising after admission invalidates dependent launch/publication
+  ---
+  duration_ms: 0.195875
+  ...
+# Subtest: behavior evaluation covers proportionate delegation, parallel checks, authority and concise notices
+ok 10 - behavior evaluation covers proportionate delegation, parallel checks, authority and concise notices
+  ---
+  duration_ms: 9.229042
+  ...
+# (node:13613) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: development capability fails closed without a supported sandbox, and MCP preserves binding
+ok 11 - development capability fails closed without a supported sandbox, and MCP preserves binding
+  ---
+  duration_ms: 12.927166
+  ...
+# Subtest: installed development capability does not silently authorize older teams or modified governance
+ok 12 - installed development capability does not silently authorize older teams or modified governance
+  ---
+  duration_ms: 2.467708
+  ...
+# Subtest: pinned v0.5.0 preserves authorized development and original source after a runtime update
+ok 13 - pinned v0.5.0 preserves authorized development and original source after a runtime update
+  ---
+  duration_ms: 54.789875
+  ...
+# Subtest: pinned v0.6.0 preserves authorized development and original source after a runtime update
+ok 14 - pinned v0.6.0 preserves authorized development and original source after a runtime update
+  ---
+  duration_ms: 33.033333
+  ...
+# Subtest: pinned v0.6.1 preserves authorized development and original source after a runtime update
+ok 15 - pinned v0.6.1 preserves authorized development and original source after a runtime update
+  ---
+  duration_ms: 31.835959
+  ...
+# Subtest: pinned v0.6.2 preserves authorized development and original source after a runtime update
+ok 16 - pinned v0.6.2 preserves authorized development and original source after a runtime update
+  ---
+  duration_ms: 70.63475
+  ...
+# Subtest: pinned v0.6.3 preserves authorized development and original source after a runtime update
+ok 17 - pinned v0.6.3 preserves authorized development and original source after a runtime update
+  ---
+  duration_ms: 91.468125
+  ...
+# Subtest: pinned v0.6.4 preserves authorized development and original source after a runtime update
+ok 18 - pinned v0.6.4 preserves authorized development and original source after a runtime update
+  ---
+  duration_ms: 52.717375
+  ...
+# Subtest: pinned v0.6.5 preserves authorized development and original source after a runtime update
+ok 19 - pinned v0.6.5 preserves authorized development and original source after a runtime update
+  ---
+  duration_ms: 44.684375
+  ...
+# Subtest: pinned v0.6.6 preserves authorized development and original source after a runtime update
+ok 20 - pinned v0.6.6 preserves authorized development and original source after a runtime update
+  ---
+  duration_ms: 96.873791
+  ...
+# Subtest: pinned v0.6.7 preserves authorized development and original source after a runtime update
+ok 21 - pinned v0.6.7 preserves authorized development and original source after a runtime update
+  ---
+  duration_ms: 59.9925
+  ...
+# Subtest: an actual isolated edit-test-review loop retains usable candidate and leaves original source untouched
+ok 22 - an actual isolated edit-test-review loop retains usable candidate and leaves original source untouched
+  ---
+  duration_ms: 3318.731
+  ...
+# Subtest: scope needs exact authorization and explicit source-sharing consent, not a draft decision
+ok 23 - scope needs exact authorization and explicit source-sharing consent, not a draft decision
+  ---
+  duration_ms: 29.066375
+  ...
+# Subtest: scopes reject undeclared reads, traversal, hidden files, symlinks, collisions and unbounded work
+ok 24 - scopes reject undeclared reads, traversal, hidden files, symlinks, collisions and unbounded work
+  ---
+  duration_ms: 35.0965
+  ...
+# Subtest: source mutation and new-path collision invalidate the displayed scope before authorization
+ok 25 - source mutation and new-path collision invalidate the displayed scope before authorization
+  ---
+  duration_ms: 52.431083
+  ...
+# Subtest: development records are immutable through the generic record tool
+ok 26 - development records are immutable through the generic record tool
+  ---
+  duration_ms: 12.780084
+  ...
+# Subtest: workers reject missing, additional and oversized generated paths without modifying source
+ok 27 - workers reject missing, additional and oversized generated paths without modifying source
+  ---
+  duration_ms: 215.2175
+  ...
+# Subtest: a failed test and independent failed review permit bounded repair under the same standing grant
+ok 28 - a failed test and independent failed review permit bounded repair under the same standing grant
+  ---
+  duration_ms: 4781.710667
+  ...
+# Subtest: model-written test claims cannot replace the actual runtime receipt
+ok 29 - model-written test claims cannot replace the actual runtime receipt
+  ---
+  duration_ms: 33.417458
+  ...
+# Subtest: acceptance rejects wrong receipt hash, wrong action and reviewer reuse of the author native session
+ok 30 - acceptance rejects wrong receipt hash, wrong action and reviewer reuse of the author native session
+  ---
+  duration_ms: 3780.225584
+  ...
+# Subtest: candidate tampering after test execution cannot inherit a passing review
+ok 31 - candidate tampering after test execution cannot inherit a passing review
+  ---
+  duration_ms: 977.195375
+  ...
+# Subtest: a test attempt is never repeated on the same candidate and expired grants cannot dispatch
+ok 32 - a test attempt is never repeated on the same candidate and expired grants cannot dispatch
+  ---
+  duration_ms: 2008.114709
+  ...
+# Subtest: pause or revoke during an active test aborts it and retains a quarantined outcome
+ok 33 - pause or revoke during an active test aborts it and retains a quarantined outcome
+  ---
+  duration_ms: 1594.403583
+  ...
+# Subtest: source changes and handover prevent acceptance without erasing prior evidence
+ok 34 - source changes and handover prevent acceptance without erasing prior evidence
+  ---
+  duration_ms: 1923.901333
+  ...
+# Subtest: stdio MCP remains responsive to founder pause while a detached test runs
+ok 35 - stdio MCP remains responsive to founder pause while a detached test runs
+  ---
+  duration_ms: 1158.655541
+  ...
+# Subtest: a candidate and its QA review may emit valid notices without invalidating their own outputs
+ok 36 - a candidate and its QA review may emit valid notices without invalidating their own outputs
+  ---
+  duration_ms: 836.386333
+  ...
+# Subtest: local test dispatch shares the global three-active-job limit
+ok 37 - local test dispatch shares the global three-active-job limit
+  ---
+  duration_ms: 17.019875
+  ...
+# Subtest: receipt acceptance verifies runtime provenance and completed execution, not payload hash alone
+ok 38 - receipt acceptance verifies runtime provenance and completed execution, not payload hash alone
+  ---
+  duration_ms: 1626.055792
+  ...
+# Subtest: source-sharing consent precedes file inspection; planning review grants no execution authority
+ok 39 - source-sharing consent precedes file inspection; planning review grants no execution authority
+  ---
+  duration_ms: 10.920833
+  ...
+# Subtest: a new external notice referencing a QA artifact still invalidates that earlier review
+ok 40 - a new external notice referencing a QA artifact still invalidates that earlier review
+  ---
+  duration_ms: 834.497833
+  ...
+# Subtest: a generic-only QA Pass stays inspectable but cannot accept; a complete fresh review can
+ok 41 - a generic-only QA Pass stays inspectable but cannot accept; a complete fresh review can
+  ---
+  duration_ms: 1028.707625
+  ...
+# Subtest: exact v0.18 development compatibility retains sandbox and team restrictions
+ok 42 - exact v0.18 development compatibility retains sandbox and team restrictions
+  ---
+  duration_ms: 7.016167
+  ...
+# Subtest: base-bound patches reconstruct a large complete candidate through real tests and independent acceptance
+ok 43 - base-bound patches reconstruct a large complete candidate through real tests and independent acceptance
+  ---
+  duration_ms: 936.953709
+  ...
+# Subtest: lowering configuration holds existing larger scopes and raising it never enlarges authorized bytes
+ok 44 - lowering configuration holds existing larger scopes and raising it never enlarges authorized bytes
+  ---
+  duration_ms: 17.96225
+  ...
+# Subtest: patch shape, exact base and scope violations fail without creating a materialized candidate
+ok 45 - patch shape, exact base and scope violations fail without creating a materialized candidate
+  ---
+  duration_ms: 38.095958
+  ...
+# Subtest: supported pure rename preserves a development grant but unknown decisions still revoke
+ok 46 - supported pure rename preserves a development grant but unknown decisions still revoke
+  ---
+  duration_ms: 21.276333
+  ...
+# Subtest: actual qualified validation reuse retains original execution and still requires new independent QA
+ok 47 - actual qualified validation reuse retains original execution and still requires new independent QA
+  ---
+  duration_ms: 1821.776625
+  ...
+# Subtest: unchanged-state polling still cancels generation at scope expiry
+ok 48 - unchanged-state polling still cancels generation at scope expiry
+  ---
+  duration_ms: 519.031416
+  ...
+# Subtest: unchanged database polling still cancels generation when external project ceiling is lowered
+ok 49 - unchanged database polling still cancels generation when external project ceiling is lowered
+  ---
+  duration_ms: 116.619125
+  ...
+# Subtest: post-execution input tampering holds the receipt while retaining actual executed evidence
+ok 50 - post-execution input tampering holds the receipt while retaining actual executed evidence
+  ---
+  duration_ms: 1141.023208
+  ...
+# (node:13617) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: patches use exact unshifted positions, preserve CRLF/Unicode and support empty identity edits
+ok 51 - patches use exact unshifted positions, preserve CRLF/Unicode and support empty identity edits
+  ---
+  duration_ms: 0.690125
+  ...
+# Subtest: patches reject stale bases, ambiguous/overlapping ranges, undeclared operations and invalid text
+ok 52 - patches reject stale bases, ambiguous/overlapping ranges, undeclared operations and invalid text
+  ---
+  duration_ms: 1.094791
+  ...
+# Subtest: UTF-8/JSON budgets report exact boundary, one-byte excess and escaping overhead
+ok 53 - UTF-8/JSON budgets report exact boundary, one-byte excess and escaping overhead
+  ---
+  duration_ms: 0.366375
+  ...
+# Subtest: persistent ceilings default safely, support larger budgets and reject malformed values/links
+ok 54 - persistent ceilings default safely, support larger budgets and reject malformed values/links
+  ---
+  duration_ms: 63.894458
+  ...
+# Subtest: schema is root-specific and call validation cannot inherit another company ceiling
+ok 55 - schema is root-specific and call validation cannot inherit another company ceiling
+  ---
+  duration_ms: 3.85725
+  ...
+# Subtest: failed materialization retains staging evidence and never exposes a partial candidate
+ok 56 - failed materialization retains staging evidence and never exposes a partial candidate
+  ---
+  duration_ms: 1.098292
+  ...
+# Subtest: invalid configuration blocks development without hiding pause and diagnostic schemas
+ok 57 - invalid configuration blocks development without hiding pause and diagnostic schemas
+  ---
+  duration_ms: 1048.480708
+  ...
+# (node:13618) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: same-owner pause/resume stays proportionate; fresh and cross-host replacements require reconstruction
+ok 58 - same-owner pause/resume stays proportionate; fresh and cross-host replacements require reconstruction
+  ---
+  duration_ms: 986.42975
+  ...
+# Subtest: exact independent QA allows preparation resume, preserves records/notices and durable acceptance
+ok 59 - exact independent QA allows preparation resume, preserves records/notices and durable acceptance
+  ---
+  duration_ms: 232.346125
+  ...
+# Subtest: incomplete, non-independent, wrong-hash and blocked review cannot resume
+ok 60 - incomplete, non-independent, wrong-hash and blocked review cannot resume
+  ---
+  duration_ms: 400.13425
+  ...
+# Subtest: state changes invalidate acceptance; hook delivery does not; failed review remains and revised reconstruction needs new review
+ok 61 - state changes invalidate acceptance; hook delivery does not; failed review remains and revised reconstruction needs new review
+  ---
+  duration_ms: 355.858833
+  ...
+# Subtest: ordinary work cannot run during pending handover; pause cancels a check and late output quarantines
+ok 62 - ordinary work cannot run during pending handover; pause cancels a check and late output quarantines
+  ---
+  duration_ms: 22.737208
+  ...
+# Subtest: single-copy frozen handover evidence fits moderate history and oversized state holds without truncation
+ok 63 - single-copy frozen handover evidence fits moderate history and oversized state holds without truncation
+  ---
+  duration_ms: 233.788458
+  ...
+# Subtest: integration binds coordination metadata without duplicating frozen handover evidence
+ok 64 - integration binds coordination metadata without duplicating frozen handover evidence
+  ---
+  duration_ms: 61.747792
+  ...
+# Subtest: classification-only changes invalidate handover and classification provenance is frozen for both roles
+ok 65 - classification-only changes invalidate handover and classification provenance is frozen for both roles
+  ---
+  duration_ms: 65.699292
+  ...
+# (node:13621) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: recognizes only complete versioned Company/SoloCo project launchers
+ok 66 - recognizes only complete versioned Company/SoloCo project launchers
+  ---
+  duration_ms: 1.173667
+  ...
+# Subtest: diagnostics distinguish discovery, disabled, modified, stale commands, data mismatch and missing binding
+ok 67 - diagnostics distinguish discovery, disabled, modified, stale commands, data mismatch and missing binding
+  ---
+  duration_ms: 2.680291
+  ...
+# Subtest: migration removes recognized duplicates with exact backup, preserves unrelated config and company bytes, never creates trust or bindings
+ok 68 - migration removes recognized duplicates with exact backup, preserves unrelated config and company bytes, never creates trust or bindings
+  ---
+  duration_ms: 2.634084
+  ...
+# Subtest: migration refuses stale previews, missing/disabled replacement, legacy plugin, and unknown compound commands
+ok 69 - migration refuses stale previews, missing/disabled replacement, legacy plugin, and unknown compound commands
+  ---
+  duration_ms: 4.786834
+  ...
+# Subtest: migration rejects a file changed while host discovery was running and symbolic project config
+ok 70 - migration rejects a file changed while host discovery was running and symbolic project config
+  ---
+  duration_ms: 1.618875
+  ...
+# Subtest: host discovery failure is explicit and cannot remove project hooks
+ok 71 - host discovery failure is explicit and cannot remove project hooks
+  ---
+  duration_ms: 0.444458
+  ...
+# Subtest: packaged lifecycle commands use matching host data, subprocess hook output is usable by MCP, and upgrade paths are relocatable
+ok 72 - packaged lifecycle commands use matching host data, subprocess hook output is usable by MCP, and upgrade paths are relocatable
+  ---
+  duration_ms: 4127.852167
+  ...
+# Subtest: isolation selection prefers stable and falls back only when needed
+ok 73 - isolation selection prefers stable and falls back only when needed
+  ---
+  duration_ms: 1.309708
+  ...
+# Subtest: unsupported, error, signal and timeout probes fail closed with bounded diagnostics
+ok 74 - unsupported, error, signal and timeout probes fail closed with bounded diagnostics
+  ---
+  duration_ms: 1.410291
+  ...
+# Subtest: probes use only trusted Node and fixed code with scrubbed environment and strict bounds
+ok 75 - probes use only trusted Node and fixed code with scrubbed environment and strict bounds
+  ---
+  duration_ms: 0.255834
+  ...
+# Subtest: installed trusted Node accepts the selected spelling
+ok 76 - installed trusted Node accepts the selected spelling
+  ---
+  duration_ms: 389.645542
+  ...
+# Subtest: startup wiring selects --test-isolation=none
+ok 77 - startup wiring selects --test-isolation=none
+  ---
+  duration_ms: 277.295917
+  ...
+# Subtest: startup wiring selects --experimental-test-isolation=none
+ok 78 - startup wiring selects --experimental-test-isolation=none
+  ---
+  duration_ms: 421.203833
+  ...
+# Subtest: startup wiring selects neither spelling and fails closed
+ok 79 - startup wiring selects neither spelling and fails closed
+  ---
+  duration_ms: 622.235167
+  ...
+# Subtest: watchdog wiring selects --test-isolation=none
+ok 80 - watchdog wiring selects --test-isolation=none
+  ---
+  duration_ms: 329.197417
+  ...
+# Subtest: watchdog wiring selects --experimental-test-isolation=none
+ok 81 - watchdog wiring selects --experimental-test-isolation=none
+  ---
+  duration_ms: 273.472709
+  ...
+# Subtest: watchdog wiring selects neither spelling and fails closed
+ok 82 - watchdog wiring selects neither spelling and fails closed
+  ---
+  duration_ms: 151.320042
+  ...
+# Subtest: sandbox reports explicit unavailable capability and never runs outside it
+ok 83 - sandbox reports explicit unavailable capability and never runs outside it
+  ---
+  duration_ms: 1.10425
+  ...
+# Subtest: test invocation rejects links, traversal, wildcard arguments and unbounded limits before execution
+ok 84 - test invocation rejects links, traversal, wildcard arguments and unbounded limits before execution
+  ---
+  duration_ms: 4.904291
+  ...
+# Subtest: constrained Node tests return actual pass and failure evidence without modifying source
+ok 85 - constrained Node tests return actual pass and failure evidence without modifying source
+  ---
+  duration_ms: 1627.912
+  ...
+# Subtest: OS policy independently blocks host files, source writes, links, networking and subprocesses
+ok 86 - OS policy independently blocks host files, source writes, links, networking and subprocesses
+  ---
+  duration_ms: 248.850042
+  ...
+# Subtest: runner scrubs inherited host secrets and Node options; tests may only write scratch
+ok 87 - runner scrubs inherited host secrets and Node options; tests may only write scratch
+  ---
+  duration_ms: 738.463167
+  ...
+# Subtest: timeouts, output limits and revocation stop the child without accepting success
+ok 88 - timeouts, output limits and revocation stop the child without accepting success
+  ---
+  duration_ms: 2399.411541
+  ...
+# Subtest: watchdog kills the sandbox and cleans scratch if its caller is abruptly terminated
+ok 89 - watchdog kills the sandbox and cleans scratch if its caller is abruptly terminated
+  ---
+  duration_ms: 1647.858292
+  ...
+# (node:13967) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: interception fixture exposes torn normalized reads without a caller snapshot
+ok 90 - interception fixture exposes torn normalized reads without a caller snapshot
+  ---
+  duration_ms: 67.673542
+  ...
+# Subtest: Store.read observes one snapshot across normalized root and entity queries
+ok 91 - Store.read observes one snapshot across normalized root and entity queries
+  ---
+  duration_ms: 40.777625
+  ...
+# Subtest: Store.readSelected snapshots exact entity lookups and collection scans together
+ok 92 - Store.readSelected snapshots exact entity lookups and collection scans together
+  ---
+  duration_ms: 5.273625
+  ...
+# Subtest: normalized reads inside writer transactions reuse the transaction and recover after rollback
+ok 93 - normalized reads inside writer transactions reuse the transaction and recover after rollback
+  ---
+  duration_ms: 6.799875
+  ...
+# (node:14012) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: initialize in existing folder without touching user files, resume pinned company
+ok 94 - initialize in existing folder without touching user files, resume pinned company
+  ---
+  duration_ms: 26.697917
+  ...
+# Subtest: missing hook, path traversal and symbolic company directories are refused
+ok 95 - missing hook, path traversal and symbolic company directories are refused
+  ---
+  duration_ms: 5.178083
+  ...
+# Subtest: hook ignores unrelated populated projects; empty folder supplies CoS without creating company
+ok 96 - hook ignores unrelated populated projects; empty folder supplies CoS without creating company
+  ---
+  duration_ms: 14.607375
+  ...
+# Subtest: another chat cannot claim coordinator or amend its records
+ok 97 - another chat cannot claim coordinator or amend its records
+  ---
+  duration_ms: 27.250125
+  ...
+# Subtest: optimistic revisions preserve older draft and reject stale amendments
+ok 98 - optimistic revisions preserve older draft and reject stale amendments
+  ---
+  duration_ms: 19.747417
+  ...
+# Subtest: specialist artifact, direct peer message and notice survive a new connection
+ok 99 - specialist artifact, direct peer message and notice survive a new connection
+  ---
+  duration_ms: 23.030625
+  ...
+# Subtest: independent review binds exact author artifact version and does not approve Frame
+ok 100 - independent review binds exact author artifact version and does not approve Frame
+  ---
+  duration_ms: 24.158459
+  ...
+# Subtest: generation and review prompts assign bounded deliverable ownership on both hosts
+ok 101 - generation and review prompts assign bounded deliverable ownership on both hosts
+  ---
+  duration_ms: 258.599375
+  ...
+# Subtest: changed reviewed artifact quarantines late review
+ok 102 - changed reviewed artifact quarantines late review
+  ---
+  duration_ms: 18.739375
+  ...
+# Subtest: pause works from a founder hook and quarantines in-flight output
+ok 103 - pause works from a founder hook and quarantines in-flight output
+  ---
+  duration_ms: 22.605584
+  ...
+# Subtest: handover rejects active work, preserves records/notices, revokes old coordinator
+ok 104 - handover rejects active work, preserves records/notices, revokes old coordinator
+  ---
+  duration_ms: 36.077833
+  ...
+# Subtest: failed or malformed model output creates a notice and grants no success
+ok 105 - failed or malformed model output creates a notice and grants no success
+  ---
+  duration_ms: 15.680667
+  ...
+# Subtest: invalid envelopes retain precise rejected evidence and never partially publish or route
+ok 106 - invalid envelopes retain precise rejected evidence and never partially publish or route
+  ---
+  duration_ms: 77.171083
+  ...
+# Subtest: notice delivery, seeing, resolution, and authority remain distinct
+ok 107 - notice delivery, seeing, resolution, and authority remain distinct
+  ---
+  duration_ms: 73.3525
+  ...
+# Subtest: preferences require provenance and never mutate permission
+ok 108 - preferences require provenance and never mutate permission
+  ---
+  duration_ms: 12.674208
+  ...
+# Subtest: MCP validates arguments and does not expose arbitrary command execution
+ok 109 - MCP validates arguments and does not expose arbitrary command execution
+  ---
+  duration_ms: 0.315458
+  ...
+# Subtest: adapters preserve explicit native IDs without permission bypass flags
+ok 110 - adapters preserve explicit native IDs without permission bypass flags
+  ---
+  duration_ms: 0.239
+  ...
+# Subtest: real stdio MCP initializes and lists tools without creating company state
+ok 111 - real stdio MCP initializes and lists tools without creating company state
+  ---
+  duration_ms: 290.501459
+  ...
+# Subtest: dispatch launches a separate process and resumes that role through a second assignment
+ok 112 - dispatch launches a separate process and resumes that role through a second assignment
+  ---
+  duration_ms: 2795.554708
+  ...
+# Subtest: concurrent processes cannot both commit the same expected record revision
+ok 113 - concurrent processes cannot both commit the same expected record revision
+  ---
+  duration_ms: 463.754458
+  ...
+# Subtest: same chat cannot reuse a revoked epoch after a handover
+ok 114 - same chat cannot reuse a revoked epoch after a handover
+  ---
+  duration_ms: 14.811916
+  ...
+# Subtest: compatible runtime patches preserve pinned team, ownership and native sessions without adoption
+ok 115 - compatible runtime patches preserve pinned team, ownership and native sessions without adoption
+  ---
+  duration_ms: 1023.445958
+  ...
+# Subtest: unknown runtimes and tampered teams remain held despite patch compatibility
+ok 116 - unknown runtimes and tampered teams remain held despite patch compatibility
+  ---
+  duration_ms: 12.701458
+  ...
+# Subtest: assignment packs retain constraints, failed evidence, notices and named inputs without unrelated artifacts
+ok 117 - assignment packs retain constraints, failed evidence, notices and named inputs without unrelated artifacts
+  ---
+  duration_ms: 42.523791
+  ...
+# Subtest: new constraints, pending notices and recipient messages quarantine in-flight results
+ok 118 - new constraints, pending notices and recipient messages quarantine in-flight results
+  ---
+  duration_ms: 75.477708
+  ...
+# Subtest: notice presentation and seen bookkeeping do not invalidate an assignment
+ok 119 - notice presentation and seen bookkeeping do not invalidate an assignment
+  ---
+  duration_ms: 23.417292
+  ...
+# Subtest: changed queued dependencies are held before spending a model call
+ok 120 - changed queued dependencies are held before spending a model call
+  ---
+  duration_ms: 38.777916
+  ...
+# Subtest: oversized assignment context is held intact instead of silently truncated
+ok 121 - oversized assignment context is held intact instead of silently truncated
+  ---
+  duration_ms: 98.558292
+  ...
+# Subtest: unrelated artifacts do not invalidate the bounded assignment
+ok 122 - unrelated artifacts do not invalidate the bounded assignment
+  ---
+  duration_ms: 41.097333
+  ...
+# Subtest: legacy generator folders remain protected after retiring the generator
+ok 123 - legacy generator folders remain protected after retiring the generator
+  ---
+  duration_ms: 10.026875
+  ...
+# Subtest: company names are optional display labels independent of stable identity
+ok 124 - company names are optional display labels independent of stable identity
+  ---
+  duration_ms: 16.448792
+  ...
+# Subtest: renaming records founder intent while preserving company state and native sessions
+ok 125 - renaming records founder intent while preserving company state and native sessions
+  ---
+  duration_ms: 59.8325
+  ...
+# Subtest: rename requires current owner, current name, valid label and source instruction
+ok 126 - rename requires current owner, current name, valid label and source instruction
+  ---
+  duration_ms: 51.020042
+  ...
+# Subtest: rename waits for active assignments and does not resume a held company
+ok 127 - rename waits for active assignments and does not resume a held company
+  ---
+  duration_ms: 18.930333
+  ...
+# Subtest: SoloCo can rebind the same founder chat after a plugin cache replacement
+ok 128 - SoloCo can rebind the same founder chat after a plugin cache replacement
+  ---
+  duration_ms: 134.677167
+  ...
+# Subtest: model catalog uses advertised choices and never offers hidden internal models
+ok 129 - model catalog uses advertised choices and never offers hidden internal models
+  ---
+  duration_ms: 560.775583
+  ...
+# Subtest: selected dispatch reaches the host, rotates on model/effort/reset, retains history and keeps reviewers independent
+ok 130 - selected dispatch reaches the host, rotates on model/effort/reset, retains history and keeps reviewers independent
+  ---
+  duration_ms: 4323.86325
+  ...
+# Subtest: unsupported and unavailable selected models fail visibly without fallback or stray calls
+ok 131 - unsupported and unavailable selected models fail visibly without fallback or stray calls
+  ---
+  duration_ms: 893.057375
+  ...
+# Subtest: pinned v0.5.0 preserves prior local capabilities but does not silently adopt selected-model behavior
+ok 132 - pinned v0.5.0 preserves prior local capabilities but does not silently adopt selected-model behavior
+  ---
+  duration_ms: 12.70075
+  ...
+# Subtest: pinned v0.6.0 retains selection and local capabilities after a compatible runtime update
+ok 133 - pinned v0.6.0 retains selection and local capabilities after a compatible runtime update
+  ---
+  duration_ms: 705.362917
+  ...
+# Subtest: pinned v0.6.1 retains selection and local capabilities after a compatible runtime update
+ok 134 - pinned v0.6.1 retains selection and local capabilities after a compatible runtime update
+  ---
+  duration_ms: 737.992
+  ...
+# Subtest: pinned v0.6.2 retains selection and local capabilities after a compatible runtime update
+ok 135 - pinned v0.6.2 retains selection and local capabilities after a compatible runtime update
+  ---
+  duration_ms: 604.0785
+  ...
+# Subtest: pinned v0.6.3 retains selection and local capabilities after a compatible runtime update
+ok 136 - pinned v0.6.3 retains selection and local capabilities after a compatible runtime update
+  ---
+  duration_ms: 769.059542
+  ...
+# Subtest: pinned v0.6.4 retains selection and local capabilities after a compatible runtime update
+ok 137 - pinned v0.6.4 retains selection and local capabilities after a compatible runtime update
+  ---
+  duration_ms: 751.834208
+  ...
+# Subtest: pinned v0.6.5 retains selection and local capabilities after a compatible runtime update
+ok 138 - pinned v0.6.5 retains selection and local capabilities after a compatible runtime update
+  ---
+  duration_ms: 703.558
+  ...
+# Subtest: pinned v0.6.6 retains selection and local capabilities after a compatible runtime update
+ok 139 - pinned v0.6.6 retains selection and local capabilities after a compatible runtime update
+  ---
+  duration_ms: 859.619334
+  ...
+# Subtest: pinned v0.6.7 retains selection and local capabilities after a compatible runtime update
+ok 140 - pinned v0.6.7 retains selection and local capabilities after a compatible runtime update
+  ---
+  duration_ms: 720.873
+  ...
+# Subtest: worker forwards the exact recorded selection and preserves separately attributed model evidence
+ok 141 - worker forwards the exact recorded selection and preserves separately attributed model evidence
+  ---
+  duration_ms: 11.990583
+  ...
+# Subtest: new assignment hashes bind selection and task metadata; legacy hashes remain compatible
+ok 142 - new assignment hashes bind selection and task metadata; legacy hashes remain compatible
+  ---
+  duration_ms: 27.073417
+  ...
+# Subtest: company_progress schema and read-only endpoint preserve status and expose equivalent safe formats
+ok 143 - company_progress schema and read-only endpoint preserve status and expose equivalent safe formats
+  ---
+  duration_ms: 32.433875
+  ...
+# Subtest: new dispatch metadata reaches the actual synthetic worker and changes assignment hashes only when present
+ok 144 - new dispatch metadata reaches the actual synthetic worker and changes assignment hashes only when present
+  ---
+  duration_ms: 539.36125
+  ...
+# Subtest: progress follows actual local controller candidate, software tests, independent QA and acceptance
+ok 145 - progress follows actual local controller candidate, software tests, independent QA and acceptance
+  ---
+  duration_ms: 952.730542
+  ...
+# Subtest: company_progress observes successive synthetic parallel/candidate/test/QA/acceptance snapshots without replay
+ok 146 - company_progress observes successive synthetic parallel/candidate/test/QA/acceptance snapshots without replay
+  ---
+  duration_ms: 13.613167
+  ...
+# Subtest: projection and all render formats show exact chain, independent identities and separate acceptance facts
+ok 147 - projection and all render formats show exact chain, independent identities and separate acceptance facts
+  ---
+  duration_ms: 75.795
+  ...
+# Subtest: public JSON and presentation exclude source files, record content and rejected responses
+ok 148 - public JSON and presentation exclude source files, record content and rejected responses
+  ---
+  duration_ms: 2.663917
+  ...
+# Subtest: large history retains active work and every unresolved notice while bounding history honestly
+ok 149 - large history retains active work and every unresolved notice while bounding history honestly
+  ---
+  duration_ms: 66.704791
+  ...
+# Subtest: ancestor, event, edge, evidence and input bounds disclose omitted facts
+ok 150 - ancestor, event, edge, evidence and input bounds disclose omitted facts
+  ---
+  duration_ms: 121.87075
+  ...
+# Subtest: over 200 context references cannot evict latest returned verdicts or receipt acceptance
+ok 151 - over 200 context references cannot evict latest returned verdicts or receipt acceptance
+  ---
+  duration_ms: 156.312917
+  ...
+# Subtest: recorded acceptance dependencies and notice records survive outside the selected job window
+ok 152 - recorded acceptance dependencies and notice records survive outside the selected job window
+  ---
+  duration_ms: 0.664333
+  ...
+# Subtest: core overflow stays bounded and explicitly discloses omitted evidence without losing notices
+ok 153 - core overflow stays bounded and explicitly discloses omitted evidence without losing notices
+  ---
+  duration_ms: 51.153208
+  ...
+# Subtest: malicious labels remain inert HTML and Mermaid data with generated display IDs
+ok 154 - malicious labels remain inert HTML and Mermaid data with generated display IDs
+  ---
+  duration_ms: 33.957542
+  ...
+# Subtest: empty, paused, failed, missing dates, stale evidence and cycles remain truthful
+ok 155 - empty, paused, failed, missing dates, stale evidence and cycles remain truthful
+  ---
+  duration_ms: 38.694292
+  ...
+# Subtest: real generated handlers bind relocated scripts to two explicit roots and isolate selection
+ok 156 - real generated handlers bind relocated scripts to two explicit roots and isolate selection
+  ---
+  duration_ms: 40.434917
+  ...
+# Subtest: HTML namespace is explicit, validated and deterministic without changing snapshot
+ok 157 - HTML namespace is explicit, validated and deterministic without changing snapshot
+  ---
+  duration_ms: 7.480208
+  ...
+# Subtest: primary cards expose task, role, status and provenance; details retain full facts
+ok 158 - primary cards expose task, role, status and provenance; details retain full facts
+  ---
+  duration_ms: 0.539208
+  ...
+# Subtest: long labels, empty and no-active fragments preserve responsive readable markup
+ok 159 - long labels, empty and no-active fragments preserve responsive readable markup
+  ---
+  duration_ms: 1.690541
+  ...
+# Subtest: chronology exposes recorded UTC date and time outside event details
+ok 160 - chronology exposes recorded UTC date and time outside event details
+  ---
+  duration_ms: 0.412875
+  ...
+# Subtest: only proven edges get scoped arrows; relocated scripts redraw for card and details resizing
+ok 161 - only proven edges get scoped arrows; relocated scripts redraw for card and details resizing
+  ---
+  duration_ms: 3.190125
+  ...
+# (node:14244) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: parallel tasks and dependent review preserve exact evidence distinctions
+ok 162 - parallel tasks and dependent review preserve exact evidence distinctions
+  ---
+  duration_ms: 1.704375
+  ...
+# Subtest: canonical software receipt without job_id resolves returned output, input and review edges
+ok 163 - canonical software receipt without job_id resolves returned output, input and review edges
+  ---
+  duration_ms: 1.346709
+  ...
+# Subtest: incorrect software job and artifact bindings remain unresolved
+ok 164 - incorrect software job and artifact bindings remain unresolved
+  ---
+  duration_ms: 1.697791
+  ...
+# Subtest: conflicting producer fields and competing returned-output claims cannot create links
+ok 165 - conflicting producer fields and competing returned-output claims cannot create links
+  ---
+  duration_ms: 0.410583
+  ...
+# Subtest: ordinary publications use job_id and never infer a producer from author_instance
+ok 166 - ordinary publications use job_id and never infer a producer from author_instance
+  ---
+  duration_ms: 0.588167
+  ...
+# Subtest: acceptance counterexamples remain recorded but cannot pass structural binding checks
+ok 167 - acceptance counterexamples remain recorded but cannot pass structural binding checks
+  ---
+  duration_ms: 1.184875
+  ...
+# Subtest: exact revisions only; old content snapshots cannot identify their producer
+ok 168 - exact revisions only; old content snapshots cannot identify their producer
+  ---
+  duration_ms: 0.202459
+  ...
+# Subtest: quarantined and rejected outputs stay inspectable without acceptance
+ok 169 - quarantined and rejected outputs stay inspectable without acceptance
+  ---
+  duration_ms: 0.145375
+  ...
+# Subtest: explicit dependency, input and review types stay separate; cycles are excluded
+ok 170 - explicit dependency, input and review types stay separate; cycles are excluded
+  ---
+  duration_ms: 0.295375
+  ...
+# Subtest: duplicate identities and absent producers are unresolved rather than guessed
+ok 171 - duplicate identities and absent producers are unresolved rather than guessed
+  ---
+  duration_ms: 0.302
+  ...
+# Subtest: timeline retains instants, discloses ties and missing or invalid dates
+ok 172 - timeline retains instants, discloses ties and missing or invalid dates
+  ---
+  duration_ms: 0.138584
+  ...
+# Subtest: all unresolved notices preserve kind, reference, provenance, seen and delivery facts
+ok 173 - all unresolved notices preserve kind, reference, provenance, seen and delivery facts
+  ---
+  duration_ms: 0.190958
+  ...
+# Subtest: array/map snapshots and insertion permutations are deterministic and detached
+ok 174 - array/map snapshots and insertion permutations are deterministic and detached
+  ---
+  duration_ms: 0.503916
+  ...
+# Subtest: founder context is non-job evidence; claimed specialist outputs still need producers
+ok 175 - founder context is non-job evidence; claimed specialist outputs still need producers
+  ---
+  duration_ms: 0.081708
+  ...
+# Subtest: candidate linkage requires canonical job, plan, hash and receipt bindings
+ok 176 - candidate linkage requires canonical job, plan, hash and receipt bindings
+  ---
+  duration_ms: 1.053167
+  ...
+# Subtest: canonical assignment context survives pure and public projection without job edges
+ok 177 - canonical assignment context survives pure and public projection without job edges
+  ---
+  duration_ms: 3.108375
+  ...
+# Subtest: context references require exact positive revisions except genuinely unversioned founder decisions
+ok 178 - context references require exact positive revisions except genuinely unversioned founder decisions
+  ---
+  duration_ms: 10.988959
+  ...
+# Subtest: context roles cannot claim specialist producers or competing output bindings
+ok 179 - context roles cannot claim specialist producers or competing output bindings
+  ---
+  duration_ms: 0.457917
+  ...
+# Subtest: unknown roles and noncanonical kinds never become non-job context
+ok 180 - unknown roles and noncanonical kinds never become non-job context
+  ---
+  duration_ms: 0.124583
+  ...
+# Subtest: specialist lineage stays versioned and rejects explicit unknown or mismatched author roles
+ok 181 - specialist lineage stays versioned and rejects explicit unknown or mismatched author roles
+  ---
+  duration_ms: 0.238916
+  ...
+# (node:14317) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: bounded code/test bundle flows through independent reviews and founder authorization on both hosts
+ok 182 - bounded code/test bundle flows through independent reviews and founder authorization on both hosts
+  ---
+  duration_ms: 1024.787667
+  ...
+# Subtest: no authorization bypass via a draft decision, notice receipt, wrong hash or missing fixture confirmation
+ok 183 - no authorization bypass via a draft decision, notice receipt, wrong hash or missing fixture confirmation
+  ---
+  duration_ms: 27.144667
+  ...
+# Subtest: plan refuses traversal, config paths, collisions, absent tests, excessive attempts and expiry
+ok 184 - plan refuses traversal, config paths, collisions, absent tests, excessive attempts and expiry
+  ---
+  duration_ms: 24.990625
+  ...
+# Subtest: prototype records cannot be edited through generic save
+ok 185 - prototype records cannot be edited through generic save
+  ---
+  duration_ms: 75.834291
+  ...
+# Subtest: workers reject unauthorized files, fixture rewrites, missing paths and oversized bundles
+ok 186 - workers reject unauthorized files, fixture rewrites, missing paths and oversized bundles
+  ---
+  duration_ms: 664.271625
+  ...
+# Subtest: pause, revocation and changed founder constraints quarantine late bundles
+ok 187 - pause, revocation and changed founder constraints quarantine late bundles
+  ---
+  duration_ms: 200.635916
+  ...
+# Subtest: expired scopes cannot dispatch even after a previous authorization
+ok 188 - expired scopes cannot dispatch even after a previous authorization
+  ---
+  duration_ms: 35.886625
+  ...
+# Subtest: failed candidate can be repaired within bounded attempts without erasing failed review
+ok 189 - failed candidate can be repaired within bounded attempts without erasing failed review
+  ---
+  duration_ms: 155.119167
+  ...
+# Subtest: QA must permit exact bundle without test-execution claims or unresolved blockers
+ok 190 - QA must permit exact bundle without test-execution claims or unresolved blockers
+  ---
+  duration_ms: 538.712208
+  ...
+# Subtest: review sharing the actual author native session fails even with a different role instance
+ok 191 - review sharing the actual author native session fails even with a different role instance
+  ---
+  duration_ms: 76.684459
+  ...
+# Subtest: existing files and symlinked output destinations are never overwritten
+ok 192 - existing files and symlinked output destinations are never overwritten
+  ---
+  duration_ms: 118.352084
+  ...
+# Subtest: partial filesystem failure retains a failed receipt and blocks retry
+ok 193 - partial filesystem failure retains a failed receipt and blocks retry
+  ---
+  duration_ms: 110.239375
+  ...
+# Subtest: host handover preserves evidence and notices but never transfers prototype permission
+ok 194 - host handover preserves evidence and notices but never transfers prototype permission
+  ---
+  duration_ms: 109.681333
+  ...
+# Subtest: checked team replacement preserves prototype records but requires fresh authority afterward
+ok 195 - checked team replacement preserves prototype records but requires fresh authority afterward
+  ---
+  duration_ms: 1188.08025
+  ...
+# Subtest: old pinned teams or preserved governance disclose blockers rather than silently enabling implementation
+ok 196 - old pinned teams or preserved governance disclose blockers rather than silently enabling implementation
+  ---
+  duration_ms: 32.204917
+  ...
+# Subtest: contract simplification retains known prototype governance without allowing unknown rules or teams
+ok 197 - contract simplification retains known prototype governance without allowing unknown rules or teams
+  ---
+  duration_ms: 34.923666
+  ...
+# Subtest: MCP prototype endpoint validates scope and preserves startup binding and ownership checks
+ok 198 - MCP prototype endpoint validates scope and preserves startup binding and ownership checks
+  ---
+  duration_ms: 26.579291
+  ...
+# Subtest: status reconciles an interrupted write intent into a durable founder notice
+ok 199 - status reconciles an interrupted write intent into a durable founder notice
+  ---
+  duration_ms: 44.796709
+  ...
+# Subtest: detached prototype and QA processes complete through the MCP tools on Codex and Claude adapters
+ok 200 - detached prototype and QA processes complete through the MCP tools on Codex and Claude adapters
+  ---
+  duration_ms: 5128.252041
+  ...
+# Subtest: v0.18 pinned company retains its original prototype grant across source update
+ok 201 - v0.18 pinned company retains its original prototype grant across source update
+  ---
+  duration_ms: 39.020292
+  ...
+# Subtest: supported pure rename preserves prototype authority; unknown preferences stay binding
+ok 202 - supported pure rename preserves prototype authority; unknown preferences stay binding
+  ---
+  duration_ms: 48.435541
+  ...
+# (node:14383) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: unclassified legacy obligations stay mandatory; exact reviewed dispositions bound ordinary context
+ok 203 - unclassified legacy obligations stay mandatory; exact reviewed dispositions bound ordinary context
+  ---
+  duration_ms: 20.636708
+  ...
+# Subtest: resolved archive growth does not grow task pack; raw originals remain retrievable by exact hash
+ok 204 - resolved archive growth does not grow task pack; raw originals remain retrievable by exact hash
+  ---
+  duration_ms: 155.229041
+  ...
+# Subtest: presentation-only rename detection rejects unknown effects and producers
+ok 205 - presentation-only rename detection rejects unknown effects and producers
+  ---
+  duration_ms: 0.276458
+  ...
+# Subtest: explicit normalized migration backs up, round-trips unknown values and fences legacy writes
+ok 206 - explicit normalized migration backs up, round-trips unknown values and fences legacy writes
+  ---
+  duration_ms: 34.628541
+  ...
+# Subtest: immutable corruption is detected and transactions rollback without dropping archive
+ok 207 - immutable corruption is detected and transactions rollback without dropping archive
+  ---
+  duration_ms: 17.734375
+  ...
+# Subtest: current-state upgrade projection bounds reviewed record/history growth and preserves exact retrieval
+ok 208 - current-state upgrade projection bounds reviewed record/history growth and preserves exact retrieval
+  ---
+  duration_ms: 924.555292
+  ...
+# Subtest: current-state projection never conceals unknown or orphan classification metadata
+ok 209 - current-state projection never conceals unknown or orphan classification metadata
+  ---
+  duration_ms: 71.448042
+  ...
+# Subtest: archived job entries retain their exact typed classification provenance
+ok 210 - archived job entries retain their exact typed classification provenance
+  ---
+  duration_ms: 2.679125
+  ...
+# Subtest: portable backup inventories project configuration/candidates and explicit artifacts; tampering holds restore
+ok 211 - portable backup inventories project configuration/candidates and explicit artifacts; tampering holds restore
+  ---
+  duration_ms: 41.129375
+  ...
+# Subtest: durable supplemental dependencies invalidate returned work after source mutation
+ok 212 - durable supplemental dependencies invalidate returned work after source mutation
+  ---
+  duration_ms: 4.572834
+  ...
+# Subtest: public exact-plan classification applies only after independent review and retains originals
+ok 213 - public exact-plan classification applies only after independent review and retains originals
+  ---
+  duration_ms: 863.373583
+  ...
+# Subtest: classification rejects coordinator-native review and retained same-plan negative verdict
+ok 214 - classification rejects coordinator-native review and retained same-plan negative verdict
+  ---
+  duration_ms: 103.746541
+  ...
+# Subtest: public migration holds unfinished cancelled workers and requires explicit paused authority
+ok 215 - public migration holds unfinished cancelled workers and requires explicit paused authority
+  ---
+  duration_ms: 9.203375
+  ...
+# Subtest: targeted root deletion persists and absent immutable values never silently disappear
+ok 216 - targeted root deletion persists and absent immutable values never silently disappear
+  ---
+  duration_ms: 7.666417
+  ...
+# Subtest: transfers reject self-copy through company or selected artifact ancestors before creating output
+ok 217 - transfers reject self-copy through company or selected artifact ancestors before creating output
+  ---
+  duration_ms: 7.456667
+  ...
+# Subtest: only undefined speed defaults; whole null/undefined selections stay compatible
+ok 218 - only undefined speed defaults; whole null/undefined selections stay compatible
+  ---
+  duration_ms: 23.346542
+  ...
+# Subtest: Claude fast-off gates launch and resume while preserving isolation
+ok 219 - Claude fast-off gates launch and resume while preserving isolation
+  ---
+  duration_ms: 4.149459
+  ...
+# Subtest: Codex launch and resume preserve controls and reject unverified fast-off
+ok 220 - Codex launch and resume preserve controls and reject unverified fast-off
+  ---
+  duration_ms: 0.244875
+  ...
+# Subtest: installed-version capability predicate is conservative; inputs are synthetic
+ok 221 - installed-version capability predicate is conservative; inputs are synthetic
+  ---
+  duration_ms: 5.691625
+  ...
+# Subtest: output observations do not infer requested, applied or effective settings
+ok 222 - output observations do not infer requested, applied or effective settings
+  ---
+  duration_ms: 1.550625
+  ...
+# Subtest: Codex advertised metadata is bounded and does not establish entitlement
+ok 223 - Codex advertised metadata is bounded and does not establish entitlement
+  ---
+  duration_ms: 4.842125
+  ...
+# Subtest: outcome graders require exact preserved extraction and all seeded review blockers
+ok 224 - outcome graders require exact preserved extraction and all seeded review blockers
+  ---
+  duration_ms: 0.380875
+  ...
+# Subtest: coding outcomes require executed passing runtime receipt, not generated confidence
+ok 225 - coding outcomes require executed passing runtime receipt, not generated confidence
+  ---
+  duration_ms: 2.829834
+  ...
+# Subtest: outcome summary retains failed trials, repairs and observed latency without claiming quality equivalence
+ok 226 - outcome summary retains failed trials, repairs and observed latency without claiming quality equivalence
+  ---
+  duration_ms: 0.372291
+  ...
+# Subtest: decision evaluator distinguishes task fit, escalation and unavailable catalog
+ok 227 - decision evaluator distinguishes task fit, escalation and unavailable catalog
+  ---
+  duration_ms: 4.826208
+  ...
+# Subtest: decision evaluator rejects missing/duplicate/unknown cases and invalid or unexplained settings
+ok 228 - decision evaluator rejects missing/duplicate/unknown cases and invalid or unexplained settings
+  ---
+  duration_ms: 0.257083
+  ...
+# Subtest: evaluation prompt loads supplied policy and hides scoring answer keys
+ok 229 - evaluation prompt loads supplied policy and hides scoring answer keys
+  ---
+  duration_ms: 0.155375
+  ...
+# Subtest: usage audit counts full assignment history, separates requests and omits software jobs
+ok 230 - usage audit counts full assignment history, separates requests and omits software jobs
+  ---
+  duration_ms: 8.81675
+  ...
+# (node:14706) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: dispatch schema admits only optional supported speed choices and preserves legacy requirements
+ok 231 - dispatch schema admits only optional supported speed choices and preserves legacy requirements
+  ---
+  duration_ms: 13.842375
+  ...
+# Subtest: upgrade reuses the optional dispatch selection schema with unchanged required arguments
+ok 232 - upgrade reuses the optional dispatch selection schema with unchanged required arguments
+  ---
+  duration_ms: 4.336125
+  ...
+# Subtest: legacy omission and host_default avoid catalog discovery and persist normalized requests
+ok 233 - legacy omission and host_default avoid catalog discovery and persist normalized requests
+  ---
+  duration_ms: 23.528208
+  ...
+# Subtest: default-mode fast_disabled routes catalog support without manufacturing model or execution evidence
+ok 234 - default-mode fast_disabled routes catalog support without manufacturing model or execution evidence
+  ---
+  duration_ms: 24.319875
+  ...
+# Subtest: explicit models obtain catalog once and retain separate model and speed-support metadata
+ok 235 - explicit models obtain catalog once and retain separate model and speed-support metadata
+  ---
+  duration_ms: 98.710542
+  ...
+# Subtest: unsupported speed, missing fast-off support and unverified effort reject before queuing or launch
+ok 236 - unsupported speed, missing fast-off support and unverified effort reject before queuing or launch
+  ---
+  duration_ms: 222.437625
+  ...
+# Subtest: omitted speed, explicit host_default and reason-only changes reuse a finished session
+ok 237 - omitted speed, explicit host_default and reason-only changes reuse a finished session
+  ---
+  duration_ms: 85.447042
+  ...
+# Subtest: speed changes retire identity and repeated fast_disabled reuses the replacement
+ok 238 - speed changes retire identity and repeated fast_disabled reuses the replacement
+  ---
+  duration_ms: 5.344209
+  ...
+# Subtest: explicit model session identity also rotates for speed and reuses unchanged selections
+ok 239 - explicit model session identity also rotates for speed and reuses unchanged selections
+  ---
+  duration_ms: 7.389791
+  ...
+# Subtest: speed wiring preserves ownership, pause, scope, adoption and independent-review checks
+ok 240 - speed wiring preserves ownership, pause, scope, adoption and independent-review checks
+  ---
+  duration_ms: 15.180959
+  ...
+# Subtest: selection preserves the legacy default and admits only advertised model/effort choices
+ok 241 - selection preserves the legacy default and admits only advertised model/effort choices
+  ---
+  duration_ms: 2.90125
+  ...
+# Subtest: selection rejects malformed requests and reset cannot carry a stale explicit setting
+ok 242 - selection rejects malformed requests and reset cannot carry a stale explicit setting
+  ---
+  duration_ms: 0.2565
+  ...
+# Subtest: speed is independent of model and effort; unsupported or paid requests fail closed
+ok 243 - speed is independent of model and effort; unsupported or paid requests fail closed
+  ---
+  duration_ms: 6.775958
+  ...
+# Subtest: session keys preserve legacy/default compatibility and change only for setting changes
+ok 244 - session keys preserve legacy/default compatibility and change only for setting changes
+  ---
+  duration_ms: 0.199125
+  ...
+# Subtest: explicit flags reach fresh/resumed commands and fast-off preserves all isolation settings
+ok 245 - explicit flags reach fresh/resumed commands and fast-off preserves all isolation settings
+  ---
+  duration_ms: 3.727917
+  ...
+# Subtest: fast-off support requires documented version threshold and settings control
+ok 246 - fast-off support requires documented version threshold and settings control
+  ---
+  duration_ms: 0.280333
+  ...
+# Subtest: Codex advertised speed metadata is bounded and never becomes an execution control
+ok 247 - Codex advertised speed metadata is bounded and never becomes an execution control
+  ---
+  duration_ms: 0.7065
+  ...
+# Subtest: host output does not turn successful exit or usage into effective model/effort/tier proof
+ok 248 - host output does not turn successful exit or usage into effective model/effort/tier proof
+  ---
+  duration_ms: 0.273292
+  ...
+# Subtest: runModel retains positional/options contract and distinguishes applied argv from observations
+ok 249 - runModel retains positional/options contract and distinguishes applied argv from observations
+  ---
+  duration_ms: 167.033583
+  ...
+# Subtest: activity shows lifecycle, rationale, speed, applied controls, review and handoff separately
+ok 250 - activity shows lifecycle, rationale, speed, applied controls, review and handoff separately
+  ---
+  duration_ms: 16.023584
+  ...
+# Subtest: activity retains active jobs and software rows never inherit model requests or observations
+ok 251 - activity retains active jobs and software rows never inherit model requests or observations
+  ---
+  duration_ms: 0.63525
+  ...
+# (node:14824) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: dispatch validates and persists policy, and main keeps software-test limits separate
+ok 252 - dispatch validates and persists policy, and main keeps software-test limits separate
+  ---
+  duration_ms: 188.515625
+  ...
+# Subtest: upgrade review-window schema is bounded and runtime rejects invalid or misplaced requests before binding
+ok 253 - upgrade review-window schema is bounded and runtime rejects invalid or misplaced requests before binding
+  ---
+  duration_ms: 9.572958
+  ...
+# Subtest: status distinguishes long execution, grace, startup, queue, legacy and inspection
+ok 254 - status distinguishes long execution, grace, startup, queue, legacy and inspection
+  ---
+  duration_ms: 9.445209
+  ...
+# Subtest: reconciliation rechecks eligibility inside the store transaction
+ok 255 - reconciliation rechecks eligibility inside the store transaction
+  ---
+  duration_ms: 3.719958
+  ...
+# Subtest: worker queue delay does not consume custom execution time; actual callback is persisted
+ok 256 - worker queue delay does not consume custom execution time; actual callback is persisted
+  ---
+  duration_ms: 3.901916
+  ...
+# Subtest: new jobs require spawn evidence; legacy injected models remain compatible
+ok 257 - new jobs require spawn evidence; legacy injected models remain compatible
+  ---
+  duration_ms: 6.411458
+  ...
+# Subtest: deadline aborts and late output is quarantined even if model ignores cancellation
+ok 258 - deadline aborts and late output is quarantined even if model ignores cancellation
+  ---
+  duration_ms: 4.061542
+  ...
+# Subtest: pause, ownership loss, context change and scope revocation abort active work
+ok 259 - pause, ownership loss, context change and scope revocation abort active work
+  ---
+  duration_ms: 27.922625
+  ...
+# Subtest: startup expiry aborts without inventing spawn timing and launch errors retain evidence
+ok 260 - startup expiry aborts without inventing spawn timing and launch errors retain evidence
+  ---
+  duration_ms: 11.809958
+  ...
+# Subtest: coordination dispatch binds prerequisite evidence, admits disjoint resources and rejects premature/conflicting work
+ok 261 - coordination dispatch binds prerequisite evidence, admits disjoint resources and rejects premature/conflicting work
+  ---
+  duration_ms: 10.323292
+  ...
+# Subtest: uncertain cancellation keeps resource claim; confirmed closure releases it
+ok 262 - uncertain cancellation keeps resource claim; confirmed closure releases it
+  ---
+  duration_ms: 6.199375
+  ...
+# Subtest: upgrade call ceiling schema and runtime reject invalid options before all boundaries
+ok 263 - upgrade call ceiling schema and runtime reject invalid options before all boundaries
+  ---
+  duration_ms: 1.470166
+  ...
+# Subtest: timeout policy validates boundaries and reasons without coercion
+ok 264 - timeout policy validates boundaries and reasons without coercion
+  ---
+  duration_ms: 2.834333
+  ...
+# Subtest: spawn timing is independent of creation time and deadline boundaries are exclusive
+ok 265 - spawn timing is independent of creation time and deadline boundaries are exclusive
+  ---
+  duration_ms: 1.147417
+  ...
+# Subtest: reconciliation separates queue, startup and execution; excludes development tests
+ok 266 - reconciliation separates queue, startup and execution; excludes development tests
+  ---
+  duration_ms: 0.760208
+  ...
+# Subtest: legacy timing does not expand, reset, or manufacture missing deadlines
+ok 267 - legacy timing does not expand, reset, or manufacture missing deadlines
+  ---
+  duration_ms: 0.340833
+  ...
+# Subtest: normal completion starts allowance at spawn and preserves isolation and selection
+ok 268 - normal completion starts allowance at spawn and preserves isolation and selection
+  ---
+  duration_ms: 2.422041
+  ...
+# Subtest: existing default positional timeout works with omitted rationale
+ok 269 - existing default positional timeout works with omitted rationale
+  ---
+  duration_ms: 0.342958
+  ...
+# Subtest: invalid timeout or selection fails before resolving or starting a process
+ok 270 - invalid timeout or selection fails before resolving or starting a process
+  ---
+  duration_ms: 0.421583
+  ...
+# Subtest: unverified explicit Claude effort fails before executable resolution or launch
+ok 271 - unverified explicit Claude effort fails before executable resolution or launch
+  ---
+  duration_ms: 0.170833
+  ...
+# Subtest: timeout retains cause, fences late output and escalates for resistant child
+ok 272 - timeout retains cause, fences late output and escalates for resistant child
+  ---
+  duration_ms: 0.767834
+  ...
+# Subtest: timeout followed by close confirms closure and cancels escalation
+ok 273 - timeout followed by close confirms closure and cancels escalation
+  ---
+  duration_ms: 0.458041
+  ...
+# Subtest: at and after deadline a delayed timer cannot allow successful close
+ok 274 - at and after deadline a delayed timer cannot allow successful close
+  ---
+  duration_ms: 0.872166
+  ...
+# Subtest: output arriving at deadline triggers timeout even with delayed timer
+ok 275 - output arriving at deadline triggers timeout even with delayed timer
+  ---
+  duration_ms: 0.512833
+  ...
+# Subtest: pre-abort and abort during command resolution never start child
+ok 276 - pre-abort and abort during command resolution never start child
+  ---
+  duration_ms: 0.70875
+  ...
+# Subtest: abort in spawn/listener gap stops child and prevents sending prompt
+ok 277 - abort in spawn/listener gap stops child and prevents sending prompt
+  ---
+  duration_ms: 0.527167
+  ...
+# Subtest: cancellation before spawn, during execution and after timeout is monotonic
+ok 278 - cancellation before spawn, during execution and after timeout is monotonic
+  ---
+  duration_ms: 0.479583
+  ...
+# Subtest: startup limit neither creates execution receipt nor consumes execution allowance
+ok 279 - startup limit neither creates execution receipt nor consumes execution allowance
+  ---
+  duration_ms: 1.715792
+  ...
+# Subtest: spawn errors and errors after spawn retain escalation until close
+ok 280 - spawn errors and errors after spawn retain escalation until close
+  ---
+  duration_ms: 1.630375
+  ...
+# Subtest: synchronous spawn failure has no timers, receipt or child signals
+ok 281 - synchronous spawn failure has no timers, receipt or child signals
+  ---
+  duration_ms: 0.7015
+  ...
+# Subtest: recording failure stops the spawned child and cannot publish success
+ok 282 - recording failure stops the spawned child and cannot publish success
+  ---
+  duration_ms: 0.427333
+  ...
+# Subtest: synchronous close during TERM/KILL settles once and removes timers
+ok 283 - synchronous close during TERM/KILL settles once and removes timers
+  ---
+  duration_ms: 0.982875
+  ...
+# Subtest: output overflow, stream error and thrown signal request retain bounded failure
+ok 284 - output overflow, stream error and thrown signal request retain bounded failure
+  ---
+  duration_ms: 1.138208
+  ...
+# Subtest: early process exit and malformed output are failures with cleanup
+ok 285 - early process exit and malformed output are failures with cleanup
+  ---
+  duration_ms: 0.95125
+  ...
+# Subtest: Codex and Claude launch/resume isolation and observations remain distinct
+ok 286 - Codex and Claude launch/resume isolation and observations remain distinct
+  ---
+  duration_ms: 2.801042
+  ...
+# Subtest: internal upgrade context wires a 30-minute spawn receipt and real execution timer
+ok 287 - internal upgrade context wires a 30-minute spawn receipt and real execution timer
+  ---
+  duration_ms: 1.559333
+  ...
+# Subtest: upgrade context is explicit, bounded and uses overflow-safe lifecycle clocks
+ok 288 - upgrade context is explicit, bounded and uses overflow-safe lifecycle clocks
+  ---
+  duration_ms: 1.793542
+  ...
+# Subtest: nonzero native exit preserves bounded stderr instead of replacing it with an artifact parse error
+ok 289 - nonzero native exit preserves bounded stderr instead of replacing it with an artifact parse error
+  ---
+  duration_ms: 36.031542
+  ...
+# Subtest: real adapter resumes existing native IDs with model tools disabled for both hosts
+ok 290 - real adapter resumes existing native IDs with model tools disabled for both hosts
+  ---
+  duration_ms: 0.816042
+  ...
+# Subtest: selected upgrade calls apply identical launch and resume flags while observations stay distinct
+ok 291 - selected upgrade calls apply identical launch and resume flags while observations stay distinct
+  ---
+  duration_ms: 5.553542
+  ...
+# Subtest: selected native timeout does not manufacture applied or effective model evidence
+ok 292 - selected native timeout does not manufacture applied or effective model evidence
+  ---
+  duration_ms: 2.111292
+  ...
+# Subtest: upgrade adapter schedules the selected or remaining cap for both hosts and resumed calls
+ok 293 - upgrade adapter schedules the selected or remaining cap for both hosts and resumed calls
+  ---
+  duration_ms: 2.943125
+  ...
+# (node:14923) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: real keyed collections: 145 records, 57 jobs, source-heavy history fits and exact provenance survives
+ok 294 - real keyed collections: 145 records, 57 jobs, source-heavy history fits and exact provenance survives
+  ---
+  duration_ms: 3248.475041
+  ...
+# Subtest: formatted JSON preserves raw text and quoted spaces; duplicate keys and changed lexemes remain literal
+ok 295 - formatted JSON preserves raw text and quoted spaces; duplicate keys and changed lexemes remain literal
+  ---
+  duration_ms: 3.182333
+  ...
+# Subtest: actual artifact/runtime payload shapes extract only named bodies and retain review, receipt and authority metadata
+ok 296 - actual artifact/runtime payload shapes extract only named bodies and retain review, receipt and authority metadata
+  ---
+  duration_ms: 6.2285
+  ...
+# Subtest: unknown shapes, old obligations and semantic context are not inferred inert
+ok 297 - unknown shapes, old obligations and semantic context are not inferred inert
+  ---
+  duration_ms: 4.206583
+  ...
+# Subtest: mechanical whitelist references only exact known metadata shapes
+ok 298 - mechanical whitelist references only exact known metadata shapes
+  ---
+  duration_ms: 3.83375
+  ...
+# Subtest: map keys, duplicate IDs and prototype-looking keys remain distinct and immutable
+ok 299 - map keys, duplicate IDs and prototype-looking keys remain distinct and immutable
+  ---
+  duration_ms: 0.698
+  ...
+# Subtest: frozen retrieval rejects forged identities, hashes, fields and unsafe UTF-16 ranges
+ok 300 - frozen retrieval rejects forged identities, hashes, fields and unsafe UTF-16 ranges
+  ---
+  duration_ms: 7.031542
+  ...
+# Subtest: citations require exact revision and complete delivery separately to author and QA
+ok 301 - citations require exact revision and complete delivery separately to author and QA
+  ---
+  duration_ms: 1.84125
+  ...
+# Subtest: source extraction cannot hide a huge unknown obligation to make admission succeed
+ok 302 - source extraction cannot hide a huge unknown obligation to make admission succeed
+  ---
+  duration_ms: 408.915375
+  ...
+# Subtest: complete request plus reserve bounded while cumulative traffic exceeds 1M
+ok 303 - complete request plus reserve bounded while cumulative traffic exceeds 1M
+  ---
+  duration_ms: 1.223292
+  ...
+# Subtest: unsupported JSON holds instead of silently dropping evidence or invoking accessors
+ok 304 - unsupported JSON holds instead of silently dropping evidence or invoking accessors
+  ---
+  duration_ms: 0.908375
+  ...
+# Subtest: whole bodies alias at all four locations in both orders, preserving complete inline tokens, provenance and originals
+ok 305 - whole bodies alias at all four locations in both orders, preserving complete inline tokens, provenance and originals
+  ---
+  duration_ms: 228.866291
+  ...
+# Subtest: whole-body matching refuses every differing semantic field and unsafe JSON spelling
+ok 306 - whole-body matching refuses every differing semantic field and unsafe JSON spelling
+  ---
+  duration_ms: 191.957333
+  ...
+# Subtest: native, role, phase and attempt boundaries never share unmatched or forged bodies
+ok 307 - native, role, phase and attempt boundaries never share unmatched or forged bodies
+  ---
+  duration_ms: 130.904583
+  ...
+# (node:14939) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: over 1M semantic history reassembles deterministically with every revision and old constraint
+ok 308 - over 1M semantic history reassembles deterministically with every revision and old constraint
+  ---
+  duration_ms: 957.561042
+  ...
+# Subtest: huge payload citations need only exact delivered excerpts; ledgers never share reads
+ok 309 - huge payload citations need only exact delivered excerpts; ledgers never share reads
+  ---
+  duration_ms: 684.413834
+  ...
+# Subtest: unknown string maps remain semantic and JSON escape spelling normalizes without losing duplicate keys
+ok 310 - unknown string maps remain semantic and JSON escape spelling normalizes without losing duplicate keys
+  ---
+  duration_ms: 2.689875
+  ...
+# Subtest: dotted obligation keys stay semantic while recognizable paths and explicit runtime files retain provenance
+ok 311 - dotted obligation keys stay semantic while recognizable paths and explicit runtime files retain provenance
+  ---
+  duration_ms: 19.888417
+  ...
+# Subtest: replay packing uses the full escaped envelope plus reserve and preserves all findings and blockers
+ok 312 - replay packing uses the full escaped envelope plus reserve and preserves all findings and blockers
+  ---
+  duration_ms: 121.840958
+  ...
+# Subtest: multi-page whole bodies preserve UTF-16 and aliases never deliver an unread target or original
+ok 313 - multi-page whole bodies preserve UTF-16 and aliases never deliver an unread target or original
+  ---
+  duration_ms: 71.664584
+  ...
+# Subtest: realistic fictional reports reduce net escaped stream and page counts with identical preview inputs
+ok 314 - realistic fictional reports reduce net escaped stream and page counts with identical preview inputs
+  ---
+  duration_ms: 445.148625
+  ...
+# FICTIONAL ONLY: 688352 -> 387068 UTF-16 units; 6 -> 4 pages; 301284 net saved; 24 matched, 24 aliased
+# (node:14977) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: prepare stores the default or selected review window and exposes the original grant and deadline for audit
+ok 315 - prepare stores the default or selected review window and exposes the original grant and deadline for audit
+  ---
+  duration_ms: 1229.591666
+  ...
+# Subtest: invalid review windows and non-prepare use reject before readiness, catalog, launch or state changes
+ok 316 - invalid review windows and non-prepare use reject before readiness, catalog, launch or state changes
+  ---
+  duration_ms: 129.994916
+  ...
+# Subtest: prepare cannot extend an active or expired attempt; recovery preserves it for a fresh request
+ok 317 - prepare cannot extend an active or expired attempt; recovery preserves it for a fresh request
+  ---
+  duration_ms: 315.353166
+  ...
+# Subtest: apply and verify use the stored deadline regardless of selected-window audit metadata
+ok 318 - apply and verify use the stored deadline regardless of selected-window audit metadata
+  ---
+  duration_ms: 2104.656958
+  ...
+# Subtest: explicit none survives elapsed finite windows with no overall timer or serialization ambiguity
+ok 319 - explicit none survives elapsed finite windows with no overall timer or serialization ambiguity
+  ---
+  duration_ms: 172.837
+  ...
+# Subtest: status and wait preserve explicit none after finite windows while legacy null still expires
+ok 320 - status and wait preserve explicit none after finite windows while legacy null still expires
+  ---
+  duration_ms: 20.996875
+  ...
+# Subtest: legacy null deadlines retain fallback; partial or corrupted explicit policies cannot disable expiry
+ok 321 - legacy null deadlines retain fallback; partial or corrupted explicit policies cannot disable expiry
+  ---
+  duration_ms: 240.86225
+  ...
+# Subtest: deadline policy remains immutable during review and before apply or verify
+ok 322 - deadline policy remains immutable during review and before apply or verify
+  ---
+  duration_ms: 762.207041
+  ...
+# Subtest: explicit none retains native timeout and failed review evidence without retry or adoption
+ok 323 - explicit none retains native timeout and failed review evidence without retry or adoption
+  ---
+  duration_ms: 206.815833
+  ...
+# Subtest: upgrade selection rejects incompatible actions and invalid controls without partial preparation
+ok 324 - upgrade selection rejects incompatible actions and invalid controls without partial preparation
+  ---
+  duration_ms: 25.725875
+  ...
+# Subtest: one catalog-validated selection persists and reaches fresh independent roles, retrieval, replay and synthesis unchanged
+ok 325 - one catalog-validated selection persists and reaches fresh independent roles, retrieval, replay and synthesis unchanged
+  ---
+  duration_ms: 219.137166
+  ...
+# Subtest: omitted, deliberate default and legacy upgrade selections preserve compatibility without catalog discovery
+ok 326 - omitted, deliberate default and legacy upgrade selections preserve compatibility without catalog discovery
+  ---
+  duration_ms: 402.91575
+  ...
+# Subtest: Claude upgrade selection shares supported controls across both roles and rejects unverified effort before preparation
+ok 327 - Claude upgrade selection shares supported controls across both roles and rejects unverified effort before preparation
+  ---
+  duration_ms: 192.95675
+  ...
+# Subtest: selection mutation holds before calls, during review, and before apply or verify
+ok 328 - selection mutation holds before calls, during review, and before apply or verify
+  ---
+  duration_ms: 490.654416
+  ...
+# Subtest: selected upgrade timeouts retain request and unknown execution evidence, without retry or permission
+ok 329 - selected upgrade timeouts retain request and unknown execution evidence, without retry or permission
+  ---
+  duration_ms: 168.391416
+  ...
+# Subtest: changing selection after recovery creates fresh role sessions and preserves the failed attempt evidence
+ok 330 - changing selection after recovery creates fresh role sessions and preserves the failed attempt evidence
+  ---
+  duration_ms: 269.80775
+  ...
+# Subtest: legacy inspection is read-only and hooks never inject new operating instructions before adoption
+ok 331 - legacy inspection is read-only and hooks never inject new operating instructions before adoption
+  ---
+  duration_ms: 16.083166
+  ...
+# Subtest: upgrade preserves company facts and rules, uses independent native sessions, fences old writes and verifies before resume
+ok 332 - upgrade preserves company facts and rules, uses independent native sessions, fences old writes and verifies before resume
+  ---
+  duration_ms: 137.560291
+  ...
+# Subtest: governance adoption requires separate explicit instruction and preserves prior governance for recovery
+ok 333 - governance adoption requires separate explicit instruction and preserves prior governance for recovery
+  ---
+  duration_ms: 138.948917
+  ...
+# Subtest: failed review, incomplete coverage and reused native identity all prevent adoption
+ok 334 - failed review, incomplete coverage and reused native identity all prevent adoption
+  ---
+  duration_ms: 306.527916
+  ...
+# Subtest: unsupported state, stale candidate, missing login and duplicate prepare make no adoption
+ok 335 - unsupported state, stale candidate, missing login and duplicate prepare make no adoption
+  ---
+  duration_ms: 32.25
+  ...
+# Subtest: active legacy work must reach a safe boundary; pause is available across versions
+ok 336 - active legacy work must reach a safe boundary; pause is available across versions
+  ---
+  duration_ms: 24.643333
+  ...
+# Subtest: late business changes invalidate rehearsal, but delivery attempts do not
+ok 337 - late business changes invalidate rehearsal, but delivery attempts do not
+  ---
+  duration_ms: 161.1135
+  ...
+# Subtest: recovery restores definitions, retains new facts, and does not restore old native sessions
+ok 338 - recovery restores definitions, retains new facts, and does not restore old native sessions
+  ---
+  duration_ms: 170.342375
+  ...
+# Subtest: crashed checks are held, recoverable, and late model results cannot reactivate them
+ok 339 - crashed checks are held, recoverable, and late model results cannot reactivate them
+  ---
+  duration_ms: 30.322916
+  ...
+# Subtest: pause or recovery during checks revokes the pending review
+ok 340 - pause or recovery during checks revokes the pending review
+  ---
+  duration_ms: 74.880667
+  ...
+# Subtest: post-apply continuity readback catches missing company records
+ok 341 - post-apply continuity readback catches missing company records
+  ---
+  duration_ms: 130.960833
+  ...
+# Subtest: new companies and recovered teams use pinned CoS instructions, not installed replacements
+ok 342 - new companies and recovered teams use pinned CoS instructions, not installed replacements
+  ---
+  duration_ms: 12.239459
+  ...
+# Subtest: MCP upgrade completes through detached native processes on both host adapters
+ok 343 - MCP upgrade completes through detached native processes on both host adapters
+  ---
+  duration_ms: 4231.747167
+  ...
+# Subtest: a new founder chat needs explicit paused takeover, then old chat writes remain revoked
+ok 344 - a new founder chat needs explicit paused takeover, then old chat writes remain revoked
+  ---
+  duration_ms: 152.345542
+  ...
+# Subtest: parallel prepare attempts cannot acquire the same upgrade epoch
+ok 345 - parallel prepare attempts cannot acquire the same upgrade epoch
+  ---
+  duration_ms: 114.696666
+  ...
+# Subtest: a cancelled old assignment returning after apply is quarantined and retained through verification
+ok 346 - a cancelled old assignment returning after apply is quarantined and retained through verification
+  ---
+  duration_ms: 127.962541
+  ...
+# Subtest: repeated recover and reprepare retains upgrade history and preserves the original failed verdict
+ok 347 - repeated recover and reprepare retains upgrade history and preserves the original failed verdict
+  ---
+  duration_ms: 158.061917
+  ...
+# Subtest: large semantic checkpoints page without truncation and preserve exact records through apply
+ok 348 - large semantic checkpoints page without truncation and preserve exact records through apply
+  ---
+  duration_ms: 6419.77675
+  ...
+# Subtest: an interrupted upgrade can be recovered from a replacement founder chat without the old coordinator
+ok 349 - an interrupted upgrade can be recovered from a replacement founder chat without the old coordinator
+  ---
+  duration_ms: 23.825208
+  ...
+# Subtest: a founder pause after apply prevents verification from silently continuing the upgrade
+ok 350 - a founder pause after apply prevents verification from silently continuing the upgrade
+  ---
+  duration_ms: 118.153333
+  ...
+# Subtest: continuity explanations accept substantive lists but reject empty explanations
+ok 351 - continuity explanations accept substantive lists but reject empty explanations
+  ---
+  duration_ms: 168.912083
+  ...
+# Subtest: qualified Pass with blockers or withheld adoption permission never reaches ready
+ok 352 - qualified Pass with blockers or withheld adoption permission never reaches ready
+  ---
+  duration_ms: 217.4045
+  ...
+# (node:14977) ExperimentalWarning: The MockTimers API is an experimental feature and might change at any time
+# Subtest: a company checkpoint above 200000 characters upgrades without dropping any record content
+ok 353 - a company checkpoint above 200000 characters upgrades without dropping any record content
+  ---
+  duration_ms: 526.500666
+  ...
+# Subtest: compatible 0.2.0 companies can optionally adopt and recover team definitions
+ok 354 - compatible 0.2.0 companies can optionally adopt and recover team definitions
+  ---
+  duration_ms: 130.33675
+  ...
+# Subtest: compatible 0.6.0 companies can optionally adopt and recover team definitions
+ok 355 - compatible 0.6.0 companies can optionally adopt and recover team definitions
+  ---
+  duration_ms: 125.254417
+  ...
+# Subtest: compatible 0.6.1 companies can optionally adopt and recover team definitions
+ok 356 - compatible 0.6.1 companies can optionally adopt and recover team definitions
+  ---
+  duration_ms: 128.619709
+  ...
+# Subtest: compatible 0.6.2 companies can optionally adopt and recover team definitions
+ok 357 - compatible 0.6.2 companies can optionally adopt and recover team definitions
+  ---
+  duration_ms: 129.729458
+  ...
+# Subtest: compatible 0.6.3 companies can optionally adopt and recover team definitions
+ok 358 - compatible 0.6.3 companies can optionally adopt and recover team definitions
+  ---
+  duration_ms: 122.135667
+  ...
+# Subtest: compatible 0.6.4 companies can optionally adopt and recover team definitions
+ok 359 - compatible 0.6.4 companies can optionally adopt and recover team definitions
+  ---
+  duration_ms: 124.999833
+  ...
+# Subtest: compatible 0.6.5 companies can optionally adopt and recover team definitions
+ok 360 - compatible 0.6.5 companies can optionally adopt and recover team definitions
+  ---
+  duration_ms: 132.836084
+  ...
+# Subtest: compatible 0.6.6 companies can optionally adopt and recover team definitions
+ok 361 - compatible 0.6.6 companies can optionally adopt and recover team definitions
+  ---
+  duration_ms: 150.571291
+  ...
+# Subtest: compatible 0.6.7 companies can optionally adopt and recover team definitions
+ok 362 - compatible 0.6.7 companies can optionally adopt and recover team definitions
+  ---
+  duration_ms: 131.1395
+  ...
+# Subtest: company rename cannot change a pending upgrade checkpoint
+ok 363 - company rename cannot change a pending upgrade checkpoint
+  ---
+  duration_ms: 17.031625
+  ...
+# Subtest: both roles retrieve exact huge frozen source excerpts through JSON requests in their existing sessions
+ok 364 - both roles retrieve exact huge frozen source excerpts through JSON requests in their existing sessions
+  ---
+  duration_ms: 5097.151792
+  ...
+# Subtest: QA page Blocked cannot be erased by later page and final Pass
+ok 365 - QA page Blocked cannot be erased by later page and final Pass
+  ---
+  duration_ms: 590.886583
+  ...
+# Subtest: history mutation, owner change, checkpoint change and deadline expiry retain late evidence without permission
+ok 366 - history mutation, owner change, checkpoint change and deadline expiry retain late evidence without permission
+  ---
+  duration_ms: 441.135459
+  ...
+# Subtest: bound full prior history survives apply and verify and cannot disappear through references
+ok 367 - bound full prior history survives apply and verify and cannot disappear through references
+  ---
+  duration_ms: 201.274125
+  ...
+# Subtest: 45 minute deadline is consistent with status; old attempts retain seven minute fallback
+ok 368 - 45 minute deadline is consistent with status; old attempts retain seven minute fallback
+  ---
+  duration_ms: 33.399625
+  ...
+# Subtest: native page calls use the selected ceiling capped by the unchanged rehearsal deadline
+ok 369 - native page calls use the selected ceiling capped by the unchanged rehearsal deadline
+  ---
+  duration_ms: 885.593292
+  ...
+# Subtest: native timeout remains held with its evidence and cannot restart the failed rehearsal
+ok 370 - native timeout remains held with its evidence and cannot restart the failed rehearsal
+  ---
+  duration_ms: 30.340791
+  ...
+# Subtest: immutable rehearsal deadline aborts an active native call and holds adoption
+ok 371 - immutable rehearsal deadline aborts an active native call and holds adoption
+  ---
+  duration_ms: 27.926
+  ...
+# Subtest: unexpected native identity changes fail without silent restart
+ok 372 - unexpected native identity changes fail without silent restart
+  ---
+  duration_ms: 45.724333
+  ...
+# Subtest: tool-less protocol copies every citation only from actual prompt metadata and batches small findings into one replay per role
+ok 373 - tool-less protocol copies every citation only from actual prompt metadata and batches small findings into one replay per role
+  ---
+  duration_ms: 887.053417
+  ...
+# Subtest: QA page adoption permission and final continuation permission both fail closed
+ok 374 - QA page adoption permission and final continuation permission both fail closed
+  ---
+  duration_ms: 195.644
+  ...
+# Subtest: apply rechecks QA page permission and complete replay receipts
+ok 375 - apply rechecks QA page permission and complete replay receipts
+  ---
+  duration_ms: 226.046375
+  ...
+# Subtest: large replay batches deliver every durable finding and preserve the union of QA page blockers
+ok 376 - large replay batches deliver every durable finding and preserve the union of QA page blockers
+  ---
+  duration_ms: 32014.586584
+  ...
+# Subtest: corrupted saved checkpoint is rejected before any native call while authoritative intent remains
+ok 377 - corrupted saved checkpoint is rejected before any native call while authoritative intent remains
+  ---
+  duration_ms: 17.633458
+  ...
+# Subtest: saved checkpoint corruption and changed pins during calls retain late evidence but never authorize adoption
+ok 378 - saved checkpoint corruption and changed pins during calls retain late evidence but never authorize adoption
+  ---
+  duration_ms: 73.642708
+  ...
+# Subtest: retrieval return rechecks the saved checkpoint and retains the held source response
+ok 379 - retrieval return rechecks the saved checkpoint and retains the held source response
+  ---
+  duration_ms: 34.228375
+  ...
+# Subtest: apply and verify reject saved checkpoint corruption or a repinned checkpoint
+ok 380 - apply and verify reject saved checkpoint corruption or a repinned checkpoint
+  ---
+  duration_ms: 514.4985
+  ...
+# Subtest: recovery remains available for a corrupted saved checkpoint and retains later business facts
+ok 381 - recovery remains available for a corrupted saved checkpoint and retains later business facts
+  ---
+  duration_ms: 18.791833
+  ...
+# Subtest: actual prompt contracts produce valid page, replay, synthesis and reads-only responses on both roles
+ok 382 - actual prompt contracts produce valid page, replay, synthesis and reads-only responses on both roles
+  ---
+  duration_ms: 152.713208
+  ...
+# Subtest: nested findings alone, uncited replay and incomplete synthesis remain held with their exact invalid output retained
+ok 383 - nested findings alone, uncited replay and incomplete synthesis remain held with their exact invalid output retained
+  ---
+  duration_ms: 107.808584
+  ...
+# Subtest: inspect compares identical current inputs including terminal history without authoritative transactions or external calls
+ok 384 - inspect compares identical current inputs including terminal history without authoritative transactions or external calls
+  ---
+  duration_ms: 34.78925
+  ...
+# Subtest: aliased historical Fail and Blocked remain intact through independent paging, apply, verify and recovery guards
+ok 385 - aliased historical Fail and Blocked remain intact through independent paging, apply, verify and recovery guards
+  ---
+  duration_ms: 113.908208
+  ...
+# Subtest: fresh attempts persist the exact call ceiling; legacy absence retains ten minutes
+ok 386 - fresh attempts persist the exact call ceiling; legacy absence retains ten minutes
+  ---
+  duration_ms: 325.50875
+  ...
+# Subtest: call ceiling cannot change while queued, during review, before apply or verify
+ok 387 - call ceiling cannot change while queued, during review, before apply or verify
+  ---
+  duration_ms: 833.57475
+  ...
+# Subtest: frozen call ceiling rejects a stale response even if stored evidence is also rewritten
+ok 388 - frozen call ceiling rejects a stale response even if stored evidence is also rewritten
+  ---
+  duration_ms: 23.222833
+  ...
+# Subtest: fingerprints bind complete source/test/runtime/policy/command/env/limits, canonicalize maps only
+ok 389 - fingerprints bind complete source/test/runtime/policy/command/env/limits, canonicalize maps only
+  ---
+  duration_ms: 22.1485
+  ...
+# Subtest: missing and untracked fingerprint components are non-reusable
+ok 390 - missing and untracked fingerprint components are non-reusable
+  ---
+  duration_ms: 0.593167
+  ...
+# Subtest: only exact original successful runtime evidence is eligible, never acceptance or chained reuse
+ok 391 - only exact original successful runtime evidence is eligible, never acceptance or chained reuse
+  ---
+  duration_ms: 0.275291
+  ...
+# Subtest: post-execution confirmation holds toolchain changes and incomplete rediscovery
+ok 392 - post-execution confirmation holds toolchain changes and incomplete rediscovery
+  ---
+  duration_ms: 0.221458
+  ...
+1..392
+# tests 392
+# suites 0
+# pass 392
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 71015.909041
