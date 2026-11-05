@@ -8,6 +8,7 @@ import { assignmentContext, contextMatches, contextBudgetForJob } from './contex
 import { handoverReviewEligible } from './handover.mjs';
 import { dataDir } from './engine.mjs';
 import { developmentAssignment, developmentBundle, developmentPrompt } from './develop.mjs';
+import { developmentLimits } from './development-limits.mjs';
 import { prototypeAssignment, prototypeBundle, prototypePrompt } from './prototype.mjs';
 import { coordinationEligible } from './coordination.mjs';
 import { TIMEOUT_POLICY_VERSION, normalizeTimeout, executionTiming, jobTimeoutState } from './timeout.mjs';
@@ -33,7 +34,7 @@ function failureEvidence(error) {
 }
 
 export async function work(root, jobId, model = runModel) {
-  let job, state, context, output, artifact, controller, monitor, spawned=false,invoked=false,lastToken,lastCurrent,lastGrantExpiry;
+  let job, state, context, output, artifact, controller, monitor, spawned=false,invoked=false,lastToken,lastCurrent,lastGrantExpiry,lastDevelopmentMaxBytes;
   const supplemental=[];
   const eligibility=s=>{
     const current=s.jobs[jobId];
@@ -45,6 +46,7 @@ export async function work(root, jobId, model = runModel) {
     if(['inspection','overdue','terminating'].includes(timing.state))throw Object.assign(new Error(timing.state==='inspection'?'Assignment timing requires inspection: '+timing.reason:`Assignment ${timing.phase} deadline reached`),{code:timing.state==='inspection'?'INVALID_EXECUTION_TIMING':timing.phase==='execution'?'ROLE_TIMEOUT':'STARTUP_TIMEOUT'});
     for(const ref of supplemental)if(digest(JSON.stringify(contextSource(s,ref.id)))!==ref.sha256)throw Error('Supplemental evidence changed');
     const grant=s.records[job.development_id??job.prototype_id];lastGrantExpiry=Date.parse(grant?.development?.scope?.expires_at??grant?.prototype?.scope?.expires_at??'');
+    lastDevelopmentMaxBytes=job.development_id?grant?.development?.scope?.max_bytes:undefined;
     return current;
   };
   const check=()=>{
@@ -52,6 +54,9 @@ export async function work(root, jobId, model = runModel) {
     try {withStore(root,db=>{
       const token=db.changeToken?.();
       if(Number.isFinite(lastGrantExpiry)&&Date.now()>=lastGrantExpiry)throw Object.assign(new Error('Scoped authorization expired'),{code:'SCOPE_EXPIRED'});
+      // This project file can change without a database revision. Do not let
+      // token-based polling retain a budget that the host has just lowered.
+      if(lastDevelopmentMaxBytes!==undefined&&lastDevelopmentMaxBytes>developmentLimits(root).max_bytes)throw Object.assign(new Error('Configured development ceiling was lowered below this scope'),{code:'SCOPE_BUDGET_CHANGED'});
       if(token===undefined||token!==lastToken){lastCurrent=eligibility(db.read());lastToken=token;}
       else {const timing=jobTimeoutState(lastCurrent,Date.now());if(['inspection','overdue','terminating'].includes(timing.state))throw Object.assign(new Error('Assignment deadline reached'),{code:'ROLE_TIMEOUT'});}
     });}
@@ -106,6 +111,9 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
       const remaining=lastCurrent?.execution_deadline_at?Math.min(timeout.timeout_ms,Date.parse(lastCurrent.execution_deadline_at)-Date.now()):timeout.timeout_ms;
       if(remaining<1000)throw Error('Insufficient execution time for supplemental read');
       invoked=true;
+      // A prior read round proves only that earlier process closed. Failure of
+      // this invocation still needs its own termination evidence for release.
+      output=undefined;
       output=await model(job.host,session,request,dir,remaining,job.model_selection??null,{
         signal:controller.signal,timeoutReason:timeout.timeout_reason,maxOutputCharacters:Math.max(2000000,contextBudgetForJob(state,job)),
         onSpawn:round===0?timing=>{

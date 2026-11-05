@@ -425,6 +425,16 @@ test('unchanged-state polling still cancels generation at scope expiry',live,asy
  });
  const current=read(a).jobs[key];assert.equal(current.status,'quarantined');assert.match(current.execution_failure.message,/expired/);assert.ok(Date.now()-started<2000);
 });
+test('unchanged database polling still cancels generation when external project ceiling is lowered',live,async()=>{
+ const a=setup(),p=await plan(a);await authorize(a,p);
+ const key=queue(a,{development_id:p.id}),started=Date.now();
+ await work(a.root,key,async(_host,_native,_prompt,_dir,_timeout,_selection,options)=>{
+  fs.writeFileSync(path.join(a.root,'.company','development.json'),JSON.stringify({max_bytes_ceiling:1000}));
+  await new Promise(resolve=>{const timer=setTimeout(resolve,2500);options.signal.addEventListener('abort',()=>{clearTimeout(timer);resolve();},{once:true});});
+  return output({files:good});
+ });
+ const current=read(a).jobs[key];assert.equal(current.status,'quarantined');assert.match(current.execution_failure.message,/ceiling.*lowered/);assert.ok(Date.now()-started<2000);
+});
 test('post-execution input tampering holds the receipt while retaining actual executed evidence',live,async()=>{
  const a=setup(),p=await plan(a);await authorize(a,p);
  const files=[good[0],{path:'sum.test.mjs',content:"import test from 'node:test';import fs from 'node:fs';import path from 'node:path';test('host race fixture',async()=>{fs.writeFileSync(path.join(process.env.HOME,'started'),'1');await new Promise(r=>setTimeout(r,500));});"}];
