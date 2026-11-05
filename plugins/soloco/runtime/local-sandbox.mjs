@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 const BACKEND='macos-seatbelt-node';
 const node=fs.realpathSync(process.execPath);
 const quote=value=>JSON.stringify(value);
-let runtimePaths, capability;
+let runtimePaths, capability, isolationFlag;
 function libraries() {
   if(runtimePaths) return runtimePaths;
   const started=Date.now(), seen=new Set(), queue=[node], dirs=new Set(['/System/Library','/usr/lib']);
@@ -65,8 +65,22 @@ export function sandboxProfile(directory,scratch) {
 function environment(scratch) {
   return {PATH:'/usr/bin:/bin',HOME:scratch,TMPDIR:scratch,TMP:scratch,TEMP:scratch,LANG:'C',LC_ALL:'C',OPENSSL_CONF:'/dev/null',NODE_DISABLE_COLORS:'1'};
 }
+// Probe only the trusted runtime with fixed code, never a candidate file or cwd.
+// Exported for deterministic flag-selection tests; production uses spawnSync.
+export function selectTestIsolationFlag(probe=spawnSync) {
+  const failures=[];
+  for(const flag of ['--test-isolation=none','--experimental-test-isolation=none']) {
+    try {
+      const result=probe(node,[flag,'--eval',''],{cwd:path.dirname(node),env:environment(os.tmpdir()),encoding:'utf8',timeout:1000,maxBuffer:10000,killSignal:'SIGKILL'});
+      if(!result.error && !result.signal && result.status===0)return flag;
+      failures.push(`${flag}: ${String(result.error?.message || result.stderr || result.signal || `exit ${result.status}`).trim().slice(0,200)}`);
+    } catch(error) {failures.push(`${flag}: ${String(error.message).slice(0,200)}`);}
+  }
+  throw new Error(`Node test isolation is unavailable (${failures.join('; ')}). No unsandboxed fallback.`);
+}
 function testArguments(directory,scratch,paths) {
-  return [...permissions(directory,scratch),'--test','--test-isolation=none','--test-concurrency=1','--test-reporter=tap','--test-force-exit',...paths];
+  isolationFlag??=selectTestIsolationFlag();
+  return [...permissions(directory,scratch),'--test',isolationFlag,'--test-concurrency=1','--test-reporter=tap','--test-force-exit',...paths];
 }
 function permissions(directory,scratch) {
   return ['--permission',`--allow-fs-read=${directory}`,`--allow-fs-write=${scratch}`];

@@ -31,7 +31,7 @@ export function assignmentContext(state, job) {
     governance: state.governance, charter: state.roles[job.role], records,
     notices: state.notices.filter(n => !n.resolution).map(({deliveries, seen_at, ...n}) => n),
     messages: state.messages.filter(m => m.to === job.role),
-    ...(job.context_format===2?{assignment:{task:job.task,task_summary:job.task_summary??null,next_handoff:job.next_handoff??null,model_selection:job.model_selection??{mode:'default'},model_catalog:job.model_catalog??null}}:{}),
+    ...(job.context_format===2?{assignment:{...(Object.hasOwn(job,'expected_deliverable')?{expected_deliverable:job.expected_deliverable}:{}),...(Object.hasOwn(job,'requester')?{requester:job.requester}:{}),task:job.task,task_summary:job.task_summary??null,next_handoff:job.next_handoff??null,model_selection:job.model_selection??{mode:'default'},model_catalog:job.model_catalog??null}}:{}),
   };
   const text = JSON.stringify(pack);
   if (text.length > CONTEXT_LIMIT) throw new Error('Assignment context exceeds 200000 characters; narrow the assignment or review and compact records. Nothing was truncated');

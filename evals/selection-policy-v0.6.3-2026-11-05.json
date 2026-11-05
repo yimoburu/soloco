@@ -1,0 +1,101 @@
+{
+  "schema": 1,
+  "kind": "selection_policy_decision_eval",
+  "source": "live_host_response",
+  "host": "codex",
+  "policy_sha256": "295312da5bd5ad6567857ac3fa2a0a3c9b1f5c870661dc38365fcc698274d5ff",
+  "cases_sha256": "052e9b03e50facfb329c0d7e35698195007f089ee577f37de62fd81578361624",
+  "requested_evaluator": {
+    "mode": "explicit",
+    "model": "gpt-6.1-sol",
+    "effort": "low",
+    "reason": "Bounded fictional CoS selection-policy evaluation"
+  },
+  "evaluator_evidence": {
+    "reported_models": [],
+    "reported_effort": null,
+    "reported_service_tier": null,
+    "applied_controls": {
+      "model": "gpt-6.1-sol",
+      "effort": "low",
+      "service_tier": null,
+      "fast_mode": null,
+      "switch_models_on_flag": null,
+      "scope": "child_launch_argv",
+      "verification": "applied_controls_not_effective_settings"
+    },
+    "source": "exec_json",
+    "scope": "assignment",
+    "verification": "unverified"
+  },
+  "created_at": "2026-11-05T00:15:36.095Z",
+  "duration_ms": 10965,
+  "passed": true,
+  "failures": [],
+  "cases": [
+    {
+      "id": "simple",
+      "passed": true,
+      "selection": {
+        "mode": "explicit",
+        "model": "fixture-small",
+        "effort": "low",
+        "reason": "Exact extraction with no ambiguity matches fixture-small's validated competence. Low effort meets exact-match acceptance with lower completion cost; prior deep/high settings do not justify retention.",
+        "speed": "host_default"
+      },
+      "errors": []
+    },
+    {
+      "id": "routine",
+      "passed": true,
+      "selection": {
+        "mode": "explicit",
+        "model": "fixture-balanced",
+        "effort": "medium",
+        "reason": "Balanced/medium passed comparable bounded parser fixes and fits the complete snapshot and six edge cases. Small lacks coding evidence; deeper settings add cost and latency without demonstrated need.",
+        "speed": "host_default"
+      },
+      "errors": []
+    },
+    {
+      "id": "consequential",
+      "passed": true,
+      "selection": {
+        "mode": "explicit",
+        "model": "fixture-deep",
+        "effort": "high",
+        "reason": "Deep/high is qualified for cross-component invariant review; balanced/medium failed this class and small lacks review evidence. Stale acceptance risk justifies higher cost and latency. Preserve independent reviewer identity.",
+        "speed": "host_default"
+      },
+      "errors": []
+    },
+    {
+      "id": "escalation",
+      "passed": true,
+      "selection": {
+        "mode": "explicit",
+        "model": "fixture-deep",
+        "effort": "high",
+        "reason": "Two balanced/medium failures reveal cross-component state complexity resembling deep/high's qualified review class. Higher cost and latency are justified for the one remaining repair; coding success is unproven and the allowance stays unchanged.",
+        "speed": "host_default"
+      },
+      "errors": []
+    },
+    {
+      "id": "catalog-unavailable",
+      "passed": true,
+      "selection": {
+        "mode": "default",
+        "reason": "The catalog is unavailable, so no explicit identifier is justified. Host defaults are reasonable for a brief, low-consequence feasibility proposal, avoiding unsupported controls; applied model, effort and speed remain unobserved.",
+        "speed": "host_default"
+      },
+      "errors": []
+    }
+  ],
+  "limitations": [
+    "Fictional qualification and relative-cost evidence; not real model benchmarks",
+    "Evaluates CoS choices only; selected specialist models were not executed",
+    "No effective provider settings, billing, savings or production behavior established",
+    "Founder-facing chat usage is not measured"
+  ]
+}
