@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
+import * as coordination from '../plugins/soloco/runtime/coordination.mjs';
 import * as timeout from '../plugins/soloco/runtime/timeout.mjs';
 
 // Evaluate actual module bodies with explicit boundary doubles. No runtime
@@ -20,7 +21,7 @@ function harness() {
   let matches=true,scope=true,beforeTransaction;
   const intervals=new Set(),launches=[];
   const iso=()=>new Date(now).toISOString();
-  const deps={...timeout,path,os:{homedir:()=>'/unused'},fs:{existsSync:()=>true,mkdirSync:()=>{}},process:{env:{},pid:42,execPath:'/unused/node',argv:[]},Date:class extends Date {static now(){return now;}},AbortController,
+  const deps={...coordination,...timeout,path,os:{homedir:()=>'/unused'},fs:{existsSync:()=>true,mkdirSync:()=>{}},process:{env:{},pid:42,execPath:'/unused/node',argv:[]},Date:class extends Date {static now(){return now;}},AbortController,
     PACKAGE:'/unused',VERSION:'test',SCHEMA:2,stamp:iso,id:p=>p+'-'+(++sequence),digest:()=> 'binding',folder:x=>x,noLink:()=>{},
     withStore:(root,fn)=>fn({read:()=>structuredClone(state),transaction:(type,change)=>{if(beforeTransaction){const hook=beforeTransaction;beforeTransaction=undefined;hook(type);}const next=change(structuredClone(state));state=structuredClone(next);return structuredClone(state);}}),
     owner:(s,session,host,epoch)=>{if(s.owner.session_id!==session || s.owner.host!==host || (epoch!==undefined && s.owner.epoch!==epoch))throw new Error('Stale owner');},
@@ -29,7 +30,7 @@ function harness() {
     compatibleRuntime:()=>true,upgradePending:()=>false,teamHash:()=> 'team',installedTeam:()=>({}),
     readiness:()=>({available:true,authenticated:true,version:'test'}),modelCatalog:()=>({}),
     normalizeSelection:()=>({mode:'default'}),selectionKey:()=> 'default',selectionUsage:()=>({scope:"test_stub"}),activityFor:s=>Object.values(s.jobs).map(j=>({job_id:j.id})),
-    assignmentContext:()=>({hash:'context',inputs:[],text:'fixture context'}),contextMatches:()=>matches,
+    assignmentContext:(s,j)=>({hash:'context',inputs:j.inputs??[],text:'fixture context'}),contextMatches:()=>matches,
     developmentAssignment:()=>{if(!scope)throw new Error('Scope revoked');},prototypeAssignment:()=>{},
     developmentCapability:()=>({}),prototypeCapability:()=>({}),developmentAction:()=>{},prototypeAction:()=>{},
     developmentBundle:()=>null,prototypeBundle:()=>null,developmentPrompt:()=>'',prototypePrompt:()=>'',
@@ -192,4 +193,39 @@ test('startup expiry aborts without inventing spawn timing and launch errors ret
   assert.equal(f.state.jobs[failed.id].execution_started_at,undefined);
   assert.equal(f.state.jobs[failed.id].execution_failure.code,'ENOENT');
   assert.equal(f.state.jobs[failed.id].execution_failure.termination_confirmed,undefined);assert.equal(f.intervals.size,0);
+});
+
+test('coordination dispatch binds prerequisite evidence, admits disjoint resources and rejects premature/conflicting work',async()=>{
+  const h=harness();
+  assert.throws(()=>h.dispatch({input_ids:'not-an-array'}),/array/);
+  assert.throws(()=>h.dispatch({depends_on:['missing']}),/planned/);
+  assert.equal(h.launches.length,0);
+  h.mutate(s=>{
+    s.jobs.prepared={id:'prepared',status:'completed',epoch:1,instance_id:'preparer',artifact_id:'prepared-output'};
+    s.records['prepared-output']={id:'prepared-output',revision:1,status:'Submitted',kind:'artifact',content:'Scoped prepared evidence',job_id:'prepared',author_instance:'preparer'};
+  });
+  const first=h.dispatch({depends_on:['prepared'],resources:['fixture/one']});
+  assert.ok(first.inputs.some(i=>i.id==='prepared-output'&&i.revision===1));
+  assert.equal(first.coordination.dependencies[0].artifact_id,'prepared-output');
+  h.mutate(s=>{s.roles.research={name:'Research'};});
+  assert.throws(()=>h.dispatch({role:'research',resources:['fixture/one']}),/reserved/);
+  const second=h.engine.dispatch({...h.args,role:'research',resources:['fixture/two']},'codex');
+  assert.equal(h.launches.length,2);assert.equal(second.status,'queued');
+  await h.worker.work('/fixture',first.id,async(host,id,prompt,dir,limit,selection,options)=>{
+    spawnAt(h,options,limit,first.timeout_reason);return response();
+  });
+  assert.equal(h.state.jobs[first.id].status,'completed');
+  assert.equal(h.state.jobs[first.id].coordination_release.termination_confirmed,true);
+  assert.ok(h.dispatch({resources:['fixture/one']}));
+});
+
+test('uncertain cancellation keeps resource claim; confirmed closure releases it',async()=>{
+  for(const confirmed of [false,true]) {
+    const h=harness(),j=h.dispatch({resources:['shared']}),e=Object.assign(new Error('Model process uncertain'),{termination_confirmed:confirmed});
+    await h.worker.work('/fixture',j.id,async()=>{throw e;});
+    assert.equal(h.state.jobs[j.id].status,'failed');
+    h.mutate(s=>{s.sessions={};});
+    if(confirmed)assert.ok(h.dispatch({resources:['shared']}));
+    else assert.throws(()=>h.dispatch({resources:['shared']}),/reserved/);
+  }
 });

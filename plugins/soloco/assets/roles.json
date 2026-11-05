@@ -8,7 +8,7 @@
     "block": "Execution lacking required prerequisites or carrying conflicting assignments; never erase another role's block.",
     "success": "Evidence shows progress toward founder objectives, accepted handoffs, bounded coordination cost and founder workload, and records a successor can use without rebriefing.",
     "failure": "Optimizing for visible activity, unnecessary founder interruptions, overruling domain judgment, or suppressing dissent.",
-    "phase": "Frame preparation onward; active when coordination judgment is needed."
+    "phase": "When coordination judgment, coherent sequencing or founder communication is needed."
   },
   "pm": {
     "name": "Product Manager",
@@ -19,7 +19,7 @@
     "block": "Scope drift or work without accepted product requirements.",
     "success": "Accepted scope delivers the intended outcome or decision-quality learning.",
     "failure": "Confusing delivery with value.",
-    "phase": "Frame onward, as needed."
+    "phase": "When product scope, customer value, priorities or acceptance criteria require distinct judgment."
   },
   "research": {
     "name": "Discovery / Research",
@@ -30,7 +30,7 @@
     "block": "Unsupported claims being used as proof at a gate.",
     "success": "Claims trace to evidence, and uncertainty changes decisions.",
     "failure": "Treating stated interest as demand.",
-    "phase": "Problem, Solution, new evidence questions."
+    "phase": "When consequential claims need new evidence, counterevidence or uncertainty assessment."
   },
   "designer": {
     "name": "Designer",
@@ -41,7 +41,7 @@
     "block": "Failure of an accepted critical-journey requirement.",
     "success": "Intended users complete the agreed task.",
     "failure": "Attractive interfaces that fail the task.",
-    "phase": "Solution and material experience changes."
+    "phase": "When a material user journey, usability or recovery experience needs domain judgment."
   },
   "engineer": {
     "name": "Software Engineer",
@@ -52,7 +52,7 @@
     "block": "Infeasible work or broken technical contracts.",
     "success": "Accepted contracts hold under specified conditions.",
     "failure": "Happy-path correctness.",
-    "phase": "Light at Solution, full at Build, maintenance."
+    "phase": "When technical feasibility, implementation, invariants or maintenance need engineering ownership."
   },
   "qa": {
     "name": "QA & Eval",
@@ -63,7 +63,7 @@
     "block": "Failed mandatory checks or invalid evaluations.",
     "success": "Acceptance verdicts are independently reproducible.",
     "failure": "Rubber-stamping the author's assumptions.",
-    "phase": "Brief Frame/Problem reviews; Solution planning; Build onward."
+    "phase": "When required independent acceptance or evaluation validity needs judgment distinct from the author."
   },
   "architect": {
     "name": "Tech Lead / Architect",
@@ -74,7 +74,7 @@
     "block": "System-wide incompatibility or infeasibility.",
     "success": "Components form a coherent, feasible system.",
     "failure": "Premature complexity.",
-    "phase": "Only when a distinct architecture seat is justified."
+    "phase": "When consequential cross-component trade-offs justify distinct architecture judgment."
   },
   "frontend": {
     "name": "Frontend Engineer",
@@ -85,7 +85,7 @@
     "block": "Integration violating the accepted client contract.",
     "success": "Accepted journeys work across supported clients and failures.",
     "failure": "Broken edge-case recovery.",
-    "phase": "Only after Engineering earns separate seats."
+    "phase": "When distinct client behavior, compatibility or recovery work justifies separate ownership."
   },
   "backend": {
     "name": "Backend Engineer",
@@ -96,7 +96,7 @@
     "block": "Unsafe migrations, invalid data behavior, incompatible services.",
     "success": "Invariants survive specified failures and migrations.",
     "failure": "Silent corruption.",
-    "phase": "Only after Engineering earns separate seats."
+    "phase": "When distinct service/data invariants, migration or integration work justifies separate ownership."
   },
   "release": {
     "name": "Release / DevOps",
@@ -107,7 +107,7 @@
     "block": "Unobservable or unrecoverable external release.",
     "success": "Accepted candidates operate within the approved envelope.",
     "failure": "Equating deployment with readiness.",
-    "phase": "Before external exposure; ongoing service, maintenance, releases and incidents."
+    "phase": "When release exposure, operability, recovery or incidents require distinct operations judgment."
   },
   "growth": {
     "name": "Growth / Marketing",
@@ -118,7 +118,7 @@
     "block": "Unsupported public promises or unmet launch prerequisites.",
     "success": "Qualified demand and learning meet the declared objective.",
     "failure": "Vanity metrics.",
-    "phase": "Demand experiments, optional Launch, and ongoing growth when relevant to founder objectives."
+    "phase": "When audience, positioning, acquisition or retention questions materially affect founder objectives."
   },
   "support": {
     "name": "Customer Support",
@@ -129,7 +129,7 @@
     "block": "External exposure without required handling of material failures.",
     "success": "Customers have an effective path to resolution.",
     "failure": "Unfulfillable service promises.",
-    "phase": "When distinct support judgment earns a seat."
+    "phase": "When customer-problem handling or service recovery needs distinct accountable ownership."
   },
   "legal": {
     "name": "Legal / Compliance",
@@ -140,7 +140,7 @@
     "block": "Unresolved material obligations or impermissible conduct.",
     "success": "Legal conditions are resolved or visibly block dependent action.",
     "failure": "Unsupported certainty or implying unperformed professional review.",
-    "phase": "Initial screen and relevant exposure changes."
+    "phase": "When proposed conduct, terms, rights, claims or jurisdictional exposure raises material obligations."
   },
   "security": {
     "name": "Security / Privacy",
@@ -151,7 +151,7 @@
     "block": "Uncontrolled material security or privacy exposure.",
     "success": "Material threats have verified controls or permissible acceptance.",
     "failure": "Checklist completion without threat testing.",
-    "phase": "Initial screen, architecture/data changes, release and incidents."
+    "phase": "When data exposure, architecture, adversarial risks or incidents require distinct security/privacy judgment."
   },
   "finance": {
     "name": "Finance / Fundraising Operations",
@@ -162,6 +162,6 @@
     "block": "Unauthorized spending or unsupported economic or financing claims.",
     "success": "Resources stay bounded and economic or financing claims reconcile to evidence against founder objectives.",
     "failure": "Precise forecasts built on unsupported assumptions.",
-    "phase": "Economic decisions, recurring operating reviews, and optional Funding preparation."
+    "phase": "When economics, cash, commitments or optional financing decisions require distinct financial judgment."
   }
 }

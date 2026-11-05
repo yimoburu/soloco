@@ -1,0 +1,421 @@
+{
+  "schema": 1,
+  "kind": "actual_selection_task_outcomes",
+  "host": "codex",
+  "created_at": "2026-11-05T05:29:44.614Z",
+  "fixture_sha256": "2cff34d9f5afef1365263b04cf657e1a120ec2aee1ef39a6bd4e0b4222e3e7c9",
+  "criteria": {
+    "trials_per_case": 3,
+    "all_trials_must_pass": true,
+    "repair_allowance": 0,
+    "critical_seeded_blockers_missed": 0,
+    "noninferiority_established": false
+  },
+  "trials": [
+    {
+      "case_id": "extraction",
+      "trial": 1,
+      "requested": {
+        "mode": "explicit",
+        "model": "gpt-6-luna",
+        "effort": "low",
+        "reason": "Exact low-ambiguity extraction with deterministic grading; evaluate a lighter supported choice before any production qualification claim.",
+        "speed": "host_default"
+      },
+      "passed": true,
+      "model_ms": 4033,
+      "evidence": {
+        "reported_models": [],
+        "reported_effort": null,
+        "reported_service_tier": null,
+        "applied_controls": {
+          "model": "gpt-6-luna",
+          "effort": "low",
+          "service_tier": null,
+          "fast_mode": null,
+          "switch_models_on_flag": null,
+          "scope": "child_launch_argv",
+          "verification": "applied_controls_not_effective_settings"
+        },
+        "source": "exec_json",
+        "scope": "assignment",
+        "verification": "unverified"
+      },
+      "answer": {
+        "criteria": [
+          "Keyboard users can reach every color.",
+          "The selected color has a visible label.",
+          "Cancel restores the prior selection."
+        ]
+      },
+      "grader": "exact_extraction",
+      "elapsed_ms": 4033
+    },
+    {
+      "case_id": "extraction",
+      "trial": 2,
+      "requested": {
+        "mode": "explicit",
+        "model": "gpt-6-luna",
+        "effort": "low",
+        "reason": "Exact low-ambiguity extraction with deterministic grading; evaluate a lighter supported choice before any production qualification claim.",
+        "speed": "host_default"
+      },
+      "passed": true,
+      "model_ms": 4660,
+      "evidence": {
+        "reported_models": [],
+        "reported_effort": null,
+        "reported_service_tier": null,
+        "applied_controls": {
+          "model": "gpt-6-luna",
+          "effort": "low",
+          "service_tier": null,
+          "fast_mode": null,
+          "switch_models_on_flag": null,
+          "scope": "child_launch_argv",
+          "verification": "applied_controls_not_effective_settings"
+        },
+        "source": "exec_json",
+        "scope": "assignment",
+        "verification": "unverified"
+      },
+      "answer": {
+        "criteria": [
+          "Keyboard users can reach every color.",
+          "The selected color has a visible label.",
+          "Cancel restores the prior selection."
+        ]
+      },
+      "grader": "exact_extraction",
+      "elapsed_ms": 4660
+    },
+    {
+      "case_id": "extraction",
+      "trial": 3,
+      "requested": {
+        "mode": "explicit",
+        "model": "gpt-6-luna",
+        "effort": "low",
+        "reason": "Exact low-ambiguity extraction with deterministic grading; evaluate a lighter supported choice before any production qualification claim.",
+        "speed": "host_default"
+      },
+      "passed": true,
+      "model_ms": 5089,
+      "evidence": {
+        "reported_models": [],
+        "reported_effort": null,
+        "reported_service_tier": null,
+        "applied_controls": {
+          "model": "gpt-6-luna",
+          "effort": "low",
+          "service_tier": null,
+          "fast_mode": null,
+          "switch_models_on_flag": null,
+          "scope": "child_launch_argv",
+          "verification": "applied_controls_not_effective_settings"
+        },
+        "source": "exec_json",
+        "scope": "assignment",
+        "verification": "unverified"
+      },
+      "answer": {
+        "criteria": [
+          "Keyboard users can reach every color.",
+          "The selected color has a visible label.",
+          "Cancel restores the prior selection."
+        ]
+      },
+      "grader": "exact_extraction",
+      "elapsed_ms": 5090
+    },
+    {
+      "case_id": "coding",
+      "trial": 1,
+      "requested": {
+        "mode": "explicit",
+        "model": "gpt-6.1-sol",
+        "effort": "medium",
+        "reason": "Small pure parser implementation with explicit edge cases and executed Node acceptance; balanced coding/reasoning setting.",
+        "speed": "host_default"
+      },
+      "passed": true,
+      "model_ms": 13405,
+      "evidence": {
+        "reported_models": [],
+        "reported_effort": null,
+        "reported_service_tier": null,
+        "applied_controls": {
+          "model": "gpt-6.1-sol",
+          "effort": "medium",
+          "service_tier": null,
+          "fast_mode": null,
+          "switch_models_on_flag": null,
+          "scope": "child_launch_argv",
+          "verification": "applied_controls_not_effective_settings"
+        },
+        "source": "exec_json",
+        "scope": "assignment",
+        "verification": "unverified"
+      },
+      "answer": {
+        "source": "export function parsePort(value) {\n  if (typeof value !== \"string\" || value.length === 0 || /[^0-9]/.test(value)) return null;\n  const port = Number(value);\n  return Number.isInteger(port) && port >= 1 && port <= 65535 ? port : null;\n}"
+      },
+      "grader": "sandboxed_node_tests",
+      "source_sha256": "ba379936b844a9cc814390290f42f80d0ea0eaa8c4af5918ac972ecba313f9e8",
+      "receipt": {
+        "status": "passed",
+        "exit_code": 0,
+        "tests_executed": true,
+        "duration_ms": 1355,
+        "stdout": "TAP version 13\n# Subtest: valid ASCII ports and boundaries\nok 1 - valid ASCII ports and boundaries\n  ---\n  duration_ms: 1.3855\n  type: 'test'\n  ...\n# Subtest: reject out-of-range and nondecimal values\nok 2 - reject out-of-range and nondecimal values\n  ---\n  duration_ms: 0.397125\n  type: 'test'\n  ...\n# Subtest: reject nonstrings\nok 3 - reject nonstrings\n  ---\n  duration_ms: 0.194417\n  type: 'test'\n  ...\n1..3\n# tests 3\n# suites 0\n# pass 3\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 12.5555\n",
+        "stderr": ""
+      },
+      "elapsed_ms": 14840
+    },
+    {
+      "case_id": "coding",
+      "trial": 2,
+      "requested": {
+        "mode": "explicit",
+        "model": "gpt-6.1-sol",
+        "effort": "medium",
+        "reason": "Small pure parser implementation with explicit edge cases and executed Node acceptance; balanced coding/reasoning setting.",
+        "speed": "host_default"
+      },
+      "passed": true,
+      "model_ms": 6125,
+      "evidence": {
+        "reported_models": [],
+        "reported_effort": null,
+        "reported_service_tier": null,
+        "applied_controls": {
+          "model": "gpt-6.1-sol",
+          "effort": "medium",
+          "service_tier": null,
+          "fast_mode": null,
+          "switch_models_on_flag": null,
+          "scope": "child_launch_argv",
+          "verification": "applied_controls_not_effective_settings"
+        },
+        "source": "exec_json",
+        "scope": "assignment",
+        "verification": "unverified"
+      },
+      "answer": {
+        "source": "export function parsePort(value) {\n  if (typeof value !== 'string' || !/^[0-9]+$/.test(value)) return null;\n  const port = Number(value);\n  return Number.isInteger(port) && port >= 1 && port <= 65535 ? port : null;\n}"
+      },
+      "grader": "sandboxed_node_tests",
+      "source_sha256": "4c8ecc8f1c587f5297600cc791f55c2b2724899b08be9bba26477f035cf47d69",
+      "receipt": {
+        "status": "passed",
+        "exit_code": 0,
+        "tests_executed": true,
+        "duration_ms": 739,
+        "stdout": "TAP version 13\n# Subtest: valid ASCII ports and boundaries\nok 1 - valid ASCII ports and boundaries\n  ---\n  duration_ms: 1.047917\n  type: 'test'\n  ...\n# Subtest: reject out-of-range and nondecimal values\nok 2 - reject out-of-range and nondecimal values\n  ---\n  duration_ms: 0.142625\n  type: 'test'\n  ...\n# Subtest: reject nonstrings\nok 3 - reject nonstrings\n  ---\n  duration_ms: 0.060875\n  type: 'test'\n  ...\n1..3\n# tests 3\n# suites 0\n# pass 3\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 14.04125\n",
+        "stderr": ""
+      },
+      "elapsed_ms": 6914
+    },
+    {
+      "case_id": "coding",
+      "trial": 3,
+      "requested": {
+        "mode": "explicit",
+        "model": "gpt-6.1-sol",
+        "effort": "medium",
+        "reason": "Small pure parser implementation with explicit edge cases and executed Node acceptance; balanced coding/reasoning setting.",
+        "speed": "host_default"
+      },
+      "passed": true,
+      "model_ms": 12942,
+      "evidence": {
+        "reported_models": [],
+        "reported_effort": null,
+        "reported_service_tier": null,
+        "applied_controls": {
+          "model": "gpt-6.1-sol",
+          "effort": "medium",
+          "service_tier": null,
+          "fast_mode": null,
+          "switch_models_on_flag": null,
+          "scope": "child_launch_argv",
+          "verification": "applied_controls_not_effective_settings"
+        },
+        "source": "exec_json",
+        "scope": "assignment",
+        "verification": "unverified"
+      },
+      "answer": {
+        "source": "export function parsePort(value) {\n  if (typeof value !== 'string' || value.length === 0 || /[^0-9]/.test(value)) return null;\n  const port = Number(value);\n  return port >= 1 && port <= 65535 ? port : null;\n}"
+      },
+      "grader": "sandboxed_node_tests",
+      "source_sha256": "02e2b2055bf462df71b6ff66e61ccd43d6be8cb9693b46b4d93cb797fefa80fb",
+      "receipt": {
+        "status": "passed",
+        "exit_code": 0,
+        "tests_executed": true,
+        "duration_ms": 697,
+        "stdout": "TAP version 13\n# Subtest: valid ASCII ports and boundaries\nok 1 - valid ASCII ports and boundaries\n  ---\n  duration_ms: 0.4505\n  type: 'test'\n  ...\n# Subtest: reject out-of-range and nondecimal values\nok 2 - reject out-of-range and nondecimal values\n  ---\n  duration_ms: 0.080125\n  type: 'test'\n  ...\n# Subtest: reject nonstrings\nok 3 - reject nonstrings\n  ---\n  duration_ms: 0.055416\n  type: 'test'\n  ...\n1..3\n# tests 3\n# suites 0\n# pass 3\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 8.244542\n",
+        "stderr": ""
+      },
+      "elapsed_ms": 13691
+    },
+    {
+      "case_id": "review",
+      "trial": 1,
+      "requested": {
+        "mode": "explicit",
+        "model": "gpt-6.1-sol",
+        "effort": "high",
+        "reason": "Consequential receipt/authority/independence review with multiple interacting boundaries; deeper reasoning checked against seeded blockers.",
+        "speed": "host_default"
+      },
+      "passed": true,
+      "model_ms": 5602,
+      "evidence": {
+        "reported_models": [],
+        "reported_effort": null,
+        "reported_service_tier": null,
+        "applied_controls": {
+          "model": "gpt-6.1-sol",
+          "effort": "high",
+          "service_tier": null,
+          "fast_mode": null,
+          "switch_models_on_flag": null,
+          "scope": "child_launch_argv",
+          "verification": "applied_controls_not_effective_settings"
+        },
+        "source": "exec_json",
+        "scope": "assignment",
+        "verification": "unverified"
+      },
+      "answer": {
+        "blockers": [
+          "candidate_binding",
+          "receipt_execution",
+          "reviewer_independence",
+          "live_authority"
+        ]
+      },
+      "grader": "seeded_blockers_exact_set",
+      "elapsed_ms": 5602
+    },
+    {
+      "case_id": "review",
+      "trial": 2,
+      "requested": {
+        "mode": "explicit",
+        "model": "gpt-6.1-sol",
+        "effort": "high",
+        "reason": "Consequential receipt/authority/independence review with multiple interacting boundaries; deeper reasoning checked against seeded blockers.",
+        "speed": "host_default"
+      },
+      "passed": true,
+      "model_ms": 5288,
+      "evidence": {
+        "reported_models": [],
+        "reported_effort": null,
+        "reported_service_tier": null,
+        "applied_controls": {
+          "model": "gpt-6.1-sol",
+          "effort": "high",
+          "service_tier": null,
+          "fast_mode": null,
+          "switch_models_on_flag": null,
+          "scope": "child_launch_argv",
+          "verification": "applied_controls_not_effective_settings"
+        },
+        "source": "exec_json",
+        "scope": "assignment",
+        "verification": "unverified"
+      },
+      "answer": {
+        "blockers": [
+          "candidate_binding",
+          "receipt_execution",
+          "reviewer_independence",
+          "live_authority"
+        ]
+      },
+      "grader": "seeded_blockers_exact_set",
+      "elapsed_ms": 5288
+    },
+    {
+      "case_id": "review",
+      "trial": 3,
+      "requested": {
+        "mode": "explicit",
+        "model": "gpt-6.1-sol",
+        "effort": "high",
+        "reason": "Consequential receipt/authority/independence review with multiple interacting boundaries; deeper reasoning checked against seeded blockers.",
+        "speed": "host_default"
+      },
+      "passed": true,
+      "model_ms": 4787,
+      "evidence": {
+        "reported_models": [],
+        "reported_effort": null,
+        "reported_service_tier": null,
+        "applied_controls": {
+          "model": "gpt-6.1-sol",
+          "effort": "high",
+          "service_tier": null,
+          "fast_mode": null,
+          "switch_models_on_flag": null,
+          "scope": "child_launch_argv",
+          "verification": "applied_controls_not_effective_settings"
+        },
+        "source": "exec_json",
+        "scope": "assignment",
+        "verification": "unverified"
+      },
+      "answer": {
+        "blockers": [
+          "candidate_binding",
+          "receipt_execution",
+          "reviewer_independence",
+          "live_authority"
+        ]
+      },
+      "grader": "seeded_blockers_exact_set",
+      "elapsed_ms": 4787
+    }
+  ],
+  "limitations": [
+    "Small fictional workload; not production competence or statistical non-inferiority",
+    "Observed p95 is a small-sample order statistic, not a reliable population-tail estimate",
+    "No effective provider setting or billing/savings claim; requested/applied/observed settings remain separate",
+    "No CoS/company mutation or selected-model comparisons against a prior baseline"
+  ],
+  "passed": true,
+  "summary": [
+    {
+      "case_id": "extraction",
+      "trials": 3,
+      "passed": 3,
+      "failures": 0,
+      "repairs": 0,
+      "median_ms": 4660,
+      "observed_p95_ms": 5090
+    },
+    {
+      "case_id": "coding",
+      "trials": 3,
+      "passed": 3,
+      "failures": 0,
+      "repairs": 0,
+      "median_ms": 13691,
+      "observed_p95_ms": 14840
+    },
+    {
+      "case_id": "review",
+      "trials": 3,
+      "passed": 3,
+      "failures": 0,
+      "repairs": 0,
+      "median_ms": 5288,
+      "observed_p95_ms": 5602
+    }
+  ]
+}

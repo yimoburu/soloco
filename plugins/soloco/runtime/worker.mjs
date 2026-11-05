@@ -7,6 +7,7 @@ import { assignmentContext, contextMatches } from './context.mjs';
 import { dataDir } from './engine.mjs';
 import { developmentAssignment, developmentBundle, developmentPrompt } from './develop.mjs';
 import { prototypeAssignment, prototypeBundle, prototypePrompt } from './prototype.mjs';
+import { coordinationEligible } from './coordination.mjs';
 import { TIMEOUT_POLICY_VERSION, normalizeTimeout, executionTiming, jobTimeoutState } from './timeout.mjs';
 
 function validateEnvelope(artifact,roles) {
@@ -30,10 +31,11 @@ function failureEvidence(error) {
 }
 
 export async function work(root, jobId, model = runModel) {
-  let job, state, context, output, artifact, controller, monitor, spawned=false;
+  let job, state, context, output, artifact, controller, monitor, spawned=false, invoked=false;
   const eligibility=s=>{
     const current=s.jobs[jobId];
     if(!compatibleRuntime(s) || upgradePending(s) || !current || current.status!=='running' || current.instance_id!==job.instance_id || s.owner.epoch!==job.epoch || s.paused || !contextMatches(s,job,context.hash))throw Object.assign(new Error('Assignment is no longer eligible'),{code:'ASSIGNMENT_INELIGIBLE'});
+    coordinationEligible(s,current);
     prototypeAssignment(s,job);developmentAssignment(s,job);
     if(current.timeout_policy_version!==job.timeout_policy_version || current.timeout_ms!==job.timeout_ms || current.timeout_reason!==job.timeout_reason)throw Object.assign(new Error('Recorded timeout settings changed'),{code:'ASSIGNMENT_INELIGIBLE'});
     const timing=jobTimeoutState(current,Date.now());
@@ -49,6 +51,7 @@ export async function work(root, jobId, model = runModel) {
     state=withStore(root,db=>db.transaction('job.started',s=>{
       job=s.jobs[jobId];
       if(!compatibleRuntime(s) || upgradePending(s) || !job || job.status!=='queued' || job.epoch!==s.owner.epoch || s.paused) throw new Error('Assignment is no longer eligible');
+      coordinationEligible(s,job);
       prototypeAssignment(s,job);developmentAssignment(s,job);
       context=assignmentContext(s,job);
       if(job.context_sha256 && job.context_sha256!==context.hash) throw new Error('Assignment context changed before startup');
@@ -83,6 +86,7 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
     check();
     if(controller.signal.aborted)throw controller.signal.reason;
     try {
+      invoked=true;
       output=await model(job.host,job.native_id,prompt,dir,timeout.timeout_ms,job.model_selection??null,{
         signal:controller.signal,timeoutReason:timeout.timeout_reason,
         onSpawn:timing=>{
@@ -126,6 +130,7 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
       const development=stale||!job.development_id?null:developmentBundle(s,job,artifact);
       const artifactId=id(stale?'quarantined':'artifact');
       s.records[artifactId]={id:artifactId,kind:target?'review':'artifact',content:artifact.content,author_role:job.role,author_instance:job.instance_id,revision:1,status:stale?'Quarantined':'Submitted',job_id:job.id,inputs:job.inputs,review_of:job.review_of,review:artifact.review??null,...(bundle?{prototype:bundle}:{}),...(development?{development}:{}),...(stale && artifact.files?{quarantined_files:artifact.files}:{}),created_at:stamp()};
+      current.coordination_release={termination_confirmed:true,reason:'model_process_closed',at:stamp()};
       current.status=stale?'quarantined':'completed';current.artifact_id=artifactId;current.finished_at=stamp();current.native_id=output.native_id;
       if(controller.signal.aborted)current.execution_failure={...failureEvidence(controller.signal.reason),outcome:'cancelled_or_timed_out',at:stamp()};
       current.model_evidence=output.model_evidence??{reported_models:[],reported_effort:null,verification:'unverified',source:'not_reported',scope:'unknown'};
@@ -145,6 +150,7 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
     withStore(root,db=>db.transaction('job.failed',s=>{
       const current=s.jobs[jobId];
       if(current) {
+        if(!invoked || output || error.termination_confirmed===true)current.coordination_release={termination_confirmed:true,reason:invoked?'model_process_closed':'model_not_invoked',at:stamp()};
         const cause=controller?.signal.aborted?controller.signal.reason:error;
         const evidence=failureEvidence(error),reason=failureEvidence(cause);
         current.execution_failure={...evidence,outcome:/TIMEOUT/.test(reason.code??evidence.code??'')?'timeout':controller?.signal.aborted?'cancellation':'failure',at:stamp(),...(controller?.signal.aborted?{abort:reason}:{})};

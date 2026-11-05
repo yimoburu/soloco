@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
+import * as coordination from '../plugins/soloco/runtime/coordination.mjs';
 
 // Execute the actual main/engine bodies with controlled boundary dependencies.
 // No production store, adapter, subprocess, CLI, network or timer is loaded.
@@ -69,7 +70,7 @@ function harness(host='claude') {
     if(typeof value!=='string'||!value.trim()||value.length>max)throw new Error('Invalid '+label);
     return value;
   };
-  const deps={
+  const deps={...coordination,
     path,os:{homedir:()=>'/unused'},fs:{existsSync:()=>true},
     process:{env:{},execPath:'/unused/node',argv:[]},
     PACKAGE:'/unused',VERSION:'fixture',SCHEMA:2,

@@ -57,7 +57,7 @@ Use **one active environment at a time**. To switch, pause the company in the ol
 
 ## See who is working, with the right model for the task
 
-Before dispatch, the CoS chooses an adequate model, effort and speed, plus a separate timeout, based on task complexity, ambiguity, consequence of error, inputs and outputs, latency, and relevant prior outcomes. Use supported choices within existing limits and give a concise rationale. A reasoned host default is the fallback. Simple replies need no delegation. You choose the CoS chat model in the host UI.
+Before dispatch, the CoS chooses an adequate model, effort and speed, plus a separate timeout, based on task complexity, ambiguity, consequence of error, inputs and outputs, latency, and relevant prior outcomes. Use supported choices within existing limits and give a concise rationale; a justified choice may be reused for comparable work until demands, support or observed quality change. A reasoned host default is the fallback. Simple replies need no delegation. You choose the CoS chat model in the host UI.
 
 At the start of substantive work, the CoS gives a compact update like this illustrative example:
 
@@ -66,11 +66,13 @@ At the start of substantive work, the CoS gives a compact update like this illus
 | Engineering | Implement the agreed change | Running |
 | QA | Review the result and test evidence | Planned; waits for Engineering |
 
-The CoS fetches `company_progress` after meaningful work or notice changes. It presents a primary DAG beside recorded event chronology through host inline HTML when available, or equivalent literal text/Mermaid otherwise. The view shows actual instance/native identities, concrete task labels, expected and returned outputs, exact evidence links, separate QA and recorded runtime acceptance, and prominent unresolved founder notices. Selecting an event highlights current work. Each view reflects its fetched snapshot; refresh occurs when the CoS fetches again after an observed change, without uninterrupted background monitoring or historical playback.
+The CoS refreshes authoritative status after meaningful work or notice changes and normally gives a concise outcome, actual state and next handoff. It uses the detailed `company_progress` DAG/chronology when useful or requested, through inline HTML or equivalent literal text/Mermaid. The view shows actual instance/native identities, concrete task labels, expected and returned outputs, exact evidence links, separate QA and recorded runtime acceptance, and prominent unresolved founder notices. Selecting an event highlights current work. Each view reflects its fetched snapshot; refresh occurs when the CoS fetches again after an observed change, without uninterrupted background monitoring or historical playback.
 
 The read-only endpoint defaults to the latest 20 jobs plus every active job and notice-associated work, with up to 100 prerequisite ancestors. It discloses omitted history and label truncation; unresolved notice identities, kinds, references and exact summaries are always retained. Source files, record bodies and rejected responses stay outside the view. Required attention can exceed the bounded history payload. `company_status` retains its existing behavior.
 
 Updates use recorded runtime state. “Returned” means a result arrived; review and acceptance remain separate. Planned roles have not started. Show meaningful changes, failures and the next handoff without repeating an unchanged roster.
+
+CoS decomposes outcomes and starts genuinely independent work concurrently within supported capacity. Optional dispatch `depends_on` binds completed producer outputs as supplied evidence; unfinished dependencies remain planned. Optional `resources` reserves consistent named exclusive resources, not filesystem isolation. Cancelled or uncertain processes retain claims until runtime closure evidence. These controls admit safe ready work; they do not provide unattended scheduling or confer acceptance.
 
 The catalog exposes choices, not account entitlement. Claude uses documented `haiku`, `sonnet` and `opus` aliases where CLI controls are available; account availability and effort support for a particular alias remain unverified. Unsupported explicit requests are held visibly; SoloCo does not silently substitute. Speed choices are `host_default` or evidenced Claude `fast_disabled`. Codex fast-off and Standard reset are unsupported, and SoloCo does not enable additional paid tiers.
 

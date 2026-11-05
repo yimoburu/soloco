@@ -37,3 +37,17 @@ The receipt records policy/fixture hashes, decisions, verdicts, elapsed time, an
 In that historical run, one live Codex response passed all five decisions. The evaluator requested `gpt-6.1-sol` / low effort; launch arguments confirm those controls were applied. Effective model/effort/speed remain unverified in Codex output. The decisions used small/low, balanced/medium, deep/high, deep/high after failure, and a reasoned host default when the catalog was unavailable.
 
 This is a narrow behavioral regression baseline, not evidence of actual specialist quality, lower spending, provider entitlement, improved production distribution or behavior of already pinned company teams. Existing selection integration tests separately check real dispatch/worker/launch wiring using synthetic CLIs. The account screenshot cannot establish which specialist jobs produced its aggregate distribution.
+
+## Actual task outcomes and coordination
+
+`tools/selection-outcome-eval.mjs` adds actual model work rather than only choosing settings. It performs exact fictional extraction, bounded parser generation graded by real fail-closed sandboxed Node tests, and consequential review graded against four seeded acceptance blockers. A caller-supplied task-to-setting plan is validated against current host support before any calls. Predeclared acceptance is every trial passing, no repairs, and zero seeded blockers missed; this is not a statistical equivalence criterion.
+
+```sh
+node tools/selection-outcome-eval.mjs --host codex --plan task-settings.json --trials 3 --output new-outcomes.json
+```
+
+The opt-in runner uses only fictional prompts, fresh tool-disabled native sessions and the existing account. It preserves each output, failure, requested/applied/observed control evidence and time through deterministic grading. No model assertion supplies execution proof. The report avoids native IDs/account identifiers. It is not a routine production model router or permission to enable paid tiers.
+
+`selection-outcomes-2026-11-04.json`: 3/3 extraction trials requested Luna/low; 3/3 parser trials requested Sol/medium passed actual Node tests; 3/3 seeded reviews requested Sol/high found every required blocker. Medians were 4.66s, 13.69s and 5.29s respectively. These timings include deterministic grading but not a production founder-to-acceptance workflow or an independent model comparison. Effective provider settings, billing, real-world competence and non-inferiority remain unverified. Observed p95 with three trials is only the maximum observed sample.
+
+`tools/coordination-eval.mjs` evaluates eight fictional CoS decisions covering direct work, covered repair, independent validation, tightly coupled work, exhausted authority, read-only advisory work, concise notice updates and unsupported capability. Its selected actions do not substitute for runtime enforcement. Separate actual Store/worker tests verify concurrent disjoint jobs, evidence binding and resource handling. The initial behavioral evaluation and any evaluation-design failure remain in their original receipt; later runs use new filenames.

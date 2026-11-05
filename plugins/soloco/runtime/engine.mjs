@@ -5,6 +5,7 @@ import { spawn } from 'node:child_process';
 import { PACKAGE, VERSION, stamp, id, digest, folder, noLink, withStore, owner, notice, requireText, SCHEMA, installedTeam, teamHash, upgradePending, compatibleRuntime } from './store.mjs';
 import { readiness, modelCatalog } from './adapters.mjs';
 import { normalizeSelection, selectionKey, activityFor, selectionUsage } from './selection.mjs';
+import { normalizeCoordination, bindCoordination, resourceClaims } from './coordination.mjs';
 import { progressSnapshot, renderProgress } from './progress-view.mjs';
 import { assignmentContext } from './context.mjs';
 import { developmentAction, developmentCapability, developmentAssignment } from './develop.mjs';
@@ -45,7 +46,7 @@ function summary(state) {
     if(!job || job.kind==='development_test' || job.type==='development_test')return item;
     return {...item,timeout:{policy_version:job.timeout_policy_version??null,timeout_ms:job.timeout_ms??null,reason:job.timeout_reason??null,execution_started_at:job.execution_started_at??null,execution_deadline_at:job.execution_deadline_at??null,state:jobTimeoutState(job,Date.now()),reconciliation:job.timeout_reconciliation??null,failure:job.execution_failure??null}};
   });
-  return {company_id:state.id, name:state.name, idea:state.idea, revision:state.revision, phase:state.phase, mode:state.mode, paused:state.paused, owner:state.owner, plugin_version:state.plugin_version, runtime_version:state.runtime_version??state.plugin_version, executing_runtime_version:VERSION, upgrade:upgradeSummary(state.upgrade), governance_sha256:state.governance_sha256, records:Object.values(state.records), sessions:state.sessions, jobs:Object.values(state.jobs), activity, selection_usage:selectionUsage(state), notices:state.notices.filter(n=>!n.resolution), messages:state.messages, capabilities:{standalone_sessions:true, model_selection:{eligible:['0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6',VERSION].includes(state.plugin_version),catalog:'company_doctor.models',coordinator_model:'Host UI controlled; no automatic switching',billing:'Existing host account; no hard spending enforcement'},local_prototype:prototypeCapability(state), local_development:developmentCapability(state), external_execution:false, background_founder_delivery:false, automatic_team_migration:false, explicit_team_upgrade:true}};
+  return {company_id:state.id, name:state.name, idea:state.idea, revision:state.revision, phase:state.phase, mode:state.mode, paused:state.paused, owner:state.owner, plugin_version:state.plugin_version, runtime_version:state.runtime_version??state.plugin_version, executing_runtime_version:VERSION, upgrade:upgradeSummary(state.upgrade), governance_sha256:state.governance_sha256, records:Object.values(state.records), sessions:state.sessions, jobs:Object.values(state.jobs), activity, resource_claims:resourceClaims(state), selection_usage:selectionUsage(state), notices:state.notices.filter(n=>!n.resolution), messages:state.messages, capabilities:{standalone_sessions:true, model_selection:{eligible:['0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6',VERSION].includes(state.plugin_version),catalog:'company_doctor.models',coordinator_model:'Host UI controlled; no automatic switching',billing:'Existing host account; no hard spending enforcement'},local_prototype:prototypeCapability(state), local_development:developmentCapability(state), external_execution:false, background_founder_delivery:false, automatic_team_migration:false, explicit_team_upgrade:true}};
 }
 export function develop(args,host) { binding(args,host); return developmentAction(args,host); }
 export function prototype(args,host) { binding(args,host); return prototypeAction(args,host); }
@@ -131,6 +132,7 @@ export function save(args,host) {
 }
 export function dispatch(args,host) {
   requireText(args.task,'task');
+  normalizeCoordination(args);
   if (!Number.isInteger(args.epoch)) throw new Error('Supply the current ownership epoch from company_status');
   if(args.task_summary!==undefined)requireText(args.task_summary,'task_summary',160);
   if(args.expected_deliverable!==undefined)requireText(args.expected_deliverable,'expected_deliverable',300);
@@ -160,9 +162,11 @@ export function dispatch(args,host) {
     if(!session) session=s.sessions[key]={instance_id:id(args.role),role:args.role,native_id:null,host,model_selection:selection};
     if(target?.author_instance===session.instance_id) throw new Error('Authors cannot independently review their own artifact');
     if(session.host!==host) throw new Error('Role belongs to another host; perform company handover first');
-    const inputs=args.input_ids??[];
+    if(args.input_ids!==undefined && !Array.isArray(args.input_ids))throw new Error('input_ids must be an array');
+    const coordination=bindCoordination(s,args);
+    const inputs=[...new Set([...(args.input_ids??[]),...(coordination?.dependencies??[]).map(d=>d.artifact_id)])];
     if(!Array.isArray(inputs) || inputs.some(k=>typeof k!=='string' || !Object.hasOwn(s.records,k))) throw new Error('An input record is missing');
-    const job={...(args.expected_deliverable===undefined?{}:{expected_deliverable:args.expected_deliverable}),requester:{role:'runner',session_id:s.owner.session_id,host:s.owner.host,epoch:s.owner.epoch},id:jobId,role:args.role,session_key:key,instance_id:session.instance_id,native_id:session.native_id,host,epoch:s.owner.epoch,status:'queued',task:args.task,context_format:2,timeout_policy_version:TIMEOUT_POLICY_VERSION,...timeout,model_selection:selection,cli_version:check.version,task_summary:args.task_summary??null,next_handoff:args.next_handoff??null,...(catalog?{model_catalog:{source:catalog.source,...(selection.mode==='explicit'?{model:catalog.models.find(m=>m.id===selection.model)}:{}),speed_support:catalog.speed_support}}:{}),inputs:inputs.map(k=>({id:k,revision:s.records[k].revision})),review_of:target?{id:target.id,revision:target.revision}:null,...(args.prototype_id?{prototype_id:args.prototype_id}:{}),...(args.development_id?{development_id:args.development_id}:{}),created_at:stamp()};
+    const job={...(coordination?{coordination}:{}),...(args.expected_deliverable===undefined?{}:{expected_deliverable:args.expected_deliverable}),requester:{role:'runner',session_id:s.owner.session_id,host:s.owner.host,epoch:s.owner.epoch},id:jobId,role:args.role,session_key:key,instance_id:session.instance_id,native_id:session.native_id,host,epoch:s.owner.epoch,status:'queued',task:args.task,context_format:2,timeout_policy_version:TIMEOUT_POLICY_VERSION,...timeout,model_selection:selection,cli_version:check.version,task_summary:args.task_summary??null,next_handoff:args.next_handoff??null,...(catalog?{model_catalog:{source:catalog.source,...(selection.mode==='explicit'?{model:catalog.models.find(m=>m.id===selection.model)}:{}),speed_support:catalog.speed_support}}:{}),inputs:inputs.map(k=>({id:k,revision:s.records[k].revision})),review_of:target?{id:target.id,revision:target.revision}:null,...(args.prototype_id?{prototype_id:args.prototype_id}:{}),...(args.development_id?{development_id:args.development_id}:{}),created_at:stamp()};
     prototypeAssignment(s,job,true);developmentAssignment(s,job,true);
     const context=assignmentContext(s,job);
     s.jobs[jobId]={...job,inputs:context.inputs,context_sha256:context.hash};
@@ -170,9 +174,9 @@ export function dispatch(args,host) {
   });
   try {
     const worker=spawn(process.execPath,['--no-warnings',path.join(PACKAGE,'runtime/worker.mjs'),folder(args.root),jobId],{detached:true,stdio:'ignore',env:{...process.env,COMPANY_WORKER:'1'}});
-    worker.on('error',error=>withStore(args.root,db=>db.transaction('job.spawn_failed',s=>{s.jobs[jobId].status='failed';s.jobs[jobId].error=error.message;notice(s,'must_know','Unable to start specialist session.',jobId);return s;})));
+    worker.on('error',error=>withStore(args.root,db=>db.transaction('job.spawn_failed',s=>{s.jobs[jobId].status='failed';s.jobs[jobId].error=error.message;s.jobs[jobId].coordination_release={termination_confirmed:true,reason:'worker_spawn_failed',at:stamp()};notice(s,'must_know','Unable to start specialist session.',jobId);return s;})));
     worker.unref();
-  } catch(error) {update(args,host,'job.spawn_failed',s=>{s.jobs[jobId].status='failed';s.jobs[jobId].error=error.message;});throw error;}
+  } catch(error) {update(args,host,'job.spawn_failed',s=>{s.jobs[jobId].status='failed';s.jobs[jobId].error=error.message;s.jobs[jobId].coordination_release={termination_confirmed:true,reason:'worker_not_started',at:stamp()};});throw error;}
   return state.jobs[jobId];
 }
 export function control(args,host) {
