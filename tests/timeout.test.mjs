@@ -64,13 +64,14 @@ class Child extends EventEmitter {
   }
 }
 const codexOutput = text => JSON.stringify({type:'thread.started',thread_id:'native-fictional'})+'\n'+JSON.stringify({type:'item.completed',item:{type:'agent_message',text}})+'\n';
-function harness({child=new Child(), signal=new Signal(), onSpawn, timeout=1000, timeoutReason='Small deterministic fixture', host='codex', nativeId=null, selection=null, spawnHook, resolveHook}={}) {
+function harness({child=new Child(), signal=new Signal(), onSpawn, timeout=1000, timeoutReason='Small deterministic fixture', host='codex', nativeId=null, selection=null, spawnHook, resolveHook, timeoutContext, clockStart}={}) {
   const clock=new Clock();
+  if(clockStart!==undefined)clock.time=clockStart;
   const calls=[];
   const receipts=[];
   let resolves=0;
   const options={
-    signal, timeoutReason,
+    signal, timeoutReason, timeoutContext,
     now:clock.now, setTimeout:clock.set, clearTimeout:clock.clear,
     resolveExecutable:host=>{resolves++; resolveHook?.(); return `/fictional/${host}`;},
     spawn:(...args)=>{calls.push(args); spawnHook?.(); return child;},
@@ -477,4 +478,43 @@ test('Codex and Claude launch/resume isolation and observations remain distinct'
   assert.equal(parseOutput('codex',codexOutput('text')).model_evidence.verification,'unverified');
   assert.deepEqual(parseArtifact('{"content":"fixture","messages":[],"notices":[]}'),{content:'fixture',messages:[],notices:[]});
   assert.throws(()=>parseArtifact('{"content":"fixture","messages":{}}'));
+});
+
+
+test('internal upgrade context wires a 30-minute spawn receipt and real execution timer',async()=>{
+  const h=harness({timeout:1800000,timeoutContext:'upgrade-call'});
+  h.clock.move(1100000);
+  h.child.emit('spawn');
+  assert.equal(h.receipts.length,1);
+  assert.equal(h.receipts[0].timeout_ms,1800000);
+  assert.equal(Date.parse(h.receipts[0].execution_started_at),1100000);
+  assert.equal(Date.parse(h.receipts[0].execution_deadline_at),2900000);
+  assert.equal(Date.parse(h.receipts[0].termination_deadline_at),2903000);
+  assert.deepEqual([...h.clock.timers.values()].map(t=>t.at),[2900000]);
+  h.clock.move(2899999);
+  assert.deepEqual(h.child.signals,[]);
+  h.clock.move(2900000);
+  assert.deepEqual(h.child.signals,['SIGTERM']);
+  h.clock.move(2903000);
+  assert.equal((await h.result).error.code,'ROLE_TIMEOUT');
+  assert.deepEqual(h.child.signals,['SIGTERM','SIGKILL']);
+  clean(h);
+});
+
+test('upgrade context is explicit, bounded and uses overflow-safe lifecycle clocks',async()=>{
+  for(const settings of [
+    {timeout:1800000}, {timeout:1800000,timeoutContext:'unknown'},
+    {timeout:1800001,timeoutContext:'upgrade-call'},
+    {timeout:1800000,timeoutContext:'upgrade-call',clockStart:8640000000000000-1802999}
+  ]) {
+    const h=harness(settings);
+    assert.ok((await h.result).error);
+    assert.equal(h.resolves,0);assert.equal(h.calls.length,0);clean(h);
+  }
+  const h=harness({timeout:1800000,timeoutContext:'upgrade-call',clockStart:8640000000000000-1803000});
+  h.child.emit('spawn');
+  assert.equal(Date.parse(h.receipts[0].termination_deadline_at),8640000000000000);
+  complete(h);assert.equal((await h.result).value.text,'artifact');clean(h);
+  assert.throws(()=>normalizeTimeout({timeout_ms:1800000,timeout_reason:'ordinary'}));
+  assert.equal(jobTimeoutState({status:'running',timeout_policy_version:1,timeout_ms:1800000,timeout_reason:'ordinary'},1000).state,'inspection');
 });

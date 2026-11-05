@@ -191,14 +191,16 @@ export function parseOutput(host, stdout) {
 // Existing positional calls remain valid. options is an internal dependency
 // seam, not an agent-controlled permission or a tool/API schema:
 // {signal, onSpawn(record), timeoutReason, spawn, resolveExecutable,
-//  now, setTimeout, clearTimeout}. onSpawn is synchronous; a thrown recording
+//  now, setTimeout, clearTimeout, timeoutContext}. The internal upgrade-call
+// context permits at most 30 minutes; it supplies no business authority.
+// onSpawn is synchronous; a thrown recording
 // error holds the result and stops the child. No asynchronous publication is
 // performed by this adapter. Worker eligibility and durable recording remain
 // the caller's responsibilities.
 export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selection=null, options={}) {
   return new Promise((resolve, reject) => {
     if (!options || typeof options !== 'object' || Array.isArray(options)) throw new Error('Invalid lifecycle options');
-    const policy = normalizeTimeout({timeout_ms:timeout, timeout_reason:options.timeoutReason});
+    const policy = normalizeTimeout({timeout_ms:timeout, timeout_reason:options.timeoutReason}, options.timeoutContext);
     const args = commandArgs(host,nativeId,selection);
     const startProcess = options.spawn ?? spawn;
     const resolveCommand = options.resolveExecutable ?? executable;
@@ -213,7 +215,7 @@ export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selectio
     if (signal?.aborted) throw errorFor('Role session cancelled before launch', 'ROLE_ABORTED');
     const readNow = () => {
       const value = now();
-      if (!Number.isSafeInteger(value) || value < 0 || value > 8640000000000000 - 1000000) throw new Error('Invalid lifecycle clock');
+      if (!Number.isSafeInteger(value) || value < 0 || value > 8640000000000000 - Math.max(1000000, policy.timeout_ms + TERMINATION_GRACE_MS)) throw new Error('Invalid lifecycle clock');
       return value;
     };
     const startupDeadline = readNow() + STARTUP_TIMEOUT_MS;
@@ -300,7 +302,7 @@ export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selectio
     listen(child, 'spawn', () => {
       if (settled || failure || spawned || expired()) return;
       const at=readNow();
-      const timing=executionTiming(at,policy);
+      const timing=executionTiming(at,policy,options.timeoutContext);
       spawned=true;
       executionDeadline=at+policy.timeout_ms;
       clear('startup');

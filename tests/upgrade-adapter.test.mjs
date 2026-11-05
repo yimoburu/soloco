@@ -87,3 +87,33 @@ test('selected native timeout does not manufacture applied or effective model ev
     return true;
   });
 });
+
+test('upgrade adapter schedules the selected or remaining cap for both hosts and resumed calls',async()=>{
+  for(const host of ['codex','claude'])for(const native of [null,`native-${host}`])for(const cap of [1800000,90000]) {
+    const child=new EventEmitter();
+    child.stdin=new PassThrough();child.stdout=new PassThrough();child.stderr=new PassThrough();
+    const signals=[];child.kill=signal=>{signals.push(signal);return true;};
+    let now=1000000,receipt;
+    const timers=new Set();
+    const pending=runModel(host,native,'Synthetic upgrade timer fixture','/tmp',cap,null,{
+      timeoutContext:'upgrade-call',timeoutReason:'Selected ceiling capped by remaining overall window',
+      resolveExecutable:()=>`/mock/${host}`,spawn:()=>child,now:()=>now,
+      setTimeout:(fn,ms)=>{const timer={fn,ms};timers.add(timer);return timer;},
+      clearTimeout:timer=>timers.delete(timer),onSpawn:timing=>{receipt=timing;}
+    });
+    assert.deepEqual([...timers].map(t=>t.ms),[240000]);
+    now+=100;child.emit('spawn');
+    assert.equal(receipt.timeout_ms,cap);
+    assert.equal(Date.parse(receipt.execution_started_at),now);
+    assert.equal(Date.parse(receipt.execution_deadline_at),now+cap);
+    assert.equal(Date.parse(receipt.termination_deadline_at),now+cap+3000);
+    assert.deepEqual([...timers].map(t=>t.ms),[cap]);
+    now+=cap;
+    const timer=[...timers][0];timers.delete(timer);timer.fn();
+    assert.deepEqual(signals,['SIGTERM']);
+    assert.deepEqual([...timers].map(t=>t.ms),[3000]);
+    child.emit('close',null);
+    await assert.rejects(pending,error=>error.code==='ROLE_TIMEOUT' && error.termination_confirmed===true);
+    assert.equal(timers.size,0);
+  }
+});
