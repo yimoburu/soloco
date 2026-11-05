@@ -9,7 +9,7 @@ import { readiness, modelCatalog } from './adapters.mjs';
 import { normalizeSelection, selectionKey, activityFor, selectionUsage } from './selection.mjs';
 import { normalizeCoordination, bindCoordination, resourceClaims } from './coordination.mjs';
 import { progressSnapshot, renderProgress } from './progress-view.mjs';
-import { beginHandover, submitReconstruction, handoverReviewEligible, verifyHandoverAcceptance, handoverSubject } from './handover.mjs';
+import { beginHandover, submitReconstruction, handoverReviewEligible, verifyHandoverAcceptance, handoverSubject, inspectHandover, reconstructionReceipt, admitHandover } from './handover.mjs';
 import { assignmentContext, contextMatches } from './context.mjs';
 import { developmentAction, developmentCapability, developmentAssignment } from './develop.mjs';
 import { prototypeAction, prototypeCapability, prototypeAssignment } from './prototype.mjs';
@@ -49,7 +49,7 @@ function summary(state,root=process.cwd()) {
     if(!job || job.kind==='development_test' || job.type==='development_test')return item;
     return {...item,timeout:{policy_version:job.timeout_policy_version??null,timeout_ms:job.timeout_ms??null,reason:job.timeout_reason??null,execution_started_at:job.execution_started_at??null,execution_deadline_at:job.execution_deadline_at??null,state:jobTimeoutState(job,Date.now()),reconciliation:job.timeout_reconciliation??null,failure:job.execution_failure??null}};
   });
-  return {company_id:state.id, name:state.name, idea:state.idea, revision:state.revision, phase:state.phase, mode:state.mode, paused:state.paused, owner:state.owner, plugin_version:state.plugin_version, runtime_version:state.runtime_version??state.plugin_version, executing_runtime_version:VERSION, upgrade:upgradeSummary(state.upgrade), governance_sha256:state.governance_sha256, records:Object.values(state.records), sessions:state.sessions, jobs:Object.values(state.jobs), activity, handover:state.handover??null, resource_claims:resourceClaims(state), selection_usage:selectionUsage(state), notices:state.notices.filter(n=>!n.resolution), messages:state.messages, capabilities:{standalone_sessions:true, model_selection:{eligible:['0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7','0.6.8','0.6.9','0.6.10',VERSION].includes(state.plugin_version),catalog:'company_doctor.models',coordinator_model:'Host UI controlled; no automatic switching',billing:'Existing host account; no hard spending enforcement'},local_prototype:prototypeCapability(state), local_development:developmentCapability(state,root), external_execution:false, background_founder_delivery:false, automatic_team_migration:false, explicit_team_upgrade:true}};
+  return {company_id:state.id, name:state.name, idea:state.idea, revision:state.revision, phase:state.phase, mode:state.mode, paused:state.paused, owner:state.owner, plugin_version:state.plugin_version, runtime_version:state.runtime_version??state.plugin_version, executing_runtime_version:VERSION, upgrade:upgradeSummary(state.upgrade), governance_sha256:state.governance_sha256, records:Object.values(state.records), sessions:state.sessions, jobs:Object.values(state.jobs), activity, handover:state.handover??null, resource_claims:resourceClaims(state), selection_usage:selectionUsage(state), notices:state.notices.filter(n=>!n.resolution), messages:state.messages, capabilities:{standalone_sessions:true, model_selection:{eligible:['0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7','0.6.8','0.6.9','0.6.10','0.6.11',VERSION].includes(state.plugin_version),catalog:'company_doctor.models',coordinator_model:'Host UI controlled; no automatic switching',billing:'Existing host account; no hard spending enforcement'},local_prototype:prototypeCapability(state), local_development:developmentCapability(state,root), external_execution:false, background_founder_delivery:false, automatic_team_migration:false, explicit_team_upgrade:true}};
 }
 export function develop(args,host) { binding(args,host); return developmentAction(args,host); }
 export function prototype(args,host) { binding(args,host); return prototypeAction(args,host); }
@@ -124,6 +124,7 @@ export function save(args,host) {
   if (!/^[a-zA-Z0-9][a-zA-Z0-9:_-]{0,200}$/.test(recordId) || ['constructor','prototype','__proto__'].includes(recordId)) throw new Error('Invalid record ID');
   const state=update(args,host,'record.saved',s=>{
     const old=s.records[recordId];
+    if(old?.handover)throw new Error('Handover reconstructions are immutable; submit a new reconstruction');
     if(old?.development) throw new Error('Development records are immutable; use company_develop');
     if(old?.prototype) throw new Error('Prototype records are immutable; use company_prototype or create a new scope');
     if (old && (old.author_instance!==s.owner.session_id || old.revision!==args.expected_revision)) throw new Error('Record owner or version conflict; create a new proposal instead');
@@ -134,9 +135,9 @@ export function save(args,host) {
   return state.records[recordId];
 }
 export function handover(args,host) {
-  if(args.action==='inspect'){binding(args,host);return withStore(args.root,db=>{const s=db.read();return {handover:s.handover??null,subject:handoverSubject(s)};});}
+  if(['inspect','read'].includes(args.action)){binding(args,host);return withStore(args.root,db=>inspectHandover(db.read(),args));}
   if(args.action!=='submit')throw new Error('Choose inspect or submit');
-  let result;update(args,host,'handover.reconstruction_submitted',s=>{result=submitReconstruction(s,args);});return result;
+  let result;update(args,host,'handover.reconstruction_submitted',s=>{result=submitReconstruction(s,args);});return reconstructionReceipt(result);
 }
 export function dispatch(args,host) {
   requireText(args.task,'task');
@@ -149,7 +150,7 @@ export function dispatch(args,host) {
   const timeout=normalizeTimeout({timeout_ms:args.timeout_ms,timeout_reason:args.timeout_reason});
   if (args.role==='runner') throw new Error('Choose a specialist role from company_open');
   binding(args,host);
-  withStore(args.root,db=>{const s=db.read();owner(s,args.session_id,host,args.epoch);if(args.model_selection!==undefined&&!['0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7','0.6.8','0.6.9','0.6.10',VERSION].includes(s.plugin_version))throw new Error('Explicitly adopt the model-selection team before using model_selection');});
+  withStore(args.root,db=>{const s=db.read();owner(s,args.session_id,host,args.epoch);if(args.model_selection!==undefined&&!['0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7','0.6.8','0.6.9','0.6.10','0.6.11',VERSION].includes(s.plugin_version))throw new Error('Explicitly adopt the model-selection team before using model_selection');});
   const catalog=args.model_selection?.mode==='explicit' || args.model_selection?.speed==='fast_disabled'?modelCatalog(host):null;
   const selection=normalizeSelection(args.model_selection,host,catalog);
   const check=readiness(host);
@@ -193,7 +194,7 @@ export function control(args,host) {
   if(!['pause','resume','handover','rename'].includes(args.action)) throw new Error('Unknown control action');
   binding(args,host);
   requireText(args.source_instruction,'source_instruction');
-  return withStore(args.root,db=>summary(db.transaction(`company.${args.action}`,s=>{
+  return withStore(args.root,db=>{const result=db.transaction(`company.${args.action}`,s=>{
     if (!s || ![1,SCHEMA].includes(s.schema)) throw new Error('Unsupported company version');
     if (args.action!=='pause') {
       if (!compatibleRuntime(s)) throw new Error('Use company_upgrade before resuming or handing over this version');
@@ -202,6 +203,8 @@ export function control(args,host) {
     }
     if(args.expected_epoch!==s.owner.epoch) throw new Error('Stale control request; read current status');
     const previousName=s.name;
+    const decisionId=id('control');
+    const decision={id:decisionId,kind:'decision',author_role:'human_founder',recorded_by:args.session_id,content:args.source_instruction,status:'Recorded',action:args.action,...(args.action==='rename'?{previous_name:previousName,name:args.name?.trim()}:{}),created_at:stamp()};
     // Pause is always available to a founder chat, even if the old coordinator failed.
     if(args.action==='pause') {
       s.paused=true; for(const j of busy(s)) j.status='cancelled';
@@ -210,8 +213,10 @@ export function control(args,host) {
     else if(args.action==='handover') {
       if(busy(s).length) throw new Error('Assignments are active. Pause and reconcile them before handing over.');
       const previous={...s.owner};
-      s.owner={host,session_id:args.session_id,epoch:s.owner.epoch+1};
-      beginHandover(s,previous);
+      const prospective={...s,owner:{host,session_id:args.session_id,epoch:s.owner.epoch+1},paused:true,records:{...s.records,[decisionId]:decision}};
+      beginHandover(prospective,previous);
+      const admission=admitHandover(prospective);
+      s.owner=prospective.owner;s.handover={...prospective.handover,admission};
       // Incoming role instances cold-start from records; old native histories remain attributable.
       s.retired_sessions=[...(s.retired_sessions??[]),...Object.values(s.sessions)]; s.sessions={};
       s.paused=true;
@@ -223,14 +228,13 @@ export function control(args,host) {
       if(busy(s).length) throw new Error('Assignments are active; wait or pause before renaming');
       s.name=name;
     } else {owner(s,args.session_id,host);const acceptance=verifyHandoverAcceptance(s);if(acceptance){s.handover.acceptance=acceptance;s.handover.status='completed';}s.paused=false;}
-    const decisionId=id('control');
-    s.records[decisionId]={id:decisionId,kind:'decision',author_role:'human_founder',recorded_by:args.session_id,content:args.source_instruction,status:'Recorded',action:args.action,...(args.action==='rename'?{previous_name:previousName,name:s.name}:{}),created_at:stamp()};
+    s.records[decisionId]=decision;
     // A new handover gate must fence old coordinators even on an older pinned
     // team. Pause remains available across unsupported versions and must never
     // downgrade a future producer's fence.
     if(args.action!=='pause')s.runtime_version=VERSION;
     return s;
-  }),args.root));
+  });return args.action==='handover'?{...inspectHandover(result),paused:true,admission:result.handover.admission}:summary(result,args.root);});
 }
 export function notify(args,host) {
   if(!['must_know','decision_required'].includes(args.kind)) throw new Error('Unknown notice kind');

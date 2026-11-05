@@ -170,6 +170,11 @@ function checkpointSnapshot(value) {
     && Array.isArray(value.notices) && Array.isArray(value.messages);
 }
 
+function handoverSnapshot(value) {
+  return object(value) && typeof value.company_id === 'string' && object(value.records) && object(value.jobs)
+    && Array.isArray(value.notices) && Array.isArray(value.messages);
+}
+
 function teamSnapshot(value) {
   return object(value) && typeof value.plugin_version === 'string' && typeof value.governance === 'string'
     && typeof value.governance_sha256 === 'string' && (object(value.roles) || Array.isArray(value.roles))
@@ -226,7 +231,7 @@ function stateFor(subject) {
 /** Frozen in-memory evidence only. Send handover, never the whole subject.
  * sources contain private retrieval data. No caller-owned object is retained.
  */
-export function buildEvidence(checkpoint, history = [], { wholeBodyAliases = true, currentState = false } = {}) {
+export function buildEvidence(checkpoint, history = [], { wholeBodyAliases = true, currentState = false, checkpointContinuity = false, reviewContext, retainedHandoverRecords = {} } = {}) {
   if (!object(checkpoint) || !Array.isArray(history)) hold('checkpoint must be an object and history an array');
   const checkpointRaw = serialize(checkpoint);
   const historyRaw = serialize(history);
@@ -253,6 +258,9 @@ export function buildEvidence(checkpoint, history = [], { wholeBodyAliases = tru
   if(currentState)for(const r of Object.values(snapshot.records??{})){const c=classificationFor(snapshot,r);if(c?.disposition==='resolved'){dispositionProofIds.add(c.plan.id);dispositionProofIds.add(c.review.id);}}
   if(currentState)for(const value of prior){const c=classificationFor(snapshot,value,'upgrade:'+value.id);if(c?.disposition==='resolved'){dispositionProofIds.add(c.plan.id);dispositionProofIds.add(c.review.id);}}
   const blobs = new Map();
+  // Ordinary handover keeps every distinct checkpoint obligation semantic.
+  // Equality references only point back to an already compulsory projection.
+  const continuityEntries = new Map();
 
   const bodyOccurrences = new Map();
   const generatedAliases = new Map();
@@ -383,7 +391,19 @@ export function buildEvidence(checkpoint, history = [], { wholeBodyAliases = tru
     const bundle = policy.files && sourceBundle(value);
     const reviewed = policy.files && reviewedDiff(value);
     const release = policy.files && releaseBundle(value);
-    for (const [key, item] of Object.entries(value)) {
+    for (const [key, originalItem] of Object.entries(value)) {
+      let item=originalItem;
+      if(checkpointContinuity&&key==='subject'&&exactKeys(item,['retained_handover_subject'],['retained_handover_subject'])) {
+        const locator=item.retained_handover_subject;
+        if(!exactKeys(locator,['record_id','sha256'],['record_id','sha256'])||typeof locator.record_id!=='string'
+          ||!own(retainedHandoverRecords,locator.record_id))hold('retained handover source missing');
+        const original=retainedHandoverRecords[locator.record_id],snapshot=original?.handover?.subject;
+        if(!handoverSnapshot(snapshot)||hash(serialize(snapshot))!==locator.sha256
+          ||original.handover.subject_sha256!==locator.sha256)hold('retained handover source changed');
+        const raw=serialize(original),sourceId='retained-record:'+hash(raw);
+        if(!own(sources,sourceId))register({scope:'retained-handover',path:pointer('/records',locator.record_id)},'original-handover-record',raw,'json','immutable-reconstruction-original',sourceId);
+        item=snapshot;
+      }
       const at = child(location, key);
       if (typedFile && key === 'content') {
         result[key] = externalize(item, at, 'typed-file-body');
@@ -392,10 +412,33 @@ export function buildEvidence(checkpoint, history = [], { wholeBodyAliases = tru
           { ...child(at, index), parent_source_id: location.owner_source_id }, 'record', policy.artifact));
       } else if (policy.entityKind === 'record' && policy.artifact && key === 'content' && typeof item === 'string') {
         result[key] = decodedContent(item, at);
-      } else if (policy.entityKind === 'history-attempt' && key === 'checkpoint' && checkpointSnapshot(item)) {
-        result[key] = externalize(item, at, 'prior-full-checkpoint-snapshot', 'json');
+      } else if ((policy.entityKind === 'history-attempt' && key === 'checkpoint' && checkpointSnapshot(item))
+          || (checkpointContinuity && key === 'subject' && typeof value.id==='string'
+            && typeof value.subject_sha256==='string' && object(value.incoming_owner)
+            && Array.isArray(value.input_refs) && handoverSnapshot(item))) {
+        if (!checkpointContinuity) result[key] = externalize(item, at, 'prior-full-checkpoint-snapshot', 'json');
+        else {
+          const original = register(at, 'payload', serialize(item), 'json', 'prior-full-checkpoint-snapshot');
+          const fields = Object.entries(item).map(([field, value]) => {
+            const location = child(at, field);
+            if (own(collectionKinds, field) && (object(value) || Array.isArray(value))) {
+              const entries=[], repeats=[];
+              for(const [key,v] of Object.entries(value)) {
+                const projected={key,...entry(v,child(location,key),collectionKinds[field])};
+                (projected.same_as?repeats:entries).push(projected);
+              }
+              // Repeated occurrence metadata is retrievable, not another copy
+              // of obligations already compulsory elsewhere in this packet.
+              const repeated=repeats.length?register(location,'checkpoint-equality-index',serialize(repeats),'json','exact-equality-with-compulsory-projections'):null;
+              return {key:field, collection_shape:Array.isArray(value)?'array':'object', entries,
+                ...(repeated?{repeated:{count:repeats.length,source:reference(repeated),length:repeated.length}}:{})};
+            }
+            return {key:field, ...entry(value, location, 'checkpoint-field')};
+          });
+          result[key] = {original:reference(original), fields};
+        }
       } else if (policy.entityKind === 'history-attempt' && ['previous', 'candidate'].includes(key) && teamSnapshot(item)) {
-        result[key] = externalize(item, at, 'prior-team-snapshot', 'json');
+        result[key] = checkpointContinuity ? entry(item, at, 'team-snapshot') : externalize(item, at, 'prior-team-snapshot', 'json');
       } else if (policy.entityKind && key === 'inputs' && inputReferences(item)) {
         result[key] = externalize(item, at, 'machine-input-references', 'json');
       } else if (policy.entityKind && key === 'model_catalog' && modelCatalog(item)) {
@@ -436,6 +479,10 @@ export function buildEvidence(checkpoint, history = [], { wholeBodyAliases = tru
     }
     const raw = serialize(value);
     const source = register(at, kind, raw, 'json');
+    const equalityKey = kind + ':' + hash(raw);
+    if (checkpointContinuity && continuityEntries.get(equalityKey)?.raw === raw) {
+      return {source:reference(source), same_as:continuityEntries.get(equalityKey).semantic};
+    }
     const artifact = inheritedArtifact || (object(value) && value.kind === 'artifact');
     const projected = walk(value, { ...at, owner_source_id: source.source_id },
       { ...initialPolicy, entityKind: kind, artifact });
@@ -445,6 +492,7 @@ export function buildEvidence(checkpoint, history = [], { wholeBodyAliases = tru
       semantic = register({ ...at, owner_source_id: source.source_id }, 'projection', projectedRaw, 'json',
         'exact-semantic-projection', `projection:${source.source_id}`);
     }
+    if (checkpointContinuity) continuityEntries.set(equalityKey, {raw, semantic:reference(semantic)});
     return { source: reference(source), semantic: reference(semantic), value: projected };
   }
 
@@ -483,6 +531,7 @@ export function buildEvidence(checkpoint, history = [], { wholeBodyAliases = tru
   }).filter(Boolean);
   let archiveIndex=null;
   if(archivedRecords.length){const source=register({scope:'archive',path:'/records'},'archive-index',serialize(archivedRecords),'json');archivedSourceIds.add(source.source_id);archiveIndex={count:archivedRecords.length,source:reference(source),rule:'Exact reviewed dispositions; originals and classification proofs remain retrievable. No archive item grants authority.'};}
+  const reviewSource = reviewContext === undefined ? null : register({scope:'review',path:''}, 'review-context', serialize(reviewContext), 'json');
   descriptors.sort((left, right) => left.source_id < right.source_id ? -1 : left.source_id > right.source_id ? 1 : 0);
   counts.sources = descriptors.length;
   counts.payload_occurrences = descriptors.filter(item => item.kind === 'payload').length;
@@ -490,10 +539,12 @@ export function buildEvidence(checkpoint, history = [], { wholeBodyAliases = tru
   if (wholeBodyAliases) Object.assign(counts, sharing);
   const inventory = { version: wholeBodyAliases ? 2 : 1, counts, entries: [...descriptors] };
   const inventory_sha256 = hash(serialize(inventory));
-  const handover = { format: wholeBodyAliases ? 'soloco-upgrade-evidence-v2' : 'soloco-upgrade-evidence-v1', checkpoint_sha256, history_sha256, inventory_sha256,
+  const handover = { ...(reviewSource ? {review_context:{source:reference(reviewSource),value:JSON.parse(sources[reviewSource.source_id].raw)}} : {}), format: wholeBodyAliases ? 'soloco-upgrade-evidence-v2' : 'soloco-upgrade-evidence-v1', checkpoint_sha256, history_sha256, inventory_sha256,
     counts, checkpoint: fields, history: historyEntries,...(archiveIndex?{archive:archiveIndex}:{}),...(currentState?{review_mode:'verified-current-state'}:{}) };
+  const registryEntries=inventory.entries.filter(item=>!archivedSourceIds.has(item.source_id)).map(item=>({...item}));
+  const registrySource=checkpointContinuity?register({scope:'inventory',path:''},'source-index',serialize(registryEntries),'json'):null;
   const stream = register({ scope: 'transport', path: '' }, 'semantic-stream',
-    serialize({ handover, registry: inventory.entries.filter(item=>!archivedSourceIds.has(item.source_id)).map(item => ({ ...item })) }), 'json');
+    serialize({ handover, registry:registrySource?{source:reference(registrySource),length:registrySource.length,count:registryEntries.length}:registryEntries }), 'json');
   const pages = [];
   for (let offset = 0; offset < stream.length;) {
     let end = Math.min(offset + PAGE_TARGET, stream.length);
@@ -642,6 +693,18 @@ function fullyDelivered(source, ranges) {
     if (end >= source.length) return true;
   }
   return false;
+}
+
+/** Pass requires every compulsory semantic token, independently of citation count.
+ * The source registry and exact originals remain optional lookup evidence.
+ */
+export function validateSemanticDelivery(subject, ledger) {
+  const deliveries = ledgerFor(subject, ledger);
+  const stream = subject.sources[subject.pages[0].source_id];
+  if (!fullyDelivered(stream, deliveries.ranges.get(stream.source_id))) {
+    hold('required semantic stream not completely delivered to this session');
+  }
+  return true;
 }
 
 /** Exact source eligibility only, not understanding or semantic correctness.

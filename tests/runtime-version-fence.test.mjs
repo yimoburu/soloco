@@ -23,6 +23,29 @@ assert.equal(extract.status,0,'Could not extract immutable published runtime');
 const legacy=await import(pathToFileURL(path.join(legacyDir,'plugins/soloco/runtime/engine.mjs')));
 const state=a=>withStore(a.root,db=>db.read());
 
+test('bounded-handover producer fences actual 0.6.10 and 0.6.11 writers without adopting definitions',()=>{
+ for(const [version,revision] of [['0.6.10','056c36e'],['0.6.11','b2e3974']]) {
+  const archived=spawnSync('git',['archive',revision,'plugins/soloco'],{cwd:repo,maxBuffer:20000000});
+  assert.equal(archived.status,0);
+  const dir=path.join(base,'producer-'+version);fs.mkdirSync(dir);
+  assert.equal(spawnSync('tar',['-xf','-','-C',dir],{input:archived.stdout}).status,0);
+  // Each immutable implementation runs in its own process to retain its actual
+  // package identity and version rather than patching a second interpretation.
+  const root=fs.mkdtempSync(path.join(base,'old-'+version+'-'));
+  const oldUrl=pathToFileURL(path.join(dir,'plugins/soloco/runtime/engine.mjs')).href;
+  const session=id('fixture-owner');
+  const setupScript=`import * as e from ${JSON.stringify(oldUrl)};const a=${JSON.stringify({root,session_id:session,idea:'Fictional runtime fence'})};e.bind(a.root,a.session_id,'codex');e.open(a,'codex');`;
+  assert.equal(spawnSync(process.execPath,['--input-type=module','-e',setupScript],{env:process.env}).status,0);
+  const a={root,session_id:session,epoch:1},before=state(a);
+  engine.bind(root,session,'codex');
+  engine.save({...a,kind:'decision',content:'Fictional operation under corrected handover runtime'},'codex');
+  assert.equal(state(a).runtime_version,VERSION);assert.equal(state(a).plugin_version,version);
+  for(const field of ['governance','roles','cos_instructions','team_sha256'])assert.deepEqual(state(a)[field],before[field]);
+  const staleScript=`import * as e from ${JSON.stringify(oldUrl)};const a=${JSON.stringify(a)};e.bind(a.root,a.session_id,'codex');try{e.save({...a,kind:'plan',content:'stale mutation'},'codex');process.exit(9);}catch(err){if(!/runtime upgrade/.test(err.message))throw err;}`;
+  assert.equal(spawnSync(process.execPath,['--input-type=module','-e',staleScript],{env:process.env}).status,0);
+ }
+});
+
 test('corrected release fences the actual installed 0.6.9 writer after a semantic mutation',async()=>{
   const archived=spawnSync('git',['archive','df55ac6','plugins/soloco'],{cwd:repo,maxBuffer:20000000});
   assert.equal(archived.status,0);
