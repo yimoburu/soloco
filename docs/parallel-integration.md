@@ -1,6 +1,6 @@
 # Parallel branch compatibility
 
-This branch combines separately reviewed repository candidates, without merging main, publishing, installation or actual company changes.
+This branch combines separately reviewed repository candidates without changing main, publishing, installation or actual company changes.
 
 ## Resolution rationale
 
@@ -14,3 +14,5 @@ This branch combines separately reviewed repository candidates, without merging 
 Focused integration tests cover all three candidates together, including handover, resource conflicts/closure, exact prerequisite lineage, scope-aware budgets, patch reconstruction and schema wiring. Related scalability context/storage integration will be validated separately when available. Original branch acceptance limits and fictional/live evidence distinctions remain applicable.
 
 Ordinary handover deliberately retains a single complete frozen subject under its 200000-character admission ceiling. Adding bounded format-3 everyday retrieval does not make that special initial handover context archive-bounded. Oversized handovers still hold without truncation, including any additional classification provenance. This remaining delivery limit must be disclosed; enabling safe paged handover reconstruction needs its own complete frozen-source retrieval proof. No archive-size or live-handover success claim follows from these integration checks.
+
+Release prerequisite: the integration branch retains the latest main version metadata solely for compatibility and packaging checks. Before operational use, publish a coherent new runtime version so prior runtimes reject company state produced with the new handover requirements. Normalized storage fences legacy writers; that protection alone does not make an older runtime enforce new handover gates on legacy JSON storage. Stock installed 0.6.8 does not contain these branch changes. No release, installation or company adoption is performed here.
