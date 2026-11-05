@@ -80,3 +80,15 @@ test('integration binds coordination metadata without duplicating frozen handove
  job.coordination.resources=['changed-resource'];assert.notEqual(assignmentContext(s,job).hash,before.hash);
  assert.equal(Object.keys(pack).filter(k=>k==='frozen_subject').length,1);
 });
+
+
+test('classification-only changes invalidate handover and classification provenance is frozen for both roles',async()=>{
+ const a=setup();
+ withStore(a.root,db=>db.transaction('fixture.classification',s=>{s.context_classifications={historical:{source:{id:'historical',revision:1,sha256:'source-hash'},plan:{id:'plan',sha256:'plan-hash'},review:{id:'review',sha256:'review-hash'},disposition:'resolved',roles:['research'],scopes:[]}};return s;}));
+ const b=replace(a),r=submit(b);await review(b,r);
+ const current=withStore(b.root,db=>db.read());
+ assert.deepEqual(r.handover.subject.context_classifications,current.context_classifications);
+ withStore(b.root,db=>db.transaction('fixture.classification-only-change',s=>{s.context_classifications.historical.roles=['engineer'];return s;}));
+ assert.throws(()=>engine.control({...b,action:'resume',expected_epoch:2,source_instruction:'resume'},'codex'),/stale/);
+ const fresh=submit(b);assert.deepEqual(fresh.handover.subject.context_classifications.historical.roles,['engineer']);assert.notEqual(fresh.handover.subject_sha256,r.handover.subject_sha256);
+});

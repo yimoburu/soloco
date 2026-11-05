@@ -11,7 +11,7 @@ export function handoverSubject(state) {
   const jobs=Object.fromEntries(Object.entries(state.jobs??{}).filter(([key])=>!checkJobs.has(key)));
   return {company_id:state.id,name:state.name,idea:state.idea,owner:state.owner,
     team_sha256:state.team_sha256,governance:state.governance,cos_instructions:state.cos_instructions,roles:state.roles,phase:state.phase,mode:state.mode,upgrade:state.upgrade??null,upgrade_history:state.upgrade_history??[],
-    records,jobs,messages:state.messages??[],
+    records,jobs,context_classifications:state.context_classifications??{},messages:state.messages??[],
     notices:(state.notices??[]).map(({deliveries,seen_at,...n})=>n)};
 }
 export const handoverHash=state=>digest(JSON.stringify(handoverSubject(state)));
