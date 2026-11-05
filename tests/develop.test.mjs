@@ -9,7 +9,8 @@ import { id, withStore, digest, installedTeam, teamHash } from '../plugins/soloc
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
 import { developmentAssignment, developmentCapability } from '../plugins/soloco/runtime/develop.mjs';
 import { sandboxCapability } from '../plugins/soloco/runtime/local-sandbox.mjs';
-import { assignmentContext } from '../plugins/soloco/runtime/context.mjs';
+import { assignmentContext, contextMatches } from '../plugins/soloco/runtime/context.mjs';
+import { recordReference } from '../plugins/soloco/runtime/current-state.mjs';
 import { work } from '../plugins/soloco/runtime/worker.mjs';
 import { call } from '../plugins/soloco/runtime/main.mjs';
 
@@ -42,19 +43,19 @@ function plan(a,extra={}) {
 function authorize(a,p,extra={}) {
   return engine.develop({...a,action:'authorize',plan_id:p.id,scope_sha256:p.development.scope_sha256,model_data_approved:true,source_instruction:'Approve this exact local development scope and source sharing for up to three bounded attempts.',...extra},'codex');
 }
-function queue(a,{role='engineer',development_id,review_of}={}) {
+function queue(a,{role='engineer',development_id,review_of,context_format,context_scope,evidence_ids=[]}={}) {
   const jobId=id('job'),instance=id(role);
   withStore(a.root,db=>db.transaction('test.queue',s=>{
     const target=s.records[review_of];
-    const j={id:jobId,role,instance_id:instance,session_key:instance,host:s.owner.host,native_id:null,epoch:s.owner.epoch,status:'queued',task:'Honor supplied development scope',inputs:[],review_of:target?{id:target.id,revision:target.revision}:null,...(development_id?{development_id}:{}),created_at:new Date().toISOString()};
+    const j={id:jobId,role,instance_id:instance,session_key:instance,host:s.owner.host,native_id:null,epoch:s.owner.epoch,status:'queued',task:'Honor supplied development scope',inputs:[],review_of:target?{id:target.id,revision:target.revision}:null,...(development_id?{development_id}:{}),...(context_format?{context_format}:{}),...(context_scope?{context_scope}:{}),...(evidence_ids.length?{supplemental_sources:evidence_ids.map(key=>recordReference(s.records[key]))}:{}),created_at:new Date().toISOString()};
     developmentAssignment(s,j,true,a.root);const context=assignmentContext(s,j);
     s.jobs[jobId]={...j,inputs:context.inputs,context_sha256:context.hash};
     s.sessions[instance]={instance_id:instance,role,host:s.owner.host,native_id:null};return s;
   }));return jobId;
 }
 const output=(extra={},native=id('native'))=>({native_id:native,text:JSON.stringify({content:'Attributable development candidate or independent assessment',messages:[],notices:[],...extra})});
-async function generate(a,p,{files=good,extra={},during}={}) {
-  const j=queue(a,{development_id:p.id});
+async function generate(a,p,{files=good,extra={},during,context_format}={}) {
+  const j=queue(a,{development_id:p.id,context_format});
   await work(a.root,j,async(_host,_native,prompt)=>{
     assert.match(prompt,/Bounded local development candidate/);
     if(p.development.scope.output_format==='patches') {assert.match(prompt,/\"patches\":\[/);assert.doesNotMatch(prompt,/\"files\":\[\{\"path\":\"permitted non-fixture/);}
@@ -86,6 +87,126 @@ async function review(a,receipt,{verdict='Pass',extra={},native,notices=[]}={}) 
   const s=read(a);return s.records[s.jobs[j].artifact_id]??s.jobs[j];
 }
 function accept(a,p,t,r,extra={}) {return engine.develop({...a,action:'accept',plan_id:p.id,receipt_id:t.id,review_id:r.id,receipt_sha256:t.development.receipt_sha256,...extra},'codex');}
+
+function supplemental(a) {
+  return engine.save({...a,kind:'artifact',content:'Required supplemental behavior: sum all supplied numbers.'},'codex');
+}
+function amendSupplemental(a,source) {
+  return engine.save({...a,id:source.id,expected_revision:source.revision,kind:'artifact',content:'Changed required behavior: sum only positive supplied numbers.'},'codex');
+}
+async function generateWithSupplemental(a,p,source,{retrieve=true,files=good}={}) {
+  const ref=recordReference(source),native=id('native');
+  const key=queue(a,{development_id:p.id,context_format:3,context_scope:p.id,evidence_ids:[source.id]});
+  let calls=0;
+  await work(a.root,key,async(_host,session,prompt)=>{
+    calls++;
+    if(retrieve&&calls===1)return {native_id:native,text:JSON.stringify({reads:[{id:ref.id,sha256:ref.sha256,offset:0,length:JSON.stringify(source).length}]})};
+    if(retrieve){assert.equal(session,native);assert.match(prompt,/record-reads-v1/);assert.ok(prompt.includes(source.content));}
+    return output({files,notices:[{kind:'must_know',summary:'Generation used the exact supplemental behavior.'}]},native);
+  });
+  const state=read(a),job=state.jobs[key],candidate=state.records[job.artifact_id];
+  assert.equal(job.status,'completed',JSON.stringify(job));assert.equal(candidate.status,'Submitted');
+  assert.deepEqual(job.supplemental_sources,[ref]);
+  assert.equal(job.retrieved_inputs?.length??0,retrieve?1:0);
+  assert.ok(!job.inputs.some(input=>input.id===source.id),'supplement is outside the governing/full input revisions');
+  return candidate;
+}
+
+test('fresh QA cannot accept a passing candidate after its declared or retrieved supplemental evidence changes',live,async()=>{
+  for(const retrieve of [false,true]) {
+    const a=setup(),source=supplemental(a),p=await plan(a);await authorize(a,p);
+    const c=await generateWithSupplemental(a,p,source,{retrieve}),t=await run(a,p,c);
+    assert.equal(t.status,'Submitted');assert.equal(t.development.result.status,'passed');assert.equal(t.development.result.tests_executed,true);
+    amendSupplemental(a,source);
+    const r=await review(a,t),state=read(a),qaJob=state.jobs[r.job_id];
+    assert.equal(r.status,'Submitted');assert.equal(r.review.verdict,'Pass');assert.equal(contextMatches(state,qaJob,qaJob.context_sha256),true);
+    await assert.rejects(accept(a,p,t,r),/stale/);
+    assert.deepEqual(read(a).records[t.id],t,'retain the original executed receipt unchanged');
+    assert.equal(read(a).records[t.id].development.acceptance,undefined);
+  }
+});
+
+test('changed supplemental evidence blocks test admission without consuming a test attempt',live,async()=>{
+  for(const retrieve of [false,true]) {
+    const a=setup(),source=supplemental(a),p=await plan(a);await authorize(a,p);
+    const c=await generateWithSupplemental(a,p,source,{retrieve});amendSupplemental(a,source);
+    await assert.rejects(engine.develop({...a,action:'run',plan_id:p.id,candidate_id:c.id},'codex'),/stale/);
+    const state=read(a);assert.equal(state.records[c.id].development.run,undefined);
+    assert.ok(!Object.values(state.jobs).some(job=>job.kind==='development_test'));
+    assert.equal(fs.existsSync(path.join(a.root,'.company','development')),false);
+  }
+});
+
+test('unchanged retrieved evidence survives unrelated classified updates and generation/review notices',live,async()=>{
+  const a=setup(),source=supplemental(a),p=await plan(a);await authorize(a,p);
+  const c=await generateWithSupplemental(a,p,source);
+  // Apply a real independently reviewed classification before testing. The new
+  // decision belongs to another scope, so it changes neither this grant nor pack.
+  const other=engine.save({...a,kind:'decision',content:'Unrelated fictional project must use blue icons.'},'codex');
+  const classification=engine.contextControl({...a,action:'plan',record_ids:[other.id],disposition:'current',scopes:['other-project'],source_instruction:'Classify this exact decision for the other project.'},'codex');
+  const key=queue(a,{role:'qa',review_of:classification.id,context_format:3});
+  await work(a.root,key,async()=>output({review:{verdict:'Pass',reason:'This exact decision applies only to the other project.',permitted_action:'apply_context_classification',plan_sha256:digest(JSON.stringify(classification.context_classification_plan)),blockers:[]}}));
+  const classificationReview=read(a).jobs[key].artifact_id;
+  engine.contextControl({...a,action:'apply',plan_id:classification.id,review_id:classificationReview,source_instruction:'Apply the exact independently reviewed project scope.'},'codex');
+  const t=await run(a,p,c);assert.equal(t.development.result.status,'passed');
+  const r=await review(a,t,{notices:[{kind:'must_know',summary:'QA accepts only this retained local candidate.'}]});
+  const accepted=await accept(a,p,t,r);assert.equal(accepted.source_integrated,false);
+  assert.deepEqual(read(a).records[source.id],source);
+  assert.ok(read(a).notices.some(n=>n.reference===c.id));assert.ok(read(a).notices.some(n=>n.reference===r.id));
+});
+
+test('supplemental mutation during native tests aborts and quarantines the retained outcome',live,async()=>{
+  const a=setup(),source=supplemental(a),p=await plan(a,{timeout_ms:10000});await authorize(a,p);
+  const files=[good[0],{path:'sum.test.mjs',content:"import test from 'node:test';import fs from 'node:fs';import path from 'node:path';test('slow supplemental fixture',async()=>{fs.writeFileSync(path.join(process.env.HOME,'started'),'1');await new Promise(r=>setTimeout(r,5000));});"}];
+  const c=await generateWithSupplemental(a,p,source,{files});
+  const job=await engine.develop({...a,action:'run',plan_id:p.id,candidate_id:c.id},'codex');
+  const marker=path.join(a.root,'.company','development',p.id,c.id,'source','.scratch','started'),until=Date.now()+10000;
+  while(!fs.existsSync(marker)&&Date.now()<until)await new Promise(r=>setTimeout(r,10));
+  assert.ok(fs.existsSync(marker),'actual isolated tests reached the running fixture');
+  assert.equal(read(a).jobs[job.id].status,'running');amendSupplemental(a,source);
+  const ended=await waitJob(a,job.id),t=ended.receipt;
+  assert.ok(t,JSON.stringify(ended.job));assert.equal(ended.job.status,'quarantined');assert.equal(t.status,'Quarantined');
+  assert.notEqual(t.development.result.status,'passed');assert.equal(t.development.acceptance,undefined);
+  assert.ok(read(a).notices.some(n=>n.reference===t.id));
+  const r=await review(a,t);assert.equal(r.review.verdict,'Pass');
+  await assert.rejects(accept(a,p,t,r),/runtime test receipt/);
+});
+
+test('qualified exact reuse cannot bypass the new candidate supplemental bindings',live,async()=>{
+  const a=setup(),source=supplemental(a),p=await plan(a);await authorize(a,p);
+  const first=await generate(a,p,{context_format:2}),original=await run(a,p,first);
+  assert.equal(original.development.result.status,'passed');
+  const qualification=await review(a,original,{extra:{deterministic_validation:{permitted_action:'reuse_exact_validation',fingerprint:original.development.validation_fingerprint,dependencies_complete:true,external_state:false}}});
+  await accept(a,p,original,qualification);
+  const retainedOriginal=read(a).records[original.id];
+  const second=await generateWithSupplemental(a,p,source),changed=amendSupplemental(a,source);
+  await assert.rejects(engine.develop({...a,action:'run',plan_id:p.id,candidate_id:second.id,reuse_receipt_id:original.id},'codex'),/stale/);
+  assert.equal(read(a).records[second.id].development.run,undefined);
+  const third=await generateWithSupplemental(a,p,changed);
+  const job=await engine.develop({...a,action:'run',plan_id:p.id,candidate_id:third.id,reuse_receipt_id:original.id},'codex');
+  const ended=await waitJob(a,job.id),reused=ended.receipt;
+  assert.ok(reused,JSON.stringify(ended.job));assert.equal(reused.status,'Submitted');
+  assert.equal(reused.development.result.status,'passed');assert.equal(reused.development.result.reused,true);
+  assert.equal(reused.development.result.tests_executed,false);assert.equal(reused.development.reused_from,original.id);
+  amendSupplemental(a,changed);
+  const r=await review(a,reused);assert.equal(r.review.verdict,'Pass');
+  await assert.rejects(accept(a,p,reused,r),/stale/);
+  assert.deepEqual(read(a).records[original.id],retainedOriginal);
+  assert.deepEqual(read(a).records[reused.id],reused);
+});
+
+test('supplemental candidates retain failed evidence and permit fresh bounded repair',live,async()=>{
+  const a=setup(),source=supplemental(a),p=await plan(a);await authorize(a,p);
+  const broken=await generateWithSupplemental(a,p,source,{files:[{...good[0],content:'export const sum = values => 0;\n'},good[1]]});
+  const failed=await run(a,p,broken);assert.equal(failed.development.result.status,'failed');
+  const negative=await review(a,failed,{verdict:'Fail'});assert.equal(negative.status,'Submitted');
+  const repaired=await generateWithSupplemental(a,p,source),passed=await run(a,p,repaired);
+  assert.equal(passed.development.result.status,'passed');
+  const qa=await review(a,passed,{notices:[{kind:'must_know',summary:'QA accepts this repair and retains the earlier failure.'}]});
+  await accept(a,p,passed,qa);
+  const state=read(a);assert.deepEqual(state.records[failed.id],failed);assert.deepEqual(state.records[negative.id],negative);
+  assert.equal(state.records[p.id].development.attempts.length,2);
+});
 
 test('development capability fails closed without a supported sandbox, and MCP preserves binding',async()=>{
   const a=setup(),status=engine.status(a,'codex');

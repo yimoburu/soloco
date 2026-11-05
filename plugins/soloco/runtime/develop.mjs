@@ -5,7 +5,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { VERSION, V018_GOVERNANCE_SHA256, installedTeam, digest, id, stamp, requireText, withStore, owner, folder, noLink, notice } from './store.mjs';
-import { contextMatches } from './context.mjs';
+import { contextMatches, supplementalMatches } from './context.mjs';
 import { sandboxCapability, runLocalTests, validationEnvironment } from './local-sandbox.mjs';
 import { developmentLimits, assertByteBudget, developmentTransportBudget } from './development-limits.mjs';
 import { reconstructPatch, validText } from './development-patch.mjs';
@@ -15,7 +15,7 @@ export function developmentCapability(s,root=process.cwd()) {
   let configuration,configuration_error=null;
   try{configuration=developmentLimits(root);}catch(error){configuration_error=error.message;configuration={max_bytes:0,per_file_max_bytes:0,source:'invalid'};}
   const executor=sandboxCapability();
-  const blocker=configuration_error??(!executor.supported ? executor.blocker : s && (!['0.5.0','0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7','0.6.8',VERSION].includes(s.plugin_version) || ![installedTeam().governance_sha256,V018_GOVERNANCE_SHA256].includes(s.governance_sha256))
+  const blocker=configuration_error??(!executor.supported ? executor.blocker : s && (!['0.5.0','0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7','0.6.8','0.6.9',VERSION].includes(s.plugin_version) || ![installedTeam().governance_sha256,V018_GOVERNANCE_SHA256].includes(s.governance_sha256))
     ? 'Explicitly adopt the installed development-capable team and compatible governance first' : null);
   return {supported:executor.supported,eligible:s ? !blocker : null,blocker,executor,
     output:'Retained, independently reviewable local candidate; original source is unchanged',
@@ -118,7 +118,7 @@ export function developmentPrompt(s,job,target) {
 }
 function candidateOf(s,p,key,fresh=true) {
   const c=s.records[key],j=s.jobs[c?.job_id];
-  if(c?.development?.type!=='candidate' || c.development.plan_id!==p.id || c.status!=='Submitted' || j?.status!=='completed' || (fresh&&!contextMatches(s,j,j.context_sha256)) || j.inputs.some(ref=>s.records[ref.id]?.revision!==ref.revision) || c.development.candidate_sha256!==digest(JSON.stringify(c.development.files)))throw new Error('Candidate is stale, unsubmitted or has invalid integrity');
+  if(c?.development?.type!=='candidate' || c.development.plan_id!==p.id || c.status!=='Submitted' || j?.status!=='completed' || !(fresh?contextMatches(s,j,j.context_sha256):supplementalMatches(s,j)) || j.inputs.some(ref=>s.records[ref.id]?.revision!==ref.revision) || c.development.candidate_sha256!==digest(JSON.stringify(c.development.files)))throw new Error('Candidate is stale, unsubmitted or has invalid integrity');
   return c;
 }
 function candidateDir(root,p,c) {if(c.development.validation_directory_relative){const base=path.join(folder(root),'.company','development'),directory=path.resolve(folder(root),c.development.validation_directory_relative);if(!directory.startsWith(base+path.sep))throw Error('Validation directory is outside current project');return directory;}return path.join(folder(root),'.company','development',p.id,c.id,'source');}
@@ -244,7 +244,7 @@ export async function executeDevelopmentTest(root,jobId) {
     j.status='running';j.started_at=stamp();return s;
   }));
   const abort=new AbortController();let timer,result,stale=false;
-  const eligible=()=>withStore(a.root,db=>{const s=db.read();owner(s,a.session_id,host,a.epoch);const current=planOf(s,p.id);authorized(s,current,a.root);if(s.jobs[jobId].status!=='running')throw new Error('Test cancelled');sourceMatches(a.root,current);});
+  const eligible=()=>withStore(a.root,db=>{const s=db.read();owner(s,a.session_id,host,a.epoch);const current=planOf(s,p.id);authorized(s,current,a.root);if(s.jobs[jobId].status!=='running')throw new Error('Test cancelled');sourceMatches(a.root,current);if(!supplementalMatches(s,s.jobs[c.job_id]))throw new Error('Candidate supplemental evidence changed');});
   try {
     eligible();const directory=reuseSource?candidateDir(a.root,p,c):makeCandidate(a.root,p,c);verifyCandidate(a.root,p,c);
     const fingerprint=()=>fingerprintValidation({files:c.development.files.map(f=>({path:f.path,sha256:digest(f.content)})),tests:p.development.scope.test_paths,...validationEnvironment(directory,p.development.scope.test_paths),limits:{timeout_ms:p.development.scope.timeout_ms,max_output_bytes:p.development.scope.max_output_bytes}});
@@ -261,7 +261,9 @@ export async function executeDevelopmentTest(root,jobId) {
   finally {clearInterval(timer);}
   let receipt;
   withStore(a.root,db=>db.transaction('development.test_finished',s=>{
-    try{owner(s,a.session_id,host,a.epoch);authorized(s,planOf(s,p.id),a.root);sourceMatches(a.root,p);if(s.jobs[jobId].status!=='running')stale=true;}catch{stale=true;}
+    // Recheck generation dependencies under the publication lock; polling alone
+    // cannot cover a change between the last eligibility check and this write.
+    try{owner(s,a.session_id,host,a.epoch);authorized(s,planOf(s,p.id),a.root);sourceMatches(a.root,p);if(s.jobs[jobId].status!=='running'||!supplementalMatches(s,s.jobs[c.job_id]))stale=true;}catch{stale=true;}
     const key=id('test-receipt'),payload={...result,candidate_sha256:c.development.candidate_sha256,test_paths:p.development.scope.test_paths,timeout_ms:p.development.scope.timeout_ms,max_output_bytes:p.development.scope.max_output_bytes,directory:candidateDir(a.root,p,c),finished_at:stamp()};
     receipt=s.records[key]={id:key,kind:'artifact',author_role:'runtime',author_instance:jobId,revision:1,status:stale?'Quarantined':'Submitted',created_at:stamp(),content:JSON.stringify(payload),development:{type:'test',...(validationFingerprint?{validation_fingerprint:validationFingerprint}:{}),...(reuseSource?{reused_from:reuseSource.id,reuse_qualification:reuseQualification}:{}),plan_id:p.id,candidate_id:c.id,candidate_sha256:c.development.candidate_sha256,result:payload,receipt_sha256:digest(JSON.stringify(payload))}};
     if(reuseSource)s.records[c.id].development.validation_directory_relative=c.development.validation_directory_relative;

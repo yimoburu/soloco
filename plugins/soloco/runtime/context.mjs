@@ -58,12 +58,22 @@ export function assignmentContext(state, job) {
   return {text, hash: digest(hashText), inputs: records.map(r => ({id:r.id, revision:r.revision}))};
 }
 
+// Declared and retrieved evidence stays bound after generation, even when later
+// review/output context is allowed to change. This does not rebuild that context.
+export function supplementalMatches(state, job) {
+  try {
+    const current=state.jobs[job.id]??job;
+    for(const ref of [...(current.supplemental_sources??[]),...(current.retrieved_inputs??[])])if(digest(JSON.stringify(contextSource(state,ref.id)))!==ref.sha256)return false;
+    return true;
+  }
+  catch { return false; }
+}
+
 export function contextMatches(state, job, hash) {
   try {
     // A job's published notices/messages are outputs, not changes to its inputs.
     // They remain in the real state and every subsequent assignment's context.
-    const current=state.jobs[job.id]??job;
-    for(const ref of [...(current.supplemental_sources??[]),...(current.retrieved_inputs??[])])if(digest(JSON.stringify(contextSource(state,ref.id)))!==ref.sha256)return false;
+    if(!supplementalMatches(state,job))return false;
     const view={...state,notices:state.notices.filter(n=>n.job_id!==job.id),messages:state.messages.filter(m=>m.job_id!==job.id)};
     return assignmentContext(view, state.jobs[job.id]??job).hash === hash;
   }

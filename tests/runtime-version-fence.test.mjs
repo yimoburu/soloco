@@ -22,6 +22,23 @@ const extract=spawnSync('tar',['-xf','-','-C',legacyDir],{input:archive.stdout})
 assert.equal(extract.status,0,'Could not extract immutable published runtime');
 const legacy=await import(pathToFileURL(path.join(legacyDir,'plugins/soloco/runtime/engine.mjs')));
 const state=a=>withStore(a.root,db=>db.read());
+
+test('corrected release fences the actual installed 0.6.9 writer after a semantic mutation',async()=>{
+  const archived=spawnSync('git',['archive','df55ac6','plugins/soloco'],{cwd:repo,maxBuffer:20000000});
+  assert.equal(archived.status,0);
+  const dir=path.join(base,'v069');fs.mkdirSync(dir);
+  assert.equal(spawnSync('tar',['-xf','-','-C',dir],{input:archived.stdout}).status,0);
+  const old=await import(pathToFileURL(path.join(dir,'plugins/soloco/runtime/engine.mjs')));
+  const a={root:fs.mkdtempSync(path.join(base,'v069-company-')),session_id:id('fictional-founder'),epoch:1};
+  old.bind(a.root,a.session_id,'codex');old.open({...a,idea:'Fictional installed-version fixture'},'codex');
+  assert.equal(state(a).runtime_version,'0.6.9');
+  engine.bind(a.root,a.session_id,'codex');
+  engine.save({...a,kind:'decision',content:'Fictional corrected-runtime operation'},'codex');
+  assert.equal(state(a).runtime_version,VERSION);assert.notEqual(VERSION,'0.6.9');
+  old.bind(a.root,a.session_id,'codex');
+  assert.throws(()=>old.save({...a,kind:'decision',content:'Fictional obsolete writer'},'codex'),/runtime upgrade/);
+  assert.equal(state(a).plugin_version,'0.6.9','Compatible runtime update preserves pinned definitions');
+});
 function setup(){
   const a={root:fs.mkdtempSync(path.join(base,'company-')),session_id:id('fictional-founder'),epoch:1};
   legacy.bind(a.root,a.session_id,'codex');legacy.open({...a,idea:'Fictional compatibility fixture'},'codex');
