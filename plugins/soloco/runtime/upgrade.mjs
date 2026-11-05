@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { PACKAGE, VERSION, SCHEMA, stamp, id, digest, withStore, requireText, teamHash, installedTeam, skillBody, upgradePending, noLink, notice, COMPATIBLE_TEAM_VERSIONS, compatibleRuntime } from './store.mjs';
 import { binding, dataDir, upgradeSummary } from './engine.mjs';
 import { readiness, runModel, parseArtifact } from './adapters.mjs';
+import { MAX_EXECUTION_TIMEOUT_MS } from './timeout.mjs';
 
 import { buildEvidence, evidencePage, readEvidence, createDeliveryLedger, recordDelivery, validateCitations, admitPrompt, recordResponse, boundedReplayBatches, RESPONSE_LIMIT } from './upgrade-evidence.mjs';
 
@@ -300,12 +301,12 @@ Protocol: Return JSON only matching response_contract.required_json_shape for th
         const prompt=promptFor(role,data);
         const budget=admitPrompt(prompt,session.used);
         const dir=path.join(dataDir(),'sessions',session.instance);noLink(dir);fs.mkdirSync(dir,{recursive:true,mode:0o700});
-        const remaining=Math.min(180000,deadline(u)-Date.now());
+        const remaining=Math.min(MAX_EXECUTION_TIMEOUT_MS,deadline(u)-Date.now());
         if(remaining<1000)throw new Error('Upgrade deadline expired before native call');
         let output;
         const controller=new AbortController();
         const timer=setTimeout(()=>controller.abort(),deadline(u)-Date.now());
-        try { output=await model(u.host,session.native,prompt,dir,remaining,null,{timeoutReason:'Remaining immutable upgrade rehearsal deadline',signal:controller.signal}); }
+        try { output=await model(u.host,session.native,prompt,dir,remaining,null,{timeoutReason:'Runtime execution ceiling capped by remaining immutable upgrade rehearsal deadline',signal:controller.signal}); }
         catch(error) {retain(role,{phase:task.phase,error:error.message,budget,completed_at:stamp()});throw error;}
         finally {clearTimeout(timer);}
         retain(role,{phase:task.phase,native_id:output.native_id??null,text:output.text,budget,response_characters:typeof output.text==='string'?output.text.length:null,estimated_response_tokens:typeof output.text==='string'?Math.ceil(output.text.length/4):null,completed_at:stamp()});
