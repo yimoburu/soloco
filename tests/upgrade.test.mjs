@@ -6,6 +6,7 @@ import os from 'node:os';
 import { withStore, id, digest, VERSION, teamHash } from '../plugins/soloco/runtime/store.mjs';
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
 import { upgrade, rehearse, checkpoint } from '../plugins/soloco/runtime/upgrade.mjs';
+import { MAX_EXECUTION_TIMEOUT_MS } from '../plugins/soloco/runtime/timeout.mjs';
 import { hook, call } from '../plugins/soloco/runtime/main.mjs';
 
 const base=fs.mkdtempSync(path.join(os.tmpdir(),'company-upgrade-'));
@@ -354,7 +355,7 @@ test('a company checkpoint above 200000 characters upgrades without dropping any
   assert.equal(read(a).records.large.content,content);
 });
 
-for(const version of ['0.2.0','0.6.0','0.6.1','0.6.2']) test(`compatible ${version} companies can optionally adopt and recover team definitions`,async()=>{
+for(const version of ['0.2.0','0.6.0','0.6.1','0.6.2','0.6.3']) test(`compatible ${version} companies can optionally adopt and recover team definitions`,async()=>{
   const a=setup();withStore(a.root,db=>db.transaction('test.previous_patch',s=>{
     s.schema=2;s.runtime_version=version;s.plugin_version=version;s.cos_instructions='Preserve founder limits and independently review preparation';s.team_sha256=teamHash(s);return s;
   }));
@@ -474,6 +475,68 @@ test('45 minute deadline is consistent with status; old attempts retain seven mi
     assert.equal(engine.status(a,'codex').upgrade.status,legacy?'failed':'queued');
     assert.equal(read(a).upgrade.id,p.upgrade.id);
   }
+});
+
+test('native page calls use the runtime ceiling capped by the unchanged rehearsal deadline',async()=>{
+  const a=setup(),p=prepare(a),model=modelFor(a),now=Date.now;
+  const originalDeadline=read(a).upgrade.deadline_ms;
+  let calls=0;
+  try {
+    Date.now=()=>originalDeadline-45*60*1000;
+    await rehearse(a.root,p.upgrade.id,async(...args)=>{
+      const task=JSON.parse(args[2]);
+      assert.equal(args[4],calls===0?MAX_EXECUTION_TIMEOUT_MS:90000);
+      assert.equal(args[5],null);
+      assert.equal(args[6].timeoutReason,'Runtime execution ceiling capped by remaining immutable upgrade rehearsal deadline');
+      assert.equal(args[6].signal.aborted,false);
+      if(calls++===0) {
+        assert.equal(task.phase,'page');assert.equal(args[1],null);
+        Date.now=()=>originalDeadline-90000;
+      }
+      return model(...args);
+    });
+  } finally {Date.now=now;}
+  const u=read(a).upgrade;
+  assert.ok(calls>1);assert.equal(u.status,'ready',u.error);
+  assert.equal(u.deadline_ms,originalDeadline);
+});
+
+test('native timeout remains held with its evidence and cannot restart the failed rehearsal',async()=>{
+  const a=setup(),p=prepare(a);let calls=0;
+  await rehearse(a.root,p.upgrade.id,async(...args)=>{
+    calls++;assert.equal(args[4],MAX_EXECUTION_TIMEOUT_MS);
+    throw new Error('Role session timed out; held for inspection, not automatically retried');
+  });
+  const failed=read(a).upgrade;
+  assert.equal(failed.status,'failed');assert.match(failed.error,/timed out/);
+  assert.equal(failed.calls.length,1);assert.equal(failed.calls[0].error,failed.error);
+  assert.equal(failed.cos_pages.length,0);
+  await rehearse(a.root,p.upgrade.id,async()=>{calls++;});
+  assert.equal(calls,1);assert.equal(read(a).upgrade.status,'failed');
+  assert.deepEqual(read(a).upgrade.calls,failed.calls);
+  assert.throws(()=>upgrade({...a,action:'apply',upgrade_id:p.upgrade.id,expected_epoch:p.owner.epoch},'codex'),/passing continuity review/);
+});
+
+test('immutable rehearsal deadline aborts an active native call and holds adoption',async t=>{
+  t.mock.timers.enable({apis:['setTimeout']});
+  const a=setup(),p=prepare(a),now=Date.now,originalDeadline=read(a).upgrade.deadline_ms;
+  let calls=0;
+  try {
+    Date.now=()=>originalDeadline-30000;
+    await rehearse(a.root,p.upgrade.id,async(...args)=>{
+      calls++;assert.equal(args[4],30000);
+      const signal=args[6].signal;
+      const pending=new Promise((resolve,reject)=>signal.addEventListener('abort',()=>reject(new Error('Native call cancelled at immutable deadline')),{once:true}));
+      Date.now=()=>originalDeadline;
+      t.mock.timers.tick(30000);
+      assert.equal(signal.aborted,true);
+      return pending;
+    });
+  } finally {Date.now=now;t.mock.timers.reset();}
+  const u=read(a).upgrade;
+  assert.equal(calls,1);assert.equal(u.status,'failed');assert.match(u.error,/cancelled/);
+  assert.equal(u.deadline_ms,originalDeadline);assert.equal(u.calls.length,1);
+  assert.equal(u.cos_pages.length,0);
 });
 
 test('unexpected native identity changes fail without silent restart',async()=>{

@@ -98,7 +98,7 @@ test('installed development capability does not silently authorize older teams o
   assert.equal(developmentCapability(team).eligible,true);
   for(const changed of [{...team,plugin_version:'0.4.1'},{...team,governance_sha256:digest('changed rules')}])assert.equal(developmentCapability(changed).eligible,false);
 });
-for(const version of ['0.6.0','0.6.1','0.6.2'])test(`pinned v${version} preserves authorized development and original source after a runtime update`,live,async()=>{
+for(const version of ['0.6.0','0.6.1','0.6.2','0.6.3'])test(`pinned v${version} preserves authorized development and original source after a runtime update`,live,async()=>{
   const a=setup();withStore(a.root,db=>db.transaction('test.pin_compatible_development',s=>{
     s.plugin_version=version;s.runtime_version=version;s.cos_instructions=`Pinned v${version} development instructions`;s.team_sha256=teamHash(s);return s;
   }));
