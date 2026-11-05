@@ -1,3 +1,4 @@
+import { handoverReviewContext } from './handover.mjs';
 import { digest } from './store.mjs';
 import { developmentTransportBudget } from './development-limits.mjs';
 
@@ -14,6 +15,7 @@ export function contextBudgetForJob(state,job) {
 
 // Every supplied fact is a dependency. Never silently trim a constraint or input.
 export function assignmentContext(state, job) {
+  const handover=handoverReviewContext(state,job);if(handover)return handover;
   const ids = new Set(Object.values(state.records).filter(required).map(r => r.id));
   const prototypeId=job.prototype_id ?? state.records[job.review_of?.id]?.prototype?.plan_id;
   if(prototypeId) {

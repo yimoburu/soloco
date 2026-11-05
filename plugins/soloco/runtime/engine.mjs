@@ -7,6 +7,7 @@ import { readiness, modelCatalog } from './adapters.mjs';
 import { normalizeSelection, selectionKey, activityFor, selectionUsage } from './selection.mjs';
 import { normalizeCoordination, bindCoordination, resourceClaims } from './coordination.mjs';
 import { progressSnapshot, renderProgress } from './progress-view.mjs';
+import { beginHandover, submitReconstruction, handoverReviewEligible, verifyHandoverAcceptance, handoverSubject } from './handover.mjs';
 import { assignmentContext } from './context.mjs';
 import { developmentAction, developmentCapability, developmentAssignment } from './develop.mjs';
 import { prototypeAction, prototypeCapability, prototypeAssignment } from './prototype.mjs';
@@ -46,7 +47,7 @@ function summary(state,root=process.cwd()) {
     if(!job || job.kind==='development_test' || job.type==='development_test')return item;
     return {...item,timeout:{policy_version:job.timeout_policy_version??null,timeout_ms:job.timeout_ms??null,reason:job.timeout_reason??null,execution_started_at:job.execution_started_at??null,execution_deadline_at:job.execution_deadline_at??null,state:jobTimeoutState(job,Date.now()),reconciliation:job.timeout_reconciliation??null,failure:job.execution_failure??null}};
   });
-  return {company_id:state.id, name:state.name, idea:state.idea, revision:state.revision, phase:state.phase, mode:state.mode, paused:state.paused, owner:state.owner, plugin_version:state.plugin_version, runtime_version:state.runtime_version??state.plugin_version, executing_runtime_version:VERSION, upgrade:upgradeSummary(state.upgrade), governance_sha256:state.governance_sha256, records:Object.values(state.records), sessions:state.sessions, jobs:Object.values(state.jobs), activity, resource_claims:resourceClaims(state), selection_usage:selectionUsage(state), notices:state.notices.filter(n=>!n.resolution), messages:state.messages, capabilities:{standalone_sessions:true, model_selection:{eligible:['0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6',VERSION].includes(state.plugin_version),catalog:'company_doctor.models',coordinator_model:'Host UI controlled; no automatic switching',billing:'Existing host account; no hard spending enforcement'},local_prototype:prototypeCapability(state), local_development:developmentCapability(state,root), external_execution:false, background_founder_delivery:false, automatic_team_migration:false, explicit_team_upgrade:true}};
+  return {company_id:state.id, name:state.name, idea:state.idea, revision:state.revision, phase:state.phase, mode:state.mode, paused:state.paused, owner:state.owner, plugin_version:state.plugin_version, runtime_version:state.runtime_version??state.plugin_version, executing_runtime_version:VERSION, upgrade:upgradeSummary(state.upgrade), governance_sha256:state.governance_sha256, records:Object.values(state.records), sessions:state.sessions, jobs:Object.values(state.jobs), activity, handover:state.handover??null, resource_claims:resourceClaims(state), selection_usage:selectionUsage(state), notices:state.notices.filter(n=>!n.resolution), messages:state.messages, capabilities:{standalone_sessions:true, model_selection:{eligible:['0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6',VERSION].includes(state.plugin_version),catalog:'company_doctor.models',coordinator_model:'Host UI controlled; no automatic switching',billing:'Existing host account; no hard spending enforcement'},local_prototype:prototypeCapability(state), local_development:developmentCapability(state,root), external_execution:false, background_founder_delivery:false, automatic_team_migration:false, explicit_team_upgrade:true}};
 }
 export function develop(args,host) { binding(args,host); return developmentAction(args,host); }
 export function prototype(args,host) { binding(args,host); return prototypeAction(args,host); }
@@ -130,6 +131,11 @@ export function save(args,host) {
   });
   return state.records[recordId];
 }
+export function handover(args,host) {
+  if(args.action==='inspect'){binding(args,host);return withStore(args.root,db=>{const s=db.read();return {handover:s.handover??null,subject:handoverSubject(s)};});}
+  if(args.action!=='submit')throw new Error('Choose inspect or submit');
+  let result;update(args,host,'handover.reconstruction_submitted',s=>{result=submitReconstruction(s,args);});return result;
+}
 export function dispatch(args,host) {
   requireText(args.task,'task');
   normalizeCoordination(args);
@@ -148,7 +154,7 @@ export function dispatch(args,host) {
   if (check.authenticated===false) throw new Error(`${host} CLI is not signed in. Complete its normal login before starting specialists.`);
   const jobId=id('job');
   const state=update(args,host,'job.queued',s=>{
-    if(s.paused) throw new Error('Company is paused');
+    if(s.paused && !handoverReviewEligible(s,args)) throw new Error('Company is paused; only current handover QA may run');
     if(!Object.hasOwn(s.roles,args.role)) throw new Error('Role is absent from the pinned team catalog');
     if(busy(s).length>=3) throw new Error('Three assignments already active; wait for a result');
     const target=args.review_of && Object.hasOwn(s.records,args.review_of) ? s.records[args.review_of] : null;
@@ -163,8 +169,9 @@ export function dispatch(args,host) {
     if(target?.author_instance===session.instance_id) throw new Error('Authors cannot independently review their own artifact');
     if(session.host!==host) throw new Error('Role belongs to another host; perform company handover first');
     if(args.input_ids!==undefined && !Array.isArray(args.input_ids))throw new Error('input_ids must be an array');
+    const handoverInputs=target?.handover?.input_refs?.map(r=>r.id)??[];
     const coordination=bindCoordination(s,args);
-    const inputs=[...new Set([...(args.input_ids??[]),...(coordination?.dependencies??[]).map(d=>d.artifact_id)])];
+    const inputs=[...new Set([...(args.input_ids??[]),...handoverInputs,...(coordination?.dependencies??[]).map(d=>d.artifact_id)])];
     if(!Array.isArray(inputs) || inputs.some(k=>typeof k!=='string' || !Object.hasOwn(s.records,k))) throw new Error('An input record is missing');
     const job={...(coordination?{coordination}:{}),...(args.expected_deliverable===undefined?{}:{expected_deliverable:args.expected_deliverable}),requester:{role:'runner',session_id:s.owner.session_id,host:s.owner.host,epoch:s.owner.epoch},id:jobId,role:args.role,session_key:key,instance_id:session.instance_id,native_id:session.native_id,host,epoch:s.owner.epoch,status:'queued',task:args.task,context_format:2,timeout_policy_version:TIMEOUT_POLICY_VERSION,...timeout,model_selection:selection,cli_version:check.version,task_summary:args.task_summary??null,next_handoff:args.next_handoff??null,...(catalog?{model_catalog:{source:catalog.source,...(selection.mode==='explicit'?{model:catalog.models.find(m=>m.id===selection.model)}:{}),speed_support:catalog.speed_support}}:{}),inputs:inputs.map(k=>({id:k,revision:s.records[k].revision})),review_of:target?{id:target.id,revision:target.revision}:null,...(args.prototype_id?{prototype_id:args.prototype_id}:{}),...(args.development_id?{development_id:args.development_id}:{}),created_at:stamp()};
     prototypeAssignment(s,job,true);developmentAssignment(s,job,true,args.root);
@@ -199,7 +206,9 @@ export function control(args,host) {
     }
     else if(args.action==='handover') {
       if(busy(s).length) throw new Error('Assignments are active. Pause and reconcile them before handing over.');
+      const previous={...s.owner};
       s.owner={host,session_id:args.session_id,epoch:s.owner.epoch+1};
+      beginHandover(s,previous);
       // Incoming role instances cold-start from records; old native histories remain attributable.
       s.retired_sessions=[...(s.retired_sessions??[]),...Object.values(s.sessions)]; s.sessions={};
       s.paused=true;
@@ -210,7 +219,7 @@ export function control(args,host) {
       if(args.expected_name!==s.name) throw new Error('Company name changed; read current status before renaming');
       if(busy(s).length) throw new Error('Assignments are active; wait or pause before renaming');
       s.name=name;
-    } else {owner(s,args.session_id,host);s.paused=false;}
+    } else {owner(s,args.session_id,host);const acceptance=verifyHandoverAcceptance(s);if(acceptance){s.handover.acceptance=acceptance;s.handover.status='completed';}s.paused=false;}
     const decisionId=id('control');
     s.records[decisionId]={id:decisionId,kind:'decision',author_role:'human_founder',recorded_by:args.session_id,content:args.source_instruction,status:'Recorded',action:args.action,...(args.action==='rename'?{previous_name:previousName,name:s.name}:{}),created_at:stamp()};
     return s;

@@ -179,8 +179,8 @@ test('host handover preserves evidence and notices but never transfers prototype
   const a=setup(),p=plan(a);await authorize(a,p);const b=await generate(a,p),r=await review(a,b);
   const next={...a,session_id:'next',epoch:2};engine.bind(a.root,next.session_id,'claude');
   engine.control({...next,action:'handover',expected_epoch:1,source_instruction:'Continue in Claude'},'claude');
-  engine.control({...next,action:'resume',expected_epoch:2,source_instruction:'Resume preparation'},'claude');
-  assert.throws(()=>materialize(next,p,b,r,'claude'),/authority|constraints/);
+  assert.throws(()=>engine.control({...next,action:'resume',expected_epoch:2,source_instruction:'Resume preparation'},'claude'),/reconstruction/);
+  assert.throws(()=>materialize(next,p,b,r,'claude'),/paused|authority|constraints/);
   assert.ok(read(a).records[r.id]);assert.ok(read(a).records[p.id].prototype.authorization);
 });
 test('checked team replacement preserves prototype records but requires fresh authority afterward',async()=>{
