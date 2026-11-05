@@ -66,7 +66,7 @@ export function handoverReviewContext(state,job) {
   if(!handoverReviewEligible(state,job)||target.revision!==job.review_of.revision)throw new Error('Handover review subject changed');
   const prior_reviews=Object.values(state.records).filter(r=>r.kind==='review'&&r.review_of?.id!==target.id&&state.records[r.review_of?.id]?.handover?.id===state.handover.id)
     .map(r=>({id:r.id,review_of:r.review_of,content:r.content,review:r.review,status:r.status,author_instance:r.author_instance}));
-  const pack={protocol:'ordinary-handover-review-v1',charter:state.roles[job.role],assignment:{task:job.task,model_selection:job.model_selection??{mode:'default'}},
+  const pack={protocol:'ordinary-handover-review-v1',charter:state.roles[job.role],assignment:{...(job.coordination?{coordination:job.coordination}:{}),task:job.task,model_selection:job.model_selection??{mode:'default'}},
     reconstruction:{id:target.id,revision:target.revision,author_instance:target.author_instance,content:target.content,subject_sha256:target.handover.subject_sha256},
     frozen_subject:target.handover.subject,prior_reviews};
   const text=JSON.stringify(pack);

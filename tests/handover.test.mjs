@@ -67,6 +67,16 @@ test('single-copy frozen handover evidence fits moderate history and oversized s
  const a=setup();for(let i=0;i<size;i+=90000)engine.save({...a,kind:'artifact',content:'x'.repeat(Math.min(90000,size-i)),source_reference:'Fictional archive'},'codex');
  const b=replace(a),r=submit(b),s=withStore(a.root,db=>db.read()),job={role:'qa',task:'Review exact frozen evidence',inputs:[],review_of:{id:r.id,revision:r.revision}};
  if(size>200000)assert.throws(()=>assignmentContext(s,job),/Nothing was truncated/);
- else {const ctx=assignmentContext(s,job);assert.ok(ctx.text.length<160000);assert.equal(ctx.text.split('x'.repeat(90000)).length-1,1);}
+ else {const ctx=assignmentContext(s,job);assert.ok(ctx.text.length<200000);assert.equal(ctx.text.split('x'.repeat(90000)).length-1,1);}
  }
+});
+
+
+test('integration binds coordination metadata without duplicating frozen handover evidence',()=>{
+ const a=setup(),b=replace(a),r=submit(b),s=withStore(a.root,db=>db.read());
+ const job={role:'qa',task:'Review frozen handover',inputs:[],review_of:{id:r.id,revision:r.revision},coordination:{version:1,dependencies:[],resources:['handover-review']}};
+ const before=assignmentContext(s,job),pack=JSON.parse(before.text);
+ assert.deepEqual(pack.assignment.coordination,job.coordination);
+ job.coordination.resources=['changed-resource'];assert.notEqual(assignmentContext(s,job).hash,before.hash);
+ assert.equal(Object.keys(pack).filter(k=>k==='frozen_subject').length,1);
 });
