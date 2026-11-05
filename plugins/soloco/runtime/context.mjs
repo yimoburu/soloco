@@ -1,8 +1,16 @@
 import { digest } from './store.mjs';
+import { developmentTransportBudget } from './development-limits.mjs';
 
 export const CONTEXT_LIMIT = 200000;
 const required = record => ['intent', 'decision', 'preference'].includes(record.kind)
   || ['Fail', 'Blocked'].includes(record.review?.verdict);
+
+export function contextBudgetForJob(state,job) {
+  const target=state.records[job.review_of?.id];
+  const planId=job.development_id??target?.development?.plan_id;
+  const scope=planId&&state.records[planId]?.development?.scope;
+  return scope?.transport_max_characters===undefined?CONTEXT_LIMIT:developmentTransportBudget(scope.max_bytes);
+}
 
 // Every supplied fact is a dependency. Never silently trim a constraint or input.
 export function assignmentContext(state, job) {
@@ -34,7 +42,8 @@ export function assignmentContext(state, job) {
     ...(job.context_format===2?{assignment:{...(job.coordination?{coordination:job.coordination}:{}),...(Object.hasOwn(job,'expected_deliverable')?{expected_deliverable:job.expected_deliverable}:{}),...(Object.hasOwn(job,'requester')?{requester:job.requester}:{}),task:job.task,task_summary:job.task_summary??null,next_handoff:job.next_handoff??null,model_selection:job.model_selection??{mode:'default'},model_catalog:job.model_catalog??null}}:{}),
   };
   const text = JSON.stringify(pack);
-  if (text.length > CONTEXT_LIMIT) throw new Error('Assignment context exceeds 200000 characters; narrow the assignment or review and compact records. Nothing was truncated');
+  const limit=contextBudgetForJob(state,job);
+  if (text.length > limit) throw new Error(`Assignment context exceeds ${limit} characters (actual ${text.length}); narrow the assignment or review and compact records. Nothing was truncated. Host/model context fit remains unverified`);
   return {text, hash: digest(text), inputs: records.map(r => ({id:r.id, revision:r.revision}))};
 }
 

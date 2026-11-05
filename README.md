@@ -94,6 +94,8 @@ The result is an accepted, retained candidate directory under `.company/developm
 
 Local development requires an adopted v0.5.0, v0.6.0, v0.6.1, v0.6.2, v0.6.3, v0.6.4, v0.6.5, v0.6.6 or v0.6.7 team and exact source v0.19 or exact published v0.18 governance. Existing supported companies pinned to v0.18 keep this capability without adopting v0.19 or new instructions. Historically published v0.6.6 bundled v0.18; the source contract is now v0.19 with the reviewed N1/N2 amendments. Previously authorized file-only prototypes remain usable on supported v0.4.0/v0.4.1 pinned teams with exact v0.17 or v0.18 governance, subject to their original authority checks. Budget enforcement for external services and scheduled operations remain future work. See the [issue #1 follow-up](https://github.com/yimoburu/soloco/issues/1#issuecomment-6619395459) for the broader request.
 
+The optional development patch format avoids regenerating unchanged file text while preserving complete candidate review. A project can configure its byte ceiling in `.company/development.json`; the default stays 100,000 bytes and each authorized scope keeps its explicit budget. See [candidate format and size policy](docs/development.md#efficient-retained-development-candidates).
+
 ## Create a local prototype
 
 This opt-in implements [issue #1](https://github.com/yimoburu/soloco/issues/1).

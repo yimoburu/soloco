@@ -5,19 +5,23 @@ import { fileURLToPath } from 'node:url';
 import { VERSION, V018_GOVERNANCE_SHA256, installedTeam, digest, id, stamp, requireText, withStore, owner, folder, noLink, notice } from './store.mjs';
 import { contextMatches } from './context.mjs';
 import { sandboxCapability, runLocalTests } from './local-sandbox.mjs';
+import { developmentLimits, assertByteBudget, developmentTransportBudget } from './development-limits.mjs';
+import { reconstructPatch, validText } from './development-patch.mjs';
 
 // A supported local executor, not a general permission to operate a business.
-export function developmentCapability(s) {
+export function developmentCapability(s,root=process.cwd()) {
+  let configuration,configuration_error=null;
+  try{configuration=developmentLimits(root);}catch(error){configuration_error=error.message;configuration={max_bytes:0,per_file_max_bytes:0,source:'invalid'};}
   const executor=sandboxCapability();
-  const blocker=!executor.supported ? executor.blocker : s && (!['0.5.0','0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6',VERSION].includes(s.plugin_version) || ![installedTeam().governance_sha256,V018_GOVERNANCE_SHA256].includes(s.governance_sha256))
-    ? 'Explicitly adopt the installed development-capable team and compatible governance first' : null;
+  const blocker=configuration_error??(!executor.supported ? executor.blocker : s && (!['0.5.0','0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6',VERSION].includes(s.plugin_version) || ![installedTeam().governance_sha256,V018_GOVERNANCE_SHA256].includes(s.governance_sha256))
+    ? 'Explicitly adopt the installed development-capable team and compatible governance first' : null);
   return {supported:executor.supported,eligible:s ? !blocker : null,blocker,executor,
     output:'Retained, independently reviewable local candidate; original source is unchanged',
     limits:{test_runner:'Node built-in tests',network:false,package_installation:false,source_integration:false,
-      max_files:32,max_bytes:100000,max_attempts:10,max_test_ms:120000},
+      max_files:32,max_bytes:configuration.max_bytes,per_file_max_bytes:configuration.per_file_max_bytes,max_attempts:10,max_test_ms:120000,configuration,context_admission_characters:configuration_error?null:developmentTransportBudget(configuration.max_bytes),model_context_fit:"unverified; host/model limits may be lower"},
     data_policy:'Founder selects source paths and data policy. Authorized contents are sent to the existing host model.'};
 }
-function capable(s) { const c=developmentCapability(s);if(c.blocker)throw new Error(c.blocker); }
+function capable(s,root) { const c=developmentCapability(s,root);if(c.blocker)throw new Error(c.blocker); }
 function relative(p) {
   requireText(p,'file path',180);
   if(p.split('/').some(x=>!/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(x) || x.endsWith('.') || /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(?:\.|$)/i.test(x) || /^(AGENTS|CLAUDE)\.md$/i.test(x)))throw new Error('Use portable explicit file paths, excluding hidden paths, links and host instructions');
@@ -34,17 +38,18 @@ function sourceFile(root,p) {
   for(const part of relative(p).split('/')) {file=path.join(file,part);noLink(file);}
   return file;
 }
-function readSource(root,p) {
+function readSource(root,p,limit=developmentLimits(root).max_bytes) {
   const file=sourceFile(root,p);
   if(!fs.existsSync(file))throw new Error(`Missing source: ${p}`);
   const stat=fs.statSync(file);
-  if(!stat.isFile() || stat.size>100000)throw new Error(`Source must be a bounded regular text file: ${p}`);
+  if(!stat.isFile())throw new Error(`Source must be a regular text file: ${p}`);
+  if(stat.size>limit)throw new Error(`Source ${p} exceeds byte limit: actual ${stat.size}, permitted ${limit}, excess ${stat.size-limit}`);
   const bytes=fs.readFileSync(file),content=bytes.toString('utf8');
-  if(content.includes('\0') || !Buffer.from(content).equals(bytes))throw new Error(`Source must be UTF-8 text: ${p}`);
+  if(!validText(content) || !Buffer.from(content).equals(bytes))throw new Error(`Source must be UTF-8 text: ${p}`);
   return {path:p,content,sha256:digest(content)};
 }
 function sourceMatches(root,p) {
-  for(const f of p.development.scope.sources)if(readSource(root,f.path).sha256!==f.sha256)throw new Error('Original source changed; prepare a new scope');
+  for(const f of p.development.scope.sources)if(readSource(root,f.path,p.development.scope.max_bytes).sha256!==f.sha256)throw new Error('Original source changed; prepare a new scope');
   for(const f of p.development.scope.write_paths)if(!p.development.scope.read_paths.includes(f) && fs.existsSync(sourceFile(root,f)))throw new Error('An authorized new path now exists in original source; prepare a new scope');
 }
 function planOf(s,key) {
@@ -55,18 +60,20 @@ function planOf(s,key) {
 // Routine failures, receipts and notices do not revoke a standing grant. They remain
 // in assignment/review context. Changes to governing decisions do revoke it.
 function authority(s) {return digest(JSON.stringify({owner:s.owner,team:s.team_sha256,records:Object.values(s.records).filter(r=>['intent','decision'].includes(r.kind))}));}
-function authorized(s,p) {
-  capable(s);
+function authorized(s,p,root=process.cwd()) {
+  const scope=p.development.scope;
+  if(scope.max_bytes>developmentLimits(root).max_bytes)throw new Error("Configured development ceiling was lowered below this scope; restore configuration or prepare a smaller new scope");
+  capable(s,root);
   const g=p.development.authorization;
   if(s.paused || p.development.revoked)throw new Error('Development is paused or revoked');
   if(!g)throw new Error('Exact development scope needs founder authorization');
   if(Date.now()>=Date.parse(p.development.scope.expires_at))throw new Error('Development authorization expired');
   if(g.authority_sha256!==authority(s))throw new Error('Company authority changed; authorize a new scope');
 }
-export function developmentAssignment(s,job,reserve=false) {
+export function developmentAssignment(s,job,reserve=false,root=process.cwd()) {
   if(!job.development_id)return null;
   if(job.role!=='engineer' || job.review_of || job.prototype_id)throw new Error('Development generation requires a separate Engineering assignment');
-  const p=planOf(s,job.development_id);authorized(s,p);
+  const p=planOf(s,job.development_id);authorized(s,p,root);
   if(reserve) {
     if(Object.values(s.records).some(r=>r.development?.type==='candidate'&&r.development.plan_id===p.id&&['queued','running'].includes(r.development.run?.status)))throw new Error('Prior local execution is unfinished; inspect and reconcile its receipt');
     if(Object.values(s.jobs).some(j=>j.development_id===p.id && ['queued','running'].includes(j.status)))throw new Error('Development scope already has active work');
@@ -75,21 +82,34 @@ export function developmentAssignment(s,job,reserve=false) {
   } else if(!p.development.attempts.includes(job.id))throw new Error('Development attempt was not reserved');
   return p;
 }
-export function developmentBundle(s,job,artifact) {
-  const p=developmentAssignment(s,job),scope=p.development.scope;
+export function developmentBundle(s,job,artifact,root=process.cwd()) {
+  const p=developmentAssignment(s,job,false,root),scope=p.development.scope;
   if(artifact.blocked)throw new Error(`Development held: ${requireText(artifact.blocked,'blocked reason')}`);
-  if(!Array.isArray(artifact.files))throw new Error('Return complete changed file contents');
-  const changed=artifact.files.map(f=>{
-    relative(f.path);if(typeof f.content!=='string' || f.content.includes('\0'))throw new Error('File content must be text');
-    return {path:f.path,content:f.content};
+  const format=scope.output_format??'files';
+  if(artifact.files!==undefined&&artifact.patches!==undefined)throw new Error('Return files or patches, never both');
+  if(format==='patches'&&artifact.files!==undefined)throw new Error('Scope requires patches');
+  if(format==='files'&&artifact.patches!==undefined)throw new Error('Scope requires complete files');
+  const output=format==='patches'?artifact.patches:artifact.files;
+  if(!Array.isArray(output))throw new Error('Return every scoped output in the authorized format');
+  const generated_bytes=assertByteBudget(output,scope.max_bytes,'Generated output');
+  const changed=output.map(f=>{
+    if(!f||typeof f!=='object'||Array.isArray(f))throw new Error('Invalid file output');
+    relative(f.path);
+    const source=scope.sources.find(x=>x.path===f.path);
+    const content=format==='patches'?reconstructPatch(source?.content,f):f.content;
+    if(!validText(content))throw new Error('File content must be valid UTF-8 text without NUL');
+    return {path:f.path,content};
   }).sort((a,b)=>a.path.localeCompare(b.path));
   if(JSON.stringify(changed.map(f=>f.path).sort())!==JSON.stringify(scope.write_paths))throw new Error('Output must match every permitted write path exactly');
   const files=[...scope.sources.filter(f=>!scope.write_paths.includes(f.path)).map(({path,content})=>({path,content})),...changed].sort((a,b)=>a.path.localeCompare(b.path));
-  if(Buffer.byteLength(JSON.stringify(files))>scope.max_bytes)throw new Error('Candidate exceeds authorized byte limit');
+  const candidate_bytes=assertByteBudget(files,scope.max_bytes,'Candidate');
   return {type:'candidate',plan_id:p.id,scope_sha256:p.development.scope_sha256,files,
-    candidate_sha256:digest(JSON.stringify(files)),changes:changed.map(f=>({path:f.path,before_sha256:scope.sources.find(x=>x.path===f.path)?.sha256??null,after_sha256:digest(f.content)}))};
+    candidate_sha256:digest(JSON.stringify(files)),generation:{format,generated_bytes,candidate_bytes,source_bytes:Buffer.byteLength(JSON.stringify(scope.sources)),...(format==='patches'?{patches:output,patch_sha256:digest(JSON.stringify(output))}:{})},
+    changes:changed.map(f=>({path:f.path,before_sha256:scope.sources.find(x=>x.path===f.path)?.sha256??null,after_sha256:digest(f.content)}))};
 }
+
 export function developmentPrompt(s,job,target) {
+  if(job.development_id && s.records[job.development_id]?.development.scope.output_format==='patches')return `Bounded local development candidate. Return patches:[{path,base_sha256,edits:[{start,end,text}]}] for EVERY existing write_path. base_sha256 must match the scoped source; offsets are ordered, non-overlapping UTF-16 positions in that exact original text, not shifted by prior edits. For authorized new paths only, use {path,base_sha256:null,content}. No deletion, fuzzy hunks, commands or direct writes. The runtime reconstructs complete retained candidates, validates budgets, runs authorized tests and supplies exact full candidates to independent QA. Return blocked:"reason" without patches if unable. Existing limits and authority remain unchanged.`;
   if(job.development_id)return `Bounded local development candidate. Return complete files:[{path,content}] for EVERY write_path in the supplied scope; keep unchanged files unchanged. No tools, direct edits, installs, network, external actions or test-execution claims. The runtime will create a separate candidate and run the exact authorized Node tests. If requirements cannot be met return blocked:"reason" without files. Repairs retain all previous failures and stay inside the same scope.`;
   if(target?.development?.type==='test')return `Independent LOCAL DEVELOPMENT acceptance review. Inspect the supplied candidate files, changes, scope, original inputs, and actual runtime test receipt. A model claim is not test evidence. No broad execution or integration authority is granted. Review must include permitted_action:"accept_local_development" (or "hold"), candidate_sha256:"${target.development.candidate_sha256}", receipt_sha256:"${target.development.receipt_sha256}", blockers:[]. Pass only if actual tests passed, evidence fits acceptance and no blockers remain. Preserve failed attempts. You did not independently execute these tests; attribute execution to the runtime.`;
   return '';
@@ -100,16 +120,22 @@ function candidateOf(s,p,key,fresh=true) {
   return c;
 }
 function candidateDir(root,p,c) {return path.join(folder(root),'.company','development',p.id,c.id,'source');}
-function makeCandidate(root,p,c) {
-  const dir=candidateDir(root,p,c);let parent=folder(root);
-  for(const part of path.relative(parent,dir).split(path.sep)) {parent=path.join(parent,part);noLink(parent);if(!fs.existsSync(parent))fs.mkdirSync(parent,{mode:0o700});else if(parent===dir)throw new Error('Candidate already exists; inspect uncertain previous writes');}
-  for(const f of c.development.files) {
-    let target=dir;
-    for(const part of f.path.split('/').slice(0,-1)){target=path.join(target,part);noLink(target);if(!fs.existsSync(target))fs.mkdirSync(target,{mode:0o700});}
-    fs.writeFileSync(path.join(dir,f.path),f.content,{flag:'wx',mode:0o400});
-  }
-  return dir;
+export function makeCandidate(root,p,c) {
+  const dir=candidateDir(root,p,c),container=path.dirname(dir);let parent=folder(root);
+  for(const part of path.relative(parent,container).split(path.sep)) {parent=path.join(parent,part);noLink(parent);if(!fs.existsSync(parent))fs.mkdirSync(parent,{mode:0o700});}
+  noLink(dir);if(fs.existsSync(dir))throw new Error('Candidate already exists; inspect uncertain previous writes');
+  const stage=path.join(container,'source-writing-'+id('stage'));fs.mkdirSync(stage,{mode:0o700});
+  try {
+    for(const f of c.development.files) {
+      let target=stage;
+      for(const part of f.path.split('/').slice(0,-1)){target=path.join(target,part);noLink(target);if(!fs.existsSync(target))fs.mkdirSync(target,{mode:0o700});}
+      fs.writeFileSync(path.join(stage,f.path),f.content,{flag:'wx',mode:0o400});
+    }
+    noLink(dir);if(fs.existsSync(dir))throw new Error('Candidate destination appeared during staging');
+    fs.renameSync(stage,dir);return dir;
+  } catch(error) {throw new Error(`Candidate materialization failed; inspect retained staging directory ${stage}: ${error.message}`);}
 }
+
 function verifyCandidate(root,p,c) {
   const dir=candidateDir(root,p,c),expected=new Map(c.development.files.map(f=>[f.path,digest(f.content)]));
   const walk=(base,rel='')=>{
@@ -127,11 +153,11 @@ function verifyCandidate(root,p,c) {
 }
 export async function developmentAction(a,host) {
   if(!Number.isInteger(a.epoch))throw new Error('Supply current ownership epoch');
-  if(a.action==='inspect')return withStore(a.root,db=>{const s=db.read();owner(s,a.session_id,host,a.epoch);return {capability:developmentCapability(s),records:Object.values(s.records).filter(r=>r.development)};});
+  if(a.action==='inspect')return withStore(a.root,db=>{const s=db.read();owner(s,a.session_id,host,a.epoch);return {capability:developmentCapability(s,a.root),records:Object.values(s.records).filter(r=>r.development)};});
   if(a.action==='run')return queueRun(a,host);
   let result;
   withStore(a.root,db=>db.transaction(`development.${a.action}`,s=>{
-    owner(s,a.session_id,host,a.epoch);capable(s);
+    owner(s,a.session_id,host,a.epoch);capable(s,a.root);
     if(a.action==='plan') {
       if(s.paused)throw new Error('Company is paused');
       requireText(a.source_instruction,'source_instruction');
@@ -141,12 +167,14 @@ export async function developmentAction(a,host) {
       if(all.length>32 || new Set(lower).size!==all.length || lower.some(p=>lower.some(q=>q!==p&&q.startsWith(p+'/'))))throw new Error('Conflicting or excessive scope paths');
       if(test_paths.some(p=>!all.includes(p)))throw new Error('Test paths must be supplied or generated files');
       for(const f of write_paths)if(!read_paths.includes(f)&&fs.existsSync(sourceFile(a.root,f)))throw new Error('Existing write targets must also be declared read paths');
-      const sources=read_paths.map(p=>readSource(a.root,p));
-      const limits={max_attempts:[a.max_attempts,1,10],timeout_ms:[a.timeout_ms,100,120000],max_output_bytes:[a.max_output_bytes,1024,100000],max_bytes:[a.max_bytes,1000,100000]};
-      for(const [name,[value,min,max]] of Object.entries(limits))if(!Number.isInteger(value)||value<min||value>max)throw new Error(`${name} outside supported bounds ${min}..${max}`);
-      if(Buffer.byteLength(JSON.stringify(sources))>a.max_bytes)throw new Error('Sources exceed scope byte limit');
+      const configuration=developmentLimits(a.root);
+      const limits={max_attempts:[a.max_attempts,1,10],timeout_ms:[a.timeout_ms,100,120000],max_output_bytes:[a.max_output_bytes,1024,100000],max_bytes:[a.max_bytes,1000,configuration.max_bytes]};
+      for(const [name,[value,min,max]] of Object.entries(limits))if(!Number.isSafeInteger(value)||value<min||value>max)throw new Error(`${name} outside supported bounds ${min}..${max}`);
+      const sources=read_paths.map(p=>readSource(a.root,p,a.max_bytes));
+      const output_format=a.output_format??'files';if(!['files','patches'].includes(output_format))throw new Error('Unsupported output_format');
+      const source_bytes=assertByteBudget(sources,a.max_bytes,'Sources');
       const expires=Date.parse(a.expires_at);if(!Number.isFinite(expires)||expires<=Date.now()||expires>Date.now()+30*86400000)throw new Error('Expiry must be within thirty days');
-      const scope={read_paths,write_paths,test_paths,sources,acceptance:requireText(a.acceptance,'acceptance'),stop_conditions:requireText(a.stop_conditions,'stop_conditions'),data_policy:requireText(a.data_policy,'data_policy'),source_instruction:a.source_instruction,
+      const scope={read_paths,write_paths,test_paths,sources,output_format,source_bytes,configured_ceiling:configuration.max_bytes,transport_max_characters:developmentTransportBudget(a.max_bytes),acceptance:requireText(a.acceptance,'acceptance'),stop_conditions:requireText(a.stop_conditions,'stop_conditions'),data_policy:requireText(a.data_policy,'data_policy'),source_instruction:a.source_instruction,
         max_attempts:a.max_attempts,timeout_ms:a.timeout_ms,max_output_bytes:a.max_output_bytes,max_bytes:a.max_bytes,expires_at:new Date(expires).toISOString(),test_runner:'node --test',network:false,source_integration:false};
       const key=id('development');result=s.records[key]={id:key,kind:'artifact',author_role:'runner',author_instance:a.session_id,revision:1,status:'Draft',created_at:stamp(),content:'Bounded local development scope. Selected source contents will be shared with the host model. Original source stays unchanged; candidate edits and isolated Node tests only.',development:{type:'plan',scope,scope_sha256:digest(JSON.stringify(scope)),attempts:[]}};
       s.runtime_version=VERSION;
@@ -163,7 +191,7 @@ export async function developmentAction(a,host) {
         p.development.revoked={at:stamp(),source_instruction:requireText(a.source_instruction,'source_instruction')};
         for(const j of Object.values(s.jobs))if(j.development_id===p.id&&['queued','running'].includes(j.status))j.status='cancelled';result=p;
       } else if(a.action==='accept') {
-        authorized(s,p);sourceMatches(a.root,p);
+        authorized(s,p,a.root);sourceMatches(a.root,p);
         const t=s.records[a.receipt_id],d=t?.development,c=d&&s.records[d.candidate_id],r=s.records[a.review_id],j=r&&s.jobs[r.job_id],v=r?.review;
         if(d?.type!=='test'||d.plan_id!==p.id||t.status!=='Submitted'||t.author_role!=='runtime'||s.jobs[t.author_instance]?.kind!=='development_test'||s.jobs[t.author_instance]?.status!=='completed'||s.jobs[t.author_instance]?.artifact_id!==t.id||c?.development?.run?.job_id!==t.author_instance||c?.development?.run?.receipt_id!==t.id||d.result.tests_executed!==true||d.result.status!=='passed'||d.result.exit_code!==0||d.receipt_sha256!==digest(JSON.stringify(d.result)))throw new Error('Acceptance requires a valid passing runtime test receipt');
         candidateOf(s,p,c?.id,false);verifyCandidate(a.root,p,c);
@@ -180,7 +208,7 @@ export async function developmentAction(a,host) {
 function queueRun(a,host) {
   let p,c,jobId=id('test');
   withStore(a.root,db=>db.transaction('development.test_reserved',s=>{
-    owner(s,a.session_id,host,a.epoch);p=planOf(s,a.plan_id);authorized(s,p);sourceMatches(a.root,p);c=candidateOf(s,p,a.candidate_id);
+    owner(s,a.session_id,host,a.epoch);p=planOf(s,a.plan_id);authorized(s,p,a.root);sourceMatches(a.root,p);c=candidateOf(s,p,a.candidate_id);
     if(Object.values(s.jobs).filter(j=>['queued','running'].includes(j.status)).length>=3)throw new Error('Three assignments already active; wait for a result');
     if(c.development.run)throw new Error('Candidate already has a test attempt; inspect it, never retry uncertain execution');
     if(Object.values(s.jobs).some(j=>j.development_id===p.id&&['queued','running'].includes(j.status)))throw new Error('Scope already has active work');
@@ -203,12 +231,12 @@ export async function executeDevelopmentTest(root,jobId) {
   withStore(root,db=>db.transaction('development.test_started',s=>{
     const j=s.jobs[jobId];if(!j||j.kind!=='development_test')throw new Error('Unknown local test job');
     a={root,session_id:j.session_id,epoch:j.epoch};host=j.host;
-    owner(s,a.session_id,host,a.epoch);p=planOf(s,j.development_id);authorized(s,p);sourceMatches(root,p);c=candidateOf(s,p,j.candidate_id);
+    owner(s,a.session_id,host,a.epoch);p=planOf(s,j.development_id);authorized(s,p,root);sourceMatches(root,p);c=candidateOf(s,p,j.candidate_id);
     if(j.status!=='queued')throw new Error('Local test is no longer eligible');
     j.status='running';j.started_at=stamp();return s;
   }));
   const abort=new AbortController();let timer,result,stale=false;
-  const eligible=()=>withStore(a.root,db=>{const s=db.read();owner(s,a.session_id,host,a.epoch);const current=planOf(s,p.id);authorized(s,current);if(s.jobs[jobId].status!=='running')throw new Error('Test cancelled');sourceMatches(a.root,current);});
+  const eligible=()=>withStore(a.root,db=>{const s=db.read();owner(s,a.session_id,host,a.epoch);const current=planOf(s,p.id);authorized(s,current,a.root);if(s.jobs[jobId].status!=='running')throw new Error('Test cancelled');sourceMatches(a.root,current);});
   try {
     eligible();const directory=makeCandidate(a.root,p,c);verifyCandidate(a.root,p,c);
     timer=setInterval(()=>{try{eligible();}catch{stale=true;abort.abort();}},100);
@@ -218,7 +246,7 @@ export async function executeDevelopmentTest(root,jobId) {
   finally {clearInterval(timer);}
   let receipt;
   withStore(a.root,db=>db.transaction('development.test_finished',s=>{
-    try{owner(s,a.session_id,host,a.epoch);authorized(s,planOf(s,p.id));sourceMatches(a.root,p);if(s.jobs[jobId].status!=='running')stale=true;}catch{stale=true;}
+    try{owner(s,a.session_id,host,a.epoch);authorized(s,planOf(s,p.id),a.root);sourceMatches(a.root,p);if(s.jobs[jobId].status!=='running')stale=true;}catch{stale=true;}
     const key=id('test-receipt'),payload={...result,candidate_sha256:c.development.candidate_sha256,test_paths:p.development.scope.test_paths,timeout_ms:p.development.scope.timeout_ms,max_output_bytes:p.development.scope.max_output_bytes,directory:candidateDir(a.root,p,c),finished_at:stamp()};
     receipt=s.records[key]={id:key,kind:'artifact',author_role:'runtime',author_instance:jobId,revision:1,status:stale?'Quarantined':'Submitted',created_at:stamp(),content:JSON.stringify(payload),development:{type:'test',plan_id:p.id,candidate_id:c.id,candidate_sha256:c.development.candidate_sha256,result:payload,receipt_sha256:digest(JSON.stringify(payload))}};
     s.records[c.id].development.run={job_id:jobId,status:stale?'quarantined':'completed',receipt_id:key};

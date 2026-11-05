@@ -72,7 +72,7 @@ function harness(host='claude') {
   };
   const deps={...coordination,
     path,os:{homedir:()=>'/unused'},fs:{existsSync:()=>true},
-    process:{env:{},execPath:'/unused/node',argv:[]},
+    process:{cwd:()=>process.cwd(),env:{},execPath:'/unused/node',argv:[]},
     PACKAGE:'/unused',VERSION:'fixture',SCHEMA:2,
     stamp:()=>new Date(1000000).toISOString(),id:prefix=>prefix+'-'+(++sequence),
     digest:()=> 'binding',folder:value=>value,noLink:()=>{},requireText,
@@ -99,8 +99,8 @@ function harness(host='claude') {
       normalizations.push({value:structuredClone(value),host:actualHost,catalog:structuredClone(metadata)});
       return normalizeSelection(value,actualHost,metadata);
     },selectionKey,selectionUsage:()=>({scope:"test_stub"}),activityFor:()=>[],
-    assignmentContext:(s,job)=>{contexts.push(structuredClone(job));return {hash:'fixture-context',inputs:job.inputs};},
-    developmentAction:()=>{},developmentCapability:()=>({}),
+    contextBudgetForJob:()=>200000,assignmentContext:(s,job)=>{contexts.push(structuredClone(job));return {hash:'fixture-context',inputs:job.inputs};},
+    developmentAction:()=>{},developmentLimits:()=>({max_bytes:100000}),developmentCapability:()=>({}),
     developmentAssignment:()=>{if(!scopeAllowed)throw new Error('Scope revoked');},
     prototypeAction:()=>{},prototypeCapability:()=>({}),prototypeAssignment:()=>{},
     TIMEOUT_POLICY_VERSION:1,MIN_EXECUTION_TIMEOUT_MS:1000,MAX_EXECUTION_TIMEOUT_MS:600000,

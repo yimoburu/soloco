@@ -1,0 +1,212 @@
+{
+  "schema": 1,
+  "kind": "fictional_live_candidate_format_comparison",
+  "created_at": "2026-11-05T05:35:26.610Z",
+  "requested": {
+    "mode": "explicit",
+    "model": "gpt-6.1-sol",
+    "effort": "medium",
+    "reason": "Bounded four-call fictional candidate-format qualification"
+  },
+  "trials": [
+    {
+      "files": 1,
+      "format": "files",
+      "source_bytes": 3263,
+      "prompt_sha256": "b52342fa305a3fa095886b70c220a943d120538f575b1439c70f4382bf412f2c",
+      "started_at": "2026-11-05T05:35:26.611Z",
+      "generation_ms": 19193,
+      "raw_response": "{\"content\":\"Changed the exported value from 0 to 1 in module-0.mjs.\",\"files\":[{\"path\":\"module-0.mjs\",\"content\":\"export const value = 1;\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n\"}]}",
+      "model_evidence": {
+        "reported_models": [],
+        "reported_effort": null,
+        "reported_service_tier": null,
+        "applied_controls": {
+          "model": "gpt-6.1-sol",
+          "effort": "medium",
+          "service_tier": null,
+          "fast_mode": null,
+          "switch_models_on_flag": null,
+          "scope": "child_launch_argv",
+          "verification": "applied_controls_not_effective_settings"
+        },
+        "source": "exec_json",
+        "scope": "assignment",
+        "verification": "unverified"
+      },
+      "generated_bytes": 3263,
+      "candidate_bytes": 3263,
+      "candidate_sha256": "11819ab53e29a685f5ff8f0768950ed33aba9a29c24809b969611ebea1962ad7",
+      "exact_fixture_match": true,
+      "tests": {
+        "status": "passed",
+        "exit_code": 0,
+        "signal": null,
+        "stdout": "TAP version 13\n# Subtest: values\nok 1 - values\n  ---\n  duration_ms: 0.297916\n  type: 'test'\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 5.886667\n",
+        "stderr": "",
+        "duration_ms": 413,
+        "isolation": "macos-seatbelt-node",
+        "test_execution_attempted": true,
+        "tests_executed": true,
+        "output_truncated": false,
+        "limits": {
+          "timeout_ms": 10000,
+          "max_output_bytes": 10000
+        }
+      },
+      "fixture_accepted": true,
+      "total_ms": 20061
+    },
+    {
+      "files": 1,
+      "format": "patches",
+      "source_bytes": 3263,
+      "prompt_sha256": "d5534e3ec6c5d2ef535b2115012f18e9d55297c6937db7c4c022892fe2c1911e",
+      "started_at": "2026-11-05T05:35:46.673Z",
+      "generation_ms": 7474,
+      "raw_response": "{\"content\":\"Changed module-0.mjs exported value from 0 to 1, preserving every other character.\",\"patches\":[{\"path\":\"module-0.mjs\",\"base_sha256\":\"ef52357bd5399cb4638f529259571126630d308dfa657c25b7c9e932836a1e21\",\"edits\":[{\"start\":21,\"end\":22,\"text\":\"1\"}]}]}",
+      "model_evidence": {
+        "reported_models": [],
+        "reported_effort": null,
+        "reported_service_tier": null,
+        "applied_controls": {
+          "model": "gpt-6.1-sol",
+          "effort": "medium",
+          "service_tier": null,
+          "fast_mode": null,
+          "switch_models_on_flag": null,
+          "scope": "child_launch_argv",
+          "verification": "applied_controls_not_effective_settings"
+        },
+        "source": "exec_json",
+        "scope": "assignment",
+        "verification": "unverified"
+      },
+      "generated_bytes": 149,
+      "candidate_bytes": 3263,
+      "candidate_sha256": "11819ab53e29a685f5ff8f0768950ed33aba9a29c24809b969611ebea1962ad7",
+      "exact_fixture_match": true,
+      "tests": {
+        "status": "passed",
+        "exit_code": 0,
+        "signal": null,
+        "stdout": "TAP version 13\n# Subtest: values\nok 1 - values\n  ---\n  duration_ms: 0.301584\n  type: 'test'\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 6.12925\n",
+        "stderr": "",
+        "duration_ms": 429,
+        "isolation": "macos-seatbelt-node",
+        "test_execution_attempted": true,
+        "tests_executed": true,
+        "output_truncated": false,
+        "limits": {
+          "timeout_ms": 10000,
+          "max_output_bytes": 10000
+        }
+      },
+      "fixture_accepted": true,
+      "total_ms": 7938
+    },
+    {
+      "files": 3,
+      "format": "files",
+      "source_bytes": 9787,
+      "prompt_sha256": "64793de08551b37b0600db6f0d22505890c93014aa6cd9c7d9b76cf5ce20b9b5",
+      "started_at": "2026-11-05T05:35:54.612Z",
+      "generation_ms": 39710,
+      "raw_response": "{\"content\":\"Changed each module's exported value from 0 to 1, preserving every other character.\",\"files\":[{\"path\":\"module-0.mjs\",\"content\":\"export const value = 1;\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n\"},{\"path\":\"module-1.mjs\",\"content\":\"export const value = 1;\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n\"},{\"path\":\"module-2.mjs\",\"content\":\"export const value = 1;\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n// unchanged fictional padding\\n\"}]}",
+      "model_evidence": {
+        "reported_models": [],
+        "reported_effort": null,
+        "reported_service_tier": null,
+        "applied_controls": {
+          "model": "gpt-6.1-sol",
+          "effort": "medium",
+          "service_tier": null,
+          "fast_mode": null,
+          "switch_models_on_flag": null,
+          "scope": "child_launch_argv",
+          "verification": "applied_controls_not_effective_settings"
+        },
+        "source": "exec_json",
+        "scope": "assignment",
+        "verification": "unverified"
+      },
+      "generated_bytes": 9787,
+      "candidate_bytes": 9787,
+      "candidate_sha256": "1aef3150294f32392fd53b94742b52e74bea19e6bfcdf5c34d294b27c6604a65",
+      "exact_fixture_match": true,
+      "tests": {
+        "status": "passed",
+        "exit_code": 0,
+        "signal": null,
+        "stdout": "TAP version 13\n# Subtest: values\nok 1 - values\n  ---\n  duration_ms: 0.284125\n  type: 'test'\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 5.8395\n",
+        "stderr": "",
+        "duration_ms": 355,
+        "isolation": "macos-seatbelt-node",
+        "test_execution_attempted": true,
+        "tests_executed": true,
+        "output_truncated": false,
+        "limits": {
+          "timeout_ms": 10000,
+          "max_output_bytes": 10000
+        }
+      },
+      "fixture_accepted": true,
+      "total_ms": 40124
+    },
+    {
+      "files": 3,
+      "format": "patches",
+      "source_bytes": 9787,
+      "prompt_sha256": "8aaa0cd87efacdd863982a869b7e64350ee1c3f67bf2360daaa364213e4c4e1d",
+      "started_at": "2026-11-05T05:36:34.737Z",
+      "generation_ms": 10292,
+      "raw_response": "{\"content\":\"Change each module's exported value from 0 to 1, preserving every other character.\",\"patches\":[{\"path\":\"module-0.mjs\",\"base_sha256\":\"ef52357bd5399cb4638f529259571126630d308dfa657c25b7c9e932836a1e21\",\"edits\":[{\"start\":21,\"end\":22,\"text\":\"1\"}]},{\"path\":\"module-1.mjs\",\"base_sha256\":\"ef52357bd5399cb4638f529259571126630d308dfa657c25b7c9e932836a1e21\",\"edits\":[{\"start\":21,\"end\":22,\"text\":\"1\"}]},{\"path\":\"module-2.mjs\",\"base_sha256\":\"ef52357bd5399cb4638f529259571126630d308dfa657c25b7c9e932836a1e21\",\"edits\":[{\"start\":21,\"end\":22,\"text\":\"1\"}]}]}",
+      "model_evidence": {
+        "reported_models": [],
+        "reported_effort": null,
+        "reported_service_tier": null,
+        "applied_controls": {
+          "model": "gpt-6.1-sol",
+          "effort": "medium",
+          "service_tier": null,
+          "fast_mode": null,
+          "switch_models_on_flag": null,
+          "scope": "child_launch_argv",
+          "verification": "applied_controls_not_effective_settings"
+        },
+        "source": "exec_json",
+        "scope": "assignment",
+        "verification": "unverified"
+      },
+      "generated_bytes": 445,
+      "candidate_bytes": 9787,
+      "candidate_sha256": "1aef3150294f32392fd53b94742b52e74bea19e6bfcdf5c34d294b27c6604a65",
+      "exact_fixture_match": true,
+      "tests": {
+        "status": "passed",
+        "exit_code": 0,
+        "signal": null,
+        "stdout": "TAP version 13\n# Subtest: values\nok 1 - values\n  ---\n  duration_ms: 0.295708\n  type: 'test'\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 6.047\n",
+        "stderr": "",
+        "duration_ms": 399,
+        "isolation": "macos-seatbelt-node",
+        "test_execution_attempted": true,
+        "tests_executed": true,
+        "output_truncated": false,
+        "limits": {
+          "timeout_ms": 10000,
+          "max_output_bytes": 10000
+        }
+      },
+      "fixture_accepted": true,
+      "total_ms": 10730
+    }
+  ],
+  "limitations": [
+    "Four one-shot observations; not statistical savings or quality non-inferiority proof",
+    "No retries; every output/error retained",
+    "Exact fixture acceptance and real isolated tests are not independent company QA or integration permission",
+    "Codex effective settings remain unverified; requested/applied controls are separately reported"
+  ],
+  "all_fixture_checks_passed": true
+}

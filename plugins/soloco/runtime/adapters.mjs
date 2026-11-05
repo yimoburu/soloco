@@ -199,6 +199,8 @@ export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selectio
   return new Promise((resolve, reject) => {
     if (!options || typeof options !== 'object' || Array.isArray(options)) throw new Error('Invalid lifecycle options');
     const policy = normalizeTimeout({timeout_ms:timeout, timeout_reason:options.timeoutReason});
+    const outputLimit=options.maxOutputCharacters??2000000;
+    if(!Number.isSafeInteger(outputLimit)||outputLimit<100000||outputLimit>10000000)throw new Error('Invalid role output character limit');
     const args = commandArgs(host,nativeId,selection);
     const startProcess = options.spawn ?? spawn;
     const resolveCommand = options.resolveExecutable ?? executable;
@@ -325,7 +327,7 @@ export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selectio
     listen(child.stdout, 'data', chunk => {
       if (settled || failure || expired()) return;
       stdout += chunk;
-      if (stdout.length > 2_000_000) stop(errorFor('Role output exceeded limit', 'ROLE_OUTPUT_LIMIT'), readNow()+TERMINATION_GRACE_MS);
+      if (stdout.length > outputLimit) stop(errorFor('Role output exceeded limit', 'ROLE_OUTPUT_LIMIT'), readNow()+TERMINATION_GRACE_MS);
     });
     listen(child.stderr, 'data', chunk => {
       if (settled || failure || expired()) return;

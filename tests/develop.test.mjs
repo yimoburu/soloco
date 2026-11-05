@@ -47,7 +47,7 @@ function queue(a,{role='engineer',development_id,review_of}={}) {
   withStore(a.root,db=>db.transaction('test.queue',s=>{
     const target=s.records[review_of];
     const j={id:jobId,role,instance_id:instance,session_key:instance,host:s.owner.host,native_id:null,epoch:s.owner.epoch,status:'queued',task:'Honor supplied development scope',inputs:[],review_of:target?{id:target.id,revision:target.revision}:null,...(development_id?{development_id}:{}),created_at:new Date().toISOString()};
-    developmentAssignment(s,j,true);const context=assignmentContext(s,j);
+    developmentAssignment(s,j,true,a.root);const context=assignmentContext(s,j);
     s.jobs[jobId]={...j,inputs:context.inputs,context_sha256:context.hash};
     s.sessions[instance]={instance_id:instance,role,host:s.owner.host,native_id:null};return s;
   }));return jobId;
@@ -57,6 +57,7 @@ async function generate(a,p,{files=good,extra={},during}={}) {
   const j=queue(a,{development_id:p.id});
   await work(a.root,j,async(_host,_native,prompt)=>{
     assert.match(prompt,/Bounded local development candidate/);
+    if(p.development.scope.output_format==='patches') {assert.match(prompt,/\"patches\":\[/);assert.doesNotMatch(prompt,/\"files\":\[\{\"path\":\"permitted non-fixture/);}
     assert.ok(!prompt.includes('NOT_AUTHORIZED'));
     if(during)await during();return output({files,...extra});
   });
@@ -349,4 +350,46 @@ test('exact v0.18 development compatibility retains sandbox and team restriction
     for(const changed of [{...s,plugin_version:'0.4.1'},{...s,plugin_version:'99.0.0'},{...s,governance_sha256:digest(governance+'modified')}])
       assert.equal(developmentCapability(changed).eligible,false);
   }
+});
+
+test('base-bound patches reconstruct a large complete candidate through real tests and independent acceptance',live,async()=>{
+  const a=setup(),source=fs.readFileSync(path.join(a.root,'sum.mjs'),'utf8')+'// fixture padding\n'.repeat(7500);
+  fs.writeFileSync(path.join(a.root,'sum.mjs'),source);
+  fs.writeFileSync(path.join(a.root,'.company','development.json'),JSON.stringify({max_bytes_ceiling:400000}));
+  const p=await plan(a,{max_bytes:300000,output_format:'patches'});await authorize(a,p);
+  const at=source.indexOf('0;'),patches=[{path:'sum.mjs',base_sha256:digest(source),edits:[{start:at,end:at+1,text:'values.reduce((a,b)=>a+b,0)'}]},
+    {path:'sum.test.mjs',base_sha256:null,content:good[1].content}];
+  const c=await generate(a,p,{extra:{files:undefined,patches}});
+  assert.equal(c.development.generation.format,'patches');
+  assert.ok(c.development.generation.generated_bytes<1000);
+  assert.ok(c.development.generation.candidate_bytes>100000);
+  assert.equal(c.development.files.find(f=>f.path==='sum.mjs').content,source.replace('0;','values.reduce((a,b)=>a+b,0);'));
+  const t=await run(a,p,c);assert.equal(t.development.result.status,'passed');
+  const r=await review(a,t),accepted=await accept(a,p,t,r);
+  assert.equal(accepted.source_integrated,false);
+  assert.equal(fs.readFileSync(path.join(a.root,'sum.mjs'),'utf8'),source);
+  assert.equal(fs.existsSync(path.join(a.root,'sum.test.mjs')),false);
+});
+
+test('lowering configuration holds existing larger scopes and raising it never enlarges authorized bytes',live,async()=>{
+  const a=setup(),p=await plan(a);await authorize(a,p);
+  const config=path.join(a.root,'.company','development.json');
+  fs.writeFileSync(config,JSON.stringify({max_bytes_ceiling:1000}));
+  assert.throws(()=>queue(a,{development_id:p.id}),/lowered/);
+  fs.writeFileSync(config,JSON.stringify({max_bytes_ceiling:400000}));
+  const c=await generate(a,p,{files:[{path:'sum.mjs',content:'x'.repeat(21000)},good[1]]});
+  assert.equal(c.status,'failed');assert.match(c.error,/byte limit/);
+  assert.equal(read(a).records[p.id].development.scope.max_bytes,20000);
+});
+
+test('patch shape, exact base and scope violations fail without creating a materialized candidate',live,async()=>{
+  const a=setup(),p=await plan(a,{output_format:'patches'});await authorize(a,p);
+  const source=p.development.scope.sources[0];
+  for(const patches of [
+    [{path:'sum.mjs',base_sha256:digest('stale'),edits:[]},{path:'sum.test.mjs',base_sha256:null,content:good[1].content}],
+    [{path:'../escape',base_sha256:null,content:'bad'}],
+    [{path:'sum.mjs',base_sha256:source.sha256,edits:[]}]
+  ]) {const c=await generate(a,p,{extra:{files:undefined,patches}});assert.equal(c.status,'failed');}
+  assert.equal(fs.existsSync(path.join(a.root,'.company','development')),false);
+  assert.equal(fs.readFileSync(path.join(a.root,'sum.mjs'),'utf8'),'export const sum = values => 0;\n');
 });
