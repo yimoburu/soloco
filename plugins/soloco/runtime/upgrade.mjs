@@ -4,7 +4,8 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { PACKAGE, VERSION, SCHEMA, stamp, id, digest, withStore, requireText, teamHash, installedTeam, skillBody, upgradePending, noLink, notice, COMPATIBLE_TEAM_VERSIONS, compatibleRuntime } from './store.mjs';
 import { binding, dataDir, upgradeSummary } from './engine.mjs';
-import { readiness, runModel, parseArtifact } from './adapters.mjs';
+import { readiness, modelCatalog, runModel, parseArtifact } from './adapters.mjs';
+import { normalizeSelection } from './selection.mjs';
 import { MAX_EXECUTION_TIMEOUT_MS } from './timeout.mjs';
 
 import { buildEvidence, evidencePage, readEvidence, createDeliveryLedger, recordDelivery, validateCitations, admitPrompt, recordResponse, boundedReplayBatches, RESPONSE_LIMIT } from './upgrade-evidence.mjs';
@@ -41,6 +42,12 @@ export function checkpoint(s) {
 const checkpointHash = s => digest(JSON.stringify(checkpoint(s)));
 function savedCheckpointIntegrity(u,expected=u.evidence?.checkpoint_sha256??u.checkpoint_sha256) {
   if (u.checkpoint_sha256!==expected || digest(JSON.stringify(u.checkpoint))!==expected) throw new Error('Saved upgrade checkpoint or pinned hash changed; recover before retrying');
+  // Legacy attempts had neither field. New attempts bind the exact normalized
+  // request (including rationale), independently of any execution observations.
+  if (Object.hasOwn(u,'model_selection') || Object.hasOwn(u,'model_selection_sha256') || u.evidence?.model_selection_sha256) {
+    if (!Object.hasOwn(u,'model_selection') || !u.model_selection_sha256 || digest(JSON.stringify(u.model_selection))!==u.model_selection_sha256
+        || (u.evidence?.model_selection_sha256 && u.evidence.model_selection_sha256!==u.model_selection_sha256)) throw new Error('Upgrade model selection changed; recover before retrying');
+  }
 }
 function actor(s,a,h) {
   if (!Number.isInteger(a.expected_epoch) || s.owner.epoch!==a.expected_epoch || s.owner.session_id!==a.session_id || s.owner.host!==h) throw new Error('Upgrade owner or epoch changed; read company_status');
@@ -67,7 +74,8 @@ function report(s) {
 }
 export const upgradeGuidance = `Company upgrade maintenance: use company_status and company_upgrade inspect to compare the installed candidate with this company's pinned team. Installing a package does not authorize adoption. Only proceed after the founder asks to upgrade. Preserve governance by default; show the actual differences and obtain explicit direction before choosing installed governance. Pause/reconcile active assignments, then prepare with the inspected candidate_hash, current expected_epoch, and exact source_instruction. Preparation launches a fresh CoS rehearsal and an independent QA session without business tools. Poll company_wait/status; do not claim roles started until reported. When ready, apply the same upgrade_id, then verify it. Reopen company_open to load the adopted pinned CoS instructions before resuming; resume only if covered by the founder's request. On failed/interrupted checks, inspect and recover the previous definitions; never retry silently, reset records, or bypass the hold. Recovery keeps new company facts and uses this runtime, not an older binary. Prefer the current owning chat. If continuing in a different founder chat, pause first and supply the exact founder instruction as takeover_instruction; preparation transfers ownership and revokes the old epoch. If the previous coordinator disappeared during a pending upgrade, recover it with an explicit takeover_instruction before preparing again. No upgrade grants business execution authority.`;
 
-export function upgrade(a,host,{launch=launchUpgrade,check=readiness}={}) {
+export function upgrade(a,host,{launch=launchUpgrade,check=readiness,catalog=modelCatalog}={}) {
+  if (Object.hasOwn(a,'model_selection') && a.action!=='prepare') throw new Error('model_selection is only supported for upgrade prepare');
   binding(a,host);
   if (a.action==='inspect') return withStore(a.root,db=>{
     const s=db.read();compatible(s);const old=pinned(s),next=candidate(s,a.governance);
@@ -75,6 +83,9 @@ export function upgrade(a,host,{launch=launchUpgrade,check=readiness}={}) {
   });
   if (a.action==='prepare') {
     requireText(a.source_instruction,'source_instruction');
+    const metadata=a.model_selection?.mode==='explicit' || a.model_selection?.speed==='fast_disabled'?catalog(host):null;
+    const normalized=normalizeSelection(a.model_selection,host,metadata);
+    const selection=a.model_selection===undefined?null:normalized;
     const checkResult=check(host);
     if (!checkResult.available || checkResult.authenticated!==true) throw new Error('Selected CLI must be available and signed in for independent upgrade checks');
     const s=withStore(a.root,db=>db.transaction('upgrade.prepared',s=>{
@@ -95,7 +106,7 @@ export function upgrade(a,host,{launch=launchUpgrade,check=readiness}={}) {
       s.paused=true;s.owner={host,session_id:a.session_id,epoch:s.owner.epoch+1};
       decision(s,a,'prepare_team_upgrade');
       const snapshot=checkpoint(s);
-      s.upgrade={id:id('upgrade'),status:'queued',created_at:stamp(),deadline_ms:Date.now()+REHEARSAL_TIMEOUT_MS,history_sha256:historyHash(s),epoch:s.owner.epoch,host,previous,candidate:next,candidate_hash:teamHash(next),checkpoint:snapshot,checkpoint_sha256:checkpointHash(s),governance_policy:a.governance??'preserve',governance_instruction:a.governance_instruction??null,source_instruction:a.source_instruction,takeover_instruction:a.takeover_instruction??null};
+      s.upgrade={id:id('upgrade'),status:'queued',created_at:stamp(),deadline_ms:Date.now()+REHEARSAL_TIMEOUT_MS,history_sha256:historyHash(s),epoch:s.owner.epoch,host,model_selection:selection,model_selection_sha256:digest(JSON.stringify(selection)),...(metadata?{model_catalog:{source:metadata.source,...(selection.mode==='explicit'?{model:metadata.models.find(m=>m.id===selection.model)}:{}),speed_support:metadata.speed_support}}:{}),previous,candidate:next,candidate_hash:teamHash(next),checkpoint:snapshot,checkpoint_sha256:checkpointHash(s),governance_policy:a.governance??'preserve',governance_instruction:a.governance_instruction??null,source_instruction:a.source_instruction,takeover_instruction:a.takeover_instruction??null};
       return s;
     }));
     try {launch(a.root,s.upgrade.id);} catch(error) {failUpgrade(a.root,s.upgrade.id,error);}
@@ -236,6 +247,8 @@ export async function rehearse(root,uid,model=runModel) {
       if (s.upgrade?.id!==uid || s.upgrade.status!==status || JSON.stringify(s.owner)!==frozenOwner
           || !s.paused || active(s) || checkpointHash(s)!==u.checkpoint_sha256
           || historyHash(s)!==subject.history_sha256 || Date.now()>=deadline(u) || deadline(s.upgrade)!==deadline(u)
+          || JSON.stringify(s.upgrade.model_selection)!==JSON.stringify(u.model_selection)
+          || s.upgrade.model_selection_sha256!==u.model_selection_sha256
           || teamHash(s.upgrade.candidate)!==u.candidate_hash
           || teamHash(candidate(s,u.governance_policy))!==u.candidate_hash) throw new Error('Upgrade changed during rehearsal or deadline expired');
     }
@@ -256,7 +269,7 @@ export async function rehearse(root,uid,model=runModel) {
       }));
     }
     publish('upgrade.inventory',a=>{
-      a.evidence={checkpoint_sha256:subject.checkpoint_sha256,inventory_sha256:subject.inventory_sha256,history_sha256:subject.history_sha256,
+      a.evidence={model_selection_sha256:u.model_selection_sha256,checkpoint_sha256:subject.checkpoint_sha256,inventory_sha256:subject.inventory_sha256,history_sha256:subject.history_sha256,
         counts:subject.inventory.counts,pages:pages.map(({text,...metadata})=>metadata)};
       a.cos_pages=[];a.qa_pages=[];a.replays=[];
     });
@@ -306,10 +319,12 @@ Protocol: Return JSON only matching response_contract.required_json_shape for th
         let output;
         const controller=new AbortController();
         const timer=setTimeout(()=>controller.abort(),deadline(u)-Date.now());
-        try { output=await model(u.host,session.native,prompt,dir,remaining,null,{timeoutReason:'Runtime execution ceiling capped by remaining immutable upgrade rehearsal deadline',signal:controller.signal}); }
-        catch(error) {retain(role,{phase:task.phase,error:error.message,budget,completed_at:stamp()});throw error;}
+        const requested=structuredClone(u.model_selection??null);
+        const unknownEvidence={reported_models:[],reported_effort:null,reported_service_tier:null,applied_controls:null,verification:'unverified',source:'not_reported',scope:'unknown'};
+        try { output=await model(u.host,session.native,prompt,dir,remaining,structuredClone(requested),{timeoutReason:'Runtime execution ceiling capped by remaining immutable upgrade rehearsal deadline',signal:controller.signal}); }
+        catch(error) {retain(role,{phase:task.phase,model_selection:requested,model_evidence:unknownEvidence,error:error.message,...(error.code?{error_code:error.code}:{}),budget,completed_at:stamp()});throw error;}
         finally {clearTimeout(timer);}
-        retain(role,{phase:task.phase,native_id:output.native_id??null,text:output.text,budget,response_characters:typeof output.text==='string'?output.text.length:null,estimated_response_tokens:typeof output.text==='string'?Math.ceil(output.text.length/4):null,completed_at:stamp()});
+        retain(role,{phase:task.phase,model_selection:requested,model_evidence:output.model_evidence??unknownEvidence,native_id:output.native_id??null,text:output.text,budget,response_characters:typeof output.text==='string'?output.text.length:null,estimated_response_tokens:typeof output.text==='string'?Math.ceil(output.text.length/4):null,completed_at:stamp()});
         check();
         requireText(output.native_id,'native session ID');
         if (session.native && session.native!==output.native_id) throw new Error('Unexpected native identity change');
