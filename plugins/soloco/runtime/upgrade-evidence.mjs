@@ -200,13 +200,19 @@ function releaseBundle(value) {
     && (typeof value.tests === 'string' || testResult(value.tests));
 }
 
-// JSON.parse already checked syntax. Remove only the four JSON whitespace
-// characters outside strings; preserve quoted whitespace and all escapes.
-function withoutJsonWhitespace(raw) {
+// Remove only the four JSON whitespace characters outside strings. Legacy
+// record decoding normalizes string tokens after parsing; pair matching keeps
+// every escape literal and proves syntax by equality with strict serialization.
+function withoutJsonWhitespace(raw, normalizeStrings = true) {
   // Normalize string tokens only. Duplicate keys and lossy numeric lexemes
   // still differ from the parsed serialization and therefore stay semantic raw.
-  return raw.replace(/"(?:[^"\\]|\\[\s\S])*"|[ \t\r\n]+/g, token =>
-    token.startsWith('"') ? JSON.stringify(JSON.parse(token)) : '');
+  return raw.replace(/"(?:[^"\\]|\\[\s\S])*"|[ \t\r\n]+/g, (token, offset) => {
+    if (token.startsWith('"')) return normalizeStrings ? JSON.stringify(JSON.parse(token)) : token;
+    // Whitespace inside a primitive token is malformed JSON, not formatting.
+    if (!normalizeStrings && /[\w.+-]/.test(raw[offset - 1] ?? '')
+        && /[\w.+-]/.test(raw[offset + token.length] ?? '')) return token;
+    return '';
+  });
 }
 
 function stateFor(subject) {
@@ -218,7 +224,7 @@ function stateFor(subject) {
 /** Frozen in-memory evidence only. Send handover, never the whole subject.
  * sources contain private retrieval data. No caller-owned object is retained.
  */
-export function buildEvidence(checkpoint, history = []) {
+export function buildEvidence(checkpoint, history = [], { wholeBodyAliases = true } = {}) {
   if (!object(checkpoint) || !Array.isArray(history)) hold('checkpoint must be an object and history an array');
   const checkpointRaw = serialize(checkpoint);
   const historyRaw = serialize(history);
@@ -229,6 +235,54 @@ export function buildEvidence(checkpoint, history = []) {
   const sources = Object.create(null);
   const descriptors = [];
   const blobs = new Map();
+
+  const bodyOccurrences = new Map();
+  const generatedAliases = new Map();
+  const sharing = { matched_bodies: 0, matched_occurrences: 0, aliased_occurrences: 0 };
+  // Index only known call/artifact pairs within each attempt. String-keyed maps
+  // and the explicit equality below prove all tokens, not just a digest.
+  if (wholeBodyAliases) prior.forEach((attempt, index) => {
+    if (!object(attempt)) return;
+    const groups = new Map();
+    const identity = (enclosing, role, phase) => object(enclosing)
+      && typeof enclosing.native_id === 'string' && enclosing.native_id.trim()
+      && (!own(enclosing, 'role') || enclosing.role === role)
+      && (!own(enclosing, 'phase') || enclosing.phase === phase)
+      ? serialize([enclosing.native_id, role, phase]) : null;
+    function artifact(enclosing, path, role, phase) {
+      const key = identity(enclosing, role, phase);
+      if (!key || !object(enclosing.artifact)) return;
+      const tokens = serialize(enclosing.artifact);
+      if (tokens.length < 4096) return;
+      if (!groups.has(key)) groups.set(key, new Map());
+      const bodies = groups.get(key);
+      if (!bodies.has(tokens)) bodies.set(tokens, { tokens, occurrences: [], calls: 0 });
+      bodies.get(tokens).occurrences.push({ path: `${path}/artifact`, representation: 'json-value' });
+    }
+    for (const [key, role] of [['cos_pages', 'cos'], ['qa_pages', 'qa']]) {
+      if (Array.isArray(attempt[key])) attempt[key].forEach((value, i) => artifact(value, `/${index}/${key}/${i}`, role, 'page'));
+    }
+    artifact(attempt.probe, `/${index}/probe`, 'cos', 'synthesis');
+    artifact(attempt.review, `/${index}/review`, 'qa', 'synthesis');
+    if (Array.isArray(attempt.calls)) attempt.calls.forEach((call, i) => {
+      if (!object(call) || !['cos', 'qa'].includes(call.role) || !['page', 'synthesis'].includes(call.phase)
+          || typeof call.text !== 'string') return;
+      const key = identity(call, call.role, call.phase);
+      const bodies = groups.get(key);
+      if (!bodies) return;
+      const tokens = withoutJsonWhitespace(call.text, false);
+      const group = bodies.get(tokens);
+      if (!group || tokens !== group.tokens) return;
+      group.calls++;
+      group.occurrences.push({ path: `/${index}/calls/${i}/text`, representation: 'json-text' });
+    });
+    for (const bodies of groups.values()) for (const group of bodies.values()) {
+      if (!group.calls) continue;
+      sharing.matched_bodies++;
+      sharing.matched_occurrences += group.occurrences.length;
+      for (const occurrence of group.occurrences) bodyOccurrences.set(occurrence.path, { ...occurrence, group });
+    }
+  });
 
   function register(location, kind, raw, encoding, reason, explicitId) {
     const source_id = explicitId ?? `s${descriptors.length}`;
@@ -277,6 +331,30 @@ export function buildEvidence(checkpoint, history = []) {
   }
 
   function walk(value, location, policy = {}) {
+    const occurrence = location.scope === 'history' && bodyOccurrences.get(location.path);
+    if (occurrence) {
+      const { group, representation } = occurrence;
+      const raw = representation === 'json-text' ? value : serialize(value);
+      const source = register(location, 'body-occurrence', raw,
+        representation === 'json-text' ? 'text' : 'json', 'whole-body-pair');
+      Object.assign(source, { representation, body_sha256: hash(group.tokens), body_length: group.tokens.length });
+      if (!group.first) {
+        source.delivery = 'compulsory-inline';
+        Object.assign(sources[source.source_id], source);
+        group.first = source;
+        // The entire first body stays in its original representation. Do not
+        // recursively replace even otherwise optional payloads inside it.
+        return value;
+      }
+      source.delivery = 'alias';
+      source.target = reference(group.first);
+      Object.assign(sources[source.source_id], source);
+      sharing.aliased_occurrences++;
+      const alias = { evidence_body_alias: reference(source), target: reference(group.first),
+        representation, body_sha256: source.body_sha256 };
+      generatedAliases.set(alias, { tokens: group.tokens, source, target: group.first });
+      return alias;
+    }
     if (Array.isArray(value)) {
       return value.map((item, index) => walk(item, child(location, index), { files: Boolean(policy.files) }));
     }
@@ -381,9 +459,10 @@ export function buildEvidence(checkpoint, history = []) {
   counts.sources = descriptors.length;
   counts.payload_occurrences = descriptors.filter(item => item.kind === 'payload').length;
   counts.distinct_payload_bodies = new Set(descriptors.filter(item => item.kind === 'payload').map(item => item.blob_id)).size;
-  const inventory = { version: 1, counts, entries: [...descriptors] };
+  if (wholeBodyAliases) Object.assign(counts, sharing);
+  const inventory = { version: wholeBodyAliases ? 2 : 1, counts, entries: [...descriptors] };
   const inventory_sha256 = hash(serialize(inventory));
-  const handover = { format: 'soloco-upgrade-evidence-v1', checkpoint_sha256, history_sha256, inventory_sha256,
+  const handover = { format: wholeBodyAliases ? 'soloco-upgrade-evidence-v2' : 'soloco-upgrade-evidence-v1', checkpoint_sha256, history_sha256, inventory_sha256,
     counts, checkpoint: fields, history: historyEntries };
   const stream = register({ scope: 'transport', path: '' }, 'semantic-stream',
     serialize({ handover, registry: inventory.entries.map(item => ({ ...item })) }), 'json');
@@ -395,8 +474,46 @@ export function buildEvidence(checkpoint, history = []) {
     offset = end;
   }
   const subject = freeze({ pages, checkpoint_sha256, history_sha256, inventory_sha256, inventory, sources, handover });
-  subjects.set(subject, { sessionIds: new Set() });
+  subjects.set(subject, { sessionIds: new Set(), aliases: generatedAliases });
   return subject;
+}
+
+
+/** Only runtime-generated occurrences are aliases. This returns the complete
+ * compulsory token body in the requested representation, not original spacing
+ * and not a delivery receipt. Exact originals use readEvidence as before.
+ */
+export function resolveBodyAlias(subject, alias) {
+  const issued = stateFor(subject).aliases.get(alias);
+  if (!issued || issued.target.delivery !== 'compulsory-inline'
+      || issued.source.target.source_id !== issued.target.source_id
+      || alias.target.sha256 !== issued.target.sha256
+      || alias.body_sha256 !== hash(issued.tokens)) hold('invalid generated body alias or target');
+  return alias.representation === 'json-text' ? issued.tokens : freeze(JSON.parse(issued.tokens));
+}
+
+/** Compare identical current inputs, including terminal current attempts as
+ * next-attempt history. Prepare adds a decision, so this is only a preview.
+ */
+export function projectionPreview(checkpoint, history = [], currentUpgrade = null) {
+  const projectedHistory = currentUpgrade ? [...history, currentUpgrade] : history;
+  const baseline = buildEvidence(checkpoint, projectedHistory, { wholeBodyAliases: false });
+  const candidate = buildEvidence(checkpoint, projectedHistory);
+  const metrics = subject => {
+    const stream = subject.sources[subject.pages[0].source_id];
+    return { format: subject.handover.format, checkpoint_sha256: subject.checkpoint_sha256,
+      history_sha256: subject.history_sha256, stream_sha256: stream.sha256,
+      stream_characters: stream.length, pages: subject.pages.length };
+  };
+  const before = metrics(baseline), after = metrics(candidate);
+  return { kind: 'current-state-preview', exact_reservation: false, time_forecast: false,
+    prepare_adds_decision_record: true, current_upgrade_included: Boolean(currentUpgrade),
+    baseline: before, candidate: after,
+    matched_bodies: candidate.inventory.counts.matched_bodies,
+    matched_occurrences: candidate.inventory.counts.matched_occurrences,
+    aliased_occurrences: candidate.inventory.counts.aliased_occurrences,
+    net_characters_saved: before.stream_characters - after.stream_characters,
+    pages_saved: before.pages - after.pages };
 }
 
 

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import {
-  buildEvidence, readEvidence, validateCitations, createDeliveryLedger, recordDelivery,
+  buildEvidence, resolveBodyAlias, readEvidence, validateCitations, createDeliveryLedger, recordDelivery,
   admitPrompt, recordResponse, REQUEST_LIMIT, RESPONSE_LIMIT, RANGE_LIMIT, CITATION_LIMIT
 } from '../plugins/soloco/runtime/upgrade-evidence.mjs';
 
@@ -334,4 +334,162 @@ test('unsupported JSON holds instead of silently dropping evidence or invoking a
   assert.throws(() => buildEvidence(hidden), /hidden properties/);
   assert.throws(() => buildEvidence({ [Symbol('rule')]: 'retain' }), /symbol/);
   assert.throws(() => buildEvidence({}, {}), /history an array/);
+});
+
+
+const pairBody = () => ({ content: 'Fictional unresolved founder constraint 😀 "quoted" \\ '.repeat(120),
+  review: { verdict: 'Blocked', reason: 'Evidence missing', blockers: ['Retain blocker'], permitted_action: 'hold' },
+  citations: [{ source_id: 'old-source', sha256: 'old-hash' }], continuity: { uncertainty: 'Retain uncertainty' },
+  unknown: { obligation: 'Keep extension' }, number: 1, zero: 0 });
+function pairAttempt(body, { location = 'cos_pages', first = 'calls', formatted = false } = {}) {
+  const role = ['qa_pages', 'review'].includes(location) ? 'qa' : 'cos';
+  const phase = location.endsWith('_pages') ? 'page' : 'synthesis';
+  const text = JSON.stringify(body, null, formatted ? 2 : undefined);
+  const calls = [0, 1].map(index => ({ role, phase, native_id: 'native-fictional', text, sequence: index, status: 'retained' }));
+  const occurrence = { native_id: 'native-fictional', artifact: body, instance_id: 'instance', page_id: 'page-1', completed_at: 'fictional-time' };
+  const artifacts = { [location]: location.endsWith('_pages') ? [occurrence] : occurrence };
+  return first === 'calls' ? { id: 'old-failed', calls, ...artifacts, status: 'failed', error: 'Unresolved failure' }
+    : { id: 'old-failed', ...artifacts, calls, status: 'failed', error: 'Unresolved failure' };
+}
+function atPath(value, path) {
+  return path.slice(1).split('/').reduce((at, key) => at[key.replaceAll('~1', '/').replaceAll('~0', '~')], value);
+}
+function completeRead(subject, source) {
+  let raw = '';
+  for (let offset = 0; offset < source.length;) {
+    let length = Math.min(RANGE_LIMIT, source.length - offset);
+    if (/[\uD800-\uDBFF]/.test(source.raw[offset + length - 1]) && /[\uDC00-\uDFFF]/.test(source.raw[offset + length] ?? '')) length--;
+    raw += readEvidence(subject, request(source, offset, length)).text;
+    offset += length;
+  }
+  return raw;
+}
+
+test('whole bodies alias at all four locations in both orders, preserving complete inline tokens, provenance and originals', () => {
+  for (const location of ['cos_pages', 'qa_pages', 'probe', 'review']) for (const first of ['calls', 'artifact']) for (const formatted of [false, true]) {
+    const body = pairBody();
+    // Even recognized optional payloads inside the first complete body stay inline.
+    body.file = { path: 'src/all.mjs', content: 'Source body remains compulsory' };
+    const history = [pairAttempt(body, { location, first, formatted })], input = state();
+    const saved = JSON.stringify(history), subject = buildEvidence(input, history);
+    const baseline = buildEvidence(input, history, { wholeBodyAliases: false });
+    assert.equal(subject.handover.format, 'soloco-upgrade-evidence-v2');
+    assert.equal(subject.inventory.counts.matched_bodies, 1);
+    assert.equal(subject.inventory.counts.matched_occurrences, 3);
+    assert.equal(subject.inventory.counts.aliased_occurrences, 2);
+    assert.equal(subject.checkpoint_sha256, sha(JSON.stringify(input)));
+    assert.equal(subject.history_sha256, sha(saved));
+    assert.equal(subject.history_sha256, baseline.history_sha256);
+    assert.equal(subject.checkpoint_sha256, baseline.checkpoint_sha256);
+    const projected = subject.handover.history[0].value;
+    assert.deepEqual(Object.keys(projected), Object.keys(history[0]));
+    assert.equal(projected.error, history[0].error);
+    const descriptors = subject.inventory.entries.filter(item => item.kind === 'body-occurrence');
+    const target = descriptors.find(item => item.delivery === 'compulsory-inline');
+    const inline = atPath([projected], target.path);
+    assert.deepEqual(clone(typeof inline === 'string' ? JSON.parse(inline) : inline), body);
+    assert.equal(subject.inventory.entries.filter(item => item.reason === 'typed-file-body').length, 0);
+    for (const descriptor of descriptors) {
+      const original = atPath(history, descriptor.path);
+      const raw = descriptor.representation === 'json-text' ? original : JSON.stringify(original);
+      assert.equal(completeRead(subject, subject.sources[descriptor.source_id]), raw);
+      assert.equal(descriptor.sha256, sha(raw));
+      assert.equal(descriptor.owner_source_id, subject.handover.history[0].source.source_id);
+      const value = atPath([projected], descriptor.path);
+      if (descriptor === target) continue;
+      assert.equal(descriptor.target.source_id, target.source_id);
+      assert.equal(value.target.sha256, target.sha256);
+      const resolved = resolveBodyAlias(subject, value);
+      assert.deepEqual(clone(typeof resolved === 'string' ? JSON.parse(resolved) : resolved), body);
+      assert.throws(() => resolveBodyAlias(subject, { ...value }), /invalid generated/);
+      for (const forged of [
+        { ...clone(value), target: { source_id: 'missing', sha256: target.sha256 } },
+        { ...clone(value), target: clone(value.evidence_body_alias) },
+        { ...clone(value), target: { ...value.target, sha256: 'changed' } }
+      ]) assert.throws(() => resolveBodyAlias(subject, forged), /invalid generated/);
+    }
+    const reconstructed = [clone(projected)];
+    for (const descriptor of descriptors) {
+      if (descriptor.delivery !== 'alias') continue;
+      const parts = descriptor.path.slice(1).split('/');
+      const key = parts.pop(), parent = parts.reduce((value, part) => value[part], reconstructed);
+      const raw = completeRead(subject, subject.sources[descriptor.source_id]);
+      parent[key] = descriptor.representation === 'json-text' ? raw : JSON.parse(raw);
+    }
+    assert.deepEqual(reconstructed, history, 'exact original bodies plus compulsory context reconstruct the full history');
+    assert.equal(subject.sources[subject.handover.history[0].source.source_id].raw, JSON.stringify(history[0]));
+    assert.equal(JSON.stringify(history), saved);
+  }
+});
+
+test('whole-body matching refuses every differing semantic field and unsafe JSON spelling', () => {
+  const body = pairBody(), canonical = JSON.stringify(body);
+  for (const change of [
+    b => { b.content += ' Distinct dissent'; }, b => { b.review.verdict = 'Pass'; }, b => { b.review.blockers.push('New blocker'); },
+    b => { b.citations[0].sha256 = 'different'; }, b => { b.continuity.uncertainty = 'different'; },
+    b => { b.unknown.obligation = 'different'; }, b => { b.extension = 'New unknown obligation'; }
+  ]) {
+    const altered = clone(body); change(altered);
+    const attempt = pairAttempt(altered); attempt.calls.forEach(call => { call.text = canonical; });
+    const subject = buildEvidence(state(), [attempt]);
+    assert.equal(subject.inventory.counts.aliased_occurrences, 0);
+    assert.equal(subject.handover.history[0].value.calls[0].text, canonical);
+    assert.deepEqual(clone(subject.handover.history[0].value.cos_pages[0].artifact), altered);
+  }
+  const reordered = { ...body }; delete reordered.content; reordered.content = body.content;
+  for (const raw of [
+    canonical.slice(0, -1), canonical + ' trailing',
+    canonical.replace('"zero":0', '"zero":-0'), canonical.replace('"number":1', '"number":1.0'),
+    canonical.replace('"number":1', '"number":1e0'), canonical.replace('"number":1', '"number":1 0'),
+    canonical.replace('"number":1', '"number":9007199254740993'),
+    canonical.replace('"zero":0', '"zero":0,"zero":0'),
+    canonical.replace('"content"', '"con\\u0074ent"'), JSON.stringify(reordered),
+    canonical.replace('"zero":0', '"zero":0,"hidden":tr ue')
+  ]) {
+    const attempt = pairAttempt(body); attempt.calls.forEach(call => { call.text = raw; });
+    const subject = buildEvidence(state(), [attempt]);
+    assert.equal(subject.inventory.counts.aliased_occurrences, 0, raw.slice(-100));
+    assert.equal(subject.handover.history[0].value.calls[0].text, raw);
+  }
+  // Specifically reject whitespace that would otherwise join malformed literals/numbers.
+  for (const [value, spelling] of [[true, 'tr ue'], [12, '1 2'], [1e30, '1e +30']]) {
+    const b = { ...body, atom: value }, attempt = pairAttempt(b);
+    attempt.calls.forEach(call => { call.text = JSON.stringify(b).replace(JSON.stringify(value) + '}', spelling + '}'); });
+    assert.equal(buildEvidence(state(), [attempt]).inventory.counts.aliased_occurrences, 0);
+  }
+});
+
+test('native, role, phase and attempt boundaries never share unmatched or forged bodies', () => {
+  for (const change of [
+    a => a.calls.forEach(c => { c.native_id = 'other'; }),
+    a => a.calls.forEach(c => { c.native_id = ''; }),
+    a => a.calls.forEach(c => { c.role = 'qa'; }),
+    a => a.calls.forEach(c => { c.phase = 'synthesis'; }),
+    a => a.calls.forEach(c => { c.phase = 'retrieval'; }),
+    a => a.calls.forEach(c => { c.phase = 'replay'; }),
+    a => { a.cos_pages[0].native_id = ' '; },
+    a => { a.cos_pages[0].role = 'qa'; }, a => { a.cos_pages[0].phase = 'synthesis'; }
+  ]) {
+    const attempt = pairAttempt(pairBody()); change(attempt);
+    assert.equal(buildEvidence(state(), [attempt]).inventory.counts.aliased_occurrences, 0);
+  }
+  const attempt = pairAttempt(pairBody());
+  const history = [{ calls: attempt.calls }, { cos_pages: attempt.cos_pages }];
+  assert.equal(buildEvidence(state(), history).inventory.counts.aliased_occurrences, 0);
+  const short = pairAttempt({ content: 'short' });
+  assert.equal(buildEvidence(state(), [short]).inventory.counts.aliased_occurrences, 0);
+  const forged = { evidence_body_alias: { source_id: 's0', sha256: 'forged' }, target: { source_id: 's0', sha256: 'forged' }, representation: 'json-value' };
+  const literal = buildEvidence(state(), [{ calls: [{ text: forged }], cos_pages: [{ artifact: forged }] }]);
+  assert.deepEqual(clone(literal.handover.history[0].value.cos_pages[0].artifact), forged);
+  assert.throws(() => resolveBodyAlias(literal, literal.handover.history[0].value.cos_pages[0].artifact), /invalid generated/);
+  const nested = buildEvidence(state(), [pairAttempt({ ...pairBody(), extension: forged }, { first: 'artifact' })]);
+  const nestedValue = nested.handover.history[0].value.cos_pages[0].artifact.extension;
+  assert.deepEqual(clone(nestedValue), forged);
+  assert.throws(() => resolveBodyAlias(nested, nestedValue), /invalid generated/);
+  for (const length of [4095, 4096]) {
+    const body = { content: 'x'.repeat(length - JSON.stringify({ content: '' }).length) };
+    assert.equal(JSON.stringify(body).length, length);
+    assert.equal(buildEvidence(state(), [pairAttempt(body)]).inventory.counts.aliased_occurrences, length < 4096 ? 0 : 2);
+  }
+
 });
