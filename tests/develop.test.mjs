@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { id, withStore, digest, installedTeam } from '../plugins/soloco/runtime/store.mjs';
+import { id, withStore, digest, installedTeam, teamHash } from '../plugins/soloco/runtime/store.mjs';
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
 import { developmentAssignment, developmentCapability } from '../plugins/soloco/runtime/develop.mjs';
 import { sandboxCapability } from '../plugins/soloco/runtime/local-sandbox.mjs';
@@ -97,6 +97,31 @@ test('installed development capability does not silently authorize older teams o
   const team=installedTeam();assert.match(team.governance,/v0\.18/);
   assert.equal(developmentCapability(team).eligible,true);
   for(const changed of [{...team,plugin_version:'0.4.1'},{...team,governance_sha256:digest('changed rules')}])assert.equal(developmentCapability(changed).eligible,false);
+});
+for(const version of ['0.6.0','0.6.1','0.6.2'])test(`pinned v${version} preserves authorized development and original source after a runtime update`,live,async()=>{
+  const a=setup();withStore(a.root,db=>db.transaction('test.pin_compatible_development',s=>{
+    s.plugin_version=version;s.runtime_version=version;s.cos_instructions=`Pinned v${version} development instructions`;s.team_sha256=teamHash(s);return s;
+  }));
+  const p=await plan(a);await authorize(a,p);
+  withStore(a.root,db=>db.transaction('test.pin_scope_producer',s=>{s.runtime_version=version;return s;}));
+  const before=read(a);
+  const resumed=engine.open(a,'codex');assert.equal(resumed.capabilities.local_development.eligible,true);
+  assert.deepEqual(read(a),before);
+  assert.deepEqual(before.records[p.id].development.attempts,[]);
+  const candidate=await generate(a,p);assert.equal(candidate.status,'Submitted');
+  const after=read(a);
+  for(const key of ['id','plugin_version','governance','governance_sha256','cos_instructions','team_sha256','owner'])assert.deepEqual(after[key],before[key]);
+  // Dispatch reserves one attempt; every other scope and authorization field stays pinned.
+  assert.deepEqual(after.records[p.id].development.attempts,[candidate.job_id]);
+  assert.equal(after.jobs[candidate.job_id].development_id,p.id);
+  assert.equal(after.jobs[candidate.job_id].status,'completed');
+  assert.deepEqual(after.records[p.id],{...before.records[p.id],development:{...before.records[p.id].development,attempts:[candidate.job_id]}});
+  const grant=before.records[p.id].development.authorization.decision_id;
+  assert.deepEqual(after.records[grant],before.records[grant]);
+  assert.equal(after.upgrade,undefined);
+  assert.equal(fs.readFileSync(path.join(a.root,'sum.mjs'),'utf8'),'export const sum = values => 0;\n');
+  assert.equal(fs.existsSync(path.join(a.root,'sum.test.mjs')),false);
+  assert.equal(fs.readFileSync(path.join(a.root,'private.txt'),'utf8'),'NOT_AUTHORIZED');
 });
 test('an actual isolated edit-test-review loop retains usable candidate and leaves original source untouched',live,async()=>{
   const a=setup(),p=await plan(a);await authorize(a,p);

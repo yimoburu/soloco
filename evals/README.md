@@ -26,8 +26,14 @@ Claude is also supported with `--live claude`; omit explicit effort because alia
 
 The receipt records policy/fixture hashes, decisions, verdicts, elapsed time, and requested/applied/observed evaluator controls separately. Native session IDs and account identifiers are not retained. Historical receipts do not establish that a changed policy passes: compare the hashes or run it again.
 
-## Observed result
+## Current v0.6.3 observed result
 
-`selection-policy-2026-11-04.json`: one live Codex response passed all five decisions. The evaluator requested `gpt-6.1-sol` / low effort; launch arguments confirm those controls were applied. Effective model/effort/speed remain unverified in Codex output. The decisions used small/low, balanced/medium, deep/high, deep/high after failure, and a reasoned host default when the catalog was unavailable.
+[selection-policy-v0.6.3-2026-11-05.json](selection-policy-v0.6.3-2026-11-05.json) records a completed decision-only evaluation on the current policy hash `295312da5bd5ad6567857ac3fa2a0a3c9b1f5c870661dc38365fcc698274d5ff`. One live Codex response passed all five fictional decisions using the existing host account allowance. The evaluator requested `gpt-6.1-sol` / low effort; launch arguments record those applied controls. Actual effective model, effort and speed remain unknown. Selected specialists were not executed, and this result establishes neither their performance nor cost savings.
+
+## Historical observed result
+
+`selection-policy-2026-11-04.json` records a pre-DAG skill hash and is preserved unchanged. It does not validate the changed v0.6.3 skill; the completed current-policy receipt above provides that decision-only evidence.
+
+In that historical run, one live Codex response passed all five decisions. The evaluator requested `gpt-6.1-sol` / low effort; launch arguments confirm those controls were applied. Effective model/effort/speed remain unverified in Codex output. The decisions used small/low, balanced/medium, deep/high, deep/high after failure, and a reasoned host default when the catalog was unavailable.
 
 This is a narrow behavioral regression baseline, not evidence of actual specialist quality, lower spending, provider entitlement, improved production distribution or behavior of already pinned company teams. Existing selection integration tests separately check real dispatch/worker/launch wiring using synthetic CLIs. The account screenshot cannot establish which specialist jobs produced its aggregate distribution.

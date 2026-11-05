@@ -9,6 +9,7 @@ import * as engine from '../plugins/soloco/runtime/engine.mjs';
 import { hook, call } from '../plugins/soloco/runtime/main.mjs';
 import { work } from '../plugins/soloco/runtime/worker.mjs';
 import { assignmentContext, contextMatches } from '../plugins/soloco/runtime/context.mjs';
+import { developmentAssignment, developmentCapability } from '../plugins/soloco/runtime/develop.mjs';
 import { commandArgs, parseOutput, modelCatalog } from '../plugins/soloco/runtime/adapters.mjs';
 
 const base=fs.mkdtempSync(path.join(os.tmpdir(),'company-test-'));
@@ -239,7 +240,7 @@ test('same chat cannot reuse a revoked epoch after a handover',()=>{
 
 
 test('compatible runtime patches preserve pinned team, ownership and native sessions without adoption',async()=>{
-  for(const version of ['0.2.0','0.2.1','0.2.2','0.3.0','0.3.1','0.4.0','0.4.1','0.5.0','0.6.0','0.6.1']) {
+  for(const version of ['0.2.0','0.2.1','0.2.2','0.3.0','0.3.1','0.4.0','0.4.1','0.5.0','0.6.0','0.6.1','0.6.2']) {
     const a=setup();
     withStore(a.root,db=>db.transaction('test.old_patch',s=>{
       s.plugin_version=version;s.runtime_version=version;
@@ -538,7 +539,7 @@ test('pinned v0.5.0 preserves prior local capabilities but does not silently ado
   } finally {process.env.PATH=oldPath;}
 });
 
-for(const version of ['0.6.0','0.6.1'])test(`pinned v${version} retains selection and local capabilities after a compatible runtime update`,async()=>{
+for(const version of ['0.6.0','0.6.1','0.6.2'])test(`pinned v${version} retains selection and local capabilities after a compatible runtime update`,async()=>{
   const fake=selectionHost(),oldPath=process.env.PATH;process.env.PATH=fake.bin+path.delimiter+oldPath;
   try {
     const a=setup();withStore(a.root,db=>db.transaction('test.pin_v060',s=>{s.plugin_version=version;s.runtime_version=version;s.cos_instructions=`Preserve pinned v${version} instructions`;s.team_sha256=teamHash(s);return s;}));
@@ -585,4 +586,157 @@ test('new assignment hashes bind selection and task metadata; legacy hashes rema
     let calls=0;await work(b.root,jid,async()=>{calls++;return result();});
     const job=engine.status(b,'codex').jobs.find(v=>v.id===jid);assert.equal(calls,0);assert.equal(job.status,'failed');
   }
+});
+
+test('company_progress schema and read-only endpoint preserve status and expose equivalent safe formats',async()=>{
+  const {root,session_id,epoch}=setup();const a={root,session_id,epoch};
+  const intent=engine.save({...a,kind:'intent',content:'SECRET_FOUNDER_BODY'},'codex');
+  const j=queued(a,{inputs:[{id:intent.id,revision:1}]});
+  await work(a.root,j,async()=>result('SECRET_RESPONSE_BODY',{notices:[{kind:'decision_required',summary:'Exact founder decision notice'}]}));
+  const before=withStore(a.root,db=>db.read());
+  const json=await call('company_progress',{root:a.root,session_id:a.session_id},'codex');
+  assert.equal(json.graph.valid,true);assert.equal(json.nodes.length,1);
+  assert.equal(json.nodes[0].native_id,before.jobs[j].native_id);
+  assert.deepEqual(json.nodes[0].context_inputs,[{id:intent.id,revision:1}]);
+  assert.equal(json.attention[0].notice.summary,'Exact founder decision notice');
+  for(const format of ['json','html','text','mermaid']) {
+    const output=await call('company_progress',{root:a.root,session_id:a.session_id,format,recent_jobs:1,render_id:'endpoint-check'},'codex');
+    assert.equal(JSON.stringify(output).includes('SECRET_RESPONSE_BODY'),false);
+    assert.equal(JSON.stringify(output).includes('SECRET_FOUNDER_BODY'),false);
+  }
+  assert.deepEqual(withStore(a.root,db=>db.read()),before);
+  const status=engine.status(a,'codex');
+  assert.equal(status.records.find(r=>r.id===intent.id).content,'SECRET_FOUNDER_BODY');
+  assert.equal(Object.hasOwn(status,'graph'),false);
+  for(const extra of [{format:'replay'},{format:'html'},{format:'html',render_id:'bad</script>'},{recent_jobs:0},{recent_jobs:51},{action:'run'}])await assert.rejects(call('company_progress',{root:a.root,session_id:a.session_id,...extra},'codex'));
+  await assert.rejects(call('company_progress',{root:a.root,session_id:a.session_id,session_id:'unbound'},'codex'),/binding/);
+});
+
+test('new dispatch metadata reaches the actual synthetic worker and changes assignment hashes only when present',async()=>{
+  const fake=selectionHost(),oldPath=process.env.PATH;process.env.PATH=fake.bin+path.delimiter+oldPath;
+  try {
+    const {root,session_id,epoch}=setup();const a={root,session_id,epoch};
+    const {job}=await selectionRun(a,{expected_deliverable:'A concrete scope artifact'});
+    assert.equal(job.status,'completed');
+    assert.equal(job.expected_deliverable,'A concrete scope artifact');
+    assert.deepEqual(job.requester,{role:'runner',session_id:a.session_id,host:'codex',epoch:1});
+    const s=withStore(a.root,db=>db.read());
+    const context=assignmentContext(s,job),pack=JSON.parse(context.text);
+    assert.equal(pack.assignment.expected_deliverable,job.expected_deliverable);
+    assert.deepEqual(pack.assignment.requester,job.requester);
+    for(const changed of [{...job,expected_deliverable:'Different output'},{...job,requester:{...job.requester,session_id:'other'}}])assert.notEqual(assignmentContext(s,changed).hash,context.hash);
+    const {expected_deliverable,requester,...historical}=job;
+    const oldPack=JSON.parse(assignmentContext(s,historical).text);
+    const {assignment,...rest}=oldPack;
+    const legacyAssignment={task:historical.task,task_summary:historical.task_summary??null,next_handoff:historical.next_handoff??null,model_selection:historical.model_selection??{mode:'default'},model_catalog:historical.model_catalog??null};
+    assert.equal(assignmentContext(s,historical).hash,digest(JSON.stringify({...rest,assignment:legacyAssignment})));
+    await assert.rejects(call('company_dispatch',{...a,role:'pm',task:'x',expected_deliverable:'x'.repeat(301)},'codex'),/expected_deliverable/);
+    await assert.rejects(call('company_dispatch',{...a,role:'pm',task:'x',requester:{session_id:'spoof'}},'codex'),/Unknown argument/);
+    const p=await call('company_progress',{root:a.root,session_id:a.session_id},'codex');
+    assert.equal(p.nodes.find(n=>n.id===job.id).expected_deliverable,expected_deliverable);
+  } finally {process.env.PATH=oldPath;}
+});
+
+test('progress follows actual local controller candidate, software tests, independent QA and acceptance',{
+  skip:developmentCapability().supported?false:developmentCapability().blocker
+},async()=>{
+  const {root,session_id,epoch}=setup(),a={root,session_id,epoch},readArgs={root,session_id};
+  fs.writeFileSync(path.join(root,'sum.mjs'),'export const sum = () => 0;\n');
+  const files=[{path:'sum.mjs',content:'export const sum = (a,b) => a+b;\n'},
+    {path:'sum.test.mjs',content:"import test from 'node:test';import assert from 'node:assert/strict';import {sum} from './sum.mjs';test('sum',()=>assert.equal(sum(2,3),5));\n"}];
+  const plan=await call('company_develop',{...a,action:'plan',read_paths:['sum.mjs'],write_paths:['sum.mjs','sum.test.mjs'],test_paths:['sum.test.mjs'],
+    acceptance:'Adds two numbers; original source untouched.',stop_conditions:'No network or extra files.',data_policy:'Synthetic files only.',source_instruction:'Inspect and repair these fictional files.',model_data_approved:true,
+    max_attempts:2,timeout_ms:5000,max_output_bytes:10000,max_bytes:20000,expires_at:new Date(Date.now()+60000).toISOString()},'codex');
+  await call('company_develop',{...a,action:'authorize',plan_id:plan.id,scope_sha256:plan.development.scope_sha256,model_data_approved:true,source_instruction:'Authorize this exact synthetic scope.'},'codex');
+  function controllerQueue({role,review_of=null,...details}) {
+    const jid=id('job'),instance=id(role);
+    withStore(root,db=>db.transaction('test.controller_queue',s=>{
+      s.sessions[instance]={instance_id:instance,role,native_id:null,host:s.owner.host};
+      const job={id:jid,role,session_key:instance,instance_id:instance,native_id:null,host:s.owner.host,epoch:s.owner.epoch,
+        requester:{role:'runner',session_id:s.owner.session_id,host:s.owner.host,epoch:s.owner.epoch},context_format:2,
+        status:'queued',task:'Prepare a bounded synthetic development deliverable.',inputs:[],review_of,created_at:new Date().toISOString(),...details};
+      // Match dispatch: reserve before insertion, then capture the authorized context.
+      developmentAssignment(s,job,true);
+      const context=assignmentContext(s,job);
+      s.jobs[jid]={...job,inputs:context.inputs,context_sha256:context.hash};return s;
+    }));return jid;
+  }
+  const engineering=controllerQueue({role:'engineer',development_id:plan.id,expected_deliverable:'Candidate files',next_handoff:'QA after software test output; not summoned'});
+  assert.throws(()=>controllerQueue({role:'engineer',development_id:plan.id}),/Development scope already has active work/);
+  assert.deepEqual(withStore(root,db=>db.read()).records[plan.id].development.attempts,[engineering]);
+  const parallel=controllerQueue({role:'research'});
+  const initial=await call('company_progress',readArgs,'codex');
+  assert.equal(initial.graph.valid,true,JSON.stringify(initial.diagnostics));
+  assert.equal(initial.state.active_jobs,2);assert.equal(initial.nodes.some(n=>n.role==='qa'),false);
+  assert.equal(initial.graph.edges.some(e=>e.from===parallel||e.to===parallel),false);
+  await work(root,engineering,async()=>result('Synthetic candidate',{files}));
+  await work(root,parallel,async()=>result('Synthetic independent research'));
+  let state=withStore(root,db=>db.read());const candidate=state.records[state.jobs[engineering].artifact_id];
+  assert.equal(candidate.status,'Submitted');
+  const software=await call('company_develop',{...a,action:'run',plan_id:plan.id,candidate_id:candidate.id},'codex');
+  assert.equal(software.kind,'development_test');
+  for(let i=0;i<300;i++) {
+    state=withStore(root,db=>db.read());
+    if(!['queued','running'].includes(state.jobs[software.id].status))break;
+    await new Promise(r=>setTimeout(r,30));
+  }
+  const receipt=state.records[state.jobs[software.id].artifact_id];
+  assert.ok(receipt,JSON.stringify(state.jobs[software.id]));
+  assert.equal(receipt.development.result.status,'passed');
+  assert.equal(receipt.development.result.tests_executed,true);
+  assert.equal(receipt.development.result.exit_code,0);
+  const qa=controllerQueue({role:'qa',review_of:{id:receipt.id,revision:receipt.revision}});
+  await work(root,qa,async()=>result('Synthetic independent QA assessment',{review:{verdict:'Pass',reason:'Exact candidate and actual test receipt checked',permitted_action:'accept_local_development',candidate_sha256:receipt.development.candidate_sha256,receipt_sha256:receipt.development.receipt_sha256,blockers:[]}}));
+  state=withStore(root,db=>db.read());const review=state.records[state.jobs[qa].artifact_id];
+  assert.equal(review.status,'Submitted');
+  const reviewed=await call('company_progress',readArgs,'codex');
+  assert.equal(reviewed.evidence.find(r=>r.id===review.id).review.recorded.verdict,'Pass');
+  assert.equal(reviewed.evidence.find(r=>r.id===receipt.id).acceptance,null);
+  assert.notEqual(state.jobs[qa].native_id,state.jobs[engineering].native_id);
+  const acceptance=await call('company_develop',{...a,action:'accept',plan_id:plan.id,receipt_id:receipt.id,review_id:review.id,receipt_sha256:receipt.development.receipt_sha256},'codex');
+  assert.equal(acceptance.source_integrated,false);
+  const accepted=await call('company_progress',readArgs,'codex');
+  assert.equal(accepted.graph.valid,true,JSON.stringify(accepted.diagnostics));
+  assert.equal(accepted.evidence.find(r=>r.id===receipt.id).acceptance.bindings_match,true);
+  assert.ok(accepted.graph.edges.some(e=>e.from===engineering&&e.to===software.id&&e.type==='candidate'));
+  assert.ok(accepted.graph.edges.some(e=>e.from===software.id&&e.to===qa&&e.type==='review'));
+  assert.equal(accepted.graph.edges.some(e=>e.from===parallel||e.to===parallel),false);
+  const html=await call('company_progress',{...readArgs,format:'html',render_id:'workflow-check'},'codex');
+  assert.ok(html.includes('runtime receiver acceptance recorded'));assert.equal(html.includes(files[1].content),false);
+  assert.equal(fs.readFileSync(path.join(root,'sum.mjs'),'utf8'),'export const sum = () => 0;\n');
+});
+
+test('company_progress observes successive synthetic parallel/candidate/test/QA/acceptance snapshots without replay',async()=>{
+  const {root,session_id}=setup(),args={root,session_id},at='2026-01-01T00:00:00Z';
+  const baseJob={status:'completed',created_at:at,inputs:[],task:'PRIVATE instructions',task_summary:'Concrete synthetic task'};
+  withStore(root,db=>db.transaction('test.synthetic_progress_chain',s=>{
+    s.jobs={build:{...baseJob,id:'build',role:'engineer',instance_id:'eng',native_id:'native-eng',artifact_id:'candidate'},
+      parallel:{...baseJob,id:'parallel',role:'research',status:'running',next_handoff:'QA awaits output; not summoned'},
+      test:{...baseJob,id:'test',kind:'development_test',candidate_id:'candidate',development_id:'plan',artifact_id:'receipt'}};
+    s.records={candidate:{id:'candidate',job_id:'build',revision:1,kind:'artifact',status:'Submitted',created_at:at,development:{type:'candidate',plan_id:'plan',candidate_sha256:'hash',run:{job_id:'test',receipt_id:'receipt'}}},
+      receipt:{id:'receipt',revision:1,kind:'artifact',status:'Submitted',author_role:'runtime',author_instance:'test',created_at:at,development:{type:'test',plan_id:'plan',candidate_id:'candidate',candidate_sha256:'hash',receipt_sha256:'receipt-hash',result:{tests_executed:true,status:'passed',exit_code:0}}}};
+    return s;
+  }));
+  const returned=await call('company_progress',args,'codex');
+  assert.deepEqual(returned.graph.edges.map(e=>[e.from,e.to,e.type]),[['build','test','candidate']]);
+  assert.equal(returned.nodes.some(n=>n.role==='qa'),false);
+  assert.equal(returned.evidence.find(r=>r.id==='receipt').acceptance,null);
+  withStore(root,db=>db.transaction('test.synthetic_qa_return',s=>{
+    s.jobs.qa={...baseJob,id:'qa',role:'qa',instance_id:'qa-instance',native_id:'native-qa',artifact_id:'review',review_of:{id:'receipt',revision:1}};
+    s.records.review={id:'review',job_id:'qa',revision:1,kind:'review',status:'Submitted',created_at:at,review_of:{id:'receipt',revision:1},review:{verdict:'Pass',candidate_sha256:'hash',receipt_sha256:'receipt-hash'}};
+    return s;
+  }));
+  const reviewed=await call('company_progress',args,'codex');
+  assert.equal(reviewed.evidence.find(r=>r.id==='review').review.recorded.verdict,'Pass');
+  assert.equal(reviewed.evidence.find(r=>r.id==='receipt').acceptance,null);
+  withStore(root,db=>db.transaction('test.synthetic_acceptance_fact',s=>{
+    s.records.receipt.development.acceptance={at,review_id:'review',candidate_sha256:'hash',receipt_sha256:'receipt-hash',source_integrated:false};return s;
+  }));
+  const accepted=await call('company_progress',args,'codex');
+  assert.equal(accepted.evidence.find(r=>r.id==='receipt').acceptance.bindings_match,true);
+  assert.equal(accepted.evidence.find(r=>r.id==='receipt').acceptance.current_applicability,'unknown');
+  assert.ok(accepted.graph.edges.some(e=>e.from==='test'&&e.to==='qa'&&e.reference.revision===1));
+  assert.equal(accepted.graph.edges.some(e=>e.from==='parallel'||e.to==='parallel'),false);
+  assert.equal(returned.evidence.some(r=>r.kind==='review'),false); // Earlier response is detached, not retroactively reconstructed.
+  assert.equal(JSON.stringify(accepted).includes('PRIVATE instructions'),false);
 });
