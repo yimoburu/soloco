@@ -87,11 +87,12 @@ export function upgrade(a,host,{launch=launchUpgrade,check=readiness,catalog=mod
     if (a.action!=='prepare') throw new Error('review_window_minutes is only supported for upgrade prepare');
     if (![45,90,null].includes(a.review_window_minutes)) throw new Error('review_window_minutes must be 45, 90 or null');
   }
+  if(Object.hasOwn(a,'context_mode')&&(!['prepare','inspect'].includes(a.action)||!['full','current'].includes(a.context_mode)))throw Error('context_mode is inspect/prepare full or current');
   if (Object.hasOwn(a,'model_selection') && a.action!=='prepare') throw new Error('model_selection is only supported for upgrade prepare');
   binding(a,host);
   if (a.action==='inspect') return withStore(a.root,db=>{
     const s=db.read();compatible(s);const old=pinned(s),next=candidate(s,a.governance);
-    return {...report(s),projection_preview:projectionPreview(checkpoint(s),s.upgrade_history??[],s.upgrade??null),candidate_hash:teamHash(next),candidate_version:VERSION,changes:{roles:Object.keys(next.roles).filter(k=>JSON.stringify(old.roles[k])!==JSON.stringify(next.roles[k])),cos_instructions_changed:old.cos_instructions!==next.cos_instructions,governance_changed:old.governance!==next.governance},governance:{policy:a.governance??'preserve',current:s.governance,installed:installedTeam().governance},prior_instructions:old.cos_instructions,candidate_instructions:next.cos_instructions};
+    return {...report(s),projection_preview:projectionPreview(checkpoint(s),s.upgrade_history??[],s.upgrade??null,{currentState:a.context_mode==='current'}),candidate_hash:teamHash(next),candidate_version:VERSION,changes:{roles:Object.keys(next.roles).filter(k=>JSON.stringify(old.roles[k])!==JSON.stringify(next.roles[k])),cos_instructions_changed:old.cos_instructions!==next.cos_instructions,governance_changed:old.governance!==next.governance},governance:{policy:a.governance??'preserve',current:s.governance,installed:installedTeam().governance},prior_instructions:old.cos_instructions,candidate_instructions:next.cos_instructions};
   });
   if (a.action==='prepare') {
     const reviewWindowMinutes=Object.hasOwn(a,'review_window_minutes')?a.review_window_minutes:REHEARSAL_TIMEOUT_MS/60000;
@@ -119,7 +120,7 @@ export function upgrade(a,host,{launch=launchUpgrade,check=readiness,catalog=mod
       s.paused=true;s.owner={host,session_id:a.session_id,epoch:s.owner.epoch+1};
       decision(s,a,'prepare_team_upgrade');
       const snapshot=checkpoint(s);
-      s.upgrade={id:id('upgrade'),status:'queued',created_at:stamp(),review_window_minutes:reviewWindowMinutes,review_deadline_policy:reviewWindowMinutes===null?'none':'finite',deadline_ms:reviewWindowMinutes===null?null:Date.now()+reviewWindowMinutes*60000,history_sha256:historyHash(s),epoch:s.owner.epoch,host,model_selection:selection,model_selection_sha256:digest(JSON.stringify(selection)),...(metadata?{model_catalog:{source:metadata.source,...(selection.mode==='explicit'?{model:metadata.models.find(m=>m.id===selection.model)}:{}),speed_support:metadata.speed_support}}:{}),previous,candidate:next,candidate_hash:teamHash(next),checkpoint:snapshot,checkpoint_sha256:checkpointHash(s),governance_policy:a.governance??'preserve',governance_instruction:a.governance_instruction??null,source_instruction:a.source_instruction,takeover_instruction:a.takeover_instruction??null};
+      s.upgrade={...(a.context_mode?{context_mode:a.context_mode}:{}),id:id('upgrade'),status:'queued',created_at:stamp(),review_window_minutes:reviewWindowMinutes,review_deadline_policy:reviewWindowMinutes===null?'none':'finite',deadline_ms:reviewWindowMinutes===null?null:Date.now()+reviewWindowMinutes*60000,history_sha256:historyHash(s),epoch:s.owner.epoch,host,model_selection:selection,model_selection_sha256:digest(JSON.stringify(selection)),...(metadata?{model_catalog:{source:metadata.source,...(selection.mode==='explicit'?{model:metadata.models.find(m=>m.id===selection.model)}:{}),speed_support:metadata.speed_support}}:{}),previous,candidate:next,candidate_hash:teamHash(next),checkpoint:snapshot,checkpoint_sha256:checkpointHash(s),governance_policy:a.governance??'preserve',governance_instruction:a.governance_instruction??null,source_instruction:a.source_instruction,takeover_instruction:a.takeover_instruction??null};
       return s;
     }));
     try {launch(a.root,s.upgrade.id);} catch(error) {failUpgrade(a.root,s.upgrade.id,error);}
@@ -252,7 +253,7 @@ export async function rehearse(root,uid,model=runModel) {
       u.status='checking';u.started_at=stamp();u.probe_instance=id('upgrade-cos');u.reviewer_instance=id('upgrade-qa');
       u.probe_status='running';u.review_status='planned';return s;
     }));
-    const u=initial.upgrade,subject=buildEvidence(u.checkpoint,initial.upgrade_history??[]);
+    const u=initial.upgrade,subject=buildEvidence(u.checkpoint,initial.upgrade_history??[],{currentState:u.context_mode==='current'});
     const pages=subject.pages.map(page=>evidencePage(subject,page));
     const frozenOwner=JSON.stringify(initial.owner);
     function guard(s,status='checking') {
@@ -262,6 +263,7 @@ export async function rehearse(root,uid,model=runModel) {
           || historyHash(s)!==subject.history_sha256 || Date.now()>=deadline(u) || deadline(s.upgrade)!==deadline(u)
           || s.upgrade.review_deadline_policy!==u.review_deadline_policy
           || JSON.stringify(s.upgrade.model_selection)!==JSON.stringify(u.model_selection)
+          || s.upgrade.context_mode!==u.context_mode
           || s.upgrade.model_selection_sha256!==u.model_selection_sha256
           || teamHash(s.upgrade.candidate)!==u.candidate_hash
           || teamHash(candidate(s,u.governance_policy))!==u.candidate_hash) throw new Error('Upgrade changed during rehearsal or deadline expired');

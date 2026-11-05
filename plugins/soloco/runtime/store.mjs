@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID, createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import {normalizedLayout,readNormalized,writeNormalized,migrateNormalized,writeNormalizedSelection} from './record-storage.mjs';
 
 export const PACKAGE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const VERSION = '0.6.7';
@@ -41,25 +42,61 @@ export class Store {
     const file = path.join(this.dir, 'company.sqlite');
     for (const suffix of ['', '-wal', '-shm']) noLink(file + suffix);
     this.db = new DatabaseSync(file);
+    this.inTransaction=false;
     this.db.exec('PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;');
     this.db.exec('CREATE TABLE IF NOT EXISTS company (id INTEGER PRIMARY KEY CHECK(id=1), value TEXT NOT NULL); CREATE TABLE IF NOT EXISTS events (seq INTEGER PRIMARY KEY, at TEXT NOT NULL, type TEXT NOT NULL, value TEXT NOT NULL);');
   }
+  changeToken() { return this.db.prepare('SELECT COALESCE(MAX(seq),0) AS version FROM events').get().version; }
+  storageInfo() { return {format:normalizedLayout(this.db)?'normalized-v1':'legacy-json',migration_required:!normalizedLayout(this.db)}; }
+  migrate() { return migrateNormalized(this.db,this.dir); }
+  readSnapshot(fn) {
+    if(this.inTransaction)return fn();
+    this.db.exec('BEGIN');this.inTransaction=true;
+    try {const value=fn();this.db.exec('COMMIT');return value;}
+    catch(error){this.db.exec('ROLLBACK');throw error;}
+    finally {this.inTransaction=false;}
+  }
+  readSelected(options) { return this.readSnapshot(()=>normalizedLayout(this.db)?readNormalized(this.db,options):this.read()); }
+  selectedTransaction(type,options,fn) {
+    if(!normalizedLayout(this.db))return this.transaction(type,s=>fn(s));
+    this.db.exec('BEGIN IMMEDIATE');this.inTransaction=true;
+    try {
+      const state=readNormalized(this.db,options),before=JSON.stringify(state);
+      const result=fn(state);
+      state.revision=(state.revision??0)+1;state.updated_at=stamp();
+      const changes=[];const old=JSON.parse(before);
+      for(const key of new Set([...Object.keys(old),...Object.keys(state)])) {const value=state[key];
+        if(Object.hasOwn(options.entities??{},key)) {
+          for(const id of new Set([...Object.keys(old[key]??{}),...Object.keys(value??{})]))if(JSON.stringify(old[key]?.[id])!==JSON.stringify(value?.[id]))changes.push({family:key,key:id,value:value?.[id]});
+        } else if(JSON.stringify(old[key])!==JSON.stringify(value))changes.push({family:'root',key,value});
+      }
+      writeNormalizedSelection(this.db,changes);
+      this.db.prepare('INSERT INTO events(at,type,value) VALUES (?,?,?)').run(stamp(),type,JSON.stringify({revision:state.revision,owner:state.owner}));
+      this.db.exec('COMMIT');return result;
+    }catch(error){this.db.exec('ROLLBACK');throw error;}
+    finally {this.inTransaction=false;}
+  }
   read() {
-    const row = this.db.prepare('SELECT value FROM company WHERE id=1').get();
-    return row ? JSON.parse(row.value) : null;
+    return this.readSnapshot(()=>{
+      if(normalizedLayout(this.db))return readNormalized(this.db);
+      const row = this.db.prepare('SELECT value FROM company WHERE id=1').get();
+      return row ? JSON.parse(row.value) : null;
+    });
   }
   transaction(type, fn) {
-    this.db.exec('BEGIN IMMEDIATE');
+    this.db.exec('BEGIN IMMEDIATE');this.inTransaction=true;
     try {
       const state = this.read();
       const next = fn(state);
       next.revision = (state?.revision ?? -1) + 1;
       next.updated_at = stamp();
-      this.db.prepare('INSERT INTO company VALUES (1,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value').run(JSON.stringify(next));
+      if(normalizedLayout(this.db))writeNormalized(this.db,next);
+      else this.db.prepare('INSERT INTO company VALUES (1,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value').run(JSON.stringify(next));
       this.db.prepare('INSERT INTO events(at,type,value) VALUES (?,?,?)').run(stamp(), type, JSON.stringify({revision: next.revision, owner: next.owner}));
       this.db.exec('COMMIT');
       return next;
     } catch (error) { this.db.exec('ROLLBACK'); throw error; }
+    finally {this.inTransaction=false;}
   }
   close() { this.db.close(); }
 }

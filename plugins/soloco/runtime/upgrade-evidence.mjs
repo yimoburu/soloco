@@ -1,3 +1,4 @@
+import {classificationFor,contextSource} from './current-state.mjs';
 import { createHash } from 'node:crypto';
 
 export const REQUEST_LIMIT = 900000;
@@ -224,7 +225,7 @@ function stateFor(subject) {
 /** Frozen in-memory evidence only. Send handover, never the whole subject.
  * sources contain private retrieval data. No caller-owned object is retained.
  */
-export function buildEvidence(checkpoint, history = [], { wholeBodyAliases = true } = {}) {
+export function buildEvidence(checkpoint, history = [], { wholeBodyAliases = true, currentState = false } = {}) {
   if (!object(checkpoint) || !Array.isArray(history)) hold('checkpoint must be an object and history an array');
   const checkpointRaw = serialize(checkpoint);
   const historyRaw = serialize(history);
@@ -234,6 +235,22 @@ export function buildEvidence(checkpoint, history = [], { wholeBodyAliases = tru
   const history_sha256 = hash(historyRaw);
   const sources = Object.create(null);
   const descriptors = [];
+  const archivedSourceIds=new Set();
+  const archivedRecords=[];
+  const dispositionProofIds=new Set();
+  if(currentState&&snapshot.context_classifications!==undefined){
+    if(!object(snapshot.context_classifications))hold('unknown context classification index');
+    const state={...snapshot,upgrade_history:prior};
+    for(const id of Object.keys(snapshot.context_classifications)){
+      const source=contextSource(state,id);
+      if(!source)hold('context classification source is missing: '+id);
+      // Validate all entries before replacing the index with an archive pointer,
+      // including entries unrelated to records currently being projected.
+      classificationFor(state,source,id);
+    }
+  }
+  if(currentState)for(const r of Object.values(snapshot.records??{})){const c=classificationFor(snapshot,r);if(c?.disposition==='resolved'){dispositionProofIds.add(c.plan.id);dispositionProofIds.add(c.review.id);}}
+  if(currentState)for(const value of prior){const c=classificationFor(snapshot,value,'upgrade:'+value.id);if(c?.disposition==='resolved'){dispositionProofIds.add(c.plan.id);dispositionProofIds.add(c.review.id);}}
   const blobs = new Map();
 
   const bodyOccurrences = new Map();
@@ -443,18 +460,28 @@ export function buildEvidence(checkpoint, history = [], { wholeBodyAliases = tru
       // original container shape are explicit; paths use keys, never IDs.
       const entries = Object.entries(value).map(([entryKey, item]) => {
         const at = keyed ? { ...child(location, entryKey), collection_key: entryKey } : child(location, entryKey);
+        if(currentState&&((key==='records'&&(dispositionProofIds.has(item.id)||classificationFor(snapshot,item)?.disposition==='resolved'))||(key==='jobs'&&(dispositionProofIds.has(item.artifact_id)||classificationFor(snapshot,item,'job:'+item.id)?.disposition==='resolved')))) {
+          const source=register(at,'archived-record',serialize(item),'json');
+          archivedSourceIds.add(source.source_id);archivedRecords.push({key:entryKey,source:reference(source),classification:snapshot.context_classifications[key==='jobs'?'job:'+item.id:item.id]??{proof_for_reviewed_disposition:true}});
+          return null;
+        }
         const projected = entry(item, at, collectionKinds[key]);
         return keyed ? { key: entryKey, ...projected } : projected;
       });
-      fields.push({ key, source: reference(source), collection_shape: keyed ? 'object' : 'array', entries });
+      fields.push({ key, source: reference(source), collection_shape: keyed ? 'object' : 'array', entries:entries.filter(Boolean) });
     } else {
+      if(currentState&&key==='context_classifications'){const source=register(location,'classification-index',serialize(value),'json');archivedSourceIds.add(source.source_id);fields.push({key,verified_classifications:{count:Object.keys(value).length,source:reference(source)}});continue;}
       const policy = ['development', 'prototype'].includes(key) && runtimeContainer(value)
         ? { files: true, runtime: true } : {};
       fields.push({ key, ...entry(value, location, 'checkpoint-field', false, policy) });
     }
   }
-  const historyEntries = prior.map((value, index) => entry(value,
-    { scope: 'history', path: pointer('', index) }, 'history-attempt'));
+  const historyEntries = prior.map((value,index)=>{
+    if(currentState&&classificationFor(snapshot,value,'upgrade:'+value.id)?.disposition==='resolved'){const source=register({scope:'history',path:pointer('',index)},'archived-upgrade',serialize(value),'json');archivedSourceIds.add(source.source_id);archivedRecords.push({entity:'upgrade',key:value.id,source:reference(source),classification:snapshot.context_classifications['upgrade:'+value.id]});return null;}
+    return entry(value,{scope:'history',path:pointer('',index)},'history-attempt');
+  }).filter(Boolean);
+  let archiveIndex=null;
+  if(archivedRecords.length){const source=register({scope:'archive',path:'/records'},'archive-index',serialize(archivedRecords),'json');archivedSourceIds.add(source.source_id);archiveIndex={count:archivedRecords.length,source:reference(source),rule:'Exact reviewed dispositions; originals and classification proofs remain retrievable. No archive item grants authority.'};}
   descriptors.sort((left, right) => left.source_id < right.source_id ? -1 : left.source_id > right.source_id ? 1 : 0);
   counts.sources = descriptors.length;
   counts.payload_occurrences = descriptors.filter(item => item.kind === 'payload').length;
@@ -463,9 +490,9 @@ export function buildEvidence(checkpoint, history = [], { wholeBodyAliases = tru
   const inventory = { version: wholeBodyAliases ? 2 : 1, counts, entries: [...descriptors] };
   const inventory_sha256 = hash(serialize(inventory));
   const handover = { format: wholeBodyAliases ? 'soloco-upgrade-evidence-v2' : 'soloco-upgrade-evidence-v1', checkpoint_sha256, history_sha256, inventory_sha256,
-    counts, checkpoint: fields, history: historyEntries };
+    counts, checkpoint: fields, history: historyEntries,...(archiveIndex?{archive:archiveIndex}:{}),...(currentState?{review_mode:'verified-current-state'}:{}) };
   const stream = register({ scope: 'transport', path: '' }, 'semantic-stream',
-    serialize({ handover, registry: inventory.entries.map(item => ({ ...item })) }), 'json');
+    serialize({ handover, registry: inventory.entries.filter(item=>!archivedSourceIds.has(item.source_id)).map(item => ({ ...item })) }), 'json');
   const pages = [];
   for (let offset = 0; offset < stream.length;) {
     let end = Math.min(offset + PAGE_TARGET, stream.length);
@@ -495,10 +522,10 @@ export function resolveBodyAlias(subject, alias) {
 /** Compare identical current inputs, including terminal current attempts as
  * next-attempt history. Prepare adds a decision, so this is only a preview.
  */
-export function projectionPreview(checkpoint, history = [], currentUpgrade = null) {
+export function projectionPreview(checkpoint, history = [], currentUpgrade = null, {currentState=false}={}) {
   const projectedHistory = currentUpgrade ? [...history, currentUpgrade] : history;
   const baseline = buildEvidence(checkpoint, projectedHistory, { wholeBodyAliases: false });
-  const candidate = buildEvidence(checkpoint, projectedHistory);
+  const candidate = buildEvidence(checkpoint, projectedHistory,{currentState});
   const metrics = subject => {
     const stream = subject.sources[subject.pages[0].source_id];
     return { format: subject.handover.format, checkpoint_sha256: subject.checkpoint_sha256,

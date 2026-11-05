@@ -1,3 +1,5 @@
+import {createHash} from 'node:crypto';
+const cryptoHash=v=>createHash('sha256').update(v).digest('hex');
 // Supported local execution is deliberately narrow: Node's built-in test runner on macOS.
 // Seatbelt is the access boundary; Node permissions provide additional restrictions.
 // No unsandboxed fallback. This is not a VM or a hard memory/disk quota mechanism.
@@ -12,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 const BACKEND='macos-seatbelt-node';
 const node=fs.realpathSync(process.execPath);
 const quote=value=>JSON.stringify(value);
-let runtimePaths, capability, isolationFlag;
+let runtimePaths, runtimeDependencyFiles, capability, isolationFlag;
 function libraries() {
   if(runtimePaths) return runtimePaths;
   const started=Date.now(), seen=new Set(), queue=[node], dirs=new Set(['/System/Library','/usr/lib']);
@@ -37,7 +39,7 @@ function libraries() {
     }
   }
   if([...dirs].some(dir=>dir==='/' || fs.realpathSync(dir)===fs.realpathSync(os.homedir())))throw new Error('Node library layout cannot be narrowly isolated');
-  runtimePaths=[...dirs];return runtimePaths;
+  runtimeDependencyFiles=[...seen].sort();runtimePaths=[...dirs];return runtimePaths;
 }
 const ancestors=files=>{
   const result=new Set();
@@ -195,4 +197,20 @@ if(process.argv[1] && path.resolve(process.argv[1])===fileURLToPath(import.meta.
   } catch(error) {
     if(process.connected)process.send({type:'result',result:{status:'error',exit_code:null,signal:null,stdout:'',stderr:'',duration_ms:0,isolation:BACKEND,tests_executed:false,error:error.message}},()=>process.disconnect());
   }
+}
+
+// Exact hermetic execution identity for reuse; caller hashes this descriptor and
+// must never persist raw environment values. Includes observable absolute paths.
+export function validationEnvironment(directory,test_paths) {
+  // Re-discover load commands as well as re-hashing bytes: cached directories
+  // cannot establish completeness after an in-place dynamic-library update.
+  runtimePaths=undefined;runtimeDependencyFiles=undefined;libraries();
+  const build=spawnSync('/usr/bin/sw_vers',['-buildVersion'],{encoding:'utf8',timeout:1000,maxBuffer:1000,env:{PATH:'/usr/bin:/bin',LANG:'C'}});
+  if(build.status!==0||!build.stdout.trim())throw Error('Cannot fingerprint system build for validation reuse');
+  const dependencies=runtimeDependencyFiles.map(file=>({path:file,sha256:cryptoHash(fs.readFileSync(file))}));
+  const scratch=path.join(directory,'.scratch');
+  return {command:testArguments(directory,scratch,test_paths.map(p=>'./'+p)),
+    runtime:{node:process.version,platform:process.platform,arch:process.arch,os_release:os.release(),system_build:build.stdout.trim(),dependencies,
+      executable_sha256:cryptoHash(fs.readFileSync(node)),runner_sha256:cryptoHash(fs.readFileSync(fileURLToPath(import.meta.url)))},
+    sandbox:{backend:BACKEND,policy_sha256:cryptoHash(sandboxProfile(directory,scratch))},environment:environment(scratch)};
 }

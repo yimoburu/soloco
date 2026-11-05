@@ -1,10 +1,12 @@
+import {fingerprintValidation,validateReusableReceipt,confirmValidationFingerprint} from './validation-cache.mjs';
+import {presentationOnly,relevantRecord} from './current-state.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { VERSION, V018_GOVERNANCE_SHA256, installedTeam, digest, id, stamp, requireText, withStore, owner, folder, noLink, notice } from './store.mjs';
 import { contextMatches } from './context.mjs';
-import { sandboxCapability, runLocalTests } from './local-sandbox.mjs';
+import { sandboxCapability, runLocalTests, validationEnvironment } from './local-sandbox.mjs';
 import { developmentLimits, assertByteBudget, developmentTransportBudget } from './development-limits.mjs';
 import { reconstructPatch, validText } from './development-patch.mjs';
 
@@ -59,7 +61,7 @@ function planOf(s,key) {
 }
 // Routine failures, receipts and notices do not revoke a standing grant. They remain
 // in assignment/review context. Changes to governing decisions do revoke it.
-function authority(s) {return digest(JSON.stringify({owner:s.owner,team:s.team_sha256,records:Object.values(s.records).filter(r=>['intent','decision'].includes(r.kind))}));}
+function authority(s,planId) {return digest(JSON.stringify({owner:s.owner,team:s.team_sha256,records:Object.values(s.records).filter(r=>['intent','decision'].includes(r.kind)&&!presentationOnly(r)&&relevantRecord(s,r,{role:'engineer',context_scope:planId}))}));}
 function authorized(s,p,root=process.cwd()) {
   const scope=p.development.scope;
   if(scope.max_bytes>developmentLimits(root).max_bytes)throw new Error("Configured development ceiling was lowered below this scope; restore configuration or prepare a smaller new scope");
@@ -68,7 +70,7 @@ function authorized(s,p,root=process.cwd()) {
   if(s.paused || p.development.revoked)throw new Error('Development is paused or revoked');
   if(!g)throw new Error('Exact development scope needs founder authorization');
   if(Date.now()>=Date.parse(p.development.scope.expires_at))throw new Error('Development authorization expired');
-  if(g.authority_sha256!==authority(s))throw new Error('Company authority changed; authorize a new scope');
+  if(g.authority_sha256!==authority(s,p.id))throw new Error('Company authority changed; authorize a new scope');
 }
 export function developmentAssignment(s,job,reserve=false,root=process.cwd()) {
   if(!job.development_id)return null;
@@ -111,7 +113,7 @@ export function developmentBundle(s,job,artifact,root=process.cwd()) {
 export function developmentPrompt(s,job,target) {
   if(job.development_id && s.records[job.development_id]?.development.scope.output_format==='patches')return `Bounded local development candidate. Return patches:[{path,base_sha256,edits:[{start,end,text}]}] for EVERY existing write_path. base_sha256 must match the scoped source; offsets are ordered, non-overlapping UTF-16 positions in that exact original text, not shifted by prior edits. For authorized new paths only, use {path,base_sha256:null,content}. No deletion, fuzzy hunks, commands or direct writes. The runtime reconstructs complete retained candidates, validates budgets, runs authorized tests and supplies exact full candidates to independent QA. Return blocked:"reason" without patches if unable. Existing limits and authority remain unchanged.`;
   if(job.development_id)return `Bounded local development candidate. Return complete files:[{path,content}] for EVERY write_path in the supplied scope; keep unchanged files unchanged. No tools, direct edits, installs, network, external actions or test-execution claims. The runtime will create a separate candidate and run the exact authorized Node tests. If requirements cannot be met return blocked:"reason" without files. Repairs retain all previous failures and stay inside the same scope.`;
-  if(target?.development?.type==='test')return `Independent LOCAL DEVELOPMENT acceptance review. Inspect the supplied candidate files, changes, scope, original inputs, and actual runtime test receipt. A model claim is not test evidence. No broad execution or integration authority is granted. Review must include permitted_action:"accept_local_development" (or "hold"), candidate_sha256:"${target.development.candidate_sha256}", receipt_sha256:"${target.development.receipt_sha256}", blockers:[]. Pass only if actual tests passed, evidence fits acceptance and no blockers remain. Preserve failed attempts. You did not independently execute these tests; attribute execution to the runtime.`;
+  if(target?.development?.type==='test')return `Independent LOCAL DEVELOPMENT acceptance review. Inspect the supplied candidate files, changes, scope, original inputs, and actual runtime test receipt. A model claim is not test evidence. Reused receipts explicitly did not execute again; inspect the linked original runtime receipt and applicability. Optionally qualify future exact deterministic reuse only after checking the complete source/tests/environment: include review.deterministic_validation:{permitted_action:"reuse_exact_validation",fingerprint:the supplied validation_fingerprint,dependencies_complete:true,external_state:false}. Omit that field if tests use clock/random/outside state or dependency completeness is unproven. No broad execution or integration authority is granted. Review must include permitted_action:"accept_local_development" (or "hold"), candidate_sha256:"${target.development.candidate_sha256}", receipt_sha256:"${target.development.receipt_sha256}", blockers:[]. Pass only if actual tests passed, evidence fits acceptance and no blockers remain. Preserve failed attempts. You did not independently execute these tests; attribute execution to the runtime.`;
   return '';
 }
 function candidateOf(s,p,key,fresh=true) {
@@ -119,7 +121,7 @@ function candidateOf(s,p,key,fresh=true) {
   if(c?.development?.type!=='candidate' || c.development.plan_id!==p.id || c.status!=='Submitted' || j?.status!=='completed' || (fresh&&!contextMatches(s,j,j.context_sha256)) || j.inputs.some(ref=>s.records[ref.id]?.revision!==ref.revision) || c.development.candidate_sha256!==digest(JSON.stringify(c.development.files)))throw new Error('Candidate is stale, unsubmitted or has invalid integrity');
   return c;
 }
-function candidateDir(root,p,c) {return path.join(folder(root),'.company','development',p.id,c.id,'source');}
+function candidateDir(root,p,c) {if(c.development.validation_directory_relative){const base=path.join(folder(root),'.company','development'),directory=path.resolve(folder(root),c.development.validation_directory_relative);if(!directory.startsWith(base+path.sep))throw Error('Validation directory is outside current project');return directory;}return path.join(folder(root),'.company','development',p.id,c.id,'source');}
 export function makeCandidate(root,p,c) {
   const dir=candidateDir(root,p,c),container=path.dirname(dir);let parent=folder(root);
   for(const part of path.relative(parent,container).split(path.sep)) {parent=path.join(parent,part);noLink(parent);if(!fs.existsSync(parent))fs.mkdirSync(parent,{mode:0o700});}
@@ -186,14 +188,14 @@ export async function developmentAction(a,host) {
         if(Date.now()>=Date.parse(p.development.scope.expires_at))throw new Error('Scope expired');
         sourceMatches(a.root,p);const key=id('development-authorization');
         s.records[key]={id:key,kind:'decision',author_role:'human_founder',recorded_by:a.session_id,revision:1,status:'Recorded',content:requireText(a.source_instruction,'source_instruction'),scope_sha256:a.scope_sha256,plan_id:p.id,created_at:stamp()};
-        p.development.authorization={decision_id:key,authority_sha256:authority(s)};result=p;
+        p.development.authorization={decision_id:key,authority_sha256:authority(s,p.id)};result=p;
       } else if(a.action==='revoke') {
         p.development.revoked={at:stamp(),source_instruction:requireText(a.source_instruction,'source_instruction')};
         for(const j of Object.values(s.jobs))if(j.development_id===p.id&&['queued','running'].includes(j.status))j.status='cancelled';result=p;
       } else if(a.action==='accept') {
         authorized(s,p,a.root);sourceMatches(a.root,p);
         const t=s.records[a.receipt_id],d=t?.development,c=d&&s.records[d.candidate_id],r=s.records[a.review_id],j=r&&s.jobs[r.job_id],v=r?.review;
-        if(d?.type!=='test'||d.plan_id!==p.id||t.status!=='Submitted'||t.author_role!=='runtime'||s.jobs[t.author_instance]?.kind!=='development_test'||s.jobs[t.author_instance]?.status!=='completed'||s.jobs[t.author_instance]?.artifact_id!==t.id||c?.development?.run?.job_id!==t.author_instance||c?.development?.run?.receipt_id!==t.id||d.result.tests_executed!==true||d.result.status!=='passed'||d.result.exit_code!==0||d.receipt_sha256!==digest(JSON.stringify(d.result)))throw new Error('Acceptance requires a valid passing runtime test receipt');
+        if(d?.type!=='test'||d.plan_id!==p.id||t.status!=='Submitted'||t.author_role!=='runtime'||s.jobs[t.author_instance]?.kind!=='development_test'||s.jobs[t.author_instance]?.status!=='completed'||s.jobs[t.author_instance]?.artifact_id!==t.id||c?.development?.run?.job_id!==t.author_instance||c?.development?.run?.receipt_id!==t.id||!validTestExecution(s,t)||d.result.status!=='passed'||d.result.exit_code!==0||d.receipt_sha256!==digest(JSON.stringify(d.result)))throw new Error('Acceptance requires a valid passing runtime test receipt');
         candidateOf(s,p,c?.id,false);verifyCandidate(a.root,p,c);
         if(d.candidate_sha256!==c.development.candidate_sha256||d.receipt_sha256!==a.receipt_sha256)throw new Error('Receipt/candidate mismatch');
         if(r?.kind!=='review'||r.status!=='Submitted'||r.author_role!=='qa'||r.review_of?.id!==t.id||r.review_of.revision!==t.revision||j?.status!=='completed'||!contextMatches(s,j,j.context_sha256)||!j.native_id||j.native_id===s.jobs[c.job_id]?.native_id||r.author_instance===c.author_instance||v?.verdict!=='Pass'||v.permitted_action!=='accept_local_development'||v.candidate_sha256!==d.candidate_sha256||v.receipt_sha256!==d.receipt_sha256||!Array.isArray(v.blockers)||v.blockers.length)throw new Error('A fresh independent QA Pass must accept this exact tested candidate');
@@ -213,7 +215,7 @@ function queueRun(a,host) {
     if(c.development.run)throw new Error('Candidate already has a test attempt; inspect it, never retry uncertain execution');
     if(Object.values(s.jobs).some(j=>j.development_id===p.id&&['queued','running'].includes(j.status)))throw new Error('Scope already has active work');
     c.development.run={job_id:jobId,status:'queued'};
-    s.jobs[jobId]={id:jobId,kind:'development_test',role:'engineer',development_id:p.id,candidate_id:c.id,epoch:s.owner.epoch,session_id:a.session_id,host,status:'queued',created_at:stamp(),inputs:[],native_id:null};return s;
+    s.jobs[jobId]={id:jobId,kind:'development_test',role:'engineer',development_id:p.id,candidate_id:c.id,epoch:s.owner.epoch,session_id:a.session_id,host,...(a.reuse_receipt_id?{reuse_receipt_id:a.reuse_receipt_id}:{}),status:'queued',created_at:stamp(),inputs:[],native_id:null};return s;
   }));
   const failed=error=>withStore(a.root,db=>db.transaction('development.test_spawn_failed',s=>{
     s.jobs[jobId].status='failed';s.jobs[jobId].error=error.message;
@@ -227,28 +229,43 @@ function queueRun(a,host) {
   return withStore(a.root,db=>db.read().jobs[jobId]);
 }
 export async function executeDevelopmentTest(root,jobId) {
-  let a,host,p,c;
+  let a,host,p,c,reuseSource,reuseQualification,validationFingerprint;
   withStore(root,db=>db.transaction('development.test_started',s=>{
     const j=s.jobs[jobId];if(!j||j.kind!=='development_test')throw new Error('Unknown local test job');
     a={root,session_id:j.session_id,epoch:j.epoch};host=j.host;
     owner(s,a.session_id,host,a.epoch);p=planOf(s,j.development_id);authorized(s,p,root);sourceMatches(root,p);c=candidateOf(s,p,j.candidate_id);
     if(j.status!=='queued')throw new Error('Local test is no longer eligible');
+    if(j.reuse_receipt_id){const t=s.records[j.reuse_receipt_id],origin=s.jobs[t?.author_instance],prior=s.records[t?.development?.candidate_id],priorPlan=s.records[t?.development?.plan_id];
+      if(!t||origin?.kind!=='development_test'||origin.status!=='completed'||origin.artifact_id!==t.id||prior?.development?.run?.receipt_id!==t.id||prior.development.run.job_id!==origin.id||t.development.candidate_sha256!==c.development.candidate_sha256||!priorPlan)throw Error('Reuse source lacks canonical completed runtime provenance');
+      if(negativeValidationReview(s,t))throw Error('Validation source has an unresolved negative review');
+      const qa=s.records[t.development.acceptance?.review_id],qaJob=s.jobs[qa?.job_id],reuseVerdict=qa?.review?.deterministic_validation;
+      if(qa?.author_role!=='qa'||qa.status!=='Submitted'||qa.review?.verdict!=='Pass'||qaJob?.status!=='completed'||!qaJob.native_id||qaJob.native_id===s.jobs[prior.job_id]?.native_id||qa.review.candidate_sha256!==t.development.candidate_sha256||qa.review.receipt_sha256!==t.development.receipt_sha256||reuseVerdict?.permitted_action!=='reuse_exact_validation'||reuseVerdict.fingerprint!==t.development.validation_fingerprint||reuseVerdict.dependencies_complete!==true||reuseVerdict.external_state!==false)throw Error('Prior independent QA must explicitly qualify deterministic validation reuse');
+      const directory=candidateDir(root,priorPlan,prior);if(t.development.result.directory!==directory)throw Error('Reuse directory provenance mismatch');
+      c.development.validation_directory_relative=path.relative(folder(root),directory);reuseSource=t;reuseQualification={id:qa.id,revision:qa.revision,sha256:digest(JSON.stringify(qa))};}
     j.status='running';j.started_at=stamp();return s;
   }));
   const abort=new AbortController();let timer,result,stale=false;
   const eligible=()=>withStore(a.root,db=>{const s=db.read();owner(s,a.session_id,host,a.epoch);const current=planOf(s,p.id);authorized(s,current,a.root);if(s.jobs[jobId].status!=='running')throw new Error('Test cancelled');sourceMatches(a.root,current);});
   try {
-    eligible();const directory=makeCandidate(a.root,p,c);verifyCandidate(a.root,p,c);
+    eligible();const directory=reuseSource?candidateDir(a.root,p,c):makeCandidate(a.root,p,c);verifyCandidate(a.root,p,c);
+    const fingerprint=()=>fingerprintValidation({files:c.development.files.map(f=>({path:f.path,sha256:digest(f.content)})),tests:p.development.scope.test_paths,...validationEnvironment(directory,p.development.scope.test_paths),limits:{timeout_ms:p.development.scope.timeout_ms,max_output_bytes:p.development.scope.max_output_bytes}});
+    validationFingerprint=fingerprint();
     timer=setInterval(()=>{try{eligible();}catch{stale=true;abort.abort();}},100);
-    result=await runLocalTests({directory,test_paths:p.development.scope.test_paths,timeout_ms:p.development.scope.timeout_ms,max_output_bytes:p.development.scope.max_output_bytes,signal:abort.signal});
+    if(reuseSource){if(!validateReusableReceipt(reuseSource,validationFingerprint))throw Error('Reuse fingerprint or successful execution evidence does not match');
+      result={...reuseSource.development.result,tests_executed:false,reused:true,reused_from:reuseSource.id,original_tests_executed:true};
+    }else result=await runLocalTests({directory,test_paths:p.development.scope.test_paths,timeout_ms:p.development.scope.timeout_ms,max_output_bytes:p.development.scope.max_output_bytes,signal:abort.signal});
     verifyCandidate(a.root,p,c);
-  } catch(error) {result={status:'failed',exit_code:null,tests_executed:false,error:error.message};}
+    // Fresh library discovery and byte reads bind both actual execution and the
+    // no-execution reuse path. A changed/unknown environment never emits Pass.
+    confirmValidationFingerprint(validationFingerprint,fingerprint());
+  } catch(error) {validationFingerprint=undefined;result={...(result??{exit_code:null,tests_executed:false}),status:'failed',error:error.message};}
   finally {clearInterval(timer);}
   let receipt;
   withStore(a.root,db=>db.transaction('development.test_finished',s=>{
     try{owner(s,a.session_id,host,a.epoch);authorized(s,planOf(s,p.id),a.root);sourceMatches(a.root,p);if(s.jobs[jobId].status!=='running')stale=true;}catch{stale=true;}
     const key=id('test-receipt'),payload={...result,candidate_sha256:c.development.candidate_sha256,test_paths:p.development.scope.test_paths,timeout_ms:p.development.scope.timeout_ms,max_output_bytes:p.development.scope.max_output_bytes,directory:candidateDir(a.root,p,c),finished_at:stamp()};
-    receipt=s.records[key]={id:key,kind:'artifact',author_role:'runtime',author_instance:jobId,revision:1,status:stale?'Quarantined':'Submitted',created_at:stamp(),content:JSON.stringify(payload),development:{type:'test',plan_id:p.id,candidate_id:c.id,candidate_sha256:c.development.candidate_sha256,result:payload,receipt_sha256:digest(JSON.stringify(payload))}};
+    receipt=s.records[key]={id:key,kind:'artifact',author_role:'runtime',author_instance:jobId,revision:1,status:stale?'Quarantined':'Submitted',created_at:stamp(),content:JSON.stringify(payload),development:{type:'test',...(validationFingerprint?{validation_fingerprint:validationFingerprint}:{}),...(reuseSource?{reused_from:reuseSource.id,reuse_qualification:reuseQualification}:{}),plan_id:p.id,candidate_id:c.id,candidate_sha256:c.development.candidate_sha256,result:payload,receipt_sha256:digest(JSON.stringify(payload))}};
+    if(reuseSource)s.records[c.id].development.validation_directory_relative=c.development.validation_directory_relative;
     s.records[c.id].development.run={job_id:jobId,status:stale?'quarantined':'completed',receipt_id:key};
     Object.assign(s.jobs[jobId],{status:stale?'quarantined':'completed',finished_at:stamp(),artifact_id:key});
     if(stale)notice(s,'must_know','Local test outcome was retained but authority changed; no acceptance is granted.',key);
@@ -267,3 +284,13 @@ if(process.argv[1] && path.resolve(process.argv[1])===fileURLToPath(import.meta.
     }return s;
   }));}
 }
+
+function validTestExecution(state,receipt) {
+  const d=receipt?.development,r=d?.result;if(!d||!r)return false;
+  if(!d.reused_from)return r.tests_executed===true&&r.reused!==true;
+  const qualification=state.records[d.reuse_qualification?.id];if(!qualification||digest(JSON.stringify(qualification))!==d.reuse_qualification.sha256)return false;
+  const origin=state.records[d.reused_from],j=state.jobs[origin?.author_instance],c=state.records[origin?.development?.candidate_id];
+  return r.reused===true&&r.tests_executed===false&&r.reused_from===origin?.id&&j?.kind==='development_test'&&j.status==='completed'&&j.artifact_id===origin.id&&c?.development?.run?.receipt_id===origin.id&&c.development.run.job_id===j.id&&d.candidate_sha256===origin.development.candidate_sha256&&!negativeValidationReview(state,origin)&&validateReusableReceipt(origin,d.validation_fingerprint);
+}
+
+function negativeValidationReview(state,receipt){return Object.values(state.records).some(r=>r.status==='Submitted'&&r.review_of?.id===receipt.id&&r.review_of?.revision===receipt.revision&&['Fail','Blocked'].includes(r.review?.verdict));}

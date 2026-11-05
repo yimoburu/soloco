@@ -480,7 +480,7 @@ test('selected dispatch reaches the host, rotates on model/effort/reset, retains
   const fake=selectionHost(),oldPath=process.env.PATH;process.env.PATH=fake.bin+path.delimiter+oldPath;
   try {
     const a=setup(),first=await selectionRun(a,{model_selection:selected()});
-    assert.equal(first.job.status,'completed',first.job.error);assert.equal(first.job.context_format,2);
+    assert.equal(first.job.status,'completed',first.job.error);assert.equal(first.job.context_format,3);
     assert.equal(first.job.model_selection.model,'test-small');assert.equal(first.job.cli_version,'codex-cli selection-test');
     assert.equal(first.job.model_evidence.verification,'unverified');assert.deepEqual(first.job.model_evidence.reported_models,[]);
     const same=await selectionRun(a,{model_selection:selected({reason:'Different explanation, same settings'})});
@@ -625,7 +625,7 @@ test('new dispatch metadata reaches the actual synthetic worker and changes assi
     assert.equal(pack.assignment.expected_deliverable,job.expected_deliverable);
     assert.deepEqual(pack.assignment.requester,job.requester);
     for(const changed of [{...job,expected_deliverable:'Different output'},{...job,requester:{...job.requester,session_id:'other'}}])assert.notEqual(assignmentContext(s,changed).hash,context.hash);
-    const {expected_deliverable,requester,...historical}=job;
+    const {expected_deliverable,requester,...oldJob}=job;const historical={...oldJob,context_format:2};
     const oldPack=JSON.parse(assignmentContext(s,historical).text);
     const {assignment,...rest}=oldPack;
     const legacyAssignment={task:historical.task,task_summary:historical.task_summary??null,next_handoff:historical.next_handoff??null,model_selection:historical.model_selection??{mode:'default'},model_catalog:historical.model_catalog??null};

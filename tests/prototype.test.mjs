@@ -316,3 +316,12 @@ test('v0.18 pinned company retains its original prototype grant across source up
   assert.deepEqual(after.records[decision],before.records[decision]);
   assert.equal(after.upgrade,undefined);
 });
+
+test('supported pure rename preserves prototype authority; unknown preferences stay binding',async()=>{
+ const a=setup(),p=plan(a);await authorize(a,p);const name=read(a).name;
+ engine.control({...a,action:'rename',name:'Renamed Fixture',expected_name:name,expected_epoch:1,source_instruction:'Rename the company to Renamed Fixture'},'codex');
+ assert.doesNotThrow(()=>queue(a,{prototype_id:p.id}));
+ const b=setup(),q=plan(b);await authorize(b,q);
+ engine.save({...b,kind:'preference',content:'New unknown condition',basis:'explicit',source_reference:'Founder'},'codex');
+ assert.throws(()=>queue(b,{prototype_id:q.id}),/authority|constraints/);
+});

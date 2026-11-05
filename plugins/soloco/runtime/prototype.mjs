@@ -1,3 +1,4 @@
+import {presentationOnly,relevantRecord} from './current-state.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { VERSION, V018_GOVERNANCE_SHA256, installedTeam, digest, id, stamp, requireText, withStore, owner, folder, noLink, notice } from './store.mjs';
@@ -59,7 +60,7 @@ function planOf(s, planId) {
 // Bind permission to company constraints, notices, ownership and team, not delivery bookkeeping.
 function environment(s,planId) {
   return digest(JSON.stringify({team:s.team_sha256,owner:s.owner,
-    records:Object.values(s.records).filter(r=>['intent','decision','preference'].includes(r.kind) || (['Fail','Blocked'].includes(r.review?.verdict) && s.records[r.review_of?.id]?.prototype?.plan_id!==planId)),
+    records:Object.values(s.records).filter(r=>!presentationOnly(r)&&relevantRecord(s,r,{role:'engineer',context_scope:planId})&&(['intent','decision','preference'].includes(r.kind) || (['Fail','Blocked'].includes(r.review?.verdict) && s.records[r.review_of?.id]?.prototype?.plan_id!==planId))),
     notices:s.notices.filter(n=>!n.resolution).map(({deliveries,seen_at,...n})=>n)}));
 }
 function authorized(s,p) {

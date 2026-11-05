@@ -1,0 +1,342 @@
+{
+  "protocol": {
+    "version": 1,
+    "declared_before_trials": true,
+    "archive_counts": [
+      10,
+      100,
+      1000
+    ],
+    "active_obligations": 4,
+    "read_iterations": 30,
+    "token_iterations": 300,
+    "small_write_iterations": 15,
+    "fixed_supplemental_reads": 1,
+    "acceptance": {
+      "obligation_recall": 1,
+      "bounded_context_max_growth_ratio": 1.1,
+      "current_upgrade_max_growth_ratio": 1.1,
+      "backup_readback_exact": true,
+      "stale_acceptance_rejected": true,
+      "archive_payload_unchanged": true
+    },
+    "timing_acceptance": "Diagnostic distributions only; no timing pass threshold or production speedup claim",
+    "actual_model_calls": 0,
+    "actual_model_tokens": null,
+    "model_quality_evaluation": "Not performed by this deterministic benchmark",
+    "bootstrap_cost": "Fixture classifications stand in for already retained independent review; no bootstrap work is hidden as model savings"
+  },
+  "environment": {
+    "node": "v25.2.1",
+    "platform": "darwin",
+    "arch": "arm64",
+    "os_release": "27.0.0"
+  },
+  "rows": [
+    {
+      "archive_scale": 1,
+      "archive_decisions": 10,
+      "historical_attempts": 10,
+      "stored_json_bytes": 46083,
+      "ordinary": {
+        "legacy": {
+          "characters": 11845,
+          "overflow": false
+        },
+        "bounded_characters": 937,
+        "obligation_recall": 1,
+        "retrieval_characters": 1110,
+        "stale_supplement_rejected": true
+      },
+      "upgrade": {
+        "baseline": {
+          "elapsed_ms": 16.260875,
+          "pages": 1,
+          "delivered_page_characters": 105949,
+          "mandatory_cos_qa_page_visits": 2,
+          "model_calls_executed": 0
+        },
+        "current": {
+          "elapsed_ms": 79.18308299999995,
+          "pages": 1,
+          "delivered_page_characters": 11515,
+          "mandatory_cos_qa_page_visits": 2,
+          "model_calls_executed": 0
+        }
+      },
+      "storage": {
+        "legacy_full_read": {
+          "median_ms": 0.0997910000000104,
+          "p95_ms": 0.6670410000000118,
+          "iterations": 30
+        },
+        "full_json_serialization": {
+          "median_ms": 0.06037500000000762,
+          "p95_ms": 0.765790999999993,
+          "iterations": 30
+        },
+        "normalized_full_read": {
+          "median_ms": 2.277500000000032,
+          "p95_ms": 28.976249999999993,
+          "iterations": 30
+        },
+        "normalized_selected_read": {
+          "median_ms": 0.15470799999997098,
+          "p95_ms": 1.7576250000000186,
+          "iterations": 30
+        },
+        "idle_event_token": {
+          "median_ms": 0.005166999999971722,
+          "p95_ms": 0.02466599999996788,
+          "iterations": 300
+        },
+        "three_simulated_watcher_tokens": {
+          "median_ms": 0.016000000000019554,
+          "p95_ms": 0.028332999999975073,
+          "iterations": 100
+        },
+        "notice_selected_write": {
+          "median_ms": 1.0066249999999854,
+          "p95_ms": 12.342416000000014,
+          "iterations": 15
+        },
+        "notice_writer_lock_ms": [
+          12.177166999999997,
+          2.5208339999999794,
+          1.438666000000012,
+          0.42908299999999144,
+          1.7460000000000377,
+          2.49670900000001,
+          0.30820799999997917,
+          0.98275000000001,
+          0.5202909999999861,
+          1.204417000000035,
+          0.33395799999999554,
+          0.5266250000000241,
+          0.9087910000000079,
+          0.7042079999999942,
+          0.28924999999998136
+        ],
+        "db_file_bytes": 4096,
+        "wal_file_bytes": 688072,
+        "immutable_value_count": 160,
+        "process_memory_snapshot_bytes": {
+          "rss": 67272704,
+          "heap_used": 8603304
+        },
+        "migration_ms": 12.366124999999997,
+        "backup_ms": 7.139499999999998,
+        "restore_ms": 1.0483330000000137,
+        "exact_restore": true,
+        "archive_payload_unchanged": true,
+        "all_simulated_watchers_observed_change": true
+      }
+    },
+    {
+      "archive_scale": 10,
+      "archive_decisions": 100,
+      "historical_attempts": 100,
+      "stored_json_bytes": 465303,
+      "ordinary": {
+        "legacy": {
+          "characters": 117415,
+          "overflow": false
+        },
+        "bounded_characters": 937,
+        "obligation_recall": 1,
+        "retrieval_characters": 1110,
+        "stale_supplement_rejected": true
+      },
+      "upgrade": {
+        "baseline": {
+          "elapsed_ms": 174.3872919999999,
+          "pages": 9,
+          "delivered_page_characters": 971030,
+          "mandatory_cos_qa_page_visits": 18,
+          "model_calls_executed": 0
+        },
+        "current": {
+          "elapsed_ms": 416.41075,
+          "pages": 1,
+          "delivered_page_characters": 11565,
+          "mandatory_cos_qa_page_visits": 2,
+          "model_calls_executed": 0
+        }
+      },
+      "storage": {
+        "legacy_full_read": {
+          "median_ms": 3.998291999999992,
+          "p95_ms": 22.48950000000002,
+          "iterations": 30
+        },
+        "full_json_serialization": {
+          "median_ms": 3.623874999999998,
+          "p95_ms": 23.640375000000063,
+          "iterations": 30
+        },
+        "normalized_full_read": {
+          "median_ms": 12.964958000000024,
+          "p95_ms": 49.25975000000017,
+          "iterations": 30
+        },
+        "normalized_selected_read": {
+          "median_ms": 0.0889159999999265,
+          "p95_ms": 1.9310829999999441,
+          "iterations": 30
+        },
+        "idle_event_token": {
+          "median_ms": 0.005249999999932697,
+          "p95_ms": 0.013666999999941254,
+          "iterations": 300
+        },
+        "three_simulated_watcher_tokens": {
+          "median_ms": 0.014917000000195912,
+          "p95_ms": 0.06862500000011096,
+          "iterations": 100
+        },
+        "notice_selected_write": {
+          "median_ms": 0.3550829999999223,
+          "p95_ms": 2.8969999999999345,
+          "iterations": 15
+        },
+        "notice_writer_lock_ms": [
+          2.8716249999999945,
+          0.29666599999995924,
+          1.3280840000002172,
+          0.6443329999999605,
+          0.22562500000003638,
+          0.38645900000005895,
+          0.3262079999999514,
+          1.2811659999999847,
+          0.32408399999985704,
+          0.247333000000026,
+          0.20462500000007822,
+          0.19612499999993815,
+          0.34741699999995035,
+          0.2122910000000502,
+          0.6008750000000873
+        ],
+        "db_file_bytes": 4096,
+        "wal_file_bytes": 2134192,
+        "immutable_value_count": 1053,
+        "process_memory_snapshot_bytes": {
+          "rss": 132874240,
+          "heap_used": 24431888
+        },
+        "migration_ms": 90.58100000000013,
+        "backup_ms": 15.209375000000136,
+        "restore_ms": 3.7206249999999272,
+        "exact_restore": true,
+        "archive_payload_unchanged": true,
+        "all_simulated_watchers_observed_change": true
+      }
+    },
+    {
+      "archive_scale": 100,
+      "archive_decisions": 1000,
+      "historical_attempts": 1000,
+      "stored_json_bytes": 4773603,
+      "ordinary": {
+        "legacy": {
+          "characters": null,
+          "overflow": true,
+          "reason": "Assignment context exceeds 200000 characters; narrow the assignment or review and compact records. Nothing was truncated"
+        },
+        "bounded_characters": 937,
+        "obligation_recall": 1,
+        "retrieval_characters": 1110,
+        "stale_supplement_rejected": true
+      },
+      "upgrade": {
+        "baseline": {
+          "elapsed_ms": 652.5372500000012,
+          "pages": 82,
+          "delivered_page_characters": 9779691,
+          "mandatory_cos_qa_page_visits": 164,
+          "model_calls_executed": 0
+        },
+        "current": {
+          "elapsed_ms": 7494.696959000001,
+          "pages": 1,
+          "delivered_page_characters": 11616,
+          "mandatory_cos_qa_page_visits": 2,
+          "model_calls_executed": 0
+        }
+      },
+      "storage": {
+        "legacy_full_read": {
+          "median_ms": 23.679959000000053,
+          "p95_ms": 90.96233299999994,
+          "iterations": 30
+        },
+        "full_json_serialization": {
+          "median_ms": 19.573875000000044,
+          "p95_ms": 74.16699999999992,
+          "iterations": 30
+        },
+        "normalized_full_read": {
+          "median_ms": 53.425208999999086,
+          "p95_ms": 67.96779200000128,
+          "iterations": 30
+        },
+        "normalized_selected_read": {
+          "median_ms": 0.07070899999962421,
+          "p95_ms": 0.2292090000009921,
+          "iterations": 30
+        },
+        "idle_event_token": {
+          "median_ms": 0.004750000000058208,
+          "p95_ms": 0.0061659999992116354,
+          "iterations": 300
+        },
+        "three_simulated_watcher_tokens": {
+          "median_ms": 0.016792000000350527,
+          "p95_ms": 0.06112500000017462,
+          "iterations": 100
+        },
+        "notice_selected_write": {
+          "median_ms": 0.25,
+          "p95_ms": 0.47299999999995634,
+          "iterations": 15
+        },
+        "notice_writer_lock_ms": [
+          0.44695800000044983,
+          0.31437499999992724,
+          0.21629199999915727,
+          0.23433299999851442,
+          0.2428749999999127,
+          0.28270900000097754,
+          0.21062499999970896,
+          0.20779100000072503,
+          0.21149999999943248,
+          0.2200830000001588,
+          0.2376669999994192,
+          0.2686249999987922,
+          0.2193330000009155,
+          0.34337500000037835,
+          0.2135420000013255
+        ],
+        "db_file_bytes": 13881344,
+        "wal_file_bytes": 9162912,
+        "immutable_value_count": 10051,
+        "process_memory_snapshot_bytes": {
+          "rss": 380338176,
+          "heap_used": 271299536
+        },
+        "migration_ms": 942.4209169999995,
+        "backup_ms": 123.02629200000047,
+        "restore_ms": 23.517166999999972,
+        "exact_restore": true,
+        "archive_payload_unchanged": true,
+        "all_simulated_watchers_observed_change": true
+      }
+    }
+  ],
+  "limitations": [
+    "Scripted exact-provenance fixture dispositions are not live independent model review.",
+    "Page visits are deterministic planned delivery counts, not executed model calls, reported tokens or billed usage.",
+    "Watcher checks simulate three token readers; they are not three real worker sessions or cancellation-latency evidence.",
+    "Backup scope is .company plus explicitly selected external artifacts; completeness of prose references requires separate review.",
+    "These local measurements provide no statistical production latency, hardware-capacity, or time-to-accepted-outcome guarantee."
+  ]
+}

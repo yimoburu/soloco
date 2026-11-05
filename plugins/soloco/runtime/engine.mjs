@@ -1,3 +1,5 @@
+import {backupCompany,restoreCompany} from './storage-transfer.mjs';
+import {contextPlan,validateContextPlan,recordReference,contextRead,contextSource} from './current-state.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -8,7 +10,7 @@ import { normalizeSelection, selectionKey, activityFor, selectionUsage } from '.
 import { normalizeCoordination, bindCoordination, resourceClaims } from './coordination.mjs';
 import { progressSnapshot, renderProgress } from './progress-view.mjs';
 import { beginHandover, submitReconstruction, handoverReviewEligible, verifyHandoverAcceptance, handoverSubject } from './handover.mjs';
-import { assignmentContext } from './context.mjs';
+import { assignmentContext, contextMatches } from './context.mjs';
 import { developmentAction, developmentCapability, developmentAssignment } from './develop.mjs';
 import { prototypeAction, prototypeCapability, prototypeAssignment } from './prototype.mjs';
 import { TIMEOUT_POLICY_VERSION, normalizeTimeout, jobTimeoutState } from './timeout.mjs';
@@ -51,10 +53,10 @@ function summary(state,root=process.cwd()) {
 }
 export function develop(args,host) { binding(args,host); return developmentAction(args,host); }
 export function prototype(args,host) { binding(args,host); return prototypeAction(args,host); }
-function update(args, host, type, fn) {
+function update(args, host, type, fn, selection=null) {
   binding(args,host);
   if (!Number.isInteger(args.epoch)) throw new Error('Supply the current ownership epoch from company_status');
-  return withStore(args.root, db => db.transaction(type, state => {owner(state,args.session_id,host,args.epoch); fn(state); return state;}));
+  return withStore(args.root, db => {const mutate=state=>{owner(state,args.session_id,host,args.epoch);fn(state);return state;};return selection&&db.selectedTransaction?db.selectedTransaction(type,selection,mutate):db.transaction(type,mutate);});
 }
 export function open(args, host) {
   binding(args,host);
@@ -128,7 +130,7 @@ export function save(args,host) {
     if (!old && args.expected_revision !== undefined && args.expected_revision !== 0) throw new Error('Record does not exist at expected version');
     s.records[recordId]={id:recordId,kind:args.kind,content:args.content,author_role:'runner',author_instance:s.owner.session_id,revision:(old?.revision??0)+1,status:'Draft',source_reference:args.source_reference??null,basis:args.basis??null,updated_at:stamp(),previous:old ? [...(old.previous??[]), {revision:old.revision,content:old.content,source_reference:old.source_reference}] : []};
     // An amended artifact never retains a review of its earlier version.
-  });
+  },{rootKeys:['schema','runtime_version','plugin_version','team_sha256','owner','paused','roles','governance','governance_sha256','cos_instructions','revision','updated_at'],entities:{records:[recordId],upgrade:['status']}});
   return state.records[recordId];
 }
 export function handover(args,host) {
@@ -142,6 +144,7 @@ export function dispatch(args,host) {
   if (!Number.isInteger(args.epoch)) throw new Error('Supply the current ownership epoch from company_status');
   if(args.task_summary!==undefined)requireText(args.task_summary,'task_summary',160);
   if(args.expected_deliverable!==undefined)requireText(args.expected_deliverable,'expected_deliverable',300);
+  if(args.evidence_ids!==undefined&&(!Array.isArray(args.evidence_ids)||args.evidence_ids.length>100||args.evidence_ids.some(id=>typeof id!=='string')||new Set(args.evidence_ids).size!==args.evidence_ids.length))throw Error('Choose up to100 unique supplemental source IDs');
   if(args.next_handoff!==undefined)requireText(args.next_handoff,'next_handoff',200);
   const timeout=normalizeTimeout({timeout_ms:args.timeout_ms,timeout_reason:args.timeout_reason});
   if (args.role==='runner') throw new Error('Choose a specialist role from company_open');
@@ -173,7 +176,7 @@ export function dispatch(args,host) {
     const coordination=bindCoordination(s,args);
     const inputs=[...new Set([...(args.input_ids??[]),...handoverInputs,...(coordination?.dependencies??[]).map(d=>d.artifact_id)])];
     if(!Array.isArray(inputs) || inputs.some(k=>typeof k!=='string' || !Object.hasOwn(s.records,k))) throw new Error('An input record is missing');
-    const job={...(coordination?{coordination}:{}),...(args.expected_deliverable===undefined?{}:{expected_deliverable:args.expected_deliverable}),requester:{role:'runner',session_id:s.owner.session_id,host:s.owner.host,epoch:s.owner.epoch},id:jobId,role:args.role,session_key:key,instance_id:session.instance_id,native_id:session.native_id,host,epoch:s.owner.epoch,status:'queued',task:args.task,context_format:2,timeout_policy_version:TIMEOUT_POLICY_VERSION,...timeout,model_selection:selection,cli_version:check.version,task_summary:args.task_summary??null,next_handoff:args.next_handoff??null,...(catalog?{model_catalog:{source:catalog.source,...(selection.mode==='explicit'?{model:catalog.models.find(m=>m.id===selection.model)}:{}),speed_support:catalog.speed_support}}:{}),inputs:inputs.map(k=>({id:k,revision:s.records[k].revision})),review_of:target?{id:target.id,revision:target.revision}:null,...(args.prototype_id?{prototype_id:args.prototype_id}:{}),...(args.development_id?{development_id:args.development_id}:{}),created_at:stamp()};
+    const job={...(coordination?{coordination}:{}),...(args.expected_deliverable===undefined?{}:{expected_deliverable:args.expected_deliverable}),requester:{role:'runner',session_id:s.owner.session_id,host:s.owner.host,epoch:s.owner.epoch},id:jobId,role:args.role,session_key:key,instance_id:session.instance_id,native_id:session.native_id,host,epoch:s.owner.epoch,status:'queued',task:args.task,...(args.evidence_ids?{supplemental_sources:args.evidence_ids.map(key=>{const value=contextSource(s,key);if(!value)throw Error('Supplemental source missing');return recordReference(value,key);})}:{}),context_format:3,...(args.context_scope?{context_scope:requireText(args.context_scope,'context_scope',160)}:{}),timeout_policy_version:TIMEOUT_POLICY_VERSION,...timeout,model_selection:selection,cli_version:check.version,task_summary:args.task_summary??null,next_handoff:args.next_handoff??null,...(catalog?{model_catalog:{source:catalog.source,...(selection.mode==='explicit'?{model:catalog.models.find(m=>m.id===selection.model)}:{}),speed_support:catalog.speed_support}}:{}),inputs:inputs.map(k=>({id:k,revision:s.records[k].revision})),review_of:target?{id:target.id,revision:target.revision}:null,...(args.prototype_id?{prototype_id:args.prototype_id}:{}),...(args.development_id?{development_id:args.development_id}:{}),created_at:stamp()};
     prototypeAssignment(s,job,true);developmentAssignment(s,job,true,args.root);
     const context=assignmentContext(s,job);
     s.jobs[jobId]={...job,inputs:context.inputs,context_sha256:context.hash};
@@ -243,4 +246,55 @@ export function message(args,host) {
   requireText(args.content,'content');
   const s=update(args,host,'message.sent',s=>{if(!Object.hasOwn(s.roles,args.to)) throw new Error('Unknown recipient role');s.messages.push({id:id('message'),from:'runner',author_instance:s.owner.session_id,to:args.to,content:args.content,at:stamp()});});
   return s.messages.at(-1);
+}
+
+// Explicit operations only. Neither API is called automatically on an existing company.
+export function contextControl(args,host) {
+  binding(args,host);
+  if(args.action==='inspect')return withStore(args.root,db=>{
+    const s=db.read();const offset=args.offset??0,limit=args.limit??50;
+    if(!Number.isInteger(offset)||offset<0||!Number.isInteger(limit)||limit<1||limit>100)throw Error('Invalid context index window');
+    const records=[...Object.values(s.records).map(r=>recordReference(r)),...Object.values(s.jobs).map(j=>recordReference(j,'job:'+j.id)),...(s.upgrade_history??[]).map(u=>recordReference(u,'upgrade:'+u.id))];return {sources:records.slice(offset,offset+limit),total:records.length,offset,limit,classifications:Object.fromEntries(records.slice(offset,offset+limit).filter(r=>s.context_classifications?.[r.id]).map(r=>[r.id,s.context_classifications[r.id]]))};
+  });
+  if(args.action==='read')return withStore(args.root,db=>contextRead(db.read(),args));
+  if(!['plan','apply'].includes(args.action))throw Error('Choose context inspect, read, plan or apply');
+  const s=update(args,host,'context.'+args.action,state=>{
+    requireText(args.source_instruction,'source_instruction');
+    if(args.action==='plan'){
+      const plan=contextPlan(state,args),key=id('context-plan');
+      state.records[key]={id:key,kind:'plan',revision:1,status:'Draft',author_role:'runner',author_instance:args.session_id,content:'Proposed context applicability; not an authority or resolution by itself.',context_classification_plan:plan,source_reference:args.source_instruction,created_at:stamp()};
+      state.context_last_plan=key;
+    }else{
+      const plan=state.records[args.plan_id],r=state.records[args.review_id],j=state.jobs[r?.job_id],v=r?.review;
+      if(!plan?.context_classification_plan)throw Error('Context plan missing');
+      validateContextPlan(state,plan.context_classification_plan);
+      if(r?.status!=='Submitted'||r.author_role!=='qa'||j?.status!=='completed'||r.review_of?.id!==plan.id||r.review_of?.revision!==plan.revision||v?.verdict!=='Pass'||v.permitted_action!=='apply_context_classification'||v.plan_sha256!==digest(JSON.stringify(plan.context_classification_plan))||!Array.isArray(v.blockers)||v.blockers.length||!j.native_id||r.author_instance===plan.author_instance||!contextMatches(state,j,j.context_sha256))throw Error('Fresh independent exact-plan classification Pass required');
+      if(j.native_id===plan.author_instance||j.native_id===state.owner.session_id)throw Error('Classification must use a separate native reviewer');
+      if(Object.values(state.records).some(x=>x.status==='Submitted'&&x.review_of?.id===plan.id&&x.review_of?.revision===plan.revision&&['Fail','Blocked'].includes(x.review?.verdict)))throw Error('Classification plan retains a negative review; prepare a repaired plan with the failure evidence');
+      const c=plan.context_classification_plan;
+      for(const ref of c.sources){
+        const value=contextSource(state,ref.id);if(value?.author_instance===j.instance_id||value?.author_instance===j.native_id||state.jobs[value?.job_id]?.native_id===j.native_id)throw Error('Classification reviewer owns source evidence');
+        if(state.records[ref.id]&&j.inputs.some(i=>i.id===ref.id&&i.revision===ref.revision))continue;
+        const total=JSON.stringify(contextSource(state,ref.id)).length;let end=0;
+        for(const read of (j.retrieved_inputs??[]).filter(r=>r.id===ref.id&&r.sha256===ref.sha256).sort((a,b)=>a.offset-b.offset)){if(read.offset>end)break;end=Math.max(end,read.offset+read.length);}
+        if(end<total)throw Error('Classification reviewer did not receive complete exact source '+ref.id);
+      }
+      state.context_classifications??={};
+      for(const source of c.sources)state.context_classifications[source.id]={source,disposition:c.disposition,roles:c.roles,scopes:c.scopes,plan:recordReference(plan),review:recordReference(r),source_instruction:args.source_instruction,at:stamp()};
+    }
+  });
+  return args.action==='plan'?s.records[s.context_last_plan]:{classifications:s.context_classifications};
+}
+export function storageControl(args,host) {
+  binding(args,host);
+  return withStore(args.root,db=>{
+    if(args.action==='inspect')return db.storageInfo();
+    if(!['migrate','backup','restore'].includes(args.action))throw Error('Choose storage inspect, migrate, backup or restore');
+    const s=db.read();owner(s,args.session_id,host,args.epoch);requireText(args.source_instruction,'source_instruction');
+    if(!s.paused||busy(s).length)throw Error('Pause and reconcile before explicit storage migration');
+    if(Object.values(s.jobs).some(j=>(j.status==='cancelled'&&!j.finished_at)||(j.timeout_reconciliation?.termination_confirmed===false&&!j.artifact_id)))throw Error('Uncertain worker execution must reach a terminal retained receipt before storage transfer or migration');
+    if(args.action==='backup')return backupCompany(db,args.directory,{artifacts:args.artifacts});
+    if(args.action==='restore'){const restored=restoreCompany(args.backup_dir,args.directory);return withStore(restored.directory,r=>{if(digest(JSON.stringify(r.read()))!==restored.manifest.state_sha256)throw Error('Restored company state differs from backup');return {...restored,readback_verified:true};});}
+    return db.migrate();
+  });
 }

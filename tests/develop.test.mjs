@@ -393,3 +393,45 @@ test('patch shape, exact base and scope violations fail without creating a mater
   assert.equal(fs.existsSync(path.join(a.root,'.company','development')),false);
   assert.equal(fs.readFileSync(path.join(a.root,'sum.mjs'),'utf8'),'export const sum = values => 0;\n');
 });
+
+test('supported pure rename preserves a development grant but unknown decisions still revoke',live,async()=>{
+ const a=setup(),p=await plan(a);await authorize(a,p);const name=read(a).name;
+ engine.control({...a,action:'rename',name:'Renamed Fixture',expected_name:name,expected_epoch:1,source_instruction:'Rename the company to Renamed Fixture'},'codex');
+ const candidate=await generate(a,p);assert.equal(candidate.status,'Submitted');
+ engine.save({...a,kind:'decision',content:'New unknown material condition'},'codex');
+ assert.throws(()=>queue(a,{development_id:p.id}),/authority changed/);
+});
+test('actual qualified validation reuse retains original execution and still requires new independent QA',live,async()=>{
+ const a=setup(),p=await plan(a);await authorize(a,p);const first=await generate(a,p),receipt=await run(a,p,first);
+ assert.equal(receipt.development.result.status,'passed');assert.ok(receipt.development.validation_fingerprint);
+ const qa=await review(a,receipt,{extra:{deterministic_validation:{permitted_action:'reuse_exact_validation',fingerprint:receipt.development.validation_fingerprint,dependencies_complete:true,external_state:false}}});
+ await accept(a,p,receipt,qa);
+ const second=await generate(a,p);
+ const job=await engine.develop({...a,action:'run',plan_id:p.id,candidate_id:second.id,reuse_receipt_id:receipt.id},'codex');
+ const ended=await waitJob(a,job.id),reuse=ended.receipt;
+ assert.ok(reuse,JSON.stringify(ended.job));assert.equal(reuse.development.result.reused,true,JSON.stringify(reuse));assert.equal(reuse.development.result.tests_executed,false);
+ assert.equal(reuse.development.reused_from,receipt.id);
+ await assert.rejects(accept(a,p,reuse,qa),/review|QA/);
+ const nextQa=await review(a,reuse);const accepted=await accept(a,p,reuse,nextQa);assert.equal(accepted.source_integrated,false);
+ await review(a,receipt,{verdict:'Fail'});const third=await generate(a,p);
+ const denied=await engine.develop({...a,action:'run',plan_id:p.id,candidate_id:third.id,reuse_receipt_id:receipt.id},'codex');const held=await waitJob(a,denied.id);assert.equal(held.job.status,'failed');assert.match(held.job.error,/negative review/);
+});
+test('unchanged-state polling still cancels generation at scope expiry',live,async()=>{
+ const a=setup(),p=await plan(a,{expires_at:new Date(Date.now()+500).toISOString()});await authorize(a,p);
+ const key=queue(a,{development_id:p.id});const started=Date.now();
+ await work(a.root,key,async(_host,_native,_prompt,_dir,_timeout,_selection,options)=>{
+  await new Promise(resolve=>{const timer=setTimeout(resolve,2500);options.signal.addEventListener('abort',()=>{clearTimeout(timer);resolve();},{once:true});});
+  return output({files:good});
+ });
+ const current=read(a).jobs[key];assert.equal(current.status,'quarantined');assert.match(current.execution_failure.message,/expired/);assert.ok(Date.now()-started<2000);
+});
+test('post-execution input tampering holds the receipt while retaining actual executed evidence',live,async()=>{
+ const a=setup(),p=await plan(a);await authorize(a,p);
+ const files=[good[0],{path:'sum.test.mjs',content:"import test from 'node:test';import fs from 'node:fs';import path from 'node:path';test('host race fixture',async()=>{fs.writeFileSync(path.join(process.env.HOME,'started'),'1');await new Promise(r=>setTimeout(r,500));});"}];
+ const c=await generate(a,p,{files}),job=await engine.develop({...a,action:'run',plan_id:p.id,candidate_id:c.id},'codex');
+ const directory=path.join(a.root,'.company','development',p.id,c.id,'source'),marker=path.join(directory,'.scratch','started'),until=Date.now()+10000;
+ while(!fs.existsSync(marker)&&Date.now()<until)await new Promise(r=>setTimeout(r,10));
+ assert.ok(fs.existsSync(marker),'actual isolated test started');fs.chmodSync(path.join(directory,'sum.mjs'),0o600);fs.writeFileSync(path.join(directory,'sum.mjs'),'changed by authorized host fixture');
+ const ended=await waitJob(a,job.id),result=ended.receipt.development.result;
+ assert.equal(result.status,'failed');assert.equal(result.tests_executed,true);assert.match(result.error,/changed|mismatch/);assert.equal(ended.receipt.development.validation_fingerprint,undefined);
+});
