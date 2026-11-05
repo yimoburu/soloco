@@ -1,6 +1,6 @@
 # SoloCo
 
-**v0.18 · Company contract**
+**v0.19 · Company contract**
 
 A founder brings an idea and runs a company through one conversation with a Chief of Staff and a team of standalone AI agents. The company outlives its agents, tools, and team versions.
 
@@ -69,7 +69,7 @@ Before consequential work, agree on the claim or outcome, acceptance evidence, l
 
 **Pass** means the named conditions and required reviews are satisfied with no open block. **Fail** means a condition is unmet. **Blocked** means evidence, review, capability, or authority is missing. Record ownership, deadlines, and the permitted next action. Repairs remain within bounded authority; exhaustion holds the work. A missed business target alone authorizes neither a pivot nor shutdown.
 
-Required evidence and independent review precede reserved founder authorization, which precedes execution. Permission covers only its reviewed scope and candidate within current limits. Exceptions retain failed verdicts and require named authority, bounds, expiry, and a safe hold. No approval enables an unsupported capability.
+Evidence and independent reviews required for a reserved founder authorization precede that authorization. Founder authorization precedes its covered execution and may provide standing scope for bounded work and routine repairs. Candidate-specific evidence and reviews precede the actions for which they are required. Permission remains limited to its stated scope and actions within current limits. Candidate-specific permissions and approvals remain bound to the exact reviewed candidate. Exceptions retain failed verdicts and require named authority, bounds, expiry, and a safe hold. No approval enables an unsupported capability.
 
 Preparation may include an explicitly supported, independently reviewed, founder-authorized local artifact workflow without granting broader business authority. Its permission must identify scope, inputs, acceptance, limits, and stop conditions; review the exact output before applying it. Creating an artifact does not authorize running, integrating, deploying, or exposing it. Disclose what was actually verified and preserve uncertain or partial results without blind retries.
 
@@ -91,7 +91,7 @@ Company identity, name, objectives, records, preferences, obligations, permissio
 
 Keep company records independent of installation caches and session histories. Compatible software updates may operate existing state while preserving pinned instructions. Installation alone adopts no new team, governance, or authority. Incompatible changes require an explicit migration; unknown compatibility holds affected work.
 
-Replacement requires a safe boundary, independently checked reconstruction from company records, explicit adoption, revocation of outgoing authority before incoming authority, and verification before resuming. Preparation-only replacement proves continuity without granting business-execution qualification. Governance changes require explicit adoption; historical failures and company-specific limits remain binding.
+Replacement requires a safe boundary, independently checked reconstruction from company records, explicit adoption, revocation of outgoing authority before incoming authority, and verification before resuming. Preparation-only replacement proves continuity without granting business-execution qualification. Governance changes require explicit adoption. Historical failures retain their original verdicts. Unresolved obligations arising from those failures, and company-specific limits, remain binding until resolved or superseded through an attributable disposition with applicable authority, evidence, and required review.
 
 Preserve pending actions and reconcile unknown outcomes before retrying. Recovery retains facts learned after the switch and cannot undo external effects or revive stale authority. Delegation transfers only where comparable evidence supports it. A successor, including CoS, must recover objectives, constraints, blocks, and the next permitted action without founder rebriefing.
 

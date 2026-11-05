@@ -13,6 +13,10 @@ import { assignmentContext } from '../plugins/soloco/runtime/context.mjs';
 import { work } from '../plugins/soloco/runtime/worker.mjs';
 import { call } from '../plugins/soloco/runtime/main.mjs';
 
+// Immutable published contract from 7adf94a8cf0943143fad5f83f3c2c4bda3a4a142:SPEC.md.
+const v018Governance=fs.readFileSync(new URL('./fixtures/governance-v018.md',import.meta.url),'utf8');
+assert.equal(digest(v018Governance),'185933ddeafe9709bef44e9a6605ba7adb5faaa8bc43c1c64f1da3b03ae5f400');
+
 const base=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-development-test-'));
 process.env.COMPANY_PLUGIN_DATA=path.join(base,'cache');
 test.after(()=>fs.rmSync(base,{recursive:true,force:true}));
@@ -94,13 +98,13 @@ test('development capability fails closed without a supported sandbox, and MCP p
   await assert.rejects(call('company_develop',{...a,action:'inspect',command:'anything'},'codex'),/Unknown argument/);
 });
 test('installed development capability does not silently authorize older teams or modified governance',live,()=>{
-  const team=installedTeam();assert.match(team.governance,/v0\.18/);
+  const team=installedTeam();assert.match(team.governance,/v0\.19/);
   assert.equal(developmentCapability(team).eligible,true);
   for(const changed of [{...team,plugin_version:'0.4.1'},{...team,governance_sha256:digest('changed rules')}])assert.equal(developmentCapability(changed).eligible,false);
 });
-for(const version of ['0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5'])test(`pinned v${version} preserves authorized development and original source after a runtime update`,live,async()=>{
+for(const version of ['0.5.0','0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6'])test(`pinned v${version} preserves authorized development and original source after a runtime update`,live,async()=>{
   const a=setup();withStore(a.root,db=>db.transaction('test.pin_compatible_development',s=>{
-    s.plugin_version=version;s.runtime_version=version;s.cos_instructions=`Pinned v${version} development instructions`;s.team_sha256=teamHash(s);return s;
+    s.governance=v018Governance;s.governance_sha256=digest(s.governance);s.plugin_version=version;s.runtime_version=version;s.cos_instructions=`Pinned v${version} development instructions`;s.team_sha256=teamHash(s);return s;
   }));
   const p=await plan(a);await authorize(a,p);
   withStore(a.root,db=>db.transaction('test.pin_scope_producer',s=>{s.runtime_version=version;return s;}));
@@ -332,4 +336,17 @@ test('a generic-only QA Pass stays inspectable but cannot accept; a complete fre
   const complete=await review(a,t),accepted=await accept(a,p,t,complete);
   assert.equal(accepted.review_id,complete.id);assert.equal(accepted.source_integrated,false);
   assert.ok(read(a).records[incomplete.id]);assert.notEqual(complete.job_id,incomplete.job_id);
+});
+
+test('exact v0.18 development compatibility retains sandbox and team restrictions',()=>{
+  const governance=v018Governance;
+  for(const plugin_version of ['0.5.0','0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6']) {
+    const s={...installedTeam(),plugin_version,governance,governance_sha256:digest(governance)};
+    const before=structuredClone(s),c=developmentCapability(s);
+    assert.equal(c.eligible,capability.supported);
+    assert.equal(c.blocker,capability.supported?null:capability.blocker);
+    assert.deepEqual(s,before);
+    for(const changed of [{...s,plugin_version:'0.4.1'},{...s,plugin_version:'99.0.0'},{...s,governance_sha256:digest(governance+'modified')}])
+      assert.equal(developmentCapability(changed).eligible,false);
+  }
 });

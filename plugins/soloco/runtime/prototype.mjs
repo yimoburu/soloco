@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { VERSION, installedTeam, digest, id, stamp, requireText, withStore, owner, folder, noLink, notice } from './store.mjs';
+import { VERSION, V018_GOVERNANCE_SHA256, installedTeam, digest, id, stamp, requireText, withStore, owner, folder, noLink, notice } from './store.mjs';
 import { contextMatches } from './context.mjs';
 
 const LIMIT = 100000;
@@ -12,8 +12,8 @@ export const prototypeLimits = Object.freeze({
   max_files:32, max_total_bytes:LIMIT,
 });
 export function prototypeCapability(s) {
-  // v0.17 shipped with 0.4.0; this contract-only update preserves its file workflow.
-  const supportedGovernance=[installedTeam().governance_sha256,'5f0699c046128d71a42731acdfddaaab4b911361521015def133adcfbdb8fcb9'];
+  // Preserve exact v0.17/v0.18 contracts without adopting the source contract.
+  const supportedGovernance=[installedTeam().governance_sha256,V018_GOVERNANCE_SHA256,'5f0699c046128d71a42731acdfddaaab4b911361521015def133adcfbdb8fcb9'];
   const blocker = !s ? null : !['0.4.0','0.4.1','0.5.0','0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5',VERSION].includes(s.plugin_version)
     ? 'Pinned team does not support this prototype workflow. Explicitly adopt a supported team and governance before requesting prototype authorization.'
     : !supportedGovernance.includes(s.governance_sha256)

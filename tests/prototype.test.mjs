@@ -12,6 +12,10 @@ import { prototypeAssignment, prototypeCapability } from '../plugins/soloco/runt
 import { assignmentContext } from '../plugins/soloco/runtime/context.mjs';
 import { upgrade, rehearse } from '../plugins/soloco/runtime/upgrade.mjs';
 
+// Immutable published contract from 7adf94a8cf0943143fad5f83f3c2c4bda3a4a142:SPEC.md.
+const v018Governance=fs.readFileSync(new URL('./fixtures/governance-v018.md',import.meta.url),'utf8');
+assert.equal(digest(v018Governance),'185933ddeafe9709bef44e9a6605ba7adb5faaa8bc43c1c64f1da3b03ae5f400');
+
 const base=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-prototype-test-'));
 process.env.COMPANY_PLUGIN_DATA=path.join(base,'cache');
 test.after(()=>fs.rmSync(base,{recursive:true,force:true}));
@@ -223,12 +227,13 @@ test('old pinned teams or preserved governance disclose blockers rather than sil
 test('contract simplification retains known prototype governance without allowing unknown rules or teams',()=>{
   const previous='5f0699c046128d71a42731acdfddaaab4b911361521015def133adcfbdb8fcb9';
   for(const plugin_version of ['0.4.0','0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5',installedTeam().plugin_version]) {
-    for(const governance_sha256 of [previous,installedTeam().governance_sha256])
+    for(const governance_sha256 of [previous,digest(v018Governance),installedTeam().governance_sha256])
       assert.equal(prototypeCapability({plugin_version,governance_sha256}).eligible,true);
     assert.equal(prototypeCapability({plugin_version,governance_sha256:digest('Unknown rules')}).eligible,false);
   }
   for(const plugin_version of ['0.3.1','99.0.0'])
-    assert.equal(prototypeCapability({plugin_version,governance_sha256:previous}).eligible,false);
+    for(const governance_sha256 of [previous,digest(v018Governance),installedTeam().governance_sha256])
+      assert.equal(prototypeCapability({plugin_version,governance_sha256}).eligible,false);
 });
 test('MCP prototype endpoint validates scope and preserves startup binding and ownership checks',async()=>{
   const a=setup();const s=await call('company_prototype',{...a,action:'inspect'},'codex');assert.equal(s.capability.eligible,true);
@@ -293,4 +298,21 @@ else {
       assert.equal(s.records[p.id].prototype.attempts.length,1);
     }
   } finally {process.env.PATH=oldPath;}
+});
+
+test('v0.18 pinned company retains its original prototype grant across source update',async()=>{
+  const a=setup();
+  withStore(a.root,db=>db.transaction('test.pin_v018',s=>{
+    s.governance=v018Governance;s.governance_sha256=digest(s.governance);
+    s.cos_instructions='Original pinned v0.18 instructions';s.team_sha256=teamHash(s);return s;
+  }));
+  const p=plan(a);await authorize(a,p);const before=read(a);
+  engine.open(a,'codex');assert.deepEqual(read(a),before);
+  const b=await generate(a,p),r=await review(a,b);materialize(a,p,b,r);
+  const after=read(a);
+  for(const key of ['id','plugin_version','governance','governance_sha256','cos_instructions','team_sha256','owner'])assert.deepEqual(after[key],before[key]);
+  assert.deepEqual(after.records[p.id].prototype.authorization,before.records[p.id].prototype.authorization);
+  const decision=before.records[p.id].prototype.authorization.decision_id;
+  assert.deepEqual(after.records[decision],before.records[decision]);
+  assert.equal(after.upgrade,undefined);
 });
