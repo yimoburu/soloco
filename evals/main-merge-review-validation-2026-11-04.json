@@ -1,0 +1,52 @@
+{
+  "kind": "main_merge_review_validation",
+  "review_date": "2026-11-04",
+  "review_timezone": "America/Los_Angeles",
+  "created_at": "2026-11-05T06:28:53.613580+00:00",
+  "tested_commit": "9173eae73292fec28554f9a8e79825c76cdf9b38",
+  "tested_tree": "41b7aa8cd60808ed1f7eaa51020bef5907e2eb9d",
+  "baseline_main": "37e82eb057f298aa7789f2175a53088599c429a5",
+  "candidate_version": "0.6.9",
+  "fixed_findings": [
+    "Old 0.6.8 runtime could resume new pending handover; new producer version fence and atomically stamped semantic mutations prevent it",
+    "Restore source could change after verification but before copy; destination inventory is now verified before success",
+    "Literal company names containing instruction keywords invalidated pure rename grants; exact literal rename matching preserves grants"
+  ],
+  "runs": [
+    {
+      "runtime": "v25.2.1",
+      "command": "node --test tests/*.test.mjs",
+      "exit_code": 0,
+      "tests": 402,
+      "pass": 402,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 71627.960791,
+      "log": "evals/main-merge-review-node25-tests.log",
+      "log_sha256": "dce0c4dbe46fe87ec8757b14c67a37445ad14d84503b72bac78569e11d50de09",
+      "actual_macos_sandbox": true
+    },
+    {
+      "runtime": "v22.13.0",
+      "command": "/private/tmp/soloco-node22-validation/node-v22.13.0-darwin-arm64/bin/node --test tests/*.test.mjs",
+      "exit_code": 0,
+      "tests": 402,
+      "pass": 402,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 78464.738208,
+      "log": "evals/main-merge-review-node22-tests.log",
+      "log_sha256": "548a619d244919d4cc67c7e70cd0efded3cd855121dd889811ff87d9e556a9c1",
+      "actual_macos_sandbox": true
+    }
+  ],
+  "scope": "Repository code and disposable fictional fixtures only; no publication, installation or actual company-state mutation",
+  "remaining_limits": [
+    "Ordinary handover retains its explicit 200000-character whole-subject hold",
+    "Live task-quality/accepted-outcome comparisons are not established by the deterministic regression suites"
+  ]
+}
