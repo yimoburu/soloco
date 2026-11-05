@@ -15,7 +15,7 @@ export const prototypeLimits = Object.freeze({
 export function prototypeCapability(s) {
   // Preserve exact v0.17/v0.18 contracts without adopting the source contract.
   const supportedGovernance=[installedTeam().governance_sha256,V018_GOVERNANCE_SHA256,'5f0699c046128d71a42731acdfddaaab4b911361521015def133adcfbdb8fcb9'];
-  const blocker = !s ? null : !['0.4.0','0.4.1','0.5.0','0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7','0.6.8','0.6.9',VERSION].includes(s.plugin_version)
+  const blocker = !s ? null : !['0.4.0','0.4.1','0.5.0','0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7','0.6.8','0.6.9','0.6.10',VERSION].includes(s.plugin_version)
     ? 'Pinned team does not support this prototype workflow. Explicitly adopt a supported team and governance before requesting prototype authorization.'
     : !supportedGovernance.includes(s.governance_sha256)
       ? 'Pinned governance does not support this prototype contract. Review and explicitly adopt the installed governance; more reviews cannot enable it.' : null;

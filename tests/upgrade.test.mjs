@@ -6,6 +6,7 @@ import os from 'node:os';
 import { withStore, Store, id, digest, VERSION, teamHash } from '../plugins/soloco/runtime/store.mjs';
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
 import { upgrade, rehearse, checkpoint } from '../plugins/soloco/runtime/upgrade.mjs';
+import { admitPrompt, REQUEST_LIMIT, RESPONSE_RESERVE } from '../plugins/soloco/runtime/upgrade-evidence.mjs';
 import { MAX_EXECUTION_TIMEOUT_MS } from '../plugins/soloco/runtime/timeout.mjs';
 import { hook, call } from '../plugins/soloco/runtime/main.mjs';
 
@@ -1016,7 +1017,7 @@ test('large replay batches deliver every durable finding and preserve the union 
   const replayed={cos:[],qa:[]};let qaPages=0;
   await rehearse(a.root,p.upgrade.id,async(...args)=>{
     const task=JSON.parse(args[2]),role=task.role;
-    assert.ok(args[2].length+40000<=900000);
+    assert.ok(args[2].length+RESPONSE_RESERVE<=REQUEST_LIMIT);
     if(task.phase==='replay')replayed[role].push(task.findings);
     const output=await model(...args),artifact=JSON.parse(output.text);
     if(task.phase==='page') {
@@ -1340,4 +1341,105 @@ test('frozen call ceiling rejects a stale response even if stored evidence is al
   });
   assert.equal(calls,1);assert.equal(read(a).upgrade.status,'failed');
   assert.equal(read(a).upgrade.calls.length,1);assert.equal(read(a).upgrade.cos_pages.length,0);
+});
+
+test('large final envelopes pass guarded rehearsal with exact QA input and actual traffic accounting',async()=>{
+  for(const size of [47445,90001]) {
+    const a=setup(),p=prepare(a),model=modelFor(a),prompts=[],finals={};
+    await rehearse(a.root,p.upgrade.id,async(...args)=>{
+      const task=JSON.parse(args[2]);prompts.push(args[2]);
+      assert.equal(task.response_contract.content_target_characters,20000);
+      assert.equal(task.response_contract.content_max_characters,undefined);
+      assert.doesNotMatch(task.instructions,/Total response <=/);
+      assert.match(task.instructions,/planning reserve is not an acceptance ceiling/);
+      if(task.role==='qa' && task.phase!=='replay')assert.deepEqual(task.proposed_handover,finals.cos);
+      const output=await model(...args);
+      if(task.phase!=='synthesis')return output;
+      const artifact=JSON.parse(output.text);
+      // Escaping and structured continuity add to the whole JSON independently
+      // of the concise content target. Every field remains structurally valid.
+      for(const field of Object.values(artifact.continuity))if(field?.text) {
+        field.text+=size===47445?' "quoted" \\ provenance 😀'.repeat(330):' "\\'.repeat(3900);
+        assert.ok(field.text.length<=12000);
+      }
+      const remaining=size-JSON.stringify(artifact).length;
+      assert.ok(remaining>0);
+      artifact.content+='"'.repeat(Math.floor(remaining/2))+(remaining%2?'x':'');
+      const text=JSON.stringify(artifact);
+      assert.equal(text.length,size);
+      assert.ok(artifact.content.length<=20000);
+      finals[task.role]=artifact;
+      return {...output,text};
+    });
+    const u=read(a).upgrade;
+    assert.equal(u.status,'ready',u.error);
+    assert.equal(u.cos_pages.length,u.evidence.pages.length);
+    assert.equal(u.qa_pages.length,u.evidence.pages.length);
+    assert.deepEqual(u.replays.map(r=>r.role),['cos','qa']);
+    let used={cos:0,qa:0};
+    u.calls.forEach((call,index)=>{
+      assert.equal(call.budget.prompt_characters,prompts[index].length);
+      assert.equal(call.budget.used_before,used[call.role]);
+      assert.equal(call.budget.response_reserve,80000);
+      assert.equal(call.response_characters,call.text.length);
+      used[call.role]+=prompts[index].length+call.text.length;
+      if(call.phase==='synthesis')assert.equal(call.response_characters,size);
+    });
+    assert.notEqual(u.probe.native_id,u.review.native_id);
+    assert.equal(read(a).plugin_version,'0.1.0'); // preparation only
+  }
+});
+
+test('large final reports still hold on malformed JSON, invalid citations, continuity, independence and non-Pass',async()=>{
+  for(const corruption of ['json','citation','continuity','independence','Fail','Blocked','content-bound','continuity-bound']) {
+    const a=setup(),p=prepare(a),model=modelFor(a);let invalid;
+    await rehearse(a.root,p.upgrade.id,async(...args)=>{
+      const task=JSON.parse(args[2]),output=await model(...args);
+      if(task.role!=='qa'||task.phase!=='synthesis')return output;
+      const artifact=JSON.parse(output.text);
+      if(corruption==='citation')artifact.citations[0].range_sha256='0'.repeat(64);
+      if(corruption==='continuity')artifact.continuity.inventory_sha256='0'.repeat(64);
+      if(corruption==='content-bound')artifact.content='x'.repeat(100001);
+      if(corruption==='continuity-bound')artifact.continuity.constraints.text='x'.repeat(12001);
+      if(['Fail','Blocked'].includes(corruption))artifact.review={verdict:corruption,reason:'Fictional unresolved obligation remains binding',permitted_action:'hold',blockers:['Retain the earlier failed review']};
+      invalid=corruption==='json'?'{'+' '.repeat(90000):JSON.stringify(artifact).padEnd(90001,' ');
+      return {...output,text:invalid,...(corruption==='independence'?{native_id:'native-cos'}:{})};
+    });
+    const u=read(a).upgrade;
+    assert.equal(u.status,'failed',corruption);
+    const errors={json:/JSON/,citation:/citation range hash/,continuity:/Incomplete rehearsal coverage/,independence:/identity change|author session/,Fail:/Fail:/,Blocked:/Blocked:/,'content-bound':/content under 100000/,'continuity-bound':/bounded explanation/};
+    assert.match(u.error,errors[corruption]);
+    assert.equal(u.calls.at(-1).text,invalid);
+    assert.equal(u.calls.at(-1).response_characters,invalid.length);
+    assert.equal(read(a).plugin_version,'0.1.0');
+    assert.throws(()=>upgrade({...a,action:'apply',upgrade_id:p.upgrade.id,expected_epoch:p.owner.epoch},'codex'),/passing continuity/);
+  }
+});
+
+test('complete large actual author report holds before QA dispatch when request plus reserve cannot fit',async()=>{
+  const a=setup(),p=prepare(a),model=modelFor(a);let author,qaCalls=0;
+  await rehearse(a.root,p.upgrade.id,async(...args)=>{
+    const task=JSON.parse(args[2]);if(task.role==='qa')qaCalls++;
+    const output=await model(...args);
+    if(task.role!=='cos'||task.phase!=='synthesis')return output;
+    const artifact=JSON.parse(output.text);
+    // A permitted extension models a complete detailed report; neither the
+    // parser nor the new planning reserve imposes a whole-envelope cap.
+    artifact.supporting_findings='Fictional cited obligation "quoted" \\ remains unresolved. '.repeat(16000);
+    author=JSON.stringify(artifact);
+    assert.ok(author.length>REQUEST_LIMIT-RESPONSE_RESERVE);
+    assert.ok(author.length<2000000);
+    return {...output,text:author};
+  });
+  const u=read(a).upgrade;
+  assert.equal(u.status,'failed');assert.match(u.error,/request has (\d+) characters; limit 900000/);
+  const rejectedLength=Number(u.error.match(/request has (\d+)/)[1]);
+  assert.ok(rejectedLength>author.length);
+  assert.throws(()=>admitPrompt('x'.repeat(rejectedLength)),/request has/);
+  assert.equal(qaCalls,0);assert.equal(u.qa_pages.length,0);
+  assert.deepEqual(u.probe.artifact,JSON.parse(author));
+  assert.equal(u.calls.at(-1).text,author);
+  assert.equal(u.calls.at(-1).response_characters,author.length);
+  assert.equal(u.calls.length,u.cos_pages.length+2); // all pages, one replay, final; no retry
+  assert.equal(read(a).plugin_version,'0.1.0');
 });

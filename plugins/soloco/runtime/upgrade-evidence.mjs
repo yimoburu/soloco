@@ -3,7 +3,8 @@ import { createHash } from 'node:crypto';
 
 export const REQUEST_LIMIT = 900000;
 export const PAGE_TARGET = 120000;
-export const RESPONSE_LIMIT = 40000;
+// Finite request-planning allowance, not a response acceptance ceiling.
+export const RESPONSE_RESERVE = 80000;
 export const RANGE_LIMIT = 32768;
 export const CITATION_LIMIT = 128;
 
@@ -682,11 +683,10 @@ export function validateCitations(subject, citations, ledger) {
 /** Count the exact serialized host request including envelopes, escaping and
  * QA's author output. UTF-16 character limits do not guarantee native token fit.
  */
-export function admitPrompt(prompt, used = 0, responseReserve = RESPONSE_LIMIT) {
+export function admitPrompt(prompt, used = 0) {
+  const responseReserve = RESPONSE_RESERVE;
   if (typeof prompt !== 'string') hold('prompt must be the complete serialized request string');
   integer(used, 'used');
-  integer(responseReserve, 'response reserve');
-  if (responseReserve > RESPONSE_LIMIT) hold(`response reserve exceeds ${RESPONSE_LIMIT}`);
   if (prompt.length + responseReserve > REQUEST_LIMIT) hold(`request has ${prompt.length} characters; limit ${REQUEST_LIMIT}`);
   const used_after_prompt = used + prompt.length;
   const projected_session_characters = used_after_prompt + responseReserve;
@@ -710,7 +710,7 @@ export function* boundedReplayBatches(findings, promptForBatch) {
     const next = [...batch, finding];
     const prompt = promptForBatch(next, index);
     if (typeof prompt !== 'string') hold('replay requires the complete serialized prompt');
-    if (prompt.length + RESPONSE_LIMIT > REQUEST_LIMIT && batch.length) {
+    if (prompt.length + RESPONSE_RESERVE > REQUEST_LIMIT && batch.length) {
       yield batch;
       index++;
       batch = [finding];
@@ -724,12 +724,12 @@ export function* boundedReplayBatches(findings, promptForBatch) {
 }
 
 /** used includes the preceding prompt. Runtime must retain observed output
- * before validation, including malformed or oversized responses that throw.
+ * before validation, including responses that fail JSON or semantic checks.
+ * The planning reserve is not an output cap; count actual UTF-16 units.
  */
 export function recordResponse(used, response) {
   integer(used, 'used');
   if (typeof response !== 'string') hold('observed response must be exact text');
-  if (response.length > RESPONSE_LIMIT) hold(`observed response exceeds ${RESPONSE_LIMIT} characters`);
   const next = used + response.length;
   if (!Number.isSafeInteger(next)) hold(`observed response exceeds safe cumulative count`);
   return freeze({ response_characters: response.length, used: next });

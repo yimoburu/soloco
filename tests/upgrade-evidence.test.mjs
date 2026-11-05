@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import {
   buildEvidence, resolveBodyAlias, readEvidence, validateCitations, createDeliveryLedger, recordDelivery,
-  admitPrompt, recordResponse, REQUEST_LIMIT, RESPONSE_LIMIT, RANGE_LIMIT, CITATION_LIMIT
+  admitPrompt, recordResponse, REQUEST_LIMIT, RESPONSE_RESERVE, RANGE_LIMIT, CITATION_LIMIT
 } from '../plugins/soloco/runtime/upgrade-evidence.mjs';
 
 const sha = (text, encoding = 'utf8') => createHash('sha256').update(text, encoding).digest('hex');
@@ -68,7 +68,7 @@ test('real keyed collections: 145 records, 57 jobs, source-heavy history fits an
   assert.deepEqual(subject.handover, again.handover);
   assert.deepEqual(subject.inventory, again.inventory);
   assert.ok(transport.length < REQUEST_LIMIT);
-  admitPrompt(JSON.stringify({ instructions: 'Pinned instructions', handover: subject.handover, author_output: 'a'.repeat(RESPONSE_LIMIT) }));
+  admitPrompt(JSON.stringify({ instructions: 'Pinned instructions', handover: subject.handover, author_output: 'a'.repeat(RESPONSE_RESERVE) }));
   for (const text of ['unresolved old obligation', 'Unknown extension remains binding.', 'No silent clearing.', 'Keep unknown top-level value.',
     'No completed artifact.', 'native-2', 'Missing evidence', 'Keep history extension.', 'Keep failed evidence.']) assert.ok(transport.includes(text));
   assert.ok(!transport.includes(body));
@@ -302,14 +302,24 @@ test('source extraction cannot hide a huge unknown obligation to make admission 
 });
 
 test('complete request plus reserve bounded while cumulative traffic exceeds 1M', () => {
-  const prompt='x'.repeat(REQUEST_LIMIT-RESPONSE_LIMIT);
+  const prompt='x'.repeat(REQUEST_LIMIT-RESPONSE_RESERVE);
   const receipt=admitPrompt(prompt,2000000);
   assert.equal(receipt.remaining_after_reserve,0);
   assert.equal(receipt.context_fit_verified,false);
   assert.ok(receipt.projected_session_characters>1000000);
   assert.throws(()=>admitPrompt(prompt+'x'),/request has/);
-  assert.equal(recordResponse(2000000,'r'.repeat(RESPONSE_LIMIT)).used,2040000);
-  assert.throws(()=>recordResponse(0,'r'.repeat(RESPONSE_LIMIT+1)),/response exceeds/);
+  for(const value of [null,{},[],123,new String('x')])assert.throws(()=>admitPrompt(value),/complete serialized request string/);
+  assert.equal(receipt.response_reserve,80000);
+  assert.equal(receipt.prompt_characters,prompt.length);
+  assert.equal(receipt.used_before,2000000);
+  assert.equal(receipt.used_after_prompt,2000000+prompt.length);
+  for(const length of [47445,RESPONSE_RESERVE,RESPONSE_RESERVE+1,100001]) {
+    const response='😀'.repeat(Math.floor(length/2))+(length%2?'x':'');
+    assert.deepEqual(recordResponse(2000000,response),{response_characters:length,used:2000000+length});
+  }
+  for(const response of [null,undefined,12,{},[],new String('x')])assert.throws(()=>recordResponse(0,response),/exact text/);
+  assert.throws(()=>recordResponse(Number.MAX_SAFE_INTEGER,'x'),/safe cumulative/);
+  assert.deepEqual(recordResponse(Number.MAX_SAFE_INTEGER-1,'x'),{response_characters:1,used:Number.MAX_SAFE_INTEGER});
   assert.throws(()=>admitPrompt('{}',Number.MAX_SAFE_INTEGER),/unsafe cumulative/);
   for(const value of [-1,0.5,Infinity,NaN,Number.MAX_SAFE_INTEGER+1]) {
     assert.throws(()=>admitPrompt('{}',value),/safe integer/);

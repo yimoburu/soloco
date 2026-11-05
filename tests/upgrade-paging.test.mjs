@@ -102,7 +102,7 @@ test('dotted obligation keys stay semantic while recognizable paths and explicit
 });
 
 test('replay packing uses the full escaped envelope plus reserve and preserves all findings and blockers',async()=>{
-  const {boundedReplayBatches,REQUEST_LIMIT,RESPONSE_LIMIT}=await import('../plugins/soloco/runtime/upgrade-evidence.mjs');
+  const {boundedReplayBatches,REQUEST_LIMIT,RESPONSE_RESERVE}=await import('../plugins/soloco/runtime/upgrade-evidence.mjs');
   const findings=Array.from({length:30},(_,index)=>({page_id:`page-${index}`,
     artifact:{content:'Detailed finding "quoted" and \\ escaped. '.repeat(400),review:{verdict:index%2?'Pass':'Blocked',reason:'Evidence-cited older constraints remain in force. '.repeat(300),blockers:[`Keep obligation ${index}`]}}}));
   const prompt=(batch,index)=>JSON.stringify({instructions:'Full instructions and authority '.repeat(3000),
@@ -112,9 +112,9 @@ test('replay packing uses the full escaped envelope plus reserve and preserves a
   assert.deepEqual(batches.flat(),findings);
   batches.forEach((batch,index)=>{
     const complete=prompt(batch,index);
-    assert.ok(complete.length+RESPONSE_LIMIT<=REQUEST_LIMIT);
+    assert.ok(complete.length+RESPONSE_RESERVE<=REQUEST_LIMIT);
     admitPrompt(complete);
-    if(index<batches.length-1)assert.ok(prompt([...batch,batches[index+1][0]],index).length+RESPONSE_LIMIT>REQUEST_LIMIT);
+    if(index<batches.length-1)assert.ok(prompt([...batch,batches[index+1][0]],index).length+RESPONSE_RESERVE>REQUEST_LIMIT);
   });
   assert.equal([...boundedReplayBatches(findings.slice(0,2),prompt)].length,1);
   assert.throws(()=>[...boundedReplayBatches([findings[0]],()=> 'x'.repeat(REQUEST_LIMIT))],/request has/);
