@@ -134,6 +134,16 @@ test('dispatch schema admits only optional supported speed choices and preserves
   assert.equal(schema.properties.timeout_ms.maximum,600000);
 });
 
+test('upgrade reuses the optional dispatch selection schema with unchanged required arguments',()=>{
+  const h=harness('codex');
+  const schema=plain(h.main.toolList.find(tool=>tool.name==='company_upgrade').inputSchema);
+  const dispatch=plain(h.main.toolList.find(tool=>tool.name==='company_dispatch').inputSchema);
+  assert.deepEqual(schema.properties.model_selection,dispatch.properties.model_selection);
+  assert.deepEqual(schema.required,['root','session_id','action']);
+  assert.equal(schema.additionalProperties,false);
+  assert.deepEqual(schema.properties.action.enum,['inspect','prepare','apply','verify','recover']);
+});
+
 test('legacy omission and host_default avoid catalog discovery and persist normalized requests',async()=>{
   for(const request of [undefined,{mode:'default',reason:'  keep host choice  '},{mode:'default',speed:'host_default',reason:'  keep host choice  '}]) {
     const h=harness();

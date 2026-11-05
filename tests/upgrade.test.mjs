@@ -13,6 +13,8 @@ const base=fs.mkdtempSync(path.join(os.tmpdir(),'company-upgrade-'));
 process.env.COMPANY_PLUGIN_DATA=path.join(base,'cache');
 test.after(()=>fs.rmSync(base,{recursive:true,force:true}));
 const options={launch:()=>{},check:()=>({available:true,authenticated:true})};
+const selectionCatalog={supported:true,source:'synthetic_catalog',models:[{id:'fixture-model',supported_efforts:['medium','high']}],speed_support:{fast_disabled:true}};
+const selected={mode:'explicit',model:'fixture-model',effort:'high',reason:'Bounded fictional continuity review'};
 const read=a=>withStore(a.root,db=>db.read());
 function setup(host='codex') {
   const root=fs.mkdtempSync(path.join(base,'company-'));
@@ -31,9 +33,10 @@ function setup(host='codex') {
   }));return a;
 }
 function prepare(a,host='codex',extra={}) {
-  const args={...a,...extra,action:'inspect'};
+  const {model_selection,...inspectionExtra}=extra;
+  const args={...a,...inspectionExtra,action:'inspect'};
   const inspection=upgrade(args,host);
-  return upgrade({...args,action:'prepare',candidate_hash:inspection.candidate_hash,source_instruction:'Upgrade my company team and resume after successful checks',...extra},host,options);
+  return upgrade({...args,action:'prepare',candidate_hash:inspection.candidate_hash,source_instruction:'Upgrade my company team and resume after successful checks',...extra},host,{...options,catalog:()=>selectionCatalog});
 }
 function modelFor(a,{verdict='Pass',sameId=false,omit=false}={}) {
   const sessions=new Map();
@@ -63,6 +66,186 @@ async function ready(a,host='codex') {
   assert.equal(read(a).upgrade.status,'ready',read(a).upgrade.error);
   return {...a,upgrade_id:p.upgrade.id,expected_epoch:p.owner.epoch};
 }
+
+test('upgrade selection rejects incompatible actions and invalid controls without partial preparation',async()=>{
+  const a=setup(),inspection=upgrade({...a,action:'inspect'},'codex');
+  const args={...a,candidate_hash:inspection.candidate_hash,source_instruction:'Upgrade the fictional team'};
+  const before=read(a);let launches=0,checks=0;
+  const deps={launch:()=>{launches++;},check:()=>{checks++;return {available:true,authenticated:true};},catalog:()=>selectionCatalog};
+  for(const action of ['inspect','apply','verify','recover']) {
+    assert.throws(()=>upgrade({...args,action,model_selection:selected},'codex',deps),/only supported.*prepare/);
+    await assert.rejects(call('company_upgrade',{root:a.root,session_id:a.session_id,action,model_selection:selected},'codex'),/only supported.*prepare/);
+  }
+  for(const request of [
+    {...selected,model:'unadvertised'}, {...selected,effort:'ultra'},
+    {...selected,model:'bad model'}, {...selected,reason:' '},
+    {...selected,mode:'default'}, {...selected,speed:'fast'},
+    {...selected,speed:'fast_disabled'}, {...selected,service_tier:'priority'},
+    [], 'fixture-model'
+  ]) {
+    assert.throws(()=>upgrade({...args,action:'prepare',model_selection:request},'codex',deps));
+    assert.deepEqual(read(a),before);
+  }
+  assert.throws(()=>upgrade({...args,action:'prepare',model_selection:selected},'codex',{...deps,catalog:()=>({supported:false,error:'synthetic unavailable'})}),/unavailable/);
+  assert.deepEqual(read(a),before);assert.equal(checks,0);assert.equal(launches,0);
+});
+
+test('one catalog-validated selection persists and reaches fresh independent roles, retrieval, replay and synthesis unchanged',async()=>{
+  const a=setup(),inspection=upgrade({...a,action:'inspect'},'codex');let discoveries=0;
+  const p=upgrade({...a,action:'prepare',candidate_hash:inspection.candidate_hash,source_instruction:'Upgrade fictional team',model_selection:{...selected,reason:`  ${selected.reason}  `}},'codex',{
+    ...options,catalog:host=>{assert.equal(host,'codex');discoveries++;return selectionCatalog;}
+  });
+  assert.equal(discoveries,1);assert.deepEqual(p.upgrade.model_selection,selected);
+  assert.deepEqual(read(a).upgrade.model_selection,selected);
+  assert.equal(read(a).upgrade.model_selection_sha256,digest(JSON.stringify(selected)));
+  assert.equal(read(a).upgrade.model_catalog.source,'synthetic_catalog');
+  const model=modelFor(a),phases=new Map(),retrieved=new Set();
+  const evidence={reported_models:[],reported_effort:null,reported_service_tier:null,applied_controls:{model:'fixture-model',effort:'high',verification:'applied_controls_not_effective_settings'},verification:'unverified',source:'exec_json',scope:'assignment'};
+  await rehearse(a.root,p.upgrade.id,async(...args)=>{
+    const task=JSON.parse(args[2]),role=task.role;
+    assert.deepEqual(args[5],selected);
+    assert.equal(args[1],phases.has(role)?`native-${role}`:null);
+    if(!phases.has(role))phases.set(role,new Set());
+    phases.get(role).add(task.phase);
+    if(task.phase==='page'&&!retrieved.has(role)) {
+      retrieved.add(role);
+      return {native_id:`native-${role}`,text:JSON.stringify({reads:[task.response_contract.reads_only_shape.reads[0]]}),model_evidence:evidence};
+    }
+    // The fixture model expects the resumed page shape after a retrieval.
+    const effective=task.phase==='retrieval'?{...task.task,authority:task.authority,role}:task;
+    // Its own session bookkeeping has not seen the reads-only round.
+    const output=await model(args[0],task.phase==='retrieval'?null:args[1],JSON.stringify(effective));
+    return {...output,model_evidence:evidence};
+  });
+  const u=read(a).upgrade;
+  assert.equal(u.status,'ready',u.error);assert.equal(discoveries,1);
+  for(const role of ['cos','qa'])assert.deepEqual([...phases.get(role)].sort(),['page','replay','retrieval','synthesis']);
+  assert.notEqual(u.probe.native_id,u.review.native_id);
+  assert.ok(u.calls.length>=8);
+  for(const receipt of u.calls) {
+    assert.deepEqual(receipt.model_selection,selected);
+    assert.deepEqual(receipt.model_evidence,evidence);
+    assert.deepEqual(receipt.model_evidence.reported_models,[]);
+  }
+  const done=applyAndVerify({...a,upgrade_id:p.upgrade.id,expected_epoch:p.owner.epoch});
+  assert.equal(done.upgrade.status,'completed');
+});
+
+test('omitted, deliberate default and legacy upgrade selections preserve compatibility without catalog discovery',async()=>{
+  for(const request of [undefined,{mode:'default',reason:'Keep host defaults'},'legacy']) {
+    const a=setup(),inspection=upgrade({...a,action:'inspect'},'codex');
+    const expected=request==='legacy'?null:request??null;
+    const p=upgrade({...a,action:'prepare',candidate_hash:inspection.candidate_hash,source_instruction:'Upgrade fictional team',...(expected?{model_selection:expected}:{})},'codex',{
+      ...options,catalog:()=>{throw new Error('Default must not discover models');}
+    });
+    if(request==='legacy')withStore(a.root,db=>db.transaction('test.legacy_attempt',s=>{
+      delete s.upgrade.model_selection;delete s.upgrade.model_selection_sha256;return s;
+    }));
+    const model=modelFor(a);let calls=0;
+    await rehearse(a.root,p.upgrade.id,async(...args)=>{calls++;assert.deepEqual(args[5],expected);return model(...args);});
+    const u=read(a).upgrade;assert.equal(u.status,'ready',u.error);assert.ok(calls>1);
+    assert.equal(Object.hasOwn(u,'model_catalog'),false);
+    for(const receipt of u.calls) {
+      assert.deepEqual(receipt.model_selection,expected);
+      assert.equal(receipt.model_evidence.applied_controls,null);
+      assert.deepEqual(receipt.model_evidence.reported_models,[]);
+    }
+  }
+});
+
+test('Claude upgrade selection shares supported controls across both roles and rejects unverified effort before preparation',async()=>{
+  const a=setup('claude'),before=read(a),inspection=upgrade({...a,action:'inspect'},'claude');
+  const request={mode:'explicit',model:'fixture-model',speed:'fast_disabled',reason:'Synthetic supported controls'};
+  assert.throws(()=>upgrade({...a,action:'prepare',candidate_hash:inspection.candidate_hash,source_instruction:'Upgrade fictional team',model_selection:{...request,effort:'high'}},'claude',{
+    ...options,catalog:()=>selectionCatalog
+  }),/effort support is unverified/);
+  assert.deepEqual(read(a),before);
+  const p=prepare(a,'claude',{model_selection:request}),model=modelFor(a),roles=new Set();
+  await rehearse(a.root,p.upgrade.id,async(...args)=>{
+    assert.equal(args[0],'claude');assert.deepEqual(args[5],request);
+    roles.add(JSON.parse(args[2]).role);return model(...args);
+  });
+  assert.deepEqual([...roles],['cos','qa']);assert.equal(read(a).upgrade.status,'ready',read(a).upgrade.error);
+});
+
+test('selection mutation holds before calls, during review, and before apply or verify',async()=>{
+  for(const stage of ['queued','call','ready','applied']) {
+    const a=setup(),p=prepare(a,'codex',{model_selection:selected}),model=modelFor(a);let calls=0;
+    const mutate=()=>withStore(a.root,db=>db.transaction('test.selection_changed',s=>{
+      s.upgrade.model_selection.effort='medium';
+      // Even repinning cannot replace a request already frozen for review.
+      if(stage!=='queued')s.upgrade.model_selection_sha256=digest(JSON.stringify(s.upgrade.model_selection));
+      return s;
+    }));
+    if(stage==='queued')mutate();
+    await rehearse(a.root,p.upgrade.id,async(...args)=>{
+      calls++;if(stage==='call')mutate();return model(...args);
+    });
+    if(['queued','call'].includes(stage)) {
+      const u=read(a).upgrade;
+      assert.equal(u.status,'failed');assert.equal(calls,stage==='queued'?0:1);
+      if(stage==='call')assert.deepEqual(u.calls[0].model_selection,selected);
+    } else {
+      assert.equal(read(a).upgrade.status,'ready',read(a).upgrade.error);
+      let epoch=p.owner.epoch;
+      if(stage==='applied')epoch=upgrade({...a,action:'apply',upgrade_id:p.upgrade.id,expected_epoch:epoch},'codex').owner.epoch;
+      mutate();
+      assert.throws(()=>upgrade({...a,action:stage==='ready'?'apply':'verify',upgrade_id:p.upgrade.id,expected_epoch:epoch},'codex'),/model selection changed/);
+    }
+  }
+});
+
+test('selected upgrade timeouts retain request and unknown execution evidence, without retry or permission',async()=>{
+  for(const role of ['cos','qa']) {
+    const a=setup(),p=prepare(a,'codex',{model_selection:selected}),model=modelFor(a);let calls=0;
+    await rehearse(a.root,p.upgrade.id,async(...args)=>{
+      calls++;assert.deepEqual(args[5],selected);
+      if(JSON.parse(args[2]).role===role)throw Object.assign(new Error('Synthetic native timeout'),{code:'ROLE_EXECUTION_TIMEOUT'});
+      return model(...args);
+    });
+    const u=read(a).upgrade,last=u.calls.at(-1);
+    assert.equal(u.status,'failed');assert.equal(last.role,role);assert.deepEqual(last.model_selection,selected);
+    assert.match(last.error,/timeout/);assert.equal(last.error_code,'ROLE_EXECUTION_TIMEOUT');
+    assert.equal(last.model_evidence.applied_controls,null);
+    assert.deepEqual(last.model_evidence.reported_models,[]);
+    assert.equal(last.model_evidence.reported_effort,null);assert.equal(last.model_evidence.reported_service_tier,null);
+    assert.equal(last.model_evidence.verification,'unverified');
+    const before=calls;
+    await rehearse(a.root,p.upgrade.id,async()=>{calls++;});assert.equal(calls,before);
+    assert.throws(()=>upgrade({...a,action:'apply',upgrade_id:p.upgrade.id,expected_epoch:p.owner.epoch},'codex'),/passing continuity review/);
+  }
+});
+
+test('changing selection after recovery creates fresh role sessions and preserves the failed attempt evidence',async()=>{
+  const a=setup(),p=prepare(a,'codex',{model_selection:selected}),firstModel=modelFor(a);
+  await rehearse(a.root,p.upgrade.id,async(...args)=>{
+    if(JSON.parse(args[2]).role==='qa')throw new Error('Synthetic QA timeout');
+    return firstModel(...args);
+  });
+  const failed=read(a).upgrade;
+  assert.equal(failed.status,'failed');assert.ok(failed.cos_pages.length>0);
+  const recovered=upgrade({...a,action:'recover',upgrade_id:p.upgrade.id,expected_epoch:p.owner.epoch,source_instruction:'Recover fictional failed review'},'codex');
+  const prior=read(a).upgrade,request={...selected,effort:'medium',reason:'Fresh authorized fictional review'};
+  const fresh=prepare({...a,expected_epoch:recovered.owner.epoch},'codex',{model_selection:request});
+  assert.notEqual(fresh.upgrade.id,failed.id);
+  assert.deepEqual(read(a).upgrade_history.at(-1),prior);
+  const model=modelFor(a),seen=new Set();
+  await rehearse(a.root,fresh.upgrade.id,async(...args)=>{
+    const role=JSON.parse(args[2]).role;
+    assert.deepEqual(args[5],request);
+    if(!seen.has(role)) {assert.equal(args[1],null);seen.add(role);}
+    return model(...args);
+  });
+  const state=read(a);
+  assert.equal(state.upgrade.status,'ready',state.upgrade.error);
+  assert.notEqual(state.upgrade.probe_instance,failed.probe_instance);
+  assert.notEqual(state.upgrade.reviewer_instance,failed.reviewer_instance);
+  assert.deepEqual(state.upgrade_history.at(-1),prior);
+  assert.deepEqual([...seen],['cos','qa']);
+  assert.equal(state.upgrade.cos_pages.length,state.upgrade.evidence.pages.length);
+  assert.equal(state.upgrade.qa_pages.length,state.upgrade.evidence.pages.length);
+  for(const call of state.upgrade.calls)assert.deepEqual(call.model_selection,request);
+});
 function applyAndVerify(a,host='codex') {
   const applied=upgrade({...a,action:'apply'},host);
   assert.throws(()=>engine.control({...a,action:'resume',expected_epoch:applied.owner.epoch,source_instruction:'resume'},host),/pending/);
@@ -193,12 +376,13 @@ test('MCP upgrade completes through detached native processes on both host adapt
 import {randomUUID} from 'node:crypto';
 const a=process.argv.slice(2),claude=process.argv[1].endsWith('claude');
 if(a.includes('--version'))console.log('synthetic CLI');
-else if(a.includes('--help'))console.log('--ignore-user-config --json --sandbox --tools --strict-mcp-config --setting-sources --output-format');
+else if(a.includes('--help'))console.log('--model --ignore-user-config --json --sandbox --tools --strict-mcp-config --setting-sources --output-format');
 else if(a[0]==='login'||a[0]==='auth')process.exit(0);
 else {
  let p='';for await(const c of process.stdin)p+=c;
  let text;
  if(p.includes('soloco-upgrade-pages-v1')) {
+ if(claude && process.argv[process.argv.indexOf('--model')+1]!=='sonnet')throw new Error('Synthetic public upgrade lost the selected model');
  const task=JSON.parse(p),a=task.authority,role=task.role;
  const fs=await import('node:fs');
  const file=role+'.json';
@@ -223,10 +407,17 @@ else {
       const a=setup(host);
       const args={root:a.root,session_id:a.session_id};
       const inspection=await call('company_upgrade',{...args,action:'inspect'},host);
-      const started=await call('company_upgrade',{...args,action:'prepare',expected_epoch:1,candidate_hash:inspection.candidate_hash,source_instruction:'Upgrade this team'},host);
+      const selection=host==='claude'?{mode:'explicit',model:'sonnet',reason:'Synthetic public upgrade fixture'}:undefined;
+      const started=await call('company_upgrade',{...args,action:'prepare',expected_epoch:1,candidate_hash:inspection.candidate_hash,source_instruction:'Upgrade this team',...(selection?{model_selection:selection}:{})},host);
       const s=await call('company_wait',{...args,seconds:10},host);
       assert.equal(s.upgrade.status,'ready',s.upgrade.error);
       assert.notEqual(s.upgrade.probe.native_id,s.upgrade.review.native_id);
+      for(const receipt of read(a).upgrade.calls) {
+        assert.deepEqual(receipt.model_selection,selection??null);
+        assert.equal(receipt.model_evidence.applied_controls.model,selection?.model??null);
+        assert.equal(receipt.model_evidence.reported_effort,null);
+        assert.deepEqual(receipt.model_evidence.reported_models,[]);
+      }
       const applied=await call('company_upgrade',{...args,action:'apply',expected_epoch:started.owner.epoch,upgrade_id:started.upgrade.id},host);
       const verified=await call('company_upgrade',{...args,action:'verify',expected_epoch:applied.owner.epoch,upgrade_id:started.upgrade.id},host);
       assert.equal(verified.upgrade.status,'completed');
@@ -355,7 +546,7 @@ test('a company checkpoint above 200000 characters upgrades without dropping any
   assert.equal(read(a).records.large.content,content);
 });
 
-for(const version of ['0.2.0','0.6.0','0.6.1','0.6.2','0.6.3']) test(`compatible ${version} companies can optionally adopt and recover team definitions`,async()=>{
+for(const version of ['0.2.0','0.6.0','0.6.1','0.6.2','0.6.3','0.6.4']) test(`compatible ${version} companies can optionally adopt and recover team definitions`,async()=>{
   const a=setup();withStore(a.root,db=>db.transaction('test.previous_patch',s=>{
     s.schema=2;s.runtime_version=version;s.plugin_version=version;s.cos_instructions='Preserve founder limits and independently review preparation';s.team_sha256=teamHash(s);return s;
   }));
@@ -434,8 +625,8 @@ test('QA page Blocked cannot be erased by later page and final Pass',async()=>{
 });
 
 test('history mutation, owner change, checkpoint change and deadline expiry retain late evidence without permission',async()=>{
-  for(const change of ['history','owner','checkpoint','deadline','candidate']) {
-    const a=setup(),p=prepare(a),model=modelFor(a),now=Date.now;
+  for(const selection of [undefined,selected])for(const change of ['history','owner','checkpoint','deadline','candidate']) {
+    const a=setup(),p=prepare(a,'codex',selection?{model_selection:selection}:{}),model=modelFor(a),now=Date.now;
     let calls=0;
     try {
       await rehearse(a.root,p.upgrade.id,async(...args)=>{

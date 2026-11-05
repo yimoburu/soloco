@@ -28,3 +28,62 @@ test('real adapter resumes existing native IDs with model tools disabled for bot
   assert.deepEqual(claude.slice(-2),['--resume','stable-qa']);
   assert.equal(claude[claude.indexOf('--tools')+1],'');
 });
+
+test('selected upgrade calls apply identical launch and resume flags while observations stay distinct',async()=>{
+  for(const host of ['codex','claude'])for(const native of [null,`native-${host}`]) {
+    const selection={mode:'explicit',model:'fixture-model',...(host==='codex'?{effort:'high'}:{}),reason:'Synthetic upgrade control check'};
+    const child=new EventEmitter();
+    child.stdin=new PassThrough();child.stdout=new PassThrough();child.stderr=new PassThrough();child.kill=()=>true;
+    let launched;
+    const result=await runModel(host,native,'fictional upgrade prompt','/tmp',180000,selection,{
+      resolveExecutable:()=>`/mock/${host}`,spawn:(command,args)=>{
+        launched=args;
+        process.nextTick(()=>{
+          child.emit('spawn');
+          const text=JSON.stringify({content:'Fictional review'});
+          if(host==='codex')child.stdout.write([
+            {type:'thread.started',thread_id:`native-${host}`},
+            {type:'item.completed',item:{type:'agent_message',text}}
+          ].map(value=>JSON.stringify(value)).join('\n'));
+          else child.stdout.write(JSON.stringify({subtype:'success',session_id:`native-${host}`,result:text,modelUsage:{'fixture-model':{inputTokens:10}}}));
+          child.emit('close',0);
+        });
+        return child;
+      }
+    });
+    assert.deepEqual(launched,commandArgs(host,native,selection));
+    assert.equal(launched[launched.indexOf('--model')+1],selection.model);
+    const evidence=result.model_evidence;
+    assert.equal(evidence.applied_controls.model,selection.model);
+    assert.equal(evidence.applied_controls.effort,selection.effort??null);
+    assert.equal(evidence.applied_controls.verification,'applied_controls_not_effective_settings');
+    assert.equal(evidence.applied_controls.service_tier,null);
+    assert.equal(evidence.reported_effort,null);assert.equal(evidence.reported_service_tier,null);
+    assert.deepEqual(evidence.reported_models,host==='codex'?[]:['fixture-model']);
+    assert.equal(evidence.verification,host==='codex'?'unverified':'host_reported');
+    if(host==='claude')assert.equal(evidence.scope,'session_cumulative_including_internal_calls');
+  }
+});
+
+test('selected native timeout does not manufacture applied or effective model evidence',async()=>{
+  const child=new EventEmitter();
+  child.stdin=new PassThrough();child.stdout=new PassThrough();child.stderr=new PassThrough();
+  child.kill=()=>{process.nextTick(()=>child.emit('close',null));return true;};
+  let now=1000;const timers=[];
+  const selection={mode:'explicit',model:'fixture-model',effort:'high',reason:'Synthetic timeout'};
+  const pending=runModel('codex',null,'fictional prompt','/tmp',1000,selection,{
+    timeoutReason:'Synthetic bounded timeout check',
+    resolveExecutable:()=>'/mock/codex',now:()=>now,
+    setTimeout:(fn,ms)=>{const timer={fn,ms};timers.push(timer);return timer;},clearTimeout:()=>{},
+    spawn:()=>{process.nextTick(()=>{
+      child.emit('spawn');now=2000;
+      timers.find(timer=>timer.ms===1000).fn();
+    });return child;}
+  });
+  await assert.rejects(pending,error=>{
+    assert.match(error.message,/timed out/);
+    assert.equal(error.model_evidence,undefined);
+    assert.equal(error.applied_controls,undefined);
+    return true;
+  });
+});
