@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { withStore, id, digest, VERSION, teamHash } from '../plugins/soloco/runtime/store.mjs';
+import { withStore, Store, id, digest, VERSION, teamHash } from '../plugins/soloco/runtime/store.mjs';
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
 import { upgrade, rehearse, checkpoint } from '../plugins/soloco/runtime/upgrade.mjs';
 import { MAX_EXECUTION_TIMEOUT_MS } from '../plugins/soloco/runtime/timeout.mjs';
@@ -381,7 +381,7 @@ else if(a[0]==='login'||a[0]==='auth')process.exit(0);
 else {
  let p='';for await(const c of process.stdin)p+=c;
  let text;
- if(p.includes('soloco-upgrade-pages-v1')) {
+ if(p.includes('soloco-upgrade-pages-v2')) {
  if(claude && process.argv[process.argv.indexOf('--model')+1]!=='sonnet')throw new Error('Synthetic public upgrade lost the selected model');
  const task=JSON.parse(p),a=task.authority,role=task.role;
  const fs=await import('node:fs');
@@ -546,7 +546,7 @@ test('a company checkpoint above 200000 characters upgrades without dropping any
   assert.equal(read(a).records.large.content,content);
 });
 
-for(const version of ['0.2.0','0.6.0','0.6.1','0.6.2','0.6.3','0.6.4']) test(`compatible ${version} companies can optionally adopt and recover team definitions`,async()=>{
+for(const version of ['0.2.0','0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5']) test(`compatible ${version} companies can optionally adopt and recover team definitions`,async()=>{
   const a=setup();withStore(a.root,db=>db.transaction('test.previous_patch',s=>{
     s.schema=2;s.runtime_version=version;s.plugin_version=version;s.cos_instructions='Preserve founder limits and independently review preparation';s.team_sha256=teamHash(s);return s;
   }));
@@ -1003,4 +1003,80 @@ test('nested findings alone, uncited replay and incomplete synthesis remain held
     if(phase==='replay')assert.equal(u.replays.length,0);
     assert.throws(()=>upgrade({...a,action:'apply',upgrade_id:p.upgrade.id,expected_epoch:p.owner.epoch},'codex'),/passing continuity/);
   }
+});
+
+
+test('inspect compares identical current inputs including terminal history without authoritative transactions or external calls', async () => {
+  const { buildEvidence, evidencePage } = await import('../plugins/soloco/runtime/upgrade-evidence.mjs');
+  for (const status of ['recovered', 'completed']) {
+    const a = setup();
+    withStore(a.root, db => db.transaction('test.preview', s => {
+      const artifact = { content: 'Fictional long historical unresolved finding. '.repeat(320), unknown: 'Keep unknown field' };
+      s.upgrade_history = [{ id: 'older-fail', status: 'failed', review: { verdict: 'Fail', reason: 'Keep failure' } }];
+      s.upgrade = { id: 'terminal', status, previous: { plugin_version: '0.1.0' }, candidate: { plugin_version: VERSION }, cos_pages: [{ native_id: 'old-cos', artifact }],
+        calls: [{ role: 'cos', phase: 'page', native_id: 'old-cos', text: JSON.stringify(artifact, null, 2) }] };
+      return s;
+    }));
+    const before = read(a), events = () => withStore(a.root, db => db.db.prepare('SELECT * FROM events ORDER BY seq').all());
+    const oldEvents = events(), transaction = Store.prototype.transaction;
+    const forbidden = () => { throw new Error('Inspect must not call this'); };
+    let inspection;
+    Store.prototype.transaction = forbidden;
+    try { inspection = upgrade({ ...a, action: 'inspect' }, 'codex', { launch: forbidden, check: forbidden, catalog: forbidden }); }
+    finally { Store.prototype.transaction = transaction; }
+    assert.deepEqual(read(a), before); assert.deepEqual(events(), oldEvents);
+    const history = [...before.upgrade_history, before.upgrade], input = checkpoint(before);
+    const baseline = buildEvidence(input, history, { wholeBodyAliases: false }), candidate = buildEvidence(input, history);
+    const metrics = subject => {
+      const stream = subject.pages.map(page => evidencePage(subject, page).text).join('');
+      return { format: subject.handover.format, checkpoint_sha256: digest(JSON.stringify(input)),
+        history_sha256: digest(JSON.stringify(history)), stream_sha256: digest(stream), stream_characters: stream.length, pages: subject.pages.length };
+    };
+    const preview = inspection.projection_preview;
+    assert.deepEqual(preview.baseline, metrics(baseline)); assert.deepEqual(preview.candidate, metrics(candidate));
+    assert.equal(preview.current_upgrade_included, true); assert.equal(preview.prepare_adds_decision_record, true);
+    assert.equal(preview.exact_reservation, false); assert.equal(preview.time_forecast, false);
+    assert.equal(preview.matched_bodies, 1); assert.equal(preview.matched_occurrences, 2); assert.equal(preview.aliased_occurrences, 1);
+    assert.equal(preview.net_characters_saved, preview.baseline.stream_characters - preview.candidate.stream_characters);
+    assert.ok(!JSON.stringify(preview).includes('Fictional long historical'));
+  }
+});
+
+test('aliased historical Fail and Blocked remain intact through independent paging, apply, verify and recovery guards', async () => {
+  const a = setup();
+  withStore(a.root, db => db.transaction('test.alias-history', s => {
+    s.upgrade_history = ['Fail', 'Blocked'].map((verdict, i) => {
+      const artifact = { content: 'Fictional earlier unresolved obligation. '.repeat(300),
+        review: { verdict, permitted_action: 'hold', reason: 'Unresolved historical failure', blockers: [`Blocker ${i}`] } };
+      return { id: `old-${i}`, status: 'failed', calls: [{ role: 'qa', phase: 'synthesis', native_id: `old-qa-${i}`, text: JSON.stringify(artifact, null, 2) }],
+        review: { native_id: `old-qa-${i}`, artifact } };
+    }); return s;
+  }));
+  const originalHistory = read(a).upgrade_history, originalRoles = read(a).roles;
+  const p = prepare(a), model = modelFor(a), delivered = { cos: [], qa: [] };
+  await rehearse(a.root, p.upgrade.id, async (...args) => {
+    const task = JSON.parse(args[2]);
+    assert.equal(task.protocol, 'soloco-upgrade-pages-v2');
+    assert.match(task.instructions, /Alias delivery does not deliver its target body or original source/);
+    assert.match(task.instructions, /Keep findings page-specific/);
+    if (task.phase === 'page') delivered[task.role].push(task.page.page_id);
+    return model(...args);
+  });
+  const checked = read(a);
+  assert.equal(checked.upgrade.status, 'ready', checked.upgrade.error);
+  assert.equal(checked.upgrade.evidence.counts.aliased_occurrences, 2);
+  const ids = checked.upgrade.evidence.pages.map(page => page.page_id);
+  assert.deepEqual(delivered.cos, ids); assert.deepEqual(delivered.qa, ids);
+  assert.notEqual(checked.upgrade.probe.native_id, checked.upgrade.review.native_id);
+  assert.deepEqual(checked.upgrade_history, originalHistory); assert.deepEqual(checked.roles, originalRoles);
+  const args = { ...a, upgrade_id: p.upgrade.id, expected_epoch: p.owner.epoch };
+  assert.throws(() => upgrade({ ...args, action: 'apply', expected_epoch: p.owner.epoch - 1 }, 'codex'), /epoch/);
+  const applied = upgrade({ ...args, action: 'apply' }, 'codex');
+  upgrade({ ...args, expected_epoch: applied.owner.epoch, action: 'verify' }, 'codex');
+  assert.deepEqual(read(a).upgrade_history, originalHistory);
+  const recovered = upgrade({ ...args, expected_epoch: applied.owner.epoch, action: 'recover', source_instruction: 'Recover fictional candidate definitions' }, 'codex');
+  assert.equal(recovered.upgrade.status, 'recovered');
+  assert.deepEqual(read(a).roles, originalRoles); assert.deepEqual(read(a).upgrade_history, originalHistory);
+  assert.deepEqual(read(a).upgrade_history.map(h => h.review.artifact.review.verdict), ['Fail', 'Blocked']);
+  assert.equal(read(a).records.failed.review.verdict, 'Fail');
 });
