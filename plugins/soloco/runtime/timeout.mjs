@@ -2,6 +2,7 @@ export const TIMEOUT_POLICY_VERSION = 1;
 export const DEFAULT_EXECUTION_TIMEOUT_MS = 180000;
 export const MIN_EXECUTION_TIMEOUT_MS = 1000;
 export const MAX_EXECUTION_TIMEOUT_MS = 600000;
+export const UPGRADE_CALL_TIMEOUT_MS = 1800000;
 export const STARTUP_TIMEOUT_MS = 240000;
 export const TERMINATION_GRACE_MS = 3000;
 export const DEFAULT_TIMEOUT_REASON = 'Backward-compatible default execution timeout';
@@ -17,12 +18,15 @@ function add(start, duration) {
 
 // The existing adapter's explicit 180000 argument remains a default choice.
 // A different duration requires a reason. No extensions are represented here.
-export function normalizeTimeout(input = {}) {
+// Only the known internal upgrade-call context has a separate ceiling.
+export function normalizeTimeout(input = {}, context) {
+  if (context !== undefined && context !== 'upgrade-call') throw new Error('Invalid timeout context');
+  const maximum = context === 'upgrade-call' ? UPGRADE_CALL_TIMEOUT_MS : MAX_EXECUTION_TIMEOUT_MS;
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Invalid timeout settings');
   for (const key of Object.keys(input)) if (!['timeout_ms', 'timeout_reason'].includes(key)) throw new Error(`Unsupported timeout setting: ${key}`);
   const timeout_ms = input.timeout_ms === undefined ? DEFAULT_EXECUTION_TIMEOUT_MS : input.timeout_ms;
-  if (!Number.isSafeInteger(timeout_ms) || timeout_ms < MIN_EXECUTION_TIMEOUT_MS || timeout_ms > MAX_EXECUTION_TIMEOUT_MS) {
-    throw new Error(`Execution timeout must be an integer from ${MIN_EXECUTION_TIMEOUT_MS} to ${MAX_EXECUTION_TIMEOUT_MS} ms`);
+  if (!Number.isSafeInteger(timeout_ms) || timeout_ms < MIN_EXECUTION_TIMEOUT_MS || timeout_ms > maximum) {
+    throw new Error(`Execution timeout must be an integer from ${MIN_EXECUTION_TIMEOUT_MS} to ${maximum} ms`);
   }
   let timeout_reason;
   if (input.timeout_reason !== undefined) {
@@ -35,9 +39,9 @@ export function normalizeTimeout(input = {}) {
   return {timeout_ms, timeout_reason};
 }
 
-export function executionTiming(spawnedAt, settings = {}) {
+export function executionTiming(spawnedAt, settings = {}, context) {
   const start = instant(spawnedAt, 'execution start');
-  const policy = normalizeTimeout(settings);
+  const policy = normalizeTimeout(settings, context);
   const deadline = add(start, policy.timeout_ms);
   return {
     timeout_policy_version: TIMEOUT_POLICY_VERSION,

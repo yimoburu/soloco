@@ -193,3 +193,23 @@ test('startup expiry aborts without inventing spawn timing and launch errors ret
   assert.equal(f.state.jobs[failed.id].execution_failure.code,'ENOENT');
   assert.equal(f.state.jobs[failed.id].execution_failure.termination_confirmed,undefined);assert.equal(f.intervals.size,0);
 });
+
+
+test('upgrade call ceiling schema and runtime reject invalid options before all boundaries',async()=>{
+  const h=harness(),schema=h.main.toolList.find(t=>t.name==='company_upgrade').inputSchema;
+  assert.equal(schema.properties.call_timeout_minutes.type,'integer');
+  assert.deepEqual(Array.from(schema.properties.call_timeout_minutes.enum),[10,30]);
+  assert.equal(schema.required.includes('call_timeout_minutes'),false);
+  let effects=0;
+  const forbidden=()=>{effects++;throw new Error('Unexpected boundary');};
+  const runtime=load('upgrade.mjs',{binding:forbidden,withStore:forbidden},['upgrade']);
+  for(const value of [undefined,null,'30',30.1,0,20,60,Infinity,NaN,{},[],true,new Number(30)]) {
+    assert.throws(()=>runtime.upgrade({action:'prepare',call_timeout_minutes:value},'codex',{launch:forbidden,check:forbidden,catalog:forbidden}),/call_timeout_minutes/);
+  }
+  for(const action of ['inspect','apply','verify','recover','unknown']) {
+    assert.throws(()=>runtime.upgrade({action,call_timeout_minutes:30},'codex',{launch:forbidden,check:forbidden,catalog:forbidden}),/only supported.*prepare/);
+  }
+  assert.equal(effects,0);
+  await assert.rejects(h.main.call('company_dispatch',{...h.args,timeout_ms:1800000,timeout_reason:'Upgrade context cannot be requested by business dispatch'},'codex'));
+  assert.equal(h.launches.length,0);
+});

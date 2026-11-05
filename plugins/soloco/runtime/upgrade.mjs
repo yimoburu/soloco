@@ -6,7 +6,6 @@ import { PACKAGE, VERSION, SCHEMA, stamp, id, digest, withStore, requireText, te
 import { binding, dataDir, upgradeSummary } from './engine.mjs';
 import { readiness, modelCatalog, runModel, parseArtifact } from './adapters.mjs';
 import { normalizeSelection } from './selection.mjs';
-import { MAX_EXECUTION_TIMEOUT_MS } from './timeout.mjs';
 
 import { buildEvidence, projectionPreview, evidencePage, readEvidence, createDeliveryLedger, recordDelivery, validateCitations, admitPrompt, recordResponse, boundedReplayBatches, RESPONSE_LIMIT } from './upgrade-evidence.mjs';
 
@@ -18,6 +17,11 @@ const deadline = u => {
   }
   if (u.review_deadline_policy!==undefined && (u.review_deadline_policy!=='finite' || !Number.isFinite(u.deadline_ms))) throw new Error('Invalid upgrade deadline policy; recover before retrying');
   return u.deadline_ms ?? Date.parse(u.created_at)+420000;
+};
+const callMinutes = u => {
+  if (!Object.hasOwn(u,'call_timeout_minutes')) return 10;
+  if (![10,30].includes(u.call_timeout_minutes)) throw new Error('Invalid upgrade call timeout policy; recover before retrying');
+  return u.call_timeout_minutes;
 };
 const active = s => Object.values(s.jobs).some(j=>['queued','running'].includes(j.status));
 export const REHEARSAL_TIMEOUT_MS = 45*60*1000;
@@ -50,6 +54,9 @@ const checkpointHash = s => digest(JSON.stringify(checkpoint(s)));
 function savedCheckpointIntegrity(u,expected=u.evidence?.checkpoint_sha256??u.checkpoint_sha256) {
   if (u.checkpoint_sha256!==expected || digest(JSON.stringify(u.checkpoint))!==expected) throw new Error('Saved upgrade checkpoint or pinned hash changed; recover before retrying');
   if (Object.hasOwn(u.evidence??{},'review_deadline_policy') && (u.review_deadline_policy!==u.evidence.review_deadline_policy || u.deadline_ms!==u.evidence.deadline_ms)) throw new Error('Upgrade deadline policy changed; recover before retrying');
+  callMinutes(u);
+  if ((Object.hasOwn(u,'call_timeout_minutes') || Object.hasOwn(u.evidence??{},'call_timeout_minutes'))
+      && u.call_timeout_minutes!==u.evidence?.call_timeout_minutes) throw new Error('Upgrade call timeout policy changed; recover before retrying');
   // Legacy attempts had neither field. New attempts bind the exact normalized
   // request (including rationale), independently of any execution observations.
   if (Object.hasOwn(u,'model_selection') || Object.hasOwn(u,'model_selection_sha256') || u.evidence?.model_selection_sha256) {
@@ -80,9 +87,13 @@ function retire(s) {
 function report(s) {
   return {company_id:s.id,owner:s.owner,paused:s.paused,plugin_version:s.plugin_version,runtime_version:s.runtime_version,upgrade:upgradeSummary(s.upgrade)};
 }
-export const upgradeGuidance = `Company upgrade maintenance: use company_status and company_upgrade inspect to compare the installed candidate with this company's pinned team. Installing a package does not authorize adoption. Only proceed after the founder asks to upgrade. Preserve governance by default; show the actual differences and obtain explicit direction before choosing installed governance. Pause/reconcile active assignments, then prepare with the inspected candidate_hash, current expected_epoch, and exact source_instruction. Optional prepare-only review_window_minutes accepts 45 (default), 90, or null for explicitly no overall deadline on a fresh attempt; it never extends an existing deadline or grants authority. Preparation launches a fresh CoS rehearsal and an independent QA session without business tools. Poll company_wait/status; do not claim roles started until reported. When ready, apply the same upgrade_id, then verify it. Reopen company_open to load the adopted pinned CoS instructions before resuming; resume only if covered by the founder's request. On failed/interrupted checks, inspect and recover the previous definitions; never retry silently, reset records, or bypass the hold. Recovery keeps new company facts and uses this runtime, not an older binary. Prefer the current owning chat. If continuing in a different founder chat, pause first and supply the exact founder instruction as takeover_instruction; preparation transfers ownership and revokes the old epoch. If the previous coordinator disappeared during a pending upgrade, recover it with an explicit takeover_instruction before preparing again. No upgrade grants business execution authority.`;
+export const upgradeGuidance = `Company upgrade maintenance: use company_status and company_upgrade inspect to compare the installed candidate with this company's pinned team. Installing a package does not authorize adoption. Only proceed after the founder asks to upgrade. Preserve governance by default; show the actual differences and obtain explicit direction before choosing installed governance. Pause/reconcile active assignments, then prepare with the inspected candidate_hash, current expected_epoch, and exact source_instruction. Optional prepare-only call_timeout_minutes accepts integer 10 (default) or 30, fixed for every CoS and independent QA call on a fresh attempt and capped by any remaining overall window. It never extends an existing attempt. Optional prepare-only review_window_minutes accepts 45 (default), 90, or null for explicitly no overall deadline on a fresh attempt; it never extends an existing deadline or grants authority. Preparation launches a fresh CoS rehearsal and an independent QA session without business tools. Poll company_wait/status; do not claim roles started until reported. When ready, apply the same upgrade_id, then verify it. Reopen company_open to load the adopted pinned CoS instructions before resuming; resume only if covered by the founder's request. On failed/interrupted checks, inspect and recover the previous definitions; never retry silently, reset records, or bypass the hold. Recovery keeps new company facts and uses this runtime, not an older binary. Prefer the current owning chat. If continuing in a different founder chat, pause first and supply the exact founder instruction as takeover_instruction; preparation transfers ownership and revokes the old epoch. If the previous coordinator disappeared during a pending upgrade, recover it with an explicit takeover_instruction before preparing again. No upgrade grants business execution authority.`;
 
 export function upgrade(a,host,{launch=launchUpgrade,check=readiness,catalog=modelCatalog}={}) {
+  if (Object.hasOwn(a,'call_timeout_minutes')) {
+    if (a.action!=='prepare') throw new Error('call_timeout_minutes is only supported for upgrade prepare');
+    if (![10,30].includes(a.call_timeout_minutes)) throw new Error('call_timeout_minutes must be 10 or 30');
+  }
   if (Object.hasOwn(a,'review_window_minutes')) {
     if (a.action!=='prepare') throw new Error('review_window_minutes is only supported for upgrade prepare');
     if (![45,90,null].includes(a.review_window_minutes)) throw new Error('review_window_minutes must be 45, 90 or null');
@@ -119,7 +130,8 @@ export function upgrade(a,host,{launch=launchUpgrade,check=readiness,catalog=mod
       s.paused=true;s.owner={host,session_id:a.session_id,epoch:s.owner.epoch+1};
       decision(s,a,'prepare_team_upgrade');
       const snapshot=checkpoint(s);
-      s.upgrade={id:id('upgrade'),status:'queued',created_at:stamp(),review_window_minutes:reviewWindowMinutes,review_deadline_policy:reviewWindowMinutes===null?'none':'finite',deadline_ms:reviewWindowMinutes===null?null:Date.now()+reviewWindowMinutes*60000,history_sha256:historyHash(s),epoch:s.owner.epoch,host,model_selection:selection,model_selection_sha256:digest(JSON.stringify(selection)),...(metadata?{model_catalog:{source:metadata.source,...(selection.mode==='explicit'?{model:metadata.models.find(m=>m.id===selection.model)}:{}),speed_support:metadata.speed_support}}:{}),previous,candidate:next,candidate_hash:teamHash(next),checkpoint:snapshot,checkpoint_sha256:checkpointHash(s),governance_policy:a.governance??'preserve',governance_instruction:a.governance_instruction??null,source_instruction:a.source_instruction,takeover_instruction:a.takeover_instruction??null};
+      // Bind the selected call cap before launch; inventory fills in the evidence pages later.
+      s.upgrade={id:id('upgrade'),status:'queued',created_at:stamp(),call_timeout_minutes:a.call_timeout_minutes??10,evidence:{call_timeout_minutes:a.call_timeout_minutes??10,pages:[]},review_window_minutes:reviewWindowMinutes,review_deadline_policy:reviewWindowMinutes===null?'none':'finite',deadline_ms:reviewWindowMinutes===null?null:Date.now()+reviewWindowMinutes*60000,history_sha256:historyHash(s),epoch:s.owner.epoch,host,model_selection:selection,model_selection_sha256:digest(JSON.stringify(selection)),...(metadata?{model_catalog:{source:metadata.source,...(selection.mode==='explicit'?{model:metadata.models.find(m=>m.id===selection.model)}:{}),speed_support:metadata.speed_support}}:{}),previous,candidate:next,candidate_hash:teamHash(next),checkpoint:snapshot,checkpoint_sha256:checkpointHash(s),governance_policy:a.governance??'preserve',governance_instruction:a.governance_instruction??null,source_instruction:a.source_instruction,takeover_instruction:a.takeover_instruction??null};
       return s;
     }));
     try {launch(a.root,s.upgrade.id);} catch(error) {failUpgrade(a.root,s.upgrade.id,error);}
@@ -260,6 +272,7 @@ export async function rehearse(root,uid,model=runModel) {
       if (s.upgrade?.id!==uid || s.upgrade.status!==status || JSON.stringify(s.owner)!==frozenOwner
           || !s.paused || active(s) || checkpointHash(s)!==u.checkpoint_sha256
           || historyHash(s)!==subject.history_sha256 || Date.now()>=deadline(u) || deadline(s.upgrade)!==deadline(u)
+          || s.upgrade.call_timeout_minutes!==u.call_timeout_minutes
           || s.upgrade.review_deadline_policy!==u.review_deadline_policy
           || JSON.stringify(s.upgrade.model_selection)!==JSON.stringify(u.model_selection)
           || s.upgrade.model_selection_sha256!==u.model_selection_sha256
@@ -283,7 +296,7 @@ export async function rehearse(root,uid,model=runModel) {
       }));
     }
     publish('upgrade.inventory',a=>{
-      a.evidence={review_deadline_policy:u.review_deadline_policy,deadline_ms:u.deadline_ms,model_selection_sha256:u.model_selection_sha256,checkpoint_sha256:subject.checkpoint_sha256,inventory_sha256:subject.inventory_sha256,history_sha256:subject.history_sha256,
+      a.evidence={...(Object.hasOwn(u,'call_timeout_minutes')?{call_timeout_minutes:u.call_timeout_minutes}:{}),review_deadline_policy:u.review_deadline_policy,deadline_ms:u.deadline_ms,model_selection_sha256:u.model_selection_sha256,checkpoint_sha256:subject.checkpoint_sha256,inventory_sha256:subject.inventory_sha256,history_sha256:subject.history_sha256,
         counts:subject.inventory.counts,pages:pages.map(({text,...metadata})=>metadata)};
       a.cos_pages=[];a.qa_pages=[];a.replays=[];
     });
@@ -328,14 +341,14 @@ Protocol: Return JSON only matching response_contract.required_json_shape for th
         const prompt=promptFor(role,data);
         const budget=admitPrompt(prompt,session.used);
         const dir=path.join(dataDir(),'sessions',session.instance);noLink(dir);fs.mkdirSync(dir,{recursive:true,mode:0o700});
-        const remaining=Math.min(MAX_EXECUTION_TIMEOUT_MS,deadline(u)-Date.now());
+        const remaining=Math.min(callMinutes(u)*60000,deadline(u)-Date.now());
         if(remaining<1000)throw new Error('Upgrade deadline expired before native call');
         let output;
         const controller=new AbortController();
         const timer=Number.isFinite(deadline(u))?setTimeout(()=>controller.abort(),deadline(u)-Date.now()):null;
         const requested=structuredClone(u.model_selection??null);
         const unknownEvidence={reported_models:[],reported_effort:null,reported_service_tier:null,applied_controls:null,verification:'unverified',source:'not_reported',scope:'unknown'};
-        try { output=await model(u.host,session.native,prompt,dir,remaining,structuredClone(requested),{timeoutReason:'Runtime execution ceiling capped by remaining immutable upgrade rehearsal deadline',signal:controller.signal}); }
+        try { output=await model(u.host,session.native,prompt,dir,remaining,structuredClone(requested),{timeoutContext:'upgrade-call',timeoutReason:'Runtime execution ceiling capped by remaining immutable upgrade rehearsal deadline',signal:controller.signal}); }
         catch(error) {retain(role,{phase:task.phase,model_selection:requested,model_evidence:unknownEvidence,error:error.message,...(error.code?{error_code:error.code}:{}),budget,completed_at:stamp()});throw error;}
         finally {if(timer!==null)clearTimeout(timer);}
         retain(role,{phase:task.phase,model_selection:requested,model_evidence:output.model_evidence??unknownEvidence,native_id:output.native_id??null,text:output.text,budget,response_characters:typeof output.text==='string'?output.text.length:null,estimated_response_tokens:typeof output.text==='string'?Math.ceil(output.text.length/4):null,completed_at:stamp()});
