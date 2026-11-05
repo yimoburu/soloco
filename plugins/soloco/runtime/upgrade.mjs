@@ -11,7 +11,14 @@ import { MAX_EXECUTION_TIMEOUT_MS } from './timeout.mjs';
 import { buildEvidence, projectionPreview, evidencePage, readEvidence, createDeliveryLedger, recordDelivery, validateCitations, admitPrompt, recordResponse, boundedReplayBatches, RESPONSE_LIMIT } from './upgrade-evidence.mjs';
 
 const historyHash = s => digest(JSON.stringify(s.upgrade_history ?? []));
-const deadline = u => u.deadline_ms ?? Date.parse(u.created_at)+420000;
+const deadline = u => {
+  if (u.review_deadline_policy==='none') {
+    if (u.deadline_ms!==null || u.review_window_minutes!==null) throw new Error('Invalid no-overall-deadline policy; recover before retrying');
+    return Infinity;
+  }
+  if (u.review_deadline_policy!==undefined && (u.review_deadline_policy!=='finite' || !Number.isFinite(u.deadline_ms))) throw new Error('Invalid upgrade deadline policy; recover before retrying');
+  return u.deadline_ms ?? Date.parse(u.created_at)+420000;
+};
 const active = s => Object.values(s.jobs).some(j=>['queued','running'].includes(j.status));
 export const REHEARSAL_TIMEOUT_MS = 45*60*1000;
 function compatible(s) {
@@ -42,6 +49,7 @@ export function checkpoint(s) {
 const checkpointHash = s => digest(JSON.stringify(checkpoint(s)));
 function savedCheckpointIntegrity(u,expected=u.evidence?.checkpoint_sha256??u.checkpoint_sha256) {
   if (u.checkpoint_sha256!==expected || digest(JSON.stringify(u.checkpoint))!==expected) throw new Error('Saved upgrade checkpoint or pinned hash changed; recover before retrying');
+  if (Object.hasOwn(u.evidence??{},'review_deadline_policy') && (u.review_deadline_policy!==u.evidence.review_deadline_policy || u.deadline_ms!==u.evidence.deadline_ms)) throw new Error('Upgrade deadline policy changed; recover before retrying');
   // Legacy attempts had neither field. New attempts bind the exact normalized
   // request (including rationale), independently of any execution observations.
   if (Object.hasOwn(u,'model_selection') || Object.hasOwn(u,'model_selection_sha256') || u.evidence?.model_selection_sha256) {
@@ -72,9 +80,13 @@ function retire(s) {
 function report(s) {
   return {company_id:s.id,owner:s.owner,paused:s.paused,plugin_version:s.plugin_version,runtime_version:s.runtime_version,upgrade:upgradeSummary(s.upgrade)};
 }
-export const upgradeGuidance = `Company upgrade maintenance: use company_status and company_upgrade inspect to compare the installed candidate with this company's pinned team. Installing a package does not authorize adoption. Only proceed after the founder asks to upgrade. Preserve governance by default; show the actual differences and obtain explicit direction before choosing installed governance. Pause/reconcile active assignments, then prepare with the inspected candidate_hash, current expected_epoch, and exact source_instruction. Preparation launches a fresh CoS rehearsal and an independent QA session without business tools. Poll company_wait/status; do not claim roles started until reported. When ready, apply the same upgrade_id, then verify it. Reopen company_open to load the adopted pinned CoS instructions before resuming; resume only if covered by the founder's request. On failed/interrupted checks, inspect and recover the previous definitions; never retry silently, reset records, or bypass the hold. Recovery keeps new company facts and uses this runtime, not an older binary. Prefer the current owning chat. If continuing in a different founder chat, pause first and supply the exact founder instruction as takeover_instruction; preparation transfers ownership and revokes the old epoch. If the previous coordinator disappeared during a pending upgrade, recover it with an explicit takeover_instruction before preparing again. No upgrade grants business execution authority.`;
+export const upgradeGuidance = `Company upgrade maintenance: use company_status and company_upgrade inspect to compare the installed candidate with this company's pinned team. Installing a package does not authorize adoption. Only proceed after the founder asks to upgrade. Preserve governance by default; show the actual differences and obtain explicit direction before choosing installed governance. Pause/reconcile active assignments, then prepare with the inspected candidate_hash, current expected_epoch, and exact source_instruction. Optional prepare-only review_window_minutes accepts 45 (default), 90, or null for explicitly no overall deadline on a fresh attempt; it never extends an existing deadline or grants authority. Preparation launches a fresh CoS rehearsal and an independent QA session without business tools. Poll company_wait/status; do not claim roles started until reported. When ready, apply the same upgrade_id, then verify it. Reopen company_open to load the adopted pinned CoS instructions before resuming; resume only if covered by the founder's request. On failed/interrupted checks, inspect and recover the previous definitions; never retry silently, reset records, or bypass the hold. Recovery keeps new company facts and uses this runtime, not an older binary. Prefer the current owning chat. If continuing in a different founder chat, pause first and supply the exact founder instruction as takeover_instruction; preparation transfers ownership and revokes the old epoch. If the previous coordinator disappeared during a pending upgrade, recover it with an explicit takeover_instruction before preparing again. No upgrade grants business execution authority.`;
 
 export function upgrade(a,host,{launch=launchUpgrade,check=readiness,catalog=modelCatalog}={}) {
+  if (Object.hasOwn(a,'review_window_minutes')) {
+    if (a.action!=='prepare') throw new Error('review_window_minutes is only supported for upgrade prepare');
+    if (![45,90,null].includes(a.review_window_minutes)) throw new Error('review_window_minutes must be 45, 90 or null');
+  }
   if (Object.hasOwn(a,'model_selection') && a.action!=='prepare') throw new Error('model_selection is only supported for upgrade prepare');
   binding(a,host);
   if (a.action==='inspect') return withStore(a.root,db=>{
@@ -82,6 +94,7 @@ export function upgrade(a,host,{launch=launchUpgrade,check=readiness,catalog=mod
     return {...report(s),projection_preview:projectionPreview(checkpoint(s),s.upgrade_history??[],s.upgrade??null),candidate_hash:teamHash(next),candidate_version:VERSION,changes:{roles:Object.keys(next.roles).filter(k=>JSON.stringify(old.roles[k])!==JSON.stringify(next.roles[k])),cos_instructions_changed:old.cos_instructions!==next.cos_instructions,governance_changed:old.governance!==next.governance},governance:{policy:a.governance??'preserve',current:s.governance,installed:installedTeam().governance},prior_instructions:old.cos_instructions,candidate_instructions:next.cos_instructions};
   });
   if (a.action==='prepare') {
+    const reviewWindowMinutes=Object.hasOwn(a,'review_window_minutes')?a.review_window_minutes:REHEARSAL_TIMEOUT_MS/60000;
     requireText(a.source_instruction,'source_instruction');
     const metadata=a.model_selection?.mode==='explicit' || a.model_selection?.speed==='fast_disabled'?catalog(host):null;
     const normalized=normalizeSelection(a.model_selection,host,metadata);
@@ -106,7 +119,7 @@ export function upgrade(a,host,{launch=launchUpgrade,check=readiness,catalog=mod
       s.paused=true;s.owner={host,session_id:a.session_id,epoch:s.owner.epoch+1};
       decision(s,a,'prepare_team_upgrade');
       const snapshot=checkpoint(s);
-      s.upgrade={id:id('upgrade'),status:'queued',created_at:stamp(),deadline_ms:Date.now()+REHEARSAL_TIMEOUT_MS,history_sha256:historyHash(s),epoch:s.owner.epoch,host,model_selection:selection,model_selection_sha256:digest(JSON.stringify(selection)),...(metadata?{model_catalog:{source:metadata.source,...(selection.mode==='explicit'?{model:metadata.models.find(m=>m.id===selection.model)}:{}),speed_support:metadata.speed_support}}:{}),previous,candidate:next,candidate_hash:teamHash(next),checkpoint:snapshot,checkpoint_sha256:checkpointHash(s),governance_policy:a.governance??'preserve',governance_instruction:a.governance_instruction??null,source_instruction:a.source_instruction,takeover_instruction:a.takeover_instruction??null};
+      s.upgrade={id:id('upgrade'),status:'queued',created_at:stamp(),review_window_minutes:reviewWindowMinutes,review_deadline_policy:reviewWindowMinutes===null?'none':'finite',deadline_ms:reviewWindowMinutes===null?null:Date.now()+reviewWindowMinutes*60000,history_sha256:historyHash(s),epoch:s.owner.epoch,host,model_selection:selection,model_selection_sha256:digest(JSON.stringify(selection)),...(metadata?{model_catalog:{source:metadata.source,...(selection.mode==='explicit'?{model:metadata.models.find(m=>m.id===selection.model)}:{}),speed_support:metadata.speed_support}}:{}),previous,candidate:next,candidate_hash:teamHash(next),checkpoint:snapshot,checkpoint_sha256:checkpointHash(s),governance_policy:a.governance??'preserve',governance_instruction:a.governance_instruction??null,source_instruction:a.source_instruction,takeover_instruction:a.takeover_instruction??null};
       return s;
     }));
     try {launch(a.root,s.upgrade.id);} catch(error) {failUpgrade(a.root,s.upgrade.id,error);}
@@ -247,6 +260,7 @@ export async function rehearse(root,uid,model=runModel) {
       if (s.upgrade?.id!==uid || s.upgrade.status!==status || JSON.stringify(s.owner)!==frozenOwner
           || !s.paused || active(s) || checkpointHash(s)!==u.checkpoint_sha256
           || historyHash(s)!==subject.history_sha256 || Date.now()>=deadline(u) || deadline(s.upgrade)!==deadline(u)
+          || s.upgrade.review_deadline_policy!==u.review_deadline_policy
           || JSON.stringify(s.upgrade.model_selection)!==JSON.stringify(u.model_selection)
           || s.upgrade.model_selection_sha256!==u.model_selection_sha256
           || teamHash(s.upgrade.candidate)!==u.candidate_hash
@@ -269,7 +283,7 @@ export async function rehearse(root,uid,model=runModel) {
       }));
     }
     publish('upgrade.inventory',a=>{
-      a.evidence={model_selection_sha256:u.model_selection_sha256,checkpoint_sha256:subject.checkpoint_sha256,inventory_sha256:subject.inventory_sha256,history_sha256:subject.history_sha256,
+      a.evidence={review_deadline_policy:u.review_deadline_policy,deadline_ms:u.deadline_ms,model_selection_sha256:u.model_selection_sha256,checkpoint_sha256:subject.checkpoint_sha256,inventory_sha256:subject.inventory_sha256,history_sha256:subject.history_sha256,
         counts:subject.inventory.counts,pages:pages.map(({text,...metadata})=>metadata)};
       a.cos_pages=[];a.qa_pages=[];a.replays=[];
     });
@@ -278,7 +292,7 @@ export async function rehearse(root,uid,model=runModel) {
 Protocol: Return JSON only matching response_contract.required_json_shape for this role and effective phase. REQUIRED top-level content must be a string and citations must be an array: a nested findings array cannot replace them. Replace the text/review placeholders with substantive evidence-based findings, conflicts and unresolved obligations. Copy exact citation metadata from the supplied page citation_ranges, delivered reads, or your own previously delivered evidence; never calculate or invent hashes. Page findings must cite this semantic page. Keep findings page-specific and avoid recopying long source reports while retaining every distinct constraint, blocker and uncertainty and a complete final reconstruction. Final continuity fields each need substantive text and their own citations. QA must judge truth, not delivery alone: a page Pass only permits continue_upgrade_review; only final synthesis can permit apply_preparation_team after all pages Pass with no unresolved blockers. Replay acknowledges all supplied findings and retains every blocker; it grants no permission and cannot replace earlier reviews. Alternatively, return ONLY the reads envelope shown in response_contract.reads_only_shape, with exact frozen source ID/hash and bounded UTF-16 ranges, then answer the same phase after retrieval. Do not combine reads with artifact fields. No filesystem/external tools. Total response <=${RESPONSE_LIMIT} characters.`;
     const authority={company_id:u.checkpoint.id,checkpoint_sha256:u.checkpoint_sha256,inventory_sha256:subject.inventory_sha256,
       governance_policy:u.governance_policy,source_instruction:u.source_instruction,governance_instruction:u.governance_instruction,
-      governance:u.checkpoint.governance,candidate:u.candidate,owner:initial.owner,paused:true,deadline_ms:deadline(u)};
+      governance:u.checkpoint.governance,candidate:u.candidate,owner:initial.owner,paused:true,review_deadline_policy:u.review_deadline_policy??'legacy',deadline_ms:deadline(u)===Infinity?null:deadline(u)};
     function promptFor(role,data) {
       const phase=data.resume_phase??data.phase;
       const required_review=role==='qa' && ['page','synthesis'].includes(phase)
@@ -318,12 +332,12 @@ Protocol: Return JSON only matching response_contract.required_json_shape for th
         if(remaining<1000)throw new Error('Upgrade deadline expired before native call');
         let output;
         const controller=new AbortController();
-        const timer=setTimeout(()=>controller.abort(),deadline(u)-Date.now());
+        const timer=Number.isFinite(deadline(u))?setTimeout(()=>controller.abort(),deadline(u)-Date.now()):null;
         const requested=structuredClone(u.model_selection??null);
         const unknownEvidence={reported_models:[],reported_effort:null,reported_service_tier:null,applied_controls:null,verification:'unverified',source:'not_reported',scope:'unknown'};
         try { output=await model(u.host,session.native,prompt,dir,remaining,structuredClone(requested),{timeoutReason:'Runtime execution ceiling capped by remaining immutable upgrade rehearsal deadline',signal:controller.signal}); }
         catch(error) {retain(role,{phase:task.phase,model_selection:requested,model_evidence:unknownEvidence,error:error.message,...(error.code?{error_code:error.code}:{}),budget,completed_at:stamp()});throw error;}
-        finally {clearTimeout(timer);}
+        finally {if(timer!==null)clearTimeout(timer);}
         retain(role,{phase:task.phase,model_selection:requested,model_evidence:output.model_evidence??unknownEvidence,native_id:output.native_id??null,text:output.text,budget,response_characters:typeof output.text==='string'?output.text.length:null,estimated_response_tokens:typeof output.text==='string'?Math.ceil(output.text.length/4):null,completed_at:stamp()});
         check();
         requireText(output.native_id,'native session ID');

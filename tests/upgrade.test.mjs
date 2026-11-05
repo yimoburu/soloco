@@ -33,7 +33,7 @@ function setup(host='codex') {
   }));return a;
 }
 function prepare(a,host='codex',extra={}) {
-  const {model_selection,...inspectionExtra}=extra;
+  const {model_selection,review_window_minutes,...inspectionExtra}=extra;
   const args={...a,...inspectionExtra,action:'inspect'};
   const inspection=upgrade(args,host);
   return upgrade({...args,action:'prepare',candidate_hash:inspection.candidate_hash,source_instruction:'Upgrade my company team and resume after successful checks',...extra},host,{...options,catalog:()=>selectionCatalog});
@@ -66,6 +66,194 @@ async function ready(a,host='codex') {
   assert.equal(read(a).upgrade.status,'ready',read(a).upgrade.error);
   return {...a,upgrade_id:p.upgrade.id,expected_epoch:p.owner.epoch};
 }
+
+test('prepare stores the default or selected review window and exposes the original grant and deadline for audit',()=>{
+  for(const window of [undefined,45,90,null]) {
+    const a=setup(),before=Date.now(),grant=window===null?'ignore the time limit':window===90?'Approve one 90-minute attempt':'Upgrade the fictional team with a 45-minute review window';
+    const p=prepare(a,'codex',{...(window===undefined?{}:{review_window_minutes:window}),source_instruction:grant});
+    const after=Date.now(),u=read(a).upgrade,minutes=window===undefined?45:window;
+    assert.equal(u.review_window_minutes,minutes);
+    assert.equal(u.review_deadline_policy,minutes===null?'none':'finite');
+    if(minutes===null)assert.equal(u.deadline_ms,null);
+    else assert.ok(u.deadline_ms>=before+minutes*60000 && u.deadline_ms<=after+minutes*60000);
+    assert.equal(p.upgrade.review_window_minutes,minutes);
+    assert.equal(p.upgrade.deadline_ms,u.deadline_ms);
+    assert.equal(p.upgrade.source_instruction,grant);
+    const summary=engine.status(a,'codex').upgrade;
+    assert.equal(summary.review_window_minutes,minutes);
+    assert.equal(summary.deadline_ms,u.deadline_ms);
+    assert.equal(upgrade({...a,action:'inspect'},'codex').upgrade.review_window_minutes,minutes);
+    assert.ok(Object.values(read(a).records).some(r=>r.action==='prepare_team_upgrade' && r.content===grant));
+  }
+});
+
+test('invalid review windows and non-prepare use reject before readiness, catalog, launch or state changes',async()=>{
+  const a=setup(),inspection=upgrade({...a,action:'inspect'},'codex'),before=read(a);
+  const {epoch,...toolArgs}=a;
+  const args={...toolArgs,candidate_hash:inspection.candidate_hash,source_instruction:'Approve one 90-minute attempt',model_selection:selected};
+  const forbidden=()=>{throw new Error('Unexpected external boundary');};
+  const deps={launch:forbidden,check:forbidden,catalog:forbidden};
+  for(const value of [undefined,false,true,'45','90',0,-45,44,46,60,89,91,45.5,90.1,NaN,Infinity,[],{},new Number(90)]) {
+    assert.throws(()=>upgrade({...args,action:'prepare',review_window_minutes:value},'codex',deps),/review_window_minutes/);
+    await assert.rejects(call('company_upgrade',{...args,action:'prepare',review_window_minutes:value},'codex'),/review_window_minutes/);
+    assert.deepEqual(read(a),before);
+  }
+  for(const action of ['inspect','apply','verify','recover','unknown'])for(const value of [45,90,null]) {
+    assert.throws(()=>upgrade({...args,action,review_window_minutes:value},'codex',deps),/only supported.*prepare/);
+    await assert.rejects(call('company_upgrade',{...args,action,review_window_minutes:value},'codex'));
+    assert.deepEqual(read(a),before);
+  }
+});
+
+test('prepare cannot extend an active or expired attempt; recovery preserves it for a fresh request',()=>{
+  for(const expired of [false,true]) {
+    const a=setup(),p=prepare(a,'codex',{review_window_minutes:45});
+    const now=Date.now;
+    try {
+      if(expired)Date.now=()=>p.upgrade.deadline_ms+1;
+      const before=read(a);
+      for(const requested of [90,null]) {
+        assert.throws(()=>prepare({...a,expected_epoch:p.owner.epoch},'codex',{review_window_minutes:requested}),/already pending/);
+        assert.deepEqual(read(a),before);
+      }
+      if(expired)assert.equal(engine.status(a,'codex').upgrade.status,'failed');
+      const held=read(a).upgrade;
+      assert.equal(held.deadline_ms,p.upgrade.deadline_ms);
+      assert.equal(held.review_window_minutes,45);
+      const recovered=upgrade({...a,action:'recover',expected_epoch:p.owner.epoch,upgrade_id:p.upgrade.id,source_instruction:'Recover the held attempt'},'codex');
+      const old=read(a).upgrade;
+      const fresh=prepare({...a,expected_epoch:recovered.owner.epoch},'codex',{review_window_minutes:90,source_instruction:'Approve one 90-minute attempt'});
+      assert.notEqual(fresh.upgrade.id,p.upgrade.id);
+      assert.equal(fresh.upgrade.review_window_minutes,90);
+      assert.deepEqual(read(a).upgrade_history.at(-1),old);
+    } finally {Date.now=now;}
+  }
+});
+
+test('apply and verify use the stored deadline regardless of selected-window audit metadata',async()=>{
+  for(const action of ['apply','verify'])for(const window of [45,90,'legacy-stored','legacy-fallback']) {
+    const a=setup(),p=prepare(a,'codex',typeof window==='number'?{review_window_minutes:window}:{});
+    if(typeof window==='string')withStore(a.root,db=>db.transaction('test.legacy_gate',s=>{
+      delete s.upgrade.review_deadline_policy;delete s.upgrade.review_window_minutes;
+      if(window==='legacy-fallback')delete s.upgrade.deadline_ms;
+      return s;
+    }));
+    const original=read(a).upgrade;
+    const originalDeadline=original.deadline_ms??Date.parse(original.created_at)+420000;
+    await rehearse(a.root,p.upgrade.id,modelFor(a));
+    assert.equal(read(a).upgrade.status,'ready',read(a).upgrade.error);
+    let args={...a,upgrade_id:p.upgrade.id,expected_epoch:p.owner.epoch};
+    if(action==='verify')args.expected_epoch=upgrade({...args,action:'apply'},'codex').owner.epoch;
+    // Audit metadata never recomputes the deadline, even if altered in a fixture.
+    withStore(a.root,db=>db.transaction('test.audit_only',s=>{s.upgrade.review_window_minutes=90;return s;}));
+    const before=read(a),now=Date.now;
+    try {
+      Date.now=()=>originalDeadline;
+      assert.throws(()=>upgrade({...args,action,review_window_minutes:90},'codex'),/only supported.*prepare/);
+      assert.throws(()=>upgrade({...args,action},'codex'),/deadline expired/);
+      assert.deepEqual(read(a),before);
+    } finally {Date.now=now;}
+  }
+});
+
+test('explicit none survives elapsed finite windows with no overall timer or serialization ambiguity',async t=>{
+  const a=setup(),p=prepare(a,'codex',{review_window_minutes:null,source_instruction:'ignore the time limit'}),model=modelFor(a),now=Date.now;
+  const original=read(a).upgrade;
+  let calls=0,timers=0;
+  t.mock.method(globalThis,'setTimeout',()=>{timers++;throw new Error('No overall timer permitted');});
+  try {
+    Date.now=()=>now()+3*60*60*1000;
+    await rehearse(a.root,p.upgrade.id,async(...args)=>{
+      calls++;
+      assert.equal(args[4],600000);
+      assert.equal(args[6].signal.aborted,false);
+      const task=JSON.parse(args[2]);
+      assert.equal(task.authority.deadline_ms,null);
+      assert.equal(task.authority.review_deadline_policy,'none');
+      assert.equal(engine.status(a,'codex').upgrade.status,'checking');
+      return model(...args);
+    });
+    const u=read(a).upgrade;
+    assert.equal(u.status,'ready',u.error);assert.ok(calls>1);assert.equal(timers,0);
+    assert.equal(u.deadline_ms,null);assert.equal(u.review_deadline_policy,'none');
+    assert.equal(u.created_at,original.created_at);
+    const done=applyAndVerify({...a,upgrade_id:p.upgrade.id,expected_epoch:p.owner.epoch});
+    assert.equal(done.upgrade.status,'completed');assert.equal(done.upgrade.deadline_ms,null);
+    assert.equal(done.upgrade.review_deadline_policy,'none');
+  } finally {Date.now=now;t.mock.restoreAll();}
+});
+
+test('status and wait preserve explicit none after finite windows while legacy null still expires',async()=>{
+  const a=setup(),p=prepare(a,'codex',{review_window_minutes:null}),now=Date.now;
+  try {
+    Date.now=()=>now()+3*60*60*1000;
+    const status=engine.status(a,'codex');
+    assert.equal(status.upgrade.status,'queued');assert.equal(status.upgrade.deadline_ms,null);
+    const waited=await call('company_wait',{root:a.root,session_id:a.session_id,seconds:0},'codex');
+    assert.equal(waited.upgrade.status,'queued');assert.equal(waited.upgrade.id,p.upgrade.id);
+  } finally {Date.now=now;}
+});
+
+test('legacy null deadlines retain fallback; partial or corrupted explicit policies cannot disable expiry',async()=>{
+  for(const kind of ['legacy-missing','legacy-null','legacy-null-selection','corrupt-none','corrupt-finite']) {
+    const a=setup(),p=prepare(a);
+    withStore(a.root,db=>db.transaction('test.null_deadline',s=>{
+      const u=s.upgrade;u.created_at=new Date(Date.now()-8*60000).toISOString();
+      delete u.review_deadline_policy;delete u.review_window_minutes;
+      if(kind==='legacy-missing')delete u.deadline_ms;
+      else u.deadline_ms=null;
+      if(kind==='legacy-null-selection')u.review_window_minutes=null;
+      if(kind==='corrupt-none')u.review_deadline_policy='none';
+      if(kind==='corrupt-finite')u.review_deadline_policy='finite';
+      return s;
+    }));
+    assert.equal(engine.status(a,'codex').upgrade.status,'failed',kind);
+    let calls=0;await rehearse(a.root,p.upgrade.id,async()=>{calls++;});
+    assert.equal(calls,0);assert.equal(read(a).upgrade.status,'failed');
+  }
+});
+
+test('deadline policy remains immutable during review and before apply or verify',async()=>{
+  for(const window of [45,null])for(const stage of ['call','apply','verify']) {
+    const a=setup(),p=prepare(a,'codex',{review_window_minutes:window}),model=modelFor(a);
+    const mutate=()=>withStore(a.root,db=>db.transaction('test.policy_changed',s=>{
+      s.upgrade.review_deadline_policy=window===null?'finite':'none';
+      s.upgrade.deadline_ms=window===null?Date.now()+5400000:null;
+      s.upgrade.review_window_minutes=window===null?90:null;
+      return s;
+    }));
+    let calls=0;
+    await rehearse(a.root,p.upgrade.id,async(...args)=>{const output=await model(...args);if(stage==='call'&&calls++===0)mutate();return output;});
+    if(stage==='call') {
+      const u=read(a).upgrade;assert.equal(u.status,'failed');assert.equal(calls,1);assert.equal(u.calls.length,1);assert.equal(u.cos_pages.length,0);
+    } else {
+      let args={...a,upgrade_id:p.upgrade.id,expected_epoch:p.owner.epoch};
+      assert.equal(read(a).upgrade.status,'ready',read(a).upgrade.error);
+      if(stage==='verify')args.expected_epoch=upgrade({...args,action:'apply'},'codex').owner.epoch;
+      mutate();assert.throws(()=>upgrade({...args,action:stage},'codex'),/deadline policy changed/);
+    }
+  }
+});
+
+test('explicit none retains native timeout and failed review evidence without retry or adoption',async()=>{
+  for(const failure of ['timeout','review']) {
+    const a=setup(),p=prepare(a,'codex',{review_window_minutes:null}),model=modelFor(a,{verdict:'Fail'});
+    let calls=0;
+    await rehearse(a.root,p.upgrade.id,async(...args)=>{
+      calls++;assert.equal(args[4],600000);
+      if(failure==='timeout')throw Object.assign(new Error('Synthetic native call timed out at 600000 ms'),{code:'ROLE_EXECUTION_TIMEOUT'});
+      return model(...args);
+    });
+    const failed=read(a).upgrade;
+    assert.equal(failed.status,'failed');assert.equal(failed.deadline_ms,null);
+    const count=calls;
+    await rehearse(a.root,p.upgrade.id,async()=>{calls++;});
+    assert.equal(calls,count);assert.deepEqual(read(a).upgrade.calls,failed.calls);
+    assert.throws(()=>upgrade({...a,action:'apply',upgrade_id:p.upgrade.id,expected_epoch:p.owner.epoch},'codex'),/passing continuity review/);
+    if(failure==='timeout')assert.equal(failed.calls[0].error_code,'ROLE_EXECUTION_TIMEOUT');
+    else assert.ok(failed.qa_pages.some(page=>page.artifact.review.verdict==='Fail'));
+  }
+});
 
 test('upgrade selection rejects incompatible actions and invalid controls without partial preparation',async()=>{
   const a=setup(),inspection=upgrade({...a,action:'inspect'},'codex');
@@ -546,7 +734,7 @@ test('a company checkpoint above 200000 characters upgrades without dropping any
   assert.equal(read(a).records.large.content,content);
 });
 
-for(const version of ['0.2.0','0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5']) test(`compatible ${version} companies can optionally adopt and recover team definitions`,async()=>{
+for(const version of ['0.2.0','0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6']) test(`compatible ${version} companies can optionally adopt and recover team definitions`,async()=>{
   const a=setup();withStore(a.root,db=>db.transaction('test.previous_patch',s=>{
     s.schema=2;s.runtime_version=version;s.plugin_version=version;s.cos_instructions='Preserve founder limits and independently review preparation';s.team_sha256=teamHash(s);return s;
   }));
@@ -662,34 +850,44 @@ test('bound full prior history survives apply and verify and cannot disappear th
 test('45 minute deadline is consistent with status; old attempts retain seven minute fallback',()=>{
   for(const legacy of [false,true]) {
     const a=setup(),p=prepare(a);
-    withStore(a.root,db=>db.transaction('test.old-created',s=>{s.upgrade.created_at=new Date(Date.now()-8*60*1000).toISOString();if(legacy)delete s.upgrade.deadline_ms;return s;}));
+    withStore(a.root,db=>db.transaction('test.old-created',s=>{s.upgrade.created_at=new Date(Date.now()-8*60*1000).toISOString();if(legacy){delete s.upgrade.deadline_ms;delete s.upgrade.review_deadline_policy;}return s;}));
     assert.equal(engine.status(a,'codex').upgrade.status,legacy?'failed':'queued');
     assert.equal(read(a).upgrade.id,p.upgrade.id);
   }
 });
 
 test('native page calls use the runtime ceiling capped by the unchanged rehearsal deadline',async()=>{
-  const a=setup(),p=prepare(a),model=modelFor(a),now=Date.now;
-  const originalDeadline=read(a).upgrade.deadline_ms;
-  let calls=0;
-  try {
-    Date.now=()=>originalDeadline-45*60*1000;
-    await rehearse(a.root,p.upgrade.id,async(...args)=>{
-      const task=JSON.parse(args[2]);
-      assert.equal(args[4],calls===0?MAX_EXECUTION_TIMEOUT_MS:90000);
-      assert.equal(args[5],null);
-      assert.equal(args[6].timeoutReason,'Runtime execution ceiling capped by remaining immutable upgrade rehearsal deadline');
-      assert.equal(args[6].signal.aborted,false);
-      if(calls++===0) {
-        assert.equal(task.phase,'page');assert.equal(args[1],null);
-        Date.now=()=>originalDeadline-90000;
-      }
-      return model(...args);
-    });
-  } finally {Date.now=now;}
-  const u=read(a).upgrade;
-  assert.ok(calls>1);assert.equal(u.status,'ready',u.error);
-  assert.equal(u.deadline_ms,originalDeadline);
+  for(const window of [45,90,'legacy-stored','legacy-fallback']) {
+    const a=setup(),p=prepare(a,'codex',typeof window==='number'?{review_window_minutes:window}:{}),model=modelFor(a),now=Date.now;
+    if(typeof window==='string')withStore(a.root,db=>db.transaction('test.legacy_window',s=>{
+      delete s.upgrade.review_deadline_policy;delete s.upgrade.review_window_minutes;
+      if(window==='legacy-fallback')delete s.upgrade.deadline_ms;
+      return s;
+    }));
+    const original=read(a).upgrade;
+    const originalDeadline=original.deadline_ms??Date.parse(original.created_at)+420000;
+    let calls=0;
+    try {
+      Date.now=()=>originalDeadline-(window==='legacy-fallback'?420000:45*60*1000);
+      await rehearse(a.root,p.upgrade.id,async(...args)=>{
+        const task=JSON.parse(args[2]);
+        assert.equal(args[4],calls===0?(window==='legacy-fallback'?420000:MAX_EXECUTION_TIMEOUT_MS):90000);
+        assert.equal(task.authority.deadline_ms,originalDeadline);
+        assert.equal(args[5],null);
+        assert.equal(args[6].timeoutReason,'Runtime execution ceiling capped by remaining immutable upgrade rehearsal deadline');
+        assert.equal(args[6].signal.aborted,false);
+        if(calls++===0) {
+          assert.equal(task.phase,'page');assert.equal(args[1],null);
+          Date.now=()=>originalDeadline-90000;
+        }
+        return model(...args);
+      });
+    } finally {Date.now=now;}
+    const u=read(a).upgrade;
+    assert.ok(calls>1);assert.equal(u.status,'ready',u.error);
+    assert.equal(u.deadline_ms,original.deadline_ms);
+    assert.equal(u.review_window_minutes,original.review_window_minutes);
+  }
 });
 
 test('native timeout remains held with its evidence and cannot restart the failed rehearsal',async()=>{
