@@ -63,6 +63,24 @@ test('dispatch validates and persists policy, and main keeps software-test limit
   const d=harness().dispatch();assert.equal(d.timeout_ms,180000);assert.ok(d.timeout_reason);
 });
 
+test('upgrade review-window schema is bounded and runtime rejects invalid or misplaced requests before binding',()=>{
+  const schema=harness().main.toolList.find(t=>t.name==='company_upgrade').inputSchema;
+  assert.deepEqual(Array.from(schema.properties.review_window_minutes.type),['integer','null']);
+  assert.deepEqual(Array.from(schema.properties.review_window_minutes.enum),[45,90,null]);
+  assert.equal(schema.required.includes('review_window_minutes'),false);
+  let boundaries=0;
+  const forbidden=()=>{boundaries++;throw new Error('Unexpected boundary');};
+  const runtime=load('upgrade.mjs',{binding:forbidden,withStore:forbidden},['upgrade']);
+  const deps={launch:forbidden,check:forbidden,catalog:forbidden};
+  for(const value of [undefined,'90',90.5,Infinity,{},[],false,120]) {
+    assert.throws(()=>runtime.upgrade({action:'prepare',review_window_minutes:value},'codex',deps),/review_window_minutes must be 45, 90 or null/);
+  }
+  for(const action of ['inspect','apply','verify','recover','unknown'])for(const value of [45,90,null]) {
+    assert.throws(()=>runtime.upgrade({action,review_window_minutes:value},'codex',deps),/only supported.*prepare/);
+  }
+  assert.equal(boundaries,0);
+});
+
 test('status distinguishes long execution, grace, startup, queue, legacy and inspection',()=>{
   const h=harness(),base=h.dispatch({timeout_ms:600000,timeout_reason:'Large output'}),start=h.now;
   h.mutate(s=>{

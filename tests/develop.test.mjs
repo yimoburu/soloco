@@ -340,7 +340,7 @@ test('a generic-only QA Pass stays inspectable but cannot accept; a complete fre
 
 test('exact v0.18 development compatibility retains sandbox and team restrictions',()=>{
   const governance=v018Governance;
-  for(const plugin_version of ['0.5.0','0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6']) {
+  for(const plugin_version of ['0.5.0','0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6',installedTeam().plugin_version]) {
     const s={...installedTeam(),plugin_version,governance,governance_sha256:digest(governance)};
     const before=structuredClone(s),c=developmentCapability(s);
     assert.equal(c.eligible,capability.supported);
