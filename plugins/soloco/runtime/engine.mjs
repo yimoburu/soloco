@@ -49,14 +49,14 @@ function summary(state,root=process.cwd()) {
     if(!job || job.kind==='development_test' || job.type==='development_test')return item;
     return {...item,timeout:{policy_version:job.timeout_policy_version??null,timeout_ms:job.timeout_ms??null,reason:job.timeout_reason??null,execution_started_at:job.execution_started_at??null,execution_deadline_at:job.execution_deadline_at??null,state:jobTimeoutState(job,Date.now()),reconciliation:job.timeout_reconciliation??null,failure:job.execution_failure??null}};
   });
-  return {company_id:state.id, name:state.name, idea:state.idea, revision:state.revision, phase:state.phase, mode:state.mode, paused:state.paused, owner:state.owner, plugin_version:state.plugin_version, runtime_version:state.runtime_version??state.plugin_version, executing_runtime_version:VERSION, upgrade:upgradeSummary(state.upgrade), governance_sha256:state.governance_sha256, records:Object.values(state.records), sessions:state.sessions, jobs:Object.values(state.jobs), activity, handover:state.handover??null, resource_claims:resourceClaims(state), selection_usage:selectionUsage(state), notices:state.notices.filter(n=>!n.resolution), messages:state.messages, capabilities:{standalone_sessions:true, model_selection:{eligible:['0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7',VERSION].includes(state.plugin_version),catalog:'company_doctor.models',coordinator_model:'Host UI controlled; no automatic switching',billing:'Existing host account; no hard spending enforcement'},local_prototype:prototypeCapability(state), local_development:developmentCapability(state,root), external_execution:false, background_founder_delivery:false, automatic_team_migration:false, explicit_team_upgrade:true}};
+  return {company_id:state.id, name:state.name, idea:state.idea, revision:state.revision, phase:state.phase, mode:state.mode, paused:state.paused, owner:state.owner, plugin_version:state.plugin_version, runtime_version:state.runtime_version??state.plugin_version, executing_runtime_version:VERSION, upgrade:upgradeSummary(state.upgrade), governance_sha256:state.governance_sha256, records:Object.values(state.records), sessions:state.sessions, jobs:Object.values(state.jobs), activity, handover:state.handover??null, resource_claims:resourceClaims(state), selection_usage:selectionUsage(state), notices:state.notices.filter(n=>!n.resolution), messages:state.messages, capabilities:{standalone_sessions:true, model_selection:{eligible:['0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7','0.6.8',VERSION].includes(state.plugin_version),catalog:'company_doctor.models',coordinator_model:'Host UI controlled; no automatic switching',billing:'Existing host account; no hard spending enforcement'},local_prototype:prototypeCapability(state), local_development:developmentCapability(state,root), external_execution:false, background_founder_delivery:false, automatic_team_migration:false, explicit_team_upgrade:true}};
 }
 export function develop(args,host) { binding(args,host); return developmentAction(args,host); }
 export function prototype(args,host) { binding(args,host); return prototypeAction(args,host); }
 function update(args, host, type, fn, selection=null) {
   binding(args,host);
   if (!Number.isInteger(args.epoch)) throw new Error('Supply the current ownership epoch from company_status');
-  return withStore(args.root, db => {const mutate=state=>{owner(state,args.session_id,host,args.epoch);fn(state);return state;};return selection&&db.selectedTransaction?db.selectedTransaction(type,selection,mutate):db.transaction(type,mutate);});
+  return withStore(args.root, db => {const mutate=state=>{owner(state,args.session_id,host,args.epoch);fn(state);state.runtime_version=VERSION;return state;};return selection&&db.selectedTransaction?db.selectedTransaction(type,selection,mutate):db.transaction(type,mutate);});
 }
 export function open(args, host) {
   binding(args,host);
@@ -149,7 +149,7 @@ export function dispatch(args,host) {
   const timeout=normalizeTimeout({timeout_ms:args.timeout_ms,timeout_reason:args.timeout_reason});
   if (args.role==='runner') throw new Error('Choose a specialist role from company_open');
   binding(args,host);
-  withStore(args.root,db=>{const s=db.read();owner(s,args.session_id,host,args.epoch);if(args.model_selection!==undefined&&!['0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7',VERSION].includes(s.plugin_version))throw new Error('Explicitly adopt the model-selection team before using model_selection');});
+  withStore(args.root,db=>{const s=db.read();owner(s,args.session_id,host,args.epoch);if(args.model_selection!==undefined&&!['0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7','0.6.8',VERSION].includes(s.plugin_version))throw new Error('Explicitly adopt the model-selection team before using model_selection');});
   const catalog=args.model_selection?.mode==='explicit' || args.model_selection?.speed==='fast_disabled'?modelCatalog(host):null;
   const selection=normalizeSelection(args.model_selection,host,catalog);
   const check=readiness(host);
@@ -225,6 +225,10 @@ export function control(args,host) {
     } else {owner(s,args.session_id,host);const acceptance=verifyHandoverAcceptance(s);if(acceptance){s.handover.acceptance=acceptance;s.handover.status='completed';}s.paused=false;}
     const decisionId=id('control');
     s.records[decisionId]={id:decisionId,kind:'decision',author_role:'human_founder',recorded_by:args.session_id,content:args.source_instruction,status:'Recorded',action:args.action,...(args.action==='rename'?{previous_name:previousName,name:s.name}:{}),created_at:stamp()};
+    // A new handover gate must fence old coordinators even on an older pinned
+    // team. Pause remains available across unsupported versions and must never
+    // downgrade a future producer's fence.
+    if(args.action!=='pause')s.runtime_version=VERSION;
     return s;
   }),args.root));
 }

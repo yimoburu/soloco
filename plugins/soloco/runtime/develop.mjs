@@ -15,7 +15,7 @@ export function developmentCapability(s,root=process.cwd()) {
   let configuration,configuration_error=null;
   try{configuration=developmentLimits(root);}catch(error){configuration_error=error.message;configuration={max_bytes:0,per_file_max_bytes:0,source:'invalid'};}
   const executor=sandboxCapability();
-  const blocker=configuration_error??(!executor.supported ? executor.blocker : s && (!['0.5.0','0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7',VERSION].includes(s.plugin_version) || ![installedTeam().governance_sha256,V018_GOVERNANCE_SHA256].includes(s.governance_sha256))
+  const blocker=configuration_error??(!executor.supported ? executor.blocker : s && (!['0.5.0','0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7','0.6.8',VERSION].includes(s.plugin_version) || ![installedTeam().governance_sha256,V018_GOVERNANCE_SHA256].includes(s.governance_sha256))
     ? 'Explicitly adopt the installed development-capable team and compatible governance first' : null);
   return {supported:executor.supported,eligible:s ? !blocker : null,blocker,executor,
     output:'Retained, independently reviewable local candidate; original source is unchanged',
@@ -179,7 +179,6 @@ export async function developmentAction(a,host) {
       const scope={read_paths,write_paths,test_paths,sources,output_format,source_bytes,configured_ceiling:configuration.max_bytes,transport_max_characters:developmentTransportBudget(a.max_bytes),acceptance:requireText(a.acceptance,'acceptance'),stop_conditions:requireText(a.stop_conditions,'stop_conditions'),data_policy:requireText(a.data_policy,'data_policy'),source_instruction:a.source_instruction,
         max_attempts:a.max_attempts,timeout_ms:a.timeout_ms,max_output_bytes:a.max_output_bytes,max_bytes:a.max_bytes,expires_at:new Date(expires).toISOString(),test_runner:'node --test',network:false,source_integration:false};
       const key=id('development');result=s.records[key]={id:key,kind:'artifact',author_role:'runner',author_instance:a.session_id,revision:1,status:'Draft',created_at:stamp(),content:'Bounded local development scope. Selected source contents will be shared with the host model. Original source stays unchanged; candidate edits and isolated Node tests only.',development:{type:'plan',scope,scope_sha256:digest(JSON.stringify(scope)),attempts:[]}};
-      s.runtime_version=VERSION;
     } else {
       const p=planOf(s,a.plan_id);
       if(a.action==='authorize') {
@@ -204,7 +203,7 @@ export async function developmentAction(a,host) {
         result=d.acceptance={at:stamp(),review_id:r.id,candidate_sha256:d.candidate_sha256,receipt_sha256:d.receipt_sha256,directory:candidateDir(a.root,p,c),source_integrated:false};
       } else throw new Error('Unknown development action');
     }
-    return s;
+    s.runtime_version=VERSION;return s;
   }));return result;
 }
 function queueRun(a,host) {
@@ -215,7 +214,7 @@ function queueRun(a,host) {
     if(c.development.run)throw new Error('Candidate already has a test attempt; inspect it, never retry uncertain execution');
     if(Object.values(s.jobs).some(j=>j.development_id===p.id&&['queued','running'].includes(j.status)))throw new Error('Scope already has active work');
     c.development.run={job_id:jobId,status:'queued'};
-    s.jobs[jobId]={id:jobId,kind:'development_test',role:'engineer',development_id:p.id,candidate_id:c.id,epoch:s.owner.epoch,session_id:a.session_id,host,...(a.reuse_receipt_id?{reuse_receipt_id:a.reuse_receipt_id}:{}),status:'queued',created_at:stamp(),inputs:[],native_id:null};return s;
+    s.jobs[jobId]={id:jobId,kind:'development_test',role:'engineer',development_id:p.id,candidate_id:c.id,epoch:s.owner.epoch,session_id:a.session_id,host,...(a.reuse_receipt_id?{reuse_receipt_id:a.reuse_receipt_id}:{}),status:'queued',created_at:stamp(),inputs:[],native_id:null};s.runtime_version=VERSION;return s;
   }));
   const failed=error=>withStore(a.root,db=>db.transaction('development.test_spawn_failed',s=>{
     s.jobs[jobId].status='failed';s.jobs[jobId].error=error.message;

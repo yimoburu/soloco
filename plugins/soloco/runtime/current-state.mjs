@@ -3,10 +3,14 @@ const fields=['id','kind','author_role','recorded_by','content','status','action
 // Only the supported runtime rename record shape is presentation-only. Unknown
 // fields/record producers remain conservative; no free-form status inference.
 export function presentationOnly(record) {
-  if(typeof record?.content!=='string'||/[;\n]|\b(?:and|also|but|while|prohibit|forbid|must)\b/i.test(record.content))return false;
-  const command=record.content.trim().replace(/[.!]$/,'').toLowerCase();
-  const from=record.previous_name?.toLowerCase(),to=record.name?.toLowerCase();
-  const pure=[`rename ${from} to ${to}`,`rename the company from ${from} to ${to}`,`rename company to ${to}`,`rename the company to ${to}`,`rename to ${to}`].includes(command);
+  if(typeof record?.content!=='string'||typeof record.previous_name!=='string'||typeof record.name!=='string')return false;
+  const command=record.content.trim().toLowerCase();
+  const from=record.previous_name.toLowerCase(),to=record.name.toLowerCase();
+  // Compare the entire instruction with the literal names. A name may itself
+  // contain words such as "and" or "must"; extra instructions still do not
+  // match any complete supported rename form.
+  const pure=[`rename ${from} to ${to}`,`rename the company from ${from} to ${to}`,`rename company to ${to}`,`rename the company to ${to}`,`rename to ${to}`]
+    .some(text=>command===text||command===text+'.'||command===text+'!');
   return pure&& record?.kind==='decision'&&record.action==='rename'&&record.author_role==='human_founder'
     &&typeof record.recorded_by==='string'&&typeof record.previous_name==='string'&&typeof record.name==='string'
     &&Object.keys(record).every(k=>fields.includes(k));

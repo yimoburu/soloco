@@ -27,5 +27,11 @@ export function restoreCompany(backup,directory){
  const manifest=JSON.parse(fs.readFileSync(path.join(backup,'manifest.json'),'utf8'));if(manifest.format!=='soloco-company-backup-v1'||!Array.isArray(manifest.files))throw Error('Unsupported backup manifest');
  const unique=new Set();for(const f of manifest.files){if(!safe(f.path)||unique.has(f.path))throw Error('Invalid or duplicate backup path');unique.add(f.path);const source=path.join(backup,f.path);let ancestor=backup;for(const part of f.path.split('/')){ancestor=path.join(ancestor,part);if(fs.lstatSync(ancestor).isSymbolicLink())throw Error('Linked backup path refused');}const st=fs.lstatSync(source);if(!st.isFile()||st.isSymbolicLink()||st.nlink!==1||st.size!==f.bytes||hash(fs.readFileSync(source))!==f.sha256)throw Error('Backup bytes missing or changed');}
  if(!unique.has('.company/company.sqlite'))throw Error('Backup database missing');
- fresh(directory);for(const f of manifest.files)copyTree(path.join(backup,f.path),path.join(directory,f.path));return {directory,manifest,restored:true,ownership_transferred:false};
+ fresh(directory);for(const f of manifest.files)copyTree(path.join(backup,f.path),path.join(directory,f.path));
+ // Source validation does not pin mutable backup bytes across the copy. Check
+ // the complete destination before reporting success, including non-DB files
+ // that the subsequent logical database readback cannot validate.
+ const expected=new Map(manifest.files.map(f=>[f.path,f])),copied=inventory(directory);
+ if(copied.length!==expected.size||copied.some(f=>{const original=expected.get(f.path);return !original||f.bytes!==original.bytes||f.sha256!==original.sha256;}))throw Error('Restored file inventory differs from backup manifest; retained destination for inspection');
+ return {directory,manifest,restored:true,ownership_transferred:false};
 }

@@ -15,7 +15,7 @@ export const prototypeLimits = Object.freeze({
 export function prototypeCapability(s) {
   // Preserve exact v0.17/v0.18 contracts without adopting the source contract.
   const supportedGovernance=[installedTeam().governance_sha256,V018_GOVERNANCE_SHA256,'5f0699c046128d71a42731acdfddaaab4b911361521015def133adcfbdb8fcb9'];
-  const blocker = !s ? null : !['0.4.0','0.4.1','0.5.0','0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7',VERSION].includes(s.plugin_version)
+  const blocker = !s ? null : !['0.4.0','0.4.1','0.5.0','0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7','0.6.8',VERSION].includes(s.plugin_version)
     ? 'Pinned team does not support this prototype workflow. Explicitly adopt a supported team and governance before requesting prototype authorization.'
     : !supportedGovernance.includes(s.governance_sha256)
       ? 'Pinned governance does not support this prototype contract. Review and explicitly adopt the installed governance; more reviews cannot enable it.' : null;
@@ -141,7 +141,6 @@ export function prototypeAction(a,host) {
       const scope=scopeOf(a); destination(a.root,scope);
       const key=id('prototype');
       result=s.records[key]={id:key,kind:'artifact',content:'Bounded local prototype scope. Code and test files only; tests are not executed.',author_role:'runner',author_instance:a.session_id,revision:1,status:'Draft',created_at:stamp(),prototype:{type:'plan',scope,scope_sha256:digest(JSON.stringify(scope)),attempts:[]}};
-      s.runtime_version=VERSION;
     } else {
       const p=planOf(s,a.plan_id);
       requireText(a.source_instruction,'source_instruction');
@@ -159,7 +158,7 @@ export function prototypeAction(a,host) {
       } else throw new Error('Unknown prototype action');
       result=p;
     }
-    return s;
+    s.runtime_version=VERSION;return s;
   }));
   return result;
 }
@@ -172,7 +171,7 @@ function materialize(a,host) {
     if(b?.type!=='bundle' || b.plan_id!==p.id || b.scope_sha256!==p.prototype.scope_sha256 || artifact.status!=='Submitted' || job?.status!=='completed' || !contextMatches(s,job,job.context_sha256) || a.bundle_sha256!==b.bundle_sha256 || digest(JSON.stringify(b.files))!==b.bundle_sha256) throw new Error('Prototype candidate is stale or its exact bundle hash does not match');
     reviewFor(s,artifact,a.review_id,'materialize_local_prototype'); destination(a.root,p.prototype.scope);
     p.prototype.export={status:'writing',artifact_id:artifact.id,bundle_sha256:b.bundle_sha256,review_id:a.review_id,started_at:stamp()};
-    return s;
+    s.runtime_version=VERSION;return s;
   }));
   try {
     return withStore(a.root,db=>{

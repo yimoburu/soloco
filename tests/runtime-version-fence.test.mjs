@@ -1,0 +1,75 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {spawnSync} from 'node:child_process';
+import {fileURLToPath,pathToFileURL} from 'node:url';
+import * as engine from '../plugins/soloco/runtime/engine.mjs';
+import {VERSION,id,withStore} from '../plugins/soloco/runtime/store.mjs';
+
+// Keep the compatibility assertion against the immutable published implementation,
+// not a second hand-written interpretation of its acceptance checks.
+const published='37e82eb';
+const repo=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+const base=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-version-fence-'));
+process.env.COMPANY_PLUGIN_DATA=path.join(base,'cache');
+test.after(()=>fs.rmSync(base,{recursive:true,force:true}));
+const archive=spawnSync('git',['archive',published,'plugins/soloco'],{cwd:repo,maxBuffer:20000000});
+assert.equal(archive.status,0,'Runtime fence regression requires published commit '+published+' in local Git history');
+const legacyDir=path.join(base,'published');fs.mkdirSync(legacyDir);
+const extract=spawnSync('tar',['-xf','-','-C',legacyDir],{input:archive.stdout});
+assert.equal(extract.status,0,'Could not extract immutable published runtime');
+const legacy=await import(pathToFileURL(path.join(legacyDir,'plugins/soloco/runtime/engine.mjs')));
+const state=a=>withStore(a.root,db=>db.read());
+function setup(){
+  const a={root:fs.mkdtempSync(path.join(base,'company-')),session_id:id('fictional-founder'),epoch:1};
+  legacy.bind(a.root,a.session_id,'codex');legacy.open({...a,idea:'Fictional compatibility fixture'},'codex');
+  assert.equal(state(a).runtime_version,'0.6.8');
+  engine.bind(a.root,a.session_id,'codex');return a;
+}
+
+test('new handover atomically fences actual published 0.6.8 resume without adopting pinned definitions',()=>{
+  const a=setup(),before=state(a);
+  engine.open(a,'codex');assert.deepEqual(state(a),before,'Read-only opening must not adopt or promote');
+  const b={...a,session_id:id('fictional-successor'),epoch:2};engine.bind(a.root,b.session_id,'codex');
+  engine.control({...b,action:'handover',expected_epoch:1,source_instruction:'Fictional authorized replacement'},'codex');
+  const pending=state(b);
+  assert.equal(pending.runtime_version,VERSION);assert.notEqual(VERSION,'0.6.8');
+  assert.equal(pending.handover.status,'pending');assert.equal(pending.paused,true);
+  for(const key of ['plugin_version','governance','governance_sha256','roles','cos_instructions','team_sha256'])assert.deepEqual(pending[key],before[key],key+' must stay pinned');
+  legacy.bind(b.root,b.session_id,'codex');
+  assert.throws(()=>legacy.control({...b,action:'resume',expected_epoch:2,source_instruction:'Fictional stale-runtime resume'},'codex'),/upgrade/);
+  assert.throws(()=>legacy.save({...b,kind:'decision',content:'Fictional stale-runtime mutation'},'codex'),/runtime upgrade/);
+  assert.deepEqual(state(b),pending,'Rejected old-runtime operations must preserve pending QA gate');
+  engine.bind(b.root,b.session_id,'codex');
+  assert.throws(()=>engine.control({...b,action:'resume',expected_epoch:2,source_instruction:'Fictional premature resume'},'codex'),/reconstruction/);
+});
+
+test('successful new semantic mutations promote an older producer; rejected mutations do not',()=>{
+  const a=setup(),before=state(a);
+  assert.throws(()=>engine.save({...a,kind:'intent',content:''},'codex'),/nonempty/);
+  assert.deepEqual(state(a),before);
+  const r=engine.save({...a,kind:'decision',content:'Fictional resolved source'},'codex');
+  assert.equal(state(a).runtime_version,VERSION);assert.equal(state(a).plugin_version,'0.6.8');
+  withStore(a.root,db=>db.transaction('fixture.prior_producer',s=>{s.runtime_version='0.6.8';return s;}));
+  engine.contextControl({...a,action:'plan',record_ids:[r.id],disposition:'resolved',source_instruction:'Propose fictional exact classification'},'codex');
+  assert.equal(state(a).runtime_version,VERSION);
+  legacy.bind(a.root,a.session_id,'codex');assert.throws(()=>legacy.save({...a,kind:'plan',content:'Fictional stale plan'},'codex'),/runtime upgrade/);
+});
+
+test('future-version emergency pause never downgrades its producer fence',()=>{
+  const a=setup();withStore(a.root,db=>db.transaction('fixture.future',s=>{s.runtime_version='999.0.0';return s;}));
+  engine.control({...a,action:'pause',expected_epoch:1,source_instruction:'Fictional emergency pause'},'codex');
+  assert.equal(state(a).paused,true);assert.equal(state(a).runtime_version,'999.0.0');
+  assert.throws(()=>engine.control({...a,action:'resume',expected_epoch:1,source_instruction:'Fictional unsupported resume'},'codex'),/upgrade/);
+});
+
+test('new code retains 0.6.8 team capabilities while inspecting without adoption',()=>{
+  const a=setup(),before=state(a),s=engine.status(a,'codex');
+  assert.equal(s.plugin_version,'0.6.8');assert.equal(s.runtime_version,'0.6.8');
+  assert.equal(s.capabilities.model_selection.eligible,true);
+  assert.equal(s.capabilities.local_prototype.eligible,true);
+  if(s.capabilities.local_development.supported)assert.equal(s.capabilities.local_development.eligible,true);
+  assert.deepEqual(state(a),before);
+});

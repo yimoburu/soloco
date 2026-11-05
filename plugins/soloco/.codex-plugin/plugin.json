@@ -1,6 +1,6 @@
 {
   "name": "soloco",
-  "version": "0.6.8",
+  "version": "0.6.9",
   "description": "SoloCo: your Chief of Staff and standalone AI specialists. Scoped local development candidates, constrained tests and independent review.",
   "skills": "./skills/",
   "hooks": "./hooks/codex.json",
