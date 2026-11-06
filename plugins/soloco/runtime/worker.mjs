@@ -262,8 +262,13 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
         const evidence=failureEvidence(error),reason=failureEvidence(cause);
         current.execution_failure={...evidence,...(context?.qualification&&reason.code==='ASSIGNMENT_INELIGIBLE'?{abort_kind:'eligibility_loss'}:{}),outcome:/TIMEOUT/.test(reason.code??evidence.code??'')?'timeout':controller?.signal.aborted?'cancellation':'failure',at:stamp(),...(controller?.signal.aborted?{abort:reason}:{})};
       }
-      if(current && ['queued','running'].includes(current.status)) {
-        current.status='failed';current.error=context?.qualification&&current.execution_failure?.abort?.code==='ASSIGNMENT_INELIGIBLE'?current.execution_failure.abort.message:error.message;if(error.held)current.qualification_hold=error.held;current.finished_at=stamp();
+      if(current && ['queued','running','cancelled'].includes(current.status)) {
+        // Cancellation is an eligibility fence, not proof of process closure.
+        // Retain its status and evidence; finish only after observed closure (or
+        // when this worker never invoked the adapter).
+        if(current.status!=='cancelled') {current.status='failed';current.finished_at=stamp();}
+        else if(current.coordination_release?.termination_confirmed===true)current.finished_at??=stamp();
+        current.error=context?.qualification&&current.execution_failure?.abort?.code==='ASSIGNMENT_INELIGIBLE'?current.execution_failure.abort.message:error.message;if(error.held)current.qualification_hold=error.held;
         if(output?.native_id)current.native_id=output.native_id;
         if(output?.model_evidence)current.model_evidence=output.model_evidence;
         if(artifact || context?.qualification&&typeof output?.text==='string') {
