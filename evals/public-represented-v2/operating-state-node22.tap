@@ -1,0 +1,262 @@
+TAP version 13
+# (node:52271) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: accepted historical publication proof survives an owner epoch change without admitting old in-flight work
+ok 1 - accepted historical publication proof survives an owner epoch change without admitting old in-flight work
+  ---
+  duration_ms: 110.49275
+  ...
+# Subtest: public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning
+ok 2 - public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning
+  ---
+  duration_ms: 17.333833
+  ...
+# Subtest: missing legacy bootstrap is visibly DIRTY and apply rolls back without acceptance
+ok 3 - missing legacy bootstrap is visibly DIRTY and apply rolls back without acceptance
+  ---
+  duration_ms: 12.203208
+  ...
+# Subtest: new membership, changed exact source, wrong independent identity and absent closure cannot publish
+ok 4 - new membership, changed exact source, wrong independent identity and absent closure cannot publish
+  ---
+  duration_ms: 72.847
+  ...
+# Subtest: scope closure, global membership, expiry, receipt changes, revocation and missed communication hold
+ok 5 - scope closure, global membership, expiry, receipt changes, revocation and missed communication hold
+  ---
+  duration_ms: 25.026125
+  ...
+# Subtest: pause fences publication reviewer and prospective handover cannot hide unknown legacy
+ok 6 - pause fences publication reviewer and prospective handover cannot hide unknown legacy
+  ---
+  duration_ms: 8.424167
+  ...
+# Subtest: 10x independently classified inert archive keeps actual mandatory operating assignment bytes and semantic work constant
+ok 7 - 10x independently classified inert archive keeps actual mandatory operating assignment bytes and semantic work constant
+  ---
+  duration_ms: 52.358792
+  ...
+# Subtest: deleted applicable home and changed exact provenance cannot disappear from accepted meaning
+ok 8 - deleted applicable home and changed exact provenance cannot disappear from accepted meaning
+  ---
+  duration_ms: 15.627708
+  ...
+# Subtest: typed outcome requires complete historical uncertainty; text cannot manufacture permission
+ok 9 - typed outcome requires complete historical uncertainty; text cannot manufacture permission
+  ---
+  duration_ms: 14.456875
+  ...
+# Subtest: public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure
+ok 10 - public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure
+  ---
+  duration_ms: 45.746041
+  ...
+# Subtest: late new and changed falsely scoped prohibitions stay globally DIRTY, but fresh proposals include them
+ok 11 - late new and changed falsely scoped prohibitions stay globally DIRTY, but fresh proposals include them
+  ---
+  duration_ms: 59.290959
+  ...
+# Subtest: publication proof stays current; failed, quarantined, uncertain and unknown-extension siblings stay DIRTY
+ok 12 - publication proof stays current; failed, quarantined, uncertain and unknown-extension siblings stay DIRTY
+  ---
+  duration_ms: 14.713584
+  ...
+# Subtest: mechanical publication index rejects tampering and retains unknown state extensions
+ok 13 - mechanical publication index rejects tampering and retains unknown state extensions
+  ---
+  duration_ms: 13.46475
+  ...
+# Subtest: format6 explicit non-home evidence survives dispatch, discovery and bounded same-native reads
+ok 14 - format6 explicit non-home evidence survives dispatch, discovery and bounded same-native reads
+  ---
+  duration_ms: 152.403
+  ...
+# Subtest: referenced archived revoked/retry restriction and canonical parent receipts are supplied completely inline
+not ok 15 - referenced archived revoked/retry restriction and canonical parent receipts are supplied completely inline
+  ---
+  duration_ms: 18.800958
+  location: '/private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:192:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Evidence hold: required semantic stream not completely delivered to this session
+    + actual - expected
+    
+    + 'failed'
+    - 'completed'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'completed'
+  actual: 'failed'
+  operator: 'strictEqual'
+  stack: |-
+    review (file:///private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:28:45)
+    async restrictedArchive (file:///private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:161:10)
+    async TestContext.<anonymous> (file:///private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:193:10)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: large non-home provenance uses exact same-native ranges; undelivered, partial, denied, stale or changed evidence cannot publish
+not ok 16 - large non-home provenance uses exact same-native ranges; undelivered, partial, denied, stale or changed evidence cannot publish
+  ---
+  duration_ms: 28.795334
+  location: '/private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:206:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Evidence hold: required semantic stream not completely delivered to this session
+    + actual - expected
+    
+    + 'failed'
+    - 'completed'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'completed'
+  actual: 'failed'
+  operator: 'strictEqual'
+  stack: |-
+    review (file:///private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:28:45)
+    async restrictedArchive (file:///private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:161:10)
+    async TestContext.<anonymous> (file:///private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:208:12)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: canonical preservation parent revisions cannot be borrowed from matching hashes
+not ok 17 - canonical preservation parent revisions cannot be borrowed from matching hashes
+  ---
+  duration_ms: 16.269333
+  location: '/private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:225:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Evidence hold: required semantic stream not completely delivered to this session
+    + actual - expected
+    
+    + 'failed'
+    - 'completed'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'completed'
+  actual: 'failed'
+  operator: 'strictEqual'
+  stack: |-
+    review (file:///private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:28:45)
+    async restrictedArchive (file:///private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:161:10)
+    async TestContext.<anonymous> (file:///private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:227:12)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: missing provenance and snapshot-only evidence hold rather than count pointers as delivered bodies
+ok 18 - missing provenance and snapshot-only evidence hold rather than count pointers as delivered bodies
+  ---
+  duration_ms: 12.786625
+  ...
+# Subtest: real runtime receipt attribution and deterministic reuse deliver the validated producer closure before Pass
+not ok 19 - real runtime receipt attribution and deterministic reuse deliver the validated producer closure before Pass
+  ---
+  duration_ms: 24.025166
+  location: '/private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:268:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Evidence hold: retrieval requires exactly source_id, sha256, offset and length
+    + actual - expected
+    
+    + 'failed'
+    - 'completed'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'completed'
+  actual: 'failed'
+  operator: 'strictEqual'
+  stack: |-
+    review (file:///private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:28:45)
+    async runtimeArchive (file:///private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:263:10)
+    async TestContext.<anonymous> (file:///private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:269:10)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: runtime receipt missing or mismatched producer, candidate, plan, reuse or generation holds
+not ok 20 - runtime receipt missing or mismatched producer, candidate, plan, reuse or generation holds
+  ---
+  duration_ms: 23.150709
+  location: '/private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:285:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Evidence hold: retrieval requires exactly source_id, sha256, offset and length
+    + actual - expected
+    
+    + 'failed'
+    - 'completed'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'completed'
+  actual: 'failed'
+  operator: 'strictEqual'
+  stack: |-
+    review (file:///private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:28:45)
+    async runtimeArchive (file:///private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:263:10)
+    async TestContext.<anonymous> (file:///private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:286:10)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: external catalog reference-shaped metadata is verbatim evidence without a company lookup
+not ok 21 - external catalog reference-shaped metadata is verbatim evidence without a company lookup
+  ---
+  duration_ms: 17.751292
+  location: '/private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:295:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Evidence hold: required semantic stream not completely delivered to this session
+    + actual - expected
+    
+    + 'failed'
+    - 'completed'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'completed'
+  actual: 'failed'
+  operator: 'strictEqual'
+  stack: |-
+    review (file:///private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:28:45)
+    async restrictedArchive (file:///private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:161:10)
+    async TestContext.<anonymous> (file:///private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:297:10)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: runtime closure requires complete delivery and independent source and proof sessions
+not ok 22 - runtime closure requires complete delivery and independent source and proof sessions
+  ---
+  duration_ms: 42.154834
+  location: '/private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:307:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Evidence hold: retrieval requires exactly source_id, sha256, offset and length
+    + actual - expected
+    
+    + 'failed'
+    - 'completed'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'completed'
+  actual: 'failed'
+  operator: 'strictEqual'
+  stack: |-
+    review (file:///private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:28:45)
+    async runtimeArchive (file:///private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:263:10)
+    async TestContext.<anonymous> (file:///private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:309:12)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+1..22
+# tests 22
+# suites 0
+# pass 15
+# fail 7
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 884.386417

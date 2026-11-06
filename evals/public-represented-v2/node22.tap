@@ -1,0 +1,143 @@
+TAP version 13
+# (node:52696) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# ordinary archive growth [{"scale":1,"archive_characters":184433,"context_characters":1451,"mandatory_records":7},{"scale":10,"archive_characters":1833494,"context_characters":1451,"mandatory_records":7},{"scale":100,"archive_characters":18324464,"context_characters":1451,"mandatory_records":7}]
+# Subtest: ordinary 1x/10x/100x archive growth preserves fixed current obligations and explicit evidence
+ok 1 - ordinary 1x/10x/100x archive growth preserves fixed current obligations and explicit evidence
+  ---
+  duration_ms: 179.173375
+  ...
+# (node:52697) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: public handover, independent publication, full v4 worker review, resume and first ordinary format6 Engineering return
+ok 2 - public handover, independent publication, full v4 worker review, resume and first ordinary format6 Engineering return
+  ---
+  duration_ms: 442.818375
+  ...
+# Subtest: only exact pure runtime commands are mechanically ingested; conditions, unknown fields and generic saves stay held
+ok 3 - only exact pure runtime commands are mechanically ingested; conditions, unknown fields and generic saves stay held
+  ---
+  duration_ms: 172.920584
+  ...
+# Subtest: actual conditional handover retains founder conditions and unknown legacy remains held on first pass
+ok 4 - actual conditional handover retains founder conditions and unknown legacy remains held on first pass
+  ---
+  duration_ms: 94.560375
+  ...
+# (node:52698) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: public represented v2 schema is strict and legacy/default protocols remain unchanged
+ok 5 - public represented v2 schema is strict and legacy/default protocols remain unchanged
+  ---
+  duration_ms: 133.42525
+  ...
+# Subtest: public plan, real worker complete format4 reads and public apply retain canonical current qualification and exact homes
+ok 6 - public plan, real worker complete format4 reads and public apply retain canonical current qualification and exact homes
+  ---
+  duration_ms: 1581.92075
+  ...
+# Subtest: real worker rejects incomplete semantic delivery and coordinator native identity
+ok 7 - real worker rejects incomplete semantic delivery and coordinator native identity
+  ---
+  duration_ms: 65.139833
+  ...
+# Subtest: public represented source includes canonical runtime test author_instance and exact producer homes
+ok 8 - public represented source includes canonical runtime test author_instance and exact producer homes
+  ---
+  duration_ms: 64.728
+  ...
+# (node:52699) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: 1x/10x/100x represented archive has bounded mandatory context across dispatch, handover and upgrade
+ok 9 - 1x/10x/100x represented archive has bounded mandatory context across dispatch, handover and upgrade
+  ---
+  duration_ms: 568.861917
+  ...
+# [{"archive":1,"dispatch":877,"handover":5125,"upgrade":5112},{"archive":10,"dispatch":877,"handover":5134,"upgrade":5121},{"archive":100,"dispatch":877,"handover":5160,"upgrade":5147}]
+# Subtest: source, counterpart and proof mutation revokes exclusion or holds; a new blocker is always mandatory
+ok 10 - source, counterpart and proof mutation revokes exclusion or holds; a new blocker is always mandatory
+  ---
+  duration_ms: 4.785042
+  ...
+# Subtest: qualification refuses stale epochs, native/source ownership, incomplete delivery, unique findings and negative reviews
+ok 11 - qualification refuses stale epochs, native/source ownership, incomplete delivery, unique findings and negative reviews
+  ---
+  duration_ms: 1.662708
+  ...
+# Subtest: streamed v2 qualification exceeds legacy round limits with authentic same-native coverage and explicit semantic attestations
+ok 12 - streamed v2 qualification exceeds legacy round limits with authentic same-native coverage and explicit semantic attestations
+  ---
+  duration_ms: 471.231875
+  ...
+# {"initial_packet":947,"mandatory_stream":2510167,"range_calls":77}
+# Subtest: unknown plan/reference/classification fields hold; status and a completed audit never drop negative legacy material
+ok 13 - unknown plan/reference/classification fields hold; status and a completed audit never drop negative legacy material
+  ---
+  duration_ms: 3.160792
+  ...
+# Subtest: ordinary format 5 holds all unknown semantic material and typed failures while legacy format 3 retains its contract
+ok 14 - ordinary format 5 holds all unknown semantic material and typed failures while legacy format 3 retains its contract
+  ---
+  duration_ms: 0.349292
+  ...
+# Subtest: alternating handover/upgrade/retry snapshots grow compositionally and exact originals round-trip through immutable_values
+ok 15 - alternating handover/upgrade/retry snapshots grow compositionally and exact originals round-trip through immutable_values
+  ---
+  duration_ms: 171.999875
+  ...
+# {"subjects":[1125,1621,2119,2616,3113,3610,4107,4604,5101,5598,6096,6594],"logical_state":159981,"immutable_utf8_bytes":265570,"immutable_values":130}
+# Subtest: missing/corrupt immutable snapshots and malformed shape hold after reopen, without deleting history
+ok 16 - missing/corrupt immutable snapshots and malformed shape hold after reopen, without deleting history
+  ---
+  duration_ms: 34.371042
+  ...
+# Subtest: v4 portable restore retains exact ref bodies, origin provenance, unknown root keys and rollback integrity
+ok 17 - v4 portable restore retains exact ref bodies, origin provenance, unknown root keys and rollback integrity
+  ---
+  duration_ms: 17.922167
+  ...
+# Subtest: duplicate IDs, aliased proof jobs and distinct old revisions cannot borrow another source classification
+ok 18 - duplicate IDs, aliased proof jobs and distinct old revisions cannot borrow another source classification
+  ---
+  duration_ms: 5.585292
+  ...
+# Subtest: legacy v2 handover still requires complete same-native stream; v3 reviewed context retains that delivery gate
+ok 19 - legacy v2 handover still requires complete same-native stream; v3 reviewed context retains that delivery gate
+  ---
+  duration_ms: 2.076958
+  ...
+# Subtest: qualification makes typed-only findings and referenced snapshot originals compulsory, with exact raw retrieval
+ok 20 - qualification makes typed-only findings and referenced snapshot originals compulsory, with exact raw retrieval
+  ---
+  duration_ms: 1.213917
+  ...
+# Subtest: ordinary context holds unqualified pointers; counterpart obligations must be direct and source pointers require streamed proof
+ok 21 - ordinary context holds unqualified pointers; counterpart obligations must be direct and source pointers require streamed proof
+  ---
+  duration_ms: 2.695583
+  ...
+# Subtest: legacy retained-handover locators bring their complete originals into new qualification and enforce independence
+ok 22 - legacy retained-handover locators bring their complete originals into new qualification and enforce independence
+  ---
+  duration_ms: 3.209833
+  ...
+# Subtest: native journal appends retain exact negative returns with linear storage and no full-state read
+ok 23 - native journal appends retain exact negative returns with linear storage and no full-state read
+  ---
+  duration_ms: 349.604375
+  ...
+# [{"calls":1,"bytes":14548},{"calls":10,"bytes":129825},{"calls":100,"bytes":1283042}]
+# Subtest: cached frozen handover reads revalidate exact source, counterpart, plan, review and native proof dependencies
+ok 24 - cached frozen handover reads revalidate exact source, counterpart, plan, review and native proof dependencies
+  ---
+  duration_ms: 15.355166
+  ...
+1..24
+# tests 24
+# suites 0
+# pass 24
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1942.171084

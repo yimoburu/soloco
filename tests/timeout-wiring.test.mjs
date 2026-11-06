@@ -278,6 +278,20 @@ test('stream publication fence quarantines deadline crossed during final validat
   }
 });
 
+test('format4 receipt validation cannot publish after the original execution deadline',async()=>{
+ for(const elapsed of [1000,1001]){
+  const h=harness();h.mutate(s=>{s.roles.qa={name:'QA'};s.records.target={id:'target',revision:1,author_instance:'source-author',context_classification_plan:{version:2}};});
+  const job=h.dispatch({role:'qa',review_of:'target',timeout_ms:1000,timeout_reason:'Fictional format4 deadline seam'}),start=h.now;
+  h.deps.assignmentContext=()=>({hash:'context',text:'FICTIONAL complete format4 context',inputs:[],initial_delivery:[],qualification_evidence:{fictional:true}});
+  h.deps.createDeliveryLedger=(_e,native)=>({session_id:native});
+  // The real worker's final-validation position is tested with explicit receipt
+  // and clock doubles. This is not a native semantic qualification receipt.
+  h.deps.qualificationDeliveryReceipt=()=>{h.now=start+elapsed;return {protocol:2,fictional:true};};
+  await h.worker.work('/fixture',job.id,async(_host,_native,_request,_dir,limit,_selection,options)=>{spawnAt(h,options,limit,options.timeoutReason);return {native_id:'native-fixture',text:JSON.stringify({content:'FICTIONAL Pass',messages:[],notices:[],review:{verdict:'Pass',reason:'Fictional boundary judgment',plan_sha256:'binding'}})};});
+  const done=h.state.jobs[job.id];assert.equal(done.status,'quarantined',done.error);assert.equal(done.execution_failure.code,'ROLE_TIMEOUT');assert.equal(h.state.records[done.artifact_id].status,'Quarantined');assert.equal(h.state.sessions[done.session_key].native_id,null);assert.equal(done.timeout_ms,1000);
+ }
+});
+
 test('stream exact deadline closure and delayed timers cannot publish late Pass or renew allowance',async()=>{
   for(const mode of ['exact','delayed-timer','later-spawn','renewed-later-spawn','missing-timing']){
     const {h,job}=streamHarness(),start=h.now;let calls=0,deadline;

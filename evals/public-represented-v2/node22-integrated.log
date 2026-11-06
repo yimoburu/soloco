@@ -1,0 +1,238 @@
+TAP version 13
+# (node:56127) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: public handover, independent publication, full v4 worker review, resume and first ordinary format6 Engineering return
+ok 1 - public handover, independent publication, full v4 worker review, resume and first ordinary format6 Engineering return
+  ---
+  duration_ms: 605.227458
+  ...
+# Subtest: only exact pure runtime commands are mechanically ingested; conditions, unknown fields and generic saves stay held
+ok 2 - only exact pure runtime commands are mechanically ingested; conditions, unknown fields and generic saves stay held
+  ---
+  duration_ms: 328.675916
+  ...
+# Subtest: actual conditional handover retains founder conditions and unknown legacy remains held on first pass
+ok 3 - actual conditional handover retains founder conditions and unknown legacy remains held on first pass
+  ---
+  duration_ms: 145.610291
+  ...
+# (node:56128) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: accepted historical publication proof survives an owner epoch change without admitting old in-flight work
+ok 4 - accepted historical publication proof survives an owner epoch change without admitting old in-flight work
+  ---
+  duration_ms: 155.974542
+  ...
+# Subtest: public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning
+ok 5 - public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning
+  ---
+  duration_ms: 31.621667
+  ...
+# Subtest: missing legacy bootstrap is visibly DIRTY and apply rolls back without acceptance
+ok 6 - missing legacy bootstrap is visibly DIRTY and apply rolls back without acceptance
+  ---
+  duration_ms: 25.804166
+  ...
+# Subtest: new membership, changed exact source, wrong independent identity and absent closure cannot publish
+ok 7 - new membership, changed exact source, wrong independent identity and absent closure cannot publish
+  ---
+  duration_ms: 116.689459
+  ...
+# Subtest: scope closure, global membership, expiry, receipt changes, revocation and missed communication hold
+ok 8 - scope closure, global membership, expiry, receipt changes, revocation and missed communication hold
+  ---
+  duration_ms: 40.07225
+  ...
+# Subtest: pause fences publication reviewer and prospective handover cannot hide unknown legacy
+ok 9 - pause fences publication reviewer and prospective handover cannot hide unknown legacy
+  ---
+  duration_ms: 12.178
+  ...
+# Subtest: 10x independently classified inert archive keeps actual mandatory operating assignment bytes and semantic work constant
+ok 10 - 10x independently classified inert archive keeps actual mandatory operating assignment bytes and semantic work constant
+  ---
+  duration_ms: 72.417292
+  ...
+# Subtest: deleted applicable home and changed exact provenance cannot disappear from accepted meaning
+ok 11 - deleted applicable home and changed exact provenance cannot disappear from accepted meaning
+  ---
+  duration_ms: 25.771208
+  ...
+# Subtest: typed outcome requires complete historical uncertainty; text cannot manufacture permission
+ok 12 - typed outcome requires complete historical uncertainty; text cannot manufacture permission
+  ---
+  duration_ms: 22.692209
+  ...
+# Subtest: public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure
+ok 13 - public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure
+  ---
+  duration_ms: 87.759958
+  ...
+# Subtest: late new and changed falsely scoped prohibitions stay globally DIRTY, but fresh proposals include them
+ok 14 - late new and changed falsely scoped prohibitions stay globally DIRTY, but fresh proposals include them
+  ---
+  duration_ms: 109.462875
+  ...
+# Subtest: publication proof stays current; failed, quarantined, uncertain and unknown-extension siblings stay DIRTY
+ok 15 - publication proof stays current; failed, quarantined, uncertain and unknown-extension siblings stay DIRTY
+  ---
+  duration_ms: 29.151209
+  ...
+# Subtest: mechanical publication index rejects tampering and retains unknown state extensions
+ok 16 - mechanical publication index rejects tampering and retains unknown state extensions
+  ---
+  duration_ms: 24.456584
+  ...
+# Subtest: format6 explicit non-home evidence survives dispatch, discovery and bounded same-native reads
+ok 17 - format6 explicit non-home evidence survives dispatch, discovery and bounded same-native reads
+  ---
+  duration_ms: 266.499208
+  ...
+# Subtest: referenced archived revoked/retry restriction and canonical parent receipts are supplied completely inline
+ok 18 - referenced archived revoked/retry restriction and canonical parent receipts are supplied completely inline
+  ---
+  duration_ms: 92.382792
+  ...
+# Subtest: large non-home provenance uses exact same-native ranges; undelivered, partial, denied, stale or changed evidence cannot publish
+ok 19 - large non-home provenance uses exact same-native ranges; undelivered, partial, denied, stale or changed evidence cannot publish
+  ---
+  duration_ms: 1090.617625
+  ...
+# Subtest: canonical preservation parent revisions cannot be borrowed from matching hashes
+ok 20 - canonical preservation parent revisions cannot be borrowed from matching hashes
+  ---
+  duration_ms: 57.667833
+  ...
+# Subtest: missing provenance and snapshot-only evidence hold rather than count pointers as delivered bodies
+ok 21 - missing provenance and snapshot-only evidence hold rather than count pointers as delivered bodies
+  ---
+  duration_ms: 14.262958
+  ...
+# Subtest: real runtime receipt attribution and deterministic reuse deliver the validated producer closure before Pass
+ok 22 - real runtime receipt attribution and deterministic reuse deliver the validated producer closure before Pass
+  ---
+  duration_ms: 160.529292
+  ...
+# Subtest: runtime receipt missing or mismatched producer, candidate, plan, reuse or generation holds
+ok 23 - runtime receipt missing or mismatched producer, candidate, plan, reuse or generation holds
+  ---
+  duration_ms: 47.818958
+  ...
+# Subtest: external catalog reference-shaped metadata is verbatim evidence without a company lookup
+ok 24 - external catalog reference-shaped metadata is verbatim evidence without a company lookup
+  ---
+  duration_ms: 43.4915
+  ...
+# Subtest: runtime closure requires complete delivery and independent source and proof sessions
+ok 25 - runtime closure requires complete delivery and independent source and proof sessions
+  ---
+  duration_ms: 2192.44375
+  ...
+# (node:56129) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: public represented v2 schema is strict and legacy/default protocols remain unchanged
+ok 26 - public represented v2 schema is strict and legacy/default protocols remain unchanged
+  ---
+  duration_ms: 139.529042
+  ...
+# Subtest: public plan, real worker complete format4 reads and public apply retain canonical current qualification and exact homes
+ok 27 - public plan, real worker complete format4 reads and public apply retain canonical current qualification and exact homes
+  ---
+  duration_ms: 1674.615834
+  ...
+# Subtest: real worker rejects incomplete semantic delivery and coordinator native identity
+ok 28 - real worker rejects incomplete semantic delivery and coordinator native identity
+  ---
+  duration_ms: 61.584375
+  ...
+# Subtest: public represented source includes canonical runtime test author_instance and exact producer homes
+ok 29 - public represented source includes canonical runtime test author_instance and exact producer homes
+  ---
+  duration_ms: 58.840166
+  ...
+# (node:56131) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: dispatch validates and persists policy, and main keeps software-test limits separate
+ok 30 - dispatch validates and persists policy, and main keeps software-test limits separate
+  ---
+  duration_ms: 11.793791
+  ...
+# Subtest: upgrade review-window schema is bounded and runtime rejects invalid or misplaced requests before binding
+ok 31 - upgrade review-window schema is bounded and runtime rejects invalid or misplaced requests before binding
+  ---
+  duration_ms: 4.191542
+  ...
+# Subtest: status distinguishes long execution, grace, startup, queue, legacy and inspection
+ok 32 - status distinguishes long execution, grace, startup, queue, legacy and inspection
+  ---
+  duration_ms: 9.936791
+  ...
+# Subtest: reconciliation rechecks eligibility inside the store transaction
+ok 33 - reconciliation rechecks eligibility inside the store transaction
+  ---
+  duration_ms: 3.409375
+  ...
+# Subtest: worker queue delay does not consume custom execution time; actual callback is persisted
+ok 34 - worker queue delay does not consume custom execution time; actual callback is persisted
+  ---
+  duration_ms: 3.299333
+  ...
+# Subtest: new jobs require spawn evidence; legacy injected models remain compatible
+ok 35 - new jobs require spawn evidence; legacy injected models remain compatible
+  ---
+  duration_ms: 3.036625
+  ...
+# Subtest: deadline aborts and late output is quarantined even if model ignores cancellation
+ok 36 - deadline aborts and late output is quarantined even if model ignores cancellation
+  ---
+  duration_ms: 1.724167
+  ...
+# Subtest: pause, ownership loss, context change and scope revocation abort active work
+ok 37 - pause, ownership loss, context change and scope revocation abort active work
+  ---
+  duration_ms: 6.588042
+  ...
+# Subtest: startup expiry aborts without inventing spawn timing and launch errors retain evidence
+ok 38 - startup expiry aborts without inventing spawn timing and launch errors retain evidence
+  ---
+  duration_ms: 2.484625
+  ...
+# Subtest: coordination dispatch binds prerequisite evidence, admits disjoint resources and rejects premature/conflicting work
+ok 39 - coordination dispatch binds prerequisite evidence, admits disjoint resources and rejects premature/conflicting work
+  ---
+  duration_ms: 4.300125
+  ...
+# Subtest: uncertain cancellation keeps resource claim; confirmed closure releases it
+ok 40 - uncertain cancellation keeps resource claim; confirmed closure releases it
+  ---
+  duration_ms: 3.861042
+  ...
+# Subtest: upgrade call ceiling schema and runtime reject invalid options before all boundaries
+ok 41 - upgrade call ceiling schema and runtime reject invalid options before all boundaries
+  ---
+  duration_ms: 1.602709
+  ...
+# Subtest: stream publication fence quarantines deadline crossed during final validation without session mutation
+ok 42 - stream publication fence quarantines deadline crossed during final validation without session mutation
+  ---
+  duration_ms: 13.347041
+  ...
+# Subtest: format4 receipt validation cannot publish after the original execution deadline
+ok 43 - format4 receipt validation cannot publish after the original execution deadline
+  ---
+  duration_ms: 4.530167
+  ...
+# Subtest: stream exact deadline closure and delayed timers cannot publish late Pass or renew allowance
+ok 44 - stream exact deadline closure and delayed timers cannot publish late Pass or renew allowance
+  ---
+  duration_ms: 23.219125
+  ...
+1..44
+# tests 44
+# suites 0
+# pass 44
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 4852.955334
