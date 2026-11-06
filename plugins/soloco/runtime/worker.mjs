@@ -231,7 +231,7 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
       s.records[artifactId]={id:artifactId,kind:target?'review':'artifact',content:artifact.content,author_role:job.role,author_instance:job.instance_id,revision:1,status:stale?'Quarantined':'Submitted',job_id:job.id,inputs:job.inputs,...(supplemental.length?{retrieved_inputs:[...supplemental]}:{}),review_of:job.review_of,review:artifact.review??null,...(context.qualification?{qualification_result:artifact.qualification_result}:{}),...(context.handover_evidence?{handover_evidence:{semantic_delivery_complete:artifact.review?.verdict==='Pass'&&!controller.signal.aborted,subject_sha256:target.handover.subject_sha256,reconstruction_sha256:digest(JSON.stringify(target)),native_id:output.native_id,citations:artifact.citations,reads:handoverReads}}:{}),...(bundle?{prototype:bundle}:{}),...(development?{development}:{}),...(stale && artifact.files?{quarantined_files:artifact.files}:{}),...(stale && artifact.patches?{quarantined_patches:artifact.patches}:{}),created_at:stamp()};
       current.coordination_release={termination_confirmed:true,reason:'model_process_closed',at:stamp()};
       current.status=stale?'quarantined':'completed';current.artifact_id=artifactId;current.finished_at=stamp();current.native_id=output.native_id;
-      if(controller.signal.aborted)current.execution_failure={...failureEvidence(controller.signal.reason),outcome:controller.signal.reason?.code==='ASSIGNMENT_INELIGIBLE'?'eligibility_loss':'cancelled_or_timed_out',at:stamp()};
+      if(controller.signal.aborted)current.execution_failure={...failureEvidence(controller.signal.reason),outcome:'cancelled_or_timed_out',...(context?.qualification&&controller.signal.reason?.code==='ASSIGNMENT_INELIGIBLE'?{abort_kind:'eligibility_loss'}:{}),at:stamp()};
       current.model_evidence=output.model_evidence??{reported_models:[],reported_effort:null,verification:'unverified',source:'not_reported',scope:'unknown'};
       if(context.qualification){s.records[artifactId].qualification_output=output.text;s.records[artifactId].qualification_proof=qualificationProof(partitionDelivery,current);}
       if(stale) {notice(s,'must_know','A late or stale result was quarantined; it grants no approval.',artifactId);return s;}
@@ -260,10 +260,10 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
         if(!invoked || output || error.termination_confirmed===true)current.coordination_release={termination_confirmed:true,reason:invoked?'model_process_closed':'model_not_invoked',at:stamp()};
         const cause=controller?.signal.aborted?controller.signal.reason:error;
         const evidence=failureEvidence(error),reason=failureEvidence(cause);
-        current.execution_failure={...evidence,...(reason.code==='ASSIGNMENT_INELIGIBLE'?{...reason,adapter_failure:evidence}:{}),outcome:/TIMEOUT/.test(reason.code??evidence.code??'')?'timeout':reason.code==='ASSIGNMENT_INELIGIBLE'?'eligibility_loss':controller?.signal.aborted?'cancellation':'failure',at:stamp(),...(controller?.signal.aborted?{abort:reason}:{})};
+        current.execution_failure={...evidence,...(context?.qualification&&reason.code==='ASSIGNMENT_INELIGIBLE'?{abort_kind:'eligibility_loss'}:{}),outcome:/TIMEOUT/.test(reason.code??evidence.code??'')?'timeout':controller?.signal.aborted?'cancellation':'failure',at:stamp(),...(controller?.signal.aborted?{abort:reason}:{})};
       }
       if(current && ['queued','running'].includes(current.status)) {
-        current.status='failed';current.error=current.execution_failure?.outcome==='eligibility_loss'?current.execution_failure.message:error.message;if(error.held)current.qualification_hold=error.held;current.finished_at=stamp();
+        current.status='failed';current.error=context?.qualification&&current.execution_failure?.abort?.code==='ASSIGNMENT_INELIGIBLE'?current.execution_failure.abort.message:error.message;if(error.held)current.qualification_hold=error.held;current.finished_at=stamp();
         if(output?.native_id)current.native_id=output.native_id;
         if(output?.model_evidence)current.model_evidence=output.model_evidence;
         if(artifact || context?.qualification&&typeof output?.text==='string') {

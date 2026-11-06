@@ -722,5 +722,5 @@ test('actual sibling failure notice invalidates running assignment and retains e
   assert.equal(options.signal.reason?.code,'ASSIGNMENT_INELIGIBLE');
   throw Object.assign(Error('Adapter reports local process cancellation'),{code:'ROLE_ABORTED',termination_confirmed:true});
  });
- const after=withStore(root,db=>db.read()),j=after.jobs[running];assert.equal(launched,1);assert.equal(j.execution_failure.outcome,'eligibility_loss');assert.equal(j.execution_failure.abort.code,'ASSIGNMENT_INELIGIBLE');assert.equal(j.execution_failure.code,'ASSIGNMENT_INELIGIBLE');assert.equal(j.execution_failure.adapter_failure.code,'ROLE_ABORTED');assert.equal(after.jobs[sibling].execution_failure.code,'FIXTURE_OVERFLOW');assert.equal(after.context_classifications?.old,undefined);assert.ok(after.notices.length>=2);
+ const after=withStore(root,db=>db.read()),j=after.jobs[running];assert.equal(launched,1);assert.equal(j.execution_failure.outcome,'cancellation');assert.equal(j.execution_failure.abort_kind,'eligibility_loss');assert.equal(j.execution_failure.abort.code,'ASSIGNMENT_INELIGIBLE');assert.equal(j.execution_failure.code,'ROLE_ABORTED');assert.equal(j.error,'Assignment is no longer eligible');assert.equal(after.jobs[sibling].execution_failure.code,'FIXTURE_OVERFLOW');assert.equal(after.context_classifications?.old,undefined);assert.ok(after.notices.length>=2);
 });

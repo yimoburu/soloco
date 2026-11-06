@@ -60,9 +60,9 @@ worker persistence, canonical aggregate apply and immutable capsule lookup.
 
 A regression starts one synthetic worker, fails its queued sibling, and waits for
 the real worker monitor. The retained failure notice changes the mandatory current
-subject and the running worker aborts with ASSIGNMENT_INELIGIBLE. The primary
-execution failure now reports eligibility_loss and its actual cause, retaining the
-adapter cancellation separately plus the abort evidence. Notices, failed jobs,
+subject and the running worker aborts with ASSIGNMENT_INELIGIBLE. The established cancellation outcome and adapter failure code remain unchanged.
+Qualification failures additionally record abort_kind=eligibility_loss and surface
+the actual eligibility cause in the notice, retaining the original abort evidence. Notices, failed jobs,
 negative outputs, and freshness fences remain intact. This reproduces a mechanism
 consistent with the anonymized observation; it does not prove that private event's
 cause without its evidence.
@@ -101,3 +101,5 @@ passed all 8 tests; the five focused profile regressions and public fresh-profil
 test were rerun after adding the density preflight. No background work remains.
 
 Root seam corrections after Engineering return: native JSONL transport has a separate bounded quoting allowance (six times raw-response bytes plus 16384 characters), while parsed raw128000/compact48000 UTF-8 guards remain exact. A full newline-padded raw response is persisted and canonically revalidated. The public workflow now creates a genuine replacement, submits its reconstruction and verifies that supported resume still rejects missing independent handover QA. These corrections need fresh focused receipts before source acceptance.
+
+Full matrices on the first freeze2ff4f04 each ran566tests and found one real cancellation-contract regression (565pass/1fail). That failure is retained. The correction preserves existing outcome/code/termination fields, adding only qualification-specific cause attribution. The previously completed multi-million fixture passed and its pure workflow dependencies are unchanged by this correction; final validation must disclose any exact reuse instead of claiming another full run.
