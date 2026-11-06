@@ -1,4 +1,4 @@
-import {validateScopedExclusion,SCOPED_PROTOCOL} from './scoped-context.mjs';
+import {validateScopedExclusion,SCOPED_PROTOCOL,producerClosure} from './scoped-context.mjs';
 import {validateOperatingIndex} from './operating-state.mjs';
 import {digest,requireText} from './store.mjs';
 import {snapshotReference,resolveSnapshot,resolveSnapshotEntry,hasSnapshotReferences,legacyHandoverSource} from './snapshot.mjs';
@@ -81,7 +81,7 @@ export function classificationFor(state,record,id=record.id,validation) {
   if(p?.version===2){
     // Source/counterpart changes revoke exclusion. Proof mutation is a hold.
     try{validateContextPlan(state,p);}catch(error){if(/source changed/.test(error.message))return null;throw error;}
-    if(!c.qualification||JSON.stringify(c.qualification)!==JSON.stringify(qualificationReceipt(job,p,review)))throw Error('Context qualification receipt changed');
+    if(!c.qualification||JSON.stringify(c.qualification)!==JSON.stringify(qualificationReceipt(state,job,p,review)))throw Error('Context qualification receipt changed');
     validateQualification(state,plan,review,{ownership:false});
   }
   if(!p||review.author_role!=='qa'||review.status!=='Submitted'||job?.status!=='completed'||job.role!=='qa'||!job.native_id||review.author_instance!==job.instance_id||job.artifact_id!==review.id||review.author_instance===plan.author_instance||review.review_of?.id!==plan.id||review.review_of.revision!==plan.revision||v?.verdict!=='Pass'||v.permitted_action!=='apply_context_classification'||v.plan_sha256!==digest(JSON.stringify(p))||!Array.isArray(v.blockers)||v.blockers.length||p.disposition!==c.disposition||JSON.stringify(p.roles)!==JSON.stringify(c.roles)||JSON.stringify(p.scopes)!==JSON.stringify(c.scopes)||!p.sources.some(s=>JSON.stringify(s)===JSON.stringify(c.source)))throw Error('Context classification provenance invalid: '+record.id);
@@ -172,8 +172,27 @@ export function validateContextPlan(state,plan) {
   if(JSON.stringify(current)!==JSON.stringify(plan))throw Error('Context classification source changed');
   return true;
 }
-function qualificationReceipt(job,plan,review) {
-  return {protocol:2,epoch:plan.owner.epoch,native_id:job?.native_id,job_sha256:digest(JSON.stringify(job)),legacy_dependencies:job?.context_format===4?review.context_qualification?.legacy_dependencies:[]};
+// Canonical support is evidence for the selected meanings, not another set of
+// meanings to classify. Never follow incidental reference-shaped metadata.
+export function qualificationProducers(state,plan) {
+  const refs=new Map(),declared=new Map([...plan.sources,...plan.counterparts].map(ref=>[ref.id,ref]));
+  for(const ref of [...plan.sources,...plan.counterparts]){
+    const value=resolveSnapshotEntry(state,contextSource(state,ref.id));
+    if(!value)throw Error('Qualification source missing: '+ref.id);
+    for(const producer of producerClosure(state,value)){
+      if(refs.has(producer.id)&&JSON.stringify(refs.get(producer.id))!==JSON.stringify(producer))throw Error('Ambiguous qualification producer: '+producer.id);
+      refs.set(producer.id,producer);
+    }
+  }
+  return [...refs.values()].filter(ref=>{
+    if(!declared.has(ref.id))return true;
+    if(JSON.stringify(declared.get(ref.id))!==JSON.stringify(ref))throw Error('Qualification producer source changed: '+ref.id);
+    return false;
+  }).sort((a,b)=>a.id.localeCompare(b.id));
+}
+function qualificationReceipt(state,job,plan,review) {
+  const producers=qualificationProducers(state,plan);
+  return {protocol:2,epoch:plan.owner.epoch,native_id:job?.native_id,job_sha256:digest(JSON.stringify(job)),legacy_dependencies:job?.context_format===4?review.context_qualification?.legacy_dependencies:[],...(producers.length?{producer_dependencies:producers}:{})};
 }
 function delivered(state,job,ref) {
   if(state.records[ref.id]&&job.inputs?.some(i=>i.id===ref.id&&i.revision===ref.revision))return true;
@@ -194,17 +213,20 @@ function validateQualification(state,plan,review,{ownership=true}={}) {
     ||v?.verdict!=='Pass'||v.permitted_action!=='apply_context_classification'||v.plan_sha256!==digest(JSON.stringify(p))
     ||v.coverage_complete!==true||v.obligations_preserved!==true||!Array.isArray(v.unique_findings)||v.unique_findings.length
     ||!Array.isArray(v.blockers)||v.blockers.length)throw Error('Exact independent semantic qualification Pass required');
-  const frozen=job.context_format===4;
+  const frozen=job.context_format===4,producers=qualificationProducers(state,p);
   if(frozen){
     const receipt=review.context_qualification;
     if(receipt?.protocol!==2||receipt.semantic_delivery_complete!==true||receipt.native_id!==job.native_id||receipt.plan_sha256!==v.plan_sha256||receipt.context_sha256!==job.context_sha256||!Array.isArray(receipt.legacy_dependencies))throw Error('Runtime same-native qualification delivery receipt required');
+    // Old incomplete receipts require fresh review. Rebuilding a current stream
+    // cannot manufacture delivery of previously omitted producer evidence.
+    if(JSON.stringify(receipt.producer_dependencies??[])!==JSON.stringify(producers))throw Error('Qualification producer delivery evidence changed or missing');
     for(const ref of receipt.legacy_dependencies){const source=contextSource(state,ref.id);if(!keysOnly(ref,['id','revision','sha256'])||!source||JSON.stringify(recordReference(source,ref.id))!==JSON.stringify(ref))throw Error('Qualification legacy evidence changed');}
     if(ownership){const evidence=buildQualificationEvidence(state,plan,job);if(receipt.stream_sha256!==evidence.sources[evidence.pages[0].source_id].sha256||JSON.stringify(receipt.legacy_dependencies)!==JSON.stringify(evidence.handover.review_context.value.legacy_dependencies))throw Error('Qualification delivery source changed');}
   }
-  for(const ref of [...p.sources,...p.counterparts]){
+  for(const ref of [...p.sources,...p.counterparts,...producers]){
     const value=contextSource(state,ref.id);
     if(!frozen&&hasSnapshotReferences(value))throw Error('Referenced originals require streamed qualification');
-    if(ownership&&ownsEvidence(state,value,job))throw Error('Qualification reviewer owns source or counterpart');
+    if(ownsEvidence(state,value,job))throw Error('Qualification reviewer owns source or counterpart producer evidence');
     if(!frozen&&!delivered(state,job,ref))throw Error('Qualification reviewer did not receive complete exact source/counterpart '+ref.id);
   }
 }
@@ -236,7 +258,7 @@ export function applyContextQualification(state,plan,review,{source_instruction,
   if(typeof contextMatches!=='function'||!contextMatches(state,state.jobs[review.job_id],state.jobs[review.job_id].context_sha256))throw Error('Qualification review context stale');
   if(Object.values(state.records).some(r=>r.status==='Submitted'&&r.review_of?.id===plan.id&&r.review_of.revision===plan.revision&&['Fail','Blocked'].includes(r.review?.verdict)))throw Error('Qualification retains an unresolved negative review');
   const classifications={};
-  for(const source of p.sources)classifications[source.id]={source,disposition:p.disposition,roles:p.roles,scopes:p.scopes,plan:recordReference(plan),review:recordReference(review),qualification:qualificationReceipt(state.jobs[review.job_id],p,review),source_instruction,at:new Date().toISOString()};
+  for(const source of p.sources)classifications[source.id]={source,disposition:p.disposition,roles:p.roles,scopes:p.scopes,plan:recordReference(plan),review:recordReference(review),qualification:qualificationReceipt(state,state.jobs[review.job_id],p,review),source_instruction,at:new Date().toISOString()};
   return classifications;
 }
 export function reviewedContext(state) {

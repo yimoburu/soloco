@@ -1,0 +1,18 @@
+(node:62410) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ public represented v2 schema is strict and legacy/default protocols remain unchanged (866.003833ms)
+✔ public plan, real worker complete format4 reads and public apply retain canonical current qualification and exact homes (2060.604208ms)
+✔ real worker rejects incomplete semantic delivery and coordinator native identity (72.107208ms)
+✔ public represented source includes canonical runtime test author_instance and exact producer homes (83.480667ms)
+✔ receipt-only public v2 delivers canonical producers without classifying support; mutations hold (127.497875ms)
+✔ receipt-only public v2 rejects generator and deterministic reuse producer native identities (289.084083ms)
+✔ receipt-only public v2 freezes deterministic reuse origin and QA support (110.8995ms)
+✔ receipt-only public v2 holds missing or ambiguous canonical producer evidence (46.266209ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3795.22025

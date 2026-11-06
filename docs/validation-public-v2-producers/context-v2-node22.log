@@ -1,0 +1,33 @@
+TAP version 13
+# (node:61871) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: source, counterpart and proof mutation revokes exclusion or holds; a new blocker is always mandatory
+ok 1 - source, counterpart and proof mutation revokes exclusion or holds; a new blocker is always mandatory
+  ---
+  duration_ms: 13.968334
+  ...
+# Subtest: streamed v2 qualification exceeds legacy round limits with authentic same-native coverage and explicit semantic attestations
+ok 2 - streamed v2 qualification exceeds legacy round limits with authentic same-native coverage and explicit semantic attestations
+  ---
+  duration_ms: 442.477292
+  ...
+# {"initial_packet":947,"mandatory_stream":2510167,"range_calls":77}
+# Subtest: ordinary context holds unqualified pointers; counterpart obligations must be direct and source pointers require streamed proof
+ok 3 - ordinary context holds unqualified pointers; counterpart obligations must be direct and source pointers require streamed proof
+  ---
+  duration_ms: 3.921625
+  ...
+# Subtest: cached frozen handover reads revalidate exact source, counterpart, plan, review and native proof dependencies
+ok 4 - cached frozen handover reads revalidate exact source, counterpart, plan, review and native proof dependencies
+  ---
+  duration_ms: 10.886916
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 4
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 546.926625

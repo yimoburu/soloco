@@ -1,4 +1,4 @@
-import {reviewedContext,contextSource,currentExtensions} from './current-state.mjs';
+import {reviewedContext,contextSource,currentExtensions,qualificationProducers} from './current-state.mjs';
 import {snapshotReference,snapshotBytes,snapshotEntryReference,retainSnapshotEntry,shallowSnapshotAttempt,shallowSnapshotRecord,legacyHandoverSource} from './snapshot.mjs';
 import { createHash } from 'node:crypto';
 
@@ -818,7 +818,8 @@ export function buildQualificationEvidence(state,plan,job) {
       for(const child of Object.values(item))if(child&&typeof child==='object')todo.push(child);
     }
   };
-  for(const ref of [...p.sources,...p.counterparts]){
+  const producer_dependencies=qualificationProducers(state,p);
+  for(const ref of [...new Map([...p.sources,...p.counterparts,...producer_dependencies].map(ref=>[ref.id,ref])).values()]){
     const value=contextSource(state,ref.id);
     if(!value||hash(serialize(value))!==ref.sha256||(value.revision??null)!==ref.revision)hold('qualification source changed');
     originals.push({source:ref,body:retain(serialize(value))});dependencies(value);
@@ -827,17 +828,17 @@ export function buildQualificationEvidence(state,plan,job) {
   // body that might contain its only negative finding. Every exact original and
   // referenced snapshot is compulsory once, with separate byte-exact retrieval.
   return buildEvidence({company_id:state.id,governance:state.governance,cos_instructions:state.cos_instructions,roles:state.roles,owner:state.owner,state_extensions:currentExtensions(state),qualification_plan:plan,originals,original_bodies:[...bodies.values()]},[],{wholeBodyAliases:false,checkpointContinuity:true,snapshotState:state,originalSources:[...bodies.values()],
-    retainedHandoverRecords:state.records,reviewContext:{protocol:'context-qualification-v2',plan_sha256:hash(serialize(p)),legacy_dependencies:[...legacyDependencies.values()].sort((a,b)=>a.id.localeCompare(b.id)),
+    retainedHandoverRecords:state.records,reviewContext:{protocol:'context-qualification-v2',plan_sha256:hash(serialize(p)),...(producer_dependencies.length?{producer_dependencies}:{}),legacy_dependencies:[...legacyDependencies.values()].sort((a,b)=>a.id.localeCompare(b.id)),
       charter:state.roles[job.role],assignment:{task:job.task,task_summary:job.task_summary??null,next_handoff:job.next_handoff??null,
         ...(job.coordination?{coordination:job.coordination}:{}),...(job.requester?{requester:job.requester}:{}),...(job.expected_deliverable!==undefined?{expected_deliverable:job.expected_deliverable}:{}),model_selection:job.model_selection??{mode:'default'}},
-      rule:'Compare every original finding, failure, uncertain effect and exhausted allowance with the exact mandatory counterparts. Represented does not mean resolved. Return Blocked for any omission, conflict or unique finding. No authority or renewed allowance is granted.'}});
+      rule:'Compare every original finding, failure, uncertain effect and exhausted allowance with the exact mandatory counterparts. Represented does not mean resolved. Return Blocked for any omission, conflict or unique finding. No authority or renewed allowance is granted.'+(producer_dependencies.length?' Producer dependencies are compulsory provenance evidence for the selected sources and counterparts; only qualification_plan sources are being classified.':'')}});
 }
 export function qualificationDeliveryReceipt(subject,ledger,{plan_sha256,context_sha256}) {
   validateSemanticDelivery(subject,ledger);
   const stream=subject.sources[subject.pages[0].source_id];
   const context=subject.handover.review_context?.value;
   if(context?.protocol!=='context-qualification-v2'||context.plan_sha256!==plan_sha256)hold('qualification receipt plan changed');
-  return freeze({protocol:2,semantic_delivery_complete:true,native_id:ledger.session_id,stream_sha256:stream.sha256,plan_sha256,context_sha256,legacy_dependencies:context.legacy_dependencies});
+  return freeze({protocol:2,semantic_delivery_complete:true,native_id:ledger.session_id,stream_sha256:stream.sha256,plan_sha256,context_sha256,legacy_dependencies:context.legacy_dependencies,...(context.producer_dependencies?{producer_dependencies:context.producer_dependencies}:{})});
 }
 
 /** Exact source eligibility only, not understanding or semantic correctness.

@@ -36,16 +36,16 @@ async function prepare(f,record_ids=['old']){
 }
 // Real public plan/apply, dispatch and worker; only the adapter's judgment is
 // fictional. No private qualification helper seeds a review or classification.
-async function review(f,{p,q},mode='complete'){
+async function review(f,{p,q},mode='complete',reviewNative='fictional-review-'+q.id){
  const s=read(f),pack=assignmentContext(s,s.jobs[q.id]),e=pack.qualification_evidence;
  const sources=[e.sources[e.pages[0].source_id],...Object.values(e.sources).filter(v=>v.kind!=='semantic-stream'&&v.source_id!==e.pages[0].source_id)];
  const requests=sources.flatMap(v=>{const out=[];for(let offset=0;offset<v.length;){let length=Math.min(16000,v.length-offset);if(/[\uD800-\uDBFF]/.test(v.raw[offset+length-1]))length--;out.push({source_id:v.source_id,sha256:v.sha256,offset,length});offset+=length;}return out;});
  let calls=0,delivered=0;
  await work(f.root,q.id,async(_host,native,prompt,_dir,timeout,_selection,options)=>{
   options.onSpawn?.(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));
-  calls++;if(calls>1){assert.equal(native,'fictional-review-'+q.id);const packet=JSON.parse(prompt);delivered+=packet.reads.reduce((n,r)=>n+r.text.length,0);}
-  if(mode==='complete'&&requests.length)return {native_id:'fictional-review-'+q.id,text:JSON.stringify({reads:requests.splice(0,4)})};
-  return {native_id:mode==='nonindependent'?f.session_id:'fictional-review-'+q.id,text:JSON.stringify({content:'FICTIONAL ADAPTER DOUBLE: synthetic preservation judgment; no independent acceptance.',messages:[],notices:[],review:{verdict:'Pass',reason:'Fictional complete preservation',permitted_action:'apply_context_classification',plan_sha256:sha(read(f).records[p.id].context_classification_plan),coverage_complete:true,obligations_preserved:true,unique_findings:[],blockers:[]}})};
+  calls++;if(calls>1){assert.equal(native,reviewNative);const packet=JSON.parse(prompt);delivered+=packet.reads.reduce((n,r)=>n+r.text.length,0);}
+  if(mode==='complete'&&requests.length)return {native_id:reviewNative,text:JSON.stringify({reads:requests.splice(0,4)})};
+  return {native_id:mode==='nonindependent'?f.session_id:reviewNative,text:JSON.stringify({content:'FICTIONAL ADAPTER DOUBLE: synthetic preservation judgment; no independent acceptance.',messages:[],notices:[],review:{verdict:'Pass',reason:'Fictional complete preservation',permitted_action:'apply_context_classification',plan_sha256:sha(read(f).records[p.id].context_classification_plan),coverage_complete:true,obligations_preserved:true,unique_findings:[],blockers:[]}})};
  });
  return {job:read(f).jobs[q.id],calls,delivered,total:sources.reduce((n,v)=>n+v.length,0)};
 }
@@ -129,6 +129,19 @@ test('public represented source includes canonical runtime test author_instance 
  const f=fixture();
  // Source fixture only: canonical executeDevelopmentTest attribution uses
  // author_instance for its runtime job; it does not invent a receipt job_id.
+ seedRuntime(f);
+ const prepared=await prepare(f,['old','candidate','development','job:run','job:generate']),out=await review(f,prepared);
+ assert.equal(out.job.status,'completed',out.job.error);assert.equal(out.delivered,out.total);
+ assert.equal((await api(f,{action:'apply',plan_id:prepared.p.id,review_id:out.job.artifact_id})).applied,true);
+ const after=read(f);assert.equal(Object.hasOwn(after.records.old,'job_id'),false);
+ assert.equal(after.records[out.job.artifact_id].context_qualification.producer_dependencies,undefined,'complete explicit closure retains the prior receipt shape');
+ for(const id of ['old','candidate','development','job:run','job:generate'])assert.equal(after.context_classifications[id].qualification.protocol,2);
+ assert.equal(classificationFor(after,after.records.old).disposition,'represented');
+ mutate(f,s=>{s.jobs.generate.native_id='changed';});
+ assert.equal(classificationFor(read(f),read(f).records.old),null);
+});
+
+function seedRuntime(f){
  mutate(f,s=>{
   s.records.development={id:'development',revision:1,kind:'plan',author_instance:'fictional-owner',content:'Fictional development plan'};
   s.records.candidate={id:'candidate',revision:1,kind:'artifact',author_instance:'generator-instance',job_id:'generate',content:'Fictional candidate',development:{type:'candidate',candidate_sha256:'fictional-source',run:{job_id:'run',status:'completed',receipt_id:'old'}}};
@@ -137,12 +150,82 @@ test('public represented source includes canonical runtime test author_instance 
   const result={status:'passed',tests_executed:true,candidate_sha256:'fictional-source',test_paths:['fictional.test.mjs'],timeout_ms:1000,max_output_bytes:1000,directory:'/fictional/candidate',finished_at:'2026-11-06T00:00:00Z',output:'Fictional source evidence; effects unknown, no retries remain.'};
   s.records.old={id:'old',kind:'artifact',author_role:'runtime',author_instance:'run',revision:1,status:'Submitted',content:JSON.stringify(result),development:{type:'test',plan_id:'development',candidate_id:'candidate',candidate_sha256:'fictional-source',result,receipt_sha256:sha(result)}};
  });
- const prepared=await prepare(f,['old','candidate','development','job:run','job:generate']),out=await review(f,prepared);
- assert.equal(out.job.status,'completed',out.job.error);assert.equal(out.delivered,out.total);
- assert.equal((await api(f,{action:'apply',plan_id:prepared.p.id,review_id:out.job.artifact_id})).applied,true);
- const after=read(f);assert.equal(Object.hasOwn(after.records.old,'job_id'),false);
- for(const id of ['old','candidate','development','job:run','job:generate'])assert.equal(after.context_classifications[id].qualification.protocol,2);
- assert.equal(classificationFor(after,after.records.old).disposition,'represented');
- mutate(f,s=>{s.jobs.generate.native_id='changed';});
- assert.equal(classificationFor(read(f),read(f).records.old),null);
+}
+
+function seedReuse(f){
+ seedRuntime(f);
+ mutate(f,s=>{
+  s.records.origin=structuredClone(s.records.old);s.records.origin.id='origin';s.records.origin.author_instance='origin-run';s.records.origin.development.candidate_id='origin-candidate';
+  s.records['origin-candidate']=structuredClone(s.records.candidate);Object.assign(s.records['origin-candidate'],{id:'origin-candidate',author_instance:'origin-generator-instance',job_id:'origin-generate'});
+  s.records['origin-candidate'].development.run={job_id:'origin-run',status:'completed',receipt_id:'origin'};
+  s.jobs['origin-run']={...s.jobs.run,id:'origin-run',candidate_id:'origin-candidate',artifact_id:'origin'};
+  s.jobs['origin-generate']={...s.jobs.generate,id:'origin-generate',instance_id:'origin-generator-instance',native_id:'origin-generator-native',artifact_id:'origin-candidate'};
+  s.jobs['reuse-qa-job']={id:'reuse-qa-job',status:'completed',instance_id:'reuse-qa-instance',native_id:'reuse-qa-native',artifact_id:'reuse-qa'};
+  s.records['reuse-qa']={id:'reuse-qa',revision:1,kind:'review',author_role:'qa',author_instance:'reuse-qa-instance',job_id:'reuse-qa-job',review_of:{id:'origin',revision:1},content:'Fictional reuse qualification'};
+  s.records.old.development.reused_from='origin';
+  s.records.old.development.reuse_qualification={id:'reuse-qa',revision:1,sha256:sha(s.records['reuse-qa'])};
+ });
+}
+
+test('receipt-only public v2 delivers canonical producers without classifying support; mutations hold',async()=>{
+ const f=fixture();seedRuntime(f);
+ mutate(f,s=>{
+  // External reference-shaped application metadata is not a canonical edge.
+  s.records.old.external={source:{id:'absent-external',revision:1,sha256:'external-hash'},job_id:'absent-external-job'};
+  s.records.home.author_instance='home-producer-instance';s.records.home.job_id='home-producer';
+  s.jobs['home-producer']={id:'home-producer',instance_id:'home-producer-instance',native_id:'home-producer-native',artifact_id:'home'};
+  s.records.unrelated={id:'unrelated',kind:'artifact',content:'UNRELATED ARCHIVE MUST NOT BE DELIVERED'};
+ });
+ const prepared=await prepare(f,['old']),before=read(f),packet=assignmentContext(before,before.jobs[prepared.q.id]);
+ const stream=packet.qualification_evidence.sources[packet.qualification_evidence.pages[0].source_id];
+ for(const text of ['generator-native','Fictional candidate','Fictional development plan','home-producer-native'])assert.ok(stream.raw.includes(text),text);
+ assert.equal(stream.raw.includes('UNRELATED ARCHIVE MUST NOT BE DELIVERED'),false);
+ const out=await review(f,prepared);assert.equal(out.job.status,'completed',out.job.error);assert.equal(out.delivered,out.total);
+ const apply=()=>api(f,{action:'apply',plan_id:prepared.p.id,review_id:out.job.artifact_id});
+ const reviewed=read(f);
+ mutate(f,s=>{delete s.records[out.job.artifact_id].context_qualification.producer_dependencies;});
+ await assert.rejects(apply(),/producer delivery/);
+ mutate(f,s=>Object.assign(s,structuredClone(reviewed)));
+ mutate(f,s=>{s.records[out.job.artifact_id].context_qualification.stream_sha256='stale-incomplete-delivery';});
+ await assert.rejects(apply(),/delivery source changed/);
+ mutate(f,s=>Object.assign(s,structuredClone(reviewed)));
+ assert.equal((await apply()).applied,true);
+ const accepted=read(f);assert.deepEqual(Object.keys(accepted.context_classifications),['old']);
+ for(const change of [s=>{s.jobs.generate.native_id='mutated';},s=>{s.records.candidate.content+=' changed';},s=>{s.records.development.content+=' changed';},s=>{s.jobs.run.status='failed';},s=>{s.jobs['home-producer'].native_id='mutated';}]){
+  mutate(f,change);assert.throws(()=>classificationFor(read(f),read(f).records.old),/producer|receipt|closure/);
+  mutate(f,s=>Object.assign(s,structuredClone(accepted)));
+ }
+ assert.equal(classificationFor(read(f),read(f).records.old).disposition,'represented');
+ mutate(f,s=>{s.jobs.generate.native_id='mutated';s.context_classifications.old.qualification.producer_dependencies=s.context_classifications.old.qualification.producer_dependencies.map(ref=>ref.id==='job:generate'?{id:ref.id,revision:null,sha256:sha(s.jobs.generate)}:ref);});
+ assert.throws(()=>classificationFor(read(f),read(f).records.old),/producer delivery/,'refreshing current metadata cannot repair stale delivery');
 });
+
+test('receipt-only public v2 rejects generator and deterministic reuse producer native identities',async()=>{
+ for(const native of ['generator-native','origin-generator-native','reuse-qa-native']){
+  const f=fixture();seedReuse(f);const prepared=await prepare(f,['old']),out=await review(f,prepared,'complete',native);
+  // The fictional adapter may finish, but public apply must reject ownership.
+  assert.equal(out.job.status,'completed',out.job.error);
+  await assert.rejects(api(f,{action:'apply',plan_id:prepared.p.id,review_id:out.job.artifact_id}),/owns.*producer/);
+  assert.equal(read(f).context_classifications?.old,undefined);
+ }
+});
+
+test('receipt-only public v2 freezes deterministic reuse origin and QA support',async()=>{
+ const f=fixture();seedReuse(f);const prepared=await prepare(f,['old']),out=await review(f,prepared);
+ assert.equal(out.job.status,'completed',out.job.error);
+ const reviewed=read(f),receipt=reviewed.records[out.job.artifact_id].context_qualification;
+ for(const id of ['origin','origin-candidate','job:origin-run','job:origin-generate','reuse-qa','job:reuse-qa-job'])assert.ok(receipt.producer_dependencies.some(r=>r.id===id),id);
+ assert.equal((await api(f,{action:'apply',plan_id:prepared.p.id,review_id:out.job.artifact_id})).applied,true);
+ const accepted=read(f);
+ for(const change of [s=>{s.records.origin.content+=' changed';},s=>{s.records['reuse-qa'].content+=' changed';},s=>{s.jobs['origin-generate'].native_id='changed';},s=>{s.jobs['reuse-qa-job'].native_id='changed';}]){
+  mutate(f,change);assert.throws(()=>classificationFor(read(f),read(f).records.old),/producer|receipt|closure|changed/);
+  mutate(f,s=>Object.assign(s,structuredClone(accepted)));
+ }
+});
+
+ test('receipt-only public v2 holds missing or ambiguous canonical producer evidence',async()=>{
+  for(const change of [s=>{delete s.jobs.generate;},s=>{s.jobs.generate.id='ambiguous';},s=>{s.records.candidate.author_instance='wrong-generator';}]){
+   const f=fixture();seedRuntime(f);mutate(f,change);
+   await assert.rejects(prepare(f,['old']),/source missing|identity mismatch|canonical producer/);
+  }
+ });
