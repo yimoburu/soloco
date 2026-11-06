@@ -97,6 +97,7 @@ export function appendNormalizedJournal(db,key,value) {
   if(!journals.has(key))throw Error('Unknown upgrade journal');
   journalLayout(db);
   const indexed=readPublicIndex(db)!==null;
+  installPublicIndex(db);
   let parent=db.prepare("SELECT e.*,v.bytes FROM state_entries e LEFT JOIN immutable_values v USING(sha256) WHERE family='upgrade' AND key=?").get(key);
   if(parent&&parent.encoding==='json'){
     const old=decode(parent,db);if(!Array.isArray(old))throw Error('Upgrade journal is not an array');
@@ -110,6 +111,7 @@ export function appendNormalizedJournal(db,key,value) {
   const position=parent?.position??db.prepare("SELECT COALESCE(MAX(position),-1)+1 AS n FROM state_entries WHERE family='upgrade'").get().n;
   put(db,'upgrade',key,position,{...descriptor,length:descriptor.length+1},'journal-array');
   if(indexed)finishPublicIndex(db);
+  else writePublicIndex(db,readNormalized(db));
 }
 function split(db,value) {
   const entries=[];
@@ -195,6 +197,7 @@ export function readNormalized(db,{rootKeys=null,entities=null,validateKeys=true
 }
 export function writeNormalized(db,state) {
   readPublicIndex(db); // Never overwrite an unknown derived-index protocol.
+  installPublicIndex(db); // Surviving invalidation triggers may reference a missing catalog.
   if(layoutVersion(db)>=3)journalLayout(db);
   const entries=split(db,state),existing=new Set(db.prepare('SELECT family,key FROM state_entries').all().map(r=>JSON.stringify([r.family,r.key])));
   for(const [family,key,n,value,encoding] of entries){put(db,family,key,n,value,encoding);existing.delete(JSON.stringify([family,storedKey(db,key)]));}
@@ -222,6 +225,7 @@ export function migrateNormalized(db,directory) {
     if(version)captureSnapshotDependencies(bindSnapshots(state,sha=>readImmutable(db,sha)),()=>undefined);
     if(!version)install(db);
     else {
+      installPublicIndex(db);
       if(!hasEncoding(db))db.exec("ALTER TABLE state_entries ADD COLUMN encoding TEXT NOT NULL DEFAULT 'json'");
       db.prepare('UPDATE company_layout SET version=4 WHERE id=1').run();
       db.exec('DELETE FROM state_entries');
@@ -239,6 +243,7 @@ export function migrateNormalized(db,directory) {
 }
 export function writeNormalizedSelection(db,changes) {
   const indexed=readPublicIndex(db)!==null&&changes.every(({family,value})=>publicIndexCompatible(family,value));
+  installPublicIndex(db);
   for(const {family,key,value} of changes) {
     const journal=family==='upgrade'&&journals.has(key);
     if(journal&&layoutVersion(db)>=3)journalLayout(db);
@@ -252,6 +257,7 @@ export function writeNormalizedSelection(db,changes) {
     if(indexed)updatePublicIndexValue(db,family,key,value);
   }
   if(indexed)finishPublicIndex(db);
+  else writePublicIndex(db,readNormalized(db));
 }
 
 // Independently versioned, discardable presentation index. Canonical v1-v4
@@ -275,7 +281,8 @@ function updatePublicIndexValue(db,family,key,value) {
   if(value===undefined){db.prepare('DELETE FROM public_read_values WHERE family=? AND key=?').run(family,stored);return;}
   const row=db.prepare('SELECT position FROM state_entries WHERE family=? AND key=?').get(family,stored);
   if(!row)return;
-  const projected=key==='id'&&['root','upgrade'].includes(family)?value:publicIndexValue(family,value);
+  // Collection .id is also the aggregate source's identity, with any JSON shape.
+  const projected=key==='id'&&['root','upgrade','context_classifications'].includes(family)?value:publicIndexValue(family,value);
   const bytes=JSON.stringify(projected),valueId=typeof value?.id==='string'?hash(JSON.stringify(value.id)):null;
   db.prepare('INSERT OR REPLACE INTO public_read_values VALUES(?,?,?,?,?,?)').run(family,stored,row.position,bytes,valueId,hash(JSON.stringify([family,stored,row.position,bytes,valueId])));
 }
@@ -328,6 +335,10 @@ export function readPublicIndex(db) {
   if(!Number.isSafeInteger(catalog.exports)||catalog.exports<0||!Number.isSafeInteger(catalog.claims)||catalog.claims<0)throw Error('Corrupt public reconciliation metadata');
   if(!catalog.usage||Object.keys(catalog.usage).sort().join(',')!=='assignments,coordinator_usage,details_collection,effective_settings,missing_reasons,scope,unit,with_applied_controls,with_host_reported_models'||['assignments','missing_reasons','with_applied_controls','with_host_reported_models'].some(key=>!Number.isSafeInteger(catalog.usage[key])||catalog.usage[key]<0))throw Error('Unknown or corrupt public usage metadata');
   for(const info of Object.values(catalog.collections))if(Object.keys(info).sort().join(',')!=='inventory,total'||!Number.isSafeInteger(info.total)||info.total<0||!/^[a-f0-9]{64}$/.test(info.inventory))throw Error('Corrupt public collection metadata');
+  // A partial derived schema cannot safely serve reads or incremental writes.
+  // Keep this fixed-size metadata check independent of canonical archive size.
+  const objects=db.prepare("SELECT name FROM sqlite_master WHERE (type='table' AND name IN ('public_read_values','public_read_rows')) OR (type='index' AND name IN ('public_read_value_ids','public_read_handles')) OR (type='trigger' AND name IN ('public_read_insert','public_read_update','public_read_delete'))").all();
+  if(objects.length!==7)return null;
   return catalog;
 }
 function publicRow(db,row) {

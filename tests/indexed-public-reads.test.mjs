@@ -6,7 +6,8 @@ import path from 'node:path';
 import {DatabaseSync} from 'node:sqlite';
 import {Store,withStore,VERSION,digest} from '../plugins/soloco/runtime/store.mjs';
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
-import {currentView,publicPage,exactRead,PUBLIC_COLLECTIONS} from '../plugins/soloco/runtime/public-response.mjs';
+import {currentView,publicPage,publicCatalog,exactRead,PUBLIC_COLLECTIONS} from '../plugins/soloco/runtime/public-response.mjs';
+import {readPublicIndex} from '../plugins/soloco/runtime/record-storage.mjs';
 
 const base=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'indexed-public-')));
 process.env.COMPANY_PLUGIN_DATA=path.join(base,'bindings-data');
@@ -242,4 +243,83 @@ test('idle status uses the same snapshot for reconciliation decisions and displa
     assert.equal(status.active_jobs.items[0].timeout.state.state,'executing');
   }finally{DatabaseSync.prototype.prepare=prepare;writer.close();}
   assert.equal(engine.status(args,'codex').active_jobs.total,0,'the next status reconciles the later write');
+});
+
+test('partial derived schemas fall back without writes and repair on authorized writes',()=>{
+  const objects={table:['public_read_catalog','public_read_values','public_read_rows'],index:['public_read_value_ids','public_read_handles'],trigger:['public_read_insert','public_read_update','public_read_delete']};
+  for(const mode of ['full','selected','append'])for(const [type,names] of Object.entries(objects))for(const name of names) {
+    const state=seed(2,10);state.upgrade={id:'attempt',status:'recovered',calls:[]};
+    const args=fixture(state);
+    withStore(args.root,db=>{
+      const canonical=db.read();
+      db.db.exec(`DROP ${type} ${name}`);
+      const schema=db.db.prepare('SELECT type,name,sql FROM sqlite_master ORDER BY type,name').all();
+      const changes=db.db.prepare('SELECT total_changes() AS n').get().n;
+      db.readSnapshot(()=>assert.deepEqual(publicPage(db.publicState()),publicPage(canonical)));
+      assert.deepEqual(db.db.prepare('SELECT type,name,sql FROM sqlite_master ORDER BY type,name').all(),schema);
+      assert.equal(db.db.prepare('SELECT total_changes() AS n').get().n,changes,'fallback must not mutate');
+      assert.deepEqual(db.read(),canonical);
+      if(mode==='full')db.transaction('synthetic.repair',s=>s);
+      if(mode==='selected')db.selectedTransaction('synthetic.repair',{rootKeys:['revision','updated_at'],entities:{records:['recent0']}},s=>{s.records.recent0.content='Authorized edit';return s;});
+      if(mode==='append')assert.equal(db.appendUpgradeCall('attempt',{role:'cos',text:'Authorized append'}),true);
+      const after=db.read(),expected=structuredClone(canonical);
+      expected.revision=after.revision;expected.updated_at=after.updated_at;
+      if(mode==='selected')expected.records.recent0.content='Authorized edit';
+      if(mode==='append')expected.upgrade.calls.push({role:'cos',text:'Authorized append'});
+      assert.deepEqual(after,expected,`${mode}: ${name} canonical preservation`);
+      assert.ok(readPublicIndex(db.db),`${mode}: ${name} repaired`);
+      db.readSnapshot(()=>assert.deepEqual(publicPage(db.publicState()),publicPage(after)));
+      assert.equal(db.db.prepare('PRAGMA integrity_check').get().integrity_check,'ok');
+      assert.deepEqual(db.db.prepare('PRAGMA foreign_key_check').all(),[]);
+    });
+    assert.doesNotThrow(()=>trace(()=>inspect(args)),`${mode}: ${name} indexed again`);
+  }
+});
+
+test('arbitrary classification ids preserve canonical inventories and fallback-to-index cursors',()=>{
+  for(const id of ['metadata-id',42,false,null,['arbitrary','id'],{id:'nested',unknown:{proof:'Retain exactly'}},'nul\0lone\ud800']) {
+    const state=seed(2,10);
+    for(const key of ['id','__proto__','nul\0key','lone\ud800','@public:pinned:owner'])Object.defineProperty(state.context_classifications,key,{value:key==='id'?id:{id:key,disposition:'represented'},enumerable:true});
+    const args=fixture(state);
+    withStore(args.root,db=>{
+      const canonical=db.read(),expected=publicCatalog(canonical);
+      const compare=()=>{
+        const actual=readPublicIndex(db.db);
+        for(const collection of PUBLIC_COLLECTIONS)assert.deepEqual(actual.collections[collection],{total:expected.collections[collection].total,inventory:expected.collections[collection].inventory},collection);
+      };
+      compare();
+      db.db.exec('DROP TABLE public_read_catalog');
+      const cursors=PUBLIC_COLLECTIONS.map(collection=>({collection,page:db.readSnapshot(()=>publicPage(db.publicState(),{collection,limit:1}))}));
+      db.transaction('synthetic.rebuild',s=>s);
+      compare();
+      assert.deepEqual(db.read().context_classifications,canonical.context_classifications);
+      for(const {collection,page} of cursors) {
+        assert.deepEqual(db.readSnapshot(()=>publicPage(db.publicState(),{collection,limit:1})),page);
+        if(page.next_cursor)assert.deepEqual(db.readSnapshot(()=>publicPage(db.publicState(),{collection,cursor:page.next_cursor,limit:1})),publicPage(db.read(),{collection,cursor:page.next_cursor,limit:1}));
+      }
+      db.selectedTransaction('synthetic.metadata',{rootKeys:['revision','updated_at'],entities:{context_classifications:['id']}},s=>{s.context_classifications.id={arbitrary:'replacement'};return s;});
+      const updated=publicCatalog(db.read());
+      for(const collection of PUBLIC_COLLECTIONS)assert.equal(readPublicIndex(db.db).collections[collection].inventory,updated.collections[collection].inventory,collection+' after selected write');
+    });
+  }
+});
+
+test('repair of multiple missing objects rolls back with the authorized write',()=>{
+  const args=fixture(seed(2,10));
+  withStore(args.root,db=>{
+    const canonical=db.read();
+    db.db.exec(`DROP TABLE public_read_catalog;
+      DROP TABLE public_read_values;
+      DROP TRIGGER public_read_insert;
+      CREATE TRIGGER reject_repair_event BEFORE INSERT ON events BEGIN SELECT RAISE(ABORT,'Synthetic write rejected'); END;`);
+    const schema=db.db.prepare('SELECT type,name,sql FROM sqlite_master ORDER BY type,name').all();
+    const write=()=>db.selectedTransaction('synthetic.repair',{rootKeys:['revision','updated_at'],entities:{records:['recent0']}},s=>{s.records.recent0.content='Authorized edit';return s;});
+    assert.throws(write,/Synthetic write rejected/);
+    assert.deepEqual(db.read(),canonical);
+    assert.deepEqual(db.db.prepare('SELECT type,name,sql FROM sqlite_master ORDER BY type,name').all(),schema);
+    db.db.exec('DROP TRIGGER reject_repair_event');
+    write();
+    assert.ok(readPublicIndex(db.db));
+    assert.equal(db.read().records.recent0.content,'Authorized edit');
+  });
 });
