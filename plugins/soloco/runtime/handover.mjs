@@ -142,9 +142,10 @@ export function submitReconstruction(state,args) {
   if(Object.values(state.jobs).some(j=>['queued','running'].includes(j.status)))throw new Error('Review is active; reconcile it before replacing reconstruction');
   const key=id('handover-reconstruction');
   // Retain previous submissions, but do not hide them from later reconstructions.
-  h.reconstruction_id=key;
   const prospective=args.protocol==='operating-handover-v4';
+  if(!prospective)h.reconstruction_id=key;
   const subject=prospective?requireOperatingHandover(state):handoverSubject(state),subject_sha256=digest(JSON.stringify(subject));
+  h.reconstruction_id=key;
   const record={id:key,kind:'artifact',revision:1,status:'Submitted',author_role:'runner',author_instance:args.session_id,
     content:args.content,created_at:stamp(),handover:{id:h.id,evidence_protocol:prospective?4:3,subject_sha256,subject,incoming_owner:{...state.owner},
       input_refs:Object.values(subject.records).map(r=>({id:r.id,...(r.revision===undefined?{}:{revision:r.revision}),sha256:digest(JSON.stringify(r))}))}};

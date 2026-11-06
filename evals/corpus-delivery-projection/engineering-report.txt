@@ -1,0 +1,15 @@
+Implemented on baseline `b7a186ade659972f3007dc973a8e520c68200fe6`; no commit.
+
+Changed:
+
+- `plugins/soloco/runtime/scoped-context.mjs`
+- `tests/scoped-corpus-runtime.test.mjs`
+- `docs/scoped-context.md`
+
+New marked corpus targets use phase-specific delivery while preserving full canonical validation. Unmarked targets retain legacy bytes.
+
+Validation: **82 tests passed on Node 25**, plus baseline byte comparison, syntax and diff checks. Node 22 could not run: the requested executable is missing.
+
+[Report, commands and retained logs](evals/corpus-delivery-projection/report.md) · [Source patch](evals/corpus-delivery-projection/source.patch)
+
+Actual corpus fit and independent native semantic locality remain unproven. Runtime adoption remains the owner’s responsibility after source QA and real qualification.

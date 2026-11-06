@@ -1,6 +1,6 @@
 # Prospective lossless legacy bootstrap
 
-`plugins/soloco/runtime/legacy-operating.mjs` implements `legacy-bootstrap-manifest-v1`. This is a planning and byte-preservation contract. It does not classify history, adopt a runtime, issue a grant, clear a failure, accept a handover, or reinterpret existing scoped plans, IDs or receipts. No existing runtime path imports this module in this component checkout. Root integration and independent QA remain required.
+`plugins/soloco/runtime/legacy-operating.mjs` implements `legacy-bootstrap-manifest-v1`. This is a planning and byte-preservation contract. It does not classify history, adopt a runtime, issue a grant, clear a failure, accept a handover, or reinterpret existing scoped plans, IDs or receipts. The integrated scoped corpus planner imports this module. Its lossless reconstruction supplies evidence, while independent canonical reviews and operating publication establish separate acceptance boundaries. Actual SoloDev bootstrap remains unaccepted.
 
 The builder takes the complete logical state and exact source IDs. It uses the existing canonical `handoverSubject` and existing reference, classification and snapshot APIs. It clones the input into a disposable snapshot lineage before canonical construction, so canonical shallow snapshots never enter the caller's pending vault. Existing referenced originals are read through the caller's bound vault resolver. There is no independent filesystem/database reader, company lookup, persistent cache or parallel archive.
 
@@ -56,7 +56,7 @@ Validation uses targeted fictional storage/codec tests on Node 22.13 and Node 25
 
 ## Coherent extraction planner (prospective, executable planning only)
 
-`legacy-coherent-extraction-v1` is an additional contract in the **same module**. It leaves manifest-v1, old evidence and old scoped proof contracts intact. It avoids constructing a complete baseline for every source. It is usable for public/fictional planning now; it is **not a connected operating provider or a completed migration**.
+`legacy-coherent-extraction-v1` is an additional contract in the **same module**. It leaves manifest-v1, old evidence and old scoped proof contracts intact. It avoids constructing a complete baseline for every source. It is usable for public/fictional planning now; it is **not itself an operating acceptance or a completed migration**.
 
 ```js
 const p = buildLegacyCoherentPlan(state); // default and maximum 48,000 bytes
@@ -68,6 +68,8 @@ const packet = session.materialize(p.occurrences[0].id);
 New exports are `LEGACY_COHERENT_PROTOCOL`, `buildLegacyCoherentPlan`, `decodeLegacyCoherentPlan`, `openLegacyCoherentPlan`, `validateLegacyCoherentPlan`, `captureLegacyCanonicalSource`, and `legacyCanonicalCoverage`.
 
 The builder shares the existing lossless typed codec, isolated vault closure and exact snapshot APIs. Raw originals remain reconstructable byte for byte, including ordered object keys, arrays and canonical JSON text's STRING type. State and every unique original are separate physical documents. Repeated references become exact inbound edges, not recursively expanded checkpoint trees. These edges, root identities, ordered collection membership, parent-root chains, JSON pointers and canonical-text transitions preserve all occurrence contexts. `decodeLegacyCoherentPlan` reconstructs state and originals, then deterministically rebuilds the plan; resealing a truncated index or altered measurement does not make it valid. The input must still be a complete authorized state snapshot; this API cannot detect upstream omissions.
+
+Before promoting a JSON STRING to a parsed view, the codec checks objects and arrays for the reserved object keys `immutable_snapshot` and `immutable_entry`, regardless of their values or validity. Such strings remain opaque with exact raw bytes and produce no snapshot inbound edges. The check does not parse nested strings; each nested STRING promotion applies the same gate. Genuine typed references retain full closure validation. An oversized opaque fallback remains Held without truncation or cap changes.
 
 Every complete ID-bearing body/version is a candidate logical section. Recognized document collections (`records`, `jobs`, `messages`, `notices`, `upgrade_history`) have exact ordered structural indexes; every member is still required extraction work, even without an ID. A collection index is not a reviewed snapshot container. Nested complete bodies are explicit section cuts, with exact target roots. All other local fields, including late exceptions, unknown keys, code, logs and negative judgments, remain in the section. A body with nested version cuts is labelled `complete-local-section`, not an unchanged full original record. The unchanged complete original remains reconstructable from the typed graph. Canonical JSON text is a typed, reversible view, never executable instructions or evidence of applicability.
 

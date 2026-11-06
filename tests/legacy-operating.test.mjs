@@ -12,6 +12,18 @@ function fixture(){return {id:'fictional-company',name:'Fixture',idea:'One found
 const build=(s,options={})=>legacy.buildLegacyBootstrap(s,{source_ids:['history'],...options});
 function reseal(m){delete m.manifest_sha256;m.manifest_sha256=digest(json(m));return m;}
 
+test('shared bootstrap codec leaves reserved-key STRING examples opaque with exact bytes',()=>{
+  for(const key of ['immutable_snapshot','immutable_entry'])for(const format of [undefined,2]){
+    const s=fixture(),payload={nested:[{[key]:null}],description:'Malformed example remains STRING data é.'};
+    const raw=format?' \r\n'+json(payload,null,format)+'\t':json(payload);
+    s.records.history.content=raw;
+    const m=build(s,{canonical_json_text:true}),decoded=legacy.decodeLegacyBootstrap(m);
+    assert.ok(m.definitions.some(d=>d[0]==='string'&&d[1]===raw));
+    assert.deepEqual(Buffer.from(decoded.state.records.history.content),Buffer.from(raw));
+    assert.equal(m.snapshot_occurrences.length,0);
+  }
+});
+
 test('pure builder preserves hidden prohibitions, exceptions, spent/revoked grants, failure, unknowns and attribution',()=>{
   const s=bindSnapshots(fixture()),before=json(s),pending=pendingSnapshots(s).size,m=build(s),d=legacy.decodeLegacyBootstrap(m),view=legacy.inspectLegacyBootstrap(m);
   assert.equal(json(s),before);assert.equal(pendingSnapshots(s).size,pending);assert.equal(json(d.state),before);

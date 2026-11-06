@@ -13,6 +13,7 @@ import {buildLegacyCoherentPlan,decodeLegacyCoherentPlan} from './legacy-operati
 export const COHERENT_PARTITIONER='coherent-source-v1';
 export const CORPUS_PARTITIONER='coherent-corpus-body-v1';
 export const CORPUS_PRESERVATION='coherent-corpus-preservation-v1';
+export const CORPUS_DELIVERY='corpus-phase-delivery-v1';
 
 // A separate proof grammar. No scoped receipt can satisfy a tree/legacy gate.
 export const SCOPED_PROTOCOL='scoped-context-v1';
@@ -272,6 +273,34 @@ function corpusMappingContext(s,x,proofs){
 }
 function corpusDomainProofs(s,x){return (x.t.domain_reviews??[]).map(r=>canonical(s,r));}
 function proofDependencies(s,x){return [...proofChildren(s,x),...corpusDomainProofs(s,x)];}
+// Native evidence is distinct from the full canonical proof DAG. Only newly
+// marked corpus targets use this representation; issued targets keep old bytes.
+function corpusDeliveryProjection(s,x,packet,proofs){
+  const {c,material}=plan(s,x.p),partition=c.semantic_partition;
+  const conclusion=p=>({review:scopedReference(p.record),target:{source:scopedReference(p.x.record),value:p.x.t},
+    result:p.result,mapping_occurrence_ids:corpusMappingContext(s,p.x,proofChildren(s,p.x)).occurrences.map(o=>o.id),
+    ...(partition?{selections:partition.selections.filter(q=>p.x.t.selection_ids.includes(q.id))}:{})});
+  if(x.t.phase==='applicability'){
+    // Full validated extraction result and exact bundle each appear once.
+    packet.extractions=proofs.map(p=>({review:scopedReference(p.record),reviewed_unit_bundle:p.record.reviewed_unit_bundle,result:p.result}));
+    if(x.t.interface_keys.length)packet.domain_conclusions=corpusDomainProofs(s,x).map(conclusion);
+  }else{
+    packet.domains=proofs.filter(p=>x.t.domain_review_ids.includes(p.record.id)).map(conclusion);
+    packet.interface_reviews=proofs.filter(p=>x.t.interface_review_ids.includes(p.record.id)).map(conclusion);
+    // Raw global/unknown occurrence clauses and inbound qualifiers remain raw.
+    const globals=partition?.selections.filter(q=>q.scope==='*').map(q=>q.id);
+    if(globals?.length)packet.global_occurrence_context=selectionContext(material,partition,globals);
+    packet.homes=x.t.homes.map(r=>({source:r,value:exact(s,r)}));
+    packet.dependencies=x.t.dependencies.map(r=>({source:r,value:exact(s,r)}));
+  }
+  packet.delivery_projection={schema:CORPUS_DELIVERY,phase:x.t.phase,
+    proof_dependencies:proofDependencies(s,x).map(p=>scopedReference(p.record)),
+    semantic_source_ids:packet.corpus_claim.selected_source_ids,
+    ...(x.t.phase==='applicability'?{extraction_items_path:'extractions[].result.items'}:{}),
+    canonical_validation:'The runtime recursively validates the FULL canonical graph, original native delivery, independence, currentness, negatives, timing and authority. Native evidence here is phase-specific; every original remains retrievable through its exact review/target/plan references. Software validation is not semantic acceptance.'};
+  packet.instructions+=' DELIVERY '+CORPUS_DELIVERY+': extraction items are in extractions[].result.items. Complete validated result objects are delivered without selecting semantic fields. Domain review must preserve every consequential condition, unresolved/negative/exhausted outcome and outward effect, including unknown or undeclared distant coupling. Interface review composes ALL independently accepted domain results, their exact selections/scopes, mapping occurrence vectors, typed homes and source identities, alongside COMPLETE local/incident/global raw evidence. Final review composes ALL domain and interface results, exact mappings, census/frontier, current home/dependency bodies and raw global authority. Unrelated raw extraction leaves are not automatically replayed. A Pass, digest, producer label or completeness flag alone never establishes adequate meaning. Independently compare all-domain meaning for distant/undeclared effects. If any boundary meaning, qualifier, original, interaction or current permission is missing or uncertain, return Blocked with exact missing selection/group/source IDs and request explicit widening of symmetric incidents/global scope or other expanded evidence in a NEW bound target. Never infer scope or authority, silently omit an unknown field, or treat preserved OPEN outcomes as permission. No automatic semantic assessment or widening occurs.';
+  return packet;
+}
 function corpusSourceMappings(s,x,domains){
   const claim=corpusClaim(s,x.p);
   return claim.sources.map(({source})=>({source,mapping_sha256:sha(domains.map(d=>({review:scopedReference(d.record),context_sha256:corpusMappingContext(s,d.x,proofChildren(s,d.x)).sha256,mappings:d.result.mappings.filter(m=>mappingSet(m,'source',claim.selected_source_ids).includes(source.id))})))}));
@@ -280,28 +309,59 @@ function mappingSet(mapping,kind,values){
   const key=kind==='source'?'source_ids':'occurrence_ids',refKey=kind+'_set';
   if(Object.hasOwn(mapping,key)===Object.hasOwn(mapping,refKey))fail('one exact '+kind+' mapping set required');
   if(Object.hasOwn(mapping,key)){ids(mapping[key],key,false);return mapping[key];}
-  const ref=mapping[refKey];closed(ref,['count','sha256'],refKey);
+  const ref=mapping[refKey];
+  if(Object.hasOwn(ref??{},'ranges')){
+    closed(ref,['basis_sha256','ranges'],refKey);
+    if(ref.basis_sha256!==sha(values)||!Array.isArray(ref.ranges)||!ref.ranges.length)fail('exact '+kind+' mapping basis changed');
+    const selected=[];let end=0;
+    for(const range of ref.ranges){if(!Array.isArray(range)||range.length!==2||!range.every(Number.isSafeInteger)||range[0]<end||range[0]<0||range[0]>=range[1]||range[1]>values.length)fail('invalid '+kind+' mapping index ranges');selected.push(...values.slice(range[0],range[1]));end=range[1];}
+    return selected;
+  }
+  closed(ref,['count','sha256'],refKey);
   if(ref.count!==values.length||ref.sha256!==sha(values))fail('exact '+kind+' mapping set changed');
   return values;
 }
+// Verify exact rectangular coverage without allocating the source × occurrence
+// × item product. Sources with the same rows have the same occurrence union;
+// every original row and its substantive judgment is retained unchanged.
+export function validateCorpusCellCoverage(rows,items,sources,occurrences){
+  const sourceSet=new Set(sources),occurrenceSet=new Set(occurrences),itemSet=new Set(items),byItem=new Map(items.map(item=>[item,[]]));
+  if(sourceSet.size!==sources.length||occurrenceSet.size!==occurrences.length||itemSet.size!==items.length)fail('duplicate corpus coverage identity');
+  for(const row of rows){
+    if(!itemSet.has(row.item))fail('unknown corpus mapping item');
+    ids(row.sources,'mapping sources',false);ids(row.occurrences,'mapping occurrences',false);
+    if(row.sources!==sources&&row.sources.some(id=>!sourceSet.has(id))||row.occurrences!==occurrences&&row.occurrences.some(id=>!occurrenceSet.has(id)))fail('substituted corpus source/occurrence');
+    byItem.get(row.item).push({...row,sourceSet:new Set(row.sources)});
+  }
+  for(const item of items){
+    const candidates=byItem.get(item),combinations=new Map();
+    for(const source of sources){
+      const indices=[];for(let i=0;i<candidates.length;i++)if(candidates[i].sourceSet.has(source))indices.push(i);
+      if(!indices.length)fail('missing corpus source/occurrence/item mapping');
+      const key=indices.join(',');if(!combinations.has(key))combinations.set(key,indices.map(i=>candidates[i]));
+    }
+    for(const group of combinations.values()){
+      if(group.length===1&&group[0].occurrences.length===occurrences.length)continue;
+      const union=new Set();for(const row of group)for(const occurrence of row.occurrences){if(union.has(occurrence))fail('duplicate corpus mapping cell');union.add(occurrence);}
+      if(union.size!==occurrences.length)fail('missing corpus source/occurrence/item mapping');
+    }
+  }
+  return true;
+}
 function typedHomes(s,x,homeIds){return homeIds.map(id=>{const ref=x.t.homes.find(h=>h.id===id);if(!ref)fail('mapping home missing');const r=exact(s,ref);return {source:ref,kind:r.kind??null,operating_kind:r.operating_record?.kind??null};});}
 function validateCorpusMappings(s,x,r,proofs){
-  const mc=corpusMappingContext(s,x,proofs),sources=mc.claim.selected_source_ids,occurrences=mc.occurrences.map(o=>o.id),seen=new Set();
+  const mc=corpusMappingContext(s,x,proofs),sources=mc.claim.selected_source_ids,occurrences=mc.occurrences.map(o=>o.id),rows=[];
   if(r.mapping_context_sha256!==mc.sha256)fail('exact corpus mapping context changed');
   for(const m of r.mappings){
     closed(m,['item','status','homes','reason',...(x.t.selection_ids?['selection_ids']:[]),...(Object.hasOwn(m,'source_set')?['source_set']:['source_ids']),...(Object.hasOwn(m,'occurrence_set')?['occurrence_set']:['occurrence_ids']),'context_sha256','typed_homes','conditions','unresolved_outcomes'],'corpus mapping');
     if(x.t.selection_ids)exactSet(m.selection_ids,x.t.selection_ids,'mapping selection');
     const mappedSources=mappingSet(m,'source',sources),mappedOccurrences=mappingSet(m,'occurrence',occurrences);ids(m.homes,'mapping homes',false);
     if(!x.t.item_keys.includes(m.item)||m.status!=='represented'||!text(m.reason)||!text(m.conditions)||!text(m.unresolved_outcomes)||m.context_sha256!==mc.sha256||!same(m.typed_homes,typedHomes(s,x,m.homes)))fail('incomplete typed corpus mapping');
-    for(const id of mappedSources)for(const occurrence of mappedOccurrences){
-      if(!sources.includes(id)||!occurrences.includes(occurrence))fail('substituted corpus source/occurrence');
-      const key=json([m.item,id,occurrence]);if(seen.has(key))fail('duplicate corpus mapping cell');seen.add(key);
-    }
+    rows.push({item:m.item,sources:mappedSources,occurrences:mappedOccurrences});
   }
   // Explicit rectangles may share conclusions only for their enumerated cells.
   // Each source/occurrence/item remains a separate contextual obligation.
-  let expected=0;for(const item of x.t.item_keys)for(const id of sources)for(const occurrence of occurrences){expected++;if(!seen.has(json([item,id,occurrence])))fail('missing corpus source/occurrence/item mapping');}
-  if(seen.size!==expected)fail('corpus mapping coverage changed');
+  validateCorpusCellCoverage(rows,x.t.item_keys,sources,occurrences);
 }
 function corpusContext(s,p,proofs,selectionIds){
   const checked=plan(s,p);if(checked.c.semantic_partition){const value=selectedItems(checked.material,checked.c.semantic_partition,selectionIds,proofs);return {source:checked.v.source,...value.context};}
@@ -377,7 +437,7 @@ function reviewedUnitBundle(s,p,unitId,contextIds){
   const description={source:v.source,projection_sha256:v.projection_sha256,primary:provenance(primary),supporting:supporting.map(provenance)};
   return {primary,supporting,provenance:description,provenance_sha256:sha(description)};
 }
-function targetInfo(s,job){const record=source(s,job.review_of?.id),t=record.scoped_context_target;if(!t||t.protocol!==SCOPED_PROTOCOL||job.role!=='qa'||job.review_of.revision!==record.revision||job.inputs?.length||job.supplemental_sources?.length||job.prototype_id||job.development_id)fail('invalid separate QA target');const p=exact(s,t.plan),{v}=plan(s,p);if(t.delivery_protocol!==undefined&&(t.delivery_protocol!==SCOPED_STREAM||t.phase==='extract'&&![COHERENT_PARTITIONER,CORPUS_PARTITIONER].includes(v.partitioner)))fail('invalid prospective delivery protocol');return {record,t,p,v};}
+function targetInfo(s,job){const record=source(s,job.review_of?.id),t=record.scoped_context_target;if(!t||t.protocol!==SCOPED_PROTOCOL||job.role!=='qa'||job.review_of.revision!==record.revision||job.inputs?.length||job.supplemental_sources?.length||job.prototype_id||job.development_id)fail('invalid separate QA target');const p=exact(s,t.plan),{v}=plan(s,p);if(t.delivery_protocol!==undefined&&(t.delivery_protocol!==SCOPED_STREAM||t.phase==='extract'&&![COHERENT_PARTITIONER,CORPUS_PARTITIONER].includes(v.partitioner)))fail('invalid prospective delivery protocol');if(t.delivery_schema!==undefined&&(t.delivery_schema!==CORPUS_DELIVERY||v.partitioner!==CORPUS_PARTITIONER||t.phase==='extract'))fail('invalid corpus delivery schema');return {record,t,p,v};}
 export function isScopedJob(s,j){return Boolean(s.records?.[typeof j.review_of==='string'?j.review_of:j.review_of?.id]?.scoped_context_target);}
 export function scopedMaintenanceEligible(s,j){
   const target=s.records?.[typeof j.review_of==='string'?j.review_of:j.review_of?.id],p=s.records?.[target?.scoped_context_target?.plan?.id],a=p?.context_maintenance;
@@ -441,7 +501,7 @@ export function scopedAssignment(s,j){return evaluate(()=>{live(s,j,targetInfo(s
 function assignment(s,j){
   evaluation.state=s;const x=targetInfo(s,j),proofs=proofChildren(s,x);let packet={protocol:SCOPED_PROTOCOL,phase:x.t.phase,target:scopedReference(x.record),source:x.v.source,extraction_identity:x.v.extraction_identity,instructions};
   if(x.v.partitioner===COHERENT_PARTITIONER){packet.partitioner=COHERENT_PARTITIONER;packet.instructions=coherentInstructions;}
-  if(x.v.partitioner===CORPUS_PARTITIONER){packet.partitioner=CORPUS_PARTITIONER;const claim=corpusClaim(s,x.p);packet.corpus_claim=x.t.phase==='extract'?{protocol:claim.protocol,selected_sources:{count:claim.selected_source_ids.length,sha256:sha(claim.selected_source_ids)},baseline:claim.baseline,census_sha256:claim.census_sha256,extraction_identity:claim.extraction_identity}:claim;packet.instructions=instructions+' PROSPECTIVE intrinsic BODY batches: extraction reviews complete local sections only, never applicability or authority. Cuts and canonical JSON STRING evidence stay exact. Include boundary item coherent-occurrence with primary.required_interface unchanged. Its scope proposes intrinsic effects only; never current permission. Unknown scope is *. For explicit selections, every extracted item is judged separately for all selected physical occurrences (one mapping can cover many occurrences); scope_complete independently attests that proposed local boundaries omit no cross-effects, interfaces_complete attests every incident peer including undeclared/distant coupling. Full global/unknown context is compulsory. The frontier is unaccepted, never inferred local by a writer label. Domain and interface review must judge every occurrence in occurrence_context independently for the entire exact selected_source_ids vector, all qualifiers, cuts, inbound contexts and unknown interactions. No range subdivision or inferred completeness. Mappings explicitly enumerate source_ids and occurrence_ids for each item, or bind the complete delivered vectors with the exact runtime mapping_sets count and sha256 (source_set/occurrence_set); those references expand to EVERY cell and never narrow scope. Final integration binds the complete delivered source_mappings by source_mappings_sha256 and source_mappings_count, with mapping_context_sha256, exact typed_homes, substantive conditions and unresolved_outcomes. A shared row asserts the same judgment for every explicitly enumerated cell; intrinsic equality alone never supplies it. interaction_completeness must substantively accept missing/distant/undeclared interactions after inspecting the complete census; uncertainty requires Blocked. Oversized complete output holds.';}
+  if(x.v.partitioner===CORPUS_PARTITIONER){packet.partitioner=CORPUS_PARTITIONER;const claim=corpusClaim(s,x.p);packet.corpus_claim=x.t.phase==='extract'?{protocol:claim.protocol,selected_sources:{count:claim.selected_source_ids.length,sha256:sha(claim.selected_source_ids)},baseline:claim.baseline,census_sha256:claim.census_sha256,extraction_identity:claim.extraction_identity}:claim;packet.instructions=instructions+' PROSPECTIVE intrinsic BODY batches: extraction reviews complete local sections only, never applicability or authority. Cuts and canonical JSON STRING evidence stay exact. Include boundary item coherent-occurrence with primary.required_interface unchanged. Its scope proposes intrinsic effects only; never current permission. Unknown scope is *. For explicit selections, every extracted item is judged separately for all selected physical occurrences (one mapping can cover many occurrences); scope_complete independently attests that proposed local boundaries omit no cross-effects, interfaces_complete attests every incident peer including undeclared/distant coupling. Full global/unknown context is compulsory. The frontier is unaccepted, never inferred local by a writer label. Domain and interface review must judge every occurrence in occurrence_context independently for the entire exact selected_source_ids vector, all qualifiers, cuts, inbound contexts and unknown interactions. No range subdivision or inferred completeness. Mappings explicitly enumerate source_ids and occurrence_ids for each item, or bind the complete delivered vectors with the exact runtime mapping_sets count and sha256 (source_set/occurrence_set); those complete-set references expand to EVERY cell and never narrow scope. For an explicit subset, source_set/occurrence_set may instead be {basis_sha256: the delivered full-vector sha256, ranges:[[start,end],...]}; ranges are ordered disjoint half-open zero-based positions in corpus_claim.selected_source_ids/mapping_occurrence_ids. These lossless identifier selectors grant no semantic locality and full coverage remains compulsory. Final integration binds the complete delivered source_mappings by source_mappings_sha256 and source_mappings_count, with mapping_context_sha256, exact typed_homes, substantive conditions and unresolved_outcomes. A shared row asserts the same judgment for every explicitly enumerated cell; intrinsic equality alone never supplies it. interaction_completeness must substantively accept missing/distant/undeclared interactions after inspecting the complete census; uncertainty requires Blocked. Oversized complete output holds.';}
   if(x.t.phase==='extract')packet.reviewed_unit_bundle=reviewedUnitBundle(s,x.p,x.t.unit_id,x.t.context_unit_ids);
   else {
     const global=targetGlobal(s,x);
@@ -493,10 +553,11 @@ function assignment(s,j){
   }
   packet.response_shape=shape(x);packet.response_envelope={content:'exact result.reason',messages:[],notices:[],review:{verdict:'same as result',reason:'same as result',permitted_action:'same as result'},qualification_result:'response_shape'};
   if(x.t.delivery_protocol===SCOPED_STREAM||x.v.partitioner===CORPUS_PARTITIONER&&x.t.phase!=='extract'){
-    // Complete canonical artifact closure, including immutable extraction
-    // bundles, reaches the SAME reviewer. References never substitute for bodies.
+    // Unmarked targets retain complete recursive native evidence delivery.
+    // Marked corpus targets separate native evidence from canonical validation.
     const closure=new Map();function visit(p){if(closure.has(p.record.id))return;closure.set(p.record.id,{review:scopedReference(p.record),value:p.record});for(const child of proofDependencies(s,p.x))visit(child);}
-    for(const p of proofDependencies(s,x))visit(p);packet.reference_evidence=[...closure.values()];
+    if(x.t.delivery_schema===CORPUS_DELIVERY)packet=corpusDeliveryProjection(s,x,packet,proofs);
+    else {for(const p of proofDependencies(s,x))visit(p);packet.reference_evidence=[...closure.values()];}
     if(x.t.delivery_protocol!==SCOPED_STREAM){boundedCoherent(packet,SCOPED_LIMITS.input_bytes,'complete corpus evidence');const wire=json(packet);return {text:wire,hash:digest(wire),inputs:[],packet,qualification:{protocol:SCOPED_PROTOCOL,phase:x.t.phase,target:scopedReference(x.record),plan:x.t.plan,packet_sha256:digest(wire)}};}
     const stream=buildScopedStream(packet,x.t.plan),wire=stream.pages[0].wire;
     return {text:wire,hash:digest(wire),inputs:[],packet,stream,qualification:{protocol:SCOPED_PROTOCOL,delivery_protocol:SCOPED_STREAM,phase:x.t.phase,target:scopedReference(x.record),plan:x.t.plan,packet_sha256:stream.manifest.body_sha256}};
@@ -556,7 +617,7 @@ function canonical(s,ref){
 export function createScopedTarget(s,args){return evaluate(()=>{
   const p=source(s,args.plan_id),{v}=plan(s,p),phase=args.phase;if(!['extract','applicability','integration'].includes(phase))fail('choose extract, applicability or integration');
   if(args.delivery_protocol!==undefined&&(args.delivery_protocol!==SCOPED_STREAM||phase==='extract'&&![COHERENT_PARTITIONER,CORPUS_PARTITIONER].includes(v.partitioner)))fail('stream delivery is opt-in for NEW non-extraction targets only');
-  const base={protocol:SCOPED_PROTOCOL,phase,plan:scopedReference(p),owner:{...s.owner},controls_sha256:qualificationControlHash(s),...(args.delivery_protocol?{delivery_protocol:args.delivery_protocol}:{})};
+  const base={protocol:SCOPED_PROTOCOL,phase,plan:scopedReference(p),owner:{...s.owner},controls_sha256:qualificationControlHash(s),...(args.delivery_protocol?{delivery_protocol:args.delivery_protocol}:{}),...(v.partitioner===CORPUS_PARTITIONER&&phase!=='extract'?{delivery_schema:CORPUS_DELIVERY}:{})};
   if(phase==='extract'){
     const context_unit_ids=Object.hasOwn(args,'context_unit_ids')?args.context_unit_ids:[],bundle=reviewedUnitBundle(s,p,args.unit_id,context_unit_ids);
     // Reuse only an exact completed canonical worker receipt, never a model flag.

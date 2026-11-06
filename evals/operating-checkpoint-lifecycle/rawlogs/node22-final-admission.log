@@ -1,0 +1,42 @@
+TAP version 13
+# (node:85622) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: public handover, independent publication, full v4 worker review, resume and first ordinary format6 Engineering return
+ok 1 - public handover, independent publication, full v4 worker review, resume and first ordinary format6 Engineering return
+  ---
+  duration_ms: 4116.199042
+  ...
+# Subtest: independent resume rejects changed closure, subject, identity, delivery and current meaning
+ok 2 - independent resume rejects changed closure, subject, identity, delivery and current meaning
+  ---
+  duration_ms: 8572.822291
+  ...
+# Subtest: only exact pure runtime commands are mechanically ingested; conditions, unknown fields and generic saves stay held
+ok 3 - only exact pure runtime commands are mechanically ingested; conditions, unknown fields and generic saves stay held
+  ---
+  duration_ms: 1098.820167
+  ...
+# Subtest: actual conditional handover retains founder conditions and unknown legacy remains held on first pass
+ok 4 - actual conditional handover retains founder conditions and unknown legacy remains held on first pass
+  ---
+  duration_ms: 139.12175
+  ...
+# Subtest: bounded runtime admission binds task, owner, checkpoint, complete inputs and every metadata phase
+ok 5 - bounded runtime admission binds task, owner, checkpoint, complete inputs and every metadata phase
+  ---
+  duration_ms: 938.842584
+  ...
+# Subtest: reverted publication metadata and unknown root handover/notice changes remain intake
+ok 6 - reverted publication metadata and unknown root handover/notice changes remain intake
+  ---
+  duration_ms: 1709.662875
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 16686.296292

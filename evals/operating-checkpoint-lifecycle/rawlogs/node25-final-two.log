@@ -1,0 +1,28 @@
+(node:86796) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ large non-home provenance uses exact same-native ranges; undelivered, partial, denied, stale or changed evidence cannot publish (2167.395416ms)
+✔ runtime closure requires complete delivery and independent source and proof sessions (7643.370417ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 1
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9884.226
+
+✖ failing tests:
+
+test at tests/operating-state.test.mjs:223:1
+✖ large non-home provenance uses exact same-native ranges; undelivered, partial, denied, stale or changed evidence cannot publish (2167.395416ms)
+  Error: Operating state Held: legacy frontier coverage incomplete: 3 DIRTY entries
+      at fail (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:10:22)
+      at publishOperatingState (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:469:33)
+      at file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:454:178
+      at mutate (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:93:190)
+      at Store.transaction (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:189:20)
+      at file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:93:335
+      at withStore (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:205:16)
+      at update (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:93:10)
+      at Array.contextControl (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:454:16)
+      at call (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/main.mjs:70:28)

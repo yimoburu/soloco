@@ -1,0 +1,57 @@
+(node:12651) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ missing production intake provider is fail closed (0.576917ms)
+✔ initial unknown legacy is never relabeled accepted (20.243584ms)
+✔ immutable accepted home survives replacement; new global restriction holds ordinary but complete delta repair publishes (27.505125ms)
+✔ successor exact base and concurrent semantic intake including reverted intake hold (45.352792ms)
+✔ missing original, changed producer, rejected negative, expiry and unknown nested producer hold (46.163167ms)
+✔ canonical known historical evidence freezes before bookkeeping; nested originals remain checked (28.960583ms)
+✔ atomic historical maps deliver exact new/newer/deleted originals in chronological intake and remain required after publication (23.017083ms)
+✔ intermediate transitive originals hold proposal, review, publication and accepted use when missing or corrupt (105.63575ms)
+✔ wrong historical original and reordered version transitions hold; atomic change row order is irrelevant (35.075541ms)
+✔ intake immutable_entry validates identity as well as original snapshot bytes (10.187875ms)
+✔ literal reference-like JSON in intake remains literal (19.176375ms)
+✔ allowed post-proposal reconstruction intake checks transitive originals before review and publication (23.472792ms)
+✖ real normalized intake preserves deleted intermediate envelopes while checkpoint audits their transitive vault originals (273.842833ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 12
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 717.481583
+
+✖ failing tests:
+
+test at tests/operating-checkpoint.test.mjs:166:1
+✖ real normalized intake preserves deleted intermediate envelopes while checkpoint audits their transitive vault originals (273.842833ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /missing or corrupt|Immutable value/. Input:
+  
+  'Error: Immutable storage value missing or hash mismatch'
+  
+      at TestContext.<anonymous> (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/operating-intake-dependencies-2026-11-06/source/tests/operating-checkpoint.test.mjs:183:10)
+      at Test.runInAsyncScope (node:async_hooks:213:14)
+      at Test.run (node:internal/test_runner/test:1106:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:788:18)
+      at Test.postRun (node:internal/test_runner/test:1235:19)
+      at Test.run (node:internal/test_runner/test:1163:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: Immutable storage value missing or hash mismatch
+        at readImmutable (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/operating-intake-dependencies-2026-11-06/source/plugins/soloco/runtime/record-storage.mjs:63:55)
+        at Object.read (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/operating-intake-dependencies-2026-11-06/source/plugins/soloco/runtime/store.mjs:76:18)
+        at snapshotBytes (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/operating-intake-dependencies-2026-11-06/source/plugins/soloco/runtime/snapshot.mjs:61:58)
+        at captureSnapshotDependencies (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/operating-intake-dependencies-2026-11-06/source/plugins/soloco/runtime/snapshot.mjs:156:248)
+        at check (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/operating-intake-dependencies-2026-11-06/source/plugins/soloco/runtime/operating-state.mjs:251:192)
+        at visitIntakeBoundaries (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/operating-intake-dependencies-2026-11-06/source/plugins/soloco/runtime/operating-state.mjs:257:39)
+        at archiveCheck (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/operating-intake-dependencies-2026-11-06/source/plugins/soloco/runtime/operating-state.mjs:247:3)
+        at validateOperatingIndex (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/operating-intake-dependencies-2026-11-06/source/plugins/soloco/runtime/operating-state.mjs:577:3)
+        at operatingContext (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/operating-intake-dependencies-2026-11-06/source/plugins/soloco/runtime/operating-state.mjs:582:3)
+        at file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/operating-intake-dependencies-2026-11-06/source/tests/operating-checkpoint.test.mjs:183:21,
+    expected: /missing or corrupt|Immutable value/,
+    operator: 'throws',
+    diff: 'simple'
+  }

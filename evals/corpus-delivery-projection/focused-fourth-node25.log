@@ -1,0 +1,34 @@
+(node:9504) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ FICTIONAL phase delivery preserves all boundary meaning as disjoint raw partitions grow (2404.676791ms)
+✔ FICTIONAL unmarked corpus targets reconstruct the legacy recursive delivery contract (958.68025ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 1
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3429.910417
+
+✖ failing tests:
+
+test at tests/scoped-corpus-runtime.test.mjs:308:1
+✖ FICTIONAL phase delivery preserves all boundary meaning as disjoint raw partitions grow (2404.676791ms)
+  AssertionError [ERR_ASSERTION]: A: Scoped context hold: review output exceeds 12000 bytes (12892); subdivide the exact unit or review scope, retain all other work
+  + actual - expected
+  
+  + 'failed'
+  - 'completed'
+  
+      at TestContext.<anonymous> (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/corpus-delivery-projection-2026-11-06/source/tests/scoped-corpus-runtime.test.mjs:315:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'failed',
+    expected: 'completed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

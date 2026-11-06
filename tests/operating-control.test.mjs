@@ -10,6 +10,7 @@ import {assignmentContext} from '../plugins/soloco/runtime/context.mjs';
 import {operatingContext,operatingFrontier} from '../plugins/soloco/runtime/operating-state.mjs';
 import {mechanicalOperatingControl} from '../plugins/soloco/runtime/operating-control.mjs';
 import {work} from '../plugins/soloco/runtime/worker.mjs';
+import {resolveSnapshot,snapshotBytes,inheritSnapshots} from '../plugins/soloco/runtime/snapshot.mjs';
 import {executionTiming} from '../plugins/soloco/runtime/timeout.mjs';
 
 const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'operating-control-'));
@@ -36,12 +37,17 @@ async function publish(f,maintenance=false){
  const p=await context(f,{action:'plan',...(maintenance?{maintenance:true,source_instruction:'Fictional read-only publication review while paused; no execution authority.'}:{})});
  assert.deepEqual(p.frontier,[]);
  const q=engine.dispatch({...f,role:'qa',review_of:p.id,task:'Independently review complete fictional operating conditions and preservation.'},'codex',launch);
+ const packet=assignmentContext(read(f),read(f).jobs[q.id]),evidence=packet.operating_evidence;
+ const ranges=evidence?Object.values(evidence.sources).flatMap(source=>{const out=[];for(let offset=0;offset<source.length;offset+=16000)out.push({source_id:source.source_id,sha256:source.sha256,offset,length:Math.min(16000,source.length-offset)});return out;}):[];
+ let first=true;
  await work(f.root,q.id,async(_host,_session,_prompt,_dir,timeout,_selection,options)=>{
-  spawned(timeout,options);
+  if(first){spawned(timeout,options);first=false;}
+  if(ranges.length)return {native_id:'fictional-publication-'+q.id,text:JSON.stringify({reads:ranges.splice(0,4)})};
   return {native_id:'fictional-publication-'+q.id,text:JSON.stringify({content:'FICTIONAL ADAPTER DOUBLE publication judgment.',messages:[],notices:[],review:{verdict:'Pass',reason:'Fictional preservation and authority checks',permitted_action:'publish_operating_state',plan_sha256:sha(read(f).records[p.id].operating_plan),preservation_complete:true,interaction_complete:true,authority_checked:true,blockers:[]}})};
  });
  const j=read(f).jobs[q.id];assert.equal(j.status,'completed',j.error);
  assert.equal((await context(f,{action:'apply',plan_id:p.id,review_id:j.artifact_id})).published,true);
+ return {plan:p.id,packet,snapshot:read(f).records[p.id].operating_plan.snapshot};
 }
 async function transfer(){
  const old=fixture(),f={...old,session_id:'fictional-incoming',epoch:2};
@@ -73,12 +79,7 @@ async function handoverPass(f,r){
 test('public handover, independent publication, full v4 worker review, resume and first ordinary format6 Engineering return',async()=>{
  const f=await transfer(),r=await reconstruction(f);
  assert.throws(()=>control(f,'resume'),/QA/);
- const proof=await handoverPass(f,r),baseline=read(f);
- for(const mode of ['closure','subject','identity','delivery','current']){
-  mutate(f,s=>{Object.assign(s,structuredClone(baseline));if(mode==='closure')s.jobs[proof.job].coordination_release.termination_confirmed=false;if(mode==='subject')s.records[proof.review].review.subject_sha256='wrong';if(mode==='identity')s.jobs[proof.job].native_id=f.session_id;if(mode==='delivery')s.records[proof.review].handover_evidence.semantic_delivery_complete=false;if(mode==='current')s.records.condition.content+=' Changed condition';});
-  assert.throws(()=>control(f,'resume'),/QA|Held|stale/);assert.equal(read(f).paused,true);
- }
- mutate(f,s=>Object.assign(s,structuredClone(baseline)));
+ await handoverPass(f,r);
  const beforeConditional=read(f);
  assert.throws(()=>control(f,'resume','resume only if exports are prohibited forever'),/DIRTY/);
  assert.equal(sha(read(f)),sha(beforeConditional),'condition-bearing resume must roll back without unpausing');
@@ -88,6 +89,37 @@ test('public handover, independent publication, full v4 worker review, resume an
  assert.equal(job.context_format,6);assert.equal(pack.protocol,'operating-assignment-v1');assert.equal(pack.checkpoint.owner.epoch,2);assert.equal(pack.checkpoint.paused,false);assert.equal(pack.checkpoint.homes.length,1);assert.match(pack.checkpoint.controls.governance,/No external execution/);
  await work(f.root,j.id,async(_host,_session,_prompt,_dir,timeout,_selection,options)=>{spawned(timeout,options);return {native_id:'fictional-engineering-'+j.id,text:JSON.stringify({content:'FICTIONAL ADAPTER DOUBLE read-only Engineering report: conditions retained; no action authority.',messages:[],notices:[]})};});
  const done=read(f);assert.equal(done.jobs[j.id].status,'completed',done.jobs[j.id].error);assert.match(done.records[done.jobs[j.id].artifact_id].content,/read-only Engineering report/);assert.equal(done.mode,'preparation');
+ assert.throws(()=>operatingContext(done),/Held/,'ordinary output is consequential intake');
+ assert.throws(()=>engine.dispatch({...f,role:'engineer',task:'Must hold until delta acceptance'},'codex',launch),/Held/);
+ const oldHome=done.operating_state.accepted_snapshot.home_envelopes[0],previousPlan=done.operating_state.plan.id;
+ control(f,'pause');
+ const next=await publish(f,true);
+ const accepted=read(f),delta=resolveSnapshot(accepted,next.snapshot.delta),previous=resolveSnapshot(accepted,next.snapshot.previous);
+ assert.equal(next.snapshot.predecessor.id,previousPlan);
+ assert.deepEqual(resolveSnapshot(accepted,previous.homes[0].envelope),resolveSnapshot(done,oldHome.envelope));
+ assert.ok(delta.events.some(e=>e.type==='job.completed'&&e.changes.some(c=>c.after?.raw.includes('read-only Engineering report'))));
+ assert.deepEqual(resolveSnapshot(accepted,next.snapshot.home_envelopes[0].envelope),resolveSnapshot(done,oldHome.envelope));
+ const delivered=next.packet.frozen_packet??JSON.parse(next.packet.text);
+ assert.deepEqual(delivered.previous.homes[0].value,resolveSnapshot(done,oldHome.envelope));
+ assert.deepEqual(delivered.delta.cut,delta.cut);assert.equal(delivered.delta.baseline_sha256,delta.baseline_sha256);assert.equal(delivered.delta.events.length,delta.events.length);
+ for(const [n,event] of delta.events.entries())for(const [k,change] of event.changes.entries())for(const side of ['before','after']){
+  const exact=change[side],view=delivered.delta.events[n].changes[k][side];
+  if(!exact){assert.equal(view,null);continue;}
+  if(view.original){assert.equal(view.accepted_publication.id,previousPlan);assert.equal(view.original.sha256,exact.sha256);assert.equal(snapshotBytes(accepted,view.original.snapshot),exact.raw);}
+  else {assert.equal(view.raw,exact.raw);assert.equal(view.sha256,exact.sha256);}
+ }
+ assert.deepEqual(delivered.homes[0].value,resolveSnapshot(done,oldHome.envelope));
+ control(f,'resume');
+ const second=engine.dispatch({...f,role:'engineer',task:'Next bounded read-only assignment after complete delta QA'},'codex',launch);
+ assert.equal(JSON.parse(assignmentContext(read(f),read(f).jobs[second.id]).text).checkpoint.homes.length,1);
+});
+
+test('independent resume rejects changed closure, subject, identity, delivery and current meaning',async()=>{
+ for(const mode of ['closure','subject','identity','delivery','current']){
+  const f=await transfer(),r=await reconstruction(f),proof=await handoverPass(f,r);
+  mutate(f,s=>{if(mode==='closure')s.jobs[proof.job].coordination_release.termination_confirmed=false;if(mode==='subject')s.records[proof.review].review.subject_sha256='wrong';if(mode==='identity')s.jobs[proof.job].native_id=f.session_id;if(mode==='delivery')s.records[proof.review].handover_evidence.semantic_delivery_complete=false;if(mode==='current')s.records.condition.content+=' Changed condition';});
+  assert.throws(()=>control(f,'resume'),/QA|Held|stale/);assert.equal(read(f).paused,true);
+ }
 });
 
 test('only exact pure runtime commands are mechanically ingested; conditions, unknown fields and generic saves stay held',async()=>{
@@ -115,5 +147,38 @@ test('actual conditional handover retains founder conditions and unknown legacy 
   engine.control({root:f.root,session_id:f.session_id,expected_epoch:1,action:'handover',source_instruction:mode==='condition'?'handover only for read-only work; never export':'handover'},'codex');
   const p=await context(f,{action:'plan',maintenance:true,source_instruction:'Fictional read-only review only'});assert.equal(p.held,true);assert.ok(p.frontier.some(e=>mode==='legacy'?e.source.id==='legacy-unknown':read(f).records[e.source.id]?.content.includes('never export')));
   assert.throws(()=>engine.handover({...f,action:'submit',protocol:'operating-handover-v4',content:'Fictional reconstruction cannot erase the retained conditions or unknown legacy. Read-only work only; no execution, export or retry authority. Independent review remains necessary.'},'codex'),/Held/);
+ }
+});
+
+// These mutations are isolated fictional contract probes. They cannot erase the
+// append-only intake of the primary public lifecycle above.
+test('bounded runtime admission binds task, owner, checkpoint, complete inputs and every metadata phase',async()=>{
+ const f=fixture();await publish(f);
+ const q=engine.dispatch({...f,role:'engineer',task:'Read only, preserve every condition',input_ids:['condition']},'codex',launch);
+ const base=read(f);
+ for(const change of [
+  s=>s.jobs[q.id].task+=' changed',
+  s=>s.jobs[q.id].requester.epoch++,
+  s=>s.jobs[q.id].model_selection.hidden={prohibition:'No export'},
+  s=>s.jobs[q.id].operating_admission.extra='unknown',
+  s=>s.jobs[q.id].status='failed',
+  s=>s.jobs[q.id].status='quarantined',
+  s=>s.jobs[q.id].coordination_release={termination_confirmed:false},
+  s=>s.records.condition.content+=' changed input',
+  s=>s.owner.epoch++,
+  s=>s.operating_state.plan.sha256='0'.repeat(64),
+ ]){const s=inheritSnapshots(base,structuredClone(base));change(s);assert.throws(()=>assignmentContext(s,s.jobs[q.id]),/Held|changed|missing/);}
+ assert.doesNotThrow(()=>assignmentContext(base,base.jobs[q.id]));
+ // Even a legal-looking metadata phase cannot be produced by a generic write.
+ mutate(f,s=>{Object.assign(s.jobs[q.id],{status:'running',worker_pid:123,started_at:new Date().toISOString()});});
+ assert.throws(()=>operatingContext(read(f)),/Held/);
+});
+
+test('reverted publication metadata and unknown root handover/notice changes remain intake',async()=>{
+ for(const mode of ['native','summary','handover','notice']){
+  const f=fixture();await publish(f);const base=read(f),proof=base.jobs[base.records[base.operating_state.review.id].job_id];
+  mutate(f,s=>{if(mode==='native')s.jobs[proof.id].native_id='unreviewed-native';if(mode==='summary')s.jobs[proof.id].task_summary='Never export';if(mode==='handover')s.handover={summary:'Never export'};if(mode==='notice')s.notices.push({id:'fictional-unaccepted',summary:'Never export',reference:'unknown',resolution:'unaccepted'});});
+  mutate(f,s=>{Object.assign(s,structuredClone(base));});
+  assert.throws(()=>operatingContext(read(f)),/Held/,'a revert must not erase '+mode);
  }
 });

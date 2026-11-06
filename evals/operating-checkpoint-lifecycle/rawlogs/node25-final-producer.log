@@ -1,0 +1,27 @@
+(node:85917) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ missing production intake provider is fail closed (0.564375ms)
+✔ initial unknown legacy is never relabeled accepted (21.888167ms)
+✔ immutable accepted home survives replacement; new global restriction holds ordinary but complete delta repair publishes (26.555083ms)
+✔ successor exact base and concurrent semantic intake including reverted intake hold (43.067917ms)
+✔ missing original, changed producer, rejected negative, expiry and unknown nested producer hold (50.240416ms)
+✔ canonical known historical evidence freezes before bookkeeping; nested originals remain checked (26.014375ms)
+(node:85918) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ public handover, independent publication, full v4 worker review, resume and first ordinary format6 Engineering return (4249.804875ms)
+✔ independent resume rejects changed closure, subject, identity, delivery and current meaning (6881.397667ms)
+✔ only exact pure runtime commands are mechanically ingested; conditions, unknown fields and generic saves stay held (941.064125ms)
+✔ actual conditional handover retains founder conditions and unknown legacy remains held on first pass (126.375917ms)
+✔ bounded runtime admission binds task, owner, checkpoint, complete inputs and every metadata phase (792.148417ms)
+✔ reverted publication metadata and unknown root handover/notice changes remain intake (1565.848959ms)
+(node:85919) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ tree preservation stays valid after exact operating publication while unknown extensions hold (2283.533042ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 14653.475

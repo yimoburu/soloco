@@ -204,7 +204,7 @@ for(const entry of [false,true])test('SCOPED publication '+(entry?'retains immut
   const j=read(f).jobs[q.id];assert.equal(j.status,'completed',j.error);
   assert.equal((await publicCall('company_context',{...base,protocol:'operating-state-v1',action:'apply',plan_id:p.id,review_id:j.artifact_id},'codex')).published,true);
   const state=read(f),snapshot=state.operating_state.accepted_snapshot;
-  assert.ok(snapshot.required_sources.some(r=>r.id==='old'&&r.sha256===sha(source)),'stored wrapper binding retained');
+  assert.ok(resolveSnapshot(state,snapshot.preservation).evidence.sources.some(x=>x.source.id==='old'&&x.source.sha256===sha(source)&&x.accepted_original),'stored wrapper binding retained');
   const packet=context.frozen_packet??JSON.parse(context.text),accepted=packet.required_evidence.accepted_semantics.find(x=>x.source.id==='old');
   assert.ok(accepted.resolved_originals.some(r=>r.id==='old'&&r.sha256===sha(original)),'resolved original binding retained');
   if(entry)assert.notEqual(sha(source),sha(original));

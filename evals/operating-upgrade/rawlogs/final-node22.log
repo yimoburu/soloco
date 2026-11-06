@@ -1,0 +1,271 @@
+TAP version 13
+# (node:96788) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# PUBLIC FICTIONAL measured preview {"kind":"accepted-operating-upgrade-preview","workflow":"incremental-v1","context_mode":"current","exact_reservation":false,"acceptance":false,"context_fit_verified":false,"time_forecast":false,"prepare_adds_decision_record":true,"meaning_measurement":"current-capture","projected_attempt":null,"current_upgrade_included":true,"meaning":{"stream_characters":54595,"stream_bytes":54601,"pages":1},"raw_archive_retrieval":{"sources":15,"characters":553425,"bytes":553425,"mandatory_replay":false},"boundary":"Preview is the current capture, not reserved future bytes. Preparation adds its exact founder instruction and control record. Ordinary operation remains Held after changed owner or definitions until fresh independent operating delta publication."}
+# Subtest: PUBLIC fictional worker bootstrap -> fresh accepted operating incremental/current rehearsal -> apply/readback preserves raw history and keeps ordinary operation Held
+ok 1 - PUBLIC fictional worker bootstrap -> fresh accepted operating incremental/current rehearsal -> apply/readback preserves raw history and keeps ordinary operation Held
+  ---
+  duration_ms: 3598.335625
+  ...
+# Subtest: fresh frozen reader holds raw business, proof, input, vault, expiry, candidate and owner mutations before any native call
+ok 2 - fresh frozen reader holds raw business, proof, input, vault, expiry, candidate and owner mutations before any native call
+  ---
+  duration_ms: 2046.441292
+  ...
+# Subtest: operating authority expiry is checked independently of upgrade deadline
+ok 3 - operating authority expiry is checked independently of upgrade deadline
+  ---
+  duration_ms: 1660.561167
+  ...
+# Subtest: old recovered/failed attempts cannot gain operating mode; explicit selection and original ceilings are required
+ok 4 - old recovered/failed attempts cannot gain operating mode; explicit selection and original ceilings are required
+  ---
+  duration_ms: 2700.6165
+  ...
+# Subtest: actual immutable vault byte corruption fails closed and a changed step binding cannot apply
+ok 5 - actual immutable vault byte corruption fails closed and a changed step binding cannot apply
+  ---
+  duration_ms: 2794.20475
+  ...
+# Subtest: prospective verify rejects extra business intake after apply without changing historical validators
+ok 6 - prospective verify rejects extra business intake after apply without changing historical validators
+  ---
+  duration_ms: 2855.537917
+  ...
+# Subtest: omitted explicit current request retains the existing attempt path even with an accepted operating state
+ok 7 - omitted explicit current request retains the existing attempt path even with an accepted operating state
+  ---
+  duration_ms: 1450.243458
+  ...
+# (node:96789) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: real keyed collections: 145 records, 57 jobs, source-heavy history fits and exact provenance survives
+ok 8 - real keyed collections: 145 records, 57 jobs, source-heavy history fits and exact provenance survives
+  ---
+  duration_ms: 692.594042
+  ...
+# Subtest: formatted JSON preserves raw text and quoted spaces; duplicate keys and changed lexemes remain literal
+ok 9 - formatted JSON preserves raw text and quoted spaces; duplicate keys and changed lexemes remain literal
+  ---
+  duration_ms: 1.485667
+  ...
+# Subtest: actual artifact/runtime payload shapes extract only named bodies and retain review, receipt and authority metadata
+ok 10 - actual artifact/runtime payload shapes extract only named bodies and retain review, receipt and authority metadata
+  ---
+  duration_ms: 1.672916
+  ...
+# Subtest: unknown shapes, old obligations and semantic context are not inferred inert
+ok 11 - unknown shapes, old obligations and semantic context are not inferred inert
+  ---
+  duration_ms: 0.771709
+  ...
+# Subtest: mechanical whitelist references only exact known metadata shapes
+ok 12 - mechanical whitelist references only exact known metadata shapes
+  ---
+  duration_ms: 0.436084
+  ...
+# Subtest: map keys, duplicate IDs and prototype-looking keys remain distinct and immutable
+ok 13 - map keys, duplicate IDs and prototype-looking keys remain distinct and immutable
+  ---
+  duration_ms: 0.320458
+  ...
+# Subtest: frozen retrieval rejects forged identities, hashes, fields and unsafe UTF-16 ranges
+ok 14 - frozen retrieval rejects forged identities, hashes, fields and unsafe UTF-16 ranges
+  ---
+  duration_ms: 1.753833
+  ...
+# Subtest: citations require exact revision and complete delivery separately to author and QA
+ok 15 - citations require exact revision and complete delivery separately to author and QA
+  ---
+  duration_ms: 2.18475
+  ...
+# Subtest: source extraction cannot hide a huge unknown obligation to make admission succeed
+ok 16 - source extraction cannot hide a huge unknown obligation to make admission succeed
+  ---
+  duration_ms: 82.55925
+  ...
+# Subtest: complete request plus reserve bounded while cumulative traffic exceeds 1M
+ok 17 - complete request plus reserve bounded while cumulative traffic exceeds 1M
+  ---
+  duration_ms: 0.534708
+  ...
+# Subtest: unsupported JSON holds instead of silently dropping evidence or invoking accessors
+ok 18 - unsupported JSON holds instead of silently dropping evidence or invoking accessors
+  ---
+  duration_ms: 0.305792
+  ...
+# Subtest: whole bodies alias at all four locations in both orders, preserving complete inline tokens, provenance and originals
+ok 19 - whole bodies alias at all four locations in both orders, preserving complete inline tokens, provenance and originals
+  ---
+  duration_ms: 46.714
+  ...
+# Subtest: whole-body matching refuses every differing semantic field and unsafe JSON spelling
+ok 20 - whole-body matching refuses every differing semantic field and unsafe JSON spelling
+  ---
+  duration_ms: 22.081084
+  ...
+# Subtest: native, role, phase and attempt boundaries never share unmatched or forged bodies
+ok 21 - native, role, phase and attempt boundaries never share unmatched or forged bodies
+  ---
+  duration_ms: 13.218958
+  ...
+# (node:96790) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Synthetic many-page measured traffic: [{"calls":14,"input":1987507},{"calls":12,"input":1787858}]
+# Subtest: public schema exposes prospective workflow and explicit resume without changing legacy default
+ok 22 - public schema exposes prospective workflow and explicit resume without changing legacy default
+  ---
+  duration_ms: 175.342208
+  ...
+# Subtest: many-page prepare inspect rehearse apply verify reduces calls and repeated input while final QA sees complete proposal, findings, negatives and coverage
+ok 23 - many-page prepare inspect rehearse apply verify reduces calls and repeated input while final QA sees complete proposal, findings, negatives and coverage
+  ---
+  duration_ms: 3549.954917
+  ...
+# Subtest: process loss after accepted page resumes without regenerating it, keeps native identities and immutable allowances
+ok 24 - process loss after accepted page resumes without regenerating it, keeps native identities and immutable allowances
+  ---
+  duration_ms: 2239.46975
+  ...
+# Subtest: lost call start remains ambiguous and cannot retry or reset its allowance
+ok 25 - lost call start remains ambiguous and cannot retry or reset its allowance
+  ---
+  duration_ms: 198.156833
+  ...
+# Subtest: concurrent worker and resume cannot enter a running native call
+ok 26 - concurrent worker and resume cannot enter a running native call
+  ---
+  duration_ms: 579.805584
+  ...
+# Subtest: expired deadline, owner, candidate, checkpoint, history and rules changes hold continuation
+ok 27 - expired deadline, owner, candidate, checkpoint, history and rules changes hold continuation
+  ---
+  duration_ms: 1774.039125
+  ...
+# Subtest: missing or tampered canonical output, delivery, accepted artifact or native proof rejects reuse and apply
+ok 28 - missing or tampered canonical output, delivery, accepted artifact or native proof rejects reuse and apply
+  ---
+  duration_ms: 2190.775375
+  ...
+# Subtest: a canonical CoS page cannot replace the final probe at apply
+ok 29 - a canonical CoS page cannot replace the final probe at apply
+  ---
+  duration_ms: 561.987666
+  ...
+# Subtest: a canonical QA page cannot replace final QA during receipt reuse or apply
+ok 30 - a canonical QA page cannot replace final QA during receipt reuse or apply
+  ---
+  duration_ms: 583.731625
+  ...
+# Subtest: page identities cannot be relabeled around canonical findings from another page
+ok 31 - page identities cannot be relabeled around canonical findings from another page
+  ---
+  duration_ms: 3876.139042
+  ...
+# Subtest: final QA remains bound to its exact proposal even if the CoS output proof is rewritten consistently
+ok 32 - final QA remains bound to its exact proposal even if the CoS output proof is rewritten consistently
+  ---
+  duration_ms: 534.435209
+  ...
+# Subtest: accepted page and synthesis receipts cannot skip their initial round
+ok 33 - accepted page and synthesis receipts cannot skip their initial round
+  ---
+  duration_ms: 2068.110792
+  ...
+# Subtest: page and final synthesis receipts require consecutive reads-only retrieval rounds for each role
+ok 34 - page and final synthesis receipts require consecutive reads-only retrieval rounds for each role
+  ---
+  duration_ms: 1331.314041
+  ...
+# Subtest: negative, malformed and late output stays held; recovery keeps facts and prior failed evidence
+ok 35 - negative, malformed and late output stays held; recovery keeps facts and prior failed evidence
+  ---
+  duration_ms: 615.813625
+  ...
+# Subtest: eligibility loss aborts outstanding injected local call promptly and retains its late output
+ok 36 - eligibility loss aborts outstanding injected local call promptly and retains its late output
+  ---
+  duration_ms: 211.932292
+  ...
+# Subtest: transport fallback replays all QA and corresponding CoS findings without omitting exact final proposal
+ok 37 - transport fallback replays all QA and corresponding CoS findings without omitting exact final proposal
+  ---
+  duration_ms: 2576.130167
+  ...
+# Subtest: output retained before completion receipt is still ambiguous after process loss
+ok 38 - output retained before completion receipt is still ambiguous after process loss
+  ---
+  duration_ms: 192.29625
+  ...
+# Subtest: resume cannot rewrite deadline, call cap, selection or original source authority
+ok 39 - resume cannot rewrite deadline, call cap, selection or original source authority
+  ---
+  duration_ms: 957.506208
+  ...
+# Subtest: missing worker termination proof and stale candidate request prevent launch
+ok 40 - missing worker termination proof and stale candidate request prevent launch
+  ---
+  duration_ms: 245.957167
+  ...
+# Subtest: resumed retrieval rounds reconstruct only canonical own-session reads without repeating completed calls
+ok 41 - resumed retrieval rounds reconstruct only canonical own-session reads without repeating completed calls
+  ---
+  duration_ms: 798.103208
+  ...
+# Subtest: oversized complete proposal holds before final QA without truncating or repeating it on pages
+ok 42 - oversized complete proposal holds before final QA without truncating or repeating it on pages
+  ---
+  duration_ms: 670.634459
+  ...
+# Subtest: queued eligibility failure is durably held without harming a different reserved worker
+ok 43 - queued eligibility failure is durably held without harming a different reserved worker
+  ---
+  duration_ms: 216.373291
+  ...
+# (node:96791) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: over 1M semantic history reassembles deterministically with every revision and old constraint
+ok 44 - over 1M semantic history reassembles deterministically with every revision and old constraint
+  ---
+  duration_ms: 143.156417
+  ...
+# Subtest: huge payload citations need only exact delivered excerpts; ledgers never share reads
+ok 45 - huge payload citations need only exact delivered excerpts; ledgers never share reads
+  ---
+  duration_ms: 124.182959
+  ...
+# Subtest: unknown string maps remain semantic and JSON escape spelling normalizes without losing duplicate keys
+ok 46 - unknown string maps remain semantic and JSON escape spelling normalizes without losing duplicate keys
+  ---
+  duration_ms: 1.179666
+  ...
+# Subtest: dotted obligation keys stay semantic while recognizable paths and explicit runtime files retain provenance
+ok 47 - dotted obligation keys stay semantic while recognizable paths and explicit runtime files retain provenance
+  ---
+  duration_ms: 1.975459
+  ...
+# Subtest: replay packing uses the full escaped envelope plus reserve and preserves all findings and blockers
+ok 48 - replay packing uses the full escaped envelope plus reserve and preserves all findings and blockers
+  ---
+  duration_ms: 33.256083
+  ...
+# Subtest: multi-page whole bodies preserve UTF-16 and aliases never deliver an unread target or original
+ok 49 - multi-page whole bodies preserve UTF-16 and aliases never deliver an unread target or original
+  ---
+  duration_ms: 31.328041
+  ...
+# Subtest: realistic fictional reports reduce net escaped stream and page counts with identical preview inputs
+ok 50 - realistic fictional reports reduce net escaped stream and page counts with identical preview inputs
+  ---
+  duration_ms: 105.150333
+  ...
+# FICTIONAL ONLY: 688352 -> 387068 UTF-16 units; 6 -> 4 pages; 301284 net saved; 24 matched, 24 aliased
+1..50
+# tests 50
+# suites 0
+# pass 50
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 26269.472375

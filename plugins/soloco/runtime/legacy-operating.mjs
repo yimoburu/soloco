@@ -61,6 +61,15 @@ function sameJsonTokens(raw,candidate){
   }
   try{const a=tokens(raw),b=tokens(candidate);return a!==null&&b!==null&&equal(a,b);}catch{return false;}
 }
+function hasReservedReferenceKey(value){
+  const pending=[value];
+  while(pending.length){
+    const item=pending.pop();if(!item||typeof item!=='object')continue;
+    if(Object.hasOwn(item,'immutable_snapshot')||Object.hasOwn(item,'immutable_entry'))return true;
+    for(const child of Object.values(item))if(child&&typeof child==='object')pending.push(child);
+  }
+  return false;
+}
 function codec(canonical){
   const definitions=[],buckets=new Map();
   function intern(v){
@@ -70,8 +79,10 @@ function codec(canonical){
     else if(typeof v==='object')node=['object',Object.entries(v).map(([k,x])=>[k,intern(x)])];
     else if(typeof v==='string'&&canonical&&v.length>32){
       let parsed,text,lossless=false;try{parsed=JSON.parse(v);exact(parsed);text=json(parsed);lossless=sameJsonTokens(v,text);}catch{}
-      // The tag decodes to STRING, never an operating object or instructions.
-      node=lossless?['json-text-string',intern(parsed),...(text===v?[]:[v])]:['string',v];
+      // Parsed views share typed definitions. Keep reference-shaped examples
+      // opaque, even malformed ones, so STRING data cannot acquire real edges.
+      // Nested strings enforce this gate at their own promotion boundary.
+      node=lossless&&!hasReservedReferenceKey(parsed)?['json-text-string',intern(parsed),...(text===v?[]:[v])]:['string',v];
     }else node=[typeof v,v];
     const signature=json(node),sha=digest(signature),bucket=buckets.get(sha)??[];
     for(const i of bucket){if(json(definitions[i])!==signature)hold('definition hash collision');return i;}

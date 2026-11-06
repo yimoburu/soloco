@@ -1,0 +1,82 @@
+TAP version 13
+# (node:58885) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: missing production intake provider is fail closed
+ok 1 - missing production intake provider is fail closed
+  ---
+  duration_ms: 0.406458
+  ...
+# Subtest: initial unknown legacy is never relabeled accepted
+ok 2 - initial unknown legacy is never relabeled accepted
+  ---
+  duration_ms: 17.082375
+  ...
+# Subtest: immutable accepted home survives replacement; new global restriction holds ordinary but complete delta repair publishes
+not ok 3 - immutable accepted home survives replacement; new global restriction holds ordinary but complete delta repair publishes
+  ---
+  duration_ms: 7.984333
+  location: '/private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-checkpoint.test.mjs:39:1'
+  failureType: 'testCodeFailure'
+  error: 'Operating state Held: concurrent storage intake requires new proposal: jobs:qa-operating-plan-8420d032-eb40-4eac-8de4-f8b8a10a4920'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    fail (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:10:22)
+    inputUnchanged (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:291:43)
+    livePlan (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:297:30)
+    publishOperatingState (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:381:37)
+    publish (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-checkpoint.test.mjs:35:75)
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-checkpoint.test.mjs:40:14)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:931:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:629:18)
+    Test.postRun (node:internal/test_runner/test:1042:19)
+  ...
+# Subtest: successor exact base and concurrent semantic intake including reverted intake hold
+not ok 4 - successor exact base and concurrent semantic intake including reverted intake hold
+  ---
+  duration_ms: 6.996083
+  location: '/private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-checkpoint.test.mjs:50:1'
+  failureType: 'testCodeFailure'
+  error: 'Operating state Held: concurrent storage intake requires new proposal: jobs:qa-operating-plan-f55d90ed-224f-4f42-8779-94ee779ead28'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    fail (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:10:22)
+    inputUnchanged (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:291:43)
+    livePlan (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:297:30)
+    publishOperatingState (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:381:37)
+    publish (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-checkpoint.test.mjs:35:75)
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-checkpoint.test.mjs:50:170)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:931:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:629:18)
+    Test.postRun (node:internal/test_runner/test:1042:19)
+  ...
+# Subtest: missing original, changed producer, rejected negative, expiry and unknown nested producer hold
+not ok 5 - missing original, changed producer, rejected negative, expiry and unknown nested producer hold
+  ---
+  duration_ms: 7.05475
+  location: '/private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-checkpoint.test.mjs:51:1'
+  failureType: 'testCodeFailure'
+  error: 'Operating state Held: concurrent storage intake requires new proposal: jobs:qa-operating-plan-b417f94b-2638-4002-bfd6-fa75aa95dd17'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    fail (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:10:22)
+    inputUnchanged (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:291:43)
+    livePlan (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:297:30)
+    publishOperatingState (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:381:37)
+    publish (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-checkpoint.test.mjs:35:75)
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-checkpoint.test.mjs:51:210)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:931:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:629:18)
+    Test.postRun (node:internal/test_runner/test:1042:19)
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 2
+# fail 3
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 101.298583

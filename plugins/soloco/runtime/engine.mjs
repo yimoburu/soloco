@@ -1,10 +1,11 @@
-import {OPERATING_PROTOCOL,validateOperatingRecord,proposeOperatingState,publishOperatingState,operatingInspection,operatingMaintenanceEligible,operatingContext} from './operating-state.mjs';
+import {OPERATING_PROTOCOL,validateOperatingRecord,proposeOperatingState,publishOperatingState,operatingInspection,operatingMaintenanceEligible,operatingContext,admitOperatingAssignment} from './operating-state.mjs';
+import {mechanicalOperatingControl} from './operating-control.mjs';
 import * as scoped from './scoped-context.mjs';
 import { currentView, upgradeView, publicPage, exactRead, mutationView, sourceReference, itemView, controlView, storageSourceId, fits, exactTextRead } from './public-response.mjs';
 import {backupCompany,restoreCompany} from './storage-transfer.mjs';
 import {contextPlan,validateContextPlan,applyContextQualification,recordReference,contextSource} from './current-state.mjs';
 import {captureQualificationPlan,createQualificationTarget,qualificationPlanView,qualificationReadUnit,qualificationReadEvidence,validateQualificationApply,qualificationMaintenanceEligible,qualificationControlHash,qualificationWorkload,QualificationHold} from './context-qualification.mjs';
-import {inheritSnapshots,retainSnapshot,resolveSnapshotEntry,snapshotReference,snapshotBytes} from './snapshot.mjs';
+import {bindOperatingIntake,inheritSnapshots,retainSnapshot,resolveSnapshotEntry,snapshotReference,snapshotBytes} from './snapshot.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -89,7 +90,7 @@ export function prototype(args,host) { binding(args,host); return prototypeActio
 function update(args, host, type, fn, selection=null) {
   binding(args,host);
   if (!Number.isInteger(args.epoch)) throw new Error('Supply the current ownership epoch from company_status');
-  return withStore(args.root, db => {const mutate=state=>{owner(state,args.session_id,host,args.epoch);fn(state);state.runtime_version=VERSION;return state;};return selection&&db.selectedTransaction?db.selectedTransaction(type,selection,mutate):db.transaction(type,mutate);});
+  return withStore(args.root, db => {const mutate=state=>{owner(state,args.session_id,host,args.epoch);if(state.operating_state||type.startsWith('operating.'))bindOperatingIntake(state,db);fn(state);state.runtime_version=VERSION;return state;};return selection&&db.selectedTransaction?db.selectedTransaction(type,selection,mutate):db.transaction(type,mutate);});
 }
 export function open(args, host) {
   binding(args,host);
@@ -308,6 +309,7 @@ export function dispatch(args,host,{launch=launchWorker,check=readiness,catalog=
     if(fresh)Object.assign(job,{fresh_session:true,fresh_session_reason:freshReason});
     prototypeAssignment(s,job,true);developmentAssignment(s,job,true,args.root);
     const context=assignmentContext(s,job);
+    if(job.context_format===6){job.inputs=context.inputs;job.context_sha256=context.hash;admitOperatingAssignment(s,job);}
     s.jobs[jobId]={...job,inputs:context.inputs,context_sha256:context.hash};
     s.runtime_version=VERSION;
   });
@@ -359,8 +361,8 @@ export function control(args,host) {
     } else {owner(s,args.session_id,host);if(s.operating_state){
       // A condition-bearing instruction must not unpause work before its new
       // meaning is accepted. Check its actual audit record atomically too.
-      const prospective=inheritSnapshots(s,{...s,records:{...s.records,[decisionId]:decision}});
-      operatingContext(prospective);
+      operatingContext(s);
+      if(!mechanicalOperatingControl(decision))throw Error('Operating state Held: DIRTY condition-bearing resume instruction');
     }const acceptance=verifyHandoverAcceptance(s);if(acceptance){s.handover.acceptance=acceptance;s.handover.status='completed';}s.paused=false;}
     s.records[decisionId]=decision;
     // A new handover gate must fence old coordinators even on an older pinned
@@ -447,7 +449,7 @@ function readPublicExact(db,args){return db.readSnapshot(()=>{
 export function contextControl(args,host) {
   binding(args,host);
   if(args.protocol===OPERATING_PROTOCOL){
-    if(args.action==='inspect')return withStore(args.root,db=>db.readSnapshot(()=>operatingInspection(db.read())));
+    if(args.action==='inspect')return withStore(args.root,db=>db.readSnapshot(()=>operatingInspection(bindOperatingIntake(db.read(),db))));
     if(!['plan','apply'].includes(args.action))throw Error('Operating protocol supports inspect, plan or apply');
     let result;update(args,host,'operating.'+args.action,s=>{requireText(args.source_instruction,'source_instruction');result=args.action==='plan'?proposeOperatingState(s,args):publishOperatingState(s,args);});return result;
   }

@@ -4,13 +4,13 @@ import path from 'node:path';
 import { randomUUID, createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import {normalizedLayout,readNormalized,writeNormalized,migrateNormalized,writeNormalizedSelection,flushSnapshots,readImmutable,appendNormalizedJournal,LATEST_LAYOUT,readNormalizedValue,readPublicIndex,readPublicRows,readPublicHandle,readPublicAlias,captureStorageMetadata,captureStorageBaseline,insertStorageEvent,readStorageIntake} from './record-storage.mjs';
-import {bindSnapshots} from './snapshot.mjs';
+import {bindSnapshots,bindOperatingIntake} from './snapshot.mjs';
 import {bindPublicReader,PUBLIC_COLLECTIONS} from './public-response.mjs';
 
 export const PACKAGE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-export const VERSION = '0.7.3';
+export const VERSION = '0.7.4';
 // Explicitly tested state producers, not a blanket semver compatibility promise.
-export const COMPATIBLE_RUNTIME_VERSIONS = ['0.2.0', '0.2.1', '0.2.2', '0.3.0', '0.3.1', '0.4.0', '0.4.1', '0.5.0', '0.6.0', '0.6.1', '0.6.2', '0.6.3', '0.6.4', '0.6.5', '0.6.6', '0.6.7', '0.6.8', '0.6.9', '0.6.10', '0.6.11', '0.6.12', '0.6.13', '0.7.0', '0.7.1', '0.7.2', VERSION];
+export const COMPATIBLE_RUNTIME_VERSIONS = ['0.2.0', '0.2.1', '0.2.2', '0.3.0', '0.3.1', '0.4.0', '0.4.1', '0.5.0', '0.6.0', '0.6.1', '0.6.2', '0.6.3', '0.6.4', '0.6.5', '0.6.6', '0.6.7', '0.6.8', '0.6.9', '0.6.10', '0.6.11', '0.6.12', '0.6.13', '0.7.0', '0.7.1', '0.7.2', '0.7.3', VERSION];
 export const COMPATIBLE_TEAM_VERSIONS = ['0.1.0', ...COMPATIBLE_RUNTIME_VERSIONS];
 // Exact published v0.18/v0.19 contracts; compatibility never adopts new instructions.
 export const V018_GOVERNANCE_SHA256 = '185933ddeafe9709bef44e9a6605ba7adb5faaa8bc43c1c64f1da3b03ae5f400';
@@ -71,10 +71,12 @@ export class Store {
   }
   snapshotState(state) {
     const file=path.join(this.dir,'company.sqlite');
-    return bindSnapshots(state,sha=>{
+    const bound=bindSnapshots(state,sha=>{
       const reader=new DatabaseSync(file,{readOnly:true});
       try{return readImmutable(reader,sha);}finally{reader.close();}
     },file);
+    if(bound&&this.storageInfo().format==='normalized-v4')bindOperatingIntake(bound,this,()=>new Store(this.root));
+    return bound;
   }
   readSelected(options) { return this.readSnapshot(()=>normalizedLayout(this.db)?this.snapshotState(readNormalized(this.db,options)):this.read()); }
   readRawValue(options) {return this.readSnapshot(()=>normalizedLayout(this.db)?readNormalizedValue(this.db,options):null);}
@@ -196,7 +198,7 @@ export class Store {
     } catch (error) { this.db.exec('ROLLBACK'); throw error; }
     finally {this.inTransaction=false;}
   }
-  close() { this.db.close(); }
+  close() { this.closed=true;this.db.close(); }
 }
 export function withStore(root, fn, create = false) {
   const db = new Store(root, create);

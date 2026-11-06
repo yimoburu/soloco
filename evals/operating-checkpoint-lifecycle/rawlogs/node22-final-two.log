@@ -1,0 +1,37 @@
+TAP version 13
+# (node:86885) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: large non-home provenance uses exact same-native ranges; undelivered, partial, denied, stale or changed evidence cannot publish
+not ok 1 - large non-home provenance uses exact same-native ranges; undelivered, partial, denied, stale or changed evidence cannot publish
+  ---
+  duration_ms: 2030.898792
+  location: '/private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:223:1'
+  failureType: 'testCodeFailure'
+  error: 'Operating state Held: legacy frontier coverage incomplete: 3 DIRTY entries'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    fail (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:10:22)
+    publishOperatingState (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:469:33)
+    file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:454:178
+    mutate (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:93:190)
+    Store.transaction (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:189:20)
+    file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:93:335
+    withStore (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:205:16)
+    update (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:93:10)
+    Array.contextControl (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:454:16)
+    call (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/main.mjs:70:28)
+  ...
+# Subtest: runtime closure requires complete delivery and independent source and proof sessions
+ok 2 - runtime closure requires complete delivery and independent source and proof sessions
+  ---
+  duration_ms: 7290.743417
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 1
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 9402.731417

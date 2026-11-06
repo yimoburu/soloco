@@ -1,0 +1,69 @@
+(node:96625) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+PUBLIC FICTIONAL measured preview {"kind":"accepted-operating-upgrade-preview","workflow":"incremental-v1","context_mode":"current","exact_reservation":false,"acceptance":false,"context_fit_verified":false,"time_forecast":false,"prepare_adds_decision_record":true,"meaning_measurement":"current-capture","projected_attempt":null,"current_upgrade_included":true,"meaning":{"stream_characters":54595,"stream_bytes":54601,"pages":1},"raw_archive_retrieval":{"sources":15,"characters":553425,"bytes":553425,"mandatory_replay":false},"boundary":"Preview is the current capture, not reserved future bytes. Preparation adds its exact founder instruction and control record. Ordinary operation remains Held after changed owner or definitions until fresh independent operating delta publication."}
+✔ PUBLIC fictional worker bootstrap -> fresh accepted operating incremental/current rehearsal -> apply/readback preserves raw history and keeps ordinary operation Held (3769.341792ms)
+✔ fresh frozen reader holds raw business, proof, input, vault, expiry, candidate and owner mutations before any native call (1878.9165ms)
+✔ operating authority expiry is checked independently of upgrade deadline (1488.768709ms)
+✔ old recovered/failed attempts cannot gain operating mode; explicit selection and original ceilings are required (2644.563125ms)
+✔ actual immutable vault byte corruption fails closed and a changed step binding cannot apply (2774.649375ms)
+✔ prospective verify rejects extra business intake after apply without changing historical validators (2816.402042ms)
+✔ omitted explicit current request retains the existing attempt path even with an accepted operating state (1423.433459ms)
+(node:96626) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ real keyed collections: 145 records, 57 jobs, source-heavy history fits and exact provenance survives (388.055209ms)
+✔ formatted JSON preserves raw text and quoted spaces; duplicate keys and changed lexemes remain literal (1.181667ms)
+✔ actual artifact/runtime payload shapes extract only named bodies and retain review, receipt and authority metadata (1.383ms)
+✔ unknown shapes, old obligations and semantic context are not inferred inert (0.66525ms)
+✔ mechanical whitelist references only exact known metadata shapes (0.362667ms)
+✔ map keys, duplicate IDs and prototype-looking keys remain distinct and immutable (0.2825ms)
+✔ frozen retrieval rejects forged identities, hashes, fields and unsafe UTF-16 ranges (1.24675ms)
+✔ citations require exact revision and complete delivery separately to author and QA (1.178125ms)
+✔ source extraction cannot hide a huge unknown obligation to make admission succeed (42.030459ms)
+✔ complete request plus reserve bounded while cumulative traffic exceeds 1M (0.343166ms)
+✔ unsupported JSON holds instead of silently dropping evidence or invoking accessors (0.272ms)
+✔ whole bodies alias at all four locations in both orders, preserving complete inline tokens, provenance and originals (37.466625ms)
+✔ whole-body matching refuses every differing semantic field and unsafe JSON spelling (16.179833ms)
+✔ native, role, phase and attempt boundaries never share unmatched or forged bodies (9.480334ms)
+(node:96627) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+Synthetic many-page measured traffic: [{"calls":14,"input":1987507},{"calls":12,"input":1787858}]
+✔ public schema exposes prospective workflow and explicit resume without changing legacy default (441.331708ms)
+✔ many-page prepare inspect rehearse apply verify reduces calls and repeated input while final QA sees complete proposal, findings, negatives and coverage (3479.055584ms)
+✔ process loss after accepted page resumes without regenerating it, keeps native identities and immutable allowances (2218.384583ms)
+✔ lost call start remains ambiguous and cannot retry or reset its allowance (187.906666ms)
+✔ concurrent worker and resume cannot enter a running native call (595.446375ms)
+✔ expired deadline, owner, candidate, checkpoint, history and rules changes hold continuation (1759.694667ms)
+✔ missing or tampered canonical output, delivery, accepted artifact or native proof rejects reuse and apply (2176.944375ms)
+✔ a canonical CoS page cannot replace the final probe at apply (610.433834ms)
+✔ a canonical QA page cannot replace final QA during receipt reuse or apply (609.605292ms)
+✔ page identities cannot be relabeled around canonical findings from another page (3892.839792ms)
+✔ final QA remains bound to its exact proposal even if the CoS output proof is rewritten consistently (598.981416ms)
+✔ accepted page and synthesis receipts cannot skip their initial round (2250.084791ms)
+✔ page and final synthesis receipts require consecutive reads-only retrieval rounds for each role (1425.507ms)
+✔ negative, malformed and late output stays held; recovery keeps facts and prior failed evidence (653.899083ms)
+✔ eligibility loss aborts outstanding injected local call promptly and retains its late output (214.499916ms)
+✔ transport fallback replays all QA and corresponding CoS findings without omitting exact final proposal (2610.517958ms)
+✔ output retained before completion receipt is still ambiguous after process loss (188.967208ms)
+✔ resume cannot rewrite deadline, call cap, selection or original source authority (939.560709ms)
+✔ missing worker termination proof and stale candidate request prevent launch (251.523125ms)
+✔ resumed retrieval rounds reconstruct only canonical own-session reads without repeating completed calls (831.229208ms)
+✔ oversized complete proposal holds before final QA without truncating or repeating it on pages (751.157542ms)
+✔ queued eligibility failure is durably held without harming a different reserved worker (248.273583ms)
+(node:96628) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ over 1M semantic history reassembles deterministically with every revision and old constraint (104.435667ms)
+✔ huge payload citations need only exact delivered excerpts; ledgers never share reads (85.37325ms)
+✔ unknown string maps remain semantic and JSON escape spelling normalizes without losing duplicate keys (0.879917ms)
+✔ dotted obligation keys stay semantic while recognizable paths and explicit runtime files retain provenance (1.605417ms)
+✔ replay packing uses the full escaped envelope plus reserve and preserves all findings and blockers (14.796834ms)
+✔ multi-page whole bodies preserve UTF-16 and aliases never deliver an unread target or original (25.063375ms)
+✔ realistic fictional reports reduce net escaped stream and page counts with identical preview inputs (64.963083ms)
+ℹ FICTIONAL ONLY: 688352 -> 387068 UTF-16 units; 6 -> 4 pages; 301284 net saved; 24 matched, 24 aliased
+ℹ tests 50
+ℹ suites 0
+ℹ pass 50
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 27032.432875

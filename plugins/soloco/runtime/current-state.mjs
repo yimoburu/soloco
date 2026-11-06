@@ -262,6 +262,42 @@ function validateQualification(state,plan,review,{ownership=true}={}) {
 // Rejected natives remain contributors, but external metadata cannot invent
 // a canonical job binding. Resolve storage wrappers before checking exact bytes.
 export function companySnapshotContainer(value){return Boolean(value&&(typeof value.id==='string'||typeof value.company_id==='string')&&typeof value.governance==='string'&&value.roles&&typeof value.roles==='object'&&value.records&&typeof value.records==='object'&&!Array.isArray(value.records)&&value.jobs&&typeof value.jobs==='object'&&!Array.isArray(value.jobs));}
+// Schema resemblance is insufficient: application records can contain company-
+// shaped examples. Only exact canonical roots and runtime-owned, hash-bound
+// checkpoint/subject slots establish historical record/job containment.
+export function* canonicalEvidenceNodes(state,value){
+  const equal=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+  const rootKind=v=>{
+    const id=v?.id;if(typeof id!=='string')return 'other';
+    for(const [kind,raw] of [['record',state.records?.[id]],['job',state.jobs?.[id]],['attempt',state.upgrade?.id===id?state.upgrade:null],...(state.upgrade_history??[]).filter(x=>x.id===id).map(x=>['attempt',x])])if(raw&&equal(resolveSnapshotEntry(state,raw),resolveSnapshotEntry(state,v)))return kind;
+    return 'other';
+  };
+  const todo=[{value,kind:rootKind(value)}],seen=new Map(),snapshots=new Set();
+  while(todo.length){
+    const node=todo.pop(),v=node.value,kind=node.kind;if(!v||typeof v!=='object')continue;
+    const kinds=seen.get(v)??new Set();if(kinds.has(kind))continue;kinds.add(kind);seen.set(v,kinds);
+    yield node;
+    const legacy=legacyHandoverSource(state,v);if(legacy){todo.push({value:legacy,kind:'record'});continue;}
+    const original=resolveSnapshotEntry(state,v),ref=snapshotReference(v);
+    if(original!==v||ref){const key=(ref?.sha256??snapshotReference(v.immutable_entry).sha256)+':'+kind;if(!snapshots.has(key)){snapshots.add(key);todo.push({value:original!==v?original:resolveSnapshot(state,v),kind});}continue;}
+    for(const [key,child] of Object.entries(v))if(child&&typeof child==='object'){
+      let next='other';
+      if(kind==='company'&&key==='records')next='records';
+      else if(kind==='company'&&key==='jobs')next='jobs';
+      else if(kind==='company'&&key==='upgrade')next='attempt';
+      else if(kind==='company'&&key==='upgrade_history')next='attempts';
+      else if(['records','jobs','attempts'].includes(kind))next=kind==='records'?'record':kind==='jobs'?'job':'attempt';
+      else if(kind==='record'&&key==='handover'&&v.kind==='artifact'&&v.author_role==='runner'&&Array.isArray(child.input_refs)&&child.incoming_owner?.session_id===v.author_instance)next='handover';
+      const bound=kind==='attempt'&&key==='checkpoint'?v.checkpoint_sha256:kind==='handover'&&key==='subject'?v.subject_sha256:null;
+      if(bound){
+        const snapshot=snapshotReference(child),body=snapshot?resolveSnapshot(state,child):child;
+        if((snapshot?.sha256??digest(JSON.stringify(child)))!==bound)throw Error('Canonical historical company snapshot changed');
+        if(companySnapshotContainer(body)&&(body.id??body.company_id)===state.id)next='company';
+      }
+      todo.push({value:child,kind:next});
+    }
+  }
+}
 export function rejectedJobIdentities(state,value,containedJob=false){
   const original=resolveSnapshotEntry(state,value),id=original?.id;
   if(typeof id!=='string')return [];
@@ -273,22 +309,12 @@ export function rejectedJobIdentities(state,value,containedJob=false){
   return [...new Set([original.rejected_native_id,...(Array.isArray(original.rejected_native_ids)?original.rejected_native_ids:[])].filter(v=>typeof v==='string'&&v.trim()))];
 }
 function ownsEvidence(state,value,job) {
-  const todo=[{value,containedJob:false}],seen=new Map(),snapshots=new Set();
   const identityFields=new Set(['author_instance','recorded_by','session_id','native_id','instance_id','probe_native_id','reviewer_native_id']);
-  while(todo.length){
-    const {value:item,containedJob}=todo.pop();if(!item||typeof item!=='object'||seen.has(item)&&(seen.get(item)||!containedJob))continue;seen.set(item,containedJob||seen.get(item));
-    const legacy=legacyHandoverSource(state,item);if(legacy){todo.push({value:legacy,containedJob});continue;}
-    if(rejectedJobIdentities(state,item,containedJob).some(native=>[job.instance_id,job.native_id].includes(native)))return true;
+  for(const {value:item,kind} of canonicalEvidenceNodes(state,value)){
+    if(rejectedJobIdentities(state,item,kind==='job').some(native=>[job.instance_id,job.native_id].includes(native)))return true;
     if(state.jobs?.[item.job_id]?.native_id===job.native_id)return true;
-    const ref=snapshotReference(item);
-    if(ref){const key=ref.sha256+':'+containedJob;if(!snapshots.has(key)){snapshots.add(key);todo.push({value:resolveSnapshot(state,item),containedJob});}continue;}
-    const company=companySnapshotContainer(item);
     for(const [key,value] of Object.entries(item)){
       if(identityFields.has(key)&&[job.instance_id,job.native_id].includes(value))return true;
-      if(value&&typeof value==='object'){
-        if(company&&key==='jobs')for(const child of Object.values(value))todo.push({value:child,containedJob:true});
-        else todo.push({value,containedJob:false});
-      }
     }
   }
   return false;

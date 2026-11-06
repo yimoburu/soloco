@@ -1,0 +1,121 @@
+(node:13349) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ missing production intake provider is fail closed (0.578125ms)
+✔ initial unknown legacy is never relabeled accepted (19.842375ms)
+✔ immutable accepted home survives replacement; new global restriction holds ordinary but complete delta repair publishes (24.851042ms)
+✔ successor exact base and concurrent semantic intake including reverted intake hold (39.299375ms)
+✔ missing original, changed producer, rejected negative, expiry and unknown nested producer hold (46.216291ms)
+✔ canonical known historical evidence freezes before bookkeeping; nested originals remain checked (26.606667ms)
+✖ atomic historical maps deliver exact new/newer/deleted originals in chronological intake and remain required after publication (12.603625ms)
+✖ intermediate transitive originals hold proposal, review, publication and accepted use when missing or corrupt (55.644083ms)
+✖ wrong historical original and reordered version transitions hold; atomic change row order is irrelevant (32.467375ms)
+✖ intake immutable_entry validates identity as well as original snapshot bytes (12.143958ms)
+✔ literal reference-like JSON in intake remains literal (22.151834ms)
+✖ allowed post-proposal reconstruction intake checks transitive originals before review and publication (11.477625ms)
+✖ real normalized intake preserves deleted intermediate envelopes while checkpoint audits their transitive vault originals (130.030417ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 7
+ℹ fail 6
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 493.341666
+
+✖ failing tests:
+
+test at tests/operating-checkpoint.test.mjs:84:1
+✖ atomic historical maps deliver exact new/newer/deleted originals in chronological intake and remain required after publication (12.603625ms)
+  Error: Legacy handover original missing or changed
+      at legacyHandoverSource (file:///private/var/folders/n8/886jbns96js8v6hk88_cxkkr0000gn/T/intake-counterfactual-j0qus9jg/plugins/soloco/runtime/snapshot.mjs:98:232)
+      at expand (file:///private/var/folders/n8/886jbns96js8v6hk88_cxkkr0000gn/T/intake-counterfactual-j0qus9jg/plugins/soloco/runtime/operating-state.mjs:420:20)
+      at file:///private/var/folders/n8/886jbns96js8v6hk88_cxkkr0000gn/T/intake-counterfactual-j0qus9jg/plugins/soloco/runtime/operating-state.mjs:439:156
+      at Array.map (<anonymous>)
+      at file:///private/var/folders/n8/886jbns96js8v6hk88_cxkkr0000gn/T/intake-counterfactual-j0qus9jg/plugins/soloco/runtime/operating-state.mjs:435:73
+      at Array.map (<anonymous>)
+      at deltaReviewView (file:///private/var/folders/n8/886jbns96js8v6hk88_cxkkr0000gn/T/intake-counterfactual-j0qus9jg/plugins/soloco/runtime/operating-state.mjs:435:29)
+      at operatingReviewContext (file:///private/var/folders/n8/886jbns96js8v6hk88_cxkkr0000gn/T/intake-counterfactual-j0qus9jg/plugins/soloco/runtime/operating-state.mjs:457:200)
+      at review (file:///private/var/folders/n8/886jbns96js8v6hk88_cxkkr0000gn/T/intake-counterfactual-j0qus9jg/tests/operating-checkpoint.test.mjs:30:10)
+      at TestContext.<anonymous> (file:///private/var/folders/n8/886jbns96js8v6hk88_cxkkr0000gn/T/intake-counterfactual-j0qus9jg/tests/operating-checkpoint.test.mjs:87:87)
+
+test at tests/operating-checkpoint.test.mjs:100:1
+✖ intermediate transitive originals hold proposal, review, publication and accepted use when missing or corrupt (55.644083ms)
+  Error: Legacy handover original missing or changed
+      at legacyHandoverSource (file:///private/var/folders/n8/886jbns96js8v6hk88_cxkkr0000gn/T/intake-counterfactual-j0qus9jg/plugins/soloco/runtime/snapshot.mjs:98:232)
+      at expand (file:///private/var/folders/n8/886jbns96js8v6hk88_cxkkr0000gn/T/intake-counterfactual-j0qus9jg/plugins/soloco/runtime/operating-state.mjs:420:20)
+      at file:///private/var/folders/n8/886jbns96js8v6hk88_cxkkr0000gn/T/intake-counterfactual-j0qus9jg/plugins/soloco/runtime/operating-state.mjs:439:156
+      at Array.map (<anonymous>)
+      at file:///private/var/folders/n8/886jbns96js8v6hk88_cxkkr0000gn/T/intake-counterfactual-j0qus9jg/plugins/soloco/runtime/operating-state.mjs:435:73
+      at Array.map (<anonymous>)
+      at deltaReviewView (file:///private/var/folders/n8/886jbns96js8v6hk88_cxkkr0000gn/T/intake-counterfactual-j0qus9jg/plugins/soloco/runtime/operating-state.mjs:435:29)
+      at operatingReviewContext (file:///private/var/folders/n8/886jbns96js8v6hk88_cxkkr0000gn/T/intake-counterfactual-j0qus9jg/plugins/soloco/runtime/operating-state.mjs:457:200)
+      at review (file:///private/var/folders/n8/886jbns96js8v6hk88_cxkkr0000gn/T/intake-counterfactual-j0qus9jg/tests/operating-checkpoint.test.mjs:30:10)
+      at TestContext.<anonymous> (file:///private/var/folders/n8/886jbns96js8v6hk88_cxkkr0000gn/T/intake-counterfactual-j0qus9jg/tests/operating-checkpoint.test.mjs:105:50)
+
+test at tests/operating-checkpoint.test.mjs:114:1
+✖ wrong historical original and reordered version transitions hold; atomic change row order is irrelevant (32.467375ms)
+  Error: Legacy handover original missing or changed
+      at legacyHandoverSource (file:///private/var/folders/n8/886jbns96js8v6hk88_cxkkr0000gn/T/intake-counterfactual-j0qus9jg/plugins/soloco/runtime/snapshot.mjs:98:232)
+      at expand (file:///private/var/folders/n8/886jbns96js8v6hk88_cxkkr0000gn/T/intake-counterfactual-j0qus9jg/plugins/soloco/runtime/operating-state.mjs:420:20)
+      at file:///private/var/folders/n8/886jbns96js8v6hk88_cxkkr0000gn/T/intake-counterfactual-j0qus9jg/plugins/soloco/runtime/operating-state.mjs:439:156
+      at Array.map (<anonymous>)
+      at file:///private/var/folders/n8/886jbns96js8v6hk88_cxkkr0000gn/T/intake-counterfactual-j0qus9jg/plugins/soloco/runtime/operating-state.mjs:435:73
+      at Array.map (<anonymous>)
+      at deltaReviewView (file:///private/var/folders/n8/886jbns96js8v6hk88_cxkkr0000gn/T/intake-counterfactual-j0qus9jg/plugins/soloco/runtime/operating-state.mjs:435:29)
+      at operatingReviewContext (file:///private/var/folders/n8/886jbns96js8v6hk88_cxkkr0000gn/T/intake-counterfactual-j0qus9jg/plugins/soloco/runtime/operating-state.mjs:457:200)
+      at review (file:///private/var/folders/n8/886jbns96js8v6hk88_cxkkr0000gn/T/intake-counterfactual-j0qus9jg/tests/operating-checkpoint.test.mjs:30:10)
+      at TestContext.<anonymous> (file:///private/var/folders/n8/886jbns96js8v6hk88_cxkkr0000gn/T/intake-counterfactual-j0qus9jg/tests/operating-checkpoint.test.mjs:126:67)
+
+test at tests/operating-checkpoint.test.mjs:132:1
+✖ intake immutable_entry validates identity as well as original snapshot bytes (12.143958ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (file:///private/var/folders/n8/886jbns96js8v6hk88_cxkkr0000gn/T/intake-counterfactual-j0qus9jg/tests/operating-checkpoint.test.mjs:135:10)
+      at Test.runInAsyncScope (node:async_hooks:213:14)
+      at Test.run (node:internal/test_runner/test:1106:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:788:18)
+      at Test.postRun (node:internal/test_runner/test:1235:19)
+      at Test.run (node:internal/test_runner/test:1163:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /Immutable entry identity or revision changed/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at tests/operating-checkpoint.test.mjs:153:1
+✖ allowed post-proposal reconstruction intake checks transitive originals before review and publication (11.477625ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception: review
+      at TestContext.<anonymous> (file:///private/var/folders/n8/886jbns96js8v6hk88_cxkkr0000gn/T/intake-counterfactual-j0qus9jg/tests/operating-checkpoint.test.mjs:161:11)
+      at Test.runInAsyncScope (node:async_hooks:213:14)
+      at Test.run (node:internal/test_runner/test:1106:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:788:18)
+      at Test.postRun (node:internal/test_runner/test:1235:19)
+      at Test.run (node:internal/test_runner/test:1163:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /missing or corrupt/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at tests/operating-checkpoint.test.mjs:166:1
+✖ real normalized intake preserves deleted intermediate envelopes while checkpoint audits their transitive vault originals (130.030417ms)
+  Error: Legacy handover original missing or changed
+      at legacyHandoverSource (file:///private/var/folders/n8/886jbns96js8v6hk88_cxkkr0000gn/T/intake-counterfactual-j0qus9jg/plugins/soloco/runtime/snapshot.mjs:98:232)
+      at expand (file:///private/var/folders/n8/886jbns96js8v6hk88_cxkkr0000gn/T/intake-counterfactual-j0qus9jg/plugins/soloco/runtime/operating-state.mjs:420:20)
+      at file:///private/var/folders/n8/886jbns96js8v6hk88_cxkkr0000gn/T/intake-counterfactual-j0qus9jg/plugins/soloco/runtime/operating-state.mjs:439:156
+      at Array.map (<anonymous>)
+      at file:///private/var/folders/n8/886jbns96js8v6hk88_cxkkr0000gn/T/intake-counterfactual-j0qus9jg/plugins/soloco/runtime/operating-state.mjs:435:73
+      at Array.map (<anonymous>)
+      at deltaReviewView (file:///private/var/folders/n8/886jbns96js8v6hk88_cxkkr0000gn/T/intake-counterfactual-j0qus9jg/plugins/soloco/runtime/operating-state.mjs:435:29)
+      at operatingReviewContext (file:///private/var/folders/n8/886jbns96js8v6hk88_cxkkr0000gn/T/intake-counterfactual-j0qus9jg/plugins/soloco/runtime/operating-state.mjs:457:200)
+      at review (file:///private/var/folders/n8/886jbns96js8v6hk88_cxkkr0000gn/T/intake-counterfactual-j0qus9jg/tests/operating-checkpoint.test.mjs:30:10)
+      at file:///private/var/folders/n8/886jbns96js8v6hk88_cxkkr0000gn/T/intake-counterfactual-j0qus9jg/tests/operating-checkpoint.test.mjs:172:114
+
+Exit status: 1

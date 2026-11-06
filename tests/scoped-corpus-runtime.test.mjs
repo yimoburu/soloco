@@ -43,7 +43,7 @@ function contractReview(p){
     r.items=[{id:'coherent-occurrence',kind:'boundary',text:'Fictional occurrence '+u.id+' retains all local restrictions and remains OPEN; no current permission.',scope:'*',provenance:b.provenance_sha256,interfaces:[u.required_interface]}];
     r.unit_id=u.id;r.unit_sha256=sha(u);r.reviewed_unit_bundle_sha256=sha(b);
   }else if(p.phase==='applicability'){
-    const all=p.extractions.flatMap(e=>e.items.map(item=>({key:e.review.id+'/'+item.id,item}))).filter(i=>p.item_keys.includes(i.key));
+    const all=p.extractions.flatMap(e=>(e.result?.items??e.items).map(item=>({key:e.review.id+'/'+item.id,item}))).filter(i=>p.item_keys.includes(i.key));
     r.summary='FICTIONAL ADAPTER: all fixture occurrences and inbound contexts reconciled; all restrictions remain OPEN.';
     r.mappings=all.flatMap(({key})=>(p.corpus_claim?p.corpus_claim.selected_source_ids:[null]).map(sourceId=>({item:key,...(p.corpus_claim?{source_ids:[sourceId],occurrence_ids:p.mapping_occurrence_ids,context_sha256:p.mapping_context_sha256,typed_homes:p.typed_homes,conditions:'FICTIONAL contextual judgment for '+sourceId+': '+(sourceId==='alias'?'DENY even with consent':'ALLOW only after new consent')+'; every distinct physical ancestor remains binding; LATE_NO_EXPORT overrides all local permission.',unresolved_outcomes:'OPEN remains OPEN; failures retained; retries exhausted; no execution or export permission.'}:{}),...(p.mapping_selection_ids?{selection_ids:p.mapping_selection_ids}:{}),status:'represented',homes:p.homes.map(h=>h.source.id),reason:'Fictional complete source conditions preserved, with all occurrence differences and OPEN restrictions.'})));
     if(p.corpus_claim?.selected_source_ids?.length===1)for(const mapping of r.mappings){mapping.source_set=structuredClone(p.mapping_sets.source_set);delete mapping.source_ids;}
@@ -53,8 +53,9 @@ function contractReview(p){
   }else{r.summary='FICTIONAL ADAPTER: independently scripted complete integration, no action permission.';r.unreviewed_interfaces=[];}
   return envelope(r);
 }
-async function run(f,args,{review=contractReview,native,modelHook,streamHook,omitTiming=false}={}){
+async function run(f,args,{review=contractReview,native,modelHook,streamHook,omitTiming=false,legacy=false}={}){
   const t=call(f,{action:'target',...args,plan_id:args.plan_id??f.plan_id});if(t.reused)return t;
+  if(legacy)mutate(f,s=>{delete s.records[t.id].scoped_context_target.delivery_schema;});
   const queued=engine.dispatch({...f,role:'qa',review_of:t.id,task:'Independent scoped contract review.'},'codex',{check:()=>({available:true,authenticated:true,version:'contract-double'}),launch:()=>({on(){},unref(){}})});
   const streamParts=[],streamRequests=[];
   await work(f.root,queued.id,async(host,session,prompt,dir,timeout,selection,options)=>{
@@ -134,6 +135,10 @@ test('FICTIONAL public vector pipeline shares extraction, independently judges c
   for(const mapping of referenced.mappings){mapping.occurrence_set=structuredClone(a.d.packet.mapping_sets.occurrence_set);delete mapping.occurrence_ids;}
   assert.equal(scoped.validateScopedResponse(original,job,assignment,job.native_id,referenced,job.qualification_delivery),true);
   for(const change of [m=>m.occurrence_set.count++,m=>m.occurrence_set.sha256='0'.repeat(64),m=>m.occurrence_ids=['extra']]){const bad=structuredClone(referenced);change(bad.mappings[0]);assert.throws(()=>scoped.validateScopedResponse(original,job,assignment,job.native_id,bad,job.qualification_delivery),/hold/i);}
+  const indexed=structuredClone(a.d.review.qualification_result);
+  for(const mapping of indexed.mappings){const positions=mapping.source_ids.map(id=>a.d.packet.corpus_claim.selected_source_ids.indexOf(id));mapping.source_set={basis_sha256:a.d.packet.mapping_sets.source_set.sha256,ranges:positions.map(i=>[i,i+1])};delete mapping.source_ids;}
+  assert.equal(scoped.validateScopedResponse(original,job,assignment,job.native_id,indexed,job.qualification_delivery),true);
+  for(const change of [m=>m.source_set.basis_sha256='0'.repeat(64),m=>m.source_set.ranges=[[0,999]],m=>m.source_set.ranges=[[0,1],[0,1]]]){const bad=structuredClone(indexed);change(bad.mappings[0]);assert.throws(()=>scoped.validateScopedResponse(original,job,assignment,job.native_id,bad,job.qualification_delivery),/hold/i);}
   const aggregateResult=structuredClone(a.i.review.qualification_result),aggregateAssignment=scoped.scopedAssignment(original,original.jobs[a.i.job.id]);
   for(const change of [r=>r.source_mappings_count++,r=>r.source_mappings_sha256='0'.repeat(64)]){const bad=structuredClone(aggregateResult);change(bad);assert.throws(()=>scoped.validateScopedResponse(original,original.jobs[a.i.job.id],aggregateAssignment,a.i.job.native_id,bad,a.i.job.qualification_delivery),/hold/i);}
 
@@ -235,7 +240,7 @@ test('FICTIONAL corpus preservation feeds independently reviewed operating publi
 });
 
 // Selection tests remain fictional contracts, never model-authored acceptance.
-async function semanticFixture(){
+async function semanticFixture({peers=0,inbound=false}={}){
   const {buildLegacyCoherentPlan}=await import('../plugins/soloco/runtime/legacy-operating.mjs');
   const f=fixture({domains:3});
   mutate(f,s=>{delete s.records[f.plan_id];
@@ -243,12 +248,14 @@ async function semanticFixture(){
       {id:'local-a',ancestor:'ALLOW only after consent',body:{id:'shared',content:'SAME_BODY remains OPEN'}},
       {id:'local-b',ancestor:'DENY even with consent',body:{id:'shared',content:'SAME_BODY remains OPEN'}}]};
     s.records.archive={id:'archive',revision:1,kind:'artifact',content:'UNRELATED_ARCHIVE '+('archive evidence '.repeat(250))};
-    s.records.late={id:'late',revision:1,kind:'decision',unknown_qualifier:'LATE_NO_EXPORT global prohibition'};
+    s.records.late={id:'late',revision:1,kind:'decision',unknown_qualifier:'LATE_NO_EXPORT global prohibition; UNKNOWN; FAILED; allowance EXHAUSTED'};
+    for(let n=0;n<peers;n++)s.records['peer-'+n]={id:'peer-'+n,revision:1,kind:'artifact',content:'DISTANT_RAW_SENTINEL_'+n+' '+('disjoint leaf '.repeat(900))};
+    if(inbound){const original=retainSnapshot(s,{id:'inbound-original',content:'INBOUND_ORIGINAL_OPEN'});s.records.old.locals[0].original=original;delete s.records.old.locals[0].body;delete s.records.old.locals[1].body;s.records.bridge={id:'bridge',revision:1,kind:'artifact',condition:'INBOUND_DENY_UNTIL_NEW_CONSENT',original};}
     for(const h of ['home-D00','home-D01','home-D02'])s.records[h].content='GLOBAL: no execution; LATE_NO_EXPORT; SAME_BODY remains OPEN; ALLOW only after consent; DENY even with consent; archive retained.';
   });
   const material=buildLegacyCoherentPlan(read(f));
-  const selections=['global','A','B','archive'].map(id=>({id,scope:id==='global'?'*':id,occurrence_ids:[],incident_ids:[]}));
-  for(const o of material.occurrences){const key=o.path.startsWith('/records/old/locals/0')||o.path.startsWith('/records/home-D00')?'A':o.path.startsWith('/records/old/locals/1')||o.path.startsWith('/records/home-D01')?'B':o.path.startsWith('/records/archive')||o.path.startsWith('/records/home-D02')?'archive':'global';selections.find(q=>q.id===key).occurrence_ids.push(o.id);}
+  const selections=['global','A','B','archive',...Array.from({length:peers},(_,n)=>'peer-'+n)].map(id=>({id,scope:id==='global'?'*':id,occurrence_ids:[],incident_ids:[]}));
+  for(const o of material.occurrences){const peer=selections.find(q=>q.id.startsWith('peer-')&&o.path.startsWith('/records/'+q.id));const key=o.document.kind==='snapshot-original'?'A':peer?peer.id:o.path.startsWith('/records/bridge')?'B':o.path.startsWith('/records/old/locals/0')||o.path.startsWith('/records/home-D00')?'A':o.path.startsWith('/records/old/locals/1')||o.path.startsWith('/records/home-D01')?'B':o.path.startsWith('/records/archive')||o.path.startsWith('/records/home-D02')?'archive':'global';selections.find(q=>q.id===key).occurrence_ids.push(o.id);}
   const partition={plan_sha256:material.plan_sha256,selections};
   const p=call(f,{action:'plan',protocol,partitioner:scoped.CORPUS_PARTITIONER,source_id:'old',selected_source_ids:['old'],semantic_partition:partition});f.plan_id=p.id;
   return {f,partition,material};
@@ -292,6 +299,59 @@ test('declared distant incident peer cannot be omitted by proposed local scope',
   await assert.rejects(run(f,{phase:'applicability',selection_ids:['A'],extraction_review_ids:es.filter(e=>a.intrinsic_batches.includes(e.target.target.unit_id)).map(e=>e.review.id),counterpart_ids:['home-D00'],context_scope:'*'}),/omitted declared incident peer/);
 });
 
+function projectionFixtureReview(p){
+  const e=contractReview(p);e.qualification_result.reason='FICTIONAL fixture judgment.';
+  if(p.phase==='applicability'){e.qualification_result.summary='FICTIONAL complete contextual meaning; no permission.';for(const m of e.qualification_result.mappings){m.occurrence_set=structuredClone(p.mapping_sets.occurrence_set);delete m.occurrence_ids;m.reason='FICTIONAL preserved.';m.conditions='ALLOW after consent; DENY with consent; LATE_NO_EXPORT.';m.unresolved_outcomes='OPEN; UNKNOWN; FAILED; EXHAUSTED; no permission.';}}
+  return envelope(e.qualification_result);
+}
+
+test('FICTIONAL phase delivery preserves all boundary meaning as disjoint raw partitions grow',async t=>{
+  for(const peers of [0,2]){
+    const {f,partition}=await semanticFixture({peers,inbound:true});
+    const workload=scoped.inspectCorpusWorkload(read(f),{plan_id:f.plan_id}),es=await extracts(f),ds=[],irs=[],args=[];
+    for(const selection of workload.selections){
+      const a={phase:'applicability',selection_ids:[selection.id],extraction_review_ids:es.filter(e=>selection.intrinsic_batches.includes(e.target.target.unit_id)).map(e=>e.review.id),counterpart_ids:[selection.id==='B'?'home-D01':selection.id==='A'||selection.id==='global'?'home-D00':'home-D02'],context_scope:'*',delivery_protocol:scoped.SCOPED_STREAM};args.push(a);
+      const d=await run(f,a,{review:p=>{const e=projectionFixtureReview(p);e.qualification_result.summary+=' BOUNDARY_'+selection.id+' has a distant unknown outward effect; no execution.';for(const m of e.qualification_result.mappings)m.conditions+=' BOUNDARY_'+selection.id;return e;}});
+      assert.equal(d.job.status,'completed',selection.id+': '+d.job.error);ds.push(d);
+      assert.equal(d.packet.delivery_projection.schema,scoped.CORPUS_DELIVERY);
+      assert.equal(d.packet.reference_evidence,undefined);
+      for(const extraction of d.packet.extractions){const original=es.find(e=>e.review.id===extraction.review.id);assert.deepEqual(extraction.result,original.review.qualification_result);assert.deepEqual(extraction.reviewed_unit_bundle,original.review.reviewed_unit_bundle);}
+    }
+    for(const a of args){const ir=await run(f,{...a,counterpart_ids:['home-D00','home-D01','home-D02'],domain_review_ids:ds.map(d=>d.review.id),interface_keys:ds[args.indexOf(a)].review.qualification_result.interfaces.map(i=>i.key)},{review:projectionFixtureReview});assert.equal(ir.job.status,'completed',ir.job.error);irs.push(ir);}
+    const final=await run(f,{phase:'integration',delivery_protocol:scoped.SCOPED_STREAM,domain_review_ids:ds.map(d=>d.review.id),interface_review_ids:irs.map(d=>d.review.id),counterpart_ids:['home-D00','home-D01'],dependency_ids:['home-D02']});assert.equal(final.job.status,'completed',final.job.error);
+    const local=irs[1],wire=JSON.stringify(local.packet),finalWire=JSON.stringify(final.packet);
+    for(const sentinel of ['UNRELATED_ARCHIVE',...Array.from({length:peers},(_,n)=>'DISTANT_RAW_SENTINEL_'+n)]){assert.ok(!wire.includes(sentinel),sentinel);assert.ok(!finalWire.includes(sentinel),sentinel);assert.ok(ds.some(d=>JSON.stringify(d.packet).includes(sentinel)),'original raw delivered to its domain');}
+    for(const required of ['ALLOW only after consent','INBOUND_ORIGINAL_OPEN','INBOUND_DENY_UNTIL_NEW_CONSENT','LATE_NO_EXPORT','UNKNOWN','FAILED','EXHAUSTED'])assert.ok(wire.includes(required),required);
+    assert.ok(local.packet.occurrence_context.snapshot_inbound.length>0);
+    for(const packet of [local.packet,final.packet]){
+      const conclusions=packet.domain_conclusions??packet.domains;assert.equal(conclusions.length,ds.length);
+      for(const d of ds){const c=conclusions.find(c=>c.review.id===d.review.id);assert.deepEqual(c.result,d.review.qualification_result);assert.deepEqual(c.target.value,read(f).records[d.target.id].scoped_context_target);assert.deepEqual(c.mapping_occurrence_ids,d.packet.mapping_occurrence_ids);assert.deepEqual(c.selections,[partition.selections.find(q=>q.id===args[ds.indexOf(d)].selection_ids[0])]);assert.ok(JSON.stringify(c.result).includes('BOUNDARY_'+d.packet.mapping_selection_ids[0]));}
+      assert.ok(packet.global_rules.governing.some(g=>g.source.id==='late'));
+    }
+    for(const ir of irs)assert.deepEqual(final.packet.interface_reviews.find(c=>c.review.id===ir.review.id).result,ir.review.qualification_result);
+    assert.ok(final.packet.global_occurrence_context.sections.length>0);assert.equal(final.packet.homes.length,2);assert.deepEqual(final.packet.dependencies[0].value,read(f).records['home-D02']);
+    const state=read(f);assert.equal(scoped.validateCorpusPreservation(state,{integration_review_id:final.review.id}).protocol,scoped.CORPUS_PRESERVATION);
+    const invalidSchema=inheritSnapshots(state,structuredClone(state));invalidSchema.records[local.target.id].scoped_context_target.delivery_schema='unknown';assert.throws(()=>scoped.scopedAssignment(invalidSchema,invalidSchema.jobs[local.job.id]),/invalid corpus delivery schema/);
+    for(const edit of [s=>s.records[ds.at(-1).review.id].qualification_result.mappings.pop(),s=>s.jobs[es.at(-1).job.id].native_id='changed-native',s=>s.jobs[ds.at(-1).job.id].qualification_delivery.complete=false,s=>s.records.late.unknown_qualifier='changed global',s=>s.records[local.target.id].scoped_context_target.delivery_schema='unknown-schema']){const bad=inheritSnapshots(state,structuredClone(state));edit(bad);assert.throws(()=>scoped.validateCorpusPreservation(bad,{integration_review_id:final.review.id}),/hold|changed/i);}
+    t.diagnostic(JSON.stringify({fictional_only:true,peers,local_interface_bytes:bytes(local.packet),final_bytes:bytes(final.packet),local_raw_bytes:bytes(local.packet.extractions),all_extraction_bytes:es.reduce((n,e)=>n+bytes(e.review.reviewed_unit_bundle),0),local_pages:local.streamRequests.length,final_pages:final.streamRequests.length,semantic_acceptance:false,native_fit:'unproven'}));
+  }
+});
+
+test('FICTIONAL unmarked corpus targets reconstruct the legacy recursive delivery contract',async()=>{
+  const f=corpusFixture(),es=await extracts(f),args={phase:'applicability',extraction_review_ids:es.map(e=>e.review.id),counterpart_ids:['home-D00'],context_scope:'*',delivery_protocol:scoped.SCOPED_STREAM};
+  const d=await run(f,args,{legacy:true,review:corpusReview});assert.equal(d.job.status,'completed',d.job.error);
+  const ir=await run(f,{...args,domain_review_ids:[d.review.id],interface_keys:d.review.qualification_result.interfaces.map(i=>i.key)},{legacy:true,review:corpusReview});assert.equal(ir.job.status,'completed',ir.job.error);
+  const i=await run(f,{phase:'integration',delivery_protocol:scoped.SCOPED_STREAM,domain_review_ids:[d.review.id],interface_review_ids:[ir.review.id],counterpart_ids:['home-D00']},{legacy:true});assert.equal(i.job.status,'completed',i.job.error);
+  const state=read(f);
+  for(const phase of [d,ir,i]){
+    assert.equal(state.records[phase.target.id].scoped_context_target.delivery_schema,undefined);assert.equal(phase.packet.delivery_projection,undefined);
+    for(const e of es)assert.deepEqual(phase.packet.reference_evidence.find(p=>p.review.id===e.review.id).value,e.review);
+    assert.deepEqual(scoped.scopedAssignment(state,state.jobs[phase.job.id]).packet,phase.packet);
+    if(process.env.CORPUS_BASELINE_MODULE){const baseline=await import(process.env.CORPUS_BASELINE_MODULE);const before=baseline.scopedAssignment(state,state.jobs[phase.job.id]),after=scoped.scopedAssignment(state,state.jobs[phase.job.id]);assert.deepEqual(after,before,'exact assignment, qualification and stream bytes against pinned source');}
+  }
+  assert.equal(scoped.validateCorpusPreservation(state,{integration_review_id:i.review.id}).protocol,scoped.CORPUS_PRESERVATION);
+});
+
 test('nested formatting/escape variant file sections fit intrinsic batches without implying complete global request fit',async t=>{
   const {buildLegacyCoherentPlan}=await import('../plugins/soloco/runtime/legacy-operating.mjs');
   const sources={'a.mjs':'a'.repeat(21650),'b.mjs':'b'.repeat(17056),'c.mjs':'c'.repeat(12952)};
@@ -329,8 +389,22 @@ test('upgrade journal sections enter corpus workload with complete ordered membe
   const partition={plan_sha256:m.plan_sha256,selections:[{id:'global',scope:'*',occurrence_ids:m.occurrences.map(o=>o.id),incident_ids:[]}]};
   const p=call(f,{action:'plan',protocol,partitioner:scoped.CORPUS_PARTITIONER,source_id:'upgrade:failed-attempt',selected_source_ids:['upgrade:failed-attempt'],semantic_partition:partition});f.plan_id=p.id;
   const workload=scoped.inspectCorpusWorkload(read(f),{plan_id:p.id});
-  assert.ok(workload.extraction.every(e=>e.body_bytes<48000));assert.equal(workload.semantic_acceptance,false);
+  const extraction=await run(f,{phase:'extract',unit_id:workload.extraction[0].id,delivery_protocol:scoped.SCOPED_STREAM});assert.equal(extraction.job.status,'completed',extraction.job.error);assert.ok(extraction.streamRequests.every(w=>bytes(w)<=48000));assert.equal(workload.semantic_acceptance,false);
   const bad=structuredClone(partition);bad.selections[0].occurrence_ids.splice(bad.selections[0].occurrence_ids.indexOf(journal.id),1);
   assert.throws(()=>scoped.validateCorpusPartition(m,bad),/physical occurrence partition/);
   t.diagnostic(JSON.stringify({fictional_only:true,journal_members:28,unique_sections:m.measurements.unique_sections,largest_intrinsic_packet:m.measurements.largest_packet_bytes,workload}));
+});
+
+// Mechanical coverage only: no native semantic acceptance is simulated here.
+test('rectangular corpus coverage checks a large exact product without materializing cells',{timeout:10000},()=>{
+ const sources=Array.from({length:336},(_,i)=>'source-'+i),occurrences=Array.from({length:100000},(_,i)=>'occurrence-'+i),items=['first','second'];
+ const half=occurrences.slice(0,50000),rest=occurrences.slice(50000);
+ const rows=items.flatMap(item=>[{item,sources,occurrences:half},{item,sources,occurrences:rest}]);
+ assert.equal(scoped.validateCorpusCellCoverage(rows,items,sources,occurrences),true);
+ assert.throws(()=>scoped.validateCorpusCellCoverage(rows.slice(1),items,sources,occurrences),/missing/);
+ assert.throws(()=>scoped.validateCorpusCellCoverage([...rows,rows[0]],items,sources,occurrences),/duplicate/);
+ const narrowed=rows.map((r,i)=>i===0?{...r,sources:sources.slice(1)}:r);
+ assert.throws(()=>scoped.validateCorpusCellCoverage(narrowed,items,sources,occurrences),/missing/);
+ const outside=rows.map((r,i)=>i===0?{...r,occurrences:[...half.slice(1),'unknown']}:r);
+ assert.throws(()=>scoped.validateCorpusCellCoverage(outside,items,sources,occurrences),/substituted/);
 });

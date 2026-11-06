@@ -1,0 +1,381 @@
+TAP version 13
+# (node:85345) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: missing production intake provider is fail closed
+ok 1 - missing production intake provider is fail closed
+  ---
+  duration_ms: 0.48925
+  ...
+# Subtest: initial unknown legacy is never relabeled accepted
+ok 2 - initial unknown legacy is never relabeled accepted
+  ---
+  duration_ms: 32.069333
+  ...
+# Subtest: immutable accepted home survives replacement; new global restriction holds ordinary but complete delta repair publishes
+ok 3 - immutable accepted home survives replacement; new global restriction holds ordinary but complete delta repair publishes
+  ---
+  duration_ms: 115.679542
+  ...
+# Subtest: successor exact base and concurrent semantic intake including reverted intake hold
+ok 4 - successor exact base and concurrent semantic intake including reverted intake hold
+  ---
+  duration_ms: 104.977959
+  ...
+# Subtest: missing original, changed producer, rejected negative, expiry and unknown nested producer hold
+ok 5 - missing original, changed producer, rejected negative, expiry and unknown nested producer hold
+  ---
+  duration_ms: 77.367
+  ...
+# Subtest: canonical known historical evidence freezes before bookkeeping; nested originals remain checked
+ok 6 - canonical known historical evidence freezes before bookkeeping; nested originals remain checked
+  ---
+  duration_ms: 101.594875
+  ...
+# (node:85346) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: public handover, independent publication, full v4 worker review, resume and first ordinary format6 Engineering return
+ok 7 - public handover, independent publication, full v4 worker review, resume and first ordinary format6 Engineering return
+  ---
+  duration_ms: 5348.791625
+  ...
+# Subtest: independent resume rejects changed closure, subject, identity, delivery and current meaning
+ok 8 - independent resume rejects changed closure, subject, identity, delivery and current meaning
+  ---
+  duration_ms: 9702.713375
+  ...
+# Subtest: only exact pure runtime commands are mechanically ingested; conditions, unknown fields and generic saves stay held
+ok 9 - only exact pure runtime commands are mechanically ingested; conditions, unknown fields and generic saves stay held
+  ---
+  duration_ms: 1238.098916
+  ...
+# Subtest: actual conditional handover retains founder conditions and unknown legacy remains held on first pass
+ok 10 - actual conditional handover retains founder conditions and unknown legacy remains held on first pass
+  ---
+  duration_ms: 154.314042
+  ...
+# Subtest: bounded runtime admission binds task, owner, checkpoint, complete inputs and every metadata phase
+ok 11 - bounded runtime admission binds task, owner, checkpoint, complete inputs and every metadata phase
+  ---
+  duration_ms: 1056.683709
+  ...
+# Subtest: reverted publication metadata and unknown root handover/notice changes remain intake
+ok 12 - reverted publication metadata and unknown root handover/notice changes remain intake
+  ---
+  duration_ms: 1879.603291
+  ...
+# (node:85347) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: accepted historical publication proof survives an owner epoch change without admitting old in-flight work
+ok 13 - accepted historical publication proof survives an owner epoch change without admitting old in-flight work
+  ---
+  duration_ms: 1473.4675
+  ...
+# Subtest: public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning
+ok 14 - public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning
+  ---
+  duration_ms: 474.772167
+  ...
+# Subtest: missing legacy bootstrap is visibly DIRTY and apply rolls back without acceptance
+ok 15 - missing legacy bootstrap is visibly DIRTY and apply rolls back without acceptance
+  ---
+  duration_ms: 70.057708
+  ...
+# Subtest: new membership, changed exact source, wrong independent identity and absent closure cannot publish
+ok 16 - new membership, changed exact source, wrong independent identity and absent closure cannot publish
+  ---
+  duration_ms: 1475.925625
+  ...
+# Subtest: scope closure, global membership, expiry, receipt changes, revocation and missed communication hold
+ok 17 - scope closure, global membership, expiry, receipt changes, revocation and missed communication hold
+  ---
+  duration_ms: 770.35025
+  ...
+# Subtest: pause fences publication reviewer and prospective handover cannot hide unknown legacy
+ok 18 - pause fences publication reviewer and prospective handover cannot hide unknown legacy
+  ---
+  duration_ms: 91.248666
+  ...
+# Subtest: 10x independently classified inert archive keeps actual mandatory operating assignment bytes and semantic work constant
+ok 19 - 10x independently classified inert archive keeps actual mandatory operating assignment bytes and semantic work constant
+  ---
+  duration_ms: 3087.056333
+  ...
+# Subtest: deleted applicable home and changed exact provenance cannot disappear from accepted meaning
+ok 20 - deleted applicable home and changed exact provenance cannot disappear from accepted meaning
+  ---
+  duration_ms: 420.785792
+  ...
+# Subtest: typed outcome requires complete historical uncertainty; text cannot manufacture permission
+ok 21 - typed outcome requires complete historical uncertainty; text cannot manufacture permission
+  ---
+  duration_ms: 402.971
+  ...
+# Subtest: public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure
+ok 22 - public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure
+  ---
+  duration_ms: 2140.58125
+  ...
+# Subtest: late new and changed falsely scoped prohibitions stay globally DIRTY, but fresh proposals include them
+ok 23 - late new and changed falsely scoped prohibitions stay globally DIRTY, but fresh proposals include them
+  ---
+  duration_ms: 2513.117459
+  ...
+# Subtest: publication proof stays current; failed, quarantined, uncertain and unknown-extension siblings stay DIRTY
+ok 24 - publication proof stays current; failed, quarantined, uncertain and unknown-extension siblings stay DIRTY
+  ---
+  duration_ms: 668.923542
+  ...
+# Subtest: mechanical publication index rejects tampering and retains unknown state extensions
+ok 25 - mechanical publication index rejects tampering and retains unknown state extensions
+  ---
+  duration_ms: 383.056125
+  ...
+# Subtest: format6 explicit non-home evidence survives dispatch, discovery and bounded same-native reads
+ok 26 - format6 explicit non-home evidence survives dispatch, discovery and bounded same-native reads
+  ---
+  duration_ms: 5456.396833
+  ...
+# Subtest: referenced archived revoked/retry restriction and canonical parent receipts are supplied completely inline
+ok 27 - referenced archived revoked/retry restriction and canonical parent receipts are supplied completely inline
+  ---
+  duration_ms: 775.809792
+  ...
+# Subtest: large non-home provenance uses exact same-native ranges; undelivered, partial, denied, stale or changed evidence cannot publish
+not ok 28 - large non-home provenance uses exact same-native ranges; undelivered, partial, denied, stale or changed evidence cannot publish
+  ---
+  duration_ms: 1034.249291
+  location: '/private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:223:1'
+  failureType: 'testCodeFailure'
+  error: 'Missing expected rejection: reverted read receipts remain unreviewed intake'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  operator: 'rejects'
+  stack: |-
+    async TestContext.<anonymous> (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:232:6)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: canonical preservation parent revisions cannot be borrowed from matching hashes
+ok 29 - canonical preservation parent revisions cannot be borrowed from matching hashes
+  ---
+  duration_ms: 218.424584
+  ...
+# Subtest: missing provenance and snapshot-only evidence hold rather than count pointers as delivered bodies
+ok 30 - missing provenance and snapshot-only evidence hold rather than count pointers as delivered bodies
+  ---
+  duration_ms: 58.675625
+  ...
+# Subtest: real runtime receipt attribution and deterministic reuse deliver the validated producer closure before Pass
+ok 31 - real runtime receipt attribution and deterministic reuse deliver the validated producer closure before Pass
+  ---
+  duration_ms: 1122.575667
+  ...
+# Subtest: runtime receipt missing or mismatched producer, candidate, plan, reuse or generation holds
+ok 32 - runtime receipt missing or mismatched producer, candidate, plan, reuse or generation holds
+  ---
+  duration_ms: 141.617458
+  ...
+# Subtest: external catalog reference-shaped metadata is verbatim evidence without a company lookup
+ok 33 - external catalog reference-shaped metadata is verbatim evidence without a company lookup
+  ---
+  duration_ms: 469.760833
+  ...
+# Subtest: runtime closure requires complete delivery and independent source and proof sessions
+not ok 34 - runtime closure requires complete delivery and independent source and proof sessions
+  ---
+  duration_ms: 4172.727792
+  location: '/private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:329:1'
+  failureType: 'testCodeFailure'
+  error: 'Missing expected rejection: reverted read receipts remain unreviewed intake'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  operator: 'rejects'
+  stack: |-
+    async TestContext.<anonymous> (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:340:8)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: public qualified recovered snapshot publishes current typed outcomes without replaying the paid raw archive
+ok 35 - public qualified recovered snapshot publishes current typed outcomes without replaying the paid raw archive
+  ---
+  duration_ms: 4911.465
+  ...
+# Subtest: large prospective publication uses bounded frozen worker delivery and rejects a manufactured complete flag
+ok 36 - large prospective publication uses bounded frozen worker delivery and rejects a manufactured complete flag
+  ---
+  duration_ms: 37632.426708
+  ...
+# Subtest: frozen publication worker rejects unread semantics, changed native and changed current membership
+ok 37 - frozen publication worker rejects unread semantics, changed native and changed current membership
+  ---
+  duration_ms: 1896.348958
+  ...
+# Subtest: paid snapshot archive still requires publication QA independent of nested original producers
+ok 38 - paid snapshot archive still requires publication QA independent of nested original producers
+  ---
+  duration_ms: 1535.537917
+  ...
+# Subtest: FICTIONAL PUBLIC v2 explicit complete sources preserve accepted runtime producer independence and freshness
+ok 39 - FICTIONAL PUBLIC v2 explicit complete sources preserve accepted runtime producer independence and freshness
+  ---
+  duration_ms: 5685.068167
+  ...
+# (node:85348) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: tree preservation stays valid after exact operating publication while unknown extensions hold
+ok 40 - tree preservation stays valid after exact operating publication while unknown extensions hold
+  ---
+  duration_ms: 2614.646916
+  ...
+# (node:85349) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: read-only baseline, exact full/selected deltas, deletion, reorder, shape and unknown fields
+ok 41 - read-only baseline, exact full/selected deltas, deletion, reorder, shape and unknown fields
+  ---
+  duration_ms: 39.48875
+  ...
+# Subtest: selected writes and upgrade appends never read unrelated/prior journal bodies
+ok 42 - selected writes and upgrade appends never read unrelated/prior journal bodies
+  ---
+  duration_ms: 22.299417
+  ...
+# Subtest: selected new roots allocate after both root and shape positions without moving existing rows
+ok 43 - selected new roots allocate after both root and shape positions without moving existing rows
+  ---
+  duration_ms: 96.888375
+  ...
+# Subtest: existing duplicate top-level positions hold without rewriting historical metadata
+ok 44 - existing duplicate top-level positions hold without rewriting historical metadata
+  ---
+  duration_ms: 8.890916
+  ...
+# Subtest: intake verifies envelopes; checkpoint dependency validation holds on missing/corrupt nested originals
+ok 45 - intake verifies envelopes; checkpoint dependency validation holds on missing/corrupt nested originals
+  ---
+  duration_ms: 73.521
+  ...
+# Subtest: gaps, changed event envelopes/payloads, uncovered writers and unlogged state changes hold
+ok 46 - gaps, changed event envelopes/payloads, uncovered writers and unlogged state changes hold
+  ---
+  duration_ms: 181.936208
+  ...
+# Subtest: missing/corrupt old, intermediate, new and unchanged immutable values hold
+ok 47 - missing/corrupt old, intermediate, new and unchanged immutable values hold
+  ---
+  duration_ms: 157.244208
+  ...
+# Subtest: legacy/changed layout, ambiguous encoding, inexact identities and rollback hold
+ok 48 - legacy/changed layout, ambiguous encoding, inexact identities and rollback hold
+  ---
+  duration_ms: 98.282291
+  ...
+# Subtest: failed writes roll back metadata, immutable inserts and event atomically
+ok 49 - failed writes roll back metadata, immutable inserts and event atomically
+  ---
+  duration_ms: 61.263125
+  ...
+# Subtest: position-only object reorder and selected deletion produce exact references; historical old events need no replay
+ok 50 - position-only object reorder and selected deletion produce exact references; historical old events need no replay
+  ---
+  duration_ms: 21.713
+  ...
+# Subtest: re-sealed but inconsistent metadata roots and before/after chains hold
+ok 51 - re-sealed but inconsistent metadata roots and before/after chains hold
+  ---
+  duration_ms: 90.656875
+  ...
+# (node:85350) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: legacy capture holds atomically; ordinary writes/read/reopen do not migrate; explicit migration backs up exact origin
+ok 52 - legacy capture holds atomically; ordinary writes/read/reopen do not migrate; explicit migration backs up exact origin
+  ---
+  duration_ms: 35.670959
+  ...
+# Subtest: known v1/v2/v3 layouts retain pending journals and compatibility; incompatible capture/keys require explicit migration
+ok 53 - known v1/v2/v3 layouts retain pending journals and compatibility; incompatible capture/keys require explicit migration
+  ---
+  duration_ms: 145.327459
+  ...
+# Subtest: v4 keys round-trip NUL, lone surrogates, literal prefix, unknown roots and order through selected writes and portable restore
+ok 54 - v4 keys round-trip NUL, lone surrogates, literal prefix, unknown roots and order through selected writes and portable restore
+  ---
+  duration_ms: 137.722084
+  ...
+# Subtest: unknown layouts, corrupt key markers, missing originals and failed migration readback hold without adopting a layout
+ok 55 - unknown layouts, corrupt key markers, missing originals and failed migration readback hold without adopting a layout
+  ---
+  duration_ms: 35.706833
+  ...
+# Subtest: contextMatches inherits exact resolver while arbitrary unbound copies still hold
+ok 56 - contextMatches inherits exact resolver while arbitrary unbound copies still hold
+  ---
+  duration_ms: 31.082375
+  ...
+# Subtest: frozen projection reuses exact bytes, invalidates second-writer/dependency changes, and detects original corruption between reads
+ok 57 - frozen projection reuses exact bytes, invalidates second-writer/dependency changes, and detects original corruption between reads
+  ---
+  duration_ms: 95.770583
+  ...
+# Subtest: projection cache eviction retains exact legacy frozen contract and failed-successor preview distinction
+ok 58 - projection cache eviction retains exact legacy frozen contract and failed-successor preview distinction
+  ---
+  duration_ms: 8.999167
+  ...
+# Subtest: raw direct-source reads bind exact pointers and originals across another writer, including unsafe keys and corruption
+ok 59 - raw direct-source reads bind exact pointers and originals across another writer, including unsafe keys and corruption
+  ---
+  duration_ms: 15.981167
+  ...
+# Subtest: explicit migration refuses a second-writer change after backup and keeps its exact source backup
+ok 60 - explicit migration refuses a second-writer change after backup and keeps its exact source backup
+  ---
+  duration_ms: 9.072875
+  ...
+# Subtest: detectable old lossy identities hold rather than adopting a normalized substitute
+ok 61 - detectable old lossy identities hold rather than adopting a normalized substitute
+  ---
+  duration_ms: 10.376334
+  ...
+# Subtest: pinned text preserves exact lone-surrogate hash encoding and Unicode range boundaries
+ok 62 - pinned text preserves exact lone-surrogate hash encoding and Unicode range boundaries
+  ---
+  duration_ms: 0.294708
+  ...
+# Subtest: pending legacy handover context and ordinary delivery writes keep their inline storage contract
+ok 63 - pending legacy handover context and ordinary delivery writes keep their inline storage contract
+  ---
+  duration_ms: 6.533917
+  ...
+# Subtest: a duplicate original hash cannot conceal conflicting reference shape metadata in extension slots
+ok 64 - a duplicate original hash cannot conceal conflicting reference shape metadata in extension slots
+  ---
+  duration_ms: 1.286
+  ...
+# (node:85351) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: restore verifies every copied artifact and preserves exact logical database state
+ok 65 - restore verifies every copied artifact and preserves exact logical database state
+  ---
+  duration_ms: 184.35125
+  ...
+# Subtest: public restore refuses an artifact changed after source validation even when database readback would match
+ok 66 - public restore refuses an artifact changed after source validation even when database readback would match
+  ---
+  duration_ms: 14.537542
+  ...
+# Subtest: restore refuses unexpected destination files appearing during copying
+ok 67 - restore refuses unexpected destination files appearing during copying
+  ---
+  duration_ms: 9.877083
+  ...
+1..67
+# tests 67
+# suites 0
+# pass 65
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 79278.283

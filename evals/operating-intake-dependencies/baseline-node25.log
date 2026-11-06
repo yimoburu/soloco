@@ -1,0 +1,16 @@
+(node:9679) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ missing production intake provider is fail closed (0.459708ms)
+✔ initial unknown legacy is never relabeled accepted (18.304792ms)
+✔ immutable accepted home survives replacement; new global restriction holds ordinary but complete delta repair publishes (23.324958ms)
+✔ successor exact base and concurrent semantic intake including reverted intake hold (35.844291ms)
+✔ missing original, changed producer, rejected negative, expiry and unknown nested producer hold (43.641333ms)
+✔ canonical known historical evidence freezes before bookkeeping; nested originals remain checked (24.540333ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 199.822458

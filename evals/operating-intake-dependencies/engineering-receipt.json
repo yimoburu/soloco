@@ -1,0 +1,31 @@
+{
+  "assignment": "engineering",
+  "cwd": "/Users/xiaoweili/Documents/Codex/SoloDev-reviews/operating-intake-dependencies-2026-11-06/source",
+  "scope": "Founder-authorized narrow architecture repair in public source; no company mutation, publication or installation",
+  "prompt_sha256": "6078b67572d46d59f93af70b75cc34838d0c561dd51f393e6c0d172f67b88e7c",
+  "requested_model": "gpt-6.1-sol",
+  "requested_effort": "high",
+  "requested_speed": "host_default",
+  "effective_settings": "unverified",
+  "started_at": "2026-11-06T22:35:27.928428+00:00",
+  "pid": 9127,
+  "exit_code": 0,
+  "ended_at": "2026-11-06T22:42:54.894363+00:00",
+  "report_exists": true,
+  "lifecycle": [
+    {
+      "type": "thread.started",
+      "thread_id": "01a1b300-ab80-7072-9958-d054d7d1ad6d"
+    },
+    {
+      "type": "turn.completed",
+      "usage": {
+        "input_tokens": 1564604,
+        "cached_input_tokens": 1505792,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 18708,
+        "reasoning_output_tokens": 7109
+      }
+    }
+  ]
+}

@@ -1,0 +1,230 @@
+diff --git a/plugins/soloco/runtime/operating-state.mjs b/plugins/soloco/runtime/operating-state.mjs
+index c7a6553..aa73084 100644
+--- a/plugins/soloco/runtime/operating-state.mjs
++++ b/plugins/soloco/runtime/operating-state.mjs
+@@ -244,8 +244,13 @@ function archiveCheck(s,snapshot){
+   // Storage verifies each raw envelope. Application references inside its JSON
+   // STRING must additionally be parsed and checked under the exact before/after
+   // record version map, including intermediate versions later changed again.
+-  const view=frozenState(s,snapshot.census);view.records=Object.assign(Object.create(null),view.records);
+-  const check=ref=>{if(!ref)return;const value=JSON.parse(ref.raw);if(!hasSnapshotReferences(value))return;const captured=captureSnapshotDependencies(view,()=>true,{root:value});validateSnapshotDependencies(view,captured.dependencies);};
++  visitIntakeBoundaries(frozenState(s,snapshot.census),intake);
++}
++function visitIntakeBoundaries(endpoint,intake,visit=()=>{}){
++  const view=inheritSnapshots(endpoint,{...endpoint,records:Object.assign(Object.create(null),endpoint.records)});
++  const check=ref=>{if(!ref)return;if(typeof ref.raw!=='string')fail('complete storage intake bytes required');const value=JSON.parse(ref.raw);if(hasSnapshotReferences(value)){const captured=captureSnapshotDependencies(view,()=>true,{root:value});validateSnapshotDependencies(view,captured.dependencies);}visit(ref,value,view);};
++  // One storage event is atomic: inspect its entire after set before restoring
++  // the entire before set. Never resolve a locator against a mixed record map.
+   for(const event of [...intake.events].reverse()){
+     for(const change of event.changes)check(change.after);
+     for(const change of event.changes){const ref=change.before??change.after;if(ref?.family!=='records')continue;if(change.before)view.records[ref.key]=JSON.parse(change.before.raw);else delete view.records[ref.key];}
+@@ -313,6 +318,7 @@ function assignmentSafe(s,j){
+ // value, including mutations that are subsequently reverted.
+ function inputUnchanged(s,snapshot,planId){
+   const frozen=resolveSnapshot(s,snapshot.preservation),intake=operatingIntake(s,snapshot.intake_baseline).intake;
++  visitIntakeBoundaries(s,intake);
+   const baseline=new Map(envelopes(s,snapshot.census).map(x=>[x.source.id,x.source]));
+   const b=bookkeeping(s,planId),commands=new Set(),targets=new Set();
+   let paused=snapshot.paused,handover=snapshot.handover??null;
+@@ -413,13 +419,14 @@ function deltaReviewView(s,snapshot){
+   const delta=resolveSnapshot(s,snapshot.delta),accepted=snapshot.previous_index?resolveSnapshot(s,snapshot.previous_index):null;
+   if(!accepted)return delta;
+   const originals=new Map();
+-  const expand=ref=>{
++  const expanded=new Map();
++  const expand=(ref,parsed,view)=>{
+     if(!ref)return null;
+-    const todo=[JSON.parse(ref.raw)],seen=new Set(),bindings=[];
++    const todo=[parsed],seen=new Set(),bindings=[];
+     while(todo.length){const value=todo.pop();if(!value||typeof value!=='object'||seen.has(value))continue;seen.add(value);
+-      const legacy=legacyHandoverSource(s,value),entry=snapshotEntryReference(value),snapshotRef=entry??snapshotReference(value);
++      const legacy=legacyHandoverSource(view,value),entry=snapshotEntryReference(value),snapshotRef=entry??snapshotReference(value);
+       if(legacy||snapshotRef){
+-        const body=legacy??(entry?resolveSnapshotEntry(s,value):resolveSnapshot(s,value)),raw=JSON.stringify(body),sha256=digest(raw),source_id='delta-original:'+sha256;
++        const body=legacy??(entry?resolveSnapshotEntry(view,value):resolveSnapshot(view,value)),raw=JSON.stringify(body),sha256=digest(raw),source_id='delta-original:'+sha256;
+         bindings.push({source_id,sha256});if(!originals.has(sha256)){originals.set(sha256,{source_id,sha256,original_reference:value,raw,rule:'Complete changed-source original; required semantic evidence, not a delivered pointer.'});todo.push(body);}continue;
+       }
+       for(const child of Object.values(value))if(child&&typeof child==='object')todo.push(child);
+@@ -432,11 +439,13 @@ function deltaReviewView(s,snapshot){
+   // instead of replaying its captured archive indexes as new semantic material.
+   const plan=exact(s,accepted.plan);
+   const compact=ref=>({original:{family:ref.family,key:ref.key,position:ref.position,sha256:ref.sha256,encoding:ref.encoding,snapshot:{immutable_snapshot:{version:1,sha256:ref.sha256,characters:ref.raw.length,shape:'object'}}},accepted_publication:accepted.plan,meaning:'Previously independently accepted publication bookkeeping only; complete current meaning is in previous S. The exact original remains retrievable.'});
++  const publication=(event,{before,after})=>event.type==='operating.apply'&&after?.family==='root'&&after.key==='operating_state'&&same(JSON.parse(after.raw),accepted)&&(before?before.sha256===accepted.accepted_snapshot.base:accepted.accepted_snapshot.base===null);
++  const priorPlan=(event,{before,after})=>event.type==='operating.plan'&&!before&&after?.family==='records'&&after.key===accepted.plan.id&&same(JSON.parse(after.raw),plan);
++  const compactRefs=new Set(delta.events.flatMap(event=>event.changes.filter(change=>publication(event,change)||priorPlan(event,change)).flatMap(change=>[change.before,change.after])));
++  visitIntakeBoundaries(frozenState(s,snapshot.census),delta,(ref,value,view)=>{if(!compactRefs.has(ref))expanded.set(ref,expand(ref,value,view));});
+   const events=delta.events.map(event=>({...event,changes:event.changes.map(change=>{
+     const after=change.after,before=change.before;
+-    const publication=event.type==='operating.apply'&&after?.family==='root'&&after.key==='operating_state'&&same(JSON.parse(after.raw),accepted)&&(before?before.sha256===accepted.accepted_snapshot.base:accepted.accepted_snapshot.base===null);
+-    const priorPlan=event.type==='operating.plan'&&!before&&after?.family==='records'&&after.key===accepted.plan.id&&same(JSON.parse(after.raw),plan);
+-    return publication?{before:before?compact(before):null,after:compact(after)}:priorPlan?{before:null,after:compact(after)}:{before:expand(before),after:expand(after)};
++    return publication(event,change)?{before:before?compact(before):null,after:compact(after)}:priorPlan(event,change)?{before:null,after:compact(after)}:{before:before?expanded.get(before):null,after:after?expanded.get(after):null};
+   })}));
+   return {...delta,projection:'operating-semantic-intake-v1',events,required_originals:[...originals.values()]};
+ }
+diff --git a/plugins/soloco/runtime/snapshot.mjs b/plugins/soloco/runtime/snapshot.mjs
+index b05c71f..cc97a41 100644
+--- a/plugins/soloco/runtime/snapshot.mjs
++++ b/plugins/soloco/runtime/snapshot.mjs
+@@ -151,9 +151,10 @@ export function captureSnapshotDependencies(state,build,{root=state}={}) {
+     // nested references, before a projection can become a frozen read sequence.
+     const todo=[root],seen=new Set(),originals=new Map();
+     while(todo.length){const item=todo.pop();if(!item||typeof item!=='object'||seen.has(item))continue;seen.add(item);
++      if(snapshotEntryReference(item)){todo.push(resolveSnapshotEntry(state,item));continue;}
+       const ref=snapshotReference(item);
+       if(ref){const prior=originals.get(ref.sha256);if(prior&&(prior.characters!==ref.characters||prior.shape!==ref.shape))throw Error('Immutable snapshot duplicate metadata mismatch');if(!prior){originals.set(ref.sha256,ref);todo.push(JSON.parse(snapshotBytes(state,item)));}continue;}
+-      if(Object.hasOwn(item,'retained_handover_subject')){const source=legacyHandoverSource(state,item);todo.push(source.handover.subject);continue;}
++      if(Object.hasOwn(item,'retained_handover_subject')){const source=legacyHandoverSource(state,item);todo.push(source);continue;}
+       for(const child of Object.values(item))if(child&&typeof child==='object')todo.push(child);
+     }
+     return {value:build(),dependencies:[...dependencies.values()]};
+diff --git a/tests/operating-checkpoint.test.mjs b/tests/operating-checkpoint.test.mjs
+index bf26804..5a811b2 100644
+--- a/tests/operating-checkpoint.test.mjs
++++ b/tests/operating-checkpoint.test.mjs
+@@ -6,7 +6,7 @@ import fs from 'node:fs';
+ import os from 'node:os';
+ import path from 'node:path';
+ import {Store,digest} from '../plugins/soloco/runtime/store.mjs';
+-import {bindOperatingIntake,bindSnapshots,resolveSnapshot,pendingSnapshots,retainSnapshot} from '../plugins/soloco/runtime/snapshot.mjs';
++import {bindOperatingIntake,bindSnapshots,resolveSnapshot,pendingSnapshots,retainSnapshot,retainSnapshotEntry} from '../plugins/soloco/runtime/snapshot.mjs';
+ import {proposeOperatingState,operatingReviewContext,publishOperatingState,operatingContext,operatingMaintenanceEligible} from '../plugins/soloco/runtime/operating-state.mjs';
+ import {recordReference} from '../plugins/soloco/runtime/current-state.mjs';
+ const sha=x=>digest(JSON.stringify(x));
+@@ -23,7 +23,7 @@ function fixture(){
+  store.captureIntakeBaseline=()=>{sync();const baseline={synthetic:true,seq,root:sha(s),sha256:sha([seq,s])};baselines.set(baseline.sha256,baseline);return structuredClone(baseline);};
+  store.readIntake=(baseline,{values}={})=>{sync();assert.equal(values,true);assert.deepEqual(baselines.get(baseline.sha256),baseline);return {baseline_sha256:baseline.sha256,cut:{synthetic:true,seq,root:sha(s)},events:structuredClone(events.filter(e=>e.seq>baseline.seq))};};
+  bindSnapshots(s,key=>vault.get(key),root);bindOperatingIntake(s,store);
+- return {s,store,sync,vault,close(){store.close();fs.rmSync(root,{recursive:true,force:true});}};
++ return {s,store,sync,vault,events,close(){store.close();fs.rmSync(root,{recursive:true,force:true});}};
+ }
+ function review(f,p){const {s}=f,t=s.records[p.id],id='qa-'+p.id;
+  const j={id,role:'qa',instance_id:'instance-'+id,native_id:'independent-'+id,host:'codex',epoch:1,status:'running',task:'Read complete previous S, all intake, complete proposed S and authority',review_of:{id:p.id,revision:1},inputs:[],context_format:3};
+@@ -64,3 +64,127 @@ test('canonical known historical evidence freezes before bookkeeping; nested ori
+   f.vault.delete(inner.immutable_snapshot.sha256);pendingSnapshots(s).delete(inner.immutable_snapshot.sha256);assert.throws(()=>operatingContext(s),/missing or corrupt/);
+  }finally{f.close();}
+ });
++
++// Each pair is one atomic storage event. Both locator and original change, then
++// disappear entirely; neither endpoint census can supply these record versions.
++function historicalIntake(f){
++ const versions=[];
++ for(const revision of [1,2]){
++  const inner=retainSnapshot(f.s,{restriction:'Historical version '+revision+' forbids export'});
++  const subject={company_id:'synthetic',records:{},jobs:{},messages:[],notices:[],original:inner};
++  const original={id:'historical-original',revision,handover:{subject:retainSnapshot(f.s,subject),subject_sha256:sha(subject)}};
++  const payload={id:'payload',revision,legacy:{retained_handover_subject:{record_id:original.id,sha256:sha(subject)}}};
++  f.s.records.carrier={id:'carrier',revision,content:retainSnapshotEntry(f.s,payload)};
++  f.s.records[original.id]=original;f.sync();versions.push({inner,subject,original,payload});
++ }
++ delete f.s.records.carrier;delete f.s.records['historical-original'];f.sync();return versions;
++}
++const removeOriginal=(f,ref,mode)=>{const key=ref.immutable_snapshot.sha256;pendingSnapshots(f.s).delete(key);if(mode==='missing')f.vault.delete(key);else f.vault.set(key,'{"corrupt":true}');};
++
++test('atomic historical maps deliver exact new/newer/deleted originals in chronological intake and remain required after publication',()=>{
++ const f=fixture();try{
++  publish(f);const versions=historicalIntake(f),p=proposeOperatingState(f.s,args);
++  const frozen=resolveSnapshot(f.s,f.s.records[p.id].operating_plan.snapshot.delta),r=review(f,p);
++  const projected=r.packet.delta.events;
++  assert.deepEqual(projected.map(e=>e.seq),frozen.events.map(e=>e.seq));
++  assert.deepEqual(projected.map(e=>e.changes.map(c=>[c.before?.raw,c.after?.raw])),frozen.events.map(e=>e.changes.map(c=>[c.before?.raw,c.after?.raw])));
++  const originals=r.packet.delta.required_originals;
++  for(const version of versions){assert.ok(originals.some(x=>x.raw===JSON.stringify(version.original)));assert.ok(originals.some(x=>x.raw===JSON.stringify(version.payload)));assert.ok(originals.some(x=>x.raw===JSON.stringify(resolveSnapshot(f.s,version.inner)))) ;}
++  publishOperatingState(f.s,{plan_id:p.id,review_id:r.r.id});assert.equal(operatingContext(f.s).homes.length,1);
++  const accepted=structuredClone(f.s.operating_state),events=structuredClone(f.events);
++  removeOriginal(f,versions[0].inner,'missing');assert.throws(()=>operatingContext(f.s),/missing or corrupt/);
++  assert.deepEqual(f.s.operating_state,accepted);assert.deepEqual(f.events,events,'a hold never rewrites chronological evidence');
++ }finally{f.close();}
++});
++
++test('intermediate transitive originals hold proposal, review, publication and accepted use when missing or corrupt',()=>{
++ for(const boundary of ['proposal','review','publication','use'])for(const mode of ['missing','corrupt']){
++  const f=fixture();try{
++   publish(f);const versions=historicalIntake(f);let p,r;
++   if(boundary!=='proposal')p=proposeOperatingState(f.s,args);
++   if(['publication','use'].includes(boundary))r=review(f,p);
++   if(boundary==='use')publishOperatingState(f.s,{plan_id:p.id,review_id:r.r.id});
++   const accepted=structuredClone(f.s.operating_state);removeOriginal(f,versions[0].inner,mode);
++   const run=boundary==='proposal'?()=>proposeOperatingState(f.s,args):boundary==='review'?()=>review(f,p):boundary==='publication'?()=>publishOperatingState(f.s,{plan_id:p.id,review_id:r.r.id}):()=>operatingContext(f.s);
++   assert.throws(run,/missing or corrupt/,boundary+' '+mode);assert.deepEqual(f.s.operating_state,accepted);
++  }finally{f.close();}
++ }
++});
++
++test('wrong historical original and reordered version transitions hold; atomic change row order is irrelevant',()=>{
++ for(const mode of ['wrong','reordered','row-order']){
++  const f=fixture();try{
++   publish(f);historicalIntake(f);
++   const transitions=f.events.filter(e=>e.changes.some(c=>(c.after??c.before).key==='carrier'));
++   if(mode==='wrong'){
++    const wrong=transitions[1].changes.find(c=>c.after?.key==='historical-original').after.raw;
++    transitions[0].changes.find(c=>c.after?.key==='historical-original').after.raw=wrong;
++    transitions[1].changes.find(c=>c.before?.key==='historical-original').before.raw=wrong;
++   }else if(mode==='reordered'){
++    const i=f.events.indexOf(transitions[0]),j=f.events.indexOf(transitions[1]);[f.events[i],f.events[j]]=[f.events[j],f.events[i]];
++   }else for(const event of transitions)event.changes.reverse();
++   if(mode==='row-order'){const p=proposeOperatingState(f.s,args);review(f,p);}
++   else assert.throws(()=>proposeOperatingState(f.s,args),/Legacy handover original missing or changed/);
++  }finally{f.close();}
++ }
++});
++
++test('intake immutable_entry validates identity as well as original snapshot bytes',()=>{
++ const f=fixture();try{
++  publish(f);f.s.records.carrier={id:'carrier',content:{id:'wrong-id',revision:1,immutable_entry:retainSnapshot(f.s,{id:'exact-id',revision:1,condition:'Never export'})}};f.sync();delete f.s.records.carrier;f.sync();
++  assert.throws(()=>proposeOperatingState(f.s,args),/Immutable entry identity or revision changed/);
++ }finally{f.close();}
++});
++
++test('literal reference-like JSON in intake remains literal',()=>{
++ const f=fixture();try{
++  publish(f);const literal=JSON.stringify({immutable_snapshot:{version:1,sha256:'0'.repeat(64),characters:99,shape:'object'},retained_handover_subject:{record_id:'absent',sha256:'1'.repeat(64)}});
++  f.s.records.literal={id:'literal',content:literal};f.sync();delete f.s.records.literal;f.sync();
++  const p=proposeOperatingState(f.s,args),r=review(f,p),change=r.packet.delta.events.flatMap(e=>e.changes).find(c=>c.after?.key==='literal');assert.equal(change.after.raw,JSON.stringify({id:'literal',content:literal}));assert.equal(change.after.required_originals,undefined);
++  publishOperatingState(f.s,{plan_id:p.id,review_id:r.r.id});assert.equal(operatingContext(f.s).homes.length,1);
++ }finally{f.close();}
++});
++
++function reconstructionIntake(f){
++ const s=f.s,inner=retainSnapshot(s,{restriction:'Reconstruction original remains required'}),subject={operating_checkpoint:{acceptance:s.operating_state.receipts},original:inner};
++ const t={id:'reconstruction',kind:'artifact',revision:1,status:'Submitted',author_role:'runner',author_instance:s.owner.session_id,content:'Exact synthetic reconstruction',created_at:'2026-11-06T00:00:00Z',handover:{id:s.handover.id,evidence_protocol:4,subject_sha256:sha(subject),subject,incoming_owner:s.owner,input_refs:[]}};
++ s.records[t.id]=t;s.handover={...s.handover,reconstruction_id:t.id};f.sync();f.events.at(-1).type='handover.reconstruction_submitted';return inner;
++}
++test('allowed post-proposal reconstruction intake checks transitive originals before review and publication',()=>{
++ for(const boundary of ['review','publication']){
++  const f=fixture();try{
++   publish(f);f.s.handover={id:'handover',status:'pending'};const p=proposeOperatingState(f.s,args),inner=reconstructionIntake(f);let r;
++   if(boundary!=='review')r=review(f,p);
++   // A valid original admits review; corruption must be rejected before any
++   // unrelated producer/authority gate can stand in for dependency validation.
++   removeOriginal(f,inner,'corrupt');
++   assert.throws(boundary==='review'?()=>review(f,p):()=>publishOperatingState(f.s,{plan_id:p.id,review_id:r.r.id}),/missing or corrupt/,boundary);
++  }finally{f.close();}
++ }
++});
++
++test('real normalized intake preserves deleted intermediate envelopes while checkpoint audits their transitive vault originals',()=>{
++ const f=fixture();try{
++  // Use actual normalized Store APIs, event seals, row hashes and vault binding.
++  // The independent review remains the explicit synthetic judgment above.
++  delete f.store.captureIntakeBaseline;delete f.store.readIntake;
++  const tx=(type,fn)=>f.store.transaction(type,s=>{f.s=s;fn(s);return s;});
++  const accept=()=>{let p,r;tx('operating.plan',s=>{p=proposeOperatingState(s,args);});tx('job.completed',()=>{r=review(f,p);});tx('operating.apply',s=>publishOperatingState(s,{plan_id:p.id,review_id:r.r.id}));return {p,r};};
++  accept();const baseline=f.s.operating_state.accepted_snapshot.intake_baseline;let inner;
++  tx('synthetic.intermediate',s=>{
++   inner=retainSnapshot(s,{restriction:'Real storage intermediate original'});
++   const subject={company_id:s.id,records:{},jobs:{},messages:[],notices:[],original:inner};
++   s.records.intermediate={id:'intermediate',revision:1,content:retainSnapshotEntry(s,{id:'nested',revision:1,legacy:{retained_handover_subject:{record_id:'historical-original',sha256:sha(subject)}}})};
++   s.records['historical-original']={id:'historical-original',revision:1,handover:{subject:retainSnapshot(s,subject),subject_sha256:sha(subject)}};
++  });
++  tx('synthetic.replace',s=>{s.records.intermediate={id:'intermediate',revision:2,content:'Newer complete source'};s.records['historical-original']={id:'historical-original',revision:2,content:'Replaced historical original'};});
++  tx('synthetic.delete',s=>{delete s.records.intermediate;delete s.records['historical-original'];});
++  const intake=f.store.readIntake(baseline,{values:true}),deltas=intake.events.flatMap(e=>e.changes).filter(c=>(c.after??c.before).key==='intermediate');
++  assert.equal(deltas.length,3);assert.equal(JSON.parse(deltas[0].after.raw).revision,1);assert.equal(deltas[0].after.raw,deltas[1].before.raw);assert.equal(deltas[1].after.raw,deltas[2].before.raw);assert.equal(deltas[2].after,null);
++  accept();assert.equal(operatingContext(f.store.read()).homes.length,1);
++  const accepted=structuredClone(f.s.operating_state);
++  f.store.db.prepare('UPDATE immutable_values SET bytes=? WHERE sha256=?').run('{"corrupt":true}',inner.immutable_snapshot.sha256);
++  assert.doesNotThrow(()=>f.store.readIntake(baseline,{values:true}),'normalized raw envelopes still verify; transitive audit is the checkpoint obligation');
++  assert.throws(()=>operatingContext(f.store.read()),/Immutable storage value missing or hash mismatch/);assert.deepEqual(f.store.read().operating_state,accepted);
++ }finally{f.close();}
++});

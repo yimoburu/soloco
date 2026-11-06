@@ -112,6 +112,7 @@ export function contextMatches(state, job, hash) {
     // A job's published notices/messages are outputs, not changes to its inputs.
     // They remain in the real state and every subsequent assignment's context.
     if(!supplementalMatches(state,job))return false;
+    if(state.records?.[job.review_of?.id]?.operating_plan||job.context_format===6)return assignmentContext(state,state.jobs[job.id]??job).hash===hash;
     const view=inheritSnapshots(state,{...state,notices:state.notices.filter(n=>n.job_id!==job.id),messages:state.messages.filter(m=>m.job_id!==job.id)});
     return assignmentContext(view, state.jobs[job.id]??job).hash === hash;
   }

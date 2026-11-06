@@ -11,6 +11,82 @@ function fixture(){return bindSnapshots({id:'fictional',revision:7,owner:{sessio
 function reseal(p){delete p.plan_sha256;p.plan_sha256=digest(json(p));return p;}
 function packets(p){const session=open(p);return p.occurrences.filter(o=>o.fit!=='Held').map(o=>session.materialize(o.id));}
 
+test('canonical and formatted reference examples remain opaque STRING data at every structural depth',()=>{
+  const fake={immutable_snapshot:{version:1,sha256:'a'.repeat(64),characters:4,shape:'object'}};
+  const examples=[fake,{id:'example',immutable_entry:fake},...[null,{},'example',false].flatMap(value=>[
+    {immutable_snapshot:value,description:'Malformed reference example'},
+    {immutable_entry:value,description:'Malformed entry example'}
+  ])];
+  for(const example of examples)for(const payload of [example,{nested:{examples:[null,[example]]}},[false,{nested:example}]]){
+    for(const format of [undefined,2]){
+      const raw=format?' \r\n'+json(payload,null,format)+'\t':json(payload);
+      const s=fixture();s.records.a.content=raw;
+      const p=build(s),decoded=decode(p);
+      assert.deepEqual(Buffer.from(decoded.state.records.a.content),Buffer.from(raw));
+      assert.ok(p.definitions.some(d=>d[0]==='string'&&d[1]===raw),raw);
+      assert.equal(p.snapshot_inbound.length,0);
+      assert.ok(!p.occurrences.some(o=>o.path.startsWith('/records/a/content/@json-text')));
+    }
+  }
+});
+
+test('identical real snapshot/entry and STRING example yield only the typed inbound edge',()=>{
+  for(const entry of [false,true])for(const format of [undefined,2]){
+    const s=fixture(),body={id:'frozen',content:'Original é 🧭; consent remains revoked.'};
+    const actual=entry?retainSnapshotEntry(s,body):retainSnapshot(s,body);
+    const raw=format?' \n'+json(actual,null,format)+'\t':json(actual);
+    s.records.a.actual=actual;s.records.a.content=raw;
+    const p=build(s),decoded=decode(p);
+    assert.equal(p.snapshot_inbound.length,1);
+    assert.equal(p.snapshot_inbound[0].path,entry?'/records/a/actual/immutable_entry':'/records/a/actual');
+    assert.equal(p.snapshot_inbound[0].document.kind,'state');
+    assert.deepEqual(Buffer.from(decoded.state.records.a.content),Buffer.from(raw));
+    assert.equal(decoded.originals[0].raw,json(body));
+    assert.equal(p.snapshot_inbound[0].original_sha256,digest(json(body)));
+  }
+});
+
+test('nested STRING promotion applies its own reserved-key gate without making the outer STRING opaque',()=>{
+  for(const key of ['immutable_snapshot','immutable_entry']){
+    const literal=json({[key]:null,example:'Reference spelling stays data.'});
+    const s=fixture();s.records.a.content=json({description:'Ordinary JSON still decomposes.',literal});
+    const p=build(s);
+    assert.ok(p.occurrences.some(o=>o.path==='/records/a/content/@json-text'));
+    assert.ok(!p.occurrences.some(o=>o.path.includes('/literal/@json-text')));
+    assert.ok(p.definitions.some(d=>d[0]==='string'&&d[1]===literal));
+    assert.equal(p.snapshot_inbound.length,0);
+    assert.equal(decode(p).state.records.a.content,s.records.a.content);
+  }
+});
+
+test('oversized reserved-key STRING fallback remains whole and Held',()=>{
+  const s=fixture(),raw=json({nested:[{immutable_entry:'example'}],sources:{'large.js':'x'.repeat(60000)}});
+  s.records.a.content=raw;
+  const p=build(s),session=open(p);
+  assert.equal(p.max_packet_bytes,48000);
+  assert.equal(decode(p).state.records.a.content,raw);
+  assert.ok(p.definitions.some(d=>d[0]==='string'&&d[1]===raw));
+  const occurrence=p.occurrences.find(o=>o.path==='/records/a');
+  assert.equal(occurrence.fit,'Held');
+  assert.throws(()=>session.materialize(occurrence.id),/exceeds cap/);
+  assert.equal(p.snapshot_inbound.length,0);
+});
+
+test('genuine typed snapshot and entry closure still rejects missing, corrupt and malformed originals',()=>{
+  for(const entry of [false,true]){
+    for(const corrupt of [false,true]){
+      const s=fixture(),body={id:'frozen',content:'Original, never an example.'};
+      s.records.a.actual=entry?retainSnapshotEntry(s,body):retainSnapshot(s,body);
+      // Rebind without the staged original: neither absence nor altered bytes
+      // may be excused by the STRING promotion fallback.
+      bindSnapshots(s,()=>corrupt?json({...body,content:'Changed'}):undefined);
+      assert.throws(()=>build(s),/missing or corrupt/);
+    }
+    const s=fixture();s.records.a.actual=entry?{immutable_entry:null}:{immutable_snapshot:null};
+    assert.throws(()=>build(s),/malformed/);
+  }
+});
+
 test('complete local sections retain late qualifiers, old versions, negatives and unknown code/logs; no raw baseline per packet',()=>{
   const s=fixture(),before=json(s),pending=pendingSnapshots(s).size,p=build(s),all=packets(p);
   assert.equal(json(s),before);assert.equal(pendingSnapshots(s).size,pending);

@@ -1,0 +1,42 @@
+TAP version 13
+# (node:63500) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: missing production intake provider is fail closed
+ok 1 - missing production intake provider is fail closed
+  ---
+  duration_ms: 0.527583
+  ...
+# Subtest: initial unknown legacy is never relabeled accepted
+ok 2 - initial unknown legacy is never relabeled accepted
+  ---
+  duration_ms: 22.152625
+  ...
+# Subtest: immutable accepted home survives replacement; new global restriction holds ordinary but complete delta repair publishes
+ok 3 - immutable accepted home survives replacement; new global restriction holds ordinary but complete delta repair publishes
+  ---
+  duration_ms: 43.282334
+  ...
+# Subtest: successor exact base and concurrent semantic intake including reverted intake hold
+ok 4 - successor exact base and concurrent semantic intake including reverted intake hold
+  ---
+  duration_ms: 82.625666
+  ...
+# Subtest: missing original, changed producer, rejected negative, expiry and unknown nested producer hold
+ok 5 - missing original, changed producer, rejected negative, expiry and unknown nested producer hold
+  ---
+  duration_ms: 185.916166
+  ...
+# Subtest: canonical known historical evidence freezes before bookkeeping; nested originals remain checked
+ok 6 - canonical known historical evidence freezes before bookkeeping; nested originals remain checked
+  ---
+  duration_ms: 69.01025
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 525.416708
