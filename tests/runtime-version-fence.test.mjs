@@ -23,8 +23,8 @@ assert.equal(extract.status,0,'Could not extract immutable published runtime');
 const legacy=await import(pathToFileURL(path.join(legacyDir,'plugins/soloco/runtime/engine.mjs')));
 const state=a=>withStore(a.root,db=>db.read());
 
-test('bounded-handover producer fences actual 0.6.10, 0.6.11, 0.6.12, 0.6.13 and 0.7.0 writers without adopting definitions',()=>{
- for(const [version,revision] of [['0.6.10','056c36e'],['0.6.11','b2e3974'],['0.6.12','964f90c'],['0.6.13','76d3e8d'],['0.7.0','7f7f085']]) {
+test('bounded-handover producer fences actual 0.6.10, 0.6.11, 0.6.12, 0.6.13, 0.7.0 and published 0.7.1 writers without adopting definitions',()=>{
+ for(const [version,revision] of [['0.6.10','056c36e'],['0.6.11','b2e3974'],['0.6.12','964f90c'],['0.6.13','76d3e8d'],['0.7.0','7f7f085'],['0.7.1','1347f79c4249c8e4aba39ba372ad1376476f9a79']]) {
   const archived=spawnSync('git',['archive',revision,'plugins/soloco'],{cwd:repo,maxBuffer:20000000});
   assert.equal(archived.status,0);
   const dir=path.join(base,'producer-'+version);fs.mkdirSync(dir);
@@ -38,11 +38,19 @@ test('bounded-handover producer fences actual 0.6.10, 0.6.11, 0.6.12, 0.6.13 and
   assert.equal(spawnSync(process.execPath,['--input-type=module','-e',setupScript],{env:process.env}).status,0);
   const a={root,session_id:session,epoch:1},before=state(a);
   engine.bind(root,session,'codex');
+  const opened=engine.open(a,'codex');
+  assert.equal(opened.plugin_version,version);assert.equal(opened.runtime_version,version);
+  assert.equal(opened.capabilities.model_selection.eligible,true);
+  assert.equal(opened.capabilities.local_prototype.eligible,true);
+  if(opened.capabilities.local_development.supported)assert.equal(opened.capabilities.local_development.eligible,true);
+  assert.deepEqual(state(a),before,'Read-only opening retains the published producer and pinned team');
   engine.save({...a,kind:'decision',content:'Fictional operation under corrected handover runtime'},'codex');
   assert.equal(state(a).runtime_version,VERSION);assert.equal(state(a).plugin_version,version);
-  for(const field of ['governance','roles','cos_instructions','team_sha256'])assert.deepEqual(state(a)[field],before[field]);
+  for(const field of ['governance','governance_sha256','roles','cos_instructions','team_sha256','owner'])assert.deepEqual(state(a)[field],before[field]);
   const staleScript=`import * as e from ${JSON.stringify(oldUrl)};const a=${JSON.stringify(a)};e.bind(a.root,a.session_id,'codex');try{e.save({...a,kind:'plan',content:'stale mutation'},'codex');process.exit(9);}catch(err){if(!/runtime upgrade/.test(err.message))throw err;}`;
+  const promoted=state(a);
   assert.equal(spawnSync(process.execPath,['--input-type=module','-e',staleScript],{env:process.env}).status,0);
+  assert.deepEqual(state(a),promoted,'Rejected published writer must not alter promoted state');
  }
 });
 
