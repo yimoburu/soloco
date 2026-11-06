@@ -331,13 +331,15 @@ export function validateLegacyCoherentPlan(state,plan){
   decodeLegacyCoherentPlan(plan);if(!equal(buildLegacyCoherentPlan(state,{max_packet_bytes:plan.max_packet_bytes}),plan))hold('coherent baseline or provenance changed');
   return {valid:true,semantic_acceptance:false,plan_sha256:plan.plan_sha256};
 }
-export function captureLegacyCanonicalSource(state,coherent,{source_id,transaction}={}){
+export function captureLegacyCanonicalSource(state,coherent,{source_id,transaction,partitioner}={}){
   if(!(transaction instanceof Store)||transaction.inTransaction!==true)hold('existing Store transaction required');
   validateLegacyCoherentPlan(state,coherent);
   if(coherent.sources.filter(s=>s.source.id===source_id).length!==1)hold('exact unique coherent source required');
   // Existing code checks full runtime test author_instance/candidate/reuse edges.
-  // This is the UNCHANGED canonical range path, not coherent proof conversion.
-  return captureScopedPlan(state,{source_id});
+  // Omitted partitioner keeps the unchanged range contract. Explicit
+  // coherent-source-v1 captures a NEW complete source-closure proof; no old
+  // receipt is converted and no full-company frontier is thereby accepted.
+  return captureScopedPlan(state,{source_id,partitioner});
 }
 export function legacyCanonicalCoverage(state,coherent,{integration_review_ids=[]}={}){
   validateLegacyCoherentPlan(state,coherent);

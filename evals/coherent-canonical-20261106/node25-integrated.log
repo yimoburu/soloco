@@ -1,0 +1,56 @@
+(node:51595) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ complete local sections retain late qualifiers, old versions, negatives and unknown code/logs; no raw baseline per packet (7.376ms)
+✔ repeated snapshots use exact raw originals and inbound ancestry, contradictory occurrence contexts never transfer acceptance (5.390125ms)
+✔ canonical JSON text is typed STRING evidence, coherent logical bodies replace escaped-range chunks (3.522375ms)
+✔ resealed gaps, altered ancestry, omitted originals, forged sizes and changed qualifiers/membership hold (24.829292ms)
+✔ bounded whole sections hold without truncation or cap widening; owned session resists caller mutation (5.862333ms)
+✔ linear unique section work for repeated snapshots; byte forecast without constructing corpus combinations (9.451ms)
+ℹ {"fictional_only":true,"ten":{"unique_sections":14,"physical_occurrences":16,"snapshot_inbound_edges":10,"unique_section_bytes":7293,"prospective_extraction_packets":16,"total_packet_bytes":40110,"largest_packet_bytes":2686,"held_packets":0,"complete_native_request_bytes":null,"native_same_session_fit":"unproven","semantic_acceptance":false},"hundred":{"unique_sections":104,"physical_occurrences":106,"snapshot_inbound_edges":100,"unique_section_bytes":48098,"prospective_extraction_packets":106,"total_packet_bytes":272451,"largest_packet_bytes":2692,"held_packets":0,"complete_native_request_bytes":null,"native_same_session_fit":"unproven","semantic_acceptance":false}}
+✔ existing canonical source adapter uses runtime test author_instance and rejects invalid producer/candidate closure (53.422583ms)
+✔ anonymous enclosing qualifiers and scalar collection members cannot hide complete local conditions (1.117792ms)
+(node:51596) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ public handover, independent publication, full v4 worker review, resume and first ordinary format6 Engineering return (1202.464917ms)
+✔ only exact pure runtime commands are mechanically ingested; conditions, unknown fields and generic saves stay held (248.132875ms)
+✔ actual conditional handover retains founder conditions and unknown legacy remains held on first pass (112.361667ms)
+(node:51597) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ accepted historical publication proof survives an owner epoch change without admitting old in-flight work (683.2215ms)
+✔ public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning (36.808458ms)
+✔ missing legacy bootstrap is visibly DIRTY and apply rolls back without acceptance (25.784958ms)
+✔ new membership, changed exact source, wrong independent identity and absent closure cannot publish (128.458917ms)
+✔ scope closure, global membership, expiry, receipt changes, revocation and missed communication hold (39.302458ms)
+✔ pause fences publication reviewer and prospective handover cannot hide unknown legacy (16.17225ms)
+✔ 10x independently classified inert archive keeps actual mandatory operating assignment bytes and semantic work constant (79.435958ms)
+✔ deleted applicable home and changed exact provenance cannot disappear from accepted meaning (28.822917ms)
+✔ typed outcome requires complete historical uncertainty; text cannot manufacture permission (23.477875ms)
+✔ public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure (69.464667ms)
+✔ late new and changed falsely scoped prohibitions stay globally DIRTY, but fresh proposals include them (84.9875ms)
+✔ publication proof stays current; failed, quarantined, uncertain and unknown-extension siblings stay DIRTY (20.541208ms)
+✔ mechanical publication index rejects tampering and retains unknown state extensions (17.0215ms)
+✔ format6 explicit non-home evidence survives dispatch, discovery and bounded same-native reads (210.805041ms)
+✔ referenced archived revoked/retry restriction and canonical parent receipts are supplied completely inline (62.314834ms)
+✔ large non-home provenance uses exact same-native ranges; undelivered, partial, denied, stale or changed evidence cannot publish (493.845375ms)
+✔ canonical preservation parent revisions cannot be borrowed from matching hashes (41.6225ms)
+✔ missing provenance and snapshot-only evidence hold rather than count pointers as delivered bodies (16.365875ms)
+✔ real runtime receipt attribution and deterministic reuse deliver the validated producer closure before Pass (144.57625ms)
+✔ runtime receipt missing or mismatched producer, candidate, plan, reuse or generation holds (35.325541ms)
+✔ external catalog reference-shaped metadata is verbatim evidence without a company lookup (43.963583ms)
+✔ runtime closure requires complete delivery and independent source and proof sessions (1448.556208ms)
+(node:51598) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ FICTIONAL ADAPTER: coherent public create/read -> worker -> independent interface -> canonical apply; repeats have separate provenance (3067.053209ms)
+✔ FICTIONAL ADAPTER: omissions, omitted occurrence interfaces, source producer and negative receipts hold (459.694ms)
+✔ FICTIONAL ADAPTER: late qualifier remains complete and missing home preservation is Blocked (342.957792ms)
+✔ FICTIONAL ADAPTER: prospective coherent streaming carries complete oversized section; old extraction still rejects opt-in (440.412875ms)
+✔ FICTIONAL ADAPTER: snapshot inbound native path and resealed omissions cannot enter canonical scoped plan (1826.7825ms)
+✔ coherent runtime-test producer uses canonical author_instance, candidate and receipt closure without fabricated job_id (34.3325ms)
+ℹ tests 39
+ℹ suites 0
+ℹ pass 39
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6266.539958

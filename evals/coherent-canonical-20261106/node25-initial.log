@@ -1,0 +1,54 @@
+(node:44798) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ FICTIONAL ADAPTER: coherent public create/read -> worker -> independent interface -> canonical apply; repeats have separate provenance (1849.860292ms)
+✔ FICTIONAL ADAPTER: omissions, omitted occurrence interfaces, source producer and negative receipts hold (381.030208ms)
+✖ FICTIONAL ADAPTER: late qualifier remains complete and missing home preservation is Blocked (290.822792ms)
+✔ FICTIONAL ADAPTER: prospective coherent streaming carries complete oversized section; old extraction still rejects opt-in (394.384542ms)
+✔ coherent snapshot inbound omissions and resealed coverage cannot enter canonical scoped plan (56.103625ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 3
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3045.267875
+
+✖ failing tests:
+
+test at tests/scoped-coherent-runtime.test.mjs:84:1
+✖ FICTIONAL ADAPTER: coherent public create/read -> worker -> independent interface -> canonical apply; repeats have separate provenance (1849.860292ms)
+  Error: Unknown argument: original
+      at call (file:///private/tmp/soloco-coherent-partitioner-20261106/source/plugins/soloco/runtime/main.mjs:60:74)
+      at TestContext.<anonymous> (file:///private/tmp/soloco-coherent-partitioner-20261106/source/tests/scoped-coherent-runtime.test.mjs:96:22)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3)
+
+test at tests/scoped-coherent-runtime.test.mjs:111:1
+✖ FICTIONAL ADAPTER: late qualifier remains complete and missing home preservation is Blocked (290.822792ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /negative receipt/. Input:
+  
+  'Error: Scoped context hold: global governing identity changed; re-review applicability: artifact-bc21596a-36aa-484d-91dc-b2e8741f2d65'
+  
+      at TestContext.<anonymous> (file:///private/tmp/soloco-coherent-partitioner-20261106/source/tests/scoped-coherent-runtime.test.mjs:115:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: Scoped context hold: global governing identity changed; re-review applicability: artifact-bc21596a-36aa-484d-91dc-b2e8741f2d65
+        at fail (file:///private/tmp/soloco-coherent-partitioner-20261106/source/plugins/soloco/runtime/scoped-context.mjs:18:22)
+        at targetGlobal (file:///private/tmp/soloco-coherent-partitioner-20261106/source/plugins/soloco/runtime/scoped-context.mjs:254:36)
+        at assignment (file:///private/tmp/soloco-coherent-partitioner-20261106/source/plugins/soloco/runtime/scoped-context.mjs:264:18)
+        at canonical (file:///private/tmp/soloco-coherent-partitioner-20261106/source/plugins/soloco/runtime/scoped-context.mjs:350:11)
+        at file:///private/tmp/soloco-coherent-partitioner-20261106/source/plugins/soloco/runtime/scoped-context.mjs:375:94
+        at Array.map (<anonymous>)
+        at file:///private/tmp/soloco-coherent-partitioner-20261106/source/plugins/soloco/runtime/scoped-context.mjs:375:87
+        at evaluate (file:///private/tmp/soloco-coherent-partitioner-20261106/source/plugins/soloco/runtime/scoped-context.mjs:215:129)
+        at Module.createScopedTarget (file:///private/tmp/soloco-coherent-partitioner-20261106/source/plugins/soloco/runtime/scoped-context.mjs:357:51)
+        at file:///private/tmp/soloco-coherent-partitioner-20261106/source/plugins/soloco/runtime/engine.mjs:528:27,
+    expected: /negative receipt/,
+    operator: 'throws',
+    diff: 'simple'
+  }
