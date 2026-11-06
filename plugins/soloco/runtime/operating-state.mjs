@@ -1,6 +1,7 @@
 // Prospective only. Canonical classifications remain the preservation authority.
 import {digest,id,stamp} from './store.mjs';
 import {reviewedContext,recordReference,contextSource,currentExtensions,proofJobSafe} from './current-state.mjs';
+import {mechanicalOperatingControl} from './operating-control.mjs';
 const sha=v=>digest(JSON.stringify(v));
 export const OPERATING_PROTOCOL='operating-state-v1';
 const fail=m=>{throw Error('Operating state Held: '+m);};
@@ -68,7 +69,7 @@ export function operatingFrontier(s,{plan_id,job_id,consuming=Boolean(s.operatin
   for(const [key,r] of Object.entries(s.records??{})){
     if(key!==r.id)fail('ambiguous record occurrence');
     if(consuming&&r.operating_record&&!s.operating_state?.accepted_snapshot.homes.some(ref=>same(ref,recordReference(r))))entries.push({source:recordReference(r),scope:'*',status:'DIRTY',reason:'Typed home is new or changed pending independent acceptance'});
-    if(b.ids.has(key)||p.excluded(key))continue;
+    if(b.ids.has(key)||p.excluded(key)||mechanicalOperatingControl(r))continue;
     if(r.operating_record){validateOperatingRecord(r.operating_record);homes.push({source:recordReference(r),value:r});}
     else entries.push({source:recordReference(r),scope:'*',status:'DIRTY',reason:'Unaccepted consequential or unknown record'});
   }

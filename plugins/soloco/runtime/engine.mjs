@@ -356,7 +356,12 @@ export function control(args,host) {
       if(args.expected_name!==s.name) throw new Error('Company name changed; read current status before renaming');
       if(busy(s).length) throw new Error('Assignments are active; wait or pause before renaming');
       s.name=name;
-    } else {owner(s,args.session_id,host);if(s.operating_state)operatingContext(s);const acceptance=verifyHandoverAcceptance(s);if(acceptance){s.handover.acceptance=acceptance;s.handover.status='completed';}s.paused=false;}
+    } else {owner(s,args.session_id,host);if(s.operating_state){
+      // A condition-bearing instruction must not unpause work before its new
+      // meaning is accepted. Check its actual audit record atomically too.
+      const prospective=inheritSnapshots(s,{...s,records:{...s.records,[decisionId]:decision}});
+      operatingContext(prospective);
+    }const acceptance=verifyHandoverAcceptance(s);if(acceptance){s.handover.acceptance=acceptance;s.handover.status='completed';}s.paused=false;}
     s.records[decisionId]=decision;
     // A new handover gate must fence old coordinators even on an older pinned
     // team. Pause remains available across unsupported versions and must never

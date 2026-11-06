@@ -1,0 +1,119 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import * as engine from '../plugins/soloco/runtime/engine.mjs';
+import {call} from '../plugins/soloco/runtime/main.mjs';
+import {withStore,digest,teamHash} from '../plugins/soloco/runtime/store.mjs';
+import {assignmentContext} from '../plugins/soloco/runtime/context.mjs';
+import {operatingContext,operatingFrontier} from '../plugins/soloco/runtime/operating-state.mjs';
+import {mechanicalOperatingControl} from '../plugins/soloco/runtime/operating-control.mjs';
+import {work} from '../plugins/soloco/runtime/worker.mjs';
+import {executionTiming} from '../plugins/soloco/runtime/timeout.mjs';
+
+const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'operating-control-'));
+process.env.COMPANY_PLUGIN_DATA=path.join(tmp,'bindings');
+test.after(()=>fs.rmSync(tmp,{recursive:true,force:true}));
+const sha=v=>digest(JSON.stringify(v));
+const read=f=>withStore(f.root,db=>db.read());
+const mutate=(f,fn)=>withStore(f.root,db=>db.transaction('fictional.contract.fixture',s=>{fn(s);return s;}));
+const launch={check:()=>({available:true,authenticated:true,version:'FICTIONAL ADAPTER DOUBLE'}),launch:()=>({on(){},unref(){}})};
+const control=(f,action,source_instruction=action)=>engine.control({root:f.root,session_id:f.session_id,expected_epoch:f.epoch,action,source_instruction},'codex');
+const context=(f,args)=>call('company_context',{...f,protocol:'operating-state-v1',source_instruction:'Fictional read-only operating publication; no execution authority.',...args},'codex');
+function fixture(){
+ const f={root:fs.mkdtempSync(path.join(tmp,'company-')),session_id:'fictional-outgoing',epoch:1};
+ engine.bind(f.root,f.session_id,'codex');engine.open({...f,idea:'Fictional source contract only'},'codex');
+ control(f,'pause');engine.storageControl({...f,action:'migrate',source_instruction:'Migrate this fictional fixture only.'},'codex');control(f,'resume');
+ mutate(f,s=>{s.roles={qa:{name:'QA'},engineer:{name:'Engineering'}};s.governance='Read only. No external execution or retry authority.';s.cos_instructions='Preserve every condition and uncertainty.';s.team_sha256=teamHash(s);});
+ engine.save({...f,id:'condition',kind:'artifact',content:'Fictional obligation: no export or retry without canonical grants.',operating_record:{version:1,kind:'obligation',scope:'*',owner:'runner',conditions:'Always',exceptions:'None',clearing:'Independent exact closure',expires_at:null,dependencies:[],authority_refs:[],evidence_refs:['condition']}},'codex');
+ return f;
+}
+// Explicitly fictional adapter double: the runtime, public API, evidence ledger,
+// worker transactions and closure are real; its semantic verdict is synthetic.
+const spawned=(timeout,options)=>options.onSpawn?.(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));
+async function publish(f,maintenance=false){
+ const p=await context(f,{action:'plan',...(maintenance?{maintenance:true,source_instruction:'Fictional read-only publication review while paused; no execution authority.'}:{})});
+ assert.deepEqual(p.frontier,[]);
+ const q=engine.dispatch({...f,role:'qa',review_of:p.id,task:'Independently review complete fictional operating conditions and preservation.'},'codex',launch);
+ await work(f.root,q.id,async(_host,_session,_prompt,_dir,timeout,_selection,options)=>{
+  spawned(timeout,options);
+  return {native_id:'fictional-publication-'+q.id,text:JSON.stringify({content:'FICTIONAL ADAPTER DOUBLE publication judgment.',messages:[],notices:[],review:{verdict:'Pass',reason:'Fictional preservation and authority checks',permitted_action:'publish_operating_state',plan_sha256:sha(read(f).records[p.id].operating_plan),preservation_complete:true,interaction_complete:true,authority_checked:true,blockers:[]}})};
+ });
+ const j=read(f).jobs[q.id];assert.equal(j.status,'completed',j.error);
+ assert.equal((await context(f,{action:'apply',plan_id:p.id,review_id:j.artifact_id})).published,true);
+}
+async function transfer(){
+ const old=fixture(),f={...old,session_id:'fictional-incoming',epoch:2};
+ engine.bind(f.root,f.session_id,'codex');
+ const result=engine.control({root:f.root,session_id:f.session_id,expected_epoch:1,action:'handover',source_instruction:'handover'},'codex');
+ assert.equal(result.paused,true);assert.equal(read(f).owner.epoch,2);assert.equal(read(f).handover.previous_owner.session_id,old.session_id);
+ assert.throws(()=>engine.save({...old,id:'stale',kind:'artifact',content:'Old owner write'},'codex'),/does not own/);
+ assert.throws(()=>engine.dispatch({...old,role:'engineer',task:'Old owner assignment'},'codex',launch),/does not own/);
+ assert.throws(()=>control(old,'resume'),/Stale/);
+ assert.throws(()=>engine.dispatch({...f,role:'engineer',task:'Premature assignment'},'codex',launch),/paused/);
+ await publish(f,true);
+ return f;
+}
+async function reconstruction(f){
+ const r=engine.handover({...f,action:'submit',protocol:'operating-handover-v4',content:'Objectives: preserve fictional accepted obligations. Authority: read only; no export or retry grants. Conditions: all exceptions remain binding. Communication: retain complete notices. Unknown effects: held. Next: independent exact review before preparation resume.'},'codex');
+ assert.equal(read(f).records[r.id].handover.evidence_protocol,4);return r;
+}
+async function handoverPass(f,r){
+ const q=engine.dispatch({...f,role:'qa',review_of:r.id,task:'Independently check the complete exact fictional handover subject.'},'codex',launch);
+ const pack=assignmentContext(read(f),read(f).jobs[q.id]),stream=pack.handover_evidence.sources[pack.handover_evidence.pages[0].source_id];let offset=0;
+ await work(f.root,q.id,async(_host,_session,_prompt,_dir,timeout,_selection,options)=>{
+  spawned(timeout,options);
+  if(offset<stream.length){const start=offset,length=Math.min(16000,stream.length-offset);offset+=length;return {native_id:'fictional-handover-'+q.id,text:JSON.stringify({reads:[{source_id:stream.source_id,sha256:stream.sha256,offset:start,length}]})};}
+  return {native_id:'fictional-handover-'+q.id,text:JSON.stringify({content:'FICTIONAL ADAPTER DOUBLE: full subject delivered; synthetic exact review.',messages:[],notices:[],citations:JSON.parse(pack.text).evidence_protocol.citations.slice(0,1),review:{verdict:'Pass',reason:'Fictional exact complete subject',permitted_action:'resume_handover',subject_sha256:read(f).records[r.id].handover.subject_sha256,blockers:[]}})};
+ });
+ const s=read(f),j=s.jobs[q.id],review=s.records[j.artifact_id];assert.equal(j.status,'completed',j.error);assert.equal(j.coordination_release.termination_confirmed,true);assert.equal(review.handover_evidence.semantic_delivery_complete,true);assert.equal(offset,stream.length);return {job:q.id,review:review.id};
+}
+
+test('public handover, independent publication, full v4 worker review, resume and first ordinary format6 Engineering return',async()=>{
+ const f=await transfer(),r=await reconstruction(f);
+ assert.throws(()=>control(f,'resume'),/QA/);
+ const proof=await handoverPass(f,r),baseline=read(f);
+ for(const mode of ['closure','subject','identity','delivery','current']){
+  mutate(f,s=>{Object.assign(s,structuredClone(baseline));if(mode==='closure')s.jobs[proof.job].coordination_release.termination_confirmed=false;if(mode==='subject')s.records[proof.review].review.subject_sha256='wrong';if(mode==='identity')s.jobs[proof.job].native_id=f.session_id;if(mode==='delivery')s.records[proof.review].handover_evidence.semantic_delivery_complete=false;if(mode==='current')s.records.condition.content+=' Changed condition';});
+  assert.throws(()=>control(f,'resume'),/QA|Held|stale/);assert.equal(read(f).paused,true);
+ }
+ mutate(f,s=>Object.assign(s,structuredClone(baseline)));
+ const beforeConditional=read(f);
+ assert.throws(()=>control(f,'resume','resume only if exports are prohibited forever'),/DIRTY/);
+ assert.equal(sha(read(f)),sha(beforeConditional),'condition-bearing resume must roll back without unpausing');
+ control(f,'resume');assert.equal(read(f).handover.status,'completed');assert.equal(read(f).paused,false);
+ const j=engine.dispatch({...f,role:'engineer',task:'Read the accepted fictional conditions and return a read-only report.'},'codex',launch);
+ const queued=read(f),job=queued.jobs[j.id],pack=JSON.parse(assignmentContext(queued,job).text);
+ assert.equal(job.context_format,6);assert.equal(pack.protocol,'operating-assignment-v1');assert.equal(pack.checkpoint.owner.epoch,2);assert.equal(pack.checkpoint.paused,false);assert.equal(pack.checkpoint.homes.length,1);assert.match(pack.checkpoint.controls.governance,/No external execution/);
+ await work(f.root,j.id,async(_host,_session,_prompt,_dir,timeout,_selection,options)=>{spawned(timeout,options);return {native_id:'fictional-engineering-'+j.id,text:JSON.stringify({content:'FICTIONAL ADAPTER DOUBLE read-only Engineering report: conditions retained; no action authority.',messages:[],notices:[]})};});
+ const done=read(f);assert.equal(done.jobs[j.id].status,'completed',done.jobs[j.id].error);assert.match(done.records[done.jobs[j.id].artifact_id].content,/read-only Engineering report/);assert.equal(done.mode,'preparation');
+});
+
+test('only exact pure runtime commands are mechanically ingested; conditions, unknown fields and generic saves stay held',async()=>{
+ const f=fixture();await publish(f);
+ control(f,'pause','Please pause the company!');assert.equal(read(f).paused,true);control(f,'resume','resume the company.');assert.equal(read(f).paused,false);assert.doesNotThrow(()=>operatingContext(read(f)));
+ const baseline=read(f),pure=Object.values(baseline.records).find(r=>r.action==='resume');assert.equal(mechanicalOperatingControl(pure),true);
+ for(const change of [r=>r.content='resume and never export',r=>r.conditions='No export',r=>r.action='pause',r=>r.status='Draft',r=>r.author_role='runner',r=>r.created_at='unknown',r=>r.proof={mechanical:true},r=>delete r.recorded_by]){
+  const altered=structuredClone(pure);change(altered);assert.equal(mechanicalOperatingControl(altered),false);
+  mutate(f,s=>{Object.assign(s,structuredClone(baseline));s.records[pure.id]=altered;});assert.throws(()=>operatingContext(read(f)),/DIRTY/);
+ }
+ mutate(f,s=>Object.assign(s,structuredClone(baseline)));
+ const beforeUnknown=read(f);
+ await assert.rejects(call('company_control',{root:f.root,session_id:f.session_id,expected_epoch:1,action:'resume',source_instruction:'resume',conditions:'No export'},'codex'),/Unknown argument/);assert.equal(sha(read(f)),sha(beforeUnknown));
+ engine.save({...f,id:'control-forged',kind:'decision',content:'resume',author_role:'human_founder',status:'Recorded',action:'resume',recorded_by:f.session_id},'codex');
+ const forged=read(f).records['control-forged'];assert.equal(forged.author_role,'runner');assert.equal(mechanicalOperatingControl(forged),false);assert.throws(()=>operatingContext(read(f)),/DIRTY/);
+ mutate(f,s=>Object.assign(s,structuredClone(baseline)));
+ control(f,'pause','pause and prohibit all exports');const state=read(f),audit=Object.values(state.records).find(r=>r.content==='pause and prohibit all exports');assert.ok(audit);assert.equal(state.paused,true);assert.ok(operatingFrontier(state).entries.some(e=>e.source.id===audit.id));assert.throws(()=>control(f,'resume'),/DIRTY/);
+});
+
+test('actual conditional handover retains founder conditions and unknown legacy remains held on first pass',async()=>{
+ for(const mode of ['condition','legacy']){
+  const old=fixture(),f={...old,session_id:'fictional-incoming',epoch:2};
+  if(mode==='legacy')engine.save({...old,id:'legacy-unknown',kind:'artifact',content:'Unknown old restriction; writer calls it inert.'},'codex');
+  engine.bind(f.root,f.session_id,'codex');
+  engine.control({root:f.root,session_id:f.session_id,expected_epoch:1,action:'handover',source_instruction:mode==='condition'?'handover only for read-only work; never export':'handover'},'codex');
+  const p=await context(f,{action:'plan',maintenance:true,source_instruction:'Fictional read-only review only'});assert.equal(p.held,true);assert.ok(p.frontier.some(e=>mode==='legacy'?e.source.id==='legacy-unknown':read(f).records[e.source.id]?.content.includes('never export')));
+  assert.throws(()=>engine.handover({...f,action:'submit',protocol:'operating-handover-v4',content:'Fictional reconstruction cannot erase the retained conditions or unknown legacy. Read-only work only; no execution, export or retry authority. Independent review remains necessary.'},'codex'),/Held/);
+ }
+});

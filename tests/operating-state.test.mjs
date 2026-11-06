@@ -64,13 +64,13 @@ test('public prospective v4 reconstruction requires accepted coverage and exact 
  let p=await ctx(f,{action:'plan',maintenance:true});let pr=await review(f,p.id);await ctx(f,{action:'apply',plan_id:p.id,review_id:pr.id});
  const target=engine.handover({...f,action:'submit',protocol:'operating-handover-v4',content:'Objectives: preserve current conditions. Restrictions: no export or retry without canonical grants. Communication: preserve complete notices. Uncertainty: maintain all unresolved effects. Next: review only.'},'codex');
  assert.equal(read(f).records[target.id].handover.evidence_protocol,4);
- assert.throws(()=>engine.control({...f,action:'resume',expected_epoch:1},'codex'),/QA|DIRTY/);
+ assert.throws(()=>engine.control({...f,action:'resume',source_instruction:'resume',expected_epoch:1},'codex'),/QA|DIRTY/);
  const q=engine.dispatch({...f,role:'qa',review_of:target.id,task:'Independently check exact prospective handover'},'codex',{check:()=>({available:true}),launch:()=>({on(){},unref(){}})});
  const context=assignmentContext(read(f),read(f).jobs[q.id]),stream=context.handover_evidence.sources[context.handover_evidence.pages[0].source_id];let offset=0;
  await work(f.root,q.id,async(_host,_session,_prompt,_dir,timeout,_selection,options)=>{options.onSpawn?.(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));if(offset<stream.length){const length=Math.min(16000,stream.length-offset),start=offset;offset+=length;return {native_id:'fictional-v4-native',text:JSON.stringify({reads:[{source_id:stream.source_id,sha256:stream.sha256,offset:start,length}]})};}return {native_id:'fictional-v4-native',text:JSON.stringify({content:'FICTIONAL CONTRACT DOUBLE: complete prospective fixture semantics reconstructed.',messages:[],notices:[],citations:JSON.parse(context.text).evidence_protocol.citations.slice(0,1),review:{verdict:'Pass',reason:'Exact fictional checkpoint checked',permitted_action:'resume_handover',subject_sha256:read(f).records[target.id].handover.subject_sha256,blockers:[]}})};});
  const completed=read(f).jobs[q.id];assert.equal(completed.status,'completed',completed.error);
- mutate(f,s=>{s.jobs[q.id].coordination_release.termination_confirmed=false;});assert.throws(()=>engine.control({...f,action:'resume',expected_epoch:1},'codex'),/QA|DIRTY/);
- mutate(f,s=>{s.jobs[q.id].coordination_release.termination_confirmed=true;});const accepted=read(f);engine.control({...f,action:'resume',expected_epoch:1},'codex');assert.equal(read(f).handover.status,'completed');assert.equal(read(f).paused,false);
+ mutate(f,s=>{s.jobs[q.id].coordination_release.termination_confirmed=false;});assert.throws(()=>engine.control({...f,action:'resume',source_instruction:'resume',expected_epoch:1},'codex'),/QA|DIRTY/);
+ mutate(f,s=>{s.jobs[q.id].coordination_release.termination_confirmed=true;});const accepted=read(f);engine.control({...f,action:'resume',source_instruction:'resume',expected_epoch:1},'codex');assert.equal(read(f).handover.status,'completed');assert.equal(read(f).paused,false);
  assert.equal(operatingContext(accepted).homes.length,1);
  for(const mode of ['failed','quarantined','unknown-extension']){
   const s=structuredClone(accepted),j=structuredClone(s.jobs[q.id]),r=structuredClone(s.records[j.artifact_id]);

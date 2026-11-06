@@ -1,0 +1,72 @@
+TAP version 13
+# (node:34066) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: public handover, independent publication, full v4 worker review, resume and first ordinary format6 Engineering return
+not ok 1 - public handover, independent publication, full v4 worker review, resume and first ordinary format6 Engineering return
+  ---
+  duration_ms: 116.85875
+  location: '/private/tmp/soloco-operating-control-20261106/source/tests/operating-control.test.mjs:72:1'
+  failureType: 'testCodeFailure'
+  error: 'Immutable snapshot capture requires explicit company_storage migrate before retrying'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    flushSnapshots (file:///private/tmp/soloco-operating-control-20261106/source/plugins/soloco/runtime/record-storage.mjs:70:32)
+    Store.transaction (file:///private/tmp/soloco-operating-control-20261106/source/plugins/soloco/runtime/store.mjs:181:7)
+    file:///private/tmp/soloco-operating-control-20261106/source/plugins/soloco/runtime/engine.mjs:328:51
+    withStore (file:///private/tmp/soloco-operating-control-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+    Module.control (file:///private/tmp/soloco-operating-control-20261106/source/plugins/soloco/runtime/engine.mjs:328:10)
+    transfer (file:///private/tmp/soloco-operating-control-20261106/source/tests/operating-control.test.mjs:48:22)
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-control-20261106/source/tests/operating-control.test.mjs:73:16)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:931:25)
+    Test.start (node:internal/test_runner/test:829:17)
+  ...
+# Subtest: only exact pure runtime commands are mechanically ingested; conditions, unknown fields and generic saves stay held
+not ok 2 - only exact pure runtime commands are mechanically ingested; conditions, unknown fields and generic saves stay held
+  ---
+  duration_ms: 6.577458
+  location: '/private/tmp/soloco-operating-control-20261106/source/tests/operating-control.test.mjs:91:1'
+  failureType: 'testCodeFailure'
+  error: 'source_instruction must be nonempty text, at most 20000 characters'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    requireText (file:///private/tmp/soloco-operating-control-20261106/source/plugins/soloco/runtime/store.mjs:24:79)
+    file:///private/tmp/soloco-operating-control-20261106/source/plugins/soloco/runtime/engine.mjs:454:62
+    mutate (file:///private/tmp/soloco-operating-control-20261106/source/plugins/soloco/runtime/engine.mjs:92:104)
+    Store.transaction (file:///private/tmp/soloco-operating-control-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+    file:///private/tmp/soloco-operating-control-20261106/source/plugins/soloco/runtime/engine.mjs:92:249
+    withStore (file:///private/tmp/soloco-operating-control-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+    update (file:///private/tmp/soloco-operating-control-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+    Array.contextControl (file:///private/tmp/soloco-operating-control-20261106/source/plugins/soloco/runtime/engine.mjs:454:16)
+    call (file:///private/tmp/soloco-operating-control-20261106/source/plugins/soloco/runtime/main.mjs:70:28)
+    context (file:///private/tmp/soloco-operating-control-20261106/source/tests/operating-control.test.mjs:23:25)
+  ...
+# Subtest: actual conditional handover retains founder conditions and unknown legacy remains held on first pass
+not ok 3 - actual conditional handover retains founder conditions and unknown legacy remains held on first pass
+  ---
+  duration_ms: 8.929875
+  location: '/private/tmp/soloco-operating-control-20261106/source/tests/operating-control.test.mjs:107:1'
+  failureType: 'testCodeFailure'
+  error: 'Immutable snapshot capture requires explicit company_storage migrate before retrying'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    flushSnapshots (file:///private/tmp/soloco-operating-control-20261106/source/plugins/soloco/runtime/record-storage.mjs:70:32)
+    Store.transaction (file:///private/tmp/soloco-operating-control-20261106/source/plugins/soloco/runtime/store.mjs:181:7)
+    file:///private/tmp/soloco-operating-control-20261106/source/plugins/soloco/runtime/engine.mjs:328:51
+    withStore (file:///private/tmp/soloco-operating-control-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+    Module.control (file:///private/tmp/soloco-operating-control-20261106/source/plugins/soloco/runtime/engine.mjs:328:10)
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-control-20261106/source/tests/operating-control.test.mjs:112:10)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:931:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:629:18)
+    Test.postRun (node:internal/test_runner/test:1042:19)
+  ...
+1..3
+# tests 3
+# suites 0
+# pass 0
+# fail 3
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 210.447291
