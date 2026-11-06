@@ -126,7 +126,7 @@ test('long unicode/control instruction sources and mutation receipts fit escaped
  const reply=rpcReply(noise.repeat(10000),toolResult(view));assert.ok(size(reply)<=REPLY_MAX_BYTES);assert.equal(JSON.parse(reply).id,null);
 });
 
-test('real open/status/wait and context paging in legacy and normalized storage; wait reads full state once',async()=>{
+test('real open/status/wait and context paging; normalized wait avoids full state reads',async()=>{
  for(const normalized of [false,true]) {
   const args=fixture(normalized);
   withStore(args.root,db=>db.transaction('fixture',s=>{
@@ -137,7 +137,7 @@ test('real open/status/wait and context paging in legacy and normalized storage;
   Store.prototype.read=function(...a){reads++;return read.apply(this,a);};Store.prototype.changeToken=function(...a){polls++;return token.apply(this,a);};
   let waited;
   try {waited=await call('company_wait',{...args,seconds:1},'codex');}finally{Store.prototype.read=read;Store.prototype.changeToken=token;}
-  checkReply(waited);assert.equal(reads,1);assert.ok(polls>=2);assert.equal(waited.active_jobs.items[0].status,'queued');
+  checkReply(waited);assert.equal(reads,normalized?0:1);assert.ok(polls>=2);assert.equal(waited.active_jobs.items[0].status,'queued');
   checkReply(await call('company_status',args,'codex'));checkReply(await call('company_open',args,'codex'));
   const page=await call('company_context',{...args,action:'inspect',collection:'records',limit:2},'codex');checkReply(page);assert.equal(page.complete,false);
   if(normalized){let fullReads=0;const original=Store.prototype.read;Store.prototype.read=function(...a){fullReads++;return original.apply(this,a);};try{await call('company_context',{...args,action:'read',id:page.items[0].source.id,sha256:page.items[0].source.sha256,length:1},'codex');}finally{Store.prototype.read=original;}assert.equal(fullReads,0);}

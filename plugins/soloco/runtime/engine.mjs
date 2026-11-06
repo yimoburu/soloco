@@ -53,14 +53,15 @@ function summary(state,root,options={}) { return currentView(state,{...options,c
 // Read-only public presentation; never an authorization/acceptance check.
 export function current(args,host,resultId) {
   binding(args,host);
-  return withStore(args.root,db=>{
-    const state=db.read(),view=summary(state,args.root);
+  return withStore(args.root,db=>db.readSnapshot(()=>{
+    const state=db.publicState(true),view=summary(state,args.root);
     if(typeof resultId==='string') {
-      if(Object.hasOwn(state.records??{},resultId))view.operation_source=sourceReference(state.records[resultId],storageSourceId('records',resultId));
-      else if(Object.hasOwn(state.jobs??{},resultId))view.operation_source=sourceReference(state.jobs[resultId],storageSourceId('jobs',resultId));
+      const selected=db.readPublicSelected({rootKeys:[],entities:{records:[resultId],jobs:[resultId]}});
+      if(Object.hasOwn(selected.records??{},resultId))view.operation_source=sourceReference(selected.records[resultId],storageSourceId('records',resultId));
+      else if(Object.hasOwn(selected.jobs??{},resultId))view.operation_source=sourceReference(selected.jobs[resultId],storageSourceId('jobs',resultId));
     }
     return view;
-  });
+  }));
 }
 // Read back persisted attribution without constructing another potentially large
 // current view. Never retry a completed mutation just to recover its receipt.
@@ -79,7 +80,7 @@ export function operationReceipt(args,host,result,operation) {
   });
 }
 export function inspectionPage(args,host,collection) {
-  binding(args,host);return withStore(args.root,db=>publicPage(db.read(),{collection}));
+  binding(args,host);return withStore(args.root,db=>db.readSnapshot(()=>publicPage(db.publicState(),{collection})));
 }
 export function develop(args,host) { binding(args,host); return developmentAction(args,host); }
 export function prototype(args,host) { binding(args,host); return prototypeAction(args,host); }
@@ -104,9 +105,22 @@ export function open(args, host) {
 export function status(args, host) {
   binding(args,host);
   return withStore(args.root, db => {
-    let state=db.read();
-    if (!state) throw new Error('Company initialization is incomplete; use company_open');
     const needsReconciliation=j=>['overdue','inspection'].includes(jobTimeoutState(j,Date.now()).state);
+    const expiredExports=s=>Object.values(s.records??{}).filter(r=>r?.prototype?.export?.status==='writing' && Date.now()-Date.parse(r.prototype.export.started_at)>60000);
+    const expiredUpgrade=s=>{
+      const u=s.upgrade,noOverallDeadline=u?.review_deadline_policy==='none' && u.deadline_ms===null && u.review_window_minutes===null;
+      return u && ['queued','checking'].includes(u.status) && !noOverallDeadline && Date.now()>=(u.deadline_ms ?? Date.parse(u.created_at)+420000);
+    };
+    // Reconciliation decisions and an idle view share one WAL snapshot. A
+    // concurrent writer cannot slip new overdue work into an unchecked view.
+    const initial=db.readSnapshot(()=>{
+      const selected=db.publicReconciliationState(),state=selected??db.read();
+      if(!state)throw Error('Company initialization is incomplete; use company_open');
+      return busy(state).some(needsReconciliation)||expiredExports(state).length||expiredUpgrade(state)
+        ? {state}:{view:summary(selected?db.publicState(true):state,args.root)};
+    });
+    if(initial.view)return initial.view;
+    let state=initial.state;
     if (busy(state).some(needsReconciliation)) state=db.transaction('jobs.interrupted', s=>{
       for (const job of busy(s)) {
         const timing=jobTimeoutState(job,Date.now());
@@ -118,7 +132,7 @@ export function status(args, host) {
       }
       return s;
     });
-    const interruptedExports=Object.values(state.records??{}).filter(r=>r?.prototype?.export?.status==='writing' && Date.now()-Date.parse(r.prototype.export.started_at)>60000);
+    const interruptedExports=expiredExports(state);
     if(interruptedExports.length) state=db.transaction('prototype.exports_interrupted',s=>{
       for(const r of interruptedExports) {
         if(s.records[r.id]?.prototype?.export?.status!=='writing') continue;
@@ -128,8 +142,7 @@ export function status(args, host) {
       }
       return s;
     });
-    const noOverallDeadline=state.upgrade?.review_deadline_policy==='none' && state.upgrade.deadline_ms===null && state.upgrade.review_window_minutes===null;
-    if (state.upgrade && ['queued','checking'].includes(state.upgrade.status) && !noOverallDeadline && Date.now()>=(state.upgrade.deadline_ms ?? Date.parse(state.upgrade.created_at)+420000)) {
+    if (expiredUpgrade(state)) {
       state=db.transaction('upgrade.interrupted',s=>{s.upgrade.status='failed';s.upgrade.error='Upgrade checks were interrupted or timed out; inspect and recover before retrying';notice(s,'must_know',s.upgrade.error,s.upgrade.id);return s;});
     }
     // Status is visible to a new founder chat so it can establish a handover.
@@ -137,9 +150,11 @@ export function status(args, host) {
   });
 }
 // Lifecycle projections are scheduling hints only. Final status performs the
-// normal integrity-checked read and reconciliation before returning any truth.
+// integrity-checked selected read and reconciliation before returning any truth.
 const lifecycleKeys=['id','status','kind','type','timeout_policy_version','timeout_ms','timeout_reason','created_at','started_at','execution_started_at','execution_deadline_at'];
 function waitLifecycle(db) {
+  const selected=db.publicReconciliationState(false);
+  if(selected)return {jobs:Object.values(selected.jobs??{}),upgrade:selected.upgrade??{}};
   const projection=lifecycleKeys.map(k=>"'"+k+"',json_extract(v.bytes,'$."+k+"')").join(',');
   const normalized=/^normalized-v[1-4]$/.test(db.storageInfo().format);
   const jobs=normalized
@@ -387,7 +402,17 @@ function readPublicExact(db,args){return db.readSnapshot(()=>{
   if(typeof id!=='string')throw Error('Supply an exact source id');
   if(id.startsWith('@public:')){
     const [,family,...tail]=id.split(':'),key=tail.join(':');
-    if(['records','jobs','context_classifications'].includes(family))location={family,key};
+    if(['records','jobs','notices','messages','sessions','upgrade_history','context_classifications'].includes(family))location={family,key};
+    else if(['key','keyname'].includes(family)) {
+      const [collection,hash]=tail;
+      if(!['records','jobs','notices','messages','sessions','upgrade_history','context_classifications'].includes(collection))throw Error('Unknown public source');
+      const stored=db.publicHandle(collection,hash);
+      if(stored!==null) {
+        const raw=db.readRawValue({family:collection,key:stored});
+        if(!raw)throw Error('Missing or changed supplemental source');
+        return family==='keyname'?exactTextRead(JSON.stringify(stored),args):exactTextRead(raw.raw,args,{revision:raw.revision});
+      }
+    }
     else if(family==='pinned'&&['governance','cos_instructions','roles','owner','idea','name','id','plugin_version','runtime_version','team_sha256','governance_sha256'].includes(key))location={family:'root',key};
     else if(family==='current'&&key==='handover')location={family:'root',key};
   }else{
@@ -395,8 +420,18 @@ function readPublicExact(db,args){return db.readSnapshot(()=>{
     const record=db.readRawValue({family:'records',key:id});
     if(record)return exactTextRead(record.raw,args,{revision:record.revision});
     if(id.startsWith('job:'))location={family:'jobs',key:id.slice(4)};
+    if(id.startsWith('upgrade:')) {
+      const key=db.publicAlias('upgrade_history',id.slice(8));
+      if(key!==undefined) {
+        if(key!==null)location={family:'upgrade_history',key};
+        else return exactRead(db.readPublicSelected({rootKeys:['upgrade'],entities:{upgrade:null}}),args);
+      }
+    }
   }
-  if(location){const raw=db.readRawValue(location);if(raw)return exactTextRead(raw.raw,args,{revision:raw.revision});}
+  if(location){const raw=db.readRawValue(location);if(raw){
+    if(id.startsWith('upgrade:')&&raw.value_id!==id.slice(8))throw Error('Missing or changed supplemental source');
+    return exactTextRead(raw.raw,args,{revision:raw.revision});
+  }}
   return exactRead(readPublicState(db,id),args);
 });}
 // Explicit operations only. Neither API is called automatically on an existing company.
@@ -434,7 +469,7 @@ export function contextControl(args,host) {
     }
     throw Error('Qualification source metadata exceeds public read budget');
   });
-  if(args.action==='inspect')return withStore(args.root,db=>publicPage(db.read(),args));
+  if(args.action==='inspect')return withStore(args.root,db=>db.readSnapshot(()=>publicPage(db.publicState(),args)));
   if(args.action==='read')return withStore(args.root,db=>readPublicExact(db,args));
   if(args.source_id||args.aggregate_review_id||['target','revoke'].includes(args.action))return qualificationControl(args,host);
   if(!['plan','apply'].includes(args.action))throw Error('Choose context inspect, read, plan or apply');

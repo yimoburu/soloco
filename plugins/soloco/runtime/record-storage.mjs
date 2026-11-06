@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
+import {publicCatalog,publicIndexValue,PUBLIC_COLLECTIONS} from './public-response.mjs';
 import {pendingSnapshots,bindSnapshots,captureSnapshotDependencies} from './snapshot.mjs';
 const hash=value=>createHash('sha256').update(value).digest('hex');
 const collections=new Set(['records','jobs','sessions','notices','messages','upgrade_history','retired_sessions','context_classifications','upgrade']);
@@ -95,6 +96,7 @@ function journalDescriptor(row) {
 export function appendNormalizedJournal(db,key,value) {
   if(!journals.has(key))throw Error('Unknown upgrade journal');
   journalLayout(db);
+  const indexed=readPublicIndex(db)!==null;
   let parent=db.prepare("SELECT e.*,v.bytes FROM state_entries e LEFT JOIN immutable_values v USING(sha256) WHERE family='upgrade' AND key=?").get(key);
   if(parent&&parent.encoding==='json'){
     const old=decode(parent,db);if(!Array.isArray(old))throw Error('Upgrade journal is not an array');
@@ -107,6 +109,7 @@ export function appendNormalizedJournal(db,key,value) {
   put(db,descriptor.family,String(descriptor.length),descriptor.length,value);
   const position=parent?.position??db.prepare("SELECT COALESCE(MAX(position),-1)+1 AS n FROM state_entries WHERE family='upgrade'").get().n;
   put(db,'upgrade',key,position,{...descriptor,length:descriptor.length+1},'journal-array');
+  if(indexed)finishPublicIndex(db);
 }
 function split(db,value) {
   const entries=[];
@@ -149,13 +152,12 @@ function validateKeyMetadata(db,families) {
 // pointer inside its current read snapshot for every current-source range; a
 // pinned text handle alone says nothing about current applicability/authority.
 export function readNormalizedValue(db,{family,key}) {
-  if(!['root','records','jobs','context_classifications'].includes(family)||typeof key!=='string')throw Error('Raw storage read requires a direct supported family and exact key');
+  if(!['root','records','jobs','notices','messages','sessions','upgrade_history','context_classifications'].includes(family)||typeof key!=='string')throw Error('Raw storage read requires a direct supported family and exact key');
   if(layoutVersion(db)>=3&&!hasEncoding(db))throw Error('Journal storage encoding column missing');
-  validateKeyMetadata(db,['root','shape',family]);
   if(family!=='root'){
     const shape=db.prepare("SELECT e.*,v.bytes FROM state_entries e LEFT JOIN immutable_values v USING(sha256) WHERE family='shape' AND key=?").get(storedKey(db,family));
     if(!shape)return null;
-    if(decode(shape,db)!=='object')throw Error('Raw storage collection must be an object');
+    if(!['object','array'].includes(decode(shape,db)))throw Error('Unknown raw storage collection shape');
   }
   const row=db.prepare('SELECT e.*,v.bytes FROM state_entries e LEFT JOIN immutable_values v USING(sha256) WHERE family=? AND key=?').get(family,storedKey(db,key));
   if(!row)return null;
@@ -166,9 +168,9 @@ export function readNormalizedValue(db,{family,key}) {
     ...(value&&typeof value==='object'&&Object.hasOwn(value,'revision')?{revision:value.revision}:{})};
 }
 
-export function readNormalized(db,{rootKeys=null,entities=null}={}) {
+export function readNormalized(db,{rootKeys=null,entities=null,validateKeys=true}={}) {
   if(layoutVersion(db)>=3&&!hasEncoding(db))throw Error('Journal storage encoding column missing');
-  validateKeyMetadata(db,entities===null?null:['root','shape',...Object.keys(entities)]);
+  if(validateKeys)validateKeyMetadata(db,entities===null?null:['root','shape',...Object.keys(entities)]);
   const state={};
   const define=(key,value)=>Object.defineProperty(state,key,{value,enumerable:true,writable:true,configurable:true});
   const selected=[],params=[];
@@ -192,12 +194,15 @@ export function readNormalized(db,{rootKeys=null,entities=null}={}) {
   }return state;
 }
 export function writeNormalized(db,state) {
+  readPublicIndex(db); // Never overwrite an unknown derived-index protocol.
   if(layoutVersion(db)>=3)journalLayout(db);
   const entries=split(db,state),existing=new Set(db.prepare('SELECT family,key FROM state_entries').all().map(r=>JSON.stringify([r.family,r.key])));
   for(const [family,key,n,value,encoding] of entries){put(db,family,key,n,value,encoding);existing.delete(JSON.stringify([family,storedKey(db,key)]));}
   for(const key of existing)db.prepare('DELETE FROM state_entries WHERE family=? AND key=?').run(...JSON.parse(key));
+  writePublicIndex(db,state);
 }
 export function migrateNormalized(db,directory) {
+  readPublicIndex(db);
   const version=layoutVersion(db);
   if(version===LATEST_LAYOUT)throw Error('Company storage already migrated');
   const row=db.prepare('SELECT value FROM company WHERE id=1').get();if(!row)throw Error('No initialized company');
@@ -233,6 +238,7 @@ export function migrateNormalized(db,directory) {
   }catch(error){try{db.exec('ROLLBACK');}catch{}throw error;}
 }
 export function writeNormalizedSelection(db,changes) {
+  const indexed=readPublicIndex(db)!==null&&changes.every(({family,value})=>publicIndexCompatible(family,value));
   for(const {family,key,value} of changes) {
     const journal=family==='upgrade'&&journals.has(key);
     if(journal&&layoutVersion(db)>=3)journalLayout(db);
@@ -243,5 +249,105 @@ export function writeNormalizedSelection(db,changes) {
       for(const entry of valueEntries(db,family,key,n,value))put(db,...entry);
     }
     if(journal)db.prepare('DELETE FROM state_entries WHERE family=? AND position>=?').run('upgrade.'+key,Array.isArray(value)?value.length:0);
+    if(indexed)updatePublicIndexValue(db,family,key,value);
   }
+  if(indexed)finishPublicIndex(db);
+}
+
+// Independently versioned, discardable presentation index. Canonical v1-v4
+// entries and exact receipts are unchanged. Reads never install or repair it.
+function publicIndexCompatible(family,value) {
+  return family!=='jobs'||value===undefined||(value!==null&&(!value.coordination?.resources?.length||typeof value.coordination.resources[Symbol.iterator]==='function'));
+}
+function installPublicIndex(db) {
+  db.exec(`CREATE TABLE IF NOT EXISTS public_read_values(family TEXT NOT NULL,key TEXT NOT NULL,position INTEGER NOT NULL,bytes TEXT NOT NULL,value_id_sha256 TEXT,sha256 TEXT NOT NULL,PRIMARY KEY(family,key));
+    CREATE INDEX IF NOT EXISTS public_read_value_ids ON public_read_values(family,value_id_sha256,position);
+    CREATE TABLE IF NOT EXISTS public_read_rows(collection TEXT NOT NULL,ordinal INTEGER NOT NULL,key TEXT NOT NULL,id TEXT NOT NULL,sha256 TEXT NOT NULL,key_sha256 TEXT NOT NULL,PRIMARY KEY(collection,ordinal));
+    CREATE INDEX IF NOT EXISTS public_read_handles ON public_read_rows(collection,key_sha256);
+    CREATE TABLE IF NOT EXISTS public_read_catalog(id INTEGER PRIMARY KEY CHECK(id=1),version INTEGER NOT NULL,sha256 TEXT NOT NULL,bytes TEXT NOT NULL);
+    CREATE TRIGGER IF NOT EXISTS public_read_insert AFTER INSERT ON state_entries BEGIN DELETE FROM public_read_catalog; END;
+    CREATE TRIGGER IF NOT EXISTS public_read_update AFTER UPDATE ON state_entries BEGIN DELETE FROM public_read_catalog; END;
+    CREATE TRIGGER IF NOT EXISTS public_read_delete AFTER DELETE ON state_entries BEGIN DELETE FROM public_read_catalog; END;`);
+}
+function updatePublicIndexValue(db,family,key,value) {
+  if(family!=='root'&&!collections.has(family))return;
+  const stored=storedKey(db,key);
+  if(value===undefined){db.prepare('DELETE FROM public_read_values WHERE family=? AND key=?').run(family,stored);return;}
+  const row=db.prepare('SELECT position FROM state_entries WHERE family=? AND key=?').get(family,stored);
+  if(!row)return;
+  const projected=key==='id'&&['root','upgrade'].includes(family)?value:publicIndexValue(family,value);
+  const bytes=JSON.stringify(projected),valueId=typeof value?.id==='string'?hash(JSON.stringify(value.id)):null;
+  db.prepare('INSERT OR REPLACE INTO public_read_values VALUES(?,?,?,?,?,?)').run(family,stored,row.position,bytes,valueId,hash(JSON.stringify([family,stored,row.position,bytes,valueId])));
+}
+function writePublicIndex(db,state) {
+  installPublicIndex(db);
+  db.exec('DELETE FROM public_read_catalog');
+  if([...collections].some(key=>state[key]!=null&&typeof state[key]!=='object')||Object.values(state.jobs??{}).some(value=>!publicIndexCompatible('jobs',value)))return;
+  db.exec('DELETE FROM public_read_values');
+  for(const [key,value] of Object.entries(state)) {
+    if(collections.has(key)&&value&&typeof value==='object') {
+      const shape=db.prepare("SELECT position FROM state_entries WHERE family='shape' AND key=?").get(storedKey(db,key));
+      const stored=storedKey(db,key),bytes=JSON.stringify(Array.isArray(value)?'array':'object');
+      db.prepare('INSERT INTO public_read_values VALUES(?,?,?,?,?,?)').run('shape',stored,shape.position,bytes,null,hash(JSON.stringify(['shape',stored,shape.position,bytes,null])));
+      for(const [id,item] of Object.entries(value))updatePublicIndexValue(db,key,id,item);
+    } else updatePublicIndexValue(db,'root',key,value);
+  }
+  finishPublicIndex(db);
+}
+function checkPublicValue(row) {
+  if(hash(JSON.stringify([row.family,row.key,row.position,row.bytes,row.value_id_sha256]))!==row.sha256)throw Error('Public read metadata hash mismatch');
+  return row;
+}
+function finishPublicIndex(db) {
+  const state={};
+  for(const row of db.prepare("SELECT * FROM public_read_values WHERE family IN ('root','shape') ORDER BY position").all().map(checkPublicValue)) {
+    Object.defineProperty(state,logicalKey(db,row.key),{value:row.family==='shape'?(JSON.parse(row.bytes)==='array'?[]:{}):JSON.parse(row.bytes),enumerable:true});
+  }
+  for(const row of db.prepare("SELECT * FROM public_read_values WHERE family NOT IN ('root','shape') ORDER BY position").all().map(checkPublicValue)) {
+    Object.defineProperty(state[row.family],logicalKey(db,row.key),{value:JSON.parse(row.bytes),enumerable:true});
+  }
+  const catalog=publicCatalog(state),insert=db.prepare('INSERT INTO public_read_rows VALUES(?,?,?,?,?,?)');
+  db.exec('DELETE FROM public_read_rows');
+  for(const [collection,info] of Object.entries(catalog.collections)) {
+    info.rows.forEach((row,n)=>insert.run(collection,n,storedKey(db,row.key),JSON.stringify(row.id),hash(JSON.stringify([collection,n,row.key,row.id])),hash(JSON.stringify(row.key))));delete info.rows;
+  }
+  const exports=Object.entries(state.records??{}).filter(([,v])=>v.prototype?.export?.status==='writing');
+  exports.forEach(([key],n)=>insert.run('_exports',n,storedKey(db,key),JSON.stringify(''),hash(JSON.stringify(['_exports',n,key,''])),hash(JSON.stringify(key))));
+  catalog.exports=exports.length;
+  const bytes=JSON.stringify(catalog);
+  db.prepare('INSERT OR REPLACE INTO public_read_catalog VALUES(1,1,?,?)').run(hash(bytes),bytes);
+}
+export function readPublicIndex(db) {
+  if(!normalizedLayout(db)||!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='public_read_catalog'").get())return null;
+  const row=db.prepare('SELECT * FROM public_read_catalog WHERE id=1').get();
+  if(!row)return null; // An older/foreign writer invalidated the projection.
+  if(row.version!==1)throw Error('Unknown public read index version');
+  if(hash(row.bytes)!==row.sha256)throw Error('Public read index hash mismatch');
+  const catalog=JSON.parse(row.bytes);
+  if(catalog.version!==1||Object.keys(catalog).sort().join(',')!=='claims,collections,exports,usage,version'||Object.keys(catalog.collections).join(',')!==PUBLIC_COLLECTIONS.join(','))throw Error('Unknown public read index fields');
+  if(!Number.isSafeInteger(catalog.exports)||catalog.exports<0||!Number.isSafeInteger(catalog.claims)||catalog.claims<0)throw Error('Corrupt public reconciliation metadata');
+  if(!catalog.usage||Object.keys(catalog.usage).sort().join(',')!=='assignments,coordinator_usage,details_collection,effective_settings,missing_reasons,scope,unit,with_applied_controls,with_host_reported_models'||['assignments','missing_reasons','with_applied_controls','with_host_reported_models'].some(key=>!Number.isSafeInteger(catalog.usage[key])||catalog.usage[key]<0))throw Error('Unknown or corrupt public usage metadata');
+  for(const info of Object.values(catalog.collections))if(Object.keys(info).sort().join(',')!=='inventory,total'||!Number.isSafeInteger(info.total)||info.total<0||!/^[a-f0-9]{64}$/.test(info.inventory))throw Error('Corrupt public collection metadata');
+  return catalog;
+}
+function publicRow(db,row) {
+  const key=logicalKey(db,row.key);let id;
+  try{id=JSON.parse(row.id);}catch{throw Error('Corrupt public index identity');}
+  if(typeof id!=='string'||JSON.stringify(id)!==row.id||hash(JSON.stringify([row.collection,row.ordinal,key,id]))!==row.sha256)throw Error('Public read index row hash mismatch');
+  return {key,id};
+}
+export function readPublicRows(db,collection,offset,limit) {
+  return db.prepare('SELECT collection,ordinal,key,id,sha256 FROM public_read_rows WHERE collection=? AND ordinal>=? AND ordinal<? ORDER BY ordinal').all(collection,offset,offset+limit).map(row=>publicRow(db,row));
+}
+export function readPublicHandle(db,collection,keyHash) {
+  const rows=db.prepare('SELECT collection,ordinal,key,id,sha256 FROM public_read_rows WHERE collection=? AND key_sha256=? ORDER BY ordinal').all(collection,keyHash);
+  if(rows.length!==1)throw Error('Missing or ambiguous public storage-key handle');
+  const key=publicRow(db,rows[0]).key;
+  if(hash(JSON.stringify(key))!==keyHash)throw Error('Public storage-key handle hash mismatch');
+  return key;
+}
+
+export function readPublicAlias(db,collection,id) {
+  const row=db.prepare('SELECT * FROM public_read_values WHERE family=? AND value_id_sha256=? ORDER BY position LIMIT 1').get(collection,hash(JSON.stringify(id)));
+  return row?logicalKey(db,checkPublicValue(row).key):null;
 }

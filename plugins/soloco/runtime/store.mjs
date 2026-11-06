@@ -3,8 +3,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID, createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import {normalizedLayout,readNormalized,writeNormalized,migrateNormalized,writeNormalizedSelection,flushSnapshots,readImmutable,appendNormalizedJournal,LATEST_LAYOUT,readNormalizedValue} from './record-storage.mjs';
+import {normalizedLayout,readNormalized,writeNormalized,migrateNormalized,writeNormalizedSelection,flushSnapshots,readImmutable,appendNormalizedJournal,LATEST_LAYOUT,readNormalizedValue,readPublicIndex,readPublicRows,readPublicHandle,readPublicAlias} from './record-storage.mjs';
 import {bindSnapshots} from './snapshot.mjs';
+import {bindPublicReader,PUBLIC_COLLECTIONS} from './public-response.mjs';
 
 export const PACKAGE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const VERSION = '0.7.1';
@@ -70,6 +71,60 @@ export class Store {
   }
   readSelected(options) { return this.readSnapshot(()=>normalizedLayout(this.db)?this.snapshotState(readNormalized(this.db,options)):this.read()); }
   readRawValue(options) {return this.readSnapshot(()=>normalizedLayout(this.db)?readNormalizedValue(this.db,options):null);}
+  // Callers keep this reader and all resulting pages inside one readSnapshot.
+  // No canonical-state hydration or broad key validation is needed for previews;
+  // delivered values still pass the ordinary immutable hash/encoding checks.
+  publicState(current=false) {
+    const catalog=readPublicIndex(this.db);
+    if(!catalog)return this.read();
+    const state=this.snapshotState(readNormalized(this.db,{rootKeys:current?['id','name','idea','revision','phase','mode','paused','plugin_version','runtime_version','governance_sha256','team_sha256','owner','handover','upgrade','governance','cos_instructions','roles']:[],entities:current?{upgrade:null}:{},validateKeys:false}));
+    const cache=new Map(Object.entries(state).map(([key,value])=>[JSON.stringify(key==='upgrade'?['upgrade',null]:['root',key]),value]));
+    const rows=(collection,offset,limit)=>{
+      const selected=readPublicRows(this.db,collection,offset,limit);
+      if(selected.length!==Math.min(limit,catalog.collections[collection].total-offset))throw Error('Public read index rows missing');
+      const pointers=selected.map(row=>{
+        let family=['active_jobs','claimed_jobs'].includes(collection)?'jobs':collection==='unresolved_notices'?'notices':['development','prototype_plans'].includes(collection)?'records':collection,key=row.key;
+        if(collection==='sources') {
+          if(['context_classifications','upgrade'].includes(key)){family=key;key=null;}
+          else family='root';
+        }
+        return {row,family,key,identity:JSON.stringify([family,key])};
+      });
+      const missing=pointers.filter(p=>!cache.has(p.identity));
+      if(missing.length) {
+        const rootKeys=[],entities={};
+        for(const {family,key} of missing) {
+          if(family==='root')rootKeys.push(key);
+          else if(key===null){rootKeys.push(family);entities[family]=null;}
+          else (entities[family]??=[]).push(key);
+        }
+        const loaded=this.snapshotState(readNormalized(this.db,{rootKeys,entities,validateKeys:false}));
+        for(const {family,key,identity} of missing)cache.set(identity,family==='root'?loaded[key]:key===null?loaded[family]:loaded[family]?.[key]);
+      }
+      return pointers.map(({row,identity})=>{
+        const value=cache.get(identity);
+        if(value===undefined)throw Error('Missing or changed public index source');
+        return {...row,value};
+      });
+    };
+    return bindPublicReader(state,{...catalog,info:collection=>{
+      if(!PUBLIC_COLLECTIONS.includes(collection))throw Error('Unknown public collection');
+      return catalog.collections[collection];
+    },rows});
+  }
+  publicReconciliationState(includeExports=true) {
+    const catalog=readPublicIndex(this.db);
+    if(!catalog)return null;
+    const keys=collection=>{
+      const rows=readPublicRows(this.db,collection,0,Number.MAX_SAFE_INTEGER);
+      if(rows.length!==(collection==='_exports'?catalog.exports:catalog.collections[collection].total))throw Error('Public reconciliation index rows missing');
+      return rows.map(row=>row.key);
+    };
+    return this.snapshotState(readNormalized(this.db,{rootKeys:[],entities:{jobs:keys('active_jobs'),...(includeExports?{records:keys('_exports')}:{}),upgrade:['status','review_deadline_policy','deadline_ms','review_window_minutes','created_at']},validateKeys:false}));
+  }
+  publicHandle(collection,keyHash) {return readPublicIndex(this.db)?readPublicHandle(this.db,collection,keyHash):null;}
+  publicAlias(collection,id) {return readPublicIndex(this.db)?readPublicAlias(this.db,collection,id):undefined;}
+  readPublicSelected(options) {return this.readSnapshot(()=>readPublicIndex(this.db)?this.snapshotState(readNormalized(this.db,{...options,validateKeys:false})):this.readSelected(options));}
   // Native output is an append-only fact, including late returns. This path
   // reads the current attempt identity and journal metadata, never old reports
   // or company records. Historical/legacy attempts use the ordinary fallback.
