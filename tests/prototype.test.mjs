@@ -234,7 +234,7 @@ test('old pinned teams or preserved governance disclose blockers rather than sil
 });
 test('contract simplification retains known prototype governance without allowing unknown rules or teams',()=>{
   const previous='5f0699c046128d71a42731acdfddaaab4b911361521015def133adcfbdb8fcb9';
-  for(const plugin_version of ['0.4.0','0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7','0.7.1',installedTeam().plugin_version]) {
+  for(const plugin_version of ['0.4.0','0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7','0.7.1','0.7.2',installedTeam().plugin_version]) {
     for(const governance_sha256 of [previous,digest(v018Governance),digest(v019Governance),installedTeam().governance_sha256])
       assert.equal(prototypeCapability({plugin_version,governance_sha256}).eligible,true);
     assert.equal(prototypeCapability({plugin_version,governance_sha256:digest('Unknown rules')}).eligible,false);
