@@ -2,6 +2,7 @@ import {digest,Store} from './store.mjs';
 import {handoverSubject} from './handover.mjs';
 import {contextSource,classificationFor} from './current-state.mjs';
 import {bindSnapshots,snapshotReference,snapshotBytes,snapshotEntryReference,resolveSnapshotEntry,retainSnapshot,legacyHandoverSource} from './snapshot.mjs';
+import {captureScopedPlan,validateScopedApply,SCOPED_LIMITS} from './scoped-context.mjs';
 
 // Prospective byte-preservation contract only. Never an extraction or acceptance receipt.
 export const LEGACY_BOOTSTRAP_PROTOCOL='legacy-bootstrap-manifest-v1';
@@ -202,4 +203,146 @@ export function readLegacyBootstrap(state,descriptor){
 export function legacyOperatingFrontier(state){
   const {copy}=isolated(state),frontier=entries(copy),source_root=hash(copy);
   return {protocol:'soloco-operating-legacy-provider-v1',source_root,complete:false,entries:frontier.map(e=>({id:e.id,sha256:hash(e),source:e.source,source_ref:e.source,producer_refs:e.producer,context_identity:source_root,location:e.location,scope:'global',status:'dirty',receipt_refs:[]})),interaction_complete:false,receipt_refs:[],measurements:{frontier_occurrences:frontier.length,complete_baseline_bytes:bytes(copy),semantic_acceptance:false}};
+}
+
+// NEW prospective extraction grammar. Existing manifests and scoped receipts keep
+// their original contracts. This planner never creates an acceptance receipt.
+export const LEGACY_COHERENT_PROTOCOL='legacy-coherent-extraction-v1';
+function coherentBuild(state,max_packet_bytes){
+  const {copy,raws}=isolated(state),{definitions,intern}=codec(true);
+  const state_root=intern(copy),originals=[...raws.values()].map(({reference,raw})=>({reference,raw_root:intern(raw),typed_root:intern(JSON.parse(raw))}));
+  const documents=[{kind:'state',root:state_root},...originals.map(o=>({kind:'snapshot-original',sha256:o.reference.immutable_snapshot.sha256,root:o.typed_root}))];
+  const roots=new Set(documents.map(d=>d.root)),snapshotTargets=new Map(originals.map(o=>[o.reference.immutable_snapshot.sha256,o.typed_root]));
+  // Walk definitions once to find complete record/version bodies. ID-bearing
+  // unknown objects are candidates too, never classified as inert by shape.
+  const scalar=i=>definitions[i]?.[0]==='string'?definitions[i][1]:undefined;
+  for(let i=0;i<definitions.length;i++){
+    const d=definitions[i];if(d[0]==='object'&&d[1].some(([k,v])=>k==='id'&&scalar(v)!==undefined))roots.add(i);
+  }
+  const collections=new Map();
+  // Collection membership is exact structural evidence, not a giant review
+  // body. Its children remain required units, including children without IDs.
+  for(let i=0;i<definitions.length;i++){
+    const d=definitions[i];if(d[0]!=='object'||!d[1].some(([k])=>k==='records')||!d[1].some(([k])=>k==='jobs'))continue;
+    roots.add(i);
+    for(const [key,node] of d[1])if(['records','jobs','messages','notices','upgrade_history'].includes(key)){
+      const child=definitions[node],edges=child[0]==='object'?child[1]:child[0]==='array'?child[1].map((v,n)=>[String(n),v]):null;
+      if(!edges)continue;
+      if(!collections.has(node))collections.set(node,{id:'collection-'+collections.size,root:node,ordered_members:edges});
+      for(const [,v] of edges)roots.add(v);
+    }
+  }
+  const groupByRoot=new Map([...roots].sort((a,b)=>a-b).map((root,i)=>[root,'coherent-'+i]));
+  const get=decodeGraph(definitions),views=new Map();
+  // A section has EVERY local field. Nested complete bodies are explicit cuts,
+  // not omissions. Cuts require separate extraction and later reconciliation.
+  function section(root){
+    if(views.has(root))return views.get(root);
+    const cuts=[];
+    function view(i,path,top=false){
+      if(!top&&collections.has(i)){const c=collections.get(i);cuts.push({path,collection_id:c.id,body_root:i});return {legacy_coherent_collection:c.id};}
+      if(!top&&groupByRoot.has(i)&&['object','array'].includes(definitions[i][0])){cuts.push({path,group_id:groupByRoot.get(i),body_root:i});return {legacy_coherent_link:groupByRoot.get(i)};}
+      const d=definitions[i];
+      if(d[0]==='object'){
+        const value=get(i),r=snapshotReference(value);
+        if(r){const target=snapshotTargets.get(r.sha256);if(target===undefined)hold('missing coherent snapshot original');cuts.push({path,group_id:groupByRoot.get(target),body_root:target,original_sha256:r.sha256});return {legacy_coherent_snapshot:value,target_group:groupByRoot.get(target)};}
+        return Object.fromEntries(d[1].map(([k,v])=>[k,view(v,path+'/'+pointer(k))]));
+      }
+      if(d[0]==='array')return d[1].map((v,n)=>view(v,path+'/'+n));
+      if(d[0]==='json-text-string')return {legacy_coherent_string_encoding:'canonical-json-text',value:view(d[1],path+'/@json-text')};
+      return get(i);
+    }
+    const result={body:view(root,'',true),cuts};views.set(root,result);return result;
+  }
+  const occurrences=[],inbound=[];
+  // Each physical document is visited once. Repeated snapshot paths are inbound
+  // edges; expanding them as a tree would recreate the historical blowup.
+  function walk(i,document,path='',ancestry=[],groupAncestors=[]){
+    const d=definitions[i],isGroup=groupByRoot.has(i);
+    let next=groupAncestors;
+    if(isGroup){const id='coherent-occurrence-'+occurrences.length;occurrences.push({id,group_id:groupByRoot.get(i),document,path,ancestor_roots:ancestry,qualifier_groups:groupAncestors});next=[...groupAncestors,groupByRoot.get(i)];}
+    if(d[0]==='object'){
+      const r=snapshotReference(get(i));
+      if(r){inbound.push({document,path,ancestor_roots:ancestry,qualifier_groups:next,original_sha256:r.sha256,target_group:groupByRoot.get(snapshotTargets.get(r.sha256))});return;}
+      for(const [k,v] of d[1])walk(v,document,path+'/'+pointer(k),[...ancestry,i],next);
+    }else if(d[0]==='array')for(const [n,v] of d[1].entries())walk(v,document,path+'/'+n,[...ancestry,i],next);
+    else if(d[0]==='json-text-string')walk(d[1],document,path+'/@json-text',[...ancestry,i],next);
+  }
+  for(const d of documents)walk(d.root,d);
+  const groups=[...groupByRoot].map(([root,id])=>({id,body_root:root,kind:'complete-local-section',section:section(root),status:'unreviewed'}));
+  const sources=sourceList(copy).map(([id,v,location])=>{const value=resolveSnapshotEntry(copy,v),root=intern(value);return {source:ref(value,id),location,body_root:root,group_id:groupByRoot.get(root)??null,producer_validation:'required-canonical-scoped-plan',receipt_reuse:false};});
+  const collection_indexes=[...collections.values()].map(c=>({...c,ordered_members:c.ordered_members.map(([key,root])=>({key,body_root:root,group_id:groupByRoot.get(root)}))}));
+  const result={protocol:LEGACY_COHERENT_PROTOCOL,version:1,max_packet_bytes,baseline:{state_root,state_sha256:hash(copy),membership_sha256:hash(sources),owner:copy.owner??null},definitions,originals,documents,collection_indexes,groups,occurrences,snapshot_inbound:inbound,sources,semantic_acceptance:false};
+  // Measure reusable sections ONCE. Packet bytes below are additive JSON array
+  // framing, not construction of every combination of baseline and body.
+  const sectionSizes=new Map(groups.map(g=>[g.id,bytes({group_id:g.id,...g.section})]));
+  for(const o of occurrences){
+    const ids=[...new Set([...o.qualifier_groups,o.group_id])],base=packetBase(result,o);
+    o.packet_bytes=bytes(base)-2+2+Math.max(0,ids.length-1)+ids.reduce((n,id)=>n+sectionSizes.get(id),0);
+    o.fit=o.packet_bytes>max_packet_bytes?'Held':'unreviewed';
+  }
+  result.measurements={unique_sections:groups.length,physical_occurrences:occurrences.length,snapshot_inbound_edges:inbound.length,unique_section_bytes:[...sectionSizes.values()].reduce((a,b)=>a+b,0),prospective_extraction_packets:occurrences.length,total_packet_bytes:occurrences.reduce((n,o)=>n+o.packet_bytes,0),largest_packet_bytes:occurrences.reduce((n,o)=>Math.max(n,o.packet_bytes),0),held_packets:occurrences.filter(o=>o.fit==='Held').length,complete_native_request_bytes:null,native_same_session_fit:'unproven',semantic_acceptance:false};
+  result.adapter=coherentAdapterContract();
+  result.plan_sha256=hash(result);
+  return result;
+}
+function packetBase(p,o){
+  // Measurements are excluded from occurrence identity to avoid self-reference.
+  const {packet_bytes,fit,...occurrence}=o;
+  return {protocol:LEGACY_COHERENT_PROTOCOL,phase:'intrinsic-extraction',baseline:p.baseline,occurrence,sections:[],instructions:'Extract every local condition, exception, negative and uncertainty. Canonical JSON text remains STRING evidence. Linked sections and snapshot inbound contexts are unresolved interactions; equality never transfers acceptance. No publication or exclusion.',cross_group_status:'Held: independent applicability and interaction reconciliation required',semantic_acceptance:false};
+}
+function coherentAdapterContract(){return {
+  status:'Held',canonical_protocol:'scoped-context-v1',canonical_partitioner:'lossless-ranges-v1',
+  missing_interface:'Prospective coherent partitioner dispatch in scoped-context capture/plan/getUnit/coverage and immutable reviewed_unit_bundle; native target/delivery/canonical receipt validation must bind this plan, section cuts, every physical occurrence and snapshot inbound edge. Existing range receipts cannot accept coherent packets.',
+  required_phases:['extract complete local sections with exact qualifiers; retain negative/unknown outcomes','applicability for EVERY occurrence and all extracted items, exact current homes, producer/candidate/reuse closure and current governing membership','independent cross-group and snapshot-inbound reconciliation, including undeclared coupling completeness','canonical integration with exact occurrence/section/item/interface coverage, noNegatives, independent native identities, timing/delivery/output receipts','validateScopedApply/exclusion under a NEW prospective partitioner contract; atomic operating publication owned by caller'],
+  existing_source_path:'captureLegacyCanonicalSource -> captureScopedPlan -> createScopedTarget extract/applicability/integration -> native worker -> validateScopedApply; preserves existing lossless-ranges-v1 contract and costs',
+  frontier_rule:'No coherent group or hash closes legacyOperatingFrontier. Canonical source proofs below close only their exact original source contract; root sections, snapshot contexts and unknown cross-group coupling remain Held.'
+};}
+export function buildLegacyCoherentPlan(state,{max_packet_bytes=SCOPED_LIMITS.input_bytes}={}){
+  if(!Number.isSafeInteger(max_packet_bytes)||max_packet_bytes<1||max_packet_bytes>SCOPED_LIMITS.input_bytes)hold('coherent cap must not exceed native scoped input cap');
+  return coherentBuild(state,max_packet_bytes);
+}
+export function decodeLegacyCoherentPlan(p){
+  exact(p);const {plan_sha256,...body}=p;
+  if(p.protocol!==LEGACY_COHERENT_PROTOCOL||p.version!==1||hash(body)!==plan_sha256)hold('coherent plan identity');
+  const get=decodeGraph(p.definitions),state=get(p.baseline.state_root),raws=new Map();
+  for(const o of p.originals){const r=snapshotReference(o.reference),raw=get(o.raw_root);if(!r||typeof raw!=='string'||digest(raw)!==r.sha256||raw.length!==r.characters||!equal(JSON.parse(raw),get(o.typed_root)))hold('coherent original corruption');raws.set(r.sha256,raw);}
+  bindSnapshots(state,sha=>raws.get(sha));
+  const rebuilt=buildLegacyCoherentPlan(state,{max_packet_bytes:p.max_packet_bytes});
+  if(!equal(rebuilt,p))hold('coherent coverage, ancestry, section or measurement changed');
+  return {state,originals:p.originals.map(o=>({reference:o.reference,raw:get(o.raw_root)}))};
+}
+// Validate once, materialize many. An owned immutable plan prevents cache trust
+// in caller-mutable metadata. Only requested bounded packets are constructed.
+export function openLegacyCoherentPlan(plan){
+  const owned=JSON.parse(json(plan));decodeLegacyCoherentPlan(owned);
+  const byId=new Map(owned.groups.map(g=>[g.id,g]));
+  return Object.freeze({plan_sha256:owned.plan_sha256,measurements:Object.freeze({...owned.measurements}),
+    materialize(occurrence_id){
+      const o=owned.occurrences.find(x=>x.id===occurrence_id);if(!o)hold('unknown coherent occurrence');
+      if(o.fit==='Held')hold('coherent packet exceeds cap; complete logical boundary needs reviewed decomposition');
+      const packet=packetBase(owned,o);packet.sections=[...new Set([...o.qualifier_groups,o.group_id])].map(id=>({group_id:id,...byId.get(id).section}));
+      if(bytes(packet)!==o.packet_bytes||bytes(packet)>owned.max_packet_bytes)hold('coherent packet measurement changed');
+      return JSON.parse(json(packet));
+    }
+  });
+}
+export function validateLegacyCoherentPlan(state,plan){
+  decodeLegacyCoherentPlan(plan);if(!equal(buildLegacyCoherentPlan(state,{max_packet_bytes:plan.max_packet_bytes}),plan))hold('coherent baseline or provenance changed');
+  return {valid:true,semantic_acceptance:false,plan_sha256:plan.plan_sha256};
+}
+export function captureLegacyCanonicalSource(state,coherent,{source_id,transaction}={}){
+  if(!(transaction instanceof Store)||transaction.inTransaction!==true)hold('existing Store transaction required');
+  validateLegacyCoherentPlan(state,coherent);
+  if(coherent.sources.filter(s=>s.source.id===source_id).length!==1)hold('exact unique coherent source required');
+  // Existing code checks full runtime test author_instance/candidate/reuse edges.
+  // This is the UNCHANGED canonical range path, not coherent proof conversion.
+  return captureScopedPlan(state,{source_id});
+}
+export function legacyCanonicalCoverage(state,coherent,{integration_review_ids=[]}={}){
+  validateLegacyCoherentPlan(state,coherent);
+  if(!Array.isArray(integration_review_ids)||new Set(integration_review_ids).size!==integration_review_ids.length)hold('unique canonical integration review IDs required');
+  const proofs=integration_review_ids.map(integration_review_id=>validateScopedApply(state,{integration_review_id}));
+  if(proofs.some(p=>!coherent.sources.some(s=>equal(s.source,p.source))))hold('canonical proof is outside exact baseline source membership');
+  return {protocol:LEGACY_COHERENT_PROTOCOL,complete:false,status:'Held',semantic_acceptance:false,canonical_source_proofs:proofs,unreviewed_sources:coherent.sources.filter(s=>!proofs.some(p=>equal(p.source,s.source))),missing_interface:coherent.adapter.missing_interface,unresolved:['all coherent occurrence applicability','all snapshot inbound contexts','root/local section completeness and cross-group coupling'],receipt_refs:proofs.flatMap(p=>p.receipts)};
 }
