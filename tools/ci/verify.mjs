@@ -72,7 +72,7 @@ export async function verify(expected,out,request=githubRequest) {
   const coverage=[];
   for(const lane of expected.lanes) {
     const job=jobs.find(j=>j.name===lane.job);
-    requireThat(job.runner_name&&!job.labels?.includes('self-hosted')&&lane.labels.includes(lane.lane==='build'?'ubuntu-24.04':'macos-15')&&lane.labels.every(label=>job.labels?.includes(label)),'wrong approved runner');
+    requireThat(job.runner_name&&!job.labels?.includes('self-hosted')&&lane.labels.includes(lane.lane==='build'?'ubuntu-24.04':'macos-15-intel')&&lane.labels.every(label=>job.labels?.includes(label)),'wrong approved runner');
     const name=`source-ci-${expected.run}-${expected.attempt}-${lane.lane}`;
     const matches=artifacts.filter(a=>a.name===name);requireThat(matches.length===1&&!matches[0].expired,'missing/duplicate/expired artifact');const artifact=matches[0];
     requireThat(artifact.workflow_run?.id===Number(expected.run)&&artifact.workflow_run?.head_sha===expected.commit&&/^sha256:[a-f0-9]{64}$/.test(artifact.digest),'unbound artifact');

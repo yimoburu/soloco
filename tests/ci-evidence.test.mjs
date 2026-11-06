@@ -15,7 +15,7 @@ let serial=0;
 const directory=()=>fs.mkdtempSync(path.join(temp,`case-${serial++}-`));
 const sha='a'.repeat(40),tree='b'.repeat(40),manifest='c'.repeat(64);
 const trustedBodies={'tools/ci/evidence.mjs':'approved evidence validator','tools/ci/gate.mjs':'approved gate','tools/ci/run.mjs':'approved runner','tools/ci/verify.mjs':'approved transitive gate helper'};
-const expected={repository:'fictional/repository',run:123,attempt:2,commit:sha,tree,workflow:'.github/workflows/ci.yml',workflowSha:sha,workflowSha256:hash('approved workflow'),trustedFiles:Object.fromEntries(Object.entries(trustedBodies).map(([p,b])=>[p,hash(b)])),gate:'CI gate',lanes:[{lane:'build',job:'Build and drift',labels:['ubuntu-24.04']},{lane:'tests-22',job:'Tests Node 22',labels:['macos-15']},{lane:'tests-25',job:'Tests Node 25',labels:['macos-15']}]};
+const expected={repository:'fictional/repository',run:123,attempt:2,commit:sha,tree,workflow:'.github/workflows/ci.yml',workflowSha:sha,workflowSha256:hash('approved workflow'),trustedFiles:Object.fromEntries(Object.entries(trustedBodies).map(([p,b])=>[p,hash(b)])),gate:'CI gate',lanes:[{lane:'build',job:'Build and drift',labels:['ubuntu-24.04']},{lane:'tests-22',job:'Tests Node 22',labels:['macos-15-intel']},{lane:'tests-25',job:'Tests Node 25',labels:['macos-15-intel']}]};
 const fixture=directory();fs.mkdirSync(path.join(fixture,'tests'));fs.writeFileSync(path.join(fixture,'tests/ci-evidence.test.mjs'),"import test from 'node:test';import assert from 'node:assert/strict';test('fictional arithmetic',()=>assert.equal(2+2,4));\n");
 const actual=execute(fixture,fixture,'tests',process.execPath,['--no-warnings','--test','--test-concurrency=4','--test-reporter=tap','tests/ci-evidence.test.mjs']);
 function receipt(lane='tests-25') {

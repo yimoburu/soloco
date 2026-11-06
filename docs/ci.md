@@ -4,7 +4,7 @@ Source CI checks public repository source. It does not authorize work, clear not
 
 ## Required checks
 
-`.github/workflows/ci.yml` runs for pull requests, pushes to `main`, and manual dispatch. The Node 22/25 full-test matrix uses GitHub-hosted `macos-15`. Each lane must demonstrate actual `macos-seatbelt-node` capability through the existing runtime probe before running the full suite. Unsupported Seatbelt, skips, cancellation, todo, zero execution, malformed/incomplete TAP or any failing command fails the lane. The label is explicit because [GitHub retired macOS 14 on November 2, 2026](https://github.com/actions/runner-images/issues/13518); [the current standard runner reference](https://docs.github.com/en/actions/reference/runners/github-hosted-runners) lists `macos-15` as supported. This intentionally exposes capability and fixture gaps instead of accepting a reduced suite. Linux runs the independent build/generated-drift and whitespace checks, without duplicating the full suite.
+`.github/workflows/ci.yml` runs for pull requests, pushes to `main`, and manual dispatch. The Node 22/25 full-test matrix uses GitHub-hosted `macos-15-intel`. Each lane must demonstrate actual `macos-seatbelt-node` capability through the existing runtime probe before running the full suite. Unsupported Seatbelt, skips, cancellation, todo, zero execution, malformed/incomplete TAP or any failing command fails the lane. The label is explicit because [GitHub retired macOS 14 on November 2, 2026](https://github.com/actions/runner-images/issues/13518); [the current standard runner reference](https://docs.github.com/en/actions/reference/runners/github-hosted-runners) lists `macos-15-intel` as supported. The explicit Intel pool avoids the ARM capacity constraint observed during initial main-run qualification; it still must prove actual Seatbelt startup and pass the entire suite. This intentionally exposes capability and fixture gaps instead of accepting a reduced suite. Linux runs the independent build/generated-drift and whitespace checks, without duplicating the full suite.
 
 Checkout uses `fetch-depth: 0`: historical-writer compatibility tests archive published commits with `git archive`. A shallow checkout is insufficient. Checkout does not persist credentials. Actions use full commit pins; integration QA must independently verify those pins and current runner availability. Only read permissions are granted; the final gate additionally reads Actions job conclusions with the automatic repository token. There are no model/account secrets, `pull_request_target`, publication or adoption steps.
 
@@ -52,8 +52,8 @@ The remote verifier owns GitHub API retrieval using built-in `fetch`; it accepts
   "gate": "CI gate",
   "lanes": [
     {"lane":"build","job":"Build and drift","labels":["ubuntu-24.04"]},
-    {"lane":"tests-22","job":"Tests Node 22","labels":["macos-15"]},
-    {"lane":"tests-25","job":"Tests Node 25","labels":["macos-15"]}
+    {"lane":"tests-22","job":"Tests Node 22","labels":["macos-15-intel"]},
+    {"lane":"tests-25","job":"Tests Node 25","labels":["macos-15-intel"]}
   ]
 }
 ```
@@ -72,4 +72,4 @@ The minimum remote path supports completed successful `push` and `workflow_dispa
 
 GitHub artifacts are retained for 30 days; GitHub job logs follow repository retention settings. Download verification evidence before expiry and retain it with the independent QA record. The verifier fails after required evidence expires. Failed attempts remain failed and are not combined with successful reruns.
 
-Live GitHub CI is unexecuted until this candidate is integrated and pushed. The deterministic API doubles exercise successful and adversarial verification paths without a network call; passing fixtures do not establish a real GitHub run, native host acceptance or live company recovery.
+Live GitHub acceptance requires a completed exact run and retained remote evidence. The deterministic API doubles exercise successful and adversarial verification paths without a network call; passing fixtures do not establish a real GitHub run, native host acceptance or live company recovery.
