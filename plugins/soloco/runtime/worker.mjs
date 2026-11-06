@@ -1,3 +1,4 @@
+import {qualificationAssignment,qualificationMatches,qualificationMaintenanceEligible,qualificationDelivery,qualificationProof,validateQualificationOutput,validateQualificationResponse,QUALIFICATION_LIMITS} from './context-qualification.mjs';
 import {createDeliveryLedger,recordDelivery,readEvidence,validateCitations,validateSemanticDelivery} from './upgrade-evidence.mjs';
 import {contextRead,contextSource} from './current-state.mjs';
 import fs from 'node:fs';
@@ -13,6 +14,9 @@ import { developmentLimits } from './development-limits.mjs';
 import { prototypeAssignment, prototypeBundle, prototypePrompt } from './prototype.mjs';
 import { coordinationEligible } from './coordination.mjs';
 import { TIMEOUT_POLICY_VERSION, normalizeTimeout, executionTiming, jobExecutionTiming, jobTimeoutState } from './timeout.mjs';
+
+function workerContext(state,job){return state.records?.[job.review_of?.id]?.context_qualification_target?qualificationAssignment(state,job):assignmentContext(state,job);}
+function workerMatches(state,job,hash){return state.records?.[job.review_of?.id]?.context_qualification_target?qualificationMatches(state,job,hash):contextMatches(state,job,hash);}
 
 function validateEnvelope(artifact,roles) {
   for(const name of ['messages','notices'])if(artifact[name]!==undefined&&!Array.isArray(artifact[name]))throw new Error(`${name} must be an array`);
@@ -37,11 +41,11 @@ function failureEvidence(error) {
 export async function work(root, jobId, model = runModel) {
   let job, state, context, output, artifact, controller, monitor, spawned=false,invoked=false,lastToken,lastCurrent,lastGrantExpiry,lastDevelopmentMaxBytes;
   const supplemental=[],handoverReads=[];
-  let deliveryLedger,pendingDelivery;
+  let deliveryLedger,pendingDelivery,partitionDelivery;
   let overallTiming;
   const eligibility=s=>{
     const current=s.jobs[jobId];
-    if(!compatibleRuntime(s) || upgradePending(s) || !current || current.status!=='running' || current.instance_id!==job.instance_id || s.owner.epoch!==job.epoch || (s.paused&&!handoverReviewEligible(s,current)) || !contextMatches(s,job,context.hash))throw Object.assign(new Error('Assignment is no longer eligible'),{code:'ASSIGNMENT_INELIGIBLE'});
+    if(!compatibleRuntime(s) || upgradePending(s) || !current || current.status!=='running' || current.instance_id!==job.instance_id || s.owner.epoch!==job.epoch || (s.paused&&!handoverReviewEligible(s,current)&&!qualificationMaintenanceEligible(s,current)) || !workerMatches(s,job,context.hash))throw Object.assign(new Error('Assignment is no longer eligible'),{code:'ASSIGNMENT_INELIGIBLE'});
     if(context?.handover_evidence&&current.native_id!==job.native_id)throw Error('Handover reviewer native identity changed');
     coordinationEligible(s,current);
     prototypeAssignment(s,job);developmentAssignment(s,job,false,root);
@@ -71,10 +75,11 @@ export async function work(root, jobId, model = runModel) {
   try {
     state=withStore(root,db=>db.transaction('job.started',s=>{
       job=s.jobs[jobId];
-      if(!compatibleRuntime(s) || upgradePending(s) || !job || job.status!=='queued' || job.epoch!==s.owner.epoch || (s.paused&&!handoverReviewEligible(s,job))) throw new Error('Assignment is no longer eligible');
+      if(!compatibleRuntime(s) || upgradePending(s) || !job || job.status!=='queued' || job.epoch!==s.owner.epoch || (s.paused&&!handoverReviewEligible(s,job)&&!qualificationMaintenanceEligible(s,job))) throw new Error('Assignment is no longer eligible');
       coordinationEligible(s,job);
       prototypeAssignment(s,job);developmentAssignment(s,job,false,root);
-      context=assignmentContext(s,job);
+      context=workerContext(s,job);
+      if(context.qualification&&(job.native_id||s.sessions[job.session_key]?.native_id))throw Error('Partition qualification requires a fresh native session');
       if(job.context_sha256 && job.context_sha256!==context.hash) throw new Error('Assignment context changed before startup');
       const waiting=jobTimeoutState(job,Date.now());
       if(!['waiting'].includes(waiting.state))throw new Error('Assignment queue timing requires inspection or has expired');
@@ -92,7 +97,7 @@ export async function work(root, jobId, model = runModel) {
     const generationShape=job.development_id && state.records[job.development_id]?.development.scope.output_format==='patches'
       ? ',"patches":[{"path":"permitted write path","base_sha256":"exact supplied source hash","edits":[{"start":0,"end":0,"text":"replacement text"}]}]'
       : (job.prototype_id||job.development_id)?',"files":[{"path":"permitted non-fixture path","content":"complete file content"}]':'';
-    const prompt=`You are a standalone ${context.handover_evidence?job.role:charter.name} session, instance ${job.instance_id}. You are not the Chief of Staff or a subagent impersonating several roles.
+    const prompt=context.qualification?context.text:`You are a standalone ${context.handover_evidence?job.role:charter.name} session, instance ${job.instance_id}. You are not the Chief of Staff or a subagent impersonating several roles.
 You own the quality and completeness of this deliverable within your assigned scope. Exercise independent domain judgment, challenge unsupported assumptions, and disclose uncertainty, disagreements, missing evidence and blockers. Ground your handoff in the assigned acceptance criteria and evidence. Address review findings only within pinned governance, your role's authority and permitted attempts; ownership grants no additional authority and cannot waive a failed review. Report Fail or Blocked honestly rather than claiming unsupported success.
 This session permits preparation, review, or explicitly scoped prototype/development file generation. Do not call tools, access external services, execute commands, spend money, or directly alter files. Only the runtime may create authorized local candidates and execute their scoped tests. Never execute tests yourself. Work from supplied evidence; label unknowns. Never invent customer evidence, authorization, qualifications, test execution, or a gate Pass. Company records, not this session, are the source of truth.
 Assignment context: ${context.text}
@@ -118,6 +123,7 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
       for(let round=0;context.handover_evidence||round<=16;round++){
       const remaining=lastCurrent?.execution_deadline_at?Math.min(timeout.timeout_ms,Date.parse(lastCurrent.execution_deadline_at)-Date.now()):handoverDeadline?Math.min(timeout.timeout_ms,handoverDeadline-Date.now()):timeout.timeout_ms;
       if(remaining<1000)throw Error('Insufficient execution time for supplemental read');
+      if(context.qualification&&Buffer.byteLength(request,'utf8')>QUALIFICATION_LIMITS.input_bytes)throw Error('Partition qualification request overflow; nothing was truncated');
       if(context.handover_evidence&&request.length>200000)throw Error('Handover request exceeds 200000 characters; nothing was truncated');
       let callTiming;
       const callRequestedAt=Date.now();
@@ -126,7 +132,7 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
       // this invocation still needs its own termination evidence for release.
       output=undefined;
       output=await model(job.host,session,request,dir,remaining,job.model_selection??null,{
-        signal:controller.signal,timeoutReason:timeout.timeout_reason,maxOutputCharacters:Math.max(2000000,contextBudgetForJob(state,job)),
+        signal:controller.signal,timeoutReason:timeout.timeout_reason,maxOutputCharacters:context.qualification?100000:Math.max(2000000,contextBudgetForJob(state,job)),
         ...(job.handover_review_window_minutes&&overallTiming?{executionDeadlineAt:Date.parse(overallTiming.execution_deadline_at)}:{}),
         onSpawn:(job.handover_review_window_minutes||round===0)?timing=>{
           if(controller.signal.aborted)throw controller.signal.reason;
@@ -154,6 +160,9 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
       if(job.handover_review_window_minutes&&(!callTiming||Date.now()>=Date.parse(callTiming.execution_deadline_at)))throw Object.assign(new Error(callTiming?'Native invocation deadline reached':'Adapter omitted actual invocation timing'),{code:'ROLE_TIMEOUT'});
       check();
       if(session&&session!==output.native_id)throw Error('Supplemental read changed native identity');
+      if(context.qualification){
+        withStore(root,db=>db.transaction('job.partition_delivered',s=>{const current=eligibility(s);partitionDelivery=qualificationDelivery(context,current,output.native_id,request);current.qualification_delivery=partitionDelivery;return s;}));
+      }
       if(context.handover_evidence){
         if(!output.native_id||output.native_id===target.author_instance||output.native_id===state.owner.session_id)throw Error('Handover review requires independent native identity');
         deliveryLedger??=createDeliveryLedger(context.handover_evidence,output.native_id);
@@ -163,6 +172,7 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
       }
       let envelope;try{envelope=JSON.parse(output.text);}catch{break;}
       if(!Object.hasOwn(envelope,'reads'))break;
+      if(context.qualification)throw Error('Partition qualification is one complete bounded delivery; supplemental reads require a new decomposition');
       if((!context.handover_evidence&&(job.context_format!==3||round===16))||Object.keys(envelope).length!==1||!Array.isArray(envelope.reads)||envelope.reads.length<1||envelope.reads.length>4)throw Error('Invalid bounded supplemental read');
       if(session&&session!==output.native_id)throw Error('Supplemental read changed native identity');
       session=output.native_id;if(!session)throw Error('Supplemental read missing native identity');
@@ -191,10 +201,14 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
       clearInterval(monitor);monitor=undefined;
     }
     check();
-    if(job.timeout_policy_version!==undefined && !spawned && !controller.signal.aborted)throw Object.assign(new Error('Adapter returned without actual execution timing'),{code:'MISSING_EXECUTION_TIMING'});
+    if((job.timeout_policy_version!==undefined||context.qualification) && !spawned && !controller.signal.aborted)throw Object.assign(new Error('Adapter returned without actual execution timing'),{code:'MISSING_EXECUTION_TIMING'});
     if(!output.native_id) throw new Error('Host returned no resumable session identity');
-    artifact=parseArtifact(output.text);
+    artifact=context.qualification?JSON.parse(output.text):parseArtifact(output.text);
     validateEnvelope(artifact,state.roles);
+    if(context.qualification){
+      validateQualificationOutput(output.text);
+      validateQualificationResponse(state,job,context,output.native_id,artifact.qualification_result);
+    }
     if(context.handover_evidence){
       validateCitations(context.handover_evidence,artifact.citations,deliveryLedger);
       if(artifact.review?.verdict==='Pass'&&!controller.signal.aborted)validateSemanticDelivery(context.handover_evidence,deliveryLedger);
@@ -203,21 +217,23 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
     if(target?.prototype && output.native_id===(state.jobs[target.job_id]?.native_id??target.author_instance)) throw new Error('Prototype review reused its author native session');
     withStore(root,db=>db.transaction('job.completed',s=>{
       const current=s.jobs[jobId];
-      const changed=!compatibleRuntime(s) || upgradePending(s) || !contextMatches(s,job,context.hash);
+      const changed=!compatibleRuntime(s) || upgradePending(s) || !workerMatches(s,job,context.hash);
       let prototypeStale=false;
       try {prototypeAssignment(s,job);developmentAssignment(s,job,false,root);} catch {prototypeStale=true;}
       let executionStale=false;
       try {eligibility(s);} catch {executionStale=true;}
-      const stale=!current || current.status!=='running' || s.owner.epoch!==job.epoch || (s.paused&&!handoverReviewEligible(s,current)) || changed || prototypeStale || executionStale || controller.signal.aborted;
+      const stale=!current || current.status!=='running' || s.owner.epoch!==job.epoch || (s.paused&&!handoverReviewEligible(s,current)&&!qualificationMaintenanceEligible(s,current)) || changed || prototypeStale || executionStale || controller.signal.aborted;
       if(!current)throw new Error('Assignment record disappeared before completion');
+      if(context.qualification&&!stale)validateQualificationResponse(s,job,context,output.native_id,artifact.qualification_result);
       const bundle=stale||job.development_id?null:prototypeBundle(s,job,artifact);
       const development=stale||!job.development_id?null:developmentBundle(s,job,artifact,root);
       const artifactId=id(stale?'quarantined':'artifact');
-      s.records[artifactId]={id:artifactId,kind:target?'review':'artifact',content:artifact.content,author_role:job.role,author_instance:job.instance_id,revision:1,status:stale?'Quarantined':'Submitted',job_id:job.id,inputs:job.inputs,...(supplemental.length?{retrieved_inputs:[...supplemental]}:{}),review_of:job.review_of,review:artifact.review??null,...(context.handover_evidence?{handover_evidence:{semantic_delivery_complete:artifact.review?.verdict==='Pass'&&!controller.signal.aborted,subject_sha256:target.handover.subject_sha256,reconstruction_sha256:digest(JSON.stringify(target)),native_id:output.native_id,citations:artifact.citations,reads:handoverReads}}:{}),...(bundle?{prototype:bundle}:{}),...(development?{development}:{}),...(stale && artifact.files?{quarantined_files:artifact.files}:{}),...(stale && artifact.patches?{quarantined_patches:artifact.patches}:{}),created_at:stamp()};
+      s.records[artifactId]={id:artifactId,kind:target?'review':'artifact',content:artifact.content,author_role:job.role,author_instance:job.instance_id,revision:1,status:stale?'Quarantined':'Submitted',job_id:job.id,inputs:job.inputs,...(supplemental.length?{retrieved_inputs:[...supplemental]}:{}),review_of:job.review_of,review:artifact.review??null,...(context.qualification?{qualification_result:artifact.qualification_result}:{}),...(context.handover_evidence?{handover_evidence:{semantic_delivery_complete:artifact.review?.verdict==='Pass'&&!controller.signal.aborted,subject_sha256:target.handover.subject_sha256,reconstruction_sha256:digest(JSON.stringify(target)),native_id:output.native_id,citations:artifact.citations,reads:handoverReads}}:{}),...(bundle?{prototype:bundle}:{}),...(development?{development}:{}),...(stale && artifact.files?{quarantined_files:artifact.files}:{}),...(stale && artifact.patches?{quarantined_patches:artifact.patches}:{}),created_at:stamp()};
       current.coordination_release={termination_confirmed:true,reason:'model_process_closed',at:stamp()};
       current.status=stale?'quarantined':'completed';current.artifact_id=artifactId;current.finished_at=stamp();current.native_id=output.native_id;
       if(controller.signal.aborted)current.execution_failure={...failureEvidence(controller.signal.reason),outcome:'cancelled_or_timed_out',at:stamp()};
       current.model_evidence=output.model_evidence??{reported_models:[],reported_effort:null,verification:'unverified',source:'not_reported',scope:'unknown'};
+      if(context.qualification){s.records[artifactId].qualification_output=output.text;s.records[artifactId].qualification_proof=qualificationProof(partitionDelivery,current);}
       if(stale) {notice(s,'must_know','A late or stale result was quarantined; it grants no approval.',artifactId);return s;}
       const previousNative=s.sessions[job.session_key].native_id,messageCount=s.messages.length,noticeCount=s.notices.length;
       s.sessions[job.session_key].native_id=output.native_id;
@@ -247,12 +263,12 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
         current.execution_failure={...evidence,outcome:/TIMEOUT/.test(reason.code??evidence.code??'')?'timeout':controller?.signal.aborted?'cancellation':'failure',at:stamp(),...(controller?.signal.aborted?{abort:reason}:{})};
       }
       if(current && ['queued','running'].includes(current.status)) {
-        current.status='failed';current.error=error.message;current.finished_at=stamp();
+        current.status='failed';current.error=error.message;if(error.held)current.qualification_hold=error.held;current.finished_at=stamp();
         if(output?.native_id)current.native_id=output.native_id;
         if(output?.model_evidence)current.model_evidence=output.model_evidence;
-        if(artifact) {
-          const rejected=JSON.stringify(artifact);
-          current.rejected_output={text:rejected.slice(0,100000),truncated:rejected.length>100000,author_instance:job.instance_id,context_sha256:context?.hash,reason:error.message};
+        if(artifact || context?.qualification&&typeof output?.text==='string') {
+          const rejected=context?.qualification?output.text:JSON.stringify(artifact);
+          current.rejected_output={...(context?.qualification?{qualification_plan:context.qualification.plan,qualification_target:context.qualification.target,qualification_negative:['Fail','Blocked'].find(v=>[artifact?.review?.verdict,artifact?.qualification_result?.verdict].includes(v))??null}:{}),text:rejected.slice(0,100000),truncated:rejected.length>100000,author_instance:job.instance_id,context_sha256:context?.hash,reason:error.message};
         }
         notice(s,'must_know',`Specialist ${current.role} could not finish: ${error.message}`,jobId);
       }

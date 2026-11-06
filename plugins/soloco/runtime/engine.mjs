@@ -1,13 +1,16 @@
+import { currentView, upgradeView, publicPage, exactRead, mutationView, sourceReference, itemView, controlView, storageSourceId, fits, exactTextRead } from './public-response.mjs';
 import {backupCompany,restoreCompany} from './storage-transfer.mjs';
-import {contextPlan,validateContextPlan,recordReference,contextRead,contextSource} from './current-state.mjs';
+import {contextPlan,validateContextPlan,recordReference,contextSource} from './current-state.mjs';
+import {captureQualificationPlan,createQualificationTarget,qualificationPlanView,qualificationReadUnit,qualificationReadEvidence,validateQualificationApply,qualificationMaintenanceEligible,qualificationControlHash,QualificationHold} from './context-qualification.mjs';
+import {inheritSnapshots,retainSnapshot,resolveSnapshotEntry,snapshotReference,snapshotBytes} from './snapshot.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { spawn } from 'node:child_process';
 import { PACKAGE, VERSION, stamp, id, digest, folder, noLink, withStore, owner, notice, requireText, SCHEMA, installedTeam, teamHash, upgradePending, compatibleRuntime } from './store.mjs';
 import { readiness, modelCatalog } from './adapters.mjs';
-import { normalizeSelection, selectionKey, activityFor, selectionUsage } from './selection.mjs';
-import { normalizeCoordination, bindCoordination, resourceClaims } from './coordination.mjs';
+import { normalizeSelection, selectionKey } from './selection.mjs';
+import { normalizeCoordination, bindCoordination } from './coordination.mjs';
 import { progressSnapshot, renderProgress } from './progress-view.mjs';
 import { beginHandover, submitReconstruction, handoverReviewEligible, freshHandoverReviewEligible, verifyHandoverAcceptance, handoverSubject, inspectHandover, reconstructionReceipt, admitHandover } from './handover.mjs';
 import { assignmentContext, contextMatches } from './context.mjs';
@@ -15,7 +18,7 @@ import { developmentAction, developmentCapability, developmentAssignment } from 
 import { prototypeAction, prototypeCapability, prototypeAssignment } from './prototype.mjs';
 import { TIMEOUT_POLICY_VERSION, normalizeTimeout, normalizeHandoverReviewWindow, jobTimeoutState } from './timeout.mjs';
 
-const busy = state => Object.values(state.jobs).filter(j => ['queued','running'].includes(j.status));
+const busy = state => Object.values(state.jobs??{}).filter(j => ['queued','running'].includes(j?.status));
 export function dataDir() {
   return process.env.COMPANY_PLUGIN_DATA || process.env.PLUGIN_DATA || process.env.CLAUDE_PLUGIN_DATA || path.join(os.homedir(),'.cache','soloco');
 }
@@ -25,31 +28,58 @@ export function bind(root, session, host) {
   fs.mkdirSync(dir,{recursive:true,mode:0o700});
   const file = path.join(dir,digest(JSON.stringify([folder(root),host,session]))+'.json');
   noLink(file);
-  fs.writeFileSync(file,JSON.stringify({root:folder(root),host,session_id:session,at:stamp(),plugin_version:VERSION,plugin_root:PACKAGE,data_directory:dataDir()}),{mode:0o600});
+  let previous={};try{previous=JSON.parse(fs.readFileSync(file,'utf8'));}catch(error){if(error.code!=='ENOENT')throw error;}
+  fs.writeFileSync(file,JSON.stringify({...previous,root:folder(root),host,session_id:session,at:stamp(),plugin_version:VERSION,plugin_root:PACKAGE,data_directory:dataDir()}),{mode:0o600});
 }
 export function binding(args, host) {
   requireText(args.session_id,'session_id',200);
   const file = path.join(dataDir(),'bindings',digest(JSON.stringify([folder(args.root),host,args.session_id]))+'.json');
   if (!fs.existsSync(file)) throw new Error('No startup-hook binding in this MCP data directory. Run company_doctor with root and session_id to distinguish missing discovery, stale project hooks, disabled/untrusted hooks, or a data-directory mismatch. Then reopen this chat and send a prompt.');
 }
-export function upgradeSummary(u) {
-  if (!u) return null;
-  const {checkpoint,previous,candidate,calls,deliveries,cos_pages,qa_pages,replays,evidence,...progress}=u;
-  const total=key=>(calls??[]).reduce((sum,call)=>sum+(key==='prompt_characters'?call.budget?.prompt_characters??0:call[key]??0),0);
-  const paging=evidence?{inventory_sha256:evidence.inventory_sha256,counts:evidence.counts,
-    pages:evidence.pages.length,cos_pages:cos_pages?.length??0,qa_pages:qa_pages?.length??0,
-    qa_blocked_pages:qa_pages?.filter(p=>p.artifact.review?.verdict!=='Pass').map(p=>p.page_id)??[],
-    calls:calls?.length??0,replay_batches:replays?.length??0,prompt_characters:total('prompt_characters'),response_characters:total('response_characters'),
-    token_estimate_only:true,context_fit_verified:false}:null;
-  return {...progress,candidate_version:candidate.plugin_version,previous_version:previous.plugin_version,...(paging?{paging}:{})};
+export const noticePreviewHash=n=>digest(JSON.stringify([n.kind,n.summary,n.reference]));
+export function openedTeam(args,host,team) {
+  binding(args,host);
+  const file=path.join(dataDir(),'bindings',digest(JSON.stringify([folder(args.root),host,args.session_id]))+'.json');
+  noLink(file);
+  const bindingState=JSON.parse(fs.readFileSync(file,'utf8'));
+  if(team!==undefined) {
+    bindingState.opened_team_sha256=team;
+    fs.writeFileSync(file,JSON.stringify(bindingState),{mode:0o600});
+  }
+  return bindingState.opened_team_sha256??null;
 }
-function summary(state,root=process.cwd()) {
-  const activity=activityFor(state).map(item=>{
-    const job=state.jobs[item.job_id];
-    if(!job || job.kind==='development_test' || job.type==='development_test')return item;
-    return {...item,timeout:{policy_version:job.timeout_policy_version??null,timeout_ms:job.timeout_ms??null,reason:job.timeout_reason??null,...(job.handover_review_window_minutes?{handover_review_window_minutes:job.handover_review_window_minutes,handover_review_reason:job.handover_review_reason}:{}),execution_started_at:job.execution_started_at??null,execution_deadline_at:job.execution_deadline_at??null,state:jobTimeoutState(job,Date.now()),reconciliation:job.timeout_reconciliation??null,failure:job.execution_failure??null}};
+export function upgradeSummary(u) { return upgradeView(u); }
+function summary(state,root,options={}) { return currentView(state,{...options,capabilities:{local_prototype:prototypeCapability(state),local_development:developmentCapability(state,root)}}); }
+// Read-only public presentation; never an authorization/acceptance check.
+export function current(args,host,resultId) {
+  binding(args,host);
+  return withStore(args.root,db=>{
+    const state=db.read(),view=summary(state,args.root);
+    if(typeof resultId==='string') {
+      if(Object.hasOwn(state.records??{},resultId))view.operation_source=sourceReference(state.records[resultId],storageSourceId('records',resultId));
+      else if(Object.hasOwn(state.jobs??{},resultId))view.operation_source=sourceReference(state.jobs[resultId],storageSourceId('jobs',resultId));
+    }
+    return view;
   });
-  return {company_id:state.id, name:state.name, idea:state.idea, revision:state.revision, phase:state.phase, mode:state.mode, paused:state.paused, owner:state.owner, plugin_version:state.plugin_version, runtime_version:state.runtime_version??state.plugin_version, executing_runtime_version:VERSION, upgrade:upgradeSummary(state.upgrade), governance_sha256:state.governance_sha256, records:Object.values(state.records), sessions:state.sessions, jobs:Object.values(state.jobs), activity, handover:state.handover??null, resource_claims:resourceClaims(state), selection_usage:selectionUsage(state), notices:state.notices.filter(n=>!n.resolution), messages:state.messages, capabilities:{standalone_sessions:true, model_selection:{eligible:['0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7','0.6.8','0.6.9','0.6.10','0.6.11','0.6.12','0.6.13',VERSION].includes(state.plugin_version),catalog:'company_doctor.models',coordinator_model:'Host UI controlled; no automatic switching',billing:'Existing host account; no hard spending enforcement'},local_prototype:prototypeCapability(state), local_development:developmentCapability(state,root), external_execution:false, background_founder_delivery:false, automatic_team_migration:false, explicit_team_upgrade:true}};
+}
+// Read back persisted attribution without constructing another potentially large
+// current view. Never retry a completed mutation just to recover its receipt.
+export function operationReceipt(args,host,result,operation) {
+  binding(args,host);
+  return withStore(args.root,db=>{
+    const state=db.read(),receipt={...controlView(state)};
+    for(const family of ['records','jobs','notices','messages']) {
+      const match=Object.entries(state[family]??{}).find(([key,v])=>typeof result?.id==='string'&&(v?.id===result.id||key===result.id));
+      if(match){const [key,value]=match;const id=storageSourceId(family,key);receipt.operation_source=sourceReference(value,id);receipt.result=itemView(value,id,family);return receipt;}
+    }
+    if(operation==='company_upgrade'&&state.upgrade){receipt.result=upgradeView(state.upgrade);receipt.operation_source=receipt.result.source;}
+    else if(args.plan_id&&state.records[args.plan_id]){receipt.operation_source=sourceReference(state.records[args.plan_id],storageSourceId('records',args.plan_id));receipt.result=itemView(state.records[args.plan_id],receipt.operation_source.id);}
+    else {receipt.attribution_hold='No exact persisted result could be identified. Inspect current sources before taking further action; do not repeat the mutation.';receipt.sources=publicPage(state,{collection:'sources',limit:8});}
+    return receipt;
+  });
+}
+export function inspectionPage(args,host,collection) {
+  binding(args,host);return withStore(args.root,db=>publicPage(db.read(),{collection}));
 }
 export function develop(args,host) { binding(args,host); return developmentAction(args,host); }
 export function prototype(args,host) { binding(args,host); return prototypeAction(args,host); }
@@ -67,7 +97,9 @@ export function open(args, host) {
     const team=installedTeam();
     return db.transaction('company.created', () => ({schema:SCHEMA,runtime_version:VERSION,id:id('company'),name:requireText(args.name ?? 'Untitled Venture','name',200).trim(),idea:requireText(args.idea,'idea'),phase:'Frame',mode:'preparation',paused:false,...team,team_sha256:teamHash(team),owner:{host,session_id:args.session_id,epoch:1},records:{},sessions:{},jobs:{},messages:[],notices:[],created_at:stamp()}));
   }, true);
-  return {...summary(state,args.root),governance:state.governance, roles:state.roles, cos_instructions:state.cos_instructions};
+  const result=summary(state,args.root,{open:true});
+  openedTeam(args,host,state.team_sha256);
+  return result;
 }
 export function status(args, host) {
   binding(args,host);
@@ -86,7 +118,7 @@ export function status(args, host) {
       }
       return s;
     });
-    const interruptedExports=Object.values(state.records).filter(r=>r.prototype?.export?.status==='writing' && Date.now()-Date.parse(r.prototype.export.started_at)>60000);
+    const interruptedExports=Object.values(state.records??{}).filter(r=>r?.prototype?.export?.status==='writing' && Date.now()-Date.parse(r.prototype.export.started_at)>60000);
     if(interruptedExports.length) state=db.transaction('prototype.exports_interrupted',s=>{
       for(const r of interruptedExports) {
         if(s.records[r.id]?.prototype?.export?.status!=='writing') continue;
@@ -104,17 +136,80 @@ export function status(args, host) {
     return summary(state,args.root);
   });
 }
+// Lifecycle projections are scheduling hints only. Final status performs the
+// normal integrity-checked read and reconciliation before returning any truth.
+const lifecycleKeys=['id','status','kind','type','timeout_policy_version','timeout_ms','timeout_reason','created_at','started_at','execution_started_at','execution_deadline_at'];
+function waitLifecycle(db) {
+  const projection=lifecycleKeys.map(k=>"'"+k+"',json_extract(v.bytes,'$."+k+"')").join(',');
+  const normalized=/^normalized-v[1-4]$/.test(db.storageInfo().format);
+  const jobs=normalized
+    ? db.db.prepare("SELECT json_object("+projection+") AS value FROM state_entries e JOIN immutable_values v USING(sha256) WHERE e.family='jobs' AND json_extract(v.bytes,'$.status') IN ('queued','running')").all().map(r=>Object.fromEntries(Object.entries(JSON.parse(r.value)).filter(([,v])=>v!==null)))
+    : db.db.prepare("SELECT json_object("+projection.replaceAll('v.bytes','j.value')+") AS value FROM company c, json_each(c.value,'$.jobs') j WHERE json_extract(j.value,'$.status') IN ('queued','running')").all().map(r=>Object.fromEntries(Object.entries(JSON.parse(r.value)).filter(([,v])=>v!==null)));
+  const keys=['status','review_deadline_policy','deadline_ms','review_window_minutes','created_at'];
+  let upgrade;
+  if(normalized) {
+    const rows=db.db.prepare("SELECT e.key,json_extract(v.bytes,'$') AS value FROM state_entries e JOIN immutable_values v USING(sha256) WHERE e.family='upgrade' AND e.key IN ("+keys.map(()=>'?').join(',')+")").all(...keys);
+    upgrade=Object.fromEntries(rows.map(r=>[r.key,r.value]));
+  } else {
+    const fields=keys.map(k=>"'"+k+"',json_extract(value,'$.upgrade."+k+"')").join(',');
+    const row=db.db.prepare('SELECT json_object('+fields+') AS value FROM company WHERE id=1').get();
+    upgrade=row?JSON.parse(row.value):{};
+  }
+  return {jobs,upgrade};
+}
+export async function wait(args,host) {
+  binding(args,host);
+  const until=Date.now()+Math.min(20,Math.max(0,args.seconds??15))*1000;
+  let previous,observed;
+  do {
+    observed=withStore(args.root,db=>db.readSnapshot(()=>{
+      const token=db.changeToken();
+      if(previous?.token===token)return previous;
+      return {token,...waitLifecycle(db)};
+    }));
+    previous=observed;
+    const u=observed.upgrade,now=Date.now();
+    const pendingUpgrade=['queued','checking'].includes(u.status);
+    const unlimited=u.review_deadline_policy==='none'&&u.deadline_ms===null&&u.review_window_minutes===null;
+    const overdueUpgrade=pendingUpgrade&&!unlimited&&now>=(u.deadline_ms??Date.parse(u.created_at)+420000);
+    if((!observed.jobs.length&&!pendingUpgrade)||observed.jobs.some(j=>['overdue','inspection'].includes(jobTimeoutState(j,now).state))||overdueUpgrade||now>=until)break;
+    await new Promise(resolve=>setTimeout(resolve,Math.min(500,until-now)));
+  } while(true);
+  return status(args,host);
+}
 // Read only: unlike status, never reconciles jobs or writes receipts.
 export function progress(args,host) {
   binding(args,host);
   if (!['json','html','text','mermaid'].includes(args.format ?? 'json')) throw new Error('Unknown progress format');
   if (args.recent_jobs !== undefined && (!Number.isInteger(args.recent_jobs) || args.recent_jobs < 1 || args.recent_jobs > 50)) throw new Error('recent_jobs must be 1 to 50');
-  return withStore(args.root,db=>{
+  if(args.action==='read')return readProgressArtifact(args,host);
+  return withStore(args.root,db=>db.readSnapshot(()=>{
     const state=db.read();
     if (!state) throw new Error('Company initialization is incomplete; use company_open');
     const projection=progressSnapshot(state,{recentJobs:args.recent_jobs ?? 20});
-    return args.format && args.format !== 'json' ? renderProgress(projection,args.format,{renderId:args.render_id}) : projection;
-  });
+    const result=args.format && args.format !== 'json' ? renderProgress(projection,args.format,{renderId:args.render_id}) : projection;
+    if(fits(result))return result;
+    const format=args.format??'json',snapshot={generated_at:stamp(),company_revision:state.revision,change_token:db.changeToken(),source_sha256:digest(JSON.stringify(state)),projection_sha256:digest(JSON.stringify(projection)),format,render_id:args.render_id??null};
+    const text=JSON.stringify({snapshot,result}),file=progressArtifactPath(args,host,format);
+    fs.mkdirSync(path.dirname(file),{recursive:true,mode:0o700});noLink(file);
+    const temporary=file+'.'+id('write');
+    try {fs.writeFileSync(temporary,text,{mode:0o600,flag:'wx'});fs.renameSync(temporary,file);}finally{fs.rmSync(temporary,{force:true});}
+    return {response_format:'soloco-current-v2',render_not_inlined:true,format,snapshot,
+      artifact:{id:format,sha256:digest(text),total_characters:text.length,read:{tool:'company_progress',action:'read',artifact:format},encoding:'Exact JSON envelope {snapshot,result}; UTF-16 ranges. Parse the concatenated text; result is the original render/projection.',retention:'Latest oversized render per format in this company/host. Replaced only by another oversized render of the same format; missing/replaced/tampered artifacts fail closed.'},
+      attention:publicPage(state,{collection:'unresolved_notices',limit:3}),
+      retrieval:'Follow company_progress read next_offset until complete, verify sha256, then parse result. HTML result is the complete mountable fragment, not an inline preview. Frozen snapshot; current state may have changed. Present every unresolved notice using attention pages and exact company_context sources.'};
+  }));
+}
+function progressArtifactPath(args,host,format) {
+  if(!['json','html','text','mermaid'].includes(format))throw Error('Invalid progress artifact');
+  const directory=path.join(dataDir(),'progress-renders',digest(JSON.stringify([folder(args.root),host])));
+  noLink(path.dirname(directory));noLink(directory);
+  return path.join(directory,format+'.json');
+}
+function readProgressArtifact(args,host) {
+  const file=progressArtifactPath(args,host,args.artifact);noLink(file);
+  let text;try{text=fs.readFileSync(file,'utf8');}catch(error){if(error.code==='ENOENT')throw Error('Missing or replaced progress artifact; request a new render');throw error;}
+  return exactTextRead(text,{...args,id:args.artifact});
 }
 export function save(args,host) {
   requireText(args.content,'content',100000);
@@ -132,15 +227,20 @@ export function save(args,host) {
     s.records[recordId]={id:recordId,kind:args.kind,content:args.content,author_role:'runner',author_instance:s.owner.session_id,revision:(old?.revision??0)+1,status:'Draft',source_reference:args.source_reference??null,basis:args.basis??null,updated_at:stamp(),previous:old ? [...(old.previous??[]), {revision:old.revision,content:old.content,source_reference:old.source_reference}] : []};
     // An amended artifact never retains a review of its earlier version.
   },{rootKeys:['schema','runtime_version','plugin_version','team_sha256','owner','paused','roles','governance','governance_sha256','cos_instructions','revision','updated_at'],entities:{records:[recordId],upgrade:['status']}});
-  return state.records[recordId];
+  return mutationView(state.records[recordId],recordId);
 }
 export function handover(args,host) {
   if(['inspect','read'].includes(args.action)){binding(args,host);return withStore(args.root,db=>inspectHandover(db.read(),args));}
   if(args.action!=='submit')throw new Error('Choose inspect or submit');
   let result;update(args,host,'handover.reconstruction_submitted',s=>{result=submitReconstruction(s,args);});return reconstructionReceipt(result);
 }
-export function dispatch(args,host) {
+export function dispatch(args,host,{launch=launchWorker,check=readiness,catalog=modelCatalog}={}) {
   requireText(args.task,'task');
+  if(args.fresh_session!==undefined && typeof args.fresh_session!=='boolean')throw new Error('fresh_session must be boolean');
+  const fresh=args.fresh_session===true;
+  const freshReason=fresh?requireText(args.fresh_session_reason,'fresh_session_reason',300).trim():null;
+  if(!fresh && args.fresh_session_reason!==undefined)throw new Error('fresh_session_reason requires fresh_session: true');
+  if(fresh && (args.review_of!==undefined || args.prototype_id!==undefined || args.development_id!==undefined))throw new Error('fresh_session is only for ordinary specialist assignments; review and scoped generation retain their existing session lifecycle');
   normalizeCoordination(args);
   if (!Number.isInteger(args.epoch)) throw new Error('Supply the current ownership epoch from company_status');
   if(args.task_summary!==undefined)requireText(args.task_summary,'task_summary',160);
@@ -152,47 +252,54 @@ export function dispatch(args,host) {
   if (args.role==='runner') throw new Error('Choose a specialist role from company_open');
   binding(args,host);
   if(reviewWindow)withStore(args.root,db=>{const s=db.read();owner(s,args.session_id,host,args.epoch);if(!freshHandoverReviewEligible(s,args))throw Error('Review window is only for a fresh current paused streamed handover QA');});
-  withStore(args.root,db=>{const s=db.read();owner(s,args.session_id,host,args.epoch);if(args.model_selection!==undefined&&!['0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7','0.6.8','0.6.9','0.6.10','0.6.11','0.6.12','0.6.13',VERSION].includes(s.plugin_version))throw new Error('Explicitly adopt the model-selection team before using model_selection');});
-  const catalog=args.model_selection?.mode==='explicit' || args.model_selection?.speed==='fast_disabled'?modelCatalog(host):null;
-  const selection=normalizeSelection(args.model_selection,host,catalog);
-  const check=readiness(host);
-  if (!check.available) throw new Error(check.error);
-  if (check.authenticated===false) throw new Error(`${host} CLI is not signed in. Complete its normal login before starting specialists.`);
+  withStore(args.root,db=>{const s=db.read();owner(s,args.session_id,host,args.epoch);if(args.model_selection!==undefined&&!['0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7','0.6.8','0.6.9','0.6.10','0.6.11','0.6.12','0.6.13','0.7.0',VERSION].includes(s.plugin_version))throw new Error('Explicitly adopt the model-selection team before using model_selection');});
+  const inventory=args.model_selection?.mode==='explicit' || args.model_selection?.speed==='fast_disabled'?catalog(host):null;
+  const selection=normalizeSelection(args.model_selection,host,inventory);
+  const ready=check(host);
+  if (!ready.available) throw new Error(ready.error);
+  if (ready.authenticated===false) throw new Error(`${host} CLI is not signed in. Complete its normal login before starting specialists.`);
   const jobId=id('job');
   const state=update(args,host,'job.queued',s=>{
-    if(s.paused && !handoverReviewEligible(s,args)) throw new Error('Company is paused; only current handover QA may run');
-    if(reviewWindow&&(!freshHandoverReviewEligible(s,args)))throw Error('Review window is only for a fresh current paused streamed handover QA');
+    if(s.paused && !handoverReviewEligible(s,args)&&!qualificationMaintenanceEligible(s,args)) throw new Error('Company is paused; only current handover QA or explicitly authorized read-only qualification may run');
+    if(reviewWindow&&!freshHandoverReviewEligible(s,args))throw Error('Review window is only for a fresh current paused streamed handover QA');
     if(!Object.hasOwn(s.roles,args.role)) throw new Error('Role is absent from the pinned team catalog');
     if(busy(s).length>=3) throw new Error('Three assignments already active; wait for a result');
     const target=args.review_of && Object.hasOwn(s.records,args.review_of) ? s.records[args.review_of] : null;
     if(args.review_of && !target) throw new Error('Review target not found');
     const key=target ? `${args.role}:review:${target.id}:${target.revision}` : args.prototype_id ? `${args.role}:prototype:${jobId}` : args.development_id ? `${args.role}:development:${jobId}` : args.role;
+    const qualification=Boolean(target?.context_qualification_target);
+    if(qualification&&(args.role!=='qa'||args.prototype_id||args.development_id||args.input_ids?.length||args.evidence_ids?.length))throw Error('Qualification requires separate bounded QA without extra inputs');
     let session=s.sessions[key];
     if(session && busy(s).some(j=>j.instance_id===session.instance_id)) throw new Error('This role session already has an assignment');
-    if(session && selectionKey(session.model_selection)!==selectionKey(selection)) {
-      (s.retired_sessions??=[]).push({...session,retired_at:stamp(),reason:'model_selection_changed'});session=null;
+    if(session && session.host!==host) throw new Error('Role belongs to another host; perform company handover first');
+    if(session && target?.author_instance===session.instance_id) throw new Error('Authors cannot independently review their own artifact');
+    if(fresh && session && Object.values(s.jobs).some(j=>j.instance_id===session.instance_id && j.coordination_release?.termination_confirmed!==true && (!['completed','quarantined'].includes(j.status) || j.coordination?.resources?.length)))throw new Error('Prior role session execution is uncertain; inspect and confirm process closure before requesting a fresh session');
+    if(session && (qualification || fresh || selectionKey(session.model_selection)!==selectionKey(selection))) {
+      (s.retired_sessions??=[]).push({...session,retired_at:stamp(),reason:qualification?'qualification_fresh_node':fresh?'fresh_session_requested':'model_selection_changed',...(fresh?{fresh_session_reason:freshReason,replacement_job_id:jobId}:{})});session=null;
     }
     if(!session) session=s.sessions[key]={instance_id:id(args.role),role:args.role,native_id:null,host,model_selection:selection};
     if(target?.author_instance===session.instance_id) throw new Error('Authors cannot independently review their own artifact');
     if(session.host!==host) throw new Error('Role belongs to another host; perform company handover first');
     if(args.input_ids!==undefined && !Array.isArray(args.input_ids))throw new Error('input_ids must be an array');
-    const handoverInputs=target?.handover?.input_refs?.map(r=>r.id)??[];
+    const handoverInputs=qualification?[]:target?.handover?.input_refs?.map(r=>r.id)??[];
     const coordination=bindCoordination(s,args);
     const inputs=[...new Set([...(args.input_ids??[]),...handoverInputs,...(coordination?.dependencies??[]).map(d=>d.artifact_id)])];
     if(!Array.isArray(inputs) || inputs.some(k=>typeof k!=='string' || !Object.hasOwn(s.records,k))) throw new Error('An input record is missing');
-    const job={...(coordination?{coordination}:{}),...(args.expected_deliverable===undefined?{}:{expected_deliverable:args.expected_deliverable}),requester:{role:'runner',session_id:s.owner.session_id,host:s.owner.host,epoch:s.owner.epoch},id:jobId,role:args.role,session_key:key,instance_id:session.instance_id,native_id:session.native_id,host,epoch:s.owner.epoch,status:'queued',task:args.task,...(args.evidence_ids?{supplemental_sources:args.evidence_ids.map(key=>{const value=contextSource(s,key);if(!value)throw Error('Supplemental source missing');return recordReference(value,key);})}:{}),context_format:3,...(args.context_scope?{context_scope:requireText(args.context_scope,'context_scope',160)}:{}),timeout_policy_version:TIMEOUT_POLICY_VERSION,...timeout,...(reviewWindow??{}),model_selection:selection,cli_version:check.version,task_summary:args.task_summary??null,next_handoff:args.next_handoff??null,...(catalog?{model_catalog:{source:catalog.source,...(selection.mode==='explicit'?{model:catalog.models.find(m=>m.id===selection.model)}:{}),speed_support:catalog.speed_support}}:{}),inputs:inputs.map(k=>({id:k,revision:s.records[k].revision})),review_of:target?{id:target.id,revision:target.revision}:null,...(args.prototype_id?{prototype_id:args.prototype_id}:{}),...(args.development_id?{development_id:args.development_id}:{}),created_at:stamp()};
+    const job={...(coordination?{coordination}:{}),...(args.expected_deliverable===undefined?{}:{expected_deliverable:args.expected_deliverable}),requester:{role:'runner',session_id:s.owner.session_id,host:s.owner.host,epoch:s.owner.epoch},id:jobId,role:args.role,session_key:key,instance_id:session.instance_id,native_id:session.native_id,host,epoch:s.owner.epoch,status:'queued',task:args.task,...(args.evidence_ids?{supplemental_sources:args.evidence_ids.map(key=>{const value=contextSource(s,key);if(!value)throw Error('Supplemental source missing');return recordReference(value,key);})}:{}),context_format:3,...(args.context_scope?{context_scope:requireText(args.context_scope,'context_scope',160)}:{}),timeout_policy_version:TIMEOUT_POLICY_VERSION,...timeout,...(reviewWindow??{}),model_selection:selection,cli_version:ready.version,task_summary:args.task_summary??null,next_handoff:args.next_handoff??null,...(inventory?{model_catalog:{source:inventory.source,...(selection.mode==='explicit'?{model:inventory.models.find(m=>m.id===selection.model)}:{}),speed_support:inventory.speed_support}}:{}),inputs:inputs.map(k=>({id:k,revision:s.records[k].revision})),review_of:target?{id:target.id,revision:target.revision}:null,...(args.prototype_id?{prototype_id:args.prototype_id}:{}),...(args.development_id?{development_id:args.development_id}:{}),created_at:stamp()};
+    if(fresh)Object.assign(job,{fresh_session:true,fresh_session_reason:freshReason});
     prototypeAssignment(s,job,true);developmentAssignment(s,job,true,args.root);
     const context=assignmentContext(s,job);
     s.jobs[jobId]={...job,inputs:context.inputs,context_sha256:context.hash};
     s.runtime_version=VERSION;
   });
   try {
-    const worker=spawn(process.execPath,['--no-warnings',path.join(PACKAGE,'runtime/worker.mjs'),folder(args.root),jobId],{detached:true,stdio:'ignore',env:{...process.env,COMPANY_WORKER:'1'}});
+    const worker=launch(args.root,jobId);
     worker.on('error',error=>withStore(args.root,db=>db.transaction('job.spawn_failed',s=>{s.jobs[jobId].status='failed';s.jobs[jobId].error=error.message;s.jobs[jobId].coordination_release={termination_confirmed:true,reason:'worker_spawn_failed',at:stamp()};notice(s,'must_know','Unable to start specialist session.',jobId);return s;})));
     worker.unref();
   } catch(error) {update(args,host,'job.spawn_failed',s=>{s.jobs[jobId].status='failed';s.jobs[jobId].error=error.message;s.jobs[jobId].coordination_release={termination_confirmed:true,reason:'worker_not_started',at:stamp()};});throw error;}
-  return state.jobs[jobId];
+  return mutationView(state.jobs[jobId],'job:'+jobId,'jobs');
 }
+function launchWorker(root,jobId){return spawn(process.execPath,['--no-warnings',path.join(PACKAGE,'runtime/worker.mjs'),folder(root),jobId],{detached:true,stdio:'ignore',env:{...process.env,COMPANY_WORKER:'1'}});}
 export function control(args,host) {
   if(!['pause','resume','handover','rename'].includes(args.action)) throw new Error('Unknown control action');
   binding(args,host);
@@ -216,7 +323,7 @@ export function control(args,host) {
     else if(args.action==='handover') {
       if(busy(s).length) throw new Error('Assignments are active. Pause and reconcile them before handing over.');
       const previous={...s.owner};
-      const prospective={...s,owner:{host,session_id:args.session_id,epoch:s.owner.epoch+1},paused:true,records:{...s.records,[decisionId]:decision}};
+      const prospective=inheritSnapshots(s,{...s,owner:{host,session_id:args.session_id,epoch:s.owner.epoch+1},paused:true,records:{...s.records,[decisionId]:decision}});
       beginHandover(prospective,previous);
       const admission=admitHandover(prospective);
       s.owner=prospective.owner;s.handover={...prospective.handover,admission};
@@ -243,31 +350,92 @@ export function notify(args,host) {
   if(!['must_know','decision_required'].includes(args.kind)) throw new Error('Unknown notice kind');
   requireText(args.summary,'summary');
   const s=update(args,host,'notice.created',s=>{notice(s,args.kind,args.summary,args.reference??null);});
-  return s.notices.at(-1);
+  const n=s.notices.at(-1);return mutationView(n,'@public:notices:'+(s.notices.length-1),'notices');
 }
 export function acknowledge(args,host) {
-  return update(args,host,'notice.updated',s=>{
+  const state=update(args,host,'notice.updated',s=>{
     const n=s.notices.find(n=>n.id===args.notice_id); if(!n) throw new Error('Notice not found');
     if(args.seen) n.seen_at=stamp();
     if(args.resolution) {requireText(args.source_reference,'source_reference'); n.resolution={text:args.resolution,source_reference:args.source_reference,at:stamp()};}
     // A notice receipt/resolution cannot authorize venture execution.
-  }).notices.find(n=>n.id===args.notice_id);
+  });const index=state.notices.findIndex(n=>n.id===args.notice_id);return mutationView(state.notices[index],'@public:notices:'+index,'notices');
 }
 export function message(args,host) {
   requireText(args.content,'content');
   const s=update(args,host,'message.sent',s=>{if(!Object.hasOwn(s.roles,args.to)) throw new Error('Unknown recipient role');s.messages.push({id:id('message'),from:'runner',author_instance:s.owner.session_id,to:args.to,content:args.content,at:stamp()});});
-  return s.messages.at(-1);
+  return mutationView(s.messages.at(-1),'@public:messages:'+(s.messages.length-1),'messages');
 }
 
+function readPublicState(db,id) {
+  if(typeof id!=='string')throw Error('Supply an exact source id');
+  if(id.startsWith('@public:')) {
+    const [,family,...tail]=id.split(':'),key=tail.join(':');
+    if(family==='team')return db.readSelected({rootKeys:['plugin_version','governance','governance_sha256','roles','cos_instructions'],entities:{}});
+    if(['key','keyname'].includes(family)&&['records','jobs','notices','messages','sessions','upgrade_history','context_classifications'].includes(tail[0]))return db.readSelected({rootKeys:[],entities:{[tail[0]]:null}});
+    if(family==='pinned'&&key==='context_classifications')return db.readSelected({rootKeys:[],entities:{context_classifications:null}});
+    if(family==='pinned'&&['governance','cos_instructions','roles','owner','idea','name','id','plugin_version','runtime_version','team_sha256','governance_sha256','context_classifications'].includes(key))return db.readSelected({rootKeys:[key],entities:{}});
+    if(family==='current'&&key==='handover')return db.readSelected({rootKeys:['handover'],entities:{}});
+    if(family==='current'&&key==='upgrade')return db.readSelected({rootKeys:[],entities:{upgrade:null}});
+    if(['records','jobs','notices','messages','sessions','upgrade_history','context_classifications'].includes(family))return db.readSelected({rootKeys:[],entities:{[family]:[key]}});
+    throw Error('Unknown public source');
+  }
+  if(id.startsWith('upgrade:'))return db.readSelected({rootKeys:[],entities:{records:[id],upgrade_history:null}});
+  return db.readSelected({rootKeys:[],entities:{records:[id],...(id.startsWith('job:')?{jobs:[id.slice(4)]}:{})}});
+}
+function readPublicExact(db,args){return db.readSnapshot(()=>{
+  const id=args.id;let location;
+  if(typeof id!=='string')throw Error('Supply an exact source id');
+  if(id.startsWith('@public:')){
+    const [,family,...tail]=id.split(':'),key=tail.join(':');
+    if(['records','jobs','context_classifications'].includes(family))location={family,key};
+    else if(family==='pinned'&&['governance','cos_instructions','roles','owner','idea','name','id','plugin_version','runtime_version','team_sha256','governance_sha256'].includes(key))location={family:'root',key};
+    else if(family==='current'&&key==='handover')location={family:'root',key};
+  }else{
+    // Raw record keys have precedence over typed job aliases, just as publicSource.
+    const record=db.readRawValue({family:'records',key:id});
+    if(record)return exactTextRead(record.raw,args,{revision:record.revision});
+    if(id.startsWith('job:'))location={family:'jobs',key:id.slice(4)};
+  }
+  if(location){const raw=db.readRawValue(location);if(raw)return exactTextRead(raw.raw,args,{revision:raw.revision});}
+  return exactRead(readPublicState(db,id),args);
+});}
 // Explicit operations only. Neither API is called automatically on an existing company.
 export function contextControl(args,host) {
   binding(args,host);
-  if(args.action==='inspect')return withStore(args.root,db=>{
-    const s=db.read();const offset=args.offset??0,limit=args.limit??50;
-    if(!Number.isInteger(offset)||offset<0||!Number.isInteger(limit)||limit<1||limit>100)throw Error('Invalid context index window');
-    const records=[...Object.values(s.records).map(r=>recordReference(r)),...Object.values(s.jobs).map(j=>recordReference(j,'job:'+j.id)),...(s.upgrade_history??[]).map(u=>recordReference(u,'upgrade:'+u.id))];return {sources:records.slice(offset,offset+limit),total:records.length,offset,limit,classifications:Object.fromEntries(records.slice(offset,offset+limit).filter(r=>s.context_classifications?.[r.id]).map(r=>[r.id,s.context_classifications[r.id]]))};
+  if(args.action==='inspect'&&args.plan_id)return withStore(args.root,db=>qualificationPlanView(db.read(),args));
+  if(args.action==='read'&&args.snapshot)return withStore(args.root,db=>{
+    const s=db.readSelected({rootKeys:[],entities:{}}),ref=snapshotReference(args.snapshot),offset=args.offset??0;
+    if(!ref)throw Error('Exact immutable snapshot reference required');
+    const total=ref.characters,raw=snapshotBytes(s,args.snapshot),split=index=>index>0&&index<total&&/[\uD800-\uDBFF]/.test(raw[index-1])&&/[\uDC00-\uDFFF]/.test(raw[index]);
+    if(!Number.isSafeInteger(offset)||offset<0||offset>=total||split(offset))throw Error('Invalid immutable snapshot offset or surrogate boundary');
+    let length=args.length??8000;
+    if(!Number.isSafeInteger(length)||length<1||length>32768)throw Error('Invalid immutable snapshot range');
+    length=Math.min(length,total-offset);
+    while(length>0){
+      if(split(offset+length)){length--;continue;}
+      const text=raw.slice(offset,offset+length),r={snapshot:args.snapshot,offset,length,total,text,range_sha256:digest(text)};
+      const next_offset=offset+r.length<total?offset+r.length:null,result={...r,next_offset,complete:next_offset===null,retrieval_only:true};
+      if(fits(result))return result;length=Math.floor(length/2);
+    }
+    throw Error('Invalid or oversized immutable snapshot range');
   });
-  if(args.action==='read')return withStore(args.root,db=>contextRead(db.read(),args));
+  if(args.action==='read'&&args.plan_id)return withStore(args.root,db=>{
+    const s=db.read();if(args.unit_id)return qualificationReadUnit(s,args);
+    let length=args.length??8000;
+    if(!Number.isSafeInteger(length)||length<1||length>32768)throw Error('Invalid qualification evidence range');
+    while(length>0){
+      let result;
+      try{result=qualificationReadEvidence(s,{...args,offset:args.offset??0,length});}
+      catch(error){if(error instanceof QualificationHold&&error.held.boundary==='evidence-read'){length=Math.floor(length/2);continue;}throw error;}
+      const {end,total}=result.evidence,next_offset=end<total?end:null;
+      result={...result,next_offset,complete:next_offset===null};
+      if(fits(result))return result;length=Math.floor(length/2);
+    }
+    throw Error('Qualification source metadata exceeds public read budget');
+  });
+  if(args.action==='inspect')return withStore(args.root,db=>publicPage(db.read(),args));
+  if(args.action==='read')return withStore(args.root,db=>readPublicExact(db,args));
+  if(args.source_id||args.aggregate_review_id||['target','revoke'].includes(args.action))return qualificationControl(args,host);
   if(!['plan','apply'].includes(args.action))throw Error('Choose context inspect, read, plan or apply');
   const s=update(args,host,'context.'+args.action,state=>{
     requireText(args.source_instruction,'source_instruction');
@@ -294,14 +462,51 @@ export function contextControl(args,host) {
       for(const source of c.sources)state.context_classifications[source.id]={source,disposition:c.disposition,roles:c.roles,scopes:c.scopes,plan:recordReference(plan),review:recordReference(r),source_instruction:args.source_instruction,at:stamp()};
     }
   });
-  return args.action==='plan'?s.records[s.context_last_plan]:{classifications:s.context_classifications};
+  return args.action==='plan'?mutationView(s.records[s.context_last_plan],s.context_last_plan):{applied:true,response_format:'soloco-current-v2',records:publicPage(s,{collection:'records'}),classifications:publicPage(s,{collection:'context_classifications'}),note:'Stored metadata; current applicability is not validated by inspection. Applicability dispositions do not authorize execution'};
+}
+function qualificationControl(args,host){
+  if(!['plan','target','apply','revoke'].includes(args.action))throw Error('Choose qualification plan, target, apply or revoke');
+  let result;
+  const state=update(args,host,'context.tree.'+args.action,s=>{
+    requireText(args.source_instruction,'source_instruction');
+    if(args.action==='plan'){
+      const {original,plan,units}=captureQualificationPlan(s,args),key=id('context-plan');
+      const refs=[plan.source,...plan.reviewed_subject.records.flatMap(r=>[r.ref,r.producer]),plan.producer].filter(Boolean);
+      const originals=[...new Map(refs.map(ref=>[ref.id,ref])).values()].map(ref=>({source:ref,snapshot:retainSnapshot(s,resolveSnapshotEntry(s,contextSource(s,ref.id)))}));
+      const record={id:key,kind:'plan',revision:1,status:'Draft',author_role:'runner',author_instance:args.session_id,content:'Exact historical preservation qualification; no resolution or business authority.',context_partition_plan:plan,
+        context_originals:{source:originals.find(r=>r.source.id===plan.source.id).snapshot,subject:retainSnapshot(s,plan.reviewed_subject),inputs:originals},context_units:units,
+        ...(args.maintenance===true?{context_maintenance:{readonly:true,owner:{...s.owner},controls_sha256:qualificationControlHash(s),source_instruction:args.source_instruction,at:stamp()}}:{}),source_reference:args.source_instruction,created_at:stamp()};
+      if(record.context_originals.source.immutable_snapshot.sha256!==original.sha256)throw Error('Qualification original capture differs');
+      s.records[key]=record;result={id:key,source:recordReference(record),protocol:plan.protocol,total_units:plan.units.length,total_nodes:plan.nodes.length,roots:plan.roots,original:record.context_originals.source,subject:record.context_originals.subject,maintenance:args.maintenance===true,retrieval:'company_context inspect plan_id with section units/nodes; read snapshot or exact plan source'};
+    }else if(args.action==='target'){
+      const target=createQualificationTarget(s,args),key=id('context-target');
+      s.records[key]={id:key,kind:'qualification_target',revision:1,status:'Draft',author_role:'runner',author_instance:args.session_id,context_qualification_target:target,source_reference:args.source_instruction,created_at:stamp()};
+      result={id:key,source:recordReference(s.records[key]),target};
+    }else if(args.action==='apply'){
+      const proof=validateQualificationApply(s,args);
+      s.context_classifications??={};s.context_classifications[proof.source.id]={source:proof.source,disposition:'represented',plan:proof.plan,review:proof.aggregate,partition_qualification:proof,source_instruction:args.source_instruction,at:stamp()};
+      result={applied:true,source:proof.source,plan:proof.plan,review:proof.aggregate};
+    }else{
+      const p=s.records[args.plan_id];if(!p?.context_maintenance)throw Error('Read-only maintenance authorization missing');
+      p.context_maintenance.revoked_at=stamp();p.context_maintenance.revocation_instruction=args.source_instruction;
+      for(const j of busy(s))if(s.records[j.review_of?.id]?.context_qualification_target?.plan.id===p.id)j.status='cancelled';
+      result={revoked:true,plan_id:p.id};
+    }
+  });
+  return {...result,response_format:'soloco-current-v2',...(args.action==='apply'?{classifications:publicPage(state,{collection:'context_classifications'})}:{})};
 }
 export function storageControl(args,host) {
   binding(args,host);
   return withStore(args.root,db=>{
     if(args.action==='inspect')return db.storageInfo();
     if(!['migrate','backup','restore'].includes(args.action))throw Error('Choose storage inspect, migrate, backup or restore');
-    const s=db.read();owner(s,args.session_id,host,args.epoch);requireText(args.source_instruction,'source_instruction');
+    const s=db.read();
+    if(args.action==='migrate'&&s.schema===1){
+      if(s.plugin_version!=='0.1.0'||s.mode!=='preparation'||s.runtime_version!==undefined&&!compatibleRuntime({...s,schema:SCHEMA})||digest(s.governance)!==s.governance_sha256)throw Error('Unsupported legacy company; separate migration required');
+      if(!Number.isInteger(args.epoch)||s.owner.session_id!==args.session_id||s.owner.host!==host||s.owner.epoch!==args.epoch)throw Error('Current owner and epoch required for explicit storage migration');
+      if(upgradePending(s))throw Error('Recover the pending upgrade before storage migration');
+    }else owner(s,args.session_id,host,args.epoch);
+    requireText(args.source_instruction,'source_instruction');
     if(!s.paused||busy(s).length)throw Error('Pause and reconcile before explicit storage migration');
     if(Object.values(s.jobs).some(j=>(j.status==='cancelled'&&!j.finished_at)||(j.timeout_reconciliation?.termination_confirmed===false&&!j.artifact_id)))throw Error('Uncertain worker execution must reach a terminal retained receipt before storage transfer or migration');
     if(args.action==='backup')return backupCompany(db,args.directory,{artifacts:args.artifacts});

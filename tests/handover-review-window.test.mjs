@@ -37,7 +37,7 @@ test('separate review window retains native cap and validates narrow explicit se
 
 function fixture(){
  const root=fs.mkdtempSync(path.join(base,'fixture-')),old=id('old'),session_id=id('incoming');
- engine.bind(root,old,'codex');engine.open({root,session_id:old,idea:'Fictional continuation window'},'codex');
+ engine.bind(root,old,'codex');engine.open({root,session_id:old,idea:'Fictional continuation window'},'codex');withStore(root,db=>db.migrate());
  engine.bind(root,session_id,'codex');engine.control({root,session_id,expected_epoch:1,action:'handover',source_instruction:'Continue fictional company here'},'codex');
  const b={root,session_id,epoch:2};
  const receipt=engine.handover({...b,action:'submit',content:'Recover fictional objectives, exact rules, held work and uncertainty. No external execution. Fresh independent exact-state QA is required before preparation resume.'},'codex');

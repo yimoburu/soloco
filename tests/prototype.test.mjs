@@ -1,3 +1,4 @@
+import {exactStatus} from './helpers/public-exact.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -24,6 +25,8 @@ function setup(host='codex') {
   const root=fs.mkdtempSync(path.join(base,'company-'));
   const a={root,session_id:id('founder'),epoch:1};
   engine.bind(root,a.session_id,host);engine.open({...a,idea:'An offline fictional calculator'},host);
+  // Explicit synthetic fixture setup for later snapshot-based handover/upgrades.
+  withStore(root,db=>db.migrate());
   fs.writeFileSync(path.join(root,'private.txt'),'PRIVATE_DO_NOT_READ');
   return a;
 }
@@ -221,7 +224,9 @@ test('old pinned teams or preserved governance disclose blockers rather than sil
     }));
     const before=read(a),s=engine.status(a,'codex');assert.equal(s.capabilities.local_prototype.eligible,false);
     assert.throws(()=>plan(a),/Pinned/);assert.deepEqual(read(a).records,before.records);
-    assert.match(hook({cwd:a.root,session_id:a.session_id,hook_event_name:'SessionStart'},'codex').hookSpecificOutput.additionalContext,/blocker/);
+    const guidance=JSON.parse(hook({cwd:a.root,session_id:a.session_id,hook_event_name:'SessionStart'},'codex').hookSpecificOutput.additionalContext);
+    assert.match(guidance.instruction_loading,/company_open is required/);
+    assert.ok(s.capabilities.local_prototype.blocker);
   }
 });
 test('contract simplification retains known prototype governance without allowing unknown rules or teams',()=>{
@@ -247,7 +252,7 @@ test('status reconciles an interrupted write intent into a durable founder notic
   withStore(a.root,db=>db.transaction('test.crashed',s=>{
     s.records[p.id].prototype.export={status:'writing',started_at:'2000-01-01T00:00:00Z',artifact_id:'interrupted'};return s;
   }));
-  const s=engine.status(a,'codex');
+  const s=exactStatus(a,'codex');
   assert.equal(s.records.find(r=>r.id===p.id).prototype.export.status,'failed');
   assert.ok(s.notices.some(n=>n.reference===p.id && /partial files/.test(n.summary)));
 });
@@ -281,7 +286,7 @@ else {
         const j=await call('company_dispatch',{...a,task:'Produce only the permitted prototype artifact',...args},host);
         for(let i=0;i<200;i++) {
           await new Promise(resolve=>setTimeout(resolve,20));
-          const s=engine.status(a,host),done=s.jobs.find(x=>x.id===j.id);
+          const s=exactStatus(a,host),done=s.jobs.find(x=>x.id===j.id);
           if(!['queued','running'].includes(done.status)) {assert.equal(done.status,'completed',done.error);return s.records.find(r=>r.id===done.artifact_id);}
         }
         throw new Error('Synthetic native prototype process timed out');

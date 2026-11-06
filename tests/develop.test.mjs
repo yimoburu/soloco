@@ -72,6 +72,29 @@ async function waitJob(a,id,timeout=15000) {
   }
   assert.fail(`Local test worker did not finish: ${id}`);
 }
+async function waitQuarantinedReceipt(a,jobId,candidate,timeout=30000) {
+  const until=Date.now()+timeout;let s;
+  do {
+    s=read(a);const job=s.jobs[jobId],receipt=s.records[job.artifact_id];
+    // Pause/revoke may mark the job cancelled before the detached controller
+    // publishes its outcome. Wait for that retained evidence, not terminal status.
+    if(receipt) {
+      assert.equal(job.status,'quarantined');assert.equal(receipt.status,'Quarantined');
+      assert.equal(receipt.author_instance,jobId);assert.equal(receipt.author_role,'runtime');
+      assert.equal(receipt.development.candidate_id,candidate.id);
+      assert.equal(receipt.development.candidate_sha256,candidate.development.candidate_sha256);
+      assert.deepEqual(JSON.parse(receipt.content),receipt.development.result,'retain the exact controller outcome');
+      assert.equal(digest(receipt.content),receipt.development.receipt_sha256);
+      assert.deepEqual(s.records[candidate.id].development.run,{job_id:jobId,status:'quarantined',receipt_id:receipt.id});
+      assert.notEqual(receipt.development.result.status,'passed');
+      assert.equal(receipt.development.acceptance,undefined);
+      assert.ok(s.notices.some(n=>n.reference===receipt.id));
+      return receipt;
+    }
+    await new Promise(r=>setTimeout(r,30));
+  }while(Date.now()<until);
+  assert.fail(`Local controller did not retain a quarantined receipt: ${JSON.stringify(s.jobs[jobId])}`);
+}
 async function run(a,p,c) {
   const j=await engine.develop({...a,action:'run',plan_id:p.id,candidate_id:c.id},'codex');
   assert.equal(j.kind,'development_test');const ended=await waitJob(a,j.id);
@@ -339,17 +362,17 @@ test('pause or revoke during an active test aborts it and retains a quarantined 
     assert.equal(read(a).jobs[j.id].status,'running');
     if(action==='pause')engine.control({...a,action:'pause',expected_epoch:1,source_instruction:'Pause local work now'},'codex');
     else await engine.develop({...a,action:'revoke',plan_id:p.id,source_instruction:'Revoke local development scope'},'codex');
-    // Cancellation is immediate; allow the worker to retain the final aborted receipt.
-    const deadline=Date.now()+5000;let s;do{s=read(a);if(s.jobs[j.id].artifact_id)break;await new Promise(r=>setTimeout(r,30));}while(Date.now()<deadline);
-    const t=s.records[s.jobs[j.id].artifact_id];assert.ok(t,JSON.stringify(s.jobs[j.id]));assert.equal(t.status,'Quarantined');
-    assert.notEqual(t.development.result.status,'passed');assert.ok(s.notices.some(n=>n.reference===t.id));
+    await waitQuarantinedReceipt(a,j.id,c);
   }
 });
 test('source changes and handover prevent acceptance without erasing prior evidence',live,async()=>{
   for(const change of ['source','handover']) {
     const a=setup(),p=await plan(a);await authorize(a,p);const c=await generate(a,p),t=await run(a,p,c),r=await review(a,t);
     if(change==='source')fs.writeFileSync(path.join(a.root,'sum.mjs'),'changed');
-    else engine.control({...a,action:'handover',expected_epoch:1,source_instruction:'Replace coordinator'},'codex');
+    else {
+      withStore(a.root,db=>db.migrate());
+      engine.control({...a,action:'handover',expected_epoch:1,source_instruction:'Replace coordinator'},'codex');
+    }
     await assert.rejects(accept(a,p,t,r));assert.ok(read(a).records[t.id]);assert.ok(read(a).records[r.id]);
   }
 });
@@ -382,9 +405,7 @@ test('stdio MCP remains responsive to founder pause while a detached test runs',
     const {epoch,...identity}=a;
     const paused=await tool('company_control',{...identity,action:'pause',expected_epoch:epoch,source_instruction:'Pause tests now'});
     assert.equal(paused.paused,true);
-    const deadline=Date.now()+5000;let state;
-    do {state=read(a);if(state.jobs[j.id].artifact_id)break;await new Promise(r=>setTimeout(r,30));}while(Date.now()<deadline);
-    assert.equal(state.records[state.jobs[j.id].artifact_id]?.status,'Quarantined');
+    await waitQuarantinedReceipt(a,j.id,c);
   } finally {server.kill('SIGTERM');for(const entry of pending.values())clearTimeout(entry.timer);}
 });
 

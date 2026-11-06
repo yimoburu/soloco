@@ -1,0 +1,18 @@
+{
+  "version": "0.7.0",
+  "reviewed_commit": "60fd8c1",
+  "reviewed_manifest_sha256": "ce90ea92aee2c561715f70aaa9d4eec47e1bc5c7c86b7acdbf49e47f9b357756",
+  "qa_native_id": "01a1af0b-bc56-7ca0-a34f-6b312f22ca2d",
+  "qa_report_sha256": "408df2000a4cc2b386bc79c6170565d4fc88514db1d012b136ce485c455218e6",
+  "qa_verdict": "Pass for source candidate only",
+  "tests": {
+    "node22_corrected": 545,
+    "node25_corrected": 545,
+    "node22_merged_affected": 103,
+    "node25_merged_affected": 103,
+    "offline_preservation": 26,
+    "real_native_fixture_sessions": 3
+  },
+  "evidence_reuse": "Earlier successful multi-million regression and unchanged components; fresh affected checks and full preservation after merge",
+  "publication_change": "Documentation only; reviewed runtime/test bytes unchanged"
+}

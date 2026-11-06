@@ -1,6 +1,6 @@
-# v0.6.14 handover window validation
+# Pre-integration handover window validation
 
-Fresh protocol-v2 handover QA may select a fixed 30/45-minute total review window while every native call remains capped at ten minutes. Omission preserves existing behavior. Existing targets, sessions and jobs cannot be renewed.
+The unpublished 0.6.14 repair candidate was qualified before integration with published v0.7.0. Fresh protocol-v2 handover QA may select a fixed 30/45-minute total review window while every native call remains capped at ten minutes. Omission preserves existing behavior. Existing targets, sessions and jobs cannot be renewed.
 
 Frozen behavioral source: `78a83870363c53464fc89bff89c7f2449fef8bcc`. Both Node 22.13.0 and 25.2.1 passed all 444 tests with zero failures, cancellations or skips, including actual macOS isolation checks. Build and diff checks passed. Complete compressed logs, 116-file manifest and SHA-bound receipts are in `evals/handover-review-window/validation.json`. Later additions contain documentation/evidence only.
 

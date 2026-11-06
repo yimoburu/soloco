@@ -1,3 +1,4 @@
+import { exactStatus, exactCollection } from './helpers/public-exact.mjs';
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import os from 'node:os';import path from 'node:path';
 import * as engine from '../plugins/soloco/runtime/engine.mjs';import {withStore,id,stamp} from '../plugins/soloco/runtime/store.mjs';import {work} from '../plugins/soloco/runtime/worker.mjs';import {bindCoordination,resourceClaims} from '../plugins/soloco/runtime/coordination.mjs';import {executionTiming} from '../plugins/soloco/runtime/timeout.mjs';import {recordReference} from '../plugins/soloco/runtime/current-state.mjs';import {assignmentContext} from '../plugins/soloco/runtime/context.mjs';
 
@@ -18,12 +19,14 @@ test('actual store and worker admit concurrent disjoint roles and retain indepen
   };
   const a=work(root,first.id,model('engineering',resolve=>{firstDone=resolve;}));
   const b=work(root,second.id,model('research',resolve=>{secondDone=resolve;}));
-  const observed=engine.status(args,'codex');assert.equal(observed.jobs.filter(j=>j.status==='running').length,2);
-  assert.equal(observed.resource_claims.length,2);firstDone();await a;
-  let state=engine.status(args,'codex');assert.equal(state.jobs.find(j=>j.id===first.id).status,'completed');assert.equal(state.jobs.find(j=>j.id===second.id).status,'running');
-  assert.deepEqual(state.resource_claims.map(c=>c.resource),['source/two']);secondDone();await b;
-  state=engine.status(args,'codex');assert.equal(state.jobs.filter(j=>j.status==='completed').length,2);assert.equal(state.resource_claims.length,0);
+  try {
+  const observed=exactStatus(args,'codex');assert.equal(observed.jobs.filter(j=>j.status==='running').length,2);
+  assert.equal(observed.resource_claims.total,2);firstDone();await a;
+  let state=exactStatus(args,'codex');assert.equal(state.jobs.find(j=>j.id===first.id).status,'completed');assert.equal(state.jobs.find(j=>j.id===second.id).status,'running');
+  assert.deepEqual(exactCollection(args,'codex','claimed_jobs').flatMap(row=>row.value.coordination.resources),['source/two']);assert.equal(state.resource_claims.total,1);secondDone();await b;
+  state=exactStatus(args,'codex');assert.equal(state.jobs.filter(j=>j.status==='completed').length,2);assert.equal(state.resource_claims.total,0);
   assert.notEqual(state.jobs[0].native_id,state.jobs[1].native_id);
+  } finally {firstDone?.();secondDone?.();await Promise.allSettled([a,b]);}
  } finally {if(old===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=old;fs.rmSync(root,{recursive:true,force:true});fs.rmSync(cache,{recursive:true,force:true});}
 });
 

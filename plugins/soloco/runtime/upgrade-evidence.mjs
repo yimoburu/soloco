@@ -1,4 +1,5 @@
-import {classificationFor,contextSource} from './current-state.mjs';
+import {reviewedContext,contextSource,currentExtensions} from './current-state.mjs';
+import {snapshotReference,snapshotBytes,snapshotEntryReference,retainSnapshotEntry,shallowSnapshotAttempt,shallowSnapshotRecord,legacyHandoverSource} from './snapshot.mjs';
 import { createHash } from 'node:crypto';
 
 export const REQUEST_LIMIT = 900000;
@@ -124,6 +125,7 @@ function modelCatalog(value) {
     && typeof value.model.id === 'string'
     && (!own(value, 'speed_support') || exactKeys(value.speed_support, speedKeys));
 }
+export {modelCatalog as knownModelCatalog};
 
 function mechanicalContext(value) {
   return exactKeys(value, ['inputs', 'model_catalog']) && Object.keys(value).length > 0
@@ -231,7 +233,7 @@ function stateFor(subject) {
 /** Frozen in-memory evidence only. Send handover, never the whole subject.
  * sources contain private retrieval data. No caller-owned object is retained.
  */
-export function buildEvidence(checkpoint, history = [], { wholeBodyAliases = true, currentState = false, checkpointContinuity = false, reviewContext, retainedHandoverRecords = {} } = {}) {
+export function buildEvidence(checkpoint, history = [], { wholeBodyAliases = true, currentState = false, checkpointContinuity = false, reviewContext, retainedHandoverRecords = {}, snapshotState, contextState, originalSources=[] } = {}) {
   if (!object(checkpoint) || !Array.isArray(history)) hold('checkpoint must be an object and history an array');
   const checkpointRaw = serialize(checkpoint);
   const historyRaw = serialize(history);
@@ -243,31 +245,54 @@ export function buildEvidence(checkpoint, history = [], { wholeBodyAliases = tru
   const descriptors = [];
   const archivedSourceIds=new Set();
   const archivedRecords=[];
-  const dispositionProofIds=new Set();
+  const reviewState=contextState??{...snapshot,upgrade_history:prior};
+  const projection=currentState?reviewedContext(reviewState):null;
   if(currentState&&snapshot.context_classifications!==undefined){
     if(!object(snapshot.context_classifications))hold('unknown context classification index');
-    const state={...snapshot,upgrade_history:prior};
+    const state=reviewState;
     for(const id of Object.keys(snapshot.context_classifications)){
       const source=contextSource(state,id);
       if(!source)hold('context classification source is missing: '+id);
       // Validate all entries before replacing the index with an archive pointer,
       // including entries unrelated to records currently being projected.
-      classificationFor(state,source,id);
+      // The common projection above validates exact provenance and dependencies.
     }
   }
-  if(currentState)for(const r of Object.values(snapshot.records??{})){const c=classificationFor(snapshot,r);if(c?.disposition==='resolved'){dispositionProofIds.add(c.plan.id);dispositionProofIds.add(c.review.id);}}
-  if(currentState)for(const value of prior){const c=classificationFor(snapshot,value,'upgrade:'+value.id);if(c?.disposition==='resolved'){dispositionProofIds.add(c.plan.id);dispositionProofIds.add(c.review.id);}}
   const blobs = new Map();
+  for(const source of originalSources){
+    if(!exactKeys(source,['source_id','raw'],['source_id','raw'])||typeof source.source_id!=='string'||typeof source.raw!=='string')hold('invalid exact original source');
+    register({scope:'qualification-original',path:pointer('',source.source_id)},'qualification-original',source.raw,'json','compulsory-exact-original',source.source_id);
+  }
   // Ordinary handover keeps every distinct checkpoint obligation semantic.
   // Equality references only point back to an already compulsory projection.
   const continuityEntries = new Map();
+  const snapshotEntries = new Map();
+  const snapshotOriginals = new Map();
+  const entryOriginals = new Map();
+  function originalEntry(value) {
+    const locator=snapshotEntryReference(value);if(!locator)return {value,raw:null};
+    if(!snapshotState)hold('immutable entry resolver missing');
+    const ref=locator.immutable_snapshot;
+    let cached=entryOriginals.get(ref.sha256);
+    if(!cached){const raw=snapshotBytes(snapshotState,locator);cached={value:JSON.parse(raw),raw,characters:ref.characters,shape:ref.shape};entryOriginals.set(ref.sha256,cached);}
+    if(cached.characters!==ref.characters||cached.shape!==ref.shape||(cached.value.id!==undefined&&cached.value.id!==value.id)
+      ||Object.hasOwn(cached.value,'revision')!==Object.hasOwn(value,'revision')||cached.value.revision!==value.revision)hold('immutable entry identity, revision or shape changed');
+    return cached;
+  }
 
   const bodyOccurrences = new Map();
   const generatedAliases = new Map();
   const sharing = { matched_bodies: 0, matched_occurrences: 0, aliased_occurrences: 0 };
   // Index only known call/artifact pairs within each attempt. String-keyed maps
   // and the explicit equality below prove all tokens, not just a digest.
-  if (wholeBodyAliases) prior.forEach((attempt, index) => {
+  if (wholeBodyAliases) prior.forEach((value, index) => {
+    let attempt=value;
+    const locator=snapshotEntryReference(value);
+    if(locator){
+      if(!snapshotState)hold('immutable entry resolver missing');
+      if(currentState&&projection.excluded('upgrade:'+value.id)&&projection.classifications.get('upgrade:'+value.id)?.source.sha256===locator.immutable_snapshot.sha256)return;
+      attempt=originalEntry(value).value;
+    }
     if (!object(attempt)) return;
     const groups = new Map();
     const identity = (enclosing, role, phase) => object(enclosing)
@@ -393,6 +418,24 @@ export function buildEvidence(checkpoint, history = [], { wholeBodyAliases = tru
     const release = policy.files && releaseBundle(value);
     for (const [key, originalItem] of Object.entries(value)) {
       let item=originalItem;
+      const immutableSlot=(key==='checkpoint'&&policy.entityKind==='history-attempt')
+        ||(key==='subject'&&typeof value.subject_sha256==='string'&&Array.isArray(value.input_refs));
+      if(immutableSlot&&snapshotReference(item)){
+        if(!snapshotState)hold('immutable snapshot resolver missing');
+        const ref=snapshotReference(item);
+        let cached=snapshotOriginals.get(ref.sha256);
+        if(!cached){cached={raw:snapshotBytes(snapshotState,item),shape:ref.shape,characters:ref.characters};snapshotOriginals.set(ref.sha256,cached);}
+        if(cached.shape!==ref.shape||cached.characters!==ref.characters)hold('immutable snapshot reference shape changed');
+        const raw=cached.raw;
+        if(key==='subject'&&value.subject_sha256!==ref.sha256)hold('immutable handover subject hash changed');
+        if(key==='checkpoint'&&value.checkpoint_sha256&&value.checkpoint_sha256!==ref.sha256)hold('immutable checkpoint hash changed');
+        const original=register(child(location,key),'payload',raw,'json','immutable-snapshot-original');
+        if(!checkpointContinuity){result[key]={original:reference(original),immutable_snapshot:ref};continue;}
+        const previous=snapshotEntries.get(ref.sha256);
+        if(previous){result[key]={original:reference(original),same_as:previous};continue;}
+        snapshotEntries.set(ref.sha256,reference(original));
+        item=JSON.parse(raw);
+      }
       if(checkpointContinuity&&key==='subject'&&exactKeys(item,['retained_handover_subject'],['retained_handover_subject'])) {
         const locator=item.retained_handover_subject;
         if(!exactKeys(locator,['record_id','sha256'],['record_id','sha256'])||typeof locator.record_id!=='string'
@@ -426,7 +469,9 @@ export function buildEvidence(checkpoint, history = [], { wholeBodyAliases = tru
             if (kind && (object(value) || Array.isArray(value))) {
               const entries=[], repeats=[];
               for(const [key,v] of Object.entries(value)) {
-                const projected={key,...entry(v,child(location,key),kind)};
+                const at=child(location,key);
+                if(['records','jobs'].includes(field)&&object(value))at.collection_key=key;
+                const projected={key,...entry(v,at,kind)};
                 (projected.same_as?repeats:entries).push(projected);
               }
               // Repeated occurrence metadata is retrievable, not another copy
@@ -474,14 +519,40 @@ export function buildEvidence(checkpoint, history = [], { wholeBodyAliases = tru
   }
 
   function entry(value, location, kind, inheritedArtifact = false, initialPolicy = {}) {
+    const locator=['record','job','history-attempt'].includes(kind)&&snapshotEntryReference(value);
+    let originalRaw=null;
+    if(locator){
+      const original=originalEntry(value);value=original.value;originalRaw=original.raw;
+    }
     const at = { ...location };
     delete at.revision;
     if (object(value)) {
       if (own(value, 'id')) at.entity_id = value.id;
       if (own(value, 'revision')) at.revision = value.revision;
     }
-    const raw = serialize(value);
+    const raw = originalRaw??serialize(value);
     const source = register(at, kind, raw, 'json');
+    if(kind==='record'&&value?.handover&&(locator||snapshotReference(value.handover.subject))){
+      const original=retainedHandoverRecords[value.id];
+      if(original){
+        const raw=serialize(original);
+        const id='retained-record:'+hash(raw);
+        if(!own(sources,id))register({scope:'retained-handover',path:pointer('/records',value.id)},'original-handover-record',raw,'json','immutable-reconstruction-original',id);
+      }
+    }
+    if(currentState&&object(value)&&typeof value.id==='string'){
+      const key=location.collection_key??value.id;
+      const id=kind==='record'?key:kind==='job'?'job:'+key:kind==='history-attempt'?'upgrade:'+value.id:null;
+      const original=id&&contextSource(reviewState,id);
+      const excluded=id&&(projection.excluded(id)||(kind==='job'&&projection.proofJobs.has(key)));
+      const equivalent=excluded&&original&&(serialize(original)===raw||(snapshotState&&kind==='record'&&serialize(shallowSnapshotRecord(snapshotState,original))===raw)
+        ||(snapshotState&&kind==='history-attempt'&&serialize(shallowSnapshotAttempt(snapshotState,original))===raw));
+      if(equivalent){
+        archivedSourceIds.add(source.source_id);
+        archivedRecords.push({source:reference(source),key:id,classification:projection.classifications.get(id)??{proof_for_reviewed_disposition:true}});
+        return {source:reference(source),reviewed_archive:true};
+      }
+    }
     const equalityKey = kind + ':' + hash(raw);
     if (checkpointContinuity && continuityEntries.get(equalityKey)?.raw === raw) {
       return {source:reference(source), same_as:continuityEntries.get(equalityKey).semantic};
@@ -512,9 +583,12 @@ export function buildEvidence(checkpoint, history = [], { wholeBodyAliases = tru
       // original container shape are explicit; paths use keys, never IDs.
       const entries = Object.entries(value).map(([entryKey, item]) => {
         const at = keyed ? { ...child(location, entryKey), collection_key: entryKey } : child(location, entryKey);
-        if(currentState&&((key==='records'&&(dispositionProofIds.has(item.id)||classificationFor(snapshot,item)?.disposition==='resolved'))||(key==='jobs'&&(dispositionProofIds.has(item.artifact_id)||classificationFor(snapshot,item,'job:'+item.id)?.disposition==='resolved')))) {
-          const source=register(at,'archived-record',serialize(item),'json');
-          archivedSourceIds.add(source.source_id);archivedRecords.push({key:entryKey,source:reference(source),classification:snapshot.context_classifications[key==='jobs'?'job:'+item.id:item.id]??{proof_for_reviewed_disposition:true}});
+        const excluded=currentState&&((key==='records'&&projection.excluded(entryKey))||(key==='jobs'&&(projection.proofJobs.has(entryKey)||projection.excluded('job:'+entryKey))));
+        const original=excluded&&contextSource(reviewState,key==='jobs'?'job:'+entryKey:entryKey);
+        const matches=original&&(serialize(original)===serialize(item)||(snapshotState&&serialize(key==='records'?shallowSnapshotRecord(snapshotState,original):retainSnapshotEntry(snapshotState,original,original.id??entryKey))===serialize(item)));
+        if(matches){
+          const source=register(at,'archived-record',serialize(original??item),'json');
+          archivedSourceIds.add(source.source_id);archivedRecords.push({key:entryKey,source:reference(source),classification:reviewState.context_classifications[key==='jobs'?'job:'+entryKey:entryKey]??{proof_for_reviewed_disposition:true}});
           return null;
         }
         const projected = entry(item, at, collectionKinds[key]);
@@ -529,7 +603,12 @@ export function buildEvidence(checkpoint, history = [], { wholeBodyAliases = tru
     }
   }
   const historyEntries = prior.map((value,index)=>{
-    if(currentState&&classificationFor(snapshot,value,'upgrade:'+value.id)?.disposition==='resolved'){const source=register({scope:'history',path:pointer('',index)},'archived-upgrade',serialize(value),'json');archivedSourceIds.add(source.source_id);archivedRecords.push({entity:'upgrade',key:value.id,source:reference(source),classification:snapshot.context_classifications['upgrade:'+value.id]});return null;}
+    if(currentState&&projection.excluded('upgrade:'+value.id)){
+      const original=contextSource(reviewState,'upgrade:'+value.id),raw=serialize(value);
+      if(original&&(serialize(original)===raw||(snapshotState&&serialize(shallowSnapshotAttempt(snapshotState,original))===raw))){
+        const source=register({scope:'history',path:pointer('',index)},'archived-upgrade',serialize(original),'json');archivedSourceIds.add(source.source_id);archivedRecords.push({entity:'upgrade',key:value.id,source:reference(source),classification:reviewState.context_classifications['upgrade:'+value.id]});return null;
+      }
+    }
     return entry(value,{scope:'history',path:pointer('',index)},'history-attempt');
   }).filter(Boolean);
   let archiveIndex=null;
@@ -577,10 +656,10 @@ export function resolveBodyAlias(subject, alias) {
 /** Compare identical current inputs, including terminal current attempts as
  * next-attempt history. Prepare adds a decision, so this is only a preview.
  */
-export function projectionPreview(checkpoint, history = [], currentUpgrade = null, {currentState=false}={}) {
+export function projectionPreview(checkpoint, history = [], currentUpgrade = null, {currentState=false,checkpointContinuity=false,snapshotState,contextState}={}) {
   const projectedHistory = currentUpgrade ? [...history, currentUpgrade] : history;
-  const baseline = buildEvidence(checkpoint, projectedHistory, { wholeBodyAliases: false });
-  const candidate = buildEvidence(checkpoint, projectedHistory,{currentState});
+  const baseline = buildEvidence(checkpoint, projectedHistory, { wholeBodyAliases: false,snapshotState,contextState });
+  const candidate = buildEvidence(checkpoint, projectedHistory,{currentState,checkpointContinuity,snapshotState,contextState});
   const metrics = subject => {
     const stream = subject.sources[subject.pages[0].source_id];
     return { format: subject.handover.format, checkpoint_sha256: subject.checkpoint_sha256,
@@ -708,6 +787,53 @@ export function validateSemanticDelivery(subject, ledger) {
     hold('required semantic stream not completely delivered to this session');
   }
   return true;
+}
+
+// Explicit v2 qualification driver. Unlike legacy record-reads-v1 this stream
+// may take arbitrarily many bounded calls; every compulsory range must reach
+// the same independent native session. Worker integration must retain the
+// runtime-issued receipt, never a model-authored claim of complete delivery.
+export function buildQualificationEvidence(state,plan,job) {
+  const p=plan?.context_classification_plan;
+  if(p?.version!==2||job.review_of?.id!==plan.id||job.review_of.revision!==plan.revision)hold('exact v2 qualification target required');
+  const originals=[],bodies=new Map(),snapshots=new Set(),legacyDependencies=new Map();
+  const retain=(raw)=>{
+    const sha256=hash(raw),previous=bodies.get(sha256);
+    if(previous&&previous.raw!==raw)hold('qualification original hash collision');
+    if(!previous)bodies.set(sha256,{source_id:'qualification-original:'+sha256,raw});
+    return {source_id:'qualification-original:'+sha256,sha256};
+  };
+  const dependencies=value=>{
+    const todo=[value];
+    while(todo.length){
+      const item=todo.pop();if(!item||typeof item!=='object')continue;
+      const legacy=legacyHandoverSource(state,item);
+      if(legacy){const id=item.retained_handover_subject.record_id,key='legacy:'+id+':'+item.retained_handover_subject.sha256;if(!snapshots.has(key)){snapshots.add(key);const raw=serialize(legacy);retain(raw);legacyDependencies.set(id,{id,revision:legacy.revision??null,sha256:hash(raw)});todo.push(legacy);}continue;}
+      const ref=snapshotReference(item);
+      if(ref){if(!snapshots.has(ref.sha256)){snapshots.add(ref.sha256);const raw=snapshotBytes(state,item);retain(raw);todo.push(JSON.parse(raw));}continue;}
+      for(const child of Object.values(item))if(child&&typeof child==='object')todo.push(child);
+    }
+  };
+  for(const ref of [...p.sources,...p.counterparts]){
+    const value=contextSource(state,ref.id);
+    if(!value||hash(serialize(value))!==ref.sha256||(value.revision??null)!==ref.revision)hold('qualification source changed');
+    originals.push({source:ref,body:retain(serialize(value))});dependencies(value);
+  }
+  // Raw strings are intentional: qualification cannot omit a typed log/file
+  // body that might contain its only negative finding. Every exact original and
+  // referenced snapshot is compulsory once, with separate byte-exact retrieval.
+  return buildEvidence({company_id:state.id,governance:state.governance,cos_instructions:state.cos_instructions,roles:state.roles,owner:state.owner,state_extensions:currentExtensions(state),qualification_plan:plan,originals,original_bodies:[...bodies.values()]},[],{wholeBodyAliases:false,checkpointContinuity:true,snapshotState:state,originalSources:[...bodies.values()],
+    retainedHandoverRecords:state.records,reviewContext:{protocol:'context-qualification-v2',plan_sha256:hash(serialize(p)),legacy_dependencies:[...legacyDependencies.values()].sort((a,b)=>a.id.localeCompare(b.id)),
+      charter:state.roles[job.role],assignment:{task:job.task,task_summary:job.task_summary??null,next_handoff:job.next_handoff??null,
+        ...(job.coordination?{coordination:job.coordination}:{}),...(job.requester?{requester:job.requester}:{}),...(job.expected_deliverable!==undefined?{expected_deliverable:job.expected_deliverable}:{}),model_selection:job.model_selection??{mode:'default'}},
+      rule:'Compare every original finding, failure, uncertain effect and exhausted allowance with the exact mandatory counterparts. Represented does not mean resolved. Return Blocked for any omission, conflict or unique finding. No authority or renewed allowance is granted.'}});
+}
+export function qualificationDeliveryReceipt(subject,ledger,{plan_sha256,context_sha256}) {
+  validateSemanticDelivery(subject,ledger);
+  const stream=subject.sources[subject.pages[0].source_id];
+  const context=subject.handover.review_context?.value;
+  if(context?.protocol!=='context-qualification-v2'||context.plan_sha256!==plan_sha256)hold('qualification receipt plan changed');
+  return freeze({protocol:2,semantic_delivery_complete:true,native_id:ledger.session_id,stream_sha256:stream.sha256,plan_sha256,context_sha256,legacy_dependencies:context.legacy_dependencies});
 }
 
 /** Exact source eligibility only, not understanding or semantic correctness.

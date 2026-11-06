@@ -1,6 +1,6 @@
 # Fresh streamed handover execution windows
 
-v0.6.14 optionally separates an ordinary handover review's total execution window from each native invocation. `company_dispatch` accepts `handover_review_window_minutes: 30 | 45` and a nonempty `handover_review_reason` only for a fresh, current, paused protocol-v2 handover QA target. Both fields are recorded and bound to the exact review context. Applicable authority is still required. Omission preserves the existing total execution timeout and legacy behavior.
+v0.7.1 optionally separates an ordinary handover review's total execution window from each native invocation. `company_dispatch` accepts `handover_review_window_minutes: 30 | 45` and a nonempty `handover_review_reason` only for a fresh, current, paused protocol-v2/v3 handover QA target. Both fields are recorded and bound to the exact review context. Applicable authority is still required. Omission preserves the existing total execution timeout and legacy behavior.
 
 `timeout_ms` remains the invocation cap, at most 600,000 ms. The total window begins at the first actual native spawn, never at queue admission or prompt construction. Every call receives at most the smaller of its cap and the remaining fixed window. Each actual spawn is checked, and late/missing call timing holds the result. Existing queue/startup limits, cancellation/termination uncertainty, byte/range limits and same-native full evidence delivery remain unchanged.
 
