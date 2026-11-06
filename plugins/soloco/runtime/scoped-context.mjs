@@ -110,7 +110,7 @@ function manifest(raw){const units=[];let start=0;while(start<raw.length){let lo
 // Ordinary artifacts point to job_id; runtime test artifacts instead point to
 // their controller job through author_instance. Bind the whole relevant closure,
 // including candidate generation and deterministic-reuse provenance.
-function producerClosure(s,original){
+export function producerClosure(s,original){
   const closure=new Map(),seen=new Set(),active=new Set();
   function record(r){
     if(active.has(r.id))fail('cyclic producer closure '+r.id);

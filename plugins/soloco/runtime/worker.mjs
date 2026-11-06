@@ -1,4 +1,4 @@
-import {operatingMaintenanceEligible,operatingContext,operatingReviewContext} from './operating-state.mjs';
+import {operatingMaintenanceEligible,operatingContext,operatingReviewContext,validateOperatingDelivery} from './operating-state.mjs';
 import * as scoped from './scoped-context.mjs';
 import {createScopedStreamLedger,recordScopedStreamDelivery,validateScopedStreamAck} from './scoped-stream.mjs';
 import {qualificationAssignment,qualificationMatches,qualificationMaintenanceEligible,qualificationDelivery,qualificationProof,validateQualificationOutput,validateQualificationResponse} from './context-qualification.mjs';
@@ -210,7 +210,7 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
         request=JSON.stringify(packet);
         continue;
       }
-      const allowed=[...(job.supplemental_sources??[]),...(target?.context_classification_plan?.sources??[])];
+      const allowed=[...(job.supplemental_sources??[]),...(target?.context_classification_plan?.sources??[]),...(context.required_sources??[])];
       if(envelope.reads.some(r=>!allowed.some(a=>a.id===r.id&&a.sha256===r.sha256)))throw Error('Supplemental read is outside the assignment evidence allowlist');
       const reads=withStore(root,db=>{const s=db.read();eligibility(s);return envelope.reads.map(r=>contextRead(s,r));});
       for(const read of reads)supplemental.push({id:read.id,revision:read.revision,sha256:read.sha256,offset:read.offset,length:read.length,total_characters:read.total_characters});
@@ -247,6 +247,7 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
       let stale=!current || current.status!=='running' || s.owner.epoch!==job.epoch || (s.paused&&!handoverReviewEligible(s,current)&&!maintenanceEligible(s,current)) || changed || prototypeStale || executionStale || controller.signal.aborted;
       if(!current)throw new Error('Assignment record disappeared before completion');
       if(context.qualification&&!stale)(scopedContext(context)?scoped.validateScopedResponse:validateQualificationResponse)(s,context.stream?current:job,context,output.native_id,artifact.qualification_result,partitionDelivery);
+      if(target?.operating_plan&&artifact.review?.verdict==='Pass'&&!stale)validateOperatingDelivery(s,current);
       const bundle=stale||job.development_id?null:prototypeBundle(s,job,artifact);
       const development=stale||!job.development_id?null:developmentBundle(s,job,artifact,root);
       const artifactId=id(stale?'quarantined':'artifact');
@@ -262,9 +263,9 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
       }
       // Reconstruct and hash everything before this exclusive publication fence.
       // Timer callbacks may be delayed while synchronous validation is running.
-      if(context.stream&&jobTimeoutState(current,Date.now()).state!=='executing'){
+      if((context.stream||target?.operating_plan)&&jobTimeoutState(current,Date.now()).state!=='executing'){
         stale=true;completedJob.status='quarantined';completedRecord.status='Quarantined';
-        completedJob.execution_failure={code:'ROLE_TIMEOUT',message:'Scoped stream publication deadline reached',outcome:'timeout',at:stamp()};
+        completedJob.execution_failure={code:'ROLE_TIMEOUT',message:context.stream?'Scoped stream publication deadline reached':'Operating publication deadline reached',outcome:'timeout',at:stamp()};
       }
       s.records[artifactId]=completedRecord;Object.assign(current,completedJob);
       if(stale) {notice(s,'must_know','A late or stale result was quarantined; it grants no approval.',artifactId);return s;}

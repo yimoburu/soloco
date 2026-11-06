@@ -9,8 +9,8 @@ import {withStore,digest,teamHash} from '../plugins/soloco/runtime/store.mjs';
 import {executionTiming} from '../plugins/soloco/runtime/timeout.mjs';
 import {work} from '../plugins/soloco/runtime/worker.mjs';
 import {assignmentContext,contextMatches} from '../plugins/soloco/runtime/context.mjs';
-import {recordReference,currentExtensions} from '../plugins/soloco/runtime/current-state.mjs';
-import {operatingContext,operatingFrontier} from '../plugins/soloco/runtime/operating-state.mjs';
+import {recordReference,currentExtensions,applyContextQualification} from '../plugins/soloco/runtime/current-state.mjs';
+import {operatingContext,operatingFrontier,proposeOperatingState} from '../plugins/soloco/runtime/operating-state.mjs';
 const protocol='operating-state-v1',sha=v=>digest(JSON.stringify(v));
 const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'operating-contract-'));process.env.COMPANY_PLUGIN_DATA=path.join(tmp,'data');
 test.after(()=>fs.rmSync(tmp,{recursive:true,force:true}));
@@ -21,9 +21,10 @@ const ctx=(f,args)=>publicCall('company_context',{...f,protocol,...args},'codex'
 function home(f,id='home',scope='*',extra={}){return engine.save({...f,id,...(read(f).records[id]?{expected_revision:read(f).records[id].revision}:{}),kind:'artifact',content:'Complete fictional condition: no export or retry without canonical authority.',operating_record:{version:1,kind:'obligation',scope,owner:'runner',conditions:'Always while unresolved',exceptions:'None',clearing:'Exact independent closure',expires_at:null,dependencies:[],authority_refs:[],evidence_refs:[id],...extra}},'codex');}
 // The native adapter below is an explicitly fictional CONTRACT DOUBLE. Worker
 // publication/closure, public APIs, hashes and SQLite transactions are real.
-async function review(f,plan,{native='fictional-independent-'+plan,verdict='Pass',hook,action='publish_operating_state'}={}){
+async function review(f,plan,{native='fictional-independent-'+plan,verdict='Pass',hook,action='publish_operating_state',readSources=[]}={}){
  const queued=engine.dispatch({...f,role:'qa',review_of:plan,task:'Review complete fictional operating meaning, preservation, authority and interactions.'},'codex',{check:()=>({available:true,authenticated:true,version:'contract-double'}),launch:()=>({on(){},unref(){}})});
- await work(f.root,queued.id,async(_host,_session,prompt,_dir,timeout,_selection,options)=>{options.onSpawn(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));const target=read(f).records[plan];if(hook)hook();return {native_id:native,text:JSON.stringify({content:'FICTIONAL CONTRACT DOUBLE: complete fixture conditions checked; no native semantic acceptance claimed.',messages:[],notices:[],review:{verdict,reason:'Fictional contract judgment',permitted_action:action,plan_sha256:sha(target.operating_plan??target.context_classification_plan),preservation_complete:true,interaction_complete:true,authority_checked:true,blockers:verdict==='Pass'?[]:['fixture unresolved']}})};});
+ let first=true;const pendingReads=[...readSources];
+ await work(f.root,queued.id,async(_host,_session,prompt,_dir,timeout,_selection,options)=>{if(first){first=false;options.onSpawn(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));}if(pendingReads.length)return {native_id:native,text:JSON.stringify({reads:pendingReads.splice(0,4).map(id=>({id,sha256:sha(readStateSource(read(f),id)),offset:0,length:JSON.stringify(readStateSource(read(f),id)).length}))})};const target=read(f).records[plan];if(hook)hook();return {native_id:native,text:JSON.stringify({content:'FICTIONAL CONTRACT DOUBLE: complete fixture conditions checked; no native semantic acceptance claimed.',messages:[],notices:[],review:{verdict,reason:'Fictional contract judgment',permitted_action:action,plan_sha256:sha(target.operating_plan??target.context_classification_plan),preservation_complete:true,interaction_complete:true,authority_checked:true,coverage_complete:true,obligations_preserved:true,unique_findings:[],blockers:verdict==='Pass'?[]:['fixture unresolved']}})};});
  const s=read(f),j=s.jobs[queued.id];assert.equal(j.status,'completed',j.error);return {id:j.artifact_id,job:queued.id};
 }
 async function publish(f){const p=await ctx(f,{action:'plan'}),r=await review(f,p.id);const result=await ctx(f,{action:'apply',plan_id:p.id,review_id:r.id});assert.equal(result.published,true);return {p,r};}
@@ -145,5 +146,181 @@ test('format6 explicit non-home evidence survives dispatch, discovery and bounde
   if(mode==='valid'){assert.equal(calls,2);assert.equal(result.retrieved_inputs[0].sha256,ref.sha256);}
   if(mode==='unlisted')assert.match(result.error,/allowlist/);
   if(mode==='wrong-native')assert.match(result.error,/native identity/);
+ }
+});
+
+// Fictional semantic evidence, intentionally absent from the current home text.
+const revokedRestriction='VIOLET-RETRY-739: prior grant REVOKED; uncertain remote write may have spent the last allowance. Never retry until remote effects are reconciled and a fresh canonical grant is recorded.';
+async function restrictedArchive({large=false,metadata}={}){
+ const f=fixture();
+ engine.save({...f,id:'historical-restriction',kind:'artifact',content:(large?'fictional audit padding '.repeat(2000):'')+revokedRestriction},'codex');
+ home(f,'permission','*',{kind:'permission',grant_refs:['historical-restriction'],remaining:0,revoked:true,evidence_refs:['historical-restriction']});
+ home(f,'outcome','*',{kind:'outcome',attempted_action:'Fictional remote write',resources:['fictional resource'],possible_effects:'Possibly written',uncertainty:'Unknown completion',retry_clearing:'Retain canonical archived retry conditions',historical_receipts:['historical-restriction'],evidence_refs:['historical-restriction']});
+ if(metadata)mutate(f,s=>{s.records.permission.external_catalog=metadata;});
+ const p=engine.contextControl({...f,action:'plan',record_ids:['historical-restriction'],disposition:'represented',counterpart_ids:['permission','outcome'],coverage:[{source_id:'historical-restriction',counterpart_ids:['permission','outcome'],findings:'Preserve revoked grant',failures:'Retry blocked',uncertain_effects:'Write unknown',exhausted_allowances:'Zero remaining'}]},'codex');
+ const r=await review(f,p.id,{action:'apply_context_classification'});
+ // Use the canonical v2 apply helper: legacy contextControl does not retain its
+ // qualification receipt. Repairing that public bootstrap route is parent scope.
+ mutate(f,s=>{s.context_classifications={...s.context_classifications,...applyContextQualification(s,s.records[p.id],s.records[r.id],{source_instruction:f.source_instruction,contextMatches})};});
+ return f;
+}
+async function evidenceReview(f,plan,mode='complete'){
+ const queued=engine.dispatch({...f,role:'qa',review_of:plan,task:'Independently review all required publication evidence'},'codex',{check:()=>({available:true}),launch:()=>({on(){},unref(){}})});
+ const packet=JSON.parse(assignmentContext(read(f),read(f).jobs[queued.id]).text),required=packet.required_evidence;
+ const pending=required.sources.filter(ref=>!required.inline.some(x=>x.source.id===ref.id));
+ const received=new Map(required.inline.map(x=>[x.source.id,JSON.stringify(x.value)]));let offset=0,round=0;
+ await work(f.root,queued.id,async(_host,session,prompt,_dir,timeout,_selection,options)=>{
+   if(round++===0)options.onSpawn(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));
+   else {assert.equal(session,'fictional-evidence-native');const pack=JSON.parse(prompt);assert.equal(pack.protocol,'record-reads-v1');for(const r of pack.reads){assert.equal(r.offset,(received.get(r.id)??'').length);received.set(r.id,(received.get(r.id)??'')+r.text);}}
+   const ref=pending[0];
+   if(ref&&mode!=='undelivered'&&!(mode==='partial'&&offset>0)){
+     const length=Math.min(16000,ref.total_characters-offset),read={id:ref.id,sha256:ref.sha256,offset,length};offset+=length;if(offset===ref.total_characters){pending.shift();offset=0;}
+     if(mode==='outside')read.id='not-allowed';if(mode==='stale')read.sha256='0'.repeat(64);
+     return {native_id:'fictional-evidence-native',text:JSON.stringify({reads:[read]})};
+   }
+   if(mode==='complete'){
+     assert.equal(pending.length,0);for(const ref of required.sources)assert.equal(received.get(ref.id),JSON.stringify(readStateSource(read(f),ref.id)));
+     if(received.has('historical-restriction'))assert.match(JSON.parse(received.get('historical-restriction')).content,/VIOLET-RETRY-739.*REVOKED/);
+   }
+   if(mode==='changed')mutate(f,s=>{s.records['historical-restriction'].content+=' Further restriction: retry remains revoked.';});
+   return {native_id:'fictional-evidence-native',text:JSON.stringify({content:'FICTIONAL CONTRACT DOUBLE: exact complete supplied evidence examined.',messages:[],notices:[],review:{verdict:'Pass',reason:'Fictional judgment only',permitted_action:'publish_operating_state',plan_sha256:sha(read(f).records[plan].operating_plan),preservation_complete:true,interaction_complete:true,authority_checked:true,blockers:[]}})};
+ });
+ return {job:read(f).jobs[queued.id],required,received};
+}
+const readStateSource=(s,id)=>id.startsWith('job:')?s.jobs[id.slice(4)]:s.records[id];
+
+test('referenced archived revoked/retry restriction and canonical parent receipts are supplied completely inline',async()=>{
+ const f=await restrictedArchive(),p=await ctx(f,{action:'plan'}),r=await evidenceReview(f,p.id);
+ assert.equal(r.job.status,'completed',r.job.error);
+ const c=read(f).context_classifications['historical-restriction'];
+ for(const id of ['historical-restriction',c.plan.id,c.review.id,'job:'+read(f).records[c.review.id].job_id])assert.ok(r.required.inline.some(x=>x.source.id===id),id);
+ assert.equal(r.required.preservation_classifications[0].value.disposition,'represented');
+ assert.equal((await ctx(f,{action:'apply',plan_id:p.id,review_id:r.job.artifact_id})).published,true);
+ const baseline=read(f);
+ for(const mode of ['source','parent','receipt','missing']){
+   mutate(f,s=>{Object.assign(s,structuredClone(baseline));if(mode==='source')s.records['historical-restriction'].content+=' revoked again';if(mode==='parent')s.records[c.plan.id].content+=' changed';if(mode==='receipt')s.jobs[s.records[c.review.id].job_id].native_id='different-native';if(mode==='missing')delete s.records[c.review.id];});
+   assert.throws(()=>operatingContext(read(f)),/changed|missing|invalid|Held/);
+ }
+});
+
+test('large non-home provenance uses exact same-native ranges; undelivered, partial, denied, stale or changed evidence cannot publish',async()=>{
+ for(const mode of ['complete','undelivered','partial','outside','stale','changed']){
+   const f=await restrictedArchive({large:true}),p=await ctx(f,{action:'plan'}),r=await evidenceReview(f,p.id,mode);
+   assert.ok(!r.required.inline.some(x=>x.source.id==='historical-restriction'));
+   if(mode==='complete'){
+     assert.equal(r.job.status,'completed',r.job.error);assert.ok(r.job.retrieved_inputs.length>=3);
+     const baseline=read(f);mutate(f,s=>{s.jobs[r.job.id].retrieved_inputs.pop();});
+     await assert.rejects(ctx(f,{action:'apply',plan_id:p.id,review_id:r.job.artifact_id}),/not completely delivered/);
+     mutate(f,s=>{Object.assign(s,structuredClone(baseline));});
+     assert.equal((await ctx(f,{action:'apply',plan_id:p.id,review_id:r.job.artifact_id})).published,true);
+   }else{
+     assert.notEqual(r.job.status,'completed',r.job.error);
+     if(mode==='outside'||mode==='stale')assert.match(r.job.error,/allowlist/);
+     if(mode==='undelivered'||mode==='partial')assert.match(r.job.error,/not completely delivered/);
+     await assert.rejects(ctx(f,{action:'apply',plan_id:p.id,review_id:r.job.artifact_id??'absent'}));assert.equal(read(f).operating_state,undefined);
+   }
+ }
+});
+
+test('canonical preservation parent revisions cannot be borrowed from matching hashes',async()=>{
+ for(const key of ['plan','review']){
+   const f=await restrictedArchive();
+   mutate(f,s=>{s.context_classifications['historical-restriction'][key].revision++;});
+   await assert.rejects(ctx(f,{action:'plan'}),/source\/receipt changed/);
+   assert.equal(read(f).operating_state,undefined);
+ }
+});
+
+test('missing provenance and snapshot-only evidence hold rather than count pointers as delivered bodies',async()=>{
+ for(const mode of ['missing','snapshot']){
+   const f=fixture();home(f,'permission','*',{kind:'permission',remaining:0,revoked:true,grant_refs:['permission']});
+   mutate(f,s=>{if(mode==='missing')s.records.permission.operating_record.grant_refs=['missing-grant'];else s.records.permission.hidden_receipt={immutable_snapshot:{version:1,sha256:'0'.repeat(64),characters:5,shape:'object'}};});
+   await assert.rejects(ctx(f,{action:'plan'}),mode==='missing'?/provenance source missing/:/canonical snapshot delivery/);
+   assert.equal(read(f).operating_state,undefined);
+ }
+});
+
+// Exact runtime receipt shape from executeDevelopmentTest (develop.mjs), with
+// deterministic reuse and generated candidate attribution. No native execution.
+async function runtimeArchive({large=false}={}){
+ const f=fixture();home(f,'permission','*',{evidence_refs:['test-reused'],authority_refs:['test-original']});
+ mutate(f,s=>{
+   for(const suffix of ['original','reused']){
+     const plan='development-'+suffix,candidate='candidate-'+suffix,receipt='test-'+suffix,generation='generate-'+suffix,job='run-'+suffix;
+     s.records[plan]={id:plan,revision:1,kind:'plan',author_instance:'fictional-development-owner',content:'Fictional bounded development plan'};
+     s.records[candidate]={id:candidate,revision:1,kind:'artifact',author_instance:'generator-instance-'+suffix,job_id:generation,content:'Fictional generated source',development:{type:'candidate',candidate_sha256:'same-source',run:{job_id:job,status:'completed',receipt_id:receipt}}};
+     s.jobs[generation]={id:generation,status:'completed',instance_id:'generator-instance-'+suffix,native_id:'generator-native-'+suffix,artifact_id:candidate};
+     s.jobs[job]={id:job,kind:'development_test',status:'completed',candidate_id:candidate,development_id:plan,artifact_id:receipt};
+     const result={status:'passed',tests_executed:suffix==='original',...(suffix==='reused'?{reused:true,reused_from:'test-original',original_tests_executed:true}:{}),candidate_sha256:'same-source',test_paths:['fictional.test.mjs'],timeout_ms:1000,max_output_bytes:1000,directory:'/fictional/candidate',finished_at:'2026-11-06T00:00:00Z',output:large?'fictional output '.repeat(1500):'passed'};
+     s.records[receipt]={id:receipt,kind:'artifact',author_role:'runtime',author_instance:job,revision:1,status:'Submitted',content:JSON.stringify(result),development:{type:'test',plan_id:plan,candidate_id:candidate,candidate_sha256:'same-source',result,receipt_sha256:sha(result)}};
+   }
+   s.jobs['reuse-qa-job']={id:'reuse-qa-job',instance_id:'reuse-qa-instance',native_id:'reuse-qa-native',status:'completed',artifact_id:'reuse-qa'};
+   s.records['reuse-qa']={id:'reuse-qa',revision:1,kind:'review',author_role:'qa',author_instance:'reuse-qa-instance',job_id:'reuse-qa-job',status:'Submitted',review_of:{id:'test-original',revision:1},content:'Fictional deterministic reuse qualification',review:{verdict:'Pass',deterministic_validation:{permitted_action:'reuse_exact_validation'}}};
+   Object.assign(s.records['test-reused'].development,{reused_from:'test-original',reuse_qualification:{id:'reuse-qa',revision:1,sha256:sha(s.records['reuse-qa'])}});
+ });
+ const state=read(f),ids=[...Object.keys(state.records).filter(id=>id!=='permission'),...Object.keys(state.jobs).map(id=>'job:'+id)];
+ const p=engine.contextControl({...f,action:'plan',record_ids:ids,disposition:'represented',counterpart_ids:['permission'],coverage:ids.map(source_id=>({source_id,counterpart_ids:['permission'],findings:'Retain exact runtime evidence',failures:'Retain failed evidence',uncertain_effects:'No authority inferred',exhausted_allowances:'No renewed allowance'}))},'codex');
+ const r=await review(f,p.id,{action:'apply_context_classification',readSources:ids.filter(id=>id.startsWith('job:'))});
+ mutate(f,s=>{s.context_classifications={...s.context_classifications,...applyContextQualification(s,s.records[p.id],s.records[r.id],{source_instruction:f.source_instruction,contextMatches})};});
+ return f;
+}
+
+test('real runtime receipt attribution and deterministic reuse deliver the validated producer closure before Pass',async()=>{
+ const f=await runtimeArchive(),p=await ctx(f,{action:'plan'});
+ const expected=['test-reused','job:run-reused','candidate-reused','development-reused','job:generate-reused','test-original','job:run-original','candidate-original','development-original','job:generate-original','reuse-qa','job:reuse-qa-job'];
+ const r=await review(f,p.id,{hook:()=>{
+   const state=read(f),job=Object.values(state.jobs).find(j=>j.status==='running'&&j.review_of?.id===p.id);
+   const packet=JSON.parse(assignmentContext(state,job).text);
+   for(const id of expected)assert.ok(packet.required_evidence.inline.some(x=>x.source.id===id),id);
+   assert.equal(state.operating_state,undefined);
+ }});
+ assert.equal((await ctx(f,{action:'apply',plan_id:p.id,review_id:r.id})).published,true);
+ const baseline=read(f);
+ for(const id of ['test-reused','test-original']){
+   mutate(f,s=>{Object.assign(s,structuredClone(baseline));const receipt=s.records[id];receipt.development.result.output+=' valid changed result';receipt.content=JSON.stringify(receipt.development.result);receipt.development.receipt_sha256=sha(receipt.development.result);});
+   assert.throws(()=>operatingContext(read(f)),/changed|Held|hold/);
+ }
+});
+
+test('runtime receipt missing or mismatched producer, candidate, plan, reuse or generation holds',async()=>{
+ const f=await runtimeArchive(),baseline=read(f);
+ for(const change of [s=>delete s.jobs['run-reused'],s=>s.jobs['run-reused'].artifact_id='other',s=>s.records['test-reused'].author_instance='missing',s=>s.jobs['run-reused'].candidate_id='candidate-original',s=>s.jobs['run-reused'].development_id='development-original',s=>s.jobs['generate-reused'].artifact_id='other',s=>delete s.records['test-original'],s=>delete s.jobs['reuse-qa-job']]){
+   const s=structuredClone(baseline);s.context_classifications={};change(s);
+   // Direct proposal exercises the producer validator even when a changed
+   // classification has made the broken source mandatory again.
+   assert.throws(()=>proposeOperatingState(s,{source_instruction:f.source_instruction}),/missing|changed|broken|invalid|hold|Held/);
+ }
+});
+
+test('external catalog reference-shaped metadata is verbatim evidence without a company lookup',async()=>{
+ const metadata={id:'external-catalog-only',revision:42,sha256:'external-digest',nested:[{id:'another-external-item',revision:7,sha256:'opaque'}],restriction:'Revoked authority and failed attempts remain evidence'};
+ const f=await restrictedArchive({metadata}),c=read(f).context_classifications['historical-restriction'];
+ const proposal=await ctx(f,{action:'plan'}),evidence=await evidenceReview(f,proposal.id);
+ assert.equal(evidence.job.status,'completed',evidence.job.error);
+ assert.deepEqual(JSON.parse(evidence.received.get('permission')).external_catalog,metadata);
+ for(const id of [metadata.id,metadata.nested[0].id])assert.ok(!evidence.required.sources.some(x=>x.id===id));
+ assert.ok(evidence.required.sources.some(x=>x.id===c.plan.id));assert.ok(evidence.required.sources.some(x=>x.id===c.review.id));
+ assert.equal((await ctx(f,{action:'apply',plan_id:proposal.id,review_id:evidence.job.artifact_id})).published,true);
+});
+
+
+test('runtime closure requires complete delivery and independent source and proof sessions',async()=>{
+ for(const mode of ['undelivered','complete','generator-native-reused','generator-instance-reused','reuse-qa-native','reuse-qa-instance']){
+   const f=await runtimeArchive({large:mode==='undelivered'||mode==='complete'}),p=await ctx(f,{action:'plan'});
+   if(mode==='undelivered'||mode==='complete'){
+     const r=await evidenceReview(f,p.id,mode);
+     assert.ok(!r.required.inline.some(x=>x.source.id==='test-reused'));
+     if(mode==='undelivered'){
+       assert.equal(r.job.status,'failed');assert.match(r.job.error,/not completely delivered/);
+       await assert.rejects(ctx(f,{action:'apply',plan_id:p.id,review_id:r.job.artifact_id??'absent'}));
+     }else{
+       assert.equal(r.job.status,'completed',r.job.error);
+       assert.equal((await ctx(f,{action:'apply',plan_id:p.id,review_id:r.job.artifact_id})).published,true);
+     }
+   }else{
+     const r=await review(f,p.id,{native:mode});
+     await assert.rejects(ctx(f,{action:'apply',plan_id:p.id,review_id:r.id}),/reviewer owns current home/);
+     assert.equal(read(f).operating_state,undefined);
+   }
  }
 });
