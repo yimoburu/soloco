@@ -1,0 +1,7 @@
+**SOURCE PASS** at `7a12ca4c37b09e24d9ee7315160b6250a07bdbf4` versus upstream `1347f79`. All 199 manifest hashes match. No material source defect found; the independent duplicate-worker reproduction and six cancellation regressions pass. Reused completed Node 22/25 evidence: 634/634 full-suite and 28/28 scoped tests, zero skips.
+
+**Final native acceptance remains pending (Held).** The interface response exceeded 12,000 bytes at 12,912 and reported zero reviewed interfaces against ten requested. No integration or canonical apply completed. The resulting failure notice correctly makes domain applicability stale; both immutable extractions remain reusable.
+
+Large-company native convergence and effective model settings remain unverified.
+
+[Detailed QA report](/private/tmp/soloco-architecture-final-qa.md)

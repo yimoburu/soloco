@@ -1,0 +1,228 @@
+{
+  "root": "/private/var/folders/n8/886jbns96js8v6hk88_cxkkr0000gn/T/soloco-scoped-fictional-TiJWEI",
+  "source_commit": "8c71df9",
+  "prior_report": "/private/var/folders/n8/886jbns96js8v6hk88_cxkkr0000gn/T/soloco-scoped-fictional-TiJWEI/report.json",
+  "prior_failed_jobs": [
+    "job-a998818b-7f0b-45ee-84e7-9cebe4c0b94e",
+    "job-4fb3c5d6-1bbb-45a8-b3e6-a01d1be5c3e1"
+  ],
+  "status": "held",
+  "reused": [
+    {
+      "job_id": "job-b1990c26-ca8e-4acb-96c3-07e9c56844aa",
+      "review_id": "artifact-f4b73994-492e-49dc-8fd4-2beda9c77e93",
+      "native_id": "01a1afd6-7307-7242-a9f9-6372e7174d36"
+    },
+    {
+      "job_id": "job-a37cdcb1-c7f4-4321-aabf-6b2084c0dd1a",
+      "review_id": "artifact-a4d4613a-b44b-4749-adf0-f76f9e4219bd",
+      "native_id": "01a1afd9-6550-7800-b70e-9972baba2d04"
+    }
+  ],
+  "classification_valid": false,
+  "applied": {
+    "applied": true,
+    "source": {
+      "id": "old",
+      "revision": 1,
+      "sha256": "2c79cab226f43905acb8b056ef071702116aeb943bac71f1fc55fd91f6247ffc"
+    },
+    "plan": {
+      "id": "scoped-plan-71cbc423-c214-47c8-856f-0c97c4eda25e",
+      "revision": 1,
+      "sha256": "631b3e99ecbbee66a1092ade34b72f031f89cb169eaded694172d8e9c71b8894"
+    },
+    "review": {
+      "id": "artifact-756e8c33-0aa2-4434-8215-544cbe94aaa8",
+      "revision": 1,
+      "sha256": "136d6079d78d6a92669fdd0f69dbcc9f5090fcd313113dbfebfb1560e01b3608"
+    },
+    "protocol": "scoped-context-v1",
+    "response_format": "soloco-current-v2"
+  },
+  "ordinary_scope_preservation": [
+    {
+      "scope": "billing",
+      "format": 3,
+      "exact_home_ids": [
+        "home-global",
+        "home-billing",
+        "home-outreach"
+      ],
+      "packet_bytes": 3887
+    }
+  ],
+  "error": "Error: Unqualified referenced evidence remains current; obtain exact independent qualification before ordinary dispatch\n    at assignmentContext (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/architecture-fix-2026-11-05/source/plugins/soloco/runtime/context.mjs:65:148)\n    at file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/architecture-fix-2026-11-05/continue-fictional-v2.mjs:33:100",
+  "paused": true,
+  "original_exact_hash_check": true,
+  "failed_evidence_retained": true,
+  "elapsed_ms": 186316,
+  "jobs": [
+    {
+      "job_id": "job-b1990c26-ca8e-4acb-96c3-07e9c56844aa",
+      "status": "completed",
+      "native_id": "01a1afd6-7307-7242-a9f9-6372e7174d36",
+      "phase": "extract",
+      "verdict": "Pass",
+      "input_bytes": 10011,
+      "output_bytes": 7833,
+      "closure": {
+        "termination_confirmed": true,
+        "reason": "model_process_closed",
+        "at": "2026-11-06T07:51:18.031Z"
+      }
+    },
+    {
+      "job_id": "job-a998818b-7f0b-45ee-84e7-9cebe4c0b94e",
+      "status": "failed",
+      "native_id": "01a1afd6-7330-78c1-9392-fdd70c2f9044",
+      "phase": "extract",
+      "input_bytes": 10011,
+      "output_bytes": null,
+      "closure": {
+        "termination_confirmed": true,
+        "reason": "model_process_closed",
+        "at": "2026-11-06T07:51:22.951Z"
+      }
+    },
+    {
+      "job_id": "job-a37cdcb1-c7f4-4321-aabf-6b2084c0dd1a",
+      "status": "completed",
+      "native_id": "01a1afd9-6550-7800-b70e-9972baba2d04",
+      "phase": "extract",
+      "verdict": "Pass",
+      "input_bytes": 10011,
+      "output_bytes": 2823,
+      "closure": {
+        "termination_confirmed": true,
+        "reason": "model_process_closed",
+        "at": "2026-11-06T07:54:26.906Z"
+      }
+    },
+    {
+      "job_id": "job-f5ac17d2-8c23-46ca-bfa0-4c3b041ddcdc",
+      "status": "completed",
+      "native_id": "01a1afda-15e4-7141-9e16-4774a29d94fa",
+      "phase": "applicability",
+      "verdict": "Pass",
+      "input_bytes": 25893,
+      "output_bytes": 5183,
+      "closure": {
+        "termination_confirmed": true,
+        "reason": "model_process_closed",
+        "at": "2026-11-06T07:55:12.808Z"
+      }
+    },
+    {
+      "job_id": "job-9c533971-66e0-48e3-8f97-432cc2f82ef9",
+      "status": "completed",
+      "native_id": "01a1afda-161a-7ba0-9152-7cb9057525bf",
+      "phase": "applicability",
+      "verdict": "Pass",
+      "input_bytes": 25980,
+      "output_bytes": 6985,
+      "closure": {
+        "termination_confirmed": true,
+        "reason": "model_process_closed",
+        "at": "2026-11-06T07:55:29.616Z"
+      }
+    },
+    {
+      "job_id": "job-e1dabbf2-8768-47ce-b304-9da0acd143db",
+      "status": "completed",
+      "native_id": "01a1afda-1660-7302-af63-6aa3611995a6",
+      "phase": "applicability",
+      "verdict": "Pass",
+      "input_bytes": 26058,
+      "output_bytes": 10729,
+      "closure": {
+        "termination_confirmed": true,
+        "reason": "model_process_closed",
+        "at": "2026-11-06T07:55:32.226Z"
+      }
+    },
+    {
+      "job_id": "job-4fb3c5d6-1bbb-45a8-b3e6-a01d1be5c3e1",
+      "status": "failed",
+      "native_id": "01a1afdb-13a2-7843-94e1-697bfd7db134",
+      "phase": "applicability",
+      "input_bytes": 28309,
+      "output_bytes": null,
+      "closure": {
+        "termination_confirmed": true,
+        "reason": "model_process_closed",
+        "at": "2026-11-06T07:56:47.310Z"
+      }
+    },
+    {
+      "job_id": "job-fb303cdd-6865-4ae4-b4ea-c91cb19dd2a2",
+      "status": "completed",
+      "native_id": "01a1afe1-3ff0-7291-8087-0a4fb145c816",
+      "phase": "applicability",
+      "verdict": "Pass",
+      "input_bytes": 26250,
+      "output_bytes": 4663,
+      "closure": {
+        "termination_confirmed": true,
+        "reason": "model_process_closed",
+        "at": "2026-11-06T08:02:56.178Z"
+      }
+    },
+    {
+      "job_id": "job-2bf0ae75-26fc-49d7-81d6-7deaa64457bb",
+      "status": "completed",
+      "native_id": "01a1afe1-401d-7b12-aafe-7140675bb802",
+      "phase": "applicability",
+      "verdict": "Pass",
+      "input_bytes": 26337,
+      "output_bytes": 7757,
+      "closure": {
+        "termination_confirmed": true,
+        "reason": "model_process_closed",
+        "at": "2026-11-06T08:03:25.201Z"
+      }
+    },
+    {
+      "job_id": "job-03fd5cc7-efbd-4d20-afda-a27bf6a0ce19",
+      "status": "completed",
+      "native_id": "01a1afe1-4055-7eb3-aae9-230b9292de34",
+      "phase": "applicability",
+      "verdict": "Pass",
+      "input_bytes": 26415,
+      "output_bytes": 10710,
+      "closure": {
+        "termination_confirmed": true,
+        "reason": "model_process_closed",
+        "at": "2026-11-06T08:03:25.043Z"
+      }
+    },
+    {
+      "job_id": "job-a7f8ac6c-75e8-4937-8c85-50490c05d3ed",
+      "status": "completed",
+      "native_id": "01a1afe2-4cab-7213-ad9f-8e503c1f16be",
+      "phase": "applicability",
+      "verdict": "Pass",
+      "input_bytes": 29371,
+      "output_bytes": 9839,
+      "closure": {
+        "termination_confirmed": true,
+        "reason": "model_process_closed",
+        "at": "2026-11-06T08:04:47.024Z"
+      }
+    },
+    {
+      "job_id": "job-86611b36-e9d2-436c-8dd7-1c5073281d44",
+      "status": "completed",
+      "native_id": "01a1afe3-8c9e-7ca0-864e-af6fa386dc95",
+      "phase": "integration",
+      "verdict": "Pass",
+      "input_bytes": 25165,
+      "output_bytes": 4569,
+      "closure": {
+        "termination_confirmed": true,
+        "reason": "model_process_closed",
+        "at": "2026-11-06T08:05:21.969Z"
+      }
+    }
+  ]
+}

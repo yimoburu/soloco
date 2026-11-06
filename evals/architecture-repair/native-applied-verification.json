@@ -1,0 +1,212 @@
+{
+  "source_commit": "8c71df9",
+  "root": "/private/var/folders/n8/886jbns96js8v6hk88_cxkkr0000gn/T/soloco-scoped-fictional-TiJWEI",
+  "original_report": "native-scoped-continuation-v2.json",
+  "canonical_qualification": "applied_and_valid",
+  "preserved_original": true,
+  "preserved_failed_evidence": true,
+  "paused": true,
+  "ordinary_default_format3": [
+    {
+      "scope": "billing",
+      "exact_home_ids": [
+        "home-global",
+        "home-billing",
+        "home-outreach"
+      ],
+      "packet_bytes": 3887,
+      "notices": 2
+    },
+    {
+      "scope": "outreach",
+      "exact_home_ids": [
+        "home-global",
+        "home-billing",
+        "home-outreach"
+      ],
+      "packet_bytes": 3888,
+      "notices": 2
+    },
+    {
+      "scope": "unrelated",
+      "exact_home_ids": [
+        "home-global",
+        "home-billing",
+        "home-outreach"
+      ],
+      "packet_bytes": 3889,
+      "notices": 2
+    }
+  ],
+  "strict_format5": [
+    {
+      "scope": "billing",
+      "status": "held",
+      "reason": "Unqualified referenced evidence remains current; obtain exact independent qualification before ordinary dispatch",
+      "unqualified_exact_sources": [
+        {
+          "id": "scoped-target-00f51921-8e0f-4083-9bcc-e9ebcab09bdd",
+          "sha256": "66d204c42bf5abb946ed4dd08ee23aee1a7f33aa569671e75083a04e6f4cfe60"
+        },
+        {
+          "id": "scoped-target-23140e1f-24c3-42d3-90f7-4778e819a7fd",
+          "sha256": "f7dda4f176f548baf1680eaaf0fd650b9ef01184fedc1433fe90ae86032a544a"
+        },
+        {
+          "id": "scoped-target-29725577-cda6-4de1-9a12-2da07bef17ea",
+          "sha256": "1d62c6f2d26db14f3fcd9a9a192eacc55b89ea58a5eee794837a0108bbcdec0d"
+        },
+        {
+          "id": "scoped-target-bc02ea6a-c9bb-4635-88e1-c0558543685e",
+          "sha256": "1a43942d887cbeb6397c67baa132dc6c53528d0f85c4650390f1efa687180204"
+        }
+      ]
+    },
+    {
+      "scope": "outreach",
+      "status": "held",
+      "reason": "Unqualified referenced evidence remains current; obtain exact independent qualification before ordinary dispatch",
+      "unqualified_exact_sources": [
+        {
+          "id": "scoped-target-00f51921-8e0f-4083-9bcc-e9ebcab09bdd",
+          "sha256": "66d204c42bf5abb946ed4dd08ee23aee1a7f33aa569671e75083a04e6f4cfe60"
+        },
+        {
+          "id": "scoped-target-23140e1f-24c3-42d3-90f7-4778e819a7fd",
+          "sha256": "f7dda4f176f548baf1680eaaf0fd650b9ef01184fedc1433fe90ae86032a544a"
+        },
+        {
+          "id": "scoped-target-29725577-cda6-4de1-9a12-2da07bef17ea",
+          "sha256": "1d62c6f2d26db14f3fcd9a9a192eacc55b89ea58a5eee794837a0108bbcdec0d"
+        },
+        {
+          "id": "scoped-target-bc02ea6a-c9bb-4635-88e1-c0558543685e",
+          "sha256": "1a43942d887cbeb6397c67baa132dc6c53528d0f85c4650390f1efa687180204"
+        }
+      ]
+    },
+    {
+      "scope": "unrelated",
+      "status": "held",
+      "reason": "Unqualified referenced evidence remains current; obtain exact independent qualification before ordinary dispatch",
+      "unqualified_exact_sources": [
+        {
+          "id": "scoped-target-00f51921-8e0f-4083-9bcc-e9ebcab09bdd",
+          "sha256": "66d204c42bf5abb946ed4dd08ee23aee1a7f33aa569671e75083a04e6f4cfe60"
+        },
+        {
+          "id": "scoped-target-23140e1f-24c3-42d3-90f7-4778e819a7fd",
+          "sha256": "f7dda4f176f548baf1680eaaf0fd650b9ef01184fedc1433fe90ae86032a544a"
+        },
+        {
+          "id": "scoped-target-29725577-cda6-4de1-9a12-2da07bef17ea",
+          "sha256": "1d62c6f2d26db14f3fcd9a9a192eacc55b89ea58a5eee794837a0108bbcdec0d"
+        },
+        {
+          "id": "scoped-target-bc02ea6a-c9bb-4635-88e1-c0558543685e",
+          "sha256": "1a43942d887cbeb6397c67baa132dc6c53528d0f85c4650390f1efa687180204"
+        }
+      ]
+    }
+  ],
+  "receipts": [
+    {
+      "review": {
+        "id": "artifact-f4b73994-492e-49dc-8fd4-2beda9c77e93",
+        "revision": 1,
+        "sha256": "4e2654f00fec1f645b0374f17fa2a34450550c924bb2e693bb8d4faa89f72864"
+      },
+      "job": {
+        "id": "job:job-b1990c26-ca8e-4acb-96c3-07e9c56844aa",
+        "revision": null,
+        "sha256": "6b0037a3f8dad7d78ef851a5b0e8b369f9ba1453f6ed7d133891fc312049cb27"
+      },
+      "native_id": "01a1afd6-7307-7242-a9f9-6372e7174d36",
+      "verdict": "Pass"
+    },
+    {
+      "review": {
+        "id": "artifact-a4d4613a-b44b-4749-adf0-f76f9e4219bd",
+        "revision": 1,
+        "sha256": "e79312e7e21ccffe2ef45e5d309fe2b68e9f3355a6a9cf03e031cca943452fb0"
+      },
+      "job": {
+        "id": "job:job-a37cdcb1-c7f4-4321-aabf-6b2084c0dd1a",
+        "revision": null,
+        "sha256": "99e2cc2d6ae77cac039c5bdb5787691ced20ac83c5b9b53511e7e538170fa4a4"
+      },
+      "native_id": "01a1afd9-6550-7800-b70e-9972baba2d04",
+      "verdict": "Pass"
+    },
+    {
+      "review": {
+        "id": "artifact-1eb170f2-9b71-4dc5-935c-ff67e00d09cb",
+        "revision": 1,
+        "sha256": "7f7f6c7192bc7211d0b7294bbe90a9c4e5a21e9497e04a7866a9b7aa28a26c97"
+      },
+      "job": {
+        "id": "job:job-fb303cdd-6865-4ae4-b4ea-c91cb19dd2a2",
+        "revision": null,
+        "sha256": "d5cc9f634d0658faeb267804f8fe89cf31efeb25efd213116bf4eadc0233cbf2"
+      },
+      "native_id": "01a1afe1-3ff0-7291-8087-0a4fb145c816",
+      "verdict": "Pass"
+    },
+    {
+      "review": {
+        "id": "artifact-43b6724b-0430-4c5e-81d5-d5c143119087",
+        "revision": 1,
+        "sha256": "9f83edbdd382056ea87eb085a5b9e2950739b2168c46320f49c42f739a34c492"
+      },
+      "job": {
+        "id": "job:job-2bf0ae75-26fc-49d7-81d6-7deaa64457bb",
+        "revision": null,
+        "sha256": "108c6459d975468cb37b91b942ef54ad1eb7e0407a9e50532c6cf3f4a56afcd7"
+      },
+      "native_id": "01a1afe1-401d-7b12-aafe-7140675bb802",
+      "verdict": "Pass"
+    },
+    {
+      "review": {
+        "id": "artifact-a59ffc25-f8d6-4436-b86c-25ee408925af",
+        "revision": 1,
+        "sha256": "78ab65ba3e9ba7badcfcd5c956fd9cc4fe5810d41596960b271d67b44a1c250e"
+      },
+      "job": {
+        "id": "job:job-03fd5cc7-efbd-4d20-afda-a27bf6a0ce19",
+        "revision": null,
+        "sha256": "41cd84491dc84b117cc3df0431c0c6c0a705b5bef5871817ae343b337000df7a"
+      },
+      "native_id": "01a1afe1-4055-7eb3-aae9-230b9292de34",
+      "verdict": "Pass"
+    },
+    {
+      "review": {
+        "id": "artifact-8b60d0b2-de97-4ded-8437-09e38d771b55",
+        "revision": 1,
+        "sha256": "3db6cbd69956dfe5c67bea19095d1f5efa4237adc20935c6c3eb073c87532648"
+      },
+      "job": {
+        "id": "job:job-a7f8ac6c-75e8-4937-8c85-50490c05d3ed",
+        "revision": null,
+        "sha256": "fafa6eafbaeab80cded544589a5332e7971ba4300d0211c1644cd5c345738dce"
+      },
+      "native_id": "01a1afe2-4cab-7213-ad9f-8e503c1f16be",
+      "verdict": "Pass"
+    },
+    {
+      "review": {
+        "id": "artifact-756e8c33-0aa2-4434-8215-544cbe94aaa8",
+        "revision": 1,
+        "sha256": "136d6079d78d6a92669fdd0f69dbcc9f5090fcd313113dbfebfb1560e01b3608"
+      },
+      "job": {
+        "id": "job:job-86611b36-e9d2-436c-8dd7-1c5073281d44",
+        "revision": null,
+        "sha256": "d18e3e0507043e460478988f4075366331eb7b4c212e0d8979619af5518ca062"
+      },
+      "native_id": "01a1afe3-8c9e-7ca0-864e-af6fa386dc95",
+      "verdict": "Pass"
+    }
+  ]
+}

@@ -1,0 +1,76 @@
+{
+  "source_commit": "8c71df9fa2cc66eca81174e0ec76d78f69cc2967",
+  "retained_local_evidence_directory": "/Users/xiaoweili/Documents/Codex/SoloDev-reviews/architecture-fix-2026-11-05",
+  "files": {
+    "node22-combined-full.tap": {
+      "sha256": "3e6e2d440eef6233c4a60ef66354b862ef42382a8fae4b64d41946561a994b74",
+      "bytes": 160344
+    },
+    "node25-combined-full.tap": {
+      "sha256": "7f9d399df46f9d5da978dc2d1b6de84e1c4b0a3e58fb53d629fc161983d193e6",
+      "bytes": 79107
+    },
+    "scoped-peer-node22.tap": {
+      "sha256": "e9f3d924a62b415ea81f69328d74ca754673771c5d40254e1cd881be9a65625a",
+      "bytes": 7649
+    },
+    "scoped-peer-evidence.tap": {
+      "sha256": "8bbb8222fca37c65eeac6b6ed7cdfb607b950b938e31ec027346c1a987331746",
+      "bytes": 3839
+    },
+    "scoped-interface-reference.tap": {
+      "sha256": "b8dd4a65e71cb7b5967b1eb222063b3a6775351fc664af5ea7d30aca730876c7",
+      "bytes": 3840
+    },
+    "interface-final-node22.tap": {
+      "sha256": "09861d29ee3a59f5fdfd62330b9c155925d9be5f52ae178a91789b70e8802271",
+      "bytes": 960
+    },
+    "interface-final-node25.tap": {
+      "sha256": "afcc9a013e37d911a91d642438679ae857df7b938e5600b8160c924837c1d370",
+      "bytes": 592
+    },
+    "native-scoped-final.json": {
+      "sha256": "557e0bfd7d7033e0ac4077673ddf592f23ca1daf46eefab5cd5f0bb571847a86",
+      "bytes": 2279
+    },
+    "native-scoped-repaired.json": {
+      "sha256": "751c41fd65b88951502752a264436166571961e94212af04e04ca5274187c414",
+      "bytes": 5185
+    },
+    "native-scoped-complete.json": {
+      "sha256": "eb28c7c2d27e267701513598f2c1db43073a10ff5ce349e4400a9e0b827f6641",
+      "bytes": 3093
+    },
+    "native-scoped-continuation.json": {
+      "sha256": "9f1e58583a92a412dfd65ef4bed4b6b6bee561afb879a2742f2e4d7b330bb5da",
+      "bytes": 4278
+    },
+    "native-scoped-continuation-v2.json": {
+      "sha256": "fcc826d24b782f760081b090a8d5392e24e11b2e20bfbb35ae6d77ec3a9f96bb",
+      "bytes": 7275
+    },
+    "native-applied-verification.json": {
+      "sha256": "d55664d38d7248c408fba61974420c7bb9bc8db83c3f8f9db2795f4b62a4c5ee",
+      "bytes": 7281
+    },
+    "continue-fictional-v2.mjs": {
+      "sha256": "b1c8cdb9c1d187759f0549a808388d9be9757786a17005516704fc9d328bd940",
+      "bytes": 8380
+    },
+    "verify-native-applied.mjs": {
+      "sha256": "06326a5f95aa6f72dc42faf199a8779be50c69f31e6f034166ea15e14b73ca39",
+      "bytes": 3171
+    },
+    "qa-static-receipt.json": {
+      "sha256": "3d7ef6080fb0a8dc64d9eee0ec6e96de0afcb747bf27839fc549ba6cd8e0ef96",
+      "bytes": 1011
+    },
+    "qa-final-receipt.json": {
+      "sha256": "89c4b79b4a89b6b0e590549139e6683ea753a64de33cc949655efc1d85912a45",
+      "bytes": 1009
+    }
+  },
+  "native_claim": "Canonical qualification applied and defaultformat3 verified; strictformat5 remainsheld on four unqualified old proof sources. All earlier held/failed reports retained.",
+  "large_scale_claim": "500 distinct obligations/20domains contractdoubles; notnative scale or liveSoloDev acceptance."
+}

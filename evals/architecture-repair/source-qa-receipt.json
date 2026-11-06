@@ -1,0 +1,31 @@
+{
+  "assignment": "qa-final",
+  "cwd": "/Users/xiaoweili/Documents/Codex/SoloDev-reviews/architecture-fix-2026-11-05/qa-final",
+  "scope": "User-authorized source architecture repair; no live company mutation, release, install, or adoption",
+  "prompt_sha256": "8e364ec9c2cef156fdf0bad667caadf93077f7b99bef3d131d3bc999fc6004aa",
+  "requested_model": "gpt-6.1-sol",
+  "requested_effort": "high",
+  "requested_speed": "host_default",
+  "effective_settings": "unverified",
+  "started_at": "2026-11-06T07:55:04.169790+00:00",
+  "pid": 33088,
+  "exit_code": 0,
+  "ended_at": "2026-11-06T08:01:02.127918+00:00",
+  "report_exists": true,
+  "lifecycle": [
+    {
+      "type": "thread.started",
+      "thread_id": "01a1afda-a4af-7982-bb9c-131644c81b30"
+    },
+    {
+      "type": "turn.completed",
+      "usage": {
+        "input_tokens": 1547229,
+        "cached_input_tokens": 1425408,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 10924,
+        "reasoning_output_tokens": 2671
+      }
+    }
+  ]
+}

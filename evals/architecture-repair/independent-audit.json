@@ -1,0 +1,185 @@
+{
+  "result": "PASS",
+  "root": "/private/var/folders/n8/886jbns96js8v6hk88_cxkkr0000gn/T/soloco-scoped-fictional-TiJWEI",
+  "canonical_db_matches_export": true,
+  "valid_applied_proof": true,
+  "source_exact": true,
+  "failed_history_exact": true,
+  "extractions_exact_reuse": true,
+  "paused": true,
+  "receipts": [
+    {
+      "job": "job-b1990c26-ca8e-4acb-96c3-07e9c56844aa",
+      "native": "01a1afd6-7307-7242-a9f9-6372e7174d36",
+      "phase": "extract",
+      "scope": null,
+      "input_bytes": 10011,
+      "output_bytes": 7833,
+      "current": true
+    },
+    {
+      "job": "job-a37cdcb1-c7f4-4321-aabf-6b2084c0dd1a",
+      "native": "01a1afd9-6550-7800-b70e-9972baba2d04",
+      "phase": "extract",
+      "scope": null,
+      "input_bytes": 10011,
+      "output_bytes": 2823,
+      "current": true
+    },
+    {
+      "job": "job-fb303cdd-6865-4ae4-b4ea-c91cb19dd2a2",
+      "native": "01a1afe1-3ff0-7291-8087-0a4fb145c816",
+      "phase": "applicability",
+      "scope": "*",
+      "input_bytes": 26250,
+      "output_bytes": 4663,
+      "current": true
+    },
+    {
+      "job": "job-2bf0ae75-26fc-49d7-81d6-7deaa64457bb",
+      "native": "01a1afe1-401d-7b12-aafe-7140675bb802",
+      "phase": "applicability",
+      "scope": "billing",
+      "input_bytes": 26337,
+      "output_bytes": 7757,
+      "current": true
+    },
+    {
+      "job": "job-03fd5cc7-efbd-4d20-afda-a27bf6a0ce19",
+      "native": "01a1afe1-4055-7eb3-aae9-230b9292de34",
+      "phase": "applicability",
+      "scope": "outreach",
+      "input_bytes": 26415,
+      "output_bytes": 10710,
+      "current": true
+    },
+    {
+      "job": "job-a7f8ac6c-75e8-4937-8c85-50490c05d3ed",
+      "native": "01a1afe2-4cab-7213-ad9f-8e503c1f16be",
+      "phase": "applicability",
+      "scope": "*",
+      "input_bytes": 29371,
+      "output_bytes": 9839,
+      "current": true
+    },
+    {
+      "job": "job-86611b36-e9d2-436c-8dd7-1c5073281d44",
+      "native": "01a1afe3-8c9e-7ca0-864e-af6fa386dc95",
+      "phase": "integration",
+      "scope": "*",
+      "input_bytes": 25165,
+      "output_bytes": 4569,
+      "current": true
+    }
+  ],
+  "contexts": [
+    {
+      "scope": "billing",
+      "format3_bytes": 3887,
+      "record_ids": [
+        "control-379e743e-f6ed-4c14-a631-9fa09a724183",
+        "home-billing",
+        "home-global",
+        "home-outreach"
+      ],
+      "home_ids": [
+        "home-billing",
+        "home-global",
+        "home-outreach"
+      ],
+      "founder_pause_decision_exact": true,
+      "unresolved_notices": 2,
+      "format5": "held",
+      "unqualified_exact_sources": [
+        {
+          "id": "scoped-target-00f51921-8e0f-4083-9bcc-e9ebcab09bdd",
+          "sha256": "66d204c42bf5abb946ed4dd08ee23aee1a7f33aa569671e75083a04e6f4cfe60"
+        },
+        {
+          "id": "scoped-target-23140e1f-24c3-42d3-90f7-4778e819a7fd",
+          "sha256": "f7dda4f176f548baf1680eaaf0fd650b9ef01184fedc1433fe90ae86032a544a"
+        },
+        {
+          "id": "scoped-target-29725577-cda6-4de1-9a12-2da07bef17ea",
+          "sha256": "1d62c6f2d26db14f3fcd9a9a192eacc55b89ea58a5eee794837a0108bbcdec0d"
+        },
+        {
+          "id": "scoped-target-bc02ea6a-c9bb-4635-88e1-c0558543685e",
+          "sha256": "1a43942d887cbeb6397c67baa132dc6c53528d0f85c4650390f1efa687180204"
+        }
+      ]
+    },
+    {
+      "scope": "outreach",
+      "format3_bytes": 3888,
+      "record_ids": [
+        "control-379e743e-f6ed-4c14-a631-9fa09a724183",
+        "home-billing",
+        "home-global",
+        "home-outreach"
+      ],
+      "home_ids": [
+        "home-billing",
+        "home-global",
+        "home-outreach"
+      ],
+      "founder_pause_decision_exact": true,
+      "unresolved_notices": 2,
+      "format5": "held",
+      "unqualified_exact_sources": [
+        {
+          "id": "scoped-target-00f51921-8e0f-4083-9bcc-e9ebcab09bdd",
+          "sha256": "66d204c42bf5abb946ed4dd08ee23aee1a7f33aa569671e75083a04e6f4cfe60"
+        },
+        {
+          "id": "scoped-target-23140e1f-24c3-42d3-90f7-4778e819a7fd",
+          "sha256": "f7dda4f176f548baf1680eaaf0fd650b9ef01184fedc1433fe90ae86032a544a"
+        },
+        {
+          "id": "scoped-target-29725577-cda6-4de1-9a12-2da07bef17ea",
+          "sha256": "1d62c6f2d26db14f3fcd9a9a192eacc55b89ea58a5eee794837a0108bbcdec0d"
+        },
+        {
+          "id": "scoped-target-bc02ea6a-c9bb-4635-88e1-c0558543685e",
+          "sha256": "1a43942d887cbeb6397c67baa132dc6c53528d0f85c4650390f1efa687180204"
+        }
+      ]
+    },
+    {
+      "scope": "unrelated",
+      "format3_bytes": 3889,
+      "record_ids": [
+        "control-379e743e-f6ed-4c14-a631-9fa09a724183",
+        "home-billing",
+        "home-global",
+        "home-outreach"
+      ],
+      "home_ids": [
+        "home-billing",
+        "home-global",
+        "home-outreach"
+      ],
+      "founder_pause_decision_exact": true,
+      "unresolved_notices": 2,
+      "format5": "held",
+      "unqualified_exact_sources": [
+        {
+          "id": "scoped-target-00f51921-8e0f-4083-9bcc-e9ebcab09bdd",
+          "sha256": "66d204c42bf5abb946ed4dd08ee23aee1a7f33aa569671e75083a04e6f4cfe60"
+        },
+        {
+          "id": "scoped-target-23140e1f-24c3-42d3-90f7-4778e819a7fd",
+          "sha256": "f7dda4f176f548baf1680eaaf0fd650b9ef01184fedc1433fe90ae86032a544a"
+        },
+        {
+          "id": "scoped-target-29725577-cda6-4de1-9a12-2da07bef17ea",
+          "sha256": "1d62c6f2d26db14f3fcd9a9a192eacc55b89ea58a5eee794837a0108bbcdec0d"
+        },
+        {
+          "id": "scoped-target-bc02ea6a-c9bb-4635-88e1-c0558543685e",
+          "sha256": "1a43942d887cbeb6397c67baa132dc6c53528d0f85c4650390f1efa687180204"
+        }
+      ]
+    }
+  ]
+}
