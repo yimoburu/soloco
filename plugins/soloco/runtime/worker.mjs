@@ -45,7 +45,7 @@ function failureEvidence(error) {
 export async function work(root, jobId, model = runModel) {
   let job, state, context, output, artifact, controller, monitor, claimed=false,spawned=false,invoked=false,lastToken,lastCurrent,lastGrantExpiry,lastDevelopmentMaxBytes;
   const supplemental=[],handoverReads=[];
-  let deliveryLedger,pendingDelivery,partitionDelivery,scopedStreamLedger,scopedNativeRejected=false;
+  let deliveryLedger,pendingDelivery,partitionDelivery,scopedStreamLedger;
   let overallTiming;
   const eligibility=s=>{
     const current=s.jobs[jobId];
@@ -168,7 +168,7 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
       if(session&&session!==output.native_id)throw Error('Supplemental read changed native identity');
       if(context.stream){
         if(!callTiming||controller.signal.aborted)throw Error('Scoped stream invocation timing/closure unproven');
-        try{withStore(root,db=>{const current=db.read();scoped.validateScopedStreamNative(current,current.jobs[jobId],output.native_id);});}catch(error){scopedNativeRejected=true;throw error;}
+        withStore(root,db=>{const current=db.read();scoped.validateScopedStreamNative(current,current.jobs[jobId],output.native_id);});
         scopedStreamLedger??=createScopedStreamLedger(context,job,output.native_id);
         const delivered=recordScopedStreamDelivery(scopedStreamLedger,context,job,output.native_id,request,callTiming,stamp());
         withStore(root,db=>db.transaction('job.scoped_stream_delivered',s=>{const current=eligibility(s);current.native_id=output.native_id;current.qualification_delivery=delivered;return s;}));
@@ -241,21 +241,29 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
       try {prototypeAssignment(s,job);developmentAssignment(s,job,false,root);} catch {prototypeStale=true;}
       let executionStale=false;
       try {eligibility(s);} catch {executionStale=true;}
-      const stale=!current || current.status!=='running' || s.owner.epoch!==job.epoch || (s.paused&&!handoverReviewEligible(s,current)&&!maintenanceEligible(s,current)) || changed || prototypeStale || executionStale || controller.signal.aborted;
+      let stale=!current || current.status!=='running' || s.owner.epoch!==job.epoch || (s.paused&&!handoverReviewEligible(s,current)&&!maintenanceEligible(s,current)) || changed || prototypeStale || executionStale || controller.signal.aborted;
       if(!current)throw new Error('Assignment record disappeared before completion');
       if(context.qualification&&!stale)(scopedContext(context)?scoped.validateScopedResponse:validateQualificationResponse)(s,context.stream?current:job,context,output.native_id,artifact.qualification_result,partitionDelivery);
       const bundle=stale||job.development_id?null:prototypeBundle(s,job,artifact);
       const development=stale||!job.development_id?null:developmentBundle(s,job,artifact,root);
       const artifactId=id(stale?'quarantined':'artifact');
-      s.records[artifactId]={id:artifactId,kind:target?'review':'artifact',content:artifact.content,author_role:job.role,author_instance:job.instance_id,revision:1,status:stale?'Quarantined':'Submitted',job_id:job.id,inputs:job.inputs,...(supplemental.length?{retrieved_inputs:[...supplemental]}:{}),review_of:job.review_of,review:artifact.review??null,...(context.qualification?{qualification_result:artifact.qualification_result}:{}),...(context.handover_evidence?{handover_evidence:{semantic_delivery_complete:artifact.review?.verdict==='Pass'&&!controller.signal.aborted,subject_sha256:target.handover.subject_sha256,reconstruction_sha256:digest(JSON.stringify(target)),native_id:output.native_id,citations:artifact.citations,reads:handoverReads}}:{}),...(bundle?{prototype:bundle}:{}),...(development?{development}:{}),...(stale && artifact.files?{quarantined_files:artifact.files}:{}),...(stale && artifact.patches?{quarantined_patches:artifact.patches}:{}),created_at:stamp()};
-      current.coordination_release={termination_confirmed:true,reason:'model_process_closed',at:stamp()};
-      current.status=stale?'quarantined':'completed';current.artifact_id=artifactId;current.finished_at=stamp();current.native_id=output.native_id;
-      if(controller.signal.aborted)current.execution_failure={...failureEvidence(controller.signal.reason),outcome:'cancelled_or_timed_out',...(context?.qualification&&controller.signal.reason?.code==='ASSIGNMENT_INELIGIBLE'?{abort_kind:'eligibility_loss'}:{}),at:stamp()};
-      current.model_evidence=output.model_evidence??{reported_models:[],reported_effort:null,verification:'unverified',source:'not_reported',scope:'unknown'};
+      const completedRecord={id:artifactId,kind:target?'review':'artifact',content:artifact.content,author_role:job.role,author_instance:job.instance_id,revision:1,status:stale?'Quarantined':'Submitted',job_id:job.id,inputs:job.inputs,...(supplemental.length?{retrieved_inputs:[...supplemental]}:{}),review_of:job.review_of,review:artifact.review??null,...(context.qualification?{qualification_result:artifact.qualification_result}:{}),...(context.handover_evidence?{handover_evidence:{semantic_delivery_complete:artifact.review?.verdict==='Pass'&&!controller.signal.aborted,subject_sha256:target.handover.subject_sha256,reconstruction_sha256:digest(JSON.stringify(target)),native_id:output.native_id,citations:artifact.citations,reads:handoverReads}}:{}),...(bundle?{prototype:bundle}:{}),...(development?{development}:{}),...(stale && artifact.files?{quarantined_files:artifact.files}:{}),...(stale && artifact.patches?{quarantined_patches:artifact.patches}:{}),created_at:stamp()};
+      const completedJob={...current};
+      completedJob.coordination_release={termination_confirmed:true,reason:'model_process_closed',at:stamp()};
+      completedJob.status=stale?'quarantined':'completed';completedJob.artifact_id=artifactId;completedJob.finished_at=stamp();completedJob.native_id=output.native_id;
+      if(controller.signal.aborted)completedJob.execution_failure={...failureEvidence(controller.signal.reason),outcome:'cancelled_or_timed_out',...(context?.qualification&&controller.signal.reason?.code==='ASSIGNMENT_INELIGIBLE'?{abort_kind:'eligibility_loss'}:{}),at:stamp()};
+      completedJob.model_evidence=output.model_evidence??{reported_models:[],reported_effort:null,verification:'unverified',source:'not_reported',scope:'unknown'};
       if(context.qualification){
-        if(scopedContext(context)&&context.packet.phase==='extract')s.records[artifactId].reviewed_unit_bundle=context.packet.reviewed_unit_bundle;
-        s.records[artifactId].qualification_output=output.text;s.records[artifactId].qualification_proof=(scopedContext(context)?scoped.scopedProof:qualificationProof)(partitionDelivery,current);
+        if(scopedContext(context)&&context.packet.phase==='extract')completedRecord.reviewed_unit_bundle=context.packet.reviewed_unit_bundle;
+        completedRecord.qualification_output=output.text;completedRecord.qualification_proof=(scopedContext(context)?scoped.scopedProof:qualificationProof)(partitionDelivery,completedJob);
       }
+      // Reconstruct and hash everything before this exclusive publication fence.
+      // Timer callbacks may be delayed while synchronous validation is running.
+      if(context.stream&&jobTimeoutState(current,Date.now()).state!=='executing'){
+        stale=true;completedJob.status='quarantined';completedRecord.status='Quarantined';
+        completedJob.execution_failure={code:'ROLE_TIMEOUT',message:'Scoped stream publication deadline reached',outcome:'timeout',at:stamp()};
+      }
+      s.records[artifactId]=completedRecord;Object.assign(current,completedJob);
       if(stale) {notice(s,'must_know','A late or stale result was quarantined; it grants no approval.',artifactId);return s;}
       const previousNative=s.sessions[job.session_key].native_id,messageCount=s.messages.length,noticeCount=s.notices.length;
       s.sessions[job.session_key].native_id=output.native_id;
@@ -297,7 +305,10 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
         if(current.status!=='cancelled') {current.status='failed';current.finished_at=stamp();}
         else if(current.coordination_release?.termination_confirmed===true)current.finished_at??=stamp();
         current.error=context?.qualification&&current.execution_failure?.abort?.code==='ASSIGNMENT_INELIGIBLE'?current.execution_failure.abort.message:error.message;if(error.held)current.qualification_hold=error.held;
-        if(output?.native_id){if(scopedNativeRejected)current.rejected_native_id=output.native_id;else current.native_id=output.native_id;}
+        // A failed scoped response is observed evidence, never a newly accepted
+        // reviewer identity. Earlier delivered identities and receipts survive
+        // failures before timing, cancellation or independence validation.
+        if(output?.native_id){if(scopedContext(context))current.rejected_native_id=output.native_id;else current.native_id=output.native_id;}
         if(output?.model_evidence)current.model_evidence=output.model_evidence;
         if(artifact || context?.qualification&&typeof output?.text==='string') {
           const rejected=context?.qualification?output.text:JSON.stringify(artifact);

@@ -1,3 +1,4 @@
+import * as scopedStream from '../plugins/soloco/runtime/scoped-stream.mjs';
 import * as scoped from '../plugins/soloco/runtime/scoped-context.mjs';
 import * as publicResponse from '../plugins/soloco/runtime/public-response.mjs';
 import test from 'node:test';
@@ -24,7 +25,7 @@ function harness() {
   let matches=true,scope=true,beforeTransaction;
   const intervals=new Set(),launches=[];
   const iso=()=>new Date(now).toISOString();
-  const deps={scoped,...publicResponse,...coordination,...timeout,path,os:{homedir:()=>'/unused'},fs:{existsSync:()=>true,mkdirSync:()=>{}},process:{cwd:()=>process.cwd(),env:{},pid:42,execPath:'/unused/node',argv:[]},Date:class extends Date {static now(){return now;}},AbortController,
+  const deps={Buffer,...scopedStream,scoped:{...scoped},...publicResponse,...coordination,...timeout,path,os:{homedir:()=>'/unused'},fs:{existsSync:()=>true,mkdirSync:()=>{}},process:{cwd:()=>process.cwd(),env:{},pid:42,execPath:'/unused/node',argv:[]},Date:class extends Date {static now(){return now;}},AbortController,
     PACKAGE:'/unused',VERSION:'test',SCHEMA:2,stamp:iso,id:p=>p+'-'+(++sequence),digest:()=> 'binding',folder:x=>x,noLink:()=>{},
     withStore:(root,fn)=>fn({readSnapshot:fn=>fn(),publicReconciliationState:()=>null,read:()=>structuredClone(state),transaction:(type,change)=>{if(beforeTransaction){const hook=beforeTransaction;beforeTransaction=undefined;hook(type);}const next=change(structuredClone(state));state=structuredClone(next);return structuredClone(state);}}),
     owner:(s,session,host,epoch)=>{if(s.owner.session_id!==session || s.owner.host!==host || (epoch!==undefined && s.owner.epoch!==epoch))throw new Error('Stale owner');},
@@ -44,7 +45,7 @@ function harness() {
   const worker=load('worker.mjs',deps,['work']);
   const main=load('main.mjs',{...deps,engine},['toolList','call']);
   const args={root:'/fixture',session_id:'founder',epoch:1,role:'engineer',task:'A bounded fixture assignment'};
-  return {engine,worker,main,args,intervals,launches,get state(){return state;},set now(v){now=v;},get now(){return now;},mutate:fn=>fn(state),tick:()=>{for(const fn of [...intervals])fn();},mismatch:()=>{matches=false;},revoke:()=>{scope=false;},before:fn=>{beforeTransaction=fn;},dispatch:settings=>engine.dispatch({...args,...settings},'codex')};
+  return {deps,engine,worker,main,args,intervals,launches,get state(){return state;},set now(v){now=v;},get now(){return now;},mutate:fn=>fn(state),tick:()=>{for(const fn of [...intervals])fn();},mismatch:()=>{matches=false;},revoke:()=>{scope=false;},before:fn=>{beforeTransaction=fn;},dispatch:settings=>engine.dispatch({...args,...settings},'codex')};
 }
 const response=()=>({native_id:'native-fixture',text:JSON.stringify({content:'Fixture output',messages:[],notices:[]})});
 const spawnAt=(h,options,limit,reason)=>options.onSpawn(timeout.executionTiming(h.now,{timeout_ms:limit,timeout_reason:reason}));
@@ -251,4 +252,52 @@ test('upgrade call ceiling schema and runtime reject invalid options before all 
   assert.equal(effects,0);
   await assert.rejects(h.main.call('company_dispatch',{...h.args,timeout_ms:1800000,timeout_reason:'Upgrade context cannot be requested by business dispatch'},'codex'));
   assert.equal(h.launches.length,0);
+});
+
+
+// FICTIONAL CONTRACT DOUBLES: actual worker body and stream transport, explicit
+// clock/store/semantic boundary doubles; no actual native qualification.
+function streamHarness(){
+  const h=harness(),job=h.dispatch({timeout_ms:600000,timeout_reason:'Bounded stream fixture'});
+  const packet={target:{id:'target'},text:'x'.repeat(50000)},plan={id:'plan'};
+  const a={hash:'context',inputs:[],text:'',packet:{phase:'applicability'},qualification:{protocol:scoped.SCOPED_PROTOCOL,target:packet.target,plan},stream:scopedStream.buildScopedStream(packet,plan)};
+  a.text=a.stream.pages[0].wire;
+  Object.assign(h.deps.scoped,{isScopedJob:()=>true,scopedAssignment:()=>a,scopedMatches:()=>true,validateScopedStreamNative:()=>true,validateScopedOutput:()=>true,validateScopedResponse:()=>true,scopedProof:()=>({contract_double:true})});
+  return {h,job,a};
+}
+const streamResponse=(p,native='native-fixture')=>({native_id:native,text:JSON.stringify(p.final?{content:'Fictional Pass',messages:[],notices:[],qualification_result:{verdict:'Pass'}}:{scoped_stream_ack:{body_sha256:p.body_sha256,sequence:p.sequence,range_sha256:p.range_sha256}})});
+
+test('stream publication fence quarantines deadline crossed during final validation without session mutation',async()=>{
+  for(const elapsed of [600000,600001]){
+    const {h,job}=streamHarness(),start=h.now;let validations=0;
+    h.deps.scoped.validateScopedResponse=()=>{if(++validations===2)h.now=start+elapsed;return true;};
+    await h.worker.work('/fixture',job.id,async(host,session,request,dir,limit,selection,options)=>{spawnAt(h,options,limit,options.timeoutReason);return streamResponse(JSON.parse(request));});
+    const j=h.state.jobs[job.id];assert.equal(validations,2,j.error);assert.equal(j.status,'quarantined');assert.equal(j.execution_failure.code,'ROLE_TIMEOUT');
+    assert.equal(h.state.records[j.artifact_id].status,'Quarantined');assert.equal(h.state.records[j.artifact_id].qualification_result.verdict,'Pass');
+    assert.equal(h.state.sessions[j.session_key].native_id,null);assert.equal(h.state.messages.length,0);assert.equal(j.timeout_ms,600000);
+  }
+});
+
+test('stream exact deadline closure and delayed timers cannot publish late Pass or renew allowance',async()=>{
+  for(const mode of ['exact','delayed-timer','later-spawn','renewed-later-spawn','missing-timing']){
+    const {h,job}=streamHarness(),start=h.now;let calls=0,deadline;
+    await h.worker.work('/fixture',job.id,async(host,session,request,dir,limit,selection,options)=>{
+      const p=JSON.parse(request);calls++;
+      if(mode==='missing-timing')return streamResponse(p,'prior-extraction-native');
+      if(calls===2){
+        assert.equal(options.executionDeadlineAt,deadline);assert.ok(limit<=600000);
+        if(['later-spawn','renewed-later-spawn'].includes(mode))h.now=start+599000;
+      }
+      const cap=Math.min(limit,options.executionDeadlineAt?options.executionDeadlineAt-h.now:limit);
+      options.onSpawn(timeout.executionTiming(h.now,{timeout_ms:mode==='renewed-later-spawn'&&calls===2?limit:cap,timeout_reason:options.timeoutReason}));
+      deadline??=Date.parse(h.state.jobs[job.id].execution_deadline_at);
+      if(mode==='exact'||mode==='delayed-timer')h.now=deadline+(mode==='delayed-timer'?100:0); // deliberately no tick()
+      else h.now+=1000;
+      return streamResponse(p);
+    });
+    const j=h.state.jobs[job.id];assert.notEqual(j.status,'completed',mode);assert.equal(h.state.sessions[j.session_key].native_id,null,mode);
+    assert.equal(j.timeout_ms,600000);assert.ok(j.rejected_output||j.execution_failure);
+    if(mode==='missing-timing'){assert.equal(j.native_id,null);assert.equal(j.rejected_native_id,'prior-extraction-native');assert.equal(calls,1);}
+    if(['later-spawn','renewed-later-spawn'].includes(mode)){assert.equal(calls,2);assert.equal(Date.parse(j.execution_deadline_at),start+600000);}
+  }
 });

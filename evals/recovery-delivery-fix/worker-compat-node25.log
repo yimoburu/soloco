@@ -1,0 +1,55 @@
+(node:26212) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ duplicates before and after pause cannot certify or overwrite the outstanding owner (1267.4165ms)
+✔ failed startup rechecks ownership when another worker claims before failure handling (154.32225ms)
+✔ pause/revoke cancellation finalizes only confirmed closure, then permits exact storage recovery (1079.649834ms)
+✔ queued cancellation closes truthfully without invoking an adapter, including revocation (216.837416ms)
+✔ late success after pause stays quarantined and retains exact evidence through recovery (62.271875ms)
+✔ rejected late output after cancellation retains evidence without accepting it (62.384792ms)
+(node:26213) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ separate review window retains native cap and validates narrow explicit settings (4.716083ms)
+✔ streamed review may complete after ten minutes only with a fresh explicit window (1358.214083ms)
+✔ window changes or completion exactly at the review deadline cannot publish an accepted Pass (395.193791ms)
+✔ ordinary dispatch rejects handover-window controls before creating a job or session (13.740292ms)
+✔ window admission requires an unused target and fresh native-session reference (56.556958ms)
+✔ terminal review receipts outside the fixed window cannot permit resume (280.578042ms)
+✔ first-call timing validates the actual shortened invocation without extending the job policy (218.721334ms)
+✔ a fixed review window shrinks later call limits and rejects completion exactly at its end (695.010125ms)
+✔ every native invocation requires complete consistent timing evidence before publication (1155.663042ms)
+✔ clock movement during publication never publishes a completed receipt at or beyond expiry (1920.87325ms)
+✔ absolute review deadline clamps actual delayed spawn and its watchdog (12.434458ms)
+✔ absolute expiry before spawn prevents timing credit and cannot accept late success (1.047666ms)
+✔ timeout policy validates boundaries and reasons without coercion (0.664417ms)
+✔ spawn timing is independent of creation time and deadline boundaries are exclusive (0.236625ms)
+✔ reconciliation separates queue, startup and execution; excludes development tests (5.2065ms)
+✔ legacy timing does not expand, reset, or manufacture missing deadlines (0.187667ms)
+✔ normal completion starts allowance at spawn and preserves isolation and selection (0.647875ms)
+✔ existing default positional timeout works with omitted rationale (0.161375ms)
+✔ invalid timeout or selection fails before resolving or starting a process (0.186667ms)
+✔ unverified explicit Claude effort fails before executable resolution or launch (0.131625ms)
+✔ timeout retains cause, fences late output and escalates for resistant child (0.22ms)
+✔ timeout followed by close confirms closure and cancels escalation (0.156625ms)
+✔ at and after deadline a delayed timer cannot allow successful close (0.266291ms)
+✔ output arriving at deadline triggers timeout even with delayed timer (0.12825ms)
+✔ pre-abort and abort during command resolution never start child (0.16475ms)
+✔ abort in spawn/listener gap stops child and prevents sending prompt (0.153375ms)
+✔ cancellation before spawn, during execution and after timeout is monotonic (0.272541ms)
+✔ startup limit neither creates execution receipt nor consumes execution allowance (0.191792ms)
+✔ spawn errors and errors after spawn retain escalation until close (0.249042ms)
+✔ synchronous spawn failure has no timers, receipt or child signals (0.102333ms)
+✔ recording failure stops the spawned child and cannot publish success (0.135791ms)
+✔ synchronous close during TERM/KILL settles once and removes timers (0.174375ms)
+✔ output overflow, stream error and thrown signal request retain bounded failure (0.266ms)
+✔ early process exit and malformed output are failures with cleanup (2.560083ms)
+✔ Codex and Claude launch/resume isolation and observations remain distinct (0.521167ms)
+✔ internal upgrade context wires a 30-minute spawn receipt and real execution timer (0.194791ms)
+✔ upgrade context is explicit, bounded and uses overflow-safe lifecycle clocks (0.295958ms)
+ℹ tests 43
+ℹ suites 0
+ℹ pass 43
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6260.074292

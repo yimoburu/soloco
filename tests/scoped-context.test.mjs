@@ -13,7 +13,7 @@ import {executionTiming} from '../plugins/soloco/runtime/timeout.mjs';
 import {reviewedContext,currentRecords} from '../plugins/soloco/runtime/current-state.mjs';
 import {assignmentContext} from '../plugins/soloco/runtime/context.mjs';
 import * as scoped from '../plugins/soloco/runtime/scoped-context.mjs';
-import {validateScopedStreamDelivery} from '../plugins/soloco/runtime/scoped-stream.mjs';
+import {buildScopedStream,validateScopedStreamDelivery} from '../plugins/soloco/runtime/scoped-stream.mjs';
 const protocol=scoped.SCOPED_PROTOCOL,sha=v=>digest(JSON.stringify(v)),bytes=v=>Buffer.byteLength(typeof v==='string'?v:JSON.stringify(v));
 const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-scoped-contract-'));
 process.env.COMPANY_PLUGIN_DATA=path.join(tmp,'cache');
@@ -59,12 +59,12 @@ function contractReview(p){
   }else {r.summary='CONTRACT DOUBLE: every domain retains its exact distinct conditions and OPEN state; all declared interfaces independently checked. No execution permission.';r.domain_review_ids=sh.domain_review_ids;r.interface_review_ids=sh.interface_review_ids;r.unreviewed_interfaces=[];}
   return envelope(r);
 }
-async function run(f,args,{review=contractReview,native,modelHook,streamHook}={}){
+async function run(f,args,{review=contractReview,native,modelHook,streamHook,omitTiming=false}={}){
   const t=call(f,{action:'target',...args,plan_id:args.plan_id??f.plan_id});if(t.reused)return t;
   const queued=engine.dispatch({...f,role:'qa',review_of:t.id,task:'Independent scoped contract review.'},'codex',{check:()=>({available:true,authenticated:true,version:'contract-double'}),launch:()=>({on(){},unref(){}})});
   const streamParts=[],streamRequests=[];
   await work(f.root,queued.id,async(host,session,prompt,dir,timeout,selection,options)=>{
-    const start=Date.now();options.onSpawn(executionTiming(start,{timeout_ms:Math.min(timeout,options.executionDeadlineAt?options.executionDeadlineAt-start:timeout),timeout_reason:options.timeoutReason}));
+    const start=Date.now();if(!omitTiming)options.onSpawn(executionTiming(start,{timeout_ms:Math.min(timeout,options.executionDeadlineAt?options.executionDeadlineAt-start:timeout),timeout_reason:options.timeoutReason}));
     let packet=JSON.parse(prompt);
     if(packet.protocol==='scoped-stream-v1'){
       streamRequests.push(prompt);streamParts.push(packet.text);
@@ -568,7 +568,9 @@ test('recovery stream CONTRACT DOUBLE: complete bounded UTF8 delivery, full inte
 test('recovery stream rejects missing/reordered/substituted ranges, corrupt bodies, wrong native and unconfirmed closure',async()=>{
   const f=fixture(),es=await extraction(f);largeGlobal(f);
   const d=await run(f,domainArgs(es));assert.equal(d.job.status,'completed',d.job.error);
+  const i=await run(f,{phase:'integration',delivery_protocol:streaming,domain_review_ids:[d.review.id],counterpart_ids:['home-D00']});assert.equal(i.job.status,'completed',i.job.error);
   const s=read(f),a=scoped.scopedAssignment(s,d.job),original=d.job.qualification_delivery;
+  assert.equal(scoped.validateScopedApply(s,{integration_review_id:i.review.id}).integration.id,i.review.id);
   for(const [label,change] of [
     ['missing range',v=>v.ranges.splice(1,1)],
     ['out of order',v=>v.ranges.reverse()],
@@ -584,8 +586,8 @@ test('recovery stream rejects missing/reordered/substituted ranges, corrupt bodi
   assert.throws(()=>validateScopedStreamDelivery(a,d.job,'substitute-native',original),/hold/i);
   const corrupt=inheritSnapshots(s,structuredClone(s));corrupt.records[d.target.id].scoped_context_target.global_snapshot.immutable_snapshot.sha256='0'.repeat(64);
   assert.throws(()=>scoped.scopedAssignment(corrupt,corrupt.jobs[d.job.id]),/missing|corrupt|hash mismatch/i);
-  const missing=inheritSnapshots(s,structuredClone(s));delete missing.jobs[d.job.id].qualification_delivery.ranges[1];
-  assert.throws(()=>scoped.validateScopedApply(missing,{integration_review_id:d.review.id}),/hold|missing|undefined/i);
+  const missing=inheritSnapshots(s,structuredClone(s));missing.jobs[d.job.id].qualification_delivery.ranges.splice(1,1);
+  assert.throws(()=>scoped.validateScopedApply(missing,{integration_review_id:i.review.id}),/incomplete or changed frozen delivery/i);
 });
 
 test('recovery stream canonical current freshness: notices, authority, outcomes, governing and home mutation hold; extraction reused',async()=>{
@@ -654,4 +656,63 @@ test('recovery stream preserves explicit unknown outcomes and rejects nonindepen
   assert.ok(held.packet.global_rules.unknown_outcomes.some(j=>j.id==='unknown'));
   assert.equal(read(f).jobs[owned.job.id].status,'failed');
   assert.throws(()=>call(f,{action:'target',phase:'integration',plan_id:f.plan_id,delivery_protocol:streaming,domain_review_ids:[held.review.id],counterpart_ids:['home-D00']}),/negative receipt|global governing/);
+});
+
+
+test('recovery stream rejected observed identities never poison accepted extraction receipts',async()=>{
+  for(const mode of ['later-page','aborted-first','missing-timing']){
+    const f=fixture(),es=await extraction(f),prior=JSON.stringify(es[0].job);largeGlobal(f);
+    const d=await run(f,domainArgs(es),{omitTiming:mode==='missing-timing',streamHook:(p)=>{
+      if(mode==='aborted-first'&&p.sequence===0)mutate(f,s=>{s.owner.epoch++;});
+      if(p.sequence===(mode==='later-page'?1:0))return {native_id:es[0].job.native_id,text:'{}'};
+    }});
+    assert.notEqual(d.job.status,'completed',mode);
+    assert.equal(d.job.rejected_native_id,es[0].job.native_id,mode);
+    assert.notEqual(d.job.native_id,es[0].job.native_id,mode);
+    assert.equal(d.review,undefined,mode);
+    if(mode==='later-page'){assert.equal(d.streamRequests.length,2);assert.match(d.job.error,/changed native identity/);}
+    else {assert.equal(d.streamRequests.length,1);assert.match(d.job.error,mode==='aborted-first'?/no longer eligible/:/timing|closure/);}
+    assert.equal(JSON.stringify(read(f).jobs[es[0].job.id]),prior);
+    if(mode==='aborted-first')f.epoch++;
+    assert.equal(call(f,{action:'target',phase:'extract',unit_id:es[0].target.target.unit_id}).review_id,es[0].review.id);
+  }
+});
+
+test('recovery stream CONTRACT DOUBLE: nonempty independent interfaces deliver peer homes, dependencies and closure',async()=>{
+  const f=fixture({count:2,domains:2,extra:{qualifier:'DISTANT_QUALIFIER'}});
+  mutate(f,s=>{s.records['home-D00'].content+='\nDISTANT_QUALIFIER: D00 may not retry unless D01 permission remains OPEN.';s.records.peer={id:'peer',kind:'artifact',revision:1,content:'Peer dependency: OPEN never renews retry. '+('🧪 保持 \\"\n'.repeat(6000))};});
+  const es=await extraction(f);largeGlobal(f);
+  const ds=[];
+  for(const domain of ['D00','D01']){
+    const d=await run(f,{...domainArgs(es),context_scope:domain,counterpart_ids:['home-'+domain],dependency_ids:['peer'],item_keys:es.flatMap(e=>e.review.qualification_result.items.filter(i=>i.scope===domain).map(i=>e.review.id+'/'+i.id))});
+    assert.equal(d.job.status,'completed',d.job.error);ds.push(d);
+  }
+  const keys=ds.flatMap(d=>d.review.qualification_result.interfaces.map(i=>i.key));assert.ok(keys.length);
+  const incomplete=await run(f,{...domainArgs(es),context_scope:'*',counterpart_ids:['home-D00','home-D01'],interface_keys:keys});assert.equal(incomplete.job.status,'completed',incomplete.job.error);
+  await assert.rejects(run(f,{phase:'integration',delivery_protocol:streaming,domain_review_ids:ds.map(d=>d.review.id),interface_review_ids:[incomplete.review.id],counterpart_ids:['home-D00','home-D01'],dependency_ids:['peer']}),/interface omitted exact incident-domain home\/dependency/);
+  const ir=await run(f,{...domainArgs(es),context_scope:'*',counterpart_ids:['home-D00','home-D01'],dependency_ids:['peer'],interface_keys:keys});assert.equal(ir.job.status,'completed',ir.job.error);
+  const i=await run(f,{phase:'integration',delivery_protocol:streaming,domain_review_ids:ds.map(d=>d.review.id),interface_review_ids:[ir.review.id],counterpart_ids:['home-D00','home-D01'],dependency_ids:['peer']});assert.equal(i.job.status,'completed',i.job.error);
+  assert.equal(new Set([...es,...ds,ir,i].map(v=>v.job.native_id)).size,es.length+4);
+  for(const v of [ir,i]){
+    for(const home of ['home-D00','home-D01'])assert.equal(v.packet.homes.find(h=>h.source.id===home).value.content,read(f).records[home].content);
+    assert.equal(v.packet.dependencies[0].value.content,read(f).records.peer.content);
+    assert.ok(v.streamRequests.length>2);
+  }
+  assert.deepEqual(i.packet.interface_reviews[0].reviewed_interfaces,keys);
+  for(const v of [...es,...ds,ir])assert.ok(i.packet.reference_evidence.some(r=>r.review.id===v.review.id));
+  assert.equal(call(f,{action:'apply',integration_review_id:i.review.id}).applied,true);
+});
+
+test('stream ranges explicitly preserve surrogate boundaries, escaping and exact reconstruction',()=>{
+  for(const prefix of [0,1,2,3]){
+    const packet={target:{id:'surrogates'},text:'x'.repeat(prefix)+('🧪保持"\\\n'.repeat(15000))},stream=buildScopedStream(packet,{id:'plan'}),raw=JSON.stringify(packet);
+    assert.ok(stream.pages.length>2);
+    for(const page of stream.pages){
+      const frame=JSON.parse(page.wire);
+      for(const boundary of [page.offset,page.end])assert.equal(boundary>0&&boundary<raw.length&&/[\uD800-\uDBFF]/.test(raw[boundary-1])&&/[\uDC00-\uDFFF]/.test(raw[boundary]),false);
+      assert.equal(frame.text,raw.slice(page.offset,page.end));assert.ok(bytes(page.wire)<=48000);
+      assert.equal(/[\uD800-\uDBFF]$/.test(frame.text),false);assert.equal(/^[\uDC00-\uDFFF]/.test(frame.text),false);
+    }
+    assert.equal(stream.pages.map(p=>JSON.parse(p.wire).text).join(''),raw);
+  }
 });

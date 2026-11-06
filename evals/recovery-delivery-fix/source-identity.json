@@ -1,0 +1,55 @@
+{
+  "base": "0c63d792c67e39923d272ba57a733dbdb3f9ac89",
+  "changed_files": {
+    "plugins/soloco/runtime/worker.mjs": "5aa03b2511549f3215270a605266ac8a0f7e9829bf50fa1b7b339098f673292a",
+    "tests/scoped-context.test.mjs": "240a88618dadb70de6ea37125dec5d7e64bbfa8f3e5aaccc573a1af476807764",
+    "tests/timeout-wiring.test.mjs": "42af7204d46aa3292505ac1704b2db660f8260c29703d950a0b5f4ac1ccaab09"
+  },
+  "unchanged_candidate_files": {
+    "plugins/soloco/runtime/context-qualification.mjs": {
+      "sha256": "ae6df4c60ea77425977a8cfccc12c85e739d9f4c793fe005eb697b4c13170efe",
+      "matches_HEAD": true
+    },
+    "plugins/soloco/runtime/scoped-context.mjs": {
+      "sha256": "2002012195396ad511e5d7c7e74531e32d2c1d33c42c1aa5919fc56123c5d729",
+      "matches_HEAD": true
+    },
+    "plugins/soloco/runtime/scoped-stream.mjs": {
+      "sha256": "ce983bf54dd63efc22f4ea11a77c398b262cf1183f6bbfc248ce6641b6ea14ff",
+      "matches_HEAD": true
+    },
+    "plugins/soloco/runtime/context.mjs": {
+      "sha256": "083e7388cfe83fe3debacf0fb45e667a7298c30eb76f5fc68c35f0b986fe39e0",
+      "matches_HEAD": true
+    },
+    "plugins/soloco/runtime/current-state.mjs": {
+      "sha256": "5b361702da492f38cf355524e1514407e7c3957a627ba84b0b2275676c8e75f9",
+      "matches_HEAD": true
+    },
+    "plugins/soloco/runtime/snapshot.mjs": {
+      "sha256": "14b7f96539de55b6c1f170fa434910fbb0d02ee338679eb182735b5a1b55bad1",
+      "matches_HEAD": true
+    },
+    "plugins/soloco/runtime/upgrade-evidence.mjs": {
+      "sha256": "3c7f1dc701a405142c85bac89ecaa0a327410a963e55e33a24c4d22f80048bcc",
+      "matches_HEAD": true
+    },
+    "plugins/soloco/runtime/engine.mjs": {
+      "sha256": "63f1e80f761ecb42690baff9e7231fb95ee51633d165e646659825f08225c798",
+      "matches_HEAD": true
+    },
+    "plugins/soloco/runtime/timeout.mjs": {
+      "sha256": "586c5f44f98742320119f0b42d0612dd79cf970f4e858f05e7d65953c31951a4",
+      "matches_HEAD": true
+    },
+    "plugins/soloco/runtime/handover.mjs": {
+      "sha256": "55c584a97b6605e78231599b0aeecbbd1b97a86d22e6a522ebb75a7a76a759c1",
+      "matches_HEAD": true
+    }
+  },
+  "prior_completed_logs": {
+    "evals/recovery-delivery/context-compat-node22.log": "80a9ce77dc97966040c96d253d0752c4812d33cf4e1f2b3e39014fc43d6acfbd",
+    "evals/recovery-delivery/handover-evidence-node22.log": "4c6df4e394d4151454b19b837d5b1a9d8707b77d90728c9b42144397de7c4d37"
+  },
+  "evidence_type": "FICTIONAL CONTRACT DOUBLES; no native semantic acceptance"
+}

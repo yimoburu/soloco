@@ -1,0 +1,32 @@
+HELD for independent native QA. Source repairs and mandatory local checks complete.
+NEW bounded source-only session, based on 0c63d792c67e39923d272ba57a733dbdb3f9ac89.
+Start 17:29:20 UTC; reported 2026-11-06T17:36:20.519501+00:00; exclusive deadline 17:39:20 UTC.
+Only /private/tmp/soloco-recovery-delivery-fix-20261106/source was edited.
+
+Repairs (runtime change only in worker.mjs):
+- Every failed scoped response retains observed rejected_native_id separately. It cannot assign an unvalidated native_id, including changed later-page identities, aborted first responses and missing timing. Earlier validated identities/receipts remain intact and canonical extraction reuse succeeds.
+- Completion record/job/proof are prepared locally after final response reconstruction. An exclusive deadline fence then runs before completion/session publication. Expired results retain exact qualification_output under Quarantined status and ROLE_TIMEOUT; no session identity or peer message is published. Existing per-call and total 600s ceiling is unchanged.
+
+Actual final checks, all exit 0, zero failures/cancellations/skips:
+- Node 22.13.0: 38 scoped + 14 timeout/wiring = 52/52 (final-focused-node22.log).
+- Node 25.2.1: 38 scoped + 14 timeout/wiring = 52/52 (final-focused-node25.log).
+- Node 22 shared timeout/cancellation/handover/window/evidence: 84/84.
+- Node 25 shared timeout/cancellation/handover-window: 43/43.
+- Node 22 affected legacy/current context worker compatibility: 18/18.
+- git diff --check: exit 0, empty output.
+Exact commands, source identities and log hashes: commands.json, source-identity.json, receipt.json.
+Source-only review patch: source.patch. No commit was created.
+
+Targeted regressions:
+- Accepted extraction native returned on a later page, aborted first response and missing-timing first response: rejected ID retained separately, no accepted artifact, earlier job unchanged and canonical extraction still reusable.
+- Final validation crosses/exactly reaches expiry; closure exactly at expiry; delayed timer callbacks; delayed later spawn; attempted renewed later-call allowance; missing timing. No completed late Pass or session mutation.
+- Missing-range negative starts from a VALID integration closure and rejects the damaged extraction-to-integration delivery closure for its intended reason.
+- Streamed domains -> independent NONEMPTY interface -> integration, with distinct reviewer natives, complete peer home/dependency bodies and recursive review closure. Omitting an incident-domain dependency from interface review blocks integration.
+- Explicit high/low surrogate boundary assertions, exact escaped reconstruction, existing Unicode/escaping and >16-page coverage retained.
+All these are FICTIONAL CONTRACT DOUBLES. Timing cases use the actual worker module body with explicit clock/store/semantic boundary doubles. They establish no cumulative actual-native context fit or semantic acceptance.
+
+Compatibility continuity:
+Existing context-compat-node22.log really completes 4/4, and handover-evidence-node22.log completes 51/51 despite the stale prior receipt. Their hashes are retained in source-identity.json. Fresh 84/84 shared checks supersede the pending handover/evidence label for this repair; fresh 18/18 covers affected context worker paths. Broad context qualification remains partial, NOT Pass. Unchanged large benchmarks were not repeated: context-qualification.mjs, scoped-context.mjs, scoped-stream.mjs, context.mjs, current-state.mjs, snapshot.mjs, upgrade-evidence.mjs, engine.mjs, timeout.mjs and handover.mjs match HEAD byte-for-byte. Their direct logic is unaffected; worker-dependent compatibility was rerun. No full 634-test claim.
+Initial failed prechecks are retained and superseded by final logs: test-double setup and an overly narrow expected error were corrected; the missing-range negative was repaired to use the intended valid integration closure. No prior session failure or exhausted grant is relabeled.
+
+Native acceptance/release remain HELD. The prior fixture running elsewhere cannot validate these repaired guards. Independent fresh native QA owns acceptance. No actual-company access, publish, install, settings, network, dependency change, new agents, commit or version bump. Published VERSION remains 0.7.2; legacy/single/extract/handover proof grammars are unchanged and streaming remains prospective opt-in. No resume_handover permission or revived allowance. The previously stated sole accepted company leaf remains 45,629 bytes / 74 items; no aggregate/exclusion, company Pass, adoption, 27k-extraction feasibility or whole-history recovery is claimed. Effective model/effort/speed remains unverified.
