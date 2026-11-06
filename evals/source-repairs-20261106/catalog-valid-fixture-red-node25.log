@@ -1,0 +1,25 @@
+(node:57969) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ host catalog default service tier does not invalidate explicit operating reviewer startup (321.036708ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 379.514583
+
+✖ failing tests:
+
+test at tests/operating-state.test.mjs:47:1
+✖ host catalog default service tier does not invalidate explicit operating reviewer startup (321.036708ms)
+  Error: Operating state Held: proposal dependency versions, applicable membership, controls or frontier changed: source_root, frontier
+      at fail (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:10:22)
+      at livePlan (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:226:325)
+      at operatingReviewContext (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:231:11)
+      at assignmentContext (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/context.mjs:26:25)
+      at TestContext.<anonymous> (file:///private/tmp/soloco-operating-state-20261106/source/tests/operating-state.test.mjs:52:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3)

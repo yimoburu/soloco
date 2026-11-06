@@ -1,0 +1,303 @@
+TAP version 13
+# (node:57495) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: accepted historical publication proof survives an owner epoch change without admitting old in-flight work
+ok 1 - accepted historical publication proof survives an owner epoch change without admitting old in-flight work
+  ---
+  duration_ms: 190.762916
+  ...
+# Subtest: public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning
+ok 2 - public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning
+  ---
+  duration_ms: 29.9275
+  ...
+# Subtest: missing legacy bootstrap is visibly DIRTY and apply rolls back without acceptance
+ok 3 - missing legacy bootstrap is visibly DIRTY and apply rolls back without acceptance
+  ---
+  duration_ms: 21.174417
+  ...
+# Subtest: host catalog default service tier does not invalidate explicit operating reviewer startup
+not ok 4 - host catalog default service tier does not invalidate explicit operating reviewer startup
+  ---
+  duration_ms: 10.116292
+  location: '/private/tmp/soloco-operating-state-20261106/source/tests/operating-state.test.mjs:47:1'
+  failureType: 'testCodeFailure'
+  error: 'Model selection unavailable: inspect company_doctor models first'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    normalizeSelection (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/selection.mjs:21:32)
+    Module.dispatch (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:276:19)
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-state-20261106/source/tests/operating-state.test.mjs:50:17)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: new membership, changed exact source, wrong independent identity and absent closure cannot publish
+ok 5 - new membership, changed exact source, wrong independent identity and absent closure cannot publish
+  ---
+  duration_ms: 126.060375
+  ...
+# Subtest: scope closure, global membership, expiry, receipt changes, revocation and missed communication hold
+ok 6 - scope closure, global membership, expiry, receipt changes, revocation and missed communication hold
+  ---
+  duration_ms: 40.653084
+  ...
+# Subtest: pause fences publication reviewer and prospective handover cannot hide unknown legacy
+ok 7 - pause fences publication reviewer and prospective handover cannot hide unknown legacy
+  ---
+  duration_ms: 13.358417
+  ...
+# Subtest: 10x independently classified inert archive keeps actual mandatory operating assignment bytes and semantic work constant
+ok 8 - 10x independently classified inert archive keeps actual mandatory operating assignment bytes and semantic work constant
+  ---
+  duration_ms: 82.054291
+  ...
+# Subtest: deleted applicable home and changed exact provenance cannot disappear from accepted meaning
+ok 9 - deleted applicable home and changed exact provenance cannot disappear from accepted meaning
+  ---
+  duration_ms: 28.30025
+  ...
+# Subtest: typed outcome requires complete historical uncertainty; text cannot manufacture permission
+ok 10 - typed outcome requires complete historical uncertainty; text cannot manufacture permission
+  ---
+  duration_ms: 33.075625
+  ...
+# Subtest: public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure
+ok 11 - public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure
+  ---
+  duration_ms: 71.387542
+  ...
+# Subtest: late new and changed falsely scoped prohibitions stay globally DIRTY, but fresh proposals include them
+ok 12 - late new and changed falsely scoped prohibitions stay globally DIRTY, but fresh proposals include them
+  ---
+  duration_ms: 85.939834
+  ...
+# Subtest: publication proof stays current; failed, quarantined, uncertain and unknown-extension siblings stay DIRTY
+ok 13 - publication proof stays current; failed, quarantined, uncertain and unknown-extension siblings stay DIRTY
+  ---
+  duration_ms: 22.244416
+  ...
+# Subtest: mechanical publication index rejects tampering and retains unknown state extensions
+ok 14 - mechanical publication index rejects tampering and retains unknown state extensions
+  ---
+  duration_ms: 20.081458
+  ...
+# Subtest: format6 explicit non-home evidence survives dispatch, discovery and bounded same-native reads
+ok 15 - format6 explicit non-home evidence survives dispatch, discovery and bounded same-native reads
+  ---
+  duration_ms: 241.494083
+  ...
+# Subtest: referenced archived revoked/retry restriction and canonical parent receipts are supplied completely inline
+ok 16 - referenced archived revoked/retry restriction and canonical parent receipts are supplied completely inline
+  ---
+  duration_ms: 76.331125
+  ...
+# Subtest: large non-home provenance uses exact same-native ranges; undelivered, partial, denied, stale or changed evidence cannot publish
+ok 17 - large non-home provenance uses exact same-native ranges; undelivered, partial, denied, stale or changed evidence cannot publish
+  ---
+  duration_ms: 1001.338167
+  ...
+# Subtest: canonical preservation parent revisions cannot be borrowed from matching hashes
+ok 18 - canonical preservation parent revisions cannot be borrowed from matching hashes
+  ---
+  duration_ms: 53.655542
+  ...
+# Subtest: missing provenance and snapshot-only evidence hold rather than count pointers as delivered bodies
+ok 19 - missing provenance and snapshot-only evidence hold rather than count pointers as delivered bodies
+  ---
+  duration_ms: 12.918541
+  ...
+# Subtest: real runtime receipt attribution and deterministic reuse deliver the validated producer closure before Pass
+ok 20 - real runtime receipt attribution and deterministic reuse deliver the validated producer closure before Pass
+  ---
+  duration_ms: 208.451916
+  ...
+# Subtest: runtime receipt missing or mismatched producer, candidate, plan, reuse or generation holds
+ok 21 - runtime receipt missing or mismatched producer, candidate, plan, reuse or generation holds
+  ---
+  duration_ms: 45.353625
+  ...
+# Subtest: external catalog reference-shaped metadata is verbatim evidence without a company lookup
+ok 22 - external catalog reference-shaped metadata is verbatim evidence without a company lookup
+  ---
+  duration_ms: 47.030416
+  ...
+# Subtest: runtime closure requires complete delivery and independent source and proof sessions
+ok 23 - runtime closure requires complete delivery and independent source and proof sessions
+  ---
+  duration_ms: 5389.934916
+  ...
+# Subtest: public qualified recovered snapshot publishes current typed outcomes without replaying the paid raw archive
+ok 24 - public qualified recovered snapshot publishes current typed outcomes without replaying the paid raw archive
+  ---
+  duration_ms: 1624.007875
+  ...
+# Subtest: large prospective publication uses bounded frozen worker delivery and rejects a manufactured complete flag
+ok 25 - large prospective publication uses bounded frozen worker delivery and rejects a manufactured complete flag
+  ---
+  duration_ms: 10499.796083
+  ...
+# Subtest: frozen publication worker rejects unread semantics, changed native and changed current membership
+ok 26 - frozen publication worker rejects unread semantics, changed native and changed current membership
+  ---
+  duration_ms: 640.259292
+  ...
+# Subtest: paid snapshot archive still requires publication QA independent of nested original producers
+ok 27 - paid snapshot archive still requires publication QA independent of nested original producers
+  ---
+  duration_ms: 1293.168333
+  ...
+# Subtest: FICTIONAL PUBLIC v2 explicit complete sources preserve accepted runtime producer independence and freshness
+ok 28 - FICTIONAL PUBLIC v2 explicit complete sources preserve accepted runtime producer independence and freshness
+  ---
+  duration_ms: 2952.075375
+  ...
+# (node:57496) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: tree preservation stays valid after exact operating publication while unknown extensions hold
+ok 29 - tree preservation stays valid after exact operating publication while unknown extensions hold
+  ---
+  duration_ms: 1139.316958
+  ...
+# (node:57497) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: dispatch schema admits only optional supported speed choices and preserves legacy requirements
+ok 30 - dispatch schema admits only optional supported speed choices and preserves legacy requirements
+  ---
+  duration_ms: 5.461542
+  ...
+# Subtest: upgrade reuses the optional dispatch selection schema with unchanged required arguments
+ok 31 - upgrade reuses the optional dispatch selection schema with unchanged required arguments
+  ---
+  duration_ms: 2.913083
+  ...
+# Subtest: legacy omission and host_default avoid catalog discovery and persist normalized requests
+ok 32 - legacy omission and host_default avoid catalog discovery and persist normalized requests
+  ---
+  duration_ms: 12.604041
+  ...
+# Subtest: default-mode fast_disabled routes catalog support without manufacturing model or execution evidence
+ok 33 - default-mode fast_disabled routes catalog support without manufacturing model or execution evidence
+  ---
+  duration_ms: 2.519458
+  ...
+# Subtest: explicit models obtain catalog once and retain separate model and speed-support metadata
+ok 34 - explicit models obtain catalog once and retain separate model and speed-support metadata
+  ---
+  duration_ms: 5.7575
+  ...
+# Subtest: unsupported speed, missing fast-off support and unverified effort reject before queuing or launch
+ok 35 - unsupported speed, missing fast-off support and unverified effort reject before queuing or launch
+  ---
+  duration_ms: 29.771333
+  ...
+# Subtest: omitted speed, explicit host_default and reason-only changes reuse a finished session
+ok 36 - omitted speed, explicit host_default and reason-only changes reuse a finished session
+  ---
+  duration_ms: 3.976208
+  ...
+# Subtest: speed changes retire identity and repeated fast_disabled reuses the replacement
+ok 37 - speed changes retire identity and repeated fast_disabled reuses the replacement
+  ---
+  duration_ms: 3.760041
+  ...
+# Subtest: explicit model session identity also rotates for speed and reuses unchanged selections
+ok 38 - explicit model session identity also rotates for speed and reuses unchanged selections
+  ---
+  duration_ms: 4.141792
+  ...
+# Subtest: speed wiring preserves ownership, pause, scope, adoption and independent-review checks
+ok 39 - speed wiring preserves ownership, pause, scope, adoption and independent-review checks
+  ---
+  duration_ms: 13.603125
+  ...
+# Subtest: fresh-session schema is optional and rejects missing, orphaned or invalid reasons without mutation
+ok 40 - fresh-session schema is optional and rejects missing, orphaned or invalid reasons without mutation
+  ---
+  duration_ms: 23.652208
+  ...
+# Subtest: explicit fresh with identical settings retires exact lineage and queues null native without execution claims
+ok 41 - explicit fresh with identical settings retires exact lineage and queues null native without execution claims
+  ---
+  duration_ms: 7.706958
+  ...
+# Subtest: fresh after confirmed failure preserves failed job, authority, limits, inputs and attempt evidence
+ok 42 - fresh after confirmed failure preserves failed job, authority, limits, inputs and attempt evidence
+  ---
+  duration_ms: 3.700084
+  ...
+# Subtest: fresh cannot retire active/uncertain sessions or bypass owner, pause, host, resource or scope holds
+ok 43 - fresh cannot retire active/uncertain sessions or bypass owner, pause, host, resource or scope holds
+  ---
+  duration_ms: 68.740334
+  ...
+# Subtest: fresh is ordinary-only and cannot rotate handover reviewers or scoped generation identities
+ok 44 - fresh is ordinary-only and cannot rotate handover reviewers or scoped generation identities
+  ---
+  duration_ms: 13.735208
+  ...
+# (node:57498) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: read-only baseline, exact full/selected deltas, deletion, reorder, shape and unknown fields
+ok 45 - read-only baseline, exact full/selected deltas, deletion, reorder, shape and unknown fields
+  ---
+  duration_ms: 35.003583
+  ...
+# Subtest: selected writes and upgrade appends never read unrelated/prior journal bodies
+ok 46 - selected writes and upgrade appends never read unrelated/prior journal bodies
+  ---
+  duration_ms: 20.931041
+  ...
+# Subtest: selected new roots allocate after both root and shape positions without moving existing rows
+ok 47 - selected new roots allocate after both root and shape positions without moving existing rows
+  ---
+  duration_ms: 18.234541
+  ...
+# Subtest: existing duplicate top-level positions hold without rewriting historical metadata
+ok 48 - existing duplicate top-level positions hold without rewriting historical metadata
+  ---
+  duration_ms: 9.080708
+  ...
+# Subtest: intake verifies envelopes; checkpoint dependency validation holds on missing/corrupt nested originals
+ok 49 - intake verifies envelopes; checkpoint dependency validation holds on missing/corrupt nested originals
+  ---
+  duration_ms: 41.576375
+  ...
+# Subtest: gaps, changed event envelopes/payloads, uncovered writers and unlogged state changes hold
+ok 50 - gaps, changed event envelopes/payloads, uncovered writers and unlogged state changes hold
+  ---
+  duration_ms: 122.78525
+  ...
+# Subtest: missing/corrupt old, intermediate, new and unchanged immutable values hold
+ok 51 - missing/corrupt old, intermediate, new and unchanged immutable values hold
+  ---
+  duration_ms: 133.619417
+  ...
+# Subtest: legacy/changed layout, ambiguous encoding, inexact identities and rollback hold
+ok 52 - legacy/changed layout, ambiguous encoding, inexact identities and rollback hold
+  ---
+  duration_ms: 100.958917
+  ...
+# Subtest: failed writes roll back metadata, immutable inserts and event atomically
+ok 53 - failed writes roll back metadata, immutable inserts and event atomically
+  ---
+  duration_ms: 21.450166
+  ...
+# Subtest: position-only object reorder and selected deletion produce exact references; historical old events need no replay
+ok 54 - position-only object reorder and selected deletion produce exact references; historical old events need no replay
+  ---
+  duration_ms: 16.918333
+  ...
+# Subtest: re-sealed but inconsistent metadata roots and before/after chains hold
+ok 55 - re-sealed but inconsistent metadata roots and before/after chains hold
+  ---
+  duration_ms: 71.3025
+  ...
+1..55
+# tests 55
+# suites 0
+# pass 54
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 25007.724333
