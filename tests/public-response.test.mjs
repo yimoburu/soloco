@@ -41,6 +41,11 @@ function allItems(state,collection) {
  return items;
 }
 
+test('current capability preserves published 0.7.0 model-selection compatibility and rejects unpublished teams',()=>{
+ for(const version of ['0.6.2','0.7.0',VERSION])assert.equal(currentView({...seed(),plugin_version:version}).capabilities.model_selection.eligible,true,version);
+ for(const version of ['0.6.14','unknown'])assert.equal(currentView({...seed(),plugin_version:version}).capabilities.model_selection.eligible,false,version);
+});
+
 test('1x/10x/100x archives keep full serialized default replies bounded; exact giant sources survive',()=>{
  const metrics=[];
  for(const scale of [1,10,100]) {
