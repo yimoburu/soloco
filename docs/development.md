@@ -311,3 +311,7 @@ freeze; no actual model execution or live adoption is implied by component tests
 The existing direct normalized raw read API verifies the current pointer and
 original in one SQLite read snapshot per range, avoiding raw-source serialization.
 Assembled/alias/legacy sources retain their exact existing fallback.
+
+## Repository CI
+
+See [source CI and evidence verification](ci.md) for the required macOS Node matrix, generated-drift check, retained receipts, local commands and remote provenance boundaries.
