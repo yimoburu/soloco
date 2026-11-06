@@ -41,6 +41,8 @@ export async function runScopedFictional({model,effort='high',inspectOnly=false}
     const original=await readSnapshot(plan.original);assert.equal(JSON.parse(original).content,sourceText);report.original_sha256=digest(original);write('original.json',original);
     const units=[];let offset=0;do{const page=await context({action:'inspect',plan_id:plan.id,offset,limit:16});units.push(...page.units);offset=page.next_offset;}while(offset!==null);
     const delivered=[];for(const unit of units)delivered.push(await context({action:'read',plan_id:plan.id,unit_id:unit.id}));write('units.json',delivered);
+    assert.equal(units.length,2,'This small fixture expects exactly two units; inspect changed partitioning before native execution.');
+    const extractionTargets=units.map(unit=>({phase:'extract',unit_id:unit.id,context_unit_ids:units.filter(other=>other.id!==unit.id).map(other=>other.id)}));write('extraction-targets.json',extractionTargets);report.extraction_targets=extractionTargets;
     report.workload={source_bytes:bytes(sourceText),original_bytes:bytes(original),units:units.length,unit_bytes:delivered.map(v=>bytes(v.unit)),limits:SCOPED_LIMITS};
     if(inspectOnly){report.status='inspected';report.claim='No model invoked; no semantic acceptance.';return report;}
     const run=async args=>{
@@ -50,7 +52,7 @@ export async function runScopedFictional({model,effort='high',inspectOnly=false}
       const review=state().records[job.artifact_id];assert.equal(job.status,'completed',job.error);assert.ok(job.native_id&&job.qualification_delivery&&job.execution_started_at);assert.equal(job.coordination_release?.termination_confirmed,true);assert.equal(job.coordination_release.reason,'model_process_closed');assert.equal(review?.review?.verdict,'Pass',review?.content);
       return {target:target.target,job,review};
     };
-    const extracts=[];for(const unit of units)extracts.push(await run({phase:'extract',unit_id:unit.id}));
+    const extracts=[];for(const target of extractionTargets)extracts.push(await run(target));
     const extractionIds=extracts.map(e=>e.review.id),items=extracts.flatMap(e=>e.review.qualification_result.items.map(item=>({key:e.review.id+'/'+item.id,item}))),groups=new Map();
     for(const item of items){assert.ok(Object.hasOwn(homes,item.item.scope),'Native extraction returned an undeclared source scope; hold rather than relabel it.');if(!groups.has(item.item.scope))groups.set(item.item.scope,[]);groups.get(item.item.scope).push(item.key);}
     assert.deepEqual([...groups.keys()].sort(),Object.keys(homes).sort(),'Every explicit source scope must be extracted.');

@@ -28,18 +28,40 @@ mutations. This protocol grants no venture execution or renewed allowance.
    Page `inspect` with `plan_id`, `offset`, `limit` (1–16). Retrieve a unit with
    `read`, `plan_id`, `unit_id`; read the returned original/projection snapshot
    handles through existing exact snapshot range reads. Retrieval is not QA.
-3. `target` with `phase: "extract"`, `plan_id`, `unit_id`. Dispatch fresh `qa`
-   with `review_of` the returned target and no extra inputs. The worker delivers
-   the whole bounded unit, then retains exact structured items, conditions,
-   uncertainty, source ranges, interfaces, output wire and canonical job receipt.
-   A target may instead return `reused: true`, `review_id`, `job_id`: this is an
-   existing validated completed worker receipt, with no dispatch or new model
-   claim. Unchanged qualifications and replacement plans reuse those receipts.
+3. Inspect/read the manifest and exact units before choosing an extraction scope.
+   `target` with `phase: "extract"`, `plan_id`, `unit_id` accepts optional
+   `context_unit_ids: ["u1", "u2/0"]`: exact other frozen units or valid binary
+   subdivisions, unique and in the requested order, with no primary duplicate.
+   Omission means an empty supporting set. Choose adjacent or full logical
+   context sufficient to finish a clipped qualifier or semantic boundary.
+   Dispatch fresh `qa` with `review_of` the returned target and no extra inputs.
+   The worker delivers `reviewed_unit_bundle` with `primary`, ordered `supporting`
+   units, and `provenance`: exact source reference, projection hash, and primary
+   and supporting unit IDs, unit hashes, paths and primary/delivered ranges.
+   Every returned item must cite that entire exact provenance bundle; the result
+   also binds its primary ID/hash and `reviewed_unit_bundle_sha256`. Extract effects
+   belonging to the primary with complete conditions/interfaces from the full
+   delivered context. Supporting evidence never counts as completed primary coverage.
+   The canonical extraction artifact retains the entire reviewed bundle, items,
+   output wire and job proof; applicability receives those full validated bundles.
+   For every phase, `target_sha256` equals `packet.target.sha256`: the SHA-256 of
+   the complete target record, not just its inner target payload.
+   A target may instead return `reused: true`, `review_id`, `job_id`: an existing
+   validated completed worker receipt, with no dispatch or new model claim.
+   Reuse requires the exact requested primary and ordered context bundle, even
+   after unrelated current changes or replacement plans. A changed support request
+   creates a new target; a less-informed receipt cannot satisfy it.
+   Missing distant qualifiers or clipped/uncertain boundaries must hold. Retain the
+   original held target/result verbatim, inspect/read more frozen evidence, and
+   request a newly explicit expanded target within the existing authority for new
+   independent judgment. This never relabels the original failure or autostarts a
+   review/retry. A context set that still cannot fit holds for decomposition.
 4. `target` with `phase: "applicability"`, bounded `extraction_review_ids`,
    `counterpart_ids`, `dependency_ids`, and `context_scope` (unknown/global: `*`).
    Optional `item_keys` select exact `review-id/local-item-id` keys; by default all
    items in the supplied extractions are selected. Complete extraction artifacts
-   and source units are delivered, alongside complete current homes, dependencies,
+   and reviewed-unit bundles are delivered, alongside complete current homes,
+   dependencies,
    global rules, authority, notices, messages, unknown governing records and state
    extensions. Scoped governing declarations still arrive in full until their
    boundaries have canonical independent review. Independent QA must preserve every selected item in an exact home,
@@ -67,12 +89,16 @@ mutations. This protocol grants no venture execution or renewed allowance.
 
 Every request is at most 48,000 UTF-8 bytes; complete parsed review envelopes at
 most 12,000 bytes (wire independently at most 48,000). These are supported bounds,
-not host/model context-fit guarantees. Overflow retains the failed output and
-unit. Request `unit_id: "u3/0"` and `"u3/1"` to subdivide a deterministic primary
-range, recursively if necessary. Overlap preserves boundary evidence; it does
-not establish independence. Integration accepts only exact primary range coverage
-and does not discard accepted work elsewhere. Partition applicability selections
-and interfaces when needed. If complete global rules, coupled interfaces, or the
+not host/model context-fit guarantees. Complete bundle provenance adds per-item
+output overhead; dense primaries may need explicit subdivision sooner. Overflow
+retains the failed output and unit. Request `unit_id: "u3/0"` and `"u3/1"` to
+subdivide a deterministic primary range, recursively if necessary. Overlap
+preserves boundary evidence; it does
+not establish semantic completeness or independence. Supporting context uses the
+same fixed input/output ceilings; never clip it. Integration accepts only exact
+primary range coverage from the initial gap-free manifest and does not discard
+accepted work elsewhere. Partition applicability selections and interfaces when
+needed. If complete global rules, coupled interfaces, or the
 final review cannot fit, hold truthfully; never truncate or substitute hashes for
 semantic review. A false or incomplete accepted extraction requires fresh source
 repair/requalification, not a coordinator assertion that it is complete.
@@ -129,11 +155,13 @@ implicitly qualify its retired proof bodies. These can still hold format 5 until
 separately reviewed; governing-only format 3 and unchanged unrelated scoped
 receipts remain reusable. This implementation does not silently archive them.
 
-Validation: `node --test tests/scoped-context.test.mjs tests/develop.test.mjs`. Reviewers in the scoped-context file
-are explicitly labeled contract doubles exercising a tiny obligation language,
-the real public engine/store/worker lifecycle and bounded proof checks. They are
-not native/model semantic acceptance or evidence of production performance.
-The development test file adds a regression using the actual sandbox/controller
+Synthetic scoped checks: `node --test tests/scoped-context.test.mjs`. Reviewers
+in that file are explicitly labeled contract doubles. They exercise a tiny
+obligation language, a clipped natural-language qualifier requiring exact delivered
+text and explicit supporting evidence, and the real public engine/store/worker
+lifecycle with bounded proof checks. They are not native/model semantic acceptance
+or evidence of production performance. `tests/develop.test.mjs` also contains a
+regression using the actual sandbox/controller
 receipt, candidate and native producer. It skips when the supported sandbox is
 unavailable; a skip is not runtime execution evidence.
 

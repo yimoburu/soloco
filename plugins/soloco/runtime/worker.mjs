@@ -237,7 +237,10 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
       current.status=stale?'quarantined':'completed';current.artifact_id=artifactId;current.finished_at=stamp();current.native_id=output.native_id;
       if(controller.signal.aborted)current.execution_failure={...failureEvidence(controller.signal.reason),outcome:'cancelled_or_timed_out',...(context?.qualification&&controller.signal.reason?.code==='ASSIGNMENT_INELIGIBLE'?{abort_kind:'eligibility_loss'}:{}),at:stamp()};
       current.model_evidence=output.model_evidence??{reported_models:[],reported_effort:null,verification:'unverified',source:'not_reported',scope:'unknown'};
-      if(context.qualification){s.records[artifactId].qualification_output=output.text;s.records[artifactId].qualification_proof=(scopedContext(context)?scoped.scopedProof:qualificationProof)(partitionDelivery,current);}
+      if(context.qualification){
+        if(scopedContext(context)&&context.packet.phase==='extract')s.records[artifactId].reviewed_unit_bundle=context.packet.reviewed_unit_bundle;
+        s.records[artifactId].qualification_output=output.text;s.records[artifactId].qualification_proof=(scopedContext(context)?scoped.scopedProof:qualificationProof)(partitionDelivery,current);
+      }
       if(stale) {notice(s,'must_know','A late or stale result was quarantined; it grants no approval.',artifactId);return s;}
       const previousNative=s.sessions[job.session_key].native_id,messageCount=s.messages.length,noticeCount=s.notices.length;
       s.sessions[job.session_key].native_id=output.native_id;

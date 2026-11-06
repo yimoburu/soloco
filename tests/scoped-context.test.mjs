@@ -38,14 +38,14 @@ function contractReview(p){
   const sh=p.response_shape,r={protocol,phase:p.phase,extraction_identity:p.extraction_identity,target_sha256:sh.target_sha256,verdict:'Pass',reason:'CONTRACT DOUBLE: exact fixture language reviewed; no real native acceptance.',permitted_action:p.phase==='integration'?'apply_scoped_context':'continue',preservation_complete:true,interfaces_complete:true,authority_checked:true,scope_complete:true,blockers:[]};
   const block=reason=>Object.assign(r,{verdict:'Blocked',permitted_action:'hold',reason,blockers:[reason]});
   if(p.phase==='extract'){
-    const f=p.unit.fragment,items=[];for(const m of f.text.matchAll(/OBL~(D\d\d)~(\d+)~[A-Z0-9_]+~(OPEN|CLOSED)~END/g)){
+    const bundle=p.reviewed_unit_bundle,f=bundle.primary.fragment,items=[];for(const m of f.text.matchAll(/OBL~(D\d\d)~(\d+)~[A-Z0-9_]+~(OPEN|CLOSED)~END/g)){
       const pos=f.range.delivered_start+m.index;if(pos<f.range.start||pos>=f.range.end)continue;
-      items.push({id:'o'+m[2],kind:m[3]==='OPEN'?'uncertain_effect':'obligation',text:m[0],scope:m[1],provenance:f.range,interfaces:[]});
+      items.push({id:'o'+m[2],kind:m[3]==='OPEN'?'uncertain_effect':'obligation',text:m[0],scope:m[1],provenance:bundle.provenance,interfaces:[]});
     }
-    for(const m of f.text.matchAll(/NEGATIVE~(D\d\d)~NO_RETRY_WHILE_OPEN~END/g)){const pos=f.range.delivered_start+m.index;if(pos>=f.range.start&&pos<f.range.end)items.push({id:'negative',kind:'negative_finding',text:m[0],scope:m[1],provenance:f.range,interfaces:[]});}
-    if(f.text.includes('DISTANT_QUALIFIER'))items.push({id:'qualifier',kind:'boundary',text:'DISTANT_QUALIFIER: D00 may not retry unless D01 permission remains OPEN.',scope:'D00',provenance:f.range,interfaces:[{id:'permission',with_scope:'D01',text:'D01 permission remains OPEN; D00 must not retry.'}]});
-    if(f.text.includes('UNKNOWN_EXTRA'))items.push({id:'unknown',kind:'exhausted_allowance',text:'UNKNOWN_EXTRA: exhausted means no retry.',scope:'*',provenance:f.range,interfaces:[]});
-    Object.assign(r,{unit_id:p.unit.id,unit_sha256:sha(p.unit),items});
+    for(const m of f.text.matchAll(/NEGATIVE~(D\d\d)~NO_RETRY_WHILE_OPEN~END/g)){const pos=f.range.delivered_start+m.index;if(pos>=f.range.start&&pos<f.range.end)items.push({id:'negative',kind:'negative_finding',text:m[0],scope:m[1],provenance:bundle.provenance,interfaces:[]});}
+    if(f.text.includes('DISTANT_QUALIFIER'))items.push({id:'qualifier',kind:'boundary',text:'DISTANT_QUALIFIER: D00 may not retry unless D01 permission remains OPEN.',scope:'D00',provenance:bundle.provenance,interfaces:[{id:'permission',with_scope:'D01',text:'D01 permission remains OPEN; D00 must not retry.'}]});
+    if(f.text.includes('UNKNOWN_EXTRA'))items.push({id:'unknown',kind:'exhausted_allowance',text:'UNKNOWN_EXTRA: exhausted means no retry.',scope:'*',provenance:bundle.provenance,interfaces:[]});
+    Object.assign(r,{unit_id:bundle.primary.id,unit_sha256:sha(bundle.primary),reviewed_unit_bundle_sha256:sha(bundle),items});
   }else if(p.phase==='applicability'){
     const items=p.extractions.flatMap(e=>e.items.map(item=>({key:e.review.id+'/'+item.id,item}))).filter(i=>p.item_keys.includes(i.key));
     r.summary=items.length?`CONTRACT DOUBLE: ${p.context_scope} preserves ${items.length} distinct per-customer export ceilings, consent classes and region conditions in exact current homes. Every OPEN outcome remains OPEN. No permission to export. Cross-domain conditions are exactly the complete interfaces below; unexpected interactions must hold.`:'No consequential effects in the exact source unit.';
@@ -67,7 +67,7 @@ async function run(f,args,{review=contractReview,native,modelHook}={}){
   });
   const s=read(f),j=s.jobs[queued.id];return {target:t,job:j,review:s.records[j.artifact_id],packet:j.qualification_delivery&&JSON.parse(j.qualification_delivery.wire)};
 }
-async function extraction(f){const results=[];for(const unit of unitPages(f)){const v=await run(f,{phase:'extract',unit_id:unit.id});assert.equal(v.job.status,'completed',v.job.error);results.push(v);}return results;}
+async function extraction(f){const results=[];for(const unit_id of f.extraction_unit_ids??unitPages(f).map(u=>u.id)){const v=await run(f,{phase:'extract',unit_id});assert.equal(v.job.status,'completed',v.job.error);results.push(v);}return results;}
 async function qualify(f){
   const extracts=await extraction(f),byDomain=new Map();for(const e of extracts)for(const item of e.review.qualification_result.items){const d=item.scope;if(!byDomain.has(d))byDomain.set(d,[]);byDomain.get(d).push({e,item,key:e.review.id+'/'+item.id});}
   // Zero-item units still require an independent applicability receipt.
@@ -78,7 +78,7 @@ async function qualify(f){
 }
 
 test('public store + worker path: 500 distinct obligations / 20 domains exceed union output, bounded packets apply and archive exact originals',async t=>{
-  const f=fixture({count:500,domains:20});mutate(f,s=>{s.records.unknownRule={id:'unknownRule',kind:'decision',revision:1,content:'Unknown old governing rule: never execute without current consent.'};});const before=JSON.stringify(read(f).records.old),q=await qualify(f),s=read(f);
+  const f=fixture({count:500,domains:20});f.extraction_unit_ids=unitPages(f).flatMap(u=>[u.id+'/0',u.id+'/1']);mutate(f,s=>{s.records.unknownRule={id:'unknownRule',kind:'decision',revision:1,content:'Unknown old governing rule: never execute without current consent.'};});const before=JSON.stringify(read(f).records.old),q=await qualify(f),s=read(f);
   assert.equal(q.extracts.reduce((n,e)=>n+e.review.qualification_result.items.length,0),500);
   assert.equal(new Set(q.extracts.flatMap(e=>e.review.qualification_result.items.map(i=>i.text))).size,500);
   const total=q.extracts.reduce((n,e)=>n+bytes(e.review.qualification_output),0);assert.ok(total>12000);
@@ -117,9 +117,9 @@ test('unknown source fields and current global rules are semantic; historical cl
 });
 
 test('distant qualifier absent from home blocks independently; no resolution of OPEN invented',async()=>{
-  const f=fixture({count:80,extra:{far_qualifier:'DISTANT_QUALIFIER'}}),es=await extraction(f),e=es.find(e=>e.review.qualification_result.items.some(i=>i.id==='qualifier')),first=es.find(e=>e.review.qualification_result.items.some(i=>i.id==='o000'));
+  const f=fixture({count:80,extra:{far_qualifier:'DISTANT_QUALIFIER'}});f.extraction_unit_ids=unitPages(f).flatMap(u=>[u.id+'/0',u.id+'/1']);const es=await extraction(f),e=es.find(e=>e.review.qualification_result.items.some(i=>i.id==='qualifier')),first=es.find(e=>e.review.qualification_result.items.some(i=>i.id==='o000'));
   assert.notEqual(first.target.target.unit_id,e.target.target.unit_id,'Qualifier is genuinely distant across immutable units');
-  assert.ok(e.packet.unit.fragment.range.start-first.packet.unit.fragment.range.end>2400);
+  assert.ok(e.packet.reviewed_unit_bundle.primary.fragment.range.start-first.packet.reviewed_unit_bundle.primary.fragment.range.end>2400);
   const d=await run(f,{phase:'applicability',extraction_review_ids:[first.review.id,e.review.id],item_keys:[first.review.id+'/o000',e.review.id+'/qualifier'],counterpart_ids:['home-D00'],context_scope:'D00'});assert.equal(d.job.status,'completed',d.job.error);assert.equal(d.review.review.verdict,'Blocked');
   const i=await run(f,{phase:'integration',domain_review_ids:[d.review.id],counterpart_ids:['home-D00']}).catch(error=>error);assert.match(i.message,/negative receipt|global governing identity/);assert.ok(read(f).records[e.review.id]);
 });
@@ -136,7 +136,7 @@ test('cross-domain interface must have independent complete exact review; contra
 
 test('canonical receipt rejects forged native/job/closure/output/provenance and tampered source; no coordinator proof reuse',async()=>{
   const f=fixture(),q=await qualify(f),original=read(f);
-  const changes=[s=>s.jobs[q.extracts[0].job.id].native_id='forged',s=>s.jobs[q.extracts[0].job.id].coordination_release.termination_confirmed=false,s=>s.jobs[q.extracts[0].job.id].artifact_id='forged',s=>s.jobs[q.extracts[0].job.id].execution_deadline_at='2000-01-01T00:00:00Z',s=>s.jobs[q.extracts[0].job.id].qualification_delivery.wire+=' ',s=>s.records[q.extracts[0].review.id].qualification_proof.native_id='forged',s=>s.records[q.extracts[0].review.id].qualification_result.items[0].provenance.start++,s=>s.records.old.clauses.push('tampered'),s=>s.records['home-D00'].content+=' changed'];
+  const changes=[s=>s.jobs[q.extracts[0].job.id].native_id='forged',s=>s.jobs[q.extracts[0].job.id].coordination_release.termination_confirmed=false,s=>s.jobs[q.extracts[0].job.id].artifact_id='forged',s=>s.jobs[q.extracts[0].job.id].execution_deadline_at='2000-01-01T00:00:00Z',s=>s.jobs[q.extracts[0].job.id].qualification_delivery.wire+=' ',s=>s.records[q.extracts[0].review.id].qualification_proof.native_id='forged',s=>s.records[q.extracts[0].review.id].qualification_result.items[0].provenance.primary.range.start++,s=>s.records.old.clauses.push('tampered'),s=>s.records['home-D00'].content+=' changed'];
   for(const change of changes){const s=inheritSnapshots(original,structuredClone(original));change(s);assert.throws(()=>reviewedContext(s),/Scoped context hold|Immutable snapshot/);}
   mutate(f,s=>{s.jobs[q.extracts[0].job.id].coordination_release.termination_confirmed=false;});
   const t=call(f,{action:'target',plan_id:f.plan_id,phase:'extract',unit_id:unitPages(f)[0].id});assert.ok(t.id);assert.equal(t.reused,undefined);
@@ -179,7 +179,7 @@ test('stale owner, paused maintenance controls, revocation and late pause fence 
 
 test('main exposes usable scoped schema and public current home schema',()=>{
   const main=path.resolve('plugins/soloco/runtime/main.mjs');const result=spawnSync(process.execPath,[main,'serve','codex'],{input:JSON.stringify({jsonrpc:'2.0',id:1,method:'tools/list',params:{}})+'\n',encoding:'utf8',env:{...process.env,COMPANY_PLUGIN_DATA:path.join(tmp,'mcp-cache')}});assert.equal(result.status,0,result.stderr);const list=result.stdout.split('\n').filter(Boolean).map(x=>JSON.parse(x)).find(x=>x.id===1);assert.ok(list?.result?.tools);
-  const schema=list.result.tools.find(t=>t.name==='company_context').inputSchema.properties;for(const k of ['protocol','phase','extraction_review_ids','item_keys','interface_keys','domain_review_ids','interface_review_ids','integration_review_id'])assert.ok(schema[k],k);
+  const schema=list.result.tools.find(t=>t.name==='company_context').inputSchema.properties;for(const k of ['protocol','phase','context_unit_ids','extraction_review_ids','item_keys','interface_keys','domain_review_ids','interface_review_ids','integration_review_id'])assert.ok(schema[k],k);assert.equal(schema.context_unit_ids.uniqueItems,true);
   assert.ok(list.result.tools.find(t=>t.name==='company_save').inputSchema.properties.context_obligations);
 });
 
@@ -195,7 +195,7 @@ test('bounded independent interface review can complete integration without a gl
 });
 
 test('closed output grammar rejects fabricated citations, altered provenance and hidden findings and retains rejected evidence',async()=>{
-  for(const change of [e=>{e.citations=[{native_id:'model-claim',complete:true}];},e=>{e.qualification_result.items[0].provenance.start++;},e=>{e.qualification_result.hidden_finding='No renewed allowance.';}]){
+  for(const change of [e=>{e.citations=[{native_id:'model-claim',complete:true}];},e=>{e.qualification_result.items[0].provenance.primary.range.start++;},e=>{e.qualification_result.hidden_finding='No renewed allowance.';}]){
     const f=fixture(),v=await run(f,{phase:'extract',unit_id:unitPages(f)[0].id},{review:p=>{const e=contractReview(p);change(e);return e;}});assert.equal(v.job.status,'failed');assert.ok(v.job.rejected_output.text);assert.ok(!v.review);assert.equal(read(f).context_classifications?.old,undefined);
   }
 });
@@ -401,4 +401,120 @@ test('root authority changes and changed or removed scope rules widen fresh revi
     const target=scoped.createScopedTarget(current,{plan_id:f.plan_id,phase:'applicability',extraction_review_ids:es.map(e=>e.review.id),counterpart_ids:['home-second'],context_scope:'D01'});
     assert.ok(resolveSnapshot(current,target.global_snapshot).governing.some(r=>r.source.id==='home-D00'&&r.value.content===f.clauses[0]),change);
   }
+});
+
+// Synthetic evidence check only: completeness depends on the actual delivered
+// sentence, never merely on changing a semantic attestation to true.
+test('clipped natural-language qualifier holds until a new explicit supporting bundle supplies its entire boundary',async()=>{
+  const qualifier='Sending remains blocked until independent billing evidence establishes '+[
+    'whether the original charge settled, duplicated, was reversed, or remains pending in the bank ledger',
+    'whether the invoice balance includes a provisional adjustment rather than a completed refund',
+    'whether the payment processor and the bank describe the same transaction and settlement period',
+    'whether a disputed payment was recorded separately from the original possible duplicate charge',
+    'whether the customer account contains an unresolved credit that could conceal the duplicate',
+    'whether an earlier repair attempt consumed the single allowance without establishing its effects',
+    'whether a pending refund is conditional and could still fail before the bank confirms completion',
+    'whether a settlement report excludes transactions recorded after its reporting cutoff',
+    'whether an apparent reversal belongs to this invoice rather than another invoice with the same amount',
+    'whether a previous reconciliation assumed success from an acknowledgement before settlement',
+    'whether the billing record preserves the uncertain outcome and every exhausted repair allowance',
+    'whether a separate customer account has been incorrectly used as evidence of this payment',
+    'whether the reported balance includes a manual correction whose source has not been verified',
+    'whether the bank statement and processor export agree about the exact transaction identifier',
+    'whether an open dispute can change the settlement outcome after the current reporting date',
+    'whether the ledger distinguishes a proposed refund from a refund that the bank actually completed',
+    'whether the historical report omitted any pending adjustment that could restore the duplicate',
+    'whether the internal draft describes the outcome as unknown while this evidence is incomplete',
+    'whether another employee recorded a proposed repair as complete before independent confirmation',
+    'whether any retry would exceed the exhausted allowance or presume authority absent from the source',
+    'whether a later settlement correction changes the original record without resolving the uncertainty',
+    'whether all statements about the payment refer to this exact fictional invoice and account',
+    'whether any correction in a subsequent reporting period has been independently reconciled with the original entry',
+    'whether customer contact has a separate explicit authorization covering the recipient, message and delivery method'
+  ].join('; ')+ '; resolving that uncertainty alone grants no contact authority.';
+  assert.ok(qualifier.length>2400);
+  const f=fixture({count:0,extra:{content:qualifier}}),units=unitPages(f),reads=units.map(u=>call(f,{action:'read',plan_id:f.plan_id,unit_id:u.id}).unit);
+  const primary=reads.find(u=>u.fragment.text.includes('Sending remains blocked until'));
+  assert.ok(primary);assert.ok(!primary.fragment.text.includes('alone grants no contact authority.'));
+  const review=p=>{
+    const e=contractReview(p),r=e.qualification_result,b=p.reviewed_unit_bundle;
+    // Reassemble exact overlapping frozen ranges, checking every shared code unit.
+    const chars=[];for(const u of [b.primary,...b.supporting])for(let n=0;n<u.fragment.text.length;n++){
+      const at=u.fragment.range.delivered_start+n;assert.ok(chars[at]===undefined||chars[at]===u.fragment.text[n]);chars[at]=u.fragment.text[n];
+    }
+    const complete=Array.from({length:chars.length},(_,i)=>chars[i]??'\0').join('').includes(qualifier);
+    Object.assign(r,{items:complete?[{id:'boundary',kind:'boundary',text:qualifier,scope:'outreach',provenance:b.provenance,interfaces:[{id:'billing',with_scope:'billing',text:qualifier}]}]:[],...(!complete?{verdict:'Blocked',permitted_action:'hold',preservation_complete:false,interfaces_complete:false,scope_complete:false,reason:'CONTRACT DOUBLE: delivered qualifier ends mid-sentence; explicit supporting evidence required.',blockers:['Missing the complete billing condition and contact-authority boundary.']}: {})});
+    return envelope(r);
+  };
+  const held=await run(f,{phase:'extract',unit_id:primary.id},{review});assert.equal(held.job.status,'completed',held.job.error);assert.equal(held.review.review.verdict,'Blocked');const retained=JSON.stringify(held.review);
+  await assert.rejects(run(f,{phase:'applicability',extraction_review_ids:[held.review.id],counterpart_ids:['home-D00']}),/negative receipt|retained negative evidence/);
+  const expanded=await run(f,{phase:'extract',unit_id:primary.id,context_unit_ids:units.filter(u=>u.id!==primary.id).map(u=>u.id)},{review});
+  assert.equal(expanded.job.status,'completed',expanded.job.error);assert.equal(expanded.review.review.verdict,'Pass');assert.notEqual(expanded.target.id,held.target.id);
+  assert.equal(expanded.review.qualification_result.items[0].text,qualifier);assert.equal(expanded.review.qualification_result.items[0].interfaces[0].text,qualifier);
+  assert.equal(JSON.stringify(read(f).records[held.review.id]),retained,'The original hold is retained verbatim');
+  assert.equal(read(f).context_classifications?.old,undefined,'Deterministic extraction evidence grants no applicability or model acceptance');
+});
+
+test('exact ordered supporting ranges and hashes survive canonical artifact delivery; only identical bundles reuse',async()=>{
+  const f=fixture({count:35}),units=unitPages(f);assert.ok(units.length>=3);
+  const bare=await run(f,{phase:'extract',unit_id:units[0].id});assert.equal(bare.job.status,'completed',bare.job.error);
+  const args={phase:'extract',unit_id:units[0].id,context_unit_ids:[units[2].id+'/1',units[1].id]},e=await run(f,args);
+  assert.notEqual(e.review.id,bare.review.id,'The less-informed completed extraction cannot satisfy expanded context');
+  assert.equal(e.job.status,'completed',e.job.error);
+  const b=e.packet.reviewed_unit_bundle;
+  assert.deepEqual(b.supporting.map(u=>u.id),args.context_unit_ids);
+  for(const [index,u] of [b.primary,...b.supporting].entries()){
+    assert.deepEqual(u,call(f,{action:'read',plan_id:f.plan_id,unit_id:u.id}).unit);
+    const provenance=index?b.provenance.supporting[index-1]:b.provenance.primary;
+    assert.deepEqual(provenance,{unit_id:u.id,unit_sha256:sha(u),path:u.fragment.path,range:u.fragment.range});
+    const projection=JSON.stringify(resolveSnapshot(read(f),resolveSnapshot(read(f),read(f).records[f.plan_id].scoped_context_plan.capsule).projection));
+    assert.equal(u.fragment.text,projection.slice(u.fragment.range.delivered_start,u.fragment.range.delivered_end));
+    assert.equal(b.provenance.projection_sha256,digest(projection));
+  }
+  assert.deepEqual(b.provenance.source,read(f).records[f.plan_id].scoped_context_plan.source);
+  assert.deepEqual(e.review.reviewed_unit_bundle,b);assert.equal(e.review.qualification_result.reviewed_unit_bundle_sha256,sha(b));
+  assert.ok(e.review.qualification_result.items.length);assert.ok(e.review.qualification_result.items.every(i=>JSON.stringify(i.provenance)===JSON.stringify(b.provenance)));
+  const d=await run(f,{phase:'applicability',extraction_review_ids:[e.review.id],counterpart_ids:['home-D00'],context_scope:'D00'});
+  assert.equal(d.job.status,'completed',d.job.error);assert.deepEqual(d.packet.extractions[0].reviewed_unit_bundle,b);
+  for(const v of [e,d])assert.equal(v.packet.response_shape.target_sha256,v.packet.target.sha256);
+  assert.equal(e.packet.target.sha256,sha(read(f).records[e.target.id]));assert.notEqual(e.packet.target.sha256,sha(e.target.target));
+  assert.equal(call(f,{action:'target',...args}).review_id,e.review.id);
+  assert.equal(call(f,{action:'target',...args,context_unit_ids:[]}).review_id,bare.review.id);
+  for(const context_unit_ids of [[units[1].id],args.context_unit_ids.toReversed(),[units[2].id+'/0',units[1].id]])assert.ok(call(f,{action:'target',...args,context_unit_ids}).id,'Different context must create a target');
+  mutate(f,s=>s.notices.push({id:'unrelated-context',summary:'Current context changes do not alter frozen extraction.'}));
+  const replacement=call(f,{action:'plan',protocol,source_id:'old'});assert.equal(call(f,{action:'target',...args,plan_id:replacement.id}).review_id,e.review.id);
+  const original=read(f);
+  for(const change of [s=>s.records[e.review.id].reviewed_unit_bundle.supporting[0].fragment.text+='substitute',s=>s.records[e.review.id].reviewed_unit_bundle.provenance.source.sha256='forged',s=>s.records[e.target.id].scoped_context_target.context_unit_ids.reverse(),s=>s.records.old.clauses.push('changed')]){
+    const copy=inheritSnapshots(original,structuredClone(original));change(copy);
+    assert.throws(()=>scoped.createScopedTarget(copy,{plan_id:f.plan_id,phase:'applicability',extraction_review_ids:[e.review.id],counterpart_ids:['home-D00']}),/Scoped context hold/);
+  }
+});
+
+test('invalid support IDs and altered bundle provenance cannot substitute for exact frozen delivery',async()=>{
+  const f=fixture({count:18}),units=unitPages(f),primary=units[0].id,support=units[1].id;
+  for(const context_unit_ids of [[primary],[support,support],['u999'],[support+'/2'],[support+'/0/'.repeat(18)],null,'u1'])assert.throws(()=>call(f,{action:'target',phase:'extract',unit_id:primary,context_unit_ids}),/primary unit|unique context|unknown subdivision/);
+  for(const change of [r=>r.target_sha256='forged',(r,p)=>r.target_sha256=sha(read(f).records[p.target.id].scoped_context_target),r=>r.unit_sha256='forged',r=>r.reviewed_unit_bundle_sha256='forged',r=>r.items[0].provenance.supporting[0].range.end++,r=>r.items[0].provenance.supporting[0].unit_id=primary,r=>r.items[0].provenance.supporting[0].unit_sha256='forged',r=>r.items[0].provenance.source.sha256='forged',r=>r.items[0].provenance.projection_sha256='forged',r=>r.items[0].provenance.supporting=[],r=>r.items[0].provenance.supporting.push(r.items[0].provenance.supporting[0])]){
+    const e=await run(f,{phase:'extract',unit_id:primary,context_unit_ids:[support]},{review:p=>{const e=contractReview(p);change(e.qualification_result,p);return e;}});
+    assert.equal(e.job.status,'failed');assert.ok(e.job.rejected_output.text);assert.ok(!e.review);
+  }
+});
+
+test('supporting units do not count as primary coverage; exact independent primaries still complete',async()=>{
+  const f=fixture({count:8}),units=unitPages(f);assert.ok(units.length>=2);
+  const first=await run(f,{phase:'extract',unit_id:units[0].id,context_unit_ids:units.slice(1).map(u=>u.id)});
+  const d=await run(f,{phase:'applicability',extraction_review_ids:[first.review.id],counterpart_ids:['home-D00'],context_scope:'D00'});
+  await assert.rejects(run(f,{phase:'integration',domain_review_ids:[d.review.id],counterpart_ids:['home-D00']}),/unit coverage omission/);
+  const duplicate=await run(f,{phase:'extract',unit_id:units[0].id});
+  const repeated=await run(f,{phase:'applicability',extraction_review_ids:[first.review.id,duplicate.review.id],counterpart_ids:['home-D00'],context_scope:'D00'});
+  await assert.rejects(run(f,{phase:'integration',domain_review_ids:[repeated.review.id],counterpart_ids:['home-D00']}),/unit coverage gap\/duplicate\/overlap/);
+  const es=[first];for(const u of units.slice(1))es.push(await run(f,{phase:'extract',unit_id:u.id,context_unit_ids:[units[0].id]}));
+  const full=await run(f,{phase:'applicability',extraction_review_ids:es.map(e=>e.review.id),counterpart_ids:['home-D00'],context_scope:'D00'});
+  const i=await run(f,{phase:'integration',domain_review_ids:[full.review.id],counterpart_ids:['home-D00']});assert.equal(i.job.status,'completed',i.job.error);assert.equal(i.packet.response_shape.target_sha256,i.packet.target.sha256);
+  assert.equal(call(f,{action:'apply',integration_review_id:i.review.id}).applied,true);
+});
+
+test('an explicit supporting context set above the original input ceiling holds without dispatch',()=>{
+  const f=fixture({count:500}),units=unitPages(f),t=call(f,{action:'target',phase:'extract',unit_id:units[0].id,context_unit_ids:units.slice(1).map(u=>u.id)}),before=Object.keys(read(f).jobs).length;
+  assert.throws(()=>engine.dispatch({...f,role:'qa',review_of:t.id,task:'Oversized explicit context must hold.'},'codex',{check:()=>({available:true,authenticated:true}),launch:()=>{assert.fail('Must not launch');}}),e=>e instanceof scoped.ScopedHold&&e.held.limit_bytes===48000);
+  assert.equal(Object.keys(read(f).jobs).length,before);assert.equal(read(f).context_classifications?.old,undefined);
 });
