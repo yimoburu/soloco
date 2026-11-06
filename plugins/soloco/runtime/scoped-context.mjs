@@ -4,6 +4,8 @@ import {buildEvidence} from './upgrade-evidence.mjs';
 import {retainSnapshot,resolveSnapshot,resolveSnapshotEntry,captureSnapshotDependencies,validateSnapshotDependencies} from './snapshot.mjs';
 import {executionTiming,TIMEOUT_POLICY_VERSION} from './timeout.mjs';
 import {qualificationControlHash} from './context-qualification.mjs';
+import {SCOPED_STREAM,buildScopedStream,validateScopedStreamDelivery} from './scoped-stream.mjs';
+export {SCOPED_STREAM} from './scoped-stream.mjs';
 
 // A separate proof grammar. No scoped receipt can satisfy a tree/legacy gate.
 export const SCOPED_PROTOCOL='scoped-context-v1';
@@ -161,7 +163,7 @@ function reviewedUnitBundle(s,p,unitId,contextIds){
   const description={source:v.source,projection_sha256:v.projection_sha256,primary:provenance(primary),supporting:supporting.map(provenance)};
   return {primary,supporting,provenance:description,provenance_sha256:sha(description)};
 }
-function targetInfo(s,job){const record=source(s,job.review_of?.id),t=record.scoped_context_target;if(!t||t.protocol!==SCOPED_PROTOCOL||job.role!=='qa'||job.review_of.revision!==record.revision||job.inputs?.length||job.supplemental_sources?.length||job.prototype_id||job.development_id)fail('invalid separate QA target');const p=exact(s,t.plan),{v}=plan(s,p);return {record,t,p,v};}
+function targetInfo(s,job){const record=source(s,job.review_of?.id),t=record.scoped_context_target;if(!t||t.protocol!==SCOPED_PROTOCOL||job.role!=='qa'||job.review_of.revision!==record.revision||job.inputs?.length||job.supplemental_sources?.length||job.prototype_id||job.development_id)fail('invalid separate QA target');if(t.delivery_protocol!==undefined&&(t.delivery_protocol!==SCOPED_STREAM||t.phase==='extract'))fail('invalid prospective delivery protocol');const p=exact(s,t.plan),{v}=plan(s,p);return {record,t,p,v};}
 export function isScopedJob(s,j){return Boolean(s.records?.[typeof j.review_of==='string'?j.review_of:j.review_of?.id]?.scoped_context_target);}
 export function scopedMaintenanceEligible(s,j){
   const target=s.records?.[typeof j.review_of==='string'?j.review_of:j.review_of?.id],p=s.records?.[target?.scoped_context_target?.plan?.id],a=p?.context_maintenance;
@@ -252,17 +254,26 @@ function assignment(s,j){
       packet.interface_reviews=interfaces.map(p=>({review:scopedReference(p.record),summary:p.result.summary,reviewed_interfaces:p.result.reviewed_interfaces}));
       // Current home bodies were already delivered to independent domain and
       // interface QA. The final packet refers to those canonical artifacts.
-      delete packet.homes;delete packet.dependencies;
+      if(x.t.delivery_protocol!==SCOPED_STREAM){delete packet.homes;delete packet.dependencies;}
       packet.coverage='Software verified exact unit ranges, every item exactly once, all declared interfaces and acyclic exact current homes. This is NOT semantic review.';
     }
   }
   packet.response_shape=shape(x);packet.response_envelope={content:'exact result.reason',messages:[],notices:[],review:{verdict:'same as result',reason:'same as result',permitted_action:'same as result'},qualification_result:'response_shape'};
+  if(x.t.delivery_protocol===SCOPED_STREAM){
+    // Complete canonical artifact closure, including immutable extraction
+    // bundles, reaches the SAME reviewer. References never substitute for bodies.
+    const closure=new Map();function visit(p){if(closure.has(p.record.id))return;closure.set(p.record.id,{review:scopedReference(p.record),value:p.record});for(const child of proofChildren(s,p.x))visit(child);}
+    for(const p of proofs)visit(p);packet.reference_evidence=[...closure.values()];
+    const stream=buildScopedStream(packet,x.t.plan),wire=stream.pages[0].wire;
+    return {text:wire,hash:digest(wire),inputs:[],packet,stream,qualification:{protocol:SCOPED_PROTOCOL,delivery_protocol:SCOPED_STREAM,phase:x.t.phase,target:scopedReference(x.record),plan:x.t.plan,packet_sha256:stream.manifest.body_sha256}};
+  }
   bounded(packet,SCOPED_LIMITS.input_bytes,'bounded '+x.t.phase);const wire=json(packet);
   return {text:wire,hash:digest(wire),inputs:[],packet,qualification:{protocol:SCOPED_PROTOCOL,phase:x.t.phase,target:scopedReference(x.record),plan:x.t.plan,packet_sha256:digest(wire)}};
 }
 export function scopedMatches(s,j,hash){try{const x=targetInfo(s,j);live(s,j,x);return scopedAssignment(s,j).hash===hash;}catch{return false;}}
+export function validateScopedStreamNative(s,j,native){return evaluate(()=>{const x=targetInfo(s,j);if(x.t.delivery_protocol!==SCOPED_STREAM)fail('stream native check requires explicit delivery protocol');live(s,j,x);independent(s,j,native,x,proofChildren(s,x));return true;});}
 export function scopedDelivery(a,j,native,wire){bounded(wire,SCOPED_LIMITS.input_bytes,'native delivery');return {protocol:SCOPED_PROTOCOL,job_id:j.id,native_id:native,assignment_sha256:a.hash,target:a.qualification.target,plan:a.qualification.plan,wire,wire_sha256:digest(wire),complete:true};}
-export function scopedProof(d,j){return {protocol:SCOPED_PROTOCOL,delivery_sha256:sha(d),native_id:d.native_id,assignment_sha256:d.assignment_sha256,job:scopedReference(j,'job:'+j.id)};}
+export function scopedProof(d,j){return {protocol:d?.protocol===SCOPED_STREAM?SCOPED_STREAM:SCOPED_PROTOCOL,delivery_sha256:sha(d),native_id:d.native_id,assignment_sha256:d.assignment_sha256,job:scopedReference(j,'job:'+j.id)};}
 export function validateScopedOutput(raw){bounded(raw,SCOPED_LIMITS.output_wire_bytes,'native response');const e=JSON.parse(raw);bounded(e,SCOPED_LIMITS.output_bytes,'review output');closed(e,['content','messages','notices','review','qualification_result'],'envelope');closed(e.review,['verdict','reason','permitted_action'],'review');if(!Array.isArray(e.messages)||e.messages.length||!Array.isArray(e.notices)||e.notices.length||e.content!==e.qualification_result?.reason||['verdict','reason','permitted_action'].some(k=>e.review[k]!==e.qualification_result[k]))fail('review/envelope mismatch or extra output channels');return e;}
 function semantic(s,x,r,proofs){
   const common=['protocol','phase','extraction_identity','target_sha256','verdict','reason','permitted_action','preservation_complete','interfaces_complete','authority_checked','scope_complete','blockers'];
@@ -282,7 +293,7 @@ function semantic(s,x,r,proofs){
     if(x.t.interface_keys.length){const needed=interfaceList(all).filter(i=>x.t.interface_keys.includes(i.key));for(const i of needed){const scopes=[i.scope,i.with_scope];if(scopes.includes('*')&&x.t.context_scope!=='*'||scopes.some(scope=>scope!=='*'&&!x.t.homes.some(h=>scopeOf(exact(s,h))===scope)))fail('interface requires full involved current scopes/global authority');}}
   }else if(x.t.phase==='integration'){if(!text(r.summary))fail('missing semantic integration judgment');exactSet(r.domain_review_ids,x.t.domain_review_ids,'domain receipts');exactSet(r.interface_review_ids,x.t.interface_review_ids,'interface receipts');exactSet(r.unreviewed_interfaces,[],'unreviewed cross-domain interactions');}
 }
-export function validateScopedResponse(s,j,a,native,r){return evaluate(()=>{const x=targetInfo(s,j);live(s,j,x);if(scopedAssignment(s,j).hash!==a.hash)fail('stale assignment');independent(s,j,native,x,proofChildren(s,x));semantic(s,x,r,proofChildren(s,x));return true;});}
+export function validateScopedResponse(s,j,a,native,r,delivery){return evaluate(()=>{const x=targetInfo(s,j);live(s,j,x);if(scopedAssignment(s,j).hash!==a.hash)fail('stale assignment');if(a.stream)validateScopedStreamDelivery(a,s.jobs?.[j.id]??j,native,delivery);independent(s,j,native,x,proofChildren(s,x));semantic(s,x,r,proofChildren(s,x));return true;});}
 function canonical(s,ref){
   const key=json(ref);if(evaluation.proofs.has(key))return evaluation.proofs.get(key);if(evaluation.visiting.has(key))fail('cyclic proof references');evaluation.visiting.add(key);
   const record=exact(s,ref),job=s.jobs?.[record.job_id];if(!job)fail('canonical job missing');const x=targetInfo(s,job),e=validateScopedOutput(record.qualification_output);
@@ -290,14 +301,16 @@ function canonical(s,ref){
   const timing=executionTiming(job.execution_started_at,{timeout_ms:job.timeout_ms,timeout_reason:job.timeout_reason});
   if(job.timeout_policy_version!==TIMEOUT_POLICY_VERSION||job.execution_deadline_at!==timing.execution_deadline_at||!Number.isFinite(Date.parse(job.started_at))||!Number.isFinite(Date.parse(job.finished_at))||Date.parse(job.finished_at)<Date.parse(job.execution_started_at)||Date.parse(job.finished_at)>=Date.parse(job.execution_deadline_at)||job.coordination_release?.termination_confirmed!==true||job.coordination_release.reason!=='model_process_closed'||job.execution_failure||job.rejected_output)fail('native timing/termination/outcome unproven');
   const a=assignment(s,job),d=job.qualification_delivery;
-  if(!d||!same(d,scopedDelivery(a,job,job.native_id,a.text))||job.context_sha256!==a.hash||!same(record.qualification_proof,scopedProof(d,job)))fail('canonical exact native delivery/job receipt changed');
+  if(a.stream)validateScopedStreamDelivery(a,job,job.native_id,d,{completed:true});
+  if(!d||!a.stream&&!same(d,scopedDelivery(a,job,job.native_id,a.text))||job.context_sha256!==a.hash||!same(record.qualification_proof,scopedProof(d,job)))fail('canonical exact native delivery/job receipt changed');
   if(x.t.phase==='extract'&&!same(record.reviewed_unit_bundle,a.packet.reviewed_unit_bundle))fail('canonical reviewed-unit bundle changed');
   noNegatives(s,x);const children=proofChildren(s,x);independent(s,job,job.native_id,x,children);semantic(s,x,e.qualification_result,children);if(e.qualification_result.verdict!=='Pass')fail('negative receipt');
   const value={record,job,x,result:e.qualification_result};evaluation.visiting.delete(key);evaluation.proofs.set(key,value);return value;
 }
 export function createScopedTarget(s,args){return evaluate(()=>{
   const p=source(s,args.plan_id),{v}=plan(s,p),phase=args.phase;if(!['extract','applicability','integration'].includes(phase))fail('choose extract, applicability or integration');
-  const base={protocol:SCOPED_PROTOCOL,phase,plan:scopedReference(p),owner:{...s.owner},controls_sha256:qualificationControlHash(s)};
+  if(args.delivery_protocol!==undefined&&(args.delivery_protocol!==SCOPED_STREAM||phase==='extract'))fail('stream delivery is opt-in for NEW non-extraction targets only');
+  const base={protocol:SCOPED_PROTOCOL,phase,plan:scopedReference(p),owner:{...s.owner},controls_sha256:qualificationControlHash(s),...(args.delivery_protocol?{delivery_protocol:args.delivery_protocol}:{})};
   if(phase==='extract'){
     const context_unit_ids=Object.hasOwn(args,'context_unit_ids')?args.context_unit_ids:[],bundle=reviewedUnitBundle(s,p,args.unit_id,context_unit_ids);
     // Reuse only an exact completed canonical worker receipt, never a model flag.

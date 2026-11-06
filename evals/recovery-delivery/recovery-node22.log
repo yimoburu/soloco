@@ -1,0 +1,49 @@
+TAP version 13
+# (node:6439) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: recovery regression: oversized compulsory global holds legacy scoped assignment without dispatch or evidence mutation
+ok 1 - recovery regression: oversized compulsory global holds legacy scoped assignment without dispatch or evidence mutation
+  ---
+  duration_ms: 284.988292
+  ...
+# Subtest: recovery stream CONTRACT DOUBLE: complete bounded UTF8 delivery, full integration closure and immutable extraction reuse
+ok 2 - recovery stream CONTRACT DOUBLE: complete bounded UTF8 delivery, full integration closure and immutable extraction reuse
+  ---
+  duration_ms: 2996.161583
+  ...
+# {"contract_double":true,"domain_requests":7,"integration_requests":7,"max_request_utf8_bytes":48000,"integration_body_utf8_bytes":230382}
+# Subtest: recovery stream rejects missing/reordered/substituted ranges, corrupt bodies, wrong native and unconfirmed closure
+ok 3 - recovery stream rejects missing/reordered/substituted ranges, corrupt bodies, wrong native and unconfirmed closure
+  ---
+  duration_ms: 1082.607833
+  ...
+# Subtest: recovery stream canonical current freshness: notices, authority, outcomes, governing and home mutation hold; extraction reused
+ok 4 - recovery stream canonical current freshness: notices, authority, outcomes, governing and home mutation hold; extraction reused
+  ---
+  duration_ms: 3034.092333
+  ...
+# Subtest: recovery stream worker rejects premature Pass, wrong ack/order, changed native and mid-delivery current changes
+ok 5 - recovery stream worker rejects premature Pass, wrong ack/order, changed native and mid-delivery current changes
+  ---
+  duration_ms: 2592.199333
+  ...
+# Subtest: recovery stream CONTRACT DOUBLE: more than sixteen pages and oversized homes/dependencies reach same reviewer
+ok 6 - recovery stream CONTRACT DOUBLE: more than sixteen pages and oversized homes/dependencies reach same reviewer
+  ---
+  duration_ms: 7346.585666
+  ...
+# {"contract_double":true,"requests":26,"body_utf8_bytes":947154,"max_request_utf8_bytes":48000}
+# Subtest: recovery stream preserves explicit unknown outcomes and rejects nonindependent native even after full transport
+ok 7 - recovery stream preserves explicit unknown outcomes and rejects nonindependent native even after full transport
+  ---
+  duration_ms: 1184.952458
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 18613.951917

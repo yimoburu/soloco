@@ -1,0 +1,19 @@
+(node:6457) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ recovery regression: oversized compulsory global holds legacy scoped assignment without dispatch or evidence mutation (615.090167ms)
+✔ recovery stream CONTRACT DOUBLE: complete bounded UTF8 delivery, full integration closure and immutable extraction reuse (3438.731875ms)
+ℹ {"contract_double":true,"domain_requests":7,"integration_requests":7,"max_request_utf8_bytes":48000,"integration_body_utf8_bytes":230382}
+✔ recovery stream rejects missing/reordered/substituted ranges, corrupt bodies, wrong native and unconfirmed closure (1219.150041ms)
+✔ recovery stream canonical current freshness: notices, authority, outcomes, governing and home mutation hold; extraction reused (3514.950041ms)
+✔ recovery stream worker rejects premature Pass, wrong ack/order, changed native and mid-delivery current changes (2494.562375ms)
+✔ recovery stream CONTRACT DOUBLE: more than sixteen pages and oversized homes/dependencies reach same reviewer (8213.504292ms)
+ℹ {"contract_double":true,"requests":26,"body_utf8_bytes":947154,"max_request_utf8_bytes":48000}
+✔ recovery stream preserves explicit unknown outcomes and rejects nonindependent native even after full transport (1287.451209ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 20870.28975

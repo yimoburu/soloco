@@ -116,6 +116,42 @@ final review cannot fit, hold truthfully; never truncate or substitute hashes fo
 semantic review. A false or incomplete accepted extraction requires fresh source
 repair/requalification, not a coordinator assertion that it is complete.
 
+New applicability, interface and integration targets may explicitly opt into
+`delivery_protocol: "scoped-stream-v1"`. Omission preserves the published single
+packet contract and its oversized-input hold. Extraction targets cannot opt in;
+their immutable bundle identities and reuse rules are unchanged. This delivery
+protocol creates a new versioned delivery/proof record; it never reinterprets an
+old receipt or upgrades an existing target.
+
+The runtime streams the exact complete JSON assignment in ordered, surrogate-safe
+UTF-16 ranges of at most 32,768 code units. Admission measures the **complete
+serialized UTF-8 request**, including metadata, escaping and instructions, against
+48,000 bytes. The body contains all frozen global rules, exact current homes and
+dependencies, extraction bundles, and complete recursively referenced canonical
+review artifacts. Streamed integration also carries the full current home bodies
+and extraction artifacts behind its domain/interface references. Hashes identify
+these bodies; every body range still reaches the same fresh independent native.
+
+Each nonfinal response must be exactly
+`{"scoped_stream_ack":{"body_sha256":"delivered body hash","sequence":0,"range_sha256":"delivered range hash"}}`
+with that request's sequence and hashes. The final response uses the original
+scoped result/envelope grammar. Acknowledgement is transport progress, never a
+semantic judgment. Runtime-owned range receipts bind target, plan, full body,
+request and range hashes, native identity, actual per-call spawn/deadline and
+process closure. Missing, reordered or substituted delivery cannot qualify.
+Canonical validation reconstructs every bounded request from frozen evidence
+and rechecks the complete receipt plus ordinary current freshness/independence.
+Failures and rejected outputs remain retained. There is no separate global
+semantic certificate, automatic retry or renewed allowance.
+
+Every invocation remains capped at 600 seconds; the existing total job execution
+deadline also remains binding, with no new window or extension. There is no fixed
+16-page cutoff for this opt-in stream. Transport completion does not establish
+cumulative native context fit or semantic acceptance. A native unable to review
+all carried evidence must return Blocked. Fictional contract doubles exercise
+this protocol in the recovery tests; independent native fixture qualification is
+a separate next stage. This repair grants no `resume_handover` permission.
+
 Current-state consumers validate the entire canonical receipt closure, exact
 source/projection/home/dependency bytes, native identity, delivery, actual spawn
 timing, terminal closure, output grammar and provenance. New global governing

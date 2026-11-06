@@ -1,4 +1,5 @@
 import * as scoped from './scoped-context.mjs';
+import {createScopedStreamLedger,recordScopedStreamDelivery,validateScopedStreamAck} from './scoped-stream.mjs';
 import {qualificationAssignment,qualificationMatches,qualificationMaintenanceEligible,qualificationDelivery,qualificationProof,validateQualificationOutput,validateQualificationResponse} from './context-qualification.mjs';
 import {createDeliveryLedger,recordDelivery,readEvidence,validateCitations,validateSemanticDelivery} from './upgrade-evidence.mjs';
 import {contextRead,contextSource} from './current-state.mjs';
@@ -44,12 +45,13 @@ function failureEvidence(error) {
 export async function work(root, jobId, model = runModel) {
   let job, state, context, output, artifact, controller, monitor, claimed=false,spawned=false,invoked=false,lastToken,lastCurrent,lastGrantExpiry,lastDevelopmentMaxBytes;
   const supplemental=[],handoverReads=[];
-  let deliveryLedger,pendingDelivery,partitionDelivery;
+  let deliveryLedger,pendingDelivery,partitionDelivery,scopedStreamLedger,scopedNativeRejected=false;
   let overallTiming;
   const eligibility=s=>{
     const current=s.jobs[jobId];
     if(!compatibleRuntime(s) || upgradePending(s) || !current || current.status!=='running' || current.instance_id!==job.instance_id || s.owner.epoch!==job.epoch || (s.paused&&!handoverReviewEligible(s,current)&&!maintenanceEligible(s,current)) || !workerMatches(s,job,context.hash))throw Object.assign(new Error('Assignment is no longer eligible'),{code:'ASSIGNMENT_INELIGIBLE'});
     if(context?.handover_evidence&&current.native_id!==job.native_id)throw Error('Handover reviewer native identity changed');
+    if(context?.stream&&partitionDelivery&&current.native_id!==partitionDelivery.native_id)throw Error('Scoped stream reviewer native identity changed');
     coordinationEligible(s,current);
     prototypeAssignment(s,job);developmentAssignment(s,job,false,root);
     if(current.timeout_policy_version!==job.timeout_policy_version || current.timeout_ms!==job.timeout_ms || current.timeout_reason!==job.timeout_reason)throw Object.assign(new Error('Recorded timeout settings changed'),{code:'ASSIGNMENT_INELIGIBLE'});
@@ -124,7 +126,7 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
       let session=job.native_id,request=prompt;
       const handoverDeadline=context.handover_evidence?Date.now()+(job.handover_review_window_minutes?job.handover_review_window_minutes*60000:timeout.timeout_ms):null;
       pendingDelivery=context.initial_delivery;
-      for(let round=0;context.handover_evidence||round<=16;round++){
+      for(let round=0;context.handover_evidence||context.stream||round<=16;round++){
       const remaining=lastCurrent?.execution_deadline_at?Math.min(timeout.timeout_ms,Date.parse(lastCurrent.execution_deadline_at)-Date.now()):handoverDeadline?Math.min(timeout.timeout_ms,handoverDeadline-Date.now()):timeout.timeout_ms;
       if(remaining<1000)throw Error('Insufficient execution time for supplemental read');
       if(context.qualification&&Buffer.byteLength(request,'utf8')>(scopedContext(context)?scoped.SCOPED_LIMITS:context.qualification.limits).input_bytes)throw Error('Partition qualification request overflow; nothing was truncated');
@@ -137,16 +139,16 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
       output=undefined;
       output=await model(job.host,session,request,dir,remaining,job.model_selection??null,{
         signal:controller.signal,timeoutReason:timeout.timeout_reason,maxOutputCharacters:context.qualification?(context.packet.profile?context.qualification.limits.output_wire_bytes*6+16384:100000):Math.max(2000000,contextBudgetForJob(state,job)),
-        ...(job.handover_review_window_minutes&&overallTiming?{executionDeadlineAt:Date.parse(overallTiming.execution_deadline_at)}:{}),
-        onSpawn:(job.handover_review_window_minutes||round===0)?timing=>{
+        ...((job.handover_review_window_minutes||context.stream)&&overallTiming?{executionDeadlineAt:Date.parse(overallTiming.execution_deadline_at)}:{}),
+        onSpawn:(job.handover_review_window_minutes||context.stream||round===0)?timing=>{
           if(controller.signal.aborted)throw controller.signal.reason;
           if(callTiming)throw new Error('Duplicate execution spawn callback');
           const start=Date.parse(timing?.execution_started_at);
-          const cap=job.handover_review_window_minutes&&overallTiming?Math.min(remaining,Date.parse(overallTiming.execution_deadline_at)-start):remaining;
+          const cap=(job.handover_review_window_minutes||context.stream)&&overallTiming?Math.min(remaining,Date.parse(overallTiming.execution_deadline_at)-start):remaining;
           const recorded=executionTiming(start,{...timeout,timeout_ms:cap});
           if(start<callRequestedAt||start>Date.now()||Object.keys(recorded).some(k=>timing?.[k]!==recorded[k]))throw new Error('Invalid adapter spawn timing');
           callTiming=recorded;
-          if(spawned){if(!job.handover_review_window_minutes)throw Error('Duplicate execution spawn callback');withStore(root,db=>eligibility(db.read()));return;}
+          if(spawned){if(!job.handover_review_window_minutes&&!context.stream)throw Error('Duplicate execution spawn callback');withStore(root,db=>eligibility(db.read()));return;}
           withStore(root,db=>db.transaction('job.execution_started',s=>{
             const current=eligibility(s);
             if(current.execution_started_at!=null || current.execution_deadline_at!=null)throw new Error('Execution timing already recorded');
@@ -164,7 +166,18 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
       if(job.handover_review_window_minutes&&(!callTiming||Date.now()>=Date.parse(callTiming.execution_deadline_at)))throw Object.assign(new Error(callTiming?'Native invocation deadline reached':'Adapter omitted actual invocation timing'),{code:'ROLE_TIMEOUT'});
       check();
       if(session&&session!==output.native_id)throw Error('Supplemental read changed native identity');
-      if(context.qualification){
+      if(context.stream){
+        if(!callTiming||controller.signal.aborted)throw Error('Scoped stream invocation timing/closure unproven');
+        try{withStore(root,db=>{const current=db.read();scoped.validateScopedStreamNative(current,current.jobs[jobId],output.native_id);});}catch(error){scopedNativeRejected=true;throw error;}
+        scopedStreamLedger??=createScopedStreamLedger(context,job,output.native_id);
+        const delivered=recordScopedStreamDelivery(scopedStreamLedger,context,job,output.native_id,request,callTiming,stamp());
+        withStore(root,db=>db.transaction('job.scoped_stream_delivered',s=>{const current=eligibility(s);current.native_id=output.native_id;current.qualification_delivery=delivered;return s;}));
+        partitionDelivery=delivered;
+        if(!partitionDelivery.complete){
+          validateScopedStreamAck(output.text,context,round);
+          session=output.native_id;request=context.stream.pages[round+1].wire;continue;
+        }
+      }else if(context.qualification){
         withStore(root,db=>db.transaction('job.partition_delivered',s=>{const current=eligibility(s);partitionDelivery=(scopedContext(context)?scoped.scopedDelivery:qualificationDelivery)(context,current,output.native_id,request);current.qualification_delivery=partitionDelivery;return s;}));
       }
       if(context.handover_evidence){
@@ -212,7 +225,8 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
     if(context.qualification){
       if(scopedContext(context))scoped.validateScopedOutput(output.text);
       else validateQualificationOutput(output.text,state.records[context.qualification.plan.id].context_partition_plan);
-      (scopedContext(context)?scoped.validateScopedResponse:validateQualificationResponse)(state,job,context,output.native_id,artifact.qualification_result);
+      if(context.stream)withStore(root,db=>{const current=db.read();scoped.validateScopedResponse(current,current.jobs[jobId],context,output.native_id,artifact.qualification_result,partitionDelivery);});
+      else (scopedContext(context)?scoped.validateScopedResponse:validateQualificationResponse)(state,job,context,output.native_id,artifact.qualification_result);
     }
     if(context.handover_evidence){
       validateCitations(context.handover_evidence,artifact.citations,deliveryLedger);
@@ -229,7 +243,7 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
       try {eligibility(s);} catch {executionStale=true;}
       const stale=!current || current.status!=='running' || s.owner.epoch!==job.epoch || (s.paused&&!handoverReviewEligible(s,current)&&!maintenanceEligible(s,current)) || changed || prototypeStale || executionStale || controller.signal.aborted;
       if(!current)throw new Error('Assignment record disappeared before completion');
-      if(context.qualification&&!stale)(scopedContext(context)?scoped.validateScopedResponse:validateQualificationResponse)(s,job,context,output.native_id,artifact.qualification_result);
+      if(context.qualification&&!stale)(scopedContext(context)?scoped.validateScopedResponse:validateQualificationResponse)(s,context.stream?current:job,context,output.native_id,artifact.qualification_result,partitionDelivery);
       const bundle=stale||job.development_id?null:prototypeBundle(s,job,artifact);
       const development=stale||!job.development_id?null:developmentBundle(s,job,artifact,root);
       const artifactId=id(stale?'quarantined':'artifact');
@@ -283,7 +297,7 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
         if(current.status!=='cancelled') {current.status='failed';current.finished_at=stamp();}
         else if(current.coordination_release?.termination_confirmed===true)current.finished_at??=stamp();
         current.error=context?.qualification&&current.execution_failure?.abort?.code==='ASSIGNMENT_INELIGIBLE'?current.execution_failure.abort.message:error.message;if(error.held)current.qualification_hold=error.held;
-        if(output?.native_id)current.native_id=output.native_id;
+        if(output?.native_id){if(scopedNativeRejected)current.rejected_native_id=output.native_id;else current.native_id=output.native_id;}
         if(output?.model_evidence)current.model_evidence=output.model_evidence;
         if(artifact || context?.qualification&&typeof output?.text==='string') {
           const rejected=context?.qualification?output.text:JSON.stringify(artifact);

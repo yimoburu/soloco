@@ -1,0 +1,60 @@
+{
+  "base_revision": "64bd2eb",
+  "status": "source candidate; held for independent native fixture QA",
+  "fictional_contract_doubles_only": true,
+  "native_acceptance": false,
+  "resume_handover": false,
+  "version_changed": false,
+  "limits": {
+    "serialized_request_utf8_bytes": 48000,
+    "parsed_response_utf8_bytes": 12000,
+    "wire_response_utf8_bytes": 48000,
+    "range_utf16_units": 32768,
+    "per_call_ms": 600000,
+    "total_job_deadline": "unchanged"
+  },
+  "verification": {
+    "prepatch_regression_node22": "1/1 pass",
+    "scoped_suite_before_final_hardening_node22": "33/33 pass",
+    "final_recovery_node22": "7/7 pass",
+    "final_recovery_node25": "7/7 pass",
+    "focused_legacy_context_node22": "4/4 pass",
+    "handover_evidence_full": "pending; partial log, no pass claim",
+    "broader_context_suite": "pending; partial log, no pass claim",
+    "diff_check": "pass",
+    "final_full_scoped_node22": "35/35pass zero skips",
+    "final_full_scoped_node25": "35/35pass zero skips"
+  },
+  "observed_fixture": {
+    "body_utf8_bytes": 947154,
+    "requests": 26,
+    "max_serialized_request_utf8_bytes": 48000
+  },
+  "sources": [
+    {
+      "path": "plugins/soloco/runtime/scoped-stream.mjs",
+      "sha256": "ce983bf54dd63efc22f4ea11a77c398b262cf1183f6bbfc248ce6641b6ea14ff"
+    },
+    {
+      "path": "plugins/soloco/runtime/scoped-context.mjs",
+      "sha256": "2002012195396ad511e5d7c7e74531e32d2c1d33c42c1aa5919fc56123c5d729"
+    },
+    {
+      "path": "plugins/soloco/runtime/worker.mjs",
+      "sha256": "d3c299bff9b674e5edbfda19d6481209d888afe1615e538f833ddc003656067b"
+    },
+    {
+      "path": "plugins/soloco/runtime/main.mjs",
+      "sha256": "452c544f9a6a78511e9bbd091bcc44ec9e313affdaed5a3a68c56518e188647c"
+    },
+    {
+      "path": "tests/scoped-context.test.mjs",
+      "sha256": "88c6abc6fd02f55c324f90e90c649f012439c91eda421a0f004029193d3bf926"
+    },
+    {
+      "path": "docs/scoped-context.md",
+      "sha256": "fb4090b9fd897ff0618b20295b5d419ce1a32047d1f5fc030d8f168c2da41a33"
+    }
+  ],
+  "engineering_turn": "Fixed600secondtimeout; retained source/tests inspected byCoS; no report or successful engineering turn claimed."
+}

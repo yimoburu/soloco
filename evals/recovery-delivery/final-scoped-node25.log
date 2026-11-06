@@ -1,0 +1,47 @@
+{"same_scope":"D00","qualified_artifact_home_effect_present":true,"applicability_verdict":"Pass","contract_doubles_only":true}
+✔ public store + worker path: 500 distinct obligations / 20 domains exceed union output, bounded packets apply and archive exact originals (21046.539667ms)
+ℹ {"contract_doubles":true,"obligations":500,"domains":20,"extraction_jobs":27,"total_extraction_output_bytes":149414,"final_packet_bytes":19392}
+✔ source-only extraction survives unrelated notice/global change and replacement uses canonical completed job receipt (692.79975ms)
+✔ unknown source fields and current global rules are semantic; historical claims never current permission (509.438625ms)
+✔ distant qualifier absent from home blocks independently; no resolution of OPEN invented (511.660417ms)
+✔ cross-domain interface must have independent complete exact review; contradiction holds (386.889334ms)
+✔ canonical receipt rejects forged native/job/closure/output/provenance and tampered source; no coordinator proof reuse (342.108083ms)
+✔ independent reviewer cannot review source or domain producer (252.482792ms)
+✔ integration coverage rejects omissions, duplicate items/ranges, substitutions and dependency cycles (340.293917ms)
+✔ overflow retains complete rejected unit output and allows exact bounded subdivision coverage (681.757416ms)
+✔ stale owner, paused maintenance controls, revocation and late pause fence new work and returns (355.043875ms)
+✔ main exposes usable scoped schema and public current home schema (57.851458ms)
+✔ bounded independent interface review can complete integration without a global semantic union (579.38075ms)
+✔ closed output grammar rejects fabricated citations, altered provenance and hidden findings and retains rejected evidence (199.768584ms)
+✔ main routes scoped plan/target/read; owner handover fences new work while exact adopted preservation and extraction survive (381.3255ms)
+✔ unknown terminal execution remains exact current evidence and blocks permission without spoiling immutable extraction (211.426875ms)
+✔ unknown current home scope and domain dependencies stay mandatory despite integration relabeling (912.025333ms)
+✔ regression: interface must include every exact incident-domain home (413.454667ms)
+✔ separate governing scopes reuse receipts through qualified archive growth and unrelated requalification (7085.046584ms)
+✔ ordinary worker producer edge binds exact outcome and native closure while keeping source-only identity reusable (312.164958ms)
+✔ regression: a represented governing rule retains its same-scope artifact home (864.547166ms)
+✔ typed mandatory dependencies and changed artifact homes remain exact governing evidence (538.534042ms)
+✔ new global scope expansion widens old homes in fresh applicability instead of hiding their bodies (494.365666ms)
+✔ root authority changes and changed or removed scope rules widen fresh review inputs (1552.744667ms)
+✔ clipped natural-language qualifier holds until a new explicit supporting bundle supplies its entire boundary (139.083875ms)
+✔ exact ordered supporting ranges and hashes survive canonical artifact delivery; only identical bundles reuse (307.408583ms)
+✔ invalid support IDs and altered bundle provenance cannot substitute for exact frozen delivery (781.351959ms)
+✔ supporting units do not count as primary coverage; exact independent primaries still complete (636.035333ms)
+✔ an explicit supporting context set above the original input ceiling holds without dispatch (52.976375ms)
+✔ recovery regression: oversized compulsory global holds legacy scoped assignment without dispatch or evidence mutation (152.412292ms)
+✔ recovery stream CONTRACT DOUBLE: complete bounded UTF8 delivery, full integration closure and immutable extraction reuse (3043.805125ms)
+ℹ {"contract_double":true,"domain_requests":7,"integration_requests":7,"max_request_utf8_bytes":48000,"integration_body_utf8_bytes":230382}
+✔ recovery stream rejects missing/reordered/substituted ranges, corrupt bodies, wrong native and unconfirmed closure (1067.331541ms)
+✔ recovery stream canonical current freshness: notices, authority, outcomes, governing and home mutation hold; extraction reused (3079.365208ms)
+✔ recovery stream worker rejects premature Pass, wrong ack/order, changed native and mid-delivery current changes (2350.511958ms)
+✔ recovery stream CONTRACT DOUBLE: more than sixteen pages and oversized homes/dependencies reach same reviewer (8035.166125ms)
+ℹ {"contract_double":true,"requests":26,"body_utf8_bytes":947154,"max_request_utf8_bytes":48000}
+✔ recovery stream preserves explicit unknown outcomes and rejects nonindependent native even after full transport (1238.4855ms)
+ℹ tests 35
+ℹ suites 0
+ℹ pass 35
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 59730.213625

@@ -1,0 +1,32 @@
+TAP version 13
+# (node:6414) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: complete extraction, independent reconciliation and final mapping; immutable original retained
+ok 1 - complete extraction, independent reconciliation and final mapping; immutable original retained
+  ---
+  duration_ms: 16.762417
+  ...
+# Subtest: historical checkpoint, handover subject and old team UNIQUE restrictions are compulsory
+ok 2 - historical checkpoint, handover subject and old team UNIQUE restrictions are compulsory
+  ---
+  duration_ms: 2.513625
+  ...
+# Subtest: exact source, counterpart, dependency, producer, governance and semantic notice freshness; informational history independent
+ok 3 - exact source, counterpart, dependency, producer, governance and semantic notice freshness; informational history independent
+  ---
+  duration_ms: 49.608125
+  ...
+# Subtest: notice deliveries and seen are mechanical; changed notice semantics invalidate exclusion
+ok 4 - notice deliveries and seen are mechanical; changed notice semantics invalidate exclusion
+  ---
+  duration_ms: 0.957042
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 4
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 150.804084
