@@ -1,0 +1,117 @@
+{
+  "version": "0.7.1",
+  "reviewed_behavioral_commit": "cb474b49f35001ec8dac772e7ec364fb6944f20e",
+  "reviewed_tree": "3d73aaf1988a1be6ac7dd7b7f92d0fb6d0258558",
+  "final_manifest_sha256": "ef747fb149a638d3312f939014b42ca86ba91cb7acb3a19718be19967e4e1565",
+  "verified_source_files": 166,
+  "verified_package_files": 39,
+  "package_sha256": "3a55a21e95fe8f93f9f45b916ce2e3971248df58e05865d123404dc3a7399af7",
+  "engineering_native_id": "01a1af69-dd92-7e62-9917-c503ba8ddf80",
+  "qa_native_id": "01a1af6a-6fbc-7522-8912-c14a07a313a6",
+  "qa_verdict": "Pass for current source integration; compatible publication held only for completed receipt/hash/package conditions, all verified by root. Root may close without another model call. Not company semantic acceptance.",
+  "runs": [
+    {
+      "stage": "full",
+      "node": "22",
+      "tests": 566,
+      "pass": 565,
+      "fail": 1,
+      "cancelled": 0,
+      "skipped": 0,
+      "exit_code": 1,
+      "log": "evals/qualification-capacity/full-node22.tap.gz",
+      "original_sha256": "227b95d402362aaadf3da1bd13f4bf9d6a88ec8e9c8dd1306d27ef67fd973b34",
+      "gzip_sha256": "a3ec7e32f7704f3da4777cf03ff3cab0d5694af82b0a1d877a6dd152c2beb4e6",
+      "actual_macos_isolation": true,
+      "named_benchmark_excluded": false
+    },
+    {
+      "stage": "full",
+      "node": "25",
+      "tests": 566,
+      "pass": 565,
+      "fail": 1,
+      "cancelled": 0,
+      "skipped": 0,
+      "exit_code": 1,
+      "log": "evals/qualification-capacity/full-node25.tap.gz",
+      "original_sha256": "0fa2becd91baf3813895161b24c8b3a99dcd9426a672d3db1610313cbb8daf77",
+      "gzip_sha256": "a76c9edb0b0cb6da7158e13503fb9f494d4b882364b699942f45d7c81d0cb7b7",
+      "actual_macos_isolation": true,
+      "named_benchmark_excluded": false
+    },
+    {
+      "stage": "final",
+      "node": "22",
+      "tests": 565,
+      "pass": 565,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "exit_code": 0,
+      "log": "evals/qualification-capacity/final-node22.tap.gz",
+      "original_sha256": "edf97f19c84d06151282bd412b1f83f57573e5e0a60a5fdfd56193ebd068bd05",
+      "gzip_sha256": "ffa17b52794b66e9e0314c2b132176ddea99f63a05a005229dfccc217e99da0d",
+      "actual_macos_isolation": true,
+      "named_benchmark_excluded": true
+    },
+    {
+      "stage": "final",
+      "node": "25",
+      "tests": 565,
+      "pass": 565,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "exit_code": 0,
+      "log": "evals/qualification-capacity/final-node25.tap.gz",
+      "original_sha256": "161241930288708a32a272e14f6932a5d78c559f49fa36ef68c9725be9f7a536",
+      "gzip_sha256": "81ef9b66bfbfbd0a5fe0cf908abc106df7d37cb62e94c4b56eff826abac703b9",
+      "actual_macos_isolation": true,
+      "named_benchmark_excluded": true
+    }
+  ],
+  "benchmark_reuse": {
+    "benchmark": "complete multi-million unknown semantic workflow converges with every receipt, not sampling",
+    "benchmark_body_sha256": "7235ba8825bbd6a930e05ebce8150c105d28fa370c8f98ad8bb5add2035d54c6",
+    "body_unchanged": true,
+    "pure_qualification_modules_unchanged": true,
+    "changed_worker_not_invoked_by_pure_workflow": true,
+    "first_runs_full": {
+      "22": {
+        "total": 566,
+        "passed": 565,
+        "failed": 1,
+        "benchmark_passed": true,
+        "log_sha256": "227b95d402362aaadf3da1bd13f4bf9d6a88ec8e9c8dd1306d27ef67fd973b34"
+      },
+      "25": {
+        "total": 566,
+        "passed": 565,
+        "failed": 1,
+        "benchmark_passed": true,
+        "log_sha256": "0fa2becd91baf3813895161b24c8b3a99dcd9426a672d3db1610313cbb8daf77"
+      }
+    },
+    "shared_test_prefix_unchanged": true,
+    "shared_test_prefix_sha256": "bb881540bc476ec6524aa26dced5ea9b0d9a56fe71bb86ee27e6e4a80dc9a7b6",
+    "root_verified": true
+  },
+  "fixture_measurement": {
+    "before_sessions": 87,
+    "after_sessions": 21,
+    "factor": 4.142857142857143,
+    "type": "same complete fictional negative-bearing source; contract doubles, not real native acceptance"
+  },
+  "limits": [
+    "Initial full-matrix failures remain failures, never relabeled.",
+    "Final565passing tests plus the explicitly reused successful benchmark provide566scenario coverage; no fresh final-tree566/566claim.",
+    "Real-company pilot and independent handover remain Blocked/paused until genuine fresh acceptance.",
+    "No shared-current-root or failed-job reuse, no authority/governance/team change.",
+    "Byte bounds and model advertisements do not prove effective native context, semantic completion or production latency."
+  ],
+  "commands": {
+    "final": "node --test --test-concurrency=4 --test-skip-pattern=^complete multi-million unknown semantic workflow converges with every receipt, not sampling$ tests/*.test.mjs",
+    "initial": "node --test --test-concurrency=4 tests/*.test.mjs"
+  }
+}

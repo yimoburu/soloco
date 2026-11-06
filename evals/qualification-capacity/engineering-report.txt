@@ -1,0 +1,9 @@
+Implemented the prospective `large-v2` profile with fixed 32K unit / 224K input / 48K compact-output / 128K raw-output byte limits and fanout 4. Added immutable bindings, prelaunch merge-density holds, and eligibility-loss cause attribution. V1 and the independent handover gate remain intact.
+
+- Same complete fictional fixture: **87 → 21 sessions (4.14× reduction)**, with exact original/payload retrieval.
+- Passed five profile regressions, 23 selected compatibility checks, the new public-profile workflow, and all eight public/storage tests. Syntax and diff checks passed.
+- Changed four runtime files, two test files, and the [repair report](/private/tmp/soloco-qualification-repair-20261105/source/docs/qualification-large-profile-repair.md), which records exact commands and the interrupted broad run.
+
+Current-root reuse and historical-only extraction salvage remain deferred. Failure notices still fence dependent work. Native semantic acceptance, real-pilot workload and final runtime matrices remain unproven.
+
+No commit, installation, publication, company-state access or background work remains.

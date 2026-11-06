@@ -1,0 +1,11 @@
+# v0.7.1 continuity qualification validation
+
+Reviewed behavioral source: cb474b49f35001ec8dac772e7ec364fb6944f20e. Native Engineering01a1af69-dd92-7e62-9917-c503ba8ddf80 implemented the fresh plan profile; independent nativeQA01a1af6a-6fbc-7522-8912-c14a07a313a6 accepted the corrected source and explicitly qualified evidence reuse. Root verified every stated receipt condition before integration/publication.
+
+Initial full Node22.13.0/25.2.1 matrices each ran566tests,565passing and one real cancellation-contract regression. That failure remains retained. The corrected source preserves existing cancellation outcome/code/termination fields while attributing qualification eligibility loss separately. Both corrected matrices passed all other565tests with zero failures/cancellations/skips and actual macOS isolation. The single named multi-million pure qualification workflow passed in both initial full runs; its body, shared helpers and pure executed dependencies remained exact. Root verified those hashes. This is explicit composite coverage, not fresh final-tree566/566runs. All four complete compressed logs and source/package/native receipts are retained in evals/qualification-capacity/validation.json.
+
+All166frozen files were checked against both behavioral commits; final package payload39files and version0.7.1agree. Build, whitespace and hook-launcher syntax checks passed; published0.7.0ancestry and actual older-writer fencing are retained. Later changes contain documentation/evidence only.
+
+The same complete fictional negative-bearing audit required87→21independent sessions. This does not measure the private213-session plan or prove native semantic completion. Full newline-padded raw response retention, quoted native transport, immutable limits, canonical child support, freshness/negative closure and a genuine fictional replacement's guarded resume rejection were tested. Reusing current roots and salvaging failed nodes remain deferred.
+
+This source qualification supersedes the earlier retained candidate's pending documentation/receipt disposition. Installation, authentic host activation, company classification and real independent resume_handover acceptance remain separate. Old failures and unresolved notices are preserved.

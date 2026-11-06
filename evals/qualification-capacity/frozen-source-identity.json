@@ -1,0 +1,8 @@
+{
+  "commit": "2ff4f04c5137d58a41d45736b84e63da16db53e3",
+  "tree": "80dbbd5e4159473ab3ca2353433c64a6be96d96f",
+  "manifest_sha256": "f2c8faf13c348dc9702f5418badd7d59f46ab0582957154656e04dcb45d7b39a",
+  "files": 166,
+  "base": "a2056a276464086e8093a606a589908f87dfd5b5",
+  "version": "0.7.1"
+}

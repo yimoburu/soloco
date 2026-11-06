@@ -1,0 +1,11 @@
+{
+  "commit": "cb474b49f35001ec8dac772e7ec364fb6944f20e",
+  "tree": "3d73aaf1988a1be6ac7dd7b7f92d0fb6d0258558",
+  "manifest_sha256": "ef747fb149a638d3312f939014b42ca86ba91cb7acb3a19718be19967e4e1565",
+  "files": 166,
+  "changed_from_2ff4f04": [
+    "docs/qualification-large-profile-repair.md",
+    "plugins/soloco/runtime/worker.mjs",
+    "tests/context-qualification.test.mjs"
+  ]
+}

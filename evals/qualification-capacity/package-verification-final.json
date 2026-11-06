@@ -1,0 +1,17 @@
+{
+  "commit": "cb474b49f35001ec8dac772e7ec364fb6944f20e",
+  "source_files_verified": 166,
+  "package_files_verified": 39,
+  "version": "0.7.1",
+  "package": "/private/tmp/soloco-qualification-repair-20261105/soloco-0.7.1-cb474b4.zip",
+  "package_sha256": "3a55a21e95fe8f93f9f45b916ce2e3971248df58e05865d123404dc3a7399af7",
+  "source_manifest_sha256": "ef747fb149a638d3312f939014b42ca86ba91cb7acb3a19718be19967e4e1565",
+  "checks": {
+    "build": 0,
+    "diff": 0,
+    "hook_launcher_syntax": 0
+  },
+  "published_v070_ancestry": true,
+  "installation_performed": false,
+  "company_mutations": false
+}

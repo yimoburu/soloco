@@ -1,0 +1,13 @@
+**Pass for source integration**, limited to the supplied freeze `2ff4f04c5137d58a41d45736b84e63da16db53e3`. I found no remaining code blocker in the supplied changes. **Compatible publication remains Blocked pending receipts.**
+
+Concrete outstanding conditions:
+
+- **Complete both frozen Node 22/25 matrices:** successful exits, zero failures/cancellations/skips, real macOS isolation exercised, and the complete multi-million regression executed. Retain commands, runtime versions, totals and logs. The reported 34/34 seam run does not substitute for these pending results.
+- **Verify source identity:** root must recompute the supplied tree, 166-file manifest and file hashes, tying both matrix runs to those exact bytes. I have reviewed supplied text, not independently verified filesystem hashes.
+- **Verify the publication package:** retain its digest and confirm its runtime/schema/assets match the reviewed source; version declarations consistently identify 0.7.1; package/build/hook checks pass; published 0.7.0 ancestry and existing writer fencing remain intact.
+
+**Root may close these test/hash/package conditions without another advisory call**, provided they succeed against the reviewed source. Evidence-only additions need no further source review; implementation changes or unresolved failures do.
+
+The transport allowance remains separate from parsed-output permission, and canonical validation uses the selected plan’s bounds. The conservative merge carrier is a preflight calculation, not an adopted semantic Pass.
+
+This verdict establishes neither effective host fit nor native semantic acceptance. The fictional 87→21 measurement does not close the real pilot or independent exact-state handover gate.

@@ -1,0 +1,15 @@
+**Pass — current source integration** for supplied freeze `cb474b49f35001ec8dac772e7ec364fb6944f20e`. No remaining code blocker found in this correction. The earlier Pass remains historical; its two matrix failures remain failures.
+
+The correction restores established cancellation outcomes and adapter code/message/termination evidence while adding qualification-specific eligibility attribution.
+
+**The proposed benchmark reuse is proportionate and acceptable.** Both initial matrices executed it successfully; the correction leaves its body, shared helpers and executed pure-qualification dependencies unchanged. Repeating that scenario is unnecessary once root verifies those bindings. This provides combined scenario coverage, not fresh final-tree 566/566 runs.
+
+**Compatible publication remains Blocked only on these receipts:**
+
+- Both corrected matrices finish with all other **565 tests passing**, zero failures/cancellations, and only the explicitly named benchmark skipped. Preserve real macOS isolation coverage.
+- Root verifies exact manifests and benchmark reuse dependencies, retaining both original failed runs and corrected-run logs. Report the two stages separately; retain the reported 19/19 focused receipt.
+- Final package hashes and payload match the reviewed source, with consistent 0.7.1 metadata, passing package/build/hook checks, preserved ancestry and writer fencing.
+
+**Root may close these completed receipt/hash/package conditions without another model call.** Any implementation change or unresolved test failure falls outside this disposition.
+
+This source verdict does not establish native semantic acceptance, effective execution settings, or permission to resume the paused company.

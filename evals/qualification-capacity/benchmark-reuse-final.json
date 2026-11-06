@@ -1,0 +1,26 @@
+{
+  "benchmark": "complete multi-million unknown semantic workflow converges with every receipt, not sampling",
+  "benchmark_body_sha256": "7235ba8825bbd6a930e05ebce8150c105d28fa370c8f98ad8bb5add2035d54c6",
+  "body_unchanged": true,
+  "pure_qualification_modules_unchanged": true,
+  "changed_worker_not_invoked_by_pure_workflow": true,
+  "first_runs_full": {
+    "22": {
+      "total": 566,
+      "passed": 565,
+      "failed": 1,
+      "benchmark_passed": true,
+      "log_sha256": "227b95d402362aaadf3da1bd13f4bf9d6a88ec8e9c8dd1306d27ef67fd973b34"
+    },
+    "25": {
+      "total": 566,
+      "passed": 565,
+      "failed": 1,
+      "benchmark_passed": true,
+      "log_sha256": "0fa2becd91baf3813895161b24c8b3a99dcd9426a672d3db1610313cbb8daf77"
+    }
+  },
+  "shared_test_prefix_unchanged": true,
+  "shared_test_prefix_sha256": "bb881540bc476ec6524aa26dced5ea9b0d9a56fe71bb86ee27e6e4a80dc9a7b6",
+  "root_verified": true
+}

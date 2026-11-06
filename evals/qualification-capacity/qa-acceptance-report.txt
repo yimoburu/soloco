@@ -1,0 +1,32 @@
+The baseline supports a bounded capacity repair. The observed 14,925-byte envelope correctly exceeded the 12,000-byte cap; it does not establish incomplete QA semantics. The sibling abort establishes eligibility loss, with notice-induced staleness a plausible cause requiring confirmation. Neither observation supports a Pass.
+
+This is preliminary advisory review only. Effective Sol/high/host-default settings remain unverified; prior test receipts do not cover the forthcoming changes.
+
+**Mandatory acceptance conditions**
+
+- **Fresh, immutable profile selection.** Use a finite reviewed profile, bound into the plan, assignments, delivery proofs and canonical validation, and exposed accurately through the public schema. Missing selection must preserve existing v1 behavior. Reject unknown profiles, caller-supplied caps and profile substitution, including through pinned-unit paths.
+- **Coupled capacity enforcement.** Partitioning, packet construction, instructions, worker limits, raw-output validation and canonical replay must use the same selected limits. Measure UTF-8 bytes of the complete serialized envelope, including repeated reason fields and JSON escaping. Preserve overflow as a hold.
+- **Pre-invocation fit checks.** Serialize and check complete leaf, merge and aggregate input packets before invoking a model. Check merges against actual canonical child results. Reserve the complete output envelope; input size alone cannot guarantee how many distinct semantic findings extraction requires. Residual semantic overflow must still hold without truncation.
+- **Measured work and timing.** Report exact leaf, merge, aggregate and total invocation counts for the fresh topology, plus selected context, concurrency and deadline limits. Enforce safe fanout without inventing a company budget. Keep qualification separate from the installed ordinary-handover 600-second total ceiling and any separately selected reviewed capability.
+- **Preserve proof strength.** Retain exact coverage, provenance, freshness, independent single-use native reviewers, negative closure and all actual owner/pause/revoke/source/current-authority holds. Exact-current proof reuse may remain deferred.
+- **No retrospective revival.** Failed jobs, rejected outputs and notices remain retained. Any repaired execution uses fresh eligible assignments and sessions; it cannot extend, relabel or complete an old failed job.
+
+**Concrete minimum-scope risks**
+
+1. `projected()` caches already-partitioned historical `parts` by source identity. A new profile must distinguish partition derivations or repartition the cached semantic tree; otherwise cache order can select the wrong units.
+2. Binary topology and two-child reconciliation are hardcoded. If “fanout” means changing tree arity, topology, target validation, ordered supports and canonical child validation must agree. If it means execution concurrency, leave arity unchanged.
+3. Output instructions and validators use global constants; the worker separately uses a 100,000-character adapter ceiling and rejected-output retention limit. Raising one constant is insufficient, and larger valid limits must not cause silent receipt truncation.
+4. Failure notices enter the current semantic subject. Improved attribution must distinguish the initiating overflow from downstream cancellation without suppressing consequential notices or weakening freshness.
+5. `jobReviewWindow()` does not itself verify that the target is an ordinary handover. Explicitly prevent qualification jobs from acquiring that separate timing capability; a late canonical rejection would waste execution.
+
+**Compact validation plan**
+
+- Freeze the exact implementation and identify its supported Node versions; provide new test receipts tied to that source.
+- Exercise default v1 compatibility, fresh-profile selection, public schema, pinned-unit validation, cache-order independence and profile-tampering rejection.
+- Test complete-envelope byte boundaries with Unicode, escaping, whitespace and repeated reasons; reproduce the observed overflow class.
+- Verify actual-child merge/aggregate preflight, total-call accounting, concurrency, deadline boundaries and confirmed process closure.
+- Reproduce notice-induced cancellation alongside owner, pause, revoke and source-change fences; verify retained outputs, negatives and distinct cancellation attribution.
+
+A genuine failed-node repair corrects a demonstrated capacity or execution defect, retains the original failure, and obtains fresh independent evidence under the corrected bounds. Every applicable semantic negative still needs evidenced reconciliation. Changing plan IDs, shrinking findings, dropping conditions, merging inequivalent items, hiding notices or treating an overflowed return as accepted proof is negative laundering. If existing negative gates still veto the replacement, retain the hold and expose the unresolved reason.
+
+No implementation acceptance or company-state change is established by this report.
