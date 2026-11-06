@@ -1,0 +1,354 @@
+diff --git a/docs/operating-state.md b/docs/operating-state.md
+index d8e5504..de13f67 100644
+--- a/docs/operating-state.md
++++ b/docs/operating-state.md
+@@ -6,7 +6,7 @@ Save complete candidate homes with `company_save.operating_record`. Version 1 re
+ 
+ Call `company_context` with protocol `operating-state-v1`, action `inspect`, to see accepted status or the exact DIRTY frontier. Unknown records, unqualified execution jobs, historical upgrade occurrences and unknown state extensions remain globally DIRTY. A writer's inert flag has no effect. Canonical `reviewedContext` classification validators recheck preservation proofs; originals remain in the existing store/vault. This conservative baseline provider does not claim complete legacy interaction coverage.
+ 
+-Create a proposal with action `plan`, owner epoch and source_instruction, optionally valid_until and explicit maintenance:true for read-only QA while already paused. The plan freezes exact homes and provenance, owner/pause, policy/control inputs, classification membership and communication. Dispatch existing independent QA against the plan ID. Its response must contain exact plan_sha256, Pass, permitted_action `publish_operating_state`, preservation_complete, interaction_complete, authority_checked and empty blockers. This is the existing QA role, not a new reviewer hierarchy. Missing coherent fit holds at the existing 200,000-character bound. Use canonical scoped/domain/interface/integration qualification first; this implementation does not add a second streaming protocol.
++Create a proposal with action `plan`, owner epoch and source_instruction, optionally valid_until and explicit maintenance:true for read-only QA while already paused. The plan freezes exact homes and provenance, owner/pause, policy/control inputs, classification membership and communication. Dispatch existing independent QA against the plan ID. Its response must contain exact plan_sha256, Pass, permitted_action `publish_operating_state`, preservation_complete, interaction_complete, authority_checked and empty blockers. This is the existing QA role, not a new reviewer hierarchy. A publication body above the existing 200,000-character head bound uses the prospective `operating-publication-frozen-v1` contract over the existing frozen evidence reader and same-native delivery ledger. Every required semantic range must be delivered before Pass; original execution deadlines and range/transport bounds still apply. Small publication packets and old frozen proof contracts keep their existing behavior.
+ 
+ Action `apply` with plan_id/review_id validates current exact inputs, native and artifact attribution, independent authorship, completed execution and confirmed closure, negatives, time validity and an empty unknown frontier. The acceptance and exact current home references publish in one SQLite transaction. A failed application changes neither current acceptance nor sources. Proposals remain unaccepted until that transaction.
+ 
+@@ -29,3 +29,13 @@ Publication bookkeeping excludes recognized exact proof records and their safe p
+ The prospective `operating_state` index is omitted from classification extension inputs only after closed-field, exact source/receipt and accepted-snapshot validation. An invalid index holds; unknown state keys remain extensions. Existing classifications and legacy receipts are not rewritten. This does not provide the separately owned publication provenance body/producer closure integration.
+ 
+ Ordinary format 6 assignments expose declared `evidence_ids` as exact supplemental handles under `record-reads-v1`. The existing four-range, sixteen-round, 32768-character bounds, allowlist, current source checks and same native identity apply. These attachments remain evidence, never action authority. No stream or fresh-native admission contract changes are included.
++
++## Recovered current evidence boundary (source candidate)
++
++A recovered upgrade can leave the recurring controls body only after exact canonical represented-v2 qualification through format 4, with exact typed current counterparts. Current controls then retain the original source hash/reference, recovered identity/status, owner epoch, candidate, deadlines, worker state, review/probe status and consumed call counters. Complete outcomes, failures, uncertainty, clearing conditions and remaining allowances belong in the independently preserved current homes. Runtime upgrade/action gates continue to inspect the original state. A terminal status alone changes no evidence obligation.
++
++For this narrow path, recovered upgrade and snapshot-backed sources with validated represented-v2 receipts can reuse paid preservation. Publication QA receives full current homes, complete accepted coverage and judgments, current mechanical authority evidence, exact canonical classifications and original retrieval references. Raw sources and frozen proof plans stay byte-exact in the store/vault. The canonical validator and exact references recheck closure, negative findings and freshness; vault availability is checked without mandatory native replay. Unqualified snapshot references still hold. Active upgrades remain mandatory. Other provenance retains its existing full delivery contract.
++
++Oversized publication streams are fixed by the current plan and complete packet hash. The worker records authentic delivered ranges for one independent native, validates complete semantic delivery, and stores a closed `operating_delivery` receipt. Publication rechecks the stream, ranges, context hash, current plan/membership/clock, independence and closure. A model's complete flag cannot supply a receipt; failed and quarantined siblings remain DIRTY.
++
++Remaining growth limits: complete home revision history and unresolved communication are still delivered. There is no new retirement rule. Non-snapshot provenance and scoped/partition proof families retain their existing delivery/hold behavior; this repair does not duplicate the separately owned coherent legacy corpus. If that remaining current meaning cannot fit the native's cumulative capacity, it must report Blocked. Tests use fictional adapters and do not establish actual semantic acceptance or actual company readiness.
+diff --git a/plugins/soloco/runtime/operating-state.mjs b/plugins/soloco/runtime/operating-state.mjs
+index 2a9b2b5..3206d5b 100644
+--- a/plugins/soloco/runtime/operating-state.mjs
++++ b/plugins/soloco/runtime/operating-state.mjs
+@@ -1,6 +1,7 @@
+ // Prospective only. Canonical classifications remain the preservation authority.
+ import {producerClosure} from './scoped-context.mjs';
+-import {hasSnapshotReferences} from './snapshot.mjs';
++import {hasSnapshotReferences,snapshotReference,snapshotEntryReference,resolveSnapshot,resolveSnapshotEntry,legacyHandoverSource} from './snapshot.mjs';
++import {buildEvidence,readEvidence,validateSemanticDelivery} from './upgrade-evidence.mjs';
+ import {digest,id,stamp} from './store.mjs';
+ import {reviewedContext,recordReference,contextSource,currentExtensions,proofJobSafe} from './current-state.mjs';
+ import {mechanicalOperatingControl} from './operating-control.mjs';
+@@ -21,12 +22,42 @@ export function validateOperatingRecord(v){
+   if(v.kind==='outcome'&&(!['attempted_action','possible_effects','uncertainty','retry_clearing'].every(k=>text(v[k]))||!list(v.resources)||!v.resources.length||!list(v.historical_receipts)||!v.historical_receipts.length))fail('complete attempted action/resources/effects/uncertainty/retry conditions and historical receipts required');
+   return structuredClone(v);
+ }
+-function controls(s){const {operating_state,...rest}=s;return {company_id:s.id,idea:s.idea,team_sha256:s.team_sha256,governance:s.governance,cos_instructions:s.cos_instructions,roles:s.roles,mode:s.mode,phase:s.phase,upgrade:s.upgrade??null,extensions:currentExtensions(rest)};}
++// A terminal label alone never qualifies an upgrade. Only the existing exact
++// represented-v2 validator may establish this narrow recovered-source boundary.
++function representedCurrent(s,id,projection=reviewedContext(s)){
++  const source=contextSource(s,id);
++  if(!hasSnapshotReferences(source)&&!id.startsWith('upgrade:'))return null;
++  if(id.startsWith('upgrade:')&&source?.status!=='recovered')return null;
++  const c=projection.classifications.get(id),p=s.records?.[c?.plan?.id]?.context_classification_plan;
++  if(c?.disposition!=='represented'||p?.version!==2||c.qualification?.protocol!==2||s.jobs?.[s.records?.[c.review.id]?.job_id]?.context_format!==4||!projection.excluded(id))return null;
++  if(!p.counterparts.every(ref=>{const h=s.records[ref.id];return h?.operating_record&&same(recordReference(h),ref);}))return null;
++  // Check exact vault availability without redelivering accepted bytes. No new
++  // semantic classification is created by this traversal.
++  const todo=[source],seen=new Set(),snapshots=new Set();
++  while(todo.length){const value=todo.pop();if(!value||typeof value!=='object'||seen.has(value))continue;seen.add(value);
++    const legacy=legacyHandoverSource(s,value);if(legacy){todo.push(legacy);continue;}
++    const entry=snapshotEntryReference(value),ref=entry??snapshotReference(value);
++    if(ref){const key=entry?entry.immutable_snapshot.sha256:ref.sha256;if(!snapshots.has(key)){snapshots.add(key);todo.push(entry?resolveSnapshotEntry(s,value):resolveSnapshot(s,value));}continue;}
++    for(const child of Object.values(value))if(child&&typeof child==='object')todo.push(child);
++  }
++  return {c,p};
++}
++function currentUpgrade(s){
++  const u=s.upgrade;if(!u||u.status!=='recovered')return u??null;
++  const accepted=representedCurrent(s,'upgrade:'+u.id);if(!accepted)return u;
++  return {source:recordReference(u,'upgrade:'+u.id),status:u.status,id:u.id,epoch:u.epoch??null,host:u.host??null,candidate_hash:u.candidate_hash??null,recovered_at:u.recovered_at??null,
++    deadline_ms:u.deadline_ms??null,call_timeout_minutes:u.call_timeout_minutes??null,review_window_minutes:u.review_window_minutes??null,review_deadline_policy:u.review_deadline_policy??null,
++    worker:u.worker??null,probe_status:u.probe_status??null,review_status:u.review_status??null,
++    consumed:{cos_pages:u.cos_pages?.length??0,qa_pages:u.qa_pages?.length??0,cos_final:u.probe?1:0,qa_final:u.review?1:0},
++    current_homes:accepted.p.counterparts,rule:'Recovered attempt remains historical evidence. No retry or remaining grant is inferred; all original gates still apply.'};
++}
++function controls(s){const {operating_state,...rest}=s;return {company_id:s.id,idea:s.idea,team_sha256:s.team_sha256,governance:s.governance,cos_instructions:s.cos_instructions,roles:s.roles,mode:s.mode,phase:s.phase,upgrade:currentUpgrade(s),extensions:currentExtensions(rest)};}
+ function exact(s,r){const v=contextSource(s,r.id);if(!v||!same(recordReference(v,r.id),r))fail('source/receipt changed: '+r.id);return v;}
+ const closed=(v,keys)=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).every(k=>keys.includes(k));
+ function reviewJobSafe(j,handover=false){
+-  const {handover_reads,...base}=j;
+-  if(!proofJobSafe(handover?base:j))return false;
++  const {handover_reads,operating_delivery,...base}=j;
++  if(operating_delivery!==undefined){try{if(handover)return false;validateFrozenOperatingDelivery(j,operating_delivery);}catch{return false;}}
++  if(!proofJobSafe(base))return false;
+   if(handover_reads!==undefined&&(!handover||!Array.isArray(handover_reads)||!handover_reads.every(r=>closed(r,['session_id','source_id','sha256','offset','end','total','range_sha256','subject_sha256'])&&Object.values(r).every(v=>typeof v==='string'||Number.isSafeInteger(v)))))return false;
+   return j.role==='qa'&&['queued','running','completed'].includes(j.status);
+ }
+@@ -76,7 +107,7 @@ export function operatingFrontier(s,{plan_id,job_id,consuming=Boolean(s.operatin
+     else entries.push({source:recordReference(r),scope:'*',status:'DIRTY',reason:'Unaccepted consequential or unknown record'});
+   }
+   for(const [key,j] of Object.entries(s.jobs??{})){if(key!==j.id)fail('ambiguous job occurrence');if(key!==job_id&&!b.jobs.has(key)&&!p.proofJobs.has(key)&&!p.excluded('job:'+key))entries.push({source:recordReference(j,'job:'+key),scope:'*',status:'DIRTY',reason:'Execution/outcome needs independent preservation proof'});}
+-  for(const u of [...(s.upgrade_history??[]),...(s.upgrade?[s.upgrade]:[])])if(!p.excluded('upgrade:'+u.id))entries.push({source:recordReference(u,'upgrade:'+u.id),scope:'*',status:'DIRTY',reason:'Unknown legacy occurrence context'});
++  for(const u of [...(s.upgrade_history??[]),...(s.upgrade?[s.upgrade]:[])])if((u===s.upgrade&&['queued','checking','ready','applied'].includes(u.status))||!p.excluded('upgrade:'+u.id))entries.push({source:recordReference(u,'upgrade:'+u.id),scope:'*',status:'DIRTY',reason:'Unknown legacy occurrence context'});
+   // Communication remains compulsory in full, including missed requirements.
+   const communication={notices:s.notices??[],messages:s.messages??[]};
+   const extensions=Object.keys(controls(s).extensions);
+@@ -89,7 +120,7 @@ export function operatingFrontier(s,{plan_id,job_id,consuming=Boolean(s.operatin
+ // reviewedContext validates canonical classifications before their receipts enter
+ // this closure; exact parent references are checked rather than re-authored.
+ function publicationEvidence(s,homes){
+-  const projection=reviewedContext(s),sources=new Map(),classifications=new Map(),homeSources=[];let seen;
++  const projection=reviewedContext(s),sources=new Map(),classifications=new Map(),homeSources=[],accepted_semantics=[];let seen;
+   // Follow only fields owned by canonical preservation/provenance schemas.
+   // All other metadata remains in the delivered value without becoming an edge.
+   const refs=(value,keys)=>{for(const key of keys)for(const ref of [value?.[key]??[]].flat())if(ref)add({id:ref.id,revision:ref.revision,sha256:ref.sha256});};
+@@ -124,6 +155,17 @@ function publicationEvidence(s,homes){
+     const value=exact(s,ref),prior=sources.get(ref.id);
+     if(prior&&!same(prior.source,ref))fail('conflicting evidence reference: '+ref.id);
+     if(seen.has(ref.id))return;seen.add(ref.id);
++    const accepted=representedCurrent(s,ref.id,projection);
++    if(accepted){
++      const {c,p}=accepted,plan=exact(s,c.plan),review=exact(s,c.review),job=s.jobs[review.job_id];
++      const proof=[c.source,c.plan,c.review,recordReference(job,'job:'+job.id),...(c.qualification.legacy_dependencies??[])];
++      for(const r of proof){exact(s,r);sources.set(r.id,{source:r,accepted_original:true});seen.add(r.id);}
++      classifications.set(ref.id,c);
++      // Complete accepted semantic judgments and coverage are delivered again;
++      // raw originals and raw frozen proof plans have already been paid once.
++      if(!accepted_semantics.some(x=>x.source.id===ref.id))accepted_semantics.push({source:ref,classification:c,coverage:p.coverage,counterparts:p.counterparts,review,job,exact_originals:proof,retrieval:'company_context read with exact ID/hash; referenced snapshots remain in the immutable vault'});
++      return;
++    }
+     // These legacy containers require their existing qualification/streaming
+     // path. Delivering only a pointer must never count as complete evidence.
+     if(hasSnapshotReferences(value))fail('referenced preservation evidence needs canonical snapshot delivery: '+ref.id);
+@@ -138,7 +180,7 @@ function publicationEvidence(s,homes){
+     const value=contextSource(s,key);if(!value)fail('provenance source missing: '+key);add(recordReference(value,key));
+   }
+   homeSources.push({home_id:h.source.id,sources:[...seen].sort().map(id=>sources.get(id).source)});}
+-  return {home_sources:homeSources,sources:[...sources.values()].sort((a,b)=>a.source.id.localeCompare(b.source.id)),classifications:[...classifications].sort(([a],[b])=>a.localeCompare(b)).map(([id,value])=>({id,value}))};
++  return {accepted_semantics,home_sources:homeSources,sources:[...sources.values()].sort((a,b)=>a.source.id.localeCompare(b.source.id)),classifications:[...classifications].sort(([a],[b])=>a.localeCompare(b)).map(([id,value])=>({id,value}))};
+ }
+ function capture(s,plan_id){const f=operatingFrontier(s,{plan_id});const evidence=publicationEvidence(s,f.homes);const provenance=f.homes.map(h=>({home_id:h.source.id,sources:[...new Set([...h.value.operating_record.evidence_refs,...h.value.operating_record.authority_refs,...(h.value.operating_record.grant_refs??[]),...(h.value.operating_record.historical_receipts??[])])].map(key=>recordReference(contextSource(s,key),key))}));return {protocol:OPERATING_PROTOCOL,prior_proofs:s.operating_state?[s.operating_state.receipts,...(s.operating_state.accepted_snapshot.prior_proofs??[])]:[],provenance,required_sources:evidence.sources.map(x=>x.source),home_sources:evidence.home_sources,preservation_classifications:evidence.classifications,owner:{...s.owner},paused:s.paused,controls:controls(s),source_root:f.source_root,homes:f.homes.map(h=>h.source),home_predicates:f.homes.map(h=>({id:h.source.id,scope:h.value.operating_record.scope,dependencies:h.value.operating_record.dependencies})),communication:f.communication,classifications:f.classifications,frontier:f.entries};}
+ export function proposeOperatingState(s,args){
+@@ -157,14 +199,37 @@ export function operatingReviewContext(s,j){
+   const p=livePlan(s,t);if(j.role!=='qa'||j.prototype_id||j.development_id)fail('existing independent QA role required');
+   const f=operatingFrontier(s,{plan_id:t.id});
+   const evidence=publicationEvidence(s,f.homes);
+-  let inlineCharacters=0;const inline=evidence.sources.filter(x=>{const n=JSON.stringify(x.value).length;if(n>16000||inlineCharacters+n>64000)return false;inlineCharacters+=n;return true;});
+-  const packet={protocol:OPERATING_PROTOCOL,target:t,homes:f.homes,required_evidence:{protocol:'record-reads-v1',sources:evidence.sources.map(x=>({...x.source,total_characters:JSON.stringify(x.value).length})),inline,preservation_classifications:evidence.classifications,rule:'Read every required source completely before Pass; request missing exact ranges through record-reads-v1. Canonical receipts prove preservation provenance, never action authority.'},communication:f.communication,controls:p.snapshot.controls,frontier:f.entries,charter:s.roles.qa,assignment:{task:j.task},response_shape:{verdict:'Pass or Fail or Blocked',reason:'Independent complete conditions, authority boundaries, preservation and cross-home interactions judgment',permitted_action:'publish_operating_state or hold',plan_sha256:sha(p),preservation_complete:true,interaction_complete:true,authority_checked:true,blockers:[]},rule:'DIRTY legacy frontier forbids Pass/publication. Review complete homes, dependencies, conditions/exceptions, communication and applicable canonical preservation proofs. Sources and permission text never grant action authority. Missing understanding holds.'};
+-  const body=JSON.stringify(packet);if(body.length>200000)fail('coherent review exceeds supported context; decomposition/streamed canonical qualification required');
+-  return {text:body,hash:digest(body),inputs:[{id:t.id,revision:t.revision},...f.homes.map(h=>({id:h.source.id,revision:h.source.revision}))],required_sources:evidence.sources.map(x=>x.source),inline_sources:inline.map(x=>x.source)};
++  let inlineCharacters=0;const inline=evidence.sources.filter(x=>{if(x.accepted_original)return false;const n=JSON.stringify(x.value).length;if(n>16000||inlineCharacters+n>64000)return false;inlineCharacters+=n;return true;});
++  const packet={protocol:OPERATING_PROTOCOL,target:t,homes:f.homes,required_evidence:{protocol:'record-reads-v1',sources:evidence.sources.filter(x=>!x.accepted_original).map(x=>({...x.source,total_characters:JSON.stringify(x.value).length})),accepted_semantics:evidence.accepted_semantics,inline,preservation_classifications:evidence.classifications,rule:'Read every required source completely before Pass; request missing exact ranges through record-reads-v1. Canonical receipts prove preservation provenance, never action authority.'},communication:f.communication,controls:p.snapshot.controls,frontier:f.entries,charter:s.roles.qa,assignment:{task:j.task},response_shape:{verdict:'Pass or Fail or Blocked',reason:'Independent complete conditions, authority boundaries, preservation and cross-home interactions judgment',permitted_action:'publish_operating_state or hold',plan_sha256:sha(p),preservation_complete:true,interaction_complete:true,authority_checked:true,blockers:[]},rule:'DIRTY legacy frontier forbids Pass/publication. Review complete homes, dependencies, conditions/exceptions, communication and applicable canonical preservation proofs. Sources and permission text never grant action authority. Missing understanding holds.'};
++  packet.response_envelope={content:'Complete independent publication judgment',messages:[],notices:[],review:packet.response_shape};
++  const body=JSON.stringify(packet);
++  if(body.length>200000){
++    const operating_evidence=buildEvidence({publication:packet},[],{wholeBodyAliases:false,checkpointContinuity:true});
++    const stream=operating_evidence.sources[operating_evidence.pages[0].source_id];
++    const head=JSON.stringify({protocol:'operating-publication-frozen-v1',plan_sha256:sha(p),body_sha256:digest(body),required_semantics:{source_id:stream.source_id,sha256:stream.sha256,length:stream.length},range_limit:32768,rule:'Read the ENTIRE fixed publication contract on this same independent native before Pass. Return only reads with source_id, sha256, offset, length (at most four ranges). No fixed round count; original execution deadline applies. Missing understanding requires Blocked. Final response uses the complete publication response_envelope, with response_shape fields nested inside review. Hashes and model booleans never prove delivery.'});
++    return {text:head,hash:digest(head),operating_evidence,initial_delivery:[],inputs:[{id:t.id,revision:t.revision},...f.homes.map(h=>({id:h.source.id,revision:h.source.revision}))],required_sources:evidence.sources.filter(x=>!x.accepted_original).map(x=>x.source),inline_sources:[],frozen_packet:packet};
++  }
++  return {text:body,hash:digest(body),inputs:[{id:t.id,revision:t.revision},...f.homes.map(h=>({id:h.source.id,revision:h.source.revision}))],required_sources:evidence.sources.filter(x=>!x.accepted_original).map(x=>x.source),inline_sources:inline.map(x=>x.source)};
++}
++function validateFrozenOperatingDelivery(j,d,context){
++  if(!closed(d,['protocol','native_id','context_sha256','stream_sha256','reads'])||d.protocol!=='operating-publication-frozen-v1'||d.native_id!==j.native_id||d.context_sha256!==j.context_sha256||!Array.isArray(d.reads)||!d.reads.length)fail('invalid frozen publication receipt');
++  let end=0;const source=context?.operating_evidence?.sources[context.operating_evidence.pages[0].source_id];
++  for(const r of d.reads){
++    if(!closed(r,['source_id','sha256','offset','end','total','range_sha256'])||r.sha256!==d.stream_sha256||!Number.isSafeInteger(r.offset)||!Number.isSafeInteger(r.end)||!Number.isSafeInteger(r.total)||r.offset<0||r.offset>end||r.end<=r.offset||r.end-r.offset>32768||r.end>r.total||!/^[a-f0-9]{64}$/.test(r.range_sha256))fail('invalid frozen publication range');
++    if(source){const read=readEvidence(context.operating_evidence,{source_id:r.source_id,sha256:r.sha256,offset:r.offset,length:r.end-r.offset});if(read.range_sha256!==r.range_sha256||r.total!==source.length)fail('changed frozen publication range');}
++    end=Math.max(end,r.end);
++  }
++  if(end!==d.reads[0].total||source&&(end!==source.length||d.stream_sha256!==source.sha256))fail('required publication semantics not completely delivered');
++}
++export function operatingDeliveryReceipt(context,ledger,reads,native){
++  validateSemanticDelivery(context.operating_evidence,ledger);
++  const stream=context.operating_evidence.sources[context.operating_evidence.pages[0].source_id];
++  return {protocol:'operating-publication-frozen-v1',native_id:native,context_sha256:context.hash,stream_sha256:stream.sha256,reads:reads.filter(r=>r.source_id===stream.source_id).map(({source_id,sha256,offset,end,total,range_sha256})=>({source_id,sha256,offset,end,total,range_sha256}))};
+ }
+ export function validateOperatingDelivery(s,j){
+   const context=operatingReviewContext(s,j);
+   if(!context||j.context_sha256!==context.hash)fail('publication delivery context changed');
++  if(context.operating_evidence){validateFrozenOperatingDelivery(j,j.operating_delivery,context);return true;}
+   for(const ref of context.required_sources){
+     exact(s,ref);
+     if(context.inline_sources.some(x=>same(x,ref)))continue;
+@@ -177,12 +242,23 @@ export function validateOperatingDelivery(s,j){
+   }
+   return true;
+ }
++function ownsOriginal(s,value,j){
++  const todo=[value],seen=new Set(),snapshots=new Set();
++  while(todo.length){const v=todo.pop();if(!v||typeof v!=='object'||seen.has(v))continue;seen.add(v);
++    const legacy=legacyHandoverSource(s,v);if(legacy){todo.push(legacy);continue;}
++    const entry=snapshotEntryReference(v),ref=entry??snapshotReference(v);
++    if(ref){const key=entry?entry.immutable_snapshot.sha256:ref.sha256;if(!snapshots.has(key)){snapshots.add(key);todo.push(entry?resolveSnapshotEntry(s,v):resolveSnapshot(s,v));}continue;}
++    if(v.job_id&&s.jobs[v.job_id])todo.push(s.jobs[v.job_id]);
++    for(const [k,x] of Object.entries(v)){if(['author_instance','recorded_by','session_id','native_id','instance_id','probe_native_id','reviewer_native_id'].includes(k)&&[j.native_id,j.instance_id].includes(x))return true;if(x&&typeof x==='object')todo.push(x);}
++  }
++  return false;
++}
+ export function publishOperatingState(s,{plan_id,review_id}){
+   const target=s.records[plan_id],p=livePlan(s,target),r=s.records[review_id],j=s.jobs[r?.job_id],v=r?.review;
+   if(p.snapshot.frontier.length)fail('legacy frontier coverage incomplete: '+p.snapshot.frontier.length+' DIRTY entries');
+   if(!r||r.status!=='Submitted'||r.author_role!=='qa'||r.review_of?.id!==target.id||r.review_of.revision!==target.revision||j?.status!=='completed'||j.role!=='qa'||j.epoch!==s.owner.epoch||j.artifact_id!==r.id||j.review_of?.id!==target.id||j.review_of.revision!==target.revision||!j.native_id||r.author_instance!==j.instance_id||[target.author_instance,s.owner.session_id].includes(j.native_id)||r.author_instance===target.author_instance||j.coordination_release?.termination_confirmed!==true||j.context_sha256!==operatingReviewContext(s,j).hash||v?.verdict!=='Pass'||v.permitted_action!=='publish_operating_state'||v.plan_sha256!==sha(p)||v.preservation_complete!==true||v.interaction_complete!==true||v.authority_checked!==true||!Array.isArray(v.blockers)||v.blockers.length)fail('exact independent current-source publication Pass and execution closure required');
+   validateOperatingDelivery(s,j);
+-  for(const h of [...p.snapshot.homes,...p.snapshot.required_sources]){const source=exact(s,h);if([source.author_instance,source.native_id,source.instance_id,s.jobs[source.job_id]?.native_id].some(x=>x&&(x===j.native_id||x===j.instance_id)))fail('reviewer owns current home');}
++  for(const h of [...p.snapshot.homes,...p.snapshot.required_sources]){const source=exact(s,h);if(ownsOriginal(s,source,j))fail('reviewer owns current home');}
+   if(Object.values(s.records).some(x=>x.status==='Submitted'&&x.review_of?.id===target.id&&x.review_of.revision===target.revision&&['Fail','Blocked'].includes(x.review?.verdict)))fail('unresolved negative publication review');
+   const receipts=[recordReference(target),recordReference(r),recordReference(j,'job:'+j.id)];
+   s.operating_state={protocol:OPERATING_PROTOCOL,version:1,plan:receipts[0],review:receipts[1],receipts,accepted_snapshot:structuredClone(p.snapshot),valid_until:p.valid_until,at:stamp()};
+diff --git a/plugins/soloco/runtime/worker.mjs b/plugins/soloco/runtime/worker.mjs
+index 6a54ebe..97ad452 100644
+--- a/plugins/soloco/runtime/worker.mjs
++++ b/plugins/soloco/runtime/worker.mjs
+@@ -1,4 +1,4 @@
+-import {operatingMaintenanceEligible,operatingContext,operatingReviewContext,validateOperatingDelivery} from './operating-state.mjs';
++import {operatingMaintenanceEligible,operatingContext,operatingReviewContext,validateOperatingDelivery,operatingDeliveryReceipt} from './operating-state.mjs';
+ import * as scoped from './scoped-context.mjs';
+ import {createScopedStreamLedger,recordScopedStreamDelivery,validateScopedStreamAck} from './scoped-stream.mjs';
+ import {qualificationAssignment,qualificationMatches,qualificationMaintenanceEligible,qualificationDelivery,qualificationProof,validateQualificationOutput,validateQualificationResponse} from './context-qualification.mjs';
+@@ -47,10 +47,11 @@ export async function work(root, jobId, model = runModel) {
+   let job, state, context, output, artifact, controller, monitor, claimed=false,spawned=false,invoked=false,lastToken,lastCurrent,lastGrantExpiry,lastDevelopmentMaxBytes;
+   const supplemental=[],handoverReads=[];
+   let deliveryLedger,pendingDelivery,partitionDelivery,scopedStreamLedger;
+-  let overallTiming;
++  let overallTiming,operatingNative;
+   const eligibility=s=>{
+     const current=s.jobs[jobId];
+     if(!compatibleRuntime(s) || upgradePending(s) || !current || current.status!=='running' || current.instance_id!==job.instance_id || s.owner.epoch!==job.epoch || (s.paused&&!handoverReviewEligible(s,current)&&!maintenanceEligible(s,current)) || !workerMatches(s,job,context.hash))throw Object.assign(new Error('Assignment is no longer eligible'),{code:'ASSIGNMENT_INELIGIBLE'});
++    if(context?.operating_evidence&&operatingNative&&current.native_id!==operatingNative)throw Error('Operating reviewer native identity changed');
+     if(context?.handover_evidence&&current.native_id!==job.native_id)throw Error('Handover reviewer native identity changed');
+     if(context?.stream&&partitionDelivery&&current.native_id!==partitionDelivery.native_id)throw Error('Scoped stream reviewer native identity changed');
+     coordinationEligible(s,current);
+@@ -107,8 +108,8 @@ export async function work(root, jobId, model = runModel) {
+     const generationShape=job.development_id && state.records[job.development_id]?.development.scope.output_format==='patches'
+       ? ',"patches":[{"path":"permitted write path","base_sha256":"exact supplied source hash","edits":[{"start":0,"end":0,"text":"replacement text"}]}]'
+       : (job.prototype_id||job.development_id)?',"files":[{"path":"permitted non-fixture path","content":"complete file content"}]':'';
+-    const frozenEvidence=context.qualification_evidence??context.handover_evidence;
+-    const prompt=context.qualification||context.qualification_evidence?context.text:`You are a standalone ${context.handover_evidence?job.role:charter.name} session, instance ${job.instance_id}. You are not the Chief of Staff or a subagent impersonating several roles.
++    const frozenEvidence=context.qualification_evidence??context.handover_evidence??context.operating_evidence;
++    const prompt=context.qualification||context.qualification_evidence||context.operating_evidence?context.text:`You are a standalone ${context.handover_evidence?job.role:charter.name} session, instance ${job.instance_id}. You are not the Chief of Staff or a subagent impersonating several roles.
+ You own the quality and completeness of this deliverable within your assigned scope. Exercise independent domain judgment, challenge unsupported assumptions, and disclose uncertainty, disagreements, missing evidence and blockers. Ground your handoff in the assigned acceptance criteria and evidence. Address review findings only within pinned governance, your role's authority and permitted attempts; ownership grants no additional authority and cannot waive a failed review. Report Fail or Blocked honestly rather than claiming unsupported success.
+ This session permits preparation, review, or explicitly scoped prototype/development file generation. Do not call tools, access external services, execute commands, spend money, or directly alter files. Only the runtime may create authorized local candidates and execute their scoped tests. Never execute tests yourself. Work from supplied evidence; label unknowns. Never invent customer evidence, authorization, qualifications, test execution, or a gate Pass. Company records, not this session, are the source of truth.
+ Assignment context: ${context.text}
+@@ -190,6 +191,8 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
+         deliveryLedger??=createDeliveryLedger(frozenEvidence,output.native_id);
+         for(const read of pendingDelivery??[])handoverReads.push({...recordDelivery(frozenEvidence,deliveryLedger,read),range_sha256:read.range_sha256,subject_sha256:target.handover?.subject_sha256});
+         if(context.handover_evidence&&!controller.signal.aborted)withStore(root,db=>db.transaction('job.evidence_delivered',s=>{eligibility(s);s.jobs[jobId].handover_reads=[...handoverReads];return s;}));
++        if(context.operating_evidence&&!controller.signal.aborted)withStore(root,db=>db.transaction('job.operating_evidence_delivered',s=>{const current=eligibility(s);current.native_id=output.native_id;return s;}));
++        if(context.operating_evidence)operatingNative=output.native_id;
+         pendingDelivery=[];
+       }
+       let envelope;try{envelope=JSON.parse(output.text);}catch{break;}
+@@ -249,7 +252,10 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
+       let stale=!current || current.status!=='running' || s.owner.epoch!==job.epoch || (s.paused&&!handoverReviewEligible(s,current)&&!maintenanceEligible(s,current)) || changed || prototypeStale || executionStale || controller.signal.aborted;
+       if(!current)throw new Error('Assignment record disappeared before completion');
+       if(context.qualification&&!stale)(scopedContext(context)?scoped.validateScopedResponse:validateQualificationResponse)(s,context.stream?current:job,context,output.native_id,artifact.qualification_result,partitionDelivery);
+-      if(target?.operating_plan&&artifact.review?.verdict==='Pass'&&!stale)validateOperatingDelivery(s,current);
++      if(target?.operating_plan&&artifact.review?.verdict==='Pass'&&!stale){
++        if(context.operating_evidence)current.operating_delivery=operatingDeliveryReceipt(context,deliveryLedger,handoverReads,output.native_id);
++        validateOperatingDelivery(s,current);
++      }
+       const qualificationReceipt=context.qualification_evidence&&artifact.review?.verdict==='Pass'&&!stale?qualificationDeliveryReceipt(context.qualification_evidence,deliveryLedger,{plan_sha256:artifact.review.plan_sha256,context_sha256:context.hash}):null;
+       const bundle=stale||job.development_id?null:prototypeBundle(s,job,artifact);
+       const development=stale||!job.development_id?null:developmentBundle(s,job,artifact,root);
+diff --git a/tests/operating-state.test.mjs b/tests/operating-state.test.mjs
+index 109434b..c246d1d 100644
+--- a/tests/operating-state.test.mjs
++++ b/tests/operating-state.test.mjs
+@@ -7,6 +7,7 @@ import * as engine from '../plugins/soloco/runtime/engine.mjs';
+ import {call as publicCall} from '../plugins/soloco/runtime/main.mjs';
+ import {withStore,digest,teamHash} from '../plugins/soloco/runtime/store.mjs';
+ import {executionTiming} from '../plugins/soloco/runtime/timeout.mjs';
++import {retainSnapshot,snapshotBytes} from '../plugins/soloco/runtime/snapshot.mjs';
+ import {work} from '../plugins/soloco/runtime/worker.mjs';
+ import {assignmentContext,contextMatches} from '../plugins/soloco/runtime/context.mjs';
+ import {recordReference,currentExtensions,applyContextQualification} from '../plugins/soloco/runtime/current-state.mjs';
+@@ -23,9 +24,9 @@ function home(f,id='home',scope='*',extra={}){return engine.save({...f,id,...(re
+ // publication/closure, public APIs, hashes and SQLite transactions are real.
+ async function review(f,plan,{native='fictional-independent-'+plan,verdict='Pass',hook,action='publish_operating_state',readSources=[]}={}){
+  const queued=engine.dispatch({...f,role:'qa',review_of:plan,task:'Review complete fictional operating meaning, preservation, authority and interactions.'},'codex',{check:()=>({available:true,authenticated:true,version:'contract-double'}),launch:()=>({on(){},unref(){}})});
+- let first=true;const evidence=assignmentContext(read(f),read(f).jobs[queued.id]).qualification_evidence;
++ let first=true;const evidence=(()=>{const c=assignmentContext(read(f),read(f).jobs[queued.id]);return c.qualification_evidence??c.operating_evidence;})();
+  const pendingReads=[...readSources],frozenReads=evidence?Object.values(evidence.sources).flatMap(v=>{const ranges=[];for(let offset=0;offset<v.length;){let length=Math.min(16000,v.length-offset);if(/[\uD800-\uDBFF]/.test(v.raw[offset+length-1]))length--;ranges.push({source_id:v.source_id,sha256:v.sha256,offset,length});offset+=length;}return ranges;}):[];
+- await work(f.root,queued.id,async(_host,_session,prompt,_dir,timeout,_selection,options)=>{if(first){first=false;options.onSpawn(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));}if(frozenReads.length)return {native_id:native,text:JSON.stringify({reads:frozenReads.splice(0,4)})};if(!evidence&&pendingReads.length)return {native_id:native,text:JSON.stringify({reads:pendingReads.splice(0,4).map(id=>({id,sha256:sha(readStateSource(read(f),id)),offset:0,length:JSON.stringify(readStateSource(read(f),id)).length}))})};const target=read(f).records[plan];if(hook)hook();return {native_id:native,text:JSON.stringify({content:'FICTIONAL CONTRACT DOUBLE: complete fixture conditions checked; no native semantic acceptance claimed.',messages:[],notices:[],review:{verdict,reason:'Fictional contract judgment',permitted_action:action,plan_sha256:sha(target.operating_plan??target.context_classification_plan),preservation_complete:true,interaction_complete:true,authority_checked:true,...(action==='apply_context_classification'?{coverage_complete:true,obligations_preserved:true,unique_findings:[]}:{}),blockers:verdict==='Pass'?[]:['fixture unresolved']}})};});
++ await work(f.root,queued.id,async(_host,_session,prompt,_dir,timeout,_selection,options)=>{if(first){first=false;options.onSpawn(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));}if(frozenReads.length)return {native_id:native,text:JSON.stringify({reads:frozenReads.splice(0,evidence.handover.review_context?4:1)})};if(!evidence&&pendingReads.length)return {native_id:native,text:JSON.stringify({reads:pendingReads.splice(0,4).map(id=>({id,sha256:sha(readStateSource(read(f),id)),offset:0,length:JSON.stringify(readStateSource(read(f),id)).length}))})};const target=read(f).records[plan];if(hook)hook();return {native_id:native,text:JSON.stringify({content:'FICTIONAL CONTRACT DOUBLE: complete fixture conditions checked; no native semantic acceptance claimed.',messages:[],notices:[],review:{verdict,reason:'Fictional contract judgment',permitted_action:action,plan_sha256:sha(target.operating_plan??target.context_classification_plan),preservation_complete:true,interaction_complete:true,authority_checked:true,...(action==='apply_context_classification'?{coverage_complete:true,obligations_preserved:true,unique_findings:[]}:{}),blockers:verdict==='Pass'?[]:['fixture unresolved']}})};});
+  const s=read(f),j=s.jobs[queued.id];assert.equal(j.status,'completed',j.error);return {id:j.artifact_id,job:queued.id};
+ }
+ async function publish(f){const p=await ctx(f,{action:'plan'}),r=await review(f,p.id);const result=await ctx(f,{action:'apply',plan_id:p.id,review_id:r.id});assert.equal(result.published,true);return {p,r};}
+@@ -74,6 +75,8 @@ test('public prospective v4 reconstruction requires accepted coverage and exact
+  mutate(f,s=>{s.jobs[q.id].coordination_release.termination_confirmed=false;});assert.throws(()=>engine.control({...f,action:'resume',source_instruction:'resume',expected_epoch:1},'codex'),/QA|DIRTY/);
+  mutate(f,s=>{s.jobs[q.id].coordination_release.termination_confirmed=true;});const accepted=read(f);engine.control({...f,action:'resume',source_instruction:'resume',expected_epoch:1},'codex');assert.equal(read(f).handover.status,'completed');assert.equal(read(f).paused,false);
+  assert.equal(operatingContext(accepted).homes.length,1);
++ const ordinary=engine.dispatch({...f,role:'engineer',task:'First ordinary assignment after accepted resume'},'codex',{check:()=>({available:true}),launch:()=>({on(){},unref(){}})});
++ assert.equal(read(f).jobs[ordinary.id].context_format,6);assert.equal(JSON.parse(assignmentContext(read(f),read(f).jobs[ordinary.id]).text).checkpoint.homes.length,1);
+  for(const mode of ['failed','quarantined','unknown-extension']){
+   const s=structuredClone(accepted),j=structuredClone(s.jobs[q.id]),r=structuredClone(s.records[j.artifact_id]);
+   j.id='handover-sibling';j.artifact_id='handover-sibling-review';r.id=j.artifact_id;r.job_id=j.id;
+@@ -325,3 +328,67 @@ test('runtime closure requires complete delivery and independent source and proo
+    }
+  }
+ });
++
++// The canonical first pass uses PUBLIC represented-v2 plan/worker/apply, not a
++// complete flag injected by this fixture. All semantic judgments remain fictional.
++async function qualifiedRecovered(){
++ const f=fixture();withStore(f.root,db=>db.migrate());
++ mutate(f,s=>{s.upgrade={id:'fictional-recovered',status:'recovered',epoch:1,host:'codex',candidate_hash:'fictional-candidate',recovered_at:'2026-11-06T00:00:00Z',probe_status:'failed',review_status:'failed',error:'Prior continuity QA failed; never retry on old allowance',probe_native_id:'fictional-original-upgrade-producer',probe:{content:'FICTIONAL retained full failed report '+'.'.repeat(240000)},checkpoint:retainSnapshot(s,{raw:'FICTIONAL original failed attempt; unknown effects and zero retries. '+'.'.repeat(260000)})};});
++ home(f,'outcome','*',{kind:'outcome',attempted_action:'Failed fictional upgrade rehearsal',resources:['fictional candidate'],possible_effects:'Preparation may have produced uncertain evidence',uncertainty:'Original failure remains failed; effects unknown',retry_clearing:'Independent reconciliation plus fresh canonical authority; current independent resume_handover gate remains',historical_receipts:['upgrade:fictional-recovered'],evidence_refs:['upgrade:fictional-recovered']});
++ home(f,'permission','*',{kind:'permission',grant_refs:['upgrade:fictional-recovered'],remaining:0,revoked:true,evidence_refs:['upgrade:fictional-recovered']});
++ const p=await publicCall('company_context',{...f,action:'plan',record_ids:['upgrade:fictional-recovered'],disposition:'represented',counterpart_ids:['outcome','permission'],coverage:[{source_id:'upgrade:fictional-recovered',counterpart_ids:['outcome','permission'],findings:'Complete fictional original retained; current independent resume_handover remains required',failures:'Prior QA remains failed; old failure is not resolved',uncertain_effects:'All effects remain unknown pending independent reconciliation',exhausted_allowances:'Zero retries; revoked; fresh canonical authority required'}]},'codex');
++ const r=await review(f,p.id,{action:'apply_context_classification'});
++ assert.equal((await publicCall('company_context',{...f,action:'apply',plan_id:p.id,review_id:r.id},'codex')).applied,true);
++ return f;
++}
++test('public qualified recovered snapshot publishes current typed outcomes without replaying the paid raw archive',async()=>{
++ const f=await qualifiedRecovered(),raw=snapshotBytes(read(f),read(f).upgrade.checkpoint),before=read(f),p=await ctx(f,{action:'plan'});
++ assert.equal(p.held,false);
++ const q=engine.dispatch({...f,role:'qa',review_of:p.id,task:'Inspect full current homes and accepted judgments'},'codex',{check:()=>({available:true}),launch:()=>({on(){},unref(){}})});
++ const pack=JSON.parse(assignmentContext(read(f),read(f).jobs[q.id]).text);
++ assert.ok(pack.required_evidence.accepted_semantics.some(x=>x.source.id==='upgrade:fictional-recovered'));
++ assert.ok(!pack.required_evidence.sources.some(x=>x.id==='upgrade:fictional-recovered'));
++ assert.equal(pack.controls.upgrade.consumed.qa_final,0);assert.equal(pack.controls.upgrade.status,'recovered');
++ assert.ok(JSON.stringify(pack).length<100000);assert.ok(!JSON.stringify(pack).includes('.'.repeat(1000)));
++ await work(f.root,q.id,async(_h,_n,_p,_d,timeout,_s,options)=>{options.onSpawn(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));return {native_id:'fictional-current-publication',text:JSON.stringify({content:'FICTIONAL complete current semantics judgment',messages:[],notices:[],review:{verdict:'Pass',reason:'Fictional complete supplied outcomes and paid preservation judgment',permitted_action:'publish_operating_state',plan_sha256:sha(read(f).records[p.id].operating_plan),preservation_complete:true,interaction_complete:true,authority_checked:true,blockers:[]}})};});
++ const completed=read(f).jobs[q.id];assert.equal(completed.status,'completed',completed.error);
++ assert.equal((await ctx(f,{action:'apply',plan_id:p.id,review_id:completed.artifact_id})).published,true);
++ const job={id:'prospective',role:'engineer',context_format:6,task:'Current only',inputs:[]},body=assignmentContext(read(f),job).text;
++ assert.match(body,/effects unknown/);assert.match(body,/"remaining":0/);assert.match(body,/resume_handover/);
++ assert.equal(snapshotBytes(read(f),read(f).upgrade.checkpoint),raw);
++ await archive(f,1);assert.equal(assignmentContext(read(f),job).text,body);
++ const accepted=read(f);
++ for(const change of [s=>{s.upgrade.error+=' new prohibition';},s=>{s.upgrade.status='checking';},s=>{s.records.outcome.operating_record.uncertainty='changed';},s=>{s.jobs[before.records[before.context_classifications['upgrade:fictional-recovered'].review.id].job_id].native_id='changed';},s=>{s.records.new={id:'new',kind:'artifact',content:'New prohibition'};}]){const s=structuredClone(accepted);change(s);assert.throws(()=>assignmentContext(s,job),/Held|changed|qualification|missing/);}
++});
++test('large prospective publication uses bounded frozen worker delivery and rejects a manufactured complete flag',async()=>{
++ const f=fixture();home(f,'large','*',{conditions:'Complete indivisible fictional current restriction. '.repeat(6500)});
++ const p=await ctx(f,{action:'plan'}),r=await review(f,p.id);
++ const s=read(f),j=s.jobs[r.job],c=assignmentContext(s,j);
++ assert.ok(c.operating_evidence);assert.ok(c.text.length<200000);assert.equal(j.operating_delivery.protocol,'operating-publication-frozen-v1');assert.ok(j.operating_delivery.reads.length>16);
++ const baseline=read(f);
++ for(const change of [s=>{s.jobs[r.job].operating_delivery.reads.pop();},s=>{s.jobs[r.job].operating_delivery.native_id='other';},s=>{s.jobs[r.job].operating_delivery.complete=true;},s=>{s.jobs[r.job].operating_delivery.reads[0].range_sha256='0'.repeat(64);},s=>{s.jobs[r.job].coordination_release.termination_confirmed=false;}]){mutate(f,change);await assert.rejects(ctx(f,{action:'apply',plan_id:p.id,review_id:r.id}));mutate(f,s=>Object.assign(s,structuredClone(baseline)));}
++ assert.equal((await ctx(f,{action:'apply',plan_id:p.id,review_id:r.id})).published,true);
++});
++
++test('frozen publication worker rejects unread semantics, changed native and changed current membership',async()=>{
++ for(const mode of ['unread','native','membership']){
++  const f=fixture();home(f,'large','*',{conditions:'Fictional complete current operative rule. '.repeat(5200)});
++  const p=await ctx(f,{action:'plan'}),q=engine.dispatch({...f,role:'qa',review_of:p.id,task:'Fictional large current review'},'codex',{check:()=>({available:true}),launch:()=>({on(){},unref(){}})});
++  const c=assignmentContext(read(f),read(f).jobs[q.id]),e=c.operating_evidence,v=e.sources[e.pages[0].source_id];let call=0;
++  assert.ok(c.text.length<200000);
++  await work(f.root,q.id,async(_h,native,prompt,_d,timeout,_s,options)=>{
++   call++;options.onSpawn?.(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));assert.ok(prompt.length<=200000);
++   if(call===1&&mode!=='unread')return {native_id:'fictional-frozen-reader',text:JSON.stringify({reads:[{source_id:v.source_id,sha256:v.sha256,offset:0,length:16000}]})};
++   if(mode==='membership')home(f,'new-prohibition');
++   return {native_id:mode==='native'?'different-native':'fictional-frozen-reader',text:JSON.stringify({content:'FICTIONAL unsupported complete claim',messages:[],notices:[],semantic_delivery_complete:true,review:{verdict:'Pass',reason:'Fictional claim must not pass delivery',permitted_action:'publish_operating_state',plan_sha256:sha(read(f).records[p.id].operating_plan),preservation_complete:true,interaction_complete:true,authority_checked:true,blockers:[]}})};
++  });
++  assert.notEqual(read(f).jobs[q.id].status,'completed');
++  await assert.rejects(ctx(f,{action:'apply',plan_id:p.id,review_id:read(f).jobs[q.id].artifact_id??'missing'}));
++  assert.equal(read(f).operating_state,undefined);
++ }
++});
++
++test('paid snapshot archive still requires publication QA independent of nested original producers',async()=>{
++ const f=await qualifiedRecovered(),p=await ctx(f,{action:'plan'}),r=await review(f,p.id,{native:'fictional-original-upgrade-producer'});
++ await assert.rejects(ctx(f,{action:'apply',plan_id:p.id,review_id:r.id}),/reviewer owns current home/);assert.equal(read(f).operating_state,undefined);
++});

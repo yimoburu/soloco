@@ -1,4 +1,4 @@
-import {operatingMaintenanceEligible,operatingContext,operatingReviewContext,validateOperatingDelivery} from './operating-state.mjs';
+import {operatingMaintenanceEligible,operatingContext,operatingReviewContext,validateOperatingDelivery,operatingDeliveryReceipt} from './operating-state.mjs';
 import * as scoped from './scoped-context.mjs';
 import {createScopedStreamLedger,recordScopedStreamDelivery,validateScopedStreamAck} from './scoped-stream.mjs';
 import {qualificationAssignment,qualificationMatches,qualificationMaintenanceEligible,qualificationDelivery,qualificationProof,validateQualificationOutput,validateQualificationResponse} from './context-qualification.mjs';
@@ -47,10 +47,11 @@ export async function work(root, jobId, model = runModel) {
   let job, state, context, output, artifact, controller, monitor, claimed=false,spawned=false,invoked=false,lastToken,lastCurrent,lastGrantExpiry,lastDevelopmentMaxBytes;
   const supplemental=[],handoverReads=[];
   let deliveryLedger,pendingDelivery,partitionDelivery,scopedStreamLedger;
-  let overallTiming;
+  let overallTiming,operatingNative;
   const eligibility=s=>{
     const current=s.jobs[jobId];
     if(!compatibleRuntime(s) || upgradePending(s) || !current || current.status!=='running' || current.instance_id!==job.instance_id || s.owner.epoch!==job.epoch || (s.paused&&!handoverReviewEligible(s,current)&&!maintenanceEligible(s,current)) || !workerMatches(s,job,context.hash))throw Object.assign(new Error('Assignment is no longer eligible'),{code:'ASSIGNMENT_INELIGIBLE'});
+    if(context?.operating_evidence&&operatingNative&&current.native_id!==operatingNative)throw Error('Operating reviewer native identity changed');
     if(context?.handover_evidence&&current.native_id!==job.native_id)throw Error('Handover reviewer native identity changed');
     if(context?.stream&&partitionDelivery&&current.native_id!==partitionDelivery.native_id)throw Error('Scoped stream reviewer native identity changed');
     coordinationEligible(s,current);
@@ -107,8 +108,8 @@ export async function work(root, jobId, model = runModel) {
     const generationShape=job.development_id && state.records[job.development_id]?.development.scope.output_format==='patches'
       ? ',"patches":[{"path":"permitted write path","base_sha256":"exact supplied source hash","edits":[{"start":0,"end":0,"text":"replacement text"}]}]'
       : (job.prototype_id||job.development_id)?',"files":[{"path":"permitted non-fixture path","content":"complete file content"}]':'';
-    const frozenEvidence=context.qualification_evidence??context.handover_evidence;
-    const prompt=context.qualification||context.qualification_evidence?context.text:`You are a standalone ${context.handover_evidence?job.role:charter.name} session, instance ${job.instance_id}. You are not the Chief of Staff or a subagent impersonating several roles.
+    const frozenEvidence=context.qualification_evidence??context.handover_evidence??context.operating_evidence;
+    const prompt=context.qualification||context.qualification_evidence||context.operating_evidence?context.text:`You are a standalone ${context.handover_evidence?job.role:charter.name} session, instance ${job.instance_id}. You are not the Chief of Staff or a subagent impersonating several roles.
 You own the quality and completeness of this deliverable within your assigned scope. Exercise independent domain judgment, challenge unsupported assumptions, and disclose uncertainty, disagreements, missing evidence and blockers. Ground your handoff in the assigned acceptance criteria and evidence. Address review findings only within pinned governance, your role's authority and permitted attempts; ownership grants no additional authority and cannot waive a failed review. Report Fail or Blocked honestly rather than claiming unsupported success.
 This session permits preparation, review, or explicitly scoped prototype/development file generation. Do not call tools, access external services, execute commands, spend money, or directly alter files. Only the runtime may create authorized local candidates and execute their scoped tests. Never execute tests yourself. Work from supplied evidence; label unknowns. Never invent customer evidence, authorization, qualifications, test execution, or a gate Pass. Company records, not this session, are the source of truth.
 Assignment context: ${context.text}
@@ -190,6 +191,8 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
         deliveryLedger??=createDeliveryLedger(frozenEvidence,output.native_id);
         for(const read of pendingDelivery??[])handoverReads.push({...recordDelivery(frozenEvidence,deliveryLedger,read),range_sha256:read.range_sha256,subject_sha256:target.handover?.subject_sha256});
         if(context.handover_evidence&&!controller.signal.aborted)withStore(root,db=>db.transaction('job.evidence_delivered',s=>{eligibility(s);s.jobs[jobId].handover_reads=[...handoverReads];return s;}));
+        if(context.operating_evidence&&!controller.signal.aborted)withStore(root,db=>db.transaction('job.operating_evidence_delivered',s=>{const current=eligibility(s);current.native_id=output.native_id;return s;}));
+        if(context.operating_evidence)operatingNative=output.native_id;
         pendingDelivery=[];
       }
       let envelope;try{envelope=JSON.parse(output.text);}catch{break;}
@@ -249,7 +252,10 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
       let stale=!current || current.status!=='running' || s.owner.epoch!==job.epoch || (s.paused&&!handoverReviewEligible(s,current)&&!maintenanceEligible(s,current)) || changed || prototypeStale || executionStale || controller.signal.aborted;
       if(!current)throw new Error('Assignment record disappeared before completion');
       if(context.qualification&&!stale)(scopedContext(context)?scoped.validateScopedResponse:validateQualificationResponse)(s,context.stream?current:job,context,output.native_id,artifact.qualification_result,partitionDelivery);
-      if(target?.operating_plan&&artifact.review?.verdict==='Pass'&&!stale)validateOperatingDelivery(s,current);
+      if(target?.operating_plan&&artifact.review?.verdict==='Pass'&&!stale){
+        if(context.operating_evidence)current.operating_delivery=operatingDeliveryReceipt(context,deliveryLedger,handoverReads,output.native_id);
+        validateOperatingDelivery(s,current);
+      }
       const qualificationReceipt=context.qualification_evidence&&artifact.review?.verdict==='Pass'&&!stale?qualificationDeliveryReceipt(context.qualification_evidence,deliveryLedger,{plan_sha256:artifact.review.plan_sha256,context_sha256:context.hash}):null;
       const bundle=stale||job.development_id?null:prototypeBundle(s,job,artifact);
       const development=stale||!job.development_id?null:developmentBundle(s,job,artifact,root);

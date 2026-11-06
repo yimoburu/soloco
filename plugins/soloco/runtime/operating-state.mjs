@@ -1,6 +1,7 @@
 // Prospective only. Canonical classifications remain the preservation authority.
 import {producerClosure} from './scoped-context.mjs';
-import {hasSnapshotReferences} from './snapshot.mjs';
+import {hasSnapshotReferences,snapshotReference,snapshotEntryReference,resolveSnapshot,resolveSnapshotEntry,legacyHandoverSource} from './snapshot.mjs';
+import {buildEvidence,readEvidence,validateSemanticDelivery} from './upgrade-evidence.mjs';
 import {digest,id,stamp} from './store.mjs';
 import {reviewedContext,recordReference,contextSource,currentExtensions,proofJobSafe} from './current-state.mjs';
 import {mechanicalOperatingControl} from './operating-control.mjs';
@@ -21,12 +22,42 @@ export function validateOperatingRecord(v){
   if(v.kind==='outcome'&&(!['attempted_action','possible_effects','uncertainty','retry_clearing'].every(k=>text(v[k]))||!list(v.resources)||!v.resources.length||!list(v.historical_receipts)||!v.historical_receipts.length))fail('complete attempted action/resources/effects/uncertainty/retry conditions and historical receipts required');
   return structuredClone(v);
 }
-function controls(s){const {operating_state,...rest}=s;return {company_id:s.id,idea:s.idea,team_sha256:s.team_sha256,governance:s.governance,cos_instructions:s.cos_instructions,roles:s.roles,mode:s.mode,phase:s.phase,upgrade:s.upgrade??null,extensions:currentExtensions(rest)};}
+// A terminal label alone never qualifies an upgrade. Only the existing exact
+// represented-v2 validator may establish this narrow recovered-source boundary.
+function representedCurrent(s,id,projection=reviewedContext(s)){
+  const source=contextSource(s,id);
+  if(!hasSnapshotReferences(source)&&!id.startsWith('upgrade:'))return null;
+  if(id.startsWith('upgrade:')&&source?.status!=='recovered')return null;
+  const c=projection.classifications.get(id),p=s.records?.[c?.plan?.id]?.context_classification_plan;
+  if(c?.disposition!=='represented'||p?.version!==2||c.qualification?.protocol!==2||s.jobs?.[s.records?.[c.review.id]?.job_id]?.context_format!==4||!projection.excluded(id))return null;
+  if(!p.counterparts.every(ref=>{const h=s.records[ref.id];return h?.operating_record&&same(recordReference(h),ref);}))return null;
+  // Check exact vault availability without redelivering accepted bytes. No new
+  // semantic classification is created by this traversal.
+  const todo=[source],seen=new Set(),snapshots=new Set();
+  while(todo.length){const value=todo.pop();if(!value||typeof value!=='object'||seen.has(value))continue;seen.add(value);
+    const legacy=legacyHandoverSource(s,value);if(legacy){todo.push(legacy);continue;}
+    const entry=snapshotEntryReference(value),ref=entry??snapshotReference(value);
+    if(ref){const key=entry?entry.immutable_snapshot.sha256:ref.sha256;if(!snapshots.has(key)){snapshots.add(key);todo.push(entry?resolveSnapshotEntry(s,value):resolveSnapshot(s,value));}continue;}
+    for(const child of Object.values(value))if(child&&typeof child==='object')todo.push(child);
+  }
+  return {c,p};
+}
+function currentUpgrade(s){
+  const u=s.upgrade;if(!u||u.status!=='recovered')return u??null;
+  const accepted=representedCurrent(s,'upgrade:'+u.id);if(!accepted)return u;
+  return {source:recordReference(u,'upgrade:'+u.id),status:u.status,id:u.id,epoch:u.epoch??null,host:u.host??null,candidate_hash:u.candidate_hash??null,recovered_at:u.recovered_at??null,
+    deadline_ms:u.deadline_ms??null,call_timeout_minutes:u.call_timeout_minutes??null,review_window_minutes:u.review_window_minutes??null,review_deadline_policy:u.review_deadline_policy??null,
+    worker:u.worker??null,probe_status:u.probe_status??null,review_status:u.review_status??null,
+    consumed:{cos_pages:u.cos_pages?.length??0,qa_pages:u.qa_pages?.length??0,cos_final:u.probe?1:0,qa_final:u.review?1:0},
+    current_homes:accepted.p.counterparts,rule:'Recovered attempt remains historical evidence. No retry or remaining grant is inferred; all original gates still apply.'};
+}
+function controls(s){const {operating_state,...rest}=s;return {company_id:s.id,idea:s.idea,team_sha256:s.team_sha256,governance:s.governance,cos_instructions:s.cos_instructions,roles:s.roles,mode:s.mode,phase:s.phase,upgrade:currentUpgrade(s),extensions:currentExtensions(rest)};}
 function exact(s,r){const v=contextSource(s,r.id);if(!v||!same(recordReference(v,r.id),r))fail('source/receipt changed: '+r.id);return v;}
 const closed=(v,keys)=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).every(k=>keys.includes(k));
 function reviewJobSafe(j,handover=false){
-  const {handover_reads,...base}=j;
-  if(!proofJobSafe(handover?base:j))return false;
+  const {handover_reads,operating_delivery,...base}=j;
+  if(operating_delivery!==undefined){try{if(handover)return false;validateFrozenOperatingDelivery(j,operating_delivery);}catch{return false;}}
+  if(!proofJobSafe(base))return false;
   if(handover_reads!==undefined&&(!handover||!Array.isArray(handover_reads)||!handover_reads.every(r=>closed(r,['session_id','source_id','sha256','offset','end','total','range_sha256','subject_sha256'])&&Object.values(r).every(v=>typeof v==='string'||Number.isSafeInteger(v)))))return false;
   return j.role==='qa'&&['queued','running','completed'].includes(j.status);
 }
@@ -76,7 +107,7 @@ export function operatingFrontier(s,{plan_id,job_id,consuming=Boolean(s.operatin
     else entries.push({source:recordReference(r),scope:'*',status:'DIRTY',reason:'Unaccepted consequential or unknown record'});
   }
   for(const [key,j] of Object.entries(s.jobs??{})){if(key!==j.id)fail('ambiguous job occurrence');if(key!==job_id&&!b.jobs.has(key)&&!p.proofJobs.has(key)&&!p.excluded('job:'+key))entries.push({source:recordReference(j,'job:'+key),scope:'*',status:'DIRTY',reason:'Execution/outcome needs independent preservation proof'});}
-  for(const u of [...(s.upgrade_history??[]),...(s.upgrade?[s.upgrade]:[])])if(!p.excluded('upgrade:'+u.id))entries.push({source:recordReference(u,'upgrade:'+u.id),scope:'*',status:'DIRTY',reason:'Unknown legacy occurrence context'});
+  for(const u of [...(s.upgrade_history??[]),...(s.upgrade?[s.upgrade]:[])])if((u===s.upgrade&&['queued','checking','ready','applied'].includes(u.status))||!p.excluded('upgrade:'+u.id))entries.push({source:recordReference(u,'upgrade:'+u.id),scope:'*',status:'DIRTY',reason:'Unknown legacy occurrence context'});
   // Communication remains compulsory in full, including missed requirements.
   const communication={notices:s.notices??[],messages:s.messages??[]};
   const extensions=Object.keys(controls(s).extensions);
@@ -89,7 +120,7 @@ export function operatingFrontier(s,{plan_id,job_id,consuming=Boolean(s.operatin
 // reviewedContext validates canonical classifications before their receipts enter
 // this closure; exact parent references are checked rather than re-authored.
 function publicationEvidence(s,homes){
-  const projection=reviewedContext(s),sources=new Map(),classifications=new Map(),homeSources=[];let seen;
+  const projection=reviewedContext(s),sources=new Map(),classifications=new Map(),homeSources=[],accepted_semantics=[];let seen;
   // Follow only fields owned by canonical preservation/provenance schemas.
   // All other metadata remains in the delivered value without becoming an edge.
   const refs=(value,keys)=>{for(const key of keys)for(const ref of [value?.[key]??[]].flat())if(ref)add({id:ref.id,revision:ref.revision,sha256:ref.sha256});};
@@ -124,6 +155,17 @@ function publicationEvidence(s,homes){
     const value=exact(s,ref),prior=sources.get(ref.id);
     if(prior&&!same(prior.source,ref))fail('conflicting evidence reference: '+ref.id);
     if(seen.has(ref.id))return;seen.add(ref.id);
+    const accepted=representedCurrent(s,ref.id,projection);
+    if(accepted){
+      const {c,p}=accepted,plan=exact(s,c.plan),review=exact(s,c.review),job=s.jobs[review.job_id];
+      const proof=[c.source,c.plan,c.review,recordReference(job,'job:'+job.id),...(c.qualification.legacy_dependencies??[])];
+      for(const r of proof){exact(s,r);sources.set(r.id,{source:r,accepted_original:true});seen.add(r.id);}
+      classifications.set(ref.id,c);
+      // Complete accepted semantic judgments and coverage are delivered again;
+      // raw originals and raw frozen proof plans have already been paid once.
+      if(!accepted_semantics.some(x=>x.source.id===ref.id))accepted_semantics.push({source:ref,classification:c,coverage:p.coverage,counterparts:p.counterparts,review,job,exact_originals:proof,retrieval:'company_context read with exact ID/hash; referenced snapshots remain in the immutable vault'});
+      return;
+    }
     // These legacy containers require their existing qualification/streaming
     // path. Delivering only a pointer must never count as complete evidence.
     if(hasSnapshotReferences(value))fail('referenced preservation evidence needs canonical snapshot delivery: '+ref.id);
@@ -138,7 +180,7 @@ function publicationEvidence(s,homes){
     const value=contextSource(s,key);if(!value)fail('provenance source missing: '+key);add(recordReference(value,key));
   }
   homeSources.push({home_id:h.source.id,sources:[...seen].sort().map(id=>sources.get(id).source)});}
-  return {home_sources:homeSources,sources:[...sources.values()].sort((a,b)=>a.source.id.localeCompare(b.source.id)),classifications:[...classifications].sort(([a],[b])=>a.localeCompare(b)).map(([id,value])=>({id,value}))};
+  return {accepted_semantics,home_sources:homeSources,sources:[...sources.values()].sort((a,b)=>a.source.id.localeCompare(b.source.id)),classifications:[...classifications].sort(([a],[b])=>a.localeCompare(b)).map(([id,value])=>({id,value}))};
 }
 function capture(s,plan_id){const f=operatingFrontier(s,{plan_id});const evidence=publicationEvidence(s,f.homes);const provenance=f.homes.map(h=>({home_id:h.source.id,sources:[...new Set([...h.value.operating_record.evidence_refs,...h.value.operating_record.authority_refs,...(h.value.operating_record.grant_refs??[]),...(h.value.operating_record.historical_receipts??[])])].map(key=>recordReference(contextSource(s,key),key))}));return {protocol:OPERATING_PROTOCOL,prior_proofs:s.operating_state?[s.operating_state.receipts,...(s.operating_state.accepted_snapshot.prior_proofs??[])]:[],provenance,required_sources:evidence.sources.map(x=>x.source),home_sources:evidence.home_sources,preservation_classifications:evidence.classifications,owner:{...s.owner},paused:s.paused,controls:controls(s),source_root:f.source_root,homes:f.homes.map(h=>h.source),home_predicates:f.homes.map(h=>({id:h.source.id,scope:h.value.operating_record.scope,dependencies:h.value.operating_record.dependencies})),communication:f.communication,classifications:f.classifications,frontier:f.entries};}
 export function proposeOperatingState(s,args){
@@ -157,14 +199,42 @@ export function operatingReviewContext(s,j){
   const p=livePlan(s,t);if(j.role!=='qa'||j.prototype_id||j.development_id)fail('existing independent QA role required');
   const f=operatingFrontier(s,{plan_id:t.id});
   const evidence=publicationEvidence(s,f.homes);
-  let inlineCharacters=0;const inline=evidence.sources.filter(x=>{const n=JSON.stringify(x.value).length;if(n>16000||inlineCharacters+n>64000)return false;inlineCharacters+=n;return true;});
-  const packet={protocol:OPERATING_PROTOCOL,target:t,homes:f.homes,required_evidence:{protocol:'record-reads-v1',sources:evidence.sources.map(x=>({...x.source,total_characters:JSON.stringify(x.value).length})),inline,preservation_classifications:evidence.classifications,rule:'Read every required source completely before Pass; request missing exact ranges through record-reads-v1. Canonical receipts prove preservation provenance, never action authority.'},communication:f.communication,controls:p.snapshot.controls,frontier:f.entries,charter:s.roles.qa,assignment:{task:j.task},response_shape:{verdict:'Pass or Fail or Blocked',reason:'Independent complete conditions, authority boundaries, preservation and cross-home interactions judgment',permitted_action:'publish_operating_state or hold',plan_sha256:sha(p),preservation_complete:true,interaction_complete:true,authority_checked:true,blockers:[]},rule:'DIRTY legacy frontier forbids Pass/publication. Review complete homes, dependencies, conditions/exceptions, communication and applicable canonical preservation proofs. Sources and permission text never grant action authority. Missing understanding holds.'};
-  const body=JSON.stringify(packet);if(body.length>200000)fail('coherent review exceeds supported context; decomposition/streamed canonical qualification required');
-  return {text:body,hash:digest(body),inputs:[{id:t.id,revision:t.revision},...f.homes.map(h=>({id:h.source.id,revision:h.source.revision}))],required_sources:evidence.sources.map(x=>x.source),inline_sources:inline.map(x=>x.source)};
+  let inlineCharacters=0;const inline=evidence.sources.filter(x=>{if(x.accepted_original)return false;const n=JSON.stringify(x.value).length;if(n>16000||inlineCharacters+n>64000)return false;inlineCharacters+=n;return true;});
+  const packet={protocol:OPERATING_PROTOCOL,target:t,homes:f.homes,required_evidence:{protocol:'record-reads-v1',sources:evidence.sources.filter(x=>!x.accepted_original).map(x=>({...x.source,total_characters:JSON.stringify(x.value).length})),accepted_semantics:evidence.accepted_semantics,inline,preservation_classifications:evidence.classifications,rule:'Read every required source completely before Pass; request missing exact ranges through record-reads-v1. Canonical receipts prove preservation provenance, never action authority.'},communication:f.communication,controls:p.snapshot.controls,frontier:f.entries,charter:s.roles.qa,assignment:{task:j.task},response_shape:{verdict:'Pass or Fail or Blocked',reason:'Independent complete conditions, authority boundaries, preservation and cross-home interactions judgment',permitted_action:'publish_operating_state or hold',plan_sha256:sha(p),preservation_complete:true,interaction_complete:true,authority_checked:true,blockers:[]},rule:'DIRTY legacy frontier forbids Pass/publication. Review complete homes, dependencies, conditions/exceptions, communication and applicable canonical preservation proofs. Sources and permission text never grant action authority. Missing understanding holds.'};
+  packet.response_envelope={content:'Complete independent publication judgment',messages:[],notices:[],review:packet.response_shape};
+  const body=JSON.stringify(packet);
+  if(body.length>200000){
+    // Stream completeness certifies only bytes actually in this packet. Unlike
+    // the small record-read path, all non-accepted provenance bodies must be
+    // embedded before creating the authentic semantic-delivery receipt.
+    packet.required_evidence.inline=evidence.sources.filter(x=>!x.accepted_original);
+    const completeBody=JSON.stringify(packet);
+    const operating_evidence=buildEvidence({publication:packet},[],{wholeBodyAliases:false,checkpointContinuity:true});
+    const stream=operating_evidence.sources[operating_evidence.pages[0].source_id];
+    const head=JSON.stringify({protocol:'operating-publication-frozen-v1',plan_sha256:sha(p),body_sha256:digest(completeBody),required_semantics:{source_id:stream.source_id,sha256:stream.sha256,length:stream.length},range_limit:32768,rule:'Read the ENTIRE fixed publication contract on this same independent native before Pass. Return only reads with source_id, sha256, offset, length (at most four ranges). No fixed round count; original execution deadline applies. Missing understanding requires Blocked. Final response uses the complete publication response_envelope, with response_shape fields nested inside review. Hashes and model booleans never prove delivery.'});
+    return {text:head,hash:digest(head),operating_evidence,initial_delivery:[],inputs:[{id:t.id,revision:t.revision},...f.homes.map(h=>({id:h.source.id,revision:h.source.revision}))],required_sources:evidence.sources.filter(x=>!x.accepted_original).map(x=>x.source),inline_sources:[],frozen_packet:packet};
+  }
+  return {text:body,hash:digest(body),inputs:[{id:t.id,revision:t.revision},...f.homes.map(h=>({id:h.source.id,revision:h.source.revision}))],required_sources:evidence.sources.filter(x=>!x.accepted_original).map(x=>x.source),inline_sources:inline.map(x=>x.source)};
+}
+function validateFrozenOperatingDelivery(j,d,context){
+  if(!closed(d,['protocol','native_id','context_sha256','stream_sha256','reads'])||d.protocol!=='operating-publication-frozen-v1'||d.native_id!==j.native_id||d.context_sha256!==j.context_sha256||!Array.isArray(d.reads)||!d.reads.length)fail('invalid frozen publication receipt');
+  let end=0;const source=context?.operating_evidence?.sources[context.operating_evidence.pages[0].source_id];
+  for(const r of d.reads){
+    if(!closed(r,['source_id','sha256','offset','end','total','range_sha256'])||r.sha256!==d.stream_sha256||!Number.isSafeInteger(r.offset)||!Number.isSafeInteger(r.end)||!Number.isSafeInteger(r.total)||r.offset<0||r.offset>end||r.end<=r.offset||r.end-r.offset>32768||r.end>r.total||!/^[a-f0-9]{64}$/.test(r.range_sha256))fail('invalid frozen publication range');
+    if(source){const read=readEvidence(context.operating_evidence,{source_id:r.source_id,sha256:r.sha256,offset:r.offset,length:r.end-r.offset});if(read.range_sha256!==r.range_sha256||r.total!==source.length)fail('changed frozen publication range');}
+    end=Math.max(end,r.end);
+  }
+  if(end!==d.reads[0].total||source&&(end!==source.length||d.stream_sha256!==source.sha256))fail('required publication semantics not completely delivered');
+}
+export function operatingDeliveryReceipt(context,ledger,reads,native){
+  validateSemanticDelivery(context.operating_evidence,ledger);
+  const stream=context.operating_evidence.sources[context.operating_evidence.pages[0].source_id];
+  return {protocol:'operating-publication-frozen-v1',native_id:native,context_sha256:context.hash,stream_sha256:stream.sha256,reads:reads.filter(r=>r.source_id===stream.source_id).map(({source_id,sha256,offset,end,total,range_sha256})=>({source_id,sha256,offset,end,total,range_sha256}))};
 }
 export function validateOperatingDelivery(s,j){
   const context=operatingReviewContext(s,j);
   if(!context||j.context_sha256!==context.hash)fail('publication delivery context changed');
+  if(context.operating_evidence){validateFrozenOperatingDelivery(j,j.operating_delivery,context);return true;}
   for(const ref of context.required_sources){
     exact(s,ref);
     if(context.inline_sources.some(x=>same(x,ref)))continue;
@@ -177,12 +247,23 @@ export function validateOperatingDelivery(s,j){
   }
   return true;
 }
+function ownsOriginal(s,value,j){
+  const todo=[value],seen=new Set(),snapshots=new Set();
+  while(todo.length){const v=todo.pop();if(!v||typeof v!=='object'||seen.has(v))continue;seen.add(v);
+    const legacy=legacyHandoverSource(s,v);if(legacy){todo.push(legacy);continue;}
+    const entry=snapshotEntryReference(v),ref=entry??snapshotReference(v);
+    if(ref){const key=entry?entry.immutable_snapshot.sha256:ref.sha256;if(!snapshots.has(key)){snapshots.add(key);todo.push(entry?resolveSnapshotEntry(s,v):resolveSnapshot(s,v));}continue;}
+    if(v.job_id&&s.jobs[v.job_id])todo.push(s.jobs[v.job_id]);
+    for(const [k,x] of Object.entries(v)){if(['author_instance','recorded_by','session_id','native_id','instance_id','probe_native_id','reviewer_native_id'].includes(k)&&[j.native_id,j.instance_id].includes(x))return true;if(x&&typeof x==='object')todo.push(x);}
+  }
+  return false;
+}
 export function publishOperatingState(s,{plan_id,review_id}){
   const target=s.records[plan_id],p=livePlan(s,target),r=s.records[review_id],j=s.jobs[r?.job_id],v=r?.review;
   if(p.snapshot.frontier.length)fail('legacy frontier coverage incomplete: '+p.snapshot.frontier.length+' DIRTY entries');
   if(!r||r.status!=='Submitted'||r.author_role!=='qa'||r.review_of?.id!==target.id||r.review_of.revision!==target.revision||j?.status!=='completed'||j.role!=='qa'||j.epoch!==s.owner.epoch||j.artifact_id!==r.id||j.review_of?.id!==target.id||j.review_of.revision!==target.revision||!j.native_id||r.author_instance!==j.instance_id||[target.author_instance,s.owner.session_id].includes(j.native_id)||r.author_instance===target.author_instance||j.coordination_release?.termination_confirmed!==true||j.context_sha256!==operatingReviewContext(s,j).hash||v?.verdict!=='Pass'||v.permitted_action!=='publish_operating_state'||v.plan_sha256!==sha(p)||v.preservation_complete!==true||v.interaction_complete!==true||v.authority_checked!==true||!Array.isArray(v.blockers)||v.blockers.length)fail('exact independent current-source publication Pass and execution closure required');
   validateOperatingDelivery(s,j);
-  for(const h of [...p.snapshot.homes,...p.snapshot.required_sources]){const source=exact(s,h);if([source.author_instance,source.native_id,source.instance_id,s.jobs[source.job_id]?.native_id].some(x=>x&&(x===j.native_id||x===j.instance_id)))fail('reviewer owns current home');}
+  for(const h of [...p.snapshot.homes,...p.snapshot.required_sources]){const source=exact(s,h);if(ownsOriginal(s,source,j))fail('reviewer owns current home');}
   if(Object.values(s.records).some(x=>x.status==='Submitted'&&x.review_of?.id===target.id&&x.review_of.revision===target.revision&&['Fail','Blocked'].includes(x.review?.verdict)))fail('unresolved negative publication review');
   const receipts=[recordReference(target),recordReference(r),recordReference(j,'job:'+j.id)];
   s.operating_state={protocol:OPERATING_PROTOCOL,version:1,plan:receipts[0],review:receipts[1],receipts,accepted_snapshot:structuredClone(p.snapshot),valid_until:p.valid_until,at:stamp()};
