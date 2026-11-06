@@ -23,8 +23,8 @@ assert.equal(extract.status,0,'Could not extract immutable published runtime');
 const legacy=await import(pathToFileURL(path.join(legacyDir,'plugins/soloco/runtime/engine.mjs')));
 const state=a=>withStore(a.root,db=>db.read());
 
-test('bounded-handover producer fences actual 0.6.10, 0.6.11 and 0.6.12 writers without adopting definitions',()=>{
- for(const [version,revision] of [['0.6.10','056c36e'],['0.6.11','b2e3974'],['0.6.12','964f90c']]) {
+test('bounded-handover producer fences actual 0.6.10, 0.6.11, 0.6.12 and 0.6.13 writers without adopting definitions',()=>{
+ for(const [version,revision] of [['0.6.10','056c36e'],['0.6.11','b2e3974'],['0.6.12','964f90c'],['0.6.13','76d3e8d']]) {
   const archived=spawnSync('git',['archive',revision,'plugins/soloco'],{cwd:repo,maxBuffer:20000000});
   assert.equal(archived.status,0);
   const dir=path.join(base,'producer-'+version);fs.mkdirSync(dir);

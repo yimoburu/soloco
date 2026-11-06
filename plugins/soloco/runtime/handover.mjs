@@ -1,5 +1,6 @@
 import {buildEvidence,readEvidence} from './upgrade-evidence.mjs';
 import { digest, id, requireText, stamp } from './store.mjs';
+import {jobExecutionTiming} from './timeout.mjs';
 
 // Ordinary coordinator replacement is separate from team-definition adoption.
 // No new summary is authoritative: both reconstruction and QA see these exact
@@ -110,6 +111,21 @@ export function handoverReviewEligible(state,job) {
     target.handover.subject_sha256===handoverHash(state)&&digest(JSON.stringify(target.handover.subject))===target.handover.subject_sha256&&
     target.handover.incoming_owner.epoch===state.owner.epoch&&target.author_instance===state.owner.session_id);
 }
+export function freshHandoverReviewEligible(state,args) {
+  const key=args.review_of?.id??args.review_of,target=state.records?.[key];
+  return handoverReviewEligible(state,args)&&target?.handover?.evidence_protocol===2
+    &&!Object.values(state.jobs??{}).some(j=>j.review_of?.id===key)
+    &&!state.sessions?.[`qa:review:${key}:${target.revision}`];
+}
+function completedWithinReviewWindow(job,artifact) {
+  if(job.handover_review_window_minutes===undefined&&job.handover_review_reason===undefined)return true;
+  try {
+    const expected=jobExecutionTiming(job.execution_started_at,job),start=Date.parse(expected.execution_started_at),end=Date.parse(expected.execution_deadline_at);
+    const finished=Date.parse(job.finished_at),published=Date.parse(artifact.created_at);
+    return job.execution_deadline_at===expected.execution_deadline_at&&job.termination_deadline_at===expected.termination_deadline_at
+      &&start<=published&&published<=finished&&finished<end;
+  }catch{return false;}
+}
 export function verifyHandoverAcceptance(state) {
   const h=state.handover;if(!h||h.status==='completed')return null;
   const target=state.records[h.reconstruction_id];
@@ -119,7 +135,7 @@ export function verifyHandoverAcceptance(state) {
   const review=candidates.find(r=>{
     const j=state.jobs[r.job_id],v=r.review;
     return r.status==='Submitted'&&r.author_role==='qa'&&r.review_of.revision===target.revision&&
-      j?.status==='completed'&&j.epoch===state.owner.epoch&&j.artifact_id===r.id&&j.review_of?.id===target.id&&j.review_of.revision===target.revision&&
+      j?.status==='completed'&&completedWithinReviewWindow(j,r)&&j.epoch===state.owner.epoch&&j.artifact_id===r.id&&j.review_of?.id===target.id&&j.review_of.revision===target.revision&&
       r.author_instance===j.instance_id&&j.native_id&&j.native_id!==target.author_instance&&r.author_instance!==target.author_instance&&
       (target.handover.evidence_protocol!==2||handoverReviewContext(state,j).hash===j.context_sha256)&&
       (target.handover.evidence_protocol!==2||(r.handover_evidence?.semantic_delivery_complete===true&&r.handover_evidence?.subject_sha256===target.handover.subject_sha256&&r.handover_evidence.reconstruction_sha256===digest(JSON.stringify(target))&&r.handover_evidence.native_id===j.native_id))&&
@@ -141,7 +157,7 @@ export function handoverReviewContext(state,job) {
   let evidence,initial_delivery;
   if(bounded){
     const {upgrade_history,upgrade,...current}=target.handover.subject;
-    evidence=buildEvidence(current,[...upgrade_history,...(upgrade?[upgrade]:[])],{wholeBodyAliases:false,checkpointContinuity:true,retainedHandoverRecords:state.records,reviewContext:{charter:state.roles[job.role],assignment:{...(job.coordination?{coordination:job.coordination}:{}),task:job.task,model_selection:job.model_selection??{mode:'default'},supplemental_sources:job.supplemental_sources??[]},prior_reviews}});
+    evidence=buildEvidence(current,[...upgrade_history,...(upgrade?[upgrade]:[])],{wholeBodyAliases:false,checkpointContinuity:true,retainedHandoverRecords:state.records,reviewContext:{charter:state.roles[job.role],assignment:{...(job.coordination?{coordination:job.coordination}:{}),task:job.task,...(job.handover_review_window_minutes?{handover_review_window_minutes:job.handover_review_window_minutes,handover_review_reason:job.handover_review_reason}:{}),model_selection:job.model_selection??{mode:'default'},supplemental_sources:job.supplemental_sources??[]},prior_reviews}});
     // Bounded previews are entry points, never a replacement for compulsory reads.
     initial_delivery=evidence.handover.checkpoint.filter(f=>['idea','name','governance','cos_instructions','roles','owner','notices'].includes(f.key)).map(f=>{
       const source=evidence.sources[f.source.source_id];
@@ -155,7 +171,7 @@ export function handoverReviewContext(state,job) {
   const registry=bounded?Object.values(evidence.sources).find(s=>s.kind==='source-index'):null;
   const ref=s=>({source_id:s.source_id,sha256:s.sha256,length:s.length,scope:s.scope,path:s.path});
   const pack={protocol:bounded?'ordinary-handover-review-v2':'ordinary-handover-review-v1',
-    ...(bounded?{review_context:ref(Object.values(evidence.sources).find(s=>s.kind==='review-context'))}:{charter:state.roles[job.role],assignment:{task:job.task,model_selection:job.model_selection??{mode:'default'},...(job.coordination?{coordination:job.coordination}:{})},prior_reviews}),
+    ...(bounded?{review_context:ref(Object.values(evidence.sources).find(s=>s.kind==='review-context'))}:{charter:state.roles[job.role],assignment:{task:job.task,...(job.handover_review_window_minutes?{handover_review_window_minutes:job.handover_review_window_minutes,handover_review_reason:job.handover_review_reason}:{}),model_selection:job.model_selection??{mode:'default'},...(job.coordination?{coordination:job.coordination}:{})},prior_reviews}),
     reconstruction:{id:target.id,revision:target.revision,author_instance:target.author_instance,content:target.content,subject_sha256:target.handover.subject_sha256},
     frozen_subject:bounded?{required_semantics:ref(stream),registry:{source:ref(registry),length:registry.length},entry_points:initial_delivery}:target.handover.subject,
     ...(bounded?{preservation:{subject_sha256:target.handover.subject_sha256,upgrade_history_sha256:digest(JSON.stringify(target.handover.subject.upgrade_history)),source_scopes:{checkpoint:'Frozen subject fields except upgrade and upgrade_history',history:'History indices 0..upgrade_history.length-1 map to /upgrade_history/<index>; final index maps to /upgrade when present',upgrade_history_length:target.handover.subject.upgrade_history.length,current_upgrade:Boolean(target.handover.subject.upgrade)}},evidence_protocol:{reads:'Return only {"reads":[{"source_id":"known frozen source","sha256":"exact source hash","offset":0,"length":16000}]}',range_limit:32768,ranges:'Half-open UTF-16; never split a surrogate pair. At most four ranges per request. Runtime execution deadline remains binding. If escaping exceeds the packet budget, only a prefix of requested ranges is delivered; request deferred ranges again.',citations:initial_delivery.map(({source_id,sha256,revision,offset,length,range_sha256})=>({source_id,sha256,...(revision!==undefined?{revision}:{}),offset,length,range_sha256})),rule:'Read the ENTIRE required_semantics source before Pass. All distinct semantic material is compulsory, including current objectives, pinned definitions, authority, unresolved notices, unknown legacy restrictions, old failures and dissent regardless of status/classification. Entry points are bounded previews; their total lengths show what remains to stream. same_as and repeated indexes prove exact equality with earlier compulsory projections, never resolution. The bounded-readable registry locates every original and its exact length; it is not embedded here. Payload originals are independently retrievable. Inventory/hash equality proves preservation only. Derivatives grant no authority. Final artifact requires nonempty citations copied from delivered ranges. Pass is rejected until every required semantic range has been delivered to this native session; Blocked may report incomplete delivery.'}}:{})};

@@ -12,7 +12,7 @@ import { developmentAssignment, developmentBundle, developmentPrompt } from './d
 import { developmentLimits } from './development-limits.mjs';
 import { prototypeAssignment, prototypeBundle, prototypePrompt } from './prototype.mjs';
 import { coordinationEligible } from './coordination.mjs';
-import { TIMEOUT_POLICY_VERSION, normalizeTimeout, executionTiming, jobTimeoutState } from './timeout.mjs';
+import { TIMEOUT_POLICY_VERSION, normalizeTimeout, executionTiming, jobExecutionTiming, jobTimeoutState } from './timeout.mjs';
 
 function validateEnvelope(artifact,roles) {
   for(const name of ['messages','notices'])if(artifact[name]!==undefined&&!Array.isArray(artifact[name]))throw new Error(`${name} must be an array`);
@@ -38,6 +38,7 @@ export async function work(root, jobId, model = runModel) {
   let job, state, context, output, artifact, controller, monitor, spawned=false,invoked=false,lastToken,lastCurrent,lastGrantExpiry,lastDevelopmentMaxBytes;
   const supplemental=[],handoverReads=[];
   let deliveryLedger,pendingDelivery;
+  let overallTiming;
   const eligibility=s=>{
     const current=s.jobs[jobId];
     if(!compatibleRuntime(s) || upgradePending(s) || !current || current.status!=='running' || current.instance_id!==job.instance_id || s.owner.epoch!==job.epoch || (s.paused&&!handoverReviewEligible(s,current)) || !contextMatches(s,job,context.hash))throw Object.assign(new Error('Assignment is no longer eligible'),{code:'ASSIGNMENT_INELIGIBLE'});
@@ -45,6 +46,8 @@ export async function work(root, jobId, model = runModel) {
     coordinationEligible(s,current);
     prototypeAssignment(s,job);developmentAssignment(s,job,false,root);
     if(current.timeout_policy_version!==job.timeout_policy_version || current.timeout_ms!==job.timeout_ms || current.timeout_reason!==job.timeout_reason)throw Object.assign(new Error('Recorded timeout settings changed'),{code:'ASSIGNMENT_INELIGIBLE'});
+    if(current.handover_review_window_minutes!==job.handover_review_window_minutes||current.handover_review_reason!==job.handover_review_reason)throw Object.assign(new Error('Recorded handover review window changed'),{code:'ASSIGNMENT_INELIGIBLE'});
+    if(job.handover_review_window_minutes&&overallTiming&&['execution_started_at','execution_deadline_at','termination_deadline_at'].some(k=>current[k]!==overallTiming[k]))throw Object.assign(new Error('Recorded execution timing changed'),{code:'ASSIGNMENT_INELIGIBLE'});
     const timing=jobTimeoutState(current,Date.now());
     if(['inspection','overdue','terminating'].includes(timing.state))throw Object.assign(new Error(timing.state==='inspection'?'Assignment timing requires inspection: '+timing.reason:`Assignment ${timing.phase} deadline reached`),{code:timing.state==='inspection'?'INVALID_EXECUTION_TIMING':timing.phase==='execution'?'ROLE_TIMEOUT':'STARTUP_TIMEOUT'});
     for(const ref of supplemental)if(digest(JSON.stringify(contextSource(s,ref.id)))!==ref.sha256)throw Error('Supplemental evidence changed');
@@ -110,29 +113,33 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
     if(controller.signal.aborted)throw controller.signal.reason;
     try {
       let session=job.native_id,request=prompt;
-      const handoverDeadline=context.handover_evidence?Date.now()+timeout.timeout_ms:null;
+      const handoverDeadline=context.handover_evidence?Date.now()+(job.handover_review_window_minutes?job.handover_review_window_minutes*60000:timeout.timeout_ms):null;
       pendingDelivery=context.initial_delivery;
       for(let round=0;context.handover_evidence||round<=16;round++){
-      const remaining=lastCurrent?.execution_deadline_at?Math.min(timeout.timeout_ms,Date.parse(lastCurrent.execution_deadline_at)-Date.now()):handoverDeadline?handoverDeadline-Date.now():timeout.timeout_ms;
+      const remaining=lastCurrent?.execution_deadline_at?Math.min(timeout.timeout_ms,Date.parse(lastCurrent.execution_deadline_at)-Date.now()):handoverDeadline?Math.min(timeout.timeout_ms,handoverDeadline-Date.now()):timeout.timeout_ms;
       if(remaining<1000)throw Error('Insufficient execution time for supplemental read');
       if(context.handover_evidence&&request.length>200000)throw Error('Handover request exceeds 200000 characters; nothing was truncated');
+      let callTiming;
       invoked=true;
       // A prior read round proves only that earlier process closed. Failure of
       // this invocation still needs its own termination evidence for release.
       output=undefined;
       output=await model(job.host,session,request,dir,remaining,job.model_selection??null,{
         signal:controller.signal,timeoutReason:timeout.timeout_reason,maxOutputCharacters:Math.max(2000000,contextBudgetForJob(state,job)),
-        onSpawn:round===0?timing=>{
+        onSpawn:(job.handover_review_window_minutes||round===0)?timing=>{
           if(controller.signal.aborted)throw controller.signal.reason;
-          if(spawned)throw new Error('Duplicate execution spawn callback');
-          const recorded=executionTiming(timing?.execution_started_at,timeout);
+          if(callTiming)throw new Error('Duplicate execution spawn callback');
+          const recorded=executionTiming(timing?.execution_started_at,{...timeout,timeout_ms:remaining});
           if(timing?.timeout_policy_version!==TIMEOUT_POLICY_VERSION || timing.execution_deadline_at!==recorded.execution_deadline_at || timing.timeout_ms!==recorded.timeout_ms)throw new Error('Invalid adapter spawn timing');
+          callTiming=recorded;
+          if(spawned){if(!job.handover_review_window_minutes)throw Error('Duplicate execution spawn callback');withStore(root,db=>eligibility(db.read()));return;}
           withStore(root,db=>db.transaction('job.execution_started',s=>{
             const current=eligibility(s);
             if(current.execution_started_at!=null || current.execution_deadline_at!=null)throw new Error('Execution timing already recorded');
             // Legacy injected models may omit this callback. A real callback upgrades
             // their timing to the same explicit policy used by new dispatches.
-            Object.assign(current,recorded);
+            overallTiming=jobExecutionTiming(timing.execution_started_at,{...job,...timeout,timeout_policy_version:TIMEOUT_POLICY_VERSION});
+            Object.assign(current,overallTiming);
             return s;
           }));
           spawned=true;
@@ -140,6 +147,7 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
           if(job.timeout_policy_version===undefined)Object.assign(job,{timeout_policy_version:TIMEOUT_POLICY_VERSION,...timeout});
         }:undefined
       });
+      if(job.handover_review_window_minutes&&(!callTiming||Date.now()>=Date.parse(callTiming.execution_deadline_at)))throw Object.assign(new Error(callTiming?'Native invocation deadline reached':'Adapter omitted actual invocation timing'),{code:'ROLE_TIMEOUT'});
       check();
       if(session&&session!==output.native_id)throw Error('Supplemental read changed native identity');
       if(context.handover_evidence){

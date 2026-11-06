@@ -52,6 +52,31 @@ export function executionTiming(spawnedAt, settings = {}, context) {
   };
 }
 
+// An explicitly selected fresh streamed handover may need several bounded
+// invocations. This never changes the per-invocation timeout or an old job.
+export function normalizeHandoverReviewWindow(input = {}) {
+  const minutes=input.handover_review_window_minutes,reason=input.handover_review_reason;
+  if(minutes===undefined&&reason===undefined)return null;
+  if(![30,45].includes(minutes))throw Error('Choose a fresh handover review window of 30 or 45 minutes');
+  if(typeof reason!=='string'||!reason.trim()||reason.length>300)throw Error('Handover review reason must be nonempty and at most 300 characters');
+  return {handover_review_window_minutes:minutes,handover_review_reason:reason.trim()};
+}
+
+function jobReviewWindow(job) {
+  const window=normalizeHandoverReviewWindow(job);
+  if(window&&(job.timeout_policy_version!==TIMEOUT_POLICY_VERSION||job.role!=='qa'||typeof job.review_of?.id!=='string'||job.prototype_id||job.development_id))throw Error('Review window requires a fresh ordinary handover QA job');
+  if(window&&job.handover_review_reason!==window.handover_review_reason)throw Error('Noncanonical recorded handover review reason');
+  return window;
+}
+
+export function jobExecutionTiming(spawnedAt,job) {
+  const timing=executionTiming(spawnedAt,{timeout_ms:job.timeout_ms,timeout_reason:job.timeout_reason});
+  const window=jobReviewWindow(job);
+  if(!window)return timing;
+  const deadline=add(instant(spawnedAt,'execution start'),window.handover_review_window_minutes*60000);
+  return {...timing,execution_deadline_at:new Date(deadline).toISOString(),termination_deadline_at:new Date(add(deadline,TERMINATION_GRACE_MS)).toISOString()};
+}
+
 // A deadline is exclusive: completion at the deadline is already too late.
 export function deadlinePhase(deadlineAt, now) {
   const deadline = instant(deadlineAt, 'deadline');
@@ -80,19 +105,22 @@ export function jobTimeoutState(job, now) {
     if (legacy && (job.execution_started_at != null || job.execution_deadline_at != null)) return inspect('Execution timing lacks a policy version');
     if (!legacy && job.timeout_ms === undefined) return inspect('Missing recorded execution timeout');
     const policy = legacy ? normalizeTimeout() : normalizeTimeout({timeout_ms: job.timeout_ms, timeout_reason: job.timeout_reason});
+    const window=jobReviewWindow(job);
     let phase, start, deadline;
     if (!legacy && job.execution_started_at != null) {
       if (job.status !== 'running') return inspect('Execution timing on a queued job');
       phase = 'execution';
       start = instant(job.execution_started_at, 'execution start');
-      deadline = add(start, policy.timeout_ms);
+      deadline = add(start, window?window.handover_review_window_minutes*60000:policy.timeout_ms);
       if (instant(job.execution_deadline_at, 'recorded execution deadline') !== deadline) return inspect('Execution deadline disagrees with recorded policy');
+      if(window&&instant(job.termination_deadline_at,'recorded termination deadline')!==add(deadline,TERMINATION_GRACE_MS))return inspect('Termination deadline disagrees with recorded review window');
     } else if (legacy && job.status === 'running') {
       phase = 'execution';
       start = instant(job.started_at, 'legacy worker start');
       deadline = add(start, DEFAULT_EXECUTION_TIMEOUT_MS);
     } else {
       if (!legacy && job.execution_deadline_at != null) return inspect('Execution deadline without an execution start');
+      if(window&&job.termination_deadline_at!=null)return inspect('Termination deadline without an execution start');
       phase = job.status === 'queued' ? 'queue' : 'startup';
       start = instant(phase === 'queue' ? job.created_at : job.started_at, `${phase} start`);
       deadline = add(start, STARTUP_TIMEOUT_MS);
@@ -104,6 +132,7 @@ export function jobTimeoutState(job, now) {
       state, phase, legacy,
       timeout_ms: policy.timeout_ms,
       timeout_reason: policy.timeout_reason,
+      ...(window?window:{}),
       deadline_at: new Date(deadline).toISOString(),
       reconciliation_deadline_at: new Date(effectiveDeadline).toISOString(),
       termination_confirmed: false
