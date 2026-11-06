@@ -6,7 +6,7 @@ import path from 'node:path';
 import {pathToFileURL,fileURLToPath} from 'node:url';
 import {performance} from 'node:perf_hooks';
 import {
-  QUALIFICATION_PROTOCOL as protocol,QUALIFICATION_LIMITS as limits,QualificationHold,
+  QUALIFICATION_PROTOCOL as protocol,QUALIFICATION_LIMITS as limits,QUALIFICATION_PROFILES,QUALIFICATION_PROFILE,qualificationLimits,qualificationWorkload,validateQualificationOutput,QualificationHold,
   qualificationReference as ref,createQualificationPlan,validateQualificationPlan,
   createQualificationTarget,qualificationAssignment,qualificationMatches,
   qualificationDelivery,qualificationProof,validateQualificationEnvelope,validateQualificationResponse,
@@ -17,6 +17,7 @@ import {contextPlan,validateContextPlan,contextRead,governingRecords} from '../p
 import {assignmentContext} from '../plugins/soloco/runtime/context.mjs';
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
 import {work} from '../plugins/soloco/runtime/worker.mjs';
+import {buildEvidence} from '../plugins/soloco/runtime/upgrade-evidence.mjs';
 import {TIMEOUT_POLICY_VERSION,normalizeTimeout,executionTiming} from '../plugins/soloco/runtime/timeout.mjs';
 const sha=v=>digest(JSON.stringify(v)),size=v=>Buffer.byteLength(typeof v==='string'?v:JSON.stringify(v));
 const clone=structuredClone;
@@ -43,9 +44,9 @@ function result(a,{empty=false,verdict='Pass'}={}){
   return r;
 }
 const unitResult=result;
-function workflow(content,{empty=false,current,measure=false,setup,review,dependency_ids=[]}={}){
+function workflow(content,{empty=false,current,measure=false,setup,review,dependency_ids=[],profile}={}){
   const s=seed(content);if(current!==undefined)s.records.current.content=current;if(setup)setup(s);
-  const start=performance.now(),p=plan(s,{dependency_ids}),proofs=new Map(),packets=[];
+  const start=performance.now(),p=plan(s,{dependency_ids,...(profile?{profile}:{})}),proofs=new Map(),packets=[];
   const run=args=>{const j=queue(s,p,args),a=qualificationAssignment(s,j);packets.push({kind:a.packet.kind,bytes:size(a.text)});if(process.env.QUALIFICATION_MEASURE&&packets.length%64===0)process.stderr.write('contract progress '+packets.length+'\n');const value=result(a,{empty}),r=complete(s,j,a,review?review(value,a):value);return {j,a,r};};
   for(const u of p.context_partition_plan.units)proofs.set(u.id,run({unit_id:u.id}).r);
   for(const n of p.context_partition_plan.nodes)proofs.set(n.id,run({node_id:n.id,child_review_ids:n.children.map(id=>proofs.get(id).id)}).r);
@@ -385,7 +386,7 @@ test('complete multi-million unknown semantic workflow converges with every rece
   t.diagnostic(JSON.stringify({label:'contract double multi-million COMPLETE workflow; not native QA',source_utf16:text.length,...f.metrics}));
 });
 const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-qualification-'));test.after(()=>fs.rmSync(tmp,{recursive:true,force:true}));
-function runtimeFixture(content){const root=fs.mkdtempSync(path.join(tmp,'worker-')),session_id=id('founder');process.env.COMPANY_PLUGIN_DATA=path.join(tmp,'cache');engine.bind(root,session_id,'codex');engine.open({root,session_id,epoch:1,idea:'Synthetic partition qualification'},'codex');withStore(root,db=>db.migrate());withStore(root,db=>db.transaction('fixture',s=>{s.governance=seed().governance;s.cos_instructions='No additional authority.';s.roles=seed().roles;s.records.old=seed(content).records.old;s.records.current=seed().records.current;plan(s);return s;}));return root;}
+function runtimeFixture(content,profile){const root=fs.mkdtempSync(path.join(tmp,'worker-')),session_id=id('founder');process.env.COMPANY_PLUGIN_DATA=path.join(tmp,'cache');engine.bind(root,session_id,'codex');engine.open({root,session_id,epoch:1,idea:'Synthetic partition qualification'},'codex');withStore(root,db=>db.migrate());withStore(root,db=>db.transaction('fixture',s=>{s.governance=seed().governance;s.cos_instructions='No additional authority.';s.roles=seed().roles;s.records.old=seed(content).records.old;s.records.current=seed().records.current;plan(s,profile?{profile}:{});return s;}));return root;}
 function runtimeQueue(root,args){let jobId;withStore(root,db=>db.transaction('fixture.queue',s=>{const j=queue(s,s.records.plan,args);j.context_sha256=qualificationAssignment(s,j).hash;jobId=j.id;return s;}));return jobId;}
 function output(r){return {content:r.reason,messages:[],notices:[],review:{verdict:r.verdict,reason:r.reason,permitted_action:r.permitted_action},qualification_result:r};}
 const hiddenMarker='UNIQUE_NEGATIVE_NEVER_RETRY_THE_EXHAUSTED_ALLOWANCE';
@@ -643,4 +644,83 @@ test('ordinary format 3 preserves typed job and upgrade homes without replaying 
   const rejected=clone(f.s);rejected.jobs.unknownFailure={id:'unknownFailure',rejected_output:{qualification_negative:'Blocked',text:'incomplete'}};assert.throws(()=>validateQualificationExclusion(rejected,f.proof),/unscoped|unknown/);
   f.s.records.domainFail={id:'domainFail',kind:'review',revision:1,status:'Submitted',review_of:{id:'domainOutput',revision:1},review:{verdict:'Fail',reason:'Exact dependency output is incomplete.'}};
   assert.throws(()=>validateQualificationExclusion(f.s,f.proof),/negative/);
+});
+
+const large=QUALIFICATION_PROFILES[QUALIFICATION_PROFILE];
+test('fresh large profile accepts dense structured extraction; exact output and raw max+1 remain hard holds',()=>{
+ const s=seed(),p=plan(s,{profile:QUALIFICATION_PROFILE}),{j,a}=first(s,p),r=result(a);
+ r.items=Array.from({length:24},(_,i)=>({...r.items[0],id:'finding-'+i,text:('Condition '+i+' never authorizes retry; allowance exhausted. ').repeat(10)}));
+ const v=output(r),raw=JSON.stringify(v);assert.ok(size(raw)>12000&&size(raw)<large.output_bytes);
+ validateQualificationOutput(raw,p.context_partition_plan);validateQualificationResponse(s,j,a,'fresh-dense-native',r);
+ assert.throws(()=>validateQualificationOutput(raw),/review-envelope/);
+ // Pad a structured finding, never an omitted output channel, to the exact cap.
+ v.qualification_result.items[0].text+='x'.repeat(large.output_bytes-size(v));
+ assert.equal(size(v),large.output_bytes);validateQualificationOutput(JSON.stringify(v),p.context_partition_plan);
+ v.qualification_result.items[0].text+='x';assert.throws(()=>validateQualificationOutput(JSON.stringify(v),p.context_partition_plan),e=>e.held.actual_bytes===large.output_bytes+1);
+ const small=JSON.stringify(output(result(a))),wire=small+' '.repeat(large.output_wire_bytes-size(small));
+ assert.equal(size(wire),large.output_wire_bytes);validateQualificationOutput(wire,p.context_partition_plan);
+ assert.throws(()=>validateQualificationOutput(wire+' ',p.context_partition_plan),e=>e.held.actual_bytes===large.output_wire_bytes+1);
+});
+
+test('fresh profile immutable binding, exact input max+1, authority fences and failed-job preservation',()=>{
+ const s=seed(),p=plan(s,{profile:QUALIFICATION_PROFILE}),{j,a}=first(s,p),old=clone(s);
+ for(const mutate of [x=>x.records.plan.context_partition_plan.limits={...large,input_bytes:large.input_bytes+1},x=>delete x.records.plan.context_partition_plan.profile,x=>x.records.plan.context_partition_plan.partitioner='framed-byte-tree-v1',x=>x.records.old.content+=' changed',x=>x.records.current.content+=' changed',x=>x.owner.epoch++,x=>x.paused=true,x=>x.governance+=' changed']){const x=clone(old);mutate(x);assert.equal(qualificationMatches(x,x.jobs[j.id],a.hash),false);}
+ assert.throws(()=>createQualificationPlan(s,{source_id:'old',profile:'caller-limits',limits:large}),/unsupported/);
+ const legacy=seed(),lp=plan(legacy),prior=clone(lp.context_partition_plan);lp.context_partition_plan.profile=QUALIFICATION_PROFILE;assert.throws(()=>validateQualificationPlan(legacy,lp.context_partition_plan),/legacy/);lp.context_partition_plan=prior;
+ legacy.jobs.failed={id:'failed',status:'failed',rejected_output:{text:'original failure'},execution_failure:{code:'ROLE_ABORTED'}};
+ const before=JSON.stringify(legacy.jobs.failed);createQualificationPlan(legacy,{source_id:'old',profile:QUALIFICATION_PROFILE});assert.equal(JSON.stringify(legacy.jobs.failed),before);assert.deepEqual(lp.context_partition_plan,prior);
+ // Oversized exact target framing must hold before dispatch, even with tiny evidence.
+ const t=s.records[j.review_of.id],original=t.id;delete s.records[original];
+ t.id='t'.repeat(original.length+large.input_bytes-size(a.text));s.records[t.id]=t;j.review_of.id=t.id;
+ const max=qualificationAssignment(s,j);assert.equal(size(max.text),large.input_bytes);
+ delete s.records[t.id];t.id+='t';s.records[t.id]=t;j.review_of.id=t.id;
+ assert.throws(()=>qualificationAssignment(s,j),e=>e.held.actual_bytes===large.input_bytes+1);
+});
+
+test('same complete negative-bearing fictional audit reduces sessions by at least four times with exact retrieval',t=>{
+ const text=('Fictional unknown effect; failed allowance remains exhausted; NEVER execute. 😀漢字\n').repeat(2400);
+ const setup=s=>{s.records.old.unknown_condition={unless:'owner explicitly authorizes',failure:'prior attempt failed',allowance:0};for(let i=0;i<6;i++)s.records['home'+i]={id:'home'+i,kind:'decision',revision:1,content:('Current home '+i+': no retry, no spending, all unknown conditions bind.\n').repeat(220)};};
+ const framed=JSON.stringify({files:[{path:'fictional-audit.txt',content:text}]});
+ const before=workflow(framed,{setup}),after=workflow(framed,{setup,profile:QUALIFICATION_PROFILE});
+ assert.ok(before.metrics.sessions>=after.metrics.sessions*4,JSON.stringify([before.metrics,after.metrics]));
+ for(const f of [before,after]){
+  assert.equal(qualificationOriginal(f.s,{source_id:'old'}).raw,JSON.stringify(f.s.records.old));
+  const e=buildEvidence({records:{old:f.s.records.old}},[],{wholeBodyAliases:false,checkpointContinuity:true,snapshotState:f.s});
+  const payload=Object.values(e.sources).find(v=>v.kind==='payload'&&v.raw===text);
+  assert.ok(payload,'exact typed payload must remain retrievable');
+  if(payload){let raw='';for(let offset=0;offset<text.length;){const part=qualificationReadEvidence(f.s,{plan_id:'plan',source_id:payload.source_id,sha256:payload.sha256,offset,length:Math.min(8000,text.length-offset)}).evidence;raw+=part.text;offset+=part.length;}assert.equal(raw,text);}
+  assert.deepEqual(validateQualificationExclusion(f.s,f.proof),f.proof);
+ }
+ assert.ok(after.p.context_partition_plan.nodes.some(n=>n.children.length===4));
+ t.diagnostic(JSON.stringify({fixture_utf16:text.length,before:before.metrics,after:after.metrics}));
+});
+
+test('four maximum child envelopes hold for density before launch; fitting merge retains complete support',()=>{
+ for(const maximal of [true,false]){
+  const s=seed('Bound unknown effects. '.repeat(7000)),p=plan(s,{profile:QUALIFICATION_PROFILE}),node=p.context_partition_plan.nodes.find(n=>n.children.length===4),reviews=[];
+  assert.ok(node);
+  for(const id of node.children){const j=queue(s,p,{unit_id:id}),a=qualificationAssignment(s,j),r=result(a);r.items[0].text+='x'.repeat((maximal?large.output_bytes:8000)-size(output(r)));validateQualificationOutput(JSON.stringify(output(r)),p.context_partition_plan);reviews.push(complete(s,j,a,r));}
+  const j=queue(s,p,{node_id:node.id,child_review_ids:reviews.map(r=>r.id)});
+  if(maximal){assert.throws(()=>qualificationAssignment(s,j),e=>e.held.boundary==='reconciliation-output-density');continue;}
+  const a=qualificationAssignment(s,j);assert.equal(a.packet.children.length,4);assert.ok(size(a.text)<large.input_bytes);
+  const r=result(a);validateQualificationResponse(s,j,a,'large-parent-native',r);
+  r.items[0].supports=[];assert.throws(()=>validateQualificationResponse(s,j,a,'large-parent-native',r),/preserved child/);
+ }
+ const f=workflow('Never retry.',{profile:QUALIFICATION_PROFILE});
+ const incomplete=clone(f.r.qualification_result);incomplete.mappings=[];assert.throws(()=>validateQualificationResponse(f.s,f.j,f.a,f.j.native_id,incomplete),/historical mappings/);
+ const bad=clone(f.s);bad.records[f.proofs.values().next().value.id].qualification_result.items[0].kind='contradiction';assert.throws(()=>validateQualificationApply(bad,{aggregate_review_id:f.r.id}),/hold:/);
+});
+
+test('actual sibling failure notice invalidates running assignment and retains eligibility-loss abort cause',async()=>{
+ const root=runtimeFixture('Fictional never retry. '.repeat(1800),QUALIFICATION_PROFILE),s=withStore(root,db=>db.read()),units=s.records.plan.context_partition_plan.units;
+ const sibling=runtimeQueue(root,{unit_id:units[0].id}),running=runtimeQueue(root,{unit_id:units[1].id});let launched=0;
+ await work(root,running,async(h,native,wire,dir,remaining,selection,options)=>{
+  launched++;options.onSpawn(executionTiming(Date.now(),{timeout_ms:remaining,timeout_reason:options.timeoutReason}));
+  await work(root,sibling,async(h,n,w,d,r,sel,o)=>{o.onSpawn(executionTiming(Date.now(),{timeout_ms:r,timeout_reason:o.timeoutReason}));throw Object.assign(Error('Fictional sibling envelope overflow'),{code:'FIXTURE_OVERFLOW',termination_confirmed:true});});
+  const changed=withStore(root,db=>db.read());assert.equal(changed.jobs[sibling].status,'failed');assert.ok(changed.notices.some(n=>n.source_id===sibling||JSON.stringify(n).includes(sibling)));
+  await new Promise(resolve=>{const timer=setTimeout(resolve,2500);options.signal.addEventListener('abort',()=>{clearTimeout(timer);resolve();},{once:true});});
+  assert.equal(options.signal.reason?.code,'ASSIGNMENT_INELIGIBLE');
+  throw Object.assign(Error('Adapter reports local process cancellation'),{code:'ROLE_ABORTED',termination_confirmed:true});
+ });
+ const after=withStore(root,db=>db.read()),j=after.jobs[running];assert.equal(launched,1);assert.equal(j.execution_failure.outcome,'eligibility_loss');assert.equal(j.execution_failure.abort.code,'ASSIGNMENT_INELIGIBLE');assert.equal(j.execution_failure.code,'ASSIGNMENT_INELIGIBLE');assert.equal(j.execution_failure.adapter_failure.code,'ROLE_ABORTED');assert.equal(after.jobs[sibling].execution_failure.code,'FIXTURE_OVERFLOW');assert.equal(after.context_classifications?.old,undefined);assert.ok(after.notices.length>=2);
 });

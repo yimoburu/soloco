@@ -1,7 +1,7 @@
 import { currentView, upgradeView, publicPage, exactRead, mutationView, sourceReference, itemView, controlView, storageSourceId, fits, exactTextRead } from './public-response.mjs';
 import {backupCompany,restoreCompany} from './storage-transfer.mjs';
 import {contextPlan,validateContextPlan,recordReference,contextSource} from './current-state.mjs';
-import {captureQualificationPlan,createQualificationTarget,qualificationPlanView,qualificationReadUnit,qualificationReadEvidence,validateQualificationApply,qualificationMaintenanceEligible,qualificationControlHash,QualificationHold} from './context-qualification.mjs';
+import {captureQualificationPlan,createQualificationTarget,qualificationPlanView,qualificationReadUnit,qualificationReadEvidence,validateQualificationApply,qualificationMaintenanceEligible,qualificationControlHash,qualificationWorkload,QualificationHold} from './context-qualification.mjs';
 import {inheritSnapshots,retainSnapshot,resolveSnapshotEntry,snapshotReference,snapshotBytes} from './snapshot.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -402,6 +402,7 @@ function readPublicExact(db,args){return db.readSnapshot(()=>{
 // Explicit operations only. Neither API is called automatically on an existing company.
 export function contextControl(args,host) {
   binding(args,host);
+  if(args.profile!==undefined&&(args.action!=='plan'||!args.source_id))throw Error('Qualification profile selects fresh source plans only; existing plans cannot be extended');
   if(args.action==='inspect'&&args.plan_id)return withStore(args.root,db=>qualificationPlanView(db.read(),args));
   if(args.action==='read'&&args.snapshot)return withStore(args.root,db=>{
     const s=db.readSelected({rootKeys:[],entities:{}}),ref=snapshotReference(args.snapshot),offset=args.offset??0;
@@ -477,7 +478,7 @@ function qualificationControl(args,host){
         context_originals:{source:originals.find(r=>r.source.id===plan.source.id).snapshot,subject:retainSnapshot(s,plan.reviewed_subject),inputs:originals},context_units:units,
         ...(args.maintenance===true?{context_maintenance:{readonly:true,owner:{...s.owner},controls_sha256:qualificationControlHash(s),source_instruction:args.source_instruction,at:stamp()}}:{}),source_reference:args.source_instruction,created_at:stamp()};
       if(record.context_originals.source.immutable_snapshot.sha256!==original.sha256)throw Error('Qualification original capture differs');
-      s.records[key]=record;result={id:key,source:recordReference(record),protocol:plan.protocol,total_units:plan.units.length,total_nodes:plan.nodes.length,roots:plan.roots,original:record.context_originals.source,subject:record.context_originals.subject,maintenance:args.maintenance===true,retrieval:'company_context inspect plan_id with section units/nodes; read snapshot or exact plan source'};
+      s.records[key]=record;result={id:key,source:recordReference(record),protocol:plan.protocol,...qualificationWorkload(plan),roots:plan.roots,original:record.context_originals.source,subject:record.context_originals.subject,maintenance:args.maintenance===true,retrieval:'company_context inspect plan_id with section units/nodes; read snapshot or exact plan source'};
     }else if(args.action==='target'){
       const target=createQualificationTarget(s,args),key=id('context-target');
       s.records[key]={id:key,kind:'qualification_target',revision:1,status:'Draft',author_role:'runner',author_instance:args.session_id,context_qualification_target:target,source_reference:args.source_instruction,created_at:stamp()};

@@ -1,4 +1,4 @@
-import {qualificationAssignment,qualificationMatches,qualificationMaintenanceEligible,qualificationDelivery,qualificationProof,validateQualificationOutput,validateQualificationResponse,QUALIFICATION_LIMITS} from './context-qualification.mjs';
+import {qualificationAssignment,qualificationMatches,qualificationMaintenanceEligible,qualificationDelivery,qualificationProof,validateQualificationOutput,validateQualificationResponse} from './context-qualification.mjs';
 import {createDeliveryLedger,recordDelivery,readEvidence,validateCitations,validateSemanticDelivery} from './upgrade-evidence.mjs';
 import {contextRead,contextSource} from './current-state.mjs';
 import fs from 'node:fs';
@@ -123,7 +123,7 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
       for(let round=0;context.handover_evidence||round<=16;round++){
       const remaining=lastCurrent?.execution_deadline_at?Math.min(timeout.timeout_ms,Date.parse(lastCurrent.execution_deadline_at)-Date.now()):handoverDeadline?Math.min(timeout.timeout_ms,handoverDeadline-Date.now()):timeout.timeout_ms;
       if(remaining<1000)throw Error('Insufficient execution time for supplemental read');
-      if(context.qualification&&Buffer.byteLength(request,'utf8')>QUALIFICATION_LIMITS.input_bytes)throw Error('Partition qualification request overflow; nothing was truncated');
+      if(context.qualification&&Buffer.byteLength(request,'utf8')>context.qualification.limits.input_bytes)throw Error('Partition qualification request overflow; nothing was truncated');
       if(context.handover_evidence&&request.length>200000)throw Error('Handover request exceeds 200000 characters; nothing was truncated');
       let callTiming;
       const callRequestedAt=Date.now();
@@ -132,7 +132,7 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
       // this invocation still needs its own termination evidence for release.
       output=undefined;
       output=await model(job.host,session,request,dir,remaining,job.model_selection??null,{
-        signal:controller.signal,timeoutReason:timeout.timeout_reason,maxOutputCharacters:context.qualification?100000:Math.max(2000000,contextBudgetForJob(state,job)),
+        signal:controller.signal,timeoutReason:timeout.timeout_reason,maxOutputCharacters:context.qualification?(context.packet.profile?context.qualification.limits.output_wire_bytes*6+16384:100000):Math.max(2000000,contextBudgetForJob(state,job)),
         ...(job.handover_review_window_minutes&&overallTiming?{executionDeadlineAt:Date.parse(overallTiming.execution_deadline_at)}:{}),
         onSpawn:(job.handover_review_window_minutes||round===0)?timing=>{
           if(controller.signal.aborted)throw controller.signal.reason;
@@ -206,7 +206,7 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
     artifact=context.qualification?JSON.parse(output.text):parseArtifact(output.text);
     validateEnvelope(artifact,state.roles);
     if(context.qualification){
-      validateQualificationOutput(output.text);
+      validateQualificationOutput(output.text,state.records[context.qualification.plan.id].context_partition_plan);
       validateQualificationResponse(state,job,context,output.native_id,artifact.qualification_result);
     }
     if(context.handover_evidence){
@@ -231,7 +231,7 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
       s.records[artifactId]={id:artifactId,kind:target?'review':'artifact',content:artifact.content,author_role:job.role,author_instance:job.instance_id,revision:1,status:stale?'Quarantined':'Submitted',job_id:job.id,inputs:job.inputs,...(supplemental.length?{retrieved_inputs:[...supplemental]}:{}),review_of:job.review_of,review:artifact.review??null,...(context.qualification?{qualification_result:artifact.qualification_result}:{}),...(context.handover_evidence?{handover_evidence:{semantic_delivery_complete:artifact.review?.verdict==='Pass'&&!controller.signal.aborted,subject_sha256:target.handover.subject_sha256,reconstruction_sha256:digest(JSON.stringify(target)),native_id:output.native_id,citations:artifact.citations,reads:handoverReads}}:{}),...(bundle?{prototype:bundle}:{}),...(development?{development}:{}),...(stale && artifact.files?{quarantined_files:artifact.files}:{}),...(stale && artifact.patches?{quarantined_patches:artifact.patches}:{}),created_at:stamp()};
       current.coordination_release={termination_confirmed:true,reason:'model_process_closed',at:stamp()};
       current.status=stale?'quarantined':'completed';current.artifact_id=artifactId;current.finished_at=stamp();current.native_id=output.native_id;
-      if(controller.signal.aborted)current.execution_failure={...failureEvidence(controller.signal.reason),outcome:'cancelled_or_timed_out',at:stamp()};
+      if(controller.signal.aborted)current.execution_failure={...failureEvidence(controller.signal.reason),outcome:controller.signal.reason?.code==='ASSIGNMENT_INELIGIBLE'?'eligibility_loss':'cancelled_or_timed_out',at:stamp()};
       current.model_evidence=output.model_evidence??{reported_models:[],reported_effort:null,verification:'unverified',source:'not_reported',scope:'unknown'};
       if(context.qualification){s.records[artifactId].qualification_output=output.text;s.records[artifactId].qualification_proof=qualificationProof(partitionDelivery,current);}
       if(stale) {notice(s,'must_know','A late or stale result was quarantined; it grants no approval.',artifactId);return s;}
@@ -260,17 +260,17 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
         if(!invoked || output || error.termination_confirmed===true)current.coordination_release={termination_confirmed:true,reason:invoked?'model_process_closed':'model_not_invoked',at:stamp()};
         const cause=controller?.signal.aborted?controller.signal.reason:error;
         const evidence=failureEvidence(error),reason=failureEvidence(cause);
-        current.execution_failure={...evidence,outcome:/TIMEOUT/.test(reason.code??evidence.code??'')?'timeout':controller?.signal.aborted?'cancellation':'failure',at:stamp(),...(controller?.signal.aborted?{abort:reason}:{})};
+        current.execution_failure={...evidence,...(reason.code==='ASSIGNMENT_INELIGIBLE'?{...reason,adapter_failure:evidence}:{}),outcome:/TIMEOUT/.test(reason.code??evidence.code??'')?'timeout':reason.code==='ASSIGNMENT_INELIGIBLE'?'eligibility_loss':controller?.signal.aborted?'cancellation':'failure',at:stamp(),...(controller?.signal.aborted?{abort:reason}:{})};
       }
       if(current && ['queued','running'].includes(current.status)) {
-        current.status='failed';current.error=error.message;if(error.held)current.qualification_hold=error.held;current.finished_at=stamp();
+        current.status='failed';current.error=current.execution_failure?.outcome==='eligibility_loss'?current.execution_failure.message:error.message;if(error.held)current.qualification_hold=error.held;current.finished_at=stamp();
         if(output?.native_id)current.native_id=output.native_id;
         if(output?.model_evidence)current.model_evidence=output.model_evidence;
         if(artifact || context?.qualification&&typeof output?.text==='string') {
           const rejected=context?.qualification?output.text:JSON.stringify(artifact);
-          current.rejected_output={...(context?.qualification?{qualification_plan:context.qualification.plan,qualification_target:context.qualification.target,qualification_negative:['Fail','Blocked'].find(v=>[artifact?.review?.verdict,artifact?.qualification_result?.verdict].includes(v))??null}:{}),text:rejected.slice(0,100000),truncated:rejected.length>100000,author_instance:job.instance_id,context_sha256:context?.hash,reason:error.message};
+          current.rejected_output={...(context?.qualification?{qualification_plan:context.qualification.plan,qualification_target:context.qualification.target,qualification_negative:['Fail','Blocked'].find(v=>[artifact?.review?.verdict,artifact?.qualification_result?.verdict].includes(v))??null}:{}),text:rejected.slice(0,context?.packet?.profile?context.qualification.limits.output_wire_bytes:100000),truncated:rejected.length>(context?.packet?.profile?context.qualification.limits.output_wire_bytes:100000),author_instance:job.instance_id,context_sha256:context?.hash,reason:current.error};
         }
-        notice(s,'must_know',`Specialist ${current.role} could not finish: ${error.message}`,jobId);
+        notice(s,'must_know',`Specialist ${current.role} could not finish: ${current.error}`,jobId);
       }
       return s;
     }));

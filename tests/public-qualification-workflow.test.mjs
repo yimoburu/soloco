@@ -107,3 +107,46 @@ test('public qualification originals and payload ranges adapt to escaped reply b
   throw Error('range fixture complete');
  }}),/range fixture complete/);
 });
+
+test('public fresh profile binds immutable capsule, persists dense worker results and still requires independent handover',async()=>{
+ await assert.rejects(runFictionalQualification({directory:directory(),afterPlan:async({root,base,plan:legacy,host})=>{
+  const old=withStore(root,db=>JSON.stringify(db.read().records[legacy.id]));
+  const plan=await call('company_context',{...base,action:'plan',source_id:'old',counterpart_ids:['home'],profile:'large-v2',maintenance:true,source_instruction:'Authorize only fresh fictional bounded read-only QA.'},host);
+  assert.equal(plan.profile,'large-v2');assert.equal(plan.total_sessions,plan.total_units+plan.total_nodes+1);assert.equal(plan.limits.output_bytes,48000);
+  assert.equal(withStore(root,db=>JSON.stringify(db.read().records[legacy.id])),old);
+  await assert.rejects(call('company_context',{...base,action:'target',plan_id:legacy.id,unit_id:'historical-0',profile:'large-v2',source_instruction:'Cannot extend old plan.'},host),/fresh source plans only/);
+  const state=withStore(root,db=>db.read()),p=state.records[plan.id].context_partition_plan;
+  assert.ok(state.records[plan.id].context_units.immutable_snapshot);assert.deepEqual(p.limits,plan.limits);
+  const proofs=new Map();
+  const run=async args=>{
+   const target=await call('company_context',{...base,action:'target',plan_id:plan.id,...args,source_instruction:'Exact fictional fresh profile review.'},host);
+   const j=engine.dispatch({...base,role:'qa',task:'Fictional bounded review.',review_of:target.id},host,{check,launch});
+   await work(root,j.id,async(h,native,wire,dir,remaining,selection,options)=>{
+    options.onSpawn(executionTiming(Date.now(),{timeout_ms:remaining,timeout_reason:options.timeoutReason}));
+    const r=contractResult(JSON.parse(wire));
+    if(r.kind==='unit')r.items=r.items.flatMap(item=>Array.from({length:24},(_,i)=>({...item,id:'dense-'+i,text:item.text.repeat(10)})));
+    let text=JSON.stringify({content:r.reason,messages:[],notices:[],review:{verdict:r.verdict,reason:r.reason,permitted_action:r.permitted_action},qualification_result:r});
+    if(r.kind==='unit'){
+     assert.ok(Buffer.byteLength(text)>12000&&Buffer.byteLength(text)<48000);
+     text+='\n'.repeat(128000-Buffer.byteLength(text));
+     const wrapped=JSON.stringify({type:'item.completed',item:{type:'agent_message',text}})+'\n';
+     assert.ok(wrapped.length>128001,'Native JSONL quoting exceeds the raw response length');
+     assert.ok(options.maxOutputCharacters>=wrapped.length,'Adapter transport must carry a valid full raw response');
+    }
+    return {native_id:'fresh-profile-'+j.id,text};
+   });
+   const after=withStore(root,db=>db.read()).jobs[j.id];assert.equal(after.status,'completed',after.error);return after.artifact_id;
+  };
+  for(const u of p.units)proofs.set(u.id,await run({unit_id:u.id}));
+  for(const n of p.nodes)proofs.set(n.id,await run({node_id:n.id,child_review_ids:n.children.map(id=>proofs.get(id))}));
+  const aggregate=await run({root_review_ids:[proofs.get(p.roots.historical),proofs.get(p.roots.current)]});
+  await call('company_context',{...base,action:'apply',aggregate_review_id:aggregate,source_instruction:'Preservation only; no handover approval.'},host);
+  const applied=withStore(root,db=>db.read());assert.equal(applied.paused,true);validateQualificationExclusion(applied,applied.context_classifications.old.partition_qualification);
+  const incoming={...base,session_id:'fictional-incoming-profile-owner',epoch:2};
+  engine.bind(root,incoming.session_id,host);
+  engine.control({...incoming,action:'handover',expected_epoch:1,source_instruction:'Continue fictional company in replacement coordinator.'},host);
+  engine.handover({...incoming,action:'submit',content:'Recover fictional objectives, exact rules, held work and uncertainty from current company records. This classification proof does not establish independent handover acceptance. No external authority is granted.'},host);
+  assert.throws(()=>engine.control({...incoming,action:'resume',expected_epoch:2,source_instruction:'Cannot use extraction as handover QA.'},host),/Independent exact-state handover QA Pass/);
+  throw Error('fresh profile public fixture complete');
+ }}),/fresh profile public fixture complete/);
+});
