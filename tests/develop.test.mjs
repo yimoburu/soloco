@@ -10,6 +10,8 @@ import * as engine from '../plugins/soloco/runtime/engine.mjs';
 import { developmentAssignment, developmentCapability } from '../plugins/soloco/runtime/develop.mjs';
 import { sandboxCapability } from '../plugins/soloco/runtime/local-sandbox.mjs';
 import { assignmentContext, contextMatches } from '../plugins/soloco/runtime/context.mjs';
+import {captureScopedPlan,scopedPlanView} from '../plugins/soloco/runtime/scoped-context.mjs';
+import {resolveSnapshot,inheritSnapshots} from '../plugins/soloco/runtime/snapshot.mjs';
 import { recordReference } from '../plugins/soloco/runtime/current-state.mjs';
 import { work } from '../plugins/soloco/runtime/worker.mjs';
 import { call } from '../plugins/soloco/runtime/main.mjs';
@@ -586,4 +588,26 @@ test('post-execution input tampering holds the receipt while retaining actual ex
  assert.ok(fs.existsSync(marker),'actual isolated test started');fs.chmodSync(path.join(directory,'sum.mjs'),0o600);fs.writeFileSync(path.join(directory,'sum.mjs'),'changed by authorized host fixture');
  const ended=await waitJob(a,job.id),result=ended.receipt.development.result;
  assert.equal(result.status,'failed');assert.equal(result.tests_executed,true);assert.match(result.error,/changed|mismatch/);assert.equal(ended.receipt.development.validation_fingerprint,undefined);
+});
+
+
+// Actual sandbox/controller-produced runtime receipt; generation alone uses the
+// existing explicit model double. No invented runtime receipt or producer job.
+test('scoped extraction binds actual development test controller, candidate and native producer closure',live,async()=>{
+  const a=setup(),p=await plan(a);await authorize(a,p);const c=await generate(a,p),receipt=await run(a,p,c),state=read(a);
+  assert.equal(receipt.job_id,undefined);assert.equal(receipt.author_instance,state.jobs[receipt.author_instance].id);
+  assert.equal(receipt.development.result.tests_executed,true);assert.equal(receipt.development.result.status,'passed');
+  const scoped=captureScopedPlan(state,{source_id:receipt.id}),capsule=resolveSnapshot(state,scoped.capsule),key='scoped-runtime-plan';state.records[key]={id:key,scoped_context_plan:scoped};
+  assert.equal(capsule.producer.id,'job:'+receipt.author_instance);
+  assert.ok(capsule.producer_closure.some(r=>r.id==='job:'+c.job_id));assert.ok(capsule.producer_closure.some(r=>r.id===c.id));
+  assert.ok(scopedPlanView(state,{plan_id:key}).total_units>0);
+  const unrelated=inheritSnapshots(state,structuredClone(state));unrelated.notices.push({id:'unrelated',summary:'Current unrelated notice.'});
+  assert.equal(captureScopedPlan(unrelated,{source_id:receipt.id}).extraction_identity,scoped.extraction_identity);
+  for(const change of [
+    s=>s.jobs[receipt.author_instance].status='failed',s=>s.jobs[receipt.author_instance].artifact_id='other',
+    s=>s.records[c.id].development.run.receipt_id='other',s=>s.jobs[c.job_id].native_id='other',
+    s=>s.jobs[c.job_id].coordination_release.termination_confirmed=false,
+    s=>s.jobs[receipt.author_instance].execution_failure={outcome:'unknown'},s=>s.records[p.id].development.revoked={at:'later'}
+  ]){const copy=inheritSnapshots(state,structuredClone(state));change(copy);assert.throws(()=>scopedPlanView(copy,{plan_id:key}),/Scoped context hold/);}
+  const broken=inheritSnapshots(state,structuredClone(state));delete broken.jobs[receipt.author_instance];assert.throws(()=>captureScopedPlan(broken,{source_id:receipt.id}),/source missing/);
 });

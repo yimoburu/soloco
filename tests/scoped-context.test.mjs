@@ -21,12 +21,12 @@ const mutate=(f,fn)=>withStore(f.root,db=>db.transaction('contract.fixture',s=>{
 const read=f=>withStore(f.root,db=>db.read());
 const call=(f,args)=>engine.contextControl({...f,...args},'codex');
 const token=(domain,n,status='OPEN')=>`OBL~${domain}~${String(n).padStart(3,'0')}~CUSTOMER_${n}_NO_EXPORT_ABOVE_${17*n+3}_ROWS_UNTIL_CONSENT_${n%7}_IN_REGION_${n%11}~${status}~END`;
-function fixture({count=1,domains=1,extra={},maintenance=false}={}){
+function fixture({count=1,domains=1,extra={},maintenance=false,kind='artifact',homeKind='artifact'}={}){
   const root=fs.mkdtempSync(path.join(tmp,'company-')),session_id=id('owner'),f={root,session_id,epoch:1,source_instruction:'Explicit fixture instruction: qualify exact source read-only, preserve all failed evidence and OPEN uncertainty.'};
   engine.bind(root,session_id,'codex');engine.open({...f,idea:'Source-only contract fixture'},'codex');withStore(root,db=>db.migrate());
   const clauses=Array.from({length:count},(_,n)=>token('D'+String(Math.min(domains-1,Math.floor(n*domains/count))).padStart(2,'0'),n));
-  mutate(f,s=>{s.roles={qa:{name:'Independent QA'},engineer:{name:'Engineer'}};s.governance='Preparation only. No execution or renewed allowance.';s.cos_instructions='Preserve uncertain effects and exhausted allowances.';s.records.old={id:'old',kind:'artifact',revision:1,author_instance:'historical-producer',content:'Historical evidence grants no current permission.',clauses,...extra};if(maintenance)s.paused=true;s.team_sha256=teamHash(s);});
-  for(let d=0;d<domains;d++){const domain='D'+String(d).padStart(2,'0');engine.save({...f,id:'home-'+domain,kind:'artifact',content:clauses.filter((_,n)=>Math.min(domains-1,Math.floor(n*domains/count))===d).join('\n')||'No additional obligation.',context_obligations:{version:1,scope:domain}},'codex');}
+  mutate(f,s=>{s.roles={qa:{name:'Independent QA'},engineer:{name:'Engineer'}};s.governance='Preparation only. No execution or renewed allowance.';s.cos_instructions='Preserve uncertain effects and exhausted allowances.';s.records.old={id:'old',kind,revision:1,author_instance:'historical-producer',content:'Historical evidence grants no current permission.',clauses,...extra};if(maintenance)s.paused=true;s.team_sha256=teamHash(s);});
+  for(let d=0;d<domains;d++){const domain='D'+String(d).padStart(2,'0');engine.save({...f,id:'home-'+domain,kind:homeKind,content:clauses.filter((_,n)=>Math.min(domains-1,Math.floor(n*domains/count))===d).join('\n')||'No additional obligation.',context_obligations:{version:1,scope:domain}},'codex');}
   const p=call(f,{action:'plan',protocol,source_id:'old',maintenance});f.plan_id=p.id;f.original=p.original;f.units=p.units;f.all_units=call(f,{action:'inspect',plan_id:p.id,limit:16});f.extraction_identity=p.extraction_identity;f.clauses=clauses;return f;
 }
 function unitPages(f){const units=[];let offset=0;do{const page=call(f,{action:'inspect',plan_id:f.plan_id,offset,limit:16});units.push(...page.units);offset=page.next_offset;}while(offset!==null);return units;}
@@ -42,6 +42,7 @@ function contractReview(p){
       const pos=f.range.delivered_start+m.index;if(pos<f.range.start||pos>=f.range.end)continue;
       items.push({id:'o'+m[2],kind:m[3]==='OPEN'?'uncertain_effect':'obligation',text:m[0],scope:m[1],provenance:f.range,interfaces:[]});
     }
+    for(const m of f.text.matchAll(/NEGATIVE~(D\d\d)~NO_RETRY_WHILE_OPEN~END/g)){const pos=f.range.delivered_start+m.index;if(pos>=f.range.start&&pos<f.range.end)items.push({id:'negative',kind:'negative_finding',text:m[0],scope:m[1],provenance:f.range,interfaces:[]});}
     if(f.text.includes('DISTANT_QUALIFIER'))items.push({id:'qualifier',kind:'boundary',text:'DISTANT_QUALIFIER: D00 may not retry unless D01 permission remains OPEN.',scope:'D00',provenance:f.range,interfaces:[{id:'permission',with_scope:'D01',text:'D01 permission remains OPEN; D00 must not retry.'}]});
     if(f.text.includes('UNKNOWN_EXTRA'))items.push({id:'unknown',kind:'exhausted_allowance',text:'UNKNOWN_EXTRA: exhausted means no retry.',scope:'*',provenance:f.range,interfaces:[]});
     Object.assign(r,{unit_id:p.unit.id,unit_sha256:sha(p.unit),items});
@@ -73,7 +74,7 @@ async function qualify(f){
   const empty=extracts.filter(e=>!e.review.qualification_result.items.length);
   const domains=[];for(const [domain,items] of byDomain){const v=await run(f,{phase:'applicability',extraction_review_ids:[...new Set([...items.map(i=>i.e.review.id),...empty.map(e=>e.review.id)])],item_keys:items.map(i=>i.key),counterpart_ids:domain==='*'?['home-global']:['home-'+domain],context_scope:domain});assert.equal(v.job.status,'completed',v.job.error);assert.equal(v.review.review.verdict,'Pass',v.review.content);domains.push(v);}
   const integrated=await run(f,{phase:'integration',domain_review_ids:domains.map(d=>d.review.id),counterpart_ids:[...new Set(domains.flatMap(d=>d.target.target.homes.map(h=>h.id)))]});assert.equal(integrated.job.status,'completed',integrated.job.error);
-  const applied=await publicCall('company_context',{root:f.root,session_id:f.session_id,epoch:f.epoch,source_instruction:f.source_instruction,action:'apply',integration_review_id:integrated.review.id},'codex');assert.equal(applied.applied,true);return {extracts,domains,integrated,proof:read(f).context_classifications.old.scoped_qualification};
+  const applied=await publicCall('company_context',{root:f.root,session_id:f.session_id,epoch:f.epoch,source_instruction:f.source_instruction,action:'apply',integration_review_id:integrated.review.id},'codex');assert.equal(applied.applied,true);return {extracts,domains,integrated,proof:read(f).context_classifications[f.source_id??'old'].scoped_qualification};
 }
 
 test('public store + worker path: 500 distinct obligations / 20 domains exceed union output, bounded packets apply and archive exact originals',async t=>{
@@ -107,7 +108,9 @@ test('source-only extraction survives unrelated notice/global change and replace
 
 test('unknown source fields and current global rules are semantic; historical claims never current permission',async()=>{
   const f=fixture({extra:{future_protocol_field:{effect:'UNKNOWN_EXTRA'}}});engine.save({...f,id:'home-global',kind:'artifact',content:'UNKNOWN_EXTRA: exhausted means no retry.',context_obligations:{version:1,scope:'*'}},'codex');
+  mutate(f,s=>{s.records.retainedRule={id:'retainedRule',kind:'decision',revision:1,content:'Previously delivered global rule: preparation needs consent.'};});
   const q=await qualify(f);assert.ok(q.extracts.flatMap(e=>e.review.qualification_result.items).some(i=>i.id==='unknown'));
+  const before=read(f);for(const change of [s=>delete s.records.retainedRule,s=>s.records.retainedRule.kind='artifact',s=>s.records.retainedRule.content+=' New consequential condition.']){const copy=inheritSnapshots(before,structuredClone(before));change(copy);assert.throws(()=>scoped.validateScopedApply(copy,{integration_review_id:q.integrated.review.id}),/global governing identity/);}
   mutate(f,s=>{s.records.rule={id:'rule',kind:'decision',revision:1,author_instance:'founder-rule',content:'NEW GLOBAL RULE: consent cannot renew exhausted allowance.'};});
   assert.throws(()=>scoped.validateScopedApply(read(f),{integration_review_id:q.integrated.review.id}),/global governing identity/);
   const reuse=call(f,{action:'target',plan_id:f.plan_id,phase:'extract',unit_id:unitPages(f)[0].id});assert.equal(reuse.job_id,q.extracts[0].job.id);
@@ -243,4 +246,75 @@ test('regression: interface must include every exact incident-domain home',async
   assert.ok(!ir.packet.homes.some(h=>h.source.id==='home-D01-second'));
   const integrate=()=>run(f,{phase:'integration',domain_review_ids:domains.map(d=>d.review.id),interface_review_ids:[ir.review.id],counterpart_ids:['home-D00','home-D01','home-D01-second']});
   await assert.rejects(integrate,/interface omitted exact incident-domain/);
+});
+
+// Governing histories and homes, separately qualified through the same REAL
+// worker lifecycle with the explicit semantic CONTRACT DOUBLE above.
+test('separate governing scopes reuse receipts through qualified archive growth and unrelated requalification',async()=>{
+  const f=fixture({kind:'decision',homeKind:'decision'}),firstPlan={id:f.plan_id};
+  const a=await qualify(f),ordinaryJob={id:'ordinary',role:'engineer',task:'Preparation',inputs:[],context_format:5,context_scope:'D00'},baseline=assignmentContext(read(f),ordinaryJob),governingBaseline=assignmentContext(read(f),{...ordinaryJob,context_format:3});
+  const aDomainHash=a.domains[0].job.context_sha256,aIntegrationHash=a.integrated.job.context_sha256;
+  async function addScope(n,{update=false}={}){
+    const domain='D'+String(n).padStart(2,'0'),source_id='history-'+domain,home='home-'+domain,clause=token(domain,n),negative='NEGATIVE~'+domain+'~NO_RETRY_WHILE_OPEN~END';
+    mutate(f,s=>{
+      s.records[source_id]={id:source_id,revision:update?2:1,kind:n%2?'preference':'review',author_instance:'archive-author-'+n,content:clause,...(n%2?{}:{review:{verdict:'Fail',reason:negative}})};
+      s.records[home]={id:home,revision:update?2:1,kind:n%2?'preference':'decision',author_instance:'home-author-'+n,content:clause+(n%2?'':'\n'+negative)+(update?' Updated unrelated preparation detail.':''),context_obligations:{version:1,scope:domain}};
+    });
+    assert.throws(()=>scoped.validateScopedApply(read(f),{integration_review_id:a.integrated.review.id}),/global governing identity/,'New unclassified or changed history must hold until reviewed');
+    const p=call(f,{action:'plan',protocol,source_id});Object.assign(f,{source_id,plan_id:p.id,extraction_identity:p.extraction_identity});
+    const q=await qualify(f);
+    assert.equal(scoped.validateScopedApply(read(f),{integration_review_id:a.integrated.review.id}).extraction_identity,a.proof.extraction_identity);
+    const state=read(f),domainAssignment=scoped.scopedAssignment(state,state.jobs[a.domains[0].job.id]),integration=scoped.scopedAssignment(state,state.jobs[a.integrated.job.id]);
+    assert.equal(domainAssignment.hash,aDomainHash);assert.equal(integration.hash,aIntegrationHash);
+    assert.ok(!q.domains[0].packet.global_rules.governing.some(r=>r.id==='old'||r.id==='home-D00'));
+    assert.ok(!q.integrated.packet.global_rules.scoped_governing.some(r=>r.source.id==='home-D00'));
+    if(!update)assert.equal(assignmentContext(state,ordinaryJob).text,baseline.text,'Qualified governing archive and proof growth do not grow ordinary inputs');
+    assert.equal(assignmentContext(state,{...ordinaryJob,context_format:3}).text,governingBaseline.text,'Unrelated updates do not grow governing task inputs');
+    if(update)assert.throws(()=>assignmentContext(state,ordinaryJob),/Unqualified referenced evidence/,'Superseded proof bodies remain unclassified in format 5; no implicit archive permission');
+    assert.ok(bytes(domainAssignment.text)<48000);assert.ok(bytes(integration.text)<48000);
+    return q;
+  }
+  // Three independent scopes include decision, preference and retained Fail
+  // histories. Additional qualified archive entries cannot force A to replay.
+  const b=await addScope(1),negative=await addScope(2);assert.ok(negative.extracts.some(e=>e.review.qualification_result.items.some(i=>i.kind==='negative_finding')));await addScope(3);await addScope(1,{update:true});
+  const state=read(f),projection=reviewedContext(state);
+  assert.equal(projection.excluded('history-D02'),true);assert.equal(state.records['history-D02'].review.verdict,'Fail');
+  assert.deepEqual(currentRecords(state,{context_scope:'D00'},projection).filter(r=>r.id.startsWith('home-')).map(r=>r.id),['home-D00']);
+  f.plan_id=firstPlan.id;
+  assert.equal(call(f,{action:'target',phase:'extract',unit_id:a.extracts[0].target.target.unit_id}).job_id,a.extracts[0].job.id);
+  const fresh=await run(f,{phase:'applicability',extraction_review_ids:a.extracts.map(e=>e.review.id),counterpart_ids:['home-D00'],context_scope:'D00'});
+  assert.equal(fresh.review.review.verdict,'Pass');assert.ok(!fresh.packet.global_rules.governing.some(r=>r.id.startsWith('history-')||r.id==='home-D01'));
+  assert.ok(bytes(fresh.job.qualification_delivery.wire)<48000);assert.equal(b.extracts[0].packet.phase,'extract');
+  for(const extra of [
+    {id:'unclassified',kind:'decision',content:'New history may interact; must review.'},
+    {id:'proposed',kind:'preference',content:'Proposed unrelated scope still requires review.',context_obligations:{version:1,scope:'D99'}},
+    {id:'global',kind:'decision',content:'NEW GLOBAL RULE: all preparation now requires fresh consent.',context_obligations:{version:1,scope:'*'}},
+    {id:'negative',kind:'review',content:'Unreviewed negative.',review:{verdict:'Blocked',reason:'Unknown interaction.'}},
+    {id:'negative-result',kind:'artifact',content:'Partial negative result is still evidence.',qualification_result:{verdict:'Fail',reason:'Unknown interaction.'}}
+  ]){
+    const copy=inheritSnapshots(state,structuredClone(state));copy.records[extra.id]={revision:1,...extra};
+    assert.throws(()=>scoped.validateScopedApply(copy,{integration_review_id:a.integrated.review.id}),/global governing identity/);
+    const target=scoped.createScopedTarget(copy,{plan_id:firstPlan.id,phase:'applicability',extraction_review_ids:a.extracts.map(e=>e.review.id),counterpart_ids:['home-D00'],context_scope:'D00'});
+    assert.ok(resolveSnapshot(copy,target.global_snapshot).governing.some(r=>r.id===extra.id&&r.content===extra.content),'Full unknown/global/negative/proposed evidence reaches fresh QA');
+  }
+  for(const mutateRule of [s=>delete s.records['home-D00'],s=>s.records['home-D00'].content+=' New relevant condition.']){const copy=inheritSnapshots(state,structuredClone(state));mutateRule(copy);assert.throws(()=>scoped.validateScopedApply(copy,{integration_review_id:a.integrated.review.id}),/Scoped context hold/);}
+  mutate(f,s=>{s.records['unknown-source']={id:'unknown-source',kind:'artifact',revision:1,content:'UNKNOWN_EXTRA'};});
+  f.plan_id=call(f,{action:'plan',protocol,source_id:'unknown-source'}).id;const unknown=await extraction(f);
+  const unknownState=read(f),unknownTarget=scoped.createScopedTarget(unknownState,{plan_id:f.plan_id,phase:'applicability',extraction_review_ids:unknown.map(e=>e.review.id),counterpart_ids:['home-D00'],context_scope:'D00'});
+  assert.deepEqual(unknownTarget.governing_scopes,['*'],'Unknown extracted effects cannot be narrowed by the caller task scope');
+  assert.ok(resolveSnapshot(unknownState,unknownTarget.global_snapshot).governing.some(r=>r.id==='home-D01'),'Unknown applicability sees independently qualified other scopes in full');
+
+});
+
+test('ordinary worker producer edge binds exact outcome and native closure while keeping source-only identity reusable',async()=>{
+  const f=fixture(),q=await qualify(f),produced=q.extracts[0].review,state=read(f);
+  const p=scoped.captureScopedPlan(state,{source_id:produced.id}),planRecord={id:'producer-plan',scoped_context_plan:p};state.records[planRecord.id]=planRecord;
+  const capsule=resolveSnapshot(state,p.capsule);assert.equal(capsule.producer.id,'job:'+produced.job_id);
+  assert.equal(p.extraction_identity,sha({protocol,source:p.source,producer:capsule.producer,projection_sha256:p.projection_sha256,partitioner:'lossless-ranges-v1',units:p.units}),'Ordinary producer identities preserve the original v1 grammar');
+  const changed=inheritSnapshots(state,structuredClone(state));changed.notices.push({id:'new',summary:'Unrelated current rule.'});
+  assert.equal(scoped.captureScopedPlan(changed,{source_id:produced.id}).extraction_identity,p.extraction_identity);
+  for(const change of [j=>j.status='failed',j=>j.artifact_id='other',j=>j.native_id='changed',j=>j.coordination_release.termination_confirmed=false,j=>j.execution_failure={outcome:'unknown'}]){
+    const copy=inheritSnapshots(state,structuredClone(state));change(copy.jobs[produced.job_id]);assert.throws(()=>scoped.scopedPlanView(copy,{plan_id:planRecord.id}),/Scoped context hold/);
+  }
+  const broken=inheritSnapshots(state,structuredClone(state));delete broken.jobs[produced.job_id];assert.throws(()=>scoped.captureScopedPlan(broken,{source_id:produced.id}),/source missing/);
 });
