@@ -1,0 +1,21 @@
+**Conditional Pass for code integration and compatible repair publication** of candidate `61dca7124bd20dba9db865a2d3e8777a98741333`. I found no blocking source defect in the supplied diff.
+
+The runtime repair is narrowly scoped and matches the diagnosed type loss:
+
+- Retained `upgrade_history` members and nonnull object `upgrade` receive the existing `history-attempt` projection.
+- Reuse still requires matching entity kind, hash **and complete serialized value**. Changed findings, calls, execution evidence, unknown fields or checkpoint obligations prevent attempt-level reuse.
+- First projections remain compulsory; equal occurrences use the existing equality mechanism. Exact serialized originals remain registered and retrievable.
+- Malformed containers retain generic handling. No classification, truncation, history deletion or new store is introduced.
+
+The supplied acceptance seams retain compulsory delivery to the same independent native session, citation validation, freshness checks, deadline enforcement and the exact-state `Pass`/`resume_handover` gate. The explicit producer-version bump and added `0.6.12` compatibility entries preserve the intended separation between runtime fencing and pinned team/governance adoption. No queued latency behavior appears in this diff.
+
+The evidence has material limits:
+
+- The reported pre-fix failure and patched results support this amplification repair. They do not establish that type loss caused every part of the historical growth.
+- The new regression’s ratio check is useful but lacks direct typed-equality assertions and an absolute fixed-fixture ceiling. Its negative-history assertions check selected phrases rather than every prior review, blocker and execution field; the original-retrieval loop also lacks a nonzero-count assertion. These are nonblocking test-hardening opportunities given the supplied source, not proof of exhaustive preservation.
+- The reported 432/432 results on both Node versions support regression confidence. I reviewed supplied text and log excerpts only; I executed no tests and verified no files, hashes or receipt-to-commit binding.
+- The aggregate diagnostic supports reduced amplification on an identical subject. It proves neither completion within the unchanged deadline nor comprehension, model fit or bounded total-history cost. Effective model/effort settings and native isolation are unverified here.
+
+**Required before actual publication:** root must verify that the exact candidate source, complete diff, build/diff checks and full test receipts correspond to this commit, including the actual old-writer fence results. No source repair is required by this review based on the supplied text.
+
+The installed real-company **Blocked remains valid**: incomplete delivery, the missing recorded communication requirement and uncertain historical recovery still require a fresh reconstruction and genuine independent exact-current-state acceptance. This source verdict grants no installation, adoption, resume or business authority.

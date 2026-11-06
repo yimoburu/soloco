@@ -1,0 +1,247 @@
+The supplied source confirms the type-loss defect. It does **not** establish that this defect explains all growth from 5.32M to 21.43M characters.
+
+Retained subjects are resolved and hash-checked correctly. Inside their snapshot projection, however, `upgrade_history` and `upgrade` fall through to `entry(..., 'checkpoint-field')`. Their attempts consequently lose:
+
+- Typed checkpoint and team-snapshot projection.
+- Per-attempt equality with already compulsory `history-attempt` projections.
+
+Generic equality can still deduplicate an identical **whole history array**, but cannot reuse individual attempts across changed history prefixes. Checkpoint artifact content can consequently reappear as large opaque JSON strings.
+
+The existing Blocked remains valid. Reducing amplification neither supplies the missing understanding nor authorizes resume.
+
+The smallest proposed runtime change is confined to the existing snapshot-field mapper:
+
+```diff
+diff --git a/plugins/soloco/runtime/upgrade-evidence.mjs b/plugins/soloco/runtime/upgrade-evidence.mjs
+--- a/plugins/soloco/runtime/upgrade-evidence.mjs
++++ b/plugins/soloco/runtime/upgrade-evidence.mjs
+@@
+           const fields = Object.entries(item).map(([field, value]) => {
+             const location = child(at, field);
+-            if (own(collectionKinds, field) && (object(value) || Array.isArray(value))) {
++            const kind = own(collectionKinds, field) ? collectionKinds[field]
++              : field === 'upgrade_history' && Array.isArray(value) ? 'history-attempt' : null;
++            if (kind && (object(value) || Array.isArray(value))) {
+               const entries=[], repeats=[];
+               for(const [key,v] of Object.entries(value)) {
+-                const projected={key,...entry(v,child(location,key),collectionKinds[field])};
++                const projected={key,...entry(v,child(location,key),kind)};
+                 (projected.same_as?repeats:entries).push(projected);
+               }
+@@
+-            return {key:field, ...entry(value, location, 'checkpoint-field')};
++            return {key:field, ...entry(value, location,
++              field === 'upgrade' && object(value) ? 'history-attempt' : 'checkpoint-field')};
+           });
+```
+
+This uses existing mechanisms rather than introducing another representation:
+
+- Each historical attempt receives the same kind used by top-level history.
+- Equality still requires matching kind, hash **and complete serialized raw value**.
+- First projections remain compulsory. Later equal occurrences use existing equality references and occurrence indexes.
+- Changed errors, reviews, calls, unknown fields or checkpoints prevent attempt-level equality.
+- Existing snapshot and retained-record originals remain registered and retrievable.
+- Null or malformed history containers retain generic handling; unknown attempt fields retain the existing walker.
+- No classification, deadline, authority or acceptance code changes.
+
+Both fields need repair. Fixing only `upgrade_history` leaves a retained nonnull `upgrade` capable of reproducing the same problem.
+
+The following fictional regression can be appended to the supplied test file using its existing imports. It exercises both fields with **nonempty history**, requires typed equality, checks complete negative evidence and retrieves complete originals.
+
+```js
+test('retained nonempty upgrade histories retain typed equality and exact originals',()=>{
+ const make=size=>{
+  const checkpoint={
+   id:'fictional-company',
+   records:{
+    rule:{
+     id:'fictional-rule',revision:1,kind:'decision',status:'Resolved',
+     content:'Fictional communication preference: record the DAG and timeline.'
+    },
+    source:{
+     id:'fictional-source',revision:1,kind:'artifact',
+     content:JSON.stringify({
+      kind:'source-evidence',source:'x'.repeat(size),
+      claim:'Fictional source only; historical outcome remains unverified.'
+     })
+    }
+   },
+   jobs:{
+    failed:{
+     id:'fictional-failed-job',status:'failed',
+     error:'Fictional execution failed; outcome remains unknown.',
+     execution:{stdout:'Complete fictional stdout\n',stderr:'Complete fictional stderr\n'}
+    }
+   },
+   notices:[{
+    id:'fictional-notice',resolution:'old status',
+    summary:'Fictional approval obligation remains binding.'
+   }],
+   messages:[{
+    id:'fictional-dissent',content:'Fictional unresolved dissent.'
+   }],
+   unknown_legacy_limit:'Fictional unknown restriction must be recovered.'
+  };
+  const previous={
+   plugin_version:'fictional',
+   governance:'Fictional legacy governance requires approval.',
+   governance_sha256:digest('Fictional legacy governance requires approval.'),
+   roles:{qa:{name:'Fictional QA'}},
+   cos_instructions:'Fictional pinned rule: no external execution.'
+  };
+  const historical={
+   id:'fictional-historical-upgrade',status:'Blocked',checkpoint,previous,
+   error:'Distinct fictional historical failure.',
+   review:{
+    native_id:'fictional-old-qa',
+    artifact:{
+     verdict:'Blocked',
+     blockers:['Fictional missing preference','Fictional unverified outcome'],
+     unknown_finding:{must_preserve:'Fictional unknown review obligation.'}
+    }
+   },
+   calls:[{
+    role:'qa',phase:'synthesis',native_id:'fictional-old-qa',
+    text:' { "verdict": "Blocked", "reason": "Fictional unverified outcome" }\n'
+   }],
+   unknown:{restriction:'Fictional unknown attempt restriction.'}
+  };
+  const active={
+   ...historical,id:'fictional-current-upgrade',
+   error:'Distinct fictional current-upgrade failure.'
+  };
+  const snapshot={
+   company_id:'fictional-company',
+   records:checkpoint.records,jobs:checkpoint.jobs,
+   notices:checkpoint.notices,messages:checkpoint.messages,
+   upgrade_history:[historical],upgrade:active
+  };
+  const original={
+   id:'fictional-retained',kind:'artifact',revision:1,
+   author_role:'runner',author_instance:'fictional-prior-owner',
+   content:'Fictional earlier reconstruction omitted a binding preference.',
+   handover:{
+    id:'fictional-handover',
+    subject_sha256:digest(JSON.stringify(snapshot)),
+    subject:snapshot,
+    incoming_owner:{session_id:'fictional-prior-owner'},
+    input_refs:[]
+   }
+  };
+  const retained={
+   ...original,
+   handover:{
+    ...original.handover,
+    subject:{retained_handover_subject:{
+     record_id:original.id,sha256:original.handover.subject_sha256
+    }}
+   }
+  };
+  const e=buildEvidence({
+   company_id:'fictional-company',
+   records:{...checkpoint.records,[retained.id]:retained},
+   jobs:checkpoint.jobs,notices:checkpoint.notices,messages:checkpoint.messages
+  },[historical,active],{
+   wholeBodyAliases:false,checkpointContinuity:true,
+   retainedHandoverRecords:{[original.id]:original}
+  });
+  return {e,original,historical,active,checkpoint};
+ };
+ const stream=e=>e.sources[e.pages[0].source_id].raw;
+ const restore=(e,source)=>{
+  let text='';
+  while(text.length<source.length){
+   text+=readEvidence(e,{
+    source_id:source.source_id,sha256:source.sha256,
+    offset:text.length,length:Math.min(32768,source.length-text.length)
+   }).text;
+  }
+  return text;
+ };
+ const fixtures=[make(100000),make(200000)];
+ for(const {e,original,historical,active,checkpoint} of fixtures){
+  const retained=e.handover.checkpoint.find(f=>f.key==='records')
+   .entries.find(r=>r.key===original.id).value;
+  const fields=retained.handover.subject.fields;
+  const history=fields.find(f=>f.key==='upgrade_history');
+  const upgrade=fields.find(f=>f.key==='upgrade');
+
+  assert.equal(history.collection_shape,'array');
+  assert.equal(history.entries.length,1);
+  assert.equal(e.sources[history.entries[0].source.source_id].kind,'history-attempt');
+  assert.equal(e.sources[upgrade.source.source_id].kind,'history-attempt');
+  assert.deepEqual(e.handover.history[0].same_as,history.entries[0].semantic);
+  assert.deepEqual(e.handover.history[1].same_as,upgrade.semantic);
+
+  for(const [projected,expected] of [
+   [history.entries[0].value,historical],[upgrade.value,active]
+  ]){
+   assert.deepEqual(projected.review,expected.review);
+   assert.deepEqual(projected.calls,expected.calls);
+   assert.deepEqual(projected.unknown,expected.unknown);
+   assert.equal(projected.error,expected.error);
+  }
+  for(const phrase of [
+   'record the DAG and timeline',
+   'Fictional execution failed; outcome remains unknown.',
+   'Complete fictional stdout',
+   'Complete fictional stderr',
+   'Fictional approval obligation remains binding.',
+   'Fictional unresolved dissent.',
+   'Fictional unknown restriction must be recovered.',
+   'Fictional legacy governance requires approval.',
+   'Fictional pinned rule: no external execution.'
+  ])assert.ok(stream(e).includes(phrase),phrase);
+  assert.ok(!stream(e).includes('x'.repeat(4096)));
+
+  const retainedOriginal=Object.values(e.sources)
+   .find(s=>s.kind==='original-handover-record');
+  assert.ok(retainedOriginal);
+  for(const [ref,expected] of [
+   [retainedOriginal,original],
+   [history.entries[0].source,historical],
+   [upgrade.source,active],
+   [history.entries[0].value.checkpoint.original,checkpoint]
+  ]){
+   const source=e.sources[ref.source_id];
+   const raw=JSON.stringify(expected);
+   assert.equal(restore(e,source),raw);
+   assert.equal(source.sha256,digest(raw));
+  }
+ }
+ // Both payload lengths have six decimal digits. Existing typed payload
+ // externalization should leave required-stream size unchanged here.
+ assert.equal(stream(fixtures[0].e).length,stream(fixtures[1].e).length);
+});
+```
+
+Current code fails the typed history assertions and retains the large source string inside generic history projection. The exact-size assertion is deliberately narrow: these fixtures differ only in an already optional typed source body, with metadata widths held stable. It is **not** a constant-cost assertion for growing history.
+
+Additional required checks before considering adoption:
+
+| Case | Required result |
+|---|---|
+| Retained snapshots containing history prefixes `[A]`, `[A,B]`, `[A,B,C]` | Previously projected attempts use typed equality; every distinct attempt remains compulsory. |
+| Same attempt ID, changed blocker, call whitespace, execution output, unknown field or checkpoint obligation | Changed attempt is projected distinctly; complete changed evidence remains recoverable. |
+| Only `upgrade` differs | Its distinct evidence remains compulsory. |
+| Resolved statuses, negative reviews and unknown legacy restrictions | No status-based omission or new classification behavior. |
+| Empty/null/malformed histories, primitive history members, extra unknown fields | Preserve values or existing validation holds; never silently filter them. |
+| Missing/tampered retained record, subject hash or locator | Existing holds remain enforced. |
+| Unicode, unpaired surrogates, duplicate JSON keys and lossy numeric lexemes | Existing exact retrieval and decoding safeguards continue to pass. |
+| Partial delivery, final gap, forged citation, another native ledger, native identity change | Pass remains rejected. |
+| State, reconstruction, prior negative evidence or assignment changes after QA | Earlier Pass cannot authorize resume. |
+| Deadline expires during reads or before final acceptance | Late output cannot produce accepted Pass or resume. |
+
+Also run the supplied handover tests, including full delivery, prior negative execution evidence, stale state, immutable originals and bounded escaped responses. Add deterministic repeated-build assertions and a fixed-fixture size ceiling after measuring the patched result; do not invent a production reduction percentage.
+
+No further source is necessary to propose this narrow projection fix. To verify the deadline and final acceptance integration, the missing public sections are specifically:
+
+- The handover branch of `worker.mjs`: native launch/resume, evidence-read loop, deadline checks, late-output handling, and conversion of delivery validation into `handover_evidence`.
+- The `engine.mjs` resume transaction around `verifyHandoverAcceptance`, including how its result permits unpausing.
+
+The supplied acceptance code checks freshness, independent identities, current review context and protocol-v2 delivery evidence, but the omitted worker implementation is needed to verify how those attestations and deadline checks are established.
+
+This proposal does not bound total history cost. Distinct obligations and failures must grow the compulsory stream; occurrence indexes, raw originals, registry size, hashing and construction work also retain costs. Equal raw attempts may now reuse compulsory projections, but equality and complete delivery still do not prove comprehension.
+
+The real Blocked—including incomplete delivery, the missing recorded DAG/timeline preference and unverified historical recovery—remains evidence for a fresh reconstruction and independent exact-current-state QA. No tools were used, no tests were executed, and this advice grants no installation, adoption, release or resume authority.
