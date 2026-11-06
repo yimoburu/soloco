@@ -54,6 +54,7 @@ function contractReview(p){
     if(p.global_rules.unknown_outcomes.length)block('Unknown execution outcome remains held; native closure and effects are unproven.');
     if(r.mappings.some(m=>!m.homes.length))block('Specific source condition is absent from current home; retain OPEN and do not retry.');
     if(p.interface_keys.length&&p.homes.some(h=>h.value.content.includes('CONTRADICTION')))block('D00/D01 interface contradicts permission: retry denied while permission OPEN.');
+    if(p.interface_keys.length)r.interfaces=[]; // Exact keys bind the full delivered interfaces; mappings still checked.
   }else {r.summary='CONTRACT DOUBLE: every domain retains its exact distinct conditions and OPEN state; all declared interfaces independently checked. No execution permission.';r.domain_review_ids=sh.domain_review_ids;r.interface_review_ids=sh.interface_review_ids;r.unreviewed_interfaces=[];}
   return envelope(r);
 }
@@ -190,7 +191,8 @@ test('bounded independent interface review can complete integration without a gl
   const es=await extraction(f),domains=[];
   for(const scope of ['D00','D01']){const item_keys=es.flatMap(e=>e.review.qualification_result.items.filter(i=>i.scope===scope).map(i=>e.review.id+'/'+i.id));const d=await run(f,{phase:'applicability',extraction_review_ids:es.map(e=>e.review.id),item_keys,counterpart_ids:['home-'+scope],context_scope:scope});assert.equal(d.job.status,'completed',d.job.error);domains.push(d);}
   const ir=await run(f,{phase:'applicability',extraction_review_ids:es.map(e=>e.review.id),interface_keys:domains.flatMap(d=>d.review.qualification_result.interfaces.map(i=>i.key)),counterpart_ids:['home-D00','home-D01'],context_scope:'*'});assert.equal(ir.review.review.verdict,'Pass');
-  const i=await run(f,{phase:'integration',domain_review_ids:domains.map(d=>d.review.id),interface_review_ids:[ir.review.id],counterpart_ids:['home-D00','home-D01']});assert.equal(i.job.status,'completed',i.job.error);assert.equal(call(f,{action:'apply',integration_review_id:i.review.id}).applied,true);
+  assert.deepEqual(ir.review.qualification_result.interfaces,[]);assert.ok(ir.review.qualification_result.mappings.length);assert.deepEqual(ir.review.qualification_result.reviewed_interfaces,domains.flatMap(d=>d.review.qualification_result.interfaces.map(i=>i.key)));assert.ok(ir.packet.extractions.some(e=>e.items.some(i=>i.interfaces.length)));
+  const i=await run(f,{phase:'integration',domain_review_ids:domains.map(d=>d.review.id),interface_review_ids:[ir.review.id],counterpart_ids:['home-D00','home-D01']});assert.equal(i.job.status,'completed',i.job.error);assert.ok(i.packet.domains.some(d=>d.interfaces.length));assert.ok(i.packet.interface_reviews.every(r=>!Object.hasOwn(r,'interfaces')));assert.equal(call(f,{action:'apply',integration_review_id:i.review.id}).applied,true);
   const s=read(f),projection=reviewedContext(s);assert.equal(currentRecords(s,{context_scope:'different'},projection).filter(r=>r.id.startsWith('home-')).length,2,'Cross-domain interface homes remain global compulsory evidence');
 });
 

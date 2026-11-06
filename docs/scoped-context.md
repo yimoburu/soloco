@@ -80,6 +80,12 @@ mutations. This protocol grants no venture execution or renewed allowance.
    and full homes for both scopes. Unknown/global interfaces require `context_scope:
    "*"`. A different native reviewer must judge these interactions. Empty interface
    sets require substantive independent completeness judgments at every stage.
+   Interface reviewers still receive every complete incident item/home/dependency,
+   return full item mappings and an independent substantive judgment. They name
+   the exact `reviewed_interfaces` keys and return `interfaces: []`; original
+   interface text remains in the extraction and domain receipts, and reaches
+   final QA once through the domains. This removes repeated output, not evidence
+   or independent semantic checks.
 6. `target` with `phase: "integration"`, `domain_review_ids`,
    `interface_review_ids`, and the exact union of reviewed `counterpart_ids` and
    `dependency_ids`. Software checks gap-free, nonoverlapping coverage of every
