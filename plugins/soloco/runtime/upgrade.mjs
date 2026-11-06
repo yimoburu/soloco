@@ -1,3 +1,4 @@
+import { upgradeInspectionView } from './public-response.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -6,10 +7,11 @@ import { PACKAGE, VERSION, SCHEMA, stamp, id, digest, withStore, requireText, te
 import { binding, dataDir, upgradeSummary } from './engine.mjs';
 import { readiness, modelCatalog, runModel, parseArtifact } from './adapters.mjs';
 import { normalizeSelection } from './selection.mjs';
+import {shallowSnapshotState,shallowSnapshotHistory,resolveSnapshotEntry} from './snapshot.mjs';
 
 import { buildEvidence, projectionPreview, evidencePage, readEvidence, createDeliveryLedger, recordDelivery, validateCitations, admitPrompt, recordResponse, boundedReplayBatches, RESPONSE_RESERVE } from './upgrade-evidence.mjs';
 
-const historyHash = s => digest(JSON.stringify(s.upgrade_history ?? []));
+const historyHash = (s,shallow=s.upgrade?.snapshot_protocol===1) => digest(JSON.stringify(shallow?shallowSnapshotHistory(s,{current:false}).upgrade_history:s.upgrade_history??[]));
 const deadline = u => {
   if (u.review_deadline_policy==='none') {
     if (u.deadline_ms!==null || u.review_window_minutes!==null) throw new Error('Invalid no-overall-deadline policy; recover before retrying');
@@ -44,13 +46,16 @@ function candidate(s, policy='preserve') {
 }
 // Include all business state, including unknown extension fields. Only runtime bookkeeping
 // and delivery attempts are excluded; late artifacts and new notices invalidate a rehearsal.
-export function checkpoint(s) {
-  const value=structuredClone(s);
-  for (const key of ['schema','runtime_version','revision','updated_at','owner','paused','upgrade','upgrade_history','retired_sessions','team_sha256']) delete value[key];
+export function checkpoint(s,{shallow=true}={}) {
+  const excluded=new Set(['schema','runtime_version','revision','updated_at','owner','paused','upgrade','upgrade_history','retired_sessions','team_sha256']);
+  // Discard history before cloning, and only capture slots actually included.
+  const selected=Object.fromEntries(Object.entries(s).filter(([key])=>!excluded.has(key)));
+  if(shallow){const captured=shallowSnapshotState(s,{history:false});selected.records=captured.records;selected.jobs=captured.jobs;}
+  const value=structuredClone(selected);
   value.notices=value.notices.map(({deliveries,...n})=>n);
   return value;
 }
-const checkpointHash = s => digest(JSON.stringify(checkpoint(s)));
+const checkpointHash = s => digest(JSON.stringify(checkpoint(s,{shallow:s.upgrade?.snapshot_protocol===1})));
 function savedCheckpointIntegrity(u,expected=u.evidence?.checkpoint_sha256??u.checkpoint_sha256) {
   if (u.checkpoint_sha256!==expected || digest(JSON.stringify(u.checkpoint))!==expected) throw new Error('Saved upgrade checkpoint or pinned hash changed; recover before retrying');
   if (Object.hasOwn(u.evidence??{},'review_deadline_policy') && (u.review_deadline_policy!==u.evidence.review_deadline_policy || u.deadline_ms!==u.evidence.deadline_ms)) throw new Error('Upgrade deadline policy changed; recover before retrying');
@@ -103,7 +108,7 @@ export function upgrade(a,host,{launch=launchUpgrade,check=readiness,catalog=mod
   binding(a,host);
   if (a.action==='inspect') return withStore(a.root,db=>{
     const s=db.read();compatible(s);const old=pinned(s),next=candidate(s,a.governance);
-    return {...report(s),projection_preview:projectionPreview(checkpoint(s),s.upgrade_history??[],s.upgrade??null,{currentState:a.context_mode==='current'}),candidate_hash:teamHash(next),candidate_version:VERSION,changes:{roles:Object.keys(next.roles).filter(k=>JSON.stringify(old.roles[k])!==JSON.stringify(next.roles[k])),cos_instructions_changed:old.cos_instructions!==next.cos_instructions,governance_changed:old.governance!==next.governance},governance:{policy:a.governance??'preserve',current:s.governance,installed:installedTeam().governance},prior_instructions:old.cos_instructions,candidate_instructions:next.cos_instructions};
+    return upgradeInspectionView({...report(s),projection_preview:projectionPreview(checkpoint(s),shallowSnapshotHistory(s).upgrade_history,shallowSnapshotHistory(s).upgrade??null,{currentState:a.context_mode!=='full',checkpointContinuity:true,snapshotState:s,contextState:s}),candidate_hash:teamHash(next),candidate_version:VERSION,changes:{roles:Object.keys(next.roles).filter(k=>JSON.stringify(old.roles[k])!==JSON.stringify(next.roles[k])),cos_instructions_changed:old.cos_instructions!==next.cos_instructions,governance_changed:old.governance!==next.governance},governance:{policy:a.governance??'preserve',current:s.governance,installed:installedTeam().governance},prior_instructions:old.cos_instructions,candidate_instructions:next.cos_instructions},{old,next,installed:installedTeam()});
   });
   if (a.action==='prepare') {
     const reviewWindowMinutes=Object.hasOwn(a,'review_window_minutes')?a.review_window_minutes:REHEARSAL_TIMEOUT_MS/60000;
@@ -132,7 +137,7 @@ export function upgrade(a,host,{launch=launchUpgrade,check=readiness,catalog=mod
       decision(s,a,'prepare_team_upgrade');
       const snapshot=checkpoint(s);
       // Bind the selected call cap before launch; inventory fills in the evidence pages later.
-      s.upgrade={...(a.context_mode?{context_mode:a.context_mode}:{}),id:id('upgrade'),status:'queued',created_at:stamp(),call_timeout_minutes:a.call_timeout_minutes??10,evidence:{call_timeout_minutes:a.call_timeout_minutes??10,pages:[]},review_window_minutes:reviewWindowMinutes,review_deadline_policy:reviewWindowMinutes===null?'none':'finite',deadline_ms:reviewWindowMinutes===null?null:Date.now()+reviewWindowMinutes*60000,history_sha256:historyHash(s),epoch:s.owner.epoch,host,model_selection:selection,model_selection_sha256:digest(JSON.stringify(selection)),...(metadata?{model_catalog:{source:metadata.source,...(selection.mode==='explicit'?{model:metadata.models.find(m=>m.id===selection.model)}:{}),speed_support:metadata.speed_support}}:{}),previous,candidate:next,candidate_hash:teamHash(next),checkpoint:snapshot,checkpoint_sha256:checkpointHash(s),governance_policy:a.governance??'preserve',governance_instruction:a.governance_instruction??null,source_instruction:a.source_instruction,takeover_instruction:a.takeover_instruction??null};
+      s.upgrade={snapshot_protocol:1,context_mode:a.context_mode??'current',id:id('upgrade'),status:'queued',created_at:stamp(),call_timeout_minutes:a.call_timeout_minutes??10,evidence:{call_timeout_minutes:a.call_timeout_minutes??10,pages:[]},review_window_minutes:reviewWindowMinutes,review_deadline_policy:reviewWindowMinutes===null?'none':'finite',deadline_ms:reviewWindowMinutes===null?null:Date.now()+reviewWindowMinutes*60000,history_sha256:historyHash(s,true),epoch:s.owner.epoch,host,model_selection:selection,model_selection_sha256:digest(JSON.stringify(selection)),...(metadata?{model_catalog:{source:metadata.source,...(selection.mode==='explicit'?{model:metadata.models.find(m=>m.id===selection.model)}:{}),speed_support:metadata.speed_support}}:{}),previous,candidate:next,candidate_hash:teamHash(next),checkpoint:snapshot,checkpoint_sha256:digest(JSON.stringify(snapshot)),governance_policy:a.governance??'preserve',governance_instruction:a.governance_instruction??null,source_instruction:a.source_instruction,takeover_instruction:a.takeover_instruction??null};
       return s;
     }));
     try {launch(a.root,s.upgrade.id);} catch(error) {failUpgrade(a.root,s.upgrade.id,error);}
@@ -168,11 +173,11 @@ export function upgrade(a,host,{launch=launchUpgrade,check=readiness,catalog=mod
     // Separate post-commit readback. Preserve every checkpoint field except adopted definitions
     // and retired session references. Extra records (e.g. late quarantined work) remain intact.
     const expected={...u.checkpoint,...u.candidate,sessions:{}};
-    const actual=checkpoint(s);
+    const actual=checkpoint(s,{shallow:u.snapshot_protocol===1});
     for (const [k,v] of Object.entries(expected)) {
       if (k==='jobs') {
-        for (const [jid,j] of Object.entries(v)) {
-          const now=actual.jobs[jid];
+        for (const [jid,value] of Object.entries(v)) {
+          const j=resolveSnapshotEntry(s,value),now=actual.jobs[jid]&&resolveSnapshotEntry(s,actual.jobs[jid]);
           if (!now || (now.status!==j.status && now.status!=='quarantined')) throw new Error('Assignment history failed continuity readback');
           for (const [field,value] of Object.entries(j)) {
             if (now.status==='quarantined' && ['status','artifact_id','finished_at','native_id'].includes(field)) continue;
@@ -265,7 +270,7 @@ export async function rehearse(root,uid,model=runModel) {
       u.status='checking';u.started_at=stamp();u.probe_instance=id('upgrade-cos');u.reviewer_instance=id('upgrade-qa');
       u.probe_status='running';u.review_status='planned';return s;
     }));
-    const u=initial.upgrade,subject=buildEvidence(u.checkpoint,initial.upgrade_history??[],{currentState:u.context_mode==='current'});
+    const u=initial.upgrade,subject=buildEvidence(u.checkpoint,u.snapshot_protocol===1?shallowSnapshotHistory(initial,{current:false}).upgrade_history:initial.upgrade_history??[],{currentState:u.context_mode==='current',checkpointContinuity:u.snapshot_protocol===1,snapshotState:initial,contextState:initial});
     const pages=subject.pages.map(page=>evidencePage(subject,page));
     const frozenOwner=JSON.stringify(initial.owner);
     function guard(s,status='checking') {
@@ -289,13 +294,16 @@ export async function rehearse(root,uid,model=runModel) {
     }
     // This journal deliberately retains late/malformed output even after recovery.
     function retain(role,entry) {
-      withStore(root,db=>db.transaction('upgrade.native_returned',s=>{
+      withStore(root,db=>{
+        if(db.appendUpgradeCall(uid,{role,...entry}))return;
+        return db.transaction('upgrade.native_returned',s=>{
         const attempt=s.upgrade?.id===uid?s.upgrade:s.upgrade_history?.find(item=>item.id===uid);
         if (attempt) { (attempt.calls??=[]).push({role,...entry});
           if(entry.native_id)attempt[role==='cos'?'probe_native_id':'reviewer_native_id']=entry.native_id;
         }
         return s;
-      }));
+        });
+      });
     }
     publish('upgrade.inventory',a=>{
       a.evidence={...(Object.hasOwn(u,'call_timeout_minutes')?{call_timeout_minutes:u.call_timeout_minutes}:{}),review_deadline_policy:u.review_deadline_policy,deadline_ms:u.deadline_ms,model_selection_sha256:u.model_selection_sha256,checkpoint_sha256:subject.checkpoint_sha256,inventory_sha256:subject.inventory_sha256,history_sha256:subject.history_sha256,

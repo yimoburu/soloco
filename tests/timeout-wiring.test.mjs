@@ -1,3 +1,4 @@
+import * as publicResponse from '../plugins/soloco/runtime/public-response.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -6,8 +7,9 @@ import vm from 'node:vm';
 import * as coordination from '../plugins/soloco/runtime/coordination.mjs';
 import * as timeout from '../plugins/soloco/runtime/timeout.mjs';
 
-// Evaluate actual module bodies with explicit boundary doubles. No runtime
-// dependency closure, subprocess, CLI, network, or production store is loaded.
+// Evaluate actual module bodies with explicit boundary doubles. No real
+// model, subprocess, CLI, network, or production store is opened. Public
+// presentation helpers use their pure production implementations.
 const runtime=new URL('../plugins/soloco/runtime/',import.meta.url);
 function load(name,deps,names) {
   let source=fs.readFileSync(new URL(name,runtime),'utf8').replace(/^import .*;\r?\n/gm,'');
@@ -21,7 +23,7 @@ function harness() {
   let matches=true,scope=true,beforeTransaction;
   const intervals=new Set(),launches=[];
   const iso=()=>new Date(now).toISOString();
-  const deps={...coordination,...timeout,path,os:{homedir:()=>'/unused'},fs:{existsSync:()=>true,mkdirSync:()=>{}},process:{cwd:()=>process.cwd(),env:{},pid:42,execPath:'/unused/node',argv:[]},Date:class extends Date {static now(){return now;}},AbortController,
+  const deps={...publicResponse,...coordination,...timeout,path,os:{homedir:()=>'/unused'},fs:{existsSync:()=>true,mkdirSync:()=>{}},process:{cwd:()=>process.cwd(),env:{},pid:42,execPath:'/unused/node',argv:[]},Date:class extends Date {static now(){return now;}},AbortController,
     PACKAGE:'/unused',VERSION:'test',SCHEMA:2,stamp:iso,id:p=>p+'-'+(++sequence),digest:()=> 'binding',folder:x=>x,noLink:()=>{},
     withStore:(root,fn)=>fn({read:()=>structuredClone(state),transaction:(type,change)=>{if(beforeTransaction){const hook=beforeTransaction;beforeTransaction=undefined;hook(type);}const next=change(structuredClone(state));state=structuredClone(next);return structuredClone(state);}}),
     owner:(s,session,host,epoch)=>{if(s.owner.session_id!==session || s.owner.host!==host || (epoch!==undefined && s.owner.epoch!==epoch))throw new Error('Stale owner');},
@@ -37,7 +39,7 @@ function harness() {
     parseArtifact:JSON.parse,runModel:()=>{throw new Error('Real model forbidden');},dataDir:()=>'/unused',
     setInterval:(fn,ms)=>{assert.equal(ms,100);intervals.add(fn);return fn;},clearInterval:fn=>intervals.delete(fn),
     spawn:(...args)=>{launches.push(args);return {on:()=>{},unref:()=>{}};},hooks:()=>{},upgrade:()=>{},upgradeGuidance:''};
-  const engine=load('engine.mjs',deps,['dispatch','status','control']);
+  const engine=load('engine.mjs',deps,['dispatch','status','control','wait']);
   const worker=load('worker.mjs',deps,['work']);
   const main=load('main.mjs',{...deps,engine},['toolList','call']);
   const args={root:'/fixture',session_id:'founder',epoch:1,role:'engineer',task:'A bounded fixture assignment'};

@@ -90,6 +90,7 @@ function harness(host='claude') {
     },
     notice:(s,kind,summary,reference)=>s.notices.push({kind,summary,reference}),
     installedTeam:()=>({}),teamHash:()=> 'team',upgradePending:()=>false,compatibleRuntime:()=>true,
+    mutationView:value=>value,fits:()=>true,handoverReviewEligible:()=>false,qualificationMaintenanceEligible:()=>false,
     readiness:actualHost=>{
       assert.equal(actualHost,host);readinessCalls++;
       return {available:true,authenticated:true,version:'fixture-cli'};
@@ -310,4 +311,107 @@ test('speed wiring preserves ownership, pause, scope, adoption and independent-r
   await assert.rejects(h.call({model_selection:request,review_of:'target'}),/Authors cannot independently review/);
   assert.equal(Object.keys(h.state.jobs).length,1);
   assert.equal(h.launches.length,1);
+});
+
+const freshRequest={fresh_session:true,fresh_session_reason:'  Prior native history is unusable  '};
+test('fresh-session schema is optional and rejects missing, orphaned or invalid reasons without mutation',async()=>{
+  const schema=plain(harness().main.toolList.find(t=>t.name==='company_dispatch').inputSchema);
+  assert.deepEqual(schema.properties.fresh_session,{type:'boolean'});
+  assert.equal(schema.properties.fresh_session_reason.maxLength,300);
+  assert.ok(!schema.required.includes('fresh_session'));
+  for(const request of [
+    {fresh_session:true},{fresh_session:true,fresh_session_reason:' '},
+    {fresh_session:true,fresh_session_reason:'x'.repeat(301)},
+    {fresh_session:true,fresh_session_reason:42},{fresh_session:'true'},
+    {fresh_session_reason:'orphan'},{fresh_session:false,fresh_session_reason:'orphan'}
+  ]) {
+    const h=harness();await assert.rejects(h.call(request),/fresh_session/);
+    assert.deepEqual(h.state.jobs,{});assert.deepEqual(h.state.sessions,{});assert.equal(h.launches.length,0);
+  }
+});
+
+test('explicit fresh with identical settings retires exact lineage and queues null native without execution claims',async()=>{
+  for(const host of ['codex','claude']) {
+    const h=harness(host),choice=host==='codex'
+      ?{mode:'explicit',model:'fixture-model',effort:'high',reason:'Same scoped choice'}
+      :{mode:'explicit',model:'sonnet',speed:'fast_disabled',reason:'Same scoped choice'};
+    const first=await h.call({model_selection:choice});h.finish(first);
+    const prior=h.state.sessions.engineer,oldJob=h.state.jobs[first.id];
+    const fresh=await h.call({...freshRequest,model_selection:choice});
+    assert.notEqual(fresh.instance_id,first.instance_id);assert.equal(fresh.native_id,null);
+    assert.equal(h.state.sessions.engineer.native_id,null);assert.deepEqual(plain(fresh.model_selection),choice);
+    assert.equal(fresh.fresh_session,true);assert.equal(fresh.fresh_session_reason,freshRequest.fresh_session_reason.trim());
+    assert.equal(Object.hasOwn(fresh,'model_evidence'),false);
+    const retired=h.state.retired_sessions[0];
+    for(const [key,value] of Object.entries(prior))assert.deepEqual(retired[key],value);
+    assert.equal(retired.reason,'fresh_session_requested');assert.equal(retired.replacement_job_id,fresh.id);
+    assert.equal(retired.fresh_session_reason,fresh.fresh_session_reason);assert.ok(retired.retired_at);
+    assert.deepEqual(h.state.jobs[first.id],oldJob);assert.equal(h.launches.length,2);
+    assert.equal(h.contexts[1].native_id,null);assert.deepEqual(plain(fresh.inputs),[]);
+    h.finish(fresh);const resumed=await h.call({fresh_session:false,model_selection:choice});
+    assert.equal(resumed.instance_id,fresh.instance_id);assert.equal(resumed.native_id,'native-fixture');
+    assert.equal(Object.hasOwn(resumed,'fresh_session'),false);assert.equal(h.state.retired_sessions.length,1);
+  }
+  const empty=harness(),first=await empty.call(freshRequest);
+  assert.equal(first.native_id,null);assert.equal(empty.state.retired_sessions,undefined);
+});
+
+test('fresh after confirmed failure preserves failed job, authority, limits, inputs and attempt evidence',async()=>{
+  const h=harness(),first=await h.call({});h.finish(first);
+  h.mutate(s=>{
+    s.jobs[first.id].status='failed';s.jobs[first.id].error='Context history unusable';
+    s.jobs[first.id].coordination_release={termination_confirmed:true};
+    s.jobs[first.id].execution_deadline_at='retained original deadline';
+    s.records.evidence={id:'evidence',revision:2,content:'Canonical exact input'};
+    s.records.grant={id:'grant',revision:1,remaining_attempts:1,max_attempts:2,expires_at:'unchanged expiry'};
+    s.notices=[{id:'failure-notice',kind:'must_know',summary:'Retain prior failure'}];
+    s.governance='Original authority';
+  });
+  const before=h.state,fresh=await h.call({...freshRequest,input_ids:['evidence']});
+  assert.deepEqual(h.state.jobs[first.id],before.jobs[first.id]);
+  for(const key of ['owner','governance','roles','records','notices'])assert.deepEqual(h.state[key],before[key]);
+  assert.deepEqual(plain(fresh.inputs),[{id:'evidence',revision:2}]);
+  assert.equal(fresh.timeout_ms,first.timeout_ms);assert.equal(fresh.timeout_reason,first.timeout_reason);
+  assert.equal(Object.hasOwn(fresh,'execution_deadline_at'),false);
+  assert.equal(h.launches.length,2);assert.equal(fresh.native_id,null);
+});
+
+test('fresh cannot retire active/uncertain sessions or bypass owner, pause, host, resource or scope holds',async()=>{
+  for(const [configure,request,pattern] of [
+    [()=>{}, {}, /already has an assignment/],
+    [h=>h.mutate(s=>{s.jobs[Object.keys(s.jobs)[0]].status='running';}),{},/already has an assignment/],
+    [h=>h.mutate(s=>{s.jobs[Object.keys(s.jobs)[0]].status='failed';}),{},/uncertain/],
+    [h=>h.mutate(s=>{s.jobs[Object.keys(s.jobs)[0]].status='cancelled';}),{},/uncertain/],
+    [h=>h.mutate(s=>{s.jobs[Object.keys(s.jobs)[0]].status='interrupted';}),{},/uncertain/],
+    [h=>{h.finish(h.state.jobs[Object.keys(h.state.jobs)[0]]);h.mutate(s=>{s.jobs[Object.keys(s.jobs)[0]].coordination={resources:['held-by-prior-session']};});},{},/uncertain/],
+    [h=>h.mutate(s=>{s.owner.epoch=2;}),{},/owner/],
+    [h=>h.mutate(s=>{s.owner.session_id='other';}),{},/owner/],
+    [h=>h.mutate(s=>{s.paused=true;}),{},/paused/],
+    [h=>{h.finish(h.state.jobs[Object.keys(h.state.jobs)[0]]);h.mutate(s=>{s.sessions.engineer.host='codex';});},{model_selection:{mode:'default',speed:'fast_disabled',reason:'Changed choice cannot evade host'}},/another host/],
+    [h=>{h.finish(h.state.jobs[Object.keys(h.state.jobs)[0]]);h.revoke();},{},/Scope revoked/],
+    [h=>{h.finish(h.state.jobs[Object.keys(h.state.jobs)[0]]);h.mutate(s=>{s.jobs.uncertain={id:'uncertain',status:'failed',coordination:{resources:['shared']}};});},{resources:['shared']},/reserved/],
+    [h=>{h.finish(h.state.jobs[Object.keys(h.state.jobs)[0]]);h.mutate(s=>{s.jobs.active={id:'active',status:'running',coordination:{resources:['shared']}};});},{resources:['shared']},/reserved/],
+    [h=>h.finish(h.state.jobs[Object.keys(h.state.jobs)[0]]),{input_ids:['missing']},/input record is missing/],
+    [h=>h.finish(h.state.jobs[Object.keys(h.state.jobs)[0]]),{role:'invented'},/Role is absent/],
+    [h=>h.finish(h.state.jobs[Object.keys(h.state.jobs)[0]]),{role:'__proto__'},/Role is absent/],
+    [h=>h.finish(h.state.jobs[Object.keys(h.state.jobs)[0]]),{input_ids:['__proto__']},/input record is missing/]
+  ]) {
+    const h=harness();await h.call({});configure(h);const before=h.state;
+    await assert.rejects(h.call({...freshRequest,...request}),pattern);
+    assert.deepEqual(h.state,before);assert.equal(h.launches.length,1);
+  }
+});
+
+test('fresh is ordinary-only and cannot rotate handover reviewers or scoped generation identities',async()=>{
+  for(const scope of [{review_of:'handover'},{prototype_id:'scope'},{development_id:'scope'}]) {
+    const h=harness();await h.call({});const before=h.state;
+    await assert.rejects(h.call({...freshRequest,...scope}),/only for ordinary/);
+    assert.deepEqual(h.state,before);assert.equal(h.launches.length,1);
+  }
+  // Changed selection must still enforce same-author QA before replacing identity.
+  const h=harness(),first=await h.call({});h.finish(first);
+  h.mutate(s=>{s.records.target={id:'target',revision:1,author_instance:first.instance_id};s.sessions['engineer:review:target:1']={...s.sessions.engineer};});
+  const before=h.state;
+  await assert.rejects(h.call({review_of:'target',model_selection:{mode:'default',speed:'fast_disabled',reason:'Cannot rotate around author check'}}),/Authors cannot independently review/);
+  assert.deepEqual(h.state,before);assert.equal(h.launches.length,1);
 });

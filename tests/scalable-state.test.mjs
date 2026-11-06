@@ -117,6 +117,7 @@ test('durable supplemental dependencies invalidate returned work after source mu
  assert.equal(contextMatches(s,j,c.hash),true);s.records.supplement.content='changed after worker returned';assert.equal(contextMatches(s,j,c.hash),false);
 });
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
+import {call} from '../plugins/soloco/runtime/main.mjs';
 import {id,withStore} from '../plugins/soloco/runtime/store.mjs';
 import {work} from '../plugins/soloco/runtime/worker.mjs';
 async function contextFixture({negative=false,sameNative=false}={}) {
@@ -133,7 +134,11 @@ async function contextFixture({negative=false,sameNative=false}={}) {
 }
 test('public exact-plan classification applies only after independent review and retains originals',async()=>{
  const {a,source,plan,review}=await contextFixture();
- engine.contextControl({...a,action:'apply',plan_id:plan.id,review_id:review,source_instruction:'Apply independently reviewed historical disposition'},'codex');
+ const receipt=await call('company_context',{...a,action:'apply',plan_id:plan.id,review_id:review,source_instruction:'Apply independently reviewed historical disposition'},'codex');
+ assert.equal(receipt.applied,true);assert.equal(receipt.classifications.total,1);
+ const item=receipt.classifications.items[0];assert.equal(item.stored_metadata,true);
+ const exact=await call('company_context',{root:a.root,session_id:a.session_id,action:'read',id:item.source.id,sha256:item.source.sha256},'codex');
+ const stored=JSON.parse(exact.text);assert.equal(stored.disposition,'resolved');assert.equal(stored.plan.id,plan.id);assert.equal(stored.review.id,review);
  const state=withStore(a.root,db=>db.read());assert.deepEqual(state.records[source.id],source);
  assert.ok(!assignmentContext(state,{role:'engineer',context_format:3,inputs:[],task:'Current task'}).inputs.some(r=>r.id===source.id));
 });

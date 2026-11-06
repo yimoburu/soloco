@@ -1,3 +1,4 @@
+import { exactStatus, exactSource } from './helpers/public-exact.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -9,11 +10,12 @@ import {handoverHash,handoverReviewEligible,handoverSubject} from '../plugins/so
 import {work} from '../plugins/soloco/runtime/worker.mjs';
 import {readEvidence,buildEvidence} from '../plugins/soloco/runtime/upgrade-evidence.mjs';
 import {assignmentContext} from '../plugins/soloco/runtime/context.mjs';
+import {resolveSnapshotEntry} from '../plugins/soloco/runtime/snapshot.mjs';
 const base=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-handover-'));
 process.env.COMPANY_PLUGIN_DATA=path.join(base,'cache');
 test.after(()=>fs.rmSync(base,{recursive:true,force:true}));
 const content='Objectives: preserve the project. Rules: preparation only. Authority: no external execution. Pending work: inspect evidence and notices. Uncertainty: no business outcomes proven. Next action: independent review before resuming.';
-function setup(host='codex') {const root=fs.mkdtempSync(path.join(base,'fixture-')),a={root,session_id:id('old'),epoch:1,idea:'Fictional handover fixture'};engine.bind(root,a.session_id,host);engine.open(a,host);return a;}
+function setup(host='codex') {const root=fs.mkdtempSync(path.join(base,'fixture-')),a={root,session_id:id('old'),epoch:1,idea:'Fictional handover fixture'};engine.bind(root,a.session_id,host);engine.open(a,host);withStore(root,db=>db.migrate());return a;}
 function replace(a,host='codex') {const b={...a,session_id:id('new'),epoch:2};engine.bind(a.root,b.session_id,host);engine.control({...b,action:'handover',expected_epoch:1,source_instruction:'Continue here'},host);return b;}
 function submit(b,host='codex'){const receipt=engine.handover({...b,action:'submit',content},host);return withStore(b.root,db=>db.read().records[receipt.id]);}
 function queue(b,r,role='qa') {let key=id('job');withStore(b.root,db=>db.transaction('fixture.queue',s=>{
@@ -57,7 +59,7 @@ test('exact independent QA allows preparation resume, preserves records/notices 
  const a=setup();engine.notify({...a,kind:'must_know',summary:'Fictional unknown outcome'},'codex');
  const b=replace(a,host),r=submit(b,host);await review(b,r);
  const s=engine.control({...b,action:'resume',expected_epoch:2,source_instruction:'Resume after checked reconstruction'},host);
- assert.equal(s.paused,false);assert.equal(s.handover.status,'completed');assert.equal(s.handover.acceptance.subject_sha256,r.handover.subject_sha256);assert.equal(s.notices.length,1);assert.equal(s.capabilities.external_execution,false);
+ assert.equal(s.paused,false);assert.equal(s.handover.status,'completed');assert.equal(exactSource(b,host,s.handover.source).acceptance.subject_sha256,r.handover.subject_sha256);assert.equal(s.notices.total,1);assert.equal(s.capabilities.external_execution,false);
  engine.control({...b,action:'pause',expected_epoch:2,source_instruction:'pause'},host);engine.control({...b,action:'resume',expected_epoch:2,source_instruction:'same owner resume'},host);
  }
 });
@@ -80,7 +82,7 @@ test('state changes invalidate acceptance; hook delivery does not; failed review
 test('ordinary work cannot run during pending handover; pause cancels a check and late output quarantines',async()=>{
  const a=setup(),b=replace(a),r=submit(b);assert.equal(handoverReviewEligible(withStore(b.root,db=>db.read()),{role:'engineer',review_of:r.id}),false);
  const j=queue(b,r),ctx=withStore(b.root,db=>{const s=db.read();return assignmentContext(s,s.jobs[j]);}),page=ctx.initial_delivery[0];await work(b.root,j,async()=>{engine.control({...b,action:'pause',expected_epoch:2,source_instruction:'pause'},'codex');return {native_id:id('native'),text:JSON.stringify({content:'Late check',citations:[{source_id:page.source_id,sha256:page.sha256,offset:page.offset,length:page.length,range_sha256:page.range_sha256}],messages:[],notices:[],review:{verdict:'Pass',reason:'late'}})};});
- assert.equal(engine.status(b,'codex').jobs.find(v=>v.id===j).status,'quarantined');assert.throws(()=>engine.control({...b,action:'resume',expected_epoch:2,source_instruction:'resume'},'codex'),/reconstruction|QA/);
+ assert.equal(exactStatus(b,'codex').jobs.find(v=>v.id===j).status,'quarantined');assert.throws(()=>engine.control({...b,action:'resume',expected_epoch:2,source_instruction:'resume'},'codex'),/reconstruction|QA/);
 });
 
 
@@ -104,15 +106,12 @@ test('integration binds coordination metadata without duplicating frozen handove
 });
 
 
-test('classification-only changes invalidate handover and classification provenance is frozen for both roles',async()=>{
+test('orphan classification provenance holds handover without revoking outgoing ownership',()=>{
  const a=setup();
  withStore(a.root,db=>db.transaction('fixture.classification',s=>{s.context_classifications={historical:{source:{id:'historical',revision:1,sha256:'source-hash'},plan:{id:'plan',sha256:'plan-hash'},review:{id:'review',sha256:'review-hash'},disposition:'resolved',roles:['research'],scopes:[]}};return s;}));
- const b=replace(a),r=submit(b);await review(b,r);
- const current=withStore(b.root,db=>db.read());
- assert.deepEqual(r.handover.subject.context_classifications,current.context_classifications);
- withStore(b.root,db=>db.transaction('fixture.classification-only-change',s=>{s.context_classifications.historical.roles=['engineer'];return s;}));
- assert.throws(()=>engine.control({...b,action:'resume',expected_epoch:2,source_instruction:'resume'},'codex'),/stale/);
- const fresh=submit(b);assert.deepEqual(fresh.handover.subject.context_classifications.historical.roles,['engineer']);assert.notEqual(fresh.handover.subject_sha256,r.handover.subject_sha256);
+ assert.throws(()=>replace(a),/classification source is missing/);
+ const current=withStore(a.root,db=>db.read());assert.equal(current.owner.session_id,a.session_id);assert.equal(current.owner.epoch,1);
+ assert.equal(current.context_classifications.historical.source.sha256,'source-hash');
 });
 
 function semanticText(ctx){const e=ctx.handover_evidence;return e.sources[e.pages[0].source_id].raw;}
@@ -128,8 +127,9 @@ test('founder inspection, exact reads and submission receipts remain bounded whi
  assert.equal(read.text.length,32768);assert.ok(JSON.stringify(read).length<200000);
  const receipt=engine.handover({...b,action:'submit',content},'codex');
  assert.ok(JSON.stringify(receipt).length<200000);assert.equal(receipt.handover.subject,undefined);
- const target=withStore(b.root,db=>db.read().records[receipt.id]);
- assert.ok(JSON.stringify(target.handover.subject).length>200000);
+ const frozen=withStore(b.root,db=>db.read()),target=frozen.records[receipt.id];
+ assert.ok(JSON.stringify(target.handover.subject).length<200000);
+ assert.ok(JSON.stringify(Object.fromEntries(Object.entries(target.handover.subject.records).map(([key,value])=>[key,resolveSnapshotEntry(frozen,value)]))).length>200000);
  assert.equal(receipt.handover.retained_subject.sha256,target.handover.subject_sha256);
  withStore(b.root,db=>db.transaction('fixture.source-change',s=>{s.records.extra={id:'extra',kind:'intent',content:'Another binding obligation'};return s;}));
  assert.throws(()=>engine.handover({...b,action:'read',subject_sha256:packet.subject_sha256,source_id:source.source_id,sha256:source.sha256,offset:0,length:1},'codex'),/subject changed/);
@@ -172,9 +172,7 @@ test('founder read response bounds include escaped payload and long source metad
  const a=setup(),key='k'.repeat(5000)+'.mjs',payload='\u0000'.repeat(40000);
  withStore(a.root,db=>db.transaction('fixture.escaped-range',s=>{s.records.long={id:'long',kind:'artifact',content:JSON.stringify({basis:'Fictional',files:{[key]:payload}})};return s;}));
  const packet=engine.handover({...a,action:'inspect'},'codex');
- const subject=withStore(a.root,db=>handoverSubject(db.read()));
- const {upgrade_history,upgrade,...current}=subject;
- const evidence=buildEvidence(current,[...upgrade_history,...(upgrade?[upgrade]:[])],{wholeBodyAliases:false,checkpointContinuity:true});
+ const evidence=withStore(a.root,db=>{const s=db.read(),{upgrade_history,upgrade,...current}=handoverSubject(s);return buildEvidence(current,[...upgrade_history,...(upgrade?[upgrade]:[])],{wholeBodyAliases:false,checkpointContinuity:true,snapshotState:s});});
  const source=Object.values(evidence.sources).find(s=>s.kind==='payload'&&s.raw===payload);
  assert.ok(source);
  const args={...a,action:'read',subject_sha256:packet.subject_sha256,source_id:source.source_id,sha256:source.sha256,offset:0,length:32768};
@@ -208,14 +206,15 @@ test('25.7M fictional archive fits 200k; exact originals, mandatory legacy oblig
  assert.ok(archive.length>25700000);
  const b=replace(a),r=submit(b),j=queue(b,r),ctx=frozenContext(b,j),pack=JSON.parse(ctx.text);
  assert.ok(ctx.text.length<200000,ctx.text.length);
- assert.equal(pack.preservation.upgrade_history_sha256,digest(archive));
+ assert.equal(pack.preservation.upgrade_history_sha256,digest(JSON.stringify(r.handover.subject.upgrade_history)));
  assert.equal(digest(JSON.stringify(r.handover.subject)),r.handover.subject_sha256);
- assert.equal(JSON.stringify(r.handover.subject.upgrade_history),archive);
+ const retained=withStore(b.root,db=>{const s=db.read();return r.handover.subject.upgrade_history.map(u=>resolveSnapshotEntry(s,u));});
+ assert.equal(JSON.stringify(retained),archive);
  assert.match(semanticText(ctx),/Legacy restriction: never contact fictional customers/);
  assert.match(semanticText(ctx),/Fictional unknown restriction remains binding/);
  assert.match(semanticText(ctx),/Unresolved fictional historical failure/);
  const source=ctx.handover_evidence.inventory.entries.find(x=>x.reason==='prior-full-checkpoint-snapshot');
- const original=JSON.stringify(r.handover.subject.upgrade_history[0].checkpoint),unicodeOffset=original.indexOf('🧪');
+ const original=JSON.stringify(retained[0].checkpoint),unicodeOffset=original.indexOf('🧪');
  assert.equal(source.sha256,digest(original));
  let calls=0;const native=id('independent-native'),registry=pack.frozen_subject.registry;
  await completeReview(b,j,async(host,session,request)=>{
@@ -292,7 +291,7 @@ test('current obligations and distinct legacy team rules stay compulsory regardl
 
 test('retained legacy v1 reconstruction and review still resume under their original contract',async()=>{
  const a=setup(),b=replace(a),r=submit(b);
- withStore(b.root,db=>db.transaction('fixture.retained-v1',s=>{delete s.records[r.id].handover.evidence_protocol;return s;}));
+ withStore(b.root,db=>db.transaction('fixture.retained-v1',s=>{const h=s.records[r.id].handover;delete h.evidence_protocol;h.subject=handoverSubject(s);h.subject_sha256=digest(JSON.stringify(h.subject));return s;}));
  const legacy=withStore(b.root,db=>db.read().records[r.id]);await review(b,legacy);
  const s=engine.control({...b,action:'resume',expected_epoch:2,source_instruction:'Resume retained fictional legacy handover'},'codex');assert.equal(s.paused,false);
 });
@@ -320,7 +319,7 @@ test('archival occurrence indexes and distinct current semantics stay retrievabl
   s.upgrade_history=Array.from({length:8},(_,i)=>({id:'many-'+i,checkpoint:structuredClone(checkpoint)}));return s;
  }));
  const b=replace(a),r=submit(b),j=queue(b,r),ctx=frozenContext(b,j),pack=JSON.parse(ctx.text);
- assert.ok(ctx.text.length<200000,ctx.text.length);assert.ok(pack.frozen_subject.registry.length>200000);
+ assert.ok(ctx.text.length<200000,ctx.text.length);assert.ok(pack.frozen_subject.registry.length>0);
  assert.match(semanticText(ctx),/Fictional binding restriction 179/);
  assert.ok(ctx.handover_evidence.inventory.entries.some(e=>e.kind==='checkpoint-equality-index'));
 });
@@ -343,7 +342,7 @@ test('227 varied fictional obligations and large pinned rules require complete s
  assert.ok(pack.frozen_subject.entry_points.find(x=>x.path==='/governance').total>200000);
  const semantics=JSON.parse(semanticText(ctx));
  for(let i=0;i<3;i++){
-  const original=JSON.stringify(r.handover.subject.upgrade_history[i].checkpoint);
+  const original=withStore(b.root,db=>{const s=db.read();return JSON.stringify(resolveSnapshotEntry(s,r.handover.subject.upgrade_history[i]).checkpoint);});
   const source=ctx.handover_evidence.inventory.entries.find(x=>x.reason==='prior-full-checkpoint-snapshot'&&x.scope==='history'&&x.path===`/${i}/checkpoint`);
   assert.ok(source);let restored='';
   while(restored.length<source.length){

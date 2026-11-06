@@ -69,9 +69,11 @@ function setup(){
   engine.bind(a.root,a.session_id,'codex');return a;
 }
 
-test('new handover atomically fences actual published 0.6.8 resume without adopting pinned definitions',()=>{
+test('explicitly migrated handover fences actual published 0.6.8 resume without adopting pinned definitions',()=>{
   const a=setup(),before=state(a);
   engine.open(a,'codex');assert.deepEqual(state(a),before,'Read-only opening must not adopt or promote');
+  // New snapshot storage needs explicit migration; the read-only open above did not do it.
+  withStore(a.root,db=>db.migrate());
   const b={...a,session_id:id('fictional-successor'),epoch:2};engine.bind(a.root,b.session_id,'codex');
   engine.control({...b,action:'handover',expected_epoch:1,source_instruction:'Fictional authorized replacement'},'codex');
   const pending=state(b);
@@ -79,8 +81,8 @@ test('new handover atomically fences actual published 0.6.8 resume without adopt
   assert.equal(pending.handover.status,'pending');assert.equal(pending.paused,true);
   for(const key of ['plugin_version','governance','governance_sha256','roles','cos_instructions','team_sha256'])assert.deepEqual(pending[key],before[key],key+' must stay pinned');
   legacy.bind(b.root,b.session_id,'codex');
-  assert.throws(()=>legacy.control({...b,action:'resume',expected_epoch:2,source_instruction:'Fictional stale-runtime resume'},'codex'),/upgrade/);
-  assert.throws(()=>legacy.save({...b,kind:'decision',content:'Fictional stale-runtime mutation'},'codex'),/runtime upgrade/);
+  assert.throws(()=>legacy.control({...b,action:'resume',expected_epoch:2,source_instruction:'Fictional stale-runtime resume'},'codex'),/upgrade|company version|storage/i);
+  assert.throws(()=>legacy.save({...b,kind:'decision',content:'Fictional stale-runtime mutation'},'codex'),/runtime upgrade|company version|storage/i);
   assert.deepEqual(state(b),pending,'Rejected old-runtime operations must preserve pending QA gate');
   engine.bind(b.root,b.session_id,'codex');
   assert.throws(()=>engine.control({...b,action:'resume',expected_epoch:2,source_instruction:'Fictional premature resume'},'codex'),/reconstruction/);

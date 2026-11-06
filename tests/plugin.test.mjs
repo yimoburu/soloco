@@ -1,3 +1,5 @@
+import { exactStatus, exactCollection } from './helpers/public-exact.mjs';
+import { activityFor, selectionUsage } from '../plugins/soloco/runtime/selection.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -12,6 +14,13 @@ import { assignmentContext, contextMatches } from '../plugins/soloco/runtime/con
 import { developmentAssignment, developmentCapability } from '../plugins/soloco/runtime/develop.mjs';
 import { commandArgs, parseOutput, modelCatalog } from '../plugins/soloco/runtime/adapters.mjs';
 
+// Legacy assertions consume exact paged evidence. Activity and usage assertions
+// inspect all job requests/evidence instead of a bounded status window.
+function completeStatus(a,host) {
+  const view=exactStatus(a,host),state={...view,jobs:Object.fromEntries(view.jobs.map(j=>[j.id,j])),records:Object.fromEntries(view.records.map(r=>[r.id,r]))};
+  view.activity=activityFor(state);view.selection_usage={...view.selection_usage,groups:selectionUsage(state).groups};
+  return view;
+}
 const base=fs.mkdtempSync(path.join(os.tmpdir(),'company-test-'));
 process.env.COMPANY_PLUGIN_DATA=path.join(base,'cache');
 test.after(()=>fs.rmSync(base,{recursive:true,force:true}));
@@ -22,6 +31,8 @@ function setup(host='codex') {
   engine.open(a,host);
   return a;
 }
+// Synthetic snapshot workflows explicitly prepare storage; production never migrates implicitly.
+function migrated(a){withStore(a.root,db=>db.migrate());return a;}
 function queued(a,{role='pm',review_of=null,inputs=[]}={}) {
   const jid=id('job'), instance=id(role);
   withStore(a.root,db=>db.transaction('test.queue',s=>{
@@ -33,7 +44,7 @@ const result=(content='A bounded experiment.',extra={})=>({native_id:id('native'
 
 test('initialize in existing folder without touching user files, resume pinned company',()=>{
   const a=setup();fs.writeFileSync(path.join(a.root,'existing.txt'),'preserve');
-  const before=engine.status(a,'codex');
+  const before=completeStatus(a,'codex');
   const resumed=engine.open({...a,idea:'Must not reset'},'codex');
   assert.equal(resumed.company_id,before.company_id);assert.equal(resumed.idea,before.idea);
   assert.equal(fs.readFileSync(path.join(a.root,'existing.txt'),'utf8'),'preserve');
@@ -57,18 +68,18 @@ test('another chat cannot claim coordinator or amend its records',()=>{
   const a=setup(),b={...a,session_id:'other'};engine.bind(b.root,b.session_id,'codex');
   assert.throws(()=>engine.open(b,'codex'),/does not own/);
   assert.throws(()=>engine.save({...b,kind:'plan',content:'overwrite'},'codex'),/does not own/);
-  assert.equal(engine.status(b,'codex').idea,a.idea);
+  assert.equal(completeStatus(b,'codex').idea,a.idea);
 });
 test('optimistic revisions preserve older draft and reject stale amendments',()=>{
   const a=setup();const r=engine.save({...a,kind:'intent',content:'solo freelancers',source_reference:'founder message'},'codex');
   engine.save({...a,id:r.id,kind:'intent',expected_revision:1,content:'agencies'},'codex');
   assert.throws(()=>engine.save({...a,id:r.id,kind:'intent',expected_revision:1,content:'stale'},'codex'),/version conflict/);
-  const saved=engine.status(a,'codex').records[0];assert.equal(saved.previous[0].content,'solo freelancers');assert.equal(saved.status,'Draft');
+  const saved=completeStatus(a,'codex').records[0];assert.equal(saved.previous[0].content,'solo freelancers');assert.equal(saved.status,'Draft');
 });
 test('specialist artifact, direct peer message and notice survive a new connection',async()=>{
   const a=setup(),j=queued(a);
   await work(a.root,j,async()=>result('Scope proposal',{messages:[{to:'research',content:'Check the assumption'}],notices:[{kind:'must_know',summary:'Customer evidence is missing'}]}));
-  const state=engine.status(a,'codex');assert.equal(state.jobs[0].status,'completed');assert.equal(state.records[0].status,'Submitted');
+  const state=completeStatus(a,'codex');assert.equal(state.jobs[0].status,'completed');assert.equal(state.records[0].status,'Submitted');
   assert.equal(state.messages[0].from,'pm');assert.equal(state.messages[0].to,'research');assert.equal(state.notices.length,1);
   assert.ok(Object.values(state.sessions)[0].native_id);
 });
@@ -76,7 +87,7 @@ test('independent review binds exact author artifact version and does not approv
   const a=setup(),r=engine.save({...a,kind:'plan',content:'Hypothesis and bounds'},'codex');
   const j=queued(a,{role:'qa',review_of:{id:r.id,revision:r.revision}});
   await work(a.root,j,async()=>result('Review evidence',{review:{verdict:'Pass',reason:'Explicit measurable criteria'}}));
-  const s=engine.status(a,'codex');const review=s.records.find(r=>r.kind==='review');
+  const s=completeStatus(a,'codex');const review=s.records.find(r=>r.kind==='review');
   assert.notEqual(review.author_instance,r.author_instance);assert.equal(review.review.verdict,'Pass');assert.equal(s.phase,'Frame');assert.equal(s.mode,'preparation');
 });
 test('generation and review prompts assign bounded deliverable ownership on both hosts',async()=>{
@@ -86,7 +97,7 @@ test('generation and review prompts assign bounded deliverable ownership on both
     await work(a.root,producer,async(actualHost,_native,prompt)=>{
       assert.equal(actualHost,host);generationPrompt=prompt;return result('Candidate with evidence and limitations');
     });
-    let s=engine.status(a,host),generation=s.jobs.find(j=>j.id===producer);
+    let s=completeStatus(a,host),generation=s.jobs.find(j=>j.id===producer);
     assert.equal(generation.status,'completed',generation.error);
     const artifact=s.records.find(r=>r.id===generation.artifact_id);
     const reviewer=queued(a,{role:'qa',review_of:{id:artifact.id,revision:artifact.revision}});
@@ -94,7 +105,7 @@ test('generation and review prompts assign bounded deliverable ownership on both
       assert.equal(actualHost,host);reviewPrompt=prompt;
       return result('Evidence is incomplete',{review:{verdict:'Blocked',reason:'Required acceptance evidence is missing'}});
     });
-    s=engine.status(a,host);const reviewJob=s.jobs.find(j=>j.id===reviewer);
+    s=completeStatus(a,host);const reviewJob=s.jobs.find(j=>j.id===reviewer);
     assert.equal(reviewJob.status,'completed',reviewJob.error);
     const review=s.records.find(r=>r.id===reviewJob.artifact_id);
     assert.equal(review.review.verdict,'Blocked');assert.notEqual(review.author_instance,artifact.author_instance);
@@ -119,25 +130,25 @@ test('changed reviewed artifact quarantines late review',async()=>{
   const a=setup(),r=engine.save({...a,kind:'plan',content:'v1'},'codex');
   const j=queued(a,{role:'qa',review_of:{id:r.id,revision:1}});
   await work(a.root,j,async()=>{engine.save({...a,id:r.id,kind:'plan',expected_revision:1,content:'v2'},'codex');return result('Review v1',{review:{verdict:'Pass',reason:'v1 only'}});});
-  const s=engine.status(a,'codex');assert.equal(s.jobs[0].status,'quarantined');assert.equal(s.records.find(r=>r.kind==='review').status,'Quarantined');
+  const s=completeStatus(a,'codex');assert.equal(s.jobs[0].status,'quarantined');assert.equal(s.records.find(r=>r.kind==='review').status,'Quarantined');
 });
 test('pause works from a founder hook and quarantines in-flight output',async()=>{
   const a=setup(),j=queued(a);
   await work(a.root,j,async()=>{hook({cwd:a.root,session_id:a.session_id,hook_event_name:'UserPromptSubmit',prompt:'pause'},'codex');return result();});
-  const s=engine.status(a,'codex');assert.equal(s.paused,true);assert.equal(s.jobs[0].status,'quarantined');
+  const s=completeStatus(a,'codex');assert.equal(s.paused,true);assert.equal(s.jobs[0].status,'quarantined');
 });
 test('handover rejects active work, preserves records/notices, revokes old coordinator',()=>{
-  const a=setup(),j=queued(a),b={...a,session_id:'incoming'};engine.bind(b.root,b.session_id,'claude');
+  const a=migrated(setup()),j=queued(a),b={...a,session_id:'incoming'};engine.bind(b.root,b.session_id,'claude');
   engine.notify({...a,kind:'decision_required',summary:'Choose audience'},'codex');
   assert.throws(()=>engine.control({...b,action:'handover',expected_epoch:1,source_instruction:'Continue in Claude'},'claude'),/active/);
   engine.control({...a,action:'pause',expected_epoch:1,source_instruction:'pause'},'codex');
-  const s=engine.control({...b,action:'handover',expected_epoch:1,source_instruction:'Continue in Claude'},'claude');
+  engine.control({...b,action:'handover',expected_epoch:1,source_instruction:'Continue in Claude'},'claude');const s=completeStatus(b,'claude');
   assert.equal(s.owner.epoch,2);assert.equal(s.paused,true);assert.equal(s.notices.length,1);assert.equal(s.jobs.find(x=>x.id===j).status,'cancelled');
   assert.throws(()=>engine.save({...a,kind:'plan',content:'old'},'codex'),/does not own/);
 });
 test('failed or malformed model output creates a notice and grants no success',async()=>{
   const a=setup(),j=queued(a);await work(a.root,j,async()=>({native_id:'n',text:'not JSON'}));
-  const s=engine.status(a,'codex');assert.equal(s.jobs[0].status,'failed');assert.equal(s.notices.length,1);assert.equal(s.records.length,0);
+  const s=completeStatus(a,'codex');assert.equal(s.jobs[0].status,'failed');assert.equal(s.notices.length,1);assert.equal(s.records.length,0);
 });
 test('invalid envelopes retain precise rejected evidence and never partially publish or route',async()=>{
   const invalid=[
@@ -149,7 +160,7 @@ test('invalid envelopes retain precise rejected evidence and never partially pub
   for(const {field,...payload} of invalid) {
     const a=setup(),j=queued(a),out=result('Preserve this substantive candidate',payload);
     await work(a.root,j,async()=>out);
-    const s=engine.status(a,'codex'),job=s.jobs[0];
+    const s=completeStatus(a,'codex'),job=s.jobs[0];
     assert.equal(job.status,'failed');assert.match(job.error,field);
     assert.equal(job.native_id,out.native_id);assert.match(job.rejected_output.text,/Preserve this substantive candidate/);
     assert.equal(s.messages.length,0);assert.equal(s.records.length,0);assert.equal(s.notices.length,1);
@@ -159,13 +170,13 @@ test('invalid envelopes retain precise rejected evidence and never partially pub
 test('notice delivery, seeing, resolution, and authority remain distinct',()=>{
   const a=setup(),n=engine.notify({...a,kind:'decision_required',summary:'Choose the customer'},'codex');
   hook({cwd:a.root,session_id:a.session_id,hook_event_name:'UserPromptSubmit',prompt:'status'},'codex');
-  let s=engine.status(a,'codex');assert.equal(s.notices[0].deliveries.length,1);assert.equal(s.notices[0].seen_at,null);
-  engine.acknowledge({...a,notice_id:n.id,seen:true},'codex');s=engine.status(a,'codex');assert.ok(s.notices[0].seen_at);assert.equal(s.notices[0].resolution,null);assert.equal(s.capabilities.external_execution,false);
+  let s=completeStatus(a,'codex');assert.equal(s.notices[0].deliveries.length,1);assert.equal(s.notices[0].seen_at,null);
+  engine.acknowledge({...a,notice_id:n.id,seen:true},'codex');s=completeStatus(a,'codex');assert.ok(s.notices[0].seen_at);assert.equal(s.notices[0].resolution,null);assert.equal(s.capabilities.external_execution,false);
 });
 test('preferences require provenance and never mutate permission',()=>{
   const a=setup();assert.throws(()=>engine.save({...a,kind:'preference',content:'No updates'},'codex'),/basis/);
   engine.save({...a,kind:'preference',content:'Short updates',basis:'explicit',source_reference:'founder msg 1'},'codex');
-  assert.equal(engine.status(a,'codex').mode,'preparation');
+  assert.equal(completeStatus(a,'codex').mode,'preparation');
 });
 test('MCP validates arguments and does not expose arbitrary command execution',async()=>{
   await assert.rejects(call('company_dispatch',{root:base,session_id:'s',role:'pm',task:'x',command:'rm -rf'},'codex'),/Unknown argument/);
@@ -210,7 +221,7 @@ else {
     async function run() {
       const j=engine.dispatch({...a,role:'pm',task:'Prepare a proposal'},'codex');
       assert.ok(j.context_sha256);assert.ok(j.inputs.some(ref=>ref.id===intent.id && ref.revision===1));
-      for(let i=0;i<100;i++) {await new Promise(r=>setTimeout(r,30));const s=engine.status(a,'codex');const job=s.jobs.find(x=>x.id===j.id);if(!['queued','running'].includes(job.status))return {job,s};}
+      for(let i=0;i<100;i++) {await new Promise(r=>setTimeout(r,30));const s=completeStatus(a,'codex');const job=s.jobs.find(x=>x.id===j.id);if(!['queued','running'].includes(job.status))return {job,s};}
       throw new Error('Worker did not finish');
     }
     const first=await run();assert.equal(first.job.status,'completed',first.job.error);
@@ -226,14 +237,14 @@ test('concurrent processes cannot both commit the same expected record revision'
   const url=new URL('../plugins/soloco/runtime/engine.mjs',import.meta.url).href;
   const source=`import {save} from ${JSON.stringify(url)}; try {save(${JSON.stringify({...a,id:r.id,expected_revision:1,kind:'plan',content:'v2'})},'codex');}catch{process.exitCode=1;}`;
   const codes=await Promise.all([1,2].map(()=>new Promise(resolve=>{const p=spawn(process.execPath,['--no-warnings','--input-type=module','-e',source],{stdio:'ignore'});p.on('close',resolve);})));
-  assert.deepEqual(codes.sort(),[0,1]);assert.equal(engine.status(a,'codex').records[0].revision,2);
+  assert.deepEqual(codes.sort(),[0,1]);assert.equal(completeStatus(a,'codex').records[0].revision,2);
 });
 
 test('same chat cannot reuse a revoked epoch after a handover',()=>{
-  const a=setup();
+  const a=migrated(setup());
   engine.control({...a,action:'handover',expected_epoch:1,source_instruction:'Replace these preparation sessions'},'codex');
   assert.throws(()=>engine.save({...a,kind:'plan',content:'stale pending write'},'codex'),/does not own/);
-  const current=engine.status(a,'codex');
+  const current=completeStatus(a,'codex');
   const saved=engine.save({...a,epoch:current.owner.epoch,kind:'plan',content:'current proposal'},'codex');
   assert.equal(saved.status,'Draft');
 });
@@ -241,7 +252,7 @@ test('same chat cannot reuse a revoked epoch after a handover',()=>{
 
 test('compatible runtime patches preserve pinned team, ownership and native sessions without adoption',async()=>{
   for(const version of ['0.2.0','0.2.1','0.2.2','0.3.0','0.3.1','0.4.0','0.4.1','0.5.0','0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7']) {
-    const a=setup();
+    const a=migrated(setup());
     withStore(a.root,db=>db.transaction('test.old_patch',s=>{
       s.plugin_version=version;s.runtime_version=version;
       s.governance='Pinned preparation governance; preserve founder limits';s.governance_sha256=digest(s.governance);
@@ -254,16 +265,16 @@ test('compatible runtime patches preserve pinned team, ownership and native sess
     assert.equal(resumed.cos_instructions,'PINNED OLD COS');
     assert.deepEqual(withStore(a.root,db=>db.read()),before);
     const injected=hook({cwd:a.root,session_id:a.session_id,hook_event_name:'SessionStart'},'codex').hookSpecificOutput.additionalContext;
-    assert.match(injected,/PINNED OLD COS/);assert.doesNotMatch(injected,/Company requires upgrade maintenance/);
+    assert.match(injected,/company_open is required/);const reopened=engine.open(a,'codex');const pinned=exactCollection(a,'codex','sources').find(row=>row.source.id==='@public:pinned:cos_instructions');assert.equal(pinned.value,'PINNED OLD COS');assert.equal(reopened.cos_instructions,pinned.value);assert.doesNotMatch(injected,/Company requires upgrade maintenance/);
     engine.save({...a,kind:'intent',content:'Keep the existing budget'},'codex');
     const j=queued(a);await work(a.root,j,async()=>result());
-    const s=engine.status(a,'codex');assert.equal(s.jobs[0].status,'completed');
+    const s=completeStatus(a,'codex');assert.equal(s.jobs[0].status,'completed');
     assert.equal(s.plugin_version,version);assert.equal(s.sessions.pm.native_id,'persisted-native');
     assert.equal(s.owner.epoch,before.owner.epoch);assert.equal(s.upgrade,null);
     engine.control({...a,action:'pause',expected_epoch:1,source_instruction:'Pause'},'codex');
     engine.control({...a,action:'resume',expected_epoch:1,source_instruction:'Resume'},'codex');
     engine.control({...a,action:'handover',expected_epoch:1,source_instruction:'Replace the coordinator'},'codex');
-    assert.equal(engine.status(a,'codex').owner.epoch,2);
+    assert.equal(completeStatus(a,'codex').owner.epoch,2);
   }
 });
 
@@ -291,7 +302,7 @@ test('assignment packs retain constraints, failed evidence, notices and named in
     assert.match(prompt,/Missing source needs follow-up/);assert.ok(!prompt.includes(unrelated.content));
     return result();
   });
-  const job=engine.status(a,'codex').jobs[0];assert.equal(job.status,'completed');
+  const job=completeStatus(a,'codex').jobs[0];assert.equal(job.status,'completed');
   assert.ok(job.inputs.some(r=>r.id===intent.id));assert.ok(job.inputs.some(r=>r.id==='failure'));
   assert.ok(job.context_sha256);
 });
@@ -304,7 +315,7 @@ test('new constraints, pending notices and recipient messages quarantine in-flig
   ]) {
     const a=setup(),j=queued(a);
     await work(a.root,j,async()=>{change(a);return result();});
-    assert.equal(engine.status(a,'codex').jobs[0].status,'quarantined');
+    assert.equal(completeStatus(a,'codex').jobs[0].status,'quarantined');
   }
 });
 
@@ -314,7 +325,7 @@ test('notice presentation and seen bookkeeping do not invalidate an assignment',
     hook({cwd:a.root,session_id:a.session_id,hook_event_name:'UserPromptSubmit',prompt:'status'},'codex');
     engine.acknowledge({...a,notice_id:n.id,seen:true},'codex');return result();
   });
-  assert.equal(engine.status(a,'codex').jobs[0].status,'completed');
+  assert.equal(completeStatus(a,'codex').jobs[0].status,'completed');
 });
 
 test('changed queued dependencies are held before spending a model call',async()=>{
@@ -325,14 +336,14 @@ test('changed queued dependencies are held before spending a model call',async()
     if(addConstraint)engine.save({...a,kind:'decision',content:'New founder limit'},'codex');
     else engine.save({...a,id:r.id,expected_revision:1,kind:'plan',content:'Version two'},'codex');
     let calls=0;await work(a.root,j,async()=>{calls++;return result();});
-    assert.equal(calls,0);assert.equal(engine.status(a,'codex').jobs[0].status,'failed');
+    assert.equal(calls,0);assert.equal(completeStatus(a,'codex').jobs[0].status,'failed');
   }
 });
 
 test('oversized assignment context is held intact instead of silently truncated',async()=>{
   const a=setup();for(let i=0;i<3;i++)engine.save({...a,kind:'intent',content:'x'.repeat(80000)},'codex');
   const j=queued(a);let calls=0;await work(a.root,j,async()=>{calls++;return result();});
-  const s=engine.status(a,'codex');assert.equal(calls,0);assert.equal(s.jobs[0].status,'failed');
+  const s=completeStatus(a,'codex');assert.equal(calls,0);assert.equal(s.jobs[0].status,'failed');
   assert.match(s.jobs[0].error,/Nothing was truncated/);
   assert.equal(s.records.filter(r=>r.kind==='intent').reduce((n,r)=>n+r.content.length,0),240000);
 });
@@ -342,7 +353,7 @@ test('unrelated artifacts do not invalidate the bounded assignment',async()=>{
   await work(a.root,j,async()=>{
     engine.save({...a,id:r.id,expected_revision:1,kind:'artifact',content:'Unrelated v2'},'codex');return result();
   });
-  assert.equal(engine.status(a,'codex').jobs[0].status,'completed');
+  assert.equal(completeStatus(a,'codex').jobs[0].status,'completed');
 });
 
 test('legacy generator folders remain protected after retiring the generator',()=>{
@@ -390,15 +401,15 @@ test('rename requires current owner, current name, valid label and source instru
   }
   engine.control(request,'codex');
   assert.throws(()=>engine.control({...request,name:'Stale competing rename'},'codex'),/name changed/);
-  assert.equal(engine.status(a,'codex').name,'BriefLink');
+  assert.equal(completeStatus(a,'codex').name,'BriefLink');
 });
 
 test('rename waits for active assignments and does not resume a held company',()=>{
   const a=setup(),j=queued(a),request={...a,action:'rename',expected_epoch:1,expected_name:'Untitled Venture',name:'New name',source_instruction:'Rename'};
   assert.throws(()=>engine.control(request,'codex'),/Assignments are active/);
-  assert.equal(engine.status(a,'codex').jobs[0].status,'queued');
+  assert.equal(completeStatus(a,'codex').jobs[0].status,'queued');
   engine.control({...a,action:'pause',expected_epoch:1,source_instruction:'Pause'},'codex');
-  const s=engine.control(request,'codex');assert.equal(s.name,'New name');assert.equal(s.paused,true);assert.equal(s.jobs[0].status,'cancelled');
+  engine.control(request,'codex');const s=completeStatus(a,'codex');assert.equal(s.name,'New name');assert.equal(s.paused,true);assert.equal(s.jobs[0].status,'cancelled');
 });
 
 test('SoloCo can rebind the same founder chat after a plugin cache replacement',async()=>{
@@ -411,9 +422,9 @@ test('SoloCo can rebind the same founder chat after a plugin cache replacement',
     assert.throws(()=>engine.open(a,'codex'),/binding/);
     hook({cwd:a.root,session_id:a.session_id,hook_event_name:'SessionStart'},'codex');
     assert.deepEqual(withStore(a.root,db=>db.read()),before);
-    const current=engine.open(a,'codex');assert.equal(current.company_id,before.id);assert.deepEqual(current.sessions,before.sessions);
+    const current=engine.open(a,'codex');assert.equal(current.company_id,before.id);assert.deepEqual(completeStatus(a,'codex').sessions,before.sessions);
     engine.control({...a,action:'resume',expected_epoch:1,source_instruction:'Continue the same company'},'codex');
-    assert.equal(engine.status(a,'codex').paused,false);
+    assert.equal(completeStatus(a,'codex').paused,false);
   } finally {process.env.COMPANY_PLUGIN_DATA=oldCache;}
 });
 
@@ -444,8 +455,9 @@ else if(args[0]==='app-server') {
  }
 } else {
  let prompt='';for await(const c of process.stdin)prompt+=c;
- fs.appendFileSync(${JSON.stringify(log)},JSON.stringify({args,cwd:process.cwd()})+'\\n');
+ fs.appendFileSync(${JSON.stringify(log)},JSON.stringify({args,cwd:process.cwd(),prompt})+'\\n');
  if(args[args.indexOf('--model')+1]==='test-unavailable'){console.error('Selected model unavailable');process.exit(1);}
+ if(prompt.includes('SYNTHETIC_SESSION_FAILURE')){console.error('Synthetic unusable history');process.exit(1);}
  const file='.native-id';const native=fs.existsSync(file)?fs.readFileSync(file,'utf8'):randomUUID();fs.writeFileSync(file,native);
  console.log(JSON.stringify({type:'thread.started',thread_id:native}));
  const review=prompt.includes('Independent review of artifact')?{review:{verdict:'Pass',reason:'Synthetic review of supplied artifact'}}:{};
@@ -458,7 +470,7 @@ async function selectionRun(a,extra={}) {
   const j=engine.dispatch({...a,role:'pm',task:'Prepare a scope with unchanged authority',task_summary:'Prepare the bounded scope',next_handoff:'Engineering checks the proposal',...extra},'codex');
   for(let i=0;i<200;i++) {
     await new Promise(r=>setTimeout(r,30));
-    const s=engine.status(a,'codex'),job=s.jobs.find(v=>v.id===j.id);
+    const s=completeStatus(a,'codex'),job=s.jobs.find(v=>v.id===j.id);
     if(!['queued','running'].includes(job.status))return {job,state:s,artifact:s.records.find(r=>r.id===job.artifact_id)};
   }
   throw new Error('Synthetic selection worker did not finish');
@@ -518,7 +530,7 @@ test('unsupported and unavailable selected models fail visibly without fallback 
   try {
     const a=setup();
     for(const model of ['test-hidden','not-advertised'])assert.throws(()=>engine.dispatch({...a,role:'pm',task:'No inference permitted',model_selection:selected({model})},'codex'),/choice|advertised|model/i);
-    assert.equal(fs.existsSync(fake.log),false);assert.equal(engine.status(a,'codex').jobs.length,0);
+    assert.equal(fs.existsSync(fake.log),false);assert.equal(completeStatus(a,'codex').jobs.length,0);
     const unavailable=await selectionRun(a,{model_selection:selected({model:'test-unavailable'})});
     assert.equal(unavailable.job.status,'failed');assert.match(unavailable.job.error,/unavailable|no completed artifact/i);
     assert.equal(unavailable.state.records.length,0);assert.equal(unavailable.state.notices.length,1);
@@ -531,10 +543,10 @@ test('pinned v0.5.0 preserves prior local capabilities but does not silently ado
   const fake=selectionHost(),oldPath=process.env.PATH;process.env.PATH=fake.bin+path.delimiter+oldPath;
   try {
     const a=setup();withStore(a.root,db=>db.transaction('test.pin_prior_team',s=>{s.plugin_version='0.5.0';s.runtime_version='0.5.0';s.team_sha256=teamHash(s);return s;}));
-    const before=engine.status(a,'codex');assert.equal(before.capabilities.local_prototype.eligible,true);
+    const before=completeStatus(a,'codex');assert.equal(before.capabilities.local_prototype.eligible,true);
     assert.doesNotMatch(before.capabilities.local_development.blocker??'',/adopt|team|governance/i);
     assert.throws(()=>engine.dispatch({...a,role:'pm',task:'Must preserve pinned instructions',model_selection:selected()},'codex'),/adopt|pinned|team/i);
-    assert.equal(engine.status(a,'codex').jobs.length,0);assert.equal(fs.existsSync(fake.log),false);
+    assert.equal(completeStatus(a,'codex').jobs.length,0);assert.equal(fs.existsSync(fake.log),false);
     assert.equal(engine.open(a,'codex').plugin_version,'0.5.0');
   } finally {process.env.PATH=oldPath;}
 });
@@ -562,7 +574,7 @@ test('worker forwards the exact recorded selection and preserves separately attr
   withStore(a.root,db=>db.transaction('test.selected_job',s=>{Object.assign(s.jobs[j],{model_selection:choice,context_format:2,cli_version:'test-cli',task_summary:'Visible task',next_handoff:'QA review'});return s;}));
   const evidence={reported_models:['provider-model'],reported_effort:null,verification:'host_reported',source:'result.modelUsage',scope:'session_cumulative_including_internal_calls'};
   await work(a.root,j,async(...args)=>{assert.deepEqual(args[5],choice);return {...result(),model_evidence:evidence};});
-  const s=engine.status(a,'codex'),job=s.jobs.find(v=>v.id===j);
+  const s=completeStatus(a,'codex'),job=s.jobs.find(v=>v.id===j);
   assert.equal(job.status,'completed',job.error);assert.deepEqual(job.model_evidence,evidence);
   assert.equal(job.model_selection.model,'test-small');assert.equal(job.cli_version,'test-cli');
   const activity=s.activity.find(v=>v.job_id===j);assert.equal(activity.task,'Visible task');assert.equal(activity.requested_model,'test-small');
@@ -584,7 +596,7 @@ test('new assignment hashes bind selection and task metadata; legacy hashes rema
     const b=setup(),jid=queued(b);
     withStore(b.root,db=>db.transaction('test.pin_selection',s=>{Object.assign(s.jobs[jid],{context_format:2,model_selection:selected()});s.jobs[jid].context_sha256=assignmentContext(s,s.jobs[jid]).hash;mutate(s.jobs[jid]);return s;}));
     let calls=0;await work(b.root,jid,async()=>{calls++;return result();});
-    const job=engine.status(b,'codex').jobs.find(v=>v.id===jid);assert.equal(calls,0);assert.equal(job.status,'failed');
+    const job=completeStatus(b,'codex').jobs.find(v=>v.id===jid);assert.equal(calls,0);assert.equal(job.status,'failed');
   }
 });
 
@@ -605,7 +617,7 @@ test('company_progress schema and read-only endpoint preserve status and expose 
     assert.equal(JSON.stringify(output).includes('SECRET_FOUNDER_BODY'),false);
   }
   assert.deepEqual(withStore(a.root,db=>db.read()),before);
-  const status=engine.status(a,'codex');
+  const status=completeStatus(a,'codex');
   assert.equal(status.records.find(r=>r.id===intent.id).content,'SECRET_FOUNDER_BODY');
   assert.equal(Object.hasOwn(status,'graph'),false);
   for(const extra of [{format:'replay'},{format:'html'},{format:'html',render_id:'bad</script>'},{recent_jobs:0},{recent_jobs:51},{action:'run'}])await assert.rejects(call('company_progress',{root:a.root,session_id:a.session_id,...extra},'codex'));
@@ -701,7 +713,17 @@ test('progress follows actual local controller candidate, software tests, indepe
   assert.ok(accepted.graph.edges.some(e=>e.from===engineering&&e.to===software.id&&e.type==='candidate'));
   assert.ok(accepted.graph.edges.some(e=>e.from===software.id&&e.to===qa&&e.type==='review'));
   assert.equal(accepted.graph.edges.some(e=>e.from===parallel||e.to===parallel),false);
-  const html=await call('company_progress',{...readArgs,format:'html',render_id:'workflow-check'},'codex');
+  const rendered=await call('company_progress',{...readArgs,format:'html',render_id:'workflow-check'},'codex');
+  assert.equal(rendered.render_not_inlined,true);
+  let offset=0,text='';
+  do {
+    const page=await call('company_progress',{...readArgs,action:'read',artifact:rendered.artifact.id,sha256:rendered.artifact.sha256,offset,length:32768},'codex');
+    assert.equal(page.offset,offset);assert.ok(page.length>0);
+    text+=page.text;offset=page.next_offset;assert.equal(page.complete,offset===null);
+  }while(offset!==null);
+  assert.equal(text.length,rendered.artifact.total_characters);assert.equal(digest(text),rendered.artifact.sha256);
+  const envelope=JSON.parse(text);assert.deepEqual(envelope.snapshot,rendered.snapshot);
+  const html=envelope.result;
   assert.ok(html.includes('runtime receiver acceptance recorded'));assert.equal(html.includes(files[1].content),false);
   assert.equal(fs.readFileSync(path.join(root,'sum.mjs'),'utf8'),'export const sum = () => 0;\n');
 });
@@ -739,4 +761,77 @@ test('company_progress observes successive synthetic parallel/candidate/test/QA/
   assert.equal(accepted.graph.edges.some(e=>e.from==='parallel'||e.to==='parallel'),false);
   assert.equal(returned.evidence.some(r=>r.kind==='review'),false); // Earlier response is detached, not retroactively reconstructed.
   assert.equal(JSON.stringify(accepted).includes('PRIVATE instructions'),false);
+});
+
+test('explicit ordinary fresh after failure starts a new native with canonical inputs and retains every prior attempt',async()=>{
+  const fake=selectionHost(),oldPath=process.env.PATH;process.env.PATH=fake.bin+path.delimiter+oldPath;
+  try {
+    const a=setup(),choice=selected();
+    const intent=engine.save({...a,kind:'intent',content:'Current exact founder objective'},'codex');
+    const input=engine.save({...a,kind:'plan',content:'Current exact task inputs and remaining work'},'codex');
+    engine.save({...a,kind:'decision',content:'Retain all authority and remaining allowances'},'codex');
+    engine.notify({...a,kind:'must_know',summary:'Unresolved limitation remains binding'},'codex');
+    engine.message({...a,to:'pm',content:'Current peer input'},'codex');
+    withStore(a.root,db=>db.transaction('test.failed_review',s=>{
+      s.records['prior-failed-review']={id:'prior-failed-review',kind:'review',revision:1,content:'Prior failed review remains binding',author_role:'qa',author_instance:'prior-independent-qa',review:{verdict:'Fail',reason:'Missing required evidence'},status:'Submitted'};return s;
+    }));
+    const first=await selectionRun(a,{model_selection:choice,input_ids:[input.id]});
+    assert.equal(first.job.status,'completed',first.job.error);
+    const failed=await selectionRun(a,{model_selection:choice,task:'SYNTHETIC_SESSION_FAILURE'});
+    assert.equal(failed.job.status,'failed');assert.match(failed.job.error,/unusable history/);
+    assert.equal(failed.job.instance_id,first.job.instance_id);assert.equal(failed.job.native_id,first.job.native_id);
+    assert.equal(failed.job.coordination_release.termination_confirmed,true);
+    const before=withStore(a.root,db=>db.read());
+    const fresh=await selectionRun(a,{fresh_session:true,fresh_session_reason:'Prior native history is unusable',model_selection:choice,input_ids:[input.id]});
+    assert.equal(fresh.job.status,'completed',fresh.job.error);
+    assert.notEqual(fresh.job.instance_id,first.job.instance_id);assert.notEqual(fresh.job.native_id,first.job.native_id);
+    assert.equal(fresh.job.fresh_session,true);assert.equal(fresh.job.fresh_session_reason,'Prior native history is unusable');
+    assert.deepEqual(fresh.job.model_selection,first.job.model_selection);
+    assert.equal(fresh.job.timeout_ms,first.job.timeout_ms);assert.equal(fresh.job.timeout_reason,first.job.timeout_reason);
+    const stored=withStore(a.root,db=>db.read()),retired=stored.retired_sessions.find(s=>s.instance_id===first.job.instance_id);
+    assert.equal(retired.native_id,first.job.native_id);assert.deepEqual(retired.model_selection,before.sessions.pm.model_selection);
+    assert.equal(retired.replacement_job_id,fresh.job.id);assert.equal(retired.reason,'fresh_session_requested');
+    for(const [key,value] of Object.entries(before.jobs))assert.deepEqual(stored.jobs[key],value);
+    for(const [key,value] of Object.entries(before.records))assert.deepEqual(stored.records[key],value);
+    for(const key of ['owner','roles','governance','team_sha256','phase','mode','paused'])assert.deepEqual(stored[key],before[key]);
+    assert.deepEqual(stored.notices,before.notices);assert.deepEqual(stored.messages,before.messages);
+    assert.equal(Object.keys(stored.jobs).length,3);
+    const calls=fs.readFileSync(fake.log,'utf8').trim().split('\n').map(JSON.parse);
+    assert.equal(calls.length,3);assert.ok(calls[1].args.includes('resume'));assert.ok(!calls[2].args.includes('resume'));
+    assert.notEqual(calls[2].cwd,calls[0].cwd);
+    const pack=JSON.parse(calls[2].prompt.split('\n').find(line=>line.startsWith('Assignment context: ')).slice('Assignment context: '.length));
+    assert.deepEqual(pack.charter,stored.roles.pm);assert.deepEqual(pack.governance,stored.governance);
+    assert.deepEqual(pack.records.find(r=>r.id===intent.id),stored.records[intent.id]);
+    assert.deepEqual(pack.records.find(r=>r.id===input.id),stored.records[input.id]);
+    assert.deepEqual(pack.records.find(r=>r.id==='prior-failed-review'),before.records['prior-failed-review']);
+    for(const record of pack.records)assert.ok(fresh.job.inputs.some(ref=>ref.id===record.id&&ref.revision===record.revision));
+    assert.ok(pack.notices.some(n=>n.reference===failed.job.id));assert.deepEqual(pack.messages,before.messages);
+    assert.ok(calls[2].prompt.includes('Company records, not this session, are the source of truth'));
+    assert.ok(calls[2].prompt.includes(`session, instance ${fresh.job.instance_id}.`));
+    const resumed=await selectionRun(a,{model_selection:choice});
+    assert.equal(resumed.job.instance_id,fresh.job.instance_id);assert.equal(resumed.job.native_id,fresh.job.native_id);
+  } finally {process.env.PATH=oldPath;}
+});
+
+test('fresh assignment still quarantines output after current source, owner or pause changes',async()=>{
+  for(const change of ['source','owner','pause']) {
+    const a=setup(),input=engine.save({...a,kind:'plan',content:'Exact current source'},'codex');
+    const j=queued(a,{inputs:[{id:input.id,revision:1}]});
+    withStore(a.root,db=>db.transaction('test.fresh_assignment',s=>{
+      const job=s.jobs[j];Object.assign(job,{native_id:null,fresh_session:true,fresh_session_reason:'A clean bounded assignment',context_format:3});
+      job.context_sha256=assignmentContext(s,job).hash;return s;
+    }));
+    let calls=0;
+    await work(a.root,j,async(_host,native,prompt)=>{
+      calls++;assert.equal(native,null);assert.ok(prompt.includes(input.id));
+      if(change==='source')engine.save({...a,id:input.id,kind:'plan',expected_revision:1,content:'Changed exact source'},'codex');
+      else if(change==='pause')engine.control({...a,action:'pause',expected_epoch:1,source_instruction:'Pause current preparation'},'codex');
+      else withStore(a.root,db=>db.transaction('test.owner_changed',s=>{s.owner.epoch++;return s;}));
+      return result('Late candidate remains evidence');
+    });
+    const state=withStore(a.root,db=>db.read());assert.equal(calls,1);
+    assert.equal(state.jobs[j].status,'quarantined',change);
+    assert.equal(state.records[state.jobs[j].artifact_id].status,'Quarantined');
+    assert.equal(state.sessions[state.jobs[j].session_key].native_id,null);
+  }
 });

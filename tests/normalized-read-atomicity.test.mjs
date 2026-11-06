@@ -113,3 +113,19 @@ test('normalized reads inside writer transactions reuse the transaction and reco
     assert.equal(f.reader.read().commit_marker,'selected committed');
   } finally {f.close();}
 });
+
+test('Store.readRawValue checks collection shape and current immutable pointer in one read snapshot',()=>{
+  const f=fixture(),prepare=f.reader.db.prepare,before=f.reader.readRawValue({family:'records',key:'evidence'});let commits=0;
+  f.reader.db.prepare=function(sql,...rest){
+    const statement=Reflect.apply(prepare,this,[sql,...rest]);
+    if(!sql.includes("WHERE family='shape'"))return statement;
+    return new Proxy(statement,{get(target,key){const value=Reflect.get(target,key,target);if(key!=='get')return typeof value==='function'?value.bind(target):value;return (...args)=>{
+      const row=Reflect.apply(value,target,args);
+      if(!commits++){f.writer.transaction('raw concurrent commit',s=>{s.records.evidence={id:'evidence',revision:2,content:'after'};return s;});}
+      return row;
+    };}});
+  };
+  try{assert.deepEqual(f.reader.readRawValue({family:'records',key:'evidence'}),before);assert.equal(commits,1);}
+  finally{f.reader.db.prepare=prepare;}
+  assert.equal(f.reader.readRawValue({family:'records',key:'evidence'}).revision,2);f.close();
+});

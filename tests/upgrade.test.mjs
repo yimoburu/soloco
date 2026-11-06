@@ -1,3 +1,4 @@
+import { exactSource, exactCollection } from './helpers/public-exact.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -9,6 +10,7 @@ import { upgrade, rehearse, checkpoint } from '../plugins/soloco/runtime/upgrade
 import { admitPrompt, REQUEST_LIMIT, RESPONSE_RESERVE } from '../plugins/soloco/runtime/upgrade-evidence.mjs';
 import { MAX_EXECUTION_TIMEOUT_MS } from '../plugins/soloco/runtime/timeout.mjs';
 import { hook, call } from '../plugins/soloco/runtime/main.mjs';
+import {resolveSnapshotEntry,shallowSnapshotHistory} from '../plugins/soloco/runtime/snapshot.mjs';
 
 const base=fs.mkdtempSync(path.join(os.tmpdir(),'company-upgrade-'));
 process.env.COMPANY_PLUGIN_DATA=path.join(base,'cache');
@@ -31,7 +33,7 @@ function setup(host='codex') {
     s.records.failed={id:'failed',kind:'review',content:'Fail: evidence missing',revision:1,review:{verdict:'Fail',reason:'No evidence'},author_instance:'qa-old'};
     s.sessions.pm={instance_id:'pm-old',role:'pm',native_id:'native-old',host};
     s.extension={obligations:['retain user records'],limit:20};return s;
-  }));return a;
+  }));withStore(root,db=>db.migrate());return a;
 }
 function prepare(a,host='codex',extra={}) {
   const {model_selection,review_window_minutes,call_timeout_minutes,...inspectionExtra}=extra;
@@ -79,7 +81,7 @@ test('prepare stores the default or selected review window and exposes the origi
     else assert.ok(u.deadline_ms>=before+minutes*60000 && u.deadline_ms<=after+minutes*60000);
     assert.equal(p.upgrade.review_window_minutes,minutes);
     assert.equal(p.upgrade.deadline_ms,u.deadline_ms);
-    assert.equal(p.upgrade.source_instruction,grant);
+    assert.equal(exactSource(a,'codex',p.upgrade.source).source_instruction,grant);
     const summary=engine.status(a,'codex').upgrade;
     assert.equal(summary.review_window_minutes,minutes);
     assert.equal(summary.deadline_ms,u.deadline_ms);
@@ -127,7 +129,7 @@ test('prepare cannot extend an active or expired attempt; recovery preserves it 
       const fresh=prepare({...a,expected_epoch:recovered.owner.epoch},'codex',{review_window_minutes:90,call_timeout_minutes:30,source_instruction:'Approve one 90-minute attempt with a 30-minute call cap'});
       assert.notEqual(fresh.upgrade.id,p.upgrade.id);
       assert.equal(fresh.upgrade.review_window_minutes,90);
-      assert.equal(fresh.upgrade.call_timeout_minutes,30);
+      assert.equal(exactSource(a,'codex',fresh.upgrade.source).call_timeout_minutes,30);
       assert.deepEqual(read(a).upgrade_history.at(-1),old);
     } finally {Date.now=now;}
   }
@@ -286,7 +288,7 @@ test('one catalog-validated selection persists and reaches fresh independent rol
   const p=upgrade({...a,action:'prepare',candidate_hash:inspection.candidate_hash,source_instruction:'Upgrade fictional team',call_timeout_minutes:30,model_selection:{...selected,reason:`  ${selected.reason}  `}},'codex',{
     ...options,catalog:host=>{assert.equal(host,'codex');discoveries++;return selectionCatalog;}
   });
-  assert.equal(discoveries,1);assert.deepEqual(p.upgrade.model_selection,selected);
+  assert.equal(discoveries,1);assert.deepEqual(exactSource(a,'codex',p.upgrade.source).model_selection,selected);
   assert.deepEqual(read(a).upgrade.model_selection,selected);
   assert.equal(read(a).upgrade.model_selection_sha256,digest(JSON.stringify(selected)));
   assert.equal(read(a).upgrade.model_catalog.source,'synthetic_catalog');
@@ -465,7 +467,7 @@ test('upgrade preserves company facts and rules, uses independent native session
   for(const [key,r]of Object.entries(before.records))assert.deepEqual(after.records[key],r);
   assert.deepEqual(after.extension,before.extension);assert.deepEqual(after.messages,before.messages);
   assert.deepEqual(after.notices,before.notices);assert.deepEqual(after.sessions,{});assert.equal(after.retired_sessions[0].native_id,'native-old');
-  assert.equal(engine.open({...a,epoch:after.owner.epoch},'codex').cos_instructions,after.cos_instructions);
+  const opened=engine.open({...a,epoch:after.owner.epoch},'codex');assert.equal(exactSource(a,'codex',opened.pinned.items.find(item=>item.source.id==='@public:pinned:cos_instructions').source),after.cos_instructions);
   engine.control({...a,expected_epoch:after.owner.epoch,action:'resume',source_instruction:'Original request included resume'},'codex');
   assert.equal(read(a).paused,false);assert.equal(read(a).mode,'preparation');
 });
@@ -558,7 +560,7 @@ test('new companies and recovered teams use pinned CoS instructions, not install
     s.schema=2;s.runtime_version=VERSION;s.cos_instructions='PINNED COMPANY COS';s.team_sha256=teamHash(s);return s;
   }));
   const text=hook({cwd:a.root,session_id:a.session_id,hook_event_name:'SessionStart'},'codex').hookSpecificOutput.additionalContext;
-  assert.match(text,/PINNED COMPANY COS/);assert.doesNotMatch(text,/Make the work visible/);
+  assert.match(text,/company_open is required/);const opened=engine.open(a,'codex');assert.equal(exactSource(a,'codex',opened.pinned.items.find(item=>item.source.id==='@public:pinned:cos_instructions').source),'PINNED COMPANY COS');assert.doesNotMatch(text,/Make the work visible/);
 });
 
 // Synthetic native CLIs exercise actual detached worker launch and both adapter protocols.
@@ -604,7 +606,7 @@ else {
       const started=await call('company_upgrade',{...args,action:'prepare',expected_epoch:1,candidate_hash:inspection.candidate_hash,source_instruction:'Upgrade this team',...(selection?{model_selection:selection}:{})},host);
       const s=await call('company_wait',{...args,seconds:10},host);
       assert.equal(s.upgrade.status,'ready',s.upgrade.error);
-      assert.notEqual(s.upgrade.probe.native_id,s.upgrade.review.native_id);
+      const exact=exactSource(args,host,s.upgrade.source);assert.notEqual(exact.probe.native_id,exact.review.native_id);
       for(const receipt of read(a).upgrade.calls) {
         assert.deepEqual(receipt.model_selection,selection??null);
         assert.equal(receipt.model_evidence.applied_controls.model,selection?.model??null);
@@ -618,9 +620,9 @@ else {
       await call('company_control',{...args,action:'resume',expected_epoch:verified.owner.epoch,source_instruction:'Resume the upgraded preparation team'},host);
       const job=await call('company_dispatch',{...args,epoch:verified.owner.epoch,role:'pm',task:'Recover company intent and prepare the next bounded proposal'},host);
       const resumed=await call('company_wait',{...args,seconds:10},host);
-      assert.equal(resumed.jobs.find(j=>j.id===job.id).status,'completed');
-      assert.notEqual(resumed.sessions.pm.native_id,'native-old');
-      assert.notEqual(resumed.sessions.pm.instance_id,'pm-old');
+      assert.equal(exactCollection(args,host,'jobs').map(row=>row.value).find(j=>j.id===job.id).status,'completed');
+      assert.notEqual(exactCollection(args,host,'sessions').find(row=>row.source.id==='@public:sessions:pm').value.native_id,'native-old');
+      assert.notEqual(exactCollection(args,host,'sessions').find(row=>row.source.id==='@public:sessions:pm').value.instance_id,'pm-old');
     }
   } finally {process.env.PATH=oldPath;}
 });
@@ -734,7 +736,8 @@ test('a company checkpoint above 200000 characters upgrades without dropping any
   const a=setup(),content='Retain the complete source evidence. '.repeat(5800);
   withStore(a.root,db=>db.transaction('test.large_supported',s=>{s.records.large={id:'large',content};return s;}));
   const args=await ready(a);
-  assert.ok(JSON.stringify(read(a).upgrade.checkpoint).length>200000);
+  const frozen=read(a);assert.ok(JSON.stringify(frozen.upgrade.checkpoint).length<200000);
+  assert.equal(resolveSnapshotEntry(frozen,frozen.upgrade.checkpoint.records.large).content,content);
   applyAndVerify(args);
   assert.equal(read(a).records.large.content,content);
 });
@@ -770,7 +773,7 @@ test('both roles retrieve exact huge frozen source excerpts through JSON request
     s.upgrade_history=[{id:'original-failed',status:'failed',error:'input_too_large actual2254398',checkpoint:checkpoint(s),previous:{plugin_version:'0.1.0',governance:s.governance,governance_sha256:s.governance_sha256,roles:s.roles,cos_instructions:'Original retained CoS instructions'},review:{verdict:'Blocked',reason:'Missing evidence is still unresolved'}}];return s;
   }));
   const originalHistory=read(a).upgrade_history;
-  const p=prepare(a),u=read(a).upgrade,subject=buildEvidence(u.checkpoint,originalHistory);
+  const p=prepare(a),state=read(a),u=state.upgrade,subject=buildEvidence(u.checkpoint,originalHistory,{snapshotState:state});
   const source=Object.values(subject.sources).find(s=>s.reason==='typed-file-body');
   const model=modelFor(a),pending=new Map(),requested=new Set(),readCounts={cos:0,qa:0};
   await rehearse(a.root,p.upgrade.id,async(...args)=>{
@@ -796,7 +799,7 @@ test('both roles retrieve exact huge frozen source excerpts through JSON request
   const delivered=read(a).upgrade.deliveries.filter(d=>d.source_id===source.source_id);
   assert.equal(delivered.length,2);assert.notEqual(delivered[0].session_id,delivered[1].session_id);
   applyAndVerify({...a,upgrade_id:p.upgrade.id,expected_epoch:p.owner.epoch});
-  assert.equal(read(a).records.source.content,u.checkpoint.records.source.content);
+  assert.equal(read(a).records.source.content,resolveSnapshotEntry(state,u.checkpoint.records.source).content);
   assert.deepEqual(read(a).upgrade_history,originalHistory);
   assert.ok(subject.inventory.entries.some(s=>s.reason==='prior-full-checkpoint-snapshot'));
   assert.ok(subject.inventory.entries.some(s=>s.reason==='prior-team-snapshot'));
@@ -1228,8 +1231,8 @@ test('inspect compares identical current inputs including terminal history witho
     try { inspection = upgrade({ ...a, action: 'inspect' }, 'codex', { launch: forbidden, check: forbidden, catalog: forbidden }); }
     finally { Store.prototype.transaction = transaction; }
     assert.deepEqual(read(a), before); assert.deepEqual(events(), oldEvents);
-    const history = [...before.upgrade_history, before.upgrade], input = checkpoint(before);
-    const baseline = buildEvidence(input, history, { wholeBodyAliases: false }), candidate = buildEvidence(input, history);
+    const shallow=shallowSnapshotHistory(before),history = [...shallow.upgrade_history, shallow.upgrade], input = checkpoint(before);
+    const baseline = buildEvidence(input, history, { wholeBodyAliases: false,snapshotState:before }), candidate = buildEvidence(input, history,{currentState:true,checkpointContinuity:true,snapshotState:before,contextState:before});
     const metrics = subject => {
       const stream = subject.pages.map(page => evidencePage(subject, page).text).join('');
       return { format: subject.handover.format, checkpoint_sha256: digest(JSON.stringify(input)),
@@ -1294,7 +1297,7 @@ test('fresh attempts persist the exact call ceiling; legacy absence retains ten 
     else {
       assert.equal(read(a).upgrade.call_timeout_minutes,choice??10);
       assert.equal(read(a).upgrade.evidence.call_timeout_minutes,choice??10);
-      assert.equal(p.upgrade.call_timeout_minutes,choice??10);
+      assert.equal(exactSource(a,'codex',p.upgrade.source).call_timeout_minutes,choice??10);
     }
     const model=modelFor(a);let calls=0;
     await rehearse(a.root,p.upgrade.id,async(...args)=>{

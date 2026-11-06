@@ -1,15 +1,23 @@
 # Scalable company state and exact evidence reuse
 
-This repository implementation is opt-in where it changes storage or historical
-inclusion. It does not migrate a real company, resolve a notice, install a package,
-adopt instructions, transfer ownership, or prove a production latency improvement.
-The public APIs preserve the legacy full-state/whole-history routes.
+Candidate v0.7.0 separates current task context from retrievable historical evidence.
+Incompatible storage changes require explicit migration. Source tests do not migrate
+a real company, resolve a notice, install a package, adopt instructions, transfer
+ownership, or establish native semantic acceptance.
+Public current views are bounded; exact history remains available through explicit
+collection pages, hash-checked reads and verified storage backups.
 
 ## Everyday context and reviewed applicability
 
 New dispatches use context format 3; existing queued format-2 jobs retain their
 original serialization. Every unclassified intent, decision, preference and failed
 or blocked review remains mandatory. A `Resolved` status alone excludes nothing.
+The pack also includes exact task inputs, required dependency artifacts, every
+valid mapped home (including artifact-kind homes), current unknown authority
+extensions, open notices and the role inbox. Unrelated unknown archives remain
+unclassified and exactly retrievable; ordinary work does not globally replay them.
+Formats 4/5 remain internal compatibility code and are not selected by new public
+dispatch. Old frozen handover and upgrade attempts retain their original contracts.
 
 `company_context inspect` returns a paged exact source index. `read` retrieves an
 exact SHA-256-bound range (maximum 32,768 UTF-16 characters). Record IDs use their
@@ -29,6 +37,69 @@ canonical QA provenance, native/source independence, complete source delivery,
 and retained same-plan negative reviews. A repaired plan retains old Fail/Blocked
 evidence; the original failed work never becomes a Pass.
 
+For an oversized historical container, use the existing `company_context` tool
+with `action: plan`, `source_id`, `counterpart_ids`, `dependency_ids`, current epoch
+and the exact source instruction. This uses `soloco-context-tree-v1`, separately
+from legacy classification. The transaction pins the exact original, as-of subject
+and referenced current inputs in the shared immutable snapshot vault. Legacy/v1
+capture holds until explicit storage migration; capture never migrates. The initial
+receipt contains counts, root IDs and immutable read handles. Inspect `plan_id`,
+`section: units|nodes`, `offset` and `limit` (at most 16), following `next_offset`;
+read `plan_id`/`unit_id` for exact extraction input. The ordinary exact plan source
+remains available for audit. Read a `snapshot` handle to retrieve immutable JSON
+by SHA/length, following returned `next_offset`.
+
+Create each leaf with `action: target`, `plan_id` and `unit_id`; each bottom-up
+reconciliation with `node_id` and ordered `child_review_ids`; and the final target
+with two ordered `root_review_ids`. Dispatch QA with empty inputs and `review_of`
+the target ID. Every node has a fresh instance and native session, independent of
+source, plan, current producers, CoS and all other reviewers. The canonical worker
+sends only the bounded tree assignment. It records actual spawn timing, complete
+wire, observed native identity, closure and terminal artifact/job bindings. Model
+claims cannot supply these receipts. Qualification output is closed JSON: only the
+shown envelope, review and node-specific result/item/mapping/resolution/provenance
+keys are accepted. `messages` and `notices` must be empty; `content` must exactly
+equal `qualification_result.reason`. Put all consequential findings in structured
+items/mappings/blockers. Unknown source input fields still require review. The
+exact response is retained, and canonical proof/apply rechecks the same contract;
+malformed output stays in rejected evidence with its plan and target provenance.
+Apply with `aggregate_review_id`;
+transactional validation checks the entire canonical DAG, exact ranges, topology,
+provenance, negatives and surviving homes. Stored `partition_qualification` lives
+in the existing classification index and is revalidated by ordinary context,
+current handover and current upgrade. Represented-by never means resolved.
+
+Paused or handover-held companies can explicitly authorize this read-only tree
+with `maintenance: true` on plan creation and the exact founder instruction. It
+permits only that plan's bounded QA; ordinary work stays paused. `revoke` with
+`plan_id`, a later founder pause, cancellation or owner change fences fresh work
+and return. Existing owning-session/epoch authority is required; installation and
+an arbitrary QA target grant no maintenance permission.
+
+Applied complete preservation uses its exact as-of proof and present sources,
+homes, dependencies and current authority. Pure complete representation can
+survive owner/epoch replacement, supported boolean pause changes and additive
+current rules. An exact scoped unrelated negative stays mandatory and unresolved
+without revoking independent preservation. The negative veto covers the entire
+source/plan/proof/current-input/dependency closure; unscoped, unknown and global
+negatives remain conservative. Non-applicability and global resolutions retain
+exact subject freshness. Fresh apply and in-flight work retain strict fences.
+
+Each extraction frame is at most 10,000 UTF-8 bytes, entire application input
+48,000 bytes and the complete parsed response envelope serialized as compact JSON
+12,000 bytes. Exact raw response transport has an independent 48,000 UTF-8 byte
+cap including whitespace; it is retained unchanged, without charging JSON string
+escaping a second time. Reviewers are instructed to return compact JSON.
+These bounds do not prove native
+context fit or semantic completeness. Reconciliation preserves every distinct
+finding and its complete conditions; a distinct union that cannot fit holds with
+its exact children and decomposition requirement. Bounded pages do not bound
+total semantic work. Run the fictional driver with
+`node tools/qualify-fictional.mjs --contract`; contract doubles establish software
+wiring only. After freeze, root may explicitly choose the real adapter with
+`--native --model <catalog-id> --effort high`, using host-default speed. Component
+tests claim neither real-model acceptance nor live adoption.
+
 For scoped work, dispatch may set `context_scope`; absence remains conservative.
 `evidence_ids` declares up to 100 supplemental source IDs. Their immutable hashes
 are supplied to the specialist; other prior-session hashes grant no access. A
@@ -46,8 +117,9 @@ Scope expiry is checked even when the event token has not changed.
 
 ## Upgrade review
 
-`company_upgrade inspect`/`prepare` may explicitly select `context_mode: current`.
-Default `full` preserves the established full-history review. Current mode moves
+New `company_upgrade inspect`/`prepare` use `context_mode: current` by default;
+explicit `full` retains exhaustive historical review. Existing attempts retain
+their frozen mode/protocol. Current mode moves
 ONLY exact independently reviewed resolved records, their known proof records/jobs,
 and reviewed historical attempts behind a source-addressed archive index. Originals,
 raw checkpoint/history hashes, inventory and bounded retrieval remain intact.
@@ -70,10 +142,40 @@ verifies complete logical readback (including unknown fields), then fences legac
 writers with triggers. Originals are not garbage collected. An interrupted migration
 rolls back while retaining its backup. No actual company is migrated by installation.
 
+Explicit migration reaches layout v4 from supported legacy/v1/v2/v3 layouts,
+retaining the old monolith, backup and exact logical readback. Existing v2 capture
+remains compatible and does not advance layout; v1/v2 journal appends retain
+inline arrays. v3/v4 journals store complete entries individually, avoiding
+repeated prefixes. v4 canonically escapes NUL/lone-surrogate/reserved-prefix keys
+without changing identity, order or JSON. Unknown encodings and detectable old
+identity loss hold; missing identities cannot be invented. Installation, reads,
+status and ordinary writes never migrate or silently fence old writers. Explicit
+storage migration is reachable for supported paused schema-1 upgrade maintenance.
+Standing upgrade authorization can cover the explicit migration when applicable.
+
+Snapshot references store exact JSON SHA, UTF-16 length and shape; originals are
+immutable and shared across captures. Resolver inheritance is explicit at copied
+state seams. Frozen handover caches retain at most two exact sequences and 128 Mi
+UTF-16 units, with at most 64 Mi pinned raw units per inspection. Full state and
+contract identity, vault lineage and fresh transitive integrity checks guard reuse.
+Failed-successor previews have separate identities. Qualification projections use
+a 32 MB cache with fresh source, legacy-reference and immutable-dependency checks.
+Public plans also pin software-derived unit originals and their derivation capsule
+in the shared vault: fresh exact sources, as-of inputs, legacy refs and transitive
+originals are checked before a node reads its exact immutable unit. Manifest, node,
+apply and applied-proof validation avoid rebuilding the whole projection. This is
+a software byte/derivation receipt, never independent semantic QA. Oversized
+initial projections and older internal plans without pinned units remain transient. Direct normalized record/job/classification
+and root reads use verified stored raw JSON per current read snapshot, avoiding
+reserialization. Assembled, aliased and legacy sources retain integrity-checked
+fallbacks. Full-state reads/hashes, first builds, transitive checks and oversized
+transient graphs remain material server costs; caches grant no acceptance.
+
 Selected save/hook bookkeeping operations use targeted transactions. Idle worker
 monitoring reads the small committed event token; relevant changes trigger full
 eligibility checks, with clock-based expiry and final atomic validation retained.
-Full-state status and generic transactions remain available and linear in history.
+Status returns a bounded public view; its integrity-checked storage read and generic
+transactions still examine full logical state and remain linear in history.
 Normalized full reads can be slower than legacy JSON reads; see measured results.
 
 `backup` inventories the consistent database, project-owned `.company` configuration
@@ -121,6 +223,12 @@ must be materialized/tested normally. No old attempt allowance is reset.
 
 ## Acceptance evidence and remaining limits
 
+### Retained historical component evidence
+
+The following dated results describe earlier isolated components and frozen legacy
+protocols. Candidate v0.7.0 behavior and limits are described above; these receipts
+are not its final acceptance.
+
 Final isolated branch verification (2026-11-04): Node 25.2.1 full suite passed
 344/344 with zero skips using actual macOS sandbox execution. The subsequently
 added deterministic second-writer snapshot regressions passed 4/4 separately
@@ -141,8 +249,9 @@ trade-offs. It makes no model-quality, token, billing or production noninferiori
 claim. Full live task-quality/latency comparisons remain a release/operating
 qualification step; do not close the broad issue solely on these fixture results.
 
-Ordinary coordinator handover now freezes the same complete subject and exact
-SHA256 as before, while new reconstructions use `ordinary-handover-review-v2`.
+The retained ordinary-handover v2 protocol freezes the complete subject and exact
+SHA256. Candidate v0.7.0 reconstructions use verified current protocol v3; retained
+v1/v2 reconstructions keep their original all-source contracts.
 The 200000-character initial review budget is unchanged. The initial pack contains
 bounded current objective, pinned rule, authority and notice previews, plus exact source/length entry points. Large pinned definitions
 continue in frozen ranges. The complete semantic stream is referenced, never
@@ -153,7 +262,7 @@ repeated-occurrence indexes are themselves frozen, bounded-readable sources,
 so archive registry growth does not fill the initial packet. Every
 distinct checkpoint field, legacy team restriction, current record, job, notice,
 message, failed review and unknown obligation remains compulsory. Neither age,
-status nor context classification automatically clears handover evidence. Exact
+status nor an unvalidated classification clears handover evidence. Exact
 originals remain retrievable; the preservation inventory is not proof that QA
 understood them. Distinct mandatory semantics exceeding the initial budget
 are delivered through bounded frozen reads without truncation.
@@ -200,3 +309,5 @@ Resume revalidates the exact review context as well as the subject and reconstru
 This repair keeps all unknown/unclassified legacy semantics compulsory. It does not classify old audits, add a new evidence database, or claim constant total-history review work. One-time reviewed applicability work and broader scalable company-memory design remain separate, visible obligations.
 
 Earlier reconstruction records are immutable through `company_save`; a repair uses a new reconstruction. Later subjects keep their full content, metadata, reviews and execution evidence while referencing each original embedded snapshot by record ID and exact hash. The lossless reader resolves only matching retained originals, registers their exact bytes, and includes every distinct semantic field through proven checkpoint equality. This prevents recursive full-snapshot duplication across repaired submissions without adding another evidence store or marking a finding resolved. Missing or corrupted originals hold. Legacy encoding remains supported, but changed freshness dependencies may require a new independently reviewed reconstruction; an old Pass is never promoted across changed evidence. Founder range replies count the full escaped response and hold with a smaller-range bound when text or source metadata cannot fit.
+
+Candidate integration evidence and remaining root-owned acceptance: [integration report](../integration-evidence/REPORT.md).
