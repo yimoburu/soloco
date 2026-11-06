@@ -1,0 +1,31 @@
+✖ archived rejected contributors cannot review scoped extraction while company-shaped application examples stay data (2417.197042ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2548.116125
+
+✖ failing tests:
+
+test at tests/scoped-coherent-runtime.test.mjs:110:1
+✖ archived rejected contributors cannot review scoped extraction while company-shaped application examples stay data (2417.197042ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'completed'
+  - 'failed'
+  
+      at TestContext.<anonymous> (file:///private/tmp/soloco-corpus-independence-20261106/source/tests/scoped-coherent-runtime.test.mjs:124:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'completed',
+    expected: 'failed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

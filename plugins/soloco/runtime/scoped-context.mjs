@@ -460,6 +460,14 @@ function collectIdentities(s,values,{rejected=false}={}){
 }
 function independent(s,j,native,x,proofs){
   const banned=collectIdentities(s,[x.t.owner,x.record,x.p,...(x.v.partitioner===CORPUS_PARTITIONER?plan(s,x.p).c.selected_sources.map(id=>source(s,id)):[]),resolveSnapshot(s,plan(s,x.p).c.original),resolveSnapshot(s,plan(s,x.p).c.projection),...(plan(s,x.p).c.producer_closure??(plan(s,x.p).c.producer?[plan(s,x.p).c.producer]:[])).map(r=>exact(s,r)),...(x.t.homes??[]).map(r=>exact(s,r)),...(x.t.dependencies??[]).map(r=>exact(s,r)),...(x.t.phase==='extract'?[]:[targetGlobal(s,x)]),...proofs.map(p=>p.job)]);
+  if(x.v.partitioner===CORPUS_PARTITIONER){
+    // Extraction assesses the complete validated frozen corpus, including inputs
+    // outside the selected exclusion claim. Preserve their canonical provenance
+    // under the frozen version map; selected labels cannot narrow authorship.
+    const frozen=inheritSnapshots(s,corpusGraph(s,plan(s,x.p).c.projection).state);
+    const roots=[...Object.values(frozen.records??{}),...Object.values(frozen.jobs??{}),...(frozen.upgrade_history??[]),...(frozen.upgrade?[frozen.upgrade]:[])];
+    for(const identity of collectIdentities(frozen,roots))banned.add(identity);
+  }
   if(!text(native)||!text(j.instance_id)||banned.has(native)||banned.has(j.instance_id))fail('independent reviewer owns source/domain/authority');
   if(Object.values(s.jobs??{}).some(other=>other.id!==j.id&&[other.native_id,other.instance_id].some(id=>[native,j.instance_id].includes(id)))||(s.retired_sessions??[]).some(r=>[r.native_id,r.instance_id].some(id=>[native,j.instance_id].includes(id)))||Object.values(s.sessions??{}).some(r=>r.instance_id!==j.instance_id&&r.native_id===native))fail('native reviewer reused');
 }

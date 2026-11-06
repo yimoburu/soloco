@@ -108,17 +108,19 @@ test('FICTIONAL ADAPTER: omissions, omitted occurrence interfaces, source produc
 });
 
 test('archived rejected contributors cannot review scoped extraction while company-shaped application examples stay data',async()=>{
- for(const mode of ['absent','different','external']){
+ for(const partitioner of [scoped.COHERENT_PARTITIONER,scoped.CORPUS_PARTITIONER])for(const mode of ['absent','different','external']){
   const f=fixture(),native='fictional-archived-rejected-scoped';
   mutate(f,s=>{
+   delete s.records[f.plan_id];
    const old={id:'retired',role:'qa',status:'failed',native_id:null,rejected_native_ids:[native],rejected_output:{text:'Original failed contribution stays failed.'}};
    const example={id:s.id,governance:'External application example',roles:{qa:{}},records:{},jobs:{retired:old}};
    const body={id:s.id,governance:s.governance,roles:s.roles,records:{},jobs:mode==='external'?{}:{retired:old},...(mode==='external'?{external_catalog:example}:{})};
    s.upgrade={id:'historical',status:'recovered',checkpoint:retainSnapshot(s,body),checkpoint_sha256:sha(body)};
    if(mode==='different')s.jobs.retired={id:'retired',role:'engineer',status:'completed',instance_id:'new-instance',native_id:'new-native',rejected_native_ids:[]};
   });
-  const p=call(f,{action:'plan',protocol,partitioner:scoped.COHERENT_PARTITIONER,source_id:'upgrade:historical'});f.plan_id=p.id;
-  const result=await run(f,{phase:'extract',unit_id:unitPages(f)[0].id},{native});
+  const p=call(f,{action:'plan',protocol,partitioner,source_id:partitioner===scoped.CORPUS_PARTITIONER?'old':'upgrade:historical',...(partitioner===scoped.CORPUS_PARTITIONER?{selected_source_ids:['old']}:{})});f.plan_id=p.id;
+  const unit=unitPages(f).find(u=>JSON.stringify(call(f,{action:'read',plan_id:f.plan_id,unit_id:u.id}).unit).includes(native));assert.ok(unit,'exact reviewed unit contains the rejected contribution');
+  const result=await run(f,{phase:'extract',unit_id:unit.id},{native,modelHook:p=>{assert.ok(JSON.stringify(p.reviewed_unit_bundle).includes(native),'reviewed batch contains the historical rejected contribution or external example');}});
   assert.equal(result.job.status,mode==='external'?'completed':'failed',result.job.error);
   if(mode!=='external'){assert.match(result.job.error,/independent reviewer owns/);assert.equal(result.review,undefined);assert.ok(result.job.rejected_native_ids.includes(native));}
  }
