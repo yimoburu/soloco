@@ -1,0 +1,264 @@
+(node:42846) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ordinary archive growth [{"scale":1,"archive_characters":184433,"context_characters":1451,"mandatory_records":7},{"scale":10,"archive_characters":1833494,"context_characters":1451,"mandatory_records":7},{"scale":100,"archive_characters":18324464,"context_characters":1451,"mandatory_records":7}]
+✔ ordinary 1x/10x/100x archive growth preserves fixed current obligations and explicit evidence (193.052625ms)
+(node:42847) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ public handover, independent publication, full v4 worker review, resume and first ordinary format6 Engineering return (1185.816ms)
+✔ only exact pure runtime commands are mechanically ingested; conditions, unknown fields and generic saves stay held (240.484833ms)
+✔ actual conditional handover retains founder conditions and unknown legacy remains held on first pass (115.7675ms)
+(node:42848) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ accepted historical publication proof survives an owner epoch change without admitting old in-flight work (697.273958ms)
+✖ public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning (25.545917ms)
+✔ missing legacy bootstrap is visibly DIRTY and apply rolls back without acceptance (12.733ms)
+✔ new membership, changed exact source, wrong independent identity and absent closure cannot publish (108.393916ms)
+✖ scope closure, global membership, expiry, receipt changes, revocation and missed communication hold (24.132834ms)
+✔ pause fences publication reviewer and prospective handover cannot hide unknown legacy (10.487625ms)
+✖ 10x independently classified inert archive keeps actual mandatory operating assignment bytes and semantic work constant (38.984375ms)
+✖ deleted applicable home and changed exact provenance cannot disappear from accepted meaning (23.598083ms)
+✖ typed outcome requires complete historical uncertainty; text cannot manufacture permission (22.792959ms)
+✖ public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure (19.903459ms)
+✖ late new and changed falsely scoped prohibitions stay globally DIRTY, but fresh proposals include them (24.121542ms)
+✖ publication proof stays current; failed, quarantined, uncertain and unknown-extension siblings stay DIRTY (20.171333ms)
+✖ mechanical publication index rejects tampering and retains unknown state extensions (19.372458ms)
+✖ format6 explicit non-home evidence survives dispatch, discovery and bounded same-native reads (32.435542ms)
+✔ referenced archived revoked/retry restriction and canonical parent receipts are supplied completely inline (71.306667ms)
+✔ large non-home provenance uses exact same-native ranges; undelivered, partial, denied, stale or changed evidence cannot publish (572.718417ms)
+✔ canonical preservation parent revisions cannot be borrowed from matching hashes (38.881ms)
+✔ missing provenance and snapshot-only evidence hold rather than count pointers as delivered bodies (15.929875ms)
+✖ real runtime receipt attribution and deterministic reuse deliver the validated producer closure before Pass (134.836917ms)
+✔ runtime receipt missing or mismatched producer, candidate, plan, reuse or generation holds (34.358ms)
+✔ external catalog reference-shaped metadata is verbatim evidence without a company lookup (40.820333ms)
+✖ runtime closure requires complete delivery and independent source and proof sessions (1014.001708ms)
+(node:42849) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ public paused tree workflow captures originals, pages topology, observes spawn and applies canonical worker proof (1116.119625ms)
+✔ public maintenance is fenced by new founder pause, revocation and queued cancellation (161.450333ms)
+✔ new tree capture on legacy storage holds atomically until explicit migration (23.969833ms)
+✔ actual in-flight maintenance worker rejects late output after founder pause, revoke or cancellation (264.789291ms)
+✔ supported paused schema-1 storage migration is explicit, owner fenced and preserves exact logical state (12.844375ms)
+✔ public qualification originals and payload ranges adapt to escaped reply budgets without mutation receipts (199.9865ms)
+✔ public fresh profile binds immutable capsule, persists dense worker results and still requires independent handover (658.561ms)
+(node:42850) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ dispatch validates and persists policy, and main keeps software-test limits separate (15.139584ms)
+✔ upgrade review-window schema is bounded and runtime rejects invalid or misplaced requests before binding (5.310334ms)
+✔ status distinguishes long execution, grace, startup, queue, legacy and inspection (9.340083ms)
+✔ reconciliation rechecks eligibility inside the store transaction (1.529ms)
+✔ worker queue delay does not consume custom execution time; actual callback is persisted (2.925042ms)
+✔ new jobs require spawn evidence; legacy injected models remain compatible (3.033708ms)
+✔ deadline aborts and late output is quarantined even if model ignores cancellation (1.507625ms)
+✔ pause, ownership loss, context change and scope revocation abort active work (10.030625ms)
+✔ startup expiry aborts without inventing spawn timing and launch errors retain evidence (49.179167ms)
+✔ coordination dispatch binds prerequisite evidence, admits disjoint resources and rejects premature/conflicting work (5.39925ms)
+✔ uncertain cancellation keeps resource claim; confirmed closure releases it (4.006834ms)
+✔ upgrade call ceiling schema and runtime reject invalid options before all boundaries (4.19325ms)
+✔ stream publication fence quarantines deadline crossed during final validation without session mutation (12.814292ms)
+✔ stream exact deadline closure and delayed timers cannot publish late Pass or renew allowance (34.2465ms)
+ℹ tests 47
+ℹ suites 0
+ℹ pass 34
+ℹ fail 13
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3100.334625
+
+✖ failing tests:
+
+test at tests/operating-state.test.mjs:32:1
+✖ accepted historical publication proof survives an owner epoch change without admitting old in-flight work (697.273958ms)
+  Error: Operating state Held: proposal dependency versions, applicable membership, controls or frontier changed
+      at fail (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:9:22)
+      at livePlan (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:152:136)
+      at publishOperatingState (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:181:37)
+      at file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:452:178
+      at mutate (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:104)
+      at Store.transaction (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+      at file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:249
+      at withStore (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+      at update (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+      at Array.contextControl (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:452:16)
+
+test at tests/operating-state.test.mjs:41:1
+✖ public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning (25.545917ms)
+  Error: Operating state Held: proposal dependency versions, applicable membership, controls or frontier changed
+      at fail (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:9:22)
+      at livePlan (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:152:136)
+      at publishOperatingState (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:181:37)
+      at file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:452:178
+      at mutate (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:104)
+      at Store.transaction (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+      at file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:249
+      at withStore (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+      at update (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+      at Array.contextControl (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:452:16)
+
+test at tests/operating-state.test.mjs:47:1
+✖ scope closure, global membership, expiry, receipt changes, revocation and missed communication hold (24.132834ms)
+  Error: Operating state Held: proposal dependency versions, applicable membership, controls or frontier changed
+      at fail (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:9:22)
+      at livePlan (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:152:136)
+      at publishOperatingState (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:181:37)
+      at file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:452:178
+      at mutate (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:104)
+      at Store.transaction (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+      at file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:249
+      at withStore (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+      at update (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+      at Array.contextControl (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:452:16)
+
+test at tests/operating-state.test.mjs:57:1
+✖ 10x independently classified inert archive keeps actual mandatory operating assignment bytes and semantic work constant (38.984375ms)
+  Error: Operating state Held: proposal dependency versions, applicable membership, controls or frontier changed
+      at fail (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:9:22)
+      at livePlan (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:152:136)
+      at publishOperatingState (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:181:37)
+      at file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:452:178
+      at mutate (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:104)
+      at Store.transaction (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+      at file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:249
+      at withStore (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+      at update (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+      at Array.contextControl (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:452:16)
+
+test at tests/operating-state.test.mjs:59:1
+✖ deleted applicable home and changed exact provenance cannot disappear from accepted meaning (23.598083ms)
+  Error: Operating state Held: proposal dependency versions, applicable membership, controls or frontier changed
+      at fail (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:9:22)
+      at livePlan (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:152:136)
+      at publishOperatingState (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:181:37)
+      at file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:452:178
+      at mutate (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:104)
+      at Store.transaction (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+      at file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:249
+      at withStore (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+      at update (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+      at Array.contextControl (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:452:16)
+
+test at tests/operating-state.test.mjs:61:1
+✖ typed outcome requires complete historical uncertainty; text cannot manufacture permission (22.792959ms)
+  Error: Operating state Held: proposal dependency versions, applicable membership, controls or frontier changed
+      at fail (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:9:22)
+      at livePlan (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:152:136)
+      at publishOperatingState (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:181:37)
+      at file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:452:178
+      at mutate (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:104)
+      at Store.transaction (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+      at file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:249
+      at withStore (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+      at update (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+      at Array.contextControl (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:452:16)
+
+test at tests/operating-state.test.mjs:63:1
+✖ public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure (19.903459ms)
+  Error: Operating state Held: proposal dependency versions, applicable membership, controls or frontier changed
+      at fail (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:9:22)
+      at livePlan (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:152:136)
+      at publishOperatingState (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:181:37)
+      at file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:452:178
+      at mutate (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:104)
+      at Store.transaction (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+      at file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:249
+      at withStore (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+      at update (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+      at Array.contextControl (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:452:16)
+
+test at tests/operating-state.test.mjs:87:1
+✖ late new and changed falsely scoped prohibitions stay globally DIRTY, but fresh proposals include them (24.121542ms)
+  Error: Operating state Held: proposal dependency versions, applicable membership, controls or frontier changed
+      at fail (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:9:22)
+      at livePlan (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:152:136)
+      at publishOperatingState (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:181:37)
+      at file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:452:178
+      at mutate (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:104)
+      at Store.transaction (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+      at file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:249
+      at withStore (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+      at update (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+      at Array.contextControl (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:452:16)
+
+test at tests/operating-state.test.mjs:101:1
+✖ publication proof stays current; failed, quarantined, uncertain and unknown-extension siblings stay DIRTY (20.171333ms)
+  Error: Operating state Held: proposal dependency versions, applicable membership, controls or frontier changed
+      at fail (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:9:22)
+      at livePlan (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:152:136)
+      at publishOperatingState (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:181:37)
+      at file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:452:178
+      at mutate (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:104)
+      at Store.transaction (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+      at file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:249
+      at withStore (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+      at update (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+      at Array.contextControl (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:452:16)
+
+test at tests/operating-state.test.mjs:121:1
+✖ mechanical publication index rejects tampering and retains unknown state extensions (19.372458ms)
+  Error: Operating state Held: proposal dependency versions, applicable membership, controls or frontier changed
+      at fail (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:9:22)
+      at livePlan (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:152:136)
+      at publishOperatingState (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:181:37)
+      at file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:452:178
+      at mutate (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:104)
+      at Store.transaction (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+      at file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:249
+      at withStore (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+      at update (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+      at Array.contextControl (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:452:16)
+
+test at tests/operating-state.test.mjs:131:1
+✖ format6 explicit non-home evidence survives dispatch, discovery and bounded same-native reads (32.435542ms)
+  Error: Operating state Held: proposal dependency versions, applicable membership, controls or frontier changed
+      at fail (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:9:22)
+      at livePlan (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:152:136)
+      at publishOperatingState (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:181:37)
+      at file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:452:178
+      at mutate (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:104)
+      at Store.transaction (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+      at file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:249
+      at withStore (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+      at update (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+      at Array.contextControl (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:452:16)
+
+test at tests/operating-state.test.mjs:268:1
+✖ real runtime receipt attribution and deterministic reuse deliver the validated producer closure before Pass (134.836917ms)
+  Error: Operating state Held: proposal dependency versions, applicable membership, controls or frontier changed
+      at fail (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:9:22)
+      at livePlan (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:152:136)
+      at publishOperatingState (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:181:37)
+      at file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:452:178
+      at mutate (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:104)
+      at Store.transaction (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+      at file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:249
+      at withStore (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+      at update (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+      at Array.contextControl (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:452:16)
+
+test at tests/operating-state.test.mjs:307:1
+✖ runtime closure requires complete delivery and independent source and proof sessions (1014.001708ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /reviewer owns current home/. Input:
+  
+  'Error: Operating state Held: proposal dependency versions, applicable membership, controls or frontier changed'
+  
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async TestContext.<anonymous> (file:///private/tmp/soloco-operating-state-20261106/source/tests/operating-state.test.mjs:322:6)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: Operating state Held: proposal dependency versions, applicable membership, controls or frontier changed
+        at fail (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:9:22)
+        at livePlan (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:152:136)
+        at publishOperatingState (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:181:37)
+        at file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:452:178
+        at mutate (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:104)
+        at Store.transaction (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+        at file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:249
+        at withStore (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+        at update (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+        at Array.contextControl (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:452:16),
+    expected: /reviewer owns current home/,
+    operator: 'rejects',
+    diff: 'simple'
+  }

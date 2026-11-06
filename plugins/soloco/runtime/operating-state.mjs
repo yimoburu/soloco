@@ -149,7 +149,7 @@ export function proposeOperatingState(s,args){
   s.records[key]={id:key,kind:'plan',revision:1,status:'Draft',author_role:'runner',author_instance:s.owner.session_id,content:'Proposed current operating meaning; no authority, acceptance or legacy retirement.',operating_plan:plan,created_at:stamp()};
   return {id:key,revision:1,plan_sha256:sha(plan),frontier:snapshot.frontier,held:snapshot.frontier.length>0};
 }
-function livePlan(s,target){const p=target?.operating_plan;if(p?.protocol!==OPERATING_PROTOCOL||!same(capture(s,target.id),p.snapshot))fail('proposal dependency versions, applicable membership, controls or frontier changed');validTime(p.valid_until);return p;}
+function livePlan(s,target){const p=target?.operating_plan;if(p?.protocol!==OPERATING_PROTOCOL)fail('proposal protocol changed');const current=capture(s,target.id);if(!same(current,p.snapshot)){const changed=[...new Set([...Object.keys(current),...Object.keys(p.snapshot??{})])].filter(k=>!same(current[k],p.snapshot?.[k]));fail('proposal dependency versions, applicable membership, controls or frontier changed: '+changed.join(', '));}validTime(p.valid_until);return p;}
 function validTime(until,now=Date.now()){if(until!==null&&(!Number.isFinite(Date.parse(until))||now>=Date.parse(until)))fail('wall-clock validity expired');}
 export function operatingMaintenanceEligible(s,j){try{const t=s.records?.[typeof j.review_of==='string'?j.review_of:j.review_of?.id],p=livePlan(s,t);return Boolean(s.paused&&p.maintenance&&text(p.source_instruction)&&j.role==='qa'&&!j.prototype_id&&!j.development_id);}catch{return false;}}
 export function operatingReviewContext(s,j){
