@@ -19,6 +19,9 @@ import { call } from '../plugins/soloco/runtime/main.mjs';
 // Immutable published contract from 7adf94a8cf0943143fad5f83f3c2c4bda3a4a142:SPEC.md.
 const v018Governance=fs.readFileSync(new URL('./fixtures/governance-v018.md',import.meta.url),'utf8');
 assert.equal(digest(v018Governance),'185933ddeafe9709bef44e9a6605ba7adb5faaa8bc43c1c64f1da3b03ae5f400');
+// Immutable published contract from 64bd2eb:SPEC.md.
+const v019Governance=fs.readFileSync(new URL('./fixtures/governance-v019.md',import.meta.url),'utf8');
+assert.equal(digest(v019Governance),'d79b73676543ab053ea5ce7e456364f68700d0340d47c852a83bc97308f6a422');
 
 const base=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-development-test-'));
 process.env.COMPANY_PLUGIN_DATA=path.join(base,'cache');
@@ -245,7 +248,7 @@ test('development capability fails closed without a supported sandbox, and MCP p
   await assert.rejects(call('company_develop',{...a,action:'inspect',command:'anything'},'codex'),/Unknown argument/);
 });
 test('installed development capability does not silently authorize older teams or modified governance',live,()=>{
-  const team=installedTeam();assert.match(team.governance,/v0\.19/);
+  const team=installedTeam();assert.match(team.governance,/v0\.20/);
   assert.equal(developmentCapability(team).eligible,true);
   for(const changed of [{...team,plugin_version:'0.4.1'},{...team,governance_sha256:digest('changed rules')}])assert.equal(developmentCapability(changed).eligible,false);
 });
@@ -274,6 +277,22 @@ for(const version of ['0.5.0','0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0
   assert.equal(fs.existsSync(path.join(a.root,'sum.test.mjs')),false);
   assert.equal(fs.readFileSync(path.join(a.root,'private.txt'),'utf8'),'NOT_AUTHORIZED');
 });
+test('v0.19 development candidate preparation preserves pinned company state and authority',live,async()=>{
+  const a=setup();
+  withStore(a.root,db=>db.transaction('test.pin_v019',s=>{
+    s.governance=v019Governance;s.governance_sha256=digest(s.governance);
+    s.cos_instructions='Original pinned v0.19 instructions';s.team_sha256=teamHash(s);return s;
+  }));
+  engine.notify({...a,kind:'must_know',summary:'Retain this development constraint.'},'codex');
+  const p=await plan(a);await authorize(a,p);const before=read(a);
+  engine.open(a,'codex');assert.deepEqual(read(a),before);
+  const c=await generate(a,p),after=read(a);assert.equal(c.status,'Submitted');
+  for(const key of ['governance','governance_sha256','cos_instructions','team_sha256','owner','paused','notices'])
+    assert.deepEqual(after[key],before[key]);
+  for(const [key,record] of Object.entries(before.records))
+    assert.deepEqual(after.records[key],key===p.id?{...record,development:{...record.development,attempts:[c.job_id]}}:record);
+});
+
 test('an actual isolated edit-test-review loop retains usable candidate and leaves original source untouched',live,async()=>{
   const a=setup(),p=await plan(a);await authorize(a,p);
   const before=read(a),c=await generate(a,p);assert.equal(c.status,'Submitted');
@@ -483,15 +502,15 @@ test('a generic-only QA Pass stays inspectable but cannot accept; a complete fre
   assert.ok(read(a).records[incomplete.id]);assert.notEqual(complete.job_id,incomplete.job_id);
 });
 
-test('exact v0.18 development compatibility retains sandbox and team restrictions',()=>{
-  const governance=v018Governance;
+test('exact published development compatibility retains sandbox and team restrictions',()=>{
+  for(const governance of [v018Governance,v019Governance,installedTeam().governance])
   for(const plugin_version of ['0.5.0','0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7','0.7.1',installedTeam().plugin_version]) {
     const s={...installedTeam(),plugin_version,governance,governance_sha256:digest(governance)};
     const before=structuredClone(s),c=developmentCapability(s);
     assert.equal(c.eligible,capability.supported);
     assert.equal(c.blocker,capability.supported?null:capability.blocker);
     assert.deepEqual(s,before);
-    for(const changed of [{...s,plugin_version:'0.4.1'},{...s,plugin_version:'99.0.0'},{...s,governance_sha256:digest(governance+'modified')}])
+    for(const changed of [{...s,plugin_version:'0.4.1'},{...s,plugin_version:'99.0.0'},{...s,governance_sha256:digest(governance+'modified')},{...s,governance_sha256:digest('Unknown rules')}])
       assert.equal(developmentCapability(changed).eligible,false);
   }
 });
