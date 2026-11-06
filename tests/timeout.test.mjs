@@ -64,14 +64,14 @@ class Child extends EventEmitter {
   }
 }
 const codexOutput = text => JSON.stringify({type:'thread.started',thread_id:'native-fictional'})+'\n'+JSON.stringify({type:'item.completed',item:{type:'agent_message',text}})+'\n';
-function harness({child=new Child(), signal=new Signal(), onSpawn, timeout=1000, timeoutReason='Small deterministic fixture', host='codex', nativeId=null, selection=null, spawnHook, resolveHook, timeoutContext, clockStart}={}) {
+function harness({child=new Child(), signal=new Signal(), onSpawn, timeout=1000, timeoutReason='Small deterministic fixture', host='codex', nativeId=null, selection=null, spawnHook, resolveHook, timeoutContext, clockStart, executionDeadlineAt}={}) {
   const clock=new Clock();
   if(clockStart!==undefined)clock.time=clockStart;
   const calls=[];
   const receipts=[];
   let resolves=0;
   const options={
-    signal, timeoutReason, timeoutContext,
+    signal, timeoutReason, timeoutContext, executionDeadlineAt,
     now:clock.now, setTimeout:clock.set, clearTimeout:clock.clear,
     resolveExecutable:host=>{resolves++; resolveHook?.(); return `/fictional/${host}`;},
     spawn:(...args)=>{calls.push(args); spawnHook?.(); return child;},
@@ -86,6 +86,25 @@ function clean(h) {
   assert.equal(h.signal.handlers.size,0,'abort listener removed');
   for (const emitter of [h.child,h.child.stdout,h.child.stderr,h.child.stdin]) assert.deepEqual(emitter.eventNames(),[],'adapter listeners removed');
 }
+test('absolute review deadline clamps actual delayed spawn and its watchdog',async()=>{
+ const end=1080000,h=harness({timeout:80000,executionDeadlineAt:end});
+ h.clock.move(1030000,false);h.child.emit('spawn');
+ assert.equal(h.receipts.length,1);assert.equal(h.receipts[0].timeout_ms,50000);
+ assert.equal(Date.parse(h.receipts[0].execution_deadline_at),end);
+ assert.equal(Date.parse(h.receipts[0].termination_deadline_at),end+3000);
+ h.clock.move(end,false);h.child.emit('close',0);
+ assert.equal((await h.result).error.code,'ROLE_TIMEOUT');clean(h);
+});
+
+test('absolute expiry before spawn prevents timing credit and cannot accept late success',async()=>{
+ const h=harness({timeout:600000,executionDeadlineAt:1002000,child:new Child({closeOnTerm:true})});
+ h.clock.move(1002000,false);h.child.emit('spawn');
+ assert.equal(h.receipts.length,0);assert.equal((await h.result).error.code,'ROLE_TIMEOUT');clean(h);
+ for(const executionDeadlineAt of [NaN,Infinity,'1080000',-1]){
+  const bad=harness({executionDeadlineAt});assert.match((await bad.result).error.message,/absolute execution deadline/);assert.equal(bad.calls.length,0);clean(bad);
+ }
+});
+
 function complete(h,text='artifact') {
   h.child.stdout.emit('data',codexOutput(text));
   h.child.emit('close',0);

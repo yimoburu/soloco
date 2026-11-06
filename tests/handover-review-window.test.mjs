@@ -51,8 +51,18 @@ function queue(b,window=45){
   const ctx=assignmentContext(s,j);s.jobs[key]={...j,inputs:ctx.inputs,context_sha256:ctx.hash};return s;
  }));return key;
 }
-async function simulated(b,key,{expire=false,tamper=false,fastBlocked=false,progressive=false}={}){
- const RealDate=Date;let now=RealDate.now()+10000,calls=0;globalThis.Date=class extends RealDate {constructor(...args){super(...(args.length?args:[now]));}static now(){return fastBlocked?now++:now;}};
+async function simulated(b,key,{expire=false,tamper=false,fastBlocked=false,progressive=false,badTiming,publicationTickBudget}={}){
+ const RealDate=Date;let now=RealDate.now()+10000,calls=0,publicationClock=false;globalThis.Date=class extends RealDate {constructor(...args){if(!args.length&&publicationClock)now++;super(...(args.length?args:[now]));}static now(){return fastBlocked?now++:now;}};
+ const reportSpawn=(options,limit)=>{
+  const timing=executionTiming(now,{timeout_ms:limit,timeout_reason:settings.timeout_reason});
+  if(badTiming&&calls===badTiming.call){
+   if(badTiming.field==='future-start')Object.assign(timing,executionTiming(now+1000,{timeout_ms:limit,timeout_reason:settings.timeout_reason}));
+   else if(badTiming.field==='past-start')Object.assign(timing,executionTiming(now-360001,{timeout_ms:limit,timeout_reason:settings.timeout_reason}));
+   else if(badTiming.missing)delete timing[badTiming.field];
+   else timing[badTiming.field]=badTiming.field==='timeout_reason'?'Contradictory fictional reason':new RealDate(RealDate.parse(timing[badTiming.field])+1).toISOString();
+  }
+  options.onSpawn?.(timing);
+ };
  try{
   const s=withStore(b.root,db=>db.read()),ctx=assignmentContext(s,s.jobs[key]),e=ctx.handover_evidence,stream=e.sources[e.pages[0].source_id];
   const citations=JSON.parse(ctx.text).evidence_protocol.citations.slice(0,1),target=s.records[b.target];
@@ -61,20 +71,22 @@ async function simulated(b,key,{expire=false,tamper=false,fastBlocked=false,prog
    assert.ok(limit<=600000,'Each actual native invocation stays bounded at ten minutes');
    limits.push(limit);
    if(progressive){
-    calls++;options.onSpawn(executionTiming(now,{timeout_ms:limit,timeout_reason:settings.timeout_reason}));now+=progressive==='exact'?450000:440000;
+    calls++;reportSpawn(options,limit);now+=progressive==='exact'?450000:440000;
     if(offset<stream.length){let length=Math.min(Math.ceil(stream.length/5),stream.length-offset);const c=stream.raw.charCodeAt(offset+length-1);if(c>=0xd800&&c<=0xdbff)length--;const read={source_id:stream.source_id,sha256:stream.sha256,offset,length};offset+=length;return {native_id:'fictional-independent',text:JSON.stringify({reads:[read]})};}
+    if(publicationTickBudget!==undefined){now=Date.parse(withStore(b.root,db=>db.read().jobs[key]).execution_deadline_at)-publicationTickBudget;publicationClock=true;}
     return {native_id:'fictional-independent',text:JSON.stringify({content:'Independent complete fictional review.',citations,messages:[],notices:[],review:{verdict:'Pass',reason:'Fictional full coverage',permitted_action:'resume_handover',subject_sha256:target.handover.subject_sha256,blockers:[]}})};
    }
    if(calls++===0){
-    options.onSpawn(executionTiming(now,{timeout_ms:limit,timeout_reason:settings.timeout_reason}));
+    reportSpawn(options,limit);
     if(fastBlocked){assert.ok(limit<600000);return {native_id:'fictional-independent',text:JSON.stringify({content:'Fictional missing evidence.',citations,messages:[],notices:[],review:{verdict:'Blocked',reason:'Incomplete fictional evidence',permitted_action:'hold',subject_sha256:target.handover.subject_sha256,blockers:['Incomplete']}})};}
     now+=360000;
     if(tamper)withStore(b.root,db=>db.transaction('fixture.tamper',v=>{v.jobs[key].handover_review_window_minutes=30;return v;}));
     const reads=[];for(let offset=0;offset<stream.length;){let length=Math.min(32768,stream.length-offset);const c=stream.raw.charCodeAt(offset+length-1);if(c>=0xd800&&c<=0xdbff)length--;reads.push({source_id:stream.source_id,sha256:stream.sha256,offset,length});offset+=length;}
     assert.ok(reads.length<=4);return {native_id:'fictional-independent',text:JSON.stringify({reads})};
    }
-   options.onSpawn?.(executionTiming(now,{timeout_ms:limit,timeout_reason:settings.timeout_reason}));
+   reportSpawn(options,limit);
    now=expire?Date.parse(withStore(b.root,db=>db.read().jobs[key]).execution_deadline_at):now+360000;
+   if(publicationTickBudget!==undefined){now=Date.parse(withStore(b.root,db=>db.read().jobs[key]).execution_deadline_at)-publicationTickBudget;publicationClock=true;}
    return {native_id:'fictional-independent',text:JSON.stringify({content:'Independent fictional understanding established.',citations,messages:[],notices:[],review:{verdict:'Pass',reason:'Fictional complete frozen review',permitted_action:'resume_handover',subject_sha256:target.handover.subject_sha256,blockers:[]}})};
   });
   return {calls,limits,state:withStore(b.root,db=>db.read())};
@@ -140,4 +152,48 @@ test('a fixed review window shrinks later call limits and rejects completion exa
   if(progressive===true){assert.equal(j.status,'completed');assert.equal(Date.parse(j.finished_at)-Date.parse(j.execution_started_at),44*60000);}
   else{assert.notEqual(j.status,'completed');assert.throws(()=>engine.control({...b,action:'resume',expected_epoch:2,source_instruction:'resume'},'codex'));}
  }
+});
+
+
+test('every native invocation requires complete consistent timing evidence before publication',async()=>{
+ const malformed=[
+  {field:'termination_deadline_at',missing:true},{field:'termination_deadline_at'},
+  {field:'timeout_reason',missing:true},{field:'timeout_reason'}
+ ];
+ for(const call of [1,2])for(const bad of malformed){
+  const b=fixture(),key=queue(b),{state,calls}=await simulated(b,key,{badTiming:{...bad,call}}),j=state.jobs[key];
+  assert.equal(calls,call,'Malformed timing stops the affected invocation');
+  assert.notEqual(j.status,'completed',JSON.stringify({call,...bad}));
+  assert.notEqual(state.records[j.artifact_id]?.status,'Submitted');
+  assert.equal(state.paused,true);
+ }
+ for(const field of ['future-start','past-start']){
+  const b=fixture(),key=queue(b),{state}=await simulated(b,key,{badTiming:{field,call:2}}),j=state.jobs[key];
+  assert.notEqual(j.status,'completed',field);
+  assert.notEqual(state.records[j.artifact_id]?.status,'Submitted');
+  assert.equal(state.paused,true);
+ }
+});
+
+test('clock movement during publication never publishes a completed receipt at or beyond expiry',async()=>{
+ // Advance the wall clock as timestamps are acquired, across several offsets.
+ // This exercises boundary crossing during durable publication, not only a
+ // model result that was already late when the worker first checked it.
+ let lateObserved=false;
+ for(const publicationTickBudget of [1,2,3,4,5,6,7,8]){
+  const b=fixture(),key=queue(b),{state}=await simulated(b,key,{progressive:true,publicationTickBudget}),j=state.jobs[key],r=state.records[j.artifact_id];
+  const deadline=Date.parse(j.execution_deadline_at);
+  const late=Date.parse(j.finished_at)>=deadline||Date.parse(r?.created_at)>=deadline;
+  if(late){
+   lateObserved=true;
+   assert.notEqual(j.status,'completed','Late publication must fail closed at offset '+publicationTickBudget);
+   assert.notEqual(r?.status,'Submitted','Late artifact must remain unaccepted at offset '+publicationTickBudget);
+  }
+  if(j.status==='completed'){
+   assert.ok(Date.parse(j.finished_at)<deadline);
+   assert.ok(Date.parse(r.created_at)<deadline);
+  }
+  assert.equal(state.paused,true);
+ }
+ assert.equal(lateObserved,true,'Fixture must cross the publication deadline');
 });

@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { withStore, stamp, id, digest, notice, noLink, upgradePending, compatibleRuntime } from './store.mjs';
 import { runModel, parseArtifact } from './adapters.mjs';
 import { assignmentContext, contextMatches, contextBudgetForJob } from './context.mjs';
-import { handoverReviewEligible } from './handover.mjs';
+import { handoverReviewEligible, completedWithinReviewWindow } from './handover.mjs';
 import { dataDir } from './engine.mjs';
 import { developmentAssignment, developmentBundle, developmentPrompt } from './develop.mjs';
 import { developmentLimits } from './development-limits.mjs';
@@ -120,17 +120,21 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
       if(remaining<1000)throw Error('Insufficient execution time for supplemental read');
       if(context.handover_evidence&&request.length>200000)throw Error('Handover request exceeds 200000 characters; nothing was truncated');
       let callTiming;
+      const callRequestedAt=Date.now();
       invoked=true;
       // A prior read round proves only that earlier process closed. Failure of
       // this invocation still needs its own termination evidence for release.
       output=undefined;
       output=await model(job.host,session,request,dir,remaining,job.model_selection??null,{
         signal:controller.signal,timeoutReason:timeout.timeout_reason,maxOutputCharacters:Math.max(2000000,contextBudgetForJob(state,job)),
+        ...(job.handover_review_window_minutes&&overallTiming?{executionDeadlineAt:Date.parse(overallTiming.execution_deadline_at)}:{}),
         onSpawn:(job.handover_review_window_minutes||round===0)?timing=>{
           if(controller.signal.aborted)throw controller.signal.reason;
           if(callTiming)throw new Error('Duplicate execution spawn callback');
-          const recorded=executionTiming(timing?.execution_started_at,{...timeout,timeout_ms:remaining});
-          if(timing?.timeout_policy_version!==TIMEOUT_POLICY_VERSION || timing.execution_deadline_at!==recorded.execution_deadline_at || timing.timeout_ms!==recorded.timeout_ms)throw new Error('Invalid adapter spawn timing');
+          const start=Date.parse(timing?.execution_started_at);
+          const cap=job.handover_review_window_minutes&&overallTiming?Math.min(remaining,Date.parse(overallTiming.execution_deadline_at)-start):remaining;
+          const recorded=executionTiming(start,{...timeout,timeout_ms:cap});
+          if(start<callRequestedAt||start>Date.now()||Object.keys(recorded).some(k=>timing?.[k]!==recorded[k]))throw new Error('Invalid adapter spawn timing');
           callTiming=recorded;
           if(spawned){if(!job.handover_review_window_minutes)throw Error('Duplicate execution spawn callback');withStore(root,db=>eligibility(db.read()));return;}
           withStore(root,db=>db.transaction('job.execution_started',s=>{
@@ -215,6 +219,7 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
       if(controller.signal.aborted)current.execution_failure={...failureEvidence(controller.signal.reason),outcome:'cancelled_or_timed_out',at:stamp()};
       current.model_evidence=output.model_evidence??{reported_models:[],reported_effort:null,verification:'unverified',source:'not_reported',scope:'unknown'};
       if(stale) {notice(s,'must_know','A late or stale result was quarantined; it grants no approval.',artifactId);return s;}
+      const previousNative=s.sessions[job.session_key].native_id,messageCount=s.messages.length,noticeCount=s.notices.length;
       s.sessions[job.session_key].native_id=output.native_id;
       for(const m of artifact.messages??[]) {
         if(!Object.hasOwn(s.roles,m.to) || typeof m.content!=='string' || m.content.length>20000) throw new Error('Invalid peer message');
@@ -223,6 +228,12 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
       for(const n of artifact.notices??[]) {
         if(!['must_know','decision_required'].includes(n.kind) || typeof n.summary!=='string' || !n.summary.trim() || n.summary.length>20000) throw new Error('Invalid founder notice');
         notice(s,n.kind,n.summary,artifactId).job_id=job.id;
+      }
+      if(job.handover_review_window_minutes&&(!completedWithinReviewWindow(current,s.records[artifactId])||jobTimeoutState({...current,status:'running'},Date.now()).state!=='executing')){
+        s.messages.length=messageCount;s.notices.length=noticeCount;s.sessions[job.session_key].native_id=previousNative;
+        current.status='quarantined';s.records[artifactId].status='Quarantined';
+        current.execution_failure={code:'ROLE_TIMEOUT',message:'Handover review publication deadline reached',outcome:'timeout',at:stamp()};
+        notice(s,'must_know','A late or stale result was quarantined; it grants no approval.',artifactId);
       }
       return s;
     }));

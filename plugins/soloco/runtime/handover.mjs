@@ -117,7 +117,7 @@ export function freshHandoverReviewEligible(state,args) {
     &&!Object.values(state.jobs??{}).some(j=>j.review_of?.id===key)
     &&!state.sessions?.[`qa:review:${key}:${target.revision}`];
 }
-function completedWithinReviewWindow(job,artifact) {
+export function completedWithinReviewWindow(job,artifact) {
   if(job.handover_review_window_minutes===undefined&&job.handover_review_reason===undefined)return true;
   try {
     const expected=jobExecutionTiming(job.execution_started_at,job),start=Date.parse(expected.execution_started_at),end=Date.parse(expected.execution_deadline_at);

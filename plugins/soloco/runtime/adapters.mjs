@@ -3,7 +3,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { normalizeTimeout, executionTiming, STARTUP_TIMEOUT_MS, TERMINATION_GRACE_MS } from './timeout.mjs';
+import { normalizeTimeout, executionTiming, MIN_EXECUTION_TIMEOUT_MS, STARTUP_TIMEOUT_MS, TERMINATION_GRACE_MS } from './timeout.mjs';
 
 const ownFile=fileURLToPath(import.meta.url);
 const modelId=value=>typeof value==='string' && /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/.test(value);
@@ -220,7 +220,10 @@ export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selectio
       if (!Number.isSafeInteger(value) || value < 0 || value > 8640000000000000 - Math.max(1000000, policy.timeout_ms + TERMINATION_GRACE_MS)) throw new Error('Invalid lifecycle clock');
       return value;
     };
-    const startupDeadline = readNow() + STARTUP_TIMEOUT_MS;
+    const absoluteDeadline=options.executionDeadlineAt;
+    if(absoluteDeadline!==undefined&&(!Number.isSafeInteger(absoluteDeadline)||absoluteDeadline<0||absoluteDeadline>8640000000000000-TERMINATION_GRACE_MS))throw Error('Invalid absolute execution deadline');
+    if(absoluteDeadline!==undefined&&readNow()>=absoluteDeadline)throw errorFor('Role review deadline reached before launch','ROLE_TIMEOUT');
+    const startupDeadline = Math.min(readNow() + STARTUP_TIMEOUT_MS,absoluteDeadline??Infinity);
     const env = {...process.env, COMPANY_WORKER:'1'};
     delete env.CLAUDECODE; // A new standalone process, not a nested Claude agent.
     const command = resolveCommand(host);
@@ -286,7 +289,7 @@ export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selectio
         return true;
       }
       if (!spawned && current >= startupDeadline) {
-        stop(startupFailure(), startupDeadline+TERMINATION_GRACE_MS);
+        stop(absoluteDeadline!==undefined&&current>=absoluteDeadline?timeoutFailure():startupFailure(), startupDeadline+TERMINATION_GRACE_MS);
         return true;
       }
       return false;
@@ -304,9 +307,11 @@ export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selectio
     listen(child, 'spawn', () => {
       if (settled || failure || spawned || expired()) return;
       const at=readNow();
-      const timing=executionTiming(at,policy,options.timeoutContext);
+      const duration=Math.min(policy.timeout_ms,absoluteDeadline===undefined?policy.timeout_ms:absoluteDeadline-at);
+      if(duration<MIN_EXECUTION_TIMEOUT_MS){stop(timeoutFailure(),absoluteDeadline+TERMINATION_GRACE_MS);return;}
+      const timing=executionTiming(at,{...policy,timeout_ms:duration},options.timeoutContext);
       spawned=true;
-      executionDeadline=at+policy.timeout_ms;
+      executionDeadline=Date.parse(timing.execution_deadline_at);
       clear('startup');
       executionTimer=schedule(() => {
         executionTimer=null;
