@@ -323,9 +323,13 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
         // failures before timing, cancellation or independence validation.
         if(output?.native_id){if(scopedContext(context)){current.rejected_native_ids=[...new Set([...(current.rejected_native_ids??[]),current.rejected_native_id,output.native_id].filter(Boolean))];current.rejected_native_id=output.native_id;}else current.native_id=output.native_id;}
         if(output?.model_evidence)current.model_evidence=output.model_evidence;
-        if(artifact || context?.qualification&&typeof output?.text==='string') {
-          const rejected=context?.qualification?output.text:JSON.stringify(artifact);
-          current.rejected_output={...(context?.qualification?{qualification_plan:context.qualification.plan,qualification_target:context.qualification.target,qualification_negative:['Fail','Blocked'].find(v=>[artifact?.review?.verdict,artifact?.qualification_result?.verdict].includes(v))??null}:{}),...(s.records?.[job.review_of?.id]?.context_classification_plan?.version===2?{qualification_negative:['Fail','Blocked'].find(v=>[artifact?.review?.verdict,artifact?.qualification_result?.verdict].includes(v))??null}:{}),text:rejected.slice(0,context?.packet?.profile?context.qualification.limits.output_wire_bytes:100000),truncated:rejected.length>(context?.packet?.profile?context.qualification.limits.output_wire_bytes:100000),author_instance:job.instance_id,context_sha256:context?.hash,reason:current.error};
+        if(artifact || (context?.qualification||context?.qualification_evidence)&&typeof output?.text==='string') {
+          const rejected=(context?.qualification||context?.qualification_evidence)?output.text:JSON.stringify(artifact);
+          // Format 4 may fail parseArtifact's body/envelope checks before artifact
+          // assignment. Preserve its returned verdict independently of that failure.
+          let rejectedArtifact=artifact;
+          if(!rejectedArtifact&&context?.qualification_evidence){try{rejectedArtifact=JSON.parse(output.text.trim().replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, ''));}catch{}}
+          current.rejected_output={...(context?.qualification?{qualification_plan:context.qualification.plan,qualification_target:context.qualification.target,qualification_negative:['Fail','Blocked'].find(v=>[artifact?.review?.verdict,artifact?.qualification_result?.verdict].includes(v))??null}:{}),...(context?.qualification_evidence?{qualification_negative:['Fail','Blocked'].find(v=>[rejectedArtifact?.review?.verdict,rejectedArtifact?.qualification_result?.verdict].includes(v))??null}:{}),text:rejected.slice(0,context?.packet?.profile?context.qualification.limits.output_wire_bytes:100000),truncated:rejected.length>(context?.packet?.profile?context.qualification.limits.output_wire_bytes:100000),author_instance:job.instance_id,context_sha256:context?.hash,reason:current.error};
         }
         notice(s,'must_know',`Specialist ${current.role} could not finish: ${current.error}`,jobId);
       }

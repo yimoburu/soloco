@@ -44,7 +44,8 @@ async function review(f,{p,q},mode='complete',reviewNative='fictional-review-'+q
  await work(f.root,q.id,async(_host,native,prompt,_dir,timeout,_selection,options)=>{
   options.onSpawn?.(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));
   calls++;if(calls>1){assert.equal(native,reviewNative);const packet=JSON.parse(prompt);delivered+=packet.reads.reduce((n,r)=>n+r.text.length,0);}
-  if(['complete','rejected-negative'].includes(mode)&&requests.length)return {native_id:reviewNative,text:JSON.stringify({reads:requests.splice(0,4)})};
+  if(['complete','rejected-negative','rejected-empty','rejected-oversized','rejected-fenced-empty'].includes(mode)&&requests.length)return {native_id:reviewNative,text:JSON.stringify({reads:requests.splice(0,4)})};
+  if(['rejected-empty','rejected-oversized','rejected-fenced-empty'].includes(mode)){const text=JSON.stringify({content:mode==='rejected-oversized'?'x'.repeat(100001):'',messages:[],notices:[],review:{verdict:'Blocked',reason:'FICTIONAL early parse rejection: no retry remains.',permitted_action:'hold',blockers:['No retry remains.']}});return {native_id:reviewNative,text:mode==='rejected-fenced-empty'?'```json\n'+text+'\n```':text};}
   if(mode==='rejected-negative')return {native_id:reviewNative,text:JSON.stringify({content:'FICTIONAL retained negative: no retry remains.',messages:[{to:'unknown-peer',body:'Cannot clear historical failure.'}],notices:[],review:{verdict:'Blocked',reason:'FICTIONAL negative must remain visible',permitted_action:'hold',blockers:['No retry remains.']}})};
   return {native_id:mode==='nonindependent'?f.session_id:reviewNative,text:JSON.stringify({content:'FICTIONAL ADAPTER DOUBLE: synthetic preservation judgment; no independent acceptance.',messages:[],notices:[],review:{verdict:'Pass',reason:'Fictional complete preservation',permitted_action:'apply_context_classification',plan_sha256:sha(read(f).records[p.id].context_classification_plan),coverage_complete:true,obligations_preserved:true,unique_findings:[],blockers:[]}})};
  });
@@ -254,4 +255,30 @@ test('later retained rejected negative revokes existing v2 exclusion',async()=>{
  assert.equal(classificationFor(read(f),read(f).records.old).disposition,'represented','a different revision is not the same negative target');
  mutate(f,s=>{s.jobs[q.id].review_of.revision--;s.jobs[q.id].rejected_output.text='{\"clipped\":';s.jobs[q.id].rejected_output.truncated=true;});
  assert.throws(()=>classificationFor(read(f),read(f).records.old),/negative/,'retained verdict survives raw rejection clipping');
+});
+
+
+test('format4 negative rejected before artifact assignment remains delivered and cannot be cleared',async()=>{
+ for(const mode of ['rejected-empty','rejected-oversized','rejected-fenced-empty']){
+ const f=fixture(),first=await prepare(f),negative=await review(f,first,mode);
+ assert.equal(negative.job.status,'failed');assert.match(negative.job.error,/nonempty content/);
+ assert.ok(negative.job.rejected_output,'raw negative survives parseArtifact failure');
+ assert.equal(negative.job.rejected_output.qualification_negative,'Blocked');
+ const q=engine.dispatch({...f,role:'qa',review_of:first.p.id,task:'Read retained negative.'},'codex',launch);
+ const packet=assignmentContext(read(f),read(f).jobs[q.id]);
+ const stream=packet.qualification_evidence.sources[packet.qualification_evidence.pages[0].source_id].raw;
+ assert.ok(stream.includes('qualification_negative'));
+ if(mode==='rejected-oversized')assert.equal(negative.job.rejected_output.truncated,true);else assert.ok(stream.includes('FICTIONAL early parse rejection: no retry remains.'));
+ const later=await review(f,{p:first.p,q});assert.equal(later.job.status,'completed',later.job.error);
+ await assert.rejects(api(f,{action:'apply',plan_id:first.p.id,review_id:later.job.artifact_id}),/negative/);
+ }
+});
+
+test('early parse rejected negative revokes an existing represented proof',async()=>{
+ const f=fixture(),first=await prepare(f),pass=await review(f,first);
+ assert.equal((await api(f,{action:'apply',plan_id:first.p.id,review_id:pass.job.artifact_id})).applied,true);
+ const q=engine.dispatch({...f,role:'qa',review_of:first.p.id,task:'Check prior qualification.'},'codex',launch);
+ const negative=await review(f,{p:first.p,q},'rejected-empty',read(f).jobs[q.id].native_id??undefined);
+ assert.equal(negative.job.status,'failed');assert.match(negative.job.error,/nonempty content/);
+ assert.throws(()=>classificationFor(read(f),read(f).records.old),/negative/);
 });
