@@ -1,0 +1,24 @@
+(node:35847) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ accepted historical publication proof survives an owner epoch change without admitting old in-flight work (772.418209ms)
+✔ public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning (23.262625ms)
+✔ missing legacy bootstrap is visibly DIRTY and apply rolls back without acceptance (17.426833ms)
+✔ new membership, changed exact source, wrong independent identity and absent closure cannot publish (124.25875ms)
+✔ scope closure, global membership, expiry, receipt changes, revocation and missed communication hold (38.391167ms)
+✔ pause fences publication reviewer and prospective handover cannot hide unknown legacy (18.919583ms)
+✔ 10x independently classified inert archive keeps actual mandatory operating assignment bytes and semantic work constant (79.471791ms)
+✔ deleted applicable home and changed exact provenance cannot disappear from accepted meaning (22.79375ms)
+✔ typed outcome requires complete historical uncertainty; text cannot manufacture permission (20.55625ms)
+✔ public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure (70.68675ms)
+✔ late new and changed falsely scoped prohibitions stay globally DIRTY, but fresh proposals include them (81.469334ms)
+✔ publication proof stays current; failed, quarantined, uncertain and unknown-extension siblings stay DIRTY (24.549584ms)
+✔ mechanical publication index rejects tampering and retains unknown state extensions (21.783166ms)
+✔ format6 explicit non-home evidence survives dispatch, discovery and bounded same-native reads (245.737333ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 14
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1684.83

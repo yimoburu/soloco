@@ -28,6 +28,15 @@ async function review(f,plan,{native='fictional-independent-'+plan,verdict='Pass
 }
 async function publish(f){const p=await ctx(f,{action:'plan'}),r=await review(f,p.id);const result=await ctx(f,{action:'apply',plan_id:p.id,review_id:r.id});assert.equal(result.published,true);return {p,r};}
 
+test('accepted historical publication proof survives an owner epoch change without admitting old in-flight work',async()=>{
+ const f=fixture();home(f);const {r}=await publish(f);const before=read(f),receipts=structuredClone(before.operating_state.receipts);
+ // Contract fixture for the immutable-proof seam. Public transfer/resume is
+ // separately exercised end-to-end; this is not an actual company mutation.
+ mutate(f,s=>{s.owner={host:'codex',session_id:'incoming-owner-fixture',epoch:s.owner.epoch+1};});
+ const checkpoint=operatingContext(read(f));assert.equal(checkpoint.owner.epoch,2);assert.deepEqual(read(f).operating_state.receipts,receipts);
+ mutate(f,s=>{s.jobs[r.job].coordination_release.termination_confirmed=false;});assert.throws(()=>operatingContext(read(f)),/Held/);
+});
+
 test('public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning',async()=>{const f=fixture();home(f);const {p,r}=await publish(f);assert.equal((await ctx(f,{action:'inspect'})).status,'Accepted');const j=engine.dispatch({...f,role:'engineer',task:'Read accepted fictional current meaning'},'codex',{check:()=>({available:true}),launch:()=>({on(){},unref(){}})});const s=read(f),job=s.jobs[j.id];assert.equal(job.context_format,6);const pack=JSON.parse(assignmentContext(s,job).text);assert.equal(pack.checkpoint.homes.length,1);assert.match(pack.checkpoint.controls.governance,/No external/);assert.equal(s.operating_state.review.id,r.id);assert.equal(s.operating_state.plan.id,p.id);});
 
 test('missing legacy bootstrap is visibly DIRTY and apply rolls back without acceptance',async()=>{const f=fixture();engine.save({...f,id:'unknown',kind:'artifact',content:'An unknown distant exception prohibits retry.'},'codex');const p=await ctx(f,{action:'plan'});assert.equal(p.frontier.length,1);const before=read(f);await assert.rejects(ctx(f,{action:'apply',plan_id:p.id,review_id:'absent'}),/frontier coverage incomplete/);assert.deepEqual(read(f),before);const view=await ctx(f,{action:'inspect'});assert.equal(view.status,'Held');assert.equal(view.frontier[0].status,'DIRTY');assert.equal(view.frontier[0].scope,'*');});

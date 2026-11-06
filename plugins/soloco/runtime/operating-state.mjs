@@ -53,7 +53,12 @@ function bookkeeping(s,planId){
   add(planId);
   const h=s.handover,t=s.records?.[h?.reconstruction_id];if(t?.handover?.evidence_protocol===4&&t.handover.id===h.id)add(t.id);
   const a=s.operating_state;
-  if(a){validateOperatingIndex(s);add(a.plan.id);for(const refs of a.accepted_snapshot.prior_proofs??[]){const [t,r,j]=exactProof(s,refs);ids.add(t.id);ids.add(r.id);jobs.add(j.id);}}
+  if(a){
+    validateOperatingIndex(s);
+    // Accepted immutable proof is historical evidence across owner epochs.
+    // Only new in-flight review admission is fenced to the current epoch.
+    for(const refs of [a.receipts,...(a.accepted_snapshot.prior_proofs??[])]){const [t,r,j]=exactProof(s,refs);ids.add(t.id);ids.add(r.id);jobs.add(j.id);}
+  }
   return {ids,jobs};
 }
 // Conservative built-in provider. Every unqualified occurrence is visible. No
