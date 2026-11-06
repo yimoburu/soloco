@@ -1,0 +1,85 @@
+(node:91134) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ accepted historical publication proof survives an owner epoch change without admitting old in-flight work (610.2775ms)
+✔ public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning (30.386458ms)
+✔ missing legacy bootstrap is visibly DIRTY and apply rolls back without acceptance (16.876042ms)
+✔ host catalog default service tier does not invalidate explicit operating reviewer startup (12.124417ms)
+✔ new membership, changed exact source, wrong independent identity and absent closure cannot publish (123.961334ms)
+✔ scope closure, global membership, expiry, receipt changes, revocation and missed communication hold (41.791125ms)
+✔ pause fences publication reviewer and prospective handover cannot hide unknown legacy (15.579209ms)
+✔ 10x independently classified inert archive keeps actual mandatory operating assignment bytes and semantic work constant (96.882ms)
+✔ deleted applicable home and changed exact provenance cannot disappear from accepted meaning (24.855458ms)
+✔ typed outcome requires complete historical uncertainty; text cannot manufacture permission (25.949584ms)
+✔ public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure (84.955792ms)
+✔ late new and changed falsely scoped prohibitions stay globally DIRTY, but fresh proposals include them (96.543584ms)
+✔ publication proof stays current; failed, quarantined, uncertain and unknown-extension siblings stay DIRTY (24.220292ms)
+✔ mechanical publication index rejects tampering and retains unknown state extensions (22.150416ms)
+✔ format6 explicit non-home evidence survives dispatch, discovery and bounded same-native reads (214.118917ms)
+✔ referenced archived revoked/retry restriction and canonical parent receipts are supplied completely inline (82.410417ms)
+✔ large non-home provenance uses exact same-native ranges; undelivered, partial, denied, stale or changed evidence cannot publish (816.740542ms)
+✔ canonical preservation parent revisions cannot be borrowed from matching hashes (83.707792ms)
+✔ missing provenance and snapshot-only evidence hold rather than count pointers as delivered bodies (23.308833ms)
+✔ real runtime receipt attribution and deterministic reuse deliver the validated producer closure before Pass (310.602458ms)
+✔ runtime receipt missing or mismatched producer, candidate, plan, reuse or generation holds (62.0075ms)
+✔ external catalog reference-shaped metadata is verbatim evidence without a company lookup (77.821833ms)
+✔ runtime closure requires complete delivery and independent source and proof sessions (3600.984ms)
+✔ public qualified recovered snapshot publishes current typed outcomes without replaying the paid raw archive (1627.221ms)
+✔ large prospective publication uses bounded frozen worker delivery and rejects a manufactured complete flag (7184.425125ms)
+✔ frozen publication worker rejects unread semantics, changed native and changed current membership (420.242792ms)
+✔ paid snapshot archive still requires publication QA independent of nested original producers (1165.945917ms)
+✔ FICTIONAL PUBLIC v2 explicit complete sources preserve accepted runtime producer independence and freshness (3646.237542ms)
+✔ publication cannot reuse provenance-bound rejected native identities from a preserved failed job (128.145625ms)
+✔ v2 qualification also excludes the native of its retained rejected job contribution (131.971291ms)
+✔ archived rejected job attribution survives snapshot-only retention without promoting external metadata (438.879625ms)
+(node:91135) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ FICTIONAL ADAPTER: coherent public create/read -> worker -> independent interface -> canonical apply; repeats have separate provenance (3874.114083ms)
+✔ FICTIONAL ADAPTER: omissions, omitted occurrence interfaces, source producer and negative receipts hold (669.394959ms)
+✔ FICTIONAL ADAPTER: late qualifier remains complete and missing home preservation is Blocked (412.787416ms)
+✔ FICTIONAL ADAPTER: prospective coherent streaming carries complete oversized section; old extraction still rejects opt-in (632.254416ms)
+✔ FICTIONAL ADAPTER: snapshot inbound native path and resealed omissions cannot enter canonical scoped plan (2575.61425ms)
+✔ coherent runtime-test producer uses canonical author_instance, candidate and receipt closure without fabricated job_id (82.82875ms)
+✔ nested canonical source files retain bounded native bundles and mandatory occurrence interfaces (331.258166ms)
+ℹ {"fictional_only":true,"parent_string_bytes":103529,"units":13,"leaf_bundle_bytes":[24172,24174],"extraction_request_bytes":31615,"semantic_acceptance":false}
+✔ SCOPED publication ignores colliding external producer metadata (3958.979875ms)
+✔ SCOPED publication retains immutable-entry and resolved identities (3155.89025ms)
+(node:91136) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ FICTIONAL public vector pipeline shares extraction, independently judges context, aggregates once and applies atomically (3805.148375ms)
+✔ corpus growth deduplicates intrinsic sections while keeping all repeated physical obligations unaccepted (120.981166ms)
+ℹ {"fictional_only":true,"one":{"intrinsic_batches":1,"shared_body_sections":1,"physical_occurrences":8},"ten":{"intrinsic_batches":1,"shared_body_sections":1,"physical_occurrences":26},"semantic_acceptance":false}
+✔ corpus retains external named handover originals and refuses missing closure (71.385875ms)
+✔ FICTIONAL corpus preservation feeds independently reviewed operating publication, never a borrowed scoped receipt (8470.623208ms)
+✔ semantic selections complete canonical source apply with bounded independent local packets (14050.45625ms)
+ℹ {"fictional_only":true,"workload":{"protocol":"scoped-context-v1","partitioner":"coherent-corpus-body-v1","source":{"id":"old","revision":1,"sha256":"6be63f44288d42ab3675f96a345ec25cb48d209895267518611987ecf452ca0c"},"extraction_identity":"5af6fb3948ce244517ffb399f04222c59d59bea4b84a29c47262d56584bcad05","physical_occurrences":11,"extraction":[{"id":"body-batch-0","body_bytes":615},{"id":"body-batch-1","body_bytes":719},{"id":"body-batch-2","body_bytes":717},{"id":"body-batch-3","body_bytes":874},{"id":"body-batch-4","body_bytes":1108},{"id":"body-batch-5","body_bytes":1108},{"id":"body-batch-6","body_bytes":5480},{"id":"body-batch-7","body_bytes":2115}],"selections":[{"id":"global","physical_occurrences":3,"incident_selection_ids":["global"],"intrinsic_batches":["body-batch-3","body-batch-7"],"context_bytes":4385,"domain_request_lower_bound":7374,"interface_request_lower_bound":7374},{"id":"A","physical_occurrences":6,"incident_selection_ids":["global","A"],"intrinsic_batches":["body-batch-0","body-batch-1","body-batch-3","body-batch-4","body-batch-7"],"context_bytes":6111,"domain_request_lower_bound":11542,"interface_request_lower_bound":11542},{"id":"B","physical_occurrences":6,"incident_selection_ids":["global","B"],"intrinsic_batches":["body-batch-0","body-batch-2","body-batch-3","body-batch-5","body-batch-7"],"context_bytes":6109,"domain_request_lower_bound":11538,"interface_request_lower_bound":11538},{"id":"archive","physical_occurrences":5,"incident_selection_ids":["global","archive"],"intrinsic_batches":["body-batch-3","body-batch-6","body-batch-7"],"context_bytes":9875,"domain_request_lower_bound":18344,"interface_request_lower_bound":18344}],"planned_domain_requests":4,"planned_interface_requests":4,"whole_corpus_integration_requests":1,"review_formula":"E+D+I+1","total_selected_source_requests_lower_bound":17,"input_limit_bytes":48000,"complete_request_bytes":null,"excluded_from_lower_bound":["instructions","canonical extraction results","native receipt framing","current homes and dependencies","current global rules","integration summaries"],"status":"unaccepted proposal","frontier_complete":false,"semantic_acceptance":false,"complete_native_fit":null,"native_context_fit":"unproven","retrieval_only":true}}
+ℹ {"fictional_only":true,"domain_packet_bytes":[35999,61446,61440,58684],"interface_packet_bytes":[171464,179655,179651,183731],"semantic_acceptance":false}
+✔ declared distant incident peer cannot be omitted by proposed local scope (776.860916ms)
+✖ nested file sections fit intrinsic batches without implying complete global request fit (45.817459ms)
+ℹ tests 47
+ℹ suites 0
+ℹ pass 46
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 27437.385542
+
+✖ failing tests:
+
+test at tests/scoped-corpus-runtime.test.mjs:294:1
+✖ nested file sections fit intrinsic batches without implying complete global request fit (45.817459ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(workload.extraction.every(e=>e.body_bytes<48000))
+  
+      at TestContext.<anonymous> (file:///private/tmp/soloco-operating-state-20261106/source/tests/scoped-corpus-runtime.test.mjs:303:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

@@ -7,7 +7,7 @@ import * as engine from '../plugins/soloco/runtime/engine.mjs';
 import {call as publicCall} from '../plugins/soloco/runtime/main.mjs';
 import {work} from '../plugins/soloco/runtime/worker.mjs';
 import {withStore,digest,id,teamHash} from '../plugins/soloco/runtime/store.mjs';
-import {resolveSnapshot,inheritSnapshots,retainSnapshot} from '../plugins/soloco/runtime/snapshot.mjs';
+import {resolveSnapshot,inheritSnapshots,retainSnapshot,retainSnapshotEntry} from '../plugins/soloco/runtime/snapshot.mjs';
 import {executionTiming} from '../plugins/soloco/runtime/timeout.mjs';
 import * as scoped from '../plugins/soloco/runtime/scoped-context.mjs';
 const protocol=scoped.SCOPED_PROTOCOL,sha=v=>digest(JSON.stringify(v)),bytes=v=>Buffer.byteLength(typeof v==='string'?v:JSON.stringify(v));
@@ -18,12 +18,12 @@ const mutate=(f,fn)=>withStore(f.root,db=>db.transaction('contract.fixture',s=>{
 const read=f=>withStore(f.root,db=>db.read());
 const call=(f,args)=>engine.contextControl({...f,...args},'codex');
 const token=(domain,n,status='OPEN')=>`OBL~${domain}~${String(n).padStart(3,'0')}~CUSTOMER_${n}_NO_EXPORT_ABOVE_${17*n+3}_ROWS_UNTIL_CONSENT_${n%7}_IN_REGION_${n%11}~${status}~END`;
-function fixture({count=1,domains=1,extra={},maintenance=false,kind='artifact',homeKind='artifact',operating=false,partitioner=scoped.COHERENT_PARTITIONER}={}){
+function fixture({count=1,domains=1,extra={},maintenance=false,kind='artifact',homeKind='artifact',operating=false,entry=false,evidenceOld=false,partitioner=scoped.COHERENT_PARTITIONER}={}){
   const root=fs.mkdtempSync(path.join(tmp,'company-')),session_id=id('owner'),f={root,session_id,epoch:1,source_instruction:'Explicit fixture instruction: qualify exact source read-only, preserve all failed evidence and OPEN uncertainty.'};
   engine.bind(root,session_id,'codex');engine.open({...f,idea:'Source-only contract fixture'},'codex');withStore(root,db=>db.migrate());
   const clauses=Array.from({length:count},(_,n)=>token('D'+String(Math.min(domains-1,Math.floor(n*domains/count))).padStart(2,'0'),n));
-  mutate(f,s=>{s.roles={qa:{name:'Independent QA'},engineer:{name:'Engineer'}};s.governance='Preparation only. No execution or renewed allowance.';s.cos_instructions='Preserve uncertain effects and exhausted allowances.';s.records.old={id:'old',kind,revision:1,author_instance:'historical-producer',content:'Historical evidence grants no current permission.',clauses,...extra};if(maintenance)s.paused=true;s.team_sha256=teamHash(s);});
-  for(let d=0;d<domains;d++){const domain='D'+String(d).padStart(2,'0');engine.save({...f,id:'home-'+domain,kind:homeKind,content:clauses.filter((_,n)=>Math.min(domains-1,Math.floor(n*domains/count))===d).join('\n')||'No additional obligation.',context_obligations:{version:1,scope:domain},...(operating?{operating_record:{version:1,kind:'obligation',scope:domain,owner:'runner',conditions:'Always',exceptions:'None',clearing:'Independent review',expires_at:null,dependencies:[],authority_refs:[],evidence_refs:['home-'+domain]}}:{})},'codex');}
+  mutate(f,s=>{s.roles={qa:{name:'Independent QA'},engineer:{name:'Engineer'}};s.governance='Preparation only. No execution or renewed allowance.';s.cos_instructions='Preserve uncertain effects and exhausted allowances.';s.records.old={id:'old',kind,revision:1,author_instance:'historical-producer',content:'Historical evidence grants no current permission.',clauses,...extra};if(entry)s.records.old=retainSnapshotEntry(s,s.records.old);if(maintenance)s.paused=true;s.team_sha256=teamHash(s);});
+  for(let d=0;d<domains;d++){const domain='D'+String(d).padStart(2,'0');engine.save({...f,id:'home-'+domain,kind:homeKind,content:clauses.filter((_,n)=>Math.min(domains-1,Math.floor(n*domains/count))===d).join('\n')||'No additional obligation.',context_obligations:{version:1,scope:domain},...(operating?{operating_record:{version:1,kind:'obligation',scope:domain,owner:'runner',conditions:'Always',exceptions:'None',clearing:'Independent review',expires_at:null,dependencies:[],authority_refs:[],evidence_refs:evidenceOld?['home-'+domain,'old']:['home-'+domain]}}:{})},'codex');}
   const p=call(f,{action:'plan',protocol,source_id:'old',maintenance,partitioner});f.plan_id=p.id;f.original=p.original;f.units=p.units;f.all_units=call(f,{action:'inspect',plan_id:p.id,limit:16});f.extraction_identity=p.extraction_identity;f.clauses=clauses;return f;
 }
 function unitPages(f){const units=[];let offset=0;do{const page=call(f,{action:'inspect',plan_id:f.plan_id,offset,limit:16});units.push(...page.units);offset=page.next_offset;}while(offset!==null);return units;}
@@ -68,11 +68,11 @@ async function run(f,args,{review=contractReview,native,modelHook,streamHook,omi
 }
 
 async function extracts(f){const es=[];for(const u of unitPages(f)){const e=await run(f,{phase:'extract',unit_id:u.id});assert.equal(e.job.status,'completed',e.job.error);es.push(e);}return es;}
-async function finish(f,es){
+async function finish(f,es,{probeMissing=true}={}){
   const args={phase:'applicability',extraction_review_ids:es.map(e=>e.review.id),counterpart_ids:['home-D00'],context_scope:'*',delivery_protocol:scoped.SCOPED_STREAM};
   const d=await run(f,args);assert.equal(d.job.status,'completed',d.job.error);assert.equal(d.review.review.verdict,'Pass',d.review.content);
   const keys=d.review.qualification_result.interfaces.map(i=>i.key);
-  await assert.rejects(run(f,{phase:'integration',domain_review_ids:[d.review.id],counterpart_ids:['home-D00']}),/interface coverage/);
+  if(probeMissing)await assert.rejects(run(f,{phase:'integration',domain_review_ids:[d.review.id],counterpart_ids:['home-D00']}),/interface coverage/);
   const ir=await run(f,{...args,interface_keys:keys});assert.equal(ir.job.status,'completed',ir.job.error);
   const i=await run(f,{phase:'integration',domain_review_ids:[d.review.id],interface_review_ids:[ir.review.id],counterpart_ids:['home-D00'],delivery_protocol:scoped.SCOPED_STREAM});assert.equal(i.job.status,'completed',i.job.error);
   return {d,ir,i};
@@ -156,11 +156,15 @@ test('coherent runtime-test producer uses canonical author_instance, candidate a
   }
 });
 
-test('nested canonical source files retain bounded native bundles and mandatory occurrence interfaces',async t=>{
+test('nested formatting/escape variant source files retain bounded native bundles and mandatory occurrence interfaces',async t=>{
   const sources={'a.mjs':'a'.repeat(21650),'b.mjs':'b'.repeat(17056),'c.mjs':'c'.repeat(12952)};
-  const content=JSON.stringify({left:{scope:'Consent exhausted.',sources},right:{scope:'Consent revoked.',sources},late_unknown:'LATE_NO_EXPORT: no execution.'});
+  const content=JSON.stringify({left:{scope:'Consent exhausted.',sources},right:{scope:'Consent revoked.',sources},late_unknown:'LATE_NO_EXPORT: no execution.'},null,2).replace('LATE_NO_EXPORT','\\u004cATE_NO_EXPORT');
   assert.ok(bytes(content)>48000);
   const f=fixture({extra:{content}}),units=unitPages(f);
+  const state=read(f),capsule=resolveSnapshot(state,state.records[f.plan_id].scoped_context_plan.capsule),material=resolveSnapshot(state,capsule.projection);
+  const {decodeLegacyCoherentPlan}=await import('../plugins/soloco/runtime/legacy-operating.mjs');
+  assert.equal(decodeLegacyCoherentPlan(material).state.records.old.content,content);
+  assert.ok(material.definitions.some(d=>d[0]==='json-text-string'&&d[2]===content));
   const bundles=units.map(u=>call(f,{action:'read',unit_id:u.id}).unit);
   const leaves=bundles.filter(b=>b.sections.some(g=>g.group_id===b.group_id&&g.body===sources['a.mjs']));
   assert.equal(leaves.length,2);assert.equal(leaves[0].body_root,leaves[1].body_root);
@@ -178,4 +182,30 @@ test('nested canonical source files retain bounded native bundles and mandatory 
   assert.equal(invalid.job.status,'failed');assert.match(invalid.job.error,/occurrence requires/);
   assert.ok(bytes(invalid.packet)<48000);
   t.diagnostic(JSON.stringify({fictional_only:true,parent_string_bytes:bytes(content),units:units.length,leaf_bundle_bytes:leaves.map(bytes),extraction_request_bytes:bytes(invalid.packet),semantic_acceptance:false}));
+});
+
+// Real public/store/worker mechanics with FICTIONAL judgments only. This covers
+// the SCOPED entry identity seam, separately from represented-v2 fixtures.
+for(const entry of [false,true])test('SCOPED publication '+(entry?'retains immutable-entry and resolved identities':'ignores colliding external producer metadata'),async()=>{
+  const f=fixture({operating:true,entry,evidenceOld:true,extra:entry?{}:{external_metadata:{id:'home-D00',job_id:'external-provider-id'}}});
+  const base={root:f.root,session_id:f.session_id,epoch:f.epoch,source_instruction:f.source_instruction};
+  const es=await extracts(f),{i}=await finish(f,es,{probeMissing:false});
+  await publicCall('company_context',{...base,action:'apply',integration_review_id:i.review.id},'codex');
+  const source=read(f).records.old,original=entry?resolveSnapshot(read(f),source.immutable_entry):source;
+  const p=await publicCall('company_context',{...base,protocol:'operating-state-v1',action:'plan'},'codex');assert.equal(p.held,false,JSON.stringify(p.frontier));
+  const q=engine.dispatch({...f,role:'qa',review_of:p.id,task:'Fictional independent complete current-meaning publication'},'codex',{check:()=>({available:true,authenticated:true}),launch:()=>({on(){},unref(){}})});
+  const context=(await import('../plugins/soloco/runtime/context.mjs')).assignmentContext(read(f),read(f).jobs[q.id]);
+  const evidence=context.operating_evidence,reads=evidence?Object.values(evidence.sources).flatMap(source=>{const out=[];for(let offset=0;offset<source.length;){let length=Math.min(16000,source.length-offset);if(/[\uD800-\uDBFF]/.test(source.raw[offset+length-1]))length--;out.push({source_id:source.source_id,sha256:source.sha256,offset,length});offset+=length;}return out;}):[];
+  let first=true;await work(f.root,q.id,async(_host,_native,_wire,_dir,timeout,_selection,options)=>{
+   if(first){first=false;options.onSpawn(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));}
+   if(reads.length)return {native_id:'fictional-publisher-'+q.id,text:JSON.stringify({reads:reads.splice(0,4)})};
+   return {native_id:'fictional-publisher-'+q.id,text:JSON.stringify({content:'Fictional complete source preservation and current conditions.',messages:[],notices:[],review:{verdict:'Pass',reason:'Scripted fixture judgment only',permitted_action:'publish_operating_state',plan_sha256:sha(read(f).records[p.id].operating_plan),preservation_complete:true,interaction_complete:true,authority_checked:true,blockers:[]}})};
+  });
+  const j=read(f).jobs[q.id];assert.equal(j.status,'completed',j.error);
+  assert.equal((await publicCall('company_context',{...base,protocol:'operating-state-v1',action:'apply',plan_id:p.id,review_id:j.artifact_id},'codex')).published,true);
+  const state=read(f),snapshot=state.operating_state.accepted_snapshot;
+  assert.ok(snapshot.required_sources.some(r=>r.id==='old'&&r.sha256===sha(source)),'stored wrapper binding retained');
+  const packet=context.frozen_packet??JSON.parse(context.text),accepted=packet.required_evidence.accepted_semantics.find(x=>x.source.id==='old');
+  assert.ok(accepted.resolved_originals.some(r=>r.id==='old'&&r.sha256===sha(original)),'resolved original binding retained');
+  if(entry)assert.notEqual(sha(source),sha(original));
 });

@@ -1,0 +1,108 @@
+(node:88790) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ accepted historical publication proof survives an owner epoch change without admitting old in-flight work (393.930167ms)
+✔ public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning (20.780542ms)
+✔ missing legacy bootstrap is visibly DIRTY and apply rolls back without acceptance (14.0255ms)
+✔ host catalog default service tier does not invalidate explicit operating reviewer startup (8.526875ms)
+✔ new membership, changed exact source, wrong independent identity and absent closure cannot publish (85.706542ms)
+✔ scope closure, global membership, expiry, receipt changes, revocation and missed communication hold (27.32325ms)
+✔ pause fences publication reviewer and prospective handover cannot hide unknown legacy (9.815667ms)
+✔ 10x independently classified inert archive keeps actual mandatory operating assignment bytes and semantic work constant (58.245833ms)
+✔ deleted applicable home and changed exact provenance cannot disappear from accepted meaning (18.420834ms)
+✔ typed outcome requires complete historical uncertainty; text cannot manufacture permission (17.372ms)
+✔ public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure (58.966084ms)
+✔ late new and changed falsely scoped prohibitions stay globally DIRTY, but fresh proposals include them (73.32775ms)
+✔ publication proof stays current; failed, quarantined, uncertain and unknown-extension siblings stay DIRTY (17.559584ms)
+✔ mechanical publication index rejects tampering and retains unknown state extensions (16.602416ms)
+✔ format6 explicit non-home evidence survives dispatch, discovery and bounded same-native reads (182.4715ms)
+✔ referenced archived revoked/retry restriction and canonical parent receipts are supplied completely inline (60.513459ms)
+✔ large non-home provenance uses exact same-native ranges; undelivered, partial, denied, stale or changed evidence cannot publish (621.190708ms)
+✔ canonical preservation parent revisions cannot be borrowed from matching hashes (57.545167ms)
+✔ missing provenance and snapshot-only evidence hold rather than count pointers as delivered bodies (13.894334ms)
+✔ real runtime receipt attribution and deterministic reuse deliver the validated producer closure before Pass (207.730541ms)
+✔ runtime receipt missing or mismatched producer, candidate, plan, reuse or generation holds (46.768041ms)
+✔ external catalog reference-shaped metadata is verbatim evidence without a company lookup (48.541292ms)
+✔ runtime closure requires complete delivery and independent source and proof sessions (2777.866333ms)
+✔ public qualified recovered snapshot publishes current typed outcomes without replaying the paid raw archive (1324.681875ms)
+✔ large prospective publication uses bounded frozen worker delivery and rejects a manufactured complete flag (5392.272ms)
+✔ frozen publication worker rejects unread semantics, changed native and changed current membership (346.725375ms)
+✔ paid snapshot archive still requires publication QA independent of nested original producers (1049.070541ms)
+✔ FICTIONAL PUBLIC v2 explicit complete sources preserve accepted runtime producer independence and freshness (3254.029709ms)
+✔ publication cannot reuse provenance-bound rejected native identities from a preserved failed job (107.387291ms)
+✔ v2 qualification also excludes the native of its retained rejected job contribution (112.466333ms)
+✔ archived rejected job attribution survives snapshot-only retention without promoting external metadata (383.691542ms)
+(node:88791) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ FICTIONAL ADAPTER: coherent public create/read -> worker -> independent interface -> canonical apply; repeats have separate provenance (2459.6775ms)
+✔ FICTIONAL ADAPTER: omissions, omitted occurrence interfaces, source producer and negative receipts hold (476.271834ms)
+✔ FICTIONAL ADAPTER: late qualifier remains complete and missing home preservation is Blocked (368.778584ms)
+✔ FICTIONAL ADAPTER: prospective coherent streaming carries complete oversized section; old extraction still rejects opt-in (461.543542ms)
+✔ FICTIONAL ADAPTER: snapshot inbound native path and resealed omissions cannot enter canonical scoped plan (1989.030208ms)
+✔ coherent runtime-test producer uses canonical author_instance, candidate and receipt closure without fabricated job_id (42.061208ms)
+✔ nested canonical source files retain bounded native bundles and mandatory occurrence interfaces (251.4975ms)
+ℹ {"fictional_only":true,"parent_string_bytes":103529,"units":13,"leaf_bundle_bytes":[24172,24174],"extraction_request_bytes":31615,"semantic_acceptance":false}
+✔ SCOPED publication ignores colliding external producer metadata (2801.197625ms)
+✔ SCOPED publication retains immutable-entry and resolved identities (2265.871292ms)
+(node:88792) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ FICTIONAL public vector pipeline shares extraction, independently judges context, aggregates once and applies atomically (1433.966458ms)
+✔ corpus growth deduplicates intrinsic sections while keeping all repeated physical obligations unaccepted (90.304125ms)
+ℹ {"fictional_only":true,"one":{"intrinsic_batches":1,"shared_body_sections":1,"physical_occurrences":8},"ten":{"intrinsic_batches":1,"shared_body_sections":1,"physical_occurrences":26},"semantic_acceptance":false}
+✔ corpus retains external named handover originals and refuses missing closure (55.562333ms)
+✖ FICTIONAL corpus application exposes explicit operating integration hold, never a borrowed scoped receipt (976.78475ms)
+✖ semantic selections complete canonical source apply with bounded independent local packets (3533.716083ms)
+ℹ {"fictional_only":true,"workload":{"protocol":"scoped-context-v1","partitioner":"coherent-corpus-body-v1","source":{"id":"old","revision":1,"sha256":"6be63f44288d42ab3675f96a345ec25cb48d209895267518611987ecf452ca0c"},"extraction_identity":"a36f06c1274e1abc5d65dcabeeb7e3679653bd3d643f9798fb3f8a3fce0d3be3","physical_occurrences":11,"extraction":[{"id":"body-batch-0","body_bytes":615},{"id":"body-batch-1","body_bytes":719},{"id":"body-batch-2","body_bytes":717},{"id":"body-batch-3","body_bytes":874},{"id":"body-batch-4","body_bytes":1108},{"id":"body-batch-5","body_bytes":1108},{"id":"body-batch-6","body_bytes":5480},{"id":"body-batch-7","body_bytes":2115}],"selections":[{"id":"global","physical_occurrences":3,"incident_selection_ids":["global"],"intrinsic_batches":["body-batch-3","body-batch-7"],"context_bytes":4385,"domain_request_lower_bound":7374,"interface_request_lower_bound":7374},{"id":"A","physical_occurrences":6,"incident_selection_ids":["global","A"],"intrinsic_batches":["body-batch-0","body-batch-1","body-batch-3","body-batch-4","body-batch-7"],"context_bytes":6111,"domain_request_lower_bound":11542,"interface_request_lower_bound":11542},{"id":"B","physical_occurrences":6,"incident_selection_ids":["global","B"],"intrinsic_batches":["body-batch-0","body-batch-2","body-batch-3","body-batch-5","body-batch-7"],"context_bytes":6109,"domain_request_lower_bound":11538,"interface_request_lower_bound":11538},{"id":"archive","physical_occurrences":5,"incident_selection_ids":["global","archive"],"intrinsic_batches":["body-batch-3","body-batch-6","body-batch-7"],"context_bytes":9875,"domain_request_lower_bound":18344,"interface_request_lower_bound":18344}],"planned_domain_requests":4,"planned_interface_requests":4,"whole_corpus_integration_requests":1,"review_formula":"E+D+I+1","total_selected_source_requests_lower_bound":17,"input_limit_bytes":48000,"complete_request_bytes":null,"excluded_from_lower_bound":["instructions","canonical extraction results","native receipt framing","current homes and dependencies","current global rules","integration summaries"],"status":"unaccepted proposal","frontier_complete":false,"semantic_acceptance":false,"complete_native_fit":null,"native_context_fit":"unproven","retrieval_only":true}}
+✔ declared distant incident peer cannot be omitted by proposed local scope (796.447958ms)
+✔ nested file sections fit intrinsic batches without implying complete global request fit (41.058083ms)
+ℹ {"fictional_only":true,"nested_sources_workload":{"protocol":"scoped-context-v1","partitioner":"coherent-corpus-body-v1","source":{"id":"old","revision":1,"sha256":"3f5b716a2e2bf2f62c61efa40061d45b88d0ff915689719dae44937b2a8ca075"},"extraction_identity":"80c79fcfa7a26add98a04d79eb7d7bf8df3b31b3d20814a1e95c7d8acd73e24d","physical_occurrences":14,"extraction":[{"id":"body-batch-0","body_bytes":22217},{"id":"body-batch-1","body_bytes":17623},{"id":"body-batch-2","body_bytes":13519},{"id":"body-batch-3","body_bytes":3909}],"selections":[{"id":"global","physical_occurrences":14,"incident_selection_ids":["global"],"intrinsic_batches":["body-batch-0","body-batch-1","body-batch-2","body-batch-3"],"context_bytes":60706,"domain_request_lower_bound":117974,"interface_request_lower_bound":117974}],"planned_domain_requests":1,"planned_interface_requests":1,"whole_corpus_integration_requests":1,"review_formula":"E+D+I+1","total_selected_source_requests_lower_bound":7,"input_limit_bytes":48000,"complete_request_bytes":null,"excluded_from_lower_bound":["instructions","canonical extraction results","native receipt framing","current homes and dependencies","current global rules","integration summaries"],"status":"unaccepted proposal","frontier_complete":false,"semantic_acceptance":false,"complete_native_fit":null,"native_context_fit":"unproven","retrieval_only":true}}
+ℹ tests 47
+ℹ suites 0
+ℹ pass 44
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 16909.640083
+
+✖ failing tests:
+
+test at tests/scoped-corpus-runtime.test.mjs:116:1
+✖ FICTIONAL public vector pipeline shares extraction, independently judges context, aggregates once and applies atomically (1433.966458ms)
+  TypeError: Cannot read properties of undefined (reading 'length')
+      at TestContext.<anonymous> (file:///private/tmp/soloco-operating-state-20261106/source/tests/scoped-corpus-runtime.test.mjs:127:65)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3)
+
+test at tests/scoped-corpus-runtime.test.mjs:213:1
+✖ FICTIONAL corpus application exposes explicit operating integration hold, never a borrowed scoped receipt (976.78475ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async TestContext.<anonymous> (file:///private/tmp/soloco-operating-state-20261106/source/tests/scoped-corpus-runtime.test.mjs:220:3)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /Held.*canonical snapshot delivery/,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at tests/scoped-corpus-runtime.test.mjs:243:1
+✖ semantic selections complete canonical source apply with bounded independent local packets (3533.716083ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(JSON.stringify(ir.packet.complete_corpus_context).includes('UNRELATED_ARCHIVE'))
+  
+      at TestContext.<anonymous> (file:///private/tmp/soloco-operating-state-20261106/source/tests/scoped-corpus-runtime.test.mjs:259:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

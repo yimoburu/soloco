@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {Store,digest} from '../plugins/soloco/runtime/store.mjs';
-import {bindSnapshots,retainSnapshot,pendingSnapshots,resolveSnapshot} from '../plugins/soloco/runtime/snapshot.mjs';
+import {bindSnapshots,retainSnapshot,retainSnapshotEntry,pendingSnapshots,resolveSnapshot,resolveSnapshotEntry} from '../plugins/soloco/runtime/snapshot.mjs';
 import {buildLegacyCoherentPlan as build,decodeLegacyCoherentPlan as decode,openLegacyCoherentPlan as open,validateLegacyCoherentPlan as validate,captureLegacyCanonicalSource,legacyCanonicalCoverage} from '../plugins/soloco/runtime/legacy-operating.mjs';
 const json=JSON.stringify,clone=v=>JSON.parse(json(v));
 function fixture(){return bindSnapshots({id:'fictional',revision:7,owner:{session_id:'fixture-owner',host:'codex',epoch:1},paused:true,governance:'Current permission requires independent review.',cos_instructions:'Retain every OPEN failure.',roles:{qa:{name:'QA'}},records:{a:{id:'a',revision:2,content:'Export permitted under local conditions.',previous:[{id:'a',revision:1,content:'Export forbidden.',review:{verdict:'Fail',reason:'Consent absent.'}}],late_qualifier:'Except personal data; spent allowance is never renewed.'}},jobs:{},messages:[],notices:[],upgrade_history:[],context_classifications:{},unknown_extension:{code:'export default "No permission granted"',logs:'Blocked: unresolved effects'}});}
@@ -206,4 +206,90 @@ test('canonical array roots preserve nested arrays, primitive members, empties a
   const held=build(s),leaf=held.groups.find(g=>g.section.body===payload[4][2].sources['a.js']);
   const occurrence=held.occurrences.find(o=>o.group_id===leaf.id);
   assert.equal(occurrence.fit,'Held');assert.throws(()=>open(held).materialize(occurrence.id),/exceeds cap/);
+});
+
+test('formatting/escape-only JSON STRING views roundtrip raw bytes, nested data and late prohibitions',()=>{
+  const s=fixture(),payload={purpose:'Evidence only é 🧭',status:'Held',verification:{quote:'"',slash:'\\',nested:[null,false,12,{},[]]},
+    runtime_and_docs_diff:'d'.repeat(30000),new_timeout_helper_source:'s'.repeat(30000),
+    unknown_late_prohibition:'LATE_NO_EXPORT: never retry after consent exhaustion.'};
+  const raw=' \r\n'+json(payload,null,2).replaceAll('é','\\u00e9').replaceAll('🧭','\\ud83e\\udded').replace('"purpose"','"purpo\\u0073e"')+'\t';
+  s.records.a.content=raw;s.records.a.original=retainSnapshot(s,{content:raw});
+  const p=build(s),decoded=decode(p),session=open(p);
+  assert.equal(decoded.state.records.a.content,raw);assert.equal(typeof decoded.state.records.a.content,'string');
+  assert.deepEqual(Buffer.from(decoded.state.records.a.content),Buffer.from(raw));
+  assert.equal(decoded.originals[0].raw,json({content:raw}));
+  assert.ok(p.definitions.some(d=>d[0]==='json-text-string'&&d[2]===raw));
+  assert.ok(p.groups.some(g=>g.section.body?.legacy_coherent_string_encoding==='lossless-json-text'||g.section.body?.content?.legacy_coherent_string_encoding==='lossless-json-text'));
+  const leaf=p.groups.find(g=>g.section.body===payload.runtime_and_docs_diff);
+  for(const o of p.occurrences.filter(o=>o.group_id===leaf.id)){
+    const packet=session.materialize(o.id);assert.match(json(packet),/LATE_NO_EXPORT/);
+    assert.equal(Buffer.byteLength(json(packet)),o.packet_bytes);assert.ok(o.packet_bytes<48000);
+  }
+  for(const mutate of [d=>d[2]=d[2].replace('Held','Pass'),d=>d[2]=d[2].replace('12','1e1'),d=>d[2]+='false',d=>d[2]=d[2].replace('"status"','"purpose"')]){
+    const bad=clone(p);mutate(bad.definitions.find(d=>d[0]==='json-text-string'&&d[2]===raw));
+    assert.throws(()=>decode(reseal(bad)),/Held/);
+  }
+});
+
+test('ambiguous or normalized JSON tokens remain opaque; large non-JSON terminals stay Held',()=>{
+  const samples=[
+    '{"same":1,"same":2,"late":"Never retry"}',
+    '{"same":1,"s\\u0061me":2,"late":"Never retry"}',
+    '{"2":"second","1":"first","late":"Never retry"}',
+    ...['-0','1e3','1.0','1E+3','9007199254740993','1e400'].map(n=>'{"number":'+n+',"late":"Never retry"}'),
+    '{"late":"Never retry",}', '{"late":"Never retry"} true',
+    '{"late":"Never retry","bad":"\\x20"}', '{"late":"Never retry","bad":"line\nbreak"}',
+    '\u00a0{"late":"Never retry"}',
+  ].map(v=>'  '+v+'  ');
+  const s=fixture();s.records.a.samples=samples;
+  s.records.a.files=[67024,61631,53163].map(size=>({path:'terminal-'+size,content:'NOT_JSON '.padEnd(size,'x')}));
+  const p=build(s),decoded=decode(p),session=open(p);
+  assert.deepEqual(decoded.state.records.a.samples,samples);
+  for(const raw of samples)assert.ok(p.definitions.some(d=>d[0]==='string'&&d[1]===raw),raw);
+  for(const file of s.records.a.files){
+    const group=p.groups.find(g=>g.section.body===file.content),o=p.occurrences.find(o=>o.group_id===group.id);
+    assert.equal(o.fit,'Held');assert.throws(()=>session.materialize(o.id),/exceeds cap/);
+  }
+});
+
+test('upgrade complete fields and ordered journal members split bounded bodies with separate failed contexts',t=>{
+  const s=fixture(),shared={response:'No retry. '+ 'x'.repeat(1800),unknown:'OPEN'},
+    attempt=(id,outcome)=>({id,status:'failed',outcome,candidate:{roles:{qa:{instructions:'Independent review only.'}},unknown:'No adoption'},
+      previous:{governance:'Consent exhausted.'},probe:{verdict:'Fail',unknown:'No execution'},review:{verdict:'Blocked',reason:outcome},
+      calls:Array.from({length:28},(_,n)=>({sequence:n,body:shared,returned:n%2===0})),
+      qa_pages:Array.from({length:12},(_,n)=>({sequence:n,body:'q'.repeat(1900)})),cos_pages:[null,false,7,'small',{},[]],
+      late_unknown:'LATE_NO_EXPORT: retain every failed attempt.'});
+  s.upgrade=attempt('current','Failed due to revoked consent.');
+  const old=attempt('old','Failed due to exhausted allowance.');
+  s.upgrade_history=[retainSnapshotEntry(s,old)];
+  const historical=fixture();historical.upgrade=attempt('historic','Historical failure stays OPEN.');
+  s.records.a.past=retainSnapshot(s,historical);
+  const before=json(s),p=build(s),decoded=decode(p),session=open(p);
+  assert.ok(Buffer.byteLength(json(s.upgrade))>48000);assert.equal(json(decoded.state),before);
+  assert.equal(json(resolveSnapshotEntry(decoded.state,decoded.state.upgrade_history[0])),json(old));
+  assert.equal(json(resolveSnapshot(decoded.state,decoded.state.records.a.past)),json(historical));
+  const current=p.occurrences.find(o=>o.path==='/upgrade'),group=p.groups.find(g=>g.id===current.group_id);
+  for(const key of ['candidate','previous','probe','review','calls','qa_pages','cos_pages'])assert.ok(group.section.cuts.some(c=>c.path==='/'+key));
+  const journal=p.occurrences.find(o=>o.path==='/upgrade/calls'),journalGroup=p.groups.find(g=>g.id===journal.group_id);
+  assert.equal(journalGroup.section.body.length,28);
+  assert.deepEqual(journalGroup.section.cuts.map(c=>c.path),Array.from({length:28},(_,n)=>'/'+n));
+  for(let n=0;n<28;n++){
+    const o=p.occurrences.find(o=>o.path==='/upgrade/calls/'+n),g=p.groups.find(g=>g.id===o.group_id);
+    assert.equal(g.section.body.sequence,n);assert.equal(g.section.body.returned,n%2===0);
+    assert.ok(o.packet_bytes<48000);assert.match(json(session.materialize(o.id)),/LATE_NO_EXPORT/);
+  }
+  const body=p.groups.find(g=>g.section.body===shared.response),occurrences=p.occurrences.filter(o=>o.group_id===body.id);
+  assert.equal(occurrences.length,84);assert.equal(new Set(occurrences.map(o=>json([o.document,o.path]))).size,84);
+  const currentBody=occurrences.find(o=>o.path==='/upgrade/calls/0/body/response'&&o.document.kind==='state');
+  const oldBody=occurrences.find(o=>o.document.sha256===s.upgrade_history[0].immutable_entry.immutable_snapshot.sha256);
+  assert.notDeepEqual(currentBody.qualifier_groups,oldBody.qualifier_groups);
+  assert.match(json(session.materialize(currentBody.id)),/revoked consent/);
+  assert.match(json(session.materialize(oldBody.id)),/exhausted allowance/);
+  assert.ok(p.snapshot_inbound.length>=2);assert.equal(p.semantic_acceptance,false);
+  // An unrelated anonymous state extension is not exploded into scalar units.
+  assert.ok(!p.occurrences.some(o=>o.path==='/unknown_extension/code'));
+  for(const edit of [x=>x.groups.find(g=>g.id===journal.group_id).section.cuts.reverse(),x=>x.occurrences.splice(x.occurrences.findIndex(o=>o.id===oldBody.id),1)]){
+    const bad=clone(p);edit(bad);assert.throws(()=>decode(reseal(bad)),/Held/);
+  }
+  t.diagnostic(json({fictional_only:true,attempt_bytes:Buffer.byteLength(json(s.upgrade)),journal_members:28,shared_physical_occurrences:occurrences.length,measurements:p.measurements}));
 });

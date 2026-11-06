@@ -444,3 +444,55 @@ test('FICTIONAL PUBLIC v2 explicit complete sources preserve accepted runtime pr
   }
  }
 });
+
+
+test('publication cannot reuse provenance-bound rejected native identities from a preserved failed job',async()=>{
+ for(const [field,reused] of [['rejected_native_id',true],['rejected_native_ids',true],['rejected_native_ids',false]]){
+  const f=fixture(),original='fictional-rejected-'+field,native=reused?original:'fictional-distinct-publication-native';
+  home(f,'home','*',{evidence_refs:['job:failed-scoped'],conditions:'The scoped attempt failed; uncertain effects remain, and no retry grant is renewed.'});
+  mutate(f,s=>{s.jobs['failed-scoped']={id:'failed-scoped',role:'qa',status:'failed',instance_id:'fictional-failed-instance',native_id:null,context_format:8,review_of:null,task:'Fictional failed scoped extraction; preserve every negative.',[field]:field==='rejected_native_ids'?[original,'another-fictional-rejected']:original,rejected_output:{text:JSON.stringify({review:{verdict:'Blocked',reason:'Unresolved historical finding; no retry remains.'}}),author_instance:'fictional-failed-instance',reason:'Invalid fictional scoped result'}};});
+  const p=await publicCall('company_context',{...f,action:'plan',record_ids:['job:failed-scoped'],disposition:'represented',counterpart_ids:['home'],coverage:[{source_id:'job:failed-scoped',counterpart_ids:['home'],findings:'All negative findings remain open.',failures:'The scoped attempt remains failed.',uncertain_effects:'Effects unknown.',exhausted_allowances:'No retries remain.'}]},'codex');
+  const prior=await review(f,p.id,{action:'apply_context_classification'});
+  assert.equal((await publicCall('company_context',{...f,action:'apply',plan_id:p.id,review_id:prior.id},'codex')).applied,true);
+  const publication=await ctx(f,{action:'plan'});assert.equal(publication.held,false);
+  const returned=await review(f,publication.id,{native});
+  if(reused){await assert.rejects(ctx(f,{action:'apply',plan_id:publication.id,review_id:returned.id}),/reviewer owns current home/);assert.equal(read(f).operating_state,undefined);}
+  else assert.equal((await ctx(f,{action:'apply',plan_id:publication.id,review_id:returned.id})).published,true);
+ }
+});
+
+
+test('v2 qualification also excludes the native of its retained rejected job contribution',async()=>{
+ for(const [field,wrapped] of [['rejected_native_id',false],['rejected_native_ids',false],['rejected_native_ids',true]]){
+  const f=fixture(),native='fictional-original-rejected-native';home(f,'home','*',{evidence_refs:['job:failed']});
+  mutate(f,s=>{s.jobs.failed={id:'failed',role:'qa',status:'failed',instance_id:'fictional-original-instance',native_id:null,[field]:field==='rejected_native_ids'?[native]:native,rejected_output:{text:'Fictional rejected contribution: no retry remains.'}};});
+  if(wrapped){withStore(f.root,db=>db.migrate());mutate(f,s=>{s.jobs.failed=retainSnapshotEntry(s,s.jobs.failed);});}
+  const p=await publicCall('company_context',{...f,action:'plan',record_ids:['job:failed'],disposition:'represented',counterpart_ids:['home'],coverage:[{source_id:'job:failed',counterpart_ids:['home'],findings:'Finding remains open.',failures:'Attempt remains failed.',uncertain_effects:'Effects unknown.',exhausted_allowances:'No retries.'}]},'codex');
+  const r=await review(f,p.id,{native,action:'apply_context_classification'});
+  await assert.rejects(publicCall('company_context',{...f,action:'apply',plan_id:p.id,review_id:r.id},'codex'),/reviewer owns source/);
+  assert.equal(read(f).context_classifications?.['job:failed'],undefined);
+ }
+});
+
+// Canonical snapshot jobs retain historical authorship even after the live row
+// disappears. Incidental external metadata does not create that relationship.
+test('archived rejected job attribution survives snapshot-only retention without promoting external metadata',async()=>{
+ for(const lane of ['qualification','qualification-different','publication','external']){
+  const f=fixture(),native='fictional-archived-rejected-native';withStore(f.root,db=>db.migrate());
+  home(f,'home','*',{evidence_refs:['history'],conditions:'Historical failure and uncertain effects remain; no retry authority.'});
+  mutate(f,s=>{const rejected={id:'retired-job',role:'qa',status:'failed',native_id:null,rejected_native_ids:[native],rejected_output:{text:'Failed contribution remains unaccepted.'}};
+   const body=lane==='external'?{external_metadata:rejected}:{id:'historical-company',governance:'No external action',roles:{qa:{}},records:{},jobs:{'retired-job':rejected}};
+   if(lane==='qualification-different')s.jobs['retired-job']={...rejected,native_id:'fictional-newer-native',rejected_native_ids:[],instance_id:'fictional-newer-instance'};
+   s.records.history={id:'history',kind:'artifact',revision:1,author_instance:'fictional-history-author',content:'Preserve failed historical contribution without renewed authority.',snapshot:retainSnapshot(s,body)};
+  });
+  const plan=await publicCall('company_context',{...f,action:'plan',record_ids:['history'],disposition:'represented',counterpart_ids:['home'],coverage:[{source_id:'history',counterpart_ids:['home'],findings:'All findings remain open.',failures:'Historical failed contribution remains unaccepted.',uncertain_effects:'Effects remain unknown.',exhausted_allowances:'No retries.'}]},'codex');
+  const prior=await review(f,plan.id,{native:lane.startsWith('qualification')?native:'fictional-independent-history-qa',action:'apply_context_classification'});
+  if(lane.startsWith('qualification')){
+   await assert.rejects(publicCall('company_context',{...f,action:'apply',plan_id:plan.id,review_id:prior.id},'codex'),/reviewer owns source/);continue;
+  }
+  assert.equal((await publicCall('company_context',{...f,action:'apply',plan_id:plan.id,review_id:prior.id},'codex')).applied,true);
+  const proposal=await ctx(f,{action:'plan'}),r=await review(f,proposal.id,{native});
+  if(lane==='publication')await assert.rejects(ctx(f,{action:'apply',plan_id:proposal.id,review_id:r.id}),/reviewer owns current home/);
+  else assert.equal((await ctx(f,{action:'apply',plan_id:proposal.id,review_id:r.id})).published,true);
+ }
+});

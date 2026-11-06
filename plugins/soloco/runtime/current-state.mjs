@@ -1,4 +1,4 @@
-import {validateScopedExclusion,SCOPED_PROTOCOL,producerClosure} from './scoped-context.mjs';
+import {validateScopedExclusion,validateCorpusExclusion,CORPUS_PRESERVATION,SCOPED_PROTOCOL,producerClosure} from './scoped-context.mjs';
 import {validateOperatingIndex} from './operating-state.mjs';
 import {digest,requireText} from './store.mjs';
 import {snapshotReference,resolveSnapshot,resolveSnapshotEntry,hasSnapshotReferences,legacyHandoverSource} from './snapshot.mjs';
@@ -71,7 +71,21 @@ export function qualificationNegatives(state,plan){
   return negativeInventory(state).filter(e=>e.target.id===plan.id&&e.target.revision===plan.revision).map(({kind,value})=>({kind,value})).sort((a,b)=>a.value.id.localeCompare(b.value.id));
 }
 export function classificationFor(state,record,id=record.id,validation) {
-  const c=state.context_classifications?.[id];if(!c)return null;
+  let c=state.context_classifications?.[id];
+  const vectors=Object.values(state.context_classifications??{}).filter(c=>c.scoped_qualification?.protocol===CORPUS_PRESERVATION&&c.scoped_qualification.selected_source_ids?.includes(id));
+  if(vectors.length>1)throw Error('Held: overlapping corpus preservation vectors');
+  if(vectors.length){
+    const anchor=vectors[0],p=anchor.scoped_qualification;
+    if(c&&c!==anchor)throw Error('Held: corpus member has a competing classification');
+    if(Object.keys(anchor).some(k=>!['source','disposition','plan','review','scoped_qualification','source_instruction','at'].includes(k))||anchor.disposition!=='represented')throw Error('Corpus classification fields changed');
+    for(const [key,value] of [['source',p.source],['plan',p.plan],['review',p.integration]])if(JSON.stringify(anchor[key])!==JSON.stringify(value))throw Error('Corpus classification metadata changed');
+    if(!validation?.corpus?.has(p)){validateCorpusExclusion(state,p,id);validation?.corpus?.add(p);}
+    const mapping=p.source_mappings.find(m=>m.source.id===id);
+    if(!mapping||JSON.stringify(mapping.source)!==JSON.stringify(recordReference(record,id)))throw Error('Corpus member mapping changed');
+    return {source:mapping.source,disposition:'represented',plan:p.plan,review:p.integration,corpus_qualification:p};
+  }
+  if(c?.scoped_qualification?.protocol===CORPUS_PRESERVATION)throw Error('Held: corpus source vector/member changed');
+  if(!c)return null;
   if(c.scoped_qualification){
     const proof=c.scoped_qualification;
     if(Object.keys(c).some(k=>!['source','disposition','plan','review','scoped_qualification','source_instruction','at'].includes(k))||proof.protocol!==SCOPED_PROTOCOL||proof.source?.id!==id||c.disposition!=='represented')throw Error('Scoped classification identity/fields changed: '+id);
@@ -245,18 +259,36 @@ function validateQualification(state,plan,review,{ownership=true}={}) {
     if(!frozen&&!delivered(state,job,ref))throw Error('Qualification reviewer did not receive complete exact source/counterpart '+ref.id);
   }
 }
+// Rejected natives remain contributors, but external metadata cannot invent
+// a canonical job binding. Resolve storage wrappers before checking exact bytes.
+export function companySnapshotContainer(value){return Boolean(value&&(typeof value.id==='string'||typeof value.company_id==='string')&&typeof value.governance==='string'&&value.roles&&typeof value.roles==='object'&&value.records&&typeof value.records==='object'&&!Array.isArray(value.records)&&value.jobs&&typeof value.jobs==='object'&&!Array.isArray(value.jobs));}
+export function rejectedJobIdentities(state,value,containedJob=false){
+  const original=resolveSnapshotEntry(state,value),id=original?.id;
+  if(typeof id!=='string')return [];
+  if(!containedJob){
+    if(!Object.hasOwn(state.jobs??{},id))return [];
+    const canonical=resolveSnapshotEntry(state,state.jobs[id]);
+    if(JSON.stringify(canonical)!==JSON.stringify(original))return [];
+  }
+  return [...new Set([original.rejected_native_id,...(Array.isArray(original.rejected_native_ids)?original.rejected_native_ids:[])].filter(v=>typeof v==='string'&&v.trim()))];
+}
 function ownsEvidence(state,value,job) {
-  const todo=[value],seen=new Set(),snapshots=new Set();
+  const todo=[{value,containedJob:false}],seen=new Map(),snapshots=new Set();
   const identityFields=new Set(['author_instance','recorded_by','session_id','native_id','instance_id','probe_native_id','reviewer_native_id']);
   while(todo.length){
-    const item=todo.pop();if(!item||typeof item!=='object'||seen.has(item))continue;seen.add(item);
-    const legacy=legacyHandoverSource(state,item);if(legacy){todo.push(legacy);continue;}
+    const {value:item,containedJob}=todo.pop();if(!item||typeof item!=='object'||seen.has(item)&&(seen.get(item)||!containedJob))continue;seen.set(item,containedJob||seen.get(item));
+    const legacy=legacyHandoverSource(state,item);if(legacy){todo.push({value:legacy,containedJob});continue;}
+    if(rejectedJobIdentities(state,item,containedJob).some(native=>[job.instance_id,job.native_id].includes(native)))return true;
     if(state.jobs?.[item.job_id]?.native_id===job.native_id)return true;
     const ref=snapshotReference(item);
-    if(ref){if(!snapshots.has(ref.sha256)){snapshots.add(ref.sha256);todo.push(resolveSnapshot(state,item));}continue;}
+    if(ref){const key=ref.sha256+':'+containedJob;if(!snapshots.has(key)){snapshots.add(key);todo.push({value:resolveSnapshot(state,item),containedJob});}continue;}
+    const company=companySnapshotContainer(item);
     for(const [key,value] of Object.entries(item)){
       if(identityFields.has(key)&&[job.instance_id,job.native_id].includes(value))return true;
-      if(value&&typeof value==='object')todo.push(value);
+      if(value&&typeof value==='object'){
+        if(company&&key==='jobs')for(const child of Object.values(value))todo.push({value:child,containedJob:true});
+        else todo.push({value,containedJob:false});
+      }
     }
   }
   return false;
@@ -278,8 +310,10 @@ export function applyContextQualification(state,plan,review,{source_instruction,
 }
 export function reviewedContext(state) {
   const classifications=new Map(),mandatory=new Set(),proofs=new Set(),proofJobs=new Set(),scopedHomes=new Map(),globalMandatory=new Set();
-  const validation={negativePlans:new Set(negativeInventory(state).map(({target})=>JSON.stringify([target.id,target.revision])))};
-  for(const id of Object.keys(state.context_classifications??{})){
+  const validation={corpus:new Set(),negativePlans:new Set(negativeInventory(state).map(({target})=>JSON.stringify([target.id,target.revision])))};
+  const classifiedIds=new Set(Object.keys(state.context_classifications??{}));
+  for(const c of Object.values(state.context_classifications??{}))if(c.scoped_qualification?.protocol===CORPUS_PRESERVATION)for(const id of c.scoped_qualification.selected_source_ids??[])classifiedIds.add(id);
+  for(const id of classifiedIds){
     const source=contextSource(state,id);if(!source)throw Error('Context classification source is missing: '+id);
     const c=classificationFor(state,source,id,validation);
     if(!c){
@@ -294,6 +328,12 @@ export function reviewedContext(state) {
       continue;
     }
     classifications.set(id,c);
+    if(c.corpus_qualification){
+      const p=c.corpus_qualification;
+      for(const h of p.homes){mandatory.add(h.id);globalMandatory.add(h.id);scopedHomes.set(h.id,['*']);}
+      proofs.add(p.plan.id);for(const receipt of p.receipts){proofJobs.add(receipt.job.id.slice(4));proofs.add(receipt.review.id);proofs.add(receipt.target.id);const target=state.records[receipt.target.id]?.scoped_context_target;if(target)proofs.add(target.plan.id);}
+      continue;
+    }
     if(c.scoped_qualification){
       const p=c.scoped_qualification;
       for(const {source,scopes} of p.home_scopes){mandatory.add(source.id);const prior=scopedHomes.get(source.id)??[];scopedHomes.set(source.id,[...new Set([...prior,...scopes])]);}

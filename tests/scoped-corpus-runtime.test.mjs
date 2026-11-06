@@ -11,6 +11,7 @@ import {resolveSnapshot,inheritSnapshots,retainSnapshot} from '../plugins/soloco
 import {executionTiming} from '../plugins/soloco/runtime/timeout.mjs';
 import * as scoped from '../plugins/soloco/runtime/scoped-context.mjs';
 import {assignmentContext} from '../plugins/soloco/runtime/context.mjs';
+import {classificationFor,reviewedContext} from '../plugins/soloco/runtime/current-state.mjs';
 import {operatingContext} from '../plugins/soloco/runtime/operating-state.mjs';
 const protocol=scoped.SCOPED_PROTOCOL,sha=v=>digest(JSON.stringify(v)),bytes=v=>Buffer.byteLength(typeof v==='string'?v:JSON.stringify(v));
 const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-coherent-runtime-'));
@@ -44,7 +45,8 @@ function contractReview(p){
   }else if(p.phase==='applicability'){
     const all=p.extractions.flatMap(e=>e.items.map(item=>({key:e.review.id+'/'+item.id,item}))).filter(i=>p.item_keys.includes(i.key));
     r.summary='FICTIONAL ADAPTER: all fixture occurrences and inbound contexts reconciled; all restrictions remain OPEN.';
-    r.mappings=all.map(({key})=>({item:key,...(p.mapping_selection_ids?{selection_ids:p.mapping_selection_ids}:{}),status:'represented',homes:p.homes.map(h=>h.source.id),reason:'Fictional complete source conditions preserved, with all occurrence differences and OPEN restrictions.'}));
+    r.mappings=all.flatMap(({key})=>(p.corpus_claim?p.corpus_claim.selected_source_ids:[null]).map(sourceId=>({item:key,...(p.corpus_claim?{source_ids:[sourceId],occurrence_ids:p.mapping_occurrence_ids,context_sha256:p.mapping_context_sha256,typed_homes:p.typed_homes,conditions:'FICTIONAL contextual judgment for '+sourceId+': '+(sourceId==='alias'?'DENY even with consent':'ALLOW only after new consent')+'; every distinct physical ancestor remains binding; LATE_NO_EXPORT overrides all local permission.',unresolved_outcomes:'OPEN remains OPEN; failures retained; retries exhausted; no execution or export permission.'}:{}),...(p.mapping_selection_ids?{selection_ids:p.mapping_selection_ids}:{}),status:'represented',homes:p.homes.map(h=>h.source.id),reason:'Fictional complete source conditions preserved, with all occurrence differences and OPEN restrictions.'})));
+    if(p.corpus_claim?.selected_source_ids?.length===1)for(const mapping of r.mappings){mapping.source_set=structuredClone(p.mapping_sets.source_set);delete mapping.source_ids;}
     r.interfaces=p.interface_keys.length?[]:all.flatMap(({key,item})=>item.interfaces.map(i=>({key:key+'/'+i.id,item:key,scope:item.scope,...i})));
     r.reviewed_interfaces=p.interface_keys;
     if(JSON.stringify(p.extractions).includes('LATE_NO_EXPORT')&&!p.homes.some(h=>h.value.content.includes('LATE_NO_EXPORT'))){r.verdict='Blocked';r.permitted_action='hold';r.reason='Fictional late qualifier missing from current home';r.blockers=[r.reason];}
@@ -76,7 +78,7 @@ async function finish(f,es){
   const d=await run(f,args);assert.equal(d.job.status,'completed',d.job.error);assert.equal(d.review.review.verdict,'Pass',d.review.content);
   const keys=d.review.qualification_result.interfaces.map(i=>i.key);
   await assert.rejects(run(f,{phase:'integration',domain_review_ids:[d.review.id],counterpart_ids:['home-D00']}),/interface coverage/);
-  const ir=await run(f,{...args,interface_keys:keys});assert.equal(ir.job.status,'completed',ir.job.error);
+  const ir=await run(f,{...args,domain_review_ids:[d.review.id],interface_keys:keys});assert.equal(ir.job.status,'completed',ir.job.error);
   const i=await run(f,{phase:'integration',domain_review_ids:[d.review.id],interface_review_ids:[ir.review.id],counterpart_ids:['home-D00'],delivery_protocol:scoped.SCOPED_STREAM});assert.equal(i.job.status,'completed',i.job.error);
   return {d,ir,i};
 }
@@ -84,14 +86,16 @@ async function finish(f,es){
 
 function corpusFixture(repeats=1){
   const body={id:'shared-body',revision:1,content:'BODY_RULE: never export while OPEN; retries exhausted.'};
-  const f=fixture({extra:{ancestor:'ALLOW only after new consent',copies:Array(repeats).fill(body)}});
+  const f=fixture({deferPlan:true,operating:true,extra:{ancestor:'ALLOW only after new consent',copies:Array(repeats).fill(body)}});
   mutate(f,s=>{s.records['home-D00'].content+='\nBODY_RULE: never export while OPEN; retries exhausted.\nold: ALLOW only after new consent\nalias: DENY even with consent; distant exception remains OPEN\nNo execution permission.';s.records.alias={id:'alias',revision:1,kind:'artifact',ancestor:'DENY even with consent; distant exception remains OPEN',copies:Array(repeats).fill(body)};});
+  mutate(f,s=>{const original=retainSnapshot(s,{id:'shared-original',content:'GLOBAL ORIGINAL: failure retained; retries exhausted; no export.'});s.records.old.archive=original;s.records.alias.archive=original;s.records.late={id:'late',revision:1,kind:'decision',unknown_qualifier:'LATE_NO_EXPORT global prohibition'};s.records['home-D00'].content+=' LATE_NO_EXPORT global prohibition; GLOBAL ORIGINAL: failure retained; retries exhausted; no export.';});
   const p=call(f,{action:'plan',protocol,partitioner:scoped.CORPUS_PARTITIONER,source_id:'old',selected_source_ids:['old','alias']});f.plan_id=p.id;
   return f;
 }
 function corpusReview(p){
   const e=contractReview(p);
   if(p.phase==='applicability'){
+    assert.deepEqual(p.corpus_claim.selected_source_ids,['old','alias']);
     assert.equal(p.occurrence_context.source.id,p.source.id);
     const wire=JSON.stringify(p.occurrence_context);
     assert.ok(wire.includes('ALLOW only after new consent'));
@@ -106,34 +110,52 @@ function corpusReview(p){
 async function corpusFinish(f,es){
   const args={phase:'applicability',extraction_review_ids:es.map(e=>e.review.id),counterpart_ids:['home-D00'],context_scope:'*',delivery_protocol:scoped.SCOPED_STREAM};
   const d=await run(f,args,{review:corpusReview});assert.equal(d.job.status,'completed',d.job.error);
-  const ir=await run(f,{...args,interface_keys:d.review.qualification_result.interfaces.map(i=>i.key)},{review:corpusReview});assert.equal(ir.job.status,'completed',ir.job.error);
+  const ir=await run(f,{...args,domain_review_ids:[d.review.id],interface_keys:d.review.qualification_result.interfaces.map(i=>i.key)},{review:corpusReview});assert.equal(ir.job.status,'completed',ir.job.error);
   const i=await run(f,{phase:'integration',domain_review_ids:[d.review.id],interface_review_ids:[ir.review.id],counterpart_ids:['home-D00'],delivery_protocol:scoped.SCOPED_STREAM});assert.equal(i.job.status,'completed',i.job.error);
   return {d,ir,i};
 }
-test('FICTIONAL public corpus adapter shares intrinsic receipts but independently reviews both source claims',async()=>{
+test('FICTIONAL public vector pipeline shares extraction, independently judges context, aggregates once and applies atomically',async()=>{
   const f=corpusFixture(),first=f.plan_id;
   const es=[];for(const u of unitPages(f)){const e=await run(f,{phase:'extract',unit_id:u.id,delivery_protocol:scoped.SCOPED_STREAM});assert.equal(e.job.status,'completed',e.job.error);es.push(e);}
   const a=await corpusFinish(f,es);
-  const p=await publicCall('company_context',{root:f.root,session_id:f.session_id,epoch:f.epoch,source_instruction:f.source_instruction,action:'plan',protocol,partitioner:scoped.CORPUS_PARTITIONER,source_id:'alias',corpus_plan_id:first},'codex');f.plan_id=p.id;
-  const state=read(f);assert.deepEqual(state.records[first].scoped_context_plan.capsule,state.records[p.id].scoped_context_plan.capsule);
-  for(const u of unitPages(f)){const reused=call(f,{action:'target',phase:'extract',unit_id:u.id});assert.equal(reused.reused,true);assert.equal(reused.review_id,es.find(e=>e.target.target.unit_id===u.id).review.id);}
-  await assert.rejects(run(f,{phase:'integration',domain_review_ids:[a.d.review.id],interface_review_ids:[a.ir.review.id],counterpart_ids:['home-D00']}),/another source claim/);
-  const b=await corpusFinish(f,es);
-  assert.notEqual(a.d.job.native_id,b.d.job.native_id);assert.notEqual(a.ir.job.native_id,b.ir.job.native_id);
-  for(const [claim,q] of [['old',a],['alias',b]])assert.equal(scoped.validateScopedApply(read(f),{integration_review_id:q.i.review.id}).source.id,claim);
-  for(const e of [...es,a.d,a.ir,a.i,b.d,b.ir,b.i]){assert.ok(e.streamRequests.every(w=>bytes(w)<=48000));assert.ok(bytes(JSON.parse(e.review.qualification_output))<=12000);assert.ok(bytes(e.review.qualification_output)<=48000);assert.ok(e.job.timeout_ms<=600000);}
-  const original=read(f);
-  for(const change of [s=>s.records.alias.ancestor='changed',s=>s.records.newSource={id:'newSource',revision:1,content:'unknown'},s=>s.records[first].unknown_qualifier='No permission',s=>s.records.alias.copies.pop(),s=>{const v=s.records[first].scoped_context_plan,c=resolveSnapshot(s,v.capsule);c.original=retainSnapshot(s,{});v.capsule=retainSnapshot(s,c);},s=>s.jobs[es[0].job.id].coordination_release.termination_confirmed=false]){
-    const bad=inheritSnapshots(original,structuredClone(original));change(bad);assert.throws(()=>scoped.validateScopedApply(bad,{integration_review_id:a.i.review.id}),/changed|membership|unproven|hold/i);
-  }
-  // Publication is exact-source only; the other claim remains independently required.
-  const applied=await publicCall('company_context',{root:f.root,session_id:f.session_id,epoch:f.epoch,source_instruction:f.source_instruction,action:'apply',integration_review_id:a.i.review.id},'codex');assert.equal(applied.applied,true);
-  assert.equal(read(f).context_classifications.alias,undefined);
-  // A retained failed judgment on the other alias fences this source too.
-  const denied=await run(f,{phase:'applicability',extraction_review_ids:es.map(e=>e.review.id),counterpart_ids:['home-D00'],context_scope:'*',delivery_protocol:scoped.SCOPED_STREAM},{review:p=>{const e=corpusReview(p),r=e.qualification_result;r.verdict='Blocked';r.permitted_action='hold';r.reason='FICTIONAL conflicting distant authority remains unresolved';r.blockers=[r.reason];return envelope(r);}});
-  assert.equal(denied.review.review.verdict,'Blocked');
-  assert.throws(()=>scoped.validateScopedApply(read(f),{integration_review_id:a.i.review.id}),/negative|governing/);
+  const proof=scoped.validateCorpusPreservation(read(f),{integration_review_id:a.i.review.id});
+  assert.equal(proof.protocol,scoped.CORPUS_PRESERVATION);assert.deepEqual(proof.selected_source_ids,['old','alias']);
+  assert.deepEqual(proof.source_mappings.map(m=>m.source.id),['old','alias']);
+  assert.notEqual(a.d.job.native_id,a.ir.job.native_id);assert.notEqual(a.ir.job.native_id,a.i.job.native_id);
+  assert.ok(a.ir.packet.domain_conclusions.some(d=>d.review.id===a.d.review.id));
+  assert.deepEqual(a.i.packet.source_mappings,proof.source_mappings);
+  for(const e of [...es,a.d,a.ir,a.i]){assert.ok(e.streamRequests.every(w=>bytes(w)<=48000));assert.ok(bytes(JSON.parse(e.review.qualification_output))<=12000);assert.ok(bytes(e.review.qualification_output)<=48000);assert.ok(e.job.timeout_ms<=600000);}
+  assert.ok(a.i.packet.complete_corpus_context.evidence.snapshot_inbound.count>=2);
+  assert.ok(a.i.packet.complete_corpus_context.evidence.collections.count>0);
+  assert.ok(JSON.stringify(a.i.packet.domains??a.i.packet).includes('LATE_NO_EXPORT'));
+  assert.ok(!Object.hasOwn(a.i.packet.complete_corpus_context,'sections'),'aggregate accounting does not replay raw accepted section bodies');
+  const original=read(f),job=original.jobs[a.d.job.id],assignment=scoped.scopedAssignment(original,job);
+  const referenced=structuredClone(a.d.review.qualification_result);
+  for(const mapping of referenced.mappings){mapping.occurrence_set=structuredClone(a.d.packet.mapping_sets.occurrence_set);delete mapping.occurrence_ids;}
+  assert.equal(scoped.validateScopedResponse(original,job,assignment,job.native_id,referenced,job.qualification_delivery),true);
+  for(const change of [m=>m.occurrence_set.count++,m=>m.occurrence_set.sha256='0'.repeat(64),m=>m.occurrence_ids=['extra']]){const bad=structuredClone(referenced);change(bad.mappings[0]);assert.throws(()=>scoped.validateScopedResponse(original,job,assignment,job.native_id,bad,job.qualification_delivery),/hold/i);}
+  const aggregateResult=structuredClone(a.i.review.qualification_result),aggregateAssignment=scoped.scopedAssignment(original,original.jobs[a.i.job.id]);
+  for(const change of [r=>r.source_mappings_count++,r=>r.source_mappings_sha256='0'.repeat(64)]){const bad=structuredClone(aggregateResult);change(bad);assert.throws(()=>scoped.validateScopedResponse(original,original.jobs[a.i.job.id],aggregateAssignment,a.i.job.native_id,bad,a.i.job.qualification_delivery),/hold/i);}
 
+  assert.equal(scoped.validateScopedResponse(original,job,assignment,job.native_id,a.d.review.qualification_result,job.qualification_delivery),true);
+  for(const native of [f.session_id,'historical-producer',a.ir.job.native_id])assert.throws(()=>scoped.validateScopedNativeAdmission(original,job,native),/hold/i);
+  for(const edit of [r=>r.selected_source_count++,r=>r.mappings[0].source_ids=[],r=>r.mappings[0].occurrence_ids.pop(),r=>r.mappings[0].typed_homes[0].kind='permission',r=>r.mapping_context_sha256='omitted ancestry',r=>r.interaction_completeness.declared_complete=false,r=>r.interaction_completeness.undeclared_complete=false,r=>r.interaction_completeness.global_complete=false,r=>delete r.interaction_completeness,r=>r.corpus_claim_sha256='borrowed single-source',r=>r.mappings[0].conditions='',r=>r.mappings[0].unresolved_outcomes='']){
+    const result=structuredClone(a.d.review.qualification_result);edit(result);assert.throws(()=>scoped.validateScopedResponse(original,job,assignment,job.native_id,result,job.qualification_delivery),/hold/i);
+  }
+  for(const change of [s=>s.context_classifications={alias:{disposition:'current'}},s=>s.records.alias.ancestor='changed',s=>s.records.newSource={id:'newSource',revision:1,content:'unknown'},s=>s.records[first].unknown_qualifier='No permission',s=>s.records.alias.copies.pop(),s=>s.records['home-D00'].content+='changed',s=>{const v=s.records[first].scoped_context_plan;v.selected_source_ids.pop();},s=>{const v=s.records[first].scoped_context_plan,c=resolveSnapshot(s,v.capsule);c.original=retainSnapshot(s,{});v.capsule=retainSnapshot(s,c);},s=>s.jobs[es[0].job.id].coordination_release.termination_confirmed=false,s=>s.jobs[a.ir.job.id].qualification_delivery.complete=false,s=>s.jobs[a.ir.job.id].native_id=a.d.job.native_id,s=>s.jobs[a.ir.job.id].rejected_output={text:'negative',qualification_negative:'Blocked'},s=>s.records.old.author_instance='changed producer',s=>s.upgrade_history=[{id:'new-upgrade',status:'recovered'}]]){
+    const bad=inheritSnapshots(original,structuredClone(original));change(bad);assert.throws(()=>scoped.validateCorpusPreservation(bad,{integration_review_id:a.i.review.id}),/changed|membership|unproven|hold/i);
+  }
+  mutate(f,s=>{s.records.alias.ancestor+=' CHANGED';});
+  await assert.rejects(publicCall('company_context',{root:f.root,session_id:f.session_id,epoch:f.epoch,source_instruction:f.source_instruction,action:'apply',integration_review_id:a.i.review.id},'codex'),/hold/i);assert.equal(read(f).context_classifications?.old,undefined);
+  mutate(f,s=>{s.records.alias.ancestor=original.records.alias.ancestor;});
+  const applied=await publicCall('company_context',{root:f.root,session_id:f.session_id,epoch:f.epoch,source_instruction:f.source_instruction,action:'apply',integration_review_id:a.i.review.id},'codex');assert.equal(applied.applied,true);
+  const state=read(f);assert.equal(Object.keys(state.context_classifications).length,1);assert.equal(state.context_classifications.alias,undefined);
+  const view=reviewedContext(state);for(const id of ['old','alias']){assert.equal(view.excluded(id),true);const c=classificationFor(state,state.records[id],id);assert.equal(c.corpus_qualification.protocol,scoped.CORPUS_PRESERVATION);assert.equal(c.scoped_qualification,undefined);}
+  assert.deepEqual(view.scopedHomes.get('home-D00'),['*']);
+  assert.throws(()=>scoped.validateScopedExclusion(state,proof),/missing|changed/);
+  for(const edit of [p=>p.selected_source_ids.pop(),p=>p.source_mappings.pop(),p=>p.domain_mappings[0].mappings[0].source_ids.pop(),p=>p.home_scopes[0].scopes=['local'],p=>p.protocol=scoped.SCOPED_PROTOCOL]){const bad=inheritSnapshots(state,structuredClone(state));edit(bad.context_classifications.old.scoped_qualification);assert.throws(()=>reviewedContext(bad),/hold|changed|missing|identity/i);}
+  const denied=await run(f,{phase:'applicability',extraction_review_ids:es.map(e=>e.review.id),counterpart_ids:['home-D00'],context_scope:'*',delivery_protocol:scoped.SCOPED_STREAM},{review:p=>{const e=corpusReview(p),r=e.qualification_result;r.verdict='Blocked';r.permitted_action='hold';r.reason='FICTIONAL conflicting distant authority remains unresolved';r.blockers=[r.reason];return envelope(r);}});
+  assert.equal(denied.review.review.verdict,'Blocked');assert.throws(()=>scoped.validateCorpusPreservation(read(f),{integration_review_id:a.i.review.id}),/negative|governing/);
 });
 test('corpus growth deduplicates intrinsic sections while keeping all repeated physical obligations unaccepted',t=>{
   const one=corpusFixture(1),ten=corpusFixture(10);
@@ -178,7 +200,7 @@ async function acceptedOperatingCorpus({upgrade=false}={}){
  const p=await publicCall('company_context',{...f,action:'plan',protocol,partitioner:scoped.CORPUS_PARTITIONER,source_id:sourceId,selected_source_ids:[sourceId]},'codex');f.plan_id=p.id;
  const es=[];for(const u of unitPages(f)){const e=await run(f,{phase:'extract',unit_id:u.id,delivery_protocol:scoped.SCOPED_STREAM});assert.equal(e.job.status,'completed',e.job.error);es.push(e);}
  const args={phase:'applicability',extraction_review_ids:es.map(e=>e.review.id),counterpart_ids:['home-D00','home-outcome'],context_scope:'*',delivery_protocol:scoped.SCOPED_STREAM};
- const d=await run(f,args),ir=await run(f,{...args,interface_keys:d.review.qualification_result.interfaces.map(i=>i.key)});
+ const d=await run(f,args),ir=await run(f,{...args,domain_review_ids:[d.review.id],interface_keys:d.review.qualification_result.interfaces.map(i=>i.key)});
  const i=await run(f,{phase:'integration',domain_review_ids:[d.review.id],interface_review_ids:[ir.review.id],counterpart_ids:['home-D00','home-outcome'],delivery_protocol:scoped.SCOPED_STREAM});
  for(const r of [d,ir,i])assert.equal(r.job.status,'completed',r.job.error);
  const proof={d,ir,i};
@@ -190,33 +212,26 @@ async function operatingReview(f,plan,native='fictional-operating-corpus-native'
  const context=assignmentContext(read(f),read(f).jobs[queued.id]);
  const packet=context.frozen_packet??JSON.parse(context.text),e=context.operating_evidence;
  const ranges=e?Object.values(e.sources).flatMap(v=>{const out=[];for(let offset=0;offset<v.length;offset+=16000)out.push({source_id:v.source_id,sha256:v.sha256,offset,length:Math.min(16000,v.length-offset)});return out;}):[];
- await work(f.root,queued.id,async(_h,_n,_p,_d,timeout,_s,options)=>{
-  options.onSpawn(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));
+ let first=true;await work(f.root,queued.id,async(_h,_n,_p,_d,timeout,_s,options)=>{
+  if(first){first=false;options.onSpawn(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));}
   if(ranges.length)return {native_id:native,text:JSON.stringify({reads:ranges.splice(0,1)})};
   return {native_id:native,text:JSON.stringify({content:'FICTIONAL ADAPTER: scripted complete current meaning, never live QA.',messages:[],notices:[],review:{verdict:'Pass',reason:'FICTIONAL current meaning contract',permitted_action:'publish_operating_state',plan_sha256:sha(read(f).records[plan].operating_plan),preservation_complete:true,interaction_complete:true,authority_checked:true,blockers:[]}})};
  });
  const j=read(f).jobs[queued.id];assert.equal(j.status,'completed',j.error);return {j,packet};
 }
-test('FICTIONAL public SCOPED corpus accepted semantics publish current homes and recovered controls without raw replay',async()=>{
+test('FICTIONAL corpus preservation feeds independently reviewed operating publication, never a borrowed scoped receipt',async()=>{
  for(const upgrade of [false,true]){
-  const {f,sourceId,proof,es}=await acceptedOperatingCorpus({upgrade});
-  const c=read(f).context_classifications[sourceId];assert.ok(c.scoped_qualification);
-  const p=await publicCall('company_context',{...f,protocol:'operating-state-v1',action:'plan'},'codex');assert.equal(p.held,false,JSON.stringify(p.frontier));
-  const {j,packet}=await operatingReview(f,p.id),accepted=packet.required_evidence.accepted_semantics.find(x=>x.source.id===sourceId);
-  assert.ok(accepted);assert.deepEqual(accepted.counterparts,c.scoped_qualification.homes);
-  for(const review of [proof.d.review,proof.ir.review,proof.i.review])assert.deepEqual(accepted.judgments.find(x=>x.review.id===review.id).result,review.qualification_result);
-  for(const receipt of c.scoped_qualification.receipts)for(const ref of [receipt.review,receipt.target,receipt.job])assert.ok(accepted.exact_originals.some(r=>r.id===ref.id&&r.sha256===ref.sha256));
-  assert.ok(!JSON.stringify(packet).includes('RAW-CORPUS-ORIGINAL'));
-  assert.ok(!packet.required_evidence.sources.some(r=>r.id===sourceId));
-  if(upgrade){assert.equal(packet.controls.upgrade.status,'recovered');assert.equal(packet.controls.upgrade.consumed.qa_final,0);}
-  assert.equal((await publicCall('company_context',{...f,protocol:'operating-state-v1',action:'apply',plan_id:p.id,review_id:j.artifact_id},'codex')).published,true);
-  assert.match(assignmentContext(read(f),{id:'next',role:'engineer',context_format:6,task:'Current only',inputs:[]}).text,/resume_handover/);
-  const baseline=read(f);
-  for(const change of [s=>{s.records['home-D00'].content+=' stale';},s=>{s.records[proof.d.review.id].qualification_result.summary+=' stale';},s=>{s.jobs[es[0].job.id].coordination_release.termination_confirmed=false;},s=>{s.records.unknown={id:'unknown',revision:1,kind:'artifact',content:'Unknown authority'};},s=>{s.records.negative={id:'negative',revision:1,kind:'review',status:'Submitted',review_of:proof.d.review.review_of,review:{verdict:'Blocked'}};},...(upgrade?[s=>{s.upgrade.status='checking';},s=>{s.upgrade.error+=' new uncertainty';}]:[s=>{s.records.old.content+=' stale';}])]){
-   mutate(f,s=>{Object.assign(s,structuredClone(baseline));change(s);});assert.throws(()=>operatingContext(read(f)),/Held|hold|changed|membership|closure|negative/i);
-  }
+  const {f,sourceId,proof}=await acceptedOperatingCorpus({upgrade});
+  const stored=read(f).context_classifications[sourceId].scoped_qualification;
+  assert.equal(stored.protocol,scoped.CORPUS_PRESERVATION);
+  assert.equal(stored.operating_integration.status,'requires_independent_publication');assert.equal(stored.operating_integration.interface,'validateCorpusPreservation');
+  assert.deepEqual(scoped.validateCorpusPreservation(read(f),{integration_review_id:proof.i.review.id}),stored);
+  const proposal=await publicCall('company_context',{...f,protocol:'operating-state-v1',action:'plan'},'codex');assert.equal(proposal.held,false,JSON.stringify(proposal.frontier));
+  const qa=await operatingReview(f,proposal.id);assert.equal(qa.packet.required_evidence.accepted_semantics.filter(x=>x.corpus_integration?.id===proof.i.review.id).length,1);
+  assert.ok(!JSON.stringify(qa.packet).includes('RAW-CORPUS-ORIGINAL'));
+  assert.equal((await publicCall('company_context',{...f,protocol:'operating-state-v1',action:'apply',plan_id:proposal.id,review_id:qa.j.artifact_id},'codex')).published,true);
+  assert.ok(operatingContext(read(f)).homes.some(h=>h.source.id==='home-outcome'));
  }
-
 });
 
 // Selection tests remain fictional contracts, never model-authored acceptance.
@@ -241,22 +256,23 @@ async function semanticFixture(){
 test('semantic selections complete canonical source apply with bounded independent local packets',async t=>{
   const {f,partition,material}=await semanticFixture(),before=JSON.stringify(read(f));
   const workload=await publicCall('company_context',{root:f.root,session_id:f.session_id,action:'inspect',plan_id:f.plan_id,section:'workload'},'codex');
-  assert.equal(JSON.stringify(read(f)),before);assert.equal(workload.semantic_acceptance,false);assert.equal(workload.selections.length,4);
+  assert.equal(JSON.stringify(read(f)),before);assert.equal(workload.semantic_acceptance,false);assert.equal(workload.selections.length,4);assert.equal(workload.review_formula,'E+D+I+1');assert.equal(workload.total_selected_source_requests_lower_bound,workload.extraction.length+4+4+1);assert.equal(workload.complete_native_fit,null);
   t.diagnostic(JSON.stringify({fictional_only:true,workload}));
   const a=workload.selections.find(q=>q.id==='A');assert.ok(!a.incident_selection_ids.includes('archive'));
   const es=await extracts(f),byUnit=new Map(es.map(e=>[e.target.target.unit_id,e]));
-  const ds=[],irs=[];
+  const ds=[],irs=[],domainArgs=[];
   for(const selection of workload.selections){
-    const args={phase:'applicability',selection_ids:[selection.id],extraction_review_ids:selection.intrinsic_batches.map(id=>byUnit.get(id).review.id),counterpart_ids:[selection.id==='B'?'home-D01':selection.id==='archive'?'home-D02':'home-D00'],context_scope:'*'};
+    const args={phase:'applicability',selection_ids:[selection.id],extraction_review_ids:selection.intrinsic_batches.map(id=>byUnit.get(id).review.id),counterpart_ids:[selection.id==='B'?'home-D01':selection.id==='archive'?'home-D02':'home-D00'],context_scope:'*',delivery_protocol:scoped.SCOPED_STREAM};
     if(selection.id==='A')await assert.rejects(run(f,{...args,extraction_review_ids:args.extraction_review_ids.slice(1)}),/missing complete body extraction/);
-    const d=await run(f,args);assert.equal(d.job.status,'completed',d.job.error);ds.push(d);
-    const homes=[...new Set([...(args.counterpart_ids),...selection.incident_selection_ids.map(id=>id==='B'?'home-D01':id==='archive'?'home-D02':'home-D00')])];
-    const ir=await run(f,{...args,counterpart_ids:homes,interface_keys:d.review.qualification_result.interfaces.map(i=>i.key)});assert.equal(ir.job.status,'completed',ir.job.error);irs.push(ir);
-    if(selection.id==='A'){assert.ok(!JSON.stringify(d.packet).includes('UNRELATED_ARCHIVE'));assert.ok(JSON.stringify(d.packet).includes('LATE_NO_EXPORT'));assert.ok(JSON.stringify(d.packet).includes('ALLOW only after consent'));assert.ok(!JSON.stringify(d.packet).includes('DENY even with consent')||JSON.stringify(d.packet.homes).includes('DENY even with consent'));}
-    assert.ok(bytes(d.packet)<48000);assert.ok(bytes(ir.packet)<48000);
+    const d=await run(f,args);assert.equal(d.job.status,'completed',d.job.error);ds.push(d);domainArgs.push(args);
+    if(selection.id==='A'){assert.ok(!JSON.stringify(d.packet).includes('UNRELATED_ARCHIVE'));assert.ok(JSON.stringify(d.packet).includes('LATE_NO_EXPORT'));assert.ok(JSON.stringify(d.packet).includes('ALLOW only after consent'));}
+  }
+  for(const [n,d] of ds.entries()){
+    const ir=await run(f,{...domainArgs[n],counterpart_ids:['home-D00','home-D01','home-D02'],domain_review_ids:ds.map(d=>d.review.id),interface_keys:d.review.qualification_result.interfaces.map(i=>i.key)});assert.equal(ir.job.status,'completed',ir.job.error);irs.push(ir);
+    assert.ok(JSON.stringify(ir.packet.homes).includes('archive retained'));assert.ok(ir.packet.domain_conclusions.some(d=>d.review.id===ds[3].review.id));assert.ok(ir.packet.complete_corpus_context.evidence.sections.count>0);assert.equal(ir.packet.domain_conclusions.length,ds.length);
   }
   t.diagnostic(JSON.stringify({fictional_only:true,domain_packet_bytes:ds.map(d=>bytes(d.packet)),interface_packet_bytes:irs.map(d=>bytes(d.packet)),semantic_acceptance:false}));
-  const integrationArgs={phase:'integration',domain_review_ids:ds.map(d=>d.review.id),interface_review_ids:irs.map(d=>d.review.id),counterpart_ids:['home-D00','home-D01','home-D02']};
+  const integrationArgs={phase:'integration',delivery_protocol:scoped.SCOPED_STREAM,domain_review_ids:ds.map(d=>d.review.id),interface_review_ids:irs.map(d=>d.review.id),counterpart_ids:['home-D00','home-D01','home-D02']};
   await assert.rejects(run(f,{...integrationArgs,interface_review_ids:irs.slice(1).map(d=>d.review.id)}),/interface coverage/);
   const i=await run(f,integrationArgs);assert.equal(i.job.status,'completed',i.job.error);
   assert.equal(scoped.validateScopedApply(read(f),{integration_review_id:i.review.id}).source.id,'old');
@@ -265,7 +281,7 @@ test('semantic selections complete canonical source apply with bounded independe
   const {decodeLegacyCoherentPlan}=await import('../plugins/soloco/runtime/legacy-operating.mjs');assert.equal(sha(decodeLegacyCoherentPlan(material).state),material.baseline.state_sha256);
   for(const edit of [p=>p.selections[0].occurrence_ids.pop(),p=>p.selections[1].incident_ids.push('B')]){const bad=structuredClone(partition);edit(bad);assert.throws(()=>scoped.validateCorpusPartition(material,bad),/occurrence|incident/);}
   assert.equal((await publicCall('company_context',{root:f.root,session_id:f.session_id,epoch:f.epoch,source_instruction:f.source_instruction,action:'apply',integration_review_id:i.review.id},'codex')).applied,true);
-  const denied=await run(f,{phase:'applicability',selection_ids:['A'],extraction_review_ids:a.intrinsic_batches.map(id=>byUnit.get(id).review.id),counterpart_ids:['home-D00'],context_scope:'*'},{review:p=>{const e=contractReview(p),r=e.qualification_result;r.verdict='Blocked';r.permitted_action='hold';r.reason='FICTIONAL unresolved distant prohibition';r.blockers=[r.reason];return envelope(r);}});
+  const denied=await run(f,{phase:'applicability',selection_ids:['A'],extraction_review_ids:a.intrinsic_batches.map(id=>byUnit.get(id).review.id),counterpart_ids:['home-D00'],context_scope:'*',delivery_protocol:scoped.SCOPED_STREAM},{review:p=>{const e=contractReview(p),r=e.qualification_result;r.verdict='Blocked';r.permitted_action='hold';r.reason='FICTIONAL unresolved distant prohibition';r.blockers=[r.reason];return envelope(r);}});
   assert.equal(denied.review.review.verdict,'Blocked');assert.throws(()=>scoped.validateScopedApply(read(f),{integration_review_id:i.review.id}),/negative|governing/);
 });
 
@@ -276,16 +292,22 @@ test('declared distant incident peer cannot be omitted by proposed local scope',
   await assert.rejects(run(f,{phase:'applicability',selection_ids:['A'],extraction_review_ids:es.filter(e=>a.intrinsic_batches.includes(e.target.target.unit_id)).map(e=>e.review.id),counterpart_ids:['home-D00'],context_scope:'*'}),/omitted declared incident peer/);
 });
 
-test('nested file sections fit intrinsic batches without implying complete global request fit',async t=>{
+test('nested formatting/escape variant file sections fit intrinsic batches without implying complete global request fit',async t=>{
   const {buildLegacyCoherentPlan}=await import('../plugins/soloco/runtime/legacy-operating.mjs');
   const sources={'a.mjs':'a'.repeat(21650),'b.mjs':'b'.repeat(17056),'c.mjs':'c'.repeat(12952)};
-  const content=JSON.stringify({left:{scope:'Consent exhausted.',sources},right:{scope:'Consent revoked.',sources},late_unknown:'LATE_NO_EXPORT'});
+  const content=JSON.stringify({left:{scope:'Consent exhausted.',sources},right:{scope:'Consent revoked.',sources},late_unknown:'LATE_NO_EXPORT'},null,2).replace('LATE_NO_EXPORT','\\u004cATE_NO_EXPORT');
   const f=fixture({deferPlan:true,extra:{content}}),m=buildLegacyCoherentPlan(read(f));
+  const {decodeLegacyCoherentPlan}=await import('../plugins/soloco/runtime/legacy-operating.mjs');
+  assert.equal(decodeLegacyCoherentPlan(m).state.records.old.content,content);
+  assert.ok(m.definitions.some(d=>d[0]==='json-text-string'&&d[2]===content));
   // Explicit fictional global proposal: size and file paths confer no locality.
   const partition={plan_sha256:m.plan_sha256,selections:[{id:'global',scope:'*',occurrence_ids:m.occurrences.map(o=>o.id),incident_ids:[]}]};
   const p=call(f,{action:'plan',protocol,partitioner:scoped.CORPUS_PARTITIONER,source_id:'old',selected_source_ids:['old'],semantic_partition:partition});f.plan_id=p.id;
   const workload=scoped.inspectCorpusWorkload(read(f),{plan_id:p.id}),global=workload.selections[0];
-  assert.ok(workload.extraction.every(e=>e.body_bytes<48000));
+  const extraction=await run(f,{phase:'extract',unit_id:workload.extraction[0].id,delivery_protocol:scoped.SCOPED_STREAM});
+  assert.equal(extraction.job.status,'completed',extraction.job.error);assert.ok(extraction.streamRequests.length>1);
+  assert.ok(extraction.streamRequests.every(w=>bytes(w)<=48000),'transport request bound remains unchanged for a complete multi-section batch');
+  assert.equal(extraction.packet.reviewed_unit_bundle.primary.sections.length>1,true);
   assert.ok(global.context_bytes>48000);assert.ok(global.domain_request_lower_bound>48000);assert.ok(global.interface_request_lower_bound>48000);
   assert.equal(workload.complete_request_bytes,null);assert.equal(workload.native_context_fit,'unproven');
   assert.equal(workload.frontier_complete,false);assert.equal(workload.semantic_acceptance,false);
@@ -294,4 +316,21 @@ test('nested file sections fit intrinsic batches without implying complete globa
   const bad=structuredClone(partition);bad.selections[0].occurrence_ids.splice(bad.selections[0].occurrence_ids.indexOf(m.occurrences.find(o=>o.group_id===shared.id).id),1);
   assert.throws(()=>scoped.validateCorpusPartition(m,bad),/physical occurrence partition/);
   t.diagnostic(JSON.stringify({fictional_only:true,nested_sources_workload:workload}));
+});
+
+test('upgrade journal sections enter corpus workload with complete ordered membership and occurrence guards',async t=>{
+  const {buildLegacyCoherentPlan}=await import('../plugins/soloco/runtime/legacy-operating.mjs');
+  const f=fixture({deferPlan:true});
+  mutate(f,s=>{s.upgrade_history=[{id:'failed-attempt',status:'failed',candidate:{unknown:'No adoption'},previous:{unknown:'Revoked consent'},
+    probe:{verdict:'Fail'},review:{verdict:'Blocked'},late_unknown:'LATE_NO_EXPORT',
+    calls:Array.from({length:28},(_,n)=>({sequence:n,response:'failed '+String(n).padEnd(1900,'x')}))}];});
+  const m=buildLegacyCoherentPlan(read(f)),journal=m.occurrences.find(o=>o.path==='/upgrade_history/0/calls'),group=m.groups.find(g=>g.id===journal.group_id);
+  assert.equal(group.section.body.length,28);assert.deepEqual(group.section.cuts.map(c=>c.path),Array.from({length:28},(_,n)=>'/'+n));
+  const partition={plan_sha256:m.plan_sha256,selections:[{id:'global',scope:'*',occurrence_ids:m.occurrences.map(o=>o.id),incident_ids:[]}]};
+  const p=call(f,{action:'plan',protocol,partitioner:scoped.CORPUS_PARTITIONER,source_id:'upgrade:failed-attempt',selected_source_ids:['upgrade:failed-attempt'],semantic_partition:partition});f.plan_id=p.id;
+  const workload=scoped.inspectCorpusWorkload(read(f),{plan_id:p.id});
+  assert.ok(workload.extraction.every(e=>e.body_bytes<48000));assert.equal(workload.semantic_acceptance,false);
+  const bad=structuredClone(partition);bad.selections[0].occurrence_ids.splice(bad.selections[0].occurrence_ids.indexOf(journal.id),1);
+  assert.throws(()=>scoped.validateCorpusPartition(m,bad),/physical occurrence partition/);
+  t.diagnostic(JSON.stringify({fictional_only:true,journal_members:28,unique_sections:m.measurements.unique_sections,largest_intrinsic_packet:m.measurements.largest_packet_bytes,workload}));
 });

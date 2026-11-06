@@ -1,0 +1,22 @@
+# Local public source only. No network, installation, model invocation or git mutation.
+# Initial retained failure:
+/private/tmp/soloco-node22-validation/node-v22.13.0-darwin-arm64/bin/node --test tests/scoped-corpus-runtime.test.mjs > evals/corpus-claim/initial-node22.log 2>&1
+# Revised fixture validation:
+/private/tmp/soloco-node22-validation/node-v22.13.0-darwin-arm64/bin/node --test tests/scoped-corpus-runtime.test.mjs > evals/corpus-claim/revised-node22.log 2>&1
+# Relevant compatibility suites (before final duplicate-location guard):
+/private/tmp/soloco-node22-validation/node-v22.13.0-darwin-arm64/bin/node --test tests/scoped-context.test.mjs tests/scoped-coherent-runtime.test.mjs tests/scoped-corpus-runtime.test.mjs tests/public-response.test.mjs tests/public-represented-v2.test.mjs > evals/corpus-claim/final-node22.log 2>&1
+/opt/homebrew/bin/node --test tests/scoped-context.test.mjs tests/scoped-coherent-runtime.test.mjs tests/scoped-corpus-runtime.test.mjs tests/public-response.test.mjs tests/public-represented-v2.test.mjs > evals/corpus-claim/final-node25.log 2>&1
+# Final guard and ownership regression checks after source changes:
+/private/tmp/soloco-node22-validation/node-v22.13.0-darwin-arm64/bin/node --test tests/scoped-corpus-runtime.test.mjs > evals/corpus-claim/guarded-corpus-node22.log 2>&1
+/opt/homebrew/bin/node --test tests/scoped-corpus-runtime.test.mjs > evals/corpus-claim/guarded-corpus-node25.log 2>&1
+# Read-only checks and retained patch:
+git rev-parse --short HEAD
+git diff --check
+git diff -- plugins/soloco/runtime/scoped-context.mjs plugins/soloco/runtime/current-state.mjs plugins/soloco/runtime/main.mjs tests/scoped-corpus-runtime.test.mjs docs/scoped-context.md > evals/corpus-claim/source.patch
+# Final atomic competing-classification guard:
+/private/tmp/soloco-node22-validation/node-v22.13.0-darwin-arm64/bin/node --test tests/scoped-corpus-runtime.test.mjs > evals/corpus-claim/atomic-corpus-node22.log 2>&1
+/opt/homebrew/bin/node --test tests/scoped-corpus-runtime.test.mjs > evals/corpus-claim/atomic-corpus-node25.log 2>&1
+/private/tmp/soloco-node22-validation/node-v22.13.0-darwin-arm64/bin/node --version > evals/corpus-claim/node22-version.log
+/opt/homebrew/bin/node --version > evals/corpus-claim/node25-version.log
+# Trailing whitespace found by initial diff-check.log was corrected; final check:
+git diff --check > evals/corpus-claim/final-diff-check.log 2>&1

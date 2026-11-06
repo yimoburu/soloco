@@ -1,0 +1,1 @@
+Native controller reached fixed600seconds without turn.completed/final output file. Source/report/logs were retained before deadline; implementation is partial/unaccepted despite agent completion prose. Root must independently test merged source and obtain fresh independent source QA.

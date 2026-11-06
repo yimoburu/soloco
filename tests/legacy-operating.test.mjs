@@ -117,3 +117,24 @@ test('ambiguous current/history source IDs and missing embedded raw originals ho
   const m=build(other),damaged=clone(m);damaged.originals=[];
   assert.throws(()=>legacy.decodeLegacyBootstrap(reseal(damaged)),/missing|corrupt|coverage/);
 });
+
+test('lossless noncanonical STRING graph preserves raw bytes and rejects forged token correspondence',()=>{
+  const s=fixture(),raw=String.raw` {
+    "message": "escaped \u00e9 and \"quotes\" and \\ backslash",
+    "nested": [true, null, {"late": "Never retry while OPEN"}]
+  } `;
+  s.records.history.content=raw;
+  const untouched=build(s);assert.ok(untouched.definitions.some(d=>d[0]==='string'&&d[1]===raw));
+  const m=build(s,{canonical_json_text:true}),decoded=legacy.decodeLegacyBootstrap(m);
+  assert.deepEqual(Buffer.from(decoded.state.records.history.content),Buffer.from(raw));
+  assert.equal(typeof decoded.state.records.history.content,'string');
+  const node=m.definitions.find(d=>d[0]==='json-text-string'&&d[2]===raw);assert.ok(node);
+  for(const alter of [(_m,d)=>d[2]=d[2].replace('true','false'),(_m,d)=>d[2]=d[2].replace('"message"','"nested"'),(_m,d)=>d[2]=d[2].slice(0,-2),
+    (m,d)=>{const child=m.definitions[d[1]];d[1]=m.definitions.length;m.definitions.push(['object',[...child[1]].reverse()]);}]){
+    // Each adversarial definition is independently resealed; decoder validation
+    // and the exact deterministic rebuild remain compulsory.
+    const bad=clone(m),target=bad.definitions.find(d=>d[0]==='json-text-string'&&d[2]===raw);
+    alter(bad,target);
+    assert.throws(()=>legacy.decodeLegacyBootstrap(reseal(bad)),/Held/);
+  }
+});

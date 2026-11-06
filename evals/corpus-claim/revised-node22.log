@@ -1,0 +1,45 @@
+TAP version 13
+# (node:79327) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: FICTIONAL public vector pipeline shares extraction, independently judges context, aggregates once and applies atomically
+ok 1 - FICTIONAL public vector pipeline shares extraction, independently judges context, aggregates once and applies atomically
+  ---
+  duration_ms: 1736.211875
+  ...
+# Subtest: corpus growth deduplicates intrinsic sections while keeping all repeated physical obligations unaccepted
+ok 2 - corpus growth deduplicates intrinsic sections while keeping all repeated physical obligations unaccepted
+  ---
+  duration_ms: 80.556042
+  ...
+# {"fictional_only":true,"one":{"intrinsic_batches":1,"shared_body_sections":1,"physical_occurrences":8},"ten":{"intrinsic_batches":1,"shared_body_sections":1,"physical_occurrences":26},"semantic_acceptance":false}
+# Subtest: corpus retains external named handover originals and refuses missing closure
+ok 3 - corpus retains external named handover originals and refuses missing closure
+  ---
+  duration_ms: 47.918625
+  ...
+# Subtest: FICTIONAL corpus application exposes explicit operating integration hold, never a borrowed scoped receipt
+ok 4 - FICTIONAL corpus application exposes explicit operating integration hold, never a borrowed scoped receipt
+  ---
+  duration_ms: 1834.200417
+  ...
+# Subtest: semantic selections complete canonical source apply with bounded independent local packets
+ok 5 - semantic selections complete canonical source apply with bounded independent local packets
+  ---
+  duration_ms: 12559.163666
+  ...
+# {"fictional_only":true,"workload":{"protocol":"scoped-context-v1","partitioner":"coherent-corpus-body-v1","source":{"id":"old","revision":1,"sha256":"6be63f44288d42ab3675f96a345ec25cb48d209895267518611987ecf452ca0c"},"extraction_identity":"1cc274cf3c52921b0bdafada6d641dcc6adf8e05b6391edd968c58b82faa5623","physical_occurrences":11,"extraction":[{"id":"body-batch-0","body_bytes":615},{"id":"body-batch-1","body_bytes":719},{"id":"body-batch-2","body_bytes":717},{"id":"body-batch-3","body_bytes":874},{"id":"body-batch-4","body_bytes":1108},{"id":"body-batch-5","body_bytes":1108},{"id":"body-batch-6","body_bytes":5480},{"id":"body-batch-7","body_bytes":2115}],"selections":[{"id":"global","physical_occurrences":3,"incident_selection_ids":["global"],"intrinsic_batches":["body-batch-3","body-batch-7"],"context_bytes":4385,"domain_request_lower_bound":7374,"interface_request_lower_bound":7374},{"id":"A","physical_occurrences":6,"incident_selection_ids":["global","A"],"intrinsic_batches":["body-batch-0","body-batch-1","body-batch-3","body-batch-4","body-batch-7"],"context_bytes":6111,"domain_request_lower_bound":11542,"interface_request_lower_bound":11542},{"id":"B","physical_occurrences":6,"incident_selection_ids":["global","B"],"intrinsic_batches":["body-batch-0","body-batch-2","body-batch-3","body-batch-5","body-batch-7"],"context_bytes":6109,"domain_request_lower_bound":11538,"interface_request_lower_bound":11538},{"id":"archive","physical_occurrences":5,"incident_selection_ids":["global","archive"],"intrinsic_batches":["body-batch-3","body-batch-6","body-batch-7"],"context_bytes":9875,"domain_request_lower_bound":18344,"interface_request_lower_bound":18344}],"planned_domain_requests":4,"planned_interface_requests":4,"whole_corpus_integration_requests":1,"review_formula":"E+D+I+1","total_selected_source_requests_lower_bound":17,"input_limit_bytes":48000,"complete_request_bytes":null,"excluded_from_lower_bound":["instructions","canonical extraction results","native receipt framing","current homes and dependencies","current global rules","integration summaries"],"status":"unaccepted proposal","frontier_complete":false,"semantic_acceptance":false,"complete_native_fit":null,"native_context_fit":"unproven","retrieval_only":true}}
+# {"fictional_only":true,"domain_packet_bytes":[35028,59935,59929,57533],"interface_packet_bytes":[179007,187198,187194,191274],"semantic_acceptance":false}
+# Subtest: declared distant incident peer cannot be omitted by proposed local scope
+ok 6 - declared distant incident peer cannot be omitted by proposed local scope
+  ---
+  duration_ms: 685.737958
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 17024.940667

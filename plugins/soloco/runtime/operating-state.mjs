@@ -3,7 +3,7 @@ import {producerClosure} from './scoped-context.mjs';
 import {hasSnapshotReferences,snapshotReference,snapshotEntryReference,resolveSnapshot,resolveSnapshotEntry,legacyHandoverSource} from './snapshot.mjs';
 import {buildEvidence,readEvidence,validateSemanticDelivery} from './upgrade-evidence.mjs';
 import {digest,id,stamp} from './store.mjs';
-import {reviewedContext,recordReference,contextSource,currentExtensions,proofJobSafe} from './current-state.mjs';
+import {reviewedContext,recordReference,contextSource,currentExtensions,proofJobSafe,rejectedJobIdentities,companySnapshotContainer} from './current-state.mjs';
 import {mechanicalOperatingControl} from './operating-control.mjs';
 const sha=v=>digest(JSON.stringify(v));
 export const OPERATING_PROTOCOL='operating-state-v1';
@@ -29,7 +29,7 @@ function representedCurrent(s,id,projection=reviewedContext(s)){
   if(id.startsWith('upgrade:')&&source?.status!=='recovered')return null;
   const c=projection.classifications.get(id);
   if(c?.disposition!=='represented'||!projection.excluded(id))return null;
-  const scoped=c.scoped_qualification;
+  const scoped=c.scoped_qualification??c.corpus_qualification;
   const plan=s.records?.[c.plan?.id],v=plan?.context_classification_plan;
   if(!scoped&&(!hasSnapshotReferences(source)&&!id.startsWith('upgrade:')||v?.version!==2||c.qualification?.protocol!==2||s.jobs?.[s.records?.[c.review.id]?.job_id]?.context_format!==4))return null;
   const p=scoped?{counterparts:scoped.homes}:v;
@@ -183,8 +183,15 @@ function publicationEvidence(s,homes){
     if(seen.has(ref.id))return;seen.add(ref.id);
     const accepted=representedCurrent(s,ref.id,projection);
     if(accepted){
-      const {c,p,scoped}=accepted,review=exact(s,c.review),job=s.jobs[review.job_id];
-      const proof=scoped?[c.source,c.plan,...scoped.receipts.flatMap(r=>[r.review,r.job,r.target]),...scoped.receipts.map(r=>exact(s,r.target).scoped_context_target.plan)]:[c.source,c.plan,c.review,recordReference(job,'job:'+job.id),...(c.qualification.legacy_dependencies??[])];
+      // SCOPED references identify resolved originals. Retain the independent
+      // stored-envelope binding too; never compare an original hash to its
+      // immutable-entry wrapper or discard the wrapper from the proof closure.
+      const {c,p,scoped}=accepted,corpus=c.corpus_qualification;
+      const stored=r=>{const raw=contextSource(s,r.id),resolved=resolveSnapshotEntry(s,raw);if(!resolved||!same(recordReference(resolved,r.id),r))fail('scoped original changed: '+r.id);return recordReference(raw,r.id);};
+      const readScoped=r=>resolveSnapshotEntry(s,exact(s,stored(r)));
+      const review=scoped?readScoped(c.review):exact(s,c.review),job=s.jobs[review.job_id];
+      const resolvedProof=scoped?[c.source,c.plan,...(corpus?corpus.claim.sources.map(x=>x.source):[]),...scoped.receipts.flatMap(r=>[r.review,r.job,r.target]),...scoped.receipts.map(r=>readScoped(r.target).scoped_context_target.plan)]:null;
+      const proof=scoped?resolvedProof.map(stored):[c.source,c.plan,c.review,recordReference(job,'job:'+job.id),...(c.qualification.legacy_dependencies??[])];
       // Resolve originals before collecting canonical producer edges. Explicit
       // source lists intentionally leave producer_dependencies empty.
       const producers=new Map();
@@ -194,8 +201,8 @@ function publicationEvidence(s,homes){
       classifications.set(ref.id,c);
       // Full canonical semantic judgments are current evidence; extraction raw
       // bundles and frozen proof plans remain exact retrievable originals.
-      const judgments=scoped?scoped.receipts.map(r=>{const record=exact(s,r.review),target=exact(s,r.target).scoped_context_target;return {review:r.review,job:exact(s,r.job),target:r.target,phase:target.phase,result:record.qualification_result};}):undefined;
-      if(!accepted_semantics.some(x=>x.source.id===ref.id))accepted_semantics.push({source:ref,classification:c,...(scoped?{judgments}:{coverage:p.coverage,review,job}),counterparts:p.counterparts,producer_refs:[...producers.values()],author_identities:[...new Set(originals.flatMap(r=>[...originalIdentities(s,exact(s,r))]))].sort(),exact_originals:originals,retrieval:'company_context read with exact ID/hash; referenced snapshots remain in the immutable vault'});
+      const judgments=scoped?scoped.receipts.map(r=>{const record=readScoped(r.review),target=readScoped(r.target).scoped_context_target;return {review:stored(r.review),job:readScoped(r.job),target:stored(r.target),phase:target.phase,result:record.qualification_result};}):undefined;
+      if(!accepted_semantics.some(x=>corpus?x.corpus_integration?.id===corpus.integration.id:x.source.id===ref.id))accepted_semantics.push({source:ref,classification:c,...(corpus?{corpus_integration:corpus.integration,source_mappings:corpus.source_mappings,source_set:corpus.selected_source_ids}:{}),...(scoped?{judgments,resolved_originals:resolvedProof}:{coverage:p.coverage,review,job}),counterparts:p.counterparts,producer_refs:[...producers.values()],author_identities:[...new Set(originals.flatMap(r=>[...originalIdentities(s,exact(s,r))]))].sort(),exact_originals:originals,retrieval:'company_context read with exact ID/hash; referenced snapshots remain in the immutable vault'});
       return;
     }
     // These legacy containers require their existing qualification/streaming
@@ -280,25 +287,35 @@ export function validateOperatingDelivery(s,j){
   return true;
 }
 function originalProducers(s,value){
-  const refs=new Map(),todo=[value],seen=new Set(),snapshots=new Set();
-  while(todo.length){const v=todo.pop();if(!v||typeof v!=='object'||seen.has(v))continue;seen.add(v);
-    const legacy=legacyHandoverSource(s,v);if(legacy){todo.push(legacy);continue;}
+  const refs=new Map(),todo=[{value,record:true}],seen=new Map(),snapshots=new Set();
+  while(todo.length){const {value:v,record}=todo.pop();if(!v||typeof v!=='object'||seen.has(v)&&(seen.get(v)||!record))continue;seen.set(v,record||seen.get(v));
+    const legacy=legacyHandoverSource(s,v);if(legacy){todo.push({value:legacy,record:true});continue;}
     const entry=snapshotEntryReference(v),ref=entry??snapshotReference(v);
-    if(ref){const key=entry?entry.immutable_snapshot.sha256:ref.sha256;if(!snapshots.has(key)){snapshots.add(key);todo.push(entry?resolveSnapshotEntry(s,v):resolveSnapshot(s,v));}continue;}
-    if(typeof v.id==='string'&&(v===value||Object.hasOwn(s.records??{},v.id)))for(const r of producerClosure(s,v)){exact(s,r);refs.set(r.id,r);}
-    for(const x of Object.values(v))if(x&&typeof x==='object')todo.push(x);
+    if(ref){const key=(entry?entry.immutable_snapshot.sha256:ref.sha256)+':'+record;if(!snapshots.has(key)){snapshots.add(key);todo.push({value:entry?resolveSnapshotEntry(s,v):resolveSnapshot(s,v),record});}continue;}
+    if(record&&typeof v.id==='string')for(const r of producerClosure(s,v)){exact(s,r);refs.set(r.id,r);}
+    // Only canonical company-state containment makes a nested value a record.
+    // An incidental external {id,job_id} object is evidence, not a producer edge.
+    const company=companySnapshotContainer(v);
+    for(const [key,x] of Object.entries(v))if(x&&typeof x==='object'){
+      if(company&&key==='records')for(const child of Object.values(x))todo.push({value:child,record:true});
+      else todo.push({value:x,record:false});
+    }
   }
   return [...refs.values()].sort((a,b)=>a.id.localeCompare(b.id));
 }
 function originalIdentities(s,value){
   const identities=new Set();
-  const todo=[value,...originalProducers(s,value).map(r=>exact(s,r))],seen=new Set(),snapshots=new Set();
-  while(todo.length){const v=todo.pop();if(!v||typeof v!=='object'||seen.has(v))continue;seen.add(v);
-    const legacy=legacyHandoverSource(s,v);if(legacy){todo.push(legacy);continue;}
+  const todo=[value,...originalProducers(s,value).map(r=>exact(s,r))].map(value=>({value,containedJob:false})),seen=new Map(),snapshots=new Set();
+  while(todo.length){const {value:v,containedJob}=todo.pop();if(!v||typeof v!=='object'||seen.has(v)&&(seen.get(v)||!containedJob))continue;seen.set(v,containedJob||seen.get(v));
+    const legacy=legacyHandoverSource(s,v);if(legacy){todo.push({value:legacy,containedJob});continue;}
     const entry=snapshotEntryReference(v),ref=entry??snapshotReference(v);
-    if(ref){const key=entry?entry.immutable_snapshot.sha256:ref.sha256;if(!snapshots.has(key)){snapshots.add(key);todo.push(entry?resolveSnapshotEntry(s,v):resolveSnapshot(s,v));}continue;}
-    if(v.job_id&&s.jobs[v.job_id])todo.push(s.jobs[v.job_id]);
-    for(const [k,x] of Object.entries(v)){if(['author_instance','recorded_by','session_id','native_id','instance_id','probe_native_id','reviewer_native_id'].includes(k)&&text(x))identities.add(x);if(x&&typeof x==='object')todo.push(x);}
+    if(ref){const key=(entry?entry.immutable_snapshot.sha256:ref.sha256)+':'+containedJob;if(!snapshots.has(key)){snapshots.add(key);todo.push({value:entry?resolveSnapshotEntry(s,v):resolveSnapshot(s,v),containedJob});}continue;}
+    for(const native of rejectedJobIdentities(s,v,containedJob))identities.add(native);
+    const company=companySnapshotContainer(v);
+    for(const [k,x] of Object.entries(v)){if(['author_instance','recorded_by','session_id','native_id','instance_id','probe_native_id','reviewer_native_id'].includes(k)&&text(x))identities.add(x);if(x&&typeof x==='object'){
+      if(company&&k==='jobs')for(const child of Object.values(x))todo.push({value:child,containedJob:true});
+      else todo.push({value:x,containedJob:false});
+    }}
   }
   return identities;
 }

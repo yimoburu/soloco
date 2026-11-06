@@ -43,6 +43,24 @@ function isolated(state){
   bindSnapshots(copy,sha=>raws.get(sha)?.raw);
   return {copy,raws};
 }
+// Closed JSON lexer: parsing validates grammar; tokens prove that ONLY JSON
+// whitespace and STRING escape spelling differ from the canonical candidate.
+// Duplicate keys/reordered keys cannot match the canonical ordered token list.
+function sameJsonTokens(raw,candidate){
+  function tokens(text){
+    JSON.parse(text);
+    const token=/[ \t\r\n]+|"(?:[^"\\\u0000-\u001f]|\\(?:["\\/bfnrt]|u[0-9a-fA-F]{4}))*"|-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?|true|false|null|[{}\[\],:]/y;
+    const result=[];let offset=0;
+    while(offset<text.length){
+      token.lastIndex=offset;const match=token.exec(text);if(!match)return null;
+      const value=match[0];offset=token.lastIndex;
+      if(/^[ \t\r\n]/.test(value))continue;
+      result.push(value[0]==='"'?['string',JSON.parse(value)]:['token',value]);
+    }
+    return result;
+  }
+  try{const a=tokens(raw),b=tokens(candidate);return a!==null&&b!==null&&equal(a,b);}catch{return false;}
+}
 function codec(canonical){
   const definitions=[],buckets=new Map();
   function intern(v){
@@ -51,9 +69,9 @@ function codec(canonical){
     else if(Array.isArray(v))node=['array',v.map(intern)];
     else if(typeof v==='object')node=['object',Object.entries(v).map(([k,x])=>[k,intern(x)])];
     else if(typeof v==='string'&&canonical&&v.length>32){
-      let parsed,canonicalText=false;try{parsed=JSON.parse(v);exact(parsed);canonicalText=json(parsed)===v;}catch{}
+      let parsed,text,lossless=false;try{parsed=JSON.parse(v);exact(parsed);text=json(parsed);lossless=sameJsonTokens(v,text);}catch{}
       // The tag decodes to STRING, never an operating object or instructions.
-      node=canonicalText?['json-text-string',intern(parsed)]:['string',v];
+      node=lossless?['json-text-string',intern(parsed),...(text===v?[]:[v])]:['string',v];
     }else node=[typeof v,v];
     const signature=json(node),sha=digest(signature),bucket=buckets.get(sha)??[];
     for(const i of bucket){if(json(definitions[i])!==signature)hold('definition hash collision');return i;}
@@ -73,7 +91,10 @@ function decodeGraph(definitions){
     else if(d[0]==='object'&&d.length===2&&Array.isArray(d[1])){
       value=Object.create(null);const seen=new Set();for(const edge of d[1]){if(!Array.isArray(edge)||edge.length!==2||typeof edge[0]!=='string'||seen.has(edge[0]))hold('duplicate/malformed ordered key');seen.add(edge[0]);Object.defineProperty(value,edge[0],{value:get(edge[1]),enumerable:true,writable:true,configurable:true});}
       if(!equal(Object.keys(value),d[1].map(e=>e[0])))hold('ordered key shape changed');
-    }else if(d[0]==='json-text-string'&&d.length===2)value=json(get(d[1]));
+    }else if(d[0]==='json-text-string'&&(d.length===2||d.length===3)){
+      const candidate=json(get(d[1]));value=d.length===2?candidate:d[2];
+      if(typeof value!=='string'||!sameJsonTokens(value,candidate))hold('unproven JSON STRING encoding');
+    }
     else if(['string','boolean','number'].includes(d[0])&&d.length===2&&typeof d[1]===d[0]){exact(d[1]);value=d[1];}
     else hold('unknown typed definition');
     active.delete(i);values.set(i,value);return value;
@@ -228,12 +249,16 @@ function coherentBuild(state,max_packet_bytes){
   for(let i=0;i<definitions.length;i++){
     const d=definitions[i];if(d[0]==='object'&&d[1].some(([k,v])=>k==='id'&&scalar(v)!==undefined)&&!referenceOnly(referenceValue(i)))roots.add(i);
   }
-  const collections=new Map();
+  const collections=new Map(),upgradeRoots=new Set(),stateContainers=new Set();
   // Collection membership is exact structural evidence, not a giant review
   // body. Its children remain required units, including children without IDs.
   for(let i=0;i<definitions.length;i++){
     const d=definitions[i];if(d[0]!=='object'||!d[1].some(([k])=>k==='records')||!d[1].some(([k])=>k==='jobs'))continue;
-    roots.add(i);
+    roots.add(i);stateContainers.add(i);
+    for(const [key,node] of d[1])if(key==='upgrade'||key==='upgrade_history'){
+      const members=key==='upgrade_history'&&definitions[node][0]==='array'?definitions[node][1]:key==='upgrade'?[node]:[];
+      for(const member of members)upgradeRoots.add(intern(resolveSnapshotEntry(copy,referenceValue(member))));
+    }
     for(const [key,node] of d[1])if(['records','jobs','messages','notices','upgrade_history'].includes(key)){
       const child=definitions[node],edges=child[0]==='object'?child[1]:child[0]==='array'?child[1].map((v,n)=>[String(n),v]):null;
       if(!edges)continue;
@@ -241,16 +266,19 @@ function coherentBuild(state,max_packet_bytes){
       for(const [,v] of edges)roots.add(v);
     }
   }
-  // Complete fields of canonical JSON STRING views and explicit file entries
+  // Complete fields of lossless JSON STRING views and explicit file entries
   // are logical candidates. Unknown keys stay present; text leaves are never
   // range sliced. The enclosing section retains every typed qualifier/link.
   const fieldRoots=new Set(),fieldStructures=new Set();
-  function fields(node){
+  function fields(node,upgrade=false){
     // Discover each shared structure once; physical occurrences and qualifiers
     // are still enumerated separately below. No extra recursive codec depth.
     const pending=[node];
     while(pending.length){
       const root=pending.pop(),d=definitions[root];
+      // Upgrade field discovery stops at complete state/transport boundaries;
+      // it must not turn every scalar/key in a checkpoint into a new section.
+      if(upgrade&&(stateContainers.has(root)||snapshotReference(referenceValue(root))||snapshotEntryReference(referenceValue(root))))continue;
       if(fieldStructures.has(root)||!['object','array'].includes(d[0]))continue;
       fieldStructures.add(root);roots.add(root);
       const children=d[0]==='object'?d[1].map(([,child])=>child):d[1];
@@ -264,6 +292,7 @@ function coherentBuild(state,max_packet_bytes){
     const d=definitions[i];if(d[0]==='json-text-string')fields(d[1]);
     if(d[0]==='object'&&d[1].some(([k])=>k==='path')&&d[1].some(([k])=>['content','body'].includes(k)))fields(i);
   }
+  for(const root of upgradeRoots)fields(root,true);
   const groupByRoot=new Map([...roots].sort((a,b)=>a-b).map((root,i)=>[root,'coherent-'+i]));
   const get=decodeGraph(definitions),views=new Map();
   // A section has EVERY local field. Nested complete bodies are explicit cuts,
@@ -281,7 +310,7 @@ function coherentBuild(state,max_packet_bytes){
         return Object.fromEntries(d[1].map(([k,v])=>[k,view(v,path+'/'+pointer(k))]));
       }
       if(d[0]==='array')return d[1].map((v,n)=>view(v,path+'/'+n));
-      if(d[0]==='json-text-string')return {legacy_coherent_string_encoding:'canonical-json-text',value:view(d[1],path+'/@json-text')};
+      if(d[0]==='json-text-string')return {legacy_coherent_string_encoding:d.length===2?'canonical-json-text':'lossless-json-text',value:view(d[1],path+'/@json-text')};
       return get(i);
     }
     const result={body:view(root,'',true),cuts};views.set(root,result);return result;
@@ -321,7 +350,7 @@ function coherentBuild(state,max_packet_bytes){
 function packetBase(p,o){
   // Measurements are excluded from occurrence identity to avoid self-reference.
   const {packet_bytes,fit,...occurrence}=o;
-  return {protocol:LEGACY_COHERENT_PROTOCOL,phase:'intrinsic-extraction',baseline:p.baseline,occurrence,sections:[],instructions:'Extract every local condition, exception, negative and uncertainty. Canonical JSON text remains STRING evidence. Linked sections and snapshot inbound contexts are unresolved interactions; equality never transfers acceptance. No publication or exclusion.',cross_group_status:'Held: independent applicability and interaction reconciliation required',semantic_acceptance:false};
+  return {protocol:LEGACY_COHERENT_PROTOCOL,phase:'intrinsic-extraction',baseline:p.baseline,occurrence,sections:[],instructions:'Extract every local condition, exception, negative and uncertainty. Lossless JSON text remains STRING evidence. Linked sections and snapshot inbound contexts are unresolved interactions; equality never transfers acceptance. No publication or exclusion.',cross_group_status:'Held: independent applicability and interaction reconciliation required',semantic_acceptance:false};
 }
 function coherentAdapterContract(){return {
   status:'Held',canonical_protocol:'scoped-context-v1',canonical_partitioner:'lossless-ranges-v1',
