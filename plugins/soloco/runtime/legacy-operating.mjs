@@ -241,6 +241,17 @@ function coherentBuild(state,max_packet_bytes){
       for(const [,v] of edges)roots.add(v);
     }
   }
+  // Complete fields of canonical JSON STRING views and explicit file entries
+  // are logical candidates. Unknown keys stay present; text leaves are never
+  // range sliced. The enclosing section retains every typed qualifier/link.
+  const fieldRoots=new Set();
+  function fields(node){const d=definitions[node];if(d[0]!=='object')return;
+    roots.add(node);for(const [,child] of d[1])if(['object','array','json-text-string'].includes(definitions[child][0])||definitions[child][0]==='string'&&definitions[child][1].length>1200){roots.add(child);fieldRoots.add(child);}
+  }
+  for(let i=0;i<definitions.length;i++){
+    const d=definitions[i];if(d[0]==='json-text-string')fields(d[1]);
+    if(d[0]==='object'&&d[1].some(([k])=>k==='path')&&d[1].some(([k])=>['content','body'].includes(k)))fields(i);
+  }
   const groupByRoot=new Map([...roots].sort((a,b)=>a-b).map((root,i)=>[root,'coherent-'+i]));
   const get=decodeGraph(definitions),views=new Map();
   // A section has EVERY local field. Nested complete bodies are explicit cuts,
@@ -250,7 +261,7 @@ function coherentBuild(state,max_packet_bytes){
     const cuts=[];
     function view(i,path,top=false){
       if(!top&&collections.has(i)){const c=collections.get(i);cuts.push({path,collection_id:c.id,body_root:i});return {legacy_coherent_collection:c.id};}
-      if(!top&&groupByRoot.has(i)&&['object','array'].includes(definitions[i][0])){cuts.push({path,group_id:groupByRoot.get(i),body_root:i});return {legacy_coherent_link:groupByRoot.get(i)};}
+      if(!top&&groupByRoot.has(i)&&(['object','array'].includes(definitions[i][0])||fieldRoots.has(i))){cuts.push({path,group_id:groupByRoot.get(i),body_root:i});return {legacy_coherent_link:groupByRoot.get(i)};}
       const d=definitions[i];
       if(d[0]==='object'){
         const value=get(i),r=snapshotReference(value);
@@ -360,7 +371,7 @@ export function legacyCanonicalCoverage(state,coherent,{integration_review_ids=[
 
 // Shared corpus entrypoint: capture once in the existing vault; sibling source
 // claims name that plan. No caller-supplied reduced baseline is accepted here.
-export function captureLegacyCanonicalCorpusSource(state,{source_id,selected_source_ids,corpus_plan_id,transaction}={}){
+export function captureLegacyCanonicalCorpusSource(state,{source_id,selected_source_ids,corpus_plan_id,semantic_partition,transaction}={}){
   if(!(transaction instanceof Store)||transaction.inTransaction!==true)hold('existing Store transaction required');
-  return captureScopedPlan(state,{source_id,selected_source_ids,corpus_plan_id,partitioner:CORPUS_PARTITIONER});
+  return captureScopedPlan(state,{source_id,selected_source_ids,corpus_plan_id,semantic_partition,partitioner:CORPUS_PARTITIONER});
 }

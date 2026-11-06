@@ -44,7 +44,7 @@ function contractReview(p){
   }else if(p.phase==='applicability'){
     const all=p.extractions.flatMap(e=>e.items.map(item=>({key:e.review.id+'/'+item.id,item}))).filter(i=>p.item_keys.includes(i.key));
     r.summary='FICTIONAL ADAPTER: all fixture occurrences and inbound contexts reconciled; all restrictions remain OPEN.';
-    r.mappings=all.map(({key})=>({item:key,status:'represented',homes:p.homes.map(h=>h.source.id),reason:'Fictional complete source conditions preserved, with all occurrence differences and OPEN restrictions.'}));
+    r.mappings=all.map(({key})=>({item:key,...(p.mapping_selection_ids?{selection_ids:p.mapping_selection_ids}:{}),status:'represented',homes:p.homes.map(h=>h.source.id),reason:'Fictional complete source conditions preserved, with all occurrence differences and OPEN restrictions.'}));
     r.interfaces=p.interface_keys.length?[]:all.flatMap(({key,item})=>item.interfaces.map(i=>({key:key+'/'+i.id,item:key,scope:item.scope,...i})));
     r.reviewed_interfaces=p.interface_keys;
     if(JSON.stringify(p.extractions).includes('LATE_NO_EXPORT')&&!p.homes.some(h=>h.value.content.includes('LATE_NO_EXPORT'))){r.verdict='Blocked';r.permitted_action='hold';r.reason='Fictional late qualifier missing from current home';r.blockers=[r.reason];}
@@ -216,4 +216,62 @@ test('FICTIONAL public SCOPED corpus accepted semantics publish current homes an
    mutate(f,s=>{Object.assign(s,structuredClone(baseline));change(s);});assert.throws(()=>operatingContext(read(f)),/Held|hold|changed|membership|closure|negative/i);
   }
  }
+
+});
+
+// Selection tests remain fictional contracts, never model-authored acceptance.
+async function semanticFixture(){
+  const {buildLegacyCoherentPlan}=await import('../plugins/soloco/runtime/legacy-operating.mjs');
+  const f=fixture({domains:3});
+  mutate(f,s=>{delete s.records[f.plan_id];
+    s.records.old={id:'old',revision:1,kind:'artifact',content:'GLOBAL: no execution; exact v0.18 gate remains.',locals:[
+      {id:'local-a',ancestor:'ALLOW only after consent',body:{id:'shared',content:'SAME_BODY remains OPEN'}},
+      {id:'local-b',ancestor:'DENY even with consent',body:{id:'shared',content:'SAME_BODY remains OPEN'}}]};
+    s.records.archive={id:'archive',revision:1,kind:'artifact',content:'UNRELATED_ARCHIVE '+('archive evidence '.repeat(250))};
+    s.records.late={id:'late',revision:1,kind:'decision',unknown_qualifier:'LATE_NO_EXPORT global prohibition'};
+    for(const h of ['home-D00','home-D01','home-D02'])s.records[h].content='GLOBAL: no execution; LATE_NO_EXPORT; SAME_BODY remains OPEN; ALLOW only after consent; DENY even with consent; archive retained.';
+  });
+  const material=buildLegacyCoherentPlan(read(f));
+  const selections=['global','A','B','archive'].map(id=>({id,scope:id==='global'?'*':id,occurrence_ids:[],incident_ids:[]}));
+  for(const o of material.occurrences){const key=o.path.startsWith('/records/old/locals/0')||o.path.startsWith('/records/home-D00')?'A':o.path.startsWith('/records/old/locals/1')||o.path.startsWith('/records/home-D01')?'B':o.path.startsWith('/records/archive')||o.path.startsWith('/records/home-D02')?'archive':'global';selections.find(q=>q.id===key).occurrence_ids.push(o.id);}
+  const partition={plan_sha256:material.plan_sha256,selections};
+  const p=call(f,{action:'plan',protocol,partitioner:scoped.CORPUS_PARTITIONER,source_id:'old',selected_source_ids:['old'],semantic_partition:partition});f.plan_id=p.id;
+  return {f,partition,material};
+}
+test('semantic selections complete canonical source apply with bounded independent local packets',async t=>{
+  const {f,partition,material}=await semanticFixture(),before=JSON.stringify(read(f));
+  const workload=await publicCall('company_context',{root:f.root,session_id:f.session_id,action:'inspect',plan_id:f.plan_id,section:'workload'},'codex');
+  assert.equal(JSON.stringify(read(f)),before);assert.equal(workload.semantic_acceptance,false);assert.equal(workload.selections.length,4);
+  t.diagnostic(JSON.stringify({fictional_only:true,workload}));
+  const a=workload.selections.find(q=>q.id==='A');assert.ok(!a.incident_selection_ids.includes('archive'));
+  const es=await extracts(f),byUnit=new Map(es.map(e=>[e.target.target.unit_id,e]));
+  const ds=[],irs=[];
+  for(const selection of workload.selections){
+    const args={phase:'applicability',selection_ids:[selection.id],extraction_review_ids:selection.intrinsic_batches.map(id=>byUnit.get(id).review.id),counterpart_ids:[selection.id==='B'?'home-D01':selection.id==='archive'?'home-D02':'home-D00'],context_scope:'*'};
+    if(selection.id==='A')await assert.rejects(run(f,{...args,extraction_review_ids:args.extraction_review_ids.slice(1)}),/missing complete body extraction/);
+    const d=await run(f,args);assert.equal(d.job.status,'completed',d.job.error);ds.push(d);
+    const homes=[...new Set([...(args.counterpart_ids),...selection.incident_selection_ids.map(id=>id==='B'?'home-D01':id==='archive'?'home-D02':'home-D00')])];
+    const ir=await run(f,{...args,counterpart_ids:homes,interface_keys:d.review.qualification_result.interfaces.map(i=>i.key)});assert.equal(ir.job.status,'completed',ir.job.error);irs.push(ir);
+    if(selection.id==='A'){assert.ok(!JSON.stringify(d.packet).includes('UNRELATED_ARCHIVE'));assert.ok(JSON.stringify(d.packet).includes('LATE_NO_EXPORT'));assert.ok(JSON.stringify(d.packet).includes('ALLOW only after consent'));assert.ok(!JSON.stringify(d.packet).includes('DENY even with consent')||JSON.stringify(d.packet.homes).includes('DENY even with consent'));}
+    assert.ok(bytes(d.packet)<48000);assert.ok(bytes(ir.packet)<48000);
+  }
+  t.diagnostic(JSON.stringify({fictional_only:true,domain_packet_bytes:ds.map(d=>bytes(d.packet)),interface_packet_bytes:irs.map(d=>bytes(d.packet)),semantic_acceptance:false}));
+  const integrationArgs={phase:'integration',domain_review_ids:ds.map(d=>d.review.id),interface_review_ids:irs.map(d=>d.review.id),counterpart_ids:['home-D00','home-D01','home-D02']};
+  await assert.rejects(run(f,{...integrationArgs,interface_review_ids:irs.slice(1).map(d=>d.review.id)}),/interface coverage/);
+  const i=await run(f,integrationArgs);assert.equal(i.job.status,'completed',i.job.error);
+  assert.equal(scoped.validateScopedApply(read(f),{integration_review_id:i.review.id}).source.id,'old');
+  const original=read(f);
+  for(const edit of [s=>s.records.late.unknown_qualifier='new prohibition',s=>{delete s.records.late;},s=>{s.records.old.locals[0].body.content='changed physical body';},s=>s.records['home-D00'].context_obligations.scope='changed',s=>s.records.old.locals.pop(),s=>{s.records.new={id:'new',revision:1,content:'unknown neighbor'};},s=>{s.jobs[irs[0].job.id].coordination_release.termination_confirmed=false;},s=>{s.records[irs[0].review.id].author_instance='historical-producer';},s=>{delete s.records[irs[0].review.id];}]){const bad=inheritSnapshots(original,structuredClone(original));edit(bad);assert.throws(()=>scoped.validateScopedApply(bad,{integration_review_id:i.review.id}),/hold|changed|missing/i);}
+  const {decodeLegacyCoherentPlan}=await import('../plugins/soloco/runtime/legacy-operating.mjs');assert.equal(sha(decodeLegacyCoherentPlan(material).state),material.baseline.state_sha256);
+  for(const edit of [p=>p.selections[0].occurrence_ids.pop(),p=>p.selections[1].incident_ids.push('B')]){const bad=structuredClone(partition);edit(bad);assert.throws(()=>scoped.validateCorpusPartition(material,bad),/occurrence|incident/);}
+  assert.equal((await publicCall('company_context',{root:f.root,session_id:f.session_id,epoch:f.epoch,source_instruction:f.source_instruction,action:'apply',integration_review_id:i.review.id},'codex')).applied,true);
+  const denied=await run(f,{phase:'applicability',selection_ids:['A'],extraction_review_ids:a.intrinsic_batches.map(id=>byUnit.get(id).review.id),counterpart_ids:['home-D00'],context_scope:'*'},{review:p=>{const e=contractReview(p),r=e.qualification_result;r.verdict='Blocked';r.permitted_action='hold';r.reason='FICTIONAL unresolved distant prohibition';r.blockers=[r.reason];return envelope(r);}});
+  assert.equal(denied.review.review.verdict,'Blocked');assert.throws(()=>scoped.validateScopedApply(read(f),{integration_review_id:i.review.id}),/negative|governing/);
+});
+
+test('declared distant incident peer cannot be omitted by proposed local scope',async()=>{
+  const {f}=await semanticFixture();
+  const workload=scoped.inspectCorpusWorkload(read(f),{plan_id:f.plan_id}),a=workload.selections.find(q=>q.id==='A'),es=[];
+  for(const u of unitPages(f)){const e=await run(f,{phase:'extract',unit_id:u.id},{review:p=>{const e=contractReview(p);if(JSON.stringify(p.reviewed_unit_bundle.primary).includes('ALLOW only after consent'))e.qualification_result.items[0].interfaces.push({id:'distant-peer',with_scope:'B',text:'Explicit interaction with B must be independently reconciled.'});return e;}});assert.equal(e.job.status,'completed',e.job.error);es.push(e);}
+  await assert.rejects(run(f,{phase:'applicability',selection_ids:['A'],extraction_review_ids:es.filter(e=>a.intrinsic_batches.includes(e.target.target.unit_id)).map(e=>e.review.id),counterpart_ids:['home-D00'],context_scope:'*'}),/omitted declared incident peer/);
 });

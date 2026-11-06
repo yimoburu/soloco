@@ -119,3 +119,15 @@ test('strict reference metadata remains in its parent section without independen
  const q=build(s);assert.ok(q.sources.some(r=>r.source.id==='untrusted'&&r.group_id));
  assert.ok(q.occurrences.some(o=>o.path==='/records/untrusted'));
 });
+
+test('complete JSON fields and file bodies cut at typed boundaries; indivisible strings still hold',()=>{
+  const s=fixture(),payload={first:'a'.repeat(9000),unknown_last_field:'DENY '+('b'.repeat(9000)),nested:{condition:'OPEN'}};
+  s.records.a.content=JSON.stringify(payload);s.records.a.files=[{path:'example.txt',content:'indivisible '.repeat(5000),unknown_qualifier:'No execution'}];
+  const before=JSON.stringify(s),p=build(s),decoded=decode(p);
+  assert.equal(JSON.stringify(decoded.state),before);assert.equal(typeof decoded.state.records.a.content,'string');
+  const fields=p.groups.find(g=>g.section.cuts.some(c=>c.path==='/first'));
+  assert.ok(fields);assert.ok(fields.section.cuts.some(c=>c.path==='/unknown_last_field'));
+  assert.ok(p.groups.some(g=>g.section.body===payload.unknown_last_field));
+  assert.ok(p.groups.some(g=>g.section.body?.unknown_qualifier==='No execution'));
+  assert.ok(p.occurrences.some(o=>o.fit==='Held'));assert.equal(p.semantic_acceptance,false);
+});
