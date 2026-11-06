@@ -118,7 +118,7 @@ function inputReferences(value) {
 
 function modelCatalog(value) {
   const modelKeys = ['id', 'name', 'description', 'supported_efforts', 'effort_support', 'default_effort',
-    'is_default', 'serviceTiers', 'additionalSpeedTiers'];
+    'is_default', 'serviceTiers', 'additionalSpeedTiers', 'defaultServiceTier'];
   const speedKeys = ['host_default', 'fast_disabled', 'evidence', 'default_service_tier', 'default_speed', 'paid_tiers_enabled'];
   return exactKeys(value, ['source', 'model', 'speed_support'], ['source', 'model'])
     && value.source === 'host_catalog' && exactKeys(value.model, modelKeys, ['id'])
