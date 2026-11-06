@@ -1,0 +1,96 @@
+TAP version 13
+# (node:91456) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: public handover, independent publication, full v4 worker review, resume and first ordinary format6 Engineering return
+ok 1 - public handover, independent publication, full v4 worker review, resume and first ordinary format6 Engineering return
+  ---
+  duration_ms: 540.180209
+  ...
+# Subtest: only exact pure runtime commands are mechanically ingested; conditions, unknown fields and generic saves stay held
+ok 2 - only exact pure runtime commands are mechanically ingested; conditions, unknown fields and generic saves stay held
+  ---
+  duration_ms: 256.382916
+  ...
+# Subtest: actual conditional handover retains founder conditions and unknown legacy remains held on first pass
+ok 3 - actual conditional handover retains founder conditions and unknown legacy remains held on first pass
+  ---
+  duration_ms: 131.449083
+  ...
+# (node:91457) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: public paused tree workflow captures originals, pages topology, observes spawn and applies canonical worker proof
+ok 4 - public paused tree workflow captures originals, pages topology, observes spawn and applies canonical worker proof
+  ---
+  duration_ms: 486.14275
+  ...
+# Subtest: public maintenance is fenced by new founder pause, revocation and queued cancellation
+ok 5 - public maintenance is fenced by new founder pause, revocation and queued cancellation
+  ---
+  duration_ms: 171.58
+  ...
+# Subtest: new tree capture on legacy storage holds atomically until explicit migration
+ok 6 - new tree capture on legacy storage holds atomically until explicit migration
+  ---
+  duration_ms: 28.991
+  ...
+# Subtest: actual in-flight maintenance worker rejects late output after founder pause, revoke or cancellation
+ok 7 - actual in-flight maintenance worker rejects late output after founder pause, revoke or cancellation
+  ---
+  duration_ms: 277.435125
+  ...
+# Subtest: supported paused schema-1 storage migration is explicit, owner fenced and preserves exact logical state
+ok 8 - supported paused schema-1 storage migration is explicit, owner fenced and preserves exact logical state
+  ---
+  duration_ms: 20.215917
+  ...
+# Subtest: public qualification originals and payload ranges adapt to escaped reply budgets without mutation receipts
+ok 9 - public qualification originals and payload ranges adapt to escaped reply budgets without mutation receipts
+  ---
+  duration_ms: 173.889833
+  ...
+# Subtest: public fresh profile binds immutable capsule, persists dense worker results and still requires independent handover
+ok 10 - public fresh profile binds immutable capsule, persists dense worker results and still requires independent handover
+  ---
+  duration_ms: 617.057667
+  ...
+# (node:91461) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: public represented v2 schema is strict and legacy/default protocols remain unchanged
+ok 11 - public represented v2 schema is strict and legacy/default protocols remain unchanged
+  ---
+  duration_ms: 139.542334
+  ...
+# Subtest: public plan, real worker complete format4 reads and public apply retain canonical current qualification and exact homes
+ok 12 - public plan, real worker complete format4 reads and public apply retain canonical current qualification and exact homes
+  ---
+  duration_ms: 1536.116917
+  ...
+# Subtest: real worker rejects incomplete semantic delivery and coordinator native identity
+ok 13 - real worker rejects incomplete semantic delivery and coordinator native identity
+  ---
+  duration_ms: 59.903583
+  ...
+# Subtest: pending paused handover permits only explicitly scoped owner-bound represented preservation QA
+ok 14 - pending paused handover permits only explicitly scoped owner-bound represented preservation QA
+  ---
+  duration_ms: 148.296458
+  ...
+# Subtest: represented maintenance is fenced by subsequent pause, revocation, changed source and owner transfer
+ok 15 - represented maintenance is fenced by subsequent pause, revocation, changed source and owner transfer
+  ---
+  duration_ms: 195.139958
+  ...
+# Subtest: public represented source includes canonical runtime test author_instance and exact producer homes
+ok 16 - public represented source includes canonical runtime test author_instance and exact producer homes
+  ---
+  duration_ms: 54.015
+  ...
+1..16
+# tests 16
+# suites 0
+# pass 16
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2235.646583

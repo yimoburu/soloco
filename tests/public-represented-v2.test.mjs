@@ -96,6 +96,35 @@ test('real worker rejects incomplete semantic delivery and coordinator native id
  }
 });
 
+function pendingFixture(){
+ const old=fixture(),f={...old,session_id:'fictional-incoming-maintenance',epoch:2};
+ engine.control({root:old.root,session_id:old.session_id,expected_epoch:1,action:'pause',source_instruction:'pause'},'codex');engine.storageControl({...old,action:'migrate',source_instruction:'Migrate this fictional storage fixture only.'},'codex');
+ engine.bind(f.root,f.session_id,'codex');engine.control({root:f.root,session_id:f.session_id,expected_epoch:1,action:'handover',source_instruction:'handover'},'codex');
+ assert.equal(read(f).paused,true);assert.equal(read(f).handover.status,'pending');return f;
+}
+const maintenancePlan=(f,maintenance=true)=>api(f,{action:'plan',record_ids:['old'],disposition:'represented',counterpart_ids:['home'],coverage,maintenance,source_instruction:'Explicit fictional read-only preservation review for this exact source and current owner; no ordinary work or execution authority.'});
+test('pending paused handover permits only explicitly scoped owner-bound represented preservation QA',async()=>{
+ const f=pendingFixture(),without=await maintenancePlan(f,false),dispatch=(id,extra={})=>engine.dispatch({...f,role:'qa',review_of:id,task:'Read-only exact preservation',...extra},'codex',launch);
+ assert.throws(()=>dispatch(without.id),/paused/);const p=await maintenancePlan(f);
+ assert.throws(()=>dispatch(p.id,{role:'engineer'}),/paused/);assert.throws(()=>dispatch(p.id,{input_ids:['old']}),/paused/);assert.throws(()=>dispatch(p.id,{evidence_ids:['old']}),/paused/);
+ const q=dispatch(p.id),out=await review(f,{p,q});assert.equal(out.job.status,'completed',out.job.error);
+ assert.equal((await api(f,{action:'apply',plan_id:p.id,review_id:out.job.artifact_id})).applied,true);
+ const s=read(f);assert.equal(s.paused,true);assert.equal(s.handover.status,'pending');assert.equal(s.owner.epoch,2);assert.equal(classificationFor(s,s.records.old).disposition,'represented');
+ assert.throws(()=>engine.dispatch({...f,role:'engineer',task:'Ordinary work is still paused'},'codex',launch),/paused/);
+});
+test('represented maintenance is fenced by subsequent pause, revocation, changed source and owner transfer',async()=>{
+ for(const mode of ['pause','revoke','source','owner']){
+  let f=pendingFixture();const p=await maintenancePlan(f);
+  if(mode==='pause')engine.control({root:f.root,session_id:f.session_id,expected_epoch:2,action:'pause',source_instruction:'pause'},'codex');
+  if(mode==='revoke')assert.equal((await api(f,{action:'revoke',plan_id:p.id,source_instruction:'Revoke this exact fictional maintenance.'})).revoked,true);
+  // Adversarial fixture mutation: the normal save API already prevents a new
+  // coordinator from rewriting the previous author's immutable proposal.
+  if(mode==='source')mutate(f,s=>{s.records.old.content='Changed unresolved restriction.';s.records.old.revision++;});
+  if(mode==='owner'){const next={...f,session_id:'fictional-next-maintenance',epoch:3};engine.bind(next.root,next.session_id,'codex');engine.control({root:next.root,session_id:next.session_id,expected_epoch:2,action:'handover',source_instruction:'handover'},'codex');f=next;}
+  assert.throws(()=>engine.dispatch({...f,role:'qa',review_of:p.id,task:'Stale preservation grant'},'codex',launch),/paused|source changed/);assert.equal(read(f).paused,true);
+ }
+});
+
 test('public represented source includes canonical runtime test author_instance and exact producer homes',async()=>{
  const f=fixture();
  // Source fixture only: canonical executeDevelopmentTest attribution uses

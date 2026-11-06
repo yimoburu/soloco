@@ -1,0 +1,46 @@
+(node:88593) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ public handover, independent publication, full v4 worker review, resume and first ordinary format6 Engineering return (1851.455709ms)
+✔ only exact pure runtime commands are mechanically ingested; conditions, unknown fields and generic saves stay held (394.450416ms)
+✔ actual conditional handover retains founder conditions and unknown legacy remains held on first pass (284.130584ms)
+(node:88594) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ public paused tree workflow captures originals, pages topology, observes spawn and applies canonical worker proof (1619.783ms)
+✔ public maintenance is fenced by new founder pause, revocation and queued cancellation (327.958458ms)
+✔ new tree capture on legacy storage holds atomically until explicit migration (68.986209ms)
+✔ actual in-flight maintenance worker rejects late output after founder pause, revoke or cancellation (441.019584ms)
+✔ supported paused schema-1 storage migration is explicit, owner fenced and preserves exact logical state (91.601666ms)
+✔ public qualification originals and payload ranges adapt to escaped reply budgets without mutation receipts (414.374042ms)
+✔ public fresh profile binds immutable capsule, persists dense worker results and still requires independent handover (1609.475625ms)
+(node:88595) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ public represented v2 schema is strict and legacy/default protocols remain unchanged (924.478792ms)
+✔ public plan, real worker complete format4 reads and public apply retain canonical current qualification and exact homes (2683.590625ms)
+✔ real worker rejects incomplete semantic delivery and coordinator native identity (120.562083ms)
+✔ pending paused handover permits only explicitly scoped owner-bound represented preservation QA (387.970041ms)
+✖ represented maintenance is fenced by subsequent pause, revocation, changed source and owner transfer (321.251917ms)
+✔ public represented source includes canonical runtime test author_instance and exact producer homes (108.090625ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 15
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4756.13825
+
+✖ failing tests:
+
+test at tests/public-represented-v2.test.mjs:115:1
+✖ represented maintenance is fenced by subsequent pause, revocation, changed source and owner transfer (321.251917ms)
+  Error: Record owner or version conflict; create a new proposal instead
+      at update.rootKeys (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:244:107)
+      at mutate (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:104)
+      at Store.selectedTransaction (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/store.mjs:152:20)
+      at file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:203
+      at withStore (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+      at update (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+      at Module.save (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:239:15)
+      at TestContext.<anonymous> (file:///private/tmp/soloco-operating-state-20261106/source/tests/public-represented-v2.test.mjs:120:29)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1113:7)

@@ -1,0 +1,111 @@
+TAP version 13
+# (node:88601) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: public handover, independent publication, full v4 worker review, resume and first ordinary format6 Engineering return
+ok 1 - public handover, independent publication, full v4 worker review, resume and first ordinary format6 Engineering return
+  ---
+  duration_ms: 1240.256791
+  ...
+# Subtest: only exact pure runtime commands are mechanically ingested; conditions, unknown fields and generic saves stay held
+ok 2 - only exact pure runtime commands are mechanically ingested; conditions, unknown fields and generic saves stay held
+  ---
+  duration_ms: 539.006167
+  ...
+# Subtest: actual conditional handover retains founder conditions and unknown legacy remains held on first pass
+ok 3 - actual conditional handover retains founder conditions and unknown legacy remains held on first pass
+  ---
+  duration_ms: 155.850625
+  ...
+# (node:88604) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: public paused tree workflow captures originals, pages topology, observes spawn and applies canonical worker proof
+ok 4 - public paused tree workflow captures originals, pages topology, observes spawn and applies canonical worker proof
+  ---
+  duration_ms: 1111.4895
+  ...
+# Subtest: public maintenance is fenced by new founder pause, revocation and queued cancellation
+ok 5 - public maintenance is fenced by new founder pause, revocation and queued cancellation
+  ---
+  duration_ms: 352.5005
+  ...
+# Subtest: new tree capture on legacy storage holds atomically until explicit migration
+ok 6 - new tree capture on legacy storage holds atomically until explicit migration
+  ---
+  duration_ms: 32.79825
+  ...
+# Subtest: actual in-flight maintenance worker rejects late output after founder pause, revoke or cancellation
+ok 7 - actual in-flight maintenance worker rejects late output after founder pause, revoke or cancellation
+  ---
+  duration_ms: 530.824958
+  ...
+# Subtest: supported paused schema-1 storage migration is explicit, owner fenced and preserves exact logical state
+ok 8 - supported paused schema-1 storage migration is explicit, owner fenced and preserves exact logical state
+  ---
+  duration_ms: 75.851833
+  ...
+# Subtest: public qualification originals and payload ranges adapt to escaped reply budgets without mutation receipts
+ok 9 - public qualification originals and payload ranges adapt to escaped reply budgets without mutation receipts
+  ---
+  duration_ms: 422.220584
+  ...
+# Subtest: public fresh profile binds immutable capsule, persists dense worker results and still requires independent handover
+ok 10 - public fresh profile binds immutable capsule, persists dense worker results and still requires independent handover
+  ---
+  duration_ms: 1475.412
+  ...
+# (node:88605) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: public represented v2 schema is strict and legacy/default protocols remain unchanged
+ok 11 - public represented v2 schema is strict and legacy/default protocols remain unchanged
+  ---
+  duration_ms: 310.390041
+  ...
+# Subtest: public plan, real worker complete format4 reads and public apply retain canonical current qualification and exact homes
+ok 12 - public plan, real worker complete format4 reads and public apply retain canonical current qualification and exact homes
+  ---
+  duration_ms: 3616.364958
+  ...
+# Subtest: real worker rejects incomplete semantic delivery and coordinator native identity
+ok 13 - real worker rejects incomplete semantic delivery and coordinator native identity
+  ---
+  duration_ms: 115.691583
+  ...
+# Subtest: pending paused handover permits only explicitly scoped owner-bound represented preservation QA
+ok 14 - pending paused handover permits only explicitly scoped owner-bound represented preservation QA
+  ---
+  duration_ms: 355.229834
+  ...
+# Subtest: represented maintenance is fenced by subsequent pause, revocation, changed source and owner transfer
+not ok 15 - represented maintenance is fenced by subsequent pause, revocation, changed source and owner transfer
+  ---
+  duration_ms: 235.899667
+  location: '/private/tmp/soloco-operating-state-20261106/source/tests/public-represented-v2.test.mjs:115:1'
+  failureType: 'testCodeFailure'
+  error: 'Record owner or version conflict; create a new proposal instead'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    update.rootKeys (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:244:107)
+    mutate (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:104)
+    Store.selectedTransaction (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/store.mjs:152:20)
+    file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:203
+    withStore (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+    update (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+    Module.save (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:239:15)
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-state-20261106/source/tests/public-represented-v2.test.mjs:120:29)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: public represented source includes canonical runtime test author_instance and exact producer homes
+ok 16 - public represented source includes canonical runtime test author_instance and exact producer homes
+  ---
+  duration_ms: 86.883292
+  ...
+1..16
+# tests 16
+# suites 0
+# pass 15
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 4944.627875

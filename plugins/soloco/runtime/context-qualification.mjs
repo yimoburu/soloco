@@ -399,8 +399,10 @@ export function qualificationControlHash(state){return sha(Object.values(state.r
 // A later founder pause, revoke or ownership change fences dispatch and return.
 export function qualificationMaintenanceEligible(state,job){
   const target=state.records?.[typeof job.review_of==='string'?job.review_of:job.review_of?.id];
-  const p=state.records?.[target?.context_qualification_target?.plan?.id],a=p?.context_maintenance;
+  const represented=target?.context_classification_plan?.version===2;
+  const p=represented?target:state.records?.[target?.context_qualification_target?.plan?.id],a=p?.context_maintenance;
   return Boolean(state.paused===true&&job.role==='qa'&&!job.prototype_id&&!job.development_id&&!job.input_ids?.length&&!job.evidence_ids?.length
+    &&(!represented||(equal(p.context_classification_plan.owner,state.owner)&&!job.supplemental_sources?.length&&(!job.inputs||job.inputs.every(ref=>ref.id===target.id&&ref.revision===target.revision))))
     &&a?.readonly===true&&!a.revoked_at&&equal(a.owner,state.owner)&&a.controls_sha256===qualificationControlHash(state)&&nonempty(a.source_instruction));
 }
 function uniqueExact(actual,expected,label){if(!Array.isArray(actual)||actual.length!==expected.length||new Set(actual).size!==actual.length||actual.some(v=>!expected.includes(v)))fail('missing/duplicate '+label);}

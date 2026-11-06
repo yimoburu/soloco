@@ -1,0 +1,126 @@
+TAP version 13
+# (node:83596) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: public handover, independent publication, full v4 worker review, resume and first ordinary format6 Engineering return
+ok 1 - public handover, independent publication, full v4 worker review, resume and first ordinary format6 Engineering return
+  ---
+  duration_ms: 1312.373209
+  ...
+# Subtest: only exact pure runtime commands are mechanically ingested; conditions, unknown fields and generic saves stay held
+ok 2 - only exact pure runtime commands are mechanically ingested; conditions, unknown fields and generic saves stay held
+  ---
+  duration_ms: 516.250166
+  ...
+# Subtest: actual conditional handover retains founder conditions and unknown legacy remains held on first pass
+ok 3 - actual conditional handover retains founder conditions and unknown legacy remains held on first pass
+  ---
+  duration_ms: 360.528125
+  ...
+# (node:83597) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: public paused tree workflow captures originals, pages topology, observes spawn and applies canonical worker proof
+ok 4 - public paused tree workflow captures originals, pages topology, observes spawn and applies canonical worker proof
+  ---
+  duration_ms: 756.290417
+  ...
+# Subtest: public maintenance is fenced by new founder pause, revocation and queued cancellation
+ok 5 - public maintenance is fenced by new founder pause, revocation and queued cancellation
+  ---
+  duration_ms: 426.466375
+  ...
+# Subtest: new tree capture on legacy storage holds atomically until explicit migration
+ok 6 - new tree capture on legacy storage holds atomically until explicit migration
+  ---
+  duration_ms: 37.929291
+  ...
+# Subtest: actual in-flight maintenance worker rejects late output after founder pause, revoke or cancellation
+ok 7 - actual in-flight maintenance worker rejects late output after founder pause, revoke or cancellation
+  ---
+  duration_ms: 631.048584
+  ...
+# Subtest: supported paused schema-1 storage migration is explicit, owner fenced and preserves exact logical state
+ok 8 - supported paused schema-1 storage migration is explicit, owner fenced and preserves exact logical state
+  ---
+  duration_ms: 18.16375
+  ...
+# Subtest: public qualification originals and payload ranges adapt to escaped reply budgets without mutation receipts
+ok 9 - public qualification originals and payload ranges adapt to escaped reply budgets without mutation receipts
+  ---
+  duration_ms: 565.928916
+  ...
+# Subtest: public fresh profile binds immutable capsule, persists dense worker results and still requires independent handover
+ok 10 - public fresh profile binds immutable capsule, persists dense worker results and still requires independent handover
+  ---
+  duration_ms: 1534.008583
+  ...
+# (node:83600) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: public represented v2 schema is strict and legacy/default protocols remain unchanged
+ok 11 - public represented v2 schema is strict and legacy/default protocols remain unchanged
+  ---
+  duration_ms: 166.893375
+  ...
+# Subtest: public plan, real worker complete format4 reads and public apply retain canonical current qualification and exact homes
+ok 12 - public plan, real worker complete format4 reads and public apply retain canonical current qualification and exact homes
+  ---
+  duration_ms: 4003.535583
+  ...
+# Subtest: real worker rejects incomplete semantic delivery and coordinator native identity
+ok 13 - real worker rejects incomplete semantic delivery and coordinator native identity
+  ---
+  duration_ms: 106.843209
+  ...
+# Subtest: pending paused handover permits only explicitly scoped owner-bound represented preservation QA
+not ok 14 - pending paused handover permits only explicitly scoped owner-bound represented preservation QA
+  ---
+  duration_ms: 19.977167
+  location: '/private/tmp/soloco-operating-state-20261106/source/tests/public-represented-v2.test.mjs:105:1'
+  failureType: 'testCodeFailure'
+  error: 'Immutable snapshot capture requires explicit company_storage migrate before retrying'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    flushSnapshots (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/record-storage.mjs:70:32)
+    Store.transaction (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/store.mjs:181:7)
+    file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:326:51
+    withStore (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+    Module.control (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:326:10)
+    pendingFixture (file:///private/tmp/soloco-operating-state-20261106/source/tests/public-represented-v2.test.mjs:101:50)
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-state-20261106/source/tests/public-represented-v2.test.mjs:106:10)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:931:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:629:18)
+  ...
+# Subtest: represented maintenance is fenced by subsequent pause, revocation, changed source and owner transfer
+not ok 15 - represented maintenance is fenced by subsequent pause, revocation, changed source and owner transfer
+  ---
+  duration_ms: 18.154542
+  location: '/private/tmp/soloco-operating-state-20261106/source/tests/public-represented-v2.test.mjs:114:1'
+  failureType: 'testCodeFailure'
+  error: 'Immutable snapshot capture requires explicit company_storage migrate before retrying'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    flushSnapshots (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/record-storage.mjs:70:32)
+    Store.transaction (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/store.mjs:181:7)
+    file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:326:51
+    withStore (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+    Module.control (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:326:10)
+    pendingFixture (file:///private/tmp/soloco-operating-state-20261106/source/tests/public-represented-v2.test.mjs:101:50)
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-state-20261106/source/tests/public-represented-v2.test.mjs:116:9)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:931:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:629:18)
+  ...
+# Subtest: public represented source includes canonical runtime test author_instance and exact producer homes
+ok 16 - public represented source includes canonical runtime test author_instance and exact producer homes
+  ---
+  duration_ms: 116.12725
+  ...
+1..16
+# tests 16
+# suites 0
+# pass 14
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 4569.600041

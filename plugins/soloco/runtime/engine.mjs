@@ -485,6 +485,10 @@ export function contextControl(args,host) {
   });
   if(args.action==='inspect')return withStore(args.root,db=>db.readSnapshot(()=>publicPage(db.publicState(),args)));
   if(args.action==='read')return withStore(args.root,db=>readPublicExact(db,args));
+  if(args.protocol===undefined&&args.action==='revoke'&&args.plan_id&&withStore(args.root,db=>db.read().records[args.plan_id]?.context_classification_plan?.version===2)){
+    update(args,host,'context.revoke',state=>{requireText(args.source_instruction,'source_instruction');const p=state.records[args.plan_id];if(!p.context_maintenance)throw Error('Represented plan has no maintenance grant');p.context_maintenance.revoked_at=stamp();p.context_maintenance.revocation_instruction=args.source_instruction;});
+    return {revoked:true,plan_id:args.plan_id,readonly:true};
+  }
   if(args.protocol===scoped.SCOPED_PROTOCOL||args.integration_review_id||args.phase)return scopedControl(args,host);
   if(args.action==='revoke'&&args.plan_id&&withStore(args.root,db=>Boolean(db.read().records[args.plan_id]?.scoped_context_plan)))return scopedControl(args,host);
   if(args.protocol!==undefined)throw Error('Unsupported context protocol');
@@ -494,7 +498,8 @@ export function contextControl(args,host) {
     requireText(args.source_instruction,'source_instruction');
     if(args.action==='plan'){
       const plan=contextPlan(state,args),key=id('context-plan');
-      state.records[key]={id:key,kind:'plan',revision:1,status:'Draft',author_role:'runner',author_instance:args.session_id,content:'Proposed context applicability; not an authority or resolution by itself.',context_classification_plan:plan,source_reference:args.source_instruction,created_at:stamp()};
+      if(args.maintenance===true&&plan.version!==2)throw Error('Read-only maintenance requires represented v2 preservation');
+      state.records[key]={id:key,kind:'plan',revision:1,status:'Draft',author_role:'runner',author_instance:args.session_id,content:'Proposed context applicability; not an authority or resolution by itself.',context_classification_plan:plan,...(args.maintenance===true?{context_maintenance:{readonly:true,owner:{...state.owner},controls_sha256:qualificationControlHash(state),source_instruction:args.source_instruction,at:stamp()}}:{}),source_reference:args.source_instruction,created_at:stamp()};
       state.context_last_plan=key;
     }else{
       const plan=state.records[args.plan_id],r=state.records[args.review_id],j=state.jobs[r?.job_id],v=r?.review;
