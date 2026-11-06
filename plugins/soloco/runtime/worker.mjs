@@ -42,7 +42,7 @@ function failureEvidence(error) {
 }
 
 export async function work(root, jobId, model = runModel) {
-  let job, state, context, output, artifact, controller, monitor, spawned=false,invoked=false,lastToken,lastCurrent,lastGrantExpiry,lastDevelopmentMaxBytes;
+  let job, state, context, output, artifact, controller, monitor, claimed=false,spawned=false,invoked=false,lastToken,lastCurrent,lastGrantExpiry,lastDevelopmentMaxBytes;
   const supplemental=[],handoverReads=[];
   let deliveryLedger,pendingDelivery,partitionDelivery;
   let overallTiming;
@@ -90,6 +90,7 @@ export async function work(root, jobId, model = runModel) {
       job.status='running';job.started_at=stamp();job.worker_pid=process.pid;
       return s;
     }));
+    claimed=true; // Only a committed queued -> running transition owns this execution.
     job=state.jobs[jobId];
     const timeout=job.timeout_policy_version===undefined?normalizeTimeout():normalizeTimeout({timeout_ms:job.timeout_ms,timeout_reason:job.timeout_reason});
     const charter=state.roles[job.role];
@@ -261,8 +262,14 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
       return s;
     }));
   } catch(error) {
-    withStore(root,db=>db.transaction('job.failed',s=>{
+    const unowned=Symbol('unowned worker');
+    try {withStore(root,db=>db.transaction('job.failed',s=>{
       const current=s.jobs[jobId];
+      // Recheck under the write lock: another worker may have claimed after
+      // startup validation failed. Only persistent never-started queue evidence
+      // permits an unclaimed worker to close a cancelled assignment.
+      if(!claimed && (!current || !['queued','cancelled'].includes(current.status) ||
+        ['started_at','worker_pid','execution_started_at','execution_deadline_at','termination_deadline_at','finished_at'].some(k=>current[k]!=null)))throw unowned;
       if(current) {
         if(!invoked || output || error.termination_confirmed===true)current.coordination_release={termination_confirmed:true,reason:invoked?'model_process_closed':'model_not_invoked',at:stamp()};
         const cause=controller?.signal.aborted?controller.signal.reason:error;
@@ -285,7 +292,7 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
         notice(s,'must_know',`Specialist ${current.role} could not finish: ${current.error}`,jobId);
       }
       return s;
-    }));
+    }));} catch(failure) {if(failure!==unowned)throw failure;}
   } finally {
     if(monitor!==undefined)clearInterval(monitor);
   }

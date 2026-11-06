@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
 import {call} from '../plugins/soloco/runtime/main.mjs';
-import {withStore,teamHash} from '../plugins/soloco/runtime/store.mjs';
+import {Store,withStore,teamHash} from '../plugins/soloco/runtime/store.mjs';
 import {work} from '../plugins/soloco/runtime/worker.mjs';
 import {executionTiming} from '../plugins/soloco/runtime/timeout.mjs';
 import {resourceClaims} from '../plugins/soloco/runtime/coordination.mjs';
@@ -51,6 +51,82 @@ async function storageRoundTrip(f) {
  assert.equal(read(root).paused,true);assert.deepEqual(read(root).notices,before.notices);
 }
 
+function pendingAdapter() {
+ let reject,options;
+ const pending=new Promise((resolve,fail)=>{reject=fail;});
+ return {
+  model:async(h,native,wire,dir,remaining,selection,value)=>{
+   options=value;options.onSpawn(executionTiming(Date.now(),{timeout_ms:remaining,timeout_reason:options.timeoutReason}));
+   return pending;
+  },
+  aborted:()=>options.signal.aborted?Promise.resolve():new Promise(resolve=>options.signal.addEventListener('abort',resolve,{once:true})),
+  close:confirmed=>reject(Object.assign(Error('Original invocation closure evidence'),{code:'ROLE_ABORTED',...(confirmed===undefined?{}:{termination_confirmed:confirmed})}))
+ };
+}
+async function assertStorageHeld(f) {
+ assert.equal(resourceClaims(read(f.root)).length,1);
+ for(const action of ['backup','migrate','restore'])await assert.rejects(call('company_storage',{...f.base,action,directory:path.join(f.directory,action),backup_dir:path.join(f.directory,'unused'),source_instruction:'Synthetic outstanding invocation must hold.'},f.host),/Uncertain worker/);
+}
+
+test('duplicates before and after pause cannot certify or overwrite the outstanding owner',async()=>{
+ for(const confirmed of [false,undefined,true]){
+  const f=await fixture(),adapter=pendingAdapter(),owner=work(f.root,f.job.id,adapter.model);
+  let duplicateCalls=0;
+  const duplicate=async()=>{duplicateCalls++;throw Error('Duplicate must not invoke');};
+  try {
+   const running=read(f.root);
+   await work(f.root,f.job.id,duplicate);
+   assert.deepEqual(read(f.root),running);
+   await f.cancel();await adapter.aborted();
+   const cancelled=read(f.root);
+   await work(f.root,f.job.id,duplicate);
+   assert.deepEqual(read(f.root),cancelled);
+   assert.equal(duplicateCalls,0);
+   assert.equal(cancelled.jobs[f.job.id].finished_at,undefined);
+   assert.equal(cancelled.jobs[f.job.id].coordination_release,undefined);
+   await assertStorageHeld(f);
+  } finally {adapter.close(confirmed);await owner;}
+  const state=read(f.root),current=state.jobs[f.job.id];
+  assert.equal(current.status,'cancelled');assert.equal(current.execution_failure.termination_confirmed,confirmed);
+  assert.equal(current.execution_failure.message,'Original invocation closure evidence');
+  assert.equal(current.native_id,null);assert.equal(current.artifact_id,undefined);
+  if(confirmed===true){
+   assert.ok(current.finished_at);assert.equal(current.coordination_release.reason,'model_process_closed');
+   assert.equal(resourceClaims(state).length,0);await storageRoundTrip(f);
+  }else{
+   assert.equal(current.finished_at,undefined);assert.equal(current.coordination_release,undefined);await assertStorageHeld(f);
+  }
+  const final=read(f.root);await work(f.root,f.job.id,duplicate);assert.deepEqual(read(f.root),final);
+ }
+});
+
+test('failed startup rechecks ownership when another worker claims before failure handling',async()=>{
+ const f=await fixture(),adapter=pendingAdapter();
+ withStore(f.root,db=>db.transaction('fixture.invalid_context',s=>{s.jobs[f.job.id].context_sha256='invalid';return s;}));
+ const transaction=Store.prototype.transaction;
+ let owner,intercepted=false;
+ Store.prototype.transaction=function(type,change){
+  if(type==='job.failed'&&!intercepted){
+   intercepted=true;
+   withStore(f.root,db=>transaction.call(db,'fixture.repair_context',s=>{delete s.jobs[f.job.id].context_sha256;return s;}));
+   owner=work(f.root,f.job.id,adapter.model);
+  }
+  return transaction.call(this,type,change);
+ };
+ try {
+  await work(f.root,f.job.id,async()=>{throw Error('Rejected startup must not invoke');});
+  assert.equal(intercepted,true);
+  const current=read(f.root).jobs[f.job.id];
+  assert.equal(current.status,'running');assert.ok(current.execution_started_at);
+  assert.equal(current.execution_failure,undefined);assert.equal(current.coordination_release,undefined);
+  assert.equal(current.finished_at,undefined);
+  await f.cancel();await adapter.aborted();await assertStorageHeld(f);
+ } finally {Store.prototype.transaction=transaction;adapter.close(false);await owner;}
+ const current=read(f.root).jobs[f.job.id];
+ assert.equal(current.status,'cancelled');assert.equal(current.coordination_release,undefined);
+ assert.equal(current.finished_at,undefined);await assertStorageHeld(f);
+});
+
 test('pause/revoke cancellation finalizes only confirmed closure, then permits exact storage recovery',async()=>{
  for(const revoke of [false,true])for(const confirmed of [true,false,undefined]){
   const f=await fixture(revoke),{root,job}=f;
@@ -85,7 +161,9 @@ test('queued cancellation closes truthfully without invoking an adapter, includi
   assert.equal(invoked,false);assert.equal(current.status,'cancelled');assert.ok(current.finished_at);
   assert.equal(current.started_at,undefined);assert.equal(current.execution_started_at,undefined);
   assert.equal(current.coordination_release.reason,'model_not_invoked');
-  assert.equal(current.coordination_release.termination_confirmed,true);await storageRoundTrip(f);
+  assert.equal(current.coordination_release.termination_confirmed,true);
+  const closed=read(f.root);await work(f.root,f.job.id,async()=>{throw Error('Closed queue must not invoke');});
+  assert.deepEqual(read(f.root),closed);await storageRoundTrip(f);
  }
 });
 
