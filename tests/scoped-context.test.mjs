@@ -266,8 +266,12 @@ test('separate governing scopes reuse receipts through qualified archive growth 
     assert.equal(scoped.validateScopedApply(read(f),{integration_review_id:a.integrated.review.id}).extraction_identity,a.proof.extraction_identity);
     const state=read(f),domainAssignment=scoped.scopedAssignment(state,state.jobs[a.domains[0].job.id]),integration=scoped.scopedAssignment(state,state.jobs[a.integrated.job.id]);
     assert.equal(domainAssignment.hash,aDomainHash);assert.equal(integration.hash,aIntegrationHash);
-    assert.ok(!q.domains[0].packet.global_rules.governing.some(r=>r.id==='old'||r.id==='home-D00'));
-    assert.ok(!q.integrated.packet.global_rules.scoped_governing.some(r=>r.source.id==='home-D00'));
+    // Before B is qualified, its new unknown rule can expand A's scope; B's
+    // first review therefore sees A's full current home. Once B is independently
+    // qualified unrelated, fresh B work and existing A receipts need no replay.
+    assert.ok(q.domains[0].packet.global_rules.governing.some(r=>r.source.id==='home-D00'));
+    const refreshed=scoped.createScopedTarget(state,{plan_id:f.plan_id,phase:'applicability',extraction_review_ids:q.extracts.map(e=>e.review.id),counterpart_ids:[home],context_scope:domain});
+    assert.ok(!resolveSnapshot(state,refreshed.global_snapshot).governing.some(r=>r.source.id==='old'||r.source.id==='home-D00'));
     if(!update)assert.equal(assignmentContext(state,ordinaryJob).text,baseline.text,'Qualified governing archive and proof growth do not grow ordinary inputs');
     assert.equal(assignmentContext(state,{...ordinaryJob,context_format:3}).text,governingBaseline.text,'Unrelated updates do not grow governing task inputs');
     if(update)assert.throws(()=>assignmentContext(state,ordinaryJob),/Unqualified referenced evidence/,'Superseded proof bodies remain unclassified in format 5; no implicit archive permission');
@@ -283,7 +287,7 @@ test('separate governing scopes reuse receipts through qualified archive growth 
   f.plan_id=firstPlan.id;
   assert.equal(call(f,{action:'target',phase:'extract',unit_id:a.extracts[0].target.target.unit_id}).job_id,a.extracts[0].job.id);
   const fresh=await run(f,{phase:'applicability',extraction_review_ids:a.extracts.map(e=>e.review.id),counterpart_ids:['home-D00'],context_scope:'D00'});
-  assert.equal(fresh.review.review.verdict,'Pass');assert.ok(!fresh.packet.global_rules.governing.some(r=>r.id.startsWith('history-')||r.id==='home-D01'));
+  assert.equal(fresh.review.review.verdict,'Pass');assert.ok(!fresh.packet.global_rules.governing.some(r=>r.source.id.startsWith('history-')||r.source.id==='home-D01'));
   assert.ok(bytes(fresh.job.qualification_delivery.wire)<48000);assert.equal(b.extracts[0].packet.phase,'extract');
   for(const extra of [
     {id:'unclassified',kind:'decision',content:'New history may interact; must review.'},
@@ -295,14 +299,14 @@ test('separate governing scopes reuse receipts through qualified archive growth 
     const copy=inheritSnapshots(state,structuredClone(state));copy.records[extra.id]={revision:1,...extra};
     assert.throws(()=>scoped.validateScopedApply(copy,{integration_review_id:a.integrated.review.id}),/global governing identity/);
     const target=scoped.createScopedTarget(copy,{plan_id:firstPlan.id,phase:'applicability',extraction_review_ids:a.extracts.map(e=>e.review.id),counterpart_ids:['home-D00'],context_scope:'D00'});
-    assert.ok(resolveSnapshot(copy,target.global_snapshot).governing.some(r=>r.id===extra.id&&r.content===extra.content),'Full unknown/global/negative/proposed evidence reaches fresh QA');
+    assert.ok(resolveSnapshot(copy,target.global_snapshot).governing.some(r=>r.source.id===extra.id&&r.value.content===extra.content),'Full unknown/global/negative/proposed evidence reaches fresh QA');
   }
   for(const mutateRule of [s=>delete s.records['home-D00'],s=>s.records['home-D00'].content+=' New relevant condition.']){const copy=inheritSnapshots(state,structuredClone(state));mutateRule(copy);assert.throws(()=>scoped.validateScopedApply(copy,{integration_review_id:a.integrated.review.id}),/Scoped context hold/);}
   mutate(f,s=>{s.records['unknown-source']={id:'unknown-source',kind:'artifact',revision:1,content:'UNKNOWN_EXTRA'};});
   f.plan_id=call(f,{action:'plan',protocol,source_id:'unknown-source'}).id;const unknown=await extraction(f);
   const unknownState=read(f),unknownTarget=scoped.createScopedTarget(unknownState,{plan_id:f.plan_id,phase:'applicability',extraction_review_ids:unknown.map(e=>e.review.id),counterpart_ids:['home-D00'],context_scope:'D00'});
   assert.deepEqual(unknownTarget.governing_scopes,['*'],'Unknown extracted effects cannot be narrowed by the caller task scope');
-  assert.ok(resolveSnapshot(unknownState,unknownTarget.global_snapshot).governing.some(r=>r.id==='home-D01'),'Unknown applicability sees independently qualified other scopes in full');
+  assert.ok(resolveSnapshot(unknownState,unknownTarget.global_snapshot).governing.some(r=>r.source.id==='home-D01'),'Unknown applicability sees independently qualified other scopes in full');
 
 });
 
@@ -317,4 +321,84 @@ test('ordinary worker producer edge binds exact outcome and native closure while
     const copy=inheritSnapshots(state,structuredClone(state));change(copy.jobs[produced.job_id]);assert.throws(()=>scoped.scopedPlanView(copy,{plan_id:planRecord.id}),/Scoped context hold/);
   }
   const broken=inheritSnapshots(state,structuredClone(state));delete broken.jobs[produced.job_id];assert.throws(()=>scoped.captureScopedPlan(broken,{source_id:produced.id}),/source missing/);
+});
+
+test('regression: a represented governing rule retains its same-scope artifact home',async()=>{
+  const f=fixture({kind:'decision',homeKind:'artifact'});
+  const first=await qualify(f);
+  assert.equal(scoped.validateScopedApply(read(f),{integration_review_id:first.integrated.review.id}).source.id,'old');
+  mutate(f,s=>{
+    s.records.second={id:'second',kind:'artifact',revision:1,content:token('D00',100)};
+    s.records['home-second']={id:'home-second',kind:'artifact',revision:1,content:token('D00',100),context_obligations:{version:1,scope:'D00'}};
+  });
+  f.plan_id=call(f,{action:'plan',protocol,source_id:'second'}).id;
+  const es=await extraction(f);
+  const d=await run(f,{phase:'applicability',extraction_review_ids:es.map(e=>e.review.id),counterpart_ids:['home-second'],context_scope:'D00'});
+  assert.equal(d.job.status,'completed',d.job.error);
+  const globals=JSON.stringify(d.packet.global_rules),preserved=globals.includes(f.clauses[0]);
+  console.log(JSON.stringify({same_scope:'D00',qualified_artifact_home_effect_present:preserved,applicability_verdict:d.review?.review.verdict,contract_doubles_only:true}));
+  {
+    assert.ok(preserved,'The exact effect from home-D00 must remain in same-scope global evidence.');
+    const i=await run(f,{phase:'integration',domain_review_ids:[d.review.id],counterpart_ids:['home-second']});
+    assert.equal(i.job.status,'completed',i.job.error);
+    assert.equal(i.review.review.verdict,'Pass');
+    assert.equal(call(f,{action:'apply',integration_review_id:i.review.id}).applied,true);
+    assert.equal(scoped.validateScopedApply(read(f),{integration_review_id:i.review.id}).source.id,'second');
+  }
+});
+
+test('typed mandatory dependencies and changed artifact homes remain exact governing evidence',async()=>{
+  const f=fixture({kind:'decision',homeKind:'artifact'});
+  mutate(f,s=>{s.jobs.dep={id:'dep',status:'completed',task:'Retain the exact dependency constraint',native_id:'dependency-native',coordination_release:{termination_confirmed:true}};s.records.dep={id:'dep',kind:'artifact',revision:1,content:'Distinct record with the same raw ID; must never substitute for job:dep.'};});
+  const es=await extraction(f),d=await run(f,{phase:'applicability',extraction_review_ids:es.map(e=>e.review.id),counterpart_ids:['home-D00'],dependency_ids:['job:dep'],context_scope:'D00'});
+  const i=await run(f,{phase:'integration',domain_review_ids:[d.review.id],counterpart_ids:['home-D00'],dependency_ids:['job:dep']});
+  assert.equal(call(f,{action:'apply',integration_review_id:i.review.id}).applied,true);
+  assert.equal(scoped.validateScopedApply(read(f),{integration_review_id:i.review.id}).source.id,'old');
+  mutate(f,s=>{s.records.second={id:'second',kind:'artifact',revision:1,content:token('D00',100)};s.records['home-second']={id:'home-second',kind:'artifact',revision:1,content:token('D00',100),context_obligations:{version:1,scope:'D00'}};});
+  f.plan_id=call(f,{action:'plan',protocol,source_id:'second'}).id;const second=await extraction(f),state=read(f);
+  const args={plan_id:f.plan_id,phase:'applicability',extraction_review_ids:second.map(e=>e.review.id),counterpart_ids:['home-second'],context_scope:'D00'};
+  const target=scoped.createScopedTarget(state,args),governing=resolveSnapshot(state,target.global_snapshot).governing;
+  const dependency=governing.find(e=>e.source.id==='job:dep');assert.deepEqual(dependency.value,state.jobs.dep);assert.notEqual(dependency.source.sha256,sha(state.records.dep));
+  assert.ok(governing.some(e=>e.source.id==='home-D00'&&e.value.content===state.records['home-D00'].content));
+  for(const change of [s=>{s.records['home-D00'].revision++;s.records['home-D00'].content+=' NEW CURRENT RESTRICTION: no renewed allowance.';},s=>{s.jobs.dep.status='failed';s.jobs.dep.coordination_release.termination_confirmed=false;}]){
+    const changed=inheritSnapshots(state,structuredClone(state));change(changed);
+    const next=scoped.createScopedTarget(changed,args),current=resolveSnapshot(changed,next.global_snapshot).governing;
+    assert.ok(current.some(e=>e.source.id==='home-D00'&&JSON.stringify(e.value)===JSON.stringify(changed.records['home-D00'])));
+    assert.ok(current.some(e=>e.source.id==='job:dep'&&JSON.stringify(e.value)===JSON.stringify(changed.jobs.dep)));
+  }
+});
+
+
+test('new global scope expansion widens old homes in fresh applicability instead of hiding their bodies',async()=>{
+  const f=fixture({kind:'decision',homeKind:'artifact'}),first=await qualify(f);
+  mutate(f,s=>{
+    s.records.expand={id:'expand',kind:'decision',revision:1,content:'All D00 constraints now also apply to D01.'};
+    s.records.second={id:'second',kind:'artifact',revision:1,content:token('D01',100)};
+    s.records['home-second']={id:'home-second',kind:'artifact',revision:1,content:token('D01',100),context_obligations:{version:1,scope:'D01'}};
+  });
+  assert.throws(()=>scoped.validateScopedApply(read(f),{integration_review_id:first.integrated.review.id}),/global governing identity/);
+  f.plan_id=call(f,{action:'plan',protocol,source_id:'second'}).id;const es=await extraction(f);
+  const current=read(f),target=scoped.createScopedTarget(current,{plan_id:f.plan_id,phase:'applicability',extraction_review_ids:es.map(e=>e.review.id),counterpart_ids:['home-second'],context_scope:'D01'});
+  const global=resolveSnapshot(current,target.global_snapshot);
+  assert.ok(global.governing.some(r=>r.source.id==='expand'));
+  assert.ok(global.governing.some(r=>r.source.id==='home-D00'&&r.value.content===f.clauses[0]),'Fresh QA receives the newly relevant exact scope body');
+});
+
+test('root authority changes and changed or removed scope rules widen fresh review inputs',async()=>{
+  for(const change of ['root','changed-rule','removed-rule']){
+    const f=fixture({kind:'decision',homeKind:'artifact'});
+    mutate(f,s=>{s.records.limiter={id:'limiter',kind:'decision',revision:1,content:'D00 obligations are limited to D00 under this current rule.'};});
+    const first=await qualify(f);
+    mutate(f,s=>{
+      if(change==='root'){s.governance+=' All D00 obligations now extend to D01.';s.team_sha256=teamHash(s);}
+      if(change==='changed-rule'){s.records.limiter.revision++;s.records.limiter.content='D00 obligations now also apply to D01.';}
+      if(change==='removed-rule')delete s.records.limiter;
+      s.records.second={id:'second',kind:'artifact',revision:1,content:token('D01',100)};
+      s.records['home-second']={id:'home-second',kind:'artifact',revision:1,content:token('D01',100),context_obligations:{version:1,scope:'D01'}};
+    });
+    assert.throws(()=>scoped.validateScopedApply(read(f),{integration_review_id:first.integrated.review.id}),/global governing identity/);
+    f.plan_id=call(f,{action:'plan',protocol,source_id:'second'}).id;const es=await extraction(f),current=read(f);
+    const target=scoped.createScopedTarget(current,{plan_id:f.plan_id,phase:'applicability',extraction_review_ids:es.map(e=>e.review.id),counterpart_ids:['home-second'],context_scope:'D01'});
+    assert.ok(resolveSnapshot(current,target.global_snapshot).governing.some(r=>r.source.id==='home-D00'&&r.value.content===f.clauses[0]),change);
+  }
 });

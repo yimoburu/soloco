@@ -99,8 +99,8 @@ A genuinely new unclassified record, an unreviewed proposed scope, `*`, unknown
 scope, unresolved notice or negative interaction remains compulsory. A changed
 home loses its scope certificate until independently requalified; unrelated
 receipts can then be reused. No hashes stand in for that semantic judgment.
-Existing scoped targets without a frozen governing packet retain their prior
-conservative validation. Existing ordinary producer identities remain compatible;
+All non-extraction scoped targets require their frozen governing packet.
+Existing ordinary producer identities remain compatible;
 unsafe runtime-test plans that omitted their controller cannot be reused.
 Exact source or producer mutation holds.
 No model-provided native ID, coverage assertion, citation or termination claim can
@@ -136,3 +136,18 @@ not native/model semantic acceptance or evidence of production performance.
 The development test file adds a regression using the actual sandbox/controller
 receipt, candidate and native producer. It skips when the supported sandbox is
 unavailable; a skip is not runtime execution evidence.
+
+Current governing evidence carries exact typed source references and complete values,
+including applicable artifact homes and job/upgrade dependencies. A target does not
+repeat its exact explicitly delivered homes in that governing packet. A globally
+delivered rule does not need to be misrepresented as a mapping home for another
+source. Every non-extraction target requires its frozen governing packet; no
+compatibility branch is retained for unreleased scoped prototypes. Published
+legacy/tree proof grammars remain unchanged.
+
+A new or changed global/unknown rule, notice, outcome or root authority can expand
+previous applicability. Fresh review therefore receives the complete current homes
+with a widened scope until independently requalified; an old scope certificate
+cannot hide those bodies. Already qualified unrelated archives remain omittable.
+Legacy current classifications are conservative global evidence for this new
+protocol; their published ordinary-task behavior is unchanged.
