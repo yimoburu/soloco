@@ -155,3 +155,27 @@ test('coherent runtime-test producer uses canonical author_instance, candidate a
     const bad=inheritSnapshots(state,structuredClone(state));change(bad);assert.throws(()=>scoped.captureScopedPlan(bad,{source_id:'old',partitioner:scoped.COHERENT_PARTITIONER}),/missing|producer|closure|changed/i);
   }
 });
+
+test('nested canonical source files retain bounded native bundles and mandatory occurrence interfaces',async t=>{
+  const sources={'a.mjs':'a'.repeat(21650),'b.mjs':'b'.repeat(17056),'c.mjs':'c'.repeat(12952)};
+  const content=JSON.stringify({left:{scope:'Consent exhausted.',sources},right:{scope:'Consent revoked.',sources},late_unknown:'LATE_NO_EXPORT: no execution.'});
+  assert.ok(bytes(content)>48000);
+  const f=fixture({extra:{content}}),units=unitPages(f);
+  const bundles=units.map(u=>call(f,{action:'read',unit_id:u.id}).unit);
+  const leaves=bundles.filter(b=>b.sections.some(g=>g.group_id===b.group_id&&g.body===sources['a.mjs']));
+  assert.equal(leaves.length,2);assert.equal(leaves[0].body_root,leaves[1].body_root);
+  assert.notEqual(leaves[0].occurrence.id,leaves[1].occurrence.id);
+  assert.notDeepEqual(leaves[0].occurrence.ancestor_roots,leaves[1].occurrence.ancestor_roots);
+  for(const b of leaves){
+    assert.ok(JSON.stringify(b).includes('LATE_NO_EXPORT'));
+    assert.equal(b.required_interface.id,'coherent-context');assert.equal(b.required_interface.with_scope,'*');
+    assert.match(b.required_interface.text,/every snapshot inbound context/);
+    assert.ok(bytes(b)<48000);
+  }
+  assert.ok(leaves.some(b=>JSON.stringify(b).includes('Consent exhausted.')));
+  assert.ok(leaves.some(b=>JSON.stringify(b).includes('Consent revoked.')));
+  const invalid=await run(f,{phase:'extract',unit_id:leaves[0].id},{review:p=>{const e=contractReview(p);e.qualification_result.items[0].interfaces=[];return e;}});
+  assert.equal(invalid.job.status,'failed');assert.match(invalid.job.error,/occurrence requires/);
+  assert.ok(bytes(invalid.packet)<48000);
+  t.diagnostic(JSON.stringify({fictional_only:true,parent_string_bytes:bytes(content),units:units.length,leaf_bundle_bytes:leaves.map(bytes),extraction_request_bytes:bytes(invalid.packet),semantic_acceptance:false}));
+});

@@ -244,9 +244,21 @@ function coherentBuild(state,max_packet_bytes){
   // Complete fields of canonical JSON STRING views and explicit file entries
   // are logical candidates. Unknown keys stay present; text leaves are never
   // range sliced. The enclosing section retains every typed qualifier/link.
-  const fieldRoots=new Set();
-  function fields(node){const d=definitions[node];if(d[0]!=='object')return;
-    roots.add(node);for(const [,child] of d[1])if(['object','array','json-text-string'].includes(definitions[child][0])||definitions[child][0]==='string'&&definitions[child][1].length>1200){roots.add(child);fieldRoots.add(child);}
+  const fieldRoots=new Set(),fieldStructures=new Set();
+  function fields(node){
+    // Discover each shared structure once; physical occurrences and qualifiers
+    // are still enumerated separately below. No extra recursive codec depth.
+    const pending=[node];
+    while(pending.length){
+      const root=pending.pop(),d=definitions[root];
+      if(fieldStructures.has(root)||!['object','array'].includes(d[0]))continue;
+      fieldStructures.add(root);roots.add(root);
+      const children=d[0]==='object'?d[1].map(([,child])=>child):d[1];
+      for(const child of children){const value=definitions[child];
+        if(['object','array','json-text-string'].includes(value[0])||value[0]==='string'&&value[1].length>1200){roots.add(child);fieldRoots.add(child);}
+        if(['object','array'].includes(value[0]))pending.push(child);
+      }
+    }
   }
   for(let i=0;i<definitions.length;i++){
     const d=definitions[i];if(d[0]==='json-text-string')fields(d[1]);

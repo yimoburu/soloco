@@ -275,3 +275,23 @@ test('declared distant incident peer cannot be omitted by proposed local scope',
   for(const u of unitPages(f)){const e=await run(f,{phase:'extract',unit_id:u.id},{review:p=>{const e=contractReview(p);if(JSON.stringify(p.reviewed_unit_bundle.primary).includes('ALLOW only after consent'))e.qualification_result.items[0].interfaces.push({id:'distant-peer',with_scope:'B',text:'Explicit interaction with B must be independently reconciled.'});return e;}});assert.equal(e.job.status,'completed',e.job.error);es.push(e);}
   await assert.rejects(run(f,{phase:'applicability',selection_ids:['A'],extraction_review_ids:es.filter(e=>a.intrinsic_batches.includes(e.target.target.unit_id)).map(e=>e.review.id),counterpart_ids:['home-D00'],context_scope:'*'}),/omitted declared incident peer/);
 });
+
+test('nested file sections fit intrinsic batches without implying complete global request fit',async t=>{
+  const {buildLegacyCoherentPlan}=await import('../plugins/soloco/runtime/legacy-operating.mjs');
+  const sources={'a.mjs':'a'.repeat(21650),'b.mjs':'b'.repeat(17056),'c.mjs':'c'.repeat(12952)};
+  const content=JSON.stringify({left:{scope:'Consent exhausted.',sources},right:{scope:'Consent revoked.',sources},late_unknown:'LATE_NO_EXPORT'});
+  const f=fixture({deferPlan:true,extra:{content}}),m=buildLegacyCoherentPlan(read(f));
+  // Explicit fictional global proposal: size and file paths confer no locality.
+  const partition={plan_sha256:m.plan_sha256,selections:[{id:'global',scope:'*',occurrence_ids:m.occurrences.map(o=>o.id),incident_ids:[]}]};
+  const p=call(f,{action:'plan',protocol,partitioner:scoped.CORPUS_PARTITIONER,source_id:'old',selected_source_ids:['old'],semantic_partition:partition});f.plan_id=p.id;
+  const workload=scoped.inspectCorpusWorkload(read(f),{plan_id:p.id}),global=workload.selections[0];
+  assert.ok(workload.extraction.every(e=>e.body_bytes<48000));
+  assert.ok(global.context_bytes>48000);assert.ok(global.domain_request_lower_bound>48000);assert.ok(global.interface_request_lower_bound>48000);
+  assert.equal(workload.complete_request_bytes,null);assert.equal(workload.native_context_fit,'unproven');
+  assert.equal(workload.frontier_complete,false);assert.equal(workload.semantic_acceptance,false);
+  const shared=m.groups.find(g=>g.section.body===sources['a.mjs']);
+  assert.equal(m.occurrences.filter(o=>o.group_id===shared.id).length,2);
+  const bad=structuredClone(partition);bad.selections[0].occurrence_ids.splice(bad.selections[0].occurrence_ids.indexOf(m.occurrences.find(o=>o.group_id===shared.id).id),1);
+  assert.throws(()=>scoped.validateCorpusPartition(m,bad),/physical occurrence partition/);
+  t.diagnostic(JSON.stringify({fictional_only:true,nested_sources_workload:workload}));
+});
