@@ -678,6 +678,63 @@ test('recovery stream rejected observed identities never poison accepted extract
   }
 });
 
+test('forward native admission rejects earlier failed observations across single-packet and streamed jobs',async()=>{
+  for(const firstStream of [false,true])for(const nextStream of [false,true])for(const mode of ['missing-timing','aborted-first']){
+    const label=JSON.stringify({firstStream,nextStream,mode}),f=fixture(),es=await extraction(f),accepted=JSON.stringify(es[0].job);
+    const args=stream=>({...domainArgs(es),delivery_protocol:stream?streaming:undefined});
+    const abort=()=>{if(mode==='aborted-first')mutate(f,s=>{s.owner.epoch++;});};
+    const first=await run(f,args(firstStream),{native:'observed-N',omitTiming:mode==='missing-timing',modelHook:firstStream?undefined:abort,streamHook:firstStream?abort:undefined});
+    assert.equal(first.job.status,'failed',label);assert.equal(first.job.native_id,null,label);
+    assert.equal(first.job.rejected_native_id,'observed-N',label);assert.equal(first.review,undefined,label);
+    assert.deepEqual(first.job.rejected_native_ids,['observed-N'],label);assert.equal(first.job.qualification_delivery,undefined,label);
+    assert.equal(first.job.coordination_release.termination_confirmed,true,label);
+    if(mode==='aborted-first')f.epoch++;
+    const next=await run(f,args(nextStream),{native:'observed-N'});
+    assert.notEqual(next.job.id,first.job.id,label);assert.notEqual(next.target.id,first.target.id,label);
+    assert.equal(next.job.status,'failed',label);assert.match(next.job.error,/reused|observed|fresh/i,label);
+    assert.equal(next.job.native_id,null,label);assert.equal(next.review,undefined,label);
+    assert.deepEqual(next.job.rejected_native_ids,['observed-N'],label);assert.equal(next.job.qualification_delivery,undefined,label);
+    assert.equal(read(f).sessions[next.job.session_key].native_id,null,label);
+    const fresh=await run(f,args(nextStream),{native:'fresh-M'});
+    assert.equal(fresh.job.status,'completed',fresh.job.error);assert.equal(fresh.review.review.verdict,'Pass',label);
+    assert.equal(JSON.stringify(read(f).jobs[es[0].job.id]),accepted,label);
+    assert.equal(call(f,{action:'target',phase:'extract',unit_id:es[0].target.target.unit_id}).review_id,es[0].review.id,label);
+  }
+});
+
+test('single-packet rejected identities preserve older canonical extraction and never become bindings',async()=>{
+  for(const mode of ['missing-timing','aborted-first','nonindependent']){
+    const f=fixture(),es=await extraction(f),prior=JSON.stringify(es[0].job);
+    const failed=await run(f,{...domainArgs(es),delivery_protocol:undefined},{native:es[0].job.native_id,omitTiming:mode==='missing-timing',modelHook:()=>{if(mode==='aborted-first')mutate(f,s=>{s.owner.epoch++;});}});
+    assert.equal(failed.job.status,'failed',mode);assert.equal(failed.job.native_id,null,mode);
+    assert.equal(failed.job.rejected_native_id,es[0].job.native_id,mode);assert.equal(failed.review,undefined,mode);
+    assert.equal(read(f).sessions[failed.job.session_key].native_id,null,mode);
+    if(mode==='aborted-first')f.epoch++;
+    assert.equal(JSON.stringify(read(f).jobs[es[0].job.id]),prior,mode);
+    assert.equal(call(f,{action:'target',phase:'extract',unit_id:es[0].target.target.unit_id}).review_id,es[0].review.id,mode);
+  }
+});
+
+test('later changed stream identity is retained separately and barred from future admission in both protocols',async()=>{
+  for(const nextStream of [false,true]){
+    const f=fixture(),es=await extraction(f);
+    // Force multiple ranges while keeping subsequent single-packet assignments bounded.
+    mutate(f,s=>{s.records.peer={id:'peer',kind:'artifact',revision:1,content:'Fictional dependency: OPEN. '.repeat(2500)};});
+    const d=await run(f,{...domainArgs(es),dependency_ids:['peer']},{native:'bound-N',streamHook:p=>{
+      if(p.sequence===1)return {native_id:'changed-B',text:'{}'};
+    },modelHook:()=>assert.fail('Changed identity must stop before final semantic review')});
+    assert.equal(d.streamRequests.length,2);assert.equal(d.job.status,'failed',d.job.error);
+    assert.equal(d.job.native_id,'bound-N');assert.equal(d.job.rejected_native_id,'changed-B');
+    assert.deepEqual(d.job.rejected_native_ids,['changed-B']);assert.equal(d.review,undefined);
+    const args={...domainArgs(es),delivery_protocol:nextStream?streaming:undefined};
+    const rejected=await run(f,args,{native:'changed-B'});
+    assert.equal(rejected.job.status,'failed');assert.equal(rejected.job.native_id,null);assert.equal(rejected.review,undefined);
+    assert.match(rejected.job.error,/reused earlier rejected observation/);
+    const fresh=await run(f,args,{native:'fresh-M'});
+    assert.equal(fresh.job.status,'completed',fresh.job.error);assert.equal(fresh.review.review.verdict,'Pass');
+  }
+});
+
 test('recovery stream CONTRACT DOUBLE: nonempty independent interfaces deliver peer homes, dependencies and closure',async()=>{
   const f=fixture({count:2,domains:2,extra:{qualifier:'DISTANT_QUALIFIER'}});
   mutate(f,s=>{s.records['home-D00'].content+='\nDISTANT_QUALIFIER: D00 may not retry unless D01 permission remains OPEN.';s.records.peer={id:'peer',kind:'artifact',revision:1,content:'Peer dependency: OPEN never renews retry. '+('🧪 保持 \\"\n'.repeat(6000))};});

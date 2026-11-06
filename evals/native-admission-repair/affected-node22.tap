@@ -1,0 +1,293 @@
+TAP version 13
+# (node:1527) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# {"same_scope":"D00","qualified_artifact_home_effect_present":true,"applicability_verdict":"Pass","contract_doubles_only":true}
+# Subtest: public store + worker path: 500 distinct obligations / 20 domains exceed union output, bounded packets apply and archive exact originals
+ok 1 - public store + worker path: 500 distinct obligations / 20 domains exceed union output, bounded packets apply and archive exact originals
+  ---
+  duration_ms: 25453.123
+  ...
+# {"contract_doubles":true,"obligations":500,"domains":20,"extraction_jobs":27,"total_extraction_output_bytes":149414,"final_packet_bytes":19392}
+# Subtest: source-only extraction survives unrelated notice/global change and replacement uses canonical completed job receipt
+ok 2 - source-only extraction survives unrelated notice/global change and replacement uses canonical completed job receipt
+  ---
+  duration_ms: 883.223833
+  ...
+# Subtest: unknown source fields and current global rules are semantic; historical claims never current permission
+ok 3 - unknown source fields and current global rules are semantic; historical claims never current permission
+  ---
+  duration_ms: 637.357666
+  ...
+# Subtest: distant qualifier absent from home blocks independently; no resolution of OPEN invented
+ok 4 - distant qualifier absent from home blocks independently; no resolution of OPEN invented
+  ---
+  duration_ms: 649.152792
+  ...
+# Subtest: cross-domain interface must have independent complete exact review; contradiction holds
+ok 5 - cross-domain interface must have independent complete exact review; contradiction holds
+  ---
+  duration_ms: 600.658583
+  ...
+# Subtest: canonical receipt rejects forged native/job/closure/output/provenance and tampered source; no coordinator proof reuse
+ok 6 - canonical receipt rejects forged native/job/closure/output/provenance and tampered source; no coordinator proof reuse
+  ---
+  duration_ms: 443.667416
+  ...
+# Subtest: independent reviewer cannot review source or domain producer
+ok 7 - independent reviewer cannot review source or domain producer
+  ---
+  duration_ms: 284.881959
+  ...
+# Subtest: integration coverage rejects omissions, duplicate items/ranges, substitutions and dependency cycles
+ok 8 - integration coverage rejects omissions, duplicate items/ranges, substitutions and dependency cycles
+  ---
+  duration_ms: 420.36775
+  ...
+# Subtest: overflow retains complete rejected unit output and allows exact bounded subdivision coverage
+ok 9 - overflow retains complete rejected unit output and allows exact bounded subdivision coverage
+  ---
+  duration_ms: 858.636292
+  ...
+# Subtest: stale owner, paused maintenance controls, revocation and late pause fence new work and returns
+ok 10 - stale owner, paused maintenance controls, revocation and late pause fence new work and returns
+  ---
+  duration_ms: 463.998792
+  ...
+# Subtest: main exposes usable scoped schema and public current home schema
+ok 11 - main exposes usable scoped schema and public current home schema
+  ---
+  duration_ms: 93.242625
+  ...
+# Subtest: bounded independent interface review can complete integration without a global semantic union
+ok 12 - bounded independent interface review can complete integration without a global semantic union
+  ---
+  duration_ms: 715.988667
+  ...
+# Subtest: closed output grammar rejects fabricated citations, altered provenance and hidden findings and retains rejected evidence
+ok 13 - closed output grammar rejects fabricated citations, altered provenance and hidden findings and retains rejected evidence
+  ---
+  duration_ms: 237.207167
+  ...
+# Subtest: main routes scoped plan/target/read; owner handover fences new work while exact adopted preservation and extraction survive
+ok 14 - main routes scoped plan/target/read; owner handover fences new work while exact adopted preservation and extraction survive
+  ---
+  duration_ms: 462.822584
+  ...
+# Subtest: unknown terminal execution remains exact current evidence and blocks permission without spoiling immutable extraction
+ok 15 - unknown terminal execution remains exact current evidence and blocks permission without spoiling immutable extraction
+  ---
+  duration_ms: 272.531125
+  ...
+# Subtest: unknown current home scope and domain dependencies stay mandatory despite integration relabeling
+ok 16 - unknown current home scope and domain dependencies stay mandatory despite integration relabeling
+  ---
+  duration_ms: 1112.479958
+  ...
+# Subtest: regression: interface must include every exact incident-domain home
+ok 17 - regression: interface must include every exact incident-domain home
+  ---
+  duration_ms: 497.342167
+  ...
+# Subtest: separate governing scopes reuse receipts through qualified archive growth and unrelated requalification
+ok 18 - separate governing scopes reuse receipts through qualified archive growth and unrelated requalification
+  ---
+  duration_ms: 8541.353667
+  ...
+# Subtest: ordinary worker producer edge binds exact outcome and native closure while keeping source-only identity reusable
+ok 19 - ordinary worker producer edge binds exact outcome and native closure while keeping source-only identity reusable
+  ---
+  duration_ms: 362.188666
+  ...
+# Subtest: regression: a represented governing rule retains its same-scope artifact home
+ok 20 - regression: a represented governing rule retains its same-scope artifact home
+  ---
+  duration_ms: 1879.919
+  ...
+# Subtest: typed mandatory dependencies and changed artifact homes remain exact governing evidence
+ok 21 - typed mandatory dependencies and changed artifact homes remain exact governing evidence
+  ---
+  duration_ms: 1775.699959
+  ...
+# Subtest: new global scope expansion widens old homes in fresh applicability instead of hiding their bodies
+ok 22 - new global scope expansion widens old homes in fresh applicability instead of hiding their bodies
+  ---
+  duration_ms: 1178.826042
+  ...
+# Subtest: root authority changes and changed or removed scope rules widen fresh review inputs
+ok 23 - root authority changes and changed or removed scope rules widen fresh review inputs
+  ---
+  duration_ms: 3070.952542
+  ...
+# Subtest: clipped natural-language qualifier holds until a new explicit supporting bundle supplies its entire boundary
+ok 24 - clipped natural-language qualifier holds until a new explicit supporting bundle supplies its entire boundary
+  ---
+  duration_ms: 252.650584
+  ...
+# Subtest: exact ordered supporting ranges and hashes survive canonical artifact delivery; only identical bundles reuse
+ok 25 - exact ordered supporting ranges and hashes survive canonical artifact delivery; only identical bundles reuse
+  ---
+  duration_ms: 482.802625
+  ...
+# Subtest: invalid support IDs and altered bundle provenance cannot substitute for exact frozen delivery
+ok 26 - invalid support IDs and altered bundle provenance cannot substitute for exact frozen delivery
+  ---
+  duration_ms: 1089.434792
+  ...
+# Subtest: supporting units do not count as primary coverage; exact independent primaries still complete
+ok 27 - supporting units do not count as primary coverage; exact independent primaries still complete
+  ---
+  duration_ms: 916.099584
+  ...
+# Subtest: an explicit supporting context set above the original input ceiling holds without dispatch
+ok 28 - an explicit supporting context set above the original input ceiling holds without dispatch
+  ---
+  duration_ms: 68.638333
+  ...
+# Subtest: recovery regression: oversized compulsory global holds legacy scoped assignment without dispatch or evidence mutation
+ok 29 - recovery regression: oversized compulsory global holds legacy scoped assignment without dispatch or evidence mutation
+  ---
+  duration_ms: 208.867792
+  ...
+# Subtest: recovery stream CONTRACT DOUBLE: complete bounded UTF8 delivery, full integration closure and immutable extraction reuse
+ok 30 - recovery stream CONTRACT DOUBLE: complete bounded UTF8 delivery, full integration closure and immutable extraction reuse
+  ---
+  duration_ms: 3474.423167
+  ...
+# {"contract_double":true,"domain_requests":7,"integration_requests":7,"max_request_utf8_bytes":48000,"integration_body_utf8_bytes":230382}
+# Subtest: recovery stream rejects missing/reordered/substituted ranges, corrupt bodies, wrong native and unconfirmed closure
+ok 31 - recovery stream rejects missing/reordered/substituted ranges, corrupt bodies, wrong native and unconfirmed closure
+  ---
+  duration_ms: 3252.593333
+  ...
+# Subtest: recovery stream canonical current freshness: notices, authority, outcomes, governing and home mutation hold; extraction reused
+ok 32 - recovery stream canonical current freshness: notices, authority, outcomes, governing and home mutation hold; extraction reused
+  ---
+  duration_ms: 3494.935708
+  ...
+# Subtest: recovery stream worker rejects premature Pass, wrong ack/order, changed native and mid-delivery current changes
+ok 33 - recovery stream worker rejects premature Pass, wrong ack/order, changed native and mid-delivery current changes
+  ---
+  duration_ms: 2880.193666
+  ...
+# Subtest: recovery stream CONTRACT DOUBLE: more than sixteen pages and oversized homes/dependencies reach same reviewer
+ok 34 - recovery stream CONTRACT DOUBLE: more than sixteen pages and oversized homes/dependencies reach same reviewer
+  ---
+  duration_ms: 9049.849834
+  ...
+# {"contract_double":true,"requests":26,"body_utf8_bytes":947154,"max_request_utf8_bytes":48000}
+# Subtest: recovery stream preserves explicit unknown outcomes and rejects nonindependent native even after full transport
+ok 35 - recovery stream preserves explicit unknown outcomes and rejects nonindependent native even after full transport
+  ---
+  duration_ms: 1504.684625
+  ...
+# Subtest: recovery stream rejected observed identities never poison accepted extraction receipts
+ok 36 - recovery stream rejected observed identities never poison accepted extraction receipts
+  ---
+  duration_ms: 1593.029292
+  ...
+# Subtest: forward native admission rejects earlier failed observations across single-packet and streamed jobs
+ok 37 - forward native admission rejects earlier failed observations across single-packet and streamed jobs
+  ---
+  duration_ms: 5040.2385
+  ...
+# Subtest: single-packet rejected identities preserve older canonical extraction and never become bindings
+ok 38 - single-packet rejected identities preserve older canonical extraction and never become bindings
+  ---
+  duration_ms: 1103.461
+  ...
+# Subtest: later changed stream identity is retained separately and barred from future admission in both protocols
+ok 39 - later changed stream identity is retained separately and barred from future admission in both protocols
+  ---
+  duration_ms: 1474.628458
+  ...
+# Subtest: recovery stream CONTRACT DOUBLE: nonempty independent interfaces deliver peer homes, dependencies and closure
+ok 40 - recovery stream CONTRACT DOUBLE: nonempty independent interfaces deliver peer homes, dependencies and closure
+  ---
+  duration_ms: 17718.2395
+  ...
+# Subtest: stream ranges explicitly preserve surrogate boundaries, escaping and exact reconstruction
+ok 41 - stream ranges explicitly preserve surrogate boundaries, escaping and exact reconstruction
+  ---
+  duration_ms: 91.007792
+  ...
+# (node:1528) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: dispatch validates and persists policy, and main keeps software-test limits separate
+ok 42 - dispatch validates and persists policy, and main keeps software-test limits separate
+  ---
+  duration_ms: 10.020292
+  ...
+# Subtest: upgrade review-window schema is bounded and runtime rejects invalid or misplaced requests before binding
+ok 43 - upgrade review-window schema is bounded and runtime rejects invalid or misplaced requests before binding
+  ---
+  duration_ms: 4.829083
+  ...
+# Subtest: status distinguishes long execution, grace, startup, queue, legacy and inspection
+ok 44 - status distinguishes long execution, grace, startup, queue, legacy and inspection
+  ---
+  duration_ms: 9.158625
+  ...
+# Subtest: reconciliation rechecks eligibility inside the store transaction
+ok 45 - reconciliation rechecks eligibility inside the store transaction
+  ---
+  duration_ms: 1.813791
+  ...
+# Subtest: worker queue delay does not consume custom execution time; actual callback is persisted
+ok 46 - worker queue delay does not consume custom execution time; actual callback is persisted
+  ---
+  duration_ms: 4.214833
+  ...
+# Subtest: new jobs require spawn evidence; legacy injected models remain compatible
+ok 47 - new jobs require spawn evidence; legacy injected models remain compatible
+  ---
+  duration_ms: 2.798666
+  ...
+# Subtest: deadline aborts and late output is quarantined even if model ignores cancellation
+ok 48 - deadline aborts and late output is quarantined even if model ignores cancellation
+  ---
+  duration_ms: 1.409375
+  ...
+# Subtest: pause, ownership loss, context change and scope revocation abort active work
+ok 49 - pause, ownership loss, context change and scope revocation abort active work
+  ---
+  duration_ms: 10.19075
+  ...
+# Subtest: startup expiry aborts without inventing spawn timing and launch errors retain evidence
+ok 50 - startup expiry aborts without inventing spawn timing and launch errors retain evidence
+  ---
+  duration_ms: 2.927166
+  ...
+# Subtest: coordination dispatch binds prerequisite evidence, admits disjoint resources and rejects premature/conflicting work
+ok 51 - coordination dispatch binds prerequisite evidence, admits disjoint resources and rejects premature/conflicting work
+  ---
+  duration_ms: 2.461083
+  ...
+# Subtest: uncertain cancellation keeps resource claim; confirmed closure releases it
+ok 52 - uncertain cancellation keeps resource claim; confirmed closure releases it
+  ---
+  duration_ms: 3.426
+  ...
+# Subtest: upgrade call ceiling schema and runtime reject invalid options before all boundaries
+ok 53 - upgrade call ceiling schema and runtime reject invalid options before all boundaries
+  ---
+  duration_ms: 1.68
+  ...
+# Subtest: stream publication fence quarantines deadline crossed during final validation without session mutation
+ok 54 - stream publication fence quarantines deadline crossed during final validation without session mutation
+  ---
+  duration_ms: 11.088833
+  ...
+# Subtest: stream exact deadline closure and delayed timers cannot publish late Pass or renew allowance
+ok 55 - stream exact deadline closure and delayed timers cannot publish late Pass or renew allowance
+  ---
+  duration_ms: 23.829834
+  ...
+1..55
+# tests 55
+# suites 0
+# pass 55
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 104803.767542

@@ -1,0 +1,63 @@
+{
+  "cwd": "/private/tmp/soloco-native-admission-20261106/source",
+  "commands": {
+    "affected-node22.tap": "/private/tmp/soloco-node22-validation/node-v22.13.0-darwin-arm64/bin/node --test tests/scoped-context.test.mjs tests/timeout-wiring.test.mjs",
+    "affected-node25.tap": "/opt/homebrew/bin/node --test tests/scoped-context.test.mjs tests/timeout-wiring.test.mjs",
+    "worker-compat-node22.tap": "/private/tmp/soloco-node22-validation/node-v22.13.0-darwin-arm64/bin/node --test tests/timeout.test.mjs tests/cancellation-finalization.test.mjs tests/handover.test.mjs tests/handover-review-window.test.mjs tests/upgrade-evidence.test.mjs",
+    "worker-compat-node25.tap": "/opt/homebrew/bin/node --test tests/timeout.test.mjs tests/cancellation-finalization.test.mjs tests/handover.test.mjs tests/handover-review-window.test.mjs tests/upgrade-evidence.test.mjs",
+    "context-node22.tap": "/private/tmp/soloco-node22-validation/node-v22.13.0-darwin-arm64/bin/node --test --test-name-pattern='worker|wire-size|malformed raw|canonical apply rechecks|complete extraction, independent|historical checkpoint|exact source, counterpart|notice deliveries' tests/context-qualification.test.mjs",
+    "context-node25.tap": "/opt/homebrew/bin/node --test --test-name-pattern='worker|wire-size|malformed raw|canonical apply rechecks|complete extraction, independent|historical checkpoint|exact source, counterpart|notice deliveries' tests/context-qualification.test.mjs",
+    "precheck-reproduced-node22.tap": "/private/tmp/soloco-node22-validation/node-v22.13.0-darwin-arm64/bin/node --test --test-name-pattern='forward native admission' tests/scoped-context.test.mjs",
+    "source-diff-check.log": "git diff --check -- plugins/soloco/runtime/scoped-context.mjs plugins/soloco/runtime/worker.mjs tests/scoped-context.test.mjs docs/scoped-context.md"
+  },
+  "results": {
+    "affected-node22.tap": {
+      "exit_code": 0,
+      "tests": 55,
+      "pass": 55,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    "affected-node25.tap": {
+      "exit_code": 0,
+      "tests": 55,
+      "pass": 55,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    "worker-compat-node22.tap": {
+      "exit_code": 0,
+      "tests": 84,
+      "pass": 84,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    "worker-compat-node25.tap": {
+      "exit_code": 0,
+      "tests": 84,
+      "pass": 84,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    "context-node22.tap": {
+      "exit_code": 0,
+      "tests": 18,
+      "pass": 18,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    "context-node25.tap": {
+      "exit_code": 0,
+      "tests": 18,
+      "pass": 18,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    }
+  }
+}

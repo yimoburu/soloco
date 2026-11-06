@@ -168,17 +168,16 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
       if(session&&session!==output.native_id)throw Error('Supplemental read changed native identity');
       if(context.stream){
         if(!callTiming||controller.signal.aborted)throw Error('Scoped stream invocation timing/closure unproven');
-        withStore(root,db=>{const current=db.read();scoped.validateScopedStreamNative(current,current.jobs[jobId],output.native_id);});
         scopedStreamLedger??=createScopedStreamLedger(context,job,output.native_id);
         const delivered=recordScopedStreamDelivery(scopedStreamLedger,context,job,output.native_id,request,callTiming,stamp());
-        withStore(root,db=>db.transaction('job.scoped_stream_delivered',s=>{const current=eligibility(s);current.native_id=output.native_id;current.qualification_delivery=delivered;return s;}));
+        withStore(root,db=>db.transaction('job.scoped_stream_delivered',s=>{const current=eligibility(s);scoped.validateScopedStreamNative(s,current,output.native_id);current.native_id=output.native_id;current.qualification_delivery=delivered;return s;}));
         partitionDelivery=delivered;
         if(!partitionDelivery.complete){
           validateScopedStreamAck(output.text,context,round);
           session=output.native_id;request=context.stream.pages[round+1].wire;continue;
         }
       }else if(context.qualification){
-        withStore(root,db=>db.transaction('job.partition_delivered',s=>{const current=eligibility(s);partitionDelivery=(scopedContext(context)?scoped.scopedDelivery:qualificationDelivery)(context,current,output.native_id,request);current.qualification_delivery=partitionDelivery;return s;}));
+        withStore(root,db=>db.transaction('job.partition_delivered',s=>{const current=eligibility(s);if(scopedContext(context)){if(!callTiming||controller.signal.aborted)throw Error('Scoped invocation timing/closure unproven');scoped.validateScopedNativeAdmission(s,current,output.native_id);current.native_id=output.native_id;}partitionDelivery=(scopedContext(context)?scoped.scopedDelivery:qualificationDelivery)(context,current,output.native_id,request);current.qualification_delivery=partitionDelivery;return s;}));
       }
       if(context.handover_evidence){
         if(!output.native_id||output.native_id===target.author_instance||output.native_id===state.owner.session_id)throw Error('Handover review requires independent native identity');
@@ -308,7 +307,7 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
         // A failed scoped response is observed evidence, never a newly accepted
         // reviewer identity. Earlier delivered identities and receipts survive
         // failures before timing, cancellation or independence validation.
-        if(output?.native_id){if(scopedContext(context))current.rejected_native_id=output.native_id;else current.native_id=output.native_id;}
+        if(output?.native_id){if(scopedContext(context)){current.rejected_native_ids=[...new Set([...(current.rejected_native_ids??[]),current.rejected_native_id,output.native_id].filter(Boolean))];current.rejected_native_id=output.native_id;}else current.native_id=output.native_id;}
         if(output?.model_evidence)current.model_evidence=output.model_evidence;
         if(artifact || context?.qualification&&typeof output?.text==='string') {
           const rejected=context?.qualification?output.text:JSON.stringify(artifact);

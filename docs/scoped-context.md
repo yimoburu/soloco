@@ -144,6 +144,18 @@ and rechecks the complete receipt plus ordinary current freshness/independence.
 Failures and rejected outputs remain retained. There is no separate global
 semantic certificate, automatic retry or renewed allowance.
 
+Fresh native admission is separate from canonical receipt revalidation. For both
+single-packet and streamed scoped jobs, the worker checks timing, eligibility and
+independence before atomically storing the first native binding and delivery.
+At that transaction, a native previously retained in any job's
+`rejected_native_id` or `rejected_native_ids` cannot be newly bound. Failed
+observations remain data; missing-timing or aborted first responses bind nothing.
+An admitted stream continues under its own unchanged native; a changed native
+holds and is retained separately. Later failed observations cannot retroactively
+invalidate an earlier valid receipt or its immutable extraction reuse. Canonical
+validation retains its existing independence checks without this forward history
+scan. The temporal boundary is committed admission order, not timestamp ordering.
+
 Every invocation remains capped at 600 seconds; the existing total job execution
 deadline also remains binding, with no new window or extension. There is no fixed
 16-page cutoff for this opt-in stream. Transport completion does not establish

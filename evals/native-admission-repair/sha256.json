@@ -1,0 +1,17 @@
+{
+  "evals/native-admission-repair/affected-node22.tap": "5f6911c26dbb5867901ba7b7f6147c34e405c94ea24581e735ee6c86aad2e2a8",
+  "evals/native-admission-repair/affected-node25.tap": "66a7d6c32d7e715e49cc1e49e9df69c94044a191d5d614038388f68fa381c427",
+  "evals/native-admission-repair/changed-focused-node22.tap": "61fe54d6c496e5fdf6a546cf5c63ad25f34b2767868fa1a1902bfa9e5054a8e4",
+  "evals/native-admission-repair/commands.json": "6689157518c67a0d37aff04cc09b62a1f2d4f23ce822d5e50db028f4b225e6a7",
+  "evals/native-admission-repair/context-node22.tap": "53d1a12c3db6b17f6ebc6541c49588c57af52a75bdb7dada9cea8339ef66e872",
+  "evals/native-admission-repair/context-node25.tap": "e14543d46d87db3f950de101f3b9f888232cf46c6384e9324a7e80ee1a2ae0d3",
+  "evals/native-admission-repair/initial-focused-node22.tap": "21dc2ad651a90aded94da7c09951d9731b4361287f4b430a3769289891a37550",
+  "evals/native-admission-repair/precheck-fixture-one-page-node22.tap": "002c9a0dabd72fc1aececc843e0de5897a228045d10999d3294ae0ebb172151e",
+  "evals/native-admission-repair/precheck-reproduced-node22.tap": "09bb2cb8091eb1a1648274477765a9b59af8a7b4cf4af46b79963858c68f1d05",
+  "evals/native-admission-repair/report.md": "030ed8076be1ae18982a6a03b572a8d7008ef8221b47c220eb7dccf301ea2e5b",
+  "evals/native-admission-repair/source-diff-check.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "evals/native-admission-repair/source-identity.json": "38ff097e0aabfc80c1abb3152313c240ffb9c7fb6378bbe5dbb3370842ff5423",
+  "evals/native-admission-repair/source.patch": "13248d2ac44baf86d24b9ae9f9d0b7a363feb3915353c83e004e8f281b4126ba",
+  "evals/native-admission-repair/worker-compat-node22.tap": "81980292933c60c1c5812b2d1eb69616d2f4272969a5f71bbe4d1d306a08824f",
+  "evals/native-admission-repair/worker-compat-node25.tap": "152b0fda1ec3e734cbaea045b8858c8b41bda8a6ac6ccb69283744324cb33c64"
+}

@@ -1,0 +1,95 @@
+{
+  "base": "bb9921c120f770c42e39076d2f144adef22ddb92",
+  "source": {
+    "plugins/soloco/runtime/scoped-context.mjs": {
+      "sha256": "c9e314b36d155b6fce48ac0998dda6c30826a36051dcbdd7ba591e25243e9906",
+      "base_sha256": "2002012195396ad511e5d7c7e74531e32d2c1d33c42c1aa5919fc56123c5d729",
+      "unchanged": false
+    },
+    "plugins/soloco/runtime/worker.mjs": {
+      "sha256": "6301c5f0d167d1456544b583b7dacb8708228b1d0fb19c86f242288e432b1c93",
+      "base_sha256": "5aa03b2511549f3215270a605266ac8a0f7e9829bf50fa1b7b339098f673292a",
+      "unchanged": false
+    },
+    "tests/scoped-context.test.mjs": {
+      "sha256": "b195254c429bf1a53ec981f6733a2ebdbe9baa6cbd8439c543a5b08e2699a0c9",
+      "base_sha256": "240a88618dadb70de6ea37125dec5d7e64bbfa8f3e5aaccc573a1af476807764",
+      "unchanged": false
+    },
+    "docs/scoped-context.md": {
+      "sha256": "f6f40713d05e802dbe89647d8a5199ea22171e0366f72bab7c3b682da64fe351",
+      "base_sha256": "fb4090b9fd897ff0618b20295b5d419ce1a32047d1f5fc030d8f168c2da41a33",
+      "unchanged": false
+    },
+    "plugins/soloco/runtime/scoped-stream.mjs": {
+      "sha256": "ce983bf54dd63efc22f4ea11a77c398b262cf1183f6bbfc248ce6641b6ea14ff",
+      "base_sha256": "ce983bf54dd63efc22f4ea11a77c398b262cf1183f6bbfc248ce6641b6ea14ff",
+      "unchanged": true
+    },
+    "plugins/soloco/runtime/timeout.mjs": {
+      "sha256": "586c5f44f98742320119f0b42d0612dd79cf970f4e858f05e7d65953c31951a4",
+      "base_sha256": "586c5f44f98742320119f0b42d0612dd79cf970f4e858f05e7d65953c31951a4",
+      "unchanged": true
+    },
+    "plugins/soloco/runtime/handover.mjs": {
+      "sha256": "55c584a97b6605e78231599b0aeecbbd1b97a86d22e6a522ebb75a7a76a759c1",
+      "base_sha256": "55c584a97b6605e78231599b0aeecbbd1b97a86d22e6a522ebb75a7a76a759c1",
+      "unchanged": true
+    },
+    "plugins/soloco/runtime/adapters.mjs": {
+      "sha256": "475401b8504b7cf8db0ef7bab303bd9c92360d2b7a9adbd011fd891c18c31e55",
+      "base_sha256": "475401b8504b7cf8db0ef7bab303bd9c92360d2b7a9adbd011fd891c18c31e55",
+      "unchanged": true
+    },
+    "plugins/soloco/runtime/context.mjs": {
+      "sha256": "083e7388cfe83fe3debacf0fb45e667a7298c30eb76f5fc68c35f0b986fe39e0",
+      "base_sha256": "083e7388cfe83fe3debacf0fb45e667a7298c30eb76f5fc68c35f0b986fe39e0",
+      "unchanged": true
+    },
+    "plugins/soloco/runtime/current-state.mjs": {
+      "sha256": "5b361702da492f38cf355524e1514407e7c3957a627ba84b0b2275676c8e75f9",
+      "base_sha256": "5b361702da492f38cf355524e1514407e7c3957a627ba84b0b2275676c8e75f9",
+      "unchanged": true
+    },
+    "plugins/soloco/runtime/engine.mjs": {
+      "sha256": "c36e59af9a646af97898dd8d09e5bc713b6c683fdd5e6172a9a8667b0ed7d45a",
+      "base_sha256": "c36e59af9a646af97898dd8d09e5bc713b6c683fdd5e6172a9a8667b0ed7d45a",
+      "unchanged": true
+    },
+    "plugins/soloco/runtime/store.mjs": {
+      "sha256": "a8242f57ef7d3bc246d974f96589c4dced95729786bdfd678ba85e1bda0f97ba",
+      "base_sha256": "a8242f57ef7d3bc246d974f96589c4dced95729786bdfd678ba85e1bda0f97ba",
+      "unchanged": true
+    },
+    "plugins/soloco/assets/governance.md": {
+      "sha256": "28f99838abc3794da94f97f7a2d234554811da3aef7b8ddb3742075caa78ec36",
+      "base_sha256": "28f99838abc3794da94f97f7a2d234554811da3aef7b8ddb3742075caa78ec36",
+      "unchanged": true
+    },
+    "plugins/soloco/assets/roles.json": {
+      "sha256": "7e9f4f387f3622123fe8dbd69dd3cf0aa17943628d71ff03971d4ab4a8abd7ba",
+      "base_sha256": "7e9f4f387f3622123fe8dbd69dd3cf0aa17943628d71ff03971d4ab4a8abd7ba",
+      "unchanged": true
+    },
+    "plugins/soloco/.codex-plugin/plugin.json": {
+      "sha256": "6ca885a100693f36a419cbbf80ea20eff9181705b20426315e1bcc4e9eaa3736",
+      "base_sha256": "6ca885a100693f36a419cbbf80ea20eff9181705b20426315e1bcc4e9eaa3736",
+      "unchanged": true
+    },
+    "plugins/soloco/.claude-plugin/plugin.json": {
+      "sha256": "e5b67c26f33c4a3ffdf91859f48f418e6de48acdac2538675ae39d53f4f3e67d",
+      "base_sha256": "e5b67c26f33c4a3ffdf91859f48f418e6de48acdac2538675ae39d53f4f3e67d",
+      "unchanged": true
+    },
+    "tests/fixtures/governance-v018.md": {
+      "sha256": "185933ddeafe9709bef44e9a6605ba7adb5faaa8bc43c1c64f1da3b03ae5f400",
+      "base_sha256": "185933ddeafe9709bef44e9a6605ba7adb5faaa8bc43c1c64f1da3b03ae5f400",
+      "unchanged": true
+    },
+    "SPEC.md": {
+      "sha256": "28f99838abc3794da94f97f7a2d234554811da3aef7b8ddb3742075caa78ec36",
+      "base_sha256": "28f99838abc3794da94f97f7a2d234554811da3aef7b8ddb3742075caa78ec36",
+      "unchanged": true
+    }
+  }
+}
