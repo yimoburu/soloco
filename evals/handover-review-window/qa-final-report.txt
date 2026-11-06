@@ -1,0 +1,17 @@
+**Code integration: Pass. Compatible publication: Blocked.**
+
+The status-array addition correctly aligns published v0.7.0 eligibility with dispatch. Composite evidence is proportionate: complete **559/559** matrices on `5207a24`, plus complete affected suites on `a1e29a8`, with the other 148 files unchanged. This establishes no final-tree 560/560 full-run claim.
+
+Two README occurrences remain unrepaired according to the exact diffs:
+
+- The local-development paragraph still names unsupported `0.6.14` and omits `0.7.0`/`0.7.1`.
+- The later upgrade paragraph still labels `docs/structural-scalability-validation.md` as **v0.7.1 validation**, although it documents v0.7.0.
+
+Required closure conditions:
+
+- Correct those occurrences and record the resulting final commit/tree/manifest; verify only documentation changes beyond reviewed `a1e29a87df7f197ea4f380fea2fd7e4f3af9ec3c`.
+- Retain successful complete public-response, selection-wiring and actual old-writer-fence suites on both runtimes, bound to the reviewed runtime/test bytes, with zero failures/skips/cancellations.
+- Root verifies complete full-suite receipts, package/source equality, v0.7.1 identity, published v0.7.0 ancestry, and successful build/diff checks.
+- Reconcile the earlier `5207a24` manifest digest `931494…` with Node 22’s `4e9f04…`; document any serialization difference and establish per-file equality.
+
+Root may close these conditions without another advisory call. Prior failures remain retained. Supplied-source review only; effective settings remain unverified. Company remains paused/Blocked; separate same-native handover QA remains required. No installation, adoption or resume authority.

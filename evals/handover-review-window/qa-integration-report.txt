@@ -1,0 +1,17 @@
+**Code integration: Pass, subject to final receipts. Compatible publication: Blocked.**
+
+No runtime blocker found in the supplied integration seams. Protocol-v3 context and qualification remain intact; window admission remains separate from ordinary `fresh_session`; timing, quarantine and resume guards survive the merge; published v0.7.0 is explicitly compatible.
+
+Required publication repairs:
+
+- Correct README’s development-team list: it incorrectly adds unsupported `0.6.14` and omits supported `0.7.0`/`0.7.1`.
+- Restore the validation link’s **v0.7.0** attribution or supply an accurate v0.7.1 validation record. The linked upstream evidence does not establish this merged candidate’s completed matrices.
+
+Exact receipt conditions:
+
+- Complete merged-suite Node 22/25 runs, both exit 0, every expected test passing, zero failures/skips/cancellations; no substituted subset or prior-candidate results.
+- Build/diff checks exit 0; root verifies all 151 manifest entries, packaged bytes, v0.7.1 manifests/cache path and final source equality.
+- Bind evidence to commit `5207a245558b9e12ab24b86bf4b3896b7838b0d1`, tree `bcdd31ff44bc3149cb9def82e8fb444b5915978c`, manifest `93149469041f61b4f71807571c0cbc2a40a2a1524cb4d9fe7e742cddc71027c2`. For the required documentation corrections, record the resulting identity and verify runtime/test bytes remain identical. Preserve published v0.7.0 ancestry and all prior failures.
+- Root may close these receipt conditions without another advisory round.
+
+Limits: supplied-source review only; hashes and runs unverified here. Prior Fail and repair Pass remain retained; detached-pause cause remains unknown. Effective settings remain unverified. Current company stays Blocked/paused; separate same-native handover QA remains required. No installation, adoption or resume authority.

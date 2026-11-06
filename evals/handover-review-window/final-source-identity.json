@@ -1,0 +1,11 @@
+{
+  "commit": "a1e29a87df7f197ea4f380fea2fd7e4f3af9ec3c",
+  "tree": "4eed46f1c8e83b35120d6be5f52cba16f8c5c024",
+  "manifest_sha256": "9c4ef2b24e618ead0a19c86c69594c13c583e5c2a68cd8be14b517330dc913e7",
+  "files": 151,
+  "changed_since_full_matrix": [
+    "README.md",
+    "plugins/soloco/runtime/public-response.mjs",
+    "tests/public-response.test.mjs"
+  ]
+}

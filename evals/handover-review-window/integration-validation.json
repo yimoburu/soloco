@@ -1,0 +1,71 @@
+{
+  "full_matrix_commit": "5207a245558b9e12ab24b86bf4b3896b7838b0d1",
+  "final_behavioral_commit": "a1e29a87df7f197ea4f380fea2fd7e4f3af9ec3c",
+  "full_matrix_files": 151,
+  "unchanged_files_between_tested_commits": 148,
+  "changed_paths": [
+    "README.md",
+    "plugins/soloco/runtime/public-response.mjs",
+    "tests/public-response.test.mjs"
+  ],
+  "runs": [
+    {
+      "label": "integration-full-node22",
+      "tests": 559,
+      "pass": 559,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "original_sha256": "f4b6c1adb1c7be0c249829454ba1761047abaf52fd15389bd6026c7b6e5f3135",
+      "log": "evals/handover-review-window/integration-full-node22.tap.gz",
+      "gzip_sha256": "70966ee6097ddcf46403671772cbf9925be931413084d695aba0e215ea2d59b2",
+      "exit_code": 0
+    },
+    {
+      "label": "integration-full-node25",
+      "tests": 559,
+      "pass": 559,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "original_sha256": "e9f215994e357289f358c13f863e7955d26023ef34f70fc75ec64149325eaed8",
+      "log": "evals/handover-review-window/integration-full-node25.tap.gz",
+      "gzip_sha256": "0e96fa315c3d55d6c405ef81eab6823a89e8f444a85c3cb09a45f635c15bb5c6",
+      "exit_code": 0
+    },
+    {
+      "label": "final-affected-node22",
+      "tests": 44,
+      "pass": 44,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "original_sha256": "4f8a305dfbe8cd084ba61bc319ba7e26f85789326164be32a2fdf9263d9287a6",
+      "log": "evals/handover-review-window/final-affected-node22.tap.gz",
+      "gzip_sha256": "7845d89e3226f4ff6ea0ea22d9cf6cc53abf35e2e16e7b74f3d4f236f3f8d203",
+      "exit_code": 0
+    },
+    {
+      "label": "final-affected-node25",
+      "tests": 44,
+      "pass": 44,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "original_sha256": "d5cbfdd05145dbf7533194ece47eb148241b57f3a685f139988d1f8ba67f087e",
+      "log": "evals/handover-review-window/final-affected-node25.tap.gz",
+      "gzip_sha256": "01f9d64a88f264dc9511cc5251eeb7e2b5be3e16fb68f45e23e12439007d5fde",
+      "exit_code": 0
+    }
+  ],
+  "manifest_serialization_reconciliation": {
+    "pretty_json_sha256": "93149469041f61b4f71807571c0cbc2a40a2a1524cb4d9fe7e742cddc71027c2",
+    "sorted_compact_json_sha256": "4e9f04d608c10085e7563367d1e040805e63925317e068fbf0a5d3dc8194cbfc",
+    "decoded_per_file_maps_equal": true,
+    "git_blob_equality": true
+  },
+  "qa_native_id": "01a1af34-8d30-78f3-a4e6-714ee9e0c3a2",
+  "disposition": "Retained candidate; code integration Pass. Publication was Blocked for documentation/receipt closure; the two remaining README corrections and exact evidence are now retained. No release or installation performed. Continue installed0.7.0 continuity workflow first; do not claim final-tree560/560 full matrices.",
+  "company_resume": "No current independent real-company handover Pass; company remains paused.",
+  "only_changes_after_reviewed_behavior": "Documentation and retained evidence; every runtime/test byte remains exact to a1e29a8."
+}
