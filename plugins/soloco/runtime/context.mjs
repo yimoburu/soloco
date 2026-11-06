@@ -27,7 +27,7 @@ export function assignmentContext(state, job) {
   if(job.context_format===6){
     const checkpoint=operatingContext(state,{scope:job.context_scope??'*',job_id:job.id});
     const records=(job.inputs??[]).map(ref=>{const r=state.records[ref.id];if(!r||r.revision!==ref.revision)throw Error('Assignment input version changed');return r;});
-    const text=JSON.stringify({protocol:'operating-assignment-v1',checkpoint,charter:state.roles[job.role],assignment:{task:job.task,context_scope:job.context_scope??'*',coordination:job.coordination??null,model_selection:job.model_selection??{mode:'default'}},records});
+    const text=JSON.stringify({protocol:'operating-assignment-v1',checkpoint,charter:state.roles[job.role],assignment:{task:job.task,context_scope:job.context_scope??'*',coordination:job.coordination??null,model_selection:job.model_selection??{mode:'default'}},records,supplemental_evidence:{protocol:'record-reads-v1',available:true,sources:job.supplemental_sources??[],lookup:'company_context inspect/read',rule:'Request exact known source IDs and hashes; missing input holds work'}});
     if(text.length>CONTEXT_LIMIT)throw Error('Operating assignment exceeds supported coherent context; Held');
     return {text,hash:digest(text),inputs:records.map(r=>({id:r.id,revision:r.revision}))};
   }

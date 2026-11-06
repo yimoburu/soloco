@@ -1,0 +1,14 @@
+(node:31701) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ same-owner pause/resume stays proportionate; fresh and cross-host replacements require reconstruction (496.208416ms)
+✔ exact independent QA allows preparation resume, preserves records/notices and durable acceptance (317.69475ms)
+✔ incomplete, non-independent, wrong-hash and blocked review cannot resume (486.639916ms)
+✔ state changes invalidate acceptance; hook delivery does not; failed review remains and revised reconstruction needs new review (552.047459ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1926.49475

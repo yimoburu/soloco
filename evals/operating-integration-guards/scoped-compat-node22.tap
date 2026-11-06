@@ -1,0 +1,42 @@
+TAP version 13
+# (node:29865) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: source-only extraction survives unrelated notice/global change and replacement uses canonical completed job receipt
+ok 1 - source-only extraction survives unrelated notice/global change and replacement uses canonical completed job receipt
+  ---
+  duration_ms: 857.510958
+  ...
+# Subtest: unknown source fields and current global rules are semantic; historical claims never current permission
+ok 2 - unknown source fields and current global rules are semantic; historical claims never current permission
+  ---
+  duration_ms: 564.314167
+  ...
+# Subtest: forward native admission rejects earlier failed observations across single-packet and streamed jobs
+ok 3 - forward native admission rejects earlier failed observations across single-packet and streamed jobs
+  ---
+  duration_ms: 2878.390458
+  ...
+# Subtest: single-packet rejected identities preserve older canonical extraction and never become bindings
+ok 4 - single-packet rejected identities preserve older canonical extraction and never become bindings
+  ---
+  duration_ms: 572.427
+  ...
+# Subtest: later changed stream identity is retained separately and barred from future admission in both protocols
+ok 5 - later changed stream identity is retained separately and barred from future admission in both protocols
+  ---
+  duration_ms: 839.328666
+  ...
+# Subtest: operating publication reuses existing exact scoped classification without poisoning its frozen global rules
+ok 6 - operating publication reuses existing exact scoped classification without poisoning its frozen global rules
+  ---
+  duration_ms: 693.99825
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 6495.731208

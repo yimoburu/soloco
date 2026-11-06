@@ -1,0 +1,16 @@
+(node:29875) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ source-only extraction survives unrelated notice/global change and replacement uses canonical completed job receipt (1248.652417ms)
+✔ unknown source fields and current global rules are semantic; historical claims never current permission (590.763833ms)
+✔ forward native admission rejects earlier failed observations across single-packet and streamed jobs (2919.817ms)
+✔ single-packet rejected identities preserve older canonical extraction and never become bindings (577.2815ms)
+✔ later changed stream identity is retained separately and barred from future admission in both protocols (783.181417ms)
+✔ operating publication reuses existing exact scoped classification without poisoning its frozen global rules (671.711917ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6871.843583

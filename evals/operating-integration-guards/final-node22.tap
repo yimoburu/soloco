@@ -1,0 +1,379 @@
+TAP version 13
+# (node:30029) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: actual store and worker admit concurrent disjoint roles and retain independent output lineage
+ok 1 - actual store and worker admit concurrent disjoint roles and retain independent output lineage
+  ---
+  duration_ms: 404.665792
+  ...
+# Subtest: format-3 supplemental failure keeps exclusive resources until that invocation closes
+ok 2 - format-3 supplemental failure keeps exclusive resources until that invocation closes
+  ---
+  duration_ms: 42.550667
+  ...
+# Subtest: format-3 dependency artifacts remain explicit inputs and coordination stays immutable
+ok 3 - format-3 dependency artifacts remain explicit inputs and coordination stays immutable
+  ---
+  duration_ms: 0.770292
+  ...
+# (node:30030) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: same-owner pause/resume stays proportionate; fresh and cross-host replacements require reconstruction
+ok 4 - same-owner pause/resume stays proportionate; fresh and cross-host replacements require reconstruction
+  ---
+  duration_ms: 529.8955
+  ...
+# Subtest: exact independent QA allows preparation resume, preserves records/notices and durable acceptance
+ok 5 - exact independent QA allows preparation resume, preserves records/notices and durable acceptance
+  ---
+  duration_ms: 777.2185
+  ...
+# Subtest: incomplete, non-independent, wrong-hash and blocked review cannot resume
+ok 6 - incomplete, non-independent, wrong-hash and blocked review cannot resume
+  ---
+  duration_ms: 530.625959
+  ...
+# Subtest: state changes invalidate acceptance; hook delivery does not; failed review remains and revised reconstruction needs new review
+ok 7 - state changes invalidate acceptance; hook delivery does not; failed review remains and revised reconstruction needs new review
+  ---
+  duration_ms: 537.930584
+  ...
+# Subtest: ordinary work cannot run during pending handover; pause cancels a check and late output quarantines
+ok 8 - ordinary work cannot run during pending handover; pause cancels a check and late output quarantines
+  ---
+  duration_ms: 96.012083
+  ...
+# Subtest: distinct mandatory semantics over 200k page without embedding the stream
+ok 9 - distinct mandatory semantics over 200k page without embedding the stream
+  ---
+  duration_ms: 136.223792
+  ...
+# Subtest: integration binds coordination metadata without duplicating frozen handover evidence
+ok 10 - integration binds coordination metadata without duplicating frozen handover evidence
+  ---
+  duration_ms: 40.001375
+  ...
+# Subtest: orphan classification provenance holds handover without revoking outgoing ownership
+ok 11 - orphan classification provenance holds handover without revoking outgoing ownership
+  ---
+  duration_ms: 17.794709
+  ...
+# Subtest: founder inspection, exact reads and submission receipts remain bounded while the full subject is retained
+ok 12 - founder inspection, exact reads and submission receipts remain bounded while the full subject is retained
+  ---
+  duration_ms: 114.300917
+  ...
+# Subtest: changed prior negative-review evidence invalidates a later Pass at resume
+ok 13 - changed prior negative-review evidence invalidates a later Pass at resume
+  ---
+  duration_ms: 272.578833
+  ...
+# Subtest: invalid retained evidence fails admission before owner, epoch, sessions or pause change
+ok 14 - invalid retained evidence fails admission before owner, epoch, sessions or pause change
+  ---
+  duration_ms: 20.798958
+  ...
+# Subtest: all previous reconstruction and review execution evidence remains current and retrievable
+ok 15 - all previous reconstruction and review execution evidence remains current and retrievable
+  ---
+  duration_ms: 840.566625
+  ...
+# Subtest: founder read response bounds include escaped payload and long source metadata
+ok 16 - founder read response bounds include escaped payload and long source metadata
+  ---
+  duration_ms: 49.239333
+  ...
+# Subtest: repaired reconstructions retain exact originals without recursively copying old snapshots
+ok 17 - repaired reconstructions retain exact originals without recursively copying old snapshots
+  ---
+  duration_ms: 1242.393375
+  ...
+# Subtest: failed handover with upgrade history reuses typed history semantics instead of reembedding checkpoints
+ok 18 - failed handover with upgrade history reuses typed history semantics instead of reembedding checkpoints
+  ---
+  duration_ms: 650.121375
+  ...
+# Required semantic characters across repaired submissions: 80629, 88355, 94664
+# Subtest: 25.7M fictional archive fits 200k; exact originals, mandatory legacy obligations and retrieval complete a full handover
+ok 19 - 25.7M fictional archive fits 200k; exact originals, mandatory legacy obligations and retrieval complete a full handover
+  ---
+  duration_ms: 40257.642792
+  ...
+# Subtest: frozen reads enforce exact Unicode ranges, hashes, scope, and delivery-bound citations
+ok 20 - frozen reads enforce exact Unicode ranges, hashes, scope, and delivery-bound citations
+  ---
+  duration_ms: 67.91825
+  ...
+# Subtest: worker rejects forged reads, stale canonical evidence, forged citations and native identity changes
+ok 21 - worker rejects forged reads, stale canonical evidence, forged citations and native identity changes
+  ---
+  duration_ms: 456.430208
+  ...
+# Subtest: handover reads can exceed sixteen rounds without changing native session or invalidating their own snapshot
+ok 22 - handover reads can exceed sixteen rounds without changing native session or invalidating their own snapshot
+  ---
+  duration_ms: 587.090208
+  ...
+# Subtest: current obligations and distinct legacy team rules stay compulsory regardless of resolved status or classification
+ok 23 - current obligations and distinct legacy team rules stay compulsory regardless of resolved status or classification
+  ---
+  duration_ms: 76.782
+  ...
+# Subtest: retained legacy v1 reconstruction and review still resume under their original contract
+ok 24 - retained legacy v1 reconstruction and review still resume under their original contract
+  ---
+  duration_ms: 73.171542
+  ...
+# Subtest: supplemental allowlist mutation cannot alter a running frozen handover assignment
+ok 25 - supplemental allowlist mutation cannot alter a running frozen handover assignment
+  ---
+  duration_ms: 119.094417
+  ...
+# Subtest: a reconstruction edited after QA cannot reuse its earlier Pass
+ok 26 - a reconstruction edited after QA cannot reuse its earlier Pass
+  ---
+  duration_ms: 121.980833
+  ...
+# Subtest: archival occurrence indexes and distinct current semantics stay retrievable outside the initial budget
+ok 27 - archival occurrence indexes and distinct current semantics stay retrievable outside the initial budget
+  ---
+  duration_ms: 446.482042
+  ...
+# Subtest: 227 varied fictional obligations and large pinned rules require complete same-native delivery before Pass
+ok 28 - 227 varied fictional obligations and large pinned rules require complete same-native delivery before Pass
+  ---
+  duration_ms: 10382.147792
+  ...
+# Subtest: escaped frozen read packets defer whole ranges within 200k without losing source bytes
+ok 29 - escaped frozen read packets defer whole ranges within 200k without losing source bytes
+  ---
+  duration_ms: 598.192833
+  ...
+# Subtest: compulsory delivery rejects a final gap, overlapping duplicates and another native ledger
+ok 30 - compulsory delivery rejects a final gap, overlapping duplicates and another native ledger
+  ---
+  duration_ms: 45.033584
+  ...
+# (node:30031) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# ordinary archive growth [{"scale":1,"archive_characters":184433,"context_characters":1451,"mandatory_records":7},{"scale":10,"archive_characters":1833494,"context_characters":1451,"mandatory_records":7},{"scale":100,"archive_characters":18324464,"context_characters":1451,"mandatory_records":7}]
+# Subtest: ordinary 1x/10x/100x archive growth preserves fixed current obligations and explicit evidence
+ok 31 - ordinary 1x/10x/100x archive growth preserves fixed current obligations and explicit evidence
+  ---
+  duration_ms: 807.753417
+  ...
+# (node:30032) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: pure builder preserves hidden prohibitions, exceptions, spent/revoked grants, failure, unknowns and attribution
+ok 32 - pure builder preserves hidden prohibitions, exceptions, spent/revoked grants, failure, unknowns and attribution
+  ---
+  duration_ms: 161.644084
+  ...
+# Subtest: repeated checkpoints, previous versions and retained handover remain reconstructible without original vault
+ok 33 - repeated checkpoints, previous versions and retained handover remain reconstructible without original vault
+  ---
+  duration_ms: 29.8285
+  ...
+# Subtest: canonical JSON text codec preserves STRING type, Unicode, ordered keys and array positions byte exactly
+ok 34 - canonical JSON text codec preserves STRING type, Unicode, ordered keys and array positions byte exactly
+  ---
+  duration_ms: 4.929458
+  ...
+# Subtest: producer/revision/date/scope/parent mutations and archive appends invalidate complete baseline
+ok 35 - producer/revision/date/scope/parent mutations and archive appends invalidate complete baseline
+  ---
+  duration_ms: 40.772667
+  ...
+# Subtest: missing/corrupt references, cycles, omissions, altered typed keys and resealed frontier holes hold
+ok 36 - missing/corrupt references, cycles, omissions, altered typed keys and resealed frontier holes hold
+  ---
+  duration_ms: 119.604792
+  ...
+# Subtest: same body has distinct occurrences across producer/revision/scope/date and parent contexts
+ok 37 - same body has distinct occurrences across producer/revision/scope/date and parent contexts
+  ---
+  duration_ms: 22.586167
+  ...
+# Subtest: overcapacity holds whole uncertain coupling and never implies global fit
+ok 38 - overcapacity holds whole uncertain coupling and never implies global fit
+  ---
+  duration_ms: 54.890458
+  ...
+# Subtest: capture uses existing SQLite transaction/vault; rollback does not publish capsule
+ok 39 - capture uses existing SQLite transaction/vault; rollback does not publish capsule
+  ---
+  duration_ms: 144.02075
+  ...
+# Subtest: forced digest collision never merges unequal exact definitions
+ok 40 - forced digest collision never merges unequal exact definitions
+  ---
+  duration_ms: 161.745792
+  ...
+# Subtest: ambiguous current/history source IDs and missing embedded raw originals hold
+ok 41 - ambiguous current/history source IDs and missing embedded raw originals hold
+  ---
+  duration_ms: 11.379333
+  ...
+# (node:30033) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning
+ok 42 - public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning
+  ---
+  duration_ms: 197.982709
+  ...
+# Subtest: missing legacy bootstrap is visibly DIRTY and apply rolls back without acceptance
+ok 43 - missing legacy bootstrap is visibly DIRTY and apply rolls back without acceptance
+  ---
+  duration_ms: 44.301417
+  ...
+# Subtest: new membership, changed exact source, wrong independent identity and absent closure cannot publish
+ok 44 - new membership, changed exact source, wrong independent identity and absent closure cannot publish
+  ---
+  duration_ms: 146.830334
+  ...
+# Subtest: scope closure, global membership, expiry, receipt changes, revocation and missed communication hold
+ok 45 - scope closure, global membership, expiry, receipt changes, revocation and missed communication hold
+  ---
+  duration_ms: 99.18825
+  ...
+# Subtest: pause fences publication reviewer and prospective handover cannot hide unknown legacy
+ok 46 - pause fences publication reviewer and prospective handover cannot hide unknown legacy
+  ---
+  duration_ms: 15.7695
+  ...
+# Subtest: 10x independently classified inert archive keeps actual mandatory operating assignment bytes and semantic work constant
+ok 47 - 10x independently classified inert archive keeps actual mandatory operating assignment bytes and semantic work constant
+  ---
+  duration_ms: 166.773167
+  ...
+# Subtest: deleted applicable home and changed exact provenance cannot disappear from accepted meaning
+ok 48 - deleted applicable home and changed exact provenance cannot disappear from accepted meaning
+  ---
+  duration_ms: 36.316959
+  ...
+# Subtest: typed outcome requires complete historical uncertainty; text cannot manufacture permission
+ok 49 - typed outcome requires complete historical uncertainty; text cannot manufacture permission
+  ---
+  duration_ms: 42.835416
+  ...
+# Subtest: public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure
+not ok 50 - public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure
+  ---
+  duration_ms: 104.154125
+  location: '/private/tmp/soloco-operating-integration-guards-20261106/source/tests/operating-state.test.mjs:53:1'
+  failureType: 'testCodeFailure'
+  error: 'Operating state Held: unclassified frontier: 1 DIRTY entries'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    fail (file:///private/tmp/soloco-operating-integration-guards-20261106/source/plugins/soloco/runtime/operating-state.mjs:6:22)
+    operatingContext (file:///private/tmp/soloco-operating-integration-guards-20261106/source/plugins/soloco/runtime/operating-state.mjs:137:76)
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-integration-guards-20261106/source/tests/operating-state.test.mjs:65:38)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: late new and changed falsely scoped prohibitions stay globally DIRTY, but fresh proposals include them
+ok 51 - late new and changed falsely scoped prohibitions stay globally DIRTY, but fresh proposals include them
+  ---
+  duration_ms: 104.8155
+  ...
+# Subtest: publication proof stays current; failed, quarantined, uncertain and unknown-extension siblings stay DIRTY
+ok 52 - publication proof stays current; failed, quarantined, uncertain and unknown-extension siblings stay DIRTY
+  ---
+  duration_ms: 27.869709
+  ...
+# Subtest: mechanical publication index rejects tampering and retains unknown state extensions
+ok 53 - mechanical publication index rejects tampering and retains unknown state extensions
+  ---
+  duration_ms: 21.091459
+  ...
+# Subtest: format6 explicit non-home evidence survives dispatch, discovery and bounded same-native reads
+ok 54 - format6 explicit non-home evidence survives dispatch, discovery and bounded same-native reads
+  ---
+  duration_ms: 265.458584
+  ...
+# (node:30034) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: unclassified legacy obligations stay mandatory; exact reviewed dispositions bound ordinary context
+ok 55 - unclassified legacy obligations stay mandatory; exact reviewed dispositions bound ordinary context
+  ---
+  duration_ms: 5.613667
+  ...
+# Subtest: resolved archive growth does not grow task pack; raw originals remain retrievable by exact hash
+ok 56 - resolved archive growth does not grow task pack; raw originals remain retrievable by exact hash
+  ---
+  duration_ms: 6.810459
+  ...
+# Subtest: presentation-only rename detection rejects unknown effects and producers
+ok 57 - presentation-only rename detection rejects unknown effects and producers
+  ---
+  duration_ms: 0.208792
+  ...
+# Subtest: explicit normalized migration backs up, round-trips unknown values and fences legacy writes
+ok 58 - explicit normalized migration backs up, round-trips unknown values and fences legacy writes
+  ---
+  duration_ms: 14.892792
+  ...
+# Subtest: immutable corruption is detected and transactions rollback without dropping archive
+ok 59 - immutable corruption is detected and transactions rollback without dropping archive
+  ---
+  duration_ms: 6.617167
+  ...
+# Subtest: current-state upgrade projection bounds reviewed record/history growth and preserves exact retrieval
+ok 60 - current-state upgrade projection bounds reviewed record/history growth and preserves exact retrieval
+  ---
+  duration_ms: 394.403334
+  ...
+# Subtest: current-state projection never conceals unknown or orphan classification metadata
+ok 61 - current-state projection never conceals unknown or orphan classification metadata
+  ---
+  duration_ms: 1.0035
+  ...
+# Subtest: archived job entries retain their exact typed classification provenance
+ok 62 - archived job entries retain their exact typed classification provenance
+  ---
+  duration_ms: 0.441958
+  ...
+# Subtest: portable backup inventories project configuration/candidates and explicit artifacts; tampering holds restore
+ok 63 - portable backup inventories project configuration/candidates and explicit artifacts; tampering holds restore
+  ---
+  duration_ms: 25.664583
+  ...
+# Subtest: durable supplemental dependencies invalidate returned work after source mutation
+ok 64 - durable supplemental dependencies invalidate returned work after source mutation
+  ---
+  duration_ms: 0.677417
+  ...
+# Subtest: public exact-plan classification applies only after independent review and retains originals
+ok 65 - public exact-plan classification applies only after independent review and retains originals
+  ---
+  duration_ms: 209.838458
+  ...
+# Subtest: classification rejects coordinator-native review and retained same-plan negative verdict
+ok 66 - classification rejects coordinator-native review and retained same-plan negative verdict
+  ---
+  duration_ms: 68.369375
+  ...
+# Subtest: public migration holds unfinished cancelled workers and requires explicit paused authority
+ok 67 - public migration holds unfinished cancelled workers and requires explicit paused authority
+  ---
+  duration_ms: 19.207375
+  ...
+# Subtest: targeted root deletion persists and absent immutable values never silently disappear
+ok 68 - targeted root deletion persists and absent immutable values never silently disappear
+  ---
+  duration_ms: 17.025959
+  ...
+# Subtest: transfers reject self-copy through company or selected artifact ancestors before creating output
+ok 69 - transfers reject self-copy through company or selected artifact ancestors before creating output
+  ---
+  duration_ms: 3.530375
+  ...
+1..69
+# tests 69
+# suites 0
+# pass 68
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 59319.074667

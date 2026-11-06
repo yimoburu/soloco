@@ -22,12 +22,12 @@ const mutate=(f,fn)=>withStore(f.root,db=>db.transaction('contract.fixture',s=>{
 const read=f=>withStore(f.root,db=>db.read());
 const call=(f,args)=>engine.contextControl({...f,...args},'codex');
 const token=(domain,n,status='OPEN')=>`OBL~${domain}~${String(n).padStart(3,'0')}~CUSTOMER_${n}_NO_EXPORT_ABOVE_${17*n+3}_ROWS_UNTIL_CONSENT_${n%7}_IN_REGION_${n%11}~${status}~END`;
-function fixture({count=1,domains=1,extra={},maintenance=false,kind='artifact',homeKind='artifact'}={}){
+function fixture({count=1,domains=1,extra={},maintenance=false,kind='artifact',homeKind='artifact',operating=false}={}){
   const root=fs.mkdtempSync(path.join(tmp,'company-')),session_id=id('owner'),f={root,session_id,epoch:1,source_instruction:'Explicit fixture instruction: qualify exact source read-only, preserve all failed evidence and OPEN uncertainty.'};
   engine.bind(root,session_id,'codex');engine.open({...f,idea:'Source-only contract fixture'},'codex');withStore(root,db=>db.migrate());
   const clauses=Array.from({length:count},(_,n)=>token('D'+String(Math.min(domains-1,Math.floor(n*domains/count))).padStart(2,'0'),n));
   mutate(f,s=>{s.roles={qa:{name:'Independent QA'},engineer:{name:'Engineer'}};s.governance='Preparation only. No execution or renewed allowance.';s.cos_instructions='Preserve uncertain effects and exhausted allowances.';s.records.old={id:'old',kind,revision:1,author_instance:'historical-producer',content:'Historical evidence grants no current permission.',clauses,...extra};if(maintenance)s.paused=true;s.team_sha256=teamHash(s);});
-  for(let d=0;d<domains;d++){const domain='D'+String(d).padStart(2,'0');engine.save({...f,id:'home-'+domain,kind:homeKind,content:clauses.filter((_,n)=>Math.min(domains-1,Math.floor(n*domains/count))===d).join('\n')||'No additional obligation.',context_obligations:{version:1,scope:domain}},'codex');}
+  for(let d=0;d<domains;d++){const domain='D'+String(d).padStart(2,'0');engine.save({...f,id:'home-'+domain,kind:homeKind,content:clauses.filter((_,n)=>Math.min(domains-1,Math.floor(n*domains/count))===d).join('\n')||'No additional obligation.',context_obligations:{version:1,scope:domain},...(operating?{operating_record:{version:1,kind:'obligation',scope:domain,owner:'runner',conditions:'Always',exceptions:'None',clearing:'Independent review',expires_at:null,dependencies:[],authority_refs:[],evidence_refs:['home-'+domain]}}:{})},'codex');}
   const p=call(f,{action:'plan',protocol,source_id:'old',maintenance});f.plan_id=p.id;f.original=p.original;f.units=p.units;f.all_units=call(f,{action:'inspect',plan_id:p.id,limit:16});f.extraction_identity=p.extraction_identity;f.clauses=clauses;return f;
 }
 function unitPages(f){const units=[];let offset=0;do{const page=call(f,{action:'inspect',plan_id:f.plan_id,offset,limit:16});units.push(...page.units);offset=page.next_offset;}while(offset!==null);return units;}
@@ -772,4 +772,20 @@ test('stream ranges explicitly preserve surrogate boundaries, escaping and exact
     }
     assert.equal(stream.pages.map(p=>JSON.parse(p.wire).text).join(''),raw);
   }
+});
+
+
+test('operating publication reuses existing exact scoped classification without poisoning its frozen global rules',async()=>{
+ const f=fixture({operating:true});await qualify(f);const before=read(f),classification=structuredClone(before.context_classifications.old);
+ const p=engine.contextControl({...f,protocol:'operating-state-v1',action:'plan'},'codex');assert.equal(p.held,false);
+ const q=engine.dispatch({...f,role:'qa',review_of:p.id,task:'Review exact prospective operating homes'},'codex',{check:()=>({available:true}),launch:()=>({on(){},unref(){}})});
+ await work(f.root,q.id,async(_h,_s,_prompt,_d,timeout,_selection,options)=>{options.onSpawn(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));return {native_id:'fictional-operating-independent',text:JSON.stringify({content:'CONTRACT DOUBLE: complete fictional home reviewed',messages:[],notices:[],review:{verdict:'Pass',reason:'Fictional complete conditions retained',permitted_action:'publish_operating_state',plan_sha256:sha(read(f).records[p.id].operating_plan),preservation_complete:true,interaction_complete:true,authority_checked:true,blockers:[]}})};});
+ const completed=read(f).jobs[q.id];assert.equal(completed.status,'completed',completed.error);
+ engine.contextControl({...f,protocol:'operating-state-v1',action:'apply',plan_id:p.id,review_id:completed.artifact_id},'codex');
+ const s=read(f);assert.deepEqual(s.context_classifications.old,classification);assert.equal(reviewedContext(s).excluded('old'),true);
+ const {operatingContext}=await import('../plugins/soloco/runtime/operating-state.mjs');assert.equal(operatingContext(s).homes.length,1);
+ for(const kind of ['tampered-index','unknown-index-field','unknown-state-field']){
+  const changed=inheritSnapshots(s,structuredClone(s));if(kind==='tampered-index')changed.operating_state.version=2;if(kind==='unknown-index-field')changed.operating_state.hidden='No retry';if(kind==='unknown-state-field')changed.hidden={rule:'No retry'};
+  assert.throws(()=>operatingContext(changed),/Held/);assert.deepEqual(changed.context_classifications.old,classification);
+ }
 });

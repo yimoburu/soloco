@@ -1,4 +1,5 @@
 import {validateScopedExclusion,SCOPED_PROTOCOL} from './scoped-context.mjs';
+import {validateOperatingIndex} from './operating-state.mjs';
 import {digest,requireText} from './store.mjs';
 import {snapshotReference,resolveSnapshot,resolveSnapshotEntry,hasSnapshotReferences,legacyHandoverSource} from './snapshot.mjs';
 import {buildQualificationEvidence,knownModelCatalog} from './upgrade-evidence.mjs';
@@ -7,7 +8,7 @@ const fields=['id','kind','author_role','recorded_by','content','status','action
 const knownStateFields=new Set(['id','name','idea','owner','schema','runtime_version','plugin_version','revision','created_at','updated_at','paused','mode','phase','team_sha256','governance','governance_sha256','cos_instructions','roles','records','jobs','sessions','notices','messages','upgrade','upgrade_history','retired_sessions','context_classifications','context_last_plan','handover']);
 const proofJobFields=new Set(['id','role','instance_id','session_key','native_id','host','epoch','status','artifact_id','review_of','inputs','context_format','context_scope','context_sha256','task','task_summary','next_handoff','model_selection','model_catalog','model_evidence','cli_version','requester','coordination','coordination_release','expected_deliverable','supplemental_sources','retrieved_inputs','created_at','started_at','finished_at','worker_pid','timeout_policy_version','timeout_minutes','timeout_ms','timeout_reason','execution_started_at','execution_deadline_at','termination_deadline_at']);
 const keysOnly=(v,keys)=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).every(k=>keys.includes(k));
-function proofJobSafe(job) {
+export function proofJobSafe(job) {
   if(Object.keys(job).some(k=>!proofJobFields.has(k)))return false;
   for(const key of ['review_of','requester','model_selection','model_catalog','model_evidence','coordination_release'])if(job[key]!==undefined&&job[key]!==null&&(typeof job[key]!=='object'||Array.isArray(job[key])))return false;
   const scalarObject=(value,keys)=>keysOnly(value,keys)&&Object.values(value).every(v=>v===null||typeof v!=='object');
@@ -31,7 +32,12 @@ function proofJobSafe(job) {
   }
   return true;
 }
-export function currentExtensions(state) {return Object.fromEntries(Object.entries(state).filter(([key])=>!knownStateFields.has(key)));}
+export function currentExtensions(state) {
+  // Prospective mechanical metadata is omitted only after exact receipt/index
+  // validation. With no publication, frozen classification inputs are unchanged.
+  if(Object.hasOwn(state,'operating_state'))validateOperatingIndex(state);
+  return Object.fromEntries(Object.entries(state).filter(([key])=>!knownStateFields.has(key)&&key!=='operating_state'));
+}
 // Only the supported runtime rename record shape is presentation-only. Unknown
 // fields/record producers remain conservative; no free-form status inference.
 export function presentationOnly(record) {

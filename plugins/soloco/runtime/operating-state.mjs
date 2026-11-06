@@ -1,6 +1,6 @@
 // Prospective only. Canonical classifications remain the preservation authority.
 import {digest,id,stamp} from './store.mjs';
-import {reviewedContext,recordReference,contextSource,currentExtensions} from './current-state.mjs';
+import {reviewedContext,recordReference,contextSource,currentExtensions,proofJobSafe} from './current-state.mjs';
 const sha=v=>digest(JSON.stringify(v));
 export const OPERATING_PROTOCOL='operating-state-v1';
 const fail=m=>{throw Error('Operating state Held: '+m);};
@@ -20,36 +20,64 @@ export function validateOperatingRecord(v){
 }
 function controls(s){const {operating_state,...rest}=s;return {company_id:s.id,idea:s.idea,team_sha256:s.team_sha256,governance:s.governance,cos_instructions:s.cos_instructions,roles:s.roles,mode:s.mode,phase:s.phase,upgrade:s.upgrade??null,extensions:currentExtensions(rest)};}
 function exact(s,r){const v=contextSource(s,r.id);if(!v||!same(recordReference(v,r.id),r))fail('source/receipt changed: '+r.id);return v;}
+const closed=(v,keys)=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).every(k=>keys.includes(k));
+function reviewJobSafe(j,handover=false){
+  const {handover_reads,...base}=j;
+  if(!proofJobSafe(handover?base:j))return false;
+  if(handover_reads!==undefined&&(!handover||!Array.isArray(handover_reads)||!handover_reads.every(r=>closed(r,['session_id','source_id','sha256','offset','end','total','range_sha256','subject_sha256'])&&Object.values(r).every(v=>typeof v==='string'||Number.isSafeInteger(v)))))return false;
+  return j.role==='qa'&&['queued','running','completed'].includes(j.status);
+}
+function reviewRecordSafe(r,j,t,handover){
+  if(!closed(r,['id','kind','content','author_role','author_instance','revision','status','job_id','inputs','retrieved_inputs','review_of','review','created_at',...(handover?['handover_evidence']:[])])||r.kind!=='review'||r.status!=='Submitted'||r.author_role!=='qa'||r.author_instance!==j.instance_id||r.job_id!==j.id||j.artifact_id!==r.id||j.status!=='completed'||!j.native_id||[t.author_instance,safeOwner(t)].includes(j.native_id)||r.author_instance===t.author_instance||!same(r.review_of,{id:t.id,revision:t.revision})||j.coordination_release?.termination_confirmed!==true)return false;
+  for(const key of ['inputs','retrieved_inputs'])if(r[key]!==undefined&&(!Array.isArray(r[key])||!r[key].every(ref=>closed(ref,key==='inputs'?['id','revision']:['id','revision','sha256','offset','length','total_characters'])&&Object.values(ref).every(v=>v===null||typeof v==='string'||Number.isSafeInteger(v)))))return false;
+  const v=r.review;
+  if(!closed(v,['verdict','reason','permitted_action','blockers',...(handover?['subject_sha256']:['plan_sha256','preservation_complete','interaction_complete','authority_checked'])])||v.verdict!=='Pass'||!Array.isArray(v.blockers)||v.blockers.length)return false;
+  if(!handover)return v.permitted_action==='publish_operating_state'&&v.plan_sha256===sha(t.operating_plan)&&v.preservation_complete===true&&v.interaction_complete===true&&v.authority_checked===true;
+  const e=r.handover_evidence;
+  return v.permitted_action==='resume_handover'&&v.subject_sha256===t.handover.subject_sha256&&closed(e,['semantic_delivery_complete','subject_sha256','reconstruction_sha256','native_id','citations','reads'])&&e.semantic_delivery_complete===true&&e.subject_sha256===t.handover.subject_sha256&&e.reconstruction_sha256===sha(t)&&e.native_id===j.native_id&&same(e.reads,j.handover_reads)&&Array.isArray(e.citations)&&e.citations.every(c=>closed(c,['source_id','sha256','revision','offset','length','range_sha256']));
+}
+const safeOwner=t=>t.operating_plan?.snapshot.owner.session_id??t.handover?.incoming_owner?.session_id;
 function bookkeeping(s,planId){
   const ids=new Set(),jobs=new Set();
-  const add=p=>{if(!p)return;ids.add(p);for(const r of Object.values(s.records??{}))if(r.review_of?.id===p){ids.add(r.id);if(r.job_id)jobs.add(r.job_id);}for(const j of Object.values(s.jobs??{}))if(j.review_of?.id===p)jobs.add(j.id);};
+  const add=p=>{
+    const t=s.records?.[p];if(!t)return;ids.add(p);
+    const handover=t.handover?.evidence_protocol===4;
+    const candidates=Object.values(s.jobs??{}).filter(j=>j.epoch===s.owner.epoch&&same(j.review_of,{id:t.id,revision:t.revision})&&reviewJobSafe(j,handover));
+    // Only a single current execution may be mechanically self-referential.
+    const active=candidates.filter(j=>['queued','running'].includes(j.status));
+    if(active.length===1&&((p===planId&&p!==s.operating_state?.plan.id)||(handover&&s.handover?.status==='pending')))jobs.add(active[0].id);
+    const proofs=candidates.filter(j=>{const r=s.records[j.artifact_id];return r&&reviewRecordSafe(r,j,t,handover);});
+    const accepted=s.operating_state?.plan.id===p?s.operating_state.review.id:null;
+    for(const j of proofs)if(accepted?j.artifact_id===accepted:proofs.length===1){jobs.add(j.id);ids.add(j.artifact_id);}
+  };
   add(planId);
   const h=s.handover,t=s.records?.[h?.reconstruction_id];if(t?.handover?.evidence_protocol===4&&t.handover.id===h.id)add(t.id);
   const a=s.operating_state;
-  if(a){for(const ref of a.receipts??[])exact(s,ref);add(a.plan.id);}
+  if(a){validateOperatingIndex(s);add(a.plan.id);for(const refs of a.accepted_snapshot.prior_proofs??[]){const [t,r,j]=exactProof(s,refs);ids.add(t.id);ids.add(r.id);jobs.add(j.id);}}
   return {ids,jobs};
 }
 // Conservative built-in provider. Every unqualified occurrence is visible. No
 // author-supplied inert flag, graph equality or missing provider can clear it.
-export function operatingFrontier(s,{plan_id,job_id}={}){
+export function operatingFrontier(s,{plan_id,job_id,consuming=Boolean(s.operating_state)&&!plan_id}={}){
   const p=reviewedContext(s),b=bookkeeping(s,plan_id),entries=[],homes=[];
   for(const [key,r] of Object.entries(s.records??{})){
     if(key!==r.id)fail('ambiguous record occurrence');
+    if(consuming&&r.operating_record&&!s.operating_state?.accepted_snapshot.homes.some(ref=>same(ref,recordReference(r))))entries.push({source:recordReference(r),scope:'*',status:'DIRTY',reason:'Typed home is new or changed pending independent acceptance'});
     if(b.ids.has(key)||p.excluded(key))continue;
     if(r.operating_record){validateOperatingRecord(r.operating_record);homes.push({source:recordReference(r),value:r});}
     else entries.push({source:recordReference(r),scope:'*',status:'DIRTY',reason:'Unaccepted consequential or unknown record'});
   }
-  for(const [key,j] of Object.entries(s.jobs??{}))if(key!==job_id&&!b.jobs.has(key)&&!p.proofJobs.has(key)&&!p.excluded('job:'+key))entries.push({source:recordReference(j,'job:'+key),scope:'*',status:'DIRTY',reason:'Execution/outcome needs independent preservation proof'});
+  for(const [key,j] of Object.entries(s.jobs??{})){if(key!==j.id)fail('ambiguous job occurrence');if(key!==job_id&&!b.jobs.has(key)&&!p.proofJobs.has(key)&&!p.excluded('job:'+key))entries.push({source:recordReference(j,'job:'+key),scope:'*',status:'DIRTY',reason:'Execution/outcome needs independent preservation proof'});}
   for(const u of [...(s.upgrade_history??[]),...(s.upgrade?[s.upgrade]:[])])if(!p.excluded('upgrade:'+u.id))entries.push({source:recordReference(u,'upgrade:'+u.id),scope:'*',status:'DIRTY',reason:'Unknown legacy occurrence context'});
   // Communication remains compulsory in full, including missed requirements.
   const communication={notices:s.notices??[],messages:s.messages??[]};
-  const extensions=Object.keys(controls(s).extensions).filter(k=>k!=='operating_state');
+  const extensions=Object.keys(controls(s).extensions);
   if(extensions.length)entries.push({source:{id:'state_extensions',sha256:sha(controls(s).extensions)},scope:'*',status:'DIRTY',reason:'Unknown state extension: '+extensions.join(',')});
   homes.sort((a,b)=>a.source.id.localeCompare(b.source.id));entries.sort((a,b)=>a.source.id.localeCompare(b.source.id));
   const classifications=Object.entries(s.context_classifications??{}).map(([key,value])=>({id:key,sha256:sha(value)})).sort((a,b)=>a.id.localeCompare(b.id));
   return {protocol:OPERATING_PROTOCOL,provider:'canonical-conservative-v1',complete:entries.length===0,interaction_complete:false,entries,homes,communication,classifications,source_root:sha({entries,homes:homes.map(h=>h.source),communication,classifications}),measurements:{dirty_entries:entries.length,current_homes:homes.length,mandatory_home_bytes:Buffer.byteLength(JSON.stringify(homes))}};
 }
-function capture(s,plan_id){const f=operatingFrontier(s,{plan_id});const provenance=f.homes.map(h=>({home_id:h.source.id,sources:[...new Set([...h.value.operating_record.evidence_refs,...h.value.operating_record.authority_refs,...(h.value.operating_record.grant_refs??[]),...(h.value.operating_record.historical_receipts??[])])].map(key=>recordReference(contextSource(s,key),key))}));return {protocol:OPERATING_PROTOCOL,provenance,owner:{...s.owner},paused:s.paused,controls:controls(s),source_root:f.source_root,homes:f.homes.map(h=>h.source),home_predicates:f.homes.map(h=>({id:h.source.id,scope:h.value.operating_record.scope,dependencies:h.value.operating_record.dependencies})),communication:f.communication,classifications:f.classifications,frontier:f.entries};}
+function capture(s,plan_id){const f=operatingFrontier(s,{plan_id});const provenance=f.homes.map(h=>({home_id:h.source.id,sources:[...new Set([...h.value.operating_record.evidence_refs,...h.value.operating_record.authority_refs,...(h.value.operating_record.grant_refs??[]),...(h.value.operating_record.historical_receipts??[])])].map(key=>recordReference(contextSource(s,key),key))}));return {protocol:OPERATING_PROTOCOL,prior_proofs:s.operating_state?[s.operating_state.receipts,...(s.operating_state.accepted_snapshot.prior_proofs??[])]:[],provenance,owner:{...s.owner},paused:s.paused,controls:controls(s),source_root:f.source_root,homes:f.homes.map(h=>h.source),home_predicates:f.homes.map(h=>({id:h.source.id,scope:h.value.operating_record.scope,dependencies:h.value.operating_record.dependencies})),communication:f.communication,classifications:f.classifications,frontier:f.entries};}
 export function proposeOperatingState(s,args){
   const key=id('operating-plan'),snapshot=capture(s,key);
   for(const h of snapshot.homes){const v=exact(s,h).operating_record;for(const ref of [...v.evidence_refs,...v.authority_refs,...(v.historical_receipts??[]),...(v.grant_refs??[])])if(!contextSource(s,ref))fail('provenance source missing: '+ref);}
@@ -84,12 +112,29 @@ function validateAcceptedReceipt(s,a){
   if(!j||!same(a.receipts,[recordReference(t),recordReference(r),recordReference(j,'job:'+j.id)])||r.status!=='Submitted'||r.author_role!=='qa'||j.role!=='qa'||j.status!=='completed'||j.artifact_id!==r.id||j.coordination_release?.termination_confirmed!==true||!j.native_id||j.native_id===t.author_instance||j.instance_id===t.author_instance||r.author_instance!==j.instance_id||v?.verdict!=='Pass'||v.permitted_action!=='publish_operating_state'||v.plan_sha256!==sha(t.operating_plan)||v.preservation_complete!==true||v.interaction_complete!==true||v.authority_checked!==true||!Array.isArray(v.blockers)||v.blockers.length)fail('accepted receipt invalid');
   if(Object.values(s.records).some(x=>x.status==='Submitted'&&x.review_of?.id===t.id&&x.review_of.revision===t.revision&&['Fail','Blocked'].includes(x.review?.verdict)))fail('negative publication finding remains');
 }
+// This validator has no frontier/classification recursion and grants no semantic
+// acceptance. It permits the prospective index to coexist with frozen proofs.
+function exactProof(s,refs){
+  if(!Array.isArray(refs)||refs.length!==3)fail('invalid prior mechanical proof');
+  const [t,r,j]=refs.map(ref=>exact(s,ref));
+  if(!same(refs,[recordReference(t),recordReference(r),recordReference(j,'job:'+j.id)])||!same(j.review_of,{id:t.id,revision:t.revision})||!reviewJobSafe(j)||!reviewRecordSafe(r,j,t,false))fail('prior mechanical proof changed');
+  return [t,r,j];
+}
+export function validateOperatingIndex(s){
+  const a=s.operating_state;
+  if(!closed(a,['protocol','version','plan','review','receipts','accepted_snapshot','valid_until','at'])||a.protocol!==OPERATING_PROTOCOL||a.version!==1||!text(a.at)||!Array.isArray(a.receipts))fail('invalid mechanical publication index');
+  const t=exact(s,a.plan),r=exact(s,a.review),j=s.jobs[r.job_id];
+  if(!same(a.accepted_snapshot,t.operating_plan?.snapshot)||a.valid_until!==t.operating_plan?.valid_until||!j||!reviewJobSafe(j)||!reviewRecordSafe(r,j,t,false))fail('mechanical publication index changed');
+  validateAcceptedReceipt(s,a);
+  for(const refs of a.accepted_snapshot.prior_proofs??[])exactProof(s,refs);
+  return true;
+}
 export function operatingContext(s,{scope='*',now=Date.now(),job_id}={}){
   const a=s.operating_state;if(a?.protocol!==OPERATING_PROTOCOL)fail('no accepted prospective checkpoint');
   for(const ref of a.receipts)exact(s,ref);validTime(a.valid_until,now);
   const plan=exact(s,a.plan).operating_plan;if(a.valid_until!==plan.valid_until)fail('acceptance expiry differs from reviewed contract');if(!same(plan.snapshot,a.accepted_snapshot)||!same(controls(s),a.accepted_snapshot.controls))fail('global policy/control changed');
   validateAcceptedReceipt(s,a);
-  const f=operatingFrontier(s,{job_id});if(f.entries.length)fail('unclassified frontier: '+f.entries.length+' DIRTY entries');
+  const f=operatingFrontier(s,{job_id,consuming:true});if(f.entries.length)fail('unclassified frontier: '+f.entries.length+' DIRTY entries');
   const ids=new Set(f.homes.filter(h=>scope==='*'||h.value.operating_record.scope==='*'||h.value.operating_record.scope===scope).map(h=>h.source.id));
   let changed=true;while(changed){changed=false;for(const h of f.homes.filter(h=>ids.has(h.source.id)))for(const key of h.value.operating_record.dependencies)if(!ids.has(key)){if(!f.homes.some(x=>x.source.id===key))fail('current dependency missing: '+key);ids.add(key);changed=true;}}
   const expected=new Set(a.accepted_snapshot.home_predicates.filter(h=>scope==='*'||h.scope==='*'||h.scope===scope).map(h=>h.id));

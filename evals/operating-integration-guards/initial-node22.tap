@@ -1,0 +1,121 @@
+TAP version 13
+# (node:28056) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning
+ok 1 - public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning
+  ---
+  duration_ms: 124.437791
+  ...
+# Subtest: missing legacy bootstrap is visibly DIRTY and apply rolls back without acceptance
+ok 2 - missing legacy bootstrap is visibly DIRTY and apply rolls back without acceptance
+  ---
+  duration_ms: 18.409541
+  ...
+# Subtest: new membership, changed exact source, wrong independent identity and absent closure cannot publish
+ok 3 - new membership, changed exact source, wrong independent identity and absent closure cannot publish
+  ---
+  duration_ms: 74.620333
+  ...
+# Subtest: scope closure, global membership, expiry, receipt changes, revocation and missed communication hold
+not ok 4 - scope closure, global membership, expiry, receipt changes, revocation and missed communication hold
+  ---
+  duration_ms: 15.258792
+  location: '/private/tmp/soloco-operating-integration-guards-20261106/source/tests/operating-state.test.mjs:36:1'
+  failureType: 'testCodeFailure'
+  error: 'Operating state Held: unclassified frontier: 1 DIRTY entries'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    fail (file:///private/tmp/soloco-operating-integration-guards-20261106/source/plugins/soloco/runtime/operating-state.mjs:6:22)
+    operatingContext (file:///private/tmp/soloco-operating-integration-guards-20261106/source/plugins/soloco/runtime/operating-state.mjs:126:76)
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-integration-guards-20261106/source/tests/operating-state.test.mjs:36:1004)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: pause fences publication reviewer and prospective handover cannot hide unknown legacy
+ok 5 - pause fences publication reviewer and prospective handover cannot hide unknown legacy
+  ---
+  duration_ms: 8.522375
+  ...
+# Subtest: 10x independently classified inert archive keeps actual mandatory operating assignment bytes and semantic work constant
+ok 6 - 10x independently classified inert archive keeps actual mandatory operating assignment bytes and semantic work constant
+  ---
+  duration_ms: 53.093458
+  ...
+# Subtest: deleted applicable home and changed exact provenance cannot disappear from accepted meaning
+not ok 7 - deleted applicable home and changed exact provenance cannot disappear from accepted meaning
+  ---
+  duration_ms: 114.750791
+  location: '/private/tmp/soloco-operating-integration-guards-20261106/source/tests/operating-state.test.mjs:48:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /source\/receipt changed|unaccepted/. Input:
+    
+    'Error: Operating state Held: unclassified frontier: 1 DIRTY entries'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual:
+  error: 'Operating state Held: unclassified frontier: 1 DIRTY entries'
+  stack: |-
+    fail (file:///private/tmp/soloco-operating-integration-guards-20261106/source/plugins/soloco/runtime/operating-state.mjs:6:22)
+    operatingContext (file:///private/tmp/soloco-operating-integration-guards-20261106/source/plugins/soloco/runtime/operating-state.mjs:126:76)
+    file:///private/tmp/soloco-operating-integration-guards-20261106/source/tests/operating-state.test.mjs:48:408
+    getActual (node:assert:805:5)
+    Function.throws (node:assert:951:24)
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-integration-guards-20261106/source/tests/operating-state.test.mjs:48:397)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  operator: 'throws'
+  stack: |-
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-integration-guards-20261106/source/tests/operating-state.test.mjs:48:397)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: typed outcome requires complete historical uncertainty; text cannot manufacture permission
+ok 8 - typed outcome requires complete historical uncertainty; text cannot manufacture permission
+  ---
+  duration_ms: 45.48375
+  ...
+# Subtest: public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure
+not ok 9 - public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure
+  ---
+  duration_ms: 40.219291
+  location: '/private/tmp/soloco-operating-integration-guards-20261106/source/tests/operating-state.test.mjs:52:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /QA/. Input:
+    
+    'Error: Operating state Held: unclassified frontier: 2 DIRTY entries'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual:
+  error: 'Operating state Held: unclassified frontier: 2 DIRTY entries'
+  stack: |-
+    fail (file:///private/tmp/soloco-operating-integration-guards-20261106/source/plugins/soloco/runtime/operating-state.mjs:6:22)
+    operatingContext (file:///private/tmp/soloco-operating-integration-guards-20261106/source/plugins/soloco/runtime/operating-state.mjs:126:76)
+    file:///private/tmp/soloco-operating-integration-guards-20261106/source/plugins/soloco/runtime/engine.mjs:359:64
+    Store.transaction (file:///private/tmp/soloco-operating-integration-guards-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+    file:///private/tmp/soloco-operating-integration-guards-20261106/source/plugins/soloco/runtime/engine.mjs:326:51
+    withStore (file:///private/tmp/soloco-operating-integration-guards-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+    Module.control (file:///private/tmp/soloco-operating-integration-guards-20261106/source/plugins/soloco/runtime/engine.mjs:326:10)
+    file:///private/tmp/soloco-operating-integration-guards-20261106/source/tests/operating-state.test.mjs:62:105
+    getActual (node:assert:805:5)
+    Function.throws (node:assert:951:24)
+  operator: 'throws'
+  stack: |-
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-integration-guards-20261106/source/tests/operating-state.test.mjs:62:87)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 6
+# fail 3
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 586.756833

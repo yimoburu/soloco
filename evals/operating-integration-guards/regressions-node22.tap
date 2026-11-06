@@ -1,0 +1,87 @@
+TAP version 13
+# (node:28788) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning
+ok 1 - public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning
+  ---
+  duration_ms: 117.685459
+  ...
+# Subtest: missing legacy bootstrap is visibly DIRTY and apply rolls back without acceptance
+ok 2 - missing legacy bootstrap is visibly DIRTY and apply rolls back without acceptance
+  ---
+  duration_ms: 12.984625
+  ...
+# Subtest: new membership, changed exact source, wrong independent identity and absent closure cannot publish
+ok 3 - new membership, changed exact source, wrong independent identity and absent closure cannot publish
+  ---
+  duration_ms: 73.927708
+  ...
+# Subtest: scope closure, global membership, expiry, receipt changes, revocation and missed communication hold
+ok 4 - scope closure, global membership, expiry, receipt changes, revocation and missed communication hold
+  ---
+  duration_ms: 24.421833
+  ...
+# Subtest: pause fences publication reviewer and prospective handover cannot hide unknown legacy
+ok 5 - pause fences publication reviewer and prospective handover cannot hide unknown legacy
+  ---
+  duration_ms: 8.969791
+  ...
+# Subtest: 10x independently classified inert archive keeps actual mandatory operating assignment bytes and semantic work constant
+ok 6 - 10x independently classified inert archive keeps actual mandatory operating assignment bytes and semantic work constant
+  ---
+  duration_ms: 53.862833
+  ...
+# Subtest: deleted applicable home and changed exact provenance cannot disappear from accepted meaning
+ok 7 - deleted applicable home and changed exact provenance cannot disappear from accepted meaning
+  ---
+  duration_ms: 14.809875
+  ...
+# Subtest: typed outcome requires complete historical uncertainty; text cannot manufacture permission
+ok 8 - typed outcome requires complete historical uncertainty; text cannot manufacture permission
+  ---
+  duration_ms: 15.446709
+  ...
+# Subtest: public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure
+ok 9 - public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure
+  ---
+  duration_ms: 45.430584
+  ...
+# Subtest: late new and changed falsely scoped prohibitions stay globally DIRTY, but fresh proposals include them
+not ok 10 - late new and changed falsely scoped prohibitions stay globally DIRTY, but fresh proposals include them
+  ---
+  duration_ms: 27.71575
+  location: '/private/tmp/soloco-operating-integration-guards-20261106/source/tests/operating-state.test.mjs:68:1'
+  failureType: 'testCodeFailure'
+  error: 'Operating state Held: unclassified frontier: 3 DIRTY entries'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    fail (file:///private/tmp/soloco-operating-integration-guards-20261106/source/plugins/soloco/runtime/operating-state.mjs:6:22)
+    operatingContext (file:///private/tmp/soloco-operating-integration-guards-20261106/source/plugins/soloco/runtime/operating-state.mjs:130:76)
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-integration-guards-20261106/source/tests/operating-state.test.mjs:78:16)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: publication proof stays current; failed, quarantined, uncertain and unknown-extension siblings stay DIRTY
+ok 11 - publication proof stays current; failed, quarantined, uncertain and unknown-extension siblings stay DIRTY
+  ---
+  duration_ms: 14.228625
+  ...
+# Subtest: mechanical publication index rejects tampering and retains unknown state extensions
+ok 12 - mechanical publication index rejects tampering and retains unknown state extensions
+  ---
+  duration_ms: 13.339125
+  ...
+# Subtest: format6 explicit non-home evidence survives dispatch, discovery and bounded same-native reads
+ok 13 - format6 explicit non-home evidence survives dispatch, discovery and bounded same-native reads
+  ---
+  duration_ms: 119.856583
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 12
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 625.600542
