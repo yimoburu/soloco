@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID, createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import {normalizedLayout,readNormalized,writeNormalized,migrateNormalized,writeNormalizedSelection,flushSnapshots,readImmutable,appendNormalizedJournal,LATEST_LAYOUT,readNormalizedValue,readPublicIndex,readPublicRows,readPublicHandle,readPublicAlias} from './record-storage.mjs';
+import {normalizedLayout,readNormalized,writeNormalized,migrateNormalized,writeNormalizedSelection,flushSnapshots,readImmutable,appendNormalizedJournal,LATEST_LAYOUT,readNormalizedValue,readPublicIndex,readPublicRows,readPublicHandle,readPublicAlias,captureStorageMetadata,captureStorageBaseline,insertStorageEvent,readStorageIntake} from './record-storage.mjs';
 import {bindSnapshots} from './snapshot.mjs';
 import {bindPublicReader,PUBLIC_COLLECTIONS} from './public-response.mjs';
 
@@ -50,6 +50,8 @@ export class Store {
     this.db.exec('CREATE TABLE IF NOT EXISTS company (id INTEGER PRIMARY KEY CHECK(id=1), value TEXT NOT NULL); CREATE TABLE IF NOT EXISTS events (seq INTEGER PRIMARY KEY, at TEXT NOT NULL, type TEXT NOT NULL, value TEXT NOT NULL);');
   }
   changeToken() { return this.db.prepare('SELECT COALESCE(MAX(seq),0) AS version FROM events').get().version; }
+  captureIntakeBaseline() {return this.readSnapshot(()=>captureStorageBaseline(this.db));}
+  readIntake(baseline,options) {return this.readSnapshot(()=>readStorageIntake(this.db,baseline,options));}
   storageInfo() {
     const normalized=normalizedLayout(this.db),sentinel=normalized?JSON.parse(this.db.prepare('SELECT value FROM company WHERE id=1').get().value):null;
     return {format:normalized?'normalized-v'+this.db.prepare('SELECT version FROM company_layout WHERE id=1').get().version:'legacy-json',migration_required:!normalized||this.db.prepare('SELECT version FROM company_layout WHERE id=1').get().version<LATEST_LAYOUT,
@@ -133,13 +135,14 @@ export class Store {
     if(!normalizedLayout(this.db)||this.db.prepare('SELECT version FROM company_layout WHERE id=1').get().version<3)return false;
     this.db.exec('BEGIN IMMEDIATE');this.inTransaction=true;
     try {
+      const metadata=captureStorageMetadata(this.db);
       const header=readNormalized(this.db,{rootKeys:['revision','owner'],entities:{upgrade:['id']}});
       if(header.upgrade?.id!==uid){this.db.exec('ROLLBACK');return false;}
       appendNormalizedJournal(this.db,'calls',entry);
       const changes=[{family:'root',key:'revision',value:(header.revision??-1)+1},{family:'root',key:'updated_at',value:stamp()}];
       if(entry.native_id)changes.push({family:'upgrade',key:entry.role==='cos'?'probe_native_id':'reviewer_native_id',value:entry.native_id});
       writeNormalizedSelection(this.db,changes);
-      this.db.prepare('INSERT INTO events(at,type,value) VALUES(?,?,?)').run(stamp(),'upgrade.native_returned',JSON.stringify({revision:(header.revision??-1)+1,owner:header.owner}));
+      insertStorageEvent(this.db,'upgrade.native_returned',{revision:(header.revision??-1)+1,owner:header.owner},metadata);
       this.db.exec('COMMIT');return true;
     }catch(error){this.db.exec('ROLLBACK');throw error;}
     finally{this.inTransaction=false;}
@@ -148,6 +151,7 @@ export class Store {
     if(!normalizedLayout(this.db))return this.transaction(type,s=>fn(s));
     this.db.exec('BEGIN IMMEDIATE');this.inTransaction=true;
     try {
+      const metadata=captureStorageMetadata(this.db);
       const state=this.snapshotState(readNormalized(this.db,options)),before=JSON.stringify(state);
       const result=fn(state);
       state.revision=(state.revision??0)+1;state.updated_at=stamp();
@@ -159,7 +163,7 @@ export class Store {
       }
       flushSnapshots(this.db,state);
       writeNormalizedSelection(this.db,changes);
-      this.db.prepare('INSERT INTO events(at,type,value) VALUES (?,?,?)').run(stamp(),type,JSON.stringify({revision:state.revision,owner:state.owner}));
+      insertStorageEvent(this.db,type,{revision:state.revision,owner:state.owner},metadata);
       this.db.exec('COMMIT');this.snapshotState(state);return result;
     }catch(error){this.db.exec('ROLLBACK');throw error;}
     finally {this.inTransaction=false;}
@@ -174,6 +178,7 @@ export class Store {
   transaction(type, fn) {
     this.db.exec('BEGIN IMMEDIATE');this.inTransaction=true;
     try {
+      const metadata=normalizedLayout(this.db)?captureStorageMetadata(this.db):null;
       const state = this.read();
       const next = fn(state);
       next.revision = (state?.revision ?? -1) + 1;
@@ -181,7 +186,7 @@ export class Store {
       flushSnapshots(this.db,state,next);
       if(normalizedLayout(this.db))writeNormalized(this.db,next);
       else this.db.prepare('INSERT INTO company VALUES (1,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value').run(JSON.stringify(next));
-      this.db.prepare('INSERT INTO events(at,type,value) VALUES (?,?,?)').run(stamp(), type, JSON.stringify({revision: next.revision, owner: next.owner}));
+      insertStorageEvent(this.db,type,{revision:next.revision,owner:next.owner},metadata);
       this.db.exec('COMMIT');
       return this.snapshotState(next);
     } catch (error) { this.db.exec('ROLLBACK'); throw error; }

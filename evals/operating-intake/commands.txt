@@ -1,0 +1,18 @@
+Working directory: /Users/xiaoweili/Documents/Codex/SoloDev-reviews/operating-intake-2026-11-06/source
+Base: git rev-parse --short HEAD => 1890827
+
+Runtime identification:
+/private/tmp/soloco-node22-validation/node-v22.13.0-darwin-arm64/bin/node --version
+=> v22.13.0
+/opt/homebrew/bin/node --version
+=> v25.2.1
+
+Initial diagnostic (18 pass, 1 fail; missing-value test injection blocked by foreign keys):
+/private/tmp/soloco-node22-validation/node-v22.13.0-darwin-arm64/bin/node --test tests/storage-intake.test.mjs tests/storage-layout-repairs.test.mjs > evals/operating-intake/node22-initial.log 2>&1
+
+Final focused tests (each exit 0, 24 pass, 0 fail):
+/private/tmp/soloco-node22-validation/node-v22.13.0-darwin-arm64/bin/node --test tests/storage-intake.test.mjs tests/storage-layout-repairs.test.mjs tests/storage-transfer-integrity.test.mjs > evals/operating-intake/node22-storage.log 2>&1
+/opt/homebrew/bin/node --test tests/storage-intake.test.mjs tests/storage-layout-repairs.test.mjs tests/storage-transfer-integrity.test.mjs > evals/operating-intake/node25-storage.log 2>&1
+
+Final whitespace check:
+git diff --check

@@ -1,0 +1,38 @@
+(node:54498) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ read-only baseline, exact full/selected deltas, deletion, reorder, shape and unknown fields (29.57ms)
+✔ selected writes and upgrade appends never read unrelated/prior journal bodies (15.947292ms)
+✔ gaps, changed event envelopes/payloads, uncovered writers and unlogged state changes hold (97.824417ms)
+✔ missing/corrupt old, intermediate, new and unchanged immutable values hold (127.881208ms)
+✔ legacy/changed layout, ambiguous encoding, inexact identities and rollback hold (91.337833ms)
+✔ failed writes roll back metadata, immutable inserts and event atomically (17.913709ms)
+✔ position-only object reorder and selected deletion produce exact references; historical old events need no replay (16.798208ms)
+✔ re-sealed but inconsistent metadata roots and before/after chains hold (54.933917ms)
+(node:54499) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ legacy capture holds atomically; ordinary writes/read/reopen do not migrate; explicit migration backs up exact origin (19.211833ms)
+✔ known v1/v2/v3 layouts retain pending journals and compatibility; incompatible capture/keys require explicit migration (91.302ms)
+✔ v4 keys round-trip NUL, lone surrogates, literal prefix, unknown roots and order through selected writes and portable restore (81.170125ms)
+✔ unknown layouts, corrupt key markers, missing originals and failed migration readback hold without adopting a layout (37.3605ms)
+✔ contextMatches inherits exact resolver while arbitrary unbound copies still hold (13.121875ms)
+✔ frozen projection reuses exact bytes, invalidates second-writer/dependency changes, and detects original corruption between reads (62.951792ms)
+✔ projection cache eviction retains exact legacy frozen contract and failed-successor preview distinction (6.708125ms)
+✔ raw direct-source reads bind exact pointers and originals across another writer, including unsafe keys and corruption (15.06075ms)
+✔ explicit migration refuses a second-writer change after backup and keeps its exact source backup (3.843333ms)
+✔ detectable old lossy identities hold rather than adopting a normalized substitute (7.251958ms)
+✔ pinned text preserves exact lone-surrogate hash encoding and Unicode range boundaries (0.253167ms)
+✔ pending legacy handover context and ordinary delivery writes keep their inline storage contract (3.8185ms)
+✔ a duplicate original hash cannot conceal conflicting reference shape metadata in extension slots (0.282125ms)
+(node:54500) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ restore verifies every copied artifact and preserves exact logical database state (565.535625ms)
+✔ public restore refuses an artifact changed after source validation even when database readback would match (11.050834ms)
+✔ restore refuses unexpected destination files appearing during copying (8.776583ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 24
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 659.456834

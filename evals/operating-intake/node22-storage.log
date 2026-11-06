@@ -1,0 +1,136 @@
+TAP version 13
+# (node:54516) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: read-only baseline, exact full/selected deltas, deletion, reorder, shape and unknown fields
+ok 1 - read-only baseline, exact full/selected deltas, deletion, reorder, shape and unknown fields
+  ---
+  duration_ms: 47.517375
+  ...
+# Subtest: selected writes and upgrade appends never read unrelated/prior journal bodies
+ok 2 - selected writes and upgrade appends never read unrelated/prior journal bodies
+  ---
+  duration_ms: 17.834625
+  ...
+# Subtest: gaps, changed event envelopes/payloads, uncovered writers and unlogged state changes hold
+ok 3 - gaps, changed event envelopes/payloads, uncovered writers and unlogged state changes hold
+  ---
+  duration_ms: 118.127583
+  ...
+# Subtest: missing/corrupt old, intermediate, new and unchanged immutable values hold
+ok 4 - missing/corrupt old, intermediate, new and unchanged immutable values hold
+  ---
+  duration_ms: 96.997583
+  ...
+# Subtest: legacy/changed layout, ambiguous encoding, inexact identities and rollback hold
+ok 5 - legacy/changed layout, ambiguous encoding, inexact identities and rollback hold
+  ---
+  duration_ms: 64.29975
+  ...
+# Subtest: failed writes roll back metadata, immutable inserts and event atomically
+ok 6 - failed writes roll back metadata, immutable inserts and event atomically
+  ---
+  duration_ms: 14.493417
+  ...
+# Subtest: position-only object reorder and selected deletion produce exact references; historical old events need no replay
+ok 7 - position-only object reorder and selected deletion produce exact references; historical old events need no replay
+  ---
+  duration_ms: 11.35925
+  ...
+# Subtest: re-sealed but inconsistent metadata roots and before/after chains hold
+ok 8 - re-sealed but inconsistent metadata roots and before/after chains hold
+  ---
+  duration_ms: 39.926208
+  ...
+# (node:54518) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: legacy capture holds atomically; ordinary writes/read/reopen do not migrate; explicit migration backs up exact origin
+ok 9 - legacy capture holds atomically; ordinary writes/read/reopen do not migrate; explicit migration backs up exact origin
+  ---
+  duration_ms: 34.653458
+  ...
+# Subtest: known v1/v2/v3 layouts retain pending journals and compatibility; incompatible capture/keys require explicit migration
+ok 10 - known v1/v2/v3 layouts retain pending journals and compatibility; incompatible capture/keys require explicit migration
+  ---
+  duration_ms: 114.398125
+  ...
+# Subtest: v4 keys round-trip NUL, lone surrogates, literal prefix, unknown roots and order through selected writes and portable restore
+ok 11 - v4 keys round-trip NUL, lone surrogates, literal prefix, unknown roots and order through selected writes and portable restore
+  ---
+  duration_ms: 65.860375
+  ...
+# Subtest: unknown layouts, corrupt key markers, missing originals and failed migration readback hold without adopting a layout
+ok 12 - unknown layouts, corrupt key markers, missing originals and failed migration readback hold without adopting a layout
+  ---
+  duration_ms: 25.665833
+  ...
+# Subtest: contextMatches inherits exact resolver while arbitrary unbound copies still hold
+ok 13 - contextMatches inherits exact resolver while arbitrary unbound copies still hold
+  ---
+  duration_ms: 9.81325
+  ...
+# Subtest: frozen projection reuses exact bytes, invalidates second-writer/dependency changes, and detects original corruption between reads
+ok 14 - frozen projection reuses exact bytes, invalidates second-writer/dependency changes, and detects original corruption between reads
+  ---
+  duration_ms: 55.032875
+  ...
+# Subtest: projection cache eviction retains exact legacy frozen contract and failed-successor preview distinction
+ok 15 - projection cache eviction retains exact legacy frozen contract and failed-successor preview distinction
+  ---
+  duration_ms: 5.028333
+  ...
+# Subtest: raw direct-source reads bind exact pointers and originals across another writer, including unsafe keys and corruption
+ok 16 - raw direct-source reads bind exact pointers and originals across another writer, including unsafe keys and corruption
+  ---
+  duration_ms: 11.117083
+  ...
+# Subtest: explicit migration refuses a second-writer change after backup and keeps its exact source backup
+ok 17 - explicit migration refuses a second-writer change after backup and keeps its exact source backup
+  ---
+  duration_ms: 3.549416
+  ...
+# Subtest: detectable old lossy identities hold rather than adopting a normalized substitute
+ok 18 - detectable old lossy identities hold rather than adopting a normalized substitute
+  ---
+  duration_ms: 6.354125
+  ...
+# Subtest: pinned text preserves exact lone-surrogate hash encoding and Unicode range boundaries
+ok 19 - pinned text preserves exact lone-surrogate hash encoding and Unicode range boundaries
+  ---
+  duration_ms: 0.228417
+  ...
+# Subtest: pending legacy handover context and ordinary delivery writes keep their inline storage contract
+ok 20 - pending legacy handover context and ordinary delivery writes keep their inline storage contract
+  ---
+  duration_ms: 2.777541
+  ...
+# Subtest: a duplicate original hash cannot conceal conflicting reference shape metadata in extension slots
+ok 21 - a duplicate original hash cannot conceal conflicting reference shape metadata in extension slots
+  ---
+  duration_ms: 0.134584
+  ...
+# (node:54519) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: restore verifies every copied artifact and preserves exact logical database state
+ok 22 - restore verifies every copied artifact and preserves exact logical database state
+  ---
+  duration_ms: 193.820291
+  ...
+# Subtest: public restore refuses an artifact changed after source validation even when database readback would match
+ok 23 - public restore refuses an artifact changed after source validation even when database readback would match
+  ---
+  duration_ms: 13.252125
+  ...
+# Subtest: restore refuses unexpected destination files appearing during copying
+ok 24 - restore refuses unexpected destination files appearing during copying
+  ---
+  duration_ms: 12.709791
+  ...
+1..24
+# tests 24
+# suites 0
+# pass 24
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 535.736458
