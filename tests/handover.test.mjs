@@ -200,6 +200,29 @@ function archiveFixture(a,size=500){
   return s;
  }));
 }
+test('failed handover with upgrade history reuses typed history semantics instead of reembedding checkpoints',t=>{
+ const a=setup();archiveFixture(a,80000);const b=replace(a),lengths=[];
+ withStore(b.root,db=>db.transaction('fixture.distinct-history',s=>{
+  s.upgrade={id:'fictional-current-upgrade',status:'recovered',checkpoint:structuredClone(s.upgrade_history[0].checkpoint),unknown_current_condition:'Never revive the exhausted fictional scope.'};
+  s.upgrade_history[3].distinct_finding='Historical dissent must remain compulsory.';return s;
+ }));
+ for(let n=0;n<3;n++){
+  const r=submit(b),s=withStore(b.root,db=>db.read()),job={role:'qa',task:'Review fixed fictional reconstruction',inputs:[],review_of:{id:r.id,revision:r.revision}};
+  const ctx=assignmentContext(s,job),e=ctx.handover_evidence,stream=e.sources[e.pages[0].source_id];lengths.push(stream.length);
+  assert.match(stream.raw,/Historical dissent must remain compulsory/);assert.match(stream.raw,/Never revive the exhausted fictional scope/);
+  assert.match(stream.raw,/Fictional unknown restriction remains binding/);
+  if(n>0)assert.match(stream.raw,/Unresolved fictional finding/);
+  for(const original of Object.values(e.sources).filter(x=>x.kind==='original-handover-record')){
+   const raw=JSON.stringify(s.records[original.path.slice('/records/'.length)]);let returned='';
+   for(let offset=0;offset<original.length;){let length=Math.min(32768,original.length-offset);const c=raw.charCodeAt(offset+length-1);if(c>=0xd800&&c<=0xdbff)length--;returned+=readEvidence(e,{source_id:original.source_id,sha256:original.sha256,offset,length}).text;offset+=length;}
+   assert.equal(returned,raw,'Every retained original remains exactly retrievable');
+  }
+  withStore(b.root,db=>db.transaction('fixture.negative-review',v=>{const key=id('negative-review');v.records[key]={id:key,kind:'review',revision:1,status:'Submitted',author_role:'qa',author_instance:'fictional-independent-'+n,review_of:{id:r.id,revision:1},content:'Unresolved fictional finding '+n,review:{verdict:'Blocked',permitted_action:'hold',subject_sha256:r.handover.subject_sha256,blockers:['Still open '+n]}};return v;}));
+  assert.throws(()=>engine.control({...b,action:'resume',expected_epoch:2,source_instruction:'Do not bypass Blocked'},'codex'),/negative review|stale/);
+ }
+ t.diagnostic('Required semantic characters across repaired submissions: '+lengths.join(', '));
+ assert.ok(Math.max(...lengths)<2*Math.min(...lengths),`Typed history must not cause semantic amplification: ${lengths}`);
+});
 test('25.7M fictional archive fits 200k; exact originals, mandatory legacy obligations and retrieval complete a full handover',async()=>{
  const a=setup();archiveFixture(a,3212500);
  const archive=withStore(a.root,db=>JSON.stringify(db.read().upgrade_history));

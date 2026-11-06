@@ -310,4 +310,11 @@ This repair keeps all unknown/unclassified legacy semantics compulsory. It does 
 
 Earlier reconstruction records are immutable through `company_save`; a repair uses a new reconstruction. Later subjects keep their full content, metadata, reviews and execution evidence while referencing each original embedded snapshot by record ID and exact hash. The lossless reader resolves only matching retained originals, registers their exact bytes, and includes every distinct semantic field through proven checkpoint equality. This prevents recursive full-snapshot duplication across repaired submissions without adding another evidence store or marking a finding resolved. Missing or corrupted originals hold. Legacy encoding remains supported, but changed freshness dependencies may require a new independently reviewed reconstruction; an old Pass is never promoted across changed evidence. Founder range replies count the full escaped response and hold with a smaller-range bound when text or source metadata cannot fit.
 
+
+### v0.6.13 retained upgrade-history projection
+
+Earlier handover subjects retain both `upgrade_history` and a possible current `upgrade`. Their attempts now use the existing history-attempt projection and exact-equality mechanism when those subjects are inspected again. A failed review no longer turns typed archival checkpoint payloads back into opaque compulsory strings. Equality still requires the same entity kind, hash and exact serialized value; every distinct error, finding, unknown field and checkpoint obligation remains compulsory. Originals remain exactly retrievable. No record classification, deadline, independence or resume-acceptance rule changes.
+
+The regression includes nonempty history and a current upgrade across three repaired submissions, exact complete original retrieval, distinct unresolved restrictions/dissent and a held resume after each negative review. This repairs amplification; it does not prove bounded total historical review, model fit, semantic understanding or real-company acceptance. The separate unreleased latency candidate remains deferred until the actual continuity gate completes.
+
 Candidate integration evidence and remaining root-owned acceptance: [integration report](../integration-evidence/REPORT.md).

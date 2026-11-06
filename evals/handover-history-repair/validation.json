@@ -1,0 +1,46 @@
+{
+  "tested_source_commit": "61dca7124bd20dba9db865a2d3e8777a98741333",
+  "source_version": "0.6.13",
+  "frozen_existing_files_verified": 105,
+  "source_manifest_sha256": "742fd03283aba3536598bcfe296d02a8a7cfc2d7df22dab4e2a9847c0097672d",
+  "runs": [
+    {
+      "node": "22",
+      "tests": 432,
+      "pass": 432,
+      "fail": 0,
+      "skipped": 0,
+      "original_sha256": "36a3659853605a73dec3a3acf19e1fbc08b2d2cc969fa80251033eb88e93afc1",
+      "log": "evals/handover-history-repair/full-node22.tap.gz",
+      "gzip_sha256": "f472f89598b43303e7d924ab4624b85882f585a7e1d5d5ed9e2bde9dbef4b46a",
+      "actual_macos_sandbox": true
+    },
+    {
+      "node": "25",
+      "tests": 432,
+      "pass": 432,
+      "fail": 0,
+      "skipped": 0,
+      "original_sha256": "9070ba0efa82f845646e093d343ddebbbe84ba82ad99983a4a7e5c577cedf7d0",
+      "log": "evals/handover-history-repair/full-node25.tap.gz",
+      "gzip_sha256": "6b478ace4b676fec433523aa6789807a0654c81caa2087f9fdde56ad83e84a65",
+      "actual_macos_sandbox": true
+    }
+  ],
+  "engineering_native_id": "01a1af04-9529-7d61-845e-8f1bf66b3c69",
+  "qa_native_id": "01a1af0f-e902-7582-bf52-ccfcab36aa8f",
+  "qa_result": "Conditional Pass for code integration and compatible repair publication; root verified exact frozen files/receipts before publication. Not real-company resume authority.",
+  "aggregate_readonly_diagnostic": {
+    "same_subject_hash": true,
+    "before_required_units": 21435058,
+    "after_required_units": 5400416,
+    "company_mutations": false,
+    "private_record_bodies_exported": false
+  },
+  "limits": [
+    "Existing real-company handover Blocked remains binding.",
+    "Transport/type-equality repair does not prove bounded total-history work, model fit, comprehension or completion within deadline.",
+    "No classification, governance adoption, business authority or queued latency behavior.",
+    "Advisory specialists reviewed supplied public text with tools disabled; root executed tests and hash checks."
+  ]
+}
