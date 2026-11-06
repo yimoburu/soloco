@@ -1,3 +1,4 @@
+import {OPERATING_PROTOCOL,validateOperatingRecord,proposeOperatingState,publishOperatingState,operatingInspection,operatingMaintenanceEligible,operatingContext} from './operating-state.mjs';
 import * as scoped from './scoped-context.mjs';
 import { currentView, upgradeView, publicPage, exactRead, mutationView, sourceReference, itemView, controlView, storageSourceId, fits, exactTextRead } from './public-response.mjs';
 import {backupCompany,restoreCompany} from './storage-transfer.mjs';
@@ -228,6 +229,7 @@ function readProgressArtifact(args,host) {
   return exactTextRead(text,{...args,id:args.artifact});
 }
 export function save(args,host) {
+  if(args.operating_record!==undefined)validateOperatingRecord(args.operating_record);
   requireText(args.content,'content',100000);
   if (!['intent','plan','decision','preference','artifact'].includes(args.kind)) throw new Error('Unsupported record kind');
   if (args.kind==='preference' && (!['explicit','inferred'].includes(args.basis) || !args.source_reference)) throw new Error('Preferences need explicit/inferred basis and source_reference');
@@ -241,7 +243,7 @@ export function save(args,host) {
     if(old?.prototype) throw new Error('Prototype records are immutable; use company_prototype or create a new scope');
     if (old && (old.author_instance!==s.owner.session_id || old.revision!==args.expected_revision)) throw new Error('Record owner or version conflict; create a new proposal instead');
     if (!old && args.expected_revision !== undefined && args.expected_revision !== 0) throw new Error('Record does not exist at expected version');
-    s.records[recordId]={id:recordId,kind:args.kind,content:args.content,...(args.context_obligations===undefined?{}:{context_obligations:structuredClone(args.context_obligations)}),author_role:'runner',author_instance:s.owner.session_id,revision:(old?.revision??0)+1,status:'Draft',source_reference:args.source_reference??null,basis:args.basis??null,updated_at:stamp(),previous:old ? [...(old.previous??[]), {revision:old.revision,content:old.content,source_reference:old.source_reference,...(old.context_obligations?{context_obligations:old.context_obligations}:{})}] : []};
+    s.records[recordId]={id:recordId,kind:args.kind,content:args.content,...(args.operating_record===undefined?{}:{operating_record:structuredClone(args.operating_record)}),...(args.context_obligations===undefined?{}:{context_obligations:structuredClone(args.context_obligations)}),author_role:'runner',author_instance:s.owner.session_id,revision:(old?.revision??0)+1,status:'Draft',source_reference:args.source_reference??null,basis:args.basis??null,updated_at:stamp(),previous:old ? [...(old.previous??[]), {revision:old.revision,content:old.content,source_reference:old.source_reference,...(old.operating_record?{operating_record:old.operating_record}:{}),...(old.context_obligations?{context_obligations:old.context_obligations}:{})}] : []};
     // An amended artifact never retains a review of its earlier version.
   },{rootKeys:['schema','runtime_version','plugin_version','team_sha256','owner','paused','roles','governance','governance_sha256','cos_instructions','revision','updated_at'],entities:{records:[recordId],upgrade:['status']}});
   return mutationView(state.records[recordId],recordId);
@@ -277,7 +279,7 @@ export function dispatch(args,host,{launch=launchWorker,check=readiness,catalog=
   if (ready.authenticated===false) throw new Error(`${host} CLI is not signed in. Complete its normal login before starting specialists.`);
   const jobId=id('job');
   const state=update(args,host,'job.queued',s=>{
-    if(s.paused && !handoverReviewEligible(s,args)&&!qualificationMaintenanceEligible(s,args)&&!scoped.scopedMaintenanceEligible(s,args)) throw new Error('Company is paused; only current handover QA or explicitly authorized read-only qualification may run');
+    if(s.paused && !handoverReviewEligible(s,args)&&!qualificationMaintenanceEligible(s,args)&&!scoped.scopedMaintenanceEligible(s,args)&&!operatingMaintenanceEligible(s,args)) throw new Error('Company is paused; only current handover QA or explicitly authorized read-only qualification may run');
     if(reviewWindow&&!freshHandoverReviewEligible(s,args))throw Error('Review window is only for a fresh current paused streamed handover QA');
     if(!Object.hasOwn(s.roles,args.role)) throw new Error('Role is absent from the pinned team catalog');
     if(busy(s).length>=3) throw new Error('Three assignments already active; wait for a result');
@@ -302,7 +304,7 @@ export function dispatch(args,host,{launch=launchWorker,check=readiness,catalog=
     const coordination=bindCoordination(s,args);
     const inputs=[...new Set([...(args.input_ids??[]),...handoverInputs,...(coordination?.dependencies??[]).map(d=>d.artifact_id)])];
     if(!Array.isArray(inputs) || inputs.some(k=>typeof k!=='string' || !Object.hasOwn(s.records,k))) throw new Error('An input record is missing');
-    const job={...(coordination?{coordination}:{}),...(args.expected_deliverable===undefined?{}:{expected_deliverable:args.expected_deliverable}),requester:{role:'runner',session_id:s.owner.session_id,host:s.owner.host,epoch:s.owner.epoch},id:jobId,role:args.role,session_key:key,instance_id:session.instance_id,native_id:session.native_id,host,epoch:s.owner.epoch,status:'queued',task:args.task,...(args.evidence_ids?{supplemental_sources:args.evidence_ids.map(key=>{const value=contextSource(s,key);if(!value)throw Error('Supplemental source missing');return recordReference(value,key);})}:{}),context_format:3,...(args.context_scope?{context_scope:requireText(args.context_scope,'context_scope',160)}:{}),timeout_policy_version:TIMEOUT_POLICY_VERSION,...timeout,...(reviewWindow??{}),model_selection:selection,cli_version:ready.version,task_summary:args.task_summary??null,next_handoff:args.next_handoff??null,...(inventory?{model_catalog:{source:inventory.source,...(selection.mode==='explicit'?{model:inventory.models.find(m=>m.id===selection.model)}:{}),speed_support:inventory.speed_support}}:{}),inputs:inputs.map(k=>({id:k,revision:s.records[k].revision})),review_of:target?{id:target.id,revision:target.revision}:null,...(args.prototype_id?{prototype_id:args.prototype_id}:{}),...(args.development_id?{development_id:args.development_id}:{}),created_at:stamp()};
+    const job={...(coordination?{coordination}:{}),...(args.expected_deliverable===undefined?{}:{expected_deliverable:args.expected_deliverable}),requester:{role:'runner',session_id:s.owner.session_id,host:s.owner.host,epoch:s.owner.epoch},id:jobId,role:args.role,session_key:key,instance_id:session.instance_id,native_id:session.native_id,host,epoch:s.owner.epoch,status:'queued',task:args.task,...(args.evidence_ids?{supplemental_sources:args.evidence_ids.map(key=>{const value=contextSource(s,key);if(!value)throw Error('Supplemental source missing');return recordReference(value,key);})}:{}),context_format:s.operating_state&&!target&&!args.prototype_id&&!args.development_id?6:3,...(args.context_scope?{context_scope:requireText(args.context_scope,'context_scope',160)}:{}),timeout_policy_version:TIMEOUT_POLICY_VERSION,...timeout,...(reviewWindow??{}),model_selection:selection,cli_version:ready.version,task_summary:args.task_summary??null,next_handoff:args.next_handoff??null,...(inventory?{model_catalog:{source:inventory.source,...(selection.mode==='explicit'?{model:inventory.models.find(m=>m.id===selection.model)}:{}),speed_support:inventory.speed_support}}:{}),inputs:inputs.map(k=>({id:k,revision:s.records[k].revision})),review_of:target?{id:target.id,revision:target.revision}:null,...(args.prototype_id?{prototype_id:args.prototype_id}:{}),...(args.development_id?{development_id:args.development_id}:{}),created_at:stamp()};
     if(fresh)Object.assign(job,{fresh_session:true,fresh_session_reason:freshReason});
     prototypeAssignment(s,job,true);developmentAssignment(s,job,true,args.root);
     const context=assignmentContext(s,job);
@@ -354,7 +356,7 @@ export function control(args,host) {
       if(args.expected_name!==s.name) throw new Error('Company name changed; read current status before renaming');
       if(busy(s).length) throw new Error('Assignments are active; wait or pause before renaming');
       s.name=name;
-    } else {owner(s,args.session_id,host);const acceptance=verifyHandoverAcceptance(s);if(acceptance){s.handover.acceptance=acceptance;s.handover.status='completed';}s.paused=false;}
+    } else {owner(s,args.session_id,host);if(s.operating_state)operatingContext(s);const acceptance=verifyHandoverAcceptance(s);if(acceptance){s.handover.acceptance=acceptance;s.handover.status='completed';}s.paused=false;}
     s.records[decisionId]=decision;
     // A new handover gate must fence old coordinators even on an older pinned
     // team. Pause remains available across unsupported versions and must never
@@ -439,6 +441,11 @@ function readPublicExact(db,args){return db.readSnapshot(()=>{
 // Explicit operations only. Neither API is called automatically on an existing company.
 export function contextControl(args,host) {
   binding(args,host);
+  if(args.protocol===OPERATING_PROTOCOL){
+    if(args.action==='inspect')return withStore(args.root,db=>db.readSnapshot(()=>operatingInspection(db.read())));
+    if(!['plan','apply'].includes(args.action))throw Error('Operating protocol supports inspect, plan or apply');
+    let result;update(args,host,'operating.'+args.action,s=>{requireText(args.source_instruction,'source_instruction');result=args.action==='plan'?proposeOperatingState(s,args):publishOperatingState(s,args);});return result;
+  }
   if(args.profile!==undefined&&(args.action!=='plan'||!args.source_id))throw Error('Qualification profile selects fresh source plans only; existing plans cannot be extended');
   if(args.action==='inspect'&&args.plan_id)return withStore(args.root,db=>{const s=db.read();return s.records[args.plan_id]?.scoped_context_plan?scoped.scopedPlanView(s,args):qualificationPlanView(s,args);});
   if(args.action==='read'&&args.snapshot)return withStore(args.root,db=>{

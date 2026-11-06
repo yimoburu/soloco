@@ -1,3 +1,4 @@
+import {operatingMaintenanceEligible,operatingContext,operatingReviewContext} from './operating-state.mjs';
 import * as scoped from './scoped-context.mjs';
 import {createScopedStreamLedger,recordScopedStreamDelivery,validateScopedStreamAck} from './scoped-stream.mjs';
 import {qualificationAssignment,qualificationMatches,qualificationMaintenanceEligible,qualificationDelivery,qualificationProof,validateQualificationOutput,validateQualificationResponse} from './context-qualification.mjs';
@@ -18,7 +19,7 @@ import { coordinationEligible } from './coordination.mjs';
 import { TIMEOUT_POLICY_VERSION, normalizeTimeout, executionTiming, jobExecutionTiming, jobTimeoutState } from './timeout.mjs';
 
 const scopedContext=a=>a?.qualification?.protocol===scoped.SCOPED_PROTOCOL;
-const maintenanceEligible=(s,j)=>qualificationMaintenanceEligible(s,j)||scoped.scopedMaintenanceEligible(s,j);
+const maintenanceEligible=(s,j)=>qualificationMaintenanceEligible(s,j)||scoped.scopedMaintenanceEligible(s,j)||operatingMaintenanceEligible(s,j);
 function workerContext(state,job){if(scoped.isScopedJob(state,job))return scoped.scopedAssignment(state,job);return state.records?.[job.review_of?.id]?.context_qualification_target?qualificationAssignment(state,job):assignmentContext(state,job);}
 function workerMatches(state,job,hash){if(scoped.isScopedJob(state,job))return scoped.scopedMatches(state,job,hash);return state.records?.[job.review_of?.id]?.context_qualification_target?qualificationMatches(state,job,hash):contextMatches(state,job,hash);}
 
@@ -68,6 +69,9 @@ export async function work(root, jobId, model = runModel) {
     if(controller.signal.aborted)return;
     try {withStore(root,db=>{
       const token=db.changeToken?.();
+      // Operating validity can expire without any write/change token.
+      if(lastCurrent?.context_format===6)operatingContext(db.read(),{scope:lastCurrent.context_scope??'*',job_id:lastCurrent.id});
+      else if(state?.records?.[job?.review_of?.id]?.operating_plan)operatingReviewContext(db.read(),lastCurrent??job);
       if(Number.isFinite(lastGrantExpiry)&&Date.now()>=lastGrantExpiry)throw Object.assign(new Error('Scoped authorization expired'),{code:'SCOPE_EXPIRED'});
       // This project file can change without a database revision. Do not let
       // token-based polling retain a budget that the host has just lowered.
@@ -97,7 +101,7 @@ export async function work(root, jobId, model = runModel) {
     const timeout=job.timeout_policy_version===undefined?normalizeTimeout():normalizeTimeout({timeout_ms:job.timeout_ms,timeout_reason:job.timeout_reason});
     const charter=state.roles[job.role];
     const target=job.review_of?state.records[job.review_of.id]:null;
-    const reviewShape=target?{...(target.handover?{permitted_action:'resume_handover or hold',subject_sha256:target.handover.subject_sha256,blockers:[]}:{}),...(target.context_classification_plan?{permitted_action:'apply_context_classification or hold',plan_sha256:digest(JSON.stringify(target.context_classification_plan)),blockers:[]}:{}),verdict:'Pass or Fail or Blocked',reason:'evidence-based explanation',
+    const reviewShape=target?{...(target.operating_plan?{permitted_action:'publish_operating_state or hold',plan_sha256:digest(JSON.stringify(target.operating_plan)),preservation_complete:true,interaction_complete:true,authority_checked:true,blockers:[]}:{}),...(target.handover?{permitted_action:'resume_handover or hold',subject_sha256:target.handover.subject_sha256,blockers:[]}:{}),...(target.context_classification_plan?{permitted_action:'apply_context_classification or hold',plan_sha256:digest(JSON.stringify(target.context_classification_plan)),blockers:[]}:{}),verdict:'Pass or Fail or Blocked',reason:'evidence-based explanation',
       ...(target.development?.type==='test'?{permitted_action:'accept_local_development or hold',candidate_sha256:target.development.candidate_sha256,receipt_sha256:target.development.receipt_sha256,blockers:[]}:{}),
       ...(target.prototype?{permitted_action:target.prototype.type==='plan'?'authorize_local_prototype or hold':'materialize_local_prototype or hold',scope_sha256:target.prototype.scope_sha256,...(target.prototype.bundle_sha256?{bundle_sha256:target.prototype.bundle_sha256}:{}),blockers:[],tests_executed:false}:{})}:null;
     const generationShape=job.development_id && state.records[job.development_id]?.development.scope.output_format==='patches'

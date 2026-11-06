@@ -1,3 +1,4 @@
+import {operatingReviewContext,operatingContext} from './operating-state.mjs';
 import {scopedAssignment,scopedMatches,isScopedJob,SCOPED_LIMITS} from './scoped-context.mjs';
 import { handoverReviewContext } from './handover.mjs';
 import { digest } from './store.mjs';
@@ -22,6 +23,14 @@ export function contextBudgetForJob(state,job) {
 
 // Every supplied fact is a dependency. Never silently trim a constraint or input.
 export function assignmentContext(state, job) {
+  const operatingReview=operatingReviewContext(state,job);if(operatingReview)return operatingReview;
+  if(job.context_format===6){
+    const checkpoint=operatingContext(state,{scope:job.context_scope??'*',job_id:job.id});
+    const records=(job.inputs??[]).map(ref=>{const r=state.records[ref.id];if(!r||r.revision!==ref.revision)throw Error('Assignment input version changed');return r;});
+    const text=JSON.stringify({protocol:'operating-assignment-v1',checkpoint,charter:state.roles[job.role],assignment:{task:job.task,context_scope:job.context_scope??'*',coordination:job.coordination??null,model_selection:job.model_selection??{mode:'default'}},records});
+    if(text.length>CONTEXT_LIMIT)throw Error('Operating assignment exceeds supported coherent context; Held');
+    return {text,hash:digest(text),inputs:records.map(r=>({id:r.id,revision:r.revision}))};
+  }
   if(isScopedJob(state,job))return scopedAssignment(state,job);
   const qualification=qualificationAssignment(state,job);if(qualification)return qualification;
   const handover=handoverReviewContext(state,job);if(handover)return handover;

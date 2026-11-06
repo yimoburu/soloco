@@ -1,3 +1,4 @@
+import {requireOperatingHandover} from './operating-state.mjs';
 import {buildEvidence,readEvidence} from './upgrade-evidence.mjs';
 import { digest, id, requireText, stamp } from './store.mjs';
 import {jobExecutionTiming} from './timeout.mjs';
@@ -36,6 +37,7 @@ function frozenProjection(state,contract,build,accept=()=>true) {
 export function handoverSubject(state) {
   const h=state.handover;
   const active=state.records?.[h?.reconstruction_id];
+  if(active?.handover?.evidence_protocol===4)return requireOperatingHandover(state);
   const legacy=active?.handover&&(active.handover.evidence_protocol??1)<3;
   // Only the active reconstruction/review output is excluded to avoid a
   // self-reference. Earlier attempts and their complete execution evidence
@@ -141,9 +143,10 @@ export function submitReconstruction(state,args) {
   const key=id('handover-reconstruction');
   // Retain previous submissions, but do not hide them from later reconstructions.
   h.reconstruction_id=key;
-  const subject=handoverSubject(state),subject_sha256=handoverHash(state);
+  const prospective=args.protocol==='operating-handover-v4';
+  const subject=prospective?requireOperatingHandover(state):handoverSubject(state),subject_sha256=digest(JSON.stringify(subject));
   const record={id:key,kind:'artifact',revision:1,status:'Submitted',author_role:'runner',author_instance:args.session_id,
-    content:args.content,created_at:stamp(),handover:{id:h.id,evidence_protocol:3,subject_sha256,subject,incoming_owner:{...state.owner},
+    content:args.content,created_at:stamp(),handover:{id:h.id,evidence_protocol:prospective?4:3,subject_sha256,subject,incoming_owner:{...state.owner},
       input_refs:Object.values(subject.records).map(r=>({id:r.id,...(r.revision===undefined?{}:{revision:r.revision}),sha256:digest(JSON.stringify(r))}))}};
   state.records[key]=record;
   return record;
@@ -179,7 +182,7 @@ export function verifyHandoverAcceptance(state) {
   const review=candidates.find(r=>{
     const j=state.jobs[r.job_id],v=r.review;
     return r.status==='Submitted'&&r.author_role==='qa'&&r.review_of.revision===target.revision&&
-      j?.status==='completed'&&completedWithinReviewWindow(j,r)&&j.epoch===state.owner.epoch&&j.artifact_id===r.id&&j.review_of?.id===target.id&&j.review_of.revision===target.revision&&
+      j?.status==='completed'&&(target.handover.evidence_protocol!==4||j.coordination_release?.termination_confirmed===true)&&completedWithinReviewWindow(j,r)&&j.epoch===state.owner.epoch&&j.artifact_id===r.id&&j.review_of?.id===target.id&&j.review_of.revision===target.revision&&
       r.author_instance===j.instance_id&&j.native_id&&j.native_id!==target.author_instance&&r.author_instance!==target.author_instance&&
       (!(target.handover.evidence_protocol>=2)||handoverReviewContext(state,j).hash===j.context_sha256)&&
       (!(target.handover.evidence_protocol>=2)||(r.handover_evidence?.semantic_delivery_complete===true&&r.handover_evidence?.subject_sha256===target.handover.subject_sha256&&r.handover_evidence.reconstruction_sha256===digest(JSON.stringify(target))&&r.handover_evidence.native_id===j.native_id))&&
