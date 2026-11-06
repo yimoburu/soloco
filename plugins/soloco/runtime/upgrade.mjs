@@ -344,9 +344,33 @@ function validateIncrementalReceipts(u) {
     used[step.role]=recordResponse(step.budget.used_after_prompt,call.text).used;
   }
   if(natives.cos && natives.cos===natives.qa)throw Error('Reviewer reused the author session');
-  for(const role of ['cos','qa'])for(const result of [...(u[`${role}_pages`]??[]),u[role==='cos'?'probe':'review']].filter(Boolean)) {
+  function validateResult(result,role,phase,key) {
     const call=calls.find(call=>call.call_id===result.call_id);
     if(!call || call.role!==role || call.native_id!==result.native_id || JSON.stringify(parseArtifact(call.text))!==JSON.stringify(result.artifact))throw Error('Accepted artifact lacks canonical native proof');
+    // Retrieval retains the original task's phase/key and advances only its
+    // round. Only the terminal artifact of that exact task can be accepted.
+    const ids=Array.from({length:17},(_,round)=>`${role}:${phase}:${key}:${round}`);
+    const taskSteps=ids.map(id=>steps.find(step=>step.id===id)).filter(Boolean);
+    if(key===undefined || taskSteps.at(-1)?.id!==result.call_id)throw Error('Accepted artifact does not match expected task step');
+    for(let round=0;round<taskSteps.length;round++) {
+      const step=taskSteps[round],envelope=JSON.parse(calls.find(call=>call.call_id===step.id).text);
+      if(step.id!==ids[round] || step.role!==role || step.phase!==phase
+          || (round===taskSteps.length-1?Object.hasOwn(envelope,'reads'):
+            !Object.hasOwn(envelope,'reads') || Object.keys(envelope).length!==1 || !Array.isArray(envelope.reads)
+            || !envelope.reads.length || envelope.reads.length>4))throw Error('Accepted artifact does not match expected retrieval step');
+    }
+  }
+  for(const role of ['cos','qa']) {
+    for(const [index,result] of (u[`${role}_pages`]??[]).entries())validateResult(result,role,'page',u.evidence.pages[index]?.page_id);
+    const final=u[role==='cos'?'probe':'review'];
+    if(final)validateResult(final,role,'synthesis','final');
+  }
+  // Bind every final QA round to the proposal actually supplied, independently
+  // of a later, internally consistent rewrite of the accepted CoS output.
+  for(const step of steps.filter(step=>step.role==='qa' && step.phase==='synthesis')) {
+    const call=calls.find(call=>call.call_id===step.id);
+    if(!u.probe || step.proposed_handover_sha256!==digest(JSON.stringify(u.probe.artifact))
+        || call.proposed_handover_sha256!==step.proposed_handover_sha256)throw Error('Final QA proposal binding changed');
   }
 }
 function validateVerdict(review) {
@@ -478,8 +502,11 @@ Protocol: Return JSON only matching response_contract.required_json_shape for th
         const budget=admitPrompt(prompt,session.used);
         const callId=`${role}:${task.phase}:${task.page?.page_id??task.batch_id??'final'}:${round}`;
         const inputHash=digest(prompt);
+        const proposalBinding=modern && role==='qa' && task.phase==='synthesis'
+          ? {proposed_handover_sha256:digest(JSON.stringify(task.proposed_handover))}:{};
         const prior=modern?u.steps?.[callCursor++]:null;
-        if(prior && (prior.id!==callId || prior.input_sha256!==inputHash || JSON.stringify(prior.budget)!==JSON.stringify(budget)))throw Error('Retained step identity, exact input or accounting changed');
+        if(prior && (prior.id!==callId || prior.input_sha256!==inputHash || JSON.stringify(prior.budget)!==JSON.stringify(budget)
+            || prior.proposed_handover_sha256!==proposalBinding.proposed_handover_sha256))throw Error('Retained step identity, exact input or accounting changed');
         const dir=path.join(dataDir(),'sessions',session.instance);noLink(dir);fs.mkdirSync(dir,{recursive:true,mode:0o700});
         const remaining=Math.min(callMinutes(u)*60000,deadline(u)-Date.now());
         if(remaining<1000)throw new Error('Upgrade deadline expired before native call');
@@ -495,14 +522,14 @@ Protocol: Return JSON only matching response_contract.required_json_shape for th
             output=u.calls.find(call=>call.call_id===callId);
             if(!output || prior.state!=='returned' || digest(output.text)!==prior.output_sha256)throw Error('Missing canonical completed call receipt');
           } else {
-            if(modern)publish('upgrade.call_started',a=>a.steps.push({id:callId,role,phase:task.phase,input_sha256:inputHash,budget,requested_native_id:session.native,state:'started',started_at:stamp(),worker_token:token}));
+            if(modern)publish('upgrade.call_started',a=>a.steps.push({id:callId,role,phase:task.phase,input_sha256:inputHash,...proposalBinding,budget,requested_native_id:session.native,state:'started',started_at:stamp(),worker_token:token}));
             output=await model(u.host,session.native,prompt,dir,remaining,structuredClone(requested),{timeoutContext:'upgrade-call',timeoutReason:'Runtime execution ceiling capped by remaining immutable upgrade rehearsal deadline',signal:controller.signal});
           }
         }
         catch(error) {if(!prior)retain(role,{...(modern?{call_id:callId,input_sha256:inputHash}:{}),phase:task.phase,model_selection:requested,model_evidence:unknownEvidence,error:error.message,...(error.code?{error_code:error.code}:{}),budget,completed_at:stamp()});throw error;}
         finally {if(timer!==null)clearTimeout(timer);if(poll!==null)clearInterval(poll);}
         const completedAt=prior?output.completed_at:stamp();
-        if(!prior)retain(role,{...(modern?{call_id:callId,input_sha256:inputHash}:{}),phase:task.phase,model_selection:requested,model_evidence:output.model_evidence??unknownEvidence,native_id:output.native_id??null,text:output.text,budget,response_characters:typeof output.text==='string'?output.text.length:null,estimated_response_tokens:typeof output.text==='string'?Math.ceil(output.text.length/4):null,completed_at:completedAt});
+        if(!prior)retain(role,{...(modern?{call_id:callId,input_sha256:inputHash,...proposalBinding}:{}),phase:task.phase,model_selection:requested,model_evidence:output.model_evidence??unknownEvidence,native_id:output.native_id??null,text:output.text,budget,response_characters:typeof output.text==='string'?output.text.length:null,estimated_response_tokens:typeof output.text==='string'?Math.ceil(output.text.length/4):null,completed_at:completedAt});
         if(eligibilityError)throw eligibilityError;
         check();
         requireText(output.native_id,'native session ID');

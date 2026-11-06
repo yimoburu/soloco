@@ -46,6 +46,12 @@ exact input hash, requested native identity, traffic accounting and worker token
 The existing append-only call journal retains the exact output or error before
 validation, including late and malformed returns. A separate completion receipt
 links the exact output hash, native identity and canonical delivery receipts.
+Accepted page findings must come from that exact page's role/task step; final
+probe and review must come from their role's synthesis step. Retrieval rounds
+must start at zero, remain consecutive and follow reads-only requests until the
+terminal artifact. Each final QA round also records the exact proposed handover
+hash in its step and canonical call receipt; reuse and apply compare it with the
+accepted CoS proposal.
 The interval between call start and committed completion is deliberately
 ambiguous after process loss, even if an output journal entry exists. There is
 no automatic retry or operator-supplied model claim that can close it.
@@ -92,10 +98,14 @@ characters (about 9.8% less); fixture identities can change exact totals. This
 establishes neither native model fit nor actual company adoption. Legacy protocol
 regressions run unchanged with the legacy default.
 
-Focused checks completed: all 15 prospective regressions in
-`node --test tests/upgrade-incremental.test.mjs`, plus 25 distinct legacy upgrade
-regressions selected with `--test-name-pattern` in `tests/upgrade.test.mjs`
-(continuity/authority, recovery, independent sessions, deadlines/call caps,
-negative/replay coverage, saved-checkpoint corruption and read-only inspection).
-The legacy tests were not edited. Syntax checks for the three runtime modules
-and `git diff --check` also passed. The full suite and native adapters were not run.
+Receipt-binding repair checks completed on Node v25.2.1: all 21 prospective
+regressions in `node --test tests/upgrade-incremental.test.mjs`, including page
+substitution for probe/final QA, swapped page identities, proposal changes after
+QA, skipped rounds and reads-only retrieval transitions. The new adversarial
+tests were run before the repair to reproduce missing task/proposal checks.
+Another 97 tests passed with
+`node --test --test-skip-pattern='MCP upgrade completes through detached native processes' tests/upgrade.test.mjs tests/upgrade-evidence.test.mjs tests/upgrade-paging.test.mjs`.
+The detached native integration test was excluded; the legacy suites and existing
+failed fixtures were not edited. Syntax checks for the changed runtime/test
+modules and `git diff --check` passed. The full suite, native adapters and live
+company adoption were not run.

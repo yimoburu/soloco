@@ -150,6 +150,99 @@ test('missing or tampered canonical output, delivery, accepted artifact or nativ
   const a=prepare();await rehearse(a.root,a.upgrade_id,contractModel());
   edit(a,s=>s.upgrade.deliveries.pop());assert.throws(()=>upgrade({...a,action:'apply'},'codex'),/receipt|proof/);
 });
+test('a canonical CoS page cannot replace the final probe at apply',async()=>{
+  const a=prepare();await rehearse(a.root,a.upgrade_id,contractModel());
+  const before=read(a).upgrade;assert.equal(before.status,'ready',before.error);
+  edit(a,s=>s.upgrade.probe=s.upgrade.cos_pages[0]);
+  const after=read(a).upgrade;
+  for(const field of ['calls','deliveries','final_packets'])assert.deepEqual(after[field],before[field]);
+  assert.throws(()=>upgrade({...a,action:'apply'},'codex'),/expected.*step/i);
+  assert.equal(read(a).upgrade.status,'ready');
+});
+test('a canonical QA page cannot replace final QA during receipt reuse or apply',async()=>{
+  const a=prepare();await rehearse(a.root,a.upgrade_id,contractModel());
+  assert.equal(read(a).upgrade.status,'ready');
+  edit(a,s=>s.upgrade.review=s.upgrade.qa_pages[0]);
+  assert.throws(()=>upgrade({...a,action:'apply'},'codex'),/apply_preparation_team/);
+  // Resume checks receipt provenance before final permission validation.
+  edit(a,s=>s.upgrade.status='checking');
+  assert.throws(()=>resume(a),/expected.*step/i);
+});
+test('page identities cannot be relabeled around canonical findings from another page',async()=>{
+  for(const role of ['cos','qa']) {
+    const a=prepare({large:true});await rehearse(a.root,a.upgrade_id,contractModel());
+    const before=read(a).upgrade;assert.equal(before.status,'ready',before.error);
+    assert.ok(before.evidence.pages.length>1);
+    edit(a,s=>{
+      const findings=s.upgrade[`${role}_pages`],[first,second]=findings;
+      findings[0]={...second,page_id:first.page_id,range_sha256:first.range_sha256};
+      findings[1]={...first,page_id:second.page_id,range_sha256:second.range_sha256};
+    });
+    const after=read(a).upgrade;
+    for(const field of ['calls','deliveries','final_packets'])assert.deepEqual(after[field],before[field]);
+    assert.throws(()=>upgrade({...a,action:'apply'},'codex'),/expected.*step/i);
+  }
+});
+test('final QA remains bound to its exact proposal even if the CoS output proof is rewritten consistently',async()=>{
+  const a=prepare();await rehearse(a.root,a.upgrade_id,contractModel());
+  const before=read(a).upgrade;assert.equal(before.status,'ready',before.error);
+  edit(a,s=>{
+    const u=s.upgrade,probe=u.probe;
+    probe.artifact.content='Changed'+probe.artifact.content.slice(7);
+    const call=u.calls.find(c=>c.call_id===probe.call_id),step=u.steps.find(c=>c.id===probe.call_id);
+    call.text=JSON.stringify(probe.artifact);step.output_sha256=digest(call.text);
+    // Same-length rewrite preserves traffic accounting; QA's exact input stays fixed.
+    assert.equal(call.text.length,call.response_characters);
+  });
+  const after=read(a).upgrade;
+  assert.deepEqual(after.calls.filter(c=>c.role==='qa'),before.calls.filter(c=>c.role==='qa'));
+  assert.deepEqual(after.final_packets,before.final_packets);
+  assert.throws(()=>upgrade({...a,action:'apply'},'codex'),/proposal/i);
+});
+test('accepted page and synthesis receipts cannot skip their initial round',async()=>{
+  for(const target of ['cos_pages','qa_pages','probe','review']) {
+    const a=prepare();await rehearse(a.root,a.upgrade_id,contractModel());
+    assert.equal(read(a).upgrade.status,'ready');
+    edit(a,s=>{
+      const u=s.upgrade,result=Array.isArray(u[target])?u[target][0]:u[target];
+      const old=result.call_id,next=old.replace(/:0$/,':1');assert.notEqual(old,next);
+      result.call_id=next;
+      u.calls.find(c=>c.call_id===old).call_id=next;
+      const step=u.steps.find(c=>c.id===old);step.id=next;
+      for(const delivery of u.deliveries.filter(d=>d.call_id===old))delivery.call_id=next;
+      step.deliveries_sha256=digest(JSON.stringify(u.deliveries.filter(d=>d.call_id===next)));
+    });
+    assert.throws(()=>upgrade({...a,action:'apply'},'codex'),/expected.*step/i);
+  }
+});
+test('page and final synthesis receipts require consecutive reads-only retrieval rounds for each role',async()=>{
+  const a=prepare(),model=contractModel(),rounds=new Map();
+  await rehearse(a.root,a.upgrade_id,async(...args)=>{
+    const task=JSON.parse(args[2]),phase=task.resume_phase??task.phase;
+    const key=`${task.role}:${phase}:${task.page?.page_id??task.task?.page?.page_id??'final'}`;
+    const round=rounds.get(key)??0;rounds.set(key,round+1);
+    if(round<2) return {native_id:`local-${task.role}`,text:JSON.stringify(task.response_contract.reads_only_shape)};
+    return model(...args);
+  });
+  const u=read(a).upgrade;assert.equal(u.status,'ready',u.error);
+  for(const result of [...u.cos_pages,...u.qa_pages,u.probe,u.review])assert.ok(result.call_id.endsWith(':2'));
+  for(const result of [u.cos_pages[0],u.qa_pages[0],u.probe,u.review]) {
+    const first=result.call_id.replace(/:2$/,':0'),original=u.calls.find(c=>c.call_id===first).text;
+    edit(a,s=>{
+      const call=s.upgrade.calls.find(c=>c.call_id===first);
+      call.text=call.text.replace('"reads":','"wrong":');assert.notEqual(call.text,original);
+      s.upgrade.steps.find(c=>c.id===first).output_sha256=digest(call.text);
+    });
+    assert.throws(()=>upgrade({...a,action:'apply'},'codex'),/expected retrieval step/i);
+    edit(a,s=>{
+      s.upgrade.calls.find(c=>c.call_id===first).text=original;
+      s.upgrade.steps.find(c=>c.id===first).output_sha256=digest(original);
+    });
+  }
+  upgrade({...a,action:'apply'},'codex');
+  upgrade({...a,action:'verify',expected_epoch:read(a).owner.epoch},'codex');
+  assert.equal(read(a).upgrade.status,'completed');
+});
 test('negative, malformed and late output stays held; recovery keeps facts and prior failed evidence',async()=>{
   for(const kind of ['negative','malformed']) {
     const a=prepare(),model=contractModel({verdict:kind==='negative'?'Blocked':'Pass'});
