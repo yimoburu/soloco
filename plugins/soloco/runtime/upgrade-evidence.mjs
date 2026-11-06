@@ -421,10 +421,12 @@ export function buildEvidence(checkpoint, history = [], { wholeBodyAliases = tru
           const original = register(at, 'payload', serialize(item), 'json', 'prior-full-checkpoint-snapshot');
           const fields = Object.entries(item).map(([field, value]) => {
             const location = child(at, field);
-            if (own(collectionKinds, field) && (object(value) || Array.isArray(value))) {
+            const kind = own(collectionKinds, field) ? collectionKinds[field]
+              : field === 'upgrade_history' && Array.isArray(value) ? 'history-attempt' : null;
+            if (kind && (object(value) || Array.isArray(value))) {
               const entries=[], repeats=[];
               for(const [key,v] of Object.entries(value)) {
-                const projected={key,...entry(v,child(location,key),collectionKinds[field])};
+                const projected={key,...entry(v,child(location,key),kind)};
                 (projected.same_as?repeats:entries).push(projected);
               }
               // Repeated occurrence metadata is retrievable, not another copy
@@ -433,7 +435,8 @@ export function buildEvidence(checkpoint, history = [], { wholeBodyAliases = tru
               return {key:field, collection_shape:Array.isArray(value)?'array':'object', entries,
                 ...(repeated?{repeated:{count:repeats.length,source:reference(repeated),length:repeated.length}}:{})};
             }
-            return {key:field, ...entry(value, location, 'checkpoint-field')};
+            return {key:field, ...entry(value, location,
+              field === 'upgrade' && object(value) ? 'history-attempt' : 'checkpoint-field')};
           });
           result[key] = {original:reference(original), fields};
         }
