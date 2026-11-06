@@ -40,11 +40,11 @@ function contractReview(p){
   if(p.phase==='extract'){
     const bundle=p.reviewed_unit_bundle,f=bundle.primary.fragment,items=[];for(const m of f.text.matchAll(/OBL~(D\d\d)~(\d+)~[A-Z0-9_]+~(OPEN|CLOSED)~END/g)){
       const pos=f.range.delivered_start+m.index;if(pos<f.range.start||pos>=f.range.end)continue;
-      items.push({id:'o'+m[2],kind:m[3]==='OPEN'?'uncertain_effect':'obligation',text:m[0],scope:m[1],provenance:bundle.provenance,interfaces:[]});
+      items.push({id:'o'+m[2],kind:m[3]==='OPEN'?'uncertain_effect':'obligation',text:m[0],scope:m[1],provenance:bundle.provenance_sha256,interfaces:[]});
     }
-    for(const m of f.text.matchAll(/NEGATIVE~(D\d\d)~NO_RETRY_WHILE_OPEN~END/g)){const pos=f.range.delivered_start+m.index;if(pos>=f.range.start&&pos<f.range.end)items.push({id:'negative',kind:'negative_finding',text:m[0],scope:m[1],provenance:bundle.provenance,interfaces:[]});}
-    if(f.text.includes('DISTANT_QUALIFIER'))items.push({id:'qualifier',kind:'boundary',text:'DISTANT_QUALIFIER: D00 may not retry unless D01 permission remains OPEN.',scope:'D00',provenance:bundle.provenance,interfaces:[{id:'permission',with_scope:'D01',text:'D01 permission remains OPEN; D00 must not retry.'}]});
-    if(f.text.includes('UNKNOWN_EXTRA'))items.push({id:'unknown',kind:'exhausted_allowance',text:'UNKNOWN_EXTRA: exhausted means no retry.',scope:'*',provenance:bundle.provenance,interfaces:[]});
+    for(const m of f.text.matchAll(/NEGATIVE~(D\d\d)~NO_RETRY_WHILE_OPEN~END/g)){const pos=f.range.delivered_start+m.index;if(pos>=f.range.start&&pos<f.range.end)items.push({id:'negative',kind:'negative_finding',text:m[0],scope:m[1],provenance:bundle.provenance_sha256,interfaces:[]});}
+    if(f.text.includes('DISTANT_QUALIFIER'))items.push({id:'qualifier',kind:'boundary',text:'DISTANT_QUALIFIER: D00 may not retry unless D01 permission remains OPEN.',scope:'D00',provenance:bundle.provenance_sha256,interfaces:[{id:'permission',with_scope:'D01',text:'D01 permission remains OPEN; D00 must not retry.'}]});
+    if(f.text.includes('UNKNOWN_EXTRA'))items.push({id:'unknown',kind:'exhausted_allowance',text:'UNKNOWN_EXTRA: exhausted means no retry.',scope:'*',provenance:bundle.provenance_sha256,interfaces:[]});
     Object.assign(r,{unit_id:bundle.primary.id,unit_sha256:sha(bundle.primary),reviewed_unit_bundle_sha256:sha(bundle),items});
   }else if(p.phase==='applicability'){
     const items=p.extractions.flatMap(e=>e.items.map(item=>({key:e.review.id+'/'+item.id,item}))).filter(i=>p.item_keys.includes(i.key));
@@ -78,7 +78,7 @@ async function qualify(f){
 }
 
 test('public store + worker path: 500 distinct obligations / 20 domains exceed union output, bounded packets apply and archive exact originals',async t=>{
-  const f=fixture({count:500,domains:20});f.extraction_unit_ids=unitPages(f).flatMap(u=>[u.id+'/0',u.id+'/1']);mutate(f,s=>{s.records.unknownRule={id:'unknownRule',kind:'decision',revision:1,content:'Unknown old governing rule: never execute without current consent.'};});const before=JSON.stringify(read(f).records.old),q=await qualify(f),s=read(f);
+  const f=fixture({count:500,domains:20});mutate(f,s=>{s.records.unknownRule={id:'unknownRule',kind:'decision',revision:1,content:'Unknown old governing rule: never execute without current consent.'};});const before=JSON.stringify(read(f).records.old),q=await qualify(f),s=read(f);
   assert.equal(q.extracts.reduce((n,e)=>n+e.review.qualification_result.items.length,0),500);
   assert.equal(new Set(q.extracts.flatMap(e=>e.review.qualification_result.items.map(i=>i.text))).size,500);
   const total=q.extracts.reduce((n,e)=>n+bytes(e.review.qualification_output),0);assert.ok(total>12000);
@@ -117,7 +117,7 @@ test('unknown source fields and current global rules are semantic; historical cl
 });
 
 test('distant qualifier absent from home blocks independently; no resolution of OPEN invented',async()=>{
-  const f=fixture({count:80,extra:{far_qualifier:'DISTANT_QUALIFIER'}});f.extraction_unit_ids=unitPages(f).flatMap(u=>[u.id+'/0',u.id+'/1']);const es=await extraction(f),e=es.find(e=>e.review.qualification_result.items.some(i=>i.id==='qualifier')),first=es.find(e=>e.review.qualification_result.items.some(i=>i.id==='o000'));
+  const f=fixture({count:80,extra:{far_qualifier:'DISTANT_QUALIFIER'}});const es=await extraction(f),e=es.find(e=>e.review.qualification_result.items.some(i=>i.id==='qualifier')),first=es.find(e=>e.review.qualification_result.items.some(i=>i.id==='o000'));
   assert.notEqual(first.target.target.unit_id,e.target.target.unit_id,'Qualifier is genuinely distant across immutable units');
   assert.ok(e.packet.reviewed_unit_bundle.primary.fragment.range.start-first.packet.reviewed_unit_bundle.primary.fragment.range.end>2400);
   const d=await run(f,{phase:'applicability',extraction_review_ids:[first.review.id,e.review.id],item_keys:[first.review.id+'/o000',e.review.id+'/qualifier'],counterpart_ids:['home-D00'],context_scope:'D00'});assert.equal(d.job.status,'completed',d.job.error);assert.equal(d.review.review.verdict,'Blocked');
@@ -136,7 +136,7 @@ test('cross-domain interface must have independent complete exact review; contra
 
 test('canonical receipt rejects forged native/job/closure/output/provenance and tampered source; no coordinator proof reuse',async()=>{
   const f=fixture(),q=await qualify(f),original=read(f);
-  const changes=[s=>s.jobs[q.extracts[0].job.id].native_id='forged',s=>s.jobs[q.extracts[0].job.id].coordination_release.termination_confirmed=false,s=>s.jobs[q.extracts[0].job.id].artifact_id='forged',s=>s.jobs[q.extracts[0].job.id].execution_deadline_at='2000-01-01T00:00:00Z',s=>s.jobs[q.extracts[0].job.id].qualification_delivery.wire+=' ',s=>s.records[q.extracts[0].review.id].qualification_proof.native_id='forged',s=>s.records[q.extracts[0].review.id].qualification_result.items[0].provenance.primary.range.start++,s=>s.records.old.clauses.push('tampered'),s=>s.records['home-D00'].content+=' changed'];
+  const changes=[s=>s.jobs[q.extracts[0].job.id].native_id='forged',s=>s.jobs[q.extracts[0].job.id].coordination_release.termination_confirmed=false,s=>s.jobs[q.extracts[0].job.id].artifact_id='forged',s=>s.jobs[q.extracts[0].job.id].execution_deadline_at='2000-01-01T00:00:00Z',s=>s.jobs[q.extracts[0].job.id].qualification_delivery.wire+=' ',s=>s.records[q.extracts[0].review.id].qualification_proof.native_id='forged',s=>s.records[q.extracts[0].review.id].qualification_result.items[0].provenance='0'.repeat(64),s=>s.records.old.clauses.push('tampered'),s=>s.records['home-D00'].content+=' changed'];
   for(const change of changes){const s=inheritSnapshots(original,structuredClone(original));change(s);assert.throws(()=>reviewedContext(s),/Scoped context hold|Immutable snapshot/);}
   mutate(f,s=>{s.jobs[q.extracts[0].job.id].coordination_release.termination_confirmed=false;});
   const t=call(f,{action:'target',plan_id:f.plan_id,phase:'extract',unit_id:unitPages(f)[0].id});assert.ok(t.id);assert.equal(t.reused,undefined);
@@ -195,7 +195,7 @@ test('bounded independent interface review can complete integration without a gl
 });
 
 test('closed output grammar rejects fabricated citations, altered provenance and hidden findings and retains rejected evidence',async()=>{
-  for(const change of [e=>{e.citations=[{native_id:'model-claim',complete:true}];},e=>{e.qualification_result.items[0].provenance.primary.range.start++;},e=>{e.qualification_result.hidden_finding='No renewed allowance.';}]){
+  for(const change of [e=>{e.citations=[{native_id:'model-claim',complete:true}];},e=>{e.qualification_result.items[0].provenance='0'.repeat(64);},e=>{e.qualification_result.hidden_finding='No renewed allowance.';}]){
     const f=fixture(),v=await run(f,{phase:'extract',unit_id:unitPages(f)[0].id},{review:p=>{const e=contractReview(p);change(e);return e;}});assert.equal(v.job.status,'failed');assert.ok(v.job.rejected_output.text);assert.ok(!v.review);assert.equal(read(f).context_classifications?.old,undefined);
   }
 });
@@ -443,7 +443,7 @@ test('clipped natural-language qualifier holds until a new explicit supporting b
       const at=u.fragment.range.delivered_start+n;assert.ok(chars[at]===undefined||chars[at]===u.fragment.text[n]);chars[at]=u.fragment.text[n];
     }
     const complete=Array.from({length:chars.length},(_,i)=>chars[i]??'\0').join('').includes(qualifier);
-    Object.assign(r,{items:complete?[{id:'boundary',kind:'boundary',text:qualifier,scope:'outreach',provenance:b.provenance,interfaces:[{id:'billing',with_scope:'billing',text:qualifier}]}]:[],...(!complete?{verdict:'Blocked',permitted_action:'hold',preservation_complete:false,interfaces_complete:false,scope_complete:false,reason:'CONTRACT DOUBLE: delivered qualifier ends mid-sentence; explicit supporting evidence required.',blockers:['Missing the complete billing condition and contact-authority boundary.']}: {})});
+    Object.assign(r,{items:complete?[{id:'boundary',kind:'boundary',text:qualifier,scope:'outreach',provenance:b.provenance_sha256,interfaces:[{id:'billing',with_scope:'billing',text:qualifier}]}]:[],...(!complete?{verdict:'Blocked',permitted_action:'hold',preservation_complete:false,interfaces_complete:false,scope_complete:false,reason:'CONTRACT DOUBLE: delivered qualifier ends mid-sentence; explicit supporting evidence required.',blockers:['Missing the complete billing condition and contact-authority boundary.']}: {})});
     return envelope(r);
   };
   const held=await run(f,{phase:'extract',unit_id:primary.id},{review});assert.equal(held.job.status,'completed',held.job.error);assert.equal(held.review.review.verdict,'Blocked');const retained=JSON.stringify(held.review);
@@ -472,8 +472,9 @@ test('exact ordered supporting ranges and hashes survive canonical artifact deli
     assert.equal(b.provenance.projection_sha256,digest(projection));
   }
   assert.deepEqual(b.provenance.source,read(f).records[f.plan_id].scoped_context_plan.source);
+  assert.equal(b.provenance_sha256,sha(b.provenance));
   assert.deepEqual(e.review.reviewed_unit_bundle,b);assert.equal(e.review.qualification_result.reviewed_unit_bundle_sha256,sha(b));
-  assert.ok(e.review.qualification_result.items.length);assert.ok(e.review.qualification_result.items.every(i=>JSON.stringify(i.provenance)===JSON.stringify(b.provenance)));
+  assert.ok(e.review.qualification_result.items.length);assert.ok(e.review.qualification_result.items.every(i=>i.provenance===b.provenance_sha256));
   const d=await run(f,{phase:'applicability',extraction_review_ids:[e.review.id],counterpart_ids:['home-D00'],context_scope:'D00'});
   assert.equal(d.job.status,'completed',d.job.error);assert.deepEqual(d.packet.extractions[0].reviewed_unit_bundle,b);
   for(const v of [e,d])assert.equal(v.packet.response_shape.target_sha256,v.packet.target.sha256);
@@ -493,7 +494,8 @@ test('exact ordered supporting ranges and hashes survive canonical artifact deli
 test('invalid support IDs and altered bundle provenance cannot substitute for exact frozen delivery',async()=>{
   const f=fixture({count:18}),units=unitPages(f),primary=units[0].id,support=units[1].id;
   for(const context_unit_ids of [[primary],[support,support],['u999'],[support+'/2'],[support+'/0/'.repeat(18)],null,'u1'])assert.throws(()=>call(f,{action:'target',phase:'extract',unit_id:primary,context_unit_ids}),/primary unit|unique context|unknown subdivision/);
-  for(const change of [r=>r.target_sha256='forged',(r,p)=>r.target_sha256=sha(read(f).records[p.target.id].scoped_context_target),r=>r.unit_sha256='forged',r=>r.reviewed_unit_bundle_sha256='forged',r=>r.items[0].provenance.supporting[0].range.end++,r=>r.items[0].provenance.supporting[0].unit_id=primary,r=>r.items[0].provenance.supporting[0].unit_sha256='forged',r=>r.items[0].provenance.source.sha256='forged',r=>r.items[0].provenance.projection_sha256='forged',r=>r.items[0].provenance.supporting=[],r=>r.items[0].provenance.supporting.push(r.items[0].provenance.supporting[0])]){
+  const forged=change=>(r,p)=>{const descriptor=structuredClone(p.reviewed_unit_bundle.provenance);change(descriptor);r.items[0].provenance=sha(descriptor);};
+  for(const change of [r=>r.target_sha256='forged',(r,p)=>r.target_sha256=sha(read(f).records[p.target.id].scoped_context_target),r=>r.unit_sha256='forged',r=>r.reviewed_unit_bundle_sha256='forged',forged(d=>d.supporting[0].range.end++),forged(d=>d.supporting[0].unit_id=primary),forged(d=>d.supporting[0].unit_sha256='forged'),forged(d=>d.source.sha256='forged'),forged(d=>d.projection_sha256='forged'),forged(d=>d.supporting=[]),forged(d=>d.supporting.push(d.supporting[0]))]){
     const e=await run(f,{phase:'extract',unit_id:primary,context_unit_ids:[support]},{review:p=>{const e=contractReview(p);change(e.qualification_result,p);return e;}});
     assert.equal(e.job.status,'failed');assert.ok(e.job.rejected_output.text);assert.ok(!e.review);
   }

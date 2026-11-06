@@ -38,7 +38,7 @@ mutations. This protocol grants no venture execution or renewed allowance.
    The worker delivers `reviewed_unit_bundle` with `primary`, ordered `supporting`
    units, and `provenance`: exact source reference, projection hash, and primary
    and supporting unit IDs, unit hashes, paths and primary/delivered ranges.
-   Every returned item must cite that entire exact provenance bundle; the result
+   Every returned item must cite `provenance_sha256`, the exact complete descriptor retained in that bundle; the result
    also binds its primary ID/hash and `reviewed_unit_bundle_sha256`. Extract effects
    belonging to the primary with complete conditions/interfaces from the full
    delivered context. Supporting evidence never counts as completed primary coverage.
@@ -89,8 +89,8 @@ mutations. This protocol grants no venture execution or renewed allowance.
 
 Every request is at most 48,000 UTF-8 bytes; complete parsed review envelopes at
 most 12,000 bytes (wire independently at most 48,000). These are supported bounds,
-not host/model context-fit guarantees. Complete bundle provenance adds per-item
-output overhead; dense primaries may need explicit subdivision sooner. Overflow
+not host/model context-fit guarantees. Per-item provenance references the complete retained bundle without repeating its
+metadata. Dense semantic output can still require subdivision. Overflow
 retains the failed output and unit. Request `unit_id: "u3/0"` and `"u3/1"` to
 subdivide a deterministic primary range, recursively if necessary. Overlap
 preserves boundary evidence; it does
@@ -179,3 +179,10 @@ with a widened scope until independently requalified; an old scope certificate
 cannot hide those bodies. Already qualified unrelated archives remain omittable.
 Legacy current classifications are conservative global evidence for this new
 protocol; their published ordinary-task behavior is unchanged.
+
+Per-item provenance is a checked reference to `reviewed_unit_bundle.provenance_sha256`.
+The canonical delivered bundle retains the complete original source, projection,
+unit hashes and all primary/supporting ranges once. Every item inherits that
+exact immutable evidence through the enclosing review; copying the same descriptor
+into every item adds no evidence. Wrong references or changed bundle data hold.
+This avoids forcing extra subdivisions merely to repeat metadata.
