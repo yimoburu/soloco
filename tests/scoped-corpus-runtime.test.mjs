@@ -10,6 +10,8 @@ import {withStore,digest,id,teamHash} from '../plugins/soloco/runtime/store.mjs'
 import {resolveSnapshot,inheritSnapshots,retainSnapshot} from '../plugins/soloco/runtime/snapshot.mjs';
 import {executionTiming} from '../plugins/soloco/runtime/timeout.mjs';
 import * as scoped from '../plugins/soloco/runtime/scoped-context.mjs';
+import {assignmentContext} from '../plugins/soloco/runtime/context.mjs';
+import {operatingContext} from '../plugins/soloco/runtime/operating-state.mjs';
 const protocol=scoped.SCOPED_PROTOCOL,sha=v=>digest(JSON.stringify(v)),bytes=v=>Buffer.byteLength(typeof v==='string'?v:JSON.stringify(v));
 const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-coherent-runtime-'));
 process.env.COMPANY_PLUGIN_DATA=path.join(tmp,'cache');
@@ -18,12 +20,13 @@ const mutate=(f,fn)=>withStore(f.root,db=>db.transaction('contract.fixture',s=>{
 const read=f=>withStore(f.root,db=>db.read());
 const call=(f,args)=>engine.contextControl({...f,...args},'codex');
 const token=(domain,n,status='OPEN')=>`OBL~${domain}~${String(n).padStart(3,'0')}~CUSTOMER_${n}_NO_EXPORT_ABOVE_${17*n+3}_ROWS_UNTIL_CONSENT_${n%7}_IN_REGION_${n%11}~${status}~END`;
-function fixture({count=1,domains=1,extra={},maintenance=false,kind='artifact',homeKind='artifact',operating=false,partitioner=scoped.COHERENT_PARTITIONER}={}){
+function fixture({count=1,domains=1,extra={},maintenance=false,kind='artifact',homeKind='artifact',operating=false,deferPlan=false,partitioner=scoped.COHERENT_PARTITIONER}={}){
   const root=fs.mkdtempSync(path.join(tmp,'company-')),session_id=id('owner'),f={root,session_id,epoch:1,source_instruction:'Explicit fixture instruction: qualify exact source read-only, preserve all failed evidence and OPEN uncertainty.'};
   engine.bind(root,session_id,'codex');engine.open({...f,idea:'Source-only contract fixture'},'codex');withStore(root,db=>db.migrate());
   const clauses=Array.from({length:count},(_,n)=>token('D'+String(Math.min(domains-1,Math.floor(n*domains/count))).padStart(2,'0'),n));
   mutate(f,s=>{s.roles={qa:{name:'Independent QA'},engineer:{name:'Engineer'}};s.governance='Preparation only. No execution or renewed allowance.';s.cos_instructions='Preserve uncertain effects and exhausted allowances.';s.records.old={id:'old',kind,revision:1,author_instance:'historical-producer',content:'Historical evidence grants no current permission.',clauses,...extra};if(maintenance)s.paused=true;s.team_sha256=teamHash(s);});
   for(let d=0;d<domains;d++){const domain='D'+String(d).padStart(2,'0');engine.save({...f,id:'home-'+domain,kind:homeKind,content:clauses.filter((_,n)=>Math.min(domains-1,Math.floor(n*domains/count))===d).join('\n')||'No additional obligation.',context_obligations:{version:1,scope:domain},...(operating?{operating_record:{version:1,kind:'obligation',scope:domain,owner:'runner',conditions:'Always',exceptions:'None',clearing:'Independent review',expires_at:null,dependencies:[],authority_refs:[],evidence_refs:['home-'+domain]}}:{})},'codex');}
+  if(deferPlan)return f;
   const p=call(f,{action:'plan',protocol,source_id:'old',maintenance,partitioner});f.plan_id=p.id;f.original=p.original;f.units=p.units;f.all_units=call(f,{action:'inspect',plan_id:p.id,limit:16});f.extraction_identity=p.extraction_identity;f.clauses=clauses;return f;
 }
 function unitPages(f){const units=[];let offset=0;do{const page=call(f,{action:'inspect',plan_id:f.plan_id,offset,limit:16});units.push(...page.units);offset=page.next_offset;}while(offset!==null);return units;}
@@ -158,4 +161,59 @@ test('corpus retains external named handover originals and refuses missing closu
   assert.ok(m.sources.some(r=>r.source.id==='named'));
   const bad=inheritSnapshots(state,structuredClone(state));delete bad.records.named;
   assert.throws(()=>scoped.scopedPlanView(bad,{plan_id:p.id}),/missing|changed/);
+});
+
+
+async function acceptedOperatingCorpus({upgrade=false}={}){
+ const f=fixture({operating:true,deferPlan:true});
+ const sourceId=upgrade?'upgrade:recovered-corpus':'old';
+ mutate(f,s=>{
+  if(upgrade){delete s.records.old;s.upgrade={id:'recovered-corpus',status:'recovered',epoch:1,host:'codex',error:'FICTIONAL prior QA failed; unknown effects; no retry',probe_status:'failed',review_status:'failed',probe_native_id:'fictional-upgrade-producer',checkpoint:retainSnapshot(s,{content:'RAW-CORPUS-ORIGINAL: failed evidence retained; no renewed allowance.'})};}
+  else s.records.old.archive=retainSnapshot(s,{content:'RAW-CORPUS-ORIGINAL: all restrictions and distant exceptions remain OPEN.'});
+  const h=s.records['home-D00'];h.content+=' Complete failed outcome remains failed, effects unknown, retries exhausted; current independent resume_handover required.';
+  Object.assign(h.operating_record,{evidence_refs:[sourceId],kind:'permission',remaining:0,revoked:true,grant_refs:[sourceId]});
+  s.records['home-outcome']={id:'home-outcome',revision:1,kind:'artifact',author_instance:f.session_id,content:'FICTIONAL failed attempt remains failed, effects unknown; current independent resume_handover required.',context_obligations:{version:1,scope:'*'},operating_record:{version:1,kind:'outcome',scope:'*',owner:'runner',conditions:'While unreconciled',exceptions:'None',clearing:'Independent reconciliation',expires_at:null,dependencies:[],authority_refs:[],evidence_refs:[sourceId],attempted_action:'Failed fictional rehearsal',resources:['fictional source'],possible_effects:'Unknown partial effects',uncertainty:'Prior QA remains failed',retry_clearing:'Fresh canonical authority and independent resume_handover required',historical_receipts:[sourceId]}};
+ });
+ await assert.rejects(publicCall('company_context',{...f,protocol:'operating-state-v1',action:'plan'},'codex'),/canonical snapshot delivery/);
+ const p=await publicCall('company_context',{...f,action:'plan',protocol,partitioner:scoped.CORPUS_PARTITIONER,source_id:sourceId,selected_source_ids:[sourceId]},'codex');f.plan_id=p.id;
+ const es=[];for(const u of unitPages(f)){const e=await run(f,{phase:'extract',unit_id:u.id,delivery_protocol:scoped.SCOPED_STREAM});assert.equal(e.job.status,'completed',e.job.error);es.push(e);}
+ const args={phase:'applicability',extraction_review_ids:es.map(e=>e.review.id),counterpart_ids:['home-D00','home-outcome'],context_scope:'*',delivery_protocol:scoped.SCOPED_STREAM};
+ const d=await run(f,args),ir=await run(f,{...args,interface_keys:d.review.qualification_result.interfaces.map(i=>i.key)});
+ const i=await run(f,{phase:'integration',domain_review_ids:[d.review.id],interface_review_ids:[ir.review.id],counterpart_ids:['home-D00','home-outcome'],delivery_protocol:scoped.SCOPED_STREAM});
+ for(const r of [d,ir,i])assert.equal(r.job.status,'completed',r.job.error);
+ const proof={d,ir,i};
+ assert.equal((await publicCall('company_context',{...f,action:'apply',integration_review_id:proof.i.review.id},'codex')).applied,true);
+ return {f,sourceId,proof,es};
+}
+async function operatingReview(f,plan,native='fictional-operating-corpus-native'){
+ const queued=engine.dispatch({...f,role:'qa',review_of:plan,task:'FICTIONAL complete current operating meaning contract'},'codex',{check:()=>({available:true}),launch:()=>({on(){},unref(){}})});
+ const context=assignmentContext(read(f),read(f).jobs[queued.id]);
+ const packet=context.frozen_packet??JSON.parse(context.text),e=context.operating_evidence;
+ const ranges=e?Object.values(e.sources).flatMap(v=>{const out=[];for(let offset=0;offset<v.length;offset+=16000)out.push({source_id:v.source_id,sha256:v.sha256,offset,length:Math.min(16000,v.length-offset)});return out;}):[];
+ await work(f.root,queued.id,async(_h,_n,_p,_d,timeout,_s,options)=>{
+  options.onSpawn(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));
+  if(ranges.length)return {native_id:native,text:JSON.stringify({reads:ranges.splice(0,1)})};
+  return {native_id:native,text:JSON.stringify({content:'FICTIONAL ADAPTER: scripted complete current meaning, never live QA.',messages:[],notices:[],review:{verdict:'Pass',reason:'FICTIONAL current meaning contract',permitted_action:'publish_operating_state',plan_sha256:sha(read(f).records[plan].operating_plan),preservation_complete:true,interaction_complete:true,authority_checked:true,blockers:[]}})};
+ });
+ const j=read(f).jobs[queued.id];assert.equal(j.status,'completed',j.error);return {j,packet};
+}
+test('FICTIONAL public SCOPED corpus accepted semantics publish current homes and recovered controls without raw replay',async()=>{
+ for(const upgrade of [false,true]){
+  const {f,sourceId,proof,es}=await acceptedOperatingCorpus({upgrade});
+  const c=read(f).context_classifications[sourceId];assert.ok(c.scoped_qualification);
+  const p=await publicCall('company_context',{...f,protocol:'operating-state-v1',action:'plan'},'codex');assert.equal(p.held,false,JSON.stringify(p.frontier));
+  const {j,packet}=await operatingReview(f,p.id),accepted=packet.required_evidence.accepted_semantics.find(x=>x.source.id===sourceId);
+  assert.ok(accepted);assert.deepEqual(accepted.counterparts,c.scoped_qualification.homes);
+  for(const review of [proof.d.review,proof.ir.review,proof.i.review])assert.deepEqual(accepted.judgments.find(x=>x.review.id===review.id).result,review.qualification_result);
+  for(const receipt of c.scoped_qualification.receipts)for(const ref of [receipt.review,receipt.target,receipt.job])assert.ok(accepted.exact_originals.some(r=>r.id===ref.id&&r.sha256===ref.sha256));
+  assert.ok(!JSON.stringify(packet).includes('RAW-CORPUS-ORIGINAL'));
+  assert.ok(!packet.required_evidence.sources.some(r=>r.id===sourceId));
+  if(upgrade){assert.equal(packet.controls.upgrade.status,'recovered');assert.equal(packet.controls.upgrade.consumed.qa_final,0);}
+  assert.equal((await publicCall('company_context',{...f,protocol:'operating-state-v1',action:'apply',plan_id:p.id,review_id:j.artifact_id},'codex')).published,true);
+  assert.match(assignmentContext(read(f),{id:'next',role:'engineer',context_format:6,task:'Current only',inputs:[]}).text,/resume_handover/);
+  const baseline=read(f);
+  for(const change of [s=>{s.records['home-D00'].content+=' stale';},s=>{s.records[proof.d.review.id].qualification_result.summary+=' stale';},s=>{s.jobs[es[0].job.id].coordination_release.termination_confirmed=false;},s=>{s.records.unknown={id:'unknown',revision:1,kind:'artifact',content:'Unknown authority'};},s=>{s.records.negative={id:'negative',revision:1,kind:'review',status:'Submitted',review_of:proof.d.review.review_of,review:{verdict:'Blocked'}};},...(upgrade?[s=>{s.upgrade.status='checking';},s=>{s.upgrade.error+=' new uncertainty';}]:[s=>{s.records.old.content+=' stale';}])]){
+   mutate(f,s=>{Object.assign(s,structuredClone(baseline));change(s);});assert.throws(()=>operatingContext(read(f)),/Held|hold|changed|membership|closure|negative/i);
+  }
+ }
 });

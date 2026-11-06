@@ -1,4 +1,5 @@
 import {digest} from './store.mjs';
+import {operatingProofOccurrences} from './operating-state.mjs';
 import {contextSource,currentExtensions,presentationOnly,classificationFor,proofJobSafe} from './current-state.mjs';
 import {buildEvidence} from './upgrade-evidence.mjs';
 import {retainSnapshot,resolveSnapshot,resolveSnapshotEntry,captureSnapshotDependencies,validateSnapshotDependencies,inheritSnapshots,snapshotBytes} from './snapshot.mjs';
@@ -174,9 +175,9 @@ function corpusRuntimeRecord(s,r){
 function corpusLive(s,c,m){
   for(const r of m.sources){const original=exact(s,r.source);if(!same(producerClosure(s,original),c.producer_closures[r.source.id]))fail('corpus producer closure changed');}
   for(const r of m.sources.filter(r=>r.location.startsWith('/upgrade'))){const value=r.location==='/upgrade'?s.upgrade:s.upgrade_history?.[Number(r.location.split('/').at(-1))];if(!value||!same(scopedReference(resolveSnapshotEntry(s,value),r.source.id),r.source))fail('corpus exact source location changed');}
-  const known=new Set(m.sources.map(r=>r.source.id));
-  for(const [id,r] of Object.entries(s.records??{}))if(!known.has(id)&&!corpusRuntimeRecord(s,r))fail('corpus current membership added '+id);
-  for(const [id,j] of Object.entries(s.jobs??{}))if(!known.has('job:'+id)&&(!s.records[j.review_of?.id]?.scoped_context_target||!proofJobSafe(Object.fromEntries(Object.entries(j).filter(([k])=>!['qualification_delivery','error','execution_failure','rejected_output','rejected_native_ids','rejected_native_id'].includes(k))))))fail('corpus current job membership added '+id);
+  const known=new Set(m.sources.map(r=>r.source.id)),operating=operatingProofOccurrences(s);
+  for(const [id,r] of Object.entries(s.records??{}))if(!known.has(id)&&!operating.ids.has(id)&&!corpusRuntimeRecord(s,r))fail('corpus current membership added '+id);
+  for(const [id,j] of Object.entries(s.jobs??{}))if(!known.has('job:'+id)&&!operating.jobs.has(id)&&(!s.records[j.review_of?.id]?.scoped_context_target||!proofJobSafe(Object.fromEntries(Object.entries(j).filter(([k])=>!['qualification_delivery','error','execution_failure','rejected_output','rejected_native_ids','rejected_native_id'].includes(k))))))fail('corpus current job membership added '+id);
   for(const u of [s.upgrade,...(s.upgrade_history??[])].filter(Boolean))if(!known.has('upgrade:'+u.id))fail('corpus upgrade membership added');
 }
 function captureCorpus(s,{source_id,corpus_plan_id,selected_source_ids}){

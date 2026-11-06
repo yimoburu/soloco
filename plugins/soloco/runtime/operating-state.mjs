@@ -23,14 +23,18 @@ export function validateOperatingRecord(v){
   return structuredClone(v);
 }
 // A terminal label alone never qualifies an upgrade. Only the existing exact
-// represented-v2 validator may establish this narrow recovered-source boundary.
+// canonical validator may establish this narrow recovered-source boundary.
 function representedCurrent(s,id,projection=reviewedContext(s)){
   const source=contextSource(s,id);
-  if(!hasSnapshotReferences(source)&&!id.startsWith('upgrade:'))return null;
   if(id.startsWith('upgrade:')&&source?.status!=='recovered')return null;
-  const c=projection.classifications.get(id),p=s.records?.[c?.plan?.id]?.context_classification_plan;
-  if(c?.disposition!=='represented'||p?.version!==2||c.qualification?.protocol!==2||s.jobs?.[s.records?.[c.review.id]?.job_id]?.context_format!==4||!projection.excluded(id))return null;
-  if(!p.counterparts.every(ref=>{const h=s.records[ref.id];return h?.operating_record&&same(recordReference(h),ref);}))return null;
+  const c=projection.classifications.get(id);
+  if(c?.disposition!=='represented'||!projection.excluded(id))return null;
+  const scoped=c.scoped_qualification;
+  const plan=s.records?.[c.plan?.id],v=plan?.context_classification_plan;
+  if(!scoped&&(!hasSnapshotReferences(source)&&!id.startsWith('upgrade:')||v?.version!==2||c.qualification?.protocol!==2||s.jobs?.[s.records?.[c.review.id]?.job_id]?.context_format!==4))return null;
+  const p=scoped?{counterparts:scoped.homes}:v;
+  if(!p.counterparts.length||!p.counterparts.every(ref=>{const h=s.records[ref.id];return h?.operating_record&&!hasSnapshotReferences(h)&&same(recordReference(h),ref);}))return null;
+  for(const ref of p.counterparts)validateOperatingRecord(s.records[ref.id].operating_record);
   // Check exact vault availability without redelivering accepted bytes. No new
   // semantic classification is created by this traversal.
   const todo=[source],seen=new Set(),snapshots=new Set();
@@ -40,7 +44,7 @@ function representedCurrent(s,id,projection=reviewedContext(s)){
     if(ref){const key=entry?entry.immutable_snapshot.sha256:ref.sha256;if(!snapshots.has(key)){snapshots.add(key);todo.push(entry?resolveSnapshotEntry(s,value):resolveSnapshot(s,value));}continue;}
     for(const child of Object.values(value))if(child&&typeof child==='object')todo.push(child);
   }
-  return {c,p};
+  return {c,p,scoped};
 }
 function currentUpgrade(s){
   const u=s.upgrade;if(!u||u.status!=='recovered')return u??null;
@@ -92,6 +96,19 @@ function bookkeeping(s,planId){
     // Accepted immutable proof is historical evidence across owner epochs.
     // Only new in-flight review admission is fenced to the current epoch.
     for(const refs of [a.receipts,...(a.accepted_snapshot.prior_proofs??[])]){const [t,r,j]=exactProof(s,refs);ids.add(t.id);ids.add(r.id);jobs.add(j.id);}
+  }
+  return {ids,jobs};
+}
+// Corpus membership may admit only existing mechanical publication bookkeeping.
+// This grants no exclusion: operatingFrontier still requires independent acceptance.
+export function operatingProofOccurrences(s){
+  const ids=new Set(),jobs=new Set();
+  for(const r of Object.values(s.records??{})){
+    const p=r.operating_plan;
+    if(!p||!closed(r,['id','kind','revision','status','author_role','author_instance','content','operating_plan','created_at'])||r.kind!=='plan'||r.author_role!=='runner'||!closed(p,['protocol','version','snapshot','maintenance','source_instruction','valid_until'])||p.protocol!==OPERATING_PROTOCOL||p.version!==1)continue;
+    const b=bookkeeping(s,r.id);
+    for(const key of b.ids)if(key===r.id||s.records[key]?.review_of?.id===r.id)ids.add(key);
+    for(const key of b.jobs)if(s.jobs[key]?.review_of?.id===r.id)jobs.add(key);
   }
   return {ids,jobs};
 }
@@ -157,13 +174,19 @@ function publicationEvidence(s,homes){
     if(seen.has(ref.id))return;seen.add(ref.id);
     const accepted=representedCurrent(s,ref.id,projection);
     if(accepted){
-      const {c,p}=accepted,plan=exact(s,c.plan),review=exact(s,c.review),job=s.jobs[review.job_id];
-      const proof=[c.source,c.plan,c.review,recordReference(job,'job:'+job.id),...(c.qualification.legacy_dependencies??[])];
-      for(const r of proof){exact(s,r);sources.set(r.id,{source:r,accepted_original:true});seen.add(r.id);}
+      const {c,p,scoped}=accepted,review=exact(s,c.review),job=s.jobs[review.job_id];
+      const proof=scoped?[c.source,c.plan,...scoped.receipts.flatMap(r=>[r.review,r.job,r.target]),...scoped.receipts.map(r=>exact(s,r.target).scoped_context_target.plan)]:[c.source,c.plan,c.review,recordReference(job,'job:'+job.id),...(c.qualification.legacy_dependencies??[])];
+      // Resolve originals before collecting canonical producer edges. Explicit
+      // source lists intentionally leave producer_dependencies empty.
+      const producers=new Map();
+      for(const r of proof)for(const producer of originalProducers(s,exact(s,r)))producers.set(producer.id,producer);
+      const originals=[...new Map([...proof,...producers.values()].map(r=>[r.id,r])).values()];
+      for(const r of originals){exact(s,r);sources.set(r.id,{source:r,accepted_original:true});seen.add(r.id);}
       classifications.set(ref.id,c);
-      // Complete accepted semantic judgments and coverage are delivered again;
-      // raw originals and raw frozen proof plans have already been paid once.
-      if(!accepted_semantics.some(x=>x.source.id===ref.id))accepted_semantics.push({source:ref,classification:c,coverage:p.coverage,counterparts:p.counterparts,review,job,exact_originals:proof,retrieval:'company_context read with exact ID/hash; referenced snapshots remain in the immutable vault'});
+      // Full canonical semantic judgments are current evidence; extraction raw
+      // bundles and frozen proof plans remain exact retrievable originals.
+      const judgments=scoped?scoped.receipts.map(r=>{const record=exact(s,r.review),target=exact(s,r.target).scoped_context_target;return {review:r.review,job:exact(s,r.job),target:r.target,phase:target.phase,result:record.qualification_result};}):undefined;
+      if(!accepted_semantics.some(x=>x.source.id===ref.id))accepted_semantics.push({source:ref,classification:c,...(scoped?{judgments}:{coverage:p.coverage,review,job}),counterparts:p.counterparts,producer_refs:[...producers.values()],author_identities:[...new Set(originals.flatMap(r=>[...originalIdentities(s,exact(s,r))]))].sort(),exact_originals:originals,retrieval:'company_context read with exact ID/hash; referenced snapshots remain in the immutable vault'});
       return;
     }
     // These legacy containers require their existing qualification/streaming
@@ -247,17 +270,30 @@ export function validateOperatingDelivery(s,j){
   }
   return true;
 }
-function ownsOriginal(s,value,j){
-  const todo=[value],seen=new Set(),snapshots=new Set();
+function originalProducers(s,value){
+  const refs=new Map(),todo=[value],seen=new Set(),snapshots=new Set();
+  while(todo.length){const v=todo.pop();if(!v||typeof v!=='object'||seen.has(v))continue;seen.add(v);
+    const legacy=legacyHandoverSource(s,v);if(legacy){todo.push(legacy);continue;}
+    const entry=snapshotEntryReference(v),ref=entry??snapshotReference(v);
+    if(ref){const key=entry?entry.immutable_snapshot.sha256:ref.sha256;if(!snapshots.has(key)){snapshots.add(key);todo.push(entry?resolveSnapshotEntry(s,v):resolveSnapshot(s,v));}continue;}
+    if(typeof v.id==='string'&&(v===value||Object.hasOwn(s.records??{},v.id)))for(const r of producerClosure(s,v)){exact(s,r);refs.set(r.id,r);}
+    for(const x of Object.values(v))if(x&&typeof x==='object')todo.push(x);
+  }
+  return [...refs.values()].sort((a,b)=>a.id.localeCompare(b.id));
+}
+function originalIdentities(s,value){
+  const identities=new Set();
+  const todo=[value,...originalProducers(s,value).map(r=>exact(s,r))],seen=new Set(),snapshots=new Set();
   while(todo.length){const v=todo.pop();if(!v||typeof v!=='object'||seen.has(v))continue;seen.add(v);
     const legacy=legacyHandoverSource(s,v);if(legacy){todo.push(legacy);continue;}
     const entry=snapshotEntryReference(v),ref=entry??snapshotReference(v);
     if(ref){const key=entry?entry.immutable_snapshot.sha256:ref.sha256;if(!snapshots.has(key)){snapshots.add(key);todo.push(entry?resolveSnapshotEntry(s,v):resolveSnapshot(s,v));}continue;}
     if(v.job_id&&s.jobs[v.job_id])todo.push(s.jobs[v.job_id]);
-    for(const [k,x] of Object.entries(v)){if(['author_instance','recorded_by','session_id','native_id','instance_id','probe_native_id','reviewer_native_id'].includes(k)&&[j.native_id,j.instance_id].includes(x))return true;if(x&&typeof x==='object')todo.push(x);}
+    for(const [k,x] of Object.entries(v)){if(['author_instance','recorded_by','session_id','native_id','instance_id','probe_native_id','reviewer_native_id'].includes(k)&&text(x))identities.add(x);if(x&&typeof x==='object')todo.push(x);}
   }
-  return false;
+  return identities;
 }
+function ownsOriginal(s,value,j){const identities=originalIdentities(s,value);return identities.has(j.native_id)||identities.has(j.instance_id);}
 export function publishOperatingState(s,{plan_id,review_id}){
   const target=s.records[plan_id],p=livePlan(s,target),r=s.records[review_id],j=s.jobs[r?.job_id],v=r?.review;
   if(p.snapshot.frontier.length)fail('legacy frontier coverage incomplete: '+p.snapshot.frontier.length+' DIRTY entries');

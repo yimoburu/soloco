@@ -7,7 +7,7 @@ import * as engine from '../plugins/soloco/runtime/engine.mjs';
 import {call as publicCall} from '../plugins/soloco/runtime/main.mjs';
 import {withStore,digest,teamHash} from '../plugins/soloco/runtime/store.mjs';
 import {executionTiming} from '../plugins/soloco/runtime/timeout.mjs';
-import {retainSnapshot,snapshotBytes} from '../plugins/soloco/runtime/snapshot.mjs';
+import {retainSnapshot,retainSnapshotEntry,snapshotBytes} from '../plugins/soloco/runtime/snapshot.mjs';
 import {work} from '../plugins/soloco/runtime/worker.mjs';
 import {assignmentContext,contextMatches} from '../plugins/soloco/runtime/context.mjs';
 import {recordReference,currentExtensions,applyContextQualification} from '../plugins/soloco/runtime/current-state.mjs';
@@ -246,7 +246,7 @@ test('missing provenance and snapshot-only evidence hold rather than count point
 
 // Exact runtime receipt shape from executeDevelopmentTest (develop.mjs), with
 // deterministic reuse and generated candidate attribution. No native execution.
-async function runtimeArchive({large=false}={}){
+async function runtimeArchive({large=false,accepted=false}={}){
  const f=fixture();home(f,'permission','*',{evidence_refs:['test-reused'],authority_refs:['test-original']});
  mutate(f,s=>{
    for(const suffix of ['original','reused']){
@@ -262,10 +262,14 @@ async function runtimeArchive({large=false}={}){
    s.records['reuse-qa']={id:'reuse-qa',revision:1,kind:'review',author_role:'qa',author_instance:'reuse-qa-instance',job_id:'reuse-qa-job',status:'Submitted',review_of:{id:'test-original',revision:1},content:'Fictional deterministic reuse qualification',review:{verdict:'Pass',deterministic_validation:{permitted_action:'reuse_exact_validation'}}};
    Object.assign(s.records['test-reused'].development,{reused_from:'test-original',reuse_qualification:{id:'reuse-qa',revision:1,sha256:sha(s.records['reuse-qa'])}});
  });
+ if(accepted){withStore(f.root,db=>db.migrate());mutate(f,s=>{s.records['test-reused'].retained_archive=retainSnapshot(s,{content:'FICTIONAL immutable original: failed evidence and no retry remain.'});if(accepted==='entry')s.records['test-reused']=retainSnapshotEntry(s,s.records['test-reused']);});}
  const state=read(f),ids=[...Object.keys(state.records).filter(id=>id!=='permission'),...Object.keys(state.jobs).map(id=>'job:'+id)];
- const p=engine.contextControl({...f,action:'plan',record_ids:ids,disposition:'represented',counterpart_ids:['permission'],coverage:ids.map(source_id=>({source_id,counterpart_ids:['permission'],findings:'Retain exact runtime evidence',failures:'Retain failed evidence',uncertain_effects:'No authority inferred',exhausted_allowances:'No renewed allowance'}))},'codex');
+ const args={...f,action:'plan',record_ids:ids,disposition:'represented',counterpart_ids:['permission'],coverage:ids.map(source_id=>({source_id,counterpart_ids:['permission'],findings:'Retain exact runtime evidence',failures:'Retain failed evidence',uncertain_effects:'No authority inferred',exhausted_allowances:'No renewed allowance'}))};
+ const p=accepted?await publicCall('company_context',args,'codex'):engine.contextControl(args,'codex');
+ if(accepted)assert.deepEqual(read(f).records[p.id].context_classification_plan.sources.map(r=>r.id),ids,'qualification must use the persisted complete source list');
  const r=await review(f,p.id,{action:'apply_context_classification',readSources:ids.filter(id=>id.startsWith('job:'))});
- mutate(f,s=>{s.context_classifications={...s.context_classifications,...applyContextQualification(s,s.records[p.id],s.records[r.id],{source_instruction:f.source_instruction,contextMatches})};});
+ if(accepted){assert.equal(read(f).jobs[r.job].context_format,4);assert.equal((await publicCall('company_context',{...f,action:'apply',plan_id:p.id,review_id:r.id},'codex')).applied,true);assert.deepEqual(read(f).context_classifications['test-reused'].qualification.producer_dependencies??[],[]);}
+ else mutate(f,s=>{s.context_classifications={...s.context_classifications,...applyContextQualification(s,s.records[p.id],s.records[r.id],{source_instruction:f.source_instruction,contextMatches})};});
  return f;
 }
 
@@ -397,4 +401,26 @@ test('frozen publication worker rejects unread semantics, changed native and cha
 test('paid snapshot archive still requires publication QA independent of nested original producers',async()=>{
  const f=await qualifiedRecovered(),p=await ctx(f,{action:'plan'}),r=await review(f,p.id,{native:'fictional-original-upgrade-producer'});
  await assert.rejects(ctx(f,{action:'apply',plan_id:p.id,review_id:r.id}),/reviewer owns current home/);assert.equal(read(f).operating_state,undefined);
+});
+
+
+test('FICTIONAL PUBLIC v2 explicit complete sources preserve accepted runtime producer independence and freshness',async()=>{
+ for(const native of ['generator-native-reused','generator-instance-reused','generator-native-original','reuse-qa-native','fictional-distinct-accepted-publisher','fictional-entry-publisher']){
+  const f=await runtimeArchive({accepted:native==='fictional-entry-publisher'?'entry':true}),p=await ctx(f,{action:'plan'});
+  assert.equal(p.held,false);
+  const r=await review(f,p.id,{native,hook:()=>{
+   const state=read(f),job=Object.values(state.jobs).find(j=>j.status==='running'&&j.review_of?.id===p.id),packet=JSON.parse(assignmentContext(state,job).text);
+   const accepted=packet.required_evidence.accepted_semantics.find(x=>x.source.id==='test-reused');
+   assert.ok(accepted);assert.ok(accepted.author_identities.includes('generator-native-reused'));assert.ok(accepted.author_identities.includes('reuse-qa-native'));for(const id of ['job:run-reused','candidate-reused','development-reused','job:generate-reused','test-original','job:generate-original','reuse-qa','job:reuse-qa-job'])assert.ok(accepted.producer_refs.some(r=>r.id===id),id);
+  }});
+  if(!['fictional-distinct-accepted-publisher','fictional-entry-publisher'].includes(native)){
+   await assert.rejects(ctx(f,{action:'apply',plan_id:p.id,review_id:r.id}),/reviewer owns current home/);assert.equal(read(f).operating_state,undefined);
+  }else{
+   assert.equal((await ctx(f,{action:'apply',plan_id:p.id,review_id:r.id})).published,true);
+   const baseline=read(f);
+   for(const change of [s=>{s.jobs['generate-reused'].native_id='changed';},s=>{s.records['candidate-original'].content+=' stale';},s=>{s.records['reuse-qa'].content+=' stale';},s=>{s.jobs['run-original'].artifact_id='changed';}]){
+    mutate(f,s=>{Object.assign(s,structuredClone(baseline));change(s);});assert.throws(()=>operatingContext(read(f)),/Held|changed|broken|qualification|closure/i);
+   }
+  }
+ }
 });

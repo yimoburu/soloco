@@ -1,0 +1,36 @@
+(node:22709) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ accepted historical publication proof survives an owner epoch change without admitting old in-flight work (333.745666ms)
+✔ public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning (18.423667ms)
+✔ missing legacy bootstrap is visibly DIRTY and apply rolls back without acceptance (12.298041ms)
+✔ new membership, changed exact source, wrong independent identity and absent closure cannot publish (76.15475ms)
+✔ scope closure, global membership, expiry, receipt changes, revocation and missed communication hold (25.5045ms)
+✔ pause fences publication reviewer and prospective handover cannot hide unknown legacy (9.364ms)
+✔ 10x independently classified inert archive keeps actual mandatory operating assignment bytes and semantic work constant (50.048959ms)
+✔ deleted applicable home and changed exact provenance cannot disappear from accepted meaning (16.007958ms)
+✔ typed outcome requires complete historical uncertainty; text cannot manufacture permission (15.8365ms)
+✔ public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure (48.97975ms)
+✔ late new and changed falsely scoped prohibitions stay globally DIRTY, but fresh proposals include them (63.090625ms)
+✔ publication proof stays current; failed, quarantined, uncertain and unknown-extension siblings stay DIRTY (15.915584ms)
+✔ mechanical publication index rejects tampering and retains unknown state extensions (14.03425ms)
+✔ format6 explicit non-home evidence survives dispatch, discovery and bounded same-native reads (158.145709ms)
+✔ referenced archived revoked/retry restriction and canonical parent receipts are supplied completely inline (53.252792ms)
+✔ large non-home provenance uses exact same-native ranges; undelivered, partial, denied, stale or changed evidence cannot publish (552.879875ms)
+✔ canonical preservation parent revisions cannot be borrowed from matching hashes (50.189334ms)
+✔ missing provenance and snapshot-only evidence hold rather than count pointers as delivered bodies (12.907125ms)
+✔ real runtime receipt attribution and deterministic reuse deliver the validated producer closure before Pass (191.687625ms)
+✔ runtime receipt missing or mismatched producer, candidate, plan, reuse or generation holds (43.301208ms)
+✔ external catalog reference-shaped metadata is verbatim evidence without a company lookup (43.990791ms)
+✔ runtime closure requires complete delivery and independent source and proof sessions (2519.585167ms)
+✔ public qualified recovered snapshot publishes current typed outcomes without replaying the paid raw archive (1088.660959ms)
+✔ large prospective publication uses bounded frozen worker delivery and rejects a manufactured complete flag (5188.212291ms)
+✔ frozen publication worker rejects unread semantics, changed native and changed current membership (341.465ms)
+✔ paid snapshot archive still requires publication QA independent of nested original producers (970.44075ms)
+ℹ tests 26
+ℹ suites 0
+ℹ pass 26
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 12000.491167

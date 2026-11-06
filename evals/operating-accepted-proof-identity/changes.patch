@@ -1,0 +1,318 @@
+diff --git a/docs/operating-state.md b/docs/operating-state.md
+index de13f67..d7192bc 100644
+--- a/docs/operating-state.md
++++ b/docs/operating-state.md
+@@ -26,16 +26,16 @@ The current home envelope retains existing record revision history. There is no
+ 
+ Publication bookkeeping excludes recognized exact proof records and their safe producing QA execution, plus a single current exact review execution. Failed, quarantined, uncertain, additional Pass siblings and unknown execution extensions remain ordinary DIRTY evidence; no canonical receipt is rewritten to clear them. Replacement proposals retain exact prior publication proof references, validated mechanically on every use.
+ 
+-The prospective `operating_state` index is omitted from classification extension inputs only after closed-field, exact source/receipt and accepted-snapshot validation. An invalid index holds; unknown state keys remain extensions. Existing classifications and legacy receipts are not rewritten. This does not provide the separately owned publication provenance body/producer closure integration.
++The prospective `operating_state` index is omitted from classification extension inputs only after closed-field, exact source/receipt and accepted-snapshot validation. An invalid index holds; unknown state keys remain extensions. Existing classifications and legacy receipts are not rewritten. Publication provenance retains the canonical producer closure, including runtime controller, candidate, development plan, generation and deterministic reuse sources; publication QA must be independent of all known contribution and proof authors.
+ 
+ Ordinary format 6 assignments expose declared `evidence_ids` as exact supplemental handles under `record-reads-v1`. The existing four-range, sixteen-round, 32768-character bounds, allowlist, current source checks and same native identity apply. These attachments remain evidence, never action authority. No stream or fresh-native admission contract changes are included.
+ 
+ ## Recovered current evidence boundary (source candidate)
+ 
+-A recovered upgrade can leave the recurring controls body only after exact canonical represented-v2 qualification through format 4, with exact typed current counterparts. Current controls then retain the original source hash/reference, recovered identity/status, owner epoch, candidate, deadlines, worker state, review/probe status and consumed call counters. Complete outcomes, failures, uncertainty, clearing conditions and remaining allowances belong in the independently preserved current homes. Runtime upgrade/action gates continue to inspect the original state. A terminal status alone changes no evidence obligation.
++A recovered upgrade can leave the recurring controls body only after exact canonical represented-v2 qualification through format 4 or validated SCOPED qualification, with complete exact typed current counterparts. Current controls then retain the original source hash/reference, recovered identity/status, owner epoch, candidate, deadlines, worker state, review/probe status and consumed call counters. Complete outcomes, failures, uncertainty, clearing conditions and remaining allowances belong in the independently preserved current homes. Runtime upgrade/action gates continue to inspect the original state. A terminal status alone changes no evidence obligation.
+ 
+-For this narrow path, recovered upgrade and snapshot-backed sources with validated represented-v2 receipts can reuse paid preservation. Publication QA receives full current homes, complete accepted coverage and judgments, current mechanical authority evidence, exact canonical classifications and original retrieval references. Raw sources and frozen proof plans stay byte-exact in the store/vault. The canonical validator and exact references recheck closure, negative findings and freshness; vault availability is checked without mandatory native replay. Unqualified snapshot references still hold. Active upgrades remain mandatory. Other provenance retains its existing full delivery contract.
++For this narrow path, recovered upgrades and archived sources with validated represented-v2 or SCOPED receipts can reuse paid preservation. Publication QA receives full current homes, complete accepted coverage and judgments (including every SCOPED extraction, domain, interface and integration result), current mechanical authority evidence, exact canonical classifications, canonical producer references/author identities and original/support retrieval references. Canonical first-pass delivery, no-negative, native independence, current homes and source freshness remain authoritative; neither summaries nor identity hashes substitute for qualification. Raw sources and frozen proof plans stay byte-exact in the store/vault. The canonical validator and exact references recheck closure, negative findings and freshness; vault availability is checked without mandatory native replay. Unqualified snapshot references still hold. Active upgrades remain mandatory. Other provenance retains its existing full delivery contract.
+ 
+ Oversized publication streams are fixed by the current plan and complete packet hash. The worker records authentic delivered ranges for one independent native, validates complete semantic delivery, and stores a closed `operating_delivery` receipt. Publication rechecks the stream, ranges, context hash, current plan/membership/clock, independence and closure. A model's complete flag cannot supply a receipt; failed and quarantined siblings remain DIRTY.
+ 
+-Remaining growth limits: complete home revision history and unresolved communication are still delivered. There is no new retirement rule. Non-snapshot provenance and scoped/partition proof families retain their existing delivery/hold behavior; this repair does not duplicate the separately owned coherent legacy corpus. If that remaining current meaning cannot fit the native's cumulative capacity, it must report Blocked. Tests use fictional adapters and do not establish actual semantic acceptance or actual company readiness.
++Remaining growth limits: complete home revision history and unresolved communication are still delivered. There is no new retirement rule. Unqualified provenance and partition proof families retain their existing delivery/hold behavior. SCOPED reuses the existing coherent corpus validators; only recognized operating publication bookkeeping may enter its membership after capture, and this grants no evidence exclusion or authority. Unknown records and failed/unqualified executions remain DIRTY or Held. There is no new overall frontier-complete API. If that remaining current meaning cannot fit the native's cumulative capacity, it must report Blocked. Tests use fictional adapters and do not establish actual semantic acceptance or actual company readiness.
+diff --git a/plugins/soloco/runtime/operating-state.mjs b/plugins/soloco/runtime/operating-state.mjs
+index 300a913..78a08a3 100644
+--- a/plugins/soloco/runtime/operating-state.mjs
++++ b/plugins/soloco/runtime/operating-state.mjs
+@@ -23,14 +23,18 @@ export function validateOperatingRecord(v){
+   return structuredClone(v);
+ }
+ // A terminal label alone never qualifies an upgrade. Only the existing exact
+-// represented-v2 validator may establish this narrow recovered-source boundary.
++// canonical validator may establish this narrow recovered-source boundary.
+ function representedCurrent(s,id,projection=reviewedContext(s)){
+   const source=contextSource(s,id);
+-  if(!hasSnapshotReferences(source)&&!id.startsWith('upgrade:'))return null;
+   if(id.startsWith('upgrade:')&&source?.status!=='recovered')return null;
+-  const c=projection.classifications.get(id),p=s.records?.[c?.plan?.id]?.context_classification_plan;
+-  if(c?.disposition!=='represented'||p?.version!==2||c.qualification?.protocol!==2||s.jobs?.[s.records?.[c.review.id]?.job_id]?.context_format!==4||!projection.excluded(id))return null;
+-  if(!p.counterparts.every(ref=>{const h=s.records[ref.id];return h?.operating_record&&same(recordReference(h),ref);}))return null;
++  const c=projection.classifications.get(id);
++  if(c?.disposition!=='represented'||!projection.excluded(id))return null;
++  const scoped=c.scoped_qualification;
++  const plan=s.records?.[c.plan?.id],v=plan?.context_classification_plan;
++  if(!scoped&&(!hasSnapshotReferences(source)&&!id.startsWith('upgrade:')||v?.version!==2||c.qualification?.protocol!==2||s.jobs?.[s.records?.[c.review.id]?.job_id]?.context_format!==4))return null;
++  const p=scoped?{counterparts:scoped.homes}:v;
++  if(!p.counterparts.length||!p.counterparts.every(ref=>{const h=s.records[ref.id];return h?.operating_record&&!hasSnapshotReferences(h)&&same(recordReference(h),ref);}))return null;
++  for(const ref of p.counterparts)validateOperatingRecord(s.records[ref.id].operating_record);
+   // Check exact vault availability without redelivering accepted bytes. No new
+   // semantic classification is created by this traversal.
+   const todo=[source],seen=new Set(),snapshots=new Set();
+@@ -40,7 +44,7 @@ function representedCurrent(s,id,projection=reviewedContext(s)){
+     if(ref){const key=entry?entry.immutable_snapshot.sha256:ref.sha256;if(!snapshots.has(key)){snapshots.add(key);todo.push(entry?resolveSnapshotEntry(s,value):resolveSnapshot(s,value));}continue;}
+     for(const child of Object.values(value))if(child&&typeof child==='object')todo.push(child);
+   }
+-  return {c,p};
++  return {c,p,scoped};
+ }
+ function currentUpgrade(s){
+   const u=s.upgrade;if(!u||u.status!=='recovered')return u??null;
+@@ -95,6 +99,19 @@ function bookkeeping(s,planId){
+   }
+   return {ids,jobs};
+ }
++// Corpus membership may admit only existing mechanical publication bookkeeping.
++// This grants no exclusion: operatingFrontier still requires independent acceptance.
++export function operatingProofOccurrences(s){
++  const ids=new Set(),jobs=new Set();
++  for(const r of Object.values(s.records??{})){
++    const p=r.operating_plan;
++    if(!p||!closed(r,['id','kind','revision','status','author_role','author_instance','content','operating_plan','created_at'])||r.kind!=='plan'||r.author_role!=='runner'||!closed(p,['protocol','version','snapshot','maintenance','source_instruction','valid_until'])||p.protocol!==OPERATING_PROTOCOL||p.version!==1)continue;
++    const b=bookkeeping(s,r.id);
++    for(const key of b.ids)if(key===r.id||s.records[key]?.review_of?.id===r.id)ids.add(key);
++    for(const key of b.jobs)if(s.jobs[key]?.review_of?.id===r.id)jobs.add(key);
++  }
++  return {ids,jobs};
++}
+ // Conservative built-in provider. Every unqualified occurrence is visible. No
+ // author-supplied inert flag, graph equality or missing provider can clear it.
+ export function operatingFrontier(s,{plan_id,job_id,consuming=Boolean(s.operating_state)&&!plan_id}={}){
+@@ -157,13 +174,19 @@ function publicationEvidence(s,homes){
+     if(seen.has(ref.id))return;seen.add(ref.id);
+     const accepted=representedCurrent(s,ref.id,projection);
+     if(accepted){
+-      const {c,p}=accepted,plan=exact(s,c.plan),review=exact(s,c.review),job=s.jobs[review.job_id];
+-      const proof=[c.source,c.plan,c.review,recordReference(job,'job:'+job.id),...(c.qualification.legacy_dependencies??[])];
+-      for(const r of proof){exact(s,r);sources.set(r.id,{source:r,accepted_original:true});seen.add(r.id);}
++      const {c,p,scoped}=accepted,review=exact(s,c.review),job=s.jobs[review.job_id];
++      const proof=scoped?[c.source,c.plan,...scoped.receipts.flatMap(r=>[r.review,r.job,r.target]),...scoped.receipts.map(r=>exact(s,r.target).scoped_context_target.plan)]:[c.source,c.plan,c.review,recordReference(job,'job:'+job.id),...(c.qualification.legacy_dependencies??[])];
++      // Resolve originals before collecting canonical producer edges. Explicit
++      // source lists intentionally leave producer_dependencies empty.
++      const producers=new Map();
++      for(const r of proof)for(const producer of originalProducers(s,exact(s,r)))producers.set(producer.id,producer);
++      const originals=[...new Map([...proof,...producers.values()].map(r=>[r.id,r])).values()];
++      for(const r of originals){exact(s,r);sources.set(r.id,{source:r,accepted_original:true});seen.add(r.id);}
+       classifications.set(ref.id,c);
+-      // Complete accepted semantic judgments and coverage are delivered again;
+-      // raw originals and raw frozen proof plans have already been paid once.
+-      if(!accepted_semantics.some(x=>x.source.id===ref.id))accepted_semantics.push({source:ref,classification:c,coverage:p.coverage,counterparts:p.counterparts,review,job,exact_originals:proof,retrieval:'company_context read with exact ID/hash; referenced snapshots remain in the immutable vault'});
++      // Full canonical semantic judgments are current evidence; extraction raw
++      // bundles and frozen proof plans remain exact retrievable originals.
++      const judgments=scoped?scoped.receipts.map(r=>{const record=exact(s,r.review),target=exact(s,r.target).scoped_context_target;return {review:r.review,job:exact(s,r.job),target:r.target,phase:target.phase,result:record.qualification_result};}):undefined;
++      if(!accepted_semantics.some(x=>x.source.id===ref.id))accepted_semantics.push({source:ref,classification:c,...(scoped?{judgments}:{coverage:p.coverage,review,job}),counterparts:p.counterparts,producer_refs:[...producers.values()],author_identities:[...new Set(originals.flatMap(r=>[...originalIdentities(s,exact(s,r))]))].sort(),exact_originals:originals,retrieval:'company_context read with exact ID/hash; referenced snapshots remain in the immutable vault'});
+       return;
+     }
+     // These legacy containers require their existing qualification/streaming
+@@ -247,17 +270,30 @@ export function validateOperatingDelivery(s,j){
+   }
+   return true;
+ }
+-function ownsOriginal(s,value,j){
+-  const todo=[value],seen=new Set(),snapshots=new Set();
++function originalProducers(s,value){
++  const refs=new Map(),todo=[value],seen=new Set(),snapshots=new Set();
++  while(todo.length){const v=todo.pop();if(!v||typeof v!=='object'||seen.has(v))continue;seen.add(v);
++    const legacy=legacyHandoverSource(s,v);if(legacy){todo.push(legacy);continue;}
++    const entry=snapshotEntryReference(v),ref=entry??snapshotReference(v);
++    if(ref){const key=entry?entry.immutable_snapshot.sha256:ref.sha256;if(!snapshots.has(key)){snapshots.add(key);todo.push(entry?resolveSnapshotEntry(s,v):resolveSnapshot(s,v));}continue;}
++    if(typeof v.id==='string'&&(v===value||Object.hasOwn(s.records??{},v.id)))for(const r of producerClosure(s,v)){exact(s,r);refs.set(r.id,r);}
++    for(const x of Object.values(v))if(x&&typeof x==='object')todo.push(x);
++  }
++  return [...refs.values()].sort((a,b)=>a.id.localeCompare(b.id));
++}
++function originalIdentities(s,value){
++  const identities=new Set();
++  const todo=[value,...originalProducers(s,value).map(r=>exact(s,r))],seen=new Set(),snapshots=new Set();
+   while(todo.length){const v=todo.pop();if(!v||typeof v!=='object'||seen.has(v))continue;seen.add(v);
+     const legacy=legacyHandoverSource(s,v);if(legacy){todo.push(legacy);continue;}
+     const entry=snapshotEntryReference(v),ref=entry??snapshotReference(v);
+     if(ref){const key=entry?entry.immutable_snapshot.sha256:ref.sha256;if(!snapshots.has(key)){snapshots.add(key);todo.push(entry?resolveSnapshotEntry(s,v):resolveSnapshot(s,v));}continue;}
+     if(v.job_id&&s.jobs[v.job_id])todo.push(s.jobs[v.job_id]);
+-    for(const [k,x] of Object.entries(v)){if(['author_instance','recorded_by','session_id','native_id','instance_id','probe_native_id','reviewer_native_id'].includes(k)&&[j.native_id,j.instance_id].includes(x))return true;if(x&&typeof x==='object')todo.push(x);}
++    for(const [k,x] of Object.entries(v)){if(['author_instance','recorded_by','session_id','native_id','instance_id','probe_native_id','reviewer_native_id'].includes(k)&&text(x))identities.add(x);if(x&&typeof x==='object')todo.push(x);}
+   }
+-  return false;
++  return identities;
+ }
++function ownsOriginal(s,value,j){const identities=originalIdentities(s,value);return identities.has(j.native_id)||identities.has(j.instance_id);}
+ export function publishOperatingState(s,{plan_id,review_id}){
+   const target=s.records[plan_id],p=livePlan(s,target),r=s.records[review_id],j=s.jobs[r?.job_id],v=r?.review;
+   if(p.snapshot.frontier.length)fail('legacy frontier coverage incomplete: '+p.snapshot.frontier.length+' DIRTY entries');
+diff --git a/plugins/soloco/runtime/scoped-context.mjs b/plugins/soloco/runtime/scoped-context.mjs
+index afd77ab..cba35b3 100644
+--- a/plugins/soloco/runtime/scoped-context.mjs
++++ b/plugins/soloco/runtime/scoped-context.mjs
+@@ -1,4 +1,5 @@
+ import {digest} from './store.mjs';
++import {operatingProofOccurrences} from './operating-state.mjs';
+ import {contextSource,currentExtensions,presentationOnly,classificationFor,proofJobSafe} from './current-state.mjs';
+ import {buildEvidence} from './upgrade-evidence.mjs';
+ import {retainSnapshot,resolveSnapshot,resolveSnapshotEntry,captureSnapshotDependencies,validateSnapshotDependencies,inheritSnapshots,snapshotBytes} from './snapshot.mjs';
+@@ -174,9 +175,9 @@ function corpusRuntimeRecord(s,r){
+ function corpusLive(s,c,m){
+   for(const r of m.sources){const original=exact(s,r.source);if(!same(producerClosure(s,original),c.producer_closures[r.source.id]))fail('corpus producer closure changed');}
+   for(const r of m.sources.filter(r=>r.location.startsWith('/upgrade'))){const value=r.location==='/upgrade'?s.upgrade:s.upgrade_history?.[Number(r.location.split('/').at(-1))];if(!value||!same(scopedReference(resolveSnapshotEntry(s,value),r.source.id),r.source))fail('corpus exact source location changed');}
+-  const known=new Set(m.sources.map(r=>r.source.id));
+-  for(const [id,r] of Object.entries(s.records??{}))if(!known.has(id)&&!corpusRuntimeRecord(s,r))fail('corpus current membership added '+id);
+-  for(const [id,j] of Object.entries(s.jobs??{}))if(!known.has('job:'+id)&&(!s.records[j.review_of?.id]?.scoped_context_target||!proofJobSafe(Object.fromEntries(Object.entries(j).filter(([k])=>!['qualification_delivery','error','execution_failure','rejected_output','rejected_native_ids','rejected_native_id'].includes(k))))))fail('corpus current job membership added '+id);
++  const known=new Set(m.sources.map(r=>r.source.id)),operating=operatingProofOccurrences(s);
++  for(const [id,r] of Object.entries(s.records??{}))if(!known.has(id)&&!operating.ids.has(id)&&!corpusRuntimeRecord(s,r))fail('corpus current membership added '+id);
++  for(const [id,j] of Object.entries(s.jobs??{}))if(!known.has('job:'+id)&&!operating.jobs.has(id)&&(!s.records[j.review_of?.id]?.scoped_context_target||!proofJobSafe(Object.fromEntries(Object.entries(j).filter(([k])=>!['qualification_delivery','error','execution_failure','rejected_output','rejected_native_ids','rejected_native_id'].includes(k))))))fail('corpus current job membership added '+id);
+   for(const u of [s.upgrade,...(s.upgrade_history??[])].filter(Boolean))if(!known.has('upgrade:'+u.id))fail('corpus upgrade membership added');
+ }
+ function captureCorpus(s,{source_id,corpus_plan_id,selected_source_ids}){
+diff --git a/tests/operating-state.test.mjs b/tests/operating-state.test.mjs
+index f85f2fc..32a0f4e 100644
+--- a/tests/operating-state.test.mjs
++++ b/tests/operating-state.test.mjs
+@@ -7,7 +7,7 @@ import * as engine from '../plugins/soloco/runtime/engine.mjs';
+ import {call as publicCall} from '../plugins/soloco/runtime/main.mjs';
+ import {withStore,digest,teamHash} from '../plugins/soloco/runtime/store.mjs';
+ import {executionTiming} from '../plugins/soloco/runtime/timeout.mjs';
+-import {retainSnapshot,snapshotBytes} from '../plugins/soloco/runtime/snapshot.mjs';
++import {retainSnapshot,retainSnapshotEntry,snapshotBytes} from '../plugins/soloco/runtime/snapshot.mjs';
+ import {work} from '../plugins/soloco/runtime/worker.mjs';
+ import {assignmentContext,contextMatches} from '../plugins/soloco/runtime/context.mjs';
+ import {recordReference,currentExtensions,applyContextQualification} from '../plugins/soloco/runtime/current-state.mjs';
+@@ -246,7 +246,7 @@ test('missing provenance and snapshot-only evidence hold rather than count point
+ 
+ // Exact runtime receipt shape from executeDevelopmentTest (develop.mjs), with
+ // deterministic reuse and generated candidate attribution. No native execution.
+-async function runtimeArchive({large=false}={}){
++async function runtimeArchive({large=false,accepted=false}={}){
+  const f=fixture();home(f,'permission','*',{evidence_refs:['test-reused'],authority_refs:['test-original']});
+  mutate(f,s=>{
+    for(const suffix of ['original','reused']){
+@@ -262,10 +262,14 @@ async function runtimeArchive({large=false}={}){
+    s.records['reuse-qa']={id:'reuse-qa',revision:1,kind:'review',author_role:'qa',author_instance:'reuse-qa-instance',job_id:'reuse-qa-job',status:'Submitted',review_of:{id:'test-original',revision:1},content:'Fictional deterministic reuse qualification',review:{verdict:'Pass',deterministic_validation:{permitted_action:'reuse_exact_validation'}}};
+    Object.assign(s.records['test-reused'].development,{reused_from:'test-original',reuse_qualification:{id:'reuse-qa',revision:1,sha256:sha(s.records['reuse-qa'])}});
+  });
++ if(accepted){withStore(f.root,db=>db.migrate());mutate(f,s=>{s.records['test-reused'].retained_archive=retainSnapshot(s,{content:'FICTIONAL immutable original: failed evidence and no retry remain.'});if(accepted==='entry')s.records['test-reused']=retainSnapshotEntry(s,s.records['test-reused']);});}
+  const state=read(f),ids=[...Object.keys(state.records).filter(id=>id!=='permission'),...Object.keys(state.jobs).map(id=>'job:'+id)];
+- const p=engine.contextControl({...f,action:'plan',record_ids:ids,disposition:'represented',counterpart_ids:['permission'],coverage:ids.map(source_id=>({source_id,counterpart_ids:['permission'],findings:'Retain exact runtime evidence',failures:'Retain failed evidence',uncertain_effects:'No authority inferred',exhausted_allowances:'No renewed allowance'}))},'codex');
++ const args={...f,action:'plan',record_ids:ids,disposition:'represented',counterpart_ids:['permission'],coverage:ids.map(source_id=>({source_id,counterpart_ids:['permission'],findings:'Retain exact runtime evidence',failures:'Retain failed evidence',uncertain_effects:'No authority inferred',exhausted_allowances:'No renewed allowance'}))};
++ const p=accepted?await publicCall('company_context',args,'codex'):engine.contextControl(args,'codex');
++ if(accepted)assert.deepEqual(read(f).records[p.id].context_classification_plan.sources.map(r=>r.id),ids,'qualification must use the persisted complete source list');
+  const r=await review(f,p.id,{action:'apply_context_classification',readSources:ids.filter(id=>id.startsWith('job:'))});
+- mutate(f,s=>{s.context_classifications={...s.context_classifications,...applyContextQualification(s,s.records[p.id],s.records[r.id],{source_instruction:f.source_instruction,contextMatches})};});
++ if(accepted){assert.equal(read(f).jobs[r.job].context_format,4);assert.equal((await publicCall('company_context',{...f,action:'apply',plan_id:p.id,review_id:r.id},'codex')).applied,true);assert.deepEqual(read(f).context_classifications['test-reused'].qualification.producer_dependencies??[],[]);}
++ else mutate(f,s=>{s.context_classifications={...s.context_classifications,...applyContextQualification(s,s.records[p.id],s.records[r.id],{source_instruction:f.source_instruction,contextMatches})};});
+  return f;
+ }
+ 
+@@ -398,3 +402,25 @@ test('paid snapshot archive still requires publication QA independent of nested
+  const f=await qualifiedRecovered(),p=await ctx(f,{action:'plan'}),r=await review(f,p.id,{native:'fictional-original-upgrade-producer'});
+  await assert.rejects(ctx(f,{action:'apply',plan_id:p.id,review_id:r.id}),/reviewer owns current home/);assert.equal(read(f).operating_state,undefined);
+ });
++
++
++test('FICTIONAL PUBLIC v2 explicit complete sources preserve accepted runtime producer independence and freshness',async()=>{
++ for(const native of ['generator-native-reused','generator-instance-reused','generator-native-original','reuse-qa-native','fictional-distinct-accepted-publisher','fictional-entry-publisher']){
++  const f=await runtimeArchive({accepted:native==='fictional-entry-publisher'?'entry':true}),p=await ctx(f,{action:'plan'});
++  assert.equal(p.held,false);
++  const r=await review(f,p.id,{native,hook:()=>{
++   const state=read(f),job=Object.values(state.jobs).find(j=>j.status==='running'&&j.review_of?.id===p.id),packet=JSON.parse(assignmentContext(state,job).text);
++   const accepted=packet.required_evidence.accepted_semantics.find(x=>x.source.id==='test-reused');
++   assert.ok(accepted);assert.ok(accepted.author_identities.includes('generator-native-reused'));assert.ok(accepted.author_identities.includes('reuse-qa-native'));for(const id of ['job:run-reused','candidate-reused','development-reused','job:generate-reused','test-original','job:generate-original','reuse-qa','job:reuse-qa-job'])assert.ok(accepted.producer_refs.some(r=>r.id===id),id);
++  }});
++  if(!['fictional-distinct-accepted-publisher','fictional-entry-publisher'].includes(native)){
++   await assert.rejects(ctx(f,{action:'apply',plan_id:p.id,review_id:r.id}),/reviewer owns current home/);assert.equal(read(f).operating_state,undefined);
++  }else{
++   assert.equal((await ctx(f,{action:'apply',plan_id:p.id,review_id:r.id})).published,true);
++   const baseline=read(f);
++   for(const change of [s=>{s.jobs['generate-reused'].native_id='changed';},s=>{s.records['candidate-original'].content+=' stale';},s=>{s.records['reuse-qa'].content+=' stale';},s=>{s.jobs['run-original'].artifact_id='changed';}]){
++    mutate(f,s=>{Object.assign(s,structuredClone(baseline));change(s);});assert.throws(()=>operatingContext(read(f)),/Held|changed|broken|qualification|closure/i);
++   }
++  }
++ }
++});
+diff --git a/tests/scoped-corpus-runtime.test.mjs b/tests/scoped-corpus-runtime.test.mjs
+index c47f80a..87d400f 100644
+--- a/tests/scoped-corpus-runtime.test.mjs
++++ b/tests/scoped-corpus-runtime.test.mjs
+@@ -10,6 +10,8 @@ import {withStore,digest,id,teamHash} from '../plugins/soloco/runtime/store.mjs'
+ import {resolveSnapshot,inheritSnapshots,retainSnapshot} from '../plugins/soloco/runtime/snapshot.mjs';
+ import {executionTiming} from '../plugins/soloco/runtime/timeout.mjs';
+ import * as scoped from '../plugins/soloco/runtime/scoped-context.mjs';
++import {assignmentContext} from '../plugins/soloco/runtime/context.mjs';
++import {operatingContext} from '../plugins/soloco/runtime/operating-state.mjs';
+ const protocol=scoped.SCOPED_PROTOCOL,sha=v=>digest(JSON.stringify(v)),bytes=v=>Buffer.byteLength(typeof v==='string'?v:JSON.stringify(v));
+ const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-coherent-runtime-'));
+ process.env.COMPANY_PLUGIN_DATA=path.join(tmp,'cache');
+@@ -18,12 +20,13 @@ const mutate=(f,fn)=>withStore(f.root,db=>db.transaction('contract.fixture',s=>{
+ const read=f=>withStore(f.root,db=>db.read());
+ const call=(f,args)=>engine.contextControl({...f,...args},'codex');
+ const token=(domain,n,status='OPEN')=>`OBL~${domain}~${String(n).padStart(3,'0')}~CUSTOMER_${n}_NO_EXPORT_ABOVE_${17*n+3}_ROWS_UNTIL_CONSENT_${n%7}_IN_REGION_${n%11}~${status}~END`;
+-function fixture({count=1,domains=1,extra={},maintenance=false,kind='artifact',homeKind='artifact',operating=false,partitioner=scoped.COHERENT_PARTITIONER}={}){
++function fixture({count=1,domains=1,extra={},maintenance=false,kind='artifact',homeKind='artifact',operating=false,deferPlan=false,partitioner=scoped.COHERENT_PARTITIONER}={}){
+   const root=fs.mkdtempSync(path.join(tmp,'company-')),session_id=id('owner'),f={root,session_id,epoch:1,source_instruction:'Explicit fixture instruction: qualify exact source read-only, preserve all failed evidence and OPEN uncertainty.'};
+   engine.bind(root,session_id,'codex');engine.open({...f,idea:'Source-only contract fixture'},'codex');withStore(root,db=>db.migrate());
+   const clauses=Array.from({length:count},(_,n)=>token('D'+String(Math.min(domains-1,Math.floor(n*domains/count))).padStart(2,'0'),n));
+   mutate(f,s=>{s.roles={qa:{name:'Independent QA'},engineer:{name:'Engineer'}};s.governance='Preparation only. No execution or renewed allowance.';s.cos_instructions='Preserve uncertain effects and exhausted allowances.';s.records.old={id:'old',kind,revision:1,author_instance:'historical-producer',content:'Historical evidence grants no current permission.',clauses,...extra};if(maintenance)s.paused=true;s.team_sha256=teamHash(s);});
+   for(let d=0;d<domains;d++){const domain='D'+String(d).padStart(2,'0');engine.save({...f,id:'home-'+domain,kind:homeKind,content:clauses.filter((_,n)=>Math.min(domains-1,Math.floor(n*domains/count))===d).join('\n')||'No additional obligation.',context_obligations:{version:1,scope:domain},...(operating?{operating_record:{version:1,kind:'obligation',scope:domain,owner:'runner',conditions:'Always',exceptions:'None',clearing:'Independent review',expires_at:null,dependencies:[],authority_refs:[],evidence_refs:['home-'+domain]}}:{})},'codex');}
++  if(deferPlan)return f;
+   const p=call(f,{action:'plan',protocol,source_id:'old',maintenance,partitioner});f.plan_id=p.id;f.original=p.original;f.units=p.units;f.all_units=call(f,{action:'inspect',plan_id:p.id,limit:16});f.extraction_identity=p.extraction_identity;f.clauses=clauses;return f;
+ }
+ function unitPages(f){const units=[];let offset=0;do{const page=call(f,{action:'inspect',plan_id:f.plan_id,offset,limit:16});units.push(...page.units);offset=page.next_offset;}while(offset!==null);return units;}
+@@ -159,3 +162,58 @@ test('corpus retains external named handover originals and refuses missing closu
+   const bad=inheritSnapshots(state,structuredClone(state));delete bad.records.named;
+   assert.throws(()=>scoped.scopedPlanView(bad,{plan_id:p.id}),/missing|changed/);
+ });
++
++
++async function acceptedOperatingCorpus({upgrade=false}={}){
++ const f=fixture({operating:true,deferPlan:true});
++ const sourceId=upgrade?'upgrade:recovered-corpus':'old';
++ mutate(f,s=>{
++  if(upgrade){delete s.records.old;s.upgrade={id:'recovered-corpus',status:'recovered',epoch:1,host:'codex',error:'FICTIONAL prior QA failed; unknown effects; no retry',probe_status:'failed',review_status:'failed',probe_native_id:'fictional-upgrade-producer',checkpoint:retainSnapshot(s,{content:'RAW-CORPUS-ORIGINAL: failed evidence retained; no renewed allowance.'})};}
++  else s.records.old.archive=retainSnapshot(s,{content:'RAW-CORPUS-ORIGINAL: all restrictions and distant exceptions remain OPEN.'});
++  const h=s.records['home-D00'];h.content+=' Complete failed outcome remains failed, effects unknown, retries exhausted; current independent resume_handover required.';
++  Object.assign(h.operating_record,{evidence_refs:[sourceId],kind:'permission',remaining:0,revoked:true,grant_refs:[sourceId]});
++  s.records['home-outcome']={id:'home-outcome',revision:1,kind:'artifact',author_instance:f.session_id,content:'FICTIONAL failed attempt remains failed, effects unknown; current independent resume_handover required.',context_obligations:{version:1,scope:'*'},operating_record:{version:1,kind:'outcome',scope:'*',owner:'runner',conditions:'While unreconciled',exceptions:'None',clearing:'Independent reconciliation',expires_at:null,dependencies:[],authority_refs:[],evidence_refs:[sourceId],attempted_action:'Failed fictional rehearsal',resources:['fictional source'],possible_effects:'Unknown partial effects',uncertainty:'Prior QA remains failed',retry_clearing:'Fresh canonical authority and independent resume_handover required',historical_receipts:[sourceId]}};
++ });
++ await assert.rejects(publicCall('company_context',{...f,protocol:'operating-state-v1',action:'plan'},'codex'),/canonical snapshot delivery/);
++ const p=await publicCall('company_context',{...f,action:'plan',protocol,partitioner:scoped.CORPUS_PARTITIONER,source_id:sourceId,selected_source_ids:[sourceId]},'codex');f.plan_id=p.id;
++ const es=[];for(const u of unitPages(f)){const e=await run(f,{phase:'extract',unit_id:u.id,delivery_protocol:scoped.SCOPED_STREAM});assert.equal(e.job.status,'completed',e.job.error);es.push(e);}
++ const args={phase:'applicability',extraction_review_ids:es.map(e=>e.review.id),counterpart_ids:['home-D00','home-outcome'],context_scope:'*',delivery_protocol:scoped.SCOPED_STREAM};
++ const d=await run(f,args),ir=await run(f,{...args,interface_keys:d.review.qualification_result.interfaces.map(i=>i.key)});
++ const i=await run(f,{phase:'integration',domain_review_ids:[d.review.id],interface_review_ids:[ir.review.id],counterpart_ids:['home-D00','home-outcome'],delivery_protocol:scoped.SCOPED_STREAM});
++ for(const r of [d,ir,i])assert.equal(r.job.status,'completed',r.job.error);
++ const proof={d,ir,i};
++ assert.equal((await publicCall('company_context',{...f,action:'apply',integration_review_id:proof.i.review.id},'codex')).applied,true);
++ return {f,sourceId,proof,es};
++}
++async function operatingReview(f,plan,native='fictional-operating-corpus-native'){
++ const queued=engine.dispatch({...f,role:'qa',review_of:plan,task:'FICTIONAL complete current operating meaning contract'},'codex',{check:()=>({available:true}),launch:()=>({on(){},unref(){}})});
++ const context=assignmentContext(read(f),read(f).jobs[queued.id]);
++ const packet=context.frozen_packet??JSON.parse(context.text),e=context.operating_evidence;
++ const ranges=e?Object.values(e.sources).flatMap(v=>{const out=[];for(let offset=0;offset<v.length;offset+=16000)out.push({source_id:v.source_id,sha256:v.sha256,offset,length:Math.min(16000,v.length-offset)});return out;}):[];
++ await work(f.root,queued.id,async(_h,_n,_p,_d,timeout,_s,options)=>{
++  options.onSpawn(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));
++  if(ranges.length)return {native_id:native,text:JSON.stringify({reads:ranges.splice(0,1)})};
++  return {native_id:native,text:JSON.stringify({content:'FICTIONAL ADAPTER: scripted complete current meaning, never live QA.',messages:[],notices:[],review:{verdict:'Pass',reason:'FICTIONAL current meaning contract',permitted_action:'publish_operating_state',plan_sha256:sha(read(f).records[plan].operating_plan),preservation_complete:true,interaction_complete:true,authority_checked:true,blockers:[]}})};
++ });
++ const j=read(f).jobs[queued.id];assert.equal(j.status,'completed',j.error);return {j,packet};
++}
++test('FICTIONAL public SCOPED corpus accepted semantics publish current homes and recovered controls without raw replay',async()=>{
++ for(const upgrade of [false,true]){
++  const {f,sourceId,proof,es}=await acceptedOperatingCorpus({upgrade});
++  const c=read(f).context_classifications[sourceId];assert.ok(c.scoped_qualification);
++  const p=await publicCall('company_context',{...f,protocol:'operating-state-v1',action:'plan'},'codex');assert.equal(p.held,false,JSON.stringify(p.frontier));
++  const {j,packet}=await operatingReview(f,p.id),accepted=packet.required_evidence.accepted_semantics.find(x=>x.source.id===sourceId);
++  assert.ok(accepted);assert.deepEqual(accepted.counterparts,c.scoped_qualification.homes);
++  for(const review of [proof.d.review,proof.ir.review,proof.i.review])assert.deepEqual(accepted.judgments.find(x=>x.review.id===review.id).result,review.qualification_result);
++  for(const receipt of c.scoped_qualification.receipts)for(const ref of [receipt.review,receipt.target,receipt.job])assert.ok(accepted.exact_originals.some(r=>r.id===ref.id&&r.sha256===ref.sha256));
++  assert.ok(!JSON.stringify(packet).includes('RAW-CORPUS-ORIGINAL'));
++  assert.ok(!packet.required_evidence.sources.some(r=>r.id===sourceId));
++  if(upgrade){assert.equal(packet.controls.upgrade.status,'recovered');assert.equal(packet.controls.upgrade.consumed.qa_final,0);}
++  assert.equal((await publicCall('company_context',{...f,protocol:'operating-state-v1',action:'apply',plan_id:p.id,review_id:j.artifact_id},'codex')).published,true);
++  assert.match(assignmentContext(read(f),{id:'next',role:'engineer',context_format:6,task:'Current only',inputs:[]}).text,/resume_handover/);
++  const baseline=read(f);
++  for(const change of [s=>{s.records['home-D00'].content+=' stale';},s=>{s.records[proof.d.review.id].qualification_result.summary+=' stale';},s=>{s.jobs[es[0].job.id].coordination_release.termination_confirmed=false;},s=>{s.records.unknown={id:'unknown',revision:1,kind:'artifact',content:'Unknown authority'};},s=>{s.records.negative={id:'negative',revision:1,kind:'review',status:'Submitted',review_of:proof.d.review.review_of,review:{verdict:'Blocked'}};},...(upgrade?[s=>{s.upgrade.status='checking';},s=>{s.upgrade.error+=' new uncertainty';}]:[s=>{s.records.old.content+=' stale';}])]){
++   mutate(f,s=>{Object.assign(s,structuredClone(baseline));change(s);});assert.throws(()=>operatingContext(read(f)),/Held|hold|changed|membership|closure|negative/i);
++  }
++ }
++});
