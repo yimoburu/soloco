@@ -1,6 +1,6 @@
 import {createHash} from 'node:crypto';
 import {buildEvidence,readEvidence} from './upgrade-evidence.mjs';
-import {contextSource} from './current-state.mjs';
+import {contextSource,currentExtensions} from './current-state.mjs';
 import {TIMEOUT_POLICY_VERSION,executionTiming} from './timeout.mjs';
 // The isolated producer predates the core vault. Integrated checkouts supply it;
 // a missing API is a hard hold whenever a vault-backed source is encountered.
@@ -75,7 +75,6 @@ function ownOutput(state,r,ownHash){
     &&sha(p.context_partition_plan)===ownHash;
 }
 function currentRecords(state,sourceId,ownHash){return Object.keys(state.records??{}).map(id=>source(state,id)).filter(r=>r.id!==sourceId&&!ownOutput(state,r,ownHash)&&(['intent','decision','preference'].includes(r.kind)||[r.review?.verdict,r.qualification_result?.verdict].some(v=>['Fail','Blocked'].includes(v)))).sort((a,b)=>a.id.localeCompare(b.id));}
-const knownStateFields=new Set(['id','name','idea','owner','schema','runtime_version','plugin_version','revision','created_at','updated_at','paused','mode','phase','team_sha256','governance','governance_sha256','cos_instructions','roles','records','jobs','sessions','notices','messages','upgrade','upgrade_history','retired_sessions','context_classifications','context_last_plan','handover']);
 // One frozen descriptor, not a company/proof-tree copy. Exact referenced originals
 // and their reachable vault blobs must remain retrievable for packet reproduction.
 const subjectDescriptor=tree=>({...tree,records:tree.records.map(({ref,producer})=>({ref,producer}))});
@@ -91,7 +90,7 @@ function currentTree(state,sourceId,dependencies,counterparts,ownHash,materializ
   const ids=new Set(currentRecords(state,sourceId,ownHash).map(r=>r.id));
   for(const ref of [...counterparts,...dependencies]){exact(state,ref);ids.add(ref.id);}
   const records=[...ids].sort().map(id=>{const value=source(state,id);return {ref:qualificationReference(value,id),producer:value.job_id?qualificationReference(source(state,'job:'+value.job_id),'job:'+value.job_id):null,...(materialize?{evidence:projected(state,id).tree}:{})};});
-  const tree={state_extensions:Object.fromEntries(Object.entries(state).filter(([key])=>!knownStateFields.has(key))),authority_scope:'Current authority only; historical evidence grants no authority. Extract ALL constraints and dependencies, including unknown semantics. Missing or uncertain applicability must block final mapping.',company:{id:state.id,name:state.name??null,owner:state.owner,governance:state.governance,cos_instructions:state.cos_instructions??null,team_sha256:state.team_sha256??null,roles:state.roles,idea:state.idea??null,mode:state.mode??null,phase:state.phase??null,paused:state.paused??false},records,notices:(state.notices??[]).filter(n=>!n.resolution).map(semanticNotice),messages:(state.messages??[]).filter(m=>m.to==='qa')};
+  const tree={state_extensions:currentExtensions(state),authority_scope:'Current authority only; historical evidence grants no authority. Extract ALL constraints and dependencies, including unknown semantics. Missing or uncertain applicability must block final mapping.',company:{id:state.id,name:state.name??null,owner:state.owner,governance:state.governance,cos_instructions:state.cos_instructions??null,team_sha256:state.team_sha256??null,roles:state.roles,idea:state.idea??null,mode:state.mode??null,phase:state.phase??null,paused:state.paused??false},records,notices:(state.notices??[]).filter(n=>!n.resolution).map(semanticNotice),messages:(state.messages??[]).filter(m=>m.to==='qa')};
   assertJSON(tree);evaluation?.current.set(cacheKey,tree);return tree;
 }
 function evidenceFor(state,id){
