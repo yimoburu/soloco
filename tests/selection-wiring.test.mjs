@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
 import * as coordination from '../plugins/soloco/runtime/coordination.mjs';
+import {normalizeHandoverReviewWindow} from '../plugins/soloco/runtime/timeout.mjs';
 
 // Execute the actual main/engine bodies with controlled boundary dependencies.
 // No production store, adapter, subprocess, CLI, network or timer is loaded.
@@ -105,7 +106,7 @@ function harness(host='claude') {
     prototypeAction:()=>{},prototypeCapability:()=>({}),prototypeAssignment:()=>{},
     TIMEOUT_POLICY_VERSION:1,MIN_EXECUTION_TIMEOUT_MS:1000,MAX_EXECUTION_TIMEOUT_MS:600000,
     // Timeout is an unchanged boundary in this focused wiring test.
-    normalizeTimeout:({timeout_ms,timeout_reason})=>({timeout_ms:timeout_ms??180000,timeout_reason:timeout_reason??'Fixture default'}),
+    normalizeTimeout:({timeout_ms,timeout_reason})=>({timeout_ms:timeout_ms??180000,timeout_reason:timeout_reason??'Fixture default'}),normalizeHandoverReviewWindow,
     jobTimeoutState:()=>({state:'terminal'}),
     spawn:(...args)=>{launches.push(args);return {on:()=>{},unref:()=>{}};},
     hooks:()=>{},upgrade:()=>{},upgradeGuidance:''
