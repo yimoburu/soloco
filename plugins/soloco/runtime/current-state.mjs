@@ -55,6 +55,21 @@ export function presentationOnly(record) {
 }
 export function contextSource(state,id) {if(Object.hasOwn(state.records??{},id))return state.records[id];return id.startsWith('upgrade:')?(state.upgrade_history?.find(u=>u.id===id.slice(8))??(state.upgrade?.id===id.slice(8)?state.upgrade:undefined)):id.startsWith('job:')?state.jobs?.[id.slice(4)]:state.records?.[id];}
 export function recordReference(record,id=record.id) {return {id,revision:record.revision??null,sha256:digest(JSON.stringify(record))};}
+// Rejected worker output is observed counterevidence even when an invalid
+// envelope prevented a Submitted review. Bind it to the exact reviewed revision.
+function negativeInventory(state){
+  const negative=v=>['Fail','Blocked'].includes(v),entries=[];
+  for(const value of Object.values(state.records??{}))if(value.status==='Submitted'&&value.review_of&&negative(value.review?.verdict))entries.push({target:value.review_of,kind:'review',value});
+  for(const value of Object.values(state.jobs??{})){
+    if(!value.review_of||!value.rejected_output)continue;
+    let parsed;try{parsed=JSON.parse(value.rejected_output.text);}catch{}
+    if([value.rejected_output.qualification_negative,parsed?.review?.verdict,parsed?.qualification_result?.verdict].some(negative))entries.push({target:value.review_of,kind:'rejected-output',value});
+  }
+  return entries;
+}
+export function qualificationNegatives(state,plan){
+  return negativeInventory(state).filter(e=>e.target.id===plan.id&&e.target.revision===plan.revision).map(({kind,value})=>({kind,value})).sort((a,b)=>a.value.id.localeCompare(b.value.id));
+}
 export function classificationFor(state,record,id=record.id,validation) {
   const c=state.context_classifications?.[id];if(!c)return null;
   if(c.scoped_qualification){
@@ -78,6 +93,7 @@ export function classificationFor(state,record,id=record.id,validation) {
   const plan=state.records[c.plan.id],review=state.records[c.review.id];
   if(!plan||digest(JSON.stringify(plan))!==c.plan.sha256||!review||digest(JSON.stringify(review))!==c.review.sha256)throw Error('Context classification evidence changed: '+record.id);
   const job=state.jobs?.[review.job_id],v=review.review,p=plan.context_classification_plan;
+  if(validation?.negativePlans?validation.negativePlans.has(JSON.stringify([plan.id,plan.revision])):qualificationNegatives(state,plan).length)throw Error('Context classification retains an unresolved negative review');
   if(p?.version===2){
     // Source/counterpart changes revoke exclusion. Proof mutation is a hold.
     try{validateContextPlan(state,p);}catch(error){if(/source changed/.test(error.message))return null;throw error;}
@@ -87,7 +103,6 @@ export function classificationFor(state,record,id=record.id,validation) {
   if(!p||review.author_role!=='qa'||review.status!=='Submitted'||job?.status!=='completed'||job.role!=='qa'||!job.native_id||review.author_instance!==job.instance_id||job.artifact_id!==review.id||review.author_instance===plan.author_instance||review.review_of?.id!==plan.id||review.review_of.revision!==plan.revision||v?.verdict!=='Pass'||v.permitted_action!=='apply_context_classification'||v.plan_sha256!==digest(JSON.stringify(p))||!Array.isArray(v.blockers)||v.blockers.length||p.disposition!==c.disposition||JSON.stringify(p.roles)!==JSON.stringify(c.roles)||JSON.stringify(p.scopes)!==JSON.stringify(c.scopes)||!p.sources.some(s=>JSON.stringify(s)===JSON.stringify(c.source)))throw Error('Context classification provenance invalid: '+record.id);
   if(job.native_id===plan.author_instance||job.native_id===state.owner?.session_id)throw Error('Context classification reused coordinator native identity');
   for(const source of p.sources){const value=contextSource(state,source.id);if(value?.author_instance===job.instance_id||value?.author_instance===job.native_id||state.jobs?.[value?.job_id]?.native_id===job.native_id)throw Error('Context classification reviewer owns source evidence');}
-  if(validation?.negativePlans?validation.negativePlans.has(JSON.stringify([plan.id,plan.revision])):Object.values(state.records).some(r=>r.status==='Submitted'&&r.review_of?.id===plan.id&&r.review_of?.revision===plan.revision&&['Fail','Blocked'].includes(r.review?.verdict)))throw Error('Context classification retains an unresolved negative review');
   return c;
 }
 export function relevantRecord(state,record,job={},classification=classificationFor(state,record)) {
@@ -252,18 +267,18 @@ export function applyContextQualification(state,plan,review,{source_instruction,
   requireText(source_instruction,'source_instruction');
   const p=plan?.context_classification_plan;
   if(p?.version!==2)throw Error('Expected v2 context qualification');
+  if(qualificationNegatives(state,plan).length)throw Error('Qualification retains an unresolved negative review');
   validateContextPlan(state,p);
   if(JSON.stringify(p.owner)!==JSON.stringify(state.owner))throw Error('Qualification owner epoch changed');
   validateQualification(state,plan,review);
   if(typeof contextMatches!=='function'||!contextMatches(state,state.jobs[review.job_id],state.jobs[review.job_id].context_sha256))throw Error('Qualification review context stale');
-  if(Object.values(state.records).some(r=>r.status==='Submitted'&&r.review_of?.id===plan.id&&r.review_of.revision===plan.revision&&['Fail','Blocked'].includes(r.review?.verdict)))throw Error('Qualification retains an unresolved negative review');
   const classifications={};
   for(const source of p.sources)classifications[source.id]={source,disposition:p.disposition,roles:p.roles,scopes:p.scopes,plan:recordReference(plan),review:recordReference(review),qualification:qualificationReceipt(state,state.jobs[review.job_id],p,review),source_instruction,at:new Date().toISOString()};
   return classifications;
 }
 export function reviewedContext(state) {
   const classifications=new Map(),mandatory=new Set(),proofs=new Set(),proofJobs=new Set(),scopedHomes=new Map(),globalMandatory=new Set();
-  const validation={negativePlans:new Set(Object.values(state.records??{}).filter(r=>r.status==='Submitted'&&r.review_of&&['Fail','Blocked'].includes(r.review?.verdict)).map(r=>JSON.stringify([r.review_of.id,r.review_of.revision])))};
+  const validation={negativePlans:new Set(negativeInventory(state).map(({target})=>JSON.stringify([target.id,target.revision])))};
   for(const id of Object.keys(state.context_classifications??{})){
     const source=contextSource(state,id);if(!source)throw Error('Context classification source is missing: '+id);
     const c=classificationFor(state,source,id,validation);

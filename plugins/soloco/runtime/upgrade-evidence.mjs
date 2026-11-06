@@ -1,4 +1,4 @@
-import {reviewedContext,contextSource,currentExtensions,qualificationProducers} from './current-state.mjs';
+import {reviewedContext,contextSource,currentExtensions,qualificationProducers,qualificationNegatives} from './current-state.mjs';
 import {snapshotReference,snapshotBytes,snapshotEntryReference,retainSnapshotEntry,shallowSnapshotAttempt,shallowSnapshotRecord,legacyHandoverSource} from './snapshot.mjs';
 import { createHash } from 'node:crypto';
 
@@ -818,7 +818,7 @@ export function buildQualificationEvidence(state,plan,job) {
       for(const child of Object.values(item))if(child&&typeof child==='object')todo.push(child);
     }
   };
-  const producer_dependencies=qualificationProducers(state,p);
+  const producer_dependencies=qualificationProducers(state,p),prior_negative_reviews=qualificationNegatives(state,plan);
   for(const ref of [...new Map([...p.sources,...p.counterparts,...producer_dependencies].map(ref=>[ref.id,ref])).values()]){
     const value=contextSource(state,ref.id);
     if(!value||hash(serialize(value))!==ref.sha256||(value.revision??null)!==ref.revision)hold('qualification source changed');
@@ -827,7 +827,7 @@ export function buildQualificationEvidence(state,plan,job) {
   // Raw strings are intentional: qualification cannot omit a typed log/file
   // body that might contain its only negative finding. Every exact original and
   // referenced snapshot is compulsory once, with separate byte-exact retrieval.
-  return buildEvidence({company_id:state.id,governance:state.governance,cos_instructions:state.cos_instructions,roles:state.roles,owner:state.owner,state_extensions:currentExtensions(state),qualification_plan:plan,originals,original_bodies:[...bodies.values()]},[],{wholeBodyAliases:false,checkpointContinuity:true,snapshotState:state,originalSources:[...bodies.values()],
+  return buildEvidence({company_id:state.id,governance:state.governance,cos_instructions:state.cos_instructions,roles:state.roles,owner:state.owner,state_extensions:currentExtensions(state),qualification_plan:plan,...(prior_negative_reviews.length?{prior_negative_reviews}:{}),originals,original_bodies:[...bodies.values()]},[],{wholeBodyAliases:false,checkpointContinuity:true,snapshotState:state,originalSources:[...bodies.values()],
     retainedHandoverRecords:state.records,reviewContext:{protocol:'context-qualification-v2',plan_sha256:hash(serialize(p)),...(producer_dependencies.length?{producer_dependencies}:{}),legacy_dependencies:[...legacyDependencies.values()].sort((a,b)=>a.id.localeCompare(b.id)),
       charter:state.roles[job.role],assignment:{task:job.task,task_summary:job.task_summary??null,next_handoff:job.next_handoff??null,
         ...(job.coordination?{coordination:job.coordination}:{}),...(job.requester?{requester:job.requester}:{}),...(job.expected_deliverable!==undefined?{expected_deliverable:job.expected_deliverable}:{}),model_selection:job.model_selection??{mode:'default'}},

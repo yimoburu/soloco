@@ -44,7 +44,8 @@ async function review(f,{p,q},mode='complete',reviewNative='fictional-review-'+q
  await work(f.root,q.id,async(_host,native,prompt,_dir,timeout,_selection,options)=>{
   options.onSpawn?.(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));
   calls++;if(calls>1){assert.equal(native,reviewNative);const packet=JSON.parse(prompt);delivered+=packet.reads.reduce((n,r)=>n+r.text.length,0);}
-  if(mode==='complete'&&requests.length)return {native_id:reviewNative,text:JSON.stringify({reads:requests.splice(0,4)})};
+  if(['complete','rejected-negative'].includes(mode)&&requests.length)return {native_id:reviewNative,text:JSON.stringify({reads:requests.splice(0,4)})};
+  if(mode==='rejected-negative')return {native_id:reviewNative,text:JSON.stringify({content:'FICTIONAL retained negative: no retry remains.',messages:[{to:'unknown-peer',body:'Cannot clear historical failure.'}],notices:[],review:{verdict:'Blocked',reason:'FICTIONAL negative must remain visible',permitted_action:'hold',blockers:['No retry remains.']}})};
   return {native_id:mode==='nonindependent'?f.session_id:reviewNative,text:JSON.stringify({content:'FICTIONAL ADAPTER DOUBLE: synthetic preservation judgment; no independent acceptance.',messages:[],notices:[],review:{verdict:'Pass',reason:'Fictional complete preservation',permitted_action:'apply_context_classification',plan_sha256:sha(read(f).records[p.id].context_classification_plan),coverage_complete:true,obligations_preserved:true,unique_findings:[],blockers:[]}})};
  });
  return {job:read(f).jobs[q.id],calls,delivered,total:sources.reduce((n,v)=>n+v.length,0)};
@@ -229,3 +230,28 @@ test('receipt-only public v2 freezes deterministic reuse origin and QA support',
    await assert.rejects(prepare(f,['old']),/source missing|identity mismatch|canonical producer/);
   }
  });
+
+
+test('rejected negative is compulsory counterevidence and later Pass cannot clear it',async()=>{
+ const f=fixture(),first=await prepare(f),negative=await review(f,first,'rejected-negative');
+ assert.equal(negative.job.status,'failed');assert.ok(negative.job.rejected_output);assert.equal(negative.job.rejected_output.qualification_negative,'Blocked');
+ const q=engine.dispatch({...f,role:'qa',review_of:first.p.id,task:'Reconcile retained failed review.'},'codex',launch);
+ const s=read(f),packet=assignmentContext(s,s.jobs[q.id]);
+ assert.ok(packet.qualification_evidence.sources[packet.qualification_evidence.pages[0].source_id].raw.includes('FICTIONAL retained negative: no retry remains.'),'complete retained counterevidence must be delivered');
+ const later=await review(f,{p:first.p,q});assert.equal(later.job.status,'completed',later.job.error);
+ await assert.rejects(api(f,{action:'apply',plan_id:first.p.id,review_id:later.job.artifact_id}),/negative/);
+ assert.equal(read(f).context_classifications?.old,undefined);
+});
+
+test('later retained rejected negative revokes existing v2 exclusion',async()=>{
+ const f=fixture(),first=await prepare(f),pass=await review(f,first);
+ assert.equal((await api(f,{action:'apply',plan_id:first.p.id,review_id:pass.job.artifact_id})).applied,true);
+ const q=engine.dispatch({...f,role:'qa',review_of:first.p.id,task:'Recheck exact preservation.'},'codex',launch);
+ const negative=await review(f,{p:first.p,q},'rejected-negative',read(f).jobs[q.id].native_id??undefined);assert.equal(negative.job.status,'failed');assert.ok(negative.job.rejected_output,negative.job.error);
+ assert.throws(()=>classificationFor(read(f),read(f).records.old),/negative/);
+ assert.throws(()=>reviewedContext(read(f)),/negative/);
+ mutate(f,s=>{s.jobs[q.id].review_of.revision++;});
+ assert.equal(classificationFor(read(f),read(f).records.old).disposition,'represented','a different revision is not the same negative target');
+ mutate(f,s=>{s.jobs[q.id].review_of.revision--;s.jobs[q.id].rejected_output.text='{\"clipped\":';s.jobs[q.id].rejected_output.truncated=true;});
+ assert.throws(()=>classificationFor(read(f),read(f).records.old),/negative/,'retained verdict survives raw rejection clipping');
+});
