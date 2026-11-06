@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {Store,digest} from '../plugins/soloco/runtime/store.mjs';
 import {readImmutable} from '../plugins/soloco/runtime/record-storage.mjs';
+import {bindSnapshots,retainSnapshot,retainSnapshotEntry,captureSnapshotDependencies,validateSnapshotDependencies} from '../plugins/soloco/runtime/snapshot.mjs';
 const temporary=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'storage-intake-')));
 test.after(()=>fs.rmSync(temporary,{recursive:true,force:true}));
 function fixture(normalized=true) {
@@ -70,6 +71,72 @@ test('selected writes and upgrade appends never read unrelated/prior journal bod
     assert.ok(append.changes.some(c=>c.after?.family==='upgrade.calls'&&c.after.key==='1'&&JSON.parse(c.after.raw).text==='new native report'));
     assert.equal(JSON.parse(append.changes.find(c=>c.after?.encoding==='journal-array').after.raw).length,2);
   }finally{store.close();}
+});
+
+test('selected new roots allocate after both root and shape positions without moving existing rows',()=>{
+  const store=fixture();try {
+    const baseline=store.captureIntakeBaseline();
+    store.transaction('append absent collection',s=>{s.context_classifications={first:{label:'synthetic'}};return s;});
+    const before=store.captureIntakeBaseline(),shape=before.entries.find(r=>r.family==='shape'&&r.key==='context_classifications');
+    const roots=before.entries.filter(r=>r.family==='root');
+    assert.ok(shape.position>Math.max(...roots.map(r=>r.position)));
+    store.selectedTransaction('append root and collection entry',{rootKeys:['revision'],entities:{records:['added']}},s=>{
+      s.extension={future:true};s.records.added={id:'added',text:'new'};
+    });
+    const after=store.captureIntakeBaseline();
+    const extension=after.entries.find(r=>r.family==='root'&&r.key==='extension');
+    assert.equal(extension.position,shape.position+1);
+    assert.equal(after.entries.find(r=>r.family==='records'&&r.key==='added').position,2);
+    for(const row of before.entries.filter(r=>!(r.family==='root'&&['revision','updated_at'].includes(r.key))))
+      assert.deepEqual(after.entries.find(r=>r.family===row.family&&r.key===row.key),row);
+    assert.deepEqual(Object.keys(store.read()).slice(-2),['context_classifications','extension']);
+    const intake=store.readIntake(baseline,{values:true});
+    assert.equal(intake.events.length,2);
+    const added=intake.events[1].changes.find(c=>c.after?.key==='extension');
+    assert.equal(added.before,null);assert.deepEqual(JSON.parse(added.after.raw),{future:true});
+    assert.equal(store.readIntake(after).events.length,0);
+  }finally{store.close();}
+});
+
+test('existing duplicate top-level positions hold without rewriting historical metadata',()=>{
+  const store=fixture();try {
+    const baseline=store.captureIntakeBaseline();
+    store.db.exec("UPDATE state_entries SET position=(SELECT position FROM state_entries WHERE family='root' AND key='revision') WHERE family='shape' AND key='records'");
+    const damaged=store.db.prepare('SELECT * FROM state_entries ORDER BY family,key').all();
+    assert.throws(()=>store.captureIntakeBaseline(),/duplicate identity or order/);
+    assert.throws(()=>store.readIntake(baseline),/duplicate identity or order/);
+    assert.deepEqual(store.db.prepare('SELECT * FROM state_entries ORDER BY family,key').all(),damaged);
+  }finally{store.close();}
+});
+
+test('intake verifies envelopes; checkpoint dependency validation holds on missing/corrupt nested originals',()=>{
+  for(const damage of ['missing','corrupt']) {
+    const store=fixture();try {
+      let original;
+      store.transaction('snapshot envelope',s=>{
+        original=retainSnapshot(s,{text:'nested original'});
+        s.unknown={entry:retainSnapshotEntry(s,{id:'original',nested:original})};return s;
+      });
+      const baseline=store.captureIntakeBaseline();
+      store.selectedTransaction('replace envelope',{rootKeys:['revision','unknown'],entities:{}},s=>{s.unknown={replacement:true};});
+      const intake=store.readIntake(baseline,{values:true});
+      const change=intake.events[0].changes.find(c=>c.after?.key==='unknown');
+      // A caller's frozen version map preserves both accepted envelopes, including
+      // the deleted old envelope, rather than substituting the current state.
+      const versions=new Map([change.before,change.after].map(ref=>[ref.sha256,JSON.parse(ref.raw)]));
+      const accepted=[change.before,change.after].map(ref=>versions.get(ref.sha256));
+      const vault=bindSnapshots({},sha=>readImmutable(store.db,sha));
+      const {dependencies}=captureSnapshotDependencies(vault,()=>undefined,{root:accepted});
+      assert.equal(dependencies.length,2);
+      validateSnapshotDependencies(vault,dependencies);
+      const sha=original.immutable_snapshot.sha256;
+      if(damage==='missing')store.db.prepare('DELETE FROM immutable_values WHERE sha256=?').run(sha);
+      else store.db.prepare("UPDATE immutable_values SET bytes='null' WHERE sha256=?").run(sha);
+      assert.deepEqual(store.readIntake(baseline,{values:true}),intake);
+      assert.throws(()=>captureSnapshotDependencies(vault,()=>undefined,{root:accepted}),/missing|hash mismatch/);
+      assert.throws(()=>validateSnapshotDependencies(vault,dependencies),/missing|hash mismatch/);
+    }finally{store.close();}
+  }
 });
 
 test('gaps, changed event envelopes/payloads, uncovered writers and unlogged state changes hold',()=>{

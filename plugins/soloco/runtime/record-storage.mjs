@@ -251,7 +251,10 @@ export function writeNormalizedSelection(db,changes) {
     const old=db.prepare('SELECT position FROM state_entries WHERE family=? AND key=?').get(family,storedKey(db,key));
     if(value===undefined)db.prepare('DELETE FROM state_entries WHERE family=? AND key=?').run(family,storedKey(db,key));
     else {
-      const n=old?.position??db.prepare('SELECT COALESCE(MAX(position),-1)+1 AS n FROM state_entries WHERE family=?').get(family).n;
+      // Root values and collection shapes share the top-level object order.
+      const n=old?.position??(['root','shape'].includes(family)
+        ?db.prepare("SELECT COALESCE(MAX(position),-1)+1 AS n FROM state_entries WHERE family IN ('root','shape')").get().n
+        :db.prepare('SELECT COALESCE(MAX(position),-1)+1 AS n FROM state_entries WHERE family=?').get(family).n);
       for(const entry of valueEntries(db,family,key,n,value))put(db,...entry);
     }
     if(journal)db.prepare('DELETE FROM state_entries WHERE family=? AND position>=?').run('upgrade.'+key,Array.isArray(value)?value.length:0);
@@ -438,7 +441,8 @@ function validateMetadata(db,metadata,verifyValue=null) {
     if(!shapes.has(row.family)&&!journalParents.has(row.family))intakeHold('orphan family');
   }
   // Descriptors and shapes are small metadata values. Baseline capture stays
-  // body-free; exhaustive immutable validation belongs to the explicit reader.
+  // body-free; the explicit reader validates directly referenced row envelopes,
+  // not the transitive snapshot dependency graph inside their JSON values.
   if(verifyValue) {
     for(const row of shapes.values())if(!['array','object'].includes(JSON.parse(readImmutable(db,row.sha256))))intakeHold('unknown collection shape');
     for(const [family,row] of journalParents) {
@@ -452,6 +456,12 @@ function validateMetadata(db,metadata,verifyValue=null) {
     }
   }
 }
+// Verifies exact normalized row envelopes and event changes only. Before review,
+// publication or use, the checkpoint caller must resolve accepted old/new
+// envelopes against its frozen version map and captureSnapshotDependencies /
+// validateSnapshotDependencies against the bound vault. Missing/corrupt originals
+// hold there; intake success alone does not validate immutable_snapshot or
+// immutable_entry dependencies. Writer capture remains metadata-only.
 export function readStorageIntake(db,baseline,{values=false}={}) {
   const {sha256,...unsigned}=baseline??{};
   if(sha256!==hash(JSON.stringify(unsigned))||unsigned.version!==1||!Number.isSafeInteger(unsigned.seq)||unsigned.seq<0)intakeHold('invalid baseline; bind the runtime baseline into the reviewed proposal');

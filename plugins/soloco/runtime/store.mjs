@@ -51,6 +51,10 @@ export class Store {
   }
   changeToken() { return this.db.prepare('SELECT COALESCE(MAX(seq),0) AS version FROM events').get().version; }
   captureIntakeBaseline() {return this.readSnapshot(()=>captureStorageBaseline(this.db));}
+  // Exact row/event verification only. Checkpoint callers must resolve accepted
+  // old/new envelopes against their frozen version map and validate snapshot
+  // dependencies via captureSnapshotDependencies/validateSnapshotDependencies
+  // against the bound vault before review/publication/use; missing originals hold.
   readIntake(baseline,options) {return this.readSnapshot(()=>readStorageIntake(this.db,baseline,options));}
   storageInfo() {
     const normalized=normalizedLayout(this.db),sentinel=normalized?JSON.parse(this.db.prepare('SELECT value FROM company WHERE id=1').get().value):null;

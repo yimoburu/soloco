@@ -1,0 +1,151 @@
+TAP version 13
+# (node:55890) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: read-only baseline, exact full/selected deltas, deletion, reorder, shape and unknown fields
+ok 1 - read-only baseline, exact full/selected deltas, deletion, reorder, shape and unknown fields
+  ---
+  duration_ms: 24.724875
+  ...
+# Subtest: selected writes and upgrade appends never read unrelated/prior journal bodies
+ok 2 - selected writes and upgrade appends never read unrelated/prior journal bodies
+  ---
+  duration_ms: 13.772875
+  ...
+# Subtest: selected new roots allocate after both root and shape positions without moving existing rows
+ok 3 - selected new roots allocate after both root and shape positions without moving existing rows
+  ---
+  duration_ms: 17.145875
+  ...
+# Subtest: existing duplicate top-level positions hold without rewriting historical metadata
+ok 4 - existing duplicate top-level positions hold without rewriting historical metadata
+  ---
+  duration_ms: 7.468291
+  ...
+# Subtest: intake verifies envelopes; checkpoint dependency validation holds on missing/corrupt nested originals
+ok 5 - intake verifies envelopes; checkpoint dependency validation holds on missing/corrupt nested originals
+  ---
+  duration_ms: 27.478208
+  ...
+# Subtest: gaps, changed event envelopes/payloads, uncovered writers and unlogged state changes hold
+ok 6 - gaps, changed event envelopes/payloads, uncovered writers and unlogged state changes hold
+  ---
+  duration_ms: 81.247916
+  ...
+# Subtest: missing/corrupt old, intermediate, new and unchanged immutable values hold
+ok 7 - missing/corrupt old, intermediate, new and unchanged immutable values hold
+  ---
+  duration_ms: 75.350917
+  ...
+# Subtest: legacy/changed layout, ambiguous encoding, inexact identities and rollback hold
+ok 8 - legacy/changed layout, ambiguous encoding, inexact identities and rollback hold
+  ---
+  duration_ms: 56.219084
+  ...
+# Subtest: failed writes roll back metadata, immutable inserts and event atomically
+ok 9 - failed writes roll back metadata, immutable inserts and event atomically
+  ---
+  duration_ms: 12.615333
+  ...
+# Subtest: position-only object reorder and selected deletion produce exact references; historical old events need no replay
+ok 10 - position-only object reorder and selected deletion produce exact references; historical old events need no replay
+  ---
+  duration_ms: 10.436
+  ...
+# Subtest: re-sealed but inconsistent metadata roots and before/after chains hold
+ok 11 - re-sealed but inconsistent metadata roots and before/after chains hold
+  ---
+  duration_ms: 33.849958
+  ...
+# (node:55891) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: legacy capture holds atomically; ordinary writes/read/reopen do not migrate; explicit migration backs up exact origin
+ok 12 - legacy capture holds atomically; ordinary writes/read/reopen do not migrate; explicit migration backs up exact origin
+  ---
+  duration_ms: 16.431708
+  ...
+# Subtest: known v1/v2/v3 layouts retain pending journals and compatibility; incompatible capture/keys require explicit migration
+ok 13 - known v1/v2/v3 layouts retain pending journals and compatibility; incompatible capture/keys require explicit migration
+  ---
+  duration_ms: 79.823625
+  ...
+# Subtest: v4 keys round-trip NUL, lone surrogates, literal prefix, unknown roots and order through selected writes and portable restore
+ok 14 - v4 keys round-trip NUL, lone surrogates, literal prefix, unknown roots and order through selected writes and portable restore
+  ---
+  duration_ms: 49.145875
+  ...
+# Subtest: unknown layouts, corrupt key markers, missing originals and failed migration readback hold without adopting a layout
+ok 15 - unknown layouts, corrupt key markers, missing originals and failed migration readback hold without adopting a layout
+  ---
+  duration_ms: 21.143459
+  ...
+# Subtest: contextMatches inherits exact resolver while arbitrary unbound copies still hold
+ok 16 - contextMatches inherits exact resolver while arbitrary unbound copies still hold
+  ---
+  duration_ms: 8.008625
+  ...
+# Subtest: frozen projection reuses exact bytes, invalidates second-writer/dependency changes, and detects original corruption between reads
+ok 17 - frozen projection reuses exact bytes, invalidates second-writer/dependency changes, and detects original corruption between reads
+  ---
+  duration_ms: 47.603625
+  ...
+# Subtest: projection cache eviction retains exact legacy frozen contract and failed-successor preview distinction
+ok 18 - projection cache eviction retains exact legacy frozen contract and failed-successor preview distinction
+  ---
+  duration_ms: 4.65125
+  ...
+# Subtest: raw direct-source reads bind exact pointers and originals across another writer, including unsafe keys and corruption
+ok 19 - raw direct-source reads bind exact pointers and originals across another writer, including unsafe keys and corruption
+  ---
+  duration_ms: 9.847541
+  ...
+# Subtest: explicit migration refuses a second-writer change after backup and keeps its exact source backup
+ok 20 - explicit migration refuses a second-writer change after backup and keeps its exact source backup
+  ---
+  duration_ms: 3.732
+  ...
+# Subtest: detectable old lossy identities hold rather than adopting a normalized substitute
+ok 21 - detectable old lossy identities hold rather than adopting a normalized substitute
+  ---
+  duration_ms: 6.752875
+  ...
+# Subtest: pinned text preserves exact lone-surrogate hash encoding and Unicode range boundaries
+ok 22 - pinned text preserves exact lone-surrogate hash encoding and Unicode range boundaries
+  ---
+  duration_ms: 0.190625
+  ...
+# Subtest: pending legacy handover context and ordinary delivery writes keep their inline storage contract
+ok 23 - pending legacy handover context and ordinary delivery writes keep their inline storage contract
+  ---
+  duration_ms: 3.34875
+  ...
+# Subtest: a duplicate original hash cannot conceal conflicting reference shape metadata in extension slots
+ok 24 - a duplicate original hash cannot conceal conflicting reference shape metadata in extension slots
+  ---
+  duration_ms: 0.119125
+  ...
+# (node:55892) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: restore verifies every copied artifact and preserves exact logical database state
+ok 25 - restore verifies every copied artifact and preserves exact logical database state
+  ---
+  duration_ms: 113.966875
+  ...
+# Subtest: public restore refuses an artifact changed after source validation even when database readback would match
+ok 26 - public restore refuses an artifact changed after source validation even when database readback would match
+  ---
+  duration_ms: 11.459
+  ...
+# Subtest: restore refuses unexpected destination files appearing during copying
+ok 27 - restore refuses unexpected destination files appearing during copying
+  ---
+  duration_ms: 9.308959
+  ...
+1..27
+# tests 27
+# suites 0
+# pass 27
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 441.853959

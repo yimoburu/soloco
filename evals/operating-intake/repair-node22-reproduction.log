@@ -1,0 +1,32 @@
+TAP version 13
+# (node:55736) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: selected new roots allocate after both root and shape positions without moving existing rows
+not ok 1 - selected new roots allocate after both root and shape positions without moving existing rows
+  ---
+  duration_ms: 15.3655
+  location: '/Users/xiaoweili/Documents/Codex/SoloDev-reviews/operating-intake-2026-11-06/source/tests/storage-intake.test.mjs:75:1'
+  failureType: 'testCodeFailure'
+  error: 'Storage intake hold: duplicate identity or order'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    intakeHold (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/operating-intake-2026-11-06/source/plugins/soloco/runtime/record-storage.mjs:374:36)
+    validateMetadata (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/operating-intake-2026-11-06/source/plugins/soloco/runtime/record-storage.mjs:421:51)
+    captureStorageBaseline (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/operating-intake-2026-11-06/source/plugins/soloco/runtime/record-storage.mjs:391:3)
+    file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/operating-intake-2026-11-06/source/plugins/soloco/runtime/store.mjs:53:57
+    Store.readSnapshot (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/operating-intake-2026-11-06/source/plugins/soloco/runtime/store.mjs:64:22)
+    Store.captureIntakeBaseline (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/operating-intake-2026-11-06/source/plugins/soloco/runtime/store.mjs:53:40)
+    TestContext.<anonymous> (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/operating-intake-2026-11-06/source/tests/storage-intake.test.mjs:85:23)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:931:25)
+    Test.start (node:internal/test_runner/test:829:17)
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 76.970542
