@@ -213,11 +213,20 @@ function coherentBuild(state,max_packet_bytes){
   const state_root=intern(copy),originals=[...raws.values()].map(({reference,raw})=>({reference,raw_root:intern(raw),typed_root:intern(JSON.parse(raw))}));
   const documents=[{kind:'state',root:state_root},...originals.map(o=>({kind:'snapshot-original',sha256:o.reference.immutable_snapshot.sha256,root:o.typed_root}))];
   const roots=new Set(documents.map(d=>d.root)),snapshotTargets=new Map(originals.map(o=>[o.reference.immutable_snapshot.sha256,o.typed_root]));
+  // Strict references stay verbatim in their enclosing complete section.
+  // They are not separate semantic bodies or omitted evidence. An extra field
+  // prevents this transport-shape recognition and remains a candidate body.
+  const referenceOnly=value=>value&&typeof value==='object'&&!Array.isArray(value)
+    &&typeof value.id==='string'&&value.id.length>0&&Object.hasOwn(value,'revision')
+    &&(value.revision===null||Number.isSafeInteger(value.revision)&&value.revision>=0)
+    &&Object.keys(value).every(k=>['id','revision','sha256'].includes(k))
+    &&(!Object.hasOwn(value,'sha256')||typeof value.sha256==='string'&&/^[a-f0-9]{64}$/.test(value.sha256));
+  const referenceValue=decodeGraph(definitions);
   // Walk definitions once to find complete record/version bodies. ID-bearing
   // unknown objects are candidates too, never classified as inert by shape.
   const scalar=i=>definitions[i]?.[0]==='string'?definitions[i][1]:undefined;
   for(let i=0;i<definitions.length;i++){
-    const d=definitions[i];if(d[0]==='object'&&d[1].some(([k,v])=>k==='id'&&scalar(v)!==undefined))roots.add(i);
+    const d=definitions[i];if(d[0]==='object'&&d[1].some(([k,v])=>k==='id'&&scalar(v)!==undefined)&&!referenceOnly(referenceValue(i)))roots.add(i);
   }
   const collections=new Map();
   // Collection membership is exact structural evidence, not a giant review

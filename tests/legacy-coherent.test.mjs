@@ -105,3 +105,17 @@ test('anonymous enclosing qualifiers and scalar collection members cannot hide c
   assert.ok(packet.sections.some(g=>g.body?.wrapper?.scope==='billing-only'));
   assert.ok(p.sources.every(x=>x.producer_validation==='required-canonical-scoped-plan'&&x.receipt_reuse===false));
 });
+
+test('strict reference metadata remains in its parent section without independent extraction subjects',()=>{
+ const s=fixture();s.records.a.inputs=Array.from({length:40},(_,i)=>({id:'source-'+i,revision:i,sha256:'a'.repeat(64)}));
+ s.records.a.conditional_reference={id:'source-special',revision:1,sha256:'b'.repeat(64),condition:'Never retry while OPEN.'};
+ const p=build(s),current=p.groups.find(g=>g.section.body?.late_qualifier);
+ assert.deepEqual(current.section.body.inputs,s.records.a.inputs);
+ assert.ok(!p.occurrences.some(o=>o.path.includes('/inputs/')));
+ assert.ok(p.groups.some(g=>g.section.body?.condition==='Never retry while OPEN.'));
+ assert.equal(json(decode(p).state),json(s));
+ // Top-level collection intake cannot become inert merely by using ref shape.
+ s.records.untrusted={id:'untrusted',revision:1,sha256:'c'.repeat(64)};
+ const q=build(s);assert.ok(q.sources.some(r=>r.source.id==='untrusted'&&r.group_id));
+ assert.ok(q.occurrences.some(o=>o.path==='/records/untrusted'));
+});
