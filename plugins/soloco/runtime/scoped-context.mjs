@@ -1,7 +1,7 @@
 import {digest} from './store.mjs';
-import {contextSource,currentExtensions,presentationOnly,classificationFor} from './current-state.mjs';
+import {contextSource,currentExtensions,presentationOnly,classificationFor,proofJobSafe} from './current-state.mjs';
 import {buildEvidence} from './upgrade-evidence.mjs';
-import {retainSnapshot,resolveSnapshot,resolveSnapshotEntry,captureSnapshotDependencies,validateSnapshotDependencies,inheritSnapshots} from './snapshot.mjs';
+import {retainSnapshot,resolveSnapshot,resolveSnapshotEntry,captureSnapshotDependencies,validateSnapshotDependencies,inheritSnapshots,snapshotBytes} from './snapshot.mjs';
 import {executionTiming,TIMEOUT_POLICY_VERSION} from './timeout.mjs';
 import {qualificationControlHash} from './context-qualification.mjs';
 import {SCOPED_STREAM,buildScopedStream,validateScopedStreamDelivery} from './scoped-stream.mjs';
@@ -10,6 +10,7 @@ import {buildLegacyCoherentPlan,decodeLegacyCoherentPlan} from './legacy-operati
 
 // Explicit prospective source-closure contract; old range identities stay exact.
 export const COHERENT_PARTITIONER='coherent-source-v1';
+export const CORPUS_PARTITIONER='coherent-corpus-body-v1';
 
 // A separate proof grammar. No scoped receipt can satisfy a tree/legacy gate.
 export const SCOPED_PROTOCOL='scoped-context-v1';
@@ -149,8 +150,65 @@ function captureCoherentSource(s,source_id){
   const capsule={original:retainSnapshot(s,original),projection:retainSnapshot(s,material),producer:producer_closure[0]??null,producer_closure,units};
   return {protocol:SCOPED_PROTOCOL,version:1,partitioner:COHERENT_PARTITIONER,source:sourceRef,extraction_identity:coherentIdentity(sourceRef,producer_closure,material,units),projection_sha256:sha(material),capsule:retainSnapshot(s,capsule),units};
 }
-export function captureScopedPlan(s,{source_id,partitioner}){
+// Only mechanical owned graphs are cached. Every access revalidates vault bytes;
+// source membership, producers, native proofs and current authority remain live.
+const corpusGraphs=new Map();
+function freezeGraph(v){if(v&&typeof v==='object'&&!Object.isFrozen(v)){for(const x of Object.values(v))freezeGraph(x);Object.freeze(v);}return v;}
+function corpusGraph(s,reference){
+  const raw=snapshotBytes(s,reference),key=digest(raw);let cached=corpusGraphs.get(key);
+  if(!cached){const material=JSON.parse(raw),decoded=decodeLegacyCoherentPlan(material);cached=freezeGraph({material,state:decoded.state,units:corpusUnits(material),projection_sha256:sha(material)});if(corpusGraphs.size>=2)corpusGraphs.delete(corpusGraphs.keys().next().value);corpusGraphs.set(key,cached);}
+  for(const o of cached.material.originals)snapshotBytes(s,o.reference);
+  return cached;
+}
+function corpusUnits(m){
+  const units=[];let group_ids=[],size=0;
+  for(const g of m.groups){const n=Buffer.byteLength(json(g.section));if(group_ids.length&&size+n>12000){units.push({id:'body-batch-'+units.length,group_ids});group_ids=[];size=0;}group_ids.push(g.id);size+=n;}
+  if(group_ids.length)units.push({id:'body-batch-'+units.length,group_ids});return units;
+}
+const corpusIdentity=c=>sha({partitioner:CORPUS_PARTITIONER,projection:c.projection,selected_sources:c.selected_sources,units:c.units,producer_closures:c.producer_closures});
+function corpusRuntimeRecord(s,r){
+  const common=['id','kind','revision','status','author_role','author_instance','created_at'];
+  const extra=r.scoped_context_plan?['scoped_context_plan','context_maintenance','source_reference']:r.scoped_context_target?['scoped_context_target','source_reference']:s.records[s.jobs?.[r.job_id]?.review_of?.id]?.scoped_context_target?['content','job_id','inputs','retrieved_inputs','review_of','review','qualification_result','reviewed_unit_bundle','qualification_output','qualification_proof']:null;
+  return extra!==null&&Object.keys(r).every(k=>[...common,...extra].includes(k));
+}
+function corpusLive(s,c,m){
+  for(const r of m.sources){const original=exact(s,r.source);if(!same(producerClosure(s,original),c.producer_closures[r.source.id]))fail('corpus producer closure changed');}
+  for(const r of m.sources.filter(r=>r.location.startsWith('/upgrade'))){const value=r.location==='/upgrade'?s.upgrade:s.upgrade_history?.[Number(r.location.split('/').at(-1))];if(!value||!same(scopedReference(resolveSnapshotEntry(s,value),r.source.id),r.source))fail('corpus exact source location changed');}
+  const known=new Set(m.sources.map(r=>r.source.id));
+  for(const [id,r] of Object.entries(s.records??{}))if(!known.has(id)&&!corpusRuntimeRecord(s,r))fail('corpus current membership added '+id);
+  for(const [id,j] of Object.entries(s.jobs??{}))if(!known.has('job:'+id)&&(!s.records[j.review_of?.id]?.scoped_context_target||!proofJobSafe(Object.fromEntries(Object.entries(j).filter(([k])=>!['qualification_delivery','error','execution_failure','rejected_output','rejected_native_ids','rejected_native_id'].includes(k))))))fail('corpus current job membership added '+id);
+  for(const u of [s.upgrade,...(s.upgrade_history??[])].filter(Boolean))if(!known.has('upgrade:'+u.id))fail('corpus upgrade membership added');
+}
+function captureCorpus(s,{source_id,corpus_plan_id,selected_source_ids}){
+  let c,m;
+  if(corpus_plan_id){const prior=plan(s,source(s,corpus_plan_id));if(prior.v.partitioner!==CORPUS_PARTITIONER)fail('exact corpus plan required');c=prior.c;m=prior.material;if(selected_source_ids&&!same(selected_source_ids,c.selected_sources))fail('selected corpus membership changed');}
+  else {
+    ids(selected_source_ids,'explicit selected corpus sources',false);
+    m=buildLegacyCoherentPlan(s);
+    for(const id of selected_source_ids)if(m.sources.filter(r=>r.source.id===id).length!==1)fail('exact selected corpus source required');
+    c={projection:retainSnapshot(s,m),original:retainSnapshot(s,s),selected_sources:[...selected_source_ids],units:corpusUnits(m),producer_closures:Object.fromEntries(m.sources.map(r=>[r.source.id,producerClosure(s,source(s,r.source.id))]))};
+  }
+  if(!c.selected_sources.includes(source_id))fail('source outside explicit selected corpus membership');
+  corpusLive(s,c,m);
+  return {protocol:SCOPED_PROTOCOL,version:1,partitioner:CORPUS_PARTITIONER,source:scopedReference(source(s,source_id),source_id),extraction_identity:corpusIdentity(c),projection_sha256:sha(m),capsule:retainSnapshot(s,c),units:c.units};
+}
+function corpusUnit(m,u){
+  if(!u)fail('unknown complete body batch; no range subdivision');
+  return {id:u.id,partitioner:CORPUS_PARTITIONER,plan_sha256:m.plan_sha256,sections:u.group_ids.map(id=>({group_id:id,...m.groups.find(g=>g.id===id).section})),
+    required_interface:{id:'corpus-context',with_scope:'*',text:'Intrinsic bodies grant no applicability or authority. Independently reconcile EVERY physical occurrence, complete ancestors, ordered collection members, named originals, inbound edges, unknown and distant coupling for this exact source claim; all negative and exhausted states remain mandatory.'}};
+}
+function corpusContext(s,p,proofs){
+  const {material:m}=plan(s,p),groupIds=new Set(proofs.flatMap(p=>p.record.reviewed_unit_bundle.primary.sections.map(g=>g.group_id)));
+  const occurrences=m.occurrences.filter(o=>groupIds.has(o.group_id));
+  const needed=new Set(occurrences.flatMap(o=>[o.group_id,...o.qualifier_groups]));
+  // All inbound edges and their ancestors remain compulsory, including distant aliases.
+  for(const e of m.snapshot_inbound)for(const id of e.qualifier_groups)needed.add(id);
+  return {source:p.scoped_context_plan.source,plan_sha256:m.plan_sha256,occurrences,snapshot_inbound:m.snapshot_inbound,collection_indexes:m.collection_indexes,sections:m.groups.filter(g=>needed.has(g.id)).map(g=>({group_id:g.id,...g.section})),status:'UNACCEPTED until this source domain and independent interface review'};
+}
+export function captureScopedPlan(s,args){
+  const {source_id,partitioner}=args;
   if(!s.owner?.session_id||!Number.isSafeInteger(s.owner.epoch))fail('owner required');
+  if(partitioner===CORPUS_PARTITIONER)return captureCorpus(s,args);
   if(partitioner===COHERENT_PARTITIONER)return captureCoherentSource(s,source_id);
   if(partitioner!==undefined&&partitioner!=='lossless-ranges-v1')fail('unknown explicit partitioner');
   const original=source(s,source_id),sourceRef=scopedReference(original,source_id);
@@ -163,7 +221,17 @@ export function captureScopedPlan(s,{source_id,partitioner}){
 function plan(s,p){
   if(evaluation?.plans.has(p))return evaluation.plans.get(p);
   const v=p?.scoped_context_plan;if(v?.protocol!==SCOPED_PROTOCOL||v.version!==1)fail('scoped plan missing');
-  if(v.partitioner!==undefined&&v.partitioner!==COHERENT_PARTITIONER)fail('unknown frozen partitioner');
+  if(v.partitioner!==undefined&&v.partitioner!==COHERENT_PARTITIONER&&v.partitioner!==CORPUS_PARTITIONER)fail('unknown frozen partitioner');
+  if(v.partitioner===CORPUS_PARTITIONER){
+    const c=resolveSnapshot(s,v.capsule),{material,units,projection_sha256}=corpusGraph(s,c.projection);
+    closed(c,['projection','original','selected_sources','units','producer_closures'],'corpus capsule');
+    ids(c.selected_sources,'explicit selected corpus sources',false);
+    if(c.selected_sources.some(id=>material.sources.filter(r=>r.source.id===id).length!==1)||!material.sources.some(r=>same(r.source,v.source)))fail('corpus selected source membership changed');
+    if(digest(snapshotBytes(s,c.original))!==material.baseline.state_sha256)fail('corpus complete original changed');
+    corpusLive(s,c,material);exact(s,v.source);
+    if(!c.selected_sources.includes(v.source.id)||!same(c.units,units)||!same(v.units,c.units)||v.extraction_identity!==corpusIdentity(c)||v.projection_sha256!==projection_sha256)fail('corpus identity/coverage changed');
+    const result={v,c,material};evaluation?.plans.set(p,result);return result;
+  }
   if(v.partitioner===COHERENT_PARTITIONER){
     const original=exact(s,v.source),c=resolveSnapshot(s,v.capsule),material=resolveSnapshot(s,c.projection);
     const decoded=decodeLegacyCoherentPlan(material),closure=producerClosure(s,original),units=coherentUnits(material);
@@ -192,15 +260,16 @@ function coherentUnit(material,unitId){
   return {id:unitId,partitioner:COHERENT_PARTITIONER,plan_sha256:material.plan_sha256,group_id:o.group_id,body_root:group.body_root,occurrence:o,sections,collection_indexes:collections,snapshot_inbound:incoming,
     required_interface:{id:'coherent-context',with_scope:'*',text:'Reconcile this exact physical occurrence, complete local qualifiers, section cuts, ordered collection members and every snapshot inbound context against all source occurrences and current rules. Unknown or distant coupling remains OPEN until independently reconciled; equal bodies never establish equal applicability.'}};
 }
-function getUnit(s,p,unitId){const checked=plan(s,p);if(checked.v.partitioner===COHERENT_PARTITIONER)return coherentUnit(checked.material,unitId);const {v,raw}=checked,[base,...path]=String(unitId).split('/'),u=v.units.find(x=>x.id===base);if(!u||path.some(x=>!['0','1'].includes(x))||path.length>16)fail('unknown subdivision');let {start,end}=u;for(const side of path){let mid=Math.floor((start+end)/2);if(splitPair(raw,mid))mid--;if(mid<=start||mid>=end)fail('subdivision exhausted');if(side==='0')end=mid;else start=mid;}return {id:unitId,base_id:base,fragment:fragment(raw,start,end)};}
+function getUnit(s,p,unitId){const checked=plan(s,p);if(checked.v.partitioner===CORPUS_PARTITIONER)return corpusUnit(checked.material,checked.v.units.find(u=>u.id===unitId));if(checked.v.partitioner===COHERENT_PARTITIONER)return coherentUnit(checked.material,unitId);const {v,raw}=checked,[base,...path]=String(unitId).split('/'),u=v.units.find(x=>x.id===base);if(!u||path.some(x=>!['0','1'].includes(x))||path.length>16)fail('unknown subdivision');let {start,end}=u;for(const side of path){let mid=Math.floor((start+end)/2);if(splitPair(raw,mid))mid--;if(mid<=start||mid>=end)fail('subdivision exhausted');if(side==='0')end=mid;else start=mid;}return {id:unitId,base_id:base,fragment:fragment(raw,start,end)};}
 function reviewedUnitBundle(s,p,unitId,contextIds){
   ids(contextIds,'context unit IDs');if(contextIds.includes(unitId))fail('primary unit duplicated in supporting context');
   const {v}=plan(s,p),primary=getUnit(s,p,unitId),supporting=contextIds.map(id=>getUnit(s,p,id));
+  if(v.partitioner===CORPUS_PARTITIONER){const description={intrinsic_claim:v.extraction_identity,primary:sha(primary),supporting:supporting.map(sha)};return {primary,supporting,provenance:description,provenance_sha256:sha(description)};}
   const provenance=u=>u.partitioner===COHERENT_PARTITIONER?{unit_id:u.id,unit_sha256:sha(u),partitioner:u.partitioner,plan_sha256:u.plan_sha256,group_id:u.group_id,body_root:u.body_root,occurrence:u.occurrence,snapshot_inbound:u.snapshot_inbound}:{unit_id:u.id,unit_sha256:sha(u),path:u.fragment.path,range:u.fragment.range};
   const description={source:v.source,projection_sha256:v.projection_sha256,primary:provenance(primary),supporting:supporting.map(provenance)};
   return {primary,supporting,provenance:description,provenance_sha256:sha(description)};
 }
-function targetInfo(s,job){const record=source(s,job.review_of?.id),t=record.scoped_context_target;if(!t||t.protocol!==SCOPED_PROTOCOL||job.role!=='qa'||job.review_of.revision!==record.revision||job.inputs?.length||job.supplemental_sources?.length||job.prototype_id||job.development_id)fail('invalid separate QA target');const p=exact(s,t.plan),{v}=plan(s,p);if(t.delivery_protocol!==undefined&&(t.delivery_protocol!==SCOPED_STREAM||t.phase==='extract'&&v.partitioner!==COHERENT_PARTITIONER))fail('invalid prospective delivery protocol');return {record,t,p,v};}
+function targetInfo(s,job){const record=source(s,job.review_of?.id),t=record.scoped_context_target;if(!t||t.protocol!==SCOPED_PROTOCOL||job.role!=='qa'||job.review_of.revision!==record.revision||job.inputs?.length||job.supplemental_sources?.length||job.prototype_id||job.development_id)fail('invalid separate QA target');const p=exact(s,t.plan),{v}=plan(s,p);if(t.delivery_protocol!==undefined&&(t.delivery_protocol!==SCOPED_STREAM||t.phase==='extract'&&![COHERENT_PARTITIONER,CORPUS_PARTITIONER].includes(v.partitioner)))fail('invalid prospective delivery protocol');return {record,t,p,v};}
 export function isScopedJob(s,j){return Boolean(s.records?.[typeof j.review_of==='string'?j.review_of:j.review_of?.id]?.scoped_context_target);}
 export function scopedMaintenanceEligible(s,j){
   const target=s.records?.[typeof j.review_of==='string'?j.review_of:j.review_of?.id],p=s.records?.[target?.scoped_context_target?.plan?.id],a=p?.context_maintenance;
@@ -224,13 +293,14 @@ function coverage(s,x,domains){
   const extracts=new Map();for(const d of domains)for(const p of proofChildren(s,d.x))if(p.x.t.phase==='extract')extracts.set(p.record.id,p);
   const all=extracted([...extracts.values()]),mapped=domains.flatMap(d=>d.result.mappings.map(m=>m.item));exactSet(mapped,all.map(i=>i.key),'item coverage');
   for(const p of extracts.values())if(p.x.v.extraction_identity!==x.v.extraction_identity)fail('substituted extraction source');
-  if(x.v.partitioner===COHERENT_PARTITIONER){exactSet([...extracts.values()].map(p=>p.x.t.unit_id),x.v.units.map(u=>u.id),'coherent occurrence coverage');return {all,extracts:[...extracts.values()]};}
+  if([COHERENT_PARTITIONER,CORPUS_PARTITIONER].includes(x.v.partitioner)){exactSet([...extracts.values()].map(p=>p.x.t.unit_id),x.v.units.map(u=>u.id),'coherent occurrence coverage');return {all,extracts:[...extracts.values()]};}
   for(const u of x.v.units){let next=u.start;const spans=[...extracts.values()].map(p=>getUnit(s,p.x.p,p.x.t.unit_id)).filter(v=>v.base_id===u.id).map(v=>v.fragment.range).sort((a,b)=>a.start-b.start);for(const r of spans){if(r.start!==next||r.end<=r.start)fail('unit coverage gap/duplicate/overlap '+u.id);next=r.end;}if(next!==u.end)fail('unit coverage omission '+u.id);}
   return {all,extracts:[...extracts.values()]};
 }
 function dependencyCycles(s,sourceId,homes){const visiting=new Set([sourceId]),done=new Set();function visit(id){if(visiting.has(id))fail('cyclic current home dependency');if(done.has(id))return;visiting.add(id);const c=s.context_classifications?.[id]?.scoped_qualification;for(const r of c?.homes??[])visit(r.id);visiting.delete(id);done.add(id);}for(const r of homes)visit(r.id);}
 function noNegatives(s,x){
-  const closure=new Set([x.v.source.id,x.p.id,...(x.t.homes??[]).map(r=>r.id),...(x.t.dependencies??[]).map(r=>r.id)]);
+  const closure=new Set([...(x.v.partitioner===CORPUS_PARTITIONER?plan(s,x.p).material.sources.map(r=>r.source.id):[]),x.v.source.id,x.p.id,...(x.t.homes??[]).map(r=>r.id),...(x.t.dependencies??[]).map(r=>r.id)]);
+  if(x.v.partitioner===CORPUS_PARTITIONER)for(const r of Object.values(s.records??{})){const v=r.scoped_context_plan??s.records[r.scoped_context_target?.plan?.id]?.scoped_context_plan;if(v?.partitioner===CORPUS_PARTITIONER&&v.extraction_identity===x.v.extraction_identity)closure.add(r.id);}
   for(const r of Object.values(s.records??{})){if(negative(r)&&(r.review_of?.id===x.record.id||x.t.phase!=='extract'&&closure.has(r.review_of?.id)))fail('retained negative evidence '+r.id);}
   for(const j of Object.values(s.jobs??{})){if(!j.rejected_output)continue;let r;try{r=JSON.parse(j.rejected_output.text);}catch{}const ref=j.review_of,unknown=!ref||!Number.isSafeInteger(ref.revision)||typeof ref.id!=='string'||!contextSource(s,ref.id)||source(s,ref.id).revision!==ref.revision;
     if((negative(r??{})||j.rejected_output.qualification_negative)&&(j.review_of?.id===x.record.id||x.t.phase!=='extract'&&(unknown||closure.has(j.review_of?.id))))fail('retained rejected negative evidence '+j.id);}
@@ -262,17 +332,20 @@ export function scopedAssignment(s,j){return evaluate(()=>{live(s,j,targetInfo(s
 function assignment(s,j){
   evaluation.state=s;const x=targetInfo(s,j),proofs=proofChildren(s,x);let packet={protocol:SCOPED_PROTOCOL,phase:x.t.phase,target:scopedReference(x.record),source:x.v.source,extraction_identity:x.v.extraction_identity,instructions};
   if(x.v.partitioner===COHERENT_PARTITIONER){packet.partitioner=COHERENT_PARTITIONER;packet.instructions=coherentInstructions;}
+  if(x.v.partitioner===CORPUS_PARTITIONER){packet.partitioner=CORPUS_PARTITIONER;packet.instructions=instructions+' PROSPECTIVE intrinsic BODY batches: extraction reviews complete local sections only, never applicability or authority. Cuts and canonical JSON STRING evidence stay exact. Include boundary item coherent-occurrence, scope *, with primary.required_interface unchanged. Domain and interface review must judge every occurrence in occurrence_context independently for the exact source, all qualifiers, cuts, inbound contexts and unknown interactions. No range subdivision or inferred completeness. Oversized complete output holds.';}
   if(x.t.phase==='extract')packet.reviewed_unit_bundle=reviewedUnitBundle(s,x.p,x.t.unit_id,x.t.context_unit_ids);
   else {
     const global=targetGlobal(s,x);
     packet.global_rules=global;packet.homes=x.t.homes.map(r=>({source:r,value:exact(s,r)}));packet.dependencies=x.t.dependencies.map(r=>({source:r,value:exact(s,r)}));packet.context_scope=x.t.context_scope;
     if(x.t.phase==='applicability'){
       if(proofs.some(p=>p.x.t.phase!=='extract'||p.x.v.extraction_identity!==x.v.extraction_identity))fail('exact extraction receipts required');
+      if(x.v.partitioner===CORPUS_PARTITIONER)packet.occurrence_context=corpusContext(s,x.p,proofs);
       const all=extracted(proofs);exactSet(x.t.item_keys,x.t.item_keys.filter(k=>all.some(i=>i.key===k)),'selected extraction items');
       packet.extractions=proofs.map(p=>({review:scopedReference(p.record),reviewed_unit_bundle:p.record.reviewed_unit_bundle,items:p.result.items}));packet.item_keys=x.t.item_keys;packet.interface_keys=x.t.interface_keys;
       if(x.t.interface_keys.length){const interfaces=interfaceList(all);if(x.t.interface_keys.some(k=>!interfaces.some(i=>i.key===k)))fail('unknown interface');packet.interface_review_instructions='Independently review complete interface semantics from all delivered extraction items and exact current homes/dependencies. Return full item mappings and a substantive complete judgment. reviewed_interfaces must name every requested exact key; interfaces must be empty because its full original text is already retained in the extraction and domain receipts. Empty interfaces is not absence of interfaces or permission to skip their meaning. Missing evidence, unresolved interface conflict, or uncertainty about completeness/current applicability requires Blocked; faithfully preserved explicit OPEN outcomes may remain OPEN and grant no action authority. Do not duplicate original interface text in your summary; preserve every distinct conclusion and condition.';}
     }else {
       const domains=proofs.filter(p=>x.t.domain_review_ids.includes(p.record.id)),interfaces=proofs.filter(p=>x.t.interface_review_ids.includes(p.record.id));
+      if(x.v.partitioner===CORPUS_PARTITIONER&&proofs.some(p=>!same(p.x.v.source,x.v.source)||p.x.v.extraction_identity!==x.v.extraction_identity))fail('corpus applicability/interface belongs to another source claim');
       if(domains.some(p=>p.x.t.phase!=='applicability'||p.x.t.interface_keys.length)||interfaces.some(p=>p.x.t.phase!=='applicability'||!p.x.t.interface_keys.length))fail('wrong domain/interface receipt kind');
       const {all}=coverage(s,x,domains),required=interfaceList(all);
       exactSet(interfaces.flatMap(p=>p.result.reviewed_interfaces),required.map(i=>i.key),'independent interface coverage');
@@ -307,7 +380,7 @@ function assignment(s,j){
     const stream=buildScopedStream(packet,x.t.plan),wire=stream.pages[0].wire;
     return {text:wire,hash:digest(wire),inputs:[],packet,stream,qualification:{protocol:SCOPED_PROTOCOL,delivery_protocol:SCOPED_STREAM,phase:x.t.phase,target:scopedReference(x.record),plan:x.t.plan,packet_sha256:stream.manifest.body_sha256}};
   }
-  (x.v.partitioner===COHERENT_PARTITIONER?boundedCoherent:bounded)(packet,SCOPED_LIMITS.input_bytes,'bounded '+x.t.phase);const wire=json(packet);
+  ([COHERENT_PARTITIONER,CORPUS_PARTITIONER].includes(x.v.partitioner)?boundedCoherent:bounded)(packet,SCOPED_LIMITS.input_bytes,'bounded '+x.t.phase);const wire=json(packet);
   return {text:wire,hash:digest(wire),inputs:[],packet,qualification:{protocol:SCOPED_PROTOCOL,phase:x.t.phase,target:scopedReference(x.record),plan:x.t.plan,packet_sha256:digest(wire)}};
 }
 export function scopedMatches(s,j,hash){try{const x=targetInfo(s,j);live(s,j,x);return scopedAssignment(s,j).hash===hash;}catch{return false;}}
@@ -332,7 +405,7 @@ function semantic(s,x,r,proofs){
     const bundle=reviewedUnitBundle(s,x.p,x.t.unit_id,x.t.context_unit_ids),unit=bundle.primary;if(r.unit_id!==unit.id||r.unit_sha256!==sha(unit)||r.reviewed_unit_bundle_sha256!==sha(bundle)||!Array.isArray(r.items))fail('unit identity changed');ids(r.items.map(i=>i.id),'item IDs');if(r.items.some(i=>!/^[-A-Za-z0-9_:]{1,160}$/.test(i.id)))fail('invalid local item ID');
     for(const i of r.items){closed(i,['id','kind','text','scope','provenance','interfaces'],'item');if(!['obligation','negative_finding','exhausted_allowance','uncertain_effect','contradiction','boundary','authority'].includes(i.kind)||!text(i.text)||!text(i.scope)||i.provenance!==bundle.provenance_sha256||!Array.isArray(i.interfaces))fail('incomplete extraction/provenance');ids(i.interfaces.map(v=>v.id),'interface IDs');if(i.interfaces.some(v=>!/^[-A-Za-z0-9_:]{1,160}$/.test(v.id)))fail('invalid local interface ID');for(const v of i.interfaces){closed(v,['id','with_scope','text'],'interface');if(!text(v.with_scope)||!text(v.text))fail('incomplete interface');}}
   }
-  if(r.verdict==='Pass'&&x.t.phase==='extract'&&x.v.partitioner===COHERENT_PARTITIONER){const unit=getUnit(s,x.p,x.t.unit_id),boundary=r.items.find(i=>i.id==='coherent-occurrence');if(!boundary||boundary.kind!=='boundary'||boundary.scope!=='*'||!boundary.interfaces.some(i=>same(i,unit.required_interface)))fail('coherent occurrence requires explicit independent context interface');}
+  if(r.verdict==='Pass'&&x.t.phase==='extract'&&[COHERENT_PARTITIONER,CORPUS_PARTITIONER].includes(x.v.partitioner)){const unit=getUnit(s,x.p,x.t.unit_id),boundary=r.items.find(i=>i.id==='coherent-occurrence');if(!boundary||boundary.kind!=='boundary'||boundary.scope!=='*'||!boundary.interfaces.some(i=>same(i,unit.required_interface)))fail('coherent occurrence requires explicit independent context interface');}
   if(r.verdict!=='Pass'){if(r.permitted_action!=='hold'||!r.blockers.length)fail('negative must retain specific blockers');return;}
   if(r.permitted_action!==(x.t.phase==='integration'?'apply_scoped_context':'continue')||r.blockers.length||['preservation_complete','interfaces_complete','authority_checked','scope_complete'].some(k=>r[k]!==true))fail('missing independent semantic attestation');
   if(x.t.phase==='applicability'){
@@ -359,7 +432,7 @@ function canonical(s,ref){
 }
 export function createScopedTarget(s,args){return evaluate(()=>{
   const p=source(s,args.plan_id),{v}=plan(s,p),phase=args.phase;if(!['extract','applicability','integration'].includes(phase))fail('choose extract, applicability or integration');
-  if(args.delivery_protocol!==undefined&&(args.delivery_protocol!==SCOPED_STREAM||phase==='extract'&&v.partitioner!==COHERENT_PARTITIONER))fail('stream delivery is opt-in for NEW non-extraction targets only');
+  if(args.delivery_protocol!==undefined&&(args.delivery_protocol!==SCOPED_STREAM||phase==='extract'&&![COHERENT_PARTITIONER,CORPUS_PARTITIONER].includes(v.partitioner)))fail('stream delivery is opt-in for NEW non-extraction targets only');
   const base={protocol:SCOPED_PROTOCOL,phase,plan:scopedReference(p),owner:{...s.owner},controls_sha256:qualificationControlHash(s),...(args.delivery_protocol?{delivery_protocol:args.delivery_protocol}:{})};
   if(phase==='extract'){
     const context_unit_ids=Object.hasOwn(args,'context_unit_ids')?args.context_unit_ids:[],bundle=reviewedUnitBundle(s,p,args.unit_id,context_unit_ids);
@@ -402,7 +475,7 @@ export function validateScopedExclusion(s,proof){
   const current=validateScopedApply(s,{integration_review_id:proof.integration.id},{adopted:true});if(!same(current,proof))fail('scoped qualification receipt changed');return current;
 }
 export function scopedPlanView(s,{plan_id,offset=0,limit=16,unit_id}){
-  const p=source(s,plan_id),{v,c}=plan(s,p);if(unit_id){const result={protocol:SCOPED_PROTOCOL,source:v.source,unit:getUnit(s,p,unit_id),retrieval_only:true};return v.partitioner===COHERENT_PARTITIONER?boundedCoherent(result,SCOPED_LIMITS.input_bytes,'read unit'):result;}
+  const p=source(s,plan_id),{v,c,material}=plan(s,p);if(unit_id){const result={protocol:SCOPED_PROTOCOL,source:v.source,unit:getUnit(s,p,unit_id),retrieval_only:true};return [COHERENT_PARTITIONER,CORPUS_PARTITIONER].includes(v.partitioner)?boundedCoherent(result,SCOPED_LIMITS.input_bytes,'read unit'):result;}
   if(!Number.isSafeInteger(offset)||offset<0||!Number.isSafeInteger(limit)||limit<1||limit>16)fail('invalid unit page');const end=Math.min(v.units.length,offset+limit);
-  return {protocol:SCOPED_PROTOCOL,...(v.partitioner?{partitioner:v.partitioner}:{}),plan:scopedReference(p),source:v.source,extraction_identity:v.extraction_identity,total_units:v.units.length,units:v.units.slice(offset,end),next_offset:end<v.units.length?end:null,original:c.original,projection:c.projection,retrieval_only:true};
+  return {protocol:SCOPED_PROTOCOL,...(v.partitioner?{partitioner:v.partitioner}:{}),plan:scopedReference(p),source:v.source,extraction_identity:v.extraction_identity,...(v.partitioner===CORPUS_PARTITIONER?{corpus:{baseline:material.baseline,selected_sources:c.selected_sources,total_sources:material.sources.length,physical_occurrences:material.occurrences.length,intrinsic_batches:v.units.length,frontier_complete:false,semantic_acceptance:false}}:{}),total_units:v.units.length,units:v.units.slice(offset,end),next_offset:end<v.units.length?end:null,original:c.original,projection:c.projection,retrieval_only:true};
 }

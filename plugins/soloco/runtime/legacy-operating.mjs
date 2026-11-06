@@ -2,7 +2,7 @@ import {digest,Store} from './store.mjs';
 import {handoverSubject} from './handover.mjs';
 import {contextSource,classificationFor} from './current-state.mjs';
 import {bindSnapshots,snapshotReference,snapshotBytes,snapshotEntryReference,resolveSnapshotEntry,retainSnapshot,legacyHandoverSource} from './snapshot.mjs';
-import {captureScopedPlan,validateScopedApply,SCOPED_LIMITS} from './scoped-context.mjs';
+import {captureScopedPlan,validateScopedApply,SCOPED_LIMITS,CORPUS_PARTITIONER} from './scoped-context.mjs';
 
 // Prospective byte-preservation contract only. Never an extraction or acceptance receipt.
 export const LEGACY_BOOTSTRAP_PROTOCOL='legacy-bootstrap-manifest-v1';
@@ -356,4 +356,11 @@ export function legacyCanonicalCoverage(state,coherent,{integration_review_ids=[
   const proofs=integration_review_ids.map(integration_review_id=>validateScopedApply(state,{integration_review_id}));
   if(proofs.some(p=>!coherent.sources.some(s=>equal(s.source,p.source))))hold('canonical proof is outside exact baseline source membership');
   return {protocol:LEGACY_COHERENT_PROTOCOL,complete:false,status:'Held',semantic_acceptance:false,canonical_source_proofs:proofs,unreviewed_sources:coherent.sources.filter(s=>!proofs.some(p=>equal(p.source,s.source))),missing_interface:coherent.adapter.missing_interface,unresolved:['all coherent occurrence applicability','all snapshot inbound contexts','root/local section completeness and cross-group coupling'],receipt_refs:proofs.flatMap(p=>p.receipts)};
+}
+
+// Shared corpus entrypoint: capture once in the existing vault; sibling source
+// claims name that plan. No caller-supplied reduced baseline is accepted here.
+export function captureLegacyCanonicalCorpusSource(state,{source_id,selected_source_ids,corpus_plan_id,transaction}={}){
+  if(!(transaction instanceof Store)||transaction.inTransaction!==true)hold('existing Store transaction required');
+  return captureScopedPlan(state,{source_id,selected_source_ids,corpus_plan_id,partitioner:CORPUS_PARTITIONER});
 }

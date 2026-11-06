@@ -1,0 +1,259 @@
+TAP version 13
+# (node:64989) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: complete local sections retain late qualifiers, old versions, negatives and unknown code/logs; no raw baseline per packet
+ok 1 - complete local sections retain late qualifiers, old versions, negatives and unknown code/logs; no raw baseline per packet
+  ---
+  duration_ms: 8.542625
+  ...
+# Subtest: repeated snapshots use exact raw originals and inbound ancestry, contradictory occurrence contexts never transfer acceptance
+ok 2 - repeated snapshots use exact raw originals and inbound ancestry, contradictory occurrence contexts never transfer acceptance
+  ---
+  duration_ms: 6.252208
+  ...
+# Subtest: canonical JSON text is typed STRING evidence, coherent logical bodies replace escaped-range chunks
+ok 3 - canonical JSON text is typed STRING evidence, coherent logical bodies replace escaped-range chunks
+  ---
+  duration_ms: 2.565709
+  ...
+# Subtest: resealed gaps, altered ancestry, omitted originals, forged sizes and changed qualifiers/membership hold
+ok 4 - resealed gaps, altered ancestry, omitted originals, forged sizes and changed qualifiers/membership hold
+  ---
+  duration_ms: 18.164209
+  ...
+# Subtest: bounded whole sections hold without truncation or cap widening; owned session resists caller mutation
+ok 5 - bounded whole sections hold without truncation or cap widening; owned session resists caller mutation
+  ---
+  duration_ms: 16.890667
+  ...
+# Subtest: linear unique section work for repeated snapshots; byte forecast without constructing corpus combinations
+ok 6 - linear unique section work for repeated snapshots; byte forecast without constructing corpus combinations
+  ---
+  duration_ms: 193.449958
+  ...
+# {"fictional_only":true,"ten":{"unique_sections":14,"physical_occurrences":16,"snapshot_inbound_edges":10,"unique_section_bytes":7293,"prospective_extraction_packets":16,"total_packet_bytes":40110,"largest_packet_bytes":2686,"held_packets":0,"complete_native_request_bytes":null,"native_same_session_fit":"unproven","semantic_acceptance":false},"hundred":{"unique_sections":104,"physical_occurrences":106,"snapshot_inbound_edges":100,"unique_section_bytes":48098,"prospective_extraction_packets":106,"total_packet_bytes":272451,"largest_packet_bytes":2692,"held_packets":0,"complete_native_request_bytes":null,"native_same_session_fit":"unproven","semantic_acceptance":false}}
+# Subtest: existing canonical source adapter uses runtime test author_instance and rejects invalid producer/candidate closure
+ok 7 - existing canonical source adapter uses runtime test author_instance and rejects invalid producer/candidate closure
+  ---
+  duration_ms: 473.722375
+  ...
+# Subtest: anonymous enclosing qualifiers and scalar collection members cannot hide complete local conditions
+ok 8 - anonymous enclosing qualifiers and scalar collection members cannot hide complete local conditions
+  ---
+  duration_ms: 1.147167
+  ...
+# Subtest: strict reference metadata remains in its parent section without independent extraction subjects
+ok 9 - strict reference metadata remains in its parent section without independent extraction subjects
+  ---
+  duration_ms: 49.994291
+  ...
+# (node:64990) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: public handover, independent publication, full v4 worker review, resume and first ordinary format6 Engineering return
+ok 10 - public handover, independent publication, full v4 worker review, resume and first ordinary format6 Engineering return
+  ---
+  duration_ms: 1408.925
+  ...
+# Subtest: only exact pure runtime commands are mechanically ingested; conditions, unknown fields and generic saves stay held
+ok 11 - only exact pure runtime commands are mechanically ingested; conditions, unknown fields and generic saves stay held
+  ---
+  duration_ms: 569.768458
+  ...
+# Subtest: actual conditional handover retains founder conditions and unknown legacy remains held on first pass
+ok 12 - actual conditional handover retains founder conditions and unknown legacy remains held on first pass
+  ---
+  duration_ms: 310.929334
+  ...
+# (node:64991) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: accepted historical publication proof survives an owner epoch change without admitting old in-flight work
+ok 13 - accepted historical publication proof survives an owner epoch change without admitting old in-flight work
+  ---
+  duration_ms: 472.284208
+  ...
+# Subtest: public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning
+ok 14 - public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning
+  ---
+  duration_ms: 38.071416
+  ...
+# Subtest: missing legacy bootstrap is visibly DIRTY and apply rolls back without acceptance
+ok 15 - missing legacy bootstrap is visibly DIRTY and apply rolls back without acceptance
+  ---
+  duration_ms: 42.619375
+  ...
+# Subtest: new membership, changed exact source, wrong independent identity and absent closure cannot publish
+ok 16 - new membership, changed exact source, wrong independent identity and absent closure cannot publish
+  ---
+  duration_ms: 258.114
+  ...
+# Subtest: scope closure, global membership, expiry, receipt changes, revocation and missed communication hold
+ok 17 - scope closure, global membership, expiry, receipt changes, revocation and missed communication hold
+  ---
+  duration_ms: 55.843
+  ...
+# Subtest: pause fences publication reviewer and prospective handover cannot hide unknown legacy
+ok 18 - pause fences publication reviewer and prospective handover cannot hide unknown legacy
+  ---
+  duration_ms: 23.943458
+  ...
+# Subtest: 10x independently classified inert archive keeps actual mandatory operating assignment bytes and semantic work constant
+ok 19 - 10x independently classified inert archive keeps actual mandatory operating assignment bytes and semantic work constant
+  ---
+  duration_ms: 263.429291
+  ...
+# Subtest: deleted applicable home and changed exact provenance cannot disappear from accepted meaning
+ok 20 - deleted applicable home and changed exact provenance cannot disappear from accepted meaning
+  ---
+  duration_ms: 39.806209
+  ...
+# Subtest: typed outcome requires complete historical uncertainty; text cannot manufacture permission
+ok 21 - typed outcome requires complete historical uncertainty; text cannot manufacture permission
+  ---
+  duration_ms: 129.764084
+  ...
+# Subtest: public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure
+ok 22 - public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure
+  ---
+  duration_ms: 121.886834
+  ...
+# Subtest: late new and changed falsely scoped prohibitions stay globally DIRTY, but fresh proposals include them
+ok 23 - late new and changed falsely scoped prohibitions stay globally DIRTY, but fresh proposals include them
+  ---
+  duration_ms: 174.560167
+  ...
+# Subtest: publication proof stays current; failed, quarantined, uncertain and unknown-extension siblings stay DIRTY
+ok 24 - publication proof stays current; failed, quarantined, uncertain and unknown-extension siblings stay DIRTY
+  ---
+  duration_ms: 44.674042
+  ...
+# Subtest: mechanical publication index rejects tampering and retains unknown state extensions
+ok 25 - mechanical publication index rejects tampering and retains unknown state extensions
+  ---
+  duration_ms: 23.324292
+  ...
+# Subtest: format6 explicit non-home evidence survives dispatch, discovery and bounded same-native reads
+ok 26 - format6 explicit non-home evidence survives dispatch, discovery and bounded same-native reads
+  ---
+  duration_ms: 525.630292
+  ...
+# Subtest: referenced archived revoked/retry restriction and canonical parent receipts are supplied completely inline
+ok 27 - referenced archived revoked/retry restriction and canonical parent receipts are supplied completely inline
+  ---
+  duration_ms: 176.346958
+  ...
+# Subtest: large non-home provenance uses exact same-native ranges; undelivered, partial, denied, stale or changed evidence cannot publish
+ok 28 - large non-home provenance uses exact same-native ranges; undelivered, partial, denied, stale or changed evidence cannot publish
+  ---
+  duration_ms: 2237.782208
+  ...
+# Subtest: canonical preservation parent revisions cannot be borrowed from matching hashes
+ok 29 - canonical preservation parent revisions cannot be borrowed from matching hashes
+  ---
+  duration_ms: 142.228834
+  ...
+# Subtest: missing provenance and snapshot-only evidence hold rather than count pointers as delivered bodies
+ok 30 - missing provenance and snapshot-only evidence hold rather than count pointers as delivered bodies
+  ---
+  duration_ms: 18.926541
+  ...
+# Subtest: real runtime receipt attribution and deterministic reuse deliver the validated producer closure before Pass
+ok 31 - real runtime receipt attribution and deterministic reuse deliver the validated producer closure before Pass
+  ---
+  duration_ms: 746.543292
+  ...
+# Subtest: runtime receipt missing or mismatched producer, candidate, plan, reuse or generation holds
+ok 32 - runtime receipt missing or mismatched producer, candidate, plan, reuse or generation holds
+  ---
+  duration_ms: 97.415209
+  ...
+# Subtest: external catalog reference-shaped metadata is verbatim evidence without a company lookup
+ok 33 - external catalog reference-shaped metadata is verbatim evidence without a company lookup
+  ---
+  duration_ms: 63.529958
+  ...
+# Subtest: runtime closure requires complete delivery and independent source and proof sessions
+ok 34 - runtime closure requires complete delivery and independent source and proof sessions
+  ---
+  duration_ms: 5079.289292
+  ...
+# (node:64992) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: public represented v2 schema is strict and legacy/default protocols remain unchanged
+ok 35 - public represented v2 schema is strict and legacy/default protocols remain unchanged
+  ---
+  duration_ms: 318.313709
+  ...
+# Subtest: public plan, real worker complete format4 reads and public apply retain canonical current qualification and exact homes
+ok 36 - public plan, real worker complete format4 reads and public apply retain canonical current qualification and exact homes
+  ---
+  duration_ms: 4268.898959
+  ...
+# Subtest: real worker rejects incomplete semantic delivery and coordinator native identity
+ok 37 - real worker rejects incomplete semantic delivery and coordinator native identity
+  ---
+  duration_ms: 237.905959
+  ...
+# Subtest: public represented source includes canonical runtime test author_instance and exact producer homes
+ok 38 - public represented source includes canonical runtime test author_instance and exact producer homes
+  ---
+  duration_ms: 154.304708
+  ...
+# (node:64993) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: FICTIONAL ADAPTER: coherent public create/read -> worker -> independent interface -> canonical apply; repeats have separate provenance
+ok 39 - FICTIONAL ADAPTER: coherent public create/read -> worker -> independent interface -> canonical apply; repeats have separate provenance
+  ---
+  duration_ms: 7474.417042
+  ...
+# Subtest: FICTIONAL ADAPTER: omissions, omitted occurrence interfaces, source producer and negative receipts hold
+ok 40 - FICTIONAL ADAPTER: omissions, omitted occurrence interfaces, source producer and negative receipts hold
+  ---
+  duration_ms: 918.716583
+  ...
+# Subtest: FICTIONAL ADAPTER: late qualifier remains complete and missing home preservation is Blocked
+ok 41 - FICTIONAL ADAPTER: late qualifier remains complete and missing home preservation is Blocked
+  ---
+  duration_ms: 767.681708
+  ...
+# Subtest: FICTIONAL ADAPTER: prospective coherent streaming carries complete oversized section; old extraction still rejects opt-in
+ok 42 - FICTIONAL ADAPTER: prospective coherent streaming carries complete oversized section; old extraction still rejects opt-in
+  ---
+  duration_ms: 865.661291
+  ...
+# Subtest: FICTIONAL ADAPTER: snapshot inbound native path and resealed omissions cannot enter canonical scoped plan
+ok 43 - FICTIONAL ADAPTER: snapshot inbound native path and resealed omissions cannot enter canonical scoped plan
+  ---
+  duration_ms: 2541.655625
+  ...
+# Subtest: coherent runtime-test producer uses canonical author_instance, candidate and receipt closure without fabricated job_id
+ok 44 - coherent runtime-test producer uses canonical author_instance, candidate and receipt closure without fabricated job_id
+  ---
+  duration_ms: 36.567042
+  ...
+# (node:64994) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: FICTIONAL public corpus adapter shares intrinsic receipts but independently reviews both source claims
+ok 45 - FICTIONAL public corpus adapter shares intrinsic receipts but independently reviews both source claims
+  ---
+  duration_ms: 12915.452084
+  ...
+# Subtest: corpus growth deduplicates intrinsic sections while keeping all repeated physical obligations unaccepted
+ok 46 - corpus growth deduplicates intrinsic sections while keeping all repeated physical obligations unaccepted
+  ---
+  duration_ms: 93.791875
+  ...
+# {"fictional_only":true,"one":{"intrinsic_batches":2,"shared_body_sections":1,"physical_occurrences":34},"ten":{"intrinsic_batches":2,"shared_body_sections":1,"physical_occurrences":88},"semantic_acceptance":false}
+# Subtest: corpus retains external named handover originals and refuses missing closure
+ok 47 - corpus retains external named handover originals and refuses missing closure
+  ---
+  duration_ms: 42.590084
+  ...
+1..47
+# tests 47
+# suites 0
+# pass 47
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 13454.433208
