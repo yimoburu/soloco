@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {Store,digest} from '../plugins/soloco/runtime/store.mjs';
-import {bindOperatingIntake,bindSnapshots,resolveSnapshot,pendingSnapshots,retainSnapshot,retainSnapshotEntry} from '../plugins/soloco/runtime/snapshot.mjs';
+import {captureSnapshotDependencies,bindOperatingIntake,bindSnapshots,resolveSnapshot,pendingSnapshots,retainSnapshot,retainSnapshotEntry} from '../plugins/soloco/runtime/snapshot.mjs';
 import {proposeOperatingState,operatingReviewContext,publishOperatingState,operatingContext,operatingMaintenanceEligible} from '../plugins/soloco/runtime/operating-state.mjs';
 import {recordReference} from '../plugins/soloco/runtime/current-state.mjs';
 const sha=x=>digest(JSON.stringify(x));
@@ -197,4 +197,60 @@ test('real normalized intake preserves deleted intermediate envelopes while chec
   assert.doesNotThrow(()=>f.store.readIntake(baseline,{values:true}),'normalized raw envelopes still verify; transitive audit is the checkpoint obligation');
   assert.throws(()=>operatingContext(f.store.read()),/Immutable storage value missing or hash mismatch/);assert.deepEqual(f.store.read().operating_state,accepted);
  }finally{f.close();}
+});
+
+// Count vault reads, not elapsed time: the logical DAG has two edges per level,
+// and each immutable original must contribute its children only once.
+function dependencyDAG(kind,depth=10){
+ const state={records:{}},vault=new Map();let reads=0;
+ bindSnapshots(state,key=>{reads++;return vault.get(key);});
+ const subject={company_id:'synthetic',records:{},jobs:{},messages:[],notices:[]};
+ const subjectRef=retainSnapshot(state,subject);
+ let previous;
+ for(let level=0;level<=depth;level++){
+  const original={id:'level-'+level,revision:1,...(kind==='legacy'?{handover:{subject:subjectRef,subject_sha256:sha(subject)}}:{}),children:previous?[structuredClone(previous),structuredClone(previous)]:[],literal:JSON.stringify({immutable_entry:{immutable_snapshot:{version:1,sha256:'0'.repeat(64),characters:1,shape:'object'}},id:'absent'})};
+  const entry=retainSnapshotEntry(state,original);state.records[original.id]=entry;
+  previous=kind==='legacy'?{retained_handover_subject:{record_id:original.id,sha256:sha(subject)}}:entry;
+ }
+ for(const [key,raw] of pendingSnapshots(state))vault.set(key,raw);
+ pendingSnapshots(state).clear();
+ // Entry fixtures do not actually depend on the legacy subject.
+ if(kind!=='legacy')vault.delete(subjectRef.immutable_snapshot.sha256);
+ return {state,vault,root:previous,depth,reads:()=>reads};
+}
+test('shared immutable entry DAG traverses originals linearly with exact dependency inventory',()=>{
+ const f=dependencyDAG('entry');
+ const result=captureSnapshotDependencies(f.state,()=> 'exact',{root:f.root});
+ assert.equal(result.value,'exact');assert.deepEqual(new Set(result.dependencies.map(x=>x.value.immutable_snapshot.sha256)),new Set(f.vault.keys()));
+ assert.ok(f.reads()<=4*(f.depth+1),`shared entry DAG performed ${f.reads()} vault reads for ${f.depth+1} originals`);
+});
+test('legacy locators backed by shared immutable entries traverse full originals linearly',()=>{
+ const f=dependencyDAG('legacy');
+ const result=captureSnapshotDependencies(f.state,()=>null,{root:f.root});
+ assert.deepEqual(new Set(result.dependencies.map(x=>x.value.immutable_snapshot.sha256)),new Set(f.vault.keys()));
+ assert.ok(f.reads()<=16*(f.depth+1),`shared legacy DAG performed ${f.reads()} vault reads for ${f.depth+2} originals`);
+});
+test('raw and entry references share traversal but repeated entry identity and metadata still validate',()=>{
+ for(const mode of ['valid','id','revision','missing-revision','characters','shape','version','extra']){
+  const state={},vault=new Map();let reads=0;bindSnapshots(state,key=>{reads++;return vault.get(key);});
+  const nested=retainSnapshot(state,{restriction:'Exact nested original'}),entry=retainSnapshotEntry(state,{id:'same',revision:1,nested});
+  for(const [key,raw] of pendingSnapshots(state))vault.set(key,raw);pendingSnapshots(state).clear();
+  const repeated=structuredClone(entry);
+  if(mode==='id')repeated.id='wrong';if(mode==='revision')repeated.revision=2;if(mode==='missing-revision')delete repeated.revision;
+  if(mode==='characters')repeated.immutable_entry.immutable_snapshot.characters++;
+  if(mode==='shape')repeated.immutable_entry.immutable_snapshot.shape='array';
+  if(mode==='version')repeated.immutable_entry.immutable_snapshot.version=2;
+  if(mode==='extra')repeated.extra=true;
+  // LIFO visits the raw original before either entry wrapper.
+  const run=()=>captureSnapshotDependencies(state,()=>null,{root:[repeated,entry,entry.immutable_entry]});
+  if(mode==='valid'){const result=run();assert.equal(result.dependencies.length,2);assert.equal(reads,4,'two original traversals plus validation of both entry occurrences');}
+  else assert.throws(run,/Immutable (entry|snapshot)/,mode);
+ }
+});
+test('shared DAG nested missing or corrupt originals hold for entry and legacy forms',()=>{
+ for(const kind of ['entry','legacy'])for(const mode of ['missing','corrupt']){
+  const f=dependencyDAG(kind,5),leaf=f.state.records['level-0'].immutable_entry.immutable_snapshot.sha256;
+  if(mode==='missing')f.vault.delete(leaf);else f.vault.set(leaf,'{"corrupt":true}');
+  assert.throws(()=>captureSnapshotDependencies(f.state,()=>null,{root:f.root}),/missing or corrupt/,kind+' '+mode);
+ }
 });

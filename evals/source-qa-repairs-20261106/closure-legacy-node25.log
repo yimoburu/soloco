@@ -1,0 +1,73 @@
+paused pending handover growth [{"scale":1,"archive_utf16":1830,"pending_stream_utf16":5880,"initial_packet_utf16":7279},{"scale":10,"archive_utf16":18300,"pending_stream_utf16":5881,"initial_packet_utf16":7279},{"scale":100,"archive_utf16":183000,"pending_stream_utf16":5893,"initial_packet_utf16":7284}]
+✔ complete extraction, independent reconciliation and final mapping; immutable original retained (13.943542ms)
+✔ core vault fixture: snapshot/entry references resolve all historical and current semantics, raw bytes remain exact (25.496625ms)
+ℹ {"fixture":"core modules copied ONLY to temporary directory","sha256":{"snapshot.mjs":"3d19ce17db2014b44b98b3b7438f8413a07079cf41d9cb2f080e28221c4cf7dd","upgrade-evidence.mjs":"14b809e88cb4a380829e6bb6ab9feceefc7582db230b0e8dcc70bed3b7b70e21","current-state.mjs":"2d0ae3702eddac9951e66270c06d143b831931e610d5ab3477a592de92072a9c"}}
+✔ historical checkpoint, handover subject and old team UNIQUE restrictions are compulsory (2.448875ms)
+✔ exact source, counterpart, dependency, producer, governance and semantic notice freshness; informational history independent (44.644209ms)
+✔ exclude only exact-plan proof outputs; unrelated qualification negatives stay current (10.674292ms)
+✔ notice deliveries and seen are mechanical; changed notice semantics invalidate exclusion (0.504084ms)
+✔ applied complete representation survives owner identity, epoch, real handover and additive governing context (11.864167ms)
+✔ raw canonical Pass is not applied authority; stale plans cannot dispatch, return or freshly apply (8.786833ms)
+✔ applied proof retains exact original subject and reproduces historical/current units and evidence after handover (12.322709ms)
+✔ present exact homes, dependencies, producers, authority, native bindings and negatives still hold after handover (16.283416ms)
+✔ pure preservation tolerates only exact unrelated negative scopes; full dependency and canonical proof closure vetoes (15.841125ms)
+✔ non-applicability and global boundary resolutions keep semantic freshness while notice bookkeeping stays stable (14.377792ms)
+✔ projection wiring contract double keeps mandatory homes plus new governing records without the represented archive (8.013292ms)
+✔ byte packing preserves exact framed coverage and Unicode, including control-heavy JSON (89.082583ms)
+✔ deterministic coverage rejects deleted, duplicated, substituted, overlapping leaves and proof cycles (35.562291ms)
+✔ every unique finding, contradiction, allowance and distant boundary retains explicit parent provenance (61.495833ms)
+✔ no current applicability at extraction; final missing mappings and unresolved effects block (9.380917ms)
+✔ new exact-plan negatives and retained rejected negatives cannot be overwritten by later Pass (8.658792ms)
+✔ independent fresh natives for every leaf, merge and root; producers and CoS excluded (8.506292ms)
+✔ canonical native receipt/job/artifact corruption always invalidates exclusion (40.541709ms)
+✔ represented-by counterpart/dependency cycles cannot become exclusion authority (7.449209ms)
+✔ large current decision is extracted once in bounded units; historical leaves do not repeat current context (505.065542ms)
+ℹ {"label":"contract double current-context convergence","raw_bytes":101,"units":12,"reconciliation_nodes":10,"levels":6,"sessions":23,"max_full_prompt_bytes":14598,"aggregate_bytes":6082,"total_input_bytes":227940,"total_output_bytes":22443,"retained_wire_bytes":227940,"plan_bytes":4515,"logical_state_bytes":427762,"elapsed_ms":505}
+✔ 100K zero findings converges despite per-leaf boilerplate; maximum child responses fit full schema packet (125.752209ms)
+ℹ {"label":"contract double zero findings","raw_bytes":100090,"units":14,"reconciliation_nodes":12,"levels":6,"sessions":27,"max_full_prompt_bytes":14616,"aggregate_bytes":5640,"total_input_bytes":262043,"total_output_bytes":18032,"retained_wire_bytes":262043,"plan_bytes":5197,"logical_state_bytes":486811,"elapsed_ms":126}
+✔ two near-limit child results fit the complete packet; genuinely distinct union holds instead of truncating (10.386583ms)
+ℹ {"label":"contract double near-output-limit reconciliation","full_prompt_bytes":26306,"children":2}
+✔ content-addressed cache never bypasses exact JSON integrity or mutable-state freshness (0.904541ms)
+✔ genuinely distinct oversized semantics hold with concrete node/subdomain next action (1.144625ms)
+✔ complete 1x/10x/100x UNKNOWN semantic archive workflows, fixed current obligations (587.621792ms)
+ℹ {"label":"contract double unknown archive","factor":1,"raw_bytes":1170,"units":2,"reconciliation_nodes":0,"levels":2,"sessions":3,"max_full_prompt_bytes":7728,"aggregate_bytes":6203,"total_input_bytes":21378,"total_output_bytes":2764,"retained_wire_bytes":21378,"plan_bytes":2236,"logical_state_bytes":41090,"elapsed_ms":5}
+ℹ {"label":"contract double unknown archive","factor":10,"raw_bytes":10890,"units":4,"reconciliation_nodes":2,"levels":4,"sessions":7,"max_full_prompt_bytes":14613,"aggregate_bytes":6084,"total_input_bytes":58022,"total_output_bytes":6667,"retained_wire_bytes":58022,"plan_bytes":2729,"logical_state_bytes":108529,"elapsed_ms":19}
+ℹ {"label":"contract double unknown archive","factor":100,"raw_bytes":108090,"units":15,"reconciliation_nodes":13,"levels":6,"sessions":29,"max_full_prompt_bytes":14616,"aggregate_bytes":6079,"total_input_bytes":290307,"total_output_bytes":28173,"retained_wire_bytes":290307,"plan_bytes":5445,"logical_state_bytes":551418,"elapsed_ms":564}
+✔ complete multi-million unknown semantic workflow converges with every receipt, not sampling (197694.546292ms)
+ℹ {"label":"contract double multi-million COMPLETE workflow; not native QA","source_utf16":3360000,"raw_bytes":3612090,"units":429,"reconciliation_nodes":427,"levels":11,"sessions":857,"max_full_prompt_bytes":14594,"aggregate_bytes":6081,"total_input_bytes":8897342,"total_output_bytes":841152,"retained_wire_bytes":8897342,"plan_bytes":109745,"logical_state_bytes":17030033,"elapsed_ms":197694}
+▶ injected worker rejects all omitted output channels before persistence and retains exact bad output/provenance
+  ✔ content (456.379125ms)
+  ✔ result_unknown_property (59.487584ms)
+  ✔ item_unknown_property (62.822542ms)
+  ✔ message_to_engineer (63.105625ms)
+  ✔ message_to_qa (62.048292ms)
+  ✔ notice (65.614417ms)
+✔ injected worker rejects all omitted output channels before persistence and retains exact bad output/provenance (770.102708ms)
+✔ malformed raw qualification JSON retains exact text and target provenance through the worker failure path (58.21125ms)
+✔ worker retains the negative verdict when rejecting unknown qualification output keys (57.759083ms)
+✔ canonical apply rechecks closed leaf envelopes even with refreshed child references (6.065ms)
+✔ closed node-specific grammar covers nested outputs and explicit negatives without filtering source fields (26.162666ms)
+✔ actual paused engine handover admission and QA preserve applied representation before resume (235.032583ms)
+✔ actual pending paused handover has bounded current QA projection across represented archive growth (911.285ms)
+✔ worker delivers complete bounded wire once, retains canonical native proof and supports different aggregate reviewer (639.455959ms)
+✔ wire-size accounting: actual worker retains pretty output and canonical apply enforces both independent caps (291.775167ms)
+✔ worker rejects supplemental growth, invalid response, CoS native and oversized UTF-8 output (235.849333ms)
+✔ worker requires observed spawn timing and preserves timeout/closure failure evidence (96.347583ms)
+✔ typed log/file-only restrictions enter extraction units as complete payload semantics (1.804584ms)
+✔ dependency-only surviving homes remain exact mandatory counterparts (4.962625ms)
+✔ ordinary format 3 preserves typed job and upgrade homes without replaying unrelated history (7.379459ms)
+✔ fresh large profile accepts dense structured extraction; exact output and raw max+1 remain hard holds (1.78225ms)
+✔ fresh profile immutable binding, exact input max+1, authority fences and failed-job preservation (4.413333ms)
+✔ same complete negative-bearing fictional audit reduces sessions by at least four times with exact retrieval (8824.4975ms)
+ℹ {"fixture_utf16":196800,"before":{"raw_bytes":216263,"units":44,"reconciliation_nodes":42,"levels":7,"sessions":87,"max_full_prompt_bytes":14579,"aggregate_bytes":5961,"total_input_bytes":861478,"total_output_bytes":83484,"retained_wire_bytes":861478,"plan_bytes":13067,"logical_state_bytes":1628487,"elapsed_ms":4018},"after":{"raw_bytes":216263,"units":14,"reconciliation_nodes":6,"levels":4,"sessions":21,"max_full_prompt_bytes":36739,"aggregate_bytes":6143,"total_input_bytes":448852,"total_output_bytes":20342,"retained_wire_bytes":448852,"plan_bytes":5457,"logical_state_bytes":874756,"elapsed_ms":1665}}
+✔ four maximum child envelopes hold for density before launch; fitting merge retains complete support (345.194625ms)
+✔ actual sibling failure notice invalidates running assignment and retains eligibility-loss abort cause (174.414ms)
+✔ immutable qualification unit lookup preserves exact wire and canonical proof without rebuilding projections (12722.694792ms)
+ℹ tests 54
+ℹ suites 0
+ℹ pass 54
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 212150.267292

@@ -1,6 +1,6 @@
 import {digest} from './store.mjs';
 import {operatingProofOccurrences} from './operating-state.mjs';
-import {contextSource,currentExtensions,presentationOnly,classificationFor,proofJobSafe} from './current-state.mjs';
+import {contextSource,currentExtensions,presentationOnly,classificationFor,proofJobSafe,canonicalEvidenceNodes,rejectedJobIdentities} from './current-state.mjs';
 import {buildEvidence} from './upgrade-evidence.mjs';
 import {retainSnapshot,resolveSnapshot,resolveSnapshotEntry,captureSnapshotDependencies,validateSnapshotDependencies,inheritSnapshots,snapshotBytes} from './snapshot.mjs';
 import {executionTiming,TIMEOUT_POLICY_VERSION} from './timeout.mjs';
@@ -444,9 +444,22 @@ export function scopedMaintenanceEligible(s,j){
   return Boolean(s.paused===true&&j.role==='qa'&&!j.prototype_id&&!j.development_id&&!j.input_ids?.length&&!j.evidence_ids?.length&&a?.readonly===true&&!a.revoked_at&&same(a.owner,s.owner)&&a.controls_sha256===qualificationControlHash(s)&&text(a.source_instruction));
 }
 function live(s,j,x){if(j.epoch!==s.owner.epoch||!same(x.t.owner,s.owner)||x.t.controls_sha256!==qualificationControlHash(s)||s.paused&&!scopedMaintenanceEligible(s,j)||x.p.context_maintenance?.revoked_at)fail('owner/epoch/pause/revocation changed; regain eligibility with a newly authorized plan/target');}
-function collectIdentities(s,values,{rejected=false}={}){const out=new Set(),seen=new Set(),todo=[...values];while(todo.length){const v=todo.pop();if(!v||typeof v!=='object'||seen.has(v))continue;seen.add(v);if(v.immutable_snapshot){todo.push(resolveSnapshot(s,v));continue;}if(v.immutable_entry){todo.push(resolveSnapshotEntry(s,v));continue;}if(v.job_id&&s.jobs?.[v.job_id])todo.push(s.jobs[v.job_id]);for(const [k,x] of Object.entries(v)){if(['author_instance','recorded_by','session_id','native_id','instance_id','probe_native_id','reviewer_native_id',...(rejected?['rejected_native_id']:[])].includes(k)&&text(x))out.add(x);if(rejected&&k==='rejected_native_ids'&&Array.isArray(x))for(const id of x)if(text(id))out.add(id);if(x&&typeof x==='object')todo.push(x);}}return out;}
+function collectIdentities(s,values,{rejected=false}={}){
+  const out=new Set(),roots=new Set(),todo=[...values];
+  while(todo.length){const root=todo.pop();if(!root||typeof root!=='object'||roots.has(root))continue;roots.add(root);
+    for(const {value:v,kind,view} of canonicalEvidenceNodes(s,root)){
+      for(const native of rejectedJobIdentities(view,v,kind==='job'))out.add(native);
+      // Forward admission also fences previously observed rejected identities;
+      // canonical revalidation uses only provenance-bound contribution checks.
+      if(rejected){if(text(v.rejected_native_id))out.add(v.rejected_native_id);if(Array.isArray(v.rejected_native_ids))for(const id of v.rejected_native_ids)if(text(id))out.add(id);}
+      if(kind==='record'&&view===s&&v.job_id&&s.jobs?.[v.job_id])todo.push(s.jobs[v.job_id]);
+      for(const [k,x] of Object.entries(v))if(['author_instance','recorded_by','session_id','native_id','instance_id','probe_native_id','reviewer_native_id'].includes(k)&&text(x))out.add(x);
+    }
+  }
+  return out;
+}
 function independent(s,j,native,x,proofs){
-  const banned=collectIdentities(s,[x.t.owner,x.record,x.p,resolveSnapshot(s,plan(s,x.p).c.original),resolveSnapshot(s,plan(s,x.p).c.projection),...(plan(s,x.p).c.producer_closure??(plan(s,x.p).c.producer?[plan(s,x.p).c.producer]:[])).map(r=>exact(s,r)),...(x.t.homes??[]).map(r=>exact(s,r)),...(x.t.dependencies??[]).map(r=>exact(s,r)),...(x.t.phase==='extract'?[]:[targetGlobal(s,x)]),...proofs.map(p=>p.job)]);
+  const banned=collectIdentities(s,[x.t.owner,x.record,x.p,...(x.v.partitioner===CORPUS_PARTITIONER?plan(s,x.p).c.selected_sources.map(id=>source(s,id)):[]),resolveSnapshot(s,plan(s,x.p).c.original),resolveSnapshot(s,plan(s,x.p).c.projection),...(plan(s,x.p).c.producer_closure??(plan(s,x.p).c.producer?[plan(s,x.p).c.producer]:[])).map(r=>exact(s,r)),...(x.t.homes??[]).map(r=>exact(s,r)),...(x.t.dependencies??[]).map(r=>exact(s,r)),...(x.t.phase==='extract'?[]:[targetGlobal(s,x)]),...proofs.map(p=>p.job)]);
   if(!text(native)||!text(j.instance_id)||banned.has(native)||banned.has(j.instance_id))fail('independent reviewer owns source/domain/authority');
   if(Object.values(s.jobs??{}).some(other=>other.id!==j.id&&[other.native_id,other.instance_id].some(id=>[native,j.instance_id].includes(id)))||(s.retired_sessions??[]).some(r=>[r.native_id,r.instance_id].some(id=>[native,j.instance_id].includes(id)))||Object.values(s.sessions??{}).some(r=>r.instance_id!==j.instance_id&&r.native_id===native))fail('native reviewer reused');
 }

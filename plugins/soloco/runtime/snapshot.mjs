@@ -151,10 +151,13 @@ export function captureSnapshotDependencies(state,build,{root=state}={}) {
     // nested references, before a projection can become a frozen read sequence.
     const todo=[root],seen=new Set(),originals=new Map();
     while(todo.length){const item=todo.pop();if(!item||typeof item!=='object'||seen.has(item))continue;seen.add(item);
-      if(snapshotEntryReference(item)){todo.push(resolveSnapshotEntry(state,item));continue;}
+      const entry=snapshotEntryReference(item);
+      // Every wrapper must validate, even when its original was already walked.
+      // Queue the reference so entry and raw forms share hash/metadata dedup.
+      if(entry){resolveSnapshotEntry(state,item);todo.push(entry);continue;}
       const ref=snapshotReference(item);
       if(ref){const prior=originals.get(ref.sha256);if(prior&&(prior.characters!==ref.characters||prior.shape!==ref.shape))throw Error('Immutable snapshot duplicate metadata mismatch');if(!prior){originals.set(ref.sha256,ref);todo.push(JSON.parse(snapshotBytes(state,item)));}continue;}
-      if(Object.hasOwn(item,'retained_handover_subject')){const source=legacyHandoverSource(state,item);todo.push(source);continue;}
+      if(Object.hasOwn(item,'retained_handover_subject')){legacyHandoverSource(state,item);todo.push(state.records[item.retained_handover_subject.record_id]);continue;}
       for(const child of Object.values(item))if(child&&typeof child==='object')todo.push(child);
     }
     return {value:build(),dependencies:[...dependencies.values()]};

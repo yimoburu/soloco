@@ -362,9 +362,9 @@ test('runtime closure requires complete delivery and independent source and proo
 
 // The canonical first pass uses PUBLIC represented-v2 plan/worker/apply, not a
 // complete flag injected by this fixture. All semantic judgments remain fictional.
-async function qualifiedRecovered(){
+async function qualifiedRecovered({checkpointBody,small=false}={}){
  const f=fixture();withStore(f.root,db=>{if(db.storageInfo().format!=='normalized-v4')db.migrate();});
- mutate(f,s=>{s.upgrade={id:'fictional-recovered',status:'recovered',epoch:1,host:'codex',candidate_hash:'fictional-candidate',recovered_at:'2026-11-06T00:00:00Z',probe_status:'failed',review_status:'failed',error:'Prior continuity QA failed; never retry on old allowance',probe_native_id:'fictional-original-upgrade-producer',probe:{content:'FICTIONAL retained full failed report '+'.'.repeat(240000)},checkpoint:retainSnapshot(s,{raw:'FICTIONAL original failed attempt; unknown effects and zero retries. '+'.'.repeat(260000)})};});
+ mutate(f,s=>{const body=checkpointBody?checkpointBody(s):{raw:'FICTIONAL original failed attempt; unknown effects and zero retries. '+'.'.repeat(small?0:260000)};s.upgrade={id:'fictional-recovered',status:'recovered',epoch:1,host:'codex',candidate_hash:'fictional-candidate',recovered_at:'2026-11-06T00:00:00Z',probe_status:'failed',review_status:'failed',error:'Prior continuity QA failed; never retry on old allowance',probe_native_id:'fictional-original-upgrade-producer',probe:{content:'FICTIONAL retained full failed report '+'.'.repeat(small?0:240000)},checkpoint:retainSnapshot(s,body),checkpoint_sha256:sha(body)};});
  home(f,'outcome','*',{kind:'outcome',attempted_action:'Failed fictional upgrade rehearsal',resources:['fictional candidate'],possible_effects:'Preparation may have produced uncertain evidence',uncertainty:'Original failure remains failed; effects unknown',retry_clearing:'Independent reconciliation plus fresh canonical authority; current independent resume_handover gate remains',historical_receipts:['upgrade:fictional-recovered'],evidence_refs:['upgrade:fictional-recovered']});
  home(f,'permission','*',{kind:'permission',grant_refs:['upgrade:fictional-recovered'],remaining:0,revoked:true,evidence_refs:['upgrade:fictional-recovered']});
  const p=await publicCall('company_context',{...f,action:'plan',record_ids:['upgrade:fictional-recovered'],disposition:'represented',counterpart_ids:['outcome','permission'],coverage:[{source_id:'upgrade:fictional-recovered',counterpart_ids:['outcome','permission'],findings:'Complete fictional original retained; current independent resume_handover remains required',failures:'Prior QA remains failed; old failure is not resolved',uncertain_effects:'All effects remain unknown pending independent reconciliation',exhausted_allowances:'Zero retries; revoked; fresh canonical authority required'}]},'codex');
@@ -429,6 +429,29 @@ test('frozen publication worker rejects unread semantics, changed native and cha
 test('paid snapshot archive still requires publication QA independent of nested original producers',async()=>{
  const f=await qualifiedRecovered(),p=await ctx(f,{action:'plan'}),r=await review(f,p.id,{native:'fictional-original-upgrade-producer'});
  await assert.rejects(ctx(f,{action:'apply',plan_id:p.id,review_id:r.id}),/reviewer owns current home/);assert.equal(read(f).operating_state,undefined);
+});
+
+test('historical artifact producers use the frozen checkpoint map and retain separate current bindings',async()=>{
+ for(const mode of ['absent','different','broken']){
+  const f=await qualifiedRecovered({small:true,checkpointBody:s=>{
+   const producer={id:'archived-producer',role:'engineer',status:'completed',artifact_id:mode==='broken'?'wrong-artifact':'archived-artifact',instance_id:'archived-instance',native_id:'archived-native'};
+   if(mode==='different')s.jobs[producer.id]={...producer,instance_id:'newer-instance',native_id:'newer-native',artifact_id:'newer-artifact'};
+   return {id:s.id,governance:s.governance,roles:s.roles,records:{'archived-artifact':{id:'archived-artifact',kind:'artifact',revision:1,job_id:producer.id,author_instance:'archived-instance',content:'Historical condition; failure remains OPEN.'}},jobs:{[producer.id]:retainSnapshotEntry(s,producer)}};
+  }});
+  if(mode==='broken'){await assert.rejects(ctx(f,{action:'plan'}),/broken canonical producer edge/);continue;}
+  // A different current row is independent new intake and needs its own proof.
+  if(mode==='different'){
+   const p=await publicCall('company_context',{...f,action:'plan',record_ids:['job:archived-producer'],disposition:'represented',counterpart_ids:['outcome'],coverage:[{source_id:'job:archived-producer',counterpart_ids:['outcome'],findings:'Separate newer producer outcome.',failures:'Historical failure remains open.',uncertain_effects:'No effects reconciled.',exhausted_allowances:'No retry.'}]},'codex');
+   const r=await review(f,p.id,{action:'apply_context_classification'});await publicCall('company_context',{...f,action:'apply',plan_id:p.id,review_id:r.id},'codex');
+  }
+  const p=await ctx(f,{action:'plan'}),preservation=read(f).records[p.id].operating_plan.snapshot.preservation;
+  const frozen=resolveSnapshotEntry(read(f),read(f).upgrade);assert.ok(frozen.checkpoint_sha256);
+  const evidence=JSON.parse(snapshotBytes(read(f),preservation)).evidence.accepted_semantics.find(x=>x.source.id==='upgrade:fictional-recovered');
+  const old=evidence.historical_producers.find(x=>x.source.id==='job:archived-producer');assert.ok(old);assert.equal(old.company_sha256,frozen.checkpoint_sha256);
+  assert.equal(JSON.parse(snapshotBytes(read(f),old.envelope)).native_id,'archived-native');
+  assert.ok(!evidence.producer_refs.some(x=>x.id==='job:archived-producer'));
+  const r=await review(f,p.id);assert.equal((await ctx(f,{action:'apply',plan_id:p.id,review_id:r.id})).published,true);
+ }
 });
 
 

@@ -1,0 +1,31 @@
+{
+  "role": "corpus-incidence-architect",
+  "mode": "advisory",
+  "started_at": "2026-11-06T22:49:05.458216+00:00",
+  "ended_at": "2026-11-06T22:54:42.937575+00:00",
+  "exit_code": 0,
+  "prompt_sha256": "d760c73b123b99e9934341ac1698a97368c365403203d237143ac577232c96b6",
+  "requested_model": "gpt-6.1-sol",
+  "requested_effort": "high",
+  "requested_speed": "host_default",
+  "effective_settings": "unverified",
+  "timeout_seconds": 600,
+  "scope": "Maintainer public source only in isolated worktree; no real company records or authority changes",
+  "lifecycle": [
+    {
+      "type": "thread.started",
+      "thread_id": "01a1b30d-2536-7410-90e8-ad881a14efa1"
+    },
+    {
+      "type": "turn.completed",
+      "usage": {
+        "input_tokens": 64826,
+        "cached_input_tokens": 9216,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 13111,
+        "reasoning_output_tokens": 10798
+      }
+    }
+  ],
+  "report_exists": true
+}

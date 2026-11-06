@@ -1,7 +1,7 @@
 import {validateScopedExclusion,validateCorpusExclusion,CORPUS_PRESERVATION,SCOPED_PROTOCOL,producerClosure} from './scoped-context.mjs';
 import {validateOperatingIndex} from './operating-state.mjs';
 import {digest,requireText} from './store.mjs';
-import {snapshotReference,resolveSnapshot,resolveSnapshotEntry,hasSnapshotReferences,legacyHandoverSource} from './snapshot.mjs';
+import {snapshotReference,resolveSnapshot,resolveSnapshotEntry,hasSnapshotReferences,legacyHandoverSource,inheritSnapshots} from './snapshot.mjs';
 import {buildQualificationEvidence,knownModelCatalog} from './upgrade-evidence.mjs';
 import {validateQualificationExclusion,QUALIFICATION_PROTOCOL} from './context-qualification.mjs';
 const fields=['id','kind','author_role','recorded_by','content','status','action','previous_name','name','created_at'];
@@ -266,22 +266,22 @@ export function companySnapshotContainer(value){return Boolean(value&&(typeof va
 // shaped examples. Only exact canonical roots and runtime-owned, hash-bound
 // checkpoint/subject slots establish historical record/job containment.
 export function* canonicalEvidenceNodes(state,value){
-  const equal=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+  const equal=(a,b)=>a===b||JSON.stringify(a)===JSON.stringify(b);
   const rootKind=v=>{
     const id=v?.id;if(typeof id!=='string')return 'other';
     for(const [kind,raw] of [['record',state.records?.[id]],['job',state.jobs?.[id]],['attempt',state.upgrade?.id===id?state.upgrade:null],...(state.upgrade_history??[]).filter(x=>x.id===id).map(x=>['attempt',x])])if(raw&&equal(resolveSnapshotEntry(state,raw),resolveSnapshotEntry(state,v)))return kind;
     return 'other';
   };
-  const todo=[{value,kind:rootKind(value)}],seen=new Map(),snapshots=new Set();
+  const todo=[{value,kind:rootKind(value),view:state,company_sha256:null}],seen=new Map(),snapshots=new Set();
   while(todo.length){
-    const node=todo.pop(),v=node.value,kind=node.kind;if(!v||typeof v!=='object')continue;
-    const kinds=seen.get(v)??new Set();if(kinds.has(kind))continue;kinds.add(kind);seen.set(v,kinds);
+    const node=todo.pop(),v=node.value,kind=node.kind,view=node.view,company_sha256=node.company_sha256;if(!v||typeof v!=='object')continue;
+    const marker=kind+':'+company_sha256,kinds=seen.get(v)??new Set();if(kinds.has(marker))continue;kinds.add(marker);seen.set(v,kinds);
     yield node;
-    const legacy=legacyHandoverSource(state,v);if(legacy){todo.push({value:legacy,kind:'record'});continue;}
-    const original=resolveSnapshotEntry(state,v),ref=snapshotReference(v);
-    if(original!==v||ref){const key=(ref?.sha256??snapshotReference(v.immutable_entry).sha256)+':'+kind;if(!snapshots.has(key)){snapshots.add(key);todo.push({value:original!==v?original:resolveSnapshot(state,v),kind});}continue;}
+    const legacy=legacyHandoverSource(view,v);if(legacy){todo.push({value:legacy,kind:'record',view,company_sha256});continue;}
+    const original=resolveSnapshotEntry(view,v),ref=snapshotReference(v);
+    if(original!==v||ref){const key=(ref?.sha256??snapshotReference(v.immutable_entry).sha256)+':'+marker;if(!snapshots.has(key)){snapshots.add(key);todo.push({value:original!==v?original:resolveSnapshot(view,v),kind,view,company_sha256});}continue;}
     for(const [key,child] of Object.entries(v))if(child&&typeof child==='object'){
-      let next='other';
+      let next='other',nextView=view,nextCompany=company_sha256;
       if(kind==='company'&&key==='records')next='records';
       else if(kind==='company'&&key==='jobs')next='jobs';
       else if(kind==='company'&&key==='upgrade')next='attempt';
@@ -290,11 +290,11 @@ export function* canonicalEvidenceNodes(state,value){
       else if(kind==='record'&&key==='handover'&&v.kind==='artifact'&&v.author_role==='runner'&&Array.isArray(child.input_refs)&&child.incoming_owner?.session_id===v.author_instance)next='handover';
       const bound=kind==='attempt'&&key==='checkpoint'?v.checkpoint_sha256:kind==='handover'&&key==='subject'?v.subject_sha256:null;
       if(bound){
-        const snapshot=snapshotReference(child),body=snapshot?resolveSnapshot(state,child):child;
+        const snapshot=snapshotReference(child),body=snapshot?resolveSnapshot(view,child):child;
         if((snapshot?.sha256??digest(JSON.stringify(child)))!==bound)throw Error('Canonical historical company snapshot changed');
-        if(companySnapshotContainer(body)&&(body.id??body.company_id)===state.id)next='company';
+        if(companySnapshotContainer(body)){if((body.id??body.company_id)!==state.id)throw Error('Canonical historical company identity changed');next='company';nextView=inheritSnapshots(state,{...body,id:body.id??body.company_id});nextCompany=bound;}
       }
-      todo.push({value:child,kind:next});
+      todo.push({value:child,kind:next,view:nextView,company_sha256:nextCompany});
     }
   }
 }

@@ -1,0 +1,109 @@
+Recommend one **prospective corpus-only fit repair: incidence-bound mappings with conclusion-backed domain delivery and exact structural factoring**. Keep frozen `34b4650f9618dad5b0e74918d85c69fc54209869` untouched. This recommendation neither assesses its source-QA acceptance nor establishes actual bootstrap fit.
+
+COMPLETE canonical extraction conclusions can validly support domain judgment under SPEC v0.18. The SPEC requires adequate evidence, preserved conditions, independent acceptance and usable context; it does not require every receiver to repeat raw-source extraction. This is semantic composition, however, not lossless compression. Retaining originals and validating hashes cannot establish that conclusions carry sufficient meaning.
+
+1. **Introduce one explicit prospective representation.**
+
+   Add `CORPUS_FIT_DELIVERY = 'corpus-incidence-conclusions-v2'` in `scoped-context.mjs`, using the existing `delivery_schema` target field.
+
+   Update `createScopedTarget`, `targetInfo`, `assignment`, `shape` and `semantic` to dispatch this marker explicitly. Unknown markers Hold. Replace the corpus instructions requiring every item against every source and occurrence; do not leave contradictory old instructions in the new packet.
+
+   Preserve existing plans, extraction identities, capsules and reviewed bundles byte-for-byte. An existing extraction receipt is reusable only through existing exact canonical validation. Issued non-extraction targets retain their original representation and mapping grammar. New domain/interface/integration chains must consistently use the new marker; no automatic conversion or mixed aggregation.
+
+   Partition changes that alter batching or extraction identity still require newly bound extraction evidence. This patch does not migrate an issued plan.
+
+2. **Replace fabricated rectangular obligations with exact physical incidence.**
+
+   Add pure helpers:
+
+   - `corpusPhysicalIncidence(material, decodedState, selectedSources)`
+   - `corpusBatchSupport(proof)`
+   - `corpusIncidenceBasis(material, selections, proofs, incidence)`
+
+   Internally expose the already validated decoded state from `corpusGraph`; create no new durable index.
+
+   Anchor each selected source using its **exact source reference, location and resolved body root**. Derive physical ownership through containment below that anchor and genuine snapshot-reference edges into original documents. Preserve document/path, qualifier ancestry and every relevant inbound route.
+
+   Equal body roots do not establish ownership. A shared ancestor does not make its siblings part of a source. Incoming contextual evidence does not itself create source ownership. Reference-shaped STRING examples remain data.
+
+   Every physical occurrence still needs an accountable preservation obligation. Root clauses, unselected-source material and occurrences without selected-source ownership become explicit **context obligations**, rather than fictitious selected-source pairs. They remain in exhaustive primary-selection coverage.
+
+   Keep conservative whole-batch item support: every item inherits **all primary and supporting section groups in its reviewed bundle**. Do not infer individual section support from item scope, text, producer labels or hashes.
+
+   For each occurrence context, require mappings for items whose complete batch support intersects its compulsory structural support. Preserve the existing qualifier, incident/global and inbound closure. If attribution is uncertain, retain a broader context obligation. Additional independently judged cross-effects may be mapped to other genuine delivered incidences; missing distant evidence requires widening.
+
+   This changes mechanical accounting. It does **not** assert that semantic influence follows structural incidence.
+
+3. **Change mapping validation without weakening preservation.**
+
+   Add `validateCorpusIncidenceCoverage`; retain `validateCorpusCellCoverage` for issued targets.
+
+   For the new marker, each mapping replaces `source_ids/source_set` and `occurrence_ids/occurrence_set` with exactly one of:
+
+   ```text
+   incidence_ids: [...]
+   incidence_set: { basis_sha256, ranges: [[start,end], ...] }
+   ```
+
+   Retain `item`, exact `selection_ids` where applicable, `status`, `homes`, `typed_homes`, `conditions`, `unresolved_outcomes`, `reason` and `context_sha256`.
+
+   Update `corpusMappingContext`, `validateCorpusMappings` and `mappingSet` accordingly. Bind `mapping_context_sha256` to the schema, exact claim, logical incidence/provenance graph, selection responsibilities and conservative batch support.
+
+   Validation must reject missing required obligations, duplicate cells, invented source ownership, substituted incidences, narrowed support and uncovered context-only occurrences. Every extracted item must retain a faithful home; an empty required set must not silently discard it.
+
+   Update `corpusSourceMappings` to bind each source’s real incidence mappings **and the shared context mappings on which preservation depends**. Keep one exact source mapping per selected source. `validateScopedApply` and `validateCorpusPreservation` must recompute these through the target-specific grammar.
+
+   No scope relaxation is needed in `current-state.mjs`: corpus homes remain conservatively global.
+
+4. **Deliver complete extraction meaning once to domains.**
+
+   Add a new branch in `corpusDeliveryProjection` and `corpusContext`.
+
+   New domain packets receive:
+
+   - Complete canonical extraction **result objects**, including every item and interface.
+   - Exact review/target/plan identities and whole-bundle provenance descriptors.
+   - Section-to-review coverage, cuts, ordered membership, physical incidence, qualifiers and inbound relationships.
+   - Complete current homes, dependencies, raw current governing evidence, notices, unknown outcomes and extensions.
+
+   Remove automatic raw extraction-bundle replay from this representation. A section-to-review association proves that the section was delivered to that extraction reviewer; it does not claim individual item support.
+
+   Add target-bound `raw_review_ids`, selecting complete original reviewed bundles already present in the canonical dependency closure. This provides a concrete expansion path: a reviewer names missing groups/originals, and a **new target** restores their complete bundles. Evidence outside the available closure requires explicit widening. Preserve the earlier Blocked result and spent allowance.
+
+   Interfaces continue receiving **all complete domain conclusions**, plus their required local/incident/global evidence. Final integration continues receiving all complete domain and interface conclusions, exact mappings, full homes/dependencies and current global authority. Do not weaken either independent gate.
+
+   Software can prove identity, delivery, coverage, provenance, freshness and receipt integrity. Independent specialists must judge extraction fidelity, conditional applicability, adequate meaning, undeclared/distant interactions, faithful homes and current permission. A canonical Pass flag alone supplies none of those judgments.
+
+5. **Factor structural repetition exactly in the same wire format.**
+
+   Add local `factorCorpusStructure` / `expandCorpusStructure` helpers. Intern repeated document/source references and ancestry vectors; encode paths and ancestry prefixes through explicit, acyclic tables. Preserve occurrence IDs, ordering, duplicate physical locations, every inbound edge and unknown fields.
+
+   Require exact logical reconstruction and deterministic encoding, with bounds and reference validation. Deliver the readable tables themselves; expanding them before streaming would restore the payload cost.
+
+   This is a packet encoding, not another archive or authority system. Keep semantic conclusion substitution distinct from exact metadata factoring. Initially retain the existing nonroot inbound closure: factor its evidence without treating broadcast as proof of semantic coupling or pruning it by assumption.
+
+Mandatory fixtures and acceptance conditions:
+
+- **Real incidence versus false ownership:** two unrelated locations containing equal bodies must not acquire each other’s source obligations. Deleting a genuine containment or snapshot route must fail reconstruction/coverage.
+- **Opposite qualifiers:** one shared original reached under “remaining allowance available” and “allowance exhausted; renewal required” retains both inbound contexts. Equal bodies cannot justify one unconditional permission.
+- **Unowned restriction:** a root/global prohibition remains compulsory even without selected-source ownership. Sparse incidence must not erase it.
+- **Whole-batch conservatism:** an item extracted from a two-section bundle cannot be attributed solely to one section without separately accepted support evidence.
+- **Distant counterevidence:** “retry up to three times” alongside a distant exhausted ledger and unknown external outcome must preserve the hold. Structural nonincidence cannot authorize another attempt.
+- **Independent composition:** omitted conditions, inadequate conclusions or a newly suspected peer require Blocked and a new expanded target. Faithfully representing OPEN does not resolve it.
+- **Mechanical preservation:** issued packet/receipt bytes remain exact; changed originals, homes, authority or membership invalidate affected evidence. Retain negative/rejected results, independence checks, stale-write rejection, timing, termination and delivery checks.
+- **Limits:** unchanged 48,000-byte requests, 12,000-byte parsed envelopes, 48,000-byte output wire and existing shared job deadline. Contract doubles test enforcement, not semantic acceptance.
+
+Update `inspectCorpusWorkload` to run the following **without targets, fabricated Passes, worker jobs or company mutation**:
+
+1. Reconcile the supplied baseline: 336 sources, 7,150 sections, 78,453 occurrences and 318 inbound edges. Report real incidence counts, multiple inbound routes, context-only obligations and conservative batch-support counts.
+2. Report the removed rectangular demand. A whole-corpus row currently spans **26,360,208 source–occurrence pairs per item**. Measure its real replacement; do not predict the reduction.
+3. Measure raw and factored structural bytes separately. Of the supplied 41,969,763-byte context, **34,906,047 bytes are occurrences**, 6,744,910 are sections and 318,806 are other structure. Removing section bodies alone cannot solve that metadata floor.
+4. Measure extraction batching again for the exact prospective partition. If `E=73` remains valid, complete extraction results have a grammar ceiling of **876,000 bytes** before descriptors and framing. This is a capacity bound, not an observed result size or evidence of sufficient extraction.
+5. Report per-selection structural bytes, required extraction-result counts, raw expansion bytes, global evidence and known framing. Until authentic results and homes exist, their actual sizes, complete packets, page counts and token totals remain **null**, with explicit component bounds.
+6. Compute schema-only minimum output sizes. Exceeding 12 KB proves an impossible target; fitting below it proves only room for syntax. Necessary semantic text may still overflow.
+7. Measure exact framed requests and cumulative native tokens once authentic artifacts exist. Include stream instructions, ACK/history overhead and output reservation against the observed 475,000-token context. Do not estimate tokens by dividing bytes by four.
+8. Measure canonical-validation CPU separately. The 39,275-byte largest extraction request demonstrates bounded transport; the 79,537-byte largest section still requires streaming. Neither establishes cumulative understanding or completion within the existing deadline.
+
+Expected improvement is fewer invented mapping obligations, zero automatic raw extraction replay in new domains, and less repeated structural metadata. All-domain semantic comparison remains deliberate. Actual savings, complete home sizes, semantic-output density and native fit remain unknown.
+
+If preflight passes, the bounded next work is authentic extraction, home construction and independent domain/interface/integration qualification within existing authority. A failure holds the named selection and preserves its evidence and spent allowance. Operating publication and the genuine independent `resume_handover` gate remain separate requirements. The company remains paused, with no active jobs and binding/runtime **0.7.3**.

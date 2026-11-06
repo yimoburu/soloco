@@ -1,0 +1,67 @@
+TAP version 13
+# (node:38861) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: early empty body Blocked
+ok 1 - early empty body Blocked
+  ---
+  duration_ms: 746.393083
+  ...
+# Subtest: oversized body with negative tail
+ok 2 - oversized body with negative tail
+  ---
+  duration_ms: 638.765875
+  ...
+# Subtest: fenced original with late negative
+ok 3 - fenced original with late negative
+  ---
+  duration_ms: 634.614917
+  ...
+# Subtest: invalid JSON remains unknown
+ok 4 - invalid JSON remains unknown
+  ---
+  duration_ms: 615.782791
+  ...
+# Subtest: oversized invalid raw remains retrievable
+ok 5 - oversized invalid raw remains retrievable
+  ---
+  duration_ms: 637.076209
+  ...
+# Subtest: empty body Pass cannot become approval
+ok 6 - empty body Pass cannot become approval
+  ---
+  duration_ms: 629.233083
+  ...
+# Subtest: cancelled late negative is retained without acceptance
+ok 7 - cancelled late negative is retained without acceptance
+  ---
+  duration_ms: 449.845958
+  ...
+# Subtest: wrong-native late negative is retained without acceptance
+ok 8 - wrong-native late negative is retained without acceptance
+  ---
+  duration_ms: 695.10525
+  ...
+# Subtest: legacy qualification evidence retains negative verdict and full raw original
+ok 9 - legacy qualification evidence retains negative verdict and full raw original
+  ---
+  duration_ms: 139.694
+  ...
+# Subtest: complete oversized negative reason survives independently of the clipped preview
+ok 10 - complete oversized negative reason survives independently of the clipped preview
+  ---
+  duration_ms: 687.472666
+  ...
+# Subtest: small inline operating review also retains an early negative
+ok 11 - small inline operating review also retains an early negative
+  ---
+  duration_ms: 255.611084
+  ...
+1..11
+# tests 11
+# suites 0
+# pass 11
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 6218.566834

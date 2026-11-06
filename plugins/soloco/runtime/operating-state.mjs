@@ -194,15 +194,15 @@ function publicationEvidence(s,homes){
       const proof=scoped?resolvedProof.map(stored):[c.source,c.plan,c.review,recordReference(job,'job:'+job.id),...(c.qualification.legacy_dependencies??[])];
       // Resolve originals before collecting canonical producer edges. Explicit
       // source lists intentionally leave producer_dependencies empty.
-      const producers=new Map();
-      for(const r of proof)for(const producer of originalProducers(s,exact(s,r)))producers.set(producer.id,producer);
+      const producers=new Map(),historicalProducers=new Map();
+      for(const r of proof){const closure=originalProducers(s,exact(s,r));for(const producer of closure.current)producers.set(producer.id,producer);for(const producer of closure.historical)historicalProducers.set(JSON.stringify([producer.company_sha256,producer.source]),producer);}
       const originals=[...new Map([...proof,...producers.values()].map(r=>[r.id,r])).values()];
       for(const r of originals){exact(s,r);sources.set(r.id,{source:r,accepted_original:true});seen.add(r.id);}
       classifications.set(ref.id,c);
       // Full canonical semantic judgments are current evidence; extraction raw
       // bundles and frozen proof plans remain exact retrievable originals.
       const judgments=scoped?scoped.receipts.map(r=>{const record=readScoped(r.review),target=readScoped(r.target).scoped_context_target;return {review:stored(r.review),job:readScoped(r.job),target:stored(r.target),phase:target.phase,result:record.qualification_result};}):undefined;
-      if(!accepted_semantics.some(x=>corpus?x.corpus_integration?.id===corpus.integration.id:x.source.id===ref.id))accepted_semantics.push({source:ref,classification:c,...(corpus?{corpus_integration:corpus.integration,source_mappings:corpus.source_mappings,source_set:corpus.selected_source_ids}:{}),...(scoped?{judgments,resolved_originals:resolvedProof}:{coverage:p.coverage,review,job}),counterparts:p.counterparts,producer_refs:[...producers.values()],author_identities:[...new Set(originals.flatMap(r=>[...originalIdentities(s,exact(s,r))]))].sort(),exact_originals:originals,retrieval:'company_context read with exact ID/hash; referenced snapshots remain in the immutable vault'});
+      if(!accepted_semantics.some(x=>corpus?x.corpus_integration?.id===corpus.integration.id:x.source.id===ref.id))accepted_semantics.push({source:ref,classification:c,...(corpus?{corpus_integration:corpus.integration,source_mappings:corpus.source_mappings,source_set:corpus.selected_source_ids}:{}),...(scoped?{judgments,resolved_originals:resolvedProof}:{coverage:p.coverage,review,job}),counterparts:p.counterparts,producer_refs:[...producers.values()],historical_producers:[...historicalProducers.values()],author_identities:[...new Set(originals.flatMap(r=>[...originalIdentities(s,exact(s,r))]))].sort(),exact_originals:originals,retrieval:'company_context read with exact ID/hash; historical producer envelopes use exact immutable snapshot reads and remain bound to their frozen containing company; no historical reference is a current source or permission'});
       return;
     }
     // These legacy containers require their existing qualification/streaming
@@ -525,15 +525,21 @@ export function validateOperatingDelivery(s,j){
   return true;
 }
 function originalProducers(s,value){
-  const refs=new Map();
-  for(const {value:v,kind} of canonicalEvidenceNodes(s,value)){
-    if(kind==='record'&&!snapshotEntryReference(v)&&!snapshotReference(v)&&typeof v.id==='string')for(const r of producerClosure(s,v)){exact(s,r);refs.set(r.id,r);}
+  const refs=new Map(),historical=new Map();
+  for(const {value:v,kind,view,company_sha256} of canonicalEvidenceNodes(s,value)){
+    if(kind==='record'&&!snapshotEntryReference(v)&&!snapshotReference(v)&&typeof v.id==='string')for(const r of producerClosure(view,v)){
+      const raw=contextSource(view,r.id),resolved=resolveSnapshotEntry(view,raw);
+      if(!resolved||!same(recordReference(resolved,r.id),r))fail('frozen producer changed: '+r.id);
+      if(view===s)refs.set(r.id,recordReference(raw,r.id));
+      else {const entry={source:r,envelope:retainSnapshot(s,resolved),company_sha256};historical.set(JSON.stringify([company_sha256,r]),entry);}
+    }
   }
-  return [...refs.values()].sort((a,b)=>a.id.localeCompare(b.id));
+  return {current:[...refs.values()].sort((a,b)=>a.id.localeCompare(b.id)),historical:[...historical.values()]};
 }
 function originalIdentities(s,value){
   const identities=new Set();
-  for(const root of [value,...originalProducers(s,value).map(r=>exact(s,r))])for(const {value:v,kind} of canonicalEvidenceNodes(s,root)){
+  const producers=originalProducers(s,value);
+  for(const root of [value,...producers.current.map(r=>exact(s,r)),...producers.historical.map(r=>resolveSnapshot(s,r.envelope))])for(const {value:v,kind} of canonicalEvidenceNodes(s,root)){
     for(const native of rejectedJobIdentities(s,v,kind==='job'))identities.add(native);
     for(const [k,x] of Object.entries(v))if(['author_instance','recorded_by','session_id','native_id','instance_id','probe_native_id','reviewer_native_id'].includes(k)&&text(x))identities.add(x);
   }

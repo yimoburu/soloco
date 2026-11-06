@@ -1,0 +1,16 @@
+{
+  "pin": "34b4650f9618dad5b0e74918d85c69fc54209869",
+  "test_roots": [
+    14370,
+    15444
+  ],
+  "local_descendant_pids": [
+    14370,
+    15444,
+    22095,
+    32222,
+    32339
+  ],
+  "reason": "Stopped obsolete full-suite runs after finding immutable-entry closure expansion without snapshot deduplication. Logs retained; no whole-suite Pass claimed.",
+  "native_jobs_cancelled": false
+}

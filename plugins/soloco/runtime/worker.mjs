@@ -1,5 +1,6 @@
 import {operatingMaintenanceEligible,operatingContext,operatingReviewContext,validateOperatingDelivery,operatingDeliveryReceipt} from './operating-state.mjs';
 import * as scoped from './scoped-context.mjs';
+import {retainSnapshot} from './snapshot.mjs';
 import {createScopedStreamLedger,recordScopedStreamDelivery,validateScopedStreamAck} from './scoped-stream.mjs';
 import {qualificationAssignment,qualificationMatches,qualificationMaintenanceEligible,qualificationDelivery,qualificationProof,validateQualificationOutput,validateQualificationResponse} from './context-qualification.mjs';
 import {createDeliveryLedger,recordDelivery,readEvidence,validateCitations,validateSemanticDelivery,qualificationDeliveryReceipt} from './upgrade-evidence.mjs';
@@ -323,13 +324,23 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
         // failures before timing, cancellation or independence validation.
         if(output?.native_id){if(scopedContext(context)){current.rejected_native_ids=[...new Set([...(current.rejected_native_ids??[]),current.rejected_native_id,output.native_id].filter(Boolean))];current.rejected_native_id=output.native_id;}else current.native_id=output.native_id;}
         if(output?.model_evidence)current.model_evidence=output.model_evidence;
-        if(artifact || (context?.qualification||context?.qualification_evidence)&&typeof output?.text==='string') {
-          const rejected=(context?.qualification||context?.qualification_evidence)?output.text:JSON.stringify(artifact);
-          // Format 4 may fail parseArtifact's body/envelope checks before artifact
-          // assignment. Preserve its returned verdict independently of that failure.
+        const operatingReview=Boolean(context?.operating_evidence||state?.records?.[job.review_of?.id]?.operating_plan);
+        const rawResponse=Boolean(context?.qualification||context?.qualification_evidence||operatingReview);
+        if(artifact || rawResponse&&typeof output?.text==='string') {
+          const rejected=rawResponse?output.text:JSON.stringify(artifact);
+          // Retention does not accept an artifact. Parse the complete observed
+          // envelope independently of body limits, before clipping any preview.
           let rejectedArtifact=artifact;
-          if(!rejectedArtifact&&context?.qualification_evidence){try{rejectedArtifact=JSON.parse(output.text.trim().replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, ''));}catch{}}
-          current.rejected_output={...(context?.qualification?{qualification_plan:context.qualification.plan,qualification_target:context.qualification.target,qualification_negative:['Fail','Blocked'].find(v=>[artifact?.review?.verdict,artifact?.qualification_result?.verdict].includes(v))??null}:{}),...(context?.qualification_evidence?{qualification_negative:['Fail','Blocked'].find(v=>[rejectedArtifact?.review?.verdict,rejectedArtifact?.qualification_result?.verdict].includes(v))??null}:{}),text:rejected.slice(0,context?.packet?.profile?context.qualification.limits.output_wire_bytes:100000),truncated:rejected.length>(context?.packet?.profile?context.qualification.limits.output_wire_bytes:100000),author_instance:job.instance_id,context_sha256:context?.hash,reason:current.error};
+          if(!rejectedArtifact&&rawResponse){try{rejectedArtifact=JSON.parse(output.text.trim().replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, ''));}catch{}}
+          const negatives=[rejectedArtifact?.review,rejectedArtifact?.qualification_result];
+          const verdict=['Fail','Blocked'].find(v=>negatives.some(r=>r?.verdict===v));
+          const negative=verdict?negatives.find(r=>r?.verdict===verdict):null;
+          const limit=context?.packet?.profile?context.qualification.limits.output_wire_bytes:100000;
+          const truncated=rejected.length>limit;
+          // The existing immutable vault retains the exact wire, including
+          // fences, whitespace and negative tails; a preview is never the original.
+          const original=truncated&&/^normalized-v[234]$/.test(db.storageInfo().format)?retainSnapshot(s,rejected):null;
+          current.rejected_output={...(context?.qualification?{qualification_plan:context.qualification.plan,qualification_target:context.qualification.target}:{}),...((context?.qualification||context?.qualification_evidence)?{qualification_negative:negative?.verdict??null}:{}),...(operatingReview?{operating_negative:negative?.verdict??null}:{}),...(rawResponse?{negative_reason:typeof negative?.reason==='string'?negative.reason:null}:{}),text:rejected.slice(0,limit),truncated,...(original?{original}:{}),author_instance:job.instance_id,context_sha256:context?.hash,reason:current.error};
         }
         notice(s,'must_know',`Specialist ${current.role} could not finish: ${current.error}`,jobId);
       }

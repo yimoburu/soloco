@@ -1,0 +1,147 @@
+(node:34907) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ early empty body Blocked (464.927375ms)
+✖ oversized body with negative tail (25.818208ms)
+✖ fenced original with late negative (24.222916ms)
+✖ invalid JSON remains unknown (23.753875ms)
+✖ oversized invalid raw remains retrievable (25.8655ms)
+✖ empty body Pass cannot become approval (24.29625ms)
+✖ cancelled late negative is retained without acceptance (27.106875ms)
+✖ wrong-native late negative is retained without acceptance (25.095416ms)
+✖ legacy qualification evidence retains negative verdict and full raw original (30.925833ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 0
+ℹ fail 9
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 761.282417
+
+✖ failing tests:
+
+test at tests/operating-negative-retention.test.mjs:73:3
+✖ early empty body Blocked (464.927375ms)
+  Error: source_instruction must be nonempty text, at most 20000 characters
+      at requireText (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/store.mjs:24:79)
+      at file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:454:62
+      at mutate (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:93:190)
+      at Store.transaction (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/store.mjs:189:20)
+      at file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:93:335
+      at withStore (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/store.mjs:205:16)
+      at update (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:93:10)
+      at Array.contextControl (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:454:16)
+      at call (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/main.mjs:70:28)
+      at ctx (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:20:21)
+
+test at tests/operating-negative-retention.test.mjs:73:3
+✖ oversized body with negative tail (25.818208ms)
+  Error: source_instruction must be nonempty text, at most 20000 characters
+      at requireText (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/store.mjs:24:79)
+      at file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:454:62
+      at mutate (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:93:190)
+      at Store.transaction (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/store.mjs:189:20)
+      at file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:93:335
+      at withStore (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/store.mjs:205:16)
+      at update (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:93:10)
+      at Array.contextControl (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:454:16)
+      at call (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/main.mjs:70:28)
+      at ctx (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:20:21)
+
+test at tests/operating-negative-retention.test.mjs:73:3
+✖ fenced original with late negative (24.222916ms)
+  Error: source_instruction must be nonempty text, at most 20000 characters
+      at requireText (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/store.mjs:24:79)
+      at file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:454:62
+      at mutate (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:93:190)
+      at Store.transaction (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/store.mjs:189:20)
+      at file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:93:335
+      at withStore (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/store.mjs:205:16)
+      at update (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:93:10)
+      at Array.contextControl (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:454:16)
+      at call (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/main.mjs:70:28)
+      at ctx (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:20:21)
+
+test at tests/operating-negative-retention.test.mjs:73:3
+✖ invalid JSON remains unknown (23.753875ms)
+  Error: source_instruction must be nonempty text, at most 20000 characters
+      at requireText (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/store.mjs:24:79)
+      at file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:454:62
+      at mutate (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:93:190)
+      at Store.transaction (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/store.mjs:189:20)
+      at file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:93:335
+      at withStore (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/store.mjs:205:16)
+      at update (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:93:10)
+      at Array.contextControl (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:454:16)
+      at call (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/main.mjs:70:28)
+      at ctx (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:20:21)
+
+test at tests/operating-negative-retention.test.mjs:73:3
+✖ oversized invalid raw remains retrievable (25.8655ms)
+  Error: source_instruction must be nonempty text, at most 20000 characters
+      at requireText (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/store.mjs:24:79)
+      at file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:454:62
+      at mutate (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:93:190)
+      at Store.transaction (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/store.mjs:189:20)
+      at file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:93:335
+      at withStore (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/store.mjs:205:16)
+      at update (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:93:10)
+      at Array.contextControl (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:454:16)
+      at call (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/main.mjs:70:28)
+      at ctx (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:20:21)
+
+test at tests/operating-negative-retention.test.mjs:73:3
+✖ empty body Pass cannot become approval (24.29625ms)
+  Error: source_instruction must be nonempty text, at most 20000 characters
+      at requireText (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/store.mjs:24:79)
+      at file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:454:62
+      at mutate (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:93:190)
+      at Store.transaction (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/store.mjs:189:20)
+      at file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:93:335
+      at withStore (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/store.mjs:205:16)
+      at update (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:93:10)
+      at Array.contextControl (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:454:16)
+      at call (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/main.mjs:70:28)
+      at ctx (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:20:21)
+
+test at tests/operating-negative-retention.test.mjs:80:48
+✖ cancelled late negative is retained without acceptance (27.106875ms)
+  Error: source_instruction must be nonempty text, at most 20000 characters
+      at requireText (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/store.mjs:24:79)
+      at file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:454:62
+      at mutate (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:93:190)
+      at Store.transaction (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/store.mjs:189:20)
+      at file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:93:335
+      at withStore (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/store.mjs:205:16)
+      at update (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:93:10)
+      at Array.contextControl (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:454:16)
+      at call (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/main.mjs:70:28)
+      at ctx (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:20:21)
+
+test at tests/operating-negative-retention.test.mjs:80:48
+✖ wrong-native late negative is retained without acceptance (25.095416ms)
+  Error: source_instruction must be nonempty text, at most 20000 characters
+      at requireText (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/store.mjs:24:79)
+      at file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:454:62
+      at mutate (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:93:190)
+      at Store.transaction (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/store.mjs:189:20)
+      at file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:93:335
+      at withStore (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/store.mjs:205:16)
+      at update (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:93:10)
+      at Array.contextControl (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:454:16)
+      at call (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/main.mjs:70:28)
+      at ctx (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:20:21)
+
+test at tests/operating-negative-retention.test.mjs:87:1
+✖ legacy qualification evidence retains negative verdict and full raw original (30.925833ms)
+  Error: source_instruction must be nonempty text, at most 20000 characters
+      at requireText (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/store.mjs:24:79)
+      at file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:500:5
+      at mutate (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:93:190)
+      at Store.transaction (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/store.mjs:189:20)
+      at file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:93:335
+      at withStore (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/store.mjs:205:16)
+      at update (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:93:10)
+      at Array.contextControl (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:499:11)
+      at call (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/main.mjs:70:28)
+      at ctx (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:20:21)

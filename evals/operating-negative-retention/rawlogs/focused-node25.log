@@ -1,0 +1,21 @@
+(node:35940) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ early empty body Blocked (954.141417ms)
+✔ oversized body with negative tail (578.563583ms)
+✔ fenced original with late negative (575.474458ms)
+✔ invalid JSON remains unknown (550.3645ms)
+✔ oversized invalid raw remains retrievable (565.758834ms)
+✔ empty body Pass cannot become approval (550.976541ms)
+✔ cancelled late negative is retained without acceptance (397.467791ms)
+✔ wrong-native late negative is retained without acceptance (607.957458ms)
+✔ legacy qualification evidence retains negative verdict and full raw original (110.185166ms)
+✔ complete oversized negative reason survives independently of the clipped preview (601.69525ms)
+✔ small inline operating review also retains an early negative (237.854041ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5810.457458

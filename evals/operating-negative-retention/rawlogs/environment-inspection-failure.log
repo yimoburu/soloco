@@ -1,0 +1,4 @@
+Command: ps -axo pid,etime,command | rg 'node --test|node.*test.mjs'
+Exit: 1
+Output: zsh:5: operation not permitted: ps
+No retry or permission escalation.

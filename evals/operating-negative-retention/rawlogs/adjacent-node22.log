@@ -1,0 +1,8 @@
+TAP version 13
+# (node:36217) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: complete extraction, independent reconciliation and final mapping; immutable original retained
+ok 1 - complete extraction, independent reconciliation and final mapping; immutable original retained
+  ---
+  duration_ms: 145.84675
+  ...

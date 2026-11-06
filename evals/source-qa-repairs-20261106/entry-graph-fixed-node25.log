@@ -1,0 +1,29 @@
+(node:33200) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ missing production intake provider is fail closed (0.599375ms)
+✔ initial unknown legacy is never relabeled accepted (20.580417ms)
+✔ immutable accepted home survives replacement; new global restriction holds ordinary but complete delta repair publishes (33.715458ms)
+✔ successor exact base and concurrent semantic intake including reverted intake hold (47.799958ms)
+✔ missing original, changed producer, rejected negative, expiry and unknown nested producer hold (50.371042ms)
+✔ canonical known historical evidence freezes before bookkeeping; nested originals remain checked (36.113333ms)
+✔ atomic historical maps deliver exact new/newer/deleted originals in chronological intake and remain required after publication (28.884583ms)
+✔ intermediate transitive originals hold proposal, review, publication and accepted use when missing or corrupt (123.642292ms)
+✔ a later checkpoint still validates originals that existed only in an older intermediate delta (56.380833ms)
+✔ wrong historical original and reordered version transitions hold; atomic change row order is irrelevant (38.280792ms)
+✔ intake immutable_entry validates identity as well as original snapshot bytes (11.475334ms)
+✔ literal reference-like JSON in intake remains literal (23.561333ms)
+✔ allowed post-proposal reconstruction intake checks transitive originals before review and publication (27.056375ms)
+✔ real normalized intake preserves deleted intermediate envelopes while checkpoint audits their transitive vault originals (442.150042ms)
+✔ shared immutable-entry histories are validated as a graph while every wrapper identity remains checked (2.12525ms)
+✔ fingerprints bind complete source/test/runtime/policy/command/env/limits, canonicalize maps only (8.265792ms)
+✔ missing and untracked fingerprint components are non-reusable (0.477833ms)
+✔ only exact original successful runtime evidence is eligible, never acceptance or chained reuse (0.219709ms)
+✔ post-execution confirmation holds toolchain changes and incomplete rediscovery (0.218042ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1001.093625
