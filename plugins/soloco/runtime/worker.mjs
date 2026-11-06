@@ -126,7 +126,7 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
       for(let round=0;context.handover_evidence||round<=16;round++){
       const remaining=lastCurrent?.execution_deadline_at?Math.min(timeout.timeout_ms,Date.parse(lastCurrent.execution_deadline_at)-Date.now()):handoverDeadline?Math.min(timeout.timeout_ms,handoverDeadline-Date.now()):timeout.timeout_ms;
       if(remaining<1000)throw Error('Insufficient execution time for supplemental read');
-      if(context.qualification&&Buffer.byteLength(request,'utf8')>context.qualification.limits.input_bytes)throw Error('Partition qualification request overflow; nothing was truncated');
+      if(context.qualification&&Buffer.byteLength(request,'utf8')>(scopedContext(context)?scoped.SCOPED_LIMITS:context.qualification.limits).input_bytes)throw Error('Partition qualification request overflow; nothing was truncated');
       if(context.handover_evidence&&request.length>200000)throw Error('Handover request exceeds 200000 characters; nothing was truncated');
       let callTiming;
       const callRequestedAt=Date.now();

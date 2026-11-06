@@ -117,6 +117,18 @@ function assignment(s,j){
       if(domains.some(p=>p.x.t.phase!=='applicability'||p.x.t.interface_keys.length)||interfaces.some(p=>p.x.t.phase!=='applicability'||!p.x.t.interface_keys.length))fail('wrong domain/interface receipt kind');
       const {all}=coverage(s,x,domains),required=interfaceList(all);
       exactSet(interfaces.flatMap(p=>p.result.reviewed_interfaces),required.map(i=>i.key),'independent interface coverage');
+      // A scope name is not complete interface evidence. Bind each edge review
+      // to every exact home/dependency and selected item in its incident domains.
+      for(const edge of required){
+        const reviewer=interfaces.find(p=>p.result.reviewed_interfaces.includes(edge.key));
+        const incident=domains.filter(d=>edge.scope==='*'||edge.with_scope==='*'||d.x.t.context_scope==='*'||[edge.scope,edge.with_scope].includes(d.x.t.context_scope)||d.x.t.item_keys.includes(edge.item));
+        const supplied=[...reviewer.x.t.homes,...reviewer.x.t.dependencies];
+        for(const d of incident){
+          if([...d.x.t.homes,...d.x.t.dependencies].some(ref=>!supplied.some(h=>same(h,ref))))fail('interface omitted exact incident-domain home/dependency');
+          if(d.x.t.item_keys.some(key=>!reviewer.x.t.item_keys.includes(key)))fail('interface omitted incident-domain extraction item');
+          for(const extraction of proofChildren(s,d.x))if(!reviewer.x.t.reviews.some(ref=>same(ref,scopedReference(extraction.record))))fail('interface substituted incident-domain extraction');
+        }
+      }
       const homes=[...new Map([...domains,...interfaces].flatMap(p=>[...p.x.t.homes,...p.x.t.dependencies]).map(r=>[r.id,r])).values()];
       exactSet([...x.t.homes,...x.t.dependencies].map(r=>r.id),homes.map(r=>r.id),'integration current homes');dependencyCycles(s,x.v.source.id,homes);
       for(const g of global.scoped_governing)if(!domains.some(p=>p.x.t.homes.some(h=>same(h,g.source))))fail('unreviewed scoped governing interface/home '+g.source.id);

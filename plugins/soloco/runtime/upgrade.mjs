@@ -266,14 +266,15 @@ export function upgrade(a,host,{launch=launchUpgrade,check=readiness,catalog=mod
     return s;
   })));
 }
+function recordUpgradeFailure(s,uid,error) {
+  if (s.upgrade?.id===uid && ['queued','checking','ready'].includes(s.upgrade.status)) {s.upgrade.status='failed';s.upgrade.error=error.message;s.upgrade.failed_at=stamp();
+    if(s.upgrade.probe_status==='running')s.upgrade.probe_status='failed';
+    if(s.upgrade.review_status==='running')s.upgrade.review_status='failed';
+    notice(s,'must_know',`Team upgrade held: ${error.message}`,uid);}
+  return s;
+}
 export function failUpgrade(root,uid,error) {
-  withStore(root,db=>db.transaction('upgrade.failed',s=>{
-    if (s.upgrade?.id===uid && ['queued','checking','ready'].includes(s.upgrade.status)) {s.upgrade.status='failed';s.upgrade.error=error.message;s.upgrade.failed_at=stamp();
-      if(s.upgrade.probe_status==='running')s.upgrade.probe_status='failed';
-      if(s.upgrade.review_status==='running')s.upgrade.review_status='failed';
-      notice(s,'must_know',`Team upgrade held: ${error.message}`,uid);}
-    return s;
-  }));
+  withStore(root,db=>db.transaction('upgrade.failed',s=>recordUpgradeFailure(s,uid,error)));
 }
 function launchUpgrade(root,uid,token='') {
   const child=spawn(process.execPath,['--no-warnings',path.join(PACKAGE,'runtime/upgrade.mjs'),root,uid,token],{detached:true,stdio:'ignore',env:{...process.env,COMPANY_WORKER:'1'}});
@@ -366,14 +367,16 @@ function validateReview(review,passPermission) {
 export async function rehearse(root,uid,model=runModel,workerToken='') {
   // Claim before entering the failure handler: a second worker must never fail
   // or close the worker that already owns this attempt.
-  let token;
+  let token,startupHeld=false;
   try {withStore(root,db=>db.transaction('upgrade.worker_claimed',s=>{
     const u=s.upgrade;if(u?.id!==uid)throw Error('Upgrade ID does not match');
-    if(!incremental(u))return s;
-    continuationGuard(s,u);
+    if(u.workflow===undefined && u.workflow_rules_sha256===undefined && u.evidence?.workflow===undefined && u.evidence?.workflow_contract_sha256===undefined)return s;
     if(u.status!=='queued' || (u.worker && (u.worker.state!=='reserved' || u.worker.token!==workerToken)))throw Error('Upgrade worker already claimed; explicit resume required');
+    // Record a genuine startup hold atomically, after excluding competing workers.
+    try {continuationGuard(s,u);} catch(error) {startupHeld=true;return recordUpgradeFailure(s,uid,error);}
     token=workerToken||id('upgrade-worker');u.worker={token,pid:process.pid,state:'running',started_at:stamp()};return s;
   }));} catch {return;}
+  if(startupHeld)return;
   try {
     const initial=withStore(root,db=>db.transaction('upgrade.checking',s=>{
       const u=s.upgrade;

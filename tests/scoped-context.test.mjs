@@ -226,3 +226,21 @@ test('unknown current home scope and domain dependencies stay mandatory despite 
   const i=await run(g,{phase:'integration',domain_review_ids:domains.map(d=>d.review.id),counterpart_ids:['home-D00','home-D01'],dependency_ids:[]});assert.equal(i.job.status,'completed',i.job.error);assert.equal(call(g,{action:'apply',integration_review_id:i.review.id}).applied,true);
   assert.equal(currentRecords(read(g),{context_scope:'D00'}).filter(r=>r.id.startsWith('home-')).length,2);
 });
+
+test('regression: interface must include every exact incident-domain home',async()=>{
+  const f=fixture({count:2,domains:2,extra:{qualifier:'DISTANT_QUALIFIER'}});
+  mutate(f,s=>{s.records['home-D00'].content+='\nDISTANT_QUALIFIER: D00 may not retry unless D01 permission remains OPEN.';});
+  engine.save({...f,id:'home-D01-second',kind:'artifact',content:'CONTRADICTION: D01 forbids retry while OPEN.',context_obligations:{version:1,scope:'D01'}},'codex');
+  const es=await extraction(f),domains=[];
+  for(const scope of ['D00','D01']){
+    const item_keys=es.flatMap(e=>e.review.qualification_result.items.filter(i=>i.scope===scope).map(i=>e.review.id+'/'+i.id));
+    const d=await run(f,{phase:'applicability',extraction_review_ids:es.map(e=>e.review.id),item_keys,counterpart_ids:scope==='D00'?['home-D00']:['home-D01','home-D01-second'],context_scope:scope});
+    assert.equal(d.review.review.verdict,'Pass');
+    domains.push(d);
+  }
+  const ir=await run(f,{phase:'applicability',extraction_review_ids:es.map(e=>e.review.id),interface_keys:domains.flatMap(d=>d.review.qualification_result.interfaces.map(i=>i.key)),counterpart_ids:['home-D00','home-D01'],context_scope:'*'});
+  assert.equal(ir.review.review.verdict,'Pass');
+  assert.ok(!ir.packet.homes.some(h=>h.source.id==='home-D01-second'));
+  const integrate=()=>run(f,{phase:'integration',domain_review_ids:domains.map(d=>d.review.id),interface_review_ids:[ir.review.id],counterpart_ids:['home-D00','home-D01','home-D01-second']});
+  await assert.rejects(integrate,/interface omitted exact incident-domain/);
+});

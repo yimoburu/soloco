@@ -237,3 +237,17 @@ test('oversized complete proposal holds before final QA without truncating or re
   assert.equal(seen.filter(t=>t.role==='qa'&&t.phase==='synthesis').length,0);
   assert.throws(()=>resume(a),/nonfailed/);
 });
+
+
+test('queued eligibility failure is durably held without harming a different reserved worker',async()=>{
+  for(const kind of ['deadline','checkpoint','candidate','rules']) {
+    const a=prepare(),before=read(a).upgrade,now=Date.now;
+    if(kind==='deadline')Date.now=()=>before.deadline_ms+1;
+    else edit(a,s=>{if(kind==='checkpoint')s.records.newFact={id:'newFact',content:'Changed obligation'};if(kind==='candidate')s.upgrade.candidate.cos_instructions+='changed';if(kind==='rules')s.upgrade.workflow_rules_sha256='changed';});
+    let calls=0;try{await rehearse(a.root,a.upgrade_id,()=>{calls++;throw Error('must not invoke');});}finally{Date.now=now;}
+    const s=read(a);assert.equal(calls,0);assert.equal(s.upgrade.status,'failed',kind);assert.ok(s.upgrade.error);assert.ok(s.notices.some(n=>n.summary.includes(s.upgrade.error)));assert.equal(s.upgrade.deadline_ms,before.deadline_ms);
+  }
+  const a=prepare();edit(a,s=>{s.upgrade.worker={token:'different-worker',state:'reserved',pid:process.pid};s.upgrade.candidate.cos_instructions+='changed';});
+  const before=read(a);await rehearse(a.root,a.upgrade_id,()=>{throw Error('must not invoke');},'wrong-token');
+  const after=read(a);assert.equal(after.upgrade.status,'queued');assert.deepEqual(after.upgrade.worker,before.upgrade.worker);assert.deepEqual(after.notices,before.notices);
+});
