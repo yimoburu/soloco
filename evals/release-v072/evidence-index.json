@@ -1,0 +1,42 @@
+{
+  "node22-focused.tap": {
+    "path": "/private/tmp/soloco-v072-20261106/node22-focused.tap",
+    "sha256": "380eeb4278634460bac061ab18db07d8cf2c293ba7a2d7e6d7da2065418b9912"
+  },
+  "node25-focused.tap": {
+    "path": "/private/tmp/soloco-v072-20261106/node25-focused.tap",
+    "sha256": "c7f1ae09d407ffcba63ba76f647bb96863d9f037bcc107ea92fb60bc9da1e2b7"
+  },
+  "node22-final-fence.tap": {
+    "path": "/private/tmp/soloco-v072-20261106/node22-final-fence.tap",
+    "sha256": "1a48e512d2819c294c7daecf9c0c8fbb049c17938054b467ba768bd5e64adda2"
+  },
+  "node25-final-fence.tap": {
+    "path": "/private/tmp/soloco-v072-20261106/node25-final-fence.tap",
+    "sha256": "54557588b151b18ecd2b93c0718b38786812686f66201186c5946523023f7121"
+  },
+  "node22-live-v071-development.tap": {
+    "path": "/private/tmp/soloco-v072-20261106/node22-live-v071-development.tap",
+    "sha256": "048de44e2fd52f47a3eb9e07a7705b986e2d8f6ff8c871fc9d80239e5cafd1d6"
+  },
+  "node25-live-v071-development.tap": {
+    "path": "/private/tmp/soloco-v072-20261106/node25-live-v071-development.tap",
+    "sha256": "5326695c893d304af9dbfb7182db71eb6e3c55fc37a83fc7a76f8ecda2bc4dab"
+  },
+  "package-checks.log": {
+    "path": "/private/tmp/soloco-v072-20261106/package-checks.log",
+    "sha256": "ae4877218d98b37c61724fde1c82bb8d90d16afa4ea2157601b976d0a7b7843c"
+  },
+  "strict-plugin.log": {
+    "path": "/private/tmp/soloco-v072-20261106/strict-plugin.log",
+    "sha256": "341a401835d6c7745e284b711567902068a7301ee3fc4c665c626bd35ae7d278"
+  },
+  "strict-marketplace.log": {
+    "path": "/private/tmp/soloco-v072-20261106/strict-marketplace.log",
+    "sha256": "332fc27189f56c9cbe26dca8c206dfc4819f438edae8be019bca032e40c2cc65"
+  },
+  "native-plugin-smoke.log": {
+    "path": "/private/tmp/soloco-v072-20261106/native-plugin-smoke.log",
+    "sha256": "59645ba0d28b0f6b9a92d1984ba9320327b17b8d4dd9c883d6b664e07c2bdcae"
+  }
+}

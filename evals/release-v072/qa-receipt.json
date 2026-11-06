@@ -1,0 +1,31 @@
+{
+  "role": "qa",
+  "mode": "advisory",
+  "started_at": "2026-11-06T16:50:51.474952+00:00",
+  "ended_at": "2026-11-06T16:51:52.731842+00:00",
+  "exit_code": 0,
+  "prompt_sha256": "6ab3e321d2734cd33940935bd549904ffb944622a88cb13c8209cc0652b448db",
+  "requested_model": "gpt-6.1-sol",
+  "requested_effort": "high",
+  "requested_speed": "host_default",
+  "effective_settings": "unverified",
+  "timeout_seconds": 600,
+  "scope": "Maintainer public source only in isolated worktree; no real company records or authority changes",
+  "lifecycle": [
+    {
+      "type": "thread.started",
+      "thread_id": "01a1b1c5-2c0d-7962-892e-efbe174ceb04"
+    },
+    {
+      "type": "turn.completed",
+      "usage": {
+        "input_tokens": 50928,
+        "cached_input_tokens": 9216,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 1972,
+        "reasoning_output_tokens": 1238
+      }
+    }
+  ],
+  "report_exists": true
+}
