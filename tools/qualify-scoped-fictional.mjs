@@ -32,7 +32,7 @@ export async function runScopedFictional({model,effort='high',inspectOnly=false}
   try{
     bind(root,base.session_id,host);await call('company_open',{root,session_id:base.session_id,idea:'FICTIONAL source-only semantic fixture. No business operations.'},host);
     // Bootstrap only the newly created fictional fixture; records use public save.
-    withStore(root,db=>db.transaction('fixture.scoped-fictional',s=>{s.governance=homes['*'];s.cos_instructions='Preserve OPEN uncertainty, exhausted allowances and complete cross-domain restrictions.';s.roles={qa:{name:'Independent QA',instructions:'Independently review all supplied evidence; hold missing or uncertain preservation.'},engineer:{name:'Engineer'}};s.team_sha256=teamHash(s);return s;}));
+    withStore(root,db=>db.transaction('fixture.scoped-fictional',s=>{s.governance=homes['*'];s.cos_instructions='Preserve OPEN uncertainty, exhausted allowances and complete cross-domain restrictions.';s.roles={qa:{name:'Independent QA',instructions:'Independently review all supplied evidence; hold missing or uncertain preservation.'},engineer:{name:'Engineer'}};s.governance_sha256=digest(s.governance);s.team_sha256=teamHash(s);return s;}));
     await api('company_save',{id:'old',kind:'artifact',content:sourceText});
     for(const [scope,content] of Object.entries(homes))await api('company_save',{id:homeId(scope),kind:'artifact',content,context_obligations:{version:1,scope}});
     await call('company_control',{root,session_id:base.session_id,action:'pause',expected_epoch:1,source_instruction:instruction},host);

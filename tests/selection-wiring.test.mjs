@@ -1,3 +1,4 @@
+import * as scoped from '../plugins/soloco/runtime/scoped-context.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -7,7 +8,7 @@ import * as coordination from '../plugins/soloco/runtime/coordination.mjs';
 import {normalizeHandoverReviewWindow} from '../plugins/soloco/runtime/timeout.mjs';
 
 // Execute the actual main/engine bodies with controlled boundary dependencies.
-// No production store, adapter, subprocess, CLI, network or timer is loaded.
+// No production store operation, adapter call, subprocess, CLI, network or timer is executed.
 // Selection functions below are the supplied accepted component contract,
 // frozen here because selection.mjs is outside this sparse source scope.
 // Full dependency integration and timeout.test.mjs run separately.
@@ -71,7 +72,7 @@ function harness(host='claude') {
     if(typeof value!=='string'||!value.trim()||value.length>max)throw new Error('Invalid '+label);
     return value;
   };
-  const deps={...coordination,
+  const deps={scoped,...coordination,
     path,os:{homedir:()=>'/unused'},fs:{existsSync:()=>true},
     process:{cwd:()=>process.cwd(),env:{},execPath:'/unused/node',argv:[]},
     PACKAGE:'/unused',VERSION:'fixture',SCHEMA:2,
@@ -144,7 +145,7 @@ test('upgrade reuses the optional dispatch selection schema with unchanged requi
   assert.deepEqual(schema.properties.model_selection,dispatch.properties.model_selection);
   assert.deepEqual(schema.required,['root','session_id','action']);
   assert.equal(schema.additionalProperties,false);
-  assert.deepEqual(schema.properties.action.enum,['inspect','prepare','apply','verify','recover']);
+  assert.deepEqual(schema.properties.action.enum,['inspect','prepare','resume','apply','verify','recover']);
 });
 
 test('legacy omission and host_default avoid catalog discovery and persist normalized requests',async()=>{
