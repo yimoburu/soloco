@@ -65,7 +65,14 @@ mutations. This protocol grants no venture execution or renewed allowance.
    global rules, authority, notices, messages, unknown governing records and state
    extensions. Scoped governing declarations still arrive in full until their
    boundaries have canonical independent review. Independent QA must preserve every selected item in an exact home,
-   including OPEN effects, failures and exhausted allowances. `scope_complete`
+   including all of its local effect, conditions, OPEN state, authority, failures
+   and exhausted allowances. Supply peer records needed by its interfaces as
+   exact dependencies; peer-side interface semantics are preserved collectively,
+   without duplicating them into every local home. Missing local or peer meaning
+   holds. Domain `interfaces_complete` attests complete carried evidence, not the
+   independent interface review in step 5; `reviewed_interfaces` remains empty.
+   When combining targets, put each record in homes or dependencies once.
+   `scope_complete`
    attests exhaustive home applicability: uncertain scope requires `*`.
 5. Every extraction interface has a stable `review/item/interface` key, complete
    condition text and `with_scope` (unknown/global: `*`). Request separate
