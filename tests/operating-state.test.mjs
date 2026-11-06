@@ -75,6 +75,16 @@ test('public prospective v4 reconstruction requires accepted coverage and exact 
  mutate(f,s=>{s.jobs[q.id].coordination_release.termination_confirmed=false;});assert.throws(()=>engine.control({...f,action:'resume',source_instruction:'resume',expected_epoch:1},'codex'),/QA|DIRTY/);
  mutate(f,s=>{s.jobs[q.id].coordination_release.termination_confirmed=true;});const accepted=read(f);engine.control({...f,action:'resume',source_instruction:'resume',expected_epoch:1},'codex');assert.equal(read(f).handover.status,'completed');assert.equal(read(f).paused,false);
  assert.equal(operatingContext(accepted).homes.length,1);
+ const historical=read(f);historical.owner.epoch++;
+ assert.equal(operatingContext(historical).homes.length,1,'exact completed handover remains historical proof across epochs');
+ for(const change of ['reconstruction','review','job','acceptance']){
+  const altered=structuredClone(historical),h=altered.handover,r=altered.records[h.acceptance.review_id],j=altered.jobs[r.job_id];
+  if(change==='reconstruction')altered.records[h.reconstruction_id].content+=' Changed condition';
+  if(change==='review')r.review.reason+=' Changed finding';
+  if(change==='job')j.native_id='different-native';
+  if(change==='acceptance')h.acceptance.subject_sha256='0'.repeat(64);
+  assert.throws(()=>operatingContext(altered),/Held|DIRTY|changed|receipt/,change+' mutation must not become historical proof');
+ }
  const ordinary=engine.dispatch({...f,role:'engineer',task:'First ordinary assignment after accepted resume'},'codex',{check:()=>({available:true}),launch:()=>({on(){},unref(){}})});
  assert.equal(read(f).jobs[ordinary.id].context_format,6);assert.equal(JSON.parse(assignmentContext(read(f),read(f).jobs[ordinary.id]).text).checkpoint.homes.length,1);
  for(const mode of ['failed','quarantined','unknown-extension']){

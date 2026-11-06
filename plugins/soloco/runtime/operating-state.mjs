@@ -90,6 +90,15 @@ function bookkeeping(s,planId){
   };
   add(planId);
   const h=s.handover,t=s.records?.[h?.reconstruction_id];if(t?.handover?.evidence_protocol===4&&t.handover.id===h.id)add(t.id);
+  // Preserve only the exact receipt issued by successful v4 resume. Historical
+  // acceptance is not a new review admission and does not renew owner authority.
+  if(h?.status==='completed'&&t?.handover?.evidence_protocol===4){
+    const a=h.acceptance;
+    if(!closed(a,['reconstruction_id','review_id','subject_sha256','incoming_owner','at','receipts'])||a.reconstruction_id!==t.id||a.subject_sha256!==t.handover.subject_sha256||!same(a.incoming_owner,t.handover.incoming_owner)||!Number.isFinite(Date.parse(a.at))||!Array.isArray(a.receipts)||a.receipts.length!==3)fail('historical handover acceptance changed');
+    const [target,review,job]=a.receipts.map(ref=>exact(s,ref));
+    if(target.id!==t.id||review.id!==a.review_id||job.epoch!==a.incoming_owner.epoch||!same(a.receipts,[recordReference(t),recordReference(review),recordReference(job,'job:'+job.id)])||!reviewJobSafe(job,true)||!reviewRecordSafe(review,job,t,true))fail('historical handover receipt changed');
+    ids.add(t.id);ids.add(review.id);jobs.add(job.id);
+  }
   const a=s.operating_state;
   if(a){
     validateOperatingIndex(s);

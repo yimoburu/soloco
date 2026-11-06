@@ -3,7 +3,7 @@ import {buildEvidence,readEvidence} from './upgrade-evidence.mjs';
 import { digest, id, requireText, stamp } from './store.mjs';
 import {jobExecutionTiming} from './timeout.mjs';
 import {shallowSnapshotState,inheritSnapshots,snapshotScope,captureSnapshotDependencies,validateSnapshotDependencies,pinFrozenText,readFrozenText} from './snapshot.mjs';
-import {reviewedContext,currentExtensions} from './current-state.mjs';
+import {reviewedContext,currentExtensions,recordReference} from './current-state.mjs';
 
 // Two frozen sequences, capped at 128M UTF-16 source units in total. Entries
 // contain exact frozen evidence only; they never carry a QA/authority decision.
@@ -190,7 +190,8 @@ export function verifyHandoverAcceptance(state) {
       Array.isArray(v.blockers)&&v.blockers.length===0;
   });
   if(!review)throw new Error('Independent exact-state handover QA Pass is required before resuming');
-  return {reconstruction_id:target.id,review_id:review.id,subject_sha256:target.handover.subject_sha256,incoming_owner:{...state.owner},at:stamp()};
+  return {reconstruction_id:target.id,review_id:review.id,subject_sha256:target.handover.subject_sha256,incoming_owner:{...state.owner},at:stamp(),
+    ...(target.handover.evidence_protocol===4?{receipts:[recordReference(target),recordReference(review),recordReference(state.jobs[review.job_id],'job:'+review.job_id)]}:{})};
 }
 
 export function handoverReviewContext(state,job) {
