@@ -1,0 +1,15 @@
+Code integration: **Fail**. Compatible publication: **Blocked**.
+
+Required repairs:
+
+- `worker.mjs` computes later-call allowances before actual spawn. Startup delay can make the adapter’s deadline exceed the remaining total window; `onSpawn` checks eligibility without rejecting that overrun. Clamp the adapter watchdog to the immutable overall deadline at actual spawn. The 100 ms monitor alone cannot enforce this exact bound.
+- Per-call timing validation accepts missing or contradictory `termination_deadline_at` and `timeout_reason`, and later calls lack a start-time consistency check. Validate each complete timing receipt.
+- `job.completed` checks eligibility before generating publication/completion timestamps. Crossing the deadline afterward can produce `Submitted`/`completed` receipts outside the window. The resume guard rejects these, but publication must also fail closed.
+
+Exact receipt conditions:
+
+- Identify the repaired immutable commit, tree/source hashes, complete diff and built-package hashes; verify version/manifests and packaged source agree. For the supplied candidate, independently establish production equality with `cac23e3` and the stated test-only `d40f4e73bae1cd020cbca25303d95a76da3a8065` delta.
+- Retain complete final Node 22/25 logs: successful exits, all 440 existing tests plus repair regressions passing, zero failures/cancellations/skips. Include delayed-spawn deadline clamping, malformed call timing, and publication crossing expiry. Preserve every original failure and rerun receipt.
+- Any eventual window selection requires fresh applicable authority, an unused exact paused v2 target/session, and bound policy/context/start/deadline. Resume still requires a current independent exact-state Pass and same-native full semantic delivery.
+
+Material limits: supplied text only; no tools, execution, hash/build verification or completed final-suite receipts. Synthetic timing is not an observed 44-minute native run. The detached-pause missing-receipt cause remains unverified. Effective Sol/high/host-default settings and provider/unknown-descendant termination remain unproven. Existing Blocked and real-company pause remain unchanged; installed 13 hooks confer no manufactured binding or installed-14 claim. No real-company resume authority.

@@ -1,0 +1,30 @@
+{
+  "role": "engineering",
+  "scope": "SoloCo maintainer repair; no company records, active ownership, governance adoption or private data access",
+  "started_at": "2026-11-06T04:33:53.754632+00:00",
+  "ended_at": "2026-11-06T04:41:08.870269+00:00",
+  "exit_code": 0,
+  "prompt_sha256": "5c9dc9f59ff93a2900581571098c36b788cdcb476afddf536b62f678f6c37c51",
+  "requested_model": "gpt-6.1-sol",
+  "requested_effort": "high",
+  "effective_settings": "unverified",
+  "selection_reason": "Authority-sensitive bounded evidence and independently checked continuity implementation/review; existing account and host service defaults",
+  "timeout_seconds": 600,
+  "lifecycle": [
+    {
+      "type": "thread.started",
+      "thread_id": "01a1af22-76a4-7580-8e75-dede23665b3a"
+    },
+    {
+      "type": "turn.completed",
+      "usage": {
+        "input_tokens": 29681,
+        "cached_input_tokens": 4096,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 18454,
+        "reasoning_output_tokens": 13359
+      }
+    }
+  ],
+  "report_exists": true
+}

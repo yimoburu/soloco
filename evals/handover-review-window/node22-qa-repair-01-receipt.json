@@ -1,0 +1,35 @@
+{
+  "base_commit": "d40f4e73bae1cd020cbca25303d95a76da3a8065",
+  "initial_status": [
+    " M plugins/soloco/runtime/adapters.mjs",
+    " M plugins/soloco/runtime/handover.mjs",
+    " M plugins/soloco/runtime/worker.mjs",
+    " M tests/handover-review-window.test.mjs",
+    " M tests/timeout.test.mjs"
+  ],
+  "initial_patch_sha256": "a269758b1bb5517fc4fb81fe8724805e6efd948b6e9d8b76a4bdcced88bc8587",
+  "post_head": "d40f4e73bae1cd020cbca25303d95a76da3a8065",
+  "post_head_manifest_mismatches": [
+    "plugins/soloco/runtime/adapters.mjs",
+    "plugins/soloco/runtime/handover.mjs",
+    "plugins/soloco/runtime/worker.mjs",
+    "tests/handover-review-window.test.mjs",
+    "tests/timeout.test.mjs"
+  ],
+  "node": "v22.13.0",
+  "started_at": "2026-11-06T05:04:39.747993+00:00",
+  "finished_at": "2026-11-06T05:05:59.736039+00:00",
+  "exit_code": 0,
+  "manifest_files": 116,
+  "source_manifest_sha256": "abaf0b18e509f2604eae5e135880815a778c0ee3e2163e496142ad689570ff4a",
+  "changed_paths": [],
+  "log": "/private/tmp/soloco-p0-root-verification/node22-qa-repair-01.tap",
+  "log_sha256": "246ac6e86b5e2328782abf8346ef4e21e720984d45bb7e39ef40c1e8530dbd24",
+  "terminal_counts": [
+    "# tests 444",
+    "# pass 444",
+    "# fail 0",
+    "# cancelled 0",
+    "# skipped 0"
+  ]
+}

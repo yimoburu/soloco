@@ -1,0 +1,15 @@
+{
+  "test_file_sha256": "babeaffdc3b786b5451284aeee60f8095c7fe133d713d3adbb79889665ac19c7",
+  "diff_check_exit": 0,
+  "diff_summary": "tests/handover-review-window.test.mjs | 66 ++++++++++++++++++++++++++++++++---\n 1 file changed, 61 insertions(+), 5 deletions(-)",
+  "source_hashes_at_focused_completion": {
+    "tests/handover-review-window.test.mjs": "babeaffdc3b786b5451284aeee60f8095c7fe133d713d3adbb79889665ac19c7",
+    "plugins/soloco/runtime/worker.mjs": "3e0a91022e6f2ddabaf99c9853c3a3951327f25458eaa0cd1b51363e49c9e38b",
+    "plugins/soloco/runtime/adapters.mjs": "475401b8504b7cf8db0ef7bab303bd9c92360d2b7a9adbd011fd891c18c31e55",
+    "plugins/soloco/runtime/timeout.mjs": "586c5f44f98742320119f0b42d0612dd79cf970f4e858f05e7d65953c31951a4"
+  },
+  "node22_log": "/private/tmp/soloco-p0-root-verification/handover-window-regressions-node22.txt",
+  "node25_log": "/private/tmp/soloco-p0-root-verification/handover-window-regressions-node25.txt",
+  "red_log": "/private/tmp/soloco-p0-root-verification/handover-window-regressions-red-node22.txt",
+  "patch": "/private/tmp/soloco-p0-root-verification/handover-window-regressions.patch"
+}

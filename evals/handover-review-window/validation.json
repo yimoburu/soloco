@@ -1,0 +1,72 @@
+{
+  "tested_source_commit": "78a83870363c53464fc89bff89c7f2449fef8bcc",
+  "tested_source_tree": "07261eea2ea68b97dcd7795578cdcd59b72ebd90",
+  "source_version": "0.6.14",
+  "frozen_existing_files_verified": 116,
+  "source_manifest_sha256": "a6d9df872296483f14b54d92bed9ec3c1f7065ac2fed1defdf09c5634c60360f",
+  "package_files_verified": 36,
+  "package_manifest_sha256": "eb1753ee569f99a7eb7d4bd14251e2a9620b403bdc8ce14d38b00ee01d57f82d",
+  "runs": [
+    {
+      "node": "22",
+      "tests": 444,
+      "pass": 444,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "original_sha256": "246ac6e86b5e2328782abf8346ef4e21e720984d45bb7e39ef40c1e8530dbd24",
+      "log": "evals/handover-review-window/full-node22.tap.gz",
+      "gzip_sha256": "c0d75f6ce4632e3007bd732d4fc045ea10ffc6a45f55f0360d7a213cb3ae8a04",
+      "actual_macos_sandbox": true
+    },
+    {
+      "node": "25",
+      "tests": 444,
+      "pass": 444,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "original_sha256": "c7b01160982ed431307ad805b4b4c557ac235b3fba78d7e5741ce34a08472841",
+      "log": "evals/handover-review-window/full-node25.tap.gz",
+      "gzip_sha256": "b60652bb0a54a75b6ee6b1e85784bc80b9885198a708c0400616b00c376b72ce",
+      "actual_macos_sandbox": true
+    }
+  ],
+  "engineering_native_id": "01a1af22-76a4-7580-8e75-dede23665b3a",
+  "qa_native_id": "01a1af34-8d30-78f3-a4e6-714ee9e0c3a2",
+  "qa_result": "Original source Fail retained. Same independent native continuation returned repair Pass for all three concrete blockers, integration/publication held pending exact final receipts. Root verified those conditions: all 116 files match both runs and frozen commit; both matrices 444/444 with no failures/skips/cancellations; build/diff checks pass. No source change after reviewed commit.",
+  "retained_earlier_evidence": [
+    {
+      "log": "evals/handover-review-window/initial-node22.gz",
+      "original_sha256": "f2cdb4c2b3f0a9982f7102999b0b7d046db7d02afff766c42362cae5525fcb7c",
+      "gzip_sha256": "72102239465521a61f9d859d463f04c04542be9661d447e1d12f0cb153c5795c"
+    },
+    {
+      "log": "evals/handover-review-window/initial-node25.gz",
+      "original_sha256": "8e8d512be56651fc41b6c3ac521b533bfbe455d7e6ec5b00216548883d842aa1",
+      "gzip_sha256": "1af4b2afde8ed9fd4f9d538baebdd92d0d295b39b8e6359f33c7f1a143c29fb7"
+    },
+    {
+      "log": "evals/handover-review-window/regression-red.gz",
+      "original_sha256": "9388a3ff25eb7f4d37b5f484b2846f59654d7500e6ef56b19ab1b553e37d8677",
+      "gzip_sha256": "9c55e1b0671b32599ec6b7f0acd487a3f494530c84ccdfe5313e5c7bfc19e1b8"
+    },
+    {
+      "log": "evals/handover-review-window/repair-first-targeted.gz",
+      "original_sha256": "c610594e4066bb79e7440e321a295280080de0742ac8a525a69cb343a4e8d8e3",
+      "gzip_sha256": "fe10bf5752398756a5a967d95e82c5adfc51e2a879fb3561c4b8303a5e4a3062"
+    },
+    {
+      "log": "evals/handover-review-window/outer-sandbox-skips-node25.gz",
+      "original_sha256": "e2be025ab8affe418aed8bd808bedc596f5d899738d4e12de0e88d388baf2975",
+      "gzip_sha256": "d2898e2f873217a639e89cbba42b3f7252595921b8fd87b168223278d32e8737"
+    }
+  ],
+  "limits": [
+    "Synthetic clocks are not an observed 44-minute native review.",
+    "Detached-pause initial missing-receipt root cause remains unverified; original failure and later unchanged passes retained.",
+    "Real-company handover Blocked remains binding; same-native complete semantic delivery and current independent resume_handover Pass remain required.",
+    "Effective native model/effort/service settings, provider cancellation and unknown descendant termination remain unverified.",
+    "No old-job extension, prior failure reset, company governance/team adoption, business authority or deferred latency integration."
+  ]
+}

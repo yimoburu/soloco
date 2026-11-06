@@ -1,0 +1,349 @@
+The proposed separation is sound: `timeout_ms` remains the per-invocation limit; an explicitly selected 30/45-minute window becomes the fixed total execution allowance for one fresh handover QA job.
+
+Three corrections are necessary:
+
+- Validate each adapter callback against that call’s **actual requested duration**, then record overall job timing separately. The current first callback incorrectly compares a shortened call with the full configured timeout.
+- Require a fresh reconstruction target and native session for the new window. Creating another job against an exhausted target must not reopen its allowance.
+- Check original publication/completion timing at resume. `jobTimeoutState()` returns `terminal` before validating completed-job deadlines.
+
+The following proposal changes only the five supplied runtime files. It preserves omitted-field behavior, policy version 1, queue/startup limits, range bounds, independent review gates and existing cancellation semantics.
+
+```diff
+*** Begin Patch
+*** Update File: plugins/soloco/runtime/timeout.mjs
+@@
+ export function normalizeTimeout(input = {}, context) {
+@@
+   return {timeout_ms, timeout_reason};
+ }
+ 
++// An explicit selector for a fresh ordinary-handover QA job only.
++// Absence preserves the existing total execution timeout.
++export function normalizeHandoverReviewWindow(input = {}) {
++  const minutes = input.handover_review_window_minutes;
++  const reason = input.handover_review_reason;
++  if (minutes === undefined && reason === undefined) return null;
++  if (![30, 45].includes(minutes)) throw new Error('Handover review window must be 30 or 45 minutes');
++  if (typeof reason !== 'string' || !reason.trim() || reason.length > 300) {
++    throw new Error('Handover review reason must be nonempty and at most 300 characters');
++  }
++  return {
++    handover_review_window_minutes: minutes,
++    handover_review_reason: reason.trim()
++  };
++}
++
+ export function executionTiming(spawnedAt, settings = {}, context) {
+@@
+   };
+ }
+ 
++// executionTiming remains the adapter's per-call timing contract.
++// Job timing may instead use an explicitly selected total review window.
++export function jobExecutionTiming(spawnedAt, job) {
++  const timing = executionTiming(spawnedAt, {
++    timeout_ms: job.timeout_ms,
++    timeout_reason: job.timeout_reason
++  });
++  const window = normalizeHandoverReviewWindow(job);
++  if (!window) return timing;
++  if (job.timeout_policy_version !== TIMEOUT_POLICY_VERSION) {
++    throw new Error('Handover review window requires an explicit current timeout policy');
++  }
++  const deadline = add(
++    instant(timing.execution_started_at, 'execution start'),
++    window.handover_review_window_minutes * 60000
++  );
++  return {
++    ...timing,
++    execution_deadline_at: new Date(deadline).toISOString(),
++    termination_deadline_at: new Date(add(deadline, TERMINATION_GRACE_MS)).toISOString()
++  };
++}
++
+@@
+     const legacy = job.timeout_policy_version === undefined;
+     if (!legacy && job.timeout_policy_version !== TIMEOUT_POLICY_VERSION) return inspect('Unsupported timeout policy version');
+     if (legacy && (job.execution_started_at != null || job.execution_deadline_at != null)) return inspect('Execution timing lacks a policy version');
+     if (!legacy && job.timeout_ms === undefined) return inspect('Missing recorded execution timeout');
++    const window = normalizeHandoverReviewWindow(job);
++    if (window && legacy) return inspect('Legacy jobs cannot select a handover review window');
++    if (window && job.handover_review_reason !== window.handover_review_reason) return inspect('Noncanonical recorded handover review reason');
+     const policy = legacy ? normalizeTimeout() : normalizeTimeout({timeout_ms: job.timeout_ms, timeout_reason: job.timeout_reason});
+@@
+       phase = 'execution';
+       start = instant(job.execution_started_at, 'execution start');
+-      deadline = add(start, policy.timeout_ms);
++      deadline = add(start, window ? window.handover_review_window_minutes * 60000 : policy.timeout_ms);
+       if (instant(job.execution_deadline_at, 'recorded execution deadline') !== deadline) return inspect('Execution deadline disagrees with recorded policy');
++      if (window && instant(job.termination_deadline_at, 'recorded termination deadline') !== add(deadline, TERMINATION_GRACE_MS)) {
++        return inspect('Termination deadline disagrees with recorded review window');
++      }
+@@
+     } else {
+       if (!legacy && job.execution_deadline_at != null) return inspect('Execution deadline without an execution start');
++      if (window && job.termination_deadline_at != null) return inspect('Termination deadline without an execution start');
+@@
+       timeout_ms: policy.timeout_ms,
+       timeout_reason: policy.timeout_reason,
++      ...(window ?? {}),
+@@
+   }
+ }
++
++// A completed review may be resumed later, provided its original publication
++// and completion were both strictly before its fixed execution deadline.
++export function handoverReviewCompletedInTime(job, artifactCreatedAt) {
++  try {
++    if (!normalizeHandoverReviewWindow(job)) return true;
++    if (job.status !== 'completed' || job.execution_started_at == null) return false;
++    const created = instant(artifactCreatedAt, 'artifact publication time');
++    const finished = instant(job.finished_at, 'job completion time');
++    if (created > finished) return false;
++    return [created, finished].every(at =>
++      jobTimeoutState({...job, status: 'running'}, at).state === 'executing'
++    );
++  } catch {
++    return false;
++  }
++}
+
+*** Update File: plugins/soloco/runtime/handover.mjs
+@@
+ import { digest, id, requireText, stamp } from './store.mjs';
++import {TIMEOUT_POLICY_VERSION,normalizeHandoverReviewWindow,handoverReviewCompletedInTime} from './timeout.mjs';
+@@
+ export function handoverReviewEligible(state,job) {
+@@
+ }
++
++export function validateHandoverReviewWindow(state,job,{fresh=false}={}) {
++  const window=normalizeHandoverReviewWindow(job);
++  if(!window)return null;
++  const target=state.records?.[job.review_of?.id];
++  if(job.timeout_policy_version!==TIMEOUT_POLICY_VERSION ||
++    !handoverReviewEligible(state,job) ||
++    target?.handover?.evidence_protocol!==2 ||
++    target.revision!==job.review_of?.revision) {
++    throw Error('A review window requires current exact paused ordinary-handover QA with bounded evidence');
++  }
++  if(fresh && (
++    job.status!=='queued' ||
++    job.native_id!=null ||
++    ['started_at','worker_pid','execution_started_at','execution_deadline_at','termination_deadline_at','finished_at'].some(key=>job[key]!=null) ||
++    Object.values(state.jobs??{}).some(prior=>(prior.review_of?.id??prior.review_of)===target.id)
++  )) {
++    throw Error('A review window requires a fresh reconstruction and reviewer session; existing attempts cannot be extended');
++  }
++  return window;
++}
++
+ export function verifyHandoverAcceptance(state) {
+@@
+       j?.status==='completed'&&j.epoch===state.owner.epoch&&j.artifact_id===r.id&&j.review_of?.id===target.id&&j.review_of.revision===target.revision&&
++      handoverReviewCompletedInTime(j,r.created_at)&&
+@@
+ export function handoverReviewContext(state,job) {
+   const target=state.records?.[job.review_of?.id];
+   if(!target?.handover)return null;
+   if(!handoverReviewEligible(state,job)||target.revision!==job.review_of.revision)throw new Error('Handover review subject changed');
++  const reviewWindow=validateHandoverReviewWindow(state,job);
+@@
+-    evidence=buildEvidence(current,[...upgrade_history,...(upgrade?[upgrade]:[])],{wholeBodyAliases:false,checkpointContinuity:true,retainedHandoverRecords:state.records,reviewContext:{charter:state.roles[job.role],assignment:{...(job.coordination?{coordination:job.coordination}:{}),task:job.task,model_selection:job.model_selection??{mode:'default'},supplemental_sources:job.supplemental_sources??[]},prior_reviews}});
++    evidence=buildEvidence(current,[...upgrade_history,...(upgrade?[upgrade]:[])],{wholeBodyAliases:false,checkpointContinuity:true,retainedHandoverRecords:state.records,reviewContext:{charter:state.roles[job.role],assignment:{...(job.coordination?{coordination:job.coordination}:{}),task:job.task,model_selection:job.model_selection??{mode:'default'},supplemental_sources:job.supplemental_sources??[],...(reviewWindow?{timeout_policy_version:job.timeout_policy_version,timeout_ms:job.timeout_ms,timeout_reason:job.timeout_reason,...reviewWindow}:{})},prior_reviews}});
+
+*** Update File: plugins/soloco/runtime/engine.mjs
+@@
+-import { beginHandover, submitReconstruction, handoverReviewEligible, verifyHandoverAcceptance, handoverSubject, inspectHandover, reconstructionReceipt, admitHandover } from './handover.mjs';
++import { beginHandover, submitReconstruction, handoverReviewEligible, validateHandoverReviewWindow, verifyHandoverAcceptance, handoverSubject, inspectHandover, reconstructionReceipt, admitHandover } from './handover.mjs';
+@@
+-import { TIMEOUT_POLICY_VERSION, normalizeTimeout, jobTimeoutState } from './timeout.mjs';
++import { TIMEOUT_POLICY_VERSION, normalizeTimeout, normalizeHandoverReviewWindow, jobTimeoutState } from './timeout.mjs';
+@@
+   const timeout=normalizeTimeout({timeout_ms:args.timeout_ms,timeout_reason:args.timeout_reason});
++  const reviewWindow=normalizeHandoverReviewWindow(args);
+@@
+-    prototypeAssignment(s,job,true);developmentAssignment(s,job,true,args.root);
++    if(reviewWindow) {
++      Object.assign(job,reviewWindow);
++      validateHandoverReviewWindow(s,job,{fresh:true});
++    }
++    prototypeAssignment(s,job,true);developmentAssignment(s,job,true,args.root);
+
+*** Update File: plugins/soloco/runtime/worker.mjs
+@@
+-import { handoverReviewEligible } from './handover.mjs';
++import { handoverReviewEligible, validateHandoverReviewWindow } from './handover.mjs';
+@@
+-import { TIMEOUT_POLICY_VERSION, normalizeTimeout, executionTiming, jobTimeoutState } from './timeout.mjs';
++import { TIMEOUT_POLICY_VERSION, normalizeTimeout, executionTiming, jobExecutionTiming, jobTimeoutState, handoverReviewCompletedInTime } from './timeout.mjs';
+@@
+   let job, state, context, output, artifact, controller, monitor, spawned=false,invoked=false,lastToken,lastCurrent,lastGrantExpiry,lastDevelopmentMaxBytes;
++  let reviewWindow=null,overallTiming=null,reviewTimer;
+@@
+-    if(current.timeout_policy_version!==job.timeout_policy_version || current.timeout_ms!==job.timeout_ms || current.timeout_reason!==job.timeout_reason)throw Object.assign(new Error('Recorded timeout settings changed'),{code:'ASSIGNMENT_INELIGIBLE'});
++    validateHandoverReviewWindow(s,current);
++    if(current.timeout_policy_version!==job.timeout_policy_version || current.timeout_ms!==job.timeout_ms || current.timeout_reason!==job.timeout_reason ||
++      current.handover_review_window_minutes!==job.handover_review_window_minutes ||
++      current.handover_review_reason!==job.handover_review_reason)throw Object.assign(new Error('Recorded timeout settings changed'),{code:'ASSIGNMENT_INELIGIBLE'});
++    if(reviewWindow && overallTiming &&
++      ['execution_started_at','execution_deadline_at','termination_deadline_at'].some(key=>current[key]!==overallTiming[key])) {
++      throw Object.assign(new Error('Recorded execution timing changed'),{code:'ASSIGNMENT_INELIGIBLE'});
++    }
+@@
+       coordinationEligible(s,job);
++      reviewWindow=validateHandoverReviewWindow(s,job);
+       prototypeAssignment(s,job);developmentAssignment(s,job,false,root);
+@@
+-      const handoverDeadline=context.handover_evidence?Date.now()+timeout.timeout_ms:null;
++      const handoverDeadline=context.handover_evidence&&!reviewWindow?Date.now()+timeout.timeout_ms:null;
+@@
+-      const remaining=lastCurrent?.execution_deadline_at?Math.min(timeout.timeout_ms,Date.parse(lastCurrent.execution_deadline_at)-Date.now()):handoverDeadline?handoverDeadline-Date.now():timeout.timeout_ms;
+-      if(remaining<1000)throw Error('Insufficient execution time for supplemental read');
++      const remaining=reviewWindow
++        ? Math.min(timeout.timeout_ms,overallTiming?Date.parse(overallTiming.execution_deadline_at)-Date.now():timeout.timeout_ms)
++        : lastCurrent?.execution_deadline_at?Math.min(timeout.timeout_ms,Date.parse(lastCurrent.execution_deadline_at)-Date.now()):handoverDeadline?handoverDeadline-Date.now():timeout.timeout_ms;
++      if(remaining<1000)throw Object.assign(new Error('Insufficient execution time for supplemental read'),{code:'ROLE_TIMEOUT'});
++      if(reviewWindow&&controller.signal.aborted)throw controller.signal.reason;
+       if(context.handover_evidence&&request.length>200000)throw Error('Handover request exceeds 200000 characters; nothing was truncated');
++      let callSpawned=false,callTiming;
+@@
+-        onSpawn:round===0?timing=>{
++        onSpawn:(reviewWindow||round===0)?timing=>{
+           if(controller.signal.aborted)throw controller.signal.reason;
+-          if(spawned)throw new Error('Duplicate execution spawn callback');
+-          const recorded=executionTiming(timing?.execution_started_at,timeout);
+-          if(timing?.timeout_policy_version!==TIMEOUT_POLICY_VERSION || timing.execution_deadline_at!==recorded.execution_deadline_at || timing.timeout_ms!==recorded.timeout_ms)throw new Error('Invalid adapter spawn timing');
++          if(callSpawned)throw new Error('Duplicate execution spawn callback');
++          callTiming=executionTiming(timing?.execution_started_at,{
++            timeout_ms:remaining,timeout_reason:timeout.timeout_reason
++          });
++          if(timing?.timeout_policy_version!==TIMEOUT_POLICY_VERSION ||
++            timing.execution_deadline_at!==callTiming.execution_deadline_at ||
++            timing.timeout_ms!==callTiming.timeout_ms)throw new Error('Invalid adapter spawn timing');
++          callSpawned=true;
++          if(spawned) {
++            if(!reviewWindow)throw new Error('Duplicate execution spawn callback');
++            withStore(root,db=>eligibility(db.read()));
++            return;
++          }
++          const recorded=jobExecutionTiming(timing.execution_started_at,job);
+           withStore(root,db=>db.transaction('job.execution_started',s=>{
+             const current=eligibility(s);
+-            if(current.execution_started_at!=null || current.execution_deadline_at!=null)throw new Error('Execution timing already recorded');
++            if(current.execution_started_at!=null || current.execution_deadline_at!=null ||
++              (reviewWindow&&current.termination_deadline_at!=null))throw new Error('Execution timing already recorded');
+@@
+             Object.assign(current,recorded);
++            if(reviewWindow&&jobTimeoutState(current,Date.now()).state!=='executing') {
++              throw Object.assign(new Error('Invalid or expired execution start'),{code:'INVALID_EXECUTION_TIMING'});
++            }
+             return s;
+           }));
++          overallTiming=recorded;
+           spawned=true;
+@@
+           if(job.timeout_policy_version===undefined)Object.assign(job,{timeout_policy_version:TIMEOUT_POLICY_VERSION,...timeout});
++          if(reviewWindow) {
++            reviewTimer=setTimeout(()=>{
++              controller.abort(Object.assign(new Error('Handover review deadline reached'),{code:'ROLE_TIMEOUT'}));
++            },Math.max(0,Date.parse(recorded.execution_deadline_at)-Date.now()));
++            reviewTimer.unref?.();
++          }
+         }:undefined
+       });
++      if(reviewWindow&&!callSpawned)throw Object.assign(new Error('Adapter returned without actual execution timing'),{code:'MISSING_EXECUTION_TIMING'});
++      if(reviewWindow&&Date.now()>=Date.parse(callTiming.execution_deadline_at)) {
++        throw Object.assign(new Error('Native invocation deadline reached'),{code:'ROLE_TIMEOUT'});
++      }
+       check();
++      if(reviewWindow&&controller.signal.aborted)throw controller.signal.reason;
+@@
+       for(const n of artifact.notices??[]) {
+         if(!['must_know','decision_required'].includes(n.kind) || typeof n.summary!=='string' || !n.summary.trim() || n.summary.length>20000) throw new Error('Invalid founder notice');
+         notice(s,n.kind,n.summary,artifactId).job_id=job.id;
+       }
++      if(reviewWindow&&(
++        !handoverReviewCompletedInTime(current,s.records[artifactId].created_at) ||
++        jobTimeoutState({...current,status:'running'},Date.now()).state!=='executing'
++      ))throw Object.assign(new Error('Handover review publication deadline reached'),{code:'ROLE_TIMEOUT'});
+       return s;
+@@
+   } finally {
+     if(monitor!==undefined)clearInterval(monitor);
++    if(reviewTimer!==undefined)clearTimeout(reviewTimer);
+   }
+ }
+
+*** Update File: plugins/soloco/runtime/main.mjs
+@@
+ const common={root:{...string,description:'Absolute attached company folder'},session_id:{...string,description:'Current host session_id supplied by SoloCo startup hook'}};
++const handoverReviewWindowProperties={
++  handover_review_window_minutes:{
++    type:'integer',enum:[30,45],
++    description:'Fresh current paused ordinary-handover QA only. Fixed total execution window from first actual native spawn; requires handover_review_reason. Never extends an existing attempt. Omission preserves the existing total execution timeout.'
++  },
++  handover_review_reason:{
++    type:'string',minLength:1,maxLength:300,
++    description:'Required with handover_review_window_minutes; nonempty after trimming.'
++  }
++};
+*** End Patch
+```
+
+For the long `company_dispatch` definition, make these two exact textual substitutions in `main.mjs`:
+
+```text
+Replace:
+timeout_ms bounds execution from actual child spawn, separately from queue/startup; a custom limit requires timeout_reason.
+
+With:
+timeout_ms caps each native invocation at no more than 600 seconds; a custom limit requires timeout_reason. Without handover_review_window_minutes it also retains the existing total execution timeout. Explicit handover_review_window_minutes selects a separate fixed total execution window only for fresh current paused ordinary-handover QA, requires handover_review_reason, and starts at first actual native spawn. Queue/startup limits remain separate.
+```
+
+```text
+Replace:
+model_selection:modelSelection,timeout_ms:
+
+With:
+model_selection:modelSelection,...handoverReviewWindowProperties,timeout_ms:
+```
+
+These changes deliberately require a new reconstruction after any prior job against that target. Existing failures remain retained evidence. No setter, retry mechanism or extension operation is added.
+
+Required adversarial acceptance cases follow. These are proposed tests; I have not executed them.
+
+| Test | Required result |
+|---|---|
+| Both fields omitted | Existing normalization, context hash, total timeout and legacy behavior remain unchanged. |
+| Window `30`/`45`, reason with surrounding whitespace | Accepted only in the eligible fresh dispatch; stored reason is trimmed. |
+| Window `null`, string, fractional, `0`, `31`, `90`; missing/blank/301-character reason; reason alone | Rejected before job creation. |
+| Normal task, other role, prototype/development, other artifact, legacy handover evidence, stale revision/hash/epoch, unpaused company | Window selection rejected. |
+| Existing queued, running, completed, failed, cancelled or timed-out job against the target | Window selection rejected; no existing job changes. |
+| Non-null reviewer session identity, even without a prior job | Window selection rejected. |
+| Queue/startup delay before first spawn | Existing 240-second limits apply; review deadline is not started early. |
+| First callback reports a shortened legitimate call | Verified against the supplied call duration; overall deadline still derives from original job policy. |
+| Each subsequent frozen-read call | Requires its own valid spawn callback; missing, duplicate or contradictory timing fails closed. |
+| 30-minute window, 600-second per-call cap | Overall deadline is first spawn + 1,800,000 ms; termination deadline is +1,803,000 ms. |
+| Later call starts with 80,000 ms remaining | Adapter receives at most 80,000 ms; original overall deadline is unchanged. |
+| Fewer than 1,000 ms remain | No further invocation starts. |
+| Any call returns at or after its own deadline | Failure; output cannot become an approval. |
+| Overall deadline boundary | At deadline: `terminating`; at deadline +3,000 ms: `overdue`. Neither establishes termination. |
+| Window/reason/per-call policy changes during execution | Assignment becomes ineligible. |
+| Start/deadline/termination fields are shifted together during execution | Local first-spawn timing comparison rejects the reset. |
+| Pause cleared, owner/native identity changed, evidence altered | Existing eligibility/freshness checks reject continuation. |
+| Deadline crossed during parsing or publication | Transaction fails or result is quarantined; no submitted qualifying Pass. |
+| Completed review has publication/finish exactly at deadline, missing start, inconsistent deadline or invalid termination deadline | Resume rejected. |
+| Review finished before deadline; resume occurs later | Timing remains valid; all existing exact-state, independence, semantic-delivery and Pass gates still apply. |
+| Failed job is given new window fields afterward | It remains terminal and cannot qualify for acceptance. |
+| Maximum reason escaping and existing packet/range boundaries | Existing bounds hold; overflow rejects without truncation. |
+| Adapter ignores abort or termination is uncertain | No fabricated closure evidence or resource release. |
+
+Two limits need explicit attention before accepting the implementation:
+
+- **Adapter enforcement is unverified.** Its source was not supplied. This proposal passes the remaining allowance immediately before adapter entry and supplies an absolute overall abort deadline across spawn latency. Verify that the adapter honors already-aborted signals, prevents delayed spawning after cancellation, handles callback exceptions, and applies its existing termination grace. If the requirement means the native timeout timer itself must be recalculated atomically at actual spawn, the supplied callback interface cannot establish that; a small adapter change would be necessary.
+- **Version compatibility needs checking.** When `VERSION` becomes `0.6.14`, both supplied engine allowlists otherwise omit `0.6.13`. Include `0.6.13` in the mechanical compatibility update and verify the existing `compatibleRuntime` rules without changing governance.
+
+The roughly 29-minute extrapolation gives a 30-minute selection little margin; neither selection guarantees completion or model context fit. Queue latency remains deferred.
+
+This is source-only advice. No checks were run, binding was not verified, and no company write, live review or real-company Pass is authorized by this proposal.
