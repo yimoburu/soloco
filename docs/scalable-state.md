@@ -1,6 +1,6 @@
 # Scalable company state and exact evidence reuse
 
-Candidate v0.7.0 separates current task context from retrievable historical evidence.
+v0.7.0 separates current task context from retrievable historical evidence.
 Incompatible storage changes require explicit migration. Source tests do not migrate
 a real company, resolve a notice, install a package, adopt instructions, transfer
 ownership, or establish native semantic acceptance.
@@ -226,7 +226,7 @@ must be materialized/tested normally. No old attempt allowance is reset.
 ### Retained historical component evidence
 
 The following dated results describe earlier isolated components and frozen legacy
-protocols. Candidate v0.7.0 behavior and limits are described above; these receipts
+protocols. v0.7.0 behavior and limits are described above; these receipts
 are not its final acceptance.
 
 Final isolated branch verification (2026-11-04): Node 25.2.1 full suite passed
@@ -250,7 +250,7 @@ claim. Full live task-quality/latency comparisons remain a release/operating
 qualification step; do not close the broad issue solely on these fixture results.
 
 The retained ordinary-handover v2 protocol freezes the complete subject and exact
-SHA256. Candidate v0.7.0 reconstructions use verified current protocol v3; retained
+SHA256. v0.7.0 reconstructions use verified current protocol v3; retained
 v1/v2 reconstructions keep their original all-source contracts.
 The 200000-character initial review budget is unchanged. The initial pack contains
 bounded current objective, pinned rule, authority and notice previews, plus exact source/length entry points. Large pinned definitions
@@ -317,4 +317,4 @@ Earlier handover subjects retain both `upgrade_history` and a possible current `
 
 The regression includes nonempty history and a current upgrade across three repaired submissions, exact complete original retrieval, distinct unresolved restrictions/dissent and a held resume after each negative review. This repairs amplification; it does not prove bounded total historical review, model fit, semantic understanding or real-company acceptance. The separate unreleased latency candidate remains deferred until the actual continuity gate completes.
 
-Candidate integration evidence and remaining root-owned acceptance: [integration report](../integration-evidence/REPORT.md).
+Release source validation and its limits: [v0.7.0 validation](structural-scalability-validation.md).
