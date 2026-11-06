@@ -13,7 +13,7 @@ New dispatches use context format 3; existing queued format-2 jobs retain their
 original serialization. Every unclassified intent, decision, preference and failed
 or blocked review remains mandatory. A `Resolved` status alone excludes nothing.
 The pack also includes exact task inputs, required dependency artifacts, every
-valid mapped home (including artifact-kind homes), current unknown authority
+valid mapped home required by the reviewed task scope (including artifact-kind homes), current unknown authority
 extensions, open notices and the role inbox. Unrelated unknown archives remain
 unclassified and exactly retrievable; ordinary work does not globally replay them.
 Formats 4/5 remain internal compatibility code and are not selected by new public
@@ -37,7 +37,16 @@ canonical QA provenance, native/source independence, complete source delivery,
 and retained same-plan negative reviews. A repaired plan retains old Fail/Blocked
 evidence; the original failed work never becomes a Pass.
 
-For an oversized historical container, use the existing `company_context` tool
+For new oversized historical containers, prefer the explicit
+[`scoped-context-v1` workflow](scoped-context.md): immutable extraction, bounded
+current applicability and interface checks, then independent integration. OPEN
+uncertainty can remain faithfully OPEN; preservation does not resolve it or renew
+authority. Independent reviewed scopes keep unrelated current homes out of a
+task, while global/unknown obligations remain mandatory. Original bytes, failed
+results and canonical receipt provenance remain available.
+
+Existing tree qualifications retain the following protocol and proof rules.
+Use the existing `company_context` tool
 with `action: plan`, `source_id`, `counterpart_ids`, `dependency_ids`, current epoch
 and the exact source instruction. This uses `soloco-context-tree-v1`, separately
 from legacy classification. The transaction pins the exact original, as-of subject
@@ -120,8 +129,10 @@ Scope expiry is checked even when the event token has not changed.
 New `company_upgrade inspect`/`prepare` use `context_mode: current` by default;
 explicit `full` retains exhaustive historical review. Existing attempts retain
 their frozen mode/protocol. Current mode moves
-ONLY exact independently reviewed resolved records, their known proof records/jobs,
-and reviewed historical attempts behind a source-addressed archive index. Originals,
+only exact independently reviewed classifications behind a source-addressed archive
+index. This includes faithful represented-by classifications whose obligations
+and OPEN uncertainties survive in current homes, plus known proof records/jobs
+and reviewed historical attempts. Originals,
 raw checkpoint/history hashes, inventory and bounded retrieval remain intact.
 Unknown or changed history is still mandatory; conflicting or missing classification
 proof holds. Current understanding is not a second authoritative database.
@@ -132,7 +143,23 @@ readback, epoch/pause/candidate integrity and recovery are unchanged. Inspect sh
 measured projection size before a fresh attempt; it grants no adoption credit.
 One-time legacy classification is deliberate work, not automatic compaction.
 
+New upgrade attempts can explicitly choose [incremental-v1](upgrade-incremental.md).
+Completed exact steps can be resumed after proven worker closure under the same
+identity, inputs and limits. QA page reviews receive their page and matching CoS
+findings; final QA receives the exact complete proposal and every required finding.
+No ambiguous native call is retried. Legacy attempts keep their original workflow.
+
 ## Targeted SQLite storage and transfer
+
+Current views, collection pages and idle status use a derived SQLite index and
+hash-check selected records within one snapshot. Work stays bounded by the
+requested page, selected-source size and active jobs rather than the entire
+archive. Missing derived indexes use the canonical fallback and rebuild during
+a full authorized normalized write; selected writes and native-return retention
+repair missing schema but defer archive reconstruction. Reads never repair storage. Writes and consequential
+authorization checks still validate canonical state. Confirmed cancelled workers
+receive a terminal timestamp; unknown closure keeps resource claims and storage
+maintenance held.
 
 `company_storage inspect` reports the physical layout. Explicit `migrate` requires
 the owning session/epoch, actual source instruction, a paused company, no active

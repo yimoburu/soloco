@@ -111,7 +111,8 @@ export function appendNormalizedJournal(db,key,value) {
   const position=parent?.position??db.prepare("SELECT COALESCE(MAX(position),-1)+1 AS n FROM state_entries WHERE family='upgrade'").get().n;
   put(db,'upgrade',key,position,{...descriptor,length:descriptor.length+1},'journal-array');
   if(indexed)finishPublicIndex(db);
-  else writePublicIndex(db,readNormalized(db));
+  // Leave an unavailable catalog invalid; only a full write rebuilds it.
+  // Native return retention must never depend on unrelated archived bodies.
 }
 function split(db,value) {
   const entries=[];
@@ -257,7 +258,8 @@ export function writeNormalizedSelection(db,changes) {
     if(indexed)updatePublicIndexValue(db,family,key,value);
   }
   if(indexed)finishPublicIndex(db);
-  else writePublicIndex(db,readNormalized(db));
+  // Leave an unavailable catalog invalid; only a full write rebuilds it.
+  // Native return retention must never depend on unrelated archived bodies.
 }
 
 // Independently versioned, discardable presentation index. Canonical v1-v4

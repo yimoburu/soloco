@@ -267,6 +267,7 @@ test('partial derived schemas fall back without writes and repair on authorized 
       if(mode==='selected')expected.records.recent0.content='Authorized edit';
       if(mode==='append')expected.upgrade.calls.push({role:'cos',text:'Authorized append'});
       assert.deepEqual(after,expected,`${mode}: ${name} canonical preservation`);
+      if(mode!=='full'){assert.equal(readPublicIndex(db.db),null,'Selected writes repair schema without hydrating the archive');db.transaction('synthetic.full_rebuild',s=>s);}
       assert.ok(readPublicIndex(db.db),`${mode}: ${name} repaired`);
       db.readSnapshot(()=>assert.deepEqual(publicPage(db.publicState()),publicPage(after)));
       assert.equal(db.db.prepare('PRAGMA integrity_check').get().integrity_check,'ok');
@@ -319,7 +320,26 @@ test('repair of multiple missing objects rolls back with the authorized write',(
     assert.deepEqual(db.db.prepare('SELECT type,name,sql FROM sqlite_master ORDER BY type,name').all(),schema);
     db.db.exec('DROP TRIGGER reject_repair_event');
     write();
+    assert.equal(readPublicIndex(db.db),null);
+    db.transaction('synthetic.full_rebuild',s=>s);
     assert.ok(readPublicIndex(db.db));
     assert.equal(db.read().records.recent0.content,'Authorized edit');
+  });
+});
+
+
+test('unavailable index and corrupt unrelated archive cannot roll back a native return',()=>{
+  const state=seed(2,10);state.upgrade={id:'attempt',status:'checking',calls:[]};const args=fixture(state);
+  withStore(args.root,db=>{
+    const hash=db.db.prepare("SELECT sha256 FROM state_entries WHERE family='records' AND key='archive0'").get().sha256;
+    db.db.exec('DROP TABLE public_read_catalog');
+    db.db.prepare('UPDATE immutable_values SET bytes=? WHERE sha256=?').run('{"corrupt":"unrelated archive"}',hash);
+    const returned={role:'cos',native_id:'observed-native',text:'Exact late returned evidence',call_id:'cos:page:p0:0'};
+    assert.equal(db.appendUpgradeCall('attempt',returned),true);
+    const retained=db.readSelected({rootKeys:[],entities:{upgrade:['calls','probe_native_id']}}).upgrade;
+    assert.deepEqual(retained.calls,[returned]);
+    assert.equal(retained.probe_native_id,'observed-native');
+    assert.equal(readPublicIndex(db.db),null);
+    assert.throws(()=>db.read(),/hash mismatch/,'Canonical integrity still holds on affected reads');
   });
 });
