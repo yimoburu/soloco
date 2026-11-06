@@ -1,3 +1,4 @@
+import * as scoped from './scoped-context.mjs';
 import { currentView, upgradeView, publicPage, exactRead, mutationView, sourceReference, itemView, controlView, storageSourceId, fits, exactTextRead } from './public-response.mjs';
 import {backupCompany,restoreCompany} from './storage-transfer.mjs';
 import {contextPlan,validateContextPlan,recordReference,contextSource} from './current-state.mjs';
@@ -230,6 +231,7 @@ export function save(args,host) {
   requireText(args.content,'content',100000);
   if (!['intent','plan','decision','preference','artifact'].includes(args.kind)) throw new Error('Unsupported record kind');
   if (args.kind==='preference' && (!['explicit','inferred'].includes(args.basis) || !args.source_reference)) throw new Error('Preferences need explicit/inferred basis and source_reference');
+  if(args.context_obligations!==undefined&&(args.context_obligations?.version!==1||!['artifact','decision','intent','preference'].includes(args.kind)||typeof args.context_obligations.scope!=='string'||!args.context_obligations.scope.trim()))throw Error('Versioned context_obligations requires scope and a current artifact record');
   const recordId=args.id ?? id(args.kind);
   if (!/^[a-zA-Z0-9][a-zA-Z0-9:_-]{0,200}$/.test(recordId) || ['constructor','prototype','__proto__'].includes(recordId)) throw new Error('Invalid record ID');
   const state=update(args,host,'record.saved',s=>{
@@ -239,7 +241,7 @@ export function save(args,host) {
     if(old?.prototype) throw new Error('Prototype records are immutable; use company_prototype or create a new scope');
     if (old && (old.author_instance!==s.owner.session_id || old.revision!==args.expected_revision)) throw new Error('Record owner or version conflict; create a new proposal instead');
     if (!old && args.expected_revision !== undefined && args.expected_revision !== 0) throw new Error('Record does not exist at expected version');
-    s.records[recordId]={id:recordId,kind:args.kind,content:args.content,author_role:'runner',author_instance:s.owner.session_id,revision:(old?.revision??0)+1,status:'Draft',source_reference:args.source_reference??null,basis:args.basis??null,updated_at:stamp(),previous:old ? [...(old.previous??[]), {revision:old.revision,content:old.content,source_reference:old.source_reference}] : []};
+    s.records[recordId]={id:recordId,kind:args.kind,content:args.content,...(args.context_obligations===undefined?{}:{context_obligations:structuredClone(args.context_obligations)}),author_role:'runner',author_instance:s.owner.session_id,revision:(old?.revision??0)+1,status:'Draft',source_reference:args.source_reference??null,basis:args.basis??null,updated_at:stamp(),previous:old ? [...(old.previous??[]), {revision:old.revision,content:old.content,source_reference:old.source_reference,...(old.context_obligations?{context_obligations:old.context_obligations}:{})}] : []};
     // An amended artifact never retains a review of its earlier version.
   },{rootKeys:['schema','runtime_version','plugin_version','team_sha256','owner','paused','roles','governance','governance_sha256','cos_instructions','revision','updated_at'],entities:{records:[recordId],upgrade:['status']}});
   return mutationView(state.records[recordId],recordId);
@@ -275,14 +277,14 @@ export function dispatch(args,host,{launch=launchWorker,check=readiness,catalog=
   if (ready.authenticated===false) throw new Error(`${host} CLI is not signed in. Complete its normal login before starting specialists.`);
   const jobId=id('job');
   const state=update(args,host,'job.queued',s=>{
-    if(s.paused && !handoverReviewEligible(s,args)&&!qualificationMaintenanceEligible(s,args)) throw new Error('Company is paused; only current handover QA or explicitly authorized read-only qualification may run');
+    if(s.paused && !handoverReviewEligible(s,args)&&!qualificationMaintenanceEligible(s,args)&&!scoped.scopedMaintenanceEligible(s,args)) throw new Error('Company is paused; only current handover QA or explicitly authorized read-only qualification may run');
     if(reviewWindow&&!freshHandoverReviewEligible(s,args))throw Error('Review window is only for a fresh current paused streamed handover QA');
     if(!Object.hasOwn(s.roles,args.role)) throw new Error('Role is absent from the pinned team catalog');
     if(busy(s).length>=3) throw new Error('Three assignments already active; wait for a result');
     const target=args.review_of && Object.hasOwn(s.records,args.review_of) ? s.records[args.review_of] : null;
     if(args.review_of && !target) throw new Error('Review target not found');
     const key=target ? `${args.role}:review:${target.id}:${target.revision}` : args.prototype_id ? `${args.role}:prototype:${jobId}` : args.development_id ? `${args.role}:development:${jobId}` : args.role;
-    const qualification=Boolean(target?.context_qualification_target);
+    const qualification=Boolean(target?.context_qualification_target||target?.scoped_context_target);
     if(qualification&&(args.role!=='qa'||args.prototype_id||args.development_id||args.input_ids?.length||args.evidence_ids?.length))throw Error('Qualification requires separate bounded QA without extra inputs');
     let session=s.sessions[key];
     if(session && busy(s).some(j=>j.instance_id===session.instance_id)) throw new Error('This role session already has an assignment');
@@ -438,7 +440,7 @@ function readPublicExact(db,args){return db.readSnapshot(()=>{
 export function contextControl(args,host) {
   binding(args,host);
   if(args.profile!==undefined&&(args.action!=='plan'||!args.source_id))throw Error('Qualification profile selects fresh source plans only; existing plans cannot be extended');
-  if(args.action==='inspect'&&args.plan_id)return withStore(args.root,db=>qualificationPlanView(db.read(),args));
+  if(args.action==='inspect'&&args.plan_id)return withStore(args.root,db=>{const s=db.read();return s.records[args.plan_id]?.scoped_context_plan?scoped.scopedPlanView(s,args):qualificationPlanView(s,args);});
   if(args.action==='read'&&args.snapshot)return withStore(args.root,db=>{
     const s=db.readSelected({rootKeys:[],entities:{}}),ref=snapshotReference(args.snapshot),offset=args.offset??0;
     if(!ref)throw Error('Exact immutable snapshot reference required');
@@ -456,7 +458,7 @@ export function contextControl(args,host) {
     throw Error('Invalid or oversized immutable snapshot range');
   });
   if(args.action==='read'&&args.plan_id)return withStore(args.root,db=>{
-    const s=db.read();if(args.unit_id)return qualificationReadUnit(s,args);
+    const s=db.read();if(s.records[args.plan_id]?.scoped_context_plan)return scoped.scopedPlanView(s,args);if(args.unit_id)return qualificationReadUnit(s,args);
     let length=args.length??8000;
     if(!Number.isSafeInteger(length)||length<1||length>32768)throw Error('Invalid qualification evidence range');
     while(length>0){
@@ -471,6 +473,9 @@ export function contextControl(args,host) {
   });
   if(args.action==='inspect')return withStore(args.root,db=>db.readSnapshot(()=>publicPage(db.publicState(),args)));
   if(args.action==='read')return withStore(args.root,db=>readPublicExact(db,args));
+  if(args.protocol===scoped.SCOPED_PROTOCOL||args.integration_review_id||args.phase)return scopedControl(args,host);
+  if(args.action==='revoke'&&args.plan_id&&withStore(args.root,db=>Boolean(db.read().records[args.plan_id]?.scoped_context_plan)))return scopedControl(args,host);
+  if(args.protocol!==undefined)throw Error('Unsupported context protocol');
   if(args.source_id||args.aggregate_review_id||['target','revoke'].includes(args.action))return qualificationControl(args,host);
   if(!['plan','apply'].includes(args.action))throw Error('Choose context inspect, read, plan or apply');
   const s=update(args,host,'context.'+args.action,state=>{
@@ -500,6 +505,36 @@ export function contextControl(args,host) {
   });
   return args.action==='plan'?mutationView(s.records[s.context_last_plan],s.context_last_plan):{applied:true,response_format:'soloco-current-v2',records:publicPage(s,{collection:'records'}),classifications:publicPage(s,{collection:'context_classifications'}),note:'Stored metadata; current applicability is not validated by inspection. Applicability dispositions do not authorize execution'};
 }
+
+function scopedControl(args,host){
+  if(!['plan','target','apply','revoke'].includes(args.action))throw Error('Choose scoped plan, target, apply or revoke');
+  let result;
+  update(args,host,'context.scoped.'+args.action,s=>{
+    requireText(args.source_instruction,'source_instruction');
+    if(args.action==='plan'){
+      if(args.protocol!==scoped.SCOPED_PROTOCOL)throw Error('New scoped plans require explicit protocol:scoped-context-v1');
+      const plan=scoped.captureScopedPlan(s,args),key=id('scoped-plan');
+      s.records[key]={id:key,kind:'plan',revision:1,status:'Draft',author_role:'runner',author_instance:args.session_id,scoped_context_plan:plan,
+        ...(args.maintenance===true?{context_maintenance:{readonly:true,owner:{...s.owner},controls_sha256:qualificationControlHash(s),source_instruction:args.source_instruction,at:stamp()}}:{}),source_reference:args.source_instruction,created_at:stamp()};
+      result={id:key,...scoped.scopedPlanView(s,{plan_id:key})};
+    }else if(args.action==='target'){
+      const target=scoped.createScopedTarget(s,args);
+      if(target.reused){result=target;return;}
+      const key=id('scoped-target');s.records[key]={id:key,kind:'qualification_target',revision:1,status:'Draft',author_role:'runner',author_instance:args.session_id,scoped_context_target:target,source_reference:args.source_instruction,created_at:stamp()};
+      result={id:key,source:recordReference(s.records[key]),target};
+    }else if(args.action==='apply'){
+      const proof=scoped.validateScopedApply(s,args);
+      s.context_classifications??={};s.context_classifications[proof.source.id]={source:proof.source,disposition:'represented',plan:proof.plan,review:proof.integration,scoped_qualification:proof,source_instruction:args.source_instruction,at:stamp()};
+      result={applied:true,source:proof.source,plan:proof.plan,review:proof.integration};
+    }else {
+      const p=s.records[args.plan_id];if(!p?.scoped_context_plan||!p.context_maintenance)throw Error('Scoped maintenance authorization missing');
+      p.context_maintenance.revoked_at=stamp();p.context_maintenance.revocation_instruction=args.source_instruction;
+      for(const j of busy(s))if(s.records[j.review_of?.id]?.scoped_context_target?.plan.id===p.id)j.status='cancelled';
+      result={revoked:true,plan_id:p.id};
+    }
+  });return {...result,protocol:scoped.SCOPED_PROTOCOL,response_format:'soloco-current-v2'};
+}
+
 function qualificationControl(args,host){
   if(!['plan','target','apply','revoke'].includes(args.action))throw Error('Choose qualification plan, target, apply or revoke');
   let result;

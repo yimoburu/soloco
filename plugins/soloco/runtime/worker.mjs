@@ -1,3 +1,4 @@
+import * as scoped from './scoped-context.mjs';
 import {qualificationAssignment,qualificationMatches,qualificationMaintenanceEligible,qualificationDelivery,qualificationProof,validateQualificationOutput,validateQualificationResponse} from './context-qualification.mjs';
 import {createDeliveryLedger,recordDelivery,readEvidence,validateCitations,validateSemanticDelivery} from './upgrade-evidence.mjs';
 import {contextRead,contextSource} from './current-state.mjs';
@@ -15,8 +16,10 @@ import { prototypeAssignment, prototypeBundle, prototypePrompt } from './prototy
 import { coordinationEligible } from './coordination.mjs';
 import { TIMEOUT_POLICY_VERSION, normalizeTimeout, executionTiming, jobExecutionTiming, jobTimeoutState } from './timeout.mjs';
 
-function workerContext(state,job){return state.records?.[job.review_of?.id]?.context_qualification_target?qualificationAssignment(state,job):assignmentContext(state,job);}
-function workerMatches(state,job,hash){return state.records?.[job.review_of?.id]?.context_qualification_target?qualificationMatches(state,job,hash):contextMatches(state,job,hash);}
+const scopedContext=a=>a?.qualification?.protocol===scoped.SCOPED_PROTOCOL;
+const maintenanceEligible=(s,j)=>qualificationMaintenanceEligible(s,j)||scoped.scopedMaintenanceEligible(s,j);
+function workerContext(state,job){if(scoped.isScopedJob(state,job))return scoped.scopedAssignment(state,job);return state.records?.[job.review_of?.id]?.context_qualification_target?qualificationAssignment(state,job):assignmentContext(state,job);}
+function workerMatches(state,job,hash){if(scoped.isScopedJob(state,job))return scoped.scopedMatches(state,job,hash);return state.records?.[job.review_of?.id]?.context_qualification_target?qualificationMatches(state,job,hash):contextMatches(state,job,hash);}
 
 function validateEnvelope(artifact,roles) {
   for(const name of ['messages','notices'])if(artifact[name]!==undefined&&!Array.isArray(artifact[name]))throw new Error(`${name} must be an array`);
@@ -45,7 +48,7 @@ export async function work(root, jobId, model = runModel) {
   let overallTiming;
   const eligibility=s=>{
     const current=s.jobs[jobId];
-    if(!compatibleRuntime(s) || upgradePending(s) || !current || current.status!=='running' || current.instance_id!==job.instance_id || s.owner.epoch!==job.epoch || (s.paused&&!handoverReviewEligible(s,current)&&!qualificationMaintenanceEligible(s,current)) || !workerMatches(s,job,context.hash))throw Object.assign(new Error('Assignment is no longer eligible'),{code:'ASSIGNMENT_INELIGIBLE'});
+    if(!compatibleRuntime(s) || upgradePending(s) || !current || current.status!=='running' || current.instance_id!==job.instance_id || s.owner.epoch!==job.epoch || (s.paused&&!handoverReviewEligible(s,current)&&!maintenanceEligible(s,current)) || !workerMatches(s,job,context.hash))throw Object.assign(new Error('Assignment is no longer eligible'),{code:'ASSIGNMENT_INELIGIBLE'});
     if(context?.handover_evidence&&current.native_id!==job.native_id)throw Error('Handover reviewer native identity changed');
     coordinationEligible(s,current);
     prototypeAssignment(s,job);developmentAssignment(s,job,false,root);
@@ -75,7 +78,7 @@ export async function work(root, jobId, model = runModel) {
   try {
     state=withStore(root,db=>db.transaction('job.started',s=>{
       job=s.jobs[jobId];
-      if(!compatibleRuntime(s) || upgradePending(s) || !job || job.status!=='queued' || job.epoch!==s.owner.epoch || (s.paused&&!handoverReviewEligible(s,job)&&!qualificationMaintenanceEligible(s,job))) throw new Error('Assignment is no longer eligible');
+      if(!compatibleRuntime(s) || upgradePending(s) || !job || job.status!=='queued' || job.epoch!==s.owner.epoch || (s.paused&&!handoverReviewEligible(s,job)&&!maintenanceEligible(s,job))) throw new Error('Assignment is no longer eligible');
       coordinationEligible(s,job);
       prototypeAssignment(s,job);developmentAssignment(s,job,false,root);
       context=workerContext(s,job);
@@ -161,7 +164,7 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
       check();
       if(session&&session!==output.native_id)throw Error('Supplemental read changed native identity');
       if(context.qualification){
-        withStore(root,db=>db.transaction('job.partition_delivered',s=>{const current=eligibility(s);partitionDelivery=qualificationDelivery(context,current,output.native_id,request);current.qualification_delivery=partitionDelivery;return s;}));
+        withStore(root,db=>db.transaction('job.partition_delivered',s=>{const current=eligibility(s);partitionDelivery=(scopedContext(context)?scoped.scopedDelivery:qualificationDelivery)(context,current,output.native_id,request);current.qualification_delivery=partitionDelivery;return s;}));
       }
       if(context.handover_evidence){
         if(!output.native_id||output.native_id===target.author_instance||output.native_id===state.owner.session_id)throw Error('Handover review requires independent native identity');
@@ -206,8 +209,9 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
     artifact=context.qualification?JSON.parse(output.text):parseArtifact(output.text);
     validateEnvelope(artifact,state.roles);
     if(context.qualification){
-      validateQualificationOutput(output.text,state.records[context.qualification.plan.id].context_partition_plan);
-      validateQualificationResponse(state,job,context,output.native_id,artifact.qualification_result);
+      if(scopedContext(context))scoped.validateScopedOutput(output.text);
+      else validateQualificationOutput(output.text,state.records[context.qualification.plan.id].context_partition_plan);
+      (scopedContext(context)?scoped.validateScopedResponse:validateQualificationResponse)(state,job,context,output.native_id,artifact.qualification_result);
     }
     if(context.handover_evidence){
       validateCitations(context.handover_evidence,artifact.citations,deliveryLedger);
@@ -222,9 +226,9 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
       try {prototypeAssignment(s,job);developmentAssignment(s,job,false,root);} catch {prototypeStale=true;}
       let executionStale=false;
       try {eligibility(s);} catch {executionStale=true;}
-      const stale=!current || current.status!=='running' || s.owner.epoch!==job.epoch || (s.paused&&!handoverReviewEligible(s,current)&&!qualificationMaintenanceEligible(s,current)) || changed || prototypeStale || executionStale || controller.signal.aborted;
+      const stale=!current || current.status!=='running' || s.owner.epoch!==job.epoch || (s.paused&&!handoverReviewEligible(s,current)&&!maintenanceEligible(s,current)) || changed || prototypeStale || executionStale || controller.signal.aborted;
       if(!current)throw new Error('Assignment record disappeared before completion');
-      if(context.qualification&&!stale)validateQualificationResponse(s,job,context,output.native_id,artifact.qualification_result);
+      if(context.qualification&&!stale)(scopedContext(context)?scoped.validateScopedResponse:validateQualificationResponse)(s,job,context,output.native_id,artifact.qualification_result);
       const bundle=stale||job.development_id?null:prototypeBundle(s,job,artifact);
       const development=stale||!job.development_id?null:developmentBundle(s,job,artifact,root);
       const artifactId=id(stale?'quarantined':'artifact');
@@ -233,7 +237,7 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
       current.status=stale?'quarantined':'completed';current.artifact_id=artifactId;current.finished_at=stamp();current.native_id=output.native_id;
       if(controller.signal.aborted)current.execution_failure={...failureEvidence(controller.signal.reason),outcome:'cancelled_or_timed_out',...(context?.qualification&&controller.signal.reason?.code==='ASSIGNMENT_INELIGIBLE'?{abort_kind:'eligibility_loss'}:{}),at:stamp()};
       current.model_evidence=output.model_evidence??{reported_models:[],reported_effort:null,verification:'unverified',source:'not_reported',scope:'unknown'};
-      if(context.qualification){s.records[artifactId].qualification_output=output.text;s.records[artifactId].qualification_proof=qualificationProof(partitionDelivery,current);}
+      if(context.qualification){s.records[artifactId].qualification_output=output.text;s.records[artifactId].qualification_proof=(scopedContext(context)?scoped.scopedProof:qualificationProof)(partitionDelivery,current);}
       if(stale) {notice(s,'must_know','A late or stale result was quarantined; it grants no approval.',artifactId);return s;}
       const previousNative=s.sessions[job.session_key].native_id,messageCount=s.messages.length,noticeCount=s.notices.length;
       s.sessions[job.session_key].native_id=output.native_id;

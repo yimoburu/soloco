@@ -1,3 +1,4 @@
+import {validateScopedExclusion,SCOPED_PROTOCOL} from './scoped-context.mjs';
 import {digest,requireText} from './store.mjs';
 import {snapshotReference,resolveSnapshot,resolveSnapshotEntry,hasSnapshotReferences,legacyHandoverSource} from './snapshot.mjs';
 import {buildQualificationEvidence,knownModelCatalog} from './upgrade-evidence.mjs';
@@ -50,6 +51,12 @@ export function contextSource(state,id) {if(Object.hasOwn(state.records??{},id))
 export function recordReference(record,id=record.id) {return {id,revision:record.revision??null,sha256:digest(JSON.stringify(record))};}
 export function classificationFor(state,record,id=record.id,validation) {
   const c=state.context_classifications?.[id];if(!c)return null;
+  if(c.scoped_qualification){
+    const proof=c.scoped_qualification;
+    if(Object.keys(c).some(k=>!['source','disposition','plan','review','scoped_qualification','source_instruction','at'].includes(k))||proof.protocol!==SCOPED_PROTOCOL||proof.source?.id!==id||c.disposition!=='represented')throw Error('Scoped classification identity/fields changed: '+id);
+    for(const [key,value] of [['source',proof.source],['plan',proof.plan],['review',proof.integration]])if(JSON.stringify(c[key])!==JSON.stringify(value))throw Error('Scoped classification metadata changed: '+id);
+    validateScopedExclusion(state,proof);return c;
+  }
   if(c.partition_qualification){
     const proof=c.partition_qualification;
     if(Object.keys(c).some(k=>!['source','disposition','plan','review','partition_qualification','source_instruction','at'].includes(k)))throw Error('Unknown context tree classification fields: '+id);
@@ -87,9 +94,13 @@ export function relevantRecord(state,record,job={},classification=classification
   if(c.roles?.length&&!c.roles.includes(job.role))return false;
   return true;
 }
+function unrelatedScopedHome(projection,id,job){
+  const scopes=projection.scopedHomes?.get(id);
+  return Boolean(!projection.globalMandatory?.has(id)&&job.context_scope&&scopes?.length&&!scopes.includes('*')&&!scopes.includes(job.context_scope));
+}
 export function governingRecords(state,job={},projection=reviewedContext(state)) {
   if(Object.entries(state.records).some(([key,r])=>key!==r.id))throw Error('Ambiguous record identity; exact source repair required');
-  return Object.values(state.records).filter(r=>projection.mandatory.has(r.id)||((['intent','decision','preference'].includes(r.kind)||['Fail','Blocked'].includes(r.review?.verdict))&&relevantRecord(state,r,job,projection.classifications.get(r.id)??null)));
+  return Object.values(state.records).filter(r=>!unrelatedScopedHome(projection,r.id,job)&&(projection.mandatory.has(r.id)||((['intent','decision','preference'].includes(r.kind)||['Fail','Blocked'].includes(r.review?.verdict))&&relevantRecord(state,r,job,projection.classifications.get(r.id)??null))));
 }
 // Typed job/upgrade homes are exact compulsory inputs too. Ordinary format 3
 // includes ONLY these declared homes, never every historical execution body.
@@ -106,7 +117,7 @@ export function mandatoryExecutionEvidence(state,projection=reviewedContext(stat
 // category-based selection; format 5 includes every unqualified semantic record.
 export function currentRecords(state,job={},projection=reviewedContext(state)) {
   if(Object.entries(state.records).some(([key,r])=>key!==r.id))throw Error('Ambiguous record identity; exact source repair required');
-  return Object.values(state.records).filter(r=>(!job.id||r.job_id!==job.id)&&(projection.mandatory.has(r.id)||(!projection.excluded(r.id)&&relevantRecord(state,r,job,projection.classifications.get(r.id)??null))));
+  return Object.values(state.records).filter(r=>!unrelatedScopedHome(projection,r.id,job)&&(!job.id||r.job_id!==job.id)&&(projection.mandatory.has(r.id)||(!projection.excluded(r.id)&&relevantRecord(state,r,job,projection.classifications.get(r.id)??null))));
 }
 export function currentExecutionEvidence(state,job={},projection=reviewedContext(state)) {
   const sources=[];
@@ -223,7 +234,7 @@ export function applyContextQualification(state,plan,review,{source_instruction,
   return classifications;
 }
 export function reviewedContext(state) {
-  const classifications=new Map(),mandatory=new Set(),proofs=new Set(),proofJobs=new Set();
+  const classifications=new Map(),mandatory=new Set(),proofs=new Set(),proofJobs=new Set(),scopedHomes=new Map(),globalMandatory=new Set();
   const validation={negativePlans:new Set(Object.values(state.records??{}).filter(r=>r.status==='Submitted'&&r.review_of&&['Fail','Blocked'].includes(r.review?.verdict)).map(r=>JSON.stringify([r.review_of.id,r.review_of.revision])))};
   for(const id of Object.keys(state.context_classifications??{})){
     const source=contextSource(state,id);if(!source)throw Error('Context classification source is missing: '+id);
@@ -234,15 +245,22 @@ export function reviewedContext(state) {
         const plan=state.records[stale.plan.id]?.context_classification_plan;
         if(!plan?.counterparts)throw Error('Context qualification proof changed');
         if(!state.records[id])throw Error('Reviewed historical source changed; fresh qualification required: '+id);
-        mandatory.add(id);
-        for(const ref of plan.counterparts){if(!state.records[ref.id])throw Error('Mandatory counterpart missing');mandatory.add(ref.id);}
+        mandatory.add(id);globalMandatory.add(id);
+        for(const ref of plan.counterparts){if(!state.records[ref.id])throw Error('Mandatory counterpart missing');mandatory.add(ref.id);globalMandatory.add(ref.id);}
       }
       continue;
     }
     classifications.set(id,c);
+    if(c.scoped_qualification){
+      const p=c.scoped_qualification;
+      for(const {source,scopes} of p.home_scopes){mandatory.add(source.id);const prior=scopedHomes.get(source.id)??[];scopedHomes.set(source.id,[...new Set([...prior,...scopes])]);}
+      proofs.add(p.plan.id);
+      for(const receipt of p.receipts){proofJobs.add(receipt.job.id.slice(4));proofs.add(receipt.review.id);proofs.add(receipt.target.id);const target=state.records[receipt.target.id]?.scoped_context_target;if(target)proofs.add(target.plan.id);}
+      continue;
+    }
     if(c.partition_qualification){
       const p=c.partition_qualification,plan=state.records[p.plan.id].context_partition_plan;
-      for(const ref of [...p.counterparts,...plan.reviewed_subject.records.map(r=>r.ref)])mandatory.add(ref.id);
+      for(const ref of [...p.counterparts,...plan.reviewed_subject.records.map(r=>r.ref)]){mandatory.add(ref.id);globalMandatory.add(ref.id);}
       proofs.add(p.plan.id);
       for(const reviewer of p.reviewers){const job=state.jobs[reviewer.id];proofJobs.add(job.id);proofs.add(job.artifact_id);proofs.add(job.review_of.id);}
       continue;
@@ -254,11 +272,11 @@ export function reviewedContext(state) {
       // part of the classification proof. An aliasing artifact_id, error or
       // unknown extension is independent evidence and stays compulsory.
       if(job&&job.id===jobId&&job.artifact_id===c.review.id&&proofJobSafe(job))proofJobs.add(jobId);
-      if(c.disposition==='represented')for(const ref of state.records[c.plan.id].context_classification_plan.counterparts)mandatory.add(ref.id);
+      if(c.disposition==='represented')for(const ref of state.records[c.plan.id].context_classification_plan.counterparts){mandatory.add(ref.id);globalMandatory.add(ref.id);}
     }
   }
   for(const key of proofJobs)if(mandatory.has('job:'+key)||classifications.get('job:'+key)?.disposition==='current')proofJobs.delete(key);
-  return {classifications,mandatory,proofs,proofJobs,excluded:id=>!mandatory.has(id)&&(['resolved','represented'].includes(classifications.get(id)?.disposition)||(!classifications.has(id)&&proofs.has(id)))};
+  return {classifications,mandatory,proofs,proofJobs,scopedHomes,globalMandatory,excluded:id=>!mandatory.has(id)&&(['resolved','represented'].includes(classifications.get(id)?.disposition)||(!classifications.has(id)&&proofs.has(id)))};
 }
 export function contextRead(state,{id,sha256,offset=0,length=16000}) {
   const record=contextSource(state,id);if(!record||digest(JSON.stringify(record))!==sha256)throw Error('Missing or changed supplemental source');

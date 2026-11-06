@@ -1,3 +1,4 @@
+import {scopedAssignment,scopedMatches,isScopedJob,SCOPED_LIMITS} from './scoped-context.mjs';
 import { handoverReviewContext } from './handover.mjs';
 import { digest } from './store.mjs';
 import { developmentTransportBudget } from './development-limits.mjs';
@@ -12,6 +13,7 @@ const required = record => ['intent', 'decision', 'preference'].includes(record.
 
 export function contextBudgetForJob(state,job) {
   const target=state.records[job.review_of?.id];
+  if(target?.scoped_context_target)return SCOPED_LIMITS.input_bytes;
   if(target?.context_qualification_target)return QUALIFICATION_LIMITS.input_bytes;
   const planId=job.development_id??target?.development?.plan_id;
   const scope=planId&&state.records[planId]?.development?.scope;
@@ -20,6 +22,7 @@ export function contextBudgetForJob(state,job) {
 
 // Every supplied fact is a dependency. Never silently trim a constraint or input.
 export function assignmentContext(state, job) {
+  if(isScopedJob(state,job))return scopedAssignment(state,job);
   const qualification=qualificationAssignment(state,job);if(qualification)return qualification;
   const handover=handoverReviewContext(state,job);if(handover)return handover;
   if(job.context_format===4)return qualificationReviewContext(state,job);
@@ -95,6 +98,7 @@ export function supplementalMatches(state, job) {
 
 export function contextMatches(state, job, hash) {
   try {
+    if(isScopedJob(state,job))return scopedMatches(state,job,hash);
     if(state.records?.[job.review_of?.id]?.context_qualification_target)return qualificationMatches(state,job,hash);
     // A job's published notices/messages are outputs, not changes to its inputs.
     // They remain in the real state and every subsequent assignment's context.
