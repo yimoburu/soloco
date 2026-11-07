@@ -301,4 +301,57 @@ test('restore preserves accepted exact evidence, a queued obligation and an unpr
  }finally{f.close();fs.rmSync(transfer,{recursive:true,force:true});}
 });
 
+test('scheduler retries only typed pre-execution waits and retains misleading unknown failures',async()=>{
+ const {SchedulingHold}=await import('../plugins/soloco/runtime/recovery.mjs');
+ const f=fixture();
+ try{
+  const t=f.submit('typed-wait');
+  tickRuntime(f.root,{queue:()=>{throw new SchedulingHold('CAPACITY_BUSY','Completely different display wording');}});
+  assert.equal(f.read().records[t.id].runtime_task.state,'planned');
+  tickRuntime(f.root,{queue:()=>{throw Error('capacity reserved already active: an unknown integrity failure');}});
+  const state=f.read();assert.equal(state.records[t.id].runtime_task.state,'needs_attention');
+  assert.equal(state.records[t.id].runtime_task.attention_code,'UNKNOWN');
+  assert.equal(state.records[t.id].runtime_task.attempts.length,0);
+  const page=taskAction({...f.args,action:'inspect',task_id:t.id},host);
+  assert.equal(page.tasks[0].recovery.automatic,false);
+  assert.equal(page.tasks[0].recovery.retry_execution,false);
+ }finally{f.close();}
+});
+
+test('unstarted dependents expose an actionable wait without claiming an attempt',()=>{
+ const f=fixture();
+ try{const a=f.submit('pending-producer'),b=f.submit('pending-review',{role:'qa',review_task_id:a.id});
+  const page=taskAction({...f.args,action:'inspect',task_id:b.id},host);
+  assert.equal(page.tasks[0].readiness.ready,false);assert.equal(page.tasks[0].readiness.recovery.code,'DEPENDENCY_PENDING');assert.equal(page.tasks[0].readiness.recovery.automatic,true);assert.equal(page.tasks[0].attempts.length,0);
+ }finally{f.close();}
+});
+
+test('nonautomatic readiness holds persist even after the original evidence is restored',()=>{
+ const f=fixture();try{
+  engine.save({...f.args,epoch:1,id:'fixed-input',kind:'artifact',content:'Original evidence'},host);
+  const t=f.submit('readiness-integrity',{input_ids:['fixed-input']});
+  const original=f.read().records['fixed-input'];
+  withStore(f.root,db=>db.transaction('fixture.changed',s=>{s.records['fixed-input'].content='Changed source';s.records['fixed-input'].revision++;return s;}));
+  let calls=0;tickRuntime(f.root,{queue:()=>{calls++;return {};}});assert.equal(calls,0,'held task must not dispatch');
+  assert.equal(f.read().records[t.id].runtime_task.state,'needs_attention');
+  assert.equal(f.read().records[t.id].runtime_task.attention_code,'CONTEXT_CHANGED');
+  withStore(f.root,db=>db.transaction('fixture.restored',s=>{s.records['fixed-input']=original;return s;}));
+  tickRuntime(f.root,{queue:()=>{calls++;return {};}});assert.equal(calls,0,'restoration alone cannot reconcile a held task');
+  assert.equal(f.read().records[t.id].runtime_task.attempts.length,0);
+ }finally{f.close();}
+});
+
+test('two simultaneously ready resource claimants preserve the unstarted wait at queue revalidation',async()=>{
+ const f=fixture();try{
+  const tasks=[f.submit('shared-a',{resources:['fixture/shared']}),f.submit('shared-b',{resources:['fixture/shared']})];
+  const first=tickRuntime(f.root,{queue:(root,key)=>queue(root,key)});
+  assert.equal(first.ready.length,2);assert.equal(first.dispatched.length,1);
+  const waiting=tasks.find(t=>f.read().records[t.id].runtime_task.state==='planned');assert(waiting);
+  assert.equal(f.read().records[waiting.id].runtime_task.attempts.length,0);
+  await work(f.root,first.dispatched[0].job_id,model('fictional-shared-first'));
+  const next=tickRuntime(f.root,{queue:(root,key)=>queue(root,key)});
+  assert.equal(next.dispatched.length,1);assert.equal(f.read().records[waiting.id].runtime_task.state,'queued');
+ }finally{f.close();}
+});
+
 }

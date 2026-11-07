@@ -23,3 +23,28 @@ Successor review delivers complete previous and proposed current homes and all n
 Mechanical archive verification and retained census/baseline metadata still depend on history size. The bounded native packet is not a claim of constant storage, constant validation work, or bounded growth when current obligations themselves grow.
 
 First bootstrap feasibility remains unproved. Complete initial semantic understanding, finite native capacity, the fixed 600-second call and 45-minute rehearsal ceiling remain separate acceptance boundaries. Checkpoints do not establish fit for the real corpus.
+
+## Prospective unaccepted proposal continuation
+
+An ordinary format-6 dispatch can opt into
+`output_contract: "operating-proposal-v1"`. Its runtime admission freezes that
+contract before generation. The worker accepts only `content`, `messages` and
+`notices`; it must surface newly discovered restrictions, contradictions and
+uncertain obligations as notices. An exact successful proposal is retained for
+explicit consumers without changing accepted operating homes or requiring a
+publication solely for the new proposal. Full proposal bodies and producer
+records remain in the operating handover subject as pending work.
+
+This is a prospective producer contract, not classification of arbitrary text.
+Legacy outputs keep their original reconciliation path. Unknown fields,
+negative/rejected results, changed inputs, new notices/messages, altered outputs
+(including change-then-revert) and changed controls retain their holds. Proposal
+prose grants no authority and establishes no accepted fact. Accepting changed
+knowledge still requires the existing independent publication path.
+
+`tools/operating-proposal-eval.mjs --contract-double NEW_DIRECTORY` checks the
+production path with explicit fictional judgments. `--native` instead uses real
+standalone CLI sessions and independent initial publication, then three chained
+proposals and a seeded conflicting-evidence notice. Reports preserve exact source
+identity, calls, closure and failures; there is no automatic retry. This narrow
+fixture does not establish customer benefit or whole-company legacy bootstrap.

@@ -213,3 +213,26 @@ test('worker cannot accept later Pass over a completed negative',async()=>{
  const j=read(f).jobs[f.job.id];assert.equal(j.status,'failed');assert.equal(j.artifact_id,undefined);
  assert.equal(j.rejected_output.text,raw);assert.equal(j.rejected_output.qualification_negative,'Blocked');
 });
+
+const startupWarning={type:'item.completed',item:{id:'startup-warning',type:'error',message:'Ignoring unknown `features` requirement `ultrafast_mode` from requirements layers: fictional managed requirements'}};
+test('known pre-turn CLI startup diagnostic is retained and requires a complete turn',async()=>{
+ const result=await invoke([thread,startupWarning,start,message(negative('Pass')),done]);
+ assert.deepEqual(result.model_evidence.cli_warnings,[{type:'error',message:startupWarning.item.message}]);
+ assert.equal(result.model_evidence.verification,'unverified');
+ for(const events of [
+  [thread,startupWarning],
+  [thread,startupWarning,start,message(negative('Pass'))],
+  [thread,startupWarning,start,{type:'turn.failed'},message(negative('Pass')),done],
+  [thread,startupWarning,startupWarning,start,message(negative('Pass')),done],
+  [thread,start,message(negative('Pass')),done,startupWarning],
+       ])await assert.rejects(invoke(events));
+});
+
+test('skill-budget diagnostic preserves warning evidence and still requires successful terminal completion',async()=>{
+ const event={type:'item.completed',item:{id:'skill-warning',type:'error',message:'Skill descriptions were shortened to fit the skills context budget. Codex can still see every skill, but some descriptions are shorter. Disable unused skills or plugins to leave more room for the rest.'}};
+ const result=await invoke([thread,start,event,message(negative('Pass')),done]);
+ assert.deepEqual(result.model_evidence.cli_warnings,[{type:'error',message:event.item.message}]);
+ const {proofJobSafe}=await import('../plugins/soloco/runtime/current-state.mjs');assert(proofJobSafe({model_evidence:result.model_evidence}));
+ assert.deepEqual((await invoke([thread,start,message(negative('Pass')),event,done])).model_evidence.cli_warnings,[{type:'error',message:event.item.message}]);
+ await assert.rejects(invoke([thread,start,event,{type:'turn.failed'},message(negative('Pass')),done]));
+});

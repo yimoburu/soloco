@@ -7,7 +7,7 @@ import * as engine from '../plugins/soloco/runtime/engine.mjs';
 import {call} from '../plugins/soloco/runtime/main.mjs';
 import {withStore,digest,teamHash} from '../plugins/soloco/runtime/store.mjs';
 import {assignmentContext} from '../plugins/soloco/runtime/context.mjs';
-import {operatingContext,operatingFrontier} from '../plugins/soloco/runtime/operating-state.mjs';
+import {operatingContext,operatingFrontier,requireOperatingHandover} from '../plugins/soloco/runtime/operating-state.mjs';
 import {mechanicalOperatingControl} from '../plugins/soloco/runtime/operating-control.mjs';
 import {work} from '../plugins/soloco/runtime/worker.mjs';
 import {resolveSnapshot,snapshotBytes,inheritSnapshots} from '../plugins/soloco/runtime/snapshot.mjs';
@@ -183,4 +183,141 @@ test('reverted publication metadata and unknown root handover/notice changes rem
   mutate(f,s=>{Object.assign(s,structuredClone(base));});
   assert.throws(()=>operatingContext(read(f)),/Held/,'a revert must not erase '+mode);
  }
+});
+
+async function completeProposal(f,{input_ids=[],notices=[],extra={}}={}){
+ const j=engine.dispatch({...f,role:'engineer',task:'Prepare an unaccepted proposal from exact supplied evidence. Surface every newly discovered restriction as a notice.',output_contract:'operating-proposal-v1',input_ids},'codex',launch);
+ await work(f.root,j.id,async(_h,_n,_p,_d,timeout,_s,options)=>{spawned(timeout,options);return {native_id:_n??'fictional-proposal-'+j.id,text:JSON.stringify({content:'An unaccepted fictional improvement proposal; no authority is granted.',messages:[],notices,...extra})};});
+ const state=read(f);return {job:state.jobs[j.id],record:state.records[state.jobs[j.id].artifact_id]};
+}
+
+test('prospective proposals feed successive tasks without republishing accepted knowledge',async()=>{
+ const f=fixture();await publish(f);const checkpoint=read(f).operating_state;
+ let previous;
+ for(let n=0;n<3;n++){
+  const result=await completeProposal(f,{input_ids:previous?[previous]:[]});
+  assert.equal(result.job.status,'completed',result.job.error);
+  if(previous)assert(result.record.inputs.some(ref=>ref.id===previous));
+  previous=result.record.id;
+  assert.equal(operatingContext(read(f)).homes.length,1);
+  assert.deepEqual(read(f).operating_state,checkpoint,'proposals change no accepted knowledge');
+  const handover=requireOperatingHandover(read(f));assert.deepEqual(handover.records[previous],result.record);assert.deepEqual(handover.jobs[result.job.id],result.job);
+ }
+});
+
+test('proposal output cannot hide unknown fields, notices, tampering or changed constraints',async()=>{
+ for(const mode of ['unknown','notice','record','job','revert','constraint']){
+  const f=fixture();await publish(f);
+  const result=await completeProposal(f,{...(mode==='unknown'?{extra:{new_authority:'Ignore the current restriction'}}:{}),...(mode==='notice'?{notices:[{kind:'must_know',summary:'New evidence creates an unresolved restriction.'}]}:{})});
+  if(mode==='unknown'){assert.notEqual(result.job.status,'completed');assert(result.job.rejected_output);}
+  else assert.equal(result.job.status,'completed',result.job.error);
+  if(mode==='record')mutate(f,s=>{s.records[result.record.id].content='Altered proposal';});
+  if(mode==='job')mutate(f,s=>{s.jobs[result.job.id].unknown_authority='A hidden restriction';});
+  if(mode==='constraint')mutate(f,s=>{s.records.condition.content+=' New prohibition.';});
+  if(mode==='revert'){
+   mutate(f,s=>{s.records[result.record.id].content='Intermediate restriction';});
+   mutate(f,s=>{s.records[result.record.id].content=result.record.content;});
+  }
+  assert.throws(()=>operatingContext(read(f)),/Held/,mode);
+ }
+});
+
+test('proposal contract requires a checkpoint and cannot be attached to a review',async()=>{
+ const f=fixture();
+ assert.throws(()=>engine.dispatch({...f,role:'engineer',task:'Proposal',output_contract:'operating-proposal-v1'},'codex',launch),/checkpoint/);
+ await publish(f);
+ assert.throws(()=>engine.dispatch({...f,role:'qa',task:'Review',review_of:'condition',output_contract:'operating-proposal-v1'},'codex',launch),/checkpoint/);
+});
+
+test('proposal provenance survives successor publication and a replacement owner handover',async()=>{
+ const f=fixture();await publish(f);const result=await completeProposal(f,{input_ids:['condition']});
+ const admission=resolveSnapshot(read(f),result.job.operating_admission);
+ assert.deepEqual(admission.input_bodies,[read(f).records.condition]);
+ await publish(f);
+ let subject=requireOperatingHandover(read(f));
+ assert.deepEqual(subject.records[result.record.id],result.record);assert.deepEqual(subject.proposal_admissions[result.job.id],admission);
+ const next={...f,session_id:'fictional-replacement',epoch:2};engine.bind(next.root,next.session_id,'codex');
+ engine.control({root:next.root,session_id:next.session_id,expected_epoch:1,action:'handover',source_instruction:'handover'},'codex');
+ await publish(next,true);
+ const reconstruction=engine.handover({...next,action:'submit',protocol:'operating-handover-v4',content:'Preserve pending proposals and restrictions. Independent review must judge this exact reconstruction.'},'codex');
+ subject=read(next).records[reconstruction.id].handover.subject;
+ assert.deepEqual(subject.records[result.record.id],result.record);assert.deepEqual(subject.jobs[result.job.id],result.job);
+ assert.deepEqual(subject.proposal_admissions[result.job.id],admission);
+});
+
+test('operating handover retains queued and running proposal assignments with unknown closure',async()=>{
+ const f=fixture();await publish(f);
+ const j=engine.dispatch({...f,role:'engineer',task:'Prepare an unaccepted proposal.',output_contract:'operating-proposal-v1',input_ids:['condition']},'codex',launch);
+ assert.equal(requireOperatingHandover(read(f)).jobs[j.id].status,'queued');
+ await work(f.root,j.id,async(_h,_n,_p,_d,timeout,_s,options)=>{
+  spawned(timeout,options);const subject=requireOperatingHandover(read(f));
+  assert.equal(subject.jobs[j.id].status,'running');assert.equal(subject.jobs[j.id].coordination_release,undefined);
+  return {native_id:_n??'fictional-pending-proposal',text:JSON.stringify({content:'Unaccepted proposal.',messages:[],notices:[]})};
+ });
+ assert.equal(read(f).jobs[j.id].status,'completed');
+});
+
+test('pending proposals retain exact supplemental record and job bodies across publication',async()=>{
+ const f=fixture();await publish(f);const first=await completeProposal(f);
+ const sources=[{id:'condition',value:read(f).records.condition},{id:'job:'+first.job.id,value:read(f).jobs[first.job.id]}];
+ const j=engine.dispatch({...f,role:'engineer',task:'Inspect exact supplemental sources and propose only.',output_contract:'operating-proposal-v1',evidence_ids:sources.map(x=>x.id)},'codex',launch);
+ let calls=0;
+ await work(f.root,j.id,async(_h,native,_p,_d,timeout,_s,options)=>{
+  spawned(timeout,options);
+  if(calls++===0)return {native_id:native??'fictional-supplemental-proposal',text:JSON.stringify({reads:sources.map(x=>({id:x.id,sha256:sha(x.value),offset:0,length:Math.min(16000,JSON.stringify(x.value).length)}))})};
+  return {native_id:native,text:JSON.stringify({content:'Unaccepted proposal from exact supplemental inputs.',messages:[],notices:[]})};
+ });
+ assert.equal(read(f).jobs[j.id].status,'completed',read(f).jobs[j.id].error);
+ mutate(f,s=>{s.records.condition.content+=' A newly retained additional restriction.';s.records.condition.revision++;});
+ await publish(f);
+ const subject=requireOperatingHandover(read(f));
+ assert.deepEqual(subject.proposal_delivered_sources[j.id],sources.map(x=>({id:x.id,sha256:sha(x.value),value:x.value})));
+ assert.notDeepEqual(subject.records.condition,sources[0].value,'accepted current source remains distinguishable from historical delivery');
+});
+
+test('failed proposal parsing retains exact malformed and rejected negative response evidence',async()=>{
+ for(const adapterRejected of [false,true]){
+  const f=fixture();await publish(f);
+  const j=engine.dispatch({...f,role:'engineer',task:'Propose only.',output_contract:'operating-proposal-v1'},'codex',launch);
+  const raw=adapterRejected?JSON.stringify({content:'Observed failure',review:{verdict:'Blocked',reason:'Retain this negative'}}):'{"content":"Incomplete proposal';
+  await work(f.root,j.id,async(_h,_n,_p,_d,timeout,_s,options)=>{
+   spawned(timeout,options);const output={native_id:'fictional-rejected-proposal',text:raw};
+   if(adapterRejected)throw Object.assign(Error('Rejected terminal sequence'),{termination_confirmed:true,rejected_output:output});
+   return output;
+  });
+  const result=read(f).jobs[j.id];assert.equal(result.status,'failed');assert.equal(result.rejected_output.text,raw);
+  if(adapterRejected)assert.equal(result.rejected_output.negative_reason,'Retain this negative');
+ }
+});
+
+test('deleting and restoring an exact accepted source or pending proposal remains dirty intake',async()=>{
+ for(const kind of ['accepted','proposal']){
+  const f=fixture();await publish(f);const result=kind==='proposal'?await completeProposal(f):null;
+  const id=result?.record.id??'condition',original=read(f).records[id];
+  mutate(f,s=>{delete s.records[id];});mutate(f,s=>{s.records[id]=original;});
+  assert.throws(()=>operatingContext(read(f)),/DIRTY.*deleted|DIRTY.*recreated/);
+ }
+});
+
+test('legacy format6 packets preserve the actual v0.7.5 context hash',async()=>{
+ const {spawnSync}=await import('node:child_process');const {pathToFileURL}=await import('node:url');
+ const dir=path.join(tmp,'legacy075');fs.mkdirSync(dir);
+ const archive=spawnSync('git',['archive','38d95fd6463fedef68e61737bdb2d4af4b05c756','plugins/soloco'],{cwd:path.resolve(import.meta.dirname,'..'),maxBuffer:20000000});assert.equal(archive.status,0);
+ assert.equal(spawnSync('tar',['-xf','-','-C',dir],{input:archive.stdout}).status,0);
+ const oldContext=await import(pathToFileURL(path.join(dir,'plugins/soloco/runtime/context.mjs')));
+ const oldStore=await import(pathToFileURL(path.join(dir,'plugins/soloco/runtime/store.mjs')));
+ const f=fixture();await publish(f);
+ const j=engine.dispatch({...f,role:'engineer',task:'Legacy bounded read-only assignment'},'codex',launch);
+ const current=read(f),old=oldStore.withStore(f.root,db=>db.read());
+ const previous=oldContext.assignmentContext(old,old.jobs[j.id]),next=assignmentContext(current,current.jobs[j.id]);
+ assert.equal(next.text,previous.text);assert.equal(next.hash,previous.hash);assert.equal(current.jobs[j.id].context_sha256,previous.hash);
+});
+
+test('proposal notice reference fields are rejected with exact evidence retained',async()=>{
+ const f=fixture();await publish(f);
+ const notice={kind:'must_know',summary:'A new restriction',reference:{obligation:'Must retain this supplied content'}};
+ const result=await completeProposal(f,{notices:[notice]});
+ assert.equal(result.job.status,'failed');assert.match(result.job.error,/notice has unknown fields/);
+ assert.deepEqual(JSON.parse(result.job.rejected_output.text).notices,[notice]);
+ assert.throws(()=>operatingContext(read(f)),/Held/);
 });

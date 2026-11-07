@@ -144,3 +144,31 @@ Record useful communication preferences with source/date and explicit or inferre
 Notice resolutions are immutable attributed dispositions. An exact replay is safe; record a correction as a new notice referencing the original notice ID. Resolution ends pending attention but does not erase continuing conditions from assignment evidence. Changed conditions can hold affected scopes or reviews; preserve prior evidence and attempt allowances.
 
 Apply an explicit founder pause promptly with `company_control`; the exact message `pause` also works through the hook. Pause requests process cancellation through the worker and stops new assignments. Provider completion, descendant processes and worker-death termination are not guaranteed; late results are quarantined. Resumption and takeover retain records, unresolved notices, failed reviews and previous authorship. Never erase them to make progress appear cleaner.
+
+## Connect work to observed founder outcomes
+
+For meaningful durable tasks, use optional `spec.outcome` to carry the founder
+objective, expected effect, the observation that could confirm or challenge it,
+assessment period, and exact evidence IDs also supplied as task inputs. These
+are hypotheses. A completed task or passing review never establishes business
+impact. Reuse recorded outcomes and standing authority without another interview.
+
+On an accepted operating checkpoint, an ordinary read-only proposal can explicitly
+use `output_contract: "operating-proposal-v1"`. Proposals remain unaccepted and
+are supplied explicitly to consumers. Discovered restrictions, contradictions and
+uncertain obligations must be notices. Changed accepted knowledge still uses
+independent publication. Legacy outputs and unknown content keep their existing
+reconciliation path; never retroactively label them harmless proposals.
+
+Use typed readiness/recovery details to route the next action. Pending producers,
+capacity and live resource claims can wait in software. Changed context, failed
+review and uncertain execution need CoS reconciliation within existing authority;
+only a genuinely missing founder decision needs founder involvement. A recovery
+hint grants no retry, extra attempt, or permission. Preserve pending proposals in
+handover and verify the next useful action after reconstruction.
+
+For the approved SoloCo improvement workflow, link supplied founder feedback to
+the exact candidate, executed checks, review findings and observed result. Count
+actual founder interventions only when observed; leave unmeasured human time and
+customer effects unknown. Supplied local observations may be imported with the
+source utility `tools/outcome-observations.mjs` and reviewed as ordinary evidence.

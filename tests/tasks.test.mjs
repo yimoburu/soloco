@@ -6,7 +6,7 @@ import path from 'node:path';
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
 import {withStore,id,stamp} from '../plugins/soloco/runtime/store.mjs';
 import {resourceClaims} from '../plugins/soloco/runtime/coordination.mjs';
-import {taskAssignmentContext,taskDefinitionBinding} from '../plugins/soloco/runtime/task-context.mjs';
+import {taskAssignmentContext,taskDefinitionBinding,taskCheckpoint} from '../plugins/soloco/runtime/task-context.mjs';
 import {setRuntimeControl} from '../plugins/soloco/runtime/task-runtime-authority.mjs';
 import {submitTask,amendTask,cancelTask,taskRecord,taskView,taskReady,bindTaskAttempt,reconcileTask,isTaskBookkeeping,isTaskOutput,isTaskOwnOutput,validateTaskRecord,sendTaskMessage,appendPeerMessage,messagesForTask,disposeTaskMessage,disposePeerMessage,isOwnMessageDisposition,taskMessageInput,validateTaskMessage,isTaskMessage,isTaskScopedMessage} from '../plugins/soloco/runtime/tasks.mjs';
 
@@ -241,4 +241,48 @@ test('owner message and disposition source qualifiers survive, affect replay and
   assert.equal(command.content,dispositionSource);assert.equal(command.runtime_command.message_id,legacy.id);assert.equal(isTaskBookkeeping(state,command),false);assert.equal(isTaskScopedMessage(state,state.records[legacy.id]),false);
   const packet=unrelatedPacket(state,state.records[b.id]);assert(packet.records.some(entry=>entry.source.id===command.id));assert(packet.records.some(entry=>entry.source.id===legacy.id&&entry.value.runtime_message.disposition.source_instruction===dispositionSource));
   const malformed=structuredClone(state);malformed.records[message.id].runtime_message.source_instruction={hidden:'Unrecognized authority'};assert.equal(isTaskMessage(malformed,malformed.records[message.id]),false);
+}));
+
+test('task outcome is a bound hypothesis with exact evidence, retained through checkpoint definition changes',()=>fixture(({identity,write,read})=>{
+ write(s=>{s.records['feedback']={id:'feedback',kind:'artifact',revision:1,content:'Supplied fictional customer feedback'};});
+ const outcome={objective:'Reduce invalid configuration failures',expected_effect:'Clearer validation helps users correct input',observation:'Compare supplied failure counts before and after',assessment_period:'Next supplied weekly observation',evidence_ids:['feedback']};
+ const record=write(s=>submitTask(s,args(identity,'outcome',{input_ids:['feedback'],outcome}),'codex'));
+ assert.deepEqual(taskView(record).outcome,outcome);
+ assert.match(taskView(record).outcome_status,/hypothesis/);
+ assert.throws(()=>write(s=>submitTask(s,args(identity,'missing-outcome-input',{outcome}),'codex')),/exact task inputs/);
+ assert.throws(()=>write(s=>submitTask(s,args(identity,'invalid-outcome',{input_ids:['feedback'],outcome:{...outcome,achieved:true}}),'codex')),/Outcome requires/);
+ const amended=write(s=>amendTask(s,args(identity,'outcome-amend',{task_id:record.id,expected_definition_revision:1,input_ids:['feedback'],outcome:{...outcome,expected_effect:'A revised hypothesis'}}),'codex'));
+ assert.notEqual(amended.runtime_task.definition_sha256,record.runtime_task.definition_sha256);
+ assert.equal(read().records[record.id].runtime_task.spec.outcome.expected_effect,'A revised hypothesis');
+}));
+
+test('readiness validates an attempted producer before classifying a pending dependency',()=>fixture(({identity,read,write})=>{
+ const a=write(s=>submitTask(s,args(identity,'pending-exact-producer'),'codex'));
+ const b=write(s=>submitTask(s,args(identity,'pending-exact-consumer',{depends_on:[{task_id:a.id,gate:'output'}]}),'codex'));
+ const job=write(s=>queue(s,s.records[a.id])),state=read();
+ assert.equal(taskReady(state,state.records[b.id]).recovery.code,'DEPENDENCY_PENDING');
+ for(const mode of ['missing','identity','failed','interrupted']){
+  const changed=structuredClone(state);
+  if(mode==='missing')delete changed.jobs[job.id];
+  else if(mode==='identity')changed.jobs[job.id].instance_id='changed';
+  else changed.jobs[job.id].status=mode;
+  const recovery=taskReady(changed,changed.records[b.id]).recovery;
+  assert.equal(recovery.automatic,false,mode);assert.notEqual(recovery.code,'DEPENDENCY_PENDING',mode);
+ }
+}));
+
+test('a held completed producer cannot become a positive prerequisite after source restoration',()=>fixture(({identity,write,read})=>{
+ const a=write(s=>submitTask(s,args(identity,'held-producer'),'codex'));
+ const b=write(s=>submitTask(s,args(identity,'held-consumer',{depends_on:[{task_id:a.id,gate:'output'}]}),'codex'));
+ write(s=>queue(s,s.records[a.id]));write(s=>finish(s,s.records[a.id]));
+ assert.equal(taskReady(read(),read().records[b.id]).ready,true);
+ write(s=>{const r=s.records[a.id];r.runtime_task.state='needs_attention';r.runtime_task.attention_code='CONTEXT_CHANGED';r.status='Async:needs_attention';});
+ const result=taskReady(read(),read().records[b.id]);assert.equal(result.ready,false);assert.equal(result.recovery.automatic,false);assert.equal(result.recovery.code,'CONTEXT_CHANGED');
+}));
+
+test('explicit amendment clears a reconciled unstarted hold from the cold checkpoint',()=>fixture(({identity,write,read})=>{
+ const a=write(s=>submitTask(s,args(identity,'amend-held'),'codex'));
+ write(s=>{const r=s.records[a.id];r.runtime_task.state='needs_attention';r.runtime_task.attention_code='CONTEXT_CHANGED';r.runtime_task.attention='Old input hold';r.status='Async:needs_attention';});
+ write(s=>amendTask(s,{...args(identity,'reconcile-held'),task_id:a.id,expected_definition_revision:1},'codex'));
+ const r=read().records[a.id];assert.equal(r.runtime_task.state,'planned');assert.equal(r.runtime_task.attention,undefined);assert.equal(r.runtime_task.attention_code,undefined);assert.equal(taskReady(read(),r).ready,true);assert.deepEqual(taskCheckpoint(read(),r).blockers,[]);assert.equal(taskCheckpoint(read(),r).recovery,null);
 }));

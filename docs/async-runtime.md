@@ -62,3 +62,25 @@ Optional `--model <id>` explicitly selects a model for that fresh fixture (defau
 `gpt-6.1-sol`). The live host catalog must advertise the exact model and required
 low/medium efforts before any native job starts; an unavailable choice holds
 without substitution. This changes neither task scope nor attempt limits.
+
+## Prospective founder outcome and recovery contracts
+
+New tasks may supply `spec.outcome` with `objective`, `expected_effect`,
+`observation`, `assessment_period` and `evidence_ids`. Every outcome evidence ID
+must also be an explicit task input. The complete hypothesis travels with the
+immutable task definition, dependent evidence and cold checkpoint. An outcome is
+never marked achieved merely because its task or review completed. Amending it
+changes the definition hash and retains the existing consumed-attempt boundary.
+
+Task inspection exposes a typed readiness/recovery explanation. Only runtime
+capacity, a live resource claim or a pending prerequisite permits automatic
+rechecking of an unstarted task. An uncertain process, changed authority or
+context, rejected review, and unknown failure require the indicated owner and
+next action. Scheduling never interprets error-message wording as permission.
+No recovery descriptor restarts an execution or replenishes attempts.
+
+Use `tools/outcome-observations.mjs BEFORE.json AFTER.json NEW_REPORT.json` for
+explicitly supplied local measurements. Each input contains `metric`, `period`,
+`numerator`, `denominator`, and `source_reference`. The report retains exact file
+hashes and normalized rates, and makes no causal, customer-value or founder-time
+claim. Supply it through the existing artifact/input route for outcome review.
