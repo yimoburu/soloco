@@ -1,0 +1,94 @@
+TAP version 13
+# FICTIONAL lifecycle: parent retained
+# FICTIONAL lifecycle: child obstruction retained
+# FICTIONAL lifecycle: grandchildren complete
+# FICTIONAL lifecycle: domain continuation
+# Subtest: FICTIONAL complete-group parent Blocked, recursive child split, exact reuse and independent final dispositions
+ok 1 - FICTIONAL complete-group parent Blocked, recursive child split, exact reuse and independent final dispositions
+  ---
+  duration_ms: 81784.878666
+  type: 'test'
+  ...
+# {"fictional_only":true,"original_groups":61,"complete_children":3,"actual_native_fit":null,"source_acceptance":false}
+# Subtest: FICTIONAL split adversaries reject overlapping/parent primary, supporting-only credit and stale controls; ordered bundles reuse exactly
+ok 2 - FICTIONAL split adversaries reject overlapping/parent primary, supporting-only credit and stale controls; ordered bundles reuse exactly
+  ---
+  duration_ms: 2345.284584
+  type: 'test'
+  ...
+# Subtest: FICTIONAL failed negative delivery is retained before child acceptance; unknown/missing wire and expired tampering Hold
+ok 3 - FICTIONAL failed negative delivery is retained before child acceptance; unknown/missing wire and expired tampering Hold
+  ---
+  duration_ms: 3674.889959
+  type: 'test'
+  ...
+# Subtest: FICTIONAL indivisible complete-group overflow and actual worker timeout retain Hold without limits reset
+ok 4 - FICTIONAL indivisible complete-group overflow and actual worker timeout retain Hold without limits reset
+  ---
+  duration_ms: 361.837459
+  type: 'test'
+  ...
+# Subtest: FICTIONAL recovered native warning stays usable through corpus reuse and complete integration
+ok 5 - FICTIONAL recovered native warning stays usable through corpus reuse and complete integration
+  ---
+  duration_ms: 3751.678458
+  type: 'test'
+  ...
+# Subtest: FICTIONAL decomposition reads complete immutable rejected negative wire, never its clipped preview
+ok 6 - FICTIONAL decomposition reads complete immutable rejected negative wire, never its clipped preview
+  ---
+  duration_ms: 1739.80775
+  type: 'test'
+  ...
+# Subtest: proof projection removes repeated computed closure, retaining complete distinct DIRECT and unknown routes
+ok 7 - proof projection removes repeated computed closure, retaining complete distinct DIRECT and unknown routes
+  ---
+  duration_ms: 93.469875
+  type: 'test'
+  ...
+# {"synthetic_only":true,"sources":40,"full_claim_bytes":499480,"projected_claim_bytes":40551,"full_edge_copies":1680,"direct_edges":43,"full_factored_bytes":58213,"projected_factored_bytes":20561,"actual_native_fit":null}
+# Subtest: deterministic external revalidation rejects route, endpoint, flag, seed and unowned omissions even after resealing
+ok 8 - deterministic external revalidation rejects route, endpoint, flag, seed and unowned omissions even after resealing
+  ---
+  duration_ms: 20.936125
+  type: 'test'
+  ...
+# Subtest: opposite physical qualifiers, immutable originals and producer associations survive projection
+ok 9 - opposite physical qualifiers, immutable originals and producer associations survive projection
+  ---
+  duration_ms: 36.943583
+  type: 'test'
+  ...
+# Subtest: FICTIONAL worker chain binds projected routes to full proof and rejects a resealed native packet
+ok 10 - FICTIONAL worker chain binds projected routes to full proof and rejects a resealed native packet
+  ---
+  duration_ms: 3005.600708
+  type: 'test'
+  ...
+# Subtest: stream size probes retain exact legacy bytes for escaped, Unicode and boundary-sized evidence
+ok 11 - stream size probes retain exact legacy bytes for escaped, Unicode and boundary-sized evidence
+  ---
+  duration_ms: 30.334792
+  type: 'test'
+  ...
+# Subtest: stream construction observes changed packet and plan identities on every call
+ok 12 - stream construction observes changed packet and plan identities on every call
+  ---
+  duration_ms: 6.503458
+  type: 'test'
+  ...
+# Subtest: structural factoring preserves complete semantic subgraphs and remains live after mutation
+ok 13 - structural factoring preserves complete semantic subgraphs and remains live after mutation
+  ---
+  duration_ms: 1.097792
+  type: 'test'
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 13
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 93750.058167

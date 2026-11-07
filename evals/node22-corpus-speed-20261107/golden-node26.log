@@ -1,0 +1,11 @@
+✔ stream size probes retain exact legacy bytes for escaped, Unicode and boundary-sized evidence (21.598ms)
+✔ stream construction observes changed packet and plan identities on every call (1.576625ms)
+✔ structural factoring preserves complete semantic subgraphs and remains live after mutation (1.358083ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 159.735083
