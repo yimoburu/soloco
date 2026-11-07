@@ -1,0 +1,9 @@
+Implemented ephemeral route indices, preserving exact ordered output against the incoming oracle.
+
+- New route tests: **5/5** on Node 25 and 22.
+- Phase/proof focus: **8/8** on both.
+- Syntax, diff and patch checks passed.
+
+[Exact component patch](/private/tmp/soloco-route-index-20261107-component.patch) · [Report](/private/tmp/soloco-route-index-20261107-report.md)
+
+Completed within targets. Actual-corpus CPU and native fit remain unknown.

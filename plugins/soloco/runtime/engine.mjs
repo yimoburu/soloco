@@ -244,9 +244,10 @@ export function save(args,host) {
     if(old?.prototype) throw new Error('Prototype records are immutable; use company_prototype or create a new scope');
     if (old && (old.author_instance!==s.owner.session_id || old.revision!==args.expected_revision)) throw new Error('Record owner or version conflict; create a new proposal instead');
     if (!old && args.expected_revision !== undefined && args.expected_revision !== 0) throw new Error('Record does not exist at expected version');
-    s.records[recordId]={id:recordId,kind:args.kind,content:args.content,...(args.operating_record===undefined?{}:{operating_record:structuredClone(args.operating_record)}),...(args.context_obligations===undefined?{}:{context_obligations:structuredClone(args.context_obligations)}),author_role:'runner',author_instance:s.owner.session_id,revision:(old?.revision??0)+1,status:'Draft',source_reference:args.source_reference??null,basis:args.basis??null,updated_at:stamp(),previous:old ? [...(old.previous??[]), {revision:old.revision,content:old.content,source_reference:old.source_reference,...(old.operating_record?{operating_record:old.operating_record}:{}),...(old.context_obligations?{context_obligations:old.context_obligations}:{})}] : []};
+    const bootstrap=scoped.bootstrapSaveProvenance(s,args,old);
+    s.records[recordId]={...(bootstrap?{bootstrap_home_provenance:bootstrap}:{}),id:recordId,kind:args.kind,content:args.content,...(args.operating_record===undefined?{}:{operating_record:structuredClone(args.operating_record)}),...(args.context_obligations===undefined?{}:{context_obligations:structuredClone(args.context_obligations)}),author_role:'runner',author_instance:s.owner.session_id,revision:(old?.revision??0)+1,status:'Draft',source_reference:args.source_reference??null,basis:args.basis??null,updated_at:stamp(),previous:old ? [...(old.previous??[]), {revision:old.revision,content:old.content,source_reference:old.source_reference,...(old.operating_record?{operating_record:old.operating_record}:{}),...(old.context_obligations?{context_obligations:old.context_obligations}:{})}] : []};
     // An amended artifact never retains a review of its earlier version.
-  },{rootKeys:['schema','runtime_version','plugin_version','team_sha256','owner','paused','roles','governance','governance_sha256','cos_instructions','revision','updated_at'],entities:{records:[recordId],upgrade:['status']}});
+  },args.bootstrap_plan_id||args.id?null:{rootKeys:['schema','runtime_version','plugin_version','team_sha256','owner','paused','roles','governance','governance_sha256','cos_instructions','revision','updated_at'],entities:{records:[recordId],upgrade:['status']}});
   return mutationView(state.records[recordId],recordId);
 }
 export function handover(args,host) {
@@ -448,11 +449,11 @@ function readPublicExact(db,args){return db.readSnapshot(()=>{
 // Explicit operations only. Neither API is called automatically on an existing company.
 export function contextControl(args,host) {
   binding(args,host);
-  if(args.batching_policy!==undefined||args.semantic_partition?.context_policy!==undefined||args.semantic_partition?.shared_selection_ids!==undefined){
+  if(args.home_intake_policy!==undefined||args.batching_policy!==undefined||args.semantic_partition?.context_policy!==undefined||args.semantic_partition?.shared_selection_ids!==undefined){
     if(args.delivery_schema!==undefined||args.raw_review_ids!==undefined||args.action!=='plan'||args.protocol!==scoped.SCOPED_PROTOCOL||args.partitioner!==scoped.CORPUS_PARTITIONER)throw Error('Physical/batching policy requires an explicit scoped corpus plan');
     return scopedControl(args,host);
   }
-  if(args.delivery_schema!==undefined||args.raw_review_ids!==undefined){
+  if(args.current_home_inventory!==undefined||args.repair_of!==undefined||args.delivery_schema!==undefined||args.raw_review_ids!==undefined){
     if(args.action!=='target'||args.protocol!==undefined&&args.protocol!==scoped.SCOPED_PROTOCOL)throw Error('Corpus delivery options require a new scoped target');
     return scopedControl(args,host);
   }

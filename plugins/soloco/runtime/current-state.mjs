@@ -336,6 +336,7 @@ export function applyContextQualification(state,plan,review,{source_instruction,
 }
 export function reviewedContext(state) {
   const classifications=new Map(),mandatory=new Set(),proofs=new Set(),proofJobs=new Set(),scopedHomes=new Map(),globalMandatory=new Set();
+  for(const r of Object.values(state.records??{}))if(r.bootstrap_home_provenance){mandatory.add(r.id);globalMandatory.add(r.id);scopedHomes.set(r.id,['*']);}
   const validation={corpus:new Set(),negativePlans:new Set(negativeInventory(state).map(({target})=>JSON.stringify([target.id,target.revision])))};
   const classifiedIds=new Set(Object.keys(state.context_classifications??{}));
   for(const c of Object.values(state.context_classifications??{}))if(c.scoped_qualification?.protocol===CORPUS_PRESERVATION)for(const id of c.scoped_qualification.selected_source_ids??[])classifiedIds.add(id);

@@ -190,7 +190,7 @@ function publicationEvidence(s,homes){
       const stored=r=>{const raw=contextSource(s,r.id),resolved=resolveSnapshotEntry(s,raw);if(!resolved||!same(recordReference(resolved,r.id),r))fail('scoped original changed: '+r.id);return recordReference(raw,r.id);};
       const readScoped=r=>resolveSnapshotEntry(s,exact(s,stored(r)));
       const review=scoped?readScoped(c.review):exact(s,c.review),job=s.jobs[review.job_id];
-      const resolvedProof=scoped?[c.source,c.plan,...(corpus?corpus.claim.sources.map(x=>x.source):[]),...scoped.receipts.flatMap(r=>[r.review,r.job,r.target]),...scoped.receipts.map(r=>readScoped(r.target).scoped_context_target.plan)]:null;
+      const resolvedProof=scoped?[c.source,c.plan,...(corpus?(corpus.claim.protocol==='corpus-preservation-claim-reference-v1'?corpus.source_mappings.map(x=>x.source):corpus.claim.sources.map(x=>x.source)):[]),...scoped.receipts.flatMap(r=>[r.review,r.job,r.target]),...scoped.receipts.map(r=>readScoped(r.target).scoped_context_target.plan)]:null;
       const proof=scoped?resolvedProof.map(stored):[c.source,c.plan,c.review,recordReference(job,'job:'+job.id),...(c.qualification.legacy_dependencies??[])];
       // Resolve originals before collecting canonical producer edges. Explicit
       // source lists intentionally leave producer_dependencies empty.

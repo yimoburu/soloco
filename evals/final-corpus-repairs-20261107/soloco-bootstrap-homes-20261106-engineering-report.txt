@@ -1,0 +1,7 @@
+**Blocked for freeze.** Partial source implements proposed-home intake, complete inventories and independent domain repair.
+
+Remaining gaps: canonical-evidence inspection lacks an evaluation context; final adversarial checks are red. Phased tests passed on Node 25/22. Native fit and independent source QA remain unproven.
+
+[Report](docs/initial-proposed-homes-source-report.md) · [Source-only patch](evals/initial-proposed-homes/source-only.patch)
+
+Snapshots and failed logs are retained. No company operations occurred. The report was saved two seconds after the requested bound.

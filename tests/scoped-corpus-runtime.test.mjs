@@ -462,7 +462,10 @@ test('FICTIONAL new incidence worker/apply covers A and B only at their provenan
   const compact=structuredClone(d.review.qualification_result);
   for(const m of compact.mappings){m.occurrence_set={basis_sha256:p.mapping_sets.occurrence_set.sha256,ranges:m.occurrence_ids.map(id=>p.mapping_occurrence_ids.indexOf(id)).map(n=>[n,n+1])};delete m.occurrence_ids;}
   assert.equal(scoped.validateScopedResponse(state,job,assignment,job.native_id,compact,job.qualification_delivery),true);
-  assert.equal(scoped.validateCorpusPreservation(state,{integration_review_id:i.review.id}).claim.incidence.protocol,inc.protocol);
+  const preserved=scoped.validateCorpusPreservation(state,{integration_review_id:i.review.id});
+  assert.equal(preserved.claim.protocol,'corpus-preservation-claim-reference-v1');
+  assert.equal(preserved.claim.incidence,undefined,'stored proof does not embed derived incidence');
+  assert.equal(scoped.inspectCorpusIncidence(state,{plan_id:f.plan_id}).protocol,inc.protocol);
   assert.equal((await publicCall('company_context',{root:f.root,session_id:f.session_id,epoch:f.epoch,source_instruction:f.source_instruction,action:'apply',integration_review_id:i.review.id},'codex')).applied,true);
   const mismatch=inheritSnapshots(state,structuredClone(state));delete mismatch.records[d.target.id].scoped_context_target.incidence_protocol;
   assert.throws(()=>scoped.scopedAssignment(mismatch,mismatch.jobs[d.job.id]),/incompatible target/);

@@ -481,3 +481,148 @@ ceilings. Complete result floors, tokenizer counts, authentic elapsed execution
 and native fit remain unknown until authentic artifacts exist. Synthetic adapter
 tests establish source mechanics only. No actual incidence/FIT adoption,
 publication, QA Pass, retry, release or company resume is established here.
+
+### Ephemeral direct-route indices (source performance correction)
+
+`corpusDirectReferences` builds document/path indices within each invocation.
+Each document object is serialized once to preserve exact JSON equality,
+including descriptor field order. Occurrence buckets retain every occurrence at
+an exact escaped pointer path. Context lookup visits only physical ancestor
+paths, then applies the original identity/qualifier predicate. Incoming lookup
+also retains every original occurrence matching the original hash and target
+group, including non-root paths and equivalent separately allocated documents.
+The resulting location IDs still filter the original occurrence order.
+
+Route filtering visits only selected sections at a route's exact ancestor paths.
+Relative cut paths are indexed without decoding or rewriting pointers; root cuts,
+empty keys, escaped slashes and physical qualifiers retain their prior behavior.
+Private route dedup keys use cached document strings while delivered evidence
+keeps the original descriptors and exact ordered route objects. Typed discovery,
+source revision/hash matching, ambiguity/unknown flags and STRING opacity retain
+the incoming helper's output. No index, cached authority or manifest survives a
+call. The new route-index tests retain the incoming helper verbatim as an ordered
+JSON oracle and count document serializations, occurrence/section candidates,
+linear index/membership passes and cut probes. Bounded synthetic comparisons
+establish exact mechanics and operation counts, not actual native CPU or fit.
+
+### Optional exact v3 output selectors (source-only prospective repair)
+
+Only `corpus-context-conclusions-v3` accepts a mapping row with `item_set`
+instead of `item`. Exactly one is required. `item_set` is either the exact
+`{count,sha256}` supplied in `mapping_sets.item_set`, binding the complete
+ordered `item_keys`, or `{basis_sha256,ranges}` over that complete vector.
+Ranges use the existing ordered, disjoint, nonempty, half-open index grammar.
+Every expanded item/source/occurrence cell asserts the row's **entire** same
+conditions, unresolved outcomes, exact typed homes and preservation judgment.
+All varied and opposite qualifiers must appear in full; inability to make this
+shared judgment requires Blocked. Labels and selector hashes prove no meaning.
+Whole-batch support and incidence remain unchanged. Coverage expands only item
+references, never allocates the item × source × occurrence product, and still
+rejects missing/duplicate/out-of-basis cells and empty incidence intersections.
+
+A nonempty DOMAIN `interfaces` value may alternatively be the closed
+`{count,sha256}` from `interface_set`. It selects the complete ordered canonical
+`interfaceList(selected)` already delivered in the extraction results. Partial
+ranges, empty selectors and mixed array/selector objects are rejected. Explicit
+complete arrays remain valid, and independent `interfaces_complete` is still
+required. The runtime-owned coherent-occurrence interface remains compulsory in
+every extraction. Every actual semantic interface, original qualifier and
+unknown/negative/exhausted outcome remains compulsory too.
+
+Interface and final packets include `interface_catalog.interfaces`: full literal
+canonical values, each keyed once. `interface_catalog.domains` carries each exact
+domain review, its canonical extraction review references, and its complete
+ordered `interface_keys`. The runtime resolves selectors only through validated
+canonical proof children, not through response counts or caller dictionaries.
+Complete canonical DOMAIN/INTERFACE result objects remain unchanged alongside
+this catalog. Same-packet full values supply semantic input; a digest-only result
+alone does not. Original native delivery, identity, independence and timing still
+validate recursively. Reconstructing the exact assignment binds the catalog,
+ordering, membership and provenance, including against resealed forged delivery.
+
+The existing source-mapping hash binds the exact compact rows through canonical
+review references and their exact target/context identities. Those targets bind
+the complete item basis; source and occurrence selectors bind their delivered
+bases. Thus expanded meaning is fixed without globally duplicating conditions.
+No v1/v2/unmarked target gains selector interpretation. Their forward packets
+retain exact bytes; explicit v3 rows/arrays retain their interpretation. The
+12,000-byte parsed output, 48,000-byte transport and 600-second timeout remain
+unchanged. Irreducible complete meaning can still overflow and must Hold.
+
+Validation uses FICTIONAL scripted semantics through the public engine/store/
+worker pipeline, not actual native semantic acceptance. One 11,727-byte complete
+extraction supplies 31 interfaces; explicit domain output is 41,531 bytes and
+compact output is 2,641 bytes (38,890 bytes less). The supplied actual-domain
+schema floor alone falls from 4,690/22,925/22,404/18,757 interface bytes to
+87/88/88/88 selector bytes: reductions of 4,603/22,837/22,316/18,669 bytes.
+These are structural output reductions only. Full semantic input, remaining
+irreducible conclusions, actual real-data output fit and authentic native
+cumulative fit are still unknown; no company QA, application or adoption occurs.
+
+### Prospective stored corpus preservation claims
+
+Applying a descriptor-backed corpus plan stores a closed
+`corpus-preservation-claim-reference-v1` claim in the preservation proof. It binds
+`canonical_claim_sha256`, the exact immutable `capsule`, `incidence_derivation`,
+`selected_sources_sha256`, `source_mappings_sha256`, `domain_mappings_sha256`, and
+`receipts_sha256`. These are bindings to the complete validated claim, source
+vector, semantic mappings, and canonical proof closure; they are not substitutes
+for those inputs or for independent semantic review.
+
+Every revalidation still reconstructs the full canonical claim and validates the
+archive, membership, producer/native independence, original delivery, negatives,
+timing, closure, and complete source/occurrence mapping coverage. The expected
+compact proof is compared exactly with the stored proof, rejecting unknown,
+mixed or substituted representations. Member exclusions use the validated exact
+source vector and source mappings. Operating evidence obtains selected source
+references from those revalidated mappings, so neither public apply nor later
+operating capture embeds the reconstructed incidence relation in classifications.
+Raw originals remain exact and retrievable in the existing vault.
+
+Issued inline-incidence and no-incidence plans retain their full preservation
+claims and existing byte contracts; they are not reinterpreted as compact claims.
+Native packets, response grammar, semantic conditions and canonical claim hashes
+are unchanged. This source repair confers no source acceptance, actual native
+fit, semantic qualification, operating publication, adoption or resume authority.
+
+
+Initial current homes are prepared through an explicit prospective maintenance
+policy, `home_intake_policy: "initial-proposed-homes-v1"`, on a fresh corpus plan
+using `physical-shared-v1` and `intrinsic-body-96k-v1`. Capture requires zero typed
+operating homes, a paused company, the current owner and existing read-only
+maintenance authority, and normalized-v4 intake. This permission represents
+existing evidence; it grants no execution, allowance renewal or governance change.
+
+After canonical intrinsic extraction, `company_save` may prepare a new artifact
+with `bootstrap_plan_id`, its complete `operating_record`, and globally mandatory
+context. Evidence references in these initial homes are JSON strings encoding
+exact `{id, revision, sha256}` references to frozen sources or canonical extraction
+receipts. The runtime records plan/owner provenance and verifies the immutable
+intake chain. Revisions require the same explicit plan, retain prior contents, and
+cannot delete/retype homes or replace their provenance. A permission home describes
+an existing grant; it does not modify authoritative grants or remaining allowance.
+
+Every non-extraction target derives the COMPLETE current home inventory and sends
+every complete current home. A supplied inventory or counterpart list must match
+that inventory. An addition or revision invalidates earlier non-extraction
+bindings, while unchanged intrinsic extraction remains reusable. Unknown fields,
+unsupported writes, changed frozen sources, jobs, upgrades, authority, owner,
+pause or revocation continue to Hold. Current proposed homes remain compulsory
+even to governing-only consumers; an artifact label is never qualification.
+
+A materially corrected initial-bootstrap domain may request a NEW target with
+`repair_of` naming exact canonical negative review IDs. Its review receives the
+complete previous negative, immutable prior candidate/delivery, and corrected
+current inventory. A fresh independent reviewer must supply an exact substantive
+disposition for every named negative. Unchanged candidates, unrelated or
+unaddressed negatives, rejected/ambiguous outputs and unsupported historical
+boundaries remain Held. The original verdict and spent allowance remain intact.
+An interface or final review can consume only canonically accepted repairs.
+
+This is source capability, not actual SoloDev qualification. Complete semantic
+results, homes, catalogs, counterevidence, framing, native context and runtime
+limits still require a bounded authentic trial. Installation, operating
+publication, the independent `resume_handover` gate and actual resumption remain
+separate facts. The retained native component reports and independent Fail F1
+remain under `evals/final-corpus-repairs-20261107`; they are historical evidence,
+not a current acceptance verdict.
