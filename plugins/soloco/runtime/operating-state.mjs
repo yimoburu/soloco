@@ -453,6 +453,10 @@ function inputUnchanged(s,snapshot,planId){
   };
   for(const x of census(s))if(!same(x.source,baseline.get(x.source.id))&&!allowed(x.source.id.startsWith('job:')?'jobs':'records',x.source.id.replace(/^job:/,''),resolveSnapshot(s,x.envelope)))fail('DIRTY semantic intake changed: '+x.source.id);
   for(const [key] of baseline)if(!contextSource(s,key))fail('source deleted after proposal: '+key);
+  for(const event of intake.events)for(const change of event.changes){
+    const ref=change.after??change.before,sourceId=ref?.family==='jobs'?'job:'+ref.key:ref?.key;
+    if(['records','jobs'].includes(ref?.family)&&(!change.after||!change.before&&baseline.has(sourceId)))fail('DIRTY source deleted or recreated during intake: '+sourceId);
+  }
   for(const event of intake.events)for(const change of event.changes)for(const ref of [change.before,change.after])if(ref){
     if(typeof ref.raw!=='string')fail('complete storage intake bytes required');
     const value=JSON.parse(ref.raw),sourceId=ref.family==='jobs'?'job:'+ref.key:ref.key;

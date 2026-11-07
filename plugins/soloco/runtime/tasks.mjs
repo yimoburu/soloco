@@ -66,9 +66,10 @@ function normalizeSpec(value,state,source){
   if(value.outcome!==undefined){spec.outcome=validateOutcome(value.outcome);for(const id of spec.outcome.evidence_ids)if(!input_ids.includes(id))throw Error('Outcome evidence must be supplied as exact task inputs');}
   return spec;
 }
-const inputBindings=(state,spec)=>[...new Set([...spec.input_ids,...spec.evidence_ids])].map(id=>({id,revision:state.records[id].revision??null,sha256:digest(JSON.stringify(state.records[id]))}));
-function assertInputBindings(state,t){
-  if(t.input_bindings!==undefined&&!same(t.input_bindings,inputBindings(state,t.spec)))throw new SchedulingHold('CONTEXT_CHANGED','Submitted task input evidence changed; explicit amendment is required');
+const inputBindings=(state,spec,job=null)=>[...new Set([...spec.input_ids,...spec.evidence_ids])].map(id=>{const value=job?taskMessageInput(state,job,state.records[id]):state.records[id];return {id,revision:value.revision??null,sha256:digest(JSON.stringify(value))};});
+function assertInputBindings(state,record){
+  const t=record.runtime_task,job=t.attempts.length?currentAttempt(state,record):null;
+  if(t.input_bindings!==undefined&&!same(t.input_bindings,inputBindings(state,t.spec,job)))throw new SchedulingHold('CONTEXT_CHANGED','Submitted task input evidence changed; explicit amendment is required');
 }
 export const taskDefinitionHash=spec=>digest(JSON.stringify(spec));
 function validateSpec(spec){
@@ -143,7 +144,8 @@ export function assertTaskPrerequisites(state,key){
     if(visiting.has(id))throw Error('Cyclic task prerequisite evidence');
     if(done.has(id))return;
     const record=taskRecord(state,id),t=record.runtime_task;
-    assertInputBindings(state,t);
+    assertInputBindings(state,record);
+    if(t.state==='needs_attention')throw new SchedulingHold(t.attention_code??'UNKNOWN','Task prerequisite requires explicit reconciliation: '+id);
     if(['cancelling','cancelled'].includes(t.state))throw Error('Task prerequisite was cancelled: '+id);
     visiting.add(id);
     const inputs=new Set(t.spec.input_ids),next=new Set([...t.spec.depends_on.map(dep=>dep.task_id),...(t.spec.review_task_id?[t.spec.review_task_id]:[])]);
@@ -165,6 +167,7 @@ export function isTaskOutput(state,record,{own_job_id=null}={}){
   try{
     if(!allowed(record,['id','kind','content','author_role','author_instance','revision','status','job_id','inputs','retrieved_inputs','review_of','review','runtime_output','created_at'])||!allowed(record.runtime_output,['version','task_id','definition_revision','definition_sha256'])||record.runtime_output.version!==1||!Object.hasOwn(state.records??{},record.id)||!same(state.records[record.id],record)||record.status!=='Submitted'||record.revision!==1||typeof record.content!=='string'||!timestamp(record.created_at))return false;
     const marker=record.runtime_output,task=taskRecord(state,marker.task_id),t=task.runtime_task,job=currentAttempt(state,task);
+    if(t.state==='needs_attention'&&!(own_job_id===job.id&&['Fail','Blocked'].includes(record.review?.verdict)))return false;
     if(own_job_id!==job.id)assertTaskPrerequisites(state,task);
     if(!same(state.owner,t.owner)||marker.definition_revision!==t.definition_revision||marker.definition_sha256!==t.definition_sha256||job.id!==record.job_id||job.artifact_id!==record.id||job.status!=='completed'||job.context_format!==7||job.context_scope!==t.spec.context_scope||!/^[a-f0-9]{64}$/.test(job.context_sha256??'')||typeof job.native_id!=='string'||!job.native_id||job.native_id===t.owner.session_id||job.coordination_release?.termination_confirmed!==true||job.coordination_release.reason!=='model_process_closed'||record.author_role!==job.role||record.author_instance!==job.instance_id||!same(record.inputs,job.inputs)||!Array.isArray(record.inputs)||!same(record.review_of,job.review_of))return false;
     if(record.inputs.some(ref=>!allowed(ref,['id','revision'])||Object.keys(ref).length!==2||typeof ref.id!=='string'||!(ref.revision===null||Number.isSafeInteger(ref.revision)&&ref.revision>0)||!Object.hasOwn(state.records,ref.id)||(taskMessageInput(state,job,state.records[ref.id]).revision??null)!==ref.revision))return false;

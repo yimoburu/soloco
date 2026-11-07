@@ -289,3 +289,12 @@ test('failed proposal parsing retains exact malformed and rejected negative resp
   if(adapterRejected)assert.equal(result.rejected_output.negative_reason,'Retain this negative');
  }
 });
+
+test('deleting and restoring an exact accepted source or pending proposal remains dirty intake',async()=>{
+ for(const kind of ['accepted','proposal']){
+  const f=fixture();await publish(f);const result=kind==='proposal'?await completeProposal(f):null;
+  const id=result?.record.id??'condition',original=read(f).records[id];
+  mutate(f,s=>{delete s.records[id];});mutate(f,s=>{s.records[id]=original;});
+  assert.throws(()=>operatingContext(read(f)),/DIRTY.*deleted|DIRTY.*recreated/);
+ }
+});

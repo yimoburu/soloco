@@ -210,3 +210,12 @@ test('known pre-turn CLI startup diagnostic is retained and requires a complete 
   [thread,{...startupWarning,item:{...startupWarning.item,unknown:true}},start,message(negative('Pass')),done],
  ])await assert.rejects(invoke(events));
 });
+
+test('known skill-budget diagnostic preserves canonical warning evidence without accepting arbitrary errors',async()=>{
+ const event={type:'item.completed',item:{id:'skill-warning',type:'error',message:'Skill descriptions were shortened to fit the skills context budget. Codex can still see every skill, but some descriptions are shorter. Disable unused skills or plugins to leave more room for the rest.'}};
+ const result=await invoke([thread,start,event,message(negative('Pass')),done]);
+ assert.deepEqual(result.model_evidence.cli_warnings,[{type:'error',message:event.item.message}]);
+ const {proofJobSafe}=await import('../plugins/soloco/runtime/current-state.mjs');assert(proofJobSafe({model_evidence:result.model_evidence}));
+ await assert.rejects(invoke([thread,start,message(negative('Pass')),event,done]));
+ await assert.rejects(invoke([thread,start,event,{type:'turn.failed'},message(negative('Pass')),done]));
+});

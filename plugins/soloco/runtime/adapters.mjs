@@ -210,9 +210,10 @@ export function parseOutput(host, stdout) {
         // Installed Codex 0.154 emits this startup diagnostic as an error item
         // before turn.started. Retain it; only a later complete turn can succeed.
         // Do not generalize it into permission to ignore arbitrary error items.
-        if(event.type==='item.completed'&&event.item?.type==='error'&&!turn&&native_id
+        if(event.type==='item.completed'&&event.item?.type==='error'&&native_id&&!completed
           &&typeof event.item.id==='string'&&event.item.id&&!itemTurns.has(event.item.id)
-          &&typeof event.item.message==='string'&&event.item.message.startsWith('Ignoring unknown `features` requirement `ultrafast_mode` from requirements layers: ')
+          &&typeof event.item.message==='string'&&(!turn&&event.item.message.startsWith('Ignoring unknown `features` requirement `ultrafast_mode` from requirements layers: ')
+            ||active&&!text&&event.item.message==='Skill descriptions were shortened to fit the skills context budget. Codex can still see every skill, but some descriptions are shorter. Disable unused skills or plugins to leave more room for the rest.')
           &&Object.keys(event.item).every(k=>['id','type','message'].includes(k))){
           itemTurns.set(event.item.id,turn);warnings.push({type:'error',message:event.item.message});pendingWarning=true;break;
         }

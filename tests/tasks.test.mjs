@@ -270,3 +270,12 @@ test('readiness validates an attempted producer before classifying a pending dep
   assert.equal(recovery.automatic,false,mode);assert.notEqual(recovery.code,'DEPENDENCY_PENDING',mode);
  }
 }));
+
+test('a held completed producer cannot become a positive prerequisite after source restoration',()=>fixture(({identity,write,read})=>{
+ const a=write(s=>submitTask(s,args(identity,'held-producer'),'codex'));
+ const b=write(s=>submitTask(s,args(identity,'held-consumer',{depends_on:[{task_id:a.id,gate:'output'}]}),'codex'));
+ write(s=>queue(s,s.records[a.id]));write(s=>finish(s,s.records[a.id]));
+ assert.equal(taskReady(read(),read().records[b.id]).ready,true);
+ write(s=>{const r=s.records[a.id];r.runtime_task.state='needs_attention';r.runtime_task.attention_code='CONTEXT_CHANGED';r.status='Async:needs_attention';});
+ const result=taskReady(read(),read().records[b.id]);assert.equal(result.ready,false);assert.equal(result.recovery.automatic,false);assert.equal(result.recovery.code,'CONTEXT_CHANGED');
+}));
