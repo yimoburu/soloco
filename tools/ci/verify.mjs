@@ -39,7 +39,7 @@ export async function verify(expected,out,request=githubRequest) {
   requireThat(expected.workflow==='.github/workflows/ci.yml'&&/^[a-f0-9]{64}$/.test(expected.workflowSha256),'approved workflow required');
   const tools=['tools/ci/evidence.mjs','tools/ci/gate.mjs','tools/ci/run.mjs','tools/ci/verify.mjs'];
   requireThat(expected.trustedFiles&&JSON.stringify(Object.keys(expected.trustedFiles).sort())===JSON.stringify(tools)&&tools.every(p=>/^[a-f0-9]{64}$/.test(expected.trustedFiles[p])),'approved CI helper identities required');
-  requireThat(JSON.stringify(expected.lanes?.map(l=>l.lane).sort())===JSON.stringify(['build','tests-22','tests-25']),'all required lanes required');
+  requireThat(JSON.stringify(expected.lanes?.map(l=>l.lane).sort())===JSON.stringify(['build','compatibility-26','tests-22']),'all required lanes required');
   for(const lane of expected.lanes)requireThat(typeof lane.job==='string'&&Array.isArray(lane.labels)&&lane.labels.length>0,'approved runner labels required');
   requireThat(typeof expected.gate==='string','required gate');
   fs.mkdirSync(out,{recursive:true});out=fs.realpathSync(out);
@@ -86,7 +86,7 @@ export async function verify(expected,out,request=githubRequest) {
     const logs=await get(`${base}/actions/jobs/${job.id}/logs`,true,`${lane.lane}.github.log`);requireThat(logs.length>0,'missing GitHub job log');
     coverage.push({...result,job:job.html_url,artifact:name,github_log_sha256:hash(logs)});
   }
-  const evidence={scope:'source_ci_evidence',provenance:'github-api-run-attempt',repository:expected.repository,run:expected.run,attempt:expected.attempt,commit:expected.commit,tree:expected.tree,claims:['approved workflow and runner labels','required jobs succeeded','retained artifact and log digests','unchanged clean source','full test counts on Node 22 and 25 with Seatbelt','build/generated drift'],coverage,retained};
+  const evidence={scope:'source_ci_evidence',provenance:'github-api-run-attempt',repository:expected.repository,run:expected.run,attempt:expected.attempt,commit:expected.commit,tree:expected.tree,claims:['approved workflow and runner labels','required jobs succeeded','retained artifact and log digests','unchanged clean source','full Node 22 suite and targeted Node 26 compatibility with Seatbelt','build/generated drift'],coverage,retained};
   fs.writeFileSync(path.join(out,'verified.json'),JSON.stringify(evidence,null,2)+'\n');return evidence;
 }
 if(process.argv[1]===fileURLToPath(import.meta.url)) {try {const result=await verify(JSON.parse(fs.readFileSync(process.argv[2],'utf8')),process.argv[3]);console.log(JSON.stringify(result));}catch(e){console.error(`source_ci_evidence HOLD: ${e.message}`);process.exitCode=1;}}
