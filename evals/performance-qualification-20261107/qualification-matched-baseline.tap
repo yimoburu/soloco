@@ -1,0 +1,17 @@
+TAP version 13
+# Subtest: complete multi-million unknown semantic workflow converges with every receipt, not sampling
+ok 1 - complete multi-million unknown semantic workflow converges with every receipt, not sampling
+  ---
+  duration_ms: 20885.740458
+  type: 'test'
+  ...
+# {"label":"contract double multi-million COMPLETE workflow; not native QA","source_utf16":3360000,"raw_bytes":3612090,"units":429,"reconciliation_nodes":427,"levels":11,"sessions":857,"max_full_prompt_bytes":14592,"aggregate_bytes":6079,"total_input_bytes":8896959,"total_output_bytes":841152,"retained_wire_bytes":8896959,"plan_bytes":109745,"logical_state_bytes":17024657,"elapsed_ms":20885}
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 21133.723625

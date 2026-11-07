@@ -1,0 +1,46 @@
+TAP version 13
+# Subtest: independence membership rebuilds after new job, session and retired collisions
+ok 1 - independence membership rebuilds after new job, session and retired collisions
+  ---
+  duration_ms: 10.335125
+  type: 'test'
+  ...
+# Subtest: frozen JSON memoization preserves shallow mutation, replacements and exact descriptor checks
+ok 2 - frozen JSON memoization preserves shallow mutation, replacements and exact descriptor checks
+  ---
+  duration_ms: 0.91175
+  type: 'test'
+  ...
+# Subtest: frozen JSON memoization never trusts Proxy or custom array serialization
+ok 3 - frozen JSON memoization never trusts Proxy or custom array serialization
+  ---
+  duration_ms: 0.826416
+  type: 'test'
+  ...
+# Subtest: frozen arrays cannot replace missing own indices with mutable inherited values
+ok 4 - frozen arrays cannot replace missing own indices with mutable inherited values
+  ---
+  duration_ms: 0.118666
+  type: 'test'
+  ...
+# Subtest: frozen JSON hashes follow changed inherited hooks and keep nesting bounds
+ok 5 - frozen JSON hashes follow changed inherited hooks and keep nesting bounds
+  ---
+  duration_ms: 2.356792
+  type: 'test'
+  ...
+# Subtest: immutable exact source and unit UTF-8 byte counts are not rescanned during repeated plan validation
+ok 6 - immutable exact source and unit UTF-8 byte counts are not rescanned during repeated plan validation
+  ---
+  duration_ms: 30.524791
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 122.235667
