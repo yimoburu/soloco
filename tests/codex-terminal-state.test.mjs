@@ -197,7 +197,7 @@ test('worker cannot accept later Pass over a completed negative',async()=>{
 const startupWarning={type:'item.completed',item:{id:'startup-warning',type:'error',message:'Ignoring unknown `features` requirement `ultrafast_mode` from requirements layers: fictional managed requirements'}};
 test('known pre-turn CLI startup diagnostic is retained and requires a complete turn',async()=>{
  const result=await invoke([thread,startupWarning,start,message(negative('Pass')),done]);
- assert.deepEqual(result.model_evidence.cli_warnings,[startupWarning]);
+ assert.deepEqual(result.model_evidence.cli_warnings,[{type:'error',message:startupWarning.item.message}]);
  assert.equal(result.model_evidence.verification,'unverified');
  for(const events of [
   [thread,startupWarning],

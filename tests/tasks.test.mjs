@@ -255,3 +255,18 @@ test('task outcome is a bound hypothesis with exact evidence, retained through c
  assert.notEqual(amended.runtime_task.definition_sha256,record.runtime_task.definition_sha256);
  assert.equal(read().records[record.id].runtime_task.spec.outcome.expected_effect,'A revised hypothesis');
 }));
+
+test('readiness validates an attempted producer before classifying a pending dependency',()=>fixture(({identity,read,write})=>{
+ const a=write(s=>submitTask(s,args(identity,'pending-exact-producer'),'codex'));
+ const b=write(s=>submitTask(s,args(identity,'pending-exact-consumer',{depends_on:[{task_id:a.id,gate:'output'}]}),'codex'));
+ const job=write(s=>queue(s,s.records[a.id])),state=read();
+ assert.equal(taskReady(state,state.records[b.id]).recovery.code,'DEPENDENCY_PENDING');
+ for(const mode of ['missing','identity','failed','interrupted']){
+  const changed=structuredClone(state);
+  if(mode==='missing')delete changed.jobs[job.id];
+  else if(mode==='identity')changed.jobs[job.id].instance_id='changed';
+  else changed.jobs[job.id].status=mode;
+  const recovery=taskReady(changed,changed.records[b.id]).recovery;
+  assert.equal(recovery.automatic,false,mode);assert.notEqual(recovery.code,'DEPENDENCY_PENDING',mode);
+ }
+}));

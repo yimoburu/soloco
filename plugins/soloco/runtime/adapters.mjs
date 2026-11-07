@@ -214,7 +214,7 @@ export function parseOutput(host, stdout) {
           &&typeof event.item.id==='string'&&event.item.id&&!itemTurns.has(event.item.id)
           &&typeof event.item.message==='string'&&event.item.message.startsWith('Ignoring unknown `features` requirement `ultrafast_mode` from requirements layers: ')
           &&Object.keys(event.item).every(k=>['id','type','message'].includes(k))){
-          itemTurns.set(event.item.id,turn);warnings.push(event);pendingWarning=true;break;
+          itemTurns.set(event.item.id,turn);warnings.push({type:'error',message:event.item.message});pendingWarning=true;break;
         }
         if(!active || !itemTypes.has(event.item?.type))fail('Unsupported Codex item sequence');
         if(event.item?.type==='agent_message'&&event.type!=='item.completed'&&event.item.id===undefined)fail('Codex message start requires item identity');

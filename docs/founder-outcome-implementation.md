@@ -39,3 +39,12 @@ requirement is retained as a warning only before the first turn. Arbitrary error
 items, malformed sequences and absent/failed completion still reject the result.
 Native evaluator wire output is retained so failures can be diagnosed without a
 new call. Applied model controls remain separate from effective speed/price.
+
+New task definitions also bind declared input and supplemental evidence to their
+submitted revisions and hashes. Explicit amendment refreshes those bindings;
+a recorded nonautomatic hold survives later source restoration. Existing task
+records without those bindings retain their legacy validation. Supplemental
+proposal deliveries retain immutable historical bodies, including job sources,
+separately from current checkpoint homes. Malformed/rejected proposal responses
+remain inspectable evidence. The native evaluator requires the specific notice
+hold and an actual refused follow-up dispatch with no new attempt.

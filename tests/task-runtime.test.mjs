@@ -304,11 +304,11 @@ test('nonautomatic readiness holds persist even after the original evidence is r
   const t=f.submit('readiness-integrity',{input_ids:['fixed-input']});
   const original=f.read().records['fixed-input'];
   withStore(f.root,db=>db.transaction('fixture.changed',s=>{s.records['fixed-input'].content='Changed source';s.records['fixed-input'].revision++;return s;}));
-  tickRuntime(f.root,{queue:()=>assert.fail('held task must not dispatch')});
+  let calls=0;tickRuntime(f.root,{queue:()=>{calls++;return {};}});assert.equal(calls,0,'held task must not dispatch');
   assert.equal(f.read().records[t.id].runtime_task.state,'needs_attention');
-  assert.equal(f.read().records[t.id].runtime_task.attention_code,'UNKNOWN');
+  assert.equal(f.read().records[t.id].runtime_task.attention_code,'CONTEXT_CHANGED');
   withStore(f.root,db=>db.transaction('fixture.restored',s=>{s.records['fixed-input']=original;return s;}));
-  tickRuntime(f.root,{queue:()=>assert.fail('restoration alone cannot reconcile a held task')});
+  tickRuntime(f.root,{queue:()=>{calls++;return {};}});assert.equal(calls,0,'restoration alone cannot reconcile a held task');
   assert.equal(f.read().records[t.id].runtime_task.attempts.length,0);
  }finally{f.close();}
 });

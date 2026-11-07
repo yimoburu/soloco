@@ -6,7 +6,7 @@ import {normalizeTimeout} from './timeout.mjs';
 
 export const TASK_PROTOCOL='async-task-v1';
 export const TASK_STATES=['planned','queued','running','returned','accepted','needs_attention','cancelling','cancelled'];
-const taskKeys=['version','operation_id','command_sha256','owner','definition_revision','definition_sha256','spec','state','attempts','created_at','updated_at','previous_definition','attention','attention_code'];
+const taskKeys=['version','operation_id','command_sha256','owner','definition_revision','definition_sha256','spec','state','attempts','created_at','updated_at','previous_definition','attention','attention_code','input_bindings'];
 const recordKeys=['id','kind','status','author_role','author_instance','revision','content','created_at','updated_at','runtime_task'];
 const ownerKeys=['host','session_id','epoch'];
 const attemptKeys=['job_id','instance_id','definition_revision','definition_sha256','created_at','artifact_id','finished_at'];
@@ -66,6 +66,10 @@ function normalizeSpec(value,state,source){
   if(value.outcome!==undefined){spec.outcome=validateOutcome(value.outcome);for(const id of spec.outcome.evidence_ids)if(!input_ids.includes(id))throw Error('Outcome evidence must be supplied as exact task inputs');}
   return spec;
 }
+const inputBindings=(state,spec)=>[...new Set([...spec.input_ids,...spec.evidence_ids])].map(id=>({id,revision:state.records[id].revision??null,sha256:digest(JSON.stringify(state.records[id]))}));
+function assertInputBindings(state,t){
+  if(t.input_bindings!==undefined&&!same(t.input_bindings,inputBindings(state,t.spec)))throw new SchedulingHold('CONTEXT_CHANGED','Submitted task input evidence changed; explicit amendment is required');
+}
 export const taskDefinitionHash=spec=>digest(JSON.stringify(spec));
 function validateSpec(spec){
   if(spec.outcome!==undefined){validateOutcome(spec.outcome);if(spec.outcome.evidence_ids.some(id=>!spec.input_ids?.includes(id)))throw Error('Outcome evidence must remain exact task inputs');}
@@ -103,6 +107,7 @@ export function validateTaskRecord(record,state){
   if(t.attention!==undefined&&t.attention!==null&&(typeof t.attention!=='string'||t.attention.length>4000))throw Error('Invalid task attention record');
   if(t.attention_code!==undefined&&!recoveryCode(t.attention_code))throw Error('Invalid task recovery code');
   validateSpec(t.spec);
+  if(t.input_bindings!==undefined&&(!Array.isArray(t.input_bindings)||!same(t.input_bindings.map(r=>r?.id),[...new Set([...t.spec.input_ids,...t.spec.evidence_ids])])||t.input_bindings.some(r=>!allowed(r,['id','revision','sha256'])||!(r.revision===null||Number.isSafeInteger(r.revision)&&r.revision>0)||!/^[a-f0-9]{64}$/.test(r.sha256??''))))throw Error('Invalid submitted task input bindings');
   if(state&&(!Object.hasOwn(state.records??{},record.id)||!same(state.records[record.id],record)||record.id!==hashId('async-task-',state,t.owner,t.operation_id)))throw Error('Async task identity or canonical source changed');
   return record;
 }
@@ -138,6 +143,7 @@ export function assertTaskPrerequisites(state,key){
     if(visiting.has(id))throw Error('Cyclic task prerequisite evidence');
     if(done.has(id))return;
     const record=taskRecord(state,id),t=record.runtime_task;
+    assertInputBindings(state,t);
     if(['cancelling','cancelled'].includes(t.state))throw Error('Task prerequisite was cancelled: '+id);
     visiting.add(id);
     const inputs=new Set(t.spec.input_ids),next=new Set([...t.spec.depends_on.map(dep=>dep.task_id),...(t.spec.review_task_id?[t.spec.review_task_id]:[])]);
@@ -189,7 +195,7 @@ export function submitTask(state,args,host){
   if(Object.hasOwn(state.records,key))throw Error('Async task identity is already present');
   cycleCheck(state,key,spec);
   const at=stamp();
-  const record={id:key,kind:'plan',status:'Async:planned',author_role:'runner',author_instance:who.session_id,revision:1,content:spec.task,created_at:at,runtime_task:{version:1,operation_id:op,command_sha256:c.hash,owner:who,definition_revision:1,definition_sha256:taskDefinitionHash(spec),spec,state:'planned',attempts:[],created_at:at,updated_at:at}};
+  const record={id:key,kind:'plan',status:'Async:planned',author_role:'runner',author_instance:who.session_id,revision:1,content:spec.task,created_at:at,runtime_task:{version:1,operation_id:op,command_sha256:c.hash,owner:who,definition_revision:1,definition_sha256:taskDefinitionHash(spec),spec,input_bindings:inputBindings(state,spec),state:'planned',attempts:[],created_at:at,updated_at:at}};
   state.records[key]=record;commitCommand(state,c,args,'submit',record);return record;
 }
 function expected(record,args){if(args.expected_definition_revision!==record.runtime_task.definition_revision)throw Error('Task definition changed; refresh before mutating');}
@@ -202,7 +208,7 @@ export function amendTask(state,args,host){
   if(c.prior)return record;
   expected(record,args);cycleCheck(state,record.id,spec);
   const t=record.runtime_task;
-  t.previous_definition={revision:t.definition_revision,sha256:t.definition_sha256};t.definition_revision++;t.definition_sha256=taskDefinitionHash(spec);t.spec=spec;record.content=spec.task;
+  t.previous_definition={revision:t.definition_revision,sha256:t.definition_sha256};t.definition_revision++;t.definition_sha256=taskDefinitionHash(spec);t.spec=spec;t.input_bindings=inputBindings(state,spec);record.content=spec.task;
   if(t.attempts.length){
     const job=state.jobs?.[t.attempts[0].job_id];if(job&&['queued','running'].includes(job.status))job.status='cancelled';
     t.state='needs_attention';t.attention_code='DEFINITION_CHANGED';t.attention='Definition superseded an existing attempt; reconcile closure and create a separately authorized task if more work is required';
@@ -235,8 +241,9 @@ function currentAttempt(state,record){
 }
 function output(state,record,gate){
   assertTaskPrerequisites(state,record);
-  if(['planned','queued','running'].includes(record.runtime_task.state)&&state.jobs?.[record.runtime_task.attempts[0]?.job_id]?.status!=='completed')throw new SchedulingHold('DEPENDENCY_PENDING','Task producer has not returned its required output');
+  if(record.runtime_task.state==='planned'&&!record.runtime_task.attempts.length)throw new SchedulingHold('DEPENDENCY_PENDING','Task producer has not started');
   const job=currentAttempt(state,record),artifact=state.records?.[job.artifact_id];
+  if(['queued','running'].includes(job.status))throw new SchedulingHold('DEPENDENCY_PENDING','Task producer has not returned its required output');
   if(job.coordination_release?.termination_confirmed!==true)throw new SchedulingHold('EXECUTION_UNCERTAIN','Task producer process closure is unconfirmed');
   const coordination=bindCoordination(state,{depends_on:[job.id]});
   if(gate==='accepted'&&(artifact?.kind!=='review'||artifact.review?.verdict!=='Pass'))throw Error('Accepted prerequisite requires a current independent exact-subject Pass');

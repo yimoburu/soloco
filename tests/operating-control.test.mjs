@@ -256,3 +256,36 @@ test('operating handover retains queued and running proposal assignments with un
  });
  assert.equal(read(f).jobs[j.id].status,'completed');
 });
+
+test('pending proposals retain exact supplemental record and job bodies across publication',async()=>{
+ const f=fixture();await publish(f);const first=await completeProposal(f);
+ const sources=[{id:'condition',value:read(f).records.condition},{id:'job:'+first.job.id,value:read(f).jobs[first.job.id]}];
+ const j=engine.dispatch({...f,role:'engineer',task:'Inspect exact supplemental sources and propose only.',output_contract:'operating-proposal-v1',evidence_ids:sources.map(x=>x.id)},'codex',launch);
+ let calls=0;
+ await work(f.root,j.id,async(_h,native,_p,_d,timeout,_s,options)=>{
+  spawned(timeout,options);
+  if(calls++===0)return {native_id:native??'fictional-supplemental-proposal',text:JSON.stringify({reads:sources.map(x=>({id:x.id,sha256:sha(x.value),offset:0,length:Math.min(16000,JSON.stringify(x.value).length)}))})};
+  return {native_id:native,text:JSON.stringify({content:'Unaccepted proposal from exact supplemental inputs.',messages:[],notices:[]})};
+ });
+ assert.equal(read(f).jobs[j.id].status,'completed',read(f).jobs[j.id].error);
+ mutate(f,s=>{s.records.condition.content+=' A newly retained additional restriction.';s.records.condition.revision++;});
+ await publish(f);
+ const subject=requireOperatingHandover(read(f));
+ assert.deepEqual(subject.proposal_delivered_sources[j.id],sources.map(x=>({id:x.id,sha256:sha(x.value),value:x.value})));
+ assert.notDeepEqual(subject.records.condition,sources[0].value,'accepted current source remains distinguishable from historical delivery');
+});
+
+test('failed proposal parsing retains exact malformed and rejected negative response evidence',async()=>{
+ for(const adapterRejected of [false,true]){
+  const f=fixture();await publish(f);
+  const j=engine.dispatch({...f,role:'engineer',task:'Propose only.',output_contract:'operating-proposal-v1'},'codex',launch);
+  const raw=adapterRejected?JSON.stringify({content:'Observed failure',review:{verdict:'Blocked',reason:'Retain this negative'}}):'{"content":"Incomplete proposal';
+  await work(f.root,j.id,async(_h,_n,_p,_d,timeout,_s,options)=>{
+   spawned(timeout,options);const output={native_id:'fictional-rejected-proposal',text:raw};
+   if(adapterRejected)throw Object.assign(Error('Rejected terminal sequence'),{termination_confirmed:true,rejected_output:output});
+   return output;
+  });
+  const result=read(f).jobs[j.id];assert.equal(result.status,'failed');assert.equal(result.rejected_output.text,raw);
+  if(adapterRejected)assert.equal(result.rejected_output.negative_reason,'Retain this negative');
+ }
+});
