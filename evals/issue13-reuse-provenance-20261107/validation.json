@@ -219,5 +219,39 @@
     "Model judgments are scripted fixture data, not native semantic acceptance.",
     "No company migration, installation, adoption, ownership change or history rewriting.",
     "The consolidated issue acceptance remains incomplete."
+  ],
+  "retained_evidence": [
+    {
+      "path": "after.tap",
+      "sha256": "4a62d80b3164eab523b8c0d5afe59e56790a466bb447398fecbb37d47a64bc19"
+    },
+    {
+      "path": "before-tests.mjs",
+      "sha256": "335625226bc877193caa969670fd00da577d9401dd68d07ed73a6d5297c5336d"
+    },
+    {
+      "path": "before.tap",
+      "sha256": "4aa352f34179358a9de49c3765ab1ce33701f45f30e1c979454698377d91e82b"
+    },
+    {
+      "path": "final.tap",
+      "sha256": "467030c5c2ac0c6ef308c883926df5038f77da5793ed9db65f1eb47ba508c47f"
+    },
+    {
+      "path": "focused.tap",
+      "sha256": "8cf1a6b6027d2ad215406e9b3a6d049efd5ed5d71e65abf687510efcc51461a2"
+    },
+    {
+      "path": "independent-after.log",
+      "sha256": "918140ee64bf7bb90189eeed2c2d2fc3e6fe01182dcba0ea6e5083223d3c6927"
+    },
+    {
+      "path": "independent-probes.mjs",
+      "sha256": "e5e6f46b60aafc9a8d6ce34bf7cb0faaf104b53724e46601c19972625071b779"
+    },
+    {
+      "path": "independent-publication-before.log",
+      "sha256": "63da60de79227fdd53d3fe7150547f7ef6c83f72dfc3c2fe90bbd62413b4043e"
+    }
   ]
 }
