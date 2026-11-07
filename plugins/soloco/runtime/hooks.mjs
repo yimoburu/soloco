@@ -82,6 +82,19 @@ export function hostHooks(root) {
     send({id:1, method:'initialize', params:{clientInfo:{name:'soloco-hook-check',version:VERSION},capabilities:{experimentalApi:true}}});
   });
 }
+// A lifecycle receipt proves invocation, not the host's current trust setting.
+function lifecycleBinding(args,host) {
+  if(!args.session_id)return {status:'session_not_supplied'};
+  requireText(args.session_id,'session_id',200);
+  const root=folder(args.root),directory=dataDir();
+  noLink(path.join(directory,'bindings'));
+  const file=path.join(directory,'bindings',digest(JSON.stringify([root,host,args.session_id]))+'.json');
+  noLink(file);
+  if(!fs.existsSync(file))return {status:'missing',message:'No lifecycle binding in this MCP data directory. Check hooks in the host UI, reopen the chat and send a prompt; a data mismatch or skipped event is also possible.'};
+  const receipt=JSON.parse(fs.readFileSync(file,'utf8'));
+  const current=receipt.root===root && receipt.host===host && receipt.session_id===args.session_id && receipt.plugin_version===VERSION && receipt.plugin_root===PACKAGE && receipt.data_directory===directory;
+  return {status:current?'current_runtime':'old_or_unverified_runtime',plugin_version:receipt.plugin_version??null,at:receipt.at};
+}
 export function hookHealth(snapshot, project, args) {
   const plugin = snapshot.hooks.filter(h => h.source === 'plugin' && h.pluginId === 'soloco@soloco');
   const problems = [];
@@ -106,21 +119,16 @@ export function hookHealth(snapshot, project, args) {
   for (const h of project.found) if (h.data_directory && h.data_directory !== dataDir()) problems.push({code:'data_directory_mismatch',event:h.event,configured:h.data_directory,expected:dataDir()});
   if (snapshot.errors?.length) problems.push({code:'host_discovery_errors',details:snapshot.errors});
   if (snapshot.warnings?.length) problems.push({code:'host_discovery_warnings',details:snapshot.warnings});
-  let binding = {status:'session_not_supplied'};
-  if (args.session_id) {
-    requireText(args.session_id,'session_id',200);
-    const file = path.join(dataDir(),'bindings',digest(JSON.stringify([folder(args.root),'codex',args.session_id]))+'.json');
-    noLink(file);
-    if (!fs.existsSync(file)) binding = {status:'missing',message:'No lifecycle binding in this MCP data directory. Review discovery/trust, reopen the chat and send a prompt; a data mismatch or skipped lifecycle event is also possible.'};
-    else {
-      const receipt = JSON.parse(fs.readFileSync(file,'utf8'));
-      binding = {status:receipt.plugin_version === VERSION && receipt.plugin_root === PACKAGE && receipt.data_directory === dataDir() ? 'current_runtime' : 'old_or_unverified_runtime',plugin_version:receipt.plugin_version ?? null,at:receipt.at};
-    }
-  }
+  const binding=lifecycleBinding(args,'codex');
   return {problems,plugin_hooks:plugin.map(({eventName,enabled,trustStatus,sourcePath})=>({event:eventName,enabled,trust:trustStatus,path:sourcePath})),binding};
 }
 export async function hooks(args, host, discover = hostHooks) {
-  if (host !== 'codex') return {status:'not_supported',message:'This repair addresses Codex project hooks. Use Claude /hooks for host trust and discovery.'};
+  if(host==='claude') {
+    if(args.action!=='inspect')return {status:'not_supported',message:'Project-hook migration is Codex-specific. Use Claude /hooks to manage Claude hooks.'};
+    const binding=lifecycleBinding(args,host);
+    return {status:'binding_inspected',scope:'Claude lifecycle receipt only; current hook enablement and trust require Claude /hooks',discovery:'unverified',binding,problems:binding.status==='missing'?[{code:'missing_lifecycle_binding'}]:binding.status==='old_or_unverified_runtime'?[{code:'stale_lifecycle_binding'}]:[],plugin_version:VERSION,plugin_root:PACKAGE,data_directory:dataDir()};
+  }
+  if(host!=='codex')throw new Error('Unsupported host');
   const root = folder(args.root), project = projectFile(root);
   let snapshot;
   try { snapshot = await discover(root); }

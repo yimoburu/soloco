@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { PACKAGE, VERSION, digest } from '../plugins/soloco/runtime/store.mjs';
 import { hooks, projectCommand } from '../plugins/soloco/runtime/hooks.mjs';
 import { call } from '../plugins/soloco/runtime/main.mjs';
+import { bind } from '../plugins/soloco/runtime/engine.mjs';
 
 const base=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-hooks-'));
 process.env.CODEX_HOME=path.join(base,'profile');
@@ -91,4 +92,29 @@ test('packaged lifecycle commands use matching host data, subprocess hook output
     assert.ok(!JSON.stringify(config).includes(VERSION));
   }
   // This tests subprocess plumbing with synthetic lifecycle inputs, not host trust or live UI invocation.
+});
+
+test('Claude diagnostics distinguish missing, current, stale and wrong-host lifecycle receipts without creating state',async()=>{
+  const root=fs.realpathSync(fs.mkdtempSync(path.join(base,'claude-diagnostics-'))),args={root,session_id:'claude-diagnostic-session',action:'inspect'};
+  let result=await hooks(args,'claude');
+  assert.equal(result.binding.status,'missing');
+  assert.equal(result.discovery,'unverified');
+  assert.equal(fs.existsSync(path.join(root,'.company')),false);
+  bind(root,args.session_id,'codex');
+  assert.equal((await hooks(args,'claude')).binding.status,'missing');
+  bind(root,args.session_id,'claude');
+  result=await hooks(args,'claude');assert.equal(result.binding.status,'current_runtime');
+  assert.equal(result.discovery,'unverified','receipt does not prove current host trust');
+  const file=path.join(process.env.COMPANY_PLUGIN_DATA,'bindings',digest(JSON.stringify([root,'claude',args.session_id]))+'.json');
+  const original=fs.readFileSync(file,'utf8');
+  for(const [key,value] of [['plugin_version','old'],['plugin_root','/old'],['data_directory','/wrong'],['host','codex'],['session_id','other'],['root',base]]) {
+    fs.writeFileSync(file,JSON.stringify({...JSON.parse(original),[key]:value}));
+    assert.equal((await hooks(args,'claude')).binding.status,'old_or_unverified_runtime',key);
+  }
+  fs.writeFileSync(file,original);
+  assert.equal((await hooks({...args,action:'migrate'},'claude')).status,'not_supported');
+  assert.equal(fs.readFileSync(file,'utf8'),original);
+  assert.equal((await hooks({root,action:'inspect'},'claude')).binding.status,'session_not_supplied');
+  fs.unlinkSync(file);fs.symlinkSync(path.join(root,'missing'),file);
+  await assert.rejects(hooks(args,'claude'),/linked/);
 });

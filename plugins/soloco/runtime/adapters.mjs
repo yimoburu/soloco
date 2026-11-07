@@ -173,7 +173,15 @@ export function parseOutput(host, stdout) {
   if(!['codex','claude'].includes(host))throw new Error('Unsupported host');
   if (host === 'claude') {
     const value = JSON.parse(stdout);
-    if (value.is_error || value.subtype !== 'success') throw new Error(`Claude session did not finish successfully: ${String(value.result ?? value.subtype).slice(0,500)}`);
+    const reject=message=>{
+      const error=new Error(message);
+      if(typeof value?.result==='string' && value.result.trim())error.rejected_output={native_id:typeof value.session_id==='string'?value.session_id:undefined,text:value.result,model_evidence:modelEvidence(host,value.modelUsage)};
+      throw error;
+    };
+    if (!value || typeof value!=='object' || Array.isArray(value))reject('Malformed Claude CLI result');
+    if (value.is_error || value.subtype !== 'success') reject(`Claude session did not finish successfully: ${String(value.result ?? value.subtype).slice(0,500)}`);
+    if(typeof value.session_id!=='string' || !value.session_id.trim())reject('Claude returned no native session identity');
+    if(typeof value.result!=='string' || !value.result.trim())reject('Claude returned no completed artifact');
     return {native_id:value.session_id, text:value.result,model_evidence:modelEvidence(host,value.modelUsage)};
   }
   let native_id, text, observedText, observedNegative, turnId, turn=0, active=false, completed=false, pendingWarning=false, failure;
@@ -320,7 +328,7 @@ export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selectio
       settled=true;
       cleanup();
       if (error) {
-        if(host==='codex' && stdout && !error.rejected_output) {
+        if(stdout && !error.rejected_output) {
           try {error.rejected_output=parseOutput(host,stdout);}
           catch(parseError) {error.rejected_output=parseError.rejected_output;}
         }
@@ -428,7 +436,7 @@ export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selectio
       }
       try {
         const result=parseOutput(host,stdout);
-        if(host==='codex' && nativeId && result.native_id!==nativeId)throw Object.assign(new Error('Codex resumed thread identity changed'),{rejected_output:result});
+        if(nativeId && result.native_id!==nativeId)throw Object.assign(new Error(`${host==='codex'?'Codex resumed thread':'Claude resumed session'} identity changed`),{rejected_output:result});
         result.model_evidence.applied_controls=appliedControls(host,args);
         // Parsing also must not carry a completion across its deadline.
         if (expired()) return finish(failure);
