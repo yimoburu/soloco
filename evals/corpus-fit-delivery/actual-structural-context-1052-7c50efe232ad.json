@@ -1,0 +1,49 @@
+{
+  "authority": "READ ONLY known structural context lower bound only; no model calls, no plans/targets/jobs or receipts, no acceptance/publication, company unchanged; body composition/results are not manufactured",
+  "snapshot": {
+    "revision": 1052,
+    "event_sequence": 1053,
+    "logical_sha256": "980bedfc4c6d55f4c667b04f313566da295f15f2a56b749b8b1986d24ef4ce83",
+    "immutable_readset_sha256": "a1f8fc69ef7ad1612295a02bfca13187a7e16e6b85b91c2bcbc40200956ae9ed"
+  },
+  "source_pins": {
+    "legacy-operating.mjs": "47fca09ae9e6fefe48dbf922a6538818d856579c3fae64e8cfc5f0fd203e8f2d",
+    "snapshot.mjs": "f822adc27fe06921b73ee923e967c1d36af3528b2d22f3425cbccdbf8fd477c1",
+    "corpus-structure.mjs": "db63be6ae2504344c161fb512783f8940ed5f6f278dafa1f6cba16f63e71c8d8"
+  },
+  "occurrences": 78453,
+  "groups": 7150,
+  "logical_structural_bytes": 36335912,
+  "factored_structural_bytes": 14753361,
+  "logical_parts": {
+    "occurrences": 34906047,
+    "sections": 1111373,
+    "snapshot_inbound": 116826,
+    "collection_indexes": 201596
+  },
+  "encoded_parts": {
+    "protocol": 30,
+    "instructions": 1215,
+    "logical_sha256": 66,
+    "paths": 1282877,
+    "fields": 271,
+    "tables": 1361556,
+    "logical_packet": 12107252
+  },
+  "exact_expand": true,
+  "external_expected_validation": true,
+  "elapsed_ms": 9651,
+  "omitted_unmeasured": [
+    "instructions/framing",
+    "semantic conclusions and review/target/plan descriptors",
+    "primary/canonical review IDs for sections",
+    "current authority and unknown outcomes",
+    "full homes/dependencies",
+    "source claim vector and mechanical incidence projection",
+    "final domain/interface results"
+  ],
+  "complete_native_fit": null,
+  "semantic_acceptance": false,
+  "source_bodies_exported": false,
+  "logical_state_events_immutable_and_source_unchanged": true
+}

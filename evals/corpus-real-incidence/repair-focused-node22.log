@@ -1,0 +1,32 @@
+TAP version 13
+# (node:39165) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: FICTIONAL unmarked corpus targets reconstruct the legacy recursive delivery contract
+ok 1 - FICTIONAL unmarked corpus targets reconstruct the legacy recursive delivery contract
+  ---
+  duration_ms: 1116.006208
+  ...
+# Subtest: FICTIONAL new incidence worker/apply covers A and B only at their provenance, retaining global obligations
+ok 2 - FICTIONAL new incidence worker/apply covers A and B only at their provenance, retaining global obligations
+  ---
+  duration_ms: 865.197458
+  ...
+# Subtest: FICTIONAL transitive originals and source references retain exact physical paths; unknown references widen
+ok 3 - FICTIONAL transitive originals and source references retain exact physical paths; unknown references widen
+  ---
+  duration_ms: 278.09675
+  ...
+# Subtest: FICTIONAL JSON STRING views retain evidence but never create typed incidence edges
+ok 4 - FICTIONAL JSON STRING views retain evidence but never create typed incidence edges
+  ---
+  duration_ms: 309.972917
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 4
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2654.133208

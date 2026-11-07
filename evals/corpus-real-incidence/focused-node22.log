@@ -1,0 +1,84 @@
+TAP version 13
+# (node:33140) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: FICTIONAL public vector pipeline shares extraction, independently judges context, aggregates once and applies atomically
+ok 1 - FICTIONAL public vector pipeline shares extraction, independently judges context, aggregates once and applies atomically
+  ---
+  duration_ms: 1839.09725
+  ...
+# Subtest: corpus growth deduplicates intrinsic sections while keeping all repeated physical obligations unaccepted
+ok 2 - corpus growth deduplicates intrinsic sections while keeping all repeated physical obligations unaccepted
+  ---
+  duration_ms: 87.179792
+  ...
+# {"fictional_only":true,"one":{"intrinsic_batches":1,"shared_body_sections":1,"physical_occurrences":8},"ten":{"intrinsic_batches":1,"shared_body_sections":1,"physical_occurrences":26},"semantic_acceptance":false}
+# Subtest: corpus retains external named handover originals and refuses missing closure
+ok 3 - corpus retains external named handover originals and refuses missing closure
+  ---
+  duration_ms: 55.101958
+  ...
+# Subtest: FICTIONAL corpus preservation feeds independently reviewed operating publication, never a borrowed scoped receipt
+ok 4 - FICTIONAL corpus preservation feeds independently reviewed operating publication, never a borrowed scoped receipt
+  ---
+  duration_ms: 3307.657958
+  ...
+# Subtest: semantic selections complete canonical source apply with bounded independent local packets
+ok 5 - semantic selections complete canonical source apply with bounded independent local packets
+  ---
+  duration_ms: 7969.468
+  ...
+# {"fictional_only":true,"workload":{"protocol":"scoped-context-v1","partitioner":"coherent-corpus-body-v1","source":{"id":"old","revision":1,"sha256":"6be63f44288d42ab3675f96a345ec25cb48d209895267518611987ecf452ca0c"},"extraction_identity":"5e4ba44f4b80762ed9ddae4a57a5e4de9f4b1609243690100c5fa9fb7da6a4c5","physical_occurrences":11,"extraction":[{"id":"body-batch-0","body_bytes":615},{"id":"body-batch-1","body_bytes":719},{"id":"body-batch-2","body_bytes":717},{"id":"body-batch-3","body_bytes":874},{"id":"body-batch-4","body_bytes":1108},{"id":"body-batch-5","body_bytes":1108},{"id":"body-batch-6","body_bytes":5480},{"id":"body-batch-7","body_bytes":2153}],"selections":[{"id":"global","physical_occurrences":3,"incident_selection_ids":["global"],"intrinsic_batches":["body-batch-3","body-batch-7"],"context_bytes":4423,"domain_request_lower_bound":7450,"interface_request_lower_bound":7450},{"id":"A","physical_occurrences":6,"incident_selection_ids":["global","A"],"intrinsic_batches":["body-batch-0","body-batch-1","body-batch-3","body-batch-4","body-batch-7"],"context_bytes":6149,"domain_request_lower_bound":11618,"interface_request_lower_bound":11618},{"id":"B","physical_occurrences":6,"incident_selection_ids":["global","B"],"intrinsic_batches":["body-batch-0","body-batch-2","body-batch-3","body-batch-5","body-batch-7"],"context_bytes":6147,"domain_request_lower_bound":11614,"interface_request_lower_bound":11614},{"id":"archive","physical_occurrences":5,"incident_selection_ids":["global","archive"],"intrinsic_batches":["body-batch-3","body-batch-6","body-batch-7"],"context_bytes":9913,"domain_request_lower_bound":18420,"interface_request_lower_bound":18420}],"planned_domain_requests":4,"planned_interface_requests":4,"whole_corpus_integration_requests":1,"review_formula":"E+D+I+1","total_selected_source_requests_lower_bound":17,"input_limit_bytes":48000,"complete_request_bytes":null,"excluded_from_lower_bound":["instructions","canonical extraction results","native receipt framing","current homes and dependencies","current global rules","integration summaries"],"status":"unaccepted proposal","frontier_complete":false,"semantic_acceptance":false,"complete_native_fit":null,"native_context_fit":"unproven","retrieval_only":true}}
+# {"fictional_only":true,"domain_packet_bytes":[28348,39296,39292,41534],"interface_packet_bytes":[73543,84989,84985,86895],"semantic_acceptance":false}
+# Subtest: declared distant incident peer cannot be omitted by proposed local scope
+ok 6 - declared distant incident peer cannot be omitted by proposed local scope
+  ---
+  duration_ms: 684.674542
+  ...
+# Subtest: FICTIONAL phase delivery preserves all boundary meaning as disjoint raw partitions grow
+ok 7 - FICTIONAL phase delivery preserves all boundary meaning as disjoint raw partitions grow
+  ---
+  duration_ms: 64471.94125
+  ...
+# {"fictional_only":true,"peers":0,"local_interface_bytes":111333,"final_bytes":141165,"local_raw_bytes":21641,"all_extraction_bytes":17561,"local_pages":4,"final_pages":5,"semantic_acceptance":false,"native_fit":"unproven"}
+# {"fictional_only":true,"peers":2,"local_interface_bytes":140566,"final_bytes":201172,"local_raw_bytes":21649,"all_extraction_bytes":44675,"local_pages":5,"final_pages":7,"semantic_acceptance":false,"native_fit":"unproven"}
+# Subtest: FICTIONAL unmarked corpus targets reconstruct the legacy recursive delivery contract
+ok 8 - FICTIONAL unmarked corpus targets reconstruct the legacy recursive delivery contract
+  ---
+  duration_ms: 1429.638458
+  ...
+# Subtest: nested formatting/escape variant file sections fit intrinsic batches without implying complete global request fit
+ok 9 - nested formatting/escape variant file sections fit intrinsic batches without implying complete global request fit
+  ---
+  duration_ms: 327.597375
+  ...
+# {"fictional_only":true,"nested_sources_workload":{"protocol":"scoped-context-v1","partitioner":"coherent-corpus-body-v1","source":{"id":"old","revision":1,"sha256":"af1fde5480618c9f976de083be85d6e2f211e0c2de09a4d1e0e4e3db73f0ae5f"},"extraction_identity":"7baf70a070c3d4ff514627a1e6ee91ea4d5dc5da1d3a93ec92407470466c029a","physical_occurrences":14,"extraction":[{"id":"body-batch-0","body_bytes":55704}],"selections":[{"id":"global","physical_occurrences":14,"incident_selection_ids":["global"],"intrinsic_batches":["body-batch-0"],"context_bytes":60705,"domain_request_lower_bound":116409,"interface_request_lower_bound":116409}],"planned_domain_requests":1,"planned_interface_requests":1,"whole_corpus_integration_requests":1,"review_formula":"E+D+I+1","total_selected_source_requests_lower_bound":4,"input_limit_bytes":48000,"complete_request_bytes":null,"excluded_from_lower_bound":["instructions","canonical extraction results","native receipt framing","current homes and dependencies","current global rules","integration summaries"],"status":"unaccepted proposal","frontier_complete":false,"semantic_acceptance":false,"complete_native_fit":null,"native_context_fit":"unproven","retrieval_only":true}}
+# Subtest: upgrade journal sections enter corpus workload with complete ordered membership and occurrence guards
+ok 10 - upgrade journal sections enter corpus workload with complete ordered membership and occurrence guards
+  ---
+  duration_ms: 348.809708
+  ...
+# {"fictional_only":true,"journal_members":28,"unique_sections":65,"largest_intrinsic_packet":8085,"workload":{"protocol":"scoped-context-v1","partitioner":"coherent-corpus-body-v1","source":{"id":"upgrade:failed-attempt","revision":null,"sha256":"0ccdedde33bfa10f23e7875fdc76dbe5fed41f0b268edd8226a829971e39a86d"},"extraction_identity":"8317f4d1e4bc627f8ebc89c29e4f98378ddec69064cef4dcda55347593763366","physical_occurrences":65,"extraction":[{"id":"body-batch-0","body_bytes":65997}],"selections":[{"id":"global","physical_occurrences":65,"incident_selection_ids":["global"],"intrinsic_batches":["body-batch-0"],"context_bytes":87653,"domain_request_lower_bound":153650,"interface_request_lower_bound":153650}],"planned_domain_requests":1,"planned_interface_requests":1,"whole_corpus_integration_requests":1,"review_formula":"E+D+I+1","total_selected_source_requests_lower_bound":4,"input_limit_bytes":48000,"complete_request_bytes":null,"excluded_from_lower_bound":["instructions","canonical extraction results","native receipt framing","current homes and dependencies","current global rules","integration summaries"],"status":"unaccepted proposal","frontier_complete":false,"semantic_acceptance":false,"complete_native_fit":null,"native_context_fit":"unproven","retrieval_only":true}}
+# Subtest: rectangular corpus coverage checks a large exact product without materializing cells
+ok 11 - rectangular corpus coverage checks a large exact product without materializing cells
+  ---
+  duration_ms: 194.743458
+  ...
+# Subtest: FICTIONAL new incidence worker/apply covers A and B only at their provenance, retaining global obligations
+ok 12 - FICTIONAL new incidence worker/apply covers A and B only at their provenance, retaining global obligations
+  ---
+  duration_ms: 1287.885041
+  ...
+# Subtest: FICTIONAL transitive originals and source references retain exact physical paths; unknown references widen
+ok 13 - FICTIONAL transitive originals and source references retain exact physical paths; unknown references widen
+  ---
+  duration_ms: 413.842458
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 13
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 82524.3435

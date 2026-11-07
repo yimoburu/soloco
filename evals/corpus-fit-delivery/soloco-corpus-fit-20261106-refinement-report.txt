@@ -1,0 +1,13 @@
+Refined the same Fv2 marker with path-prefix tables, ordered metadata tuples, exact ordinal ranges and shared edge metadata. Historical global/unknown evidence now composes complete canonical results without implicit raw replay; current controls stay raw.
+
+Changed only the owned delivery function, codec helper, focused tests, scoped docs and refinement artifacts. Incidence/mapping code, safety checks and `main.mjs` remain untouched.
+
+All **7 focused tests passed on Node 25 and Node 22**, including old issued-byte equality. Synthetic rotating-edge data shrank from 5,922,892 to 139,480 bytes. Actual corpus/native fit and semantic acceptance remain unproven.
+
+Previous artifacts are preserved.
+
+- [Refinement report](/private/tmp/soloco-corpus-fit-20261106/source/evals/corpus-fit-delivery/refinement-report.md)
+- [Commands and log locations](/private/tmp/soloco-corpus-fit-20261106/source/evals/corpus-fit-delivery/refinement-commands.txt)
+- [Patch against returned component](/private/tmp/soloco-corpus-fit-20261106/source/evals/corpus-fit-delivery/refinement-source.patch)
+
+Completed before the cutoff. Unaccepted/unpublished; SoloDev remains paused.

@@ -1,0 +1,8 @@
+Implemented the prospective source contract.
+
+- [Exact component patch](/private/tmp/soloco-phased-repair.patch)
+- [Source-only report](/private/tmp/soloco-phased-repair.report.md)
+
+Validation: Node 25 **52/52**; Node 22 focused **8/8**. Legacy byte comparisons, syntax and patch checks passed.
+
+Actual fit remains **unknown**; adoption remains **Blocked**. No real company state changed. The report exceeded the 540-second target, within the 600-second cap.

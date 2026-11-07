@@ -70,7 +70,15 @@ async function run(f,args,{review=contractReview,native,modelHook,streamHook,omi
     if(modelHook)await modelHook(packet);
     return {native_id:native??'contract-native-'+queued.id,text:JSON.stringify(review(packet))};
   });
-  const s=read(f),j=s.jobs[queued.id];return {target:t,job:j,review:s.records[j.artifact_id],streamRequests,packet:streamRequests.length?(j.status==='completed'?JSON.parse(streamParts.join('')):null):j.qualification_delivery&&JSON.parse(j.qualification_delivery.wire)};
+  const s=read(f),j=s.jobs[queued.id];
+  if(process.env.CORPUS_CONSTRUCTION_BASELINE_MODULE&&j.status==='completed'){
+    const baseline=await import(process.env.CORPUS_CONSTRUCTION_BASELINE_MODULE);
+    // A deliberately Blocked receipt can itself change current governance.
+    // Compare both exact assignments and exact live-validation Hold outcomes.
+    const outcome=fn=>{try{return {assignment:fn()};}catch(error){return {hold:error.message};}};
+    assert.deepEqual(outcome(()=>scoped.scopedAssignment(s,j)),outcome(()=>baseline.scopedAssignment(s,j)),'exact assignment/result/native claim, stream bytes or live Hold against incoming construction');
+  }
+  return {target:t,job:j,review:s.records[j.artifact_id],streamRequests,packet:streamRequests.length?(j.status==='completed'?JSON.parse(streamParts.join('')):null):j.qualification_delivery&&JSON.parse(j.qualification_delivery.wire)};
 }
 
 async function extracts(f){const es=[];for(const u of unitPages(f)){const e=await run(f,{phase:'extract',unit_id:u.id});assert.equal(e.job.status,'completed',e.job.error);es.push(e);}return es;}
@@ -338,12 +346,18 @@ test('FICTIONAL phase delivery preserves all boundary meaning as disjoint raw pa
 });
 
 test('FICTIONAL unmarked corpus targets reconstruct the legacy recursive delivery contract',async()=>{
-  const f=corpusFixture(),es=await extracts(f),args={phase:'applicability',extraction_review_ids:es.map(e=>e.review.id),counterpart_ids:['home-D00'],context_scope:'*',delivery_protocol:scoped.SCOPED_STREAM};
+  const f=corpusFixture();
+  // Reconstruct an issued pre-incidence plan with its original identity formula.
+  mutate(f,s=>{const v=s.records[f.plan_id].scoped_context_plan,c=resolveSnapshot(s,v.capsule);delete c.incidence;delete v.incidence_protocol;v.capsule=retainSnapshot(s,c);v.extraction_identity=sha({partitioner:scoped.CORPUS_PARTITIONER,projection:c.projection,selected_sources:c.selected_sources,units:c.units,producer_closures:c.producer_closures});});
+  const es=await extracts(f),args={phase:'applicability',extraction_review_ids:es.map(e=>e.review.id),counterpart_ids:['home-D00'],context_scope:'*',delivery_protocol:scoped.SCOPED_STREAM};
   const d=await run(f,args,{legacy:true,review:corpusReview});assert.equal(d.job.status,'completed',d.job.error);
   const ir=await run(f,{...args,domain_review_ids:[d.review.id],interface_keys:d.review.qualification_result.interfaces.map(i=>i.key)},{legacy:true,review:corpusReview});assert.equal(ir.job.status,'completed',ir.job.error);
   const i=await run(f,{phase:'integration',delivery_protocol:scoped.SCOPED_STREAM,domain_review_ids:[d.review.id],interface_review_ids:[ir.review.id],counterpart_ids:['home-D00']},{legacy:true});assert.equal(i.job.status,'completed',i.job.error);
   const state=read(f);
   for(const phase of [d,ir,i]){
+    assert.equal(phase.packet.corpus_claim.incidence,undefined);assert.match(phase.packet.instructions,/expand to EVERY cell/);
+    assert.match(phase.packet.instructions,/every occurrence in occurrence_context independently for the entire exact selected_source_ids vector/);
+    assert.doesNotMatch(phase.packet.instructions,/Structural mapping coverage|Separate semantic review/);
     assert.equal(state.records[phase.target.id].scoped_context_target.delivery_schema,undefined);assert.equal(phase.packet.delivery_projection,undefined);
     for(const e of es)assert.deepEqual(phase.packet.reference_evidence.find(p=>p.review.id===e.review.id).value,e.review);
     assert.deepEqual(scoped.scopedAssignment(state,state.jobs[phase.job.id]).packet,phase.packet);
@@ -407,4 +421,125 @@ test('rectangular corpus coverage checks a large exact product without materiali
  assert.throws(()=>scoped.validateCorpusCellCoverage(narrowed,items,sources,occurrences),/missing/);
  const outside=rows.map((r,i)=>i===0?{...r,occurrences:[...half.slice(1),'unknown']}:r);
  assert.throws(()=>scoped.validateCorpusCellCoverage(outside,items,sources,occurrences),/substituted/);
+});
+
+// FICTIONAL worker judgments below deliberately omit structurally unrelated
+// source cells. Global census work and semantic cross-effects remain present.
+function realIncidenceReview(p){
+  const e=corpusReview(p);
+  if(p.phase==='applicability')for(const m of e.qualification_result.mappings){
+    const other=m.source_ids[0]==='old'?'alias':'old';
+    m.occurrence_ids=m.occurrence_ids.filter(id=>{
+      const o=p.occurrence_context.occurrences.find(o=>o.id===id);
+      return !(o.document.kind==='state'&&(o.path==='/records/'+other||o.path.startsWith('/records/'+other+'/')));
+    });
+  }
+  return e;
+}
+test('FICTIONAL new incidence worker/apply covers A and B only at their provenance, retaining global obligations',async()=>{
+  const f=corpusFixture(),es=await extracts(f);
+  const args={phase:'applicability',extraction_review_ids:es.map(e=>e.review.id),counterpart_ids:['home-D00'],context_scope:'*',delivery_protocol:scoped.SCOPED_STREAM};
+  const d=await run(f,args,{review:realIncidenceReview});assert.equal(d.job.status,'completed',d.job.error);
+  const ir=await run(f,{...args,domain_review_ids:[d.review.id],interface_keys:d.review.qualification_result.interfaces.map(i=>i.key)},{review:realIncidenceReview});assert.equal(ir.job.status,'completed',ir.job.error);
+  const i=await run(f,{phase:'integration',domain_review_ids:[d.review.id],interface_review_ids:[ir.review.id],counterpart_ids:['home-D00'],delivery_protocol:scoped.SCOPED_STREAM});assert.equal(i.job.status,'completed',i.job.error);
+  const p=d.packet,inc=p.corpus_claim.incidence;
+  assert.equal(inc.protocol,'corpus-provenance-incidence-v1');assert.match(p.instructions,/intersection with corpus_claim.incidence/);
+  for(const packet of [...es.map(e=>e.packet),d.packet,ir.packet,i.packet]){
+    assert.doesNotMatch(packet.instructions,/every occurrence in occurrence_context independently for the entire exact selected_source_ids vector|every extracted item is judged separately for all selected physical occurrences|expand to EVERY cell/);
+    assert.match(packet.instructions,/Structural mapping coverage.*exact required incidence/);
+    assert.match(packet.instructions,/Separate semantic review.*complete cross-source and global interactions/);
+  }
+  const own=p.occurrence_context.occurrences.find(o=>o.document.kind==='state'&&o.path==='/records/old');
+  const other=p.occurrence_context.occurrences.find(o=>o.document.kind==='state'&&o.path==='/records/alias');
+  const global=p.occurrence_context.occurrences.find(o=>o.document.kind==='state'&&o.path==='');
+  const row=d.review.qualification_result.mappings.find(m=>m.source_ids[0]==='old');
+  assert.ok(row.occurrence_ids.includes(own.id));assert.ok(!row.occurrence_ids.includes(other.id));assert.ok(row.occurrence_ids.includes(global.id));assert.ok(inc.unowned_occurrence_ids.includes(global.id));
+  assert.ok(p.global_rules.governing.some(g=>g.source.id==='late'));assert.ok(JSON.stringify(ir.packet).includes('LATE_NO_EXPORT'));
+  const state=read(f),job=state.jobs[d.job.id],assignment=scoped.scopedAssignment(state,job);
+  for(const edit of [r=>r.mappings[0].occurrence_ids.splice(r.mappings[0].occurrence_ids.indexOf(own.id),1),r=>r.mappings.push(structuredClone(r.mappings[0])),r=>{const a=r.mappings[0].occurrence_ids;a[a.indexOf(own.id)]=other.id;},r=>r.mappings[0].occurrence_ids.splice(r.mappings[0].occurrence_ids.indexOf(global.id),1)]){
+    const bad=structuredClone(d.review.qualification_result);edit(bad);assert.throws(()=>scoped.validateScopedResponse(state,job,assignment,job.native_id,bad,job.qualification_delivery),/missing|duplicate|intersection/);
+  }
+  const compact=structuredClone(d.review.qualification_result);
+  for(const m of compact.mappings){m.occurrence_set={basis_sha256:p.mapping_sets.occurrence_set.sha256,ranges:m.occurrence_ids.map(id=>p.mapping_occurrence_ids.indexOf(id)).map(n=>[n,n+1])};delete m.occurrence_ids;}
+  assert.equal(scoped.validateScopedResponse(state,job,assignment,job.native_id,compact,job.qualification_delivery),true);
+  assert.equal(scoped.validateCorpusPreservation(state,{integration_review_id:i.review.id}).claim.incidence.protocol,inc.protocol);
+  assert.equal((await publicCall('company_context',{root:f.root,session_id:f.session_id,epoch:f.epoch,source_instruction:f.source_instruction,action:'apply',integration_review_id:i.review.id},'codex')).applied,true);
+  const mismatch=inheritSnapshots(state,structuredClone(state));delete mismatch.records[d.target.id].scoped_context_target.incidence_protocol;
+  assert.throws(()=>scoped.scopedAssignment(mismatch,mismatch.jobs[d.job.id]),/incompatible target/);
+});
+
+test('FICTIONAL transitive originals and source references retain exact physical paths; unknown references widen',async()=>{
+  const f=fixture({deferPlan:true});let first,second;
+  mutate(f,s=>{
+    second=retainSnapshot(s,{id:'deep-original',content:'EXHAUSTED UNKNOWN: never export.'});
+    first=retainSnapshot(s,{id:'outer-original',nested:second,content:'OPEN: permission denied.'});
+    s.records.alias={id:'alias',revision:1,content:'DENY despite consent.',archive:first};
+    s.records.bridge={id:'bridge',revision:1,next:scoped.scopedReference(s.records.alias)};
+    s.records.old.next=scoped.scopedReference(s.records.bridge);
+  });
+  f.plan_id=call(f,{action:'plan',protocol,partitioner:scoped.CORPUS_PARTITIONER,source_id:'old',selected_source_ids:['old','alias']}).id;
+  const es=await extracts(f),d=await run(f,{phase:'applicability',extraction_review_ids:es.map(e=>e.review.id),counterpart_ids:['home-D00'],context_scope:'*',delivery_protocol:scoped.SCOPED_STREAM});assert.equal(d.job.status,'completed',d.job.error);
+  const a=d.packet.corpus_claim.incidence.sources.find(r=>r.source_id==='old');
+  assert.ok(a.regions.some(r=>r.path==='/records/bridge'));assert.ok(a.regions.some(r=>r.path==='/records/alias'));
+  for(const ref of [first,second])assert.ok(a.regions.some(r=>r.document.sha256===ref.immutable_snapshot.sha256));
+  assert.ok(a.references.some(r=>r.path==='/records/old/next'));assert.ok(a.references.some(r=>r.path==='/records/bridge/next'));
+  assert.ok(JSON.stringify(d.packet).includes('EXHAUSTED UNKNOWN'));
+  const g=fixture({deferPlan:true,extra:{unresolved:{id:'missing-original-source',revision:1,sha256:'a'.repeat(64)}}});
+  g.plan_id=call(g,{action:'plan',protocol,partitioner:scoped.CORPUS_PARTITIONER,source_id:'old',selected_source_ids:['old']}).id;
+  const c=resolveSnapshot(read(g),read(g).records[g.plan_id].scoped_context_plan.capsule);
+  const incidence=scoped.inspectCorpusIncidence(read(g),{plan_id:g.plan_id});
+  assert.equal(incidence.sources[0].conservative,true);assert.ok(incidence.sources[0].references.some(r=>r.unknown));
+  for(const edit of [m=>m.sources[0].body_root=-1,m=>m.originals.pop(),m=>m.snapshot_inbound[0].target_group='absent']){
+    const state=read(f),v=state.records[f.plan_id].scoped_context_plan,capsule=resolveSnapshot(state,v.capsule),m=resolveSnapshot(state,capsule.projection);edit(m);const {plan_sha256,...body}=m;m.plan_sha256=sha(body);capsule.projection=retainSnapshot(state,m);v.capsule=retainSnapshot(state,capsule);
+    assert.throws(()=>scoped.scopedPlanView(state,{plan_id:f.plan_id}),/coherent|original|coverage|missing|incidence/);
+  }
+});
+
+
+test('FICTIONAL JSON STRING views retain evidence but never create typed incidence edges',async()=>{
+  // Both traversal orders share the exact parsed/typed object definitions.
+  // A definition-level visited set must neither suppress genuine paths nor
+  // allow a typed path to bless a quoted occurrence of that same definition.
+  for(const typed of ['absent','before','after','peer']){
+    const f=fixture({deferPlan:true});
+    const reference={id:'C',revision:1},example={example:reference};
+    const quoted=JSON.stringify(example),nested=JSON.stringify({nested:quoted});
+    mutate(f,s=>{
+      s.records.old={id:'old',revision:1,...(typed==='before'?{typed:example}:{}),content:quoted,nested,
+        missing:JSON.stringify({example:{id:'missing',revision:1}}),...(typed==='after'?{typed:example}:{})};
+      s.records.alias={id:'alias',revision:1,content:'Selected B has no implicit reference to C.',...(typed==='peer'?{typed:example}:{})};
+      s.records.C={id:'C',revision:1,content:'C remains a complete unselected obligation, OPEN.'};
+    });
+    f.plan_id=call(f,{action:'plan',protocol,partitioner:scoped.CORPUS_PARTITIONER,source_id:'old',selected_source_ids:['old','alias']}).id;
+    const state=read(f),c=resolveSnapshot(state,state.records[f.plan_id].scoped_context_plan.capsule),m=resolveSnapshot(state,c.projection);
+    assert.ok(m.definitions.some(d=>d[0]==='json-text-string'),'valid JSON STRING still promoted');
+    const quotedDefinition=m.definitions.find(d=>d[0]==='json-text-string'&&JSON.stringify(m.definitions[d[1]]).includes('example'));
+    assert.ok(quotedDefinition);
+    if(typed!=='absent'){
+      const root=m.definitions[m.documents[0].root],records=m.definitions[root[1].find(([k])=>k==='records')[1]];
+      const record=m.definitions[records[1].find(([k])=>k===(typed==='peer'?'alias':'old'))[1]];
+      assert.equal(record[1].find(([k])=>k==='typed')[1],quotedDefinition[1],'identical shared definition');
+    }
+    const incidence=scoped.inspectCorpusIncidence(read(f),{plan_id:f.plan_id});
+    const a=incidence.sources.find(r=>r.source_id==='old'),b=incidence.sources.find(r=>r.source_id==='alias');
+    assert.equal(a.regions.some(r=>r.path==='/records/C'),['before','after'].includes(typed));
+    for(const source of [a,b]){
+      assert.equal(source.conservative,false,'quoted unresolved examples do not widen');
+      assert.ok(source.references.every(r=>!r.path.includes('/@json-text')),'no reference through any STRING boundary');
+    }
+    assert.equal(b.regions.some(r=>r.path==='/records/C'),typed==='peer');
+    const co=m.occurrences.find(o=>o.document.kind==='state'&&o.path==='/records/C');assert.ok(co);
+    assert.equal(incidence.unowned_occurrence_ids.includes(co.id),typed==='absent');
+    const views=m.occurrences.filter(o=>o.document.kind==='state'&&o.path.startsWith('/records/old/')&&o.path.includes('/@json-text'));
+    assert.ok(views.length>0,'STRING views retain physical extraction occurrences');
+    assert.ok(views.every(o=>a.regions.some(r=>r.document.kind==='state'&&o.path.startsWith(r.path+'/'))),'own-region STRING evidence retained');
+    if(typed==='absent'){
+      const es=await extracts(f),d=await run(f,{phase:'applicability',extraction_review_ids:es.map(e=>e.review.id),counterpart_ids:['home-D00'],context_scope:'*',delivery_protocol:scoped.SCOPED_STREAM});
+      assert.equal(d.job.status,'completed',d.job.error);
+      assert.ok(JSON.stringify(d.packet.extractions).includes('example'),'valid STRING extraction evidence delivered');
+      const live=read(f),job=live.jobs[d.job.id],assignment=scoped.scopedAssignment(live,job),bad=structuredClone(d.review.qualification_result);
+      const row=bad.mappings.find(r=>r.source_ids[0]==='alias');row.occurrence_ids=row.occurrence_ids.filter(id=>id!==co.id);
+      assert.throws(()=>scoped.validateScopedResponse(live,job,assignment,job.native_id,bad,job.qualification_delivery),/missing corpus incidence/,'B cannot omit unowned C');
+    }
+  }
 });

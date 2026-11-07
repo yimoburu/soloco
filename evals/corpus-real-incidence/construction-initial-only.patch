@@ -1,0 +1,305 @@
+diff --git a/plugins/soloco/runtime/scoped-context.mjs b/plugins/soloco/runtime/scoped-context.mjs
+--- a/plugins/soloco/runtime/scoped-context.mjs
++++ b/plugins/soloco/runtime/scoped-context.mjs
+@@ -180,25 +180,43 @@
+ const within=(path,root)=>path===root||path.startsWith(root+'/');
+ const inRegion=(o,r)=>same(o.document,r.document)&&within(o.path,r.path);
+ function corpusIncidence(m,selected,closures){
+-  const groups=new Map(m.groups.map(g=>[g.id,g])),edges=[...m.snapshot_inbound.map(e=>({document:e.document,path:e.path,kind:'original',original_sha256:e.original_sha256,
+-    target:{document:m.documents.find(d=>d.kind==='snapshot-original'&&d.sha256===e.original_sha256),path:''}}))];
++  // These indexes live only for this derivation: no mutable manifest, selection
++  // or producer closure can reuse a prior result. Document equality remains the
++  // exact JSON equality used by the original traversal.
++  const documentKeys=new WeakMap(),documentKey=d=>{
++    if(!documentKeys.has(d))documentKeys.set(d,json(d));return documentKeys.get(d);
++  };
++  const groups=new Map(m.groups.map(g=>[g.id,g])),byId=new Map(),byReference=new Map(),byIdentity=new Map(),originalDocuments=new Map();
++  const addMatch=(map,key,value)=>{const match=map.get(key);if(match)match.count++;else map.set(key,{count:1,value});};
++  for(const d of m.documents)if(d.kind==='snapshot-original'&&!originalDocuments.has(d.sha256))originalDocuments.set(d.sha256,d);
++  for(const r of m.sources){
++    if(!byId.has(r.source.id))byId.set(r.source.id,r);
++    addMatch(byReference,json(r.source),r);
++    let revisions=byIdentity.get(r.source.id);if(!revisions)byIdentity.set(r.source.id,revisions=new Map());
++    let match=revisions.get(r.source.revision);if(!match)revisions.set(r.source.revision,match={all:new Map(),hashes:new Map()});
++    addMatch(match.all,'source',r);addMatch(match.hashes,r.source.sha256,r);
++  }
++  const producerTarget=reference=>{const match=byReference.get(json(reference));if(match?.count!==1)fail('missing corpus producer incidence');return match.value;};
++  const edges=m.snapshot_inbound.map(e=>({document:e.document,path:e.path,kind:'original',original_sha256:e.original_sha256,
++    target:{document:originalDocuments.get(e.original_sha256),path:''}}));
+   // A reached reference source carries its complete producer closure too.
+   for(const source of m.sources)for(const reference of closures[source.source.id]){
+-    const targets=m.sources.filter(r=>same(r.source,reference));if(targets.length!==1)fail('missing corpus producer incidence');
+-    edges.push({document:m.documents[0],path:source.location,kind:'producer',reference,target:{document:m.documents[0],path:targets[0].location}});
+-  }
+-  const inboundPaths=new Set(m.snapshot_inbound.map(e=>json([e.document,e.path])));
++    const target=producerTarget(reference);
++    edges.push({document:m.documents[0],path:source.location,kind:'producer',reference,target:{document:m.documents[0],path:target.location}});
++  }
++  const inboundPaths=new Map();
++  for(const e of m.snapshot_inbound){const key=documentKey(e.document);if(!inboundPaths.has(key))inboundPaths.set(key,new Set());inboundPaths.get(key).add(e.path);}
+   const scalar=i=>{const d=m.definitions[i];return d?.[0]==='null'?null:['string','number'].includes(d?.[0])?d[1]:undefined;};
+   function walk(i,document,path=''){
+     const d=m.definitions[i];
+     if(d[0]==='object'){
+       const keys=d[1].map(([k])=>k),value=Object.fromEntries(d[1].map(([k,v])=>[k,scalar(v)]));
+       if(keys.includes('id')&&keys.includes('revision')&&keys.every(k=>['id','revision','sha256'].includes(k))){
+-        const matches=m.sources.filter(r=>r.source.id===value.id&&r.source.revision===value.revision&&(!keys.includes('sha256')||r.source.sha256===value.sha256));
+-        edges.push({document,path,kind:'source-reference',reference:value,...(matches.length===1?{target:{document:m.documents[0],path:matches[0].location}}:{unknown:true})});
++        const candidates=byIdentity.get(value.id)?.get(value.revision),match=keys.includes('sha256')?candidates?.hashes.get(value.sha256):candidates?.all.get('source');
++        edges.push({document,path,kind:'source-reference',reference:value,...(match?.count===1?{target:{document:m.documents[0],path:match.value.location}}:{unknown:true})});
+       }
+       // Real snapshot edges are already indexed; their transport is opaque.
+-      if(inboundPaths.has(json([document,path])))return;
++      if(inboundPaths.get(documentKey(document))?.has(path))return;
+       for(const [k,v] of d[1])walk(v,document,path+'/'+k.replaceAll('~','~0').replaceAll('/','~1'));
+     }else if(d[0]==='array')for(const [n,v] of d[1].entries())walk(v,document,path+'/'+n);
+     // JSON STRING views retain extraction/physical region coverage, but their
+@@ -207,20 +225,47 @@
+   }
+   for(const d of m.documents)walk(d.root,d);
+   if(edges.some(e=>e.kind==='original'&&!e.target.document))fail('dangling corpus original relation');
++  // Paths use escaped JSON pointer segments. An exact path and its '/' prefix
++  // range are disjoint; '/a' must never include '/ab' (or '/a~1b').
++  const lowerBound=(entries,path)=>{let lo=0,hi=entries.length;while(lo<hi){const mid=(lo+hi)>>>1;if(entries[mid].path<path)lo=mid+1;else hi=mid;}return lo;};
++  function pathIndex(values){
++    const index=new Map();
++    for(const [i,v] of values.entries()){const key=documentKey(v.document);if(!index.has(key))index.set(key,[]);index.get(key).push({path:v.path,i});}
++    for(const entries of index.values())entries.sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:a.i-b.i);
++    return index;
++  }
++  function regionCandidates(index,region,first=false){
++    const entries=index.get(documentKey(region.document))??[],found=[],prefix=region.path+'/';
++    for(let n=lowerBound(entries,region.path);n<entries.length&&entries[n].path===region.path;n++){if(first)return true;found.push(entries[n].i);}
++    for(let n=lowerBound(entries,prefix);n<entries.length&&entries[n].path.startsWith(prefix);n++){if(first)return true;found.push(entries[n].i);}
++    // Restore the original all-edge scan order before discovering new regions.
++    return first?false:found.sort((a,b)=>a-b);
++  }
++  const edgeIndex=pathIndex(edges),rootOccurrences=new Map();
++  for(const o of m.occurrences){const root=groups.get(o.group_id)?.body_root;if(!rootOccurrences.has(root))rootOccurrences.set(root,[]);rootOccurrences.get(root).push(o);}
++  const rootIndexes=new Map([...rootOccurrences].map(([root,values])=>[root,pathIndex(values)]));
++  const regionKey=r=>json([documentKey(r.document),r.path]);
+   const sources=selected.map(source_id=>{
+-    const r=m.sources.find(r=>r.source.id===source_id),regions=[{document:m.documents[0],path:r.location}],references=[],producer_sources=closures[source_id];
+-    for(const ref of producer_sources){const target=m.sources.filter(r=>same(r.source,ref));if(target.length!==1)fail('missing corpus producer incidence');regions.push({document:m.documents[0],path:target[0].location});}
+-    const seen=new Set();let conservative=false;
+-    for(let n=0;n<regions.length;n++)for(const [i,e] of edges.entries())if(!seen.has(i)&&inRegion(e,regions[n])){
+-      seen.add(i);references.push(e);if(e.unknown){conservative=true;continue;}
+-      if(!regions.some(r=>same(r,e.target)))regions.push(e.target);
++    const r=byId.get(source_id),regions=[{document:m.documents[0],path:r.location}],references=[],producer_sources=closures[source_id];
++    // Preserve even duplicate initial producer regions, as in the old output.
++    for(const ref of producer_sources)regions.push({document:m.documents[0],path:producerTarget(ref).location});
++    const regionKeys=new Set(regions.map(regionKey)),seen=new Set();let conservative=false;
++    for(let n=0;n<regions.length;n++)for(const i of regionCandidates(edgeIndex,regions[n]))if(!seen.has(i)){
++      const e=edges[i];seen.add(i);references.push(e);if(e.unknown){conservative=true;continue;}
++      const key=regionKey(e.target);if(!regionKeys.has(key)){regionKeys.add(key);regions.push(e.target);}
+     }
+-    if(!m.occurrences.some(o=>regions.some(r=>inRegion(o,r))&&groups.get(o.group_id)?.body_root===r.body_root))fail('missing corpus source root incidence');
++    const roots=rootIndexes.get(r.body_root);
++    if(!roots||!regions.some(region=>regionCandidates(roots,region,true)))fail('missing corpus source root incidence');
+     return {source_id,regions,producer_sources,references,conservative};
+   });
+-  // Root/global/unselected obligations retain explicit conservative whole-vector
+-  // coverage. This classification says only "no selected provenance path".
+-  const unowned_occurrence_ids=m.occurrences.filter(o=>!sources.some(s=>s.regions.some(r=>inRegion(o,r)))).map(o=>o.id);
++  // Union only exact physical regions. Membership walks pointer boundaries once
++  // per occurrence, independent of the selected-source/region product.
++  const ownedPaths=new Map();
++  for(const s of sources)for(const r of s.regions){const key=documentKey(r.document);if(!ownedPaths.has(key))ownedPaths.set(key,new Set());ownedPaths.get(key).add(r.path);}
++  const unowned_occurrence_ids=m.occurrences.filter(o=>{
++    const paths=ownedPaths.get(documentKey(o.document));if(!paths)return true;
++    let path=o.path;for(;;){if(paths.has(path))return false;const slash=path.lastIndexOf('/');if(slash<0)return true;path=path.slice(0,slash);}
++  }).map(o=>o.id);
+   return {protocol:CORPUS_INCIDENCE,sources,unowned_occurrence_ids};
+ }
+ function incidenceOwns(source,o,unowned){return unowned.has(o.id)||source.conservative||source.regions.some(r=>inRegion(o,r));}
+diff --git a/tests/scoped-corpus-runtime.test.mjs b/tests/scoped-corpus-runtime.test.mjs
+--- a/tests/scoped-corpus-runtime.test.mjs
++++ b/tests/scoped-corpus-runtime.test.mjs
+@@ -70,7 +70,12 @@
+     if(modelHook)await modelHook(packet);
+     return {native_id:native??'contract-native-'+queued.id,text:JSON.stringify(review(packet))};
+   });
+-  const s=read(f),j=s.jobs[queued.id];return {target:t,job:j,review:s.records[j.artifact_id],streamRequests,packet:streamRequests.length?(j.status==='completed'?JSON.parse(streamParts.join('')):null):j.qualification_delivery&&JSON.parse(j.qualification_delivery.wire)};
++  const s=read(f),j=s.jobs[queued.id];
++  if(process.env.CORPUS_CONSTRUCTION_BASELINE_MODULE&&j.status==='completed'){
++    const baseline=await import(process.env.CORPUS_CONSTRUCTION_BASELINE_MODULE);
++    assert.deepEqual(scoped.scopedAssignment(s,j),baseline.scopedAssignment(s,j),'exact assignment/result/native claim and stream bytes against incoming construction');
++  }
++  return {target:t,job:j,review:s.records[j.artifact_id],streamRequests,packet:streamRequests.length?(j.status==='completed'?JSON.parse(streamParts.join('')):null):j.qualification_delivery&&JSON.parse(j.qualification_delivery.wire)};
+ }
+ 
+ async function extracts(f){const es=[];for(const u of unitPages(f)){const e=await run(f,{phase:'extract',unit_id:u.id});assert.equal(e.job.status,'completed',e.job.error);es.push(e);}return es;}
+diff --git a/tests/corpus-incidence-construction.test.mjs b/tests/corpus-incidence-construction.test.mjs
+new file mode 100644
+index 0000000..c8b2f8e
+--- /dev/null
++++ b/tests/corpus-incidence-construction.test.mjs
+@@ -0,0 +1,113 @@
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import fs from 'node:fs';
++import {performance} from 'node:perf_hooks';
++import {buildLegacyCoherentPlan} from '../plugins/soloco/runtime/legacy-operating.mjs';
++import {retainSnapshot} from '../plugins/soloco/runtime/snapshot.mjs';
++import {corpusIncidence as before} from '../evals/corpus-real-incidence/construction-before-incidence.mjs';
++
++// Exercise the private pure derivation without adding a runtime export/option.
++// The oracle is the verbatim incoming implementation, after the STRING repair.
++const runtime=fs.readFileSync(new URL('../plugins/soloco/runtime/scoped-context.mjs',import.meta.url),'utf8');
++const incoming=fs.readFileSync(new URL('../evals/corpus-real-incidence/construction-before-incidence.mjs',import.meta.url),'utf8');
++const body=code=>code.slice(code.indexOf('function corpusIncidence('),code.indexOf('function incidenceOwns(')<0?code.length:code.indexOf('function incidenceOwns('));
++function derive(m,selected,closures,{old=false}={}){
++  const documents=new Set([...m.documents,...m.snapshot_inbound.map(e=>e.document),...m.occurrences.map(o=>o.document)]);
++  const stats={document_serializations:0,edge_candidates:0},json=v=>{if(documents.has(v))stats.document_serializations++;return JSON.stringify(v);};
++  const same=(a,b)=>json(a)===json(b),within=(path,root)=>path===root||path.startsWith(root+'/'),inRegion=(o,r)=>same(o.document,r.document)&&within(o.path,r.path);
++  let code=body(old?incoming:runtime);
++  code=old?code.replace('if(!seen.has(i)&&inRegion(e,regions[n]))','if((stats.edge_candidates++,!seen.has(i)&&inRegion(e,regions[n])))'):
++    code.replace('if(!seen.has(i)){','if((stats.edge_candidates++,!seen.has(i))){');
++  assert.ok(code.includes('stats.edge_candidates++'),'candidate instrumentation must be installed');
++  const fn=Function('json','same','within','inRegion','fail','CORPUS_INCIDENCE','stats',code+';return corpusIncidence;')(
++    json,same,within,inRegion,m=>{throw Error('Scoped context hold: '+m);},'corpus-provenance-incidence-v1',stats);
++  const start=performance.now(),result=fn(m,selected,closures);
++  return {result,stats,ms:performance.now()-start};
++}
++const closuresFor=m=>Object.fromEntries(m.sources.map(r=>[r.source.id,[]]));
++const ref=(m,id)=>m.sources.find(r=>r.source.id===id).source;
++function compare(m,selected,closures=closuresFor(m)){
++  const expected=before(m,selected,closures),actual=derive(m,selected,closures).result;
++  assert.deepEqual(actual,expected);assert.equal(JSON.stringify(actual),JSON.stringify(expected),'exact ordered relation bytes');return actual;
++}
++function graph(){
++  const s={records:{a:{id:'a',revision:1,next:{id:'b',revision:1}},ab:{id:'ab',revision:1,next:{id:'missing',revision:1}},
++    b:{id:'b',revision:1,next:{id:'a',revision:1},then:{id:'c',revision:1}},c:{id:'c',revision:1,content:'OPEN'},
++    'a/b~':{id:'a/b~',revision:1,next:{id:'c',revision:1}}},jobs:{},global:'All unknown interactions remain required.'};
++  const deep=retainSnapshot(s,{id:'deep',next:{id:'c',revision:1},content:'Retain exhausted failure.'});
++  const shared=retainSnapshot(s,{id:'shared',deep,link:{id:'a/b~',revision:1}});
++  s.records.a.archive=shared;s.records.b.archive=shared;
++  return {s,m:buildLegacyCoherentPlan(s)};
++}
++test('construction exact ordered oracle: cyclic/transitive/shared originals, producers and changed selections',()=>{
++  const {s,m}=graph(),closures=closuresFor(m);
++  closures.a=[ref(m,'c'),ref(m,'c')];closures.b=[ref(m,'a/b~')];
++  const a=compare(m,['a','b'],closures);
++  assert.equal(a.sources[0].conservative,false,'/a does not visit /ab');
++  assert.equal(a.sources[0].regions.filter(r=>r.path==='/records/c').length,2,'retain duplicate initial regions');
++  assert.ok(a.sources[0].regions.some(r=>r.path==='/records/a~1b~0'));
++  assert.equal(a.sources[0].regions.filter(r=>r.document.kind==='snapshot-original').length,2);
++  assert.ok(a.unowned_occurrence_ids.includes(m.occurrences.find(o=>o.path==='/records/ab').id));
++  assert.deepEqual(compare(m,['b','a'],closures).sources.map(s=>s.source_id),['b','a']);
++  assert.equal(compare(m,['ab'],closures).sources[0].conservative,true);
++  const changed=structuredClone(closures);changed.a=[ref(m,'ab')];
++  assert.equal(compare(m,['a'],changed).sources[0].conservative,true,'closure changes are live');
++  const reordered={...s,records:Object.fromEntries(Object.entries(s.records).reverse())};
++  // Preserve the private original vault while varying the canonical census order.
++  const {inheritSnapshots}=snapshotHelpers;
++  const reverse=buildLegacyCoherentPlan(inheritSnapshots(s,reordered));compare(reverse,['a','b']);
++  s.records.a.archive=retainSnapshot(s,{id:'replacement',next:{id:'ab',revision:1}});
++  assert.equal(compare(buildLegacyCoherentPlan(s),['a']).sources[0].conservative,true,'changed original is traversed');
++});
++import * as snapshotHelpers from '../plugins/soloco/runtime/snapshot.mjs';
++test('construction exact duplicate rejection and strict identity/revision/hash matching',()=>{
++  const s={records:{a:{id:'a',revision:1,links:[]}},jobs:{},upgrade_history:[{id:'dup',revision:1,content:'first'},{id:'dup',revision:1,content:'second'}]};
++  const initial=buildLegacyCoherentPlan(s),targets=initial.sources.filter(r=>r.source.id==='upgrade:dup');
++  for(const [reference,unknown] of [[{id:'upgrade:dup',revision:1},true],[targets[0].source,false],
++    [{...targets[0].source,revision:2},true],[{...targets[0].source,sha256:'0'.repeat(64)},true],
++    [{id:'upgrade:dup',revision:'1'},true],[{id:'upgrade:dup',revision:null},true],
++    [{id:{example:'upgrade:dup'},revision:1},true]]){
++    s.records.a.links=[reference];const result=compare(buildLegacyCoherentPlan(s),['a']);assert.equal(result.sources[0].conservative,unknown);
++  }
++  s.records.a.links=[targets[0].source];s.upgrade_history[1]=structuredClone(s.upgrade_history[0]);
++  const duplicate=buildLegacyCoherentPlan(s);assert.equal(compare(duplicate,['a']).sources[0].conservative,true,'even hash-qualified duplicates are ambiguous');
++  const closures=closuresFor(duplicate);closures.a=[targets[0].source];
++  for(const fn of [before,(...args)=>derive(...args).result])assert.throws(()=>fn(duplicate,['a'],closures),/missing corpus producer incidence/);
++  closures.a=[{...targets[0].source,sha256:'f'.repeat(64)}];
++  for(const fn of [before,(...args)=>derive(...args).result])assert.throws(()=>fn(duplicate,['a'],closures),/missing corpus producer incidence/);
++});
++test('construction pointer siblings, escaped segments, typed/STRING boundary and document equality',()=>{
++  for(const order of ['first','last']){
++    const example={id:'c',revision:1},s={records:{a:{id:'a',revision:1,...(order==='first'?{typed:example}:{}),
++      quoted:JSON.stringify({example}),nested:JSON.stringify({example:JSON.stringify({id:'missing',revision:1})}),
++      ...(order==='last'?{typed:example}:{})},ab:{id:'ab',revision:1,next:{id:'missing',revision:1}},
++      'a/b':{id:'a/b',revision:1,next:{id:'missing',revision:1}},'a~b':{id:'a~b',revision:1,next:{id:'missing',revision:1}},c:{id:'c',revision:1,content:'OPEN'}},jobs:{}};
++    let m=buildLegacyCoherentPlan(s),result=compare(m,['a']);
++    assert.equal(result.sources[0].conservative,false);assert.ok(result.sources[0].regions.some(r=>r.path==='/records/c'));
++    assert.ok(result.sources[0].references.every(r=>!r.path.includes('@json-text')));
++    delete s.records.a.typed;m=buildLegacyCoherentPlan(s);result=compare(m,['a']);
++    assert.equal(result.sources[0].regions.length,1);assert.equal(result.sources[0].conservative,false);
++    // Decoded manifests contain equal, independently allocated document objects.
++    compare(JSON.parse(JSON.stringify(m)),['a']);
++  }
++});
++function scaling(n){
++  const s={records:Object.fromEntries(Array.from({length:n},(_,i)=>['s'+i,{id:'s'+i,revision:1,next:{id:'s'+i,revision:1},content:'OPEN'}])),jobs:{}};
++  const m=buildLegacyCoherentPlan(s);return {m,selected:m.sources.map(r=>r.source.id),closures:closuresFor(m)};
++}
++test('construction bounded synthetic comparison counts edge candidates and document serializations',t=>{
++  const observations=[];
++  for(const n of [32,128]){
++    const {m,selected,closures}=scaling(n),old=derive(m,selected,closures,{old:true}),optimized=derive(m,selected,closures);
++    assert.deepEqual(optimized.result,old.result);
++    assert.equal(optimized.stats.edge_candidates,n);assert.equal(old.stats.edge_candidates,n*n);
++    assert.ok(old.stats.document_serializations>optimized.stats.document_serializations*n);
++    assert.equal(optimized.stats.document_serializations,m.documents.length);
++    observations.push({sources:n,before:{...old.stats,ms:old.ms},optimized:{...optimized.stats,ms:optimized.ms}});
++  }
++  const {m,selected,closures}=scaling(1024),large=derive(m,selected,closures);
++  assert.equal(large.result.sources.length,1024);assert.equal(large.stats.edge_candidates,1024);
++  assert.equal(large.stats.document_serializations,m.documents.length);
++  observations.push({sources:1024,optimized:{...large.stats,ms:large.ms},before:'not rerun; bounded 32/128 comparison above'});
++  t.diagnostic(JSON.stringify({fictional_only:true,construction_only:true,observations}));
++});
+diff --git a/evals/corpus-real-incidence/construction-before-incidence.mjs b/evals/corpus-real-incidence/construction-before-incidence.mjs
+new file mode 100644
+index 0000000..57d2d62
+--- /dev/null
++++ b/evals/corpus-real-incidence/construction-before-incidence.mjs
+@@ -0,0 +1,49 @@
++// Frozen incoming incidence derivation, including the completed literal repair. Fictional comparison oracle only.
++const json=JSON.stringify,same=(a,b)=>json(a)===json(b),fail=m=>{throw Error("Scoped context hold: "+m);};
++const CORPUS_INCIDENCE="corpus-provenance-incidence-v1";
++const within=(path,root)=>path===root||path.startsWith(root+"/");
++const inRegion=(o,r)=>same(o.document,r.document)&&within(o.path,r.path);
++export function corpusIncidence(m,selected,closures){
++  const groups=new Map(m.groups.map(g=>[g.id,g])),edges=[...m.snapshot_inbound.map(e=>({document:e.document,path:e.path,kind:'original',original_sha256:e.original_sha256,
++    target:{document:m.documents.find(d=>d.kind==='snapshot-original'&&d.sha256===e.original_sha256),path:''}}))];
++  // A reached reference source carries its complete producer closure too.
++  for(const source of m.sources)for(const reference of closures[source.source.id]){
++    const targets=m.sources.filter(r=>same(r.source,reference));if(targets.length!==1)fail('missing corpus producer incidence');
++    edges.push({document:m.documents[0],path:source.location,kind:'producer',reference,target:{document:m.documents[0],path:targets[0].location}});
++  }
++  const inboundPaths=new Set(m.snapshot_inbound.map(e=>json([e.document,e.path])));
++  const scalar=i=>{const d=m.definitions[i];return d?.[0]==='null'?null:['string','number'].includes(d?.[0])?d[1]:undefined;};
++  function walk(i,document,path=''){
++    const d=m.definitions[i];
++    if(d[0]==='object'){
++      const keys=d[1].map(([k])=>k),value=Object.fromEntries(d[1].map(([k,v])=>[k,scalar(v)]));
++      if(keys.includes('id')&&keys.includes('revision')&&keys.every(k=>['id','revision','sha256'].includes(k))){
++        const matches=m.sources.filter(r=>r.source.id===value.id&&r.source.revision===value.revision&&(!keys.includes('sha256')||r.source.sha256===value.sha256));
++        edges.push({document,path,kind:'source-reference',reference:value,...(matches.length===1?{target:{document:m.documents[0],path:matches[0].location}}:{unknown:true})});
++      }
++      // Real snapshot edges are already indexed; their transport is opaque.
++      if(inboundPaths.has(json([document,path])))return;
++      for(const [k,v] of d[1])walk(v,document,path+'/'+k.replaceAll('~','~0').replaceAll('/','~1'));
++    }else if(d[0]==='array')for(const [n,v] of d[1].entries())walk(v,document,path+'/'+n);
++    // JSON STRING views retain extraction/physical region coverage, but their
++    // parsed definitions are data, never typed provenance edges. Do not visit
++    // them here, even when a genuine typed path shares the same definition.
++  }
++  for(const d of m.documents)walk(d.root,d);
++  if(edges.some(e=>e.kind==='original'&&!e.target.document))fail('dangling corpus original relation');
++  const sources=selected.map(source_id=>{
++    const r=m.sources.find(r=>r.source.id===source_id),regions=[{document:m.documents[0],path:r.location}],references=[],producer_sources=closures[source_id];
++    for(const ref of producer_sources){const target=m.sources.filter(r=>same(r.source,ref));if(target.length!==1)fail('missing corpus producer incidence');regions.push({document:m.documents[0],path:target[0].location});}
++    const seen=new Set();let conservative=false;
++    for(let n=0;n<regions.length;n++)for(const [i,e] of edges.entries())if(!seen.has(i)&&inRegion(e,regions[n])){
++      seen.add(i);references.push(e);if(e.unknown){conservative=true;continue;}
++      if(!regions.some(r=>same(r,e.target)))regions.push(e.target);
++    }
++    if(!m.occurrences.some(o=>regions.some(r=>inRegion(o,r))&&groups.get(o.group_id)?.body_root===r.body_root))fail('missing corpus source root incidence');
++    return {source_id,regions,producer_sources,references,conservative};
++  });
++  // Root/global/unselected obligations retain explicit conservative whole-vector
++  // coverage. This classification says only "no selected provenance path".
++  const unowned_occurrence_ids=m.occurrences.filter(o=>!sources.some(s=>s.regions.some(r=>inRegion(o,r)))).map(o=>o.id);
++  return {protocol:CORPUS_INCIDENCE,sources,unowned_occurrence_ids};
++}

@@ -1,0 +1,92 @@
+{
+  "authority": "Readonly proposed physical partition STRUCTURAL LOWER BOUND only; scope labels/emptyincidents assert no semantic locality/authority/acceptance. No models, company mutations, source bodies export or receipts",
+  "snapshot": {
+    "revision": 1052,
+    "event_sequence": 1053,
+    "logical_sha256": "980bedfc4c6d55f4c667b04f313566da295f15f2a56b749b8b1986d24ef4ce83",
+    "immutable_readset_sha256": "a1f8fc69ef7ad1612295a02bfca13187a7e16e6b85b91c2bcbc40200956ae9ed"
+  },
+  "source_pins": {
+    "snapshot.mjs": "f822adc27fe06921b73ee923e967c1d36af3528b2d22f3425cbccdbf8fd477c1",
+    "scoped-context.mjs": "1d8aa5ca5e1a32f6264f3c360e45309b92cfc20ce76b24be459f0c61596b97d1",
+    "operating-state.mjs": "26ce74f75f9a2468b0697603f546a7cde3d7368a4b65f5458f393c8983451f18",
+    "corpus-structure.mjs": "db63be6ae2504344c161fb512783f8940ed5f6f278dafa1f6cba16f63e71c8d8"
+  },
+  "sources": 336,
+  "occurrences": 78453,
+  "groups": 7150,
+  "global_physical_occurrences": 56,
+  "proposed_selections": 122,
+  "max_local_physical_occurrences": 1000,
+  "exact_occurrence_coverage": true,
+  "original_independent_intrinsic_batches": 73,
+  "current_partition_coupled_intrinsic_batches": 166,
+  "hypothetical_independent_batch_policy_not_implemented": true,
+  "samples": [
+    {
+      "category": "global",
+      "selected_occurrences": 56,
+      "context_occurrences": 56,
+      "sections": 55,
+      "snapshot_inbound": 0,
+      "logical_structural_bytes": 79684,
+      "factored_structural_bytes": 67405,
+      "required_original_73_intrinsic_batches": 9,
+      "complete_result_grammar_ceiling_bytes": 108000,
+      "actual_complete_results_bytes": null,
+      "all_domain_semantic_acceptance": false
+    },
+    {
+      "category": "largest-local",
+      "selected_occurrences": 1000,
+      "context_occurrences": 1056,
+      "sections": 474,
+      "snapshot_inbound": 173,
+      "logical_structural_bytes": 991651,
+      "factored_structural_bytes": 648763,
+      "required_original_73_intrinsic_batches": 44,
+      "complete_result_grammar_ceiling_bytes": 528000,
+      "actual_complete_results_bytes": null,
+      "all_domain_semantic_acceptance": false
+    },
+    {
+      "category": "median-local",
+      "selected_occurrences": 700,
+      "context_occurrences": 756,
+      "sections": 355,
+      "snapshot_inbound": 187,
+      "logical_structural_bytes": 699941,
+      "factored_structural_bytes": 414890,
+      "required_original_73_intrinsic_batches": 43,
+      "complete_result_grammar_ceiling_bytes": 516000,
+      "actual_complete_results_bytes": null,
+      "all_domain_semantic_acceptance": false
+    },
+    {
+      "category": "smallest-local",
+      "selected_occurrences": 8,
+      "context_occurrences": 64,
+      "sections": 191,
+      "snapshot_inbound": 176,
+      "logical_structural_bytes": 223112,
+      "factored_structural_bytes": 180138,
+      "required_original_73_intrinsic_batches": 36,
+      "complete_result_grammar_ceiling_bytes": 432000,
+      "actual_complete_results_bytes": null,
+      "all_domain_semantic_acceptance": false
+    }
+  ],
+  "elapsed_ms": 12853,
+  "complete_native_fit": null,
+  "unmeasured": [
+    "Canonical complete source claim/proof projection",
+    "actualsemantic extraction/domain/interface results",
+    "review/target/provenance framing",
+    "current raw authority/globalunknowns",
+    "complete homes/dependencies",
+    "semantic scope/cross/distant interactions and native acceptance"
+  ],
+  "semantic_acceptance": false,
+  "source_bodies_exported": false,
+  "state_events_immutables_and_source_unchanged": true
+}

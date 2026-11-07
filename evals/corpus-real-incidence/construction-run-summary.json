@@ -1,0 +1,77 @@
+{
+  "bound_seconds": 590,
+  "wall_seconds": 254.275,
+  "results": [
+    {
+      "name": "construction-version-node22",
+      "command": [
+        "/private/tmp/soloco-node22-validation/node-v22.13.0-darwin-arm64/bin/node",
+        "--version"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "seconds": 0.098
+    },
+    {
+      "name": "construction-focused-node22",
+      "command": [
+        "/private/tmp/soloco-node22-validation/node-v22.13.0-darwin-arm64/bin/node",
+        "--test",
+        "tests/corpus-incidence-construction.test.mjs"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "seconds": 0.468
+    },
+    {
+      "name": "construction-version-node25",
+      "command": [
+        "/opt/homebrew/bin/node",
+        "--version"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "seconds": 0.048
+    },
+    {
+      "name": "construction-focused-node25",
+      "command": [
+        "/opt/homebrew/bin/node",
+        "--test",
+        "tests/corpus-incidence-construction.test.mjs"
+      ],
+      "exit_code": 0,
+      "timed_out": false,
+      "seconds": 0.311
+    },
+    {
+      "name": "construction-scoped-coherent-node22",
+      "command": [
+        "/private/tmp/soloco-node22-validation/node-v22.13.0-darwin-arm64/bin/node",
+        "--test",
+        "tests/scoped-context.test.mjs",
+        "tests/scoped-coherent-runtime.test.mjs",
+        "tests/scoped-corpus-runtime.test.mjs",
+        "tests/legacy-coherent.test.mjs"
+      ],
+      "exit_code": 1,
+      "timed_out": false,
+      "seconds": 242.778
+    },
+    {
+      "name": "construction-scoped-coherent-node25",
+      "command": [
+        "/opt/homebrew/bin/node",
+        "--test",
+        "tests/scoped-context.test.mjs",
+        "tests/scoped-coherent-runtime.test.mjs",
+        "tests/scoped-corpus-runtime.test.mjs",
+        "tests/legacy-coherent.test.mjs"
+      ],
+      "exit_code": 1,
+      "timed_out": false,
+      "seconds": 253.295
+    }
+  ],
+  "complete": false
+}

@@ -1,0 +1,31 @@
+{
+  "role": "bootstrap-homes-architect",
+  "mode": "advisory",
+  "started_at": "2026-11-07T00:15:55.236888+00:00",
+  "ended_at": "2026-11-07T00:18:06.305933+00:00",
+  "exit_code": 0,
+  "prompt_sha256": "248bac5b828116c12f30a2d143aac0cc5a5300d40f52db7314d4737a377ff199",
+  "requested_model": "gpt-6.1-sol",
+  "requested_effort": "high",
+  "requested_speed": "host_default",
+  "effective_settings": "unverified",
+  "timeout_seconds": 600,
+  "scope": "Maintainer public source only in isolated worktree; no real company records or authority changes",
+  "lifecycle": [
+    {
+      "type": "thread.started",
+      "thread_id": "01a1b30d-2536-7410-90e8-ad881a14efa1"
+    },
+    {
+      "type": "turn.completed",
+      "usage": {
+        "input_tokens": 311049,
+        "cached_input_tokens": 212224,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 26473,
+        "reasoning_output_tokens": 20608
+      }
+    }
+  ],
+  "report_exists": true
+}

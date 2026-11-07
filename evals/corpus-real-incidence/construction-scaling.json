@@ -1,0 +1,84 @@
+{
+  "node22": {
+    "fictional_only": true,
+    "construction_only": true,
+    "observations": [
+      {
+        "sources": 32,
+        "before": {
+          "document_serializations": 4288,
+          "edge_candidates": 1024,
+          "ms": 4.011042000000003
+        },
+        "optimized": {
+          "document_serializations": 1,
+          "edge_candidates": 32,
+          "ms": 0.5239159999999998
+        }
+      },
+      {
+        "sources": 128,
+        "before": {
+          "document_serializations": 66304,
+          "edge_candidates": 16384,
+          "ms": 31.080250000000007
+        },
+        "optimized": {
+          "document_serializations": 1,
+          "edge_candidates": 128,
+          "ms": 2.0546249999999873
+        }
+      },
+      {
+        "sources": 1024,
+        "optimized": {
+          "document_serializations": 1,
+          "edge_candidates": 1024,
+          "ms": 19.206958000000014
+        },
+        "before": "not rerun; bounded 32/128 comparison above"
+      }
+    ]
+  },
+  "node25": {
+    "fictional_only": true,
+    "construction_only": true,
+    "observations": [
+      {
+        "sources": 32,
+        "before": {
+          "document_serializations": 4288,
+          "edge_candidates": 1024,
+          "ms": 1.6021249999999867
+        },
+        "optimized": {
+          "document_serializations": 1,
+          "edge_candidates": 32,
+          "ms": 0.25029100000000426
+        }
+      },
+      {
+        "sources": 128,
+        "before": {
+          "document_serializations": 66304,
+          "edge_candidates": 16384,
+          "ms": 12.185707999999991
+        },
+        "optimized": {
+          "document_serializations": 1,
+          "edge_candidates": 128,
+          "ms": 0.8988329999999962
+        }
+      },
+      {
+        "sources": 1024,
+        "optimized": {
+          "document_serializations": 1,
+          "edge_candidates": 1024,
+          "ms": 10.10412500000001
+        },
+        "before": "not rerun; bounded 32/128 comparison above"
+      }
+    ]
+  }
+}

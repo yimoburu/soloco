@@ -1,0 +1,4 @@
+Read-only host helper bootstrap_contract_audit: no concrete defect in indexed incidence delta. Static only; no executed tests or native semantic acceptance. Reconstructed incoming runtime matches prior repair-source.patch and frozen oracle, production bytes outside corpusIncidence unchanged. Exact equality, strict refs, ambiguous widening, original discovery/source order, duplicate initial regions, escaped boundaries, unowned order and STRING fence preserved.
+Runtime SHA256 ce465fd58ac6f9412204b4972972df6aa12bc1ec5edadbe6fff9455becd05742
+Oracle SHA256 5f5457a457edf189002e01675a5fc300be87a1f7c25f2f7d87a65fb68b1c666b
+Focused tests SHA256 706f1815e2c4dc063f2b5e7f05554bf1fdfdfaa35753ae0ab6d76420ebaad3e2

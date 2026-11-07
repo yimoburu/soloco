@@ -1,0 +1,11 @@
+Implemented source-only FITv2 projection: canonical proof stays unchanged; native input receives deduplicated direct routes, source seeds, conservative flags and unowned scope.
+
+Changed only `scoped-context.mjs`, appended `scoped-context.md`, and added `corpus-proof-delivery.test.mjs`.
+
+- Both Node versions: **11/11 pass against exact entry**.
+- Required older seed: **10/11 pass each**; frozen-delivery compatibility failure remains unresolved and logged.
+- Synthetic claim: **499,480 → 40,551 bytes**; factored **58,213 → 20,561**. Actual native fit remains unmeasured.
+
+[Patch](evals/corpus-fit-delivery/proof-projection-source.patch) · [Full report](evals/corpus-fit-delivery/proof-projection-report.md)
+
+No actual QA or resume; SoloDev remains paused. Native session is host-observed; no session ID was exposed.

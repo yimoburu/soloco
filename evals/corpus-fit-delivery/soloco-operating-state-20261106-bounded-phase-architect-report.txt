@@ -1,0 +1,94 @@
+**The hypothesis offers a credible bounded path, with two necessary corrections: physical delivery boundaries must not imply semantic locality, and domain reviewers must not attest whole-corpus interaction completeness before receiving all-domain conclusions. Actual bootstrap remains Blocked pending fit measurements and independent judgments.**
+
+The new measurements rule out the unpartitioned delivery path. Even after removing section bodies, structural context is **14,753,361 factored bytes**, before conclusions, homes or authority. The prior source-28c QA Pass remains as reported; it supplies no acceptance of this overlay.
+
+1. **Decouple intrinsic batching from physical review partitions.**
+
+   Add an explicit capsule `batching_policy`, such as `intrinsic-body-96k-v1`. For that policy, compute units using `corpusUnits(material)` independently of selection-owner signatures. This should retain the measured **73 complete body batches**, subject to exact reconstruction.
+
+   Change `captureCorpus`, `corpusIdentity`, `plan` and their argument plumbing. Validate the marker and deterministic units; bind the complete partition and batching policy through the exact plan/target identities. Absent-marker plans retain their existing policy and bytes.
+
+   Preserve whole-batch item support, supporting bundles and complete primary extraction coverage. A global scaffolding section makes its **physical occurrence** shared context; it does not make its entire extraction batch globally applicable. Every item in that batch still accompanies any review requiring that batch.
+
+   Keeping the current partition-dependent extraction identity is conservative. It also means repartitioning can require fresh extraction receipts despite identical units. Partition-independent receipt reuse is an optional later optimization, requiring explicit identity changes and regression coverage.
+
+2. **Separate shared physical context from unresolved semantic scope.**
+
+   The 56 current-state scaffolding occurrences are a useful exact shared-context seed. They are **not proof that only those occurrences contain global restrictions**.
+
+   Use a fresh delivery marker for changed semantics, and an explicit `shared_selection_ids` field in its partition contract. Preserve `scope: "*"` for unknown semantic applicability; do not make every unknown-scope selection broadcast its entire physical history.
+
+   Update `validateCorpusPartition` and `selectionContext` for this prospective policy:
+
+   - Exhaustively partition all 78,453 primary occurrences, exactly once.
+   - Validate the explicit shared selection’s occurrence identities, including the measured 56.
+   - Include selected physical contexts, explicit incidents, shared context and complete required qualifiers/inbound closure.
+   - Preserve cuts and ordered membership without recursively importing every cut child as local context.
+   - Never prune an opposite qualifier or genuine incoming context through body equality.
+
+   Start with a **1,000-occurrence primary cap**, respecting document/path boundaries. Split particular contexts further when measured payload or output density requires it. The 32,605-occurrence record therefore cannot remain one indivisible review assignment; complete intrinsic sections remain indivisible extraction units.
+
+   `selectedItems` also needs prospective dispatch. Its current wildcard-interface rule requires every selection as a peer. That would recreate whole-corpus delivery. Under the new policy, preserve every wildcard/named interface in the complete conclusions and require independent all-domain reconciliation. Missing peer evidence needed for the current preservation judgment still requires Blocked and explicit expansion.
+
+3. **Make each existing phase own a judgment it can actually support.**
+
+   | Phase | Required evidence | Independent judgment |
+   |---|---|---|
+   | Extraction | Complete primary/supporting bodies | Intrinsic effects, conditions, negatives, uncertainties and interfaces faithfully extracted; no contextual permission |
+   | Domain | Required complete batch conclusions; exact physical qualifiers/routes/cuts; shared context; current raw authority; homes/dependencies | Faithful contextual preservation and complete outward conditions, including unresolved coupling |
+   | Interface | **All complete domain conclusions**, all required homes/dependencies and current authority; relevant expanded evidence | Declared, undeclared, distant and global interactions; missing conditions or conflicts |
+   | Final | All complete domain/interface conclusions, exact mappings, full current homes/dependencies and raw authority | Aggregate completeness, conflicts, preserved unresolved states and exact permitted next action |
+
+   Change `shape` and `semantic` under the new marker. Domain `interaction_completeness` should name `assessment_scope: "selected-context"` and attest preservation and outward-condition completeness. It must not assert whole-corpus `undeclared_complete` or `global_complete`.
+
+   Interfaces and final retain substantive whole-vector interaction judgments, explicitly scoped to their phases. Domain `continue` permits the next review, not company execution. Preserved OPEN conditions may remain OPEN; missing evidence needed to preserve them accurately cannot.
+
+   Keep domain homes conservatively global and `context_scope: "*"`. Numerical partition labels supply no reviewed scope exclusion.
+
+4. **Correct phase delivery at the existing projection sites.**
+
+   In the prospective `corpusFitDeliveryProjection` branch:
+
+   - Domain extraction descriptors remain limited to required complete batches, including conservative support.
+   - Build `global_occurrence_context` from the explicit shared selections and their required closure. Remove the new-policy fallback to all material.
+   - Stop unconditionally replacing that context’s inbound edges with `material.snapshot_inbound`.
+   - Final receives canonically reviewed historical meaning through complete domain/interface conclusions. Replaying physical global history is unnecessary unless a specific uncertainty requires expansion.
+   - Keep `global_rules`, authentic current homes/dependencies and all canonical validation dependencies intact.
+
+   Historical global meaning must be exposed by its originating domain and independently compared across **all** domain conclusions. Its absence from the shared physical seed never establishes irrelevance.
+
+   Route projection belongs in `corpusDirectReferences`, `corpusProofDelivery`, `projectCorpusProofDelivery` and `validateCorpusProofDelivery`. Supply the exact target’s delivered semantic-context set and recompute the expected route projection from it.
+
+   Select routes by concrete occurrence/local-section/inbound context, respecting section cuts. Selecting a state-root section must not automatically select every reference beneath its cut collections. Preserve every incoming route and qualifier needed to interpret a delivered original.
+
+   A useful boundary is:
+
+   - **Software:** complete incidence closure, transitive region membership, source/producer identity, coverage, canonical dependencies, freshness, authentic delivery and independence.
+   - **Model:** conditions carried by relevant reference/inbound contexts, opposite qualifiers, uncertain references, restrictions, counterevidence and cross-domain consequences.
+
+   A computed closure can remain software-owned and hash-bound. A qualifier needed for judgment cannot be replaced by that hash. A conservative flag also cannot substitute for the material uncertainty that caused it.
+
+   Retaining all 26,389 direct routes is acceptable if it fits. Selective route delivery becomes necessary only where measurement identifies it as a remaining bound.
+
+Two concrete rejection cases:
+
+- A historical checkpoint says “three retries exhausted; external result unknown.” Its domain must preserve that condition and outward effect even if the checkpoint is outside the shared 56. Interfaces must compare it with proposed retry permission. Omitting it because of a partition label would authorize an unsupported retry.
+- One original is reached through “remaining allowance available” and “founder renewal required.” Both contextual routes remain available wherever needed for that original’s judgment. Delivering one route plus the full-relation hash is insufficient.
+
+Before any native trial, extend `inspectCorpusWorkload` or its pure measurement seam to report:
+
+- **Partition size:** excluding the shared 56 leaves 78,397 occurrences. Packing floors are **79 local selections plus one shared selection** at a 1,000 cap, or **157 plus one** at a 500 cap. Document boundaries, incidents and widening can increase these counts.
+- **Session count:** with 73 extractions and one domain/interface per selection, those packing floors imply **234 or 390 sessions**. They are not stream-request counts or performance forecasts.
+- **Expanded context:** per-selection primary/support occurrence counts, groups, inbound routes, direct routes, collections and required batch counts. Report the largest expanded context, not merely its primary count.
+- **Shared floor:** remeasure the reported roughly **275 KB raw shared context** after exact closure and composition. The nine batches containing its sections still contribute their complete conclusions and conservative item/interface support.
+- **Output floor:** calculate required mapping syntax and verbatim interface bytes for every proposed target. Smaller occurrence chunks cannot fix an oversized shared whole-batch item/interface floor. If that floor exceeds 12 KB, this proposal is Blocked under the current output grammar.
+- **Aggregate floor:** 73 extraction results have a schema ceiling of **876,000 bytes**. At 80 selections, domain-plus-interface results have a ceiling of **1,920,000 bytes**; at 158, **3,792,000 bytes**. These exclude descriptors, mappings delivered separately, homes and authority. Every interface still receives all domain conclusions and currently all domain homes/dependencies.
+- **Complete native bounds:** exact framed requests, tokenizer counts including stream/history overhead and output reservation, complete output size, validation CPU and authentic elapsed execution. Result-dependent quantities remain null until authentic artifacts exist. No bytes-to-token conversion establishes fit.
+
+Necessary regressions are: old-marker byte compatibility; deterministic 73-batch reconstruction; exhaustive physical coverage; conservative whole-batch support; no global-batch contamination; opposite and unknown routes retained; distant restriction preservation; new-target raw expansion; and unchanged independence, negative-evidence, authority, deadline and termination enforcement. Synthetic fixtures establish these mechanics, not semantic acceptance.
+
+The separately owned recomputable-incidence descriptor repair addresses storage feasibility. It should preserve old inline compatibility and reproduce the exact relation used by identity and coverage. Additional codecs or persistent approval caches are unnecessary for this next step.
+
+Proceed only through the measured prospective partition path. If the all-domain catalog, shared output floor, current authority or required homes cannot fit, hold the exact affected target and retain the failed evidence and spent allowance. There is no established fit for that irreducible aggregate yet.
+
+The supplied `SPEC.md` is v0.20; it does not replace the company’s adopted v0.18 without explicit adoption. The company remains paused, and operating publication plus the genuine independent `resume_handover` gate remain outstanding.

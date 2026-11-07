@@ -1,0 +1,15 @@
+(node:61562) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ construction exact ordered oracle: cyclic/transitive/shared originals, producers and changed selections (18.513709ms)
+✔ construction exact duplicate rejection and strict identity/revision/hash matching (5.800125ms)
+✔ construction pointer siblings, escaped segments, typed/STRING boundary and document equality (3.743166ms)
+✔ construction bounded synthetic comparison counts edge candidates and document serializations (130.21975ms)
+ℹ {"fictional_only":true,"construction_only":true,"observations":[{"sources":32,"before":{"document_serializations":4288,"edge_candidates":1024,"ms":2.0776249999999976},"optimized":{"document_serializations":1,"edge_candidates":32,"ms":0.3135000000000048}},{"sources":128,"before":{"document_serializations":66304,"edge_candidates":16384,"ms":13.055875},"optimized":{"document_serializations":1,"edge_candidates":128,"ms":1.6119999999999948}},{"sources":1024,"optimized":{"document_serializations":1,"edge_candidates":1024,"ms":11.316459000000009},"before":"not rerun; bounded 32/128 comparison above"}]}
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 279.333583

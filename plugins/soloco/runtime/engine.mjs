@@ -448,6 +448,14 @@ function readPublicExact(db,args){return db.readSnapshot(()=>{
 // Explicit operations only. Neither API is called automatically on an existing company.
 export function contextControl(args,host) {
   binding(args,host);
+  if(args.batching_policy!==undefined||args.semantic_partition?.context_policy!==undefined||args.semantic_partition?.shared_selection_ids!==undefined){
+    if(args.delivery_schema!==undefined||args.raw_review_ids!==undefined||args.action!=='plan'||args.protocol!==scoped.SCOPED_PROTOCOL||args.partitioner!==scoped.CORPUS_PARTITIONER)throw Error('Physical/batching policy requires an explicit scoped corpus plan');
+    return scopedControl(args,host);
+  }
+  if(args.delivery_schema!==undefined||args.raw_review_ids!==undefined){
+    if(args.action!=='target'||args.protocol!==undefined&&args.protocol!==scoped.SCOPED_PROTOCOL)throw Error('Corpus delivery options require a new scoped target');
+    return scopedControl(args,host);
+  }
   if(args.protocol===OPERATING_PROTOCOL){
     if(args.action==='inspect')return withStore(args.root,db=>db.readSnapshot(()=>operatingInspection(bindOperatingIntake(db.read(),db))));
     if(!['plan','apply'].includes(args.action))throw Error('Operating protocol supports inspect, plan or apply');

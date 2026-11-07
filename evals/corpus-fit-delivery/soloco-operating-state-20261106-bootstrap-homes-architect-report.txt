@@ -1,0 +1,88 @@
+**Yes—this allowance is necessary for the first bootstrap.** Separate immutable archive extraction from mutable, unqualified proposed homes. Admit those homes through an explicit prospective policy, while binding every non-extraction review to their complete current inventory.
+
+Precreating placeholders is not a sufficient alternative: correcting their frozen bodies would still invalidate extraction.
+
+1. **Add one narrow plan policy, not a general membership exception.**
+
+   In `captureCorpus`, bind `home_intake_policy: "initial-proposed-homes-v1"` into the new capsule and identity. `plan` validates it; absent-marker plans retain their exact behavior.
+
+   Eligibility requires zero typed operating homes at capture, paused maintenance and the existing recorded authority for preparing these artifacts. The policy itself grants no save permission.
+
+   Add a `proposedBootstrapHomes` helper used by `corpusLive`. It admits only records that:
+
+   - Have IDs absent from the frozen source census; cannot replace any frozen record.
+   - Match a closed, runtime-supported `company_save` artifact envelope.
+   - Pass `validateOperatingRecord`, with no snapshot-container indirection or unknown outer fields.
+   - Carry runtime-persisted runner/session attribution and an exact bootstrap-plan/owner/epoch binding.
+   - Reference admissible, exact frozen evidence or canonical extraction evidence; missing or unresolved references Hold.
+   - Introduce no ordinary producer job, upgrade, governing-record kind or executable authorization.
+
+   Use existing save provenance. If it cannot identify the bootstrap plan and epoch, add one narrow runtime-owned provenance field. A caller-supplied author label is insufficient. No separate intake ledger is needed.
+
+   Preserve all existing frozen-source, producer, source-location and job/upgrade membership checks. Every other new nonmechanical record still Holds.
+
+2. **Treat typed contents as proposals, including permission representations.**
+
+   A valid typed schema is not qualification. A `permission` home may represent an existing grant, including exhausted allowance; it must not create a grant or alter authoritative remaining allowance.
+
+   Likewise, proposed outcomes may contain failures and unknown effects. Those facts must remain visible. Do not exclude negative content merely to keep intake “clean.”
+
+   Any consumer that currently treats an unaccepted typed artifact as executable permission must remain fenced from these proposals. Otherwise this allowance is unsafe.
+
+   Repairs may revise only admitted post-freeze homes. Preserve their earlier exact revisions through existing versioned records/snapshots. Deleting, retyping or changing provenance must Hold rather than silently removing a home from the inventory.
+
+3. **Bind the complete inventory into every non-extraction target.**
+
+   Update `createScopedTarget`, `globalSubject`, `targetGlobal`, assignment construction and the prospective delivery projection.
+
+   Add a deterministically ordered `current_home_inventory` of exact references. Derive it from **all** admitted proposed homes, not merely caller-supplied `counterpart_ids`. A supplied list must match the derived inventory.
+
+   Every domain receives every proposed home’s complete body, either as an explicit home/dependency or as compulsory global evidence. Domains may map their items to subsets, but cannot hide other proposed homes. Interfaces, final and operating-S acceptance receive the complete inventory and bodies.
+
+   Bind inventory membership and revisions into the frozen global packet. An addition or revision invalidates non-extraction targets bound to the earlier inventory. Initially, invalidate all such targets conservatively; precise dependency-based invalidation is optional.
+
+   Keep:
+
+   - `context_scope: "*"` and globally mandatory homes.
+   - Exact current authority, notices, unknown outcomes and extensions.
+   - Archive exclusion restricted to the original selected-source vector.
+
+   Update `reviewedContext`/mandatory-context selection so these artifacts remain compulsory before classification, including governing-only consumers that would otherwise skip ordinary artifacts. They must never become omittable merely because they resemble maintenance bookkeeping.
+
+4. **Keep extraction validity separate from current eligibility.**
+
+   Home revisions must not enter `corpusIdentity`, extraction bundles or intrinsic source claims. Canonical extraction validation continues checking the unchanged archive and producer closure.
+
+   Saving, new dispatch and application still require current paused-maintenance authority, owner/epoch and controls. Owner, pause or authority changes Hold those actions; they do not manufacture a new extraction judgment.
+
+   This preserves an extraction receipt for reuse without granting permission to use it under changed controls.
+
+5. **Handle Blocked-home repair explicitly: the current negative gate also needs attention.**
+
+   The supplied `noNegatives` behavior can reject subsequent non-extraction reviews across the same extraction identity. Merely allowing home revisions therefore does **not** establish “repair after Blocked without re-extraction.”
+
+   Use the existing repair/disposition mechanism if it supports exact failed targets. Otherwise add a narrow prospective `repair_of` reference on the new domain target:
+
+   - Deliver the exact negative result, prior candidate evidence and corrected home revisions.
+   - Admit the independent repair review with those declared negatives as mandatory counterevidence, rather than rejecting it before judgment.
+   - Require an attributable disposition showing which clearing conditions the corrected candidate satisfies.
+   - Keep every unrelated or unaddressed negative blocking.
+   - Let interface/final validation consume only the independently accepted repair disposition.
+
+   The original verdict remains Blocked/Fail. Saving a corrected home, issuing a target or changing its identity never clears it. This uses the existing independent domain-review phase; it does not require another review layer.
+
+   If that disposition path is unavailable, repair-after-Blocked remains unsupported and must be reported as such.
+
+Mandatory regressions should demonstrate:
+
+- **Zero-home sequence:** freeze → authentic extraction → save proposed homes → independent domain/interface/final review. Extraction identity and exact bundle remain unchanged.
+- **Correction:** Blocked domain → revise admitted home → independently review the correction without re-extraction; retain the original negative and prior body.
+- **Late changes:** adding or changing any proposed home invalidates earlier non-extraction bindings and appears in the next complete inventory.
+- **Closed admission:** unknown fields, forged attribution, unrelated artifacts, new ordinary jobs/upgrades, baseline-source edits and new authority remain rejected.
+- **Independence:** home authors and source producers cannot accept their contributions; current homes are included in reviewer-independence checks.
+- **No disappearance:** deletion, relabeling, omitted inventory entries or negative-content removal cannot evade mandatory evidence.
+- **Compatibility:** old plans retain their membership rules; proposed extras never enter the archive exclusion vector.
+
+Freeze the candidate-home inventory before the first domain review as the normal sequence. Permit later corrections through freshness invalidation and independent repair. This solves the zero-home bootstrap without weakening the archive claim.
+
+No new founder decision is inherently required where existing authority already covers this artifact preparation. Unsupported save capability, missing authority or an exhausted allowance still Holds. Operating acceptance and the independent `resume_handover` gate remain outstanding; the company remains paused.

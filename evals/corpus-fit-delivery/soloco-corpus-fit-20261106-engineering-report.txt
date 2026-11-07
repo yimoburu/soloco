@@ -1,0 +1,17 @@
+Implemented opt-in `corpus-incidence-conclusions-v2` with complete-result composition, readable structural tables before streaming, and explicit raw expansion targets. Seeded incidence code remains unchanged.
+
+Changed owned files:
+
+- `plugins/soloco/runtime/scoped-context.mjs`
+- `plugins/soloco/runtime/corpus-structure.mjs`
+- `tests/corpus-fit-delivery.test.mjs`
+- `docs/scoped-context.md`
+- `evals/corpus-fit-delivery/`
+
+All four focused tests passed on Node 25 and Node 22. Coverage includes exact roundtrips, tampering, opposite qualifiers, complete conclusions, bounded requests and issued packet byte equality. The initial output-limit failure is preserved.
+
+Actual corpus/native fit and semantic acceptance remain unproven. Whole-suite checks remain with ROOT. SoloDev remains paused; no acceptance or action authority was granted.
+
+[Report and limitations](/private/tmp/soloco-corpus-fit-20261106/source/evals/corpus-fit-delivery/report.md) · [Exact commands](/private/tmp/soloco-corpus-fit-20261106/source/evals/corpus-fit-delivery/commands.txt) · [Source-only patch against seeded source](/private/tmp/soloco-corpus-fit-20261106/source/evals/corpus-fit-delivery/source-only.patch)
+
+No commits, network, company reads or company mutations. Completed before the cutoff.

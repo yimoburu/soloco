@@ -254,7 +254,7 @@ This avoids forcing extra subdivisions merely to repeat metadata.
 
 Complete intrinsic body batches share only extraction. No mechanical string subdivision or semantic passivity is introduced. Explicit `scoped-stream-v1` can deliver whole logical units and complete canonical evidence to the same native in bounded ordered requests. Existing input/output limits, native identity, fixed job deadline, final output and confirmed process closure remain required; streaming neither renews the deadline nor demonstrates cumulative native fit. Oversized output or session closure Holds.
 
-An optional `semantic_partition` exhaustively partitions physical occurrences with symmetric declared incidents. Domain targets require exact `selection_ids`, all required extracted bodies, ancestors, recursively required inbound context and every global/unknown selection. Partition labels grant no omission. Contextual results bind `claim_protocol`, the exact ordered `selected_source_ids`, `corpus_claim_sha256`, and `mapping_context_sha256`. Each mapping explicitly enumerates `source_ids` and `occurrence_ids` for one intrinsic item, exact typed homes, complete conditions and unresolved outcomes. A row covers only its explicitly enumerated Cartesian cells. Different contextual judgments require separate rows. The validator rejects missing, duplicate or substituted source/occurrence/item cells; intrinsic equality supplies no contextual judgment.
+An optional `semantic_partition` exhaustively partitions physical occurrences with symmetric declared incidents. Domain targets require exact `selection_ids`, all required extracted bodies, ancestors, recursively required inbound context and every global/unknown selection. Partition labels grant no omission. Contextual results bind `claim_protocol`, the exact ordered `selected_source_ids`, `corpus_claim_sha256`, and `mapping_context_sha256`. Each mapping explicitly enumerates `source_ids` and `occurrence_ids` for one intrinsic item, exact typed homes, complete conditions and unresolved outcomes. New plans internally bind `corpus-provenance-incidence-v1` in the capsule, extraction identity and targets. Their claim delivers exact physical containment regions, transitive original/source reference paths, complete producer closure and an explicit unowned occurrence vector. A mapping row (including compact set/range selectors) asserts its intersection with that required relation. Every required item/source/occurrence cell is covered exactly once; empty, missing, duplicate and substituted incidence Holds. Whole-batch item support remains conservative. Unowned/global census occurrences retain coverage for every selected source; an unresolved reference conservatively widens its source to the complete census. Different contextual judgments require separate rows. Issued plans without this marker retain Cartesian interpretation, identity and native instructions; a mismatched plan/target marker Holds. Intrinsic equality supplies no contextual judgment.
 
 Corpus independent interface targets also require `domain_review_ids` naming every canonical domain conclusion. Dispatch domains first, then independent interfaces. For new targets marked `delivery_schema: corpus-phase-delivery-v1`, interfaces receive ALL complete validated domain result objects (including every mapping, condition, unresolved outcome, original interface and interaction judgment), exact bound targets/selections/scopes and mapping occurrence vectors, complete local/incident/global raw occurrence context and extraction bundles/results, exact current homes/dependencies and corpus census. They compose independently accepted domain meaning to assess distant and undeclared effects; they do not recursively replay unrelated extraction leaves merely because those domains are canonical dependencies. Domain extraction bundles and results each appear once, in `extractions` (`result.items` contains the items). Unmarked issued targets retain the original recursive evidence delivery bytes and contracts. Unknown delivery markers Hold. Independent `interaction_completeness` accepts declared, undeclared/distant and global completeness against the exact census with a substantive reason. Missing evidence or uncertainty requires Blocked. Software coverage proves no meaning. A generic Pass, digest, producer boundary or completeness flag is insufficient. Reviewers must Block on missing/uncertain boundary meaning, a missing original or suspected distant interaction, name exact missing selection/group/source IDs and request explicit widening (including symmetric incidents or global scope) in a NEW bound target. The projection neither assesses meaning automatically nor grants scope or current authority.
 
@@ -266,4 +266,218 @@ A marked independent final aggregate receives the complete census/frontier, comp
 
 The public corpus tests use a clearly fictional adapter through real public/store/worker delivery. Unpublished fixtures now assert one vector result, complete domain conclusions before independent interfaces, exact contextual mappings, and an explicit operating integration Hold. The previous per-source experimental fixtures and corpus-as-single-source operating fixture were incompatible with this new unreleased contract. Their published range/coherent-source counterparts are retained unchanged.
 
-The unpublished corpus planner groups complete sections toward96KB intrinsic bodies; a larger indivisible section stays whole. This changes batching, not the48KB bounded request or12KB parsed-output limits. Explicit streaming is required when framing exceeds one request. Fit of a full native session and faithful complete output remain unproven until measured. Intrinsic extraction receives a bound corpus manifest; domain/interface reviewers receive the full source vector. Results bind deterministic source/mapping vectors by exact digest and count rather than echoing every identifier. Mapping set references expand to every original cell, with the same coverage/condition/independence checks as explicit arrays; mismatched references Hold. Marked final integration receives complete domain and interface conditions and current homes, with exact census accounting and retrievable originals; unmarked targets still replay the legacy raw closure. Missing meaning or a required original requires Blocked and a new exact target.
+The unpublished corpus planner groups complete sections toward96KB intrinsic bodies; a larger indivisible section stays whole. This changes batching, not the48KB bounded request or12KB parsed-output limits. Explicit streaming is required when framing exceeds one request. Fit of a full native session and faithful complete output remain unproven until measured. Intrinsic extraction receives a bound corpus manifest; domain/interface reviewers receive the full source vector. Results bind deterministic source/mapping vectors by exact digest and count rather than echoing every identifier. Mapping set references select the same identifiers as explicit arrays and assert their intersection with required incidence for new plans; unmarked plans retain expansion to every original cell. The same coverage/condition/independence checks apply; mismatched references Hold. Marked final integration receives complete domain and interface conditions and current homes, with exact census accounting and retrievable originals; unmarked targets still replay the legacy raw closure. Missing meaning or a required original requires Blocked and a new exact target.
+
+Provenance incidence establishes evidence ownership only. A prohibition from A can affect B: all-domain semantic composition, complete local/incident/global raw delivery, distant/unknown interaction completeness and independent domain/interface/final judgments remain compulsory. This change does not infer semantic scope, permission or locality, change current homes, or establish native session fit. The complete relation is rederived from the validated coherent graph and frozen producer closures during canonical validation.
+
+Decoded JSON STRING views retain full extraction and physical own-region coverage. They never create typed source-reference ownership edges, including nested strings or definitions also reached through genuine typed paths. Structural mappings cover exactly the required incidence; separate complete cross-source/global semantic review remains compulsory. Unmarked plans retain their original Cartesian instructions and claims.
+Prospective corpus fit delivery is explicitly selected on a **new** target with
+`delivery_schema: "corpus-incidence-conclusions-v2"`. All domain, interface and
+final targets in that chain must use this marker; mixed or unknown schemas Hold.
+Unmarked and `corpus-phase-delivery-v1` assignments retain their issued bytes and
+interpretation. Extraction identities, the incidence capsule marker, canonical
+receipt validation and the 48,000-byte request / 12,000-byte parsed output /
+600-second shared deadline are unchanged. Existing extraction receipts are reused
+only after exact canonical validation.
+
+Domains receive complete validated extraction result objects, exact review,
+target, plan and whole-batch provenance descriptors, and physical occurrence
+structure with section-to-review membership. Raw section bodies are replaced by
+semantic composition for historical evidence in domains, interfaces and final
+integration. This is **not lossless meaning
+proof**: missing conditions, inadequate conclusions or suspected undeclared
+interactions require Blocked, exact missing IDs and an explicit wider **new**
+target. `raw_review_ids` binds complete original extraction bundles already in
+the canonical closure to that new target. Originals outside the closure require
+wider extraction evidence. Earlier failures and spent allowance remain binding.
+Interfaces receive every complete domain conclusion; final integration receives
+every complete domain and interface conclusion. Historical local, incident and
+global/unknown sections are composed from complete canonical extraction RESULTS,
+with all physical occurrence structure, qualifier vectors, cuts and inbound routes.
+Every replaced section lists `primary_review_ids` and `canonical_review_ids`;
+at least one validated primary extraction must cover it, and every referenced
+complete result is delivered in `extractions`. Supporting context cannot substitute
+for primary coverage. These links prove complete reviewed batch support, never
+item-specific semantic support or adequacy. Missing support Holds with the exact
+section and requires Blocked and an explicitly wider new target; inadequate
+meaning/conditions require an independent Blocked judgment and explicit widening.
+Current complete homes/dependencies and **raw CURRENT** global authority, rules,
+notices, unknown outcomes and extensions in `global_rules` remain compulsory.
+Historical global/unknown scope requires complete meaning, not automatic raw
+history replay. Without an explicit global partition the complete historical
+census still receives section/result support; scope never narrows automatically.
+Only explicit `raw_review_ids` restore complete unchanged original bundles.
+No source label, structural sharing or incidence establishes semantic locality,
+identical applicability or current permission.
+
+The same packet carries `corpus-readable-structure-v1`: `logical_packet` plus
+ordered `tables`, a raw JSON-pointer prefix trie `paths`, and ordered object
+field templates `fields`. Exactly `{"$r":N}` references an earlier table entry.
+`{"$path":N}` reconstructs a path from `paths[0] = null` (empty pointer) and
+subsequent `[earlierParent,rawSegment]` entries. Segments are appended with `/`
+without decoding/re-encoding escapes, normalizing or discarding empty keys.
+`{"$row":[fieldTemplate,values]}` reconstructs a metadata object with exactly
+the template's ordered keys. Unknown fields and distinct field order remain exact.
+`{"$ids":[prefix,[[start,end],...]]}` reconstructs literal decimal ordinal IDs
+in half-open ranges, concatenated in supplied order, including duplicates and
+backwards runs. It is selected only for structurally named vectors where the
+literal sequence is exact and the encoding is smaller; leading zeroes and unsafe
+integers remain literal. `{"$literal":[[key,value],...]}` escapes objects containing
+ANY reserved marker. Other JSON remains literal. Repeated complete physical
+edge/reference metadata can share table entries even across differently ordered
+source reference arrays; sources, every route and physical occurrence stay exact.
+Qualifier/ancestry vectors, selection indexes and mapping vectors share structures
+without changing meaning. All dictionaries are complete in the same packet. Semantic
+text remains readable JSON. There is no external dictionary, archive or code
+execution. `factorCorpusStructure`, `expandCorpusStructure` and
+`validateCorpusStructure(packet, expectedLogicalPacket)` are pure functions;
+validation checks exact deterministic reconstruction against the expected packet.
+A self-sealed hash alone cannot detect an omission with a recomputed hash.
+Factoring occurs **before** streaming; native delivery contains the complete
+tables and reference grammar. Canonical revalidation still traverses the full
+proof DAG and checks original delivery, producer/native independence,
+currentness, negative results, execution timing/closure and exact mappings.
+
+The focused public fixtures in `tests/corpus-fit-delivery.test.mjs` use FICTIONAL
+scripted judgments. Structural equality, transport bounds and fixture success
+establish no authentic semantic acceptance or actual native context fit. Small
+packets can grow from table overhead; semantic growth remains visible. Actual
+complete result/home sizes, token counts and fit require an authentic trial.
+This source representation grants no acceptance or action authority; SoloDev
+remains paused.
+
+FITv2 proof delivery now separates the runtime's full canonical incidence from
+semantic review input. The capsule `c.incidence`, extraction identity, target
+incidence marker, mapping-context hashes and complete source/item/occurrence
+coverage validator are unchanged. Runtime plan validation still decodes/rebuilds
+the coherent graph and recomputes the full incidence; canonical receipt validation
+still checks the entire proof graph, independence (including all frozen corpus
+contributors), currentness, negatives, authority, native delivery and timing.
+Unmarked and v1 delivery retain their exact entry implementation bytes.
+
+Only FITv2 non-extraction packets project `corpus_claim.incidence` to explicit
+ordered source `seed_regions`, `conservative` flags, `unowned_occurrence_ids` and
+`direct_references`. Seeds preserve each source's own physical region and initial
+producer regions, including duplicates. Direct edges appear once per complete
+physical typed route across the whole corpus, including unselected/unowned
+sources and snapshot-original documents. Each retains document, exact escaped
+path, reference id/revision/optional hash and either exact target document/path
+plus `target_source` id/revision/hash, or explicit `unknown:true`. Stale, missing
+and ambiguous endpoints remain unknown. Parsed JSON STRINGs never create typed
+edges. Physical qualifiers, ancestry, occurrences, cuts and ordered collections
+remain in their existing contexts; complete conclusions remain readable evidence.
+The complete snapshot inbound structure is retained in the existing
+`global_occurrence_context.snapshot_inbound`, including routes outside a local
+selection. Producer associations remain in the complete
+`corpus_claim.producer_closures`, with exact endpoints in `source_census`.
+No computed per-source transitive regions or repeated route traces are replayed.
+
+`incidence.canonical_relation.sha256` binds ONLY the full runtime-computed
+incidence. `corpus_claim.canonical_claim_sha256` binds the exact original canonical
+claim; response `corpus_claim_sha256` still names that full claim, not the delivery
+projection. Repeated `complete_corpus_context.claim` uses the same projection.
+These proof digests replace no semantic evidence. Membership for structural
+mapping is computed and mechanically enforced by runtime intersections with the
+full relation; reviewers do not claim to have hand-calculated it. Conservative
+sources and unowned occurrences retain full required coverage. Source ownership
+never narrows semantic cross-source/global interaction duties or grants authority.
+Complete extraction/domain/interface conclusions, raw CURRENT global rules,
+notices and unknown outcomes, exact homes/dependencies, and independent semantic
+adequacy judgments remain compulsory. Missing meaning or unusable fit requires
+Blocked and an explicitly wider new target, preserving failures and spent limits.
+
+`projectCorpusProofDelivery(material, canonicalClaim)` is a pure numeric-preflight
+seam: it validates the coherent graph, checks exact source census/membership and
+recomputes the full incidence before returning the projection.
+`validateCorpusProofDelivery(projected, material, canonicalClaim)` compares every
+projected field against that deterministic reconstruction. A resealed transport
+hash cannot authorize a removed/substituted edge, endpoint, flag, source or seed.
+The seam is not state-backed authentication or semantic acceptance; normal runtime
+validation remains required. Its inputs must be the exact canonical material and
+claim from the owner's validated plan. Whole-packet native size also includes
+complete semantic results, current controls and structural contexts. Synthetic
+size reduction and fictional worker tests establish no actual native context fit,
+QA acceptance, adoption or resume permission; SoloDev remains paused.
+
+### Prospective incidence storage
+
+Fresh `coherent-corpus-body-v1` capsules retain `incidence` as a closed
+`corpus-incidence-derivation-v1` descriptor: `protocol`, `relation_protocol`,
+`basis_sha256`, `relation_sha256`, `source_count`, and `occurrence_count`.
+The basis binds the immutable projection reference and complete projection hash,
+ordered selected sources, complete producer closures, exact units, and semantic
+partition (or explicit null). The relation hash binds the exact ordered canonical
+`corpus-provenance-incidence-v1` relation. The descriptor is itself part of the
+existing extraction identity. Fresh identities therefore change prospectively.
+
+Plan validation decodes and validates the frozen material, validates current
+sources/producers/membership and exact extraction coverage, reconstructs the full
+canonical relation and requires exact descriptor equality. Unknown, mixed,
+missing or inconsistent descriptors Hold. The full relation is returned separately
+from the stored capsule; corpus claims, mappings and full validation still use
+that relation. Reusing `corpus_plan_id` retains the exact stored representation
+and identity, without persisting the reconstructed closure. A two-entry immutable
+derivation cache binds all immutable inputs; it never caches live authorization,
+membership, producer or native independence checks.
+
+Issued inline-incidence and no-incidence capsules retain their original identity,
+claim and delivery contracts. Inline objects are validated as inline relations;
+they are never reinterpreted as descriptors. Raw originals remain exact in the
+existing snapshot vault. This is storage of mechanically recomputable proof,
+not semantic acceptance, corpus qualification, native fit, publication, renewed
+allowance, or permission to resume a paused company. Failed evidence remains.
+
+### Prospective physical context and phase contract (source only)
+
+`batching_policy: "intrinsic-body-96k-v1"` on a fresh corpus plan batches complete
+intrinsic sections independently of its physical partition. The capsule, compact
+incidence derivation and extraction identity bind that policy and the complete
+partition. Reusing `corpus_plan_id` preserves its original policy; an absent
+marker retains the exact previous partition-dependent batching and identities.
+
+A prospective partition may explicitly name
+`context_policy: "physical-shared-v1"` and `shared_selection_ids`. Its closed
+contract still assigns every physical occurrence exactly once. Selection context
+contains the selected selections, their explicit incidents and explicit shared
+selections, with full qualifier sections, ordered cuts and genuine inbound
+closure. `scope: "*"` remains unresolved semantic applicability. Neither an
+ordinal partition label nor absence from the shared seed proves locality.
+
+Changed phase judgments require the distinct delivery schema
+`corpus-context-conclusions-v3`, this physical partition and intrinsic batching.
+The entire domain/interface/integration chain must use that marker. Older v1/v2
+and unmarked deliveries keep their existing behavior. Extraction bundles retain
+their exact grammar. Both conclusion markers support explicit `raw_review_ids`
+on a new target; a wider target never renews allowance or clears failed evidence.
+
+Domain interaction completeness is closed to `assessment_scope:
+"selected-context"`, exact `census_sha256`, substantive
+`contextual_preservation_complete`, `outward_conditions_complete` and `reason`.
+Domain review preserves complete batch items, verbatim interfaces, qualifiers,
+negative/exhausted/unknown/OPEN outcomes and outward conditions in complete
+conclusions and current homes. Missing peer evidence needed for preservation
+requires Blocked and explicit widening. Domain `continue` permits the next
+independent review only. It does not attest whole unseen corpus completeness.
+Context and homes remain global. Every interface receives **all complete canonical
+domain result objects** and required current homes/dependencies and authority;
+final receives all complete domain and interface results, exact mappings and
+current homes/dependencies and authority for independent whole-vector judgment.
+
+The new shared physical projection contains only explicitly shared selections
+and their closure. Historical global meaning travels through its originating
+domain's complete conclusions and all-domain reconciliation. Relevant physical
+qualifiers and all genuine incoming routes remain evidence; full-relation hashes
+never replace material uncertainty. Direct typed routes are deterministically
+projected from concrete delivered sections and their cuts: a state-root cut
+collection does not import every child reference. The pure proof preflight takes
+a closed policy/partition/phase/selection descriptor and reconstructs membership
+from frozen material, rather than trusting caller-supplied context arrays. The
+full canonical incidence relation, source claims and coverage remain unchanged
+and software-owned. Legacy v2 retains its full direct-route projection.
+
+Workload inspection reports prospective primary/support occurrence counts,
+section/inbound/direct-route/collection counts, shared raw context size and schema
+ceilings. Complete result floors, tokenizer counts, authentic elapsed execution
+and native fit remain unknown until authentic artifacts exist. Synthetic adapter
+tests establish source mechanics only. No actual incidence/FIT adoption,
+publication, QA Pass, retry, release or company resume is established here.
