@@ -133,7 +133,9 @@ test('only exact pure runtime commands are mechanically ingested; conditions, un
  mutate(f,s=>Object.assign(s,structuredClone(baseline)));
  const beforeUnknown=read(f);
  await assert.rejects(call('company_control',{root:f.root,session_id:f.session_id,expected_epoch:1,action:'resume',source_instruction:'resume',conditions:'No export'},'codex'),/Unknown argument/);assert.equal(sha(read(f)),sha(beforeUnknown));
- engine.save({...f,id:'control-forged',kind:'decision',content:'resume',author_role:'human_founder',status:'Recorded',action:'resume',recorded_by:f.session_id},'codex');
+ const attempted={...f,id:'control-forged',kind:'decision',content:'resume',author_role:'human_founder',status:'Recorded',action:'resume',recorded_by:f.session_id},beforeForgery=sha(read(f));
+ assert.throws(()=>engine.save(attempted,'codex'),/caller cannot supply runtime provenance/);assert.equal(sha(read(f)),beforeForgery);
+ const {author_role,...ordinary}=attempted;engine.save(ordinary,'codex');
  const forged=read(f).records['control-forged'];assert.equal(forged.author_role,'runner');assert.equal(mechanicalOperatingControl(forged),false);assert.throws(()=>operatingContext(read(f)),/DIRTY/);
  mutate(f,s=>Object.assign(s,structuredClone(baseline)));
  control(f,'pause','pause and prohibit all exports');const state=read(f),audit=Object.values(state.records).find(r=>r.content==='pause and prohibit all exports');assert.ok(audit);assert.equal(state.paused,true);assert.ok(operatingFrontier(state).entries.some(e=>e.source.id===audit.id));assert.throws(()=>control(f,'resume'),/DIRTY/);

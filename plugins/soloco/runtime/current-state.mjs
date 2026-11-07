@@ -81,7 +81,9 @@ export function classificationFor(state,record,id=record.id,validation) {
     for(const [key,value] of [['source',p.source],['plan',p.plan],['review',p.integration]])if(JSON.stringify(anchor[key])!==JSON.stringify(value))throw Error('Corpus classification metadata changed');
     if(!validation?.corpus?.has(p)){validateCorpusExclusion(state,p,id);validation?.corpus?.add(p);}
     const mapping=p.source_mappings.find(m=>m.source.id===id);
-    if(!mapping||JSON.stringify(mapping.source)!==JSON.stringify(recordReference(record,id)))throw Error('Corpus member mapping changed');
+    // Corpus mappings bind resolved originals. The canonical validator above
+    // separately checks the stored envelope and its immutable dependencies.
+    if(!mapping||JSON.stringify(mapping.source)!==JSON.stringify(recordReference(resolveSnapshotEntry(state,record),id)))throw Error('Corpus member mapping changed');
     return {source:mapping.source,disposition:'represented',plan:p.plan,review:p.integration,corpus_qualification:p};
   }
   if(c?.scoped_qualification?.protocol===CORPUS_PRESERVATION)throw Error('Held: corpus source vector/member changed');

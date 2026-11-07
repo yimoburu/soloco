@@ -1,0 +1,8 @@
+{
+  "plugins/soloco/runtime/scoped-context.mjs": "da00c8e0ee174444e47ffb93b4c745ca4c75f24ae4211187f5dfe1e61700c83a",
+  "plugins/soloco/runtime/operating-state.mjs": "f833a835022d38e273d62e670a6d61edea4be63ef1173d8a681faf31d7d5fddc",
+  "tests/initial-proposed-homes.test.mjs": "5eae0e0d9c8eef275fb2f8ef90254162b4dd0e73403b2f972b31f6e4e31073be",
+  "docs/scoped-context.md": "6d6a5fadd53eb70d7b2abf733cc83d5d48c59eabc4e7b1db333e266564804332",
+  "tests/initial-home-publication.test.mjs": "c0ebe9ba71c8da1d0c798ea5b019062812e57aeefcfa3ed84f3c89e7b05bad01",
+  "docs/initial-home-publication-repair-report.md": "8c30dab37442d8703aa3a75b6f881e16c2d40776faa60a4f7dfcf424b8934a17"
+}

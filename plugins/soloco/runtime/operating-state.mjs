@@ -215,7 +215,19 @@ function publicationEvidence(s,homes){
     for(const producer of producerClosure(s,value))add(producer);
     if(value.artifact_id){const record=s.records?.[value.artifact_id];if(!record)fail('preservation artifact missing: '+value.artifact_id);add(recordReference(record));}
   };
-  for(const h of homes){seen=new Set();for(const key of [...h.value.operating_record.evidence_refs,...h.value.operating_record.authority_refs,...(h.value.operating_record.grant_refs??[]),...(h.value.operating_record.historical_receipts??[])]){
+  for(const h of homes){seen=new Set();
+    // Initial homes can cite canonical extraction receipts by plain ID. Seed
+    // their already accepted corpus closure through its stored source envelope
+    // before walking receipt parents containing immutable snapshot plans. Only
+    // exact independently accepted counterparts and runtime plan bindings qualify.
+    if(h.value.bootstrap_home_provenance)for(const c of projection.classifications.values()){
+      const corpus=c.corpus_qualification;
+      if(corpus&&same(corpus.plan,h.value.bootstrap_home_provenance.plan)&&corpus.homes.some(ref=>same(ref,h.source))){
+        const stored=contextSource(s,c.source.id);if(!stored)fail('provenance source missing: '+c.source.id);
+        add(recordReference(stored,c.source.id));
+      }
+    }
+    for(const key of [...h.value.operating_record.evidence_refs,...h.value.operating_record.authority_refs,...(h.value.operating_record.grant_refs??[]),...(h.value.operating_record.historical_receipts??[])]){
     const value=contextSource(s,key);if(!value)fail('provenance source missing: '+key);add(recordReference(value,key));
   }
   homeSources.push({home_id:h.source.id,sources:[...seen].sort().map(id=>sources.get(id).source)});}

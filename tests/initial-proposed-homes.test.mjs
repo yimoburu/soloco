@@ -56,7 +56,7 @@ async function review(f,args,change,native){
  const s=read(f),job=s.jobs[q.id];return {target,job,record:s.records[job.artifact_id],packet};
 }
 const typed=()=>({version:1,kind:'permission',scope:'*',owner:'fictional-owner',conditions:'Proposed representation only; existing allowance ZERO.',exceptions:'Never authorizes execution.',clearing:'Independent review and existing authority required.',expires_at:null,dependencies:[],authority_refs:['archive'],evidence_refs:[],grant_refs:['archive'],remaining:0,revoked:true});
-async function home(f,id='home',expected_revision){const s=read(f),op=typed();op.evidence_refs=[JSON.stringify(scoped.scopedReference(s.records.archive))];return save(f,{id,...(expected_revision===undefined?{}:{expected_revision}),kind:'artifact',content:'UNKNOWN failed outcome; allowance ZERO; no execution.',operating_record:op,bootstrap_plan_id:f.plan_id});}
+async function home(f,id='home',expected_revision){const s=read(f),op=typed();op.evidence_refs=['archive'];return save(f,{id,...(expected_revision===undefined?{}:{expected_revision}),kind:'artifact',content:'UNKNOWN failed outcome; allowance ZERO; no execution.',operating_record:op,bootstrap_plan_id:f.plan_id});}
 async function extraction(f){const v=read(f).records[f.plan_id].scoped_context_plan;const es=[];for(const u of v.units){const e=await review(f,{phase:'extract',unit_id:u.id,delivery_protocol:scoped.SCOPED_STREAM});assert.equal(e.job.status,'completed',e.job.error);es.push(e);}return es;}
 const domainArgs=es=>({phase:'applicability',delivery_schema:scoped.CORPUS_PHASED_DELIVERY,delivery_protocol:scoped.SCOPED_STREAM,selection_ids:['all'],extraction_review_ids:es.map(e=>e.record.id),context_scope:'*'});
 async function aggregate(f,es,d){const a=domainArgs(es),i=await review(f,{...a,domain_review_ids:[d.record.id],interface_keys:d.record.qualification_result.interfaces.map(i=>i.key)});assert.equal(i.job.status,'completed',i.job.error);const final=await review(f,{phase:'integration',delivery_schema:scoped.CORPUS_PHASED_DELIVERY,delivery_protocol:scoped.SCOPED_STREAM,domain_review_ids:[d.record.id],interface_review_ids:[i.record.id]});assert.equal(final.job.status,'completed',final.job.error);await context(f,{action:'apply',integration_review_id:final.record.id});return final;}
@@ -76,7 +76,7 @@ test('FICTIONAL runtime provenance, complete inventory, immutable home revisions
  await assert.rejects(save(f,{id:'home',expected_revision:1,kind:'artifact',content:'remove typed body'}),/same bootstrap plan/);
  await assert.rejects(save(f,{id:'home',expected_revision:1,bootstrap_plan_id:f.plan_id,kind:'decision',content:'retype',operating_record:typed()}),/typed artifact|complete typed/);
  await assert.rejects(save(f,{id:'forged',kind:'artifact',content:'forged',bootstrap_home_provenance:{}}),/Unknown argument/);
- const op=typed();op.evidence_refs=['missing'];await assert.rejects(save(f,{id:'bad-ref',bootstrap_plan_id:f.plan_id,kind:'artifact',content:'bad',operating_record:op}),/exact JSON evidence/);
+ const op=typed();op.evidence_refs=['missing'];await assert.rejects(save(f,{id:'bad-ref',bootstrap_plan_id:f.plan_id,kind:'artifact',content:'bad',operating_record:op}),/source missing missing/);
  await home(f,'home',1);assert.equal(read(f).records.home.previous.length,1);
  await assert.rejects(aggregate(f,es,d),/changed/);
  const reuse=await review(f,{phase:'extract',unit_id:es[0].target.target.unit_id,delivery_protocol:scoped.SCOPED_STREAM});assert.equal(reuse.reused,true);
@@ -122,7 +122,7 @@ test('FICTIONAL late authority, notices, unknown outcomes, sources and ordinary 
 
 test('FICTIONAL canonical extraction evidence remains inspectable outside review evaluation',async()=>{
  const f=await fixture(),es=await extraction(f),op=typed();
- op.evidence_refs=[JSON.stringify(scoped.scopedReference(es[0].record))];
+ op.evidence_refs=[es[0].record.id];
  await save(f,{id:'home',kind:'artifact',content:'Canonical extraction preserves UNKNOWN, failed outcome and ZERO allowance.',operating_record:op,bootstrap_plan_id:f.plan_id});
  const state=read(f);
  assert.ok(scoped.scopedPlanView(state,{plan_id:f.plan_id}).extraction_identity);

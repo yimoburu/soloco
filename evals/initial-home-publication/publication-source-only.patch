@@ -1,0 +1,270 @@
+--- a/plugins/soloco/runtime/scoped-context.mjs
++++ b/plugins/soloco/runtime/scoped-context.mjs
+@@ -335,11 +335,13 @@
+   validateOperatingRecord(r.operating_record);
+ }
+ function bootstrapEvidence(s,c,m,r){
+-  for(const encoded of r.operating_record.evidence_refs){
+-    let ref;try{ref=JSON.parse(encoded);}catch{fail('proposed home requires exact JSON evidence references');}
+-    closed(ref,['id','revision','sha256'],'home evidence reference');
+-    if(m.sources.some(o=>same(o.source,ref))){exact(s,ref);continue;}
+-    const proof=canonical(s,ref);if(proof.x.t.phase!=='extract'||proof.x.v.extraction_identity!==corpusIdentity(c))fail('home evidence outside admissible frozen originals/canonical extractions');
++  for(const id of r.operating_record.evidence_refs){
++    // Plain IDs share the existing operating publication grammar. Interpret every
++    // string literally, including JSON-looking IDs; runtime derives exact refs.
++    const frozen=m.sources.find(o=>o.source.id===id);
++    if(frozen){exact(s,frozen.source);continue;}
++    const proof=canonical(s,scopedReference(source(s,id),id));
++    if(proof.x.t.phase!=='extract'||proof.x.v.extraction_identity!==corpusIdentity(c))fail('home evidence outside admissible frozen originals/canonical extractions');
+   }
+   // Permission homes describe frozen grants only. They never enter authoritative
+   // governance or change a grant/allowance. Unknown/exhausted content is retained.
+@@ -1138,6 +1140,7 @@
+   const value={record,job,x,result:e.qualification_result};evaluation.visiting.delete(key);evaluation.proofs.set(key,value);return value;
+ }
+ export function createScopedTarget(s,args){return evaluate(()=>{
++  if(args.phase==='extract'&&args.current_home_inventory!==undefined)fail('current_home_inventory is only supported on non-extraction targets');
+   const p=source(s,args.plan_id),{v}=plan(s,p),phase=args.phase;if(!['extract','applicability','integration'].includes(phase))fail('choose extract, applicability or integration');
+   if(args.delivery_protocol!==undefined&&(args.delivery_protocol!==SCOPED_STREAM||phase==='extract'&&![COHERENT_PARTITIONER,CORPUS_PARTITIONER].includes(v.partitioner)))fail('stream delivery is opt-in for NEW non-extraction targets only');
+   if(args.delivery_schema!==undefined&&(![CORPUS_DELIVERY,CORPUS_FIT_DELIVERY,CORPUS_PHASED_DELIVERY].includes(args.delivery_schema)||v.partitioner!==CORPUS_PARTITIONER||phase==='extract'))fail('invalid corpus delivery schema');
+--- a/plugins/soloco/runtime/operating-state.mjs
++++ b/plugins/soloco/runtime/operating-state.mjs
+@@ -215,7 +215,19 @@
+     for(const producer of producerClosure(s,value))add(producer);
+     if(value.artifact_id){const record=s.records?.[value.artifact_id];if(!record)fail('preservation artifact missing: '+value.artifact_id);add(recordReference(record));}
+   };
+-  for(const h of homes){seen=new Set();for(const key of [...h.value.operating_record.evidence_refs,...h.value.operating_record.authority_refs,...(h.value.operating_record.grant_refs??[]),...(h.value.operating_record.historical_receipts??[])]){
++  for(const h of homes){seen=new Set();
++    // Initial homes can cite canonical extraction receipts by plain ID. Seed
++    // their already accepted corpus closure through its stored source envelope
++    // before walking receipt parents containing immutable snapshot plans. Only
++    // exact independently accepted counterparts and runtime plan bindings qualify.
++    if(h.value.bootstrap_home_provenance)for(const c of projection.classifications.values()){
++      const corpus=c.corpus_qualification;
++      if(corpus&&same(corpus.plan,h.value.bootstrap_home_provenance.plan)&&corpus.homes.some(ref=>same(ref,h.source))){
++        const stored=contextSource(s,c.source.id);if(!stored)fail('provenance source missing: '+c.source.id);
++        add(recordReference(stored,c.source.id));
++      }
++    }
++    for(const key of [...h.value.operating_record.evidence_refs,...h.value.operating_record.authority_refs,...(h.value.operating_record.grant_refs??[]),...(h.value.operating_record.historical_receipts??[])]){
+     const value=contextSource(s,key);if(!value)fail('provenance source missing: '+key);add(recordReference(value,key));
+   }
+   homeSources.push({home_id:h.source.id,sources:[...seen].sort().map(id=>sources.get(id).source)});}
+--- a/tests/initial-proposed-homes.test.mjs
++++ b/tests/initial-proposed-homes.test.mjs
+@@ -56,7 +56,7 @@
+  const s=read(f),job=s.jobs[q.id];return {target,job,record:s.records[job.artifact_id],packet};
+ }
+ const typed=()=>({version:1,kind:'permission',scope:'*',owner:'fictional-owner',conditions:'Proposed representation only; existing allowance ZERO.',exceptions:'Never authorizes execution.',clearing:'Independent review and existing authority required.',expires_at:null,dependencies:[],authority_refs:['archive'],evidence_refs:[],grant_refs:['archive'],remaining:0,revoked:true});
+-async function home(f,id='home',expected_revision){const s=read(f),op=typed();op.evidence_refs=[JSON.stringify(scoped.scopedReference(s.records.archive))];return save(f,{id,...(expected_revision===undefined?{}:{expected_revision}),kind:'artifact',content:'UNKNOWN failed outcome; allowance ZERO; no execution.',operating_record:op,bootstrap_plan_id:f.plan_id});}
++async function home(f,id='home',expected_revision){const s=read(f),op=typed();op.evidence_refs=['archive'];return save(f,{id,...(expected_revision===undefined?{}:{expected_revision}),kind:'artifact',content:'UNKNOWN failed outcome; allowance ZERO; no execution.',operating_record:op,bootstrap_plan_id:f.plan_id});}
+ async function extraction(f){const v=read(f).records[f.plan_id].scoped_context_plan;const es=[];for(const u of v.units){const e=await review(f,{phase:'extract',unit_id:u.id,delivery_protocol:scoped.SCOPED_STREAM});assert.equal(e.job.status,'completed',e.job.error);es.push(e);}return es;}
+ const domainArgs=es=>({phase:'applicability',delivery_schema:scoped.CORPUS_PHASED_DELIVERY,delivery_protocol:scoped.SCOPED_STREAM,selection_ids:['all'],extraction_review_ids:es.map(e=>e.record.id),context_scope:'*'});
+ async function aggregate(f,es,d){const a=domainArgs(es),i=await review(f,{...a,domain_review_ids:[d.record.id],interface_keys:d.record.qualification_result.interfaces.map(i=>i.key)});assert.equal(i.job.status,'completed',i.job.error);const final=await review(f,{phase:'integration',delivery_schema:scoped.CORPUS_PHASED_DELIVERY,delivery_protocol:scoped.SCOPED_STREAM,domain_review_ids:[d.record.id],interface_review_ids:[i.record.id]});assert.equal(final.job.status,'completed',final.job.error);await context(f,{action:'apply',integration_review_id:final.record.id});return final;}
+@@ -76,7 +76,7 @@
+  await assert.rejects(save(f,{id:'home',expected_revision:1,kind:'artifact',content:'remove typed body'}),/same bootstrap plan/);
+  await assert.rejects(save(f,{id:'home',expected_revision:1,bootstrap_plan_id:f.plan_id,kind:'decision',content:'retype',operating_record:typed()}),/typed artifact|complete typed/);
+  await assert.rejects(save(f,{id:'forged',kind:'artifact',content:'forged',bootstrap_home_provenance:{}}),/Unknown argument/);
+- const op=typed();op.evidence_refs=['missing'];await assert.rejects(save(f,{id:'bad-ref',bootstrap_plan_id:f.plan_id,kind:'artifact',content:'bad',operating_record:op}),/exact JSON evidence/);
++ const op=typed();op.evidence_refs=['missing'];await assert.rejects(save(f,{id:'bad-ref',bootstrap_plan_id:f.plan_id,kind:'artifact',content:'bad',operating_record:op}),/source missing missing/);
+  await home(f,'home',1);assert.equal(read(f).records.home.previous.length,1);
+  await assert.rejects(aggregate(f,es,d),/changed/);
+  const reuse=await review(f,{phase:'extract',unit_id:es[0].target.target.unit_id,delivery_protocol:scoped.SCOPED_STREAM});assert.equal(reuse.reused,true);
+@@ -122,7 +122,7 @@
+ 
+ test('FICTIONAL canonical extraction evidence remains inspectable outside review evaluation',async()=>{
+  const f=await fixture(),es=await extraction(f),op=typed();
+- op.evidence_refs=[JSON.stringify(scoped.scopedReference(es[0].record))];
++ op.evidence_refs=[es[0].record.id];
+  await save(f,{id:'home',kind:'artifact',content:'Canonical extraction preserves UNKNOWN, failed outcome and ZERO allowance.',operating_record:op,bootstrap_plan_id:f.plan_id});
+  const state=read(f);
+  assert.ok(scoped.scopedPlanView(state,{plan_id:f.plan_id}).extraction_identity);
+--- a/docs/scoped-context.md
++++ b/docs/scoped-context.md
+@@ -595,9 +595,12 @@
+ 
+ After canonical intrinsic extraction, `company_save` may prepare a new artifact
+ with `bootstrap_plan_id`, its complete `operating_record`, and globally mandatory
+-context. Evidence references in these initial homes are JSON strings encoding
+-exact `{id, revision, sha256}` references to frozen sources or canonical extraction
+-receipts. The runtime records plan/owner provenance and verifies the immutable
++context. `operating_record.evidence_refs` contains plain literal source IDs, as in
++ordinary operating publication. For frozen sources the runtime derives the exact
++frozen revision/hash and verifies the resolved original; for canonical extraction
++receipts it derives the exact current reference and validates the full receipt
++within this extraction identity. JSON-looking IDs remain literal IDs, never parsed
++provenance. The runtime records plan/owner provenance and verifies the immutable
+ intake chain. Revisions require the same explicit plan, retain prior contents, and
+ cannot delete/retype homes or replace their provenance. A permission home describes
+ an existing grant; it does not modify authoritative grants or remaining allowance.
+--- /dev/null
++++ b/tests/initial-home-publication.test.mjs
+@@ -0,0 +1,134 @@
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import fs from 'node:fs';
++import os from 'node:os';
++import path from 'node:path';
++import * as engine from '../plugins/soloco/runtime/engine.mjs';
++import {call} from '../plugins/soloco/runtime/main.mjs';
++import {withStore,digest} from '../plugins/soloco/runtime/store.mjs';
++import {work} from '../plugins/soloco/runtime/worker.mjs';
++import {executionTiming} from '../plugins/soloco/runtime/timeout.mjs';
++import {buildLegacyCoherentPlan} from '../plugins/soloco/runtime/legacy-operating.mjs';
++import {assignmentContext} from '../plugins/soloco/runtime/context.mjs';
++import {operatingContext,validateOperatingIndex} from '../plugins/soloco/runtime/operating-state.mjs';
++import {retainSnapshotEntry,resolveSnapshotEntry,inheritSnapshots} from '../plugins/soloco/runtime/snapshot.mjs';
++import * as scoped from '../plugins/soloco/runtime/scoped-context.mjs';
++
++// FICTIONAL scripted judgments exercise real APIs, storage and worker delivery.
++// They establish mechanics only: no actual native fit or semantic SOURCE QA.
++const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'fictional-bootstrap-publication-'));
++process.env.COMPANY_PLUGIN_DATA=path.join(tmp,'bindings');
++test.after(()=>fs.rmSync(tmp,{recursive:true,force:true}));
++const sha=v=>digest(JSON.stringify(v));
++const read=f=>withStore(f.root,db=>db.read());
++const mutate=(f,fn)=>withStore(f.root,db=>db.transaction('fictional.publication.fixture',s=>{fn(s);return s;}));
++const common=f=>({root:f.root,session_id:f.session_id,epoch:f.epoch});
++const context=(f,args)=>call('company_context',{...common(f),source_instruction:f.source_instruction,protocol:scoped.SCOPED_PROTOCOL,...args},'codex');
++const operating=(f,args)=>context(f,{protocol:'operating-state-v1',...args});
++const save=(f,args)=>call('company_save',{...common(f),...args},'codex');
++const launch={check:()=>({available:true,authenticated:true}),launch:()=>({on(){},unref(){}})};
++async function fixture({wrapped=false,literalID,partitioner=scoped.CORPUS_PARTITIONER}={}){
++ const f={root:fs.mkdtempSync(path.join(tmp,'company-')),session_id:'fictional-bootstrap-owner',epoch:1,source_instruction:'FICTIONAL authorized paused preparation and independent read-only reviews; no action grants.'};
++ engine.bind(f.root,f.session_id,'codex');engine.open({...common(f),idea:'FICTIONAL initial homes through publication'},'codex');withStore(f.root,db=>db.migrate());
++ mutate(f,s=>{s.paused=true;const original={id:'archive',kind:'artifact',revision:7,author_instance:'fictional-original-contributor',content:'UNKNOWN failed action; allowance exhausted. No execution or renewed permission.'};s.records.archive=wrapped?retainSnapshotEntry(s,original):original;if(literalID)s.records[literalID]={...original,id:literalID,content:'Literal JSON-looking ID; UNKNOWN, not a reference to another source.'};});
++ const m=buildLegacyCoherentPlan(read(f));
++ const args=partitioner===scoped.CORPUS_PARTITIONER?{selected_source_ids:['archive'],semantic_partition:{plan_sha256:m.plan_sha256,context_policy:scoped.CORPUS_PHYSICAL_CONTEXT,shared_selection_ids:['all'],selections:[{id:'all',scope:'*',occurrence_ids:m.occurrences.map(o=>o.id),incident_ids:[]}]},batching_policy:scoped.CORPUS_INTRINSIC_BATCHING,home_intake_policy:scoped.INITIAL_PROPOSED_HOMES}:{};
++ const p=await context(f,{action:'plan',source_id:'archive',partitioner,maintenance:true,...args});f.plan_id=p.id;return f;
++}
++function scripted(p){
++ const r={...p.response_shape,verdict:'Pass',reason:'FICTIONAL scripted mechanics only; no semantic acceptance.',permitted_action:p.phase==='integration'?'apply_scoped_context':'continue',preservation_complete:true,interfaces_complete:true,authority_checked:true,scope_complete:true,blockers:[]};
++ if(p.phase==='extract'){
++  const b=p.reviewed_unit_bundle;r.unit_id=b.primary.id;r.unit_sha256=sha(b.primary);r.reviewed_unit_bundle_sha256=sha(b);
++  r.items=[{id:'coherent-occurrence',kind:'boundary',text:'UNKNOWN failure and exhausted allowance retained; never grants execution.',scope:'*',provenance:b.provenance_sha256,interfaces:b.primary.required_interface?[b.primary.required_interface]:[]}];
++ }else if(p.phase==='applicability'){
++  r.summary='FICTIONAL complete unresolved conditions; all permission remains blocked.';
++  r.mappings=p.item_keys.map(item=>({item,selection_ids:p.mapping_selection_ids,source_set:p.mapping_sets.source_set,occurrence_set:p.mapping_sets.occurrence_set,context_sha256:p.mapping_context_sha256,typed_homes:p.typed_homes,conditions:'No execution; exhausted allowance.',unresolved_outcomes:'UNKNOWN failed action remains unresolved.',status:'represented',homes:p.homes.map(h=>h.source.id),reason:'FICTIONAL full conditions retained.'}));
++  r.interfaces=p.interface_keys.length?[]:p.extractions.flatMap(e=>(e.result?.items??e.items).map(item=>({key:e.review.id+'/'+item.id,item}))).filter(i=>p.item_keys.includes(i.key)).flatMap(({key,item})=>item.interfaces.map(i=>({key:key+'/'+i.id,item:key,scope:item.scope,...i})));r.reviewed_interfaces=p.interface_keys;
++ }else{r.summary='FICTIONAL full aggregate; no action authority.';r.unreviewed_interfaces=[];}
++ return {content:r.reason,messages:[],notices:[],review:{verdict:r.verdict,reason:r.reason,permitted_action:r.permitted_action},qualification_result:r};
++}
++async function scopedReview(f,args){
++ const target=await context(f,{action:'target',plan_id:f.plan_id,...args});if(target.reused)return target;
++ const q=engine.dispatch({...common(f),role:'qa',review_of:target.id,task:'FICTIONAL independent scripted preservation review.'},'codex',launch);
++ const admission=read(f);scoped.validateScopedNativeAdmission(admission,admission.jobs[q.id],'fictional-preservation-'+q.id);
++ const chunks=[];let packet;
++ await work(f.root,q.id,async(_h,_s,prompt,_d,timeout,_selection,options)=>{
++  const now=Date.now();options.onSpawn(executionTiming(now,{timeout_ms:Math.min(timeout,options.executionDeadlineAt?options.executionDeadlineAt-now:timeout),timeout_reason:options.timeoutReason}));
++  let p=JSON.parse(prompt);const native_id='fictional-preservation-'+q.id;
++  if(p.protocol===scoped.SCOPED_STREAM){chunks.push(p.text);if(!p.final)return {native_id,text:JSON.stringify({scoped_stream_ack:{body_sha256:p.body_sha256,sequence:p.sequence,range_sha256:p.range_sha256}})};p=JSON.parse(chunks.join(''));}
++  if(p.protocol==='corpus-readable-structure-v1')p=scoped.expandCorpusStructure(p);packet=p;return {native_id,text:JSON.stringify(scripted(p))};
++ });
++ const s=read(f),job=s.jobs[q.id];assert.equal(job.status,'completed',job.error);return {target,job,record:s.records[job.artifact_id],packet};
++}
++const homeRecord=evidence_refs=>({version:1,kind:'obligation',scope:'*',owner:'fictional-owner',conditions:'UNKNOWN failed action remains unresolved; allowance exhausted.',exceptions:'No executable permission.',clearing:'Independent reconciliation under existing authority.',expires_at:null,dependencies:[],authority_refs:[],evidence_refs});
++const home=(f,id,evidence_refs)=>save(f,{id,kind:'artifact',content:'UNKNOWN failure and exhausted allowance; no execution.',operating_record:homeRecord(evidence_refs),bootstrap_plan_id:f.plan_id});
++const extractArgs=(f,unit_id)=>({phase:'extract',unit_id,...(read(f).records[f.plan_id].scoped_context_plan.partitioner?{delivery_protocol:scoped.SCOPED_STREAM}:{})});
++async function extracts(f){const es=[];for(const u of read(f).records[f.plan_id].scoped_context_plan.units)es.push(await scopedReview(f,extractArgs(f,u.id)));return es;}
++const domainArgs=(es,inventory)=>({phase:'applicability',delivery_schema:scoped.CORPUS_PHASED_DELIVERY,delivery_protocol:scoped.SCOPED_STREAM,selection_ids:['all'],extraction_review_ids:es.map(e=>e.record.id),current_home_inventory:inventory});
++async function preserve(f,es){
++ const inventory=Object.values(read(f).records).filter(r=>r.bootstrap_home_provenance).map(r=>scoped.scopedReference(r)).sort((a,b)=>a.id.localeCompare(b.id));
++ const a=domainArgs(es,inventory),d=await scopedReview(f,a);assert.deepEqual(d.packet.current_home_inventory,inventory);
++ const i=await scopedReview(f,{...a,domain_review_ids:[d.record.id],interface_keys:d.record.qualification_result.interfaces.map(i=>i.key)});
++ const final=await scopedReview(f,{phase:'integration',delivery_schema:scoped.CORPUS_PHASED_DELIVERY,delivery_protocol:scoped.SCOPED_STREAM,domain_review_ids:[d.record.id],interface_review_ids:[i.record.id],current_home_inventory:inventory});
++ const result=await context(f,{action:'apply',integration_review_id:final.record.id});assert.equal(result.applied,true);return final;
++}
++async function publish(f){
++ const p=await operating(f,{action:'plan',maintenance:true});assert.equal(p.held,false,JSON.stringify(p.frontier));
++ const q=engine.dispatch({...common(f),role:'qa',review_of:p.id,task:'FICTIONAL independent scripted operating publication QA.'},'codex',launch);
++ const s=read(f),assignment=assignmentContext(s,s.jobs[q.id]),evidence=assignment.qualification_evidence??assignment.operating_evidence;
++ const reads=evidence?Object.values(evidence.sources).flatMap(v=>{const ranges=[];for(let offset=0;offset<v.length;){let length=Math.min(16000,v.length-offset);if(/[\uD800-\uDBFF]/.test(v.raw[offset+length-1]))length--;ranges.push({source_id:v.source_id,sha256:v.sha256,offset,length});offset+=length;}return ranges;}):[];
++ let first=true;
++ await work(f.root,q.id,async(_h,_s,_p,_d,timeout,_selection,options)=>{
++  if(first){first=false;options.onSpawn(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));}
++  const native_id='fictional-publication-'+q.id;
++  if(reads.length)return {native_id,text:JSON.stringify({reads:reads.splice(0,4)})};
++  return {native_id,text:JSON.stringify({content:'FICTIONAL scripted publication; no native semantic QA.',messages:[],notices:[],review:{verdict:'Pass',reason:'FICTIONAL complete mechanics fixture only.',permitted_action:'publish_operating_state',plan_sha256:sha(read(f).records[p.id].operating_plan),preservation_complete:true,interaction_complete:true,authority_checked:true,blockers:[]}})};
++ });
++ const job=read(f).jobs[q.id];assert.equal(job.status,'completed',job.error);
++ const result=await operating(f,{action:'apply',plan_id:p.id,review_id:job.artifact_id});assert.equal(result.published,true);return p;
++}
++
++for(const wrapped of [false,true])test(`FICTIONAL plain-ID initial-home lifecycle publishes S with frozen and canonical evidence (wrapped=${wrapped})`,async()=>{
++ const f=await fixture(),original=read(f),v=original.records[f.plan_id].scoped_context_plan;assert.equal(Object.values(original.records).filter(r=>r.operating_record).length,0);
++ const es=await extracts(f);if(wrapped)mutate(f,s=>{s.records.archive=retainSnapshotEntry(s,s.records.archive);});await home(f,'home-frozen',['archive']);await home(f,'home-extraction',[es[0].record.id]);
++ const prepared=read(f);assert.deepEqual(prepared.records['home-frozen'].operating_record.evidence_refs,['archive']);assert.deepEqual(prepared.records['home-extraction'].operating_record.evidence_refs,[es[0].record.id]);assert.equal(prepared.records[f.plan_id].scoped_context_plan.extraction_identity,v.extraction_identity);
++ const final=await preserve(f,es);const p=await publish(f),accepted=read(f);assert.equal(validateOperatingIndex(accepted),true);const checkpoint=operatingContext(accepted);assert.equal(checkpoint.homes.length,2);assert.equal(accepted.paused,true);assert.equal(accepted.governance,original.governance);
++ assert.equal((await scopedReview(f,extractArgs(f,v.units[0].id))).review_id,es[0].record.id);
++ if(wrapped){assert.notEqual(sha(accepted.records.archive),sha(resolveSnapshotEntry(accepted,accepted.records.archive)));assert.equal(accepted.records.archive.revision,7);}
++ for(const change of [s=>s.records.archive.revision++,s=>s.records.archive.id='substituted',s=>{if(wrapped)s.records.archive.immutable_entry.immutable_snapshot.sha256='0'.repeat(64);else s.records.archive.content+=' changed';},s=>s.records['home-frozen'].bootstrap_home_provenance.owner.epoch++,s=>s.records[es[0].record.id].qualification_result.reason+=' changed',s=>s.jobs[es[0].job.id].native_id='fictional-original-contributor']){
++  const bad=inheritSnapshots(accepted,structuredClone(accepted));change(bad);assert.throws(()=>operatingContext(bad),/Held|hold|changed|missing|corrupt/);
++ }
++ await home(f,'late',['archive']);assert.throws(()=>operatingContext(read(f)),/Held|hold|DIRTY|changed/);
++ assert.equal(accepted.records[p.id].operating_plan.snapshot.homes.length,2);assert.ok(final.record.id);
++});
++
++test('FICTIONAL missing IDs and JSON-looking reference strings never become provenance edges',async()=>{
++ const f=await fixture(),es=await extracts(f),before=read(f);
++ for(const id of ['missing',JSON.stringify(scoped.scopedReference(before.records.archive)),JSON.stringify({id:es[0].record.id}),'{"id":"archive"}']){
++  await assert.rejects(home(f,'invalid',[id]),/source missing/);assert.deepEqual(read(f),before);
++ }
++});
++
++test('PUBLIC extraction inventories reject atomically before fresh creation and canonical reuse for range/coherent/corpus',async()=>{
++ for(const partitioner of ['lossless-ranges-v1',scoped.COHERENT_PARTITIONER,scoped.CORPUS_PARTITIONER]){
++  const f=await fixture({partitioner}),v=read(f).records[f.plan_id].scoped_context_plan,a=extractArgs(f,v.units[0].id),before=read(f);
++  await assert.rejects(context(f,{action:'target',plan_id:f.plan_id,...a,current_home_inventory:[]}),/only supported on non-extraction/);assert.deepEqual(read(f),before);
++  const e=await scopedReview(f,a),completed=read(f);assert.ok(e.record);
++  await assert.rejects(context(f,{action:'target',plan_id:f.plan_id,...a,current_home_inventory:[]}),/only supported on non-extraction/);assert.deepEqual(read(f),completed);
++  assert.equal((await scopedReview(f,a)).review_id,e.record.id);
++ }
++});
++
++
++test('FICTIONAL JSON-looking existing frozen IDs stay literal and malformed reference objects reject',async()=>{
++ const literalID='{"id":"missing"}',f=await fixture({literalID});await home(f,'literal',[literalID]);assert.deepEqual(read(f).records.literal.operating_record.evidence_refs,[literalID]);
++ const before=read(f);await assert.rejects(home(f,'object',[{id:'archive',revision:7,sha256:sha(before.records.archive)}]),/complete typed/);assert.deepEqual(read(f),before);
++});
++
++// Explicit retained limitation: canonical independent identity traversal currently
++// interprets the transformed immutable_entry in the coherent projection as a raw
++// wrapper. No independent reviewer can start this at-capture variant. Do not
++// bypass that Hold or mistake the post-extraction storage-wrapper case for it.
++test('FICTIONAL wrapper already present at capture retains independent-admission Hold',async()=>{
++ const f=await fixture({wrapped:true});await assert.rejects(extracts(f),/Immutable entry reference malformed/);
++});
+--- /dev/null
++++ b/docs/initial-home-publication-repair-report.md
+@@ -0,0 +1,31 @@
++Source-only F1/F2 repair candidate: BLOCKED. Independent SOURCE QA acceptance remains withheld. No actual company was read or written; all company stores and scripted judgments in these checks are explicitly fictional. No network, services, spending, installation, release, governance adoption, operations or subagents were used.
++
++F1 is partially repaired. Initial-home evidence_refs now use the existing plain literal ID grammar. Frozen references are derived from the exact frozen source census and checked against resolved originals. Extraction IDs are resolved to exact current references and validated through the full canonical extraction receipt within the same extraction identity. JSON-looking IDs are literal IDs: missing IDs Hold, and an existing JSON-looking frozen ID retains its own identity. No generic consumer parses reference-shaped strings.
++
++The direct-original public lifecycle now reaches S: zero typed homes -> archive capture -> canonical worker extraction -> public company_save of one frozen-evidence home and one extraction-evidence home -> independent scripted domain/interface/final -> public preservation apply -> public operating proposal -> independent scripted publication QA with complete evidence delivery -> public publication -> validateOperatingIndex and operatingContext. Extraction reuse, pause, governance, unknown effects and exhausted allowance boundaries remain checked. Late home addition invalidates the checkpoint.
++
++A narrow operating-state.mjs publicationEvidence integration was necessary in addition to scoped-context.mjs: extraction evidence initially reached its snapshot-backed plan before its accepted corpus closure had been loaded. Exact runtime plan binding and independently accepted current-home reference now select the existing accepted corpus closure through its stored source envelope before traversing evidence IDs. This uses existing canonical validation, stored/resolved bindings, producer closure and publication delivery. It does not admit unaccepted snapshots, change permissions, or add a provenance ledger.
++
++F2 is repaired: current_home_inventory with phase extract is rejected at the beginning of createScopedTarget, before any target creation or receipt reuse. Public range, coherent and corpus regressions check fresh and canonical reuse paths and exact state unchanged. Valid complete non-extraction inventories remain checked and delivered.
++
++The required wrapped-original lifecycle is NOT complete. The new public fixture wraps the exact frozen original in current storage after canonical extraction, retaining the same original revision/hash. Saving homes and preservation apply succeed, but PUBLIC operating proposal fails with `Corpus member mapping changed`: current-state.mjs:84 compares the resolved-original member mapping to recordReference(record,id) for the stored immutable_entry wrapper. No publication or acceptance is fabricated. A wrapper already present at capture also retains an independent-admission Hold: canonical identity traversal sees the coherent projection's transformed `immutable_entry: {legacy_coherent_snapshot, target_group}` as a raw storage wrapper and throws `Immutable entry reference malformed`. The diagnostic log retains the exact transformed node. These blockers require independently reviewed work in current-state/canonical containment beyond this call's allowed F1/F2 seams. Neither independence nor the mapping guard was weakened.
++
++Files changed relative to the supplied publication-entry:
++- plugins/soloco/runtime/scoped-context.mjs: plain-ID bootstrap evidence verification and early extraction-option rejection only.
++- plugins/soloco/runtime/operating-state.mjs: narrow accepted corpus closure initialization described above.
++- tests/initial-proposed-homes.test.mjs: only unreleased evidence grammar and exact missing-source expectation aligned. ROOT's canonical evaluation and journaled negative/atomic repair checks remain intact.
++- tests/initial-home-publication.test.mjs: complete new fictional lifecycle, literal-ID, malformed-ref, wrapper and F2 public regressions.
++- docs/scoped-context.md: current grammar corrected.
++- This new report. Historical author reports and failed logs remain unchanged.
++
++main.mjs, engine.mjs, current-state.mjs, worker.mjs, store/snapshot providers and unrelated runtime components were not edited. tests/operating-control.test.mjs is byte-identical to publication-entry, retaining ROOT's stronger forged-author rejection and separate generic-save assertion. Output selectors, route indexes, compact stored preservation claims, canonical context wrapping and atomic historical reversal were not reverted.
++
++Validation, with zero skips in the completed reported runs:
++- Final-pin focused Node 22: 10 passed / 1 failed across the new lifecycle and existing initial-home files. The failure is the required wrapped-original operating proposal described above.
++- Final-pin focused Node 25: 10 passed / 1 failed across the same 11 tests, zero skips. The same wrapped-original operating proposal is the sole failure. Both final runs retain the corrected Blocked-home repair and canonical extraction inspection cases.
++- Final-pin selected operating-control/provenance Node 25 and Node 22: 11/11 passed each, including producer closure, rejected-native and stored historical provenance guards.
++- Earlier broader affected runs, started before the narrow publication closure change: Node 25 80/80 and Node 22 59/59 passed. These are supplementary, not a final full matrix claim.
++- Node 25/22 syntax checks for both changed runtime modules and the complete new test passed. Both `tools/build-plugin.mjs --check` runs passed without writing packaging files.
++- No full repository matrix or actual native/company qualification was performed. Complete input framing, current-home cumulative fit, output completeness and interface fan-out remain native-fit unknowns. Fictional Passes establish neither SOURCE QA nor semantic adequacy.
++
++The patch is evals/initial-home-publication/publication-source-only.patch, generated against /private/tmp/soloco-bootstrap-homes-20261106/publication-entry, with complete new test/report contents. Source hashes are in source-pin.json. Every failing exploratory log is retained. Do not freeze this candidate as ready or claim the mandatory wrapped-original publication requirement complete.

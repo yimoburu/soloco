@@ -335,11 +335,13 @@ function bootstrapEnvelope(r,binding){
   validateOperatingRecord(r.operating_record);
 }
 function bootstrapEvidence(s,c,m,r){
-  for(const encoded of r.operating_record.evidence_refs){
-    let ref;try{ref=JSON.parse(encoded);}catch{fail('proposed home requires exact JSON evidence references');}
-    closed(ref,['id','revision','sha256'],'home evidence reference');
-    if(m.sources.some(o=>same(o.source,ref))){exact(s,ref);continue;}
-    const proof=canonical(s,ref);if(proof.x.t.phase!=='extract'||proof.x.v.extraction_identity!==corpusIdentity(c))fail('home evidence outside admissible frozen originals/canonical extractions');
+  for(const id of r.operating_record.evidence_refs){
+    // Plain IDs share the existing operating publication grammar. Interpret every
+    // string literally, including JSON-looking IDs; runtime derives exact refs.
+    const frozen=m.sources.find(o=>o.source.id===id);
+    if(frozen){exact(s,frozen.source);continue;}
+    const proof=canonical(s,scopedReference(source(s,id),id));
+    if(proof.x.t.phase!=='extract'||proof.x.v.extraction_identity!==corpusIdentity(c))fail('home evidence outside admissible frozen originals/canonical extractions');
   }
   // Permission homes describe frozen grants only. They never enter authoritative
   // governance or change a grant/allowance. Unknown/exhausted content is retained.
@@ -1138,6 +1140,7 @@ function canonical(s,ref){
   const value={record,job,x,result:e.qualification_result};evaluation.visiting.delete(key);evaluation.proofs.set(key,value);return value;
 }
 export function createScopedTarget(s,args){return evaluate(()=>{
+  if(args.phase==='extract'&&args.current_home_inventory!==undefined)fail('current_home_inventory is only supported on non-extraction targets');
   const p=source(s,args.plan_id),{v}=plan(s,p),phase=args.phase;if(!['extract','applicability','integration'].includes(phase))fail('choose extract, applicability or integration');
   if(args.delivery_protocol!==undefined&&(args.delivery_protocol!==SCOPED_STREAM||phase==='extract'&&![COHERENT_PARTITIONER,CORPUS_PARTITIONER].includes(v.partitioner)))fail('stream delivery is opt-in for NEW non-extraction targets only');
   if(args.delivery_schema!==undefined&&(![CORPUS_DELIVERY,CORPUS_FIT_DELIVERY,CORPUS_PHASED_DELIVERY].includes(args.delivery_schema)||v.partitioner!==CORPUS_PARTITIONER||phase==='extract'))fail('invalid corpus delivery schema');

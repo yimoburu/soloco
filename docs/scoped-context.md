@@ -260,7 +260,7 @@ Corpus independent interface targets also require `domain_review_ids` naming eve
 
 A marked independent final aggregate receives the complete census/frontier, complete domain AND interface result objects with exact targets/selections and mapping vectors, source mappings, full current home/dependency bodies, raw global authority and global/unknown occurrence context with its inbound closure. It does not automatically replay unrelated raw extraction leaves. The runtime still recursively verifies the entire canonical extraction/domain/interface proof graph; native semantic evidence delivery is a separate phase-specific projection. Assignment reconstruction, stream delivery and canonical acceptance bind the exact same marked representation. All originals remain retrievable through exact review/target/plan references. Its `source_mappings` binds each exact source to all accepted contextual mappings; source membership cannot be appended to a generic Pass. Every canonical receipt still validates independent identity, current producer/home/dependency/membership evidence, negatives/rejected outputs, authentic native delivery, deadlines and termination. Corpus governing checks use raw current governing records rather than recursively classifying the corpus's own boundary. Homes conservatively remain global.
 
-`validateScopedApply` returns a distinct `coherent-corpus-preservation-v1` vector result for this branch. Existing public apply stores that single result atomically at the first source; it does not manufacture published single-source receipts. `validateCorpusPreservation(state, {integration_review_id})` is the narrow full-validator integration interface. `validateCorpusExclusion` checks the adopted vector and recomputes it before deriving a member mapping. `classificationFor` / `reviewedContext` recognize those validated mappings, validate once per vector within a read, and keep every home global. Invalid vectors, conflicting classifications or changed members fail closed. Operating bootstrap remains explicitly Held pending its owner's integration with this interface; this patch does not implement operating publication, immutable intake, checkpointing, field decomposition or `resume_handover`.
+`validateScopedApply` returns a distinct `coherent-corpus-preservation-v1` vector result for this branch. Existing public apply stores that single result atomically at the first source; it does not manufacture published single-source receipts. `validateCorpusPreservation(state, {integration_review_id})` is the narrow full-validator integration interface. `validateCorpusExclusion` checks the adopted vector and recomputes it before deriving a member mapping. `classificationFor` / `reviewedContext` recognize those validated mappings, validate once per vector within a read, and keep every home global. Invalid vectors, conflicting classifications or changed members fail closed. Operating publication separately requires the canonical accepted scoped proof and independent operating-state QA. Corpus apply alone grants no publication or resume permission.
 
 `inspectCorpusWorkload` reports the whole-vector lower bound **E + D + I + 1**, or **E + 2P + 1** for one domain and interface job per proposed selection. With no partition the conservative proposal is one whole-corpus domain and one interface. No source multiplier remains. Complete request framing and complete native fit remain null/unmeasured; proposals, extraction completion and synthetic adapters establish no native acceptance. Actual corpus E/D/I, capacity and final aggregate fit require the owner's bounded trials.
 
@@ -595,9 +595,12 @@ existing evidence; it grants no execution, allowance renewal or governance chang
 
 After canonical intrinsic extraction, `company_save` may prepare a new artifact
 with `bootstrap_plan_id`, its complete `operating_record`, and globally mandatory
-context. Evidence references in these initial homes are JSON strings encoding
-exact `{id, revision, sha256}` references to frozen sources or canonical extraction
-receipts. The runtime records plan/owner provenance and verifies the immutable
+context. `operating_record.evidence_refs` contains plain literal source IDs, as in
+ordinary operating publication. For frozen sources the runtime derives the exact
+frozen revision/hash and verifies the resolved original; for canonical extraction
+receipts it derives the exact current reference and validates the full receipt
+within this extraction identity. JSON-looking IDs remain literal IDs, never parsed
+provenance. The runtime records plan/owner provenance and verifies the immutable
 intake chain. Revisions require the same explicit plan, retain prior contents, and
 cannot delete/retype homes or replace their provenance. A permission home describes
 an existing grant; it does not modify authoritative grants or remaining allowance.
@@ -626,3 +629,5 @@ publication, the independent `resume_handover` gate and actual resumption remain
 separate facts. The retained native component reports and independent Fail F1
 remain under `evals/final-corpus-repairs-20261107`; they are historical evidence,
 not a current acceptance verdict.
+
+The initial-home publication lifecycle covers storage wrapping of an exact frozen original after extraction, with separate original and stored-envelope validation. An `immutable_entry` already present before coherent capture retains an explicit canonical-admission Hold: the derived coherent projection is not accepted as a raw storage wrapper. This retained limitation is tested; a passing post-extraction lifecycle does not qualify that earlier-capture shape. Actual-record applicability and native semantic fit must be checked separately.

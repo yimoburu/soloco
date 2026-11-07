@@ -1,0 +1,7 @@
+**Blocked.** F2 is fixed. F1’s plain-ID lifecycle reaches S, but wrapped originals still hit mapping and independence Holds.
+
+Both Node versions: focused **10 passed / 1 failed**; provenance **11/11 passed**. Syntax, build and patch checks passed.
+
+[Report](/private/tmp/soloco-bootstrap-homes-20261106/source/docs/initial-home-publication-repair-report.md) · [Source-only patch](/private/tmp/soloco-bootstrap-homes-20261106/source/evals/initial-home-publication/publication-source-only.patch)
+
+Prior evidence and ROOT fixes are preserved. Native fit remains unknown; no acceptance claimed.
