@@ -1,0 +1,628 @@
+{
+  "kind": "fictional_actual_process_storage_growth",
+  "protocol": {
+    "version": 1,
+    "declared_before_trials": true,
+    "archive_counts": [
+      10,
+      100,
+      1000
+    ],
+    "writers": 3,
+    "writes_per_writer": 8,
+    "poll_interval_ms": 5,
+    "acceptance": {
+      "lost_or_duplicate_receipts": 0,
+      "archive_payload_reads_by_children": 0,
+      "full_state_reads_by_children": 0,
+      "archive_bytes_changed": false,
+      "commits_after_pause": 0,
+      "pause_observation_timeout_ms": 5000,
+      "trial_timeout_ms": 30000
+    },
+    "timing": "Per-operation diagnostic distributions; timeouts detect nontermination, not production latency targets.",
+    "exclusions": [
+      "No native specialist or model execution",
+      "No provider cancellation claim",
+      "No semantic classification or company acceptance",
+      "No speedup inferred from timing"
+    ]
+  },
+  "environment": {
+    "node": "v25.2.1",
+    "platform": "darwin",
+    "arch": "arm64",
+    "os_release": "27.0.0",
+    "node_executable_sha256": "bb58c2a105f2ffd1bb80daa85231aad0d9e8ffdaef067bd32f5677ab4b98924f"
+  },
+  "benchmark_sha256": "51016b146a63690c4db4aef1d8a3b5e8207beefcb7a3d7973104280be0090d9c",
+  "runtime_manifest": {
+    "adapters.mjs": "475401b8504b7cf8db0ef7bab303bd9c92360d2b7a9adbd011fd891c18c31e55",
+    "context-qualification.mjs": "3b9d92ebe22753f66b2de2fb9a1abfa9fb61c68c63653faaf3e3f083a2301692",
+    "context.mjs": "8df76482f6db00dadbe56c35a6d1486d40dab8512f410c3293b5279f0a216812",
+    "coordination.mjs": "06644b7bfb7950aa971c380eb685a22dab6b9304f02083f80cd41eb2611adb3a",
+    "corpus-structure.mjs": "db63be6ae2504344c161fb512783f8940ed5f6f278dafa1f6cba16f63e71c8d8",
+    "current-state.mjs": "8c7d9cdfea55e8452d2b4dc0c1f50a6126bb895e6d6255334f21f18fbccc3893",
+    "develop.mjs": "fb676390f8dd8c19b8d50f22d5ebbdb363071795d9a00f77808c3116343bad4c",
+    "development-limits.mjs": "fb6b6065019c652fc27a198994cca3a248652890df5d322a9b6428ba5ccfea6a",
+    "development-patch.mjs": "a36bbefb6c28579a33d97709aabcf80fbde95520a6fd1a4a02e687bba11dd27d",
+    "engine.mjs": "1ff19a632f84fc9ebbcb662787fcb277062be65d64d323baca6a0c8598afee0d",
+    "handover.mjs": "6aa9e0b4d0178d105006b58b2b4cc5ff6c52388cd1915704d8edc4549add1fe9",
+    "hooks.mjs": "bca847d64e40213667712d4852c2774607fddbd962a5311ccf03521a885ce21d",
+    "legacy-operating.mjs": "47fca09ae9e6fefe48dbf922a6538818d856579c3fae64e8cfc5f0fd203e8f2d",
+    "local-sandbox.mjs": "efd0b036036393cb3a09939fedde0d647301fcd517693296ae5b01d023d0dcdd",
+    "main.mjs": "c75bdbe247e434ae08dce4371104e2eb52689ef7b3d97558646f4c200856a47a",
+    "operating-control.mjs": "47e2a0c8b15128ea6f39b7bfc14cb6adc385b90b132c9df8e16d9274abbdd35d",
+    "operating-state.mjs": "824143bc9035dbf4426850979d24413fd9c54e87c0845b4f1324f06befd0c664",
+    "progress-view.mjs": "bbcea8afc8760d365ac84f395e3cafb07aa26a06bf12f71b670fe7a9d08ad839",
+    "progress.mjs": "977ed14281cf7de7054babb75d953a5dc6bbf7c319e1fba3e81eeffce6812080",
+    "prototype.mjs": "1635fed46a13f60eb8ddd3ad2311a286e2af78e2264f054d07f38e85593ae855",
+    "public-response.mjs": "77af7e1b1ee429b8925d1ec7e857577840b61981ec8be7a0764ddb6b663cedf3",
+    "record-storage.mjs": "ca765aa931bb546aa65f7e499f69535725bf535c80f1ac4b222e63affe54ca3a",
+    "scoped-context.mjs": "da00c8e0ee174444e47ffb93b4c745ca4c75f24ae4211187f5dfe1e61700c83a",
+    "scoped-stream.mjs": "ce983bf54dd63efc22f4ea11a77c398b262cf1183f6bbfc248ce6641b6ea14ff",
+    "selection.mjs": "55505fa53d69b28aed8394a291ad5473fcecff9f4d4b8b01ed3b397b26015214",
+    "snapshot.mjs": "f822adc27fe06921b73ee923e967c1d36af3528b2d22f3425cbccdbf8fd477c1",
+    "storage-transfer.mjs": "2ea96610ab528d61471ee35c0482fb62b76be090f5f7bd22cc2489486a8155c3",
+    "store.mjs": "29c7b7d6bd0f33a7c599a672de0655db34ab5d7459f3495ba96092ce84e908f9",
+    "timeout.mjs": "586c5f44f98742320119f0b42d0612dd79cf970f4e858f05e7d65953c31951a4",
+    "upgrade-evidence.mjs": "14b809e88cb4a380829e6bb6ab9feceefc7582db230b0e8dcc70bed3b7b70e21",
+    "upgrade.mjs": "0a4e15abaf0cea312d9161d8c8081258da0bcf0c064f9cbb01c6e88d92e3f26e",
+    "validation-cache.mjs": "872415f42c63e015d159e5374d45b6de453dd7e8a873eb7f70473e6395b4354d",
+    "worker.mjs": "ba259d337a6d7af6a0802dd07a996c4adf944151d042379993f623860422e5be"
+  },
+  "rows": [
+    {
+      "archive_records": 10,
+      "archive_scale": 1,
+      "archive_body_bytes": 11271,
+      "committed_receipts": 24,
+      "archive_bytes_unchanged": true,
+      "commits_after_pause": 0,
+      "pause_commit_at": 1794030406053,
+      "children_confirmed_closed": 3,
+      "measurements": [
+        {
+          "jobId": "writer-0",
+          "completed": 8,
+          "observed_at": 1794030406076,
+          "pause_token_advanced": true,
+          "full_state_reads": 0,
+          "archive_payload_reads": 0,
+          "sql_result_bytes": 305566,
+          "sql_rows": 6209,
+          "read_ms": [
+            6.035750000000007,
+            0.9879999999999995,
+            1.6105840000000171,
+            1.1972079999999323,
+            26.81208300000003,
+            1.9044999999999845,
+            1.7332499999999982,
+            2.9009170000000495
+          ],
+          "write_ms": [
+            10.70599999999996,
+            123.955041,
+            5.561166999999955,
+            7.449416999999926,
+            293.7518749999999,
+            5.694874999999911,
+            7.229249999999979,
+            5.551707999999962
+          ],
+          "writer_lock_ms": [
+            10.326375000000041,
+            123.77574999999996,
+            5.373624999999947,
+            7.26766699999996,
+            14.747417000000041,
+            5.54729199999997,
+            7.0157500000000255,
+            4.934959000000049
+          ],
+          "token_reads": 3,
+          "reads": {
+            "count": 8,
+            "median_ms": 1.9044999999999845,
+            "p95_ms": 26.81208300000003,
+            "samples_ms": [
+              6.035750000000007,
+              0.9879999999999995,
+              1.6105840000000171,
+              1.1972079999999323,
+              26.81208300000003,
+              1.9044999999999845,
+              1.7332499999999982,
+              2.9009170000000495
+            ]
+          },
+          "writes": {
+            "count": 8,
+            "median_ms": 7.449416999999926,
+            "p95_ms": 293.7518749999999,
+            "samples_ms": [
+              10.70599999999996,
+              123.955041,
+              5.561166999999955,
+              7.449416999999926,
+              293.7518749999999,
+              5.694874999999911,
+              7.229249999999979,
+              5.551707999999962
+            ]
+          },
+          "writer_lock": {
+            "count": 8,
+            "median_ms": 7.26766699999996,
+            "p95_ms": 123.77574999999996,
+            "samples_ms": [
+              10.326375000000041,
+              123.77574999999996,
+              5.373624999999947,
+              7.26766699999996,
+              14.747417000000041,
+              5.54729199999997,
+              7.0157500000000255,
+              4.934959000000049
+            ]
+          },
+          "pause_observation_ms": 23
+        },
+        {
+          "jobId": "writer-1",
+          "completed": 8,
+          "observed_at": 1794030406127,
+          "pause_token_advanced": true,
+          "full_state_reads": 0,
+          "archive_payload_reads": 0,
+          "sql_result_bytes": 326720,
+          "sql_rows": 6777,
+          "read_ms": [
+            4.487584000000027,
+            0.9097500000000309,
+            1.9515830000000278,
+            0.8314159999999902,
+            2.1092909999999847,
+            0.9883750000000191,
+            1.8760839999999916,
+            0.8421670000000177
+          ],
+          "write_ms": [
+            166.81266699999998,
+            14.386916000000042,
+            15.947208000000046,
+            7.824708999999984,
+            28.716834000000063,
+            4.273042000000032,
+            178.25641699999994,
+            4.139583000000016
+          ],
+          "writer_lock_ms": [
+            17.21245900000008,
+            14.177041000000031,
+            15.710541999999919,
+            7.64224999999999,
+            7.770999999999958,
+            4.126709000000005,
+            128.23087499999997,
+            3.9767080000000306
+          ],
+          "token_reads": 11,
+          "reads": {
+            "count": 8,
+            "median_ms": 1.8760839999999916,
+            "p95_ms": 4.487584000000027,
+            "samples_ms": [
+              4.487584000000027,
+              0.9097500000000309,
+              1.9515830000000278,
+              0.8314159999999902,
+              2.1092909999999847,
+              0.9883750000000191,
+              1.8760839999999916,
+              0.8421670000000177
+            ]
+          },
+          "writes": {
+            "count": 8,
+            "median_ms": 15.947208000000046,
+            "p95_ms": 178.25641699999994,
+            "samples_ms": [
+              166.81266699999998,
+              14.386916000000042,
+              15.947208000000046,
+              7.824708999999984,
+              28.716834000000063,
+              4.273042000000032,
+              178.25641699999994,
+              4.139583000000016
+            ]
+          },
+          "writer_lock": {
+            "count": 8,
+            "median_ms": 14.177041000000031,
+            "p95_ms": 128.23087499999997,
+            "samples_ms": [
+              17.21245900000008,
+              14.177041000000031,
+              15.710541999999919,
+              7.64224999999999,
+              7.770999999999958,
+              4.126709000000005,
+              128.23087499999997,
+              3.9767080000000306
+            ]
+          },
+          "pause_observation_ms": 74
+        },
+        {
+          "jobId": "writer-2",
+          "completed": 8,
+          "observed_at": 1794030406074,
+          "pause_token_advanced": true,
+          "full_state_reads": 0,
+          "archive_payload_reads": 0,
+          "sql_result_bytes": 331635,
+          "sql_rows": 6919,
+          "read_ms": [
+            7.844042000000002,
+            0.8911249999999882,
+            1.7794169999999667,
+            0.8416250000000218,
+            0.817209000000048,
+            0.9412919999999758,
+            1.5395409999999856,
+            1.259999999999991
+          ],
+          "write_ms": [
+            214.19133400000004,
+            11.114167000000066,
+            17.615208000000052,
+            9.421083000000067,
+            4.616499999999974,
+            4.344333000000006,
+            7.418000000000006,
+            4.3549580000000105
+          ],
+          "writer_lock_ms": [
+            10.950083999999947,
+            10.887166999999977,
+            5.045333000000028,
+            9.242124999999987,
+            4.427584000000024,
+            4.222666000000004,
+            7.238375000000019,
+            4.186416000000008
+          ],
+          "token_reads": 13,
+          "reads": {
+            "count": 8,
+            "median_ms": 1.259999999999991,
+            "p95_ms": 7.844042000000002,
+            "samples_ms": [
+              7.844042000000002,
+              0.8911249999999882,
+              1.7794169999999667,
+              0.8416250000000218,
+              0.817209000000048,
+              0.9412919999999758,
+              1.5395409999999856,
+              1.259999999999991
+            ]
+          },
+          "writes": {
+            "count": 8,
+            "median_ms": 9.421083000000067,
+            "p95_ms": 214.19133400000004,
+            "samples_ms": [
+              214.19133400000004,
+              11.114167000000066,
+              17.615208000000052,
+              9.421083000000067,
+              4.616499999999974,
+              4.344333000000006,
+              7.418000000000006,
+              4.3549580000000105
+            ]
+          },
+          "writer_lock": {
+            "count": 8,
+            "median_ms": 7.238375000000019,
+            "p95_ms": 10.950083999999947,
+            "samples_ms": [
+              10.950083999999947,
+              10.887166999999977,
+              5.045333000000028,
+              9.242124999999987,
+              4.427584000000024,
+              4.222666000000004,
+              7.238375000000019,
+              4.186416000000008
+            ]
+          },
+          "pause_observation_ms": 21
+        }
+      ]
+    },
+    {
+      "archive_records": 100,
+      "archive_scale": 10,
+      "archive_body_bytes": 116571,
+      "committed_receipts": 24,
+      "archive_bytes_unchanged": true,
+      "commits_after_pause": 0,
+      "pause_commit_at": 1794030409848,
+      "children_confirmed_closed": 3,
+      "measurements": [
+        {
+          "jobId": "writer-0",
+          "completed": 8,
+          "observed_at": 1794030409876,
+          "pause_token_advanced": true,
+          "full_state_reads": 0,
+          "archive_payload_reads": 0,
+          "sql_result_bytes": 968767,
+          "sql_rows": 20054,
+          "read_ms": [
+            8.711416999999983,
+            3.6585000000000036,
+            1.4297920000000204,
+            1.3020830000000387,
+            1.4480409999996482,
+            1.359375,
+            1.9597920000001068,
+            0.9462079999998423
+          ],
+          "write_ms": [
+            550.808916,
+            162.2621660000001,
+            1744.7200420000001,
+            50.22058300000026,
+            104.7303750000001,
+            20.874250000000302,
+            129.54395799999975,
+            133.17425000000003
+          ],
+          "writer_lock_ms": [
+            177.35129200000006,
+            162.071959,
+            19.7473329999998,
+            50.02583300000015,
+            104.52616599999965,
+            20.694124999999985,
+            129.37004100000013,
+            132.9747500000003
+          ],
+          "token_reads": 18,
+          "reads": {
+            "count": 8,
+            "median_ms": 1.4480409999996482,
+            "p95_ms": 8.711416999999983,
+            "samples_ms": [
+              8.711416999999983,
+              3.6585000000000036,
+              1.4297920000000204,
+              1.3020830000000387,
+              1.4480409999996482,
+              1.359375,
+              1.9597920000001068,
+              0.9462079999998423
+            ]
+          },
+          "writes": {
+            "count": 8,
+            "median_ms": 133.17425000000003,
+            "p95_ms": 1744.7200420000001,
+            "samples_ms": [
+              550.808916,
+              162.2621660000001,
+              1744.7200420000001,
+              50.22058300000026,
+              104.7303750000001,
+              20.874250000000302,
+              129.54395799999975,
+              133.17425000000003
+            ]
+          },
+          "writer_lock": {
+            "count": 8,
+            "median_ms": 129.37004100000013,
+            "p95_ms": 177.35129200000006,
+            "samples_ms": [
+              177.35129200000006,
+              162.071959,
+              19.7473329999998,
+              50.02583300000015,
+              104.52616599999965,
+              20.694124999999985,
+              129.37004100000013,
+              132.9747500000003
+            ]
+          },
+          "pause_observation_ms": 28
+        },
+        {
+          "jobId": "writer-1",
+          "completed": 8,
+          "observed_at": 1794030409851,
+          "pause_token_advanced": true,
+          "full_state_reads": 0,
+          "archive_payload_reads": 0,
+          "sql_result_bytes": 937765,
+          "sql_rows": 19202,
+          "read_ms": [
+            2.430999999999983,
+            1.4842080000000237,
+            43.005584,
+            1.0260419999999613,
+            1.91924999999992,
+            1.492334000000028,
+            19.85954199999992,
+            2.8808749999998327
+          ],
+          "write_ms": [
+            72.05479100000002,
+            285.446958,
+            378.64579200000003,
+            255.906291,
+            314.64758400000005,
+            339.60300000000007,
+            1243.293667,
+            118.75720899999988
+          ],
+          "writer_lock_ms": [
+            71.67604200000002,
+            107.82995899999997,
+            59.58966700000008,
+            255.60395799999992,
+            313.09366699999987,
+            339.1005829999999,
+            29.77841699999999,
+            118.56216700000004
+          ],
+          "token_reads": 6,
+          "reads": {
+            "count": 8,
+            "median_ms": 2.430999999999983,
+            "p95_ms": 43.005584,
+            "samples_ms": [
+              2.430999999999983,
+              1.4842080000000237,
+              43.005584,
+              1.0260419999999613,
+              1.91924999999992,
+              1.492334000000028,
+              19.85954199999992,
+              2.8808749999998327
+            ]
+          },
+          "writes": {
+            "count": 8,
+            "median_ms": 314.64758400000005,
+            "p95_ms": 1243.293667,
+            "samples_ms": [
+              72.05479100000002,
+              285.446958,
+              378.64579200000003,
+              255.906291,
+              314.64758400000005,
+              339.60300000000007,
+              1243.293667,
+              118.75720899999988
+            ]
+          },
+          "writer_lock": {
+            "count": 8,
+            "median_ms": 118.56216700000004,
+            "p95_ms": 339.1005829999999,
+            "samples_ms": [
+              71.67604200000002,
+              107.82995899999997,
+              59.58966700000008,
+              255.60395799999992,
+              313.09366699999987,
+              339.1005829999999,
+              29.77841699999999,
+              118.56216700000004
+            ]
+          },
+          "pause_observation_ms": 3
+        },
+        {
+          "jobId": "writer-2",
+          "completed": 8,
+          "observed_at": 1794030409862,
+          "pause_token_advanced": true,
+          "full_state_reads": 0,
+          "archive_payload_reads": 0,
+          "sql_result_bytes": 1076702,
+          "sql_rows": 23178,
+          "read_ms": [
+            2.4821249999999964,
+            0.9953330000000165,
+            1.8671249999999873,
+            1.2738329999999678,
+            1.6827499999999418,
+            0.9326669999995829,
+            0.8969999999999345,
+            1.5786250000001019
+          ],
+          "write_ms": [
+            243.61975,
+            1503.8984169999999,
+            19.57508299999995,
+            183.4184160000002,
+            241.3282919999997,
+            50.76354200000014,
+            137.0027909999999,
+            22.840042000000267
+          ],
+          "writer_lock_ms": [
+            179.02495899999997,
+            27.594917000000123,
+            19.186916999999994,
+            183.24354099999982,
+            241.0899589999999,
+            50.56791599999997,
+            136.79950000000008,
+            22.65862500000003
+          ],
+          "token_reads": 62,
+          "reads": {
+            "count": 8,
+            "median_ms": 1.5786250000001019,
+            "p95_ms": 2.4821249999999964,
+            "samples_ms": [
+              2.4821249999999964,
+              0.9953330000000165,
+              1.8671249999999873,
+              1.2738329999999678,
+              1.6827499999999418,
+              0.9326669999995829,
+              0.8969999999999345,
+              1.5786250000001019
+            ]
+          },
+          "writes": {
+            "count": 8,
+            "median_ms": 183.4184160000002,
+            "p95_ms": 1503.8984169999999,
+            "samples_ms": [
+              243.61975,
+              1503.8984169999999,
+              19.57508299999995,
+              183.4184160000002,
+              241.3282919999997,
+              50.76354200000014,
+              137.0027909999999,
+              22.840042000000267
+            ]
+          },
+          "writer_lock": {
+            "count": 8,
+            "median_ms": 136.79950000000008,
+            "p95_ms": 241.0899589999999,
+            "samples_ms": [
+              179.02495899999997,
+              27.594917000000123,
+              19.186916999999994,
+              183.24354099999982,
+              241.0899589999999,
+              50.56791599999997,
+              136.79950000000008,
+              22.65862500000003
+            ]
+          },
+          "pause_observation_ms": 14
+        }
+      ]
+    }
+  ],
+  "status": "failed",
+  "error": {
+    "message": "Error: database is locked\n    at db.db.exec (file:///private/tmp/soloco-issue13-audit-20261107/tools/benchmark-storage-hot-paths.mjs:34:32)\n    at Store.selectedTransaction (file:///private/tmp/soloco-issue13-audit-20261107/plugins/soloco/runtime/store.mjs:158:13)\n    at child (file:///private/tmp/soloco-issue13-audit-20261107/tools/benchmark-storage-hot-paths.mjs:46:34)\n    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)\n    at async file:///private/tmp/soloco-issue13-audit-20261107/tools/benchmark-storage-hot-paths.mjs:109:33\n\n\n1 !== 0\n",
+    "stack": "AssertionError [ERR_ASSERTION]: Error: database is locked\n    at db.db.exec (file:///private/tmp/soloco-issue13-audit-20261107/tools/benchmark-storage-hot-paths.mjs:34:32)\n    at Store.selectedTransaction (file:///private/tmp/soloco-issue13-audit-20261107/plugins/soloco/runtime/store.mjs:158:13)\n    at child (file:///private/tmp/soloco-issue13-audit-20261107/tools/benchmark-storage-hot-paths.mjs:46:34)\n    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)\n    at async file:///private/tmp/soloco-issue13-audit-20261107/tools/benchmark-storage-hot-paths.mjs:109:33\n\n\n1 !== 0\n\n    at ChildProcess.<anonymous> (file:///private/tmp/soloco-issue13-audit-20261107/tools/benchmark-storage-hot-paths.mjs:90:55)\n    at Object.onceWrapper (node:events:623:26)\n    at ChildProcess.emit (node:events:508:28)\n    at ChildProcess._handle.onexit (node:internal/child_process:293:12)"
+  },
+  "actual_model_calls": 0
+}

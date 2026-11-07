@@ -1,0 +1,140 @@
+{
+  "kind": "preserved_synthetic_fixture_failure",
+  "native_calls": false,
+  "source": "Original failed contract-double smoke; not rerun",
+  "report": {
+    "protocol": {
+      "version": 1,
+      "kind": "matched_accepted_workflow",
+      "fixture": "independent-extraction-and-port-repair",
+      "criteria": {
+        "critical_false_acceptances": 0,
+        "all_expected_results_correct": true,
+        "noninferiority_margin_errors": 0,
+        "max_generation_attempts_per_arm": 2,
+        "max_native_calls_total": 8,
+        "latency_improvement_required": false
+      },
+      "comparison": "Serial extraction then repair versus concurrent extraction and repair. Same data, model controls, tests, QA and acceptance gates. Software harness chooses the schedule; this is not a model planning evaluation.",
+      "limitations": [
+        "Fictional small paired workload; no production quality, cost savings or natural founder-workload inference",
+        "One pair is descriptive; order and provider variance prevent causal latency or reliable tail claims",
+        "Original-source repair is required; later model repairs occur only after known deterministic test failure and within the fixed grant",
+        "Requested/applied settings are distinct from effective provider settings; missing observations remain unknown",
+        "Initial fixture setup and grant are synthetic test data, not actual-company or founder authorization",
+        "No detached autonomous scheduler claim; the harness calls real dispatch, worker, test and acceptance paths"
+      ]
+    },
+    "execution": "synthetic_contract_double",
+    "arms": [
+      {
+        "mode": "serial",
+        "execution": "synthetic_contract_double",
+        "fixture_sha256": "84dba485cc6539ec5eaa4bb628d2bc7e37788715fe9d119f83d0b3086fe59763",
+        "selections": {
+          "research": {
+            "mode": "explicit",
+            "model": "gpt-6.1-sol",
+            "effort": "low",
+            "speed": "host_default",
+            "reason": "Exact fictional extraction with deterministic acceptance; same choice in both matched schedules."
+          },
+          "engineer": {
+            "mode": "explicit",
+            "model": "gpt-6.1-sol",
+            "effort": "medium",
+            "speed": "host_default",
+            "reason": "Bounded pure parser repair with immutable executed tests; same choice in both schedules."
+          },
+          "qa": {
+            "mode": "explicit",
+            "model": "gpt-6.1-sol",
+            "effort": "high",
+            "speed": "host_default",
+            "reason": "Independent exact-candidate acceptance and seeded boundary review; same choice in both schedules."
+          }
+        },
+        "events": [
+          {
+            "type": "dispatch",
+            "at_ms": 20.376209000000017,
+            "role": "research",
+            "job_id": "job-00b5f549-c04c-434a-bcc9-e2e9a58b4d08",
+            "control_ms": 19.589875000000575
+          },
+          {
+            "type": "held",
+            "at_ms": 35.9566249999998,
+            "reason": "Production worker did not complete: {\"status\":\"failed\",\"error\":\"Invalid adapter spawn timing\"}"
+          }
+        ],
+        "calls": [
+          {
+            "role": "research",
+            "job_id": "job-00b5f549-c04c-434a-bcc9-e2e9a58b4d08",
+            "prompt_bytes": 20764,
+            "prompt_sha256": "a75f26419d29106d1562cde3fb42c63416bbdb05d104e89eefcc0847562380a8",
+            "started_ms": 28.071249999999964,
+            "requested": {
+              "mode": "explicit",
+              "model": "gpt-6.1-sol",
+              "effort": "low",
+              "reason": "Exact fictional extraction with deterministic acceptance; same choice in both matched schedules.",
+              "speed": "host_default"
+            },
+            "error": {
+              "message": "Invalid adapter spawn timing",
+              "code": null,
+              "termination_confirmed": null
+            },
+            "duration_ms": 2.7642500000001746
+          }
+        ],
+        "attempts": [],
+        "accepted": false,
+        "errors": [
+          {
+            "message": "Production worker did not complete: {\"status\":\"failed\",\"error\":\"Invalid adapter spawn timing\"}",
+            "code": "WORKER_NOT_COMPLETED",
+            "termination_confirmed": null
+          }
+        ],
+        "founder_requests": [
+          {
+            "reason": "Production worker did not complete: {\"status\":\"failed\",\"error\":\"Invalid adapter spawn timing\"}",
+            "stage": "held_outcome",
+            "kind": "requires_attention",
+            "synthetic_harness_decision": true
+          }
+        ],
+        "precheck": {
+          "status": "failed",
+          "exit_code": 1,
+          "tests_executed": true
+        },
+        "founder_notices": [],
+        "elapsed_ms": 38.25575000000026,
+        "metrics": {
+          "model_calls": 1,
+          "generation_attempts": 0,
+          "repairs": 0,
+          "failed_test_attempts": 0,
+          "founder_requests": 1,
+          "decision_required_notices": 0,
+          "prompt_bytes": 20764,
+          "output_bytes": 0,
+          "control_path_max_ms": 19.589875000000575
+        },
+        "original_source_unchanged": true
+      }
+    ],
+    "assessment": {
+      "passed": false,
+      "quality_errors": 1,
+      "serial_ms": 38.25575000000026,
+      "concurrent_ms": null,
+      "descriptive_only": true,
+      "causal_speedup_established": false
+    }
+  }
+}

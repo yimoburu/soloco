@@ -1,0 +1,693 @@
+{
+  "protocol": {
+    "version": 1,
+    "kind": "accepted_candidate_format_comparison",
+    "source_pin": "9c0cb8a9d40da42242787b1bbaacfa11ba37acdc",
+    "fixture": {
+      "module_bytes": 32768,
+      "module_counts": [
+        1,
+        3
+      ],
+      "formats": [
+        "files",
+        "patches"
+      ]
+    },
+    "criteria": {
+      "max_native_calls_total": 8,
+      "max_generation_attempts_per_case": 1,
+      "max_test_attempts_per_case": 1,
+      "max_qa_attempts_per_case": 1,
+      "critical_false_acceptances": 0,
+      "quality_error_margin": 0,
+      "latency_improvement_required": false
+    },
+    "limits": {
+      "scope_max_bytes": 200000,
+      "configuration_ceiling": 200000,
+      "native_timeout_ms": 300000,
+      "test_timeout_ms": 10000,
+      "test_wait_ms": 20000
+    },
+    "order": "one-file files, one-file patches, three-file files, three-file patches; sequential, no retries",
+    "acceptance": "Real production dispatch and worker produce a retained exact candidate. Actual sandboxed tests must pass; a different native QA must permit the exact candidate and actual receipt; the fixture receiver then calls production accept. Exact grading additionally compares all complete candidate bytes against the known fixture.",
+    "limitations": [
+      "One observation per arm; descriptive results cannot establish statistical quality noninferiority, production reliability, cost savings or causal latency gains.",
+      "Only manually supplied fictional modules and fixed tests are shared with the existing host model. Synthetic company binding and grant are fixture data; no actual company state or authority changes.",
+      "Requested/applied model controls differ from effective provider settings; missing observations remain unknown.",
+      "All failed or uncertain calls stay retained and hold that case without retry. Source integration, installation and deployment are outside this evaluation."
+    ]
+  },
+  "execution": "native_cli",
+  "cases": [
+    {
+      "count": 1,
+      "format": "files",
+      "execution": "native_cli",
+      "scope_sha256": "72171d08b6f2f2726f27eb3bff2f986c59aa792706d93a86f10410f8cce9aaac",
+      "fixture_sha256": "491835db654f1899f8d84ef708824ed5b3bcd4aa4225dfcc6da7e68f92f88296",
+      "module_bytes": [
+        32768
+      ],
+      "source_bytes": 33535,
+      "expected_candidate_bytes": 34032,
+      "events": [
+        {
+          "type": "dispatch",
+          "at_ms": 6.0230840000001535,
+          "role": "engineer",
+          "job_id": "job-4b39ddca-bfc5-41ac-9385-46d4a55486aa",
+          "control_ms": 5.811500000000024
+        },
+        {
+          "type": "held",
+          "at_ms": 45213.434417,
+          "reason": "Production worker did not complete: {\"status\":\"failed\",\"error\":\"Development held: Cannot reliably provide the complete byte-preserving full-file candidate. Stop without a partial file or retry under the one-attempt scope.\"}"
+        }
+      ],
+      "calls": [
+        {
+          "role": "engineer",
+          "job_id": "job-4b39ddca-bfc5-41ac-9385-46d4a55486aa",
+          "prompt_bytes": 59237,
+          "prompt_sha256": "4a1b8eba3de714b502d7191c7b5f59af8ae63f0d98f47ab697c42ffbf5f196c1",
+          "started_ms": 17.858625000000075,
+          "requested": {
+            "mode": "explicit",
+            "model": "gpt-6.1-sol",
+            "effort": "medium",
+            "reason": "Exact one-character fictional module repairs; identical model controls in all format arms.",
+            "speed": "host_default"
+          },
+          "native_id": "09945e652c906455b68631d663df61f9539b323301269e6fb8b0d6f80481e578",
+          "output_bytes": 583,
+          "output_sha256": "c7ac69982d00109ad120063abf4ca2371ef0f49cd99dae1e21b8e9ccd66de333",
+          "model_evidence": {
+            "reported_models": [],
+            "reported_effort": null,
+            "reported_service_tier": null,
+            "applied_controls": {
+              "model": "gpt-6.1-sol",
+              "effort": "medium",
+              "service_tier": null,
+              "fast_mode": null,
+              "switch_models_on_flag": null,
+              "scope": "child_launch_argv",
+              "verification": "applied_controls_not_effective_settings"
+            },
+            "source": "exec_json",
+            "scope": "assignment",
+            "verification": "unverified"
+          },
+          "duration_ms": 45181.318959
+        }
+      ],
+      "attempts": [],
+      "accepted": false,
+      "errors": [
+        {
+          "message": "Production worker did not complete: {\"status\":\"failed\",\"error\":\"Development held: Cannot reliably provide the complete byte-preserving full-file candidate. Stop without a partial file or retry under the one-attempt scope.\"}",
+          "code": "WORKER_NOT_COMPLETED",
+          "termination_confirmed": null
+        }
+      ],
+      "repairs": 0,
+      "precheck": {
+        "status": "failed",
+        "exit_code": 1,
+        "tests_executed": true
+      },
+      "elapsed_ms": 45213.442792,
+      "original_source_unchanged": true,
+      "metrics": {
+        "model_calls": 1,
+        "producer_calls": 1,
+        "qa_calls": 0,
+        "repairs": 0,
+        "invalid_or_incomplete_generations": 1,
+        "prompt_bytes": 59237,
+        "output_bytes": 583,
+        "time_to_accepted_result_ms": null
+      }
+    },
+    {
+      "count": 1,
+      "format": "patches",
+      "execution": "native_cli",
+      "scope_sha256": "ce1a296af9c3e5ab7484048da0e04c0d6a9a0cca0839af83cea10a065f755bd8",
+      "fixture_sha256": "491835db654f1899f8d84ef708824ed5b3bcd4aa4225dfcc6da7e68f92f88296",
+      "module_bytes": [
+        32768
+      ],
+      "source_bytes": 33535,
+      "expected_candidate_bytes": 34032,
+      "events": [
+        {
+          "type": "dispatch",
+          "at_ms": 8.070082999998704,
+          "role": "engineer",
+          "job_id": "job-d472fd1d-cf17-48ba-a60e-b334a775c170",
+          "control_ms": 8.042875000006461
+        },
+        {
+          "type": "returned",
+          "at_ms": 8792.229916000004,
+          "role": "engineer",
+          "job_id": "job-d472fd1d-cf17-48ba-a60e-b334a775c170",
+          "artifact_id": "artifact-871e4fcb-641a-4a61-8b7f-0a3591447be7"
+        },
+        {
+          "type": "tests_queued",
+          "at_ms": 8796.76425,
+          "job_id": "test-6f9bd9f2-5a5b-4792-b61f-335030074ce3"
+        },
+        {
+          "type": "dispatch",
+          "at_ms": 11000.771541000002,
+          "role": "qa",
+          "job_id": "job-4368ee6f-2a37-4259-9395-550483dd0ae0",
+          "control_ms": 5.60712500000227
+        },
+        {
+          "type": "returned",
+          "at_ms": 36341.22891600001,
+          "role": "qa",
+          "job_id": "job-4368ee6f-2a37-4259-9395-550483dd0ae0",
+          "artifact_id": "artifact-a13808e6-5d85-441a-acf8-f6cefc25f2cb"
+        },
+        {
+          "type": "receiver_accepted",
+          "at_ms": 36355.156375000006,
+          "candidate_sha256": "14591e4ef821625f21a0f2120453a5570d8e1c59267b75515e44f21138d2ed38",
+          "receipt_sha256": "c3a6c545cfa7eb348cf6e9913445590034cd66dc3f0fe5cb7d88a36950f7a3e7"
+        }
+      ],
+      "calls": [
+        {
+          "role": "engineer",
+          "job_id": "job-d472fd1d-cf17-48ba-a60e-b334a775c170",
+          "prompt_bytes": 59500,
+          "prompt_sha256": "ef5520a0b2f636b850ad130222dc17d24f8435bf12a386e3e0c6b3bb0bf29f68",
+          "started_ms": 18.379832999999053,
+          "requested": {
+            "mode": "explicit",
+            "model": "gpt-6.1-sol",
+            "effort": "medium",
+            "reason": "Exact one-character fictional module repairs; identical model controls in all format arms.",
+            "speed": "host_default"
+          },
+          "native_id": "12ae62fa65e7e7e4724c9228f897fcc98d1e1d8ac7bea1b1e5c4933e6a39da2f",
+          "output_bytes": 364,
+          "output_sha256": "3c449f57a1da50770a942e22685e31b166a9bb0acd88fee826bc8f99a9eb149f",
+          "model_evidence": {
+            "reported_models": [],
+            "reported_effort": null,
+            "reported_service_tier": null,
+            "applied_controls": {
+              "model": "gpt-6.1-sol",
+              "effort": "medium",
+              "service_tier": null,
+              "fast_mode": null,
+              "switch_models_on_flag": null,
+              "scope": "child_launch_argv",
+              "verification": "applied_controls_not_effective_settings"
+            },
+            "source": "exec_json",
+            "scope": "assignment",
+            "verification": "unverified"
+          },
+          "duration_ms": 8767.020708999997
+        },
+        {
+          "role": "qa",
+          "job_id": "job-4368ee6f-2a37-4259-9395-550483dd0ae0",
+          "prompt_bytes": 99389,
+          "prompt_sha256": "3de92bbc32a54c580ed18f0103d18853ac3de0975f0595ee06fc73f6576f6949",
+          "started_ms": 11005.370833,
+          "requested": {
+            "mode": "explicit",
+            "model": "gpt-6.1-sol",
+            "effort": "high",
+            "reason": "Independent complete candidate, actual receipt and exact fixture preservation review; identical controls in all arms.",
+            "speed": "host_default"
+          },
+          "native_id": "b3c36ffd6411d4e01685a8a3dda64139d2ede26f73ea1a89401f2cb580811bbc",
+          "output_bytes": 1671,
+          "output_sha256": "360cfd2dc7ececc18702d65bc6d925bef229af198ec5a03d08e02fb4e1d4c335",
+          "model_evidence": {
+            "reported_models": [],
+            "reported_effort": null,
+            "reported_service_tier": null,
+            "applied_controls": {
+              "model": "gpt-6.1-sol",
+              "effort": "high",
+              "service_tier": null,
+              "fast_mode": null,
+              "switch_models_on_flag": null,
+              "scope": "child_launch_argv",
+              "verification": "applied_controls_not_effective_settings"
+            },
+            "source": "exec_json",
+            "scope": "assignment",
+            "verification": "unverified"
+          },
+          "duration_ms": 25323.409292000004
+        }
+      ],
+      "attempts": [
+        {
+          "test_job_id": "test-6f9bd9f2-5a5b-4792-b61f-335030074ce3",
+          "receipt_id": "test-receipt-bf4db0b8-9a28-4825-b3f5-faf28ecbbf39",
+          "receipt_sha256": "c3a6c545cfa7eb348cf6e9913445590034cd66dc3f0fe5cb7d88a36950f7a3e7",
+          "result": {
+            "status": "passed",
+            "exit_code": 0,
+            "signal": null,
+            "stdout": "TAP version 13\n# Subtest: exact values and complete unchanged module bytes\nok 1 - exact values and complete unchanged module bytes\n  ---\n  duration_ms: 0.681542\n  type: 'test'\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 8.866375\n",
+            "stderr": "",
+            "duration_ms": 492,
+            "isolation": "macos-seatbelt-node",
+            "test_execution_attempted": true,
+            "tests_executed": true,
+            "output_truncated": false,
+            "limits": {
+              "timeout_ms": 10000,
+              "max_output_bytes": 20000
+            },
+            "candidate_sha256": "14591e4ef821625f21a0f2120453a5570d8e1c59267b75515e44f21138d2ed38",
+            "test_paths": [
+              "fixture.test.mjs"
+            ],
+            "timeout_ms": 10000,
+            "max_output_bytes": 20000,
+            "finished_at": "2026-11-07T05:53:10.848Z"
+          },
+          "test_elapsed_ms": 2202.5934170000037
+        }
+      ],
+      "accepted": true,
+      "errors": [],
+      "repairs": 0,
+      "precheck": {
+        "status": "failed",
+        "exit_code": 1,
+        "tests_executed": true
+      },
+      "generation": {
+        "candidate_id": "artifact-871e4fcb-641a-4a61-8b7f-0a3591447be7",
+        "native_id": "12ae62fa65e7e7e4724c9228f897fcc98d1e1d8ac7bea1b1e5c4933e6a39da2f",
+        "candidate_sha256": "14591e4ef821625f21a0f2120453a5570d8e1c59267b75515e44f21138d2ed38",
+        "byte_accounting": {
+          "format": "patches",
+          "generated_bytes": 149,
+          "candidate_bytes": 34032,
+          "source_bytes": 34184,
+          "patches": [
+            {
+              "path": "module-0.mjs",
+              "base_sha256": "092aaf1d41c4ed97dac065053aa75da9c664c5df467e79b3287c04b84d51a818",
+              "edits": [
+                {
+                  "start": 21,
+                  "end": 22,
+                  "text": "1"
+                }
+              ]
+            }
+          ],
+          "patch_sha256": "27a594af5003e42bb2982b83f555399f17858bd249988caf3cac8aa26e7e9138"
+        }
+      },
+      "exact_fixture_match": true,
+      "review": {
+        "id": "artifact-a13808e6-5d85-441a-acf8-f6cefc25f2cb",
+        "native_id": "b3c36ffd6411d4e01685a8a3dda64139d2ede26f73ea1a89401f2cb580811bbc",
+        "author_native_id": "12ae62fa65e7e7e4724c9228f897fcc98d1e1d8ac7bea1b1e5c4933e6a39da2f",
+        "verdict": "Pass",
+        "candidate_sha256": "14591e4ef821625f21a0f2120453a5570d8e1c59267b75515e44f21138d2ed38",
+        "receipt_sha256": "c3a6c545cfa7eb348cf6e9913445590034cd66dc3f0fe5cb7d88a36950f7a3e7"
+      },
+      "acceptance": {
+        "at": "2026-11-07T05:53:36.229Z",
+        "review_id": "artifact-a13808e6-5d85-441a-acf8-f6cefc25f2cb",
+        "candidate_sha256": "14591e4ef821625f21a0f2120453a5570d8e1c59267b75515e44f21138d2ed38",
+        "receipt_sha256": "c3a6c545cfa7eb348cf6e9913445590034cd66dc3f0fe5cb7d88a36950f7a3e7",
+        "source_integrated": false
+      },
+      "elapsed_ms": 36355.166958,
+      "original_source_unchanged": true,
+      "metrics": {
+        "model_calls": 2,
+        "producer_calls": 1,
+        "qa_calls": 1,
+        "repairs": 0,
+        "invalid_or_incomplete_generations": 0,
+        "prompt_bytes": 158889,
+        "output_bytes": 2035,
+        "time_to_accepted_result_ms": 36355.166958
+      }
+    },
+    {
+      "count": 3,
+      "format": "files",
+      "execution": "native_cli",
+      "scope_sha256": "1b87999659d2901653475963ce1d29c3800acc23578aeab3f81496b40a3d4712",
+      "fixture_sha256": "6ac1ff6793b49be70e19d31260e8bfcec21e5813e70e8e7a2a3e01009e6aeaaf",
+      "module_bytes": [
+        32768,
+        32768,
+        32768
+      ],
+      "source_bytes": 100603,
+      "expected_candidate_bytes": 101610,
+      "events": [
+        {
+          "type": "dispatch",
+          "at_ms": 13.069250000000466,
+          "role": "engineer",
+          "job_id": "job-24dec578-f43e-45cb-af96-627574e292d1",
+          "control_ms": 13.026500000007218
+        },
+        {
+          "type": "held",
+          "at_ms": 21438.29849999999,
+          "reason": "Production worker did not complete: {\"status\":\"failed\",\"error\":\"Development held: I cannot reliably reproduce all three complete files while guaranteeing exact preservation of every repeated padding byte. Submitting shortened files or a patch would violate the required full-file format. No files were altered or tests executed.\"}"
+        }
+      ],
+      "calls": [
+        {
+          "role": "engineer",
+          "job_id": "job-24dec578-f43e-45cb-af96-627574e292d1",
+          "prompt_bytes": 127030,
+          "prompt_sha256": "5a00bfc12e980fda08bd15478812a7ee8aa71d2f56662d367cde02df13c57bca",
+          "started_ms": 24.148499999995693,
+          "requested": {
+            "mode": "explicit",
+            "model": "gpt-6.1-sol",
+            "effort": "medium",
+            "reason": "Exact one-character fictional module repairs; identical model controls in all format arms.",
+            "speed": "host_default"
+          },
+          "native_id": "c911e7288fe542c633ecbaccaf476d383f76b46dc0c16f9b72230f8eb125e999",
+          "output_bytes": 466,
+          "output_sha256": "5f7a080ad2eacb404ffa4f5aea59de2bceaf4b85ded1b38b5c21050c9f78eb07",
+          "model_evidence": {
+            "reported_models": [],
+            "reported_effort": null,
+            "reported_service_tier": null,
+            "applied_controls": {
+              "model": "gpt-6.1-sol",
+              "effort": "medium",
+              "service_tier": null,
+              "fast_mode": null,
+              "switch_models_on_flag": null,
+              "scope": "child_launch_argv",
+              "verification": "applied_controls_not_effective_settings"
+            },
+            "source": "exec_json",
+            "scope": "assignment",
+            "verification": "unverified"
+          },
+          "duration_ms": 21392.187459000008
+        }
+      ],
+      "attempts": [],
+      "accepted": false,
+      "errors": [
+        {
+          "message": "Production worker did not complete: {\"status\":\"failed\",\"error\":\"Development held: I cannot reliably reproduce all three complete files while guaranteeing exact preservation of every repeated padding byte. Submitting shortened files or a patch would violate the required full-file format. No files were altered or tests executed.\"}",
+          "code": "WORKER_NOT_COMPLETED",
+          "termination_confirmed": null
+        }
+      ],
+      "repairs": 0,
+      "precheck": {
+        "status": "failed",
+        "exit_code": 1,
+        "tests_executed": true
+      },
+      "elapsed_ms": 21438.311082999993,
+      "original_source_unchanged": true,
+      "metrics": {
+        "model_calls": 1,
+        "producer_calls": 1,
+        "qa_calls": 0,
+        "repairs": 0,
+        "invalid_or_incomplete_generations": 1,
+        "prompt_bytes": 127030,
+        "output_bytes": 466,
+        "time_to_accepted_result_ms": null
+      }
+    },
+    {
+      "count": 3,
+      "format": "patches",
+      "execution": "native_cli",
+      "scope_sha256": "a4909d68a264de468e36cbbf16bc04b8706f3dff5baabcf50aa35024cbcb5845",
+      "fixture_sha256": "6ac1ff6793b49be70e19d31260e8bfcec21e5813e70e8e7a2a3e01009e6aeaaf",
+      "module_bytes": [
+        32768,
+        32768,
+        32768
+      ],
+      "source_bytes": 100603,
+      "expected_candidate_bytes": 101610,
+      "events": [
+        {
+          "type": "dispatch",
+          "at_ms": 12.514999999999418,
+          "role": "engineer",
+          "job_id": "job-1f0ab84c-8a2f-4786-8dfc-ffa96c882381",
+          "control_ms": 12.477041000005556
+        },
+        {
+          "type": "returned",
+          "at_ms": 11499.162333999993,
+          "role": "engineer",
+          "job_id": "job-1f0ab84c-8a2f-4786-8dfc-ffa96c882381",
+          "artifact_id": "artifact-c1c502a0-1124-416d-aef6-61e5aba2afd0"
+        },
+        {
+          "type": "tests_queued",
+          "at_ms": 11520.218458999996,
+          "job_id": "test-e0b3b4b0-68dd-421b-bc5c-81bb8661396e"
+        },
+        {
+          "type": "dispatch",
+          "at_ms": 18298.21683399999,
+          "role": "qa",
+          "job_id": "job-40c71dee-1db1-45a5-92c5-e12784489e9d",
+          "control_ms": 21.340125000002445
+        },
+        {
+          "type": "returned",
+          "at_ms": 45188.62999999999,
+          "role": "qa",
+          "job_id": "job-40c71dee-1db1-45a5-92c5-e12784489e9d",
+          "artifact_id": "artifact-e25e703a-d555-4e48-a8e2-e6157077f655"
+        },
+        {
+          "type": "receiver_accepted",
+          "at_ms": 45208.360417,
+          "candidate_sha256": "fddafee2e21c49325791a7b90768f6c3a987e91d09697bb4d6873d5a131e86fe",
+          "receipt_sha256": "f84f7dc2d8fde2875392d6868f415ffae4e88ff16600834ffd3e781d9c2f3082"
+        }
+      ],
+      "calls": [
+        {
+          "role": "engineer",
+          "job_id": "job-1f0ab84c-8a2f-4786-8dfc-ffa96c882381",
+          "prompt_bytes": 127291,
+          "prompt_sha256": "4b0949691d460094bb2cf5564e3b61cd00d4b08127a78bd79d4fafaa2407ee72",
+          "started_ms": 49.986625000005006,
+          "requested": {
+            "mode": "explicit",
+            "model": "gpt-6.1-sol",
+            "effort": "medium",
+            "reason": "Exact one-character fictional module repairs; identical model controls in all format arms.",
+            "speed": "host_default"
+          },
+          "native_id": "0dda135920aaff60e5907c923aeb38eccd5753ccecc1ee9043fee456b7842681",
+          "output_bytes": 716,
+          "output_sha256": "cfd367c57d0ad0ebabac690388a027c7c12a96fc589567dcb063ce9948942555",
+          "model_evidence": {
+            "reported_models": [],
+            "reported_effort": null,
+            "reported_service_tier": null,
+            "applied_controls": {
+              "model": "gpt-6.1-sol",
+              "effort": "medium",
+              "service_tier": null,
+              "fast_mode": null,
+              "switch_models_on_flag": null,
+              "scope": "child_launch_argv",
+              "verification": "applied_controls_not_effective_settings"
+            },
+            "source": "exec_json",
+            "scope": "assignment",
+            "verification": "unverified"
+          },
+          "duration_ms": 11408.830417000005
+        },
+        {
+          "role": "qa",
+          "job_id": "job-40c71dee-1db1-45a5-92c5-e12784489e9d",
+          "prompt_bytes": 235492,
+          "prompt_sha256": "f04b3447011465f7afe7fc778d2f6d6eb750210eb0b2e2f0f2a5aefc78081b19",
+          "started_ms": 18317.95525,
+          "requested": {
+            "mode": "explicit",
+            "model": "gpt-6.1-sol",
+            "effort": "high",
+            "reason": "Independent complete candidate, actual receipt and exact fixture preservation review; identical controls in all arms.",
+            "speed": "host_default"
+          },
+          "native_id": "ac62c92caf52d3fcddc541b37f7f77f3ec7f4ab6578d0f6aa329ef0d17da03c1",
+          "output_bytes": 1615,
+          "output_sha256": "5500bb659dbfac56e68b4fbfe1fdd7fe311ff805af5be2e463a5ee177bcd02af",
+          "model_evidence": {
+            "reported_models": [],
+            "reported_effort": null,
+            "reported_service_tier": null,
+            "applied_controls": {
+              "model": "gpt-6.1-sol",
+              "effort": "high",
+              "service_tier": null,
+              "fast_mode": null,
+              "switch_models_on_flag": null,
+              "scope": "child_launch_argv",
+              "verification": "applied_controls_not_effective_settings"
+            },
+            "source": "exec_json",
+            "scope": "assignment",
+            "verification": "unverified"
+          },
+          "duration_ms": 26851.30870800001
+        }
+      ],
+      "attempts": [
+        {
+          "test_job_id": "test-e0b3b4b0-68dd-421b-bc5c-81bb8661396e",
+          "receipt_id": "test-receipt-42a02767-0177-4853-87fd-83575afc12b8",
+          "receipt_sha256": "f84f7dc2d8fde2875392d6868f415ffae4e88ff16600834ffd3e781d9c2f3082",
+          "result": {
+            "status": "passed",
+            "exit_code": 0,
+            "signal": null,
+            "stdout": "TAP version 13\n# Subtest: exact values and complete unchanged module bytes\nok 1 - exact values and complete unchanged module bytes\n  ---\n  duration_ms: 2.158416\n  type: 'test'\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 26.47175\n",
+            "stderr": "",
+            "duration_ms": 1484,
+            "isolation": "macos-seatbelt-node",
+            "test_execution_attempted": true,
+            "tests_executed": true,
+            "output_truncated": false,
+            "limits": {
+              "timeout_ms": 10000,
+              "max_output_bytes": 20000
+            },
+            "candidate_sha256": "fddafee2e21c49325791a7b90768f6c3a987e91d09697bb4d6873d5a131e86fe",
+            "test_paths": [
+              "fixture.test.mjs"
+            ],
+            "timeout_ms": 10000,
+            "max_output_bytes": 20000,
+            "finished_at": "2026-11-07T05:54:18.953Z"
+          },
+          "test_elapsed_ms": 6777.068583
+        }
+      ],
+      "accepted": true,
+      "errors": [],
+      "repairs": 0,
+      "precheck": {
+        "status": "failed",
+        "exit_code": 1,
+        "tests_executed": true
+      },
+      "generation": {
+        "candidate_id": "artifact-c1c502a0-1124-416d-aef6-61e5aba2afd0",
+        "native_id": "0dda135920aaff60e5907c923aeb38eccd5753ccecc1ee9043fee456b7842681",
+        "candidate_sha256": "fddafee2e21c49325791a7b90768f6c3a987e91d09697bb4d6873d5a131e86fe",
+        "byte_accounting": {
+          "format": "patches",
+          "generated_bytes": 445,
+          "candidate_bytes": 101610,
+          "source_bytes": 101914,
+          "patches": [
+            {
+              "path": "module-0.mjs",
+              "base_sha256": "092aaf1d41c4ed97dac065053aa75da9c664c5df467e79b3287c04b84d51a818",
+              "edits": [
+                {
+                  "start": 21,
+                  "end": 22,
+                  "text": "1"
+                }
+              ]
+            },
+            {
+              "path": "module-1.mjs",
+              "base_sha256": "092aaf1d41c4ed97dac065053aa75da9c664c5df467e79b3287c04b84d51a818",
+              "edits": [
+                {
+                  "start": 21,
+                  "end": 22,
+                  "text": "1"
+                }
+              ]
+            },
+            {
+              "path": "module-2.mjs",
+              "base_sha256": "092aaf1d41c4ed97dac065053aa75da9c664c5df467e79b3287c04b84d51a818",
+              "edits": [
+                {
+                  "start": 21,
+                  "end": 22,
+                  "text": "1"
+                }
+              ]
+            }
+          ],
+          "patch_sha256": "627079ead8fa97ce9c957e2b802e0164f7cb8bf5544aabcd9dd03ae9d741f389"
+        }
+      },
+      "exact_fixture_match": true,
+      "review": {
+        "id": "artifact-e25e703a-d555-4e48-a8e2-e6157077f655",
+        "native_id": "ac62c92caf52d3fcddc541b37f7f77f3ec7f4ab6578d0f6aa329ef0d17da03c1",
+        "author_native_id": "0dda135920aaff60e5907c923aeb38eccd5753ccecc1ee9043fee456b7842681",
+        "verdict": "Pass",
+        "candidate_sha256": "fddafee2e21c49325791a7b90768f6c3a987e91d09697bb4d6873d5a131e86fe",
+        "receipt_sha256": "f84f7dc2d8fde2875392d6868f415ffae4e88ff16600834ffd3e781d9c2f3082"
+      },
+      "acceptance": {
+        "at": "2026-11-07T05:54:45.899Z",
+        "review_id": "artifact-e25e703a-d555-4e48-a8e2-e6157077f655",
+        "candidate_sha256": "fddafee2e21c49325791a7b90768f6c3a987e91d09697bb4d6873d5a131e86fe",
+        "receipt_sha256": "f84f7dc2d8fde2875392d6868f415ffae4e88ff16600834ffd3e781d9c2f3082",
+        "source_integrated": false
+      },
+      "elapsed_ms": 45208.374417,
+      "original_source_unchanged": true,
+      "metrics": {
+        "model_calls": 2,
+        "producer_calls": 1,
+        "qa_calls": 1,
+        "repairs": 0,
+        "invalid_or_incomplete_generations": 0,
+        "prompt_bytes": 362783,
+        "output_bytes": 2331,
+        "time_to_accepted_result_ms": 45208.374417
+      }
+    }
+  ],
+  "assessment": {
+    "passed": false,
+    "accepted_cases": 2,
+    "total_cases": 4,
+    "critical_false_acceptances": 0,
+    "statistical_noninferiority_established": false,
+    "causal_latency_improvement_established": false
+  }
+}

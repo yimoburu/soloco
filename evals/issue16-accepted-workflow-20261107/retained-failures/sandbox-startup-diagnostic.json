@@ -1,0 +1,9 @@
+{
+  "kind": "preserved_execution_environment_failure",
+  "execution": "synthetic_contract_double",
+  "native_calls": 0,
+  "stage": "sandbox capability startup probe before arm setup",
+  "observed_diagnostic": "Constrained Node startup failed: sandbox-exec: sandbox_apply: Operation not permitted. No unsandboxed fallback.",
+  "source": "Observed first contract command tool output; no report file was emitted by that early-failing driver.",
+  "protocol_sha256": "ab671c8d5df66dae001f86bf00390e4598cb8cad775cd8e7080625246efedfeb"
+}

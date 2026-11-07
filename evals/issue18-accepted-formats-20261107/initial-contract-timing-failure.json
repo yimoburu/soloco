@@ -1,0 +1,128 @@
+{
+  "protocol": {
+    "version": 1,
+    "kind": "accepted_candidate_format_comparison",
+    "source_pin": "9c0cb8a9d40da42242787b1bbaacfa11ba37acdc",
+    "fixture": {
+      "module_bytes": 32768,
+      "module_counts": [
+        1,
+        3
+      ],
+      "formats": [
+        "files",
+        "patches"
+      ]
+    },
+    "criteria": {
+      "max_native_calls_total": 8,
+      "max_generation_attempts_per_case": 1,
+      "max_test_attempts_per_case": 1,
+      "max_qa_attempts_per_case": 1,
+      "critical_false_acceptances": 0,
+      "quality_error_margin": 0,
+      "latency_improvement_required": false
+    },
+    "limits": {
+      "scope_max_bytes": 200000,
+      "configuration_ceiling": 200000,
+      "native_timeout_ms": 300000,
+      "test_timeout_ms": 10000,
+      "test_wait_ms": 20000
+    },
+    "order": "one-file files, one-file patches, three-file files, three-file patches; sequential, no retries",
+    "acceptance": "Real production dispatch and worker produce a retained exact candidate. Actual sandboxed tests must pass; a different native QA must permit the exact candidate and actual receipt; the fixture receiver then calls production accept. Exact grading additionally compares all complete candidate bytes against the known fixture.",
+    "limitations": [
+      "One observation per arm; descriptive results cannot establish statistical quality noninferiority, production reliability, cost savings or causal latency gains.",
+      "Only manually supplied fictional modules and fixed tests are shared with the existing host model. Synthetic company binding and grant are fixture data; no actual company state or authority changes.",
+      "Requested/applied model controls differ from effective provider settings; missing observations remain unknown.",
+      "All failed or uncertain calls stay retained and hold that case without retry. Source integration, installation and deployment are outside this evaluation."
+    ]
+  },
+  "execution": "synthetic_contract_double",
+  "cases": [
+    {
+      "count": 1,
+      "format": "files",
+      "execution": "synthetic_contract_double",
+      "scope_sha256": "79c52a3846115969c820d084d70c9f63ecd8bbdda8714e18b294cf110037ad61",
+      "fixture_sha256": "491835db654f1899f8d84ef708824ed5b3bcd4aa4225dfcc6da7e68f92f88296",
+      "module_bytes": [
+        32768
+      ],
+      "source_bytes": 33535,
+      "expected_candidate_bytes": 34032,
+      "events": [
+        {
+          "type": "dispatch",
+          "at_ms": 7.293749999999818,
+          "role": "engineer",
+          "job_id": "job-9a35ef5a-9425-43b6-81b1-78af6fb66f9a",
+          "control_ms": 7.064875000000029
+        },
+        {
+          "type": "held",
+          "at_ms": 18.970832999999857,
+          "reason": "Production worker did not complete: {\"status\":\"failed\",\"error\":\"A custom execution timeout requires a reason\"}"
+        }
+      ],
+      "calls": [
+        {
+          "role": "engineer",
+          "job_id": "job-9a35ef5a-9425-43b6-81b1-78af6fb66f9a",
+          "prompt_bytes": 58786,
+          "prompt_sha256": "5700da719b5d9c6ceb903a2defdba978f1e90831185bea97f6dd94514b973bd5",
+          "started_ms": 14.013791999999967,
+          "requested": {
+            "mode": "explicit",
+            "model": "gpt-6.1-sol",
+            "effort": "medium",
+            "reason": "Exact one-character fictional module repairs; identical model controls in all format arms.",
+            "speed": "host_default"
+          },
+          "error": {
+            "message": "A custom execution timeout requires a reason",
+            "code": null,
+            "termination_confirmed": null
+          },
+          "duration_ms": 1.0972920000001523
+        }
+      ],
+      "attempts": [],
+      "accepted": false,
+      "errors": [
+        {
+          "message": "Production worker did not complete: {\"status\":\"failed\",\"error\":\"A custom execution timeout requires a reason\"}",
+          "code": "WORKER_NOT_COMPLETED",
+          "termination_confirmed": null
+        }
+      ],
+      "repairs": 0,
+      "precheck": {
+        "status": "failed",
+        "exit_code": 1,
+        "tests_executed": true
+      },
+      "elapsed_ms": 18.975124999999935,
+      "original_source_unchanged": true,
+      "metrics": {
+        "model_calls": 1,
+        "producer_calls": 1,
+        "qa_calls": 0,
+        "repairs": 0,
+        "invalid_or_incomplete_generations": 1,
+        "prompt_bytes": 58786,
+        "output_bytes": 0,
+        "time_to_accepted_result_ms": null
+      }
+    }
+  ],
+  "assessment": {
+    "passed": false,
+    "accepted_cases": 0,
+    "total_cases": 1,
+    "critical_false_acceptances": 0,
+    "statistical_noninferiority_established": false,
+    "causal_latency_improvement_established": false
+  }
+}
