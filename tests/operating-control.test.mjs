@@ -312,3 +312,12 @@ test('legacy format6 packets preserve the actual v0.7.5 context hash',async()=>{
  const previous=oldContext.assignmentContext(old,old.jobs[j.id]),next=assignmentContext(current,current.jobs[j.id]);
  assert.equal(next.text,previous.text);assert.equal(next.hash,previous.hash);assert.equal(current.jobs[j.id].context_sha256,previous.hash);
 });
+
+test('proposal notice reference fields are rejected with exact evidence retained',async()=>{
+ const f=fixture();await publish(f);
+ const notice={kind:'must_know',summary:'A new restriction',reference:{obligation:'Must retain this supplied content'}};
+ const result=await completeProposal(f,{notices:[notice]});
+ assert.equal(result.job.status,'failed');assert.match(result.job.error,/notice has unknown fields/);
+ assert.deepEqual(JSON.parse(result.job.rejected_output.text).notices,[notice]);
+ assert.throws(()=>operatingContext(read(f)),/Held/);
+});

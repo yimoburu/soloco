@@ -258,7 +258,7 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
     if(!output.native_id) throw new Error('Host returned no resumable session identity');
     artifact=context.qualification?JSON.parse(output.text):parseArtifact(output.text);
     if(job.output_contract==='operating-proposal-v1'&&Object.keys(artifact).some(k=>!['content','messages','notices'].includes(k)))throw Error('Operating proposal has unsupported fields; retain the rejected result for reconciliation');
-    if(job.output_contract==='operating-proposal-v1'){for(const n of artifact.notices??[])if(Object.keys(n).some(k=>!['kind','summary','reference'].includes(k)))throw Error('Operating proposal notice has unknown fields');for(const m of artifact.messages??[])if(Object.keys(m).some(k=>!['to','content'].includes(k)))throw Error('Operating proposal message has unknown fields');}
+    if(job.output_contract==='operating-proposal-v1'){for(const n of artifact.notices??[])if(Object.keys(n).some(k=>!['kind','summary'].includes(k)))throw Error('Operating proposal notice has unknown fields');for(const m of artifact.messages??[])if(Object.keys(m).some(k=>!['to','content'].includes(k)))throw Error('Operating proposal message has unknown fields');}
     validateEnvelope(artifact,state.roles);
     if(context.qualification){
       if(scopedContext(context))scoped.validateScopedOutput(output.text);
