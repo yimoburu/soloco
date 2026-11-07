@@ -1,4 +1,5 @@
 import {createHash} from 'node:crypto';
+import {types} from 'node:util';
 import {buildEvidence,readEvidence} from './upgrade-evidence.mjs';
 import {contextSource,currentExtensions} from './current-state.mjs';
 import {TIMEOUT_POLICY_VERSION,executionTiming} from './timeout.mjs';
@@ -23,9 +24,27 @@ export function qualificationLimits(plan){
   return QUALIFICATION_LIMITS;
 }
 export function qualificationWorkload(plan){return {profile:plan.version===2?plan.profile:'legacy-v1',partitioner:plan.partitioner,limits:qualificationLimits(plan),total_units:plan.units.length,total_nodes:plan.nodes.length,total_sessions:plan.units.length+plan.nodes.length+1};}
-const json=JSON.stringify;
+const stringify=JSON.stringify;
 const hash=value=>createHash('sha256').update(value).digest('hex');
-const sha=value=>{if(value&&typeof value==='object'&&evaluation){if(evaluation.hashes.has(value))return evaluation.hashes.get(value);const digest=hash(json(value));evaluation.hashes.set(value,digest);return digest;}return hash(json(value));};
+// Only recursively frozen, ordinary JSON has a stable value between calls.
+// Proxies can synthesize toJSON even with a frozen target; prototype hooks can
+// also change independently of a frozen graph, so neither may reuse an encoding or digest.
+const immutableJSON=new WeakMap(),immutableHashes=new WeakMap(),immutableEncodings=new WeakMap();
+const ordinaryJSONSerialization=()=>!('toJSON' in Object.prototype)&&!('toJSON' in Array.prototype)&&Object.getPrototypeOf(Array.prototype)===Object.prototype;
+const json=value=>{
+  const immutable=value&&typeof value==='object'&&immutableJSON.has(value)&&ordinaryJSONSerialization();
+  if(immutable&&immutableEncodings.has(value))return immutableEncodings.get(value);
+  const encoded=stringify(value);if(immutable)immutableEncodings.set(value,encoded);return encoded;
+};
+const sha=value=>{
+  const object=value&&typeof value==='object',immutable=object&&immutableJSON.has(value)&&ordinaryJSONSerialization();
+  if(immutable&&immutableHashes.has(value))return immutableHashes.get(value);
+  if(object&&evaluation?.hashes.has(value))return evaluation.hashes.get(value);
+  const digest=hash(json(value));
+  if(object&&evaluation)evaluation.hashes.set(value,digest);
+  if(immutable)immutableHashes.set(value,digest);
+  return digest;
+};
 const bytes=value=>Buffer.byteLength(typeof value==='string'?value:json(value),'utf8');
 const equal=(a,b)=>json(a)===json(b);
 // Mutable-state validation caches live only within one synchronous evaluation.
@@ -45,12 +64,16 @@ export class QualificationHold extends Error {
 }
 function bounded(value,limit,boundary){const size=bytes(value);if(size>limit)throw new QualificationHold(boundary,size,limit);return value;}
 export function qualificationReference(value,id=value?.id){if(!value||!nonempty(id))fail('missing original/reference');return {id,revision:value.revision??null,sha256:sha(value)};}
-function assertJSON(value,active=new Set(),depth=0){
-  if(depth>256)fail('JSON nesting exceeds 256');
-  if(value===null||['string','boolean'].includes(typeof value)||typeof value==='number'&&Number.isFinite(value))return;
+function assertJSON(value,active=new Set(),depth=0,maxDepth=256){
+  if(depth>maxDepth)fail('JSON nesting exceeds '+maxDepth);
+  if(value===null||['string','boolean'].includes(typeof value)||typeof value==='number'&&Number.isFinite(value))return 0;
   if(!value||typeof value!=='object'||!Array.isArray(value)&&![Object.prototype,null].includes(Object.getPrototypeOf(value))||active.has(value))fail('exact plain acyclic JSON required');
-  const keys=Reflect.ownKeys(value);if(Array.isArray(value)&&keys.length!==value.length+1)fail('sparse/extended JSON array');
-  active.add(value);for(const key of keys){if(Array.isArray(value)&&key==='length')continue;const d=Object.getOwnPropertyDescriptor(value,key);if(typeof key!=='string'||!d.enumerable||!Object.hasOwn(d,'value'))fail('hidden/accessor JSON field');assertJSON(d.value,active,depth+1);}active.delete(value);
+  if(immutableJSON.has(value)){const height=immutableJSON.get(value);if(depth+height>maxDepth)fail('JSON nesting exceeds '+maxDepth);return height;}
+  const keys=Reflect.ownKeys(value);if(Array.isArray(value)&&(keys.length!==value.length+1||keys.some((key,index)=>key!==(index===value.length?'length':String(index)))))fail('sparse/extended JSON array');
+  let immutable=!types.isProxy(value)&&Object.isFrozen(value)&&(!Array.isArray(value)||Object.getPrototypeOf(value)===Array.prototype),height=0;
+  active.add(value);for(const key of keys){if(Array.isArray(value)&&key==='length')continue;const d=Object.getOwnPropertyDescriptor(value,key);if(typeof key!=='string'||!d.enumerable||!Object.hasOwn(d,'value'))fail('hidden/accessor JSON field');const child=assertJSON(d.value,active,depth+1,maxDepth);if(child===null)immutable=false;else height=Math.max(height,child+1);}active.delete(value);
+  if(immutable)immutableJSON.set(value,height);
+  return immutable?height:null;
 }
 function source(state,id){
   if(evaluation?.sourceValues.has(id))return evaluation.sourceValues.get(id);
@@ -140,7 +163,7 @@ function projected(state,id){
   checkSnapshots(original);
   const result={tree:{handover:e.handover,inventory:e.inventory,payload_semantics:Object.values(e.sources).filter(s=>s.kind==='payload').map(({source_id,sha256,encoding,scope,path,raw})=>({source_id,sha256,encoding,scope,path,raw})),...(retained.length?{retained_originals:retained}:{})},projection:{format:e.handover.format,inventory_version:e.inventory.version,inventory_sha256:e.inventory_sha256,counts:e.inventory.counts}};
   result.parts=partitions(result.tree,'historical');
-  if(cacheable){const references=retained.map(r=>r.source),size=bytes(result)+bytes([captured.dependencies,references]);if(size<=32000000){if(old){projectionCache.delete(cacheKey);projectionCacheBytes-=old.bytes;}while(projectionCacheBytes+size>32000000){const [key,entry]=projectionCache.entries().next().value;projectionCacheBytes-=entry.bytes;projectionCache.delete(key);}freeze(result);projectionCache.set(cacheKey,{value:result,bytes:size,scope,references,dependencies:captured.dependencies});projectionCacheBytes+=size;}}
+  if(cacheable){const references=retained.map(r=>r.source),size=bytes(result)+bytes([captured.dependencies,references]);if(size<=32000000){if(old){projectionCache.delete(cacheKey);projectionCacheBytes-=old.bytes;}while(projectionCacheBytes+size>32000000){const [key,entry]=projectionCache.entries().next().value;projectionCacheBytes-=entry.bytes;projectionCache.delete(key);}freeze(result);for(const unit of result.parts)assertJSON(unit,new Set(),0,512);projectionCache.set(cacheKey,{value:result,bytes:size,scope,references,dependencies:captured.dependencies});projectionCacheBytes+=size;}}
   if(evaluation?.state===state)evaluation.projected.set(id,result);
   return result;
 }

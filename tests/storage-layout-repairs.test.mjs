@@ -4,6 +4,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
+import {DatabaseSync} from 'node:sqlite';
+import {normalizedLayout} from '../plugins/soloco/runtime/record-storage.mjs';
 import {Store,digest} from '../plugins/soloco/runtime/store.mjs';
 import {retainSnapshot,snapshotBytes,bindSnapshots,inheritSnapshots,pinFrozenText,readFrozenText} from '../plugins/soloco/runtime/snapshot.mjs';
 import {beginHandover,admitHandover,submitReconstruction,inspectHandover,handoverSubject} from '../plugins/soloco/runtime/handover.mjs';
@@ -31,6 +33,29 @@ function oldLayout(version,state=seed()){
   for(const action of ['UPDATE','DELETE','INSERT'])db.exec(`CREATE TRIGGER fence_legacy_${action.toLowerCase()} BEFORE ${action} ON company BEGIN SELECT RAISE(ABORT,'Legacy writer fenced'); END;`);
   return f;
 }
+
+test('layout reads observe creation, live versions, rollback and recreated schema on the same connection',()=>{
+  const db=new DatabaseSync(':memory:');
+  try{
+    assert.equal(normalizedLayout(db),false);
+    db.exec('CREATE TABLE company_layout(id INTEGER PRIMARY KEY,version INTEGER); INSERT INTO company_layout VALUES(1,1)');
+    for(const version of [1,2,3,4]){db.prepare('UPDATE company_layout SET version=?').run(version);assert.equal(normalizedLayout(db),true);}
+    for(const version of [99,null,'corrupt']){db.prepare('UPDATE company_layout SET version=?').run(version);assert.throws(()=>normalizedLayout(db),/Unknown or corrupt/);}
+    db.exec('UPDATE company_layout SET version=4; BEGIN; UPDATE company_layout SET version=99');
+    assert.throws(()=>normalizedLayout(db),/Unknown or corrupt/);db.exec('ROLLBACK');assert.equal(normalizedLayout(db),true);
+    db.exec('BEGIN; DROP TABLE company_layout');assert.equal(normalizedLayout(db),false);
+    db.exec('CREATE TABLE company_layout(id INTEGER PRIMARY KEY,version INTEGER); INSERT INTO company_layout VALUES(1,2)');assert.equal(normalizedLayout(db),true);
+    db.exec('ROLLBACK');assert.equal(normalizedLayout(db),true);
+    db.exec('DROP TABLE company_layout');assert.equal(normalizedLayout(db),false);
+    db.exec("CREATE TABLE company_layout(id INTEGER PRIMARY KEY,version TEXT); INSERT INTO company_layout VALUES(1,'corrupt')");assert.throws(()=>normalizedLayout(db),/Unknown or corrupt/);
+    db.exec('DELETE FROM company_layout');assert.throws(()=>normalizedLayout(db),/Unknown or corrupt/);
+    db.exec('DROP TABLE company_layout; CREATE TABLE company_layout(id INTEGER PRIMARY KEY,version INTEGER); INSERT INTO company_layout VALUES(1,4)');assert.equal(normalizedLayout(db),true);
+    db.close();assert.throws(()=>normalizedLayout(db),/not open|finalized/);
+    db.open();assert.equal(normalizedLayout(db),false);
+    db.exec('CREATE TABLE company_layout(id INTEGER PRIMARY KEY,version INTEGER); INSERT INTO company_layout VALUES(1,4)');assert.equal(normalizedLayout(db),true);
+    db.close();db.open();assert.equal(normalizedLayout(db),false);
+  }finally{db.close();}
+});
 
 test('legacy capture holds atomically; ordinary writes/read/reopen do not migrate; explicit migration backs up exact origin',()=>{
   const {root,db}=fixture();const before=JSON.stringify(db.read()),token=db.changeToken();
