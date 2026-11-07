@@ -45,10 +45,10 @@ const sha=value=>{
   if(immutable)immutableHashes.set(value,digest);
   return digest;
 };
-const bytes=value=>{
+const bytes=(value,encoded)=>{
   const immutable=value&&typeof value==='object'&&immutableJSON.has(value)&&ordinaryJSONSerialization();
   if(immutable&&immutableByteLengths.has(value))return immutableByteLengths.get(value);
-  const length=Buffer.byteLength(typeof value==='string'?value:json(value),'utf8');
+  const length=Buffer.byteLength(typeof value==='string'?value:encoded??json(value),'utf8');
   if(immutable)immutableByteLengths.set(value,length);
   return length;
 };
@@ -296,7 +296,7 @@ function buildPlan(state,{source_id,counterpart_ids=[],dependency_ids=[],profile
   const owner=reviewOwner(state);if(!owner||!Number.isSafeInteger(owner.epoch))fail('current owner epoch required');
   if(counterpart_ids.includes(source_id)||dependency_ids.includes(source_id))fail('cyclic source dependency');
   const originalValue=source(state,source_id),original=qualificationReference(originalValue,source_id),counterparts=references(state,counterpart_ids),dependencies=references(state,dependency_ids);
-  const originalRaw=json(originalValue),original_encoding={encoding:'json-utf8',sha256:original.sha256,utf16_length:originalRaw.length,byte_length:bytes(originalValue)};
+  const originalRaw=json(originalValue),original_encoding={encoding:'json-utf8',sha256:original.sha256,utf16_length:originalRaw.length,byte_length:bytes(originalValue,originalRaw)};
   const producer=originalValue.job_id?qualificationReference(source(state,'job:'+originalValue.job_id),'job:'+originalValue.job_id):null;
   const p=projected(state,source_id),current=currentTree(state,source_id,dependencies,counterparts,ownHash);
   const units=[...(fresh?partitions(p.tree,'historical',limits):p.parts),...partitions(current,'current',limits)].map(header);
