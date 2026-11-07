@@ -1,0 +1,7 @@
+{
+  "source_base": "28c27a0d26d43f8a559ebf9d735c1bf120e45ecb",
+  "overlay": "final incidence component3b5a4b1",
+  "overlay_patch_sha256": "51a442416e273e8e78edf3ca142e18f9dc5a597efaf3d4b8fcc14eef812dfc84",
+  "baseline_sha256": "f1aab766b152fa1cd3ad37c70e2f65b8def1dbda805b3980a1b3be2aae7b615c",
+  "scope": "Exact final incidence BEFORE FIT overlay, source-only; no released corpus contract or real company plan exists. Initial old-incidence seeded comparison fails because the independent incidence component corrects contradictory Cartesian instructions; preserved failure is not attributed to FIT. Published legacy/range/coherent-source semantics remain separately tested."
+}

@@ -1,0 +1,63 @@
+{
+  "observed_at": "2026-11-06T23:23:56.820480+00:00",
+  "native_session": "01a1b321-6c8d-76c2-9891-027cdeb14ad0",
+  "native_exit_code": -15,
+  "native_final_report": false,
+  "test_evidence": "Terminal TAP summaries retained; supervisor exit/summary was interrupted and is not inferred. No rerun or reset of original call allowance.",
+  "results": [
+    {
+      "file": "construction-corrected-focused-node22.log",
+      "sha256": "7b59ecb2f668dba98798b4c83ef8bb3edf76d87b34b20cf2878d2a0c62627d9a",
+      "terminal_summary": [
+        "# tests 4",
+        "# pass 4",
+        "# fail 0",
+        "# cancelled 0",
+        "# skipped 0",
+        "# duration_ms 379.681459"
+      ]
+    },
+    {
+      "file": "construction-corrected-focused-node25.log",
+      "sha256": "226f56c6b5b9f379d0b4fc5f36fc037d5f205552d03330d95f93294a1294dbe8",
+      "terminal_summary": [
+        "\u2139 tests 4",
+        "\u2139 pass 4",
+        "\u2139 fail 0",
+        "\u2139 cancelled 0",
+        "\u2139 skipped 0",
+        "\u2139 duration_ms 279.333583"
+      ]
+    },
+    {
+      "file": "construction-corrected-scoped-coherent-node22.log",
+      "sha256": "efd59de4ae55197becd9d75c13f915765a82a0909c5537fb0e180c06c19b69f7",
+      "terminal_summary": [
+        "# tests 85",
+        "# pass 85",
+        "# fail 0",
+        "# cancelled 0",
+        "# skipped 0",
+        "# duration_ms 164586.159458"
+      ]
+    },
+    {
+      "file": "construction-corrected-scoped-coherent-node25.log",
+      "sha256": "b5684fbef21b58a36d175ed8d3214de3a7ea72625879f9785e3d40f163cec1cd",
+      "terminal_summary": [
+        "\u2139 tests 85",
+        "\u2139 pass 85",
+        "\u2139 fail 0",
+        "\u2139 cancelled 0",
+        "\u2139 skipped 0",
+        "\u2139 duration_ms 168450.262583"
+      ]
+    }
+  ],
+  "source_sha256": {
+    "plugins/soloco/runtime/scoped-context.mjs": "ce465fd58ac6f9412204b4972972df6aa12bc1ec5edadbe6fff9455becd05742",
+    "tests/scoped-corpus-runtime.test.mjs": "630de1d6f4dd96bf3546dd8fb2c59f7b62633f0d1bcc7f1b91823f5ebc710088",
+    "tests/corpus-incidence-construction.test.mjs": "706f1815e2c4dc063f2b5e7f05554bf1fdfdfaa35753ae0ab6d76420ebaad3e2",
+    "docs/scoped-context.md": "3d9174429bf4e2a1e4017c5b44bf45d2cb4023332f811e69a807a409a174e42b"
+  }
+}

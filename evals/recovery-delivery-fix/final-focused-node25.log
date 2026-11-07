@@ -1,0 +1,68 @@
+(node:27885) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+{"same_scope":"D00","qualified_artifact_home_effect_present":true,"applicability_verdict":"Pass","contract_doubles_only":true}
+✔ public store + worker path: 500 distinct obligations / 20 domains exceed union output, bounded packets apply and archive exact originals (21670.526792ms)
+ℹ {"contract_doubles":true,"obligations":500,"domains":20,"extraction_jobs":27,"total_extraction_output_bytes":149414,"final_packet_bytes":19392}
+✔ source-only extraction survives unrelated notice/global change and replacement uses canonical completed job receipt (743.43775ms)
+✔ unknown source fields and current global rules are semantic; historical claims never current permission (528.784167ms)
+✔ distant qualifier absent from home blocks independently; no resolution of OPEN invented (537.27125ms)
+✔ cross-domain interface must have independent complete exact review; contradiction holds (449.745541ms)
+✔ canonical receipt rejects forged native/job/closure/output/provenance and tampered source; no coordinator proof reuse (372.13ms)
+✔ independent reviewer cannot review source or domain producer (278.076791ms)
+✔ integration coverage rejects omissions, duplicate items/ranges, substitutions and dependency cycles (382.808416ms)
+✔ overflow retains complete rejected unit output and allows exact bounded subdivision coverage (744.431167ms)
+✔ stale owner, paused maintenance controls, revocation and late pause fence new work and returns (372.115625ms)
+✔ main exposes usable scoped schema and public current home schema (57.655708ms)
+✔ bounded independent interface review can complete integration without a global semantic union (617.209125ms)
+✔ closed output grammar rejects fabricated citations, altered provenance and hidden findings and retains rejected evidence (222.126708ms)
+✔ main routes scoped plan/target/read; owner handover fences new work while exact adopted preservation and extraction survive (407.096959ms)
+✔ unknown terminal execution remains exact current evidence and blocks permission without spoiling immutable extraction (237.788833ms)
+✔ unknown current home scope and domain dependencies stay mandatory despite integration relabeling (971.405041ms)
+✔ regression: interface must include every exact incident-domain home (442.869875ms)
+✔ separate governing scopes reuse receipts through qualified archive growth and unrelated requalification (7823.235417ms)
+✔ ordinary worker producer edge binds exact outcome and native closure while keeping source-only identity reusable (333.074291ms)
+✔ regression: a represented governing rule retains its same-scope artifact home (938.590167ms)
+✔ typed mandatory dependencies and changed artifact homes remain exact governing evidence (585.270875ms)
+✔ new global scope expansion widens old homes in fresh applicability instead of hiding their bodies (527.127417ms)
+✔ root authority changes and changed or removed scope rules widen fresh review inputs (1613.424167ms)
+✔ clipped natural-language qualifier holds until a new explicit supporting bundle supplies its entire boundary (140.813542ms)
+✔ exact ordered supporting ranges and hashes survive canonical artifact delivery; only identical bundles reuse (317.54275ms)
+✔ invalid support IDs and altered bundle provenance cannot substitute for exact frozen delivery (830.144208ms)
+✔ supporting units do not count as primary coverage; exact independent primaries still complete (675.102292ms)
+✔ an explicit supporting context set above the original input ceiling holds without dispatch (54.018208ms)
+✔ recovery regression: oversized compulsory global holds legacy scoped assignment without dispatch or evidence mutation (170.099416ms)
+✔ recovery stream CONTRACT DOUBLE: complete bounded UTF8 delivery, full integration closure and immutable extraction reuse (3072.520083ms)
+ℹ {"contract_double":true,"domain_requests":7,"integration_requests":7,"max_request_utf8_bytes":48000,"integration_body_utf8_bytes":230382}
+✔ recovery stream rejects missing/reordered/substituted ranges, corrupt bodies, wrong native and unconfirmed closure (3060.554667ms)
+✔ recovery stream canonical current freshness: notices, authority, outcomes, governing and home mutation hold; extraction reused (3336.435541ms)
+✔ recovery stream worker rejects premature Pass, wrong ack/order, changed native and mid-delivery current changes (2431.817417ms)
+✔ recovery stream CONTRACT DOUBLE: more than sixteen pages and oversized homes/dependencies reach same reviewer (7942.73925ms)
+ℹ {"contract_double":true,"requests":26,"body_utf8_bytes":947154,"max_request_utf8_bytes":48000}
+✔ recovery stream preserves explicit unknown outcomes and rejects nonindependent native even after full transport (1274.398667ms)
+✔ recovery stream rejected observed identities never poison accepted extraction receipts (966.597791ms)
+✔ recovery stream CONTRACT DOUBLE: nonempty independent interfaces deliver peer homes, dependencies and closure (13152.063333ms)
+✔ stream ranges explicitly preserve surrogate boundaries, escaping and exact reconstruction (72.493125ms)
+(node:27886) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ dispatch validates and persists policy, and main keeps software-test limits separate (9.861667ms)
+✔ upgrade review-window schema is bounded and runtime rejects invalid or misplaced requests before binding (3.262125ms)
+✔ status distinguishes long execution, grace, startup, queue, legacy and inspection (8.836833ms)
+✔ reconciliation rechecks eligibility inside the store transaction (1.736042ms)
+✔ worker queue delay does not consume custom execution time; actual callback is persisted (3.205333ms)
+✔ new jobs require spawn evidence; legacy injected models remain compatible (3.326125ms)
+✔ deadline aborts and late output is quarantined even if model ignores cancellation (1.473208ms)
+✔ pause, ownership loss, context change and scope revocation abort active work (8.228083ms)
+✔ startup expiry aborts without inventing spawn timing and launch errors retain evidence (4.255916ms)
+✔ coordination dispatch binds prerequisite evidence, admits disjoint resources and rejects premature/conflicting work (6.069792ms)
+✔ uncertain cancellation keeps resource claim; confirmed closure releases it (3.747ms)
+✔ upgrade call ceiling schema and runtime reject invalid options before all boundaries (2.311541ms)
+✔ stream publication fence quarantines deadline crossed during final validation without session mutation (9.088584ms)
+✔ stream exact deadline closure and delayed timers cannot publish late Pass or renew allowance (16.977708ms)
+ℹ tests 52
+ℹ suites 0
+ℹ pass 52
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 78490.049583

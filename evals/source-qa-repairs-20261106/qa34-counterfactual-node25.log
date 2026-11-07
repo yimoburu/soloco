@@ -1,0 +1,50 @@
+(node:36691) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ historical artifact producers use the frozen checkpoint map and retain separate current bindings (1060.458375ms)
+(node:36692) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ archived rejected contributors cannot review scoped extraction while company-shaped application examples stay data (1037.348333ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1186.458083
+
+✖ failing tests:
+
+test at tests/operating-state.test.mjs:434:1
+✖ historical artifact producers use the frozen checkpoint map and retain separate current bindings (1060.458375ms)
+  Error: Scoped context hold: source missing job:archived-producer
+      at fail (file:///private/tmp/soloco-operating-state-20261106/qa34-counterfactual/plugins/soloco/runtime/scoped-context.mjs:22:22)
+      at source (file:///private/tmp/soloco-operating-state-20261106/qa34-counterfactual/plugins/soloco/runtime/scoped-context.mjs:32:81)
+      at record (file:///private/tmp/soloco-operating-state-20261106/qa34-counterfactual/plugins/soloco/runtime/scoped-context.mjs:132:15)
+      at producerClosure (file:///private/tmp/soloco-operating-state-20261106/qa34-counterfactual/plugins/soloco/runtime/scoped-context.mjs:143:3)
+      at originalProducers (file:///private/tmp/soloco-operating-state-20261106/qa34-counterfactual/plugins/soloco/runtime/operating-state.mjs:530:114)
+      at add (file:///private/tmp/soloco-operating-state-20261106/qa34-counterfactual/plugins/soloco/runtime/operating-state.mjs:198:50)
+      at publicationEvidence (file:///private/tmp/soloco-operating-state-20261106/qa34-counterfactual/plugins/soloco/runtime/operating-state.mjs:219:88)
+      at capture (file:///private/tmp/soloco-operating-state-20261106/qa34-counterfactual/plugins/soloco/runtime/operating-state.mjs:287:47)
+      at proposeOperatingState (file:///private/tmp/soloco-operating-state-20261106/qa34-counterfactual/plugins/soloco/runtime/operating-state.mjs:303:43)
+      at file:///private/tmp/soloco-operating-state-20261106/qa34-counterfactual/plugins/soloco/runtime/engine.mjs:454:148
+
+test at tests/scoped-coherent-runtime.test.mjs:110:1
+✖ archived rejected contributors cannot review scoped extraction while company-shaped application examples stay data (1037.348333ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'completed'
+  - 'failed'
+  
+      at TestContext.<anonymous> (file:///private/tmp/soloco-operating-state-20261106/qa34-counterfactual/tests/scoped-coherent-runtime.test.mjs:122:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'completed',
+    expected: 'failed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

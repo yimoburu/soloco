@@ -1,0 +1,27 @@
+✖ shared immutable-entry histories are validated as a graph while every wrapper identity remains checked (11.9755ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 56.748125
+
+✖ failing tests:
+
+test at tests/snapshot-reference-closure.test.mjs:5:1
+✖ shared immutable-entry histories are validated as a graph while every wrapper identity remains checked (11.9755ms)
+  AssertionError [ERR_ASSERTION]: duplicate edges must not recursively expand the whole accepted history
+      at TestContext.<anonymous> (file:///private/tmp/soloco-operating-state-20261106/source/tests/snapshot-reference-closure.test.mjs:18:9)
+      at Test.runInAsyncScope (node:async_hooks:213:14)
+      at Test.run (node:internal/test_runner/test:1106:25)
+      at Test.start (node:internal/test_runner/test:1003:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

@@ -1,0 +1,45 @@
+(node:52715) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ordinary archive growth [{"scale":1,"archive_characters":184433,"context_characters":1451,"mandatory_records":7},{"scale":10,"archive_characters":1833494,"context_characters":1451,"mandatory_records":7},{"scale":100,"archive_characters":18324464,"context_characters":1451,"mandatory_records":7}]
+✔ ordinary 1x/10x/100x archive growth preserves fixed current obligations and explicit evidence (124.086167ms)
+(node:52716) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ public handover, independent publication, full v4 worker review, resume and first ordinary format6 Engineering return (908.543958ms)
+✔ only exact pure runtime commands are mechanically ingested; conditions, unknown fields and generic saves stay held (184.509959ms)
+✔ actual conditional handover retains founder conditions and unknown legacy remains held on first pass (92.597375ms)
+(node:52717) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ public represented v2 schema is strict and legacy/default protocols remain unchanged (564.733583ms)
+✔ public plan, real worker complete format4 reads and public apply retain canonical current qualification and exact homes (1515.154625ms)
+✔ real worker rejects incomplete semantic delivery and coordinator native identity (64.422833ms)
+✔ public represented source includes canonical runtime test author_instance and exact producer homes (68.308625ms)
+(node:52718) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ 1x/10x/100x represented archive has bounded mandatory context across dispatch, handover and upgrade (469.464334ms)
+ℹ [{"archive":1,"dispatch":877,"handover":5125,"upgrade":5112},{"archive":10,"dispatch":877,"handover":5134,"upgrade":5121},{"archive":100,"dispatch":877,"handover":5160,"upgrade":5147}]
+✔ source, counterpart and proof mutation revokes exclusion or holds; a new blocker is always mandatory (9.412792ms)
+✔ qualification refuses stale epochs, native/source ownership, incomplete delivery, unique findings and negative reviews (1.628167ms)
+✔ streamed v2 qualification exceeds legacy round limits with authentic same-native coverage and explicit semantic attestations (323.12575ms)
+ℹ {"initial_packet":947,"mandatory_stream":2510167,"range_calls":77}
+✔ unknown plan/reference/classification fields hold; status and a completed audit never drop negative legacy material (3.175042ms)
+✔ ordinary format 5 holds all unknown semantic material and typed failures while legacy format 3 retains its contract (0.395917ms)
+✔ alternating handover/upgrade/retry snapshots grow compositionally and exact originals round-trip through immutable_values (159.256208ms)
+ℹ {"subjects":[1125,1621,2119,2616,3113,3610,4107,4604,5101,5598,6096,6594],"logical_state":159981,"immutable_utf8_bytes":265570,"immutable_values":130}
+✔ missing/corrupt immutable snapshots and malformed shape hold after reopen, without deleting history (34.159875ms)
+✔ v4 portable restore retains exact ref bodies, origin provenance, unknown root keys and rollback integrity (15.741625ms)
+✔ duplicate IDs, aliased proof jobs and distinct old revisions cannot borrow another source classification (8.828792ms)
+✔ legacy v2 handover still requires complete same-native stream; v3 reviewed context retains that delivery gate (1.672917ms)
+✔ qualification makes typed-only findings and referenced snapshot originals compulsory, with exact raw retrieval (1.139583ms)
+✔ ordinary context holds unqualified pointers; counterpart obligations must be direct and source pointers require streamed proof (3.715625ms)
+✔ legacy retained-handover locators bring their complete originals into new qualification and enforce independence (4.821542ms)
+✔ native journal appends retain exact negative returns with linear storage and no full-state read (346.423625ms)
+ℹ [{"calls":1,"bytes":14548},{"calls":10,"bytes":129825},{"calls":100,"bytes":1283042}]
+✔ cached frozen handover reads revalidate exact source, counterpart, plan, review and native proof dependencies (9.391334ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 24
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2308.622

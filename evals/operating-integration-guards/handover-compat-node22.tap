@@ -1,0 +1,32 @@
+TAP version 13
+# (node:31702) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: same-owner pause/resume stays proportionate; fresh and cross-host replacements require reconstruction
+ok 1 - same-owner pause/resume stays proportionate; fresh and cross-host replacements require reconstruction
+  ---
+  duration_ms: 195.710458
+  ...
+# Subtest: exact independent QA allows preparation resume, preserves records/notices and durable acceptance
+ok 2 - exact independent QA allows preparation resume, preserves records/notices and durable acceptance
+  ---
+  duration_ms: 316.184333
+  ...
+# Subtest: incomplete, non-independent, wrong-hash and blocked review cannot resume
+ok 3 - incomplete, non-independent, wrong-hash and blocked review cannot resume
+  ---
+  duration_ms: 475.420041
+  ...
+# Subtest: state changes invalidate acceptance; hook delivery does not; failed review remains and revised reconstruction needs new review
+ok 4 - state changes invalidate acceptance; hook delivery does not; failed review remains and revised reconstruction needs new review
+  ---
+  duration_ms: 538.961917
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 4
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1609.235041

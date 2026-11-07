@@ -1,0 +1,13 @@
+(node:10846) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ FICTIONAL phase delivery preserves all boundary meaning as disjoint raw partitions grow (51139.620583ms)
+ℹ {"fictional_only":true,"peers":0,"local_interface_bytes":108743,"final_bytes":138360,"local_raw_bytes":21641,"all_extraction_bytes":17561,"local_pages":4,"final_pages":5,"semantic_acceptance":false,"native_fit":"unproven"}
+ℹ {"fictional_only":true,"peers":2,"local_interface_bytes":137768,"final_bytes":198051,"local_raw_bytes":21649,"all_extraction_bytes":44675,"local_pages":5,"final_pages":7,"semantic_acceptance":false,"native_fit":"unproven"}
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 51225.114458

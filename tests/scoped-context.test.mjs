@@ -13,6 +13,7 @@ import {executionTiming} from '../plugins/soloco/runtime/timeout.mjs';
 import {reviewedContext,currentRecords} from '../plugins/soloco/runtime/current-state.mjs';
 import {assignmentContext} from '../plugins/soloco/runtime/context.mjs';
 import * as scoped from '../plugins/soloco/runtime/scoped-context.mjs';
+import {buildScopedStream,validateScopedStreamDelivery} from '../plugins/soloco/runtime/scoped-stream.mjs';
 const protocol=scoped.SCOPED_PROTOCOL,sha=v=>digest(JSON.stringify(v)),bytes=v=>Buffer.byteLength(typeof v==='string'?v:JSON.stringify(v));
 const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-scoped-contract-'));
 process.env.COMPANY_PLUGIN_DATA=path.join(tmp,'cache');
@@ -21,12 +22,12 @@ const mutate=(f,fn)=>withStore(f.root,db=>db.transaction('contract.fixture',s=>{
 const read=f=>withStore(f.root,db=>db.read());
 const call=(f,args)=>engine.contextControl({...f,...args},'codex');
 const token=(domain,n,status='OPEN')=>`OBL~${domain}~${String(n).padStart(3,'0')}~CUSTOMER_${n}_NO_EXPORT_ABOVE_${17*n+3}_ROWS_UNTIL_CONSENT_${n%7}_IN_REGION_${n%11}~${status}~END`;
-function fixture({count=1,domains=1,extra={},maintenance=false,kind='artifact',homeKind='artifact'}={}){
+function fixture({count=1,domains=1,extra={},maintenance=false,kind='artifact',homeKind='artifact',operating=false}={}){
   const root=fs.mkdtempSync(path.join(tmp,'company-')),session_id=id('owner'),f={root,session_id,epoch:1,source_instruction:'Explicit fixture instruction: qualify exact source read-only, preserve all failed evidence and OPEN uncertainty.'};
   engine.bind(root,session_id,'codex');engine.open({...f,idea:'Source-only contract fixture'},'codex');withStore(root,db=>db.migrate());
   const clauses=Array.from({length:count},(_,n)=>token('D'+String(Math.min(domains-1,Math.floor(n*domains/count))).padStart(2,'0'),n));
   mutate(f,s=>{s.roles={qa:{name:'Independent QA'},engineer:{name:'Engineer'}};s.governance='Preparation only. No execution or renewed allowance.';s.cos_instructions='Preserve uncertain effects and exhausted allowances.';s.records.old={id:'old',kind,revision:1,author_instance:'historical-producer',content:'Historical evidence grants no current permission.',clauses,...extra};if(maintenance)s.paused=true;s.team_sha256=teamHash(s);});
-  for(let d=0;d<domains;d++){const domain='D'+String(d).padStart(2,'0');engine.save({...f,id:'home-'+domain,kind:homeKind,content:clauses.filter((_,n)=>Math.min(domains-1,Math.floor(n*domains/count))===d).join('\n')||'No additional obligation.',context_obligations:{version:1,scope:domain}},'codex');}
+  for(let d=0;d<domains;d++){const domain='D'+String(d).padStart(2,'0');engine.save({...f,id:'home-'+domain,kind:homeKind,content:clauses.filter((_,n)=>Math.min(domains-1,Math.floor(n*domains/count))===d).join('\n')||'No additional obligation.',context_obligations:{version:1,scope:domain},...(operating?{operating_record:{version:1,kind:'obligation',scope:domain,owner:'runner',conditions:'Always',exceptions:'None',clearing:'Independent review',expires_at:null,dependencies:[],authority_refs:[],evidence_refs:['home-'+domain]}}:{})},'codex');}
   const p=call(f,{action:'plan',protocol,source_id:'old',maintenance});f.plan_id=p.id;f.original=p.original;f.units=p.units;f.all_units=call(f,{action:'inspect',plan_id:p.id,limit:16});f.extraction_identity=p.extraction_identity;f.clauses=clauses;return f;
 }
 function unitPages(f){const units=[];let offset=0;do{const page=call(f,{action:'inspect',plan_id:f.plan_id,offset,limit:16});units.push(...page.units);offset=page.next_offset;}while(offset!==null);return units;}
@@ -58,15 +59,23 @@ function contractReview(p){
   }else {r.summary='CONTRACT DOUBLE: every domain retains its exact distinct conditions and OPEN state; all declared interfaces independently checked. No execution permission.';r.domain_review_ids=sh.domain_review_ids;r.interface_review_ids=sh.interface_review_ids;r.unreviewed_interfaces=[];}
   return envelope(r);
 }
-async function run(f,args,{review=contractReview,native,modelHook}={}){
+async function run(f,args,{review=contractReview,native,modelHook,streamHook,omitTiming=false}={}){
   const t=call(f,{action:'target',...args,plan_id:args.plan_id??f.plan_id});if(t.reused)return t;
   const queued=engine.dispatch({...f,role:'qa',review_of:t.id,task:'Independent scoped contract review.'},'codex',{check:()=>({available:true,authenticated:true,version:'contract-double'}),launch:()=>({on(){},unref(){}})});
+  const streamParts=[],streamRequests=[];
   await work(f.root,queued.id,async(host,session,prompt,dir,timeout,selection,options)=>{
-    options.onSpawn(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));
-    const packet=JSON.parse(prompt);if(modelHook)await modelHook(packet);
+    const start=Date.now();if(!omitTiming)options.onSpawn(executionTiming(start,{timeout_ms:Math.min(timeout,options.executionDeadlineAt?options.executionDeadlineAt-start:timeout),timeout_reason:options.timeoutReason}));
+    let packet=JSON.parse(prompt);
+    if(packet.protocol==='scoped-stream-v1'){
+      streamRequests.push(prompt);streamParts.push(packet.text);
+      if(streamHook){const override=await streamHook(packet,{session,options,queued});if(override)return override;}
+      if(!packet.final)return {native_id:native??'contract-native-'+queued.id,text:JSON.stringify({scoped_stream_ack:{body_sha256:packet.body_sha256,sequence:packet.sequence,range_sha256:packet.range_sha256}})};
+      packet=JSON.parse(streamParts.join(''));
+    }
+    if(modelHook)await modelHook(packet);
     return {native_id:native??'contract-native-'+queued.id,text:JSON.stringify(review(packet))};
   });
-  const s=read(f),j=s.jobs[queued.id];return {target:t,job:j,review:s.records[j.artifact_id],packet:j.qualification_delivery&&JSON.parse(j.qualification_delivery.wire)};
+  const s=read(f),j=s.jobs[queued.id];return {target:t,job:j,review:s.records[j.artifact_id],streamRequests,packet:streamRequests.length?(j.status==='completed'?JSON.parse(streamParts.join('')):null):j.qualification_delivery&&JSON.parse(j.qualification_delivery.wire)};
 }
 async function extraction(f){const results=[];for(const unit_id of f.extraction_unit_ids??unitPages(f).map(u=>u.id)){const v=await run(f,{phase:'extract',unit_id});assert.equal(v.job.status,'completed',v.job.error);results.push(v);}return results;}
 async function qualify(f){
@@ -521,4 +530,262 @@ test('an explicit supporting context set above the original input ceiling holds 
   const f=fixture({count:500}),units=unitPages(f),t=call(f,{action:'target',phase:'extract',unit_id:units[0].id,context_unit_ids:units.slice(1).map(u=>u.id)}),before=Object.keys(read(f).jobs).length;
   assert.throws(()=>engine.dispatch({...f,role:'qa',review_of:t.id,task:'Oversized explicit context must hold.'},'codex',{check:()=>({available:true,authenticated:true}),launch:()=>{assert.fail('Must not launch');}}),e=>e instanceof scoped.ScopedHold&&e.held.limit_bytes===48000);
   assert.equal(Object.keys(read(f).jobs).length,before);assert.equal(read(f).context_classifications?.old,undefined);
+});
+
+test('recovery regression: oversized compulsory global holds legacy scoped assignment without dispatch or evidence mutation',async()=>{
+  const f=fixture(),es=await extraction(f);
+  mutate(f,s=>{s.cos_instructions+=' Fictional compulsory global: '+('保持 OPEN 🧪 "quoted" \\ boundary\n'.repeat(4000));s.team_sha256=teamHash(s);});
+  const t=call(f,{action:'target',plan_id:f.plan_id,phase:'applicability',extraction_review_ids:es.map(e=>e.review.id),counterpart_ids:['home-D00'],context_scope:'D00'});
+  const s=read(f),before=JSON.stringify(s),j={id:'never-dispatched',role:'qa',instance_id:'fresh-contract',epoch:f.epoch,review_of:{id:t.id,revision:1},inputs:[]};
+  assert.throws(()=>scoped.scopedAssignment(s,j),error=>error instanceof scoped.ScopedHold&&error.held.boundary==='bounded applicability'&&error.held.actual_bytes>48000);
+  assert.equal(JSON.stringify(read(f)),before);
+  assert.ok(es.every(e=>read(f).jobs[e.job.id].status==='completed'));
+});
+
+const streaming=scoped.SCOPED_STREAM;
+function largeGlobal(f){mutate(f,s=>{s.cos_instructions+=' Fictional compulsory global: '+('保持 OPEN 🧪 "quoted" \\ boundary\n'.repeat(4000));s.team_sha256=teamHash(s);s.records.rule={id:'rule',kind:'decision',revision:1,content:'Fictional global rule: no retry or execution. '+('规则 🧪 "\\\n'.repeat(2500))};});}
+const domainArgs=es=>({phase:'applicability',delivery_protocol:streaming,extraction_review_ids:es.map(e=>e.review.id),counterpart_ids:['home-D00'],context_scope:'D00'});
+
+test('recovery stream CONTRACT DOUBLE: complete bounded UTF8 delivery, full integration closure and immutable extraction reuse',async t=>{
+  const f=fixture(),es=await extraction(f);largeGlobal(f);
+  const d=await run(f,domainArgs(es));assert.equal(d.job.status,'completed',d.job.error);assert.equal(d.review.review.verdict,'Pass');
+  const i=await run(f,{phase:'integration',delivery_protocol:streaming,domain_review_ids:[d.review.id],counterpart_ids:['home-D00']});assert.equal(i.job.status,'completed',i.job.error);
+  assert.equal(i.packet.homes[0].value.content,read(f).records['home-D00'].content);
+  assert.ok(i.packet.reference_evidence.some(r=>r.review.id===d.review.id&&r.value.qualification_output===d.review.qualification_output));
+  assert.ok(es.every(e=>i.packet.reference_evidence.some(r=>r.review.id===e.review.id&&sha(r.value.reviewed_unit_bundle)===sha(e.review.reviewed_unit_bundle))));
+  assert.equal(i.packet.global_rules.governing.find(r=>r.source.id==='rule').value.content,read(f).records.rule.content);
+  for(const v of [d,i]){
+    assert.ok(v.streamRequests.length>2);assert.ok(v.streamRequests.every(r=>bytes(r)<=48000));assert.ok(bytes(v.review.qualification_output)<=12000);
+    assert.equal(v.job.qualification_delivery.complete,true);assert.equal(v.review.qualification_proof.protocol,streaming);
+    const s=read(f),a=scoped.scopedAssignment(s,v.job);assert.equal(a.stream.manifest.body_sha256,digest(JSON.stringify(v.packet)));
+    assert.equal(validateScopedStreamDelivery(a,v.job,v.job.native_id,v.job.qualification_delivery,{completed:true}),true);
+  }
+  assert.equal(call(f,{action:'apply',integration_review_id:i.review.id}).applied,true);
+  assert.equal(call(f,{action:'target',phase:'extract',plan_id:f.plan_id,unit_id:es[0].target.target.unit_id}).job_id,es[0].job.id);
+  t.diagnostic(JSON.stringify({contract_double:true,domain_requests:d.streamRequests.length,integration_requests:i.streamRequests.length,max_request_utf8_bytes:Math.max(...[...d.streamRequests,...i.streamRequests].map(bytes)),integration_body_utf8_bytes:bytes(i.packet)}));
+});
+
+test('recovery stream rejects missing/reordered/substituted ranges, corrupt bodies, wrong native and unconfirmed closure',async()=>{
+  const f=fixture(),es=await extraction(f);largeGlobal(f);
+  const d=await run(f,domainArgs(es));assert.equal(d.job.status,'completed',d.job.error);
+  const i=await run(f,{phase:'integration',delivery_protocol:streaming,domain_review_ids:[d.review.id],counterpart_ids:['home-D00']});assert.equal(i.job.status,'completed',i.job.error);
+  const s=read(f),a=scoped.scopedAssignment(s,d.job),original=d.job.qualification_delivery;
+  assert.equal(scoped.validateScopedApply(s,{integration_review_id:i.review.id}).integration.id,i.review.id);
+  for(const [label,change] of [
+    ['missing range',v=>v.ranges.splice(1,1)],
+    ['out of order',v=>v.ranges.reverse()],
+    ['substituted text hash',v=>v.ranges[0].range_sha256='0'.repeat(64)],
+    ['substituted request',v=>v.ranges[0].request_sha256='0'.repeat(64)],
+    ['wrong frozen body',v=>v.body_sha256='0'.repeat(64)],
+    ['wrong target',v=>v.target.sha256='0'.repeat(64)],
+    ['wrong native',v=>v.ranges[1].native_id='another-native'],
+    ['closure absent',v=>delete v.ranges[1].termination_confirmed],
+    ['late closure',v=>v.ranges[1].closed_at=v.ranges[1].execution_deadline_at],
+    ['false incomplete',v=>v.complete=false]
+  ]){const v=structuredClone(original);change(v);assert.throws(()=>validateScopedStreamDelivery(a,d.job,d.job.native_id,v,{completed:true}),/hold/i,label);}
+  assert.throws(()=>validateScopedStreamDelivery(a,d.job,'substitute-native',original),/hold/i);
+  const corrupt=inheritSnapshots(s,structuredClone(s));corrupt.records[d.target.id].scoped_context_target.global_snapshot.immutable_snapshot.sha256='0'.repeat(64);
+  assert.throws(()=>scoped.scopedAssignment(corrupt,corrupt.jobs[d.job.id]),/missing|corrupt|hash mismatch/i);
+  const missing=inheritSnapshots(s,structuredClone(s));missing.jobs[d.job.id].qualification_delivery.ranges.splice(1,1);
+  assert.throws(()=>scoped.validateScopedApply(missing,{integration_review_id:i.review.id}),/incomplete or changed frozen delivery/i);
+});
+
+test('recovery stream canonical current freshness: notices, authority, outcomes, governing and home mutation hold; extraction reused',async()=>{
+  const f=fixture(),es=await extraction(f);largeGlobal(f);
+  const d=await run(f,domainArgs(es)),i=await run(f,{phase:'integration',delivery_protocol:streaming,domain_review_ids:[d.review.id],counterpart_ids:['home-D00']});assert.equal(i.job.status,'completed',i.job.error);
+  const original=read(f);
+  for(const [label,change] of [
+    ['notice',s=>s.notices.push({id:'new-notice',kind:'must_know',summary:'Fictional negative current notice: no retry.'})],
+    ['authority',s=>s.owner.authority='Fictional authority withdrawn'],
+    ['unknown outcome',s=>s.jobs.unknown={id:'unknown',status:'failed',error:'Fictional unconfirmed execution; hold'}],
+    ['changed governing',s=>s.records.rule.content+=' Additional no-retry condition.'],
+    ['deleted governing',s=>delete s.records.rule],
+    ['changed home',s=>s.records['home-D00'].content+=' Changed scope must hold.'],
+    ['closure',s=>s.jobs[i.job.id].coordination_release.termination_confirmed=false],
+    ['native',s=>s.jobs[i.job.id].native_id='substituted-native'],
+    ['delivery missing',s=>s.jobs[i.job.id].qualification_delivery.ranges.pop()]
+  ]){
+    const s=inheritSnapshots(original,structuredClone(original));change(s);
+    assert.throws(()=>scoped.validateScopedApply(s,{integration_review_id:i.review.id}),/hold|changed|missing/i,label);
+    assert.equal(scoped.createScopedTarget(s,{plan_id:f.plan_id,phase:'extract',unit_id:es[0].target.target.unit_id}).review_id,es[0].review.id,label+' leaves immutable extraction reusable');
+  }
+  const s=inheritSnapshots(original,structuredClone(original)),j=s.jobs[i.job.id];j.qualification_delivery.protocol=protocol;
+  assert.throws(()=>scoped.validateScopedApply(s,{integration_review_id:i.review.id}),/hold/i,'legacy receipt cannot satisfy new delivery grammar');
+  assert.throws(()=>call(f,{action:'target',phase:'extract',plan_id:f.plan_id,unit_id:'u0',delivery_protocol:streaming}),/non-extraction/);
+  assert.throws(()=>call(f,{action:'target',...domainArgs(es),plan_id:f.plan_id,delivery_protocol:'unknown-stream-v2'}),/opt-in/);
+});
+
+test('recovery stream worker rejects premature Pass, wrong ack/order, changed native and mid-delivery current changes',async()=>{
+  for(const mode of ['premature','ack','native','notice','authority','outcome']){
+    const f=fixture(),es=await extraction(f);largeGlobal(f);
+    const d=await run(f,domainArgs(es),{streamHook:(p)=>{
+      if(mode==='premature'&&p.sequence===0)return {native_id:'contract-premature',text:JSON.stringify(envelope({verdict:'Pass',reason:'Unsupported early Pass',permitted_action:'continue'}))};
+      if(mode==='ack'&&p.sequence===0)return {native_id:'contract-bad-ack',text:JSON.stringify({scoped_stream_ack:{body_sha256:p.body_sha256,sequence:1,range_sha256:p.range_sha256}})};
+      if(mode==='native'&&p.sequence===1)return {native_id:'substituted-native',text:'{}'};
+      if(p.sequence===1&&['notice','authority','outcome'].includes(mode))mutate(f,s=>{
+        if(mode==='notice')s.notices.push({id:'late-notice',kind:'must_know',summary:'Fictional new negative current evidence'});
+        if(mode==='authority')s.owner.authority='Fictional authority withdrawn';
+        if(mode==='outcome')s.jobs.unknown={id:'unknown',status:'failed',error:'Fictional unknown execution'};
+      });
+    }});
+    assert.notEqual(d.job.status,'completed',mode);assert.equal(d.review,undefined,mode);
+    assert.ok(d.job.rejected_output||d.job.execution_failure,mode+' retains failure');
+    assert.ok(d.streamRequests.length<7,mode+' stops on hold');
+    assert.equal(call(f,{action:'target',phase:'extract',plan_id:f.plan_id,unit_id:es[0].target.target.unit_id}).review_id,es[0].review.id);
+  }
+});
+
+test('recovery stream CONTRACT DOUBLE: more than sixteen pages and oversized homes/dependencies reach same reviewer',async t=>{
+  const f=fixture(),es=await extraction(f);largeGlobal(f);
+  const homeTail=' Fictional home condition: 🧪 保持 OPEN "\\\n'.repeat(10000),dependency='Fictional dependency: no export or retry. '+('🧪 规则 "\\\n'.repeat(12000));
+  mutate(f,s=>{s.records['home-D00'].content+=homeTail;s.records.peer={id:'peer',kind:'artifact',revision:1,content:dependency};});
+  const d=await run(f,{...domainArgs(es),dependency_ids:['peer']});assert.equal(d.job.status,'completed',d.job.error);
+  assert.ok(d.streamRequests.length>16);assert.ok(d.streamRequests.every(r=>bytes(r)<=48000));
+  assert.equal(d.packet.homes[0].value.content,read(f).records['home-D00'].content);assert.equal(d.packet.dependencies[0].value.content,dependency);
+  assert.equal(new Set(d.job.qualification_delivery.ranges.map(r=>r.native_id)).size,1);
+  t.diagnostic(JSON.stringify({contract_double:true,requests:d.streamRequests.length,body_utf8_bytes:bytes(d.packet),max_request_utf8_bytes:Math.max(...d.streamRequests.map(bytes))}));
+});
+
+test('recovery stream preserves explicit unknown outcomes and rejects nonindependent native even after full transport',async()=>{
+  const f=fixture(),es=await extraction(f);largeGlobal(f);
+  const owned=await run(f,domainArgs(es),{native:es[0].job.native_id});assert.notEqual(owned.job.status,'completed');assert.match(owned.job.error,/independent|reused/);
+  assert.equal(call(f,{action:'target',phase:'extract',plan_id:f.plan_id,unit_id:es[0].target.target.unit_id}).review_id,es[0].review.id);
+  // Preserve prior failed attempt and its grant history; use a newly explicit target.
+  mutate(f,s=>{s.jobs.unknown={id:'unknown',status:'failed',error:'Fictional unknown outcome with no process closure'};});
+  const held=await run(f,domainArgs(es));assert.equal(held.job.status,'completed',held.job.error);assert.equal(held.review.review.verdict,'Blocked');
+  assert.ok(held.packet.global_rules.unknown_outcomes.some(j=>j.id==='unknown'));
+  assert.equal(read(f).jobs[owned.job.id].status,'failed');
+  assert.throws(()=>call(f,{action:'target',phase:'integration',plan_id:f.plan_id,delivery_protocol:streaming,domain_review_ids:[held.review.id],counterpart_ids:['home-D00']}),/negative receipt|global governing/);
+});
+
+
+test('recovery stream rejected observed identities never poison accepted extraction receipts',async()=>{
+  for(const mode of ['later-page','aborted-first','missing-timing']){
+    const f=fixture(),es=await extraction(f),prior=JSON.stringify(es[0].job);largeGlobal(f);
+    const d=await run(f,domainArgs(es),{omitTiming:mode==='missing-timing',streamHook:(p)=>{
+      if(mode==='aborted-first'&&p.sequence===0)mutate(f,s=>{s.owner.epoch++;});
+      if(p.sequence===(mode==='later-page'?1:0))return {native_id:es[0].job.native_id,text:'{}'};
+    }});
+    assert.notEqual(d.job.status,'completed',mode);
+    assert.equal(d.job.rejected_native_id,es[0].job.native_id,mode);
+    assert.notEqual(d.job.native_id,es[0].job.native_id,mode);
+    assert.equal(d.review,undefined,mode);
+    if(mode==='later-page'){assert.equal(d.streamRequests.length,2);assert.match(d.job.error,/changed native identity/);}
+    else {assert.equal(d.streamRequests.length,1);assert.match(d.job.error,mode==='aborted-first'?/no longer eligible/:/timing|closure/);}
+    assert.equal(JSON.stringify(read(f).jobs[es[0].job.id]),prior);
+    if(mode==='aborted-first')f.epoch++;
+    assert.equal(call(f,{action:'target',phase:'extract',unit_id:es[0].target.target.unit_id}).review_id,es[0].review.id);
+  }
+});
+
+test('forward native admission rejects earlier failed observations across single-packet and streamed jobs',async()=>{
+  for(const firstStream of [false,true])for(const nextStream of [false,true])for(const mode of ['missing-timing','aborted-first']){
+    const label=JSON.stringify({firstStream,nextStream,mode}),f=fixture(),es=await extraction(f),accepted=JSON.stringify(es[0].job);
+    const args=stream=>({...domainArgs(es),delivery_protocol:stream?streaming:undefined});
+    const abort=()=>{if(mode==='aborted-first')mutate(f,s=>{s.owner.epoch++;});};
+    const first=await run(f,args(firstStream),{native:'observed-N',omitTiming:mode==='missing-timing',modelHook:firstStream?undefined:abort,streamHook:firstStream?abort:undefined});
+    assert.equal(first.job.status,'failed',label);assert.equal(first.job.native_id,null,label);
+    assert.equal(first.job.rejected_native_id,'observed-N',label);assert.equal(first.review,undefined,label);
+    assert.deepEqual(first.job.rejected_native_ids,['observed-N'],label);assert.equal(first.job.qualification_delivery,undefined,label);
+    assert.equal(first.job.coordination_release.termination_confirmed,true,label);
+    if(mode==='aborted-first')f.epoch++;
+    const next=await run(f,args(nextStream),{native:'observed-N'});
+    assert.notEqual(next.job.id,first.job.id,label);assert.notEqual(next.target.id,first.target.id,label);
+    assert.equal(next.job.status,'failed',label);assert.match(next.job.error,/reused|observed|fresh/i,label);
+    assert.equal(next.job.native_id,null,label);assert.equal(next.review,undefined,label);
+    assert.deepEqual(next.job.rejected_native_ids,['observed-N'],label);assert.equal(next.job.qualification_delivery,undefined,label);
+    assert.equal(read(f).sessions[next.job.session_key].native_id,null,label);
+    const fresh=await run(f,args(nextStream),{native:'fresh-M'});
+    assert.equal(fresh.job.status,'completed',fresh.job.error);assert.equal(fresh.review.review.verdict,'Pass',label);
+    assert.equal(JSON.stringify(read(f).jobs[es[0].job.id]),accepted,label);
+    assert.equal(call(f,{action:'target',phase:'extract',unit_id:es[0].target.target.unit_id}).review_id,es[0].review.id,label);
+  }
+});
+
+test('single-packet rejected identities preserve older canonical extraction and never become bindings',async()=>{
+  for(const mode of ['missing-timing','aborted-first','nonindependent']){
+    const f=fixture(),es=await extraction(f),prior=JSON.stringify(es[0].job);
+    const failed=await run(f,{...domainArgs(es),delivery_protocol:undefined},{native:es[0].job.native_id,omitTiming:mode==='missing-timing',modelHook:()=>{if(mode==='aborted-first')mutate(f,s=>{s.owner.epoch++;});}});
+    assert.equal(failed.job.status,'failed',mode);assert.equal(failed.job.native_id,null,mode);
+    assert.equal(failed.job.rejected_native_id,es[0].job.native_id,mode);assert.equal(failed.review,undefined,mode);
+    assert.equal(read(f).sessions[failed.job.session_key].native_id,null,mode);
+    if(mode==='aborted-first')f.epoch++;
+    assert.equal(JSON.stringify(read(f).jobs[es[0].job.id]),prior,mode);
+    assert.equal(call(f,{action:'target',phase:'extract',unit_id:es[0].target.target.unit_id}).review_id,es[0].review.id,mode);
+  }
+});
+
+test('later changed stream identity is retained separately and barred from future admission in both protocols',async()=>{
+  for(const nextStream of [false,true]){
+    const f=fixture(),es=await extraction(f);
+    // Force multiple ranges while keeping subsequent single-packet assignments bounded.
+    mutate(f,s=>{s.records.peer={id:'peer',kind:'artifact',revision:1,content:'Fictional dependency: OPEN. '.repeat(2500)};});
+    const d=await run(f,{...domainArgs(es),dependency_ids:['peer']},{native:'bound-N',streamHook:p=>{
+      if(p.sequence===1)return {native_id:'changed-B',text:'{}'};
+    },modelHook:()=>assert.fail('Changed identity must stop before final semantic review')});
+    assert.equal(d.streamRequests.length,2);assert.equal(d.job.status,'failed',d.job.error);
+    assert.equal(d.job.native_id,'bound-N');assert.equal(d.job.rejected_native_id,'changed-B');
+    assert.deepEqual(d.job.rejected_native_ids,['changed-B']);assert.equal(d.review,undefined);
+    const args={...domainArgs(es),delivery_protocol:nextStream?streaming:undefined};
+    const rejected=await run(f,args,{native:'changed-B'});
+    assert.equal(rejected.job.status,'failed');assert.equal(rejected.job.native_id,null);assert.equal(rejected.review,undefined);
+    assert.match(rejected.job.error,/reused earlier rejected observation/);
+    const fresh=await run(f,args,{native:'fresh-M'});
+    assert.equal(fresh.job.status,'completed',fresh.job.error);assert.equal(fresh.review.review.verdict,'Pass');
+  }
+});
+
+test('recovery stream CONTRACT DOUBLE: nonempty independent interfaces deliver peer homes, dependencies and closure',async()=>{
+  const f=fixture({count:2,domains:2,extra:{qualifier:'DISTANT_QUALIFIER'}});
+  mutate(f,s=>{s.records['home-D00'].content+='\nDISTANT_QUALIFIER: D00 may not retry unless D01 permission remains OPEN.';s.records.peer={id:'peer',kind:'artifact',revision:1,content:'Peer dependency: OPEN never renews retry. '+('🧪 保持 \\"\n'.repeat(6000))};});
+  const es=await extraction(f);largeGlobal(f);
+  const ds=[];
+  for(const domain of ['D00','D01']){
+    const d=await run(f,{...domainArgs(es),context_scope:domain,counterpart_ids:['home-'+domain],dependency_ids:['peer'],item_keys:es.flatMap(e=>e.review.qualification_result.items.filter(i=>i.scope===domain).map(i=>e.review.id+'/'+i.id))});
+    assert.equal(d.job.status,'completed',d.job.error);ds.push(d);
+  }
+  const keys=ds.flatMap(d=>d.review.qualification_result.interfaces.map(i=>i.key));assert.ok(keys.length);
+  const incomplete=await run(f,{...domainArgs(es),context_scope:'*',counterpart_ids:['home-D00','home-D01'],interface_keys:keys});assert.equal(incomplete.job.status,'completed',incomplete.job.error);
+  await assert.rejects(run(f,{phase:'integration',delivery_protocol:streaming,domain_review_ids:ds.map(d=>d.review.id),interface_review_ids:[incomplete.review.id],counterpart_ids:['home-D00','home-D01'],dependency_ids:['peer']}),/interface omitted exact incident-domain home\/dependency/);
+  const ir=await run(f,{...domainArgs(es),context_scope:'*',counterpart_ids:['home-D00','home-D01'],dependency_ids:['peer'],interface_keys:keys});assert.equal(ir.job.status,'completed',ir.job.error);
+  const i=await run(f,{phase:'integration',delivery_protocol:streaming,domain_review_ids:ds.map(d=>d.review.id),interface_review_ids:[ir.review.id],counterpart_ids:['home-D00','home-D01'],dependency_ids:['peer']});assert.equal(i.job.status,'completed',i.job.error);
+  assert.equal(new Set([...es,...ds,ir,i].map(v=>v.job.native_id)).size,es.length+4);
+  for(const v of [ir,i]){
+    for(const home of ['home-D00','home-D01'])assert.equal(v.packet.homes.find(h=>h.source.id===home).value.content,read(f).records[home].content);
+    assert.equal(v.packet.dependencies[0].value.content,read(f).records.peer.content);
+    assert.ok(v.streamRequests.length>2);
+  }
+  assert.deepEqual(i.packet.interface_reviews[0].reviewed_interfaces,keys);
+  for(const v of [...es,...ds,ir])assert.ok(i.packet.reference_evidence.some(r=>r.review.id===v.review.id));
+  assert.equal(call(f,{action:'apply',integration_review_id:i.review.id}).applied,true);
+});
+
+test('stream ranges explicitly preserve surrogate boundaries, escaping and exact reconstruction',()=>{
+  for(const prefix of [0,1,2,3]){
+    const packet={target:{id:'surrogates'},text:'x'.repeat(prefix)+('🧪保持"\\\n'.repeat(15000))},stream=buildScopedStream(packet,{id:'plan'}),raw=JSON.stringify(packet);
+    assert.ok(stream.pages.length>2);
+    for(const page of stream.pages){
+      const frame=JSON.parse(page.wire);
+      for(const boundary of [page.offset,page.end])assert.equal(boundary>0&&boundary<raw.length&&/[\uD800-\uDBFF]/.test(raw[boundary-1])&&/[\uDC00-\uDFFF]/.test(raw[boundary]),false);
+      assert.equal(frame.text,raw.slice(page.offset,page.end));assert.ok(bytes(page.wire)<=48000);
+      assert.equal(/[\uD800-\uDBFF]$/.test(frame.text),false);assert.equal(/^[\uDC00-\uDFFF]/.test(frame.text),false);
+    }
+    assert.equal(stream.pages.map(p=>JSON.parse(p.wire).text).join(''),raw);
+  }
+});
+
+
+test('operating publication reuses existing exact scoped classification without poisoning its frozen global rules',async()=>{
+ const f=fixture({operating:true});await qualify(f);const before=read(f),classification=structuredClone(before.context_classifications.old);
+ const p=engine.contextControl({...f,protocol:'operating-state-v1',action:'plan'},'codex');assert.equal(p.held,false);
+ const q=engine.dispatch({...f,role:'qa',review_of:p.id,task:'Review exact prospective operating homes'},'codex',{check:()=>({available:true}),launch:()=>({on(){},unref(){}})});
+ await work(f.root,q.id,async(_h,_s,_prompt,_d,timeout,_selection,options)=>{options.onSpawn(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));return {native_id:'fictional-operating-independent',text:JSON.stringify({content:'CONTRACT DOUBLE: complete fictional home reviewed',messages:[],notices:[],review:{verdict:'Pass',reason:'Fictional complete conditions retained',permitted_action:'publish_operating_state',plan_sha256:sha(read(f).records[p.id].operating_plan),preservation_complete:true,interaction_complete:true,authority_checked:true,blockers:[]}})};});
+ const completed=read(f).jobs[q.id];assert.equal(completed.status,'completed',completed.error);
+ engine.contextControl({...f,protocol:'operating-state-v1',action:'apply',plan_id:p.id,review_id:completed.artifact_id},'codex');
+ const s=read(f);assert.deepEqual(s.context_classifications.old,classification);assert.equal(reviewedContext(s).excluded('old'),true);
+ const {operatingContext}=await import('../plugins/soloco/runtime/operating-state.mjs');assert.equal(operatingContext(s).homes.length,1);
+ for(const kind of ['tampered-index','unknown-index-field','unknown-state-field']){
+  const changed=inheritSnapshots(s,structuredClone(s));if(kind==='tampered-index')changed.operating_state.version=2;if(kind==='unknown-index-field')changed.operating_state.hidden='No retry';if(kind==='unknown-state-field')changed.hidden={rule:'No retry'};
+  assert.throws(()=>operatingContext(changed),/Held/);assert.deepEqual(changed.context_classifications.old,classification);
+ }
 });

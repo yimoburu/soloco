@@ -1,0 +1,61 @@
+(node:31173) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ actual store and worker admit concurrent disjoint roles and retain independent output lineage (833.000083ms)
+✔ format-3 supplemental failure keeps exclusive resources until that invocation closes (20.252ms)
+✔ format-3 dependency artifacts remain explicit inputs and coordination stays immutable (0.613208ms)
+(node:31174) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+ordinary archive growth [{"scale":1,"archive_characters":184433,"context_characters":1451,"mandatory_records":7},{"scale":10,"archive_characters":1833494,"context_characters":1451,"mandatory_records":7},{"scale":100,"archive_characters":18324464,"context_characters":1451,"mandatory_records":7}]
+✔ ordinary 1x/10x/100x archive growth preserves fixed current obligations and explicit evidence (338.324125ms)
+(node:31175) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ pure builder preserves hidden prohibitions, exceptions, spent/revoked grants, failure, unknowns and attribution (13.142291ms)
+✔ repeated checkpoints, previous versions and retained handover remain reconstructible without original vault (64.006417ms)
+✔ canonical JSON text codec preserves STRING type, Unicode, ordered keys and array positions byte exactly (5.308833ms)
+✔ producer/revision/date/scope/parent mutations and archive appends invalidate complete baseline (44.262541ms)
+✔ missing/corrupt references, cycles, omissions, altered typed keys and resealed frontier holes hold (41.170375ms)
+✔ same body has distinct occurrences across producer/revision/scope/date and parent contexts (1.389125ms)
+✔ overcapacity holds whole uncertain coupling and never implies global fit (25.069667ms)
+✔ capture uses existing SQLite transaction/vault; rollback does not publish capsule (51.79175ms)
+✔ forced digest collision never merges unequal exact definitions (91.897584ms)
+✔ ambiguous current/history source IDs and missing embedded raw originals hold (4.357167ms)
+(node:31176) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning (765.416792ms)
+✔ missing legacy bootstrap is visibly DIRTY and apply rolls back without acceptance (21.592208ms)
+✔ new membership, changed exact source, wrong independent identity and absent closure cannot publish (102.694375ms)
+✔ scope closure, global membership, expiry, receipt changes, revocation and missed communication hold (31.580625ms)
+✔ pause fences publication reviewer and prospective handover cannot hide unknown legacy (10.270459ms)
+✔ 10x independently classified inert archive keeps actual mandatory operating assignment bytes and semantic work constant (61.834208ms)
+✔ deleted applicable home and changed exact provenance cannot disappear from accepted meaning (21.984042ms)
+✔ typed outcome requires complete historical uncertainty; text cannot manufacture permission (16.145375ms)
+✔ public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure (46.699041ms)
+✔ late new and changed falsely scoped prohibitions stay globally DIRTY, but fresh proposals include them (54.074708ms)
+✔ publication proof stays current; failed, quarantined, uncertain and unknown-extension siblings stay DIRTY (15.02025ms)
+✔ mechanical publication index rejects tampering and retains unknown state extensions (14.165125ms)
+✔ format6 explicit non-home evidence survives dispatch, discovery and bounded same-native reads (147.870084ms)
+(node:31177) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ unclassified legacy obligations stay mandatory; exact reviewed dispositions bound ordinary context (2.63425ms)
+✔ resolved archive growth does not grow task pack; raw originals remain retrievable by exact hash (6.616667ms)
+✔ presentation-only rename detection rejects unknown effects and producers (0.297417ms)
+✔ explicit normalized migration backs up, round-trips unknown values and fences legacy writes (21.928458ms)
+✔ immutable corruption is detected and transactions rollback without dropping archive (7.749375ms)
+✔ current-state upgrade projection bounds reviewed record/history growth and preserves exact retrieval (250.787625ms)
+✔ current-state projection never conceals unknown or orphan classification metadata (2.120292ms)
+✔ archived job entries retain their exact typed classification provenance (1.150375ms)
+✔ portable backup inventories project configuration/candidates and explicit artifacts; tampering holds restore (98.374708ms)
+✔ durable supplemental dependencies invalidate returned work after source mutation (0.320208ms)
+✔ public exact-plan classification applies only after independent review and retains originals (658.043417ms)
+✔ classification rejects coordinator-native review and retained same-plan negative verdict (34.30725ms)
+✔ public migration holds unfinished cancelled workers and requires explicit paused authority (7.548791ms)
+✔ targeted root deletion persists and absent immutable values never silently disappear (6.205458ms)
+✔ transfers reject self-copy through company or selected artifact ancestors before creating output (1.536083ms)
+ℹ tests 42
+ℹ suites 0
+ℹ pass 42
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1488.1935

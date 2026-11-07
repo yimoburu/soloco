@@ -1,0 +1,19 @@
+Working directory: /private/tmp/soloco-operating-checkpoint-20261106/source
+All commands below ran directly, with explicitly scripted fictional native adapters only.
+
+/opt/homebrew/bin/node --test tests/operating-control.test.mjs > evals/operating-checkpoint-lifecycle/rawlogs/node25-control-first.log 2>&1
+/opt/homebrew/bin/node --test tests/operating-state.test.mjs tests/operating-checkpoint.test.mjs tests/storage-intake.test.mjs tests/storage-layout-repairs.test.mjs tests/storage-transfer-integrity.test.mjs > evals/operating-checkpoint-lifecycle/rawlogs/node25-targeted-first.log 2>&1
+/opt/homebrew/bin/node --test tests/operating-control.test.mjs > evals/operating-checkpoint-lifecycle/rawlogs/node25-control-second.log 2>&1
+/opt/homebrew/bin/node --test tests/operating-control.test.mjs tests/operating-checkpoint.test.mjs tests/operating-tree-publication.test.mjs tests/storage-intake.test.mjs tests/storage-layout-repairs.test.mjs tests/storage-transfer-integrity.test.mjs > evals/operating-checkpoint-lifecycle/rawlogs/node25-core-third.log 2>&1
+/opt/homebrew/bin/node --test tests/operating-state.test.mjs > evals/operating-checkpoint-lifecycle/rawlogs/node25-state-second.log 2>&1
+/opt/homebrew/bin/node --test tests/operating-control.test.mjs > evals/operating-checkpoint-lifecycle/rawlogs/node25-control-fourth.log 2>&1
+/private/tmp/soloco-node22-validation/node-v22.13.0-darwin-arm64/bin/node --test tests/operating-state.test.mjs tests/operating-control.test.mjs tests/operating-tree-publication.test.mjs tests/operating-checkpoint.test.mjs tests/storage-intake.test.mjs tests/storage-layout-repairs.test.mjs tests/storage-transfer-integrity.test.mjs > evals/operating-checkpoint-lifecycle/rawlogs/node22-targeted-fourth.log 2>&1
+/opt/homebrew/bin/node --test tests/operating-state.test.mjs tests/operating-control.test.mjs tests/operating-tree-publication.test.mjs tests/operating-checkpoint.test.mjs tests/storage-intake.test.mjs tests/storage-layout-repairs.test.mjs tests/storage-transfer-integrity.test.mjs > evals/operating-checkpoint-lifecycle/rawlogs/node25-targeted-final.log 2>&1
+/opt/homebrew/bin/node --test tests/operating-state.test.mjs tests/operating-control.test.mjs tests/operating-tree-publication.test.mjs tests/operating-checkpoint.test.mjs tests/storage-intake.test.mjs tests/storage-layout-repairs.test.mjs tests/storage-transfer-integrity.test.mjs > evals/operating-checkpoint-lifecycle/rawlogs/node25-targeted-final2.log 2>&1
+/private/tmp/soloco-node22-validation/node-v22.13.0-darwin-arm64/bin/node --test tests/operating-state.test.mjs tests/operating-control.test.mjs tests/operating-tree-publication.test.mjs tests/operating-checkpoint.test.mjs tests/storage-intake.test.mjs tests/storage-layout-repairs.test.mjs tests/storage-transfer-integrity.test.mjs > evals/operating-checkpoint-lifecycle/rawlogs/node22-targeted-final2.log 2>&1
+/private/tmp/soloco-node22-validation/node-v22.13.0-darwin-arm64/bin/node --test tests/operating-control.test.mjs > evals/operating-checkpoint-lifecycle/rawlogs/node22-final-admission.log 2>&1
+/private/tmp/soloco-node22-validation/node-v22.13.0-darwin-arm64/bin/node --test tests/operating-control.test.mjs tests/operating-checkpoint.test.mjs tests/operating-tree-publication.test.mjs > evals/operating-checkpoint-lifecycle/rawlogs/node22-final-producer.log 2>&1
+/opt/homebrew/bin/node --test tests/operating-control.test.mjs > evals/operating-checkpoint-lifecycle/rawlogs/node25-final-admission.log 2>&1
+/opt/homebrew/bin/node --test tests/operating-control.test.mjs tests/operating-checkpoint.test.mjs tests/operating-tree-publication.test.mjs > evals/operating-checkpoint-lifecycle/rawlogs/node25-final-producer.log 2>&1
+
+git diff --check

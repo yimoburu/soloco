@@ -1,0 +1,55 @@
+{
+  "verdict": "Fail",
+  "frozen_commit": "361241feba5fb6117c3bd75fedc19c1e2885df47",
+  "frozen_tree": "f2950ecf0853b9d7013c81e0bb9ec341a9bb2210",
+  "findings": [
+    {
+      "file": "plugins/soloco/runtime/scoped-context.mjs",
+      "line": 462,
+      "priority": "P1",
+      "trigger": "A coherent-corpus-body-v1 plan selects ['old'], while its complete frozen baseline also contains an unselected upgrade checkpoint with historical rejected contributor N and no equal live job. N reviews the intrinsic batch containing that historical contribution.",
+      "consequence": "independent() adds canonical roots only for selected_sources. canonicalEvidenceNodes treats the separately supplied complete corpus-state root as 'other', so its nested upgrade/job collections do not establish historical containment. The archived rejected identity remains absent from the banned set and live admission scan, permitting self-review of that batch."
+    }
+  ],
+  "prior_finding_dispositions": [
+    {
+      "finding": "Scoped historical rejected-contributor independence",
+      "status": "Partially repaired",
+      "assessment": "Selected source closures now reject provenance-bound historical contributors, including absent or differing live jobs. The full-corpus unselected-evidence case above remains uncovered."
+    },
+    {
+      "finding": "Operating-publication early rejected-negative loss",
+      "status": "Repaired at source level",
+      "assessment": "Inline and streamed operating reviews retain raw returns independently of artifact parsing, extract negative metadata before clipping, and retain oversized originals through the existing normalized vault. Legacy failure writes do not implicitly migrate storage."
+    },
+    {
+      "finding": "Historical producer closure resolved against current jobs",
+      "status": "Repaired at source level",
+      "assessment": "Canonical traversal carries frozen version maps. Publication validates historical producers within those maps and retains historical envelopes separately from current references."
+    },
+    {
+      "finding": "Missing Codex MCP configuration",
+      "status": "Closed for supplied source",
+      "assessment": "The complete .mcp.codex.json is supplied and its declared version agrees with the retained plugin metadata."
+    }
+  ],
+  "required_changes": [
+    "Include contributors from every assessed corpus input using the verified complete frozen census and canonical containment, including unselected sources; preserve the distinction from incidental application metadata.",
+    "Add a corpus regression selecting an unrelated source while an unselected checkpoint contains N's rejected contribution. Reject N for the batch containing that contribution with both absent and differing live jobs.",
+    "Freeze the repair and obtain another exact-source review."
+  ],
+  "source_acceptance_scope": {
+    "acceptance": "No whole-pin source acceptance while the scoped independence gap remains.",
+    "method": "Conceptually applied every supplied patch to the retained complete source and reviewed the supplied new files. I have not executed tests or used tools, commands, network, company data, writes or subagents.",
+    "dependencies": "No additional required implementation dependency was identified as missing.",
+    "archive": "The shared-reference traversal repair retains per-wrapper validation while deduplicating original traversal. This does not establish actual-corpus performance or native capacity.",
+    "authority": "Source review grants no live qualification, publication, migration, adoption or resume authority. Public assets do not establish actual company pins or live SPEC v0.18 preservation.",
+    "excluded_future_work": "The prospective corpus delivery/metadata repair is outside this pin and this review."
+  },
+  "remaining_live_checks": [
+    "Executed mechanical regressions for the final repaired pin and affected legacy contracts; supplied test source is not execution evidence from this reviewer.",
+    "Actual-corpus reconstruction, exact archive retrieval, complete delivery framing, cumulative native fit and interface fan-out.",
+    "Independent native semantic bootstrap/publication, exact handover acceptance, guarded resume, first ordinary return and successor delta acceptance.",
+    "Separate exact verification of live SPEC v0.18 preservation and post-adoption operating freshness."
+  ]
+}

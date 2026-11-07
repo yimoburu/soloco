@@ -1,0 +1,34 @@
+✔ early empty body Blocked (1688.044834ms)
+✔ oversized body with negative tail (1019.781458ms)
+✔ fenced original with late negative (1022.289083ms)
+✔ invalid JSON remains unknown (1083.541542ms)
+✔ oversized invalid raw remains retrievable (956.863125ms)
+✔ empty body Pass cannot become approval (909.491083ms)
+✔ cancelled late negative is retained without acceptance (659.081833ms)
+✔ wrong-native late negative is retained without acceptance (913.534333ms)
+✔ legacy qualification evidence retains negative verdict and full raw original (157.884334ms)
+✔ legacy JSON qualification failure retains its previous lifecycle without implicit migration (72.718541ms)
+✔ complete oversized negative reason survives independently of the clipped preview (859.101833ms)
+✔ small inline operating review also retains an early negative (336.455583ms)
+✔ public represented v2 schema is strict and legacy/default protocols remain unchanged (689.28975ms)
+✔ public plan, real worker complete format4 reads and public apply retain canonical current qualification and exact homes (2223.851041ms)
+✔ real worker rejects incomplete semantic delivery and coordinator native identity (112.323708ms)
+✔ pending paused handover permits only explicitly scoped owner-bound represented preservation QA (267.539875ms)
+✔ represented maintenance is fenced by subsequent pause, revocation, changed source and owner transfer (377.132375ms)
+✔ public represented source includes canonical runtime test author_instance and exact producer homes (105.06725ms)
+✔ receipt-only public v2 delivers canonical producers without classifying support; mutations hold (140.380542ms)
+✔ receipt-only public v2 rejects generator and deterministic reuse producer native identities (332.02825ms)
+✔ receipt-only public v2 freezes deterministic reuse origin and QA support (135.348542ms)
+✔ receipt-only public v2 holds missing or ambiguous canonical producer evidence (47.934375ms)
+✔ rejected negative is compulsory counterevidence and later Pass cannot clear it (116.251917ms)
+✔ later retained rejected negative revokes existing v2 exclusion (133.384041ms)
+✔ format4 negative rejected before artifact assignment remains delivered and cannot be cleared (459.887208ms)
+✔ early parse rejected negative revokes an existing represented proof (114.0255ms)
+ℹ tests 26
+ℹ suites 0
+ℹ pass 26
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9801.141708

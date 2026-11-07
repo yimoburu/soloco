@@ -1,0 +1,45 @@
+TAP version 13
+# (node:29064) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: operating publication reuses existing exact scoped classification without poisoning its frozen global rules
+not ok 1 - operating publication reuses existing exact scoped classification without poisoning its frozen global rules
+  ---
+  duration_ms: 757.198208
+  location: '/private/tmp/soloco-operating-integration-guards-20261106/source/tests/scoped-context.test.mjs:778:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /Held/. Input:
+    
+    'Error: Immutable snapshot missing or corrupt: cc68510e56f13648c2168ff065593e36dc759ac07d13d970dca76dda558fa67f'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual:
+  error: 'Immutable snapshot missing or corrupt: cc68510e56f13648c2168ff065593e36dc759ac07d13d970dca76dda558fa67f'
+  stack: |-
+    snapshotBytes (file:///private/tmp/soloco-operating-integration-guards-20261106/source/plugins/soloco/runtime/snapshot.mjs:64:92)
+    resolveSnapshot (file:///private/tmp/soloco-operating-integration-guards-20261106/source/plugins/soloco/runtime/snapshot.mjs:68:87)
+    plan (file:///private/tmp/soloco-operating-integration-guards-20261106/source/plugins/soloco/runtime/scoped-context.mjs:148:29)
+    targetInfo (file:///private/tmp/soloco-operating-integration-guards-20261106/source/plugins/soloco/runtime/scoped-context.mjs:166:491)
+    canonical (file:///private/tmp/soloco-operating-integration-guards-20261106/source/plugins/soloco/runtime/scoped-context.mjs:308:103)
+    file:///private/tmp/soloco-operating-integration-guards-20261106/source/plugins/soloco/runtime/scoped-context.mjs:341:15
+    evaluate (file:///private/tmp/soloco-operating-integration-guards-20261106/source/plugins/soloco/runtime/scoped-context.mjs:181:129)
+    validateScopedApply (file:///private/tmp/soloco-operating-integration-guards-20261106/source/plugins/soloco/runtime/scoped-context.mjs:340:90)
+    validateScopedExclusion (file:///private/tmp/soloco-operating-integration-guards-20261106/source/plugins/soloco/runtime/scoped-context.mjs:361:17)
+    classificationFor (file:///private/tmp/soloco-operating-integration-guards-20261106/source/plugins/soloco/runtime/current-state.mjs:64:5)
+  operator: 'throws'
+  stack: |-
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-integration-guards-20261106/source/tests/scoped-context.test.mjs:789:10)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 831.543208

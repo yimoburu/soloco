@@ -1,0 +1,81 @@
+TAP version 13
+# (node:86080) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: missing production intake provider is fail closed
+ok 1 - missing production intake provider is fail closed
+  ---
+  duration_ms: 0.600792
+  ...
+# Subtest: initial unknown legacy is never relabeled accepted
+ok 2 - initial unknown legacy is never relabeled accepted
+  ---
+  duration_ms: 26.17325
+  ...
+# Subtest: immutable accepted home survives replacement; new global restriction holds ordinary but complete delta repair publishes
+ok 3 - immutable accepted home survives replacement; new global restriction holds ordinary but complete delta repair publishes
+  ---
+  duration_ms: 40.188375
+  ...
+# Subtest: successor exact base and concurrent semantic intake including reverted intake hold
+ok 4 - successor exact base and concurrent semantic intake including reverted intake hold
+  ---
+  duration_ms: 65.512125
+  ...
+# Subtest: missing original, changed producer, rejected negative, expiry and unknown nested producer hold
+ok 5 - missing original, changed producer, rejected negative, expiry and unknown nested producer hold
+  ---
+  duration_ms: 66.488458
+  ...
+# Subtest: canonical known historical evidence freezes before bookkeeping; nested originals remain checked
+ok 6 - canonical known historical evidence freezes before bookkeeping; nested originals remain checked
+  ---
+  duration_ms: 30.375541
+  ...
+# (node:86081) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: public handover, independent publication, full v4 worker review, resume and first ordinary format6 Engineering return
+ok 7 - public handover, independent publication, full v4 worker review, resume and first ordinary format6 Engineering return
+  ---
+  duration_ms: 3698.227875
+  ...
+# Subtest: independent resume rejects changed closure, subject, identity, delivery and current meaning
+ok 8 - independent resume rejects changed closure, subject, identity, delivery and current meaning
+  ---
+  duration_ms: 6463.614917
+  ...
+# Subtest: only exact pure runtime commands are mechanically ingested; conditions, unknown fields and generic saves stay held
+ok 9 - only exact pure runtime commands are mechanically ingested; conditions, unknown fields and generic saves stay held
+  ---
+  duration_ms: 898.20725
+  ...
+# Subtest: actual conditional handover retains founder conditions and unknown legacy remains held on first pass
+ok 10 - actual conditional handover retains founder conditions and unknown legacy remains held on first pass
+  ---
+  duration_ms: 121.329459
+  ...
+# Subtest: bounded runtime admission binds task, owner, checkpoint, complete inputs and every metadata phase
+ok 11 - bounded runtime admission binds task, owner, checkpoint, complete inputs and every metadata phase
+  ---
+  duration_ms: 770.029875
+  ...
+# Subtest: reverted publication metadata and unknown root handover/notice changes remain intake
+ok 12 - reverted publication metadata and unknown root handover/notice changes remain intake
+  ---
+  duration_ms: 1465.575125
+  ...
+# (node:86082) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: tree preservation stays valid after exact operating publication while unknown extensions hold
+ok 13 - tree preservation stays valid after exact operating publication while unknown extensions hold
+  ---
+  duration_ms: 1987.705084
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 13
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 13541.966166

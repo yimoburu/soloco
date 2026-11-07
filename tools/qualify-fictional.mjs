@@ -32,7 +32,7 @@ export async function contractAdapter(host,native,wire,dir,remaining,selection,o
  assert.equal(native,null);options.onSpawn(executionTiming(Date.now(),{timeout_ms:remaining,timeout_reason:options.timeoutReason}));
  const r=contractResult(JSON.parse(wire));return {native_id:'fictional-contract-'+path.basename(dir),text:JSON.stringify({content:r.reason,messages:[],notices:[],review:{verdict:r.verdict,reason:r.reason,permitted_action:r.permitted_action},qualification_result:r})};
 }
-export async function runFictionalQualification({directory,adapter=contractAdapter,model='fictional-contract',effort='high',afterPlan,afterTarget,afterQueued,sourceText=marker}={}){
+export async function runFictionalQualification({directory,adapter=contractAdapter,model='fictional-contract',effort='high',beforePlan,afterPlan,afterTarget,afterQueued,sourceText=marker}={}){
  const root=directory??fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'soloco-fictional-tree-'))),session_id='fictional-founder',host='codex',base={root,session_id,epoch:1};
  fs.mkdirSync(root,{recursive:true});const oldData=process.env.COMPANY_PLUGIN_DATA;process.env.COMPANY_PLUGIN_DATA=path.join(root,'fixture-plugin-data');
  const synthetic=adapter===contractAdapter;
@@ -42,6 +42,7 @@ export async function runFictionalQualification({directory,adapter=contractAdapt
   withStore(root,db=>db.transaction('fixture.fictional',s=>{s.governance='Fictional preparation only. No business authority.';s.cos_instructions='Preserve every restriction, negative finding and exhausted allowance.';s.roles={qa:{name:'Independent QA',instructions:'Exhaustively review fictional evidence.'},engineer:{name:'Engineer'}};s.team_sha256=teamHash(s);s.records.old={id:'old',kind:'artifact',revision:1,author_instance:'fictional-old-author',content:sourceText};s.records.home={id:'home',kind:'artifact',revision:1,author_instance:'fictional-home-author',content:marker};return s;}));
   await call('company_control',{root,session_id,action:'pause',expected_epoch:1,source_instruction:'Keep this fictional company paused; authorize only the subsequent explicitly scoped read-only qualification.'},host);
   await call('company_storage',{...base,action:'migrate',source_instruction:'Explicitly migrate the paused fictional fixture with backup and exact readback.'},host);
+  if(beforePlan)await beforePlan({root,base,host});
   const plan=await call('company_context',{...base,action:'plan',source_id:'old',counterpart_ids:['home'],dependency_ids:[],maintenance:true,source_instruction:'Authorize this exact fictional read-only qualification tree, its fresh independent QA nodes and guarded represented-by apply while keeping the company paused.'},host);
   let raw='',offset=0;do{const r=await call('company_context',{...base,action:'read',snapshot:plan.original,offset,length:8000},host);raw+=r.text;offset=r.next_offset;}while(offset!==null);
   assert.equal(digest(raw),plan.original.immutable_snapshot.sha256);assert.equal(JSON.parse(raw).content,sourceText);

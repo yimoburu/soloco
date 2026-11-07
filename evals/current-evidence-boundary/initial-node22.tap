@@ -1,0 +1,231 @@
+TAP version 13
+# (node:60928) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: accepted historical publication proof survives an owner epoch change without admitting old in-flight work
+ok 1 - accepted historical publication proof survives an owner epoch change without admitting old in-flight work
+  ---
+  duration_ms: 118.222708
+  ...
+# Subtest: public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning
+ok 2 - public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning
+  ---
+  duration_ms: 18.123417
+  ...
+# Subtest: missing legacy bootstrap is visibly DIRTY and apply rolls back without acceptance
+ok 3 - missing legacy bootstrap is visibly DIRTY and apply rolls back without acceptance
+  ---
+  duration_ms: 16.994709
+  ...
+# Subtest: new membership, changed exact source, wrong independent identity and absent closure cannot publish
+ok 4 - new membership, changed exact source, wrong independent identity and absent closure cannot publish
+  ---
+  duration_ms: 76.532917
+  ...
+# Subtest: scope closure, global membership, expiry, receipt changes, revocation and missed communication hold
+ok 5 - scope closure, global membership, expiry, receipt changes, revocation and missed communication hold
+  ---
+  duration_ms: 26.133375
+  ...
+# Subtest: pause fences publication reviewer and prospective handover cannot hide unknown legacy
+ok 6 - pause fences publication reviewer and prospective handover cannot hide unknown legacy
+  ---
+  duration_ms: 10.006209
+  ...
+# Subtest: 10x independently classified inert archive keeps actual mandatory operating assignment bytes and semantic work constant
+ok 7 - 10x independently classified inert archive keeps actual mandatory operating assignment bytes and semantic work constant
+  ---
+  duration_ms: 54.782334
+  ...
+# Subtest: deleted applicable home and changed exact provenance cannot disappear from accepted meaning
+ok 8 - deleted applicable home and changed exact provenance cannot disappear from accepted meaning
+  ---
+  duration_ms: 16.298458
+  ...
+# Subtest: typed outcome requires complete historical uncertainty; text cannot manufacture permission
+ok 9 - typed outcome requires complete historical uncertainty; text cannot manufacture permission
+  ---
+  duration_ms: 15.971708
+  ...
+# Subtest: public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure
+ok 10 - public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure
+  ---
+  duration_ms: 47.107875
+  ...
+# Subtest: late new and changed falsely scoped prohibitions stay globally DIRTY, but fresh proposals include them
+ok 11 - late new and changed falsely scoped prohibitions stay globally DIRTY, but fresh proposals include them
+  ---
+  duration_ms: 64.785292
+  ...
+# Subtest: publication proof stays current; failed, quarantined, uncertain and unknown-extension siblings stay DIRTY
+ok 12 - publication proof stays current; failed, quarantined, uncertain and unknown-extension siblings stay DIRTY
+  ---
+  duration_ms: 17.498917
+  ...
+# Subtest: mechanical publication index rejects tampering and retains unknown state extensions
+ok 13 - mechanical publication index rejects tampering and retains unknown state extensions
+  ---
+  duration_ms: 14.714292
+  ...
+# Subtest: format6 explicit non-home evidence survives dispatch, discovery and bounded same-native reads
+ok 14 - format6 explicit non-home evidence survives dispatch, discovery and bounded same-native reads
+  ---
+  duration_ms: 161.69225
+  ...
+# Subtest: referenced archived revoked/retry restriction and canonical parent receipts are supplied completely inline
+not ok 15 - referenced archived revoked/retry restriction and canonical parent receipts are supplied completely inline
+  ---
+  duration_ms: 41.039375
+  location: '/private/tmp/soloco-operating-evidence-boundary-20261106/source/tests/operating-state.test.mjs:194:1'
+  failureType: 'testCodeFailure'
+  error: 'historical-restriction'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-evidence-boundary-20261106/source/tests/operating-state.test.mjs:198:117)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: large non-home provenance uses exact same-native ranges; undelivered, partial, denied, stale or changed evidence cannot publish
+not ok 16 - large non-home provenance uses exact same-native ranges; undelivered, partial, denied, stale or changed evidence cannot publish
+  ---
+  duration_ms: 106.096041
+  location: '/private/tmp/soloco-operating-evidence-boundary-20261106/source/tests/operating-state.test.mjs:208:1'
+  failureType: 'testCodeFailure'
+  error: "Cannot read properties of undefined (reading 'length')"
+  code: 'ERR_TEST_FAILURE'
+  name: 'TypeError'
+  stack: |-
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-evidence-boundary-20261106/source/tests/operating-state.test.mjs:213:90)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: canonical preservation parent revisions cannot be borrowed from matching hashes
+ok 17 - canonical preservation parent revisions cannot be borrowed from matching hashes
+  ---
+  duration_ms: 52.4445
+  ...
+# Subtest: missing provenance and snapshot-only evidence hold rather than count pointers as delivered bodies
+ok 18 - missing provenance and snapshot-only evidence hold rather than count pointers as delivered bodies
+  ---
+  duration_ms: 13.332834
+  ...
+# Subtest: real runtime receipt attribution and deterministic reuse deliver the validated producer closure before Pass
+not ok 19 - real runtime receipt attribution and deterministic reuse deliver the validated producer closure before Pass
+  ---
+  duration_ms: 80.67825
+  location: '/private/tmp/soloco-operating-evidence-boundary-20261106/source/tests/operating-state.test.mjs:270:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    test-reused
+    + actual - expected
+    
+    + 'failed'
+    - 'completed'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'completed'
+  actual: 'failed'
+  operator: 'strictEqual'
+  stack: |-
+    review (file:///private/tmp/soloco-operating-evidence-boundary-20261106/source/tests/operating-state.test.mjs:30:45)
+    async TestContext.<anonymous> (file:///private/tmp/soloco-operating-evidence-boundary-20261106/source/tests/operating-state.test.mjs:273:10)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: runtime receipt missing or mismatched producer, candidate, plan, reuse or generation holds
+ok 20 - runtime receipt missing or mismatched producer, candidate, plan, reuse or generation holds
+  ---
+  duration_ms: 41.426875
+  ...
+# Subtest: external catalog reference-shaped metadata is verbatim evidence without a company lookup
+not ok 21 - external catalog reference-shaped metadata is verbatim evidence without a company lookup
+  ---
+  duration_ms: 36.67975
+  location: '/private/tmp/soloco-operating-evidence-boundary-20261106/source/tests/operating-state.test.mjs:297:1'
+  failureType: 'testCodeFailure'
+  error: '"undefined" is not valid JSON'
+  code: 'ERR_TEST_FAILURE'
+  name: 'SyntaxError'
+  stack: |-
+    JSON.parse (<anonymous>)
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-evidence-boundary-20261106/source/tests/operating-state.test.mjs:302:24)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: runtime closure requires complete delivery and independent source and proof sessions
+not ok 22 - runtime closure requires complete delivery and independent source and proof sessions
+  ---
+  duration_ms: 339.0075
+  location: '/private/tmp/soloco-operating-evidence-boundary-20261106/source/tests/operating-state.test.mjs:309:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'completed'
+    - 'failed'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'failed'
+  actual: 'completed'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-evidence-boundary-20261106/source/tests/operating-state.test.mjs:316:15)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: public qualified recovered snapshot publishes current typed outcomes without replaying the paid raw archive
+not ok 23 - public qualified recovered snapshot publishes current typed outcomes without replaying the paid raw archive
+  ---
+  duration_ms: 5.367
+  location: '/private/tmp/soloco-operating-evidence-boundary-20261106/source/tests/operating-state.test.mjs:342:1'
+  failureType: 'testCodeFailure'
+  error: 'Immutable snapshot capture requires explicit company_storage migrate before retrying'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    flushSnapshots (file:///private/tmp/soloco-operating-evidence-boundary-20261106/source/plugins/soloco/runtime/record-storage.mjs:70:32)
+    Store.transaction (file:///private/tmp/soloco-operating-evidence-boundary-20261106/source/plugins/soloco/runtime/store.mjs:181:7)
+    file:///private/tmp/soloco-operating-evidence-boundary-20261106/source/tests/operating-state.test.mjs:19:46
+    withStore (file:///private/tmp/soloco-operating-evidence-boundary-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+    mutate (file:///private/tmp/soloco-operating-evidence-boundary-20261106/source/tests/operating-state.test.mjs:19:22)
+    qualifiedRecovered (file:///private/tmp/soloco-operating-evidence-boundary-20261106/source/tests/operating-state.test.mjs:334:2)
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-evidence-boundary-20261106/source/tests/operating-state.test.mjs:343:16)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:931:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:629:18)
+  ...
+# Subtest: large prospective publication uses bounded frozen worker delivery and rejects a manufactured complete flag
+not ok 24 - large prospective publication uses bounded frozen worker delivery and rejects a manufactured complete flag
+  ---
+  duration_ms: 571.423708
+  location: '/private/tmp/soloco-operating-evidence-boundary-20261106/source/tests/operating-state.test.mjs:361:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The expression evaluated to a falsy value:
+    
+      assert.ok(j.operating_delivery.reads.length>16)
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-evidence-boundary-20261106/source/tests/operating-state.test.mjs:365:151)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+1..24
+# tests 24
+# suites 0
+# pass 17
+# fail 7
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2045.471041

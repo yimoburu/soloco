@@ -1,0 +1,6 @@
+Command: git status --short
+Exit status: 0
+ M plugins/soloco/runtime/operating-state.mjs
+ M plugins/soloco/runtime/snapshot.mjs
+ M tests/operating-checkpoint.test.mjs
+?? evals/operating-intake-dependencies/

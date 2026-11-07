@@ -1,0 +1,196 @@
+{
+  "source_only": true,
+  "earlier_accepted_source": "28c27a0d26d43f8a559ebf9d735c1bf120e45ecb",
+  "new_component_acceptance": "independent source QA pending; actualzero-home bootstrap repair in progress separately",
+  "real_company_revision": 1052,
+  "paused": true,
+  "actual_qualification_or_resume": false,
+  "entries": [
+    {
+      "path": "/private/tmp/soloco-corpus-fit-20261106/engineering-report.txt",
+      "retained": "evals/corpus-fit-delivery/soloco-corpus-fit-20261106-engineering-report.txt",
+      "sha256": "83155e3ca34fdfc32de7763bc72ae20f46aa4db67215ae1905ac1bad9212058e"
+    },
+    {
+      "path": "/private/tmp/soloco-corpus-fit-20261106/engineering-receipt.json",
+      "retained": "evals/corpus-fit-delivery/soloco-corpus-fit-20261106-engineering-receipt.json",
+      "sha256": "c8edb8afae53b3d916acb4700960bcfc8cefa3ebe558d90b8f1b1be943521bf2"
+    },
+    {
+      "path": "/private/tmp/soloco-corpus-fit-20261106/refinement-report.txt",
+      "retained": "evals/corpus-fit-delivery/soloco-corpus-fit-20261106-refinement-report.txt",
+      "sha256": "e91c0ee31482e2d515b554b6447d60332bde617135c14622e4a5ce0345c4fbde"
+    },
+    {
+      "path": "/private/tmp/soloco-corpus-fit-20261106/refinement-receipt.json",
+      "retained": "evals/corpus-fit-delivery/soloco-corpus-fit-20261106-refinement-receipt.json",
+      "sha256": "c0b7fde19cafba21eee7796211aef5374baa8f59ad049f22e99f486168fde33c"
+    },
+    {
+      "path": "/private/tmp/soloco-corpus-fit-20261106/proof-projection-report.txt",
+      "retained": "evals/corpus-fit-delivery/soloco-corpus-fit-20261106-proof-projection-report.txt",
+      "sha256": "f8374611ef9af1e18f8a77de4d196630cd761871e385b5aec2f1c37786d6cc87"
+    },
+    {
+      "path": "/private/tmp/soloco-corpus-fit-20261106/proof-projection-receipt.json",
+      "retained": "evals/corpus-fit-delivery/soloco-corpus-fit-20261106-proof-projection-receipt.json",
+      "sha256": "b3ab4f20147a8a9a65e395c6688399e3cf78b035d90a479a11148544d2f86109"
+    },
+    {
+      "path": "/private/tmp/soloco-corpus-fit-20261106/bounded-phase-report.txt",
+      "retained": "evals/corpus-fit-delivery/soloco-corpus-fit-20261106-bounded-phase-report.txt",
+      "sha256": "f239edcb67b63f6d95d8888492e6a5b314e35750c15ef44d6329edae77d51990"
+    },
+    {
+      "path": "/private/tmp/soloco-corpus-fit-20261106/bounded-phase-receipt.json",
+      "retained": "evals/corpus-fit-delivery/soloco-corpus-fit-20261106-bounded-phase-receipt.json",
+      "sha256": "fbee882578817024637e54c7d1338dbe8d5cb1405dfc5be96330b3c7671b0f03"
+    },
+    {
+      "path": "/private/tmp/soloco-incidence-storage-20261106/engineering-report.txt",
+      "retained": "evals/corpus-fit-delivery/soloco-incidence-storage-20261106-engineering-report.txt",
+      "sha256": "b2f80dd4f77ffd52e59972e5010fb164470642e7e4a83c1a10ee5d04f5f8a523"
+    },
+    {
+      "path": "/private/tmp/soloco-incidence-storage-20261106/engineering-receipt.json",
+      "retained": "evals/corpus-fit-delivery/soloco-incidence-storage-20261106-engineering-receipt.json",
+      "sha256": "eea5e8a09f6df86ca222e649b3c6143bdfc4c2a539c28b4a6f870b45ffde21a4"
+    },
+    {
+      "path": "/private/tmp/soloco-operating-state-20261106/bounded-phase-architect-report.txt",
+      "retained": "evals/corpus-fit-delivery/soloco-operating-state-20261106-bounded-phase-architect-report.txt",
+      "sha256": "3753d9ac636016df820916aa73e1b1b3a306e33ab5cc95ff7b22210d46e772f3"
+    },
+    {
+      "path": "/private/tmp/soloco-operating-state-20261106/bounded-phase-architect-receipt.json",
+      "retained": "evals/corpus-fit-delivery/soloco-operating-state-20261106-bounded-phase-architect-receipt.json",
+      "sha256": "65820bb8d68fcc1a866890d97605292ee8672088e63dc8538a4c00eaca8ca2ab"
+    },
+    {
+      "path": "/private/tmp/soloco-operating-state-20261106/bootstrap-homes-architect-report.txt",
+      "retained": "evals/corpus-fit-delivery/soloco-operating-state-20261106-bootstrap-homes-architect-report.txt",
+      "sha256": "7f7720dee3ead2eeb5acc6200718d929d69ac88df44f1acb3f3f850bd9607175"
+    },
+    {
+      "path": "/private/tmp/soloco-operating-state-20261106/bootstrap-homes-architect-receipt.json",
+      "retained": "evals/corpus-fit-delivery/soloco-operating-state-20261106-bootstrap-homes-architect-receipt.json",
+      "sha256": "c6362546aba087a436337fedf0c766337b7656088680569d543ce3927c267e2e"
+    },
+    {
+      "path": "/private/tmp/soloco-phased-repair.report.md",
+      "retained": "evals/corpus-fit-delivery/tmp-soloco-phased-repair.report.md",
+      "sha256": "89b2c47ba068574bc158ad1cda520cf8fc4b93ba226be5834e0b1b1d4e7df172"
+    },
+    {
+      "path": "/private/tmp/soloco-phased-repair.patch",
+      "retained": "evals/corpus-fit-delivery/tmp-soloco-phased-repair.patch",
+      "sha256": "5dc37f8e52f37558799bddbcb09f1b9db94cb1e9b535c0d1c77532b80a3c6ec5"
+    },
+    {
+      "path": "/private/tmp/soloco-incidence-storage-20261106/engineering-report.md",
+      "retained": "evals/corpus-fit-delivery/soloco-incidence-storage-20261106-engineering-report.md",
+      "sha256": "e401bd2785c46795c657b8110307cd8e7b27f7a92ce5b24eec6b05a40419015f"
+    },
+    {
+      "path": "/private/tmp/soloco-incidence-storage-20261106/source-only.patch",
+      "retained": "evals/corpus-fit-delivery/soloco-incidence-storage-20261106-source-only.patch",
+      "sha256": "ad9d5d0b4349d3ed238b766ae46c1098e4491478b1087d65f4019b0afba8258b"
+    },
+    {
+      "path": "/private/tmp/soloco-operating-state-20261106/actual-structural-context-1052-7c50efe232ad.json",
+      "retained": "evals/corpus-fit-delivery/actual-structural-context-1052-7c50efe232ad.json",
+      "sha256": "853343d9e2cd33e399ded7a8e415c574e24efd737729ddfedeb797c3202f459d",
+      "scope": "readonly numeric component; no semantic/native fit or company mutation"
+    },
+    {
+      "path": "/private/tmp/soloco-operating-state-20261106/actual-incidence-storage-1052-d28411b33d69.json",
+      "retained": "evals/corpus-fit-delivery/actual-incidence-storage-1052-d28411b33d69.json",
+      "sha256": "862e3c83c509f59eff354de7bb0d9719f163b77533c04c3ee4793f26dedf7959",
+      "scope": "readonly numeric component; no semantic/native fit or company mutation"
+    },
+    {
+      "path": "/private/tmp/soloco-operating-state-20261106/actual-proof-projection-1052-59cc65a68b3c.json",
+      "retained": "evals/corpus-fit-delivery/actual-proof-projection-1052-59cc65a68b3c.json",
+      "sha256": "b71033b41d4e304ce729e1f68ce697f300d0a2f2908f2998052a669c57832097",
+      "scope": "readonly numeric component; no semantic/native fit or company mutation"
+    },
+    {
+      "path": "/private/tmp/soloco-operating-state-20261106/actual-partition-components-1052-7dce593c75bf.json",
+      "retained": "evals/corpus-fit-delivery/actual-partition-components-1052-7dce593c75bf.json",
+      "sha256": "af854a1fb4cb534fa39e8ccb756557f532e59471d3aac764c7df790060300edd",
+      "scope": "readonly numeric component; no semantic/native fit or company mutation"
+    },
+    {
+      "path": "/private/tmp/soloco-operating-state-20261106/fit-public-node22.log",
+      "retained": "evals/corpus-fit-delivery/fit-public-node22.log.gz",
+      "raw_sha256": "4a77221c7185209ab7d4d13deeccd0ee54fe10de75d57b58d0e1a1b1369c3c3f",
+      "raw_bytes": 15129,
+      "gzip_sha256": "a8dbb76dad41a2e282e15c21c088c6cb8d395cef1934e2e4964e759f4d1116f3",
+      "scope": "Preserved exact pass/failure evidence, not all-current-pin acceptance"
+    },
+    {
+      "path": "/private/tmp/soloco-operating-state-20261106/fit-public-node25.log",
+      "retained": "evals/corpus-fit-delivery/fit-public-node25.log.gz",
+      "raw_sha256": "2b1c9f1df034b7cc61dfa36df14f3b8f4a6458d244db054afa032ba97f37ab3e",
+      "raw_bytes": 12675,
+      "gzip_sha256": "53053bc67bb691567dadcb00e5d51927bcf76ffeb6eb9a1849c480a93b55f185",
+      "scope": "Preserved exact pass/failure evidence, not all-current-pin acceptance"
+    },
+    {
+      "path": "/private/tmp/soloco-operating-state-20261106/fit-public-corrected-node22.log",
+      "retained": "evals/corpus-fit-delivery/fit-public-corrected-node22.log.gz",
+      "raw_sha256": "76e11779c26268f7afc0e20d3267d4104d84e9586f42d0ab586a931b029b5ee9",
+      "raw_bytes": 1025539,
+      "gzip_sha256": "c48e9440f8df91c8ffd34165e716c201a575bb401b249b46a833240b966742cb",
+      "scope": "Preserved exact pass/failure evidence, not all-current-pin acceptance"
+    },
+    {
+      "path": "/private/tmp/soloco-operating-state-20261106/fit-public-corrected-node25.log",
+      "retained": "evals/corpus-fit-delivery/fit-public-corrected-node25.log.gz",
+      "raw_sha256": "99358c026266e7f1ae7cbaf7940c22eae337a0936a922236cd603f870239c3c3",
+      "raw_bytes": 1024174,
+      "gzip_sha256": "9c9de2442dd972a47ccbb1e527585f208f2112f31235216c095b9a10b24092d2",
+      "scope": "Preserved exact pass/failure evidence, not all-current-pin acceptance"
+    },
+    {
+      "path": "/private/tmp/soloco-operating-state-20261106/fit-public-final-baseline-node22.log",
+      "retained": "evals/corpus-fit-delivery/fit-public-final-baseline-node22.log.gz",
+      "raw_sha256": "feb562d280c2e4ef628120a92fa417559b3abfe8d19974c8118a2af62aa08f89",
+      "raw_bytes": 4882,
+      "gzip_sha256": "d75d29a6b98e1aa59dc8141bc27537dc6e32a3b8ec8644770c7f186afb6f0c75",
+      "scope": "Preserved exact pass/failure evidence, not all-current-pin acceptance"
+    },
+    {
+      "path": "/private/tmp/soloco-operating-state-20261106/fit-public-final-baseline-node25.log",
+      "retained": "evals/corpus-fit-delivery/fit-public-final-baseline-node25.log.gz",
+      "raw_sha256": "a3c1b295aa34971c226336c5ab907dbcb5e9ccf274e25031fecd4f75af68c3c2",
+      "raw_bytes": 3357,
+      "gzip_sha256": "f7d4ac0a25b86d15f047cccaa947fd03601d21cfdf70ff1f8d09660bdd2b3ad5",
+      "scope": "Preserved exact pass/failure evidence, not all-current-pin acceptance"
+    },
+    {
+      "path": "/private/tmp/soloco-operating-state-20261106/fit-storage-integrated-node22.log",
+      "retained": "evals/corpus-fit-delivery/fit-storage-integrated-node22.log.gz",
+      "raw_sha256": "9a9ca99a1ae75fa3f729aa768877a1f723c063dbcb302f059e3f6f53bb0477c1",
+      "raw_bytes": 21794,
+      "gzip_sha256": "c386efea9728a7c09de57f300184b586426fe2d397758c041218fa9c06bc632d",
+      "scope": "Preserved exact pass/failure evidence, not all-current-pin acceptance"
+    },
+    {
+      "path": "/private/tmp/soloco-operating-state-20261106/fit-storage-integrated-node25.log",
+      "retained": "evals/corpus-fit-delivery/fit-storage-integrated-node25.log.gz",
+      "raw_sha256": "66bb49aeb08a840afbe44bb8e42d30bd4c9eed6cfe1f1ccdb2e7f06388cd1a6b",
+      "raw_bytes": 17223,
+      "gzip_sha256": "f570499fe4824335d24cad536031c3bc4c1c279316037f33417a73f11f19842a",
+      "scope": "Preserved exact pass/failure evidence, not all-current-pin acceptance"
+    },
+    {
+      "path": "/private/tmp/soloco-operating-state-20261106/storage-fixture-corrected-node25.log",
+      "retained": "evals/corpus-fit-delivery/storage-fixture-corrected-node25.log.gz",
+      "raw_sha256": "6e9dcd0759c4d500485cff4dbbe6af8c08894b3c31b4cfdefffa923e5d027edc",
+      "raw_bytes": 1410,
+      "gzip_sha256": "369a5898a905e0ae5365108e3559810df5c549ce87b7239ebbcabf456e9d51be",
+      "scope": "Preserved exact pass/failure evidence, not all-current-pin acceptance"
+    }
+  ]
+}

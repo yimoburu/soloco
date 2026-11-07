@@ -1,0 +1,188 @@
+(node:52878) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ accepted historical publication proof survives an owner epoch change without admitting old in-flight work (406.045208ms)
+✔ public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning (18.577125ms)
+✔ missing legacy bootstrap is visibly DIRTY and apply rolls back without acceptance (13.258625ms)
+✔ new membership, changed exact source, wrong independent identity and absent closure cannot publish (77.443833ms)
+✔ scope closure, global membership, expiry, receipt changes, revocation and missed communication hold (25.323125ms)
+✔ pause fences publication reviewer and prospective handover cannot hide unknown legacy (9.322541ms)
+✔ 10x independently classified inert archive keeps actual mandatory operating assignment bytes and semantic work constant (50.034334ms)
+✔ deleted applicable home and changed exact provenance cannot disappear from accepted meaning (16.406584ms)
+✔ typed outcome requires complete historical uncertainty; text cannot manufacture permission (14.387959ms)
+✔ public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure (47.949959ms)
+✔ late new and changed falsely scoped prohibitions stay globally DIRTY, but fresh proposals include them (63.872709ms)
+✔ publication proof stays current; failed, quarantined, uncertain and unknown-extension siblings stay DIRTY (16.140625ms)
+✔ mechanical publication index rejects tampering and retains unknown state extensions (15.16375ms)
+✔ format6 explicit non-home evidence survives dispatch, discovery and bounded same-native reads (158.595583ms)
+✖ referenced archived revoked/retry restriction and canonical parent receipts are supplied completely inline (19.971167ms)
+✖ large non-home provenance uses exact same-native ranges; undelivered, partial, denied, stale or changed evidence cannot publish (25.155917ms)
+✖ canonical preservation parent revisions cannot be borrowed from matching hashes (18.193458ms)
+✔ missing provenance and snapshot-only evidence hold rather than count pointers as delivered bodies (13.991541ms)
+✖ real runtime receipt attribution and deterministic reuse deliver the validated producer closure before Pass (24.714167ms)
+✖ runtime receipt missing or mismatched producer, candidate, plan, reuse or generation holds (24.420875ms)
+✖ external catalog reference-shaped metadata is verbatim evidence without a company lookup (18.529666ms)
+✖ runtime closure requires complete delivery and independent source and proof sessions (37.585833ms)
+ℹ tests 22
+ℹ suites 0
+ℹ pass 15
+ℹ fail 7
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1197.778
+
+✖ failing tests:
+
+test at tests/operating-state.test.mjs:192:1
+✖ referenced archived revoked/retry restriction and canonical parent receipts are supplied completely inline (19.971167ms)
+  AssertionError [ERR_ASSERTION]: Evidence hold: required semantic stream not completely delivered to this session
+  + actual - expected
+  
+  + 'failed'
+  - 'completed'
+  
+      at review (file:///private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:28:45)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async restrictedArchive (file:///private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:161:10)
+      at async TestContext.<anonymous> (file:///private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:193:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'failed',
+    expected: 'completed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/operating-state.test.mjs:206:1
+✖ large non-home provenance uses exact same-native ranges; undelivered, partial, denied, stale or changed evidence cannot publish (25.155917ms)
+  AssertionError [ERR_ASSERTION]: Evidence hold: required semantic stream not completely delivered to this session
+  + actual - expected
+  
+  + 'failed'
+  - 'completed'
+  
+      at review (file:///private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:28:45)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async restrictedArchive (file:///private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:161:10)
+      at async TestContext.<anonymous> (file:///private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:208:12)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'failed',
+    expected: 'completed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/operating-state.test.mjs:225:1
+✖ canonical preservation parent revisions cannot be borrowed from matching hashes (18.193458ms)
+  AssertionError [ERR_ASSERTION]: Evidence hold: required semantic stream not completely delivered to this session
+  + actual - expected
+  
+  + 'failed'
+  - 'completed'
+  
+      at review (file:///private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:28:45)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async restrictedArchive (file:///private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:161:10)
+      at async TestContext.<anonymous> (file:///private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:227:12)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'failed',
+    expected: 'completed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/operating-state.test.mjs:268:1
+✖ real runtime receipt attribution and deterministic reuse deliver the validated producer closure before Pass (24.714167ms)
+  AssertionError [ERR_ASSERTION]: Evidence hold: retrieval requires exactly source_id, sha256, offset and length
+  + actual - expected
+  
+  + 'failed'
+  - 'completed'
+  
+      at review (file:///private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:28:45)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async runtimeArchive (file:///private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:263:10)
+      at async TestContext.<anonymous> (file:///private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:269:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'failed',
+    expected: 'completed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/operating-state.test.mjs:285:1
+✖ runtime receipt missing or mismatched producer, candidate, plan, reuse or generation holds (24.420875ms)
+  AssertionError [ERR_ASSERTION]: Evidence hold: retrieval requires exactly source_id, sha256, offset and length
+  + actual - expected
+  
+  + 'failed'
+  - 'completed'
+  
+      at review (file:///private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:28:45)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async runtimeArchive (file:///private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:263:10)
+      at async TestContext.<anonymous> (file:///private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:286:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'failed',
+    expected: 'completed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/operating-state.test.mjs:295:1
+✖ external catalog reference-shaped metadata is verbatim evidence without a company lookup (18.529666ms)
+  AssertionError [ERR_ASSERTION]: Evidence hold: required semantic stream not completely delivered to this session
+  + actual - expected
+  
+  + 'failed'
+  - 'completed'
+  
+      at review (file:///private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:28:45)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async restrictedArchive (file:///private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:161:10)
+      at async TestContext.<anonymous> (file:///private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:297:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'failed',
+    expected: 'completed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/operating-state.test.mjs:307:1
+✖ runtime closure requires complete delivery and independent source and proof sessions (37.585833ms)
+  AssertionError [ERR_ASSERTION]: Evidence hold: retrieval requires exactly source_id, sha256, offset and length
+  + actual - expected
+  
+  + 'failed'
+  - 'completed'
+  
+      at review (file:///private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:28:45)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async runtimeArchive (file:///private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:263:10)
+      at async TestContext.<anonymous> (file:///private/tmp/soloco-public-represented-20261106/source/tests/operating-state.test.mjs:309:12)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'failed',
+    expected: 'completed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

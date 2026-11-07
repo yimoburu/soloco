@@ -1,0 +1,2149 @@
+TAP version 13
+# (node:34605) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: public handover, independent publication, full v4 worker review, resume and first ordinary format6 Engineering return
+not ok 1 - public handover, independent publication, full v4 worker review, resume and first ordinary format6 Engineering return
+  ---
+  duration_ms: 363.875708
+  location: '/private/tmp/soloco-operating-control-20261106/source/tests/operating-control.test.mjs:73:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    condition-bearing resume must roll back without unpausing
+    + actual - expected
+    ... Skipped lines
+    
+      {
+        cos_instructions: 'Preserve every condition and uncertainty.',
+        created_at: '2026-11-06T18:50:56.482Z',
+        governance: 'Read only. No external execution or retry authority.',
+        governance_sha256: '28f99838abc3794da94f97f7a2d234554811da3aef7b8ddb3742075caa78ec36',
+    ...
+        retired_sessions: [],
+    +   revision: 19,
+    -   revision: 18,
+        roles: {
+          engineer: {
+            name: 'Engineering'
+          },
+          qa: {
+    ...
+        team_sha256: '12b650589dda4485aca72bd8efd9d9573862151ce4ba984d0568efd67db576ac',
+    +   updated_at: '2026-11-06T18:50:56.822Z'
+    -   updated_at: '2026-11-06T18:50:56.760Z'
+      }
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    schema: 2
+    runtime_version: '0.7.3'
+    id: 'company-7cc3dadb-4d64-494a-b071-c46dca4b4446'
+    name: 'Untitled Venture'
+    idea: 'Fictional source contract only'
+    phase: 'Frame'
+    mode: 'preparation'
+    paused: true
+    plugin_version: '0.7.3'
+    governance: 'Read only. No external execution or retry authority.'
+    governance_sha256: '28f99838abc3794da94f97f7a2d234554811da3aef7b8ddb3742075caa78ec36'
+    roles:
+      qa:
+        name: 'QA'
+      engineer:
+        name: 'Engineering'
+    cos_instructions: 'Preserve every condition and uncertainty.'
+    team_sha256: '12b650589dda4485aca72bd8efd9d9573862151ce4ba984d0568efd67db576ac'
+    owner:
+      host: 'codex'
+      session_id: 'fictional-incoming'
+      epoch: 2
+    records:
+      control-a058b7fd-49ee-41c5-9506-73ce47442811:
+        id: 'control-a058b7fd-49ee-41c5-9506-73ce47442811'
+        kind: 'decision'
+        author_role: 'human_founder'
+        recorded_by: 'fictional-outgoing'
+        content: 'pause'
+        status: 'Recorded'
+        action: 'pause'
+        created_at: '2026-11-06T18:50:56.585Z'
+      control-513db921-911f-4ceb-9122-3b9971ffa663:
+        id: 'control-513db921-911f-4ceb-9122-3b9971ffa663'
+        kind: 'decision'
+        author_role: 'human_founder'
+        recorded_by: 'fictional-outgoing'
+        content: 'resume'
+        status: 'Recorded'
+        action: 'resume'
+        created_at: '2026-11-06T18:50:56.597Z'
+      condition:
+        id: 'condition'
+        kind: 'artifact'
+        content: 'Fictional obligation: no export or retry without canonical grants.'
+        operating_record:
+          version: 1
+          kind: 'obligation'
+          scope: '*'
+          owner: 'runner'
+          conditions: 'Always'
+          exceptions: 'None'
+          clearing: 'Independent exact closure'
+          expires_at: ~
+          dependencies:
+          authority_refs:
+          evidence_refs:
+            0: 'condition'
+        author_role: 'runner'
+        author_instance: 'fictional-outgoing'
+        revision: 1
+        status: 'Draft'
+        source_reference: ~
+        basis: ~
+        updated_at: '2026-11-06T18:50:56.609Z'
+        previous:
+      control-bd3bb1ca-1db9-4461-9455-2f85579a45c8:
+        id: 'control-bd3bb1ca-1db9-4461-9455-2f85579a45c8'
+        kind: 'decision'
+        author_role: 'human_founder'
+        recorded_by: 'fictional-incoming'
+        content: 'handover'
+        status: 'Recorded'
+        action: 'handover'
+        created_at: '2026-11-06T18:50:56.612Z'
+      operating-plan-c0384a1b-094d-4e1e-a07a-cc4f6d686498:
+        id: 'operating-plan-c0384a1b-094d-4e1e-a07a-cc4f6d686498'
+        kind: 'plan'
+        revision: 1
+        status: 'Draft'
+        author_role: 'runner'
+        author_instance: 'fictional-incoming'
+        content: 'Proposed current operating meaning; no authority, acceptance or legacy retirement.'
+        operating_plan:
+          protocol: 'operating-state-v1'
+          version: 1
+          snapshot:
+            protocol: 'operating-state-v1'
+            provenance:
+              0:
+                home_id: 'condition'
+                sources:
+                  0:
+                    id: 'condition'
+                    revision: 1
+                    sha256: 'c1409d9f4fcf74e750676ef9d953980fcc0ff0a9b9be95cfacd541a1d0607e36'
+            owner:
+              host: 'codex'
+              session_id: 'fictional-incoming'
+              epoch: 2
+            paused: true
+            controls:
+              company_id: 'company-7cc3dadb-4d64-494a-b071-c46dca4b4446'
+              idea: 'Fictional source contract only'
+              team_sha256: '12b650589dda4485aca72bd8efd9d9573862151ce4ba984d0568efd67db576ac'
+              governance: 'Read only. No external execution or retry authority.'
+              cos_instructions: 'Preserve every condition and uncertainty.'
+              roles:
+                qa:
+                  name: 'QA'
+                engineer:
+                  name: 'Engineering'
+              mode: 'preparation'
+              phase: 'Frame'
+              upgrade: ~
+              extensions:
+            source_root: '9c708cf22d7330f8f9dda164411bb8359f9b783a29bfc243145b0e0326f385be'
+            homes:
+              0:
+                id: 'condition'
+                revision: 1
+                sha256: 'c1409d9f4fcf74e750676ef9d953980fcc0ff0a9b9be95cfacd541a1d0607e36'
+            home_predicates:
+              0:
+                id: 'condition'
+                scope: '*'
+                dependencies:
+            communication:
+              notices:
+              messages:
+            classifications:
+            frontier:
+          maintenance: true
+          source_instruction: 'Fictional read-only publication review while paused; no execution authority.'
+          valid_until: ~
+        created_at: '2026-11-06T18:50:56.637Z'
+      artifact-ccfbeb17-597c-42b5-998a-408017e9aa35:
+        id: 'artifact-ccfbeb17-597c-42b5-998a-408017e9aa35'
+        kind: 'review'
+        content: 'FICTIONAL ADAPTER DOUBLE publication judgment.'
+        author_role: 'qa'
+        author_instance: 'qa-b74bccaf-11af-4c25-9bd7-2f2a734137a2'
+        revision: 1
+        status: 'Submitted'
+        job_id: 'job-1fe9ad0f-e0e5-4f0b-8879-c3a524b52587'
+        inputs:
+          0:
+            id: 'operating-plan-c0384a1b-094d-4e1e-a07a-cc4f6d686498'
+            revision: 1
+          1:
+            id: 'condition'
+            revision: 1
+        review_of:
+          id: 'operating-plan-c0384a1b-094d-4e1e-a07a-cc4f6d686498'
+          revision: 1
+        review:
+          verdict: 'Pass'
+          reason: 'Fictional preservation and authority checks'
+          permitted_action: 'publish_operating_state'
+          plan_sha256: '840ff622f8a7f55d43396a9a9efbd896271d6060c08daf8d4a249b24ccfc8b34'
+          preservation_complete: true
+          interaction_complete: true
+          authority_checked: true
+          blockers:
+        created_at: '2026-11-06T18:50:56.676Z'
+      handover-reconstruction-0f743dc7-4548-4a22-be97-a6c80dc5e345:
+        id: 'handover-reconstruction-0f743dc7-4548-4a22-be97-a6c80dc5e345'
+        kind: 'artifact'
+        revision: 1
+        status: 'Submitted'
+        author_role: 'runner'
+        author_instance: 'fictional-incoming'
+        content: 'Objectives: preserve fictional accepted obligations. Authority: read only; no export or retry grants. Conditions: all exceptions remain binding. Communication: retain complete notices. Unknown effects: held. Next: independent exact review before preparation resume.'
+        created_at: '2026-11-06T18:50:56.690Z'
+        handover:
+          id: 'handover-1a521c17-6cfd-4b62-b747-fe4921b8a25d'
+          evidence_protocol: 4
+          subject_sha256: 'e3703d1c67c479af2cdc27bd964a2617a349580b10bb6b24dd44a28b60a91ae9'
+          subject:
+            company_id: 'company-7cc3dadb-4d64-494a-b071-c46dca4b4446'
+            name: 'Untitled Venture'
+            idea: 'Fictional source contract only'
+            owner:
+              host: 'codex'
+              session_id: 'fictional-incoming'
+              epoch: 2
+            governance: 'Read only. No external execution or retry authority.'
+            cos_instructions: 'Preserve every condition and uncertainty.'
+            roles:
+              qa:
+                name: 'QA'
+              engineer:
+                name: 'Engineering'
+            team_sha256: '12b650589dda4485aca72bd8efd9d9573862151ce4ba984d0568efd67db576ac'
+            mode: 'preparation'
+            phase: 'Frame'
+            records:
+              condition:
+                id: 'condition'
+                kind: 'artifact'
+                content: 'Fictional obligation: no export or retry without canonical grants.'
+                operating_record:
+                  version: 1
+                  kind: 'obligation'
+                  scope: '*'
+                  owner: 'runner'
+                  conditions: 'Always'
+                  exceptions: 'None'
+                  clearing: 'Independent exact closure'
+                  expires_at: ~
+                  dependencies:
+                  authority_refs:
+                  evidence_refs:
+                    0: 'condition'
+                author_role: 'runner'
+                author_instance: 'fictional-outgoing'
+                revision: 1
+                status: 'Draft'
+                source_reference: ~
+                basis: ~
+                updated_at: '2026-11-06T18:50:56.609Z'
+                previous:
+            jobs:
+            upgrade: ~
+            upgrade_history:
+            notices:
+            messages:
+            operating_checkpoint:
+              protocol: 'operating-state-v1'
+              company_id: 'company-7cc3dadb-4d64-494a-b071-c46dca4b4446'
+              owner:
+                host: 'codex'
+                session_id: 'fictional-incoming'
+                epoch: 2
+              paused: true
+              scope: '*'
+              controls:
+                company_id: 'company-7cc3dadb-4d64-494a-b071-c46dca4b4446'
+                idea: 'Fictional source contract only'
+                team_sha256: '12b650589dda4485aca72bd8efd9d9573862151ce4ba984d0568efd67db576ac'
+                governance: 'Read only. No external execution or retry authority.'
+                cos_instructions: 'Preserve every condition and uncertainty.'
+                roles:
+                  qa:
+                    name: 'QA'
+                  engineer:
+                    name: 'Engineering'
+                mode: 'preparation'
+                phase: 'Frame'
+                upgrade: ~
+                extensions:
+              homes:
+                0:
+                  source:
+                    id: 'condition'
+                    revision: 1
+                    sha256: 'c1409d9f4fcf74e750676ef9d953980fcc0ff0a9b9be95cfacd541a1d0607e36'
+                  value:
+                    id: 'condition'
+                    kind: 'artifact'
+                    content: 'Fictional obligation: no export or retry without canonical grants.'
+                    operating_record:
+                      version: 1
+                      kind: 'obligation'
+                      scope: '*'
+                      owner: 'runner'
+                      conditions: 'Always'
+                      exceptions: 'None'
+                      clearing: 'Independent exact closure'
+                      expires_at: ~
+                      dependencies:
+                      authority_refs:
+                      evidence_refs:
+                        0: 'condition'
+                    author_role: 'runner'
+                    author_instance: 'fictional-outgoing'
+                    revision: 1
+                    status: 'Draft'
+                    source_reference: ~
+                    basis: ~
+                    updated_at: '2026-11-06T18:50:56.609Z'
+                    previous:
+              communication:
+                notices:
+                messages:
+              acceptance:
+                0:
+                  id: 'operating-plan-c0384a1b-094d-4e1e-a07a-cc4f6d686498'
+                  revision: 1
+                  sha256: '9a8de3b5f8a1317ba5f5a645515dbd34fe142c0eecbbe517e3a878de67f4d017'
+                1:
+                  id: 'artifact-ccfbeb17-597c-42b5-998a-408017e9aa35'
+                  revision: 1
+                  sha256: '62d4d5eaf10a47aa14a12b8facc7a7f0739408763f3b6dc9f28b162f839e42fd'
+                2:
+                  id: 'job:job-1fe9ad0f-e0e5-4f0b-8879-c3a524b52587'
+                  revision: ~
+                  sha256: 'a0d5b2356cfe7c7b24512f249468c5b9413086ea34598b5ff4ccbce671a548de'
+              valid_until: ~
+              applicable_set_root: '0750ea82a7bfb7b99a2fc111b29af5ed752b56a7f62b89d41e8235a5fd2dab62'
+          incoming_owner:
+            host: 'codex'
+            session_id: 'fictional-incoming'
+            epoch: 2
+          input_refs:
+            0:
+              id: 'condition'
+              revision: 1
+              sha256: 'c1409d9f4fcf74e750676ef9d953980fcc0ff0a9b9be95cfacd541a1d0607e36'
+      artifact-f8b9488e-7db1-49c8-9d6e-480a02f19083:
+        id: 'artifact-f8b9488e-7db1-49c8-9d6e-480a02f19083'
+        kind: 'review'
+        content: 'FICTIONAL ADAPTER DOUBLE: full subject delivered; synthetic exact review.'
+        author_role: 'qa'
+        author_instance: 'qa-65145f5a-2b74-48bd-bc90-d51df035fe7e'
+        revision: 1
+        status: 'Submitted'
+        job_id: 'job-4c93feea-766f-4853-8bf6-9ac45e99cc82'
+        inputs:
+          0:
+            id: 'handover-reconstruction-0f743dc7-4548-4a22-be97-a6c80dc5e345'
+            revision: 1
+          1:
+            id: 'condition'
+            revision: 1
+        review_of:
+          id: 'handover-reconstruction-0f743dc7-4548-4a22-be97-a6c80dc5e345'
+          revision: 1
+        review:
+          verdict: 'Pass'
+          reason: 'Fictional exact complete subject'
+          permitted_action: 'resume_handover'
+          subject_sha256: 'e3703d1c67c479af2cdc27bd964a2617a349580b10bb6b24dd44a28b60a91ae9'
+          blockers:
+        handover_evidence:
+          semantic_delivery_complete: true
+          subject_sha256: 'e3703d1c67c479af2cdc27bd964a2617a349580b10bb6b24dd44a28b60a91ae9'
+          reconstruction_sha256: '3d6aad20958e4695188fdaa97056dbe7029923a7d7452c7323202d4c7d370c9a'
+          native_id: 'fictional-handover-job-4c93feea-766f-4853-8bf6-9ac45e99cc82'
+          citations:
+            0:
+              source_id: 's1'
+              sha256: 'a59e635d1fccbef9dbb8114b2bb91e3b79428fa486019f979623ec104e3b0fe7'
+              offset: 0
+              length: 43
+              range_sha256: 'a59e635d1fccbef9dbb8114b2bb91e3b79428fa486019f979623ec104e3b0fe7'
+          reads:
+            0:
+              session_id: 'fictional-handover-job-4c93feea-766f-4853-8bf6-9ac45e99cc82'
+              source_id: 's1'
+              sha256: 'a59e635d1fccbef9dbb8114b2bb91e3b79428fa486019f979623ec104e3b0fe7'
+              offset: 0
+              end: 43
+              total: 43
+              range_sha256: 'a59e635d1fccbef9dbb8114b2bb91e3b79428fa486019f979623ec104e3b0fe7'
+              subject_sha256: 'e3703d1c67c479af2cdc27bd964a2617a349580b10bb6b24dd44a28b60a91ae9'
+            1:
+              session_id: 'fictional-handover-job-4c93feea-766f-4853-8bf6-9ac45e99cc82'
+              source_id: 's2'
+              sha256: '8209cfdc0aaf3990fc7ed2b3d191a9126c86424e493140cadb2dade94d037760'
+              offset: 0
+              end: 54
+              total: 54
+              range_sha256: '8209cfdc0aaf3990fc7ed2b3d191a9126c86424e493140cadb2dade94d037760'
+              subject_sha256: 'e3703d1c67c479af2cdc27bd964a2617a349580b10bb6b24dd44a28b60a91ae9'
+            2:
+              session_id: 'fictional-handover-job-4c93feea-766f-4853-8bf6-9ac45e99cc82'
+              source_id: 's3'
+              sha256: '31be36ec87b380dd77f73bcd66de6c517003d4bf852d3ab36c4af60f527f188f'
+              offset: 0
+              end: 32
+              total: 32
+              range_sha256: '31be36ec87b380dd77f73bcd66de6c517003d4bf852d3ab36c4af60f527f188f'
+              subject_sha256: 'e3703d1c67c479af2cdc27bd964a2617a349580b10bb6b24dd44a28b60a91ae9'
+            3:
+              session_id: 'fictional-handover-job-4c93feea-766f-4853-8bf6-9ac45e99cc82'
+              source_id: 's7'
+              sha256: 'ba2d787a2042ad2d2176a32a544fdb87a696f02783f7c1b90a865c2e6cbfbf1a'
+              offset: 0
+              end: 18
+              total: 18
+              range_sha256: 'ba2d787a2042ad2d2176a32a544fdb87a696f02783f7c1b90a865c2e6cbfbf1a'
+              subject_sha256: 'e3703d1c67c479af2cdc27bd964a2617a349580b10bb6b24dd44a28b60a91ae9'
+            4:
+              session_id: 'fictional-handover-job-4c93feea-766f-4853-8bf6-9ac45e99cc82'
+              source_id: 's8'
+              sha256: '4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945'
+              offset: 0
+              end: 2
+              total: 2
+              range_sha256: '4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945'
+              subject_sha256: 'e3703d1c67c479af2cdc27bd964a2617a349580b10bb6b24dd44a28b60a91ae9'
+            5:
+              session_id: 'fictional-handover-job-4c93feea-766f-4853-8bf6-9ac45e99cc82'
+              source_id: 's10'
+              sha256: '4a37e625c98117e5302a478702131145c6864269a863b943e64ebbf56dcea1ff'
+              offset: 0
+              end: 60
+              total: 60
+              range_sha256: '4a37e625c98117e5302a478702131145c6864269a863b943e64ebbf56dcea1ff'
+              subject_sha256: 'e3703d1c67c479af2cdc27bd964a2617a349580b10bb6b24dd44a28b60a91ae9'
+            6:
+              session_id: 'fictional-handover-job-4c93feea-766f-4853-8bf6-9ac45e99cc82'
+              source_id: 's14'
+              sha256: '0788583bdc8b7fa4310bf3640cea1f5486c8d31c826a0fc0b478e7a32a9d74f1'
+              offset: 0
+              end: 54
+              total: 54
+              range_sha256: '0788583bdc8b7fa4310bf3640cea1f5486c8d31c826a0fc0b478e7a32a9d74f1'
+              subject_sha256: 'e3703d1c67c479af2cdc27bd964a2617a349580b10bb6b24dd44a28b60a91ae9'
+            7:
+              session_id: 'fictional-handover-job-4c93feea-766f-4853-8bf6-9ac45e99cc82'
+              source_id: 's18'
+              sha256: '7158dd9985a987658b50746b7f3181e010abd072e545773cc68c7c2085865daa'
+              offset: 0
+              end: 7440
+              total: 7440
+              range_sha256: '7158dd9985a987658b50746b7f3181e010abd072e545773cc68c7c2085865daa'
+              subject_sha256: 'e3703d1c67c479af2cdc27bd964a2617a349580b10bb6b24dd44a28b60a91ae9'
+        created_at: '2026-11-06T18:50:56.760Z'
+    sessions:
+      qa:review:operating-plan-c0384a1b-094d-4e1e-a07a-cc4f6d686498:1:
+        instance_id: 'qa-b74bccaf-11af-4c25-9bd7-2f2a734137a2'
+        role: 'qa'
+        native_id: 'fictional-publication-job-1fe9ad0f-e0e5-4f0b-8879-c3a524b52587'
+        host: 'codex'
+        model_selection:
+          mode: 'default'
+      qa:review:handover-reconstruction-0f743dc7-4548-4a22-be97-a6c80dc5e345:1:
+        instance_id: 'qa-65145f5a-2b74-48bd-bc90-d51df035fe7e'
+        role: 'qa'
+        native_id: 'fictional-handover-job-4c93feea-766f-4853-8bf6-9ac45e99cc82'
+        host: 'codex'
+        model_selection:
+          mode: 'default'
+    jobs:
+      job-1fe9ad0f-e0e5-4f0b-8879-c3a524b52587:
+        requester:
+          role: 'runner'
+          session_id: 'fictional-incoming'
+          host: 'codex'
+          epoch: 2
+        id: 'job-1fe9ad0f-e0e5-4f0b-8879-c3a524b52587'
+        role: 'qa'
+        session_key: 'qa:review:operating-plan-c0384a1b-094d-4e1e-a07a-cc4f6d686498:1'
+        instance_id: 'qa-b74bccaf-11af-4c25-9bd7-2f2a734137a2'
+        native_id: 'fictional-publication-job-1fe9ad0f-e0e5-4f0b-8879-c3a524b52587'
+        host: 'codex'
+        epoch: 2
+        status: 'completed'
+        task: 'Independently review complete fictional operating conditions and preservation.'
+        context_format: 3
+        timeout_policy_version: 1
+        timeout_ms: 180000
+        timeout_reason: 'Backward-compatible default execution timeout'
+        model_selection:
+          mode: 'default'
+        cli_version: 'FICTIONAL ADAPTER DOUBLE'
+        task_summary: ~
+        next_handoff: ~
+        inputs:
+          0:
+            id: 'operating-plan-c0384a1b-094d-4e1e-a07a-cc4f6d686498'
+            revision: 1
+          1:
+            id: 'condition'
+            revision: 1
+        review_of:
+          id: 'operating-plan-c0384a1b-094d-4e1e-a07a-cc4f6d686498'
+          revision: 1
+        created_at: '2026-11-06T18:50:56.644Z'
+        context_sha256: '49fe4adfa2aee67c46f20483e0930af16ef4c97a5bc6cc309aa3ea4e4bdb3e2f'
+        started_at: '2026-11-06T18:50:56.652Z'
+        worker_pid: 34605
+        execution_started_at: '2026-11-06T18:50:56.659Z'
+        execution_deadline_at: '2026-11-06T18:53:56.659Z'
+        termination_deadline_at: '2026-11-06T18:53:59.659Z'
+        coordination_release:
+          termination_confirmed: true
+          reason: 'model_process_closed'
+          at: '2026-11-06T18:50:56.676Z'
+        artifact_id: 'artifact-ccfbeb17-597c-42b5-998a-408017e9aa35'
+        finished_at: '2026-11-06T18:50:56.676Z'
+        model_evidence:
+          reported_models:
+          reported_effort: ~
+          verification: 'unverified'
+          source: 'not_reported'
+          scope: 'unknown'
+      job-4c93feea-766f-4853-8bf6-9ac45e99cc82:
+        requester:
+          role: 'runner'
+          session_id: 'fictional-incoming'
+          host: 'codex'
+          epoch: 2
+        id: 'job-4c93feea-766f-4853-8bf6-9ac45e99cc82'
+        role: 'qa'
+        session_key: 'qa:review:handover-reconstruction-0f743dc7-4548-4a22-be97-a6c80dc5e345:1'
+        instance_id: 'qa-65145f5a-2b74-48bd-bc90-d51df035fe7e'
+        native_id: 'fictional-handover-job-4c93feea-766f-4853-8bf6-9ac45e99cc82'
+        host: 'codex'
+        epoch: 2
+        status: 'completed'
+        task: 'Independently check the complete exact fictional handover subject.'
+        context_format: 3
+        timeout_policy_version: 1
+        timeout_ms: 180000
+        timeout_reason: 'Backward-compatible default execution timeout'
+        model_selection:
+          mode: 'default'
+        cli_version: 'FICTIONAL ADAPTER DOUBLE'
+        task_summary: ~
+        next_handoff: ~
+        inputs:
+          0:
+            id: 'handover-reconstruction-0f743dc7-4548-4a22-be97-a6c80dc5e345'
+            revision: 1
+          1:
+            id: 'condition'
+            revision: 1
+        review_of:
+          id: 'handover-reconstruction-0f743dc7-4548-4a22-be97-a6c80dc5e345'
+          revision: 1
+        created_at: '2026-11-06T18:50:56.703Z'
+        context_sha256: 'f97153d30de4415b8fac8a3c429a99ba49f6c265c4d5580d96b4fc8239980f64'
+        started_at: '2026-11-06T18:50:56.716Z'
+        worker_pid: 34605
+        execution_started_at: '2026-11-06T18:50:56.724Z'
+        execution_deadline_at: '2026-11-06T18:53:56.724Z'
+        termination_deadline_at: '2026-11-06T18:53:59.724Z'
+        handover_reads:
+          0:
+            session_id: 'fictional-handover-job-4c93feea-766f-4853-8bf6-9ac45e99cc82'
+            source_id: 's1'
+            sha256: 'a59e635d1fccbef9dbb8114b2bb91e3b79428fa486019f979623ec104e3b0fe7'
+            offset: 0
+            end: 43
+            total: 43
+            range_sha256: 'a59e635d1fccbef9dbb8114b2bb91e3b79428fa486019f979623ec104e3b0fe7'
+            subject_sha256: 'e3703d1c67c479af2cdc27bd964a2617a349580b10bb6b24dd44a28b60a91ae9'
+          1:
+            session_id: 'fictional-handover-job-4c93feea-766f-4853-8bf6-9ac45e99cc82'
+            source_id: 's2'
+            sha256: '8209cfdc0aaf3990fc7ed2b3d191a9126c86424e493140cadb2dade94d037760'
+            offset: 0
+            end: 54
+            total: 54
+            range_sha256: '8209cfdc0aaf3990fc7ed2b3d191a9126c86424e493140cadb2dade94d037760'
+            subject_sha256: 'e3703d1c67c479af2cdc27bd964a2617a349580b10bb6b24dd44a28b60a91ae9'
+          2:
+            session_id: 'fictional-handover-job-4c93feea-766f-4853-8bf6-9ac45e99cc82'
+            source_id: 's3'
+            sha256: '31be36ec87b380dd77f73bcd66de6c517003d4bf852d3ab36c4af60f527f188f'
+            offset: 0
+            end: 32
+            total: 32
+            range_sha256: '31be36ec87b380dd77f73bcd66de6c517003d4bf852d3ab36c4af60f527f188f'
+            subject_sha256: 'e3703d1c67c479af2cdc27bd964a2617a349580b10bb6b24dd44a28b60a91ae9'
+          3:
+            session_id: 'fictional-handover-job-4c93feea-766f-4853-8bf6-9ac45e99cc82'
+            source_id: 's7'
+            sha256: 'ba2d787a2042ad2d2176a32a544fdb87a696f02783f7c1b90a865c2e6cbfbf1a'
+            offset: 0
+            end: 18
+            total: 18
+            range_sha256: 'ba2d787a2042ad2d2176a32a544fdb87a696f02783f7c1b90a865c2e6cbfbf1a'
+            subject_sha256: 'e3703d1c67c479af2cdc27bd964a2617a349580b10bb6b24dd44a28b60a91ae9'
+          4:
+            session_id: 'fictional-handover-job-4c93feea-766f-4853-8bf6-9ac45e99cc82'
+            source_id: 's8'
+            sha256: '4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945'
+            offset: 0
+            end: 2
+            total: 2
+            range_sha256: '4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945'
+            subject_sha256: 'e3703d1c67c479af2cdc27bd964a2617a349580b10bb6b24dd44a28b60a91ae9'
+          5:
+            session_id: 'fictional-handover-job-4c93feea-766f-4853-8bf6-9ac45e99cc82'
+            source_id: 's10'
+            sha256: '4a37e625c98117e5302a478702131145c6864269a863b943e64ebbf56dcea1ff'
+            offset: 0
+            end: 60
+            total: 60
+            range_sha256: '4a37e625c98117e5302a478702131145c6864269a863b943e64ebbf56dcea1ff'
+            subject_sha256: 'e3703d1c67c479af2cdc27bd964a2617a349580b10bb6b24dd44a28b60a91ae9'
+          6:
+            session_id: 'fictional-handover-job-4c93feea-766f-4853-8bf6-9ac45e99cc82'
+            source_id: 's14'
+            sha256: '0788583bdc8b7fa4310bf3640cea1f5486c8d31c826a0fc0b478e7a32a9d74f1'
+            offset: 0
+            end: 54
+            total: 54
+            range_sha256: '0788583bdc8b7fa4310bf3640cea1f5486c8d31c826a0fc0b478e7a32a9d74f1'
+            subject_sha256: 'e3703d1c67c479af2cdc27bd964a2617a349580b10bb6b24dd44a28b60a91ae9'
+          7:
+            session_id: 'fictional-handover-job-4c93feea-766f-4853-8bf6-9ac45e99cc82'
+            source_id: 's18'
+            sha256: '7158dd9985a987658b50746b7f3181e010abd072e545773cc68c7c2085865daa'
+            offset: 0
+            end: 7440
+            total: 7440
+            range_sha256: '7158dd9985a987658b50746b7f3181e010abd072e545773cc68c7c2085865daa'
+            subject_sha256: 'e3703d1c67c479af2cdc27bd964a2617a349580b10bb6b24dd44a28b60a91ae9'
+        coordination_release:
+          termination_confirmed: true
+          reason: 'model_process_closed'
+          at: '2026-11-06T18:50:56.760Z'
+        artifact_id: 'artifact-f8b9488e-7db1-49c8-9d6e-480a02f19083'
+        finished_at: '2026-11-06T18:50:56.760Z'
+        model_evidence:
+          reported_models:
+          reported_effort: ~
+          verification: 'unverified'
+          source: 'not_reported'
+          scope: 'unknown'
+    messages:
+    notices:
+    created_at: '2026-11-06T18:50:56.482Z'
+    revision: 18
+    updated_at: '2026-11-06T18:50:56.760Z'
+    handover:
+      id: 'handover-1a521c17-6cfd-4b62-b747-fe4921b8a25d'
+      status: 'pending'
+      previous_owner:
+        host: 'codex'
+        session_id: 'fictional-outgoing'
+        epoch: 1
+      incoming_owner:
+        host: 'codex'
+        session_id: 'fictional-incoming'
+        epoch: 2
+      created_at: '2026-11-06T18:50:56.612Z'
+      admission:
+        initial_packet_characters: 127038
+        worker_reserve_characters: 20000
+        request_limit: 200000
+        context_fit_verified: false
+        limitation: 'Admission proves bounded packet construction only; completion, cumulative model fit and independent understanding remain unverified.'
+      reconstruction_id: 'handover-reconstruction-0f743dc7-4548-4a22-be97-a6c80dc5e345'
+    retired_sessions:
+    operating_state:
+      protocol: 'operating-state-v1'
+      version: 1
+      plan:
+        id: 'operating-plan-c0384a1b-094d-4e1e-a07a-cc4f6d686498'
+        revision: 1
+        sha256: '9a8de3b5f8a1317ba5f5a645515dbd34fe142c0eecbbe517e3a878de67f4d017'
+      review:
+        id: 'artifact-ccfbeb17-597c-42b5-998a-408017e9aa35'
+        revision: 1
+        sha256: '62d4d5eaf10a47aa14a12b8facc7a7f0739408763f3b6dc9f28b162f839e42fd'
+      receipts:
+        0:
+          id: 'operating-plan-c0384a1b-094d-4e1e-a07a-cc4f6d686498'
+          revision: 1
+          sha256: '9a8de3b5f8a1317ba5f5a645515dbd34fe142c0eecbbe517e3a878de67f4d017'
+        1:
+          id: 'artifact-ccfbeb17-597c-42b5-998a-408017e9aa35'
+          revision: 1
+          sha256: '62d4d5eaf10a47aa14a12b8facc7a7f0739408763f3b6dc9f28b162f839e42fd'
+        2:
+          id: 'job:job-1fe9ad0f-e0e5-4f0b-8879-c3a524b52587'
+          revision: ~
+          sha256: 'a0d5b2356cfe7c7b24512f249468c5b9413086ea34598b5ff4ccbce671a548de'
+      accepted_snapshot:
+        protocol: 'operating-state-v1'
+        provenance:
+          0:
+            home_id: 'condition'
+            sources:
+              0:
+                id: 'condition'
+                revision: 1
+                sha256: 'c1409d9f4fcf74e750676ef9d953980fcc0ff0a9b9be95cfacd541a1d0607e36'
+        owner:
+          host: 'codex'
+          session_id: 'fictional-incoming'
+          epoch: 2
+        paused: true
+        controls:
+          company_id: 'company-7cc3dadb-4d64-494a-b071-c46dca4b4446'
+          idea: 'Fictional source contract only'
+          team_sha256: '12b650589dda4485aca72bd8efd9d9573862151ce4ba984d0568efd67db576ac'
+          governance: 'Read only. No external execution or retry authority.'
+          cos_instructions: 'Preserve every condition and uncertainty.'
+          roles:
+            qa:
+              name: 'QA'
+            engineer:
+              name: 'Engineering'
+          mode: 'preparation'
+          phase: 'Frame'
+          upgrade: ~
+          extensions:
+        source_root: '9c708cf22d7330f8f9dda164411bb8359f9b783a29bfc243145b0e0326f385be'
+        homes:
+          0:
+            id: 'condition'
+            revision: 1
+            sha256: 'c1409d9f4fcf74e750676ef9d953980fcc0ff0a9b9be95cfacd541a1d0607e36'
+        home_predicates:
+          0:
+            id: 'condition'
+            scope: '*'
+            dependencies:
+        communication:
+          notices:
+          messages:
+        classifications:
+        frontier:
+      valid_until: ~
+      at: '2026-11-06T18:50:56.683Z'
+  actual:
+    schema: 2
+    runtime_version: '0.7.3'
+    id: 'company-7cc3dadb-4d64-494a-b071-c46dca4b4446'
+    name: 'Untitled Venture'
+    idea: 'Fictional source contract only'
+    phase: 'Frame'
+    mode: 'preparation'
+    paused: true
+    plugin_version: '0.7.3'
+    governance: 'Read only. No external execution or retry authority.'
+    governance_sha256: '28f99838abc3794da94f97f7a2d234554811da3aef7b8ddb3742075caa78ec36'
+    roles:
+      qa:
+        name: 'QA'
+      engineer:
+        name: 'Engineering'
+    cos_instructions: 'Preserve every condition and uncertainty.'
+    team_sha256: '12b650589dda4485aca72bd8efd9d9573862151ce4ba984d0568efd67db576ac'
+    owner:
+      host: 'codex'
+      session_id: 'fictional-incoming'
+      epoch: 2
+    records:
+      control-a058b7fd-49ee-41c5-9506-73ce47442811:
+        id: 'control-a058b7fd-49ee-41c5-9506-73ce47442811'
+        kind: 'decision'
+        author_role: 'human_founder'
+        recorded_by: 'fictional-outgoing'
+        content: 'pause'
+        status: 'Recorded'
+        action: 'pause'
+        created_at: '2026-11-06T18:50:56.585Z'
+      control-513db921-911f-4ceb-9122-3b9971ffa663:
+        id: 'control-513db921-911f-4ceb-9122-3b9971ffa663'
+        kind: 'decision'
+        author_role: 'human_founder'
+        recorded_by: 'fictional-outgoing'
+        content: 'resume'
+        status: 'Recorded'
+        action: 'resume'
+        created_at: '2026-11-06T18:50:56.597Z'
+      condition:
+        id: 'condition'
+        kind: 'artifact'
+        content: 'Fictional obligation: no export or retry without canonical grants.'
+        operating_record:
+          version: 1
+          kind: 'obligation'
+          scope: '*'
+          owner: 'runner'
+          conditions: 'Always'
+          exceptions: 'None'
+          clearing: 'Independent exact closure'
+          expires_at: ~
+          dependencies:
+          authority_refs:
+          evidence_refs:
+            0: 'condition'
+        author_role: 'runner'
+        author_instance: 'fictional-outgoing'
+        revision: 1
+        status: 'Draft'
+        source_reference: ~
+        basis: ~
+        updated_at: '2026-11-06T18:50:56.609Z'
+        previous:
+      control-bd3bb1ca-1db9-4461-9455-2f85579a45c8:
+        id: 'control-bd3bb1ca-1db9-4461-9455-2f85579a45c8'
+        kind: 'decision'
+        author_role: 'human_founder'
+        recorded_by: 'fictional-incoming'
+        content: 'handover'
+        status: 'Recorded'
+        action: 'handover'
+        created_at: '2026-11-06T18:50:56.612Z'
+      operating-plan-c0384a1b-094d-4e1e-a07a-cc4f6d686498:
+        id: 'operating-plan-c0384a1b-094d-4e1e-a07a-cc4f6d686498'
+        kind: 'plan'
+        revision: 1
+        status: 'Draft'
+        author_role: 'runner'
+        author_instance: 'fictional-incoming'
+        content: 'Proposed current operating meaning; no authority, acceptance or legacy retirement.'
+        operating_plan:
+          protocol: 'operating-state-v1'
+          version: 1
+          snapshot:
+            protocol: 'operating-state-v1'
+            provenance:
+              0:
+                home_id: 'condition'
+                sources:
+                  0:
+                    id: 'condition'
+                    revision: 1
+                    sha256: 'c1409d9f4fcf74e750676ef9d953980fcc0ff0a9b9be95cfacd541a1d0607e36'
+            owner:
+              host: 'codex'
+              session_id: 'fictional-incoming'
+              epoch: 2
+            paused: true
+            controls:
+              company_id: 'company-7cc3dadb-4d64-494a-b071-c46dca4b4446'
+              idea: 'Fictional source contract only'
+              team_sha256: '12b650589dda4485aca72bd8efd9d9573862151ce4ba984d0568efd67db576ac'
+              governance: 'Read only. No external execution or retry authority.'
+              cos_instructions: 'Preserve every condition and uncertainty.'
+              roles:
+                qa:
+                  name: 'QA'
+                engineer:
+                  name: 'Engineering'
+              mode: 'preparation'
+              phase: 'Frame'
+              upgrade: ~
+              extensions:
+            source_root: '9c708cf22d7330f8f9dda164411bb8359f9b783a29bfc243145b0e0326f385be'
+            homes:
+              0:
+                id: 'condition'
+                revision: 1
+                sha256: 'c1409d9f4fcf74e750676ef9d953980fcc0ff0a9b9be95cfacd541a1d0607e36'
+            home_predicates:
+              0:
+                id: 'condition'
+                scope: '*'
+                dependencies:
+            communication:
+              notices:
+              messages:
+            classifications:
+            frontier:
+          maintenance: true
+          source_instruction: 'Fictional read-only publication review while paused; no execution authority.'
+          valid_until: ~
+        created_at: '2026-11-06T18:50:56.637Z'
+      artifact-ccfbeb17-597c-42b5-998a-408017e9aa35:
+        id: 'artifact-ccfbeb17-597c-42b5-998a-408017e9aa35'
+        kind: 'review'
+        content: 'FICTIONAL ADAPTER DOUBLE publication judgment.'
+        author_role: 'qa'
+        author_instance: 'qa-b74bccaf-11af-4c25-9bd7-2f2a734137a2'
+        revision: 1
+        status: 'Submitted'
+        job_id: 'job-1fe9ad0f-e0e5-4f0b-8879-c3a524b52587'
+        inputs:
+          0:
+            id: 'operating-plan-c0384a1b-094d-4e1e-a07a-cc4f6d686498'
+            revision: 1
+          1:
+            id: 'condition'
+            revision: 1
+        review_of:
+          id: 'operating-plan-c0384a1b-094d-4e1e-a07a-cc4f6d686498'
+          revision: 1
+        review:
+          verdict: 'Pass'
+          reason: 'Fictional preservation and authority checks'
+          permitted_action: 'publish_operating_state'
+          plan_sha256: '840ff622f8a7f55d43396a9a9efbd896271d6060c08daf8d4a249b24ccfc8b34'
+          preservation_complete: true
+          interaction_complete: true
+          authority_checked: true
+          blockers:
+        created_at: '2026-11-06T18:50:56.676Z'
+      handover-reconstruction-0f743dc7-4548-4a22-be97-a6c80dc5e345:
+        id: 'handover-reconstruction-0f743dc7-4548-4a22-be97-a6c80dc5e345'
+        kind: 'artifact'
+        revision: 1
+        status: 'Submitted'
+        author_role: 'runner'
+        author_instance: 'fictional-incoming'
+        content: 'Objectives: preserve fictional accepted obligations. Authority: read only; no export or retry grants. Conditions: all exceptions remain binding. Communication: retain complete notices. Unknown effects: held. Next: independent exact review before preparation resume.'
+        created_at: '2026-11-06T18:50:56.690Z'
+        handover:
+          id: 'handover-1a521c17-6cfd-4b62-b747-fe4921b8a25d'
+          evidence_protocol: 4
+          subject_sha256: 'e3703d1c67c479af2cdc27bd964a2617a349580b10bb6b24dd44a28b60a91ae9'
+          subject:
+            company_id: 'company-7cc3dadb-4d64-494a-b071-c46dca4b4446'
+            name: 'Untitled Venture'
+            idea: 'Fictional source contract only'
+            owner:
+              host: 'codex'
+              session_id: 'fictional-incoming'
+              epoch: 2
+            governance: 'Read only. No external execution or retry authority.'
+            cos_instructions: 'Preserve every condition and uncertainty.'
+            roles:
+              qa:
+                name: 'QA'
+              engineer:
+                name: 'Engineering'
+            team_sha256: '12b650589dda4485aca72bd8efd9d9573862151ce4ba984d0568efd67db576ac'
+            mode: 'preparation'
+            phase: 'Frame'
+            records:
+              condition:
+                id: 'condition'
+                kind: 'artifact'
+                content: 'Fictional obligation: no export or retry without canonical grants.'
+                operating_record:
+                  version: 1
+                  kind: 'obligation'
+                  scope: '*'
+                  owner: 'runner'
+                  conditions: 'Always'
+                  exceptions: 'None'
+                  clearing: 'Independent exact closure'
+                  expires_at: ~
+                  dependencies:
+                  authority_refs:
+                  evidence_refs:
+                    0: 'condition'
+                author_role: 'runner'
+                author_instance: 'fictional-outgoing'
+                revision: 1
+                status: 'Draft'
+                source_reference: ~
+                basis: ~
+                updated_at: '2026-11-06T18:50:56.609Z'
+                previous:
+            jobs:
+            upgrade: ~
+            upgrade_history:
+            notices:
+            messages:
+            operating_checkpoint:
+              protocol: 'operating-state-v1'
+              company_id: 'company-7cc3dadb-4d64-494a-b071-c46dca4b4446'
+              owner:
+                host: 'codex'
+                session_id: 'fictional-incoming'
+                epoch: 2
+              paused: true
+              scope: '*'
+              controls:
+                company_id: 'company-7cc3dadb-4d64-494a-b071-c46dca4b4446'
+                idea: 'Fictional source contract only'
+                team_sha256: '12b650589dda4485aca72bd8efd9d9573862151ce4ba984d0568efd67db576ac'
+                governance: 'Read only. No external execution or retry authority.'
+                cos_instructions: 'Preserve every condition and uncertainty.'
+                roles:
+                  qa:
+                    name: 'QA'
+                  engineer:
+                    name: 'Engineering'
+                mode: 'preparation'
+                phase: 'Frame'
+                upgrade: ~
+                extensions:
+              homes:
+                0:
+                  source:
+                    id: 'condition'
+                    revision: 1
+                    sha256: 'c1409d9f4fcf74e750676ef9d953980fcc0ff0a9b9be95cfacd541a1d0607e36'
+                  value:
+                    id: 'condition'
+                    kind: 'artifact'
+                    content: 'Fictional obligation: no export or retry without canonical grants.'
+                    operating_record:
+                      version: 1
+                      kind: 'obligation'
+                      scope: '*'
+                      owner: 'runner'
+                      conditions: 'Always'
+                      exceptions: 'None'
+                      clearing: 'Independent exact closure'
+                      expires_at: ~
+                      dependencies:
+                      authority_refs:
+                      evidence_refs:
+                        0: 'condition'
+                    author_role: 'runner'
+                    author_instance: 'fictional-outgoing'
+                    revision: 1
+                    status: 'Draft'
+                    source_reference: ~
+                    basis: ~
+                    updated_at: '2026-11-06T18:50:56.609Z'
+                    previous:
+              communication:
+                notices:
+                messages:
+              acceptance:
+                0:
+                  id: 'operating-plan-c0384a1b-094d-4e1e-a07a-cc4f6d686498'
+                  revision: 1
+                  sha256: '9a8de3b5f8a1317ba5f5a645515dbd34fe142c0eecbbe517e3a878de67f4d017'
+                1:
+                  id: 'artifact-ccfbeb17-597c-42b5-998a-408017e9aa35'
+                  revision: 1
+                  sha256: '62d4d5eaf10a47aa14a12b8facc7a7f0739408763f3b6dc9f28b162f839e42fd'
+                2:
+                  id: 'job:job-1fe9ad0f-e0e5-4f0b-8879-c3a524b52587'
+                  revision: ~
+                  sha256: 'a0d5b2356cfe7c7b24512f249468c5b9413086ea34598b5ff4ccbce671a548de'
+              valid_until: ~
+              applicable_set_root: '0750ea82a7bfb7b99a2fc111b29af5ed752b56a7f62b89d41e8235a5fd2dab62'
+          incoming_owner:
+            host: 'codex'
+            session_id: 'fictional-incoming'
+            epoch: 2
+          input_refs:
+            0:
+              id: 'condition'
+              revision: 1
+              sha256: 'c1409d9f4fcf74e750676ef9d953980fcc0ff0a9b9be95cfacd541a1d0607e36'
+      artifact-f8b9488e-7db1-49c8-9d6e-480a02f19083:
+        id: 'artifact-f8b9488e-7db1-49c8-9d6e-480a02f19083'
+        kind: 'review'
+        content: 'FICTIONAL ADAPTER DOUBLE: full subject delivered; synthetic exact review.'
+        author_role: 'qa'
+        author_instance: 'qa-65145f5a-2b74-48bd-bc90-d51df035fe7e'
+        revision: 1
+        status: 'Submitted'
+        job_id: 'job-4c93feea-766f-4853-8bf6-9ac45e99cc82'
+        inputs:
+          0:
+            id: 'handover-reconstruction-0f743dc7-4548-4a22-be97-a6c80dc5e345'
+            revision: 1
+          1:
+            id: 'condition'
+            revision: 1
+        review_of:
+          id: 'handover-reconstruction-0f743dc7-4548-4a22-be97-a6c80dc5e345'
+          revision: 1
+        review:
+          verdict: 'Pass'
+          reason: 'Fictional exact complete subject'
+          permitted_action: 'resume_handover'
+          subject_sha256: 'e3703d1c67c479af2cdc27bd964a2617a349580b10bb6b24dd44a28b60a91ae9'
+          blockers:
+        handover_evidence:
+          semantic_delivery_complete: true
+          subject_sha256: 'e3703d1c67c479af2cdc27bd964a2617a349580b10bb6b24dd44a28b60a91ae9'
+          reconstruction_sha256: '3d6aad20958e4695188fdaa97056dbe7029923a7d7452c7323202d4c7d370c9a'
+          native_id: 'fictional-handover-job-4c93feea-766f-4853-8bf6-9ac45e99cc82'
+          citations:
+            0:
+              source_id: 's1'
+              sha256: 'a59e635d1fccbef9dbb8114b2bb91e3b79428fa486019f979623ec104e3b0fe7'
+              offset: 0
+              length: 43
+              range_sha256: 'a59e635d1fccbef9dbb8114b2bb91e3b79428fa486019f979623ec104e3b0fe7'
+          reads:
+            0:
+              session_id: 'fictional-handover-job-4c93feea-766f-4853-8bf6-9ac45e99cc82'
+              source_id: 's1'
+              sha256: 'a59e635d1fccbef9dbb8114b2bb91e3b79428fa486019f979623ec104e3b0fe7'
+              offset: 0
+              end: 43
+              total: 43
+              range_sha256: 'a59e635d1fccbef9dbb8114b2bb91e3b79428fa486019f979623ec104e3b0fe7'
+              subject_sha256: 'e3703d1c67c479af2cdc27bd964a2617a349580b10bb6b24dd44a28b60a91ae9'
+            1:
+              session_id: 'fictional-handover-job-4c93feea-766f-4853-8bf6-9ac45e99cc82'
+              source_id: 's2'
+              sha256: '8209cfdc0aaf3990fc7ed2b3d191a9126c86424e493140cadb2dade94d037760'
+              offset: 0
+              end: 54
+              total: 54
+              range_sha256: '8209cfdc0aaf3990fc7ed2b3d191a9126c86424e493140cadb2dade94d037760'
+              subject_sha256: 'e3703d1c67c479af2cdc27bd964a2617a349580b10bb6b24dd44a28b60a91ae9'
+            2:
+              session_id: 'fictional-handover-job-4c93feea-766f-4853-8bf6-9ac45e99cc82'
+              source_id: 's3'
+              sha256: '31be36ec87b380dd77f73bcd66de6c517003d4bf852d3ab36c4af60f527f188f'
+              offset: 0
+              end: 32
+              total: 32
+              range_sha256: '31be36ec87b380dd77f73bcd66de6c517003d4bf852d3ab36c4af60f527f188f'
+              subject_sha256: 'e3703d1c67c479af2cdc27bd964a2617a349580b10bb6b24dd44a28b60a91ae9'
+            3:
+              session_id: 'fictional-handover-job-4c93feea-766f-4853-8bf6-9ac45e99cc82'
+              source_id: 's7'
+              sha256: 'ba2d787a2042ad2d2176a32a544fdb87a696f02783f7c1b90a865c2e6cbfbf1a'
+              offset: 0
+              end: 18
+              total: 18
+              range_sha256: 'ba2d787a2042ad2d2176a32a544fdb87a696f02783f7c1b90a865c2e6cbfbf1a'
+              subject_sha256: 'e3703d1c67c479af2cdc27bd964a2617a349580b10bb6b24dd44a28b60a91ae9'
+            4:
+              session_id: 'fictional-handover-job-4c93feea-766f-4853-8bf6-9ac45e99cc82'
+              source_id: 's8'
+              sha256: '4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945'
+              offset: 0
+              end: 2
+              total: 2
+              range_sha256: '4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945'
+              subject_sha256: 'e3703d1c67c479af2cdc27bd964a2617a349580b10bb6b24dd44a28b60a91ae9'
+            5:
+              session_id: 'fictional-handover-job-4c93feea-766f-4853-8bf6-9ac45e99cc82'
+              source_id: 's10'
+              sha256: '4a37e625c98117e5302a478702131145c6864269a863b943e64ebbf56dcea1ff'
+              offset: 0
+              end: 60
+              total: 60
+              range_sha256: '4a37e625c98117e5302a478702131145c6864269a863b943e64ebbf56dcea1ff'
+              subject_sha256: 'e3703d1c67c479af2cdc27bd964a2617a349580b10bb6b24dd44a28b60a91ae9'
+            6:
+              session_id: 'fictional-handover-job-4c93feea-766f-4853-8bf6-9ac45e99cc82'
+              source_id: 's14'
+              sha256: '0788583bdc8b7fa4310bf3640cea1f5486c8d31c826a0fc0b478e7a32a9d74f1'
+              offset: 0
+              end: 54
+              total: 54
+              range_sha256: '0788583bdc8b7fa4310bf3640cea1f5486c8d31c826a0fc0b478e7a32a9d74f1'
+              subject_sha256: 'e3703d1c67c479af2cdc27bd964a2617a349580b10bb6b24dd44a28b60a91ae9'
+            7:
+              session_id: 'fictional-handover-job-4c93feea-766f-4853-8bf6-9ac45e99cc82'
+              source_id: 's18'
+              sha256: '7158dd9985a987658b50746b7f3181e010abd072e545773cc68c7c2085865daa'
+              offset: 0
+              end: 7440
+              total: 7440
+              range_sha256: '7158dd9985a987658b50746b7f3181e010abd072e545773cc68c7c2085865daa'
+              subject_sha256: 'e3703d1c67c479af2cdc27bd964a2617a349580b10bb6b24dd44a28b60a91ae9'
+        created_at: '2026-11-06T18:50:56.760Z'
+    sessions:
+      qa:review:operating-plan-c0384a1b-094d-4e1e-a07a-cc4f6d686498:1:
+        instance_id: 'qa-b74bccaf-11af-4c25-9bd7-2f2a734137a2'
+        role: 'qa'
+        native_id: 'fictional-publication-job-1fe9ad0f-e0e5-4f0b-8879-c3a524b52587'
+        host: 'codex'
+        model_selection:
+          mode: 'default'
+      qa:review:handover-reconstruction-0f743dc7-4548-4a22-be97-a6c80dc5e345:1:
+        instance_id: 'qa-65145f5a-2b74-48bd-bc90-d51df035fe7e'
+        role: 'qa'
+        native_id: 'fictional-handover-job-4c93feea-766f-4853-8bf6-9ac45e99cc82'
+        host: 'codex'
+        model_selection:
+          mode: 'default'
+    jobs:
+      job-1fe9ad0f-e0e5-4f0b-8879-c3a524b52587:
+        requester:
+          role: 'runner'
+          session_id: 'fictional-incoming'
+          host: 'codex'
+          epoch: 2
+        id: 'job-1fe9ad0f-e0e5-4f0b-8879-c3a524b52587'
+        role: 'qa'
+        session_key: 'qa:review:operating-plan-c0384a1b-094d-4e1e-a07a-cc4f6d686498:1'
+        instance_id: 'qa-b74bccaf-11af-4c25-9bd7-2f2a734137a2'
+        native_id: 'fictional-publication-job-1fe9ad0f-e0e5-4f0b-8879-c3a524b52587'
+        host: 'codex'
+        epoch: 2
+        status: 'completed'
+        task: 'Independently review complete fictional operating conditions and preservation.'
+        context_format: 3
+        timeout_policy_version: 1
+        timeout_ms: 180000
+        timeout_reason: 'Backward-compatible default execution timeout'
+        model_selection:
+          mode: 'default'
+        cli_version: 'FICTIONAL ADAPTER DOUBLE'
+        task_summary: ~
+        next_handoff: ~
+        inputs:
+          0:
+            id: 'operating-plan-c0384a1b-094d-4e1e-a07a-cc4f6d686498'
+            revision: 1
+          1:
+            id: 'condition'
+            revision: 1
+        review_of:
+          id: 'operating-plan-c0384a1b-094d-4e1e-a07a-cc4f6d686498'
+          revision: 1
+        created_at: '2026-11-06T18:50:56.644Z'
+        context_sha256: '49fe4adfa2aee67c46f20483e0930af16ef4c97a5bc6cc309aa3ea4e4bdb3e2f'
+        started_at: '2026-11-06T18:50:56.652Z'
+        worker_pid: 34605
+        execution_started_at: '2026-11-06T18:50:56.659Z'
+        execution_deadline_at: '2026-11-06T18:53:56.659Z'
+        termination_deadline_at: '2026-11-06T18:53:59.659Z'
+        coordination_release:
+          termination_confirmed: true
+          reason: 'model_process_closed'
+          at: '2026-11-06T18:50:56.676Z'
+        artifact_id: 'artifact-ccfbeb17-597c-42b5-998a-408017e9aa35'
+        finished_at: '2026-11-06T18:50:56.676Z'
+        model_evidence:
+          reported_models:
+          reported_effort: ~
+          verification: 'unverified'
+          source: 'not_reported'
+          scope: 'unknown'
+      job-4c93feea-766f-4853-8bf6-9ac45e99cc82:
+        requester:
+          role: 'runner'
+          session_id: 'fictional-incoming'
+          host: 'codex'
+          epoch: 2
+        id: 'job-4c93feea-766f-4853-8bf6-9ac45e99cc82'
+        role: 'qa'
+        session_key: 'qa:review:handover-reconstruction-0f743dc7-4548-4a22-be97-a6c80dc5e345:1'
+        instance_id: 'qa-65145f5a-2b74-48bd-bc90-d51df035fe7e'
+        native_id: 'fictional-handover-job-4c93feea-766f-4853-8bf6-9ac45e99cc82'
+        host: 'codex'
+        epoch: 2
+        status: 'completed'
+        task: 'Independently check the complete exact fictional handover subject.'
+        context_format: 3
+        timeout_policy_version: 1
+        timeout_ms: 180000
+        timeout_reason: 'Backward-compatible default execution timeout'
+        model_selection:
+          mode: 'default'
+        cli_version: 'FICTIONAL ADAPTER DOUBLE'
+        task_summary: ~
+        next_handoff: ~
+        inputs:
+          0:
+            id: 'handover-reconstruction-0f743dc7-4548-4a22-be97-a6c80dc5e345'
+            revision: 1
+          1:
+            id: 'condition'
+            revision: 1
+        review_of:
+          id: 'handover-reconstruction-0f743dc7-4548-4a22-be97-a6c80dc5e345'
+          revision: 1
+        created_at: '2026-11-06T18:50:56.703Z'
+        context_sha256: 'f97153d30de4415b8fac8a3c429a99ba49f6c265c4d5580d96b4fc8239980f64'
+        started_at: '2026-11-06T18:50:56.716Z'
+        worker_pid: 34605
+        execution_started_at: '2026-11-06T18:50:56.724Z'
+        execution_deadline_at: '2026-11-06T18:53:56.724Z'
+        termination_deadline_at: '2026-11-06T18:53:59.724Z'
+        handover_reads:
+          0:
+            session_id: 'fictional-handover-job-4c93feea-766f-4853-8bf6-9ac45e99cc82'
+            source_id: 's1'
+            sha256: 'a59e635d1fccbef9dbb8114b2bb91e3b79428fa486019f979623ec104e3b0fe7'
+            offset: 0
+            end: 43
+            total: 43
+            range_sha256: 'a59e635d1fccbef9dbb8114b2bb91e3b79428fa486019f979623ec104e3b0fe7'
+            subject_sha256: 'e3703d1c67c479af2cdc27bd964a2617a349580b10bb6b24dd44a28b60a91ae9'
+          1:
+            session_id: 'fictional-handover-job-4c93feea-766f-4853-8bf6-9ac45e99cc82'
+            source_id: 's2'
+            sha256: '8209cfdc0aaf3990fc7ed2b3d191a9126c86424e493140cadb2dade94d037760'
+            offset: 0
+            end: 54
+            total: 54
+            range_sha256: '8209cfdc0aaf3990fc7ed2b3d191a9126c86424e493140cadb2dade94d037760'
+            subject_sha256: 'e3703d1c67c479af2cdc27bd964a2617a349580b10bb6b24dd44a28b60a91ae9'
+          2:
+            session_id: 'fictional-handover-job-4c93feea-766f-4853-8bf6-9ac45e99cc82'
+            source_id: 's3'
+            sha256: '31be36ec87b380dd77f73bcd66de6c517003d4bf852d3ab36c4af60f527f188f'
+            offset: 0
+            end: 32
+            total: 32
+            range_sha256: '31be36ec87b380dd77f73bcd66de6c517003d4bf852d3ab36c4af60f527f188f'
+            subject_sha256: 'e3703d1c67c479af2cdc27bd964a2617a349580b10bb6b24dd44a28b60a91ae9'
+          3:
+            session_id: 'fictional-handover-job-4c93feea-766f-4853-8bf6-9ac45e99cc82'
+            source_id: 's7'
+            sha256: 'ba2d787a2042ad2d2176a32a544fdb87a696f02783f7c1b90a865c2e6cbfbf1a'
+            offset: 0
+            end: 18
+            total: 18
+            range_sha256: 'ba2d787a2042ad2d2176a32a544fdb87a696f02783f7c1b90a865c2e6cbfbf1a'
+            subject_sha256: 'e3703d1c67c479af2cdc27bd964a2617a349580b10bb6b24dd44a28b60a91ae9'
+          4:
+            session_id: 'fictional-handover-job-4c93feea-766f-4853-8bf6-9ac45e99cc82'
+            source_id: 's8'
+            sha256: '4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945'
+            offset: 0
+            end: 2
+            total: 2
+            range_sha256: '4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945'
+            subject_sha256: 'e3703d1c67c479af2cdc27bd964a2617a349580b10bb6b24dd44a28b60a91ae9'
+          5:
+            session_id: 'fictional-handover-job-4c93feea-766f-4853-8bf6-9ac45e99cc82'
+            source_id: 's10'
+            sha256: '4a37e625c98117e5302a478702131145c6864269a863b943e64ebbf56dcea1ff'
+            offset: 0
+            end: 60
+            total: 60
+            range_sha256: '4a37e625c98117e5302a478702131145c6864269a863b943e64ebbf56dcea1ff'
+            subject_sha256: 'e3703d1c67c479af2cdc27bd964a2617a349580b10bb6b24dd44a28b60a91ae9'
+          6:
+            session_id: 'fictional-handover-job-4c93feea-766f-4853-8bf6-9ac45e99cc82'
+            source_id: 's14'
+            sha256: '0788583bdc8b7fa4310bf3640cea1f5486c8d31c826a0fc0b478e7a32a9d74f1'
+            offset: 0
+            end: 54
+            total: 54
+            range_sha256: '0788583bdc8b7fa4310bf3640cea1f5486c8d31c826a0fc0b478e7a32a9d74f1'
+            subject_sha256: 'e3703d1c67c479af2cdc27bd964a2617a349580b10bb6b24dd44a28b60a91ae9'
+          7:
+            session_id: 'fictional-handover-job-4c93feea-766f-4853-8bf6-9ac45e99cc82'
+            source_id: 's18'
+            sha256: '7158dd9985a987658b50746b7f3181e010abd072e545773cc68c7c2085865daa'
+            offset: 0
+            end: 7440
+            total: 7440
+            range_sha256: '7158dd9985a987658b50746b7f3181e010abd072e545773cc68c7c2085865daa'
+            subject_sha256: 'e3703d1c67c479af2cdc27bd964a2617a349580b10bb6b24dd44a28b60a91ae9'
+        coordination_release:
+          termination_confirmed: true
+          reason: 'model_process_closed'
+          at: '2026-11-06T18:50:56.760Z'
+        artifact_id: 'artifact-f8b9488e-7db1-49c8-9d6e-480a02f19083'
+        finished_at: '2026-11-06T18:50:56.760Z'
+        model_evidence:
+          reported_models:
+          reported_effort: ~
+          verification: 'unverified'
+          source: 'not_reported'
+          scope: 'unknown'
+    messages:
+    notices:
+    created_at: '2026-11-06T18:50:56.482Z'
+    revision: 19
+    updated_at: '2026-11-06T18:50:56.822Z'
+    handover:
+      id: 'handover-1a521c17-6cfd-4b62-b747-fe4921b8a25d'
+      status: 'pending'
+      previous_owner:
+        host: 'codex'
+        session_id: 'fictional-outgoing'
+        epoch: 1
+      incoming_owner:
+        host: 'codex'
+        session_id: 'fictional-incoming'
+        epoch: 2
+      created_at: '2026-11-06T18:50:56.612Z'
+      admission:
+        initial_packet_characters: 127038
+        worker_reserve_characters: 20000
+        request_limit: 200000
+        context_fit_verified: false
+        limitation: 'Admission proves bounded packet construction only; completion, cumulative model fit and independent understanding remain unverified.'
+      reconstruction_id: 'handover-reconstruction-0f743dc7-4548-4a22-be97-a6c80dc5e345'
+    retired_sessions:
+    operating_state:
+      protocol: 'operating-state-v1'
+      version: 1
+      plan:
+        id: 'operating-plan-c0384a1b-094d-4e1e-a07a-cc4f6d686498'
+        revision: 1
+        sha256: '9a8de3b5f8a1317ba5f5a645515dbd34fe142c0eecbbe517e3a878de67f4d017'
+      review:
+        id: 'artifact-ccfbeb17-597c-42b5-998a-408017e9aa35'
+        revision: 1
+        sha256: '62d4d5eaf10a47aa14a12b8facc7a7f0739408763f3b6dc9f28b162f839e42fd'
+      receipts:
+        0:
+          id: 'operating-plan-c0384a1b-094d-4e1e-a07a-cc4f6d686498'
+          revision: 1
+          sha256: '9a8de3b5f8a1317ba5f5a645515dbd34fe142c0eecbbe517e3a878de67f4d017'
+        1:
+          id: 'artifact-ccfbeb17-597c-42b5-998a-408017e9aa35'
+          revision: 1
+          sha256: '62d4d5eaf10a47aa14a12b8facc7a7f0739408763f3b6dc9f28b162f839e42fd'
+        2:
+          id: 'job:job-1fe9ad0f-e0e5-4f0b-8879-c3a524b52587'
+          revision: ~
+          sha256: 'a0d5b2356cfe7c7b24512f249468c5b9413086ea34598b5ff4ccbce671a548de'
+      accepted_snapshot:
+        protocol: 'operating-state-v1'
+        provenance:
+          0:
+            home_id: 'condition'
+            sources:
+              0:
+                id: 'condition'
+                revision: 1
+                sha256: 'c1409d9f4fcf74e750676ef9d953980fcc0ff0a9b9be95cfacd541a1d0607e36'
+        owner:
+          host: 'codex'
+          session_id: 'fictional-incoming'
+          epoch: 2
+        paused: true
+        controls:
+          company_id: 'company-7cc3dadb-4d64-494a-b071-c46dca4b4446'
+          idea: 'Fictional source contract only'
+          team_sha256: '12b650589dda4485aca72bd8efd9d9573862151ce4ba984d0568efd67db576ac'
+          governance: 'Read only. No external execution or retry authority.'
+          cos_instructions: 'Preserve every condition and uncertainty.'
+          roles:
+            qa:
+              name: 'QA'
+            engineer:
+              name: 'Engineering'
+          mode: 'preparation'
+          phase: 'Frame'
+          upgrade: ~
+          extensions:
+        source_root: '9c708cf22d7330f8f9dda164411bb8359f9b783a29bfc243145b0e0326f385be'
+        homes:
+          0:
+            id: 'condition'
+            revision: 1
+            sha256: 'c1409d9f4fcf74e750676ef9d953980fcc0ff0a9b9be95cfacd541a1d0607e36'
+        home_predicates:
+          0:
+            id: 'condition'
+            scope: '*'
+            dependencies:
+        communication:
+          notices:
+          messages:
+        classifications:
+        frontier:
+      valid_until: ~
+      at: '2026-11-06T18:50:56.683Z'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-control-20261106/source/tests/operating-control.test.mjs:83:9)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# Subtest: only exact pure runtime commands are mechanically ingested; conditions, unknown fields and generic saves stay held
+not ok 2 - only exact pure runtime commands are mechanically ingested; conditions, unknown fields and generic saves stay held
+  ---
+  duration_ms: 148.823458
+  location: '/private/tmp/soloco-operating-control-20261106/source/tests/operating-control.test.mjs:92:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    ... Skipped lines
+    
+      {
+        cos_instructions: 'Preserve every condition and uncertainty.',
+        created_at: '2026-11-06T18:50:56.835Z',
+        governance: 'Read only. No external execution or retry authority.',
+        governance_sha256: '28f99838abc3794da94f97f7a2d234554811da3aef7b8ddb3742075caa78ec36',
+    ...
+        },
+    +   revision: 13,
+    -   revision: 12,
+        roles: {
+          engineer: {
+            name: 'Engineering'
+          },
+          qa: {
+    ...
+        team_sha256: '12b650589dda4485aca72bd8efd9d9573862151ce4ba984d0568efd67db576ac',
+    +   updated_at: '2026-11-06T18:50:56.975Z'
+    -   updated_at: '2026-11-06T18:50:56.906Z'
+      }
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    schema: 2
+    runtime_version: '0.7.3'
+    id: 'company-26d4961a-8e12-4f3c-b2e3-f62c8be4c8e8'
+    name: 'Untitled Venture'
+    idea: 'Fictional source contract only'
+    phase: 'Frame'
+    mode: 'preparation'
+    paused: false
+    plugin_version: '0.7.3'
+    governance: 'Read only. No external execution or retry authority.'
+    governance_sha256: '28f99838abc3794da94f97f7a2d234554811da3aef7b8ddb3742075caa78ec36'
+    roles:
+      qa:
+        name: 'QA'
+      engineer:
+        name: 'Engineering'
+    cos_instructions: 'Preserve every condition and uncertainty.'
+    team_sha256: '12b650589dda4485aca72bd8efd9d9573862151ce4ba984d0568efd67db576ac'
+    owner:
+      host: 'codex'
+      session_id: 'fictional-outgoing'
+      epoch: 1
+    records:
+      control-6609475c-5eaf-413e-ab5a-f7b22c878eac:
+        id: 'control-6609475c-5eaf-413e-ab5a-f7b22c878eac'
+        kind: 'decision'
+        author_role: 'human_founder'
+        recorded_by: 'fictional-outgoing'
+        content: 'pause'
+        status: 'Recorded'
+        action: 'pause'
+        created_at: '2026-11-06T18:50:56.837Z'
+      control-9fb52219-5b82-4597-91b4-766d85954cc3:
+        id: 'control-9fb52219-5b82-4597-91b4-766d85954cc3'
+        kind: 'decision'
+        author_role: 'human_founder'
+        recorded_by: 'fictional-outgoing'
+        content: 'resume'
+        status: 'Recorded'
+        action: 'resume'
+        created_at: '2026-11-06T18:50:56.848Z'
+      condition:
+        id: 'condition'
+        kind: 'artifact'
+        content: 'Fictional obligation: no export or retry without canonical grants.'
+        operating_record:
+          version: 1
+          kind: 'obligation'
+          scope: '*'
+          owner: 'runner'
+          conditions: 'Always'
+          exceptions: 'None'
+          clearing: 'Independent exact closure'
+          expires_at: ~
+          dependencies:
+          authority_refs:
+          evidence_refs:
+            0: 'condition'
+        author_role: 'runner'
+        author_instance: 'fictional-outgoing'
+        revision: 1
+        status: 'Draft'
+        source_reference: ~
+        basis: ~
+        updated_at: '2026-11-06T18:50:56.856Z'
+        previous:
+      operating-plan-1fe93f94-9984-482b-b83b-a997e8ac1356:
+        id: 'operating-plan-1fe93f94-9984-482b-b83b-a997e8ac1356'
+        kind: 'plan'
+        revision: 1
+        status: 'Draft'
+        author_role: 'runner'
+        author_instance: 'fictional-outgoing'
+        content: 'Proposed current operating meaning; no authority, acceptance or legacy retirement.'
+        operating_plan:
+          protocol: 'operating-state-v1'
+          version: 1
+          snapshot:
+            protocol: 'operating-state-v1'
+            provenance:
+              0:
+                home_id: 'condition'
+                sources:
+                  0:
+                    id: 'condition'
+                    revision: 1
+                    sha256: '95ed36f0cf2dc1d6f949877c8405de162881de4ca9baacd392f5a241cab0753c'
+            owner:
+              host: 'codex'
+              session_id: 'fictional-outgoing'
+              epoch: 1
+            paused: false
+            controls:
+              company_id: 'company-26d4961a-8e12-4f3c-b2e3-f62c8be4c8e8'
+              idea: 'Fictional source contract only'
+              team_sha256: '12b650589dda4485aca72bd8efd9d9573862151ce4ba984d0568efd67db576ac'
+              governance: 'Read only. No external execution or retry authority.'
+              cos_instructions: 'Preserve every condition and uncertainty.'
+              roles:
+                qa:
+                  name: 'QA'
+                engineer:
+                  name: 'Engineering'
+              mode: 'preparation'
+              phase: 'Frame'
+              upgrade: ~
+              extensions:
+            source_root: '30c6b171a778767b15f86fb977f807b7d0e1020c5cb7b251645176b7c5f90519'
+            homes:
+              0:
+                id: 'condition'
+                revision: 1
+                sha256: '95ed36f0cf2dc1d6f949877c8405de162881de4ca9baacd392f5a241cab0753c'
+            home_predicates:
+              0:
+                id: 'condition'
+                scope: '*'
+                dependencies:
+            communication:
+              notices:
+              messages:
+            classifications:
+            frontier:
+          maintenance: false
+          source_instruction: 'Fictional read-only operating publication; no execution authority.'
+          valid_until: ~
+        created_at: '2026-11-06T18:50:56.859Z'
+      artifact-691e4860-b1bf-468b-8f93-378c0900760e:
+        id: 'artifact-691e4860-b1bf-468b-8f93-378c0900760e'
+        kind: 'review'
+        content: 'FICTIONAL ADAPTER DOUBLE publication judgment.'
+        author_role: 'qa'
+        author_instance: 'qa-9b5e1d83-d4ff-4739-91ba-a5946afe89f2'
+        revision: 1
+        status: 'Submitted'
+        job_id: 'job-d8f5ec79-86b9-41a0-858a-d8cefe01c6a9'
+        inputs:
+          0:
+            id: 'operating-plan-1fe93f94-9984-482b-b83b-a997e8ac1356'
+            revision: 1
+          1:
+            id: 'condition'
+            revision: 1
+        review_of:
+          id: 'operating-plan-1fe93f94-9984-482b-b83b-a997e8ac1356'
+          revision: 1
+        review:
+          verdict: 'Pass'
+          reason: 'Fictional preservation and authority checks'
+          permitted_action: 'publish_operating_state'
+          plan_sha256: 'c91ab127606e00b667b96ebba0fcc88659e7d36e59731b04fd4c6fb2d6f0dab1'
+          preservation_complete: true
+          interaction_complete: true
+          authority_checked: true
+          blockers:
+        created_at: '2026-11-06T18:50:56.887Z'
+      control-9c4c79ff-e854-4496-99a1-1d2f47e18318:
+        id: 'control-9c4c79ff-e854-4496-99a1-1d2f47e18318'
+        kind: 'decision'
+        author_role: 'human_founder'
+        recorded_by: 'fictional-outgoing'
+        content: 'Please pause the company!'
+        status: 'Recorded'
+        action: 'pause'
+        created_at: '2026-11-06T18:50:56.898Z'
+      control-ef6d2086-81e5-4fa5-bfb7-fbf7cc3792d5:
+        id: 'control-ef6d2086-81e5-4fa5-bfb7-fbf7cc3792d5'
+        kind: 'decision'
+        author_role: 'human_founder'
+        recorded_by: 'fictional-outgoing'
+        content: 'resume the company.'
+        status: 'Recorded'
+        action: 'resume'
+        created_at: '2026-11-06T18:50:56.906Z'
+    sessions:
+      qa:review:operating-plan-1fe93f94-9984-482b-b83b-a997e8ac1356:1:
+        instance_id: 'qa-9b5e1d83-d4ff-4739-91ba-a5946afe89f2'
+        role: 'qa'
+        native_id: 'fictional-publication-job-d8f5ec79-86b9-41a0-858a-d8cefe01c6a9'
+        host: 'codex'
+        model_selection:
+          mode: 'default'
+    jobs:
+      job-d8f5ec79-86b9-41a0-858a-d8cefe01c6a9:
+        requester:
+          role: 'runner'
+          session_id: 'fictional-outgoing'
+          host: 'codex'
+          epoch: 1
+        id: 'job-d8f5ec79-86b9-41a0-858a-d8cefe01c6a9'
+        role: 'qa'
+        session_key: 'qa:review:operating-plan-1fe93f94-9984-482b-b83b-a997e8ac1356:1'
+        instance_id: 'qa-9b5e1d83-d4ff-4739-91ba-a5946afe89f2'
+        native_id: 'fictional-publication-job-d8f5ec79-86b9-41a0-858a-d8cefe01c6a9'
+        host: 'codex'
+        epoch: 1
+        status: 'completed'
+        task: 'Independently review complete fictional operating conditions and preservation.'
+        context_format: 3
+        timeout_policy_version: 1
+        timeout_ms: 180000
+        timeout_reason: 'Backward-compatible default execution timeout'
+        model_selection:
+          mode: 'default'
+        cli_version: 'FICTIONAL ADAPTER DOUBLE'
+        task_summary: ~
+        next_handoff: ~
+        inputs:
+          0:
+            id: 'operating-plan-1fe93f94-9984-482b-b83b-a997e8ac1356'
+            revision: 1
+          1:
+            id: 'condition'
+            revision: 1
+        review_of:
+          id: 'operating-plan-1fe93f94-9984-482b-b83b-a997e8ac1356'
+          revision: 1
+        created_at: '2026-11-06T18:50:56.865Z'
+        context_sha256: 'aafb67f1c8bb6397f8b81769cc2b040fb2ea339a0419c96b9e17022382468310'
+        started_at: '2026-11-06T18:50:56.870Z'
+        worker_pid: 34605
+        execution_started_at: '2026-11-06T18:50:56.875Z'
+        execution_deadline_at: '2026-11-06T18:53:56.875Z'
+        termination_deadline_at: '2026-11-06T18:53:59.875Z'
+        coordination_release:
+          termination_confirmed: true
+          reason: 'model_process_closed'
+          at: '2026-11-06T18:50:56.887Z'
+        artifact_id: 'artifact-691e4860-b1bf-468b-8f93-378c0900760e'
+        finished_at: '2026-11-06T18:50:56.887Z'
+        model_evidence:
+          reported_models:
+          reported_effort: ~
+          verification: 'unverified'
+          source: 'not_reported'
+          scope: 'unknown'
+    messages:
+    notices:
+    created_at: '2026-11-06T18:50:56.835Z'
+    revision: 12
+    updated_at: '2026-11-06T18:50:56.906Z'
+    operating_state:
+      protocol: 'operating-state-v1'
+      version: 1
+      plan:
+        id: 'operating-plan-1fe93f94-9984-482b-b83b-a997e8ac1356'
+        revision: 1
+        sha256: 'd89c47cd5ae0d51146a226e72a516cc771064ca271dab0239add8524dcc9bbba'
+      review:
+        id: 'artifact-691e4860-b1bf-468b-8f93-378c0900760e'
+        revision: 1
+        sha256: 'cebf39064029727022c9ab20014f84547feec52703a56c7b73af6bfd92f44a3f'
+      receipts:
+        0:
+          id: 'operating-plan-1fe93f94-9984-482b-b83b-a997e8ac1356'
+          revision: 1
+          sha256: 'd89c47cd5ae0d51146a226e72a516cc771064ca271dab0239add8524dcc9bbba'
+        1:
+          id: 'artifact-691e4860-b1bf-468b-8f93-378c0900760e'
+          revision: 1
+          sha256: 'cebf39064029727022c9ab20014f84547feec52703a56c7b73af6bfd92f44a3f'
+        2:
+          id: 'job:job-d8f5ec79-86b9-41a0-858a-d8cefe01c6a9'
+          revision: ~
+          sha256: '1ecffc01b4457576f9a2566f1a3cde9600f2a65c3ad68f6f0cc6ebc20ee00fab'
+      accepted_snapshot:
+        protocol: 'operating-state-v1'
+        provenance:
+          0:
+            home_id: 'condition'
+            sources:
+              0:
+                id: 'condition'
+                revision: 1
+                sha256: '95ed36f0cf2dc1d6f949877c8405de162881de4ca9baacd392f5a241cab0753c'
+        owner:
+          host: 'codex'
+          session_id: 'fictional-outgoing'
+          epoch: 1
+        paused: false
+        controls:
+          company_id: 'company-26d4961a-8e12-4f3c-b2e3-f62c8be4c8e8'
+          idea: 'Fictional source contract only'
+          team_sha256: '12b650589dda4485aca72bd8efd9d9573862151ce4ba984d0568efd67db576ac'
+          governance: 'Read only. No external execution or retry authority.'
+          cos_instructions: 'Preserve every condition and uncertainty.'
+          roles:
+            qa:
+              name: 'QA'
+            engineer:
+              name: 'Engineering'
+          mode: 'preparation'
+          phase: 'Frame'
+          upgrade: ~
+          extensions:
+        source_root: '30c6b171a778767b15f86fb977f807b7d0e1020c5cb7b251645176b7c5f90519'
+        homes:
+          0:
+            id: 'condition'
+            revision: 1
+            sha256: '95ed36f0cf2dc1d6f949877c8405de162881de4ca9baacd392f5a241cab0753c'
+        home_predicates:
+          0:
+            id: 'condition'
+            scope: '*'
+            dependencies:
+        communication:
+          notices:
+          messages:
+        classifications:
+        frontier:
+      valid_until: ~
+      at: '2026-11-06T18:50:56.893Z'
+  actual:
+    schema: 2
+    runtime_version: '0.7.3'
+    id: 'company-26d4961a-8e12-4f3c-b2e3-f62c8be4c8e8'
+    name: 'Untitled Venture'
+    idea: 'Fictional source contract only'
+    phase: 'Frame'
+    mode: 'preparation'
+    paused: false
+    plugin_version: '0.7.3'
+    governance: 'Read only. No external execution or retry authority.'
+    governance_sha256: '28f99838abc3794da94f97f7a2d234554811da3aef7b8ddb3742075caa78ec36'
+    roles:
+      qa:
+        name: 'QA'
+      engineer:
+        name: 'Engineering'
+    cos_instructions: 'Preserve every condition and uncertainty.'
+    team_sha256: '12b650589dda4485aca72bd8efd9d9573862151ce4ba984d0568efd67db576ac'
+    owner:
+      host: 'codex'
+      session_id: 'fictional-outgoing'
+      epoch: 1
+    records:
+      control-6609475c-5eaf-413e-ab5a-f7b22c878eac:
+        id: 'control-6609475c-5eaf-413e-ab5a-f7b22c878eac'
+        kind: 'decision'
+        author_role: 'human_founder'
+        recorded_by: 'fictional-outgoing'
+        content: 'pause'
+        status: 'Recorded'
+        action: 'pause'
+        created_at: '2026-11-06T18:50:56.837Z'
+      control-9fb52219-5b82-4597-91b4-766d85954cc3:
+        id: 'control-9fb52219-5b82-4597-91b4-766d85954cc3'
+        kind: 'decision'
+        author_role: 'human_founder'
+        recorded_by: 'fictional-outgoing'
+        content: 'resume'
+        status: 'Recorded'
+        action: 'resume'
+        created_at: '2026-11-06T18:50:56.848Z'
+      condition:
+        id: 'condition'
+        kind: 'artifact'
+        content: 'Fictional obligation: no export or retry without canonical grants.'
+        operating_record:
+          version: 1
+          kind: 'obligation'
+          scope: '*'
+          owner: 'runner'
+          conditions: 'Always'
+          exceptions: 'None'
+          clearing: 'Independent exact closure'
+          expires_at: ~
+          dependencies:
+          authority_refs:
+          evidence_refs:
+            0: 'condition'
+        author_role: 'runner'
+        author_instance: 'fictional-outgoing'
+        revision: 1
+        status: 'Draft'
+        source_reference: ~
+        basis: ~
+        updated_at: '2026-11-06T18:50:56.856Z'
+        previous:
+      operating-plan-1fe93f94-9984-482b-b83b-a997e8ac1356:
+        id: 'operating-plan-1fe93f94-9984-482b-b83b-a997e8ac1356'
+        kind: 'plan'
+        revision: 1
+        status: 'Draft'
+        author_role: 'runner'
+        author_instance: 'fictional-outgoing'
+        content: 'Proposed current operating meaning; no authority, acceptance or legacy retirement.'
+        operating_plan:
+          protocol: 'operating-state-v1'
+          version: 1
+          snapshot:
+            protocol: 'operating-state-v1'
+            provenance:
+              0:
+                home_id: 'condition'
+                sources:
+                  0:
+                    id: 'condition'
+                    revision: 1
+                    sha256: '95ed36f0cf2dc1d6f949877c8405de162881de4ca9baacd392f5a241cab0753c'
+            owner:
+              host: 'codex'
+              session_id: 'fictional-outgoing'
+              epoch: 1
+            paused: false
+            controls:
+              company_id: 'company-26d4961a-8e12-4f3c-b2e3-f62c8be4c8e8'
+              idea: 'Fictional source contract only'
+              team_sha256: '12b650589dda4485aca72bd8efd9d9573862151ce4ba984d0568efd67db576ac'
+              governance: 'Read only. No external execution or retry authority.'
+              cos_instructions: 'Preserve every condition and uncertainty.'
+              roles:
+                qa:
+                  name: 'QA'
+                engineer:
+                  name: 'Engineering'
+              mode: 'preparation'
+              phase: 'Frame'
+              upgrade: ~
+              extensions:
+            source_root: '30c6b171a778767b15f86fb977f807b7d0e1020c5cb7b251645176b7c5f90519'
+            homes:
+              0:
+                id: 'condition'
+                revision: 1
+                sha256: '95ed36f0cf2dc1d6f949877c8405de162881de4ca9baacd392f5a241cab0753c'
+            home_predicates:
+              0:
+                id: 'condition'
+                scope: '*'
+                dependencies:
+            communication:
+              notices:
+              messages:
+            classifications:
+            frontier:
+          maintenance: false
+          source_instruction: 'Fictional read-only operating publication; no execution authority.'
+          valid_until: ~
+        created_at: '2026-11-06T18:50:56.859Z'
+      artifact-691e4860-b1bf-468b-8f93-378c0900760e:
+        id: 'artifact-691e4860-b1bf-468b-8f93-378c0900760e'
+        kind: 'review'
+        content: 'FICTIONAL ADAPTER DOUBLE publication judgment.'
+        author_role: 'qa'
+        author_instance: 'qa-9b5e1d83-d4ff-4739-91ba-a5946afe89f2'
+        revision: 1
+        status: 'Submitted'
+        job_id: 'job-d8f5ec79-86b9-41a0-858a-d8cefe01c6a9'
+        inputs:
+          0:
+            id: 'operating-plan-1fe93f94-9984-482b-b83b-a997e8ac1356'
+            revision: 1
+          1:
+            id: 'condition'
+            revision: 1
+        review_of:
+          id: 'operating-plan-1fe93f94-9984-482b-b83b-a997e8ac1356'
+          revision: 1
+        review:
+          verdict: 'Pass'
+          reason: 'Fictional preservation and authority checks'
+          permitted_action: 'publish_operating_state'
+          plan_sha256: 'c91ab127606e00b667b96ebba0fcc88659e7d36e59731b04fd4c6fb2d6f0dab1'
+          preservation_complete: true
+          interaction_complete: true
+          authority_checked: true
+          blockers:
+        created_at: '2026-11-06T18:50:56.887Z'
+      control-9c4c79ff-e854-4496-99a1-1d2f47e18318:
+        id: 'control-9c4c79ff-e854-4496-99a1-1d2f47e18318'
+        kind: 'decision'
+        author_role: 'human_founder'
+        recorded_by: 'fictional-outgoing'
+        content: 'Please pause the company!'
+        status: 'Recorded'
+        action: 'pause'
+        created_at: '2026-11-06T18:50:56.898Z'
+      control-ef6d2086-81e5-4fa5-bfb7-fbf7cc3792d5:
+        id: 'control-ef6d2086-81e5-4fa5-bfb7-fbf7cc3792d5'
+        kind: 'decision'
+        author_role: 'human_founder'
+        recorded_by: 'fictional-outgoing'
+        content: 'resume the company.'
+        status: 'Recorded'
+        action: 'resume'
+        created_at: '2026-11-06T18:50:56.906Z'
+    sessions:
+      qa:review:operating-plan-1fe93f94-9984-482b-b83b-a997e8ac1356:1:
+        instance_id: 'qa-9b5e1d83-d4ff-4739-91ba-a5946afe89f2'
+        role: 'qa'
+        native_id: 'fictional-publication-job-d8f5ec79-86b9-41a0-858a-d8cefe01c6a9'
+        host: 'codex'
+        model_selection:
+          mode: 'default'
+    jobs:
+      job-d8f5ec79-86b9-41a0-858a-d8cefe01c6a9:
+        requester:
+          role: 'runner'
+          session_id: 'fictional-outgoing'
+          host: 'codex'
+          epoch: 1
+        id: 'job-d8f5ec79-86b9-41a0-858a-d8cefe01c6a9'
+        role: 'qa'
+        session_key: 'qa:review:operating-plan-1fe93f94-9984-482b-b83b-a997e8ac1356:1'
+        instance_id: 'qa-9b5e1d83-d4ff-4739-91ba-a5946afe89f2'
+        native_id: 'fictional-publication-job-d8f5ec79-86b9-41a0-858a-d8cefe01c6a9'
+        host: 'codex'
+        epoch: 1
+        status: 'completed'
+        task: 'Independently review complete fictional operating conditions and preservation.'
+        context_format: 3
+        timeout_policy_version: 1
+        timeout_ms: 180000
+        timeout_reason: 'Backward-compatible default execution timeout'
+        model_selection:
+          mode: 'default'
+        cli_version: 'FICTIONAL ADAPTER DOUBLE'
+        task_summary: ~
+        next_handoff: ~
+        inputs:
+          0:
+            id: 'operating-plan-1fe93f94-9984-482b-b83b-a997e8ac1356'
+            revision: 1
+          1:
+            id: 'condition'
+            revision: 1
+        review_of:
+          id: 'operating-plan-1fe93f94-9984-482b-b83b-a997e8ac1356'
+          revision: 1
+        created_at: '2026-11-06T18:50:56.865Z'
+        context_sha256: 'aafb67f1c8bb6397f8b81769cc2b040fb2ea339a0419c96b9e17022382468310'
+        started_at: '2026-11-06T18:50:56.870Z'
+        worker_pid: 34605
+        execution_started_at: '2026-11-06T18:50:56.875Z'
+        execution_deadline_at: '2026-11-06T18:53:56.875Z'
+        termination_deadline_at: '2026-11-06T18:53:59.875Z'
+        coordination_release:
+          termination_confirmed: true
+          reason: 'model_process_closed'
+          at: '2026-11-06T18:50:56.887Z'
+        artifact_id: 'artifact-691e4860-b1bf-468b-8f93-378c0900760e'
+        finished_at: '2026-11-06T18:50:56.887Z'
+        model_evidence:
+          reported_models:
+          reported_effort: ~
+          verification: 'unverified'
+          source: 'not_reported'
+          scope: 'unknown'
+    messages:
+    notices:
+    created_at: '2026-11-06T18:50:56.835Z'
+    revision: 13
+    updated_at: '2026-11-06T18:50:56.975Z'
+    operating_state:
+      protocol: 'operating-state-v1'
+      version: 1
+      plan:
+        id: 'operating-plan-1fe93f94-9984-482b-b83b-a997e8ac1356'
+        revision: 1
+        sha256: 'd89c47cd5ae0d51146a226e72a516cc771064ca271dab0239add8524dcc9bbba'
+      review:
+        id: 'artifact-691e4860-b1bf-468b-8f93-378c0900760e'
+        revision: 1
+        sha256: 'cebf39064029727022c9ab20014f84547feec52703a56c7b73af6bfd92f44a3f'
+      receipts:
+        0:
+          id: 'operating-plan-1fe93f94-9984-482b-b83b-a997e8ac1356'
+          revision: 1
+          sha256: 'd89c47cd5ae0d51146a226e72a516cc771064ca271dab0239add8524dcc9bbba'
+        1:
+          id: 'artifact-691e4860-b1bf-468b-8f93-378c0900760e'
+          revision: 1
+          sha256: 'cebf39064029727022c9ab20014f84547feec52703a56c7b73af6bfd92f44a3f'
+        2:
+          id: 'job:job-d8f5ec79-86b9-41a0-858a-d8cefe01c6a9'
+          revision: ~
+          sha256: '1ecffc01b4457576f9a2566f1a3cde9600f2a65c3ad68f6f0cc6ebc20ee00fab'
+      accepted_snapshot:
+        protocol: 'operating-state-v1'
+        provenance:
+          0:
+            home_id: 'condition'
+            sources:
+              0:
+                id: 'condition'
+                revision: 1
+                sha256: '95ed36f0cf2dc1d6f949877c8405de162881de4ca9baacd392f5a241cab0753c'
+        owner:
+          host: 'codex'
+          session_id: 'fictional-outgoing'
+          epoch: 1
+        paused: false
+        controls:
+          company_id: 'company-26d4961a-8e12-4f3c-b2e3-f62c8be4c8e8'
+          idea: 'Fictional source contract only'
+          team_sha256: '12b650589dda4485aca72bd8efd9d9573862151ce4ba984d0568efd67db576ac'
+          governance: 'Read only. No external execution or retry authority.'
+          cos_instructions: 'Preserve every condition and uncertainty.'
+          roles:
+            qa:
+              name: 'QA'
+            engineer:
+              name: 'Engineering'
+          mode: 'preparation'
+          phase: 'Frame'
+          upgrade: ~
+          extensions:
+        source_root: '30c6b171a778767b15f86fb977f807b7d0e1020c5cb7b251645176b7c5f90519'
+        homes:
+          0:
+            id: 'condition'
+            revision: 1
+            sha256: '95ed36f0cf2dc1d6f949877c8405de162881de4ca9baacd392f5a241cab0753c'
+        home_predicates:
+          0:
+            id: 'condition'
+            scope: '*'
+            dependencies:
+        communication:
+          notices:
+          messages:
+        classifications:
+        frontier:
+      valid_until: ~
+      at: '2026-11-06T18:50:56.893Z'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-control-20261106/source/tests/operating-control.test.mjs:101:204)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: actual conditional handover retains founder conditions and unknown legacy remains held on first pass
+ok 3 - actual conditional handover retains founder conditions and unknown legacy remains held on first pass
+  ---
+  duration_ms: 84.559375
+  ...
+1..3
+# tests 3
+# suites 0
+# pass 1
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 702.000417

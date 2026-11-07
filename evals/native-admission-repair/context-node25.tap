@@ -1,0 +1,29 @@
+(node:1896) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ complete extraction, independent reconciliation and final mapping; immutable original retained (19.890291ms)
+✔ historical checkpoint, handover subject and old team UNIQUE restrictions are compulsory (5.77825ms)
+✔ exact source, counterpart, dependency, producer, governance and semantic notice freshness; informational history independent (262.385209ms)
+✔ notice deliveries and seen are mechanical; changed notice semantics invalidate exclusion (0.70725ms)
+▶ injected worker rejects all omitted output channels before persistence and retains exact bad output/provenance
+  ✔ content (1011.687875ms)
+  ✔ result_unknown_property (97.818208ms)
+  ✔ item_unknown_property (77.024709ms)
+  ✔ message_to_engineer (175.603125ms)
+  ✔ message_to_qa (144.745417ms)
+  ✔ notice (79.210667ms)
+✔ injected worker rejects all omitted output channels before persistence and retains exact bad output/provenance (1586.892916ms)
+✔ malformed raw qualification JSON retains exact text and target provenance through the worker failure path (179.886667ms)
+✔ worker retains the negative verdict when rejecting unknown qualification output keys (98.294208ms)
+✔ canonical apply rechecks closed leaf envelopes even with refreshed child references (76.767125ms)
+✔ worker delivers complete bounded wire once, retains canonical native proof and supports different aggregate reviewer (1377.592875ms)
+✔ wire-size accounting: actual worker retains pretty output and canonical apply enforces both independent caps (484.628ms)
+✔ worker rejects supplemental growth, invalid response, CoS native and oversized UTF-8 output (374.323208ms)
+✔ worker requires observed spawn timing and preserves timeout/closure failure evidence (172.721167ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 18
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4883.273583

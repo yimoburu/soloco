@@ -1,0 +1,90 @@
+TAP version 13
+# (node:59959) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: missing production intake provider is fail closed
+ok 1 - missing production intake provider is fail closed
+  ---
+  duration_ms: 0.462209
+  ...
+# Subtest: initial unknown legacy is never relabeled accepted
+ok 2 - initial unknown legacy is never relabeled accepted
+  ---
+  duration_ms: 22.382541
+  ...
+# Subtest: immutable accepted home survives replacement; new global restriction holds ordinary but complete delta repair publishes
+not ok 3 - immutable accepted home survives replacement; new global restriction holds ordinary but complete delta repair publishes
+  ---
+  duration_ms: 12.174917
+  location: '/private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-checkpoint.test.mjs:39:1'
+  failureType: 'testCodeFailure'
+  error: 'exactProof is not defined'
+  code: 'ERR_TEST_FAILURE'
+  name: 'ReferenceError'
+  stack: |-
+    bookkeeping (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:107:51)
+    inputUnchanged (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:271:11)
+    operatingContext (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:417:3)
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-checkpoint.test.mjs:41:15)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:931:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:629:18)
+    Test.postRun (node:internal/test_runner/test:1042:19)
+    Test.run (node:internal/test_runner/test:970:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: successor exact base and concurrent semantic intake including reverted intake hold
+not ok 4 - successor exact base and concurrent semantic intake including reverted intake hold
+  ---
+  duration_ms: 11.7105
+  location: '/private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-checkpoint.test.mjs:50:1'
+  failureType: 'testCodeFailure'
+  error: 'exactProof is not defined'
+  code: 'ERR_TEST_FAILURE'
+  name: 'ReferenceError'
+  stack: |-
+    bookkeeping (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:107:51)
+    inputUnchanged (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:271:11)
+    livePlan (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:300:30)
+    operatingReviewContext (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:306:11)
+    review (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-checkpoint.test.mjs:30:10)
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-checkpoint.test.mjs:50:255)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:931:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:629:18)
+    Test.postRun (node:internal/test_runner/test:1042:19)
+  ...
+# Subtest: missing original, changed producer, rejected negative, expiry and unknown nested producer hold
+ok 5 - missing original, changed producer, rejected negative, expiry and unknown nested producer hold
+  ---
+  duration_ms: 50.650917
+  ...
+# Subtest: canonical known historical evidence freezes before bookkeeping; nested originals remain checked
+not ok 6 - canonical known historical evidence freezes before bookkeeping; nested originals remain checked
+  ---
+  duration_ms: 12.358959
+  location: '/private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-checkpoint.test.mjs:53:1'
+  failureType: 'testCodeFailure'
+  error: 'exactProof is not defined'
+  code: 'ERR_TEST_FAILURE'
+  name: 'ReferenceError'
+  stack: |-
+    bookkeeping (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:107:51)
+    inputUnchanged (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:271:11)
+    operatingContext (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:417:3)
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-checkpoint.test.mjs:61:27)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:931:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:629:18)
+    Test.postRun (node:internal/test_runner/test:1042:19)
+    Test.run (node:internal/test_runner/test:970:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 3
+# fail 3
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 187.863125

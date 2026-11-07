@@ -1,0 +1,48 @@
+{
+  "authority": "Schema-only strict LOWER BOUND, no nativecall, no plans/targets/artifacts/Passes or companychanges. Symbolic IDs are width-only, not receipts. Uses mandatory canonical boundary interface for every complete intrinsic batch. Actual semantic interfaces can only increase output.",
+  "source_sha256": "88260d425355e4133ea8a01c4f8bb3e699768fcc9ace2aa74817a7f1fedef46c",
+  "sample_source": "actual-partition-components-1052-7dce593c75bf.json",
+  "snapshot": {
+    "revision": 1052,
+    "event_sequence": 1053,
+    "logical_sha256": "980bedfc4c6d55f4c667b04f313566da295f15f2a56b749b8b1986d24ef4ce83",
+    "immutable_readset_sha256": "a1f8fc69ef7ad1612295a02bfca13187a7e16e6b85b91c2bcbc40200956ae9ed"
+  },
+  "mandatory_interface_text": "Intrinsic bodies grant no applicability or authority. Independently reconcile EVERY physical occurrence, complete ancestors, ordered collection members, named originals, inbound edges, unknown and distant coupling for this exact source claim; all negative and exhausted states remain mandatory.",
+  "measurements": [
+    {
+      "category": "global",
+      "required_intrinsic_batches": 9,
+      "mandatory_verbatim_runtime_boundary_interfaces_bytes": 4690,
+      "result_cap_bytes": 12000,
+      "interfaces_alone_prove_no_fit": false,
+      "actual_semantic_items_interfaces_mappings_not_counted": true
+    },
+    {
+      "category": "largest-local",
+      "required_intrinsic_batches": 44,
+      "mandatory_verbatim_runtime_boundary_interfaces_bytes": 22925,
+      "result_cap_bytes": 12000,
+      "interfaces_alone_prove_no_fit": true,
+      "actual_semantic_items_interfaces_mappings_not_counted": true
+    },
+    {
+      "category": "median-local",
+      "required_intrinsic_batches": 43,
+      "mandatory_verbatim_runtime_boundary_interfaces_bytes": 22404,
+      "result_cap_bytes": 12000,
+      "interfaces_alone_prove_no_fit": true,
+      "actual_semantic_items_interfaces_mappings_not_counted": true
+    },
+    {
+      "category": "smallest-local",
+      "required_intrinsic_batches": 36,
+      "mandatory_verbatim_runtime_boundary_interfaces_bytes": 18757,
+      "result_cap_bytes": 12000,
+      "interfaces_alone_prove_no_fit": true,
+      "actual_semantic_items_interfaces_mappings_not_counted": true
+    }
+  ],
+  "whole_assignment_native_fit": null,
+  "semantic_acceptance": false
+}

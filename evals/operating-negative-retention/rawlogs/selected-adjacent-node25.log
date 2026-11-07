@@ -1,0 +1,28 @@
+(node:38179) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+▶ injected worker rejects all omitted output channels before persistence and retains exact bad output/provenance
+  ✔ content (854.209208ms)
+  ✔ result_unknown_property (76.252875ms)
+  ✔ item_unknown_property (96.543208ms)
+  ✔ message_to_engineer (87.769958ms)
+  ✔ message_to_qa (86.043542ms)
+  ✔ notice (94.224ms)
+✔ injected worker rejects all omitted output channels before persistence and retains exact bad output/provenance (1296.304958ms)
+✔ malformed raw qualification JSON retains exact text and target provenance through the worker failure path (83.019958ms)
+✔ worker retains the negative verdict when rejecting unknown qualification output keys (77.830375ms)
+(node:38180) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ frozen publication worker rejects unread semantics, changed native and changed current membership (3837.681292ms)
+✔ publication cannot reuse provenance-bound rejected native identities from a preserved failed job (2273.125958ms)
+(node:38181) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ single-packet rejected identities preserve older canonical extraction and never become bindings (1923.020334ms)
+✔ later changed stream identity is retained separately and barred from future admission in both protocols (1372.034542ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6240.302042

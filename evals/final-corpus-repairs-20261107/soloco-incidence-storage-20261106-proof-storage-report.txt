@@ -1,0 +1,11 @@
+Repaired F1: descriptor-backed plans now persist a versioned compact preservation claim. Operating capture uses revalidated source mappings; full canonical validation remains intact.
+
+Saved [component patch](/private/tmp/soloco-incidence-storage-20261106/proof-storage-source-only.patch) and [complete report](/private/tmp/soloco-incidence-storage-20261106/proof-storage-report.md).
+
+- Both Nodes: new lifecycle tests **2/2**, broader existing checks **59/59**, focused operating checks **4/4**.
+- Synthetic relation: **2,424,122 bytes**; persisted proof: **18,184 bytes**.
+- No expanded incidence appeared in new apply or operating-capture payloads.
+- Legacy full-proof byte comparisons pass.
+- Untouched corpus suite: **13/14**; one assertion still expects the former stored layout.
+
+Independent **SOURCE acceptance remains pending**. Actual native fit is **unknown**. No actual-company action occurred.

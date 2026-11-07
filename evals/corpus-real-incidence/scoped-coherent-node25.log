@@ -1,0 +1,115 @@
+(node:33430) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ canonical and formatted reference examples remain opaque STRING data at every structural depth (69.984292ms)
+✔ identical real snapshot/entry and STRING example yield only the typed inbound edge (8.727667ms)
+✔ nested STRING promotion applies its own reserved-key gate without making the outer STRING opaque (3.747917ms)
+✔ oversized reserved-key STRING fallback remains whole and Held (6.472125ms)
+✔ genuine typed snapshot and entry closure still rejects missing, corrupt and malformed originals (0.978583ms)
+✔ complete local sections retain late qualifiers, old versions, negatives and unknown code/logs; no raw baseline per packet (5.299541ms)
+✔ repeated snapshots use exact raw originals and inbound ancestry, contradictory occurrence contexts never transfer acceptance (6.9985ms)
+✔ canonical JSON text is typed STRING evidence, coherent logical bodies replace escaped-range chunks (3.485875ms)
+✔ resealed gaps, altered ancestry, omitted originals, forged sizes and changed qualifiers/membership hold (35.418958ms)
+✔ bounded whole sections hold without truncation or cap widening; owned session resists caller mutation (10.139708ms)
+✔ linear unique section work for repeated snapshots; byte forecast without constructing corpus combinations (21.152917ms)
+ℹ {"fictional_only":true,"ten":{"unique_sections":24,"physical_occurrences":49,"snapshot_inbound_edges":10,"unique_section_bytes":6360,"prospective_extraction_packets":49,"total_packet_bytes":126829,"largest_packet_bytes":3274,"held_packets":0,"complete_native_request_bytes":null,"native_same_session_fit":"unproven","semantic_acceptance":false},"hundred":{"unique_sections":114,"physical_occurrences":229,"snapshot_inbound_edges":100,"unique_section_bytes":24294,"prospective_extraction_packets":229,"total_packet_bytes":607786,"largest_packet_bytes":3283,"held_packets":0,"complete_native_request_bytes":null,"native_same_session_fit":"unproven","semantic_acceptance":false}}
+✔ existing canonical source adapter uses runtime test author_instance and rejects invalid producer/candidate closure (138.388542ms)
+✔ anonymous enclosing qualifiers and scalar collection members cannot hide complete local conditions (0.999125ms)
+✔ strict reference metadata remains in its parent section without independent extraction subjects (4.988708ms)
+✔ complete JSON fields and file bodies cut at typed boundaries; indivisible strings still hold (4.426166ms)
+✔ nested canonical sources maps expose bounded complete fields with every shared occurrence and exact original (89.176375ms)
+ℹ {"fictional_only":true,"parent_string_bytes":[89692,89690],"terminal_string_bytes":[21650,17056,12952,11782,9904],"measurements":{"unique_sections":22,"physical_occurrences":54,"snapshot_inbound_edges":1,"unique_section_bytes":94660,"prospective_extraction_packets":54,"total_packet_bytes":441936,"largest_packet_bytes":25964,"held_packets":0,"complete_native_request_bytes":null,"native_same_session_fit":"unproven","semantic_acceptance":false}}
+✔ canonical array roots preserve nested arrays, primitive members, empties and oversized terminal holds (12.593334ms)
+✔ formatting/escape-only JSON STRING views roundtrip raw bytes, nested data and late prohibitions (53.415834ms)
+✔ ambiguous or normalized JSON tokens remain opaque; large non-JSON terminals stay Held (14.868625ms)
+✔ upgrade complete fields and ordered journal members split bounded bodies with separate failed contexts (126.994333ms)
+ℹ {"fictional_only":true,"attempt_bytes":76274,"journal_members":28,"shared_physical_occurrences":84,"measurements":{"unique_sections":72,"physical_occurrences":389,"snapshot_inbound_edges":2,"unique_section_bytes":24052,"prospective_extraction_packets":389,"total_packet_bytes":2224911,"largest_packet_bytes":8368,"held_packets":0,"complete_native_request_bytes":null,"native_same_session_fit":"unproven","semantic_acceptance":false}}
+(node:33431) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ FICTIONAL ADAPTER: coherent public create/read -> worker -> independent interface -> canonical apply; repeats have separate provenance (4089.736333ms)
+✔ FICTIONAL ADAPTER: omissions, omitted occurrence interfaces, source producer and negative receipts hold (798.970208ms)
+✔ FICTIONAL ADAPTER: late qualifier remains complete and missing home preservation is Blocked (568.398709ms)
+✔ FICTIONAL ADAPTER: prospective coherent streaming carries complete oversized section; old extraction still rejects opt-in (708.066792ms)
+✔ FICTIONAL ADAPTER: snapshot inbound native path and resealed omissions cannot enter canonical scoped plan (3066.192958ms)
+✔ coherent runtime-test producer uses canonical author_instance, candidate and receipt closure without fabricated job_id (57.579ms)
+✔ nested formatting/escape variant source files retain bounded native bundles and mandatory occurrence interfaces (586.4265ms)
+ℹ {"fictional_only":true,"parent_string_bytes":103635,"units":13,"leaf_bundle_bytes":[24171,24173],"extraction_request_bytes":31614,"semantic_acceptance":false}
+✔ SCOPED publication ignores colliding external producer metadata (3038.318417ms)
+✔ SCOPED publication retains immutable-entry and resolved identities (2292.167417ms)
+(node:33432) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+{"same_scope":"D00","qualified_artifact_home_effect_present":true,"applicability_verdict":"Pass","contract_doubles_only":true}
+✔ public store + worker path: 500 distinct obligations / 20 domains exceed union output, bounded packets apply and archive exact originals (31208.484833ms)
+ℹ {"contract_doubles":true,"obligations":500,"domains":20,"extraction_jobs":27,"total_extraction_output_bytes":149414,"final_packet_bytes":19392}
+✔ source-only extraction survives unrelated notice/global change and replacement uses canonical completed job receipt (1100.070125ms)
+✔ unknown source fields and current global rules are semantic; historical claims never current permission (844.588375ms)
+✔ distant qualifier absent from home blocks independently; no resolution of OPEN invented (837.185208ms)
+✔ cross-domain interface must have independent complete exact review; contradiction holds (644.058708ms)
+✔ canonical receipt rejects forged native/job/closure/output/provenance and tampered source; no coordinator proof reuse (553.663291ms)
+✔ independent reviewer cannot review source or domain producer (388.921666ms)
+✔ integration coverage rejects omissions, duplicate items/ranges, substitutions and dependency cycles (560.237ms)
+✔ overflow retains complete rejected unit output and allows exact bounded subdivision coverage (1185.515542ms)
+✔ stale owner, paused maintenance controls, revocation and late pause fence new work and returns (558.266416ms)
+✔ main exposes usable scoped schema and public current home schema (76.899875ms)
+✔ bounded independent interface review can complete integration without a global semantic union (957.405584ms)
+✔ closed output grammar rejects fabricated citations, altered provenance and hidden findings and retains rejected evidence (325.727958ms)
+✔ main routes scoped plan/target/read; owner handover fences new work while exact adopted preservation and extraction survive (637.289833ms)
+✔ unknown terminal execution remains exact current evidence and blocks permission without spoiling immutable extraction (360.223792ms)
+✔ unknown current home scope and domain dependencies stay mandatory despite integration relabeling (1561.416833ms)
+✔ regression: interface must include every exact incident-domain home (707.531125ms)
+✔ separate governing scopes reuse receipts through qualified archive growth and unrelated requalification (11883.6315ms)
+✔ ordinary worker producer edge binds exact outcome and native closure while keeping source-only identity reusable (545.216625ms)
+✔ regression: a represented governing rule retains its same-scope artifact home (1348.818458ms)
+✔ typed mandatory dependencies and changed artifact homes remain exact governing evidence (797.089458ms)
+✔ new global scope expansion widens old homes in fresh applicability instead of hiding their bodies (740.532334ms)
+✔ root authority changes and changed or removed scope rules widen fresh review inputs (2290.000667ms)
+✔ clipped natural-language qualifier holds until a new explicit supporting bundle supplies its entire boundary (192.950041ms)
+✔ exact ordered supporting ranges and hashes survive canonical artifact delivery; only identical bundles reuse (442.288792ms)
+✔ invalid support IDs and altered bundle provenance cannot substitute for exact frozen delivery (1165.1715ms)
+✔ supporting units do not count as primary coverage; exact independent primaries still complete (940.37325ms)
+✔ an explicit supporting context set above the original input ceiling holds without dispatch (80.508125ms)
+✔ recovery regression: oversized compulsory global holds legacy scoped assignment without dispatch or evidence mutation (264.429875ms)
+✔ recovery stream CONTRACT DOUBLE: complete bounded UTF8 delivery, full integration closure and immutable extraction reuse (3838.73975ms)
+ℹ {"contract_double":true,"domain_requests":7,"integration_requests":7,"max_request_utf8_bytes":48000,"integration_body_utf8_bytes":230382}
+✔ recovery stream rejects missing/reordered/substituted ranges, corrupt bodies, wrong native and unconfirmed closure (3538.99625ms)
+✔ recovery stream canonical current freshness: notices, authority, outcomes, governing and home mutation hold; extraction reused (3813.0745ms)
+✔ recovery stream worker rejects premature Pass, wrong ack/order, changed native and mid-delivery current changes (2942.644542ms)
+✔ recovery stream CONTRACT DOUBLE: more than sixteen pages and oversized homes/dependencies reach same reviewer (9410.267041ms)
+ℹ {"contract_double":true,"requests":26,"body_utf8_bytes":947154,"max_request_utf8_bytes":48000}
+✔ recovery stream preserves explicit unknown outcomes and rejects nonindependent native even after full transport (2010.3165ms)
+✔ recovery stream rejected observed identities never poison accepted extraction receipts (1302.846042ms)
+✔ forward native admission rejects earlier failed observations across single-packet and streamed jobs (3702.318459ms)
+✔ single-packet rejected identities preserve older canonical extraction and never become bindings (665.256834ms)
+✔ later changed stream identity is retained separately and barred from future admission in both protocols (899.365709ms)
+✔ recovery stream CONTRACT DOUBLE: nonempty independent interfaces deliver peer homes, dependencies and closure (21798.482583ms)
+✔ stream ranges explicitly preserve surrogate boundaries, escaping and exact reconstruction (130.927417ms)
+✔ operating publication reuses existing exact scoped classification without poisoning its frozen global rules (3047.92825ms)
+(node:33433) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ FICTIONAL public vector pipeline shares extraction, independently judges context, aggregates once and applies atomically (3873.990833ms)
+✔ corpus growth deduplicates intrinsic sections while keeping all repeated physical obligations unaccepted (143.14625ms)
+ℹ {"fictional_only":true,"one":{"intrinsic_batches":1,"shared_body_sections":1,"physical_occurrences":8},"ten":{"intrinsic_batches":1,"shared_body_sections":1,"physical_occurrences":26},"semantic_acceptance":false}
+✔ corpus retains external named handover originals and refuses missing closure (97.346042ms)
+✔ FICTIONAL corpus preservation feeds independently reviewed operating publication, never a borrowed scoped receipt (6206.68175ms)
+✔ semantic selections complete canonical source apply with bounded independent local packets (11254.880667ms)
+ℹ {"fictional_only":true,"workload":{"protocol":"scoped-context-v1","partitioner":"coherent-corpus-body-v1","source":{"id":"old","revision":1,"sha256":"6be63f44288d42ab3675f96a345ec25cb48d209895267518611987ecf452ca0c"},"extraction_identity":"6e7cd2cb82ef9d1da8c1ef8f4a2256c3d229312a43f7a52ce7e34ccb45818e2d","physical_occurrences":11,"extraction":[{"id":"body-batch-0","body_bytes":615},{"id":"body-batch-1","body_bytes":719},{"id":"body-batch-2","body_bytes":717},{"id":"body-batch-3","body_bytes":874},{"id":"body-batch-4","body_bytes":1108},{"id":"body-batch-5","body_bytes":1108},{"id":"body-batch-6","body_bytes":5480},{"id":"body-batch-7","body_bytes":2153}],"selections":[{"id":"global","physical_occurrences":3,"incident_selection_ids":["global"],"intrinsic_batches":["body-batch-3","body-batch-7"],"context_bytes":4423,"domain_request_lower_bound":7450,"interface_request_lower_bound":7450},{"id":"A","physical_occurrences":6,"incident_selection_ids":["global","A"],"intrinsic_batches":["body-batch-0","body-batch-1","body-batch-3","body-batch-4","body-batch-7"],"context_bytes":6149,"domain_request_lower_bound":11618,"interface_request_lower_bound":11618},{"id":"B","physical_occurrences":6,"incident_selection_ids":["global","B"],"intrinsic_batches":["body-batch-0","body-batch-2","body-batch-3","body-batch-5","body-batch-7"],"context_bytes":6147,"domain_request_lower_bound":11614,"interface_request_lower_bound":11614},{"id":"archive","physical_occurrences":5,"incident_selection_ids":["global","archive"],"intrinsic_batches":["body-batch-3","body-batch-6","body-batch-7"],"context_bytes":9913,"domain_request_lower_bound":18420,"interface_request_lower_bound":18420}],"planned_domain_requests":4,"planned_interface_requests":4,"whole_corpus_integration_requests":1,"review_formula":"E+D+I+1","total_selected_source_requests_lower_bound":17,"input_limit_bytes":48000,"complete_request_bytes":null,"excluded_from_lower_bound":["instructions","canonical extraction results","native receipt framing","current homes and dependencies","current global rules","integration summaries"],"status":"unaccepted proposal","frontier_complete":false,"semantic_acceptance":false,"complete_native_fit":null,"native_context_fit":"unproven","retrieval_only":true}}
+ℹ {"fictional_only":true,"domain_packet_bytes":[28348,39296,39292,41534],"interface_packet_bytes":[73543,84989,84985,86895],"semantic_acceptance":false}
+✔ declared distant incident peer cannot be omitted by proposed local scope (977.823167ms)
+✔ FICTIONAL phase delivery preserves all boundary meaning as disjoint raw partitions grow (61509.630125ms)
+ℹ {"fictional_only":true,"peers":0,"local_interface_bytes":111333,"final_bytes":141165,"local_raw_bytes":21641,"all_extraction_bytes":17561,"local_pages":4,"final_pages":5,"semantic_acceptance":false,"native_fit":"unproven"}
+ℹ {"fictional_only":true,"peers":2,"local_interface_bytes":140566,"final_bytes":201172,"local_raw_bytes":21649,"all_extraction_bytes":44675,"local_pages":5,"final_pages":7,"semantic_acceptance":false,"native_fit":"unproven"}
+✔ FICTIONAL unmarked corpus targets reconstruct the legacy recursive delivery contract (1418.793458ms)
+✔ nested formatting/escape variant file sections fit intrinsic batches without implying complete global request fit (293.118ms)
+ℹ {"fictional_only":true,"nested_sources_workload":{"protocol":"scoped-context-v1","partitioner":"coherent-corpus-body-v1","source":{"id":"old","revision":1,"sha256":"af1fde5480618c9f976de083be85d6e2f211e0c2de09a4d1e0e4e3db73f0ae5f"},"extraction_identity":"20e30673c2f013007b2164ed7af06a1a51998a3165e1f96559d3030d486e9159","physical_occurrences":14,"extraction":[{"id":"body-batch-0","body_bytes":55704}],"selections":[{"id":"global","physical_occurrences":14,"incident_selection_ids":["global"],"intrinsic_batches":["body-batch-0"],"context_bytes":60705,"domain_request_lower_bound":116409,"interface_request_lower_bound":116409}],"planned_domain_requests":1,"planned_interface_requests":1,"whole_corpus_integration_requests":1,"review_formula":"E+D+I+1","total_selected_source_requests_lower_bound":4,"input_limit_bytes":48000,"complete_request_bytes":null,"excluded_from_lower_bound":["instructions","canonical extraction results","native receipt framing","current homes and dependencies","current global rules","integration summaries"],"status":"unaccepted proposal","frontier_complete":false,"semantic_acceptance":false,"complete_native_fit":null,"native_context_fit":"unproven","retrieval_only":true}}
+✔ upgrade journal sections enter corpus workload with complete ordered membership and occurrence guards (438.29225ms)
+ℹ {"fictional_only":true,"journal_members":28,"unique_sections":65,"largest_intrinsic_packet":8085,"workload":{"protocol":"scoped-context-v1","partitioner":"coherent-corpus-body-v1","source":{"id":"upgrade:failed-attempt","revision":null,"sha256":"0ccdedde33bfa10f23e7875fdc76dbe5fed41f0b268edd8226a829971e39a86d"},"extraction_identity":"fd101d964b9a2560068b7cbe41c7fd844e494274c142881a37f7d9836d36650b","physical_occurrences":65,"extraction":[{"id":"body-batch-0","body_bytes":65997}],"selections":[{"id":"global","physical_occurrences":65,"incident_selection_ids":["global"],"intrinsic_batches":["body-batch-0"],"context_bytes":87653,"domain_request_lower_bound":153650,"interface_request_lower_bound":153650}],"planned_domain_requests":1,"planned_interface_requests":1,"whole_corpus_integration_requests":1,"review_formula":"E+D+I+1","total_selected_source_requests_lower_bound":4,"input_limit_bytes":48000,"complete_request_bytes":null,"excluded_from_lower_bound":["instructions","canonical extraction results","native receipt framing","current homes and dependencies","current global rules","integration summaries"],"status":"unaccepted proposal","frontier_complete":false,"semantic_acceptance":false,"complete_native_fit":null,"native_context_fit":"unproven","retrieval_only":true}}
+✔ rectangular corpus coverage checks a large exact product without materializing cells (307.412541ms)
+✔ FICTIONAL new incidence worker/apply covers A and B only at their provenance, retaining global obligations (1598.067ms)
+✔ FICTIONAL transitive originals and source references retain exact physical paths; unknown references widen (427.71775ms)
+ℹ tests 84
+ℹ suites 0
+ℹ pass 84
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 120555.074542

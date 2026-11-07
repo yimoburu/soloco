@@ -1,0 +1,56 @@
+{
+  "source_pin": "c1cf258505979e788c3734ff6f2b59103e36d1d3",
+  "scope": "source-only; no company mutation, native semantic acceptance, release/install/adoption or resume",
+  "focused_checks": {
+    "node22": {
+      "tests": 55,
+      "pass": 55,
+      "fail": 0,
+      "skip": 0
+    },
+    "node25": {
+      "tests": 55,
+      "pass": 55,
+      "fail": 0,
+      "skip": 0
+    }
+  },
+  "test_files": [
+    "operating-state.test.mjs",
+    "operating-tree-publication.test.mjs",
+    "context-public-v2.test.mjs",
+    "selection-wiring.test.mjs",
+    "storage-intake.test.mjs"
+  ],
+  "semantic_partition_root_checks": {
+    "node22": 22,
+    "node25": 22,
+    "all_pass": true
+  },
+  "retained_failures": [
+    "handover epoch regression was red before production repair",
+    "first catalog fixture lacked supported:true and failed earlier; retained",
+    "corrected catalog fixture reproduces production failure before model-field fix",
+    "earlier 54/55 matrix is retained, final55/55 was rerun after fixture repair"
+  ],
+  "source_qa": {
+    "original_native": "01a1b27e-7987-73b2-b5b7-d62d0d3151b4",
+    "original_pin": "34648cf",
+    "verdict": "Blocked",
+    "current_pin_review": "not yet accepted"
+  },
+  "files": {
+    "source-repairs-final-node22.log": "c3943fbe6a5f8a71072481c193b056cacb39800571500562e0ae78c837b1e55e",
+    "source-repairs-final-node25.log": "fe1b4ff25a106781098c3277b9a6e9660d50ddf4e542c51d5dcd51b57660878e",
+    "source-repairs-node22.log": "44af1172180df729a667e412114b0623ef32e2f96f84713ae83295c0cf7d63b9",
+    "source-repairs-node25.log": "25db2be563e33c5d7bacd742f24c35b725b05dee8b1de6fdcca7c5a335eb535a",
+    "catalog-red-node25.log": "f226df23cf70c269db69eb161bcda2a998035f6e3f55b00c6375530a3dfbda91",
+    "catalog-valid-fixture-red-node25.log": "75e26ba203e292e6927b2fa25bed591af0efb8b7f964c37ca2a1c108ea01fc2e",
+    "catalog-green-node25.log": "351ddc5f1602b9670f5f20ecd3d5871ca4805ed737c966c3a12aee6d6547fec2",
+    "handover-epoch-red-node25.log": "8f5852912592f6bae99f949ec50a8bbd5e1873a78cf5317d4c126051d315904c",
+    "final-fixes-node22.log": "e820c400cdbe636eb72924d5da2c1c63b80a5a2f3f13370dad8f69379ca6e98b",
+    "final-fixes-node25.log": "f3edbeb7cb522e45e3e0c48153948d07c0f8d729d4d3fd025b27b0616e4546a1",
+    "node22-semantic-merged.log": "c4595e78a10b9df5da5fce96ac53c719042072b797dcd8f970baa3858aba922b",
+    "node25-semantic-merged.log": "988db6c083ba7425988d21251b4e68da44da39192183944de34a10879df49104"
+  }
+}

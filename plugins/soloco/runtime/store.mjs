@@ -3,14 +3,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID, createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import {normalizedLayout,readNormalized,writeNormalized,migrateNormalized,writeNormalizedSelection,flushSnapshots,readImmutable,appendNormalizedJournal,LATEST_LAYOUT,readNormalizedValue,readPublicIndex,readPublicRows,readPublicHandle,readPublicAlias} from './record-storage.mjs';
-import {bindSnapshots} from './snapshot.mjs';
+import {normalizedLayout,readNormalized,writeNormalized,migrateNormalized,writeNormalizedSelection,flushSnapshots,readImmutable,appendNormalizedJournal,LATEST_LAYOUT,readNormalizedValue,readPublicIndex,readPublicRows,readPublicHandle,readPublicAlias,captureStorageMetadata,captureStorageBaseline,insertStorageEvent,readStorageIntake} from './record-storage.mjs';
+import {bindSnapshots,bindOperatingIntake} from './snapshot.mjs';
 import {bindPublicReader,PUBLIC_COLLECTIONS} from './public-response.mjs';
 
 export const PACKAGE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-export const VERSION = '0.7.3';
+export const VERSION = '0.7.4';
 // Explicitly tested state producers, not a blanket semver compatibility promise.
-export const COMPATIBLE_RUNTIME_VERSIONS = ['0.2.0', '0.2.1', '0.2.2', '0.3.0', '0.3.1', '0.4.0', '0.4.1', '0.5.0', '0.6.0', '0.6.1', '0.6.2', '0.6.3', '0.6.4', '0.6.5', '0.6.6', '0.6.7', '0.6.8', '0.6.9', '0.6.10', '0.6.11', '0.6.12', '0.6.13', '0.7.0', '0.7.1', '0.7.2', VERSION];
+export const COMPATIBLE_RUNTIME_VERSIONS = ['0.2.0', '0.2.1', '0.2.2', '0.3.0', '0.3.1', '0.4.0', '0.4.1', '0.5.0', '0.6.0', '0.6.1', '0.6.2', '0.6.3', '0.6.4', '0.6.5', '0.6.6', '0.6.7', '0.6.8', '0.6.9', '0.6.10', '0.6.11', '0.6.12', '0.6.13', '0.7.0', '0.7.1', '0.7.2', '0.7.3', VERSION];
 export const COMPATIBLE_TEAM_VERSIONS = ['0.1.0', ...COMPATIBLE_RUNTIME_VERSIONS];
 // Exact published v0.18/v0.19 contracts; compatibility never adopts new instructions.
 export const V018_GOVERNANCE_SHA256 = '185933ddeafe9709bef44e9a6605ba7adb5faaa8bc43c1c64f1da3b03ae5f400';
@@ -50,6 +50,12 @@ export class Store {
     this.db.exec('CREATE TABLE IF NOT EXISTS company (id INTEGER PRIMARY KEY CHECK(id=1), value TEXT NOT NULL); CREATE TABLE IF NOT EXISTS events (seq INTEGER PRIMARY KEY, at TEXT NOT NULL, type TEXT NOT NULL, value TEXT NOT NULL);');
   }
   changeToken() { return this.db.prepare('SELECT COALESCE(MAX(seq),0) AS version FROM events').get().version; }
+  captureIntakeBaseline() {return this.readSnapshot(()=>captureStorageBaseline(this.db));}
+  // Exact row/event verification only. Checkpoint callers must resolve accepted
+  // old/new envelopes against their frozen version map and validate snapshot
+  // dependencies via captureSnapshotDependencies/validateSnapshotDependencies
+  // against the bound vault before review/publication/use; missing originals hold.
+  readIntake(baseline,options) {return this.readSnapshot(()=>readStorageIntake(this.db,baseline,options));}
   storageInfo() {
     const normalized=normalizedLayout(this.db),sentinel=normalized?JSON.parse(this.db.prepare('SELECT value FROM company WHERE id=1').get().value):null;
     return {format:normalized?'normalized-v'+this.db.prepare('SELECT version FROM company_layout WHERE id=1').get().version:'legacy-json',migration_required:!normalized||this.db.prepare('SELECT version FROM company_layout WHERE id=1').get().version<LATEST_LAYOUT,
@@ -65,10 +71,12 @@ export class Store {
   }
   snapshotState(state) {
     const file=path.join(this.dir,'company.sqlite');
-    return bindSnapshots(state,sha=>{
+    const bound=bindSnapshots(state,sha=>{
       const reader=new DatabaseSync(file,{readOnly:true});
       try{return readImmutable(reader,sha);}finally{reader.close();}
     },file);
+    if(bound&&this.storageInfo().format==='normalized-v4')bindOperatingIntake(bound,this,()=>new Store(this.root));
+    return bound;
   }
   readSelected(options) { return this.readSnapshot(()=>normalizedLayout(this.db)?this.snapshotState(readNormalized(this.db,options)):this.read()); }
   readRawValue(options) {return this.readSnapshot(()=>normalizedLayout(this.db)?readNormalizedValue(this.db,options):null);}
@@ -133,13 +141,14 @@ export class Store {
     if(!normalizedLayout(this.db)||this.db.prepare('SELECT version FROM company_layout WHERE id=1').get().version<3)return false;
     this.db.exec('BEGIN IMMEDIATE');this.inTransaction=true;
     try {
+      const metadata=captureStorageMetadata(this.db);
       const header=readNormalized(this.db,{rootKeys:['revision','owner'],entities:{upgrade:['id']}});
       if(header.upgrade?.id!==uid){this.db.exec('ROLLBACK');return false;}
       appendNormalizedJournal(this.db,'calls',entry);
       const changes=[{family:'root',key:'revision',value:(header.revision??-1)+1},{family:'root',key:'updated_at',value:stamp()}];
       if(entry.native_id)changes.push({family:'upgrade',key:entry.role==='cos'?'probe_native_id':'reviewer_native_id',value:entry.native_id});
       writeNormalizedSelection(this.db,changes);
-      this.db.prepare('INSERT INTO events(at,type,value) VALUES(?,?,?)').run(stamp(),'upgrade.native_returned',JSON.stringify({revision:(header.revision??-1)+1,owner:header.owner}));
+      insertStorageEvent(this.db,'upgrade.native_returned',{revision:(header.revision??-1)+1,owner:header.owner},metadata);
       this.db.exec('COMMIT');return true;
     }catch(error){this.db.exec('ROLLBACK');throw error;}
     finally{this.inTransaction=false;}
@@ -148,6 +157,7 @@ export class Store {
     if(!normalizedLayout(this.db))return this.transaction(type,s=>fn(s));
     this.db.exec('BEGIN IMMEDIATE');this.inTransaction=true;
     try {
+      const metadata=captureStorageMetadata(this.db);
       const state=this.snapshotState(readNormalized(this.db,options)),before=JSON.stringify(state);
       const result=fn(state);
       state.revision=(state.revision??0)+1;state.updated_at=stamp();
@@ -159,7 +169,7 @@ export class Store {
       }
       flushSnapshots(this.db,state);
       writeNormalizedSelection(this.db,changes);
-      this.db.prepare('INSERT INTO events(at,type,value) VALUES (?,?,?)').run(stamp(),type,JSON.stringify({revision:state.revision,owner:state.owner}));
+      insertStorageEvent(this.db,type,{revision:state.revision,owner:state.owner},metadata);
       this.db.exec('COMMIT');this.snapshotState(state);return result;
     }catch(error){this.db.exec('ROLLBACK');throw error;}
     finally {this.inTransaction=false;}
@@ -174,6 +184,7 @@ export class Store {
   transaction(type, fn) {
     this.db.exec('BEGIN IMMEDIATE');this.inTransaction=true;
     try {
+      const metadata=normalizedLayout(this.db)?captureStorageMetadata(this.db):null;
       const state = this.read();
       const next = fn(state);
       next.revision = (state?.revision ?? -1) + 1;
@@ -181,13 +192,13 @@ export class Store {
       flushSnapshots(this.db,state,next);
       if(normalizedLayout(this.db))writeNormalized(this.db,next);
       else this.db.prepare('INSERT INTO company VALUES (1,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value').run(JSON.stringify(next));
-      this.db.prepare('INSERT INTO events(at,type,value) VALUES (?,?,?)').run(stamp(), type, JSON.stringify({revision: next.revision, owner: next.owner}));
+      insertStorageEvent(this.db,type,{revision:next.revision,owner:next.owner},metadata);
       this.db.exec('COMMIT');
       return this.snapshotState(next);
     } catch (error) { this.db.exec('ROLLBACK'); throw error; }
     finally {this.inTransaction=false;}
   }
-  close() { this.db.close(); }
+  close() { this.closed=true;this.db.close(); }
 }
 export function withStore(root, fn, create = false) {
   const db = new Store(root, create);

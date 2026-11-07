@@ -1,0 +1,107 @@
+TAP version 13
+# (node:56389) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: complete local sections retain late qualifiers, old versions, negatives and unknown code/logs; no raw baseline per packet
+ok 1 - complete local sections retain late qualifiers, old versions, negatives and unknown code/logs; no raw baseline per packet
+  ---
+  duration_ms: 5.602834
+  ...
+# Subtest: repeated snapshots use exact raw originals and inbound ancestry, contradictory occurrence contexts never transfer acceptance
+ok 2 - repeated snapshots use exact raw originals and inbound ancestry, contradictory occurrence contexts never transfer acceptance
+  ---
+  duration_ms: 4.203834
+  ...
+# Subtest: canonical JSON text is typed STRING evidence, coherent logical bodies replace escaped-range chunks
+ok 3 - canonical JSON text is typed STRING evidence, coherent logical bodies replace escaped-range chunks
+  ---
+  duration_ms: 1.463958
+  ...
+# Subtest: resealed gaps, altered ancestry, omitted originals, forged sizes and changed qualifiers/membership hold
+ok 4 - resealed gaps, altered ancestry, omitted originals, forged sizes and changed qualifiers/membership hold
+  ---
+  duration_ms: 9.207833
+  ...
+# Subtest: bounded whole sections hold without truncation or cap widening; owned session resists caller mutation
+ok 5 - bounded whole sections hold without truncation or cap widening; owned session resists caller mutation
+  ---
+  duration_ms: 9.741083
+  ...
+# Subtest: linear unique section work for repeated snapshots; byte forecast without constructing corpus combinations
+ok 6 - linear unique section work for repeated snapshots; byte forecast without constructing corpus combinations
+  ---
+  duration_ms: 6.743416
+  ...
+# {"fictional_only":true,"ten":{"unique_sections":14,"physical_occurrences":16,"snapshot_inbound_edges":10,"unique_section_bytes":7293,"prospective_extraction_packets":16,"total_packet_bytes":40110,"largest_packet_bytes":2686,"held_packets":0,"complete_native_request_bytes":null,"native_same_session_fit":"unproven","semantic_acceptance":false},"hundred":{"unique_sections":104,"physical_occurrences":106,"snapshot_inbound_edges":100,"unique_section_bytes":48098,"prospective_extraction_packets":106,"total_packet_bytes":272451,"largest_packet_bytes":2692,"held_packets":0,"complete_native_request_bytes":null,"native_same_session_fit":"unproven","semantic_acceptance":false}}
+# Subtest: existing canonical source adapter uses runtime test author_instance and rejects invalid producer/candidate closure
+ok 7 - existing canonical source adapter uses runtime test author_instance and rejects invalid producer/candidate closure
+  ---
+  duration_ms: 38.251792
+  ...
+# Subtest: anonymous enclosing qualifiers and scalar collection members cannot hide complete local conditions
+ok 8 - anonymous enclosing qualifiers and scalar collection members cannot hide complete local conditions
+  ---
+  duration_ms: 0.907791
+  ...
+# Subtest: strict reference metadata remains in its parent section without independent extraction subjects
+ok 9 - strict reference metadata remains in its parent section without independent extraction subjects
+  ---
+  duration_ms: 4.761916
+  ...
+# (node:56390) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: FICTIONAL ADAPTER: coherent public create/read -> worker -> independent interface -> canonical apply; repeats have separate provenance
+ok 10 - FICTIONAL ADAPTER: coherent public create/read -> worker -> independent interface -> canonical apply; repeats have separate provenance
+  ---
+  duration_ms: 2009.64025
+  ...
+# Subtest: FICTIONAL ADAPTER: omissions, omitted occurrence interfaces, source producer and negative receipts hold
+ok 11 - FICTIONAL ADAPTER: omissions, omitted occurrence interfaces, source producer and negative receipts hold
+  ---
+  duration_ms: 382.928791
+  ...
+# Subtest: FICTIONAL ADAPTER: late qualifier remains complete and missing home preservation is Blocked
+ok 12 - FICTIONAL ADAPTER: late qualifier remains complete and missing home preservation is Blocked
+  ---
+  duration_ms: 302.908417
+  ...
+# Subtest: FICTIONAL ADAPTER: prospective coherent streaming carries complete oversized section; old extraction still rejects opt-in
+ok 13 - FICTIONAL ADAPTER: prospective coherent streaming carries complete oversized section; old extraction still rejects opt-in
+  ---
+  duration_ms: 448.028667
+  ...
+# Subtest: FICTIONAL ADAPTER: snapshot inbound native path and resealed omissions cannot enter canonical scoped plan
+ok 14 - FICTIONAL ADAPTER: snapshot inbound native path and resealed omissions cannot enter canonical scoped plan
+  ---
+  duration_ms: 1797.327042
+  ...
+# Subtest: coherent runtime-test producer uses canonical author_instance, candidate and receipt closure without fabricated job_id
+ok 15 - coherent runtime-test producer uses canonical author_instance, candidate and receipt closure without fabricated job_id
+  ---
+  duration_ms: 34.250708
+  ...
+# (node:56391) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: FICTIONAL public corpus adapter shares intrinsic receipts but independently reviews both source claims
+ok 16 - FICTIONAL public corpus adapter shares intrinsic receipts but independently reviews both source claims
+  ---
+  duration_ms: 5073.195041
+  ...
+# Subtest: corpus growth deduplicates intrinsic sections while keeping all repeated physical obligations unaccepted
+ok 17 - corpus growth deduplicates intrinsic sections while keeping all repeated physical obligations unaccepted
+  ---
+  duration_ms: 89.938333
+  ...
+# Subtest: corpus retains external named handover originals and refuses missing closure
+ok 18 - corpus retains external named handover originals and refuses missing closure
+  ---
+  duration_ms: 41.46225
+  ...
+1..18
+# tests 18
+# suites 0
+# pass 18
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5282.582625

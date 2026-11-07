@@ -1,0 +1,4 @@
+{
+  "plugins/soloco/runtime/worker.mjs": "6571854a16d75947af6ee3893e0a649713b902df6a94905a470cb9662adc204e",
+  "tests/operating-negative-retention.test.mjs": "04ce99f28cf36da773a7e3b7f85476360e4ad88005b96b1213a0e5215f4aea00"
+}

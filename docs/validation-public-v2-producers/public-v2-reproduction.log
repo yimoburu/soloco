@@ -1,0 +1,10 @@
+file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/public-v2-provenance-2026-11-06/source/plugins/soloco/runtime/current-state.mjs:229
+    if(ownsEvidence(state,value,job))throw Error('Qualification reviewer owns source or counterpart producer evidence');
+                                           ^
+
+Error: Qualification reviewer owns source or counterpart producer evidence
+    at validateQualification (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/public-v2-provenance-2026-11-06/source/plugins/soloco/runtime/current-state.mjs:229:44)
+    at applyContextQualification (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/public-v2-provenance-2026-11-06/source/plugins/soloco/runtime/current-state.mjs:257:3)
+    at file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/public-v2-provenance-2026-11-06/reproduction.mjs:82:31
+
+Node.js v25.2.1

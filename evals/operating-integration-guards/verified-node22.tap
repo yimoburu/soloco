@@ -1,0 +1,231 @@
+TAP version 13
+# (node:31178) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: actual store and worker admit concurrent disjoint roles and retain independent output lineage
+ok 1 - actual store and worker admit concurrent disjoint roles and retain independent output lineage
+  ---
+  duration_ms: 229.718292
+  ...
+# Subtest: format-3 supplemental failure keeps exclusive resources until that invocation closes
+ok 2 - format-3 supplemental failure keeps exclusive resources until that invocation closes
+  ---
+  duration_ms: 23.043958
+  ...
+# Subtest: format-3 dependency artifacts remain explicit inputs and coordination stays immutable
+ok 3 - format-3 dependency artifacts remain explicit inputs and coordination stays immutable
+  ---
+  duration_ms: 0.654375
+  ...
+# (node:31179) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# ordinary archive growth [{"scale":1,"archive_characters":184433,"context_characters":1451,"mandatory_records":7},{"scale":10,"archive_characters":1833494,"context_characters":1451,"mandatory_records":7},{"scale":100,"archive_characters":18324464,"context_characters":1451,"mandatory_records":7}]
+# Subtest: ordinary 1x/10x/100x archive growth preserves fixed current obligations and explicit evidence
+ok 4 - ordinary 1x/10x/100x archive growth preserves fixed current obligations and explicit evidence
+  ---
+  duration_ms: 439.168208
+  ...
+# (node:31181) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: pure builder preserves hidden prohibitions, exceptions, spent/revoked grants, failure, unknowns and attribution
+ok 5 - pure builder preserves hidden prohibitions, exceptions, spent/revoked grants, failure, unknowns and attribution
+  ---
+  duration_ms: 22.880583
+  ...
+# Subtest: repeated checkpoints, previous versions and retained handover remain reconstructible without original vault
+ok 6 - repeated checkpoints, previous versions and retained handover remain reconstructible without original vault
+  ---
+  duration_ms: 46.171625
+  ...
+# Subtest: canonical JSON text codec preserves STRING type, Unicode, ordered keys and array positions byte exactly
+ok 7 - canonical JSON text codec preserves STRING type, Unicode, ordered keys and array positions byte exactly
+  ---
+  duration_ms: 8.241875
+  ...
+# Subtest: producer/revision/date/scope/parent mutations and archive appends invalidate complete baseline
+ok 8 - producer/revision/date/scope/parent mutations and archive appends invalidate complete baseline
+  ---
+  duration_ms: 79.814042
+  ...
+# Subtest: missing/corrupt references, cycles, omissions, altered typed keys and resealed frontier holes hold
+ok 9 - missing/corrupt references, cycles, omissions, altered typed keys and resealed frontier holes hold
+  ---
+  duration_ms: 8.021292
+  ...
+# Subtest: same body has distinct occurrences across producer/revision/scope/date and parent contexts
+ok 10 - same body has distinct occurrences across producer/revision/scope/date and parent contexts
+  ---
+  duration_ms: 0.728875
+  ...
+# Subtest: overcapacity holds whole uncertain coupling and never implies global fit
+ok 11 - overcapacity holds whole uncertain coupling and never implies global fit
+  ---
+  duration_ms: 3.987583
+  ...
+# Subtest: capture uses existing SQLite transaction/vault; rollback does not publish capsule
+ok 12 - capture uses existing SQLite transaction/vault; rollback does not publish capsule
+  ---
+  duration_ms: 102.067292
+  ...
+# Subtest: forced digest collision never merges unequal exact definitions
+ok 13 - forced digest collision never merges unequal exact definitions
+  ---
+  duration_ms: 103.605917
+  ...
+# Subtest: ambiguous current/history source IDs and missing embedded raw originals hold
+ok 14 - ambiguous current/history source IDs and missing embedded raw originals hold
+  ---
+  duration_ms: 2.659667
+  ...
+# (node:31182) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning
+ok 15 - public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning
+  ---
+  duration_ms: 204.722959
+  ...
+# Subtest: missing legacy bootstrap is visibly DIRTY and apply rolls back without acceptance
+ok 16 - missing legacy bootstrap is visibly DIRTY and apply rolls back without acceptance
+  ---
+  duration_ms: 24.367
+  ...
+# Subtest: new membership, changed exact source, wrong independent identity and absent closure cannot publish
+ok 17 - new membership, changed exact source, wrong independent identity and absent closure cannot publish
+  ---
+  duration_ms: 132.901667
+  ...
+# Subtest: scope closure, global membership, expiry, receipt changes, revocation and missed communication hold
+ok 18 - scope closure, global membership, expiry, receipt changes, revocation and missed communication hold
+  ---
+  duration_ms: 35.375
+  ...
+# Subtest: pause fences publication reviewer and prospective handover cannot hide unknown legacy
+ok 19 - pause fences publication reviewer and prospective handover cannot hide unknown legacy
+  ---
+  duration_ms: 13.85025
+  ...
+# Subtest: 10x independently classified inert archive keeps actual mandatory operating assignment bytes and semantic work constant
+ok 20 - 10x independently classified inert archive keeps actual mandatory operating assignment bytes and semantic work constant
+  ---
+  duration_ms: 74.5445
+  ...
+# Subtest: deleted applicable home and changed exact provenance cannot disappear from accepted meaning
+ok 21 - deleted applicable home and changed exact provenance cannot disappear from accepted meaning
+  ---
+  duration_ms: 21.957292
+  ...
+# Subtest: typed outcome requires complete historical uncertainty; text cannot manufacture permission
+ok 22 - typed outcome requires complete historical uncertainty; text cannot manufacture permission
+  ---
+  duration_ms: 22.624958
+  ...
+# Subtest: public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure
+ok 23 - public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure
+  ---
+  duration_ms: 77.728167
+  ...
+# Subtest: late new and changed falsely scoped prohibitions stay globally DIRTY, but fresh proposals include them
+ok 24 - late new and changed falsely scoped prohibitions stay globally DIRTY, but fresh proposals include them
+  ---
+  duration_ms: 92.521917
+  ...
+# Subtest: publication proof stays current; failed, quarantined, uncertain and unknown-extension siblings stay DIRTY
+ok 25 - publication proof stays current; failed, quarantined, uncertain and unknown-extension siblings stay DIRTY
+  ---
+  duration_ms: 23.417958
+  ...
+# Subtest: mechanical publication index rejects tampering and retains unknown state extensions
+ok 26 - mechanical publication index rejects tampering and retains unknown state extensions
+  ---
+  duration_ms: 19.611833
+  ...
+# Subtest: format6 explicit non-home evidence survives dispatch, discovery and bounded same-native reads
+ok 27 - format6 explicit non-home evidence survives dispatch, discovery and bounded same-native reads
+  ---
+  duration_ms: 197.245417
+  ...
+# (node:31183) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: unclassified legacy obligations stay mandatory; exact reviewed dispositions bound ordinary context
+ok 28 - unclassified legacy obligations stay mandatory; exact reviewed dispositions bound ordinary context
+  ---
+  duration_ms: 3.300208
+  ...
+# Subtest: resolved archive growth does not grow task pack; raw originals remain retrievable by exact hash
+ok 29 - resolved archive growth does not grow task pack; raw originals remain retrievable by exact hash
+  ---
+  duration_ms: 9.721416
+  ...
+# Subtest: presentation-only rename detection rejects unknown effects and producers
+ok 30 - presentation-only rename detection rejects unknown effects and producers
+  ---
+  duration_ms: 0.206041
+  ...
+# Subtest: explicit normalized migration backs up, round-trips unknown values and fences legacy writes
+ok 31 - explicit normalized migration backs up, round-trips unknown values and fences legacy writes
+  ---
+  duration_ms: 24.09275
+  ...
+# Subtest: immutable corruption is detected and transactions rollback without dropping archive
+ok 32 - immutable corruption is detected and transactions rollback without dropping archive
+  ---
+  duration_ms: 8.379875
+  ...
+# Subtest: current-state upgrade projection bounds reviewed record/history growth and preserves exact retrieval
+ok 33 - current-state upgrade projection bounds reviewed record/history growth and preserves exact retrieval
+  ---
+  duration_ms: 312.895333
+  ...
+# Subtest: current-state projection never conceals unknown or orphan classification metadata
+ok 34 - current-state projection never conceals unknown or orphan classification metadata
+  ---
+  duration_ms: 0.899375
+  ...
+# Subtest: archived job entries retain their exact typed classification provenance
+ok 35 - archived job entries retain their exact typed classification provenance
+  ---
+  duration_ms: 0.499625
+  ...
+# Subtest: portable backup inventories project configuration/candidates and explicit artifacts; tampering holds restore
+ok 36 - portable backup inventories project configuration/candidates and explicit artifacts; tampering holds restore
+  ---
+  duration_ms: 30.506833
+  ...
+# Subtest: durable supplemental dependencies invalidate returned work after source mutation
+ok 37 - durable supplemental dependencies invalidate returned work after source mutation
+  ---
+  duration_ms: 0.669333
+  ...
+# Subtest: public exact-plan classification applies only after independent review and retains originals
+ok 38 - public exact-plan classification applies only after independent review and retains originals
+  ---
+  duration_ms: 167.659291
+  ...
+# Subtest: classification rejects coordinator-native review and retained same-plan negative verdict
+ok 39 - classification rejects coordinator-native review and retained same-plan negative verdict
+  ---
+  duration_ms: 38.73475
+  ...
+# Subtest: public migration holds unfinished cancelled workers and requires explicit paused authority
+ok 40 - public migration holds unfinished cancelled workers and requires explicit paused authority
+  ---
+  duration_ms: 8.782458
+  ...
+# Subtest: targeted root deletion persists and absent immutable values never silently disappear
+ok 41 - targeted root deletion persists and absent immutable values never silently disappear
+  ---
+  duration_ms: 7.682042
+  ...
+# Subtest: transfers reject self-copy through company or selected artifact ancestors before creating output
+ok 42 - transfers reject self-copy through company or selected artifact ancestors before creating output
+  ---
+  duration_ms: 1.846
+  ...
+1..42
+# tests 42
+# suites 0
+# pass 42
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1167.748875

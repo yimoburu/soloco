@@ -1,0 +1,11 @@
+{
+  "cwd": "/private/tmp/soloco-recovery-delivery-fix-20261106/source",
+  "commands": {
+    "final-focused-node22.log": "/private/tmp/soloco-node22-validation/node-v22.13.0-darwin-arm64/bin/node --test tests/scoped-context.test.mjs tests/timeout-wiring.test.mjs",
+    "final-focused-node25.log": "/opt/homebrew/bin/node --test tests/scoped-context.test.mjs tests/timeout-wiring.test.mjs",
+    "worker-compat-node22.log": "/private/tmp/soloco-node22-validation/node-v22.13.0-darwin-arm64/bin/node --test tests/timeout.test.mjs tests/cancellation-finalization.test.mjs tests/handover.test.mjs tests/handover-review-window.test.mjs tests/upgrade-evidence.test.mjs",
+    "worker-compat-node25.log": "/opt/homebrew/bin/node --test tests/timeout.test.mjs tests/cancellation-finalization.test.mjs tests/handover-review-window.test.mjs",
+    "affected-context-node22.log": "/private/tmp/soloco-node22-validation/node-v22.13.0-darwin-arm64/bin/node --test --test-name-pattern='worker|wire-size|malformed raw|canonical apply rechecks|complete extraction, independent|historical checkpoint|exact source, counterpart|notice deliveries' tests/context-qualification.test.mjs",
+    "git-diff-check.log": "git diff --check"
+  }
+}

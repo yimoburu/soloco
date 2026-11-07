@@ -1,0 +1,25 @@
+Working directory: /private/tmp/soloco-operating-checkpoint-20261106/source
+Node22=/private/tmp/soloco-node22-validation/node-v22.13.0-darwin-arm64/bin/node
+Node25=/opt/homebrew/bin/node
+$Node22 --test tests/operating-control.test.mjs > evals/operating-checkpoint/node22-initial.log 2>&1
+# Initial existing integration attempt: provider missing, exit 1.
+$Node22 --test tests/operating-checkpoint.test.mjs > evals/operating-checkpoint/node22-debug.log 2>&1
+# Further diagnostic runs: node22-debug2.log through node22-debug5.log; retained failures include synthetic fixture staging mismatch, pending-vault deletion simulation, and a rejected circular Store import.
+$Node22 --test tests/operating-checkpoint.test.mjs > evals/operating-checkpoint/node22-checkpoint.log 2>&1
+# Diagnostic: removed helper still referenced; corrected before final runs.
+$Node22 --test tests/operating-checkpoint.test.mjs > evals/operating-checkpoint/node22-checkpoint-final.log 2>&1
+$Node25 --test tests/operating-checkpoint.test.mjs > evals/operating-checkpoint/node25-checkpoint-final.log 2>&1
+# Final focused runs: each exit 0, 6/6.
+$Node22 --test tests/operating-checkpoint.test.mjs tests/handover.test.mjs tests/handover-review-window.test.mjs tests/scoped-context.test.mjs tests/context-qualification.test.mjs > evals/operating-checkpoint/node22-focused.log 2>&1
+# Broader attempt is incomplete at report checkpoint; no compatibility Pass claimed.
+$Node25 --test tests/handover.test.mjs tests/handover-review-window.test.mjs > evals/operating-checkpoint/node25-handover.log 2>&1
+$Node22 --test tests/operating-state.test.mjs > evals/operating-checkpoint/node22-existing-operating.log 2>&1
+# Existing operating integration: exit 1, 1/27 pass, missing required provider (old fixtures have no normalized intake binding).
+$Node22 --test tests/handover-review-window.test.mjs > evals/operating-checkpoint/node22-window.log 2>&1
+# Completed compatibility: Node25 handover + window 37/37, exit 0;
+# Node22 window 10/10, exit 0. Combined Node22 run remains inconclusive.
+$Node22 --check plugins/soloco/runtime/operating-state.mjs
+$Node25 --check plugins/soloco/runtime/snapshot.mjs
+# Both syntax checks exit 0.
+kill -TERM 59677
+# Environment denied operation; incomplete combined test is not reported as passed.

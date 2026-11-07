@@ -1,0 +1,10 @@
+/opt/homebrew/bin/node --check plugins/soloco/runtime/upgrade.mjs
+/opt/homebrew/bin/node --check plugins/soloco/runtime/upgrade-evidence.mjs
+/opt/homebrew/bin/node --test tests/operating-upgrade.test.mjs > evals/operating-upgrade/rawlogs/new-node25-initial.log 2>&1
+/opt/homebrew/bin/node --test --test-skip-pattern='MCP upgrade completes through detached native processes' tests/operating-upgrade.test.mjs tests/upgrade-evidence.test.mjs tests/upgrade-paging.test.mjs tests/upgrade-incremental.test.mjs tests/upgrade.test.mjs > evals/operating-upgrade/rawlogs/focused-node25.log 2>&1
+/private/tmp/soloco-node22-validation/node-v22.13.0-darwin-arm64/bin/node --test --test-skip-pattern='MCP upgrade completes through detached native processes' tests/operating-upgrade.test.mjs tests/upgrade-evidence.test.mjs tests/upgrade-paging.test.mjs tests/upgrade-incremental.test.mjs tests/upgrade.test.mjs > evals/operating-upgrade/rawlogs/focused-node22.log 2>&1
+/opt/homebrew/bin/node --test tests/operating-upgrade.test.mjs tests/upgrade-evidence.test.mjs tests/upgrade-paging.test.mjs tests/upgrade-incremental.test.mjs > evals/operating-upgrade/rawlogs/final-node25.log 2>&1
+/private/tmp/soloco-node22-validation/node-v22.13.0-darwin-arm64/bin/node --test tests/operating-upgrade.test.mjs tests/upgrade-evidence.test.mjs tests/upgrade-paging.test.mjs tests/upgrade-incremental.test.mjs > evals/operating-upgrade/rawlogs/final-node22.log 2>&1
+/opt/homebrew/bin/node --test tests/operating-upgrade.test.mjs > evals/operating-upgrade/rawlogs/guard-final-node25.log 2>&1
+/private/tmp/soloco-node22-validation/node-v22.13.0-darwin-arm64/bin/node --test tests/operating-upgrade.test.mjs > evals/operating-upgrade/rawlogs/guard-final-node22.log 2>&1
+git diff --check -- plugins/soloco/runtime/upgrade.mjs plugins/soloco/runtime/upgrade-evidence.mjs docs/upgrade-incremental.md

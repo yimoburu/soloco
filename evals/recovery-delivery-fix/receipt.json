@@ -1,0 +1,66 @@
+{
+  "status": "HELD for independent native QA; all mandatory local repair checks completed",
+  "started_at": "2026-11-06T17:29:20Z",
+  "reported_at": "2026-11-06T17:36:20.519501+00:00",
+  "exclusive_deadline_at": "2026-11-06T17:39:20Z",
+  "elapsed_seconds": 420.522712,
+  "base": "0c63d792c67e39923d272ba57a733dbdb3f9ac89",
+  "version": "0.7.2",
+  "evidence_type": "FICTIONAL CONTRACT DOUBLES, not actual native evidence",
+  "results": {
+    "final-focused-node22.log": {
+      "tests": 52,
+      "pass": 52,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "exit_code": 0,
+      "sha256": "4e62e7e251d2247833cdfff03e05220706fa4ae614c585f9e59f77916925abf5"
+    },
+    "final-focused-node25.log": {
+      "tests": 52,
+      "pass": 52,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "exit_code": 0,
+      "sha256": "4cdf27357093baa80902567ad4958db3a47b29cc1849a33a2a2285313bd6d4a5"
+    },
+    "worker-compat-node22.log": {
+      "tests": 84,
+      "pass": 84,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "exit_code": 0,
+      "sha256": "15692a8f3a5d9d2b69a3762843da6f6be470181c2cc85323a1a5963e765dd9a4"
+    },
+    "worker-compat-node25.log": {
+      "tests": 43,
+      "pass": 43,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "exit_code": 0,
+      "sha256": "8d36cd80be9740a64945e59003bcc6f9d4e8fad77c9f890ba4c4f176f194cc70"
+    },
+    "affected-context-node22.log": {
+      "tests": 18,
+      "pass": 18,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "exit_code": 0,
+      "sha256": "03d25cbc24832212d09f1361025fbae8ac7e3a166ce970bf06775c9b597aaded"
+    }
+  },
+  "git_diff_check": {
+    "exit_code": 0,
+    "output_bytes": 0
+  },
+  "source_identity": "source-identity.json",
+  "commands": "commands.json",
+  "full_634_suite": "not run",
+  "prior_broad_context_qualification": "partial retained; not Pass",
+  "native_acceptance": "pending independent fresh QA; prior running fixture elsewhere is not evidence for repaired guards"
+}

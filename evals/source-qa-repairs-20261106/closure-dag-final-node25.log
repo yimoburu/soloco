@@ -1,0 +1,27 @@
+✔ missing production intake provider is fail closed (0.536542ms)
+✔ initial unknown legacy is never relabeled accepted (19.13825ms)
+✔ immutable accepted home survives replacement; new global restriction holds ordinary but complete delta repair publishes (32.037833ms)
+✔ successor exact base and concurrent semantic intake including reverted intake hold (49.0115ms)
+✔ missing original, changed producer, rejected negative, expiry and unknown nested producer hold (46.690792ms)
+✔ canonical known historical evidence freezes before bookkeeping; nested originals remain checked (35.165125ms)
+✔ atomic historical maps deliver exact new/newer/deleted originals in chronological intake and remain required after publication (27.772333ms)
+✔ intermediate transitive originals hold proposal, review, publication and accepted use when missing or corrupt (118.630042ms)
+✔ a later checkpoint still validates originals that existed only in an older intermediate delta (53.835417ms)
+✔ wrong historical original and reordered version transitions hold; atomic change row order is irrelevant (35.018958ms)
+✔ intake immutable_entry validates identity as well as original snapshot bytes (9.952333ms)
+✔ literal reference-like JSON in intake remains literal (22.666875ms)
+✔ allowed post-proposal reconstruction intake checks transitive originals before review and publication (25.953416ms)
+✔ real normalized intake preserves deleted intermediate envelopes while checkpoint audits their transitive vault originals (420.948375ms)
+✔ shared immutable entry DAG traverses originals linearly with exact dependency inventory (0.583084ms)
+✔ legacy locators backed by shared immutable entries traverse full originals linearly (0.492ms)
+✔ raw and entry references share traversal but repeated entry identity and metadata still validate (0.445083ms)
+✔ shared DAG nested missing or corrupt originals hold for entry and legacy forms (0.735917ms)
+✔ shared immutable-entry histories are validated as a graph while every wrapper identity remains checked (2.031ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 952.812833

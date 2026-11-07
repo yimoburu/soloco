@@ -1,0 +1,15 @@
+(node:95578) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+PUBLIC FICTIONAL measured preview {"kind":"accepted-operating-upgrade-preview","workflow":"incremental-v1","context_mode":"current","exact_reservation":false,"acceptance":false,"context_fit_verified":false,"prepare_adds_decision_record":true,"current_upgrade_included":true,"meaning":{"stream_characters":54872,"stream_bytes":54878,"pages":1},"raw_archive_retrieval":{"sources":15,"characters":553425,"bytes":553425,"mandatory_replay":false},"boundary":"Preview is the current capture, not reserved future bytes. Preparation adds its exact founder instruction and control record. Ordinary operation remains Held after changed owner or definitions until fresh independent operating delta publication."}
+✔ PUBLIC fictional worker bootstrap -> fresh accepted operating incremental/current rehearsal -> apply/readback preserves raw history and keeps ordinary operation Held (2991.01525ms)
+✔ fresh frozen reader holds raw business, proof, input, vault, expiry, candidate and owner mutations before any native call (1545.252ms)
+✔ operating authority expiry is checked independently of upgrade deadline (1238.804292ms)
+✔ old recovered/failed attempts cannot gain operating mode; explicit selection and original ceilings are required (2235.350917ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8080.260916

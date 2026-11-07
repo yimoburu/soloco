@@ -1,0 +1,17 @@
+Working directory: /Users/xiaoweili/Documents/Codex/SoloDev-reviews/operating-intake-2026-11-06/source
+
+Runtime identification:
+/private/tmp/soloco-node22-validation/node-v22.13.0-darwin-arm64/bin/node --version
+=> v22.13.0
+/opt/homebrew/bin/node --version
+=> v25.2.1
+
+Pre-fix synthetic regression (exit 1; duplicate identity or order after committed selected write):
+/private/tmp/soloco-node22-validation/node-v22.13.0-darwin-arm64/bin/node --test --test-name-pattern='selected new roots' tests/storage-intake.test.mjs > evals/operating-intake/repair-node22-reproduction.log 2>&1
+
+Post-fix focused suite (each exit 0; 27 pass, 0 fail):
+/private/tmp/soloco-node22-validation/node-v22.13.0-darwin-arm64/bin/node --test tests/storage-intake.test.mjs tests/storage-layout-repairs.test.mjs tests/storage-transfer-integrity.test.mjs > evals/operating-intake/repair-node22-storage.log 2>&1
+/opt/homebrew/bin/node --test tests/storage-intake.test.mjs tests/storage-layout-repairs.test.mjs tests/storage-transfer-integrity.test.mjs > evals/operating-intake/repair-node25-storage.log 2>&1
+
+Whitespace check (exit 0):
+git diff --check

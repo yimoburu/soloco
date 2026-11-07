@@ -1,0 +1,103 @@
+TAP version 13
+# (node:26220) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: complete extraction, independent reconciliation and final mapping; immutable original retained
+ok 1 - complete extraction, independent reconciliation and final mapping; immutable original retained
+  ---
+  duration_ms: 22.527916
+  ...
+# Subtest: historical checkpoint, handover subject and old team UNIQUE restrictions are compulsory
+ok 2 - historical checkpoint, handover subject and old team UNIQUE restrictions are compulsory
+  ---
+  duration_ms: 20.302708
+  ...
+# Subtest: exact source, counterpart, dependency, producer, governance and semantic notice freshness; informational history independent
+ok 3 - exact source, counterpart, dependency, producer, governance and semantic notice freshness; informational history independent
+  ---
+  duration_ms: 212.018333
+  ...
+# Subtest: notice deliveries and seen are mechanical; changed notice semantics invalidate exclusion
+ok 4 - notice deliveries and seen are mechanical; changed notice semantics invalidate exclusion
+  ---
+  duration_ms: 0.853083
+  ...
+# Subtest: injected worker rejects all omitted output channels before persistence and retains exact bad output/provenance
+    # Subtest: content
+    ok 1 - content
+      ---
+      duration_ms: 343.482333
+      ...
+    # Subtest: result_unknown_property
+    ok 2 - result_unknown_property
+      ---
+      duration_ms: 97.508083
+      ...
+    # Subtest: item_unknown_property
+    ok 3 - item_unknown_property
+      ---
+      duration_ms: 108.743083
+      ...
+    # Subtest: message_to_engineer
+    ok 4 - message_to_engineer
+      ---
+      duration_ms: 94.475292
+      ...
+    # Subtest: message_to_qa
+    ok 5 - message_to_qa
+      ---
+      duration_ms: 78.487916
+      ...
+    # Subtest: notice
+    ok 6 - notice
+      ---
+      duration_ms: 131.535708
+      ...
+    1..6
+ok 5 - injected worker rejects all omitted output channels before persistence and retains exact bad output/provenance
+  ---
+  duration_ms: 855.79025
+  ...
+# Subtest: malformed raw qualification JSON retains exact text and target provenance through the worker failure path
+ok 6 - malformed raw qualification JSON retains exact text and target provenance through the worker failure path
+  ---
+  duration_ms: 96.721917
+  ...
+# Subtest: worker retains the negative verdict when rejecting unknown qualification output keys
+ok 7 - worker retains the negative verdict when rejecting unknown qualification output keys
+  ---
+  duration_ms: 77.541
+  ...
+# Subtest: canonical apply rechecks closed leaf envelopes even with refreshed child references
+ok 8 - canonical apply rechecks closed leaf envelopes even with refreshed child references
+  ---
+  duration_ms: 15.093916
+  ...
+# Subtest: worker delivers complete bounded wire once, retains canonical native proof and supports different aggregate reviewer
+ok 9 - worker delivers complete bounded wire once, retains canonical native proof and supports different aggregate reviewer
+  ---
+  duration_ms: 1220.662208
+  ...
+# Subtest: wire-size accounting: actual worker retains pretty output and canonical apply enforces both independent caps
+ok 10 - wire-size accounting: actual worker retains pretty output and canonical apply enforces both independent caps
+  ---
+  duration_ms: 417.820167
+  ...
+# Subtest: worker rejects supplemental growth, invalid response, CoS native and oversized UTF-8 output
+ok 11 - worker rejects supplemental growth, invalid response, CoS native and oversized UTF-8 output
+  ---
+  duration_ms: 308.480125
+  ...
+# Subtest: worker requires observed spawn timing and preserves timeout/closure failure evidence
+ok 12 - worker requires observed spawn timing and preserves timeout/closure failure evidence
+  ---
+  duration_ms: 123.739375
+  ...
+1..12
+# tests 18
+# suites 0
+# pass 18
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3638.45425

@@ -1,0 +1,9 @@
+Implemented within the three authorized files. Saved [source-only.patch](/private/tmp/soloco-incidence-storage-20261106/source-only.patch) and [full report](/private/tmp/soloco-incidence-storage-20261106/engineering-report.md).
+
+- Fresh capsules store a descriptor; validation reconstructs the full canonical relation separately.
+- Legacy inline/no-incidence identities, packets, hashes, and reuse remain exact.
+- Both Nodes: focused tests **12/12**; genuine issued-plan FIT comparison **passes**.
+- Untouched scoped-corpus suite: **12/14**, with two stale capsule-layout reads. Supplemental reconstruction checks: **14/14**.
+- Synthetic 64-source capsule: **2,585 bytes versus 2,426,378 bytes** inline.
+
+Actual-corpus storage, CPU/memory, native fit, and independent QA remain unmeasured. No real-company changes or resume occurred.

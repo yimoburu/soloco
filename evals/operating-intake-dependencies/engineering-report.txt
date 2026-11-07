@@ -1,0 +1,7 @@
+Prepared an uncommitted narrow repair. Frozen-boundary validation now covers review rendering and concurrent intake, with immutable-entry identity checks.
+
+Node 25 passed 71 operating tests and all 13 final checkpoint tests. Node 22 remains unverified: the requested executable is absent. Diff-check passed.
+
+[Report, commands, and logs](evals/operating-intake-dependencies/report.md) · [Source patch](evals/operating-intake-dependencies/source.patch)
+
+Owner review is required before integration. Model settings remain unverified; source tests do not establish native semantic acceptance.

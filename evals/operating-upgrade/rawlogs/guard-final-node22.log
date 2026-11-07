@@ -1,0 +1,48 @@
+TAP version 13
+# (node:97312) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# PUBLIC FICTIONAL measured preview {"kind":"accepted-operating-upgrade-preview","workflow":"incremental-v1","context_mode":"current","exact_reservation":false,"acceptance":false,"context_fit_verified":false,"time_forecast":false,"prepare_adds_decision_record":true,"meaning_measurement":"current-capture","projected_attempt":null,"current_upgrade_included":true,"meaning":{"stream_characters":54595,"stream_bytes":54601,"pages":1},"raw_archive_retrieval":{"sources":15,"characters":553425,"bytes":553425,"mandatory_replay":false},"boundary":"Preview is the current capture, not reserved future bytes. Preparation adds its exact founder instruction and control record. Ordinary operation remains Held after changed owner or definitions until fresh independent operating delta publication."}
+# Subtest: PUBLIC fictional worker bootstrap -> fresh accepted operating incremental/current rehearsal -> apply/readback preserves raw history and keeps ordinary operation Held
+ok 1 - PUBLIC fictional worker bootstrap -> fresh accepted operating incremental/current rehearsal -> apply/readback preserves raw history and keeps ordinary operation Held
+  ---
+  duration_ms: 5198.878625
+  ...
+# Subtest: fresh frozen reader holds raw business, proof, input, vault, expiry, candidate and owner mutations before any native call
+ok 2 - fresh frozen reader holds raw business, proof, input, vault, expiry, candidate and owner mutations before any native call
+  ---
+  duration_ms: 4438.181
+  ...
+# Subtest: operating authority expiry is checked independently of upgrade deadline
+ok 3 - operating authority expiry is checked independently of upgrade deadline
+  ---
+  duration_ms: 3314.648667
+  ...
+# Subtest: old recovered/failed attempts cannot gain operating mode; explicit selection and original ceilings are required
+ok 4 - old recovered/failed attempts cannot gain operating mode; explicit selection and original ceilings are required
+  ---
+  duration_ms: 5524.301333
+  ...
+# Subtest: actual immutable vault byte corruption fails closed and a changed step binding cannot apply
+ok 5 - actual immutable vault byte corruption fails closed and a changed step binding cannot apply
+  ---
+  duration_ms: 5440.874708
+  ...
+# Subtest: prospective verify rejects extra business intake after apply without changing historical validators
+ok 6 - prospective verify rejects extra business intake after apply without changing historical validators
+  ---
+  duration_ms: 4431.920458
+  ...
+# Subtest: omitted explicit current request retains the existing attempt path even with an accepted operating state
+ok 7 - omitted explicit current request retains the existing attempt path even with an accepted operating state
+  ---
+  duration_ms: 1843.698542
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 30281.640834

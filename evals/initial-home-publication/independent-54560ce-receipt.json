@@ -1,0 +1,54 @@
+{
+  "role": "fresh_independent_source_QA",
+  "commit": "54560ceff468ec2135670e978bd3439a60b49371",
+  "tree": "417e15c9778bc3c95b17e45dcfeb96638f10fa95",
+  "packet": 3,
+  "packets": 3,
+  "native_session_id": "01a1b385-9388-7370-8c01-d66a67bb3262",
+  "started_at": "2026-11-07T01:02:20.107881+00:00",
+  "ended_at": "2026-11-07T01:07:54.550643+00:00",
+  "exit_code": 0,
+  "turn_completed": true,
+  "lifecycle": [
+    {
+      "type": "thread.started",
+      "thread_id": "01a1b385-9388-7370-8c01-d66a67bb3262"
+    },
+    {
+      "type": "error",
+      "message": "Reconnecting... 2/5 (request timed out)"
+    },
+    {
+      "type": "error",
+      "message": "Reconnecting... 3/5 (request timed out)"
+    },
+    {
+      "type": "error",
+      "message": "Reconnecting... 4/5 (request timed out)"
+    },
+    {
+      "type": "error",
+      "message": "Reconnecting... 5/5 (request timed out)"
+    },
+    {
+      "type": "turn.completed",
+      "usage": {
+        "input_tokens": 809286,
+        "cached_input_tokens": 542080,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 7304,
+        "reasoning_output_tokens": 5975
+      }
+    }
+  ],
+  "prompt_sha256": "fe46ef012405b61405fceb37cf6527ab4f613f7783b44cfc7ee24f6f64668e11",
+  "prompt_characters": 478776,
+  "requested_model": "gpt-6.1-sol",
+  "requested_effort": "high",
+  "requested_speed": "host_default",
+  "selection_reason": "Fresh independent exact-source integration review; prior reviewer exhausted physical context. Reuse supported Sol/high within existing account and ceiling.",
+  "effective_settings": "unverified",
+  "timeout_seconds": 600,
+  "scope": "Public source only; no tools, company writes, migration, adoption or live resume",
+  "report_exists": true
+}

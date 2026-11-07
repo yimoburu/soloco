@@ -1,0 +1,50 @@
+(node:60064) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ separate review window retains native cap and validates narrow explicit settings (1.855458ms)
+✔ streamed review may complete after ten minutes only with a fresh explicit window (781.873792ms)
+✔ window changes or completion exactly at the review deadline cannot publish an accepted Pass (226.3825ms)
+✔ ordinary dispatch rejects handover-window controls before creating a job or session (7.155875ms)
+✔ window admission requires an unused target and fresh native-session reference (37.786041ms)
+✔ terminal review receipts outside the fixed window cannot permit resume (142.287625ms)
+✔ first-call timing validates the actual shortened invocation without extending the job policy (108.99775ms)
+✔ a fixed review window shrinks later call limits and rejects completion exactly at its end (411.995791ms)
+✔ every native invocation requires complete consistent timing evidence before publication (923.756791ms)
+✔ clock movement during publication never publishes a completed receipt at or beyond expiry (1547.740125ms)
+(node:60065) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ same-owner pause/resume stays proportionate; fresh and cross-host replacements require reconstruction (611.863416ms)
+✔ exact independent QA allows preparation resume, preserves records/notices and durable acceptance (361.189292ms)
+✔ incomplete, non-independent, wrong-hash and blocked review cannot resume (530.952208ms)
+✔ state changes invalidate acceptance; hook delivery does not; failed review remains and revised reconstruction needs new review (623.484708ms)
+✔ ordinary work cannot run during pending handover; pause cancels a check and late output quarantines (107.020917ms)
+✔ distinct mandatory semantics over 200k page without embedding the stream (142.353791ms)
+✔ integration binds coordination metadata without duplicating frozen handover evidence (46.441959ms)
+✔ orphan classification provenance holds handover without revoking outgoing ownership (23.565083ms)
+✔ founder inspection, exact reads and submission receipts remain bounded while the full subject is retained (115.914875ms)
+✔ changed prior negative-review evidence invalidates a later Pass at resume (305.767625ms)
+✔ invalid retained evidence fails admission before owner, epoch, sessions or pause change (20.907334ms)
+✔ all previous reconstruction and review execution evidence remains current and retrievable (882.346667ms)
+✔ founder read response bounds include escaped payload and long source metadata (53.439667ms)
+✔ repaired reconstructions retain exact originals without recursively copying old snapshots (1204.490375ms)
+✔ failed handover with upgrade history reuses typed history semantics instead of reembedding checkpoints (758.143333ms)
+ℹ Required semantic characters across repaired submissions: 80629, 88355, 94664
+✔ 25.7M fictional archive fits 200k; exact originals, mandatory legacy obligations and retrieval complete a full handover (60731.681708ms)
+✔ frozen reads enforce exact Unicode ranges, hashes, scope, and delivery-bound citations (114.083666ms)
+✔ worker rejects forged reads, stale canonical evidence, forged citations and native identity changes (1074.937125ms)
+✔ handover reads can exceed sixteen rounds without changing native session or invalidating their own snapshot (1530.663792ms)
+✔ current obligations and distinct legacy team rules stay compulsory regardless of resolved status or classification (207.523166ms)
+✔ retained legacy v1 reconstruction and review still resume under their original contract (141.359292ms)
+✔ supplemental allowlist mutation cannot alter a running frozen handover assignment (360.8265ms)
+✔ a reconstruction edited after QA cannot reuse its earlier Pass (285.35025ms)
+✔ archival occurrence indexes and distinct current semantics stay retrievable outside the initial budget (1080.814042ms)
+✔ 227 varied fictional obligations and large pinned rules require complete same-native delivery before Pass (37379.3165ms)
+✔ escaped frozen read packets defer whole ranges within 200k without losing source bytes (1909.734666ms)
+✔ compulsory delivery rejects a final gap, overlapping duplicates and another native ledger (69.096167ms)
+ℹ tests 37
+ℹ suites 0
+ℹ pass 37
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 110842.140709

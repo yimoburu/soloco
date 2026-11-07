@@ -1,0 +1,10 @@
+Implemented the scoped v3 selectors and canonical interface catalog. Changed only scoped-context.mjs, appended docs, and added tests.
+
+- [Scope-only patch](/private/tmp/soloco-corpus-output-20261106/source-only.patch)
+- [Report, exact counts, and preserved failures](/private/tmp/soloco-corpus-output-20261106/engineering-report.md)
+
+Node 25 and Node 22 each passed **19/19 focused tests**, plus the legacy byte oracle covering nine assignments.
+
+Fictional output shrank **41,531 → 2,641 bytes**. Supplied structural interface-floor reductions are **4,603 / 22,837 / 22,316 / 18,669 bytes**.
+
+Complete real-data output fit and native acceptance remain **unknown**. No company QA or adoption occurred.

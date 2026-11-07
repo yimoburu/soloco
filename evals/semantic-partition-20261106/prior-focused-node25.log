@@ -1,0 +1,34 @@
+(node:92410) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ complete local sections retain late qualifiers, old versions, negatives and unknown code/logs; no raw baseline per packet (5.381958ms)
+✔ repeated snapshots use exact raw originals and inbound ancestry, contradictory occurrence contexts never transfer acceptance (5.193583ms)
+✔ canonical JSON text is typed STRING evidence, coherent logical bodies replace escaped-range chunks (1.563416ms)
+✔ resealed gaps, altered ancestry, omitted originals, forged sizes and changed qualifiers/membership hold (10.739667ms)
+✔ bounded whole sections hold without truncation or cap widening; owned session resists caller mutation (4.5195ms)
+✔ linear unique section work for repeated snapshots; byte forecast without constructing corpus combinations (7.50875ms)
+ℹ {"fictional_only":true,"ten":{"unique_sections":20,"physical_occurrences":33,"snapshot_inbound_edges":10,"unique_section_bytes":8083,"prospective_extraction_packets":33,"total_packet_bytes":82978,"largest_packet_bytes":2970,"held_packets":0,"complete_native_request_bytes":null,"native_same_session_fit":"unproven","semantic_acceptance":false},"hundred":{"unique_sections":110,"physical_occurrences":123,"snapshot_inbound_edges":100,"unique_section_bytes":48900,"prospective_extraction_packets":123,"total_packet_bytes":327692,"largest_packet_bytes":2979,"held_packets":0,"complete_native_request_bytes":null,"native_same_session_fit":"unproven","semantic_acceptance":false}}
+✔ existing canonical source adapter uses runtime test author_instance and rejects invalid producer/candidate closure (38.854292ms)
+✔ anonymous enclosing qualifiers and scalar collection members cannot hide complete local conditions (0.906375ms)
+✔ strict reference metadata remains in its parent section without independent extraction subjects (4.978709ms)
+(node:92411) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ FICTIONAL ADAPTER: coherent public create/read -> worker -> independent interface -> canonical apply; repeats have separate provenance (2185.182875ms)
+✔ FICTIONAL ADAPTER: omissions, omitted occurrence interfaces, source producer and negative receipts hold (401.070375ms)
+✔ FICTIONAL ADAPTER: late qualifier remains complete and missing home preservation is Blocked (308.44025ms)
+✔ FICTIONAL ADAPTER: prospective coherent streaming carries complete oversized section; old extraction still rejects opt-in (428.353583ms)
+✔ FICTIONAL ADAPTER: snapshot inbound native path and resealed omissions cannot enter canonical scoped plan (1800.62325ms)
+✔ coherent runtime-test producer uses canonical author_instance, candidate and receipt closure without fabricated job_id (36.6995ms)
+(node:92412) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ FICTIONAL public corpus adapter shares intrinsic receipts but independently reviews both source claims (5898.626458ms)
+✔ corpus growth deduplicates intrinsic sections while keeping all repeated physical obligations unaccepted (93.7535ms)
+ℹ {"fictional_only":true,"one":{"intrinsic_batches":2,"shared_body_sections":1,"physical_occurrences":64},"ten":{"intrinsic_batches":2,"shared_body_sections":1,"physical_occurrences":118},"semantic_acceptance":false}
+✔ corpus retains external named handover originals and refuses missing closure (44.133791ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 18
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6105.558084

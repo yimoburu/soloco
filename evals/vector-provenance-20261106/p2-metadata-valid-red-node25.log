@@ -1,0 +1,27 @@
+(node:87856) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ SCOPED publication ignores colliding external producer metadata (1211.84125ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1278.001542
+
+✖ failing tests:
+
+test at tests/scoped-coherent-runtime.test.mjs:185:33
+✖ SCOPED publication ignores colliding external producer metadata (1211.84125ms)
+  Error: Scoped context hold: source missing job:external-provider-id
+      at fail (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/scoped-context.mjs:21:22)
+      at source (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/scoped-context.mjs:31:81)
+      at record (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/scoped-context.mjs:131:15)
+      at producerClosure (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/scoped-context.mjs:142:3)
+      at originalProducers (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:288:94)
+      at add (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:191:50)
+      at publicationEvidence (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:212:88)
+      at capture (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:217:83)
+      at proposeOperatingState (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:219:43)
+      at file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:452:148

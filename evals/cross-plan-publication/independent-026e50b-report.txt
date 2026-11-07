@@ -1,0 +1,57 @@
+{
+  "verdict": "Fail",
+  "frozen_commit": "026e50bd320f467958c33e368132117b12646358",
+  "frozen_tree": "a14b10ee64e1192942c3212271e611d4aee7f45c",
+  "findings": [
+    {
+      "id": "F3",
+      "file": "plugins/soloco/runtime/operating-state.mjs",
+      "line": 225,
+      "line_anchor": "same(corpus.plan,h.value.bootstrap_home_provenance.plan)",
+      "priority": "P1",
+      "trigger": "Create initial-home corpus plan A, reuse its capsule through corpus_plan_id to create B, extract and save an extraction-evidence home under B, then complete preservation under A using B's canonical extraction. Both plans enter the canonical preservation closure.",
+      "consequence": "Home admission and preservation accept the shared extraction_identity, but publication closure seeding requires identical plan-record references. It therefore skips this home. Traversing its extraction evidence reaches the snapshot-bearing scoped plan as unqualified evidence and Holds operating proposal. Supported corpus-plan/extraction reuse still breaks the initial-home publication lifecycle."
+    }
+  ],
+  "dispositions": {
+    "F1": "The direct reference-grammar mismatch is repaired. Plain IDs remain literal; frozen references and canonical extraction receipts are validated. The supplied new lifecycle crosses public publication and checkpoint validation. Publication integration remains incomplete for the supported reuse case in F3.",
+    "F2": "Repaired. The guard precedes plan lookup, target creation and canonical extraction reuse. Supplied regressions cover range, coherent-source and corpus paths.",
+    "prior19f": "Compact persisted preservation claims remain intact. No patch hunk restores persistence of the reconstructed incidence closure.",
+    "prior28": [
+      "All-frozen and historical rejected-contributor independence retained.",
+      "Early negative detection, exact rejected-wire retention and historical failures retained.",
+      "Canonical containment, frozen producer maps and producer closure retained.",
+      "Resolved-original corpus comparison follows canonical exclusion validation; malformed or changed wrappers still Hold.",
+      "Normalized-v4 intake, checkpoint and transitive immutable audits retained.",
+      "Tree/index freshness, authority, owner, pause, revocation, home/dependency freshness, native delivery, closure and deadlines retained.",
+      "Explicit compatibility allowlists and Codex MCP configuration retained."
+    ]
+  },
+  "required_changes": [
+    {
+      "finding": "F3",
+      "change": "Align publication closure seeding with supported corpus-plan reuse. Validate the home's exact runtime-bound plan and its shared frozen extraction identity against the accepted corpus proof, while retaining exact home, source, stored-envelope and canonical receipt bindings. Do not broadly exempt snapshot-bearing plans or parse JSON-looking strings.",
+      "verification": "Add a normalized-v4 public lifecycle regression with distinct plans A/B sharing a corpus capsule, B extraction and home provenance, and A preservation integration. Require operating proposal, independent publication, validateOperatingIndex and operatingContext to succeed; reject changed capsule, identity, home and receipt bindings."
+    }
+  ],
+  "source_acceptance_scope": {
+    "acceptance": "Withheld pending F3.",
+    "method": "Reviewed the complete supplied patch and new test source against the retained implementation. No tools, commands, network, subagents or test execution.",
+    "dependencies": "No necessary retained runtime source is missing.",
+    "wrapper_limitation": "The documented pre-capture immutable-entry admission Hold remains a conservative limitation, not repaired support.",
+    "semantic_boundary": "Canonical results and mechanical coverage do not establish adequate meaning, locality or permission. Missing material evidence requires Hold and an explicit NEW widened target, retaining failures and spent allowance.",
+    "authority": "No live qualification, migration, publication, installation, adoption, handover or resume permission."
+  },
+  "execution_evidence_limits": {
+    "independently_observed_execution": false,
+    "controller_reports": "Supplied logs report wrapped-publication 1/1 and operating-control 6/6 on each Node runtime. I have not independently verified execution or recomputed artifact hashes.",
+    "final_matrix": "No completed full-matrix result for this exact pin was supplied. Prior-pin results are not final-pin validation.",
+    "fixture_scope": "Scripted fictional judgments establish neither authentic semantic acceptance nor actual native fit."
+  },
+  "remaining_live_checks": [
+    "Repair F3 and retain the cross-plan publication regression plus final-pin mechanical, compatibility and provenance checks.",
+    "Complete and retain the final Node 22/25 matrix and build/drift evidence.",
+    "Measure actual complete framing, output completeness, cumulative native capacity and interface fan-out under unchanged deadlines.",
+    "Separately verify live SPEC v0.18 pins, current authority, independent semantic qualification and guarded continuity."
+  ]
+}

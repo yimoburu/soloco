@@ -1,0 +1,95 @@
+{
+  "verdict": "Fail",
+  "frozen_commit": "34b4650f9618dad5b0e74918d85c69fc54209869",
+  "frozen_tree": "8ad34a70d3c38291da1ec19ca04f41eaf2b3fee9",
+  "findings": [
+    {
+      "file": "plugins/soloco/runtime/scoped-context.mjs",
+      "line": 447,
+      "priority": "P1",
+      "trigger": "A scoped source contains a verified historical checkpoint job whose contributor N appears only in rejected_native_id/rejected_native_ids, without an equal live job. N reviews an extraction of that source.",
+      "consequence": "independent() calls collectIdentities without rejected identities. Forward native admission scans only live jobs' rejected fields. N can therefore receive canonical acceptance while reviewing its own archived rejected contribution."
+    },
+    {
+      "file": "plugins/soloco/runtime/worker.mjs",
+      "line": 326,
+      "priority": "P1",
+      "trigger": "An operating-publication reviewer returns a Blocked response with empty or oversized content, causing parseArtifact to throw before artifact assignment.",
+      "consequence": "The rejection-retention predicate covers qualification and qualification_evidence, but omits operating publication. The raw response and substantive negative reason are lost; only generic failure evidence survives. A successor cannot assess the complete counterevidence."
+    },
+    {
+      "file": "plugins/soloco/runtime/operating-state.mjs",
+      "line": 531,
+      "priority": "P2",
+      "trigger": "An independently preserved upgrade checkpoint contains a canonical historical artifact and its producer job, but that job is absent or different in today's jobs collection.",
+      "consequence": "originalProducers identifies the historical record correctly, then calls producerClosure against today's state rather than its frozen containment map. Missing or mismatched live producers can block publication despite complete unchanged historical provenance."
+    },
+    {
+      "file": "plugins/soloco/.codex-plugin/plugin.json",
+      "line": 8,
+      "priority": "P2",
+      "trigger": "The Codex plugin declares mcpServers='./.mcp.codex.json', whose complete source was not supplied.",
+      "consequence": "The declared Codex server-launch configuration remains unreviewable. Acceptance of that integration boundary must remain held."
+    }
+  ],
+  "prior_finding_dispositions": [
+    {
+      "finding": "Historical rejected-native ownership in represented-v2 and operating publication",
+      "status": "Repaired at source level",
+      "assessment": "Canonical historical job containment now supplies rejected identities without requiring an equal live row. The adjacent scoped path remains defective as reported above."
+    },
+    {
+      "finding": "Incidental ID collisions interpreted as producer edges",
+      "status": "Repaired at source level",
+      "assessment": "Producer discovery now requires canonical record containment. Historical producer lookup still has the separate frozen-map defect above."
+    },
+    {
+      "finding": "Stored immutable-entry versus resolved scoped-source identity",
+      "status": "Repaired at source level",
+      "assessment": "Publication retains stored-envelope bindings separately from resolved scoped references; the supplied regression addresses this scoped path."
+    },
+    {
+      "finding": "Tree proof invalidated by operating publication",
+      "status": "Repair retained",
+      "assessment": "currentExtensions validates the operating index before omitting it and preserves unknown extensions."
+    },
+    {
+      "finding": "Represented-v2 rejected-negative laundering, including early parse rejection",
+      "status": "Repair retained",
+      "assessment": "Format-4 rejection preserves raw output and negative metadata before clipping. This does not repair operating-publication retention."
+    },
+    {
+      "finding": "Accepted handover proof lost across upgrade epochs",
+      "status": "Repair retained",
+      "assessment": "Historical v4 acceptance retains exact receipts and original incoming-owner bindings; fresh admission remains fenced."
+    },
+    {
+      "finding": "defaultServiceTier catalog mismatch",
+      "status": "Repair retained"
+    },
+    {
+      "finding": "Missing runtime and hook implementation source",
+      "status": "Closed for those implementations",
+      "assessment": "Runtime, hooks and launcher were supplied. The separately declared Codex MCP configuration remains missing."
+    }
+  ],
+  "required_changes": [
+    "Include provenance-bound historical rejected contributors in scoped independence checks, using canonical containment rather than arbitrary metadata. Cover absent and differing live jobs.",
+    "Retain operating-publication raw returns before parsing or envelope validation, including early rejected negatives; preserve verdict metadata before clipping without relaxing acceptance rules.",
+    "Resolve historical producer closures against their exact frozen company/version maps while retaining separate current-source bindings.",
+    "Supply the exact frozen .mcp.codex.json, freeze the repairs, and obtain another complete-source review."
+  ],
+  "source_acceptance_scope": {
+    "acceptance": "No whole-pin source acceptance; must-fix defects remain and the missing Codex configuration boundary is held.",
+    "method": "Reviewed all three supplied packets as evidence. No tools, commands, network, subagents, company records or writes were used. I have not run tests or independently verified supplied logs or hashes.",
+    "storage_intake": "Normalized row/event verification remains distinct from transitive snapshot validation, native delivery and semantic acceptance.",
+    "authority": "This review grants no migration, publication, handover, resume, installation or adoption permission.",
+    "governance": "Public assets and fixtures do not establish actual SoloDev pins or preservation of its live SPEC v0.18."
+  },
+  "remaining_live_checks": [
+    "Independent executed regressions for the repaired pin, including historical scoped contributors, early operating negatives, frozen producer maps and affected legacy contracts.",
+    "Actual-corpus lossless reconstruction, archive retrieval, complete request framing, cumulative native capacity and residual interface fan-out.",
+    "Independent native semantic bootstrap and operating publication, followed by exact handover QA, guarded resume, first ordinary return and successor delta acceptance.",
+    "Checked team adoption with exact live governance preservation and separate post-upgrade operating freshness verification."
+  ]
+}

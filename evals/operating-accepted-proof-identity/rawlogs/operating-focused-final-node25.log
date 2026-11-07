@@ -1,0 +1,44 @@
+(node:24089) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ accepted historical publication proof survives an owner epoch change without admitting old in-flight work (440.356792ms)
+✔ public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning (25.680917ms)
+✔ missing legacy bootstrap is visibly DIRTY and apply rolls back without acceptance (17.424667ms)
+✔ new membership, changed exact source, wrong independent identity and absent closure cannot publish (105.016083ms)
+✔ scope closure, global membership, expiry, receipt changes, revocation and missed communication hold (34.688584ms)
+✔ pause fences publication reviewer and prospective handover cannot hide unknown legacy (12.290625ms)
+✔ 10x independently classified inert archive keeps actual mandatory operating assignment bytes and semantic work constant (66.47275ms)
+✔ deleted applicable home and changed exact provenance cannot disappear from accepted meaning (21.01625ms)
+✔ typed outcome requires complete historical uncertainty; text cannot manufacture permission (20.25975ms)
+✔ public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure (67.751833ms)
+✔ late new and changed falsely scoped prohibitions stay globally DIRTY, but fresh proposals include them (85.847083ms)
+✔ publication proof stays current; failed, quarantined, uncertain and unknown-extension siblings stay DIRTY (21.511958ms)
+✔ mechanical publication index rejects tampering and retains unknown state extensions (22.85375ms)
+✔ format6 explicit non-home evidence survives dispatch, discovery and bounded same-native reads (219.13975ms)
+✔ referenced archived revoked/retry restriction and canonical parent receipts are supplied completely inline (64.629125ms)
+✔ large non-home provenance uses exact same-native ranges; undelivered, partial, denied, stale or changed evidence cannot publish (688.457209ms)
+✔ canonical preservation parent revisions cannot be borrowed from matching hashes (65.01575ms)
+✔ missing provenance and snapshot-only evidence hold rather than count pointers as delivered bodies (15.000166ms)
+✔ real runtime receipt attribution and deterministic reuse deliver the validated producer closure before Pass (226.953292ms)
+✔ runtime receipt missing or mismatched producer, candidate, plan, reuse or generation holds (49.337375ms)
+✔ external catalog reference-shaped metadata is verbatim evidence without a company lookup (53.300042ms)
+✔ runtime closure requires complete delivery and independent source and proof sessions (2824.46575ms)
+✔ public qualified recovered snapshot publishes current typed outcomes without replaying the paid raw archive (1297.747458ms)
+✔ large prospective publication uses bounded frozen worker delivery and rejects a manufactured complete flag (5756.677666ms)
+✔ frozen publication worker rejects unread semantics, changed native and changed current membership (386.237583ms)
+✔ paid snapshot archive still requires publication QA independent of nested original producers (1109.710458ms)
+✔ FICTIONAL PUBLIC v2 explicit complete sources preserve accepted runtime producer independence and freshness (3086.207875ms)
+(node:24090) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ FICTIONAL public corpus adapter shares intrinsic receipts but independently reviews both source claims (6370.770417ms)
+✔ corpus growth deduplicates intrinsic sections while keeping all repeated physical obligations unaccepted (107.366292ms)
+ℹ {"fictional_only":true,"one":{"intrinsic_batches":2,"shared_body_sections":1,"physical_occurrences":34},"ten":{"intrinsic_batches":2,"shared_body_sections":1,"physical_occurrences":88},"semantic_acceptance":false}
+✔ corpus retains external named handover originals and refuses missing closure (51.679167ms)
+✔ FICTIONAL public SCOPED corpus accepted semantics publish current homes and recovered controls without raw replay (6957.682459ms)
+ℹ tests 31
+ℹ suites 0
+ℹ pass 31
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 16886.045208

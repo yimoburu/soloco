@@ -1,0 +1,12 @@
+Implemented without committing.
+
+Changed:
+- `plugins/soloco/runtime/worker.mjs`
+- New `tests/operating-negative-retention.test.mjs`
+- Evidence under `evals/operating-negative-retention/`; exact inventory in the report.
+
+Complete negative reasons now survive pre-assignment failures; clipped raw output has an exactly retrievable immutable original.
+
+Per runtime, Node 25 and Node 22: **84 passed, 0 failed, 1 sandbox skip**. Broad stress runs were interrupted and remain unverified. Judgments were FICTIONAL, not native semantic acceptance. Editing/testing stopped before 480 seconds.
+
+[Report, commands, logs, and diff](/private/tmp/soloco-operating-negative-retention-20261106/source/evals/operating-negative-retention/report.md)

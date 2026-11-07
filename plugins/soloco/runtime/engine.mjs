@@ -1,9 +1,11 @@
+import {OPERATING_PROTOCOL,validateOperatingRecord,proposeOperatingState,publishOperatingState,operatingInspection,operatingMaintenanceEligible,operatingContext,admitOperatingAssignment} from './operating-state.mjs';
+import {mechanicalOperatingControl} from './operating-control.mjs';
 import * as scoped from './scoped-context.mjs';
 import { currentView, upgradeView, publicPage, exactRead, mutationView, sourceReference, itemView, controlView, storageSourceId, fits, exactTextRead } from './public-response.mjs';
 import {backupCompany,restoreCompany} from './storage-transfer.mjs';
-import {contextPlan,validateContextPlan,recordReference,contextSource} from './current-state.mjs';
+import {contextPlan,validateContextPlan,applyContextQualification,recordReference,contextSource} from './current-state.mjs';
 import {captureQualificationPlan,createQualificationTarget,qualificationPlanView,qualificationReadUnit,qualificationReadEvidence,validateQualificationApply,qualificationMaintenanceEligible,qualificationControlHash,qualificationWorkload,QualificationHold} from './context-qualification.mjs';
-import {inheritSnapshots,retainSnapshot,resolveSnapshotEntry,snapshotReference,snapshotBytes} from './snapshot.mjs';
+import {bindOperatingIntake,inheritSnapshots,retainSnapshot,resolveSnapshotEntry,snapshotReference,snapshotBytes} from './snapshot.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -88,7 +90,7 @@ export function prototype(args,host) { binding(args,host); return prototypeActio
 function update(args, host, type, fn, selection=null) {
   binding(args,host);
   if (!Number.isInteger(args.epoch)) throw new Error('Supply the current ownership epoch from company_status');
-  return withStore(args.root, db => {const mutate=state=>{owner(state,args.session_id,host,args.epoch);fn(state);state.runtime_version=VERSION;return state;};return selection&&db.selectedTransaction?db.selectedTransaction(type,selection,mutate):db.transaction(type,mutate);});
+  return withStore(args.root, db => {const mutate=state=>{owner(state,args.session_id,host,args.epoch);if(state.operating_state||type.startsWith('operating.'))bindOperatingIntake(state,db);fn(state);state.runtime_version=VERSION;return state;};return selection&&db.selectedTransaction?db.selectedTransaction(type,selection,mutate):db.transaction(type,mutate);});
 }
 export function open(args, host) {
   binding(args,host);
@@ -228,6 +230,7 @@ function readProgressArtifact(args,host) {
   return exactTextRead(text,{...args,id:args.artifact});
 }
 export function save(args,host) {
+  if(args.operating_record!==undefined)validateOperatingRecord(args.operating_record);
   requireText(args.content,'content',100000);
   if (!['intent','plan','decision','preference','artifact'].includes(args.kind)) throw new Error('Unsupported record kind');
   if (args.kind==='preference' && (!['explicit','inferred'].includes(args.basis) || !args.source_reference)) throw new Error('Preferences need explicit/inferred basis and source_reference');
@@ -241,9 +244,10 @@ export function save(args,host) {
     if(old?.prototype) throw new Error('Prototype records are immutable; use company_prototype or create a new scope');
     if (old && (old.author_instance!==s.owner.session_id || old.revision!==args.expected_revision)) throw new Error('Record owner or version conflict; create a new proposal instead');
     if (!old && args.expected_revision !== undefined && args.expected_revision !== 0) throw new Error('Record does not exist at expected version');
-    s.records[recordId]={id:recordId,kind:args.kind,content:args.content,...(args.context_obligations===undefined?{}:{context_obligations:structuredClone(args.context_obligations)}),author_role:'runner',author_instance:s.owner.session_id,revision:(old?.revision??0)+1,status:'Draft',source_reference:args.source_reference??null,basis:args.basis??null,updated_at:stamp(),previous:old ? [...(old.previous??[]), {revision:old.revision,content:old.content,source_reference:old.source_reference,...(old.context_obligations?{context_obligations:old.context_obligations}:{})}] : []};
+    const bootstrap=scoped.bootstrapSaveProvenance(s,args,old);
+    s.records[recordId]={...(bootstrap?{bootstrap_home_provenance:bootstrap}:{}),id:recordId,kind:args.kind,content:args.content,...(args.operating_record===undefined?{}:{operating_record:structuredClone(args.operating_record)}),...(args.context_obligations===undefined?{}:{context_obligations:structuredClone(args.context_obligations)}),author_role:'runner',author_instance:s.owner.session_id,revision:(old?.revision??0)+1,status:'Draft',source_reference:args.source_reference??null,basis:args.basis??null,updated_at:stamp(),previous:old ? [...(old.previous??[]), {revision:old.revision,content:old.content,source_reference:old.source_reference,...(old.operating_record?{operating_record:old.operating_record}:{}),...(old.context_obligations?{context_obligations:old.context_obligations}:{})}] : []};
     // An amended artifact never retains a review of its earlier version.
-  },{rootKeys:['schema','runtime_version','plugin_version','team_sha256','owner','paused','roles','governance','governance_sha256','cos_instructions','revision','updated_at'],entities:{records:[recordId],upgrade:['status']}});
+  },args.bootstrap_plan_id||args.id?null:{rootKeys:['schema','runtime_version','plugin_version','team_sha256','owner','paused','roles','governance','governance_sha256','cos_instructions','revision','updated_at'],entities:{records:[recordId],upgrade:['status']}});
   return mutationView(state.records[recordId],recordId);
 }
 export function handover(args,host) {
@@ -269,7 +273,7 @@ export function dispatch(args,host,{launch=launchWorker,check=readiness,catalog=
   if (args.role==='runner') throw new Error('Choose a specialist role from company_open');
   binding(args,host);
   if(reviewWindow)withStore(args.root,db=>{const s=db.read();owner(s,args.session_id,host,args.epoch);if(!freshHandoverReviewEligible(s,args))throw Error('Review window is only for a fresh current paused streamed handover QA');});
-  withStore(args.root,db=>{const s=db.read();owner(s,args.session_id,host,args.epoch);if(args.model_selection!==undefined&&!['0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7','0.6.8','0.6.9','0.6.10','0.6.11','0.6.12','0.6.13','0.7.0','0.7.1','0.7.2',VERSION].includes(s.plugin_version))throw new Error('Explicitly adopt the model-selection team before using model_selection');});
+  withStore(args.root,db=>{const s=db.read();owner(s,args.session_id,host,args.epoch);if(args.model_selection!==undefined&&!['0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7','0.6.8','0.6.9','0.6.10','0.6.11','0.6.12','0.6.13','0.7.0','0.7.1','0.7.2','0.7.3',VERSION].includes(s.plugin_version))throw new Error('Explicitly adopt the model-selection team before using model_selection');});
   const inventory=args.model_selection?.mode==='explicit' || args.model_selection?.speed==='fast_disabled'?catalog(host):null;
   const selection=normalizeSelection(args.model_selection,host,inventory);
   const ready=check(host);
@@ -277,7 +281,7 @@ export function dispatch(args,host,{launch=launchWorker,check=readiness,catalog=
   if (ready.authenticated===false) throw new Error(`${host} CLI is not signed in. Complete its normal login before starting specialists.`);
   const jobId=id('job');
   const state=update(args,host,'job.queued',s=>{
-    if(s.paused && !handoverReviewEligible(s,args)&&!qualificationMaintenanceEligible(s,args)&&!scoped.scopedMaintenanceEligible(s,args)) throw new Error('Company is paused; only current handover QA or explicitly authorized read-only qualification may run');
+    if(s.paused && !handoverReviewEligible(s,args)&&!qualificationMaintenanceEligible(s,args)&&!scoped.scopedMaintenanceEligible(s,args)&&!operatingMaintenanceEligible(s,args)) throw new Error('Company is paused; only current handover QA or explicitly authorized read-only qualification may run');
     if(reviewWindow&&!freshHandoverReviewEligible(s,args))throw Error('Review window is only for a fresh current paused streamed handover QA');
     if(!Object.hasOwn(s.roles,args.role)) throw new Error('Role is absent from the pinned team catalog');
     if(busy(s).length>=3) throw new Error('Three assignments already active; wait for a result');
@@ -302,10 +306,11 @@ export function dispatch(args,host,{launch=launchWorker,check=readiness,catalog=
     const coordination=bindCoordination(s,args);
     const inputs=[...new Set([...(args.input_ids??[]),...handoverInputs,...(coordination?.dependencies??[]).map(d=>d.artifact_id)])];
     if(!Array.isArray(inputs) || inputs.some(k=>typeof k!=='string' || !Object.hasOwn(s.records,k))) throw new Error('An input record is missing');
-    const job={...(coordination?{coordination}:{}),...(args.expected_deliverable===undefined?{}:{expected_deliverable:args.expected_deliverable}),requester:{role:'runner',session_id:s.owner.session_id,host:s.owner.host,epoch:s.owner.epoch},id:jobId,role:args.role,session_key:key,instance_id:session.instance_id,native_id:session.native_id,host,epoch:s.owner.epoch,status:'queued',task:args.task,...(args.evidence_ids?{supplemental_sources:args.evidence_ids.map(key=>{const value=contextSource(s,key);if(!value)throw Error('Supplemental source missing');return recordReference(value,key);})}:{}),context_format:3,...(args.context_scope?{context_scope:requireText(args.context_scope,'context_scope',160)}:{}),timeout_policy_version:TIMEOUT_POLICY_VERSION,...timeout,...(reviewWindow??{}),model_selection:selection,cli_version:ready.version,task_summary:args.task_summary??null,next_handoff:args.next_handoff??null,...(inventory?{model_catalog:{source:inventory.source,...(selection.mode==='explicit'?{model:inventory.models.find(m=>m.id===selection.model)}:{}),speed_support:inventory.speed_support}}:{}),inputs:inputs.map(k=>({id:k,revision:s.records[k].revision})),review_of:target?{id:target.id,revision:target.revision}:null,...(args.prototype_id?{prototype_id:args.prototype_id}:{}),...(args.development_id?{development_id:args.development_id}:{}),created_at:stamp()};
+    const job={...(coordination?{coordination}:{}),...(args.expected_deliverable===undefined?{}:{expected_deliverable:args.expected_deliverable}),requester:{role:'runner',session_id:s.owner.session_id,host:s.owner.host,epoch:s.owner.epoch},id:jobId,role:args.role,session_key:key,instance_id:session.instance_id,native_id:session.native_id,host,epoch:s.owner.epoch,status:'queued',task:args.task,...(args.evidence_ids?{supplemental_sources:args.evidence_ids.map(key=>{const value=contextSource(s,key);if(!value)throw Error('Supplemental source missing');return recordReference(value,key);})}:{}),context_format:target?.context_classification_plan?.version===2?4:s.operating_state&&!target&&!args.prototype_id&&!args.development_id?6:3,...(args.context_scope?{context_scope:requireText(args.context_scope,'context_scope',160)}:{}),timeout_policy_version:TIMEOUT_POLICY_VERSION,...timeout,...(reviewWindow??{}),model_selection:selection,cli_version:ready.version,task_summary:args.task_summary??null,next_handoff:args.next_handoff??null,...(inventory?{model_catalog:{source:inventory.source,...(selection.mode==='explicit'?{model:inventory.models.find(m=>m.id===selection.model)}:{}),speed_support:inventory.speed_support}}:{}),inputs:inputs.map(k=>({id:k,revision:s.records[k].revision})),review_of:target?{id:target.id,revision:target.revision}:null,...(args.prototype_id?{prototype_id:args.prototype_id}:{}),...(args.development_id?{development_id:args.development_id}:{}),created_at:stamp()};
     if(fresh)Object.assign(job,{fresh_session:true,fresh_session_reason:freshReason});
     prototypeAssignment(s,job,true);developmentAssignment(s,job,true,args.root);
     const context=assignmentContext(s,job);
+    if(job.context_format===6){job.inputs=context.inputs;job.context_sha256=context.hash;admitOperatingAssignment(s,job);}
     s.jobs[jobId]={...job,inputs:context.inputs,context_sha256:context.hash};
     s.runtime_version=VERSION;
   });
@@ -354,7 +359,12 @@ export function control(args,host) {
       if(args.expected_name!==s.name) throw new Error('Company name changed; read current status before renaming');
       if(busy(s).length) throw new Error('Assignments are active; wait or pause before renaming');
       s.name=name;
-    } else {owner(s,args.session_id,host);const acceptance=verifyHandoverAcceptance(s);if(acceptance){s.handover.acceptance=acceptance;s.handover.status='completed';}s.paused=false;}
+    } else {owner(s,args.session_id,host);if(s.operating_state){
+      // A condition-bearing instruction must not unpause work before its new
+      // meaning is accepted. Check its actual audit record atomically too.
+      operatingContext(s);
+      if(!mechanicalOperatingControl(decision))throw Error('Operating state Held: DIRTY condition-bearing resume instruction');
+    }const acceptance=verifyHandoverAcceptance(s);if(acceptance){s.handover.acceptance=acceptance;s.handover.status='completed';}s.paused=false;}
     s.records[decisionId]=decision;
     // A new handover gate must fence old coordinators even on an older pinned
     // team. Pause remains available across unsupported versions and must never
@@ -439,6 +449,19 @@ function readPublicExact(db,args){return db.readSnapshot(()=>{
 // Explicit operations only. Neither API is called automatically on an existing company.
 export function contextControl(args,host) {
   binding(args,host);
+  if(args.home_intake_policy!==undefined||args.batching_policy!==undefined||args.semantic_partition?.context_policy!==undefined||args.semantic_partition?.shared_selection_ids!==undefined){
+    if(args.delivery_schema!==undefined||args.raw_review_ids!==undefined||args.action!=='plan'||args.protocol!==scoped.SCOPED_PROTOCOL||args.partitioner!==scoped.CORPUS_PARTITIONER)throw Error('Physical/batching policy requires an explicit scoped corpus plan');
+    return scopedControl(args,host);
+  }
+  if(args.current_home_inventory!==undefined||args.repair_of!==undefined||args.delivery_schema!==undefined||args.raw_review_ids!==undefined){
+    if(args.action!=='target'||args.protocol!==undefined&&args.protocol!==scoped.SCOPED_PROTOCOL)throw Error('Corpus delivery options require a new scoped target');
+    return scopedControl(args,host);
+  }
+  if(args.protocol===OPERATING_PROTOCOL){
+    if(args.action==='inspect')return withStore(args.root,db=>db.readSnapshot(()=>operatingInspection(bindOperatingIntake(db.read(),db))));
+    if(!['plan','apply'].includes(args.action))throw Error('Operating protocol supports inspect, plan or apply');
+    let result;update(args,host,'operating.'+args.action,s=>{requireText(args.source_instruction,'source_instruction');result=args.action==='plan'?proposeOperatingState(s,args):publishOperatingState(s,args);});return result;
+  }
   if(args.profile!==undefined&&(args.action!=='plan'||!args.source_id))throw Error('Qualification profile selects fresh source plans only; existing plans cannot be extended');
   if(args.action==='inspect'&&args.plan_id)return withStore(args.root,db=>{const s=db.read();return s.records[args.plan_id]?.scoped_context_plan?scoped.scopedPlanView(s,args):qualificationPlanView(s,args);});
   if(args.action==='read'&&args.snapshot)return withStore(args.root,db=>{
@@ -473,6 +496,10 @@ export function contextControl(args,host) {
   });
   if(args.action==='inspect')return withStore(args.root,db=>db.readSnapshot(()=>publicPage(db.publicState(),args)));
   if(args.action==='read')return withStore(args.root,db=>readPublicExact(db,args));
+  if(args.protocol===undefined&&args.action==='revoke'&&args.plan_id&&withStore(args.root,db=>db.read().records[args.plan_id]?.context_classification_plan?.version===2)){
+    update(args,host,'context.revoke',state=>{requireText(args.source_instruction,'source_instruction');const p=state.records[args.plan_id];if(!p.context_maintenance)throw Error('Represented plan has no maintenance grant');p.context_maintenance.revoked_at=stamp();p.context_maintenance.revocation_instruction=args.source_instruction;});
+    return {revoked:true,plan_id:args.plan_id,readonly:true};
+  }
   if(args.protocol===scoped.SCOPED_PROTOCOL||args.integration_review_id||args.phase)return scopedControl(args,host);
   if(args.action==='revoke'&&args.plan_id&&withStore(args.root,db=>Boolean(db.read().records[args.plan_id]?.scoped_context_plan)))return scopedControl(args,host);
   if(args.protocol!==undefined)throw Error('Unsupported context protocol');
@@ -482,11 +509,16 @@ export function contextControl(args,host) {
     requireText(args.source_instruction,'source_instruction');
     if(args.action==='plan'){
       const plan=contextPlan(state,args),key=id('context-plan');
-      state.records[key]={id:key,kind:'plan',revision:1,status:'Draft',author_role:'runner',author_instance:args.session_id,content:'Proposed context applicability; not an authority or resolution by itself.',context_classification_plan:plan,source_reference:args.source_instruction,created_at:stamp()};
+      if(args.maintenance===true&&plan.version!==2)throw Error('Read-only maintenance requires represented v2 preservation');
+      state.records[key]={id:key,kind:'plan',revision:1,status:'Draft',author_role:'runner',author_instance:args.session_id,content:'Proposed context applicability; not an authority or resolution by itself.',context_classification_plan:plan,...(args.maintenance===true?{context_maintenance:{readonly:true,owner:{...state.owner},controls_sha256:qualificationControlHash(state),source_instruction:args.source_instruction,at:stamp()}}:{}),source_reference:args.source_instruction,created_at:stamp()};
       state.context_last_plan=key;
     }else{
       const plan=state.records[args.plan_id],r=state.records[args.review_id],j=state.jobs[r?.job_id],v=r?.review;
       if(!plan?.context_classification_plan)throw Error('Context plan missing');
+      if(plan.context_classification_plan.version===2){
+        Object.assign(state.context_classifications??={},applyContextQualification(state,plan,r,{source_instruction:args.source_instruction,contextMatches}));
+        return;
+      }
       validateContextPlan(state,plan.context_classification_plan);
       if(r?.status!=='Submitted'||r.author_role!=='qa'||j?.status!=='completed'||r.review_of?.id!==plan.id||r.review_of?.revision!==plan.revision||v?.verdict!=='Pass'||v.permitted_action!=='apply_context_classification'||v.plan_sha256!==digest(JSON.stringify(plan.context_classification_plan))||!Array.isArray(v.blockers)||v.blockers.length||!j.native_id||r.author_instance===plan.author_instance||!contextMatches(state,j,j.context_sha256))throw Error('Fresh independent exact-plan classification Pass required');
       if(j.native_id===plan.author_instance||j.native_id===state.owner.session_id)throw Error('Classification must use a separate native reviewer');

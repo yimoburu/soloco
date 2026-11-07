@@ -1,0 +1,31 @@
+{
+  "role": "publication-integration",
+  "mode": "implementation",
+  "started_at": "2026-11-07T01:13:51.825095+00:00",
+  "ended_at": "2026-11-07T01:22:50.641853+00:00",
+  "exit_code": 0,
+  "prompt_sha256": "c4fec8195d7832d4f015864c581d007ceece4ea6f640cea02f2437c92c09f3ab",
+  "requested_model": "gpt-6.1-sol",
+  "requested_effort": "high",
+  "requested_speed": "host_default",
+  "effective_settings": "unverified",
+  "timeout_seconds": 600,
+  "scope": "Maintainer public source only in isolated worktree; no real company records or authority changes",
+  "lifecycle": [
+    {
+      "type": "thread.started",
+      "thread_id": "01a1b362-bd5e-72e1-baae-889b587161e5"
+    },
+    {
+      "type": "turn.completed",
+      "usage": {
+        "input_tokens": 8687809,
+        "cached_input_tokens": 8536704,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 46168,
+        "reasoning_output_tokens": 16653
+      }
+    }
+  ],
+  "report_exists": true
+}

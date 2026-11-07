@@ -1,0 +1,14 @@
+{
+  "read_only": true,
+  "revision": 1052,
+  "event_sequence": 1053,
+  "logical_sha256": "980bedfc4c6d55f4c667b04f313566da295f15f2a56b749b8b1986d24ef4ce83",
+  "canonical_nodes": 71600,
+  "kinds": {
+    "other": 71600
+  },
+  "raw_storage_wrappers": 0,
+  "state_unchanged": true,
+  "source_bodies_exported": false,
+  "semantic_acceptance": false
+}

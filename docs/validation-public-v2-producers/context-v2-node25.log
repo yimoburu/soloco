@@ -1,0 +1,15 @@
+(node:61868) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ source, counterpart and proof mutation revokes exclusion or holds; a new blocker is always mandatory (11.445541ms)
+✔ streamed v2 qualification exceeds legacy round limits with authentic same-native coverage and explicit semantic attestations (272.087708ms)
+ℹ {"initial_packet":947,"mandatory_stream":2510167,"range_calls":77}
+✔ ordinary context holds unqualified pointers; counterpart obligations must be direct and source pointers require streamed proof (3.720958ms)
+✔ cached frozen handover reads revalidate exact source, counterpart, plan, review and native proof dependencies (11.122958ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 361.454708

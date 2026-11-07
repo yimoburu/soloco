@@ -1,6 +1,6 @@
 import {createHash} from 'node:crypto';
 import {buildEvidence,readEvidence} from './upgrade-evidence.mjs';
-import {contextSource} from './current-state.mjs';
+import {contextSource,currentExtensions} from './current-state.mjs';
 import {TIMEOUT_POLICY_VERSION,executionTiming} from './timeout.mjs';
 // The isolated producer predates the core vault. Integrated checkouts supply it;
 // a missing API is a hard hold whenever a vault-backed source is encountered.
@@ -75,7 +75,6 @@ function ownOutput(state,r,ownHash){
     &&sha(p.context_partition_plan)===ownHash;
 }
 function currentRecords(state,sourceId,ownHash){return Object.keys(state.records??{}).map(id=>source(state,id)).filter(r=>r.id!==sourceId&&!ownOutput(state,r,ownHash)&&(['intent','decision','preference'].includes(r.kind)||[r.review?.verdict,r.qualification_result?.verdict].some(v=>['Fail','Blocked'].includes(v)))).sort((a,b)=>a.id.localeCompare(b.id));}
-const knownStateFields=new Set(['id','name','idea','owner','schema','runtime_version','plugin_version','revision','created_at','updated_at','paused','mode','phase','team_sha256','governance','governance_sha256','cos_instructions','roles','records','jobs','sessions','notices','messages','upgrade','upgrade_history','retired_sessions','context_classifications','context_last_plan','handover']);
 // One frozen descriptor, not a company/proof-tree copy. Exact referenced originals
 // and their reachable vault blobs must remain retrievable for packet reproduction.
 const subjectDescriptor=tree=>({...tree,records:tree.records.map(({ref,producer})=>({ref,producer}))});
@@ -91,7 +90,7 @@ function currentTree(state,sourceId,dependencies,counterparts,ownHash,materializ
   const ids=new Set(currentRecords(state,sourceId,ownHash).map(r=>r.id));
   for(const ref of [...counterparts,...dependencies]){exact(state,ref);ids.add(ref.id);}
   const records=[...ids].sort().map(id=>{const value=source(state,id);return {ref:qualificationReference(value,id),producer:value.job_id?qualificationReference(source(state,'job:'+value.job_id),'job:'+value.job_id):null,...(materialize?{evidence:projected(state,id).tree}:{})};});
-  const tree={state_extensions:Object.fromEntries(Object.entries(state).filter(([key])=>!knownStateFields.has(key))),authority_scope:'Current authority only; historical evidence grants no authority. Extract ALL constraints and dependencies, including unknown semantics. Missing or uncertain applicability must block final mapping.',company:{id:state.id,name:state.name??null,owner:state.owner,governance:state.governance,cos_instructions:state.cos_instructions??null,team_sha256:state.team_sha256??null,roles:state.roles,idea:state.idea??null,mode:state.mode??null,phase:state.phase??null,paused:state.paused??false},records,notices:(state.notices??[]).filter(n=>!n.resolution).map(semanticNotice),messages:(state.messages??[]).filter(m=>m.to==='qa')};
+  const tree={state_extensions:currentExtensions(state),authority_scope:'Current authority only; historical evidence grants no authority. Extract ALL constraints and dependencies, including unknown semantics. Missing or uncertain applicability must block final mapping.',company:{id:state.id,name:state.name??null,owner:state.owner,governance:state.governance,cos_instructions:state.cos_instructions??null,team_sha256:state.team_sha256??null,roles:state.roles,idea:state.idea??null,mode:state.mode??null,phase:state.phase??null,paused:state.paused??false},records,notices:(state.notices??[]).filter(n=>!n.resolution).map(semanticNotice),messages:(state.messages??[]).filter(m=>m.to==='qa')};
   assertJSON(tree);evaluation?.current.set(cacheKey,tree);return tree;
 }
 function evidenceFor(state,id){
@@ -399,8 +398,10 @@ export function qualificationControlHash(state){return sha(Object.values(state.r
 // A later founder pause, revoke or ownership change fences dispatch and return.
 export function qualificationMaintenanceEligible(state,job){
   const target=state.records?.[typeof job.review_of==='string'?job.review_of:job.review_of?.id];
-  const p=state.records?.[target?.context_qualification_target?.plan?.id],a=p?.context_maintenance;
+  const represented=target?.context_classification_plan?.version===2;
+  const p=represented?target:state.records?.[target?.context_qualification_target?.plan?.id],a=p?.context_maintenance;
   return Boolean(state.paused===true&&job.role==='qa'&&!job.prototype_id&&!job.development_id&&!job.input_ids?.length&&!job.evidence_ids?.length
+    &&(!represented||(equal(p.context_classification_plan.owner,state.owner)&&!job.supplemental_sources?.length&&(!job.inputs||job.inputs.every(ref=>ref.id===target.id&&ref.revision===target.revision))))
     &&a?.readonly===true&&!a.revoked_at&&equal(a.owner,state.owner)&&a.controls_sha256===qualificationControlHash(state)&&nonempty(a.source_instruction));
 }
 function uniqueExact(actual,expected,label){if(!Array.isArray(actual)||actual.length!==expected.length||new Set(actual).size!==actual.length||actual.some(v=>!expected.includes(v)))fail('missing/duplicate '+label);}

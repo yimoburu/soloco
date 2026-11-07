@@ -1,0 +1,23 @@
+(node:55024) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure (362.117ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 422.578583
+
+✖ failing tests:
+
+test at tests/operating-state.test.mjs:65:1
+✖ public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure (362.117ms)
+  Error: Operating state Held: unclassified frontier: 2 DIRTY entries
+      at fail (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:10:22)
+      at operatingContext (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/operating-state.mjs:335:76)
+      at TestContext.<anonymous> (file:///private/tmp/soloco-operating-state-20261106/source/tests/operating-state.test.mjs:79:15)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3)

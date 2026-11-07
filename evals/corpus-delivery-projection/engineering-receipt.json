@@ -1,0 +1,31 @@
+{
+  "assignment": "engineering",
+  "cwd": "/Users/xiaoweili/Documents/Codex/SoloDev-reviews/corpus-delivery-projection-2026-11-06/source",
+  "scope": "Founder-authorized narrow architecture repair in public source; no company mutation, publication or installation",
+  "prompt_sha256": "e33fe40f23b692e0b584cc1b8cfe8812674dc83481d541c0ec6f2c53130389b7",
+  "requested_model": "gpt-6.1-sol",
+  "requested_effort": "high",
+  "requested_speed": "host_default",
+  "effective_settings": "unverified",
+  "started_at": "2026-11-06T22:31:00.994837+00:00",
+  "pid": 7669,
+  "exit_code": 0,
+  "ended_at": "2026-11-06T22:39:46.662796+00:00",
+  "report_exists": true,
+  "lifecycle": [
+    {
+      "type": "thread.started",
+      "thread_id": "01a1b2fc-98cc-71b3-8f7b-d3537428d6cd"
+    },
+    {
+      "type": "turn.completed",
+      "usage": {
+        "input_tokens": 2372438,
+        "cached_input_tokens": 2309376,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 20322,
+        "reasoning_output_tokens": 8255
+      }
+    }
+  ]
+}

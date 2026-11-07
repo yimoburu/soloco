@@ -1,0 +1,292 @@
+TAP version 13
+# (node:34809) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: separate review window retains native cap and validates narrow explicit settings
+ok 1 - separate review window retains native cap and validates narrow explicit settings
+  ---
+  duration_ms: 3.031834
+  ...
+# Subtest: streamed review may complete after ten minutes only with a fresh explicit window
+ok 2 - streamed review may complete after ten minutes only with a fresh explicit window
+  ---
+  duration_ms: 589.235416
+  ...
+# Subtest: window changes or completion exactly at the review deadline cannot publish an accepted Pass
+ok 3 - window changes or completion exactly at the review deadline cannot publish an accepted Pass
+  ---
+  duration_ms: 335.61275
+  ...
+# Subtest: ordinary dispatch rejects handover-window controls before creating a job or session
+ok 4 - ordinary dispatch rejects handover-window controls before creating a job or session
+  ---
+  duration_ms: 11.14
+  ...
+# Subtest: window admission requires an unused target and fresh native-session reference
+ok 5 - window admission requires an unused target and fresh native-session reference
+  ---
+  duration_ms: 62.767792
+  ...
+# Subtest: terminal review receipts outside the fixed window cannot permit resume
+ok 6 - terminal review receipts outside the fixed window cannot permit resume
+  ---
+  duration_ms: 247.755125
+  ...
+# Subtest: first-call timing validates the actual shortened invocation without extending the job policy
+ok 7 - first-call timing validates the actual shortened invocation without extending the job policy
+  ---
+  duration_ms: 137.459416
+  ...
+# Subtest: a fixed review window shrinks later call limits and rejects completion exactly at its end
+ok 8 - a fixed review window shrinks later call limits and rejects completion exactly at its end
+  ---
+  duration_ms: 534.157833
+  ...
+# Subtest: every native invocation requires complete consistent timing evidence before publication
+ok 9 - every native invocation requires complete consistent timing evidence before publication
+  ---
+  duration_ms: 941.8335
+  ...
+# Subtest: clock movement during publication never publishes a completed receipt at or beyond expiry
+ok 10 - clock movement during publication never publishes a completed receipt at or beyond expiry
+  ---
+  duration_ms: 1766.9915
+  ...
+# (node:34810) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: same-owner pause/resume stays proportionate; fresh and cross-host replacements require reconstruction
+ok 11 - same-owner pause/resume stays proportionate; fresh and cross-host replacements require reconstruction
+  ---
+  duration_ms: 320.862042
+  ...
+# Subtest: exact independent QA allows preparation resume, preserves records/notices and durable acceptance
+ok 12 - exact independent QA allows preparation resume, preserves records/notices and durable acceptance
+  ---
+  duration_ms: 613.883667
+  ...
+# Subtest: incomplete, non-independent, wrong-hash and blocked review cannot resume
+ok 13 - incomplete, non-independent, wrong-hash and blocked review cannot resume
+  ---
+  duration_ms: 741.438292
+  ...
+# Subtest: state changes invalidate acceptance; hook delivery does not; failed review remains and revised reconstruction needs new review
+ok 14 - state changes invalidate acceptance; hook delivery does not; failed review remains and revised reconstruction needs new review
+  ---
+  duration_ms: 659.744959
+  ...
+# Subtest: ordinary work cannot run during pending handover; pause cancels a check and late output quarantines
+ok 15 - ordinary work cannot run during pending handover; pause cancels a check and late output quarantines
+  ---
+  duration_ms: 108.324125
+  ...
+# Subtest: distinct mandatory semantics over 200k page without embedding the stream
+ok 16 - distinct mandatory semantics over 200k page without embedding the stream
+  ---
+  duration_ms: 182.135417
+  ...
+# Subtest: integration binds coordination metadata without duplicating frozen handover evidence
+ok 17 - integration binds coordination metadata without duplicating frozen handover evidence
+  ---
+  duration_ms: 50.832709
+  ...
+# Subtest: orphan classification provenance holds handover without revoking outgoing ownership
+ok 18 - orphan classification provenance holds handover without revoking outgoing ownership
+  ---
+  duration_ms: 21.433
+  ...
+# Subtest: founder inspection, exact reads and submission receipts remain bounded while the full subject is retained
+ok 19 - founder inspection, exact reads and submission receipts remain bounded while the full subject is retained
+  ---
+  duration_ms: 144.203667
+  ...
+# Subtest: changed prior negative-review evidence invalidates a later Pass at resume
+ok 20 - changed prior negative-review evidence invalidates a later Pass at resume
+  ---
+  duration_ms: 318.253417
+  ...
+# Subtest: invalid retained evidence fails admission before owner, epoch, sessions or pause change
+ok 21 - invalid retained evidence fails admission before owner, epoch, sessions or pause change
+  ---
+  duration_ms: 23.387208
+  ...
+# Subtest: all previous reconstruction and review execution evidence remains current and retrievable
+ok 22 - all previous reconstruction and review execution evidence remains current and retrievable
+  ---
+  duration_ms: 1003.234917
+  ...
+# Subtest: founder read response bounds include escaped payload and long source metadata
+ok 23 - founder read response bounds include escaped payload and long source metadata
+  ---
+  duration_ms: 59.048542
+  ...
+# Subtest: repaired reconstructions retain exact originals without recursively copying old snapshots
+ok 24 - repaired reconstructions retain exact originals without recursively copying old snapshots
+  ---
+  duration_ms: 1951.143083
+  ...
+# Subtest: failed handover with upgrade history reuses typed history semantics instead of reembedding checkpoints
+ok 25 - failed handover with upgrade history reuses typed history semantics instead of reembedding checkpoints
+  ---
+  duration_ms: 797.9845
+  ...
+# Required semantic characters across repaired submissions: 80629, 88355, 94664
+# Subtest: 25.7M fictional archive fits 200k; exact originals, mandatory legacy obligations and retrieval complete a full handover
+ok 26 - 25.7M fictional archive fits 200k; exact originals, mandatory legacy obligations and retrieval complete a full handover
+  ---
+  duration_ms: 60087.691
+  ...
+# Subtest: frozen reads enforce exact Unicode ranges, hashes, scope, and delivery-bound citations
+ok 27 - frozen reads enforce exact Unicode ranges, hashes, scope, and delivery-bound citations
+  ---
+  duration_ms: 162.87025
+  ...
+# Subtest: worker rejects forged reads, stale canonical evidence, forged citations and native identity changes
+ok 28 - worker rejects forged reads, stale canonical evidence, forged citations and native identity changes
+  ---
+  duration_ms: 966.428583
+  ...
+# Subtest: handover reads can exceed sixteen rounds without changing native session or invalidating their own snapshot
+ok 29 - handover reads can exceed sixteen rounds without changing native session or invalidating their own snapshot
+  ---
+  duration_ms: 2584.865291
+  ...
+# Subtest: current obligations and distinct legacy team rules stay compulsory regardless of resolved status or classification
+ok 30 - current obligations and distinct legacy team rules stay compulsory regardless of resolved status or classification
+  ---
+  duration_ms: 144.137958
+  ...
+# Subtest: retained legacy v1 reconstruction and review still resume under their original contract
+ok 31 - retained legacy v1 reconstruction and review still resume under their original contract
+  ---
+  duration_ms: 125.488042
+  ...
+# Subtest: supplemental allowlist mutation cannot alter a running frozen handover assignment
+ok 32 - supplemental allowlist mutation cannot alter a running frozen handover assignment
+  ---
+  duration_ms: 209.976584
+  ...
+# Subtest: a reconstruction edited after QA cannot reuse its earlier Pass
+ok 33 - a reconstruction edited after QA cannot reuse its earlier Pass
+  ---
+  duration_ms: 207.136542
+  ...
+# Subtest: archival occurrence indexes and distinct current semantics stay retrievable outside the initial budget
+ok 34 - archival occurrence indexes and distinct current semantics stay retrievable outside the initial budget
+  ---
+  duration_ms: 880.52475
+  ...
+# Subtest: 227 varied fictional obligations and large pinned rules require complete same-native delivery before Pass
+ok 35 - 227 varied fictional obligations and large pinned rules require complete same-native delivery before Pass
+  ---
+  duration_ms: 15339.552458
+  ...
+# Subtest: escaped frozen read packets defer whole ranges within 200k without losing source bytes
+ok 36 - escaped frozen read packets defer whole ranges within 200k without losing source bytes
+  ---
+  duration_ms: 768.419417
+  ...
+# Subtest: compulsory delivery rejects a final gap, overlapping duplicates and another native ledger
+ok 37 - compulsory delivery rejects a final gap, overlapping duplicates and another native ledger
+  ---
+  duration_ms: 58.591084
+  ...
+# (node:34811) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: public handover, independent publication, full v4 worker review, resume and first ordinary format6 Engineering return
+ok 38 - public handover, independent publication, full v4 worker review, resume and first ordinary format6 Engineering return
+  ---
+  duration_ms: 777.534125
+  ...
+# Subtest: only exact pure runtime commands are mechanically ingested; conditions, unknown fields and generic saves stay held
+ok 39 - only exact pure runtime commands are mechanically ingested; conditions, unknown fields and generic saves stay held
+  ---
+  duration_ms: 354.030334
+  ...
+# Subtest: actual conditional handover retains founder conditions and unknown legacy remains held on first pass
+ok 40 - actual conditional handover retains founder conditions and unknown legacy remains held on first pass
+  ---
+  duration_ms: 162.1645
+  ...
+# (node:34812) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning
+ok 41 - public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning
+  ---
+  duration_ms: 166.452833
+  ...
+# Subtest: missing legacy bootstrap is visibly DIRTY and apply rolls back without acceptance
+ok 42 - missing legacy bootstrap is visibly DIRTY and apply rolls back without acceptance
+  ---
+  duration_ms: 38.126042
+  ...
+# Subtest: new membership, changed exact source, wrong independent identity and absent closure cannot publish
+ok 43 - new membership, changed exact source, wrong independent identity and absent closure cannot publish
+  ---
+  duration_ms: 141.820625
+  ...
+# Subtest: scope closure, global membership, expiry, receipt changes, revocation and missed communication hold
+ok 44 - scope closure, global membership, expiry, receipt changes, revocation and missed communication hold
+  ---
+  duration_ms: 49.413
+  ...
+# Subtest: pause fences publication reviewer and prospective handover cannot hide unknown legacy
+ok 45 - pause fences publication reviewer and prospective handover cannot hide unknown legacy
+  ---
+  duration_ms: 12.830083
+  ...
+# Subtest: 10x independently classified inert archive keeps actual mandatory operating assignment bytes and semantic work constant
+ok 46 - 10x independently classified inert archive keeps actual mandatory operating assignment bytes and semantic work constant
+  ---
+  duration_ms: 95.63225
+  ...
+# Subtest: deleted applicable home and changed exact provenance cannot disappear from accepted meaning
+ok 47 - deleted applicable home and changed exact provenance cannot disappear from accepted meaning
+  ---
+  duration_ms: 26.665375
+  ...
+# Subtest: typed outcome requires complete historical uncertainty; text cannot manufacture permission
+ok 48 - typed outcome requires complete historical uncertainty; text cannot manufacture permission
+  ---
+  duration_ms: 29.721167
+  ...
+# Subtest: public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure
+not ok 49 - public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure
+  ---
+  duration_ms: 40.809084
+  location: '/private/tmp/soloco-operating-control-20261106/source/tests/operating-state.test.mjs:52:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /QA/. Input:
+    
+    'Error: Operating state Held: unclassified frontier: 1 DIRTY entries'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual:
+  error: 'Operating state Held: unclassified frontier: 1 DIRTY entries'
+  stack: |-
+    fail (file:///private/tmp/soloco-operating-control-20261106/source/plugins/soloco/runtime/operating-state.mjs:7:22)
+    operatingContext (file:///private/tmp/soloco-operating-control-20261106/source/plugins/soloco/runtime/operating-state.mjs:93:61)
+    file:///private/tmp/soloco-operating-control-20261106/source/plugins/soloco/runtime/engine.mjs:363:7
+    Store.transaction (file:///private/tmp/soloco-operating-control-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+    file:///private/tmp/soloco-operating-control-20261106/source/plugins/soloco/runtime/engine.mjs:326:51
+    withStore (file:///private/tmp/soloco-operating-control-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+    Module.control (file:///private/tmp/soloco-operating-control-20261106/source/plugins/soloco/runtime/engine.mjs:326:10)
+    file:///private/tmp/soloco-operating-control-20261106/source/tests/operating-state.test.mjs:57:27
+    getActual (node:assert:805:5)
+    Function.throws (node:assert:951:24)
+  operator: 'throws'
+  stack: |-
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-control-20261106/source/tests/operating-state.test.mjs:57:9)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+1..49
+# tests 49
+# suites 0
+# pass 48
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 88724.599791

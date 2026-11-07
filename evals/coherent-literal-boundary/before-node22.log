@@ -1,0 +1,107 @@
+TAP version 13
+# (node:98352) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: canonical and formatted reference examples remain opaque STRING data at every structural depth
+not ok 1 - canonical and formatted reference examples remain opaque STRING data at every structural depth
+  ---
+  duration_ms: 2.142959
+  location: '/Users/xiaoweili/Documents/Codex/SoloDev-reviews/coherent-nested-fields-2026-11-06/source/tests/legacy-coherent.test.mjs:14:1'
+  failureType: 'testCodeFailure'
+  error: 'Legacy bootstrap Held: missing coherent snapshot original'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    hold (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/coherent-nested-fields-2026-11-06/source/plugins/soloco/runtime/legacy-operating.mjs:10:22)
+    view (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/coherent-nested-fields-2026-11-06/source/plugins/soloco/runtime/legacy-operating.mjs:309:80)
+    section (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/coherent-nested-fields-2026-11-06/source/plugins/soloco/runtime/legacy-operating.mjs:316:24)
+    file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/coherent-nested-fields-2026-11-06/source/plugins/soloco/runtime/legacy-operating.mjs:333:108
+    Array.map (<anonymous>)
+    coherentBuild (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/coherent-nested-fields-2026-11-06/source/plugins/soloco/runtime/legacy-operating.mjs:333:33)
+    buildLegacyCoherentPlan (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/coherent-nested-fields-2026-11-06/source/plugins/soloco/runtime/legacy-operating.mjs:364:10)
+    TestContext.<anonymous> (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/coherent-nested-fields-2026-11-06/source/tests/legacy-coherent.test.mjs:24:15)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:931:25)
+  ...
+# Subtest: identical real snapshot/entry and STRING example yield only the typed inbound edge
+not ok 2 - identical real snapshot/entry and STRING example yield only the typed inbound edge
+  ---
+  duration_ms: 2.466166
+  location: '/Users/xiaoweili/Documents/Codex/SoloDev-reviews/coherent-nested-fields-2026-11-06/source/tests/legacy-coherent.test.mjs:33:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    2 !== 1
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 1
+  actual: 2
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/coherent-nested-fields-2026-11-06/source/tests/legacy-coherent.test.mjs:40:12)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:931:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:629:18)
+    Test.postRun (node:internal/test_runner/test:1042:19)
+    Test.run (node:internal/test_runner/test:970:12)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# Subtest: nested STRING promotion applies its own reserved-key gate without making the outer STRING opaque
+not ok 3 - nested STRING promotion applies its own reserved-key gate without making the outer STRING opaque
+  ---
+  duration_ms: 0.309916
+  location: '/Users/xiaoweili/Documents/Codex/SoloDev-reviews/coherent-nested-fields-2026-11-06/source/tests/legacy-coherent.test.mjs:49:1'
+  failureType: 'testCodeFailure'
+  error: 'Immutable snapshot reference malformed'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    snapshotReference (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/coherent-nested-fields-2026-11-06/source/plugins/soloco/runtime/snapshot.mjs:46:86)
+    walk (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/coherent-nested-fields-2026-11-06/source/plugins/soloco/runtime/legacy-operating.mjs:326:15)
+    walk (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/coherent-nested-fields-2026-11-06/source/plugins/soloco/runtime/legacy-operating.mjs:330:39)
+    walk (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/coherent-nested-fields-2026-11-06/source/plugins/soloco/runtime/legacy-operating.mjs:328:31)
+    walk (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/coherent-nested-fields-2026-11-06/source/plugins/soloco/runtime/legacy-operating.mjs:330:39)
+    walk (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/coherent-nested-fields-2026-11-06/source/plugins/soloco/runtime/legacy-operating.mjs:328:31)
+    walk (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/coherent-nested-fields-2026-11-06/source/plugins/soloco/runtime/legacy-operating.mjs:328:31)
+    walk (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/coherent-nested-fields-2026-11-06/source/plugins/soloco/runtime/legacy-operating.mjs:328:31)
+    coherentBuild (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/coherent-nested-fields-2026-11-06/source/plugins/soloco/runtime/legacy-operating.mjs:332:28)
+    buildLegacyCoherentPlan (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/coherent-nested-fields-2026-11-06/source/plugins/soloco/runtime/legacy-operating.mjs:364:10)
+  ...
+# Subtest: oversized reserved-key STRING fallback remains whole and Held
+not ok 4 - oversized reserved-key STRING fallback remains whole and Held
+  ---
+  duration_ms: 18.189458
+  location: '/Users/xiaoweili/Documents/Codex/SoloDev-reviews/coherent-nested-fields-2026-11-06/source/tests/legacy-coherent.test.mjs:62:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The expression evaluated to a falsy value:
+    
+      assert.ok(p.definitions.some(d=>d[0]==='string'&&d[1]===raw))
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    TestContext.<anonymous> (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/coherent-nested-fields-2026-11-06/source/tests/legacy-coherent.test.mjs:68:10)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:931:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:629:18)
+    Test.postRun (node:internal/test_runner/test:1042:19)
+    Test.run (node:internal/test_runner/test:970:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: genuine typed snapshot and entry closure still rejects missing, corrupt and malformed originals
+ok 5 - genuine typed snapshot and entry closure still rejects missing, corrupt and malformed originals
+  ---
+  duration_ms: 0.700917
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 1
+# fail 4
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 87.394291

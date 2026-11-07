@@ -1,0 +1,163 @@
+(node:35357) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ early empty body Blocked (963.402583ms)
+✖ oversized body with negative tail (565.777375ms)
+✖ fenced original with late negative (573.050375ms)
+✖ invalid JSON remains unknown (569.2945ms)
+✖ oversized invalid raw remains retrievable (569.071333ms)
+✖ empty body Pass cannot become approval (566.123208ms)
+✖ cancelled late negative is retained without acceptance (382.420417ms)
+✖ wrong-native late negative is retained without acceptance (626.565ms)
+✖ legacy qualification evidence retains negative verdict and full raw original (27.869084ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 0
+ℹ fail 9
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4919.991875
+
+✖ failing tests:
+
+test at tests/operating-negative-retention.test.mjs:73:3
+✖ early empty body Blocked (963.402583ms)
+  AssertionError [ERR_ASSERTION]: complete raw failure evidence must survive before artifact assignment
+      at rejected (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:48:9)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async TestContext.<anonymous> (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:74:61)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at tests/operating-negative-retention.test.mjs:73:3
+✖ oversized body with negative tail (565.777375ms)
+  AssertionError [ERR_ASSERTION]: complete raw failure evidence must survive before artifact assignment
+      at rejected (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:48:9)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async TestContext.<anonymous> (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:74:61)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at tests/operating-negative-retention.test.mjs:73:3
+✖ fenced original with late negative (573.050375ms)
+  AssertionError [ERR_ASSERTION]: complete raw failure evidence must survive before artifact assignment
+      at rejected (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:48:9)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async TestContext.<anonymous> (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:74:61)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at tests/operating-negative-retention.test.mjs:73:3
+✖ invalid JSON remains unknown (569.2945ms)
+  AssertionError [ERR_ASSERTION]: complete raw failure evidence must survive before artifact assignment
+      at rejected (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:48:9)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async TestContext.<anonymous> (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:74:61)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at tests/operating-negative-retention.test.mjs:73:3
+✖ oversized invalid raw remains retrievable (569.071333ms)
+  AssertionError [ERR_ASSERTION]: complete raw failure evidence must survive before artifact assignment
+      at rejected (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:48:9)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async TestContext.<anonymous> (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:74:61)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at tests/operating-negative-retention.test.mjs:73:3
+✖ empty body Pass cannot become approval (566.123208ms)
+  AssertionError [ERR_ASSERTION]: complete raw failure evidence must survive before artifact assignment
+      at rejected (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:48:9)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async TestContext.<anonymous> (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:74:61)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at tests/operating-negative-retention.test.mjs:80:48
+✖ cancelled late negative is retained without acceptance (382.420417ms)
+  AssertionError [ERR_ASSERTION]: complete raw failure evidence must survive before artifact assignment
+      at rejected (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:48:9)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async TestContext.<anonymous> (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:81:100)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at tests/operating-negative-retention.test.mjs:80:48
+✖ wrong-native late negative is retained without acceptance (626.565ms)
+  AssertionError [ERR_ASSERTION]: complete raw failure evidence must survive before artifact assignment
+      at rejected (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:48:9)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async TestContext.<anonymous> (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:81:100)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at tests/operating-negative-retention.test.mjs:87:1
+✖ legacy qualification evidence retains negative verdict and full raw original (27.869084ms)
+  Error: Complete per-source semantic coverage required
+      at contextPlan (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/current-state.mjs:188:71)
+      at file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:502:18
+      at mutate (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:93:190)
+      at Store.transaction (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/store.mjs:189:20)
+      at file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:93:335
+      at withStore (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/store.mjs:205:16)
+      at update (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:93:10)
+      at Array.contextControl (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:499:11)
+      at call (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/main.mjs:70:28)
+      at ctx (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:20:21)

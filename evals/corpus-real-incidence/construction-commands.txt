@@ -1,0 +1,63 @@
+Standalone construction-performance repair. Incoming literal/prose candidate retained.
+No company DB, connected tools, network, model/native sessions, other worktrees,
+host/config/release changes, installation, or commits.
+
+Before editing:
+- SHA256 of every existing eval artifact recorded in construction-prior-evidence-sha256.json.
+- Incoming runtime, corpus test and guide copied to /private/tmp/incidence-construction-before/.
+- Verbatim incoming corpusIncidence function (including repaired STRING boundary) retained
+  in construction-before-incidence.mjs with its unchanged local equality/containment helpers.
+- Incoming full runtime copied to /private/tmp/incidence-construction-before/incoming-runtime.mjs;
+  only relative ESM import specifiers rewritten to absolute file URLs into this cwd/runtime.
+- Existing pinned b6a81f7 comparison module /private/tmp/incidence-repair-before/baseline-b6a81f7.mjs reused read-only.
+
+ONE bounded validation supervisor invocation (590-second shared subprocess deadline,
+inside the requested 600-second envelope; no oversized unchanged retry):
+python3 evals/corpus-real-incidence/construction-validate.py
+
+Supervisor first executes sequential focused checks, then both full-suite processes concurrently.
+Environment for each child:
+CORPUS_BASELINE_MODULE=file:///private/tmp/incidence-repair-before/baseline-b6a81f7.mjs
+CORPUS_CONSTRUCTION_BASELINE_MODULE=file:///private/tmp/incidence-construction-before/incoming-runtime.mjs
+
+/private/tmp/soloco-node22-validation/node-v22.13.0-darwin-arm64/bin/node --version > evals/corpus-real-incidence/construction-version-node22.log 2>&1
+/private/tmp/soloco-node22-validation/node-v22.13.0-darwin-arm64/bin/node --test tests/corpus-incidence-construction.test.mjs > evals/corpus-real-incidence/construction-focused-node22.log 2>&1
+/opt/homebrew/bin/node --version > evals/corpus-real-incidence/construction-version-node25.log 2>&1
+/opt/homebrew/bin/node --test tests/corpus-incidence-construction.test.mjs > evals/corpus-real-incidence/construction-focused-node25.log 2>&1
+/private/tmp/soloco-node22-validation/node-v22.13.0-darwin-arm64/bin/node --test tests/scoped-context.test.mjs tests/scoped-coherent-runtime.test.mjs tests/scoped-corpus-runtime.test.mjs tests/legacy-coherent.test.mjs > evals/corpus-real-incidence/construction-scoped-coherent-node22.log 2>&1
+/opt/homebrew/bin/node --test tests/scoped-context.test.mjs tests/scoped-coherent-runtime.test.mjs tests/scoped-corpus-runtime.test.mjs tests/legacy-coherent.test.mjs > evals/corpus-real-incidence/construction-scoped-coherent-node25.log 2>&1
+
+All focused fixtures are fictional. The bounded pre-fix scaling comparison uses only
+32/128 sources, preserving exact relation output and operation counts on both binaries.
+The larger 1024-source fixture executes only the optimized derivation.
+The four suites compare complete scopedAssignment objects for completed fictional
+worker jobs to the incoming runtime (including claims, result shapes, qualifications
+and stream bytes), and unmarked assignments also to pinned b6a81f7 as before.
+construction-run-summary.json records exact commands, exits, durations and completeness.
+
+Final evidence preparation:
+git diff --check > evals/corpus-real-incidence/construction-diff-check.txt 2>&1
+git diff -- plugins/soloco/runtime/scoped-context.mjs tests/scoped-corpus-runtime.test.mjs docs/scoped-context.md > evals/corpus-real-incidence/construction-source.patch
+New construction test and frozen oracle are appended as new-file diffs to construction-source.patch.
+construction-only.patch isolates runtime/test changes against the incoming candidate
+using /private/tmp/incidence-construction-before/ and includes both new files.
+construction-final-evidence-sha256.json fingerprints new artifacts after completion.
+Original logs/patches/commands remain unchanged; report.md is appended only.
+
+Correction after the initial full runs (83/85 each, two harness failures each):
+The new post-completion comparison reconstructed intentionally Blocked jobs after
+negative reviews had changed current governance. Both runtimes correctly Hold;
+the harness had assumed every completed worker job still had a valid assignment.
+It now compares exact Hold messages as well as complete successful assignment objects.
+The incidence runtime itself did not change after focused validation.
+Initial failed logs, summary, supervisor and patches are retained unchanged;
+construction-initial-source.patch / construction-initial-only.patch retain that harness.
+
+A second supervisor invocation uses ONLY time remaining before the ORIGINAL
+590-second deadline (read from initial version-log timestamp), never a renewed
+600-second allowance. This is a changed-harness retry, not an unchanged corpus retry:
+python3 evals/corpus-real-incidence/construction-corrected-validate.py
+It repeats the same focused/version/four-suite commands and environment, writing
+construction-corrected-{version,focused,scoped-coherent}-node{22,25}.log and
+construction-corrected-run-summary.json. Both supervisor invocations are recorded
+explicitly; do not describe them as one successful call. The company DB was never run.

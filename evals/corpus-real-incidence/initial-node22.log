@@ -1,0 +1,217 @@
+TAP version 13
+# (node:32823) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: FICTIONAL public vector pipeline shares extraction, independently judges context, aggregates once and applies atomically
+not ok 1 - FICTIONAL public vector pipeline shares extraction, independently judges context, aggregates once and applies atomically
+  ---
+  duration_ms: 282.558958
+  location: '/Users/xiaoweili/Documents/Codex/SoloDev-reviews/corpus-real-incidence-2026-11-06/source/tests/scoped-corpus-runtime.test.mjs:118:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    packet is not defined
+    + actual - expected
+    
+    + 'failed'
+    - 'completed'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'completed'
+  actual: 'failed'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/corpus-real-incidence-2026-11-06/source/tests/scoped-corpus-runtime.test.mjs:120:142)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# Subtest: corpus growth deduplicates intrinsic sections while keeping all repeated physical obligations unaccepted
+ok 2 - corpus growth deduplicates intrinsic sections while keeping all repeated physical obligations unaccepted
+  ---
+  duration_ms: 117.398667
+  ...
+# {"fictional_only":true,"one":{"intrinsic_batches":1,"shared_body_sections":1,"physical_occurrences":8},"ten":{"intrinsic_batches":1,"shared_body_sections":1,"physical_occurrences":26},"semantic_acceptance":false}
+# Subtest: corpus retains external named handover originals and refuses missing closure
+ok 3 - corpus retains external named handover originals and refuses missing closure
+  ---
+  duration_ms: 75.309708
+  ...
+# Subtest: FICTIONAL corpus preservation feeds independently reviewed operating publication, never a borrowed scoped receipt
+not ok 4 - FICTIONAL corpus preservation feeds independently reviewed operating publication, never a borrowed scoped receipt
+  ---
+  duration_ms: 153.961333
+  location: '/Users/xiaoweili/Documents/Codex/SoloDev-reviews/corpus-real-incidence-2026-11-06/source/tests/scoped-corpus-runtime.test.mjs:227:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    packet is not defined
+    + actual - expected
+    
+    + 'failed'
+    - 'completed'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'completed'
+  actual: 'failed'
+  operator: 'strictEqual'
+  stack: |-
+    acceptedOperatingCorpus (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/corpus-real-incidence-2026-11-06/source/tests/scoped-corpus-runtime.test.mjs:206:141)
+    async TestContext.<anonymous> (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/corpus-real-incidence-2026-11-06/source/tests/scoped-corpus-runtime.test.mjs:229:28)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: semantic selections complete canonical source apply with bounded independent local packets
+not ok 5 - semantic selections complete canonical source apply with bounded independent local packets
+  ---
+  duration_ms: 163.205875
+  location: '/Users/xiaoweili/Documents/Codex/SoloDev-reviews/corpus-real-incidence-2026-11-06/source/tests/scoped-corpus-runtime.test.mjs:263:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    packet is not defined
+    + actual - expected
+    
+    + 'failed'
+    - 'completed'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'completed'
+  actual: 'failed'
+  operator: 'strictEqual'
+  stack: |-
+    extracts (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/corpus-real-incidence-2026-11-06/source/tests/scoped-corpus-runtime.test.mjs:76:128)
+    async TestContext.<anonymous> (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/corpus-real-incidence-2026-11-06/source/tests/scoped-corpus-runtime.test.mjs:269:12)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# {"fictional_only":true,"workload":{"protocol":"scoped-context-v1","partitioner":"coherent-corpus-body-v1","source":{"id":"old","revision":1,"sha256":"6be63f44288d42ab3675f96a345ec25cb48d209895267518611987ecf452ca0c"},"extraction_identity":"7a10cd016f82a5e19ffb7e11dd7ebe400cdec76ccb7de206f8c009742329d93b","physical_occurrences":11,"extraction":[{"id":"body-batch-0","body_bytes":615},{"id":"body-batch-1","body_bytes":719},{"id":"body-batch-2","body_bytes":717},{"id":"body-batch-3","body_bytes":874},{"id":"body-batch-4","body_bytes":1108},{"id":"body-batch-5","body_bytes":1108},{"id":"body-batch-6","body_bytes":5480},{"id":"body-batch-7","body_bytes":2153}],"selections":[{"id":"global","physical_occurrences":3,"incident_selection_ids":["global"],"intrinsic_batches":["body-batch-3","body-batch-7"],"context_bytes":4423,"domain_request_lower_bound":7450,"interface_request_lower_bound":7450},{"id":"A","physical_occurrences":6,"incident_selection_ids":["global","A"],"intrinsic_batches":["body-batch-0","body-batch-1","body-batch-3","body-batch-4","body-batch-7"],"context_bytes":6149,"domain_request_lower_bound":11618,"interface_request_lower_bound":11618},{"id":"B","physical_occurrences":6,"incident_selection_ids":["global","B"],"intrinsic_batches":["body-batch-0","body-batch-2","body-batch-3","body-batch-5","body-batch-7"],"context_bytes":6147,"domain_request_lower_bound":11614,"interface_request_lower_bound":11614},{"id":"archive","physical_occurrences":5,"incident_selection_ids":["global","archive"],"intrinsic_batches":["body-batch-3","body-batch-6","body-batch-7"],"context_bytes":9913,"domain_request_lower_bound":18420,"interface_request_lower_bound":18420}],"planned_domain_requests":4,"planned_interface_requests":4,"whole_corpus_integration_requests":1,"review_formula":"E+D+I+1","total_selected_source_requests_lower_bound":17,"input_limit_bytes":48000,"complete_request_bytes":null,"excluded_from_lower_bound":["instructions","canonical extraction results","native receipt framing","current homes and dependencies","current global rules","integration summaries"],"status":"unaccepted proposal","frontier_complete":false,"semantic_acceptance":false,"complete_native_fit":null,"native_context_fit":"unproven","retrieval_only":true}}
+# Subtest: declared distant incident peer cannot be omitted by proposed local scope
+not ok 6 - declared distant incident peer cannot be omitted by proposed local scope
+  ---
+  duration_ms: 165.770167
+  location: '/Users/xiaoweili/Documents/Codex/SoloDev-reviews/corpus-real-incidence-2026-11-06/source/tests/scoped-corpus-runtime.test.mjs:295:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    packet is not defined
+    + actual - expected
+    
+    + 'failed'
+    - 'completed'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'completed'
+  actual: 'failed'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/corpus-real-incidence-2026-11-06/source/tests/scoped-corpus-runtime.test.mjs:298:381)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: FICTIONAL phase delivery preserves all boundary meaning as disjoint raw partitions grow
+not ok 7 - FICTIONAL phase delivery preserves all boundary meaning as disjoint raw partitions grow
+  ---
+  duration_ms: 184.998584
+  location: '/Users/xiaoweili/Documents/Codex/SoloDev-reviews/corpus-real-incidence-2026-11-06/source/tests/scoped-corpus-runtime.test.mjs:308:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    packet is not defined
+    + actual - expected
+    
+    + 'failed'
+    - 'completed'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'completed'
+  actual: 'failed'
+  operator: 'strictEqual'
+  stack: |-
+    extracts (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/corpus-real-incidence-2026-11-06/source/tests/scoped-corpus-runtime.test.mjs:76:128)
+    async TestContext.<anonymous> (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/corpus-real-incidence-2026-11-06/source/tests/scoped-corpus-runtime.test.mjs:311:81)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: FICTIONAL unmarked corpus targets reconstruct the legacy recursive delivery contract
+not ok 8 - FICTIONAL unmarked corpus targets reconstruct the legacy recursive delivery contract
+  ---
+  duration_ms: 142.334625
+  location: '/Users/xiaoweili/Documents/Codex/SoloDev-reviews/corpus-real-incidence-2026-11-06/source/tests/scoped-corpus-runtime.test.mjs:340:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    packet is not defined
+    + actual - expected
+    
+    + 'failed'
+    - 'completed'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'completed'
+  actual: 'failed'
+  operator: 'strictEqual'
+  stack: |-
+    extracts (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/corpus-real-incidence-2026-11-06/source/tests/scoped-corpus-runtime.test.mjs:76:128)
+    async TestContext.<anonymous> (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/corpus-real-incidence-2026-11-06/source/tests/scoped-corpus-runtime.test.mjs:341:30)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: nested formatting/escape variant file sections fit intrinsic batches without implying complete global request fit
+not ok 9 - nested formatting/escape variant file sections fit intrinsic batches without implying complete global request fit
+  ---
+  duration_ms: 293.526834
+  location: '/Users/xiaoweili/Documents/Codex/SoloDev-reviews/corpus-real-incidence-2026-11-06/source/tests/scoped-corpus-runtime.test.mjs:355:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    packet is not defined
+    + actual - expected
+    
+    + 'failed'
+    - 'completed'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'completed'
+  actual: 'failed'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/corpus-real-incidence-2026-11-06/source/tests/scoped-corpus-runtime.test.mjs:368:10)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: upgrade journal sections enter corpus workload with complete ordered membership and occurrence guards
+not ok 10 - upgrade journal sections enter corpus workload with complete ordered membership and occurrence guards
+  ---
+  duration_ms: 313.002458
+  location: '/Users/xiaoweili/Documents/Codex/SoloDev-reviews/corpus-real-incidence-2026-11-06/source/tests/scoped-corpus-runtime.test.mjs:381:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    packet is not defined
+    + actual - expected
+    
+    + 'failed'
+    - 'completed'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'completed'
+  actual: 'failed'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/corpus-real-incidence-2026-11-06/source/tests/scoped-corpus-runtime.test.mjs:392:131)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: rectangular corpus coverage checks a large exact product without materializing cells
+ok 11 - rectangular corpus coverage checks a large exact product without materializing cells
+  ---
+  duration_ms: 191.612583
+  ...
+1..11
+# tests 11
+# suites 0
+# pass 3
+# fail 8
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2190.9695

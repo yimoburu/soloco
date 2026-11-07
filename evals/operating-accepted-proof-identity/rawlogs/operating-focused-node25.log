@@ -1,0 +1,82 @@
+(node:23825) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ accepted historical publication proof survives an owner epoch change without admitting old in-flight work (358.206208ms)
+✔ public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning (19.335625ms)
+✔ missing legacy bootstrap is visibly DIRTY and apply rolls back without acceptance (13.0725ms)
+✔ new membership, changed exact source, wrong independent identity and absent closure cannot publish (79.54275ms)
+✔ scope closure, global membership, expiry, receipt changes, revocation and missed communication hold (26.849583ms)
+✔ pause fences publication reviewer and prospective handover cannot hide unknown legacy (8.976458ms)
+✔ 10x independently classified inert archive keeps actual mandatory operating assignment bytes and semantic work constant (53.728875ms)
+✔ deleted applicable home and changed exact provenance cannot disappear from accepted meaning (17.434875ms)
+✔ typed outcome requires complete historical uncertainty; text cannot manufacture permission (16.297334ms)
+✔ public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure (51.970084ms)
+✔ late new and changed falsely scoped prohibitions stay globally DIRTY, but fresh proposals include them (67.0225ms)
+✔ publication proof stays current; failed, quarantined, uncertain and unknown-extension siblings stay DIRTY (17.969833ms)
+✔ mechanical publication index rejects tampering and retains unknown state extensions (16.641958ms)
+✔ format6 explicit non-home evidence survives dispatch, discovery and bounded same-native reads (167.540291ms)
+✖ referenced archived revoked/retry restriction and canonical parent receipts are supplied completely inline (24.949667ms)
+✖ large non-home provenance uses exact same-native ranges; undelivered, partial, denied, stale or changed evidence cannot publish (40.224584ms)
+✖ canonical preservation parent revisions cannot be borrowed from matching hashes (23.950041ms)
+✔ missing provenance and snapshot-only evidence hold rather than count pointers as delivered bodies (12.863709ms)
+✔ real runtime receipt attribution and deterministic reuse deliver the validated producer closure before Pass (202.353959ms)
+✔ runtime receipt missing or mismatched producer, candidate, plan, reuse or generation holds (46.13575ms)
+✖ external catalog reference-shaped metadata is verbatim evidence without a company lookup (24.184708ms)
+✔ runtime closure requires complete delivery and independent source and proof sessions (2675.343416ms)
+✔ public qualified recovered snapshot publishes current typed outcomes without replaying the paid raw archive (1149.766375ms)
+✔ large prospective publication uses bounded frozen worker delivery and rejects a manufactured complete flag (5394.488209ms)
+✔ frozen publication worker rejects unread semantics, changed native and changed current membership (358.605333ms)
+✔ paid snapshot archive still requires publication QA independent of nested original producers (1008.982959ms)
+✔ FICTIONAL PUBLIC v2 explicit complete sources preserve accepted runtime producer independence and freshness (2887.210416ms)
+(node:23826) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ FICTIONAL public corpus adapter shares intrinsic receipts but independently reviews both source claims (5563.583334ms)
+✔ corpus growth deduplicates intrinsic sections while keeping all repeated physical obligations unaccepted (97.700958ms)
+ℹ {"fictional_only":true,"one":{"intrinsic_batches":2,"shared_body_sections":1,"physical_occurrences":34},"ten":{"intrinsic_batches":2,"shared_body_sections":1,"physical_occurrences":88},"semantic_acceptance":false}
+✔ corpus retains external named handover originals and refuses missing closure (46.403625ms)
+✔ FICTIONAL public SCOPED corpus accepted semantics publish current homes and recovered controls without raw replay (6138.290459ms)
+ℹ tests 31
+ℹ suites 0
+ℹ pass 27
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 14857.774166
+
+✖ failing tests:
+
+test at tests/operating-state.test.mjs:197:1
+✖ referenced archived revoked/retry restriction and canonical parent receipts are supplied completely inline (24.949667ms)
+  ReferenceError: accepted is not defined
+      at restrictedArchive (file:///private/tmp/soloco-operating-proof-identity-20261106/source/tests/operating-state.test.mjs:168:2)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async TestContext.<anonymous> (file:///private/tmp/soloco-operating-proof-identity-20261106/source/tests/operating-state.test.mjs:198:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7)
+
+test at tests/operating-state.test.mjs:211:1
+✖ large non-home provenance uses exact same-native ranges; undelivered, partial, denied, stale or changed evidence cannot publish (40.224584ms)
+  ReferenceError: accepted is not defined
+      at restrictedArchive (file:///private/tmp/soloco-operating-proof-identity-20261106/source/tests/operating-state.test.mjs:168:2)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async TestContext.<anonymous> (file:///private/tmp/soloco-operating-proof-identity-20261106/source/tests/operating-state.test.mjs:213:12)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7)
+
+test at tests/operating-state.test.mjs:230:1
+✖ canonical preservation parent revisions cannot be borrowed from matching hashes (23.950041ms)
+  ReferenceError: accepted is not defined
+      at restrictedArchive (file:///private/tmp/soloco-operating-proof-identity-20261106/source/tests/operating-state.test.mjs:168:2)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async TestContext.<anonymous> (file:///private/tmp/soloco-operating-proof-identity-20261106/source/tests/operating-state.test.mjs:232:12)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7)
+
+test at tests/operating-state.test.mjs:303:1
+✖ external catalog reference-shaped metadata is verbatim evidence without a company lookup (24.184708ms)
+  ReferenceError: accepted is not defined
+      at restrictedArchive (file:///private/tmp/soloco-operating-proof-identity-20261106/source/tests/operating-state.test.mjs:168:2)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async TestContext.<anonymous> (file:///private/tmp/soloco-operating-proof-identity-20261106/source/tests/operating-state.test.mjs:305:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7)

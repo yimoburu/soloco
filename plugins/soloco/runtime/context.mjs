@@ -1,3 +1,4 @@
+import {operatingReviewContext,operatingContext} from './operating-state.mjs';
 import {scopedAssignment,scopedMatches,isScopedJob,SCOPED_LIMITS} from './scoped-context.mjs';
 import { handoverReviewContext } from './handover.mjs';
 import { digest } from './store.mjs';
@@ -22,6 +23,14 @@ export function contextBudgetForJob(state,job) {
 
 // Every supplied fact is a dependency. Never silently trim a constraint or input.
 export function assignmentContext(state, job) {
+  const operatingReview=operatingReviewContext(state,job);if(operatingReview)return operatingReview;
+  if(job.context_format===6){
+    const checkpoint=operatingContext(state,{scope:job.context_scope??'*',job_id:job.id});
+    const records=(job.inputs??[]).map(ref=>{const r=state.records[ref.id];if(!r||r.revision!==ref.revision)throw Error('Assignment input version changed');return r;});
+    const text=JSON.stringify({protocol:'operating-assignment-v1',checkpoint,charter:state.roles[job.role],assignment:{task:job.task,context_scope:job.context_scope??'*',coordination:job.coordination??null,model_selection:job.model_selection??{mode:'default'}},records,supplemental_evidence:{protocol:'record-reads-v1',available:true,sources:job.supplemental_sources??[],lookup:'company_context inspect/read',rule:'Request exact known source IDs and hashes; missing input holds work'}});
+    if(text.length>CONTEXT_LIMIT)throw Error('Operating assignment exceeds supported coherent context; Held');
+    return {text,hash:digest(text),inputs:records.map(r=>({id:r.id,revision:r.revision}))};
+  }
   if(isScopedJob(state,job))return scopedAssignment(state,job);
   const qualification=qualificationAssignment(state,job);if(qualification)return qualification;
   const handover=handoverReviewContext(state,job);if(handover)return handover;
@@ -103,6 +112,7 @@ export function contextMatches(state, job, hash) {
     // A job's published notices/messages are outputs, not changes to its inputs.
     // They remain in the real state and every subsequent assignment's context.
     if(!supplementalMatches(state,job))return false;
+    if(state.records?.[job.review_of?.id]?.operating_plan||job.context_format===6)return assignmentContext(state,state.jobs[job.id]??job).hash===hash;
     const view=inheritSnapshots(state,{...state,notices:state.notices.filter(n=>n.job_id!==job.id),messages:state.messages.filter(m=>m.job_id!==job.id)});
     return assignmentContext(view, state.jobs[job.id]??job).hash === hash;
   }

@@ -1,0 +1,120 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import * as engine from '../plugins/soloco/runtime/engine.mjs';
+import {call as publicCall} from '../plugins/soloco/runtime/main.mjs';
+import {withStore,teamHash,digest} from '../plugins/soloco/runtime/store.mjs';
+import {assignmentContext} from '../plugins/soloco/runtime/context.mjs';
+import {executionTiming} from '../plugins/soloco/runtime/timeout.mjs';
+import {snapshotBytes} from '../plugins/soloco/runtime/snapshot.mjs';
+import {work} from '../plugins/soloco/runtime/worker.mjs';
+
+// Real normalized Store, public context API and worker lifecycle. All adapter
+// judgments and native IDs are FICTIONAL; these are not native semantic acceptance.
+const tmpRoot=path.resolve('evals/operating-negative-retention/tmp');
+fs.mkdirSync(tmpRoot,{recursive:true});
+const tmp=fs.mkdtempSync(path.join(tmpRoot,'fixture-'));
+process.env.COMPANY_PLUGIN_DATA=path.join(tmp,'data');
+test.after(()=>fs.rmSync(tmp,{recursive:true,force:true}));
+const read=f=>withStore(f.root,db=>db.read());
+const mutate=(f,fn)=>withStore(f.root,db=>db.transaction('fictional.negative-retention',s=>{fn(s);return s;}));
+const ctx=(f,args)=>publicCall('company_context',{...f,...args},'codex');
+const operating=(f,args)=>ctx(f,{protocol:'operating-state-v1',...args});
+function fixture({migrate=true}={}){
+ const f={root:fs.mkdtempSync(path.join(tmp,'company-')),session_id:'fictional-founder',epoch:1,source_instruction:'FICTIONAL read-only source QA contract; no external authority.'};
+ engine.bind(f.root,f.session_id,'codex');engine.open({...f,idea:'FICTIONAL negative retention contract'},'codex');
+ if(migrate)withStore(f.root,db=>db.migrate());
+ mutate(f,s=>{s.roles={qa:{name:'QA'},engineer:{name:'Engineer'}};s.governance='No external execution.';s.cos_instructions='Preserve negative evidence.';s.team_sha256=teamHash(s);});
+ engine.save({...f,id:'home',kind:'artifact',content:'FICTIONAL restriction: no retry or export.',operating_record:{version:1,kind:'obligation',scope:'*',owner:'runner',conditions:'FICTIONAL complete operative restriction. '.repeat(5200),exceptions:'None',clearing:'Independent closure',expires_at:null,dependencies:[],authority_refs:[],evidence_refs:['home']}},'codex');
+ return f;
+}
+function queue(f,plan){return engine.dispatch({...f,role:'qa',review_of:plan.id,task:'FICTIONAL review, report unresolved negative evidence.',model_selection:{mode:'default',reason:'Use existing account and host_default'},timeout_ms:600000,timeout_reason:'FICTIONAL bounded source QA, max 600 seconds'},'codex',{check:()=>({available:true,authenticated:true}),launch:()=>({on(){},unref(){}})});}
+const negativeReason='FICTIONAL complete counterevidence: prior failure remains unresolved; zero retries; effects unknown.\n```text\nNever export.\n```';
+const response=(content='',verdict='Blocked',reason=negativeReason)=>JSON.stringify({content,messages:[],notices:[],review:{verdict,reason,permitted_action:'hold',blockers:[reason]}});
+async function rejected(f,plan,raw,{mode}={}){
+ const q=queue(f,plan),context=assignmentContext(read(f),read(f).jobs[q.id]);
+ assert.ok(context.operating_evidence||context.qualification_evidence);
+ let calls=0;
+ await work(f.root,q.id,async(_h,native,_p,_d,timeout,_s,options)=>{
+  calls++;
+  if(calls===1)options.onSpawn(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));
+  if(mode==='wrong-native'&&calls===1){const source=Object.values(context.operating_evidence.sources)[0];return {native_id:'fictional-first-native',text:JSON.stringify({reads:[{source_id:source.source_id,sha256:source.sha256,offset:0,length:Math.min(source.length,100)}]})};}
+  if(mode==='cancelled')mutate(f,s=>{s.jobs[q.id].status='cancelled';});
+  return {native_id:mode==='wrong-native'?'fictional-wrong-native':'fictional-negative-native',text:raw};
+ });
+ const s=read(f),j=s.jobs[q.id];
+ assert.equal(j.status,mode==='cancelled'?'cancelled':'failed',j.error);
+ assert.equal(j.artifact_id,undefined);assert.equal(Object.values(s.records).some(r=>r.job_id===q.id),false);
+ assert.equal(j.coordination_release.termination_confirmed,true);
+ assert.ok(j.rejected_output,'complete raw failure evidence must survive before artifact assignment');
+ assert.equal(j.rejected_output.author_instance,j.instance_id);assert.equal(j.rejected_output.context_sha256,j.context_sha256);
+ assert.equal(j.rejected_output.text,raw.slice(0,100000));assert.equal(j.rejected_output.truncated,raw.length>100000);
+ assert.equal(s.sessions[j.session_key].native_id,null,'failed output must not resume an accepted session');
+ return {j,context,calls};
+}
+async function exactOriginal(f,rejected,raw){
+ if(raw.length<=100000)return;
+ assert.ok(rejected.original?.immutable_snapshot,'clipping requires an immutable original');
+ assert.equal(withStore(f.root,db=>snapshotBytes(db.read(),rejected.original)),JSON.stringify(raw));
+ let bytes='';const total=rejected.original.immutable_snapshot.characters;
+ for(let offset=0;offset<total;){const length=Math.min(32768,total-offset),range=await ctx(f,{action:'read',snapshot:rejected.original,offset,length});assert.equal(range.range_sha256,digest(range.text));bytes+=range.text;offset+=range.length;}
+ assert.equal(JSON.parse(bytes),raw,'public snapshot ranges retrieve every original character exactly');
+}
+async function held(f,plan,j){
+ await assert.rejects(operating(f,{action:'apply',plan_id:plan.id,review_id:j.artifact_id??'missing'}),/Held/);
+ assert.equal(read(f).operating_state,undefined);assert.equal((await operating(f,{action:'inspect'})).status,'Held');
+}
+for(const [name,raw,verdict] of [
+ ['early empty body Blocked',response(),'Blocked'],
+ ['oversized body with negative tail',response('FICTIONAL body '.repeat(10000),'Fail'),'Fail'],
+ ['fenced original with late negative', '  ```json\n'+response('x'.repeat(120000))+'\n```  ','Blocked'],
+ ['invalid JSON remains unknown', '{"content":"","review":{"verdict":"Blocked","reason":"incomplete',null],
+ ['oversized invalid raw remains retrievable','x'.repeat(120000)+' negative tail: UNKNOWN',null],
+ ['empty body Pass cannot become approval',response('','Pass','FICTIONAL unsupported Pass'),null],
+])test(name,async()=>{
+ const f=fixture(),p=await operating(f,{action:'plan'}),{j}=await rejected(f,p,raw);
+ assert.equal(j.native_id,'fictional-negative-native');
+ assert.equal(j.rejected_output.operating_negative,verdict);
+ assert.equal(j.rejected_output.negative_reason,verdict?negativeReason:null);
+ await exactOriginal(f,j.rejected_output,raw);await held(f,p,j);
+});
+for(const mode of ['cancelled','wrong-native'])test(mode+' late negative is retained without acceptance',async()=>{
+ const f=fixture(),p=await operating(f,{action:'plan'}),raw=response('x'.repeat(110000)),{j,calls}=await rejected(f,p,raw,{mode});
+ assert.equal(j.rejected_output.operating_negative,'Blocked');assert.equal(j.rejected_output.negative_reason,negativeReason);
+ assert.equal(j.native_id,mode==='wrong-native'?'fictional-wrong-native':'fictional-negative-native');
+ if(mode==='wrong-native'){assert.equal(calls,2);assert.match(j.error,/native identity/);}
+ await exactOriginal(f,j.rejected_output,raw);await held(f,p,j);
+});
+test('legacy qualification evidence retains negative verdict and full raw original',async()=>{
+ const f=fixture();engine.save({...f,id:'legacy',kind:'artifact',content:'FICTIONAL unresolved prior failure.'},'codex');
+ const p=await ctx(f,{action:'plan',record_ids:['legacy'],disposition:'represented',counterpart_ids:['home'],coverage:[{source_id:'legacy',counterpart_ids:['home'],findings:'FICTIONAL full prior finding',failures:'Prior failure remains unresolved',uncertain_effects:'All effects unknown',exhausted_allowances:'Zero retries'}]}),raw=response('x'.repeat(110000),'Fail');
+ const {j,context}=await rejected(f,p,raw);assert.ok(context.qualification_evidence);
+ assert.equal(j.rejected_output.qualification_negative,'Fail');assert.equal(j.rejected_output.negative_reason,negativeReason);
+ await exactOriginal(f,j.rejected_output,raw);
+ await assert.rejects(ctx(f,{action:'apply',plan_id:p.id,review_id:'missing'}));
+});
+
+test('legacy JSON qualification failure retains its previous lifecycle without implicit migration',async()=>{
+ const f=fixture({migrate:false});engine.save({...f,id:'legacy',kind:'artifact',content:'Retain prior failure.'},'codex');
+ const p=await ctx(f,{action:'plan',record_ids:['legacy'],disposition:'represented',counterpart_ids:['home'],coverage:[{source_id:'legacy',counterpart_ids:['home'],findings:'Prior finding',failures:'Failure remains open',uncertain_effects:'Unknown',exhausted_allowances:'Zero retries'}]});
+ const {j}=await rejected(f,p,response('x'.repeat(110000),'Fail'));
+ assert.equal(j.rejected_output.qualification_negative,'Fail');assert.equal(j.rejected_output.original,undefined);
+ assert.equal(withStore(f.root,db=>db.storageInfo().format),'legacy-json');
+});
+
+test('complete oversized negative reason survives independently of the clipped preview',async()=>{
+ const f=fixture(),p=await operating(f,{action:'plan'}),reason='FICTIONAL counterevidence '.repeat(6000)+negativeReason,raw=response('', 'Blocked',reason);
+ const {j}=await rejected(f,p,raw);
+ assert.equal(j.rejected_output.operating_negative,'Blocked');assert.equal(j.rejected_output.negative_reason,reason);
+ await exactOriginal(f,j.rejected_output,raw);await held(f,p,j);
+});
+test('small inline operating review also retains an early negative',async()=>{
+ const f=fixture();mutate(f,s=>{s.records.home.operating_record.conditions='Always';});
+ const p=await operating(f,{action:'plan'}),q=queue(f,p),c=assignmentContext(read(f),read(f).jobs[q.id]),raw=response();
+ assert.equal(c.operating_evidence,undefined);
+ await work(f.root,q.id,async(_h,_n,_p,_d,timeout,_s,options)=>{options.onSpawn(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));return {native_id:'fictional-inline-negative',text:raw};});
+ const j=read(f).jobs[q.id];assert.equal(j.status,'failed');assert.equal(j.artifact_id,undefined);
+ assert.equal(j.rejected_output.text,raw);assert.equal(j.rejected_output.operating_negative,'Blocked');assert.equal(j.rejected_output.negative_reason,negativeReason);
+ await held(f,p,j);
+});

@@ -1,0 +1,27 @@
+(node:86898) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ missing production intake provider is fail closed (0.517834ms)
+✔ initial unknown legacy is never relabeled accepted (24.934542ms)
+✔ immutable accepted home survives replacement; new global restriction holds ordinary but complete delta repair publishes (23.365334ms)
+✔ successor exact base and concurrent semantic intake including reverted intake hold (39.455042ms)
+✔ missing original, changed producer, rejected negative, expiry and unknown nested producer hold (49.585875ms)
+✔ canonical known historical evidence freezes before bookkeeping; nested originals remain checked (28.446583ms)
+(node:86900) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ public handover, independent publication, full v4 worker review, resume and first ordinary format6 Engineering return (4189.53025ms)
+✔ independent resume rejects changed closure, subject, identity, delivery and current meaning (6244.833959ms)
+✔ only exact pure runtime commands are mechanically ingested; conditions, unknown fields and generic saves stay held (788.27275ms)
+✔ actual conditional handover retains founder conditions and unknown legacy remains held on first pass (105.722042ms)
+✔ bounded runtime admission binds task, owner, checkpoint, complete inputs and every metadata phase (667.347625ms)
+✔ reverted publication metadata and unknown root handover/notice changes remain intake (1280.394667ms)
+(node:86901) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ tree preservation stays valid after exact operating publication while unknown extensions hold (2297.99725ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 13361.092166

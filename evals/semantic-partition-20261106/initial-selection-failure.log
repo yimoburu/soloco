@@ -1,0 +1,31 @@
+(node:93206) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ FICTIONAL public corpus adapter shares intrinsic receipts but independently reviews both source claims (5517.720292ms)
+✔ corpus growth deduplicates intrinsic sections while keeping all repeated physical obligations unaccepted (92.811792ms)
+ℹ {"fictional_only":true,"one":{"intrinsic_batches":2,"shared_body_sections":1,"physical_occurrences":64},"ten":{"intrinsic_batches":2,"shared_body_sections":1,"physical_occurrences":118},"semantic_acceptance":false}
+✔ corpus retains external named handover originals and refuses missing closure (43.556167ms)
+✖ semantic selections complete canonical source apply with bounded independent local packets (2745.3135ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 3
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8468.769125
+
+✖ failing tests:
+
+test at tests/scoped-corpus-runtime.test.mjs:182:1
+✖ semantic selections complete canonical source apply with bounded independent local packets (2745.3135ms)
+  Error: source_instruction must be nonempty text, at most 20000 characters
+      at requireText (file:///private/tmp/soloco-semantic-partition-20261106/source/plugins/soloco/runtime/store.mjs:24:79)
+      at file:///private/tmp/soloco-semantic-partition-20261106/source/plugins/soloco/runtime/engine.mjs:529:5
+      at mutate (file:///private/tmp/soloco-semantic-partition-20261106/source/plugins/soloco/runtime/engine.mjs:92:104)
+      at Store.transaction (file:///private/tmp/soloco-semantic-partition-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+      at file:///private/tmp/soloco-semantic-partition-20261106/source/plugins/soloco/runtime/engine.mjs:92:249
+      at withStore (file:///private/tmp/soloco-semantic-partition-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+      at update (file:///private/tmp/soloco-semantic-partition-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+      at scopedControl (file:///private/tmp/soloco-semantic-partition-20261106/source/plugins/soloco/runtime/engine.mjs:528:3)
+      at Array.contextControl (file:///private/tmp/soloco-semantic-partition-20261106/source/plugins/soloco/runtime/engine.mjs:488:92)
+      at call (file:///private/tmp/soloco-semantic-partition-20261106/source/plugins/soloco/runtime/main.mjs:70:28)

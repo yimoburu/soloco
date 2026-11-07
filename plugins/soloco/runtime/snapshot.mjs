@@ -151,9 +151,13 @@ export function captureSnapshotDependencies(state,build,{root=state}={}) {
     // nested references, before a projection can become a frozen read sequence.
     const todo=[root],seen=new Set(),originals=new Map();
     while(todo.length){const item=todo.pop();if(!item||typeof item!=='object'||seen.has(item))continue;seen.add(item);
+      const entry=snapshotEntryReference(item);
+      // Every wrapper must validate, even when its original was already walked.
+      // Queue the reference so entry and raw forms share hash/metadata dedup.
+      if(entry){resolveSnapshotEntry(state,item);todo.push(entry);continue;}
       const ref=snapshotReference(item);
       if(ref){const prior=originals.get(ref.sha256);if(prior&&(prior.characters!==ref.characters||prior.shape!==ref.shape))throw Error('Immutable snapshot duplicate metadata mismatch');if(!prior){originals.set(ref.sha256,ref);todo.push(JSON.parse(snapshotBytes(state,item)));}continue;}
-      if(Object.hasOwn(item,'retained_handover_subject')){const source=legacyHandoverSource(state,item);todo.push(source.handover.subject);continue;}
+      if(Object.hasOwn(item,'retained_handover_subject')){legacyHandoverSource(state,item);todo.push(state.records[item.retained_handover_subject.record_id]);continue;}
       for(const child of Object.values(item))if(child&&typeof child==='object')todo.push(child);
     }
     return {value:build(),dependencies:[...dependencies.values()]};
@@ -192,4 +196,26 @@ export function readFrozenText(handle,{sha256,offset=0,length=16000}={}) {
   if(split(offset)||split(offset+length))throw Error('Frozen text range splits surrogate pair');
   const text=raw.slice(offset,offset+length),range=exactTextHash(text);
   return Object.freeze({source_id:handle.source_id,sha256:handle.sha256,...(Object.hasOwn(handle,'revision')?{revision:handle.revision}:{}),scope:handle.scope,path:handle.path,encoding:handle.encoding,hash_encoding:handle.hash_encoding,offset,end:offset+length,length,total:raw.length,text,range_sha256:range.sha256,range_hash_encoding:range.hash_encoding});
+}
+
+// Logical consumers never accept a caller-supplied cut. The storage owner must
+// bind the actual normalized Store while its read/write snapshot is active.
+const intakeProviders=new WeakMap();
+export function bindOperatingIntake(state,store,reopen) {
+  if(store?.storageInfo?.().format!=='normalized-v4'||typeof store.captureIntakeBaseline!=='function'||typeof store.readIntake!=='function'||typeof store.readSnapshot!=='function'||typeof store.db?.prepare!=='function'||store.db.prepare('SELECT version FROM company_layout WHERE id=1').get()?.version!==4)throw Error('Operating state Held: normalized storage intake provider unavailable');
+  const key=context(state),old=intakeProviders.get(key);
+  intakeProviders.set(key,{store,reopen:reopen??old?.reopen});return state;
+}
+export function operatingIntake(state,baseline) {
+  const provider=intakeProviders.get(context(state));
+  if(!provider)throw Error('Operating state Held: normalized storage intake provider unavailable');
+  const owned=provider.store.closed===true,store=owned?provider.reopen?.():provider.store;
+  if(!store)throw Error('Operating state Held: normalized storage intake provider closed');
+  try{return store.readSnapshot(()=>{
+    const next=store.captureIntakeBaseline();
+    const intake=store.readIntake(baseline??next,{values:true});
+    const current=store.readIntake(next,{values:true});
+    if(JSON.stringify(intake.cut)!==JSON.stringify(current.cut))throw Error('Operating state Held: storage intake capture/read cut changed');
+    return {baseline:next,intake};
+  });}finally{if(owned)store.close();}
 }

@@ -1,0 +1,8 @@
+{
+  "runtime_outside_corpusIncidence_byte_identical_to_incoming": true,
+  "guide_byte_identical_to_incoming": true,
+  "frozen_oracle_function_verbatim_incoming": true,
+  "incoming_runtime_sha256": "0a8e3d44904c2e733be79f3c0e4c7400a0346921263a87e6b275ff4935f96cb8",
+  "optimized_runtime_sha256": "ce465fd58ac6f9412204b4972972df6aa12bc1ec5edadbe6fff9455becd05742",
+  "new_incidence_cache": false
+}

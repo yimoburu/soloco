@@ -1,4 +1,4 @@
-import {reviewedContext,contextSource,currentExtensions} from './current-state.mjs';
+import {reviewedContext,contextSource,currentExtensions,qualificationProducers,qualificationNegatives} from './current-state.mjs';
 import {snapshotReference,snapshotBytes,snapshotEntryReference,retainSnapshotEntry,shallowSnapshotAttempt,shallowSnapshotRecord,legacyHandoverSource} from './snapshot.mjs';
 import { createHash } from 'node:crypto';
 
@@ -118,7 +118,7 @@ function inputReferences(value) {
 
 function modelCatalog(value) {
   const modelKeys = ['id', 'name', 'description', 'supported_efforts', 'effort_support', 'default_effort',
-    'is_default', 'serviceTiers', 'additionalSpeedTiers'];
+    'is_default', 'serviceTiers', 'additionalSpeedTiers', 'defaultServiceTier'];
   const speedKeys = ['host_default', 'fast_disabled', 'evidence', 'default_service_tier', 'default_speed', 'paid_tiers_enabled'];
   return exactKeys(value, ['source', 'model', 'speed_support'], ['source', 'model'])
     && value.source === 'host_catalog' && exactKeys(value.model, modelKeys, ['id'])
@@ -233,12 +233,18 @@ function stateFor(subject) {
 /** Frozen in-memory evidence only. Send handover, never the whole subject.
  * sources contain private retrieval data. No caller-owned object is retained.
  */
-export function buildEvidence(checkpoint, history = [], { wholeBodyAliases = true, currentState = false, checkpointContinuity = false, reviewContext, retainedHandoverRecords = {}, snapshotState, contextState, originalSources=[] } = {}) {
+export function buildEvidence(checkpoint, history = [], { wholeBodyAliases = true, currentState = false, checkpointContinuity = false, reviewContext, retainedHandoverRecords = {}, snapshotState, contextState, originalSources=[], operatingInput } = {}) {
   if (!object(checkpoint) || !Array.isArray(history)) hold('checkpoint must be an object and history an array');
   const checkpointRaw = serialize(checkpoint);
   const historyRaw = serialize(history);
-  const snapshot = JSON.parse(checkpointRaw);
-  const prior = JSON.parse(historyRaw);
+  // Raw identity is never replaced by semantic acceptance. This prospective
+  // packet is supplied only by the fresh-attempt capture/reader in upgrade.mjs.
+  if(operatingInput && (operatingInput.protocol!=='accepted-operating-upgrade-v1'||!checkpointContinuity||!snapshotState||!currentState))hold('invalid operating upgrade input contract');
+  const snapshot = operatingInput ? JSON.parse(serialize({accepted_operating_context:operatingInput.context,
+    pinned:operatingInput.pinned,candidate:operatingInput.candidate,preparation_owner:operatingInput.preparation_owner,
+    source_instruction:operatingInput.source_instruction})) : JSON.parse(checkpointRaw);
+  const prior = operatingInput ? [] : JSON.parse(historyRaw);
+  if(operatingInput)currentState=false;
   const checkpoint_sha256 = hash(checkpointRaw);
   const history_sha256 = hash(historyRaw);
   const sources = Object.create(null);
@@ -570,6 +576,26 @@ export function buildEvidence(checkpoint, history = [], { wholeBodyAliases = tru
     return { source: reference(source), semantic: reference(semantic), value: projected };
   }
 
+  let operatingArchive;
+  if(operatingInput){
+    const originals=[];
+    for(const [name,raw] of [['checkpoint',checkpointRaw],['history',historyRaw]]){
+      const source=register({scope:'operating-archive',path:'/'+name},'accepted-original',raw,'json');
+      archivedSourceIds.add(source.source_id);originals.push(reference(source));
+    }
+    // Register each exact vault body once, including nested proof/producer and
+    // failed-attempt envelopes. Retrieval follows the original locators.
+    const todo=[checkpoint,history],seen=new Set();
+    while(todo.length){const value=todo.pop();if(!value||typeof value!=='object')continue;
+      const ref=snapshotReference(value);
+      if(ref){if(seen.has(ref.sha256))continue;seen.add(ref.sha256);
+        const raw=snapshotBytes(snapshotState,value),source=register({scope:'operating-archive',path:'/vault/'+ref.sha256},'accepted-original',raw,'json',undefined,'vault-'+ref.sha256);
+        archivedSourceIds.add(source.source_id);todo.push(JSON.parse(raw));continue;}
+      for(const child of Object.values(value))if(child&&typeof child==='object')todo.push(child);
+    }
+    operatingArchive={protocol:'accepted-operating-upgrade-v1',originals,vault_source_prefix:'vault-',
+      rule:'Complete raw business checkpoint and history, including all failed attempts, remain exact retrievable originals. Accepted preservation never grants authority or renews current meaning.'};
+  }
   const fields = [];
   const counts = { checkpoint_fields: Object.keys(snapshot).length, records: 0, jobs: 0, notices: 0, messages: 0, history_attempts: prior.length };
   for (const key of Object.keys(snapshot).sort()) {
@@ -622,7 +648,7 @@ export function buildEvidence(checkpoint, history = [], { wholeBodyAliases = tru
   const inventory = { version: wholeBodyAliases ? 2 : 1, counts, entries: [...descriptors] };
   const inventory_sha256 = hash(serialize(inventory));
   const handover = { ...(reviewSource ? {review_context:{source:reference(reviewSource),value:JSON.parse(sources[reviewSource.source_id].raw)}} : {}), format: wholeBodyAliases ? 'soloco-upgrade-evidence-v2' : 'soloco-upgrade-evidence-v1', checkpoint_sha256, history_sha256, inventory_sha256,
-    counts, checkpoint: fields, history: historyEntries,...(archiveIndex?{archive:archiveIndex}:{}),...(currentState?{review_mode:'verified-current-state'}:{}) };
+    counts, checkpoint: fields, history: historyEntries,...(operatingArchive?{operating_archive:operatingArchive,review_mode:'accepted-operating-upgrade-v1'}:{}),...(archiveIndex?{archive:archiveIndex}:{}),...(currentState?{review_mode:'verified-current-state'}:{}) };
   const registryEntries=inventory.entries.filter(item=>!archivedSourceIds.has(item.source_id)).map(item=>({...item}));
   const registrySource=checkpointContinuity?register({scope:'inventory',path:''},'source-index',serialize(registryEntries),'json'):null;
   const stream = register({ scope: 'transport', path: '' }, 'semantic-stream',
@@ -656,8 +682,19 @@ export function resolveBodyAlias(subject, alias) {
 /** Compare identical current inputs, including terminal current attempts as
  * next-attempt history. Prepare adds a decision, so this is only a preview.
  */
-export function projectionPreview(checkpoint, history = [], currentUpgrade = null, {currentState=false,checkpointContinuity=false,snapshotState,contextState}={}) {
+export function projectionPreview(checkpoint, history = [], currentUpgrade = null, {currentState=false,checkpointContinuity=false,snapshotState,contextState,operatingInput}={}) {
   const projectedHistory = currentUpgrade ? [...history, currentUpgrade] : history;
+  if(operatingInput){
+    const subject=buildEvidence(checkpoint,projectedHistory,{currentState:true,checkpointContinuity:true,snapshotState,contextState,operatingInput});
+    const stream=subject.sources[subject.pages[0].source_id],raw=Object.values(subject.sources).filter(s=>s.kind==='accepted-original');
+    return {kind:'accepted-operating-upgrade-preview',workflow:'incremental-v1',context_mode:'current',exact_reservation:false,
+      acceptance:false,context_fit_verified:false,time_forecast:false,prepare_adds_decision_record:true,
+      meaning_measurement:operatingInput.attempt_id?'frozen-attempt':'current-capture',
+      projected_attempt:operatingInput.attempt_id?'Measured frozen attempt; no new preparation':null,
+      current_upgrade_included:Boolean(currentUpgrade),meaning:{stream_characters:stream.length,stream_bytes:Buffer.byteLength(stream.raw,'utf8'),pages:subject.pages.length},
+      raw_archive_retrieval:{sources:raw.length,characters:raw.reduce((n,s)=>n+s.length,0),bytes:raw.reduce((n,s)=>n+Buffer.byteLength(s.raw,'utf8'),0),mandatory_replay:false},
+      boundary:'Preview is the current capture, not reserved future bytes. Preparation adds its exact founder instruction and control record. Ordinary operation remains Held after changed owner or definitions until fresh independent operating delta publication.'};
+  }
   const baseline = buildEvidence(checkpoint, projectedHistory, { wholeBodyAliases: false,snapshotState,contextState });
   const candidate = buildEvidence(checkpoint, projectedHistory,{currentState,checkpointContinuity,snapshotState,contextState});
   const metrics = subject => {
@@ -818,7 +855,8 @@ export function buildQualificationEvidence(state,plan,job) {
       for(const child of Object.values(item))if(child&&typeof child==='object')todo.push(child);
     }
   };
-  for(const ref of [...p.sources,...p.counterparts]){
+  const producer_dependencies=qualificationProducers(state,p),prior_negative_reviews=qualificationNegatives(state,plan);
+  for(const ref of [...new Map([...p.sources,...p.counterparts,...producer_dependencies].map(ref=>[ref.id,ref])).values()]){
     const value=contextSource(state,ref.id);
     if(!value||hash(serialize(value))!==ref.sha256||(value.revision??null)!==ref.revision)hold('qualification source changed');
     originals.push({source:ref,body:retain(serialize(value))});dependencies(value);
@@ -826,18 +864,18 @@ export function buildQualificationEvidence(state,plan,job) {
   // Raw strings are intentional: qualification cannot omit a typed log/file
   // body that might contain its only negative finding. Every exact original and
   // referenced snapshot is compulsory once, with separate byte-exact retrieval.
-  return buildEvidence({company_id:state.id,governance:state.governance,cos_instructions:state.cos_instructions,roles:state.roles,owner:state.owner,state_extensions:currentExtensions(state),qualification_plan:plan,originals,original_bodies:[...bodies.values()]},[],{wholeBodyAliases:false,checkpointContinuity:true,snapshotState:state,originalSources:[...bodies.values()],
-    retainedHandoverRecords:state.records,reviewContext:{protocol:'context-qualification-v2',plan_sha256:hash(serialize(p)),legacy_dependencies:[...legacyDependencies.values()].sort((a,b)=>a.id.localeCompare(b.id)),
+  return buildEvidence({company_id:state.id,governance:state.governance,cos_instructions:state.cos_instructions,roles:state.roles,owner:state.owner,state_extensions:currentExtensions(state),qualification_plan:plan,...(prior_negative_reviews.length?{prior_negative_reviews}:{}),originals,original_bodies:[...bodies.values()]},[],{wholeBodyAliases:false,checkpointContinuity:true,snapshotState:state,originalSources:[...bodies.values()],
+    retainedHandoverRecords:state.records,reviewContext:{protocol:'context-qualification-v2',plan_sha256:hash(serialize(p)),...(producer_dependencies.length?{producer_dependencies}:{}),legacy_dependencies:[...legacyDependencies.values()].sort((a,b)=>a.id.localeCompare(b.id)),
       charter:state.roles[job.role],assignment:{task:job.task,task_summary:job.task_summary??null,next_handoff:job.next_handoff??null,
         ...(job.coordination?{coordination:job.coordination}:{}),...(job.requester?{requester:job.requester}:{}),...(job.expected_deliverable!==undefined?{expected_deliverable:job.expected_deliverable}:{}),model_selection:job.model_selection??{mode:'default'}},
-      rule:'Compare every original finding, failure, uncertain effect and exhausted allowance with the exact mandatory counterparts. Represented does not mean resolved. Return Blocked for any omission, conflict or unique finding. No authority or renewed allowance is granted.'}});
+      rule:'Compare every original finding, failure, uncertain effect and exhausted allowance with the exact mandatory counterparts. Represented does not mean resolved. Return Blocked for any omission, conflict or unique finding. No authority or renewed allowance is granted.'+(producer_dependencies.length?' Producer dependencies are compulsory provenance evidence for the selected sources and counterparts; only qualification_plan sources are being classified.':'')}});
 }
 export function qualificationDeliveryReceipt(subject,ledger,{plan_sha256,context_sha256}) {
   validateSemanticDelivery(subject,ledger);
   const stream=subject.sources[subject.pages[0].source_id];
   const context=subject.handover.review_context?.value;
   if(context?.protocol!=='context-qualification-v2'||context.plan_sha256!==plan_sha256)hold('qualification receipt plan changed');
-  return freeze({protocol:2,semantic_delivery_complete:true,native_id:ledger.session_id,stream_sha256:stream.sha256,plan_sha256,context_sha256,legacy_dependencies:context.legacy_dependencies});
+  return freeze({protocol:2,semantic_delivery_complete:true,native_id:ledger.session_id,stream_sha256:stream.sha256,plan_sha256,context_sha256,legacy_dependencies:context.legacy_dependencies,...(context.producer_dependencies?{producer_dependencies:context.producer_dependencies}:{})});
 }
 
 /** Exact source eligibility only, not understanding or semantic correctness.

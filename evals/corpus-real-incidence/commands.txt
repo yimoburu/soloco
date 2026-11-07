@@ -1,0 +1,15 @@
+Baseline: b6a81f7ab408a0cba90d984a336f56978574a9c3
+No commit, network, actual company, model, installation, publishing, or hosting operations.
+
+Initial development check (failure preserved):
+/private/tmp/soloco-node22-validation/node-v22.13.0-darwin-arm64/bin/node --test tests/scoped-corpus-runtime.test.mjs > evals/corpus-real-incidence/initial-node22.log 2>&1
+Corrected development check:
+/private/tmp/soloco-node22-validation/node-v22.13.0-darwin-arm64/bin/node --test tests/scoped-corpus-runtime.test.mjs > evals/corpus-real-incidence/corrected-node22.log 2>&1
+Expanded focused check:
+/private/tmp/soloco-node22-validation/node-v22.13.0-darwin-arm64/bin/node --test tests/scoped-corpus-runtime.test.mjs > evals/corpus-real-incidence/focused-node22.log 2>&1
+Final relevant suites (independent commands, run concurrently):
+/private/tmp/soloco-node22-validation/node-v22.13.0-darwin-arm64/bin/node --test tests/scoped-context.test.mjs tests/scoped-coherent-runtime.test.mjs tests/scoped-corpus-runtime.test.mjs tests/legacy-coherent.test.mjs > evals/corpus-real-incidence/scoped-coherent-node22.log 2>&1
+/opt/homebrew/bin/node --test tests/scoped-context.test.mjs tests/scoped-coherent-runtime.test.mjs tests/scoped-corpus-runtime.test.mjs tests/legacy-coherent.test.mjs > evals/corpus-real-incidence/scoped-coherent-node25.log 2>&1
+
+git diff --check > evals/corpus-real-incidence/diff-check.txt 2>&1
+git diff -- plugins/soloco/runtime/scoped-context.mjs tests/scoped-corpus-runtime.test.mjs docs/scoped-context.md > evals/corpus-real-incidence/source.patch

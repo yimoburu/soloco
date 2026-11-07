@@ -1,0 +1,33 @@
+{
+  "role": "independent_source_QA_followup",
+  "native_session": "01a1b30a-70aa-7110-a2a8-9a1920a68f8a",
+  "commit": "361241feba5fb6117c3bd75fedc19c1e2885df47",
+  "tree": "f2950ecf0853b9d7013c81e0bb9ec341a9bb2210",
+  "started_at": "2026-11-06T23:13:13.571324+00:00",
+  "ended_at": "2026-11-06T23:16:29.345551+00:00",
+  "exit_code": 0,
+  "prompt_sha256": "4c7306ef2d4fa801497e7acdcddbe250bcf1e2383ed2173c865eb5dfa66a091b",
+  "prompt_characters": 63844,
+  "requested_model": "gpt-6.1-sol",
+  "requested_effort": "high",
+  "effective_settings": "unverified",
+  "timeout_seconds": 600,
+  "lifecycle": [
+    {
+      "type": "thread.started",
+      "thread_id": "01a1b30a-70aa-7110-a2a8-9a1920a68f8a"
+    },
+    {
+      "type": "turn.completed",
+      "usage": {
+        "input_tokens": 1379029,
+        "cached_input_tokens": 978816,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 22453,
+        "reasoning_output_tokens": 20009
+      }
+    }
+  ],
+  "report_exists": true,
+  "scope": "Public source only; no real company data or authority changes"
+}

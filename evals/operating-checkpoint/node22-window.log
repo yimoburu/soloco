@@ -1,0 +1,62 @@
+TAP version 13
+# (node:69494) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: separate review window retains native cap and validates narrow explicit settings
+ok 1 - separate review window retains native cap and validates narrow explicit settings
+  ---
+  duration_ms: 5.096209
+  ...
+# Subtest: streamed review may complete after ten minutes only with a fresh explicit window
+ok 2 - streamed review may complete after ten minutes only with a fresh explicit window
+  ---
+  duration_ms: 739.966375
+  ...
+# Subtest: window changes or completion exactly at the review deadline cannot publish an accepted Pass
+ok 3 - window changes or completion exactly at the review deadline cannot publish an accepted Pass
+  ---
+  duration_ms: 492.204
+  ...
+# Subtest: ordinary dispatch rejects handover-window controls before creating a job or session
+ok 4 - ordinary dispatch rejects handover-window controls before creating a job or session
+  ---
+  duration_ms: 7.428375
+  ...
+# Subtest: window admission requires an unused target and fresh native-session reference
+ok 5 - window admission requires an unused target and fresh native-session reference
+  ---
+  duration_ms: 113.610375
+  ...
+# Subtest: terminal review receipts outside the fixed window cannot permit resume
+ok 6 - terminal review receipts outside the fixed window cannot permit resume
+  ---
+  duration_ms: 216.45325
+  ...
+# Subtest: first-call timing validates the actual shortened invocation without extending the job policy
+ok 7 - first-call timing validates the actual shortened invocation without extending the job policy
+  ---
+  duration_ms: 208.737458
+  ...
+# Subtest: a fixed review window shrinks later call limits and rejects completion exactly at its end
+ok 8 - a fixed review window shrinks later call limits and rejects completion exactly at its end
+  ---
+  duration_ms: 804.458666
+  ...
+# Subtest: every native invocation requires complete consistent timing evidence before publication
+ok 9 - every native invocation requires complete consistent timing evidence before publication
+  ---
+  duration_ms: 1941.426875
+  ...
+# Subtest: clock movement during publication never publishes a completed receipt at or beyond expiry
+ok 10 - clock movement during publication never publishes a completed receipt at or beyond expiry
+  ---
+  duration_ms: 3474.656792
+  ...
+1..10
+# tests 10
+# suites 0
+# pass 10
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 8345.379167

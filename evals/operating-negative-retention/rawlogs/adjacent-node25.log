@@ -1,0 +1,61 @@
+(node:36213) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ tests/context-qualification.test.mjs (153468.756167ms)
+(node:36214) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ separate review window retains native cap and validates narrow explicit settings (4.469792ms)
+✔ streamed review may complete after ten minutes only with a fresh explicit window (1282.652958ms)
+✔ window changes or completion exactly at the review deadline cannot publish an accepted Pass (421.121292ms)
+✔ ordinary dispatch rejects handover-window controls before creating a job or session (6.799167ms)
+✔ window admission requires an unused target and fresh native-session reference (95.386584ms)
+✔ terminal review receipts outside the fixed window cannot permit resume (243.491083ms)
+✔ first-call timing validates the actual shortened invocation without extending the job policy (285.575417ms)
+✔ a fixed review window shrinks later call limits and rejects completion exactly at its end (814.074833ms)
+✔ every native invocation requires complete consistent timing evidence before publication (1989.7875ms)
+✔ clock movement during publication never publishes a completed receipt at or beyond expiry (3192.606125ms)
+(node:36215) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ tests/operating-state.test.mjs (153464.086333ms)
+(node:36216) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+{"same_scope":"D00","qualified_artifact_home_effect_present":true,"applicability_verdict":"Pass","contract_doubles_only":true}
+✖ tests/scoped-context.test.mjs (153461.872458ms)
+(node:36218) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ dispatch validates and persists policy, and main keeps software-test limits separate (46.717ms)
+✔ upgrade review-window schema is bounded and runtime rejects invalid or misplaced requests before binding (13.256167ms)
+✔ status distinguishes long execution, grace, startup, queue, legacy and inspection (7.690459ms)
+✔ reconciliation rechecks eligibility inside the store transaction (2.035125ms)
+✔ worker queue delay does not consume custom execution time; actual callback is persisted (6.107583ms)
+✔ new jobs require spawn evidence; legacy injected models remain compatible (83.601125ms)
+✔ deadline aborts and late output is quarantined even if model ignores cancellation (3.412125ms)
+✔ pause, ownership loss, context change and scope revocation abort active work (92.866667ms)
+✔ startup expiry aborts without inventing spawn timing and launch errors retain evidence (4.726834ms)
+✔ coordination dispatch binds prerequisite evidence, admits disjoint resources and rejects premature/conflicting work (28.137833ms)
+✔ uncertain cancellation keeps resource claim; confirmed closure releases it (9.679041ms)
+✔ upgrade call ceiling schema and runtime reject invalid options before all boundaries (6.572416ms)
+✔ stream publication fence quarantines deadline crossed during final validation without session mutation (50.416375ms)
+✔ format4 receipt validation cannot publish after the original execution deadline (14.95375ms)
+✔ stream exact deadline closure and delayed timers cannot publish late Pass or renew allowance (92.194958ms)
+ℹ tests 28
+ℹ suites 0
+ℹ pass 25
+ℹ fail 0
+ℹ cancelled 3
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 153471.476042
+
+✖ failing tests:
+
+test at tests/context-qualification.test.mjs:1:1
+✖ tests/context-qualification.test.mjs (153468.756167ms)
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/operating-state.test.mjs:1:1
+✖ tests/operating-state.test.mjs (153464.086333ms)
+  'Promise resolution is still pending but the event loop has already resolved'
+
+test at tests/scoped-context.test.mjs:1:1
+✖ tests/scoped-context.test.mjs (153461.872458ms)
+  'Promise resolution is still pending but the event loop has already resolved'

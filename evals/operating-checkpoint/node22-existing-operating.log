@@ -1,0 +1,563 @@
+TAP version 13
+# (node:60066) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: accepted historical publication proof survives an owner epoch change without admitting old in-flight work
+not ok 1 - accepted historical publication proof survives an owner epoch change without admitting old in-flight work
+  ---
+  duration_ms: 115.541459
+  location: '/private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:34:1'
+  failureType: 'testCodeFailure'
+  error: 'no such table: company_layout'
+  code: 'ERR_SQLITE_ERROR'
+  stack: |-
+    bindOperatingIntake (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/snapshot.mjs:201:55)
+    mutate (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:160)
+    Store.transaction (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+    file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:335
+    withStore (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+    update (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+    Array.contextControl (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:452:16)
+    call (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/main.mjs:70:28)
+    ctx (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:21:21)
+    publish (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:32:41)
+  ...
+# Subtest: public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning
+not ok 2 - public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning
+  ---
+  duration_ms: 8.153
+  location: '/private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:43:1'
+  failureType: 'testCodeFailure'
+  error: 'no such table: company_layout'
+  code: 'ERR_SQLITE_ERROR'
+  stack: |-
+    bindOperatingIntake (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/snapshot.mjs:201:55)
+    mutate (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:160)
+    Store.transaction (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+    file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:335
+    withStore (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+    update (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+    Array.contextControl (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:452:16)
+    call (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/main.mjs:70:28)
+    ctx (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:21:21)
+    publish (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:32:41)
+  ...
+# Subtest: missing legacy bootstrap is visibly DIRTY and apply rolls back without acceptance
+not ok 3 - missing legacy bootstrap is visibly DIRTY and apply rolls back without acceptance
+  ---
+  duration_ms: 6.604083
+  location: '/private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:45:1'
+  failureType: 'testCodeFailure'
+  error: 'no such table: company_layout'
+  code: 'ERR_SQLITE_ERROR'
+  stack: |-
+    bindOperatingIntake (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/snapshot.mjs:201:55)
+    mutate (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:160)
+    Store.transaction (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+    file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:335
+    withStore (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+    update (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+    Array.contextControl (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:452:16)
+    call (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/main.mjs:70:28)
+    ctx (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:21:21)
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:45:245)
+  ...
+# Subtest: new membership, changed exact source, wrong independent identity and absent closure cannot publish
+not ok 4 - new membership, changed exact source, wrong independent identity and absent closure cannot publish
+  ---
+  duration_ms: 7.608333
+  location: '/private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:47:1'
+  failureType: 'testCodeFailure'
+  error: 'no such table: company_layout'
+  code: 'ERR_SQLITE_ERROR'
+  stack: |-
+    bindOperatingIntake (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/snapshot.mjs:201:55)
+    mutate (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:160)
+    Store.transaction (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+    file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:335
+    withStore (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+    update (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+    Array.contextControl (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:452:16)
+    call (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/main.mjs:70:28)
+    ctx (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:21:21)
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:47:230)
+  ...
+# Subtest: scope closure, global membership, expiry, receipt changes, revocation and missed communication hold
+not ok 5 - scope closure, global membership, expiry, receipt changes, revocation and missed communication hold
+  ---
+  duration_ms: 8.176416
+  location: '/private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:49:1'
+  failureType: 'testCodeFailure'
+  error: 'no such table: company_layout'
+  code: 'ERR_SQLITE_ERROR'
+  stack: |-
+    bindOperatingIntake (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/snapshot.mjs:201:55)
+    mutate (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:160)
+    Store.transaction (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+    file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:335
+    withStore (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+    update (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+    Array.contextControl (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:452:16)
+    call (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/main.mjs:70:28)
+    ctx (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:21:21)
+    publish (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:32:41)
+  ...
+# Subtest: pause fences publication reviewer and prospective handover cannot hide unknown legacy
+not ok 6 - pause fences publication reviewer and prospective handover cannot hide unknown legacy
+  ---
+  duration_ms: 7.417
+  location: '/private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:51:1'
+  failureType: 'testCodeFailure'
+  error: 'no such table: company_layout'
+  code: 'ERR_SQLITE_ERROR'
+  stack: |-
+    bindOperatingIntake (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/snapshot.mjs:201:55)
+    mutate (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:160)
+    Store.transaction (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+    file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:335
+    withStore (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+    update (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+    Array.contextControl (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:452:16)
+    call (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/main.mjs:70:28)
+    ctx (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:21:21)
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:51:144)
+  ...
+# Subtest: 10x independently classified inert archive keeps actual mandatory operating assignment bytes and semantic work constant
+not ok 7 - 10x independently classified inert archive keeps actual mandatory operating assignment bytes and semantic work constant
+  ---
+  duration_ms: 23.825458
+  location: '/private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:59:1'
+  failureType: 'testCodeFailure'
+  error: 'no such table: company_layout'
+  code: 'ERR_SQLITE_ERROR'
+  stack: |-
+    bindOperatingIntake (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/snapshot.mjs:201:55)
+    mutate (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:160)
+    Store.transaction (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+    file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:335
+    withStore (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+    update (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+    Array.contextControl (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:452:16)
+    call (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/main.mjs:70:28)
+    ctx (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:21:21)
+    publish (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:32:41)
+  ...
+# Subtest: deleted applicable home and changed exact provenance cannot disappear from accepted meaning
+not ok 8 - deleted applicable home and changed exact provenance cannot disappear from accepted meaning
+  ---
+  duration_ms: 6.945625
+  location: '/private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:61:1'
+  failureType: 'testCodeFailure'
+  error: 'no such table: company_layout'
+  code: 'ERR_SQLITE_ERROR'
+  stack: |-
+    bindOperatingIntake (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/snapshot.mjs:201:55)
+    mutate (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:160)
+    Store.transaction (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+    file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:335
+    withStore (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+    update (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+    Array.contextControl (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:452:16)
+    call (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/main.mjs:70:28)
+    ctx (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:21:21)
+    publish (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:32:41)
+  ...
+# Subtest: typed outcome requires complete historical uncertainty; text cannot manufacture permission
+not ok 9 - typed outcome requires complete historical uncertainty; text cannot manufacture permission
+  ---
+  duration_ms: 8.055208
+  location: '/private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:63:1'
+  failureType: 'testCodeFailure'
+  error: 'no such table: company_layout'
+  code: 'ERR_SQLITE_ERROR'
+  stack: |-
+    bindOperatingIntake (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/snapshot.mjs:201:55)
+    mutate (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:160)
+    Store.transaction (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+    file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:335
+    withStore (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+    update (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+    Array.contextControl (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:452:16)
+    call (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/main.mjs:70:28)
+    ctx (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:21:21)
+    publish (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:32:41)
+  ...
+# Subtest: public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure
+not ok 10 - public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure
+  ---
+  duration_ms: 8.036458
+  location: '/private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:65:1'
+  failureType: 'testCodeFailure'
+  error: 'no such table: company_layout'
+  code: 'ERR_SQLITE_ERROR'
+  stack: |-
+    bindOperatingIntake (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/snapshot.mjs:201:55)
+    mutate (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:160)
+    Store.transaction (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+    file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:335
+    withStore (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+    update (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+    Array.contextControl (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:452:16)
+    call (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/main.mjs:70:28)
+    ctx (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:21:21)
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:67:14)
+  ...
+# Subtest: late new and changed falsely scoped prohibitions stay globally DIRTY, but fresh proposals include them
+not ok 11 - late new and changed falsely scoped prohibitions stay globally DIRTY, but fresh proposals include them
+  ---
+  duration_ms: 7.766
+  location: '/private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:101:1'
+  failureType: 'testCodeFailure'
+  error: 'no such table: company_layout'
+  code: 'ERR_SQLITE_ERROR'
+  stack: |-
+    bindOperatingIntake (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/snapshot.mjs:201:55)
+    mutate (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:160)
+    Store.transaction (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+    file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:335
+    withStore (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+    update (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+    Array.contextControl (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:452:16)
+    call (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/main.mjs:70:28)
+    ctx (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:21:21)
+    publish (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:32:41)
+  ...
+# Subtest: publication proof stays current; failed, quarantined, uncertain and unknown-extension siblings stay DIRTY
+not ok 12 - publication proof stays current; failed, quarantined, uncertain and unknown-extension siblings stay DIRTY
+  ---
+  duration_ms: 6.35075
+  location: '/private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:115:1'
+  failureType: 'testCodeFailure'
+  error: 'no such table: company_layout'
+  code: 'ERR_SQLITE_ERROR'
+  stack: |-
+    bindOperatingIntake (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/snapshot.mjs:201:55)
+    mutate (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:160)
+    Store.transaction (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+    file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:335
+    withStore (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+    update (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+    Array.contextControl (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:452:16)
+    call (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/main.mjs:70:28)
+    ctx (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:21:21)
+    publish (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:32:41)
+  ...
+# Subtest: mechanical publication index rejects tampering and retains unknown state extensions
+not ok 13 - mechanical publication index rejects tampering and retains unknown state extensions
+  ---
+  duration_ms: 7.204834
+  location: '/private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:135:1'
+  failureType: 'testCodeFailure'
+  error: 'no such table: company_layout'
+  code: 'ERR_SQLITE_ERROR'
+  stack: |-
+    bindOperatingIntake (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/snapshot.mjs:201:55)
+    mutate (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:160)
+    Store.transaction (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+    file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:335
+    withStore (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+    update (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+    Array.contextControl (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:452:16)
+    call (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/main.mjs:70:28)
+    ctx (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:21:21)
+    publish (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:32:41)
+  ...
+# Subtest: format6 explicit non-home evidence survives dispatch, discovery and bounded same-native reads
+not ok 14 - format6 explicit non-home evidence survives dispatch, discovery and bounded same-native reads
+  ---
+  duration_ms: 19.620833
+  location: '/private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:145:1'
+  failureType: 'testCodeFailure'
+  error: 'no such table: company_layout'
+  code: 'ERR_SQLITE_ERROR'
+  stack: |-
+    bindOperatingIntake (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/snapshot.mjs:201:55)
+    mutate (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:160)
+    Store.transaction (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+    file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:335
+    withStore (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+    update (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+    Array.contextControl (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:452:16)
+    call (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/main.mjs:70:28)
+    ctx (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:21:21)
+    publish (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:32:41)
+  ...
+# Subtest: referenced archived revoked/retry restriction and canonical parent receipts are supplied completely inline
+not ok 15 - referenced archived revoked/retry restriction and canonical parent receipts are supplied completely inline
+  ---
+  duration_ms: 42.442125
+  location: '/private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:206:1'
+  failureType: 'testCodeFailure'
+  error: 'no such table: company_layout'
+  code: 'ERR_SQLITE_ERROR'
+  stack: |-
+    bindOperatingIntake (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/snapshot.mjs:201:55)
+    mutate (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:160)
+    Store.transaction (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+    file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:335
+    withStore (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+    update (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+    Array.contextControl (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:452:16)
+    call (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/main.mjs:70:28)
+    ctx (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:21:21)
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:207:44)
+  ...
+# Subtest: large non-home provenance uses exact same-native ranges; undelivered, partial, denied, stale or changed evidence cannot publish
+not ok 16 - large non-home provenance uses exact same-native ranges; undelivered, partial, denied, stale or changed evidence cannot publish
+  ---
+  duration_ms: 69.807459
+  location: '/private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:220:1'
+  failureType: 'testCodeFailure'
+  error: 'no such table: company_layout'
+  code: 'ERR_SQLITE_ERROR'
+  stack: |-
+    bindOperatingIntake (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/snapshot.mjs:201:55)
+    mutate (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:160)
+    Store.transaction (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+    file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:335
+    withStore (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+    update (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+    Array.contextControl (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:452:16)
+    call (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/main.mjs:70:28)
+    ctx (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:21:21)
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:222:58)
+  ...
+# Subtest: canonical preservation parent revisions cannot be borrowed from matching hashes
+not ok 17 - canonical preservation parent revisions cannot be borrowed from matching hashes
+  ---
+  duration_ms: 37.198625
+  location: '/private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:239:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /source\/receipt changed/. Input:
+    
+    'Error: no such table: company_layout'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual:
+  error: 'no such table: company_layout'
+  stack: |-
+    bindOperatingIntake (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/snapshot.mjs:201:55)
+    mutate (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:160)
+    Store.transaction (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+    file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:335
+    withStore (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+    update (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+    Array.contextControl (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:452:16)
+    call (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/main.mjs:70:28)
+    ctx (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:21:21)
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:243:25)
+  operator: 'rejects'
+  stack: |-
+    async TestContext.<anonymous> (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:243:4)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: missing provenance and snapshot-only evidence hold rather than count pointers as delivered bodies
+not ok 18 - missing provenance and snapshot-only evidence hold rather than count pointers as delivered bodies
+  ---
+  duration_ms: 7.367583
+  location: '/private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:248:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /provenance source missing/. Input:
+    
+    'Error: no such table: company_layout'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual:
+  error: 'no such table: company_layout'
+  stack: |-
+    bindOperatingIntake (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/snapshot.mjs:201:55)
+    mutate (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:160)
+    Store.transaction (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+    file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:335
+    withStore (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+    update (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+    Array.contextControl (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:452:16)
+    call (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/main.mjs:70:28)
+    ctx (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:21:21)
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:252:25)
+  operator: 'rejects'
+  stack: |-
+    async TestContext.<anonymous> (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:252:4)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: real runtime receipt attribution and deterministic reuse deliver the validated producer closure before Pass
+not ok 19 - real runtime receipt attribution and deterministic reuse deliver the validated producer closure before Pass
+  ---
+  duration_ms: 50.881084
+  location: '/private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:286:1'
+  failureType: 'testCodeFailure'
+  error: 'no such table: company_layout'
+  code: 'ERR_SQLITE_ERROR'
+  stack: |-
+    bindOperatingIntake (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/snapshot.mjs:201:55)
+    mutate (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:160)
+    Store.transaction (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+    file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:335
+    withStore (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+    update (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+    Array.contextControl (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:452:16)
+    call (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/main.mjs:70:28)
+    ctx (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:21:21)
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:287:41)
+  ...
+# Subtest: runtime receipt missing or mismatched producer, candidate, plan, reuse or generation holds
+ok 20 - runtime receipt missing or mismatched producer, candidate, plan, reuse or generation holds
+  ---
+  duration_ms: 64.473583
+  ...
+# Subtest: external catalog reference-shaped metadata is verbatim evidence without a company lookup
+not ok 21 - external catalog reference-shaped metadata is verbatim evidence without a company lookup
+  ---
+  duration_ms: 34.612333
+  location: '/private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:313:1'
+  failureType: 'testCodeFailure'
+  error: 'no such table: company_layout'
+  code: 'ERR_SQLITE_ERROR'
+  stack: |-
+    bindOperatingIntake (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/snapshot.mjs:201:55)
+    mutate (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:160)
+    Store.transaction (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+    file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:335
+    withStore (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+    update (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+    Array.contextControl (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:452:16)
+    call (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/main.mjs:70:28)
+    ctx (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:21:21)
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:316:23)
+  ...
+# Subtest: runtime closure requires complete delivery and independent source and proof sessions
+not ok 22 - runtime closure requires complete delivery and independent source and proof sessions
+  ---
+  duration_ms: 174.244834
+  location: '/private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:325:1'
+  failureType: 'testCodeFailure'
+  error: 'no such table: company_layout'
+  code: 'ERR_SQLITE_ERROR'
+  stack: |-
+    bindOperatingIntake (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/snapshot.mjs:201:55)
+    mutate (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:160)
+    Store.transaction (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+    file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:335
+    withStore (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+    update (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+    Array.contextControl (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:452:16)
+    call (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/main.mjs:70:28)
+    ctx (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:21:21)
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:327:90)
+  ...
+# Subtest: public qualified recovered snapshot publishes current typed outcomes without replaying the paid raw archive
+not ok 23 - public qualified recovered snapshot publishes current typed outcomes without replaying the paid raw archive
+  ---
+  duration_ms: 902.846333
+  location: '/private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:358:1'
+  failureType: 'testCodeFailure'
+  error: 'Operating state Held: normalized storage intake provider unavailable'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    bindOperatingIntake (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/snapshot.mjs:201:313)
+    mutate (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:160)
+    Store.transaction (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+    file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:335
+    withStore (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+    update (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+    Array.contextControl (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:452:16)
+    call (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/main.mjs:70:28)
+    ctx (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:21:21)
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:359:114)
+  ...
+# Subtest: large prospective publication uses bounded frozen worker delivery and rejects a manufactured complete flag
+not ok 24 - large prospective publication uses bounded frozen worker delivery and rejects a manufactured complete flag
+  ---
+  duration_ms: 24.539708
+  location: '/private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:377:1'
+  failureType: 'testCodeFailure'
+  error: 'no such table: company_layout'
+  code: 'ERR_SQLITE_ERROR'
+  stack: |-
+    bindOperatingIntake (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/snapshot.mjs:201:55)
+    mutate (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:160)
+    Store.transaction (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+    file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:335
+    withStore (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+    update (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+    Array.contextControl (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:452:16)
+    call (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/main.mjs:70:28)
+    ctx (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:21:21)
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:383:27)
+  ...
+# Subtest: frozen publication worker rejects unread semantics, changed native and changed current membership
+not ok 25 - frozen publication worker rejects unread semantics, changed native and changed current membership
+  ---
+  duration_ms: 10.367125
+  location: '/private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:393:1'
+  failureType: 'testCodeFailure'
+  error: 'no such table: company_layout'
+  code: 'ERR_SQLITE_ERROR'
+  stack: |-
+    bindOperatingIntake (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/snapshot.mjs:201:55)
+    mutate (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:160)
+    Store.transaction (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+    file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:335
+    withStore (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+    update (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+    Array.contextControl (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:452:16)
+    call (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/main.mjs:70:28)
+    ctx (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:21:21)
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:396:17)
+  ...
+# Subtest: paid snapshot archive still requires publication QA independent of nested original producers
+not ok 26 - paid snapshot archive still requires publication QA independent of nested original producers
+  ---
+  duration_ms: 895.811083
+  location: '/private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:411:1'
+  failureType: 'testCodeFailure'
+  error: 'Operating state Held: normalized storage intake provider unavailable'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    bindOperatingIntake (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/snapshot.mjs:201:313)
+    mutate (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:160)
+    Store.transaction (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+    file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:335
+    withStore (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+    update (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+    Array.contextControl (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:452:16)
+    call (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/main.mjs:70:28)
+    ctx (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:21:21)
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:412:45)
+  ...
+# Subtest: FICTIONAL PUBLIC v2 explicit complete sources preserve accepted runtime producer independence and freshness
+not ok 27 - FICTIONAL PUBLIC v2 explicit complete sources preserve accepted runtime producer independence and freshness
+  ---
+  duration_ms: 143.961541
+  location: '/private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:417:1'
+  failureType: 'testCodeFailure'
+  error: 'Operating state Held: normalized storage intake provider unavailable'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    bindOperatingIntake (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/snapshot.mjs:201:313)
+    mutate (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:160)
+    Store.transaction (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:178:20)
+    file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:335
+    withStore (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:194:16)
+    update (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:92:10)
+    Array.contextControl (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:452:16)
+    call (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/main.mjs:70:28)
+    ctx (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:21:21)
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:419:102)
+  ...
+1..27
+# tests 27
+# suites 0
+# pass 1
+# fail 26
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2817.87525

@@ -1,0 +1,79 @@
+(node:11704) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ missing production intake provider is fail closed (0.75275ms)
+✔ initial unknown legacy is never relabeled accepted (27.958708ms)
+✔ immutable accepted home survives replacement; new global restriction holds ordinary but complete delta repair publishes (34.402833ms)
+✔ successor exact base and concurrent semantic intake including reverted intake hold (45.940583ms)
+✔ missing original, changed producer, rejected negative, expiry and unknown nested producer hold (56.19725ms)
+✔ canonical known historical evidence freezes before bookkeeping; nested originals remain checked (33.945584ms)
+✔ atomic historical maps deliver exact new/newer/deleted originals in chronological intake and remain required after publication (25.963916ms)
+✔ intermediate transitive originals hold proposal, review, publication and accepted use when missing or corrupt (127.706083ms)
+✖ wrong historical original and reordered version transitions hold; atomic change row order is irrelevant (12.947292ms)
+✔ intake immutable_entry validates identity as well as original snapshot bytes (11.249417ms)
+✖ literal reference-like JSON in intake remains literal (13.679125ms)
+✖ allowed post-proposal reconstruction intake checks transitive originals before review, publication and accepted use (48.495042ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 9
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 510.096875
+
+✖ failing tests:
+
+test at tests/operating-checkpoint.test.mjs:114:1
+✖ wrong historical original and reordered version transitions hold; atomic change row order is irrelevant (12.947292ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception.
+      at TestContext.<anonymous> (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/operating-intake-dependencies-2026-11-06/source/tests/operating-checkpoint.test.mjs:125:16)
+      at Test.runInAsyncScope (node:async_hooks:213:14)
+      at Test.run (node:internal/test_runner/test:1106:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:788:18)
+      at Test.postRun (node:internal/test_runner/test:1235:19)
+      at Test.run (node:internal/test_runner/test:1163:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /Legacy handover original missing or changed/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at tests/operating-checkpoint.test.mjs:137:1
+✖ literal reference-like JSON in intake remains literal (13.679125ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  4 !== 0
+  
+      at TestContext.<anonymous> (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/operating-intake-dependencies-2026-11-06/source/tests/operating-checkpoint.test.mjs:141:187)
+      at Test.runInAsyncScope (node:async_hooks:213:14)
+      at Test.run (node:internal/test_runner/test:1106:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:788:18)
+      at Test.postRun (node:internal/test_runner/test:1235:19)
+      at Test.run (node:internal/test_runner/test:1163:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 4,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/operating-checkpoint.test.mjs:151:1
+✖ allowed post-proposal reconstruction intake checks transitive originals before review, publication and accepted use (48.495042ms)
+  Error: Operating state Held: DIRTY reconstruction bookkeeping changed
+      at fail (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/operating-intake-dependencies-2026-11-06/source/plugins/soloco/runtime/operating-state.mjs:10:22)
+      at inputUnchanged (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/operating-intake-dependencies-2026-11-06/source/plugins/soloco/runtime/operating-state.mjs:343:221)
+      at operatingContext (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/operating-intake-dependencies-2026-11-06/source/plugins/soloco/runtime/operating-state.mjs:583:3)
+      at TestContext.<anonymous> (file:///Users/xiaoweili/Documents/Codex/SoloDev-reviews/operating-intake-dependencies-2026-11-06/source/tests/operating-checkpoint.test.mjs:156:97)
+      at Test.runInAsyncScope (node:async_hooks:213:14)
+      at Test.run (node:internal/test_runner/test:1106:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:788:18)
+      at Test.postRun (node:internal/test_runner/test:1235:19)
+      at Test.run (node:internal/test_runner/test:1163:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)

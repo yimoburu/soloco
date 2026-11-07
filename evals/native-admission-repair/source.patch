@@ -1,0 +1,155 @@
+diff --git a/docs/scoped-context.md b/docs/scoped-context.md
+index 6426ed6..f7ef152 100644
+--- a/docs/scoped-context.md
++++ b/docs/scoped-context.md
+@@ -144,6 +144,18 @@ and rechecks the complete receipt plus ordinary current freshness/independence.
+ Failures and rejected outputs remain retained. There is no separate global
+ semantic certificate, automatic retry or renewed allowance.
+ 
++Fresh native admission is separate from canonical receipt revalidation. For both
++single-packet and streamed scoped jobs, the worker checks timing, eligibility and
++independence before atomically storing the first native binding and delivery.
++At that transaction, a native previously retained in any job's
++`rejected_native_id` or `rejected_native_ids` cannot be newly bound. Failed
++observations remain data; missing-timing or aborted first responses bind nothing.
++An admitted stream continues under its own unchanged native; a changed native
++holds and is retained separately. Later failed observations cannot retroactively
++invalidate an earlier valid receipt or its immutable extraction reuse. Canonical
++validation retains its existing independence checks without this forward history
++scan. The temporal boundary is committed admission order, not timestamp ordering.
++
+ Every invocation remains capped at 600 seconds; the existing total job execution
+ deadline also remains binding, with no new window or extension. There is no fixed
+ 16-page cutoff for this opt-in stream. Transport completion does not establish
+diff --git a/plugins/soloco/runtime/scoped-context.mjs b/plugins/soloco/runtime/scoped-context.mjs
+index 86c9761..edf4ee4 100644
+--- a/plugins/soloco/runtime/scoped-context.mjs
++++ b/plugins/soloco/runtime/scoped-context.mjs
+@@ -170,7 +170,7 @@ export function scopedMaintenanceEligible(s,j){
+   return Boolean(s.paused===true&&j.role==='qa'&&!j.prototype_id&&!j.development_id&&!j.input_ids?.length&&!j.evidence_ids?.length&&a?.readonly===true&&!a.revoked_at&&same(a.owner,s.owner)&&a.controls_sha256===qualificationControlHash(s)&&text(a.source_instruction));
+ }
+ function live(s,j,x){if(j.epoch!==s.owner.epoch||!same(x.t.owner,s.owner)||x.t.controls_sha256!==qualificationControlHash(s)||s.paused&&!scopedMaintenanceEligible(s,j)||x.p.context_maintenance?.revoked_at)fail('owner/epoch/pause/revocation changed; regain eligibility with a newly authorized plan/target');}
+-function collectIdentities(s,values){const out=new Set(),seen=new Set(),todo=[...values];while(todo.length){const v=todo.pop();if(!v||typeof v!=='object'||seen.has(v))continue;seen.add(v);if(v.immutable_snapshot){todo.push(resolveSnapshot(s,v));continue;}if(v.immutable_entry){todo.push(resolveSnapshotEntry(s,v));continue;}if(v.job_id&&s.jobs?.[v.job_id])todo.push(s.jobs[v.job_id]);for(const [k,x] of Object.entries(v)){if(['author_instance','recorded_by','session_id','native_id','instance_id','probe_native_id','reviewer_native_id'].includes(k)&&text(x))out.add(x);if(x&&typeof x==='object')todo.push(x);}}return out;}
++function collectIdentities(s,values,{rejected=false}={}){const out=new Set(),seen=new Set(),todo=[...values];while(todo.length){const v=todo.pop();if(!v||typeof v!=='object'||seen.has(v))continue;seen.add(v);if(v.immutable_snapshot){todo.push(resolveSnapshot(s,v));continue;}if(v.immutable_entry){todo.push(resolveSnapshotEntry(s,v));continue;}if(v.job_id&&s.jobs?.[v.job_id])todo.push(s.jobs[v.job_id]);for(const [k,x] of Object.entries(v)){if(['author_instance','recorded_by','session_id','native_id','instance_id','probe_native_id','reviewer_native_id',...(rejected?['rejected_native_id']:[])].includes(k)&&text(x))out.add(x);if(rejected&&k==='rejected_native_ids'&&Array.isArray(x))for(const id of x)if(text(id))out.add(id);if(x&&typeof x==='object')todo.push(x);}}return out;}
+ function independent(s,j,native,x,proofs){
+   const banned=collectIdentities(s,[x.t.owner,x.record,x.p,resolveSnapshot(s,plan(s,x.p).c.original),resolveSnapshot(s,plan(s,x.p).c.projection),...(plan(s,x.p).c.producer_closure??(plan(s,x.p).c.producer?[plan(s,x.p).c.producer]:[])).map(r=>exact(s,r)),...(x.t.homes??[]).map(r=>exact(s,r)),...(x.t.dependencies??[]).map(r=>exact(s,r)),...(x.t.phase==='extract'?[]:[targetGlobal(s,x)]),...proofs.map(p=>p.job)]);
+   if(!text(native)||!text(j.instance_id)||banned.has(native)||banned.has(j.instance_id))fail('independent reviewer owns source/domain/authority');
+@@ -271,7 +271,16 @@ function assignment(s,j){
+   return {text:wire,hash:digest(wire),inputs:[],packet,qualification:{protocol:SCOPED_PROTOCOL,phase:x.t.phase,target:scopedReference(x.record),plan:x.t.plan,packet_sha256:digest(wire)}};
+ }
+ export function scopedMatches(s,j,hash){try{const x=targetInfo(s,j);live(s,j,x);return scopedAssignment(s,j).hash===hash;}catch{return false;}}
+-export function validateScopedStreamNative(s,j,native){return evaluate(()=>{const x=targetInfo(s,j);if(x.t.delivery_protocol!==SCOPED_STREAM)fail('stream native check requires explicit delivery protocol');live(s,j,x);independent(s,j,native,x,proofChildren(s,x));return true;});}
++// Forward-only admission, under the worker's binding transaction. Once bound,
++// the same job may continue; future failed observations cannot revoke its receipt.
++// Canonical revalidation deliberately uses independent(), never this history scan.
++export function validateScopedNativeAdmission(s,j,native){return evaluate(()=>{
++  const x=targetInfo(s,j);live(s,j,x);independent(s,j,native,x,proofChildren(s,x));
++  if(j.native_id){if(j.native_id!==native)fail('native reviewer changed within job');}
++  else if(collectIdentities(s,Object.values(s.jobs??{}).map(other=>({rejected_native_id:other.rejected_native_id,rejected_native_ids:other.rejected_native_ids})),{rejected:true}).has(native))fail('native reviewer reused earlier rejected observation');
++  return true;
++});}
++export function validateScopedStreamNative(s,j,native){return evaluate(()=>{const x=targetInfo(s,j);if(x.t.delivery_protocol!==SCOPED_STREAM)fail('stream native check requires explicit delivery protocol');return validateScopedNativeAdmission(s,j,native);});}
+ export function scopedDelivery(a,j,native,wire){bounded(wire,SCOPED_LIMITS.input_bytes,'native delivery');return {protocol:SCOPED_PROTOCOL,job_id:j.id,native_id:native,assignment_sha256:a.hash,target:a.qualification.target,plan:a.qualification.plan,wire,wire_sha256:digest(wire),complete:true};}
+ export function scopedProof(d,j){return {protocol:d?.protocol===SCOPED_STREAM?SCOPED_STREAM:SCOPED_PROTOCOL,delivery_sha256:sha(d),native_id:d.native_id,assignment_sha256:d.assignment_sha256,job:scopedReference(j,'job:'+j.id)};}
+ export function validateScopedOutput(raw){bounded(raw,SCOPED_LIMITS.output_wire_bytes,'native response');const e=JSON.parse(raw);bounded(e,SCOPED_LIMITS.output_bytes,'review output');closed(e,['content','messages','notices','review','qualification_result'],'envelope');closed(e.review,['verdict','reason','permitted_action'],'review');if(!Array.isArray(e.messages)||e.messages.length||!Array.isArray(e.notices)||e.notices.length||e.content!==e.qualification_result?.reason||['verdict','reason','permitted_action'].some(k=>e.review[k]!==e.qualification_result[k]))fail('review/envelope mismatch or extra output channels');return e;}
+diff --git a/plugins/soloco/runtime/worker.mjs b/plugins/soloco/runtime/worker.mjs
+index f763190..65c9d82 100644
+--- a/plugins/soloco/runtime/worker.mjs
++++ b/plugins/soloco/runtime/worker.mjs
+@@ -168,17 +168,16 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
+       if(session&&session!==output.native_id)throw Error('Supplemental read changed native identity');
+       if(context.stream){
+         if(!callTiming||controller.signal.aborted)throw Error('Scoped stream invocation timing/closure unproven');
+-        withStore(root,db=>{const current=db.read();scoped.validateScopedStreamNative(current,current.jobs[jobId],output.native_id);});
+         scopedStreamLedger??=createScopedStreamLedger(context,job,output.native_id);
+         const delivered=recordScopedStreamDelivery(scopedStreamLedger,context,job,output.native_id,request,callTiming,stamp());
+-        withStore(root,db=>db.transaction('job.scoped_stream_delivered',s=>{const current=eligibility(s);current.native_id=output.native_id;current.qualification_delivery=delivered;return s;}));
++        withStore(root,db=>db.transaction('job.scoped_stream_delivered',s=>{const current=eligibility(s);scoped.validateScopedStreamNative(s,current,output.native_id);current.native_id=output.native_id;current.qualification_delivery=delivered;return s;}));
+         partitionDelivery=delivered;
+         if(!partitionDelivery.complete){
+           validateScopedStreamAck(output.text,context,round);
+           session=output.native_id;request=context.stream.pages[round+1].wire;continue;
+         }
+       }else if(context.qualification){
+-        withStore(root,db=>db.transaction('job.partition_delivered',s=>{const current=eligibility(s);partitionDelivery=(scopedContext(context)?scoped.scopedDelivery:qualificationDelivery)(context,current,output.native_id,request);current.qualification_delivery=partitionDelivery;return s;}));
++        withStore(root,db=>db.transaction('job.partition_delivered',s=>{const current=eligibility(s);if(scopedContext(context)){if(!callTiming||controller.signal.aborted)throw Error('Scoped invocation timing/closure unproven');scoped.validateScopedNativeAdmission(s,current,output.native_id);current.native_id=output.native_id;}partitionDelivery=(scopedContext(context)?scoped.scopedDelivery:qualificationDelivery)(context,current,output.native_id,request);current.qualification_delivery=partitionDelivery;return s;}));
+       }
+       if(context.handover_evidence){
+         if(!output.native_id||output.native_id===target.author_instance||output.native_id===state.owner.session_id)throw Error('Handover review requires independent native identity');
+@@ -308,7 +307,7 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
+         // A failed scoped response is observed evidence, never a newly accepted
+         // reviewer identity. Earlier delivered identities and receipts survive
+         // failures before timing, cancellation or independence validation.
+-        if(output?.native_id){if(scopedContext(context))current.rejected_native_id=output.native_id;else current.native_id=output.native_id;}
++        if(output?.native_id){if(scopedContext(context)){current.rejected_native_ids=[...new Set([...(current.rejected_native_ids??[]),current.rejected_native_id,output.native_id].filter(Boolean))];current.rejected_native_id=output.native_id;}else current.native_id=output.native_id;}
+         if(output?.model_evidence)current.model_evidence=output.model_evidence;
+         if(artifact || context?.qualification&&typeof output?.text==='string') {
+           const rejected=context?.qualification?output.text:JSON.stringify(artifact);
+diff --git a/tests/scoped-context.test.mjs b/tests/scoped-context.test.mjs
+index 6f8b8d7..8fd8df1 100644
+--- a/tests/scoped-context.test.mjs
++++ b/tests/scoped-context.test.mjs
+@@ -678,6 +678,63 @@ test('recovery stream rejected observed identities never poison accepted extract
+   }
+ });
+ 
++test('forward native admission rejects earlier failed observations across single-packet and streamed jobs',async()=>{
++  for(const firstStream of [false,true])for(const nextStream of [false,true])for(const mode of ['missing-timing','aborted-first']){
++    const label=JSON.stringify({firstStream,nextStream,mode}),f=fixture(),es=await extraction(f),accepted=JSON.stringify(es[0].job);
++    const args=stream=>({...domainArgs(es),delivery_protocol:stream?streaming:undefined});
++    const abort=()=>{if(mode==='aborted-first')mutate(f,s=>{s.owner.epoch++;});};
++    const first=await run(f,args(firstStream),{native:'observed-N',omitTiming:mode==='missing-timing',modelHook:firstStream?undefined:abort,streamHook:firstStream?abort:undefined});
++    assert.equal(first.job.status,'failed',label);assert.equal(first.job.native_id,null,label);
++    assert.equal(first.job.rejected_native_id,'observed-N',label);assert.equal(first.review,undefined,label);
++    assert.deepEqual(first.job.rejected_native_ids,['observed-N'],label);assert.equal(first.job.qualification_delivery,undefined,label);
++    assert.equal(first.job.coordination_release.termination_confirmed,true,label);
++    if(mode==='aborted-first')f.epoch++;
++    const next=await run(f,args(nextStream),{native:'observed-N'});
++    assert.notEqual(next.job.id,first.job.id,label);assert.notEqual(next.target.id,first.target.id,label);
++    assert.equal(next.job.status,'failed',label);assert.match(next.job.error,/reused|observed|fresh/i,label);
++    assert.equal(next.job.native_id,null,label);assert.equal(next.review,undefined,label);
++    assert.deepEqual(next.job.rejected_native_ids,['observed-N'],label);assert.equal(next.job.qualification_delivery,undefined,label);
++    assert.equal(read(f).sessions[next.job.session_key].native_id,null,label);
++    const fresh=await run(f,args(nextStream),{native:'fresh-M'});
++    assert.equal(fresh.job.status,'completed',fresh.job.error);assert.equal(fresh.review.review.verdict,'Pass',label);
++    assert.equal(JSON.stringify(read(f).jobs[es[0].job.id]),accepted,label);
++    assert.equal(call(f,{action:'target',phase:'extract',unit_id:es[0].target.target.unit_id}).review_id,es[0].review.id,label);
++  }
++});
++
++test('single-packet rejected identities preserve older canonical extraction and never become bindings',async()=>{
++  for(const mode of ['missing-timing','aborted-first','nonindependent']){
++    const f=fixture(),es=await extraction(f),prior=JSON.stringify(es[0].job);
++    const failed=await run(f,{...domainArgs(es),delivery_protocol:undefined},{native:es[0].job.native_id,omitTiming:mode==='missing-timing',modelHook:()=>{if(mode==='aborted-first')mutate(f,s=>{s.owner.epoch++;});}});
++    assert.equal(failed.job.status,'failed',mode);assert.equal(failed.job.native_id,null,mode);
++    assert.equal(failed.job.rejected_native_id,es[0].job.native_id,mode);assert.equal(failed.review,undefined,mode);
++    assert.equal(read(f).sessions[failed.job.session_key].native_id,null,mode);
++    if(mode==='aborted-first')f.epoch++;
++    assert.equal(JSON.stringify(read(f).jobs[es[0].job.id]),prior,mode);
++    assert.equal(call(f,{action:'target',phase:'extract',unit_id:es[0].target.target.unit_id}).review_id,es[0].review.id,mode);
++  }
++});
++
++test('later changed stream identity is retained separately and barred from future admission in both protocols',async()=>{
++  for(const nextStream of [false,true]){
++    const f=fixture(),es=await extraction(f);
++    // Force multiple ranges while keeping subsequent single-packet assignments bounded.
++    mutate(f,s=>{s.records.peer={id:'peer',kind:'artifact',revision:1,content:'Fictional dependency: OPEN. '.repeat(2500)};});
++    const d=await run(f,{...domainArgs(es),dependency_ids:['peer']},{native:'bound-N',streamHook:p=>{
++      if(p.sequence===1)return {native_id:'changed-B',text:'{}'};
++    },modelHook:()=>assert.fail('Changed identity must stop before final semantic review')});
++    assert.equal(d.streamRequests.length,2);assert.equal(d.job.status,'failed',d.job.error);
++    assert.equal(d.job.native_id,'bound-N');assert.equal(d.job.rejected_native_id,'changed-B');
++    assert.deepEqual(d.job.rejected_native_ids,['changed-B']);assert.equal(d.review,undefined);
++    const args={...domainArgs(es),delivery_protocol:nextStream?streaming:undefined};
++    const rejected=await run(f,args,{native:'changed-B'});
++    assert.equal(rejected.job.status,'failed');assert.equal(rejected.job.native_id,null);assert.equal(rejected.review,undefined);
++    assert.match(rejected.job.error,/reused earlier rejected observation/);
++    const fresh=await run(f,args,{native:'fresh-M'});
++    assert.equal(fresh.job.status,'completed',fresh.job.error);assert.equal(fresh.review.review.verdict,'Pass');
++  }
++});
++
+ test('recovery stream CONTRACT DOUBLE: nonempty independent interfaces deliver peer homes, dependencies and closure',async()=>{
+   const f=fixture({count:2,domains:2,extra:{qualifier:'DISTANT_QUALIFIER'}});
+   mutate(f,s=>{s.records['home-D00'].content+='\nDISTANT_QUALIFIER: D00 may not retry unless D01 permission remains OPEN.';s.records.peer={id:'peer',kind:'artifact',revision:1,content:'Peer dependency: OPEN never renews retry. '+('🧪 保持 \\"\n'.repeat(6000))};});

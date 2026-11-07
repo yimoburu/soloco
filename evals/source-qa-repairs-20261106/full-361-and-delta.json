@@ -1,0 +1,33 @@
+{
+  "full_frozen_pin": "361241feba5fb6117c3bd75fedc19c1e2885df47",
+  "full_runs": {
+    "22": {
+      "totals": [
+        "# tests 828",
+        "# pass 827",
+        "# fail 1",
+        "# cancelled 0",
+        "# skipped 0",
+        "# duration_ms 549160.333125"
+      ],
+      "sha256": "951db84d3333445a446f9185d38e6f9f8c859b61ad124cbd542584da632a4ea4",
+      "log": "/private/tmp/soloco-operating-state-20261106/full-361241f-node22.tap",
+      "only_failure": "runtime-version-fence new0.7.3 model_selection eligibility; repaired and wholefamily passed in69/69 affected checks each runtime"
+    },
+    "25": {
+      "totals": [
+        "# tests 828",
+        "# pass 827",
+        "# fail 1",
+        "# cancelled 0",
+        "# skipped 0",
+        "# duration_ms 567429.457375"
+      ],
+      "sha256": "c9827a4f90d409457816503b326a6a15d80a84c28305dd4b9697d97fbe74ec05",
+      "log": "/private/tmp/soloco-operating-state-20261106/full-361241f-node25.tap",
+      "only_failure": "runtime-version-fence new0.7.3 model_selection eligibility; repaired and wholefamily passed in69/69 affected checks each runtime"
+    }
+  },
+  "repair": "Full frozen corpus canonical roots now supply contributor identities even outside the selected exclusion claim. Old version0.7.3 added to model selection eligibility at both admission and public capability seams.",
+  "scope": "No actual company acceptance, release, installation, migration or adoption; actualfit remains held."
+}

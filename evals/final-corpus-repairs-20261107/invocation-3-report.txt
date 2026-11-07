@@ -1,0 +1,66 @@
+{
+  "verdict": "Fail",
+  "frozen_commit": "19f51461aa0b6d41cef4a52d3ba6321dfb209802",
+  "frozen_tree": "a9b852b9597244132058d075dbaf797c655143bf",
+  "findings": [
+    {
+      "id": "F1",
+      "file": "plugins/soloco/runtime/scoped-context.mjs",
+      "line": 986,
+      "line_anchor": "validateScopedApply: claim:corpusClaim(s,x.p)",
+      "priority": "P1",
+      "trigger": "Apply a successfully qualified fresh corpus plan using the compact incidence derivation descriptor.",
+      "consequence": "corpusClaim reconstructs the full incidence relation, and validateScopedApply includes it in the returned preservation proof. engine.mjs scopedControl then persists that entire proof in context_classifications. Consequently, compact capsule storage does not prevent the derived approximately 109 MB closure from being newly persisted and subsequently copied into frozen operating evidence. The supplied no-persistence test checks capture, not this application path."
+    }
+  ],
+  "required_changes": [
+    {
+      "finding": "F1",
+      "change": "Use an explicitly versioned compact representation for newly stored preservation claims, binding the complete canonical claim and incidence derivation while reconstructing the full relation transiently for validation. Preserve issued inline/no-marker proofs, original snapshots, native delivery bytes and complete mapping checks.",
+      "verification": "Add a storage-backed capture-through-apply and operating-capture regression showing that fresh persisted proof envelopes do not embed the derived relation, while full canonical revalidation and tamper rejection remain intact."
+    }
+  ],
+  "prior28repairdispositions": [
+    {
+      "repair": "All-frozen unselected and historical rejected-contributor independence",
+      "status": "Retained through canonical frozen roots and version maps."
+    },
+    {
+      "repair": "Operating early rejected-negative retention",
+      "status": "Retained, including negative detection before preview clipping."
+    },
+    {
+      "repair": "Historical producer closure and canonical containment",
+      "status": "Retained; incidental metadata does not establish canonical producer containment."
+    },
+    {
+      "repair": "Stored immutable-entry versus resolved source identity",
+      "status": "Retained."
+    },
+    {
+      "repair": "Storage intake, checkpoint and transitive immutable audit",
+      "status": "Retained."
+    },
+    {
+      "repair": "Tree/index freshness, represented-v2 negatives, historical handover epochs and catalog/version compatibility",
+      "status": "Prior repaired paths retained in supplied source."
+    },
+    {
+      "repair": "Codex MCP configuration",
+      "status": "Present in supplied source."
+    }
+  ],
+  "sourceacceptancescope": {
+    "acceptance": "Withheld pending F1.",
+    "method": "Read all three exact frozen packets. No tools, commands, network, subagents or test execution.",
+    "dependencies": "No missing imported runtime module identified in the supplied runtime.",
+    "semantic_boundary": "Complete result delivery, structural reconstruction and canonical proof checks establish neither adequate meaning nor locality or permission. Missing material qualifiers, routes, originals or conditions must Hold and require explicit NEW widening, retaining failures and spent allowance.",
+    "authority": "No company action, migration, publication, installation, adoption, handover or resume is authorized. Supplied reports and fictional adapters are evidence only."
+  },
+  "remaininglivechecks": [
+    "Execute and retain final-pin mechanical, compatibility, provenance, negative-retention and storage-backed lifecycle checks after repair.",
+    "Measure actual-corpus complete request framing, output completeness, cumulative native capacity and interface fan-out.",
+    "Obtain independent native semantic qualification, operating publication, exact handover acceptance and guarded continuity checks under separately established authority.",
+    "Verify actual company SPEC v0.18 pins and current authority freshness separately."
+  ]
+}

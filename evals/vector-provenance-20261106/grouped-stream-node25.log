@@ -1,0 +1,21 @@
+(node:91954) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ nested file sections fit intrinsic batches without implying complete global request fit (480.715625ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 545.581458
+
+✖ failing tests:
+
+test at tests/scoped-corpus-runtime.test.mjs:294:1
+✖ nested file sections fit intrinsic batches without implying complete global request fit (480.715625ms)
+  TypeError: Cannot read properties of undefined (reading 'length')
+      at TestContext.<anonymous> (file:///private/tmp/soloco-operating-state-20261106/source/tests/scoped-corpus-runtime.test.mjs:306:73)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3)

@@ -1,0 +1,83 @@
+{
+  "verdict": "Fail",
+  "frozen_commit": "54560ceff468ec2135670e978bd3439a60b49371",
+  "frozen_tree": "417e15c9778bc3c95b17e45dcfeb96638f10fa95",
+  "findings": [
+    {
+      "id": "F1",
+      "file": "plugins/soloco/runtime/operating-state.mjs",
+      "line": "publicationEvidence: const value=contextSource(s,key)",
+      "priority": "P1",
+      "trigger": "Complete initial-proposed-homes preservation, then request an operating-state plan. bootstrapEvidence requires evidence_refs to contain JSON-encoded exact references.",
+      "consequence": "publicationEvidence treats each encoded reference as a literal source ID and throws provenance source missing. proposeOperatingState also assumes plain IDs. Supplying plain IDs instead fails bootstrapEvidence. The new initial-home grammar therefore cannot reach operating publication through the supplied runtime."
+    },
+    {
+      "id": "F2",
+      "file": "plugins/soloco/runtime/scoped-context.mjs",
+      "line": "createScopedTarget: return {...base,unit_id:args.unit_id,context_unit_ids:[...context_unit_ids],reviews:[]}",
+      "priority": "P2",
+      "trigger": "Call public company_context target with phase extract and current_home_inventory, including against a legacy range plan.",
+      "consequence": "The extraction branch returns or reuses a receipt before validating current_home_inventory. The public option is silently discarded instead of rejecting unsupported use."
+    }
+  ],
+  "requiredchanges": [
+    {
+      "finding": "F1",
+      "change": "Integrate runtime-proven initial-home exact references with operating provenance traversal and proposal validation. Verify ID, revision and hash while preserving stored-wrapper versus resolved-original bindings. Do not promote arbitrary JSON STRING data into authority or provenance edges.",
+      "verification": "Add a normalized-v4 initial-home lifecycle regression through preservation apply, operating proposal, independent publication and checkpoint validation, covering both frozen-source and canonical-extraction evidence references."
+    },
+    {
+      "finding": "F2",
+      "change": "Reject current_home_inventory on extraction targets before either target creation or receipt reuse; retain its existing policy and exact-inventory checks for non-extraction targets.",
+      "verification": "Add public-call regressions for legacy and corpus extraction, including the reuse path."
+    }
+  ],
+  "prior19fdisposition": {
+    "finding": "F1: newly persisted expanded incidence",
+    "status": "Repaired in supplied source",
+    "assessment": "Descriptor-backed apply now stores a versioned compact claim; operating capture uses validated source mappings without embedding the reconstructed incidence. Inline and unmarked claims retain their branch. Supplied storage-backed regression code covers apply and operating capture; I did not execute it."
+  },
+  "prior28repairdispositions": [
+    {
+      "repair": "All-frozen unselected and historical rejected-contributor independence",
+      "status": "Retained through canonical frozen roots and version maps."
+    },
+    {
+      "repair": "Early rejected-negative retention",
+      "status": "Retained, including detection before preview clipping and exact oversized-wire retention."
+    },
+    {
+      "repair": "Historical producer closure and canonical containment",
+      "status": "Retained; incidental company-shaped metadata does not establish canonical containment."
+    },
+    {
+      "repair": "Stored immutable-entry versus resolved-source identity",
+      "status": "Retained."
+    },
+    {
+      "repair": "Storage intake, checkpoint and transitive immutable audit",
+      "status": "Retained."
+    },
+    {
+      "repair": "Tree/index freshness, represented-v2 negatives, historical handover epochs and explicit compatibility allowlists",
+      "status": "No regression identified in supplied paths."
+    },
+    {
+      "repair": "Codex MCP configuration",
+      "status": "Present."
+    }
+  ],
+  "sourceacceptancescope": {
+    "acceptance": "Withheld pending F1 and F2.",
+    "method": "Read all three frozen packets. No tools, commands, network, subagents or test execution.",
+    "dependencies": "No missing imported runtime module identified. F1 is a missing integration between supplied reference grammars.",
+    "semantic_boundary": "Complete canonical results, physical context, external-expected reconstruction and recursive proof validation remain distinct from semantic adequacy. Missing originals, qualifiers, conditions or material interactions must Hold and require an explicit NEW widened target, preserving failed evidence and spent allowance.",
+    "authority": "No company action, migration, publication, installation, adoption, handover or resume permission. Reports, numeric bounds and fictional adapters establish neither actual native fit nor semantic acceptance."
+  },
+  "remaininglivechecks": [
+    "After repair, execute and retain final-pin Node 22/25 matrix, build and affected compatibility, provenance, rejection-retention and storage-backed lifecycle checks.",
+    "Measure actual complete request framing, semantic output completeness, cumulative native capacity and interface fan-out under original deadlines.",
+    "Obtain separately authorized independent semantic qualification, operating publication, exact handover acceptance and guarded continuity checks.",
+    "Verify actual company SPEC v0.18 pins and current authority freshness separately."
+  ]
+}

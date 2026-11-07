@@ -1,0 +1,319 @@
+TAP version 13
+# (node:36982) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: duplicates before and after pause cannot certify or overwrite the outstanding owner
+ok 1 - duplicates before and after pause cannot certify or overwrite the outstanding owner
+  ---
+  duration_ms: 575.912375
+  ...
+# Subtest: failed startup rechecks ownership when another worker claims before failure handling
+ok 2 - failed startup rechecks ownership when another worker claims before failure handling
+  ---
+  duration_ms: 132.410042
+  ...
+# Subtest: pause/revoke cancellation finalizes only confirmed closure, then permits exact storage recovery
+ok 3 - pause/revoke cancellation finalizes only confirmed closure, then permits exact storage recovery
+  ---
+  duration_ms: 1011.637792
+  ...
+# Subtest: queued cancellation closes truthfully without invoking an adapter, including revocation
+ok 4 - queued cancellation closes truthfully without invoking an adapter, including revocation
+  ---
+  duration_ms: 178.8955
+  ...
+# Subtest: late success after pause stays quarantined and retains exact evidence through recovery
+ok 5 - late success after pause stays quarantined and retains exact evidence through recovery
+  ---
+  duration_ms: 136.072958
+  ...
+# Subtest: rejected late output after cancellation retains evidence without accepting it
+ok 6 - rejected late output after cancellation retains evidence without accepting it
+  ---
+  duration_ms: 59.258667
+  ...
+# (node:36983) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: initialize in existing folder without touching user files, resume pinned company
+ok 7 - initialize in existing folder without touching user files, resume pinned company
+  ---
+  duration_ms: 23.92225
+  ...
+# Subtest: missing hook, path traversal and symbolic company directories are refused
+ok 8 - missing hook, path traversal and symbolic company directories are refused
+  ---
+  duration_ms: 0.824583
+  ...
+# Subtest: hook ignores unrelated populated projects; empty folder supplies CoS without creating company
+ok 9 - hook ignores unrelated populated projects; empty folder supplies CoS without creating company
+  ---
+  duration_ms: 1.45925
+  ...
+# Subtest: another chat cannot claim coordinator or amend its records
+ok 10 - another chat cannot claim coordinator or amend its records
+  ---
+  duration_ms: 11.5655
+  ...
+# Subtest: optimistic revisions preserve older draft and reject stale amendments
+ok 11 - optimistic revisions preserve older draft and reject stale amendments
+  ---
+  duration_ms: 15.468583
+  ...
+# Subtest: specialist artifact, direct peer message and notice survive a new connection
+ok 12 - specialist artifact, direct peer message and notice survive a new connection
+  ---
+  duration_ms: 25.292084
+  ...
+# Subtest: independent review binds exact author artifact version and does not approve Frame
+ok 13 - independent review binds exact author artifact version and does not approve Frame
+  ---
+  duration_ms: 22.5385
+  ...
+# Subtest: generation and review prompts assign bounded deliverable ownership on both hosts
+ok 14 - generation and review prompts assign bounded deliverable ownership on both hosts
+  ---
+  duration_ms: 131.236917
+  ...
+# Subtest: changed reviewed artifact quarantines late review
+ok 15 - changed reviewed artifact quarantines late review
+  ---
+  duration_ms: 41.634791
+  ...
+# Subtest: pause works from a founder hook and quarantines in-flight output
+ok 16 - pause works from a founder hook and quarantines in-flight output
+  ---
+  duration_ms: 38.601458
+  ...
+# Subtest: handover rejects active work, preserves records/notices, revokes old coordinator
+ok 17 - handover rejects active work, preserves records/notices, revokes old coordinator
+  ---
+  duration_ms: 138.548834
+  ...
+# Subtest: failed or malformed model output creates a notice and grants no success
+ok 18 - failed or malformed model output creates a notice and grants no success
+  ---
+  duration_ms: 18.110041
+  ...
+# Subtest: invalid envelopes retain precise rejected evidence and never partially publish or route
+ok 19 - invalid envelopes retain precise rejected evidence and never partially publish or route
+  ---
+  duration_ms: 97.326291
+  ...
+# Subtest: notice delivery, seeing, resolution, and authority remain distinct
+ok 20 - notice delivery, seeing, resolution, and authority remain distinct
+  ---
+  duration_ms: 21.438625
+  ...
+# Subtest: preferences require provenance and never mutate permission
+ok 21 - preferences require provenance and never mutate permission
+  ---
+  duration_ms: 10.137917
+  ...
+# Subtest: MCP validates arguments and does not expose arbitrary command execution
+ok 22 - MCP validates arguments and does not expose arbitrary command execution
+  ---
+  duration_ms: 0.372958
+  ...
+# Subtest: adapters preserve explicit native IDs without permission bypass flags
+ok 23 - adapters preserve explicit native IDs without permission bypass flags
+  ---
+  duration_ms: 0.245
+  ...
+# Subtest: real stdio MCP initializes and lists tools without creating company state
+ok 24 - real stdio MCP initializes and lists tools without creating company state
+  ---
+  duration_ms: 115.627916
+  ...
+# Subtest: dispatch launches a separate process and resumes that role through a second assignment
+ok 25 - dispatch launches a separate process and resumes that role through a second assignment
+  ---
+  duration_ms: 1190.332416
+  ...
+# Subtest: concurrent processes cannot both commit the same expected record revision
+ok 26 - concurrent processes cannot both commit the same expected record revision
+  ---
+  duration_ms: 144.314459
+  ...
+# Subtest: same chat cannot reuse a revoked epoch after a handover
+ok 27 - same chat cannot reuse a revoked epoch after a handover
+  ---
+  duration_ms: 69.926709
+  ...
+# Subtest: compatible runtime patches preserve pinned team, ownership and native sessions without adoption
+ok 28 - compatible runtime patches preserve pinned team, ownership and native sessions without adoption
+  ---
+  duration_ms: 2859.871042
+  ...
+# Subtest: unknown runtimes and tampered teams remain held despite patch compatibility
+ok 29 - unknown runtimes and tampered teams remain held despite patch compatibility
+  ---
+  duration_ms: 8.591417
+  ...
+# Subtest: assignment packs retain constraints, failed evidence, notices and named inputs without unrelated artifacts
+ok 30 - assignment packs retain constraints, failed evidence, notices and named inputs without unrelated artifacts
+  ---
+  duration_ms: 31.7425
+  ...
+# Subtest: new constraints, pending notices and recipient messages quarantine in-flight results
+ok 31 - new constraints, pending notices and recipient messages quarantine in-flight results
+  ---
+  duration_ms: 62.318458
+  ...
+# Subtest: notice presentation and seen bookkeeping do not invalidate an assignment
+ok 32 - notice presentation and seen bookkeeping do not invalidate an assignment
+  ---
+  duration_ms: 24.64225
+  ...
+# Subtest: changed queued dependencies are held before spending a model call
+ok 33 - changed queued dependencies are held before spending a model call
+  ---
+  duration_ms: 39.272417
+  ...
+# Subtest: oversized assignment context is held intact instead of silently truncated
+ok 34 - oversized assignment context is held intact instead of silently truncated
+  ---
+  duration_ms: 75.653167
+  ...
+# Subtest: unrelated artifacts do not invalidate the bounded assignment
+ok 35 - unrelated artifacts do not invalidate the bounded assignment
+  ---
+  duration_ms: 71.014542
+  ...
+# Subtest: legacy generator folders remain protected after retiring the generator
+ok 36 - legacy generator folders remain protected after retiring the generator
+  ---
+  duration_ms: 1.995042
+  ...
+# Subtest: company names are optional display labels independent of stable identity
+ok 37 - company names are optional display labels independent of stable identity
+  ---
+  duration_ms: 10.503042
+  ...
+# Subtest: renaming records founder intent while preserving company state and native sessions
+ok 38 - renaming records founder intent while preserving company state and native sessions
+  ---
+  duration_ms: 70.488667
+  ...
+# Subtest: rename requires current owner, current name, valid label and source instruction
+ok 39 - rename requires current owner, current name, valid label and source instruction
+  ---
+  duration_ms: 29.820208
+  ...
+# Subtest: rename waits for active assignments and does not resume a held company
+ok 40 - rename waits for active assignments and does not resume a held company
+  ---
+  duration_ms: 36.533
+  ...
+# Subtest: SoloCo can rebind the same founder chat after a plugin cache replacement
+ok 41 - SoloCo can rebind the same founder chat after a plugin cache replacement
+  ---
+  duration_ms: 71.035666
+  ...
+# Subtest: model catalog uses advertised choices and never offers hidden internal models
+ok 42 - model catalog uses advertised choices and never offers hidden internal models
+  ---
+  duration_ms: 406.148416
+  ...
+# Subtest: selected dispatch reaches the host, rotates on model/effort/reset, retains history and keeps reviewers independent
+ok 43 - selected dispatch reaches the host, rotates on model/effort/reset, retains history and keeps reviewers independent
+  ---
+  duration_ms: 3638.773083
+  ...
+# Subtest: unsupported and unavailable selected models fail visibly without fallback or stray calls
+ok 44 - unsupported and unavailable selected models fail visibly without fallback or stray calls
+  ---
+  duration_ms: 846.383625
+  ...
+# Subtest: pinned v0.5.0 preserves prior local capabilities but does not silently adopt selected-model behavior
+ok 45 - pinned v0.5.0 preserves prior local capabilities but does not silently adopt selected-model behavior
+  ---
+  duration_ms: 19.162875
+  ...
+# Subtest: pinned v0.6.0 retains selection and local capabilities after a compatible runtime update
+ok 46 - pinned v0.6.0 retains selection and local capabilities after a compatible runtime update
+  ---
+  duration_ms: 800.07925
+  ...
+# Subtest: pinned v0.6.1 retains selection and local capabilities after a compatible runtime update
+ok 47 - pinned v0.6.1 retains selection and local capabilities after a compatible runtime update
+  ---
+  duration_ms: 824.236875
+  ...
+# Subtest: pinned v0.6.2 retains selection and local capabilities after a compatible runtime update
+ok 48 - pinned v0.6.2 retains selection and local capabilities after a compatible runtime update
+  ---
+  duration_ms: 823.632584
+  ...
+# Subtest: pinned v0.6.3 retains selection and local capabilities after a compatible runtime update
+ok 49 - pinned v0.6.3 retains selection and local capabilities after a compatible runtime update
+  ---
+  duration_ms: 902.739625
+  ...
+# Subtest: pinned v0.6.4 retains selection and local capabilities after a compatible runtime update
+ok 50 - pinned v0.6.4 retains selection and local capabilities after a compatible runtime update
+  ---
+  duration_ms: 870.804458
+  ...
+# Subtest: pinned v0.6.5 retains selection and local capabilities after a compatible runtime update
+ok 51 - pinned v0.6.5 retains selection and local capabilities after a compatible runtime update
+  ---
+  duration_ms: 845.130083
+  ...
+# Subtest: pinned v0.6.6 retains selection and local capabilities after a compatible runtime update
+ok 52 - pinned v0.6.6 retains selection and local capabilities after a compatible runtime update
+  ---
+  duration_ms: 921.857
+  ...
+# Subtest: pinned v0.6.7 retains selection and local capabilities after a compatible runtime update
+ok 53 - pinned v0.6.7 retains selection and local capabilities after a compatible runtime update
+  ---
+  duration_ms: 893.070083
+  ...
+# Subtest: worker forwards the exact recorded selection and preserves separately attributed model evidence
+ok 54 - worker forwards the exact recorded selection and preserves separately attributed model evidence
+  ---
+  duration_ms: 20.365791
+  ...
+# Subtest: new assignment hashes bind selection and task metadata; legacy hashes remain compatible
+ok 55 - new assignment hashes bind selection and task metadata; legacy hashes remain compatible
+  ---
+  duration_ms: 43.864459
+  ...
+# Subtest: company_progress schema and read-only endpoint preserve status and expose equivalent safe formats
+ok 56 - company_progress schema and read-only endpoint preserve status and expose equivalent safe formats
+  ---
+  duration_ms: 34.428416
+  ...
+# Subtest: new dispatch metadata reaches the actual synthetic worker and changes assignment hashes only when present
+ok 57 - new dispatch metadata reaches the actual synthetic worker and changes assignment hashes only when present
+  ---
+  duration_ms: 632.176291
+  ...
+# Subtest: progress follows actual local controller candidate, software tests, independent QA and acceptance
+ok 58 - progress follows actual local controller candidate, software tests, independent QA and acceptance # SKIP Constrained Node startup failed: sandbox-exec: sandbox_apply: Operation not permitted. No unsandboxed fallback.
+  ---
+  duration_ms: 0.101208
+  ...
+# Subtest: company_progress observes successive synthetic parallel/candidate/test/QA/acceptance snapshots without replay
+ok 59 - company_progress observes successive synthetic parallel/candidate/test/QA/acceptance snapshots without replay
+  ---
+  duration_ms: 23.68475
+  ...
+# Subtest: explicit ordinary fresh after failure starts a new native with canonical inputs and retains every prior attempt
+ok 60 - explicit ordinary fresh after failure starts a new native with canonical inputs and retains every prior attempt
+  ---
+  duration_ms: 2597.7315
+  ...
+# Subtest: fresh assignment still quarantines output after current source, owner or pause changes
+ok 61 - fresh assignment still quarantines output after current source, owner or pause changes
+  ---
+  duration_ms: 50.268833
+  ...
+1..61
+# tests 61
+# suites 0
+# pass 60
+# fail 0
+# cancelled 0
+# skipped 1
+# todo 0
+# duration_ms 21028.052417

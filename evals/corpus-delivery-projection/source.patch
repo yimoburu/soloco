@@ -1,0 +1,213 @@
+diff --git a/docs/scoped-context.md b/docs/scoped-context.md
+index 7139a6a..a0cc33f 100644
+--- a/docs/scoped-context.md
++++ b/docs/scoped-context.md
+@@ -256,9 +256,9 @@ Complete intrinsic body batches share only extraction. No mechanical string subd
+ 
+ An optional `semantic_partition` exhaustively partitions physical occurrences with symmetric declared incidents. Domain targets require exact `selection_ids`, all required extracted bodies, ancestors, recursively required inbound context and every global/unknown selection. Partition labels grant no omission. Contextual results bind `claim_protocol`, the exact ordered `selected_source_ids`, `corpus_claim_sha256`, and `mapping_context_sha256`. Each mapping explicitly enumerates `source_ids` and `occurrence_ids` for one intrinsic item, exact typed homes, complete conditions and unresolved outcomes. A row covers only its explicitly enumerated Cartesian cells. Different contextual judgments require separate rows. The validator rejects missing, duplicate or substituted source/occurrence/item cells; intrinsic equality supplies no contextual judgment.
+ 
+-Corpus independent interface targets also require `domain_review_ids` naming every canonical domain conclusion. Dispatch domains first, then independent interfaces. Interfaces receive all domain conclusions, their complete evidence closure, exact homes and the full corpus census, including distant peers, section cuts, all inbound edges and ordered collections. Independent `interaction_completeness` accepts declared, undeclared/distant and global completeness against the exact census with a substantive reason. Missing evidence or uncertainty requires Blocked. Software coverage proves no meaning.
++Corpus independent interface targets also require `domain_review_ids` naming every canonical domain conclusion. Dispatch domains first, then independent interfaces. For new targets marked `delivery_schema: corpus-phase-delivery-v1`, interfaces receive ALL complete validated domain result objects (including every mapping, condition, unresolved outcome, original interface and interaction judgment), exact bound targets/selections/scopes and mapping occurrence vectors, complete local/incident/global raw occurrence context and extraction bundles/results, exact current homes/dependencies and corpus census. They compose independently accepted domain meaning to assess distant and undeclared effects; they do not recursively replay unrelated extraction leaves merely because those domains are canonical dependencies. Domain extraction bundles and results each appear once, in `extractions` (`result.items` contains the items). Unmarked issued targets retain the original recursive evidence delivery bytes and contracts. Unknown delivery markers Hold. Independent `interaction_completeness` accepts declared, undeclared/distant and global completeness against the exact census with a substantive reason. Missing evidence or uncertainty requires Blocked. Software coverage proves no meaning. A generic Pass, digest, producer boundary or completeness flag is insufficient. Reviewers must Block on missing/uncertain boundary meaning, a missing original or suspected distant interaction, name exact missing selection/group/source IDs and request explicit widening (including symmetric incidents or global scope) in a NEW bound target. The projection neither assesses meaning automatically nor grants scope or current authority.
+ 
+-One independent final aggregate receives the complete census, canonical extraction/domain/interface closure and current governing evidence. Its `source_mappings` binds each exact source to all accepted contextual mappings; source membership cannot be appended to a generic Pass. Every canonical receipt still validates independent identity, current producer/home/dependency/membership evidence, negatives/rejected outputs, authentic native delivery, deadlines and termination. Corpus governing checks use raw current governing records rather than recursively classifying the corpus's own boundary. Homes conservatively remain global.
++A marked independent final aggregate receives the complete census/frontier, complete domain AND interface result objects with exact targets/selections and mapping vectors, source mappings, full current home/dependency bodies, raw global authority and global/unknown occurrence context with its inbound closure. It does not automatically replay unrelated raw extraction leaves. The runtime still recursively verifies the entire canonical extraction/domain/interface proof graph; native semantic evidence delivery is a separate phase-specific projection. Assignment reconstruction, stream delivery and canonical acceptance bind the exact same marked representation. All originals remain retrievable through exact review/target/plan references. Its `source_mappings` binds each exact source to all accepted contextual mappings; source membership cannot be appended to a generic Pass. Every canonical receipt still validates independent identity, current producer/home/dependency/membership evidence, negatives/rejected outputs, authentic native delivery, deadlines and termination. Corpus governing checks use raw current governing records rather than recursively classifying the corpus's own boundary. Homes conservatively remain global.
+ 
+ `validateScopedApply` returns a distinct `coherent-corpus-preservation-v1` vector result for this branch. Existing public apply stores that single result atomically at the first source; it does not manufacture published single-source receipts. `validateCorpusPreservation(state, {integration_review_id})` is the narrow full-validator integration interface. `validateCorpusExclusion` checks the adopted vector and recomputes it before deriving a member mapping. `classificationFor` / `reviewedContext` recognize those validated mappings, validate once per vector within a read, and keep every home global. Invalid vectors, conflicting classifications or changed members fail closed. Operating bootstrap remains explicitly Held pending its owner's integration with this interface; this patch does not implement operating publication, immutable intake, checkpointing, field decomposition or `resume_handover`.
+ 
+@@ -266,4 +266,4 @@ One independent final aggregate receives the complete census, canonical extracti
+ 
+ The public corpus tests use a clearly fictional adapter through real public/store/worker delivery. Unpublished fixtures now assert one vector result, complete domain conclusions before independent interfaces, exact contextual mappings, and an explicit operating integration Hold. The previous per-source experimental fixtures and corpus-as-single-source operating fixture were incompatible with this new unreleased contract. Their published range/coherent-source counterparts are retained unchanged.
+ 
+-The unpublished corpus planner groups complete sections toward96KB intrinsic bodies; a larger indivisible section stays whole. This changes batching, not the48KB bounded request or12KB parsed-output limits. Explicit streaming is required when framing exceeds one request. Fit of a full native session and faithful complete output remain unproven until measured. Intrinsic extraction receives a bound corpus manifest; domain/interface reviewers receive the full source vector. Results bind deterministic source/mapping vectors by exact digest and count rather than echoing every identifier. Mapping set references expand to every original cell, with the same coverage/condition/independence checks as explicit arrays; mismatched references Hold. Final integration receives complete domain and interface conditions and current homes, with exact census accounting and retrievable originals; it does not replay raw sections already independently reviewed by the domain/interface closure. Missing meaning or a required original requires Blocked and a new exact target.
++The unpublished corpus planner groups complete sections toward96KB intrinsic bodies; a larger indivisible section stays whole. This changes batching, not the48KB bounded request or12KB parsed-output limits. Explicit streaming is required when framing exceeds one request. Fit of a full native session and faithful complete output remain unproven until measured. Intrinsic extraction receives a bound corpus manifest; domain/interface reviewers receive the full source vector. Results bind deterministic source/mapping vectors by exact digest and count rather than echoing every identifier. Mapping set references expand to every original cell, with the same coverage/condition/independence checks as explicit arrays; mismatched references Hold. Marked final integration receives complete domain and interface conditions and current homes, with exact census accounting and retrievable originals; unmarked targets still replay the legacy raw closure. Missing meaning or a required original requires Blocked and a new exact target.
+diff --git a/plugins/soloco/runtime/scoped-context.mjs b/plugins/soloco/runtime/scoped-context.mjs
+index 43ab0bb..359867d 100644
+--- a/plugins/soloco/runtime/scoped-context.mjs
++++ b/plugins/soloco/runtime/scoped-context.mjs
+@@ -13,6 +13,7 @@ import {buildLegacyCoherentPlan,decodeLegacyCoherentPlan} from './legacy-operati
+ export const COHERENT_PARTITIONER='coherent-source-v1';
+ export const CORPUS_PARTITIONER='coherent-corpus-body-v1';
+ export const CORPUS_PRESERVATION='coherent-corpus-preservation-v1';
++export const CORPUS_DELIVERY='corpus-phase-delivery-v1';
+ 
+ // A separate proof grammar. No scoped receipt can satisfy a tree/legacy gate.
+ export const SCOPED_PROTOCOL='scoped-context-v1';
+@@ -272,6 +273,34 @@ function corpusMappingContext(s,x,proofs){
+ }
+ function corpusDomainProofs(s,x){return (x.t.domain_reviews??[]).map(r=>canonical(s,r));}
+ function proofDependencies(s,x){return [...proofChildren(s,x),...corpusDomainProofs(s,x)];}
++// Native evidence is distinct from the full canonical proof DAG. Only newly
++// marked corpus targets use this representation; issued targets keep old bytes.
++function corpusDeliveryProjection(s,x,packet,proofs){
++  const {c,material}=plan(s,x.p),partition=c.semantic_partition;
++  const conclusion=p=>({review:scopedReference(p.record),target:{source:scopedReference(p.x.record),value:p.x.t},
++    result:p.result,mapping_occurrence_ids:corpusMappingContext(s,p.x,proofChildren(s,p.x)).occurrences.map(o=>o.id),
++    ...(partition?{selections:partition.selections.filter(q=>p.x.t.selection_ids.includes(q.id))}:{})});
++  if(x.t.phase==='applicability'){
++    // Full validated extraction result and exact bundle each appear once.
++    packet.extractions=proofs.map(p=>({review:scopedReference(p.record),reviewed_unit_bundle:p.record.reviewed_unit_bundle,result:p.result}));
++    if(x.t.interface_keys.length)packet.domain_conclusions=corpusDomainProofs(s,x).map(conclusion);
++  }else{
++    packet.domains=proofs.filter(p=>x.t.domain_review_ids.includes(p.record.id)).map(conclusion);
++    packet.interface_reviews=proofs.filter(p=>x.t.interface_review_ids.includes(p.record.id)).map(conclusion);
++    // Raw global/unknown occurrence clauses and inbound qualifiers remain raw.
++    const globals=partition?.selections.filter(q=>q.scope==='*').map(q=>q.id);
++    if(globals?.length)packet.global_occurrence_context=selectionContext(material,partition,globals);
++    packet.homes=x.t.homes.map(r=>({source:r,value:exact(s,r)}));
++    packet.dependencies=x.t.dependencies.map(r=>({source:r,value:exact(s,r)}));
++  }
++  packet.delivery_projection={schema:CORPUS_DELIVERY,phase:x.t.phase,
++    proof_dependencies:proofDependencies(s,x).map(p=>scopedReference(p.record)),
++    semantic_source_ids:packet.corpus_claim.selected_source_ids,
++    ...(x.t.phase==='applicability'?{extraction_items_path:'extractions[].result.items'}:{}),
++    canonical_validation:'The runtime recursively validates the FULL canonical graph, original native delivery, independence, currentness, negatives, timing and authority. Native evidence here is phase-specific; every original remains retrievable through its exact review/target/plan references. Software validation is not semantic acceptance.'};
++  packet.instructions+=' DELIVERY '+CORPUS_DELIVERY+': extraction items are in extractions[].result.items. Complete validated result objects are delivered without selecting semantic fields. Domain review must preserve every consequential condition, unresolved/negative/exhausted outcome and outward effect, including unknown or undeclared distant coupling. Interface review composes ALL independently accepted domain results, their exact selections/scopes, mapping occurrence vectors, typed homes and source identities, alongside COMPLETE local/incident/global raw evidence. Final review composes ALL domain and interface results, exact mappings, census/frontier, current home/dependency bodies and raw global authority. Unrelated raw extraction leaves are not automatically replayed. A Pass, digest, producer label or completeness flag alone never establishes adequate meaning. Independently compare all-domain meaning for distant/undeclared effects. If any boundary meaning, qualifier, original, interaction or current permission is missing or uncertain, return Blocked with exact missing selection/group/source IDs and request explicit widening of symmetric incidents/global scope or other expanded evidence in a NEW bound target. Never infer scope or authority, silently omit an unknown field, or treat preserved OPEN outcomes as permission. No automatic semantic assessment or widening occurs.';
++  return packet;
++}
+ function corpusSourceMappings(s,x,domains){
+   const claim=corpusClaim(s,x.p);
+   return claim.sources.map(({source})=>({source,mapping_sha256:sha(domains.map(d=>({review:scopedReference(d.record),context_sha256:corpusMappingContext(s,d.x,proofChildren(s,d.x)).sha256,mappings:d.result.mappings.filter(m=>mappingSet(m,'source',claim.selected_source_ids).includes(source.id))})))}));
+@@ -408,7 +437,7 @@ function reviewedUnitBundle(s,p,unitId,contextIds){
+   const description={source:v.source,projection_sha256:v.projection_sha256,primary:provenance(primary),supporting:supporting.map(provenance)};
+   return {primary,supporting,provenance:description,provenance_sha256:sha(description)};
+ }
+-function targetInfo(s,job){const record=source(s,job.review_of?.id),t=record.scoped_context_target;if(!t||t.protocol!==SCOPED_PROTOCOL||job.role!=='qa'||job.review_of.revision!==record.revision||job.inputs?.length||job.supplemental_sources?.length||job.prototype_id||job.development_id)fail('invalid separate QA target');const p=exact(s,t.plan),{v}=plan(s,p);if(t.delivery_protocol!==undefined&&(t.delivery_protocol!==SCOPED_STREAM||t.phase==='extract'&&![COHERENT_PARTITIONER,CORPUS_PARTITIONER].includes(v.partitioner)))fail('invalid prospective delivery protocol');return {record,t,p,v};}
++function targetInfo(s,job){const record=source(s,job.review_of?.id),t=record.scoped_context_target;if(!t||t.protocol!==SCOPED_PROTOCOL||job.role!=='qa'||job.review_of.revision!==record.revision||job.inputs?.length||job.supplemental_sources?.length||job.prototype_id||job.development_id)fail('invalid separate QA target');const p=exact(s,t.plan),{v}=plan(s,p);if(t.delivery_protocol!==undefined&&(t.delivery_protocol!==SCOPED_STREAM||t.phase==='extract'&&![COHERENT_PARTITIONER,CORPUS_PARTITIONER].includes(v.partitioner)))fail('invalid prospective delivery protocol');if(t.delivery_schema!==undefined&&(t.delivery_schema!==CORPUS_DELIVERY||v.partitioner!==CORPUS_PARTITIONER||t.phase==='extract'))fail('invalid corpus delivery schema');return {record,t,p,v};}
+ export function isScopedJob(s,j){return Boolean(s.records?.[typeof j.review_of==='string'?j.review_of:j.review_of?.id]?.scoped_context_target);}
+ export function scopedMaintenanceEligible(s,j){
+   const target=s.records?.[typeof j.review_of==='string'?j.review_of:j.review_of?.id],p=s.records?.[target?.scoped_context_target?.plan?.id],a=p?.context_maintenance;
+@@ -524,10 +553,11 @@ function assignment(s,j){
+   }
+   packet.response_shape=shape(x);packet.response_envelope={content:'exact result.reason',messages:[],notices:[],review:{verdict:'same as result',reason:'same as result',permitted_action:'same as result'},qualification_result:'response_shape'};
+   if(x.t.delivery_protocol===SCOPED_STREAM||x.v.partitioner===CORPUS_PARTITIONER&&x.t.phase!=='extract'){
+-    // Complete canonical artifact closure, including immutable extraction
+-    // bundles, reaches the SAME reviewer. References never substitute for bodies.
++    // Unmarked targets retain complete recursive native evidence delivery.
++    // Marked corpus targets separate native evidence from canonical validation.
+     const closure=new Map();function visit(p){if(closure.has(p.record.id))return;closure.set(p.record.id,{review:scopedReference(p.record),value:p.record});for(const child of proofDependencies(s,p.x))visit(child);}
+-    for(const p of proofDependencies(s,x))visit(p);packet.reference_evidence=[...closure.values()];
++    if(x.t.delivery_schema===CORPUS_DELIVERY)packet=corpusDeliveryProjection(s,x,packet,proofs);
++    else {for(const p of proofDependencies(s,x))visit(p);packet.reference_evidence=[...closure.values()];}
+     if(x.t.delivery_protocol!==SCOPED_STREAM){boundedCoherent(packet,SCOPED_LIMITS.input_bytes,'complete corpus evidence');const wire=json(packet);return {text:wire,hash:digest(wire),inputs:[],packet,qualification:{protocol:SCOPED_PROTOCOL,phase:x.t.phase,target:scopedReference(x.record),plan:x.t.plan,packet_sha256:digest(wire)}};}
+     const stream=buildScopedStream(packet,x.t.plan),wire=stream.pages[0].wire;
+     return {text:wire,hash:digest(wire),inputs:[],packet,stream,qualification:{protocol:SCOPED_PROTOCOL,delivery_protocol:SCOPED_STREAM,phase:x.t.phase,target:scopedReference(x.record),plan:x.t.plan,packet_sha256:stream.manifest.body_sha256}};
+@@ -587,7 +617,7 @@ function canonical(s,ref){
+ export function createScopedTarget(s,args){return evaluate(()=>{
+   const p=source(s,args.plan_id),{v}=plan(s,p),phase=args.phase;if(!['extract','applicability','integration'].includes(phase))fail('choose extract, applicability or integration');
+   if(args.delivery_protocol!==undefined&&(args.delivery_protocol!==SCOPED_STREAM||phase==='extract'&&![COHERENT_PARTITIONER,CORPUS_PARTITIONER].includes(v.partitioner)))fail('stream delivery is opt-in for NEW non-extraction targets only');
+-  const base={protocol:SCOPED_PROTOCOL,phase,plan:scopedReference(p),owner:{...s.owner},controls_sha256:qualificationControlHash(s),...(args.delivery_protocol?{delivery_protocol:args.delivery_protocol}:{})};
++  const base={protocol:SCOPED_PROTOCOL,phase,plan:scopedReference(p),owner:{...s.owner},controls_sha256:qualificationControlHash(s),...(args.delivery_protocol?{delivery_protocol:args.delivery_protocol}:{}),...(v.partitioner===CORPUS_PARTITIONER&&phase!=='extract'?{delivery_schema:CORPUS_DELIVERY}:{})};
+   if(phase==='extract'){
+     const context_unit_ids=Object.hasOwn(args,'context_unit_ids')?args.context_unit_ids:[],bundle=reviewedUnitBundle(s,p,args.unit_id,context_unit_ids);
+     // Reuse only an exact completed canonical worker receipt, never a model flag.
+diff --git a/tests/scoped-corpus-runtime.test.mjs b/tests/scoped-corpus-runtime.test.mjs
+index bea4fb1..198b212 100644
+--- a/tests/scoped-corpus-runtime.test.mjs
++++ b/tests/scoped-corpus-runtime.test.mjs
+@@ -43,7 +43,7 @@ function contractReview(p){
+     r.items=[{id:'coherent-occurrence',kind:'boundary',text:'Fictional occurrence '+u.id+' retains all local restrictions and remains OPEN; no current permission.',scope:'*',provenance:b.provenance_sha256,interfaces:[u.required_interface]}];
+     r.unit_id=u.id;r.unit_sha256=sha(u);r.reviewed_unit_bundle_sha256=sha(b);
+   }else if(p.phase==='applicability'){
+-    const all=p.extractions.flatMap(e=>e.items.map(item=>({key:e.review.id+'/'+item.id,item}))).filter(i=>p.item_keys.includes(i.key));
++    const all=p.extractions.flatMap(e=>(e.result?.items??e.items).map(item=>({key:e.review.id+'/'+item.id,item}))).filter(i=>p.item_keys.includes(i.key));
+     r.summary='FICTIONAL ADAPTER: all fixture occurrences and inbound contexts reconciled; all restrictions remain OPEN.';
+     r.mappings=all.flatMap(({key})=>(p.corpus_claim?p.corpus_claim.selected_source_ids:[null]).map(sourceId=>({item:key,...(p.corpus_claim?{source_ids:[sourceId],occurrence_ids:p.mapping_occurrence_ids,context_sha256:p.mapping_context_sha256,typed_homes:p.typed_homes,conditions:'FICTIONAL contextual judgment for '+sourceId+': '+(sourceId==='alias'?'DENY even with consent':'ALLOW only after new consent')+'; every distinct physical ancestor remains binding; LATE_NO_EXPORT overrides all local permission.',unresolved_outcomes:'OPEN remains OPEN; failures retained; retries exhausted; no execution or export permission.'}:{}),...(p.mapping_selection_ids?{selection_ids:p.mapping_selection_ids}:{}),status:'represented',homes:p.homes.map(h=>h.source.id),reason:'Fictional complete source conditions preserved, with all occurrence differences and OPEN restrictions.'})));
+     if(p.corpus_claim?.selected_source_ids?.length===1)for(const mapping of r.mappings){mapping.source_set=structuredClone(p.mapping_sets.source_set);delete mapping.source_ids;}
+@@ -53,8 +53,9 @@ function contractReview(p){
+   }else{r.summary='FICTIONAL ADAPTER: independently scripted complete integration, no action permission.';r.unreviewed_interfaces=[];}
+   return envelope(r);
+ }
+-async function run(f,args,{review=contractReview,native,modelHook,streamHook,omitTiming=false}={}){
++async function run(f,args,{review=contractReview,native,modelHook,streamHook,omitTiming=false,legacy=false}={}){
+   const t=call(f,{action:'target',...args,plan_id:args.plan_id??f.plan_id});if(t.reused)return t;
++  if(legacy)mutate(f,s=>{delete s.records[t.id].scoped_context_target.delivery_schema;});
+   const queued=engine.dispatch({...f,role:'qa',review_of:t.id,task:'Independent scoped contract review.'},'codex',{check:()=>({available:true,authenticated:true,version:'contract-double'}),launch:()=>({on(){},unref(){}})});
+   const streamParts=[],streamRequests=[];
+   await work(f.root,queued.id,async(host,session,prompt,dir,timeout,selection,options)=>{
+@@ -239,7 +240,7 @@ test('FICTIONAL corpus preservation feeds independently reviewed operating publi
+ });
+ 
+ // Selection tests remain fictional contracts, never model-authored acceptance.
+-async function semanticFixture(){
++async function semanticFixture({peers=0,inbound=false}={}){
+   const {buildLegacyCoherentPlan}=await import('../plugins/soloco/runtime/legacy-operating.mjs');
+   const f=fixture({domains:3});
+   mutate(f,s=>{delete s.records[f.plan_id];
+@@ -247,12 +248,14 @@ async function semanticFixture(){
+       {id:'local-a',ancestor:'ALLOW only after consent',body:{id:'shared',content:'SAME_BODY remains OPEN'}},
+       {id:'local-b',ancestor:'DENY even with consent',body:{id:'shared',content:'SAME_BODY remains OPEN'}}]};
+     s.records.archive={id:'archive',revision:1,kind:'artifact',content:'UNRELATED_ARCHIVE '+('archive evidence '.repeat(250))};
+-    s.records.late={id:'late',revision:1,kind:'decision',unknown_qualifier:'LATE_NO_EXPORT global prohibition'};
++    s.records.late={id:'late',revision:1,kind:'decision',unknown_qualifier:'LATE_NO_EXPORT global prohibition; UNKNOWN; FAILED; allowance EXHAUSTED'};
++    for(let n=0;n<peers;n++)s.records['peer-'+n]={id:'peer-'+n,revision:1,kind:'artifact',content:'DISTANT_RAW_SENTINEL_'+n+' '+('disjoint leaf '.repeat(900))};
++    if(inbound){const original=retainSnapshot(s,{id:'inbound-original',content:'INBOUND_ORIGINAL_OPEN'});s.records.old.locals[0].original=original;delete s.records.old.locals[0].body;delete s.records.old.locals[1].body;s.records.bridge={id:'bridge',revision:1,kind:'artifact',condition:'INBOUND_DENY_UNTIL_NEW_CONSENT',original};}
+     for(const h of ['home-D00','home-D01','home-D02'])s.records[h].content='GLOBAL: no execution; LATE_NO_EXPORT; SAME_BODY remains OPEN; ALLOW only after consent; DENY even with consent; archive retained.';
+   });
+   const material=buildLegacyCoherentPlan(read(f));
+-  const selections=['global','A','B','archive'].map(id=>({id,scope:id==='global'?'*':id,occurrence_ids:[],incident_ids:[]}));
+-  for(const o of material.occurrences){const key=o.path.startsWith('/records/old/locals/0')||o.path.startsWith('/records/home-D00')?'A':o.path.startsWith('/records/old/locals/1')||o.path.startsWith('/records/home-D01')?'B':o.path.startsWith('/records/archive')||o.path.startsWith('/records/home-D02')?'archive':'global';selections.find(q=>q.id===key).occurrence_ids.push(o.id);}
++  const selections=['global','A','B','archive',...Array.from({length:peers},(_,n)=>'peer-'+n)].map(id=>({id,scope:id==='global'?'*':id,occurrence_ids:[],incident_ids:[]}));
++  for(const o of material.occurrences){const peer=selections.find(q=>q.id.startsWith('peer-')&&o.path.startsWith('/records/'+q.id));const key=o.document.kind==='snapshot-original'?'A':peer?peer.id:o.path.startsWith('/records/bridge')?'B':o.path.startsWith('/records/old/locals/0')||o.path.startsWith('/records/home-D00')?'A':o.path.startsWith('/records/old/locals/1')||o.path.startsWith('/records/home-D01')?'B':o.path.startsWith('/records/archive')||o.path.startsWith('/records/home-D02')?'archive':'global';selections.find(q=>q.id===key).occurrence_ids.push(o.id);}
+   const partition={plan_sha256:material.plan_sha256,selections};
+   const p=call(f,{action:'plan',protocol,partitioner:scoped.CORPUS_PARTITIONER,source_id:'old',selected_source_ids:['old'],semantic_partition:partition});f.plan_id=p.id;
+   return {f,partition,material};
+@@ -296,6 +299,59 @@ test('declared distant incident peer cannot be omitted by proposed local scope',
+   await assert.rejects(run(f,{phase:'applicability',selection_ids:['A'],extraction_review_ids:es.filter(e=>a.intrinsic_batches.includes(e.target.target.unit_id)).map(e=>e.review.id),counterpart_ids:['home-D00'],context_scope:'*'}),/omitted declared incident peer/);
+ });
+ 
++function projectionFixtureReview(p){
++  const e=contractReview(p);e.qualification_result.reason='FICTIONAL fixture judgment.';
++  if(p.phase==='applicability'){e.qualification_result.summary='FICTIONAL complete contextual meaning; no permission.';for(const m of e.qualification_result.mappings){m.occurrence_set=structuredClone(p.mapping_sets.occurrence_set);delete m.occurrence_ids;m.reason='FICTIONAL preserved.';m.conditions='ALLOW after consent; DENY with consent; LATE_NO_EXPORT.';m.unresolved_outcomes='OPEN; UNKNOWN; FAILED; EXHAUSTED; no permission.';}}
++  return envelope(e.qualification_result);
++}
++
++test('FICTIONAL phase delivery preserves all boundary meaning as disjoint raw partitions grow',async t=>{
++  for(const peers of [0,2]){
++    const {f,partition}=await semanticFixture({peers,inbound:true});
++    const workload=scoped.inspectCorpusWorkload(read(f),{plan_id:f.plan_id}),es=await extracts(f),ds=[],irs=[],args=[];
++    for(const selection of workload.selections){
++      const a={phase:'applicability',selection_ids:[selection.id],extraction_review_ids:es.filter(e=>selection.intrinsic_batches.includes(e.target.target.unit_id)).map(e=>e.review.id),counterpart_ids:[selection.id==='B'?'home-D01':selection.id==='A'||selection.id==='global'?'home-D00':'home-D02'],context_scope:'*',delivery_protocol:scoped.SCOPED_STREAM};args.push(a);
++      const d=await run(f,a,{review:p=>{const e=projectionFixtureReview(p);e.qualification_result.summary+=' BOUNDARY_'+selection.id+' has a distant unknown outward effect; no execution.';for(const m of e.qualification_result.mappings)m.conditions+=' BOUNDARY_'+selection.id;return e;}});
++      assert.equal(d.job.status,'completed',selection.id+': '+d.job.error);ds.push(d);
++      assert.equal(d.packet.delivery_projection.schema,scoped.CORPUS_DELIVERY);
++      assert.equal(d.packet.reference_evidence,undefined);
++      for(const extraction of d.packet.extractions){const original=es.find(e=>e.review.id===extraction.review.id);assert.deepEqual(extraction.result,original.review.qualification_result);assert.deepEqual(extraction.reviewed_unit_bundle,original.review.reviewed_unit_bundle);}
++    }
++    for(const a of args){const ir=await run(f,{...a,counterpart_ids:['home-D00','home-D01','home-D02'],domain_review_ids:ds.map(d=>d.review.id),interface_keys:ds[args.indexOf(a)].review.qualification_result.interfaces.map(i=>i.key)},{review:projectionFixtureReview});assert.equal(ir.job.status,'completed',ir.job.error);irs.push(ir);}
++    const final=await run(f,{phase:'integration',delivery_protocol:scoped.SCOPED_STREAM,domain_review_ids:ds.map(d=>d.review.id),interface_review_ids:irs.map(d=>d.review.id),counterpart_ids:['home-D00','home-D01'],dependency_ids:['home-D02']});assert.equal(final.job.status,'completed',final.job.error);
++    const local=irs[1],wire=JSON.stringify(local.packet),finalWire=JSON.stringify(final.packet);
++    for(const sentinel of ['UNRELATED_ARCHIVE',...Array.from({length:peers},(_,n)=>'DISTANT_RAW_SENTINEL_'+n)]){assert.ok(!wire.includes(sentinel),sentinel);assert.ok(!finalWire.includes(sentinel),sentinel);assert.ok(ds.some(d=>JSON.stringify(d.packet).includes(sentinel)),'original raw delivered to its domain');}
++    for(const required of ['ALLOW only after consent','INBOUND_ORIGINAL_OPEN','INBOUND_DENY_UNTIL_NEW_CONSENT','LATE_NO_EXPORT','UNKNOWN','FAILED','EXHAUSTED'])assert.ok(wire.includes(required),required);
++    assert.ok(local.packet.occurrence_context.snapshot_inbound.length>0);
++    for(const packet of [local.packet,final.packet]){
++      const conclusions=packet.domain_conclusions??packet.domains;assert.equal(conclusions.length,ds.length);
++      for(const d of ds){const c=conclusions.find(c=>c.review.id===d.review.id);assert.deepEqual(c.result,d.review.qualification_result);assert.deepEqual(c.target.value,read(f).records[d.target.id].scoped_context_target);assert.deepEqual(c.mapping_occurrence_ids,d.packet.mapping_occurrence_ids);assert.deepEqual(c.selections,[partition.selections.find(q=>q.id===args[ds.indexOf(d)].selection_ids[0])]);assert.ok(JSON.stringify(c.result).includes('BOUNDARY_'+d.packet.mapping_selection_ids[0]));}
++      assert.ok(packet.global_rules.governing.some(g=>g.source.id==='late'));
++    }
++    for(const ir of irs)assert.deepEqual(final.packet.interface_reviews.find(c=>c.review.id===ir.review.id).result,ir.review.qualification_result);
++    assert.ok(final.packet.global_occurrence_context.sections.length>0);assert.equal(final.packet.homes.length,2);assert.deepEqual(final.packet.dependencies[0].value,read(f).records['home-D02']);
++    const state=read(f);assert.equal(scoped.validateCorpusPreservation(state,{integration_review_id:final.review.id}).protocol,scoped.CORPUS_PRESERVATION);
++    const invalidSchema=inheritSnapshots(state,structuredClone(state));invalidSchema.records[local.target.id].scoped_context_target.delivery_schema='unknown';assert.throws(()=>scoped.scopedAssignment(invalidSchema,invalidSchema.jobs[local.job.id]),/invalid corpus delivery schema/);
++    for(const edit of [s=>s.records[ds.at(-1).review.id].qualification_result.mappings.pop(),s=>s.jobs[es.at(-1).job.id].native_id='changed-native',s=>s.jobs[ds.at(-1).job.id].qualification_delivery.complete=false,s=>s.records.late.unknown_qualifier='changed global',s=>s.records[local.target.id].scoped_context_target.delivery_schema='unknown-schema']){const bad=inheritSnapshots(state,structuredClone(state));edit(bad);assert.throws(()=>scoped.validateCorpusPreservation(bad,{integration_review_id:final.review.id}),/hold|changed/i);}
++    t.diagnostic(JSON.stringify({fictional_only:true,peers,local_interface_bytes:bytes(local.packet),final_bytes:bytes(final.packet),local_raw_bytes:bytes(local.packet.extractions),all_extraction_bytes:es.reduce((n,e)=>n+bytes(e.review.reviewed_unit_bundle),0),local_pages:local.streamRequests.length,final_pages:final.streamRequests.length,semantic_acceptance:false,native_fit:'unproven'}));
++  }
++});
++
++test('FICTIONAL unmarked corpus targets reconstruct the legacy recursive delivery contract',async()=>{
++  const f=corpusFixture(),es=await extracts(f),args={phase:'applicability',extraction_review_ids:es.map(e=>e.review.id),counterpart_ids:['home-D00'],context_scope:'*',delivery_protocol:scoped.SCOPED_STREAM};
++  const d=await run(f,args,{legacy:true,review:corpusReview});assert.equal(d.job.status,'completed',d.job.error);
++  const ir=await run(f,{...args,domain_review_ids:[d.review.id],interface_keys:d.review.qualification_result.interfaces.map(i=>i.key)},{legacy:true,review:corpusReview});assert.equal(ir.job.status,'completed',ir.job.error);
++  const i=await run(f,{phase:'integration',delivery_protocol:scoped.SCOPED_STREAM,domain_review_ids:[d.review.id],interface_review_ids:[ir.review.id],counterpart_ids:['home-D00']},{legacy:true});assert.equal(i.job.status,'completed',i.job.error);
++  const state=read(f);
++  for(const phase of [d,ir,i]){
++    assert.equal(state.records[phase.target.id].scoped_context_target.delivery_schema,undefined);assert.equal(phase.packet.delivery_projection,undefined);
++    for(const e of es)assert.deepEqual(phase.packet.reference_evidence.find(p=>p.review.id===e.review.id).value,e.review);
++    assert.deepEqual(scoped.scopedAssignment(state,state.jobs[phase.job.id]).packet,phase.packet);
++    if(process.env.CORPUS_BASELINE_MODULE){const baseline=await import(process.env.CORPUS_BASELINE_MODULE);const before=baseline.scopedAssignment(state,state.jobs[phase.job.id]),after=scoped.scopedAssignment(state,state.jobs[phase.job.id]);assert.deepEqual(after,before,'exact assignment, qualification and stream bytes against pinned source');}
++  }
++  assert.equal(scoped.validateCorpusPreservation(state,{integration_review_id:i.review.id}).protocol,scoped.CORPUS_PRESERVATION);
++});
++
+ test('nested formatting/escape variant file sections fit intrinsic batches without implying complete global request fit',async t=>{
+   const {buildLegacyCoherentPlan}=await import('../plugins/soloco/runtime/legacy-operating.mjs');
+   const sources={'a.mjs':'a'.repeat(21650),'b.mjs':'b'.repeat(17056),'c.mjs':'c'.repeat(12952)};

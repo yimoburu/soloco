@@ -1,0 +1,36 @@
+{
+  "authority": "READONLY actual proposed capsule sizing only; in-memory diagnostic plan wrapper deleted before consistency check. No persisted company plans/targets/jobs/receipts, nativecalls, bodiesexport, acceptance/publication/adoption/resume",
+  "snapshot": {
+    "revision": 1052,
+    "event_sequence": 1053,
+    "logical_sha256": "980bedfc4c6d55f4c667b04f313566da295f15f2a56b749b8b1986d24ef4ce83",
+    "immutable_readset_sha256": "a1f8fc69ef7ad1612295a02bfca13187a7e16e6b85b91c2bcbc40200956ae9ed"
+  },
+  "source_pins": {
+    "snapshot.mjs": "f822adc27fe06921b73ee923e967c1d36af3528b2d22f3425cbccdbf8fd477c1",
+    "scoped-context.mjs": "f44f66a845a97a189dbc00c1f0e12d9a9d013d65cdcab62e8b1b1e145de48e9f",
+    "operating-state.mjs": "26ce74f75f9a2468b0697603f546a7cde3d7368a4b65f5458f393c8983451f18",
+    "corpus-structure.mjs": "db63be6ae2504344c161fb512783f8940ed5f6f278dafa1f6cba16f63e71c8d8"
+  },
+  "sources": 336,
+  "groups": 7150,
+  "occurrences": 78453,
+  "stored_descriptor_bytes": 309,
+  "capsule_bytes": 161267,
+  "counterfactual_inline_capsule_bytes": 109151376,
+  "full_reconstructed_relation_bytes": 108990418,
+  "full_reconstructed_relation_sha256": "a7cfce73ed56604ac70a96d62f134bbf8eb589c8d6f04492469a9ae58411c0a6",
+  "conservative_sources": 148,
+  "unowned_occurrences": 56,
+  "new_staged_immutable_blobs": 3,
+  "new_staged_total_bytes": 100964708,
+  "new_staged_largest_bytes": 52188678,
+  "derived_relation_not_stored": true,
+  "warm_inspect_ms": 6796,
+  "elapsed_ms": 16071,
+  "peak_rss_bytes": 1912225792,
+  "semantic_acceptance": false,
+  "complete_native_fit": null,
+  "source_bodies_exported": false,
+  "state_events_immutables_and_source_unchanged": true
+}

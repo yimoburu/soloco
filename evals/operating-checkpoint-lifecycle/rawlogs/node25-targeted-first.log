@@ -1,0 +1,271 @@
+(node:81961) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ missing production intake provider is fail closed (0.538625ms)
+✔ initial unknown legacy is never relabeled accepted (22.379042ms)
+✔ immutable accepted home survives replacement; new global restriction holds ordinary but complete delta repair publishes (27.517791ms)
+✔ successor exact base and concurrent semantic intake including reverted intake hold (45.173042ms)
+✔ missing original, changed producer, rejected negative, expiry and unknown nested producer hold (58.60425ms)
+✔ canonical known historical evidence freezes before bookkeeping; nested originals remain checked (30.303959ms)
+(node:81962) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ accepted historical publication proof survives an owner epoch change without admitting old in-flight work (695.297334ms)
+✖ public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning (236.677333ms)
+✔ missing legacy bootstrap is visibly DIRTY and apply rolls back without acceptance (40.60375ms)
+✔ new membership, changed exact source, wrong independent identity and absent closure cannot publish (938.996916ms)
+✔ scope closure, global membership, expiry, receipt changes, revocation and missed communication hold (440.667583ms)
+✔ pause fences publication reviewer and prospective handover cannot hide unknown legacy (50.067625ms)
+✖ 10x independently classified inert archive keeps actual mandatory operating assignment bytes and semantic work constant (678.949083ms)
+✖ deleted applicable home and changed exact provenance cannot disappear from accepted meaning (229.403292ms)
+✔ typed outcome requires complete historical uncertainty; text cannot manufacture permission (227.304125ms)
+✖ public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure (841.416792ms)
+✔ late new and changed falsely scoped prohibitions stay globally DIRTY, but fresh proposals include them (1444.535792ms)
+✖ publication proof stays current; failed, quarantined, uncertain and unknown-extension siblings stay DIRTY (220.230625ms)
+✖ mechanical publication index rejects tampering and retains unknown state extensions (210.232708ms)
+✖ format6 explicit non-home evidence survives dispatch, discovery and bounded same-native reads (391.657417ms)
+✔ referenced archived revoked/retry restriction and canonical parent receipts are supplied completely inline (646.187791ms)
+✔ large non-home provenance uses exact same-native ranges; undelivered, partial, denied, stale or changed evidence cannot publish (3267.666708ms)
+✔ canonical preservation parent revisions cannot be borrowed from matching hashes (193.422417ms)
+✔ missing provenance and snapshot-only evidence hold rather than count pointers as delivered bodies (51.948333ms)
+✔ real runtime receipt attribution and deterministic reuse deliver the validated producer closure before Pass (1016.885125ms)
+✔ runtime receipt missing or mismatched producer, candidate, plan, reuse or generation holds (125.336834ms)
+✔ external catalog reference-shaped metadata is verbatim evidence without a company lookup (429.145417ms)
+✔ runtime closure requires complete delivery and independent source and proof sessions (6203.564166ms)
+✖ public qualified recovered snapshot publishes current typed outcomes without replaying the paid raw archive (15.55525ms)
+✖ large prospective publication uses bounded frozen worker delivery and rejects a manufactured complete flag (29347.074291ms)
+✔ frozen publication worker rejects unread semantics, changed native and changed current membership (1451.756792ms)
+✖ paid snapshot archive still requires publication QA independent of nested original producers (15.707125ms)
+✖ FICTIONAL PUBLIC v2 explicit complete sources preserve accepted runtime producer independence and freshness (26.430166ms)
+(node:81963) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ read-only baseline, exact full/selected deltas, deletion, reorder, shape and unknown fields (29.831292ms)
+✔ selected writes and upgrade appends never read unrelated/prior journal bodies (16.210625ms)
+✔ selected new roots allocate after both root and shape positions without moving existing rows (20.989583ms)
+✔ existing duplicate top-level positions hold without rewriting historical metadata (9.567708ms)
+✔ intake verifies envelopes; checkpoint dependency validation holds on missing/corrupt nested originals (33.066917ms)
+✔ gaps, changed event envelopes/payloads, uncovered writers and unlogged state changes hold (97.081958ms)
+✔ missing/corrupt old, intermediate, new and unchanged immutable values hold (89.885958ms)
+✔ legacy/changed layout, ambiguous encoding, inexact identities and rollback hold (68.572667ms)
+✔ failed writes roll back metadata, immutable inserts and event atomically (14.754167ms)
+✔ position-only object reorder and selected deletion produce exact references; historical old events need no replay (12.619ms)
+✔ re-sealed but inconsistent metadata roots and before/after chains hold (41.790625ms)
+(node:81964) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ legacy capture holds atomically; ordinary writes/read/reopen do not migrate; explicit migration backs up exact origin (18.858333ms)
+✔ known v1/v2/v3 layouts retain pending journals and compatibility; incompatible capture/keys require explicit migration (97.217209ms)
+✔ v4 keys round-trip NUL, lone surrogates, literal prefix, unknown roots and order through selected writes and portable restore (60.430209ms)
+✔ unknown layouts, corrupt key markers, missing originals and failed migration readback hold without adopting a layout (25.77925ms)
+✔ contextMatches inherits exact resolver while arbitrary unbound copies still hold (8.096375ms)
+✔ frozen projection reuses exact bytes, invalidates second-writer/dependency changes, and detects original corruption between reads (47.308042ms)
+✔ projection cache eviction retains exact legacy frozen contract and failed-successor preview distinction (4.709833ms)
+✔ raw direct-source reads bind exact pointers and originals across another writer, including unsafe keys and corruption (11.812208ms)
+✔ explicit migration refuses a second-writer change after backup and keeps its exact source backup (3.754667ms)
+✔ detectable old lossy identities hold rather than adopting a normalized substitute (6.338666ms)
+✔ pinned text preserves exact lone-surrogate hash encoding and Unicode range boundaries (0.206875ms)
+✔ pending legacy handover context and ordinary delivery writes keep their inline storage contract (3.599666ms)
+✔ a duplicate original hash cannot conceal conflicting reference shape metadata in extension slots (0.151833ms)
+(node:81965) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ restore verifies every copied artifact and preserves exact logical database state (461.899375ms)
+✔ public restore refuses an artifact changed after source validation even when database readback would match (11.210458ms)
+✔ restore refuses unexpected destination files appearing during copying (8.059208ms)
+ℹ tests 60
+ℹ suites 0
+ℹ pass 48
+ℹ fail 12
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 49547.369958
+
+✖ failing tests:
+
+test at tests/operating-state.test.mjs:34:1
+✖ accepted historical publication proof survives an owner epoch change without admitting old in-flight work (695.297334ms)
+  Error: Operating state Held: DIRTY proposal controls, communication or negative findings changed
+      at fail (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:10:22)
+      at inputUnchanged (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:322:246)
+      at operatingContext (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:469:3)
+      at TestContext.<anonymous> (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:39:19)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3)
+
+test at tests/operating-state.test.mjs:43:1
+✖ public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning (236.677333ms)
+  Error: Immutable snapshot requires acyclic plain JSON
+      at validate (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/snapshot.mjs:12:150)
+      at validate (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/snapshot.mjs:19:7)
+      at validate (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/snapshot.mjs:19:7)
+      at exactJSON (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/snapshot.mjs:23:3)
+      at retainSnapshot (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/snapshot.mjs:50:13)
+      at admitOperatingAssignment (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:273:25)
+      at file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:311:31
+      at mutate (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:93:190)
+      at Store.transaction (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:189:20)
+      at file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:93:335
+
+test at tests/operating-state.test.mjs:59:1
+✖ 10x independently classified inert archive keeps actual mandatory operating assignment bytes and semantic work constant (678.949083ms)
+  Error: Operating state Held: DIRTY proposal controls, communication or negative findings changed
+      at fail (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:10:22)
+      at inputUnchanged (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:322:246)
+      at operatingContext (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:469:3)
+      at assignmentContext (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/context.mjs:28:22)
+      at TestContext.<anonymous> (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:59:418)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7)
+
+test at tests/operating-state.test.mjs:61:1
+✖ deleted applicable home and changed exact provenance cannot disappear from accepted meaning (229.403292ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /membership/. Input:
+  
+  'Error: Operating state Held: source deleted after proposal: home'
+  
+      at TestContext.<anonymous> (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:61:221)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: Operating state Held: source deleted after proposal: home
+        at fail (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:10:22)
+        at inputUnchanged (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:340:56)
+        at operatingContext (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:469:3)
+        at file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:61:232
+        at getActual (node:assert:586:5)
+        at strict.throws (node:assert:734:24)
+        at TestContext.<anonymous> (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:61:221)
+        at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+        at async Test.run (node:internal/test_runner/test:1113:7)
+        at async Test.processPendingSubtests (node:internal/test_runner/test:788:7),
+    expected: /membership/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at tests/operating-state.test.mjs:65:1
+✖ public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure (841.416792ms)
+  Error: Operating state Held: DIRTY concurrent storage intake requires new proposal: jobs:job-ba71cba4-7156-422e-957c-5074b9579f14
+      at fail (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:10:22)
+      at inputUnchanged (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:345:43)
+      at operatingContext (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:469:3)
+      at file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:364:7
+      at Store.transaction (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:189:20)
+      at file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:328:51
+      at withStore (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:205:16)
+      at Module.control (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:328:10)
+      at TestContext.<anonymous> (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:76:109)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+
+test at tests/operating-state.test.mjs:115:1
+✖ publication proof stays current; failed, quarantined, uncertain and unknown-extension siblings stay DIRTY (220.230625ms)
+  Error: Immutable snapshot missing or corrupt: 3c2160ebbf4fab800d2e30aadea9ddb32a06aef0d16933e682af9f34cadcf4aa
+      at snapshotBytes (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/snapshot.mjs:64:92)
+      at resolveSnapshot (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/snapshot.mjs:68:87)
+      at validateAcceptedReceipt (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:449:35)
+      at validateOperatingIndex (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:462:3)
+      at bookkeeping (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:104:5)
+      at operatingFrontier (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:127:32)
+      at TestContext.<anonymous> (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:126:18)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7)
+
+test at tests/operating-state.test.mjs:135:1
+✖ mechanical publication index rejects tampering and retains unknown state extensions (210.232708ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /Held|changed/. Input:
+  
+  'Error: Immutable snapshot missing or corrupt: bd968a892843985199d115717b36081fc5dd24631f9fdfc7cd32a1526f73b7b0'
+  
+      at TestContext.<anonymous> (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:139:49)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: Immutable snapshot missing or corrupt: bd968a892843985199d115717b36081fc5dd24631f9fdfc7cd32a1526f73b7b0
+        at snapshotBytes (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/snapshot.mjs:64:92)
+        at resolveSnapshot (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/snapshot.mjs:68:87)
+        at validateAcceptedReceipt (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:449:35)
+        at validateOperatingIndex (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:462:3)
+        at currentExtensions (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/current-state.mjs:38:45)
+        at file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:139:60
+        at getActual (node:assert:586:5)
+        at strict.throws (node:assert:734:24)
+        at TestContext.<anonymous> (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:139:49)
+        at process.processTicksAndRejections (node:internal/process/task_queues:103:5),
+    expected: /Held|changed/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at tests/operating-state.test.mjs:145:1
+✖ format6 explicit non-home evidence survives dispatch, discovery and bounded same-native reads (391.657417ms)
+  Error: Immutable snapshot requires acyclic plain JSON
+      at validate (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/snapshot.mjs:12:150)
+      at validate (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/snapshot.mjs:19:7)
+      at validate (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/snapshot.mjs:19:7)
+      at exactJSON (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/snapshot.mjs:23:3)
+      at retainSnapshot (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/snapshot.mjs:50:13)
+      at admitOperatingAssignment (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:273:25)
+      at file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:311:31
+      at mutate (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:93:190)
+      at Store.transaction (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:189:20)
+      at file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:93:335
+
+test at tests/operating-state.test.mjs:358:1
+✖ public qualified recovered snapshot publishes current typed outcomes without replaying the paid raw archive (15.55525ms)
+  Error: Company storage already migrated
+      at migrateNormalized (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/record-storage.mjs:211:36)
+      at Store.migrate (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:64:22)
+      at file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:349:44
+      at withStore (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:205:16)
+      at qualifiedRecovered (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:349:20)
+      at TestContext.<anonymous> (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:359:16)
+      at Test.runInAsyncScope (node:async_hooks:213:14)
+      at Test.run (node:internal/test_runner/test:1106:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:788:18)
+      at Test.postRun (node:internal/test_runner/test:1235:19)
+
+test at tests/operating-state.test.mjs:377:1
+✖ large prospective publication uses bounded frozen worker delivery and rejects a manufactured complete flag (29347.074291ms)
+  Error: Operating state Held: DIRTY concurrent storage intake requires new proposal: jobs:job-cb13632c-5b81-49b6-90be-e93d5f0a17de
+      at fail (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:10:22)
+      at inputUnchanged (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:345:43)
+      at livePlan (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:351:30)
+      at publishOperatingState (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:435:37)
+      at file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:454:178
+      at mutate (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:93:190)
+      at Store.transaction (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:189:20)
+      at file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:93:335
+      at withStore (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:205:16)
+      at update (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:93:10)
+
+test at tests/operating-state.test.mjs:411:1
+✖ paid snapshot archive still requires publication QA independent of nested original producers (15.707125ms)
+  Error: Company storage already migrated
+      at migrateNormalized (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/record-storage.mjs:211:36)
+      at Store.migrate (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:64:22)
+      at file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:349:44
+      at withStore (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:205:16)
+      at qualifiedRecovered (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:349:20)
+      at TestContext.<anonymous> (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:412:16)
+      at Test.runInAsyncScope (node:async_hooks:213:14)
+      at Test.run (node:internal/test_runner/test:1106:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:788:18)
+      at Test.postRun (node:internal/test_runner/test:1235:19)
+
+test at tests/operating-state.test.mjs:417:1
+✖ FICTIONAL PUBLIC v2 explicit complete sources preserve accepted runtime producer independence and freshness (26.430166ms)
+  Error: Company storage already migrated
+      at migrateNormalized (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/record-storage.mjs:211:36)
+      at Store.migrate (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:64:22)
+      at file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:275:39
+      at withStore (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:205:16)
+      at runtimeArchive (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:275:15)
+      at TestContext.<anonymous> (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:419:17)
+      at Test.runInAsyncScope (node:async_hooks:213:14)
+      at Test.run (node:internal/test_runner/test:1106:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:788:18)
+      at Test.postRun (node:internal/test_runner/test:1235:19)

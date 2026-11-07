@@ -1,0 +1,27 @@
+✔ missing production intake provider is fail closed (0.555208ms)
+✔ initial unknown legacy is never relabeled accepted (19.328833ms)
+✔ immutable accepted home survives replacement; new global restriction holds ordinary but complete delta repair publishes (35.09075ms)
+✔ successor exact base and concurrent semantic intake including reverted intake hold (45.479875ms)
+✔ missing original, changed producer, rejected negative, expiry and unknown nested producer hold (49.268709ms)
+✔ canonical known historical evidence freezes before bookkeeping; nested originals remain checked (35.537ms)
+✔ atomic historical maps deliver exact new/newer/deleted originals in chronological intake and remain required after publication (27.811292ms)
+✔ intermediate transitive originals hold proposal, review, publication and accepted use when missing or corrupt (122.488417ms)
+✔ a later checkpoint still validates originals that existed only in an older intermediate delta (54.383375ms)
+✔ wrong historical original and reordered version transitions hold; atomic change row order is irrelevant (37.723209ms)
+✔ intake immutable_entry validates identity as well as original snapshot bytes (11.310583ms)
+✔ literal reference-like JSON in intake remains literal (23.029083ms)
+✔ allowed post-proposal reconstruction intake checks transitive originals before review and publication (26.894667ms)
+✔ real normalized intake preserves deleted intermediate envelopes while checkpoint audits their transitive vault originals (412.25175ms)
+✔ shared immutable-entry histories are validated as a graph while every wrapper identity remains checked (2.13175ms)
+✔ fingerprints bind complete source/test/runtime/policy/command/env/limits, canonicalize maps only (6.97425ms)
+✔ missing and untracked fingerprint components are non-reusable (0.437209ms)
+✔ only exact original successful runtime evidence is eligible, never acceptance or chained reuse (0.233666ms)
+✔ post-execution confirmation holds toolchain changes and incomplete rediscovery (0.198375ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 969.894333

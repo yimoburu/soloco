@@ -1,0 +1,129 @@
+(node:35038) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ early empty body Blocked (442.7105ms)
+✖ oversized body with negative tail (34.069333ms)
+✖ fenced original with late negative (33.819959ms)
+✖ invalid JSON remains unknown (33.860958ms)
+✖ oversized invalid raw remains retrievable (34.691083ms)
+✖ empty body Pass cannot become approval (33.720042ms)
+✖ cancelled late negative is retained without acceptance (34.459541ms)
+✖ wrong-native late negative is retained without acceptance (33.310625ms)
+✖ legacy qualification evidence retains negative verdict and full raw original (30.699959ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 0
+ℹ fail 9
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 784.347958
+
+✖ failing tests:
+
+test at tests/operating-negative-retention.test.mjs:73:3
+✖ early empty body Blocked (442.7105ms)
+  Error: A custom execution timeout requires a reason
+      at normalizeTimeout (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/timeout.mjs:36:60)
+      at Module.dispatch (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:270:17)
+      at queue (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:30:38)
+      at rejected (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:34:10)
+      at TestContext.<anonymous> (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:74:67)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3)
+
+test at tests/operating-negative-retention.test.mjs:73:3
+✖ oversized body with negative tail (34.069333ms)
+  Error: A custom execution timeout requires a reason
+      at normalizeTimeout (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/timeout.mjs:36:60)
+      at Module.dispatch (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:270:17)
+      at queue (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:30:38)
+      at rejected (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:34:10)
+      at TestContext.<anonymous> (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:74:67)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7)
+
+test at tests/operating-negative-retention.test.mjs:73:3
+✖ fenced original with late negative (33.819959ms)
+  Error: A custom execution timeout requires a reason
+      at normalizeTimeout (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/timeout.mjs:36:60)
+      at Module.dispatch (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:270:17)
+      at queue (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:30:38)
+      at rejected (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:34:10)
+      at TestContext.<anonymous> (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:74:67)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7)
+
+test at tests/operating-negative-retention.test.mjs:73:3
+✖ invalid JSON remains unknown (33.860958ms)
+  Error: A custom execution timeout requires a reason
+      at normalizeTimeout (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/timeout.mjs:36:60)
+      at Module.dispatch (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:270:17)
+      at queue (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:30:38)
+      at rejected (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:34:10)
+      at TestContext.<anonymous> (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:74:67)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7)
+
+test at tests/operating-negative-retention.test.mjs:73:3
+✖ oversized invalid raw remains retrievable (34.691083ms)
+  Error: A custom execution timeout requires a reason
+      at normalizeTimeout (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/timeout.mjs:36:60)
+      at Module.dispatch (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:270:17)
+      at queue (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:30:38)
+      at rejected (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:34:10)
+      at TestContext.<anonymous> (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:74:67)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7)
+
+test at tests/operating-negative-retention.test.mjs:73:3
+✖ empty body Pass cannot become approval (33.720042ms)
+  Error: A custom execution timeout requires a reason
+      at normalizeTimeout (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/timeout.mjs:36:60)
+      at Module.dispatch (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:270:17)
+      at queue (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:30:38)
+      at rejected (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:34:10)
+      at TestContext.<anonymous> (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:74:67)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7)
+
+test at tests/operating-negative-retention.test.mjs:80:48
+✖ cancelled late negative is retained without acceptance (34.459541ms)
+  Error: A custom execution timeout requires a reason
+      at normalizeTimeout (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/timeout.mjs:36:60)
+      at Module.dispatch (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:270:17)
+      at queue (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:30:38)
+      at rejected (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:34:10)
+      at TestContext.<anonymous> (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:81:106)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7)
+
+test at tests/operating-negative-retention.test.mjs:80:48
+✖ wrong-native late negative is retained without acceptance (33.310625ms)
+  Error: A custom execution timeout requires a reason
+      at normalizeTimeout (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/timeout.mjs:36:60)
+      at Module.dispatch (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:270:17)
+      at queue (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:30:38)
+      at rejected (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:34:10)
+      at TestContext.<anonymous> (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:81:106)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7)
+
+test at tests/operating-negative-retention.test.mjs:87:1
+✖ legacy qualification evidence retains negative verdict and full raw original (30.699959ms)
+  Error: A custom execution timeout requires a reason
+      at normalizeTimeout (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/timeout.mjs:36:60)
+      at Module.dispatch (file:///private/tmp/soloco-operating-negative-retention-20261106/source/plugins/soloco/runtime/engine.mjs:270:17)
+      at queue (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:30:38)
+      at rejected (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:34:10)
+      at TestContext.<anonymous> (file:///private/tmp/soloco-operating-negative-retention-20261106/source/tests/operating-negative-retention.test.mjs:90:26)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7)

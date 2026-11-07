@@ -109,3 +109,56 @@ The detached native integration test was excluded; the legacy suites and existin
 failed fixtures were not edited. Syntax checks for the changed runtime/test
 modules and `git diff --check` passed. The full suite, native adapters and live
 company adoption were not run.
+
+## Prospective accepted operating input
+
+A **fresh** explicit `prepare` with `workflow: "incremental-v1"` and
+`context_mode: "current"` selects `accepted-operating-upgrade-v1` only when a
+real accepted `operating_state` exists. The existing public `operatingContext()`
+must validate the complete accepted set before prepare changes ownership,
+controls, current upgrade, or history. Capture failure rolls back preparation.
+Omission, full mode, companies without operating publication, and every existing
+attempt retain their prior input and validators. Failed/exhausted attempts cannot
+select this mode through resume. This prospective mode requires ten-minute calls
+and the original 45-minute overall ceiling; it never resets an attempt deadline.
+
+The complete accepted context, pinned and candidate instructions, exact founder
+instruction, and preparation owner are retained in the existing immutable vault.
+The attempt's `operating_input` locator is bound into its workflow contract and
+every new step binds that envelope hash. Later upgrade reads validate the frozen
+vault graph and exact raw business checkpoint/history invariants, current owner,
+paused state, candidate, authority expiry and original deadlines. They do not call
+live historical applicability/classification or ordinary `operatingContext()`
+again after preparation has changed controls. No operating-module helper or
+cross-owner source edit is required.
+
+The semantic stream contains **all** accepted homes, controls, communication and
+conditions/exceptions (including typed unresolved outcomes and spent/revoked
+permissions), plus complete pinned/candidate definitions and preparation authority.
+The raw checkpoint and complete history retain their original hashes. Their exact
+JSON and every nested immutable body are independently retrievable as archive
+sources; vault bodies use `vault-<sha256>` source IDs. Preservation is not renewed
+permission or fresh semantic acceptance. CoS reconstructs accepted S and candidate
+instructions; the existing independent QA, complete exact proposal delivery,
+continuity checks and step validators still judge the proposed handover.
+
+Explicit current inspection measures this selected path. Meaning UTF-16 characters,
+UTF-8 bytes and pages are separate from raw archive retrieval bytes/characters.
+A fresh preview measures the current capture; its future prepared size is unknown
+until the exact founder instruction and decision have been recorded. Pending
+attempt inspection measures the actual frozen attempt and rejects changed raw
+business state. Counts describe retrievable source bodies, not unique stored bytes,
+native token fit, model understanding or forecast elapsed time.
+
+Apply preserves company identity, governance (under preserve policy), business
+records, historical attempts, notices and accepted publication receipts. Prospective
+readback additionally rejects any extra/changed business intake. Changed definitions
+and ownership leave ordinary operation **Held**. Upgrade QA never republishes current
+operating meaning, renews a grant, resumes business, or proves compatibility under
+the new instructions. A fresh independent operating delta publication is a separate
+required boundary owned by the operating workflow.
+
+Public fictional regression: `tests/operating-upgrade.test.mjs` uses normalized
+intake, public represented qualification and real publication workers before the
+existing upgrade controller and distinct scripted CoS/QA roles. Scripted judgments
+are fictional contract doubles, not independent native source QA or company adoption.

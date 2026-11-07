@@ -1,0 +1,82 @@
+TAP version 13
+# (node:26175) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: dispatch validates and persists policy, and main keeps software-test limits separate
+ok 1 - dispatch validates and persists policy, and main keeps software-test limits separate
+  ---
+  duration_ms: 5.750834
+  ...
+# Subtest: upgrade review-window schema is bounded and runtime rejects invalid or misplaced requests before binding
+ok 2 - upgrade review-window schema is bounded and runtime rejects invalid or misplaced requests before binding
+  ---
+  duration_ms: 2.834333
+  ...
+# Subtest: status distinguishes long execution, grace, startup, queue, legacy and inspection
+ok 3 - status distinguishes long execution, grace, startup, queue, legacy and inspection
+  ---
+  duration_ms: 6.584792
+  ...
+# Subtest: reconciliation rechecks eligibility inside the store transaction
+ok 4 - reconciliation rechecks eligibility inside the store transaction
+  ---
+  duration_ms: 1.343417
+  ...
+# Subtest: worker queue delay does not consume custom execution time; actual callback is persisted
+ok 5 - worker queue delay does not consume custom execution time; actual callback is persisted
+  ---
+  duration_ms: 2.771625
+  ...
+# Subtest: new jobs require spawn evidence; legacy injected models remain compatible
+ok 6 - new jobs require spawn evidence; legacy injected models remain compatible
+  ---
+  duration_ms: 3.005208
+  ...
+# Subtest: deadline aborts and late output is quarantined even if model ignores cancellation
+ok 7 - deadline aborts and late output is quarantined even if model ignores cancellation
+  ---
+  duration_ms: 1.299917
+  ...
+# Subtest: pause, ownership loss, context change and scope revocation abort active work
+ok 8 - pause, ownership loss, context change and scope revocation abort active work
+  ---
+  duration_ms: 5.208333
+  ...
+# Subtest: startup expiry aborts without inventing spawn timing and launch errors retain evidence
+ok 9 - startup expiry aborts without inventing spawn timing and launch errors retain evidence
+  ---
+  duration_ms: 2.726625
+  ...
+# Subtest: coordination dispatch binds prerequisite evidence, admits disjoint resources and rejects premature/conflicting work
+ok 10 - coordination dispatch binds prerequisite evidence, admits disjoint resources and rejects premature/conflicting work
+  ---
+  duration_ms: 2.109875
+  ...
+# Subtest: uncertain cancellation keeps resource claim; confirmed closure releases it
+ok 11 - uncertain cancellation keeps resource claim; confirmed closure releases it
+  ---
+  duration_ms: 2.376
+  ...
+# Subtest: upgrade call ceiling schema and runtime reject invalid options before all boundaries
+ok 12 - upgrade call ceiling schema and runtime reject invalid options before all boundaries
+  ---
+  duration_ms: 1.437709
+  ...
+# Subtest: stream publication fence quarantines deadline crossed during final validation without session mutation
+ok 13 - stream publication fence quarantines deadline crossed during final validation without session mutation
+  ---
+  duration_ms: 8.032209
+  ...
+# Subtest: stream exact deadline closure and delayed timers cannot publish late Pass or renew allowance
+ok 14 - stream exact deadline closure and delayed timers cannot publish late Pass or renew allowance
+  ---
+  duration_ms: 18.823
+  ...
+1..14
+# tests 14
+# suites 0
+# pass 14
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 129.311625

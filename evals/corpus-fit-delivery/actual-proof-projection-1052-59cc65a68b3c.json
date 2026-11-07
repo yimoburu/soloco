@@ -1,0 +1,58 @@
+{
+  "authority": "Readonly actual claim-component measurement only; no model calls, company plans/targets/jobs/receipts, source bodies export, acceptance or publication",
+  "snapshot": {
+    "revision": 1052,
+    "event_sequence": 1053,
+    "logical_sha256": "980bedfc4c6d55f4c667b04f313566da295f15f2a56b749b8b1986d24ef4ce83",
+    "immutable_readset_sha256": "a1f8fc69ef7ad1612295a02bfca13187a7e16e6b85b91c2bcbc40200956ae9ed"
+  },
+  "source_pins": {
+    "snapshot.mjs": "f822adc27fe06921b73ee923e967c1d36af3528b2d22f3425cbccdbf8fd477c1",
+    "scoped-context.mjs": "1d8aa5ca5e1a32f6264f3c360e45309b92cfc20ce76b24be459f0c61596b97d1",
+    "operating-state.mjs": "26ce74f75f9a2468b0697603f546a7cde3d7368a4b65f5458f393c8983451f18",
+    "corpus-structure.mjs": "db63be6ae2504344c161fb512783f8940ed5f6f278dafa1f6cba16f63e71c8d8"
+  },
+  "sources": 336,
+  "occurrences": 78453,
+  "groups": 7150,
+  "raw_full_claim_bytes": 109259426,
+  "raw_incidence_bytes": 108990418,
+  "projected_claim_bytes": 14318864,
+  "factored_projected_claim_bytes": 3137724,
+  "projected_parts": {
+    "protocol": 33,
+    "selected_source_ids": 14739,
+    "sources": 111916,
+    "incidence": 14049764,
+    "baseline": 277,
+    "source_census": 111916,
+    "producer_closures": 29845,
+    "census_sha256": 66,
+    "extraction_identity": 66,
+    "canonical_claim_sha256": 66
+  },
+  "projected_incidence_parts": {
+    "protocol": 32,
+    "canonical_relation": 77,
+    "sources": 75505,
+    "direct_references": 13972558,
+    "unowned_occurrence_ids": 1499
+  },
+  "direct_edges": 25974,
+  "unknown_edges": 735,
+  "conservative_sources": 148,
+  "project_ms": 6381,
+  "elapsed_ms": 23197,
+  "exact_canonical_projection_validation": true,
+  "exact_readable_external_expected_validation": true,
+  "complete_native_fit": null,
+  "omitted_unmeasured": [
+    "semantic conclusions",
+    "physical occurrence/qualifier/cut/collection context",
+    "current raw authority",
+    "full homes/dependencies",
+    "full framing/provenance"
+  ],
+  "source_bodies_exported": false,
+  "state_events_immutables_and_source_unchanged": true
+}

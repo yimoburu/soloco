@@ -1,0 +1,271 @@
+TAP version 13
+# (node:87282) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: accepted historical publication proof survives an owner epoch change without admitting old in-flight work
+ok 1 - accepted historical publication proof survives an owner epoch change without admitting old in-flight work
+  ---
+  duration_ms: 151.354041
+  ...
+# Subtest: public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning
+ok 2 - public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning
+  ---
+  duration_ms: 26.739792
+  ...
+# Subtest: missing legacy bootstrap is visibly DIRTY and apply rolls back without acceptance
+ok 3 - missing legacy bootstrap is visibly DIRTY and apply rolls back without acceptance
+  ---
+  duration_ms: 18.206958
+  ...
+# Subtest: host catalog default service tier does not invalidate explicit operating reviewer startup
+ok 4 - host catalog default service tier does not invalidate explicit operating reviewer startup
+  ---
+  duration_ms: 11.360875
+  ...
+# Subtest: new membership, changed exact source, wrong independent identity and absent closure cannot publish
+ok 5 - new membership, changed exact source, wrong independent identity and absent closure cannot publish
+  ---
+  duration_ms: 116.060208
+  ...
+# Subtest: scope closure, global membership, expiry, receipt changes, revocation and missed communication hold
+ok 6 - scope closure, global membership, expiry, receipt changes, revocation and missed communication hold
+  ---
+  duration_ms: 37.886291
+  ...
+# Subtest: pause fences publication reviewer and prospective handover cannot hide unknown legacy
+ok 7 - pause fences publication reviewer and prospective handover cannot hide unknown legacy
+  ---
+  duration_ms: 15.505084
+  ...
+# Subtest: 10x independently classified inert archive keeps actual mandatory operating assignment bytes and semantic work constant
+ok 8 - 10x independently classified inert archive keeps actual mandatory operating assignment bytes and semantic work constant
+  ---
+  duration_ms: 78.940667
+  ...
+# Subtest: deleted applicable home and changed exact provenance cannot disappear from accepted meaning
+ok 9 - deleted applicable home and changed exact provenance cannot disappear from accepted meaning
+  ---
+  duration_ms: 26.331
+  ...
+# Subtest: typed outcome requires complete historical uncertainty; text cannot manufacture permission
+ok 10 - typed outcome requires complete historical uncertainty; text cannot manufacture permission
+  ---
+  duration_ms: 21.500792
+  ...
+# Subtest: public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure
+ok 11 - public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure
+  ---
+  duration_ms: 78.210209
+  ...
+# Subtest: late new and changed falsely scoped prohibitions stay globally DIRTY, but fresh proposals include them
+ok 12 - late new and changed falsely scoped prohibitions stay globally DIRTY, but fresh proposals include them
+  ---
+  duration_ms: 108.371333
+  ...
+# Subtest: publication proof stays current; failed, quarantined, uncertain and unknown-extension siblings stay DIRTY
+ok 13 - publication proof stays current; failed, quarantined, uncertain and unknown-extension siblings stay DIRTY
+  ---
+  duration_ms: 29.597959
+  ...
+# Subtest: mechanical publication index rejects tampering and retains unknown state extensions
+ok 14 - mechanical publication index rejects tampering and retains unknown state extensions
+  ---
+  duration_ms: 28.784208
+  ...
+# Subtest: format6 explicit non-home evidence survives dispatch, discovery and bounded same-native reads
+ok 15 - format6 explicit non-home evidence survives dispatch, discovery and bounded same-native reads
+  ---
+  duration_ms: 279.484458
+  ...
+# Subtest: referenced archived revoked/retry restriction and canonical parent receipts are supplied completely inline
+ok 16 - referenced archived revoked/retry restriction and canonical parent receipts are supplied completely inline
+  ---
+  duration_ms: 81.719709
+  ...
+# Subtest: large non-home provenance uses exact same-native ranges; undelivered, partial, denied, stale or changed evidence cannot publish
+ok 17 - large non-home provenance uses exact same-native ranges; undelivered, partial, denied, stale or changed evidence cannot publish
+  ---
+  duration_ms: 1316.597584
+  ...
+# Subtest: canonical preservation parent revisions cannot be borrowed from matching hashes
+ok 18 - canonical preservation parent revisions cannot be borrowed from matching hashes
+  ---
+  duration_ms: 83.180417
+  ...
+# Subtest: missing provenance and snapshot-only evidence hold rather than count pointers as delivered bodies
+ok 19 - missing provenance and snapshot-only evidence hold rather than count pointers as delivered bodies
+  ---
+  duration_ms: 22.192708
+  ...
+# Subtest: real runtime receipt attribution and deterministic reuse deliver the validated producer closure before Pass
+ok 20 - real runtime receipt attribution and deterministic reuse deliver the validated producer closure before Pass
+  ---
+  duration_ms: 324.316
+  ...
+# Subtest: runtime receipt missing or mismatched producer, candidate, plan, reuse or generation holds
+ok 21 - runtime receipt missing or mismatched producer, candidate, plan, reuse or generation holds
+  ---
+  duration_ms: 68.679166
+  ...
+# Subtest: external catalog reference-shaped metadata is verbatim evidence without a company lookup
+ok 22 - external catalog reference-shaped metadata is verbatim evidence without a company lookup
+  ---
+  duration_ms: 68.478833
+  ...
+# Subtest: runtime closure requires complete delivery and independent source and proof sessions
+ok 23 - runtime closure requires complete delivery and independent source and proof sessions
+  ---
+  duration_ms: 6949.519041
+  ...
+# Subtest: public qualified recovered snapshot publishes current typed outcomes without replaying the paid raw archive
+ok 24 - public qualified recovered snapshot publishes current typed outcomes without replaying the paid raw archive
+  ---
+  duration_ms: 2036.70025
+  ...
+# Subtest: large prospective publication uses bounded frozen worker delivery and rejects a manufactured complete flag
+ok 25 - large prospective publication uses bounded frozen worker delivery and rejects a manufactured complete flag
+  ---
+  duration_ms: 12322.399917
+  ...
+# Subtest: frozen publication worker rejects unread semantics, changed native and changed current membership
+ok 26 - frozen publication worker rejects unread semantics, changed native and changed current membership
+  ---
+  duration_ms: 709.976959
+  ...
+# Subtest: paid snapshot archive still requires publication QA independent of nested original producers
+ok 27 - paid snapshot archive still requires publication QA independent of nested original producers
+  ---
+  duration_ms: 1395.693875
+  ...
+# Subtest: FICTIONAL PUBLIC v2 explicit complete sources preserve accepted runtime producer independence and freshness
+ok 28 - FICTIONAL PUBLIC v2 explicit complete sources preserve accepted runtime producer independence and freshness
+  ---
+  duration_ms: 3160.683959
+  ...
+# Subtest: publication cannot reuse provenance-bound rejected native identities from a preserved failed job
+ok 29 - publication cannot reuse provenance-bound rejected native identities from a preserved failed job
+  ---
+  duration_ms: 107.94175
+  ...
+# Subtest: v2 qualification also excludes the native of its retained rejected job contribution
+ok 30 - v2 qualification also excludes the native of its retained rejected job contribution
+  ---
+  duration_ms: 107.765917
+  ...
+# Subtest: archived rejected job attribution survives snapshot-only retention without promoting external metadata
+not ok 31 - archived rejected job attribution survives snapshot-only retention without promoting external metadata
+  ---
+  duration_ms: 5.621
+  location: '/private/tmp/soloco-operating-state-20261106/source/tests/operating-state.test.mjs:479:1'
+  failureType: 'testCodeFailure'
+  error: 'Immutable snapshot capture requires explicit company_storage migrate before retrying'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    flushSnapshots (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/record-storage.mjs:70:32)
+    Store.transaction (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/store.mjs:190:7)
+    file:///private/tmp/soloco-operating-state-20261106/source/tests/operating-state.test.mjs:19:46
+    withStore (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/store.mjs:203:16)
+    mutate (file:///private/tmp/soloco-operating-state-20261106/source/tests/operating-state.test.mjs:19:22)
+    TestContext.<anonymous> (file:///private/tmp/soloco-operating-state-20261106/source/tests/operating-state.test.mjs:483:3)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:931:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:629:18)
+    Test.postRun (node:internal/test_runner/test:1042:19)
+  ...
+# (node:87283) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: FICTIONAL ADAPTER: coherent public create/read -> worker -> independent interface -> canonical apply; repeats have separate provenance
+ok 32 - FICTIONAL ADAPTER: coherent public create/read -> worker -> independent interface -> canonical apply; repeats have separate provenance
+  ---
+  duration_ms: 3413.749416
+  ...
+# Subtest: FICTIONAL ADAPTER: omissions, omitted occurrence interfaces, source producer and negative receipts hold
+ok 33 - FICTIONAL ADAPTER: omissions, omitted occurrence interfaces, source producer and negative receipts hold
+  ---
+  duration_ms: 606.198959
+  ...
+# Subtest: FICTIONAL ADAPTER: late qualifier remains complete and missing home preservation is Blocked
+ok 34 - FICTIONAL ADAPTER: late qualifier remains complete and missing home preservation is Blocked
+  ---
+  duration_ms: 452.205917
+  ...
+# Subtest: FICTIONAL ADAPTER: prospective coherent streaming carries complete oversized section; old extraction still rejects opt-in
+ok 35 - FICTIONAL ADAPTER: prospective coherent streaming carries complete oversized section; old extraction still rejects opt-in
+  ---
+  duration_ms: 605.281083
+  ...
+# Subtest: FICTIONAL ADAPTER: snapshot inbound native path and resealed omissions cannot enter canonical scoped plan
+ok 36 - FICTIONAL ADAPTER: snapshot inbound native path and resealed omissions cannot enter canonical scoped plan
+  ---
+  duration_ms: 2672.40075
+  ...
+# Subtest: coherent runtime-test producer uses canonical author_instance, candidate and receipt closure without fabricated job_id
+ok 37 - coherent runtime-test producer uses canonical author_instance, candidate and receipt closure without fabricated job_id
+  ---
+  duration_ms: 46.035292
+  ...
+# Subtest: nested canonical source files retain bounded native bundles and mandatory occurrence interfaces
+ok 38 - nested canonical source files retain bounded native bundles and mandatory occurrence interfaces
+  ---
+  duration_ms: 497.797125
+  ...
+# {"fictional_only":true,"parent_string_bytes":103529,"units":13,"leaf_bundle_bytes":[24172,24174],"extraction_request_bytes":31615,"semantic_acceptance":false}
+# Subtest: SCOPED publication ignores colliding external producer metadata
+ok 39 - SCOPED publication ignores colliding external producer metadata
+  ---
+  duration_ms: 4023.184541
+  ...
+# Subtest: SCOPED publication retains immutable-entry and resolved identities
+ok 40 - SCOPED publication retains immutable-entry and resolved identities
+  ---
+  duration_ms: 3304.653792
+  ...
+# (node:87284) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: FICTIONAL public vector pipeline shares extraction, independently judges context, aggregates once and applies atomically
+ok 41 - FICTIONAL public vector pipeline shares extraction, independently judges context, aggregates once and applies atomically
+  ---
+  duration_ms: 3117.764
+  ...
+# Subtest: corpus growth deduplicates intrinsic sections while keeping all repeated physical obligations unaccepted
+ok 42 - corpus growth deduplicates intrinsic sections while keeping all repeated physical obligations unaccepted
+  ---
+  duration_ms: 113.699834
+  ...
+# {"fictional_only":true,"one":{"intrinsic_batches":1,"shared_body_sections":1,"physical_occurrences":8},"ten":{"intrinsic_batches":1,"shared_body_sections":1,"physical_occurrences":26},"semantic_acceptance":false}
+# Subtest: corpus retains external named handover originals and refuses missing closure
+ok 43 - corpus retains external named handover originals and refuses missing closure
+  ---
+  duration_ms: 78.5225
+  ...
+# Subtest: FICTIONAL corpus application exposes explicit operating integration hold, never a borrowed scoped receipt
+ok 44 - FICTIONAL corpus application exposes explicit operating integration hold, never a borrowed scoped receipt
+  ---
+  duration_ms: 2678.016208
+  ...
+# Subtest: semantic selections complete canonical source apply with bounded independent local packets
+ok 45 - semantic selections complete canonical source apply with bounded independent local packets
+  ---
+  duration_ms: 17855.9785
+  ...
+# {"fictional_only":true,"workload":{"protocol":"scoped-context-v1","partitioner":"coherent-corpus-body-v1","source":{"id":"old","revision":1,"sha256":"6be63f44288d42ab3675f96a345ec25cb48d209895267518611987ecf452ca0c"},"extraction_identity":"ba14e6ecd9d44efb68af4a712c2bfd5f5602bb3de9c493e85604d45d0f72c372","physical_occurrences":11,"extraction":[{"id":"body-batch-0","body_bytes":615},{"id":"body-batch-1","body_bytes":719},{"id":"body-batch-2","body_bytes":717},{"id":"body-batch-3","body_bytes":874},{"id":"body-batch-4","body_bytes":1108},{"id":"body-batch-5","body_bytes":1108},{"id":"body-batch-6","body_bytes":5480},{"id":"body-batch-7","body_bytes":2115}],"selections":[{"id":"global","physical_occurrences":3,"incident_selection_ids":["global"],"intrinsic_batches":["body-batch-3","body-batch-7"],"context_bytes":4385,"domain_request_lower_bound":7374,"interface_request_lower_bound":7374},{"id":"A","physical_occurrences":6,"incident_selection_ids":["global","A"],"intrinsic_batches":["body-batch-0","body-batch-1","body-batch-3","body-batch-4","body-batch-7"],"context_bytes":6111,"domain_request_lower_bound":11542,"interface_request_lower_bound":11542},{"id":"B","physical_occurrences":6,"incident_selection_ids":["global","B"],"intrinsic_batches":["body-batch-0","body-batch-2","body-batch-3","body-batch-5","body-batch-7"],"context_bytes":6109,"domain_request_lower_bound":11538,"interface_request_lower_bound":11538},{"id":"archive","physical_occurrences":5,"incident_selection_ids":["global","archive"],"intrinsic_batches":["body-batch-3","body-batch-6","body-batch-7"],"context_bytes":9875,"domain_request_lower_bound":18344,"interface_request_lower_bound":18344}],"planned_domain_requests":4,"planned_interface_requests":4,"whole_corpus_integration_requests":1,"review_formula":"E+D+I+1","total_selected_source_requests_lower_bound":17,"input_limit_bytes":48000,"complete_request_bytes":null,"excluded_from_lower_bound":["instructions","canonical extraction results","native receipt framing","current homes and dependencies","current global rules","integration summaries"],"status":"unaccepted proposal","frontier_complete":false,"semantic_acceptance":false,"complete_native_fit":null,"native_context_fit":"unproven","retrieval_only":true}}
+# {"fictional_only":true,"domain_packet_bytes":[35028,59935,59929,57533],"interface_packet_bytes":[179007,187198,187194,191274],"semantic_acceptance":false}
+# Subtest: declared distant incident peer cannot be omitted by proposed local scope
+ok 46 - declared distant incident peer cannot be omitted by proposed local scope
+  ---
+  duration_ms: 754.45425
+  ...
+# Subtest: nested file sections fit intrinsic batches without implying complete global request fit
+ok 47 - nested file sections fit intrinsic batches without implying complete global request fit
+  ---
+  duration_ms: 47.613
+  ...
+# {"fictional_only":true,"nested_sources_workload":{"protocol":"scoped-context-v1","partitioner":"coherent-corpus-body-v1","source":{"id":"old","revision":1,"sha256":"3f5b716a2e2bf2f62c61efa40061d45b88d0ff915689719dae44937b2a8ca075"},"extraction_identity":"490932463b521d2f5e8bb09431a87795a7e57d4908da39f8070ac035d7d9da26","physical_occurrences":14,"extraction":[{"id":"body-batch-0","body_bytes":22217},{"id":"body-batch-1","body_bytes":17623},{"id":"body-batch-2","body_bytes":13519},{"id":"body-batch-3","body_bytes":3909}],"selections":[{"id":"global","physical_occurrences":14,"incident_selection_ids":["global"],"intrinsic_batches":["body-batch-0","body-batch-1","body-batch-2","body-batch-3"],"context_bytes":60706,"domain_request_lower_bound":117974,"interface_request_lower_bound":117974}],"planned_domain_requests":1,"planned_interface_requests":1,"whole_corpus_integration_requests":1,"review_formula":"E+D+I+1","total_selected_source_requests_lower_bound":7,"input_limit_bytes":48000,"complete_request_bytes":null,"excluded_from_lower_bound":["instructions","canonical extraction results","native receipt framing","current homes and dependencies","current global rules","integration summaries"],"status":"unaccepted proposal","frontier_complete":false,"semantic_acceptance":false,"complete_native_fit":null,"native_context_fit":"unproven","retrieval_only":true}}
+1..47
+# tests 47
+# suites 0
+# pass 46
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 29911.298709

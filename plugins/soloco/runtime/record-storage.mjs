@@ -251,7 +251,10 @@ export function writeNormalizedSelection(db,changes) {
     const old=db.prepare('SELECT position FROM state_entries WHERE family=? AND key=?').get(family,storedKey(db,key));
     if(value===undefined)db.prepare('DELETE FROM state_entries WHERE family=? AND key=?').run(family,storedKey(db,key));
     else {
-      const n=old?.position??db.prepare('SELECT COALESCE(MAX(position),-1)+1 AS n FROM state_entries WHERE family=?').get(family).n;
+      // Root values and collection shapes share the top-level object order.
+      const n=old?.position??(['root','shape'].includes(family)
+        ?db.prepare("SELECT COALESCE(MAX(position),-1)+1 AS n FROM state_entries WHERE family IN ('root','shape')").get().n
+        :db.prepare('SELECT COALESCE(MAX(position),-1)+1 AS n FROM state_entries WHERE family=?').get(family).n);
       for(const entry of valueEntries(db,family,key,n,value))put(db,...entry);
     }
     if(journal)db.prepare('DELETE FROM state_entries WHERE family=? AND position>=?').run('upgrade.'+key,Array.isArray(value)?value.length:0);
@@ -363,4 +366,141 @@ export function readPublicHandle(db,collection,keyHash) {
 export function readPublicAlias(db,collection,id) {
   const row=db.prepare('SELECT * FROM public_read_values WHERE family=? AND value_id_sha256=? ORDER BY position LIMIT 1').get(collection,hash(JSON.stringify(id)));
   return row?logicalKey(db,checkPublicValue(row).key):null;
+}
+
+// Internal mechanical intake evidence. No acceptance or transition semantics.
+const metadataId=row=>JSON.stringify([row.family,row.key]);
+const metadataSort=(a,b)=>a.family<b.family?-1:a.family>b.family?1:a.key<b.key?-1:a.key>b.key?1:0;
+const metadataRoot=(layout,entries)=>hash(JSON.stringify([layout,entries]));
+const eventHash=row=>row?hash(JSON.stringify([row.seq,row.at,row.type,row.value])):null;
+const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+function intakeHold(message){throw Error('Storage intake hold: '+message);}
+export function captureStorageMetadata(db) {
+  const version=layoutVersion(db);if(!version)intakeHold('legacy JSON requires explicit migration');
+  const schema=db.prepare("SELECT type,name,tbl_name,sql FROM sqlite_master WHERE tbl_name IN ('company','events','company_layout','state_entries','immutable_values') AND name NOT GLOB 'public_read_*' ORDER BY type,name").all();
+  const layout={version,identity:hash(JSON.stringify([schema,db.prepare('SELECT * FROM company_layout ORDER BY id').all()]))};
+  validateKeyMetadata(db);
+  const entries=db.prepare('SELECT family,key,position,sha256'+(hasEncoding(db)?',encoding':",'json' AS encoding")+' FROM state_entries').all().map(row=>({...row,key:logicalKey(db,row.key)})).sort(metadataSort);
+  return {layout,entries,root:metadataRoot(layout,entries)};
+}
+function eventTail(db) {return db.prepare('SELECT seq,at,type,value FROM events ORDER BY seq DESC LIMIT 1').get();}
+function cut(db,metadata) {
+  const tail=eventTail(db);
+  return {version:1,...metadata,seq:tail?.seq??0,event_sha256:eventHash(tail)};
+}
+export function captureStorageBaseline(db) {
+  const metadata=captureStorageMetadata(db);
+  if(metadata.layout.version!==4)intakeHold('exact intake requires explicit migration to normalized v4');
+  validateMetadata(db,metadata);
+  const baseline=cut(db,metadata);
+  return {...baseline,sha256:hash(JSON.stringify(baseline))};
+}
+// Called inside the writer's existing transaction. Metadata queries never join
+// immutable bodies, including when an old native return is being appended.
+export function insertStorageEvent(db,type,payload,before) {
+  const at=new Date().toISOString(),tail=eventTail(db),seq=(tail?.seq??0)+1;
+  if(before) {
+    const after=captureStorageMetadata(db);
+    if(!same(before.layout,after.layout))intakeHold('layout changed during write');
+    const old=new Map(before.entries.map(row=>[metadataId(row),row])),next=new Map(after.entries.map(row=>[metadataId(row),row]));
+    const changes=[];
+    for(const identity of new Set([...old.keys(),...next.keys()])) {
+      const a=old.get(identity)??null,b=next.get(identity)??null;
+      if(!same(a,b))changes.push({before:a,after:b});
+    }
+    payload={...payload,storage_delta:{version:1,layout:before.layout,before_root:before.root,after_root:after.root,previous_event_sha256:eventHash(tail),changes}};
+    payload.storage_delta.sha256=hash(JSON.stringify([seq,at,type,payload]));
+  }
+  db.prepare('INSERT INTO events(seq,at,type,value) VALUES(?,?,?,?)').run(seq,at,type,JSON.stringify(payload));
+}
+function validateMetadata(db,metadata,verifyValue=null) {
+  if(metadata.layout?.version!==4||metadata.root!==metadataRoot(metadata.layout,metadata.entries))intakeHold('metadata root or layout mismatch');
+  const ids=new Set(),positions=new Set(),top=new Map(),shapes=new Map(),journalParents=new Map();
+  for(const row of metadata.entries) {
+    if(Object.keys(row).sort().join(',')!=='encoding,family,key,position,sha256'||typeof row.family!=='string'||typeof row.key!=='string'||!Number.isSafeInteger(row.position)||row.position<0||!/^[a-f0-9]{64}$/.test(row.sha256))intakeHold('invalid metadata identity');
+    // Round-trip the canonical v4 key representation without reading a body.
+    if(logicalKey(db,storedKey(db,row.key))!==row.key)intakeHold('inexact identity');
+    const identity=metadataId(row),position=JSON.stringify([['root','shape'].includes(row.family)?'top':row.family,row.position]);
+    if(ids.has(identity)||positions.has(position))intakeHold('duplicate identity or order');
+    ids.add(identity);positions.add(position);
+    if(!['json','journal-array'].includes(row.encoding))intakeHold('ambiguous encoding');
+    if(row.encoding==='journal-array') {
+      if(row.family!=='upgrade'||!journals.has(row.key))intakeHold('ambiguous journal encoding');
+      journalParents.set('upgrade.'+row.key,row);
+    }
+    if(['root','shape'].includes(row.family)) {
+      if(top.has(row.key))intakeHold('ambiguous root/shape');top.set(row.key,row);
+      if(row.family==='shape') {if(!collections.has(row.key)||row.encoding!=='json')intakeHold('unsupported shape');shapes.set(row.key,row);}
+    }
+    if(verifyValue)verifyValue(row);
+  }
+  const ordered=[...metadata.entries].sort(metadataSort);
+  if(!same(ordered,metadata.entries))intakeHold('noncanonical metadata order');
+  for(const row of metadata.entries) {
+    if(['root','shape'].includes(row.family))continue;
+    if(!shapes.has(row.family)&&!journalParents.has(row.family))intakeHold('orphan family');
+  }
+  // Descriptors and shapes are small metadata values. Baseline capture stays
+  // body-free; the explicit reader validates directly referenced row envelopes,
+  // not the transitive snapshot dependency graph inside their JSON values.
+  if(verifyValue) {
+    for(const row of shapes.values())if(!['array','object'].includes(JSON.parse(readImmutable(db,row.sha256))))intakeHold('unknown collection shape');
+    for(const [family,row] of journalParents) {
+      const descriptor=journalDescriptor({...row,bytes:readImmutable(db,row.sha256)});
+      const children=metadata.entries.filter(entry=>entry.family===family).sort((a,b)=>a.position-b.position);
+      if(children.length!==descriptor.length||children.some((child,n)=>child.key!==String(n)||child.position!==n||child.encoding!=='json'))intakeHold('journal shape mismatch');
+    }
+    for(const row of metadata.entries)if(row.family==='upgrade'&&journals.has(row.key)&&row.encoding==='json') {
+      const value=JSON.parse(readImmutable(db,row.sha256));
+      if(!Array.isArray(value)&&((value?.version===1&&value?.family==='upgrade.'+row.key)||journalParents.has('upgrade.'+row.key)))intakeHold('journal encoding marker missing');
+    }
+  }
+}
+// Verifies exact normalized row envelopes and event changes only. Before review,
+// publication or use, the checkpoint caller must resolve accepted old/new
+// envelopes against its frozen version map and captureSnapshotDependencies /
+// validateSnapshotDependencies against the bound vault. Missing/corrupt originals
+// hold there; intake success alone does not validate immutable_snapshot or
+// immutable_entry dependencies. Writer capture remains metadata-only.
+export function readStorageIntake(db,baseline,{values=false}={}) {
+  const {sha256,...unsigned}=baseline??{};
+  if(sha256!==hash(JSON.stringify(unsigned))||unsigned.version!==1||!Number.isSafeInteger(unsigned.seq)||unsigned.seq<0)intakeHold('invalid baseline; bind the runtime baseline into the reviewed proposal');
+  const current=captureStorageMetadata(db);
+  if(!same(baseline.layout,current.layout))intakeHold('changed layout');
+  const checked=new Set(),verify=row=>{
+    if(checked.has(row.sha256))return;
+    JSON.parse(readImmutable(db,row.sha256));checked.add(row.sha256);
+  };
+  validateMetadata(db,baseline,verify);
+  const anchor=baseline.seq?db.prepare('SELECT seq,at,type,value FROM events WHERE seq=?').get(baseline.seq):undefined;
+  if(eventHash(anchor)!==baseline.event_sha256)intakeHold('baseline event changed or missing');
+  const end=cut(db,current),events=db.prepare('SELECT seq,at,type,value FROM events WHERE seq>? ORDER BY seq').all(baseline.seq);
+  if(end.seq<baseline.seq||events.length!==end.seq-baseline.seq)intakeHold('event coverage gap');
+  let metadata={layout:baseline.layout,entries:baseline.entries,root:baseline.root},previous=baseline.event_sha256,seq=baseline.seq;
+  const intake=[];
+  for(const event of events) {
+    if(event.seq!==++seq)intakeHold('nonconsecutive event coverage');
+    const payload=JSON.parse(event.value),delta=payload.storage_delta;
+    if(event.value!==JSON.stringify(payload))intakeHold('changed event bytes');
+    if(!delta||delta.version!==1)intakeHold('uncovered writer');
+    const {sha256:seal,...body}=delta;
+    if(seal!==hash(JSON.stringify([event.seq,event.at,event.type,{...payload,storage_delta:body}]))||delta.previous_event_sha256!==previous)intakeHold('changed event or chain');
+    if(!same(delta.layout,baseline.layout)||delta.before_root!==metadata.root||!Array.isArray(delta.changes))intakeHold('before root or layout mismatch');
+    const rows=new Map(metadata.entries.map(row=>[metadataId(row),row])),seen=new Set();
+    for(const change of delta.changes) {
+      const {before,after}=change;
+      if(!before&&!after||before&&after&&metadataId(before)!==metadataId(after))intakeHold('delta identity mismatch');
+      const identity=metadataId(before??after);
+      if(seen.has(identity)||!same(rows.get(identity)??null,before)||same(before,after))intakeHold('before/after chain mismatch');
+      seen.add(identity);
+      if(after)rows.set(identity,after);else rows.delete(identity);
+    }
+    metadata={layout:baseline.layout,entries:[...rows.values()].sort(metadataSort),root:delta.after_root};
+    validateMetadata(db,metadata,verify);
+    intake.push({seq:event.seq,at:event.at,type:event.type,payload,changes:delta.changes.map(change=>values?Object.fromEntries(Object.entries(change).map(([side,ref])=>[side,ref?{...ref,raw:readImmutable(db,ref.sha256)}:null])):change)});
+    previous=eventHash(event);
+  }
+  validateMetadata(db,current,verify);
+  if(!same(metadata,current)||previous!==end.event_sha256)intakeHold('current end state mismatch');
+  return {baseline_sha256:sha256,cut:{version:end.version,layout:end.layout,seq:end.seq,event_sha256:end.event_sha256,root:end.root},events:intake};
 }

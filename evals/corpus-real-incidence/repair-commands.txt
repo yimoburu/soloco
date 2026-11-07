@@ -1,0 +1,20 @@
+Base: b6a81f7ab408a0cba90d984a336f56978574a9c3; existing candidate preserved in original source.patch.
+No commit, external services, company data, models, native sessions, installation, release, hosting, or other-worktree writes.
+
+Pre-repair regression (exit 1; 1 pass / 2 failures):
+/private/tmp/soloco-node22-validation/node-v22.13.0-darwin-arm64/bin/node --test --test-name-pattern='FICTIONAL JSON STRING|FICTIONAL new incidence|FICTIONAL unmarked' tests/scoped-corpus-runtime.test.mjs > evals/corpus-real-incidence/repair-prefailure-node22.log 2>&1
+Pre-repair direct false C ownership assertion (exit 1; failure retained):
+/private/tmp/soloco-node22-validation/node-v22.13.0-darwin-arm64/bin/node --test --test-name-pattern='FICTIONAL JSON STRING' tests/scoped-corpus-runtime.test.mjs > evals/corpus-real-incidence/repair-prefailure-ownership-node22.log 2>&1
+Post-repair focused checks (exit 0; 4/4):
+/private/tmp/soloco-node22-validation/node-v22.13.0-darwin-arm64/bin/node --test --test-name-pattern='FICTIONAL JSON STRING|FICTIONAL new incidence|FICTIONAL unmarked|FICTIONAL transitive' tests/scoped-corpus-runtime.test.mjs > evals/corpus-real-incidence/repair-focused-node22.log 2>&1
+
+Pinned legacy assignment comparison: git show b6a81f7:plugins/soloco/runtime/scoped-context.mjs was written to /private/tmp/incidence-repair-before/baseline-b6a81f7.mjs, replacing only relative ESM module specifiers with absolute file URLs into cwd/runtime. Runtime logic is unchanged. CORPUS_BASELINE_MODULE=file:///private/tmp/incidence-repair-before/baseline-b6a81f7.mjs is set for both full-suite processes. The existing unmarked test compares complete scopedAssignment outputs (packet, claims, qualification and stream bytes) at domain/interface/integration against that baseline, in addition to explicit old instruction assertions.
+
+Four suites, concurrent in ONE bounded Python supervisor call with 590-second shared subprocess deadline; no process exceeded the bound:
+CORPUS_BASELINE_MODULE=file:///private/tmp/incidence-repair-before/baseline-b6a81f7.mjs /private/tmp/soloco-node22-validation/node-v22.13.0-darwin-arm64/bin/node --test tests/scoped-context.test.mjs tests/scoped-coherent-runtime.test.mjs tests/scoped-corpus-runtime.test.mjs tests/legacy-coherent.test.mjs > evals/corpus-real-incidence/repair-scoped-coherent-node22.log 2>&1
+CORPUS_BASELINE_MODULE=file:///private/tmp/incidence-repair-before/baseline-b6a81f7.mjs /opt/homebrew/bin/node --test tests/scoped-context.test.mjs tests/scoped-coherent-runtime.test.mjs tests/scoped-corpus-runtime.test.mjs tests/legacy-coherent.test.mjs > evals/corpus-real-incidence/repair-scoped-coherent-node25.log 2>&1
+
+git diff --check > evals/corpus-real-incidence/repair-diff-check.txt 2>&1
+git diff -- plugins/soloco/runtime/scoped-context.mjs tests/scoped-corpus-runtime.test.mjs docs/scoped-context.md > evals/corpus-real-incidence/repair-source.patch
+repair-only.patch: unified diff of the same three files against the candidate captured before repair, with standard a/b file labels.
+repair-original-evidence-sha256.txt: original evidence fingerprints before the repair report append; all originals except the appended report remain unchanged.

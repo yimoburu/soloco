@@ -1,0 +1,90 @@
+(node:83835) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ accepted historical publication proof survives an owner epoch change without admitting old in-flight work (1128.029042ms)
+✔ public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning (300.406875ms)
+✔ missing legacy bootstrap is visibly DIRTY and apply rolls back without acceptance (43.149666ms)
+✔ new membership, changed exact source, wrong independent identity and absent closure cannot publish (1028.027208ms)
+✔ scope closure, global membership, expiry, receipt changes, revocation and missed communication hold (463.616292ms)
+✔ pause fences publication reviewer and prospective handover cannot hide unknown legacy (49.241709ms)
+✔ 10x independently classified inert archive keeps actual mandatory operating assignment bytes and semantic work constant (1787.628917ms)
+✔ deleted applicable home and changed exact provenance cannot disappear from accepted meaning (268.465291ms)
+✔ typed outcome requires complete historical uncertainty; text cannot manufacture permission (234.671ms)
+✖ public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure (941.657625ms)
+✔ late new and changed falsely scoped prohibitions stay globally DIRTY, but fresh proposals include them (1513.461916ms)
+✔ publication proof stays current; failed, quarantined, uncertain and unknown-extension siblings stay DIRTY (405.58575ms)
+✔ mechanical publication index rejects tampering and retains unknown state extensions (245.308791ms)
+✔ format6 explicit non-home evidence survives dispatch, discovery and bounded same-native reads (3608.303041ms)
+✔ referenced archived revoked/retry restriction and canonical parent receipts are supplied completely inline (708.348292ms)
+✖ large non-home provenance uses exact same-native ranges; undelivered, partial, denied, stale or changed evidence cannot publish (819.359375ms)
+✔ canonical preservation parent revisions cannot be borrowed from matching hashes (191.444792ms)
+✔ missing provenance and snapshot-only evidence hold rather than count pointers as delivered bodies (53.595208ms)
+✔ real runtime receipt attribution and deterministic reuse deliver the validated producer closure before Pass (1006.330166ms)
+✔ runtime receipt missing or mismatched producer, candidate, plan, reuse or generation holds (129.897292ms)
+✔ external catalog reference-shaped metadata is verbatim evidence without a company lookup (429.069375ms)
+✔ runtime closure requires complete delivery and independent source and proof sessions (6136.845042ms)
+✖ public qualified recovered snapshot publishes current typed outcomes without replaying the paid raw archive (1563.644042ms)
+✔ large prospective publication uses bounded frozen worker delivery and rejects a manufactured complete flag (29912.819209ms)
+✔ frozen publication worker rejects unread semantics, changed native and changed current membership (1510.699209ms)
+✔ paid snapshot archive still requires publication QA independent of nested original producers (1208.536958ms)
+✔ FICTIONAL PUBLIC v2 explicit complete sources preserve accepted runtime producer independence and freshness (6480.09325ms)
+ℹ tests 27
+ℹ suites 0
+ℹ pass 24
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 62281.376166
+
+✖ failing tests:
+
+test at tests/operating-state.test.mjs:67:1
+✖ public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure (941.657625ms)
+  Error: Operating state Held: DIRTY handover completion changed
+      at fail (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:10:22)
+      at inputUnchanged (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:314:169)
+      at operatingContext (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:499:3)
+      at TestContext.<anonymous> (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:79:15)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7)
+
+test at tests/operating-state.test.mjs:222:1
+✖ large non-home provenance uses exact same-native ranges; undelivered, partial, denied, stale or changed evidence cannot publish (819.359375ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /not completely delivered/. Input:
+  
+  'Error: Operating state Held: DIRTY concurrent storage intake requires new proposal: jobs:job-d24fd4e4-2cd7-44b2-8542-61483ed8b847'
+  
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async TestContext.<anonymous> (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:229:6)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: Operating state Held: DIRTY concurrent storage intake requires new proposal: jobs:job-d24fd4e4-2cd7-44b2-8542-61483ed8b847
+        at fail (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:10:22)
+        at inputUnchanged (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:375:43)
+        at livePlan (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:381:30)
+        at publishOperatingState (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:465:37)
+        at file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:454:178
+        at mutate (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:93:190)
+        at Store.transaction (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:189:20)
+        at file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:93:335
+        at withStore (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:205:16)
+        at update (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:93:10),
+    expected: /not completely delivered/,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at tests/operating-state.test.mjs:360:1
+✖ public qualified recovered snapshot publishes current typed outcomes without replaying the paid raw archive (1563.644042ms)
+  Error: Operating state Held: DIRTY proposal controls, communication or negative findings changed
+      at fail (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:10:22)
+      at inputUnchanged (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:322:246)
+      at operatingContext (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:499:3)
+      at assignmentContext (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/context.mjs:28:22)
+      at TestContext.<anonymous> (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:375:34)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7)

@@ -1,0 +1,33 @@
+TAP version 13
+# (node:61556) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: construction exact ordered oracle: cyclic/transitive/shared originals, producers and changed selections
+ok 1 - construction exact ordered oracle: cyclic/transitive/shared originals, producers and changed selections
+  ---
+  duration_ms: 21.978084
+  ...
+# Subtest: construction exact duplicate rejection and strict identity/revision/hash matching
+ok 2 - construction exact duplicate rejection and strict identity/revision/hash matching
+  ---
+  duration_ms: 6.846791
+  ...
+# Subtest: construction pointer siblings, escaped segments, typed/STRING boundary and document equality
+ok 3 - construction pointer siblings, escaped segments, typed/STRING boundary and document equality
+  ---
+  duration_ms: 5.035875
+  ...
+# Subtest: construction bounded synthetic comparison counts edge candidates and document serializations
+ok 4 - construction bounded synthetic comparison counts edge candidates and document serializations
+  ---
+  duration_ms: 182.890875
+  ...
+# {"fictional_only":true,"construction_only":true,"observations":[{"sources":32,"before":{"document_serializations":4288,"edge_candidates":1024,"ms":3.9595000000000056},"optimized":{"document_serializations":1,"edge_candidates":32,"ms":0.5184580000000096}},{"sources":128,"before":{"document_serializations":66304,"edge_candidates":16384,"ms":36.908625},"optimized":{"document_serializations":1,"edge_candidates":128,"ms":2.031125000000003}},{"sources":1024,"optimized":{"document_serializations":1,"edge_candidates":1024,"ms":20.66624999999999},"before":"not rerun; bounded 32/128 comparison above"}]}
+1..4
+# tests 4
+# suites 0
+# pass 4
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 379.681459

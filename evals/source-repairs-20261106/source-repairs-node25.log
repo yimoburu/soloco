@@ -1,0 +1,83 @@
+(node:57491) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ accepted historical publication proof survives an owner epoch change without admitting old in-flight work (721.58475ms)
+✔ public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning (26.462042ms)
+✔ missing legacy bootstrap is visibly DIRTY and apply rolls back without acceptance (20.026541ms)
+✖ host catalog default service tier does not invalidate explicit operating reviewer startup (8.892083ms)
+✔ new membership, changed exact source, wrong independent identity and absent closure cannot publish (118.14825ms)
+✔ scope closure, global membership, expiry, receipt changes, revocation and missed communication hold (36.632959ms)
+✔ pause fences publication reviewer and prospective handover cannot hide unknown legacy (12.641125ms)
+✔ 10x independently classified inert archive keeps actual mandatory operating assignment bytes and semantic work constant (73.556416ms)
+✔ deleted applicable home and changed exact provenance cannot disappear from accepted meaning (26.975ms)
+✔ typed outcome requires complete historical uncertainty; text cannot manufacture permission (25.540125ms)
+✔ public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure (77.698083ms)
+✔ late new and changed falsely scoped prohibitions stay globally DIRTY, but fresh proposals include them (83.20525ms)
+✔ publication proof stays current; failed, quarantined, uncertain and unknown-extension siblings stay DIRTY (17.478208ms)
+✔ mechanical publication index rejects tampering and retains unknown state extensions (16.152292ms)
+✔ format6 explicit non-home evidence survives dispatch, discovery and bounded same-native reads (184.797875ms)
+✔ referenced archived revoked/retry restriction and canonical parent receipts are supplied completely inline (63.07325ms)
+✔ large non-home provenance uses exact same-native ranges; undelivered, partial, denied, stale or changed evidence cannot publish (595.253791ms)
+✔ canonical preservation parent revisions cannot be borrowed from matching hashes (56.632333ms)
+✔ missing provenance and snapshot-only evidence hold rather than count pointers as delivered bodies (13.627792ms)
+✔ real runtime receipt attribution and deterministic reuse deliver the validated producer closure before Pass (206.891917ms)
+✔ runtime receipt missing or mismatched producer, candidate, plan, reuse or generation holds (46.664458ms)
+✔ external catalog reference-shaped metadata is verbatim evidence without a company lookup (48.493167ms)
+✔ runtime closure requires complete delivery and independent source and proof sessions (2642.396625ms)
+✔ public qualified recovered snapshot publishes current typed outcomes without replaying the paid raw archive (1227.841584ms)
+✔ large prospective publication uses bounded frozen worker delivery and rejects a manufactured complete flag (5408.586167ms)
+✔ frozen publication worker rejects unread semantics, changed native and changed current membership (386.737792ms)
+✔ paid snapshot archive still requires publication QA independent of nested original producers (1101.588625ms)
+✔ FICTIONAL PUBLIC v2 explicit complete sources preserve accepted runtime producer independence and freshness (3246.643292ms)
+(node:57492) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ tree preservation stays valid after exact operating publication while unknown extensions hold (1490.4785ms)
+(node:57493) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ dispatch schema admits only optional supported speed choices and preserves legacy requirements (6.406708ms)
+✔ upgrade reuses the optional dispatch selection schema with unchanged required arguments (4.051583ms)
+✔ legacy omission and host_default avoid catalog discovery and persist normalized requests (13.33575ms)
+✔ default-mode fast_disabled routes catalog support without manufacturing model or execution evidence (3.729125ms)
+✔ explicit models obtain catalog once and retain separate model and speed-support metadata (10.46025ms)
+✔ unsupported speed, missing fast-off support and unverified effort reject before queuing or launch (37.328666ms)
+✔ omitted speed, explicit host_default and reason-only changes reuse a finished session (2.958959ms)
+✔ speed changes retire identity and repeated fast_disabled reuses the replacement (4.339084ms)
+✔ explicit model session identity also rotates for speed and reuses unchanged selections (3.95875ms)
+✔ speed wiring preserves ownership, pause, scope, adoption and independent-review checks (14.419875ms)
+✔ fresh-session schema is optional and rejects missing, orphaned or invalid reasons without mutation (18.90975ms)
+✔ explicit fresh with identical settings retires exact lineage and queues null native without execution claims (9.681042ms)
+✔ fresh after confirmed failure preserves failed job, authority, limits, inputs and attempt evidence (3.678042ms)
+✔ fresh cannot retire active/uncertain sessions or bypass owner, pause, host, resource or scope holds (53.991ms)
+✔ fresh is ordinary-only and cannot rotate handover reviewers or scoped generation identities (11.698958ms)
+(node:57494) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ read-only baseline, exact full/selected deltas, deletion, reorder, shape and unknown fields (34.096542ms)
+✔ selected writes and upgrade appends never read unrelated/prior journal bodies (24.397042ms)
+✔ selected new roots allocate after both root and shape positions without moving existing rows (25.482083ms)
+✔ existing duplicate top-level positions hold without rewriting historical metadata (8.720666ms)
+✔ intake verifies envelopes; checkpoint dependency validation holds on missing/corrupt nested originals (33.963292ms)
+✔ gaps, changed event envelopes/payloads, uncovered writers and unlogged state changes hold (107.544625ms)
+✔ missing/corrupt old, intermediate, new and unchanged immutable values hold (135.720458ms)
+✔ legacy/changed layout, ambiguous encoding, inexact identities and rollback hold (113.675333ms)
+✔ failed writes roll back metadata, immutable inserts and event atomically (24.270334ms)
+✔ position-only object reorder and selected deletion produce exact references; historical old events need no replay (24.296584ms)
+✔ re-sealed but inconsistent metadata roots and before/after chains hold (65.448875ms)
+ℹ tests 55
+ℹ suites 0
+ℹ pass 54
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 16613.398708
+
+✖ failing tests:
+
+test at tests/operating-state.test.mjs:47:1
+✖ host catalog default service tier does not invalidate explicit operating reviewer startup (8.892083ms)
+  Error: Model selection unavailable: inspect company_doctor models first
+      at normalizeSelection (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/selection.mjs:21:32)
+      at Module.dispatch (file:///private/tmp/soloco-operating-state-20261106/source/plugins/soloco/runtime/engine.mjs:276:19)
+      at TestContext.<anonymous> (file:///private/tmp/soloco-operating-state-20261106/source/tests/operating-state.test.mjs:50:17)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7)

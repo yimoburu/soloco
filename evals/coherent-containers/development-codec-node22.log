@@ -1,0 +1,147 @@
+TAP version 13
+# (node:85818) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: complete local sections retain late qualifiers, old versions, negatives and unknown code/logs; no raw baseline per packet
+ok 1 - complete local sections retain late qualifiers, old versions, negatives and unknown code/logs; no raw baseline per packet
+  ---
+  duration_ms: 9.815792
+  ...
+# Subtest: repeated snapshots use exact raw originals and inbound ancestry, contradictory occurrence contexts never transfer acceptance
+ok 2 - repeated snapshots use exact raw originals and inbound ancestry, contradictory occurrence contexts never transfer acceptance
+  ---
+  duration_ms: 17.142334
+  ...
+# Subtest: canonical JSON text is typed STRING evidence, coherent logical bodies replace escaped-range chunks
+ok 3 - canonical JSON text is typed STRING evidence, coherent logical bodies replace escaped-range chunks
+  ---
+  duration_ms: 3.753
+  ...
+# Subtest: resealed gaps, altered ancestry, omitted originals, forged sizes and changed qualifiers/membership hold
+ok 4 - resealed gaps, altered ancestry, omitted originals, forged sizes and changed qualifiers/membership hold
+  ---
+  duration_ms: 25.846292
+  ...
+# Subtest: bounded whole sections hold without truncation or cap widening; owned session resists caller mutation
+ok 5 - bounded whole sections hold without truncation or cap widening; owned session resists caller mutation
+  ---
+  duration_ms: 14.295041
+  ...
+# Subtest: linear unique section work for repeated snapshots; byte forecast without constructing corpus combinations
+ok 6 - linear unique section work for repeated snapshots; byte forecast without constructing corpus combinations
+  ---
+  duration_ms: 22.943125
+  ...
+# {"fictional_only":true,"ten":{"unique_sections":24,"physical_occurrences":49,"snapshot_inbound_edges":10,"unique_section_bytes":6360,"prospective_extraction_packets":49,"total_packet_bytes":126829,"largest_packet_bytes":3274,"held_packets":0,"complete_native_request_bytes":null,"native_same_session_fit":"unproven","semantic_acceptance":false},"hundred":{"unique_sections":114,"physical_occurrences":229,"snapshot_inbound_edges":100,"unique_section_bytes":24294,"prospective_extraction_packets":229,"total_packet_bytes":607786,"largest_packet_bytes":3283,"held_packets":0,"complete_native_request_bytes":null,"native_same_session_fit":"unproven","semantic_acceptance":false}}
+# Subtest: existing canonical source adapter uses runtime test author_instance and rejects invalid producer/candidate closure
+ok 7 - existing canonical source adapter uses runtime test author_instance and rejects invalid producer/candidate closure
+  ---
+  duration_ms: 92.683292
+  ...
+# Subtest: anonymous enclosing qualifiers and scalar collection members cannot hide complete local conditions
+ok 8 - anonymous enclosing qualifiers and scalar collection members cannot hide complete local conditions
+  ---
+  duration_ms: 1.282958
+  ...
+# Subtest: strict reference metadata remains in its parent section without independent extraction subjects
+ok 9 - strict reference metadata remains in its parent section without independent extraction subjects
+  ---
+  duration_ms: 8.906666
+  ...
+# Subtest: complete JSON fields and file bodies cut at typed boundaries; indivisible strings still hold
+ok 10 - complete JSON fields and file bodies cut at typed boundaries; indivisible strings still hold
+  ---
+  duration_ms: 20.207708
+  ...
+# Subtest: nested canonical sources maps expose bounded complete fields with every shared occurrence and exact original
+ok 11 - nested canonical sources maps expose bounded complete fields with every shared occurrence and exact original
+  ---
+  duration_ms: 170.324584
+  ...
+# {"fictional_only":true,"parent_string_bytes":[89692,89690],"terminal_string_bytes":[21650,17056,12952,11782,9904],"measurements":{"unique_sections":22,"physical_occurrences":54,"snapshot_inbound_edges":1,"unique_section_bytes":94660,"prospective_extraction_packets":54,"total_packet_bytes":441936,"largest_packet_bytes":25964,"held_packets":0,"complete_native_request_bytes":null,"native_same_session_fit":"unproven","semantic_acceptance":false}}
+# Subtest: canonical array roots preserve nested arrays, primitive members, empties and oversized terminal holds
+ok 12 - canonical array roots preserve nested arrays, primitive members, empties and oversized terminal holds
+  ---
+  duration_ms: 21.03925
+  ...
+# Subtest: formatting/escape-only JSON STRING views roundtrip raw bytes, nested data and late prohibitions
+ok 13 - formatting/escape-only JSON STRING views roundtrip raw bytes, nested data and late prohibitions
+  ---
+  duration_ms: 74.125375
+  ...
+# Subtest: ambiguous or normalized JSON tokens remain opaque; large non-JSON terminals stay Held
+ok 14 - ambiguous or normalized JSON tokens remain opaque; large non-JSON terminals stay Held
+  ---
+  duration_ms: 29.486
+  ...
+# Subtest: upgrade complete fields and ordered journal members split bounded bodies with separate failed contexts
+ok 15 - upgrade complete fields and ordered journal members split bounded bodies with separate failed contexts
+  ---
+  duration_ms: 141.297
+  ...
+# {"fictional_only":true,"attempt_bytes":76274,"journal_members":28,"shared_physical_occurrences":84,"measurements":{"unique_sections":72,"physical_occurrences":389,"snapshot_inbound_edges":2,"unique_section_bytes":24052,"prospective_extraction_packets":389,"total_packet_bytes":2224911,"largest_packet_bytes":8368,"held_packets":0,"complete_native_request_bytes":null,"native_same_session_fit":"unproven","semantic_acceptance":false}}
+# (node:85819) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: pure builder preserves hidden prohibitions, exceptions, spent/revoked grants, failure, unknowns and attribution
+ok 16 - pure builder preserves hidden prohibitions, exceptions, spent/revoked grants, failure, unknowns and attribution
+  ---
+  duration_ms: 11.944084
+  ...
+# Subtest: repeated checkpoints, previous versions and retained handover remain reconstructible without original vault
+ok 17 - repeated checkpoints, previous versions and retained handover remain reconstructible without original vault
+  ---
+  duration_ms: 16.469666
+  ...
+# Subtest: canonical JSON text codec preserves STRING type, Unicode, ordered keys and array positions byte exactly
+ok 18 - canonical JSON text codec preserves STRING type, Unicode, ordered keys and array positions byte exactly
+  ---
+  duration_ms: 9.894166
+  ...
+# Subtest: producer/revision/date/scope/parent mutations and archive appends invalidate complete baseline
+ok 19 - producer/revision/date/scope/parent mutations and archive appends invalidate complete baseline
+  ---
+  duration_ms: 34.089792
+  ...
+# Subtest: missing/corrupt references, cycles, omissions, altered typed keys and resealed frontier holes hold
+ok 20 - missing/corrupt references, cycles, omissions, altered typed keys and resealed frontier holes hold
+  ---
+  duration_ms: 13.311709
+  ...
+# Subtest: same body has distinct occurrences across producer/revision/scope/date and parent contexts
+ok 21 - same body has distinct occurrences across producer/revision/scope/date and parent contexts
+  ---
+  duration_ms: 2.675
+  ...
+# Subtest: overcapacity holds whole uncertain coupling and never implies global fit
+ok 22 - overcapacity holds whole uncertain coupling and never implies global fit
+  ---
+  duration_ms: 5.001209
+  ...
+# Subtest: capture uses existing SQLite transaction/vault; rollback does not publish capsule
+ok 23 - capture uses existing SQLite transaction/vault; rollback does not publish capsule
+  ---
+  duration_ms: 74.407459
+  ...
+# Subtest: forced digest collision never merges unequal exact definitions
+ok 24 - forced digest collision never merges unequal exact definitions
+  ---
+  duration_ms: 95.323208
+  ...
+# Subtest: ambiguous current/history source IDs and missing embedded raw originals hold
+ok 25 - ambiguous current/history source IDs and missing embedded raw originals hold
+  ---
+  duration_ms: 4.432459
+  ...
+# Subtest: lossless noncanonical STRING graph preserves raw bytes and rejects forged token correspondence
+ok 26 - lossless noncanonical STRING graph preserves raw bytes and rejects forged token correspondence
+  ---
+  duration_ms: 10.245708
+  ...
+1..26
+# tests 26
+# suites 0
+# pass 26
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 792.759875

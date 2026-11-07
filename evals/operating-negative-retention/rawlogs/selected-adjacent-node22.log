@@ -1,0 +1,82 @@
+TAP version 13
+# (node:38182) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: injected worker rejects all omitted output channels before persistence and retains exact bad output/provenance
+    # Subtest: content
+    ok 1 - content
+      ---
+      duration_ms: 224.817083
+      ...
+    # Subtest: result_unknown_property
+    ok 2 - result_unknown_property
+      ---
+      duration_ms: 73.003667
+      ...
+    # Subtest: item_unknown_property
+    ok 3 - item_unknown_property
+      ---
+      duration_ms: 90.445541
+      ...
+    # Subtest: message_to_engineer
+    ok 4 - message_to_engineer
+      ---
+      duration_ms: 83.7415
+      ...
+    # Subtest: message_to_qa
+    ok 5 - message_to_qa
+      ---
+      duration_ms: 114.094375
+      ...
+    # Subtest: notice
+    ok 6 - notice
+      ---
+      duration_ms: 80.626334
+      ...
+    1..6
+ok 1 - injected worker rejects all omitted output channels before persistence and retains exact bad output/provenance
+  ---
+  duration_ms: 667.641709
+  ...
+# Subtest: malformed raw qualification JSON retains exact text and target provenance through the worker failure path
+ok 2 - malformed raw qualification JSON retains exact text and target provenance through the worker failure path
+  ---
+  duration_ms: 129.089375
+  ...
+# Subtest: worker retains the negative verdict when rejecting unknown qualification output keys
+ok 3 - worker retains the negative verdict when rejecting unknown qualification output keys
+  ---
+  duration_ms: 77.1665
+  ...
+# (node:38183) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: frozen publication worker rejects unread semantics, changed native and changed current membership
+ok 4 - frozen publication worker rejects unread semantics, changed native and changed current membership
+  ---
+  duration_ms: 3564.344417
+  ...
+# Subtest: publication cannot reuse provenance-bound rejected native identities from a preserved failed job
+ok 5 - publication cannot reuse provenance-bound rejected native identities from a preserved failed job
+  ---
+  duration_ms: 2195.529458
+  ...
+# (node:38184) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: single-packet rejected identities preserve older canonical extraction and never become bindings
+ok 6 - single-packet rejected identities preserve older canonical extraction and never become bindings
+  ---
+  duration_ms: 1326.851583
+  ...
+# Subtest: later changed stream identity is retained separately and barred from future admission in both protocols
+ok 7 - later changed stream identity is retained separately and barred from future admission in both protocols
+  ---
+  duration_ms: 1402.430917
+  ...
+1..7
+# tests 13
+# suites 0
+# pass 13
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5910.237833

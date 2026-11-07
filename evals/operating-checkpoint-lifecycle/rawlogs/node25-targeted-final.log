@@ -1,0 +1,130 @@
+(node:84474) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ missing production intake provider is fail closed (0.581209ms)
+✔ initial unknown legacy is never relabeled accepted (36.863917ms)
+✔ immutable accepted home survives replacement; new global restriction holds ordinary but complete delta repair publishes (60.174292ms)
+✔ successor exact base and concurrent semantic intake including reverted intake hold (69.428167ms)
+✔ missing original, changed producer, rejected negative, expiry and unknown nested producer hold (61.816834ms)
+✔ canonical known historical evidence freezes before bookkeeping; nested originals remain checked (54.673042ms)
+(node:84475) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ public handover, independent publication, full v4 worker review, resume and first ordinary format6 Engineering return (3962.380291ms)
+✔ independent resume rejects changed closure, subject, identity, delivery and current meaning (6105.306625ms)
+✔ only exact pure runtime commands are mechanically ingested; conditions, unknown fields and generic saves stay held (839.41125ms)
+✔ actual conditional handover retains founder conditions and unknown legacy remains held on first pass (110.316292ms)
+✔ bounded runtime admission binds task, owner, checkpoint, complete inputs and every metadata phase (695.232458ms)
+✔ reverted publication metadata and unknown root handover/notice changes remain intake (1345.254708ms)
+(node:84476) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ accepted historical publication proof survives an owner epoch change without admitting old in-flight work (1596.740375ms)
+✔ public API publishes atomically, keeps authority separate, and dispatch uses accepted current meaning (360.764083ms)
+✔ missing legacy bootstrap is visibly DIRTY and apply rolls back without acceptance (47.689333ms)
+✔ new membership, changed exact source, wrong independent identity and absent closure cannot publish (1095.40525ms)
+✔ scope closure, global membership, expiry, receipt changes, revocation and missed communication hold (488.4605ms)
+✔ pause fences publication reviewer and prospective handover cannot hide unknown legacy (51.394625ms)
+✔ 10x independently classified inert archive keeps actual mandatory operating assignment bytes and semantic work constant (1901.258041ms)
+✔ deleted applicable home and changed exact provenance cannot disappear from accepted meaning (283.364583ms)
+✔ typed outcome requires complete historical uncertainty; text cannot manufacture permission (249.773667ms)
+✖ public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure (995.031833ms)
+✔ late new and changed falsely scoped prohibitions stay globally DIRTY, but fresh proposals include them (1609.561625ms)
+✔ publication proof stays current; failed, quarantined, uncertain and unknown-extension siblings stay DIRTY (422.967833ms)
+✔ mechanical publication index rejects tampering and retains unknown state extensions (260.866375ms)
+✔ format6 explicit non-home evidence survives dispatch, discovery and bounded same-native reads (3794.278542ms)
+✔ referenced archived revoked/retry restriction and canonical parent receipts are supplied completely inline (677.919667ms)
+✖ large non-home provenance uses exact same-native ranges; undelivered, partial, denied, stale or changed evidence cannot publish (859.306833ms)
+✔ canonical preservation parent revisions cannot be borrowed from matching hashes (199.2845ms)
+✔ missing provenance and snapshot-only evidence hold rather than count pointers as delivered bodies (63.943ms)
+✔ real runtime receipt attribution and deterministic reuse deliver the validated producer closure before Pass (1061.855042ms)
+✔ runtime receipt missing or mismatched producer, candidate, plan, reuse or generation holds (134.138291ms)
+✔ external catalog reference-shaped metadata is verbatim evidence without a company lookup (450.936709ms)
+✔ runtime closure requires complete delivery and independent source and proof sessions (6446.731083ms)
+✔ public qualified recovered snapshot publishes current typed outcomes without replaying the paid raw archive (3336.755042ms)
+✔ large prospective publication uses bounded frozen worker delivery and rejects a manufactured complete flag (44439.614209ms)
+✔ frozen publication worker rejects unread semantics, changed native and changed current membership (1767.725542ms)
+✔ paid snapshot archive still requires publication QA independent of nested original producers (1252.863875ms)
+✔ FICTIONAL PUBLIC v2 explicit complete sources preserve accepted runtime producer independence and freshness (6543.323708ms)
+(node:84477) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ tree preservation stays valid after exact operating publication while unknown extensions hold (2408.35625ms)
+(node:84478) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ read-only baseline, exact full/selected deltas, deletion, reorder, shape and unknown fields (37.835167ms)
+✔ selected writes and upgrade appends never read unrelated/prior journal bodies (18.890208ms)
+✔ selected new roots allocate after both root and shape positions without moving existing rows (24.677292ms)
+✔ existing duplicate top-level positions hold without rewriting historical metadata (9.208875ms)
+✔ intake verifies envelopes; checkpoint dependency validation holds on missing/corrupt nested originals (44.949542ms)
+✔ gaps, changed event envelopes/payloads, uncovered writers and unlogged state changes hold (144.903ms)
+✔ missing/corrupt old, intermediate, new and unchanged immutable values hold (110.233625ms)
+✔ legacy/changed layout, ambiguous encoding, inexact identities and rollback hold (91.868125ms)
+✔ failed writes roll back metadata, immutable inserts and event atomically (21.098417ms)
+✔ position-only object reorder and selected deletion produce exact references; historical old events need no replay (17.48575ms)
+✔ re-sealed but inconsistent metadata roots and before/after chains hold (54.491375ms)
+(node:84479) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ legacy capture holds atomically; ordinary writes/read/reopen do not migrate; explicit migration backs up exact origin (44.024ms)
+✔ known v1/v2/v3 layouts retain pending journals and compatibility; incompatible capture/keys require explicit migration (123.380417ms)
+✔ v4 keys round-trip NUL, lone surrogates, literal prefix, unknown roots and order through selected writes and portable restore (71.328458ms)
+✔ unknown layouts, corrupt key markers, missing originals and failed migration readback hold without adopting a layout (30.416458ms)
+✔ contextMatches inherits exact resolver while arbitrary unbound copies still hold (33.517708ms)
+✔ frozen projection reuses exact bytes, invalidates second-writer/dependency changes, and detects original corruption between reads (67.486666ms)
+✔ projection cache eviction retains exact legacy frozen contract and failed-successor preview distinction (8.661416ms)
+✔ raw direct-source reads bind exact pointers and originals across another writer, including unsafe keys and corruption (17.236584ms)
+✔ explicit migration refuses a second-writer change after backup and keeps its exact source backup (5.404709ms)
+✔ detectable old lossy identities hold rather than adopting a normalized substitute (14.870916ms)
+✔ pinned text preserves exact lone-surrogate hash encoding and Unicode range boundaries (0.234458ms)
+✔ pending legacy handover context and ordinary delivery writes keep their inline storage contract (3.720958ms)
+✔ a duplicate original hash cannot conceal conflicting reference shape metadata in extension slots (0.20875ms)
+(node:84480) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ restore verifies every copied artifact and preserves exact logical database state (674.957834ms)
+✔ public restore refuses an artifact changed after source validation even when database readback would match (13.829459ms)
+✔ restore refuses unexpected destination files appearing during copying (12.260459ms)
+ℹ tests 67
+ℹ suites 0
+ℹ pass 65
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 80535.168334
+
+✖ failing tests:
+
+test at tests/operating-state.test.mjs:67:1
+✖ public prospective v4 reconstruction requires accepted coverage and exact independent resume QA plus closure (995.031833ms)
+  Error: Operating state Held: DIRTY handover completion changed
+      at fail (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:10:22)
+      at inputUnchanged (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:314:169)
+      at operatingContext (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:499:3)
+      at TestContext.<anonymous> (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:79:15)
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7)
+
+test at tests/operating-state.test.mjs:222:1
+✖ large non-home provenance uses exact same-native ranges; undelivered, partial, denied, stale or changed evidence cannot publish (859.306833ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /not completely delivered/. Input:
+  
+  'Error: Operating state Held: DIRTY concurrent storage intake requires new proposal: jobs:job-5b9d4bb4-4966-4bb9-862f-eec299b35d92'
+  
+      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+      at async TestContext.<anonymous> (file:///private/tmp/soloco-operating-checkpoint-20261106/source/tests/operating-state.test.mjs:229:6)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: Operating state Held: DIRTY concurrent storage intake requires new proposal: jobs:job-5b9d4bb4-4966-4bb9-862f-eec299b35d92
+        at fail (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:10:22)
+        at inputUnchanged (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:375:43)
+        at livePlan (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:381:30)
+        at publishOperatingState (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/operating-state.mjs:465:37)
+        at file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:454:178
+        at mutate (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:93:190)
+        at Store.transaction (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:189:20)
+        at file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:93:335
+        at withStore (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/store.mjs:205:16)
+        at update (file:///private/tmp/soloco-operating-checkpoint-20261106/source/plugins/soloco/runtime/engine.mjs:93:10),
+    expected: /not completely delivered/,
+    operator: 'rejects',
+    diff: 'simple'
+  }

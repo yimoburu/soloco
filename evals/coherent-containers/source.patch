@@ -1,0 +1,328 @@
+diff --git a/docs/legacy-operating.md b/docs/legacy-operating.md
+index 106e6ca..b8ed443 100644
+--- a/docs/legacy-operating.md
++++ b/docs/legacy-operating.md
+@@ -138,3 +138,7 @@ The old range default, `coherent-source-v1`, `captureLegacyCanonicalSource`, and
+ The unreleased corpus experiment now supports an exact frozen semantic partition proposal and metadata-only workload inspection; see the scoped-context documentation. Complete fields of canonical JSON STRING views and recognized `{path, content|body}` file entries may become linked sections. The enclosing fields, unknown keys, qualifier links and ordered structure remain exact; decoded values remain their original types and immutable raw bytes round-trip. No text serialization ranges are semantic cuts. An indivisible 1 MB body still holds under the existing cap. These field cuts supersede the earlier experimental coherent plan layout, not published range proofs or issued company receipts.
+ 
+ Field discovery traverses nested objects and arrays, including canonical STRING array roots and nested `sources` maps. Shared structures are discovered once, while every physical occurrence retains its own path, ancestor qualifiers and independent reconciliation obligations. Primitive members and empty structures remain in the exact ordered graph and local sections. File-path keys and small size confer no semantic independence. Discovery uses an iterative visited traversal; codec protections and opaque terminal-string holds remain. Bounded intrinsic sections do not establish bounded domain/interface requests or semantic acceptance; see the synthetic measurements and focused Node 22/25 logs in [nested-field repair report](../evals/coherent-nested-fields/report.md).
++
++The connected container repair also seeds this field traversal from recognized `upgrade` and ordered `upgrade_history` source slots, including state containers in retained originals and immutable attempt entries. Complete attempt fields and journal members become linked sections; candidate/previous/probe/review wrappers, unknown qualifiers, ordered membership and every physical occurrence remain compulsory. Upgrade discovery stops at complete state and snapshot transport boundaries, so it does not recursively promote every checkpoint scalar. These are structural candidates only; no scope, passive status, semantic independence or authority is inferred.
++
++Unpublished JSON STRING views additionally admit formatting and escape variants only after a closed lexical comparison against the canonical candidate. Both texts must validate as JSON; token count/order, punctuation, exact numeric/literal spelling and decoded STRING values must match. Duplicate keys, numeric normalization/precision changes, reordered keys, invalid escapes and trailing data cannot pass. Noncanonical views retain their exact original text in the typed graph; decoding verifies the correspondence again and returns the original STRING byte-for-byte. Existing full graph/coverage reconstruction remains required. Non-JSON terminal strings remain indivisible and oversized packets Held under unchanged limits. The synthetic repair results and exact Node 22/25 focused logs are in the [container repair report](../evals/coherent-containers/report.md); they establish no native semantic acceptance, actual-company fit or resumption.
+diff --git a/plugins/soloco/runtime/legacy-operating.mjs b/plugins/soloco/runtime/legacy-operating.mjs
+index 6e25a7f..70a2cb2 100644
+--- a/plugins/soloco/runtime/legacy-operating.mjs
++++ b/plugins/soloco/runtime/legacy-operating.mjs
+@@ -43,6 +43,24 @@ function isolated(state){
+   bindSnapshots(copy,sha=>raws.get(sha)?.raw);
+   return {copy,raws};
+ }
++// Closed JSON lexer: parsing validates grammar; tokens prove that ONLY JSON
++// whitespace and STRING escape spelling differ from the canonical candidate.
++// Duplicate keys/reordered keys cannot match the canonical ordered token list.
++function sameJsonTokens(raw,candidate){
++  function tokens(text){
++    JSON.parse(text);
++    const token=/[ \t\r\n]+|"(?:[^"\\\u0000-\u001f]|\\(?:["\\/bfnrt]|u[0-9a-fA-F]{4}))*"|-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?|true|false|null|[{}\[\],:]/y;
++    const result=[];let offset=0;
++    while(offset<text.length){
++      token.lastIndex=offset;const match=token.exec(text);if(!match)return null;
++      const value=match[0];offset=token.lastIndex;
++      if(/^[ \t\r\n]/.test(value))continue;
++      result.push(value[0]==='"'?['string',JSON.parse(value)]:['token',value]);
++    }
++    return result;
++  }
++  try{const a=tokens(raw),b=tokens(candidate);return a!==null&&b!==null&&equal(a,b);}catch{return false;}
++}
+ function codec(canonical){
+   const definitions=[],buckets=new Map();
+   function intern(v){
+@@ -51,9 +69,9 @@ function codec(canonical){
+     else if(Array.isArray(v))node=['array',v.map(intern)];
+     else if(typeof v==='object')node=['object',Object.entries(v).map(([k,x])=>[k,intern(x)])];
+     else if(typeof v==='string'&&canonical&&v.length>32){
+-      let parsed,canonicalText=false;try{parsed=JSON.parse(v);exact(parsed);canonicalText=json(parsed)===v;}catch{}
++      let parsed,text,lossless=false;try{parsed=JSON.parse(v);exact(parsed);text=json(parsed);lossless=sameJsonTokens(v,text);}catch{}
+       // The tag decodes to STRING, never an operating object or instructions.
+-      node=canonicalText?['json-text-string',intern(parsed)]:['string',v];
++      node=lossless?['json-text-string',intern(parsed),...(text===v?[]:[v])]:['string',v];
+     }else node=[typeof v,v];
+     const signature=json(node),sha=digest(signature),bucket=buckets.get(sha)??[];
+     for(const i of bucket){if(json(definitions[i])!==signature)hold('definition hash collision');return i;}
+@@ -73,7 +91,10 @@ function decodeGraph(definitions){
+     else if(d[0]==='object'&&d.length===2&&Array.isArray(d[1])){
+       value=Object.create(null);const seen=new Set();for(const edge of d[1]){if(!Array.isArray(edge)||edge.length!==2||typeof edge[0]!=='string'||seen.has(edge[0]))hold('duplicate/malformed ordered key');seen.add(edge[0]);Object.defineProperty(value,edge[0],{value:get(edge[1]),enumerable:true,writable:true,configurable:true});}
+       if(!equal(Object.keys(value),d[1].map(e=>e[0])))hold('ordered key shape changed');
+-    }else if(d[0]==='json-text-string'&&d.length===2)value=json(get(d[1]));
++    }else if(d[0]==='json-text-string'&&(d.length===2||d.length===3)){
++      const candidate=json(get(d[1]));value=d.length===2?candidate:d[2];
++      if(typeof value!=='string'||!sameJsonTokens(value,candidate))hold('unproven JSON STRING encoding');
++    }
+     else if(['string','boolean','number'].includes(d[0])&&d.length===2&&typeof d[1]===d[0]){exact(d[1]);value=d[1];}
+     else hold('unknown typed definition');
+     active.delete(i);values.set(i,value);return value;
+@@ -228,12 +249,16 @@ function coherentBuild(state,max_packet_bytes){
+   for(let i=0;i<definitions.length;i++){
+     const d=definitions[i];if(d[0]==='object'&&d[1].some(([k,v])=>k==='id'&&scalar(v)!==undefined)&&!referenceOnly(referenceValue(i)))roots.add(i);
+   }
+-  const collections=new Map();
++  const collections=new Map(),upgradeRoots=new Set(),stateContainers=new Set();
+   // Collection membership is exact structural evidence, not a giant review
+   // body. Its children remain required units, including children without IDs.
+   for(let i=0;i<definitions.length;i++){
+     const d=definitions[i];if(d[0]!=='object'||!d[1].some(([k])=>k==='records')||!d[1].some(([k])=>k==='jobs'))continue;
+-    roots.add(i);
++    roots.add(i);stateContainers.add(i);
++    for(const [key,node] of d[1])if(key==='upgrade'||key==='upgrade_history'){
++      const members=key==='upgrade_history'&&definitions[node][0]==='array'?definitions[node][1]:key==='upgrade'?[node]:[];
++      for(const member of members)upgradeRoots.add(intern(resolveSnapshotEntry(copy,referenceValue(member))));
++    }
+     for(const [key,node] of d[1])if(['records','jobs','messages','notices','upgrade_history'].includes(key)){
+       const child=definitions[node],edges=child[0]==='object'?child[1]:child[0]==='array'?child[1].map((v,n)=>[String(n),v]):null;
+       if(!edges)continue;
+@@ -241,16 +266,19 @@ function coherentBuild(state,max_packet_bytes){
+       for(const [,v] of edges)roots.add(v);
+     }
+   }
+-  // Complete fields of canonical JSON STRING views and explicit file entries
++  // Complete fields of lossless JSON STRING views and explicit file entries
+   // are logical candidates. Unknown keys stay present; text leaves are never
+   // range sliced. The enclosing section retains every typed qualifier/link.
+   const fieldRoots=new Set(),fieldStructures=new Set();
+-  function fields(node){
++  function fields(node,upgrade=false){
+     // Discover each shared structure once; physical occurrences and qualifiers
+     // are still enumerated separately below. No extra recursive codec depth.
+     const pending=[node];
+     while(pending.length){
+       const root=pending.pop(),d=definitions[root];
++      // Upgrade field discovery stops at complete state/transport boundaries;
++      // it must not turn every scalar/key in a checkpoint into a new section.
++      if(upgrade&&(stateContainers.has(root)||snapshotReference(referenceValue(root))||snapshotEntryReference(referenceValue(root))))continue;
+       if(fieldStructures.has(root)||!['object','array'].includes(d[0]))continue;
+       fieldStructures.add(root);roots.add(root);
+       const children=d[0]==='object'?d[1].map(([,child])=>child):d[1];
+@@ -264,6 +292,7 @@ function coherentBuild(state,max_packet_bytes){
+     const d=definitions[i];if(d[0]==='json-text-string')fields(d[1]);
+     if(d[0]==='object'&&d[1].some(([k])=>k==='path')&&d[1].some(([k])=>['content','body'].includes(k)))fields(i);
+   }
++  for(const root of upgradeRoots)fields(root,true);
+   const groupByRoot=new Map([...roots].sort((a,b)=>a-b).map((root,i)=>[root,'coherent-'+i]));
+   const get=decodeGraph(definitions),views=new Map();
+   // A section has EVERY local field. Nested complete bodies are explicit cuts,
+@@ -281,7 +310,7 @@ function coherentBuild(state,max_packet_bytes){
+         return Object.fromEntries(d[1].map(([k,v])=>[k,view(v,path+'/'+pointer(k))]));
+       }
+       if(d[0]==='array')return d[1].map((v,n)=>view(v,path+'/'+n));
+-      if(d[0]==='json-text-string')return {legacy_coherent_string_encoding:'canonical-json-text',value:view(d[1],path+'/@json-text')};
++      if(d[0]==='json-text-string')return {legacy_coherent_string_encoding:d.length===2?'canonical-json-text':'lossless-json-text',value:view(d[1],path+'/@json-text')};
+       return get(i);
+     }
+     const result={body:view(root,'',true),cuts};views.set(root,result);return result;
+@@ -321,7 +350,7 @@ function coherentBuild(state,max_packet_bytes){
+ function packetBase(p,o){
+   // Measurements are excluded from occurrence identity to avoid self-reference.
+   const {packet_bytes,fit,...occurrence}=o;
+-  return {protocol:LEGACY_COHERENT_PROTOCOL,phase:'intrinsic-extraction',baseline:p.baseline,occurrence,sections:[],instructions:'Extract every local condition, exception, negative and uncertainty. Canonical JSON text remains STRING evidence. Linked sections and snapshot inbound contexts are unresolved interactions; equality never transfers acceptance. No publication or exclusion.',cross_group_status:'Held: independent applicability and interaction reconciliation required',semantic_acceptance:false};
++  return {protocol:LEGACY_COHERENT_PROTOCOL,phase:'intrinsic-extraction',baseline:p.baseline,occurrence,sections:[],instructions:'Extract every local condition, exception, negative and uncertainty. Lossless JSON text remains STRING evidence. Linked sections and snapshot inbound contexts are unresolved interactions; equality never transfers acceptance. No publication or exclusion.',cross_group_status:'Held: independent applicability and interaction reconciliation required',semantic_acceptance:false};
+ }
+ function coherentAdapterContract(){return {
+   status:'Held',canonical_protocol:'scoped-context-v1',canonical_partitioner:'lossless-ranges-v1',
+diff --git a/tests/legacy-coherent.test.mjs b/tests/legacy-coherent.test.mjs
+index 14a992c..811f4c0 100644
+--- a/tests/legacy-coherent.test.mjs
++++ b/tests/legacy-coherent.test.mjs
+@@ -4,7 +4,7 @@ import fs from 'node:fs';
+ import os from 'node:os';
+ import path from 'node:path';
+ import {Store,digest} from '../plugins/soloco/runtime/store.mjs';
+-import {bindSnapshots,retainSnapshot,pendingSnapshots,resolveSnapshot} from '../plugins/soloco/runtime/snapshot.mjs';
++import {bindSnapshots,retainSnapshot,retainSnapshotEntry,pendingSnapshots,resolveSnapshot,resolveSnapshotEntry} from '../plugins/soloco/runtime/snapshot.mjs';
+ import {buildLegacyCoherentPlan as build,decodeLegacyCoherentPlan as decode,openLegacyCoherentPlan as open,validateLegacyCoherentPlan as validate,captureLegacyCanonicalSource,legacyCanonicalCoverage} from '../plugins/soloco/runtime/legacy-operating.mjs';
+ const json=JSON.stringify,clone=v=>JSON.parse(json(v));
+ function fixture(){return bindSnapshots({id:'fictional',revision:7,owner:{session_id:'fixture-owner',host:'codex',epoch:1},paused:true,governance:'Current permission requires independent review.',cos_instructions:'Retain every OPEN failure.',roles:{qa:{name:'QA'}},records:{a:{id:'a',revision:2,content:'Export permitted under local conditions.',previous:[{id:'a',revision:1,content:'Export forbidden.',review:{verdict:'Fail',reason:'Consent absent.'}}],late_qualifier:'Except personal data; spent allowance is never renewed.'}},jobs:{},messages:[],notices:[],upgrade_history:[],context_classifications:{},unknown_extension:{code:'export default "No permission granted"',logs:'Blocked: unresolved effects'}});}
+@@ -207,3 +207,89 @@ test('canonical array roots preserve nested arrays, primitive members, empties a
+   const occurrence=held.occurrences.find(o=>o.group_id===leaf.id);
+   assert.equal(occurrence.fit,'Held');assert.throws(()=>open(held).materialize(occurrence.id),/exceeds cap/);
+ });
++
++test('formatting/escape-only JSON STRING views roundtrip raw bytes, nested data and late prohibitions',()=>{
++  const s=fixture(),payload={purpose:'Evidence only é 🧭',status:'Held',verification:{quote:'"',slash:'\\',nested:[null,false,12,{},[]]},
++    runtime_and_docs_diff:'d'.repeat(30000),new_timeout_helper_source:'s'.repeat(30000),
++    unknown_late_prohibition:'LATE_NO_EXPORT: never retry after consent exhaustion.'};
++  const raw=' \r\n'+json(payload,null,2).replaceAll('é','\\u00e9').replaceAll('🧭','\\ud83e\\udded').replace('"purpose"','"purpo\\u0073e"')+'\t';
++  s.records.a.content=raw;s.records.a.original=retainSnapshot(s,{content:raw});
++  const p=build(s),decoded=decode(p),session=open(p);
++  assert.equal(decoded.state.records.a.content,raw);assert.equal(typeof decoded.state.records.a.content,'string');
++  assert.deepEqual(Buffer.from(decoded.state.records.a.content),Buffer.from(raw));
++  assert.equal(decoded.originals[0].raw,json({content:raw}));
++  assert.ok(p.definitions.some(d=>d[0]==='json-text-string'&&d[2]===raw));
++  assert.ok(p.groups.some(g=>g.section.body?.legacy_coherent_string_encoding==='lossless-json-text'||g.section.body?.content?.legacy_coherent_string_encoding==='lossless-json-text'));
++  const leaf=p.groups.find(g=>g.section.body===payload.runtime_and_docs_diff);
++  for(const o of p.occurrences.filter(o=>o.group_id===leaf.id)){
++    const packet=session.materialize(o.id);assert.match(json(packet),/LATE_NO_EXPORT/);
++    assert.equal(Buffer.byteLength(json(packet)),o.packet_bytes);assert.ok(o.packet_bytes<48000);
++  }
++  for(const mutate of [d=>d[2]=d[2].replace('Held','Pass'),d=>d[2]=d[2].replace('12','1e1'),d=>d[2]+='false',d=>d[2]=d[2].replace('"status"','"purpose"')]){
++    const bad=clone(p);mutate(bad.definitions.find(d=>d[0]==='json-text-string'&&d[2]===raw));
++    assert.throws(()=>decode(reseal(bad)),/Held/);
++  }
++});
++
++test('ambiguous or normalized JSON tokens remain opaque; large non-JSON terminals stay Held',()=>{
++  const samples=[
++    '{"same":1,"same":2,"late":"Never retry"}',
++    '{"same":1,"s\\u0061me":2,"late":"Never retry"}',
++    '{"2":"second","1":"first","late":"Never retry"}',
++    ...['-0','1e3','1.0','1E+3','9007199254740993','1e400'].map(n=>'{"number":'+n+',"late":"Never retry"}'),
++    '{"late":"Never retry",}', '{"late":"Never retry"} true',
++    '{"late":"Never retry","bad":"\\x20"}', '{"late":"Never retry","bad":"line\nbreak"}',
++    '\u00a0{"late":"Never retry"}',
++  ].map(v=>'  '+v+'  ');
++  const s=fixture();s.records.a.samples=samples;
++  s.records.a.files=[67024,61631,53163].map(size=>({path:'terminal-'+size,content:'NOT_JSON '.padEnd(size,'x')}));
++  const p=build(s),decoded=decode(p),session=open(p);
++  assert.deepEqual(decoded.state.records.a.samples,samples);
++  for(const raw of samples)assert.ok(p.definitions.some(d=>d[0]==='string'&&d[1]===raw),raw);
++  for(const file of s.records.a.files){
++    const group=p.groups.find(g=>g.section.body===file.content),o=p.occurrences.find(o=>o.group_id===group.id);
++    assert.equal(o.fit,'Held');assert.throws(()=>session.materialize(o.id),/exceeds cap/);
++  }
++});
++
++test('upgrade complete fields and ordered journal members split bounded bodies with separate failed contexts',t=>{
++  const s=fixture(),shared={response:'No retry. '+ 'x'.repeat(1800),unknown:'OPEN'},
++    attempt=(id,outcome)=>({id,status:'failed',outcome,candidate:{roles:{qa:{instructions:'Independent review only.'}},unknown:'No adoption'},
++      previous:{governance:'Consent exhausted.'},probe:{verdict:'Fail',unknown:'No execution'},review:{verdict:'Blocked',reason:outcome},
++      calls:Array.from({length:28},(_,n)=>({sequence:n,body:shared,returned:n%2===0})),
++      qa_pages:Array.from({length:12},(_,n)=>({sequence:n,body:'q'.repeat(1900)})),cos_pages:[null,false,7,'small',{},[]],
++      late_unknown:'LATE_NO_EXPORT: retain every failed attempt.'});
++  s.upgrade=attempt('current','Failed due to revoked consent.');
++  const old=attempt('old','Failed due to exhausted allowance.');
++  s.upgrade_history=[retainSnapshotEntry(s,old)];
++  const historical=fixture();historical.upgrade=attempt('historic','Historical failure stays OPEN.');
++  s.records.a.past=retainSnapshot(s,historical);
++  const before=json(s),p=build(s),decoded=decode(p),session=open(p);
++  assert.ok(Buffer.byteLength(json(s.upgrade))>48000);assert.equal(json(decoded.state),before);
++  assert.equal(json(resolveSnapshotEntry(decoded.state,decoded.state.upgrade_history[0])),json(old));
++  assert.equal(json(resolveSnapshot(decoded.state,decoded.state.records.a.past)),json(historical));
++  const current=p.occurrences.find(o=>o.path==='/upgrade'),group=p.groups.find(g=>g.id===current.group_id);
++  for(const key of ['candidate','previous','probe','review','calls','qa_pages','cos_pages'])assert.ok(group.section.cuts.some(c=>c.path==='/'+key));
++  const journal=p.occurrences.find(o=>o.path==='/upgrade/calls'),journalGroup=p.groups.find(g=>g.id===journal.group_id);
++  assert.equal(journalGroup.section.body.length,28);
++  assert.deepEqual(journalGroup.section.cuts.map(c=>c.path),Array.from({length:28},(_,n)=>'/'+n));
++  for(let n=0;n<28;n++){
++    const o=p.occurrences.find(o=>o.path==='/upgrade/calls/'+n),g=p.groups.find(g=>g.id===o.group_id);
++    assert.equal(g.section.body.sequence,n);assert.equal(g.section.body.returned,n%2===0);
++    assert.ok(o.packet_bytes<48000);assert.match(json(session.materialize(o.id)),/LATE_NO_EXPORT/);
++  }
++  const body=p.groups.find(g=>g.section.body===shared.response),occurrences=p.occurrences.filter(o=>o.group_id===body.id);
++  assert.equal(occurrences.length,84);assert.equal(new Set(occurrences.map(o=>json([o.document,o.path]))).size,84);
++  const currentBody=occurrences.find(o=>o.path==='/upgrade/calls/0/body/response'&&o.document.kind==='state');
++  const oldBody=occurrences.find(o=>o.document.sha256===s.upgrade_history[0].immutable_entry.immutable_snapshot.sha256);
++  assert.notDeepEqual(currentBody.qualifier_groups,oldBody.qualifier_groups);
++  assert.match(json(session.materialize(currentBody.id)),/revoked consent/);
++  assert.match(json(session.materialize(oldBody.id)),/exhausted allowance/);
++  assert.ok(p.snapshot_inbound.length>=2);assert.equal(p.semantic_acceptance,false);
++  // An unrelated anonymous state extension is not exploded into scalar units.
++  assert.ok(!p.occurrences.some(o=>o.path==='/unknown_extension/code'));
++  for(const edit of [x=>x.groups.find(g=>g.id===journal.group_id).section.cuts.reverse(),x=>x.occurrences.splice(x.occurrences.findIndex(o=>o.id===oldBody.id),1)]){
++    const bad=clone(p);edit(bad);assert.throws(()=>decode(reseal(bad)),/Held/);
++  }
++  t.diagnostic(json({fictional_only:true,attempt_bytes:Buffer.byteLength(json(s.upgrade)),journal_members:28,shared_physical_occurrences:occurrences.length,measurements:p.measurements}));
++});
+diff --git a/tests/legacy-operating.test.mjs b/tests/legacy-operating.test.mjs
+index 5d96315..0c6e4a8 100644
+--- a/tests/legacy-operating.test.mjs
++++ b/tests/legacy-operating.test.mjs
+@@ -117,3 +117,24 @@ test('ambiguous current/history source IDs and missing embedded raw originals ho
+   const m=build(other),damaged=clone(m);damaged.originals=[];
+   assert.throws(()=>legacy.decodeLegacyBootstrap(reseal(damaged)),/missing|corrupt|coverage/);
+ });
++
++test('lossless noncanonical STRING graph preserves raw bytes and rejects forged token correspondence',()=>{
++  const s=fixture(),raw=String.raw` {
++    "message": "escaped \u00e9 and \"quotes\" and \\ backslash",
++    "nested": [true, null, {"late": "Never retry while OPEN"}]
++  } `;
++  s.records.history.content=raw;
++  const untouched=build(s);assert.ok(untouched.definitions.some(d=>d[0]==='string'&&d[1]===raw));
++  const m=build(s,{canonical_json_text:true}),decoded=legacy.decodeLegacyBootstrap(m);
++  assert.deepEqual(Buffer.from(decoded.state.records.history.content),Buffer.from(raw));
++  assert.equal(typeof decoded.state.records.history.content,'string');
++  const node=m.definitions.find(d=>d[0]==='json-text-string'&&d[2]===raw);assert.ok(node);
++  for(const alter of [(_m,d)=>d[2]=d[2].replace('true','false'),(_m,d)=>d[2]=d[2].replace('"message"','"nested"'),(_m,d)=>d[2]=d[2].slice(0,-2),
++    (m,d)=>{const child=m.definitions[d[1]];d[1]=m.definitions.length;m.definitions.push(['object',[...child[1]].reverse()]);}]){
++    // Each adversarial definition is independently resealed; decoder validation
++    // and the exact deterministic rebuild remain compulsory.
++    const bad=clone(m),target=bad.definitions.find(d=>d[0]==='json-text-string'&&d[2]===raw);
++    alter(bad,target);
++    assert.throws(()=>legacy.decodeLegacyBootstrap(reseal(bad)),/Held/);
++  }
++});
+diff --git a/tests/scoped-coherent-runtime.test.mjs b/tests/scoped-coherent-runtime.test.mjs
+index e16670a..051d16f 100644
+--- a/tests/scoped-coherent-runtime.test.mjs
++++ b/tests/scoped-coherent-runtime.test.mjs
+@@ -156,11 +156,15 @@ test('coherent runtime-test producer uses canonical author_instance, candidate a
+   }
+ });
+ 
+-test('nested canonical source files retain bounded native bundles and mandatory occurrence interfaces',async t=>{
++test('nested formatting/escape variant source files retain bounded native bundles and mandatory occurrence interfaces',async t=>{
+   const sources={'a.mjs':'a'.repeat(21650),'b.mjs':'b'.repeat(17056),'c.mjs':'c'.repeat(12952)};
+-  const content=JSON.stringify({left:{scope:'Consent exhausted.',sources},right:{scope:'Consent revoked.',sources},late_unknown:'LATE_NO_EXPORT: no execution.'});
++  const content=JSON.stringify({left:{scope:'Consent exhausted.',sources},right:{scope:'Consent revoked.',sources},late_unknown:'LATE_NO_EXPORT: no execution.'},null,2).replace('LATE_NO_EXPORT','\\u004cATE_NO_EXPORT');
+   assert.ok(bytes(content)>48000);
+   const f=fixture({extra:{content}}),units=unitPages(f);
++  const state=read(f),capsule=resolveSnapshot(state,state.records[f.plan_id].scoped_context_plan.capsule),material=resolveSnapshot(state,capsule.projection);
++  const {decodeLegacyCoherentPlan}=await import('../plugins/soloco/runtime/legacy-operating.mjs');
++  assert.equal(decodeLegacyCoherentPlan(material).state.records.old.content,content);
++  assert.ok(material.definitions.some(d=>d[0]==='json-text-string'&&d[2]===content));
+   const bundles=units.map(u=>call(f,{action:'read',unit_id:u.id}).unit);
+   const leaves=bundles.filter(b=>b.sections.some(g=>g.group_id===b.group_id&&g.body===sources['a.mjs']));
+   assert.equal(leaves.length,2);assert.equal(leaves[0].body_root,leaves[1].body_root);
+diff --git a/tests/scoped-corpus-runtime.test.mjs b/tests/scoped-corpus-runtime.test.mjs
+index 778fbdf..2b851b8 100644
+--- a/tests/scoped-corpus-runtime.test.mjs
++++ b/tests/scoped-corpus-runtime.test.mjs
+@@ -276,11 +276,14 @@ test('declared distant incident peer cannot be omitted by proposed local scope',
+   await assert.rejects(run(f,{phase:'applicability',selection_ids:['A'],extraction_review_ids:es.filter(e=>a.intrinsic_batches.includes(e.target.target.unit_id)).map(e=>e.review.id),counterpart_ids:['home-D00'],context_scope:'*'}),/omitted declared incident peer/);
+ });
+ 
+-test('nested file sections fit intrinsic batches without implying complete global request fit',async t=>{
++test('nested formatting/escape variant file sections fit intrinsic batches without implying complete global request fit',async t=>{
+   const {buildLegacyCoherentPlan}=await import('../plugins/soloco/runtime/legacy-operating.mjs');
+   const sources={'a.mjs':'a'.repeat(21650),'b.mjs':'b'.repeat(17056),'c.mjs':'c'.repeat(12952)};
+-  const content=JSON.stringify({left:{scope:'Consent exhausted.',sources},right:{scope:'Consent revoked.',sources},late_unknown:'LATE_NO_EXPORT'});
++  const content=JSON.stringify({left:{scope:'Consent exhausted.',sources},right:{scope:'Consent revoked.',sources},late_unknown:'LATE_NO_EXPORT'},null,2).replace('LATE_NO_EXPORT','\\u004cATE_NO_EXPORT');
+   const f=fixture({deferPlan:true,extra:{content}}),m=buildLegacyCoherentPlan(read(f));
++  const {decodeLegacyCoherentPlan}=await import('../plugins/soloco/runtime/legacy-operating.mjs');
++  assert.equal(decodeLegacyCoherentPlan(m).state.records.old.content,content);
++  assert.ok(m.definitions.some(d=>d[0]==='json-text-string'&&d[2]===content));
+   // Explicit fictional global proposal: size and file paths confer no locality.
+   const partition={plan_sha256:m.plan_sha256,selections:[{id:'global',scope:'*',occurrence_ids:m.occurrences.map(o=>o.id),incident_ids:[]}]};
+   const p=call(f,{action:'plan',protocol,partitioner:scoped.CORPUS_PARTITIONER,source_id:'old',selected_source_ids:['old'],semantic_partition:partition});f.plan_id=p.id;
+@@ -295,3 +298,20 @@ test('nested file sections fit intrinsic batches without implying complete globa
+   assert.throws(()=>scoped.validateCorpusPartition(m,bad),/physical occurrence partition/);
+   t.diagnostic(JSON.stringify({fictional_only:true,nested_sources_workload:workload}));
+ });
++
++test('upgrade journal sections enter corpus workload with complete ordered membership and occurrence guards',async t=>{
++  const {buildLegacyCoherentPlan}=await import('../plugins/soloco/runtime/legacy-operating.mjs');
++  const f=fixture({deferPlan:true});
++  mutate(f,s=>{s.upgrade_history=[{id:'failed-attempt',status:'failed',candidate:{unknown:'No adoption'},previous:{unknown:'Revoked consent'},
++    probe:{verdict:'Fail'},review:{verdict:'Blocked'},late_unknown:'LATE_NO_EXPORT',
++    calls:Array.from({length:28},(_,n)=>({sequence:n,response:'failed '+String(n).padEnd(1900,'x')}))}];});
++  const m=buildLegacyCoherentPlan(read(f)),journal=m.occurrences.find(o=>o.path==='/upgrade_history/0/calls'),group=m.groups.find(g=>g.id===journal.group_id);
++  assert.equal(group.section.body.length,28);assert.deepEqual(group.section.cuts.map(c=>c.path),Array.from({length:28},(_,n)=>'/'+n));
++  const partition={plan_sha256:m.plan_sha256,selections:[{id:'global',scope:'*',occurrence_ids:m.occurrences.map(o=>o.id),incident_ids:[]}]};
++  const p=call(f,{action:'plan',protocol,partitioner:scoped.CORPUS_PARTITIONER,source_id:'upgrade:failed-attempt',selected_source_ids:['upgrade:failed-attempt'],semantic_partition:partition});f.plan_id=p.id;
++  const workload=scoped.inspectCorpusWorkload(read(f),{plan_id:p.id});
++  assert.ok(workload.extraction.every(e=>e.body_bytes<48000));assert.equal(workload.semantic_acceptance,false);
++  const bad=structuredClone(partition);bad.selections[0].occurrence_ids.splice(bad.selections[0].occurrence_ids.indexOf(journal.id),1);
++  assert.throws(()=>scoped.validateCorpusPartition(m,bad),/physical occurrence partition/);
++  t.diagnostic(JSON.stringify({fictional_only:true,journal_members:28,unique_sections:m.measurements.unique_sections,largest_intrinsic_packet:m.measurements.largest_packet_bytes,workload}));
++});
