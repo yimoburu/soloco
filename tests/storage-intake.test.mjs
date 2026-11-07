@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {Store,digest} from '../plugins/soloco/runtime/store.mjs';
 import {readImmutable} from '../plugins/soloco/runtime/record-storage.mjs';
-import {bindSnapshots,retainSnapshot,retainSnapshotEntry,captureSnapshotDependencies,validateSnapshotDependencies} from '../plugins/soloco/runtime/snapshot.mjs';
+import {bindSnapshots,retainSnapshot,retainSnapshotEntry,captureSnapshotDependencies,validateSnapshotDependencies,operatingIntake} from '../plugins/soloco/runtime/snapshot.mjs';
 const temporary=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'storage-intake-')));
 test.after(()=>fs.rmSync(temporary,{recursive:true,force:true}));
 function fixture(normalized=true) {
@@ -237,4 +237,71 @@ test('re-sealed but inconsistent metadata roots and before/after chains hold',()
       assert.throws(()=>store.readIntake(baseline),/Storage intake hold/);
     }finally{store.close();}
   }
+});
+
+
+test('operating intake checks one complete read against the independent capture, including zero-event corruption',()=>{
+  const store=fixture();try {
+    const state=store.read(),baseline=store.captureIntakeBaseline(),original=store.readIntake.bind(store);let reads=0;
+    store.readIntake=(...args)=>{reads++;return original(...args);};
+    const first=operatingIntake(state,baseline);assert.equal(reads,1);assert.equal(first.intake.events.length,0);
+    assert.deepEqual(first.intake.cut,{version:baseline.version,layout:baseline.layout,seq:baseline.seq,event_sha256:baseline.event_sha256,root:baseline.root});
+    for(const field of ['version','layout','seq','event_sha256','root']){
+      store.readIntake=(...args)=>{const result=original(...args);result.cut[field]='changed';return result;};
+      assert.throws(()=>operatingIntake(state,baseline),/capture\/read cut changed/,field);
+    }
+    for(const edit of [cut=>{delete cut.seq;},cut=>{cut.unknown='unreviewed';}]){
+      store.readIntake=(...args)=>{const result=original(...args);edit(result.cut);return result;};
+      assert.throws(()=>operatingIntake(state,baseline),/capture\/read cut changed/);
+    }
+    store.readIntake=original;
+    const row=store.db.prepare("SELECT sha256 FROM state_entries WHERE family='records' AND key='unrelated'").get(),bytes=store.db.prepare('SELECT bytes FROM immutable_values WHERE sha256=?').get(row.sha256).bytes;
+    for(const mode of ['corrupt','missing']){
+      try {
+        if(mode==='corrupt')store.db.prepare("UPDATE immutable_values SET bytes='{}' WHERE sha256=?").run(row.sha256);
+        else {store.db.exec('PRAGMA foreign_keys=OFF');store.db.prepare('DELETE FROM immutable_values WHERE sha256=?').run(row.sha256);}
+        assert.throws(()=>operatingIntake(state,baseline),/missing or hash mismatch/);
+      }finally{store.db.prepare('INSERT OR REPLACE INTO immutable_values VALUES(?,?)').run(row.sha256,bytes);store.db.exec('PRAGMA foreign_keys=ON');}
+    }
+    assert.deepEqual(operatingIntake(state,baseline),first);
+  }finally{store.close();}
+});
+
+test('one intake snapshot reuses validated change bytes without retaining the next call or rereading oversized unchanged archive',()=>{
+  const store=fixture();try {
+    store.transaction('large immutable archive',s=>{s.records.big={id:'big',content:'Complete retained fictional archive '.repeat(150000)};return s;});
+    const baseline=store.captureIntakeBaseline(),original=store.read().records.a;
+    change(store);
+    store.selectedTransaction('restore exact source',{rootKeys:['revision','owner'],entities:{records:['a']}},s=>{s.records.a=original;});
+    const prepare=store.db.prepare.bind(store.db),reads=new Map();
+    store.db.prepare=sql=>{
+      const statement=prepare(sql);
+      if(sql==='SELECT bytes FROM immutable_values WHERE sha256=?'){
+        const get=statement.get.bind(statement);statement.get=sha=>{reads.set(sha,(reads.get(sha)??0)+1);return get(sha);};
+      }
+      return statement;
+    };
+    try {
+      const first=store.readIntake(baseline,{values:true});assert.equal(first.events.length,2);
+      assert(first.events.flatMap(e=>e.changes).some(c=>c.before?.family==='records'&&c.before.key==='a'));
+      assert(reads.size>0);assert.equal(Math.max(...reads.values()),1,'verified immutable bytes were reread in one intake snapshot');
+      const second=store.readIntake(baseline,{values:true});assert.deepEqual(second,first);
+      assert.equal(Math.min(...reads.values()),2,'a new intake call must revalidate every immutable body');
+      assert.equal(Math.max(...reads.values()),2);
+    }finally{store.db.prepare=prepare;}
+  }finally{store.close();}
+});
+
+test('oversized changed envelopes retain complete before/after bytes when they exceed the intake read cache',()=>{
+  const store=fixture();try {
+    const old='A'.repeat(4500000),next='B'.repeat(4500000);
+    store.transaction('oversized source',s=>{s.records.big={id:'big',content:old};return s;});
+    const baseline=store.captureIntakeBaseline();
+    store.selectedTransaction('oversized replacement',{rootKeys:['revision'],entities:{records:['big']}},s=>{s.records.big.content=next;});
+    const result=store.readIntake(baseline,{values:true}),change=result.events[0].changes.find(c=>c.after?.family==='records'&&c.after.key==='big');
+    assert.equal(JSON.parse(change.before.raw).content,old);assert.equal(JSON.parse(change.after.raw).content,next);
+    assert.equal(digest(change.before.raw),change.before.sha256);assert.equal(digest(change.after.raw),change.after.sha256);
+    store.db.prepare("UPDATE immutable_values SET bytes='{}' WHERE sha256=?").run(change.before.sha256);
+    assert.throws(()=>store.readIntake(baseline,{values:true}),/missing or hash mismatch/);
+  }finally{store.close();}
 });

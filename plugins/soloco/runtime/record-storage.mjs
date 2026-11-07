@@ -444,7 +444,7 @@ export function insertStorageEvent(db,type,payload,before) {
   }
   db.prepare('INSERT INTO events(seq,at,type,value) VALUES(?,?,?,?)').run(seq,at,type,JSON.stringify(payload));
 }
-function validateMetadata(db,metadata,verifyValue=null) {
+function validateMetadata(db,metadata,verifyValue=null,readValue=sha=>readImmutable(db,sha)) {
   if(metadata.layout?.version!==4||metadata.root!==metadataRoot(metadata.layout,metadata.entries))intakeHold('metadata root or layout mismatch');
   const ids=new Set(),positions=new Set(),top=new Map(),shapes=new Map(),journalParents=new Map();
   for(const row of metadata.entries) {
@@ -475,14 +475,14 @@ function validateMetadata(db,metadata,verifyValue=null) {
   // body-free; the explicit reader validates directly referenced row envelopes,
   // not the transitive snapshot dependency graph inside their JSON values.
   if(verifyValue) {
-    for(const row of shapes.values())if(!['array','object'].includes(JSON.parse(readImmutable(db,row.sha256))))intakeHold('unknown collection shape');
+    for(const row of shapes.values())if(!['array','object'].includes(JSON.parse(readValue(row.sha256))))intakeHold('unknown collection shape');
     for(const [family,row] of journalParents) {
-      const descriptor=journalDescriptor({...row,bytes:readImmutable(db,row.sha256)});
+      const descriptor=journalDescriptor({...row,bytes:readValue(row.sha256)});
       const children=metadata.entries.filter(entry=>entry.family===family).sort((a,b)=>a.position-b.position);
       if(children.length!==descriptor.length||children.some((child,n)=>child.key!==String(n)||child.position!==n||child.encoding!=='json'))intakeHold('journal shape mismatch');
     }
     for(const row of metadata.entries)if(row.family==='upgrade'&&journals.has(row.key)&&row.encoding==='json') {
-      const value=JSON.parse(readImmutable(db,row.sha256));
+      const value=JSON.parse(readValue(row.sha256));
       if(!Array.isArray(value)&&((value?.version===1&&value?.family==='upgrade.'+row.key)||journalParents.has('upgrade.'+row.key)))intakeHold('journal encoding marker missing');
     }
   }
@@ -498,11 +498,18 @@ export function readStorageIntake(db,baseline,{values=false}={}) {
   if(sha256!==hash(JSON.stringify(unsigned))||unsigned.version!==1||!Number.isSafeInteger(unsigned.seq)||unsigned.seq<0)intakeHold('invalid baseline; bind the runtime baseline into the reviewed proposal');
   const current=captureStorageMetadata(db);
   if(!same(baseline.layout,current.layout))intakeHold('changed layout');
-  const checked=new Set(),verify=row=>{
-    if(checked.has(row.sha256))return;
-    JSON.parse(readImmutable(db,row.sha256));checked.add(row.sha256);
-  };
-  validateMetadata(db,baseline,verify);
+  // The Store owns one read snapshot for this call. Reuse only bytes already
+  // hash- and JSON-validated in that snapshot, never across calls. Bound retained
+  // UTF-16 storage even for a large archive; uncached values keep the old path.
+  const checked=new Set(),raws=new Map();let rawBytes=0;
+  const read=sha=>{
+    if(raws.has(sha))return raws.get(sha);
+    const raw=readImmutable(db,sha);
+    if(!checked.has(sha)){JSON.parse(raw);checked.add(sha);}
+    const size=raw.length*2;if(rawBytes+size<=8*1024*1024){raws.set(sha,raw);rawBytes+=size;}
+    return raw;
+  },verify=row=>{if(!checked.has(row.sha256))read(row.sha256);};
+  validateMetadata(db,baseline,verify,read);
   const anchor=baseline.seq?db.prepare('SELECT seq,at,type,value FROM events WHERE seq=?').get(baseline.seq):undefined;
   if(eventHash(anchor)!==baseline.event_sha256)intakeHold('baseline event changed or missing');
   const end=cut(db,current),events=db.prepare('SELECT seq,at,type,value FROM events WHERE seq>? ORDER BY seq').all(baseline.seq);
@@ -527,11 +534,11 @@ export function readStorageIntake(db,baseline,{values=false}={}) {
       if(after)rows.set(identity,after);else rows.delete(identity);
     }
     metadata={layout:baseline.layout,entries:[...rows.values()].sort(metadataSort),root:delta.after_root};
-    validateMetadata(db,metadata,verify);
-    intake.push({seq:event.seq,at:event.at,type:event.type,payload,changes:delta.changes.map(change=>values?Object.fromEntries(Object.entries(change).map(([side,ref])=>[side,ref?{...ref,raw:readImmutable(db,ref.sha256)}:null])):change)});
+    validateMetadata(db,metadata,verify,read);
+    intake.push({seq:event.seq,at:event.at,type:event.type,payload,changes:delta.changes.map(change=>values?Object.fromEntries(Object.entries(change).map(([side,ref])=>[side,ref?{...ref,raw:read(ref.sha256)}:null])):change)});
     previous=eventHash(event);
   }
-  validateMetadata(db,current,verify);
+  validateMetadata(db,current,verify,read);
   if(!same(metadata,current)||previous!==end.event_sha256)intakeHold('current end state mismatch');
   return {baseline_sha256:sha256,cut:{version:end.version,layout:end.layout,seq:end.seq,event_sha256:end.event_sha256,root:end.root},events:intake};
 }
