@@ -360,6 +360,10 @@ test('acceptance rejects wrong receipt hash, wrong action and reviewer reuse of 
   for(const kind of ['receipt','action','native']) {
     const a=setup(),p=await plan(a);await authorize(a,p);const c=await generate(a,p),t=await run(a,p,c);
     const qa=await review(a,t,{...(kind==='action'?{extra:{permitted_action:'anything'}}:{}),...(kind==='native'?{native:read(a).jobs[c.job_id].native_id}:{})});
+    if(kind==='native'){
+      assert.equal(qa.status,'failed');assert.match(qa.error,/independent native identity/);
+      assert.equal(qa.artifact_id,undefined);assert.match(qa.rejected_output.text,/Checked exact source/);
+    }
     await assert.rejects(accept(a,p,t,qa,kind==='receipt'?{receipt_sha256:'different'}:{}),/mismatch|QA Pass/);
   }
 });

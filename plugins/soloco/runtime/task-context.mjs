@@ -202,7 +202,7 @@ export function taskAssignmentContext(state,job,{budget}={}){
   verifySupplemental(state,job);
   const source=requiredSources(state,job),extensions=currentExtensions(state);
   if(hasSnapshotReferences(extensions))fail('unknown referenced state extension requires qualification');
-  const notices=(state.notices??[]).filter(n=>!n.resolution&&n.job_id!==job.id).map(({deliveries,seen_at,...n})=>n);
+  const notices=(state.notices??[]).filter(n=>n.job_id!==job.id).map(({deliveries,seen_at,...n})=>n);
   const messages=(state.messages??[]).filter(m=>m.to===job.role&&m.job_id!==job.id);
   const packet={
     protocol:TASK_CONTEXT_PROTOCOL,controls:controls(state),runtime:runtimeControlBinding(state),governance:state.governance,charter:state.roles[job.role],

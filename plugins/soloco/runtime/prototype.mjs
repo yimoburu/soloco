@@ -61,7 +61,7 @@ function planOf(s, planId) {
 function environment(s,planId) {
   return digest(JSON.stringify({team:s.team_sha256,owner:s.owner,
     records:Object.values(s.records).filter(r=>!presentationOnly(r)&&relevantRecord(s,r,{role:'engineer',context_scope:planId})&&(['intent','decision','preference'].includes(r.kind) || (['Fail','Blocked'].includes(r.review?.verdict) && s.records[r.review_of?.id]?.prototype?.plan_id!==planId))),
-    notices:s.notices.filter(n=>!n.resolution).map(({deliveries,seen_at,...n})=>n)}));
+    notices:s.notices.map(({deliveries,seen_at,...n})=>n)}));
 }
 function authorized(s,p) {
   capable(s);

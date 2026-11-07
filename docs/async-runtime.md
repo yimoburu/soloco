@@ -57,3 +57,8 @@ Known conservative boundary: a scoped-current classification does not automatica
 Keep [#13](https://github.com/yimoburu/soloco/issues/13)'s context/storage and [#16](https://github.com/yimoburu/soloco/issues/16)'s CoS judgment contracts. Separate services, vector databases, recursive agent managers and additional business/spending powers are outside this minimum.
 
 `node tools/async-runtime-acceptance.mjs --prepare-only --output-dir /absolute/new/directory` prepares a fictional project through a real MCP process without starting native jobs. Explicit `--run-native` on a clean frozen source commit starts its three one-attempt native assignments, retains receipts and checks the exact producer/review/dependent links. Recovery restarts only the identified software supervisor while its detached native worker is in flight, preserving that job/attempt without duplication; it never kills the native worker. Missing that boundary is an unmet check. The fixture's hook binding is synthetic; it does not establish trusted Codex Hooks UI invocation or actual-company adoption. Inspect any failed receipt before taking another action; the harness never automatically retries.
+
+Optional `--model <id>` explicitly selects a model for that fresh fixture (default
+`gpt-6.1-sol`). The live host catalog must advertise the exact model and required
+low/medium efforts before any native job starts; an unavailable choice holds
+without substitution. This changes neither task scope nor attempt limits.

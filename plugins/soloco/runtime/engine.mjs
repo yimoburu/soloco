@@ -423,14 +423,20 @@ export function control(args,host) {
 export function notify(args,host) {
   if(!['must_know','decision_required'].includes(args.kind)) throw new Error('Unknown notice kind');
   requireText(args.summary,'summary');
-  const s=update(args,host,'notice.created',s=>{notice(s,args.kind,args.summary,args.reference??null);});
+  const s=update(args,host,'notice.created',s=>{Object.assign(notice(s,args.kind,args.summary,args.reference??null),{author_role:'runner',author_instance:s.owner.session_id,author_host:host,author_epoch:s.owner.epoch});});
   const n=s.notices.at(-1);return mutationView(n,'@public:notices:'+(s.notices.length-1),'notices');
 }
 export function acknowledge(args,host) {
   const state=update(args,host,'notice.updated',s=>{
     const n=s.notices.find(n=>n.id===args.notice_id); if(!n) throw new Error('Notice not found');
-    if(args.seen) n.seen_at=stamp();
-    if(args.resolution) {requireText(args.source_reference,'source_reference'); n.resolution={text:args.resolution,source_reference:args.source_reference,at:stamp()};}
+    if(args.resolution) {
+      requireText(args.resolution,'resolution');requireText(args.source_reference,'source_reference');
+      // Dispositions are consequential history. Exact replays are harmless;
+      // a correction must be a new attributable notice referencing this one.
+      if(n.resolution && (n.resolution.text!==args.resolution || n.resolution.source_reference!==args.source_reference))throw new Error('Notice resolution is immutable; record a correction in a new notice referencing this notice');
+      n.resolution??={text:args.resolution,source_reference:args.source_reference,at:stamp(),recorded_by:args.session_id,host,epoch:s.owner.epoch};
+    }
+    if(args.seen && !n.seen_at) n.seen_at=stamp();
     // A notice receipt/resolution cannot authorize venture execution.
   });const index=state.notices.findIndex(n=>n.id===args.notice_id);return mutationView(state.notices[index],'@public:notices:'+index,'notices');
 }

@@ -233,6 +233,10 @@ Required notices are stored durably and presented on an open chat’s next turn.
 
 ## Development
 
+[SPEC reconciliation](docs/spec-reconciliation.md) maps all 47 normative
+paragraphs of v0.20 to implementation, checks and remaining acceptance gaps.
+It distinguishes software safeguards, agent judgment and disclosed release limits.
+
 [Developer guide](docs/development.md) explains the runtime, compatibility and tests. [SPEC.md](SPEC.md) contains only enduring rules and constitutions. It is the implementation target, not a claim of full conformance; [optional playbooks](docs/playbooks.md) illustrate its operating loop. The legacy generator is retired; its source remains in Git history. Earlier designs and Claude reviews remain in the [archived snapshot](https://github.com/yimoburu/soloco/tree/ee3f302f47e82539ca0a40e0268a1e762c47929a/history).
 
 Ordinary coordinator replacement remains paused until the incoming CoS submits current understanding through `company_handover` and independent exact-state QA permits resumption. Same-owner pause/resume does not require a full team-upgrade rehearsal. See [handover assurance](docs/development.md#ordinary-coordinator-handover-assurance-23).

@@ -258,7 +258,9 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
       if(artifact.review?.verdict==='Pass'&&!controller.signal.aborted)validateSemanticDelivery(context.handover_evidence,deliveryLedger);
     }
     if(target && (!['Pass','Fail','Blocked'].includes(artifact.review?.verdict) || !artifact.review?.reason?.trim())) throw new Error('Independent review needs a verdict and reason');
-    if(target?.prototype && output.native_id===(state.jobs[target.job_id]?.native_id??target.author_instance)) throw new Error('Prototype review reused its author native session');
+    if(target && artifact.review?.verdict==='Pass' && artifact.review.blockers!==undefined && (!Array.isArray(artifact.review.blockers)||artifact.review.blockers.length))throw new Error('Pass cannot contain unresolved or malformed blockers');
+    const candidate=target?.development?.type==='test'?state.records[target.development.candidate_id]:target;
+    if(target && [target.author_instance,state.jobs[target.job_id]?.native_id,candidate?.author_instance,state.jobs[candidate?.job_id]?.native_id,state.owner.session_id].includes(output.native_id)) throw new Error('Review requires independent native identity; author or coordinator native session was reused');
     withStore(root,db=>db.transaction('job.completed',s=>{
       const current=s.jobs[jobId];
       const changed=!compatibleRuntime(s) || upgradePending(s) || !workerMatches(s,job,context.hash);
@@ -309,7 +311,7 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
       }
       for(const n of artifact.notices??[]) {
         if(!['must_know','decision_required'].includes(n.kind) || typeof n.summary!=='string' || !n.summary.trim() || n.summary.length>20000) throw new Error('Invalid founder notice');
-        notice(s,n.kind,n.summary,artifactId).job_id=job.id;
+        Object.assign(notice(s,n.kind,n.summary,artifactId),{job_id:job.id,author_role:job.role,author_instance:job.instance_id,native_id:output.native_id});
       }
       if(job.runtime_task){
         if(artifact.message_dispositions!==undefined&&!Array.isArray(artifact.message_dispositions))throw Error('message_dispositions must be an array');

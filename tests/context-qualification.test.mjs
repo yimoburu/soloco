@@ -153,6 +153,14 @@ test('notice deliveries and seen are mechanical; changed notice semantics invali
   s.notices[0].summary+='changed';assert.throws(()=>validateQualificationPlan(s,p.context_partition_plan),/subject/);
 });
 
+test('resolved notice qualifiers remain part of the qualification subject',()=>{
+  const s=seed();s.notices=[{id:'resolved-condition',summary:'No customer-data export',resolution:{text:'Resolved for planning only; export remains prohibited',source_reference:'Fictional disposition'}}];
+  const p=createQualificationPlan(s,{source_id:'old',counterpart_ids:['current']});
+  assert.equal(validateQualificationPlan(s,p),true);
+  s.notices[0].resolution.text='Export now requires a new independent review';
+  assert.throws(()=>validateQualificationPlan(s,p),/stale|corrupt|subject/);
+});
+
 test('applied complete representation survives owner identity, epoch, real handover and additive governing context',()=>{
   const f=workflow('Never retry.');
   for(const mutate of [

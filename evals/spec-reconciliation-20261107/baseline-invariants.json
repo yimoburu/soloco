@@ -1,0 +1,12 @@
+{
+  "source_commit": "7b6d6d53f37c6923399284d51e5b9f96dd255545",
+  "tests_source_commit": "cc0edb58a4b4c1bbfa6b5765b4d19b64d9e09e2e",
+  "counts": {
+    "tests": 14,
+    "pass": 1,
+    "fail": 13,
+    "skipped": 0
+  },
+  "raw_tap_sha256": "3c8c2343a20718154ecbb54692911701fb46dd8db31a84b920eef1515485dae3",
+  "note": "Regression tests applied to the original source archive. This is retained failing evidence, not acceptance."
+}
