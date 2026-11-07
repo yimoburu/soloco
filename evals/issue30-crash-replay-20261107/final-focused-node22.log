@@ -1,0 +1,563 @@
+TAP version 13
+# FICTIONAL accepted archive task context [{"scale":1,"archive_bytes":72907,"context_bytes":19120,"hash":"cc9fc5b6ae066468dac76cfc396ac2a2047271b5aed32246085c0ef7c98dfd23"},{"scale":10,"archive_bytes":89395,"context_bytes":19120,"hash":"cc9fc5b6ae066468dac76cfc396ac2a2047271b5aed32246085c0ef7c98dfd23"},{"scale":100,"archive_bytes":225188,"context_bytes":19120,"hash":"cc9fc5b6ae066468dac76cfc396ac2a2047271b5aed32246085c0ef7c98dfd23"}]
+# Subtest: packet binds canonical task definition and current sources without mutable task bookkeeping
+ok 1 - packet binds canonical task definition and current sources without mutable task bookkeeping
+  ---
+  duration_ms: 164.74175
+  type: 'test'
+  ...
+# Subtest: new applicable membership, source changes, task amendments, controls and incomplete evidence fence context
+ok 2 - new applicable membership, source changes, task amendments, controls and incomplete evidence fence context
+  ---
+  duration_ms: 473.221208
+  type: 'test'
+  ...
+# Subtest: unclassified evidence is retained and required packet overflow is explicit, never truncation
+ok 3 - unclassified evidence is retained and required packet overflow is explicit, never truncation
+  ---
+  duration_ms: 53.92175
+  type: 'test'
+  ...
+# Subtest: 1x/10x/100x canonical resolved archive grows without growing fixed task working context
+ok 4 - 1x/10x/100x canonical resolved archive grows without growing fixed task working context
+  ---
+  duration_ms: 1356.726917
+  type: 'test'
+  ...
+# Subtest: completely qualified unrelated sources stay outside context; unqualified receipt evidence is not erased
+ok 5 - completely qualified unrelated sources stay outside context; unqualified receipt evidence is not erased
+  ---
+  duration_ms: 252.79775
+  type: 'test'
+  ...
+# Subtest: legacy failed jobs, recovered upgrade bodies and unknown own-job fields remain exact compulsory evidence
+ok 6 - legacy failed jobs, recovered upgrade bodies and unknown own-job fields remain exact compulsory evidence
+  ---
+  duration_ms: 203.628958
+  type: 'test'
+  ...
+# Subtest: task inbox messages are exact task evidence, including stored dispositions
+ok 7 - task inbox messages are exact task evidence, including stored dispositions
+  ---
+  duration_ms: 69.448542
+  type: 'test'
+  ...
+# Subtest: declared peer targets expose exact receivers without copying their task histories; lifecycle changes stay stable
+ok 8 - declared peer targets expose exact receivers without copying their task histories; lifecycle changes stay stable
+  ---
+  duration_ms: 65.904041
+  type: 'test'
+  ...
+# Subtest: peer definition, canonical owner or membership changes stale the sender context
+ok 9 - peer definition, canonical owner or membership changes stale the sender context
+  ---
+  duration_ms: 147.062208
+  type: 'test'
+  ...
+# Subtest: exact runtime proposal is output, not a new global input; declared consumers receive its complete body
+ok 10 - exact runtime proposal is output, not a new global input; declared consumers receive its complete body
+  ---
+  duration_ms: 111.483416
+  type: 'test'
+  ...
+# Subtest: a proven receiver acknowledgment preserves its delivered message body without hiding later messages
+ok 11 - a proven receiver acknowledgment preserves its delivered message body without hiding later messages
+  ---
+  duration_ms: 117.425209
+  type: 'test'
+  ...
+# Subtest: QA and accepted dependents receive exact producer objectives, candidate and current acknowledged input evidence
+ok 12 - QA and accepted dependents receive exact producer objectives, candidate and current acknowledged input evidence
+  ---
+  duration_ms: 258.698583
+  type: 'test'
+  ...
+# Subtest: positive prospective job metadata is omitted only while its strict source-generated envelope remains closed
+ok 13 - positive prospective job metadata is omitted only while its strict source-generated envelope remains closed
+  ---
+  duration_ms: 109.36025
+  type: 'test'
+  ...
+# Subtest: portfolio pages are bounded metadata with exact refs and explicit incomplete coverage
+ok 14 - portfolio pages are bounded metadata with exact refs and explicit incomplete coverage
+  ---
+  duration_ms: 77.169333
+  type: 'test'
+  ...
+# Subtest: checkpoint rehydrates source-linked current objective and rejects stale records or remembered task facts
+ok 15 - checkpoint rehydrates source-linked current objective and rejects stale records or remembered task facts
+  ---
+  duration_ms: 48.457667
+  type: 'test'
+  ...
+# FICTIONAL control latency {"unit":"milliseconds","samples":5,"status_median":3.300374999999974,"status_p95":3.7798329999999964,"submit":11.353749999999991,"outstanding_model_promises":2,"model_response_time":"unmeasured; fictional promises deliberately held"}
+# Subtest: public task and scoped portfolio pages have exact membership, source references and visible related resources
+ok 16 - public task and scoped portfolio pages have exact membership, source references and visible related resources
+  ---
+  duration_ms: 273.392041
+  type: 'test'
+  ...
+# Subtest: public submit and bounded status complete while two model promises remain outstanding, with separate control timings
+ok 17 - public submit and bounded status complete while two model promises remain outstanding, with separate control timings
+  ---
+  duration_ms: 208.327541
+  type: 'test'
+  ...
+# Subtest: task amendment, pause, owner change and runtime revocation fence slow late results while retaining their evidence
+    # Subtest: amend
+    ok 1 - amend
+      ---
+      duration_ms: 122.959291
+      type: 'test'
+      ...
+    # Subtest: pause
+    ok 2 - pause
+      ---
+      duration_ms: 113.394166
+      type: 'test'
+      ...
+    # Subtest: owner
+    ok 3 - owner
+      ---
+      duration_ms: 99.507375
+      type: 'test'
+      ...
+    # Subtest: stop
+    ok 4 - stop
+      ---
+      duration_ms: 106.072833
+      type: 'test'
+      ...
+    1..4
+ok 18 - task amendment, pause, owner change and runtime revocation fence slow late results while retaining their evidence
+  ---
+  duration_ms: 442.387209
+  type: 'test'
+  ...
+# Subtest: independent worker Fail and Blocked reviews keep accepted dependents planned
+    # Subtest: Fail
+    ok 1 - Fail
+      ---
+      duration_ms: 184.160125
+      type: 'test'
+      ...
+    # Subtest: Blocked
+    ok 2 - Blocked
+      ---
+      duration_ms: 182.93825
+      type: 'test'
+      ...
+    1..2
+ok 19 - independent worker Fail and Blocked reviews keep accepted dependents planned
+  ---
+  duration_ms: 367.647708
+  type: 'test'
+  ...
+# Subtest: a fresh supervisor resumes after result commit, preserving peer delivery and one receiver disposition without duplicate attempts
+ok 20 - a fresh supervisor resumes after result commit, preserving peer delivery and one receiver disposition without duplicate attempts
+  ---
+  duration_ms: 310.832666
+  type: 'test'
+  ...
+# Subtest: public pause, storage migration and resume retain current nullable control references through A to independent QA to B
+ok 21 - public pause, storage migration and resume retain current nullable control references through A to independent QA to B
+  ---
+  duration_ms: 319.820833
+  type: 'test'
+  ...
+# Subtest: public pause, storage migration and resume retain explicit nullable control references through A to independent QA to B
+ok 22 - public pause, storage migration and resume retain explicit nullable control references through A to independent QA to B
+  ---
+  duration_ms: 334.6695
+  type: 'test'
+  ...
+# Subtest: cancelling committed producer or review evidence revokes readiness without rewriting its completed job
+    # Subtest: producer-before-reconcile
+    ok 1 - producer-before-reconcile
+      ---
+      duration_ms: 167.224834
+      type: 'test'
+      ...
+    # Subtest: review-after-Pass
+    ok 2 - review-after-Pass
+      ---
+      duration_ms: 224.460417
+      type: 'test'
+      ...
+    # Subtest: negative-review
+    ok 3 - negative-review
+      ---
+      duration_ms: 188.460791
+      type: 'test'
+      ...
+    1..3
+ok 23 - cancelling committed producer or review evidence revokes readiness without rewriting its completed job
+  ---
+  duration_ms: 580.497917
+  type: 'test'
+  ...
+# Subtest: cancelling producer or accepted reviewer fences an already-running dependent and retains its late return
+    # Subtest: producer
+    ok 1 - producer
+      ---
+      duration_ms: 252.434875
+      type: 'test'
+      ...
+    # Subtest: review
+    ok 2 - review
+      ---
+      duration_ms: 273.530917
+      type: 'test'
+      ...
+    1..2
+ok 24 - cancelling producer or accepted reviewer fences an already-running dependent and retains its late return
+  ---
+  duration_ms: 526.262417
+  type: 'test'
+  ...
+# Subtest: compulsory and declared cancelled negative evidence do not become positive prerequisites for an independent pipeline
+    # Subtest: compulsory counterevidence
+    ok 1 - compulsory counterevidence
+      ---
+      duration_ms: 489.9545
+      type: 'test'
+      ...
+    # Subtest: declared repair evidence
+    ok 2 - declared repair evidence
+      ---
+      duration_ms: 510.830167
+      type: 'test'
+      ...
+    1..2
+ok 25 - compulsory and declared cancelled negative evidence do not become positive prerequisites for an independent pipeline
+  ---
+  duration_ms: 1001.052792
+  type: 'test'
+  ...
+# Subtest: SIGKILL before task persistence loses no acknowledged command and replay creates one task
+ok 26 - SIGKILL before task persistence loses no acknowledged command and replay creates one task
+  ---
+  duration_ms: 212.103583
+  type: 'test'
+  ...
+# Subtest: SIGKILL uncommitted task persistence loses no acknowledged command and replay creates one task
+ok 27 - SIGKILL uncommitted task persistence loses no acknowledged command and replay creates one task
+  ---
+  duration_ms: 117.603958
+  type: 'test'
+  ...
+# Subtest: SIGKILL committed task persistence loses no acknowledged command and replay creates one task
+ok 28 - SIGKILL committed task persistence loses no acknowledged command and replay creates one task
+  ---
+  duration_ms: 117.711
+  type: 'test'
+  ...
+# Subtest: SIGKILL before dispatch fences uncertain attempts and retains exclusive claims
+ok 29 - SIGKILL before dispatch fences uncertain attempts and retains exclusive claims
+  ---
+  duration_ms: 121.618334
+  type: 'test'
+  ...
+# Subtest: SIGKILL uncommitted dispatch fences uncertain attempts and retains exclusive claims
+ok 30 - SIGKILL uncommitted dispatch fences uncertain attempts and retains exclusive claims
+  ---
+  duration_ms: 119.565958
+  type: 'test'
+  ...
+# Subtest: SIGKILL committed dispatch fences uncertain attempts and retains exclusive claims
+ok 31 - SIGKILL committed dispatch fences uncertain attempts and retains exclusive claims
+  ---
+  duration_ms: 130.21075
+  type: 'test'
+  ...
+# Subtest: SIGKILL before result commit keeps artifact, message action and acknowledgment atomic
+ok 32 - SIGKILL before result commit keeps artifact, message action and acknowledgment atomic
+  ---
+  duration_ms: 146.279959
+  type: 'test'
+  ...
+# Subtest: SIGKILL uncommitted result commit keeps artifact, message action and acknowledgment atomic
+ok 33 - SIGKILL uncommitted result commit keeps artifact, message action and acknowledgment atomic
+  ---
+  duration_ms: 147.720417
+  type: 'test'
+  ...
+# Subtest: SIGKILL committed result commit keeps artifact, message action and acknowledgment atomic
+ok 34 - SIGKILL committed result commit keeps artifact, message action and acknowledgment atomic
+  ---
+  duration_ms: 162.110083
+  type: 'test'
+  ...
+# Subtest: SIGKILL uncommitted receiver disposition and command replay commit one durable action
+ok 35 - SIGKILL uncommitted receiver disposition and command replay commit one durable action
+  ---
+  duration_ms: 122.956709
+  type: 'test'
+  ...
+# Subtest: SIGKILL committed receiver disposition and command replay commit one durable action
+ok 36 - SIGKILL committed receiver disposition and command replay commit one durable action
+  ---
+  duration_ms: 120.239916
+  type: 'test'
+  ...
+# Subtest: lost message response replays its original envelope after receiver amendment without granting a new definition
+ok 37 - lost message response replays its original envelope after receiver amendment without granting a new definition
+  ---
+  duration_ms: 142.641
+  type: 'test'
+  ...
+# Subtest: SIGKILL before next-event reconciliation resumes once from the committed result
+ok 38 - SIGKILL before next-event reconciliation resumes once from the committed result
+  ---
+  duration_ms: 262.421333
+  type: 'test'
+  ...
+# Subtest: SIGKILL uncommitted next-event reconciliation resumes once from the committed result
+ok 39 - SIGKILL uncommitted next-event reconciliation resumes once from the committed result
+  ---
+  duration_ms: 283.101458
+  type: 'test'
+  ...
+# Subtest: SIGKILL committed next-event reconciliation resumes once from the committed result
+ok 40 - SIGKILL committed next-event reconciliation resumes once from the committed result
+  ---
+  duration_ms: 266.139583
+  type: 'test'
+  ...
+# Subtest: new task and status are durable while two workers remain in slow execution; runtime never impersonates owner
+ok 41 - new task and status are durable while two workers remain in slow execution; runtime never impersonates owner
+  ---
+  duration_ms: 284.364666
+  type: 'test'
+  ...
+# Subtest: A to exact independent QA to B advances in supervisor loop while CoS performs no polling
+ok 42 - A to exact independent QA to B advances in supervisor loop while CoS performs no polling
+  ---
+  duration_ms: 317.90875
+  type: 'test'
+  ...
+# Subtest: idle supervisor ticks do not create canonical history or invalidate task context
+ok 43 - idle supervisor ticks do not create canonical history or invalidate task context
+  ---
+  duration_ms: 55.899458
+  type: 'test'
+  ...
+# Subtest: canonical task and queued attempt commit together; spawn failure is durable and never retries
+ok 44 - canonical task and queued attempt commit together; spawn failure is durable and never retries
+  ---
+  duration_ms: 59.230792
+  type: 'test'
+  ...
+# Subtest: startup detects existing live supervisor rather than duplicating it; stop fences queue grants
+ok 45 - startup detects existing live supervisor rather than duplicating it; stop fences queue grants
+  ---
+  duration_ms: 50.174958
+  type: 'test'
+  ...
+# Subtest: public tools expose bounded task/runtime contracts and reject unrecognized authority arguments
+ok 46 - public tools expose bounded task/runtime contracts and reject unrecognized authority arguments
+  ---
+  duration_ms: 0.6435
+  type: 'test'
+  ...
+# Subtest: background reconciliation catches a crash after queue commit even while runtime is stopped
+ok 47 - background reconciliation catches a crash after queue commit even while runtime is stopped
+  ---
+  duration_ms: 67.352
+  type: 'test'
+  ...
+# Subtest: killed running attempts remain uncertain and occupy capacity without automatic replacement
+ok 48 - killed running attempts remain uncertain and occupy capacity without automatic replacement
+  ---
+  duration_ms: 110.050875
+  type: 'test'
+  ...
+# Subtest: format7 same-native exact supplemental reads are delivered and accounted in the visible wire budget
+ok 49 - format7 same-native exact supplemental reads are delivered and accounted in the visible wire budget
+  ---
+  duration_ms: 105.346791
+  type: 'test'
+  ...
+# Subtest: format7 changed native identity on retrieval fails and preserves the rejected return
+ok 50 - format7 changed native identity on retrieval fails and preserves the rejected return
+  ---
+  duration_ms: 99.779708
+  type: 'test'
+  ...
+# Subtest: cumulative multibyte and escaped retrieval history Holds before another oversized native call
+ok 51 - cumulative multibyte and escaped retrieval history Holds before another oversized native call
+  ---
+  duration_ms: 134.838167
+  type: 'test'
+  ...
+# Subtest: fatal supervisor validation is durable and suppresses automatic restart churn
+ok 52 - fatal supervisor validation is durable and suppresses automatic restart churn
+  ---
+  duration_ms: 48.761334
+  type: 'test'
+  ...
+# Subtest: superseded supervisor generation cannot dispatch through a newly started runtime principal
+ok 53 - superseded supervisor generation cannot dispatch through a newly started runtime principal
+  ---
+  duration_ms: 55.040166
+  type: 'test'
+  ...
+# Subtest: long idle supervisor waits keep only the current abort listener
+ok 54 - long idle supervisor waits keep only the current abort listener
+  ---
+  duration_ms: 133.486417
+  type: 'test'
+  ...
+# Subtest: new applicable rules between worker publication and runtime acceptance fence a formerly passing review
+ok 55 - new applicable rules between worker publication and runtime acceptance fence a formerly passing review
+  ---
+  duration_ms: 186.014208
+  type: 'test'
+  ...
+# Subtest: peer handoff is delivered to the declared receiver and acknowledged atomically with its actual result
+ok 56 - peer handoff is delivered to the declared receiver and acknowledged atomically with its actual result
+  ---
+  duration_ms: 181.880167
+  type: 'test'
+  ...
+# Subtest: an interrupted exact attempt retains its late native response and full negative original without acceptance
+ok 57 - an interrupted exact attempt retains its late native response and full negative original without acceptance
+  ---
+  duration_ms: 107.535209
+  type: 'test'
+  ...
+# Subtest: supervisor starts an explicit output consumer after its producer is terminal without another active transition
+ok 58 - supervisor starts an explicit output consumer after its producer is terminal without another active transition
+  ---
+  duration_ms: 181.042917
+  type: 'test'
+  ...
+# Subtest: restore preserves accepted exact evidence, a queued obligation and an unprocessed peer message
+ok 59 - restore preserves accepted exact evidence, a queued obligation and an unprocessed peer message
+  ---
+  duration_ms: 235.342292
+  type: 'test'
+  ...
+# Subtest: Store-backed submit is attributable, bounded, replay-safe and preserves fields through normalized migration
+ok 60 - Store-backed submit is attributable, bounded, replay-safe and preserves fields through normalized migration
+  ---
+  duration_ms: 123.009417
+  type: 'test'
+  ...
+# Subtest: task creation rejects non-owner, stale epoch, pause, malformed dependencies and missing authority
+ok 61 - task creation rejects non-owner, stale epoch, pause, malformed dependencies and missing authority
+  ---
+  duration_ms: 29.5935
+  type: 'test'
+  ...
+# Subtest: definition amendments have guarded revisions and preserve a small previous-definition reference
+ok 62 - definition amendments have guarded revisions and preserve a small previous-definition reference
+  ---
+  duration_ms: 25.072917
+  type: 'test'
+  ...
+# Subtest: A to independent QA to B advances only on a canonical exact Pass, never output completion alone
+ok 63 - A to independent QA to B advances only on a canonical exact Pass, never output completion alone
+  ---
+  duration_ms: 39.997083
+  type: 'test'
+  ...
+# Subtest: Fail/Blocked reviews and changed exact subjects hold dependent work
+ok 64 - Fail/Blocked reviews and changed exact subjects hold dependent work
+  ---
+  duration_ms: 31.293333
+  type: 'test'
+  ...
+# Subtest: attempt binding is atomic, uniquely attributable and one-shot
+ok 65 - attempt binding is atomic, uniquely attributable and one-shot
+  ---
+  duration_ms: 27.22475
+  type: 'test'
+  ...
+# Subtest: cancellation requests stop without claiming closure; resource claims survive until confirmed
+ok 66 - cancellation requests stop without claiming closure; resource claims survive until confirmed
+  ---
+  duration_ms: 25.258958
+  type: 'test'
+  ...
+# Subtest: amending in-flight work fences the definition and never authorizes automatic retry
+ok 67 - amending in-flight work fences the definition and never authorizes automatic retry
+  ---
+  duration_ms: 21.145291
+  type: 'test'
+  ...
+# Subtest: cycles and forged bookkeeping remain visible or rejected
+ok 68 - cycles and forged bookkeeping remain visible or rejected
+  ---
+  duration_ms: 19.026458
+  type: 'test'
+  ...
+# Subtest: durable messages preserve body, attribution and cursors; read is not processing
+ok 69 - durable messages preserve body, attribution and cursors; read is not processing
+  ---
+  duration_ms: 41.9305
+  type: 'test'
+  ...
+# Subtest: peer messages bind exact source attempt and reject forged or late writers
+ok 70 - peer messages bind exact source attempt and reject forged or late writers
+  ---
+  duration_ms: 29.283292
+  type: 'test'
+  ...
+# Subtest: only exact prospective scoped worker proposals can be omitted from unrelated current knowledge
+ok 71 - only exact prospective scoped worker proposals can be omitted from unrelated current knowledge
+  ---
+  duration_ms: 21.344125
+  type: 'test'
+  ...
+# Subtest: public pause and resume control evidence binds as nullable revisions without weakening output references
+ok 72 - public pause and resume control evidence binds as nullable revisions without weakening output references
+  ---
+  duration_ms: 38.5735
+  type: 'test'
+  ...
+# Subtest: an exact negative output is excluded only from its own original inputs, never unrelated task context
+ok 73 - an exact negative output is excluded only from its own original inputs, never unrelated task context
+  ---
+  duration_ms: 24.022417
+  type: 'test'
+  ...
+# Subtest: worker disposition binds the delivered receiver attempt and preserves its immutable original message input
+ok 74 - worker disposition binds the delivered receiver attempt and preserves its immutable original message input
+  ---
+  duration_ms: 29.201333
+  type: 'test'
+  ...
+# Subtest: worker cannot acknowledge a task message that was not part of its actual delivered inputs
+ok 75 - worker cannot acknowledge a task message that was not part of its actual delivered inputs
+  ---
+  duration_ms: 23.338625
+  type: 'test'
+  ...
+# Subtest: known bookkeeping fields reject object-valued qualifiers and malformed timestamps
+ok 76 - known bookkeeping fields reject object-valued qualifiers and malformed timestamps
+  ---
+  duration_ms: 23.45575
+  type: 'test'
+  ...
+# Subtest: cancel preserves verbatim attributed source intent, replay and compulsory unrelated-task context
+ok 77 - cancel preserves verbatim attributed source intent, replay and compulsory unrelated-task context
+  ---
+  duration_ms: 34.589959
+  type: 'test'
+  ...
+# Subtest: owner message and disposition source qualifiers survive, affect replay and remain globally compulsory
+ok 78 - owner message and disposition source qualifiers survive, affect replay and remain globally compulsory
+  ---
+  duration_ms: 48.64425
+  type: 'test'
+  ...
+1..78
+# tests 91
+# suites 0
+# pass 91
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 4430.8345

@@ -13,6 +13,8 @@ The minimum is CoS, one software runtime/SQLite store, and finite specialist/rev
 
 Use the same `operation_id` only to retrieve the result of the identical command. Reusing it for changed content fails. `amend` and `cancel` require the current `expected_definition_revision`. An amendment fences old work; it does not reset the consumed attempt.
 
+A message replay retains its original receiver definition even if that task has since been amended. It retrieves the existing envelope, including any durable disposition; it does not create a second message or retarget old evidence. Disposition against a changed receiver definition still requires explicit reconciliation.
+
 ## Dependencies and communication
 
 - `spec.depends_on` names existing task IDs with explicit gates. `output` requires an attributable completed output; `accepted` requires a current independent exact-subject Pass. A test gate requires a canonical passing runtime test receipt, never a model-written "passed" flag. Async task submission introduces no new generation or software-test execution capability.
@@ -44,6 +46,7 @@ These are source test mappings, not a final-candidate acceptance receipt. Script
 |---|---|---|
 | New commands/status during slow workers; public pagination and related resource visibility; no CoS polling; A → independent QA → B | `tests/task-runtime.test.mjs`, `tests/task-runtime-acceptance.test.mjs` | Real supported-host lifecycle, observed native identities and exact output/review links |
 | Idempotent commands, one-shot attempts, cancellation, source/owner fences, durable peer messages and dispositions | `tests/tasks.test.mjs` | Independent review of final code and crash/recovery evidence |
+| Process SIGKILL before persistence, after uncommitted writes and after commit/lost reply; dispatch uncertainty; atomic output/message action/ack; next-event recovery and duplicate suppression | `tests/task-runtime-crash.test.mjs`, `tests/fixtures/task-runtime-crash-child.mjs` | Fictional model adapters exercise real SQLite/process cuts; this does not establish native-session replacement or external exactly-once execution |
 | 1x/10x/100x classified archive, exact context sources, late-message Hold, bounded portfolio/checkpoint, stale sources | `tests/task-context.test.mjs` | Actual native context/output fit and semantic adequacy; packet size alone is insufficient |
 | Task index, backup/restore and stale-writer compatibility | `tests/task-index.test.mjs` | Exact-final-pin results and supported restore/migration evidence |
 | Late returns after amend/pause/owner/stop; Fail/Blocked QA; software restart after result commit with a durable peer handoff | `tests/task-runtime-acceptance.test.mjs` | Actual host/native lifecycle is separate from these scripted model adapters |
