@@ -1,0 +1,12 @@
+(node:88790) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ actual contract-double candidates accept; duplicated arms, negative reviews, call failures and changed bindings cannot pass assessment (24353.959959ms)
+✔ exact fixture mismatch and independent QA hold retain output without acceptance or retry (10223.737042ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 35296.198709

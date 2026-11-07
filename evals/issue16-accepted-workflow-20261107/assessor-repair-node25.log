@@ -1,0 +1,17 @@
+(node:83879) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ paired contract doubles traverse production checks and exact independent receiver acceptance (10506.3585ms)
+✔ known deterministic failure consumes one observed repair; original failed receipt survives (13816.1045ms)
+✔ independent negative verdict holds receiver acceptance and records actual escalation (5048.754125ms)
+✔ uncertain backend failure is retained without another generation or false acceptance (767.674209ms)
+✔ final assessor rejects duplicate schedules and unmatched fixture, execution or model settings (0.970958ms)
+✔ final assessor rejects contradictory QA, held/error paths, altered call identity and stale exact bindings (1.065083ms)
+✔ pre/post source verification detects actual file drift, failed capture, runtime drift and invalid manifests (198.373542ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 31521.137333
