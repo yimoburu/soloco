@@ -4,7 +4,7 @@ export {factorCorpusStructure,expandCorpusStructure,validateCorpusStructure} fro
 import {validateOperatingRecord,operatingProofOccurrences} from './operating-state.mjs';
 import {contextSource,currentExtensions,presentationOnly,classificationFor,proofJobSafe,canonicalEvidenceNodes,rejectedJobIdentities} from './current-state.mjs';
 import {buildEvidence} from './upgrade-evidence.mjs';
-import {retainSnapshot,resolveSnapshot,resolveSnapshotEntry,captureSnapshotDependencies,validateSnapshotDependencies,inheritSnapshots,snapshotBytes,operatingIntake,hasSnapshotReferences} from './snapshot.mjs';
+import {retainSnapshot,resolveSnapshot,resolveSnapshotEntry,captureSnapshotDependencies,validateSnapshotDependencies,inheritSnapshots,snapshotBytes,snapshotReference,operatingIntake,hasSnapshotReferences} from './snapshot.mjs';
 import {executionTiming,TIMEOUT_POLICY_VERSION} from './timeout.mjs';
 import {qualificationControlHash} from './context-qualification.mjs';
 import {SCOPED_STREAM,buildScopedStream,validateScopedStreamDelivery} from './scoped-stream.mjs';
@@ -1017,10 +1017,10 @@ function decompositionCounterevidence(s,p,t){
       if(typeof rejected.truncated!=='boolean'||rejected.author_instance!==job.instance_id||rejected.context_sha256!==job.context_sha256||!same(rejected.qualification_plan,x.t.plan)||!same(rejected.qualification_target,scopedReference(x.record))||job.coordination_release.reason!=='model_process_closed'||job.rejected_native_id&&job.rejected_native_id!==job.native_id||(job.rejected_native_ids??[]).some(id=>id!==job.native_id))fail('changed original rejected decomposition binding');
       let wire=rejected.text;
       if(rejected.truncated){
-        if(!rejected.original)fail('missing complete rejected decomposition wire');
+        if(!snapshotReference(rejected.original))fail('missing complete immutable rejected decomposition wire');
         wire=resolveSnapshot(s,rejected.original);
         if(typeof wire!=='string'||wire.length<=rejected.text.length||wire.slice(0,rejected.text.length)!==rejected.text)fail('changed complete rejected decomposition wire');
-      }else if(rejected.original)fail('ambiguous rejected decomposition wire');
+      }else if(rejected.original!==undefined)fail('ambiguous rejected decomposition wire');
       let output;try{output=JSON.parse(wire.trim().replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, ''));}catch{fail('ambiguous rejected decomposition output');}
       const verdict=['Fail','Blocked'].find(v=>[output?.review?.verdict,output?.qualification_result?.verdict].includes(v));
       if(!verdict||rejected.qualification_negative!==verdict)fail('unknown or ambiguous rejected decomposition outcome');

@@ -13,67 +13,7 @@ import {governingRecords} from '../plugins/soloco/runtime/current-state.mjs';
 import {resolveSnapshot,retainSnapshot} from '../plugins/soloco/runtime/snapshot.mjs';
 import * as scoped from '../plugins/soloco/runtime/scoped-context.mjs';
 import {parseOutput} from '../plugins/soloco/runtime/adapters.mjs';
-const sha=x=>digest(JSON.stringify(x));
-const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'fictional-initial-homes-'));
-process.env.COMPANY_PLUGIN_DATA=path.join(tmp,'cache');
-test.after(()=>fs.rmSync(tmp,{recursive:true,force:true}));
-const read=f=>withStore(f.root,db=>db.read());
-const mutate=(f,fn)=>withStore(f.root,db=>db.transaction('fictional.fixture',s=>{fn(s);return s;}));
-const save=(f,args)=>call('company_save',{root:f.root,session_id:f.session_id,epoch:f.epoch,...args},'codex');
-const context=(f,args)=>call('company_context',{...f,protocol:scoped.SCOPED_PROTOCOL,...args},'codex');
-async function fixture({dense=false,groups=61,bootstrap=true}={}){
- const f={root:fs.mkdtempSync(path.join(tmp,'company-')),session_id:'fictional-owner',epoch:1,source_instruction:'FICTIONAL existing authorization: prepare proposed homes and read-only QA while paused; no execution.'};
- engine.bind(f.root,f.session_id,'codex');engine.open({...f,idea:'FICTIONAL mechanics only'},'codex');withStore(f.root,db=>db.migrate());
- mutate(f,s=>{s.paused=bootstrap;if(!bootstrap)s.records.home={id:'home',revision:1,kind:'artifact',content:'UNKNOWN; ZERO allowance; no execution.',context_obligations:{version:1,scope:'*'},operating_record:typed()};s.records.archive={id:'archive',kind:'artifact',revision:1,author_instance:'fictional-source-author',content:'UNKNOWN failed attempt. Remaining allowance ZERO. No execution; retain all negative outcomes.'};});
- if(dense)mutate(f,s=>{
-  const original=retainSnapshot(s,{id:'shared-original',content:'UNKNOWN; allowance ZERO; incoming originals retain opposite qualifiers.'});
-  s.records.allow={id:'allow',revision:1,kind:'artifact',condition:'ALLOW only after consent',original,unknown:{id:'missing',revision:1},lookalike:'STRING body-batch-0/g0-1'};
-  s.records.deny={id:'deny',revision:1,kind:'artifact',condition:'DENY even with consent',original};
-  const count=buildLegacyCoherentPlan(s).groups.length;
-  for(let i=count;i<groups;i++)s.records['dense-'+i]={id:'dense-'+i,revision:1,kind:'artifact',content:'FICTIONAL complete clause '+i+'; UNKNOWN; no export; allowance ZERO.'};
- });
- const m=buildLegacyCoherentPlan(read(f));if(dense)assert.equal(m.groups.length,groups);
- const partition={plan_sha256:m.plan_sha256,context_policy:scoped.CORPUS_PHYSICAL_CONTEXT,shared_selection_ids:['all'],selections:[{id:'all',scope:'*',occurrence_ids:m.occurrences.map(o=>o.id),incident_ids:[]}]};
- const p=await context(f,{action:'plan',source_id:'archive',selected_source_ids:['archive'],partitioner:scoped.CORPUS_PARTITIONER,semantic_partition:partition,batching_policy:scoped.CORPUS_INTRINSIC_BATCHING,...(bootstrap?{home_intake_policy:scoped.INITIAL_PROPOSED_HOMES,maintenance:true}:{})});
- f.plan_id=p.id;return f;
-}
-// Deliberately tiny FICTIONAL test language. This is not extraction of arbitrary
-// company semantics: the fixture's distinct clauses and opposing sentinels are
-// carried verbatim, while full physical evidence remains in the worker packet.
-function fictionalEffects(sections){const raw=JSON.stringify(sections);return ['UNKNOWN; failed outcome; ZERO allowance; no execution.',...raw.matchAll(/FICTIONAL complete clause [0-9]+; UNKNOWN; no export; allowance ZERO\./g)].map(x=>typeof x==='string'?x:x[0]).concat(['ALLOW only after consent','DENY even with consent','incoming originals retain opposite qualifiers','missing','STRING body-batch-0/g0-1'].filter(x=>raw.includes(x))).join('\n');}
-function judgment(p){
- const r={...p.response_shape,verdict:'Pass',reason:'FICTIONAL SCRIPT: mechanics only; no native semantic QA.',permitted_action:p.phase==='integration'?'apply_scoped_context':'continue',preservation_complete:true,interfaces_complete:true,authority_checked:true,scope_complete:true,blockers:[]};
- if(p.phase==='extract'){
-  const b=p.reviewed_unit_bundle;r.unit_id=b.primary.id;r.unit_sha256=sha(b.primary);r.reviewed_unit_bundle_sha256=sha(b);
-  r.items=[{id:'coherent-occurrence',kind:'boundary',text:p.unit_selection_schema?fictionalEffects(b.primary.sections):'UNKNOWN; failed outcome; ZERO allowance; no execution.',scope:'*',provenance:b.provenance_sha256,interfaces:[b.primary.required_interface]}];
- }else if(p.phase==='applicability'){
-  r.summary='FICTIONAL: full unknown and exhausted conditions retained; no permission.';
-  r.mappings=p.item_keys.map(item=>({item,selection_ids:p.mapping_selection_ids,source_set:p.mapping_sets.source_set,occurrence_set:p.mapping_sets.occurrence_set,context_sha256:p.mapping_context_sha256,typed_homes:p.typed_homes,conditions:'No execution; allowance ZERO.',unresolved_outcomes:'UNKNOWN failed outcome remains OPEN.',status:'represented',homes:p.homes.map(h=>h.source.id),reason:'FICTIONAL preservation judgment.'}));
-  r.interfaces=p.interface_keys.length?[]:p.extractions.flatMap(e=>e.result.items.map(i=>({key:e.review.id+'/'+i.id,item:i}))).filter(i=>p.item_keys.includes(i.key)).flatMap(({key,item})=>item.interfaces.map(i=>({key:key+'/'+i.id,item:key,scope:item.scope,...i})));
-  r.reviewed_interfaces=p.interface_keys;
- }else{r.summary='FICTIONAL independent aggregate; no execution.';r.unreviewed_interfaces=[];}
- return {content:r.reason,messages:[],notices:[],review:{verdict:r.verdict,reason:r.reason,permitted_action:r.permitted_action},qualification_result:r};
-}
-async function review(f,args,change,native,cliEvents){
- const target=await context(f,{action:'target',plan_id:f.plan_id,...args});if(target.reused)return target;
- const q=engine.dispatch({...f,role:'qa',review_of:target.id,task:'FICTIONAL scripted contract review'},'codex',{check:()=>({available:true,authenticated:true}),launch:()=>({on(){},unref(){}})});
- const chunks=[];let packet;
- await work(f.root,q.id,async(host,session,prompt,dir,timeout,selection,options)=>{
-  const now=Date.now();options.onSpawn(executionTiming(now,{timeout_ms:Math.min(timeout,options.executionDeadlineAt?options.executionDeadlineAt-now:timeout),timeout_reason:options.timeoutReason}));
-  let p=JSON.parse(prompt);const n=native??'fictional-independent-'+q.id;
-  if(p.protocol===scoped.SCOPED_STREAM){chunks.push(p.text);if(!p.final)return {native_id:n,text:JSON.stringify({scoped_stream_ack:{body_sha256:p.body_sha256,sequence:p.sequence,range_sha256:p.range_sha256}})};p=JSON.parse(chunks.join(''));}
-  if(p.protocol==='corpus-readable-structure-v1')p=scoped.expandCorpusStructure(p);packet=p;
-  const e=judgment(p);if(change)change(e,p);
-  if(cliEvents)return parseOutput('codex',[{type:'thread.started',thread_id:n},{type:'turn.started'},...cliEvents,{type:'item.completed',item:{id:'final',type:'agent_message',text:JSON.stringify(e)}},{type:'turn.completed'}].map(JSON.stringify).join('\n'));
-  return {native_id:n,text:JSON.stringify(e)};
- });
- const s=read(f),job=s.jobs[q.id];return {target,job,record:s.records[job.artifact_id],packet};
-}
-const typed=()=>({version:1,kind:'permission',scope:'*',owner:'fictional-owner',conditions:'Proposed representation only; existing allowance ZERO.',exceptions:'Never authorizes execution.',clearing:'Independent review and existing authority required.',expires_at:null,dependencies:[],authority_refs:['archive'],evidence_refs:[],grant_refs:['archive'],remaining:0,revoked:true});
-async function home(f,id='home',expected_revision){const s=read(f),op=typed();op.evidence_refs=['archive'];return save(f,{id,...(expected_revision===undefined?{}:{expected_revision}),kind:'artifact',content:'UNKNOWN failed outcome; allowance ZERO; no execution.',operating_record:op,bootstrap_plan_id:f.plan_id});}
-async function extraction(f){const v=read(f).records[f.plan_id].scoped_context_plan;const es=[];for(const u of v.units){const e=await review(f,{phase:'extract',unit_id:u.id,delivery_protocol:scoped.SCOPED_STREAM});assert.equal(e.job.status,'completed',e.job.error);es.push(e);}return es;}
-const domainArgs=es=>({phase:'applicability',delivery_schema:scoped.CORPUS_PHASED_DELIVERY,delivery_protocol:scoped.SCOPED_STREAM,selection_ids:['all'],extraction_review_ids:es.map(e=>e.record.id),context_scope:'*'});
-async function aggregate(f,es,d){const a=domainArgs(es),i=await review(f,{...a,domain_review_ids:[d.record.id],interface_keys:d.record.qualification_result.interfaces.map(i=>i.key)});assert.equal(i.job.status,'completed',i.job.error);const final=await review(f,{phase:'integration',delivery_schema:scoped.CORPUS_PHASED_DELIVERY,delivery_protocol:scoped.SCOPED_STREAM,domain_review_ids:[d.record.id],interface_review_ids:[i.record.id]});assert.equal(final.job.status,'completed',final.job.error);await context(f,{action:'apply',integration_review_id:final.record.id});return final;}
+import {sha,fixture,read,mutate,save,context,review,home,domainArgs,aggregate,typed,groupMarker,splitArgs,blockedJudgment,dispositions} from './support/scoped-home-fixture.mjs';
 
 test('FICTIONAL zero-home bootstrap uses real normalized-v4 intake and unchanged canonical extraction',async()=>{
  const f=await fixture(),s0=read(f),v=s0.records[f.plan_id].scoped_context_plan;assert.equal(Object.values(s0.records).filter(r=>r.operating_record).length,0);
@@ -186,11 +126,6 @@ test('FICTIONAL complete-group parent Blocked, recursive child split, exact reus
  t.diagnostic(JSON.stringify({fictional_only:true,original_groups:n,complete_children:3,actual_native_fit:null,source_acceptance:false}));
 });
 
-const groupMarker={unit_selection_schema:scoped.COMPLETE_GROUP_RANGES,delivery_protocol:scoped.SCOPED_STREAM};
-const splitArgs=(id,extra={})=>({phase:'extract',...groupMarker,unit_id:id,...extra});
-const blockedJudgment=e=>{const r=e.qualification_result;r.verdict='Blocked';r.permitted_action='hold';r.reason='FICTIONAL retained negative: UNKNOWN and ZERO allowance';r.blockers=[r.reason];e.content=r.reason;e.review={verdict:r.verdict,reason:r.reason,permitted_action:r.permitted_action};};
-const dispositions=e=>{for(const d of e.qualification_result.repair_dispositions??[]){d.reason='FICTIONAL exact complete children replace overflow while retaining UNKNOWN, failed evidence and ZERO allowance.';d.clearing_conditions='Independent contextual preservation only; all actual restrictions retained; no renewed authority.';}};
-
 test('FICTIONAL split adversaries reject overlapping/parent primary, supporting-only credit and stale controls; ordered bundles reuse exactly',async()=>{
  const f=await fixture({dense:true,groups:7,bootstrap:false}),v=read(f).records[f.plan_id].scoped_context_plan,n=v.units[0].group_ids.length;
  const parent=await review(f,splitArgs('body-batch-0'));assert.equal(parent.job.status,'completed',parent.job.error);
@@ -269,7 +204,7 @@ test('FICTIONAL decomposition reads complete immutable rejected negative wire, n
  const a=splitArgs('body-batch-0/g0-1',{repair_of:['job:'+failed.job.id]}),child=await review(f,a);assert.equal(child.job.status,'completed',child.job.error);
  assert.ok(child.packet.repair_counterevidence[0].value.qualification_result.reason.endsWith(tail));
  const state=read(f),{inheritSnapshots}=await import('../plugins/soloco/runtime/snapshot.mjs');
- for(const edit of [r=>delete r.original,r=>r.text+='changed',r=>r.original.immutable_snapshot.sha256='0'.repeat(64),r=>r.truncated=false,r=>r.truncated='true',r=>r.qualification_negative=null,r=>r.author_instance='other',r=>r.context_sha256='wrong',r=>r.qualification_plan.id='other',r=>r.qualification_target.id='other']){
+ for(const edit of [r=>delete r.original,r=>r.original=resolveSnapshot(state,r.original),r=>r.original={...r.original,unknown:'not an exact reference'},r=>r.text+='changed',r=>r.original.immutable_snapshot.sha256='0'.repeat(64),r=>r.truncated=false,r=>r.truncated='true',r=>r.qualification_negative=null,r=>r.author_instance='other',r=>r.context_sha256='wrong',r=>r.qualification_plan.id='other',r=>r.qualification_target.id='other']){
   const bad=inheritSnapshots(state,structuredClone(state));edit(bad.jobs[failed.job.id].rejected_output);assert.throws(()=>scoped.createScopedTarget(bad,{plan_id:f.plan_id,...a}),/hold|snapshot|immutable|hash/i);
  }
  // A parseable preview cannot stand in for a malformed complete original.
@@ -277,72 +212,4 @@ test('FICTIONAL decomposition reads complete immutable rejected negative wire, n
  r.text=JSON.stringify({review:{verdict:'Blocked'}});r.original=retainSnapshot(bad,r.text+' malformed tail');r.qualification_negative=null;
  assert.throws(()=>scoped.createScopedTarget(bad,{plan_id:f.plan_id,...a}),/ambiguous|unknown/);
 
-});
-
-test('FICTIONAL marked initial-home correction retains mixed negatives through independent whole-vector apply',async t=>{
- // This scripted reviewer measures evidence/repair correctness, not native fit.
- // Isolate CPU-heavy history reconstruction from Date-based fixture deadlines;
- // dedicated timeout/stream tests still check real deadline enforcement.
- t.mock.timers.enable({apis:['Date'],now:Date.now()});
- const f=await fixture({dense:true,groups:7}),initial=read(f),v=initial.records[f.plan_id].scoped_context_plan;
- assert.equal(Object.values(initial.records).filter(r=>r.operating_record).length,0);
- const n=v.units[0].group_ids.length;assert.equal(n,7);
- const parent=await review(f,{phase:'extract',unit_id:'body-batch-0',delivery_protocol:scoped.SCOPED_STREAM},blockedJudgment);
- assert.equal(parent.job.status,'completed',parent.job.error);console.error('FICTIONAL marked home: parent retained');
- const mid=3,childArgs=id=>splitArgs(id,{repair_of:[parent.record.id]});
- const left=await review(f,childArgs(`body-batch-0/g0-${mid}`),dispositions),right=await review(f,childArgs(`body-batch-0/g${mid}-${n}`),dispositions),es=[left,right];
- for(const e of es)assert.equal(e.job.status,'completed',e.job.error);
- console.error('FICTIONAL marked home: complete children');await home(f);await home(f,'other-home');
- const a={...domainArgs(es),...groupMarker,repair_of:[parent.record.id]};
- const blocked=await review(f,a,(e,p)=>{dispositions(e);blockedJudgment(e);e.qualification_result.reason='FICTIONAL home missing explicit reconciliation of distant/opposite conditions';e.qualification_result.blockers=[e.qualification_result.reason];e.content=e.qualification_result.reason;e.review.reason=e.content;});
- assert.equal(blocked.job.status,'completed',blocked.job.error);assert.equal(blocked.record.review.verdict,'Blocked');console.error('FICTIONAL marked home: domain negative retained');
- const negatives=[parent.record.id,blocked.record.id],repair={...a,repair_of:negatives},before=read(f),oldHome=structuredClone(before.records.home);
- // A new target or metadata-only revision is never a material correction.
- await assert.rejects(context(f,{action:'target',plan_id:f.plan_id,...repair}),/unchanged repair candidate/);
- await assert.rejects(context(f,{action:'target',plan_id:f.plan_id,...childArgs('body-batch-0/g0-1'),repair_of:negatives}),/unrelated negative/);
- await home(f,'home',1);
- await assert.rejects(context(f,{action:'target',plan_id:f.plan_id,...repair}),/unchanged repair candidate/);
- const unchanged=read(f).records.home,op=structuredClone(unchanged.operating_record);op.clearing='Explicit independent reconciliation of UNKNOWN distant/opposite conditions; allowance stays ZERO.';
- await save(f,{id:'home',expected_revision:2,kind:'artifact',content:unchanged.content+' Corrected explicit reconciliation; opposite and distant conditions remain OPEN.',operating_record:op,bootstrap_plan_id:f.plan_id});
- const corrected=read(f),inventory=['home','other-home'].map(id=>scoped.scopedReference(corrected.records[id]));
- await assert.rejects(context(f,{action:'target',plan_id:f.plan_id,...repair,current_home_inventory:inventory.slice(0,1)}),/inventory/);
- for(const repair_of of [[parent.record.id],[blocked.record.id]])await assert.rejects(context(f,{action:'target',plan_id:f.plan_id,...repair,repair_of}),/negative/);
- await assert.rejects(context(f,{action:'target',plan_id:f.plan_id,...repair,extraction_review_ids:[left.record.id]}),/missing complete body|unrelated negative/);
- await assert.rejects(context(f,{action:'target',plan_id:f.plan_id,...repair,selection_ids:['unrelated']}),/selection/);
- const {unit_selection_schema:marker,...unmarked}=repair;await assert.rejects(context(f,{action:'target',plan_id:f.plan_id,...unmarked}),/marker|repair requires/);
- const d=await review(f,repair,dispositions);assert.equal(d.job.status,'completed',JSON.stringify({error:d.job.error,execution_failure:d.job.execution_failure,execution_started_at:d.job.execution_started_at,execution_deadline_at:d.job.execution_deadline_at,finished_at:d.job.finished_at}));console.error('FICTIONAL marked home: independent corrected domain');
- assert.notEqual(d.job.native_id,blocked.job.native_id);
- assert.throws(()=>scoped.validateScopedNativeAdmission(read(f),d.job,blocked.job.native_id),/independent|reused/);
- assert.throws(()=>scoped.validateScopedNativeAdmission(read(f),d.job,f.session_id),/independent|reused/);
- const counter=d.packet.repair_counterevidence.find(e=>e.review.id===blocked.record.id);
- assert.deepEqual(counter.value,blocked.record);assert.deepEqual(counter.job,blocked.job);
- assert.deepEqual(counter.prior_packet.homes,blocked.packet.homes);
- assert.equal(counter.prior_packet.homes.find(h=>h.source.id==='home').value.content,oldHome.content);
- assert.deepEqual(d.packet.current_home_inventory,inventory);
- const ia={...repair,domain_review_ids:[d.record.id],interface_keys:d.record.qualification_result.interfaces.map(i=>i.key)};
- // Each own-phase target must name both negatives and obtain its own disposition.
- await assert.rejects(context(f,{action:'target',plan_id:f.plan_id,...ia,repair_of:[parent.record.id]}),/negative/);
- const ir=await review(f,ia,dispositions);assert.equal(ir.job.status,'completed',ir.job.error);
- const fa={phase:'integration',...groupMarker,delivery_schema:scoped.CORPUS_PHASED_DELIVERY,domain_review_ids:[d.record.id],interface_review_ids:[ir.record.id],repair_of:negatives};
- await assert.rejects(context(f,{action:'target',plan_id:f.plan_id,...fa,repair_of:[parent.record.id]}),/negative/);
- const final=await review(f,fa,dispositions);assert.equal(final.job.status,'completed',final.job.error);console.error('FICTIONAL marked home: independent interface and final');
- for(const e of [d,ir,final]){
-  assert.equal(e.record.qualification_result.repair_dispositions.length,2);
-  assert.equal(e.packet.repair_counterevidence.length,2);
-  assert.deepEqual(e.packet.repair_counterevidence.find(c=>c.review.id===blocked.record.id).prior_packet.homes,blocked.packet.homes);
- }
- const ready=read(f);
- const {inheritSnapshots}=await import('../plugins/soloco/runtime/snapshot.mjs');
- for(const edit of [s=>s.paused=false,s=>s.owner.epoch++,s=>s.records.home.content+=' stale',s=>s.records['other-home'].content+=' stale',s=>s.records.archive.content+=' changed',s=>s.records[d.record.id].qualification_result.repair_dispositions=[]]){
-  const bad=inheritSnapshots(ready,structuredClone(ready));edit(bad);assert.throws(()=>scoped.validateScopedApply(bad,{integration_review_id:final.record.id}),/hold/i);
- }
- assert.equal((await context(f,{action:'apply',integration_review_id:final.record.id})).applied,true);
- const state=read(f);for(const e of [parent,blocked]){assert.deepEqual(state.records[e.record.id],e.record);assert.deepEqual(state.jobs[e.job.id],e.job);}
- assert.deepEqual(state.records.home.previous[0].content,oldHome.content);assert.equal(state.records.home.previous.length,2);
- assert.deepEqual(state.records['other-home'],before.records['other-home']);
- assert.equal(state.records.home.operating_record.remaining,0);assert.equal(state.records['other-home'].operating_record.remaining,0);
- assert.equal(state.records[f.plan_id].scoped_context_plan.extraction_identity,v.extraction_identity);assert.deepEqual(state.records[f.plan_id].scoped_context_plan.units,v.units);
- for(const e of es){assert.deepEqual(state.records[e.record.id],e.record);const reused=await review(f,childArgs(e.target.target.unit_id));assert.equal(reused.reused,true);assert.equal(reused.review_id,e.record.id);}
- for(const q of ['ALLOW only after consent','DENY even with consent','missing','STRING body-batch-0/g0-1'])assert.ok(JSON.stringify(final.packet.extractions).includes(q),q);
- t.diagnostic(JSON.stringify({fictional_only:true,groups:n,initial_homes:0,applied:true,actual_native_qualification:null,source_acceptance:false}));
 });
