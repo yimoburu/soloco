@@ -63,7 +63,7 @@ class Child extends EventEmitter {
     return true;
   }
 }
-const codexOutput = text => JSON.stringify({type:'thread.started',thread_id:'native-fictional'})+'\n'+JSON.stringify({type:'item.completed',item:{type:'agent_message',text}})+'\n';
+const codexOutput = text => JSON.stringify({type:'thread.started',thread_id:'native-fictional'})+'\n'+JSON.stringify({type:'turn.started'})+'\n'+JSON.stringify({type:'item.completed',item:{type:'agent_message',text}})+'\n'+JSON.stringify({type:'turn.completed'})+'\n';
 function harness({child=new Child(), signal=new Signal(), onSpawn, timeout=1000, timeoutReason='Small deterministic fixture', host='codex', nativeId=null, selection=null, spawnHook, resolveHook, timeoutContext, clockStart, executionDeadlineAt}={}) {
   const clock=new Clock();
   if(clockStart!==undefined)clock.time=clockStart;
@@ -182,14 +182,14 @@ test('legacy timing does not expand, reset, or manufacture missing deadlines',()
 
 test('normal completion starts allowance at spawn and preserves isolation and selection',async()=>{
   const selection={mode:'explicit',model:'fictional-model',effort:'high'};
-  const h=harness({selection,nativeId:'previous-native'});
+  const h=harness({selection,nativeId:'native-fictional'});
   h.clock.move(1239999);
   assert.equal(h.receipts.length,0);
   h.child.emit('spawn');
   assert.equal(h.receipts.length,1);
   assert.equal(Date.parse(h.receipts[0].execution_started_at),1239999);
   assert.equal(Date.parse(h.receipts[0].execution_deadline_at),1240999);
-  assert.deepEqual(h.calls[0][1],commandArgs('codex','previous-native',selection));
+  assert.deepEqual(h.calls[0][1],commandArgs('codex','native-fictional',selection));
   assert.equal(h.calls[0][2].env.COMPANY_WORKER,'1');
   assert.equal(Object.hasOwn(h.calls[0][2].env,'CLAUDECODE'),false);
   assert.deepEqual(h.calls[0][2].stdio,['pipe','pipe','pipe']);

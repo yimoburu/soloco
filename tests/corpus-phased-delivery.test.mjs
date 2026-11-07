@@ -195,3 +195,16 @@ test('exact context routes respect root cuts and preserve selected, stale, unkno
  assert.equal(scoped.validateCorpusProofDelivery(projected,m,claim,d),true);
  for(const edit of [p=>p.incidence.direct_references.pop(),p=>p.incidence.direct_references[0].reference.revision++,p=>p.incidence.context_binding_sha256='wrong']){const bad=structuredClone(projected);edit(bad);assert.throws(()=>scoped.validateCorpusProofDelivery(bad,m,claim,d),/omission or substitution/);}
 });
+
+test('public complete-group retrieval preserves frozen sections, STRING evidence and prospective routing',async()=>{
+ const {f}=await semanticFixture({inbound:true}),state=read(f),v=state.records[f.plan_id].scoped_context_plan,u=v.units.find(u=>u.group_ids.length>2),before=structuredClone(v);
+ const common={root:f.root,session_id:f.session_id,epoch:f.epoch,source_instruction:f.source_instruction};
+ const unit_id=u.id+'/g0-2',child=await publicCall('company_context',{...common,action:'read',plan_id:f.plan_id,unit_id},'codex');
+ const whole=call(f,{action:'read',plan_id:f.plan_id,unit_id:u.id});assert.deepEqual(child.unit.sections,whole.unit.sections.slice(0,2));assert.equal(child.unit.id,unit_id);
+ const work=await publicCall('company_context',{...common,action:'inspect',plan_id:f.plan_id,section:'workload',unit_id},'codex');assert.equal(work.original_intrinsic_batch_count,v.units.length);assert.deepEqual(work.selected_review_unit_ids,[unit_id]);assert.equal(work.complete_native_fit,null);
+ for(const bad of [u.id+'/g00-2',u.id+'/g0-0',u.id+'/g0-'+u.group_ids.length,u.id+'/g0-2/g0-1','STRING '+unit_id,'body-batch-999/g0-1'])await assert.rejects(publicCall('company_context',{...common,action:'read',plan_id:f.plan_id,unit_id:bad},'codex'),/group|selection/);
+ for(const action of ['inspect','read','plan','apply','revoke'])await assert.rejects(publicCall('company_context',{...common,action,unit_selection_schema:scoped.COMPLETE_GROUP_RANGES},'codex'),/new scoped target/);
+ await assert.rejects(publicCall('company_context',{...common,action:'target',plan_id:f.plan_id,phase:'extract',unit_id},'codex'),/marker/);
+ await assert.rejects(publicCall('company_context',{...common,action:'target',plan_id:f.plan_id,phase:'extract',unit_id,unit_selection_schema:'unknown'},'codex'),/contract|schema/);
+ assert.deepEqual(read(f).records[f.plan_id].scoped_context_plan,before);
+});

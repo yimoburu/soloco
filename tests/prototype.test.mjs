@@ -279,7 +279,7 @@ else {
  else artifact.files=${JSON.stringify(files)};
  const native=randomUUID(),text=JSON.stringify(artifact);
  if(args.includes('--output-format'))console.log(JSON.stringify({type:'result',subtype:'success',session_id:native,result:text}));
- else {console.log(JSON.stringify({type:'thread.started',thread_id:native}));console.log(JSON.stringify({type:'item.completed',item:{type:'agent_message',text}}));}
+ else {console.log(JSON.stringify({type:'thread.started',thread_id:native}));console.log(JSON.stringify({type:'turn.started'}));console.log(JSON.stringify({type:'item.completed',item:{type:'agent_message',text}}));console.log(JSON.stringify({type:'turn.completed'}));}
 }
 `;
   for(const host of ['codex','claude'])fs.writeFileSync(path.join(bin,host),script,{mode:0o700});
