@@ -3,8 +3,9 @@
 Review baseline: `7b6d6d53f37c6923399284d51e5b9f96dd255545`, November 7, 2026.
 Contract: [SPEC.md](../SPEC.md), SHA-256
 `28f99838abc3794da94f97f7a2d234554811da3aef7b8ddb3742075caa78ec36`.
-Integrated implementation pin: `9160c2655cc14a5e5f1ff1690d5358e8c08b4f92`,
-including main through `b6ea56bc845f9e8f82f25d88da96950f35cde46f`.
+Integrated implementation pin: `46226dc48ac2998a01c825b4a58fa2cb95508236`,
+including main through `48ae6fa` (Claude host parity). The complete Node 22 suite
+is pinned separately to the prior candidate `9160c26` below.
 The contract is unchanged. This ledger covers every non-heading normative
 paragraph/bullet by its original line number; grouped prose retains the full
 requirement in SPEC. A source or contract change requires an affected-row review.
@@ -134,6 +135,9 @@ records clean source pins, complete local test logs/counts, original failures,
 sanitized native receipts and an independent source review. These are local
 executed checks, not GitHub CI receipts or actual-company adoption.
 
+- Final main integration at `46226dc`: Node 22 regression plus changed boundaries
+  **814/814 passed**; Node 26 compatibility plus changed boundaries **459/459
+  passed**. Both have zero failures/skips and unchanged clean source pins.
 - Full Node 22.23.2: **1121/1121 passed**, zero failures/skips, on `9160c26`.
 - Node 26.13.0 compatibility plus changed boundaries: **429/429 passed**, zero
   failures/skips, on `9160c26`.
@@ -144,8 +148,10 @@ executed checks, not GitHub CI receipts or actual-company adoption.
   invariant cases pass in the complete suite. Counts across suites overlap.
 
 Final test receipts require unchanged clean before/after source pins. The final
-passing TAPs also pass the repository's strict complete-plan/count parser. The
-following evidence/documentation commit changes no executable source.
+passing TAPs also pass the repository's strict complete-plan/count parser. The final
+evidence/documentation commit changes no executable source after `46226dc`. The
+full suite was not repeated after merging Claude host parity; the final regression
+and compatibility checks cover that integration.
 
 The native fixture used three distinct Codex sessions requested as `gpt-6-astra`
 (low effort for producer/receiver, medium for QA), as advertised by this host.
@@ -153,9 +159,10 @@ Effective provider settings remain unverified. Artifact generation, exact indepe
 review, receiver handoff and peer disposition passed; software-supervisor
 interruption recovered without duplicate work, idle started no new jobs, and
 native closure was confirmed. The successful fixture is pinned to `19414e6`;
-subsequent integration changed development receipt validation, its format verifier,
-tests and documentation, not the async adapter/task/worker path. It is not an
-exact-commit native run of the integrated candidate.
+the first integration to `9160c26` changed development receipt validation, its
+format verifier, tests and documentation. The later Claude parity merge also
+changed host handling and the worker prompt. No native rerun of `46226dc` is
+claimed; the native result remains specific to `19414e6`.
 
 The original native fixture at `cc0edb5` remains `needs_attention` after the
 unsupported diagnostic sequence; its output is retained, with no published

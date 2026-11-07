@@ -45,3 +45,19 @@ CLI warnings, protocol/stderr logs or identified private host diagnostics are
 included. Original failures and remaining acceptance gaps stay open as recorded.
 No source or evidence blocker remained. This closes the scoped reconciliation
 review, not universal SPEC conformance or actual-company adoption.
+
+## Concurrent main integration
+
+Main subsequently merged Claude parity at `48ae6fa`. The independent reviewer
+compared both merge parents and gave integrated source/evidence `46226dc` a
+**scoped Pass**. The Codex diagnostic/replay fences, native reviewer-independence
+gates, immutable notice dispositions and retained semantic context survive.
+The resolved acceptance harness is byte-identical to upstream's host-aware harness.
+
+The reviewer verified the final integration Node 22 **814/814** and Node 26
+**459/459** receipts, zero failures/skips, strict TAP parsing, compressed and
+uncompressed hashes, and unchanged clean source pins. The ledger correctly keeps
+the complete-suite receipt at `9160c26` and native fixture at `19414e6`; neither
+was rerun on the merged source. No identified private diagnostic markers were
+found in the added test logs. No blocker remained within the reviewed scope;
+actual-company acceptance gaps remain open.

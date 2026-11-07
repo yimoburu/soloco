@@ -7,14 +7,20 @@ or adoption.
 
 ## Source and validation
 
-Implementation: `9160c2655cc14a5e5f1ff1690d5358e8c08b4f92`.
+Final integrated implementation: `46226dc48ac2998a01c825b4a58fa2cb95508236`.
+Complete-suite source: `9160c2655cc14a5e5f1ff1690d5358e8c08b4f92`.
 Original audit baseline: `7b6d6d53f37c6923399284d51e5b9f96dd255545`.
 Unchanged SPEC SHA-256:
 `28f99838abc3794da94f97f7a2d234554811da3aef7b8ddb3742075caa78ec36`.
-The evidence/documentation commit changes no executable source after this pin.
+The initial evidence commit `b42ddd5` changes no executable source after `9160c26`.
+The subsequent merge brings in main `48ae6fa` (Claude host parity), preserving
+its exact host-aware acceptance harness. Final evidence changes no executable
+source after `46226dc`.
 
 | Check | Source | Result |
 |---|---|---|
+| Final integration Node 22 regression + changed boundaries | `46226dc` | 814/814, zero failures/skips |
+| Final integration Node 26 compatibility + changed boundaries | `46226dc` | 459/459, zero failures/skips |
 | Full Node 22.23.2 suite | `9160c26` | 1121/1121, zero failures/skips |
 | Node 26.13.0 compatibility + changed boundaries | `9160c26` | 429/429, zero failures/skips |
 | Integrated Node 22 regression + changed boundaries | `c4fd3c5` | 780/780, zero failures/skips |
@@ -57,7 +63,9 @@ and raw CLI diagnostics remain local because they include host configuration.
 The successful fixture source is **19414e6**, not the integrated implementation
 pin. Subsequent changes from main affect development receipt provenance and the
 candidate-format verifier; the test correction affects operating-state assertions.
-The async adapter/worker/task implementation and harness are unchanged. Native
+The later Claude parity merge also changes host handling and the worker prompt.
+No exact-commit native rerun or full-suite rerun of `46226dc` is claimed; the final
+integration regression and compatibility receipts cover that merge. Native
 model-session replacement, actual company adoption, Hooks UI trust, effective
 provider settings and realistic large-history semantic fit remain unverified.
 
@@ -67,7 +75,8 @@ The source-review Pass remains scoped to that reviewed delta and evidence.
 
 ## Reproduction
 
-At a clean checkout of the implementation pin, use supported Node 22 on macOS:
+To reproduce the complete-suite receipt, check out `9160c26` and use supported
+Node 22 on macOS (the command also runs the current suite on the final pin):
 
 ```sh
 node tools/build-plugin.mjs --check
@@ -75,7 +84,9 @@ git diff --check
 node --no-warnings --test --test-concurrency=4 --test-reporter=tap tests/*.test.mjs
 ```
 
-For Node 26 use the exact `test_files` selection in `compatibility-node26.json`.
+For final integration checks use the exact `test_files` selections in
+`integration-regression-node22.json` and `integration-compatibility-node26.json`.
+The earlier `compatibility-node26.json` remains pinned to `9160c26`.
 Native reproduction is a new inference-consuming fixture and requires a fresh
 output directory and an explicitly supported catalog model:
 
