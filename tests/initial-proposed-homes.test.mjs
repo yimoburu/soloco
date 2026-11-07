@@ -13,7 +13,7 @@ import {governingRecords} from '../plugins/soloco/runtime/current-state.mjs';
 import {resolveSnapshot,retainSnapshot} from '../plugins/soloco/runtime/snapshot.mjs';
 import * as scoped from '../plugins/soloco/runtime/scoped-context.mjs';
 import {parseOutput} from '../plugins/soloco/runtime/adapters.mjs';
-import {sha,fixture,read,mutate,save,context,review,home,domainArgs,aggregate,typed,groupMarker,splitArgs,blockedJudgment,dispositions} from './support/scoped-home-fixture.mjs';
+import {sha,fixture,read,mutate,save,context,review,home,extraction,domainArgs,aggregate,typed,groupMarker,splitArgs,blockedJudgment,dispositions} from './support/scoped-home-fixture.mjs';
 
 test('FICTIONAL zero-home bootstrap uses real normalized-v4 intake and unchanged canonical extraction',async()=>{
  const f=await fixture(),s0=read(f),v=s0.records[f.plan_id].scoped_context_plan;assert.equal(Object.values(s0.records).filter(r=>r.operating_record).length,0);

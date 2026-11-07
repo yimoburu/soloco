@@ -13,7 +13,7 @@ import {governingRecords} from '../plugins/soloco/runtime/current-state.mjs';
 import {resolveSnapshot,retainSnapshot} from '../plugins/soloco/runtime/snapshot.mjs';
 import * as scoped from '../plugins/soloco/runtime/scoped-context.mjs';
 import {parseOutput} from '../plugins/soloco/runtime/adapters.mjs';
-import {sha,fixture,read,mutate,save,context,review,home,domainArgs,aggregate,typed,groupMarker,splitArgs,blockedJudgment,dispositions} from './support/scoped-home-fixture.mjs';
+import {sha,fixture,read,mutate,save,context,review,home,extraction,domainArgs,aggregate,typed,groupMarker,splitArgs,blockedJudgment,dispositions} from './support/scoped-home-fixture.mjs';
 
 test('FICTIONAL marked initial-home correction retains mixed negatives through independent whole-vector apply',async t=>{
  // This scripted reviewer measures evidence/repair correctness, not native fit.

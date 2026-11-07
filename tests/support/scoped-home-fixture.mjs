@@ -81,4 +81,4 @@ const blockedJudgment=e=>{const r=e.qualification_result;r.verdict='Blocked';r.p
 const dispositions=e=>{for(const d of e.qualification_result.repair_dispositions??[]){d.reason='FICTIONAL exact complete children replace overflow while retaining UNKNOWN, failed evidence and ZERO allowance.';d.clearing_conditions='Independent contextual preservation only; all actual restrictions retained; no renewed authority.';}};
 
 
-export {sha,fixture,read,mutate,save,context,review,home,domainArgs,aggregate,typed,groupMarker,splitArgs,blockedJudgment,dispositions};
+export {sha,fixture,read,mutate,save,context,review,home,extraction,domainArgs,aggregate,typed,groupMarker,splitArgs,blockedJudgment,dispositions};
