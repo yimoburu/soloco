@@ -1,0 +1,454 @@
+TAP version 13
+# Subtest: known Claude aliases are mechanical metadata without claiming effort support or entitlement
+ok 1 - known Claude aliases are mechanical metadata without claiming effort support or entitlement
+  ---
+  duration_ms: 0.507834
+  type: 'test'
+  ...
+# Subtest: Claude host-default fast-off is recognized without inventing a selected model
+ok 2 - Claude host-default fast-off is recognized without inventing a selected model
+  ---
+  duration_ms: 0.102
+  type: 'test'
+  ...
+# Subtest: current adapter speed values and historical scalar host-default metadata remain mechanical
+ok 3 - current adapter speed values and historical scalar host-default metadata remain mechanical
+  ---
+  duration_ms: 3.531333
+  type: 'test'
+  ...
+# Subtest: unknown speed values remain compulsory for Claude and Codex even after semantic delivery passes
+ok 4 - unknown speed values remain compulsory for Claude and Codex even after semantic delivery passes
+  ---
+  duration_ms: 5.676875
+  type: 'test'
+  ...
+# Subtest: dispatch schema admits only optional supported speed choices and preserves legacy requirements
+ok 5 - dispatch schema admits only optional supported speed choices and preserves legacy requirements
+  ---
+  duration_ms: 3.458584
+  type: 'test'
+  ...
+# Subtest: upgrade reuses the optional dispatch selection schema with unchanged required arguments
+ok 6 - upgrade reuses the optional dispatch selection schema with unchanged required arguments
+  ---
+  duration_ms: 1.596416
+  type: 'test'
+  ...
+# Subtest: legacy omission and host_default avoid catalog discovery and persist normalized requests
+ok 7 - legacy omission and host_default avoid catalog discovery and persist normalized requests
+  ---
+  duration_ms: 6.073875
+  type: 'test'
+  ...
+# Subtest: default-mode fast_disabled routes catalog support without manufacturing model or execution evidence
+ok 8 - default-mode fast_disabled routes catalog support without manufacturing model or execution evidence
+  ---
+  duration_ms: 1.973417
+  type: 'test'
+  ...
+# Subtest: explicit models obtain catalog once and retain separate model and speed-support metadata
+ok 9 - explicit models obtain catalog once and retain separate model and speed-support metadata
+  ---
+  duration_ms: 3.542
+  type: 'test'
+  ...
+# Subtest: unsupported speed, missing fast-off support and unverified effort reject before queuing or launch
+ok 10 - unsupported speed, missing fast-off support and unverified effort reject before queuing or launch
+  ---
+  duration_ms: 14.95575
+  type: 'test'
+  ...
+# Subtest: omitted speed, explicit host_default and reason-only changes reuse a finished session
+ok 11 - omitted speed, explicit host_default and reason-only changes reuse a finished session
+  ---
+  duration_ms: 1.907458
+  type: 'test'
+  ...
+# Subtest: speed changes retire identity and repeated fast_disabled reuses the replacement
+ok 12 - speed changes retire identity and repeated fast_disabled reuses the replacement
+  ---
+  duration_ms: 1.817792
+  type: 'test'
+  ...
+# Subtest: explicit model session identity also rotates for speed and reuses unchanged selections
+ok 13 - explicit model session identity also rotates for speed and reuses unchanged selections
+  ---
+  duration_ms: 2.027958
+  type: 'test'
+  ...
+# Subtest: speed wiring preserves ownership, pause, scope, adoption and independent-review checks
+ok 14 - speed wiring preserves ownership, pause, scope, adoption and independent-review checks
+  ---
+  duration_ms: 7.542458
+  type: 'test'
+  ...
+# Subtest: fresh-session schema is optional and rejects missing, orphaned or invalid reasons without mutation
+ok 15 - fresh-session schema is optional and rejects missing, orphaned or invalid reasons without mutation
+  ---
+  duration_ms: 10.4465
+  type: 'test'
+  ...
+# Subtest: explicit fresh with identical settings retires exact lineage and queues null native without execution claims
+ok 16 - explicit fresh with identical settings retires exact lineage and queues null native without execution claims
+  ---
+  duration_ms: 5.000125
+  type: 'test'
+  ...
+# Subtest: fresh after confirmed failure preserves failed job, authority, limits, inputs and attempt evidence
+ok 17 - fresh after confirmed failure preserves failed job, authority, limits, inputs and attempt evidence
+  ---
+  duration_ms: 3.595333
+  type: 'test'
+  ...
+# Subtest: fresh cannot retire active/uncertain sessions or bypass owner, pause, host, resource or scope holds
+ok 18 - fresh cannot retire active/uncertain sessions or bypass owner, pause, host, resource or scope holds
+  ---
+  duration_ms: 23.359416
+  type: 'test'
+  ...
+# Subtest: fresh is ordinary-only and cannot rotate handover reviewers or scoped generation identities
+ok 19 - fresh is ordinary-only and cannot rotate handover reviewers or scoped generation identities
+  ---
+  duration_ms: 5.023541
+  type: 'test'
+  ...
+# Subtest: codex: explicit host model metadata survives queue, worker startup and task reconciliation
+ok 20 - codex: explicit host model metadata survives queue, worker startup and task reconciliation
+  ---
+  duration_ms: 294.472042
+  type: 'test'
+  ...
+# Subtest: codex: new task and status are durable while two workers remain in slow execution; runtime never impersonates owner
+ok 21 - codex: new task and status are durable while two workers remain in slow execution; runtime never impersonates owner
+  ---
+  duration_ms: 172.246875
+  type: 'test'
+  ...
+# Subtest: codex: A to exact independent QA to B advances in supervisor loop while CoS performs no polling
+ok 22 - codex: A to exact independent QA to B advances in supervisor loop while CoS performs no polling
+  ---
+  duration_ms: 266.895
+  type: 'test'
+  ...
+# Subtest: codex: idle supervisor ticks do not create canonical history or invalidate task context
+ok 23 - codex: idle supervisor ticks do not create canonical history or invalidate task context
+  ---
+  duration_ms: 40.121667
+  type: 'test'
+  ...
+# Subtest: codex: canonical task and queued attempt commit together; spawn failure is durable and never retries
+ok 24 - codex: canonical task and queued attempt commit together; spawn failure is durable and never retries
+  ---
+  duration_ms: 53.811209
+  type: 'test'
+  ...
+# Subtest: codex: startup detects existing live supervisor rather than duplicating it; stop fences queue grants
+ok 25 - codex: startup detects existing live supervisor rather than duplicating it; stop fences queue grants
+  ---
+  duration_ms: 44.044542
+  type: 'test'
+  ...
+# Subtest: codex: public tools expose bounded task/runtime contracts and reject unrecognized authority arguments
+ok 26 - codex: public tools expose bounded task/runtime contracts and reject unrecognized authority arguments
+  ---
+  duration_ms: 0.642666
+  type: 'test'
+  ...
+# Subtest: codex: background reconciliation catches a crash after queue commit even while runtime is stopped
+ok 27 - codex: background reconciliation catches a crash after queue commit even while runtime is stopped
+  ---
+  duration_ms: 56.057709
+  type: 'test'
+  ...
+# Subtest: codex: killed running attempts remain uncertain and occupy capacity without automatic replacement
+ok 28 - codex: killed running attempts remain uncertain and occupy capacity without automatic replacement
+  ---
+  duration_ms: 105.655458
+  type: 'test'
+  ...
+# Subtest: codex: format7 same-native exact supplemental reads are delivered and accounted in the visible wire budget
+ok 29 - codex: format7 same-native exact supplemental reads are delivered and accounted in the visible wire budget
+  ---
+  duration_ms: 112.227625
+  type: 'test'
+  ...
+# Subtest: codex: format7 changed native identity on retrieval fails and preserves the rejected return
+ok 30 - codex: format7 changed native identity on retrieval fails and preserves the rejected return
+  ---
+  duration_ms: 104.287834
+  type: 'test'
+  ...
+# Subtest: codex: cumulative multibyte and escaped retrieval history Holds before another oversized native call
+ok 31 - codex: cumulative multibyte and escaped retrieval history Holds before another oversized native call
+  ---
+  duration_ms: 128.391792
+  type: 'test'
+  ...
+# Subtest: codex: fatal supervisor validation is durable and suppresses automatic restart churn
+ok 32 - codex: fatal supervisor validation is durable and suppresses automatic restart churn
+  ---
+  duration_ms: 55.634083
+  type: 'test'
+  ...
+# Subtest: codex: superseded supervisor generation cannot dispatch through a newly started runtime principal
+ok 33 - codex: superseded supervisor generation cannot dispatch through a newly started runtime principal
+  ---
+  duration_ms: 57.683584
+  type: 'test'
+  ...
+# Subtest: codex: long idle supervisor waits keep only the current abort listener
+ok 34 - codex: long idle supervisor waits keep only the current abort listener
+  ---
+  duration_ms: 142.758792
+  type: 'test'
+  ...
+# Subtest: codex: new applicable rules between worker publication and runtime acceptance fence a formerly passing review
+ok 35 - codex: new applicable rules between worker publication and runtime acceptance fence a formerly passing review
+  ---
+  duration_ms: 157.6635
+  type: 'test'
+  ...
+# Subtest: codex: peer handoff is delivered to the declared receiver and acknowledged atomically with its actual result
+ok 36 - codex: peer handoff is delivered to the declared receiver and acknowledged atomically with its actual result
+  ---
+  duration_ms: 170.453208
+  type: 'test'
+  ...
+# Subtest: codex: an interrupted exact attempt retains its late native response and full negative original without acceptance
+ok 37 - codex: an interrupted exact attempt retains its late native response and full negative original without acceptance
+  ---
+  duration_ms: 80.246333
+  type: 'test'
+  ...
+# Subtest: codex: supervisor starts an explicit output consumer after its producer is terminal without another active transition
+ok 38 - codex: supervisor starts an explicit output consumer after its producer is terminal without another active transition
+  ---
+  duration_ms: 158.704
+  type: 'test'
+  ...
+# Subtest: codex: restore preserves accepted exact evidence, a queued obligation and an unprocessed peer message
+ok 39 - codex: restore preserves accepted exact evidence, a queued obligation and an unprocessed peer message
+  ---
+  duration_ms: 192.801791
+  type: 'test'
+  ...
+# Subtest: claude: explicit host model metadata survives queue, worker startup and task reconciliation
+ok 40 - claude: explicit host model metadata survives queue, worker startup and task reconciliation
+  ---
+  duration_ms: 87.860792
+  type: 'test'
+  ...
+# Subtest: claude: host-default fast-off survives the same durable task workflow
+ok 41 - claude: host-default fast-off survives the same durable task workflow
+  ---
+  duration_ms: 92.263417
+  type: 'test'
+  ...
+# Subtest: claude: new task and status are durable while two workers remain in slow execution; runtime never impersonates owner
+ok 42 - claude: new task and status are durable while two workers remain in slow execution; runtime never impersonates owner
+  ---
+  duration_ms: 159.430875
+  type: 'test'
+  ...
+# Subtest: claude: A to exact independent QA to B advances in supervisor loop while CoS performs no polling
+ok 43 - claude: A to exact independent QA to B advances in supervisor loop while CoS performs no polling
+  ---
+  duration_ms: 268.194084
+  type: 'test'
+  ...
+# Subtest: claude: idle supervisor ticks do not create canonical history or invalidate task context
+ok 44 - claude: idle supervisor ticks do not create canonical history or invalidate task context
+  ---
+  duration_ms: 44.823417
+  type: 'test'
+  ...
+# Subtest: claude: canonical task and queued attempt commit together; spawn failure is durable and never retries
+ok 45 - claude: canonical task and queued attempt commit together; spawn failure is durable and never retries
+  ---
+  duration_ms: 61.028542
+  type: 'test'
+  ...
+# Subtest: claude: startup detects existing live supervisor rather than duplicating it; stop fences queue grants
+ok 46 - claude: startup detects existing live supervisor rather than duplicating it; stop fences queue grants
+  ---
+  duration_ms: 53.5715
+  type: 'test'
+  ...
+# Subtest: claude: public tools expose bounded task/runtime contracts and reject unrecognized authority arguments
+ok 47 - claude: public tools expose bounded task/runtime contracts and reject unrecognized authority arguments
+  ---
+  duration_ms: 0.285375
+  type: 'test'
+  ...
+# Subtest: claude: background reconciliation catches a crash after queue commit even while runtime is stopped
+ok 48 - claude: background reconciliation catches a crash after queue commit even while runtime is stopped
+  ---
+  duration_ms: 62.719958
+  type: 'test'
+  ...
+# Subtest: claude: killed running attempts remain uncertain and occupy capacity without automatic replacement
+ok 49 - claude: killed running attempts remain uncertain and occupy capacity without automatic replacement
+  ---
+  duration_ms: 105.34525
+  type: 'test'
+  ...
+# Subtest: claude: format7 same-native exact supplemental reads are delivered and accounted in the visible wire budget
+ok 50 - claude: format7 same-native exact supplemental reads are delivered and accounted in the visible wire budget
+  ---
+  duration_ms: 104.088542
+  type: 'test'
+  ...
+# Subtest: claude: format7 changed native identity on retrieval fails and preserves the rejected return
+ok 51 - claude: format7 changed native identity on retrieval fails and preserves the rejected return
+  ---
+  duration_ms: 100.644791
+  type: 'test'
+  ...
+# Subtest: claude: cumulative multibyte and escaped retrieval history Holds before another oversized native call
+ok 52 - claude: cumulative multibyte and escaped retrieval history Holds before another oversized native call
+  ---
+  duration_ms: 138.056041
+  type: 'test'
+  ...
+# Subtest: claude: fatal supervisor validation is durable and suppresses automatic restart churn
+ok 53 - claude: fatal supervisor validation is durable and suppresses automatic restart churn
+  ---
+  duration_ms: 57.253042
+  type: 'test'
+  ...
+# Subtest: claude: superseded supervisor generation cannot dispatch through a newly started runtime principal
+ok 54 - claude: superseded supervisor generation cannot dispatch through a newly started runtime principal
+  ---
+  duration_ms: 56.736
+  type: 'test'
+  ...
+# Subtest: claude: long idle supervisor waits keep only the current abort listener
+ok 55 - claude: long idle supervisor waits keep only the current abort listener
+  ---
+  duration_ms: 132.570875
+  type: 'test'
+  ...
+# Subtest: claude: new applicable rules between worker publication and runtime acceptance fence a formerly passing review
+ok 56 - claude: new applicable rules between worker publication and runtime acceptance fence a formerly passing review
+  ---
+  duration_ms: 162.779334
+  type: 'test'
+  ...
+# Subtest: claude: peer handoff is delivered to the declared receiver and acknowledged atomically with its actual result
+ok 57 - claude: peer handoff is delivered to the declared receiver and acknowledged atomically with its actual result
+  ---
+  duration_ms: 172.703375
+  type: 'test'
+  ...
+# Subtest: claude: an interrupted exact attempt retains its late native response and full negative original without acceptance
+ok 58 - claude: an interrupted exact attempt retains its late native response and full negative original without acceptance
+  ---
+  duration_ms: 94.925042
+  type: 'test'
+  ...
+# Subtest: claude: supervisor starts an explicit output consumer after its producer is terminal without another active transition
+ok 59 - claude: supervisor starts an explicit output consumer after its producer is terminal without another active transition
+  ---
+  duration_ms: 158.390583
+  type: 'test'
+  ...
+# Subtest: claude: restore preserves accepted exact evidence, a queued obligation and an unprocessed peer message
+ok 60 - claude: restore preserves accepted exact evidence, a queued obligation and an unprocessed peer message
+  ---
+  duration_ms: 210.05025
+  type: 'test'
+  ...
+# Subtest: real keyed collections: 145 records, 57 jobs, source-heavy history fits and exact provenance survives
+ok 61 - real keyed collections: 145 records, 57 jobs, source-heavy history fits and exact provenance survives
+  ---
+  duration_ms: 534.905166
+  type: 'test'
+  ...
+# Subtest: formatted JSON preserves raw text and quoted spaces; duplicate keys and changed lexemes remain literal
+ok 62 - formatted JSON preserves raw text and quoted spaces; duplicate keys and changed lexemes remain literal
+  ---
+  duration_ms: 1.303375
+  type: 'test'
+  ...
+# Subtest: actual artifact/runtime payload shapes extract only named bodies and retain review, receipt and authority metadata
+ok 63 - actual artifact/runtime payload shapes extract only named bodies and retain review, receipt and authority metadata
+  ---
+  duration_ms: 1.397125
+  type: 'test'
+  ...
+# Subtest: unknown shapes, old obligations and semantic context are not inferred inert
+ok 64 - unknown shapes, old obligations and semantic context are not inferred inert
+  ---
+  duration_ms: 0.700958
+  type: 'test'
+  ...
+# Subtest: mechanical whitelist references only exact known metadata shapes
+ok 65 - mechanical whitelist references only exact known metadata shapes
+  ---
+  duration_ms: 0.384208
+  type: 'test'
+  ...
+# Subtest: map keys, duplicate IDs and prototype-looking keys remain distinct and immutable
+ok 66 - map keys, duplicate IDs and prototype-looking keys remain distinct and immutable
+  ---
+  duration_ms: 0.277917
+  type: 'test'
+  ...
+# Subtest: frozen retrieval rejects forged identities, hashes, fields and unsafe UTF-16 ranges
+ok 67 - frozen retrieval rejects forged identities, hashes, fields and unsafe UTF-16 ranges
+  ---
+  duration_ms: 1.187
+  type: 'test'
+  ...
+# Subtest: citations require exact revision and complete delivery separately to author and QA
+ok 68 - citations require exact revision and complete delivery separately to author and QA
+  ---
+  duration_ms: 1.340542
+  type: 'test'
+  ...
+# Subtest: source extraction cannot hide a huge unknown obligation to make admission succeed
+ok 69 - source extraction cannot hide a huge unknown obligation to make admission succeed
+  ---
+  duration_ms: 65.744333
+  type: 'test'
+  ...
+# Subtest: complete request plus reserve bounded while cumulative traffic exceeds 1M
+ok 70 - complete request plus reserve bounded while cumulative traffic exceeds 1M
+  ---
+  duration_ms: 0.482833
+  type: 'test'
+  ...
+# Subtest: unsupported JSON holds instead of silently dropping evidence or invoking accessors
+ok 71 - unsupported JSON holds instead of silently dropping evidence or invoking accessors
+  ---
+  duration_ms: 0.291125
+  type: 'test'
+  ...
+# Subtest: whole bodies alias at all four locations in both orders, preserving complete inline tokens, provenance and originals
+ok 72 - whole bodies alias at all four locations in both orders, preserving complete inline tokens, provenance and originals
+  ---
+  duration_ms: 34.114833
+  type: 'test'
+  ...
+# Subtest: whole-body matching refuses every differing semantic field and unsafe JSON spelling
+ok 73 - whole-body matching refuses every differing semantic field and unsafe JSON spelling
+  ---
+  duration_ms: 16.098583
+  type: 'test'
+  ...
+# Subtest: native, role, phase and attempt boundaries never share unmatched or forged bodies
+ok 74 - native, role, phase and attempt boundaries never share unmatched or forged bodies
+  ---
+  duration_ms: 12.628375
+  type: 'test'
+  ...
+1..74
+# tests 74
+# suites 0
+# pass 74
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 4793.717125
