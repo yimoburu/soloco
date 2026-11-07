@@ -7,12 +7,14 @@ import {governingRecords,mandatoryExecutionEvidence,reviewedContext,currentRecor
 import {buildQualificationEvidence} from './upgrade-evidence.mjs';
 import {hasSnapshotReferences,inheritSnapshots} from './snapshot.mjs';
 import {qualificationAssignment,qualificationMatches,QUALIFICATION_LIMITS} from './context-qualification.mjs';
+import {taskAssignmentContext,taskContextMatches,TASK_CONTEXT_BUDGET} from './task-context.mjs';
 
 export const CONTEXT_LIMIT = 200000;
 const required = record => ['intent', 'decision', 'preference'].includes(record.kind)
   || ['Fail', 'Blocked'].includes(record.review?.verdict);
 
 export function contextBudgetForJob(state,job) {
+  if(job.context_format===7)return TASK_CONTEXT_BUDGET;
   const target=state.records[job.review_of?.id];
   if(target?.scoped_context_target)return SCOPED_LIMITS.input_bytes;
   if(target?.context_qualification_target)return QUALIFICATION_LIMITS.input_bytes;
@@ -23,6 +25,7 @@ export function contextBudgetForJob(state,job) {
 
 // Every supplied fact is a dependency. Never silently trim a constraint or input.
 export function assignmentContext(state, job) {
+  if(job.context_format===7)return taskAssignmentContext(state,job);
   const operatingReview=operatingReviewContext(state,job);if(operatingReview)return operatingReview;
   if(job.context_format===6){
     const checkpoint=operatingContext(state,{scope:job.context_scope??'*',job_id:job.id});
@@ -107,6 +110,7 @@ export function supplementalMatches(state, job) {
 
 export function contextMatches(state, job, hash) {
   try {
+    if(job.context_format===7)return taskContextMatches(state,job,hash);
     if(isScopedJob(state,job))return scopedMatches(state,job,hash);
     if(state.records?.[job.review_of?.id]?.context_qualification_target)return qualificationMatches(state,job,hash);
     // A job's published notices/messages are outputs, not changes to its inputs.

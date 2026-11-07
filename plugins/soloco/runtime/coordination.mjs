@@ -1,4 +1,5 @@
 import { digest } from './store.mjs';
+import {taskMessageInput,assertTaskPrerequisites} from './tasks.mjs';
 
 const active=new Set(['queued','running']);
 function names(value,label,max) {
@@ -15,7 +16,15 @@ function dependency(state,id,seen=new Set()) {
   const job=state.jobs?.[id],artifact=state.records?.[job?.artifact_id];
   const software=job?.kind==='development_test';
   if(!job || job.status!=='completed' || !artifact || artifact.status!=='Submitted' || (software ? artifact.kind!=='artifact'||artifact.author_role!=='runtime'||artifact.author_instance!==job.id : artifact.job_id!==job.id||artifact.author_instance!==job.instance_id))throw new Error(`Dependency ${id} is not a completed, attributable submitted output; keep dependent work planned`);
-  if((job.inputs??[]).some(ref=>state.records?.[ref.id]?.revision!==ref.revision))throw new Error(`Dependency ${id} has changed prerequisite evidence`);
+  if(job.runtime_task)assertTaskPrerequisites(state,job.runtime_task.id);
+  if((job.inputs??[]).some(ref=>{
+    const value=state.records?.[ref.id];
+    if(job.runtime_task){
+      const delivered=taskMessageInput(state,job,value);
+      return !ref||Object.keys(ref).sort().join(',')!=='id,revision'||typeof ref.id!=='string'||!(ref.revision===null||Number.isSafeInteger(ref.revision)&&ref.revision>0)||!Object.hasOwn(state.records??{},ref.id)||!delivered||(delivered.revision??null)!==ref.revision;
+    }
+    return value?.revision!==ref.revision;
+  }))throw new Error(`Dependency ${id} has changed prerequisite evidence`);
   if(!Number.isInteger(artifact.revision)||artifact.revision<1)throw new Error(`Dependency ${id} has an invalid artifact version`);
   if(software) {
     const d=artifact.development,c=state.records[d?.candidate_id],p=state.records[d?.plan_id],producer=state.jobs?.[c?.job_id];

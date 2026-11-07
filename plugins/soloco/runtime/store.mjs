@@ -153,8 +153,8 @@ export class Store {
     }catch(error){this.db.exec('ROLLBACK');throw error;}
     finally{this.inTransaction=false;}
   }
-  selectedTransaction(type,options,fn) {
-    if(!normalizedLayout(this.db))return this.transaction(type,s=>fn(s));
+  selectedTransaction(type,options,fn,{afterWrite}={}) {
+    if(!normalizedLayout(this.db))return this.transaction(type,s=>fn(s),{afterWrite});
     this.db.exec('BEGIN IMMEDIATE');this.inTransaction=true;
     try {
       const metadata=captureStorageMetadata(this.db);
@@ -169,6 +169,7 @@ export class Store {
       }
       flushSnapshots(this.db,state);
       writeNormalizedSelection(this.db,changes);
+      if(afterWrite)afterWrite(this.db,state);
       insertStorageEvent(this.db,type,{revision:state.revision,owner:state.owner},metadata);
       this.db.exec('COMMIT');this.snapshotState(state);return result;
     }catch(error){this.db.exec('ROLLBACK');throw error;}
@@ -181,7 +182,7 @@ export class Store {
       return row ? this.snapshotState(JSON.parse(row.value)) : null;
     });
   }
-  transaction(type, fn) {
+  transaction(type, fn, {afterWrite}={}) {
     this.db.exec('BEGIN IMMEDIATE');this.inTransaction=true;
     try {
       const metadata=normalizedLayout(this.db)?captureStorageMetadata(this.db):null;
@@ -192,6 +193,7 @@ export class Store {
       flushSnapshots(this.db,state,next);
       if(normalizedLayout(this.db))writeNormalized(this.db,next);
       else this.db.prepare('INSERT INTO company VALUES (1,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value').run(JSON.stringify(next));
+      if(afterWrite)afterWrite(this.db,next);
       insertStorageEvent(this.db,type,{revision:next.revision,owner:next.owner},metadata);
       this.db.exec('COMMIT');
       return this.snapshotState(next);
