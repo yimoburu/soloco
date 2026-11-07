@@ -215,7 +215,7 @@ export function amendTask(state,args,host){
   if(t.attempts.length){
     const job=state.jobs?.[t.attempts[0].job_id];if(job&&['queued','running'].includes(job.status))job.status='cancelled';
     t.state='needs_attention';t.attention_code='DEFINITION_CHANGED';t.attention='Definition superseded an existing attempt; reconcile closure and create a separately authorized task if more work is required';
-  }else t.state='planned';
+  }else {t.state='planned';delete t.attention;delete t.attention_code;}
   bump(record);commitCommand(state,c,args,'amend',record);return record;
 }
 export function cancelTask(state,args,host){

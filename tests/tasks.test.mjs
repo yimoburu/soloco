@@ -6,7 +6,7 @@ import path from 'node:path';
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
 import {withStore,id,stamp} from '../plugins/soloco/runtime/store.mjs';
 import {resourceClaims} from '../plugins/soloco/runtime/coordination.mjs';
-import {taskAssignmentContext,taskDefinitionBinding} from '../plugins/soloco/runtime/task-context.mjs';
+import {taskAssignmentContext,taskDefinitionBinding,taskCheckpoint} from '../plugins/soloco/runtime/task-context.mjs';
 import {setRuntimeControl} from '../plugins/soloco/runtime/task-runtime-authority.mjs';
 import {submitTask,amendTask,cancelTask,taskRecord,taskView,taskReady,bindTaskAttempt,reconcileTask,isTaskBookkeeping,isTaskOutput,isTaskOwnOutput,validateTaskRecord,sendTaskMessage,appendPeerMessage,messagesForTask,disposeTaskMessage,disposePeerMessage,isOwnMessageDisposition,taskMessageInput,validateTaskMessage,isTaskMessage,isTaskScopedMessage} from '../plugins/soloco/runtime/tasks.mjs';
 
@@ -278,4 +278,11 @@ test('a held completed producer cannot become a positive prerequisite after sour
  assert.equal(taskReady(read(),read().records[b.id]).ready,true);
  write(s=>{const r=s.records[a.id];r.runtime_task.state='needs_attention';r.runtime_task.attention_code='CONTEXT_CHANGED';r.status='Async:needs_attention';});
  const result=taskReady(read(),read().records[b.id]);assert.equal(result.ready,false);assert.equal(result.recovery.automatic,false);assert.equal(result.recovery.code,'CONTEXT_CHANGED');
+}));
+
+test('explicit amendment clears a reconciled unstarted hold from the cold checkpoint',()=>fixture(({identity,write,read})=>{
+ const a=write(s=>submitTask(s,args(identity,'amend-held'),'codex'));
+ write(s=>{const r=s.records[a.id];r.runtime_task.state='needs_attention';r.runtime_task.attention_code='CONTEXT_CHANGED';r.runtime_task.attention='Old input hold';r.status='Async:needs_attention';});
+ write(s=>amendTask(s,{...args(identity,'reconcile-held'),task_id:a.id,expected_definition_revision:1},'codex'));
+ const r=read().records[a.id];assert.equal(r.runtime_task.state,'planned');assert.equal(r.runtime_task.attention,undefined);assert.equal(r.runtime_task.attention_code,undefined);assert.equal(taskReady(read(),r).ready,true);assert.deepEqual(taskCheckpoint(read(),r).blockers,[]);assert.equal(taskCheckpoint(read(),r).recovery,null);
 }));

@@ -298,3 +298,17 @@ test('deleting and restoring an exact accepted source or pending proposal remain
   assert.throws(()=>operatingContext(read(f)),/DIRTY.*deleted|DIRTY.*recreated/);
  }
 });
+
+test('legacy format6 packets preserve the actual v0.7.5 context hash',async()=>{
+ const {spawnSync}=await import('node:child_process');const {pathToFileURL}=await import('node:url');
+ const dir=path.join(tmp,'legacy075');fs.mkdirSync(dir);
+ const archive=spawnSync('git',['archive','38d95fd6463fedef68e61737bdb2d4af4b05c756','plugins/soloco'],{cwd:path.resolve(import.meta.dirname,'..'),maxBuffer:20000000});assert.equal(archive.status,0);
+ assert.equal(spawnSync('tar',['-xf','-','-C',dir],{input:archive.stdout}).status,0);
+ const oldContext=await import(pathToFileURL(path.join(dir,'plugins/soloco/runtime/context.mjs')));
+ const oldStore=await import(pathToFileURL(path.join(dir,'plugins/soloco/runtime/store.mjs')));
+ const f=fixture();await publish(f);
+ const j=engine.dispatch({...f,role:'engineer',task:'Legacy bounded read-only assignment'},'codex',launch);
+ const current=read(f),old=oldStore.withStore(f.root,db=>db.read());
+ const previous=oldContext.assignmentContext(old,old.jobs[j.id]),next=assignmentContext(current,current.jobs[j.id]);
+ assert.equal(next.text,previous.text);assert.equal(next.hash,previous.hash);assert.equal(current.jobs[j.id].context_sha256,previous.hash);
+});
