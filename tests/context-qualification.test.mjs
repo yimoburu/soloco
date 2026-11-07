@@ -339,6 +339,23 @@ test('independent fresh natives for every leaf, merge and root; producers and Co
   s.retired_sessions=[{instance_id:'retired-instance',native_id:'retired-native'}];assert.throws(()=>validateQualificationResponse(s,j,a,'retired-native',result(a)),/retired.*reused/);
 });
 
+test('independence membership rebuilds after new job, session and retired collisions',()=>{
+ const s=seed(),p=plan(s),{j,a}=first(s,p),r=result(a),native='fresh-exact-reviewer';
+ const check=()=>validateQualificationResponse(s,j,a,native,r);
+ assert.equal(check(),true);
+ for(const entry of [
+  {id:'other',native_id:native,instance_id:'different-instance'},
+  {id:'other',native_id:j.instance_id,instance_id:'different-instance'},
+  {id:'other',native_id:'different-native',instance_id:native},
+  {id:'other',native_id:'different-native',instance_id:j.instance_id},
+ ]){s.jobs.other=entry;assert.throws(check,/reused/);delete s.jobs.other;assert.equal(check(),true);}
+ s.sessions.other={instance_id:'different-instance',native_id:native};assert.throws(check,/another instance/);
+ delete s.sessions.other;assert.equal(check(),true);
+ for(const entry of [{instance_id:'retired-other',native_id:native},{instance_id:j.instance_id,native_id:'retired-other'}]){
+  s.retired_sessions=[entry];assert.throws(check,/retired.*reused/);s.retired_sessions=[];assert.equal(check(),true);
+ }
+});
+
 test('canonical native receipt/job/artifact corruption always invalidates exclusion',()=>{
   for(const mutate of [f=>delete f.s.jobs[[...f.proofs.values()][0].job_id],f=>f.s.jobs[[...f.proofs.values()][0].job_id].status='failed',f=>f.s.jobs[[...f.proofs.values()][0].job_id].native_id='change',f=>delete f.s.jobs[[...f.proofs.values()][0].job_id].qualification_delivery,f=>[...f.proofs.values()][0].qualification_result.items[0].text='tamper',f=>[...f.proofs.values()][0].qualification_proof.delivery_sha256='forged',f=>f.s.jobs[[...f.proofs.values()][0].job_id].model_evidence={changed:true}]){const f=workflow();mutate(f);assert.throws(()=>validateQualificationExclusion(f.s,f.proof),/canonical|corrupt|missing|changed/);}
   const f=workflow(),proof=clone(f.proof);proof.roots[0].sha256='forged';assert.throws(()=>validateQualificationExclusion(f.s,proof),/proof changed/);
@@ -426,6 +443,21 @@ test('genuinely distinct oversized semantics hold with concrete node/subdomain n
 
 test('complete 1x/10x/100x UNKNOWN semantic archive workflows, fixed current obligations',t=>{
   for(const factor of [1,10,100]){const f=workflow('No retry after exhausted allowance. '.repeat(30*factor));assert.ok(f.metrics.max_full_prompt_bytes<=limits.input_bytes);assert.ok(f.metrics.aggregate_bytes<9000);t.diagnostic(JSON.stringify({label:'contract double unknown archive',factor,...f.metrics}));}
+});
+
+test('immutable exact source and unit UTF-8 byte counts are not rescanned during repeated plan validation',()=>{
+ const s=seed('Never retry. 漢字😀\n'.repeat(10000));immutableJSON(s.records.old);
+ const p=plan(s),raw=JSON.stringify(s.records.old),expected=Buffer.byteLength(raw);
+ assert.equal(p.context_partition_plan.original_encoding.byte_length,expected);
+ validateQualificationPlan(s,p.context_partition_plan);
+ const byteLength=Buffer.byteLength;let sourceScans=0;
+ try{
+  Buffer.byteLength=function(value,...args){if(value===raw)sourceScans++;return byteLength.call(this,value,...args);};
+  for(let n=0;n<3;n++)assert.equal(validateQualificationPlan(s,p.context_partition_plan),true);
+ }finally{Buffer.byteLength=byteLength;}
+ assert.equal(sourceScans,0,'frozen original exact UTF-8 length must reuse its prior validated encoding');
+ s.records.old={...s.records.old,content:s.records.old.content+'\nChanged restriction.'};
+ assert.throws(()=>validateQualificationPlan(s,p.context_partition_plan),/stale|corrupt/);
 });
 
 test('complete multi-million unknown semantic workflow converges with every receipt, not sampling', {timeout:600000},t=>{
