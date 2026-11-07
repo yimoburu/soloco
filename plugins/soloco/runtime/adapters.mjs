@@ -201,12 +201,15 @@ export function parseOutput(host, stdout) {
         else native_id=event.thread_id;
         break;
       case 'turn.started':
+        if(turn)fail('Codex CLI call contains multiple or replayed turns');
         if(!native_id || active)fail('Invalid Codex turn start');
         if(event.turn_id!==undefined && (typeof event.turn_id!=='string'||!event.turn_id))fail('Invalid Codex turn identity');
         active=true;completed=false;text=undefined;turnId=event.turn_id;turn++;
         break;
       case 'item.started': case 'item.updated': case 'item.completed':
         if(!active || !itemTypes.has(event.item?.type))fail('Unsupported Codex item sequence');
+        if(event.item?.type==='agent_message'&&event.type!=='item.completed'&&event.item.id===undefined)fail('Codex message start requires item identity');
+        if(event.item?.type==='agent_message'&&event.type==='item.started'&&openMessages.has(event.item.id))fail('Codex message item already started');
         if(event.item?.id!==undefined) {
           if(typeof event.item.id!=='string' || !event.item.id || (itemTurns.has(event.item.id)&&itemTurns.get(event.item.id)!==turn))fail('Codex item belongs to another turn');
           else itemTurns.set(event.item.id,turn);

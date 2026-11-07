@@ -61,7 +61,7 @@ for(const [name,events] of [
 });
 test('a late Pass cannot erase an earlier observed negative on terminal rejection',async()=>{
  const raw=negative();
- await assert.rejects(invoke([thread,start,message(raw),done,start,{type:'turn.failed',error:{message:'Fictional terminal cause'}},message(negative('Pass'))]),error=>{
+ await assert.rejects(invoke([thread,start,message(raw),{type:'turn.failed',error:{message:'Fictional terminal cause'}},message(negative('Pass'))]),error=>{
   assert.equal(error.rejected_output.text,raw);assert.match(error.message,/Fictional terminal cause/);return true;
  });
 });
@@ -81,11 +81,19 @@ for(const verdict of ['Blocked','Fail'])for(const code of [0,7])for(const laterT
 });
 for(const type of ['item.started','item.updated'])for(const id of [undefined,'unfinished-final'])test(`unfinished ${type} message ${id} cannot reuse a completed artifact`,async()=>{
  const pending={type,item:{type:'agent_message',phase:'final_answer',...(id?{id}:{})}};
- await assert.rejects(invoke([thread,start,message(negative('Pass')),pending,done]),/no completed artifact/);
+ await assert.rejects(invoke([thread,start,message(negative('Pass')),pending,done]),/no completed artifact|requires item identity/);
 });
 test('a matching completed message closes its started final answer',async()=>{
  const raw=negative();const item={id:'final',type:'agent_message',phase:'final_answer'};
  assert.equal((await invoke([thread,start,{type:'item.started',item},{type:'item.completed',item:{...item,text:raw}},done])).text,raw);
+});
+test('anonymous starts and replayed turns cannot manufacture completion',async()=>{
+ const anonymous={type:'item.started',item:{type:'agent_message',phase:'final_answer'}};
+ await assert.rejects(invoke([thread,start,anonymous,anonymous,message(negative('Pass')),done]),/requires item identity/);
+ const named={type:'item.started',item:{id:'duplicate-start',type:'agent_message',phase:'final_answer'}};
+ await assert.rejects(invoke([thread,start,named,named,{type:'item.completed',item:{...named.item,text:negative('Pass')}},done]),/already started/);
+ const tagged={...start,turn_id:'same-turn'},complete={...done,turn_id:'same-turn'};
+ await assert.rejects(invoke([thread,tagged,message(negative('Pass')),complete,tagged,message(negative('Pass')),complete]),/multiple or replayed turns/);
 });
 for(const type of ['item.completed','item.started','item.updated'])test(`completed message ID cannot be replayed through ${type}`,async()=>{
  const item={id:'completed-final',type:'agent_message',phase:'final_answer',text:negative('Pass')};

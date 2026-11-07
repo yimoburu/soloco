@@ -432,7 +432,10 @@ function corpusSelection(v,id){
 }
 function selectionContract(v,t){
   if(t.unit_selection_schema!==undefined&&(t.unit_selection_schema!==COMPLETE_GROUP_RANGES||v.partitioner!==CORPUS_PARTITIONER||v.batching_policy!==CORPUS_INTRINSIC_BATCHING))fail('invalid complete group selection contract');
-  if(t.phase==='extract'&&[t.unit_id,...(t.context_unit_ids??[])].some(id=>typeof id==='string'&&id.includes('/'))&&t.unit_selection_schema!==COMPLETE_GROUP_RANGES&&v.partitioner===CORPUS_PARTITIONER)fail('child selection requires prospective marker');
+  if(t.phase==='extract'&&[t.unit_id,...(t.context_unit_ids??[])].some(id=>typeof id==='string'&&id.includes('/'))&&t.unit_selection_schema!==COMPLETE_GROUP_RANGES&&v.partitioner===CORPUS_PARTITIONER){
+    if([t.unit_id,...(t.context_unit_ids??[])].some(id=>typeof id==='string'&&id.includes('/')&&!id.includes('/g')))fail('unknown complete body batch; no range subdivision');
+    fail('child selection requires prospective marker');
+  }
 }
 function disjointGroups(units){const seen=new Set();for(const u of units)for(const g of u.sections){if(seen.has(g.group_id))fail('complete group overlap/duplicate');seen.add(g.group_id);}}
 function primaryCoverage(v,proofs,complete=false){
@@ -990,13 +993,16 @@ function repairCounterevidence(s,p,t){
   const {c}=plan(s,p);
   if(!p.scoped_context_plan.home_intake_policy||!phasedDomain(t))fail('repair is limited to new initial-bootstrap domain targets');
   const evidence=t.repair_of.map(ref=>historicalNegative(s,c,ref));
+  validateHomeRepair(s,p,t,evidence);
+  return evidence;
+}
+function validateHomeRepair(s,p,t,evidence){
   for(const e of evidence){
     const old=e.target.value;
     if(e.value.qualification_result.extraction_identity!==p.scoped_context_plan.extraction_identity||!same(old.selection_ids,t.selection_ids)||!same(old.item_keys,t.item_keys)||!same(old.reviews,t.reviews))fail('unrelated negative cannot be repaired by this domain');
     const corrected=t.homes.map(r=>({source:r,value:exact(s,r)}));
     if(same(homeMeaning(corrected),homeMeaning(e.prior_packet.homes))&&!(t.raw_review_ids??[]).some(id=>!old.raw_review_ids.includes(id)))fail('unchanged repair candidate; material corrected homes or new raw expansion required');
   }
-  return evidence;
 }
 // Negative extraction receipts are validated as negatives, never minted as Passes.
 function decompositionCounterevidence(s,p,t){
@@ -1007,13 +1013,29 @@ function decompositionCounterevidence(s,p,t){
     if(ref.id.startsWith('job:')){
       const job=exact(s,ref),x=targetInfo(s,job);
       if(!['failed','expired'].includes(job.status)||!job.rejected_output||!text(job.rejected_output.text)||!job.native_id||!job.execution_started_at||!job.execution_deadline_at||job.coordination_release?.termination_confirmed!==true)fail('failed decomposition evidence missing wire/native/timing/termination');
-      let output;try{output=JSON.parse(job.rejected_output.text);}catch{fail('ambiguous rejected decomposition output');}
-      if(!negative(output))fail('unknown or ambiguous rejected decomposition outcome');
+      const rejected=job.rejected_output;
+      if(typeof rejected.truncated!=='boolean'||rejected.author_instance!==job.instance_id||rejected.context_sha256!==job.context_sha256||!same(rejected.qualification_plan,x.t.plan)||!same(rejected.qualification_target,scopedReference(x.record))||job.coordination_release.reason!=='model_process_closed'||job.rejected_native_id&&job.rejected_native_id!==job.native_id||(job.rejected_native_ids??[]).some(id=>id!==job.native_id))fail('changed original rejected decomposition binding');
+      let wire=rejected.text;
+      if(rejected.truncated){
+        if(!rejected.original)fail('missing complete rejected decomposition wire');
+        wire=resolveSnapshot(s,rejected.original);
+        if(typeof wire!=='string'||wire.length<=rejected.text.length||wire.slice(0,rejected.text.length)!==rejected.text)fail('changed complete rejected decomposition wire');
+      }else if(rejected.original)fail('ambiguous rejected decomposition wire');
+      let output;try{output=JSON.parse(wire.trim().replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, ''));}catch{fail('ambiguous rejected decomposition output');}
+      const verdict=['Fail','Blocked'].find(v=>[output?.review?.verdict,output?.qualification_result?.verdict].includes(v));
+      if(!verdict||rejected.qualification_negative!==verdict)fail('unknown or ambiguous rejected decomposition outcome');
       const timing=executionTiming(job.execution_started_at,{timeout_ms:job.timeout_ms,timeout_reason:job.timeout_reason});
       if(job.timeout_policy_version!==TIMEOUT_POLICY_VERSION||job.execution_deadline_at!==timing.execution_deadline_at)fail('changed spent decomposition limits');
       const a=assignment(s,job);if(!job.qualification_delivery||job.context_sha256!==a.hash)fail('missing original failed delivery');
       if(a.stream)validateScopedStreamDelivery(a,job,job.native_id,job.qualification_delivery);else if(!same(job.qualification_delivery,scopedDelivery(a,job,job.native_id,a.text)))fail('changed original rejected delivery');
       const evidence={review:ref,value:output,job,target:{source:scopedReference(x.record),value:x.t},prior_packet:a.packet};cache.set(key,evidence);return evidence;
+    }
+    // Home negatives bind their exact completion boundary, including old homes.
+    // Current-home revalidation would erase the very correction being reviewed.
+    const retained=exact(s,ref),original=retained.review_of?.id?source(s,retained.review_of.id).scoped_context_target:null;
+    if(original?.phase!=='extract'){
+      if(!v.home_intake_policy||!original||!phasedDomain(original)||t.phase==='extract')fail('unrelated negative cannot be repaired by this domain');
+      const evidence=historicalNegative(s,plan(s,p).c,ref);cache.set(key,evidence);return evidence;
     }
     const prior=evaluation.negativeReceipt;evaluation.negativeReceipt=ref.id;
     try{const proof=canonical(s,ref);if(!negative(proof.record))fail('decomposition requires retained negative');const evidence={review:ref,value:proof.record,job:proof.job,target:{source:scopedReference(proof.x.record),value:proof.x.t},prior_packet:assignment(s,proof.job).packet};cache.set(key,evidence);return evidence;}finally{evaluation.proofs.delete(json(ref));evaluation.negativeReceipt=prior;}
@@ -1023,7 +1045,19 @@ function decompositionCounterevidence(s,p,t){
   const children=replacements??[...new Map(domains.flatMap(d=>proofChildren(s,d.x)).map(p=>[p.record.id,p])).values()];
   if(!replacements)primaryCoverage(v,children,true);
   for(const e of evidence){const old=e.target.value,oldPlan=exact(s,old.plan).scoped_context_plan;
-    if(old.phase!=='extract'||oldPlan.extraction_identity!==v.extraction_identity)fail('unrelated negative cannot be decomposed');
+    if(old.phase!=='extract'){
+      if(!v.home_intake_policy||!phasedDomain(old)||t.phase==='extract')fail('unrelated negative cannot be repaired by this domain');
+      // Reuse the exact gate with the already validated historical receipt.
+      // Reconstructing that same history again adds no evidence.
+      if(phasedDomain(t))validateHomeRepair(s,p,t,[e]);
+      else{
+        const corrected=domains.find(d=>d.result.verdict==='Pass'&&phasedDomain(d.x.t)&&d.x.t.unit_selection_schema===COMPLETE_GROUP_RANGES&&same(d.x.t.homes,t.homes)&&d.x.t.repair_of?.some(r=>same(r,e.review))&&(d.result.repair_dispositions??[]).some(r=>same(r.negative,e.review)));
+        if(!corrected)fail('current canonical domain with material home correction and disposition required');
+        validateHomeRepair(s,corrected.x.p,corrected.x.t,[e]);
+      }
+      continue;
+    }
+    if(oldPlan.extraction_identity!==v.extraction_identity)fail('unrelated negative cannot be decomposed');
     const original=corpusSelection(v,old.unit_id).group_ids;
     const split=children.filter(p=>{const g=corpusSelection(v,p.x.t.unit_id).group_ids;return g.length<original.length&&g.every(id=>original.includes(id));});
     if(!split.length)fail('material child splitting required; unchanged parent retry cannot clear');
