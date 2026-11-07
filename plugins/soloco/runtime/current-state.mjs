@@ -10,6 +10,7 @@ const proofJobFields=new Set(['id','role','instance_id','session_key','native_id
 const keysOnly=(v,keys)=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).every(k=>keys.includes(k));
 export function proofJobSafe(job) {
   if(Object.keys(job).some(k=>!proofJobFields.has(k)))return false;
+  if(job.qualification_hold!==undefined&&(!job.qualification_hold||typeof job.qualification_hold!=='object'||Array.isArray(job.qualification_hold)))return false;
   for(const key of ['review_of','requester','model_selection','model_catalog','model_evidence','coordination_release'])if(job[key]!==undefined&&job[key]!==null&&(typeof job[key]!=='object'||Array.isArray(job[key])))return false;
   const scalarObject=(value,keys)=>keysOnly(value,keys)&&Object.values(value).every(v=>v===null||typeof v!=='object');
   const refs=(value,keys)=>Array.isArray(value)&&value.every(r=>keysOnly(r,keys)&&Object.values(r).every(v=>v===null||typeof v!=='object'));
