@@ -1016,11 +1016,25 @@ function historicalNegative(s,c,ref){
 const homeMeaning=homes=>homes.map(h=>({id:h.source.id,content:h.value.content,operating_record:h.value.operating_record,context_obligations:h.value.context_obligations??null}));
 function repairCounterevidence(s,p,t){
   if(!t.repair_of)return [];
-  if(t.unit_selection_schema===COMPLETE_GROUP_RANGES)return decompositionCounterevidence(s,p,t);
-  const {c}=plan(s,p);
-  if(!p.scoped_context_plan.home_intake_policy||!phasedDomain(t))fail('repair is limited to new initial-bootstrap domain targets');
-  const evidence=t.repair_of.map(ref=>historicalNegative(s,c,ref));
-  validateHomeRepair(s,p,t,evidence);
+  // A single synchronous validation revisits the same whole repair through
+  // negative scanning, packet construction, independence and semantics. Reuse
+  // only completed validation for these exact objects and proof mode. Public
+  // calls and historical/intrinsic evaluations always start with fresh memos.
+  const states=evaluation.repairs??=new WeakMap();
+  let plans=states.get(s);if(!plans)states.set(s,plans=new WeakMap());
+  let targets=plans.get(p);if(!targets)plans.set(p,targets=new WeakMap());
+  let modes=targets.get(t);if(!modes)targets.set(t,modes=new Map());
+  const mode=json([evaluation.negativeReceipt??null,evaluation.intrinsic??false,evaluation.historicalCut??null]);
+  if(modes.has(mode))return modes.get(mode);
+  let evidence;
+  if(t.unit_selection_schema===COMPLETE_GROUP_RANGES)evidence=decompositionCounterevidence(s,p,t);
+  else{
+    const {c}=plan(s,p);
+    if(!p.scoped_context_plan.home_intake_policy||!phasedDomain(t))fail('repair is limited to new initial-bootstrap domain targets');
+    evidence=t.repair_of.map(ref=>historicalNegative(s,c,ref));
+    validateHomeRepair(s,p,t,evidence);
+  }
+  modes.set(mode,evidence);
   return evidence;
 }
 function validateHomeRepair(s,p,t,evidence){
@@ -1265,7 +1279,7 @@ function canonical(s,ref){
   if(evaluation.negativeReceipt!==record.id)noNegatives(s,x);const children=proofChildren(s,x);independent(s,job,job.native_id,x,proofDependencies(s,x));semantic(s,x,e.qualification_result,children);if(e.qualification_result.verdict!=='Pass'&&evaluation.negativeReceipt!==record.id)fail('negative receipt');
   // Reuse only the exact packet just validated in this synchronous evaluation.
   // This proof object is internal; native evidence and persisted receipts remain unchanged.
-  const value={record,job,x,result:e.qualification_result,packet:a.packet};evaluation.visiting.delete(key);evaluation.proofs.set(key,value);return value;
+  const value={record,job,x,result:e.qualification_result,...(evaluation.negativeReceipt===record.id?{packet:a.packet}:{})};evaluation.visiting.delete(key);evaluation.proofs.set(key,value);return value;
 }
 export function createScopedTarget(s,args){return evaluate(()=>{
   if(args.phase==='extract'&&args.current_home_inventory!==undefined)fail('current_home_inventory is only supported on non-extraction targets');
