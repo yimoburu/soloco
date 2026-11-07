@@ -12,6 +12,8 @@ import {executionTiming} from '../plugins/soloco/runtime/timeout.mjs';
 import {toolListFor,call} from '../plugins/soloco/runtime/main.mjs';
 import {getEventListeners} from 'node:events';
 import {resolveSnapshot} from '../plugins/soloco/runtime/snapshot.mjs';
+import {backupCompany,restoreCompany} from '../plugins/soloco/runtime/storage-transfer.mjs';
+import {resourceClaims} from '../plugins/soloco/runtime/coordination.mjs';
 
 const child=()=>({on(){return this;},unref(){}});
 const ready=()=>({available:true,authenticated:true,version:'fictional-contract-adapter'});
@@ -239,4 +241,34 @@ test('supervisor starts an explicit output consumer after its producer is termin
   await work(f.root,jb.job_id,async(_h,_n,prompt,_d,limit,_s,o)=>{assert.match(prompt,/Exact retained terminal producer content/);o.onSpawn(executionTiming(Date.now(),{timeout_ms:limit}));return {native_id:'fictional-explicit-output-consumer',text:JSON.stringify({content:'The exact retained producer evidence was read.',messages:[],notices:[]})};});
   tickRuntime(f.root,{dispatch:false});assert.equal(f.read().records[b.id].runtime_task.state,'returned');assert.equal(Object.keys(f.read().jobs).length,2);
  }finally{f.close();}
+});
+
+
+test('restore preserves accepted exact evidence, a queued obligation and an unprocessed peer message',async()=>{
+ const f=fixture(),transfer=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'soloco-async-restore-')));
+ try{
+  const a=f.submit('restore-producer',{role:'engineer'}),qa=f.submit('restore-qa',{role:'qa',review_task_id:a.id});
+  const b=f.submit('restore-receiver',{role:'research',resources:['fictional/shared-resource'],depends_on:[{task_id:qa.id,gate:'accepted'}]});
+  const msg=taskAction({...f.args,epoch:1,action:'message',operation_id:'restore-pending-message',source_instruction:'Preserve this fictional uncertainty for the receiver.',to_task_id:b.id,content:'Unresolved fictional qualifier: no permission for external effects.'},'codex',{wake:()=>({started:false})});
+  const ja=queue(f.root,a.id);await work(f.root,ja.job_id,model('fictional-restore-producer'));
+  const jq=queue(f.root,qa.id);await work(f.root,jq.job_id,async(_h,_n,_p,_d,limit,_s,o)=>{
+   o.onSpawn(executionTiming(Date.now(),{timeout_ms:limit}));
+   return {native_id:'fictional-restore-independent-qa',text:JSON.stringify({content:'Fictional independent review only.',review:{verdict:'Pass',reason:'Exact fictional producer meets the stated requirement.'},messages:[],notices:[]})};
+  });
+  tickRuntime(f.root,{dispatch:false});assert.equal(f.read().records[qa.id].runtime_task.state,'accepted');
+  const jb=queue(f.root,b.id),before=f.read(),backup=path.join(transfer,'backup'),restored=path.join(transfer,'restored');
+  withStore(f.root,db=>backupCompany(db,backup));const receipt=restoreCompany(backup,restored);
+  assert.equal(receipt.ownership_transferred,false);
+  const after=withStore(restored,db=>db.read());assert.deepEqual(after,before);
+  assert.equal(after.records[qa.id].runtime_task.state,'accepted');
+  assert.equal(after.records[after.jobs[jq.job_id].artifact_id].review.verdict,'Pass');
+  assert.equal(after.jobs[jq.job_id].review_of.id,after.jobs[ja.job_id].artifact_id);
+  assert.equal(after.records[b.id].runtime_task.state,'queued');
+  assert.equal(after.records[b.id].runtime_task.attempts[0].job_id,jb.job_id);
+  assert.equal(after.jobs[jb.job_id].artifact_id,undefined);
+  assert(resourceClaims(after).some(c=>c.job_id===jb.job_id));
+  assert.equal(after.records[msg.id].runtime_message.state,'pending');
+  assert.equal(after.records[msg.id].runtime_message.disposition,null);
+  assert.deepEqual(after.owner,before.owner);assert.deepEqual(Object.keys(after.jobs),Object.keys(before.jobs));
+ }finally{f.close();fs.rmSync(transfer,{recursive:true,force:true});}
 });

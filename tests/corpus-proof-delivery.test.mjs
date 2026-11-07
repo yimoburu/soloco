@@ -97,7 +97,8 @@ test('FICTIONAL worker chain binds projected routes to full proof and rejects a 
       const job=engine.dispatch({...f,role:'qa',review_of:target.id,task:'FICTIONAL mechanical review'},'codex',{check:()=>({available:true,authenticated:true,version:'fictional'}),launch:()=>({on(){},unref(){}})});
       const parts=[];let logical;
       await work(root,job.id,async(host,session,prompt,dir,timeout,selection,options)=>{
-        options.onSpawn(executionTiming(Date.now(),{timeout_ms:Math.min(timeout,options.executionDeadlineAt?options.executionDeadlineAt-Date.now():timeout),timeout_reason:options.timeoutReason}));
+        const now=Date.now();
+        options.onSpawn(executionTiming(now,{timeout_ms:Math.min(timeout,options.executionDeadlineAt?options.executionDeadlineAt-now:timeout),timeout_reason:options.timeoutReason}));
         let p=JSON.parse(prompt),native_id='fictional-native-'+job.id;
         if(p.protocol===scoped.SCOPED_STREAM){parts.push(p.text);if(!p.final)return {native_id,text:json({scoped_stream_ack:{body_sha256:p.body_sha256,sequence:p.sequence,range_sha256:p.range_sha256}})};p=JSON.parse(parts.join(''));}
         if(p.protocol==='corpus-readable-structure-v1')p=scoped.expandCorpusStructure(p);logical=p;

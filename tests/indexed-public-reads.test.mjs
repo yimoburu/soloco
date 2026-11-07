@@ -343,3 +343,29 @@ test('unavailable index and corrupt unrelated archive cannot roll back a native 
     assert.throws(()=>db.read(),/hash mismatch/,'Canonical integrity still holds on affected reads');
   });
 });
+
+test('selected receipt-only writes preserve exact catalog without rebuilding unrelated projections',()=>{
+  const args=fixture(seed(100));
+  withStore(args.root,store=>{
+    const baseline=store.captureIntakeBaseline();
+    const before=readPublicIndex(store.db);
+    const prepare=store.db.prepare.bind(store.db),queries=[];
+    store.db.prepare=sql=>{queries.push(sql);return prepare(sql);};
+    try{
+      store.selectedTransaction('fictional.receipt',{rootKeys:['revision','updated_at','owner'],entities:{jobs:['active']}},s=>{s.jobs.active.receipts=['exact fictional result'];});
+    }finally{store.db.prepare=prepare;}
+    assert.deepEqual(readPublicIndex(store.db),before);
+    assert(!queries.some(sql=>/DELETE FROM public_read_rows|FROM public_read_values WHERE family (?:NOT )?IN/.test(sql)),'receipt update rebuilt unrelated projections');
+    const current=store.read();
+    const expected=publicCatalog(current);expected.exports=0;for(const info of Object.values(expected.collections))delete info.rows;
+    assert.deepEqual(readPublicIndex(store.db),expected);
+    const intake=store.readIntake(baseline,{values:true});
+    assert.equal(intake.events.length,1);
+    assert.deepEqual(JSON.parse(intake.events[0].changes.find(c=>c.after?.family==='jobs').after.raw).receipts,['exact fictional result']);
+    assert.equal(intake.events[0].changes.some(c=>c.after?.family==='records'),false);
+    store.selectedTransaction('fictional.membership',{rootKeys:['revision','owner'],entities:{jobs:['active']}},s=>{s.jobs.active.status='completed';});
+    const after=publicCatalog(store.read());after.exports=0;for(const info of Object.values(after.collections))delete info.rows;
+    assert.deepEqual(readPublicIndex(store.db),after);
+    assert.equal(after.collections.active_jobs.total,0);
+  });
+});

@@ -256,7 +256,9 @@ export function migrateNormalized(db,directory) {
   }catch(error){try{db.exec('ROLLBACK');}catch{}throw error;}
 }
 export function writeNormalizedSelection(db,changes) {
-  const indexed=readPublicIndex(db)!==null&&changes.every(({family,value})=>publicIndexCompatible(family,value));
+  const catalog=readPublicIndex(db);
+  const indexed=catalog!==null&&changes.every(({family,value})=>publicIndexCompatible(family,value));
+  let catalogChanged=false;
   installPublicIndex(db);
   for(const {family,key,value} of changes) {
     const journal=family==='upgrade'&&journals.has(key);
@@ -271,9 +273,12 @@ export function writeNormalizedSelection(db,changes) {
       for(const entry of valueEntries(db,family,key,n,value))put(db,...entry);
     }
     if(journal)db.prepare('DELETE FROM state_entries WHERE family=? AND position>=?').run('upgrade.'+key,Array.isArray(value)?value.length:0);
-    if(indexed)updatePublicIndexValue(db,family,key,value);
+    if(indexed)catalogChanged=updatePublicIndexValue(db,family,key,value)||catalogChanged;
   }
-  if(indexed)finishPublicIndex(db);
+  if(indexed){
+    if(catalogChanged)finishPublicIndex(db);
+    else retainPublicCatalog(db,catalog);
+  }
   // Leave an unavailable catalog invalid; only a full write rebuilds it.
   // Native return retention must never depend on unrelated archived bodies.
 }
@@ -293,16 +298,29 @@ function installPublicIndex(db) {
     CREATE TRIGGER IF NOT EXISTS public_read_update AFTER UPDATE ON state_entries BEGIN DELETE FROM public_read_catalog; END;
     CREATE TRIGGER IF NOT EXISTS public_read_delete AFTER DELETE ON state_entries BEGIN DELETE FROM public_read_catalog; END;`);
 }
+// A selected write often changes only execution receipts, revision or updated_at.
+// Restore the previously checked catalog after canonical invalidation only when
+// its exact membership/order inputs have not changed. No cross-transaction memo.
+function retainPublicCatalog(db,catalog) {
+  const bytes=JSON.stringify(catalog);
+  db.prepare('INSERT OR REPLACE INTO public_read_catalog VALUES(1,1,?,?)').run(hash(bytes),bytes);
+}
+const receiptRoots=new Set(['revision','updated_at']);
 function updatePublicIndexValue(db,family,key,value) {
-  if(family!=='root'&&!collections.has(family))return;
+  if(family!=='root'&&!collections.has(family))return false;
   const stored=storedKey(db,key);
-  if(value===undefined){db.prepare('DELETE FROM public_read_values WHERE family=? AND key=?').run(family,stored);return;}
+  const prior=db.prepare('SELECT * FROM public_read_values WHERE family=? AND key=?').get(family,stored);
+  if(prior)checkPublicValue(prior);
+  const affectsCatalog=family!=='root'||!receiptRoots.has(key);
+  if(value===undefined){db.prepare('DELETE FROM public_read_values WHERE family=? AND key=?').run(family,stored);return !!prior&&affectsCatalog;}
   const row=db.prepare('SELECT position FROM state_entries WHERE family=? AND key=?').get(family,stored);
-  if(!row)return;
+  if(!row)return !!prior&&affectsCatalog;
   // Collection .id is also the aggregate source's identity, with any JSON shape.
   const projected=key==='id'&&['root','upgrade','context_classifications'].includes(family)?value:publicIndexValue(family,value);
   const bytes=JSON.stringify(projected),valueId=typeof value?.id==='string'?hash(JSON.stringify(value.id)):null;
+  if(prior&&prior.position===row.position&&prior.bytes===bytes&&prior.value_id_sha256===valueId)return false;
   db.prepare('INSERT OR REPLACE INTO public_read_values VALUES(?,?,?,?,?,?)').run(family,stored,row.position,bytes,valueId,hash(JSON.stringify([family,stored,row.position,bytes,valueId])));
+  return affectsCatalog;
 }
 function writePublicIndex(db,state) {
   installPublicIndex(db);
