@@ -15,6 +15,25 @@ export function source(root) {
   const entries=files.map(f=>{const p=path.join(root,f),s=fs.lstatSync(p);requireThat(s.isFile()||s.isSymbolicLink(),'unsupported source entry');return [f,s.mode,hash(s.isSymbolicLink()?fs.readlinkSync(p):fs.readFileSync(p))];});
   return {commit:git(root,['rev-parse','HEAD']),tree:git(root,['rev-parse','HEAD^{tree}']),manifest:hash(JSON.stringify(entries)),dirty:git(root,['status','--porcelain']).length>0};
 }
+export const lanes=Object.freeze(['tests-22','compatibility-26','build']);
+// Runtime-sensitive compatibility coverage; the full suite remains mandatory on Node 22.
+export const compatibilityTests=Object.freeze([
+  'cancellation-finalization','ci-evidence','hooks','indexed-public-reads',
+  'local-sandbox-flags','local-sandbox','normalized-read-atomicity','plugin',
+  'runtime-version-fence','selection-adapter','storage-intake','storage-layout-repairs',
+  'storage-transfer-integrity','timeout','timeout-wiring','upgrade-adapter',
+].map(name=>`tests/${name}.test.mjs`).sort());
+export function laneCoverage(lane) {
+  requireThat(lanes.includes(lane),'unknown fixed lane');
+  return lane==='tests-22'?'full':lane==='compatibility-26'?'compatibility':'build';
+}
+export function selectedTests(lane, inventory) {
+  laneCoverage(lane);
+  if(lane==='build')return [];
+  if(lane==='tests-22')return [...inventory];
+  requireThat(compatibilityTests.every(file=>inventory.includes(file)),'missing compatibility test source');
+  return [...compatibilityTests];
+}
 export function inventory(root) { return fs.readdirSync(path.join(root,'tests')).filter(f=>f.endsWith('.test.mjs')).sort().map(f=>`tests/${f}`); }
 export function tapCounts(text) {
   requireThat(text.startsWith('TAP version 13\n') && /# duration_ms [0-9.]+\n$/.test(text), 'incomplete TAP');
@@ -41,8 +60,8 @@ export function safeRead(directory, name) {
   return fs.readFileSync(file);
 }
 export function validateReceipt(r, directory, expected) {
-  requireThat(r?.schema===1 && ['tests-22','tests-25','build'].includes(r.lane),'receipt schema/lane');
-  const keys=['schema','lane','mode','before','after','inventory','node','platform','arch','os_release','runner_image','github','checks','sandbox','error'];
+  requireThat(r?.schema===2 && lanes.includes(r.lane),'receipt schema/lane');
+  const keys=['schema','lane','mode','before','after','inventory','test_inventory','coverage','node','platform','arch','os_release','runner_image','github','checks','sandbox','error'];
   requireThat(Object.keys(r).every(k=>keys.includes(k)),'unrecognized receipt fields');
   for(const k of ['commit','tree','manifest']) requireThat(r.before?.[k]===r.after?.[k] && (k==='manifest'?/^[a-f0-9]{64}$/:/^[a-f0-9]{40}$/).test(r.before[k]),`changed/missing source ${k}`);
   for(const k of ['commit','tree']) requireThat(r.before[k]===expected[k],`wrong source ${k}`);
@@ -53,20 +72,22 @@ export function validateReceipt(r, directory, expected) {
   requireThat(typeof r.node==='string' && ['arm64','x64'].includes(r.arch) && typeof r.os_release==='string' && r.os_release.length>0 && r.runner_image && Object.keys(r.runner_image).sort().join(',')==='os,version','missing platform');
   requireThat(Array.isArray(r.inventory) && r.inventory.length>0 && r.inventory.every((f,i,a)=>/^tests\/[a-z0-9-]+\.test\.mjs$/.test(f) && (i===0||a[i-1]<f)),'missing/duplicate inventory');
   if(expected.inventory) requireThat(JSON.stringify(r.inventory)===JSON.stringify(expected.inventory),'wrong inventory');
+  requireThat(r.coverage===laneCoverage(r.lane),'wrong coverage scope');
+  requireThat(JSON.stringify(r.test_inventory)===JSON.stringify(selectedTests(r.lane,r.inventory)),'wrong selected test inventory');
   const required=r.lane==='build'?['build','diff']:['tests'];
   requireThat(Array.isArray(r.checks) && r.checks.length===required.length,'missing/duplicate checks');
-  if(r.lane!=='build') requireThat(r.platform==='darwin' && r.node.split('.')[0]===`v${r.lane.slice(6)}` && r.sandbox?.supported===true && r.sandbox.backend==='macos-seatbelt-node','unsupported macOS sandbox/Node');
+  if(r.lane!=='build') requireThat(r.platform==='darwin' && r.node.split('.')[0]===(r.lane==='tests-22'?'v22':'v26') && r.sandbox?.supported===true && r.sandbox.backend==='macos-seatbelt-node','unsupported macOS sandbox/Node');
   else requireThat(r.platform==='linux'&&r.node.split('.')[0]==='v22','unsupported build platform/Node');
   for(const name of required) {
     const matches=r.checks.filter(c=>c.name===name);requireThat(matches.length===1,'missing/duplicate check');const c=matches[0];
     requireThat(c.exit===0 && c.signal===null && !c.error && !c.truncated && Number.isFinite(Date.parse(c.start)) && Date.parse(c.end)>=Date.parse(c.start),'failed/incomplete check');
-    const args=name==='tests'?['--no-warnings','--test','--test-concurrency=4','--test-reporter=tap',...r.inventory]:name==='build'?['tools/build-plugin.mjs','--check']:['diff','--check'];
+    const args=name==='tests'?['--no-warnings','--test','--test-concurrency=4','--test-reporter=tap',...r.test_inventory]:name==='build'?['tools/build-plugin.mjs','--check']:['diff','--check'];
     requireThat(Array.isArray(c.argv)&&c.argv.every(a=>typeof a==='string')&&JSON.stringify(c.argv.slice(1))===JSON.stringify(args)&&(name==='diff'?c.argv[0]==='git':['node','node.exe'].includes(path.basename(c.argv[0]))),'unexpected command/arguments');
     requireThat(c.timeout_ms===(name==='tests'?900000:120000),'unexpected command budget');
     for(const stream of ['stdout','stderr']) requireThat(hash(safeRead(directory,c[stream].file))===c[stream].sha256,`changed ${stream} log`);
     if(name==='tests') requireThat(JSON.stringify(tapCounts(safeRead(directory,c.stdout.file).toString('utf8')))===JSON.stringify(c.tap),'TAP/receipt disagreement');
   }
-  return {scope:'source_ci_evidence',lane:r.lane,claims:required,counts:r.checks.find(c=>c.name==='tests')?.tap??null};
+  return {scope:'source_ci_evidence',lane:r.lane,coverage:r.coverage,test_inventory:r.test_inventory,claims:required,counts:r.checks.find(c=>c.name==='tests')?.tap??null};
 }
 export function requiredJobs(jobs,names,run,attempt) {
   requireThat(Array.isArray(jobs)&&new Set(names).size===names.length,'duplicate expected jobs');
