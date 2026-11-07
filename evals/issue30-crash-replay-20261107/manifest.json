@@ -1,0 +1,64 @@
+{
+  "kind": "fictional-process-crash-and-replay-evidence",
+  "issue": 30,
+  "base": "38d95fd",
+  "node": "v22.23.2",
+  "platform": "darwin",
+  "created_at": "2026-11-07T16:47:44.855Z",
+  "baseline": {
+    "exit": 1,
+    "expected_failure": "Identical message replay is rejected after receiver amendment",
+    "log": "baseline-replay-regression.log"
+  },
+  "final": {
+    "node": "v22.23.2",
+    "exit": 0,
+    "signal": null,
+    "tests": [
+      "tests/tasks.test.mjs",
+      "tests/task-runtime.test.mjs",
+      "tests/task-runtime-acceptance.test.mjs",
+      "tests/task-context.test.mjs",
+      "tests/task-runtime-crash.test.mjs"
+    ],
+    "log": "final-focused-node22.log"
+  },
+  "source_sha256": {
+    "plugins/soloco/runtime/tasks.mjs": "f623961a569df16af62bcc4efbb90e9e4e32cdc909d2940c48167181fb3c12ac",
+    "tests/task-runtime-crash.test.mjs": "bccbb496270d3c8922de9f349893c170afe1023ba920324750244482914a7365",
+    "tests/fixtures/task-runtime-crash-child.mjs": "615a4bf21879cfdce58f26e38b9df040ae42b3156d6bea12e78271503c9cb218",
+    "docs/async-runtime.md": "a0a250ff0ac30b1e46d9641a1ca6b2668a398b0684e370ee37eb26268f4427ec"
+  },
+  "coverage": [
+    "task command before/uncommitted/committed response-loss cuts",
+    "dispatch before/uncommitted/committed cuts and retained uncertain claims",
+    "result/artifact/message-action/worker-disposition atomic cuts",
+    "owner action/disposition command response-loss replay",
+    "message response-loss plus amended recipient binding",
+    "next-event reconciliation cuts and one downstream dispatch"
+  ],
+  "limitations": [
+    "Scripted fictional adapter judgments; no native calls or native session replacement were performed.",
+    "No matched baseline/final accepted-outcome performance experiment.",
+    "Process kill proves transaction/attempt behavior in tested windows, not exactly-once external execution.",
+    "Existing restore coverage is in task-runtime.test.mjs; no persistence format or authority contract was changed."
+  ],
+  "retained_test_development_failure": {
+    "description": "Initial new test incorrectly expected any stale receiver message to prevent revised work from queuing. Inspection showed revised work receives the old exact envelope as evidence while disposition rejects changed receiver definition. The assertion was replaced with that existing contract.",
+    "observed": "11/12 first draft cases passed; one Missing expected exception assertion failed."
+  },
+  "final_node26": {
+    "node": "v26.13.0",
+    "exit": 0,
+    "signal": null,
+    "tests": [
+      "tests/tasks.test.mjs",
+      "tests/task-runtime.test.mjs",
+      "tests/task-runtime-acceptance.test.mjs",
+      "tests/task-context.test.mjs",
+      "tests/task-runtime-crash.test.mjs"
+    ],
+    "log": "final-focused-node26.log"
+  },
+  "crash_cut": "uncommitted cuts kill immediately before SQLite COMMIT, after canonical state, derived indexes and event rows have been written"
+}

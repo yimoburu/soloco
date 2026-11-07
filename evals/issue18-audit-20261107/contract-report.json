@@ -1,0 +1,1329 @@
+{
+  "protocol": {
+    "version": 1,
+    "kind": "accepted_candidate_format_comparison",
+    "design_base_revision": "9c0cb8a9d40da42242787b1bbaacfa11ba37acdc",
+    "fixture": {
+      "module_bytes": 32768,
+      "module_counts": [
+        1,
+        3
+      ],
+      "formats": [
+        "files",
+        "patches"
+      ]
+    },
+    "criteria": {
+      "max_native_calls_total": 8,
+      "max_generation_attempts_per_case": 1,
+      "max_test_attempts_per_case": 1,
+      "max_qa_attempts_per_case": 1,
+      "critical_false_acceptances": 0,
+      "quality_error_margin": 0,
+      "latency_improvement_required": false
+    },
+    "limits": {
+      "scope_max_bytes": 200000,
+      "configuration_ceiling": 200000,
+      "native_timeout_ms": 300000,
+      "test_timeout_ms": 10000,
+      "test_wait_ms": 20000
+    },
+    "order": "one-file files, one-file patches, three-file files, three-file patches; sequential, no retries",
+    "acceptance": "Real production dispatch and worker produce a retained exact candidate. Actual sandboxed tests must pass; a different native QA must permit the exact candidate and actual receipt; the fixture receiver then calls production accept. Exact grading additionally compares all complete candidate bytes against the known fixture.",
+    "limitations": [
+      "One observation per arm; descriptive results cannot establish statistical quality noninferiority, production reliability, cost savings or causal latency gains.",
+      "Only manually supplied fictional modules and fixed tests are shared with the existing host model. Synthetic company binding and grant are fixture data; no actual company state or authority changes.",
+      "Requested/applied model controls differ from effective provider settings; missing observations remain unknown.",
+      "All failed or uncertain calls stay retained and hold that case without retry. Source integration, installation and deployment are outside this evaluation."
+    ],
+    "source_identity": {
+      "design_base_revision": "9c0cb8a9d40da42242787b1bbaacfa11ba37acdc",
+      "git_head": "38d95fd6463fedef68e61737bdb2d4af4b05c756",
+      "identity_rule": "Exact file manifest controls applicability; a design baseline or Git HEAD alone is insufficient.",
+      "files": [
+        {
+          "path": "plugins/soloco/.claude-plugin/plugin.json",
+          "sha256": "986c4f9c24a5dfff0bb63fad7b666e9f4abbf7871eb3223358b2d798f46674b2"
+        },
+        {
+          "path": "plugins/soloco/.codex-plugin/plugin.json",
+          "sha256": "86eaf2142509d88bacfda122b3a49491a5a3571b8a937d7291d8896d5616f222"
+        },
+        {
+          "path": "plugins/soloco/.mcp.codex.json",
+          "sha256": "636c607d3e61f1aaffb7b5c624c7496b7c750f0bffd8c66065f8946382a109a8"
+        },
+        {
+          "path": "plugins/soloco/.mcp.json",
+          "sha256": "b6efeebb4f8ed3b045b82f584c2f1a91b172e0994c819a56b87e4069324ae81d"
+        },
+        {
+          "path": "plugins/soloco/assets/governance.md",
+          "sha256": "28f99838abc3794da94f97f7a2d234554811da3aef7b8ddb3742075caa78ec36"
+        },
+        {
+          "path": "plugins/soloco/assets/roles.json",
+          "sha256": "7e9f4f387f3622123fe8dbd69dd3cf0aa17943628d71ff03971d4ab4a8abd7ba"
+        },
+        {
+          "path": "plugins/soloco/compat/company-0.1.0.md",
+          "sha256": "bb6c3dbb6e7a03d033b7c39dccc59c31738369ffccc4fe6ff609d679e0eacc74"
+        },
+        {
+          "path": "plugins/soloco/hooks/claude.json",
+          "sha256": "128ecd4ef0c0ef53dc1a4634c65b2a1be39973096eaabaeebc3e784ebec53d5f"
+        },
+        {
+          "path": "plugins/soloco/hooks/codex.json",
+          "sha256": "882fce45b5791f8f51b2093526419fa6ab4ae2a118e597a20dc7c3b8112205a2"
+        },
+        {
+          "path": "plugins/soloco/runtime/adapters.mjs",
+          "sha256": "6a7c6f2887c6240dfac2fcbcdda1d9ea3e02dd96338816c8e37911df8e71be99"
+        },
+        {
+          "path": "plugins/soloco/runtime/context-qualification.mjs",
+          "sha256": "85e1d9176bd85a2f8321830191d132dc72b918c8b1dcd65babc865dce4b70a38"
+        },
+        {
+          "path": "plugins/soloco/runtime/context.mjs",
+          "sha256": "7a7abd4410a7ce9110bfd794624181eff364e452457a9e8a1ba94fb9f304bab6"
+        },
+        {
+          "path": "plugins/soloco/runtime/coordination.mjs",
+          "sha256": "625606e1faa51db37d008a2754643f64f197ffcc1ae99ab63a53fb7a742b556b"
+        },
+        {
+          "path": "plugins/soloco/runtime/corpus-structure.mjs",
+          "sha256": "e17f389f3b86ab43551108a5c6edbc2d77d219609abf7ab00cff557fc9c9ad5b"
+        },
+        {
+          "path": "plugins/soloco/runtime/current-state.mjs",
+          "sha256": "6f7c61213b3e998525526e2d0989ea897f380708c7bf3a447976c632d18228e2"
+        },
+        {
+          "path": "plugins/soloco/runtime/develop.mjs",
+          "sha256": "d6b4aa0ace7e4eaea610f290d6d14dd01af6104025e2c50df1a04eec9037d71d"
+        },
+        {
+          "path": "plugins/soloco/runtime/development-limits.mjs",
+          "sha256": "fb6b6065019c652fc27a198994cca3a248652890df5d322a9b6428ba5ccfea6a"
+        },
+        {
+          "path": "plugins/soloco/runtime/development-patch.mjs",
+          "sha256": "a36bbefb6c28579a33d97709aabcf80fbde95520a6fd1a4a02e687bba11dd27d"
+        },
+        {
+          "path": "plugins/soloco/runtime/engine.mjs",
+          "sha256": "484bc152e9d93ccd90e794633131cf1ddfe921a05d2eed33e29c24da0cca22de"
+        },
+        {
+          "path": "plugins/soloco/runtime/handover.mjs",
+          "sha256": "6aa9e0b4d0178d105006b58b2b4cc5ff6c52388cd1915704d8edc4549add1fe9"
+        },
+        {
+          "path": "plugins/soloco/runtime/hooks.mjs",
+          "sha256": "bca847d64e40213667712d4852c2774607fddbd962a5311ccf03521a885ce21d"
+        },
+        {
+          "path": "plugins/soloco/runtime/legacy-operating.mjs",
+          "sha256": "47fca09ae9e6fefe48dbf922a6538818d856579c3fae64e8cfc5f0fd203e8f2d"
+        },
+        {
+          "path": "plugins/soloco/runtime/local-sandbox.mjs",
+          "sha256": "e093897316b8bb4d1fe8e9306d0a0ed8145901b8fafd5641bd681ce309ce1343"
+        },
+        {
+          "path": "plugins/soloco/runtime/main.mjs",
+          "sha256": "bbf88492cb8ac0e08e271865dc0007d21f43a7b4ba7715c3a31c89f3ca595d93"
+        },
+        {
+          "path": "plugins/soloco/runtime/operating-control.mjs",
+          "sha256": "47e2a0c8b15128ea6f39b7bfc14cb6adc385b90b132c9df8e16d9274abbdd35d"
+        },
+        {
+          "path": "plugins/soloco/runtime/operating-state.mjs",
+          "sha256": "824143bc9035dbf4426850979d24413fd9c54e87c0845b4f1324f06befd0c664"
+        },
+        {
+          "path": "plugins/soloco/runtime/progress-view.mjs",
+          "sha256": "bbcea8afc8760d365ac84f395e3cafb07aa26a06bf12f71b670fe7a9d08ad839"
+        },
+        {
+          "path": "plugins/soloco/runtime/progress.mjs",
+          "sha256": "977ed14281cf7de7054babb75d953a5dc6bbf7c319e1fba3e81eeffce6812080"
+        },
+        {
+          "path": "plugins/soloco/runtime/prototype.mjs",
+          "sha256": "41eca83de2c2fe9e4006223c4efd2892eb0f20442af13ed049e59485cad06578"
+        },
+        {
+          "path": "plugins/soloco/runtime/public-response.mjs",
+          "sha256": "d84b0fbb0decbd0ae0b51a67638bec5cd44d48b741661a383cbd42c5a2541986"
+        },
+        {
+          "path": "plugins/soloco/runtime/record-storage.mjs",
+          "sha256": "fd91001c7ac8fe256e3ad1cbf7c888691d1000873bbbed3afc894cb789a17173"
+        },
+        {
+          "path": "plugins/soloco/runtime/scoped-context.mjs",
+          "sha256": "768f0df75fcc34e5647b0cbc68e1830ff6153c00ae581f9a54bbe9019c50ad13"
+        },
+        {
+          "path": "plugins/soloco/runtime/scoped-stream.mjs",
+          "sha256": "7bc83d0f2a9852868553d913b126583946d159b502adef07938e38f90ad5f16a"
+        },
+        {
+          "path": "plugins/soloco/runtime/selection.mjs",
+          "sha256": "55505fa53d69b28aed8394a291ad5473fcecff9f4d4b8b01ed3b397b26015214"
+        },
+        {
+          "path": "plugins/soloco/runtime/snapshot.mjs",
+          "sha256": "660a89aa41ffed18f6358e33d7efaf2db96b0c7b5d6807ae4f2dce939d69f7fb"
+        },
+        {
+          "path": "plugins/soloco/runtime/storage-transfer.mjs",
+          "sha256": "2ea96610ab528d61471ee35c0482fb62b76be090f5f7bd22cc2489486a8155c3"
+        },
+        {
+          "path": "plugins/soloco/runtime/store.mjs",
+          "sha256": "15ba60d1af642eea9da743b1200ce2f67d2d2b8cf16ffe9c8e8e8bc7f290add6"
+        },
+        {
+          "path": "plugins/soloco/runtime/supervisor.mjs",
+          "sha256": "b6fa3b23aae98aa6e3aef8e915c1ac7b9e61964650987bd8d65a402795a11789"
+        },
+        {
+          "path": "plugins/soloco/runtime/task-context.mjs",
+          "sha256": "88fe6b74507e01eb5edc8ae6f9b912e0b1e5ca424f6e079385699e67912d65c8"
+        },
+        {
+          "path": "plugins/soloco/runtime/task-index.mjs",
+          "sha256": "a8967fd0600e52e7f9ad6c82c9e48a497eb2ec4b8f2c3f8c326804358e3af363"
+        },
+        {
+          "path": "plugins/soloco/runtime/task-runtime-authority.mjs",
+          "sha256": "a602b66638a06995ecb138c12fa0f97e95830ff6b8a968d806acca411b46b27e"
+        },
+        {
+          "path": "plugins/soloco/runtime/task-runtime.mjs",
+          "sha256": "d8ffb80895b7a62b0d1c75aa4fd2f5ffdbce7f7a7ad8154a0243cd140bf6c887"
+        },
+        {
+          "path": "plugins/soloco/runtime/tasks.mjs",
+          "sha256": "cebefd8fffd54c0d8356e17fac3225900d8edc0e37dfaf05a0ca5d80b5111759"
+        },
+        {
+          "path": "plugins/soloco/runtime/timeout.mjs",
+          "sha256": "586c5f44f98742320119f0b42d0612dd79cf970f4e858f05e7d65953c31951a4"
+        },
+        {
+          "path": "plugins/soloco/runtime/upgrade-evidence.mjs",
+          "sha256": "14b809e88cb4a380829e6bb6ab9feceefc7582db230b0e8dcc70bed3b7b70e21"
+        },
+        {
+          "path": "plugins/soloco/runtime/upgrade.mjs",
+          "sha256": "0a4e15abaf0cea312d9161d8c8081258da0bcf0c064f9cbb01c6e88d92e3f26e"
+        },
+        {
+          "path": "plugins/soloco/runtime/validation-cache.mjs",
+          "sha256": "872415f42c63e015d159e5374d45b6de453dd7e8a873eb7f70473e6395b4354d"
+        },
+        {
+          "path": "plugins/soloco/runtime/worker.mjs",
+          "sha256": "38aec9225d4b2ef7affda037e252e2fd3f57b740811a38df8b0d78b8c47d8795"
+        },
+        {
+          "path": "plugins/soloco/scripts/run.sh",
+          "sha256": "128358b0c3d5b3f95b1584b3bcac9c8db23df86171a063591e1fd7e965b0c59b"
+        },
+        {
+          "path": "plugins/soloco/skills/setup/SKILL.md",
+          "sha256": "414a5d4acae2a47cf7dceb8a30f61cc9b6887c2b8885c3b1e03f4737b3d55761"
+        },
+        {
+          "path": "plugins/soloco/skills/soloco/SKILL.md",
+          "sha256": "622909c91ba18876ad80ce9c9ab77fc25c056fce51408f303a41e2b94551cb56"
+        },
+        {
+          "path": "SPEC.md",
+          "sha256": "28f99838abc3794da94f97f7a2d234554811da3aef7b8ddb3742075caa78ec36"
+        },
+        {
+          "path": "tests/candidate-format-qualification.test.mjs",
+          "sha256": "26d7a72474b027eb9111a20b224d62d7c7c153270d3f84bf05ec67b72ded9ba6"
+        },
+        {
+          "path": "tools/candidate-format-qualification.mjs",
+          "sha256": "85e67e9c6779d890b6eafd1b94f7e75aa0555047e898a2f2e16299fb2e43deb5"
+        },
+        {
+          "path": "tools/verify-candidate-format-qualification.mjs",
+          "sha256": "b3e40bcdc452144aef59b9221ac990c7033907112131d95ae5f93e7394091d0f"
+        },
+        {
+          "path": "tools/workflow-runtime.mjs",
+          "sha256": "d57c3849562dd4d486f8b3b21262c0108f39ea311b7eafdb950f2666b59808b5"
+        }
+      ],
+      "manifest_sha256": "64c3748a3f6d25f585719f6ba0ff20ee9f71ed6c38f5279dd2865a00a935c48f",
+      "node": {
+        "version": "v22.23.2",
+        "platform": "darwin",
+        "arch": "arm64",
+        "executable_sha256": "18e387c90ab8a8400183e8bdd396376e1e875b91b4c874b894dcade7b35bf572"
+      }
+    }
+  },
+  "source_identity_after": {
+    "design_base_revision": "9c0cb8a9d40da42242787b1bbaacfa11ba37acdc",
+    "git_head": "38d95fd6463fedef68e61737bdb2d4af4b05c756",
+    "identity_rule": "Exact file manifest controls applicability; a design baseline or Git HEAD alone is insufficient.",
+    "files": [
+      {
+        "path": "plugins/soloco/.claude-plugin/plugin.json",
+        "sha256": "986c4f9c24a5dfff0bb63fad7b666e9f4abbf7871eb3223358b2d798f46674b2"
+      },
+      {
+        "path": "plugins/soloco/.codex-plugin/plugin.json",
+        "sha256": "86eaf2142509d88bacfda122b3a49491a5a3571b8a937d7291d8896d5616f222"
+      },
+      {
+        "path": "plugins/soloco/.mcp.codex.json",
+        "sha256": "636c607d3e61f1aaffb7b5c624c7496b7c750f0bffd8c66065f8946382a109a8"
+      },
+      {
+        "path": "plugins/soloco/.mcp.json",
+        "sha256": "b6efeebb4f8ed3b045b82f584c2f1a91b172e0994c819a56b87e4069324ae81d"
+      },
+      {
+        "path": "plugins/soloco/assets/governance.md",
+        "sha256": "28f99838abc3794da94f97f7a2d234554811da3aef7b8ddb3742075caa78ec36"
+      },
+      {
+        "path": "plugins/soloco/assets/roles.json",
+        "sha256": "7e9f4f387f3622123fe8dbd69dd3cf0aa17943628d71ff03971d4ab4a8abd7ba"
+      },
+      {
+        "path": "plugins/soloco/compat/company-0.1.0.md",
+        "sha256": "bb6c3dbb6e7a03d033b7c39dccc59c31738369ffccc4fe6ff609d679e0eacc74"
+      },
+      {
+        "path": "plugins/soloco/hooks/claude.json",
+        "sha256": "128ecd4ef0c0ef53dc1a4634c65b2a1be39973096eaabaeebc3e784ebec53d5f"
+      },
+      {
+        "path": "plugins/soloco/hooks/codex.json",
+        "sha256": "882fce45b5791f8f51b2093526419fa6ab4ae2a118e597a20dc7c3b8112205a2"
+      },
+      {
+        "path": "plugins/soloco/runtime/adapters.mjs",
+        "sha256": "6a7c6f2887c6240dfac2fcbcdda1d9ea3e02dd96338816c8e37911df8e71be99"
+      },
+      {
+        "path": "plugins/soloco/runtime/context-qualification.mjs",
+        "sha256": "85e1d9176bd85a2f8321830191d132dc72b918c8b1dcd65babc865dce4b70a38"
+      },
+      {
+        "path": "plugins/soloco/runtime/context.mjs",
+        "sha256": "7a7abd4410a7ce9110bfd794624181eff364e452457a9e8a1ba94fb9f304bab6"
+      },
+      {
+        "path": "plugins/soloco/runtime/coordination.mjs",
+        "sha256": "625606e1faa51db37d008a2754643f64f197ffcc1ae99ab63a53fb7a742b556b"
+      },
+      {
+        "path": "plugins/soloco/runtime/corpus-structure.mjs",
+        "sha256": "e17f389f3b86ab43551108a5c6edbc2d77d219609abf7ab00cff557fc9c9ad5b"
+      },
+      {
+        "path": "plugins/soloco/runtime/current-state.mjs",
+        "sha256": "6f7c61213b3e998525526e2d0989ea897f380708c7bf3a447976c632d18228e2"
+      },
+      {
+        "path": "plugins/soloco/runtime/develop.mjs",
+        "sha256": "d6b4aa0ace7e4eaea610f290d6d14dd01af6104025e2c50df1a04eec9037d71d"
+      },
+      {
+        "path": "plugins/soloco/runtime/development-limits.mjs",
+        "sha256": "fb6b6065019c652fc27a198994cca3a248652890df5d322a9b6428ba5ccfea6a"
+      },
+      {
+        "path": "plugins/soloco/runtime/development-patch.mjs",
+        "sha256": "a36bbefb6c28579a33d97709aabcf80fbde95520a6fd1a4a02e687bba11dd27d"
+      },
+      {
+        "path": "plugins/soloco/runtime/engine.mjs",
+        "sha256": "484bc152e9d93ccd90e794633131cf1ddfe921a05d2eed33e29c24da0cca22de"
+      },
+      {
+        "path": "plugins/soloco/runtime/handover.mjs",
+        "sha256": "6aa9e0b4d0178d105006b58b2b4cc5ff6c52388cd1915704d8edc4549add1fe9"
+      },
+      {
+        "path": "plugins/soloco/runtime/hooks.mjs",
+        "sha256": "bca847d64e40213667712d4852c2774607fddbd962a5311ccf03521a885ce21d"
+      },
+      {
+        "path": "plugins/soloco/runtime/legacy-operating.mjs",
+        "sha256": "47fca09ae9e6fefe48dbf922a6538818d856579c3fae64e8cfc5f0fd203e8f2d"
+      },
+      {
+        "path": "plugins/soloco/runtime/local-sandbox.mjs",
+        "sha256": "e093897316b8bb4d1fe8e9306d0a0ed8145901b8fafd5641bd681ce309ce1343"
+      },
+      {
+        "path": "plugins/soloco/runtime/main.mjs",
+        "sha256": "bbf88492cb8ac0e08e271865dc0007d21f43a7b4ba7715c3a31c89f3ca595d93"
+      },
+      {
+        "path": "plugins/soloco/runtime/operating-control.mjs",
+        "sha256": "47e2a0c8b15128ea6f39b7bfc14cb6adc385b90b132c9df8e16d9274abbdd35d"
+      },
+      {
+        "path": "plugins/soloco/runtime/operating-state.mjs",
+        "sha256": "824143bc9035dbf4426850979d24413fd9c54e87c0845b4f1324f06befd0c664"
+      },
+      {
+        "path": "plugins/soloco/runtime/progress-view.mjs",
+        "sha256": "bbcea8afc8760d365ac84f395e3cafb07aa26a06bf12f71b670fe7a9d08ad839"
+      },
+      {
+        "path": "plugins/soloco/runtime/progress.mjs",
+        "sha256": "977ed14281cf7de7054babb75d953a5dc6bbf7c319e1fba3e81eeffce6812080"
+      },
+      {
+        "path": "plugins/soloco/runtime/prototype.mjs",
+        "sha256": "41eca83de2c2fe9e4006223c4efd2892eb0f20442af13ed049e59485cad06578"
+      },
+      {
+        "path": "plugins/soloco/runtime/public-response.mjs",
+        "sha256": "d84b0fbb0decbd0ae0b51a67638bec5cd44d48b741661a383cbd42c5a2541986"
+      },
+      {
+        "path": "plugins/soloco/runtime/record-storage.mjs",
+        "sha256": "fd91001c7ac8fe256e3ad1cbf7c888691d1000873bbbed3afc894cb789a17173"
+      },
+      {
+        "path": "plugins/soloco/runtime/scoped-context.mjs",
+        "sha256": "768f0df75fcc34e5647b0cbc68e1830ff6153c00ae581f9a54bbe9019c50ad13"
+      },
+      {
+        "path": "plugins/soloco/runtime/scoped-stream.mjs",
+        "sha256": "7bc83d0f2a9852868553d913b126583946d159b502adef07938e38f90ad5f16a"
+      },
+      {
+        "path": "plugins/soloco/runtime/selection.mjs",
+        "sha256": "55505fa53d69b28aed8394a291ad5473fcecff9f4d4b8b01ed3b397b26015214"
+      },
+      {
+        "path": "plugins/soloco/runtime/snapshot.mjs",
+        "sha256": "660a89aa41ffed18f6358e33d7efaf2db96b0c7b5d6807ae4f2dce939d69f7fb"
+      },
+      {
+        "path": "plugins/soloco/runtime/storage-transfer.mjs",
+        "sha256": "2ea96610ab528d61471ee35c0482fb62b76be090f5f7bd22cc2489486a8155c3"
+      },
+      {
+        "path": "plugins/soloco/runtime/store.mjs",
+        "sha256": "15ba60d1af642eea9da743b1200ce2f67d2d2b8cf16ffe9c8e8e8bc7f290add6"
+      },
+      {
+        "path": "plugins/soloco/runtime/supervisor.mjs",
+        "sha256": "b6fa3b23aae98aa6e3aef8e915c1ac7b9e61964650987bd8d65a402795a11789"
+      },
+      {
+        "path": "plugins/soloco/runtime/task-context.mjs",
+        "sha256": "88fe6b74507e01eb5edc8ae6f9b912e0b1e5ca424f6e079385699e67912d65c8"
+      },
+      {
+        "path": "plugins/soloco/runtime/task-index.mjs",
+        "sha256": "a8967fd0600e52e7f9ad6c82c9e48a497eb2ec4b8f2c3f8c326804358e3af363"
+      },
+      {
+        "path": "plugins/soloco/runtime/task-runtime-authority.mjs",
+        "sha256": "a602b66638a06995ecb138c12fa0f97e95830ff6b8a968d806acca411b46b27e"
+      },
+      {
+        "path": "plugins/soloco/runtime/task-runtime.mjs",
+        "sha256": "d8ffb80895b7a62b0d1c75aa4fd2f5ffdbce7f7a7ad8154a0243cd140bf6c887"
+      },
+      {
+        "path": "plugins/soloco/runtime/tasks.mjs",
+        "sha256": "cebefd8fffd54c0d8356e17fac3225900d8edc0e37dfaf05a0ca5d80b5111759"
+      },
+      {
+        "path": "plugins/soloco/runtime/timeout.mjs",
+        "sha256": "586c5f44f98742320119f0b42d0612dd79cf970f4e858f05e7d65953c31951a4"
+      },
+      {
+        "path": "plugins/soloco/runtime/upgrade-evidence.mjs",
+        "sha256": "14b809e88cb4a380829e6bb6ab9feceefc7582db230b0e8dcc70bed3b7b70e21"
+      },
+      {
+        "path": "plugins/soloco/runtime/upgrade.mjs",
+        "sha256": "0a4e15abaf0cea312d9161d8c8081258da0bcf0c064f9cbb01c6e88d92e3f26e"
+      },
+      {
+        "path": "plugins/soloco/runtime/validation-cache.mjs",
+        "sha256": "872415f42c63e015d159e5374d45b6de453dd7e8a873eb7f70473e6395b4354d"
+      },
+      {
+        "path": "plugins/soloco/runtime/worker.mjs",
+        "sha256": "38aec9225d4b2ef7affda037e252e2fd3f57b740811a38df8b0d78b8c47d8795"
+      },
+      {
+        "path": "plugins/soloco/scripts/run.sh",
+        "sha256": "128358b0c3d5b3f95b1584b3bcac9c8db23df86171a063591e1fd7e965b0c59b"
+      },
+      {
+        "path": "plugins/soloco/skills/setup/SKILL.md",
+        "sha256": "414a5d4acae2a47cf7dceb8a30f61cc9b6887c2b8885c3b1e03f4737b3d55761"
+      },
+      {
+        "path": "plugins/soloco/skills/soloco/SKILL.md",
+        "sha256": "622909c91ba18876ad80ce9c9ab77fc25c056fce51408f303a41e2b94551cb56"
+      },
+      {
+        "path": "SPEC.md",
+        "sha256": "28f99838abc3794da94f97f7a2d234554811da3aef7b8ddb3742075caa78ec36"
+      },
+      {
+        "path": "tests/candidate-format-qualification.test.mjs",
+        "sha256": "26d7a72474b027eb9111a20b224d62d7c7c153270d3f84bf05ec67b72ded9ba6"
+      },
+      {
+        "path": "tools/candidate-format-qualification.mjs",
+        "sha256": "85e67e9c6779d890b6eafd1b94f7e75aa0555047e898a2f2e16299fb2e43deb5"
+      },
+      {
+        "path": "tools/verify-candidate-format-qualification.mjs",
+        "sha256": "b3e40bcdc452144aef59b9221ac990c7033907112131d95ae5f93e7394091d0f"
+      },
+      {
+        "path": "tools/workflow-runtime.mjs",
+        "sha256": "d57c3849562dd4d486f8b3b21262c0108f39ea311b7eafdb950f2666b59808b5"
+      }
+    ],
+    "manifest_sha256": "64c3748a3f6d25f585719f6ba0ff20ee9f71ed6c38f5279dd2865a00a935c48f",
+    "node": {
+      "version": "v22.23.2",
+      "platform": "darwin",
+      "arch": "arm64",
+      "executable_sha256": "18e387c90ab8a8400183e8bdd396376e1e875b91b4c874b894dcade7b35bf572"
+    }
+  },
+  "source_verification": {
+    "passed": true,
+    "status": "matched",
+    "before_manifest_sha256": "64c3748a3f6d25f585719f6ba0ff20ee9f71ed6c38f5279dd2865a00a935c48f",
+    "after_manifest_sha256": "64c3748a3f6d25f585719f6ba0ff20ee9f71ed6c38f5279dd2865a00a935c48f",
+    "errors": []
+  },
+  "execution": "synthetic_contract_double",
+  "cases": [
+    {
+      "count": 1,
+      "format": "files",
+      "execution": "synthetic_contract_double",
+      "source_manifest_sha256": "64c3748a3f6d25f585719f6ba0ff20ee9f71ed6c38f5279dd2865a00a935c48f",
+      "scope_sha256": "b14ed3aaed480bac6cf9ce9160eb264fcf6c007992cc72f9168ed65854d45fd0",
+      "fixture_sha256": "491835db654f1899f8d84ef708824ed5b3bcd4aa4225dfcc6da7e68f92f88296",
+      "module_bytes": [
+        32768
+      ],
+      "source_bytes": 33535,
+      "expected_candidate_bytes": 34032,
+      "events": [
+        {
+          "type": "dispatch",
+          "at_ms": 7.74454099999997,
+          "role": "engineer",
+          "job_id": "job-5da22683-2382-4b7c-af3a-e08d6110b35c",
+          "control_ms": 7.5418750000000045
+        },
+        {
+          "type": "returned",
+          "at_ms": 42.497208,
+          "role": "engineer",
+          "job_id": "job-5da22683-2382-4b7c-af3a-e08d6110b35c",
+          "artifact_id": "artifact-1dcafbae-193b-4fbe-8f31-dff03753ff99"
+        },
+        {
+          "type": "tests_queued",
+          "at_ms": 52.35220799999996,
+          "job_id": "test-0052c816-1885-4b30-8108-2f1804585812"
+        },
+        {
+          "type": "dispatch",
+          "at_ms": 580.573083,
+          "role": "qa",
+          "job_id": "job-785c24f2-2a48-480d-b351-da7cfb5c5987",
+          "control_ms": 5.475458000000003
+        },
+        {
+          "type": "returned",
+          "at_ms": 601.309375,
+          "role": "qa",
+          "job_id": "job-785c24f2-2a48-480d-b351-da7cfb5c5987",
+          "artifact_id": "artifact-77059dbd-0d34-4c4c-9db0-393f0177e1b8"
+        },
+        {
+          "type": "receiver_accepted",
+          "at_ms": 605.615333,
+          "candidate_sha256": "14591e4ef821625f21a0f2120453a5570d8e1c59267b75515e44f21138d2ed38",
+          "receipt_sha256": "85be3d341dbbe467106f9a142d030d3dbfe9ae6b64a9976ea6f2d150fe7765f2"
+        }
+      ],
+      "calls": [
+        {
+          "role": "engineer",
+          "job_id": "job-5da22683-2382-4b7c-af3a-e08d6110b35c",
+          "prompt_bytes": 58794,
+          "prompt_sha256": "077d5b52a516c8d645cbeff08e370aefef917b57706195999736f41cee78e75d",
+          "started_ms": 16.051957999999956,
+          "requested": {
+            "mode": "explicit",
+            "model": "gpt-6.1-sol",
+            "effort": "medium",
+            "reason": "Exact one-character fictional module repairs; identical model controls in all format arms.",
+            "speed": "host_default"
+          },
+          "native_id": "14f73043d9e8a0ae1d271b1de9e11f0ecc3e65655b9f968af5ffd2e4798e67aa",
+          "output_bytes": 33641,
+          "output_sha256": "9f8226a7c0c126b5ced9a8239880f29613fea39bf16acb0e6b674750cdd35e08",
+          "model_evidence": {
+            "verification": "synthetic_contract_double"
+          },
+          "duration_ms": 7.444999999999993
+        },
+        {
+          "role": "qa",
+          "job_id": "job-785c24f2-2a48-480d-b351-da7cfb5c5987",
+          "prompt_bytes": 98595,
+          "prompt_sha256": "2e74270ab4315ee045feba4d7a39a305260bb34a93f8c701f8cfb96ce3b04099",
+          "started_ms": 587.5049999999999,
+          "requested": {
+            "mode": "explicit",
+            "model": "gpt-6.1-sol",
+            "effort": "high",
+            "reason": "Independent complete candidate, actual receipt and exact fixture preservation review; identical controls in all arms.",
+            "speed": "host_default"
+          },
+          "native_id": "1f0793e91bba981445d1ef05f3175f26ff06f2257024a81dc7debbaae56b7cf3",
+          "output_bytes": 405,
+          "output_sha256": "8a8df607401a5a7c202e790d9cdefcf1e45893a29237726429f9c1a74a9500c8",
+          "model_evidence": {
+            "verification": "synthetic_contract_double"
+          },
+          "duration_ms": 4.37337500000001
+        }
+      ],
+      "attempts": [
+        {
+          "test_job_id": "test-0052c816-1885-4b30-8108-2f1804585812",
+          "receipt_id": "test-receipt-abfa3ba8-0deb-4776-9e96-e97113a67472",
+          "receipt_sha256": "85be3d341dbbe467106f9a142d030d3dbfe9ae6b64a9976ea6f2d150fe7765f2",
+          "result": {
+            "status": "passed",
+            "exit_code": 0,
+            "signal": null,
+            "stdout": "TAP version 13\n# Subtest: exact values and complete unchanged module bytes\nok 1 - exact values and complete unchanged module bytes\n  ---\n  duration_ms: 0.590833\n  type: 'test'\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 7.525417\n",
+            "stderr": "",
+            "duration_ms": 97,
+            "isolation": "macos-seatbelt-node",
+            "test_execution_attempted": true,
+            "tests_executed": true,
+            "output_truncated": false,
+            "limits": {
+              "timeout_ms": 10000,
+              "max_output_bytes": 20000
+            },
+            "candidate_sha256": "14591e4ef821625f21a0f2120453a5570d8e1c59267b75515e44f21138d2ed38",
+            "test_paths": [
+              "fixture.test.mjs"
+            ],
+            "timeout_ms": 10000,
+            "max_output_bytes": 20000,
+            "finished_at": "2026-11-07T16:48:08.589Z"
+          },
+          "test_elapsed_ms": 531.802292
+        }
+      ],
+      "accepted": true,
+      "errors": [],
+      "repairs": 0,
+      "stage": "accepted",
+      "precheck": {
+        "status": "failed",
+        "exit_code": 1,
+        "tests_executed": true
+      },
+      "generation": {
+        "candidate_id": "artifact-1dcafbae-193b-4fbe-8f31-dff03753ff99",
+        "native_id": "14f73043d9e8a0ae1d271b1de9e11f0ecc3e65655b9f968af5ffd2e4798e67aa",
+        "candidate_sha256": "14591e4ef821625f21a0f2120453a5570d8e1c59267b75515e44f21138d2ed38",
+        "byte_accounting": {
+          "format": "files",
+          "generated_bytes": 33535,
+          "candidate_bytes": 34032,
+          "source_bytes": 34184
+        }
+      },
+      "exact_fixture_match": true,
+      "review": {
+        "id": "artifact-77059dbd-0d34-4c4c-9db0-393f0177e1b8",
+        "native_id": "1f0793e91bba981445d1ef05f3175f26ff06f2257024a81dc7debbaae56b7cf3",
+        "author_native_id": "14f73043d9e8a0ae1d271b1de9e11f0ecc3e65655b9f968af5ffd2e4798e67aa",
+        "verdict": "Pass",
+        "candidate_sha256": "14591e4ef821625f21a0f2120453a5570d8e1c59267b75515e44f21138d2ed38",
+        "receipt_sha256": "85be3d341dbbe467106f9a142d030d3dbfe9ae6b64a9976ea6f2d150fe7765f2"
+      },
+      "acceptance": {
+        "at": "2026-11-07T16:48:08.621Z",
+        "review_id": "artifact-77059dbd-0d34-4c4c-9db0-393f0177e1b8",
+        "candidate_sha256": "14591e4ef821625f21a0f2120453a5570d8e1c59267b75515e44f21138d2ed38",
+        "receipt_sha256": "85be3d341dbbe467106f9a142d030d3dbfe9ae6b64a9976ea6f2d150fe7765f2",
+        "source_integrated": false
+      },
+      "elapsed_ms": 605.6184579999999,
+      "original_source_unchanged": true,
+      "generation_validation": {
+        "outcome": "candidate_returned",
+        "producer_block": null,
+        "exact_fixture_match": true
+      },
+      "metrics": {
+        "model_calls": 2,
+        "producer_calls": 1,
+        "qa_calls": 1,
+        "repairs": 0,
+        "producer_blocks": 0,
+        "invalid_or_incomplete_outputs": 0,
+        "exact_fixture_mismatches": 0,
+        "prompt_bytes": 157389,
+        "output_bytes": 34046,
+        "time_to_accepted_result_ms": 605.6184579999999
+      }
+    },
+    {
+      "count": 1,
+      "format": "patches",
+      "execution": "synthetic_contract_double",
+      "source_manifest_sha256": "64c3748a3f6d25f585719f6ba0ff20ee9f71ed6c38f5279dd2865a00a935c48f",
+      "scope_sha256": "5980f75aa2b846b8cd46cbcce8fdbad49bdaadf864c19ac095568b78021d87ba",
+      "fixture_sha256": "491835db654f1899f8d84ef708824ed5b3bcd4aa4225dfcc6da7e68f92f88296",
+      "module_bytes": [
+        32768
+      ],
+      "source_bytes": 33535,
+      "expected_candidate_bytes": 34032,
+      "events": [
+        {
+          "type": "dispatch",
+          "at_ms": 7.035583000000088,
+          "role": "engineer",
+          "job_id": "job-3e1d410a-969e-41c4-b7f3-90f864d9e4a5",
+          "control_ms": 7.002583000000186
+        },
+        {
+          "type": "returned",
+          "at_ms": 28.897625000000062,
+          "role": "engineer",
+          "job_id": "job-3e1d410a-969e-41c4-b7f3-90f864d9e4a5",
+          "artifact_id": "artifact-1f8d0d21-17e3-4fcd-a42a-b27a587c607c"
+        },
+        {
+          "type": "tests_queued",
+          "at_ms": 35.2767080000001,
+          "job_id": "test-10ddde72-8a49-4983-b088-a9126b7084f8"
+        },
+        {
+          "type": "dispatch",
+          "at_ms": 569.5355830000001,
+          "role": "qa",
+          "job_id": "job-59771556-f5b5-4042-9716-7be628c2f35b",
+          "control_ms": 8.071791000000076
+        },
+        {
+          "type": "returned",
+          "at_ms": 610.806417,
+          "role": "qa",
+          "job_id": "job-59771556-f5b5-4042-9716-7be628c2f35b",
+          "artifact_id": "artifact-91b82de8-9919-478e-b645-5cfb255b2951"
+        },
+        {
+          "type": "receiver_accepted",
+          "at_ms": 615.1285420000002,
+          "candidate_sha256": "14591e4ef821625f21a0f2120453a5570d8e1c59267b75515e44f21138d2ed38",
+          "receipt_sha256": "3a6939759913e3463b3956a848275d378eec0642924b21da46eb1387bf30a5dc"
+        }
+      ],
+      "calls": [
+        {
+          "role": "engineer",
+          "job_id": "job-3e1d410a-969e-41c4-b7f3-90f864d9e4a5",
+          "prompt_bytes": 59052,
+          "prompt_sha256": "c9d8bac12b8c061350a5c673ada7aeb5bd8104de98bf42fa34311c7e7a35a038",
+          "started_ms": 12.836999999999989,
+          "requested": {
+            "mode": "explicit",
+            "model": "gpt-6.1-sol",
+            "effort": "medium",
+            "reason": "Exact one-character fictional module repairs; identical model controls in all format arms.",
+            "speed": "host_default"
+          },
+          "native_id": "e1637a72aea2cda71a54941f1dc79179723c4165743cd23cbe97a9ec41e7c9ec",
+          "output_bytes": 257,
+          "output_sha256": "fff1612670aa661963c6e5f764e8ccc61e3bd5ff884b70d6911961ab91c48e5d",
+          "model_evidence": {
+            "verification": "synthetic_contract_double"
+          },
+          "duration_ms": 3.3573750000000473
+        },
+        {
+          "role": "qa",
+          "job_id": "job-59771556-f5b5-4042-9716-7be628c2f35b",
+          "prompt_bytes": 98844,
+          "prompt_sha256": "ead525fcbdd44d19a9ed45acfe61c685156eddae84aad2c9fad78cde90e53466",
+          "started_ms": 585.3023330000001,
+          "requested": {
+            "mode": "explicit",
+            "model": "gpt-6.1-sol",
+            "effort": "high",
+            "reason": "Independent complete candidate, actual receipt and exact fixture preservation review; identical controls in all arms.",
+            "speed": "host_default"
+          },
+          "native_id": "a031ac7254c770d8e71810128dd5504c496ec27bf8259a999a4acdc31eb0b206",
+          "output_bytes": 405,
+          "output_sha256": "3fda6004c56efb1d56d9b8964d6ec6dc5bbd5b6a72260c5064d7dec6f0939e11",
+          "model_evidence": {
+            "verification": "synthetic_contract_double"
+          },
+          "duration_ms": 5.272917000000007
+        }
+      ],
+      "attempts": [
+        {
+          "test_job_id": "test-10ddde72-8a49-4983-b088-a9126b7084f8",
+          "receipt_id": "test-receipt-db1b4943-7d60-4d25-8ffe-bae8516b3fb0",
+          "receipt_sha256": "3a6939759913e3463b3956a848275d378eec0642924b21da46eb1387bf30a5dc",
+          "result": {
+            "status": "passed",
+            "exit_code": 0,
+            "signal": null,
+            "stdout": "TAP version 13\n# Subtest: exact values and complete unchanged module bytes\nok 1 - exact values and complete unchanged module bytes\n  ---\n  duration_ms: 0.538709\n  type: 'test'\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 7.920167\n",
+            "stderr": "",
+            "duration_ms": 94,
+            "isolation": "macos-seatbelt-node",
+            "test_execution_attempted": true,
+            "tests_executed": true,
+            "output_truncated": false,
+            "limits": {
+              "timeout_ms": 10000,
+              "max_output_bytes": 20000
+            },
+            "candidate_sha256": "14591e4ef821625f21a0f2120453a5570d8e1c59267b75515e44f21138d2ed38",
+            "test_paths": [
+              "fixture.test.mjs"
+            ],
+            "timeout_ms": 10000,
+            "max_output_bytes": 20000,
+            "finished_at": "2026-11-07T16:48:09.383Z"
+          },
+          "test_elapsed_ms": 531.6868750000001
+        }
+      ],
+      "accepted": true,
+      "errors": [],
+      "repairs": 0,
+      "stage": "accepted",
+      "precheck": {
+        "status": "failed",
+        "exit_code": 1,
+        "tests_executed": true
+      },
+      "generation": {
+        "candidate_id": "artifact-1f8d0d21-17e3-4fcd-a42a-b27a587c607c",
+        "native_id": "e1637a72aea2cda71a54941f1dc79179723c4165743cd23cbe97a9ec41e7c9ec",
+        "candidate_sha256": "14591e4ef821625f21a0f2120453a5570d8e1c59267b75515e44f21138d2ed38",
+        "byte_accounting": {
+          "format": "patches",
+          "generated_bytes": 149,
+          "candidate_bytes": 34032,
+          "source_bytes": 34184,
+          "patches": [
+            {
+              "path": "module-0.mjs",
+              "base_sha256": "092aaf1d41c4ed97dac065053aa75da9c664c5df467e79b3287c04b84d51a818",
+              "edits": [
+                {
+                  "start": 21,
+                  "end": 22,
+                  "text": "1"
+                }
+              ]
+            }
+          ],
+          "patch_sha256": "27a594af5003e42bb2982b83f555399f17858bd249988caf3cac8aa26e7e9138"
+        }
+      },
+      "exact_fixture_match": true,
+      "review": {
+        "id": "artifact-91b82de8-9919-478e-b645-5cfb255b2951",
+        "native_id": "a031ac7254c770d8e71810128dd5504c496ec27bf8259a999a4acdc31eb0b206",
+        "author_native_id": "e1637a72aea2cda71a54941f1dc79179723c4165743cd23cbe97a9ec41e7c9ec",
+        "verdict": "Pass",
+        "candidate_sha256": "14591e4ef821625f21a0f2120453a5570d8e1c59267b75515e44f21138d2ed38",
+        "receipt_sha256": "3a6939759913e3463b3956a848275d378eec0642924b21da46eb1387bf30a5dc"
+      },
+      "acceptance": {
+        "at": "2026-11-07T16:48:09.451Z",
+        "review_id": "artifact-91b82de8-9919-478e-b645-5cfb255b2951",
+        "candidate_sha256": "14591e4ef821625f21a0f2120453a5570d8e1c59267b75515e44f21138d2ed38",
+        "receipt_sha256": "3a6939759913e3463b3956a848275d378eec0642924b21da46eb1387bf30a5dc",
+        "source_integrated": false
+      },
+      "elapsed_ms": 615.133417,
+      "original_source_unchanged": true,
+      "generation_validation": {
+        "outcome": "candidate_returned",
+        "producer_block": null,
+        "exact_fixture_match": true
+      },
+      "metrics": {
+        "model_calls": 2,
+        "producer_calls": 1,
+        "qa_calls": 1,
+        "repairs": 0,
+        "producer_blocks": 0,
+        "invalid_or_incomplete_outputs": 0,
+        "exact_fixture_mismatches": 0,
+        "prompt_bytes": 157896,
+        "output_bytes": 662,
+        "time_to_accepted_result_ms": 615.133417
+      }
+    },
+    {
+      "count": 3,
+      "format": "files",
+      "execution": "synthetic_contract_double",
+      "source_manifest_sha256": "64c3748a3f6d25f585719f6ba0ff20ee9f71ed6c38f5279dd2865a00a935c48f",
+      "scope_sha256": "9df189af57319c595e587fd0fa68c645ca301cd178ad6e28a1c440ee30ee627a",
+      "fixture_sha256": "6ac1ff6793b49be70e19d31260e8bfcec21e5813e70e8e7a2a3e01009e6aeaaf",
+      "module_bytes": [
+        32768,
+        32768,
+        32768
+      ],
+      "source_bytes": 100603,
+      "expected_candidate_bytes": 101610,
+      "events": [
+        {
+          "type": "dispatch",
+          "at_ms": 7.956791000000067,
+          "role": "engineer",
+          "job_id": "job-6f1c2f69-921e-4cf1-9e96-db0bf9253890",
+          "control_ms": 7.921208000000206
+        },
+        {
+          "type": "returned",
+          "at_ms": 80.86274999999978,
+          "role": "engineer",
+          "job_id": "job-6f1c2f69-921e-4cf1-9e96-db0bf9253890",
+          "artifact_id": "artifact-ee3b057f-771f-4cf4-9a8e-8cf8661adb53"
+        },
+        {
+          "type": "tests_queued",
+          "at_ms": 133.5625,
+          "job_id": "test-625aab4e-89db-4749-8736-febbfd68ee6e"
+        },
+        {
+          "type": "dispatch",
+          "at_ms": 823.5490829999999,
+          "role": "qa",
+          "job_id": "job-34e4a909-f82f-4a12-88b0-28da0634cd9e",
+          "control_ms": 13.418750000000273
+        },
+        {
+          "type": "returned",
+          "at_ms": 870.219333,
+          "role": "qa",
+          "job_id": "job-34e4a909-f82f-4a12-88b0-28da0634cd9e",
+          "artifact_id": "artifact-6d619b14-06d0-4e2e-b6bf-83d9acffa20e"
+        },
+        {
+          "type": "receiver_accepted",
+          "at_ms": 877.396416,
+          "candidate_sha256": "fddafee2e21c49325791a7b90768f6c3a987e91d09697bb4d6873d5a131e86fe",
+          "receipt_sha256": "8e9a77467c2271ce50c085f288faf2a79b265ebe401e0c2aec53b3ddd8deafaa"
+        }
+      ],
+      "calls": [
+        {
+          "role": "engineer",
+          "job_id": "job-6f1c2f69-921e-4cf1-9e96-db0bf9253890",
+          "prompt_bytes": 126584,
+          "prompt_sha256": "b4747710096f860c76694001047f32b878bdc563f5e0c8dfec613fb4f03d6294",
+          "started_ms": 16.72645799999964,
+          "requested": {
+            "mode": "explicit",
+            "model": "gpt-6.1-sol",
+            "effort": "medium",
+            "reason": "Exact one-character fictional module repairs; identical model controls in all format arms.",
+            "speed": "host_default"
+          },
+          "native_id": "a7b83220ae3cd78bd34f9c417cfe8e0dbe4e78e4d77798c282687ef3fae32ee5",
+          "output_bytes": 100709,
+          "output_sha256": "0c1b51237b35d5eb0a4c9327e75257eac8079ebf4503ff0ab71139ac17e73c8e",
+          "model_evidence": {
+            "verification": "synthetic_contract_double"
+          },
+          "duration_ms": 11.348749999999654
+        },
+        {
+          "role": "qa",
+          "job_id": "job-34e4a909-f82f-4a12-88b0-28da0634cd9e",
+          "prompt_bytes": 234346,
+          "prompt_sha256": "c9008f27786bf63cd1d3928b07a49111d1f7eeb090a408be8438ee41a856d4ec",
+          "started_ms": 844.355125,
+          "requested": {
+            "mode": "explicit",
+            "model": "gpt-6.1-sol",
+            "effort": "high",
+            "reason": "Independent complete candidate, actual receipt and exact fixture preservation review; identical controls in all arms.",
+            "speed": "host_default"
+          },
+          "native_id": "94d2e6e5b8023d7303e6c3aebb65b56b7867cb2124ad79ccb13d2ac84f4f7a51",
+          "output_bytes": 405,
+          "output_sha256": "fe08f37812b22536fa8a85a81f64109a1512937024dc2e4ff91538a4bef2a99d",
+          "model_evidence": {
+            "verification": "synthetic_contract_double"
+          },
+          "duration_ms": 7.35162500000024
+        }
+      ],
+      "attempts": [
+        {
+          "test_job_id": "test-625aab4e-89db-4749-8736-febbfd68ee6e",
+          "receipt_id": "test-receipt-3e0d391f-76b8-4772-a74e-ec997225f01b",
+          "receipt_sha256": "8e9a77467c2271ce50c085f288faf2a79b265ebe401e0c2aec53b3ddd8deafaa",
+          "result": {
+            "status": "passed",
+            "exit_code": 0,
+            "signal": null,
+            "stdout": "TAP version 13\n# Subtest: exact values and complete unchanged module bytes\nok 1 - exact values and complete unchanged module bytes\n  ---\n  duration_ms: 0.877791\n  type: 'test'\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 9.426166\n",
+            "stderr": "",
+            "duration_ms": 129,
+            "isolation": "macos-seatbelt-node",
+            "test_execution_attempted": true,
+            "tests_executed": true,
+            "output_truncated": false,
+            "limits": {
+              "timeout_ms": 10000,
+              "max_output_bytes": 20000
+            },
+            "candidate_sha256": "fddafee2e21c49325791a7b90768f6c3a987e91d09697bb4d6873d5a131e86fe",
+            "test_paths": [
+              "fixture.test.mjs"
+            ],
+            "timeout_ms": 10000,
+            "max_output_bytes": 20000,
+            "finished_at": "2026-11-07T16:48:10.514Z"
+          },
+          "test_elapsed_ms": 711.815709
+        }
+      ],
+      "accepted": true,
+      "errors": [],
+      "repairs": 0,
+      "stage": "accepted",
+      "precheck": {
+        "status": "failed",
+        "exit_code": 1,
+        "tests_executed": true
+      },
+      "generation": {
+        "candidate_id": "artifact-ee3b057f-771f-4cf4-9a8e-8cf8661adb53",
+        "native_id": "a7b83220ae3cd78bd34f9c417cfe8e0dbe4e78e4d77798c282687ef3fae32ee5",
+        "candidate_sha256": "fddafee2e21c49325791a7b90768f6c3a987e91d09697bb4d6873d5a131e86fe",
+        "byte_accounting": {
+          "format": "files",
+          "generated_bytes": 100603,
+          "candidate_bytes": 101610,
+          "source_bytes": 101914
+        }
+      },
+      "exact_fixture_match": true,
+      "review": {
+        "id": "artifact-6d619b14-06d0-4e2e-b6bf-83d9acffa20e",
+        "native_id": "94d2e6e5b8023d7303e6c3aebb65b56b7867cb2124ad79ccb13d2ac84f4f7a51",
+        "author_native_id": "a7b83220ae3cd78bd34f9c417cfe8e0dbe4e78e4d77798c282687ef3fae32ee5",
+        "verdict": "Pass",
+        "candidate_sha256": "fddafee2e21c49325791a7b90768f6c3a987e91d09697bb4d6873d5a131e86fe",
+        "receipt_sha256": "8e9a77467c2271ce50c085f288faf2a79b265ebe401e0c2aec53b3ddd8deafaa"
+      },
+      "acceptance": {
+        "at": "2026-11-07T16:48:10.592Z",
+        "review_id": "artifact-6d619b14-06d0-4e2e-b6bf-83d9acffa20e",
+        "candidate_sha256": "fddafee2e21c49325791a7b90768f6c3a987e91d09697bb4d6873d5a131e86fe",
+        "receipt_sha256": "8e9a77467c2271ce50c085f288faf2a79b265ebe401e0c2aec53b3ddd8deafaa",
+        "source_integrated": false
+      },
+      "elapsed_ms": 877.4032079999997,
+      "original_source_unchanged": true,
+      "generation_validation": {
+        "outcome": "candidate_returned",
+        "producer_block": null,
+        "exact_fixture_match": true
+      },
+      "metrics": {
+        "model_calls": 2,
+        "producer_calls": 1,
+        "qa_calls": 1,
+        "repairs": 0,
+        "producer_blocks": 0,
+        "invalid_or_incomplete_outputs": 0,
+        "exact_fixture_mismatches": 0,
+        "prompt_bytes": 360930,
+        "output_bytes": 101114,
+        "time_to_accepted_result_ms": 877.4032079999997
+      }
+    },
+    {
+      "count": 3,
+      "format": "patches",
+      "execution": "synthetic_contract_double",
+      "source_manifest_sha256": "64c3748a3f6d25f585719f6ba0ff20ee9f71ed6c38f5279dd2865a00a935c48f",
+      "scope_sha256": "5b8433707f7b0aefbcd30bce2d52bb4bf3616ad815d705f8cb9db45b20c55930",
+      "fixture_sha256": "6ac1ff6793b49be70e19d31260e8bfcec21e5813e70e8e7a2a3e01009e6aeaaf",
+      "module_bytes": [
+        32768,
+        32768,
+        32768
+      ],
+      "source_bytes": 100603,
+      "expected_candidate_bytes": 101610,
+      "events": [
+        {
+          "type": "dispatch",
+          "at_ms": 7.956165999999939,
+          "role": "engineer",
+          "job_id": "job-428ab6bc-b29c-4fe6-af49-69ed51962f71",
+          "control_ms": 7.9223329999999805
+        },
+        {
+          "type": "returned",
+          "at_ms": 49.42462499999965,
+          "role": "engineer",
+          "job_id": "job-428ab6bc-b29c-4fe6-af49-69ed51962f71",
+          "artifact_id": "artifact-cae8216d-91e8-4a56-94d6-0cbe349717e4"
+        },
+        {
+          "type": "tests_queued",
+          "at_ms": 89.74212499999976,
+          "job_id": "test-df9629d6-3033-4089-834c-d4c4a1e6d6f8"
+        },
+        {
+          "type": "dispatch",
+          "at_ms": 638.297791,
+          "role": "qa",
+          "job_id": "job-a25a2f1a-5bad-4ab8-bc88-cc533f8d3421",
+          "control_ms": 7.684040999999979
+        },
+        {
+          "type": "returned",
+          "at_ms": 670.9549579999998,
+          "role": "qa",
+          "job_id": "job-a25a2f1a-5bad-4ab8-bc88-cc533f8d3421",
+          "artifact_id": "artifact-09952e9a-ea8c-4be3-9213-604881f96293"
+        },
+        {
+          "type": "receiver_accepted",
+          "at_ms": 677.1335409999997,
+          "candidate_sha256": "fddafee2e21c49325791a7b90768f6c3a987e91d09697bb4d6873d5a131e86fe",
+          "receipt_sha256": "1e5c65b3129d2bae8532943b5956aba5df707c26526cfe1c577e1c093e35cee4"
+        }
+      ],
+      "calls": [
+        {
+          "role": "engineer",
+          "job_id": "job-428ab6bc-b29c-4fe6-af49-69ed51962f71",
+          "prompt_bytes": 126843,
+          "prompt_sha256": "0ad23950ce5cc38e687ce3352b72839dc659a98a9d08ae3dbd1865a3922bcda5",
+          "started_ms": 24.274374999999964,
+          "requested": {
+            "mode": "explicit",
+            "model": "gpt-6.1-sol",
+            "effort": "medium",
+            "reason": "Exact one-character fictional module repairs; identical model controls in all format arms.",
+            "speed": "host_default"
+          },
+          "native_id": "77f4e2fcb69633a2a74b4cdb30d5d49015ee3d53b4155c09fad681c514328ab2",
+          "output_bytes": 553,
+          "output_sha256": "00d726808e0d052cac7d442ba912fb0311ac1f753df02ce8474efc2b97d6ed91",
+          "model_evidence": {
+            "verification": "synthetic_contract_double"
+          },
+          "duration_ms": 6.9260840000001735
+        },
+        {
+          "role": "qa",
+          "job_id": "job-a25a2f1a-5bad-4ab8-bc88-cc533f8d3421",
+          "prompt_bytes": 234885,
+          "prompt_sha256": "1193a2c91d71f2ffd88f4b804987a92ee4f737e0f3c8e2e4b9966bb383e7015d",
+          "started_ms": 648.0822079999998,
+          "requested": {
+            "mode": "explicit",
+            "model": "gpt-6.1-sol",
+            "effort": "high",
+            "reason": "Independent complete candidate, actual receipt and exact fixture preservation review; identical controls in all arms.",
+            "speed": "host_default"
+          },
+          "native_id": "635d0b6aa010e5813f511d656d2fea3de19c1baebd598ee4b4cf4196b1f2bc5f",
+          "output_bytes": 405,
+          "output_sha256": "2645c574037b51e1619fa322b6456b132d6f6188e0fb246626cc2a74c255206c",
+          "model_evidence": {
+            "verification": "synthetic_contract_double"
+          },
+          "duration_ms": 5.819332999999915
+        }
+      ],
+      "attempts": [
+        {
+          "test_job_id": "test-df9629d6-3033-4089-834c-d4c4a1e6d6f8",
+          "receipt_id": "test-receipt-7cebb946-7db4-44eb-8b20-5cf761a2f714",
+          "receipt_sha256": "1e5c65b3129d2bae8532943b5956aba5df707c26526cfe1c577e1c093e35cee4",
+          "result": {
+            "status": "passed",
+            "exit_code": 0,
+            "signal": null,
+            "stdout": "TAP version 13\n# Subtest: exact values and complete unchanged module bytes\nok 1 - exact values and complete unchanged module bytes\n  ---\n  duration_ms: 0.7825\n  type: 'test'\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 8.303958\n",
+            "stderr": "",
+            "duration_ms": 94,
+            "isolation": "macos-seatbelt-node",
+            "test_execution_attempted": true,
+            "tests_executed": true,
+            "output_truncated": false,
+            "limits": {
+              "timeout_ms": 10000,
+              "max_output_bytes": 20000
+            },
+            "candidate_sha256": "fddafee2e21c49325791a7b90768f6c3a987e91d09697bb4d6873d5a131e86fe",
+            "test_paths": [
+              "fixture.test.mjs"
+            ],
+            "timeout_ms": 10000,
+            "max_output_bytes": 20000,
+            "finished_at": "2026-11-07T16:48:11.505Z"
+          },
+          "test_elapsed_ms": 579.3554159999999
+        }
+      ],
+      "accepted": true,
+      "errors": [],
+      "repairs": 0,
+      "stage": "accepted",
+      "precheck": {
+        "status": "failed",
+        "exit_code": 1,
+        "tests_executed": true
+      },
+      "generation": {
+        "candidate_id": "artifact-cae8216d-91e8-4a56-94d6-0cbe349717e4",
+        "native_id": "77f4e2fcb69633a2a74b4cdb30d5d49015ee3d53b4155c09fad681c514328ab2",
+        "candidate_sha256": "fddafee2e21c49325791a7b90768f6c3a987e91d09697bb4d6873d5a131e86fe",
+        "byte_accounting": {
+          "format": "patches",
+          "generated_bytes": 445,
+          "candidate_bytes": 101610,
+          "source_bytes": 101914,
+          "patches": [
+            {
+              "path": "module-0.mjs",
+              "base_sha256": "092aaf1d41c4ed97dac065053aa75da9c664c5df467e79b3287c04b84d51a818",
+              "edits": [
+                {
+                  "start": 21,
+                  "end": 22,
+                  "text": "1"
+                }
+              ]
+            },
+            {
+              "path": "module-1.mjs",
+              "base_sha256": "092aaf1d41c4ed97dac065053aa75da9c664c5df467e79b3287c04b84d51a818",
+              "edits": [
+                {
+                  "start": 21,
+                  "end": 22,
+                  "text": "1"
+                }
+              ]
+            },
+            {
+              "path": "module-2.mjs",
+              "base_sha256": "092aaf1d41c4ed97dac065053aa75da9c664c5df467e79b3287c04b84d51a818",
+              "edits": [
+                {
+                  "start": 21,
+                  "end": 22,
+                  "text": "1"
+                }
+              ]
+            }
+          ],
+          "patch_sha256": "627079ead8fa97ce9c957e2b802e0164f7cb8bf5544aabcd9dd03ae9d741f389"
+        }
+      },
+      "exact_fixture_match": true,
+      "review": {
+        "id": "artifact-09952e9a-ea8c-4be3-9213-604881f96293",
+        "native_id": "635d0b6aa010e5813f511d656d2fea3de19c1baebd598ee4b4cf4196b1f2bc5f",
+        "author_native_id": "77f4e2fcb69633a2a74b4cdb30d5d49015ee3d53b4155c09fad681c514328ab2",
+        "verdict": "Pass",
+        "candidate_sha256": "fddafee2e21c49325791a7b90768f6c3a987e91d09697bb4d6873d5a131e86fe",
+        "receipt_sha256": "1e5c65b3129d2bae8532943b5956aba5df707c26526cfe1c577e1c093e35cee4"
+      },
+      "acceptance": {
+        "at": "2026-11-07T16:48:11.561Z",
+        "review_id": "artifact-09952e9a-ea8c-4be3-9213-604881f96293",
+        "candidate_sha256": "fddafee2e21c49325791a7b90768f6c3a987e91d09697bb4d6873d5a131e86fe",
+        "receipt_sha256": "1e5c65b3129d2bae8532943b5956aba5df707c26526cfe1c577e1c093e35cee4",
+        "source_integrated": false
+      },
+      "elapsed_ms": 677.137291,
+      "original_source_unchanged": true,
+      "generation_validation": {
+        "outcome": "candidate_returned",
+        "producer_block": null,
+        "exact_fixture_match": true
+      },
+      "metrics": {
+        "model_calls": 2,
+        "producer_calls": 1,
+        "qa_calls": 1,
+        "repairs": 0,
+        "producer_blocks": 0,
+        "invalid_or_incomplete_outputs": 0,
+        "exact_fixture_mismatches": 0,
+        "prompt_bytes": 361728,
+        "output_bytes": 958,
+        "time_to_accepted_result_ms": 677.137291
+      }
+    }
+  ],
+  "assessment": {
+    "passed": true,
+    "unique_expected_cases": true,
+    "source_verification_required": true,
+    "source_verification_passed": true,
+    "accepted_cases": 4,
+    "total_cases": 4,
+    "critical_false_acceptances": 0,
+    "statistical_noninferiority_established": false,
+    "causal_latency_improvement_established": false
+  }
+}

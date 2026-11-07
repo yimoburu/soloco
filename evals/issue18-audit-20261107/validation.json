@@ -1,0 +1,44 @@
+{
+  "kind": "candidate-format-evaluator-regression-audit",
+  "base_revision": "38d95fd",
+  "node": "v22.23.2",
+  "native_calls": 0,
+  "focused_tests": {
+    "command": "node --test tests/candidate-format-qualification.test.mjs",
+    "passed": 5,
+    "failed": 0,
+    "skipped": 0,
+    "actual_macos_sandbox": true
+  },
+  "cli": {
+    "command": "node tools/candidate-format-qualification.mjs --contract-double NEW_DIRECTORY",
+    "exit": 0,
+    "assessment": {
+      "passed": true,
+      "unique_expected_cases": true,
+      "source_verification_required": true,
+      "source_verification_passed": true,
+      "accepted_cases": 4,
+      "total_cases": 4,
+      "critical_false_acceptances": 0,
+      "statistical_noninferiority_established": false,
+      "causal_latency_improvement_established": false
+    },
+    "source_manifest_sha256": "64c3748a3f6d25f585719f6ba0ff20ee9f71ed6c38f5279dd2865a00a935c48f",
+    "evidence": "contract-report.json"
+  },
+  "checks": {
+    "build_generated_files": "passed",
+    "git_diff_check": "passed"
+  },
+  "retained_development_failure": {
+    "kind": "test fixture path mismatch",
+    "result": "The first disposable-source CLI drift test used the macOS /var temporary path alias; Node resolved its entry module to /private/var, so the existing entrypoint equality guard did not execute main. Four other tests passed. Canonicalizing only the test directory fixed the fixture; final focused suite passed 5/5."
+  },
+  "limitations": [
+    "All model outputs are explicit synthetic contract doubles. No native model-quality or latency evidence is added.",
+    "The positive CLI report was captured before the final test-only canonical temporary-path correction; evaluator/runtime tool bytes are unchanged. Source manifest retains the exact executed file hashes.",
+    "Original native full-file producer holds remain failed and were not retried.",
+    "Original native canonical temporary databases are absent at this audit; committed original/derived reports remain historical evidence."
+  ]
+}

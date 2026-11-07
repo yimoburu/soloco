@@ -244,7 +244,14 @@ it cannot publish a reusable Pass.
 The new receipt says `tests_executed:false`, `reused:true`, and identifies the
 original executed receipt. It cannot chain reuse or inherit acceptance. Fresh
 independent QA and exact new receipt/candidate acceptance remain required. The
-project-relative materialization pointer cannot follow an old absolute project
+original QA and candidate generation jobs must retain their canonical record,
+target and author links, distinct native/instance identities and confirmed process
+closure. New reuse receipts also bind both complete producer jobs by hash. These
+bindings are checked under the publication transaction and again at acceptance;
+changed or missing producer evidence holds. Older pending reuse receipts without
+these producer bindings cannot establish fresh acceptance. Original accepted
+receipts and judgments remain preserved. The project-relative materialization
+pointer cannot follow an old absolute project
 path after restore; path-sensitive reuse becomes inapplicable and a new candidate
 must be materialized/tested normally. No old attempt allowance is reset.
 

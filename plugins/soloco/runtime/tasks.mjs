@@ -317,9 +317,14 @@ function appendMessage(state,who,origin,args){
   const content=requireText(args.content,'content',20000),op=operation(args.operation_id),key=messageId(state,who,op);
   const source_instruction=args.source_instruction===undefined?undefined:requireText(args.source_instruction,'source_instruction',4000);
   if(origin.task_id&&source_instruction!==undefined)throw Error('Worker peer messages cannot introduce founder source instructions');
+  // A lost response may be replayed after its receiver was amended. Preserve
+  // the original definition binding: replay retrieves a durable envelope and
+  // never grants permission to retarget that message at the new definition.
+  const prior=state.records[key]&&validMessage(state,state.records[key]);
   const payload={from_task_id:origin.task_id??null,from_attempt_id:origin.attempt_id??null,to_task_id:target.id,definition_revision:t.definition_revision,content,...(source_instruction===undefined?{}:{source_instruction})};
+  if(prior)payload.definition_revision=prior.runtime_message.definition_revision;
   const hash=digest(JSON.stringify(payload));
-  if(state.records[key]){const prior=validMessage(state,state.records[key]);if(prior.runtime_message.payload_sha256!==hash)throw Error('Message operation_id already names different content');return prior;}
+  if(prior){if(prior.runtime_message.payload_sha256!==hash)throw Error('Message operation_id already names different content');return prior;}
   const at=stamp();
   const {content:messageContent,...binding}=payload;
   return state.records[key]={id:key,kind:'artifact',status:'Async:message',author_role:origin.role,author_instance:origin.instance_id,revision:1,content:messageContent,created_at:at,runtime_message:{version:1,operation_id:op,payload_sha256:hash,owner:copy(who),...binding,state:'pending',disposition:null}};
