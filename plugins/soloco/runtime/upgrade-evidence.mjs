@@ -120,8 +120,14 @@ function modelCatalog(value) {
   const modelKeys = ['id', 'name', 'description', 'supported_efforts', 'effort_support', 'default_effort',
     'is_default', 'serviceTiers', 'additionalSpeedTiers', 'defaultServiceTier'];
   const speedKeys = ['host_default', 'fast_disabled', 'evidence', 'default_service_tier', 'default_speed', 'paid_tiers_enabled'];
+  const claudeAlias=value?.source==='documented_aliases'
+    && exactKeys(value.model,['id','name','description','supported_efforts','effort_support'],['id','supported_efforts','effort_support'])
+    && ['haiku','sonnet','opus'].includes(value.model.id)
+    && Array.isArray(value.model.supported_efforts) && value.model.supported_efforts.length===0
+    && value.model.effort_support==='alias_specific_support_unverified'
+    && ['name','description'].every(key=>!own(value.model,key)||typeof value.model[key]==='string');
   return exactKeys(value, ['source', 'model', 'speed_support'], ['source', 'model'])
-    && value.source === 'host_catalog' && exactKeys(value.model, modelKeys, ['id'])
+    && (value.source === 'host_catalog' || claudeAlias) && exactKeys(value.model, modelKeys, ['id'])
     && typeof value.model.id === 'string'
     && (!own(value, 'speed_support') || exactKeys(value.speed_support, speedKeys));
 }

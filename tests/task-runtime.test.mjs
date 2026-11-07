@@ -32,6 +32,21 @@ const queue=(root,key,launch=child)=>engine.queueRuntimeTask(root,key,{launch,ch
 const model=(native,content='A fictional attributable finding.')=>async(_host,session,_prompt,_dir,limit,_selection,options)=>{assert.equal(session,null,'new tasks use finite fresh native sessions');options.onSpawn(executionTiming(Date.now(),{timeout_ms:limit}));return {native_id:native,text:JSON.stringify({content,messages:[],notices:[]})};};
 async function waitUntil(check,{ms=5000}={}){const until=Date.now()+ms;while(Date.now()<until){if(check())return;await new Promise(r=>setTimeout(r,20));}throw Error('Fictional runtime acceptance did not reach expected state');}
 
+test('explicit host model metadata survives queue, worker startup and task reconciliation',async()=>{
+ const f=fixture();try {
+  const selected=host==='claude'?'sonnet':'fictional-model';
+  const catalog={supported:true,source:host==='claude'?'documented_aliases':'host_catalog',models:[{id:selected,supported_efforts:[],effort_support:host==='claude'?'alias_specific_support_unverified':'host_catalog'}]};
+  const t=f.submit('explicit-selection',{model_selection:{mode:'explicit',model:selected,reason:'Small fictional transformation using a supported host model.'}});
+  const j=engine.queueRuntimeTask(f.root,t.id,{launch:child,check:ready,catalog:()=>catalog});
+  await work(f.root,j.job_id,model('fictional-selected-'+host));
+  tickRuntime(f.root,{dispatch:false});
+  const s=f.read(),job=s.jobs[j.job_id];
+  assert.equal(job.status,'completed',job.error);
+  assert.equal(s.records[t.id].runtime_task.state,'returned',s.records[t.id].runtime_task.attention);
+  assert.equal(job.model_catalog.source,catalog.source);
+ }finally{f.close();}
+});
+
 test('new task and status are durable while two workers remain in slow execution; runtime never impersonates owner',async()=>{
  const f=fixture();let releaseA,releaseB;const running=[];
  try{
