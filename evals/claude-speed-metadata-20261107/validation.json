@@ -1,0 +1,60 @@
+{
+  "kind": "model-speed-metadata-semantic-retention-fix",
+  "base_commit": "48ae6fa1e2122903c8f45b5acc017f1fbcceedee",
+  "node": "v22.23.2",
+  "native_calls": 0,
+  "problem": "A known model with unknown nested speed metadata was classified mechanical, leaving an unresolved obligation out of compulsory delivered pages while semantic completeness passed. Newly exposed for Claude aliases; equivalent preexisting Codex speed-metadata gap fixed by the same narrow validator.",
+  "supported_forms": [
+    "Current Codex host-default speed metadata",
+    "Claude alias host-default and supported explicit fast-off metadata",
+    "Claude host-default fast-off metadata without a selected model",
+    "Historical scalar host-default metadata"
+  ],
+  "before": {
+    "exit": 1,
+    "evidence": [
+      "before.json",
+      "before-adapter-shapes.json"
+    ],
+    "compulsory_obligation_retained": false
+  },
+  "after": {
+    "exit": 0,
+    "evidence": "after.json",
+    "compulsory_obligation_retained": true
+  },
+  "focused": {
+    "command": "node --no-warnings --test tests/claude-catalog.test.mjs tests/upgrade-evidence.test.mjs tests/task-runtime.test.mjs tests/selection-wiring.test.mjs",
+    "exit": 0,
+    "counts": {
+      "tests": 74,
+      "pass": 74,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "log": "focused-final.tap"
+  },
+  "other_checks": {
+    "build_generated_files": "passed",
+    "git_diff_check": "passed"
+  },
+  "retained_test_development_failure": {
+    "result": "Initial focused group passed73/74; new inline-data assertion rejected the projector\u2019s null-prototype objects despite identical JSON contents. The test helper now normalizes only the inspected assertion value through JSON; final focused run passes74/74. Runtime validator did not change after that fixture correction."
+  },
+  "limitations": [
+    "Pure projection/delivery probes and explicit synthetic runtime judgments; no native model-quality, cost or actual-company acceptance claim.",
+    "Original PR36 native receipts and previous reports were not changed.",
+    "Changes do not grant execution, spending or speed-tier authority."
+  ],
+  "sha256": {
+    "plugins/soloco/runtime/upgrade-evidence.mjs": "b3a8f0bf7f8c8b2def98ba3cd926c9b24932275fb65a96908a8a27e7ed1c8708",
+    "tests/claude-catalog.test.mjs": "bb0901625ff71cc257d0d456b2364309dbbee36a7cc3a54d2b07b7ffb18d2231",
+    "evals/claude-speed-metadata-20261107/probe.mjs": "db46acd538d803f6bf588220004c6112654a620866b31b8de729a80744ee64fe",
+    "evals/claude-speed-metadata-20261107/before.json": "888506026093d77e86ea2037bb41803622401e9d969e2e0e64d9326835057b02",
+    "evals/claude-speed-metadata-20261107/before-adapter-shapes.json": "6291c57fcdd5ac1e0e2c8c5ca68fdce04ee0a827de4325de3a156a9a60b9b31d",
+    "evals/claude-speed-metadata-20261107/after.json": "21872a9df6a851708261e94d0d278e30b2d6abcc9606b2fa6f27b3f5d353bcb0",
+    "evals/claude-speed-metadata-20261107/focused-final.tap": "feca75f77b4954dfbd3996b3b440f413ca52492faf570c9c61fe3d3d7abc4b0d"
+  }
+}

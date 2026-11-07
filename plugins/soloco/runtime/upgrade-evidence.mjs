@@ -116,16 +116,30 @@ function inputReferences(value) {
     && (!own(item, 'revision') || (Number.isSafeInteger(item.revision) && item.revision >= 0)));
 }
 
+const speedKeys=['host_default','fast_disabled','evidence','default_service_tier','default_speed','paid_tiers_enabled'];
+const claudeFastOffEvidence='documented_fastMode_false_with_installed_version_and_settings_control';
+function modelSpeedSupport(value,source) {
+  if(!exactKeys(value,speedKeys))return false;
+  if(own(value,'host_default')&&value.host_default!==true
+    ||own(value,'fast_disabled')&&typeof value.fast_disabled!=='boolean'
+    ||own(value,'default_service_tier')&&value.default_service_tier!==null
+    ||own(value,'default_speed')&&value.default_speed!=='unverified'
+    ||own(value,'paid_tiers_enabled')&&value.paid_tiers_enabled!==false)return false;
+  // Accept current adapter values and the earlier scalar host-default receipt.
+  // Unknown values stay compulsory evidence instead of becoming optional metadata.
+  if(own(value,'evidence')&&!['host_default','no_verified_explicit_fast_off_control',claudeFastOffEvidence].includes(value.evidence))return false;
+  if(value.fast_disabled===true||value.evidence===claudeFastOffEvidence)return source==='documented_aliases'&&value.fast_disabled===true&&value.evidence===claudeFastOffEvidence;
+  return true;
+}
 function modelCatalog(value) {
   const modelKeys = ['id', 'name', 'description', 'supported_efforts', 'effort_support', 'default_effort',
     'is_default', 'serviceTiers', 'additionalSpeedTiers', 'defaultServiceTier'];
-  const speedKeys = ['host_default', 'fast_disabled', 'evidence', 'default_service_tier', 'default_speed', 'paid_tiers_enabled'];
   // Host-default fast-off carries catalog evidence but selects no model. It is
   // the one supported Claude control that produces a catalog without a model.
   const claudeDefault=value?.source==='documented_aliases' && value.model===undefined
     && exactKeys(value.speed_support,speedKeys,speedKeys)
     && value.speed_support.host_default===true && value.speed_support.fast_disabled===true
-    && value.speed_support.evidence==='documented_fastMode_false_with_installed_version_and_settings_control'
+    && value.speed_support.evidence===claudeFastOffEvidence
     && value.speed_support.default_service_tier===null && value.speed_support.default_speed==='unverified'
     && value.speed_support.paid_tiers_enabled===false;
   const claudeAlias=value?.source==='documented_aliases'
@@ -137,7 +151,7 @@ function modelCatalog(value) {
   return exactKeys(value, ['source', 'model', 'speed_support'], claudeDefault?['source','speed_support']:['source', 'model'])
     && (claudeDefault || (value.source === 'host_catalog' || claudeAlias) && exactKeys(value.model, modelKeys, ['id'])
     && typeof value.model.id === 'string')
-    && (!own(value, 'speed_support') || exactKeys(value.speed_support, speedKeys));
+    && (!own(value, 'speed_support') || modelSpeedSupport(value.speed_support,value.source));
 }
 export {modelCatalog as knownModelCatalog};
 

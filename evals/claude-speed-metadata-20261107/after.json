@@ -1,0 +1,53 @@
+{
+  "kind": "malformed-model-speed-semantic-delivery-probe",
+  "node": "v22.23.2",
+  "native_calls": 0,
+  "source_sha256": "b3a8f0bf7f8c8b2def98ba3cd926c9b24932275fb65a96908a8a27e7ed1c8708",
+  "rows": [
+    {
+      "source": "documented_aliases",
+      "catalog": {
+        "source": "documented_aliases",
+        "model": {
+          "id": "sonnet",
+          "supported_efforts": [],
+          "effort_support": "alias_specific_support_unverified"
+        },
+        "speed_support": {
+          "evidence": {
+            "obligation": "UNRESOLVED: do not buy paid credits"
+          }
+        }
+      },
+      "recognized": false,
+      "semantic_delivery_passes": true,
+      "obligation_in_compulsory_pages": true,
+      "externalized_as_machine_metadata": false
+    },
+    {
+      "source": "host_catalog",
+      "catalog": {
+        "source": "host_catalog",
+        "model": {
+          "id": "gpt-6.1-sol",
+          "supported_efforts": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "effort_support": "host_catalog"
+        },
+        "speed_support": {
+          "evidence": {
+            "obligation": "UNRESOLVED: do not buy paid credits"
+          }
+        }
+      },
+      "recognized": false,
+      "semantic_delivery_passes": true,
+      "obligation_in_compulsory_pages": true,
+      "externalized_as_machine_metadata": false
+    }
+  ],
+  "passed": true
+}
