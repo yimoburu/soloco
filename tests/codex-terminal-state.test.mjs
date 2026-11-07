@@ -32,6 +32,9 @@ function adapter(events,{code=0,limit}={}) {
 }
 const invoke=(events,options)=>adapter(events,options)('codex',null,'fictional prompt','/tmp',180000);
 const diagnostic=(id='diagnostic')=>({type:'item.completed',item:{id,type:'error',message:'Fictional optional feature is unavailable'}});
+for(const type of ['item.started','item.updated','item.completed'])test(type+' cannot reuse a completed diagnostic identity',async()=>{
+ await assert.rejects(invoke([thread,start,diagnostic('same'),{type,item:{id:'same',type:'agent_message',text:negative('Pass')}},message(negative()),done]),/diagnostic item cannot be reused/);
+});
 for(const verdict of ['Pass','Blocked'])test('completed diagnostic items preserve a valid current '+verdict,async()=>{
  const raw=negative(verdict),result=await invoke([thread,diagnostic('startup'),start,diagnostic('during'),message(raw),done]);
  assert.equal(result.text,raw);assert.deepEqual(result.model_evidence.cli_warnings,[{type:'error',message:diagnostic().item.message},{type:'error',message:diagnostic().item.message}]);
