@@ -9,6 +9,7 @@ import {submitTask,amendTask,cancelTask,taskRecord,taskView,taskReady,reconcileT
 import {portfolioContext,taskCheckpoint} from './task-context.mjs';
 import {jobTimeoutState} from './timeout.mjs';
 import {contextMatches} from './context.mjs';
+import {inheritSnapshots} from './snapshot.mjs';
 
 const registered=new Set();
 const alive=pid=>{if(!Number.isInteger(pid)||pid<1)return false;try{process.kill(pid,0);return true;}catch(e){return e.code==='EPERM';}};
@@ -140,30 +141,44 @@ export function tickRuntime(root,{instance=null,pid=process.pid,dispatch=true,cu
     const calculate=(s,verify=false)=>{
       const r=runtimeControl(s,{enabled:dispatch}),c=r.runtime_control;
       if(instance&&(c.instance_id!==instance||c.pid!==pid))throw Error('Supervisor lease or generation changed');
-      const ready=[];let changed=false;
+      const ready=[],planned=[],jobs={...s.jobs},records={...s.records};let changed=false;
+      // All decisions in this batch see the same source state. In particular,
+      // one task's attention notice must not invalidate a later review before
+      // its own exact negative finding has been reconciled.
+      const view=inheritSnapshots(s,{...s,records,jobs});
       for(const key of loaded.page.ids){
-        const task=taskRecord(s,key),before=JSON.stringify(task);
+        const task=taskRecord(s,key);
         for(const attempt of task.runtime_task.attempts){
-          const job=s.jobs?.[attempt.job_id];if(!job||!['queued','running'].includes(job.status))continue;
+          const job=jobs[attempt.job_id];if(!job||!['queued','running'].includes(job.status))continue;
           const timing=jobTimeoutState(job,Date.now());
           if(['overdue','inspection'].includes(timing.state)){
-            job.status='interrupted';job.finished_at=stamp();job.timeout_reconciliation={...timing,at:stamp(),termination_confirmed:false};
-            job.error='Async attempt timing requires reconciliation; process closure is unverified';changed=true;
+            jobs[attempt.job_id]={...job,status:'interrupted',finished_at:stamp(),timeout_reconciliation:{...timing,at:stamp(),termination_confirmed:false},error:'Async attempt timing requires reconciliation; process closure is unverified'};changed=true;
           }
         }
-        const completed=s.jobs?.[task.runtime_task.attempts[0]?.job_id];
-        if(verify&&completed?.status==='completed'&&completed.context_sha256&&!contextMatches(s,completed,completed.context_sha256)){
-          task.runtime_task.state='needs_attention';task.runtime_task.attention_code='CONTEXT_CHANGED';task.runtime_task.attention='Completed result context changed before runtime acceptance';task.status='Async:needs_attention';task.revision++;task.updated_at=stamp();
-        }else reconcileTask(s,task);
-        if(task.runtime_task.state==='planned'){
-          const status=taskReady(s,task);
-          if(status.ready)ready.push(key);
-          else if(!status.recovery?.automatic){
-            task.runtime_task.state='needs_attention';task.runtime_task.attention_code=status.recovery?.code??'UNKNOWN';
-            task.runtime_task.attention=String(status.reason).slice(0,1000);task.status='Async:needs_attention';task.revision++;task.updated_at=stamp();
+      }
+      for(const key of loaded.page.ids){
+        const original=taskRecord(s,key),before=JSON.stringify(original),task=JSON.parse(before);
+        records[key]=task;
+        try{
+          const completed=jobs[task.runtime_task.attempts[0]?.job_id];
+          if(verify&&!['needs_attention','cancelling','cancelled'].includes(task.runtime_task.state)&&completed?.status==='completed'&&completed.context_sha256&&!contextMatches(view,completed,completed.context_sha256)){
+            task.runtime_task.state='needs_attention';task.runtime_task.attention_code='CONTEXT_CHANGED';task.runtime_task.attention='Completed result context changed before runtime acceptance';task.status='Async:needs_attention';task.revision++;task.updated_at=stamp();
+          }else reconcileTask(view,task);
+          if(task.runtime_task.state==='planned'){
+            const status=taskReady(view,task);
+            if(status.ready)ready.push(key);
+            else if(!status.recovery?.automatic){
+              task.runtime_task.state='needs_attention';task.runtime_task.attention_code=status.recovery?.code??'UNKNOWN';
+              task.runtime_task.attention=String(status.reason).slice(0,1000);task.status='Async:needs_attention';task.revision++;task.updated_at=stamp();
+            }
           }
-        }
-        if(before!==JSON.stringify(task)){changed=true;if(task.runtime_task.state==='needs_attention')notice(s,'must_know','Async task needs CoS attention: '+(task.runtime_task.attention??'inspect exact task'),key);}
+          if(before!==JSON.stringify(task)){changed=true;planned.push(task);}
+        }finally{records[key]=original;}
+      }
+      for(const [key,job] of Object.entries(jobs))if(job!==s.jobs[key])s.jobs[key]=job;
+      for(const task of planned){
+        s.records[task.id]=task;
+        if(task.runtime_task.state==='needs_attention')notice(s,'must_know','Async task needs CoS attention: '+(task.runtime_task.attention??'inspect exact task'),task.id);
       }
       return {ready,next_cursor:loaded.page.cursor,complete:loaded.page.complete,active_tasks:loaded.page.total,changed};
     };

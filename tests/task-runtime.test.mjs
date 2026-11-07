@@ -222,7 +222,33 @@ test('new applicable rules between worker publication and runtime acceptance fen
   assert.equal(f.read().jobs[jq.job_id].status,'completed');
   engine.save({...f.args,epoch:1,kind:'decision',content:'New applicable rule: this finding is not sufficient for current acceptance.'},host);
   tickRuntime(f.root,{dispatch:false});const state=f.read();assert.equal(state.records[q.id].runtime_task.state,'needs_attention');assert.match(state.records[q.id].runtime_task.attention,/context changed/);
+  for(let n=0;n<3;n++)tickRuntime(f.root,{queue:()=>assert.fail('A held result cannot create another attempt')});
+  const idle=f.read();assert.deepEqual(idle.records[q.id],state.records[q.id]);assert.deepEqual(idle.notices,state.notices);assert.equal(idle.revision,state.revision,'Idle held ticks create no canonical writes');
  }finally{f.close();}
+});
+
+test('negative review recovery is independent of task index order and remains stable on idle ticks',async()=>{
+ const orders=[['a','qa','b'],['a','b','qa'],['qa','a','b'],['qa','b','a'],['b','a','qa'],['b','qa','a']];
+ for(const verdict of ['Fail','Blocked'])for(const order of orders){
+  const f=fixture();try{
+   const state=f.read(),operations=['order-0','order-1','order-2'].map(operation=>({operation,id:'async-task-'+digest(JSON.stringify([state.id,state.owner.epoch,operation])).slice(0,32)})).sort((a,b)=>a.id.localeCompare(b.id));
+   const named=Object.fromEntries(order.map((name,n)=>[name,operations[n].operation]));
+   const a=f.submit(named.a,{role:'engineer'}),qa=f.submit(named.qa,{role:'qa',review_task_id:a.id}),b=f.submit(named.b,{role:'pm',depends_on:[{task_id:qa.id,gate:'accepted'}]});
+   assert.deepEqual(Object.entries({a,qa,b}).sort(([,a],[,b])=>a.id.localeCompare(b.id)).map(([name])=>name),order);
+   const aj=queue(f.root,a.id);await work(f.root,aj.job_id,model('fictional-order-author'));
+   const qj=queue(f.root,qa.id);await work(f.root,qj.job_id,async(_h,_n,_p,_d,limit,_s,o)=>{
+    o.onSpawn(executionTiming(Date.now(),{timeout_ms:limit}));
+    return {native_id:'fictional-order-independent-qa',text:JSON.stringify({content:'Retained exact negative finding.',review:{verdict,reason:'Required evidence is absent.',blockers:['Missing exact evidence']},messages:[],notices:[]})};
+   });
+   tickRuntime(f.root,{dispatch:false});const held=f.read(),label=verdict+' '+order.join(',');
+   for(const task of [qa,b]){assert.equal(held.records[task.id].runtime_task.state,'needs_attention',label);assert.equal(held.records[task.id].runtime_task.attention_code,'REVIEW_HELD',label);}
+   assert.equal(held.records[b.id].runtime_task.attempts.length,0);
+   assert.equal(held.records[held.jobs[qj.job_id].artifact_id].review.verdict,verdict);
+   for(let n=0;n<3;n++)tickRuntime(f.root,{queue:()=>assert.fail('Negative review cannot dispatch a dependent')});
+   const idle=f.read();for(const task of [a,qa,b])assert.deepEqual(idle.records[task.id],held.records[task.id],label);
+   assert.deepEqual(idle.notices,held.notices,label);assert.equal(idle.revision,held.revision,label);assert.deepEqual(idle.jobs,held.jobs,label);
+  }finally{f.close();}
+ }
 });
 
 test('peer handoff is delivered to the declared receiver and acknowledged atomically with its actual result',async()=>{
