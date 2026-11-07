@@ -298,6 +298,7 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
       return s;
     }));
   } catch(error) {
+    const rejectedOutput=output??error.rejected_output;
     const unowned=Symbol('unowned worker');
     try {withStore(root,db=>db.transaction('job.failed',s=>{
       const current=s.jobs[jobId];
@@ -322,16 +323,16 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
         // A failed scoped response is observed evidence, never a newly accepted
         // reviewer identity. Earlier delivered identities and receipts survive
         // failures before timing, cancellation or independence validation.
-        if(output?.native_id){if(scopedContext(context)){current.rejected_native_ids=[...new Set([...(current.rejected_native_ids??[]),current.rejected_native_id,output.native_id].filter(Boolean))];current.rejected_native_id=output.native_id;}else current.native_id=output.native_id;}
-        if(output?.model_evidence)current.model_evidence=output.model_evidence;
+        if(rejectedOutput?.native_id){if(scopedContext(context)){current.rejected_native_ids=[...new Set([...(current.rejected_native_ids??[]),current.rejected_native_id,rejectedOutput.native_id].filter(Boolean))];current.rejected_native_id=rejectedOutput.native_id;}else current.native_id=rejectedOutput.native_id;}
+        if(rejectedOutput?.model_evidence)current.model_evidence=rejectedOutput.model_evidence;
         const operatingReview=Boolean(context?.operating_evidence||state?.records?.[job.review_of?.id]?.operating_plan);
         const rawResponse=Boolean(context?.qualification||context?.qualification_evidence||operatingReview);
-        if(artifact || rawResponse&&typeof output?.text==='string') {
-          const rejected=rawResponse?output.text:JSON.stringify(artifact);
+        if(artifact || rawResponse&&typeof rejectedOutput?.text==='string') {
+          const rejected=rawResponse?rejectedOutput.text:JSON.stringify(artifact);
           // Retention does not accept an artifact. Parse the complete observed
           // envelope independently of body limits, before clipping any preview.
           let rejectedArtifact=artifact;
-          if(!rejectedArtifact&&rawResponse){try{rejectedArtifact=JSON.parse(output.text.trim().replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, ''));}catch{}}
+          if(!rejectedArtifact&&rawResponse){try{rejectedArtifact=JSON.parse(rejectedOutput.text.trim().replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, ''));}catch{}}
           const negatives=[rejectedArtifact?.review,rejectedArtifact?.qualification_result];
           const verdict=['Fail','Blocked'].find(v=>negatives.some(r=>r?.verdict===v));
           const negative=verdict?negatives.find(r=>r?.verdict===verdict):null;
