@@ -19,9 +19,9 @@ jobs:
       matrix:
         include:
           - node: '22'
-            lane: tests-22
+            lane: regression-22
             name: Tests Node 22
-            description: Full suite with exact evidence
+            description: Regression selection with exact evidence
           - node: '26'
             lane: compatibility-26
             name: Compatibility Node 26

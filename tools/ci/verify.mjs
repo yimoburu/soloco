@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {inflateRawSync} from 'node:zlib';
 import {fileURLToPath} from 'node:url';
-import {hash,requireThat,validateReceipt,requiredJobs} from './evidence.mjs';
+import {hash,requireThat,validateReceipt,requiredJobs,workflowPolicy} from './evidence.mjs';
 // GitHub artifact ZIPs only: no ZIP64, encryption, links or filesystem extraction.
 export function unzip(bytes) {
   let end=-1;
@@ -36,12 +36,14 @@ export async function githubRequest(endpoint, binary=false) {
 export async function verify(expected,out,request=githubRequest) {
   requireThat(/^[\w.-]+\/[\w.-]+$/.test(expected.repository)&&/^\d+$/.test(String(expected.run))&&/^\d+$/.test(String(expected.attempt)),'explicit repository/run/attempt required');
   for(const key of ['commit','tree','workflowSha'])requireThat(/^[a-f0-9]{40}$/.test(expected[key]),`expected ${key} required`);
-  requireThat(expected.workflow==='.github/workflows/ci.yml'&&/^[a-f0-9]{64}$/.test(expected.workflowSha256),'approved workflow required');
+  const policy=workflowPolicy(expected.workflow);
+  requireThat(/^[a-f0-9]{64}$/.test(expected.workflowSha256),'approved workflow required');
   const tools=['tools/ci/evidence.mjs','tools/ci/gate.mjs','tools/ci/run.mjs','tools/ci/verify.mjs'];
   requireThat(expected.trustedFiles&&JSON.stringify(Object.keys(expected.trustedFiles).sort())===JSON.stringify(tools)&&tools.every(p=>/^[a-f0-9]{64}$/.test(expected.trustedFiles[p])),'approved CI helper identities required');
-  requireThat(JSON.stringify(expected.lanes?.map(l=>l.lane).sort())===JSON.stringify(['build','compatibility-26','tests-22']),'all required lanes required');
+  requireThat(JSON.stringify(expected.lanes?.map(l=>l.lane).sort())===JSON.stringify([...policy.lanes].sort()),'all required lanes required');
   for(const lane of expected.lanes)requireThat(typeof lane.job==='string'&&Array.isArray(lane.labels)&&lane.labels.length>0,'approved runner labels required');
-  requireThat(typeof expected.gate==='string','required gate');
+  requireThat((expected.gate??null)===policy.gate,'required gate');
+  requireThat(JSON.stringify(expected.lanes.map(l=>l.job).sort())===JSON.stringify([...policy.jobs].sort()),'required job names');
   fs.mkdirSync(out,{recursive:true});out=fs.realpathSync(out);
   const sourceRoot=fs.realpathSync(fileURLToPath(new URL('../../',import.meta.url)));
   requireThat(out!==sourceRoot&&!out.startsWith(sourceRoot+path.sep),'evidence must be outside source');
@@ -64,11 +66,13 @@ export async function verify(expected,out,request=githubRequest) {
   }
   async function pages(endpoint,key) {let result=[];for(let page=1;page<=100;page++){const data=await get(`${endpoint}${endpoint.includes('?')?'&':'?'}per_page=100&page=${page}`,false,`${key}-${page}.json`);requireThat(Array.isArray(data[key]),`missing ${key}`);result.push(...data[key]);if(data[key].length<100){requireThat(result.length===data.total_count,`incomplete ${key}`);return result;}}throw new Error('pagination limit');}
   const jobs=await pages(`${attempt}/jobs`,'jobs');
-  const required=[...expected.lanes.map(l=>l.job),expected.gate];requireThat(new Set(required).size===4,'duplicate expected jobs');
+  const required=[...expected.lanes.map(l=>l.job),...(expected.gate?[expected.gate]:[])];requireThat(new Set(required).size===required.length,'duplicate expected jobs');
   requiredJobs(jobs,required,expected.run,expected.attempt);
   const artifacts=await pages(`${base}/actions/runs/${expected.run}/artifacts`,'artifacts');
-  const gateJob=jobs.find(j=>j.name===expected.gate);
-  const gateLogs=await get(`${base}/actions/jobs/${gateJob.id}/logs`,true,'gate.github.log');requireThat(gateLogs.length>0,'missing gate log');
+  if(expected.gate){
+    const gateJob=jobs.find(j=>j.name===expected.gate);
+    const gateLogs=await get(`${base}/actions/jobs/${gateJob.id}/logs`,true,'gate.github.log');requireThat(gateLogs.length>0,'missing gate log');
+  }
   const coverage=[];
   for(const lane of expected.lanes) {
     const job=jobs.find(j=>j.name===lane.job);
@@ -86,7 +90,7 @@ export async function verify(expected,out,request=githubRequest) {
     const logs=await get(`${base}/actions/jobs/${job.id}/logs`,true,`${lane.lane}.github.log`);requireThat(logs.length>0,'missing GitHub job log');
     coverage.push({...result,job:job.html_url,artifact:name,github_log_sha256:hash(logs)});
   }
-  const evidence={scope:'source_ci_evidence',provenance:'github-api-run-attempt',repository:expected.repository,run:expected.run,attempt:expected.attempt,commit:expected.commit,tree:expected.tree,claims:['approved workflow and runner labels','required jobs succeeded','retained artifact and log digests','unchanged clean source','full Node 22 suite and targeted Node 26 compatibility with Seatbelt','build/generated drift'],coverage,retained};
+  const evidence={scope:'source_ci_evidence',provenance:'github-api-run-attempt',repository:expected.repository,run:expected.run,attempt:expected.attempt,commit:expected.commit,tree:expected.tree,claims:['approved workflow and runner labels','required jobs succeeded','retained artifact and log digests','unchanged clean source',expected.workflow==='.github/workflows/qualification.yml'?'full Node 22 qualification with Seatbelt':'Node 22 regression selection and targeted Node 26 compatibility with Seatbelt',...(expected.lanes.some(lane=>lane.lane==='build')?['build/generated drift']:[])],coverage,retained};
   fs.writeFileSync(path.join(out,'verified.json'),JSON.stringify(evidence,null,2)+'\n');return evidence;
 }
 if(process.argv[1]===fileURLToPath(import.meta.url)) {try {const result=await verify(JSON.parse(fs.readFileSync(process.argv[2],'utf8')),process.argv[3]);console.log(JSON.stringify(result));}catch(e){console.error(`source_ci_evidence HOLD: ${e.message}`);process.exitCode=1;}}
