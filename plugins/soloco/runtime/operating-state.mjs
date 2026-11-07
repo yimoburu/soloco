@@ -1,5 +1,5 @@
 // Prospective only. Canonical classifications remain the preservation authority.
-import {producerClosure} from './scoped-context.mjs';
+import {producerClosure,scopedPlanView,CORPUS_PARTITIONER} from './scoped-context.mjs';
 import {retainSnapshot,captureSnapshotDependencies,validateSnapshotDependencies,operatingIntake,inheritSnapshots,hasSnapshotReferences,snapshotReference,snapshotEntryReference,resolveSnapshot,resolveSnapshotEntry,legacyHandoverSource} from './snapshot.mjs';
 import {buildEvidence,readEvidence,validateSemanticDelivery} from './upgrade-evidence.mjs';
 import {digest,id,stamp} from './store.mjs';
@@ -220,11 +220,16 @@ function publicationEvidence(s,homes){
     // their already accepted corpus closure through its stored source envelope
     // before walking receipt parents containing immutable snapshot plans. Only
     // exact independently accepted counterparts and runtime plan bindings qualify.
-    if(h.value.bootstrap_home_provenance)for(const c of projection.classifications.values()){
-      const corpus=c.corpus_qualification;
-      if(corpus&&same(corpus.plan,h.value.bootstrap_home_provenance.plan)&&corpus.homes.some(ref=>same(ref,h.source))){
-        const stored=contextSource(s,c.source.id);if(!stored)fail('provenance source missing: '+c.source.id);
-        add(recordReference(stored,c.source.id));
+    // Plan records may differ when their fully validated frozen extraction identity is shared.
+    if(h.value.bootstrap_home_provenance){
+      const homePlan=exact(s,h.value.bootstrap_home_provenance.plan);
+      const homeView=scopedPlanView(s,{plan_id:homePlan.id,limit:1});
+      for(const c of projection.classifications.values()){
+        const corpus=c.corpus_qualification;
+        if(corpus&&homeView.partitioner===CORPUS_PARTITIONER&&homeView.extraction_identity===corpus.extraction_identity&&corpus.homes.some(ref=>same(ref,h.source))){
+          const stored=contextSource(s,c.source.id);if(!stored)fail('provenance source missing: '+c.source.id);
+          add(recordReference(stored,c.source.id));
+        }
       }
     }
     for(const key of [...h.value.operating_record.evidence_refs,...h.value.operating_record.authority_refs,...(h.value.operating_record.grant_refs??[]),...(h.value.operating_record.historical_receipts??[])]){

@@ -132,3 +132,26 @@ test('FICTIONAL JSON-looking existing frozen IDs stay literal and malformed refe
 test('FICTIONAL wrapper already present at capture retains independent-admission Hold',async()=>{
  const f=await fixture({wrapped:true});await assert.rejects(extracts(f),/Immutable entry reference malformed/);
 });
+
+
+test('FICTIONAL shared-capsule A/B plan reuse publishes B extraction and home through A preservation',async()=>{
+ const a=await fixture(),before=read(a);
+ const reused=await context(a,{action:'plan',source_id:'archive',partitioner:scoped.CORPUS_PARTITIONER,corpus_plan_id:a.plan_id,maintenance:true});
+ const b={...a,plan_id:reused.id},plans=read(a);assert.notEqual(a.plan_id,b.plan_id);
+ assert.deepEqual(plans.records[a.plan_id].scoped_context_plan.capsule,plans.records[b.plan_id].scoped_context_plan.capsule);
+ const identity=plans.records[a.plan_id].scoped_context_plan.extraction_identity;
+ assert.equal(plans.records[b.plan_id].scoped_context_plan.extraction_identity,identity);
+ const es=await extracts(b);await home(b,'home-extraction',[es[0].record.id]);
+ assert.equal(read(a).records['home-extraction'].bootstrap_home_provenance.plan.id,b.plan_id);
+ const final=await preserve(a,es);await publish(a);const accepted=read(a);
+ assert.equal(validateOperatingIndex(accepted),true);assert.equal(operatingContext(accepted).homes.length,1);
+ assert.equal(accepted.paused,true);assert.equal(accepted.governance,before.governance);assert.ok(final.record);
+ for(const change of [
+  s=>s.records[b.plan_id].scoped_context_plan.capsule.immutable_snapshot.sha256='0'.repeat(64),
+  s=>s.records[b.plan_id].scoped_context_plan.extraction_identity='changed',
+  s=>s.records['home-extraction'].bootstrap_home_provenance.plan.sha256='0'.repeat(64),
+  s=>s.records['home-extraction'].content+=' changed',
+  s=>s.records[es[0].record.id].qualification_result.reason+=' changed',
+  s=>s.jobs[es[0].job.id].native_id='fictional-original-contributor'
+ ]){const bad=inheritSnapshots(accepted,structuredClone(accepted));change(bad);assert.throws(()=>operatingContext(bad),/Held|hold|changed|missing|corrupt/);}
+});

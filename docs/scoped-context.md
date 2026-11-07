@@ -631,3 +631,5 @@ remain under `evals/final-corpus-repairs-20261107`; they are historical evidence
 not a current acceptance verdict.
 
 The initial-home publication lifecycle covers storage wrapping of an exact frozen original after extraction, with separate original and stored-envelope validation. An `immutable_entry` already present before coherent capture retains an explicit canonical-admission Hold: the derived coherent projection is not accepted as a raw storage wrapper. This retained limitation is tested; a passing post-extraction lifecycle does not qualify that earlier-capture shape. Actual-record applicability and native semantic fit must be checked separately.
+
+Initial-home publication validates the exact runtime-bound home plan and its frozen extraction identity against the accepted corpus proof. Distinct plan records created through `corpus_plan_id` can share that identity; exact home, capsule, original, receipt and stored-envelope checks remain mandatory.

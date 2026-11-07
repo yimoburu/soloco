@@ -1,0 +1,35 @@
+{
+  "role": "independent_source_QA_publication_followup",
+  "native_session_id": "01a1b385-9388-7370-8c01-d66a67bb3262",
+  "commit": "026e50bd320f467958c33e368132117b12646358",
+  "tree": "a14b10ee64e1192942c3212271e611d4aee7f45c",
+  "prior_commit": "54560ceff468ec2135670e978bd3439a60b49371",
+  "started_at": "2026-11-07T01:25:33.487796+00:00",
+  "ended_at": "2026-11-07T01:29:08.203352+00:00",
+  "exit_code": 0,
+  "prompt_sha256": "7f5310e6f8978a64026d457ecac23ff3f7ff24cd65fe5d90f6795832703e971b",
+  "prompt_characters": 80370,
+  "requested_model": "gpt-6.1-sol",
+  "requested_effort": "high",
+  "requested_speed": "host_default",
+  "effective_settings": "unverified",
+  "timeout_seconds": 600,
+  "lifecycle": [
+    {
+      "type": "thread.started",
+      "thread_id": "01a1b385-9388-7370-8c01-d66a67bb3262"
+    },
+    {
+      "type": "turn.completed",
+      "usage": {
+        "input_tokens": 1227745,
+        "cached_input_tokens": 939648,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 16676,
+        "reasoning_output_tokens": 14228
+      }
+    }
+  ],
+  "report_exists": true,
+  "scope": "Public source only, exact delta; no live company authority or writes"
+}
