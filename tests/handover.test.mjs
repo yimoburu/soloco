@@ -8,6 +8,7 @@ import * as engine from '../plugins/soloco/runtime/engine.mjs';
 import {withStore,id,digest,teamHash} from '../plugins/soloco/runtime/store.mjs';
 import {handoverHash,handoverReviewEligible,handoverSubject} from '../plugins/soloco/runtime/handover.mjs';
 import {work} from '../plugins/soloco/runtime/worker.mjs';
+import {DEFAULT_EXECUTION_TIMEOUT_MS,jobTimeoutState} from '../plugins/soloco/runtime/timeout.mjs';
 import {readEvidence,buildEvidence} from '../plugins/soloco/runtime/upgrade-evidence.mjs';
 import {assignmentContext} from '../plugins/soloco/runtime/context.mjs';
 import {resolveSnapshotEntry} from '../plugins/soloco/runtime/snapshot.mjs';
@@ -223,7 +224,12 @@ test('failed handover with upgrade history reuses typed history semantics instea
  t.diagnostic('Required semantic characters across repaired submissions: '+lengths.join(', '));
  assert.ok(Math.max(...lengths)<2*Math.min(...lengths),`Typed history must not cause semantic amplification: ${lengths}`);
 });
-test('25.7M fictional archive fits 200k; exact originals, mandatory legacy obligations and retrieval complete a full handover',async()=>{
+test('25.7M fictional archive fits 200k; exact originals, mandatory legacy obligations and retrieval complete a full handover',async t=>{
+ // This injected reviewer has no native process/onSpawn callback and therefore
+ // uses legacy started_at timing. Test evidence correctness independently of CPU
+ // speed; only Date is mocked, scoped to this test and restored by node:test.
+ // The boundary regression below separately advances this same legacy clock.
+ t.mock.timers.enable({apis:['Date'],now:Date.now()});
  const a=setup();archiveFixture(a,3212500);
  const archive=withStore(a.root,db=>JSON.stringify(db.read().upgrade_history));
  assert.ok(archive.length>25700000);
@@ -248,11 +254,47 @@ test('25.7M fictional archive fits 200k; exact originals, mandatory legacy oblig
   const {source_id,sha256,offset,length,range_sha256}=read;
   return {native_id:native,text:JSON.stringify(pass(r,[{source_id,sha256,offset,length,range_sha256}]))};
  });
- const state=withStore(b.root,db=>db.read());assert.equal(state.jobs[j].status,'completed',state.jobs[j].error);
+ const state=withStore(b.root,db=>db.read());assert.equal(state.jobs[j].status,'completed',reviewDiagnostics(state,j));
  assert.equal(state.jobs[j].handover_reads.at(-1).session_id,native);
  assert.equal(JSON.stringify(state.upgrade_history),archive);
  assert.equal(handoverHash(state),r.handover.subject_sha256);
  engine.control({...b,action:'resume',expected_epoch:2,source_instruction:'Resume fictional preparation after independent check'},'codex');
+});
+
+// Keep failure output bounded: full archive records and read ledgers are huge.
+// Re-evaluate as running because terminal job status otherwise hides its timing.
+function reviewDiagnostics(state,key) {
+ const job=state.jobs[key],at=job.finished_at??new Date().toISOString();
+ return JSON.stringify({id:key,status:job.status,error:job.error,execution_failure:job.execution_failure,
+  started_at:job.started_at,finished_at:job.finished_at,execution_started_at:job.execution_started_at,
+  execution_deadline_at:job.execution_deadline_at,timing:jobTimeoutState({...job,status:'running'},Date.parse(at)),
+  artifact_status:state.records[job.artifact_id]?.status,read_count:job.handover_reads?.length});
+}
+
+test('legacy injected handover reviewer rejects output at and after its execution deadline',async t=>{
+ const start=Date.now();t.mock.timers.enable({apis:['Date'],now:start});
+ for(const elapsed of [DEFAULT_EXECUTION_TIMEOUT_MS-1,DEFAULT_EXECUTION_TIMEOUT_MS,DEFAULT_EXECUTION_TIMEOUT_MS+1]){
+  const b=replace(setup()),r=submit(b),j=queue(b,r),ctx=frozenContext(b,j);
+  const citation=JSON.parse(ctx.text).evidence_protocol.citations[0];
+  await work(b.root,j,async()=>{
+   const running=withStore(b.root,db=>db.read().jobs[j]);
+   assert.equal(running.timeout_policy_version,undefined);
+   assert.equal(running.execution_started_at,undefined);
+   t.mock.timers.setTime(Date.parse(running.started_at)+elapsed);
+   // An honest incomplete judgment avoids claiming semantic delivery or Pass.
+   return {native_id:'fictional-deadline-native',text:JSON.stringify({...pass(r,[citation]),review:{verdict:'Blocked',reason:'Compulsory evidence remains unread',permitted_action:'hold',subject_sha256:r.handover.subject_sha256,blockers:['Read remaining obligations']}})};
+  });
+  const s=withStore(b.root,db=>db.read()),job=s.jobs[j],late=elapsed>=DEFAULT_EXECUTION_TIMEOUT_MS;
+  const diagnostic=reviewDiagnostics(s,j);
+  assert.equal(job.status,late?'quarantined':'completed',diagnostic);
+  assert.equal(s.records[job.artifact_id].status,late?'Quarantined':'Submitted',diagnostic);
+  assert.equal(job.execution_started_at,undefined,diagnostic);
+  if(late){
+   assert.equal(job.execution_failure.code,'ROLE_TIMEOUT',diagnostic);
+   assert.equal(s.sessions[job.session_key].native_id,null,diagnostic);
+  }
+  assert.throws(()=>engine.control({...b,action:'resume',expected_epoch:2,source_instruction:'Try incomplete fictional review'},'codex'),/QA|review|negative/);
+ }
 });
 
 test('frozen reads enforce exact Unicode ranges, hashes, scope, and delivery-bound citations',async()=>{
