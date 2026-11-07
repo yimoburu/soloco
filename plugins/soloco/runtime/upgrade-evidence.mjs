@@ -120,15 +120,23 @@ function modelCatalog(value) {
   const modelKeys = ['id', 'name', 'description', 'supported_efforts', 'effort_support', 'default_effort',
     'is_default', 'serviceTiers', 'additionalSpeedTiers', 'defaultServiceTier'];
   const speedKeys = ['host_default', 'fast_disabled', 'evidence', 'default_service_tier', 'default_speed', 'paid_tiers_enabled'];
+  // Host-default fast-off carries catalog evidence but selects no model. It is
+  // the one supported Claude control that produces a catalog without a model.
+  const claudeDefault=value?.source==='documented_aliases' && value.model===undefined
+    && exactKeys(value.speed_support,speedKeys,speedKeys)
+    && value.speed_support.host_default===true && value.speed_support.fast_disabled===true
+    && value.speed_support.evidence==='documented_fastMode_false_with_installed_version_and_settings_control'
+    && value.speed_support.default_service_tier===null && value.speed_support.default_speed==='unverified'
+    && value.speed_support.paid_tiers_enabled===false;
   const claudeAlias=value?.source==='documented_aliases'
     && exactKeys(value.model,['id','name','description','supported_efforts','effort_support'],['id','supported_efforts','effort_support'])
     && ['haiku','sonnet','opus'].includes(value.model.id)
     && Array.isArray(value.model.supported_efforts) && value.model.supported_efforts.length===0
     && value.model.effort_support==='alias_specific_support_unverified'
     && ['name','description'].every(key=>!own(value.model,key)||typeof value.model[key]==='string');
-  return exactKeys(value, ['source', 'model', 'speed_support'], ['source', 'model'])
-    && (value.source === 'host_catalog' || claudeAlias) && exactKeys(value.model, modelKeys, ['id'])
-    && typeof value.model.id === 'string'
+  return exactKeys(value, ['source', 'model', 'speed_support'], claudeDefault?['source','speed_support']:['source', 'model'])
+    && (claudeDefault || (value.source === 'host_catalog' || claudeAlias) && exactKeys(value.model, modelKeys, ['id'])
+    && typeof value.model.id === 'string')
     && (!own(value, 'speed_support') || exactKeys(value.speed_support, speedKeys));
 }
 export {modelCatalog as knownModelCatalog};

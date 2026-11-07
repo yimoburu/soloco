@@ -46,6 +46,17 @@ test('explicit host model metadata survives queue, worker startup and task recon
   assert.equal(job.model_catalog.source,catalog.source);
  }finally{f.close();}
 });
+if(host==='claude')test('host-default fast-off survives the same durable task workflow',async()=>{
+ const f=fixture();try {
+  const catalog={supported:true,source:'documented_aliases',models:[],speed_support:{host_default:true,fast_disabled:true,evidence:'documented_fastMode_false_with_installed_version_and_settings_control',default_service_tier:null,default_speed:'unverified',paid_tiers_enabled:false}};
+  const t=f.submit('default-fast-off',{model_selection:{mode:'default',speed:'fast_disabled',reason:'Use the host default while explicitly disabling fast mode.'}});
+  const j=engine.queueRuntimeTask(f.root,t.id,{launch:child,check:ready,catalog:()=>catalog});
+  await work(f.root,j.job_id,model('fictional-default-claude'));
+  tickRuntime(f.root,{dispatch:false});
+  const s=f.read();assert.equal(s.jobs[j.job_id].status,'completed',s.jobs[j.job_id].error);
+  assert.equal(s.records[t.id].runtime_task.state,'returned',s.records[t.id].runtime_task.attention);
+ }finally{f.close();}
+});
 
 test('new task and status are durable while two workers remain in slow execution; runtime never impersonates owner',async()=>{
  const f=fixture();let releaseA,releaseB;const running=[];

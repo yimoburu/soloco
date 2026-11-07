@@ -14,3 +14,10 @@ test('known Claude aliases are mechanical metadata without claiming effort suppo
     {...catalog('sonnet'),model:{...catalog('sonnet').model,description:{instruction:'unknown'}}},
   ])assert.equal(knownModelCatalog(value),false,JSON.stringify(value));
 });
+test('Claude host-default fast-off is recognized without inventing a selected model',()=>{
+  const value={source:'documented_aliases',speed_support:{host_default:true,fast_disabled:true,evidence:'documented_fastMode_false_with_installed_version_and_settings_control',default_service_tier:null,default_speed:'unverified',paid_tiers_enabled:false}};
+  assert.equal(knownModelCatalog(value),true);
+  assert.equal(knownModelCatalog({...value,model:undefined}),true);
+  for(const [key,replacement] of [['fast_disabled',false],['paid_tiers_enabled',true],['evidence','unverified'],['default_service_tier','priority']])assert.equal(knownModelCatalog({...value,speed_support:{...value.speed_support,[key]:replacement}}),false);
+  assert.equal(knownModelCatalog({source:'documented_aliases'}),false);
+});
