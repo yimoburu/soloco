@@ -66,7 +66,8 @@ export function assignmentContext(state, job) {
     company_id: state.id, name: state.name, idea: state.idea,
     mode: state.mode, phase: state.phase, team_sha256: state.team_sha256,
     governance: state.governance, charter: state.roles[job.role], records,
-    notices: state.notices.filter(n => !n.resolution).map(({deliveries, seen_at, ...n}) => n),
+    // Resolution ends pending attention; its conditions remain company evidence.
+    notices: state.notices.map(({deliveries, seen_at, ...n}) => n),
     messages: state.messages.filter(m => m.to === job.role),
     ...([2,3,5].includes(job.context_format)?{assignment:{...(job.coordination?{coordination:job.coordination}:{}),...(Object.hasOwn(job,'expected_deliverable')?{expected_deliverable:job.expected_deliverable}:{}),...(Object.hasOwn(job,'requester')?{requester:job.requester}:{}),...(job.context_scope?{context_scope:job.context_scope}:{}),task:job.task,task_summary:job.task_summary??null,next_handoff:job.next_handoff??null,model_selection:job.model_selection??{mode:'default'},model_catalog:job.model_catalog??null}}:{}),
   };

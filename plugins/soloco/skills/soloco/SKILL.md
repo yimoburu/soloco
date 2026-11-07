@@ -141,4 +141,6 @@ Show required `must_know` and `decision_required` notices when returned, even if
 
 Record useful communication preferences with source/date and explicit or inferred basis. Explicit feedback wins; tentative inferences stay correctable. Preferences never suppress required alerts or imply consent. Save only useful company facts, not a transcript of private conversation.
 
+Notice resolutions are immutable attributed dispositions. An exact replay is safe; record a correction as a new notice referencing the original notice ID. Resolution ends pending attention but does not erase continuing conditions from assignment evidence. Changed conditions can hold affected scopes or reviews; preserve prior evidence and attempt allowances.
+
 Apply an explicit founder pause promptly with `company_control`; the exact message `pause` also works through the hook. Pause requests process cancellation through the worker and stops new assignments. Provider completion, descendant processes and worker-death termination are not guaranteed; late results are quarantined. Resumption and takeover retain records, unresolved notices, failed reviews and previous authorship. Never erase them to make progress appear cleaner.

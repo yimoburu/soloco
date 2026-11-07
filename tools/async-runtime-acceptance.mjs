@@ -12,7 +12,7 @@ import {withStore} from '../plugins/soloco/runtime/store.mjs';
 
 const SOURCE=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const MAIN=path.join(SOURCE,'plugins/soloco/runtime/main.mjs');
-const MODEL='gpt-6.1-sol';
+const DEFAULT_MODEL='gpt-6.1-sol';
 const sha=bytes=>createHash('sha256').update(bytes).digest('hex');
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const alive=pid=>{try{process.kill(pid,0);return true;}catch(error){return error.code==='EPERM';}};
@@ -89,10 +89,11 @@ function verifyRecoveryPersistence(before,after){
   const counts=new Map();for(const job of Object.values(after.jobs??{})){const id=job.runtime_task?.id;assert(id&&Object.hasOwn(current,id),'Recovery introduced an undeclared task job');counts.set(id,(counts.get(id)??0)+1);assert.equal(counts.get(id),1,'Recovery queued duplicate jobs for one task');}
 }
 
-export async function runAsyncRuntimeAcceptance({directory,mode='prepare-only',wait_ms=1200000}={}){
+export async function runAsyncRuntimeAcceptance({directory,mode='prepare-only',wait_ms=1200000,model=DEFAULT_MODEL}={}){
   if(!['prepare-only','run-native'].includes(mode)||!Number.isSafeInteger(wait_ms)||wait_ms<1000||wait_ms>7200000)throw Error('Choose explicit prepare-only or run-native with bounded wait_ms');
+  if(typeof model!=='string'||!/^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/.test(model))throw Error('Choose an explicit supported model ID');
   const output=newDirectory(directory),root=path.join(output,'fictional-company'),data=path.join(root,'fixture-plugin-data');fs.mkdirSync(root);fs.mkdirSync(data,{mode:0o700});
-  const receipt={version:1,mode,status:'preparing',started_at:new Date().toISOString(),output_directory:output,fixture_root:root,fixture_plugin_data:data,source:sourceIdentity(),native_execution_authorized:mode==='run-native',host:'codex',model:MODEL,synthetic_hook_binding:true,
+  const receipt={version:1,mode,status:'preparing',started_at:new Date().toISOString(),output_directory:output,fixture_root:root,fixture_plugin_data:data,source:sourceIdentity(),native_execution_authorized:mode==='run-native',host:'codex',model,synthetic_hook_binding:true,
     scope:'Fictional project-owned company via real MCP process; native mode uses the real adapter. No actual company or installed plugin mutation.',limitations:['Fixture binding is synthetic and proves no Codex Hooks UI trust or real founder lifecycle invocation.','No actual-company handover, team adoption, automatic sidebar placement or background founder notification is established.','Visible prompt/request/response measurements exclude provider-added instructions and hidden reasoning.','Recorded model requests and applied controls do not establish effective provider settings or billing.','Task/message index integrity and public cursor inventory validation scan canonical metadata; small returned context does not establish bounded storage CPU or unlimited archive scalability.'],checks:{}};
   const file=path.join(output,'receipt.json'),save=()=>fs.writeFileSync(file,JSON.stringify(receipt,null,2)+'\n',{mode:0o600});save();
   let client;const allLatency=[];const oldData=process.env.COMPANY_PLUGIN_DATA;
@@ -114,7 +115,7 @@ export async function runAsyncRuntimeAcceptance({directory,mode='prepare-only',w
     const fixtureSource={fixture:'async-native-v1',items:[{id:'fictional-1',value:'amber'},{id:'fictional-2',value:'violet'}],restrictions:['No external effects','No retry allowance']};
     const source=await client.tool('company_save',{...base,kind:'artifact',content:JSON.stringify(fixtureSource),source_reference:'Manually supplied fictional fixture in tools/async-runtime-acceptance.mjs; not an actual company fact.'});
     if(typeof source.id!=='string')throw Error('Fixture source identity was not returned; inspect persisted receipt without repeating mutation');
-    const selection=(effort,reason)=>({mode:'explicit',model:MODEL,effort,speed:'host_default',reason});
+    const selection=(effort,reason)=>({mode:'explicit',model,effort,speed:'host_default',reason});
     const instruction='Authorize exactly one bounded fictional preparation attempt for this task and its declared peer handoff. No shell, network business action, spending, source integration, retry or real company action.';
     const spec=(role,task,effort)=>({role,task,acceptance:'Preserve exactly both fictional item IDs/values and both restrictions from the fixture source; disclose missing or conflicting evidence. Never treat this fixture as business authority.',expected_deliverable:'A small JSON object in content with the exact fictional items and restrictions',context_scope:'fictional-fixture',input_ids:[source.id],resources:['fixture/'+role],max_attempts:1,timeout_ms:180000,timeout_reason:'Small bounded fictional data transformation/review; one native attempt only.',model_selection:selection(effort,role==='qa'?'Independent exact-candidate semantic check of a small fictional transformation requires adequate reasoning.':'Small unambiguous fictional transformation using supplied exact evidence; lower effort is adequate.')});
     const submit=async(operation_id,specification)=>client.tool('company_tasks',{...base,action:'submit',operation_id,source_instruction:instruction,spec:specification});
@@ -129,7 +130,7 @@ export async function runAsyncRuntimeAcceptance({directory,mode='prepare-only',w
     const prepared=fixtureState(root);assert.equal(Object.keys(prepared.jobs).length,0);assert.equal(prepared.records['async-runtime-control'].runtime_control.enabled,false);receipt.checks.prepared_without_native_jobs=true;receipt.prepared=observations(prepared);save();
     if(mode==='prepare-only'){receipt.status='prepared';return receipt;}
     const doctor=await client.tool('company_doctor',{root,session_id:base.session_id});
-    const supported=(doctor.models?.models??[]).find(m=>m.id===MODEL);if(!supported)throw Error('Required supported Sol model is absent from the host catalog; no substitution');
+    const supported=(doctor.models?.models??[]).find(m=>m.id===model);if(!supported)throw Error('Requested model '+model+' is absent from the host catalog; no substitution');
     const efforts=supported.supported_efforts??supported.supportedEfforts??[];for(const effort of ['low','medium'])if(!efforts.includes(effort))throw Error('Required model effort is not verified by the host catalog: '+effort);
     receipt.catalog={model:supported,source:doctor.models?.source,host:doctor.host};
     await client.tool('company_runtime',{...base,action:'start',source_instruction:'Run only the three already recorded one-attempt fictional producer, independent QA and receiver tasks within their exact source-linked scopes. No automatic retries or external actions.'});
@@ -185,8 +186,8 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(path.resolve(process.argv[1]
   const args=process.argv.slice(2),modes=['--prepare-only','--run-native'].filter(v=>args.includes(v));
   if(modes.length!==1)throw Error('Choose exactly --prepare-only or --run-native; native mode is explicit and requires a clean source pin');
   const take=key=>{const i=args.indexOf(key);return i<0?undefined:args[i+1];};
-  if(args.some((v,i)=>v.startsWith('--')&&!['--prepare-only','--run-native','--output-dir','--wait-ms'].includes(v)))throw Error('Unknown acceptance option');
-  const result=await runAsyncRuntimeAcceptance({directory:take('--output-dir'),mode:modes[0].slice(2),wait_ms:take('--wait-ms')===undefined?1200000:Number(take('--wait-ms'))});
+  if(args.some((v,i)=>v.startsWith('--')&&!['--prepare-only','--run-native','--output-dir','--wait-ms','--model'].includes(v)))throw Error('Unknown acceptance option');
+  const result=await runAsyncRuntimeAcceptance({directory:take('--output-dir'),model:take('--model'),mode:modes[0].slice(2),wait_ms:take('--wait-ms')===undefined?1200000:Number(take('--wait-ms'))});
   console.log(JSON.stringify({status:result.status,mode:result.mode,receipt:path.join(result.output_directory,'receipt.json'),fixture_root:result.fixture_root,source_commit:result.source.commit,native_calls_authorized:result.native_execution_authorized,error:result.error??null},null,2));
   if(!['prepared','passed_native_fixture'].includes(result.status))process.exitCode=1;
 }

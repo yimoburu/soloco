@@ -151,7 +151,11 @@ test('failed candidate can be repaired within bounded attempts without erasing f
 test('QA must permit exact bundle without test-execution claims or unresolved blockers',async()=>{
   for(const extra of [{permitted_action:'deploy'},{bundle_sha256:'wrong'},{scope_sha256:'wrong'},{blockers:['Unresolved']},{tests_executed:true}]) {
     const a=setup(),p=plan(a);await authorize(a,p);const b=await generate(a,p),r=await review(a,b,{extra});
-    assert.throws(()=>materialize(a,p,b,r),/QA Pass/);
+    if(extra.blockers){
+      assert.equal(r.status,'failed');assert.match(r.error,/Pass cannot contain/);
+      assert.equal(r.artifact_id,undefined);assert.match(r.rejected_output.text,/Unresolved/);
+      assert.throws(()=>materialize(a,p,b,r),/constraints changed|QA Pass/);
+    }else assert.throws(()=>materialize(a,p,b,r),/QA Pass/);
     assert.equal(fs.existsSync(path.join(a.root,'prototypes/demo')),false);
   }
 });
@@ -159,6 +163,14 @@ test('review sharing the actual author native session fails even with a differen
   const a=setup(),p=plan(a);await authorize(a,p);const b=await generate(a,p);
   const r=await review(a,b,{native:read(a).jobs[b.job_id].native_id});
   assert.equal(r.status,'failed');assert.match(r.error,/native session/);
+});
+test('prototype authorization retains resolved notice conditions and holds a later disposition',async()=>{
+  const a=setup(),n=engine.notify({...a,kind:'must_know',summary:'Only fictional inputs are permitted'},'codex');
+  const p=plan(a);await authorize(a,p);
+  engine.acknowledge({...a,notice_id:n.id,resolution:'Planning is complete; do not materialize before another review',source_reference:'Fictional later founder disposition'},'codex');
+  assert.throws(()=>queue(a,{prototype_id:p.id}),/changed|scope|constraint|environment/i);
+  const s=read(a);assert.equal(s.records[p.id].prototype.attempts.length,0);
+  assert.equal(s.notices.find(v=>v.id===n.id).resolution.text,'Planning is complete; do not materialize before another review');
 });
 test('existing files and symlinked output destinations are never overwritten',async()=>{
   for(const linked of [false,true]) {
