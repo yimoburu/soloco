@@ -4,7 +4,7 @@ export {factorCorpusStructure,expandCorpusStructure,validateCorpusStructure} fro
 import {validateOperatingRecord,operatingProofOccurrences} from './operating-state.mjs';
 import {contextSource,currentExtensions,presentationOnly,classificationFor,proofJobSafe,canonicalEvidenceNodes,rejectedJobIdentities} from './current-state.mjs';
 import {buildEvidence} from './upgrade-evidence.mjs';
-import {retainSnapshot,resolveSnapshot,resolveSnapshotEntry,captureSnapshotDependencies,validateSnapshotDependencies,inheritSnapshots,snapshotBytes,snapshotReference,operatingIntake,hasSnapshotReferences} from './snapshot.mjs';
+import {retainSnapshot,resolveSnapshot,resolveSnapshotEntry,captureSnapshotDependencies,validateSnapshotDependencies,inheritSnapshots,snapshotBytes,snapshotReference,operatingIntake,hasSnapshotReferences,snapshotScope} from './snapshot.mjs';
 import {executionTiming,TIMEOUT_POLICY_VERSION} from './timeout.mjs';
 import {qualificationControlHash} from './context-qualification.mjs';
 import {SCOPED_STREAM,buildScopedStream,validateScopedStreamDelivery} from './scoped-stream.mjs';
@@ -946,6 +946,25 @@ function coverage(s,x,domains){
 }
 function dependencyCycles(s,sourceId,homes){const visiting=new Set([sourceId]),done=new Set();function visit(id){if(visiting.has(id))fail('cyclic current home dependency');if(done.has(id))return;visiting.add(id);const c=s.context_classifications?.[id]?.scoped_qualification??Object.values(s.context_classifications??{}).map(c=>c.scoped_qualification).find(p=>p?.protocol===CORPUS_PRESERVATION&&p.selected_source_ids?.includes(id));for(const r of c?.homes??[])visit(r.id);visiting.delete(id);done.add(id);}for(const r of homes)visit(r.id);}
 
+// Successful historical evidence only; current authority is never memoized.
+// A global byte/entry bound also bounds retained vault identities. Staged
+// dependencies are deliberately ineligible: their hit validator skips reads.
+const historicalNegatives=new Map(),HISTORICAL_ENTRIES=8,HISTORICAL_BYTES=8*1024*1024;
+let historicalBytes=0;
+function rememberHistorical(key,scope,captured){
+  if(captured.dependencies.some(d=>d.staged))return captured.value;
+  const bytes=Buffer.byteLength(json({key,scope:typeof scope==='string'?scope:null,...captured}));
+  if(bytes>HISTORICAL_BYTES)return captured.value;
+  const prior=historicalNegatives.get(key);
+  if(prior){historicalBytes-=prior.bytes;historicalNegatives.delete(key);}
+  const owned=freezeGraph(structuredClone(captured));
+  while(historicalNegatives.size>=HISTORICAL_ENTRIES||historicalBytes+bytes>HISTORICAL_BYTES){
+    const oldest=historicalNegatives.keys().next().value;
+    historicalBytes-=historicalNegatives.get(oldest).bytes;historicalNegatives.delete(oldest);
+  }
+  historicalNegatives.set(key,{scope,bytes,...owned});historicalBytes+=bytes;
+  return owned.value;
+}
 // Reconstruct only the exact historical receipt boundary from the existing v4
 // immutable before/after chain. This is evidence, never restored company state.
 function historicalNegative(s,c,ref){
@@ -977,13 +996,21 @@ function historicalNegative(s,c,ref){
       else{if(!['array','object'].includes(value))fail('unsupported historical repair collection shape');if(!Object.hasOwn(past,at.key))put(past,at.key,value==='array'?[]:{});else if(Array.isArray(past[at.key])!==(value==='array'))fail('historical repair collection type changed');}
     }
   }
+  // Both inputs are exact logical JSON; the prefix binds every verified event
+  // through completion, even when a different history has the same endpoint.
+  const key=sha([ref,c.home_intake.baseline,events.filter(e=>e.seq<=event.seq),past]),scope=snapshotScope(past);
+  const cached=historicalNegatives.get(key);
+  if(cached&&cached.scope===scope){validateSnapshotDependencies(past,cached.dependencies);return cached.value;}
   const outer=evaluation;
   evaluation={proofs:new Map(),visiting:new Set(),plans:new WeakMap(),negativeReceipt:ref.id,historicalCut:event.seq};
   try{
-    const proof=canonical(past,ref);
-    if(!negative(proof.record)||!phasedDomain(proof.x.t)||!proof.x.v.home_intake_policy)fail('repair requires a canonical initial-bootstrap domain negative');
-    const delivered=assignment(past,proof.job).packet,packet=delivered.protocol==='corpus-readable-structure-v1'?expandCorpusStructure(delivered):delivered;
-    return {review:ref,value:proof.record,job:proof.job,target:{source:scopedReference(proof.x.record),value:proof.x.t},prior_packet:packet};
+    const captured=captureSnapshotDependencies(past,()=>{
+      const proof=canonical(past,ref);
+      if(!negative(proof.record)||!phasedDomain(proof.x.t)||!proof.x.v.home_intake_policy)fail('repair requires a canonical initial-bootstrap domain negative');
+      const delivered=assignment(past,proof.job).packet,packet=delivered.protocol==='corpus-readable-structure-v1'?expandCorpusStructure(delivered):delivered;
+      return {review:ref,value:proof.record,job:proof.job,target:{source:scopedReference(proof.x.record),value:proof.x.t},prior_packet:packet};
+    });
+    return rememberHistorical(key,scope,captured);
   }finally{evaluation=outer;}
 }
 const homeMeaning=homes=>homes.map(h=>({id:h.source.id,content:h.value.content,operating_record:h.value.operating_record,context_obligations:h.value.context_obligations??null}));
