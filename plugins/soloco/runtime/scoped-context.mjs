@@ -1007,7 +1007,7 @@ function historicalNegative(s,c,ref){
     const captured=captureSnapshotDependencies(past,()=>{
       const proof=canonical(past,ref);
       if(!negative(proof.record)||!phasedDomain(proof.x.t)||!proof.x.v.home_intake_policy)fail('repair requires a canonical initial-bootstrap domain negative');
-      const delivered=assignment(past,proof.job).packet,packet=delivered.protocol==='corpus-readable-structure-v1'?expandCorpusStructure(delivered):delivered;
+      const delivered=proof.packet,packet=delivered.protocol==='corpus-readable-structure-v1'?expandCorpusStructure(delivered):delivered;
       return {review:ref,value:proof.record,job:proof.job,target:{source:scopedReference(proof.x.record),value:proof.x.t},prior_packet:packet};
     });
     return rememberHistorical(key,scope,captured);
@@ -1065,7 +1065,7 @@ function decompositionCounterevidence(s,p,t){
       const evidence=historicalNegative(s,plan(s,p).c,ref);cache.set(key,evidence);return evidence;
     }
     const prior=evaluation.negativeReceipt;evaluation.negativeReceipt=ref.id;
-    try{const proof=canonical(s,ref);if(!negative(proof.record))fail('decomposition requires retained negative');const evidence={review:ref,value:proof.record,job:proof.job,target:{source:scopedReference(proof.x.record),value:proof.x.t},prior_packet:assignment(s,proof.job).packet};cache.set(key,evidence);return evidence;}finally{evaluation.proofs.delete(json(ref));evaluation.negativeReceipt=prior;}
+    try{const proof=canonical(s,ref);if(!negative(proof.record))fail('decomposition requires retained negative');const evidence={review:ref,value:proof.record,job:proof.job,target:{source:scopedReference(proof.x.record),value:proof.x.t},prior_packet:proof.packet};cache.set(key,evidence);return evidence;}finally{evaluation.proofs.delete(json(ref));evaluation.negativeReceipt=prior;}
   });
   const replacements=t.phase==='extract'?[{x:{t,v}}]:(t.phase==='applicability'&&!t.interface_keys.length?t.reviews.map(r=>canonical(s,r)):null);
   const domains=replacements?null:t.phase==='integration'?t.reviews.map(r=>canonical(s,r)).filter(p=>t.domain_review_ids.includes(p.record.id)):(t.domain_reviews??[]).map(r=>canonical(s,r));
@@ -1263,7 +1263,9 @@ function canonical(s,ref){
   if(!d||!a.stream&&!same(d,scopedDelivery(a,job,job.native_id,a.text))||job.context_sha256!==a.hash||!same(record.qualification_proof,scopedProof(d,job)))fail('canonical exact native delivery/job receipt changed');
   if(x.t.phase==='extract'&&!same(record.reviewed_unit_bundle,a.packet.reviewed_unit_bundle))fail('canonical reviewed-unit bundle changed');
   if(evaluation.negativeReceipt!==record.id)noNegatives(s,x);const children=proofChildren(s,x);independent(s,job,job.native_id,x,proofDependencies(s,x));semantic(s,x,e.qualification_result,children);if(e.qualification_result.verdict!=='Pass'&&evaluation.negativeReceipt!==record.id)fail('negative receipt');
-  const value={record,job,x,result:e.qualification_result};evaluation.visiting.delete(key);evaluation.proofs.set(key,value);return value;
+  // Reuse only the exact packet just validated in this synchronous evaluation.
+  // This proof object is internal; native evidence and persisted receipts remain unchanged.
+  const value={record,job,x,result:e.qualification_result,packet:a.packet};evaluation.visiting.delete(key);evaluation.proofs.set(key,value);return value;
 }
 export function createScopedTarget(s,args){return evaluate(()=>{
   if(args.phase==='extract'&&args.current_home_inventory!==undefined)fail('current_home_inventory is only supported on non-extraction targets');
