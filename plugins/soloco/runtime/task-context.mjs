@@ -1,3 +1,4 @@
+import {taskRecovery} from './recovery.mjs';
 // Ordinary async-task working context. This is a derived view of canonical
 // records, not an applicability classifier, acceptance receipt or authority.
 import {digest,owner,upgradePending} from './store.mjs';
@@ -299,7 +300,7 @@ export function taskCheckpoint(state,record,{budget}={}){
   if(!equal(current,record))fail('checkpoint source is not the current canonical record');
   const t=current.runtime_task,last=latestAttempt(state,current);
   const checkpoint={protocol:'async-task-checkpoint-v1',task:taskDefinitionBinding(current),owner:t.owner,current_owner:state.owner,paused:state.paused,
-    objective:t.spec.task,expected_deliverable:t.spec.expected_deliverable,acceptance:t.spec.acceptance,source_instruction:t.spec.source_instruction,
+    objective:t.spec.task,...(t.spec.outcome?{outcome:t.spec.outcome,outcome_status:'hypothesis; observed impact requires separate evidence'}:{}),recovery:taskRecovery(t,last?state.jobs[last.job_id]:null),expected_deliverable:t.spec.expected_deliverable,acceptance:t.spec.acceptance,source_instruction:t.spec.source_instruction,
     scope:t.spec.context_scope??'*',state:t.state,depends_on:t.spec.depends_on??[],peer_task_ids:t.spec.peer_task_ids??[],input_sources:(t.spec.input_ids??[]).map(id=>{
       const value=contextSource(state,id);if(!value)fail('checkpoint input missing: '+id);return recordReference(value,id);
     }),latest_attempt:last,blockers:[...(t.attention?[t.attention]:[]),...(!equal(t.owner,state.owner)?['Task owner or epoch changed']:[]),...(state.paused?['Company is paused']:[])],next_action:state.paused?'Wait for authorized resume':!equal(t.owner,state.owner)?'Resolve current ownership before any scheduling':t.state==='needs_attention'?'Resolve the recorded blocker within authority':last&&!last.termination_confirmed?'Reconcile current execution before any replacement':'Revalidate current task and prerequisite gates before scheduling',

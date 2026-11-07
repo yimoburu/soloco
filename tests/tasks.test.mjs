@@ -242,3 +242,16 @@ test('owner message and disposition source qualifiers survive, affect replay and
   const packet=unrelatedPacket(state,state.records[b.id]);assert(packet.records.some(entry=>entry.source.id===command.id));assert(packet.records.some(entry=>entry.source.id===legacy.id&&entry.value.runtime_message.disposition.source_instruction===dispositionSource));
   const malformed=structuredClone(state);malformed.records[message.id].runtime_message.source_instruction={hidden:'Unrecognized authority'};assert.equal(isTaskMessage(malformed,malformed.records[message.id]),false);
 }));
+
+test('task outcome is a bound hypothesis with exact evidence, retained through checkpoint definition changes',()=>fixture(({identity,write,read})=>{
+ write(s=>{s.records['feedback']={id:'feedback',kind:'artifact',revision:1,content:'Supplied fictional customer feedback'};});
+ const outcome={objective:'Reduce invalid configuration failures',expected_effect:'Clearer validation helps users correct input',observation:'Compare supplied failure counts before and after',assessment_period:'Next supplied weekly observation',evidence_ids:['feedback']};
+ const record=write(s=>submitTask(s,args(identity,'outcome',{input_ids:['feedback'],outcome}),'codex'));
+ assert.deepEqual(taskView(record).outcome,outcome);
+ assert.match(taskView(record).outcome_status,/hypothesis/);
+ assert.throws(()=>write(s=>submitTask(s,args(identity,'missing-outcome-input',{outcome}),'codex')),/exact task inputs/);
+ assert.throws(()=>write(s=>submitTask(s,args(identity,'invalid-outcome',{input_ids:['feedback'],outcome:{...outcome,achieved:true}}),'codex')),/Outcome requires/);
+ const amended=write(s=>amendTask(s,args(identity,'outcome-amend',{task_id:record.id,expected_definition_revision:1,input_ids:['feedback'],outcome:{...outcome,expected_effect:'A revised hypothesis'}}),'codex'));
+ assert.notEqual(amended.runtime_task.definition_sha256,record.runtime_task.definition_sha256);
+ assert.equal(read().records[record.id].runtime_task.spec.outcome.expected_effect,'A revised hypothesis');
+}));

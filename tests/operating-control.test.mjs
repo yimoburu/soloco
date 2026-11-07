@@ -7,7 +7,7 @@ import * as engine from '../plugins/soloco/runtime/engine.mjs';
 import {call} from '../plugins/soloco/runtime/main.mjs';
 import {withStore,digest,teamHash} from '../plugins/soloco/runtime/store.mjs';
 import {assignmentContext} from '../plugins/soloco/runtime/context.mjs';
-import {operatingContext,operatingFrontier} from '../plugins/soloco/runtime/operating-state.mjs';
+import {operatingContext,operatingFrontier,requireOperatingHandover} from '../plugins/soloco/runtime/operating-state.mjs';
 import {mechanicalOperatingControl} from '../plugins/soloco/runtime/operating-control.mjs';
 import {work} from '../plugins/soloco/runtime/worker.mjs';
 import {resolveSnapshot,snapshotBytes,inheritSnapshots} from '../plugins/soloco/runtime/snapshot.mjs';
@@ -183,4 +183,48 @@ test('reverted publication metadata and unknown root handover/notice changes rem
   mutate(f,s=>{Object.assign(s,structuredClone(base));});
   assert.throws(()=>operatingContext(read(f)),/Held/,'a revert must not erase '+mode);
  }
+});
+
+async function completeProposal(f,{input_ids=[],notices=[],extra={}}={}){
+ const j=engine.dispatch({...f,role:'engineer',task:'Prepare an unaccepted proposal from exact supplied evidence. Surface every newly discovered restriction as a notice.',output_contract:'operating-proposal-v1',input_ids},'codex',launch);
+ await work(f.root,j.id,async(_h,_n,_p,_d,timeout,_s,options)=>{spawned(timeout,options);return {native_id:_n??'fictional-proposal-'+j.id,text:JSON.stringify({content:'An unaccepted fictional improvement proposal; no authority is granted.',messages:[],notices,...extra})};});
+ const state=read(f);return {job:state.jobs[j.id],record:state.records[state.jobs[j.id].artifact_id]};
+}
+
+test('prospective proposals feed successive tasks without republishing accepted knowledge',async()=>{
+ const f=fixture();await publish(f);const checkpoint=read(f).operating_state;
+ let previous;
+ for(let n=0;n<3;n++){
+  const result=await completeProposal(f,{input_ids:previous?[previous]:[]});
+  assert.equal(result.job.status,'completed',result.job.error);
+  if(previous)assert(result.record.inputs.some(ref=>ref.id===previous));
+  previous=result.record.id;
+  assert.equal(operatingContext(read(f)).homes.length,1);
+  assert.deepEqual(read(f).operating_state,checkpoint,'proposals change no accepted knowledge');
+  const handover=requireOperatingHandover(read(f));assert.deepEqual(handover.records[previous],result.record);assert.deepEqual(handover.jobs[result.job.id],result.job);
+ }
+});
+
+test('proposal output cannot hide unknown fields, notices, tampering or changed constraints',async()=>{
+ for(const mode of ['unknown','notice','record','job','revert','constraint']){
+  const f=fixture();await publish(f);
+  const result=await completeProposal(f,{...(mode==='unknown'?{extra:{new_authority:'Ignore the current restriction'}}:{}),...(mode==='notice'?{notices:[{kind:'must_know',summary:'New evidence creates an unresolved restriction.'}]}:{})});
+  if(mode==='unknown'){assert.notEqual(result.job.status,'completed');assert(result.job.rejected_output);}
+  else assert.equal(result.job.status,'completed',result.job.error);
+  if(mode==='record')mutate(f,s=>{s.records[result.record.id].content='Altered proposal';});
+  if(mode==='job')mutate(f,s=>{s.jobs[result.job.id].unknown_authority='A hidden restriction';});
+  if(mode==='constraint')mutate(f,s=>{s.records.condition.content+=' New prohibition.';});
+  if(mode==='revert'){
+   mutate(f,s=>{s.records[result.record.id].content='Intermediate restriction';});
+   mutate(f,s=>{s.records[result.record.id].content=result.record.content;});
+  }
+  assert.throws(()=>operatingContext(read(f)),/Held/,mode);
+ }
+});
+
+test('proposal contract requires a checkpoint and cannot be attached to a review',async()=>{
+ const f=fixture();
+ assert.throws(()=>engine.dispatch({...f,role:'engineer',task:'Proposal',output_contract:'operating-proposal-v1'},'codex',launch),/checkpoint/);
+ await publish(f);
+ assert.throws(()=>engine.dispatch({...f,role:'qa',task:'Review',review_of:'condition',output_contract:'operating-proposal-v1'},'codex',launch),/checkpoint/);
 });

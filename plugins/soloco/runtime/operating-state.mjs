@@ -330,12 +330,13 @@ const assignmentStatic=j=>Object.fromEntries(Object.entries(j).filter(([k])=>!as
 export function admitOperatingAssignment(s,j){
   operatingContext(s);
   if(s.paused||s.mode!=='preparation'||j.context_format!==6||j.review_of||j.prototype_id||j.development_id||j.coordination||j.fresh_session)fail('only bounded runtime preparation assignments supported');
-  j.operating_admission=retainSnapshot(s,{producer:'runtime-bounded-read-only-v1',checkpoint:s.operating_state.plan,owner:s.owner,assignment:JSON.parse(JSON.stringify(assignmentStatic(j))),inputs:j.inputs.map(r=>recordReference(s.records[r.id])),authority:'preparation only; native tools disabled; no spending or exposure authority'});
+  j.operating_admission=retainSnapshot(s,{producer:j.output_contract==='operating-proposal-v1'?'runtime-bounded-proposal-v1':'runtime-bounded-read-only-v1',checkpoint:s.operating_state.plan,owner:s.owner,assignment:JSON.parse(JSON.stringify(assignmentStatic(j))),inputs:j.inputs.map(r=>recordReference(s.records[r.id])),authority:'preparation only; native tools disabled; no spending or exposure authority'});
 }
 function assignmentSafe(s,j){
   try{
-    const {operating_admission,...base}=j,a=resolveSnapshot(s,operating_admission);
-    if(!closed(a,['producer','checkpoint','owner','assignment','inputs','authority'])||a.producer!=='runtime-bounded-read-only-v1'||a.authority!=='preparation only; native tools disabled; no spending or exposure authority'||!same(a.checkpoint,s.operating_state?.plan)||!same(a.owner,s.owner)||!same(a.assignment,assignmentStatic(j))||!proofJobSafe(base)||j.context_format!==6||j.review_of!==null||!['queued','running','completed'].includes(j.status)||s.mode!=='preparation')return false;
+    const {operating_admission,output_contract,...base}=j,a=resolveSnapshot(s,operating_admission);
+    const producer=output_contract===undefined?'runtime-bounded-read-only-v1':output_contract==='operating-proposal-v1'?'runtime-bounded-proposal-v1':null;
+    if(!closed(a,['producer','checkpoint','owner','assignment','inputs','authority'])||(!producer||a.producer!==producer)||a.authority!=='preparation only; native tools disabled; no spending or exposure authority'||!same(a.checkpoint,s.operating_state?.plan)||!same(a.owner,s.owner)||!same(a.assignment,assignmentStatic(j))||!proofJobSafe(base)||j.context_format!==6||j.review_of!==null||!['queued','running','completed'].includes(j.status)||s.mode!=='preparation')return false;
     if(!same(a.inputs,j.inputs.map(r=>recordReference(s.records[r.id]))))return false;
     if(j.supplemental_sources?.some(r=>!same(recordReference(contextSource(s,r.id),r.id),r)))return false;
     if(j.status==='queued'&&(j.started_at||j.execution_started_at||j.artifact_id||j.coordination_release))return false;
@@ -343,6 +344,17 @@ function assignmentSafe(s,j){
     if(j.status==='completed'&&(!j.artifact_id||j.coordination_release?.termination_confirmed!==true||!j.native_id))return false;
     return true;
   }catch{return false;}
+}
+// A proposal is attributable evidence for declared consumers, never a new rule
+// or an accepted home. Only this opt-in producer and exact completion event can
+// establish it; legacy/free-form artifacts keep the original reconciliation path.
+function operatingProposal(s,j,r){
+  return j?.output_contract==='operating-proposal-v1'&&assignmentSafe(s,j)&&j.status==='completed'
+    &&closed(r,['id','kind','content','author_role','author_instance','revision','status','job_id','inputs','retrieved_inputs','review_of','review','created_at'])
+    &&r.id===j.artifact_id&&r.kind==='artifact'&&r.status==='Submitted'&&r.revision===1&&typeof r.content==='string'
+    &&r.job_id===j.id&&r.author_role===j.role&&r.author_instance===j.instance_id&&r.review_of===null&&r.review===null
+    &&same(r.inputs,j.inputs)&&same(r.retrieved_inputs??[],j.retrieved_inputs??[])
+    &&!(j.model_evidence?.cli_observed_negative_outputs?.length);
 }
 // Only exact producer bookkeeping can commute. Check every intermediate old/new
 // value, including mutations that are subsequently reverted.
@@ -407,6 +419,13 @@ function inputUnchanged(s,snapshot,planId){
       if(event.type==='job.started'?(before.status!=='queued'||after.status!=='running'):event.type==='job.completed'?(before.status!=='running'||after.status!=='completed'):before.status!=='running'||after.status!=='running')fail('DIRTY assignment phase changed');
     }
   }
+  const proposals=new Set();
+  for(const key of ordinary){
+    const j=s.jobs[key],r=s.records[j.artifact_id];
+    if(!operatingProposal(s,j,r))continue;
+    const created=intake.events.filter(event=>event.type==='job.completed'&&event.changes.some(c=>!c.before&&c.after?.family==='records'&&c.after.key===r.id&&same(JSON.parse(c.after.raw),r))&&event.changes.some(c=>c.after?.family==='jobs'&&c.after.key===j.id&&same(JSON.parse(c.after.raw),j)));
+    if(created.length===1)proposals.add(r.id);
+  }
   const stable=j=>Object.fromEntries(Object.entries(j??{}).filter(([k])=>!assignmentMutable.includes(k)&&!['handover_reads','operating_delivery'].includes(k)));
   const phaseSafe=(value,current)=>{
     for(const key of [...assignmentMutable,'handover_reads','operating_delivery']){
@@ -419,7 +438,7 @@ function inputUnchanged(s,snapshot,planId){
     return true;
   };
   const allowed=(family,key,value)=>{
-    if(family==='records')return (b.ids.has(key)||commands.has(key))&&same(value,s.records[key]);
+    if(family==='records')return (b.ids.has(key)||commands.has(key)||proposals.has(key))&&same(value,s.records[key]);
     if(family==='jobs')return (b.jobs.has(key)&&reviewJobSafe(value,Boolean(s.records[value.review_of?.id]?.handover))||ordinary.has(key)&&assignmentSafe(s,value))&&same(stable(value),stable(s.jobs[key]))&&phaseSafe(value,s.jobs[key]);
     if(family==='sessions')return Object.values(s.jobs??{}).some(j=>(b.jobs.has(j.id)||ordinary.has(j.id))&&j.session_key===key&&closed(value,['instance_id','role','native_id','host','model_selection'])&&value.instance_id===j.instance_id&&value.role===j.role&&value.host===j.host&&same(value.model_selection,j.model_selection)&&[null,j.native_id].includes(value.native_id));
     if(family==='root'&&roots.has(key))return roots.get(key).some(v=>same(v,value));
@@ -609,4 +628,12 @@ export function operatingInspection(s){
   let frontier;try{frontier=s.operating_state?{entries:[],homes:envelopes(s,s.operating_state.accepted_snapshot.home_envelopes),measurements:{}}:operatingFrontier(s);}catch(e){return {protocol:OPERATING_PROTOCOL,status:'Held',reason:e.message};}
   try{return {protocol:OPERATING_PROTOCOL,status:'Accepted',checkpoint:operatingContext(s),measurements:frontier.measurements};}catch(e){return {protocol:OPERATING_PROTOCOL,status:'Held',reason:e.message,frontier:frontier.entries,proposed_homes:frontier.homes.map(h=>h.source),measurements:frontier.measurements};}
 }
-export function requireOperatingHandover(s){const checkpoint=operatingContext(s);return {company_id:s.id,name:s.name,idea:s.idea,owner:s.owner,governance:s.governance,cos_instructions:s.cos_instructions,roles:s.roles,team_sha256:s.team_sha256,mode:s.mode,phase:s.phase,records:Object.fromEntries(checkpoint.homes.map(h=>[h.source.id,h.value])),jobs:{},upgrade:null,upgrade_history:[],notices:checkpoint.communication.notices,messages:checkpoint.communication.messages,operating_checkpoint:checkpoint};}
+export function requireOperatingHandover(s){
+  const checkpoint=operatingContext(s);
+  // Pending proposals are not accepted homes, but remain unfinished company
+  // work. A successor receives their complete bodies and producer evidence.
+  const proposals=Object.values(s.jobs??{}).filter(j=>operatingProposal(s,j,s.records[j.artifact_id]));
+  return {company_id:s.id,name:s.name,idea:s.idea,owner:s.owner,governance:s.governance,cos_instructions:s.cos_instructions,roles:s.roles,team_sha256:s.team_sha256,mode:s.mode,phase:s.phase,
+    records:Object.fromEntries([...checkpoint.homes.map(h=>[h.source.id,h.value]),...proposals.map(j=>[j.artifact_id,s.records[j.artifact_id]])]),jobs:Object.fromEntries(proposals.map(j=>[j.id,j])),
+    upgrade:null,upgrade_history:[],notices:checkpoint.communication.notices,messages:checkpoint.communication.messages,operating_checkpoint:checkpoint};
+}

@@ -1,14 +1,16 @@
+import {validateOutcome} from './outcome.mjs';
+import {taskRecovery,recoveryCode,SchedulingHold,schedulingRecovery} from './recovery.mjs';
 import {owner,digest,stamp,requireText} from './store.mjs';
 import {normalizeCoordination,bindCoordination} from './coordination.mjs';
 import {normalizeTimeout} from './timeout.mjs';
 
 export const TASK_PROTOCOL='async-task-v1';
 export const TASK_STATES=['planned','queued','running','returned','accepted','needs_attention','cancelling','cancelled'];
-const taskKeys=['version','operation_id','command_sha256','owner','definition_revision','definition_sha256','spec','state','attempts','created_at','updated_at','previous_definition','attention'];
+const taskKeys=['version','operation_id','command_sha256','owner','definition_revision','definition_sha256','spec','state','attempts','created_at','updated_at','previous_definition','attention','attention_code'];
 const recordKeys=['id','kind','status','author_role','author_instance','revision','content','created_at','updated_at','runtime_task'];
 const ownerKeys=['host','session_id','epoch'];
 const attemptKeys=['job_id','instance_id','definition_revision','definition_sha256','created_at','artifact_id','finished_at'];
-const specKeys=['role','task','input_ids','evidence_ids','peer_task_ids','resources','context_scope','expected_deliverable','acceptance','depends_on','review_task_id','model_selection','timeout_ms','timeout_reason','source_instruction','max_attempts'];
+const specKeys=['role','task','input_ids','evidence_ids','peer_task_ids','resources','context_scope','expected_deliverable','acceptance','depends_on','review_task_id','model_selection','timeout_ms','timeout_reason','source_instruction','max_attempts','outcome'];
 const allowed=(v,keys)=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).every(k=>keys.includes(k));
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const copy=v=>JSON.parse(JSON.stringify(v));
@@ -61,10 +63,12 @@ function normalizeSpec(value,state,source){
     if(!selectionShape(m)||JSON.stringify(m).length>2000)throw Error('Invalid task model selection');
     spec.model_selection=copy(m);
   }
+  if(value.outcome!==undefined){spec.outcome=validateOutcome(value.outcome);for(const id of spec.outcome.evidence_ids)if(!input_ids.includes(id))throw Error('Outcome evidence must be supplied as exact task inputs');}
   return spec;
 }
 export const taskDefinitionHash=spec=>digest(JSON.stringify(spec));
 function validateSpec(spec){
+  if(spec.outcome!==undefined){validateOutcome(spec.outcome);if(spec.outcome.evidence_ids.some(id=>!spec.input_ids?.includes(id)))throw Error('Outcome evidence must remain exact task inputs');}
   if(!allowed(spec,specKeys)||typeof spec.role!=='string'||spec.role==='runner'||typeof spec.task!=='string'||!spec.task.trim()||spec.task.length>20000||typeof spec.acceptance!=='string'||!spec.acceptance.trim()||spec.acceptance.length>4000||typeof spec.expected_deliverable!=='string'||!spec.expected_deliverable.trim()||spec.expected_deliverable.length>300||typeof spec.source_instruction!=='string'||!spec.source_instruction.trim()||spec.source_instruction.length>4000||typeof spec.context_scope!=='string'||!spec.context_scope.trim()||spec.context_scope.length>160||spec.max_attempts!==1||!Number.isSafeInteger(spec.timeout_ms)||spec.timeout_ms<1000||spec.timeout_ms>600000)throw Error('Invalid canonical async task specification');
   if(!Array.isArray(spec.input_ids)||!Array.isArray(spec.evidence_ids)||!Array.isArray(spec.peer_task_ids)||!Array.isArray(spec.resources))throw Error('Canonical task input/resource arrays are missing');
   names(spec.input_ids,'input_ids');names(spec.evidence_ids,'evidence_ids');names(spec.peer_task_ids,'peer_task_ids',16);normalizeCoordination({resources:spec.resources});
@@ -97,6 +101,7 @@ export function validateTaskRecord(record,state){
   if(t.state==='planned'&&t.attempts.length||['queued','running','returned','accepted','cancelling'].includes(t.state)&&t.attempts.length!==1)throw Error('Task lifecycle state lacks its exact attempt binding');
   if(t.previous_definition!==undefined&&(!allowed(t.previous_definition,['revision','sha256'])||!Number.isSafeInteger(t.previous_definition.revision)||t.previous_definition.revision>=t.definition_revision||!/^[a-f0-9]{64}$/.test(t.previous_definition.sha256??'')))throw Error('Invalid previous task definition reference');
   if(t.attention!==undefined&&t.attention!==null&&(typeof t.attention!=='string'||t.attention.length>4000))throw Error('Invalid task attention record');
+  if(t.attention_code!==undefined&&!recoveryCode(t.attention_code))throw Error('Invalid task recovery code');
   validateSpec(t.spec);
   if(state&&(!Object.hasOwn(state.records??{},record.id)||!same(state.records[record.id],record)||record.id!==hashId('async-task-',state,t.owner,t.operation_id)))throw Error('Async task identity or canonical source changed');
   return record;
@@ -200,7 +205,7 @@ export function amendTask(state,args,host){
   t.previous_definition={revision:t.definition_revision,sha256:t.definition_sha256};t.definition_revision++;t.definition_sha256=taskDefinitionHash(spec);t.spec=spec;record.content=spec.task;
   if(t.attempts.length){
     const job=state.jobs?.[t.attempts[0].job_id];if(job&&['queued','running'].includes(job.status))job.status='cancelled';
-    t.state='needs_attention';t.attention='Definition superseded an existing attempt; reconcile closure and create a separately authorized task if more work is required';
+    t.state='needs_attention';t.attention_code='DEFINITION_CHANGED';t.attention='Definition superseded an existing attempt; reconcile closure and create a separately authorized task if more work is required';
   }else t.state='planned';
   bump(record);commitCommand(state,c,args,'amend',record);return record;
 }
@@ -216,7 +221,7 @@ export function cancelTask(state,args,host){
 }
 export function taskView(record){
   validateTaskRecord(record);const t=record.runtime_task;
-  return {id:record.id,revision:record.revision,definition_revision:t.definition_revision,definition_sha256:t.definition_sha256,state:t.state,role:t.spec.role,task:t.spec.task,expected_deliverable:t.spec.expected_deliverable,acceptance:t.spec.acceptance,context_scope:t.spec.context_scope,resources:t.spec.resources,depends_on:t.spec.depends_on,peer_task_ids:t.spec.peer_task_ids,review_task_id:t.spec.review_task_id,attempts:t.attempts.map(copy),attention:t.attention??null,updated_at:t.updated_at};
+  return {id:record.id,revision:record.revision,definition_revision:t.definition_revision,definition_sha256:t.definition_sha256,state:t.state,role:t.spec.role,task:t.spec.task,expected_deliverable:t.spec.expected_deliverable,acceptance:t.spec.acceptance,context_scope:t.spec.context_scope,resources:t.spec.resources,depends_on:t.spec.depends_on,peer_task_ids:t.spec.peer_task_ids,review_task_id:t.spec.review_task_id,attempts:t.attempts.map(copy),...(t.spec.outcome?{outcome:copy(t.spec.outcome),outcome_status:'hypothesis; observed impact requires separate evidence'}:{}),recovery:taskRecovery(t),attention:t.attention??null,updated_at:t.updated_at};
 }
 function currentAttempt(state,record){
   const t=record.runtime_task,a=t.attempts[0],job=a&&state.jobs?.[a.job_id];
@@ -230,8 +235,9 @@ function currentAttempt(state,record){
 }
 function output(state,record,gate){
   assertTaskPrerequisites(state,record);
+  if(['planned','queued','running'].includes(record.runtime_task.state)&&state.jobs?.[record.runtime_task.attempts[0]?.job_id]?.status!=='completed')throw new SchedulingHold('DEPENDENCY_PENDING','Task producer has not returned its required output');
   const job=currentAttempt(state,record),artifact=state.records?.[job.artifact_id];
-  if(job.coordination_release?.termination_confirmed!==true)throw Error('Task producer process closure is unconfirmed');
+  if(job.coordination_release?.termination_confirmed!==true)throw new SchedulingHold('EXECUTION_UNCERTAIN','Task producer process closure is unconfirmed');
   const coordination=bindCoordination(state,{depends_on:[job.id]});
   if(gate==='accepted'&&(artifact?.kind!=='review'||artifact.review?.verdict!=='Pass'))throw Error('Accepted prerequisite requires a current independent exact-subject Pass');
   if(gate==='test'&&job.kind!=='development_test')throw Error('Test prerequisite requires a canonical passing runtime test receipt');
@@ -240,8 +246,8 @@ function output(state,record,gate){
 export function taskReady(state,record){
   try{
     validateTaskRecord(record,state);const t=record.runtime_task;
-    if(!same(state.owner,t.owner))throw Error('Task owner or epoch changed');
-    if(state.paused)throw Error('Company is paused');
+    if(!same(state.owner,t.owner))throw new SchedulingHold('AUTHORITY_CHANGED','Task owner or epoch changed');
+    if(state.paused)throw new SchedulingHold('PAUSED','Company is paused');
     if(t.state!=='planned'||t.attempts.length)throw Error('Task is not a fresh planned assignment');
     assertTaskPrerequisites(state,record);
     const jobs=[],required=[],inputs=new Set(t.spec.input_ids);
@@ -250,7 +256,7 @@ export function taskReady(state,record){
     if(t.spec.review_task_id){const r=taskRecord(state,t.spec.review_task_id),item=output(state,r,'output');review_of=item.artifact.id;required.push(item.job.id);inputs.add(review_of);}
     const coordination=bindCoordination(state,{depends_on:[...new Set(jobs)],resources:t.spec.resources});
     return {ready:true,depends_on:[...new Set(jobs)],review_of,input_ids:[...inputs],resources:[...t.spec.resources],coordination,required_context_jobs:[...new Set(required)]};
-  }catch(error){return {ready:false,reason:error.message};}
+  }catch(error){return {ready:false,reason:error.message,recovery:schedulingRecovery(error)};}
 }
 export function bindTaskAttempt(state,record,job){
   // The caller may insert the new queued job before binding it in the same
@@ -271,7 +277,7 @@ export function reconcileTask(state,record){
   if(!same(state.owner,t.owner)&&!['cancelled','needs_attention'].includes(t.state)){t.state='needs_attention';t.attention='Task owner or epoch changed; prior authority does not permit further execution or acceptance';return bump(record);}
   if(!t.attempts.length||['cancelled','needs_attention'].includes(t.state))return record;
   const prior=JSON.stringify(t);let job;
-  try{job=currentAttempt(state,record);}catch(error){t.state='needs_attention';t.attention=error.message;}
+  try{job=currentAttempt(state,record);}catch(error){t.state='needs_attention';t.attention_code=schedulingRecovery(error).code;t.attention=error.message;}
   if(job){
     if(t.state==='cancelling'){
       if(job.coordination_release?.termination_confirmed===true){t.state='cancelled';t.attention=null;}
@@ -279,7 +285,7 @@ export function reconcileTask(state,record){
     else if(job.status==='running')t.state='running';
     else if(job.status==='completed'){
       try{const {artifact}=output(state,record,'output');t.state=artifact.kind==='review'?'accepted':'returned';t.attempts[0].artifact_id=artifact.id;t.attempts[0].finished_at=job.finished_at??t.attempts[0].finished_at??stamp();}
-      catch(error){t.state='needs_attention';t.attention=error.message;}
+      catch(error){t.state='needs_attention';t.attention_code=schedulingRecovery(error).code;t.attention=error.message;}
     }else {t.state='needs_attention';t.attention=`Attempt ${job.status}; inspect retained outcome and process closure before any new work`;}
   }
   if(JSON.stringify(t)!==prior)bump(record);return record;

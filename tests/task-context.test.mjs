@@ -299,3 +299,15 @@ test('checkpoint rehydrates source-linked current objective and rejects stale re
   assert.notEqual(current.task.definition_sha256,checkpoint.task.definition_sha256);
   assert(!JSON.stringify(current).includes('private native conversation'));
 });
+
+test('outcome hypothesis and evidence survive task context and cold reconstruction',()=>{
+ const f=fixture(),outcome={objective:'Reduce founder repair effort',expected_effect:'Fewer repeated explanations',observation:'Record actual founder interventions and accepted results',assessment_period:'This supplied improvement workflow',evidence_ids:['current-input']};
+ const record=change(f,s=>submitTask(s,{...f,operation_id:'outcome-context',spec:{role:'engineer',task:'Prepare a bounded improvement',input_ids:['current-input'],expected_deliverable:'Reviewed proposal',acceptance:'Preserve every current restriction',outcome}},'codex'));
+ const j=job(f,record.id),state=read(f),pack=JSON.parse(taskAssignmentContext(state,j).text);
+ assert.deepEqual(pack.task.spec.outcome,outcome);
+ const checkpoint=taskCheckpoint(state,state.records[record.id]);assert.deepEqual(checkpoint.outcome,outcome);assert.match(checkpoint.outcome_status,/hypothesis/);
+ assert(checkpoint.input_sources.some(ref=>ref.id==='current-input'));
+ const original=taskAssignmentContext(state,j).hash;
+ change(f,s=>{s.records['current-input'].revision++;s.records['current-input'].content='Revised observation contradicts the original';});
+ assert.equal(taskContextMatches(read(f),j,original),false);
+});

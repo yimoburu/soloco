@@ -272,3 +272,28 @@ test('restore preserves accepted exact evidence, a queued obligation and an unpr
   assert.deepEqual(after.owner,before.owner);assert.deepEqual(Object.keys(after.jobs),Object.keys(before.jobs));
  }finally{f.close();fs.rmSync(transfer,{recursive:true,force:true});}
 });
+
+test('scheduler retries only typed pre-execution waits and retains misleading unknown failures',async()=>{
+ const {SchedulingHold}=await import('../plugins/soloco/runtime/recovery.mjs');
+ const f=fixture();
+ try{
+  const t=f.submit('typed-wait');
+  tickRuntime(f.root,{queue:()=>{throw new SchedulingHold('CAPACITY_BUSY','Completely different display wording');}});
+  assert.equal(f.read().records[t.id].runtime_task.state,'planned');
+  tickRuntime(f.root,{queue:()=>{throw Error('capacity reserved already active: an unknown integrity failure');}});
+  const state=f.read();assert.equal(state.records[t.id].runtime_task.state,'needs_attention');
+  assert.equal(state.records[t.id].runtime_task.attention_code,'UNKNOWN');
+  assert.equal(state.records[t.id].runtime_task.attempts.length,0);
+  const page=taskAction({...f.args,action:'inspect',task_id:t.id},'codex');
+  assert.equal(page.tasks[0].recovery.automatic,false);
+  assert.equal(page.tasks[0].recovery.retry_execution,false);
+ }finally{f.close();}
+});
+
+test('unstarted dependents expose an actionable wait without claiming an attempt',()=>{
+ const f=fixture();
+ try{const a=f.submit('pending-producer'),b=f.submit('pending-review',{role:'qa',review_task_id:a.id});
+  const page=taskAction({...f.args,action:'inspect',task_id:b.id},'codex');
+  assert.equal(page.tasks[0].readiness.ready,false);assert.equal(page.tasks[0].readiness.recovery.code,'DEPENDENCY_PENDING');assert.equal(page.tasks[0].readiness.recovery.automatic,true);assert.equal(page.tasks[0].attempts.length,0);
+ }finally{f.close();}
+});

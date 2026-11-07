@@ -57,3 +57,25 @@ Known conservative boundary: a scoped-current classification does not automatica
 Keep [#13](https://github.com/yimoburu/soloco/issues/13)'s context/storage and [#16](https://github.com/yimoburu/soloco/issues/16)'s CoS judgment contracts. Separate services, vector databases, recursive agent managers and additional business/spending powers are outside this minimum.
 
 `node tools/async-runtime-acceptance.mjs --prepare-only --output-dir /absolute/new/directory` prepares a fictional project through a real MCP process without starting native jobs. Explicit `--run-native` on a clean frozen source commit starts its three one-attempt native assignments, retains receipts and checks the exact producer/review/dependent links. Recovery restarts only the identified software supervisor while its detached native worker is in flight, preserving that job/attempt without duplication; it never kills the native worker. Missing that boundary is an unmet check. The fixture's hook binding is synthetic; it does not establish trusted Codex Hooks UI invocation or actual-company adoption. Inspect any failed receipt before taking another action; the harness never automatically retries.
+
+## Prospective founder outcome and recovery contracts
+
+New tasks may supply `spec.outcome` with `objective`, `expected_effect`,
+`observation`, `assessment_period` and `evidence_ids`. Every outcome evidence ID
+must also be an explicit task input. The complete hypothesis travels with the
+immutable task definition, dependent evidence and cold checkpoint. An outcome is
+never marked achieved merely because its task or review completed. Amending it
+changes the definition hash and retains the existing consumed-attempt boundary.
+
+Task inspection exposes a typed readiness/recovery explanation. Only runtime
+capacity, a live resource claim or a pending prerequisite permits automatic
+rechecking of an unstarted task. An uncertain process, changed authority or
+context, rejected review, and unknown failure require the indicated owner and
+next action. Scheduling never interprets error-message wording as permission.
+No recovery descriptor restarts an execution or replenishes attempts.
+
+Use `tools/outcome-observations.mjs BEFORE.json AFTER.json NEW_REPORT.json` for
+explicitly supplied local measurements. Each input contains `metric`, `period`,
+`numerator`, `denominator`, and `source_reference`. The report retains exact file
+hashes and normalized rates, and makes no causal, customer-value or founder-time
+claim. Supply it through the existing artifact/input route for outcome review.
