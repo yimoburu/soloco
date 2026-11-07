@@ -176,16 +176,82 @@ export function parseOutput(host, stdout) {
     if (value.is_error || value.subtype !== 'success') throw new Error(`Claude session did not finish successfully: ${String(value.result ?? value.subtype).slice(0,500)}`);
     return {native_id:value.session_id, text:value.result,model_evidence:modelEvidence(host,value.modelUsage)};
   }
-  let native_id, text;
-  for (const line of stdout.split('\n').filter(Boolean)) {
-    const event = JSON.parse(line);
-    if (event.type === 'thread.started') native_id = event.thread_id;
-    if (event.type === 'item.completed' && event.item?.type === 'agent_message') text = event.item.text;
-    if (event.type === 'error') throw new Error(`Codex CLI error: ${JSON.stringify(event.error ?? event.message ?? event.code ?? 'unspecified error').slice(0,500)}`);
-    if (event.type === 'turn.failed') throw new Error(`Codex session failed: ${JSON.stringify(event.error).slice(0,500)}`);
+  let native_id, text, observedText, observedNegative, turnId, turn=0, active=false, completed=false, pendingWarning=false, failure;
+  const warnings=[],itemTurns=new Map(),openMessages=new Set(),completedMessages=new Set(),negativeOutputs=new Set();
+  const fail=message=>{failure??=new Error(message);};
+  const itemTypes=new Set(['agent_message','reasoning','command_execution','file_change','mcp_tool_call','web_search','todo_list']);
+  // CLI JSONL ordering supplies turn association when IDs are omitted. Never
+  // carry a message across turn.started, or recover from a terminal failure.
+  for (const line of stdout.split('\n').filter(line=>line.trim())) {
+    let event;
+    try {event=JSON.parse(line);} catch {fail('Malformed Codex CLI event stream');continue;}
+    if(!event || typeof event!=='object' || Array.isArray(event)){fail('Malformed Codex CLI event');continue;}
+    if(event.type==='item.completed' && event.item?.type==='agent_message' && typeof event.item.text==='string') {
+      observedText=event.item.text;
+      try {
+        const envelope=JSON.parse(observedText.trim().replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, ''));
+        if([envelope?.review,envelope?.qualification_result].some(r=>['Fail','Blocked'].includes(r?.verdict))){observedNegative??=observedText;negativeOutputs.add(observedText);}
+      } catch {} // Malformed model text is still retained, never accepted here.
+    }
+    if(event.thread_id!==undefined && event.type!=='thread.started' && event.thread_id!==native_id)fail('Codex thread identity changed');
+    if(event.turn_id!==undefined && event.type!=='turn.started' && event.turn_id!==turnId)fail('Codex turn identity changed');
+    switch(event.type) {
+      case 'thread.started':
+        if(native_id!==undefined || typeof event.thread_id!=='string' || !event.thread_id.trim())fail('Invalid Codex thread identity');
+        else native_id=event.thread_id;
+        break;
+      case 'turn.started':
+        if(turn)fail('Codex CLI call contains multiple or replayed turns');
+        if(!native_id || active)fail('Invalid Codex turn start');
+        if(event.turn_id!==undefined && (typeof event.turn_id!=='string'||!event.turn_id))fail('Invalid Codex turn identity');
+        active=true;completed=false;text=undefined;turnId=event.turn_id;turn++;
+        break;
+      case 'item.started': case 'item.updated': case 'item.completed':
+        if(!active || !itemTypes.has(event.item?.type))fail('Unsupported Codex item sequence');
+        if(event.item?.type==='agent_message'&&event.type!=='item.completed'&&event.item.id===undefined)fail('Codex message start requires item identity');
+        if(event.item?.type==='agent_message'&&event.type==='item.started'&&openMessages.has(event.item.id))fail('Codex message item already started');
+        if(event.item?.id!==undefined) {
+          if(typeof event.item.id!=='string' || !event.item.id || (itemTurns.has(event.item.id)&&itemTurns.get(event.item.id)!==turn))fail('Codex item belongs to another turn');
+          else itemTurns.set(event.item.id,turn);
+          if(event.item?.type==='agent_message'&&completedMessages.has(event.item.id))fail('Codex message item already completed');
+        }
+        if(event.item?.type==='agent_message' && event.type==='item.completed') {
+          openMessages.delete(event.item.id??null);
+          if(event.item.id!==undefined)completedMessages.add(event.item.id);
+          if(typeof event.item.text!=='string' || !event.item.text.trim())fail('Invalid Codex agent message');
+          // Older CLI versions omit phase. Explicit commentary cannot be final.
+          if(event.item.phase===undefined || event.item.phase==='final_answer')text=event.item.text;
+          else if(event.item.phase!=='commentary')fail('Unsupported Codex message phase');
+        }
+        if(event.item?.type==='agent_message' && event.type!=='item.completed')openMessages.add(event.item.id??null);
+        break;
+      case 'error':
+        warnings.push(event);pendingWarning=true;
+        break;
+      case 'turn.completed':
+        if(!active || !text || openMessages.size)fail('Codex returned no completed artifact for current turn');
+        active=false;completed=true;pendingWarning=false;
+        break;
+      case 'turn.failed': case 'turn.interrupted': case 'turn.cancelled':
+        fail(`Codex session failed: ${event.type}: ${JSON.stringify(event.error??event.message??'unspecified failure').slice(0,500)}`);active=false;completed=false;text=undefined;
+        break;
+      default: fail('Unsupported Codex CLI event stream');
+    }
   }
-  if (!text) throw new Error('Codex returned no completed artifact');
-  return {native_id, text,model_evidence:modelEvidence('codex')};
+  const model_evidence=modelEvidence('codex');
+  if(warnings.length)model_evidence.cli_warnings=warnings;
+  if(negativeOutputs.size>1)model_evidence.cli_observed_negative_outputs=[...negativeOutputs];
+  if(!completed || active || pendingWarning || !text)fail('Codex returned no completed artifact for current turn');
+  // A later message cannot disposition an earlier negative inside one CLI call.
+  // Preserve the negative and require a separate, explicitly reviewed repair.
+  if(observedNegative&&(text!==observedNegative||negativeOutputs.size>1))fail('Codex returned conflicting artifacts after observed negative evidence');
+  if(failure) {
+    // This is rejected evidence only. Even malformed/truncated streams retain
+    // their observed message (or the stream itself), never a successful result.
+    failure.rejected_output={native_id,text:observedNegative??observedText??stdout,model_evidence};
+    throw failure;
+  }
+  return {native_id, text,model_evidence};
 }
 
 // Existing positional calls remain valid. options is an internal dependency
@@ -254,6 +320,10 @@ export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selectio
       settled=true;
       cleanup();
       if (error) {
+        if(host==='codex' && stdout && !error.rejected_output) {
+          try {error.rejected_output=parseOutput(host,stdout);}
+          catch(parseError) {error.rejected_output=parseError.rejected_output;}
+        }
         error.termination_confirmed=closed;
         reject(error);
       } else resolve(result);
@@ -358,6 +428,7 @@ export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selectio
       }
       try {
         const result=parseOutput(host,stdout);
+        if(host==='codex' && nativeId && result.native_id!==nativeId)throw Object.assign(new Error('Codex resumed thread identity changed'),{rejected_output:result});
         result.model_evidence.applied_controls=appliedControls(host,args);
         // Parsing also must not carry a completion across its deadline.
         if (expired()) return finish(failure);

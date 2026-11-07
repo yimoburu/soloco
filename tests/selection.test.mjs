@@ -141,7 +141,7 @@ test('Codex advertised speed metadata is bounded and never becomes an execution 
 });
 
 test('host output does not turn successful exit or usage into effective model/effort/tier proof',()=>{
-  const codex=parseOutput('codex','{"type":"thread.started","thread_id":"native"}\n{"type":"item.completed","item":{"type":"agent_message","text":"ok"}}');
+  const codex=parseOutput('codex','{"type":"thread.started","thread_id":"native"}\n{"type":"turn.started"}\n{"type":"item.completed","item":{"type":"agent_message","text":"ok"}}\n{"type":"turn.completed"}');
   assert.deepEqual(codex.model_evidence.reported_models,[]);
   assert.equal(codex.model_evidence.reported_effort,null);
   assert.equal(codex.model_evidence.reported_service_tier,null);
@@ -173,7 +173,7 @@ async function syntheticRun(host,selection,nativeId) {
   child.stdin.end=prompt=>{
     assert.equal(prompt,'test prompt');
     child.emit('spawn');
-    child.stdout.emit('data',host==='codex'?'{"type":"item.completed","item":{"type":"agent_message","text":"ok"}}\n':JSON.stringify({subtype:'success',session_id:'synthetic-native',result:'ok'}));
+    child.stdout.emit('data',host==='codex'?[{type:'thread.started',thread_id:nativeId??'synthetic-native'},{type:'turn.started'},{type:'item.completed',item:{type:'agent_message',text:'ok'}},{type:'turn.completed'}].map(e=>JSON.stringify(e)).join('\n'):JSON.stringify({subtype:'success',session_id:'synthetic-native',result:'ok'}));
     child.emit('close',0);
   };
   const result=await runModel(host,nativeId,'test prompt','/synthetic',180000,selection,{
@@ -191,7 +191,7 @@ async function syntheticRun(host,selection,nativeId) {
 test('runModel retains positional/options contract and distinguishes applied argv from observations',async()=>{
   for(const native of [null,'native-prior']) {
     const {result}=await syntheticRun('codex',explicit(),native);
-    assert.equal(result.native_id,native);
+    assert.equal(result.native_id,native??'synthetic-native');
     assert.equal(result.model_evidence.applied_controls.model,'test-small');
     assert.equal(result.model_evidence.applied_controls.effort,'low');
     assert.equal(result.model_evidence.applied_controls.service_tier,null);

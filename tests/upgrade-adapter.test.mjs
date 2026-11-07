@@ -43,7 +43,9 @@ test('selected upgrade calls apply identical launch and resume flags while obser
           const text=JSON.stringify({content:'Fictional review'});
           if(host==='codex')child.stdout.write([
             {type:'thread.started',thread_id:`native-${host}`},
-            {type:'item.completed',item:{type:'agent_message',text}}
+            {type:'turn.started'},
+            {type:'item.completed',item:{type:'agent_message',text}},
+            {type:'turn.completed'}
           ].map(value=>JSON.stringify(value)).join('\n'));
           else child.stdout.write(JSON.stringify({subtype:'success',session_id:`native-${host}`,result:text,modelUsage:{'fixture-model':{inputTokens:10}}}));
           child.emit('close',0);
