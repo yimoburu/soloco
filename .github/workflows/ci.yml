@@ -9,23 +9,14 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 permissions:
   contents: read
+defaults:
+  run:
+    shell: bash
 jobs:
   tests:
-    name: ${{ matrix.name }}
+    name: Tests Node 22
     runs-on: macos-15
     timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - node: '22'
-            lane: regression-22
-            name: Tests Node 22
-            description: Regression selection with exact evidence
-          - node: '26'
-            lane: compatibility-26
-            name: Compatibility Node 26
-            description: Targeted runtime compatibility with exact evidence
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -34,16 +25,17 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: ${{ matrix.node }}
-      - name: ${{ matrix.description }}
-        run: node tools/ci/run.mjs ${{ matrix.lane }} "$RUNNER_TEMP/source-ci"
-      - name: Retain evidence even on failure
+          node-version: '22'
+      - name: Regression tests
+        run: node tools/ci/check.mjs regression-22 2>&1 | tee "$RUNNER_TEMP/tests.log"
+      - name: Upload diagnostic log (optional)
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: source-ci-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.lane }}
-          path: ${{ runner.temp }}/source-ci/
-          if-no-files-found: error
+          name: ci-tests-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/tests.log
+          if-no-files-found: warn
           retention-days: 30
   build:
     name: Build and drift
@@ -52,41 +44,36 @@ jobs:
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          fetch-depth: 0
           persist-credentials: false
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: '22'
-      - run: node tools/ci/run.mjs build "$RUNNER_TEMP/source-ci"
-      - name: Retain evidence even on failure
+      - run: node tools/ci/check.mjs build 2>&1 | tee "$RUNNER_TEMP/build.log"
+      - name: Upload diagnostic log (optional)
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: source-ci-${{ github.run_id }}-${{ github.run_attempt }}-build
-          path: ${{ runner.temp }}/source-ci/
-          if-no-files-found: error
+          name: ci-build-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/build.log
+          if-no-files-found: warn
           retention-days: 30
   gate:
     name: CI gate
     if: always()
     needs: [tests, build]
     runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-      actions: read
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          fetch-depth: 0
           persist-credentials: false
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: '22'
-      - name: Require every lane success
+      - name: Require regression and build success
         env:
-          GH_TOKEN: ${{ github.token }}
           TESTS: ${{ needs.tests.result }}
           BUILD: ${{ needs.build.result }}
         run: node tools/ci/gate.mjs

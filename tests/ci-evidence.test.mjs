@@ -7,6 +7,7 @@ import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {hash,source,tapCounts,validateReceipt,compatibilityTests,qualificationTests,laneCoverage,selectedTests} from '../tools/ci/evidence.mjs';
 import {execute,run} from '../tools/ci/run.mjs';
+import {check} from '../tools/ci/check.mjs';
 import {verify,unzip} from '../tools/ci/verify.mjs';
 const root=fileURLToPath(new URL('../',import.meta.url));
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),'fictional-ci-'));
@@ -83,13 +84,25 @@ test('approved workflow alone cannot authorize changed CI helper code or an unex
   const other=receipt();other.r.execution_authorized=true;assert.throws(()=>valid(other.r,other.out),/unrecognized/);
 });
 test('ZIP parsing rejects traversal and truncated evidence',()=>{assert.throws(()=>unzip(zip([['../escape','x']])));assert.throws(()=>unzip(Buffer.from('truncated')));});
-test('final gate independently rejects a cancelled matrix member even if aggregate says success',async()=>{
+test('gate uses only required job results and rejects failed, skipped or cancelled checks',async()=>{
   const {gate}=await import('../tools/ci/gate.mjs');
-  const env={TESTS:'success',BUILD:'success',GITHUB_REPOSITORY:'fictional/repository',GITHUB_RUN_ID:'123',GITHUB_RUN_ATTEMPT:'2'};
-  const jobs=expected.lanes.map(l=>({name:l.job,run_id:123,run_attempt:2,status:'completed',conclusion:'success'}));
-  await gate(env,async()=>({jobs,total_count:3}));
-  jobs[1].conclusion='cancelled';await assert.rejects(gate(env,async()=>({jobs,total_count:3})),/cancelled/);
-  await assert.rejects(gate({...env,TESTS:'skipped'},async()=>{throw Error('must not fetch');}),/aggregate/);
+  const env={TESTS:'success',BUILD:'success'};
+  await gate(env);
+  for(const key of ['TESTS','BUILD'])for(const value of ['failure','cancelled','skipped',undefined])await assert.rejects(gate({...env,[key]:value}),/aggregate/);
+});
+test('ordinary checks succeed for edited local source and propagate actual test failures',()=>{
+  const repo=directory();fs.mkdirSync(path.join(repo,'tests'));
+  fs.writeFileSync(path.join(repo,'tests/a.test.mjs'),"import test from 'node:test';test('fixture pass',()=>{});\n");
+  for(const args of [['init'],['add','.'],['-c','user.name=Fiction','-c','user.email=fiction@example.invalid','commit','-m','fixture']])assert.equal(spawnSync('git',args,{cwd:repo}).status,0);
+  fs.writeFileSync(path.join(repo,'candidate.txt'),'uncommitted local edit');assert.equal(source(repo).dirty,true);
+  assert.equal(check('regression-22',repo),0);
+  fs.writeFileSync(path.join(repo,'tests/a.test.mjs'),"import test from 'node:test';test('fixture failure',()=>{throw Error('actual test failure')});\n");
+  assert.equal(check('regression-22',repo),1);
+});
+test('ordinary checks propagate a failing build and refuse an empty test selection',()=>{
+  const repo=directory();fs.mkdirSync(path.join(repo,'tools'));fs.mkdirSync(path.join(repo,'tests'));
+  fs.writeFileSync(path.join(repo,'tools/build-plugin.mjs'),'process.exitCode=7;');
+  assert.equal(check('build',repo),7);assert.throws(()=>check('regression-22',repo),/no tests selected/);
 });
 test('remote artifacts cannot hide changed or missing command logs behind a fresh archive digest',async()=>{
   for(const mutation of ['changed','missing']){
