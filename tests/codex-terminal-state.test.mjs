@@ -31,6 +31,23 @@ function adapter(events,{code=0,limit}={}) {
  });
 }
 const invoke=(events,options)=>adapter(events,options)('codex',null,'fictional prompt','/tmp',180000);
+const diagnostic=(id='diagnostic')=>({type:'item.completed',item:{id,type:'error',message:'Fictional optional feature is unavailable'}});
+for(const verdict of ['Pass','Blocked'])test('completed diagnostic items preserve a valid current '+verdict,async()=>{
+ const raw=negative(verdict),result=await invoke([thread,diagnostic('startup'),start,diagnostic('during'),message(raw),done]);
+ assert.equal(result.text,raw);assert.deepEqual(result.model_evidence.cli_warnings,[{type:'error',message:diagnostic().item.message},{type:'error',message:diagnostic().item.message}]);
+});
+for(const [name,events] of [
+ ['diagnostic only',[thread,diagnostic()]],
+ ['no current completion',[thread,start,diagnostic(),message(negative())]],
+ ['terminal failure',[thread,start,diagnostic(),message(negative()),{type:'turn.failed'}]],
+ ['post-terminal diagnostic',[thread,start,message(negative()),done,diagnostic()]],
+ ['missing identity',[thread,start,{type:'item.completed',item:{type:'error',message:'warning'}},message(negative()),done]],
+ ['malformed diagnostic',[thread,start,{type:'item.completed',item:{id:'bad',type:'error',message:7}},message(negative()),done]],
+ ['replayed diagnostic',[thread,diagnostic(),start,diagnostic(),message(negative()),done]],
+ ['diagnostic before thread',[diagnostic(),thread,start,message(negative()),done]],
+])test(name+' cannot create successful adapter completion',async()=>{
+ await assert.rejects(invoke(events),e=>e.termination_confirmed===true);
+});
 for(const verdict of ['Blocked','Pass'])test('reconnect warning coexists with current completed '+verdict,async()=>{
  const text=negative(verdict),result=await invoke([thread,start,warning,message(text),done]);
  assert.equal(result.text,text);assert.equal(result.native_id,thread.thread_id);
