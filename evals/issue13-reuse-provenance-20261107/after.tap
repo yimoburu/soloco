@@ -1,0 +1,34 @@
+TAP version 13
+# Subtest: qualified exact reuse cannot bypass the new candidate supplemental bindings
+ok 1 - qualified exact reuse cannot bypass the new candidate supplemental bindings
+  ---
+  duration_ms: 1053.040958
+  type: 'test'
+  ...
+# Subtest: actual qualified validation reuse retains original execution and still requires new independent QA
+ok 2 - actual qualified validation reuse retains original execution and still requires new independent QA
+  ---
+  duration_ms: 1152.300375
+  type: 'test'
+  ...
+# Subtest: qualified validation reuse requires the original QA job to own the exact review and target
+ok 3 - qualified validation reuse requires the original QA job to own the exact review and target
+  ---
+  duration_ms: 2306.354584
+  type: 'test'
+  ...
+# Subtest: reuse acceptance rechecks the exact qualification producer and native identity after reuse
+ok 4 - reuse acceptance rechecks the exact qualification producer and native identity after reuse
+  ---
+  duration_ms: 3333.6135
+  type: 'test'
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 4
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 8053.929083

@@ -1,0 +1,23 @@
+{
+  "kind": "independent-verifier-followup",
+  "base_revision": "860038d",
+  "node": "v22.23.2",
+  "focused_command": "node --test tests/candidate-format-qualification.test.mjs",
+  "passed": 5,
+  "failed": 0,
+  "skipped": 0,
+  "actual_macos_sandbox": true,
+  "native_calls": 0,
+  "new_coverage": [
+    "Recompute canonical plan scope hash",
+    "Runtime test job candidate identity",
+    "Runtime test job plan identity",
+    "Independent reviewer job receipt ID and revision",
+    "Receipt text equals structured actual executed result, with consistently changed downstream hashes rejected"
+  ],
+  "independent_before_after_evidence": "independent-binding-review.json",
+  "limitations": [
+    "Explicit synthetic model outputs with actual production dispatch, sandbox execution and exact acceptance; no native model quality or performance evidence.",
+    "Existing original reports, failed full-file controls, attempts and grants remain unchanged."
+  ]
+}

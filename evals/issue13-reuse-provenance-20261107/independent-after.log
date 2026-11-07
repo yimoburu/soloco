@@ -1,0 +1,30 @@
+TAP version 13
+# CLOSURE PROBE {"job":"failed","error":"Prior independent QA must explicitly qualify deterministic validation reuse with canonical producer provenance"}
+# Subtest: independent probe: changed source author closure prevents fresh validation reuse
+ok 1 - independent probe: changed source author closure prevents fresh validation reuse
+  ---
+  duration_ms: 767.281292
+  type: 'test'
+  ...
+# Subtest: independent probe: distinct changed source author native invalidates an existing reuse
+ok 2 - independent probe: distinct changed source author native invalidates an existing reuse
+  ---
+  duration_ms: 1033.972
+  type: 'test'
+  ...
+# PUBLICATION PROBE {"status":"Quarantined","reused":true,"job":"quarantined"}
+# Subtest: independent probe: changed source receipt body is quarantined at publication
+ok 3 - independent probe: changed source receipt body is quarantined at publication
+  ---
+  duration_ms: 924.7735
+  type: 'test'
+  ...
+1..3
+# tests 3
+# suites 0
+# pass 3
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2887.346958
