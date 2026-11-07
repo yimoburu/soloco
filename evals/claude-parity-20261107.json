@@ -1,0 +1,88 @@
+{
+  "date": "2026-11-07",
+  "status": "passed_with_scoped_claims",
+  "regression": {
+    "source_commit": "f25d3c2a161e17d012fe05f4dc8838410cce4fef",
+    "lane": "regression-22",
+    "platform": "macOS",
+    "tests": 713,
+    "pass": 713,
+    "fail": 0,
+    "skipped": 0,
+    "full_qualification_run": false
+  },
+  "native_pipeline": {
+    "source_commit": "c71479073875591bcc713d7e7c7f7e46a81dddf5",
+    "status": "passed_native_fixture",
+    "host": "claude",
+    "requested_model": "sonnet",
+    "checks": {
+      "prepared_without_native_jobs": true,
+      "inflight_supervisor_recovery_without_duplicate": true,
+      "native_pipeline_and_peer_disposition": true,
+      "idle_starts_no_new_native_jobs": true
+    },
+    "native_closure_confirmed": true,
+    "jobs": [
+      {
+        "role": "engineer",
+        "status": "completed",
+        "native_id": "ed426ea4-2800-4629-acd7-39d0fa2ce302"
+      },
+      {
+        "role": "qa",
+        "status": "completed",
+        "native_id": "79e841ef-db6e-463d-b0b5-cf2d041287a6"
+      },
+      {
+        "role": "research",
+        "status": "completed",
+        "native_id": "dc4e8778-9acd-47c7-970e-a7b4d4d0812f"
+      }
+    ]
+  },
+  "live_startup": {
+    "cli_version": "2.1.319",
+    "status": "passed",
+    "host": "claude",
+    "native_id": "d2b05346-8c01-4730-be7a-20c4fff9a474",
+    "scope": "Real Claude --plugin-dir invocation in an empty fictional folder; no company initialized."
+  },
+  "native_resume": {
+    "passed": true,
+    "native_id": "d2b05346-8c01-4730-be7a-20c4fff9a474",
+    "same_session_and_context_verified": true
+  },
+  "retained_failures": [
+    "Catalog source mismatch before invocation, fixed",
+    "Host required settings/authentication block, resolved through user sign-in",
+    "Nested content object rejected, shared response instructions clarified"
+  ],
+  "limitations": [
+    "Native three-role fixture tested c714790; final fast-off metadata extension tested in source regression",
+    "Host UI/model catalog/account entitlement remain host-specific",
+    "No actual-company handover or new installed plugin release",
+    "Raw local evidence retained separately; no company stores or account credentials included in this receipt"
+  ],
+  "evidence_sha256": {
+    "native-passed-inflight-restart-mcp-stderr.log": "80a9bd641d3e1b34fd81359c84e9134271d044389041d85a48673e16dc75d67f",
+    "marketplace-validation.log": "2f5371bb7cede2830df0b4d9719ec15ad407e380e1e6f6683375bd421a4af1ba",
+    "native-passed-initial-mcp-stderr.log": "db2a127f3d6cb4905f7967d4c3ed88a544e0a5c90a825fdde881756cf5d9e344",
+    "live-hook.stderr": "b6f2ae682b4240660fd1865e4d7ce8702772fcba26f73724216966b2e53225f5",
+    "plugin-validation.log": "b1db13ea957d3415235e79c74b98677aa0564024634f4d04ba2b8ae03a072ef2",
+    "verified.tap": "b423c9b67248411152f20025184857208327411df193b2591da6a3b5833017fe",
+    "native-after-fix.json": "78e19a59ebe28f4ac0b82d9a1d1ec2c495695ec16f0302b71fd3cd6f6875cf8b",
+    "live-hook-authenticated.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "native-resume.json": "5986c7424bcd80f655aa618d49dda966290af5fa2f03cb21c9ff46069db89e6c",
+    "catalog-final.tap": "0f251d5bbcca563835f5a849990156b290c34078e0629f44f2d7daf798d0f1d3",
+    "regression-final.tap": "51e357b197eff611b8e23eb7e83ea81de0b59349ce1a54e6f0d187ea1e56d7ed",
+    "response-shape.tap": "288327d91fb3a12a9cac7359208ed5230b988f0c26c4b3e2c199f170b1896732",
+    "default-fast-off.tap": "33ea83cd86871a2512134cef4404b75f13928ee7a692c093fc4611ea803a20b7",
+    "native-passed-mcp-protocol.ndjson": "9a1cccdd1d96685244f3e498276b4205a9782736e05d9d42b201442015aeff57",
+    "live-hook-authenticated.json": "7eb9524d13bec319111d53830881aa396627fcae79d7b635b11c3add6c93cd4d",
+    "native-passed.json": "92225d3c31c2d4bb9b9d268eb7aa96c22afa4343dc5f3c075d40d0865626d17d",
+    "regression-release.tap": "31db3ef73652eec0673ce7b8be9177bc12f299571f5eed87d2f3b39797a37ef4",
+    "native-before-fix.json": "2b681f4680afdfb60e7572430f562c12fb66b83281f570133b419a281d4c49af",
+    "native-content-format-failure.json": "dc094d0f4c5ba49a3ac5357ee7140aabd3732550afc9aba76c57e6aea7ea4223"
+  }
+}
