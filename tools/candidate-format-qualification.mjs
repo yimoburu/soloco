@@ -19,12 +19,26 @@ export const protocol=Object.freeze({version:1,kind:'accepted_candidate_format_c
   limitations:['One observation per arm; descriptive results cannot establish statistical quality noninferiority, production reliability, cost savings or causal latency gains.','Only manually supplied fictional modules and fixed tests are shared with the existing host model. Synthetic company binding and grant are fixture data; no actual company state or authority changes.','Requested/applied model controls differ from effective provider settings; missing observations remain unknown.','All failed or uncertain calls stay retained and hold that case without retry. Source integration, installation and deployment are outside this evaluation.']});
 const bytes=value=>Buffer.byteLength(JSON.stringify(value));
 const selections={engineer:{mode:'explicit',model:'gpt-6.1-sol',effort:'medium',speed:'host_default',reason:'Exact one-character fictional module repairs; identical model controls in all format arms.'},qa:{mode:'explicit',model:'gpt-6.1-sol',effort:'high',speed:'host_default',reason:'Independent complete candidate, actual receipt and exact fixture preservation review; identical controls in all arms.'}};
-export function sourceIdentity(){
-  const base=fileURLToPath(new URL('../',import.meta.url)),files=[];
+export function sourceIdentity(base=fileURLToPath(new URL('../',import.meta.url))){
+  const files=[];
   const walk=dir=>{for(const e of fs.readdirSync(path.join(base,dir),{withFileTypes:true})){const p=path.posix.join(dir,e.name);if(e.isDirectory())walk(p);else if(e.isFile())files.push({path:p,sha256:digest(fs.readFileSync(path.join(base,p)))});}};
   walk('plugins/soloco');for(const p of ['SPEC.md','tools/candidate-format-qualification.mjs','tools/workflow-runtime.mjs','tools/verify-candidate-format-qualification.mjs','tests/candidate-format-qualification.test.mjs'])files.push({path:p,sha256:digest(fs.readFileSync(path.join(base,p)))});files.sort((a,b)=>a.path.localeCompare(b.path));
   let git_head=null;try{git_head=execFileSync('git',['rev-parse','HEAD'],{cwd:base,encoding:'utf8',stdio:['ignore','pipe','ignore']}).trim();}catch{}
   return {design_base_revision:protocol.design_base_revision,git_head,identity_rule:'Exact file manifest controls applicability; a design baseline or Git HEAD alone is insufficient.',files,manifest_sha256:digest(JSON.stringify(files)),node:{version:process.version,platform:process.platform,arch:process.arch,executable_sha256:digest(fs.readFileSync(process.execPath))}};
+}
+
+const nonempty=value=>typeof value==='string'&&value.trim().length>0;
+const sha=value=>typeof value==='string'&&/^[a-f0-9]{64}$/.test(value);
+export function verifySourceIdentity(before,after){
+  const valid=value=>value&&Array.isArray(value.files)&&value.files.length>0&&value.files.every(f=>nonempty(f.path)&&sha(f.sha256))&&new Set(value.files.map(f=>f.path)).size===value.files.length&&value.manifest_sha256===digest(JSON.stringify(value.files))&&nonempty(value.design_base_revision)&&(value.git_head===null||/^[a-f0-9]{40}$/.test(value.git_head))&&sha(value.node?.executable_sha256)&&['version','platform','arch'].every(k=>nonempty(value.node[k]));
+  const errors=[];
+  if(!valid(before)||!valid(after))errors.push('Missing or invalid source/runtime fingerprint');
+  else if(JSON.stringify(before)!==JSON.stringify(after))errors.push('Source or Node runtime fingerprint changed during evaluation');
+  return {passed:errors.length===0,status:errors.length?'held':'matched',before_manifest_sha256:before?.manifest_sha256??null,after_manifest_sha256:after?.manifest_sha256??null,errors};
+}
+export function captureSourceVerification(before,capture=sourceIdentity){
+  try{const after=capture();return {after,verification:verifySourceIdentity(before,after)};}
+  catch(error){return {after:null,verification:{passed:false,status:'held',before_manifest_sha256:before?.manifest_sha256??null,after_manifest_sha256:null,errors:['Post-run source fingerprint could not be captured: '+error.message]}};}
 }
 
 export function fixture(count){
@@ -94,21 +108,37 @@ export async function runCase({directory,count,format,native=false,model,sharedB
   return report;
 }
 
-export function assess(cases){const expected=new Set(['1-files','1-patches','3-files','3-patches']),seen=new Set(cases.map(c=>`${c.count}-${c.format}`));const identities=cases.length===4&&seen.size===4&&[...seen].every(k=>expected.has(k))&&new Set(cases.map(c=>c.execution)).size===1&&new Set(cases.map(c=>c.source_manifest_sha256)).size===1&&!!cases[0]?.source_manifest_sha256;
-  const valid=c=>c.accepted&&c.exact_fixture_match&&c.original_source_unchanged&&c.errors.length===0&&!c.calls.some(x=>x.error)&&!c.events.some(x=>x.type==='held')&&c.calls.length===2&&c.calls.filter(x=>x.role==='engineer').length===1&&c.calls.filter(x=>x.role==='qa').length===1&&c.calls.every(x=>x.requested?.mode==='explicit'&&x.requested.model==='gpt-6.1-sol'&&x.requested.speed==='host_default'&&x.requested.effort===(x.role==='engineer'?'medium':'high'))&&c.fixture_sha256===digest(JSON.stringify(fixture(c.count)))&&c.review?.verdict==='Pass'&&c.review.native_id!==c.review.author_native_id&&c.attempts.length===1&&c.attempts[0].result?.tests_executed===true&&c.attempts[0].result.status==='passed'&&c.attempts[0].result.exit_code===0&&c.acceptance?.review_id===c.review.id&&c.acceptance.candidate_sha256===c.generation?.candidate_sha256&&c.review.candidate_sha256===c.generation?.candidate_sha256&&c.review.receipt_sha256===c.attempts[0].receipt_sha256&&c.acceptance.receipt_sha256===c.attempts[0].receipt_sha256;
-  return {passed:identities&&cases.every(valid),unique_expected_cases:identities,accepted_cases:cases.filter(valid).length,total_cases:cases.length,critical_false_acceptances:cases.filter(c=>c.accepted&&!valid(c)).length,statistical_noninferiority_established:false,causal_latency_improvement_established:false};}
+export function assess(cases,sourceVerification=null){
+  const list=Array.isArray(cases)?cases:[],expected=new Set(['1-files','1-patches','3-files','3-patches']),seen=new Set(list.map(c=>`${c?.count}-${c?.format}`));
+  const identities=list.length===4&&seen.size===4&&[...seen].every(k=>expected.has(k))&&new Set(list.map(c=>c.execution)).size===1&&['native_cli','synthetic_contract_double'].includes(list[0]?.execution)&&new Set(list.map(c=>c.source_manifest_sha256)).size===1&&sha(list[0]?.source_manifest_sha256);
+  const valid=c=>{
+    if(!c||![1,3].includes(c.count)||!Array.isArray(c.calls)||!Array.isArray(c.attempts)||!Array.isArray(c.errors)||!Array.isArray(c.events))return false;
+    const author=c.calls.find(x=>x?.role==='engineer'),reviewer=c.calls.find(x=>x?.role==='qa'),attempt=c.attempts[0],candidateHash=c.generation?.candidate_sha256;
+    return c.accepted===true&&c.exact_fixture_match===true&&c.original_source_unchanged===true&&c.repairs===0&&c.errors.length===0&&!c.calls.some(x=>!x||x.error)&&!c.events.some(x=>!x||x.type==='held')&&
+      c.calls.length===2&&c.calls.filter(x=>x.role==='engineer').length===1&&c.calls.filter(x=>x.role==='qa').length===1&&c.calls.every(x=>nonempty(x.native_id)&&nonempty(x.job_id)&&x.requested?.mode==='explicit'&&x.requested.model==='gpt-6.1-sol'&&x.requested.speed==='host_default'&&x.requested.effort===(x.role==='engineer'?'medium':'high'))&&
+      c.fixture_sha256===digest(JSON.stringify(fixture(c.count)))&&c.precheck?.tests_executed===true&&c.precheck.status==='failed'&&Number.isInteger(c.precheck.exit_code)&&c.precheck.exit_code!==0&&Number.isFinite(c.elapsed_ms)&&c.elapsed_ms>0&&
+      sha(candidateHash)&&nonempty(c.generation.candidate_id)&&c.generation.native_id===author.native_id&&c.generation.byte_accounting?.format===c.format&&c.review?.verdict==='Pass'&&nonempty(c.review.id)&&c.review.native_id===reviewer.native_id&&c.review.author_native_id===author.native_id&&reviewer.native_id!==author.native_id&&
+      c.events.some(e=>e.type==='returned'&&e.role==='engineer'&&e.job_id===author.job_id&&e.artifact_id===c.generation.candidate_id)&&c.events.some(e=>e.type==='returned'&&e.role==='qa'&&e.job_id===reviewer.job_id&&e.artifact_id===c.review.id)&&
+      c.attempts.length===1&&nonempty(attempt?.test_job_id)&&nonempty(attempt.receipt_id)&&sha(attempt.receipt_sha256)&&attempt.result?.tests_executed===true&&attempt.result.status==='passed'&&attempt.result.exit_code===0&&attempt.result.candidate_sha256===candidateHash&&
+      c.acceptance?.review_id===c.review.id&&c.acceptance.source_integrated===false&&c.acceptance.candidate_sha256===candidateHash&&c.review.candidate_sha256===candidateHash&&c.review.receipt_sha256===attempt.receipt_sha256&&c.acceptance.receipt_sha256===attempt.receipt_sha256;
+  };
+  const sourceMatched=sourceVerification===null||(sourceVerification?.passed===true&&sourceVerification.status==='matched'&&sourceVerification.errors?.length===0&&sourceVerification.before_manifest_sha256===list[0]?.source_manifest_sha256&&sourceVerification.after_manifest_sha256===list[0]?.source_manifest_sha256);
+  return {passed:identities&&sourceMatched&&list.every(valid),unique_expected_cases:identities,source_verification_required:sourceVerification!==null,source_verification_passed:sourceMatched,accepted_cases:list.filter(valid).length,total_cases:list.length,critical_false_acceptances:list.filter(c=>c?.accepted&&!valid(c)).length,statistical_noninferiority_established:false,causal_latency_improvement_established:false};
+}
 async function main(argv){
   if(argv.length!==2||!['--native','--contract-double'].includes(argv[0]))throw Error('Use --native|--contract-double NEW_OUTPUT_DIRECTORY');
   const native=argv[0]==='--native',directory=path.resolve(argv[1]);if(fs.existsSync(directory))throw Error('Preserve evidence: choose a new output directory');fs.mkdirSync(directory,{recursive:true});
   process.env.COMPANY_PLUGIN_DATA=path.join(directory,'fixture-bindings');const sourceManifest=sourceIdentity(),runProtocol={...protocol,source_identity:sourceManifest};fs.writeFileSync(path.join(directory,'predeclared-protocol.json'),JSON.stringify(runProtocol,null,2)+'\n',{flag:'wx'});
   const capability=sandboxCapability();if(!capability.supported)throw Error(capability.blocker);
   const ready=native?readiness('codex'):null,catalog=native?modelCatalog('codex'):null;if(native&&(!ready.available||!ready.authenticated))throw Error(ready.error??'Native CLI is unavailable or unauthenticated');
-  const cases=[],sharedBudget={calls:0};
-  for(const count of protocol.fixture.module_counts)for(const format of protocol.fixture.formats){
-    const result=await runCase({directory,count,format,native,sharedBudget,runtimeReady:ready,runtimeCatalog:catalog,sourceManifest});cases.push(result);
-    fs.writeFileSync(path.join(directory,'report.json'),JSON.stringify({protocol:runProtocol,execution:native?'native_cli':'synthetic_contract_double',cases:cases.map(publicReport),assessment:assess(cases)},null,2)+'\n');console.log(JSON.stringify({count,format,accepted:result.accepted,metrics:result.metrics,errors:result.errors}));
-    if(result.calls.some(c=>c.error?.termination_confirmed!==true&&c.error))return void(process.exitCode=1);
+  const cases=[],sharedBudget={calls:0};let result;
+  for(const [count,format] of protocol.fixture.module_counts.flatMap(count=>protocol.fixture.formats.map(format=>[count,format]))){
+    const observation=await runCase({directory,count,format,native,sharedBudget,runtimeReady:ready,runtimeCatalog:catalog,sourceManifest});cases.push(observation);
+    const {after:source_identity_after,verification:source_verification}=captureSourceVerification(sourceManifest);
+    result=assess(cases,source_verification);
+    fs.writeFileSync(path.join(directory,'report.json'),JSON.stringify({protocol:runProtocol,source_identity_after,source_verification,execution:native?'native_cli':'synthetic_contract_double',cases:cases.map(publicReport),assessment:result},null,2)+'\n');console.log(JSON.stringify({count,format,accepted:cases.at(-1).accepted,metrics:cases.at(-1).metrics,errors:cases.at(-1).errors,source_verification}));
+    if(!source_verification.passed||cases.at(-1).calls.some(c=>c.error?.termination_confirmed!==true&&c.error))break;
   }
-  const result=assess(cases);console.log(JSON.stringify(result));if(!result.passed)process.exitCode=1;
+  console.log(JSON.stringify(result));if(!result?.passed)process.exitCode=1;
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))main(process.argv.slice(2)).catch(e=>{console.error(e.message);process.exitCode=1;});

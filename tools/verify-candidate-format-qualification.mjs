@@ -7,11 +7,11 @@ import {publicReport} from './workflow-runtime.mjs';
 
 export function verifyCase(report,state){
   const expected=[...fixture(report.count).expected,fixture(report.count).test].sort((a,b)=>a.path.localeCompare(b.path));
-  const producerCall=report.calls.find(c=>c.role==='engineer'),producer=state.jobs[producerCall?.job_id];
+  const producerCall=report.calls.find(c=>c.role==='engineer'),reviewCall=report.calls.find(c=>c.role==='qa'),producer=state.jobs[producerCall?.job_id];
   const candidate=state.records[producer?.artifact_id],attempt=report.attempts.at(-1),testJob=state.jobs[attempt?.test_job_id],receipt=state.records[testJob?.artifact_id],review=state.records[report.review?.id],reviewJob=state.jobs[review?.job_id];
   const complete=candidate?.development?.files,exact=Array.isArray(complete)&&JSON.stringify(complete)===JSON.stringify(expected);
   const candidateHash=complete?digest(JSON.stringify(complete)):null;
-  const result=receipt?.development?.result;
+  const result=receipt?.development?.result,plan=state.records[candidate?.development?.plan_id];
   const checks={
     clean_accepted_lifecycle:report.errors.length===0&&!report.calls.some(c=>c.error)&&!report.events.some(e=>e.type==='held'),
     expected_calls:report.calls.length===2&&report.calls.filter(c=>c.role==='engineer').length===1&&report.calls.filter(c=>c.role==='qa').length===1&&report.attempts.length===1&&report.repairs===0,
@@ -19,15 +19,20 @@ export function verifyCase(report,state){
     exact_fixture_identity:report.fixture_sha256===digest(JSON.stringify(fixture(report.count)))&&report.module_bytes.length===report.count&&report.module_bytes.every(n=>n===32768),
     exact_fixture:exact,
     candidate_hash:!!candidate&&candidate.development.candidate_sha256===candidateHash&&report.generation?.candidate_sha256===candidateHash,
+    candidate_provenance:!!candidate&&candidate.kind==='artifact'&&candidate.status==='Submitted'&&candidate.author_role==='engineer'&&candidate.job_id===producer?.id&&candidate.author_instance===producer?.instance_id&&report.generation?.candidate_id===candidate.id&&report.generation?.native_id===producer?.native_id&&producerCall.native_id===producer?.native_id,
+    exact_scope_format:!!plan&&candidate?.development?.scope_sha256===plan.development.scope_sha256&&report.scope_sha256===plan.development.scope_sha256&&plan.development.scope.output_format===report.format&&candidate.development.generation?.format===report.format&&report.generation?.byte_accounting?.format===report.format,
     producer_complete:producer?.status==='completed'&&!!producer.native_id&&producer.coordination_release?.termination_confirmed===true,
     tests_executed:!!receipt&&testJob?.status==='completed'&&result?.tests_executed===true&&result.status==='passed'&&result.exit_code===0&&result.candidate_sha256===candidateHash,
     receipt_hash:!!receipt&&receipt.development.receipt_sha256===digest(receipt.content)&&report.attempts.at(-1)?.receipt_sha256===receipt.development.receipt_sha256,
-    exact_receipt_candidate:!!receipt&&receipt.development.candidate_id===candidate?.id&&receipt.development.candidate_sha256===candidateHash,
+    exact_receipt_candidate:!!receipt&&receipt.development.candidate_id===candidate?.id&&receipt.development.candidate_sha256===candidateHash&&report.attempts[0]?.receipt_id===receipt.id&&report.attempts[0].result?.candidate_sha256===candidateHash&&JSON.stringify(report.attempts[0].result)===JSON.stringify(result),
+    runtime_test_provenance:!!receipt&&receipt.status==='Submitted'&&receipt.author_role==='runtime'&&receipt.author_instance===testJob?.id&&testJob.kind==='development_test'&&candidate?.development?.run?.job_id===testJob.id&&candidate.development.run.receipt_id===receipt.id&&receipt.development.plan_id===plan?.id,
     independent_review:review?.review?.verdict==='Pass'&&review.review.permitted_action==='accept_local_development'&&Array.isArray(review.review.blockers)&&review.review.blockers.length===0&&reviewJob?.status==='completed'&&!!reviewJob.native_id&&reviewJob.native_id!==producer?.native_id&&reviewJob.coordination_release?.termination_confirmed===true,
     review_binding:!!review&&review.review_of?.id===receipt?.id&&review.review_of.revision===receipt?.revision&&review.review.candidate_sha256===candidateHash&&review.review.receipt_sha256===receipt?.development?.receipt_sha256,
+    review_provenance:!!review&&review.kind==='review'&&review.status==='Submitted'&&review.author_role==='qa'&&review.author_instance===reviewJob?.instance_id&&review.author_instance!==candidate?.author_instance&&reviewJob?.artifact_id===review.id&&reviewCall?.job_id===reviewJob?.id&&reviewCall?.native_id===reviewJob?.native_id,
     reported_review_binding:!!review&&report.review?.verdict===review.review.verdict&&report.review.candidate_sha256===review.review.candidate_sha256&&report.review.receipt_sha256===review.review.receipt_sha256&&report.review.native_id===reviewJob?.native_id&&report.review.author_native_id===producer?.native_id,
-    accepted_binding:report.accepted===true&&report.acceptance?.review_id===review?.id&&report.acceptance?.candidate_sha256===candidateHash&&report.acceptance?.receipt_sha256===receipt?.development?.receipt_sha256&&receipt?.development?.acceptance?.review_id===review?.id,
-    originals_unchanged:report.original_source_unchanged===true
+    accepted_binding:report.accepted===true&&report.acceptance?.review_id===review?.id&&report.acceptance?.candidate_sha256===candidateHash&&report.acceptance?.receipt_sha256===receipt?.development?.receipt_sha256&&report.acceptance.source_integrated===false&&receipt?.development?.acceptance?.review_id===review?.id&&receipt.development.acceptance.candidate_sha256===candidateHash&&receipt.development.acceptance.receipt_sha256===receipt.development.receipt_sha256&&receipt.development.acceptance.source_integrated===false,
+    originals_unchanged:report.original_source_unchanged===true,
+    original_test_failure:report.precheck?.tests_executed===true&&report.precheck.status==='failed'&&Number.isInteger(report.precheck.exit_code)&&report.precheck.exit_code!==0
   };
   let rejected;try{rejected=JSON.parse(producer?.rejected_output?.text??'null');}catch{}
   const producerStage=producer?.status==='completed'?'candidate_returned':rejected?.blocked?'producer_blocked':producer?.rejected_output?'invalid_or_incomplete_output':producerCall?.error?'provider_or_backend_failure':'admission_or_runtime_failure';
