@@ -31,6 +31,26 @@ function adapter(events,{code=0,limit}={}) {
  });
 }
 const invoke=(events,options)=>adapter(events,options)('codex',null,'fictional prompt','/tmp',180000);
+const diagnostic=(id='diagnostic')=>({type:'item.completed',item:{id,type:'error',message:'Fictional optional feature is unavailable'}});
+for(const type of ['item.started','item.updated','item.completed'])test(type+' cannot reuse a completed diagnostic identity',async()=>{
+ await assert.rejects(invoke([thread,start,diagnostic('same'),{type,item:{id:'same',type:'agent_message',text:negative('Pass')}},message(negative()),done]),/diagnostic item cannot be reused/);
+});
+for(const verdict of ['Pass','Blocked'])test('completed diagnostic items preserve a valid current '+verdict,async()=>{
+ const raw=negative(verdict),result=await invoke([thread,diagnostic('startup'),start,diagnostic('during'),message(raw),done]);
+ assert.equal(result.text,raw);assert.deepEqual(result.model_evidence.cli_warnings,[{type:'error',message:diagnostic().item.message},{type:'error',message:diagnostic().item.message}]);
+});
+for(const [name,events] of [
+ ['diagnostic only',[thread,diagnostic()]],
+ ['no current completion',[thread,start,diagnostic(),message(negative())]],
+ ['terminal failure',[thread,start,diagnostic(),message(negative()),{type:'turn.failed'}]],
+ ['post-terminal diagnostic',[thread,start,message(negative()),done,diagnostic()]],
+ ['missing identity',[thread,start,{type:'item.completed',item:{type:'error',message:'warning'}},message(negative()),done]],
+ ['malformed diagnostic',[thread,start,{type:'item.completed',item:{id:'bad',type:'error',message:7}},message(negative()),done]],
+ ['replayed diagnostic',[thread,diagnostic(),start,diagnostic(),message(negative()),done]],
+ ['diagnostic before thread',[diagnostic(),thread,start,message(negative()),done]],
+])test(name+' cannot create successful adapter completion',async()=>{
+ await assert.rejects(invoke(events),e=>e.termination_confirmed===true);
+});
 for(const verdict of ['Blocked','Pass'])test('reconnect warning coexists with current completed '+verdict,async()=>{
  const text=negative(verdict),result=await invoke([thread,start,warning,message(text),done]);
  assert.equal(result.text,text);assert.equal(result.native_id,thread.thread_id);
@@ -192,4 +212,27 @@ test('worker cannot accept later Pass over a completed negative',async()=>{
  await work(f.root,f.job.id,adapter(prompt=>[thread,start,message(raw),message(boundEnvelope(prompt,'Pass')),done]));
  const j=read(f).jobs[f.job.id];assert.equal(j.status,'failed');assert.equal(j.artifact_id,undefined);
  assert.equal(j.rejected_output.text,raw);assert.equal(j.rejected_output.qualification_negative,'Blocked');
+});
+
+const startupWarning={type:'item.completed',item:{id:'startup-warning',type:'error',message:'Ignoring unknown `features` requirement `ultrafast_mode` from requirements layers: fictional managed requirements'}};
+test('known pre-turn CLI startup diagnostic is retained and requires a complete turn',async()=>{
+ const result=await invoke([thread,startupWarning,start,message(negative('Pass')),done]);
+ assert.deepEqual(result.model_evidence.cli_warnings,[{type:'error',message:startupWarning.item.message}]);
+ assert.equal(result.model_evidence.verification,'unverified');
+ for(const events of [
+  [thread,startupWarning],
+  [thread,startupWarning,start,message(negative('Pass'))],
+  [thread,startupWarning,start,{type:'turn.failed'},message(negative('Pass')),done],
+  [thread,startupWarning,startupWarning,start,message(negative('Pass')),done],
+  [thread,start,message(negative('Pass')),done,startupWarning],
+       ])await assert.rejects(invoke(events));
+});
+
+test('skill-budget diagnostic preserves warning evidence and still requires successful terminal completion',async()=>{
+ const event={type:'item.completed',item:{id:'skill-warning',type:'error',message:'Skill descriptions were shortened to fit the skills context budget. Codex can still see every skill, but some descriptions are shorter. Disable unused skills or plugins to leave more room for the rest.'}};
+ const result=await invoke([thread,start,event,message(negative('Pass')),done]);
+ assert.deepEqual(result.model_evidence.cli_warnings,[{type:'error',message:event.item.message}]);
+ const {proofJobSafe}=await import('../plugins/soloco/runtime/current-state.mjs');assert(proofJobSafe({model_evidence:result.model_evidence}));
+ assert.deepEqual((await invoke([thread,start,message(negative('Pass')),event,done])).model_evidence.cli_warnings,[{type:'error',message:event.item.message}]);
+ await assert.rejects(invoke([thread,start,event,{type:'turn.failed'},message(negative('Pass')),done]));
 });

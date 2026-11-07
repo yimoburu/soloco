@@ -1,3 +1,4 @@
+import {SchedulingHold} from './recovery.mjs';
 import { digest } from './store.mjs';
 import {taskMessageInput,assertTaskPrerequisites} from './tasks.mjs';
 
@@ -32,6 +33,7 @@ function dependency(state,id,seen=new Set()) {
   }
   let subject=null;
   if(artifact.kind==='review') {
+    if(['Fail','Blocked'].includes(artifact.review?.verdict))throw new SchedulingHold('REVIEW_HELD',`Dependency ${id} lacks a current exact-subject Pass; review is ${artifact.review.verdict}`);
     const target=state.records[artifact.review_of?.id];
     if(!target || target.status!=='Submitted' || target.revision!==artifact.review_of.revision || job.review_of?.id!==target.id || job.review_of?.revision!==target.revision || artifact.review?.verdict!=='Pass' || (artifact.review.blockers!==undefined && (!Array.isArray(artifact.review.blockers)||artifact.review.blockers.length)))throw new Error(`Dependency ${id} lacks a current exact-subject Pass; a review is not acceptance or permission`);
     if(target.development?.type==='test') {
@@ -62,7 +64,7 @@ export function bindCoordination(state,args) {
   if(!value.depends_on.length&&!value.resources.length)return null;
   const dependencies=value.depends_on.map(id=>dependency(state,id));
   const claims=resourceClaims(state);
-  for(const resource of value.resources)if(claims.some(c=>c.resource===resource))throw new Error(`Resource ${resource} is reserved; wait for confirmed completion or inspect uncertain execution`);
+  for(const resource of value.resources){const claim=claims.find(c=>c.resource===resource);if(claim)throw new SchedulingHold(claim.termination_unverified?'EXECUTION_UNCERTAIN':'RESOURCE_BUSY',`Resource ${resource} is reserved; wait for confirmed completion or inspect uncertain execution`);}
   return {version:1,dependencies,resources:value.resources};
 }
 export function coordinationEligible(state,job) {

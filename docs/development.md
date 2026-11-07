@@ -1,6 +1,6 @@
 # Developer guide
 
-The [README](../README.md) covers installation and the current release boundary. [SPEC.md](../SPEC.md) v0.20 is the canonical source/target contract; the plugin implements preparation, review, file-only prototypes and bounded local development candidates, not a claim that every acceptance criterion passes.
+The [README](../README.md) covers installation and the current release boundary. [SPEC.md](../SPEC.md) v0.21 is the canonical source/target contract; the plugin implements preparation, review, file-only prototypes and bounded local development candidates, not a claim that every acceptance criterion passes.
 
 The target covers ongoing operation against founder-defined objectives, including profitability and founder workload where relevant. Launch and financing are optional milestones. The current plugin can prepare objectives, operating plans, and reviews from supplied evidence; it does not run business operations, collect live business metrics, or schedule unattended operating reviews. Existing companies keep their pinned governance until explicit adoption through the upgrade flow.
 
@@ -13,6 +13,15 @@ v0.6.11 removes the 40,000-character whole-response rejection and uses an 80,000
 v0.7.3 packages the accepted proactive CoS behavior and SPEC v0.20 alongside the accepted architecture repair: indexed current reads, reusable scoped qualification, incremental upgrade continuation, and confirmed worker closure bound to execution ownership. Explicit runtime, team, model-selection, local-development and prototype compatibility retains published v0.7.1 and v0.7.2. Read-only open preserves its producer; semantic writes stamp v0.7.3 and fence the immutable published v0.7.1 and v0.7.2 writers. Pinned governance, instructions, roles and authority remain unchanged, including exact published v0.18 support. See [historical v0.7.2 release packaging validation](release-v0.7.2-validation.md) for focused checks, reused composite evidence and native limitations.
 
 v0.7.3 packages the proactive CoS instructions and SPEC v0.20, with explicit published v0.7.2 compatibility. See [release validation](release-v0.7.3-validation.md). Existing company pins remain unchanged until checked adoption.
+
+The current v0.7.6 source carries SPEC v0.21. Its notice, follow-through and
+current-meaning clarifications have separate contract identity; exact published
+v0.20 remains eligible for the existing local development/prototype workflows.
+The frozen v0.20 fixture and both explicit capability allowlists prevent a source
+update from forcing adoption. Historical v0.20 release receipts below keep their
+original scope. See [founder-benefit acceptance](founder-benefit-acceptance.md)
+for prospective outcome measurements and [SPEC reconciliation](spec-reconciliation.md)
+for current claim/evidence boundaries.
 
 ## Design rule: less is more
 
@@ -69,7 +78,7 @@ Notices track presentation attempts, seen status, and resolution separately. Sta
 
 ## Local development implementation
 
-`company_develop` provides `inspect`, `plan`, `authorize`, `run`, `accept` and `revoke`. New development needs an adopted v0.5.0, v0.6.0, v0.6.1, v0.6.2, v0.6.3, v0.6.4, v0.6.5, v0.6.6, v0.6.7, v0.6.8–v0.6.13, v0.7.0, v0.7.1, v0.7.2 or v0.7.3 team and exact source v0.20 or exact published v0.19/v0.18 governance; installation does not adopt them. Company mode stays preparation: authority is attached to the specific standing local scope, never to a global unrestricted mode. Separate company objectives, source/data choices, expiry and attempt/time/output limits from framework identity, integrity and independent-review enforcement.
+`company_develop` provides `inspect`, `plan`, `authorize`, `run`, `accept` and `revoke`. New development needs a supported adopted team and source v0.21 or exact published v0.20/v0.19/v0.18 governance; installation does not adopt them. Company mode stays preparation: authority is attached to the specific standing local scope, never to a global unrestricted mode. Separate company objectives, source/data choices, expiry and attempt/time/output limits from framework identity, integrity and independent-review enforcement.
 
 The retained published v0.18 SHA-256 is `185933ddeafe9709bef44e9a6605ba7adb5faaa8bc43c1c64f1da3b03ae5f400`. Both local capability gates explicitly accept it alongside the installed governance hash; prototype also retains the exact v0.17 hash. Development retains supported v0.5.0–v0.6.13, v0.7.0, v0.7.1 and published v0.7.2 teams alongside v0.7.3; prototype also retains v0.4.0/v0.4.1 teams. Unknown/modified governance and unsupported teams hold affected workflows. Compatibility preserves pinned governance, instructions, team hash and existing grant records; it grants no new authority and does not bypass expiry, changed constraints, review, ownership or sandbox checks. The unchanged CoS skill already defers to pinned governance and describes standing scope and exact-output review, so this reconciliation requires no procedure amendment.
 
@@ -107,7 +116,7 @@ The [issue #18 validation report](issue-18-validation.md) records tests, a repro
 
 ## Local prototype implementation
 
-`company_prototype` adds `inspect`, `plan`, `authorize`, `revoke` and `materialize`. Company mode stays `preparation`; permission belongs to one immutable scope. Status and startup hooks distinguish installed support from company eligibility. Prototype capability accepts supported adopted teams with exact source v0.20 or retained published v0.19, v0.18 or v0.17 governance. The previous governance hashes are explicitly retained for compatibility; arbitrary older or modified governance remains unsupported. Installation neither adopts new rules nor invalidates an existing compatible prototype grant. Old pinned teams remain usable for preparation, but reviews or generic decisions cannot unlock prototype writes. Prototype records stamp the producing runtime version; old packages cannot operate new-team state.
+`company_prototype` adds `inspect`, `plan`, `authorize`, `revoke` and `materialize`. Company mode stays `preparation`; permission belongs to one immutable scope. Status and startup hooks distinguish installed support from company eligibility. Prototype capability accepts supported adopted teams with source v0.21 or retained published v0.20, v0.19, v0.18 or v0.17 governance. The previous governance hashes are explicitly retained for compatibility; arbitrary older or modified governance remains unsupported. Installation neither adopts new rules nor invalidates an existing compatible prototype grant. Old pinned teams remain usable for preparation, but reviews or generic decisions cannot unlock prototype writes. Prototype records stamp the producing runtime version; old packages cannot operate new-team state.
 
 A plan records a new `prototypes/<slug>` directory, 2–32 exact relative file paths, test paths, manually supplied fictional fixtures and their source, acceptance, stop conditions, expiry (up to seven days), and 1–3 implementation attempts. Hidden paths, traversal, host instruction files, case collisions and file/directory conflicts are rejected. Independent QA must approve the exact scope before `authorize` records the founder instruction and fictional-data attestation. Company records still supply assignment constraints; no project-data ingestion is added. Fixture provenance and fictional content are attested and reviewed, not mechanically proven. This provenance boundary is the same as existing founder controls: the runtime validates the recorded grant, not human intent or fixture truth independently.
 

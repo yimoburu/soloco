@@ -1,3 +1,4 @@
+import {schedulingRecovery} from './recovery.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import {spawn} from 'node:child_process';
@@ -8,13 +9,14 @@ import {submitTask,amendTask,cancelTask,taskRecord,taskView,taskReady,reconcileT
 import {portfolioContext,taskCheckpoint} from './task-context.mjs';
 import {jobTimeoutState} from './timeout.mjs';
 import {contextMatches} from './context.mjs';
+import {inheritSnapshots} from './snapshot.mjs';
 
 const registered=new Set();
 const alive=pid=>{if(!Number.isInteger(pid)||pid<1)return false;try{process.kill(pid,0);return true;}catch(e){return e.code==='EPERM';}};
 const options=state=>({rootKeys:TASK_ROOT_KEYS,entities:{upgrade:['id','status'],records:Object.keys(state.records??{}),jobs:Object.keys(state.jobs??{}),sessions:Object.keys(state.sessions??{}),notices:null,messages:[]}});
 function selected(db,type,state,fn){return db.selectedTransaction(type,options(state),fn,{afterWrite:updateTaskIndex});}
 const source=record=>({id:record.id,revision:record.revision,sha256:digest(JSON.stringify(record))});
-function compactTask(record){const {task,acceptance,...view}=taskView(record);return {...view,task_summary:task.slice(0,160),acceptance_preview:acceptance.slice(0,320),source:source(record),display_fields_are_previews:true,acceptance_freshness:'A recorded review outcome; current reuse always requires fresh runtime validation'};}
+function compactTask(record,state){const {task,acceptance,...view}=taskView(record);return {...view,...(state&&record.runtime_task.state==='planned'?{readiness:taskReady(state,record)}:{}),task_summary:task.slice(0,160),acceptance_preview:acceptance.slice(0,320),source:source(record),display_fields_are_previews:true,acceptance_freshness:'A recorded review outcome; current reuse always requires fresh runtime validation'};}
 function viewControl(state,db){
   let r;try{r=runtimeControl(state);}catch(e){return {enabled:false,state:'needs_attention',reason:e.message};}
   const c=r.runtime_control,hasLease=db?.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='async_runtime_lease'").get(),lease=hasLease?db.db.prepare('SELECT pid,heartbeat_at FROM async_runtime_lease WHERE instance_id=?').get(c.instance_id):null,live=alive(c.pid),fresh=Boolean(lease&&lease.pid===c.pid&&Date.now()-Date.parse(lease.heartbeat_at)<10000);
@@ -58,7 +60,7 @@ export function taskAction(args,host,{wake=ensureSupervisor}={}) {
           return result;
         }
         const ids=args.task_id?[args.task_id]:loaded.page.ids,result={protocol:'async-tasks-v1',runtime:viewControl(loaded.state,db),tasks:[],total:args.task_id?1:loaded.page.total,complete:false,next_cursor:null};
-        for(const key of ids){const item=compactTask(taskRecord(loaded.state,key));if(Buffer.byteLength(JSON.stringify({...result,tasks:[...result.tasks,item]}))>16000)break;result.tasks.push(item);}
+        for(const key of ids){const item=compactTask(taskRecord(loaded.state,key),loaded.state);if(Buffer.byteLength(JSON.stringify({...result,tasks:[...result.tasks,item]}))>16000)break;result.tasks.push(item);}
         result.complete=result.tasks.length===ids.length&&Boolean(args.task_id||loaded.page.complete);
         result.next_cursor=result.complete?null:result.tasks.length?taskCursor(db,result.tasks.at(-1).id):null;
         if(!result.tasks.length&&ids.length)result.hold='Task brief exceeds the bounded reply; read the exact task source.';
@@ -139,26 +141,44 @@ export function tickRuntime(root,{instance=null,pid=process.pid,dispatch=true,cu
     const calculate=(s,verify=false)=>{
       const r=runtimeControl(s,{enabled:dispatch}),c=r.runtime_control;
       if(instance&&(c.instance_id!==instance||c.pid!==pid))throw Error('Supervisor lease or generation changed');
-      const ready=[];let changed=false;
+      const ready=[],planned=[],jobs={...s.jobs},records={...s.records};let changed=false;
+      // All decisions in this batch see the same source state. In particular,
+      // one task's attention notice must not invalidate a later review before
+      // its own exact negative finding has been reconciled.
+      const view=inheritSnapshots(s,{...s,records,jobs});
       for(const key of loaded.page.ids){
-        const task=taskRecord(s,key),before=JSON.stringify(task);
+        const task=taskRecord(s,key);
         for(const attempt of task.runtime_task.attempts){
-          const job=s.jobs?.[attempt.job_id];if(!job||!['queued','running'].includes(job.status))continue;
+          const job=jobs[attempt.job_id];if(!job||!['queued','running'].includes(job.status))continue;
           const timing=jobTimeoutState(job,Date.now());
           if(['overdue','inspection'].includes(timing.state)){
-            job.status='interrupted';job.finished_at=stamp();job.timeout_reconciliation={...timing,at:stamp(),termination_confirmed:false};
-            job.error='Async attempt timing requires reconciliation; process closure is unverified';changed=true;
+            jobs[attempt.job_id]={...job,status:'interrupted',finished_at:stamp(),timeout_reconciliation:{...timing,at:stamp(),termination_confirmed:false},error:'Async attempt timing requires reconciliation; process closure is unverified'};changed=true;
           }
         }
-        const completed=s.jobs?.[task.runtime_task.attempts[0]?.job_id];
-        if(verify&&completed?.status==='completed'&&completed.context_sha256&&!contextMatches(s,completed,completed.context_sha256)){
-          task.runtime_task.state='needs_attention';task.runtime_task.attention='Completed result context changed before runtime acceptance';task.status='Async:needs_attention';task.revision++;task.updated_at=stamp();
-        }else reconcileTask(s,task);
-        if(task.runtime_task.state==='planned'){
-          const status=taskReady(s,task);
-          if(status.ready)ready.push(key);
-        }
-        if(before!==JSON.stringify(task)){changed=true;if(task.runtime_task.state==='needs_attention')notice(s,'must_know','Async task needs CoS attention: '+(task.runtime_task.attention??'inspect exact task'),key);}
+      }
+      for(const key of loaded.page.ids){
+        const original=taskRecord(s,key),before=JSON.stringify(original),task=JSON.parse(before);
+        records[key]=task;
+        try{
+          const completed=jobs[task.runtime_task.attempts[0]?.job_id];
+          if(verify&&!['needs_attention','cancelling','cancelled'].includes(task.runtime_task.state)&&completed?.status==='completed'&&completed.context_sha256&&!contextMatches(view,completed,completed.context_sha256)){
+            task.runtime_task.state='needs_attention';task.runtime_task.attention_code='CONTEXT_CHANGED';task.runtime_task.attention='Completed result context changed before runtime acceptance';task.status='Async:needs_attention';task.revision++;task.updated_at=stamp();
+          }else reconcileTask(view,task);
+          if(task.runtime_task.state==='planned'){
+            const status=taskReady(view,task);
+            if(status.ready)ready.push(key);
+            else if(!status.recovery?.automatic){
+              task.runtime_task.state='needs_attention';task.runtime_task.attention_code=status.recovery?.code??'UNKNOWN';
+              task.runtime_task.attention=String(status.reason).slice(0,1000);task.status='Async:needs_attention';task.revision++;task.updated_at=stamp();
+            }
+          }
+          if(before!==JSON.stringify(task)){changed=true;planned.push(task);}
+        }finally{records[key]=original;}
+      }
+      for(const [key,job] of Object.entries(jobs))if(job!==s.jobs[key])s.jobs[key]=job;
+      for(const task of planned){
+        s.records[task.id]=task;
+        if(task.runtime_task.state==='needs_attention')notice(s,'must_know','Async task needs CoS attention: '+(task.runtime_task.attention??'inspect exact task'),task.id);
       }
       return {ready,next_cursor:loaded.page.cursor,complete:loaded.page.complete,active_tasks:loaded.page.total,changed};
     };
@@ -177,9 +197,10 @@ export function tickRuntime(root,{instance=null,pid=process.pid,dispatch=true,cu
     for(const key of summary.ready){
       try{if(!queue)throw Error('A supervisor dispatch function is required');dispatched.push(queue(root,key,instance?{runtime_instance_id:instance,supervisor_pid:pid}:{}));}
       catch(e){
-        if(/Supervisor generation changed/.test(e.message))throw e;
-        if(/capacity|already active|reserved|prior.*closure|already.*assignment/i.test(e.message))continue;
-        withStore(root,db=>{const {state}=readTaskState(db,{task_ids:[key],limit:1});selected(db,'task.attention',state,s=>{const c=runtimeControl(s,{enabled:true}).runtime_control;if(instance&&(c.instance_id!==instance||c.pid!==pid))throw Error('Supervisor generation changed while handling dispatch failure');const r=taskRecord(s,key);if(r.runtime_task.state==='planned'){r.runtime_task.state='needs_attention';r.runtime_task.attention=String(e.message).slice(0,1000);r.status='Async:needs_attention';r.revision++;r.updated_at=stamp();notice(s,'must_know','Async task could not start: '+r.runtime_task.attention,r.id);}return null;});});
+        const recovery=schedulingRecovery(e);
+        if(recovery.code==='GENERATION_CHANGED')throw e;
+        if(recovery.automatic)continue;
+        withStore(root,db=>{const {state}=readTaskState(db,{task_ids:[key],limit:1});selected(db,'task.attention',state,s=>{const c=runtimeControl(s,{enabled:true}).runtime_control;if(instance&&(c.instance_id!==instance||c.pid!==pid))throw Error('Supervisor generation changed while handling dispatch failure');const r=taskRecord(s,key);if(r.runtime_task.state==='planned'){r.runtime_task.state='needs_attention';r.runtime_task.attention_code=recovery.code;r.runtime_task.attention=String(e.message).slice(0,1000);r.status='Async:needs_attention';r.revision++;r.updated_at=stamp();notice(s,'must_know','Async task could not start: '+r.runtime_task.attention,r.id);}return null;});});
       }
     }
   }

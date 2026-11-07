@@ -1,0 +1,115 @@
+{
+  "status": "validated_with_affected_harness_rerun",
+  "runtime_code_commit": "bd869bd6958c4dee35cbf5332a665865b6db1335",
+  "runtime_candidate": "0.7.6",
+  "node": "v22.23.2",
+  "platform": "darwin",
+  "sandbox": {
+    "supported": true,
+    "backend": "macos-seatbelt-node",
+    "blocker": null
+  },
+  "tests": {
+    "full_run": {
+      "tests": 1115,
+      "pass": 1085,
+      "fail": 30,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "affected_rerun": {
+      "tests": 30,
+      "pass": 30,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "all_failures_matched_to_passing_rerun": true,
+    "distinct_verified_tests": 1115,
+    "skips": 0,
+    "qualification": "A complete run passed 1085 tests and failed 30 due solely to missing outcomeSchema injection in two import-stripping VM harnesses. All 30 passed after injecting the production schema. This is full-run plus affected-suite evidence, not a second all-green monolithic run.",
+    "full_log_sha256": "fed0a5467ab762bf05d4f9f1298862266f9e1fd70252d01e70a90d6f7937295d",
+    "rerun_log_sha256": "ff790ea2ec6772215ea2ec1a9b3455144c71620395b97668433d965025defc0b",
+    "full_receipt_sha256": "338cef2ad5c1853092d29b92bca2d9f0633a468d2bfc61b147ef65fd6ca5c3bd",
+    "failed_tests_rechecked": [
+      "dispatch schema admits only optional supported speed choices and preserves legacy requirements",
+      "upgrade reuses the optional dispatch selection schema with unchanged required arguments",
+      "legacy omission and host_default avoid catalog discovery and persist normalized requests",
+      "default-mode fast_disabled routes catalog support without manufacturing model or execution evidence",
+      "explicit models obtain catalog once and retain separate model and speed-support metadata",
+      "unsupported speed, missing fast-off support and unverified effort reject before queuing or launch",
+      "omitted speed, explicit host_default and reason-only changes reuse a finished session",
+      "speed changes retire identity and repeated fast_disabled reuses the replacement",
+      "explicit model session identity also rotates for speed and reuses unchanged selections",
+      "speed wiring preserves ownership, pause, scope, adoption and independent-review checks",
+      "fresh-session schema is optional and rejects missing, orphaned or invalid reasons without mutation",
+      "explicit fresh with identical settings retires exact lineage and queues null native without execution claims",
+      "fresh after confirmed failure preserves failed job, authority, limits, inputs and attempt evidence",
+      "fresh cannot retire active/uncertain sessions or bypass owner, pause, host, resource or scope holds",
+      "fresh is ordinary-only and cannot rotate handover reviewers or scoped generation identities",
+      "dispatch validates and persists policy, and main keeps software-test limits separate",
+      "upgrade review-window schema is bounded and runtime rejects invalid or misplaced requests before binding",
+      "status distinguishes long execution, grace, startup, queue, legacy and inspection",
+      "reconciliation rechecks eligibility inside the store transaction",
+      "worker queue delay does not consume custom execution time; actual callback is persisted",
+      "new jobs require spawn evidence; legacy injected models remain compatible",
+      "deadline aborts and late output is quarantined even if model ignores cancellation",
+      "pause, ownership loss, context change and scope revocation abort active work",
+      "startup expiry aborts without inventing spawn timing and launch errors retain evidence",
+      "coordination dispatch binds prerequisite evidence, admits disjoint resources and rejects premature/conflicting work",
+      "uncertain cancellation keeps resource claim; confirmed closure releases it",
+      "upgrade call ceiling schema and runtime reject invalid options before all boundaries",
+      "stream publication fence quarantines deadline crossed during final validation without session mutation",
+      "format4 receipt validation cannot publish after the original execution deadline",
+      "stream exact deadline closure and delayed timers cannot publish late Pass or renew allowance"
+    ],
+    "harness_files": [
+      "tests/selection-wiring.test.mjs",
+      "tests/timeout-wiring.test.mjs"
+    ],
+    "local_only": true,
+    "github_ci_attestation": false
+  },
+  "runtime_and_native_driver_unchanged_after_test_harness_fix": true,
+  "native_proposal": {
+    "accepted": true,
+    "calls": 5,
+    "elapsed_ms": 60786.488833,
+    "report_sha256": "c65b8fcfcf1dbd12033eaafa03e390325f7adac0f22310403da4c929278aa348",
+    "source_manifest_sha256": "2d1469020075a219e3b9b4262361141a4b94b8de9864e29d8890c2c4f423bd9f",
+    "specific_notice_hold_and_dispatch_refusal": true
+  },
+  "independent_source_review": {
+    "verdict": "Pass",
+    "findings": [],
+    "head": "bd869bd6958c4dee35cbf5332a665865b6db1335",
+    "head_unchanged": true,
+    "result_sha256": "d273becffa163e4ad4ba16a2ddc35fb45734e5a073f76b24575a190bad4cbff4",
+    "scope": "Static review of supplied diff and complete key modules, not deployment or business acceptance"
+  },
+  "real_source_self_improvement": {
+    "status": "passed_after_explicit_new_compression_tasks",
+    "total_native_attempts_in_retained_company": 5,
+    "prior_failed_review_retained": true,
+    "prior_attempts_not_retried": true,
+    "software_supervisor_recovery_observed": true,
+    "cold_outcome_checkpoint_retained": true,
+    "repair_receipt_sha256": "492021cb2bfba9e5e67852ee7f4af77ec6ad570097eda9fb7a1e209e410531c4",
+    "source_head": "bd869bd6958c4dee35cbf5332a665865b6db1335"
+  },
+  "observation_import": {
+    "report_sha256": "186c63f5ca61e3fab3a8a00b3861c216c8b5fc08e0d4b056a2380fcc2a333a23",
+    "scope": "Descriptive protocol-completion comparison of original and repair chains; no workload baseline or causal inference"
+  },
+  "founder_minutes": null,
+  "business_effect": null,
+  "installed": false,
+  "company_adoption": false,
+  "remaining": [
+    "Measure founder workload, comparative costs and longitudinal use",
+    "Actual founder-facing coordinator ownership replacement and live-company adoption",
+    "Automatic historical proposal pruning remains unimplemented"
+  ]
+}

@@ -22,6 +22,9 @@ assert.equal(digest(v018Governance),'185933ddeafe9709bef44e9a6605ba7adb5faaa8bc4
 // Immutable published contract from 64bd2eb:SPEC.md.
 const v019Governance=fs.readFileSync(new URL('./fixtures/governance-v019.md',import.meta.url),'utf8');
 assert.equal(digest(v019Governance),'d79b73676543ab053ea5ce7e456364f68700d0340d47c852a83bc97308f6a422');
+// Immutable v0.20 contract from 4038e0f:SPEC.md, identical to published a260eb8.
+const v020Governance=fs.readFileSync(new URL('./fixtures/governance-v020.md',import.meta.url),'utf8');
+assert.equal(digest(v020Governance),'28f99838abc3794da94f97f7a2d234554811da3aef7b8ddb3742075caa78ec36');
 
 const base=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-development-test-'));
 process.env.COMPANY_PLUGIN_DATA=path.join(base,'cache');
@@ -248,7 +251,7 @@ test('development capability fails closed without a supported sandbox, and MCP p
   await assert.rejects(call('company_develop',{...a,action:'inspect',command:'anything'},'codex'),/Unknown argument/);
 });
 test('installed development capability does not silently authorize older teams or modified governance',live,()=>{
-  const team=installedTeam();assert.match(team.governance,/v0\.20/);
+  const team=installedTeam();assert.match(team.governance,/v0\.21/);
   assert.equal(developmentCapability(team).eligible,true);
   for(const changed of [{...team,plugin_version:'0.4.1'},{...team,governance_sha256:digest('changed rules')}])assert.equal(developmentCapability(changed).eligible,false);
 });
@@ -277,18 +280,23 @@ for(const version of ['0.5.0','0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0
   assert.equal(fs.existsSync(path.join(a.root,'sum.test.mjs')),false);
   assert.equal(fs.readFileSync(path.join(a.root,'private.txt'),'utf8'),'NOT_AUTHORIZED');
 });
-test('v0.19 development candidate preparation preserves pinned company state and authority',live,async()=>{
+for(const [version,governance,pluginVersion=installedTeam().plugin_version] of [['0.19',v019Governance],['0.20',v020Governance,'0.7.5']])test(`v${version} development candidate preparation preserves pinned company state and authority`,live,async()=>{
   const a=setup();
-  withStore(a.root,db=>db.transaction('test.pin_v019',s=>{
-    s.governance=v019Governance;s.governance_sha256=digest(s.governance);
-    s.cos_instructions='Original pinned v0.19 instructions';s.team_sha256=teamHash(s);return s;
+  withStore(a.root,db=>db.transaction('test.pin_governance',s=>{
+    s.plugin_version=pluginVersion;s.runtime_version=pluginVersion;
+    s.governance=governance;s.governance_sha256=digest(s.governance);
+    s.cos_instructions=`Original pinned v${version} instructions`;s.team_sha256=teamHash(s);return s;
   }));
+  const pinned=read(a);engine.open(a,'codex');assert.deepEqual(read(a),pinned,'Opening must preserve the old producer and adopted definitions');
   engine.notify({...a,kind:'must_know',summary:'Retain this development constraint.'},'codex');
   const p=await plan(a);await authorize(a,p);const before=read(a);
   engine.open(a,'codex');assert.deepEqual(read(a),before);
   const c=await generate(a,p),after=read(a);assert.equal(c.status,'Submitted');
-  for(const key of ['governance','governance_sha256','cos_instructions','team_sha256','owner','paused','notices'])
+  for(const key of ['id','plugin_version','governance','governance_sha256','cos_instructions','team_sha256','owner','paused','notices'])
     assert.deepEqual(after[key],before[key]);
+  assert.deepEqual(after.records[p.id].development.authorization,before.records[p.id].development.authorization);
+  assert.deepEqual(after.records[before.records[p.id].development.authorization.decision_id],before.records[before.records[p.id].development.authorization.decision_id]);
+  assert.equal(after.upgrade,undefined);
   for(const [key,record] of Object.entries(before.records))
     assert.deepEqual(after.records[key],key===p.id?{...record,development:{...record.development,attempts:[c.job_id]}}:record);
 });
@@ -360,6 +368,10 @@ test('acceptance rejects wrong receipt hash, wrong action and reviewer reuse of 
   for(const kind of ['receipt','action','native']) {
     const a=setup(),p=await plan(a);await authorize(a,p);const c=await generate(a,p),t=await run(a,p,c);
     const qa=await review(a,t,{...(kind==='action'?{extra:{permitted_action:'anything'}}:{}),...(kind==='native'?{native:read(a).jobs[c.job_id].native_id}:{})});
+    if(kind==='native'){
+      assert.equal(qa.status,'failed');assert.match(qa.error,/independent native identity/);
+      assert.equal(qa.artifact_id,undefined);assert.match(qa.rejected_output.text,/Checked exact source/);
+    }
     await assert.rejects(accept(a,p,t,qa,kind==='receipt'?{receipt_sha256:'different'}:{}),/mismatch|QA Pass/);
   }
 });
@@ -503,7 +515,7 @@ test('a generic-only QA Pass stays inspectable but cannot accept; a complete fre
 });
 
 test('exact published development compatibility retains sandbox and team restrictions',()=>{
-  for(const governance of [v018Governance,v019Governance,installedTeam().governance])
+  for(const governance of [v018Governance,v019Governance,v020Governance,installedTeam().governance])
   for(const plugin_version of ['0.5.0','0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7','0.7.1','0.7.2','0.7.3','0.7.4',installedTeam().plugin_version]) {
     const s={...installedTeam(),plugin_version,governance,governance_sha256:digest(governance)};
     const before=structuredClone(s),c=developmentCapability(s);

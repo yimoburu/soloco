@@ -185,7 +185,7 @@ export function parseOutput(host, stdout) {
     return {native_id:value.session_id, text:value.result,model_evidence:modelEvidence(host,value.modelUsage)};
   }
   let native_id, text, observedText, observedNegative, turnId, turn=0, active=false, completed=false, pendingWarning=false, failure;
-  const warnings=[],itemTurns=new Map(),openMessages=new Set(),completedMessages=new Set(),negativeOutputs=new Set();
+  const warnings=[],itemTurns=new Map(),completedDiagnostics=new Set(),openMessages=new Set(),completedMessages=new Set(),negativeOutputs=new Set();
   const fail=message=>{failure??=new Error(message);};
   const itemTypes=new Set(['agent_message','reasoning','command_execution','file_change','mcp_tool_call','web_search','todo_list']);
   // CLI JSONL ordering supplies turn association when IDs are omitted. Never
@@ -215,10 +215,20 @@ export function parseOutput(host, stdout) {
         active=true;completed=false;text=undefined;turnId=event.turn_id;turn++;
         break;
       case 'item.started': case 'item.updated': case 'item.completed':
+        // The installed CLI also emits nonterminal diagnostics as completed
+        // error items, including startup warnings before turn.started. They
+        // cannot supply an artifact or repair a failed/incomplete terminal turn.
+        if(event.type==='item.completed'&&event.item?.type==='error'){
+          const item=event.item;
+          if(!native_id||typeof item.id!=='string'||!item.id||itemTurns.has(item.id)||typeof item.message!=='string'||!item.message.trim())fail('Invalid Codex diagnostic item');
+          else {itemTurns.set(item.id,turn);completedDiagnostics.add(item.id);warnings.push({type:'error',message:item.message});}
+          pendingWarning=true;break;
+        }
         if(!active || !itemTypes.has(event.item?.type))fail('Unsupported Codex item sequence');
         if(event.item?.type==='agent_message'&&event.type!=='item.completed'&&event.item.id===undefined)fail('Codex message start requires item identity');
         if(event.item?.type==='agent_message'&&event.type==='item.started'&&openMessages.has(event.item.id))fail('Codex message item already started');
         if(event.item?.id!==undefined) {
+          if(completedDiagnostics.has(event.item.id))fail('Completed Codex diagnostic item cannot be reused');
           if(typeof event.item.id!=='string' || !event.item.id || (itemTurns.has(event.item.id)&&itemTurns.get(event.item.id)!==turn))fail('Codex item belongs to another turn');
           else itemTurns.set(event.item.id,turn);
           if(event.item?.type==='agent_message'&&completedMessages.has(event.item.id))fail('Codex message item already completed');
