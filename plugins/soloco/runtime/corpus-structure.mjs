@@ -31,7 +31,9 @@ export function factorCorpusStructure(logical){
   census(logical);const tables=[],index=new Map(),paths=[null],pathIndex=new Map([['',0]]),fields=[],fieldIndex=new Map();
   function path(value){let parent=0,prefix='';for(const segment of value.slice(1).split('/')){prefix+='/'+segment;if(!pathIndex.has(prefix)){pathIndex.set(prefix,paths.length);paths.push([parent,segment]);}parent=pathIndex.get(prefix);}return {$path:parent};}
   function encode(v,key='',metadata=false,root=false){
-    const meta=metadata||structural.has(key),k=json(v),intern=!root&&candidate(key,v,metadata)&&(counts.get(k)??0)>1&&k.length>18;
+    // Semantic bodies are still traversed and hashed in full; only dictionary
+    // candidates need a serialized lookup key.
+    const meta=metadata||structural.has(key),eligible=!root&&candidate(key,v,metadata),k=eligible?json(v):undefined,intern=eligible&&(counts.get(k)??0)>1&&k.length>18;
     if(intern&&index.has(k))return {$r:index.get(k)};
     let value=v;
     if(pointerKey(key)&&typeof v==='string'&&(v===''||v.startsWith('/')))value=v===''?{$path:0}:path(v);
