@@ -1,0 +1,51 @@
+TAP version 13
+# Subtest: qualified validation reuse requires the original QA job to own the exact review and target
+not ok 1 - qualified validation reuse requires the original QA job to own the exact review and target
+  ---
+  duration_ms: 1112.986541
+  type: 'test'
+  location: '/Users/xwli/Documents/soloco/audit-scalability/tests/develop.test.mjs:582:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Unbound artifact must hold instead of reusing validation
+    + actual - expected
+    
+    + 'completed'
+    - 'failed'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'failed'
+  actual: 'completed'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/xwli/Documents/soloco/audit-scalability/tests/develop.test.mjs:596:10)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# Subtest: reuse acceptance rechecks the exact qualification producer and native identity after reuse
+not ok 2 - reuse acceptance rechecks the exact qualification producer and native identity after reuse
+  ---
+  duration_ms: 1093.597875
+  type: 'test'
+  location: '/Users/xwli/Documents/soloco/audit-scalability/tests/develop.test.mjs:602:1'
+  failureType: 'testCodeFailure'
+  error: 'Missing expected rejection.'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  operator: 'rejects'
+  stack: |-
+    async TestContext.<anonymous> (file:///Users/xwli/Documents/soloco/audit-scalability/tests/develop.test.mjs:617:3)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 0
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2385.832583

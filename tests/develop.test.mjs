@@ -5,9 +5,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { id, withStore, digest, installedTeam, teamHash } from '../plugins/soloco/runtime/store.mjs';
+import { id, withStore, digest, installedTeam, teamHash, Store } from '../plugins/soloco/runtime/store.mjs';
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
-import { developmentAssignment, developmentCapability } from '../plugins/soloco/runtime/develop.mjs';
+import { developmentAssignment, developmentCapability, executeDevelopmentTest } from '../plugins/soloco/runtime/develop.mjs';
 import { sandboxCapability } from '../plugins/soloco/runtime/local-sandbox.mjs';
 import { assignmentContext, contextMatches } from '../plugins/soloco/runtime/context.mjs';
 import {captureScopedPlan,scopedPlanView} from '../plugins/soloco/runtime/scoped-context.mjs';
@@ -578,6 +578,84 @@ test('actual qualified validation reuse retains original execution and still req
  const nextQa=await review(a,reuse);const accepted=await accept(a,p,reuse,nextQa);assert.equal(accepted.source_integrated,false);
  await review(a,receipt,{verdict:'Fail'});const third=await generate(a,p);
  const denied=await engine.develop({...a,action:'run',plan_id:p.id,candidate_id:third.id,reuse_receipt_id:receipt.id},'codex');const held=await waitJob(a,denied.id);assert.equal(held.job.status,'failed');assert.match(held.job.error,/negative review/);
+});
+test('qualified validation reuse requires the original QA job to own the exact review and target',live,async()=>{
+ for(const corrupt of ['artifact','target','author','generation','generation-id','generation-closure','generation-role','candidate-role','candidate-status','candidate-bytes','controller-id','controller-candidate','reviewer-native-author-instance','author-native-reviewer-instance']) {
+  const a=setup(),p=await plan(a);await authorize(a,p);const first=await generate(a,p),receipt=await run(a,p,first);
+  const qa=await review(a,receipt,{extra:{deterministic_validation:{permitted_action:'reuse_exact_validation',fingerprint:receipt.development.validation_fingerprint,dependencies_complete:true,external_state:false}}});
+  await accept(a,p,receipt,qa);
+  withStore(a.root,db=>db.transaction('test.corrupt_reuse_qualification',s=>{
+   const producer=s.jobs[qa.job_id];
+   if(corrupt==='artifact')producer.artifact_id='another-review';
+   if(corrupt==='target')producer.review_of={id:'another-receipt',revision:1};
+   if(corrupt==='author')producer.instance_id='another-reviewer';
+   if(corrupt==='generation')delete s.jobs[first.job_id];
+   if(corrupt==='generation-id')s.jobs[first.job_id].id='another-generator';
+   if(corrupt==='generation-closure')s.jobs[first.job_id].coordination_release.termination_confirmed=false;
+   if(corrupt==='generation-role')s.jobs[first.job_id].role='qa';
+   if(corrupt==='candidate-role')s.records[first.id].author_role='qa';
+   if(corrupt==='candidate-status')s.records[first.id].status='Quarantined';
+   if(corrupt==='candidate-bytes')s.records[first.id].development.files[0].content+='changed';
+   if(corrupt==='controller-id')s.jobs[receipt.author_instance].id='another-controller';
+   if(corrupt==='controller-candidate')s.jobs[receipt.author_instance].candidate_id='another-candidate';
+   if(corrupt==='reviewer-native-author-instance')producer.native_id=s.jobs[first.job_id].instance_id;
+   if(corrupt==='author-native-reviewer-instance')s.jobs[first.job_id].native_id=producer.instance_id;
+   return s;
+  }));
+  const second=await generate(a,p),job=await engine.develop({...a,action:'run',plan_id:p.id,candidate_id:second.id,reuse_receipt_id:receipt.id},'codex');
+  const ended=await waitJob(a,job.id);
+  assert.equal(ended.job.status,'failed',`Unbound ${corrupt} must hold instead of reusing validation`);
+  assert.match(ended.job.error,/independent QA|qualification|provenance/);
+  assert.equal(ended.receipt,undefined);
+  assert.deepEqual(read(a).records[qa.id],qa,'Preserve the original qualification verbatim');
+ }
+});
+test('reuse acceptance rechecks the exact qualification producer and native identity after reuse',live,async()=>{
+ for(const corrupt of ['native','missing','closure','independence','author-native','missing-binding']) {
+  const a=setup(),p=await plan(a);await authorize(a,p);const first=await generate(a,p),receipt=await run(a,p,first);
+  const qa=await review(a,receipt,{extra:{deterministic_validation:{permitted_action:'reuse_exact_validation',fingerprint:receipt.development.validation_fingerprint,dependencies_complete:true,external_state:false}}});
+  await accept(a,p,receipt,qa);
+  const second=await generate(a,p),job=await engine.develop({...a,action:'run',plan_id:p.id,candidate_id:second.id,reuse_receipt_id:receipt.id},'codex');
+  const ended=await waitJob(a,job.id),reuse=ended.receipt;
+  assert.equal(reuse?.development.result.reused,true,JSON.stringify(ended.job));
+  withStore(a.root,db=>db.transaction('test.changed_reuse_producer',s=>{
+   if(corrupt==='native')s.jobs[qa.job_id].native_id='substituted-native';
+   if(corrupt==='missing')delete s.jobs[qa.job_id];
+   if(corrupt==='closure')s.jobs[qa.job_id].coordination_release.termination_confirmed=false;
+   if(corrupt==='independence')s.jobs[first.job_id].native_id=s.jobs[qa.job_id].native_id;
+   if(corrupt==='author-native')s.jobs[first.job_id].native_id='substituted-author-native';
+   if(corrupt==='missing-binding')delete s.records[reuse.id].development.reuse_candidate_producer;
+   return s;
+  }));
+  const retainedReuse=read(a).records[reuse.id];
+  const nextQa=await review(a,reuse);
+  await assert.rejects(accept(a,p,reuse,nextQa),/valid passing runtime test receipt/);
+  assert.deepEqual(read(a).records[qa.id],qa,'Changed job evidence does not rewrite the original judgment');
+  assert.deepEqual(read(a).records[reuse.id],retainedReuse,'Held acceptance preserves the reuse receipt');
+ }
+});
+test('reuse publication quarantines a source receipt changed at the writer fence',live,async()=>{
+ const a=setup(),p=await plan(a);await authorize(a,p);const first=await generate(a,p),receipt=await run(a,p,first);
+ const qa=await review(a,receipt,{extra:{deterministic_validation:{permitted_action:'reuse_exact_validation',fingerprint:receipt.development.validation_fingerprint,dependencies_complete:true,external_state:false}}});
+ await accept(a,p,receipt,qa);
+ const second=await generate(a,p),jobId=id('publication-controller');
+ // Reserve the ordinary fixture job without spawning a detached controller, so
+ // the interleaving is deterministic in this process's real writer transaction.
+ withStore(a.root,db=>db.transaction('test.reserve_reuse_publication',s=>{
+  s.records[second.id].development.run={job_id:jobId,status:'queued'};
+  s.jobs[jobId]={id:jobId,kind:'development_test',role:'engineer',development_id:p.id,candidate_id:second.id,epoch:a.epoch,session_id:a.session_id,host:'codex',reuse_receipt_id:receipt.id,status:'queued',created_at:new Date().toISOString(),inputs:[],native_id:null};
+  return s;
+ }));
+ const original=Store.prototype.transaction;let changed=false,result;
+ Store.prototype.transaction=function(type,fn,...rest){
+  if(type==='development.test_finished')return original.call(this,type,s=>{changed=true;s.records[receipt.id].development.result.exit_code=9;return fn(s);},...rest);
+  return original.call(this,type,fn,...rest);
+ };
+ try{result=await executeDevelopmentTest(a.root,jobId);}finally{Store.prototype.transaction=original;}
+ assert.equal(changed,true);assert.equal(result.status,'Quarantined');assert.equal(result.development.result.reused,true);
+ const state=read(a);assert.equal(state.jobs[jobId].status,'quarantined');assert.equal(state.records[second.id].development.run.status,'quarantined');
+ assert.equal(state.records[receipt.id].development.result.exit_code,9,'Retain the changed evidence rather than rewriting the source');
+ assert.deepEqual(state.records[qa.id],qa);assert.equal(result.development.acceptance,undefined);
 });
 test('unchanged-state polling still cancels generation at scope expiry',live,async()=>{
  const a=setup(),p=await plan(a,{expires_at:new Date(Date.now()+500).toISOString()});await authorize(a,p);

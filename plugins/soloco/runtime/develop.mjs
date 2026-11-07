@@ -229,19 +229,20 @@ function queueRun(a,host) {
   return withStore(a.root,db=>db.read().jobs[jobId]);
 }
 export async function executeDevelopmentTest(root,jobId) {
-  let a,host,p,c,reuseSource,reuseQualification,validationFingerprint;
+  let a,host,p,c,reuseSource,reuseQualification,reuseProducer,reuseAuthor,validationFingerprint;
   withStore(root,db=>db.transaction('development.test_started',s=>{
     const j=s.jobs[jobId];if(!j||j.kind!=='development_test')throw new Error('Unknown local test job');
     a={root,session_id:j.session_id,epoch:j.epoch};host=j.host;
     owner(s,a.session_id,host,a.epoch);p=planOf(s,j.development_id);authorized(s,p,root);sourceMatches(root,p);c=candidateOf(s,p,j.candidate_id);
     if(j.status!=='queued')throw new Error('Local test is no longer eligible');
     if(j.reuse_receipt_id){const t=s.records[j.reuse_receipt_id],origin=s.jobs[t?.author_instance],prior=s.records[t?.development?.candidate_id],priorPlan=s.records[t?.development?.plan_id];
-      if(!t||origin?.kind!=='development_test'||origin.status!=='completed'||origin.artifact_id!==t.id||prior?.development?.run?.receipt_id!==t.id||prior.development.run.job_id!==origin.id||t.development.candidate_sha256!==c.development.candidate_sha256||!priorPlan)throw Error('Reuse source lacks canonical completed runtime provenance');
+      if(!t||origin?.id!==t.author_instance||origin?.kind!=='development_test'||origin.status!=='completed'||origin.artifact_id!==t.id||origin.candidate_id!==prior?.id||origin.development_id!==priorPlan?.id||prior?.development?.run?.receipt_id!==t.id||prior.development.run.job_id!==origin.id||t.development.candidate_sha256!==c.development.candidate_sha256||!priorPlan)throw Error('Reuse source lacks canonical completed runtime provenance');
       if(negativeValidationReview(s,t))throw Error('Validation source has an unresolved negative review');
-      const qa=s.records[t.development.acceptance?.review_id],qaJob=s.jobs[qa?.job_id],reuseVerdict=qa?.review?.deterministic_validation;
-      if(qa?.author_role!=='qa'||qa.status!=='Submitted'||qa.review?.verdict!=='Pass'||qaJob?.status!=='completed'||!qaJob.native_id||qaJob.native_id===s.jobs[prior.job_id]?.native_id||qa.review.candidate_sha256!==t.development.candidate_sha256||qa.review.receipt_sha256!==t.development.receipt_sha256||reuseVerdict?.permitted_action!=='reuse_exact_validation'||reuseVerdict.fingerprint!==t.development.validation_fingerprint||reuseVerdict.dependencies_complete!==true||reuseVerdict.external_state!==false)throw Error('Prior independent QA must explicitly qualify deterministic validation reuse');
+      const qualified=validationQualification(s,t,prior);
+      if(!qualified)throw Error('Prior independent QA must explicitly qualify deterministic validation reuse with canonical producer provenance');
+      const {qa,qaJob,authorJob}=qualified;
       const directory=candidateDir(root,priorPlan,prior);if(t.development.result.directory!==directory)throw Error('Reuse directory provenance mismatch');
-      c.development.validation_directory_relative=path.relative(folder(root),directory);reuseSource=t;reuseQualification={id:qa.id,revision:qa.revision,sha256:digest(JSON.stringify(qa))};}
+      c.development.validation_directory_relative=path.relative(folder(root),directory);reuseSource=t;reuseQualification={id:qa.id,revision:qa.revision,sha256:digest(JSON.stringify(qa))};reuseProducer={id:qaJob.id,sha256:digest(JSON.stringify(qaJob))};reuseAuthor={id:authorJob.id,sha256:digest(JSON.stringify(authorJob))};}
     j.status='running';j.started_at=stamp();return s;
   }));
   const abort=new AbortController();let timer,result,stale=false;
@@ -265,8 +266,9 @@ export async function executeDevelopmentTest(root,jobId) {
     // Recheck generation dependencies under the publication lock; polling alone
     // cannot cover a change between the last eligibility check and this write.
     try{owner(s,a.session_id,host,a.epoch);authorized(s,planOf(s,p.id),a.root);sourceMatches(a.root,p);if(s.jobs[jobId].status!=='running'||!supplementalMatches(s,s.jobs[c.job_id]))stale=true;}catch{stale=true;}
+    if(reuseSource&&!reuseQualificationMatches(s,s.records[reuseSource.id],reuseQualification,reuseProducer,reuseAuthor))stale=true;
     const key=id('test-receipt'),payload={...result,candidate_sha256:c.development.candidate_sha256,test_paths:p.development.scope.test_paths,timeout_ms:p.development.scope.timeout_ms,max_output_bytes:p.development.scope.max_output_bytes,directory:candidateDir(a.root,p,c),finished_at:stamp()};
-    receipt=s.records[key]={id:key,kind:'artifact',author_role:'runtime',author_instance:jobId,revision:1,status:stale?'Quarantined':'Submitted',created_at:stamp(),content:JSON.stringify(payload),development:{type:'test',...(validationFingerprint?{validation_fingerprint:validationFingerprint}:{}),...(reuseSource?{reused_from:reuseSource.id,reuse_qualification:reuseQualification}:{}),plan_id:p.id,candidate_id:c.id,candidate_sha256:c.development.candidate_sha256,result:payload,receipt_sha256:digest(JSON.stringify(payload))}};
+    receipt=s.records[key]={id:key,kind:'artifact',author_role:'runtime',author_instance:jobId,revision:1,status:stale?'Quarantined':'Submitted',created_at:stamp(),content:JSON.stringify(payload),development:{type:'test',...(validationFingerprint?{validation_fingerprint:validationFingerprint}:{}),...(reuseSource?{reused_from:reuseSource.id,reuse_qualification:reuseQualification,reuse_qualification_producer:reuseProducer,reuse_candidate_producer:reuseAuthor}:{}),plan_id:p.id,candidate_id:c.id,candidate_sha256:c.development.candidate_sha256,result:payload,receipt_sha256:digest(JSON.stringify(payload))}};
     if(reuseSource)s.records[c.id].development.validation_directory_relative=c.development.validation_directory_relative;
     s.records[c.id].development.run={job_id:jobId,status:stale?'quarantined':'completed',receipt_id:key};
     Object.assign(s.jobs[jobId],{status:stale?'quarantined':'completed',finished_at:stamp(),artifact_id:key});
@@ -290,9 +292,26 @@ if(process.argv[1] && path.resolve(process.argv[1])===fileURLToPath(import.meta.
 function validTestExecution(state,receipt) {
   const d=receipt?.development,r=d?.result;if(!d||!r)return false;
   if(!d.reused_from)return r.tests_executed===true&&r.reused!==true;
-  const qualification=state.records[d.reuse_qualification?.id];if(!qualification||digest(JSON.stringify(qualification))!==d.reuse_qualification.sha256)return false;
   const origin=state.records[d.reused_from],j=state.jobs[origin?.author_instance],c=state.records[origin?.development?.candidate_id];
-  return r.reused===true&&r.tests_executed===false&&r.reused_from===origin?.id&&j?.kind==='development_test'&&j.status==='completed'&&j.artifact_id===origin.id&&c?.development?.run?.receipt_id===origin.id&&c.development.run.job_id===j.id&&d.candidate_sha256===origin.development.candidate_sha256&&!negativeValidationReview(state,origin)&&validateReusableReceipt(origin,d.validation_fingerprint);
+  return r.reused===true&&r.tests_executed===false&&r.reused_from===origin?.id&&j?.id===origin?.author_instance&&j?.kind==='development_test'&&j.status==='completed'&&j.artifact_id===origin.id&&j.candidate_id===c?.id&&j.development_id===origin.development.plan_id&&c?.development?.run?.receipt_id===origin.id&&c.development.run.job_id===j.id&&d.candidate_sha256===origin.development.candidate_sha256&&reuseQualificationMatches(state,origin,d.reuse_qualification,d.reuse_qualification_producer,d.reuse_candidate_producer)&&!negativeValidationReview(state,origin)&&validateReusableReceipt(origin,d.validation_fingerprint);
+}
+
+// Historical deterministic evidence does not need today's unrelated task context,
+// but its original independent reviewer must still own the exact canonical Pass.
+function validationQualification(state,receipt,candidate) {
+  const d=receipt?.development,acceptance=d?.acceptance,qa=state.records[acceptance?.review_id],qaJob=state.jobs[qa?.job_id],authorJob=state.jobs[candidate?.job_id],controller=state.jobs[receipt?.author_instance],v=qa?.review,reuse=v?.deterministic_validation;
+  if(candidate?.kind!=='artifact'||candidate.status!=='Submitted'||candidate.author_role!=='engineer'||candidate.development?.type!=='candidate'||candidate.development.plan_id!==d?.plan_id||candidate.development.candidate_sha256!==d?.candidate_sha256||digest(JSON.stringify(candidate.development.files))!==d?.candidate_sha256||!validateReusableReceipt(receipt,d?.validation_fingerprint)||negativeValidationReview(state,receipt)
+    ||controller?.id!==receipt.author_instance||controller?.kind!=='development_test'||controller.status!=='completed'||controller.artifact_id!==receipt.id||controller.candidate_id!==candidate.id||controller.development_id!==d.plan_id||candidate.development.run?.job_id!==controller.id||candidate.development.run.receipt_id!==receipt.id||candidate.development.run.status!=='completed'
+    ||authorJob?.id!==candidate.job_id||authorJob?.role!=='engineer'||authorJob.status!=='completed'||authorJob.development_id!==d.plan_id||authorJob.artifact_id!==candidate.id||authorJob.instance_id!==candidate.author_instance||!authorJob.native_id||authorJob.coordination_release?.termination_confirmed!==true
+    ||qa?.kind!=='review'||qa.author_role!=='qa'||qa.status!=='Submitted'||qaJob?.id!==qa.job_id||qaJob?.role!=='qa'||qaJob.status!=='completed'||qaJob.artifact_id!==qa.id||qa.author_instance!==qaJob.instance_id||!qaJob.native_id||qaJob.coordination_release?.termination_confirmed!==true
+    ||[authorJob.native_id,authorJob.instance_id].some(identity=>[qaJob.native_id,qaJob.instance_id].includes(identity))||qa.review_of?.id!==receipt.id||qa.review_of.revision!==receipt.revision||qaJob.review_of?.id!==receipt.id||qaJob.review_of.revision!==receipt.revision
+    ||acceptance.candidate_sha256!==d.candidate_sha256||acceptance.receipt_sha256!==d.receipt_sha256||v?.verdict!=='Pass'||v.permitted_action!=='accept_local_development'||v.candidate_sha256!==d.candidate_sha256||v.receipt_sha256!==d.receipt_sha256||!Array.isArray(v.blockers)||v.blockers.length
+    ||reuse?.permitted_action!=='reuse_exact_validation'||reuse.fingerprint!==d.validation_fingerprint||reuse.dependencies_complete!==true||reuse.external_state!==false)return null;
+  return {qa,qaJob,authorJob};
+}
+function reuseQualificationMatches(state,receipt,qualification,producer,author) {
+  const qualified=validationQualification(state,receipt,state.records[receipt?.development?.candidate_id]);
+  return Boolean(qualified&&qualification?.id===qualified.qa.id&&qualification.revision===qualified.qa.revision&&qualification.sha256===digest(JSON.stringify(qualified.qa))&&producer?.id===qualified.qaJob.id&&producer.sha256===digest(JSON.stringify(qualified.qaJob))&&author?.id===qualified.authorJob.id&&author.sha256===digest(JSON.stringify(qualified.authorJob)));
 }
 
 function negativeValidationReview(state,receipt){return Object.values(state.records).some(r=>r.status==='Submitted'&&r.review_of?.id===receipt.id&&r.review_of?.revision===receipt.revision&&['Fail','Blocked'].includes(r.review?.verdict));}
