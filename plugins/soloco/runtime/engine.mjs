@@ -20,6 +20,10 @@ import { assignmentContext, contextMatches } from './context.mjs';
 import { developmentAction, developmentCapability, developmentAssignment } from './develop.mjs';
 import { prototypeAction, prototypeCapability, prototypeAssignment } from './prototype.mjs';
 import { TIMEOUT_POLICY_VERSION, normalizeTimeout, normalizeHandoverReviewWindow, jobTimeoutState } from './timeout.mjs';
+import {taskAction,runtimeAction} from './task-runtime.mjs';
+import {taskRecord,taskReady,bindTaskAttempt} from './tasks.mjs';
+import {runtimeGrant,runtimeControlBinding} from './task-runtime-authority.mjs';
+import {readTaskState,updateTaskIndex} from './task-index.mjs';
 
 const busy = state => Object.values(state.jobs??{}).filter(j => ['queued','running'].includes(j?.status));
 export function dataDir() {
@@ -87,6 +91,8 @@ export function inspectionPage(args,host,collection) {
 }
 export function develop(args,host) { binding(args,host); return developmentAction(args,host); }
 export function prototype(args,host) { binding(args,host); return prototypeAction(args,host); }
+export function tasks(args,host){binding(args,host);return taskAction(args,host);}
+export function runtime(args,host){binding(args,host);return runtimeAction(args,host);}
 function update(args, host, type, fn, selection=null) {
   binding(args,host);
   if (!Number.isInteger(args.epoch)) throw new Error('Supply the current ownership epoch from company_status');
@@ -322,6 +328,47 @@ export function dispatch(args,host,{launch=launchWorker,check=readiness,catalog=
   return mutationView(state.jobs[jobId],'job:'+jobId,'jobs');
 }
 function launchWorker(root,jobId){return spawn(process.execPath,['--no-warnings',path.join(PACKAGE,'runtime/worker.mjs'),folder(root),jobId],{detached:true,stdio:'ignore',env:{...process.env,COMPANY_WORKER:'1'}});}
+// Internal runtime principal. No owner session is substituted into the public
+// dispatch API: the exact canonical task and current runtime grant authorize
+// this one queue transition, atomically with its attempt binding.
+export function queueRuntimeTask(root,taskId,{launch=launchWorker,check=readiness,catalog=modelCatalog,runtime_instance_id,supervisor_pid}={}) {
+  const snapshot=withStore(root,db=>readTaskState(db,{task_ids:[taskId],limit:1,semantic:true}).state);
+  const task=taskRecord(snapshot,taskId),host=task.runtime_task.owner.host,spec=task.runtime_task.spec;
+  const grant=runtimeGrant(snapshot,task),readyHost=check(host);
+  if(runtime_instance_id!==undefined&&(grant.instance_id!==runtime_instance_id||snapshot.records['async-runtime-control'].runtime_control.pid!==supervisor_pid))throw Error('Supervisor generation changed before dispatch');
+  if(!readyHost.available||readyHost.authenticated===false)throw Error(readyHost.error??'Selected host is not ready or authenticated');
+  const inventory=spec.model_selection?.mode==='explicit'||spec.model_selection?.speed==='fast_disabled'?catalog(host):null;
+  const selection=normalizeSelection(spec.model_selection,host,inventory),timeout=normalizeTimeout({timeout_ms:spec.timeout_ms,timeout_reason:spec.timeout_reason});
+  const jobId=id('job'),instance=id(spec.role),sessionKey=spec.role+':async:'+jobId;
+  const result=withStore(root,db=>db.transaction('task.job_queued',s=>{
+    const record=taskRecord(s,taskId),current=runtimeGrant(s,record);
+    if(runtime_instance_id!==undefined&&(current.instance_id!==runtime_instance_id||s.records['async-runtime-control'].runtime_control.pid!==supervisor_pid))throw Error('Supervisor generation changed before queue commit');
+    if(JSON.stringify(current)!==JSON.stringify(grant))throw Error('Runtime task grant changed before queue commit');
+    const ready=taskReady(s,record);if(!ready.ready)throw Error(ready.reason);
+    const occupied=Object.values(s.jobs??{}).filter(j=>['queued','running'].includes(j.status)||(j.runtime_task||j.started_at)&&['cancelled','interrupted','failed'].includes(j.status)&&j.coordination_release?.termination_confirmed!==true);
+    if(occupied.length>=3)throw Error('Scheduling capacity occupied by active or uncertain processes');
+    for(const jid of ready.required_context_jobs??[]){const prior=s.jobs[jid];if(prior?.context_sha256&&!contextMatches(s,prior,prior.context_sha256))throw Error('Prerequisite task context is stale; inspect current evidence before continuing');}
+    const target=ready.review_of?s.records[ready.review_of]:null;
+    if(target?.author_instance===instance)throw Error('A task author cannot review its own result');
+    const job={id:jobId,role:spec.role,session_key:sessionKey,instance_id:instance,native_id:null,host,epoch:s.owner.epoch,status:'queued',task:spec.task,
+      requester:{role:'runtime',instance_id:grant.instance_id,task_id:taskId,owner_epoch:s.owner.epoch},
+      runtime_task:{id:taskId,definition_revision:record.runtime_task.definition_revision,definition_sha256:record.runtime_task.definition_sha256},
+      supplemental_sources:(spec.evidence_ids??[]).map(key=>recordReference(contextSource(s,key),key)),
+      coordination:ready.coordination,context_format:7,context_scope:spec.context_scope,expected_deliverable:spec.expected_deliverable,
+      inputs:ready.input_ids.map(key=>({id:key,revision:s.records[key].revision})),review_of:target?{id:target.id,revision:target.revision}:null,
+      timeout_policy_version:TIMEOUT_POLICY_VERSION,...timeout,model_selection:selection,cli_version:readyHost.version??null,task_summary:spec.expected_deliverable,next_handoff:'Runtime validates the exact result and wakes eligible dependent tasks',created_at:stamp(),
+      ...(inventory?{model_catalog:{source:inventory.source,model:inventory.models.find(m=>m.id===selection.model),speed_support:inventory.speed_support}}:{})};
+    s.sessions[sessionKey]={instance_id:instance,role:spec.role,native_id:null,host,model_selection:selection};
+    const context=assignmentContext(s,job);job.inputs=context.inputs;job.context_sha256=context.hash;
+    // Context assembly may add current constraints, but declared dependency
+    // outputs must remain exact explicit inputs at the atomic attempt fence.
+    bindTaskAttempt(s,record,job);s.jobs[jobId]=job;s.runtime_version=VERSION;
+    return s;
+  },{afterWrite:updateTaskIndex}));
+  try{const child=launch(root,jobId);child.on('error',error=>withStore(root,db=>db.transaction('task.spawn_failed',s=>{const j=s.jobs[jobId];if(j?.status==='queued'){j.status='failed';j.error=error.message;j.coordination_release={termination_confirmed:true,reason:'worker_spawn_failed',at:stamp()};}return s;})));child.unref();}
+  catch(error){withStore(root,db=>db.transaction('task.spawn_failed',s=>{const j=s.jobs[jobId];j.status='failed';j.error=error.message;j.coordination_release={termination_confirmed:true,reason:'worker_not_started',at:stamp()};return s;}));throw error;}
+  return {task_id:taskId,job_id:jobId,instance_id:instance,status:result.jobs[jobId].status,native_id:null,native_identity:'not_observed_until_native_return'};
+}
 export function control(args,host) {
   if(!['pause','resume','handover','rename'].includes(args.action)) throw new Error('Unknown control action');
   binding(args,host);
