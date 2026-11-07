@@ -8,6 +8,7 @@ import {fileURLToPath} from 'node:url';
 import {runCase,contractModel,assess,sourceIdentity,verifySourceIdentity,captureSourceVerification} from '../tools/candidate-format-qualification.mjs';
 import {verifyCase} from '../tools/verify-candidate-format-qualification.mjs';
 import {read} from '../tools/workflow-runtime.mjs';
+import {digest} from '../plugins/soloco/runtime/store.mjs';
 import {sandboxCapability} from '../plugins/soloco/runtime/local-sandbox.mjs';
 
 const capability=sandboxCapability();
@@ -33,6 +34,20 @@ test('actual contract-double candidates accept; duplicated arms, negative review
       s=>s.records[original.attempts[0].receipt_id].development.acceptance.candidate_sha256='other',
       s=>s.jobs[original.calls[1].job_id].artifact_id='other'
     ]){const copy=structuredClone(canonical);mutate(copy);assert.equal(verifyCase(original,copy).acceptance_verified,false);}
+    const planId=canonical.records[original.generation.candidate_id].development.plan_id,testJobId=original.attempts[0].test_job_id,reviewJobId=canonical.records[original.review.id].job_id;
+    for(const [name,check,mutate] of [
+      ['changed test scope','scope_integrity',s=>s.records[planId].development.scope.test_paths=['different.test.mjs']],
+      ['test job candidate mismatch','runtime_test_provenance',s=>s.jobs[testJobId].candidate_id='another-candidate'],
+      ['test job plan mismatch','runtime_test_provenance',s=>s.jobs[testJobId].development_id='another-plan'],
+      ['review job receipt mismatch','review_job_binding',s=>s.jobs[reviewJobId].review_of.id='another-receipt'],
+      ['review job receipt revision mismatch','review_job_binding',s=>s.jobs[reviewJobId].review_of.revision++],
+    ]){const copy=structuredClone(canonical);mutate(copy);const verified=verifyCase(original,copy);assert.equal(verified.acceptance_verified,false,name);assert.equal(verified.checks[check],false,name);}
+    const contradictory=structuredClone(canonical),reported=structuredClone(original),receipt=contradictory.records[original.attempts[0].receipt_id];
+    receipt.content=JSON.stringify({...receipt.development.result,status:'failed',exit_code:9});
+    const changedHash=digest(receipt.content);receipt.development.receipt_sha256=changedHash;receipt.development.acceptance.receipt_sha256=changedHash;
+    contradictory.records[original.review.id].review.receipt_sha256=changedHash;
+    reported.attempts[0].receipt_sha256=changedHash;reported.review.receipt_sha256=changedHash;reported.acceptance.receipt_sha256=changedHash;
+    const rejected=verifyCase(reported,contradictory);assert.equal(rejected.acceptance_verified,false,'Receipt text must match its executed result even when all downstream hashes agree');assert.equal(rejected.checks.receipt_hash,false);
   }finally{fs.rmSync(directory,{recursive:true,force:true});}
 });
 

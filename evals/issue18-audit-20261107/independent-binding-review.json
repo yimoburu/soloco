@@ -1,0 +1,90 @@
+{
+  "kind": "read-only-independent-canonical-binding-review",
+  "original_reviewed_revision": "7b6d6d5",
+  "fixture": "Actual retained candidate, executed sandbox test receipt and independent contract-double review/acceptance from the reviewer run. Mutations change in-memory copies only.",
+  "original_review_script_sha256": "87a8eb94e8928c1816ba3b2bf77fcde866618cadae2e5d0afccdc14be37fa774",
+  "original_retained_input_sha256": "35ec5027e6519ab41b0f89b9d93f0be1958580f9614bd35f683de2935a820c56",
+  "verifier_sha256": "959b4bc388bb46a5fdd073695c6f274016a2bd42c40e1dd44c27796a4e0b82b7",
+  "native_calls": 0,
+  "before": [
+    {
+      "name": "baseline",
+      "verified": true
+    },
+    {
+      "name": "changed canonical test scope",
+      "verified": true,
+      "failed_checks": []
+    },
+    {
+      "name": "runtime test job points to different candidate",
+      "verified": true,
+      "failed_checks": []
+    },
+    {
+      "name": "runtime test job points to different plan",
+      "verified": true,
+      "failed_checks": []
+    },
+    {
+      "name": "review job targets different receipt",
+      "verified": true,
+      "failed_checks": []
+    }
+  ],
+  "after": [
+    {
+      "name": "baseline",
+      "verified": true
+    },
+    {
+      "name": "changed canonical test scope",
+      "verified": false,
+      "failed_checks": [
+        "scope_integrity"
+      ]
+    },
+    {
+      "name": "runtime test job points to different candidate",
+      "verified": false,
+      "failed_checks": [
+        "runtime_test_provenance"
+      ]
+    },
+    {
+      "name": "runtime test job points to different plan",
+      "verified": false,
+      "failed_checks": [
+        "runtime_test_provenance"
+      ]
+    },
+    {
+      "name": "review job targets different receipt",
+      "verified": false,
+      "failed_checks": [
+        "review_job_binding"
+      ]
+    },
+    {
+      "name": "review job targets different receipt revision",
+      "verified": false,
+      "failed_checks": [
+        "review_job_binding"
+      ]
+    }
+  ],
+  "receipt_content_contradiction": {
+    "name": "receipt text says failed while structured result says passed; downstream hashes consistently changed",
+    "before": {
+      "verified": true,
+      "failed_checks": []
+    },
+    "after": {
+      "verified": false,
+      "failed_checks": [
+        "receipt_hash"
+      ]
+    },
+    "retained_input_sha256": "0b51aaf8bbe5072b6b4d894c675d650a95a253aa17ef3851b832ec5e7327e57d"
+  }
+}
