@@ -3,6 +3,8 @@
 Review baseline: `7b6d6d53f37c6923399284d51e5b9f96dd255545`, November 7, 2026.
 Contract: [SPEC.md](../SPEC.md), SHA-256
 `28f99838abc3794da94f97f7a2d234554811da3aef7b8ddb3742075caa78ec36`.
+Integrated implementation pin: `9160c2655cc14a5e5f1ff1690d5358e8c08b4f92`,
+including main through `b6ea56bc845f9e8f82f25d88da96950f35cde46f`.
 The contract is unchanged. This ledger covers every non-heading normative
 paragraph/bullet by its original line number; grouped prose retains the full
 requirement in SPEC. A source or contract change requires an affected-row review.
@@ -95,6 +97,13 @@ it from attention views but does not discard its conditions from assignment inpu
    fingerprints now retain notices and their dispositions. Pending attention
    views still list only unresolved notices. Growth can cause an explicit context
    hold; this repair introduces no unreviewed notice-retirement shortcut.
+5. The actual Codex CLI emitted completed diagnostic error items alongside a
+   successful turn, which the adapter rejected as an unsupported sequence.
+   Well-formed diagnostics are now retained as warnings; acceptance still needs
+   a valid terminal turn. Missing completion, terminal failure, malformed or
+   replayed diagnostic IDs, and conflicting negative evidence remain rejected.
+   The acceptance harness accepts an explicit catalog-verified model ID without
+   changing the default or silently substituting a model.
 
 Retaining resolved notice meaning changes affected assignment, prototype-scope
 and qualification hashes. Previously recorded grants/reviews remain retained,
@@ -110,7 +119,7 @@ test receipt.
 | Realistic context and successor understanding (#13) | Engineering prepares a scoped realistic-history fixture; independent QA must demonstrate preservation of distant constraints, negative evidence and next permitted action through full handover. | Unknown or oversized context remains held. Synthetic archive volume proves neither understanding nor native fit. |
 | CoS judgment and founder effort (#16) | CoS/Research define representative paired/counterbalanced trials, including harmful parallelism and covered repairs; independent QA judges outcomes and recorded founder interventions. | Existing small evaluations are descriptive; no production workload/cost reduction claim. |
 | Candidate-format comparison (#18) | Engineering/QA preserve the original blocked full-file controls; any newly authorized trial has fresh declared criteria and separate evidence. | No relabeling old Blocked trials or restored attempt allowance. |
-| Native lifecycle and recovery (#30) | Run the bounded public-MCP producer → independent QA → receiver fixture with actual native identities and software-supervisor interruption. Model-session replacement and actual company adoption need their own evidence. | One attempt per task; failures/uncertainty retain evidence and prevent blind retry. |
+| Native lifecycle and recovery (#30) | The bounded public-MCP producer → independent QA → receiver fixture passed at `19414e6`, including software-supervisor recovery. Model-session replacement, other hosts and actual company adoption need separate evidence. | One attempt per task; failures/uncertainty retain evidence and prevent blind retry. |
 | Host/external operations | Host-specific acceptance and a separately designed enforceable execution boundary before promising new capabilities. | Current company runtime exposes preparation and bounded local artifacts only. |
 
 Software correction, native fixture acceptance and actual-company adoption are
@@ -120,6 +129,46 @@ installed plugin, adopted rules, prior verdict, or attempt allowance.
 
 ## Validation and independent review
 
-Validation receipts and final independent-review disposition will be recorded
-here after the candidate finishes testing. The initial baseline review identified
-the four defects above; that review is not acceptance of the repaired candidate.
+The retained [evidence package](../evals/spec-reconciliation-20261107/README.md)
+records clean source pins, complete local test logs/counts, original failures,
+sanitized native receipts and an independent source review. These are local
+executed checks, not GitHub CI receipts or actual-company adoption.
+
+- Full Node 22.23.2: **1121/1121 passed**, zero failures/skips, on `9160c26`.
+- Node 26.13.0 compatibility plus changed boundaries: **429/429 passed**, zero
+  failures/skips, on `9160c26`.
+- Integrated Node 22 regression plus changed boundaries: **780/780 passed**,
+  zero failures/skips, on `c4fd3c5` before the final test-only correction.
+- Build/governance drift, whitespace, and exact **47/47** SPEC-row coverage passed.
+- Baseline regression evidence retains **13 failures and 1 pass**; the repaired
+  invariant cases pass in the complete suite. Counts across suites overlap.
+
+Final test receipts require unchanged clean before/after source pins. The final
+passing TAPs also pass the repository's strict complete-plan/count parser. The
+following evidence/documentation commit changes no executable source.
+
+The native fixture used three distinct Codex sessions requested as `gpt-6-astra`
+(low effort for producer/receiver, medium for QA), as advertised by this host.
+Effective provider settings remain unverified. Artifact generation, exact independent
+review, receiver handoff and peer disposition passed; software-supervisor
+interruption recovered without duplicate work, idle started no new jobs, and
+native closure was confirmed. The successful fixture is pinned to `19414e6`;
+subsequent integration changed development receipt validation, its format verifier,
+tests and documentation, not the async adapter/task/worker path. It is not an
+exact-commit native run of the integrated candidate.
+
+The original native fixture at `cc0edb5` remains `needs_attention` after the
+unsupported diagnostic sequence; its output is retained, with no published
+artifact or QA/receiver attempt. The original full Node 22 run remains a failure
+(1104/1105): its operating-state test expected a nonindependent review to reach a
+later gate. The corrected test checks rejection at publication, retained output,
+no artifact, and no accepted operating state. An earlier interrupted full run is
+incomplete and contributes no passing-suite claim.
+
+Independent reviewer `/root/spec_independent_review` gave the integrated source
+pin a scoped **Pass** after inspecting the delta, original negative evidence,
+native artifact/review/receiver bindings, and all 40 native runtime/harness hashes.
+See the [review record](../evals/spec-reconciliation-20261107/independent-review.md).
+That verdict does not close any acceptance gap above. Raw native diagnostics and
+host configuration remain local; only sanitized projections and hashes are
+published.
