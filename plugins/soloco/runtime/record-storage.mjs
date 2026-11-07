@@ -14,11 +14,24 @@ const sqlString=value=>"'"+value.replaceAll("'","''")+"'";
 export const LATEST_LAYOUT = 4;
 const keyPrefix='~json:';
 const unsafeKey=key=>key.includes('\u0000')||/[\ud800-\udfff]/u.test(key);
-function layoutVersion(db) {
-  if(!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='company_layout'").get())return 0;
-  const version=db.prepare('SELECT version FROM company_layout WHERE id=1').get()?.version;
-  if(![1,2,3,4].includes(version))throw Error('Unknown or corrupt company storage layout; migration compatibility required');
-  return version;
+// Reuse only the fixed query plans, never a layout result. Every call executes
+// fresh reads so creation, migration, rollback and corruption remain observable.
+const layoutStatements=new WeakMap();
+function layoutVersion(db,reprepare=true) {
+  let statements=layoutStatements.get(db);
+  if(!statements){statements={exists:db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='company_layout'")};layoutStatements.set(db,statements);}
+  try{
+    if(!statements.exists.get())return 0;
+    statements.version??=db.prepare('SELECT version FROM company_layout WHERE id=1');
+    const version=statements.version.get()?.version;
+    if(![1,2,3,4].includes(version))throw Error('Unknown or corrupt company storage layout; migration compatibility required');
+    return version;
+  }catch(error){
+    // A DatabaseSync may close and open again with the same object identity.
+    // Retry only its finalized statements; closed databases and SQL errors hold.
+    if(!reprepare||error?.code!=='ERR_INVALID_STATE'||error.message!=='statement has been finalized')throw error;
+    layoutStatements.delete(db);return layoutVersion(db,false);
+  }
 }
 function storedKey(db,key) {
   key=String(key);

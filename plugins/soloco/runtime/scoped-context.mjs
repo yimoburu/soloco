@@ -924,6 +924,13 @@ function dependencyCycles(s,sourceId,homes){const visiting=new Set([sourceId]),d
 // Reconstruct only the exact historical receipt boundary from the existing v4
 // immutable before/after chain. This is evidence, never restored company state.
 function historicalNegative(s,c,ref){
+  // One exported synchronous check may encounter this same negative through
+  // several proof/repair edges. Rewind and validate its exact historical packet
+  // once in that check only; the next call must observe current state anew.
+  const cache=evaluation?(evaluation.historicalNegatives??=new WeakMap()):null;
+  let entries=cache?.get(s);if(cache&&!entries){entries=new Map();cache.set(s,entries);}
+  const key=json([c.home_intake.baseline,ref]);
+  if(entries?.has(key))return entries.get(key);
   const events=operatingIntake(s,c.home_intake.baseline).intake.events;
   const event=events.find(e=>e.type==='job.completed'&&e.changes.some(d=>!d.before&&d.after?.family==='records'&&d.after.key===ref.id&&same(scopedReference(JSON.parse(d.after.raw)),ref)));
   if(!event)fail('repair requires immutable canonical negative completion');
@@ -958,7 +965,8 @@ function historicalNegative(s,c,ref){
     const proof=canonical(past,ref);
     if(!negative(proof.record)||!phasedDomain(proof.x.t)||!proof.x.v.home_intake_policy)fail('repair requires a canonical initial-bootstrap domain negative');
     const delivered=assignment(past,proof.job).packet,packet=delivered.protocol==='corpus-readable-structure-v1'?expandCorpusStructure(delivered):delivered;
-    return {review:ref,value:proof.record,job:proof.job,target:{source:scopedReference(proof.x.record),value:proof.x.t},prior_packet:packet};
+    const result={review:ref,value:proof.record,job:proof.job,target:{source:scopedReference(proof.x.record),value:proof.x.t},prior_packet:packet};
+    entries?.set(key,result);return result;
   }finally{evaluation=outer;}
 }
 const homeMeaning=homes=>homes.map(h=>({id:h.source.id,content:h.value.content,operating_record:h.value.operating_record,context_obligations:h.value.context_obligations??null}));

@@ -21,6 +21,10 @@ import {buildEvidence} from '../plugins/soloco/runtime/upgrade-evidence.mjs';
 import {TIMEOUT_POLICY_VERSION,normalizeTimeout,executionTiming} from '../plugins/soloco/runtime/timeout.mjs';
 const sha=v=>digest(JSON.stringify(v)),size=v=>Buffer.byteLength(typeof v==='string'?v:JSON.stringify(v));
 const clone=structuredClone;
+function immutableJSON(value){
+  if(value&&typeof value==='object'&&!Object.isFrozen(value)){for(const child of Object.values(value))immutableJSON(child);Object.freeze(value);}
+  return value;
+}
 function seed(content='Do not exceed the exhausted allowance. Prior failure remains failed.'){
   return {id:'fixture',schema:2,runtime_version:'0.6.12',owner:{epoch:1,session_id:'cos-native'},governance:'Preparation only; no execution authority.',roles:{qa:{name:'QA'},engineer:{name:'Engineer'}},records:{old:{id:'old',kind:'artifact',revision:1,author_instance:'source-author',content},current:{id:'current',kind:'decision',revision:1,author_instance:'current-author',content:'Retain the exhausted allowance, prior negative verdict, and all restrictions.'}},jobs:{},sessions:{},notices:[],messages:[]};
 }
@@ -44,10 +48,12 @@ function result(a,{empty=false,verdict='Pass'}={}){
   return r;
 }
 const unitResult=result;
-function workflow(content,{empty=false,current,measure=false,setup,review,dependency_ids=[],profile}={}){
+function workflow(content,{empty=false,current,measure=false,setup,review,dependency_ids=[],profile,immutable=false}={}){
   const s=seed(content);if(current!==undefined)s.records.current.content=current;if(setup)setup(s);
+  if(immutable)for(const record of Object.values(s.records))immutableJSON(record);
   const start=performance.now(),p=plan(s,{dependency_ids,...(profile?{profile}:{})}),proofs=new Map(),packets=[];
-  const run=args=>{const j=queue(s,p,args),a=qualificationAssignment(s,j);packets.push({kind:a.packet.kind,bytes:size(a.text)});if(process.env.QUALIFICATION_MEASURE&&packets.length%64===0)process.stderr.write('contract progress '+packets.length+'\n');const value=result(a,{empty}),r=complete(s,j,a,review?review(value,a):value);return {j,a,r};};
+  if(immutable)immutableJSON(p);
+  const run=args=>{const j=queue(s,p,args);if(immutable)immutableJSON(s.records[j.review_of.id]);const a=qualificationAssignment(s,j);packets.push({kind:a.packet.kind,bytes:size(a.text)});if(process.env.QUALIFICATION_MEASURE&&packets.length%64===0)process.stderr.write('contract progress '+packets.length+'\n');const value=result(a,{empty}),r=complete(s,j,a,review?review(value,a):value);if(immutable){immutableJSON(r);immutableJSON(j);}return {j,a,r};};
   for(const u of p.context_partition_plan.units)proofs.set(u.id,run({unit_id:u.id}).r);
   for(const n of p.context_partition_plan.nodes)proofs.set(n.id,run({node_id:n.id,child_review_ids:n.children.map(id=>proofs.get(id).id)}).r);
   const roots=p.context_partition_plan.roots;
@@ -370,6 +376,48 @@ test('content-addressed cache never bypasses exact JSON integrity or mutable-sta
   for(const value of [NaN,undefined,new Date(),[,'sparse']]){const state=seed();state.records.old.unknown=value;assert.throws(()=>createQualificationPlan(state,{source_id:'old'}),/JSON/);}
 });
 
+test('frozen JSON memoization preserves shallow mutation, replacements and exact descriptor checks',()=>{
+  const s=seed();s.records.old.nested={restriction:'Never retry'};Object.freeze(s.records.old);
+  const p=plan(s);assert.equal(validateQualificationPlan(s,p.context_partition_plan),true);
+  s.records.old.nested.restriction='Changed';assert.throws(()=>validateQualificationPlan(s,p.context_partition_plan),/stale|corrupt/);
+  const frozen=seed();immutableJSON(frozen.records.old);const fp=plan(frozen);assert.equal(validateQualificationPlan(frozen,fp.context_partition_plan),true);
+  frozen.records.old={...frozen.records.old,content:'Changed'};assert.throws(()=>validateQualificationPlan(frozen,fp.context_partition_plan),/stale|corrupt/);
+  const hidden=Object.freeze(Object.defineProperty({},'hidden',{value:'Never retry'})),accessor=Object.freeze({get meaning(){throw new Error('must not invoke getter');}});
+  for(const value of [hidden,accessor,Object.freeze([,'sparse']),Object.freeze(Object.assign([,'sparse'],{extra:'not a dense index'}))]){const bad=seed();bad.records.old.extra=value;assert.throws(()=>createQualificationPlan(bad,{source_id:'old'}),/JSON/);}
+});
+
+test('frozen JSON memoization never trusts Proxy or custom array serialization',()=>{
+  const s=seed();let changed=false;
+  const proxy=new Proxy(Object.freeze({restriction:'Never retry'}),{get(target,key,receiver){if(key==='toJSON'&&changed)return ()=>({restriction:'Changed'});return Reflect.get(target,key,receiver);}});
+  s.records.old.extra=proxy;immutableJSON(s.records.old);const p=plan(s);assert.equal(validateQualificationPlan(s,p.context_partition_plan),true);
+  changed=true;assert.throws(()=>validateQualificationPlan(s,p.context_partition_plan),/stale|corrupt/);
+  const arrayState=seed(),prototype=Object.create(Array.prototype),array=Object.freeze(Object.setPrototypeOf(['Never retry'],prototype));
+  arrayState.records.old.extra=array;immutableJSON(arrayState.records.old);const ap=plan(arrayState);
+  prototype.toJSON=()=>['Changed'];assert.throws(()=>validateQualificationPlan(arrayState,ap.context_partition_plan),/stale|corrupt/);
+});
+
+test('frozen arrays cannot replace missing own indices with mutable inherited values',()=>{
+  const s=seed();s.records.old.extra=Object.freeze(Object.assign([,'present'],{extra:'compensating key'}));immutableJSON(s.records.old);
+  assert.throws(()=>createQualificationPlan(s,{source_id:'old'}),/sparse\/extended JSON array/);
+  const descriptor=Object.getOwnPropertyDescriptor(Array.prototype,'0');
+  try{Object.defineProperty(Array.prototype,'0',{configurable:true,writable:true,value:'Changed inherited value'});assert.throws(()=>createQualificationPlan(s,{source_id:'old'}),/sparse\/extended JSON array/);}
+  finally{if(descriptor)Object.defineProperty(Array.prototype,'0',descriptor);else delete Array.prototype[0];}
+});
+
+test('frozen JSON hashes follow changed inherited hooks and keep nesting bounds',()=>{
+  const s=seed();s.records.old.extra=['Never retry'];immutableJSON(s.records.old);plan(s);
+  const original=ref(s.records.old).sha256;
+  for(const prototype of [Object.prototype,Array.prototype]){
+    const descriptor=Object.getOwnPropertyDescriptor(prototype,'toJSON');
+    try{Object.defineProperty(prototype,'toJSON',{configurable:true,value:()=> 'CHANGED inherited serialization'});const changed=ref(s.records.old).sha256;assert.equal(changed,sha(s.records.old));assert.notEqual(changed,original);}
+    finally{if(descriptor)Object.defineProperty(prototype,'toJSON',descriptor);else delete prototype.toJSON;}
+    assert.equal(ref(s.records.old).sha256,original);
+  }
+  const nested=seed();let deep='leaf';for(let i=0;i<200;i++)deep=Object.freeze({child:deep});nested.records.old.extra=deep;
+  createQualificationPlan(nested,{source_id:'old'});let wrapped=deep;for(let i=0;i<57;i++)wrapped={wrapped};nested.records.old.extra=wrapped;
+  assert.throws(()=>createQualificationPlan(nested,{source_id:'old'}),/nesting/);
+});
+
 test('genuinely distinct oversized semantics hold with concrete node/subdomain next action',()=>{
   const s=seed(),p=plan(s),{j,a}=first(s,p),r=result(a);r.items[0].text='Unique constraint '.repeat(1500);
   assert.throws(()=>validateQualificationResponse(s,j,a,'fresh',r),e=>e instanceof QualificationHold&&e.held.next_action.includes('subdomains'));
@@ -382,7 +430,9 @@ test('complete 1x/10x/100x UNKNOWN semantic archive workflows, fixed current obl
 
 test('complete multi-million unknown semantic workflow converges with every receipt, not sampling', {timeout:600000},t=>{
   const text='No retry after exhausted allowance. 😀\n '.repeat(84000);assert.ok(text.length>3000000);
-  const f=workflow(text);assert.ok(f.metrics.units<700);assert.ok(f.metrics.sessions<1400);assert.ok(f.metrics.max_full_prompt_bytes<=limits.input_bytes);assert.ok(f.metrics.aggregate_bytes<9000);assert.equal(f.r.qualification_result.mappings.length,1);
+  // Completed fixture entries are immutable, like retained snapshots. Keep the
+  // entire source, every target/reviewer and full canonical receipt traversal.
+  const f=workflow(text,{immutable:true});assert.equal(f.proof.reviewers.length,f.metrics.sessions);assert.ok(f.metrics.units<700);assert.ok(f.metrics.sessions<1400);assert.ok(f.metrics.max_full_prompt_bytes<=limits.input_bytes);assert.ok(f.metrics.aggregate_bytes<9000);assert.equal(f.r.qualification_result.mappings.length,1);
   t.diagnostic(JSON.stringify({label:'contract double multi-million COMPLETE workflow; not native QA',source_utf16:text.length,...f.metrics}));
 });
 const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-qualification-'));test.after(()=>fs.rmSync(tmp,{recursive:true,force:true}));

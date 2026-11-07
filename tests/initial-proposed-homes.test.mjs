@@ -97,6 +97,14 @@ test('FICTIONAL Blocked home correction requires fresh independent exact negativ
  assert.throws(()=>scoped.validateScopedNativeAdmission(read(f),repaired.job,blocked.job.native_id),/independent|reused/);
  assert.equal(repaired.packet.repair_counterevidence[0].value.review.verdict,'Blocked');assert.equal(repaired.packet.repair_counterevidence[0].prior_packet.homes[0].value.content,original.content);
  const final=await aggregate(f,es,repaired);assert.equal(final.job.status,'completed');const s=read(f);assert.deepEqual(s.records[blocked.record.id],blocked.record);assert.equal(s.records.home.previous[0].content,original.content);
+ // Reusing work within one synchronous validation must never approve another
+ // call on the same now-mutated state object. Restore each field and require
+ // the complete canonical result again, including the historical negative.
+ const accepted=scoped.validateCorpusPreservation(s,{integration_review_id:final.record.id});
+ for(const [object,key,value] of [[s.records.home,'content',s.records.home.content+' changed'],[s.jobs[blocked.job.id],'native_id','changed-negative-native'],[s.records[blocked.record.id].qualification_result,'reason','changed-negative-reason']]){
+  const before=object[key];object[key]=value;assert.throws(()=>scoped.validateCorpusPreservation(s,{integration_review_id:final.record.id}),/hold|changed/i);object[key]=before;
+  assert.deepEqual(scoped.validateCorpusPreservation(s,{integration_review_id:final.record.id}),accepted);
+ }
  const reused=await review(f,{phase:'extract',unit_id:es[0].target.target.unit_id,delivery_protocol:scoped.SCOPED_STREAM});assert.equal(reused.review_id,es[0].record.id);
  // A second real worker result, journaled through the public pipeline, cannot
  // be cleared by naming only the first negative in another repair target.
