@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
 import {withStore,id,stamp} from '../plugins/soloco/runtime/store.mjs';
-import {submitTask,sendTaskMessage,disposeTaskMessage} from '../plugins/soloco/runtime/tasks.mjs';
+import {submitTask,sendTaskMessage,disposeTaskMessage,bindTaskAttempt,reconcileTask,taskReady,isTaskOwnOutput,cancelTask} from '../plugins/soloco/runtime/tasks.mjs';
 import {installTaskIndex,updateTaskIndex,taskKeys,taskCursor,messageKeys,readTaskState,taskIndexAvailable} from '../plugins/soloco/runtime/task-index.mjs';
 import {backupCompany,restoreCompany} from '../plugins/soloco/runtime/storage-transfer.mjs';
 
@@ -111,4 +111,30 @@ test('unknown index versions and missing tables Hold instead of implying an empt
 test('targeted controls include normalized pending upgrade status; semantic reads retain unknown extensions',()=>fixture(({db,write})=>{
   initialize(db);write(s=>{s.upgrade={id:'pending-upgrade',status:'checking'};s.unknown_new_extension={condition:'Unknown obligations remain compulsory'};});
   db(d=>{const targeted=readTaskState(d).state;assert.equal(targeted.upgrade.status,'checking');const semantic=readTaskState(d,{semantic:true}).state;assert.equal(semantic.unknown_new_extension.condition,'Unknown obligations remain compulsory');});
+}));
+
+function returnedOutput(state,task,{verdict='Pass'}={}){
+  const ready=taskReady(state,task);assert.equal(ready.ready,true,ready.reason);const t=task.runtime_task,target=ready.review_of&&state.records[ready.review_of];
+  const job={id:id('job'),instance_id:id('fictional-worker'),host:t.owner.host,epoch:t.owner.epoch,role:t.spec.role,task:t.spec.task,status:'queued',inputs:ready.input_ids.map(key=>({id:key,revision:state.records[key].revision??null})),review_of:target?{id:target.id,revision:target.revision}:null,coordination:ready.coordination,context_format:7,context_scope:t.spec.context_scope,context_sha256:'a'.repeat(64),created_at:stamp()};
+  state.jobs[job.id]=job;bindTaskAttempt(state,task,job);const key=id('artifact');
+  Object.assign(job,{status:'completed',native_id:id('fictional-native'),artifact_id:key,finished_at:stamp(),coordination_release:{termination_confirmed:true,reason:'model_process_closed'}});
+  state.records[key]={id:key,kind:target?'review':'artifact',content:'Complete retained fictional output '+verdict,author_role:job.role,author_instance:job.instance_id,revision:1,status:'Submitted',job_id:job.id,inputs:job.inputs,review_of:job.review_of,review:target?{verdict,reason:'Fictional exact review preserves its unresolved condition.',blockers:verdict==='Pass'?[]:['A fictional condition remains unresolved.']}:null,created_at:stamp(),runtime_output:{version:1,task_id:task.id,definition_revision:t.definition_revision,definition_sha256:t.definition_sha256}};
+  reconcileTask(state,task);return {job_id:job.id,artifact_id:key};
+}
+
+test('explicit terminal output inputs load exact producer provenance without a declared dependency',()=>fixture(({db,create,write,identity})=>{
+  initialize(db);const a=create('terminal-producer'),result=write(s=>returnedOutput(s,s.records[a.id]));
+  const b=write(s=>submitTask(s,{...identity,operation_id:'explicit-output-consumer',source_instruction:'Inspect only this exact fictional returned output.',role:'engineer',task:'Inspect the exact producer body with no readiness edge.',input_ids:[result.artifact_id],acceptance:'Preserve source attribution and conditions.',expected_deliverable:'One fictional assessment'},'codex'));
+  const unrelated=create('unrelated-planned-task');
+  db(d=>{const {state}=readTaskState(d,{task_ids:[b.id],active:true,limit:1});assert.equal(state.records[a.id].runtime_task.state,'returned');assert(state.jobs[result.job_id]);assert(state.records[result.artifact_id]);assert(!state.records[unrelated.id]);assert.equal(state.records[b.id].runtime_task.spec.depends_on.length,0);assert.equal(taskReady(state,state.records[b.id]).ready,true);});
+  write(s=>cancelTask(s,{...identity,operation_id:'cancel-explicit-producer',task_id:a.id,expected_definition_revision:1,source_instruction:'Cancel further use of this exact producer while preserving its retained body.'},'codex'));
+  db(d=>{const {state}=readTaskState(d,{task_ids:[b.id],active:true,limit:1});assert(state.records[result.artifact_id]);assert.match(taskReady(state,state.records[b.id]).reason,/cancelled/);});
+}));
+
+test('explicit negative review inputs retain body and complete producer attribution in targeted state',()=>fixture(({db,create,write,identity})=>{
+  initialize(db);const a=create('negative-subject');write(s=>returnedOutput(s,s.records[a.id]));
+  const qa=write(s=>submitTask(s,{...identity,operation_id:'negative-reviewer',source_instruction:'Review only this exact fictional candidate.',role:'qa',task:'Preserve a fictional unresolved condition in an independent review.',review_task_id:a.id,acceptance:'Return an honest review without acceptance authority.',expected_deliverable:'One fictional negative review'},'codex'));
+  const result=write(s=>returnedOutput(s,s.records[qa.id],{verdict:'Blocked'}));
+  const b=write(s=>submitTask(s,{...identity,operation_id:'negative-evidence-consumer',source_instruction:'Read this exact negative evidence without treating it as readiness or permission.',role:'engineer',task:'Inspect the complete unresolved review.',input_ids:[result.artifact_id],acceptance:'Keep the condition unresolved.',expected_deliverable:'One fictional assessment'},'codex'));
+  db(d=>{const {state}=readTaskState(d,{task_ids:[b.id],active:true,limit:1});assert.equal(state.records[result.artifact_id].review.verdict,'Blocked');assert.equal(state.records[qa.id].runtime_task.state,'needs_attention');assert(state.records[a.id]);assert(state.jobs[result.job_id]);assert.equal(isTaskOwnOutput(state,state.jobs[result.job_id],state.records[result.artifact_id]),true);assert.equal(taskReady(state,state.records[b.id]).ready,true);});
 }));

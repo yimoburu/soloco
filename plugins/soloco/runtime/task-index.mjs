@@ -125,6 +125,10 @@ export function readTaskState(db,{task_ids=[],message_ids=[],include_messages=tr
           if(include_messages&&inboxTargets.has(r.id)&&!page.uninitialized){const inbox=messageKeys(db,r.id,{limit:100});if(!inbox.complete)throw Error('Task inbox requires explicit bounded reconciliation before full working context');for(const key of inbox.ids)ids.add(key);}
         }
         const m=r.runtime_message;if(m){ids.add(m.to_task_id);if(m.from_task_id)ids.add(m.from_task_id);if(m.from_attempt_id)jobs.add(m.from_attempt_id);if(m.disposition?.attempt_id)jobs.add(m.disposition.attempt_id);}
+        // An explicit output input can carry prerequisite provenance without a
+        // declared readiness edge. Load its exact producer before validating;
+        // this traversal neither accepts the output nor filters negative bodies.
+        const output=r.runtime_output;if(output&&typeof output.task_id==='string'&&taskPattern.test(output.task_id)){ids.add(output.task_id);if(typeof r.job_id==='string'&&r.job_id.length<=2000)jobs.add(r.job_id);}
       }
       for(const j of Object.values(state.jobs??{})){
         if(j.runtime_task?.id)ids.add(j.runtime_task.id);if(j.artifact_id)sources.add(j.artifact_id);if(j.review_of?.id)sources.add(j.review_of.id);

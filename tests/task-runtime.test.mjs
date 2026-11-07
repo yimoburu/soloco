@@ -225,3 +225,18 @@ test('an interrupted exact attempt retains its late native response and full neg
   tickRuntime(f.root,{dispatch:false});assert.equal(f.read().records[t.id].runtime_task.state,'needs_attention');assert.equal(Object.keys(f.read().jobs).length,1);
  }finally{release?.();await running;f.close();}
 });
+
+test('supervisor starts an explicit output consumer after its producer is terminal without another active transition',async()=>{
+ const f=fixture();try{
+  const a=f.submit('terminal-explicit-producer',{role:'engineer'}),ja=queue(f.root,a.id);
+  await work(f.root,ja.job_id,model('fictional-terminal-explicit-producer','Exact retained terminal producer content.'));
+  tickRuntime(f.root,{dispatch:false});assert.equal(f.read().records[a.id].runtime_task.state,'returned');
+  const artifactId=f.read().jobs[ja.job_id].artifact_id;
+  const b=f.submit('explicit-output-consumer',{role:'research',input_ids:[artifactId]});
+  const scheduled=tickRuntime(f.root,{queue:(root,key)=>queue(root,key)});
+  assert.equal(scheduled.dispatched.length,1,'a compact no-change scheduling tick must load input producer provenance');
+  const jb=scheduled.dispatched[0];assert(f.read().jobs[jb.job_id].inputs.some(ref=>ref.id===artifactId));
+  await work(f.root,jb.job_id,async(_h,_n,prompt,_d,limit,_s,o)=>{assert.match(prompt,/Exact retained terminal producer content/);o.onSpawn(executionTiming(Date.now(),{timeout_ms:limit}));return {native_id:'fictional-explicit-output-consumer',text:JSON.stringify({content:'The exact retained producer evidence was read.',messages:[],notices:[]})};});
+  tickRuntime(f.root,{dispatch:false});assert.equal(f.read().records[b.id].runtime_task.state,'returned');assert.equal(Object.keys(f.read().jobs).length,2);
+ }finally{f.close();}
+});
