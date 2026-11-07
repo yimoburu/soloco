@@ -1,4 +1,4 @@
-import test from 'node:test';
+import hostTest from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -15,20 +15,48 @@ import {resolveSnapshot} from '../plugins/soloco/runtime/snapshot.mjs';
 import {backupCompany,restoreCompany} from '../plugins/soloco/runtime/storage-transfer.mjs';
 import {resourceClaims} from '../plugins/soloco/runtime/coordination.mjs';
 
+for(const host of ['codex','claude']) {
+const test=(name,fn)=>hostTest(`${host}: ${name}`,fn);
 const child=()=>({on(){return this;},unref(){}});
 const ready=()=>({available:true,authenticated:true,version:'fictional-contract-adapter'});
 function fixture(){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-async-runtime-')),cache=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-async-cache-')),previous=process.env.COMPANY_PLUGIN_DATA;
  process.env.COMPANY_PLUGIN_DATA=cache;
  const args={root,session_id:id('fictional-founder'),idea:'Fictional durable task runtime acceptance'};
- engine.bind(root,args.session_id,'codex');engine.open(args,'codex');withStore(root,db=>db.migrate());
- const start=runtimeAction({...args,epoch:1,action:'start',source_instruction:'Run only the explicitly submitted fictional preparation tasks.'},'codex',{launch:child});
- const submit=(operation,patch={})=>taskAction({...args,epoch:1,action:'submit',operation_id:operation,source_instruction:'Prepare fictional supplied evidence only.',spec:{role:'research',task:'Prepare a short fictional finding.',acceptance:'Return one source-grounded fictional finding.',expected_deliverable:'One fictional finding',context_scope:'fixture',...patch}},'codex',{wake:()=>({started:false,reason:'controlled test driver'})});
+ engine.bind(root,args.session_id,host);engine.open(args,host);withStore(root,db=>db.migrate());
+ const start=runtimeAction({...args,epoch:1,action:'start',source_instruction:'Run only the explicitly submitted fictional preparation tasks.'},host,{launch:child});
+ const submit=(operation,patch={})=>taskAction({...args,epoch:1,action:'submit',operation_id:operation,source_instruction:'Prepare fictional supplied evidence only.',spec:{role:'research',task:'Prepare a short fictional finding.',acceptance:'Return one source-grounded fictional finding.',expected_deliverable:'One fictional finding',context_scope:'fixture',...patch}},host,{wake:()=>({started:false,reason:'controlled test driver'})});
  return {root,args,start,submit,read:()=>withStore(root,db=>db.read()),close:()=>{if(previous===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=previous;fs.rmSync(root,{recursive:true,force:true});fs.rmSync(cache,{recursive:true,force:true});}};
 }
 const queue=(root,key,launch=child)=>engine.queueRuntimeTask(root,key,{launch,check:ready});
 const model=(native,content='A fictional attributable finding.')=>async(_host,session,_prompt,_dir,limit,_selection,options)=>{assert.equal(session,null,'new tasks use finite fresh native sessions');options.onSpawn(executionTiming(Date.now(),{timeout_ms:limit}));return {native_id:native,text:JSON.stringify({content,messages:[],notices:[]})};};
 async function waitUntil(check,{ms=5000}={}){const until=Date.now()+ms;while(Date.now()<until){if(check())return;await new Promise(r=>setTimeout(r,20));}throw Error('Fictional runtime acceptance did not reach expected state');}
+
+test('explicit host model metadata survives queue, worker startup and task reconciliation',async()=>{
+ const f=fixture();try {
+  const selected=host==='claude'?'sonnet':'fictional-model';
+  const catalog={supported:true,source:host==='claude'?'documented_aliases':'host_catalog',models:[{id:selected,supported_efforts:[],effort_support:host==='claude'?'alias_specific_support_unverified':'host_catalog'}]};
+  const t=f.submit('explicit-selection',{model_selection:{mode:'explicit',model:selected,reason:'Small fictional transformation using a supported host model.'}});
+  const j=engine.queueRuntimeTask(f.root,t.id,{launch:child,check:ready,catalog:()=>catalog});
+  await work(f.root,j.job_id,model('fictional-selected-'+host));
+  tickRuntime(f.root,{dispatch:false});
+  const s=f.read(),job=s.jobs[j.job_id];
+  assert.equal(job.status,'completed',job.error);
+  assert.equal(s.records[t.id].runtime_task.state,'returned',s.records[t.id].runtime_task.attention);
+  assert.equal(job.model_catalog.source,catalog.source);
+ }finally{f.close();}
+});
+if(host==='claude')test('host-default fast-off survives the same durable task workflow',async()=>{
+ const f=fixture();try {
+  const catalog={supported:true,source:'documented_aliases',models:[],speed_support:{host_default:true,fast_disabled:true,evidence:'documented_fastMode_false_with_installed_version_and_settings_control',default_service_tier:null,default_speed:'unverified',paid_tiers_enabled:false}};
+  const t=f.submit('default-fast-off',{model_selection:{mode:'default',speed:'fast_disabled',reason:'Use the host default while explicitly disabling fast mode.'}});
+  const j=engine.queueRuntimeTask(f.root,t.id,{launch:child,check:ready,catalog:()=>catalog});
+  await work(f.root,j.job_id,model('fictional-default-claude'));
+  tickRuntime(f.root,{dispatch:false});
+  const s=f.read();assert.equal(s.jobs[j.job_id].status,'completed',s.jobs[j.job_id].error);
+  assert.equal(s.records[t.id].runtime_task.state,'returned',s.records[t.id].runtime_task.attention);
+ }finally{f.close();}
+});
 
 test('new task and status are durable while two workers remain in slow execution; runtime never impersonates owner',async()=>{
  const f=fixture();let releaseA,releaseB;const running=[];
@@ -38,11 +66,11 @@ test('new task and status are durable while two workers remain in slow execution
   const slow=(native,set)=>async(_h,_s,_p,_d,limit,_sel,o)=>{o.onSpawn(executionTiming(Date.now(),{timeout_ms:limit}));return new Promise(resolve=>set(()=>resolve({native_id:native,text:JSON.stringify({content:'Fictional bounded result',messages:[],notices:[]})})));};
   running.push(work(f.root,ja.job_id,slow('fictional-slow-a',fn=>releaseA=fn)),work(f.root,jb.job_id,slow('fictional-slow-b',fn=>releaseB=fn)));
   const c=f.submit('new-while-running',{role:'pm',context_scope:'new'});
-  const view=taskAction({...f.args,action:'inspect'},'codex');
+  const view=taskAction({...f.args,action:'inspect'},host);
   assert(view.tasks.some(t=>t.id===c.id));assert.equal(f.read().jobs[ja.job_id].status,'running');assert.equal(f.read().jobs[jb.job_id].status,'running');
   const state=f.read();assert.equal(state.jobs[ja.job_id].requester.role,'runtime');assert.equal(state.jobs[ja.job_id].requester.session_id,undefined);assert.equal(state.jobs[ja.job_id].requester.task_id,a.id);
-  const outsider={...f.args,session_id:id('other')};engine.bind(f.root,outsider.session_id,'codex');
-  assert.throws(()=>engine.tasks({...outsider,action:'submit',epoch:1,operation_id:'forbidden',source_instruction:'not authority',spec:{role:'research',task:'x',acceptance:'x',expected_deliverable:'x'}},'codex'),/does not own/);
+  const outsider={...f.args,session_id:id('other')};engine.bind(f.root,outsider.session_id,host);
+  assert.throws(()=>engine.tasks({...outsider,action:'submit',epoch:1,operation_id:'forbidden',source_instruction:'not authority',spec:{role:'research',task:'x',acceptance:'x',expected_deliverable:'x'}},host),/does not own/);
  }finally{releaseA?.();releaseB?.();await Promise.allSettled(running);f.close();}
 });
 
@@ -71,7 +99,7 @@ test('idle supervisor ticks do not create canonical history or invalidate task c
   const before=withStore(f.root,db=>db.changeToken());
   for(let n=0;n<5;n++)tickRuntime(f.root,{instance:f.start.instance_id,dispatch:false});
   assert.equal(withStore(f.root,db=>db.changeToken()),before);
-  const live=runtimeAction({...f.args,action:'status'},'codex');assert.equal(live.state,'running');assert.equal(live.supervisor_is_model,false);
+  const live=runtimeAction({...f.args,action:'status'},host);assert.equal(live.state,'running');assert.equal(live.supervisor_is_model,false);
  }finally{f.close();}
 });
 
@@ -89,24 +117,24 @@ test('startup detects existing live supervisor rather than duplicating it; stop 
  const f=fixture();try{
   const t=f.submit('stopped');claimSupervisor(f.root,f.start.instance_id);let launches=0;
   assert.equal(ensureSupervisor(f.root,{launch:()=>{launches++;return child();}}).started,false);assert.equal(launches,0);
-  runtimeAction({...f.args,epoch:1,action:'stop',source_instruction:'Stop the fictional supervisor.'},'codex');
+  runtimeAction({...f.args,epoch:1,action:'stop',source_instruction:'Stop the fictional supervisor.'},host);
   assert.throws(()=>queue(f.root,t.id),/disabled|stopped/);
-  assert.throws(()=>runtimeAction({...f.args,epoch:0,action:'start',source_instruction:'stale'},'codex'),/does not own/);
+  assert.throws(()=>runtimeAction({...f.args,epoch:0,action:'start',source_instruction:'stale'},host),/does not own/);
  }finally{f.close();}
 });
 
 test('public tools expose bounded task/runtime contracts and reject unrecognized authority arguments',async()=>{
  const names=toolListFor().map(t=>t.name);assert(names.includes('company_tasks'));assert(names.includes('company_runtime'));
- await assert.rejects(call('company_tasks',{root:'/private/tmp',session_id:'fixture',action:'inspect',runtime_authority:true},'codex'),/Unknown argument/);
- for(const action of ['message','dispose'])assert.throws(()=>taskAction({action,root:'/private/tmp',session_id:'fixture'},'codex'),/source_instruction/,'every new public mutation needs its actual source instruction');
+ await assert.rejects(call('company_tasks',{root:'/private/tmp',session_id:'fixture',action:'inspect',runtime_authority:true},host),/Unknown argument/);
+ for(const action of ['message','dispose'])assert.throws(()=>taskAction({action,root:'/private/tmp',session_id:'fixture'},host),/source_instruction/,'every new public mutation needs its actual source instruction');
 });
 
 test('background reconciliation catches a crash after queue commit even while runtime is stopped',()=>{
  const f=fixture();try{
   const t=f.submit('orphan'),j=queue(f.root,t.id);
   withStore(f.root,db=>db.transaction('fixture.orphan',s=>{s.jobs[j.job_id].created_at=new Date(Date.now()-600000).toISOString();return s;}));
-  runtimeAction({...f.args,epoch:1,action:'stop',source_instruction:'Stop and inspect the fictional orphan.'},'codex');
-  const r=runtimeAction({...f.args,epoch:1,action:'reconcile'},'codex');assert.equal(r.dispatched.length,0);
+  runtimeAction({...f.args,epoch:1,action:'stop',source_instruction:'Stop and inspect the fictional orphan.'},host);
+  const r=runtimeAction({...f.args,epoch:1,action:'reconcile'},host);assert.equal(r.dispatched.length,0);
   const s=f.read();assert.equal(s.jobs[j.job_id].status,'interrupted');assert.equal(s.records[t.id].runtime_task.state,'needs_attention');
   assert.notEqual(s.jobs[j.job_id].coordination_release?.termination_confirmed,true);
   assert(s.notices.some(n=>n.reference===t.id));
@@ -126,7 +154,7 @@ test('killed running attempts remain uncertain and occupy capacity without autom
 
 test('format7 same-native exact supplemental reads are delivered and accounted in the visible wire budget',async()=>{
  const f=fixture();try{
-  const evidence=engine.save({...f.args,epoch:1,kind:'artifact',id:'source',content:'Fictional exact source text.'},'codex');
+  const evidence=engine.save({...f.args,epoch:1,kind:'artifact',id:'source',content:'Fictional exact source text.'},host);
   const value=f.read().records.source,hash=digest(JSON.stringify(value));
   const t=f.submit('read',{evidence_ids:['source']}),j=queue(f.root,t.id);let calls=0;
   await work(f.root,j.job_id,async(_h,native,_prompt,_dir,limit,_selection,o)=>{
@@ -139,7 +167,7 @@ test('format7 same-native exact supplemental reads are delivered and accounted i
 
 test('format7 changed native identity on retrieval fails and preserves the rejected return',async()=>{
  const f=fixture();try{
-  engine.save({...f.args,epoch:1,kind:'artifact',id:'source',content:'Fictional exact source.'},'codex');const hash=digest(JSON.stringify(f.read().records.source));
+  engine.save({...f.args,epoch:1,kind:'artifact',id:'source',content:'Fictional exact source.'},host);const hash=digest(JSON.stringify(f.read().records.source));
   const t=f.submit('wrong-read',{evidence_ids:['source']}),j=queue(f.root,t.id);let calls=0;
   await work(f.root,j.job_id,async(_h,native,_p,_d,limit,_s,o)=>{if(calls++===0){o.onSpawn(executionTiming(Date.now(),{timeout_ms:limit}));return {native_id:'fictional-read-a',text:JSON.stringify({reads:[{id:'source',sha256:hash,offset:0,length:16}]})};}return {native_id:'fictional-read-b',text:JSON.stringify({content:'This is the wrong native.',messages:[],notices:[]})};});
   const s=f.read(),job=s.jobs[j.job_id];assert.equal(job.status,'failed');assert.match(job.error,/native identity/);assert(job.rejected_output);assert(!job.artifact_id);
@@ -148,7 +176,7 @@ test('format7 changed native identity on retrieval fails and preserves the rejec
 
 test('cumulative multibyte and escaped retrieval history Holds before another oversized native call',async()=>{
  const f=fixture();try{
-  engine.save({...f.args,epoch:1,kind:'artifact',id:'source',content:'"\\é'.repeat(1800)},'codex');const hash=digest(JSON.stringify(f.read().records.source));
+  engine.save({...f.args,epoch:1,kind:'artifact',id:'source',content:'"\\é'.repeat(1800)},host);const hash=digest(JSON.stringify(f.read().records.source));
   const t=f.submit('budget-read',{evidence_ids:['source']}),j=queue(f.root,t.id);let calls=0;
   await work(f.root,j.job_id,async(_h,native,_p,_d,limit,_s,o)=>{if(calls++===0)o.onSpawn(executionTiming(Date.now(),{timeout_ms:limit}));return {native_id:native??'fictional-budget-read',text:JSON.stringify({reads:[{id:'source',sha256:hash,offset:0,length:6000}]})};});
   const job=f.read().jobs[j.job_id];assert.equal(job.status,'failed');assert.match(job.error,/wire budget/);assert(calls>1&&calls<16);assert(job.rejected_output);assert.equal(job.coordination_release.termination_confirmed,true);
@@ -161,7 +189,7 @@ test('fatal supervisor validation is durable and suppresses automatic restart ch
   withStore(f.root,db=>db.db.prepare("UPDATE async_task_index SET state='cancelled' WHERE id=?").run(t.id));
   const result=await supervise(f.root,f.start.instance_id,{poll_ms:1});assert.equal(result.stopped,true);assert.match(result.reason,/index/i);
   let spawns=0;assert.equal(ensureSupervisor(f.root,{launch:()=>{spawns++;return child();}}).started,false);assert.equal(spawns,0);
-  const status=runtimeAction({...f.args,action:'status'},'codex');assert.equal(status.state,'needs_attention');assert.equal(status.complete,false);assert.match(status.error,/index/i);
+  const status=runtimeAction({...f.args,action:'status'},host);assert.equal(status.state,'needs_attention');assert.equal(status.complete,false);assert.match(status.error,/index/i);
   assert(f.read().notices.some(n=>n.reference==='async-runtime-control'));
  }finally{f.close();}
 });
@@ -169,8 +197,8 @@ test('fatal supervisor validation is durable and suppresses automatic restart ch
 test('superseded supervisor generation cannot dispatch through a newly started runtime principal',()=>{
  const f=fixture();try{
   const t=f.submit('old-supervisor');claimSupervisor(f.root,f.start.instance_id);
-  runtimeAction({...f.args,epoch:1,action:'stop',source_instruction:'Replace only the fictional supervisor.'},'codex');
-  const restarted=runtimeAction({...f.args,epoch:1,action:'start',source_instruction:'Start the replacement fictional supervisor.'},'codex',{launch:child});
+  runtimeAction({...f.args,epoch:1,action:'stop',source_instruction:'Replace only the fictional supervisor.'},host);
+  const restarted=runtimeAction({...f.args,epoch:1,action:'start',source_instruction:'Start the replacement fictional supervisor.'},host,{launch:child});
   assert.notEqual(restarted.instance_id,f.start.instance_id);
   assert.throws(()=>engine.queueRuntimeTask(f.root,t.id,{launch:child,check:ready,runtime_instance_id:f.start.instance_id,supervisor_pid:process.pid}),/generation changed/);
   assert.equal(Object.keys(f.read().jobs).length,0);
@@ -192,7 +220,7 @@ test('new applicable rules between worker publication and runtime acceptance fen
   const q=f.submit('before-rule-review',{role:'qa',review_task_id:a.id}),jq=queue(f.root,q.id);
   await work(f.root,jq.job_id,async(_h,_n,_p,_d,limit,_s,o)=>{o.onSpawn(executionTiming(Date.now(),{timeout_ms:limit}));return {native_id:'fictional-rule-reviewer',text:JSON.stringify({content:'This fictional candidate passes the prior current criterion.',review:{verdict:'Pass',reason:'The exact supplied criterion was met.'},messages:[],notices:[]})};});
   assert.equal(f.read().jobs[jq.job_id].status,'completed');
-  engine.save({...f.args,epoch:1,kind:'decision',content:'New applicable rule: this finding is not sufficient for current acceptance.'},'codex');
+  engine.save({...f.args,epoch:1,kind:'decision',content:'New applicable rule: this finding is not sufficient for current acceptance.'},host);
   tickRuntime(f.root,{dispatch:false});const state=f.read();assert.equal(state.records[q.id].runtime_task.state,'needs_attention');assert.match(state.records[q.id].runtime_task.attention,/context changed/);
  }finally{f.close();}
 });
@@ -200,11 +228,11 @@ test('new applicable rules between worker publication and runtime acceptance fen
 test('peer handoff is delivered to the declared receiver and acknowledged atomically with its actual result',async()=>{
  const f=fixture();try{
   const a=f.submit('peer-author',{role:'research'}),b=f.submit('peer-receiver',{role:'engineer',depends_on:[{task_id:a.id,gate:'output'}]});
-  const amended=taskAction({...f.args,epoch:1,action:'amend',task_id:a.id,expected_definition_revision:1,operation_id:'declare-peer',source_instruction:'Route this fictional handoff only to the named receiver.',spec:{...f.read().records[a.id].runtime_task.spec,peer_task_ids:[b.id]}},'codex',{wake:()=>({started:false})});
+  const amended=taskAction({...f.args,epoch:1,action:'amend',task_id:a.id,expected_definition_revision:1,operation_id:'declare-peer',source_instruction:'Route this fictional handoff only to the named receiver.',spec:{...f.read().records[a.id].runtime_task.spec,peer_task_ids:[b.id]}},host,{wake:()=>({started:false})});
   assert.equal(amended.definition_revision,2);
   const ja=queue(f.root,a.id);await work(f.root,ja.job_id,async(_h,_n,prompt,_d,limit,_s,o)=>{assert.match(prompt,new RegExp(b.id));o.onSpawn(executionTiming(Date.now(),{timeout_ms:limit}));return {native_id:'fictional-peer-author',text:JSON.stringify({content:'Fictional producer evidence.',messages:[{to:'engineer',to_task_id:b.id,content:'Required fictional qualifier: retain the source uncertainty.'}],notices:[]})};});
   tickRuntime(f.root,{dispatch:false});
-  const inbox=taskAction({...f.args,action:'inbox',task_id:b.id},'codex');assert.equal(inbox.total,1);assert.equal(inbox.items[0].content_complete,false);
+  const inbox=taskAction({...f.args,action:'inbox',task_id:b.id},host);assert.equal(inbox.total,1);assert.equal(inbox.items[0].content_complete,false);
   const messageId=inbox.items[0].id,jb=queue(f.root,b.id);
   await work(f.root,jb.job_id,async(_h,_n,prompt,_d,limit,_s,o)=>{assert.match(prompt,/Required fictional qualifier/);o.onSpawn(executionTiming(Date.now(),{timeout_ms:limit}));return {native_id:'fictional-peer-receiver',text:JSON.stringify({content:'The fictional result preserves the source uncertainty.',messages:[],notices:[],message_dispositions:[{message_id:messageId,disposition:'The result explicitly preserves the supplied uncertainty.'}]})};});
   tickRuntime(f.root,{dispatch:false});const state=f.read();assert.equal(state.records[messageId].runtime_message.state,'processed');assert.equal(state.records[messageId].runtime_message.disposition.by,'worker');assert.equal(state.records[b.id].runtime_task.state,'returned');
@@ -249,7 +277,7 @@ test('restore preserves accepted exact evidence, a queued obligation and an unpr
  try{
   const a=f.submit('restore-producer',{role:'engineer'}),qa=f.submit('restore-qa',{role:'qa',review_task_id:a.id});
   const b=f.submit('restore-receiver',{role:'research',resources:['fictional/shared-resource'],depends_on:[{task_id:qa.id,gate:'accepted'}]});
-  const msg=taskAction({...f.args,epoch:1,action:'message',operation_id:'restore-pending-message',source_instruction:'Preserve this fictional uncertainty for the receiver.',to_task_id:b.id,content:'Unresolved fictional qualifier: no permission for external effects.'},'codex',{wake:()=>({started:false})});
+  const msg=taskAction({...f.args,epoch:1,action:'message',operation_id:'restore-pending-message',source_instruction:'Preserve this fictional uncertainty for the receiver.',to_task_id:b.id,content:'Unresolved fictional qualifier: no permission for external effects.'},host,{wake:()=>({started:false})});
   const ja=queue(f.root,a.id);await work(f.root,ja.job_id,model('fictional-restore-producer'));
   const jq=queue(f.root,qa.id);await work(f.root,jq.job_id,async(_h,_n,_p,_d,limit,_s,o)=>{
    o.onSpawn(executionTiming(Date.now(),{timeout_ms:limit}));
@@ -272,3 +300,5 @@ test('restore preserves accepted exact evidence, a queued obligation and an unpr
   assert.deepEqual(after.owner,before.owner);assert.deepEqual(Object.keys(after.jobs),Object.keys(before.jobs));
  }finally{f.close();fs.rmSync(transfer,{recursive:true,force:true});}
 });
+
+}

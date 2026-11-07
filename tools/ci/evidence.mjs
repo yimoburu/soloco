@@ -32,7 +32,7 @@ export const workflowPolicies=Object.freeze({
 export function workflowPolicy(workflow){requireThat(Object.hasOwn(workflowPolicies,workflow),'unsupported workflow');return workflowPolicies[workflow];}
 // Runtime-sensitive compatibility coverage; the full suite remains mandatory on Node 22.
 export const compatibilityTests=Object.freeze([
-  'cancellation-finalization','ci-evidence','hooks','indexed-public-reads',
+  'cancellation-finalization','ci-evidence','claude-terminal-state','hooks','indexed-public-reads',
   'local-sandbox-flags','local-sandbox','normalized-read-atomicity','plugin',
   'runtime-version-fence','selection-adapter','storage-intake','storage-layout-repairs',
   'storage-transfer-integrity','task-index','task-runtime','tasks',

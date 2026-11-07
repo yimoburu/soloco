@@ -41,6 +41,8 @@ Restart the session and keep SoloCo’s hooks enabled. This uses Claude’s [rep
 
 Run the plugin’s **setup** skill once to check readiness. It creates no company. If dependency setup is interrupted, rerun setup before starting work.
 
+Both hosts use the same CoS instructions, company tools, task pipeline, review gates and durable records. Setup checks the actual session's startup-hook receipt on both hosts. Claude Code's UI and model catalog are host-specific; see [Claude parity validation](docs/claude-parity.md) for coverage and remaining live checks.
+
 ## Start a company
 
 1. Create a project in your chosen app.

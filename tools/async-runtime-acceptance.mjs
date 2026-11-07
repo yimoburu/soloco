@@ -12,7 +12,6 @@ import {withStore} from '../plugins/soloco/runtime/store.mjs';
 
 const SOURCE=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const MAIN=path.join(SOURCE,'plugins/soloco/runtime/main.mjs');
-const DEFAULT_MODEL='gpt-6.1-sol';
 const sha=bytes=>createHash('sha256').update(bytes).digest('hex');
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const alive=pid=>{try{process.kill(pid,0);return true;}catch(error){return error.code==='EPERM';}};
@@ -27,11 +26,11 @@ function newDirectory(directory){
   fs.mkdirSync(resolved,{recursive:true,mode:0o700});return fs.realpathSync(resolved);
 }
 class MCP {
-  constructor(root,data,directory,phase){
+  constructor(root,data,directory,phase,host='codex'){
     this.id=0;this.waiting=new Map();this.buffer='';this.root=root;this.phase=phase;
     this.log=path.join(directory,'mcp-protocol.ndjson');this.stderr=fs.openSync(path.join(directory,phase+'-mcp-stderr.log'),'wx',0o600);this.latencies=[];
     const env={...process.env,COMPANY_PLUGIN_DATA:data};delete env.COMPANY_WORKER;
-    this.child=spawn(process.execPath,[MAIN,'serve','codex'],{cwd:root,env,stdio:['pipe','pipe',this.stderr]});
+    this.child=spawn(process.execPath,[MAIN,'serve',host],{cwd:root,env,stdio:['pipe','pipe',this.stderr]});
     this.child.stdout.setEncoding('utf8');this.child.stdout.on('data',chunk=>{this.buffer+=chunk;let n;while((n=this.buffer.indexOf('\n'))>=0){const line=this.buffer.slice(0,n);this.buffer=this.buffer.slice(n+1);if(!line.trim())continue;let r;try{r=JSON.parse(line);}catch{fs.appendFileSync(this.log,JSON.stringify({phase,kind:'invalid_stdout',line})+'\n');continue;}this.record('response',r);const pending=this.waiting.get(r.id);if(pending){this.waiting.delete(r.id);clearTimeout(pending.timer);r.error?pending.reject(Error(JSON.stringify(r.error))):pending.resolve(r.result);}}});
     this.child.on('error',error=>this.fail(error));this.child.on('exit',(code,signal)=>{this.closed={code,signal};this.fail(Error(`MCP exited ${code??signal}`));});
   }
@@ -89,12 +88,12 @@ function verifyRecoveryPersistence(before,after){
   const counts=new Map();for(const job of Object.values(after.jobs??{})){const id=job.runtime_task?.id;assert(id&&Object.hasOwn(current,id),'Recovery introduced an undeclared task job');counts.set(id,(counts.get(id)??0)+1);assert.equal(counts.get(id),1,'Recovery queued duplicate jobs for one task');}
 }
 
-export async function runAsyncRuntimeAcceptance({directory,mode='prepare-only',wait_ms=1200000,model=DEFAULT_MODEL}={}){
+export async function runAsyncRuntimeAcceptance({directory,mode='prepare-only',wait_ms=1200000,host='codex',model=host==='claude'?'sonnet':'gpt-6.1-sol'}={}){
   if(!['prepare-only','run-native'].includes(mode)||!Number.isSafeInteger(wait_ms)||wait_ms<1000||wait_ms>7200000)throw Error('Choose explicit prepare-only or run-native with bounded wait_ms');
-  if(typeof model!=='string'||!/^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/.test(model))throw Error('Choose an explicit supported model ID');
+  if(!['codex','claude'].includes(host)||typeof model!=='string'||!model.trim())throw Error('Choose host codex or claude and a nonempty model');
   const output=newDirectory(directory),root=path.join(output,'fictional-company'),data=path.join(root,'fixture-plugin-data');fs.mkdirSync(root);fs.mkdirSync(data,{mode:0o700});
-  const receipt={version:1,mode,status:'preparing',started_at:new Date().toISOString(),output_directory:output,fixture_root:root,fixture_plugin_data:data,source:sourceIdentity(),native_execution_authorized:mode==='run-native',host:'codex',model,synthetic_hook_binding:true,
-    scope:'Fictional project-owned company via real MCP process; native mode uses the real adapter. No actual company or installed plugin mutation.',limitations:['Fixture binding is synthetic and proves no Codex Hooks UI trust or real founder lifecycle invocation.','No actual-company handover, team adoption, automatic sidebar placement or background founder notification is established.','Visible prompt/request/response measurements exclude provider-added instructions and hidden reasoning.','Recorded model requests and applied controls do not establish effective provider settings or billing.','Task/message index integrity and public cursor inventory validation scan canonical metadata; small returned context does not establish bounded storage CPU or unlimited archive scalability.'],checks:{}};
+  const receipt={version:1,mode,status:'preparing',started_at:new Date().toISOString(),output_directory:output,fixture_root:root,fixture_plugin_data:data,source:sourceIdentity(),native_execution_authorized:mode==='run-native',host,model,synthetic_hook_binding:true,
+    scope:'Fictional project-owned company via real MCP process; native mode uses the real adapter. No actual company or installed plugin mutation.',limitations:['Fixture binding is synthetic and proves no host Hooks UI trust or real founder lifecycle invocation.','No actual-company handover, team adoption, automatic sidebar placement or background founder notification is established.','Visible prompt/request/response measurements exclude provider-added instructions and hidden reasoning.','Recorded model requests and applied controls do not establish effective provider settings or billing.','Task/message index integrity and public cursor inventory validation scan canonical metadata; small returned context does not establish bounded storage CPU or unlimited archive scalability.'],checks:{}};
   const file=path.join(output,'receipt.json'),save=()=>fs.writeFileSync(file,JSON.stringify(receipt,null,2)+'\n',{mode:0o600});save();
   let client;const allLatency=[];const oldData=process.env.COMPANY_PLUGIN_DATA;
   const base={root,session_id:'fictional-founder-'+randomUUID(),epoch:1};
@@ -104,9 +103,9 @@ export async function runAsyncRuntimeAcceptance({directory,mode='prepare-only',w
     git(['-c','core.hooksPath='+os.devNull,'init','--quiet'],root);git(['-c','core.hooksPath='+os.devNull,'add','README.md','.gitignore'],root);git(['-c','core.hooksPath='+os.devNull,'-c','user.name=SoloCo fixture','-c','user.email=fixture@example.invalid','-c','commit.gpgsign=false','commit','--quiet','-m','Prepare fictional async runtime acceptance'],root);
     receipt.fixture_git_commit=git(['rev-parse','HEAD'],root);
     // The sole synthetic lifecycle seam. Never use a real company root or claim
-    // that this binding was emitted by the Codex host's trusted hooks.
-    process.env.COMPANY_PLUGIN_DATA=data;bind(root,base.session_id,'codex');
-    client=new MCP(root,data,output,'initial');await client.rpc('initialize',{});const opened=await client.tool('company_open',{root,session_id:base.session_id,idea:'FICTIONAL runtime-only acceptance. No outside effects, spending, publication or actual company work.',name:'Fictional Async Fixture'});base.epoch=opened.owner.epoch;
+    // that this binding was emitted by the chosen host's trusted hooks.
+    process.env.COMPANY_PLUGIN_DATA=data;bind(root,base.session_id,host);
+    client=new MCP(root,data,output,'initial',host);await client.rpc('initialize',{});const opened=await client.tool('company_open',{root,session_id:base.session_id,idea:'FICTIONAL runtime-only acceptance. No outside effects, spending, publication or actual company work.',name:'Fictional Async Fixture'});base.epoch=opened.owner.epoch;
     await exactPinned(client,base,opened);
     await client.tool('company_control',{root,session_id:base.session_id,action:'pause',expected_epoch:base.epoch,source_instruction:'Pause this fictional fixture for its explicit backed-up normalized storage migration.'});
     await client.tool('company_storage',{...base,action:'migrate',source_instruction:'Migrate only this paused fictional fixture with retained backup.'});
@@ -115,23 +114,23 @@ export async function runAsyncRuntimeAcceptance({directory,mode='prepare-only',w
     const fixtureSource={fixture:'async-native-v1',items:[{id:'fictional-1',value:'amber'},{id:'fictional-2',value:'violet'}],restrictions:['No external effects','No retry allowance']};
     const source=await client.tool('company_save',{...base,kind:'artifact',content:JSON.stringify(fixtureSource),source_reference:'Manually supplied fictional fixture in tools/async-runtime-acceptance.mjs; not an actual company fact.'});
     if(typeof source.id!=='string')throw Error('Fixture source identity was not returned; inspect persisted receipt without repeating mutation');
-    const selection=(effort,reason)=>({mode:'explicit',model,effort,speed:'host_default',reason});
+    const selection=(effort,reason)=>({mode:'explicit',model,...(host==='codex'?{effort}:{}),speed:'host_default',reason});
     const instruction='Authorize exactly one bounded fictional preparation attempt for this task and its declared peer handoff. No shell, network business action, spending, source integration, retry or real company action.';
-    const spec=(role,task,effort)=>({role,task,acceptance:'Preserve exactly both fictional item IDs/values and both restrictions from the fixture source; disclose missing or conflicting evidence. Never treat this fixture as business authority.',expected_deliverable:'A small JSON object in content with the exact fictional items and restrictions',context_scope:'fictional-fixture',input_ids:[source.id],resources:['fixture/'+role],max_attempts:1,timeout_ms:180000,timeout_reason:'Small bounded fictional data transformation/review; one native attempt only.',model_selection:selection(effort,role==='qa'?'Independent exact-candidate semantic check of a small fictional transformation requires adequate reasoning.':'Small unambiguous fictional transformation using supplied exact evidence; lower effort is adequate.')});
+    const spec=(role,task,effort)=>({role,task,acceptance:'Preserve exactly both fictional item IDs/values and both restrictions from the fixture source; disclose missing or conflicting evidence. Never treat this fixture as business authority.',expected_deliverable:'JSON text in the content string with the exact fictional items and restrictions',context_scope:'fictional-fixture',input_ids:[source.id],resources:['fixture/'+role],max_attempts:1,timeout_ms:180000,timeout_reason:'Small bounded fictional data transformation/review; one native attempt only.',model_selection:selection(effort,role==='qa'?'Independent exact-candidate semantic check of a small fictional transformation requires adequate reasoning.':'Small unambiguous fictional transformation using supplied exact evidence; lower effort is adequate.')});
     const submit=async(operation_id,specification)=>client.tool('company_tasks',{...base,action:'submit',operation_id,source_instruction:instruction,spec:specification});
-    const producerSpec=spec('engineer','Read the fictional source. Return content as JSON with fixture:"async-native-v1", phase:"producer", items and restrictions copied exactly. Send one peer message to the sole declared peer target, with its exact to_task_id and its role in to. The message states that this fixture has no external effects or retry allowance. Do not fabricate IDs or authority. Return no other prose.','low');
+    const producerSpec=spec('engineer','Read the fictional source. Return content as a JSON-encoded string (not an object) with fixture:"async-native-v1", phase:"producer", items and restrictions copied exactly. Send one peer message to the sole declared peer target, with its exact to_task_id and its role in to. The message states that this fixture has no external effects or retry allowance. Do not fabricate IDs or authority. Return no other prose.','low');
     const a=await submit('fixture-producer',producerSpec);
     const reviewSpec={...spec('qa','Independently compare the exact producer artifact against the fictional source and task acceptance. Return an honest Pass, Fail or Blocked review with a concrete reason; never Pass merely to finish a test. Preserve restrictions and identify any unsupported or missing content. Include no peer handoff.','medium'),review_task_id:a.id,depends_on:[{task_id:a.id,gate:'output'}]};
     const qa=await submit('fixture-independent-review',reviewSpec);
-    const receiverSpec={...spec('research','Use the complete producer body and its exact independent review, not the review verdict alone. Return content as JSON with fixture:"async-native-v1", phase:"receiver", items and restrictions copied exactly. Explicitly disposition each delivered task-scoped peer message in message_dispositions with its exact message_id and explain how this artifact preserves it. This does not grant new authority.','low'),depends_on:[{task_id:qa.id,gate:'accepted'}]};
+    const receiverSpec={...spec('research','Use the complete producer body and its exact independent review, not the review verdict alone. Return content as a JSON-encoded string (not an object) with fixture:"async-native-v1", phase:"receiver", items and restrictions copied exactly. Explicitly disposition each delivered task-scoped peer message in message_dispositions with its exact message_id and explain how this artifact preserves it. This does not grant new authority.','low'),depends_on:[{task_id:qa.id,gate:'accepted'}]};
     const b=await submit('fixture-receiver',receiverSpec);
     await client.tool('company_tasks',{...base,action:'amend',operation_id:'fixture-bind-peer',source_instruction:instruction,task_id:a.id,expected_definition_revision:a.definition_revision,spec:{...producerSpec,peer_task_ids:[b.id]}});
     receipt.tasks={producer:a.id,qa:qa.id,receiver:b.id};receipt.fixture_source_id=source.id;
     const prepared=fixtureState(root);assert.equal(Object.keys(prepared.jobs).length,0);assert.equal(prepared.records['async-runtime-control'].runtime_control.enabled,false);receipt.checks.prepared_without_native_jobs=true;receipt.prepared=observations(prepared);save();
     if(mode==='prepare-only'){receipt.status='prepared';return receipt;}
     const doctor=await client.tool('company_doctor',{root,session_id:base.session_id});
-    const supported=(doctor.models?.models??[]).find(m=>m.id===model);if(!supported)throw Error('Requested model '+model+' is absent from the host catalog; no substitution');
-    const efforts=supported.supported_efforts??supported.supportedEfforts??[];for(const effort of ['low','medium'])if(!efforts.includes(effort))throw Error('Required model effort is not verified by the host catalog: '+effort);
+    const supported=(doctor.models?.models??[]).find(m=>m.id===model);if(!supported)throw Error('Requested model is absent from the host catalog; no substitution');
+    const efforts=supported.supported_efforts??supported.supportedEfforts??[];for(const effort of host==='codex'?['low','medium']:[])if(!efforts.includes(effort))throw Error('Required model effort is not verified by the host catalog: '+effort);
     receipt.catalog={model:supported,source:doctor.models?.source,host:doctor.host};
     await client.tool('company_runtime',{...base,action:'start',source_instruction:'Run only the three already recorded one-attempt fictional producer, independent QA and receiver tasks within their exact source-linked scopes. No automatic retries or external actions.'});
     const deadline=Date.now()+wait_ms;let state;
@@ -150,7 +149,7 @@ export async function runAsyncRuntimeAcceptance({directory,mode='prepare-only',w
           allLatency.push(...client.latencies);await client.close();client=null;
           process.kill(oldSupervisor,'SIGTERM');await waitDead(oldSupervisor);
           receipt.inflight_recovery.software_supervisor_stopped_at=new Date().toISOString();receipt.inflight_recovery.without_supervisor=observations(fixtureState(root));save();
-          client=new MCP(root,data,output,'inflight-restart');await client.rpc('initialize',{});
+          client=new MCP(root,data,output,'inflight-restart',host);await client.rpc('initialize',{});
           const restartDeadline=Date.now()+10000;let restarted=null;
           while(Date.now()<restartDeadline){const status=await client.tool('company_runtime',{root,session_id:base.session_id,action:'status'});if(status.state==='running'&&status.pid!==oldSupervisor){restarted=status;break;}await sleep(200);}
           assert(restarted,'MCP startup did not wake the enabled software scheduler with work in progress');
@@ -186,8 +185,8 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(path.resolve(process.argv[1]
   const args=process.argv.slice(2),modes=['--prepare-only','--run-native'].filter(v=>args.includes(v));
   if(modes.length!==1)throw Error('Choose exactly --prepare-only or --run-native; native mode is explicit and requires a clean source pin');
   const take=key=>{const i=args.indexOf(key);return i<0?undefined:args[i+1];};
-  if(args.some((v,i)=>v.startsWith('--')&&!['--prepare-only','--run-native','--output-dir','--wait-ms','--model'].includes(v)))throw Error('Unknown acceptance option');
-  const result=await runAsyncRuntimeAcceptance({directory:take('--output-dir'),model:take('--model'),mode:modes[0].slice(2),wait_ms:take('--wait-ms')===undefined?1200000:Number(take('--wait-ms'))});
+  if(args.some((v,i)=>v.startsWith('--')&&!['--prepare-only','--run-native','--output-dir','--wait-ms','--host','--model'].includes(v)))throw Error('Unknown acceptance option');
+  const result=await runAsyncRuntimeAcceptance({directory:take('--output-dir'),host:take('--host')??'codex',...(take('--model')?{model:take('--model')}:{}),mode:modes[0].slice(2),wait_ms:take('--wait-ms')===undefined?1200000:Number(take('--wait-ms'))});
   console.log(JSON.stringify({status:result.status,mode:result.mode,receipt:path.join(result.output_directory,'receipt.json'),fixture_root:result.fixture_root,source_commit:result.source.commit,native_calls_authorized:result.native_execution_authorized,error:result.error??null},null,2));
   if(!['prepared','passed_native_fixture'].includes(result.status))process.exitCode=1;
 }

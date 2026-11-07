@@ -80,7 +80,7 @@ test('output observations do not infer requested, applied or effective settings'
     for(const field of ['reported_effort','reported_service_tier','applied_controls'])assert.equal(result.model_evidence[field],null);
     assert.equal(result.model_evidence.verification,'unverified');
   }
-  const usage=parseOutput('claude',JSON.stringify({subtype:'success',result:'artifact',modelUsage:{sonnet:{inputTokens:12,outputTokens:-1,cacheReadInputTokens:1.5,costUSD:0.25,service_tier:'priority',secret:'discard'},'bad model':{inputTokens:2}}})).model_evidence;
+  const usage=parseOutput('claude',JSON.stringify({subtype:'success',session_id:'session-example',result:'artifact',modelUsage:{sonnet:{inputTokens:12,outputTokens:-1,cacheReadInputTokens:1.5,costUSD:0.25,service_tier:'priority',secret:'discard'},'bad model':{inputTokens:2}}})).model_evidence;
   assert.equal(usage.scope,'session_cumulative_including_internal_calls');
   assert.equal(usage.verification,'host_reported');
   assert.deepEqual(usage.reported_models,['sonnet']);
