@@ -24,6 +24,7 @@ export function inspectRuntimeLibrary(file,probe=spawnSync,{deadline=Date.now()+
     const remaining=deadline-now();
     if(remaining<=0)throw Error('Node runtime dependency discovery timed out');
     const result=probe('/usr/bin/otool',['-L',file],{encoding:'utf8',timeout:Math.min(5000,remaining),maxBuffer:100000,killSignal:'SIGKILL',env:{PATH:'/usr/bin:/bin'}});
+    if(now()>=deadline)throw Error('Node runtime dependency discovery timed out');
     if(result.status===0&&!result.error&&!result.signal&&typeof result.stdout==='string')return result.stdout;
     if(result.error?.code==='ETIMEDOUT'&&attempt===0)continue;
     const reason=String(result.error?.message||result.stderr||result.signal||`exit ${result.status}`).trim().slice(0,500);

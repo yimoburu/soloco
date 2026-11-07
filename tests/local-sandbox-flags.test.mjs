@@ -171,3 +171,12 @@ test('trusted library inspection retains real errors and stops at its shared dea
   assert.throws(()=>inspectRuntimeLibrary('/trusted/node',(_f,_a,options)=>{calls++;assert.equal(options.timeout,1000);clock=1000;return {status:null,error:Object.assign(Error('timed out'),{code:'ETIMEDOUT'})};},{deadline:1000,now:()=>clock}),/discovery timed out/);assert.equal(calls,1);
   calls=0;assert.throws(()=>inspectRuntimeLibrary('/trusted/node',()=>{calls++;return {status:null,error:Object.assign(Error('timed out'),{code:'ETIMEDOUT'})};}),/timed out/);assert.equal(calls,2);
 });
+
+
+test('trusted library inspection rejects even successful completion at the shared deadline',()=>{
+  for(const elapsed of [1000,1001]){
+    let now=0,calls=0;
+    assert.throws(()=>inspectRuntimeLibrary('/trusted/node',()=>{calls++;now=elapsed;return {status:0,stdout:'node:\n'};},{deadline:1000,now:()=>now}),/discovery timed out/);
+    assert.equal(calls,1);
+  }
+});
