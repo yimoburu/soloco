@@ -21,7 +21,8 @@ export const compatibilityTests=Object.freeze([
   'cancellation-finalization','ci-evidence','hooks','indexed-public-reads',
   'local-sandbox-flags','local-sandbox','normalized-read-atomicity','plugin',
   'runtime-version-fence','selection-adapter','storage-intake','storage-layout-repairs',
-  'storage-transfer-integrity','timeout','timeout-wiring','upgrade-adapter',
+  'storage-transfer-integrity','task-index','task-runtime','tasks',
+  'timeout','timeout-wiring','upgrade-adapter',
 ].map(name=>`tests/${name}.test.mjs`).sort());
 export function laneCoverage(lane) {
   requireThat(lanes.includes(lane),'unknown fixed lane');
