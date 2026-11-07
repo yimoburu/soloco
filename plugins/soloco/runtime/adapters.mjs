@@ -207,6 +207,15 @@ export function parseOutput(host, stdout) {
         active=true;completed=false;text=undefined;turnId=event.turn_id;turn++;
         break;
       case 'item.started': case 'item.updated': case 'item.completed':
+        // Installed Codex 0.154 emits this startup diagnostic as an error item
+        // before turn.started. Retain it; only a later complete turn can succeed.
+        // Do not generalize it into permission to ignore arbitrary error items.
+        if(event.type==='item.completed'&&event.item?.type==='error'&&!turn&&native_id
+          &&typeof event.item.id==='string'&&event.item.id&&!itemTurns.has(event.item.id)
+          &&typeof event.item.message==='string'&&event.item.message.startsWith('Ignoring unknown `features` requirement `ultrafast_mode` from requirements layers: ')
+          &&Object.keys(event.item).every(k=>['id','type','message'].includes(k))){
+          itemTurns.set(event.item.id,turn);warnings.push(event);pendingWarning=true;break;
+        }
         if(!active || !itemTypes.has(event.item?.type))fail('Unsupported Codex item sequence');
         if(event.item?.type==='agent_message'&&event.type!=='item.completed'&&event.item.id===undefined)fail('Codex message start requires item identity');
         if(event.item?.type==='agent_message'&&event.type==='item.started'&&openMessages.has(event.item.id))fail('Codex message item already started');

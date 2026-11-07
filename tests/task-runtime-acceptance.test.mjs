@@ -121,7 +121,7 @@ test('task amendment, pause, owner change and runtime revocation fence slow late
   });
 });
 
-test('independent worker Fail and Blocked reviews keep accepted dependents planned',async t=>{
+test('independent worker Fail and Blocked reviews retain dependents for explicit attention',async t=>{
   for(const verdict of ['Fail','Blocked'])await t.test(verdict,async()=>{
     const f=fixture();try{
       const a=await f.submit('producer'),qa=await f.submit('qa',{role:'qa',review_task_id:a.id}),b=await f.submit('dependent',{role:'pm',depends_on:[{task_id:qa.id,gate:'accepted'}]});
@@ -129,6 +129,7 @@ test('independent worker Fail and Blocked reviews keep accepted dependents plann
       const qj=f.queue(qa.id);await work(f.root,qj.job_id,immediate('fictional-independent-'+verdict,{...envelope('Independent fictional negative finding.'),review:{verdict,reason:'Required evidence is absent.',blockers:['Missing exact evidence']}}));
       tickRuntime(f.root,{dispatch:false});const state=f.read();
       assert.equal(state.records[qa.id].runtime_task.state,'needs_attention');assert.equal(state.records[state.jobs[qj.job_id].artifact_id].review.verdict,verdict);
+      assert.equal(state.records[b.id].runtime_task.state,'needs_attention');assert.equal(state.records[b.id].runtime_task.attention_code,'REVIEW_HELD');
       assert.notEqual(state.jobs[aj.job_id].native_id,state.jobs[qj.job_id].native_id);assert.equal(taskReady(state,state.records[b.id]).ready,false);
       assert.throws(()=>f.queue(b.id));assert.equal(Object.keys(f.read().jobs).length,2);
     }finally{f.close();}

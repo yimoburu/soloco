@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {spawn} from 'node:child_process';
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
 import {call} from '../plugins/soloco/runtime/main.mjs';
 import {withStore,teamHash,digest} from '../plugins/soloco/runtime/store.mjs';
@@ -45,7 +46,15 @@ export async function evaluate({directory,native=false}){
     const entry={job_id:j.id,role,prompt_sha256:digest(params[2]),prompt_bytes:Buffer.byteLength(params[2]),started_ms:performance.now()-start};report.calls.push(entry);save();
     try{
      let output;
-     if(native)output=await runModel(...params);
+     if(native){
+      // Retain the actual wire on failures as well as successes; a diagnostic
+      // must remain inspectable without spending another native call.
+      const file=path.join(directory,`call-${report.calls.length}.stdout.jsonl`);let bytes=0;
+      fs.writeFileSync(file,'',{flag:'wx'});entry.wire_file=path.basename(file);
+      try{output=await runModel(...params.slice(0,6),{...params[6],spawn:(...args)=>{
+       const child=spawn(...args);child.stdout.on('data',chunk=>{const retained=chunk.subarray(0,Math.max(0,8000000-bytes));fs.appendFileSync(file,retained);bytes+=retained.length;if(retained.length<chunk.length)entry.wire_truncated=true;});return child;
+      }});}finally{entry.wire_bytes=bytes;entry.wire_sha256=digest(fs.readFileSync(file));}
+     }
      else{
       params[6].onSpawn(executionTiming(Date.now(),{timeout_ms:params[4]}));
       const target=read(root).records[extra.review_of];

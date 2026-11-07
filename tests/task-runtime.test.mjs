@@ -297,3 +297,31 @@ test('unstarted dependents expose an actionable wait without claiming an attempt
   assert.equal(page.tasks[0].readiness.ready,false);assert.equal(page.tasks[0].readiness.recovery.code,'DEPENDENCY_PENDING');assert.equal(page.tasks[0].readiness.recovery.automatic,true);assert.equal(page.tasks[0].attempts.length,0);
  }finally{f.close();}
 });
+
+test('nonautomatic readiness holds persist even after the original evidence is restored',()=>{
+ const f=fixture();try{
+  engine.save({...f.args,epoch:1,id:'fixed-input',kind:'artifact',content:'Original evidence'},'codex');
+  const t=f.submit('readiness-integrity',{input_ids:['fixed-input']});
+  const original=f.read().records['fixed-input'];
+  withStore(f.root,db=>db.transaction('fixture.changed',s=>{s.records['fixed-input'].content='Changed source';s.records['fixed-input'].revision++;return s;}));
+  tickRuntime(f.root,{queue:()=>assert.fail('held task must not dispatch')});
+  assert.equal(f.read().records[t.id].runtime_task.state,'needs_attention');
+  assert.equal(f.read().records[t.id].runtime_task.attention_code,'UNKNOWN');
+  withStore(f.root,db=>db.transaction('fixture.restored',s=>{s.records['fixed-input']=original;return s;}));
+  tickRuntime(f.root,{queue:()=>assert.fail('restoration alone cannot reconcile a held task')});
+  assert.equal(f.read().records[t.id].runtime_task.attempts.length,0);
+ }finally{f.close();}
+});
+
+test('two simultaneously ready resource claimants preserve the unstarted wait at queue revalidation',async()=>{
+ const f=fixture();try{
+  const tasks=[f.submit('shared-a',{resources:['fixture/shared']}),f.submit('shared-b',{resources:['fixture/shared']})];
+  const first=tickRuntime(f.root,{queue:(root,key)=>queue(root,key)});
+  assert.equal(first.ready.length,2);assert.equal(first.dispatched.length,1);
+  const waiting=tasks.find(t=>f.read().records[t.id].runtime_task.state==='planned');assert(waiting);
+  assert.equal(f.read().records[waiting.id].runtime_task.attempts.length,0);
+  await work(f.root,first.dispatched[0].job_id,model('fictional-shared-first'));
+  const next=tickRuntime(f.root,{queue:(root,key)=>queue(root,key)});
+  assert.equal(next.dispatched.length,1);assert.equal(f.read().records[waiting.id].runtime_task.state,'queued');
+ }finally{f.close();}
+});

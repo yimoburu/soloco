@@ -193,3 +193,20 @@ test('worker cannot accept later Pass over a completed negative',async()=>{
  const j=read(f).jobs[f.job.id];assert.equal(j.status,'failed');assert.equal(j.artifact_id,undefined);
  assert.equal(j.rejected_output.text,raw);assert.equal(j.rejected_output.qualification_negative,'Blocked');
 });
+
+const startupWarning={type:'item.completed',item:{id:'startup-warning',type:'error',message:'Ignoring unknown `features` requirement `ultrafast_mode` from requirements layers: fictional managed requirements'}};
+test('known pre-turn CLI startup diagnostic is retained and requires a complete turn',async()=>{
+ const result=await invoke([thread,startupWarning,start,message(negative('Pass')),done]);
+ assert.deepEqual(result.model_evidence.cli_warnings,[startupWarning]);
+ assert.equal(result.model_evidence.verification,'unverified');
+ for(const events of [
+  [thread,startupWarning],
+  [thread,startupWarning,start,message(negative('Pass'))],
+  [thread,startupWarning,start,{type:'turn.failed'},message(negative('Pass')),done],
+  [thread,startupWarning,startupWarning,start,message(negative('Pass')),done],
+  [thread,start,message(negative('Pass')),done,startupWarning],
+  [thread,start,startupWarning,message(negative('Pass')),done],
+  [thread,{...startupWarning,item:{...startupWarning.item,message:'Fatal unknown failure'}},start,message(negative('Pass')),done],
+  [thread,{...startupWarning,item:{...startupWarning.item,unknown:true}},start,message(negative('Pass')),done],
+ ])await assert.rejects(invoke(events));
+});

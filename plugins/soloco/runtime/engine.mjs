@@ -346,7 +346,7 @@ export function queueRuntimeTask(root,taskId,{launch=launchWorker,check=readines
     const record=taskRecord(s,taskId),current=runtimeGrant(s,record);
     if(runtime_instance_id!==undefined&&(current.instance_id!==runtime_instance_id||s.records['async-runtime-control'].runtime_control.pid!==supervisor_pid))throw new SchedulingHold('GENERATION_CHANGED','Supervisor generation changed before queue commit');
     if(JSON.stringify(current)!==JSON.stringify(grant))throw Error('Runtime task grant changed before queue commit');
-    const ready=taskReady(s,record);if(!ready.ready)throw Error(ready.reason);
+    const ready=taskReady(s,record);if(!ready.ready)throw new SchedulingHold(ready.recovery?.code,ready.reason);
     const occupied=Object.values(s.jobs??{}).filter(j=>['queued','running'].includes(j.status)||(j.runtime_task||j.started_at)&&['cancelled','interrupted','failed'].includes(j.status)&&j.coordination_release?.termination_confirmed!==true);
     if(occupied.length>=3)throw new SchedulingHold(occupied.some(j=>!['queued','running'].includes(j.status))?'EXECUTION_UNCERTAIN':'CAPACITY_BUSY','Scheduling capacity occupied by active or uncertain processes');
     for(const jid of ready.required_context_jobs??[]){const prior=s.jobs[jid];if(prior?.context_sha256&&!contextMatches(s,prior,prior.context_sha256))throw new SchedulingHold('CONTEXT_CHANGED','Prerequisite task context is stale; inspect current evidence before continuing');}

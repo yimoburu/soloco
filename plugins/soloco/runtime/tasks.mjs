@@ -263,7 +263,7 @@ export function bindTaskAttempt(state,record,job){
   // transaction. Its own claim is not a conflicting pre-existing claimant.
   if(job?.runtime_task&&!same(job.runtime_task,{id:record.id,definition_revision:record.runtime_task.definition_revision,definition_sha256:record.runtime_task.definition_sha256}))throw Error('Job is already bound to a different task');
   const view={...state,jobs:Object.fromEntries(Object.entries(state.jobs??{}).filter(([key])=>key!==job?.id))};
-  const ready=taskReady(view,record);if(!ready.ready)throw Error(ready.reason);
+  const ready=taskReady(view,record);if(!ready.ready)throw new SchedulingHold(ready.recovery?.code,ready.reason);
   const t=record.runtime_task;
   if(!job||typeof job.id!=='string'||typeof job.instance_id!=='string'||job.status!=='queued'||job.role!==t.spec.role||job.task!==t.spec.task||job.epoch!==t.owner.epoch||job.host!==t.owner.host)throw Error('Queued job does not match the authorized task');
   if(!same(job.coordination?.resources??[],ready.resources)||!same((job.coordination?.dependencies??[]).map(d=>d.job_id).sort(),ready.depends_on.slice().sort()))throw Error('Queued task resource/dependency bindings changed');

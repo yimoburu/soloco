@@ -26,3 +26,16 @@ Acceptance work:
   human observation and adoption. Current capability reporting links exact proof.
 
 Validation and remaining boundaries are recorded here after execution.
+
+Review repairs retain unresolved proposal attempts and exact admitted input bodies
+across successor publication and owner replacement. Handover includes queued,
+running and failed attempts with their actual closure state. This release keeps
+those attempts conservatively; it does not provide automatic historical pruning.
+Nonautomatic readiness failures require attention, including before queueing;
+resource contention remains a typed automatic wait for an unstarted task.
+
+The installed Codex 0.154 startup diagnostic about its unknown `ultrafast_mode`
+requirement is retained as a warning only before the first turn. Arbitrary error
+items, malformed sequences and absent/failed completion still reject the result.
+Native evaluator wire output is retained so failures can be diagnosed without a
+new call. Applied model controls remain separate from effective speed/price.

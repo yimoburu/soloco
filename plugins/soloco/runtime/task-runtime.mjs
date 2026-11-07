@@ -158,6 +158,10 @@ export function tickRuntime(root,{instance=null,pid=process.pid,dispatch=true,cu
         if(task.runtime_task.state==='planned'){
           const status=taskReady(s,task);
           if(status.ready)ready.push(key);
+          else if(!status.recovery?.automatic){
+            task.runtime_task.state='needs_attention';task.runtime_task.attention_code=status.recovery?.code??'UNKNOWN';
+            task.runtime_task.attention=String(status.reason).slice(0,1000);task.status='Async:needs_attention';task.revision++;task.updated_at=stamp();
+          }
         }
         if(before!==JSON.stringify(task)){changed=true;if(task.runtime_task.state==='needs_attention')notice(s,'must_know','Async task needs CoS attention: '+(task.runtime_task.attention??'inspect exact task'),key);}
       }

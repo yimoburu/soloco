@@ -228,3 +228,31 @@ test('proposal contract requires a checkpoint and cannot be attached to a review
  await publish(f);
  assert.throws(()=>engine.dispatch({...f,role:'qa',task:'Review',review_of:'condition',output_contract:'operating-proposal-v1'},'codex',launch),/checkpoint/);
 });
+
+test('proposal provenance survives successor publication and a replacement owner handover',async()=>{
+ const f=fixture();await publish(f);const result=await completeProposal(f,{input_ids:['condition']});
+ const admission=resolveSnapshot(read(f),result.job.operating_admission);
+ assert.deepEqual(admission.input_bodies,[read(f).records.condition]);
+ await publish(f);
+ let subject=requireOperatingHandover(read(f));
+ assert.deepEqual(subject.records[result.record.id],result.record);assert.deepEqual(subject.proposal_admissions[result.job.id],admission);
+ const next={...f,session_id:'fictional-replacement',epoch:2};engine.bind(next.root,next.session_id,'codex');
+ engine.control({root:next.root,session_id:next.session_id,expected_epoch:1,action:'handover',source_instruction:'handover'},'codex');
+ await publish(next,true);
+ const reconstruction=engine.handover({...next,action:'submit',protocol:'operating-handover-v4',content:'Preserve pending proposals and restrictions. Independent review must judge this exact reconstruction.'},'codex');
+ subject=read(next).records[reconstruction.id].handover.subject;
+ assert.deepEqual(subject.records[result.record.id],result.record);assert.deepEqual(subject.jobs[result.job.id],result.job);
+ assert.deepEqual(subject.proposal_admissions[result.job.id],admission);
+});
+
+test('operating handover retains queued and running proposal assignments with unknown closure',async()=>{
+ const f=fixture();await publish(f);
+ const j=engine.dispatch({...f,role:'engineer',task:'Prepare an unaccepted proposal.',output_contract:'operating-proposal-v1',input_ids:['condition']},'codex',launch);
+ assert.equal(requireOperatingHandover(read(f)).jobs[j.id].status,'queued');
+ await work(f.root,j.id,async(_h,_n,_p,_d,timeout,_s,options)=>{
+  spawned(timeout,options);const subject=requireOperatingHandover(read(f));
+  assert.equal(subject.jobs[j.id].status,'running');assert.equal(subject.jobs[j.id].coordination_release,undefined);
+  return {native_id:_n??'fictional-pending-proposal',text:JSON.stringify({content:'Unaccepted proposal.',messages:[],notices:[]})};
+ });
+ assert.equal(read(f).jobs[j.id].status,'completed');
+});

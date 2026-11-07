@@ -330,14 +330,15 @@ const assignmentStatic=j=>Object.fromEntries(Object.entries(j).filter(([k])=>!as
 export function admitOperatingAssignment(s,j){
   operatingContext(s);
   if(s.paused||s.mode!=='preparation'||j.context_format!==6||j.review_of||j.prototype_id||j.development_id||j.coordination||j.fresh_session)fail('only bounded runtime preparation assignments supported');
-  j.operating_admission=retainSnapshot(s,{producer:j.output_contract==='operating-proposal-v1'?'runtime-bounded-proposal-v1':'runtime-bounded-read-only-v1',checkpoint:s.operating_state.plan,owner:s.owner,assignment:JSON.parse(JSON.stringify(assignmentStatic(j))),inputs:j.inputs.map(r=>recordReference(s.records[r.id])),authority:'preparation only; native tools disabled; no spending or exposure authority'});
+  j.operating_admission=retainSnapshot(s,{producer:j.output_contract==='operating-proposal-v1'?'runtime-bounded-proposal-v1':'runtime-bounded-read-only-v1',checkpoint:s.operating_state.plan,owner:s.owner,assignment:JSON.parse(JSON.stringify(assignmentStatic(j))),inputs:j.inputs.map(r=>recordReference(s.records[r.id])),...(j.output_contract==='operating-proposal-v1'?{input_bodies:j.inputs.map(r=>s.records[r.id])}:{}),authority:'preparation only; native tools disabled; no spending or exposure authority'});
 }
 function assignmentSafe(s,j){
   try{
     const {operating_admission,output_contract,...base}=j,a=resolveSnapshot(s,operating_admission);
     const producer=output_contract===undefined?'runtime-bounded-read-only-v1':output_contract==='operating-proposal-v1'?'runtime-bounded-proposal-v1':null;
-    if(!closed(a,['producer','checkpoint','owner','assignment','inputs','authority'])||(!producer||a.producer!==producer)||a.authority!=='preparation only; native tools disabled; no spending or exposure authority'||!same(a.checkpoint,s.operating_state?.plan)||!same(a.owner,s.owner)||!same(a.assignment,assignmentStatic(j))||!proofJobSafe(base)||j.context_format!==6||j.review_of!==null||!['queued','running','completed'].includes(j.status)||s.mode!=='preparation')return false;
+    if(!closed(a,['producer','checkpoint','owner','assignment','inputs','authority',...(output_contract==='operating-proposal-v1'?['input_bodies']:[])])||(!producer||a.producer!==producer)||a.authority!=='preparation only; native tools disabled; no spending or exposure authority'||!same(a.checkpoint,s.operating_state?.plan)||!same(a.owner,s.owner)||!same(a.assignment,assignmentStatic(j))||!proofJobSafe(base)||j.context_format!==6||j.review_of!==null||!['queued','running','completed'].includes(j.status)||s.mode!=='preparation')return false;
     if(!same(a.inputs,j.inputs.map(r=>recordReference(s.records[r.id]))))return false;
+    if(output_contract==='operating-proposal-v1'&&!same(a.input_bodies,j.inputs.map(r=>s.records[r.id])))return false;
     if(j.supplemental_sources?.some(r=>!same(recordReference(contextSource(s,r.id),r.id),r)))return false;
     if(j.status==='queued'&&(j.started_at||j.execution_started_at||j.artifact_id||j.coordination_release))return false;
     if(j.status==='running'&&(!j.started_at||!Number.isSafeInteger(j.worker_pid)||j.artifact_id||j.coordination_release))return false;
@@ -630,10 +631,23 @@ export function operatingInspection(s){
 }
 export function requireOperatingHandover(s){
   const checkpoint=operatingContext(s);
-  // Pending proposals are not accepted homes, but remain unfinished company
-  // work. A successor receives their complete bodies and producer evidence.
-  const proposals=Object.values(s.jobs??{}).filter(j=>operatingProposal(s,j,s.records[j.artifact_id]));
+  // Retain every proposal attempt across checkpoints and owner changes. Current
+  // dispatch eligibility is not a disposition of historical unfinished work.
+  // This includes queued/running/failed attempts and their closure uncertainty.
+  const proposals=Object.values(s.jobs??{}).filter(j=>j.output_contract==='operating-proposal-v1');
+  const records=new Map(checkpoint.homes.map(h=>[h.source.id,h.value]));
+  const admissions={};
+  for(const j of proposals){
+    admissions[j.id]=resolveSnapshot(s,j.operating_admission);
+    if(!admissions[j.id])fail('proposal admission missing from handover');
+    if(j.artifact_id){if(!s.records[j.artifact_id])fail('proposal output missing from handover');records.set(j.artifact_id,s.records[j.artifact_id]);}
+    for(const ref of [...(j.inputs??[]),...(j.retrieved_inputs??[])]){
+      const value=contextSource(s,ref.id);if(!value)fail('proposal input missing from handover: '+ref.id);
+      if(!ref.id.startsWith('job:'))records.set(ref.id,value);
+    }
+  }
   return {company_id:s.id,name:s.name,idea:s.idea,owner:s.owner,governance:s.governance,cos_instructions:s.cos_instructions,roles:s.roles,team_sha256:s.team_sha256,mode:s.mode,phase:s.phase,
-    records:Object.fromEntries([...checkpoint.homes.map(h=>[h.source.id,h.value]),...proposals.map(j=>[j.artifact_id,s.records[j.artifact_id]])]),jobs:Object.fromEntries(proposals.map(j=>[j.id,j])),
+    records:Object.fromEntries(records),jobs:Object.fromEntries(proposals.map(j=>[j.id,j])),
+    proposal_admissions:admissions,
     upgrade:null,upgrade_history:[],notices:checkpoint.communication.notices,messages:checkpoint.communication.messages,operating_checkpoint:checkpoint};
 }
