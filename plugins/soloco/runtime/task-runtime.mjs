@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {spawn} from 'node:child_process';
-import {withStore,owner,stamp,id,digest,PACKAGE,VERSION,folder,notice} from './store.mjs';
+import {withStore,owner,stamp,id,digest,PACKAGE,VERSION,folder,notice,requireText} from './store.mjs';
 import {taskKeys,taskCursor,messageKeys,installTaskIndex,readTaskState,updateTaskIndex,requireTaskStorage,TASK_ROOT_KEYS} from './task-index.mjs';
 import {RUNTIME_CONTROL_ID,runtimeControl,runtimeControlBinding,setRuntimeControl,runtimeGrant} from './task-runtime-authority.mjs';
 import {submitTask,amendTask,cancelTask,taskRecord,taskView,taskReady,reconcileTask,commandRecordId,sendTaskMessage,messagesForTask,disposeTaskMessage} from './tasks.mjs';
@@ -34,6 +34,7 @@ function extraRecords(db,state,args,host){
 }
 export function taskAction(args,host,{wake=ensureSupervisor}={}) {
   const readOnly=['inspect','context','checkpoint','inbox'].includes(args.action);
+  if(!readOnly)requireText(args.source_instruction,'source_instruction',4000);
   const result=withStore(args.root,db=>{
     requireTaskStorage(db);
     if(!['submit','amend','cancel','inspect','context','checkpoint','message','inbox','dispose'].includes(args.action))throw Error('Unknown async task action');

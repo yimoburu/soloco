@@ -153,7 +153,11 @@ test('task inbox messages are exact task evidence, including stored dispositions
   const received=taskAssignmentContext(read(f),j);
   assert.match(received.text,/material peer question/);assert.notEqual(received.hash,before.hash);
   change(f,s=>sendTaskMessage(s,{...f,operation_id:'message-two',to_task_id:two,content:'Task-specific shipping message, no global authority.'},'codex'));
-  assert.equal(taskContextMatches(read(f),j,received.hash),true,'verified unrelated task messages do not change this task');
+  assert.equal(taskContextMatches(read(f),j,received.hash),false,'unqualified owner source instructions remain compulsory across recipients');
+  const instructed=taskAssignmentContext(read(f),j);
+  assert.match(instructed.text,/Fixture authorizes bounded read-only preparation/);
+  change(f,s=>sendTaskMessage(s,{...f,source_instruction:undefined,operation_id:'legacy-message-two',to_task_id:two,content:'Legacy typed task-scoped body with no retained owner instruction.'},'codex'));
+  assert.equal(taskContextMatches(read(f),j,instructed.hash),true,'the supported source-less legacy scoped-message contract remains disjoint');
 });
 
 test('declared peer targets expose exact receivers without copying their task histories; lifecycle changes stay stable',()=>{
@@ -226,7 +230,7 @@ test('a proven receiver acknowledgment preserves its delivered message body with
 test('QA and accepted dependents receive exact producer objectives, candidate and current acknowledged input evidence',async()=>{
   const f=fixture(),a=task(f,'producer'),other=task(f,'unrelated','shipping');
   const condition=change(f,s=>sendTaskMessage(s,{...f,operation_id:'producer-condition',to_task_id:a,content:'Producer-only condition: retain ORCHID and do not contact anyone.'},'codex'));
-  change(f,s=>sendTaskMessage(s,{...f,operation_id:'other-condition',to_task_id:other,content:'Unrelated inbox body must stay out of this pipeline.'},'codex'));
+  change(f,s=>sendTaskMessage(s,{...f,source_instruction:undefined,operation_id:'other-condition',to_task_id:other,content:'Unrelated inbox body must stay out of this pipeline.'},'codex'));
   const qa=change(f,s=>submitTask(s,{...f,operation_id:'review',spec:{...s.records[a].runtime_task.spec,role:'qa',task:'Independently review the exact producer and its conditions.',review_task_id:a}},'codex'));
   const b=change(f,s=>submitTask(s,{...f,operation_id:'consumer',spec:{...s.records[a].runtime_task.spec,role:'pm',task:'Use the independently reviewed exact candidate.',depends_on:[{task_id:qa.id,gate:'accepted'}]}},'codex'));
   withStore(f.root,db=>installTaskIndex(db));

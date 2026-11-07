@@ -85,7 +85,8 @@ function command(state,args,host,action,payload){
 }
 function commitCommand(state,c,args,action,record){
   const at=stamp();
-  state.records[c.key]={id:c.key,kind:'artifact',status:'Async:command',author_role:'runner',author_instance:state.owner.session_id,revision:1,content:`Async task ${action}`,created_at:at,runtime_command:{version:1,operation_id:operation(args.operation_id),payload_sha256:c.hash,owner:copy(state.owner),task_id:record.id,definition_revision:record.runtime_task.definition_revision,action}};
+  const source_instruction=['cancel','dispose'].includes(action)&&args.source_instruction!==undefined?requireText(args.source_instruction,'source_instruction',4000):undefined;
+  state.records[c.key]={id:c.key,kind:'artifact',status:'Async:command',author_role:'runner',author_instance:state.owner.session_id,revision:1,content:source_instruction??`Async task ${action}`,created_at:at,runtime_command:{version:1,operation_id:operation(args.operation_id),payload_sha256:c.hash,owner:copy(state.owner),task_id:record.id,definition_revision:record.runtime_task.definition_revision,action,...(source_instruction===undefined?{}:{source_instruction}),...(action==='dispose'?{message_id:args.message_id}:{})}};
 }
 export function validateTaskRecord(record,state){
   const t=record?.runtime_task;
@@ -106,15 +107,45 @@ export function taskRecord(state,key){
 }
 function isCommandRecord(state,record){
   const c=record?.runtime_command;
-  if(!(allowed(record,['id','kind','status','author_role','author_instance','revision','content','created_at','runtime_command'])&&allowed(c,['version','operation_id','payload_sha256','owner','task_id','definition_revision','action'])&&c.version===1&&validOwner(c.owner)&&typeof c.operation_id==='string'&&Boolean(c.operation_id.trim())&&c.operation_id.length<=160&&timestamp(record.created_at)&&record.id===hashId('async-command-',state,c.owner,c.operation_id)&&record.kind==='artifact'&&record.status==='Async:command'&&record.author_role==='runner'&&record.author_instance===c.owner.session_id&&record.revision===1&&record.content===`Async task ${c.action}`&&['submit','amend','cancel','dispose'].includes(c.action)&&/^[a-f0-9]{64}$/.test(c.payload_sha256??'')&&Object.hasOwn(state.records??{},record.id)&&same(state.records[record.id],record)))return false;
+  if(!(allowed(record,['id','kind','status','author_role','author_instance','revision','content','created_at','runtime_command'])&&allowed(c,['version','operation_id','payload_sha256','owner','task_id','definition_revision','action','source_instruction','message_id'])&&c.version===1&&validOwner(c.owner)&&typeof c.operation_id==='string'&&Boolean(c.operation_id.trim())&&c.operation_id.length<=160&&timestamp(record.created_at)&&record.id===hashId('async-command-',state,c.owner,c.operation_id)&&record.kind==='artifact'&&record.status==='Async:command'&&record.author_role==='runner'&&record.author_instance===c.owner.session_id&&record.revision===1&&record.content===(c.source_instruction??`Async task ${c.action}`)&&['submit','amend','cancel','dispose'].includes(c.action)&&/^[a-f0-9]{64}$/.test(c.payload_sha256??'')&&Object.hasOwn(state.records??{},record.id)&&same(state.records[record.id],record)))return false;
+  if(c.source_instruction!==undefined&&(!['cancel','dispose'].includes(c.action)||typeof c.source_instruction!=='string'||!c.source_instruction.trim()||c.source_instruction.length>4000)||c.action==='cancel'&&c.source_instruction===undefined||c.message_id!==undefined&&(c.action!=='dispose'||!identifier(c.message_id)))return false;
   const target=state.records?.[c.task_id];
   if(!target||!Number.isSafeInteger(c.definition_revision)||c.definition_revision<1||c.definition_revision>target.runtime_task?.definition_revision)return false;
   validateTaskRecord(target,state);
+  if(c.action==='cancel'&&c.payload_sha256!==digest(JSON.stringify({action:'cancel',payload:{task_id:c.task_id,expected_definition_revision:c.definition_revision,source_instruction:c.source_instruction}})))return false;
+  if(c.action==='dispose'&&c.message_id!==undefined){
+    const message=validateTaskMessage(state.records[c.message_id],state),d=message.runtime_message.disposition;
+    if(message.runtime_message.to_task_id!==target.id||d?.by!=='owner'||d.operation_id!==c.operation_id||d.source_instruction!==c.source_instruction||c.payload_sha256!==digest(JSON.stringify({action:'dispose',payload:{message_id:message.id,disposition:d.content,...(c.source_instruction===undefined?{}:{source_instruction:c.source_instruction})}})))return false;
+  }else if(c.action==='dispose'&&c.source_instruction!==undefined)return false;
   return same(c.owner,target.runtime_task.owner)&&(c.action!=='submit'||c.task_id===hashId('async-task-',state,c.owner,c.operation_id));
 }
-// Messages retain meaningful evidence and are deliberately not bookkeeping.
+// Direct founder qualifiers remain current semantic evidence until separately
+// qualified; command delivery or task cancellation never classifies that intent.
 export function isTaskBookkeeping(state,record){
-  try{if(record?.runtime_task)return Boolean(validateTaskRecord(record,state));return isCommandRecord(state,record);}catch{return false;}
+  try{if(record?.runtime_task)return Boolean(validateTaskRecord(record,state));return isCommandRecord(state,record)&&record.runtime_command.source_instruction===undefined;}catch{return false;}
+}
+// Cancellation revokes prerequisite use without rewriting a completed job or
+// its retained evidence. Follow declared edges and exact runtime output inputs
+// so a passing review cannot conceal a cancelled producer further upstream.
+export function assertTaskPrerequisites(state,key){
+  const visiting=new Set(),done=new Set();
+  const visit=id=>{
+    if(visiting.has(id))throw Error('Cyclic task prerequisite evidence');
+    if(done.has(id))return;
+    const record=taskRecord(state,id),t=record.runtime_task;
+    if(['cancelling','cancelled'].includes(t.state))throw Error('Task prerequisite was cancelled: '+id);
+    visiting.add(id);
+    const inputs=new Set(t.spec.input_ids),next=new Set([...t.spec.depends_on.map(dep=>dep.task_id),...(t.spec.review_task_id?[t.spec.review_task_id]:[])]);
+    for(const input of inputs){
+      const value=state.records?.[input];if(!Object.hasOwn(state.records??{},input)||!value)throw Error('Task prerequisite input is missing: '+input);
+      const negative=['Fail','Blocked'].includes(value.review?.verdict),producer=state.jobs?.[value.job_id];
+      if(value.runtime_output&&!(negative&&producer&&isTaskOwnOutput(state,producer,value)))next.add(value.runtime_output.task_id);
+    }
+    for(const dependency of next)visit(dependency);
+    visiting.delete(id);done.add(id);
+  };
+  visit(typeof key==='string'?key:key.id);
+  return true;
 }
 // Explicit prospective worker contract only: a returned proposal is not current
 // company knowledge. Failures, old/unqualified shapes and stale results remain
@@ -123,8 +154,9 @@ export function isTaskOutput(state,record,{own_job_id=null}={}){
   try{
     if(!allowed(record,['id','kind','content','author_role','author_instance','revision','status','job_id','inputs','retrieved_inputs','review_of','review','runtime_output','created_at'])||!allowed(record.runtime_output,['version','task_id','definition_revision','definition_sha256'])||record.runtime_output.version!==1||!Object.hasOwn(state.records??{},record.id)||!same(state.records[record.id],record)||record.status!=='Submitted'||record.revision!==1||typeof record.content!=='string'||!timestamp(record.created_at))return false;
     const marker=record.runtime_output,task=taskRecord(state,marker.task_id),t=task.runtime_task,job=currentAttempt(state,task);
+    if(own_job_id!==job.id)assertTaskPrerequisites(state,task);
     if(!same(state.owner,t.owner)||marker.definition_revision!==t.definition_revision||marker.definition_sha256!==t.definition_sha256||job.id!==record.job_id||job.artifact_id!==record.id||job.status!=='completed'||job.context_format!==7||job.context_scope!==t.spec.context_scope||!/^[a-f0-9]{64}$/.test(job.context_sha256??'')||typeof job.native_id!=='string'||!job.native_id||job.native_id===t.owner.session_id||job.coordination_release?.termination_confirmed!==true||job.coordination_release.reason!=='model_process_closed'||record.author_role!==job.role||record.author_instance!==job.instance_id||!same(record.inputs,job.inputs)||!Array.isArray(record.inputs)||!same(record.review_of,job.review_of))return false;
-    if(record.inputs.some(ref=>!allowed(ref,['id','revision'])||!Object.hasOwn(state.records,ref.id)||taskMessageInput(state,job,state.records[ref.id]).revision!==ref.revision))return false;
+    if(record.inputs.some(ref=>!allowed(ref,['id','revision'])||Object.keys(ref).length!==2||typeof ref.id!=='string'||!(ref.revision===null||Number.isSafeInteger(ref.revision)&&ref.revision>0)||!Object.hasOwn(state.records,ref.id)||(taskMessageInput(state,job,state.records[ref.id]).revision??null)!==ref.revision))return false;
     if(record.retrieved_inputs!==undefined&&(!Array.isArray(record.retrieved_inputs)||!same(record.retrieved_inputs,job.retrieved_inputs)||record.retrieved_inputs.some(ref=>!allowed(ref,['id','revision','sha256','offset','length','total_characters'])||typeof ref.id!=='string'||!/^[a-f0-9]{64}$/.test(ref.sha256??''))))return false;
     if(record.kind==='review'){
       const own=own_job_id===job.id;
@@ -197,6 +229,7 @@ function currentAttempt(state,record){
   return job;
 }
 function output(state,record,gate){
+  assertTaskPrerequisites(state,record);
   const job=currentAttempt(state,record),artifact=state.records?.[job.artifact_id];
   if(job.coordination_release?.termination_confirmed!==true)throw Error('Task producer process closure is unconfirmed');
   const coordination=bindCoordination(state,{depends_on:[job.id]});
@@ -210,6 +243,7 @@ export function taskReady(state,record){
     if(!same(state.owner,t.owner))throw Error('Task owner or epoch changed');
     if(state.paused)throw Error('Company is paused');
     if(t.state!=='planned'||t.attempts.length)throw Error('Task is not a fresh planned assignment');
+    assertTaskPrerequisites(state,record);
     const jobs=[],required=[],inputs=new Set(t.spec.input_ids);
     for(const dep of t.spec.depends_on){const r=taskRecord(state,dep.task_id);const item=output(state,r,dep.gate);jobs.push(item.job.id);required.push(item.job.id);inputs.add(item.artifact.id);if(item.reference.subject)inputs.add(item.reference.subject.id);}
     let review_of=null;
@@ -227,7 +261,7 @@ export function bindTaskAttempt(state,record,job){
   const t=record.runtime_task;
   if(!job||typeof job.id!=='string'||typeof job.instance_id!=='string'||job.status!=='queued'||job.role!==t.spec.role||job.task!==t.spec.task||job.epoch!==t.owner.epoch||job.host!==t.owner.host)throw Error('Queued job does not match the authorized task');
   if(!same(job.coordination?.resources??[],ready.resources)||!same((job.coordination?.dependencies??[]).map(d=>d.job_id).sort(),ready.depends_on.slice().sort()))throw Error('Queued task resource/dependency bindings changed');
-  if((job.review_of?.id??null)!==ready.review_of||ready.input_ids.some(key=>!job.inputs?.some(ref=>ref.id===key&&state.records[key]?.revision===ref.revision)))throw Error('Queued task evidence/review bindings changed');
+  if((job.review_of?.id??null)!==ready.review_of||ready.input_ids.some(key=>!job.inputs?.some(ref=>ref.id===key&&Object.hasOwn(state.records,key)&&(state.records[key].revision??null)===ref.revision)))throw Error('Queued task evidence/review bindings changed');
   job.runtime_task={id:record.id,definition_revision:t.definition_revision,definition_sha256:t.definition_sha256};
   t.attempts.push({job_id:job.id,instance_id:job.instance_id,definition_revision:t.definition_revision,definition_sha256:t.definition_sha256,created_at:stamp()});
   t.state='queued';bump(record);return record;
@@ -254,17 +288,19 @@ export function reconcileTask(state,record){
 function messageId(state,who,op){return hashId('async-message-',state,who,op);}
 export function validateTaskMessage(r,state){
   const m=r?.runtime_message;
-  if(!allowed(r,['id','kind','status','author_role','author_instance','revision','content','created_at','updated_at','runtime_message'])||!allowed(m,['version','operation_id','payload_sha256','owner','from_task_id','from_attempt_id','to_task_id','definition_revision','state','disposition'])||m.version!==1||!validOwner(m.owner)||!timestamp(r.created_at)||r.updated_at!==undefined&&!timestamp(r.updated_at)||typeof m.operation_id!=='string'||!m.operation_id.trim()||m.operation_id.length>160||r.kind!=='artifact'||r.status!=='Async:message'||r.id!==messageId(state,m.owner,m.operation_id)||typeof r.content!=='string'||!r.content.trim()||r.content.length>20000||!['pending','processed'].includes(m.state)||!Object.hasOwn(state.records??{},r.id)||!same(state.records[r.id],r)||!Number.isSafeInteger(r.revision)||r.revision<1)throw Error('Invalid canonical async message');
+  if(!allowed(r,['id','kind','status','author_role','author_instance','revision','content','created_at','updated_at','runtime_message'])||!allowed(m,['version','operation_id','payload_sha256','owner','from_task_id','from_attempt_id','to_task_id','definition_revision','state','disposition','source_instruction'])||m.version!==1||!validOwner(m.owner)||!timestamp(r.created_at)||r.updated_at!==undefined&&!timestamp(r.updated_at)||typeof m.operation_id!=='string'||!m.operation_id.trim()||m.operation_id.length>160||r.kind!=='artifact'||r.status!=='Async:message'||r.id!==messageId(state,m.owner,m.operation_id)||typeof r.content!=='string'||!r.content.trim()||r.content.length>20000||!['pending','processed'].includes(m.state)||!Object.hasOwn(state.records??{},r.id)||!same(state.records[r.id],r)||!Number.isSafeInteger(r.revision)||r.revision<1)throw Error('Invalid canonical async message');
+  if(m.source_instruction!==undefined&&(m.from_task_id!==null||typeof m.source_instruction!=='string'||!m.source_instruction.trim()||m.source_instruction.length>4000))throw Error('Message founder source instruction is malformed');
   const target=taskRecord(state,m.to_task_id);
   if(!same(target.runtime_task.owner,m.owner)||!Number.isSafeInteger(m.definition_revision)||m.definition_revision<1||m.definition_revision>target.runtime_task.definition_revision)throw Error('Message recipient/owner binding changed');
-  const payload={from_task_id:m.from_task_id,from_attempt_id:m.from_attempt_id,to_task_id:m.to_task_id,definition_revision:m.definition_revision,content:r.content};
+  const payload={from_task_id:m.from_task_id,from_attempt_id:m.from_attempt_id,to_task_id:m.to_task_id,definition_revision:m.definition_revision,content:r.content,...(m.source_instruction===undefined?{}:{source_instruction:m.source_instruction})};
   if(m.payload_sha256!==digest(JSON.stringify(payload)))throw Error('Message payload changed');
   if(m.from_task_id===null){if(m.from_attempt_id!==null||r.author_role!=='runner'||r.author_instance!==m.owner.session_id)throw Error('Message founder attribution changed');}
   else{
     const producer=taskRecord(state,m.from_task_id),job=state.jobs?.[m.from_attempt_id];
     if(!same(producer.runtime_task.owner,m.owner)||!job||job.runtime_task?.id!==producer.id||!producer.runtime_task.attempts.some(a=>a.job_id===job.id&&a.instance_id===job.instance_id&&a.definition_revision===job.runtime_task.definition_revision&&a.definition_sha256===job.runtime_task.definition_sha256)||job.epoch!==m.owner.epoch||job.host!==m.owner.host||r.author_role!==job.role||r.author_instance!==job.instance_id)throw Error('Message producer attribution changed');
   }
-  if(m.state==='pending'&&m.disposition!==null||m.state==='processed'&&(!allowed(m.disposition,['operation_id','content','at','task_id','attempt_id','by','author_instance'])||m.disposition.task_id!==target.id||!timestamp(m.disposition.at)||!identifier(m.disposition.author_instance)||typeof m.disposition.operation_id!=='string'||!m.disposition.operation_id.trim()||m.disposition.operation_id.length>160||!(m.disposition.attempt_id===null||identifier(m.disposition.attempt_id))||typeof m.disposition.content!=='string'||!m.disposition.content.trim()||m.disposition.content.length>4000||!['owner','worker'].includes(m.disposition.by)))throw Error('Message disposition is malformed');
+  if(m.state==='pending'&&m.disposition!==null||m.state==='processed'&&(!allowed(m.disposition,['operation_id','content','at','task_id','attempt_id','by','author_instance','source_instruction'])||m.disposition.task_id!==target.id||!timestamp(m.disposition.at)||!identifier(m.disposition.author_instance)||typeof m.disposition.operation_id!=='string'||!m.disposition.operation_id.trim()||m.disposition.operation_id.length>160||!(m.disposition.attempt_id===null||identifier(m.disposition.attempt_id))||typeof m.disposition.content!=='string'||!m.disposition.content.trim()||m.disposition.content.length>4000||!['owner','worker'].includes(m.disposition.by)))throw Error('Message disposition is malformed');
+  if(m.disposition?.source_instruction!==undefined&&(m.disposition.by!=='owner'||typeof m.disposition.source_instruction!=='string'||!m.disposition.source_instruction.trim()||m.disposition.source_instruction.length>4000))throw Error('Message disposition source instruction is malformed');
   if(m.disposition?.by==='owner'&&m.disposition.author_instance!==m.owner.session_id)throw Error('Message disposition owner attribution changed');
   if(m.disposition?.by==='worker'){
     const receiver=state.jobs?.[m.disposition.attempt_id],attempt=target.runtime_task.attempts.find(a=>a.job_id===receiver?.id);
@@ -274,11 +310,14 @@ export function validateTaskMessage(r,state){
 }
 const validMessage=(state,record)=>validateTaskMessage(record,state);
 export function isTaskMessage(state,record){try{return Boolean(validateTaskMessage(record,state));}catch{return false;}}
+export function isTaskScopedMessage(state,record){return isTaskMessage(state,record)&&record.runtime_message.source_instruction===undefined&&record.runtime_message.disposition?.source_instruction===undefined;}
 function appendMessage(state,who,origin,args){
   const target=taskRecord(state,args.to_task_id),t=target.runtime_task;
   if(!same(t.owner,who))throw Error('Peer message recipient owner or epoch differs');
   const content=requireText(args.content,'content',20000),op=operation(args.operation_id),key=messageId(state,who,op);
-  const payload={from_task_id:origin.task_id??null,from_attempt_id:origin.attempt_id??null,to_task_id:target.id,definition_revision:t.definition_revision,content};
+  const source_instruction=args.source_instruction===undefined?undefined:requireText(args.source_instruction,'source_instruction',4000);
+  if(origin.task_id&&source_instruction!==undefined)throw Error('Worker peer messages cannot introduce founder source instructions');
+  const payload={from_task_id:origin.task_id??null,from_attempt_id:origin.attempt_id??null,to_task_id:target.id,definition_revision:t.definition_revision,content,...(source_instruction===undefined?{}:{source_instruction})};
   const hash=digest(JSON.stringify(payload));
   if(state.records[key]){const prior=validMessage(state,state.records[key]);if(prior.runtime_message.payload_sha256!==hash)throw Error('Message operation_id already names different content');return prior;}
   const at=stamp();
@@ -304,10 +343,11 @@ export function messagesForTask(state,key,{after=null,limit=20}={}){
 export function disposeTaskMessage(state,args,host){
   actor(state,args,host,true);const r=validMessage(state,state.records[args.message_id]);
   const target=taskRecord(state,r.runtime_message.to_task_id),content=requireText(args.disposition,'disposition',4000);
-  const c=command(state,args,host,'dispose',{message_id:r.id,disposition:content});if(c.prior)return r;
+  const source_instruction=args.source_instruction===undefined?undefined:requireText(args.source_instruction,'source_instruction',4000);
+  const c=command(state,args,host,'dispose',{message_id:r.id,disposition:content,...(source_instruction===undefined?{}:{source_instruction})});if(c.prior)return r;
   if(r.runtime_message.definition_revision!==target.runtime_task.definition_revision)throw Error('Recipient definition changed; message needs explicit reconciliation');
   if(r.runtime_message.state==='processed')throw Error('Message already has a durable disposition');
-  r.runtime_message.state='processed';r.runtime_message.disposition={operation_id:operation(args.operation_id),content,at:stamp(),task_id:target.id,attempt_id:target.runtime_task.attempts[0]?.job_id??null,by:'owner',author_instance:state.owner.session_id};r.revision++;r.updated_at=stamp();
+  r.runtime_message.state='processed';r.runtime_message.disposition={operation_id:operation(args.operation_id),content,at:stamp(),task_id:target.id,attempt_id:target.runtime_task.attempts[0]?.job_id??null,by:'owner',author_instance:state.owner.session_id,...(source_instruction===undefined?{}:{source_instruction})};r.revision++;r.updated_at=stamp();
   commitCommand(state,c,args,'dispose',target);return r;
 }
 export function disposePeerMessage(state,job,args){

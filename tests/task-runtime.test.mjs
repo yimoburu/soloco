@@ -11,6 +11,7 @@ import {work} from '../plugins/soloco/runtime/worker.mjs';
 import {executionTiming} from '../plugins/soloco/runtime/timeout.mjs';
 import {toolListFor,call} from '../plugins/soloco/runtime/main.mjs';
 import {getEventListeners} from 'node:events';
+import {resolveSnapshot} from '../plugins/soloco/runtime/snapshot.mjs';
 
 const child=()=>({on(){return this;},unref(){}});
 const ready=()=>({available:true,authenticated:true,version:'fictional-contract-adapter'});
@@ -95,6 +96,7 @@ test('startup detects existing live supervisor rather than duplicating it; stop 
 test('public tools expose bounded task/runtime contracts and reject unrecognized authority arguments',async()=>{
  const names=toolListFor().map(t=>t.name);assert(names.includes('company_tasks'));assert(names.includes('company_runtime'));
  await assert.rejects(call('company_tasks',{root:'/private/tmp',session_id:'fixture',action:'inspect',runtime_authority:true},'codex'),/Unknown argument/);
+ for(const action of ['message','dispose'])assert.throws(()=>taskAction({action,root:'/private/tmp',session_id:'fixture'},'codex'),/source_instruction/,'every new public mutation needs its actual source instruction');
 });
 
 test('background reconciliation catches a crash after queue commit even while runtime is stopped',()=>{
@@ -205,4 +207,21 @@ test('peer handoff is delivered to the declared receiver and acknowledged atomic
   await work(f.root,jb.job_id,async(_h,_n,prompt,_d,limit,_s,o)=>{assert.match(prompt,/Required fictional qualifier/);o.onSpawn(executionTiming(Date.now(),{timeout_ms:limit}));return {native_id:'fictional-peer-receiver',text:JSON.stringify({content:'The fictional result preserves the source uncertainty.',messages:[],notices:[],message_dispositions:[{message_id:messageId,disposition:'The result explicitly preserves the supplied uncertainty.'}]})};});
   tickRuntime(f.root,{dispatch:false});const state=f.read();assert.equal(state.records[messageId].runtime_message.state,'processed');assert.equal(state.records[messageId].runtime_message.disposition.by,'worker');assert.equal(state.records[b.id].runtime_task.state,'returned');
  }finally{f.close();}
+});
+
+test('an interrupted exact attempt retains its late native response and full negative original without acceptance',async()=>{
+ const f=fixture();let release,running;
+ try{
+  const t=f.submit('late-interrupted'),j=queue(f.root,t.id);
+  const reason='NEVER RETRY: observed effects remain uncertain. '.repeat(3000);
+  const wire=JSON.stringify({content:'Late observation only.',review:{verdict:'Blocked',reason},messages:[],notices:[]});
+  running=work(f.root,j.job_id,async(_h,_n,_p,_d,limit,_s,o)=>{o.onSpawn(executionTiming(Date.now(),{timeout_ms:limit}));return new Promise(resolve=>release=()=>resolve({native_id:'fictional-late-interrupted',text:wire}));});
+  await waitUntil(()=>typeof release==='function');
+  withStore(f.root,db=>db.transaction('fixture.supervisor_interrupted',s=>{const job=s.jobs[j.job_id];job.status='interrupted';job.finished_at=new Date().toISOString();job.timeout_reconciliation={state:'inspection',termination_confirmed:false};return s;}));
+  release();await running;
+  const s=f.read(),job=s.jobs[j.job_id];
+  assert.equal(job.status,'interrupted');assert.equal(job.native_id,'fictional-late-interrupted');assert.equal(job.coordination_release.termination_confirmed,true);
+  assert(!job.artifact_id);assert.equal(job.rejected_output.negative_reason,reason);assert.equal(job.rejected_output.truncated,true);assert.equal(resolveSnapshot(s,job.rejected_output.original),wire);
+  tickRuntime(f.root,{dispatch:false});assert.equal(f.read().records[t.id].runtime_task.state,'needs_attention');assert.equal(Object.keys(f.read().jobs).length,1);
+ }finally{release?.();await running;f.close();}
 });

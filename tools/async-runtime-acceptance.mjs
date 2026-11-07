@@ -71,6 +71,23 @@ function knownSupervisor(state,root){
   if(r.status!==0||!r.stdout.includes(path.join(SOURCE,'plugins/soloco/runtime/supervisor.mjs'))||!r.stdout.includes(root)||!r.stdout.includes(c.instance_id))throw Error('Supervisor process identity is not established; do not kill it');return c.pid;
 }
 async function waitDead(pid,limit=5000){const end=Date.now()+limit;while(alive(pid)&&Date.now()<end)await sleep(50);if(alive(pid))throw Error('Known fixture supervisor did not stop; retained for inspection');}
+function attemptIdentities(state){return Object.fromEntries(Object.values(state.records??{}).filter(r=>r.runtime_task).map(r=>[r.id,{definition_revision:r.runtime_task.definition_revision,definition_sha256:r.runtime_task.definition_sha256,attempts:r.runtime_task.attempts.map(a=>({job_id:a.job_id,instance_id:a.instance_id,definition_revision:a.definition_revision,definition_sha256:a.definition_sha256,created_at:a.created_at}))}]));}
+function verifyRecoveryPersistence(before,after){
+  const prior=attemptIdentities(before),current=attemptIdentities(after);
+  assert.deepEqual(Object.keys(current).sort(),Object.keys(prior).sort(),'Software recovery changed the durable task inventory');
+  for(const [id,t] of Object.entries(prior)){
+    assert.equal(current[id].definition_revision,t.definition_revision);assert.equal(current[id].definition_sha256,t.definition_sha256);
+    assert(current[id].attempts.length<=1,'Software recovery created a duplicate attempt');
+    for(const attempt of t.attempts)assert.deepEqual(current[id].attempts.find(a=>a.job_id===attempt.job_id),attempt,'Software recovery lost or replaced a prior attempt');
+  }
+  for(const job of Object.values(before.jobs??{})){
+    const persisted=after.jobs?.[job.id];assert(persisted,'Software recovery lost a prior job');
+    for(const field of ['id','instance_id','worker_pid','created_at','execution_started_at','execution_deadline_at'])assert.deepEqual(persisted[field],job[field],'Software recovery changed '+field);
+    assert.deepEqual(persisted.runtime_task,job.runtime_task);assert.deepEqual(persisted.inputs,job.inputs);
+    if(job.native_id)assert.equal(persisted.native_id,job.native_id,'Software recovery replaced an observed native session');
+  }
+  const counts=new Map();for(const job of Object.values(after.jobs??{})){const id=job.runtime_task?.id;assert(id&&Object.hasOwn(current,id),'Recovery introduced an undeclared task job');counts.set(id,(counts.get(id)??0)+1);assert.equal(counts.get(id),1,'Recovery queued duplicate jobs for one task');}
+}
 
 export async function runAsyncRuntimeAcceptance({directory,mode='prepare-only',wait_ms=1200000}={}){
   if(!['prepare-only','run-native'].includes(mode)||!Number.isSafeInteger(wait_ms)||wait_ms<1000||wait_ms>7200000)throw Error('Choose explicit prepare-only or run-native with bounded wait_ms');
@@ -121,6 +138,25 @@ export async function runAsyncRuntimeAcceptance({directory,mode='prepare-only',w
       state=fixtureState(root);receipt.latest=observations(state);save();
       if(Object.values(state.records).some(r=>r.runtime_task?.state==='needs_attention'))throw Error('A fictional task needs attention; retained all native/failed evidence without retry');
       if(Object.values(state.jobs).some(j=>['failed','quarantined','interrupted'].includes(j.status)))throw Error('Native fixture did not complete cleanly; no automatic retry');
+      if(!receipt.checks.inflight_supervisor_recovery_without_duplicate){
+        const firstJob=state.jobs[state.records[a.id].runtime_task.attempts[0]?.job_id],running=firstJob?.status==='running'&&firstJob.execution_started_at?firstJob:null;
+        if(running){
+          // This deliberately interrupts only the deterministic scheduler while
+          // an already dispatched detached worker owns its native invocation.
+          // Closing our MCP watcher prevents it from racing the crash probe.
+          const before=state,oldSupervisor=knownSupervisor(before,root);if(!oldSupervisor)throw Error('Cannot establish the own live software supervisor for required in-flight recovery probe');
+          receipt.inflight_recovery={status:'observed',observed_at:new Date().toISOString(),observed_running_job_id:running.id,old_supervisor_pid:oldSupervisor,before:observations(before)};save();
+          allLatency.push(...client.latencies);await client.close();client=null;
+          process.kill(oldSupervisor,'SIGTERM');await waitDead(oldSupervisor);
+          receipt.inflight_recovery.software_supervisor_stopped_at=new Date().toISOString();receipt.inflight_recovery.without_supervisor=observations(fixtureState(root));save();
+          client=new MCP(root,data,output,'inflight-restart');await client.rpc('initialize',{});
+          const restartDeadline=Date.now()+10000;let restarted=null;
+          while(Date.now()<restartDeadline){const status=await client.tool('company_runtime',{root,session_id:base.session_id,action:'status'});if(status.state==='running'&&status.pid!==oldSupervisor){restarted=status;break;}await sleep(200);}
+          assert(restarted,'MCP startup did not wake the enabled software scheduler with work in progress');
+          state=fixtureState(root);assert.equal(knownSupervisor(state,root),restarted.pid);verifyRecoveryPersistence(before,state);
+          receipt.inflight_recovery={...receipt.inflight_recovery,status:'recovered',recovered_at:new Date().toISOString(),new_supervisor_pid:restarted.pid,after:observations(state)};receipt.checks.inflight_supervisor_recovery_without_duplicate=true;save();
+        }
+      }
       if(['returned','accepted'].includes(state.records[b.id].runtime_task.state)&&closure(state))break;
       if(Object.values(state.jobs).some(j=>j.status==='running'))await client.tool('company_runtime',{root,session_id:base.session_id,action:'status'});
       await sleep(1000);
@@ -132,16 +168,8 @@ export async function runAsyncRuntimeAcceptance({directory,mode='prepare-only',w
     for(const job of [aj,bj]){const content=JSON.parse(state.records[job.artifact_id].content);assert.equal(content.fixture,fixtureSource.fixture);assert.deepEqual(content.items,fixtureSource.items);assert.deepEqual(content.restrictions,fixtureSource.restrictions);}
     const messages=Object.values(state.records).filter(r=>r.runtime_message);assert(messages.some(r=>r.runtime_message.to_task_id===b.id&&r.runtime_message.from_attempt_id===aj.id&&r.runtime_message.disposition?.by==='worker'&&r.runtime_message.disposition.attempt_id===bj.id));
     receipt.checks.native_pipeline_and_peer_disposition=true;receipt.after_pipeline=observations(state);
+    if(!receipt.checks.inflight_supervisor_recovery_without_duplicate){receipt.inflight_recovery={status:'unmet',reason:'The first worker was not observed running with execution_started_at before the pipeline finished. Native calls are not repeated to satisfy recovery coverage.'};throw Error('Required in-flight scheduler recovery boundary was not observed; no automatic native retry');}
     const priorJobs=jobs.map(j=>j.id).sort();await sleep(2500);assert.deepEqual(Object.keys(fixtureState(root).jobs).sort(),priorJobs);receipt.checks.idle_starts_no_new_native_jobs=true;
-    // Restart only after all native processes have confirmed closure. Signal
-    // only the exact software supervisor identified in this own fixture.
-    const oldSupervisor=knownSupervisor(fixtureState(root),root);if(!oldSupervisor)throw Error('Cannot establish the own live supervisor for restart probe');
-    allLatency.push(...client.latencies);await client.close();client=null;
-    process.kill(oldSupervisor,'SIGTERM');await waitDead(oldSupervisor);
-    client=new MCP(root,data,output,'restart');await client.rpc('initialize',{});
-    const restartDeadline=Date.now()+10000;let restarted=false;
-    while(Date.now()<restartDeadline){const r=await client.tool('company_runtime',{root,session_id:base.session_id,action:'status'});if(r.state==='running'&&r.pid!==oldSupervisor){restarted=true;break;}await sleep(200);}
-    assert(restarted,'MCP startup did not wake the recorded enabled software runtime');assert.deepEqual(Object.keys(fixtureState(root).jobs).sort(),priorJobs);receipt.checks.real_mcp_supervisor_restart_without_new_native_jobs=true;
     await client.tool('company_runtime',{...base,action:'stop',source_instruction:'Stop the completed fictional acceptance runtime; preserve all task, native, review and peer evidence.'});
     receipt.final=observations(fixtureState(root));receipt.status='passed_native_fixture';return receipt;
   }catch(error){receipt.status='needs_attention';receipt.error={name:error.name,message:error.message};try{receipt.latest=observations(fixtureState(root));}catch{};return receipt;}

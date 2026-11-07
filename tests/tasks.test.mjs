@@ -6,7 +6,9 @@ import path from 'node:path';
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
 import {withStore,id,stamp} from '../plugins/soloco/runtime/store.mjs';
 import {resourceClaims} from '../plugins/soloco/runtime/coordination.mjs';
-import {submitTask,amendTask,cancelTask,taskRecord,taskView,taskReady,bindTaskAttempt,reconcileTask,isTaskBookkeeping,isTaskOutput,isTaskOwnOutput,validateTaskRecord,sendTaskMessage,appendPeerMessage,messagesForTask,disposeTaskMessage,disposePeerMessage,isOwnMessageDisposition,taskMessageInput,validateTaskMessage,isTaskMessage} from '../plugins/soloco/runtime/tasks.mjs';
+import {taskAssignmentContext,taskDefinitionBinding} from '../plugins/soloco/runtime/task-context.mjs';
+import {setRuntimeControl} from '../plugins/soloco/runtime/task-runtime-authority.mjs';
+import {submitTask,amendTask,cancelTask,taskRecord,taskView,taskReady,bindTaskAttempt,reconcileTask,isTaskBookkeeping,isTaskOutput,isTaskOwnOutput,validateTaskRecord,sendTaskMessage,appendPeerMessage,messagesForTask,disposeTaskMessage,disposePeerMessage,isOwnMessageDisposition,taskMessageInput,validateTaskMessage,isTaskMessage,isTaskScopedMessage} from '../plugins/soloco/runtime/tasks.mjs';
 
 function fixture(fn){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-tasks-')),data=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-task-data-')),old=process.env.COMPANY_PLUGIN_DATA;
@@ -23,7 +25,7 @@ function args(identity,operation_id,extra={}){return {...identity,operation_id,s
 function queue(state,record){
   const ready=taskReady(state,record);assert.equal(ready.ready,true,ready.reason);
   const t=record.runtime_task;
-  const job={id:id('job'),instance_id:id(t.spec.role),native_id:null,role:t.spec.role,host:t.owner.host,epoch:t.owner.epoch,status:'queued',task:t.spec.task,inputs:ready.input_ids.map(key=>({id:key,revision:state.records[key].revision})),review_of:ready.review_of?{id:ready.review_of,revision:state.records[ready.review_of].revision}:null,coordination:ready.coordination,created_at:stamp()};
+  const job={id:id('job'),instance_id:id(t.spec.role),native_id:null,role:t.spec.role,host:t.owner.host,epoch:t.owner.epoch,status:'queued',task:t.spec.task,inputs:ready.input_ids.map(key=>({id:key,revision:state.records[key].revision??null})),review_of:ready.review_of?{id:ready.review_of,revision:state.records[ready.review_of].revision}:null,coordination:ready.coordination,created_at:stamp()};
   state.jobs[job.id]=job;bindTaskAttempt(state,record,job);return job;
 }
 function finish(state,record,{verdict='Pass',native=id('native')}={}){
@@ -142,6 +144,21 @@ test('only exact prospective scoped worker proposals can be omitted from unrelat
   for(const mutate of [x=>delete x.records[record.id].runtime_output,x=>x.records[record.id].runtime_output.definition_revision=2,x=>x.records[record.id].status='Quarantined',x=>x.records[record.id].author_instance='forged',x=>x.records[record.id].hidden_policy='new global instruction',x=>x.jobs[record.job_id].native_id=identity.session_id,x=>x.jobs[record.job_id].coordination_release.termination_confirmed=false,x=>x.jobs[record.job_id].runtime_task.definition_revision=2]){const copy=structuredClone(state);mutate(copy);assert.equal(isTaskOutput(copy,copy.records[record.id]),false);}
 }));
 
+test('public pause and resume control evidence binds as nullable revisions without weakening output references',()=>fixture(({identity,write,read})=>{
+  for(const action of ['pause','resume'])engine.control({...identity,action,expected_epoch:identity.epoch,source_instruction:action+' this fictional fixture without new authority.'},'codex');
+  const controls=Object.values(read().records).filter(r=>r.kind==='decision'&&['pause','resume'].includes(r.action));
+  assert.equal(controls.length,2);assert(controls.every(r=>!Object.hasOwn(r,'revision')));
+  const a=write(s=>submitTask(s,args(identity,'control-evidence',{input_ids:controls.map(r=>r.id)}),'codex'));
+  write(s=>{queue(s,s.records[a.id]);const job=finish(s,s.records[a.id]);job.context_format=7;job.context_scope=s.records[a.id].runtime_task.spec.context_scope;job.context_sha256='a'.repeat(64);Object.assign(s.records[job.artifact_id],{inputs:job.inputs,review_of:null,review:null,created_at:stamp(),runtime_output:{version:1,task_id:a.id,definition_revision:1,definition_sha256:s.records[a.id].runtime_task.definition_sha256}});});
+  const state=read(),job=state.jobs[state.records[a.id].runtime_task.attempts[0].job_id],record=state.records[job.artifact_id];
+  assert(job.inputs.every(ref=>ref.revision===null));assert.equal(isTaskOutput(state,record),true);
+  for(const revision of [undefined,0,'1',{hidden:'unrecognized qualifier'}]){
+    const copy=structuredClone(state);copy.jobs[job.id].inputs[0].revision=revision;copy.records[record.id].inputs[0].revision=revision;
+    assert.equal(isTaskOutput(copy,copy.records[record.id]),false);
+  }
+  const missing=structuredClone(state);delete missing.records[controls[0].id];assert.equal(isTaskOutput(missing,missing.records[record.id]),false);
+}));
+
 test('an exact negative output is excluded only from its own original inputs, never unrelated task context',()=>fixture(({identity,write,read})=>{
   const a=write(s=>submitTask(s,args(identity,'a-negative'),'codex'));write(s=>{queue(s,s.records[a.id]);finish(s,s.records[a.id]);});
   const qa=write(s=>submitTask(s,args(identity,'qa-negative',{role:'qa',review_task_id:a.id,task:'Review fictional source and preserve blockers'}),'codex'));
@@ -181,4 +198,47 @@ test('known bookkeeping fields reject object-valued qualifiers and malformed tim
   const broken=structuredClone(state);broken.records[command.id].created_at={hidden:'Another qualifier'};assert.equal(isTaskBookkeeping(broken,broken.records[command.id]),false);
   write(s=>{queue(s,s.records[task.id]);});const queued=read();
   for(const mutate of [a=>a.created_at={hidden:'x'},a=>a.artifact_id={hidden:'x'},a=>a.finished_at='invalid',a=>a.definition_sha256=['hidden']]){const copy=structuredClone(queued);mutate(copy.records[task.id].runtime_task.attempts[0]);assert.equal(isTaskBookkeeping(copy,copy.records[task.id]),false);}
+}));
+
+function unrelatedPacket(state,record){const spec=record.runtime_task.spec;return JSON.parse(taskAssignmentContext(state,{id:'fictional-prospective-unrelated',role:spec.role,task:spec.task,epoch:state.owner.epoch,context_scope:spec.context_scope,inputs:[],review_of:null,runtime_task:taskDefinitionBinding(record)}).text);}
+
+test('cancel preserves verbatim attributed source intent, replay and compulsory unrelated-task context',()=>fixture(({identity,write,read})=>{
+  write(s=>setRuntimeControl(s,{...identity,action:'start',source_instruction:'Prepare only the bounded fictional task context in this test.'},'codex'));
+  const a=write(s=>submitTask(s,args(identity,'cancel-intent-a'),'codex'));
+  const b=write(s=>submitTask(s,args(identity,'cancel-intent-b',{context_scope:'unrelated-scope'}),'codex'));
+  const source_instruction='  Cancel this task.\nAll company exports stay blocked until an independent exact review passes.  ';
+  const request=args(identity,'cancel-intent-operation',{task_id:a.id,expected_definition_revision:1,source_instruction});
+  write(s=>cancelTask(s,request,'codex'));let state=read();
+  const command=Object.values(state.records).find(r=>r.runtime_command?.operation_id===request.operation_id);
+  assert.equal(command.content,source_instruction);assert.equal(command.runtime_command.source_instruction,source_instruction);
+  assert.equal(command.author_instance,identity.session_id);assert.deepEqual(command.runtime_command.owner,state.owner);assert.equal(isTaskBookkeeping(state,command),false);
+  const revision=state.records[a.id].revision;write(s=>cancelTask(s,request,'codex'));assert.equal(read().records[a.id].revision,revision);
+  assert.throws(()=>write(s=>cancelTask(s,{...request,source_instruction:source_instruction+' Different condition.'},'codex')),/different command/);
+  const packet=unrelatedPacket(state,state.records[b.id]);assert(packet.records.some(entry=>entry.source.id===command.id&&entry.value.content===source_instruction));
+  const forged=structuredClone(state);forged.records[command.id].runtime_command.source_instruction+=' Hidden new qualifier.';forged.records[command.id].content=forged.records[command.id].runtime_command.source_instruction;
+  assert.throws(()=>cancelTask(forged,request,'codex'),/different command/);
+}));
+
+test('owner message and disposition source qualifiers survive, affect replay and remain globally compulsory',()=>fixture(({identity,write,read})=>{
+  write(s=>setRuntimeControl(s,{...identity,action:'start',source_instruction:'Prepare only the bounded fictional task context in this test.'},'codex'));
+  const a=write(s=>submitTask(s,args(identity,'owner-intent-a'),'codex'));
+  const b=write(s=>submitTask(s,args(identity,'owner-intent-b',{context_scope:'another-scope'}),'codex'));
+  const source_instruction='  Send the bounded fact.\nNo company contact is permitted until founder clarification.  ';
+  const request={...identity,operation_id:'owner-intent-message',to_task_id:a.id,content:'Exact bounded fictional fact.',source_instruction};
+  const message=write(s=>sendTaskMessage(s,request,'codex'));assert.equal(message.runtime_message.source_instruction,source_instruction);
+  assert.equal(write(s=>sendTaskMessage(s,request,'codex')).id,message.id);
+  assert.throws(()=>write(s=>sendTaskMessage(s,{...request,source_instruction:source_instruction+'Changed qualifier.'},'codex')),/different content/);
+  let state=read();assert.equal(isTaskMessage(state,state.records[message.id]),true);assert.equal(isTaskScopedMessage(state,state.records[message.id]),false);
+  assert(unrelatedPacket(state,state.records[b.id]).records.some(entry=>entry.source.id===message.id&&entry.value.runtime_message.source_instruction===source_instruction));
+  const legacy=write(s=>sendTaskMessage(s,{...identity,operation_id:'legacy-source-less-message',to_task_id:a.id,content:'A legacy task-local fact.'},'codex'));
+  state=read();assert.equal(isTaskScopedMessage(state,state.records[legacy.id]),true);
+  const dispositionSource='  Record this handling.\nKeep exports blocked even after the inbox is marked processed.  ';
+  const disposition={...identity,operation_id:'owner-intent-dispose',message_id:legacy.id,disposition:'Preserved this fact in the task assignment.',source_instruction:dispositionSource};
+  const processed=write(s=>disposeTaskMessage(s,disposition,'codex'));assert.equal(processed.runtime_message.disposition.source_instruction,dispositionSource);
+  assert.equal(write(s=>disposeTaskMessage(s,disposition,'codex')).revision,processed.revision);
+  assert.throws(()=>write(s=>disposeTaskMessage(s,{...disposition,source_instruction:dispositionSource+'Changed condition.'},'codex')),/different command/);
+  state=read();const command=Object.values(state.records).find(r=>r.runtime_command?.operation_id===disposition.operation_id);
+  assert.equal(command.content,dispositionSource);assert.equal(command.runtime_command.message_id,legacy.id);assert.equal(isTaskBookkeeping(state,command),false);assert.equal(isTaskScopedMessage(state,state.records[legacy.id]),false);
+  const packet=unrelatedPacket(state,state.records[b.id]);assert(packet.records.some(entry=>entry.source.id===command.id));assert(packet.records.some(entry=>entry.source.id===legacy.id&&entry.value.runtime_message.disposition.source_instruction===dispositionSource));
+  const malformed=structuredClone(state);malformed.records[message.id].runtime_message.source_instruction={hidden:'Unrecognized authority'};assert.equal(isTaskMessage(malformed,malformed.records[message.id]),false);
 }));

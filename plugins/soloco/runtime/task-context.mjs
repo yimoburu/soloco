@@ -3,7 +3,7 @@
 import {digest,owner,upgradePending} from './store.mjs';
 import {recordReference,contextSource,currentRecords,currentExtensions,reviewedContext,mandatoryExecutionEvidence,currentExecutionEvidence,proofJobSafe} from './current-state.mjs';
 import {hasSnapshotReferences,inheritSnapshots} from './snapshot.mjs';
-import {validateTaskRecord,isTaskBookkeeping,isTaskMessage,isTaskOutput,isTaskOwnOutput,taskMessageInput,taskDefinitionHash} from './tasks.mjs';
+import {validateTaskRecord,isTaskBookkeeping,isTaskScopedMessage,isTaskOutput,isTaskOwnOutput,taskMessageInput,taskDefinitionHash} from './tasks.mjs';
 import {runtimeControlBinding,isRuntimeBookkeeping} from './task-runtime-authority.mjs';
 import {bindCoordination} from './coordination.mjs';
 import {normalizeTimeout} from './timeout.mjs';
@@ -16,6 +16,7 @@ const equal=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const fail=message=>{throw Error('Task context Held: '+message);};
 const bytes=value=>Buffer.byteLength(typeof value==='string'?value:JSON.stringify(value));
 const only=(value,keys)=>value&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).every(key=>keys.includes(key));
+const inputReference=value=>only(value,['id','revision'])&&Object.keys(value).length===2&&typeof value.id==='string'&&(value.revision===null||Number.isSafeInteger(value.revision)&&value.revision>0);
 const unsigned=value=>Number.isSafeInteger(value)&&value>=0;
 const usageScope='Complete visible task prompts and returned texts; provider-added instructions and hidden reasoning are not measured';
 function runtimeUsageSafe(value){
@@ -45,7 +46,10 @@ function runtimeJobBookkeeping(state,job,currentJob){
       const producer=canonicalTask(state,task.spec.review_task_id),prior=state.jobs?.[producer.runtime_task.attempts[0]?.job_id],target=state.records?.[prior?.artifact_id];
       if(!target||!equal(job.review_of,{id:target.id,revision:target.revision}))return false;
     }else if(job.review_of!==null)return false;
-    if(!Array.isArray(job.inputs)||job.inputs.some(input=>!only(input,['id','revision'])||Object.keys(input).length!==2||typeof input.id!=='string'||!Number.isSafeInteger(input.revision)||taskMessageInput(state,job,state.records?.[input.id])?.revision!==input.revision)||task.spec.input_ids.some(id=>!job.inputs.some(input=>input.id===id)))return false;
+    if(!Array.isArray(job.inputs)||job.inputs.some(input=>{
+      const value=taskMessageInput(state,job,state.records?.[input.id]);
+      return !inputReference(input)||!value||(value.revision??null)!==input.revision;
+    })||task.spec.input_ids.some(id=>!job.inputs.some(input=>input.id===id)))return false;
     if(job.runtime_context_usage!==undefined&&!runtimeUsageSafe(job.runtime_context_usage))return false;
     const {runtime_task,runtime_context_usage,requester,coordination:ignored,...legacy}=job;
     if(!proofJobSafe(legacy))return false;
@@ -87,50 +91,53 @@ function taskForJob(state,job){
   if(job.role!==task.spec.role||job.task!==task.spec.task||(job.context_scope??'*')!==(task.spec.context_scope??'*'))fail('assignment does not match task definition');
   owner(state,task.owner.session_id,task.owner.host,task.owner.epoch);
   if(state.mode!=='preparation')fail('only the current bounded preparation contract is supported');
+  if(['cancelling','cancelled'].includes(task.state))fail('task was cancelled');
   if(state.paused||upgradePending(state))fail('company paused or upgrading');
   if(!runtimeControlBinding(state).enabled)fail('runtime is stopped');
   if(!Object.hasOwn(state.roles??{},job.role))fail('task role is not in the current catalog');
   return record;
 }
-function prerequisiteEvidence(state,job){
+function prerequisiteEvidence(state,job,evidenceIds=[]){
   const selected=new Map(),tasks=new Map(),receipts=new Map(),visiting=new Set(),visited=new Set();
   const currentSource=(id)=>{
     const value=contextSource(state,id);if(!value)fail('prerequisite source missing: '+id);
     selected.set(id,value);return {source:recordReference(value,id),value};
   };
-  const visitSource=(id)=>{
+  const visitSource=(id,evidence)=>{
     const entry=currentSource(id),producer=entry.value.runtime_output;
-    if(producer)visit(producer.task_id);
+    if(producer)visit(producer.task_id,evidence||['Fail','Blocked'].includes(entry.value.review?.verdict));
     return entry;
   };
-  const visit=(id)=>{
+  const visit=(id,evidence=false)=>{
     if(id===job.runtime_task.id||visiting.has(id))fail('cyclic prerequisite evidence closure');
+    const record=canonicalTask(state,id),task=record.runtime_task,attempt=task.attempts[0],producer=state.jobs?.[attempt?.job_id],output=state.records?.[producer?.artifact_id];
+    if(!evidence&&['cancelling','cancelled'].includes(task.state))fail('prerequisite task was cancelled: '+id);
+    if(!equal(task.owner,state.owner)||!producer||!(evidence?isTaskOwnOutput(state,producer,output):isTaskOutput(state,output)))fail('prerequisite output is missing, stale, negative or unqualified: '+id);
     if(visited.has(id))return;
     if(visited.size+visiting.size>=100)fail('prerequisite closure exceeds100 tasks; split the bounded assignment');
     visiting.add(id);
-    const record=canonicalTask(state,id),task=record.runtime_task,attempt=task.attempts[0],producer=state.jobs?.[attempt?.job_id],output=state.records?.[producer?.artifact_id];
-    if(!equal(task.owner,state.owner)||!producer||!isTaskOutput(state,output))fail('prerequisite output is missing, stale, negative or unqualified: '+id);
-    tasks.set(id,{binding:taskDefinitionBinding(record),owner:task.owner,spec:task.spec,source_protocol:'task-definition-v1; this binding is not a full mutable-record retrieval handle'});
-    const outputEntry=currentSource(output.id),receipt={job_id:producer.id,instance_id:producer.instance_id,native_id:producer.native_id,context_sha256:producer.context_sha256,output_source:outputEntry.source,inputs:[],supplemental_sources:[],retrieved_inputs:[]};
+    const use=evidence?'retained evidence only; no prerequisite permission':'prerequisite';
+    tasks.set(id,{binding:taskDefinitionBinding(record),owner:task.owner,spec:task.spec,use,source_protocol:'task-definition-v1; this binding is not a full mutable-record retrieval handle'});
+    const outputEntry=currentSource(output.id),receipt={job_id:producer.id,instance_id:producer.instance_id,native_id:producer.native_id,context_sha256:producer.context_sha256,output_source:outputEntry.source,use,inputs:[],supplemental_sources:[],retrieved_inputs:[]};
     if(producer.review_of){
-      const target=visitSource(producer.review_of.id);
+      const target=visitSource(producer.review_of.id,evidence);
       if(target.value.revision!==producer.review_of.revision)fail('prerequisite reviewed subject changed');
       receipt.reviewed_subject=target.source;
     }
     for(const input of producer.inputs??[]){
-      const entry=visitSource(input.id),delivered=taskMessageInput(state,producer,entry.value);
-      if(delivered?.revision!==input.revision)fail('prerequisite original input changed: '+input.id);
-      const evidence={delivered_ref:input,current_source:entry.source};
-      if(!equal(delivered,entry.value))evidence.original_delivery={source:recordReference(delivered,input.id),value:delivered,provenance:'Exact original envelope reconstructed only from this producer attempt\'s proven worker acknowledgment. Retained delivery evidence, not a current company_context retrieval handle.'};
-      receipt.inputs.push(evidence);
+      const entry=visitSource(input.id,true),delivered=taskMessageInput(state,producer,entry.value);
+      if(!inputReference(input)||!delivered||(delivered.revision??null)!==input.revision)fail('prerequisite original input changed: '+input.id);
+      const inputEvidence={delivered_ref:input,current_source:entry.source};
+      if(!equal(delivered,entry.value))inputEvidence.original_delivery={source:recordReference(delivered,input.id),value:delivered,provenance:'Exact original envelope reconstructed only from this producer attempt\'s proven worker acknowledgment. Retained delivery evidence, not a current company_context retrieval handle.'};
+      receipt.inputs.push(inputEvidence);
     }
     for(const field of ['supplemental_sources','retrieved_inputs'])for(const source of producer[field]??[]){
-      const entry=visitSource(source.id),delivered=taskMessageInput(state,producer,entry.value),original=recordReference(delivered,source.id);
+      const entry=visitSource(source.id,true),delivered=taskMessageInput(state,producer,entry.value),original=recordReference(delivered,source.id);
       if(original.sha256!==source.sha256||(source.revision!==undefined&&original.revision!==source.revision))fail('prerequisite supplemental evidence changed: '+source.id);
       receipt[field].push({delivered_ref:source,current_source:entry.source,...(!equal(delivered,entry.value)?{original_delivery:{source:original,value:delivered,provenance:'Proven original delivery evidence; not a current retrieval handle.'}}:{})});
     }
-    for(const dependency of task.spec.depends_on)visit(dependency.task_id);
-    if(task.spec.review_task_id)visit(task.spec.review_task_id);
+    for(const dependency of task.spec.depends_on)visit(dependency.task_id,evidence);
+    if(task.spec.review_task_id)visit(task.spec.review_task_id,evidence);
     visiting.delete(id);visited.add(id);receipts.set(producer.id,receipt);
   };
   const task=canonicalTask(state,job.runtime_task.id).runtime_task;
@@ -138,9 +145,12 @@ function prerequisiteEvidence(state,job){
   if(task.spec.review_task_id)visit(task.spec.review_task_id);
   // Explicit runtime-produced inputs have the same evidence requirements even
   // when the caller references the exact output rather than a readiness edge.
-  for(const input of [...(job.inputs??[]),...(job.review_of?[job.review_of]:[])]){
-    const value=contextSource(state,input.id);if(value?.runtime_output)visit(value.runtime_output.task_id);
+  for(const input of [...task.spec.input_ids.map(id=>({id})),...(job.review_of?[job.review_of]:[])]){
+    const value=contextSource(state,input.id);if(value?.runtime_output)visit(value.runtime_output.task_id,['Fail','Blocked'].includes(value.review?.verdict));
   }
+  // Compulsory counterevidence is data, not a positive readiness edge. Derive
+  // these roots before input expansion so initial and resumed packets agree.
+  for(const id of evidenceIds){const value=contextSource(state,id);if(value?.runtime_output&&['Fail','Blocked'].includes(value.review?.verdict))visit(value.runtime_output.task_id,true);}
   return {selected,tasks:[...tasks.values()].sort((a,b)=>a.binding.id.localeCompare(b.binding.id)),receipts:[...receipts.values()].sort((a,b)=>a.job_id.localeCompare(b.job_id))};
 }
 function requiredSources(state,job){
@@ -149,12 +159,13 @@ function requiredSources(state,job){
   // exact prospective runtime output may be omitted as output rather than input.
   const selected=new Map(currentRecords(state,{...job,id:undefined},projection).filter(r=>!isTaskBookkeeping(state,r)&&!isRuntimeBookkeeping(state,r)
     &&!isTaskOwnOutput(state,job,r)&&!isTaskOutput(state,r)
-    &&(!isTaskMessage(state,r)||r.runtime_message.to_task_id===job.runtime_task.id)).map(r=>[r.id,taskMessageInput(state,job,r)]));
-  const prerequisites=prerequisiteEvidence(state,job);
+    &&(!isTaskScopedMessage(state,r)||r.runtime_message.to_task_id===job.runtime_task.id)).map(r=>[r.id,taskMessageInput(state,job,r)]));
+  const prerequisites=prerequisiteEvidence(state,job,[...selected.keys()]);
   for(const [id,value] of prerequisites.selected)selected.set(id,value);
   for(const input of [...(job.inputs??[]),...(job.review_of?[job.review_of]:[])]){
+    if(!inputReference(input))fail('input reference is missing or malformed');
     const raw=contextSource(state,input.id),value=raw&&taskMessageInput(state,job,raw);
-    if(!value||value.revision!==input.revision)fail('input missing or changed: '+input.id);
+    if(!value||(value.revision??null)!==input.revision)fail('input missing or changed: '+input.id);
     selected.set(input.id,value);
   }
   for(const id of canonicalTask(state,job.runtime_task.id).runtime_task.spec.input_ids??[]){
@@ -254,7 +265,7 @@ export function portfolioContext(state,{task_ids,scope='*',limit=20,budget,curso
   const inventory=sha(matches.map(r=>recordReference(r))),offset=readCursor(cursor,inventory);
   if(offset>matches.length)throw Error('Portfolio cursor past current membership');
   let constraintRefs=[],constraint_error=null;
-  try{const p=reviewedContext(state);constraintRefs=currentRecords(state,{role:'runner',context_scope:scope},p).filter(r=>!isTaskBookkeeping(state,r)&&!isRuntimeBookkeeping(state,r)&&!isTaskMessage(state,r)&&!isTaskOutput(state,r)).map(r=>recordReference(r)).sort((a,b)=>a.id.localeCompare(b.id));}catch(error){constraint_error=error.message;}
+  try{const p=reviewedContext(state);constraintRefs=currentRecords(state,{role:'runner',context_scope:scope},p).filter(r=>!isTaskBookkeeping(state,r)&&!isRuntimeBookkeeping(state,r)&&!isTaskScopedMessage(state,r)&&!isTaskOutput(state,r)).map(r=>recordReference(r)).sort((a,b)=>a.id.localeCompare(b.id));}catch(error){constraint_error=error.message;}
   let runtime;try{const binding=runtimeControlBinding(state);runtime={state:binding.enabled?'enabled':'stopped',binding};}catch(error){runtime={state:'needs_attention',reason:error.message};}
   const pendingNotices=(state.notices??[]).filter(n=>!n.resolution);
   const result={protocol:'async-portfolio-v1',controls:controls(state),runtime,scope,summary_only:true,decision_ready:false,

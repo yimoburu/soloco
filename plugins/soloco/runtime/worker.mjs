@@ -332,17 +332,18 @@ Return one JSON object only: {"content":"your substantive artifact or review","m
       // permits an unclaimed worker to close a cancelled assignment.
       if(!claimed && (!current || !['queued','cancelled'].includes(current.status) ||
         ['started_at','worker_pid','execution_started_at','execution_deadline_at','termination_deadline_at','finished_at'].some(k=>current[k]!=null)))throw unowned;
+      if(claimed&&(!current||current.instance_id!==job?.instance_id||current.worker_pid!==process.pid))throw unowned;
       if(current) {
         if(!invoked || output || error.termination_confirmed===true)current.coordination_release={termination_confirmed:true,reason:invoked?'model_process_closed':'model_not_invoked',at:stamp()};
         const cause=controller?.signal.aborted?controller.signal.reason:error;
         const evidence=failureEvidence(error),reason=failureEvidence(cause);
         current.execution_failure={...evidence,...(context?.qualification&&reason.code==='ASSIGNMENT_INELIGIBLE'?{abort_kind:'eligibility_loss'}:{}),outcome:/TIMEOUT/.test(reason.code??evidence.code??'')?'timeout':controller?.signal.aborted?'cancellation':'failure',at:stamp(),...(controller?.signal.aborted?{abort:reason}:{})};
       }
-      if(current && ['queued','running','cancelled'].includes(current.status)) {
-        // Cancellation is an eligibility fence, not proof of process closure.
+      if(current && ['queued','running','cancelled','interrupted'].includes(current.status)) {
+        // Cancellation/interruption fence eligibility, not process closure.
         // Retain its status and evidence; finish only after observed closure (or
         // when this worker never invoked the adapter).
-        if(current.status!=='cancelled') {current.status='failed';current.finished_at=stamp();}
+        if(!['cancelled','interrupted'].includes(current.status)) {current.status='failed';current.finished_at=stamp();}
         else if(current.coordination_release?.termination_confirmed===true)current.finished_at??=stamp();
         current.error=context?.qualification&&current.execution_failure?.abort?.code==='ASSIGNMENT_INELIGIBLE'?current.execution_failure.abort.message:error.message;if(error.held)current.qualification_hold=error.held;
         // A failed scoped response is observed evidence, never a newly accepted

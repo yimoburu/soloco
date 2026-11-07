@@ -355,7 +355,7 @@ export function queueRuntimeTask(root,taskId,{launch=launchWorker,check=readines
       runtime_task:{id:taskId,definition_revision:record.runtime_task.definition_revision,definition_sha256:record.runtime_task.definition_sha256},
       supplemental_sources:(spec.evidence_ids??[]).map(key=>recordReference(contextSource(s,key),key)),
       coordination:ready.coordination,context_format:7,context_scope:spec.context_scope,expected_deliverable:spec.expected_deliverable,
-      inputs:ready.input_ids.map(key=>({id:key,revision:s.records[key].revision})),review_of:target?{id:target.id,revision:target.revision}:null,
+      inputs:ready.input_ids.map(key=>({id:key,revision:s.records[key].revision??null})),review_of:target?{id:target.id,revision:target.revision}:null,
       timeout_policy_version:TIMEOUT_POLICY_VERSION,...timeout,model_selection:selection,cli_version:readyHost.version??null,task_summary:spec.expected_deliverable,next_handoff:'Runtime validates the exact result and wakes eligible dependent tasks',created_at:stamp(),
       ...(inventory?{model_catalog:{source:inventory.source,model:inventory.models.find(m=>m.id===selection.model),speed_support:inventory.speed_support}}:{})};
     s.sessions[sessionKey]={instance_id:instance,role:spec.role,native_id:null,host,model_selection:selection};
