@@ -1,0 +1,286 @@
+TAP version 13
+# Subtest: missing production intake provider is fail closed
+ok 1 - missing production intake provider is fail closed
+  ---
+  duration_ms: 0.578583
+  type: 'test'
+  ...
+# Subtest: initial unknown legacy is never relabeled accepted
+ok 2 - initial unknown legacy is never relabeled accepted
+  ---
+  duration_ms: 22.068792
+  type: 'test'
+  ...
+# Subtest: immutable accepted home survives replacement; new global restriction holds ordinary but complete delta repair publishes
+ok 3 - immutable accepted home survives replacement; new global restriction holds ordinary but complete delta repair publishes
+  ---
+  duration_ms: 35.219167
+  type: 'test'
+  ...
+# Subtest: successor exact base and concurrent semantic intake including reverted intake hold
+ok 4 - successor exact base and concurrent semantic intake including reverted intake hold
+  ---
+  duration_ms: 47.741125
+  type: 'test'
+  ...
+# Subtest: missing original, changed producer, rejected negative, expiry and unknown nested producer hold
+ok 5 - missing original, changed producer, rejected negative, expiry and unknown nested producer hold
+  ---
+  duration_ms: 55.180625
+  type: 'test'
+  ...
+# Subtest: canonical known historical evidence freezes before bookkeeping; nested originals remain checked
+ok 6 - canonical known historical evidence freezes before bookkeeping; nested originals remain checked
+  ---
+  duration_ms: 33.5875
+  type: 'test'
+  ...
+# Subtest: atomic historical maps deliver exact new/newer/deleted originals in chronological intake and remain required after publication
+ok 7 - atomic historical maps deliver exact new/newer/deleted originals in chronological intake and remain required after publication
+  ---
+  duration_ms: 26.348416
+  type: 'test'
+  ...
+# Subtest: intermediate transitive originals hold proposal, review, publication and accepted use when missing or corrupt
+ok 8 - intermediate transitive originals hold proposal, review, publication and accepted use when missing or corrupt
+  ---
+  duration_ms: 121.580791
+  type: 'test'
+  ...
+# Subtest: a later checkpoint still validates originals that existed only in an older intermediate delta
+ok 9 - a later checkpoint still validates originals that existed only in an older intermediate delta
+  ---
+  duration_ms: 48.573584
+  type: 'test'
+  ...
+# Subtest: wrong historical original and reordered version transitions hold; atomic change row order is irrelevant
+ok 10 - wrong historical original and reordered version transitions hold; atomic change row order is irrelevant
+  ---
+  duration_ms: 38.358041
+  type: 'test'
+  ...
+# Subtest: intake immutable_entry validates identity as well as original snapshot bytes
+ok 11 - intake immutable_entry validates identity as well as original snapshot bytes
+  ---
+  duration_ms: 11.824709
+  type: 'test'
+  ...
+# Subtest: literal reference-like JSON in intake remains literal
+ok 12 - literal reference-like JSON in intake remains literal
+  ---
+  duration_ms: 26.484625
+  type: 'test'
+  ...
+# Subtest: allowed post-proposal reconstruction intake checks transitive originals before review and publication
+ok 13 - allowed post-proposal reconstruction intake checks transitive originals before review and publication
+  ---
+  duration_ms: 31.506791
+  type: 'test'
+  ...
+# Subtest: real normalized intake preserves deleted intermediate envelopes while checkpoint audits their transitive vault originals
+ok 14 - real normalized intake preserves deleted intermediate envelopes while checkpoint audits their transitive vault originals
+  ---
+  duration_ms: 279.055333
+  type: 'test'
+  ...
+# Subtest: shared immutable entry DAG traverses originals linearly with exact dependency inventory
+ok 15 - shared immutable entry DAG traverses originals linearly with exact dependency inventory
+  ---
+  duration_ms: 0.604083
+  type: 'test'
+  ...
+# Subtest: legacy locators backed by shared immutable entries traverse full originals linearly
+ok 16 - legacy locators backed by shared immutable entries traverse full originals linearly
+  ---
+  duration_ms: 0.449834
+  type: 'test'
+  ...
+# Subtest: raw and entry references share traversal but repeated entry identity and metadata still validate
+ok 17 - raw and entry references share traversal but repeated entry identity and metadata still validate
+  ---
+  duration_ms: 0.45975
+  type: 'test'
+  ...
+# Subtest: shared DAG nested missing or corrupt originals hold for entry and legacy forms
+ok 18 - shared DAG nested missing or corrupt originals hold for entry and legacy forms
+  ---
+  duration_ms: 0.851083
+  type: 'test'
+  ...
+# Subtest: read-only baseline, exact full/selected deltas, deletion, reorder, shape and unknown fields
+ok 19 - read-only baseline, exact full/selected deltas, deletion, reorder, shape and unknown fields
+  ---
+  duration_ms: 18.600958
+  type: 'test'
+  ...
+# Subtest: selected writes and upgrade appends never read unrelated/prior journal bodies
+ok 20 - selected writes and upgrade appends never read unrelated/prior journal bodies
+  ---
+  duration_ms: 10.995375
+  type: 'test'
+  ...
+# Subtest: selected new roots allocate after both root and shape positions without moving existing rows
+ok 21 - selected new roots allocate after both root and shape positions without moving existing rows
+  ---
+  duration_ms: 12.189334
+  type: 'test'
+  ...
+# Subtest: existing duplicate top-level positions hold without rewriting historical metadata
+ok 22 - existing duplicate top-level positions hold without rewriting historical metadata
+  ---
+  duration_ms: 7.068
+  type: 'test'
+  ...
+# Subtest: intake verifies envelopes; checkpoint dependency validation holds on missing/corrupt nested originals
+ok 23 - intake verifies envelopes; checkpoint dependency validation holds on missing/corrupt nested originals
+  ---
+  duration_ms: 21.701459
+  type: 'test'
+  ...
+# Subtest: gaps, changed event envelopes/payloads, uncovered writers and unlogged state changes hold
+ok 24 - gaps, changed event envelopes/payloads, uncovered writers and unlogged state changes hold
+  ---
+  duration_ms: 70.531417
+  type: 'test'
+  ...
+# Subtest: missing/corrupt old, intermediate, new and unchanged immutable values hold
+ok 25 - missing/corrupt old, intermediate, new and unchanged immutable values hold
+  ---
+  duration_ms: 66.055084
+  type: 'test'
+  ...
+# Subtest: legacy/changed layout, ambiguous encoding, inexact identities and rollback hold
+ok 26 - legacy/changed layout, ambiguous encoding, inexact identities and rollback hold
+  ---
+  duration_ms: 61.491209
+  type: 'test'
+  ...
+# Subtest: failed writes roll back metadata, immutable inserts and event atomically
+ok 27 - failed writes roll back metadata, immutable inserts and event atomically
+  ---
+  duration_ms: 10.616333
+  type: 'test'
+  ...
+# Subtest: position-only object reorder and selected deletion produce exact references; historical old events need no replay
+ok 28 - position-only object reorder and selected deletion produce exact references; historical old events need no replay
+  ---
+  duration_ms: 9.475375
+  type: 'test'
+  ...
+# Subtest: re-sealed but inconsistent metadata roots and before/after chains hold
+ok 29 - re-sealed but inconsistent metadata roots and before/after chains hold
+  ---
+  duration_ms: 34.583917
+  type: 'test'
+  ...
+# Subtest: operating intake checks one complete read against the independent capture, including zero-event corruption
+ok 30 - operating intake checks one complete read against the independent capture, including zero-event corruption
+  ---
+  duration_ms: 12.089459
+  type: 'test'
+  ...
+# Subtest: one intake snapshot reuses validated change bytes without retaining the next call or rereading oversized unchanged archive
+ok 31 - one intake snapshot reuses validated change bytes without retaining the next call or rereading oversized unchanged archive
+  ---
+  duration_ms: 59.908
+  type: 'test'
+  ...
+# Subtest: oversized changed envelopes retain complete before/after bytes when they exceed the intake read cache
+ok 32 - oversized changed envelopes retain complete before/after bytes when they exceed the intake read cache
+  ---
+  duration_ms: 118.440625
+  type: 'test'
+  ...
+# Subtest: layout reads observe creation, live versions, rollback and recreated schema on the same connection
+ok 33 - layout reads observe creation, live versions, rollback and recreated schema on the same connection
+  ---
+  duration_ms: 1.4115
+  type: 'test'
+  ...
+# Subtest: legacy capture holds atomically; ordinary writes/read/reopen do not migrate; explicit migration backs up exact origin
+ok 34 - legacy capture holds atomically; ordinary writes/read/reopen do not migrate; explicit migration backs up exact origin
+  ---
+  duration_ms: 15.899875
+  type: 'test'
+  ...
+# Subtest: known v1/v2/v3 layouts retain pending journals and compatibility; incompatible capture/keys require explicit migration
+ok 35 - known v1/v2/v3 layouts retain pending journals and compatibility; incompatible capture/keys require explicit migration
+  ---
+  duration_ms: 58.779833
+  type: 'test'
+  ...
+# Subtest: v4 keys round-trip NUL, lone surrogates, literal prefix, unknown roots and order through selected writes and portable restore
+ok 36 - v4 keys round-trip NUL, lone surrogates, literal prefix, unknown roots and order through selected writes and portable restore
+  ---
+  duration_ms: 35.991542
+  type: 'test'
+  ...
+# Subtest: unknown layouts, corrupt key markers, missing originals and failed migration readback hold without adopting a layout
+ok 37 - unknown layouts, corrupt key markers, missing originals and failed migration readback hold without adopting a layout
+  ---
+  duration_ms: 22.381
+  type: 'test'
+  ...
+# Subtest: contextMatches inherits exact resolver while arbitrary unbound copies still hold
+ok 38 - contextMatches inherits exact resolver while arbitrary unbound copies still hold
+  ---
+  duration_ms: 8.03675
+  type: 'test'
+  ...
+# Subtest: frozen projection reuses exact bytes, invalidates second-writer/dependency changes, and detects original corruption between reads
+ok 39 - frozen projection reuses exact bytes, invalidates second-writer/dependency changes, and detects original corruption between reads
+  ---
+  duration_ms: 51.033833
+  type: 'test'
+  ...
+# Subtest: projection cache eviction retains exact legacy frozen contract and failed-successor preview distinction
+ok 40 - projection cache eviction retains exact legacy frozen contract and failed-successor preview distinction
+  ---
+  duration_ms: 4.647458
+  type: 'test'
+  ...
+# Subtest: raw direct-source reads bind exact pointers and originals across another writer, including unsafe keys and corruption
+ok 41 - raw direct-source reads bind exact pointers and originals across another writer, including unsafe keys and corruption
+  ---
+  duration_ms: 12.063917
+  type: 'test'
+  ...
+# Subtest: explicit migration refuses a second-writer change after backup and keeps its exact source backup
+ok 42 - explicit migration refuses a second-writer change after backup and keeps its exact source backup
+  ---
+  duration_ms: 10.16225
+  type: 'test'
+  ...
+# Subtest: detectable old lossy identities hold rather than adopting a normalized substitute
+ok 43 - detectable old lossy identities hold rather than adopting a normalized substitute
+  ---
+  duration_ms: 7.35825
+  type: 'test'
+  ...
+# Subtest: pinned text preserves exact lone-surrogate hash encoding and Unicode range boundaries
+ok 44 - pinned text preserves exact lone-surrogate hash encoding and Unicode range boundaries
+  ---
+  duration_ms: 0.193708
+  type: 'test'
+  ...
+# Subtest: pending legacy handover context and ordinary delivery writes keep their inline storage contract
+ok 45 - pending legacy handover context and ordinary delivery writes keep their inline storage contract
+  ---
+  duration_ms: 4.865958
+  type: 'test'
+  ...
+# Subtest: a duplicate original hash cannot conceal conflicting reference shape metadata in extension slots
+ok 46 - a duplicate original hash cannot conceal conflicting reference shape metadata in extension slots
+  ---
+  duration_ms: 0.158792
+  type: 'test'
+  ...
+1..46
+# tests 46
+# suites 0
+# pass 46
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 832.669042

@@ -10,56 +10,10 @@ import {work} from '../plugins/soloco/runtime/worker.mjs';
 import {executionTiming} from '../plugins/soloco/runtime/timeout.mjs';
 import {buildLegacyCoherentPlan} from '../plugins/soloco/runtime/legacy-operating.mjs';
 import {governingRecords} from '../plugins/soloco/runtime/current-state.mjs';
-import {resolveSnapshot} from '../plugins/soloco/runtime/snapshot.mjs';
+import {resolveSnapshot,retainSnapshot} from '../plugins/soloco/runtime/snapshot.mjs';
 import * as scoped from '../plugins/soloco/runtime/scoped-context.mjs';
-const sha=x=>digest(JSON.stringify(x));
-const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'fictional-initial-homes-'));
-process.env.COMPANY_PLUGIN_DATA=path.join(tmp,'cache');
-test.after(()=>fs.rmSync(tmp,{recursive:true,force:true}));
-const read=f=>withStore(f.root,db=>db.read());
-const mutate=(f,fn)=>withStore(f.root,db=>db.transaction('fictional.fixture',s=>{fn(s);return s;}));
-const save=(f,args)=>call('company_save',{root:f.root,session_id:f.session_id,epoch:f.epoch,...args},'codex');
-const context=(f,args)=>call('company_context',{...f,protocol:scoped.SCOPED_PROTOCOL,...args},'codex');
-async function fixture(){
- const f={root:fs.mkdtempSync(path.join(tmp,'company-')),session_id:'fictional-owner',epoch:1,source_instruction:'FICTIONAL existing authorization: prepare proposed homes and read-only QA while paused; no execution.'};
- engine.bind(f.root,f.session_id,'codex');engine.open({...f,idea:'FICTIONAL mechanics only'},'codex');withStore(f.root,db=>db.migrate());
- mutate(f,s=>{s.paused=true;s.records.archive={id:'archive',kind:'artifact',revision:1,author_instance:'fictional-source-author',content:'UNKNOWN failed attempt. Remaining allowance ZERO. No execution; retain all negative outcomes.'};});
- const m=buildLegacyCoherentPlan(read(f));
- const partition={plan_sha256:m.plan_sha256,context_policy:scoped.CORPUS_PHYSICAL_CONTEXT,shared_selection_ids:['all'],selections:[{id:'all',scope:'*',occurrence_ids:m.occurrences.map(o=>o.id),incident_ids:[]}]};
- const p=await context(f,{action:'plan',source_id:'archive',selected_source_ids:['archive'],partitioner:scoped.CORPUS_PARTITIONER,semantic_partition:partition,batching_policy:scoped.CORPUS_INTRINSIC_BATCHING,home_intake_policy:scoped.INITIAL_PROPOSED_HOMES,maintenance:true});
- f.plan_id=p.id;return f;
-}
-function judgment(p){
- const r={...p.response_shape,verdict:'Pass',reason:'FICTIONAL SCRIPT: mechanics only; no native semantic QA.',permitted_action:p.phase==='integration'?'apply_scoped_context':'continue',preservation_complete:true,interfaces_complete:true,authority_checked:true,scope_complete:true,blockers:[]};
- if(p.phase==='extract'){
-  const b=p.reviewed_unit_bundle;r.unit_id=b.primary.id;r.unit_sha256=sha(b.primary);r.reviewed_unit_bundle_sha256=sha(b);
-  r.items=[{id:'coherent-occurrence',kind:'boundary',text:'UNKNOWN; failed outcome; ZERO allowance; no execution.',scope:'*',provenance:b.provenance_sha256,interfaces:[b.primary.required_interface]}];
- }else if(p.phase==='applicability'){
-  r.summary='FICTIONAL: full unknown and exhausted conditions retained; no permission.';
-  r.mappings=p.item_keys.map(item=>({item,selection_ids:p.mapping_selection_ids,source_set:p.mapping_sets.source_set,occurrence_set:p.mapping_sets.occurrence_set,context_sha256:p.mapping_context_sha256,typed_homes:p.typed_homes,conditions:'No execution; allowance ZERO.',unresolved_outcomes:'UNKNOWN failed outcome remains OPEN.',status:'represented',homes:p.homes.map(h=>h.source.id),reason:'FICTIONAL preservation judgment.'}));
-  r.interfaces=p.interface_keys.length?[]:p.extractions.flatMap(e=>e.result.items.map(i=>({key:e.review.id+'/'+i.id,item:i}))).filter(i=>p.item_keys.includes(i.key)).flatMap(({key,item})=>item.interfaces.map(i=>({key:key+'/'+i.id,item:key,scope:item.scope,...i})));
-  r.reviewed_interfaces=p.interface_keys;
- }else{r.summary='FICTIONAL independent aggregate; no execution.';r.unreviewed_interfaces=[];}
- return {content:r.reason,messages:[],notices:[],review:{verdict:r.verdict,reason:r.reason,permitted_action:r.permitted_action},qualification_result:r};
-}
-async function review(f,args,change,native){
- const target=await context(f,{action:'target',plan_id:f.plan_id,...args});if(target.reused)return target;
- const q=engine.dispatch({...f,role:'qa',review_of:target.id,task:'FICTIONAL scripted contract review'},'codex',{check:()=>({available:true,authenticated:true}),launch:()=>({on(){},unref(){}})});
- const chunks=[];let packet;
- await work(f.root,q.id,async(host,session,prompt,dir,timeout,selection,options)=>{
-  const now=Date.now();options.onSpawn(executionTiming(now,{timeout_ms:Math.min(timeout,options.executionDeadlineAt?options.executionDeadlineAt-now:timeout),timeout_reason:options.timeoutReason}));
-  let p=JSON.parse(prompt);const n=native??'fictional-independent-'+q.id;
-  if(p.protocol===scoped.SCOPED_STREAM){chunks.push(p.text);if(!p.final)return {native_id:n,text:JSON.stringify({scoped_stream_ack:{body_sha256:p.body_sha256,sequence:p.sequence,range_sha256:p.range_sha256}})};p=JSON.parse(chunks.join(''));}
-  if(p.protocol==='corpus-readable-structure-v1')p=scoped.expandCorpusStructure(p);packet=p;
-  const e=judgment(p);if(change)change(e,p);return {native_id:n,text:JSON.stringify(e)};
- });
- const s=read(f),job=s.jobs[q.id];return {target,job,record:s.records[job.artifact_id],packet};
-}
-const typed=()=>({version:1,kind:'permission',scope:'*',owner:'fictional-owner',conditions:'Proposed representation only; existing allowance ZERO.',exceptions:'Never authorizes execution.',clearing:'Independent review and existing authority required.',expires_at:null,dependencies:[],authority_refs:['archive'],evidence_refs:[],grant_refs:['archive'],remaining:0,revoked:true});
-async function home(f,id='home',expected_revision){const s=read(f),op=typed();op.evidence_refs=['archive'];return save(f,{id,...(expected_revision===undefined?{}:{expected_revision}),kind:'artifact',content:'UNKNOWN failed outcome; allowance ZERO; no execution.',operating_record:op,bootstrap_plan_id:f.plan_id});}
-async function extraction(f){const v=read(f).records[f.plan_id].scoped_context_plan;const es=[];for(const u of v.units){const e=await review(f,{phase:'extract',unit_id:u.id,delivery_protocol:scoped.SCOPED_STREAM});assert.equal(e.job.status,'completed',e.job.error);es.push(e);}return es;}
-const domainArgs=es=>({phase:'applicability',delivery_schema:scoped.CORPUS_PHASED_DELIVERY,delivery_protocol:scoped.SCOPED_STREAM,selection_ids:['all'],extraction_review_ids:es.map(e=>e.record.id),context_scope:'*'});
-async function aggregate(f,es,d){const a=domainArgs(es),i=await review(f,{...a,domain_review_ids:[d.record.id],interface_keys:d.record.qualification_result.interfaces.map(i=>i.key)});assert.equal(i.job.status,'completed',i.job.error);const final=await review(f,{phase:'integration',delivery_schema:scoped.CORPUS_PHASED_DELIVERY,delivery_protocol:scoped.SCOPED_STREAM,domain_review_ids:[d.record.id],interface_review_ids:[i.record.id]});assert.equal(final.job.status,'completed',final.job.error);await context(f,{action:'apply',integration_review_id:final.record.id});return final;}
+import {parseOutput} from '../plugins/soloco/runtime/adapters.mjs';
+import {sha,fixture,read,mutate,save,context,review,home,extraction,domainArgs,aggregate,typed,groupMarker,splitArgs,blockedJudgment,dispositions} from './support/scoped-home-fixture.mjs';
 
 test('FICTIONAL zero-home bootstrap uses real normalized-v4 intake and unchanged canonical extraction',async()=>{
  const f=await fixture(),s0=read(f),v=s0.records[f.plan_id].scoped_context_plan;assert.equal(Object.values(s0.records).filter(r=>r.operating_record).length,0);
@@ -87,7 +41,7 @@ test('FICTIONAL runtime provenance, complete inventory, immutable home revisions
 
 test('FICTIONAL Blocked home correction requires fresh independent exact negative disposition without re-extraction',async()=>{
  const f=await fixture(),es=await extraction(f);await home(f);const a=domainArgs(es);
- const blocked=await review(f,a,e=>{const r=e.qualification_result;r.verdict='Blocked';r.reason='FICTIONAL missing explicit clearing condition';r.permitted_action='hold';r.blockers=[r.reason];e.content=r.reason;e.review={verdict:r.verdict,reason:r.reason,permitted_action:r.permitted_action};});
+ const blocked=await review(f,a,e=>{const r=e.qualification_result;r.verdict='Blocked';r.reason='FICTIONAL missing explicit clearing condition';r.permitted_action='hold';r.blockers=[r.reason];if(r.items)r.items[0].text='FICTIONAL unresolved intrinsic extraction; no complete result claimed.';e.content=r.reason;e.review={verdict:r.verdict,reason:r.reason,permitted_action:r.permitted_action};});
  assert.equal(blocked.job.status,'completed',blocked.job.error);assert.equal(blocked.record.review.verdict,'Blocked');
  await assert.rejects(context(f,{action:'target',plan_id:f.plan_id,...a,repair_of:[blocked.record.id]}),/unchanged repair candidate/);
  const original=read(f).records.home;const op=structuredClone(original.operating_record);op.clearing='Explicit independent reconciliation of UNKNOWN effects; no allowance renewal.';
@@ -108,7 +62,7 @@ test('FICTIONAL Blocked home correction requires fresh independent exact negativ
  const reused=await review(f,{phase:'extract',unit_id:es[0].target.target.unit_id,delivery_protocol:scoped.SCOPED_STREAM});assert.equal(reused.review_id,es[0].record.id);
  // A second real worker result, journaled through the public pipeline, cannot
  // be cleared by naming only the first negative in another repair target.
- const second=await review(f,{...a,repair_of:[blocked.record.id]},e=>{const r=e.qualification_result;r.verdict='Blocked';r.reason='FICTIONAL separate unresolved distant condition';r.permitted_action='hold';r.blockers=[r.reason];e.content=r.reason;e.review={verdict:r.verdict,reason:r.reason,permitted_action:r.permitted_action};});
+ const second=await review(f,{...a,repair_of:[blocked.record.id]},e=>{const r=e.qualification_result;r.verdict='Blocked';r.reason='FICTIONAL separate unresolved distant condition';r.permitted_action='hold';r.blockers=[r.reason];if(r.items)r.items[0].text='FICTIONAL unresolved intrinsic extraction; no complete result claimed.';e.content=r.reason;e.review={verdict:r.verdict,reason:r.reason,permitted_action:r.permitted_action};});
  assert.equal(second.job.status,'completed',second.job.error);assert.equal(second.record.review.verdict,'Blocked');
  await assert.rejects(context(f,{action:'target',plan_id:f.plan_id,...a,repair_of:[blocked.record.id]}),/negative/);
  // Revalidation can encounter the new governing negative before its explicit negative gate.

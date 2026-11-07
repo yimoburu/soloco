@@ -1,0 +1,129 @@
+{
+  "schema": 1,
+  "kind": "fictional_corpus_encoding_speed_observation",
+  "baseline_commit": "3b9b4d14da5e7026307add4f7ad72b4e4429413b",
+  "candidate_commit": "91e8d9ec719295ba46fee53aed48d97e61a6d08b",
+  "environment": {
+    "version": "v22.23.2",
+    "arch": "arm64",
+    "platform": "darwin",
+    "executable_sha256": "18e387c90ab8a8400183e8bdd396376e1e875b91b4c874b894dcade7b35bf572",
+    "os_release_recorded_after_trials": "25.6.0"
+  },
+  "protocol": {
+    "workload": "tests/bootstrap-home-repair.test.mjs, --test-name-pattern=marked initial-home correction",
+    "node_flags": [
+      "--no-warnings",
+      "--cpu-prof",
+      "--test"
+    ],
+    "fixture_unchanged": true,
+    "fixtures_tests_base": "3b9b4d14da5e7026307add4f7ad72b4e4429413b",
+    "observations_per_source": 1,
+    "fixed_fixture_groups": 7,
+    "all_receipt_and_negative_assertions_retained": true,
+    "independent_native_execution": false
+  },
+  "source_identity": {
+    "profiled_candidate_rule": "Baseline tree plus exact retained source overlays. Later committed candidate removes an unused default parameter and adjusts comments only; parent integrated validation must run committed source.",
+    "overlays": [
+      {
+        "path": "plugins/soloco/runtime/scoped-stream.mjs",
+        "baseline_sha256": "ce983bf54dd63efc22f4ea11a77c398b262cf1183f6bbfc248ce6641b6ea14ff",
+        "profiled_candidate_file": "profiled-source/scoped-stream.mjs",
+        "profiled_candidate_sha256": "136686c937fbaf17da60626a4348163e2d75e4715983e6f76a6b8364be2880b5",
+        "committed_candidate_sha256": "7bc83d0f2a9852868553d913b126583946d159b502adef07938e38f90ad5f16a"
+      },
+      {
+        "path": "plugins/soloco/runtime/corpus-structure.mjs",
+        "baseline_sha256": "db63be6ae2504344c161fb512783f8940ed5f6f278dafa1f6cba16f63e71c8d8",
+        "profiled_candidate_file": "profiled-source/corpus-structure.mjs",
+        "profiled_candidate_sha256": "8d0d897b83616c73d8ff449ec1e07fafbd899602be80654f6cc0f1ae1b76f516",
+        "committed_candidate_sha256": "e17f389f3b86ab43551108a5c6edbc2d77d219609abf7ab00cff557fc9c9ad5b"
+      }
+    ]
+  },
+  "bootstrap_measurements": {
+    "baseline_ms": 124062.444792,
+    "candidate_ms": 102012.789083,
+    "observed_reduction_percent": 17.77303014297994,
+    "both_tests_passed": true
+  },
+  "profile_self_cpu_ms": {
+    "baseline": {
+      "buildScopedStream": 20517,
+      "encode_corpus_structure": 14995,
+      "hash_update": 15043
+    },
+    "candidate": {
+      "buildScopedStream": 19993,
+      "encode_corpus_structure": "below2113; outside top12",
+      "hash_update": 9535
+    }
+  },
+  "golden_wire_identity": {
+    "baseline_producer": "3b9b4d14da5e7026307add4f7ad72b4e4429413b",
+    "cases": "1/3/5/8-page complete streams, ASCII/escapes/astral/lone surrogate/CJK and48000-byte framing; plus reserved structural markers",
+    "test": "tests/scoped-encoding-performance.test.mjs",
+    "complete_baseline_hashes_preserved": true
+  },
+  "microbenchmark": {
+    "output": "microbenchmark.json",
+    "exact_full_output_equal": true,
+    "loops": 20,
+    "order": "ABBA",
+    "instrumentation": "Counters added around each module JSON.stringify and imported digest; function outputs compared by complete JSON bytes before timing.",
+    "fixture": "Stream: target ref + content pattern😀漢[quote][newline][backslash] repeated20000 + complete response_shape. Structure:30 sources,40KB semantic body and nested complete conclusions.",
+    "timings_are_pure_function_only": true
+  },
+  "limitations": [
+    "Single profiled slow-case observation per source; other tasks shared the host, so these are descriptive local observations, not a causal hosted-CI speed guarantee.",
+    "CPU profiling adds overhead. Cumulative source/test work and critical path differ from a full suite.",
+    "A separate encoding-cache prototype measured121892.14ms and was discarded; no persistent cache, source omission, fixture shrinking, timeout increase or weaker acceptance was retained.",
+    "Final integrated Node22 coverage belongs to the parent source candidate and is not inferred from these isolated observations."
+  ],
+  "retained": [
+    {
+      "path": "baseline-bootstrap.tap",
+      "sha256": "c6b6d8a5e748289f537c6683471a20320292a822889c25f1deaae176bfcdf9ff",
+      "bytes": 780
+    },
+    {
+      "path": "candidate-bootstrap.tap",
+      "sha256": "99debb3db56d4e4e3ca81f88f19676643c23ae86ad5cb24ed7cff6ab85994789",
+      "bytes": 780
+    },
+    {
+      "path": "microbenchmark.json",
+      "sha256": "9cbc5f5067b6ffbedae27455f22d014a773f65ae484c39e237fb2f5c4a73eead",
+      "bytes": 1077
+    },
+    {
+      "path": "golden-node22.tap",
+      "sha256": "e1d2fd833a0c769ff277c6ce1a089eb927949e2dab3df1f6e4a4ee531ec71249",
+      "bytes": 852
+    },
+    {
+      "path": "golden-node26.log",
+      "sha256": "231eb56a22655026dc73e3a0aff75efa0bac1166ea701b12191c0f45b59701c5",
+      "bytes": 427
+    },
+    {
+      "path": "complete-group-node22.tap",
+      "sha256": "05c022d2b02f317d07c95fde8b4d4356c21536833bc141b2d43cdfcbdcfeb817",
+      "bytes": 4252
+    }
+  ],
+  "complete_group_validation": {
+    "candidate_commit": "91e8d9ec719295ba46fee53aed48d97e61a6d08b",
+    "test_files": [
+      "tests/complete-group-extraction.test.mjs",
+      "tests/scoped-encoding-performance.test.mjs",
+      "tests/corpus-proof-delivery.test.mjs"
+    ],
+    "passed": 13,
+    "failed": 0,
+    "skipped": 0,
+    "duration_ms": 93750.058167
+  }
+}

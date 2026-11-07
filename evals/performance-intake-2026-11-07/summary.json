@@ -1,0 +1,46 @@
+{
+  "kind": "fictional_operating_intake_profile",
+  "baseline_commit": "3b9b4d14da5e7026307add4f7ad72b4e4429413b",
+  "candidate_files": {
+    "plugins/soloco/runtime/snapshot.mjs": {
+      "baseline_sha256": "f822adc27fe06921b73ee923e967c1d36af3528b2d22f3425cbccdbf8fd477c1",
+      "candidate_sha256": "660a89aa41ffed18f6358e33d7efaf2db96b0c7b5d6807ae4f2dce939d69f7fb"
+    },
+    "plugins/soloco/runtime/record-storage.mjs": {
+      "baseline_sha256": "c077f0f51f22d790ec534fc43c398f99ca31df31546939035c9dbaea866670fd",
+      "candidate_sha256": "fd91001c7ac8fe256e3ad1cbf7c888691d1000873bbbed3afc894cb789a17173"
+    },
+    "tests/storage-intake.test.mjs": {
+      "baseline_sha256": "170f2364efdc5b43cdddbd554440211094cd79c63d4536de173142d35bc70436",
+      "candidate_sha256": "ac0c317180f5bba2ac6a979539cc546a32767520789cc3a8dd6079b1799314f5"
+    },
+    "tests/operating-state.test.mjs": {
+      "baseline_sha256": "47236ec401115d4402c39dc61d2b6d03db1b5f07f13f2a82fb90fd72f9d76dd2",
+      "candidate_sha256": "47236ec401115d4402c39dc61d2b6d03db1b5f07f13f2a82fb90fd72f9d76dd2"
+    }
+  },
+  "node": "v22.23.2",
+  "case": "large prospective publication uses bounded frozen worker delivery and rejects a manufactured complete flag",
+  "command": [
+    "node",
+    "--no-warnings",
+    "--cpu-prof",
+    "--test",
+    "--test-name-pattern=large prospective publication uses bounded",
+    "tests/operating-state.test.mjs"
+  ],
+  "baseline_test_duration_ms": 31900.164667,
+  "candidate_test_duration_ms": 28060.000792,
+  "observed_reduction_fraction": 0.12038069129381535,
+  "focused_checks": {
+    "pass": 46,
+    "fail": 0,
+    "skipped": 0
+  },
+  "log_sha256": {
+    "baseline.tap": "1f3aa9b21dcfa7f9055e8a993281b752a2e9df45efda2bb458327a3fa079a87e",
+    "candidate.tap": "08620790f158671b18a2f20e12f921528b68584b287c603ef540cc3545c03467",
+    "focused.tap": "97f82980739316e31843c63692add77b3e2d184b3c654df3a919682f02dda1f1"
+  },
+  "limits": "One profiled observation each, on the same Node executable while other isolated profiling work could share this host. This describes the local fixture; no hosted CI speed guarantee, statistical latency claim or native semantic acceptance. Every complete source/receipt/failure check remains; no smaller fixture or timeout increase. CPU traces retained locally outside repository."
+}

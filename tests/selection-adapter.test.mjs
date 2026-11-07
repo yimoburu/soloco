@@ -69,7 +69,9 @@ test('installed-version capability predicate is conservative; inputs are synthet
 test('output observations do not infer requested, applied or effective settings',()=>{
   const codex=parseOutput('codex',[
     {type:'thread.started',thread_id:'thread-example'},
-    {type:'item.completed',item:{type:'agent_message',text:'artifact'},model:'claimed',service_tier:'priority'}
+    {type:'turn.started'},
+    {type:'item.completed',item:{type:'agent_message',text:'artifact'},model:'claimed',service_tier:'priority'},
+    {type:'turn.completed'}
   ].map(value=>JSON.stringify(value)).join('\n'));
   const claude=parseOutput('claude',JSON.stringify({subtype:'success',session_id:'session-example',result:'artifact',model:'claimed',effort:'high',service_tier:'priority'}));
   for(const result of [codex,claude]) {

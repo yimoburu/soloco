@@ -1,0 +1,64 @@
+{
+  "baseline_commit": "3b9b4d14da5e7026307add4f7ad72b4e4429413b",
+  "candidate_commit": "9f402ae2e318cf9255818ffe1bd4d7ba68d4d7c0",
+  "followup_commit": "7054734",
+  "metrics": {
+    "matched-baseline": {
+      "label": "contract double multi-million COMPLETE workflow; not native QA",
+      "source_utf16": 3360000,
+      "raw_bytes": 3612090,
+      "units": 429,
+      "reconciliation_nodes": 427,
+      "levels": 11,
+      "sessions": 857,
+      "max_full_prompt_bytes": 14592,
+      "aggregate_bytes": 6079,
+      "total_input_bytes": 8896959,
+      "total_output_bytes": 841152,
+      "retained_wire_bytes": 8896959,
+      "plan_bytes": 109745,
+      "logical_state_bytes": 17024657,
+      "elapsed_ms": 20885
+    },
+    "matched-candidate": {
+      "label": "contract double multi-million COMPLETE workflow; not native QA",
+      "source_utf16": 3360000,
+      "raw_bytes": 3612090,
+      "units": 429,
+      "reconciliation_nodes": 427,
+      "levels": 11,
+      "sessions": 857,
+      "max_full_prompt_bytes": 14592,
+      "aggregate_bytes": 6079,
+      "total_input_bytes": 8896959,
+      "total_output_bytes": 841152,
+      "retained_wire_bytes": 8896959,
+      "plan_bytes": 109745,
+      "logical_state_bytes": 17024657,
+      "elapsed_ms": 10792
+    }
+  },
+  "same_non_time_metrics": true,
+  "limitations": [
+    "Single local descriptive pair with other agent tasks sharing host; not a hosted-CI or statistical speed guarantee.",
+    "Measured full context/evidence suite73 pass zero skips before followup. Followup passes focused proxy/prototype/depth/bytecount and independence regressions; complete integration remains parent-owned."
+  ],
+  "logs": [
+    {
+      "file": "qualification-matched-baseline.tap",
+      "sha256": "f391d326d853a9cf8e217cee11550e51969e684868cd2581226f81c9c673b278"
+    },
+    {
+      "file": "qualification-matched-candidate.tap",
+      "sha256": "43d520ed303a81e12d084cc2398939b7ce82212f30c7d1ba1de1a075f5570c56"
+    },
+    {
+      "file": "qualification-full.tap",
+      "sha256": "a11b3b4a06dd8cb49fef430498bfa0e4fe556bd80b6c635de05711a7141659e8"
+    },
+    {
+      "file": "qualification-final-focused.tap",
+      "sha256": "0c0cfad1002c8e0c25f24591a9a6f2e2652f83209580c82d668ee628a0cd0aa5"
+    }
+  ]
+}

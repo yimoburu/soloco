@@ -214,8 +214,13 @@ export function operatingIntake(state,baseline) {
   try{return store.readSnapshot(()=>{
     const next=store.captureIntakeBaseline();
     const intake=store.readIntake(baseline??next,{values:true});
-    const current=store.readIntake(next,{values:true});
-    if(JSON.stringify(intake.cut)!==JSON.stringify(current.cut))throw Error('Operating state Held: storage intake capture/read cut changed');
+    // readIntake already validates the entire current end state, including all
+    // current immutable row bodies. Compare its cut with the independently
+    // captured baseline in this SAME read snapshot; a second read of the zero-
+    // event interval would repeat the same complete archive validation.
+    const {entries,sha256,...capturedCut}=next;
+    const keys=Object.keys(capturedCut).sort();
+    if(!intake.cut||JSON.stringify(keys)!==JSON.stringify(Object.keys(intake.cut).sort())||keys.some(key=>JSON.stringify(intake.cut[key])!==JSON.stringify(capturedCut[key])))throw Error('Operating state Held: storage intake capture/read cut changed');
     return {baseline:next,intake};
   });}finally{if(owned)store.close();}
 }

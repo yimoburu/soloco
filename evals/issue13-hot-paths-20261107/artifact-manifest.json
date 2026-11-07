@@ -1,0 +1,66 @@
+{
+  "tools/benchmark-storage-hot-paths.mjs": {
+    "sha256": "3646078603831c860cf36c2f9375e482215ba8b40fde0777cf8680a2fe1a4c33",
+    "bytes": 11475
+  },
+  "docs/issue13-hot-path-audit.md": {
+    "sha256": "4664429bebade7d263a51e81bf718246d16cbc12154110bb3d6e7816a2e8fe36",
+    "bytes": 9061
+  },
+  "evals/issue13-hot-paths-20261107/benchmark-comparison-source.mjs": {
+    "sha256": "10cf2b214f3ee2420541e00e290a96d4ba2df30654b2b7dbf1f494ffa05fb5f5",
+    "bytes": 10291
+  },
+  "evals/issue13-hot-paths-20261107/benchmark-initial-source.mjs": {
+    "sha256": "51016b146a63690c4db4aef1d8a3b5e8207beefcb7a3d7973104280be0090d9c",
+    "bytes": 9937
+  },
+  "evals/issue13-hot-paths-20261107/node22-0baab91-final.json": {
+    "sha256": "e191b5b9d33947e43749afe1cbee95e2b0100560c43aa20be73730508cab9562",
+    "bytes": 32266
+  },
+  "evals/issue13-hot-paths-20261107/node22-0baab91-final.stderr": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "evals/issue13-hot-paths-20261107/node22-0baab91.json": {
+    "sha256": "bfc511081853c4d3e87a8b7a262e72d97ba4471f9ba9f346928b7314223c86df",
+    "bytes": 30329
+  },
+  "evals/issue13-hot-paths-20261107/node22-0baab91.stderr": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "evals/issue13-hot-paths-20261107/node25-0baab91-final.json": {
+    "sha256": "53f92a354816f3dc324f16e5202f19c96734bbcedb8d7a824fbf7d3668056822",
+    "bytes": 32298
+  },
+  "evals/issue13-hot-paths-20261107/node25-0baab91-final.stderr": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "evals/issue13-hot-paths-20261107/node25-0baab91.json": {
+    "sha256": "37894fa335144743036caeb392caff5d18386baa8da5ee34604b1cb07d74ef1a",
+    "bytes": 30281
+  },
+  "evals/issue13-hot-paths-20261107/node25-0baab91.stderr": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "evals/issue13-hot-paths-20261107/node25-initial.json": {
+    "sha256": "94f21dc813a2beb1f6219d13888313ee7560d5991b8e33e7f2cceb73304c9c8c",
+    "bytes": 21936
+  },
+  "evals/issue13-hot-paths-20261107/node25-initial.stderr": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "evals/issue13-hot-paths-20261107/node25-main-minimal.json": {
+    "sha256": "03febd5245bebebe105c62f5ba44cf4184fc7958a57b0bd1e1314cc5bdba2639",
+    "bytes": 21960
+  },
+  "evals/issue13-hot-paths-20261107/node25-main-minimal.stderr": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  }
+}

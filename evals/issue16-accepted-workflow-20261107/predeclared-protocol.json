@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "kind": "matched_accepted_workflow",
+  "fixture": "independent-extraction-and-port-repair",
+  "criteria": {
+    "critical_false_acceptances": 0,
+    "all_expected_results_correct": true,
+    "noninferiority_margin_errors": 0,
+    "max_generation_attempts_per_arm": 2,
+    "max_native_calls_total": 8,
+    "latency_improvement_required": false
+  },
+  "comparison": "Serial extraction then repair versus concurrent extraction and repair. Same data, model controls, tests, QA and acceptance gates. Software harness chooses the schedule; this is not a model planning evaluation.",
+  "limitations": [
+    "Fictional small paired workload; no production quality, cost savings or natural founder-workload inference",
+    "One pair is descriptive; order and provider variance prevent causal latency or reliable tail claims",
+    "Original-source repair is required; later model repairs occur only after known deterministic test failure and within the fixed grant",
+    "Requested/applied settings are distinct from effective provider settings; missing observations remain unknown",
+    "Initial fixture setup and grant are synthetic test data, not actual-company or founder authorization",
+    "No detached autonomous scheduler claim; the harness calls real dispatch, worker, test and acceptance paths"
+  ]
+}

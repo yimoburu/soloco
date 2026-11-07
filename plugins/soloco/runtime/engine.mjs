@@ -279,7 +279,7 @@ export function dispatch(args,host,{launch=launchWorker,check=readiness,catalog=
   if (args.role==='runner') throw new Error('Choose a specialist role from company_open');
   binding(args,host);
   if(reviewWindow)withStore(args.root,db=>{const s=db.read();owner(s,args.session_id,host,args.epoch);if(!freshHandoverReviewEligible(s,args))throw Error('Review window is only for a fresh current paused streamed handover QA');});
-  withStore(args.root,db=>{const s=db.read();owner(s,args.session_id,host,args.epoch);if(args.model_selection!==undefined&&!['0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7','0.6.8','0.6.9','0.6.10','0.6.11','0.6.12','0.6.13','0.7.0','0.7.1','0.7.2','0.7.3',VERSION].includes(s.plugin_version))throw new Error('Explicitly adopt the model-selection team before using model_selection');});
+  withStore(args.root,db=>{const s=db.read();owner(s,args.session_id,host,args.epoch);if(args.model_selection!==undefined&&!['0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7','0.6.8','0.6.9','0.6.10','0.6.11','0.6.12','0.6.13','0.7.0','0.7.1','0.7.2','0.7.3','0.7.4',VERSION].includes(s.plugin_version))throw new Error('Explicitly adopt the model-selection team before using model_selection');});
   const inventory=args.model_selection?.mode==='explicit' || args.model_selection?.speed==='fast_disabled'?catalog(host):null;
   const selection=normalizeSelection(args.model_selection,host,inventory);
   const ready=check(host);
@@ -500,7 +500,7 @@ export function contextControl(args,host) {
     if(args.delivery_schema!==undefined||args.raw_review_ids!==undefined||args.action!=='plan'||args.protocol!==scoped.SCOPED_PROTOCOL||args.partitioner!==scoped.CORPUS_PARTITIONER)throw Error('Physical/batching policy requires an explicit scoped corpus plan');
     return scopedControl(args,host);
   }
-  if(args.current_home_inventory!==undefined||args.repair_of!==undefined||args.delivery_schema!==undefined||args.raw_review_ids!==undefined){
+  if(args.unit_selection_schema!==undefined||args.current_home_inventory!==undefined||args.repair_of!==undefined||args.delivery_schema!==undefined||args.raw_review_ids!==undefined){
     if(args.action!=='target'||args.protocol!==undefined&&args.protocol!==scoped.SCOPED_PROTOCOL)throw Error('Corpus delivery options require a new scoped target');
     return scopedControl(args,host);
   }

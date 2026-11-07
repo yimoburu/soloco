@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-import {hash,source,tapCounts,validateReceipt,compatibilityTests,laneCoverage,selectedTests} from '../tools/ci/evidence.mjs';
+import {hash,source,tapCounts,validateReceipt,compatibilityTests,qualificationTests,laneCoverage,selectedTests} from '../tools/ci/evidence.mjs';
 import {execute,run} from '../tools/ci/run.mjs';
 import {verify,unzip} from '../tools/ci/verify.mjs';
 const root=fileURLToPath(new URL('../',import.meta.url));
@@ -15,12 +15,13 @@ let serial=0;
 const directory=()=>fs.mkdtempSync(path.join(temp,`case-${serial++}-`));
 const sha='a'.repeat(40),tree='b'.repeat(40),manifest='c'.repeat(64);
 const trustedBodies={'tools/ci/evidence.mjs':'approved evidence validator','tools/ci/gate.mjs':'approved gate','tools/ci/run.mjs':'approved runner','tools/ci/verify.mjs':'approved transitive gate helper'};
-const expected={repository:'fictional/repository',run:123,attempt:2,commit:sha,tree,workflow:'.github/workflows/ci.yml',workflowSha:sha,workflowSha256:hash('approved workflow'),trustedFiles:Object.fromEntries(Object.entries(trustedBodies).map(([p,b])=>[p,hash(b)])),gate:'CI gate',lanes:[{lane:'build',job:'Build and drift',labels:['ubuntu-24.04']},{lane:'tests-22',job:'Tests Node 22',labels:['macos-15']},{lane:'compatibility-26',job:'Compatibility Node 26',labels:['macos-15']}]};
+const expected={repository:'fictional/repository',run:123,attempt:2,commit:sha,tree,workflow:'.github/workflows/ci.yml',workflowSha:sha,workflowSha256:hash('approved workflow'),trustedFiles:Object.fromEntries(Object.entries(trustedBodies).map(([p,b])=>[p,hash(b)])),gate:'CI gate',lanes:[{lane:'build',job:'Build and drift',labels:['ubuntu-24.04']},{lane:'regression-22',job:'Tests Node 22',labels:['macos-15']},{lane:'compatibility-26',job:'Compatibility Node 26',labels:['macos-15']}]};
 const fixture=directory();fs.mkdirSync(path.join(fixture,'tests'));fs.writeFileSync(path.join(fixture,'tests/ci-evidence.test.mjs'),"import test from 'node:test';import assert from 'node:assert/strict';test('fictional arithmetic',()=>assert.equal(2+2,4));\n");
 const actual=await execute(fixture,fixture,'tests',process.execPath,['--no-warnings','--test','--test-concurrency=4','--test-reporter=tap','tests/ci-evidence.test.mjs']);
-function receipt(lane='compatibility-26') {
+function receipt(lane='compatibility-26',configuration=expected) {
   const out=directory();for(const stream of ['stdout','stderr'])fs.copyFileSync(path.join(fixture,actual[stream].file),path.join(out,actual[stream].file));
-  const r={schema:2,lane,coverage:laneCoverage(lane),test_inventory:selectedTests(lane,compatibilityTests),mode:'github',before:{commit:sha,tree,manifest,dirty:false},after:{commit:sha,tree,manifest,dirty:false},inventory:[...compatibilityTests],node:lane==='compatibility-26'?'v26.0.0':'v22.0.0',platform:lane==='build'?'linux':'darwin',arch:'arm64',os_release:'fictional-kernel',runner_image:{os:'fictional-image',version:'fixture'},sandbox:{supported:true,backend:'macos-seatbelt-node'},github:{...expected},checks:[structuredClone(actual)]};
+  const selected=selectedTests(lane,compatibilityTests);
+  const r={schema:3,lane,coverage:laneCoverage(lane),test_inventory:selected,omitted_test_inventory:compatibilityTests.filter(file=>!selected.includes(file)),mode:'github',before:{commit:sha,tree,manifest,dirty:false},after:{commit:sha,tree,manifest,dirty:false},inventory:[...compatibilityTests],node:lane==='compatibility-26'?'v26.0.0':'v22.0.0',platform:lane==='build'?'linux':'darwin',arch:'arm64',os_release:'fictional-kernel',runner_image:{os:'fictional-image',version:'fixture'},sandbox:{supported:true,backend:'macos-seatbelt-node'},github:{...configuration},checks:[structuredClone(actual)]};
   if(lane!=='build')r.checks[0].argv=[process.execPath,'--no-warnings','--test','--test-concurrency=4','--test-reporter=tap',...r.test_inventory];
   if(lane==='build')r.checks=['build','diff'].map(name=>{const c=structuredClone(actual);c.name=name;c.argv=name==='build'?[process.execPath,'tools/build-plugin.mjs','--check']:['git','diff','--check'];c.timeout_ms=120000;delete c.tap;for(const stream of ['stdout','stderr']){c[stream]={file:`${name}.${stream}.log`,sha256:hash('')};fs.writeFileSync(path.join(out,c[stream].file),'');}return c;});
   return {r,out};
@@ -48,19 +49,19 @@ test('source identities catch dirty and changed fictional source; artifacts cann
 });
 // A tiny stored ZIP producer for deterministic API doubles, never a provenance source.
 function zip(files){let offset=0;const locals=[],central=[];for(const [name,data] of files){const n=Buffer.from(name),b=Buffer.from(data),l=Buffer.alloc(30),c=Buffer.alloc(46);l.writeUInt32LE(0x04034b50);l.writeUInt16LE(20,4);l.writeUInt32LE(b.length,18);l.writeUInt32LE(b.length,22);l.writeUInt16LE(n.length,26);c.writeUInt32LE(0x02014b50);c.writeUInt16LE(20,6);c.writeUInt32LE(b.length,20);c.writeUInt32LE(b.length,24);c.writeUInt16LE(n.length,28);c.writeUInt32LE(offset,42);locals.push(l,n,b);central.push(c,n);offset+=l.length+n.length+b.length;}const cd=Buffer.concat(central),end=Buffer.alloc(22);end.writeUInt32LE(0x06054b50);end.writeUInt16LE(files.length,8);end.writeUInt16LE(files.length,10);end.writeUInt32LE(cd.length,12);end.writeUInt32LE(offset,16);return Buffer.concat([...locals,cd,end]);}
-function remote(modify=()=>{}){
-  const state={run:{id:123,run_attempt:2,repository:{full_name:expected.repository},head_sha:sha,path:expected.workflow,status:'completed',conclusion:'success',event:'push'},files:{...trustedBodies},jobs:[],artifacts:[],archives:new Map(),logs:Buffer.from('fictional GitHub job log')};
-  for(const [i,lane] of expected.lanes.entries()){
+function remote(modify=()=>{},configuration=expected){
+  const state={run:{id:123,run_attempt:2,repository:{full_name:configuration.repository},head_sha:sha,path:configuration.workflow,status:'completed',conclusion:'success',event:'push'},files:{...trustedBodies},jobs:[],artifacts:[],archives:new Map(),logs:Buffer.from('fictional GitHub job log')};
+  for(const [i,lane] of configuration.lanes.entries()){
     state.jobs.push({id:i+1,name:lane.job,run_id:123,run_attempt:2,status:'completed',conclusion:'success',runner_name:'fictional-host',labels:lane.labels,html_url:`https://github.com/fictional/repository/actions/runs/123/job/${i+1}`});
-    const {r,out}=receipt(lane.lane);fs.writeFileSync(path.join(out,'receipt.json'),JSON.stringify(r));const archive=zip(fs.readdirSync(out).map(n=>[n,fs.readFileSync(path.join(out,n))]));state.archives.set(i+1,archive);state.artifacts.push({id:i+1,name:`source-ci-123-2-${lane.lane}`,expired:false,digest:`sha256:${hash(archive)}`,workflow_run:{id:123,head_sha:sha}});
+    const {r,out}=receipt(lane.lane,configuration);fs.writeFileSync(path.join(out,'receipt.json'),JSON.stringify(r));const archive=zip(fs.readdirSync(out).map(n=>[n,fs.readFileSync(path.join(out,n))]));state.archives.set(i+1,archive);state.artifacts.push({id:i+1,name:`source-ci-123-2-${lane.lane}`,expired:false,digest:`sha256:${hash(archive)}`,workflow_run:{id:123,head_sha:sha}});
   }
-  state.jobs.push({id:4,name:'CI gate',run_id:123,run_attempt:2,status:'completed',conclusion:'success'});modify(state);
+  if(configuration.gate)state.jobs.push({id:4,name:configuration.gate,run_id:123,run_attempt:2,status:'completed',conclusion:'success'});modify(state);
   const seen=[];
-  const request=async(endpoint)=>{seen.push(endpoint);if(endpoint.endsWith('/attempts/2'))return state.run;if(endpoint.includes('/git/commits/'))return {tree:{sha:tree}};if(endpoint.includes('/git/trees/'))return {truncated:false,tree:compatibilityTests.map(path=>({path}))};if(endpoint.includes('/contents/')){const file=endpoint.split('/contents/')[1].split('?')[0];return {encoding:'base64',content:Buffer.from(file===expected.workflow?'approved workflow':state.files[file]).toString('base64')};}if(endpoint.includes('/jobs?'))return {jobs:state.jobs,total_count:state.jobs.length};if(endpoint.includes('/artifacts?'))return {artifacts:state.artifacts,total_count:state.artifacts.length};if(endpoint.endsWith('/zip'))return state.archives.get(Number(endpoint.split('/').at(-2)));if(endpoint.endsWith('/logs'))return state.logs;throw Error(`unexpected endpoint ${endpoint}`);};
+  const request=async(endpoint)=>{seen.push(endpoint);if(endpoint.endsWith('/attempts/2'))return state.run;if(endpoint.includes('/git/commits/'))return {tree:{sha:tree}};if(endpoint.includes('/git/trees/'))return {truncated:false,tree:compatibilityTests.map(path=>({path}))};if(endpoint.includes('/contents/')){const file=endpoint.split('/contents/')[1].split('?')[0];return {encoding:'base64',content:Buffer.from(file===configuration.workflow?'approved workflow':state.files[file]).toString('base64')};}if(endpoint.includes('/jobs?'))return {jobs:state.jobs,total_count:state.jobs.length};if(endpoint.includes('/artifacts?'))return {artifacts:state.artifacts,total_count:state.artifacts.length};if(endpoint.endsWith('/zip'))return state.archives.get(Number(endpoint.split('/').at(-2)));if(endpoint.endsWith('/logs'))return state.logs;throw Error(`unexpected endpoint ${endpoint}`);};
   return {request,seen};
 }
 test('remote verifier owns attempt-specific retrieval and binds artifacts, exact logs and counts',async()=>{
-  const {request,seen}=remote();const out=directory();const result=await verify(expected,out,request);assert.match(result.claims.join(' '),/full Node 22 suite and targeted Node 26 compatibility/);assert.equal(result.coverage.find(x=>x.lane==='compatibility-26').coverage,'compatibility');assert.equal(result.coverage.find(x=>x.lane==='tests-22').coverage,'full');assert.equal(result.provenance,'github-api-run-attempt');assert.equal(result.coverage.length,3);assert.ok(seen.some(s=>s.includes('/attempts/2/jobs?')));assert.ok(fs.existsSync(path.join(out,'verified.json')));assert.ok(result.retained.every(r=>r.sha256.length===64));
+  const {request,seen}=remote();const out=directory();const result=await verify(expected,out,request);assert.match(result.claims.join(' '),/Node 22 regression selection and targeted Node 26 compatibility/);assert.equal(result.coverage.find(x=>x.lane==='compatibility-26').coverage,'compatibility');assert.equal(result.coverage.find(x=>x.lane==='regression-22').coverage,'regression');assert.equal(result.provenance,'github-api-run-attempt');assert.equal(result.coverage.length,3);assert.ok(seen.some(s=>s.includes('/attempts/2/jobs?')));assert.ok(fs.existsSync(path.join(out,'verified.json')));assert.ok(result.retained.every(r=>r.sha256.length===64));
 });
 test('remote verifier rejects wrong run/source/workflow/attempt and unavailable or failed required lanes',async()=>{
   const modifications=[s=>s.run.id++,s=>s.run.run_attempt--,s=>s.run.head_sha='d'.repeat(40),s=>s.run.path='other.yml',s=>s.run.event='pull_request',s=>s.jobs.pop(),s=>s.jobs.push(s.jobs[0]),s=>s.jobs[0].run_attempt--,...['skipped','failure','cancelled'].map(value=>s=>s.jobs[0].conclusion=value),s=>s.jobs[0].labels=['wrong-host'],s=>s.artifacts.pop(),s=>s.artifacts.push(s.artifacts[0]),s=>s.artifacts[0].expired=true,s=>s.artifacts[0].name='source-ci-123-1-build',s=>s.artifacts[0].digest=`sha256:${'0'.repeat(64)}`,s=>s.logs=Buffer.alloc(0)];
@@ -113,7 +114,7 @@ test('fixed compatibility policy retains full inventory and cannot claim full or
   assert.deepEqual(selectedTests('compatibility-26',full),compatibilityTests);
   assert.throws(()=>selectedTests('compatibility-26',full.slice(1)),/missing compatibility/);
   assert.throws(()=>selectedTests('tests-25',full),/unknown fixed lane/);
-  for(const lane of ['tests-22','compatibility-26']) {
+  for(const lane of ['regression-22','compatibility-26']) {
     const {r,out}=receipt(lane);assert.equal(valid(r,out).coverage,laneCoverage(lane));
     r.test_inventory=r.test_inventory.slice(1);assert.throws(()=>valid(r,out),/selected test inventory/);
   }
@@ -150,4 +151,44 @@ test('stream forwarding failures retain the error and close the child',async()=>
   const result=await execute(out,out,'forwarding',process.execPath,['-e',"process.stdout.write('retained');setInterval(()=>{},1000);"],{timeout_ms:2000,onOutput:()=>{throw Error('fixture forwarding failure');}});
   assert.match(result.error,/could not retain\/stream stdout: fixture forwarding failure/);assert.notEqual(result.signal,null);
   assert.equal(fs.readFileSync(path.join(out,result.stdout.file),'utf8'),'retained');
+});
+
+
+test('regression selects every new fast file and explicitly inventories every excluded qualification file',()=>{
+  const all=[...new Set([...compatibilityTests,...qualificationTests,'tests/new-regression.test.mjs'])].sort();
+  const selected=selectedTests('regression-22',all),omitted=all.filter(file=>!selected.includes(file));
+  assert.deepEqual(omitted,qualificationTests);
+  assert(selected.includes('tests/new-regression.test.mjs'));
+  for(const core of ['tests/task-runtime.test.mjs','tests/storage-intake.test.mjs','tests/storage-transfer-integrity.test.mjs','tests/local-sandbox.test.mjs'])assert(selected.includes(core));
+  assert.deepEqual(selectedTests('tests-22',all),all);
+  const {r,out}=receipt('regression-22');r.inventory=all;r.test_inventory=selected;r.omitted_test_inventory=omitted;r.checks[0].argv=[process.execPath,'--no-warnings','--test','--test-concurrency=4','--test-reporter=tap',...selected];
+  const check=()=>validateReceipt(r,out,{...expected,lane:r.lane,inventory:all});
+  assert.equal(check().coverage,'regression');
+  r.omitted_test_inventory=[];assert.throws(check,/omitted/);r.omitted_test_inventory=omitted;
+  r.coverage='full';assert.throws(check,/coverage/);r.coverage='regression';
+  r.schema=2;assert.throws(check,/schema/);
+});
+
+test('full qualification verifies its own workflow and all tests without pretending to satisfy the PR regression gate',async()=>{
+  const configuration={...expected,workflow:'.github/workflows/qualification.yml',gate:null,lanes:[{lane:'tests-22',job:'Full qualification Node 22',labels:['macos-15']}]};
+  const {request}=remote(()=>{},configuration),result=await verify(configuration,directory(),request);
+  assert.equal(result.coverage.length,1);assert.equal(result.coverage[0].coverage,'full');assert.deepEqual(result.coverage[0].omitted_test_inventory,[]);
+  assert.match(result.claims.join(' '),/full Node 22 qualification/);assert(!result.claims.includes('build/generated drift'),'tests-only qualification cannot claim build validation');
+  const wrong=remote(()=>{},configuration);await assert.rejects(verify({...configuration,workflow:expected.workflow},directory(),wrong.request),/required lanes/);
+  const {r,out}=receipt('tests-22',configuration);r.test_inventory=r.test_inventory.slice(1);
+  assert.throws(()=>validateReceipt(r,out,{...configuration,lane:'tests-22',inventory:r.inventory}),/selected test inventory/);
+});
+
+
+test('runner surfaces sandbox preflight failure before any test command starts',async()=>{
+  const repo=directory();fs.mkdirSync(path.join(repo,'tests'));fs.mkdirSync(path.join(repo,'plugins/soloco/runtime'),{recursive:true});
+  fs.writeFileSync(path.join(repo,'tests/a.test.mjs'),'');
+  fs.writeFileSync(path.join(repo,'plugins/soloco/runtime/local-sandbox.mjs'),"export const sandboxCapability=()=>({supported:false,backend:null,blocker:'Fictional otool ETIMEDOUT preflight'});\n");
+  for(const args of [['init'],['add','.'],['-c','user.name=Fiction','-c','user.email=fiction@example.invalid','commit','-m','fixture']])assert.equal(spawnSync('git',args,{cwd:repo}).status,0);
+  const out=directory(),error=console.error,observed=[];console.error=message=>observed.push(message);
+  try{assert.equal(await run('regression-22',out,repo),1);}finally{console.error=error;}
+  const r=JSON.parse(fs.readFileSync(path.join(out,'receipt.json')));
+  assert.equal(r.checks.length,0);assert.match(r.error,/actual macOS Seatbelt/);
+  assert.match(r.sandbox.blocker,/Fictional otool ETIMEDOUT/);
+  assert(observed.some(message=>message.includes('Fictional otool ETIMEDOUT')),'preflight cause was hidden from the workflow console');
 });

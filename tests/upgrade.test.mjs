@@ -592,7 +592,7 @@ else {
  const resumeAt=a.indexOf('--resume');
  const native=claude?(resumeAt>=0?a[resumeAt+1]:randomUUID()):(a[1]==='resume'?a[a.length-2]:randomUUID());
  if(claude)console.log(JSON.stringify({subtype:'success',session_id:native,result:text}));
- else {console.log(JSON.stringify({type:'thread.started',thread_id:native}));console.log(JSON.stringify({type:'item.completed',item:{type:'agent_message',text}}));}
+ else {console.log(JSON.stringify({type:'thread.started',thread_id:native}));console.log(JSON.stringify({type:'turn.started'}));console.log(JSON.stringify({type:'item.completed',item:{type:'agent_message',text}}));console.log(JSON.stringify({type:'turn.completed'}));}
 }
 `;
   for(const name of ['codex','claude'])fs.writeFileSync(path.join(bin,name),source,{mode:0o700});

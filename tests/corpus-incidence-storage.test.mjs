@@ -23,7 +23,7 @@ test.after(()=>fs.rmSync(tmp,{recursive:true,force:true}));
 function replaceFunction(code,start,end,value){return code.slice(0,code.indexOf(start))+value+code.slice(code.indexOf(end));}
 async function load(old=false){
  let code=currentSource;
- if(old){code=replaceFunction(code,'function captureCorpus(','function corpusUnit(',incoming.capture);code=replaceFunction(code,'function plan(','function coherentUnit(',incoming.plan);code=replaceFunction(code,'function corpusClaim(','function corpusCensus(',incoming.claim);}
+ if(old){code=replaceFunction(code,'function captureCorpus(','function corpusSelection(',incoming.capture);code=replaceFunction(code,'function plan(','function coherentUnit(',incoming.plan);code=replaceFunction(code,'function corpusClaim(','function corpusCensus(',incoming.claim);}
  code=code.replace(/from '(\.\/[^']+)'/g,(_m,p)=>"from '"+new URL(p,runtime).href+"'");
  code+='\nexport {plan as checked,corpusIncidence as relation,corpusClaim as claim,corpusIdentity as identity,validateCorpusIncidenceCoverage as coverage};\n';
  const file=path.join(tmp,old?'incoming.mjs':'current.mjs');fs.writeFileSync(file,code);return import(pathToFileURL(file).href);

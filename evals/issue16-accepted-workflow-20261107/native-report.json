@@ -1,0 +1,791 @@
+{
+  "protocol": {
+    "version": 1,
+    "kind": "matched_accepted_workflow",
+    "fixture": "independent-extraction-and-port-repair",
+    "criteria": {
+      "critical_false_acceptances": 0,
+      "all_expected_results_correct": true,
+      "noninferiority_margin_errors": 0,
+      "max_generation_attempts_per_arm": 2,
+      "max_native_calls_total": 8,
+      "latency_improvement_required": false
+    },
+    "comparison": "Serial extraction then repair versus concurrent extraction and repair. Same data, model controls, tests, QA and acceptance gates. Software harness chooses the schedule; this is not a model planning evaluation.",
+    "limitations": [
+      "Fictional small paired workload; no production quality, cost savings or natural founder-workload inference",
+      "One pair is descriptive; order and provider variance prevent causal latency or reliable tail claims",
+      "Original-source repair is required; later model repairs occur only after known deterministic test failure and within the fixed grant",
+      "Requested/applied settings are distinct from effective provider settings; missing observations remain unknown",
+      "Initial fixture setup and grant are synthetic test data, not actual-company or founder authorization",
+      "No detached autonomous scheduler claim; the harness calls real dispatch, worker, test and acceptance paths"
+    ]
+  },
+  "source_identity": {
+    "base_revision": "9c0cb8a9d40da42242787b1bbaacfa11ba37acdc",
+    "files": [
+      {
+        "path": "plugins/soloco/.claude-plugin/plugin.json",
+        "sha256": "b4852228ca35d3c4071bb2b5c394d47e95bafc476628f3cb89fe784f3de2a348"
+      },
+      {
+        "path": "plugins/soloco/.codex-plugin/plugin.json",
+        "sha256": "2b9145dd76050e0ce5de52196218ac4f53c95fc7b09f3b4997b5ecaa14f58106"
+      },
+      {
+        "path": "plugins/soloco/.mcp.codex.json",
+        "sha256": "d5ca22ea60a6dd6c74778cf67d4e51ca50a0a4a9e91e434852c26c08418db9aa"
+      },
+      {
+        "path": "plugins/soloco/.mcp.json",
+        "sha256": "b6efeebb4f8ed3b045b82f584c2f1a91b172e0994c819a56b87e4069324ae81d"
+      },
+      {
+        "path": "plugins/soloco/assets/governance.md",
+        "sha256": "28f99838abc3794da94f97f7a2d234554811da3aef7b8ddb3742075caa78ec36"
+      },
+      {
+        "path": "plugins/soloco/assets/roles.json",
+        "sha256": "7e9f4f387f3622123fe8dbd69dd3cf0aa17943628d71ff03971d4ab4a8abd7ba"
+      },
+      {
+        "path": "plugins/soloco/compat/company-0.1.0.md",
+        "sha256": "bb6c3dbb6e7a03d033b7c39dccc59c31738369ffccc4fe6ff609d679e0eacc74"
+      },
+      {
+        "path": "plugins/soloco/hooks/claude.json",
+        "sha256": "128ecd4ef0c0ef53dc1a4634c65b2a1be39973096eaabaeebc3e784ebec53d5f"
+      },
+      {
+        "path": "plugins/soloco/hooks/codex.json",
+        "sha256": "882fce45b5791f8f51b2093526419fa6ab4ae2a118e597a20dc7c3b8112205a2"
+      },
+      {
+        "path": "plugins/soloco/runtime/adapters.mjs",
+        "sha256": "475401b8504b7cf8db0ef7bab303bd9c92360d2b7a9adbd011fd891c18c31e55"
+      },
+      {
+        "path": "plugins/soloco/runtime/context-qualification.mjs",
+        "sha256": "3b9d92ebe22753f66b2de2fb9a1abfa9fb61c68c63653faaf3e3f083a2301692"
+      },
+      {
+        "path": "plugins/soloco/runtime/context.mjs",
+        "sha256": "8df76482f6db00dadbe56c35a6d1486d40dab8512f410c3293b5279f0a216812"
+      },
+      {
+        "path": "plugins/soloco/runtime/coordination.mjs",
+        "sha256": "06644b7bfb7950aa971c380eb685a22dab6b9304f02083f80cd41eb2611adb3a"
+      },
+      {
+        "path": "plugins/soloco/runtime/corpus-structure.mjs",
+        "sha256": "db63be6ae2504344c161fb512783f8940ed5f6f278dafa1f6cba16f63e71c8d8"
+      },
+      {
+        "path": "plugins/soloco/runtime/current-state.mjs",
+        "sha256": "8c7d9cdfea55e8452d2b4dc0c1f50a6126bb895e6d6255334f21f18fbccc3893"
+      },
+      {
+        "path": "plugins/soloco/runtime/develop.mjs",
+        "sha256": "fb676390f8dd8c19b8d50f22d5ebbdb363071795d9a00f77808c3116343bad4c"
+      },
+      {
+        "path": "plugins/soloco/runtime/development-limits.mjs",
+        "sha256": "fb6b6065019c652fc27a198994cca3a248652890df5d322a9b6428ba5ccfea6a"
+      },
+      {
+        "path": "plugins/soloco/runtime/development-patch.mjs",
+        "sha256": "a36bbefb6c28579a33d97709aabcf80fbde95520a6fd1a4a02e687bba11dd27d"
+      },
+      {
+        "path": "plugins/soloco/runtime/engine.mjs",
+        "sha256": "1ff19a632f84fc9ebbcb662787fcb277062be65d64d323baca6a0c8598afee0d"
+      },
+      {
+        "path": "plugins/soloco/runtime/handover.mjs",
+        "sha256": "6aa9e0b4d0178d105006b58b2b4cc5ff6c52388cd1915704d8edc4549add1fe9"
+      },
+      {
+        "path": "plugins/soloco/runtime/hooks.mjs",
+        "sha256": "bca847d64e40213667712d4852c2774607fddbd962a5311ccf03521a885ce21d"
+      },
+      {
+        "path": "plugins/soloco/runtime/legacy-operating.mjs",
+        "sha256": "47fca09ae9e6fefe48dbf922a6538818d856579c3fae64e8cfc5f0fd203e8f2d"
+      },
+      {
+        "path": "plugins/soloco/runtime/local-sandbox.mjs",
+        "sha256": "efd0b036036393cb3a09939fedde0d647301fcd517693296ae5b01d023d0dcdd"
+      },
+      {
+        "path": "plugins/soloco/runtime/main.mjs",
+        "sha256": "c75bdbe247e434ae08dce4371104e2eb52689ef7b3d97558646f4c200856a47a"
+      },
+      {
+        "path": "plugins/soloco/runtime/operating-control.mjs",
+        "sha256": "47e2a0c8b15128ea6f39b7bfc14cb6adc385b90b132c9df8e16d9274abbdd35d"
+      },
+      {
+        "path": "plugins/soloco/runtime/operating-state.mjs",
+        "sha256": "824143bc9035dbf4426850979d24413fd9c54e87c0845b4f1324f06befd0c664"
+      },
+      {
+        "path": "plugins/soloco/runtime/progress-view.mjs",
+        "sha256": "bbcea8afc8760d365ac84f395e3cafb07aa26a06bf12f71b670fe7a9d08ad839"
+      },
+      {
+        "path": "plugins/soloco/runtime/progress.mjs",
+        "sha256": "977ed14281cf7de7054babb75d953a5dc6bbf7c319e1fba3e81eeffce6812080"
+      },
+      {
+        "path": "plugins/soloco/runtime/prototype.mjs",
+        "sha256": "1635fed46a13f60eb8ddd3ad2311a286e2af78e2264f054d07f38e85593ae855"
+      },
+      {
+        "path": "plugins/soloco/runtime/public-response.mjs",
+        "sha256": "77af7e1b1ee429b8925d1ec7e857577840b61981ec8be7a0764ddb6b663cedf3"
+      },
+      {
+        "path": "plugins/soloco/runtime/record-storage.mjs",
+        "sha256": "ca765aa931bb546aa65f7e499f69535725bf535c80f1ac4b222e63affe54ca3a"
+      },
+      {
+        "path": "plugins/soloco/runtime/scoped-context.mjs",
+        "sha256": "da00c8e0ee174444e47ffb93b4c745ca4c75f24ae4211187f5dfe1e61700c83a"
+      },
+      {
+        "path": "plugins/soloco/runtime/scoped-stream.mjs",
+        "sha256": "ce983bf54dd63efc22f4ea11a77c398b262cf1183f6bbfc248ce6641b6ea14ff"
+      },
+      {
+        "path": "plugins/soloco/runtime/selection.mjs",
+        "sha256": "55505fa53d69b28aed8394a291ad5473fcecff9f4d4b8b01ed3b397b26015214"
+      },
+      {
+        "path": "plugins/soloco/runtime/snapshot.mjs",
+        "sha256": "f822adc27fe06921b73ee923e967c1d36af3528b2d22f3425cbccdbf8fd477c1"
+      },
+      {
+        "path": "plugins/soloco/runtime/storage-transfer.mjs",
+        "sha256": "2ea96610ab528d61471ee35c0482fb62b76be090f5f7bd22cc2489486a8155c3"
+      },
+      {
+        "path": "plugins/soloco/runtime/store.mjs",
+        "sha256": "29c7b7d6bd0f33a7c599a672de0655db34ab5d7459f3495ba96092ce84e908f9"
+      },
+      {
+        "path": "plugins/soloco/runtime/timeout.mjs",
+        "sha256": "586c5f44f98742320119f0b42d0612dd79cf970f4e858f05e7d65953c31951a4"
+      },
+      {
+        "path": "plugins/soloco/runtime/upgrade-evidence.mjs",
+        "sha256": "14b809e88cb4a380829e6bb6ab9feceefc7582db230b0e8dcc70bed3b7b70e21"
+      },
+      {
+        "path": "plugins/soloco/runtime/upgrade.mjs",
+        "sha256": "0a4e15abaf0cea312d9161d8c8081258da0bcf0c064f9cbb01c6e88d92e3f26e"
+      },
+      {
+        "path": "plugins/soloco/runtime/validation-cache.mjs",
+        "sha256": "872415f42c63e015d159e5374d45b6de453dd7e8a873eb7f70473e6395b4354d"
+      },
+      {
+        "path": "plugins/soloco/runtime/worker.mjs",
+        "sha256": "ba259d337a6d7af6a0802dd07a996c4adf944151d042379993f623860422e5be"
+      },
+      {
+        "path": "plugins/soloco/scripts/run.sh",
+        "sha256": "128358b0c3d5b3f95b1584b3bcac9c8db23df86171a063591e1fd7e965b0c59b"
+      },
+      {
+        "path": "plugins/soloco/skills/setup/SKILL.md",
+        "sha256": "414a5d4acae2a47cf7dceb8a30f61cc9b6887c2b8885c3b1e03f4737b3d55761"
+      },
+      {
+        "path": "plugins/soloco/skills/soloco/SKILL.md",
+        "sha256": "73b394cfae54b5669388fb592b023eca45ab27231e45c99f8169c5598cf3bb35"
+      },
+      {
+        "path": "SPEC.md",
+        "sha256": "28f99838abc3794da94f97f7a2d234554811da3aef7b8ddb3742075caa78ec36"
+      },
+      {
+        "path": "tests/accepted-workflow-eval.test.mjs",
+        "sha256": "e0ce716ac98ce30362181757a2825e1e3deea52b9ffaf8175eef254bcbe3299c"
+      },
+      {
+        "path": "tools/accepted-workflow-eval.mjs",
+        "sha256": "bbbdbe9fb2e5015480763318f9e276daa80702b7b2f5be0c1abca07e113bcb14"
+      },
+      {
+        "path": "tools/workflow-runtime.mjs",
+        "sha256": "d57c3849562dd4d486f8b3b21262c0108f39ea311b7eafdb950f2666b59808b5"
+      }
+    ],
+    "manifest_sha256": "f868ec8308a839b30be8943269ad48a0366bb70f5c547c968acf953f4b305ab9",
+    "node": {
+      "version": "v25.2.1",
+      "platform": "darwin",
+      "arch": "arm64",
+      "executable_sha256": "bb58c2a105f2ffd1bb80daa85231aad0d9e8ffdaef067bd32f5677ab4b98924f"
+    }
+  },
+  "execution": "native_cli",
+  "arms": [
+    {
+      "mode": "serial",
+      "execution": "native_cli",
+      "fixture_sha256": "84dba485cc6539ec5eaa4bb628d2bc7e37788715fe9d119f83d0b3086fe59763",
+      "selections": {
+        "research": {
+          "mode": "explicit",
+          "model": "gpt-6.1-sol",
+          "effort": "low",
+          "speed": "host_default",
+          "reason": "Exact fictional extraction with deterministic acceptance; same choice in both matched schedules."
+        },
+        "engineer": {
+          "mode": "explicit",
+          "model": "gpt-6.1-sol",
+          "effort": "medium",
+          "speed": "host_default",
+          "reason": "Bounded pure parser repair with immutable executed tests; same choice in both schedules."
+        },
+        "qa": {
+          "mode": "explicit",
+          "model": "gpt-6.1-sol",
+          "effort": "high",
+          "speed": "host_default",
+          "reason": "Independent exact-candidate acceptance and seeded boundary review; same choice in both schedules."
+        }
+      },
+      "events": [
+        {
+          "type": "dispatch",
+          "at_ms": 8.998290999999881,
+          "role": "research",
+          "job_id": "job-84739528-d42f-4244-87a4-0418d151270e",
+          "control_ms": 8.649207999999817
+        },
+        {
+          "type": "returned",
+          "at_ms": 4959.241791,
+          "role": "research",
+          "job_id": "job-84739528-d42f-4244-87a4-0418d151270e",
+          "artifact_id": "artifact-3ed0ef72-de64-4184-9a58-25167e3089d5"
+        },
+        {
+          "type": "dispatch",
+          "at_ms": 4966.618083,
+          "role": "engineer",
+          "job_id": "job-f518aff0-a3fb-4664-9708-3e8299d1e889",
+          "control_ms": 7.1950419999993755
+        },
+        {
+          "type": "returned",
+          "at_ms": 13492.526915999999,
+          "role": "engineer",
+          "job_id": "job-f518aff0-a3fb-4664-9708-3e8299d1e889",
+          "artifact_id": "artifact-c4327816-6e25-4aa1-a7b1-6a290c4259cf"
+        },
+        {
+          "type": "tests_queued",
+          "at_ms": 13496.560666000001,
+          "job_id": "test-e9c503e0-1351-4485-8611-e7d0ccad2060"
+        },
+        {
+          "type": "tests_returned",
+          "at_ms": 15495.452083,
+          "attempt": 1,
+          "status": "passed"
+        },
+        {
+          "type": "dispatch",
+          "at_ms": 15499.378083,
+          "role": "qa",
+          "job_id": "job-d2ae9b0e-6c3a-44c1-8c5b-e44ab80de74b",
+          "control_ms": 3.7722500000018044
+        },
+        {
+          "type": "returned",
+          "at_ms": 32165.453333,
+          "role": "qa",
+          "job_id": "job-d2ae9b0e-6c3a-44c1-8c5b-e44ab80de74b",
+          "artifact_id": "artifact-20cf402e-2def-436b-95d5-513db815beb1"
+        },
+        {
+          "type": "receiver_accepted",
+          "at_ms": 32170.028457999997,
+          "candidate_sha256": "8601475456a461966195695a111b19cfe261778d50bb6a4f307b51e6f7d61496",
+          "receipt_sha256": "d9a0442f3f408e03ec102b0271b22bd959078a2c025c00c0567cd0a4f6c6b1fa"
+        }
+      ],
+      "calls": [
+        {
+          "role": "research",
+          "job_id": "job-84739528-d42f-4244-87a4-0418d151270e",
+          "prompt_bytes": 21219,
+          "prompt_sha256": "1e9e1d32b4397a60ccd0c05f928fefa773aaf80cc48d04090acd80c058450689",
+          "started_ms": 22.77500000000009,
+          "requested": {
+            "mode": "explicit",
+            "model": "gpt-6.1-sol",
+            "effort": "low",
+            "reason": "Exact fictional extraction with deterministic acceptance; same choice in both matched schedules.",
+            "speed": "host_default"
+          },
+          "native_id": "6aacf23b40b32211ea1b48105055be5c0a0b7d023b27a7893cb82b8a56d388ca",
+          "output_bytes": 317,
+          "output_sha256": "dc6d05637e6755a0c87d1950fea6d43b7b6838375e10d1b51c18ec234104b611",
+          "model_evidence": {
+            "reported_models": [],
+            "reported_effort": null,
+            "reported_service_tier": null,
+            "applied_controls": {
+              "model": "gpt-6.1-sol",
+              "effort": "low",
+              "service_tier": null,
+              "fast_mode": null,
+              "switch_models_on_flag": null,
+              "scope": "child_launch_argv",
+              "verification": "applied_controls_not_effective_settings"
+            },
+            "source": "exec_json",
+            "scope": "assignment",
+            "verification": "unverified"
+          },
+          "duration_ms": 4928.273499999999
+        },
+        {
+          "role": "engineer",
+          "job_id": "job-f518aff0-a3fb-4664-9708-3e8299d1e889",
+          "prompt_bytes": 25593,
+          "prompt_sha256": "235df70843d3f1dfd3c2ce3525feeebc87f7692b69bca7dc16fc9ee5ece4b0c7",
+          "started_ms": 4974.844208,
+          "requested": {
+            "mode": "explicit",
+            "model": "gpt-6.1-sol",
+            "effort": "medium",
+            "reason": "Bounded pure parser repair with immutable executed tests; same choice in both schedules.",
+            "speed": "host_default"
+          },
+          "native_id": "6686f10c6dabe39e0ad3d6984acc80bb41e755d9ac256dc926bccab5818c0bf6",
+          "output_bytes": 571,
+          "output_sha256": "03a738f25964d8d733855af20e945b492ce5dc7753e3c51655998448fc8189a4",
+          "model_evidence": {
+            "reported_models": [],
+            "reported_effort": null,
+            "reported_service_tier": null,
+            "applied_controls": {
+              "model": "gpt-6.1-sol",
+              "effort": "medium",
+              "service_tier": null,
+              "fast_mode": null,
+              "switch_models_on_flag": null,
+              "scope": "child_launch_argv",
+              "verification": "applied_controls_not_effective_settings"
+            },
+            "source": "exec_json",
+            "scope": "assignment",
+            "verification": "unverified"
+          },
+          "duration_ms": 8512.459167
+        },
+        {
+          "role": "qa",
+          "job_id": "job-d2ae9b0e-6c3a-44c1-8c5b-e44ab80de74b",
+          "prompt_bytes": 31632,
+          "prompt_sha256": "5e0dea73f713da399f9aab89b7cbbb4f4028c6ed53a4661e1807ae519c04deb1",
+          "started_ms": 15502.514916,
+          "requested": {
+            "mode": "explicit",
+            "model": "gpt-6.1-sol",
+            "effort": "high",
+            "reason": "Independent exact-candidate acceptance and seeded boundary review; same choice in both schedules.",
+            "speed": "host_default"
+          },
+          "native_id": "7b05535792855924e7da86de0ae7c550383993760d6567d6dd7b978b494ab5af",
+          "output_bytes": 1571,
+          "output_sha256": "d74f8f5d4eacbba7bd8cdb8a8ea25e25fe5feac33ea59c3ea9fa4947a391b0e5",
+          "model_evidence": {
+            "reported_models": [],
+            "reported_effort": null,
+            "reported_service_tier": null,
+            "applied_controls": {
+              "model": "gpt-6.1-sol",
+              "effort": "high",
+              "service_tier": null,
+              "fast_mode": null,
+              "switch_models_on_flag": null,
+              "scope": "child_launch_argv",
+              "verification": "applied_controls_not_effective_settings"
+            },
+            "source": "exec_json",
+            "scope": "assignment",
+            "verification": "unverified"
+          },
+          "duration_ms": 16658.1835
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 1,
+          "candidate_id": "artifact-c4327816-6e25-4aa1-a7b1-6a290c4259cf",
+          "candidate_sha256": "8601475456a461966195695a111b19cfe261778d50bb6a4f307b51e6f7d61496",
+          "test_job_id": "test-e9c503e0-1351-4485-8611-e7d0ccad2060",
+          "test_status": "completed",
+          "receipt_id": "test-receipt-0218091f-394e-4292-aa5a-a665ef644e0b",
+          "receipt_sha256": "d9a0442f3f408e03ec102b0271b22bd959078a2c025c00c0567cd0a4f6c6b1fa",
+          "result": {
+            "status": "passed",
+            "exit_code": 0,
+            "signal": null,
+            "stdout": "TAP version 13\n# Subtest: valid boundaries and leading zeroes\nok 1 - valid boundaries and leading zeroes\n  ---\n  duration_ms: 0.440625\n  type: 'test'\n  ...\n# Subtest: reject invalid values\nok 2 - reject invalid values\n  ---\n  duration_ms: 0.0915\n  type: 'test'\n  ...\n1..2\n# tests 2\n# suites 0\n# pass 2\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 6.939791\n",
+            "stderr": "",
+            "duration_ms": 456,
+            "isolation": "macos-seatbelt-node",
+            "test_execution_attempted": true,
+            "tests_executed": true,
+            "output_truncated": false,
+            "limits": {
+              "timeout_ms": 5000,
+              "max_output_bytes": 20000
+            },
+            "candidate_sha256": "8601475456a461966195695a111b19cfe261778d50bb6a4f307b51e6f7d61496",
+            "test_paths": [
+              "port.test.mjs"
+            ],
+            "timeout_ms": 5000,
+            "max_output_bytes": 20000,
+            "finished_at": "2026-11-07T05:51:10.820Z"
+          },
+          "test_elapsed_ms": 2002.788125000001
+        }
+      ],
+      "accepted": true,
+      "errors": [],
+      "founder_requests": [],
+      "precheck": {
+        "status": "failed",
+        "exit_code": 1,
+        "tests_executed": true
+      },
+      "extraction_correct": true,
+      "review": {
+        "id": "artifact-20cf402e-2def-436b-95d5-513db815beb1",
+        "review_of": {
+          "id": "test-receipt-0218091f-394e-4292-aa5a-a665ef644e0b",
+          "revision": 1
+        },
+        "native_id": "7b05535792855924e7da86de0ae7c550383993760d6567d6dd7b978b494ab5af",
+        "author_native_id": "6686f10c6dabe39e0ad3d6984acc80bb41e755d9ac256dc926bccab5818c0bf6",
+        "verdict": "Pass",
+        "candidate_sha256": "8601475456a461966195695a111b19cfe261778d50bb6a4f307b51e6f7d61496",
+        "receipt_sha256": "d9a0442f3f408e03ec102b0271b22bd959078a2c025c00c0567cd0a4f6c6b1fa"
+      },
+      "acceptance": {
+        "at": "2026-11-07T05:51:27.501Z",
+        "review_id": "artifact-20cf402e-2def-436b-95d5-513db815beb1",
+        "candidate_sha256": "8601475456a461966195695a111b19cfe261778d50bb6a4f307b51e6f7d61496",
+        "receipt_sha256": "d9a0442f3f408e03ec102b0271b22bd959078a2c025c00c0567cd0a4f6c6b1fa",
+        "source_integrated": false
+      },
+      "founder_notices": [],
+      "elapsed_ms": 32170.858458,
+      "metrics": {
+        "model_calls": 3,
+        "generation_attempts": 1,
+        "repairs": 0,
+        "failed_test_attempts": 0,
+        "founder_requests": 0,
+        "founder_requests_basis": "Software harness needs-attention events; no natural founder behavior measured",
+        "decision_required_notices": 0,
+        "prompt_bytes": 78444,
+        "output_bytes": 2459,
+        "control_path_max_ms": 8.649207999999817
+      },
+      "original_source_unchanged": true
+    },
+    {
+      "mode": "concurrent",
+      "execution": "native_cli",
+      "fixture_sha256": "84dba485cc6539ec5eaa4bb628d2bc7e37788715fe9d119f83d0b3086fe59763",
+      "selections": {
+        "research": {
+          "mode": "explicit",
+          "model": "gpt-6.1-sol",
+          "effort": "low",
+          "speed": "host_default",
+          "reason": "Exact fictional extraction with deterministic acceptance; same choice in both matched schedules."
+        },
+        "engineer": {
+          "mode": "explicit",
+          "model": "gpt-6.1-sol",
+          "effort": "medium",
+          "speed": "host_default",
+          "reason": "Bounded pure parser repair with immutable executed tests; same choice in both schedules."
+        },
+        "qa": {
+          "mode": "explicit",
+          "model": "gpt-6.1-sol",
+          "effort": "high",
+          "speed": "host_default",
+          "reason": "Independent exact-candidate acceptance and seeded boundary review; same choice in both schedules."
+        }
+      },
+      "events": [
+        {
+          "type": "dispatch",
+          "at_ms": 2.844666999997571,
+          "role": "research",
+          "job_id": "job-62fc3a02-2f57-4d24-898d-eab50d1367c4",
+          "control_ms": 2.824790999999095
+        },
+        {
+          "type": "dispatch",
+          "at_ms": 10.261958000002778,
+          "role": "engineer",
+          "job_id": "job-48d6bd4a-dafa-453a-b781-91f0efbc90ce",
+          "control_ms": 3.543707999997423
+        },
+        {
+          "type": "returned",
+          "at_ms": 5206.473082999997,
+          "role": "research",
+          "job_id": "job-62fc3a02-2f57-4d24-898d-eab50d1367c4",
+          "artifact_id": "artifact-31a1b8c0-a000-4269-843d-626041ada7b9"
+        },
+        {
+          "type": "returned",
+          "at_ms": 8884.955458000004,
+          "role": "engineer",
+          "job_id": "job-48d6bd4a-dafa-453a-b781-91f0efbc90ce",
+          "artifact_id": "artifact-3bc19efe-d17f-4c96-adcc-f361000ae323"
+        },
+        {
+          "type": "tests_queued",
+          "at_ms": 8888.502832999999,
+          "job_id": "test-1d953ff6-352b-480b-bbbf-18b40bab9a49"
+        },
+        {
+          "type": "tests_returned",
+          "at_ms": 11763.827083000004,
+          "attempt": 1,
+          "status": "passed"
+        },
+        {
+          "type": "dispatch",
+          "at_ms": 11767.885416999998,
+          "role": "qa",
+          "job_id": "job-b317341c-f46c-4e60-8db6-8777aea9ead2",
+          "control_ms": 3.861665999997058
+        },
+        {
+          "type": "returned",
+          "at_ms": 26791.170041999998,
+          "role": "qa",
+          "job_id": "job-b317341c-f46c-4e60-8db6-8777aea9ead2",
+          "artifact_id": "artifact-8f67f050-57fc-4964-8bc9-9fc62a5634f2"
+        },
+        {
+          "type": "receiver_accepted",
+          "at_ms": 26796.502792,
+          "candidate_sha256": "19b00b6e7af7ebfcea939a578a8df8d5dc11326ede03b51fa5c0ba6d8ac25d60",
+          "receipt_sha256": "eee23505876064221d084bf848a6315dd6d139499dacf4f450de67e24b75a262"
+        }
+      ],
+      "calls": [
+        {
+          "role": "research",
+          "job_id": "job-62fc3a02-2f57-4d24-898d-eab50d1367c4",
+          "prompt_bytes": 21219,
+          "prompt_sha256": "5fdbd762738be1a82e0c7621ad0d7b0cdcc80b72c76976a6d74f93cbe90a4f76",
+          "started_ms": 5.081917000003159,
+          "requested": {
+            "mode": "explicit",
+            "model": "gpt-6.1-sol",
+            "effort": "low",
+            "reason": "Exact fictional extraction with deterministic acceptance; same choice in both matched schedules.",
+            "speed": "host_default"
+          },
+          "native_id": "30aa6a39b81a8562adf7a2923160e5a5e9e80f175851c863748d5510491f5b9a",
+          "output_bytes": 317,
+          "output_sha256": "dc6d05637e6755a0c87d1950fea6d43b7b6838375e10d1b51c18ec234104b611",
+          "model_evidence": {
+            "reported_models": [],
+            "reported_effort": null,
+            "reported_service_tier": null,
+            "applied_controls": {
+              "model": "gpt-6.1-sol",
+              "effort": "low",
+              "service_tier": null,
+              "fast_mode": null,
+              "switch_models_on_flag": null,
+              "scope": "child_launch_argv",
+              "verification": "applied_controls_not_effective_settings"
+            },
+            "source": "exec_json",
+            "scope": "assignment",
+            "verification": "unverified"
+          },
+          "duration_ms": 5197.662583999998
+        },
+        {
+          "role": "engineer",
+          "job_id": "job-48d6bd4a-dafa-453a-b781-91f0efbc90ce",
+          "prompt_bytes": 25598,
+          "prompt_sha256": "c8c32d56f865d776397b6c4b88a2e257ec087e90d0ae0ee5afa36f4dc119938f",
+          "started_ms": 13.412374999999884,
+          "requested": {
+            "mode": "explicit",
+            "model": "gpt-6.1-sol",
+            "effort": "medium",
+            "reason": "Bounded pure parser repair with immutable executed tests; same choice in both schedules.",
+            "speed": "host_default"
+          },
+          "native_id": "331e2deb46e5275fe86e5fdcf4e3e5c84f6cd55fcb4528549a42fedf02257dfe",
+          "output_bytes": 594,
+          "output_sha256": "5bfe87aeb8dd3e1881744c60ffd16b1b9fb0ec16f429df5f790eaf77a928da93",
+          "model_evidence": {
+            "reported_models": [],
+            "reported_effort": null,
+            "reported_service_tier": null,
+            "applied_controls": {
+              "model": "gpt-6.1-sol",
+              "effort": "medium",
+              "service_tier": null,
+              "fast_mode": null,
+              "switch_models_on_flag": null,
+              "scope": "child_launch_argv",
+              "verification": "applied_controls_not_effective_settings"
+            },
+            "source": "exec_json",
+            "scope": "assignment",
+            "verification": "unverified"
+          },
+          "duration_ms": 8866.428292000004
+        },
+        {
+          "role": "qa",
+          "job_id": "job-b317341c-f46c-4e60-8db6-8777aea9ead2",
+          "prompt_bytes": 31663,
+          "prompt_sha256": "0f8d5ebf9d52abc895a4422b237feed008c99840cbfe02d9bf167eb4dc3d1a00",
+          "started_ms": 11770.730875000001,
+          "requested": {
+            "mode": "explicit",
+            "model": "gpt-6.1-sol",
+            "effort": "high",
+            "reason": "Independent exact-candidate acceptance and seeded boundary review; same choice in both schedules.",
+            "speed": "host_default"
+          },
+          "native_id": "6dca3ce52fb3833a6bf40f1624ed8f1ee02974388c56c65261aae9ec52d82355",
+          "output_bytes": 1485,
+          "output_sha256": "c39fcb8955021b186f01a8f0ee8982c648da8aeaa52baa91b4d4e46de57dabc3",
+          "model_evidence": {
+            "reported_models": [],
+            "reported_effort": null,
+            "reported_service_tier": null,
+            "applied_controls": {
+              "model": "gpt-6.1-sol",
+              "effort": "high",
+              "service_tier": null,
+              "fast_mode": null,
+              "switch_models_on_flag": null,
+              "scope": "child_launch_argv",
+              "verification": "applied_controls_not_effective_settings"
+            },
+            "source": "exec_json",
+            "scope": "assignment",
+            "verification": "unverified"
+          },
+          "duration_ms": 15015.276542
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 1,
+          "candidate_id": "artifact-3bc19efe-d17f-4c96-adcc-f361000ae323",
+          "candidate_sha256": "19b00b6e7af7ebfcea939a578a8df8d5dc11326ede03b51fa5c0ba6d8ac25d60",
+          "test_job_id": "test-1d953ff6-352b-480b-bbbf-18b40bab9a49",
+          "test_status": "completed",
+          "receipt_id": "test-receipt-66383b50-4682-49b5-a72d-a0dd89720ced",
+          "receipt_sha256": "eee23505876064221d084bf848a6315dd6d139499dacf4f450de67e24b75a262",
+          "result": {
+            "status": "passed",
+            "exit_code": 0,
+            "signal": null,
+            "stdout": "TAP version 13\n# Subtest: valid boundaries and leading zeroes\nok 1 - valid boundaries and leading zeroes\n  ---\n  duration_ms: 0.3885\n  type: 'test'\n  ...\n# Subtest: reject invalid values\nok 2 - reject invalid values\n  ---\n  duration_ms: 0.086083\n  type: 'test'\n  ...\n1..2\n# tests 2\n# suites 0\n# pass 2\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 7.490333\n",
+            "stderr": "",
+            "duration_ms": 522,
+            "isolation": "macos-seatbelt-node",
+            "test_execution_attempted": true,
+            "tests_executed": true,
+            "output_truncated": false,
+            "limits": {
+              "timeout_ms": 5000,
+              "max_output_bytes": 20000
+            },
+            "candidate_sha256": "19b00b6e7af7ebfcea939a578a8df8d5dc11326ede03b51fa5c0ba6d8ac25d60",
+            "test_paths": [
+              "port.test.mjs"
+            ],
+            "timeout_ms": 5000,
+            "max_output_bytes": 20000,
+            "finished_at": "2026-11-07T05:51:39.793Z"
+          },
+          "test_elapsed_ms": 2878.6891659999965
+        }
+      ],
+      "accepted": true,
+      "errors": [],
+      "founder_requests": [],
+      "precheck": {
+        "status": "failed",
+        "exit_code": 1,
+        "tests_executed": true
+      },
+      "extraction_correct": true,
+      "review": {
+        "id": "artifact-8f67f050-57fc-4964-8bc9-9fc62a5634f2",
+        "review_of": {
+          "id": "test-receipt-66383b50-4682-49b5-a72d-a0dd89720ced",
+          "revision": 1
+        },
+        "native_id": "6dca3ce52fb3833a6bf40f1624ed8f1ee02974388c56c65261aae9ec52d82355",
+        "author_native_id": "331e2deb46e5275fe86e5fdcf4e3e5c84f6cd55fcb4528549a42fedf02257dfe",
+        "verdict": "Pass",
+        "candidate_sha256": "19b00b6e7af7ebfcea939a578a8df8d5dc11326ede03b51fa5c0ba6d8ac25d60",
+        "receipt_sha256": "eee23505876064221d084bf848a6315dd6d139499dacf4f450de67e24b75a262"
+      },
+      "acceptance": {
+        "at": "2026-11-07T05:51:54.845Z",
+        "review_id": "artifact-8f67f050-57fc-4964-8bc9-9fc62a5634f2",
+        "candidate_sha256": "19b00b6e7af7ebfcea939a578a8df8d5dc11326ede03b51fa5c0ba6d8ac25d60",
+        "receipt_sha256": "eee23505876064221d084bf848a6315dd6d139499dacf4f450de67e24b75a262",
+        "source_integrated": false
+      },
+      "founder_notices": [],
+      "elapsed_ms": 26797.490667,
+      "metrics": {
+        "model_calls": 3,
+        "generation_attempts": 1,
+        "repairs": 0,
+        "failed_test_attempts": 0,
+        "founder_requests": 0,
+        "founder_requests_basis": "Software harness needs-attention events; no natural founder behavior measured",
+        "decision_required_notices": 0,
+        "prompt_bytes": 78480,
+        "output_bytes": 2396,
+        "control_path_max_ms": 3.861665999997058
+      },
+      "original_source_unchanged": true
+    }
+  ],
+  "assessment": {
+    "passed": true,
+    "quality_errors": 0,
+    "serial_ms": 32170.858458,
+    "concurrent_ms": 26797.490667,
+    "descriptive_only": true,
+    "causal_speedup_established": false
+  }
+}

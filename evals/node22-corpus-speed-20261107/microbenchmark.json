@@ -1,0 +1,52 @@
+{
+  "runtime": "v22.23.2",
+  "loops": 20,
+  "order": "ABBA",
+  "scope": "Pure fictional microbenchmark; not end-to-end acceptance or hosted CI speed",
+  "reports": [
+    {
+      "name": "scoped-stream",
+      "exact_output_equal": true,
+      "baseline_counts": {
+        "hashes": 145,
+        "json": 129
+      },
+      "candidate_counts": {
+        "hashes": 17,
+        "json": 129
+      },
+      "samples_ms_per_call": {
+        "baseline": [
+          14.397785399999998,
+          14.26026665
+        ],
+        "candidate": [
+          11.02077295,
+          11.172664549999997
+        ]
+      }
+    },
+    {
+      "name": "corpus-structure",
+      "exact_output_equal": true,
+      "baseline_counts": {
+        "hashes": 1,
+        "json": 287
+      },
+      "candidate_counts": {
+        "hashes": 1,
+        "json": 255
+      },
+      "samples_ms_per_call": {
+        "baseline": [
+          0.5181375000000003,
+          0.48555000000000065
+        ],
+        "candidate": [
+          0.2098333499999967,
+          0.17525420000000622
+        ]
+      }
+    }
+  ]
+}

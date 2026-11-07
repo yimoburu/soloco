@@ -1,0 +1,22 @@
+TAP version 13
+# FICTIONAL marked home: parent retained
+# FICTIONAL marked home: complete children
+# FICTIONAL marked home: domain negative retained
+# FICTIONAL marked home: independent corrected domain
+# FICTIONAL marked home: independent interface and final
+# Subtest: FICTIONAL marked initial-home correction retains mixed negatives through independent whole-vector apply
+ok 1 - FICTIONAL marked initial-home correction retains mixed negatives through independent whole-vector apply
+  ---
+  duration_ms: 101799.306833
+  type: 'test'
+  ...
+# {"fictional_only":true,"groups":7,"initial_homes":0,"applied":true,"actual_native_qualification":null,"source_acceptance":false}
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 102012.789083

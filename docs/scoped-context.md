@@ -633,3 +633,36 @@ not a current acceptance verdict.
 The initial-home publication lifecycle covers storage wrapping of an exact frozen original after extraction, with separate original and stored-envelope validation. An `immutable_entry` already present before coherent capture retains an explicit canonical-admission Hold: the derived coherent projection is not accepted as a raw storage wrapper. This retained limitation is tested; a passing post-extraction lifecycle does not qualify that earlier-capture shape. Actual-record applicability and native semantic fit must be checked separately.
 
 Initial-home publication validates the exact runtime-bound home plan and its frozen extraction identity against the accepted corpus proof. Distinct plan records created through `corpus_plan_id` can share that identity; exact home, capsule, original, receipt and stored-envelope checks remain mandatory.
+
+Prospective complete-group decomposition uses target marker
+`unit_selection_schema: "complete-group-ranges-v1"` with intrinsic 96KB corpus
+batching. It preserves the frozen capsule, extraction identity, incidence and
+physical partition. `body-batch-N/gA-B` names a nonempty proper half-open interval
+of the original batch's ordered groups. Integers have canonical decimal spelling;
+whole intervals use the parent ID. Further splits use absolute original positions.
+Sections, cuts and STRING evidence remain whole. An indivisible group's complete
+result exceeding the unchanged 12KB limit remains Held. Requests remain bounded
+at 48KB and the existing shared native deadline remains at most 600 seconds.
+
+Every consumer of marked split evidence must bind the marker. Primary receipts
+must cover each frozen group exactly once at whole-vector interface and final
+validation; supporting context gives no primary credit. Gaps, overlaps and
+parent-plus-child coverage Hold. Complete results from every contributing receipt
+remain mandatory, including extra items from multi-group children. Context,
+ancestors, incoming originals, unknown references and current homes still require
+independent reconciliation. Reuse requires the exact primary and ordered context
+bundle; no parent receipt becomes child evidence.
+
+Marked decomposition uses existing `repair_of`, `repair_evidence` and
+`repair_dispositions`. Exact prior extraction negatives remain retained with their
+original target, bundle, native delivery and spent limits. Proper material child
+splitting is required; unchanged parent retries Hold. Extraction and selected
+context domain continuation carry pending parent counterevidence and cannot clear
+it. Whole-vector interface and final reviewers each independently disposition the
+actual blockers, with software additionally requiring exact replacement coverage.
+Rejected failed or expired evidence requires its original output, delivery,
+native/timing and termination evidence; missing wire or unknown outcomes Hold.
+Unrelated negatives still Hold. No allowance, authorization or revoked plan is
+renewed. Capsule reuse continues to validate current ordinary membership, homes,
+authority, notices, producers and negatives. These source mechanics establish no
+semantic acceptance or measured native fit.

@@ -186,7 +186,7 @@ test('adapters preserve explicit native IDs without permission bypass flags',()=
   assert.ok(commandArgs('codex','native-123').includes('native-123'));
   assert.ok(commandArgs('claude','native-123').includes('--resume'));
   assert.ok(!JSON.stringify(commandArgs('codex')).includes('dangerously'));
-  const parsed=parseOutput('codex','{"type":"thread.started","thread_id":"n"}\n{"type":"item.completed","item":{"type":"agent_message","text":"ok"}}');
+  const parsed=parseOutput('codex','{"type":"thread.started","thread_id":"n"}\n{"type":"turn.started"}\n{"type":"item.completed","item":{"type":"agent_message","text":"ok"}}\n{"type":"turn.completed"}');
   assert.equal(parsed.native_id,'n');assert.equal(parsed.text,'ok');assert.equal(parsed.model_evidence.verification,'unverified');
   assert.throws(()=>parseOutput('claude','{"is_error":true,"result":"not signed in"}'),/not signed in/);
 });
@@ -211,7 +211,9 @@ else {
  let prompt='';for await(const c of process.stdin)prompt+=c;
  const file='.native-id';const native=fs.existsSync(file)?fs.readFileSync(file,'utf8'):randomUUID();fs.writeFileSync(file,native);
  console.log(JSON.stringify({type:'thread.started',thread_id:native}));
+ console.log(JSON.stringify({type:'turn.started'}));
  console.log(JSON.stringify({type:'item.completed',item:{type:'agent_message',text:JSON.stringify({content:'Prepared in a standalone process',messages:[],notices:[]})}}));
+ console.log(JSON.stringify({type:'turn.completed'}));
 }
 `,{mode:0o700});
   const oldPath=process.env.PATH;process.env.PATH=bin+path.delimiter+oldPath;
@@ -460,8 +462,10 @@ else if(args[0]==='app-server') {
  if(prompt.includes('SYNTHETIC_SESSION_FAILURE')){console.error('Synthetic unusable history');process.exit(1);}
  const file='.native-id';const native=fs.existsSync(file)?fs.readFileSync(file,'utf8'):randomUUID();fs.writeFileSync(file,native);
  console.log(JSON.stringify({type:'thread.started',thread_id:native}));
+ console.log(JSON.stringify({type:'turn.started'}));
  const review=prompt.includes('Independent review of artifact')?{review:{verdict:'Pass',reason:'Synthetic review of supplied artifact'}}:{};
  console.log(JSON.stringify({type:'item.completed',item:{type:'agent_message',text:JSON.stringify({content:'Synthetic selected-model artifact',messages:[],notices:[],...review})}}));
+ console.log(JSON.stringify({type:'turn.completed'}));
 }
 `,{mode:0o700});
   return {bin,log};

@@ -49,7 +49,7 @@ export async function run(lane,out,root=process.cwd()) {
   requireThat(out!==root && !out.startsWith(root+path.sep),'evidence must be outside source');
   const before=source(root),files=inventory(root),testFiles=selectedTests(lane,files);
   const e=process.env;
-  const r={schema:2,lane,coverage:laneCoverage(lane),test_inventory:testFiles,mode:e.GITHUB_ACTIONS==='true'&&!before.dirty?'github':'unverified-local',before,inventory:files,node:process.version,platform:process.platform,arch:process.arch,os_release:os.release(),runner_image:{os:e.ImageOS??null,version:e.ImageVersion??null},sandbox:{supported:false,backend:null,blocker:'not probed in build lane'},github:{repository:e.GITHUB_REPOSITORY,run:e.GITHUB_RUN_ID,attempt:e.GITHUB_RUN_ATTEMPT,workflow:e.GITHUB_WORKFLOW_REF?.split('@')[0]?.split('/').slice(2).join('/'),workflowSha:e.GITHUB_WORKFLOW_SHA},checks:[]};
+  const r={schema:3,lane,coverage:laneCoverage(lane),test_inventory:testFiles,omitted_test_inventory:files.filter(file=>!testFiles.includes(file)),mode:e.GITHUB_ACTIONS==='true'&&!before.dirty?'github':'unverified-local',before,inventory:files,node:process.version,platform:process.platform,arch:process.arch,os_release:os.release(),runner_image:{os:e.ImageOS??null,version:e.ImageVersion??null},sandbox:{supported:false,backend:null,blocker:'not probed in build lane'},github:{repository:e.GITHUB_REPOSITORY,run:e.GITHUB_RUN_ID,attempt:e.GITHUB_RUN_ATTEMPT,workflow:e.GITHUB_WORKFLOW_REF?.split('@')[0]?.split('/').slice(2).join('/'),workflowSha:e.GITHUB_WORKFLOW_SHA},checks:[]};
   try {
     if(lane==='build') {
       r.checks.push(await execute(root,out,'build',process.execPath,['tools/build-plugin.mjs','--check']));
@@ -57,10 +57,10 @@ export async function run(lane,out,root=process.cwd()) {
     } else {
       const {sandboxCapability}=await import(path.join(root,'plugins/soloco/runtime/local-sandbox.mjs'));
       r.sandbox=sandboxCapability();
-      requireThat(process.platform==='darwin'&&r.sandbox.supported,'actual macOS Seatbelt required');
+      requireThat(process.platform==='darwin'&&r.sandbox.supported,`actual macOS Seatbelt required: ${r.sandbox.blocker??'unsupported platform'}`);
       r.checks.push(await execute(root,out,'tests',process.execPath,['--no-warnings','--test','--test-concurrency=4','--test-reporter=tap',...testFiles]));
     }
-  } catch(e) {r.error=e.message;}
+  } catch(e) {r.error=e.message;console.error(`Source CI ${lane} failed before completing checks: ${e.message}`);}
   try {r.after=source(root);}catch(e){r.error=`source after command: ${e.message}`;}
   fs.writeFileSync(path.join(out,'receipt.json'),JSON.stringify(r,null,2)+'\n');
   try {requireThat(!r.error,r.error);validateReceipt(r,out,{...r.github,...before,lane,inventory:files});return 0;}catch(e){fs.writeFileSync(path.join(out,'validation-error.log'),e.message+'\n');return 1;}

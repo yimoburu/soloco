@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { selectTestIsolationFlag } from '../plugins/soloco/runtime/local-sandbox.mjs';
+import { selectTestIsolationFlag, inspectRuntimeLibrary } from '../plugins/soloco/runtime/local-sandbox.mjs';
 
 const stable='--test-isolation=none', experimental='--experimental-test-isolation=none';
 const okay={status:0,stdout:'',stderr:''};
@@ -150,3 +150,33 @@ for(const mode of ['startup','watchdog'])for(const supported of [stable,experime
     assert.equal(result.status,0,result.error?.message||result.stderr);
   });
 }
+
+
+test('trusted library inspection tolerates one cold-start timeout with a finite scrubbed probe',()=>{
+  let calls=0;
+  const output=inspectRuntimeLibrary('/trusted/node',(tool,args,options)=>{
+    calls++;assert.equal(tool,'/usr/bin/otool');assert.deepEqual(args,['-L','/trusted/node']);
+    assert.equal(options.timeout,5000);assert.equal(options.killSignal,'SIGKILL');
+    assert.deepEqual(options.env,{PATH:'/usr/bin:/bin'});assert.equal(options.maxBuffer,100000);
+    return calls===1?{status:null,error:Object.assign(Error('cold tool startup'),{code:'ETIMEDOUT'})}:{status:0,stdout:'node:\n /usr/lib/libSystem.B.dylib (compatibility version 1.0.0)\n'};
+  },{deadline:15000,now:()=>0});
+  assert.equal(calls,2);assert.match(output,/libSystem/);
+});
+
+test('trusted library inspection retains real errors and stops at its shared deadline',()=>{
+  for(const failure of [{status:1,stderr:'cannot inspect Mach-O'},{status:null,error:Object.assign(Error('not allowed'),{code:'EPERM'})},{status:null,signal:'SIGTERM'}]){
+    let calls=0;assert.throws(()=>inspectRuntimeLibrary('/trusted/node',()=>{calls++;return failure;}),/otool -L \/trusted\/node:/);assert.equal(calls,1);
+  }
+  let calls=0,clock=0;
+  assert.throws(()=>inspectRuntimeLibrary('/trusted/node',(_f,_a,options)=>{calls++;assert.equal(options.timeout,1000);clock=1000;return {status:null,error:Object.assign(Error('timed out'),{code:'ETIMEDOUT'})};},{deadline:1000,now:()=>clock}),/discovery timed out/);assert.equal(calls,1);
+  calls=0;assert.throws(()=>inspectRuntimeLibrary('/trusted/node',()=>{calls++;return {status:null,error:Object.assign(Error('timed out'),{code:'ETIMEDOUT'})};}),/timed out/);assert.equal(calls,2);
+});
+
+
+test('trusted library inspection rejects even successful completion at the shared deadline',()=>{
+  for(const elapsed of [1000,1001]){
+    let now=0,calls=0;
+    assert.throws(()=>inspectRuntimeLibrary('/trusted/node',()=>{calls++;now=elapsed;return {status:0,stdout:'node:\n'};},{deadline:1000,now:()=>now}),/discovery timed out/);
+    assert.equal(calls,1);
+  }
+});

@@ -1,0 +1,807 @@
+{
+  "protocol": {
+    "version": 1,
+    "kind": "accepted_candidate_format_comparison",
+    "source_pin": "9c0cb8a9d40da42242787b1bbaacfa11ba37acdc",
+    "fixture": {
+      "module_bytes": 32768,
+      "module_counts": [
+        1,
+        3
+      ],
+      "formats": [
+        "files",
+        "patches"
+      ]
+    },
+    "criteria": {
+      "max_native_calls_total": 8,
+      "max_generation_attempts_per_case": 1,
+      "max_test_attempts_per_case": 1,
+      "max_qa_attempts_per_case": 1,
+      "critical_false_acceptances": 0,
+      "quality_error_margin": 0,
+      "latency_improvement_required": false
+    },
+    "limits": {
+      "scope_max_bytes": 200000,
+      "configuration_ceiling": 200000,
+      "native_timeout_ms": 300000,
+      "test_timeout_ms": 10000,
+      "test_wait_ms": 20000
+    },
+    "order": "one-file files, one-file patches, three-file files, three-file patches; sequential, no retries",
+    "acceptance": "Real production dispatch and worker produce a retained exact candidate. Actual sandboxed tests must pass; a different native QA must permit the exact candidate and actual receipt; the fixture receiver then calls production accept. Exact grading additionally compares all complete candidate bytes against the known fixture.",
+    "limitations": [
+      "One observation per arm; descriptive results cannot establish statistical quality noninferiority, production reliability, cost savings or causal latency gains.",
+      "Only manually supplied fictional modules and fixed tests are shared with the existing host model. Synthetic company binding and grant are fixture data; no actual company state or authority changes.",
+      "Requested/applied model controls differ from effective provider settings; missing observations remain unknown.",
+      "All failed or uncertain calls stay retained and hold that case without retry. Source integration, installation and deployment are outside this evaluation."
+    ]
+  },
+  "execution": "synthetic_contract_double",
+  "cases": [
+    {
+      "count": 1,
+      "format": "files",
+      "execution": "synthetic_contract_double",
+      "scope_sha256": "901e4f041011cda46f000c19516e1057297469aadc41a1abb4d0b6a9a95cee06",
+      "fixture_sha256": "491835db654f1899f8d84ef708824ed5b3bcd4aa4225dfcc6da7e68f92f88296",
+      "module_bytes": [
+        32768
+      ],
+      "source_bytes": 33535,
+      "expected_candidate_bytes": 34032,
+      "events": [
+        {
+          "type": "dispatch",
+          "at_ms": 5.398374999999987,
+          "role": "engineer",
+          "job_id": "job-38d9d778-7773-4049-8aa6-f079be980251",
+          "control_ms": 5.196124999999938
+        },
+        {
+          "type": "returned",
+          "at_ms": 20.11504100000002,
+          "role": "engineer",
+          "job_id": "job-38d9d778-7773-4049-8aa6-f079be980251",
+          "artifact_id": "artifact-f3f54488-8a42-4c5b-a32e-2af9811a3285"
+        },
+        {
+          "type": "tests_queued",
+          "at_ms": 24.55899999999997,
+          "job_id": "test-7e7b2ca1-c391-46f5-aa65-cc8619534847"
+        },
+        {
+          "type": "dispatch",
+          "at_ms": 2268.102583,
+          "role": "qa",
+          "job_id": "job-be1eeab5-f2a6-4d60-811c-4bf5c0c89dd3",
+          "control_ms": 5.834375000000364
+        },
+        {
+          "type": "returned",
+          "at_ms": 2281.655291,
+          "role": "qa",
+          "job_id": "job-be1eeab5-f2a6-4d60-811c-4bf5c0c89dd3",
+          "artifact_id": "artifact-f5dede8d-62a8-4014-9f6e-792470644ccf"
+        },
+        {
+          "type": "receiver_accepted",
+          "at_ms": 2285.908458,
+          "candidate_sha256": "14591e4ef821625f21a0f2120453a5570d8e1c59267b75515e44f21138d2ed38",
+          "receipt_sha256": "2ed7afe5c56bb8f52abf07998af9893b87a06fb66281f72a5b46f1ffc982ffeb"
+        }
+      ],
+      "calls": [
+        {
+          "role": "engineer",
+          "job_id": "job-38d9d778-7773-4049-8aa6-f079be980251",
+          "prompt_bytes": 58786,
+          "prompt_sha256": "ae59863105149210c3b0423588f36f2183eeea661b1051563d4d752826dafa3f",
+          "started_ms": 10.091041000000132,
+          "requested": {
+            "mode": "explicit",
+            "model": "gpt-6.1-sol",
+            "effort": "medium",
+            "reason": "Exact one-character fictional module repairs; identical model controls in all format arms.",
+            "speed": "host_default"
+          },
+          "native_id": "370e081754cd8271e2f1f2600ad65d7423f89ebd6c21f7cd6ce2b511ed979c7c",
+          "output_bytes": 33641,
+          "output_sha256": "9f8226a7c0c126b5ced9a8239880f29613fea39bf16acb0e6b674750cdd35e08",
+          "model_evidence": {
+            "verification": "synthetic_contract_double"
+          },
+          "duration_ms": 3.2581669999999576
+        },
+        {
+          "role": "qa",
+          "job_id": "job-be1eeab5-f2a6-4d60-811c-4bf5c0c89dd3",
+          "prompt_bytes": 98581,
+          "prompt_sha256": "b142ae0196af5bba9f4fa4b596df888536464dd6a65ba66e88d1372832c998bd",
+          "started_ms": 2272.2839999999997,
+          "requested": {
+            "mode": "explicit",
+            "model": "gpt-6.1-sol",
+            "effort": "high",
+            "reason": "Independent complete candidate, actual receipt and exact fixture preservation review; identical controls in all arms.",
+            "speed": "host_default"
+          },
+          "native_id": "342656f145b96c11d799e77a0c8fdcf46c5a4c2980de8c4a6838039daf807649",
+          "output_bytes": 405,
+          "output_sha256": "25f61879c447c2bee01ae91d1bb3bc8fad00228bc6b7e575996f509ac5865b6b",
+          "model_evidence": {
+            "verification": "synthetic_contract_double"
+          },
+          "duration_ms": 3.1433750000001055
+        }
+      ],
+      "attempts": [
+        {
+          "test_job_id": "test-7e7b2ca1-c391-46f5-aa65-cc8619534847",
+          "receipt_id": "test-receipt-e16f3cb4-1f04-4dcf-b127-e2b5743ed823",
+          "receipt_sha256": "2ed7afe5c56bb8f52abf07998af9893b87a06fb66281f72a5b46f1ffc982ffeb",
+          "result": {
+            "status": "passed",
+            "exit_code": 0,
+            "signal": null,
+            "stdout": "TAP version 13\n# Subtest: exact values and complete unchanged module bytes\nok 1 - exact values and complete unchanged module bytes\n  ---\n  duration_ms: 0.702291\n  type: 'test'\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 9.558667\n",
+            "stderr": "",
+            "duration_ms": 478,
+            "isolation": "macos-seatbelt-node",
+            "test_execution_attempted": true,
+            "tests_executed": true,
+            "output_truncated": false,
+            "limits": {
+              "timeout_ms": 10000,
+              "max_output_bytes": 20000
+            },
+            "candidate_sha256": "14591e4ef821625f21a0f2120453a5570d8e1c59267b75515e44f21138d2ed38",
+            "test_paths": [
+              "fixture.test.mjs"
+            ],
+            "timeout_ms": 10000,
+            "max_output_bytes": 20000,
+            "finished_at": "2026-11-07T05:51:52.973Z"
+          },
+          "test_elapsed_ms": 2241.868084
+        }
+      ],
+      "accepted": true,
+      "errors": [],
+      "repairs": 0,
+      "precheck": {
+        "status": "failed",
+        "exit_code": 1,
+        "tests_executed": true
+      },
+      "generation": {
+        "candidate_id": "artifact-f3f54488-8a42-4c5b-a32e-2af9811a3285",
+        "native_id": "370e081754cd8271e2f1f2600ad65d7423f89ebd6c21f7cd6ce2b511ed979c7c",
+        "candidate_sha256": "14591e4ef821625f21a0f2120453a5570d8e1c59267b75515e44f21138d2ed38",
+        "byte_accounting": {
+          "format": "files",
+          "generated_bytes": 33535,
+          "candidate_bytes": 34032,
+          "source_bytes": 34184
+        }
+      },
+      "exact_fixture_match": true,
+      "review": {
+        "id": "artifact-f5dede8d-62a8-4014-9f6e-792470644ccf",
+        "native_id": "342656f145b96c11d799e77a0c8fdcf46c5a4c2980de8c4a6838039daf807649",
+        "author_native_id": "370e081754cd8271e2f1f2600ad65d7423f89ebd6c21f7cd6ce2b511ed979c7c",
+        "verdict": "Pass",
+        "candidate_sha256": "14591e4ef821625f21a0f2120453a5570d8e1c59267b75515e44f21138d2ed38",
+        "receipt_sha256": "2ed7afe5c56bb8f52abf07998af9893b87a06fb66281f72a5b46f1ffc982ffeb"
+      },
+      "acceptance": {
+        "at": "2026-11-07T05:51:53.014Z",
+        "review_id": "artifact-f5dede8d-62a8-4014-9f6e-792470644ccf",
+        "candidate_sha256": "14591e4ef821625f21a0f2120453a5570d8e1c59267b75515e44f21138d2ed38",
+        "receipt_sha256": "2ed7afe5c56bb8f52abf07998af9893b87a06fb66281f72a5b46f1ffc982ffeb",
+        "source_integrated": false
+      },
+      "elapsed_ms": 2285.9112910000003,
+      "original_source_unchanged": true,
+      "metrics": {
+        "model_calls": 2,
+        "producer_calls": 1,
+        "qa_calls": 1,
+        "repairs": 0,
+        "invalid_or_incomplete_generations": 0,
+        "prompt_bytes": 157367,
+        "output_bytes": 34046,
+        "time_to_accepted_result_ms": 2285.9112910000003
+      }
+    },
+    {
+      "count": 1,
+      "format": "patches",
+      "execution": "synthetic_contract_double",
+      "scope_sha256": "52f8fbb0eb283ea03b44b6d6f1cbb6623ff75ac6be4970fad06c19be077953ed",
+      "fixture_sha256": "491835db654f1899f8d84ef708824ed5b3bcd4aa4225dfcc6da7e68f92f88296",
+      "module_bytes": [
+        32768
+      ],
+      "source_bytes": 33535,
+      "expected_candidate_bytes": 34032,
+      "events": [
+        {
+          "type": "dispatch",
+          "at_ms": 4.26299999999992,
+          "role": "engineer",
+          "job_id": "job-0398f4da-2268-40f1-ba6b-01922a4bb4c0",
+          "control_ms": 4.245708000000377
+        },
+        {
+          "type": "returned",
+          "at_ms": 20.020292000000154,
+          "role": "engineer",
+          "job_id": "job-0398f4da-2268-40f1-ba6b-01922a4bb4c0",
+          "artifact_id": "artifact-8c73ddb7-7c61-4a57-aa27-1a9549d3187d"
+        },
+        {
+          "type": "tests_queued",
+          "at_ms": 24.769000000000233,
+          "job_id": "test-1fdccfd5-9f59-4afa-8f33-e5a858f303c8"
+        },
+        {
+          "type": "dispatch",
+          "at_ms": 2339.2485419999994,
+          "role": "qa",
+          "job_id": "job-61c489fc-5d26-46c4-887b-78661e33f11e",
+          "control_ms": 4.695666999999958
+        },
+        {
+          "type": "returned",
+          "at_ms": 2353.179,
+          "role": "qa",
+          "job_id": "job-61c489fc-5d26-46c4-887b-78661e33f11e",
+          "artifact_id": "artifact-e8e6e53a-0d77-4b46-ba71-4ba313b63033"
+        },
+        {
+          "type": "receiver_accepted",
+          "at_ms": 2357.102959,
+          "candidate_sha256": "14591e4ef821625f21a0f2120453a5570d8e1c59267b75515e44f21138d2ed38",
+          "receipt_sha256": "3f3762181df71572636cfd2d44efcdf0a7ad00b3e7dfbc4e19caf6d77111ae65"
+        }
+      ],
+      "calls": [
+        {
+          "role": "engineer",
+          "job_id": "job-0398f4da-2268-40f1-ba6b-01922a4bb4c0",
+          "prompt_bytes": 59047,
+          "prompt_sha256": "5223928c939d4814271ac6349b6a67e03d968cb8e14ea2e40b09e0c85d098a45",
+          "started_ms": 8.467208999999457,
+          "requested": {
+            "mode": "explicit",
+            "model": "gpt-6.1-sol",
+            "effort": "medium",
+            "reason": "Exact one-character fictional module repairs; identical model controls in all format arms.",
+            "speed": "host_default"
+          },
+          "native_id": "aa2d23f0cc8470ece8e5d5c6f22d6c03d522b1482d01528008920697f2e9cc26",
+          "output_bytes": 257,
+          "output_sha256": "fff1612670aa661963c6e5f764e8ccc61e3bd5ff884b70d6911961ab91c48e5d",
+          "model_evidence": {
+            "verification": "synthetic_contract_double"
+          },
+          "duration_ms": 3.318250000000262
+        },
+        {
+          "role": "qa",
+          "job_id": "job-61c489fc-5d26-46c4-887b-78661e33f11e",
+          "prompt_bytes": 98833,
+          "prompt_sha256": "11cce707c3bf54a23d0cdb70abe76678be5a8f70d8ef63791c9721a93a0a6482",
+          "started_ms": 2343.926834,
+          "requested": {
+            "mode": "explicit",
+            "model": "gpt-6.1-sol",
+            "effort": "high",
+            "reason": "Independent complete candidate, actual receipt and exact fixture preservation review; identical controls in all arms.",
+            "speed": "host_default"
+          },
+          "native_id": "187ee36459e9137c8df6a253c3c7d6b11b03538e14d9921c923930354e654316",
+          "output_bytes": 405,
+          "output_sha256": "468a7057be49dc23a8e15767b6c83d128bee437a84b4e535a1676e103ff2be4f",
+          "model_evidence": {
+            "verification": "synthetic_contract_double"
+          },
+          "duration_ms": 3.164375000000291
+        }
+      ],
+      "attempts": [
+        {
+          "test_job_id": "test-1fdccfd5-9f59-4afa-8f33-e5a858f303c8",
+          "receipt_id": "test-receipt-98e907e7-498c-4ad1-b1a4-8bd5e326ccf4",
+          "receipt_sha256": "3f3762181df71572636cfd2d44efcdf0a7ad00b3e7dfbc4e19caf6d77111ae65",
+          "result": {
+            "status": "passed",
+            "exit_code": 0,
+            "signal": null,
+            "stdout": "TAP version 13\n# Subtest: exact values and complete unchanged module bytes\nok 1 - exact values and complete unchanged module bytes\n  ---\n  duration_ms: 0.602458\n  type: 'test'\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 8.137417\n",
+            "stderr": "",
+            "duration_ms": 510,
+            "isolation": "macos-seatbelt-node",
+            "test_execution_attempted": true,
+            "tests_executed": true,
+            "output_truncated": false,
+            "limits": {
+              "timeout_ms": 10000,
+              "max_output_bytes": 20000
+            },
+            "candidate_sha256": "14591e4ef821625f21a0f2120453a5570d8e1c59267b75515e44f21138d2ed38",
+            "test_paths": [
+              "fixture.test.mjs"
+            ],
+            "timeout_ms": 10000,
+            "max_output_bytes": 20000,
+            "finished_at": "2026-11-07T05:51:55.911Z"
+          },
+          "test_elapsed_ms": 2314.221791
+        }
+      ],
+      "accepted": true,
+      "errors": [],
+      "repairs": 0,
+      "precheck": {
+        "status": "failed",
+        "exit_code": 1,
+        "tests_executed": true
+      },
+      "generation": {
+        "candidate_id": "artifact-8c73ddb7-7c61-4a57-aa27-1a9549d3187d",
+        "native_id": "aa2d23f0cc8470ece8e5d5c6f22d6c03d522b1482d01528008920697f2e9cc26",
+        "candidate_sha256": "14591e4ef821625f21a0f2120453a5570d8e1c59267b75515e44f21138d2ed38",
+        "byte_accounting": {
+          "format": "patches",
+          "generated_bytes": 149,
+          "candidate_bytes": 34032,
+          "source_bytes": 34184,
+          "patches": [
+            {
+              "path": "module-0.mjs",
+              "base_sha256": "092aaf1d41c4ed97dac065053aa75da9c664c5df467e79b3287c04b84d51a818",
+              "edits": [
+                {
+                  "start": 21,
+                  "end": 22,
+                  "text": "1"
+                }
+              ]
+            }
+          ],
+          "patch_sha256": "27a594af5003e42bb2982b83f555399f17858bd249988caf3cac8aa26e7e9138"
+        }
+      },
+      "exact_fixture_match": true,
+      "review": {
+        "id": "artifact-e8e6e53a-0d77-4b46-ba71-4ba313b63033",
+        "native_id": "187ee36459e9137c8df6a253c3c7d6b11b03538e14d9921c923930354e654316",
+        "author_native_id": "aa2d23f0cc8470ece8e5d5c6f22d6c03d522b1482d01528008920697f2e9cc26",
+        "verdict": "Pass",
+        "candidate_sha256": "14591e4ef821625f21a0f2120453a5570d8e1c59267b75515e44f21138d2ed38",
+        "receipt_sha256": "3f3762181df71572636cfd2d44efcdf0a7ad00b3e7dfbc4e19caf6d77111ae65"
+      },
+      "acceptance": {
+        "at": "2026-11-07T05:51:55.949Z",
+        "review_id": "artifact-e8e6e53a-0d77-4b46-ba71-4ba313b63033",
+        "candidate_sha256": "14591e4ef821625f21a0f2120453a5570d8e1c59267b75515e44f21138d2ed38",
+        "receipt_sha256": "3f3762181df71572636cfd2d44efcdf0a7ad00b3e7dfbc4e19caf6d77111ae65",
+        "source_integrated": false
+      },
+      "elapsed_ms": 2357.108209,
+      "original_source_unchanged": true,
+      "metrics": {
+        "model_calls": 2,
+        "producer_calls": 1,
+        "qa_calls": 1,
+        "repairs": 0,
+        "invalid_or_incomplete_generations": 0,
+        "prompt_bytes": 157880,
+        "output_bytes": 662,
+        "time_to_accepted_result_ms": 2357.108209
+      }
+    },
+    {
+      "count": 3,
+      "format": "files",
+      "execution": "synthetic_contract_double",
+      "scope_sha256": "eee2973ad580199767485f580c89f91f9922b461896f666accd6fc57a8a96847",
+      "fixture_sha256": "6ac1ff6793b49be70e19d31260e8bfcec21e5813e70e8e7a2a3e01009e6aeaaf",
+      "module_bytes": [
+        32768,
+        32768,
+        32768
+      ],
+      "source_bytes": 100603,
+      "expected_candidate_bytes": 101610,
+      "events": [
+        {
+          "type": "dispatch",
+          "at_ms": 5.166207999999642,
+          "role": "engineer",
+          "job_id": "job-f36c0450-432e-460f-8941-af60e722838b",
+          "control_ms": 5.150166999999783
+        },
+        {
+          "type": "returned",
+          "at_ms": 22.739792000000307,
+          "role": "engineer",
+          "job_id": "job-f36c0450-432e-460f-8941-af60e722838b",
+          "artifact_id": "artifact-918dda9d-f5b9-4cd6-a4b0-ae98ca09bc04"
+        },
+        {
+          "type": "tests_queued",
+          "at_ms": 29.10174999999981,
+          "job_id": "test-d12a1161-cb12-4cee-ad36-61eb705aae1e"
+        },
+        {
+          "type": "dispatch",
+          "at_ms": 2776.7615000000005,
+          "role": "qa",
+          "job_id": "job-1ca1d4bf-1d75-4fff-8ffc-207642005e70",
+          "control_ms": 7.610999999998967
+        },
+        {
+          "type": "returned",
+          "at_ms": 2799.2595,
+          "role": "qa",
+          "job_id": "job-1ca1d4bf-1d75-4fff-8ffc-207642005e70",
+          "artifact_id": "artifact-1c8078d2-b185-4f83-b928-24d1cb741adc"
+        },
+        {
+          "type": "receiver_accepted",
+          "at_ms": 2806.0303750000003,
+          "candidate_sha256": "fddafee2e21c49325791a7b90768f6c3a987e91d09697bb4d6873d5a131e86fe",
+          "receipt_sha256": "c64b0b1e8d7d53613f628b6467fc10d4675c2d5e0ee33d394f35e01e73a9f551"
+        }
+      ],
+      "calls": [
+        {
+          "role": "engineer",
+          "job_id": "job-f36c0450-432e-460f-8941-af60e722838b",
+          "prompt_bytes": 126577,
+          "prompt_sha256": "5383deb7ae5ab1c1d560d8957062728f119edfef2e7c26b8ae77e1f6411a9928",
+          "started_ms": 10.103417000000263,
+          "requested": {
+            "mode": "explicit",
+            "model": "gpt-6.1-sol",
+            "effort": "medium",
+            "reason": "Exact one-character fictional module repairs; identical model controls in all format arms.",
+            "speed": "host_default"
+          },
+          "native_id": "2ca689d736e8ac0dda21f7d8926baa16ec77333456bd4758d068e20471e585c9",
+          "output_bytes": 100709,
+          "output_sha256": "0c1b51237b35d5eb0a4c9327e75257eac8079ebf4503ff0ab71139ac17e73c8e",
+          "model_evidence": {
+            "verification": "synthetic_contract_double"
+          },
+          "duration_ms": 4.108916000000136
+        },
+        {
+          "role": "qa",
+          "job_id": "job-1ca1d4bf-1d75-4fff-8ffc-207642005e70",
+          "prompt_bytes": 234333,
+          "prompt_sha256": "539f1230016d998d7301025abbd8408566d36049b9dda5f457d38fdbff2cc665",
+          "started_ms": 2784.316999999999,
+          "requested": {
+            "mode": "explicit",
+            "model": "gpt-6.1-sol",
+            "effort": "high",
+            "reason": "Independent complete candidate, actual receipt and exact fixture preservation review; identical controls in all arms.",
+            "speed": "host_default"
+          },
+          "native_id": "534a44c0c7c8f42308532bb8c6e98738488fdc4308bb891278a641595b4635b4",
+          "output_bytes": 405,
+          "output_sha256": "64fedaa0ef7505a7f238a25e9eb6e4ae231933172755216fb46046df6bba3d17",
+          "model_evidence": {
+            "verification": "synthetic_contract_double"
+          },
+          "duration_ms": 5.137541999998575
+        }
+      ],
+      "attempts": [
+        {
+          "test_job_id": "test-d12a1161-cb12-4cee-ad36-61eb705aae1e",
+          "receipt_id": "test-receipt-3b690303-7efa-42a7-a3db-91c195817af6",
+          "receipt_sha256": "c64b0b1e8d7d53613f628b6467fc10d4675c2d5e0ee33d394f35e01e73a9f551",
+          "result": {
+            "status": "passed",
+            "exit_code": 0,
+            "signal": null,
+            "stdout": "TAP version 13\n# Subtest: exact values and complete unchanged module bytes\nok 1 - exact values and complete unchanged module bytes\n  ---\n  duration_ms: 1.403958\n  type: 'test'\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 10.493375\n",
+            "stderr": "",
+            "duration_ms": 876,
+            "isolation": "macos-seatbelt-node",
+            "test_execution_attempted": true,
+            "tests_executed": true,
+            "output_truncated": false,
+            "limits": {
+              "timeout_ms": 10000,
+              "max_output_bytes": 20000
+            },
+            "candidate_sha256": "fddafee2e21c49325791a7b90768f6c3a987e91d09697bb4d6873d5a131e86fe",
+            "test_paths": [
+              "fixture.test.mjs"
+            ],
+            "timeout_ms": 10000,
+            "max_output_bytes": 20000,
+            "finished_at": "2026-11-07T05:51:59.226Z"
+          },
+          "test_elapsed_ms": 2746.139875
+        }
+      ],
+      "accepted": true,
+      "errors": [],
+      "repairs": 0,
+      "precheck": {
+        "status": "failed",
+        "exit_code": 1,
+        "tests_executed": true
+      },
+      "generation": {
+        "candidate_id": "artifact-918dda9d-f5b9-4cd6-a4b0-ae98ca09bc04",
+        "native_id": "2ca689d736e8ac0dda21f7d8926baa16ec77333456bd4758d068e20471e585c9",
+        "candidate_sha256": "fddafee2e21c49325791a7b90768f6c3a987e91d09697bb4d6873d5a131e86fe",
+        "byte_accounting": {
+          "format": "files",
+          "generated_bytes": 100603,
+          "candidate_bytes": 101610,
+          "source_bytes": 101914
+        }
+      },
+      "exact_fixture_match": true,
+      "review": {
+        "id": "artifact-1c8078d2-b185-4f83-b928-24d1cb741adc",
+        "native_id": "534a44c0c7c8f42308532bb8c6e98738488fdc4308bb891278a641595b4635b4",
+        "author_native_id": "2ca689d736e8ac0dda21f7d8926baa16ec77333456bd4758d068e20471e585c9",
+        "verdict": "Pass",
+        "candidate_sha256": "fddafee2e21c49325791a7b90768f6c3a987e91d09697bb4d6873d5a131e86fe",
+        "receipt_sha256": "c64b0b1e8d7d53613f628b6467fc10d4675c2d5e0ee33d394f35e01e73a9f551"
+      },
+      "acceptance": {
+        "at": "2026-11-07T05:51:59.285Z",
+        "review_id": "artifact-1c8078d2-b185-4f83-b928-24d1cb741adc",
+        "candidate_sha256": "fddafee2e21c49325791a7b90768f6c3a987e91d09697bb4d6873d5a131e86fe",
+        "receipt_sha256": "c64b0b1e8d7d53613f628b6467fc10d4675c2d5e0ee33d394f35e01e73a9f551",
+        "source_integrated": false
+      },
+      "elapsed_ms": 2806.040166999999,
+      "original_source_unchanged": true,
+      "metrics": {
+        "model_calls": 2,
+        "producer_calls": 1,
+        "qa_calls": 1,
+        "repairs": 0,
+        "invalid_or_incomplete_generations": 0,
+        "prompt_bytes": 360910,
+        "output_bytes": 101114,
+        "time_to_accepted_result_ms": 2806.040166999999
+      }
+    },
+    {
+      "count": 3,
+      "format": "patches",
+      "execution": "synthetic_contract_double",
+      "scope_sha256": "a0f95ad064420e57592b895b20687eee885453a470873a08197729860c070d78",
+      "fixture_sha256": "6ac1ff6793b49be70e19d31260e8bfcec21e5813e70e8e7a2a3e01009e6aeaaf",
+      "module_bytes": [
+        32768,
+        32768,
+        32768
+      ],
+      "source_bytes": 100603,
+      "expected_candidate_bytes": 101610,
+      "events": [
+        {
+          "type": "dispatch",
+          "at_ms": 5.294125000000349,
+          "role": "engineer",
+          "job_id": "job-a0effa37-47d2-490b-86d3-afc525e53035",
+          "control_ms": 5.277958000000581
+        },
+        {
+          "type": "returned",
+          "at_ms": 24.486166999999114,
+          "role": "engineer",
+          "job_id": "job-a0effa37-47d2-490b-86d3-afc525e53035",
+          "artifact_id": "artifact-e907df9a-36e3-472c-b38d-ca75cb47fa12"
+        },
+        {
+          "type": "tests_queued",
+          "at_ms": 32.11991699999999,
+          "job_id": "test-1b3173c2-f5d9-44df-96ca-e0ee2e5f4dad"
+        },
+        {
+          "type": "dispatch",
+          "at_ms": 2456.9565829999992,
+          "role": "qa",
+          "job_id": "job-fca460e2-643b-4a96-b623-b44e76f4f7ec",
+          "control_ms": 6.83258399999977
+        },
+        {
+          "type": "returned",
+          "at_ms": 2480.310874999999,
+          "role": "qa",
+          "job_id": "job-fca460e2-643b-4a96-b623-b44e76f4f7ec",
+          "artifact_id": "artifact-83306bee-4e77-4d9a-997d-98e76dd82599"
+        },
+        {
+          "type": "receiver_accepted",
+          "at_ms": 2486.45175,
+          "candidate_sha256": "fddafee2e21c49325791a7b90768f6c3a987e91d09697bb4d6873d5a131e86fe",
+          "receipt_sha256": "9465815a1d34cdf655873519a6d8781d14016c79408cc13e9e0262a9ed849b7a"
+        }
+      ],
+      "calls": [
+        {
+          "role": "engineer",
+          "job_id": "job-a0effa37-47d2-490b-86d3-afc525e53035",
+          "prompt_bytes": 126837,
+          "prompt_sha256": "24b94c944e1dbbdfdd69435ef335233f227a46625acc1a6812acf801cc06c284",
+          "started_ms": 10.540124999999534,
+          "requested": {
+            "mode": "explicit",
+            "model": "gpt-6.1-sol",
+            "effort": "medium",
+            "reason": "Exact one-character fictional module repairs; identical model controls in all format arms.",
+            "speed": "host_default"
+          },
+          "native_id": "baa068f2107e4e64098f6607133b736e13716d4fede17a74834b4c8406c5c091",
+          "output_bytes": 553,
+          "output_sha256": "00d726808e0d052cac7d442ba912fb0311ac1f753df02ce8474efc2b97d6ed91",
+          "model_evidence": {
+            "verification": "synthetic_contract_double"
+          },
+          "duration_ms": 4.628416999999899
+        },
+        {
+          "role": "qa",
+          "job_id": "job-fca460e2-643b-4a96-b623-b44e76f4f7ec",
+          "prompt_bytes": 234877,
+          "prompt_sha256": "ff132374fe76652ecd2cd0183ca65bce4c79d889df0dec4684357084bd2e347b",
+          "started_ms": 2464.965542,
+          "requested": {
+            "mode": "explicit",
+            "model": "gpt-6.1-sol",
+            "effort": "high",
+            "reason": "Independent complete candidate, actual receipt and exact fixture preservation review; identical controls in all arms.",
+            "speed": "host_default"
+          },
+          "native_id": "423cd8bc998863053dbd7064cebe932ceed5a6226c6f58fb2504201b79e9c0cf",
+          "output_bytes": 405,
+          "output_sha256": "0374f812ec1b1e6f0f10f50d06f7c1c7f1fecb39ee945eea0d14a51811a82a71",
+          "model_evidence": {
+            "verification": "synthetic_contract_double"
+          },
+          "duration_ms": 5.775375000001077
+        }
+      ],
+      "attempts": [
+        {
+          "test_job_id": "test-1b3173c2-f5d9-44df-96ca-e0ee2e5f4dad",
+          "receipt_id": "test-receipt-f1b439c8-c5a8-467a-a0e4-0371168fc67d",
+          "receipt_sha256": "9465815a1d34cdf655873519a6d8781d14016c79408cc13e9e0262a9ed849b7a",
+          "result": {
+            "status": "passed",
+            "exit_code": 0,
+            "signal": null,
+            "stdout": "TAP version 13\n# Subtest: exact values and complete unchanged module bytes\nok 1 - exact values and complete unchanged module bytes\n  ---\n  duration_ms: 0.768083\n  type: 'test'\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 9.209541\n",
+            "stderr": "",
+            "duration_ms": 552,
+            "isolation": "macos-seatbelt-node",
+            "test_execution_attempted": true,
+            "tests_executed": true,
+            "output_truncated": false,
+            "limits": {
+              "timeout_ms": 10000,
+              "max_output_bytes": 20000
+            },
+            "candidate_sha256": "fddafee2e21c49325791a7b90768f6c3a987e91d09697bb4d6873d5a131e86fe",
+            "test_paths": [
+              "fixture.test.mjs"
+            ],
+            "timeout_ms": 10000,
+            "max_output_bytes": 20000,
+            "finished_at": "2026-11-07T05:52:02.376Z"
+          },
+          "test_elapsed_ms": 2425.2957910000005
+        }
+      ],
+      "accepted": true,
+      "errors": [],
+      "repairs": 0,
+      "precheck": {
+        "status": "failed",
+        "exit_code": 1,
+        "tests_executed": true
+      },
+      "generation": {
+        "candidate_id": "artifact-e907df9a-36e3-472c-b38d-ca75cb47fa12",
+        "native_id": "baa068f2107e4e64098f6607133b736e13716d4fede17a74834b4c8406c5c091",
+        "candidate_sha256": "fddafee2e21c49325791a7b90768f6c3a987e91d09697bb4d6873d5a131e86fe",
+        "byte_accounting": {
+          "format": "patches",
+          "generated_bytes": 445,
+          "candidate_bytes": 101610,
+          "source_bytes": 101914,
+          "patches": [
+            {
+              "path": "module-0.mjs",
+              "base_sha256": "092aaf1d41c4ed97dac065053aa75da9c664c5df467e79b3287c04b84d51a818",
+              "edits": [
+                {
+                  "start": 21,
+                  "end": 22,
+                  "text": "1"
+                }
+              ]
+            },
+            {
+              "path": "module-1.mjs",
+              "base_sha256": "092aaf1d41c4ed97dac065053aa75da9c664c5df467e79b3287c04b84d51a818",
+              "edits": [
+                {
+                  "start": 21,
+                  "end": 22,
+                  "text": "1"
+                }
+              ]
+            },
+            {
+              "path": "module-2.mjs",
+              "base_sha256": "092aaf1d41c4ed97dac065053aa75da9c664c5df467e79b3287c04b84d51a818",
+              "edits": [
+                {
+                  "start": 21,
+                  "end": 22,
+                  "text": "1"
+                }
+              ]
+            }
+          ],
+          "patch_sha256": "627079ead8fa97ce9c957e2b802e0164f7cb8bf5544aabcd9dd03ae9d741f389"
+        }
+      },
+      "exact_fixture_match": true,
+      "review": {
+        "id": "artifact-83306bee-4e77-4d9a-997d-98e76dd82599",
+        "native_id": "423cd8bc998863053dbd7064cebe932ceed5a6226c6f58fb2504201b79e9c0cf",
+        "author_native_id": "baa068f2107e4e64098f6607133b736e13716d4fede17a74834b4c8406c5c091",
+        "verdict": "Pass",
+        "candidate_sha256": "fddafee2e21c49325791a7b90768f6c3a987e91d09697bb4d6873d5a131e86fe",
+        "receipt_sha256": "9465815a1d34cdf655873519a6d8781d14016c79408cc13e9e0262a9ed849b7a"
+      },
+      "acceptance": {
+        "at": "2026-11-07T05:52:02.415Z",
+        "review_id": "artifact-83306bee-4e77-4d9a-997d-98e76dd82599",
+        "candidate_sha256": "fddafee2e21c49325791a7b90768f6c3a987e91d09697bb4d6873d5a131e86fe",
+        "receipt_sha256": "9465815a1d34cdf655873519a6d8781d14016c79408cc13e9e0262a9ed849b7a",
+        "source_integrated": false
+      },
+      "elapsed_ms": 2486.4562499999993,
+      "original_source_unchanged": true,
+      "metrics": {
+        "model_calls": 2,
+        "producer_calls": 1,
+        "qa_calls": 1,
+        "repairs": 0,
+        "invalid_or_incomplete_generations": 0,
+        "prompt_bytes": 361714,
+        "output_bytes": 958,
+        "time_to_accepted_result_ms": 2486.4562499999993
+      }
+    }
+  ],
+  "assessment": {
+    "passed": true,
+    "accepted_cases": 4,
+    "total_cases": 4,
+    "critical_false_acceptances": 0,
+    "statistical_noninferiority_established": false,
+    "causal_latency_improvement_established": false
+  }
+}

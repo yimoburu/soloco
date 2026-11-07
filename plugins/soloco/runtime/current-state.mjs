@@ -6,10 +6,11 @@ import {buildQualificationEvidence,knownModelCatalog} from './upgrade-evidence.m
 import {validateQualificationExclusion,QUALIFICATION_PROTOCOL} from './context-qualification.mjs';
 const fields=['id','kind','author_role','recorded_by','content','status','action','previous_name','name','created_at'];
 const knownStateFields=new Set(['id','name','idea','owner','schema','runtime_version','plugin_version','revision','created_at','updated_at','paused','mode','phase','team_sha256','governance','governance_sha256','cos_instructions','roles','records','jobs','sessions','notices','messages','upgrade','upgrade_history','retired_sessions','context_classifications','context_last_plan','handover']);
-const proofJobFields=new Set(['id','role','instance_id','session_key','native_id','host','epoch','status','artifact_id','review_of','inputs','context_format','context_scope','context_sha256','task','task_summary','next_handoff','model_selection','model_catalog','model_evidence','cli_version','requester','coordination','coordination_release','expected_deliverable','supplemental_sources','retrieved_inputs','created_at','started_at','finished_at','worker_pid','timeout_policy_version','timeout_minutes','timeout_ms','timeout_reason','execution_started_at','execution_deadline_at','termination_deadline_at']);
+const proofJobFields=new Set(['id','role','instance_id','session_key','native_id','host','epoch','status','artifact_id','review_of','inputs','context_format','context_scope','context_sha256','task','task_summary','next_handoff','model_selection','model_catalog','model_evidence','cli_version','requester','coordination','coordination_release','qualification_hold','expected_deliverable','supplemental_sources','retrieved_inputs','created_at','started_at','finished_at','worker_pid','timeout_policy_version','timeout_minutes','timeout_ms','timeout_reason','execution_started_at','execution_deadline_at','termination_deadline_at']);
 const keysOnly=(v,keys)=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).every(k=>keys.includes(k));
 export function proofJobSafe(job) {
   if(Object.keys(job).some(k=>!proofJobFields.has(k)))return false;
+  if(job.qualification_hold!==undefined&&(!job.qualification_hold||typeof job.qualification_hold!=='object'||Array.isArray(job.qualification_hold)))return false;
   for(const key of ['review_of','requester','model_selection','model_catalog','model_evidence','coordination_release'])if(job[key]!==undefined&&job[key]!==null&&(typeof job[key]!=='object'||Array.isArray(job[key])))return false;
   const scalarObject=(value,keys)=>keysOnly(value,keys)&&Object.values(value).every(v=>v===null||typeof v!=='object');
   const refs=(value,keys)=>Array.isArray(value)&&value.every(r=>keysOnly(r,keys)&&Object.values(r).every(v=>v===null||typeof v!=='object'));
@@ -22,10 +23,15 @@ export function proofJobSafe(job) {
     else if(key==='model_selection'){if(!scalarObject(value,['mode','model','effort','speed','reason']))return false;}
     else if(key==='model_catalog'){if(!knownModelCatalog(value))return false;}
     else if(key==='coordination_release'){if(!scalarObject(value,['termination_confirmed','reason','at'])||value.termination_confirmed!==true||value.reason!=='model_process_closed')return false;}
+    else if(key==='qualification_hold'){
+      if(!keysOnly(value,['protocol','boundary','actual_bytes','limit_bytes','next_action'])||Object.keys(value).length!==5||value.protocol!==SCOPED_PROTOCOL||typeof value.boundary!=='string'||typeof value.next_action!=='string'||!Number.isSafeInteger(value.actual_bytes)||!Number.isSafeInteger(value.limit_bytes)||value.limit_bytes<1||value.actual_bytes<=value.limit_bytes)return false;
+    }
     else if(key==='model_evidence'){
-      if(!keysOnly(value,['reported_models','reported_effort','reported_service_tier','applied_controls','source','scope','verification','usage'])
+      if(!keysOnly(value,['reported_models','reported_effort','reported_service_tier','applied_controls','source','scope','verification','usage','cli_warnings','cli_observed_negative_outputs'])
         ||!Array.isArray(value.reported_models)||value.reported_models.some(v=>typeof v!=='string')
-        ||Object.entries(value).some(([k,v])=>!['reported_models','applied_controls','usage'].includes(k)&&v!==null&&typeof v==='object')
+        ||Object.entries(value).some(([k,v])=>!['reported_models','applied_controls','usage','cli_warnings','cli_observed_negative_outputs'].includes(k)&&v!==null&&typeof v==='object')
+        ||(value.cli_warnings!==undefined&&(!Array.isArray(value.cli_warnings)||value.cli_warnings.some(w=>!keysOnly(w,['type','message'])||w.type!=='error'||typeof w.message!=='string')))
+        ||(value.cli_observed_negative_outputs!==undefined&&(!Array.isArray(value.cli_observed_negative_outputs)||value.cli_observed_negative_outputs.some(w=>typeof w!=='string')))
         ||(value.applied_controls&&!scalarObject(value.applied_controls,['model','effort','service_tier','fast_mode','switch_models_on_flag','scope','verification']))
         ||(value.usage&&Object.values(value.usage).some(v=>!keysOnly(v,['inputTokens','outputTokens','cacheReadInputTokens','cacheCreationInputTokens','webSearchRequests','costUSD'])||Object.values(v).some(n=>!Number.isFinite(n)||n<0))))return false;
     }else return false; // Complex/unknown legacy metadata needs explicit review.

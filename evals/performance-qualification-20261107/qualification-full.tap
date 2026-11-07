@@ -1,0 +1,459 @@
+TAP version 13
+# paused pending handover growth [{"scale":1,"archive_utf16":1830,"pending_stream_utf16":5880,"initial_packet_utf16":7279},{"scale":10,"archive_utf16":18300,"pending_stream_utf16":5881,"initial_packet_utf16":7279},{"scale":100,"archive_utf16":183000,"pending_stream_utf16":5893,"initial_packet_utf16":7284}]
+# Subtest: complete extraction, independent reconciliation and final mapping; immutable original retained
+ok 1 - complete extraction, independent reconciliation and final mapping; immutable original retained
+  ---
+  duration_ms: 14.012375
+  type: 'test'
+  ...
+# Subtest: core vault fixture: snapshot/entry references resolve all historical and current semantics, raw bytes remain exact
+ok 2 - core vault fixture: snapshot/entry references resolve all historical and current semantics, raw bytes remain exact
+  ---
+  duration_ms: 111.557792
+  type: 'test'
+  ...
+# {"fixture":"core modules copied ONLY to temporary directory","sha256":{"snapshot.mjs":"f822adc27fe06921b73ee923e967c1d36af3528b2d22f3425cbccdbf8fd477c1","upgrade-evidence.mjs":"14b809e88cb4a380829e6bb6ab9feceefc7582db230b0e8dcc70bed3b7b70e21","current-state.mjs":"6f7c61213b3e998525526e2d0989ea897f380708c7bf3a447976c632d18228e2"}}
+# Subtest: historical checkpoint, handover subject and old team UNIQUE restrictions are compulsory
+ok 3 - historical checkpoint, handover subject and old team UNIQUE restrictions are compulsory
+  ---
+  duration_ms: 2.387166
+  type: 'test'
+  ...
+# Subtest: exact source, counterpart, dependency, producer, governance and semantic notice freshness; informational history independent
+ok 4 - exact source, counterpart, dependency, producer, governance and semantic notice freshness; informational history independent
+  ---
+  duration_ms: 42.312208
+  type: 'test'
+  ...
+# Subtest: exclude only exact-plan proof outputs; unrelated qualification negatives stay current
+ok 5 - exclude only exact-plan proof outputs; unrelated qualification negatives stay current
+  ---
+  duration_ms: 9.942208
+  type: 'test'
+  ...
+# Subtest: notice deliveries and seen are mechanical; changed notice semantics invalidate exclusion
+ok 6 - notice deliveries and seen are mechanical; changed notice semantics invalidate exclusion
+  ---
+  duration_ms: 0.335417
+  type: 'test'
+  ...
+# Subtest: applied complete representation survives owner identity, epoch, real handover and additive governing context
+ok 7 - applied complete representation survives owner identity, epoch, real handover and additive governing context
+  ---
+  duration_ms: 14.916291
+  type: 'test'
+  ...
+# Subtest: raw canonical Pass is not applied authority; stale plans cannot dispatch, return or freshly apply
+ok 8 - raw canonical Pass is not applied authority; stale plans cannot dispatch, return or freshly apply
+  ---
+  duration_ms: 9.667667
+  type: 'test'
+  ...
+# Subtest: applied proof retains exact original subject and reproduces historical/current units and evidence after handover
+ok 9 - applied proof retains exact original subject and reproduces historical/current units and evidence after handover
+  ---
+  duration_ms: 13.007208
+  type: 'test'
+  ...
+# Subtest: present exact homes, dependencies, producers, authority, native bindings and negatives still hold after handover
+ok 10 - present exact homes, dependencies, producers, authority, native bindings and negatives still hold after handover
+  ---
+  duration_ms: 17.100917
+  type: 'test'
+  ...
+# Subtest: pure preservation tolerates only exact unrelated negative scopes; full dependency and canonical proof closure vetoes
+ok 11 - pure preservation tolerates only exact unrelated negative scopes; full dependency and canonical proof closure vetoes
+  ---
+  duration_ms: 15.612083
+  type: 'test'
+  ...
+# Subtest: non-applicability and global boundary resolutions keep semantic freshness while notice bookkeeping stays stable
+ok 12 - non-applicability and global boundary resolutions keep semantic freshness while notice bookkeeping stays stable
+  ---
+  duration_ms: 15.943
+  type: 'test'
+  ...
+# Subtest: projection wiring contract double keeps mandatory homes plus new governing records without the represented archive
+ok 13 - projection wiring contract double keeps mandatory homes plus new governing records without the represented archive
+  ---
+  duration_ms: 6.7615
+  type: 'test'
+  ...
+# Subtest: byte packing preserves exact framed coverage and Unicode, including control-heavy JSON
+ok 14 - byte packing preserves exact framed coverage and Unicode, including control-heavy JSON
+  ---
+  duration_ms: 76.862708
+  type: 'test'
+  ...
+# Subtest: deterministic coverage rejects deleted, duplicated, substituted, overlapping leaves and proof cycles
+ok 15 - deterministic coverage rejects deleted, duplicated, substituted, overlapping leaves and proof cycles
+  ---
+  duration_ms: 45.211208
+  type: 'test'
+  ...
+# Subtest: every unique finding, contradiction, allowance and distant boundary retains explicit parent provenance
+ok 16 - every unique finding, contradiction, allowance and distant boundary retains explicit parent provenance
+  ---
+  duration_ms: 125.156209
+  type: 'test'
+  ...
+# Subtest: no current applicability at extraction; final missing mappings and unresolved effects block
+ok 17 - no current applicability at extraction; final missing mappings and unresolved effects block
+  ---
+  duration_ms: 7.829792
+  type: 'test'
+  ...
+# Subtest: new exact-plan negatives and retained rejected negatives cannot be overwritten by later Pass
+ok 18 - new exact-plan negatives and retained rejected negatives cannot be overwritten by later Pass
+  ---
+  duration_ms: 7.009375
+  type: 'test'
+  ...
+# Subtest: independent fresh natives for every leaf, merge and root; producers and CoS excluded
+ok 19 - independent fresh natives for every leaf, merge and root; producers and CoS excluded
+  ---
+  duration_ms: 8.1415
+  type: 'test'
+  ...
+# Subtest: independence membership rebuilds after new job, session and retired collisions
+ok 20 - independence membership rebuilds after new job, session and retired collisions
+  ---
+  duration_ms: 2.818083
+  type: 'test'
+  ...
+# Subtest: canonical native receipt/job/artifact corruption always invalidates exclusion
+ok 21 - canonical native receipt/job/artifact corruption always invalidates exclusion
+  ---
+  duration_ms: 31.766208
+  type: 'test'
+  ...
+# Subtest: represented-by counterpart/dependency cycles cannot become exclusion authority
+ok 22 - represented-by counterpart/dependency cycles cannot become exclusion authority
+  ---
+  duration_ms: 4.152125
+  type: 'test'
+  ...
+# Subtest: large current decision is extracted once in bounded units; historical leaves do not repeat current context
+ok 23 - large current decision is extracted once in bounded units; historical leaves do not repeat current context
+  ---
+  duration_ms: 1148.203125
+  type: 'test'
+  ...
+# {"label":"contract double current-context convergence","raw_bytes":101,"units":12,"reconciliation_nodes":10,"levels":6,"sessions":23,"max_full_prompt_bytes":14598,"aggregate_bytes":6082,"total_input_bytes":227940,"total_output_bytes":22443,"retained_wire_bytes":227940,"plan_bytes":4515,"logical_state_bytes":427762,"elapsed_ms":1148}
+# Subtest: 100K zero findings converges despite per-leaf boilerplate; maximum child responses fit full schema packet
+ok 24 - 100K zero findings converges despite per-leaf boilerplate; maximum child responses fit full schema packet
+  ---
+  duration_ms: 154.062916
+  type: 'test'
+  ...
+# {"label":"contract double zero findings","raw_bytes":100090,"units":14,"reconciliation_nodes":12,"levels":6,"sessions":27,"max_full_prompt_bytes":14616,"aggregate_bytes":5640,"total_input_bytes":262043,"total_output_bytes":18032,"retained_wire_bytes":262043,"plan_bytes":5197,"logical_state_bytes":486811,"elapsed_ms":154}
+# Subtest: two near-limit child results fit the complete packet; genuinely distinct union holds instead of truncating
+ok 25 - two near-limit child results fit the complete packet; genuinely distinct union holds instead of truncating
+  ---
+  duration_ms: 11.085959
+  type: 'test'
+  ...
+# {"label":"contract double near-output-limit reconciliation","full_prompt_bytes":26306,"children":2}
+# Subtest: content-addressed cache never bypasses exact JSON integrity or mutable-state freshness
+ok 26 - content-addressed cache never bypasses exact JSON integrity or mutable-state freshness
+  ---
+  duration_ms: 0.733542
+  type: 'test'
+  ...
+# Subtest: frozen JSON memoization preserves shallow mutation, replacements and exact descriptor checks
+ok 27 - frozen JSON memoization preserves shallow mutation, replacements and exact descriptor checks
+  ---
+  duration_ms: 0.7105
+  type: 'test'
+  ...
+# Subtest: frozen JSON memoization never trusts Proxy or custom array serialization
+ok 28 - frozen JSON memoization never trusts Proxy or custom array serialization
+  ---
+  duration_ms: 0.650833
+  type: 'test'
+  ...
+# Subtest: frozen arrays cannot replace missing own indices with mutable inherited values
+ok 29 - frozen arrays cannot replace missing own indices with mutable inherited values
+  ---
+  duration_ms: 0.112375
+  type: 'test'
+  ...
+# Subtest: frozen JSON hashes follow changed inherited hooks and keep nesting bounds
+ok 30 - frozen JSON hashes follow changed inherited hooks and keep nesting bounds
+  ---
+  duration_ms: 2.305042
+  type: 'test'
+  ...
+# Subtest: genuinely distinct oversized semantics hold with concrete node/subdomain next action
+ok 31 - genuinely distinct oversized semantics hold with concrete node/subdomain next action
+  ---
+  duration_ms: 1.224041
+  type: 'test'
+  ...
+# Subtest: complete 1x/10x/100x UNKNOWN semantic archive workflows, fixed current obligations
+ok 32 - complete 1x/10x/100x UNKNOWN semantic archive workflows, fixed current obligations
+  ---
+  duration_ms: 221.46625
+  type: 'test'
+  ...
+# {"label":"contract double unknown archive","factor":1,"raw_bytes":1170,"units":2,"reconciliation_nodes":0,"levels":2,"sessions":3,"max_full_prompt_bytes":7728,"aggregate_bytes":6203,"total_input_bytes":21378,"total_output_bytes":2764,"retained_wire_bytes":21378,"plan_bytes":2236,"logical_state_bytes":41090,"elapsed_ms":5}
+# {"label":"contract double unknown archive","factor":10,"raw_bytes":10890,"units":4,"reconciliation_nodes":2,"levels":4,"sessions":7,"max_full_prompt_bytes":14613,"aggregate_bytes":6084,"total_input_bytes":58022,"total_output_bytes":6667,"retained_wire_bytes":58022,"plan_bytes":2729,"logical_state_bytes":108529,"elapsed_ms":17}
+# {"label":"contract double unknown archive","factor":100,"raw_bytes":108090,"units":15,"reconciliation_nodes":13,"levels":6,"sessions":29,"max_full_prompt_bytes":14616,"aggregate_bytes":6079,"total_input_bytes":290307,"total_output_bytes":28173,"retained_wire_bytes":290307,"plan_bytes":5445,"logical_state_bytes":551418,"elapsed_ms":200}
+# Subtest: immutable exact source and unit UTF-8 byte counts are not rescanned during repeated plan validation
+ok 33 - immutable exact source and unit UTF-8 byte counts are not rescanned during repeated plan validation
+  ---
+  duration_ms: 29.290167
+  type: 'test'
+  ...
+# Subtest: complete multi-million unknown semantic workflow converges with every receipt, not sampling
+ok 34 - complete multi-million unknown semantic workflow converges with every receipt, not sampling
+  ---
+  duration_ms: 12188.982208
+  type: 'test'
+  ...
+# {"label":"contract double multi-million COMPLETE workflow; not native QA","source_utf16":3360000,"raw_bytes":3612090,"units":429,"reconciliation_nodes":427,"levels":11,"sessions":857,"max_full_prompt_bytes":14594,"aggregate_bytes":6081,"total_input_bytes":8897344,"total_output_bytes":841152,"retained_wire_bytes":8897344,"plan_bytes":109745,"logical_state_bytes":17030061,"elapsed_ms":12189}
+# Subtest: injected worker rejects all omitted output channels before persistence and retains exact bad output/provenance
+    # Subtest: content
+    ok 1 - content
+      ---
+      duration_ms: 175.428209
+      type: 'test'
+      ...
+    # Subtest: result_unknown_property
+    ok 2 - result_unknown_property
+      ---
+      duration_ms: 53.389958
+      type: 'test'
+      ...
+    # Subtest: item_unknown_property
+    ok 3 - item_unknown_property
+      ---
+      duration_ms: 50.136709
+      type: 'test'
+      ...
+    # Subtest: message_to_engineer
+    ok 4 - message_to_engineer
+      ---
+      duration_ms: 45.9665
+      type: 'test'
+      ...
+    # Subtest: message_to_qa
+    ok 5 - message_to_qa
+      ---
+      duration_ms: 50.845875
+      type: 'test'
+      ...
+    # Subtest: notice
+    ok 6 - notice
+      ---
+      duration_ms: 48.831
+      type: 'test'
+      ...
+    1..6
+ok 35 - injected worker rejects all omitted output channels before persistence and retains exact bad output/provenance
+  ---
+  duration_ms: 425.144792
+  type: 'test'
+  ...
+# Subtest: malformed raw qualification JSON retains exact text and target provenance through the worker failure path
+ok 36 - malformed raw qualification JSON retains exact text and target provenance through the worker failure path
+  ---
+  duration_ms: 51.953625
+  type: 'test'
+  ...
+# Subtest: worker retains the negative verdict when rejecting unknown qualification output keys
+ok 37 - worker retains the negative verdict when rejecting unknown qualification output keys
+  ---
+  duration_ms: 52.862667
+  type: 'test'
+  ...
+# Subtest: canonical apply rechecks closed leaf envelopes even with refreshed child references
+ok 38 - canonical apply rechecks closed leaf envelopes even with refreshed child references
+  ---
+  duration_ms: 5.207
+  type: 'test'
+  ...
+# Subtest: closed node-specific grammar covers nested outputs and explicit negatives without filtering source fields
+ok 39 - closed node-specific grammar covers nested outputs and explicit negatives without filtering source fields
+  ---
+  duration_ms: 28.140875
+  type: 'test'
+  ...
+# Subtest: actual paused engine handover admission and QA preserve applied representation before resume
+ok 40 - actual paused engine handover admission and QA preserve applied representation before resume
+  ---
+  duration_ms: 236.513542
+  type: 'test'
+  ...
+# Subtest: actual pending paused handover has bounded current QA projection across represented archive growth
+ok 41 - actual pending paused handover has bounded current QA projection across represented archive growth
+  ---
+  duration_ms: 2045.875667
+  type: 'test'
+  ...
+# Subtest: worker delivers complete bounded wire once, retains canonical native proof and supports different aggregate reviewer
+ok 42 - worker delivers complete bounded wire once, retains canonical native proof and supports different aggregate reviewer
+  ---
+  duration_ms: 709.187875
+  type: 'test'
+  ...
+# Subtest: wire-size accounting: actual worker retains pretty output and canonical apply enforces both independent caps
+ok 43 - wire-size accounting: actual worker retains pretty output and canonical apply enforces both independent caps
+  ---
+  duration_ms: 445.309958
+  type: 'test'
+  ...
+# Subtest: worker rejects supplemental growth, invalid response, CoS native and oversized UTF-8 output
+ok 44 - worker rejects supplemental growth, invalid response, CoS native and oversized UTF-8 output
+  ---
+  duration_ms: 342.940125
+  type: 'test'
+  ...
+# Subtest: worker requires observed spawn timing and preserves timeout/closure failure evidence
+ok 45 - worker requires observed spawn timing and preserves timeout/closure failure evidence
+  ---
+  duration_ms: 132.572458
+  type: 'test'
+  ...
+# Subtest: typed log/file-only restrictions enter extraction units as complete payload semantics
+ok 46 - typed log/file-only restrictions enter extraction units as complete payload semantics
+  ---
+  duration_ms: 1.649959
+  type: 'test'
+  ...
+# Subtest: dependency-only surviving homes remain exact mandatory counterparts
+ok 47 - dependency-only surviving homes remain exact mandatory counterparts
+  ---
+  duration_ms: 4.403708
+  type: 'test'
+  ...
+# Subtest: ordinary format 3 preserves typed job and upgrade homes without replaying unrelated history
+ok 48 - ordinary format 3 preserves typed job and upgrade homes without replaying unrelated history
+  ---
+  duration_ms: 7.970125
+  type: 'test'
+  ...
+# Subtest: fresh large profile accepts dense structured extraction; exact output and raw max+1 remain hard holds
+ok 49 - fresh large profile accepts dense structured extraction; exact output and raw max+1 remain hard holds
+  ---
+  duration_ms: 2.169208
+  type: 'test'
+  ...
+# Subtest: fresh profile immutable binding, exact input max+1, authority fences and failed-job preservation
+ok 50 - fresh profile immutable binding, exact input max+1, authority fences and failed-job preservation
+  ---
+  duration_ms: 6.553541
+  type: 'test'
+  ...
+# Subtest: same complete negative-bearing fictional audit reduces sessions by at least four times with exact retrieval
+ok 51 - same complete negative-bearing fictional audit reduces sessions by at least four times with exact retrieval
+  ---
+  duration_ms: 12765.563916
+  type: 'test'
+  ...
+# {"fixture_utf16":196800,"before":{"raw_bytes":216263,"units":44,"reconciliation_nodes":42,"levels":7,"sessions":87,"max_full_prompt_bytes":14579,"aggregate_bytes":5961,"total_input_bytes":861478,"total_output_bytes":83484,"retained_wire_bytes":861478,"plan_bytes":13067,"logical_state_bytes":1628487,"elapsed_ms":6315},"after":{"raw_bytes":216263,"units":14,"reconciliation_nodes":6,"levels":4,"sessions":21,"max_full_prompt_bytes":36739,"aggregate_bytes":6143,"total_input_bytes":448852,"total_output_bytes":20342,"retained_wire_bytes":448852,"plan_bytes":5457,"logical_state_bytes":874756,"elapsed_ms":2416}}
+# Subtest: four maximum child envelopes hold for density before launch; fitting merge retains complete support
+ok 52 - four maximum child envelopes hold for density before launch; fitting merge retains complete support
+  ---
+  duration_ms: 926.653375
+  type: 'test'
+  ...
+# Subtest: actual sibling failure notice invalidates running assignment and retains eligibility-loss abort cause
+ok 53 - actual sibling failure notice invalidates running assignment and retains eligibility-loss abort cause
+  ---
+  duration_ms: 211.573625
+  type: 'test'
+  ...
+# Subtest: real keyed collections: 145 records, 57 jobs, source-heavy history fits and exact provenance survives
+ok 54 - real keyed collections: 145 records, 57 jobs, source-heavy history fits and exact provenance survives
+  ---
+  duration_ms: 571.165834
+  type: 'test'
+  ...
+# Subtest: formatted JSON preserves raw text and quoted spaces; duplicate keys and changed lexemes remain literal
+ok 55 - formatted JSON preserves raw text and quoted spaces; duplicate keys and changed lexemes remain literal
+  ---
+  duration_ms: 1.404708
+  type: 'test'
+  ...
+# Subtest: actual artifact/runtime payload shapes extract only named bodies and retain review, receipt and authority metadata
+ok 56 - actual artifact/runtime payload shapes extract only named bodies and retain review, receipt and authority metadata
+  ---
+  duration_ms: 1.42325
+  type: 'test'
+  ...
+# Subtest: unknown shapes, old obligations and semantic context are not inferred inert
+ok 57 - unknown shapes, old obligations and semantic context are not inferred inert
+  ---
+  duration_ms: 0.732917
+  type: 'test'
+  ...
+# Subtest: mechanical whitelist references only exact known metadata shapes
+ok 58 - mechanical whitelist references only exact known metadata shapes
+  ---
+  duration_ms: 0.392708
+  type: 'test'
+  ...
+# Subtest: map keys, duplicate IDs and prototype-looking keys remain distinct and immutable
+ok 59 - map keys, duplicate IDs and prototype-looking keys remain distinct and immutable
+  ---
+  duration_ms: 0.278792
+  type: 'test'
+  ...
+# Subtest: frozen retrieval rejects forged identities, hashes, fields and unsafe UTF-16 ranges
+ok 60 - frozen retrieval rejects forged identities, hashes, fields and unsafe UTF-16 ranges
+  ---
+  duration_ms: 1.315875
+  type: 'test'
+  ...
+# Subtest: citations require exact revision and complete delivery separately to author and QA
+ok 61 - citations require exact revision and complete delivery separately to author and QA
+  ---
+  duration_ms: 1.456958
+  type: 'test'
+  ...
+# Subtest: source extraction cannot hide a huge unknown obligation to make admission succeed
+ok 62 - source extraction cannot hide a huge unknown obligation to make admission succeed
+  ---
+  duration_ms: 69.180417
+  type: 'test'
+  ...
+# Subtest: complete request plus reserve bounded while cumulative traffic exceeds 1M
+ok 63 - complete request plus reserve bounded while cumulative traffic exceeds 1M
+  ---
+  duration_ms: 0.52625
+  type: 'test'
+  ...
+# Subtest: unsupported JSON holds instead of silently dropping evidence or invoking accessors
+ok 64 - unsupported JSON holds instead of silently dropping evidence or invoking accessors
+  ---
+  duration_ms: 0.43725
+  type: 'test'
+  ...
+# Subtest: whole bodies alias at all four locations in both orders, preserving complete inline tokens, provenance and originals
+ok 65 - whole bodies alias at all four locations in both orders, preserving complete inline tokens, provenance and originals
+  ---
+  duration_ms: 36.372125
+  type: 'test'
+  ...
+# Subtest: whole-body matching refuses every differing semantic field and unsafe JSON spelling
+ok 66 - whole-body matching refuses every differing semantic field and unsafe JSON spelling
+  ---
+  duration_ms: 16.576625
+  type: 'test'
+  ...
+# Subtest: native, role, phase and attempt boundaries never share unmatched or forged bodies
+ok 67 - native, role, phase and attempt boundaries never share unmatched or forged bodies
+  ---
+  duration_ms: 13.971417
+  type: 'test'
+  ...
+1..67
+# tests 73
+# suites 0
+# pass 73
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 32856.242541

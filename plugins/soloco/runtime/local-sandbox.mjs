@@ -15,20 +15,35 @@ const BACKEND='macos-seatbelt-node';
 const node=fs.realpathSync(process.execPath);
 const quote=value=>JSON.stringify(value);
 let runtimePaths, runtimeDependencyFiles, capability, isolationFlag;
+// Inspect only the trusted runtime and its discovered libraries. Cold Xcode
+// tool startup can exceed the former two-second probe on hosted macOS runners.
+// Retry a timed-out inspection once, never a real tool/library error, and retain
+// the underlying diagnostic instead of reporting an unexplained capability Hold.
+export function inspectRuntimeLibrary(file,probe=spawnSync,{deadline=Date.now()+15000,now=Date.now}={}) {
+  for(let attempt=0;attempt<2;attempt++) {
+    const remaining=deadline-now();
+    if(remaining<=0)throw Error('Node runtime dependency discovery timed out');
+    const result=probe('/usr/bin/otool',['-L',file],{encoding:'utf8',timeout:Math.min(5000,remaining),maxBuffer:100000,killSignal:'SIGKILL',env:{PATH:'/usr/bin:/bin'}});
+    if(now()>=deadline)throw Error('Node runtime dependency discovery timed out');
+    if(result.status===0&&!result.error&&!result.signal&&typeof result.stdout==='string')return result.stdout;
+    if(result.error?.code==='ETIMEDOUT'&&attempt===0)continue;
+    const reason=String(result.error?.message||result.stderr||result.signal||`exit ${result.status}`).trim().slice(0,500);
+    throw Error(`Cannot establish Node runtime library allowlist: otool -L ${file}: ${reason}`);
+  }
+}
 function libraries() {
   if(runtimePaths) return runtimePaths;
-  const started=Date.now(), seen=new Set(), queue=[node], dirs=new Set(['/System/Library','/usr/lib']);
+  const deadline=Date.now()+15000, seen=new Set(), queue=[node], dirs=new Set(['/System/Library','/usr/lib']);
   while(queue.length) {
     const file=queue.pop();if(seen.has(file))continue;
-    if(Date.now()-started>5000)throw new Error('Node runtime dependency discovery timed out');
+    if(Date.now()>=deadline)throw new Error('Node runtime dependency discovery timed out');
     if(seen.size>=128)throw new Error('Node runtime dependency allowlist exceeds its bound');
     seen.add(file);
     const real=fs.realpathSync(file);
     if(file!==node){dirs.add(path.dirname(file));dirs.add(path.dirname(real));}
     if(real!==file && !seen.has(real))queue.push(real);
-    const result=spawnSync('/usr/bin/otool',['-L',file],{encoding:'utf8',timeout:2000,maxBuffer:100000,env:{PATH:'/usr/bin:/bin'}});
-    if(result.status!==0)throw new Error('Cannot establish Node runtime library allowlist');
-    for(const line of result.stdout.split('\n').slice(1)) {
+    const output=inspectRuntimeLibrary(file,spawnSync,{deadline});
+    for(const line of output.split('\n').slice(1)) {
       let dependency=line.trim().split(' (')[0];
       if(!dependency)continue;
       if(dependency.startsWith('/usr/lib/') || dependency.startsWith('/System/Library/'))continue;

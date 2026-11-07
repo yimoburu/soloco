@@ -1,0 +1,64 @@
+TAP version 13
+# Subtest: paired contract doubles traverse production checks and exact independent receiver acceptance
+ok 1 - paired contract doubles traverse production checks and exact independent receiver acceptance
+  ---
+  duration_ms: 7845.96725
+  type: 'test'
+  ...
+# Subtest: known deterministic failure consumes one observed repair; original failed receipt survives
+ok 2 - known deterministic failure consumes one observed repair; original failed receipt survives
+  ---
+  duration_ms: 7139.377625
+  type: 'test'
+  ...
+# Subtest: independent negative verdict holds receiver acceptance and records actual escalation
+ok 3 - independent negative verdict holds receiver acceptance and records actual escalation
+  ---
+  duration_ms: 2906.738333
+  type: 'test'
+  ...
+# Subtest: uncertain backend failure is retained without another generation or false acceptance
+ok 4 - uncertain backend failure is retained without another generation or false acceptance
+  ---
+  duration_ms: 697.931875
+  type: 'test'
+  ...
+# Subtest: final assessor rejects duplicate schedules and unmatched fixture, execution or model settings
+ok 5 - final assessor rejects duplicate schedules and unmatched fixture, execution or model settings
+  ---
+  duration_ms: 2.436167
+  type: 'test'
+  ...
+# Subtest: final assessor rejects contradictory QA, held/error paths, altered call identity and stale exact bindings
+ok 6 - final assessor rejects contradictory QA, held/error paths, altered call identity and stale exact bindings
+  ---
+  duration_ms: 9.4835
+  type: 'test'
+  ...
+# Subtest: pre/post source verification detects actual file drift, failed capture, runtime drift and invalid manifests
+ok 7 - pre/post source verification detects actual file drift, failed capture, runtime drift and invalid manifests
+  ---
+  duration_ms: 1732.404709
+  type: 'test'
+  ...
+# Subtest: actual contract-double candidates accept; duplicated arms, negative reviews, call failures and changed bindings cannot pass assessment
+ok 8 - actual contract-double candidates accept; duplicated arms, negative reviews, call failures and changed bindings cannot pass assessment
+  ---
+  duration_ms: 13723.122875
+  type: 'test'
+  ...
+# Subtest: exact fixture mismatch and independent QA hold retain output without acceptance or retry
+ok 9 - exact fixture mismatch and independent QA hold retain output without acceptance or retry
+  ---
+  duration_ms: 5041.617583
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 40642.337042
