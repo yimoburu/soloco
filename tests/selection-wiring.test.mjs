@@ -1,3 +1,4 @@
+import {outcomeSchema} from '../plugins/soloco/runtime/outcome.mjs';
 import * as scoped from '../plugins/soloco/runtime/scoped-context.mjs';
 import {operatingMaintenanceEligible} from '../plugins/soloco/runtime/operating-state.mjs';
 import test from 'node:test';
@@ -73,7 +74,7 @@ function harness(host='claude') {
     if(typeof value!=='string'||!value.trim()||value.length>max)throw new Error('Invalid '+label);
     return value;
   };
-  const deps={scoped,...coordination,operatingMaintenanceEligible,
+  const deps={outcomeSchema,scoped,...coordination,operatingMaintenanceEligible,
     path,os:{homedir:()=>'/unused'},fs:{existsSync:()=>true},
     process:{cwd:()=>process.cwd(),env:{},execPath:'/unused/node',argv:[]},
     PACKAGE:'/unused',VERSION:'fixture',SCHEMA:2,
