@@ -637,7 +637,7 @@ Protocol: Return JSON only matching response_contract.required_json_shape for th
           } else {
             if(modern)publish('upgrade.call_started',a=>a.steps.push({id:callId,role,phase:task.phase,input_sha256:inputHash,...(u.operating_input?{operating_input_sha256:u.operating_input.immutable_snapshot.sha256}:{}),...proposalBinding,budget,requested_native_id:session.native,state:'started',started_at:stamp(),worker_token:token}));
             modelStarted=performance.now();
-            output=await model(u.host,session.native,prompt,dir,remaining,structuredClone(requested),{sessionTitle:sessionTitle(role==='cos'?'Upgrade CoS':'Upgrade QA',session.instance),sessionNameDirectory:dir,timeoutContext:'upgrade-call',timeoutReason:'Runtime execution ceiling capped by remaining immutable upgrade rehearsal deadline',signal:controller.signal});
+            output=await model(u.host,session.native,prompt,dir,remaining,structuredClone(requested),{sessionTitle:sessionTitle(role==='cos'?'Upgrade CoS':'Upgrade QA',session.instance),sessionNameDirectory:dir,...(Number.isFinite(deadline(u))?{executionDeadlineAt:deadline(u)}:{}),timeoutContext:'upgrade-call',timeoutReason:'Runtime execution ceiling capped by remaining immutable upgrade rehearsal deadline',signal:controller.signal});
             modelElapsed=Math.max(0,performance.now()-modelStarted);
           }
         }

@@ -24,4 +24,6 @@ node tools/session-naming-smoke.mjs --run-native codex /tmp/soloco-codex-names.j
 node tools/session-naming-smoke.mjs --run-native claude /tmp/soloco-claude-names.json
 ```
 
+The retained native probes exercised runtime revision `3e5c5d0`. A subsequent caller-only change explicitly forwards the finite upgrade deadline into the adapter guard; the selected upgrade lifecycle test checks that binding and both role titles across fresh, retrieval, replay and synthesis calls. The naming adapter and metadata backend used by the probes are unchanged.
+
 Each check uses two short calls from the existing signed-in host allowance and a disposable fictional working folder. Display-name verification is distinct from model competence, company acceptance and installed release adoption.

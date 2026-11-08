@@ -285,7 +285,7 @@ test('upgrade selection rejects incompatible actions and invalid controls withou
 
 test('one catalog-validated selection persists and reaches fresh independent roles, retrieval, replay and synthesis unchanged',async()=>{
   const a=setup(),inspection=upgrade({...a,action:'inspect'},'codex');let discoveries=0;
-  const p=upgrade({...a,workflow:'legacy',action:'prepare',candidate_hash:inspection.candidate_hash,source_instruction:'Upgrade fictional team',call_timeout_minutes:30,model_selection:{...selected,reason:`  ${selected.reason}  `}},'codex',{
+  const p=upgrade({...a,workflow:'legacy',action:'prepare',candidate_hash:inspection.candidate_hash,source_instruction:'Upgrade fictional team',review_window_minutes:90,call_timeout_minutes:30,model_selection:{...selected,reason:`  ${selected.reason}  `}},'codex',{
     ...options,catalog:host=>{assert.equal(host,'codex');discoveries++;return selectionCatalog;}
   });
   assert.equal(discoveries,1);assert.deepEqual(exactSource(a,'codex',p.upgrade.source).model_selection,selected);
@@ -299,6 +299,9 @@ test('one catalog-validated selection persists and reaches fresh independent rol
     assert.deepEqual(args[5],selected);
     assert.equal(args[4],1800000);
     assert.equal(args[6].timeoutContext,'upgrade-call');
+    assert.equal(args[6].executionDeadlineAt,read(a).upgrade.deadline_ms);
+    assert(Number.isFinite(args[6].executionDeadlineAt));
+    assert(args[6].sessionTitle.startsWith('SoloCo — Upgrade '+(role==='cos'?'CoS':'QA')));
     assert.equal(args[1],phases.has(role)?`native-${role}`:null);
     if(!phases.has(role))phases.set(role,new Set());
     phases.get(role).add(task.phase);
