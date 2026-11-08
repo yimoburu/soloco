@@ -1,0 +1,31 @@
+{
+  "host": "codex",
+  "status": "failed",
+  "passed": false,
+  "error": "Metadata-only Codex readback timed out",
+  "source_sha256": {
+    "adapters": "5bfae06cd955a54904e3f00dbf3e2aaa487d9135d6283ea0b327baf7a354c155",
+    "session-naming": "974ae43f586056e054fea4a58e9c32e81fe4d8b22d89388368ccdc9718f724f7",
+    "worker": "844ac9af7121218ebbafc4b86a41f3c0f8e8034dbeb205cec58f0920a9098af3",
+    "upgrade": "c3b8d44e965dcb0e2bcb5ad6b610b56d25521067a4078404807219c8a4fc0b72"
+  },
+  "finished_at": "2026-11-08T04:51:43.537Z",
+  "original_report_sha256": "b7a0a985db209c55fa6a1b84a768b5c3f946d2182b32b005c80e0258249fe49d",
+  "published_scope": "Display-name metadata only; raw provider observations retained locally.",
+  "rounds": [
+    {
+      "role": "Naming Probe Engineer",
+      "native_id": "01a1b97f-325f-7320-b5e6-0a674fb4cb06",
+      "requested_title": "SoloCo \u2014 Naming Probe Engineer \u00b7 ffd9c267-45bbdb95",
+      "observed_title": "SoloCo \u2014 Naming Probe Engineer \u00b7 ffd9c267-45bbdb95",
+      "receipt": {
+        "at": "2026-11-08T04:51:24.497Z",
+        "host": "codex",
+        "status": "named",
+        "native_id": "01a1b97f-325f-7320-b5e6-0a674fb4cb06",
+        "title": "SoloCo \u2014 Naming Probe Engineer \u00b7 ffd9c267-45bbdb95",
+        "verification": "app_server_readback"
+      }
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "host": "claude",
+  "status": "passed",
+  "passed": true,
+  "source_sha256": {
+    "adapters": "5bfae06cd955a54904e3f00dbf3e2aaa487d9135d6283ea0b327baf7a354c155",
+    "session-naming": "974ae43f586056e054fea4a58e9c32e81fe4d8b22d89388368ccdc9718f724f7",
+    "worker": "844ac9af7121218ebbafc4b86a41f3c0f8e8034dbeb205cec58f0920a9098af3",
+    "upgrade": "c3b8d44e965dcb0e2bcb5ad6b610b56d25521067a4078404807219c8a4fc0b72"
+  },
+  "finished_at": "2026-11-08T04:51:16.992Z",
+  "original_report_sha256": "7d0f3d29f074ac3a41e75db72953eb5578f87eab24eb2bbf350e4e0b1475e969",
+  "published_scope": "Display-name metadata only; raw provider observations retained locally.",
+  "rounds": [
+    {
+      "role": "Naming Probe Engineer",
+      "native_id": "563339cf-d7ac-4f67-9ade-86afeb6adcc0",
+      "requested_title": "SoloCo \u2014 Naming Probe Engineer \u00b7 c6721d12-ab124a6d",
+      "observed_title": "SoloCo \u2014 Naming Probe Engineer \u00b7 c6721d12-ab124a6d",
+      "receipt": {
+        "at": "2026-11-08T04:51:13.715Z",
+        "host": "claude",
+        "status": "requested",
+        "native_id": "563339cf-d7ac-4f67-9ade-86afeb6adcc0",
+        "title": "SoloCo \u2014 Naming Probe Engineer \u00b7 c6721d12-ab124a6d",
+        "verification": "launch_argv_only"
+      }
+    },
+    {
+      "role": "Naming Probe Resumed Engineer",
+      "native_id": "563339cf-d7ac-4f67-9ade-86afeb6adcc0",
+      "requested_title": "SoloCo \u2014 Naming Probe Resumed Engineer \u00b7 c6721d12-ab124a6d",
+      "observed_title": "SoloCo \u2014 Naming Probe Resumed Engineer \u00b7 c6721d12-ab124a6d",
+      "receipt": {
+        "at": "2026-11-08T04:51:16.780Z",
+        "host": "claude",
+        "status": "requested",
+        "native_id": "563339cf-d7ac-4f67-9ade-86afeb6adcc0",
+        "title": "SoloCo \u2014 Naming Probe Resumed Engineer \u00b7 c6721d12-ab124a6d",
+        "verification": "launch_argv_only"
+      }
+    }
+  ]
+}
