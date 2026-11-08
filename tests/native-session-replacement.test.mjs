@@ -8,4 +8,5 @@ test('native replacement grader rejects stale truth and missing unresolved oblig
  assert.equal(gradeReplacement(JSON.stringify({...exact(),current_value:'amber'})).passed,false);
  assert.equal(gradeReplacement(JSON.stringify({...exact(),obsolete_value_rejected:null})).passed,false);
  assert.equal(gradeReplacement('Unverified narrative without exact obligations').passed,false);
+ for(const value of [null,[],1,'unverified'])assert.equal(gradeReplacement(JSON.stringify(value)).passed,false);
 });
