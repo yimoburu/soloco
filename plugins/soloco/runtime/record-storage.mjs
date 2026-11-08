@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import {publicCatalog,publicIndexValue,PUBLIC_COLLECTIONS} from './public-response.mjs';
+import {publicCatalog,publicIndexValue,PUBLIC_COLLECTIONS} from './state-projections.mjs';
 import {pendingSnapshots,bindSnapshots,captureSnapshotDependencies} from './snapshot.mjs';
 const hash=value=>createHash('sha256').update(value).digest('hex');
 const collections=new Set(['records','jobs','sessions','notices','messages','upgrade_history','retired_sessions','context_classifications','upgrade']);

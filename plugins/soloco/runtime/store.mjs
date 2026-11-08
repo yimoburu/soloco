@@ -1,14 +1,14 @@
 import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
 import path from 'node:path';
-import { randomUUID, createHash } from 'node:crypto';
-import { fileURLToPath } from 'node:url';
+import { randomUUID } from 'node:crypto';
 import {normalizedLayout,readNormalized,writeNormalized,migrateNormalized,writeNormalizedSelection,flushSnapshots,readImmutable,appendNormalizedJournal,LATEST_LAYOUT,readNormalizedValue,readPublicIndex,readPublicRows,readPublicHandle,readPublicAlias,captureStorageMetadata,captureStorageBaseline,insertStorageEvent,readStorageIntake} from './record-storage.mjs';
 import {bindSnapshots,bindOperatingIntake} from './snapshot.mjs';
-import {bindPublicReader,PUBLIC_COLLECTIONS} from './public-response.mjs';
+import {bindPublicReader,PUBLIC_COLLECTIONS} from './state-projections.mjs';
+export {digest} from './state-projections.mjs';
+import {PACKAGE,VERSION,teamHash} from './team-source.mjs';
+export {PACKAGE,VERSION,skillBody,installedTeam,teamHash} from './team-source.mjs';
 
-export const PACKAGE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-export const VERSION = '0.7.6';
 // Explicitly tested state producers, not a blanket semver compatibility promise.
 export const COMPATIBLE_RUNTIME_VERSIONS = ['0.2.0', '0.2.1', '0.2.2', '0.3.0', '0.3.1', '0.4.0', '0.4.1', '0.5.0', '0.6.0', '0.6.1', '0.6.2', '0.6.3', '0.6.4', '0.6.5', '0.6.6', '0.6.7', '0.6.8', '0.6.9', '0.6.10', '0.6.11', '0.6.12', '0.6.13', '0.7.0', '0.7.1', '0.7.2', '0.7.3', '0.7.4', '0.7.5', VERSION];
 export const COMPATIBLE_TEAM_VERSIONS = ['0.1.0', ...COMPATIBLE_RUNTIME_VERSIONS];
@@ -20,7 +20,6 @@ export const SCHEMA = 2;
 export const compatibleRuntime = state => state?.schema === SCHEMA && COMPATIBLE_RUNTIME_VERSIONS.includes(state.runtime_version);
 export const stamp = () => new Date().toISOString();
 export const id = (prefix) => `${prefix}-${randomUUID()}`;
-export const digest = (text) => createHash('sha256').update(text).digest('hex');
 export function requireText(value, name, max = 20000) {
   if (typeof value !== 'string' || !value.trim() || value.length > max) throw new Error(`${name} must be nonempty text, at most ${max} characters`);
   return value;
@@ -215,14 +214,6 @@ export function owner(state, actor, host, epoch) {
   if (upgradePending(state)) throw new Error('Team upgrade is held; use company_upgrade to inspect, verify, or recover');
 }
 export const upgradePending = state => state?.upgrade && !['completed','recovered'].includes(state.upgrade.status);
-export const skillBody = text => text.replace(/^---[\s\S]*?---\s*/, '');
-export function installedTeam() {
-  const governance = fs.readFileSync(path.join(PACKAGE,'assets/governance.md'),'utf8');
-  return {plugin_version:VERSION, governance, governance_sha256:digest(governance), roles:JSON.parse(fs.readFileSync(path.join(PACKAGE,'assets/roles.json'),'utf8')), cos_instructions:skillBody(fs.readFileSync(path.join(PACKAGE,'skills/soloco/SKILL.md'),'utf8'))};
-}
-export function teamHash(s) {
-  return digest(JSON.stringify([s.plugin_version,s.governance,s.roles,s.cos_instructions]));
-}
 export function notice(state, kind, summary, reference = null) {
   const item = {id: id('notice'), kind, summary, reference, created_at: stamp(), deliveries: [], seen_at: null, resolution: null};
   state.notices.push(item);

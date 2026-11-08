@@ -1,9 +1,9 @@
 import {SchedulingHold} from './recovery.mjs';
-import { digest } from './store.mjs';
+import {digest,resourceClaims} from './state-projections.mjs';
+export {resourceClaims} from './state-projections.mjs';
 import {taskMessageInput,assertTaskPrerequisites} from './tasks.mjs';
 import {validTestExecution} from './develop.mjs';
 
-const active=new Set(['queued','running']);
 function names(value,label,max) {
   if(value===undefined)return [];
   if(!Array.isArray(value)||value.length>max||value.some(v=>typeof v!=='string'||!/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,159}$/.test(v)))throw new Error(`${label} must contain at most ${max} bounded identifiers`);
@@ -48,17 +48,6 @@ function dependency(state,id,seen=new Set()) {
     if(!job.native_id || artifact.author_instance===target.author_instance || artifact.author_instance===candidate?.author_instance || job.native_id===target.author_instance || job.native_id===candidate?.author_instance || author?.native_id===job.native_id)throw new Error(`Dependency ${id} is not an independent review`);
   }
   return {job_id:job.id,epoch:job.epoch??null,instance_id:job.instance_id??null,artifact_id:artifact.id,revision:artifact.revision,sha256:digest(JSON.stringify(artifact)),...(subject?{subject}:{})};
-}
-export function resourceClaims(state,excluding=null) {
-  const claims=[];
-  for(const job of Object.values(state.jobs??{})) {
-    if(job.id===excluding || !job.coordination?.resources?.length)continue;
-    // A pause/deadline may change status before process closure. Only runtime
-    // closure evidence releases claims; no clock or terminal label proves it.
-    if(!active.has(job.status) && job.coordination_release?.termination_confirmed===true)continue;
-    for(const resource of job.coordination.resources)claims.push({resource,job_id:job.id,status:job.status,termination_unverified:!active.has(job.status)});
-  }
-  return claims;
 }
 export function bindCoordination(state,args) {
   const value=normalizeCoordination(args);

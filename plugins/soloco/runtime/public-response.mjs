@@ -1,9 +1,9 @@
 // Public presentation only. Never modifies archived evidence or implies acceptance.
-import fs from 'node:fs';
-import path from 'node:path';
-import { digest, VERSION, PACKAGE, installedTeam, skillBody } from './store.mjs';
+import {digest,publicReaderFor,resourceClaims,storageSourceId,publicEntries,usageView} from './state-projections.mjs';
+export {bindPublicReader,PUBLIC_COLLECTIONS,storageSourceId,publicEntries,publicIndexValue,publicCatalog} from './state-projections.mjs';
+import {VERSION,publicTeam} from './team-source.mjs';
+export {publicTeam} from './team-source.mjs';
 import { contextSource } from './current-state.mjs';
-import { resourceClaims } from './coordination.mjs';
 import { jobTimeoutState } from './timeout.mjs';
 
 export const MODEL_MAX_BYTES=30000;
@@ -25,10 +25,6 @@ export function rpcReply(id,result,error) {
   if(bytes(JSON.stringify(reply))>REPLY_MAX_BYTES || result?.content?.some(c=>c.type==='text'&&bytes(c.text)>MODEL_MAX_BYTES))reply={jsonrpc:'2.0',id,result:{isError:true,content:[{type:'text',text:'Response exceeds public transport budget. Use company_context inspect/read pages.'}]}};
   return JSON.stringify(reply);
 }
-const readers=new WeakMap();
-export function bindPublicReader(state,reader) { readers.set(state,reader);return state; }
-const values=x=>Object.values(x??{});
-const active=j=>['queued','running'].includes(j?.status);
 const cut=(s,n=180)=>typeof s==='string'?s.slice(0,n):(['number','boolean'].includes(typeof s)?s:null);
 // Identity/control fields are exact or explicitly withheld. A prefix must never
 // become an actionable ID, epoch, model, version or authority field.
@@ -47,16 +43,6 @@ export function sourceReference(value,id) {
   const text=JSON.stringify(value);
   return {id,revision:Number.isSafeInteger(value?.revision)?value.revision:null,...(value?.revision!==undefined&&!Number.isSafeInteger(value.revision)?{revision_not_inlined:true}:{}),sha256:digest(text),total_characters:text.length,read:{tool:'company_context',action:'read'},consistency:'Hash-checked exact JSON value; changed live/installed sources fail closed. No historical copy is promised.'};
 }
-export function publicTeam(state,kind,policy='preserve') {
-  if(kind==='pinned')return {plugin_version:state.plugin_version,governance:state.governance,governance_sha256:state.governance_sha256,roles:state.roles,cos_instructions:state.cos_instructions??skillBody(fs.readFileSync(path.join(PACKAGE,'compat/company-0.1.0.md'),'utf8'))};
-  if(!['installed','candidate'].includes(kind)||!['preserve','installed'].includes(policy))throw Error('Unknown public team source');
-  const team=installedTeam();
-  if(kind==='candidate'&&policy==='preserve'){team.governance=state.governance;team.governance_sha256=state.governance_sha256;}
-  return team;
-}
-// Reserved namespaces always resolve their declared family. Colliding raw record
-// keys remain readable through @public:records:<key> or a hashed key locator.
-export const storageSourceId=(family,key)=>bytes(key)>512||key.startsWith('@public:')?`@public:key:${family}:${digest(JSON.stringify(key))}`:`@public:${family}:${key}`;
 export function publicSource(state,id) {
   if(!id.startsWith('@public:'))return contextSource(state,id);
   const [,family,...tail]=id.split(':');const key=tail.join(':');
@@ -74,27 +60,6 @@ export function publicSource(state,id) {
   if(family==='pinned' && ['governance','cos_instructions','roles','owner','idea','name','id','plugin_version','runtime_version','team_sha256','governance_sha256','context_classifications'].includes(key))return state[key];
   if(family==='current' && ['upgrade','handover'].includes(key))return state[key];
   if(['records','jobs','notices','messages','sessions','upgrade_history','context_classifications'].includes(family))return Object.hasOwn(state[family]??{},key)?state[family][key]:undefined;
-}
-function sourceId(state,family,key,value) {
-  if(bytes(key)>512||key.startsWith('@public:'))return storageSourceId(family,key);
-  if(family==='records')return key;
-  const legacy=family==='jobs'&&value?.id===key?'job:'+key:family==='upgrade_history'&&typeof value?.id==='string'?'upgrade:'+value.id:null;
-  return legacy&&bytes(legacy)<=512&&!Object.hasOwn(state.records??{},legacy)?legacy:`@public:${family}:${key}`;
-}
-export function publicEntries(state,collection) {
-  if(collection==='sources')return ['governance','cos_instructions','roles','owner','idea','name','id','plugin_version','runtime_version','team_sha256','governance_sha256','context_classifications'].filter(k=>state[k]!==undefined).map(k=>({key:k,id:'@public:pinned:'+k,value:state[k]})).concat(['upgrade','handover'].filter(k=>state[k]!==undefined).map(k=>({key:k,id:'@public:current:'+k,value:state[k]})));
-  const family=['active_jobs','claimed_jobs'].includes(collection)?'jobs':collection==='unresolved_notices'?'notices':['development','prototype_plans'].includes(collection)?'records':collection;
-  if(!['records','jobs','notices','messages','sessions','upgrade_history','context_classifications'].includes(family))throw Error('Unknown public collection');
-  let rows=Object.entries(state[family]??{}).map(([key,value])=>({key,id:sourceId(state,family,key,value),value}));
-  if(collection==='development')rows=rows.filter(r=>r.value?.development);
-  if(collection==='prototype_plans')rows=rows.filter(r=>r.value?.prototype?.type==='plan');
-  if(collection==='active_jobs')rows=rows.filter(r=>active(r.value));
-  if(collection==='claimed_jobs'){const held=new Set(resourceClaims(state).map(c=>c.job_id));rows=rows.filter(r=>held.has(r.value?.id));}
-  if(collection==='unresolved_notices')rows=rows.filter(r=>!r.value?.resolution);
-  // New results/amendments of old objects must appear in the recent window.
-  // Missing legacy timestamps fall back to reverse storage order.
-  if(['records','jobs','messages','upgrade_history'].includes(collection))rows=rows.map((r,position)=>({...r,position,time:Math.max(0,...['updated_at','finished_at','created_at','at'].map(k=>Date.parse(r.value?.[k])||0))})).sort((a,b)=>b.time-a.time||b.position-a.position);
-  return rows;
 }
 export function itemView(value,id,collection='records') {
   const ref=sourceReference(value,id),v=value??{};
@@ -168,7 +133,7 @@ const encodeCursor=(collection,inventory,offset)=>Buffer.from(JSON.stringify({co
 export function publicPage(state,{collection='records',cursor,offset,limit=8}={}) {
   if(!Number.isSafeInteger(limit)||limit<1||limit>100)throw Error('Invalid public page limit');
   if(cursor!==undefined&&offset!==undefined)throw Error('Choose cursor or offset, not both');
-  const reader=readers.get(state),rows=reader?null:publicEntries(state,collection);
+  const reader=publicReaderFor(state),rows=reader?null:publicEntries(state,collection);
   const info=reader?.info(collection);
   // Cursor membership binding survives delivery receipts and changed item bytes.
   // Exact item hashes are reissued on each page; changed membership fails closed.
@@ -190,7 +155,7 @@ export function publicPage(state,{collection='records',cursor,offset,limit=8}={}
   return page;
 }
 function collectionInfo(state,collection) {
-  const info=readers.get(state)?.info(collection),rows=info?null:publicEntries(state,collection),total=info?.total??rows.length;
+  const info=publicReaderFor(state)?.info(collection),rows=info?null:publicEntries(state,collection),total=info?.total??rows.length;
   const inventory=info?.inventory??digest(JSON.stringify([state.id??null,collection,rows.map(r=>[r.id,r.value?.id??null])]));
   return {collection,total,returned:0,complete:total===0,next_cursor:total?encodeCursor(collection,inventory,0):null,inspect_collection:collection};
 }
@@ -215,25 +180,15 @@ export function exactTextRead(text,{id,sha256,offset=0,length=8000},value=null) 
 export function controlView(state) {
   return {...pick(state,['revision','paused','team_sha256']),owner:{...pick(state?.owner,['host','session_id','epoch']),...(state?.owner?{source:sourceReference(state.owner,'@public:pinned:owner')}:{})}};
 }
-function usageView(state) {
-  let assignments=0,missing_reasons=0,with_applied_controls=0,with_host_reported_models=0;
-  for(const job of values(state.jobs)) {
-    if(job?.kind==='development_test'||job?.type==='development_test')continue;
-    assignments++;if(typeof job?.model_selection?.reason!=='string'||!job.model_selection.reason.trim())missing_reasons++;
-    if(job?.model_evidence?.applied_controls)with_applied_controls++;
-    if(job?.model_evidence?.reported_models?.length)with_host_reported_models++;
-  }
-  return {scope:'specialist_assignments_only',unit:'assignment_count',assignments,missing_reasons,with_applied_controls,with_host_reported_models,effective_settings:'not_established_by_requests_or_applied_controls',coordinator_usage:'not_collected_host_ui_controlled',details_collection:'jobs'};
-}
 export function currentView(state,{open=false,capabilities={}}={}) {
   if(!state)throw Error('Company initialization is incomplete; use company_open');
   const result={response_format:RESPONSE_FORMAT,display_fields_are_previews:true,...pick({...state,company_id:state.id,runtime_version:state.runtime_version??state.plugin_version},['name','idea','revision','phase','mode','paused','plugin_version','governance_sha256','team_sha256','company_id','runtime_version']),company_source:state.id===undefined?null:sourceReference(state.id,'@public:pinned:id'),owner:controlView(state).owner,executing_runtime_version:VERSION,upgrade:upgradeView(state.upgrade),handover:state.handover?{...pick(state.handover,['id','status','subject_sha256','created_at']),source:sourceReference(state.handover,'@public:current:handover'),preview:true}:null,
     retrieval:{tool:'company_context',inspect:'Choose collection and follow next_cursor until complete; pages are previews',read:'Supply exact source.id and sha256; concatenate text by next_offset. Changed hashes require a fresh inspect.',archive_export:'company_storage backup (files only)',legacy:'v2 replaces full status arrays; use inspect/read for exact objects'},
-    active_jobs:publicPage(state,{collection:'active_jobs',limit:3}),records:publicPage(state,{collection:'records',limit:3}),jobs:publicPage(state,{collection:'jobs',limit:3}),notices:publicPage(state,{collection:'unresolved_notices',limit:3}),messages:publicPage(state,{collection:'messages',limit:2}),sessions:collectionInfo(state,'sessions'),upgrade_history:collectionInfo(state,'upgrade_history'),resource_claims:{total:readers.get(state)?.claims??resourceClaims(state).length,jobs:publicPage(state,{collection:'claimed_jobs',limit:1}),rule:'Claims from uncertain jobs remain held until runtime confirms process closure'},
+    active_jobs:publicPage(state,{collection:'active_jobs',limit:3}),records:publicPage(state,{collection:'records',limit:3}),jobs:publicPage(state,{collection:'jobs',limit:3}),notices:publicPage(state,{collection:'unresolved_notices',limit:3}),messages:publicPage(state,{collection:'messages',limit:2}),sessions:collectionInfo(state,'sessions'),upgrade_history:collectionInfo(state,'upgrade_history'),resource_claims:{total:publicReaderFor(state)?.claims??resourceClaims(state).length,jobs:publicPage(state,{collection:'claimed_jobs',limit:1}),rule:'Claims from uncertain jobs remain held until runtime confirms process closure'},
     capabilities:{standalone_sessions:true,model_selection:{eligible:['0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7','0.6.8','0.6.9','0.6.10','0.6.11','0.6.12','0.6.13','0.7.0','0.7.1','0.7.2','0.7.3','0.7.4','0.7.5',VERSION].includes(state.plugin_version),catalog:'company_doctor.models'},...Object.fromEntries(Object.entries(capabilities).map(([key,value])=>[key,{...pick(value,['supported','eligible','blocker']),limits:pick(value?.limits,['max_files','max_bytes','per_file_max_bytes','max_total_bytes','max_attempts','max_test_ms','context_admission_characters','network','package_installation','source_integration','test_execution','external_execution']),preview:true}])),details:'company_doctor and exact plan inspection; installed capability never grants company authority',external_execution:false,background_founder_delivery:false}};
   // Activity deliberately reuses bounded job truth; no evidence/model output spread.
   result.activity={items:[...result.active_jobs.items,...result.jobs.items.filter(j=>!result.active_jobs.items.some(a=>a.source.id===j.source.id))].map(j=>({...pick(j,['id','role','status','artifact_id','task_summary']),source:j.source})),previews:true,complete:result.active_jobs.complete&&result.jobs.complete,inspect_collection:'jobs'};
-  result.selection_usage=readers.get(state)?.usage??usageView(state);
+  result.selection_usage=publicReaderFor(state)?.usage??usageView(state);
   result.pinned=publicPage(state,{collection:'sources',limit:10});
   if(open) {
     result.instruction_loading='Before operational work load exact pinned governance, cos_instructions and roles. company_open is required on initial attachment or changed team; installation grants no authority.';
@@ -274,32 +229,4 @@ export function doctorView(raw,{cursor,limit=100}={}) {
   while(!fits(result)&&window.returned>1){result.models.models.pop();window.returned--;window.complete=false;window.next_cursor=encodeCursor('doctor_models',inventory,start+window.returned);}
   if((models.length>start&&!window.returned)||!fits(result))throw Error('Doctor diagnostics exceed the page budget; retry without optional root hook diagnostics');
   return result;
-}
-
-// Version 1 of a derived read index, never an authority or canonical state.
-// Store only fields that affect membership/order/aggregates, never archived bodies.
-export const PUBLIC_COLLECTIONS=['records','jobs','notices','messages','sessions','upgrade_history','context_classifications','active_jobs','claimed_jobs','unresolved_notices','development','prototype_plans','sources'];
-export function publicIndexValue(family,value) {
-  const v=value??{},out={};
-  for(const k of ['id','updated_at','finished_at','created_at','at'])if(v[k]!==undefined)out[k]=v[k];
-  if(family==='records') {
-    out.development=!!v.development;
-    if(v.prototype)out.prototype={type:v.prototype.type,export:v.prototype.export?{status:v.prototype.export.status,started_at:v.prototype.export.started_at}:undefined};
-  }
-  if(family==='notices')out.resolution=!!v.resolution;
-  if(family==='jobs') {
-    out.status=v.status;out.kind=v.kind;out.type=v.type;
-    out.model_selection={reason:typeof v.model_selection?.reason==='string'&&v.model_selection.reason.trim()?'present':''};
-    out.model_evidence={applied_controls:!!v.model_evidence?.applied_controls,reported_models:{length:v.model_evidence?.reported_models?.length??0}};
-    if(v.coordination?.resources?.length)out.coordination={resources:Array.from(v.coordination.resources,()=>null)};
-    out.coordination_release={termination_confirmed:v.coordination_release?.termination_confirmed};
-  }
-  return out;
-}
-export function publicCatalog(state) {
-  const collections=Object.fromEntries(PUBLIC_COLLECTIONS.map(collection=>{
-    const rows=publicEntries(state,collection);
-    return [collection,{total:rows.length,inventory:digest(JSON.stringify([state.id??null,collection,rows.map(r=>[r.id,r.value?.id??null])])),rows:rows.map(({key,id})=>({key,id}))}];
-  }));
-  return {version:1,collections,usage:usageView(state),claims:resourceClaims(state).length};
 }
