@@ -2,10 +2,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {digest,withStore} from '../plugins/soloco/runtime/store.mjs';
-import {fixture} from './candidate-format-qualification.mjs';
+import {fixture,defaultSelections,matchesModelPolicy} from './candidate-format-qualification.mjs';
 import {publicReport} from './workflow-runtime.mjs';
 
-export function verifyCase(report,state){
+export function verifyCase(report,state,selections=defaultSelections){
   const expected=[...fixture(report.count).expected,fixture(report.count).test].sort((a,b)=>a.path.localeCompare(b.path));
   const producerCall=report.calls.find(c=>c.role==='engineer'),reviewCall=report.calls.find(c=>c.role==='qa'),producer=state.jobs[producerCall?.job_id];
   const candidate=state.records[producer?.artifact_id],attempt=report.attempts.at(-1),testJob=state.jobs[attempt?.test_job_id],receipt=state.records[testJob?.artifact_id],review=state.records[report.review?.id],reviewJob=state.jobs[review?.job_id];
@@ -15,7 +15,8 @@ export function verifyCase(report,state){
   const checks={
     clean_accepted_lifecycle:report.errors.length===0&&!report.calls.some(c=>c.error)&&!report.events.some(e=>e.type==='held'),
     expected_calls:report.calls.length===2&&report.calls.filter(c=>c.role==='engineer').length===1&&report.calls.filter(c=>c.role==='qa').length===1&&report.attempts.length===1&&report.repairs===0,
-    fixed_model_settings:report.calls.every(c=>c.requested?.mode==='explicit'&&c.requested.model==='gpt-6.1-sol'&&c.requested.speed==='host_default'&&c.requested.effort===(c.role==='engineer'?'medium':'high')),
+    fixed_model_settings:report.calls.every(c=>matchesModelPolicy(c,selections))&&(report.model_selection_policy===undefined?JSON.stringify(selections)===JSON.stringify(defaultSelections):JSON.stringify(report.model_selection_policy)===JSON.stringify(selections)&&report.model_selection_policy_sha256===digest(JSON.stringify(selections))),
+    canonical_model_settings:[producer,reviewJob].every(job=>job&&matchesModelPolicy({role:job.role,requested:job.model_selection},selections)),
     exact_fixture_identity:report.fixture_sha256===digest(JSON.stringify(fixture(report.count)))&&report.module_bytes.length===report.count&&report.module_bytes.every(n=>n===32768),
     exact_fixture:exact,
     candidate_hash:!!candidate&&candidate.development.candidate_sha256===candidateHash&&report.generation?.candidate_sha256===candidateHash,
@@ -47,16 +48,18 @@ export function verifyCase(report,state){
 
 export function derive(directory){
   const base=path.resolve(directory),original=JSON.parse(fs.readFileSync(path.join(base,'report.json'),'utf8'));
+  const selections=original.protocol?.model_selection_policy??defaultSelections;
+  if(original.protocol?.model_selection_policy&&original.protocol.model_selection_policy_sha256!==digest(JSON.stringify(selections)))throw Error('Predeclared model policy hash mismatch');
   const cases=[],localReports=[];
   for(const count of [1,3])for(const format of ['files','patches']){
     const root=path.join(base,`${count}-${format}`),file=path.join(root,'qualification-local.json');if(!fs.existsSync(file))continue;
     const report=JSON.parse(fs.readFileSync(file,'utf8'));if(!report.metrics)throw Error(`Case ${count}/${format} is still in flight`);if(report.count!==count||report.format!==format)throw Error('Case identity differs from its canonical fixture location');localReports.push(report);
-    const state=withStore(root,db=>db.read()),verified=verifyCase(report,state);cases.push(verified);
+    const state=withStore(root,db=>db.read()),verified=verifyCase(report,state,selections);cases.push(verified);
   }
   const sourceFile=path.join(base,'frozen-source-identity.json'),source=fs.existsSync(sourceFile)?JSON.parse(fs.readFileSync(sourceFile,'utf8')):null;
   const sourceRoot=fileURLToPath(new URL('../',import.meta.url));
   const sourceMatches=source?source.files.every(f=>fs.existsSync(path.join(sourceRoot,f.path))&&digest(fs.readFileSync(path.join(sourceRoot,f.path)))===f.sha256):null;
-  const frozenMatches=source?source.files.every(f=>{const archived=path.join(base,path.basename(f.path)+'.frozen'),file=fs.existsSync(archived)?archived:path.join(sourceRoot,f.path);return fs.existsSync(file)&&digest(fs.readFileSync(file))===f.sha256;}):null;
+  const frozenMatches=source?source.files.every(f=>{const snapshot=path.join(base,'frozen-source',f.path),archived=path.join(base,path.basename(f.path)+'.frozen'),file=fs.existsSync(snapshot)?snapshot:fs.existsSync(archived)?archived:path.join(sourceRoot,f.path);return fs.existsSync(file)&&digest(fs.readFileSync(file))===f.sha256;}):null;
   const originalMatches=JSON.stringify(original.cases)===JSON.stringify(localReports.map(publicReport));
   const matchingExecution=localReports.every(r=>r.execution===original.execution);
   const uniqueCases=new Set(cases.map(c=>`${c.count}-${c.format}`)).size===4;

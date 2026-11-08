@@ -1,0 +1,250 @@
+{
+  "design_base_revision": "9c0cb8a9d40da42242787b1bbaacfa11ba37acdc",
+  "git_head": "5cab6ec3ba0308dd4707892962366d32be5ba729",
+  "identity_rule": "Exact file manifest controls applicability; a design baseline or Git HEAD alone is insufficient.",
+  "files": [
+    {
+      "path": "plugins/soloco/.claude-plugin/plugin.json",
+      "sha256": "0716d2a8aeb0e0f7f94810b812a00d139595e96941863704a938fe98af38f717"
+    },
+    {
+      "path": "plugins/soloco/.codex-plugin/plugin.json",
+      "sha256": "ad849fe62cc79a2826e99e2681d546a7845dc7689858f6358ca99e99331a436f"
+    },
+    {
+      "path": "plugins/soloco/.mcp.codex.json",
+      "sha256": "c2d5fd4bfdf7fb9b4801368096b66d4a904a3a94295c816e5c24683f09ed9421"
+    },
+    {
+      "path": "plugins/soloco/.mcp.json",
+      "sha256": "b6efeebb4f8ed3b045b82f584c2f1a91b172e0994c819a56b87e4069324ae81d"
+    },
+    {
+      "path": "plugins/soloco/assets/governance.md",
+      "sha256": "4bd0af7032d870195b2992e850b1dc9a50a9b9e59a3ec27267b7b0752cca57a9"
+    },
+    {
+      "path": "plugins/soloco/assets/roles.json",
+      "sha256": "7e9f4f387f3622123fe8dbd69dd3cf0aa17943628d71ff03971d4ab4a8abd7ba"
+    },
+    {
+      "path": "plugins/soloco/compat/company-0.1.0.md",
+      "sha256": "bb6c3dbb6e7a03d033b7c39dccc59c31738369ffccc4fe6ff609d679e0eacc74"
+    },
+    {
+      "path": "plugins/soloco/hooks/claude.json",
+      "sha256": "128ecd4ef0c0ef53dc1a4634c65b2a1be39973096eaabaeebc3e784ebec53d5f"
+    },
+    {
+      "path": "plugins/soloco/hooks/codex.json",
+      "sha256": "882fce45b5791f8f51b2093526419fa6ab4ae2a118e597a20dc7c3b8112205a2"
+    },
+    {
+      "path": "plugins/soloco/runtime/adapters.mjs",
+      "sha256": "301f83d6a23b4e15381cf29e75696e02ec0d9318c25cdf369c727662464ae77f"
+    },
+    {
+      "path": "plugins/soloco/runtime/context-qualification.mjs",
+      "sha256": "b9d38ede62ae1029c929524440102a709fc22e3ecda56dbd2709f6c4448f6f64"
+    },
+    {
+      "path": "plugins/soloco/runtime/context.mjs",
+      "sha256": "b746deff534a5ae9fc1a315ec4948803a1f7222246a4b4ce5743aa09b4c8c948"
+    },
+    {
+      "path": "plugins/soloco/runtime/coordination.mjs",
+      "sha256": "9076e0347ac544f751296a81b4d39f495634190a7fd3ecf5da47d5b363268ee3"
+    },
+    {
+      "path": "plugins/soloco/runtime/corpus-structure.mjs",
+      "sha256": "e17f389f3b86ab43551108a5c6edbc2d77d219609abf7ab00cff557fc9c9ad5b"
+    },
+    {
+      "path": "plugins/soloco/runtime/current-state.mjs",
+      "sha256": "6f7c61213b3e998525526e2d0989ea897f380708c7bf3a447976c632d18228e2"
+    },
+    {
+      "path": "plugins/soloco/runtime/develop.mjs",
+      "sha256": "02892501fcfe91ba971b93984e97809f0247781ad83682c984c3783f22e987f4"
+    },
+    {
+      "path": "plugins/soloco/runtime/development-limits.mjs",
+      "sha256": "fb6b6065019c652fc27a198994cca3a248652890df5d322a9b6428ba5ccfea6a"
+    },
+    {
+      "path": "plugins/soloco/runtime/development-patch.mjs",
+      "sha256": "a36bbefb6c28579a33d97709aabcf80fbde95520a6fd1a4a02e687bba11dd27d"
+    },
+    {
+      "path": "plugins/soloco/runtime/engine.mjs",
+      "sha256": "bbc46767802a58849d085e3c9ca7d596b57815195420e17c32173828e8c6d63f"
+    },
+    {
+      "path": "plugins/soloco/runtime/handover.mjs",
+      "sha256": "6aa9e0b4d0178d105006b58b2b4cc5ff6c52388cd1915704d8edc4549add1fe9"
+    },
+    {
+      "path": "plugins/soloco/runtime/hooks.mjs",
+      "sha256": "119f3cc8a7dee8152caa3686bc2bd2a396b4eda1ad9360a1a075e2938ccf18ac"
+    },
+    {
+      "path": "plugins/soloco/runtime/legacy-operating.mjs",
+      "sha256": "47fca09ae9e6fefe48dbf922a6538818d856579c3fae64e8cfc5f0fd203e8f2d"
+    },
+    {
+      "path": "plugins/soloco/runtime/local-sandbox.mjs",
+      "sha256": "e093897316b8bb4d1fe8e9306d0a0ed8145901b8fafd5641bd681ce309ce1343"
+    },
+    {
+      "path": "plugins/soloco/runtime/main.mjs",
+      "sha256": "33b4c8ca9a2370e4540769826b5a6caadb1ce879c7177517a2f2b5e8b4fad370"
+    },
+    {
+      "path": "plugins/soloco/runtime/operating-control.mjs",
+      "sha256": "47e2a0c8b15128ea6f39b7bfc14cb6adc385b90b132c9df8e16d9274abbdd35d"
+    },
+    {
+      "path": "plugins/soloco/runtime/operating-state.mjs",
+      "sha256": "0881264ce4c0223e2ebfea5e88bfdd15407b4ffa06bbf33eb0892b743df22d83"
+    },
+    {
+      "path": "plugins/soloco/runtime/outcome.mjs",
+      "sha256": "1e6c8f324e83e1c06cb3618192f8929d896f629b7c8f06561dc0ed3b645e54de"
+    },
+    {
+      "path": "plugins/soloco/runtime/progress-view.mjs",
+      "sha256": "bbcea8afc8760d365ac84f395e3cafb07aa26a06bf12f71b670fe7a9d08ad839"
+    },
+    {
+      "path": "plugins/soloco/runtime/progress.mjs",
+      "sha256": "977ed14281cf7de7054babb75d953a5dc6bbf7c319e1fba3e81eeffce6812080"
+    },
+    {
+      "path": "plugins/soloco/runtime/prototype.mjs",
+      "sha256": "f780edabba24ded41bcd6204dde8c1f57ef4401456dc8f0a9b79908c50d94068"
+    },
+    {
+      "path": "plugins/soloco/runtime/public-response.mjs",
+      "sha256": "ce7e04e25904b36c0d4356593837151590763c66aa47a3a98ad4f913bb99e58e"
+    },
+    {
+      "path": "plugins/soloco/runtime/qualification-frame.mjs",
+      "sha256": "96b837a42a0c7a92d66d81956b985d64c4387141a9f93007c65beb433f582eed"
+    },
+    {
+      "path": "plugins/soloco/runtime/record-storage.mjs",
+      "sha256": "fd91001c7ac8fe256e3ad1cbf7c888691d1000873bbbed3afc894cb789a17173"
+    },
+    {
+      "path": "plugins/soloco/runtime/recovery.mjs",
+      "sha256": "c821e1120e72a316106763badbeae14ec4ec7d4466e8444de5774dcde9d33795"
+    },
+    {
+      "path": "plugins/soloco/runtime/scoped-context.mjs",
+      "sha256": "9945bfcb79bae54a855b0ec3248e37571818d86efa95c66f8a7621070ccfd2bc"
+    },
+    {
+      "path": "plugins/soloco/runtime/scoped-stream.mjs",
+      "sha256": "7bc83d0f2a9852868553d913b126583946d159b502adef07938e38f90ad5f16a"
+    },
+    {
+      "path": "plugins/soloco/runtime/selection.mjs",
+      "sha256": "55505fa53d69b28aed8394a291ad5473fcecff9f4d4b8b01ed3b397b26015214"
+    },
+    {
+      "path": "plugins/soloco/runtime/snapshot.mjs",
+      "sha256": "660a89aa41ffed18f6358e33d7efaf2db96b0c7b5d6807ae4f2dce939d69f7fb"
+    },
+    {
+      "path": "plugins/soloco/runtime/storage-transfer.mjs",
+      "sha256": "2ea96610ab528d61471ee35c0482fb62b76be090f5f7bd22cc2489486a8155c3"
+    },
+    {
+      "path": "plugins/soloco/runtime/store.mjs",
+      "sha256": "2e1efebfed7f8159f072c9ccbc3774ded2d86c7c7e9a608f0e0c7d48e1544d07"
+    },
+    {
+      "path": "plugins/soloco/runtime/supervisor.mjs",
+      "sha256": "b6fa3b23aae98aa6e3aef8e915c1ac7b9e61964650987bd8d65a402795a11789"
+    },
+    {
+      "path": "plugins/soloco/runtime/task-context.mjs",
+      "sha256": "9706d12c3d3ec27d8deaf3971cb4458e296a45a42190a4c8c251e4060c7b2e0d"
+    },
+    {
+      "path": "plugins/soloco/runtime/task-index.mjs",
+      "sha256": "a8967fd0600e52e7f9ad6c82c9e48a497eb2ec4b8f2c3f8c326804358e3af363"
+    },
+    {
+      "path": "plugins/soloco/runtime/task-runtime-authority.mjs",
+      "sha256": "a602b66638a06995ecb138c12fa0f97e95830ff6b8a968d806acca411b46b27e"
+    },
+    {
+      "path": "plugins/soloco/runtime/task-runtime.mjs",
+      "sha256": "75c2182743e9dd5f6c505dbd99fc3e6396330f46b9394b2d68ef2377b61015d4"
+    },
+    {
+      "path": "plugins/soloco/runtime/tasks.mjs",
+      "sha256": "c110b62983a5c5ff6b3231ed3a08432ad80498a4b0cb5dd452a38a4f02714d0b"
+    },
+    {
+      "path": "plugins/soloco/runtime/timeout.mjs",
+      "sha256": "586c5f44f98742320119f0b42d0612dd79cf970f4e858f05e7d65953c31951a4"
+    },
+    {
+      "path": "plugins/soloco/runtime/upgrade-evidence.mjs",
+      "sha256": "b3a8f0bf7f8c8b2def98ba3cd926c9b24932275fb65a96908a8a27e7ed1c8708"
+    },
+    {
+      "path": "plugins/soloco/runtime/upgrade.mjs",
+      "sha256": "84b46d19f42ff3e87955874437dd22158f37b396964ea88611f21b3f34a71507"
+    },
+    {
+      "path": "plugins/soloco/runtime/validation-cache.mjs",
+      "sha256": "872415f42c63e015d159e5374d45b6de453dd7e8a873eb7f70473e6395b4354d"
+    },
+    {
+      "path": "plugins/soloco/runtime/worker.mjs",
+      "sha256": "ed89d476cdb174855e710d53b8cd60100222df5ee5917b5640de20ba035a0d4d"
+    },
+    {
+      "path": "plugins/soloco/scripts/run.sh",
+      "sha256": "128358b0c3d5b3f95b1584b3bcac9c8db23df86171a063591e1fd7e965b0c59b"
+    },
+    {
+      "path": "plugins/soloco/skills/setup/SKILL.md",
+      "sha256": "60c3572ecdd27b6bfeaba25ebcfa54c28ee2dc7e8ee80b7dbeff67e35e595247"
+    },
+    {
+      "path": "plugins/soloco/skills/soloco/SKILL.md",
+      "sha256": "e7031d075ecb3380c8ba683b66269ddba5c27144ce806dd2cd12b43a1b3132ff"
+    },
+    {
+      "path": "SPEC.md",
+      "sha256": "4bd0af7032d870195b2992e850b1dc9a50a9b9e59a3ec27267b7b0752cca57a9"
+    },
+    {
+      "path": "tests/candidate-format-qualification.test.mjs",
+      "sha256": "e25f320414630e078d49ce296064afe2a699067bb3f5fdd3ff1d07196bbec56e"
+    },
+    {
+      "path": "tools/candidate-format-qualification.mjs",
+      "sha256": "f14c8356e3f364104f712548ef58c015aba4e9ec9674d54cd70989d96d2da0e2"
+    },
+    {
+      "path": "tools/verify-candidate-format-qualification.mjs",
+      "sha256": "0f23881e5569e6f8d38705aca590ea53d771079ac75213025a8c77b6b109cef0"
+    },
+    {
+      "path": "tools/workflow-runtime.mjs",
+      "sha256": "d57c3849562dd4d486f8b3b21262c0108f39ea311b7eafdb950f2666b59808b5"
+    }
+  ],
+  "manifest_sha256": "fcd15309c283eef4dc025889a7524d99c4e5213900c2f4aa8a4b545ff83ed4eb",
+  "node": {
+    "version": "v22.23.2",
+    "platform": "darwin",
+    "arch": "arm64",
+    "executable_sha256": "18e387c90ab8a8400183e8bdd396376e1e875b91b4c874b894dcade7b35bf572"
+  }
+}

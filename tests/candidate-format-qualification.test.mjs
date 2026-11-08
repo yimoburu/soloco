@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawn} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-import {runCase,contractModel,assess,sourceIdentity,verifySourceIdentity,captureSourceVerification} from '../tools/candidate-format-qualification.mjs';
+import {runCase,contractModel,assess,sourceIdentity,verifySourceIdentity,captureSourceVerification,modelSelections,validateModelSelections} from '../tools/candidate-format-qualification.mjs';
 import {verifyCase} from '../tools/verify-candidate-format-qualification.mjs';
 import {read} from '../tools/workflow-runtime.mjs';
 import {digest} from '../plugins/soloco/runtime/store.mjs';
@@ -41,6 +41,7 @@ test('actual contract-double candidates accept; duplicated arms, negative review
       ['test job plan mismatch','runtime_test_provenance',s=>s.jobs[testJobId].development_id='another-plan'],
       ['review job receipt mismatch','review_job_binding',s=>s.jobs[reviewJobId].review_of.id='another-receipt'],
       ['review job receipt revision mismatch','review_job_binding',s=>s.jobs[reviewJobId].review_of.revision++],
+      ['review job model mismatch','canonical_model_settings',s=>s.jobs[reviewJobId].model_selection.model='different'],
     ]){const copy=structuredClone(canonical);mutate(copy);const verified=verifyCase(original,copy);assert.equal(verified.acceptance_verified,false,name);assert.equal(verified.checks[check],false,name);}
     const contradictory=structuredClone(canonical),reported=structuredClone(original),receipt=contradictory.records[original.attempts[0].receipt_id];
     receipt.content=JSON.stringify({...receipt.development.result,status:'failed',exit_code:9});
@@ -107,4 +108,21 @@ test('exact fixture mismatch and independent QA hold retain output without accep
     const held=await runCase({directory:path.join(directory,'held'),count:1,format:'patches',model:contractModel({count:1,format:'patches',qaVerdict:'Blocked'})});
     assert.equal(held.accepted,false);assert.equal(held.review.verdict,'Blocked');assert.equal(held.calls.length,2);assert.equal(held.repairs,0);assert.equal(held.errors.length,1);
   }finally{fs.rmSync(directory,{recursive:true,force:true});}
+});
+
+
+test('fresh comparison binds supported predeclared model controls instead of silently substituting the historical model',()=>{
+  const selections=modelSelections('fixture-current-model','high','high'),catalog={supported:true,models:[{id:'fixture-current-model',supported_efforts:['medium','high']}]};
+  assert.equal(validateModelSelections(selections,catalog),true);
+  assert.throws(()=>validateModelSelections(modelSelections('unadvertised'),catalog),/not supported/);
+  assert.throws(()=>validateModelSelections(modelSelections('fixture-current-model','ultra'),catalog),/not supported/);
+  assert.throws(()=>validateModelSelections(selections,{supported:false}),/supported current host catalog/);
+  const rows=retainedCases();
+  for(const r of rows){r.model_selection_policy=structuredClone(selections);r.model_selection_policy_sha256=digest(JSON.stringify(selections));for(const c of r.calls)c.requested=structuredClone(selections[c.role]);}
+  assert.equal(assess(rows,null,selections).passed,true);
+  assert.equal(assess(rows).passed,false,'a fresh model policy must be declared by the run, never inferred from its result');
+  const changed=structuredClone(rows);changed[0].model_selection_policy.engineer.effort='medium';
+  assert.equal(assess(changed,null,selections).passed,false);
+  const changedCall=structuredClone(rows);changedCall[0].calls[0].requested.effort='medium';
+  assert.equal(assess(changedCall,null,selections).passed,false);
 });

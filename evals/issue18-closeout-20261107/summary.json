@@ -1,0 +1,122 @@
+{
+  "issue": 18,
+  "disposition": "keep_open",
+  "native_run_kind": "new_disposable_fictional_four_arm_trial",
+  "historical_controls": "Original failed sol arms, original reports and exhausted allowances remain unchanged.",
+  "requested_model_policy": {
+    "engineer": {
+      "mode": "explicit",
+      "model": "gpt-6-astra",
+      "effort": "high",
+      "speed": "host_default",
+      "reason": "Exact one-character fictional module repairs; identical model controls in all format arms."
+    },
+    "qa": {
+      "mode": "explicit",
+      "model": "gpt-6-astra",
+      "effort": "high",
+      "speed": "host_default",
+      "reason": "Independent complete candidate, actual receipt and exact fixture preservation review; identical controls in all arms."
+    }
+  },
+  "effective_provider_settings": "unverified where the native CLI did not report them",
+  "source_manifest_sha256": "fcd15309c283eef4dc025889a7524d99c4e5213900c2f4aa8a4b545ff83ed4eb",
+  "source_verification": {
+    "passed": true,
+    "status": "matched",
+    "before_manifest_sha256": "fcd15309c283eef4dc025889a7524d99c4e5213900c2f4aa8a4b545ff83ed4eb",
+    "after_manifest_sha256": "fcd15309c283eef4dc025889a7524d99c4e5213900c2f4aa8a4b545ff83ed4eb",
+    "errors": []
+  },
+  "native_calls": 6,
+  "repairs": 0,
+  "scope_max_bytes": 200000,
+  "configuration_ceiling": 200000,
+  "observations": [
+    {
+      "count": 1,
+      "format": "files",
+      "stage": "producer_blocked",
+      "accepted": false,
+      "acceptance_verified": false,
+      "generated_payload_bytes": null,
+      "complete_retained_candidate_bytes": null,
+      "time_to_accepted_result_ms": null,
+      "elapsed_to_terminal_ms": 60674.185458,
+      "actual_test_executed": false,
+      "independent_review": false,
+      "all_accepted_checks_pass": null
+    },
+    {
+      "count": 1,
+      "format": "patches",
+      "stage": "accepted",
+      "accepted": true,
+      "acceptance_verified": true,
+      "generated_payload_bytes": 149,
+      "complete_retained_candidate_bytes": 34032,
+      "time_to_accepted_result_ms": 40109.99425,
+      "elapsed_to_terminal_ms": 40109.99425,
+      "actual_test_executed": true,
+      "independent_review": true,
+      "all_accepted_checks_pass": true
+    },
+    {
+      "count": 3,
+      "format": "files",
+      "stage": "producer_blocked",
+      "accepted": false,
+      "acceptance_verified": false,
+      "generated_payload_bytes": null,
+      "complete_retained_candidate_bytes": null,
+      "time_to_accepted_result_ms": null,
+      "elapsed_to_terminal_ms": 59619.75566699999,
+      "actual_test_executed": false,
+      "independent_review": false,
+      "all_accepted_checks_pass": null
+    },
+    {
+      "count": 3,
+      "format": "patches",
+      "stage": "accepted",
+      "accepted": true,
+      "acceptance_verified": true,
+      "generated_payload_bytes": 445,
+      "complete_retained_candidate_bytes": 101610,
+      "time_to_accepted_result_ms": 45879.153416999994,
+      "elapsed_to_terminal_ms": 45879.153416999994,
+      "actual_test_executed": true,
+      "independent_review": true,
+      "all_accepted_checks_pass": true
+    }
+  ],
+  "assessment": {
+    "complete_comparison_matrix": true,
+    "original_report_matches_local_reports": true,
+    "matching_execution": true,
+    "unique_expected_cases": true,
+    "original_all_four_pass_criterion": false,
+    "accepted_cases": 2,
+    "all_accepted_bindings_verified": true,
+    "critical_false_acceptances": 0,
+    "all_provider_processes_closed": true,
+    "producer_blocks": 2,
+    "invalid_or_incomplete_outputs": 0,
+    "exact_fixture_mismatches": 0,
+    "statistical_noninferiority_established": false,
+    "causal_latency_improvement_established": false
+  },
+  "tests": {
+    "command": "node --experimental-test-isolation=none --test tests/development-patch.test.mjs tests/develop.test.mjs tests/candidate-format-qualification.test.mjs",
+    "node": "v22.23.2",
+    "sandbox": "macos-seatbelt-node",
+    "tests": 69,
+    "pass": 69,
+    "fail": 0,
+    "skip": 0,
+    "tap_sha256": "8134c8b5d433f4863d65f4623bff2a9526e2ab951e8d18a4fa9a039ccad6ab74"
+  },
+  "remaining": "Both full-file producers explicitly Blocked over unchanged-byte fidelity. No native full-file accepted-time baseline; four-arm acceptance criterion fails.",
+  "statistical_quality_or_causal_latency_claim": false,
+  "privacy": "Raw native CLI warnings/session logs and canonical databases remain local. Public native identities are hashed."
+}
