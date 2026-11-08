@@ -219,23 +219,35 @@ export class PeerLedger{
     if(count!==expected)throw Error('Peer filtered membership is incomplete or changed outside the ledger');
     return count;
   }
-  #list(f,options={}){
-    family(f);const limit=options.limit??50;
-    if(!Number.isSafeInteger(limit)||limit<1||limit>100)throw Error('Peer list limit must be 1..100');
-    const selected=filters(options),generation=this.query('SELECT generation FROM peer_generations WHERE family=?').get(f)?.generation;
+  #list(f,options={},checked=operation=>operation()){
+    // Options and synchronous query hooks may run caller code. Private helpers
+    // do not publish results: validate their boundary before using their output.
+    const {limit,selected,cursor}=checked(()=>{
+      family(f);const limit=options.limit??50;
+      if(!Number.isSafeInteger(limit)||limit<1||limit>100)throw Error('Peer list limit must be 1..100');
+      return {limit,selected:filters(options),cursor:options.cursor};
+    });
+    const read=(sql,method,...parameters)=>{
+      const statement=checked(()=>this.query(sql));
+      return checked(()=>statement[method](...parameters));
+    };
+    const generation=read('SELECT generation FROM peer_generations WHERE family=?','get',f)?.generation;
     if(!Number.isSafeInteger(generation)||generation<0)throw Error('Peer family generation is missing');
     let after='';
-    if(options.cursor){
-      let c;try{c=JSON.parse(Buffer.from(exact(options.cursor,'cursor',16000),'base64url').toString('utf8'));}catch{throw Error('Invalid peer cursor');}
-      if(!c||c.family!==f||c.generation!==generation||canonical(c.filters)!==canonical(selected)||typeof c.after!=='string')throw Error('Stale or mismatched peer cursor; restart this collection');
-      after=exact(c.after,'cursor identity',2000);
-      const anchor=this.#get(f,after);
+    if(cursor){
+      after=checked(()=>{
+        let c;try{c=JSON.parse(Buffer.from(exact(cursor,'cursor',16000),'base64url').toString('utf8'));}catch{throw Error('Invalid peer cursor');}
+        if(!c||c.family!==f||c.generation!==generation||canonical(c.filters)!==canonical(selected)||typeof c.after!=='string')throw Error('Stale or mismatched peer cursor; restart this collection');
+        return exact(c.after,'cursor identity',2000);
+      });
+      const anchor=checked(()=>this.#get(f,after));
       if(!anchor||Object.entries(selected).some(([k,values])=>!values.includes(dimensions(anchor.value)[k])))throw Error('Peer cursor anchor is unavailable');
     }
-    const q=where(f,selected),total=this.#count(f,selected);
-    const raw=this.query(`SELECT * FROM peer_rows WHERE ${q.sql} AND id>? ORDER BY id LIMIT ?`).all(...q.parameters,after,limit+1);
-    const complete=raw.length<=limit,chosen=raw.slice(0,limit),items=chosen.map(row=>this.#checkedRow(row));
-    return {items,total,complete,next_cursor:complete?null:Buffer.from(canonical({family:f,generation,filters:selected,after:chosen.at(-1).id})).toString('base64url')};
+    const q=where(f,selected),total=checked(()=>this.#count(f,selected));
+    const raw=read(`SELECT * FROM peer_rows WHERE ${q.sql} AND id>? ORDER BY id LIMIT ?`,'all',...q.parameters,after,limit+1);
+    const complete=raw.length<=limit,chosen=raw.slice(0,limit),items=chosen.map(row=>checked(()=>this.#checkedRow(row)));
+    // This check also covers empty pages and the generation-bound cursor.
+    return checked(()=>({items,total,complete,next_cursor:complete?null:Buffer.from(canonical({family:f,generation,filters:selected,after:chosen.at(-1).id})).toString('base64url')}));
   }
   #eventAt(seq){
     const row=this.query('SELECT * FROM peer_events WHERE seq=?').get(seq);
@@ -355,7 +367,26 @@ export class PeerLedger{
           historicalGuard();
           return {family:r.family,id:r.id,revision:r.revision,sha256:r.sha256,value};
         },
-        list:(f,o)=>{guard();if(rowMutationStarted)throw Error('List after pending writes requires a new snapshot');return this.#list(f,o);},
+        list:(f,o)=>{
+          const collectionGuard=()=>{
+            guard();
+            if(rowMutationStarted)throw Error('List after pending writes requires a new snapshot');
+          };
+          const checked=operation=>{
+            collectionGuard();
+            let result;
+            try{result=operation();}catch(error){
+              try{collectionGuard();}catch(boundaryError){
+                throw new AggregateError([error,boundaryError],'Peer collection enumeration failed after its transaction boundary changed');
+              }
+              throw error;
+            }
+            collectionGuard();
+            return result;
+          };
+          collectionGuard();
+          return this.#list(f,o,checked);
+        },
         count:(f,o={})=>{guard();return this.#count(f,filters(o));},
         events:o=>{guard();return this.#events(o);},
         resolveLegacy:ref=>{

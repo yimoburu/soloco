@@ -1302,3 +1302,466 @@ test('connection loss inside a historical query hook cannot return evidence or s
   assert.deepEqual(snapshot(f),before);
  }finally{armed=false;owner.close();sibling.close();if(db.isOpen)db.close();f.close();}
 });
+
+// Collection-only regressions. The preceding 39 tests remain unchanged.
+const collectionGenerationSQL='SELECT generation FROM peer_generations WHERE family=?';
+const collectionHooks={
+ generation:sql=>sql===collectionGenerationSQL,
+ membership:sql=>sql.startsWith('SELECT COALESCE(SUM(count),0) AS n FROM peer_membership'),
+ count:sql=>sql.startsWith('SELECT COUNT(*) AS n FROM (SELECT 1 FROM peer_rows'),
+ body:sql=>sql.startsWith('SELECT * FROM peer_rows WHERE ')&&sql.includes(' AND id>? ORDER BY id LIMIT ?'),
+ anchor:sql=>sql==='SELECT * FROM peer_rows WHERE family=? AND id=?',
+ version:sql=>sql==='SELECT revision,sha256,bytes FROM peer_versions WHERE family=? AND id=? ORDER BY revision DESC LIMIT 1',
+ creation:sql=>sql==='SELECT bytes FROM peer_events WHERE seq=?',
+ event:sql=>sql==='SELECT * FROM peer_events WHERE seq=?'
+};
+function collectionHasError(error,expected){
+ if(expected instanceof RegExp?expected.test(String(error?.message)):error===expected)return true;
+ return error instanceof AggregateError&&error.errors.some(item=>collectionHasError(item,expected));
+}
+function collectionBoundaryError(error){
+ assert.ok(collectionHasError(error,/List after pending writes|failed row mutation/),String(error));
+ return true;
+}
+function collectionState(db){return JSON.parse(JSON.stringify(connectionTableState(db)));}
+function collectionSeed(f){
+ return f.ledger.write('collection.seed','cos-a',tx=>['a','b','c'].map(id=>tx.put('tasks',id,{status:'planned',principal_id:'cos-a',scope:'collection-scope',content:id},0)));
+}
+function collectionOptions(f,shape){
+ const base={status:'planned',scope:'collection-scope',limit:1};
+ if(shape==='continued')return {...base,cursor:f.ledger.read(tx=>tx.list('tasks',base)).next_cursor};
+ if(shape==='empty')return {...base,status:'absent'};
+ return base;
+}
+function collectionExpectedMutation(before,old,value,partial=false){
+ // These cases change content only, so membership and indexed dimensions stay
+ // unchanged. Predict the actual uncommitted SQL state, including unchanged
+ // event/outbox/head tables, rather than substituting synthetic query results.
+ const expected=JSON.parse(JSON.stringify(before));
+ const revision=old.revision+1,sha256=peerDigest(value),bytes=canonical(value);
+ expected.peer_versions.push({family:'tasks',id:old.id,revision,sha256,bytes});
+ if(!partial){
+  const row=expected.peer_rows.find(item=>item.family==='tasks'&&item.id===old.id);
+  assert.ok(row);
+  Object.assign(row,{revision,sha256,bytes});
+  expected.peer_generations.find(item=>item.family==='tasks').generation++;
+ }
+ return expected;
+}
+function collectionAssertRollback(f,before,old,value){
+ assert.deepEqual(snapshot(f),before,'all seven ledger tables return to the original committed state');
+ const ref=historyReference(old),proposed={...ref,revision:old.revision+1,sha256:peerDigest(value)};
+ const fresh=new PeerLedger(f.root);
+ try{
+  assert.deepEqual(fresh.read(tx=>tx.get('tasks',old.id)),old);
+  assert.deepEqual(fresh.read(tx=>tx.getVersion(ref)),{...ref,value:old.value});
+  assert.throws(()=>fresh.read(tx=>tx.getVersion(proposed)),/historical version is unavailable/);
+  assert.equal(fresh.verify().complete,true);
+ }finally{fresh.close();}
+ assert.deepEqual(snapshot(f),before);
+}
+
+test('collection query hooks reject successful same-handle writes on initial continued filtered and empty pages',()=>{
+ for(const shape of ['initial','continued','empty']){
+  const points=shape==='empty'?['generation','membership','count','body']:['generation','membership','count','body','version','creation','event',...(shape==='continued'?['anchor']:[])];
+  for(const point of points){
+   let armed=false,active,old,value,changed,hits=0;
+   const f=peerFixture({onQuery:q=>{
+    if(!armed||!collectionHooks[point](q.sql))return;
+    armed=false;hits++;
+    changed=active.put('tasks',old.id,value,old.revision);
+   }});
+   try{
+    const rows=collectionSeed(f),options=collectionOptions(f,shape);
+    old=rows[shape==='continued'?1:0];value={...old.value,content:'pending '+shape+' '+point};
+    const before=snapshot(f),sqlBefore=collectionState(f.ledger.db),expected=collectionExpectedMutation(sqlBefore,old,value);
+    let handle,escaped=false;
+    assert.throws(()=>f.ledger.write('collection.hook.rollback','cos-a',tx=>{
+     active=tx;handle=tx;
+     tx.event('collection.buffered.before.list',{shape,point});
+     armed=true;
+     assert.throws(()=>{tx.list('tasks',options);escaped=true;},collectionBoundaryError);
+     assert.equal(escaped,false);
+     assert.equal(hits,1,'reach the actual '+point+' hook on '+shape);
+     assert.equal(changed.revision,old.revision+1);
+     assert.equal(changed.created_seq,old.created_seq,'the pre-existing creation event remains valid');
+     assert.equal(changed.sha256,peerDigest(value));
+     assert.deepEqual(collectionState(f.ledger.db),expected,'enumeration rejection preserves exactly the successful nested write');
+     assert.deepEqual(tx.get('tasks',old.id),changed);
+     assert.throws(()=>tx.list('tasks',options),/List after pending writes/);
+     throw Error('deliberate collection hook rollback');
+    }),/deliberate collection hook rollback/);
+    active=null;
+    assert.equal(hits,1);assert.equal(escaped,false);
+    assert.equal(f.ledger.db.isTransaction,false);
+    assert.throws(()=>handle.list('tasks',options),/expired/);
+    collectionAssertRollback(f,before,old,value);
+   }finally{armed=false;active=null;f.close();}
+  }
+ }
+});
+
+test('collection hooks swallowing a real post-history put failure reject pages and poison normal callback completion',()=>{
+ for(const point of ['generation','body','version']){
+  let armed=false,faultArmed=false,active,old,value,hits=0,faults=0,nestedError;
+  const injected=Error('collection post-history canonical-row preparation failure');
+  const f=peerFixture({onQuery:q=>{
+   if(faultArmed&&q.sql.startsWith('INSERT INTO peer_rows')){
+    faultArmed=false;faults++;throw injected;
+   }
+   if(!armed||!collectionHooks[point](q.sql))return;
+   armed=false;hits++;faultArmed=true;
+   try{active.put('tasks',old.id,value,old.revision);}catch(error){nestedError=error;}
+  }});
+  try{
+   old=collectionSeed(f)[0];value={...old.value,content:'partial '+point};
+   const options=collectionOptions(f,'initial'),before=snapshot(f);
+   const expected=collectionExpectedMutation(collectionState(f.ledger.db),old,value,true);
+   let handle,callbackReturned=false,escaped=false;
+   assert.throws(()=>f.ledger.write('collection.poison.rollback','cos-a',tx=>{
+    active=tx;handle=tx;
+    tx.event('collection.poison.buffered',{});
+    armed=true;
+    assert.throws(()=>{tx.list('tasks',options);escaped=true;},error=>{
+     assert.ok(collectionHasError(error,/failed row mutation/));return true;
+    });
+    assert.equal(hits,1);assert.equal(faults,1);assert.equal(nestedError,injected);
+    assert.equal(escaped,false);
+    assert.deepEqual(collectionState(f.ledger.db),expected,'the real history INSERT occurred, but canonical row and all remaining tables are unchanged');
+    for(const operation of [
+     ()=>tx.list('tasks',options),()=>tx.get('tasks',old.id),
+     ()=>tx.getVersion(historyReference(old)),()=>tx.count('tasks'),
+     ()=>tx.event('collection.poison.late',{})
+    ])assert.throws(operation,/failed row mutation/);
+    callbackReturned=true;
+    return 'a caught partial put must still force rollback';
+   }),/failed row mutation/);
+   active=null;
+   assert.equal(callbackReturned,true);assert.equal(escaped,false);
+   assert.equal(f.ledger.db.isTransaction,false);
+   assert.throws(()=>handle.list('tasks'),/expired/);
+   collectionAssertRollback(f,before,old,value);
+  }finally{armed=false;faultArmed=false;active=null;f.close();}
+ }
+});
+
+test('collection boundaries reject writes after actual SQLite generation and body retrieval including empty and continued pages',()=>{
+ const cases=[['generation','initial'],['body','initial'],['body','continued'],['body','empty']];
+ for(const [point,shape] of cases)for(const throwsAfter of [false,true]){
+  const f=peerFixture(),originalQuery=f.ledger.query;
+  let armed=false,active,changed,hits=0,handle,escaped=false;
+  const injected=Error('collection retrieval completion fault');
+  try{
+   const rows=collectionSeed(f),options=collectionOptions(f,shape),old=rows[shape==='continued'?1:0];
+   const value={...old.value,content:'retrieval '+point+' '+shape};
+   const before=snapshot(f),expected=collectionExpectedMutation(collectionState(f.ledger.db),old,value);
+   // A controlled seam around the real StatementSync method. The real query
+   // runs first and its original result is returned, never fabricated rows.
+   f.ledger.query=function(sql,...parameters){
+    const statement=originalQuery.call(this,sql,...parameters);
+    if(!armed||!collectionHooks[point](sql))return statement;
+    armed=false;
+    const method=point==='body'?'all':'get';
+    return {[method](...bindings){
+     const result=statement[method](...bindings);
+     hits++;
+     if(point==='body')assert.equal(result.length===0,shape==='empty');
+     else assert.ok(Number.isSafeInteger(result.generation));
+     changed=active.put('tasks',old.id,value,old.revision);
+     if(throwsAfter)throw injected;
+     return result;
+    }};
+   };
+   assert.throws(()=>f.ledger.write('collection.retrieval.rollback','cos-a',tx=>{
+    active=tx;handle=tx;
+    tx.event('collection.retrieval.buffered',{});
+    armed=true;
+    assert.throws(()=>{tx.list('tasks',options);escaped=true;},error=>{
+     collectionBoundaryError(error);
+     if(throwsAfter)assert.ok(collectionHasError(error,injected),'retain the original retrieval exception');
+     return true;
+    });
+    assert.equal(hits,1);assert.equal(escaped,false);
+    assert.equal(changed.sha256,peerDigest(value));
+    assert.deepEqual(collectionState(f.ledger.db),expected);
+    assert.deepEqual(tx.get('tasks',old.id),changed);
+    throw Error('deliberate collection retrieval rollback');
+   }),/deliberate collection retrieval rollback/);
+   active=null;f.ledger.query=originalQuery;
+   assert.equal(hits,1);assert.equal(escaped,false);
+   assert.throws(()=>handle.list('tasks'),/expired/);
+   collectionAssertRollback(f,before,old,value);
+  }finally{armed=false;active=null;f.ledger.query=originalQuery;f.close();}
+ }
+});
+
+test('read-only collection telemetry and successful no-op hook puts preserve exact pages totals and cursors',()=>{
+ for(const mode of ['read','write'])for(const shape of ['initial','continued','empty']){
+  const points=shape==='continued'?['generation','anchor','body']:shape==='initial'?['generation','version','body']:['generation','body'];
+  for(const point of points){
+   let armed=false,active,old,hits=0;
+   const f=peerFixture({onQuery:q=>{
+    if(!armed||!collectionHooks[point](q.sql))return;
+    armed=false;hits++;
+    assert.deepEqual(active.get('tasks',old.id),old);
+    assert.equal(active.count('tasks',{scope:'collection-scope'}),3);
+    if(mode==='write')assert.deepEqual(active.put('tasks',old.id,old.value,old.revision),old);
+    if(point==='generation')assert.equal(active.list('tasks',{scope:'collection-scope',limit:1}).total,3,'ordinary nested read-only enumeration remains supported');
+   }});
+   try{
+    old=collectionSeed(f)[0];
+    const options=collectionOptions(f,shape),expected=f.ledger.read(tx=>tx.list('tasks',options)),before=snapshot(f);
+    let handle;
+    const callback=tx=>{
+     active=tx;handle=tx;armed=true;
+     const result=tx.list('tasks',options);
+     assert.equal(hits,1);
+     assert.deepEqual(result,expected);
+     assert.deepEqual(tx.getVersion(historyReference(old)),{...historyReference(old),value:old.value});
+     assert.deepEqual(tx.list('tasks',options),expected);
+     return result;
+    };
+    const result=mode==='read'?f.ledger.read(callback):f.ledger.write('collection.noop','cos-a',callback);
+    active=null;
+    assert.deepEqual(result,expected);
+    assert.equal(result.total,shape==='empty'?0:3);
+    assert.equal(result.complete,shape==='empty');
+    if(shape==='empty')assert.deepEqual(result,{items:[],total:0,complete:true,next_cursor:null});
+    else{
+     assert.equal(result.items[0].id,shape==='continued'?'b':'a');
+     const cursor=JSON.parse(Buffer.from(result.next_cursor,'base64url').toString('utf8'));
+     assert.equal(cursor.generation,before.peer_generations.find(row=>row.family==='tasks').generation);
+     assert.equal(cursor.after,result.items[0].id);
+     assert.deepEqual(cursor.filters,{scope:['collection-scope'],status:['planned']});
+    }
+    assert.throws(()=>handle.list('tasks',options),/expired/);
+    assert.deepEqual(snapshot(f),before);
+    assert.equal(f.ledger.verify().complete,true);
+    assert.deepEqual(snapshot(f),before);
+   }finally{armed=false;active=null;f.close();}
+  }
+ }
+});
+
+test('collection query errors retain original identity and report a simultaneously changed boundary',()=>{
+ for(const point of ['generation','body'])for(const modifies of [false,true]){
+  let armed=false,active,old,value,changed,hits=0;
+  const injected=Error('collection ordinary query-hook exception');
+  const f=peerFixture({onQuery:q=>{
+   if(!armed||!collectionHooks[point](q.sql))return;
+   armed=false;hits++;
+   if(modifies)changed=active.put('tasks',old.id,value,old.revision);
+   throw injected;
+  }});
+  try{
+   old=collectionSeed(f)[0];value={...old.value,content:'exception '+point};
+   const options=collectionOptions(f,'initial'),expectedPage=f.ledger.read(tx=>tx.list('tasks',options));
+   const before=snapshot(f),sqlBefore=collectionState(f.ledger.db);
+   let handle;
+   assert.throws(()=>f.ledger.write('collection.exception.rollback','cos-a',tx=>{
+    active=tx;handle=tx;
+    tx.event('collection.exception.buffered',{});
+    armed=true;
+    assert.throws(()=>tx.list('tasks',options),error=>{
+     if(modifies){
+      assert.ok(error instanceof AggregateError);
+      assert.equal(error.errors.length,2);
+      assert.equal(error.errors[0],injected);
+      assert.match(error.errors[1].message,/List after pending writes/);
+     }else assert.equal(error,injected);
+     return true;
+    });
+    assert.equal(hits,1);
+    assert.deepEqual(collectionState(f.ledger.db),modifies?collectionExpectedMutation(sqlBefore,old,value):sqlBefore);
+    if(modifies){
+     assert.deepEqual(tx.get('tasks',old.id),changed);
+     assert.throws(()=>tx.list('tasks',options),/List after pending writes/);
+    }else{
+     assert.deepEqual(tx.list('tasks',options),expectedPage,'an ordinary query error remains recoverable');
+     assert.deepEqual(tx.getVersion(historyReference(old)),{...historyReference(old),value:old.value});
+    }
+    throw Error('deliberate collection exception rollback');
+   }),/deliberate collection exception rollback/);
+   active=null;
+   assert.throws(()=>handle.list('tasks'),/expired/);
+   collectionAssertRollback(f,before,old,value);
+  }finally{armed=false;active=null;f.close();}
+ }
+});
+
+test('catching collection rejection permits explicit reconciliation and commit of a successful nested write',()=>{
+ let armed=false,active,old,value,changed,hits=0;
+ const f=peerFixture({onQuery:q=>{
+  if(!armed||q.sql!==collectionGenerationSQL)return;
+  armed=false;hits++;
+  changed=active.put('tasks',old.id,value,old.revision);
+ }});
+ try{
+  old=collectionSeed(f)[0];value={...old.value,content:'reconciled and committed'};
+  const options=collectionOptions(f,'initial'),oldPage=f.ledger.read(tx=>tx.list('tasks',options));
+  const before=snapshot(f),expected=collectionExpectedMutation(collectionState(f.ledger.db),old,value);
+  const result=f.ledger.write('collection.reconciled','cos-a',tx=>{
+   active=tx;armed=true;
+   assert.throws(()=>tx.list('tasks',options),collectionBoundaryError);
+   assert.equal(hits,1);
+   assert.deepEqual(collectionState(f.ledger.db),expected);
+   assert.deepEqual(tx.get('tasks',old.id),changed);
+   assert.throws(()=>tx.list('tasks',options),/List after pending writes/);
+   tx.event('collection.write.reconciled',{id:old.id,sha256:changed.sha256});
+   return changed;
+  });
+  active=null;
+  assert.deepEqual(result,changed);
+  const fresh=new PeerLedger(f.root);
+  try{
+   assert.deepEqual(fresh.read(tx=>tx.get('tasks',old.id)),changed);
+   assert.deepEqual(fresh.read(tx=>tx.getVersion(historyReference(changed))),{...historyReference(changed),value});
+   assert.deepEqual(fresh.read(tx=>tx.getVersion(historyReference(old))),{...historyReference(old),value:old.value});
+   assert.throws(()=>fresh.read(tx=>tx.list('tasks',{...options,cursor:oldPage.next_cursor})),/Stale/);
+   const page=fresh.read(tx=>tx.list('tasks',options));
+   assert.deepEqual(page.items,[changed]);assert.equal(page.total,3);
+   assert.equal(fresh.verify().complete,true);
+  }finally{fresh.close();}
+  const after=snapshot(f);
+  assert.equal(after.peer_events.length,before.peer_events.length+1);
+  assert.equal(after.peer_outbox.length,before.peer_outbox.length+1);
+  assert.equal(after.peer_versions.length,before.peer_versions.length+1);
+ }finally{armed=false;active=null;f.close();}
+});
+
+test('connection loss during collection preparation or after real retrieval cannot expose a page or successful transaction',()=>{
+ for(const point of ['prepare','retrieval']){
+  const f=peerFixture(),db=new DatabaseSync(f.file);
+  let armed=false,hits=0,handle,lookupError,escaped=false,transactionReturned=false;
+  const owner=new PeerLedger(f.root,{connection:db,onQuery:q=>{
+   if(!armed||point!=='prepare'||q.sql!==collectionGenerationSQL)return;
+   armed=false;hits++;
+   db.close();
+  }}),sibling=new PeerLedger(f.root,{connection:db}),originalQuery=owner.query;
+  try{
+   const old=collectionSeed(f)[0],options=collectionOptions(f,'initial'),before=snapshot(f);
+   owner.query=function(sql,...parameters){
+    const statement=originalQuery.call(this,sql,...parameters);
+    if(!armed||point!=='retrieval'||!collectionHooks.body(sql))return statement;
+    armed=false;
+    return {all(...bindings){
+     const rows=statement.all(...bindings);
+     assert.ok(rows.length>0);hits++;
+     // Controlled loss of the actual connection after an actual SQLite read.
+     db.close();
+     return rows;
+    }};
+   };
+   assert.throws(()=>{
+    owner.write('collection.connection-loss','cos-a',tx=>{
+     handle=tx;
+     tx.event('collection.connection-loss.buffered',{});
+     armed=true;
+     assert.throws(()=>{tx.list('tasks',options);escaped=true;},error=>{lookupError=error;return true;});
+     return 'swallowing a lookup error cannot revive a lost transaction';
+    });
+    transactionReturned=true;
+   });
+   assert.ok(lookupError);
+   assert.equal(hits,1);assert.equal(escaped,false);assert.equal(transactionReturned,false);
+   assert.equal(db.isOpen,false);
+   assert.throws(()=>handle.list('tasks',options),/expired/);
+   let entered=false;
+   assert.throws(()=>sibling.read(()=>{entered=true;}));
+   assert.equal(entered,false);
+   assert.deepEqual(snapshot(f),before);
+   const fresh=new PeerLedger(f.root);
+   try{
+    assert.deepEqual(fresh.read(tx=>tx.get('tasks',old.id)),old);
+    assert.deepEqual(fresh.read(tx=>tx.getVersion(historyReference(old))),{...historyReference(old),value:old.value});
+    assert.equal(fresh.read(tx=>tx.list('tasks',options)).total,3);
+    assert.equal(fresh.verify().complete,true);
+   }finally{fresh.close();}
+   assert.deepEqual(snapshot(f),before);
+  }finally{armed=false;owner.query=originalQuery;owner.close();sibling.close();if(db.isOpen)db.close();f.close();}
+ }
+});
+
+test('external migration enumeration retains its before-API-write boundary without claiming outer content is committed',()=>{
+ const f=peerFixture(),db=new DatabaseSync(f.file);
+ let armed=false,active,staged,hits=0;
+ const shared=new PeerLedger(f.root,{connection:db,onQuery:q=>{
+  if(!armed||q.sql!==collectionGenerationSQL)return;
+  armed=false;hits++;
+  assert.deepEqual(active.put('tasks',staged.id,staged.value,staged.revision),staged);
+ }});
+ try{
+  const old=collectionSeed(f)[0],before=snapshot(f),options=collectionOptions(f,'initial');
+  const value={...old.value,content:'outer transaction staged value'};
+  db.exec('BEGIN IMMEDIATE');
+  staged=shared.writeWithin('collection.external.stage','cos-a',tx=>tx.put('tasks',old.id,value,old.revision));
+  assert.equal(db.isTransaction,true);
+  const stagedState=collectionState(db);
+  const page=shared.writeWithin('collection.external.enumerate','cos-a',tx=>{
+   active=tx;armed=true;
+   const result=tx.list('tasks',options);
+   assert.equal(hits,1);
+   assert.deepEqual(result.items,[staged]);assert.equal(result.total,3);
+   assert.throws(()=>tx.getVersion(historyReference(staged)),/external transactions are excluded/);
+   return result;
+  });
+  active=null;
+  assert.deepEqual(page.items,[staged]);
+  assert.deepEqual(collectionState(db),stagedState,'a no-op hook changes no SQL state');
+  assert.deepEqual(f.ledger.read(tx=>tx.get('tasks',old.id)),old,'another connection still sees committed state');
+  assert.throws(()=>shared.writeWithin('collection.external.abort','cos-a',tx=>{
+   tx.put('tasks',old.id,{...value,content:'later savepoint write'},staged.revision);
+   assert.throws(()=>tx.list('tasks',options),/List after pending writes/);
+   throw Error('deliberate collection external savepoint rollback');
+  }),/deliberate collection external savepoint rollback/);
+  assert.equal(db.isTransaction,true);
+  assert.deepEqual(collectionState(db),stagedState);
+  db.exec('ROLLBACK');
+  collectionAssertRollback(f,before,old,value);
+  assert.deepEqual(shared.read(tx=>tx.list('tasks',options)).items,[old]);
+ }finally{armed=false;active=null;if(db.isTransaction)db.exec('ROLLBACK');shared.close();db.close();f.close();}
+});
+
+test('collection pagination retains its owning WAL snapshot across another connection commit',()=>{
+ let armed=false,other,old,value,future,hits=0,writerState;
+ const f=peerFixture({onQuery:q=>{
+  if(!armed||q.sql!==collectionGenerationSQL)return;
+  armed=false;hits++;
+  future=other.write('collection.wal.writer','cos-b',tx=>{
+   const updated=tx.put('tasks',old.id,value,old.revision);
+   tx.put('tasks','d',{status:'planned',principal_id:'cos-b',scope:'collection-scope',content:'new committed row'},0);
+   return updated;
+  });
+  writerState=snapshot(f);
+ }});
+ try{
+  const rows=collectionSeed(f);old=rows[0];value={...old.value,content:'future WAL value'};
+  other=new PeerLedger(f.root);
+  const options=collectionOptions(f,'initial'),expectedFirst=f.ledger.read(tx=>tx.list('tasks',options));
+  f.ledger.read(tx=>{
+   armed=true;
+   const first=tx.list('tasks',options);
+   assert.equal(hits,1);
+   assert.deepEqual(first,expectedFirst,'another connection cannot change the established read snapshot');
+   const second=tx.list('tasks',{...options,cursor:first.next_cursor});
+   const third=tx.list('tasks',{...options,cursor:second.next_cursor});
+   assert.deepEqual(first.items,[rows[0]]);
+   assert.deepEqual(second.items,[rows[1]]);
+   assert.deepEqual(third.items,[rows[2]]);
+   for(const page of [first,second,third])assert.equal(page.total,3);
+   assert.equal(first.complete,false);assert.equal(second.complete,false);
+   assert.equal(third.complete,true);assert.equal(third.next_cursor,null);
+   assert.deepEqual(tx.getVersion(historyReference(old)),{...historyReference(old),value:old.value});
+   assert.throws(()=>tx.getVersion(historyReference(future)),/historical version is unavailable/);
+   assert.equal(tx.get('tasks','d'),null);
+  });
+  assert.equal(hits,1);
+  assert.deepEqual(snapshot(f),writerState,'read-only enumeration cannot modify the concurrent writer commit');
+  assert.throws(()=>f.ledger.read(tx=>tx.list('tasks',{...options,cursor:expectedFirst.next_cursor})),/Stale/);
+  const current=f.ledger.read(tx=>tx.list('tasks',options));
+  assert.deepEqual(current.items,[future]);assert.equal(current.total,4);
+  assert.deepEqual(f.ledger.read(tx=>tx.getVersion(historyReference(future))),{...historyReference(future),value});
+  assert.equal(f.ledger.verify().complete,true);
+  assert.deepEqual(snapshot(f),writerState);
+ }finally{armed=false;other?.close();f.close();}
+});
