@@ -4,7 +4,7 @@
       "command": "sh",
       "args": [
         "-c",
-        "company_codex_home=\"${CODEX_HOME:-$HOME/.codex}\"; COMPANY_PLUGIN_DATA=\"$company_codex_home/plugins/data/soloco\" exec sh \"$company_codex_home/plugins/cache/soloco/soloco/0.7.5/scripts/run.sh\" serve codex"
+        "company_codex_home=\"${CODEX_HOME:-$HOME/.codex}\"; COMPANY_PLUGIN_DATA=\"$company_codex_home/plugins/data/soloco\" exec sh \"$company_codex_home/plugins/cache/soloco/soloco/0.7.6/scripts/run.sh\" serve codex"
       ],
       "env_vars": [
         "CODEX_HOME"

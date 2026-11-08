@@ -222,7 +222,33 @@ test('new applicable rules between worker publication and runtime acceptance fen
   assert.equal(f.read().jobs[jq.job_id].status,'completed');
   engine.save({...f.args,epoch:1,kind:'decision',content:'New applicable rule: this finding is not sufficient for current acceptance.'},host);
   tickRuntime(f.root,{dispatch:false});const state=f.read();assert.equal(state.records[q.id].runtime_task.state,'needs_attention');assert.match(state.records[q.id].runtime_task.attention,/context changed/);
+  for(let n=0;n<3;n++)tickRuntime(f.root,{queue:()=>assert.fail('A held result cannot create another attempt')});
+  const idle=f.read();assert.deepEqual(idle.records[q.id],state.records[q.id]);assert.deepEqual(idle.notices,state.notices);assert.equal(idle.revision,state.revision,'Idle held ticks create no canonical writes');
  }finally{f.close();}
+});
+
+test('negative review recovery is independent of task index order and remains stable on idle ticks',async()=>{
+ const orders=[['a','qa','b'],['a','b','qa'],['qa','a','b'],['qa','b','a'],['b','a','qa'],['b','qa','a']];
+ for(const verdict of ['Fail','Blocked'])for(const order of orders){
+  const f=fixture();try{
+   const state=f.read(),operations=['order-0','order-1','order-2'].map(operation=>({operation,id:'async-task-'+digest(JSON.stringify([state.id,state.owner.epoch,operation])).slice(0,32)})).sort((a,b)=>a.id.localeCompare(b.id));
+   const named=Object.fromEntries(order.map((name,n)=>[name,operations[n].operation]));
+   const a=f.submit(named.a,{role:'engineer'}),qa=f.submit(named.qa,{role:'qa',review_task_id:a.id}),b=f.submit(named.b,{role:'pm',depends_on:[{task_id:qa.id,gate:'accepted'}]});
+   assert.deepEqual(Object.entries({a,qa,b}).sort(([,a],[,b])=>a.id.localeCompare(b.id)).map(([name])=>name),order);
+   const aj=queue(f.root,a.id);await work(f.root,aj.job_id,model('fictional-order-author'));
+   const qj=queue(f.root,qa.id);await work(f.root,qj.job_id,async(_h,_n,_p,_d,limit,_s,o)=>{
+    o.onSpawn(executionTiming(Date.now(),{timeout_ms:limit}));
+    return {native_id:'fictional-order-independent-qa',text:JSON.stringify({content:'Retained exact negative finding.',review:{verdict,reason:'Required evidence is absent.',blockers:['Missing exact evidence']},messages:[],notices:[]})};
+   });
+   tickRuntime(f.root,{dispatch:false});const held=f.read(),label=verdict+' '+order.join(',');
+   for(const task of [qa,b]){assert.equal(held.records[task.id].runtime_task.state,'needs_attention',label);assert.equal(held.records[task.id].runtime_task.attention_code,'REVIEW_HELD',label);}
+   assert.equal(held.records[b.id].runtime_task.attempts.length,0);
+   assert.equal(held.records[held.jobs[qj.job_id].artifact_id].review.verdict,verdict);
+   for(let n=0;n<3;n++)tickRuntime(f.root,{queue:()=>assert.fail('Negative review cannot dispatch a dependent')});
+   const idle=f.read();for(const task of [a,qa,b])assert.deepEqual(idle.records[task.id],held.records[task.id],label);
+   assert.deepEqual(idle.notices,held.notices,label);assert.equal(idle.revision,held.revision,label);assert.deepEqual(idle.jobs,held.jobs,label);
+  }finally{f.close();}
+ }
 });
 
 test('peer handoff is delivered to the declared receiver and acknowledged atomically with its actual result',async()=>{
@@ -299,6 +325,59 @@ test('restore preserves accepted exact evidence, a queued obligation and an unpr
   assert.equal(after.records[msg.id].runtime_message.disposition,null);
   assert.deepEqual(after.owner,before.owner);assert.deepEqual(Object.keys(after.jobs),Object.keys(before.jobs));
  }finally{f.close();fs.rmSync(transfer,{recursive:true,force:true});}
+});
+
+test('scheduler retries only typed pre-execution waits and retains misleading unknown failures',async()=>{
+ const {SchedulingHold}=await import('../plugins/soloco/runtime/recovery.mjs');
+ const f=fixture();
+ try{
+  const t=f.submit('typed-wait');
+  tickRuntime(f.root,{queue:()=>{throw new SchedulingHold('CAPACITY_BUSY','Completely different display wording');}});
+  assert.equal(f.read().records[t.id].runtime_task.state,'planned');
+  tickRuntime(f.root,{queue:()=>{throw Error('capacity reserved already active: an unknown integrity failure');}});
+  const state=f.read();assert.equal(state.records[t.id].runtime_task.state,'needs_attention');
+  assert.equal(state.records[t.id].runtime_task.attention_code,'UNKNOWN');
+  assert.equal(state.records[t.id].runtime_task.attempts.length,0);
+  const page=taskAction({...f.args,action:'inspect',task_id:t.id},host);
+  assert.equal(page.tasks[0].recovery.automatic,false);
+  assert.equal(page.tasks[0].recovery.retry_execution,false);
+ }finally{f.close();}
+});
+
+test('unstarted dependents expose an actionable wait without claiming an attempt',()=>{
+ const f=fixture();
+ try{const a=f.submit('pending-producer'),b=f.submit('pending-review',{role:'qa',review_task_id:a.id});
+  const page=taskAction({...f.args,action:'inspect',task_id:b.id},host);
+  assert.equal(page.tasks[0].readiness.ready,false);assert.equal(page.tasks[0].readiness.recovery.code,'DEPENDENCY_PENDING');assert.equal(page.tasks[0].readiness.recovery.automatic,true);assert.equal(page.tasks[0].attempts.length,0);
+ }finally{f.close();}
+});
+
+test('nonautomatic readiness holds persist even after the original evidence is restored',()=>{
+ const f=fixture();try{
+  engine.save({...f.args,epoch:1,id:'fixed-input',kind:'artifact',content:'Original evidence'},host);
+  const t=f.submit('readiness-integrity',{input_ids:['fixed-input']});
+  const original=f.read().records['fixed-input'];
+  withStore(f.root,db=>db.transaction('fixture.changed',s=>{s.records['fixed-input'].content='Changed source';s.records['fixed-input'].revision++;return s;}));
+  let calls=0;tickRuntime(f.root,{queue:()=>{calls++;return {};}});assert.equal(calls,0,'held task must not dispatch');
+  assert.equal(f.read().records[t.id].runtime_task.state,'needs_attention');
+  assert.equal(f.read().records[t.id].runtime_task.attention_code,'CONTEXT_CHANGED');
+  withStore(f.root,db=>db.transaction('fixture.restored',s=>{s.records['fixed-input']=original;return s;}));
+  tickRuntime(f.root,{queue:()=>{calls++;return {};}});assert.equal(calls,0,'restoration alone cannot reconcile a held task');
+  assert.equal(f.read().records[t.id].runtime_task.attempts.length,0);
+ }finally{f.close();}
+});
+
+test('two simultaneously ready resource claimants preserve the unstarted wait at queue revalidation',async()=>{
+ const f=fixture();try{
+  const tasks=[f.submit('shared-a',{resources:['fixture/shared']}),f.submit('shared-b',{resources:['fixture/shared']})];
+  const first=tickRuntime(f.root,{queue:(root,key)=>queue(root,key)});
+  assert.equal(first.ready.length,2);assert.equal(first.dispatched.length,1);
+  const waiting=tasks.find(t=>f.read().records[t.id].runtime_task.state==='planned');assert(waiting);
+  assert.equal(f.read().records[waiting.id].runtime_task.attempts.length,0);
+  await work(f.root,first.dispatched[0].job_id,model('fictional-shared-first'));
+  const next=tickRuntime(f.root,{queue:(root,key)=>queue(root,key)});
+  assert.equal(next.dispatched.length,1);assert.equal(f.read().records[waiting.id].runtime_task.state,'queued');
+ }finally{f.close();}
 });
 
 }

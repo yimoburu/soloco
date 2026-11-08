@@ -116,7 +116,7 @@ function governingSelection(s,sourceId,scopes,delivered=[]){
 function globalSubject(s,sourceId,scopes=['*'],delivered=[],corpus=false){return {company_id:s.id,name:s.name??null,idea:s.idea??null,mode:s.mode??null,phase:s.phase??null,
   governance:s.governance,cos_instructions:s.cos_instructions??null,roles:s.roles,team_sha256:s.team_sha256??null,
   owner_authority:Object.fromEntries(Object.entries(s.owner??{}).filter(([k])=>!['host','session_id','instance_id','epoch'].includes(k))),
-  extensions:currentExtensions(s),unknown_outcomes:Object.values(s.jobs??{}).filter(j=>['failed','cancelled','quarantined'].includes(j.status)&&j.coordination_release?.termination_confirmed!==true),notices:(s.notices??[]).filter(n=>!n.resolution).map(cleanNotice),messages:s.messages??[],
+  extensions:currentExtensions(s),unknown_outcomes:Object.values(s.jobs??{}).filter(j=>['failed','cancelled','quarantined'].includes(j.status)&&j.coordination_release?.termination_confirmed!==true),notices:(s.notices??[]).map(cleanNotice),messages:s.messages??[],
   ...(corpus?{governing:Object.keys(s.records??{}).sort().map(id=>({source:scopedReference(source(s,id),id),value:source(s,id)})).filter(r=>r.source.id!==evaluation?.negativeReceipt&&governing(r.value)&&!presentationOnly(r.value)&&!delivered.some(d=>same(d,r.source)))}:governingSelection(s,sourceId,scopes,delivered))};}
 
 function projection(s,id){

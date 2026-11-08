@@ -1,0 +1,221 @@
+{
+  "version": 1,
+  "mode": "run-native",
+  "status": "passed_native_fixture",
+  "started_at": "2026-11-07T17:07:59.897Z",
+  "ended_at": "2026-11-07T17:08:41.470Z",
+  "model": "gpt-6-astra",
+  "synthetic_hook_binding": true,
+  "scope": "Fictional project-owned company via real MCP process; native mode uses the real adapter. No actual company or installed plugin mutation.",
+  "limitations": [
+    "Fixture binding is synthetic and proves no Codex Hooks UI trust or real founder lifecycle invocation.",
+    "No actual-company handover, team adoption, automatic sidebar placement or background founder notification is established.",
+    "Visible prompt/request/response measurements exclude provider-added instructions and hidden reasoning.",
+    "Recorded model requests and applied controls do not establish effective provider settings or billing.",
+    "Task/message index integrity and public cursor inventory validation scan canonical metadata; small returned context does not establish bounded storage CPU or unlimited archive scalability."
+  ],
+  "checks": {
+    "prepared_without_native_jobs": true,
+    "inflight_supervisor_recovery_without_duplicate": true,
+    "native_pipeline_and_peer_disposition": true,
+    "idle_starts_no_new_native_jobs": true
+  },
+  "native_closure_confirmed": true,
+  "source": {
+    "commit": "19414e6931250b936c7c654f048d9cfdf20460bc",
+    "tree": "c9936fdc402c7722a64007cac06bf0601675b692",
+    "status": "",
+    "harness_sha256": "7f8b2a7cafa05d2c5d1e6890fd1e5e080b1412c1a9c394cab881aea5a3b2d0eb",
+    "runtime_files": [
+      {
+        "path": "plugins/soloco/runtime/adapters.mjs",
+        "sha256": "bdbb338db269e8aae1748bd65ce262a779bdc5d3de44291fd3df7bdbe9f7f782"
+      },
+      {
+        "path": "plugins/soloco/runtime/context-qualification.mjs",
+        "sha256": "b9d38ede62ae1029c929524440102a709fc22e3ecda56dbd2709f6c4448f6f64"
+      },
+      {
+        "path": "plugins/soloco/runtime/context.mjs",
+        "sha256": "ed9357c4e84ee410f6d7641b4350e6cc46a45d12291525a378c28d787c2e595e"
+      },
+      {
+        "path": "plugins/soloco/runtime/coordination.mjs",
+        "sha256": "625606e1faa51db37d008a2754643f64f197ffcc1ae99ab63a53fb7a742b556b"
+      },
+      {
+        "path": "plugins/soloco/runtime/corpus-structure.mjs",
+        "sha256": "e17f389f3b86ab43551108a5c6edbc2d77d219609abf7ab00cff557fc9c9ad5b"
+      },
+      {
+        "path": "plugins/soloco/runtime/current-state.mjs",
+        "sha256": "6f7c61213b3e998525526e2d0989ea897f380708c7bf3a447976c632d18228e2"
+      },
+      {
+        "path": "plugins/soloco/runtime/develop.mjs",
+        "sha256": "d6b4aa0ace7e4eaea610f290d6d14dd01af6104025e2c50df1a04eec9037d71d"
+      },
+      {
+        "path": "plugins/soloco/runtime/development-limits.mjs",
+        "sha256": "fb6b6065019c652fc27a198994cca3a248652890df5d322a9b6428ba5ccfea6a"
+      },
+      {
+        "path": "plugins/soloco/runtime/development-patch.mjs",
+        "sha256": "a36bbefb6c28579a33d97709aabcf80fbde95520a6fd1a4a02e687bba11dd27d"
+      },
+      {
+        "path": "plugins/soloco/runtime/engine.mjs",
+        "sha256": "8dfa923186e4cfebff08192e430cdad25e294e03f8d3b753525e934bc0810549"
+      },
+      {
+        "path": "plugins/soloco/runtime/handover.mjs",
+        "sha256": "6aa9e0b4d0178d105006b58b2b4cc5ff6c52388cd1915704d8edc4549add1fe9"
+      },
+      {
+        "path": "plugins/soloco/runtime/hooks.mjs",
+        "sha256": "bca847d64e40213667712d4852c2774607fddbd962a5311ccf03521a885ce21d"
+      },
+      {
+        "path": "plugins/soloco/runtime/legacy-operating.mjs",
+        "sha256": "47fca09ae9e6fefe48dbf922a6538818d856579c3fae64e8cfc5f0fd203e8f2d"
+      },
+      {
+        "path": "plugins/soloco/runtime/local-sandbox.mjs",
+        "sha256": "e093897316b8bb4d1fe8e9306d0a0ed8145901b8fafd5641bd681ce309ce1343"
+      },
+      {
+        "path": "plugins/soloco/runtime/main.mjs",
+        "sha256": "bbf88492cb8ac0e08e271865dc0007d21f43a7b4ba7715c3a31c89f3ca595d93"
+      },
+      {
+        "path": "plugins/soloco/runtime/operating-control.mjs",
+        "sha256": "47e2a0c8b15128ea6f39b7bfc14cb6adc385b90b132c9df8e16d9274abbdd35d"
+      },
+      {
+        "path": "plugins/soloco/runtime/operating-state.mjs",
+        "sha256": "824143bc9035dbf4426850979d24413fd9c54e87c0845b4f1324f06befd0c664"
+      },
+      {
+        "path": "plugins/soloco/runtime/progress-view.mjs",
+        "sha256": "bbcea8afc8760d365ac84f395e3cafb07aa26a06bf12f71b670fe7a9d08ad839"
+      },
+      {
+        "path": "plugins/soloco/runtime/progress.mjs",
+        "sha256": "977ed14281cf7de7054babb75d953a5dc6bbf7c319e1fba3e81eeffce6812080"
+      },
+      {
+        "path": "plugins/soloco/runtime/prototype.mjs",
+        "sha256": "952cfc64d2d73bc73c97c27ccbd53b6ffd189a0806d5504bbd9ffff2e93f4d68"
+      },
+      {
+        "path": "plugins/soloco/runtime/public-response.mjs",
+        "sha256": "d84b0fbb0decbd0ae0b51a67638bec5cd44d48b741661a383cbd42c5a2541986"
+      },
+      {
+        "path": "plugins/soloco/runtime/record-storage.mjs",
+        "sha256": "fd91001c7ac8fe256e3ad1cbf7c888691d1000873bbbed3afc894cb789a17173"
+      },
+      {
+        "path": "plugins/soloco/runtime/scoped-context.mjs",
+        "sha256": "9945bfcb79bae54a855b0ec3248e37571818d86efa95c66f8a7621070ccfd2bc"
+      },
+      {
+        "path": "plugins/soloco/runtime/scoped-stream.mjs",
+        "sha256": "7bc83d0f2a9852868553d913b126583946d159b502adef07938e38f90ad5f16a"
+      },
+      {
+        "path": "plugins/soloco/runtime/selection.mjs",
+        "sha256": "55505fa53d69b28aed8394a291ad5473fcecff9f4d4b8b01ed3b397b26015214"
+      },
+      {
+        "path": "plugins/soloco/runtime/snapshot.mjs",
+        "sha256": "660a89aa41ffed18f6358e33d7efaf2db96b0c7b5d6807ae4f2dce939d69f7fb"
+      },
+      {
+        "path": "plugins/soloco/runtime/storage-transfer.mjs",
+        "sha256": "2ea96610ab528d61471ee35c0482fb62b76be090f5f7bd22cc2489486a8155c3"
+      },
+      {
+        "path": "plugins/soloco/runtime/store.mjs",
+        "sha256": "15ba60d1af642eea9da743b1200ce2f67d2d2b8cf16ffe9c8e8e8bc7f290add6"
+      },
+      {
+        "path": "plugins/soloco/runtime/supervisor.mjs",
+        "sha256": "b6fa3b23aae98aa6e3aef8e915c1ac7b9e61964650987bd8d65a402795a11789"
+      },
+      {
+        "path": "plugins/soloco/runtime/task-context.mjs",
+        "sha256": "67d89e43d623f3b31b3873680b266f1962b6f5f27642f328f08744a007ff1461"
+      },
+      {
+        "path": "plugins/soloco/runtime/task-index.mjs",
+        "sha256": "a8967fd0600e52e7f9ad6c82c9e48a497eb2ec4b8f2c3f8c326804358e3af363"
+      },
+      {
+        "path": "plugins/soloco/runtime/task-runtime-authority.mjs",
+        "sha256": "a602b66638a06995ecb138c12fa0f97e95830ff6b8a968d806acca411b46b27e"
+      },
+      {
+        "path": "plugins/soloco/runtime/task-runtime.mjs",
+        "sha256": "d8ffb80895b7a62b0d1c75aa4fd2f5ffdbce7f7a7ad8154a0243cd140bf6c887"
+      },
+      {
+        "path": "plugins/soloco/runtime/tasks.mjs",
+        "sha256": "f623961a569df16af62bcc4efbb90e9e4e32cdc909d2940c48167181fb3c12ac"
+      },
+      {
+        "path": "plugins/soloco/runtime/timeout.mjs",
+        "sha256": "586c5f44f98742320119f0b42d0612dd79cf970f4e858f05e7d65953c31951a4"
+      },
+      {
+        "path": "plugins/soloco/runtime/upgrade-evidence.mjs",
+        "sha256": "14b809e88cb4a380829e6bb6ab9feceefc7582db230b0e8dcc70bed3b7b70e21"
+      },
+      {
+        "path": "plugins/soloco/runtime/upgrade.mjs",
+        "sha256": "0a4e15abaf0cea312d9161d8c8081258da0bcf0c064f9cbb01c6e88d92e3f26e"
+      },
+      {
+        "path": "plugins/soloco/runtime/validation-cache.mjs",
+        "sha256": "872415f42c63e015d159e5374d45b6de453dd7e8a873eb7f70473e6395b4354d"
+      },
+      {
+        "path": "plugins/soloco/runtime/worker.mjs",
+        "sha256": "827bcc983c327a1bcba7c78dfc8ced60e783e9e8e6223e929e9804d4daa8cfe1"
+      }
+    ]
+  },
+  "host_version": "codex-cli 0.154.0",
+  "catalog_source": "host_catalog",
+  "jobs": [
+    {
+      "role": "engineer",
+      "status": "completed",
+      "native_id_sha256": "ac7a1ded0817170d5b63d6d7f48c952b3191729ea121ffdfcc2f62bd274759ea",
+      "error": null,
+      "artifact_published": true
+    },
+    {
+      "role": "qa",
+      "status": "completed",
+      "native_id_sha256": "f34349f93367a5f1e272005594dedd1c9b754ee49848c4442470c67b9bb8e879",
+      "error": null,
+      "artifact_published": true
+    },
+    {
+      "role": "research",
+      "status": "completed",
+      "native_id_sha256": "f2ce7aa40c00e08a641937e1867c27f1a55e4390d12f593d75f56cdcd2d29023",
+      "error": null,
+      "artifact_published": true
+    }
+  ],
+  "raw_receipt_sha256": "473656f49c7f962f71a94748b699488c9ffa858099c21b13f07789bae507ac04",
+  "evidence_kind": "Sanitized projection of retained local native receipt; raw host diagnostics are not published.",
+  "requested_efforts": {
+    "engineer": "low",
+    "qa": "medium",
+    "research": "low"
+  },
+  "effective_provider_settings": "unverified"
+}
