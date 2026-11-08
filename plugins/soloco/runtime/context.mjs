@@ -4,7 +4,8 @@ import { handoverReviewContext } from './handover.mjs';
 import { digest } from './store.mjs';
 import { developmentTransportBudget } from './development-limits.mjs';
 import {governingRecords,mandatoryExecutionEvidence,reviewedContext,currentRecords,currentExecutionEvidence,recordReference,validateContextPlan,contextSource,currentExtensions} from './current-state.mjs';
-import {buildQualificationEvidence} from './upgrade-evidence.mjs';
+import {buildQualificationEvidence,evidencePage} from './upgrade-evidence.mjs';
+import {buildQualificationReviewFrame} from './qualification-frame.mjs';
 import {hasSnapshotReferences,inheritSnapshots} from './snapshot.mjs';
 import {qualificationAssignment,qualificationMatches,QUALIFICATION_LIMITS} from './context-qualification.mjs';
 import {taskAssignmentContext,taskContextMatches,TASK_CONTEXT_BUDGET} from './task-context.mjs';
@@ -91,9 +92,13 @@ export function qualificationReviewContext(state,job) {
   const evidence=buildQualificationEvidence(state,plan,job),stream=evidence.sources[evidence.pages[0].source_id];
   const registry=Object.values(evidence.sources).find(s=>s.kind==='source-index');
   const ref=s=>({source_id:s.source_id,sha256:s.sha256,length:s.length});
-  const text=JSON.stringify({protocol:'context-qualification-review-v2',plan:{id:plan.id,revision:plan.revision,sha256:digest(JSON.stringify(plan.context_classification_plan))},
-    required_semantics:ref(stream),registry:ref(registry),range_limit:32768,
-    rule:'Read the complete required_semantics stream on this native session before Pass. Use exact source_id/sha256 UTF-16 range reads. No fixed round count; runtime deadlines and per-request transport bounds remain. Only runtime delivery receipts prove coverage. Pass requires coverage_complete:true, obligations_preserved:true, unique_findings:[], blockers:[], permitted_action:apply_context_classification and the exact plan_sha256. Every missing or uncertain semantic counterpart blocks qualification.'});
+  const read_ranges=evidence.pages.filter(page=>page.source_id===stream.source_id)
+    .flatMap(page=>evidencePage(evidence,page).citation_ranges.map(({offset,length})=>({offset,length})));
+  const text=JSON.stringify(buildQualificationReviewFrame({
+    plan:{id:plan.id,revision:plan.revision,sha256:digest(JSON.stringify(plan.context_classification_plan))},
+    required_semantics:ref(stream),registry:ref(registry),read_ranges,
+    charter:state.roles[job.role],assignment:{task:job.task,instance_id:job.instance_id??null}
+  }));
   if(text.length>CONTEXT_LIMIT)throw Error('Qualification packet exceeds context bound');
   return {text,hash:digest(text),qualification_evidence:evidence,initial_delivery:[],inputs:[{id:plan.id,revision:plan.revision}]};
 }
