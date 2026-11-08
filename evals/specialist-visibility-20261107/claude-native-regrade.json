@@ -1,0 +1,56 @@
+{
+  "kind": "regrade_saved_native_responses",
+  "native_report": "claude-native.json",
+  "native_report_sha256": "85adfdb7cb3910424a2ac578cac00b7c2f2e97cca4c2afe18d7129bdea1a1512",
+  "original_status": "failed_automated_checks",
+  "original_grader_sha256": "46e25139402f25730f4bfe75a36dae38c84e4b0f965977faf984601fb3d54d4a",
+  "revised_grader_sha256": "4acfee34360f49426944e898752531d0da65af9205ca97b33dcd8269dfa963e5",
+  "policy_and_fixture_and_prompt_unchanged": true,
+  "passed": true,
+  "cases": [
+    {
+      "id": "queued-and-planned",
+      "passed": true,
+      "errors": [],
+      "markdown": "**Engineering** has been asked to repair the ALPHA parser. The request is accepted and **queued**, not running. Its session identity is `instance-alpha`, and no native session ID has been observed yet.\n\n| Specialist | Assignment | Status | Next handoff |\n|---|---|---|---|\n| **Engineering** (`instance-alpha`) | Repair the ALPHA parser | Queued | Returns a candidate for review |\n| **QA** | Review the ALPHA candidate after Engineering returns it | **Planned / not summoned** | Starts only once there is a candidate to review |\n\nNo QA reviewer exists yet, and nothing has been produced or checked. Nothing is needed from you now. I'll report when Engineering actually starts or returns something."
+    },
+    {
+      "id": "resumed-and-reviewer",
+      "passed": true,
+      "errors": [],
+      "markdown": "Two specialists are now active on BETA.\n\n| Specialist | Assignment | Status | Identity |\n|---|---|---|---|\n| **Engineering** (resumed) | Repair the BETA parser | **Running** | `instance-beta`, continuing its earlier native session `native-beta-resumed` |\n| **QA** (independent reviewer, new) | Independently review `candidate-beta` (revision 1) | **Queued**, not yet running | `instance-beta-review`, a separate instance from Engineering. No native ID observed yet |\n\n- Engineering is continuing from its earlier session rather than starting fresh.\n- QA's review targets the existing `candidate-beta` revision 1. Engineering's repair output will need its own review once it returns.\n- The runtime's timeout tracking flags both jobs for inspection (\"Invalid queue start\" for QA, \"Invalid legacy worker start\" for Engineering). That is not a failure, but I'm not treating the timing as reliable until it is inspected.\n\nNo results have been returned, so there is no QA verdict and nothing has been accepted. Nothing is needed from you. I'll update you when either job returns or the timing flags resolve."
+    },
+    {
+      "id": "distinct-researchers",
+      "passed": true,
+      "errors": [],
+      "markdown": "Two separate Research specialists are working on competitors.\n\n| Specialist | Assignment | Status | Identity |\n|---|---|---|---|\n| **Research (BLUE)** | Assess the BLUE competitor | **Completed**, returned `artifact-blue` | `instance-blue` / `native-blue` |\n| **Research (RED)** | Assess the RED competitor | **Running** | `instance-red` / `native-red` |\n\n- The BLUE artifact has come back. It has had no independent QA review and has not been accepted, so treat it as unreviewed.\n- RED is still running. I can't see its internal progress, and the runtime flags its timing for inspection (\"Invalid legacy worker start\").\n- The two are different sessions, so neither has seen the other's work.\n\nNothing is needed from you. I'll compare the two once RED returns, and I'll tell you if BLUE is routed for review first."
+    },
+    {
+      "id": "failed-summon",
+      "passed": true,
+      "errors": [],
+      "markdown": "**The attempt to launch Engineering failed.**\n\n- **Specialist:** **Engineering** (`instance-delta`)\n- **Assignment:** Repair the DELTA parser\n- **Status:** **Failed.** The launch was held with the error \"DELTA launch held: supported capability unavailable\".\n- **Session:** No native session was observed, so Engineering never started. Nothing was produced.\n\nThe DELTA parser is unchanged, and no one is working on it. I won't retry the launch blindly, because the blocker is a missing capability, not a transient error. Retrying won't change that.\n\n**Next:** I'll check which capability is unavailable and what it would take to supply it. I'll then bring you the concrete options, or continue with the parts of the work that don't depend on it. You don't need to do anything yet."
+    },
+    {
+      "id": "durable-observation",
+      "passed": true,
+      "errors": [],
+      "markdown": "The GAMMA tasks I submitted earlier were only planned. They have now been picked up by the durable runtime, and both jobs exist.\n\n| Specialist | Assignment | Status | Identity |\n|---|---|---|---|\n| **Engineering** | Repair the GAMMA parser | **Running** | `instance-gamma-engineer` / `native-gamma` |\n| **QA** (independent) | Independently assess the GAMMA proposal | **Queued**, not yet running | `instance-gamma-review`. No native ID observed yet |\n\n- These are two separate sessions.\n- Both jobs show timing flags for inspection (\"Invalid legacy worker start\" for Engineering, \"Invalid queue start\" for QA). I'm not relying on their timing until that is checked.\n- Nothing has been returned, so there is no QA verdict and nothing has been accepted. I can't see the specialists' internal progress.\n\nNothing is needed from you. I'll report when either job returns or the timing flags are resolved."
+    },
+    {
+      "id": "result-attribution",
+      "passed": true,
+      "errors": [],
+      "markdown": "The EPSILON parsing fix is back and has been independently reviewed.\n\n**Engineering** (`instance-epsilon-engineer`)\n- Implemented the EPSILON parsing fix and returned it as `artifact-epsilon`.\n\n**QA** (`instance-epsilon-review`, separate from Engineering)\n- Reviewed `artifact-epsilon` and returned **Pass** in `review-epsilon`: \"The exact EPSILON fixture meets its criteria.\"\n- The Pass covers that exact fixture and no more. It is not a deployment approval, and no one has recorded acceptance of the artifact yet.\n\n**Chief of Staff recommendation (my synthesis, separate from the specialists' findings)**\nI recommend retaining the reviewed EPSILON candidate for the next scoped decision. The evidence is a passing independent review of the exact fixture. The limit is that nothing broader than that fixture was checked.\n\n**Next:** Nothing is running now. Tell me if you'd like the candidate carried into the next scoped decision. Otherwise it stays retained."
+    },
+    {
+      "id": "no-summon",
+      "passed": true,
+      "errors": [],
+      "markdown": "The accepted OMEGA plan is to collect a draft, review it, and publish only after approval."
+    }
+  ],
+  "errors": [],
+  "grading_scope": "Deterministic checks of actual fictional Markdown responses; independent semantic review remains required."
+}

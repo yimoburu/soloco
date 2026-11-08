@@ -1,0 +1,112 @@
+{
+  "kind": "independent_issue42_response_review",
+  "reviewer": "/root/review_visibility",
+  "scope": "Observed specialist prominence, assignment attribution and lifecycle distinctions in the exact retained fictional native responses. Not a general policy-compliance or future-response guarantee.",
+  "grader_sha256": "4acfee34360f49426944e898752531d0da65af9205ca97b33dcd8269dfa963e5",
+  "fixture_and_prompt_unchanged": true,
+  "hosts": [
+    {
+      "host": "codex",
+      "native_report": "codex-native-default.json",
+      "native_report_sha256": "f2c5c460f55391febf518eea4afad5b0c4381f0951b6a3e727ea19e2f5b14241",
+      "original_status": "failed_automated_checks",
+      "original_grader_sha256": "46e25139402f25730f4bfe75a36dae38c84e4b0f965977faf984601fb3d54d4a",
+      "policy_sha256": "4c2cd6f6a7d8447271d7cca880aaa576252169edd342202b681502921337bf5e",
+      "prompt_sha256": "db845f0105cbfab89f52a9020200702391ce251f4b30c8ad2b5dfad8e2116b04",
+      "revised_automated_passed": true,
+      "issue42_semantic_verdict": "Pass for sampled visibility/attribution behavior",
+      "cases": [
+        {
+          "id": "queued-and-planned",
+          "verdict": "Pass",
+          "basis": "Prominent role labels, attributable assignments and lifecycle states agree with the supplied fictional observations."
+        },
+        {
+          "id": "resumed-and-reviewer",
+          "verdict": "Pass",
+          "basis": "Prominent role labels, attributable assignments and lifecycle states agree with the supplied fictional observations."
+        },
+        {
+          "id": "distinct-researchers",
+          "verdict": "Pass",
+          "basis": "Prominent role labels, attributable assignments and lifecycle states agree with the supplied fictional observations."
+        },
+        {
+          "id": "failed-summon",
+          "verdict": "Pass",
+          "basis": "Prominent role labels, attributable assignments and lifecycle states agree with the supplied fictional observations."
+        },
+        {
+          "id": "durable-observation",
+          "verdict": "Pass",
+          "basis": "Prominent role labels, attributable assignments and lifecycle states agree with the supplied fictional observations."
+        },
+        {
+          "id": "result-attribution",
+          "verdict": "Pass",
+          "basis": "Prominent role labels, attributable assignments and lifecycle states agree with the supplied fictional observations."
+        },
+        {
+          "id": "no-summon",
+          "verdict": "Pass",
+          "basis": "Direct one-sentence summary without an invented specialist roster."
+        }
+      ],
+      "limitations": [
+        "Response evaluation is finite and uses fictional production-projection receipts, not live company dispatch."
+      ]
+    },
+    {
+      "host": "claude",
+      "native_report": "claude-native.json",
+      "native_report_sha256": "85adfdb7cb3910424a2ac578cac00b7c2f2e97cca4c2afe18d7129bdea1a1512",
+      "original_status": "failed_automated_checks",
+      "original_grader_sha256": "46e25139402f25730f4bfe75a36dae38c84e4b0f965977faf984601fb3d54d4a",
+      "policy_sha256": "4c2cd6f6a7d8447271d7cca880aaa576252169edd342202b681502921337bf5e",
+      "prompt_sha256": "db845f0105cbfab89f52a9020200702391ce251f4b30c8ad2b5dfad8e2116b04",
+      "revised_automated_passed": true,
+      "issue42_semantic_verdict": "Pass for sampled visibility/attribution behavior",
+      "cases": [
+        {
+          "id": "queued-and-planned",
+          "verdict": "Pass",
+          "basis": "Prominent role labels, attributable assignments and lifecycle states agree with the supplied fictional observations."
+        },
+        {
+          "id": "resumed-and-reviewer",
+          "verdict": "Pass",
+          "basis": "Prominent role labels, attributable assignments and lifecycle states agree with the supplied fictional observations."
+        },
+        {
+          "id": "distinct-researchers",
+          "verdict": "Pass",
+          "basis": "Prominent role labels, attributable assignments and lifecycle states agree with the supplied fictional observations."
+        },
+        {
+          "id": "failed-summon",
+          "verdict": "Pass",
+          "basis": "Prominent role labels, attributable assignments and lifecycle states agree with the supplied fictional observations."
+        },
+        {
+          "id": "durable-observation",
+          "verdict": "Pass",
+          "basis": "Prominent role labels, attributable assignments and lifecycle states agree with the supplied fictional observations."
+        },
+        {
+          "id": "result-attribution",
+          "verdict": "Pass",
+          "basis": "Prominent role labels, attributable assignments and lifecycle states agree with the supplied fictional observations."
+        },
+        {
+          "id": "no-summon",
+          "verdict": "Pass",
+          "basis": "Direct one-sentence summary without an invented specialist roster."
+        }
+      ],
+      "limitations": [
+        "The distinct-researchers response infers that different sessions mean neither has seen the other's work. Session identity alone does not establish that information boundary; this is an unsupported broader claim outside the issue42 prominence/attribution acceptance.",
+        "The failed-summon response says the DELTA parser is unchanged; the supplied launch observation does not independently establish source-file state."
+      ]
+    }
+  ]
+}
