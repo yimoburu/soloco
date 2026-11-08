@@ -13,7 +13,7 @@ const pause=()=>new Promise(resolve=>setTimeout(resolve,20));
 function codexTitle(nativeId) {
   return new Promise((resolve,reject)=>{
     const child=spawn(executable('codex'),['app-server','--stdio'],{stdio:['pipe','pipe','ignore']});let buffer='',done=false;
-    const timer=setTimeout(()=>finish(Error('Metadata-only Codex readback timed out')),3000);
+    const timer=setTimeout(()=>finish(Error('Metadata-only Codex readback timed out')),5000);
     function finish(error,value){if(done)return;done=true;clearTimeout(timer);child.kill('SIGTERM');setTimeout(()=>child.kill('SIGKILL'),150).unref();error?reject(error):resolve(value);}
     const send=value=>child.stdin.write(JSON.stringify(value)+'\n');
     child.on('error',()=>finish(Error('Codex metadata readback could not start')));child.on('close',()=>{if(!done)finish(Error('Codex metadata readback closed early'));});child.stdin.on('error',()=>finish(Error('Metadata readback stream failed')));
@@ -37,7 +37,7 @@ function claudeTitle(nativeId) {
 }
 export async function namingSmoke(host,output) {
   if(!['codex','claude'].includes(host)||!path.isAbsolute(output)||fs.existsSync(output))throw Error('Choose codex|claude and a new absolute report path');
-  const directory=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'soloco-naming-native-'))),report={host,status:'running',source_sha256:Object.fromEntries(['adapters','session-naming','worker','upgrade'].map(name=>[name,hash(fs.readFileSync(new URL('../plugins/soloco/runtime/'+name+'.mjs',import.meta.url)))])),rounds:[],passed:false,limitations:['Fictional native adapter naming check, not actual-company review or adoption','Claude readback inspects only the newly created probe transcript metadata','Display names do not establish role authority, acceptance or model settings']};
+  const directory=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'soloco-naming-native-'))),report={host,probe_directory:directory,status:'running',source_sha256:Object.fromEntries(['adapters','session-naming','worker','upgrade'].map(name=>[name,hash(fs.readFileSync(new URL('../plugins/soloco/runtime/'+name+'.mjs',import.meta.url)))])),rounds:[],passed:false,limitations:['Fictional native adapter naming check, not actual-company review or adoption','Claude readback inspects only the newly created probe transcript metadata','Display names do not establish role authority, acceptance or model settings']};
   fs.writeFileSync(output,JSON.stringify(report,null,2)+'\n',{flag:'wx'});
   let native=null;const instance='fictional-'+randomUUID();
   try {
@@ -46,8 +46,9 @@ export async function namingSmoke(host,output) {
       if(native&&response.native_id!==native)throw Error('Resume changed native identity');native=response.native_id;
       const until=Date.now()+3500;let receipt;
       do {try{receipt=JSON.parse(fs.readFileSync(path.join(directory,SESSION_NAMING_RECEIPT),'utf8'));}catch{};if(receipt?.native_id===native&&receipt.title===title)break;await pause();}while(Date.now()<until);
-      const observed=host==='codex'?await codexTitle(native):claudeTitle(native);
-      report.rounds.push({role,native_id:native,requested_title:title,observed_title:observed,receipt,model_evidence:response.model_evidence});
+      const round={role,native_id:native,requested_title:title,receipt,model_evidence:response.model_evidence};report.rounds.push(round);
+      // Retain the completed native call even if an independent readback fails.
+      const observed=host==='codex'?await codexTitle(native):claudeTitle(native);round.observed_title=observed;
       if(observed!==title)throw Error('Host did not retain the requested role title');
       if(!receipt||receipt.title!==title)throw Error('Naming receipt missing');
     }

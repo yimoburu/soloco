@@ -1,0 +1,8 @@
+{
+  "host": "codex",
+  "native_id": "01a1b97f-325f-7320-b5e6-0a674fb4cb06",
+  "title": "SoloCo — Naming Probe Resumed Engineer · ffd9c267-45bbdb95",
+  "verified_via": "codex_app_read_thread",
+  "original_probe": "soloco-session-naming-codex-native.json",
+  "note": "Later read-only check after independent CLI metadata readback timed out; no native invocation repeated."
+}
