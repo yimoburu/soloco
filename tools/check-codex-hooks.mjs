@@ -62,7 +62,11 @@ try {
   } finally {for(const [key,value]of Object.entries(saved))if(value===undefined)delete process.env[key];else process.env[key]=value;}
   const migratedBytes=fs.readFileSync(file);
   // Simulate the next package release. Host discovery must follow the new install without project edits.
-  const store=path.join(source,'plugins/soloco/runtime/store.mjs');fs.writeFileSync(store,fs.readFileSync(store,'utf8').replace("VERSION = '"+manifest.version+"'", "VERSION = '0.3.99'"));
+  const versionFile=path.join(source,'plugins/soloco/runtime/team-source.mjs');
+  const previousVersionSource=fs.readFileSync(versionFile,'utf8');
+  const nextVersionSource=previousVersionSource.replace("VERSION = '"+manifest.version+"'", "VERSION = '0.3.99'");
+  assert.notEqual(nextVersionSource,previousVersionSource,'Synthetic release must change the declared package version');
+  fs.writeFileSync(versionFile,nextVersionSource);
   const build=spawnSync(process.execPath,[path.join(source,'tools/build-plugin.mjs')],{encoding:'utf8'});assert.equal(build.status,0,build.stderr);
   run(['plugin','add','soloco@soloco','--json']);
   entry=(await rpc('hooks/list',{cwds:[root]})).data[0];
