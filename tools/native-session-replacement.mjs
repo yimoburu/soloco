@@ -54,7 +54,7 @@ export async function runReplacement({directory,model}){
  const direct=(label,nativeId,prompt)=>native(label,'codex',nativeId,prompt,root,replacementProtocol.timeout_ms,cosSelection,{timeoutReason:'One bounded fictional native continuity qualification; no retry.'});
  const tool=(name,args)=>call(name,args,'codex');
  const controls=[];
- const control=async(args)=>{const t=performance.now();try{return await tool('company_control',args);}finally{controls.push(performance.now()-t);}};
+ const control=async({epoch,...args})=>{const t=performance.now();try{return await tool('company_control',args);}finally{controls.push(performance.now()-t);}};
  let base;
  const dispatch=async(label,extra={})=>{
   const job=engine.dispatch({...base,role:'engineer',task:'Read the current fictional ORCHID source and return content as a JSON-encoded string containing objective, current_value, commitment, blocker, authority, next_action, and obsolete_value_rejected. Copy all current strings exactly, put the rejected old value in obsolete_value_rejected, and do not grant permission to publish. No peer messages or outside effects.',model_selection:workerSelection,timeout_ms:replacementProtocol.timeout_ms,timeout_reason:'One bounded fictional extraction or exact independent handover review.',...extra},'codex',{launch:()=>({on(){},unref(){}}),check:()=>ready,catalog:()=>catalog});
@@ -72,7 +72,7 @@ export async function runReplacement({directory,model}){
   await tool('company_storage',{...base,action:'migrate',source_instruction:'Migrate only this paused fictional fixture with retained backup.'});
   await control({...base,action:'resume',expected_epoch:1,source_instruction:'Resume preparation in this fictional fixture.'});
   const source=await tool('company_save',{...base,kind:'decision',content:JSON.stringify({current:facts,history:{current_value:'amber',status:'obsolete',superseded_by:'The current decision explicitly changes amber to violet; amber remains retained evidence only.'}}),source_reference:'Frozen fictional ORCHID facts declared in the native replacement protocol.'});
-  const notice=await tool('company_notify',{...base,kind:'must_know',summary:facts.blocker});
+  const notice=await tool('company_notice',{...base,kind:'must_know',summary:facts.blocker});
   report.frozen_facts_sha256=digest(JSON.stringify(facts));report.source_record_id=source.id;report.notice=notice;
   const before=await dispatch('outgoing-worker',{input_ids:[source.id]});assert(gradeReplacement(before.artifact.content).passed,'Outgoing worker missed a required fictional obligation');
   const oldOwner={...base},oldJob=JSON.stringify(before.job);
