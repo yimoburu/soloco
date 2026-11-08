@@ -120,7 +120,12 @@ test('qualification refuses stale epochs, native/source ownership, incomplete de
 test('streamed v2 qualification exceeds legacy round limits with authentic same-native coverage and explicit semantic attestations',t=>{
   const s=seed(),r=historyRecord(0);r.content+=' Distinct legacy diagnostic body '+ 'unknown original clauses '.repeat(100000);s.records[r.id]=r;
   const p=proposal(s,[r.id]),q=passing(s,p,{format:4}),j=s.jobs[q.job_id],ctx=assignmentContext(s,j),e=ctx.qualification_evidence,raw=stream(e);
-  assert.ok(ctx.text.length<2000);assert.ok(raw.length>2000000);
+  assert.ok(ctx.text.length<8192);assert.ok(raw.length>2000000);
+  const frame=JSON.parse(ctx.text);
+  assert.deepEqual(frame.required_semantics,{source_id:raw.source_id,sha256:raw.sha256,length:raw.length});
+  assert.equal(ctx.text.includes('Distinct legacy diagnostic body'),false);
+  assert.equal(ctx.text.includes('unknown original clauses'),false);
+  assert.equal(frame.evidence_protocol.read_ranges.reduce((n,r)=>n+r.length,0),raw.length);
   assert.throws(()=>applyContextQualification(s,p,q,{source_instruction:'fixture',contextMatches}),/delivery receipt/);
   const ledger=createDeliveryLedger(e,j.native_id),other=createDeliveryLedger(e,'different-native');
   const meta={plan_sha256:q.review.plan_sha256,context_sha256:j.context_sha256};
