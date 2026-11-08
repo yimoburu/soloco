@@ -289,7 +289,7 @@ if(process.argv[1] && path.resolve(process.argv[1])===fileURLToPath(import.meta.
   }));}
 }
 
-function validTestExecution(state,receipt) {
+export function validTestExecution(state,receipt) {
   const d=receipt?.development,r=d?.result;if(!d||!r)return false;
   if(!d.reused_from)return r.tests_executed===true&&r.reused!==true;
   const origin=state.records[d.reused_from],j=state.jobs[origin?.author_instance],c=state.records[origin?.development?.candidate_id];

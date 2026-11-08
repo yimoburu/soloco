@@ -1,6 +1,7 @@
 import {SchedulingHold} from './recovery.mjs';
 import { digest } from './store.mjs';
 import {taskMessageInput,assertTaskPrerequisites} from './tasks.mjs';
+import {validTestExecution} from './develop.mjs';
 
 const active=new Set(['queued','running']);
 function names(value,label,max) {
@@ -29,7 +30,7 @@ function dependency(state,id,seen=new Set()) {
   if(!Number.isInteger(artifact.revision)||artifact.revision<1)throw new Error(`Dependency ${id} has an invalid artifact version`);
   if(software) {
     const d=artifact.development,c=state.records[d?.candidate_id],p=state.records[d?.plan_id],producer=state.jobs?.[c?.job_id];
-    if(d?.type!=='test'||job.development_id!==d.plan_id||job.candidate_id!==d.candidate_id||c?.status!=='Submitted'||c.development?.type!=='candidate'||p?.development?.type!=='plan'||c.development.plan_id!==p?.id||c.development.scope_sha256!==p?.development?.scope_sha256||producer?.status!=='completed'||producer.artifact_id!==c.id||producer.instance_id!==c.author_instance||c.development.run?.job_id!==job.id||c.development.run.receipt_id!==artifact.id||c.development.run.status!=='completed'||c.development.candidate_sha256!==d.candidate_sha256||!Array.isArray(c.development.files)||digest(JSON.stringify(c.development.files))!==d.candidate_sha256||d.result?.candidate_sha256!==d.candidate_sha256||!Array.isArray(p?.development?.scope?.test_paths)||JSON.stringify(d.result?.test_paths)!==JSON.stringify(p.development.scope.test_paths)||d.result?.tests_executed!==true||d.result.status!=='passed'||d.result.exit_code!==0||d.receipt_sha256!==digest(JSON.stringify(d.result)))throw new Error(`Dependency ${id} lacks a canonical passing test receipt`);
+    if(d?.type!=='test'||job.development_id!==d.plan_id||job.candidate_id!==d.candidate_id||c?.status!=='Submitted'||c.development?.type!=='candidate'||p?.development?.type!=='plan'||c.development.plan_id!==p?.id||c.development.scope_sha256!==p?.development?.scope_sha256||producer?.status!=='completed'||producer.artifact_id!==c.id||producer.instance_id!==c.author_instance||c.development.run?.job_id!==job.id||c.development.run.receipt_id!==artifact.id||c.development.run.status!=='completed'||c.development.candidate_sha256!==d.candidate_sha256||!Array.isArray(c.development.files)||digest(JSON.stringify(c.development.files))!==d.candidate_sha256||d.result?.candidate_sha256!==d.candidate_sha256||!Array.isArray(p?.development?.scope?.test_paths)||JSON.stringify(d.result?.test_paths)!==JSON.stringify(p.development.scope.test_paths)||!validTestExecution(state,artifact)||d.result.status!=='passed'||d.result.exit_code!==0||d.receipt_sha256!==digest(JSON.stringify(d.result)))throw new Error(`Dependency ${id} lacks a canonical passing test receipt`);
   }
   let subject=null;
   if(artifact.kind==='review') {
