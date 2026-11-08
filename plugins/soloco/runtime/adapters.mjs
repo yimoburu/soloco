@@ -220,7 +220,7 @@ export function parseOutput(host, stdout) {
         // cannot supply an artifact or repair a failed/incomplete terminal turn.
         if(event.type==='item.completed'&&event.item?.type==='error'){
           const item=event.item;
-          if(!native_id||typeof item.id!=='string'||!item.id||itemTurns.has(item.id)||typeof item.message!=='string'||!item.message.trim())fail('Invalid Codex diagnostic item');
+          if(!native_id||completed||(turn!==0&&!active)||typeof item.id!=='string'||!item.id.trim()||itemTurns.has(item.id)||typeof item.message!=='string'||!item.message.trim()||Object.keys(item).some(k=>!['id','type','message'].includes(k)))fail('Invalid Codex diagnostic item');
           else {itemTurns.set(item.id,turn);completedDiagnostics.add(item.id);warnings.push({type:'error',message:item.message});}
           pendingWarning=true;break;
         }
