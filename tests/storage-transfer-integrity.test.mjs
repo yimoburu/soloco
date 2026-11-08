@@ -54,3 +54,43 @@ test('restore refuses unexpected destination files appearing during copying',()=
   },()=>restoreCompany(f.backup,f.destination)),/Restored file inventory differs/);
   assert.equal(fs.readFileSync(path.join(f.destination,'unexpected.txt'),'utf8'),'not in the manifest');
 });
+
+test('transfer destination checks refuse real direct, dangling and ancestor links without normalizing parent traversal',()=>{
+  const f=fixture(),directory=path.dirname(f.backup);
+  const direct=path.join(directory,'direct-link'),ancestor=path.join(directory,'ancestor-link'),dangling=path.join(directory,'dangling-link');
+  fs.symlinkSync(f.backup,direct,'dir');fs.symlinkSync(f.backup,ancestor,'dir');
+  fs.symlinkSync(path.join(directory,'absent-target'),dangling,'dir');
+  for(const destination of [direct,dangling,path.join(ancestor,'new-output')]){
+    assert.throws(()=>withStore(f.args.root,db=>backupCompany(db,destination)),/Linked transfer ancestor/);
+  }
+  assert.throws(()=>withStore(f.args.root,db=>backupCompany(db,ancestor+'/../escaped')),/Parent traversal/);
+  assert.equal(fs.existsSync(path.join(directory,'escaped')),false);
+  assert.equal(fs.existsSync(path.join(f.backup,'new-output')),false);
+});
+
+test('native realpath of the nearest existing prefix detects a link higher in that prefix',()=>{
+  const f=fixture(),directory=path.dirname(f.backup),real=path.join(directory,'real-parent');
+  fs.mkdirSync(path.join(real,'existing-child'),{recursive:true});
+  const link=path.join(directory,'linked-parent');fs.symlinkSync(real,link,'dir');
+  const destination=path.join(link,'existing-child','output');
+  assert.equal(fs.lstatSync(path.dirname(destination)).isSymbolicLink(),false);
+  assert.throws(()=>withStore(f.args.root,db=>backupCompany(db,destination)),/noncanonical transfer ancestor/);
+  assert.equal(fs.existsSync(path.join(real,'existing-child','output')),false);
+});
+
+test('fresh transfer rechecks parents after their creation and retains an observed intervening link',()=>{
+  const f=fixture(),directory=path.dirname(f.backup),parent=path.join(directory,'new-parent'),moved=parent+'-moved';
+  const destination=path.join(parent,'output'),mkdir=fs.mkdirSync;let injected=0;
+  try{
+    fs.mkdirSync=function(file,...options){
+      const result=Reflect.apply(mkdir,this,[file,...options]);
+      if(file===parent&&!injected++){fs.renameSync(parent,moved);fs.symlinkSync(moved,parent,'dir');}
+      return result;
+    };
+    assert.throws(()=>withStore(f.args.root,db=>backupCompany(db,destination)),/Linked transfer ancestor/);
+  }finally{fs.mkdirSync=mkdir;}
+  assert.equal(injected,1);
+  assert.equal(fs.lstatSync(parent).isSymbolicLink(),true);
+  assert.equal(fs.statSync(moved).isDirectory(),true);
+  assert.equal(fs.existsSync(path.join(moved,'output')),false);
+});

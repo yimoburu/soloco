@@ -7,14 +7,16 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { id, withStore, digest, installedTeam, teamHash, Store } from '../plugins/soloco/runtime/store.mjs';
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
-import { developmentAssignment, developmentCapability, executeDevelopmentTest } from '../plugins/soloco/runtime/develop.mjs';
+import { developmentAssignment, developmentCapability, executeDevelopmentTest, validTestExecution } from '../plugins/soloco/runtime/develop.mjs';
+import { validationManifest } from '../plugins/soloco/runtime/validation-cache.mjs';
 import { sandboxCapability } from '../plugins/soloco/runtime/local-sandbox.mjs';
 import { assignmentContext, contextMatches } from '../plugins/soloco/runtime/context.mjs';
 import {captureScopedPlan,scopedPlanView} from '../plugins/soloco/runtime/scoped-context.mjs';
 import {resolveSnapshot,inheritSnapshots} from '../plugins/soloco/runtime/snapshot.mjs';
 import { recordReference } from '../plugins/soloco/runtime/current-state.mjs';
 import { work } from '../plugins/soloco/runtime/worker.mjs';
-import { call } from '../plugins/soloco/runtime/main.mjs';
+import { call, toolList } from '../plugins/soloco/runtime/main.mjs';
+import { testFixtureIdentity } from '../plugins/soloco/runtime/test-fixtures.mjs';
 
 // Immutable published contract from 7adf94a8cf0943143fad5f83f3c2c4bda3a4a142:SPEC.md.
 const v018Governance=fs.readFileSync(new URL('./fixtures/governance-v018.md',import.meta.url),'utf8');
@@ -250,10 +252,66 @@ test('development capability fails closed without a supported sandbox, and MCP p
   await assert.rejects(call('company_develop',{...a,action:'execute'},'codex'),/Invalid action/);
   await assert.rejects(call('company_develop',{...a,action:'inspect',command:'anything'},'codex'),/Unknown argument/);
 });
+const transferFixture={protocol:'scratch-fixture-contract-v1',factory:'p5-transfer-two-real-links-v1'};
+test('MCP exposes a closed plan-only fixture selector and rejects caller paths before touching company state',async()=>{
+  const schema=toolList.find(t=>t.name==='company_develop').inputSchema.properties.test_fixture;
+  assert.equal(schema.additionalProperties,false);assert.deepEqual(schema.required,['protocol','factory']);
+  const a={root:'/fixture-never-opened',session_id:'not-bound',epoch:1};
+  for(const value of [null,undefined,[],{}, {...transferFixture,path:'/outside'}, {...transferFixture,target:'/outside'}, {...transferFixture,command:'run'}, {...transferFixture,content:'bytes'}, {...transferFixture,factory:'arbitrary'}, {...transferFixture,protocol:'other'}])await assert.rejects(call('company_develop',{...a,action:'plan',test_fixture:value},'codex'),/fixture|Fixture|selector|object|protocol|factory|fields/i);
+  for(const action of ['inspect','authorize','run','accept','revoke'])await assert.rejects(call('company_develop',{...a,action,test_fixture:transferFixture},'codex'),/only.*plan/);
+});
+test('execution evidence cannot lose its planned fixture binding or be relabeled as legacy or reused',()=>{
+  const identity=testFixtureIdentity(transferFixture),manifest=validationManifest({files:[{path:'check.test.mjs',sha256:digest('fixture test')}],tests:['check.test.mjs'],command:['node','--test','./check.test.mjs'],runtime:{node:'fixture-node',platform:'darwin',arch:'arm64',os_release:'fixture-os',system_build:'fixture-build',dependencies:[{path:'/fictional/library',sha256:digest('library')}],executable_sha256:digest('node'),runner_sha256:digest('runner')},sandbox:{backend:'fixture-backend',policy_sha256:digest('policy')},environment:{LANG:'C'},limits:{timeout_ms:1000,max_output_bytes:10000},test_fixture:identity,fixture_environment:{SOLOCO_TEST_FIXTURE_MANIFEST:{scratch_relative:'fixtures/manifest.json'},SOLOCO_TEST_FIXTURE_MANIFEST_SHA256:{runtime_result:'test_fixture.setup.manifest_sha256'}}});
+  // Synthetic records exercise binding validation only; no test execution is claimed.
+  const state={records:{plan:{development:{scope:{test_fixture:identity}}}}},receipt={development:{plan_id:'plan',validation_fingerprint:manifest.validation_fingerprint,validation_manifest:manifest,result:{tests_executed:true,validation_manifest_sha256:digest(JSON.stringify(manifest)),test_fixture:{identity,setup:{prepared_before_child:true,manifest_sha256:digest('manifest'),child_environment_sha256:digest('environment')},termination_confirmed:true,cleanup:{status:'confirmed'}}}}};
+  assert.equal(validTestExecution(state,receipt),true);
+  const stripped=structuredClone(receipt);delete stripped.development.validation_manifest;delete stripped.development.result.validation_manifest_sha256;delete stripped.development.result.test_fixture;assert.equal(validTestExecution(state,stripped),false);
+  assert.equal(validTestExecution({records:{plan:{development:{scope:{}}}}},receipt),false);
+  const reused=structuredClone(receipt);reused.development.reused_from='old';assert.equal(validTestExecution(state,reused),false);
+  const changed=structuredClone(state);changed.records.plan.development.scope.test_fixture.template_sha256=digest('changed');assert.equal(validTestExecution(changed,receipt),false);
+});
+test('fixture static identity is part of the exact scope before authorization and cannot be replaced by caller identity',live,async()=>{
+  const a=setup(),expires_at=new Date(Date.now()+60000).toISOString(),plain=await plan(a,{expires_at}),p=await plan(a,{expires_at,test_fixture:transferFixture});
+  const identity=testFixtureIdentity(transferFixture);assert.deepEqual(p.development.scope.test_fixture,identity);
+  assert.equal(identity.factory_source_sha256,digest(fs.readFileSync(new URL('../plugins/soloco/runtime/test-fixtures.mjs',import.meta.url),'utf8')));
+  assert.deepEqual(p.development.scope,{...plain.development.scope,test_fixture:identity});assert.notEqual(p.development.scope_sha256,plain.development.scope_sha256);
+  assert.equal(p.development.authorization,undefined);assert.equal(Object.hasOwn(plain.development.scope,'test_fixture'),false);
+  withStore(a.root,db=>db.transaction('test.tamper_fixture_identity',s=>{const x=s.records[p.id];x.development.scope.test_fixture.template_sha256=digest('wrong template');x.development.scope_sha256=digest(JSON.stringify(x.development.scope));return s;}));
+  const changed=read(a).records[p.id];await assert.rejects(authorize(a,changed),/fixture|Fixture|identity|template|changed|match/i);
+  assert.equal(read(a).records[p.id].development.authorization,undefined);
+});
+test('actual fixture execution propagates planned identity and result-bound setup, while reuse and run-time selectors remain forbidden',live,async()=>{
+  const a=setup(),p=await plan(a,{test_fixture:transferFixture});await authorize(a,p);const c=await generate(a,p),t=await run(a,p,c);
+  assert.equal(t.development.result.status,'passed',JSON.stringify(t.development.result));
+  assert.deepEqual(t.development.result.test_fixture.identity,p.development.scope.test_fixture);
+  assert.equal(t.development.result.test_fixture.setup.prepared_before_child,true);
+  assert.match(t.development.result.test_fixture.setup.manifest_sha256,/^[a-f0-9]{64}$/);assert.match(t.development.result.test_fixture.setup.child_environment_sha256,/^[a-f0-9]{64}$/);
+  assert.equal(t.development.validation_manifest.version,2);assert.deepEqual(t.development.validation_manifest.test_fixture,p.development.scope.test_fixture);
+  assert.equal(t.development.validation_manifest.fixture_environment.SOLOCO_TEST_FIXTURE_MANIFEST_SHA256.runtime_result,'test_fixture.setup.manifest_sha256');
+  const next=await generate(a,p);await assert.rejects(engine.develop({...a,action:'run',plan_id:p.id,candidate_id:next.id,reuse_receipt_id:t.id},'codex'),/fixture.*reuse|reuse.*fixture/i);
+  assert.equal(read(a).records[next.id].development.run,undefined);
+  await assert.rejects(engine.develop({...a,action:'run',plan_id:p.id,candidate_id:next.id,test_fixture:transferFixture},'codex'),/only.*plan/);
+  assert.equal(read(a).records[next.id].development.run,undefined);
+});
 test('installed development capability does not silently authorize older teams or modified governance',live,()=>{
   const team=installedTeam();assert.match(team.governance,/v0\.21/);
   assert.equal(developmentCapability(team).eligible,true);
   for(const changed of [{...team,plugin_version:'0.4.1'},{...team,governance_sha256:digest('changed rules')}])assert.equal(developmentCapability(changed).eligible,false);
+});
+test('retained v0.7.6 team can authorize a new fixed fixture without adopting runtime v0.7.7 definitions',live,async()=>{
+  const a=setup();withStore(a.root,db=>db.transaction('test.retain_v076_development_team',s=>{
+    s.plugin_version='0.7.6';s.runtime_version='0.7.6';s.cos_instructions='Retained v0.7.6 company instructions';s.team_sha256=teamHash(s);return s;
+  }));
+  const pinned=read(a);assert.equal(developmentCapability(pinned,a.root).eligible,true);
+  assert.equal(developmentCapability({...pinned,plugin_version:'0.7.6-unqualified'},a.root).eligible,false);
+  const opened=engine.open(a,'codex');assert.equal(opened.capabilities.local_development.eligible,true);assert.deepEqual(read(a),pinned);
+  const p=await plan(a,{test_fixture:transferFixture});await authorize(a,p);
+  assert.deepEqual(p.development.scope.test_fixture,testFixtureIdentity(transferFixture));
+  const authorized=read(a),grant=authorized.records[p.id].development.authorization.decision_id,candidate=await generate(a,p),after=read(a);
+  assert.equal(candidate.status,'Submitted');assert.equal(candidate.development.scope_sha256,p.development.scope_sha256);
+  for(const key of ['id','plugin_version','governance','governance_sha256','cos_instructions','team_sha256','roles','owner'])assert.deepEqual(after[key],pinned[key]);
+  assert.deepEqual(after.records[grant],authorized.records[grant]);assert.equal(after.upgrade,undefined);
+  assert.equal(fs.readFileSync(path.join(a.root,'sum.mjs'),'utf8'),'export const sum = values => 0;\n');assert.equal(fs.existsSync(path.join(a.root,'sum.test.mjs')),false);
 });
 for(const version of ['0.5.0','0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7','0.7.1','0.7.2','0.7.3','0.7.4'])test(`pinned v${version} preserves authorized development and original source after a runtime update`,live,async()=>{
   const a=setup();withStore(a.root,db=>db.transaction('test.pin_compatible_development',s=>{
