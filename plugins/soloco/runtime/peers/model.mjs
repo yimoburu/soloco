@@ -1,0 +1,964 @@
+// Trusted internal component, not an authenticated public API.
+// Actor labels are attribution supplied by a future protected transport (P8).
+// createRuntimeObserver is ONLY for trusted host composition. Its construction,
+// methods, and ledger connection must never be exposed as model tools. Persisted
+// provenance assumes trusted exclusive ledger writers, not hostile DB access.
+// P3 must separately integrate physical dispatch ordering and this observer API.
+// P5/P8 native member qualification, authentication and isolation are not supplied.
+// Review output contract: canonical JSON {review:{subject,verdict,reason,blockers}}.
+// Synthetic observer fixtures establish mechanics, never native qualification.
+import {createHash,randomUUID} from 'node:crypto';
+import {canonical,peerDigest,FAMILIES} from './ledger.mjs';
+import {REVIEW_SELECTION_RECIPE,extractReviewSelection,parseReviewOutput,reviewReference,reviewScope} from './review-selection.mjs';
+
+const PROTOCOL='peer-cos-v1',MAX_ROWS=10000;
+const outstanding=['reserved','sent','unknown'];
+const observationActions=new Set(['task/process','task/finish','task/closure']);
+const copy=v=>JSON.parse(canonical(v));
+const same=(a,b)=>canonical(a)===canonical(b);
+export const digest=value=>typeof value==='string'?createHash('sha256').update(value).digest('hex'):peerDigest(value);
+const now=()=>new Date().toISOString();
+function hold(code,message){throw Object.assign(Error(message),{code});}
+function text(v,label,max=2000){if(typeof v!=='string'||!v.trim()||v.length>max||v.includes('\0'))hold('INVALID_INPUT',`${label} requires bounded nonempty text`);return v;}
+function bounded(v,label,max=64000){const bytes=canonical(v);if(Buffer.byteLength(bytes)>max)hold('EVIDENCE_CAPACITY',`${label} exceeds capacity`);return JSON.parse(bytes);}
+const ref=(family,row)=>({family,id:row.id,revision:row.revision,sha256:row.sha256});
+const order=(a,b)=>a<b?-1:a>b?1:0;
+function all(tx,family,filter={}){
+  const rows=[],prep=preparationBudget(tx);let cursor;
+  for(;;){prep.before(family);const page=tx.list(family,{...filter,limit:16,...(cursor?{cursor}:{})});for(const row of page.items){rows.push(prep.retain(family,row));if(rows.length>MAX_ROWS)hold('LOOKUP_CAPACITY','10,000 matching-row lookup bound exceeded');}if(page.complete)return rows;if(!page.next_cursor||page.next_cursor===cursor)hold('LOOKUP_INCOMPLETE','Nonprogressing ledger cursor');cursor=page.next_cursor;}
+}
+const count=(tx,f,o={})=>tx.count?tx.count(f,o):all(tx,f,o).length;
+const semanticBudgetKey=Symbol('peer-semantic-reference-budget');
+const preparationBudgetKey=Symbol('peer-preparation-budget'),readFailuresKey=Symbol('peer-read-failures'),reviewGenerationKey=Symbol('peer-planned-review-generation');
+export const REVIEW_PREPARATION_BYTES=16*1024*1024;
+const privateClosureFamilies=new Set(['effects','slots','claims','commands']);
+function newPreparationBudget(){
+  const values=new Map(),closureValues=new Map();let bytes=0,closureBytes=0,failure=null,physical=false;
+  const before=(family,historical=false)=>{if(failure&&(!physical||historical||!privateClosureFamilies.has(family)))throw failure;};
+  return {before,failed:()=>Boolean(failure),physical:()=>{if(failure)physical=true;},retain(family,row,{historical=false}={}){
+    before(family,historical);const exact=ref(family,row),key=canonical(exact),reserve=Boolean(failure),store=reserve?closureValues:values;
+    if(!store.has(key)){
+      const size=Buffer.byteLength(canonical({...exact,value:row.value}));
+      if((reserve?closureBytes:bytes)+size>REVIEW_PREPARATION_BYTES){
+        const error=Object.assign(Error(`Complete review preparation exceeds ${REVIEW_PREPARATION_BYTES} encoded UTF-8 bytes; nothing was omitted`),{code:'CONTEXT_CAPACITY'});
+        if(!reserve)failure=error;throw error;
+      }
+      store.set(key,copy(row.value));if(reserve)closureBytes+=size;else bytes+=size;
+    }
+    // Intern retained bodies across overlapping selectors and isolated graphs.
+    // Public results are copied; metadata wrappers do not duplicate the body.
+    return {...row,value:store.get(key)};
+  }};
+}
+const preparationBudget=tx=>tx[preparationBudgetKey]??newPreparationBudget();
+const readFailure=(tx,error)=>Boolean(tx[readFailuresKey]?.has(error));
+function trackedReads(tx){
+  if(tx[readFailuresKey])return tx;
+  const failures=new Set(),wrapped={...tx,[readFailuresKey]:failures,[preparationBudgetKey]:newPreparationBudget(),[semanticBudgetKey]:newSemanticBudget()};
+  for(const method of ['get','getVersion','list','count','queryCurrentReviews','resolveLegacy'])if(typeof tx[method]==='function')wrapped[method]=(...args)=>{try{return tx[method](...args);}catch(error){failures.add(error);throw error;}};
+  return Object.freeze(wrapped);
+}
+function newSemanticBudget(){
+  const distinct=new Set();return r=>{
+    const exact=exactReference(r),key=canonical(exact);
+    if(semanticFamilies.has(exact.family)&&!distinct.has(key)){if(distinct.size>=MAX_ROWS)hold('LOOKUP_CAPACITY','10,000 exact contributor-reference bound exceeded');distinct.add(key);}
+    return key;
+  };
+}
+const semanticBudget=tx=>tx[semanticBudgetKey]??newSemanticBudget();
+function reviewSelectors(options={}){
+  const input=copy(options);if(Object.keys(input).some(k=>!['subjects','scopes','limit','cursor'].includes(k)))hold('INVALID_INPUT','Unknown review selector option');
+  const subjects=Object.hasOwn(input,'subjects')?input.subjects:[],requested=Object.hasOwn(input,'scopes')?input.scopes:[],limit=Object.hasOwn(input,'limit')?input.limit:50;
+  if(!Array.isArray(subjects)||subjects.length>100||!Array.isArray(requested)||requested.length>16||!Number.isSafeInteger(limit)||limit<1||limit>100)hold('INVALID_INPUT','Invalid bounded review selectors');
+  const refs=subjects.map(reviewReference),scopes=requested.map(reviewScope);
+  if(new Set(refs.map(canonical)).size!==refs.length||new Set(scopes).size!==scopes.length)hold('INVALID_INPUT','Duplicate review selectors');
+  refs.sort((a,b)=>order(canonical(a),canonical(b)));scopes.sort(order);
+  return {subjects:refs,scopes,limit,...(Object.hasOwn(input,'cursor')?{cursor:input.cursor}:{}),effective:{subjects:refs,scopes:scopes.length?[...new Set([...scopes,'*','unknown'])].sort(order):[]}};
+}
+const reviewMatches=(facts,selectors)=>selectors.subjects.some(r=>same(r,facts.subject))||Boolean(facts.adverse&&selectors.scopes.includes(facts.scope));
+
+// Planning reads only requested keys and filtered collections. All reads,
+// validation and legacy resolution occur before the first real P1 mutation.
+// Buffered changes supply read-your-writes without weakening P1's real
+// list-after-write fence. BEGIN IMMEDIATE supplies the snapshot/write boundary.
+// Requested collections retain P1's 10,000 matching-row capacity limit.
+function plannedWrite(ledger,type,principal,fn){
+  return ledger.write(type,principal,rawBase=>{
+    const base=trackedReads(rawBase),prep=preparationBudget(base),budget=semanticBudget(base);
+    const known=new Set(FAMILIES),keys=new Map(),history=new Map(),collections=new Map(),changes=new Map(),generations=new Map(),events=[];
+    const reviewQueries=new Map(),reviewBodies=new Map(),reviewSnapshot=randomUUID();
+    const filterKeys=['status','principal_id','task_id','scope'];
+    let active=true;
+    const guard=()=>{if(!active)hold('TRANSACTION_EXPIRED','Planning handle expired');};
+    const checkFamily=f=>{guard();if(!known.has(f))hold('FAMILY_INVALID','Unknown peer family');return f;};
+    const selectedFilters=o=>{
+      const selected={};
+      for(const key of filterKeys)if(o[key]!==undefined){
+        const values=Array.isArray(o[key])?o[key]:[o[key]];
+        if(!values.length||values.length>16||new Set(values).size!==values.length)hold('INVALID_INPUT','Invalid peer row filters');
+        selected[key]=values.map(value=>{
+          text(value,key,1000);
+          if(/[\ud800-\udfff]/u.test(value))hold('INVALID_INPUT','Invalid peer row filter text');
+          return value;
+        }).sort();
+      }
+      let expansion=1;for(const values of Object.values(selected))expansion*=values.length;
+      if(expansion>256)hold('INVALID_INPUT','Peer filter expansion is too large');
+      return selected;
+    };
+    const dimensions=v=>({status:String(v?.status??v?.state??''),principal_id:String(v?.principal_id??v?.owner_principal_id??''),task_id:String(v?.task_id??''),scope:String(v?.scope??'')});
+    const matches=(row,selected)=>Boolean(row)&&Object.entries(selected).every(([key,values])=>values.includes(dimensions(row.value)[key]));
+    const get=(f,id)=>{
+      checkFamily(f);text(id,'row id',2000);const key=canonical([f,id]);
+      if(changes.has(key))return copy(changes.get(key).row);
+      if(!keys.has(key)){prep.before(f);const row=base.get(f,id);keys.set(key,row?prep.retain(f,row):null);}
+      const row=keys.get(key);return row?copy(row):null;
+    };
+    const materialize=(f,selected)=>{
+      checkFamily(f);const key=canonical([f,selected]);
+      if(!collections.has(key))collections.set(key,all(base,f,selected));
+      const result=new Map(collections.get(key).map(row=>[row.id,row]));
+      for(const change of changes.values())if(change.family===f){
+        result.delete(change.row.id);
+        if(matches(change.row,selected))result.set(change.row.id,prep.retain(f,change.row));
+      }
+      if(result.size>MAX_ROWS)hold('LOOKUP_CAPACITY','10,000 matching-row lookup bound exceeded');
+      return [...result.values()].sort((a,b)=>order(a.id,b.id));
+    };
+    const getVersion=r=>{
+      guard();const exact=exactReference(r),key=canonical(exact);
+      if(typeof base.getVersion!=='function')hold('LINEAGE_REQUIRED','Exact committed history reader required');
+      if(!history.has(key)){prep.before(exact.family,true);const row=base.getVersion(exact);history.set(key,row?prep.retain(exact.family,row,{historical:true}):null);}
+      guard();return history.get(key)?copy(history.get(key)):null;
+    };
+    const planningSnapshotGuard=()=>{
+      guard();
+      // run always reads this actor before command/replay lookup. Reuse that
+      // committed binding without adding a control or review-index dependency.
+      const actor=keys.get(canonical(['principals',principal]));
+      if(!actor)hold('PLAN_CHANGED','Planning requires its committed actor binding');
+      if(typeof base.getVersion!=='function')hold('LINEAGE_REQUIRED','Exact committed history reader required');
+      const exact=ref('principals',actor),row=base.getVersion(exact);guard();
+      // This uncached support read checks P1's owning-snapshot/before-write
+      // fence, not historical authority or additional semantic evidence.
+      if(!row||row.family!==exact.family||row.id!==exact.id||row.revision!==exact.revision||row.sha256!==exact.sha256||peerDigest(row.value)!==exact.sha256)hold('SOURCE_CHANGED','Preflush actor binding changed');
+    };
+    const reviewSnapshotGuard=()=>{
+      guard();if(typeof base.queryCurrentReviews!=='function')hold('REVIEW_SELECTION_CAPABILITY','Indexed current review selection is required');
+      // Empty selectors hydrate no bodies but retain P1's current snapshot,
+      // dirty/error and before-real-write fences when serving a planner cache.
+      const page=base.queryCurrentReviews({subjects:[],scopes:[],limit:1});guard();
+      if(page?.recipe!==REVIEW_SELECTION_RECIPE||page.total!==0||page.complete!==true||page.next_cursor!==null||!Array.isArray(page.items)||page.items.length)hold('LOOKUP_INCOMPLETE','Indexed review snapshot eligibility is unproven');
+    };
+    const selectedReviews=options=>{
+      guard();prep.before('reviews');const selected=reviewSelectors(options),key=canonical(selected.effective),selector=digest(key),generation=generations.get('reviews')??0;
+      reviewSnapshotGuard();
+      if(!reviewQueries.has(key)){
+        const ids=new Set();let cursor,total;
+        for(;;){
+          guard();prep.before('reviews');
+          const page=base.queryCurrentReviews({subjects:selected.subjects,scopes:selected.scopes,limit:16,...(cursor?{cursor}:{})});guard();
+          if(page?.recipe!==REVIEW_SELECTION_RECIPE||!Array.isArray(page.items)||page.items.length>16||typeof page.complete!=='boolean'||!Number.isSafeInteger(page.total)||page.total<0||page.total>MAX_ROWS||total!==undefined&&total!==page.total)hold('LOOKUP_INCOMPLETE','Invalid indexed review page');
+          total=page.total;
+          for(const raw of page.items){
+            const exact=ref('reviews',raw);budget(exact);const row=prep.retain('reviews',raw),old=reviewBodies.get(row.id);
+            if(old&&!same(ref('reviews',old),exact))hold('SOURCE_CHANGED','Current indexed review binding changed');
+            if(ids.has(row.id))hold('LOOKUP_INCOMPLETE','Repeated indexed review page item');
+            ids.add(row.id);reviewBodies.set(row.id,row);
+            if(reviewBodies.size>MAX_ROWS)hold('LOOKUP_CAPACITY','10,000 aggregate selected-review bound exceeded');
+          }
+          if(page.complete){if(ids.size!==total)hold('LOOKUP_INCOMPLETE','Indexed review membership is incomplete');break;}
+          if(!page.items.length||!page.next_cursor||page.next_cursor===cursor)hold('LOOKUP_INCOMPLETE','Nonprogressing indexed review cursor');cursor=page.next_cursor;
+        }
+        reviewQueries.set(key,[...ids]);
+      }
+      const result=new Map(reviewQueries.get(key).map(id=>[id,reviewBodies.get(id)]));
+      for(const change of changes.values())if(change.family==='reviews'){
+        if(change.expected!==0||change.row.revision!==1)hold('REVIEW_SELECTION_INTEGRITY','Buffered existing-review mutation requires supported history admission');
+        const current={family:'reviews',...change.row};
+        const resolveProduction=r=>{
+          const exact=exactReference(r),pending=changes.get(canonical([exact.family,exact.id]));
+          if(pending&&same(ref(exact.family,pending.row),exact))return {family:exact.family,...prep.retain(exact.family,pending.row)};
+          return getVersion(exact);
+        };
+        // Explicit planned production bindings, never a public history fallback.
+        const facts=extractReviewSelection({current,history:[current],resolve:resolveProduction,canonical,hash:digest});
+        if(facts.outcome==='INTEGRITY_UNKNOWN'||facts.error)hold('REVIEW_SELECTION_INTEGRITY','Buffered review production integrity is unknown');
+        if(reviewMatches(facts,selected.effective)){budget(ref('reviews',change.row));result.set(change.row.id,prep.retain('reviews',change.row));}
+      }
+      if(result.size>MAX_ROWS)hold('LOOKUP_CAPACITY','10,000 matching review selection bound exceeded');
+      let after=null;
+      if(Object.hasOwn(selected,'cursor')){
+        let c;try{c=JSON.parse(Buffer.from(text(selected.cursor,'review cursor',16000),'base64url').toString('utf8'));}catch{hold('LOOKUP_INCOMPLETE','Invalid planning review cursor');}
+        if(c.snapshot!==reviewSnapshot||c.generation!==generation||c.selector!==selector||c.recipe!==REVIEW_SELECTION_RECIPE||typeof c.after!=='string'||!result.has(c.after))hold('LOOKUP_INCOMPLETE','Stale or mismatched planning review cursor');after=c.after;
+      }
+      const rows=[...result.values()].sort((a,b)=>order(a.id,b.id)),remaining=after===null?rows:rows.filter(row=>row.id>after),items=remaining.slice(0,selected.limit),complete=remaining.length<=selected.limit;
+      guard();return {items:copy(items),total:rows.length,complete,next_cursor:complete?null:Buffer.from(canonical({snapshot:reviewSnapshot,generation,selector,recipe:REVIEW_SELECTION_RECIPE,after:items.at(-1).id})).toString('base64url'),recipe:REVIEW_SELECTION_RECIPE};
+    };
+    const tx=Object.freeze({
+      [semanticBudgetKey]:budget,[preparationBudgetKey]:prep,[readFailuresKey]:base[readFailuresKey],
+      [reviewGenerationKey]:()=>generations.get('reviews')??0,
+      sequence:base.sequence,
+      get,
+      getVersion,
+      queryCurrentReviews:selectedReviews,
+      list:(f,o={})=>{
+        checkFamily(f);const limit=o.limit??100;
+        if(!Number.isSafeInteger(limit)||limit<1||limit>100)hold('INVALID_INPUT','List limit must be 1..100');
+        const selected=selectedFilters(o),generation=generations.get(f)??0;
+        let after=null;
+        if(o.cursor){
+          let cursor;
+          try{cursor=JSON.parse(Buffer.from(text(o.cursor,'cursor',16000),'base64url').toString('utf8'));}catch{hold('LOOKUP_INCOMPLETE','Invalid planning cursor');}
+          if(!cursor||cursor.family!==f||cursor.generation!==generation||!same(cursor.filters,selected)||typeof cursor.after!=='string')hold('LOOKUP_INCOMPLETE','Stale or mismatched planning cursor');
+          after=text(cursor.after,'cursor identity',2000);
+        }
+        const selectedRows=materialize(f,selected);
+        let start=0;
+        if(after!==null){const index=selectedRows.findIndex(row=>row.id===after);if(index<0)hold('LOOKUP_INCOMPLETE','Planning cursor anchor missing');start=index+1;}
+        const items=selectedRows.slice(start,start+limit),complete=start+items.length>=selectedRows.length;
+        return {items:copy(items),total:selectedRows.length,complete,next_cursor:complete?null:Buffer.from(canonical({family:f,generation,filters:selected,after:items.at(-1).id})).toString('base64url')};
+      },
+      count:(f,o={})=>{
+        checkFamily(f);const selected=selectedFilters(o);
+        let total=base.count?base.count(f,selected):all(base,f,selected).length;
+        for(const change of changes.values())if(change.family===f)total+=Number(matches(change.row,selected))-Number(matches(change.previous,selected));
+        if(!Number.isSafeInteger(total)||total<0)hold('LOOKUP_INCOMPLETE','Invalid planning membership count');
+        if(total>MAX_ROWS)hold('LOOKUP_CAPACITY','10,000 matching-row lookup bound exceeded');
+        return total;
+      },
+      put:(f,id,value,expected=0)=>{
+        const old=get(f,id);
+        if(!Number.isSafeInteger(expected)||expected<0||(old?.revision??0)!==expected)hold('REVISION_CONFLICT','Planning compare-and-swap conflict');
+        const normalized=bounded(value,'peer row',1000000),sha256=peerDigest(normalized);
+        if(old?.sha256===sha256)return copy(old);
+        const key=canonical([f,id]);
+        // Preserve one changed version per row and exact predicted references.
+        if(changes.has(key))hold('PLAN_DUPLICATE_WRITE','Plan must coalesce each row before writing');
+        const revision=expected+1;if(!Number.isSafeInteger(revision))hold('REVISION_CONFLICT','Planning revision overflow');
+        const row={id,revision,sha256,created_seq:old?.created_seq??base.sequence,value:normalized};
+        changes.set(key,{family:f,row,previous:old,expected});
+        generations.set(f,(generations.get(f)??0)+1);
+        return copy(row);
+      },
+      event:(type,payload)=>{guard();events.push({type:text(type,'event type'),payload:copy(payload)});},
+      resolveLegacy:r=>{guard();return base.resolveLegacy(r);}
+    });
+    try{
+      const result=fn(tx);
+      if(result&&typeof result.then==='function'){
+        if(result instanceof Promise)Promise.prototype.then.call(result,undefined,()=>{});
+        hold('ASYNC_FORBIDDEN','Planning must be synchronous');
+      }
+      const output=copy(result);if(reviewQueries.size)reviewSnapshotGuard();planningSnapshotGuard();active=false;
+      for(const {family,row,expected} of changes.values()){
+        const actual=base.put(family,row.id,row.value,expected);
+        if(actual.revision!==row.revision||actual.sha256!==row.sha256)hold('PLAN_CHANGED','Committed reference differs from plan');
+      }
+      for(const e of events)base.event(e.type,e.payload);
+      return output;
+    }finally{active=false;}
+  });
+}
+function control(tx){const c=tx.get('control','company');if(c?.value.protocol!==PROTOCOL)hold('PROTOCOL_REQUIRED','Checked peer adoption required');return c;}
+function member(tx,actor){
+  if(!actor||typeof actor!=='object'||Object.keys(actor).length!==1||!Object.hasOwn(actor,'principal_id'))hold('AUTHENTICATION_REQUIRED','Use only a trusted-internal principal reference');
+  const row=tx.get('principals',text(actor.principal_id,'principal_id',200));if(row?.value.status!=='active')hold('PRINCIPAL_INACTIVE','Principal is inactive');return row;
+}
+const trusted=p=>p.value.kind==='scheduler';
+const founder=(c,p)=>p.id===c.value.founder_principal_id&&p.value.kind==='founder';
+const scopeOf=v=>{
+  const scope=v===undefined||v===null?'*':text(v,'scope',160);
+  // SQLite TEXT and indexed selectors require Unicode scalar text. Under /u,
+  // this matches isolated UTF-16 surrogates, not valid non-BMP code points.
+  if(/[\ud800-\udfff]/u.test(scope))hold('INVALID_INPUT','scope requires well-formed Unicode scalar text');
+  return scope;
+};
+const scopeInputActions=new Set(['grant/create','task/submit','home/propose','conflict/create','notice/create','message/send']);
+function policy(c){
+  const p=c.value.policy;
+  if(!p||!Number.isSafeInteger(p.worker_cap)||p.worker_cap<1||p.worker_cap>3||!Number.isSafeInteger(p.queue_limit)||p.queue_limit<1||p.queue_limit>MAX_ROWS||!Number.isSafeInteger(p.principal_queue_limit)||p.principal_queue_limit<1||p.principal_queue_limit>p.queue_limit||!Number.isSafeInteger(p.max_context_bytes)||p.max_context_bytes<512||p.max_context_bytes>200000||!Number.isSafeInteger(p.max_model_calls)||p.max_model_calls<1||p.principal_model_calls!==undefined&&(!Number.isSafeInteger(p.principal_model_calls)||p.principal_model_calls<1))hold('POLICY_INVALID','Finite bounded execution policy required');return p;
+}
+function resolve(tx,r){
+  if(!r||typeof r.family!=='string'||typeof r.id!=='string'||!Number.isSafeInteger(r.revision)||r.revision<1||!/^[a-f0-9]{64}$/.test(r.sha256??''))hold('SOURCE_INVALID','Exact family/id/revision/hash required');
+  const row=tx.get(r.family,r.id);if(!row||row.revision!==r.revision||row.sha256!==r.sha256)hold('SOURCE_CHANGED',`Exact source changed: ${r.family}/${r.id}`);return preparationBudget(tx).retain(r.family,row);
+}
+const semanticFamilies=new Set(['tasks','homes','proposals','reviews','conflicts','notices','messages','deliveries']);
+function exactReference(r){
+  if(!r||typeof r.family!=='string'||typeof r.id!=='string'||!r.id||!Number.isSafeInteger(r.revision)||r.revision<1||!/^[a-f0-9]{64}$/.test(r.sha256??''))hold('SOURCE_INVALID','Exact family/id/revision/hash required');
+  return {family:r.family,id:r.id,revision:r.revision,sha256:r.sha256};
+}
+function semanticReference(r){const value=exactReference(r);if(!semanticFamilies.has(value.family))hold('SOURCE_INVALID','Unsupported semantic evidence family: '+value.family);return value;}
+function semanticInputs(tx,values=[]){
+  if(!Array.isArray(values)||values.length>100)hold('SOURCE_INVALID','At most 100 semantic input refs');
+  for(const r of values)resolve(tx,semanticReference(r));return values;
+}
+function repository(input){let v=text(input,'repository',500).replace(/\/$/,'').replace(/\.git$/i,'');if(v.startsWith('https://github.com/'))v=v.slice(19);else if(v.startsWith('git@github.com:'))v=v.slice(15);if(!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(v)||v.split('/').some(p=>['.','..'].includes(p)))hold('RESOURCE_INVALID','Invalid repository');return v.toLowerCase();}
+function relative(input){const v=text(input,'path',1000);if(v.startsWith('/')||/[\\%\u0000]/.test(v)||v.split('/').includes('..'))hold('RESOURCE_INVALID','Invalid relative resource path');const result=v.split('/').filter(p=>p&&p!=='.').join('/');if(!result)hold('RESOURCE_INVALID','Use worktree resource for root');return result;}
+function parseResource(tx,input){
+  let v=input;if(typeof v==='string'){let m;if((m=/^repo:(.+)$/.exec(v)))v={kind:'repo',repository:m[1]};else if((m=/^ref:([^:]+):(.+)$/.exec(v)))v={kind:'ref',repository:m[1],ref:m[2]};else if((m=/^worktree:([^:]+)$/.exec(v)))v={kind:'worktree',worktree_id:m[1]};else if((m=/^path:([^:]+):(.+)$/.exec(v)))v={kind:'path',worktree_id:m[1],path:m[2]};else if((m=/^home:([^:]+)$/.exec(v)))v={kind:'home',id:m[1]};else hold('RESOURCE_INVALID','Unknown resource');}
+  if(!v||typeof v!=='object'||Array.isArray(v))hold('RESOURCE_INVALID','Typed resource required');
+  if(v.kind==='home'){const id=text(v.id,'home id',200);if(id.includes(':'))hold('RESOURCE_INVALID','Invalid home id');return {kind:'home',id,key:`home:${id}`};}
+  if(v.kind==='repo'){const repo=repository(v.repository);return {kind:'repo',repository:repo,key:`repo:${repo}`};}
+  if(v.kind==='ref'){const repo=repository(v.repository),branch=text(v.ref,'ref',300);if(!branch.startsWith('refs/heads/')||/[\s\\%~^:?*\[\u0000]/.test(branch)||branch.includes('..')||branch.includes('@{')||branch.endsWith('/')||branch.endsWith('.lock')||branch.split('/').some(p=>!p||p==='.'||p.endsWith('.')))hold('RESOURCE_INVALID','Exact branch ref required');return {kind:'ref',repository:repo,ref:branch,key:`ref:${repo}:${branch}`};}
+  if(['path','worktree'].includes(v.kind)){const id=text(v.worktree_id,'worktree',200),matches=(tx.get('control','resources')?.value.worktrees??[]).filter(w=>w.id===id||w.aliases?.includes(id));if(matches.length!==1)hold('RESOURCE_INVALID','Unregistered or ambiguous worktree');const tree=matches[0],repo=repository(tree.repository);if(v.repository&&repository(v.repository)!==repo)hold('RESOURCE_INVALID','Worktree repository changed');if(v.kind==='worktree')return {kind:'worktree',worktree_id:tree.id,repository:repo,key:`worktree:${tree.id}`};const p=relative(v.path);return {kind:'path',worktree_id:tree.id,repository:repo,path:p,key:`path:${tree.id}:${p}`};}
+  hold('RESOURCE_INVALID','Unknown resource kind');
+}
+export function canonicalResources(tx,input=[]){if(!Array.isArray(input)||input.length>32)hold('RESOURCE_INVALID','At most 32 resources');return [...new Map(input.map(v=>{const r=parseResource(tx,v);return [r.key,r];})).values()].sort((a,b)=>order(a.key,b.key));}
+export function resourceOverlap(a,b){if(a.key===b.key)return true;if(a.kind==='repo'||b.kind==='repo')return Boolean(a.repository&&a.repository===b.repository);if(a.worktree_id&&a.worktree_id===b.worktree_id)return a.kind==='worktree'||b.kind==='worktree'||a.kind==='path'&&b.kind==='path'&&(a.path.startsWith(b.path+'/')||b.path.startsWith(a.path+'/'));return false;}
+function contains(a,b){return a.key===b.key||a.kind==='repo'&&a.repository===b.repository||a.worktree_id&&a.worktree_id===b.worktree_id&&(a.kind==='worktree'||a.kind==='path'&&b.kind==='path'&&b.path.startsWith(a.path+'/'));}
+export function authorize(tx,actor,action,args={}){
+  const c=control(tx),p=member(tx,actor);policy(c);
+  if(c.value.paused&&(['task/submit','task/claim','home/publish'].includes(action)||action.startsWith('github/')))hold('PAUSED','Pause fences admission and publication');
+  // Required notices are a role right, not discretionary grant authority.
+  if(action==='notice/create')return {control:c,principal:p,grant:null};
+  if(founder(c,p)||trusted(p)&&action.startsWith('task/'))return {control:c,principal:p,grant:null};
+  const g=tx.get('grants',text(args.grant_id,'grant_id',200)),scope=scopeOf(args.scope),v=g?.value;
+  if(!v||v.status!=='active'||v.principal_id!==p.id||!Number.isSafeInteger(v.generation)||v.generation<1||v.policy_generation!==c.value.policy_generation||!Number.isFinite(Date.parse(v.expires_at))||Date.parse(v.expires_at)<=Date.now()||!['*',scope].includes(v.scope)||!v.actions?.some(a=>a==='*'||a===action||a.endsWith('/*')&&action.startsWith(a.slice(0,-1))))hold('GRANT_INVALID','Current scoped grant required');
+  if(args.grant_generation!==undefined&&args.grant_generation!==v.generation)hold('GRANT_CHANGED','Grant generation changed');
+  const resources=canonicalResources(tx,args.resources??(args.resource?[args.resource]:[]));if(resources.some(r=>!v.resources?.some(b=>contains(b,r))))hold('RESOURCE_AUTHORITY','Resource is outside grant');return {control:c,principal:p,grant:g};
+}
+function taskAuthority(tx,actor,t,action){const c=control(tx),p=member(tx,actor);if(trusted(p))return {control:c,principal:p,grant:null};if(t.value.owner_principal_id!==p.id&&!founder(c,p))hold('TASK_OWNER','Different accountable owner');return authorize(tx,actor,action,{grant_id:t.value.grant_id,grant_generation:t.value.grant_generation,scope:t.value.scope,resources:t.value.resources});}
+function grantBinding(g){const {used_model_calls,...value}=g.value;return {id:g.id,value};}
+function claimResources(tx,t){const held=all(tx,'claims',{status:'held'});for(const resource of t.value.resources){if(held.some(r=>r.value.task_id!==t.id&&resourceOverlap(r.value.resource,resource)))hold('RESOURCE_BUSY','Overlapping resource claim');}for(const resource of t.value.resources){const id=digest(['claim',t.id,resource.key]),old=tx.get('claims',id);if(old?.value.status!=='held')tx.put('claims',id,{task_id:t.id,principal_id:t.value.owner_principal_id,scope:t.value.scope,resource,status:'held',definition_revision:t.value.definition_revision},old?.revision??0);}}
+function releaseClaims(tx,t,closed){if(!closed)hold('CLOSURE_REQUIRED','Protected process closure required');if(all(tx,'effects',{task_id:t.id,status:outstanding}).length)return;for(const row of all(tx,'claims',{task_id:t.id,status:'held'}))tx.put('claims',row.id,{...row.value,status:'released',closure:{termination_confirmed:true,at:now()}},row.revision);}
+function scoped(tx,f,scope,status){const values=new Map();for(const s of new Set(['*','unknown',scope]))for(const row of all(tx,f,{scope:s,status}))values.set(row.id,row);return [...values.values()].sort((a,b)=>order(a.id,b.id));}
+
+// A protocol string alone is insufficient. The persisted record must bind the
+// protected observation, exact returned task, output, native identity and review.
+function observedReview(tx,row,{pending=false}={}){
+  try{
+    const graph=evidenceAnalysis(tx);graph.historical([ref('reviews',row)]);
+    if(pending)member(tx,{principal_id:row.value.reviewer_principal_id});
+    return true;
+  }catch(error){if(readFailure(tx,error)||['SOURCE_CHANGED','SOURCE_INVALID','LOOKUP_CAPACITY','CONTEXT_CAPACITY'].includes(error.code))throw error;return false;}
+}
+function homeBinding(id,value){return digest({id,scope:scopeOf(value.scope),content:value.content,dependencies:value.dependencies??[]});}
+// Scope discovery runs once before omission. Exact subject queries add only
+// newly discovered current relationships; no full-family fallback is permitted.
+function currentReviewRows(tx,budget=semanticBudget(tx)){
+  const rows=new Map(),candidates=new Map(),scopes=new Set(),subjects=new Map(),loadedScopes=new Set(),loadedSubjects=new Set(),prep=preparationBudget(tx);
+  let generation=tx[reviewGenerationKey]?.()??0;
+  const load=selectors=>{
+    if(typeof tx.queryCurrentReviews!=='function')hold('REVIEW_SELECTION_CAPABILITY','Indexed current review selection is required');
+    let cursor,total;const seen=new Set();
+    for(;;){
+      prep.before('reviews');const page=tx.queryCurrentReviews({...selectors,limit:16,...(cursor?{cursor}:{})});
+      if(page?.recipe!==REVIEW_SELECTION_RECIPE||!Array.isArray(page.items)||page.items.length>16||typeof page.complete!=='boolean'||!Number.isSafeInteger(page.total)||page.total<0||page.total>MAX_ROWS||total!==undefined&&total!==page.total)hold('LOOKUP_INCOMPLETE','Invalid indexed review page');total=page.total;
+      for(const raw of page.items){const exact=ref('reviews',raw);budget(exact);const row=prep.retain('reviews',raw),old=rows.get(row.id);if(seen.has(row.id)||old&&!same(ref('reviews',old),exact))hold('LOOKUP_INCOMPLETE','Indexed review identity changed or repeated');seen.add(row.id);rows.set(row.id,row);if(rows.size>MAX_ROWS)hold('LOOKUP_CAPACITY','10,000 aggregate selected-review bound exceeded');}
+      if(page.complete){if(seen.size!==total)hold('LOOKUP_INCOMPLETE','Indexed review membership is incomplete');break;}
+      if(!page.items.length||!page.next_cursor||page.next_cursor===cursor)hold('LOOKUP_INCOMPLETE','Nonprogressing indexed review cursor');cursor=page.next_cursor;
+    }
+  };
+  const acquire=()=>{
+    if(typeof tx.queryCurrentReviews!=='function')hold('REVIEW_SELECTION_CAPABILITY','Indexed current review selection is required');
+    prep.before('reviews');const eligibility=tx.queryCurrentReviews({subjects:[],scopes:[],limit:1});
+    if(eligibility?.recipe!==REVIEW_SELECTION_RECIPE||eligibility.total!==0||eligibility.complete!==true||eligibility.next_cursor!==null||!Array.isArray(eligibility.items)||eligibility.items.length)hold('LOOKUP_INCOMPLETE','Indexed review snapshot eligibility is unproven');
+    const current=tx[reviewGenerationKey]?.()??0;
+    if(current!==generation){generation=current;rows.clear();candidates.clear();loadedScopes.clear();loadedSubjects.clear();}
+    for(const scope of scopes)if(!loadedScopes.has(scope)){load({subjects:[],scopes:[scope]});loadedScopes.add(scope);}
+    const pending=[...subjects].filter(([key])=>!loadedSubjects.has(key));
+    for(let i=0;i<pending.length;i+=100){const batch=pending.slice(i,i+100);load({subjects:batch.map(([,r])=>r),scopes:[]});for(const [key] of batch)loadedSubjects.add(key);}
+  };
+  const get=()=>{acquire();return [...rows.values()];};get.budget=budget;
+  get.scope=scope=>{scopes.add(reviewScope(scope));acquire();return get;};
+  get.subjects=refs=>{for(const r of refs){const exact=semanticReference(r);budget(exact);subjects.set(canonical(exact),exact);}acquire();return get;};
+  get.adverse=()=>{acquire();for(const row of rows.values()){const key=canonical(ref('reviews',row));if(!candidates.has(key))candidates.set(key,reviewCandidate(tx,row,budget));}return [...candidates.values()].filter(Boolean);};return get;
+}
+function currentInputSubjects(tx,inputs,budget){
+  const selected=new Map(),scheduled=new Set(),pending=[],prep=preparationBudget(tx);
+  const enqueue=(r,row)=>{const key=canonical(r);if(scheduled.has(key))return;budget(r);scheduled.add(key);selected.set(key,r);pending.push({reference:r,row});};
+  for(const input of inputs)enqueue(input.reference,input.row);
+  while(pending.length){
+    const {reference:r,row:known}=pending.pop();prep.before(r.family);
+    const head=known??tx.get(r.family,r.id);
+    // Discovery supplies no seal or absence proof. Missing, stale or malformed
+    // branches remain for the original final CURRENT gate to reject.
+    if(!head||!same(ref(r.family,head),r))continue;
+    const row=prep.retain(r.family,head),v=row.value;if(!v||typeof v!=='object'||Array.isArray(v))continue;
+    let groups=[],singles=[];
+    if(r.family==='tasks'){
+      const d=v.definition;if(!d||typeof d!=='object'||Array.isArray(d)||['input_refs','review_of','parent_task_id','parent_ref'].some(k=>!Object.hasOwn(d,k)||!Object.hasOwn(v,k)||!same(d[k],v[k])))continue;
+      if(d.parent_task_id===null?d.parent_ref!==null:!d.parent_ref||d.parent_ref.id!==d.parent_task_id)continue;
+      groups=[d.input_refs];singles=[d.review_of,d.parent_ref];
+    }else if(r.family==='proposals'){groups=[v.readset??[],v.dependencies??[]];singles=[v.base];}
+    else if(r.family==='homes'){groups=[v.dependencies??[]];}
+    else if(r.family==='conflicts'){groups=[v.input_refs??[],v.resolution?.evidence??[]];}
+    // Review and delivery proof links, home.previous and publication history
+    // are HISTORICAL edges, never intake LIVE dependency expansion.
+    if(groups.some(g=>!Array.isArray(g)||g.length>MAX_ROWS))continue;
+    const raw=[...groups.flat(),...singles.filter(Boolean)],children=[];let valid=true;
+    for(const value of raw){try{const child=semanticReference(value);if(r.family==='homes'&&child.family!=='homes'){valid=false;break;}children.push(child);}catch(error){if(error.code!=='SOURCE_INVALID')throw error;valid=false;break;}}
+    if(valid)for(const child of children)enqueue(child);
+  }
+  return [...selected.values()];
+}
+const adverseReview=row=>['Fail','Blocked'].includes(row.value.verdict);
+function reviewCandidate(tx,row,budget){
+  const r=row.value;let subject=r.subject,scope=r.scope,negative=adverseReview(row),error=null;
+  try{
+    budget(ref('reviews',row));
+    const reference=exactReference(r.proof?.task);
+    if(reference.family!=='tasks'||typeof tx.getVersion!=='function')hold('LINEAGE_REQUIRED','Exact protected review task required');
+    budget(reference);
+    const stored=tx.getVersion(reference);
+    if(!stored||stored.family!=='tasks'||stored.id!==reference.id||stored.revision!==reference.revision||stored.sha256!==reference.sha256||peerDigest(stored.value)!==reference.sha256)hold('LINEAGE_REQUIRED','Exact protected review task changed');
+    const task=preparationBudget(tx).retain('tasks',stored,{historical:true});
+    const raw=task.value.result?.output;let parsed;
+    try{parsed=JSON.parse(raw);}catch{hold('LINEAGE_REQUIRED','Protected review raw output missing');}
+    // Derive relevance from the protected production, before trusting mutable
+    // aliases on the review row. A claimed Pass cannot conceal an observed Fail.
+    if(['Fail','Blocked'].includes(parsed?.review?.verdict))negative=true;
+    scope=task.value.definition?.scope??task.value.scope;
+    const actual=parseReview(raw,parsed?.review?.subject);subject=actual.subject;budget(semanticReference(subject));
+    if(negative)evidenceAnalysis(tx,budget).reviewSeal(row);
+  }catch(cause){if(readFailure(tx,cause)||['LOOKUP_CAPACITY','CONTEXT_CAPACITY'].includes(cause.code))throw cause;error=cause.code?cause:Object.assign(Error('Protected adverse review binding is invalid'),{code:'LINEAGE_REQUIRED'});}
+  return negative?{row,subject,scope,error}:null;
+}
+function qualifiedHome(tx,row,budget){
+  try{
+    if(!row.value.scope_qualification)return false;
+    const graph=evidenceAnalysis(tx,budget);graph.current([ref('homes',row)]);graph.historical([ref('homes',row)]);
+    const seal=graph.homeSeal(row);if(!seal)return false;
+  }catch(error){if(readFailure(tx,error)||['LOOKUP_CAPACITY','CONTEXT_CAPACITY'].includes(error.code))throw error;return false;}
+  return true;
+}
+function sources(tx,scope,input=[],reviewRows=currentReviewRows(tx)){
+  const budget=reviewRows.budget;
+  const currentHomes=all(tx,'homes',{status:'current'}),inputs=input.map(r=>{const exact=semanticReference(r);return {reference:exact,row:resolve(tx,exact)};});
+  const liveInputs=currentInputSubjects(tx,inputs,budget);
+  // Build the exact CURRENT dependency DAG once. Completed nodes are shared
+  // across roots; a second revision of the same id still resolves separately.
+  const nodes=new Map(),done=new Set(),active=new Set(),ordered=[];
+  const roots=[...currentHomes,...inputs.filter(v=>v.reference.family==='homes').map(v=>v.row)];
+  const stack=roots.slice().reverse().map(row=>({reference:ref('homes',row),row,exit:false}));
+  while(stack.length){
+    const frame=stack.pop(),r=frame.reference,key=budget(r);
+    if(frame.exit){active.delete(key);done.add(key);ordered.push(nodes.get(key));continue;}
+    if(active.has(key))hold('DEPENDENCY_CYCLE','Home dependency cycle');
+    if(done.has(key))continue;
+    const row=frame.row??resolve(tx,r);
+    if(nodes.size>=MAX_ROWS)hold('LOOKUP_CAPACITY','10,000 exact home dependency-reference bound exceeded');
+    const dependencies=row.value.dependencies??[];
+    if(!Array.isArray(dependencies)||dependencies.length>MAX_ROWS)hold('DEPENDENCY_INVALID','Bounded home dependencies required');
+    const children=dependencies.map(d=>{if(d?.family!=='homes')hold('DEPENDENCY_INVALID','Home dependencies must name homes');return exactReference(d);});
+    let proposal=null;try{if(row.value.proposal?.family==='proposals')proposal=exactReference(row.value.proposal);}catch{}
+    nodes.set(key,{row,reference:r,children,proposal,adverse:false});active.add(key);stack.push({...frame,exit:true});
+    for(let i=children.length-1;i>=0;i--)stack.push({reference:children[i],exit:false});
+  }
+  // Current adverse records are indexed by exact subjects before any home can
+  // be omitted. Historical previous/base edges never propagate a live veto.
+  reviewRows.scope(scope).subjects([...nodes.values()].flatMap(node=>[node.reference,...(node.proposal?[node.proposal]:[])]).concat(liveInputs));
+  const reviews=[],bySubject=new Map(),applicable=new Set();
+  const knownReviews=new Set(),refreshReviews=()=>{
+    for(const candidate of reviewRows.adverse()){
+      const {row}=candidate;if(knownReviews.has(row.id))continue;
+      const applies=['*','unknown',scope].includes(scopeOf(candidate.scope));let subject;
+      try{subject=semanticReference(candidate.subject);}catch(error){if(applies)throw error;continue;}
+      const key=canonical(subject),entry={...candidate,subject};knownReviews.add(row.id);reviews.push(entry);
+      if(!bySubject.has(key))bySubject.set(key,[]);bySubject.get(key).push(entry);
+      if(applies)applicable.add(row.id);
+    }
+  };refreshReviews();
+  for(const node of ordered)node.adverse=bySubject.has(canonical(node.reference))||Boolean(node.proposal&&bySubject.has(canonical(node.proposal)))||node.children.some(r=>nodes.get(canonical(r)).adverse);
+  const homes=new Map(),bodyHomes=new Map(),selectionDone=new Map();
+  const select=(selected,rows)=>{
+    if(!selectionDone.has(selected))selectionDone.set(selected,new Set());
+    const seen=selectionDone.get(selected),pending=rows.map(row=>ref('homes',row));
+    while(pending.length){const r=pending.pop(),key=canonical(r);if(seen.has(key))continue;seen.add(key);const node=nodes.get(key);selected.set(node.row.id,node.row);for(const d of node.children)pending.push(d);}
+  };
+  select(homes,currentHomes.filter(h=>['*','unknown',scope].includes(scopeOf(h.value.scope))||nodes.get(canonical(ref('homes',h))).adverse||!qualifiedHome(tx,h,budget)));
+  for(const [id,row] of homes)bodyHomes.set(id,row);
+  // Explicit home inputs also supply their current dependency bodies. These
+  // extra bodies retain the existing homes/notices/conflicts membership shape.
+  select(bodyHomes,inputs.filter(v=>v.reference.family==='homes').map(v=>v.row));
+  const relevant=new Set(liveInputs.map(canonical));
+  const refresh=()=>{const refs=[];for(const row of bodyHomes.values()){const node=nodes.get(canonical(ref('homes',row)));relevant.add(canonical(node.reference));refs.push(node.reference);if(node.proposal){relevant.add(canonical(node.proposal));refs.push(node.proposal);}}reviewRows.subjects(refs);refreshReviews();};
+  refresh();
+  const selectedReviews=new Map(),discovery=evidenceAnalysis(tx,budget);
+  for(;;){
+    let changed=false;
+    for(const entry of reviews)if(!selectedReviews.has(entry.row.id)&&(applicable.has(entry.row.id)||relevant.has(canonical(entry.subject)))){
+      if(entry.error)throw entry.error;
+      selectedReviews.set(entry.row.id,entry);changed=true;
+      // Discover CURRENT home relationships through the exact typed subject.
+      // Historical-only home versions stop here; they never select successors.
+      const implicated=discovery.implicatedHomes([entry.subject]);
+      select(homes,implicated);select(bodyHomes,implicated);refresh();
+    }
+    if(!changed)break;
+  }
+  const groups={homes:[...homes.values()].sort((a,b)=>order(a.id,b.id)),notices:scoped(tx,'notices',scope,['pending','resolved']),conflicts:scoped(tx,'conflicts',scope,'open')},values=new Map();
+  for(const [family,items] of Object.entries(groups))for(const row of items)values.set(canonical([family,row.id]),{...ref(family,row),value:copy(row.value)});
+  for(const row of bodyHomes.values())values.set(canonical(['homes',row.id]),{...ref('homes',row),value:copy(row.value)});
+  for(const {row,subject} of selectedReviews.values()){
+    // A scoped review of an older subject remains retrievable history. Do not
+    // place that old home version in a strict-current proposal readset or map
+    // it to a successor merely because the bare home id matches.
+    const current=tx.get(subject.family,subject.id);let target=current;
+    if(!current||!same(ref(subject.family,current),subject)){
+      if(typeof tx.getVersion!=='function')hold('LINEAGE_REQUIRED','Exact adverse subject history reader required');
+      target=tx.getVersion(subject);
+    }
+    if(!target||target.id!==subject.id||target.revision!==subject.revision||target.sha256!==subject.sha256||peerDigest(target.value)!==subject.sha256)hold('LINEAGE_REQUIRED','Exact adverse subject history missing or changed');
+    values.set(canonical(['reviews',row.id]),{...ref('reviews',row),value:copy(row.value)});
+  }
+  for(const {reference:r,row} of inputs)values.set(canonical([r.family,r.id]),{...ref(r.family,row),value:copy(row.value)});
+  for(const entry of values.values())budget(entry);
+  for(const entry of values.values())if(entry.value.source?.kind==='legacy'){if(!tx.resolveLegacy)hold('LEGACY_SOURCE_MISSING','Legacy resolver required');entry.legacy_value=tx.resolveLegacy({sha256:entry.value.source.sha256});if(entry.legacy_value===undefined)hold('LEGACY_SOURCE_MISSING','Missing legacy source');}
+  return {sources:[...values.values()].sort((a,b)=>order(canonical([a.family,a.id]),canonical([b.family,b.id]))),membership:Object.fromEntries(Object.entries(groups).map(([f,items])=>[f,items.map(r=>ref(f,r))]))};
+}
+export function buildContext(tx,actor,task){
+  tx=trackedReads(tx);
+  const p=member(tx,actor),c=control(tx),t=task?.value;if(!t)hold('TASK_MISSING','Exact task required');if(p.id!==t.owner_principal_id&&!trusted(p)&&!founder(c,p))hold('TASK_OWNER','Task owner required');
+  if(!t.definition||digest(t.definition)!==t.definition_sha256)hold('DEFINITION_CHANGED','Exact original task definition required');
+  const owner=member(tx,{principal_id:t.owner_principal_id}),auth=authorize(tx,{principal_id:owner.id},'task/submit',{grant_id:t.grant_id,grant_generation:t.grant_generation,scope:t.scope,resources:t.resources});
+  const selected=sources(tx,t.scope,[...(t.input_refs??[]),...(t.review_of?[t.review_of]:[]),...(t.parent_ref?[t.parent_ref]:[])]);
+  const body={protocol:'peer-task-context-v1',control:{policy_generation:c.value.policy_generation,pause_generation:c.value.pause_generation,paused:c.value.paused,governance_sha256:c.value.governance_sha256??null,policy:policy(c)},principal:ref('principals',owner),grant:auth.grant?grantBinding(auth.grant):{founder_principal_id:owner.id},task:{id:task.id,definition_revision:t.definition_revision,definition_sha256:t.definition_sha256,definition:t.definition,owner_principal_id:t.owner_principal_id,grant_id:t.grant_id,grant_generation:t.grant_generation},...selected};
+  const encoded=canonical(body),size=Buffer.byteLength(encoded);if(size>policy(c).max_context_bytes)hold('CONTEXT_CAPACITY','Complete required context exceeds policy; no attempt consumed');return {...body,text:encoded,sha256:digest(encoded),hash:digest(encoded),utf8_bytes:size};
+}
+export function validateContext(tx,context){tx=trackedReads(tx);try{if(control(tx).value.paused)return false;const t=tx.get('tasks',context.task.id);if(!t||['cancelled','unknown','quarantined'].includes(t.value.status))return false;const current=buildContext(tx,{principal_id:t.value.owner_principal_id},t);return current.sha256===context.sha256&&current.text===context.text;}catch(error){if(readFailure(tx,error))throw error;return false;}}
+
+// Conservatively resolve all explicit contributor references. Missing author or
+// principal lineage is a hold, not permission to treat evidence as independent.
+// Current use and historical attribution are different graph purposes. Only
+// typed material edges enter this graph; identity/grant/observer support stays
+// in the local seal validators and never makes software a business contributor.
+function evidenceAnalysis(tx,budget=semanticBudget(tx)){
+  const history=new Map(),locals=new Map(),taskSeals=new Map(),reviewSeals=new Map(),aliases=new Map();
+  const nodes=new Map(),finished=new Set(),currentDone=new Set(),implicationDone=new Set(),implicated=new Map();
+  const need=(value,message)=>{if(!value)hold('LINEAGE_REQUIRED',message);};
+  const only=(v,keys)=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).every(k=>keys.includes(k));
+  const touch=r=>budget(r);
+  const reference=r=>exactReference(r);
+  const historical=r=>{
+    const exact=reference(r),k=touch(exact);
+    if(!history.has(k)){
+      if(typeof tx.getVersion!=='function')hold('LINEAGE_REQUIRED','Exact committed history reader required');
+      let row;try{row=tx.getVersion(exact);}catch(error){if(readFailure(tx,error)||error.code)throw error;hold('LINEAGE_REQUIRED','Exact contributor history unavailable: '+exact.family+'/'+exact.id);}
+      need(row&&row.family===exact.family&&row.id===exact.id&&row.revision===exact.revision&&row.sha256===exact.sha256&&peerDigest(row.value)===exact.sha256,'Exact contributor history binding changed');
+      history.set(k,preparationBudget(tx).retain(exact.family,row,{historical:true}));
+    }
+    return history.get(k);
+  };
+  const refs=(value,label)=>{need(Array.isArray(value)&&value.length<=MAX_ROWS,'Invalid '+label);return value.map(semanticReference);};
+  const one=(r,family,label)=>{const exact=reference(r);need(exact.family===family,'Invalid '+label);return exact;};
+  const principalAliases=id=>{
+    need(typeof id==='string'&&id.trim()&&id.length<=200,'Contributor principal missing');
+    if(aliases.has(id))return aliases.get(id);
+    const p=tx.get('principals',id);need(p,'Contributor principal missing');
+    const result={principals:new Set([id]),natives:new Set()};aliases.set(id,result);
+    if(p.value.native_id)result.natives.add(p.value.native_id);
+    // Existing indexed alias lookup only. These tasks do not become material
+    // ancestors, and unrelated archive bodies are never enumerated globally.
+    for(const task of all(tx,'tasks',{principal_id:id})){
+      const r=task.value.result;if(!r?.observation)continue;
+      const o=resolve(tx,r.observation);
+      need(o.value.kind==='runtime_observation'&&o.value.task_id===task.id&&o.value.native_id===r.native_id,'Contributor observation mismatch');
+      if(r.native_id)result.natives.add(r.native_id);
+    }
+    return result;
+  };
+  const processIdentity=p=>{
+    need(p&&Number.isSafeInteger(p.pid)&&p.pid>0,'Protected process identity missing');
+    const started=p.started_at??p.execution_started_at;
+    need(typeof started==='string'&&Number.isFinite(Date.parse(started))&&!(p.started_at!==undefined&&p.execution_started_at!==undefined&&p.started_at!==p.execution_started_at),'Protected process start changed');
+    return {pid:p.pid,started};
+  };
+  const protectedObservation=(r,task,action)=>{
+    const exact=one(r,'effects','protected observation reference');
+    need(exact.id===digest(['runtime-observation',task.id,task.value.attempt.id,action]),'Protected observation identity changed');
+    // An immutable observation's current alias must not be replaced while its
+    // old historical bytes remain available. This is deliberately CURRENT.
+    const current=resolve(tx,exact),stored=historical(exact);
+    need(same(current.value,stored.value),'Protected observation history changed');
+    const v=stored.value,observer=tx.get('principals',v.principal_id);
+    need(v.kind==='runtime_observation'&&v.status==='recorded'&&v.action===action&&v.task_id===task.id&&v.attempt_id===task.value.attempt.id&&v.scope===task.value.scope&&observer?.value.kind==='scheduler','Protected observation aliases changed');
+    return stored;
+  };
+  const taskSeal=row=>{
+    const k=canonical(ref('tasks',row));if(taskSeals.has(k))return taskSeals.get(k);
+    const t=row.value,d=t.definition;
+    need(d&&digest(d)===t.definition_sha256,'Original task definition missing or changed');
+    for(const field of ['input_refs','review_of','parent_task_id','parent_ref'])need(Object.hasOwn(d,field)&&Object.hasOwn(t,field)&&same(t[field],d[field]),'Declared task contribution references changed');
+    for(const field of ['scope','host','role','stage','instructions','acceptance','resources','outcome'])need(same(t[field],d[field]),'Original task purpose changed');
+    const declared=refs(d.input_refs,'declared task inputs');
+    if(d.review_of)declared.push(semanticReference(d.review_of));
+    if(d.parent_task_id===null)need(d.parent_ref===null,'Exact declared parent provenance required');
+    else{need(typeof d.parent_task_id==='string'&&d.parent_task_id,'Exact declared parent provenance required');const parent=one(d.parent_ref,'tasks','declared parent');need(parent.id===d.parent_task_id,'Exact declared parent provenance required');declared.push(parent);}
+    let owner=text(d.owner_principal_id,'original task contributor',200);
+    const actors=[owner],transfers=t.transfers??[];
+    need(Array.isArray(transfers),'Task transfer provenance missing');
+    for(const transfer of transfers){
+      need(only(transfer,['from','to','at','attempt_id'])&&transfer.from===owner&&typeof transfer.to==='string'&&Number.isFinite(Date.parse(transfer.at))&&(transfer.attempt_id===null||transfer.attempt_id===t.attempt?.id),'Task transfer chain changed');
+      actors.push(transfer.from,transfer.to);owner=transfer.to;
+    }
+    need(owner===t.owner_principal_id&&t.principal_id===owner,'Task ownership differs from transfer provenance');
+    const seal={row,actors,natives:[],declared,historical:[],context:null,producer:null};
+    taskSeals.set(k,seal);
+    const a=t.attempt;
+    if(!a){need(!t.result,'Result has no admitted production attempt');return seal;}
+    need(a.model_calls===1&&typeof a.admitted_at==='string'&&Number.isFinite(Date.parse(a.admitted_at))&&typeof a.termination_confirmed==='boolean','Admitted attempt accounting or time changed');
+    const c=a.context;
+    need(c&&typeof c.text==='string'&&c.task&&c.principal,'Admitted producer context missing');
+    const {text:encoded,sha256,hash,utf8_bytes,...body}=c;
+    need(canonical(body)===encoded&&digest(encoded)===sha256&&hash===sha256&&Buffer.byteLength(encoded)===utf8_bytes&&c.protocol==='peer-task-context-v1'&&c.task.id===row.id&&c.task.definition_sha256===t.definition_sha256&&same(c.task.definition,d)&&c.task.definition_revision===a.definition_revision&&a.definition_revision===t.definition_revision&&a.id===digest(['attempt',row.id,t.definition_revision]),'Admitted producer context changed');
+    const producer=text(c.task.owner_principal_id,'admitted producer',200);
+    need(c.principal.id===producer&&c.principal.family==='principals'&&(producer===d.owner_principal_id||transfers.some(v=>v.to===producer)),'Admitted principal binding changed');
+    const admittedPrincipal=historical(c.principal);
+    need(admittedPrincipal.value.principal_id===producer&&admittedPrincipal.value.status==='active','Admitted principal identity changed');
+    actors.push(producer);if(admittedPrincipal.value.native_id)seal.natives.push(admittedPrincipal.value.native_id);
+    need(c.control&&c.control.policy_generation===a.policy_generation&&c.control.pause_generation===a.pause_generation&&c.control.paused===false,'Admitted control binding changed');
+    need(c.task.grant_id===null?c.grant?.founder_principal_id===producer:c.grant?.id===c.task.grant_id&&c.grant.value?.principal_id===producer&&c.grant.value.generation===c.task.grant_generation,'Admitted grant binding changed');
+    const sourceRefs=refs(c.sources,'admitted context sources');
+    for(let i=0;i<sourceRefs.length;i++){
+      const entry=c.sources[i],stored=historical(sourceRefs[i]);
+      need(only(entry,['family','id','revision','sha256','value','legacy_value'])&&same(entry.value,stored.value),'Admitted context source bytes changed');
+      if(entry.value.source?.kind==='legacy')need(typeof tx.resolveLegacy==='function'&&same(entry.legacy_value,tx.resolveLegacy({sha256:entry.value.source.sha256})),'Admitted legacy source bytes changed');
+    }
+    for(const r of declared)need(sourceRefs.filter(x=>same(x,r)).length===1,'Admitted context lost its exact declared evidence');
+    need(only(c.membership,['homes','notices','conflicts']),'Admitted context membership missing');
+    for(const family of ['homes','notices','conflicts'])for(const r of refs(c.membership[family],'admitted membership'))need(r.family===family&&sourceRefs.some(x=>same(x,r)),'Admitted membership differs from supplied evidence');
+    const request={kind:'native',task_id:row.id,definition_sha256:t.definition_sha256,context_sha256:sha256};
+    need(a.effect_id===digest(['native-effect',row.id,t.definition_revision])&&a.request_sha256===digest(request),'Admitted native request changed');
+    const originalEffect={kind:'native',task_id:row.id,principal_id:producer,scope:t.scope,status:'reserved',request,request_sha256:a.request_sha256,grant_id:c.task.grant_id,grant_generation:c.task.grant_generation,policy_generation:a.policy_generation,pause_generation:a.pause_generation,termination_confirmed:false};
+    historical({family:'effects',id:a.effect_id,revision:1,sha256:peerDigest(originalEffect)});
+    const effect=tx.get('effects',a.effect_id),e=effect?.value;
+    need(e&&Object.entries(originalEffect).every(([field,value])=>['status','termination_confirmed'].includes(field)||same(e[field],value)),'Admitted production reservation missing or changed');
+    seal.context=c;seal.producer=producer;seal.historical=sourceRefs;
+    if(a.process){
+      const process=protectedObservation(a.process_observation,row,'task/process').value;
+      need(same(process.process,a.process),'Protected process observation changed');processIdentity(a.process);
+    }else need(!a.process_observation,'Process observation has no process identity');
+    const r=t.result;if(!r){need(a.termination_confirmed===false,'Attempt closure has no retained result');return seal;}
+    need(a.termination_confirmed===r.termination_confirmed,'Attempt and original result closure differ');
+    need(r.observation&&r.observed_process,'Protected production observation missing');
+    const v=protectedObservation(r.observation,row,'task/finish').value;
+    need(v.context_sha256===sha256&&v.native_id===r.native_id&&a.native_id===r.native_id&&v.output_sha256===r.output_sha256&&v.termination_confirmed===r.termination_confirmed&&same(v.process,r.observed_process)&&(r.output===null?r.output_sha256===null:typeof r.output==='string'&&digest(r.output)===r.output_sha256),'Protected production binding changed');
+    processIdentity(r.observed_process);
+    if(a.process)need(same(processIdentity(a.process),processIdentity(r.observed_process)),'Protected production process changed');
+    if(r.termination_confirmed)need(r.observed_process.close_observed===true,'Protected production closure missing');
+    need(e.result_sha256===digest(r),'Native reservation result binding changed');
+    if(t.status==='returned')need(r.error===null&&r.termination_confirmed===true&&e.status==='succeeded'&&e.termination_confirmed===true&&e.result_sha256===digest(r),'Returned production result is unproven');
+    if(r.native_id!==null)seal.natives.push(text(r.native_id,'observed production native identity',300));
+    else need(r.output===null,'Output has unknown native provenance');
+    if(t.closure){
+      const closure=protectedObservation(t.closure.observation,row,'task/closure').value;
+      need(t.closure.termination_confirmed===true&&closure.termination_confirmed===true&&same(closure.process,t.closure.observed_process)&&t.closure.observed_process.close_observed===true&&same(processIdentity(r.observed_process),processIdentity(t.closure.observed_process))&&e.termination_confirmed===true&&e.closure&&same(e.closure,t.closure),'Protected later closure changed');
+    }
+    if(t.review_id){
+      need((t.stage==='review'||t.review_of)&&r.error===null&&r.termination_confirmed===true,'Retained review result is unproven');
+      let parsed;try{parsed=parseReview(r.output,t.review_of);}catch{hold('LINEAGE_REQUIRED','Sealed review output is invalid');}
+      need(same(v.review,parsed)&&t.review_id===digest(['review',row.id,a.id]),'Protected parsed review aliases changed');
+    }else need(v.review===null&&!(t.status==='returned'&&(t.stage==='review'||t.review_of)),'Unexpected protected review subject');
+    return seal;
+  };
+  const reviewHead=(old,{pending=false}={})=>{
+    const t=old.value,head=tx.get('tasks',old.id);need(head,'Current review task head missing');
+    touch(ref('tasks',head));
+    if(pending&&head.value.status!=='returned')hold('SOURCE_CHANGED','Exact source changed: tasks/'+old.id);
+    const mutable=new Set(['owner_principal_id','principal_id','grant_id','grant_generation','transfers']);
+    const stable=value=>Object.fromEntries(Object.entries(value).filter(([name])=>!mutable.has(name)));
+    let continuation=head.value;
+    if(!pending&&continuation.status==='cancelled'){
+      // The supported cancellation changes only these lifecycle fields. Its
+      // reason is retained data, not a typed revocation of an accepted proof.
+      need(typeof continuation.cancelled_at==='string'&&Number.isFinite(Date.parse(continuation.cancelled_at))&&typeof continuation.cancellation==='string'&&continuation.cancellation.trim()&&continuation.cancellation.length<=2000&&!continuation.cancellation.includes('\0'),'Completed review cancellation provenance missing');
+      const {cancelled_at,cancellation,...value}=continuation;
+      continuation={...value,status:'returned'};
+    }
+    if(!same(stable(continuation),stable(t)))hold('SOURCE_CHANGED','Exact source changed: tasks/'+old.id);
+    const before=t.transfers??[],after=head.value.transfers??[];
+    need(after.length>=before.length&&before.every((x,i)=>same(x,after[i])),'Completed review transfer history changed');taskSeal(head);
+    if(after.length===before.length)need(same(continuation,t),'Completed review ownership changed without a transfer');
+    return head;
+  };
+  const reviewSeal=row=>{
+    const k=canonical(ref('reviews',row));if(reviewSeals.has(k))return reviewSeals.get(k);
+    const r=row.value,p=r.proof;
+    need(r.status==='accepted'&&r.termination_confirmed===true&&p?.protocol==='peer-runtime-observation-v1','Canonical accepted review seal required');
+    const subject=semanticReference(r.subject),taskRef=one(p.task,'tasks','review producing task'),task=historical(taskRef),t=task.value,seal=taskSeal(task);
+    need(task.id===r.task_id&&r.scope===t.scope&&t.status==='returned'&&t.review_id===row.id&&t.result&&same(t.result.observation,p.observation)&&same(t.review_of,subject)&&r.reviewer_principal_id===seal.producer&&t.owner_principal_id===seal.producer&&r.native_id===t.result.native_id&&r.context_sha256===seal.context?.sha256&&r.output_sha256===t.result.output_sha256,'Accepted review/task aliases changed');
+    const observation=protectedObservation(p.observation,task,'task/finish').value;
+    let parsed;try{parsed=parseReview(t.result.output,subject);}catch{hold('LINEAGE_REQUIRED','Sealed review raw output is invalid');}
+    need(same(parsed,{subject,verdict:r.verdict,reason:r.reason,blockers:r.blockers})&&same(observation.review,parsed)&&r.recorded_by===observation.principal_id,'Accepted review raw output aliases changed');
+    const target=historical(subject).value;
+    need(r.author_principal_id===(target.principal_id??target.owner_principal_id??target.author_principal_id),'Accepted review author alias changed');
+    reviewHead(task);const value={row,task,taskSeal:seal,subject,taskRef,reviewer:r.reviewer_principal_id,native:r.native_id};reviewSeals.set(k,value);return value;
+  };
+  const homeSeal=row=>{
+    const h=row.value,q=h.scope_qualification;
+    if(!q){need(!h.proposal&&!h.review,'Published home qualification missing');return null;}
+    need(q.protocol==='peer-home-scope-v1'&&q.home_binding_sha256===homeBinding(row.id,h)&&same(q.proposal,h.proposal)&&same(q.review,h.review),'Home qualification aliases changed');
+    const proposalRef=one(h.proposal,'proposals','home proposal'),reviewRef=one(h.review,'reviews','home review');
+    const proposal=historical(proposalRef),review=historical(reviewRef),r=reviewSeal(review),p=proposal.value;
+    need(review.value.verdict==='Pass'&&same(r.subject,proposalRef)&&p.home_id===row.id&&p.scope===h.scope&&same(p.content,h.content)&&same(p.dependencies,h.dependencies??[])&&same(p.base,h.previous??null),'Home accepted subject binding changed');
+    return {proposal,review};
+  };
+  // One finite typed edge table, consumed by both traversal purposes. Sealed
+  // publication and review proofs are attribution edges, not live dependencies.
+  const local=(r,row)=>{
+    const k=canonical(r);if(locals.has(k))return locals.get(k);
+    const v=row.value,n={reference:r,row,actors:[],natives:[],live:[],past:[],review:null,recordingOnly:false};
+    switch(r.family){
+      case 'tasks':{const t=taskSeal(row);n.actors=t.actors;n.natives=t.natives;n.live=t.declared;n.past=[...t.declared,...t.historical];break;}
+      case 'proposals':{
+        const dependencies=refs(v.dependencies??[],'proposal dependencies');need(dependencies.every(d=>d.family==='homes'),'Proposal dependencies must name homes');
+        const base=v.base?one(v.base,'homes','proposal base'):null;if(base)need(base.id===v.home_id,'Proposal base home identity changed');
+        n.actors=[v.principal_id];n.live=[...refs(v.readset??[],'proposal readset'),...dependencies,...(base?[base]:[])];n.past=n.live;break;
+      }
+      case 'reviews':{const s=reviewSeal(row);n.actors=[s.reviewer];n.natives=[s.native];n.past=[s.subject,s.taskRef];n.review=s;break;}
+      case 'homes':{
+        n.actors=[v.principal_id];n.live=refs(v.dependencies??[],'home dependencies');need(n.live.every(d=>d.family==='homes'),'Home dependency must name a home');
+        const s=homeSeal(row);n.past=[...n.live,...(s?[reference(v.proposal),reference(v.review)]:[])];
+        if(s&&tx.get('principals',v.principal_id)?.value.kind==='publisher'){n.actors=[];n.recordingOnly=true;}
+        if(v.previous){const previous=one(v.previous,'homes','previous home');need(previous.id===row.id,'Previous home identity changed');n.past.push(previous);}break;
+      }
+      case 'conflicts':n.actors=[v.principal_id,...(v.resolution?[v.resolution.principal_id]:[])];n.live=[...refs(v.input_refs??[],'conflict inputs'),...refs(v.resolution?.evidence??[],'conflict resolution evidence')];n.past=n.live;break;
+      case 'notices':n.actors=[v.principal_id,...(v.resolution?[v.resolution.principal_id]:[])];break;
+      case 'messages':n.actors=[v.principal_id];break;
+      case 'deliveries':n.past=[one(v.notice,'notices','delivery notice')];n.recordingOnly=true;break;
+      default:hold('SOURCE_INVALID','Unsupported semantic evidence family: '+r.family);
+    }
+    locals.set(k,n);return n;
+  };
+  const current=roots=>{
+    const active=new Set(),stack=[...roots].reverse().map(r=>({r:semanticReference(r),exit:false}));
+    while(stack.length){
+      const {r,exit}=stack.pop(),k=touch(r);
+      if(exit){active.delete(k);currentDone.add(k);continue;}
+      if(active.has(k))hold('LINEAGE_REQUIRED','Contributor reference cycle');
+      if(currentDone.has(k))continue;
+      const row=resolve(tx,r),n=local(r,row);active.add(k);stack.push({r,exit:true});
+      for(let i=n.live.length-1;i>=0;i--)stack.push({r:n.live[i],exit:false});
+    }
+    return [...currentDone].map(key=>JSON.parse(key));
+  };
+  const historicalWalk=roots=>{
+    const active=new Set(),stack=[...roots].reverse().map(r=>({r:semanticReference(r),exit:false}));
+    while(stack.length){
+      const {r,exit}=stack.pop(),k=touch(r);
+      if(exit){
+        const n=nodes.get(k),people=new Set(),natives=new Set(n.natives);
+        need(n.actors.length||n.recordingOnly,'Exact evidence has unknown contributor lineage');
+        for(const id of n.actors){const a=principalAliases(id);for(const p of a.principals)people.add(p);for(const native of a.natives)natives.add(native);}
+        for(const child of n.past){const x=nodes.get(canonical(child));need(x?.contributors,'Incomplete contributor graph');for(const p of x.contributors.principals)people.add(p);for(const native of x.contributors.natives)natives.add(native);}
+        if(n.review){const s=n.review,subject=nodes.get(canonical(s.subject)).contributors,reviewer=principalAliases(s.reviewer);need(!subject.principals.has(s.reviewer)&&!subject.natives.has(s.native)&&![...reviewer.natives].some(native=>subject.natives.has(native)),'Accepted review is not independent of its subject');}
+        n.contributors={principals:people,natives};active.delete(k);finished.add(k);continue;
+      }
+      if(active.has(k))hold('LINEAGE_REQUIRED','Contributor reference cycle');
+      if(finished.has(k))continue;
+      const row=historical(r),n=local(r,row);nodes.set(k,n);active.add(k);stack.push({r,exit:true});
+      for(let i=n.past.length-1;i>=0;i--)stack.push({r:n.past[i],exit:false});
+    }
+    const principals=new Set(),natives=new Set();
+    for(const root of roots){const c=nodes.get(canonical(semanticReference(root))).contributors;for(const id of c.principals)principals.add(id);for(const native of c.natives)natives.add(native);}
+    return {principals:[...principals].sort(),natives:[...natives].sort()};
+  };
+  const implicatedHomes=roots=>{
+    const active=new Set(),stack=[...roots].reverse().map(r=>({r:semanticReference(r),exit:false}));
+    while(stack.length){
+      const {r,exit}=stack.pop(),key=touch(r);
+      if(exit){active.delete(key);implicationDone.add(key);continue;}
+      if(active.has(key))hold('LINEAGE_REQUIRED','Contributor reference cycle');
+      if(implicationDone.has(key))continue;
+      const row=historical(r),n=local(r,row);active.add(key);stack.push({r,exit:true});
+      if(r.family==='homes'){
+        const head=tx.get('homes',row.id);
+        if(head?.value.status==='current'&&same(ref('homes',head),r))implicated.set(row.id,head);
+        continue;
+      }
+      // This is relationship discovery, not permission to make past proof
+      // edges current. Homes are terminal; their CURRENT deps come from the
+      // separate home DAG. Protected reviews/deliveries expose typed carriers.
+      const edges=['reviews','deliveries'].includes(r.family)?n.past:n.live;
+      for(let i=edges.length-1;i>=0;i--)stack.push({r:edges[i],exit:false});
+    }
+    return [...implicated.values()];
+  };
+  const pendingReviewEligible=row=>{
+    const seal=reviewSeal(row),old=seal.task,head=reviewHead(old,{pending:true});
+    // The original admitted reviewer and original grant remain accountable.
+    // Rebuilding with the transferred head's owner would silently substitute
+    // authority; rebuild only the historical sealed task against current inputs.
+    const reviewer=member(tx,{principal_id:seal.reviewer});
+    if(!same(ref('principals',reviewer),seal.taskSeal.context.principal))return false;
+    if(head.value.owner_principal_id!==seal.reviewer)authorize(tx,{principal_id:head.value.owner_principal_id},'task/submit',{grant_id:head.value.grant_id,grant_generation:head.value.grant_generation,scope:head.value.scope,resources:head.value.resources});
+    const rebuilt=buildContext(tx,{principal_id:seal.reviewer},old);
+    return rebuilt.sha256===seal.taskSeal.context.sha256&&rebuilt.text===seal.taskSeal.context.text;
+  };
+  return {current,currentTask:row=>current(taskSeal(row).declared),historical:historicalWalk,implicatedHomes,reviewSeal,homeSeal,pendingReviewEligible,taskSeal};
+}
+function lineage(tx,subject){const graph=evidenceAnalysis(tx);graph.current([subject]);return graph.historical([subject]);}
+function exclusions(args){const ids=args.exclude_task_ids??[];if(!Array.isArray(ids)||ids.length>MAX_ROWS||new Set(ids).size!==ids.length||ids.some(id=>typeof id!=='string'||!id||id.length>200))hold('INVALID_INPUT','At most 10,000 distinct excluded task IDs');return new Set(ids);}
+// Compatible task/host result shape. P3 may accumulate excluded held IDs up to
+// the full 10,000-row queue bound; fairness advances only on admitted execution.
+// Exclusion is caller-local traversal, not cancellation or persistent omission.
+function peek(tx,args={}){const excluded=exclusions(args),rows=all(tx,'tasks',{status:'pending'}).filter(t=>!excluded.has(t.id)),cursor=tx.get('control','fairness')?.value.last_principal_id??'',owners=[...new Set(rows.map(t=>t.value.owner_principal_id))].sort();if(!owners.length)return null;const owner=owners.find(id=>id>cursor)??owners[0],items=rows.filter(t=>t.value.owner_principal_id===owner).sort((a,b)=>order(a.value.created_at,b.value.created_at)||order(a.id,b.id)),aging=control(tx).value.policy.review_aging_ms??1000;return items.find(t=>t.value.stage==='review'&&Date.now()-Date.parse(t.value.created_at)>=aging)??items[0];}
+function runtimeStatus(tx){const c=control(tx),p=policy(c),active=count(tx,'slots',{status:['active','unknown']});return {paused:c.value.paused,active_slots:active,pending_count:count(tx,'tasks',{status:'pending'}),available_slots:Math.max(0,p.worker_cap-active),queue_matching_row_limit:MAX_ROWS,exclusion_limit:MAX_ROWS};}
+function parseReview(output,subject,claimed){
+  let review;try{review=parseReviewOutput(output,subject,{canonical});}catch(error){
+    // The pinned shared parser has one bounds phase. Keep the established model
+    // error codes for that phase without duplicating its structural parser.
+    if(error.message==='Invalid bounded review reason/blockers'){const r=JSON.parse(output).review;text(r.reason,'review reason',12000);bounded(r.blockers,'blockers',16000);}
+    hold('REVIEW_INVALID',error.message);
+  }
+  if(claimed){for(const key of ['subject','verdict','reason','blockers'])if(Object.hasOwn(claimed,key)&&!same(claimed[key],review[key]))hold('REVIEW_MISMATCH','Claimed review differs from observed output');if(claimed.output_sha256!==undefined&&claimed.output_sha256!==digest(output))hold('REVIEW_MISMATCH','Claimed raw output hash differs');}
+  return review;
+}
+function processEvidence(args,t,closed){
+  const p=bounded(args.observed_process,'observed process',4000);
+  const identity=value=>{
+    if(!value||!Number.isSafeInteger(value.pid)||value.pid<1)hold('PROCESS_INVALID','Protected process identity required');
+    const started=value.started_at??value.execution_started_at;
+    if(typeof started!=='string'||!Number.isFinite(Date.parse(started))||value.started_at!==undefined&&value.execution_started_at!==undefined&&value.started_at!==value.execution_started_at)hold('PROCESS_INVALID','Unambiguous protected process start required');
+    return {pid:value.pid,started};
+  };
+  const observed=identity(p);
+  if(closed&&p.close_observed!==true)hold('PROCESS_INVALID','Protected process closure required');
+  // A first finish is a process observation even without task/process. Retain
+  // and check every existing identity; never replace one with a later PID.
+  if(t.result&&!t.result.observed_process)hold('PROCESS_INVALID','Retained finish process evidence missing');
+  if(t.closure&&!t.closure.observed_process)hold('PROCESS_INVALID','Retained closure process evidence missing');
+  for(const prior of [t.attempt.process,t.result?.observed_process,t.closure?.observed_process]){
+    if(prior===undefined||prior===null)continue;
+    const bound=identity(prior);
+    if(bound.pid!==observed.pid||bound.started!==observed.started)hold('PROCESS_CHANGED','Observed process identity changed');
+  }
+  return p;
+}
+function observation(tx,actor,t,action,args,extra={}){const id=digest(['runtime-observation',t.id,t.value.attempt.id,action]);if(tx.get('effects',id))hold('OBSERVATION_EXISTS','Observation is immutable');return tx.put('effects',id,{kind:'runtime_observation',status:'recorded',principal_id:actor.principal_id,scope:t.value.scope,task_id:t.id,attempt_id:t.value.attempt.id,action,...extra,at:now()},0);}
+function command(tx,actor,action,args,protectedCall){
+  for(const key of ['actor','session_id','principal_id','runtime_observer','observer_capability'])if(Object.hasOwn(args,key))hold('ACTOR_ARGUMENT','Identity/capability cannot come from request fields');
+  const operation=text(args.operation_id,'operation_id',160),payload=copy(args);delete payload.operation_id;const id=digest(['peer-command-v1',actor.principal_id,operation]),hash=digest({channel:protectedCall?'runtime-observer':'model',action,args:payload}),prior=tx.get('commands',id);
+  if(prior){if(prior.value.request_sha256!==hash)hold('REPLAY_MISMATCH','Operation already names a different request');return copy(prior.value.result);}
+  const principal=member(tx,actor),c=control(tx);policy(c);const result=mutate(tx,actor,principal,c,action,args,protectedCall);tx.put('commands',id,{principal_id:actor.principal_id,operation_id:operation,action,request_sha256:hash,result:bounded(result,'receipt',800000),created_at:now()},0);return result;
+}
+function run(ledger,actor,action,args,protectedCall){
+  // Validate before reading fields; accessors, custom prototypes, undefined,
+  // symbols, sparse arrays, nonfinite numbers and lossy values fail as in P1.
+  const a=copy(actor),input=bounded(args,'request',1000000);text(action,'action',100);
+  if(scopeInputActions.has(action))scopeOf(input.scope);
+  if(observationActions.has(action)&&!protectedCall)hold('OBSERVER_REQUIRED','Observation actions require the separate trusted host interface');
+  return plannedWrite(ledger,action,a.principal_id,tx=>{member(tx,a);return command(tx,a,action,input,protectedCall);});
+}
+export function execute(ledger,actor,action,args={}){return run(ledger,actor,action,args,false);}
+export function createRuntimeObserver(ledger,{principal_id='scheduler'}={}){
+  // Host-owned capability by reachability. Do not export this factory through
+  // tool dispatch. Calling it is not native qualification or authentication.
+  const actor=copy({principal_id});ledger.read(tx=>{if(!trusted(member(tx,actor)))hold('SCHEDULER_REQUIRED','Trusted runtime principal required');});
+  return Object.freeze({record:(action,args)=>{if(!observationActions.has(action))hold('OBSERVER_ACTION','Unsupported observation action');return run(ledger,actor,action,args,true);}});
+}
+function mutate(tx,actor,principal,c,action,args,protectedCall){
+  if(action==='grant/create'||action==='grant/revoke'){
+    if(!founder(c,principal))hold('FOUNDER_REQUIRED','Founder grant control required');const id=text(args.grant_id,'grant_id',200),old=tx.get('grants',id);
+    if(action==='grant/revoke'){if(!old)hold('GRANT_MISSING','Missing grant');return tx.put('grants',id,{...old.value,status:'revoked',generation:old.value.generation+1,revoked_at:now()},old.revision);}
+    if(old)hold('GRANT_EXISTS','Create a new grant');member(tx,{principal_id:args.to_principal_id});if(!Array.isArray(args.actions)||!args.actions.length||args.actions.length>100||args.actions.some(a=>typeof a!=='string'||!a||a.length>100)||!Number.isFinite(Date.parse(args.expires_at))||Date.parse(args.expires_at)<=Date.now()||args.max_model_calls!==undefined&&(!Number.isSafeInteger(args.max_model_calls)||args.max_model_calls<1))hold('GRANT_INVALID','Bounded grant policy required');
+    return tx.put('grants',id,{principal_id:args.to_principal_id,status:'active',generation:1,policy_generation:c.value.policy_generation,scope:scopeOf(args.scope),actions:[...new Set(args.actions)].sort(),resources:canonicalResources(tx,args.resources),expires_at:args.expires_at,source_instruction:text(args.source_instruction,'source instruction',4000),max_model_calls:Math.min(args.max_model_calls??policy(c).max_model_calls,policy(c).max_model_calls),used_model_calls:0},0);
+  }
+  if(['company/pause','company/resume'].includes(action)){if(!founder(c,principal))hold('FOUNDER_REQUIRED','Founder control required');text(args.source_instruction,'source instruction',4000);return tx.put('control','company',{...c.value,paused:action==='company/pause',pause_generation:c.value.pause_generation+1},c.revision);}
+  if(action==='task/submit'){
+    const scope=scopeOf(args.scope),resources=canonicalResources(tx,args.resources),auth=authorize(tx,actor,action,{...args,scope,resources}),p=policy(c);
+    if(count(tx,'tasks',{status:['planned','pending']})>=p.queue_limit||count(tx,'tasks',{status:['planned','pending'],principal_id:principal.id})>=p.principal_queue_limit)hold('QUEUE_CAPACITY','Queue full');
+    const id=args.task_id?text(args.task_id,'task_id',200):digest(['task',principal.id,args.operation_id]);if(tx.get('tasks',id))hold('TASK_EXISTS','Task exists');const inputs=args.input_refs??[];if(!Array.isArray(inputs)||inputs.length>100)hold('SOURCE_INVALID','At most 100 input refs');semanticInputs(tx,inputs);if(args.review_of)resolve(tx,semanticReference(args.review_of));
+    let parent=null;if(args.parent_task_id){parent=tx.get('tasks',text(args.parent_task_id,'parent task',200));if(!parent||parent.value.owner_principal_id!==principal.id||!['*',scope].includes(parent.value.scope))hold('PARENT_AUTHORITY','Parent owner/scope mismatch');}
+    const definition={owner_principal_id:principal.id,grant_id:auth.grant?.id??null,grant_generation:auth.grant?.value.generation??null,scope,host:principal.value.host??'codex',role:text(args.role,'role',100),stage:text(args.stage??'produce','stage',40),instructions:text(args.instructions??args.task,'instructions',20000),acceptance:text(args.acceptance,'acceptance',4000),resources,input_refs:copy(inputs),review_of:args.review_of?copy(args.review_of):null,parent_task_id:parent?.id??null,parent_ref:parent?ref('tasks',parent):null,outcome:args.outcome===undefined?null:bounded(args.outcome,'outcome',8000)};
+    return tx.put('tasks',id,{...definition,definition,status:'planned',definition_revision:1,definition_sha256:digest(definition),attempt:null,principal_id:principal.id,created_at:now()},0);
+  }
+  if(action==='task/admit'){
+    if(!trusted(principal))hold('SCHEDULER_REQUIRED','Runtime admission required');const status=runtimeStatus(tx);if(status.paused)return {admitted:false,code:'PAUSED',reason:'Company paused'};if(!status.available_slots)return {admitted:false,code:'CAPACITY_BUSY',reason:'Active or uncertain execution holds capacity'};
+    const task=peek(tx,args);if(!task)return {admitted:false,code:'NO_WORK',reason:'No unexcluded pending work'};if(args.task_id&&args.task_id!==task.id)return {admitted:false,code:'FAIRNESS_CHANGED',reason:'Selection changed'};const t=task.value;
+    // Expected admission holds must occur before planning resource mutations.
+    let auth,context,usage,principalUsage,used,usedPrincipal;
+    try{
+      auth=taskAuthority(tx,{principal_id:t.owner_principal_id},task,'task/claim');if(t.attempt)hold('ATTEMPT_CONSUMED','Attempt already consumed');
+      const held=all(tx,'claims',{status:'held'});if(t.resources.some(r=>held.some(cl=>cl.value.task_id!==task.id&&resourceOverlap(cl.value.resource,r))))hold('RESOURCE_BUSY','Resource held');
+      usage=tx.get('control','usage');principalUsage=tx.get('control',`usage:${t.owner_principal_id}`);used=usage?.value.model_calls??0;usedPrincipal=principalUsage?.value.model_calls??0;
+      if(used>=policy(c).max_model_calls||usedPrincipal>=(policy(c).principal_model_calls??policy(c).max_model_calls)||auth.grant&&(auth.grant.value.used_model_calls??0)>=auth.grant.value.max_model_calls)hold('MODEL_BUDGET','Model budget exhausted');
+      context=buildContext(tx,actor,task);if(context.membership.conflicts.length)hold('CONTEXT_CONFLICT','Unresolved applicable conflict');
+    }catch(error){if(['RESOURCE_BUSY','RESOURCE_AUTHORITY','CONTEXT_CAPACITY','CONTEXT_CONFLICT','GRANT_INVALID','GRANT_CHANGED','MODEL_BUDGET','PRINCIPAL_INACTIVE','SOURCE_CHANGED','DEPENDENCY_CYCLE','LEGACY_SOURCE_MISSING','DEFINITION_CHANGED'].includes(error.code))return {admitted:false,code:error.code,reason:error.message};throw error;}
+    const effectId=digest(['native-effect',task.id,t.definition_revision]);if(tx.get('effects',effectId))hold('ATTEMPT_CONSUMED','Effect already reserved');
+    const request={kind:'native',task_id:task.id,definition_sha256:t.definition_sha256,context_sha256:context.sha256},attempt={id:digest(['attempt',task.id,t.definition_revision]),effect_id:effectId,request_sha256:digest(request),definition_revision:t.definition_revision,context,policy_generation:c.value.policy_generation,pause_generation:c.value.pause_generation,admitted_at:now(),termination_confirmed:false,model_calls:1};
+    claimResources(tx,task);
+    tx.put('effects',effectId,{kind:'native',task_id:task.id,principal_id:t.owner_principal_id,scope:t.scope,status:'reserved',request,request_sha256:attempt.request_sha256,grant_id:t.grant_id,grant_generation:t.grant_generation,policy_generation:c.value.policy_generation,pause_generation:c.value.pause_generation,termination_confirmed:false},0);
+    tx.put('slots',task.id,{status:'active',task_id:task.id,principal_id:t.owner_principal_id,attempt_id:attempt.id,effect_id:effectId},0);tx.put('control','usage',{model_calls:used+1},usage?.revision??0);tx.put('control',`usage:${t.owner_principal_id}`,{model_calls:usedPrincipal+1},principalUsage?.revision??0);
+    if(auth.grant)tx.put('grants',auth.grant.id,{...auth.grant.value,used_model_calls:(auth.grant.value.used_model_calls??0)+1},auth.grant.revision);
+    const fair=tx.get('control','fairness');tx.put('control','fairness',{last_principal_id:t.owner_principal_id},fair?.revision??0);const result=tx.put('tasks',task.id,{...t,status:'running',attempt},task.revision);tx.event('dispatch_admitted',{task_id:task.id,attempt_id:attempt.id,effect_id:effectId,pause_generation:c.value.pause_generation,policy_generation:c.value.policy_generation});return {admitted:true,task:result,context,host:t.host};
+  }
+  if(action.startsWith('task/')){
+    const task=tx.get('tasks',text(args.task_id,'task_id',200));if(!task)hold('TASK_MISSING','Missing task');const t=task.value;
+    if(action==='task/claim'){taskAuthority(tx,actor,task,action);if(c.value.paused)hold('PAUSED','Company paused');if(t.attempt||!['planned','pending'].includes(t.status))hold('ATTEMPT_CONSUMED','Task is not unattempted');claimResources(tx,task);return tx.put('tasks',task.id,{...t,status:'pending'},task.revision);}
+    if(action==='task/transfer'){
+      taskAuthority(tx,actor,task,action);const to=member(tx,{principal_id:args.to_principal_id}),auth=authorize(tx,{principal_id:to.id},'task/submit',{grant_id:args.to_grant_id,scope:t.scope,resources:t.resources}),claims=all(tx,'claims',{task_id:task.id,status:'held'});
+      const result=tx.put('tasks',task.id,{...t,owner_principal_id:to.id,principal_id:to.id,grant_id:auth.grant?.id??null,grant_generation:auth.grant?.value.generation??null,transfers:[...(t.transfers??[]),{from:t.owner_principal_id,to:to.id,at:now(),attempt_id:t.attempt?.id??null}]},task.revision);for(const claim of claims)tx.put('claims',claim.id,{...claim.value,principal_id:to.id},claim.revision);return result;
+    }
+    if(action==='task/cancel'){taskAuthority(tx,actor,task,action);const result=tx.put('tasks',task.id,{...t,status:'cancelled',cancelled_at:now(),cancellation:text(args.reason??'Cancellation requested','reason')},task.revision);if(!t.attempt)releaseClaims(tx,result,true);return result;}
+    if(!protectedCall||!trusted(principal))hold('OBSERVER_REQUIRED','Protected runtime observation required');if(!t.attempt||t.attempt.id!==args.attempt_id)hold('ATTEMPT_CHANGED','Exact attempt required');
+    if(action==='task/process'){
+      if(t.attempt.process)hold('PROCESS_RECORDED','Process identity immutable');const process=processEvidence(args,t,false),o=observation(tx,actor,task,action,args,{process});return tx.put('tasks',task.id,{...t,attempt:{...t.attempt,process,process_observation:ref('effects',o)}},task.revision);
+    }
+    if(action==='task/finish'){
+      if(t.result)hold('RESULT_RECORDED','Original result immutable');const closed=args.termination_confirmed===true,error=args.error?bounded(args.error,'error',4000):null,process=processEvidence(args,t,closed);
+      if(!error&&(typeof args.output!=='string'||!args.output.trim()||!closed))hold('RESULT_INVALID','Successful output requires closure');if(args.output!==undefined&&(typeof args.output!=='string'||Buffer.byteLength(args.output)>64000))hold('OUTPUT_CAPACITY','Output must be bounded raw text');
+      const native=args.native_id===undefined?null:text(args.native_id,'observed native id',300);if(!error&&!native)hold('RESULT_INVALID','Observed native identity required');
+      const fresh=validateContext(tx,t.attempt.context);if(!fresh&&preparationBudget(tx).failed())preparationBudget(tx).physical();
+      const state=!closed?'unknown':!fresh?'quarantined':error?'failed':'returned';let reviewData=null;
+      if(state==='returned'&&(t.stage==='review'||t.review_of)){
+        if(!t.review_of)hold('REVIEW_INVALID','Review subject missing');const graph=evidenceAnalysis(tx);graph.currentTask(task);reviewData=parseReview(args.output,t.review_of,args.review_evidence);const contributors=graph.historical([t.review_of]),reviewer=member(tx,{principal_id:t.owner_principal_id});
+        if(contributors.principals.includes(reviewer.id)||contributors.natives.includes(native)||reviewer.value.native_id&&contributors.natives.includes(reviewer.value.native_id))hold('REVIEW_INDEPENDENCE','Contributing principal or native session cannot review');
+        if(args.review_evidence?.context_sha256!==undefined&&args.review_evidence.context_sha256!==t.attempt.context.sha256||args.review_evidence?.native_id!==undefined&&args.review_evidence.native_id!==native)hold('REVIEW_MISMATCH','Claimed observation identity/context differs');
+      }
+      const reviewId=reviewData?digest(['review',task.id,t.attempt.id]):null;if(reviewId&&tx.get('reviews',reviewId))hold('REVIEW_EXISTS','Immutable review exists');
+      const o=observation(tx,actor,task,action,args,{native_id:native,termination_confirmed:closed,process,output_sha256:args.output===undefined?null:digest(args.output),context_sha256:t.attempt.context.sha256,review:reviewData});
+      const result={output:args.output??null,output_sha256:args.output===undefined?null:digest(args.output),native_id:native,error,termination_confirmed:closed,observed_process:process,observation:ref('effects',o),at:now()};
+      const updated=tx.put('tasks',task.id,{...t,status:state,result,review_id:reviewId,attempt:{...t.attempt,native_id:native,termination_confirmed:closed}},task.revision);
+      let review=null;if(reviewData){const target=resolve(tx,t.review_of),author=target.value.principal_id??target.value.owner_principal_id??target.value.author_principal_id;review=tx.put('reviews',reviewId,{status:'accepted',scope:t.scope,task_id:task.id,subject:t.review_of,author_principal_id:author,reviewer_principal_id:t.owner_principal_id,native_id:native,...reviewData,context_sha256:t.attempt.context.sha256,output_sha256:digest(args.output),termination_confirmed:true,proof:{protocol:'peer-runtime-observation-v1',observation:ref('effects',o),task:ref('tasks',updated)},recorded_by:principal.id},0);}
+      const effect=tx.get('effects',t.attempt.effect_id),slot=tx.get('slots',task.id);if(!effect||!slot)hold('ATTEMPT_CHANGED','Attempt reservation missing');tx.put('effects',effect.id,{...effect.value,status:!closed?'unknown':error?'failed':'succeeded',termination_confirmed:closed,result_sha256:digest(result)},effect.revision);tx.put('slots',slot.id,{...slot.value,status:closed?'released':'unknown',termination_confirmed:closed},slot.revision);if(closed)releaseClaims(tx,updated,true);return {task:updated,accepted:state==='returned',review};
+    }
+    if(action==='task/closure'){
+      if(args.termination_confirmed!==true||!t.result)hold('CLOSURE_REQUIRED','Retained result and protected closure required');if(t.closure||t.result.termination_confirmed)return task;const process=processEvidence(args,t,true),o=observation(tx,actor,task,action,args,{termination_confirmed:true,process});
+      const updated=tx.put('tasks',task.id,{...t,status:t.status==='unknown'?'quarantined':t.status,closure:{termination_confirmed:true,observed_process:process,observation:ref('effects',o),at:now()}},task.revision),effect=tx.get('effects',t.attempt.effect_id),slot=tx.get('slots',task.id);if(!effect||!slot)hold('ATTEMPT_CHANGED','Reservation missing');tx.put('effects',effect.id,{...effect.value,status:'failed',termination_confirmed:true,closure:updated.value.closure},effect.revision);tx.put('slots',slot.id,{...slot.value,status:'released',termination_confirmed:true},slot.revision);releaseClaims(tx,updated,true);return updated;
+    }
+    hold('ACTION_UNKNOWN','Unsupported task action');
+  }
+  if(action==='home/propose'){
+    const scope=scopeOf(args.scope),id=text(args.home_id,'home_id',200);authorize(tx,actor,action,{...args,scope,resources:[{kind:'home',id}]});const home=tx.get('homes',id);if((home?.revision??0)!==(args.expected_revision??0))hold('HOME_CHANGED','Base revision changed');if(home&&scopeOf(home.value.scope)!==scope)hold('HOME_SCOPE','Home scope cannot be relabeled');
+    const dependencies=args.dependencies??[];if(!Array.isArray(dependencies)||dependencies.length>100)hold('DEPENDENCY_INVALID','At most 100 home dependencies');for(const d of dependencies){if(d.family!=='homes')hold('DEPENDENCY_INVALID','Home dependencies required');resolve(tx,d);}
+    semanticInputs(tx,args.input_refs??[]);const selected=sources(tx,scope,[...(args.input_refs??[]),...dependencies]),content=bounded(args.content,'home content');return tx.put('proposals',digest(['proposal',principal.id,args.operation_id]),{status:'proposed',principal_id:principal.id,scope,home_id:id,base:home?ref('homes',home):null,content,dependencies:copy(dependencies),readset:selected.sources.map(({value,legacy_value,...r})=>r),membership:selected.membership,...(args.github_publication?{github_publication:bounded(args.github_publication,'GitHub subject',16000)}:{}),created_at:now()},0);
+  }
+  if(action==='home/publish'){
+    const proposal=tx.get('proposals',text(args.proposal_id,'proposal_id',200));if(proposal?.value.status!=='proposed')hold('PROPOSAL_INVALID','Proposed home required');const p=proposal.value;authorize(tx,actor,action,{...args,scope:p.scope,resources:[{kind:'home',id:p.home_id}]});const home=tx.get('homes',p.home_id);if(p.base)resolve(tx,p.base);else if(home)hold('HOME_CHANGED','Concurrent home');
+    const reviewRows=currentReviewRows(tx),selected=sources(tx,p.scope,[],reviewRows);if(selected.membership.conflicts.length)hold('CONTEXT_CONFLICT','Unresolved applicable conflict');if(!same(selected.membership,p.membership))hold('CONTEXT_CHANGED','Applicable membership changed');for(const r of p.readset)resolve(tx,r);
+    const subject=ref('proposals',proposal);reviewRows.subjects([subject]);evidenceAnalysis(tx).current([subject]);const review=tx.get('reviews',text(args.review_id,'review_id',200));if(!review||!observedReview(tx,review,{pending:true})||review.value.verdict!=='Pass'||!same(review.value.subject,subject))hold('REVIEW_REQUIRED','Protected exact independent Pass required');
+    if(!evidenceAnalysis(tx).pendingReviewEligible(review))hold('CONTEXT_CHANGED','Review context no longer current');
+    for(const adverse of reviewRows.adverse())if(same(adverse.subject,subject)){if(adverse.error)throw adverse.error;hold('REVIEW_HELD','Retained negative review requires a changed proposal');}
+    const value={status:'current',scope:p.scope,content:p.content,dependencies:p.dependencies,principal_id:principal.id,proposal:subject,review:ref('reviews',review),previous:home?ref('homes',home):null,updated_at:now()};value.scope_qualification={protocol:'peer-home-scope-v1',home_binding_sha256:homeBinding(p.home_id,value),proposal:subject,review:ref('reviews',review)};return tx.put('homes',p.home_id,value,home?.revision??0);
+  }
+  if(action==='conflict/create'){
+    const scope=scopeOf(args.scope);authorize(tx,actor,action,{...args,scope});const inputs=args.input_refs??[];if(!Array.isArray(inputs)||inputs.length<2||inputs.length>100)hold('CONFLICT_EVIDENCE','Two to 100 exact conflicting inputs required');semanticInputs(tx,inputs);
+    return tx.put('conflicts',digest(['conflict',principal.id,args.operation_id]),{status:'open',scope,principal_id:principal.id,summary:text(args.summary,'summary',4000),input_refs:copy(inputs),clearing_condition:text(args.clearing_condition,'clearing condition',4000),created_at:now()},0);
+  }
+  if(action==='conflict/resolve'){
+    const row=tx.get('conflicts',text(args.conflict_id,'conflict_id',200));if(row?.value.status!=='open')hold('CONFLICT_MISSING','Open conflict required');authorize(tx,actor,action,{...args,scope:row.value.scope});const evidence=(args.evidence_refs??[]).map(r=>{resolve(tx,semanticReference(r));return copy(r);});
+    const graph=evidenceAnalysis(tx),current=graph.current([...row.value.input_refs,...evidence]),present=new Set(current.map(r=>canonical(r)));
+    const selected=sources(tx,row.value.scope,[...row.value.input_refs,...evidence]),adverse=selected.sources.filter(r=>r.family==='reviews'&&adverseReview(r)).map(exactReference);
+    // Direct resolution has no admitted-context snapshot. Recompute current
+    // adverse evidence in this final transaction and demand exact explicit
+    // coverage; retain only the caller's actual supplied evidence in the record.
+    if(adverse.some(r=>!present.has(canonical(r))))hold('EVIDENCE_CHANGED','Current adverse evidence requires exact resolution evidence');
+    const line=graph.historical([...row.value.input_refs,...adverse]);if(evidence.length)graph.historical(evidence);
+    if(!founder(c,principal)){const people=new Set([row.value.principal_id,...line.principals]),natives=new Set(line.natives);const reporter=member(tx,{principal_id:row.value.principal_id});if(reporter.value.native_id)natives.add(reporter.value.native_id);if(!principal.value.qualifications?.includes('conflict/resolve'))hold('RESOLVER_UNQUALIFIED','Operator-qualified independent resolver required');if(people.has(principal.id)||principal.value.native_id&&natives.has(principal.value.native_id))hold('INDEPENDENT_RESOLUTION','Reporter, contributor or shared native session cannot resolve');}
+    return tx.put('conflicts',row.id,{...row.value,status:'resolved',resolution:{principal_id:principal.id,source_instruction:text(args.source_instruction,'source instruction',4000),evidence,at:now()}},row.revision);
+  }
+  if(action==='notice/create'||action==='message/send'){
+    const scope=scopeOf(args.scope);authorize(tx,actor,action,{...args,scope});const family=action==='notice/create'?'notices':'messages';if(family==='messages')member(tx,{principal_id:args.to_principal_id});const kind=args.kind??'must_know';if(family==='notices'&&!['must_know','decision_required'].includes(kind))hold('NOTICE_INVALID','Required notice kind invalid');return tx.put(family,digest([family,principal.id,args.operation_id]),{status:'pending',scope,principal_id:principal.id,...(family==='messages'?{to_principal_id:args.to_principal_id}:{}),content:text(args.content??args.summary,'content',12000),kind,created_at:now()},0);
+  }
+  if(['notice/deliver','notice/acknowledge','notice/resolve'].includes(action)){
+    const notice=tx.get('notices',text(args.notice_id,'notice_id',200));if(!notice)hold('NOTICE_MISSING','Notice required');if(action==='notice/deliver'){if(!trusted(principal))hold('SCHEDULER_REQUIRED','Trusted delivery software required');member(tx,{principal_id:args.to_principal_id});return tx.put('deliveries',digest(['notice-delivery',principal.id,args.operation_id]),{status:'delivered',scope:notice.value.scope,principal_id:args.to_principal_id,notice:ref('notices',notice),channel:text(args.channel,'channel',100),delivery_only:true,at:now()},0);}
+    if(!founder(c,principal))hold('FOUNDER_REQUIRED','Actual founder disposition required');const instruction=text(args.source_instruction,'source instruction',4000);if(action==='notice/acknowledge')return tx.put('deliveries',digest(['human-ack',principal.id,args.operation_id]),{status:'acknowledged',scope:notice.value.scope,principal_id:principal.id,notice:ref('notices',notice),human_acknowledgement:true,source_instruction:instruction,at:now()},0);if(notice.value.resolution)hold('DISPOSITION_IMMUTABLE','Create a correction notice');return tx.put('notices',notice.id,{...notice.value,status:'resolved',resolution:{principal_id:principal.id,source_instruction:instruction,at:now()},continuing_conditions_preserved:true},notice.revision);
+  }
+  hold('ACTION_UNKNOWN','Unsupported peer action');
+}
+export function inspect(ledger,actor,action,args={}){
+  const a=copy(actor),input=bounded(args,'inspection',1000000);return ledger.read(tx=>{const p=member(tx,a),c=control(tx);policy(c);if(action==='runtime/status')return runtimeStatus(tx);if(action==='task/peek'){if(!trusted(p))hold('SCHEDULER_REQUIRED','Runtime selection required');const task=peek(tx,input);return {task,host:task?tx.get('principals',task.value.owner_principal_id)?.value.host??'codex':null,traversal:{matching_row_limit:MAX_ROWS,exclusion_limit:MAX_ROWS,fairness_advances_on_admission:true}};}if(action==='task/context')return buildContext(tx,a,tx.get('tasks',text(input.task_id,'task id',200)));if(action==='task/get'){const task=tx.get('tasks',text(input.task_id,'task id',200));if(task&&task.value.owner_principal_id!==p.id&&!trusted(p)&&!founder(c,p))hold('TASK_OWNER','Task owner required');return task;}if(action==='list'){if(!['tasks','homes','proposals','conflicts','notices','messages','grants','claims','effects'].includes(input.family))hold('FAMILY_INVALID','Inspectable family required');return tx.list(input.family,{limit:Math.min(input.limit??20,100),cursor:input.cursor,status:input.status,...(founder(c,p)||trusted(p)?{}:{principal_id:p.id}),...(input.scope?{scope:input.scope}:{})});}hold('ACTION_UNKNOWN','Unsupported inspection');});
+}
