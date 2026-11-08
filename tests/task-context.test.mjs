@@ -1,10 +1,11 @@
 import test from 'node:test';
+import {SchedulingHold} from '../plugins/soloco/runtime/recovery.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
-import {withStore,digest,teamHash} from '../plugins/soloco/runtime/store.mjs';
+import {withStore,digest} from '../plugins/soloco/runtime/store.mjs';
 import {submitTask,amendTask,sendTaskMessage,disposePeerMessage} from '../plugins/soloco/runtime/tasks.mjs';
 import {setRuntimeControl} from '../plugins/soloco/runtime/task-runtime-authority.mjs';
 import {installTaskIndex} from '../plugins/soloco/runtime/task-index.mjs';
@@ -17,11 +18,10 @@ process.env.COMPANY_PLUGIN_DATA=path.join(tmp,'plugin-data');
 test.after(()=>fs.rmSync(tmp,{recursive:true,force:true}));
 const read=f=>withStore(f.root,db=>db.read());
 function change(f,fn){return withStore(f.root,db=>{let result;db.transaction('fictional.task-context',s=>{result=fn(s);return s;});return result;});}
-function fixture({cosInstructions}={}){
+function fixture(){
   const f={root:fs.mkdtempSync(path.join(tmp,'company-')),session_id:'fictional-founder',epoch:1,source_instruction:'Fixture authorizes bounded read-only preparation only; no external action.'};
   engine.bind(f.root,f.session_id,'codex');engine.open({...f,idea:'Fictional async context tests'},'codex');
   withStore(f.root,db=>db.migrate());
-  if(cosInstructions!==undefined)change(f,s=>{s.cos_instructions=cosInstructions;s.team_sha256=teamHash(s);});
   change(f,s=>setRuntimeControl(s,{...f,action:'start'},'codex'));
   engine.save({...f,id:'current-input',kind:'artifact',content:'Exact current evidence; failures and uncertain effects remain unresolved.'},'codex');
   engine.save({...f,id:'global-rule',kind:'decision',content:'Do not contact anyone or retry uncertain work.'},'codex');
@@ -87,16 +87,21 @@ test('new applicable membership, source changes, task amendments, controls and i
 test('unclassified evidence is retained and required packet overflow is explicit, never truncation',()=>{
   const f=fixture(),id=task(f),j=job(f,id);
   engine.save({...f,id:'unknown-history',kind:'artifact',content:'A possibly material legacy restriction. '.repeat(2000)},'codex');
-  assert.throws(()=>taskAssignmentContext(read(f),j),/Held.*coverage incomplete.*nothing was truncated/);
+  const s=read(f),original=structuredClone(s.records['unknown-history']),c=taskAssignmentContext(s,j,{budget:200000});
+  let packet;
+  assert.throws(()=>{packet=taskAssignmentContext(s,j);},error=>{
+    assert(error instanceof SchedulingHold);assert.equal(error.code,'CONTEXT_CAPACITY');
+    assert.equal(error.message,`Task context Held: required coherent packet exceeds 65536 UTF-8bytes (actual ${Buffer.byteLength(c.text)}); coverage incomplete; widen retrieval or split the task; nothing was truncated`);
+    return /Held.*coverage incomplete.*nothing was truncated/.test(error.message);
+  });
+  assert.equal(packet,undefined);
+  assert.deepEqual(read(f).records['unknown-history'],original);
   assert.equal(read(f).records['unknown-history'].content.length,'A possibly material legacy restriction. '.repeat(2000).length);
-  const c=taskAssignmentContext(read(f),j,{budget:200000});
   assert.match(c.text,/possibly material legacy restriction/);
 });
 
 test('1x/10x/100x canonical resolved archive grows without growing fixed task working context',async()=>{
-  // Hold the fictional company charter constant: the archive-growth ratio must
-  // measure archived evidence, independent of installed CoS instruction length.
-  const f=fixture({cosInstructions:'FICTIONAL scaling fixture: retain all restrictions, failures, uncertainty and exact handoffs. No external effects or retries.'}),id=task(f),j=job(f,id),metrics=[];let prior=0;
+  const f=fixture(),id=task(f),j=job(f,id),metrics=[];let prior=0;
   for(const scale of [1,10,100]){
     const ids=[];
     for(let n=prior;n<scale;n++){
@@ -106,12 +111,17 @@ test('1x/10x/100x canonical resolved archive grows without growing fixed task wo
     await qualify(f,ids);
     const state=read(f),context=taskAssignmentContext(state,j);
     assert(!context.text.includes('FICTIONAL INERT ARCHIVE ONLY'));
-    metrics.push({scale,archive_bytes:Buffer.byteLength(JSON.stringify(state)),context_bytes:context.context_bytes,hash:context.hash});prior=scale;
+    const archived=Object.values(state.records).filter(r=>r.id?.startsWith('archive-'));
+    assert.equal(archived.length,scale);
+    metrics.push({scale,archive_bytes:Buffer.byteLength(JSON.stringify(state)),archive_content_bytes:archived.reduce((sum,r)=>sum+Buffer.byteLength(r.content),0),context_bytes:context.context_bytes,hash:context.hash});prior=scale;
   }
-  console.log('FICTIONAL accepted archive task context '+JSON.stringify(metrics));
   assert.equal(new Set(metrics.map(m=>m.context_bytes)).size,1);
   assert.equal(new Set(metrics.map(m=>m.hash)).size,1);
-  assert(metrics[2].archive_bytes>metrics[0].archive_bytes*3);
+  // Compare the growing archive content itself: pinned instructions and
+  // qualification receipts add fixed overhead unrelated to the scale factor.
+  assert(metrics[2].archive_content_bytes>=metrics[0].archive_content_bytes*100);
+  assert(metrics[2].archive_bytes>metrics[0].archive_bytes);
+  console.log('FICTIONAL accepted archive task context '+JSON.stringify(metrics));
 });
 
 test('completely qualified unrelated sources stay outside context; unqualified receipt evidence is not erased',async()=>{

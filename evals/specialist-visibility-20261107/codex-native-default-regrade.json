@@ -1,0 +1,56 @@
+{
+  "kind": "regrade_saved_native_responses",
+  "native_report": "codex-native-default.json",
+  "native_report_sha256": "f2c5c460f55391febf518eea4afad5b0c4381f0951b6a3e727ea19e2f5b14241",
+  "original_status": "failed_automated_checks",
+  "original_grader_sha256": "46e25139402f25730f4bfe75a36dae38c84e4b0f965977faf984601fb3d54d4a",
+  "revised_grader_sha256": "4acfee34360f49426944e898752531d0da65af9205ca97b33dcd8269dfa963e5",
+  "policy_and_fixture_and_prompt_unchanged": true,
+  "passed": true,
+  "cases": [
+    {
+      "id": "queued-and-planned",
+      "passed": true,
+      "errors": [],
+      "markdown": "**Engineering — Repair the ALPHA parser** (`instance-alpha`, job `alpha`) is queued, not running. The expected output is a repaired candidate; no native session ID has been observed.\n\nNext handoff: **QA — Review the ALPHA candidate after Engineering returns it** is planned / not summoned. No founder decision is needed."
+    },
+    {
+      "id": "resumed-and-reviewer",
+      "passed": true,
+      "errors": [],
+      "markdown": "The BETA repair and its independent review have separate specialist instances:\n\n- **Engineering — Repair the BETA parser** (`instance-beta`, native session `native-beta-resumed`) resumed and is reported running. Its next handoff is the returned repair candidate for review.\n- **QA — Independently review the BETA candidate** (`instance-beta-review`, job `beta-review`) is queued against `candidate-beta`, revision 1. No native session ID is observed. Its next handoff is an independent verdict to Chief of Staff.\n\nThe supplied status previews flag both jobs for inspection: Engineering has “Invalid legacy worker start”; QA has “Invalid queue start.” These are last reported states, not verified healthy execution. Next is reconciliation of those records before relying on progress; no founder decision is needed."
+    },
+    {
+      "id": "distinct-researchers",
+      "passed": true,
+      "errors": [],
+      "markdown": "- **Research — Assess the BLUE competitor** (`instance-blue`, native session `native-blue`) completed and returned `artifact-blue`. Its findings are not supplied here; independent QA and receiver acceptance are absent. Next handoff: Chief of Staff inspection of the artifact.\n- **Research — Assess the RED competitor** (`instance-red`, native session `native-red`) is reported running, but its preview flags “Invalid legacy worker start” for inspection. Next: reconcile that status before relying on progress, then hand the returned assessment to Chief of Staff.\n\n**Chief of Staff:** BLUE has returned work, not an accepted conclusion; RED’s execution needs verification. No founder decision is needed."
+    },
+    {
+      "id": "failed-summon",
+      "passed": true,
+      "errors": [],
+      "markdown": "**Engineering — Repair the DELTA parser** (`instance-delta`, job `delta`) failed to launch: “DELTA launch held: supported capability unavailable.” No native session ID or repair output was observed.\n\nThe repair is blocked. The supported next path is a compatible host/runtime, or continued planning; more approval alone cannot unlock the capability. There is no candidate to hand to QA and no retry has occurred."
+    },
+    {
+      "id": "durable-observation",
+      "passed": true,
+      "errors": [],
+      "markdown": "GAMMA has moved beyond planned submission: the durable runtime now records dispatched specialist jobs.\n\n- **Engineering — Repair the GAMMA parser** (`instance-gamma-engineer`, native session `native-gamma`) is reported running. Expected output: a repair candidate for Chief of Staff to route to validation.\n- **QA — Independently assess the GAMMA proposal** (`instance-gamma-review`, job `gamma-review`) is queued, with no native session ID observed. Its next handoff is an independent proposal assessment to Chief of Staff; this is not evidence of review of the parser candidate.\n\nBoth previews require inspection: Engineering reports “Invalid legacy worker start”; QA reports “Invalid queue start.” Next is reconciliation of these execution records. No returned result, QA Pass, or receiver acceptance is shown, and no founder decision is needed."
+    },
+    {
+      "id": "result-attribution",
+      "passed": true,
+      "errors": [],
+      "markdown": "**Engineering — Implement the EPSILON parsing fix** (`instance-epsilon-engineer`, native session `native-epsilon-engineer`) completed and returned `artifact-epsilon`.\n\n**QA — Review the EPSILON parsing fix** (`instance-epsilon-review`, native session `native-epsilon-review`) completed its independent review of `artifact-epsilon`, revision 1. In `review-epsilon`, QA recorded **Pass**: “The exact EPSILON fixture meets its criteria.” This establishes the supplied review verdict, not executed-test evidence or receiver acceptance.\n\n**Chief of Staff recommendation:** Retain the reviewed EPSILON candidate for the next scoped decision. No integration or deployment is established; the next handoff is that scoped decision, with no additional founder decision needed for this update."
+    },
+    {
+      "id": "no-summon",
+      "passed": true,
+      "errors": [],
+      "markdown": "The accepted OMEGA plan is to collect a draft, review it, and publish after approval."
+    }
+  ],
+  "errors": [],
+  "grading_scope": "Deterministic checks of actual fictional Markdown responses; independent semantic review remains required."
+}

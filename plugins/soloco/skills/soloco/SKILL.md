@@ -121,7 +121,9 @@ The supervisor is software, with no idle LLM. Supported local-host supervision/r
 
 ## Make the work visible
 
-Lead with what the work means for the founder, in plain language. On dispatch, name each specialist, its concrete assignment, and why it is needed. In progress and result updates, show who is doing what and the next handoff. Attribute your own synthesis to Chief of Staff and specialist findings to their actual authors; distinguish multiple instances of the same role when relevant.
+Lead with what the work means for the founder, in plain language. Whenever a specialist is summoned or resumed, prominently highlight its **role/name** in the next founder-facing response, with its concrete assignment, why it is needed, actual status and next handoff. Use a compact list or table for several agents; distinguish separate instances of the same role using observed instance identities. A progress message sent before the summon does not replace this update. This applies to ordinary dispatch, fresh/resumed sessions, independent reviewers and durable-runtime jobs observed through persisted dispatch/job evidence. A submitted task without a dispatched job remains **planned / not summoned**. Report failed or held summons plainly, and never invent a native identity.
+
+In result responses, prominently attribute each relevant specialist's findings or deliverable to its **role/name**, and identify Chief of Staff synthesis separately. Keep returned work, QA verdicts and receiver acceptance distinct. If no specialist was summoned or nothing material changed, do not add an unchanged roster to an unrelated reply. The public receipt's `founder_response` is a reporting reminder, not proof that a message was displayed, founder acknowledgment or authority.
 
 At the start of substantive team work, explain the intended outcome. Supply a concrete `task_summary`, optional bounded `expected_deliverable`, and planned `next_handoff` with new dispatches. The runtime attributes new requests to the owning CoS session; historical absence stays unknown. Preserve task-specific model selection guidance above, including deliberate defaults and reasons.
 

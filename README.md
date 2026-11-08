@@ -67,12 +67,12 @@ Use **one active environment at a time**. To switch, pause the company in the ol
 
 Before dispatch, the CoS chooses an adequate model, effort and speed, plus a separate timeout, based on task complexity, ambiguity, consequence of error, inputs and outputs, latency, and relevant prior outcomes. Use supported choices within existing limits and give a concise rationale; a justified choice may be reused for comparable work until demands, support or observed quality change. A reasoned host default is the fallback. Simple replies need no delegation. You choose the CoS chat model in the host UI.
 
-At the start of substantive work, the CoS gives a compact update like this illustrative example:
+Whenever a specialist is summoned or resumed, the next response prominently highlights its **role/name**, assignment, actual status and next handoff. Returned work is attributed to its specialist; Chief of Staff synthesis is labeled separately. Planned agents remain clearly marked as not summoned. At the start of substantive work, the CoS gives a compact update like this illustrative example:
 
 | Agent | Task | Status |
 |---|---|---|
-| Engineering | Implement the agreed change | Running |
-| QA | Review the result and test evidence | Planned; waits for Engineering |
+| **Engineering** | Implement the agreed change | Running |
+| **QA** | Review the result and test evidence | Planned / not summoned; waits for Engineering |
 
 The CoS refreshes authoritative status after meaningful work or notice changes and normally gives a concise outcome, actual state and next handoff. It uses the detailed `company_progress` DAG/chronology when useful or requested, through inline HTML or equivalent literal text/Mermaid. The view shows actual instance/native identities, concrete task labels, expected and returned outputs, exact evidence links, separate QA and recorded runtime acceptance, and prominent unresolved founder notices. Selecting an event highlights current work. Each view reflects its fetched snapshot; refresh occurs when the CoS fetches again after an observed change, without uninterrupted background monitoring or historical playback.
 

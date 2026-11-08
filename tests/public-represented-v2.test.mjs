@@ -282,3 +282,104 @@ test('early parse rejected negative revokes an existing represented proof',async
  assert.equal(negative.job.status,'failed');assert.match(negative.job.error,/nonempty content/);
  assert.throws(()=>classificationFor(read(f),read(f).records.old),/negative/);
 });
+
+// Scripted wire-contract regression only, never real native acceptance.
+// Only fixture setup inspects private evidence; the adapter below sees prompt
+// JSON and returned ranges exclusively, as a real native session would.
+async function wireFixture(){
+ const f=fixture();let padding=0,prepared;
+ mutate(f,s=>{s.records.old.content='🧪'+ '"'.repeat(210000)+' FICTIONAL WIRE PRESERVATION: finding open; failed attempt; no retries; effects unknown.';});
+ for(let probe=0;probe<4;probe++){
+  prepared=await prepare(f);
+  const s=read(f),packet=assignmentContext(s,s.jobs[prepared.q.id]);
+  const raw=packet.qualification_evidence.sources[packet.qualification_evidence.pages[0].source_id].raw;
+  const index=raw.indexOf('🧪');assert.ok(index>=0);
+  if(index%32768===32767)return {f,prepared};
+  padding+=(32767-index%32768+32768)%32768;
+  mutate(f,s=>{s.records.old.content='x'.repeat(padding)+'🧪'+'"'.repeat(210000)+' FICTIONAL WIRE PRESERVATION: finding open; failed attempt; no retries; effects unknown.';});
+ }
+ assert.fail('Fictional setup could not align the surrogate boundary before dispatch');
+}
+
+async function wireReview(f,prepared,mode){
+ const nativeId='fictional-wire-native-'+prepared.q.id;
+ let frame,calls=0,delivered=new Map(),complete=false,deferredObserved=false;
+ await work(f.root,prepared.q.id,async(_host,native,prompt,_dir,timeout,_selection,options)=>{
+  options.onSpawn?.(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));
+  calls++;
+  const packet=JSON.parse(prompt);
+  if(!frame){
+   frame=packet;
+   assert.equal(frame.protocol,'context-qualification-review-v2');
+   assert.equal(frame.role.mode,'preparation');assert.ok(frame.role.charter);
+   assert.equal(frame.assignment.task,'Review every exact fictional original against the mandatory home.');
+   assert.ok(frame.evidence_protocol,'old bare prompt cannot drive this adapter');
+   assert.deepEqual(frame.evidence_protocol.read_keys,['source_id','sha256','offset','length']);
+   assert.equal(frame.evidence_protocol.max_ranges,4);
+   const first=frame.evidence_protocol.read_ranges[0];
+   assert.deepEqual(frame.evidence_protocol.request_template,{reads:[{source_id:frame.required_semantics.source_id,sha256:frame.required_semantics.sha256,offset:first.offset,length:first.length}]});
+   let end=0;for(const range of frame.evidence_protocol.read_ranges){assert.equal(range.offset,end);assert.ok(range.length>0&&range.length<=32768);end+=range.length;}
+   assert.equal(end,frame.required_semantics.length);
+  }else{
+   assert.equal(native,nativeId);
+   assert.ok(Array.isArray(packet.reads));
+   for(const range of packet.reads){
+    assert.equal(range.source_id,frame.required_semantics.source_id);
+    const planned=frame.evidence_protocol.read_ranges.find(r=>r.offset===range.offset);
+    assert.ok(planned,'only announced whole ranges may be delivered');
+    assert.equal(range.text.length,planned.length);
+    assert.equal(/[\uDC00-\uDFFF]/.test(range.text[0]),false);
+    assert.equal(/[\uD800-\uDBFF]/.test(range.text.at(-1)),false);
+    delivered.set(range.offset,range.text);
+   }
+  }
+  const pending=frame.evidence_protocol.read_ranges.filter(r=>!delivered.has(r.offset));
+  if(mode==='complete'&&pending.length){
+   const selected=pending.slice(0,frame.evidence_protocol.max_ranges);
+   // Deferred ranges remain pending because only actual packet.reads count.
+   if(calls>1&&pending.some(r=>r.offset===0))deferredObserved=true;
+   const reads=selected.map(({offset,length})=>({source_id:frame.required_semantics.source_id,sha256:frame.required_semantics.sha256,offset,length}));
+   return {native_id:nativeId,text:JSON.stringify({reads})};
+  }
+  complete=pending.length===0;
+  if(complete){
+   const body=frame.evidence_protocol.read_ranges.map(r=>delivered.get(r.offset)).join('');
+   assert.equal(body.length,frame.required_semantics.length);
+   assert.ok(body.includes('FICTIONAL WIRE PRESERVATION'));
+   assert.equal(body.indexOf('🧪')%32768,32767);
+  }
+  const result=structuredClone(frame.final_response.blocked_example);
+  result.content='FICTIONAL SCRIPTED WIRE JUDGMENT ONLY: no real native acceptance. '+(mode==='blocked'?'Required evidence remains unread.':'Synthetic preservation assessment.');
+  if(mode!=='blocked')Object.assign(result.review,{verdict:'Pass',reason:'FICTIONAL synthetic preservation assertion for runtime validation.',...frame.final_response.pass_requires});
+  return {native_id:nativeId,text:JSON.stringify(result)};
+ });
+ return {job:read(f).jobs[prepared.q.id],calls,complete,delivered,deferredObserved};
+}
+
+test('prompt-only public format4 adapter reads safe required ranges and canonical apply validates delivery',async()=>{
+ const {f,prepared}=await wireFixture(),out=await wireReview(f,prepared,'complete');
+ assert.equal(out.job.status,'completed',out.job.error);assert.equal(out.complete,true);assert.ok(out.calls>2);
+ const artifact=read(f).records[out.job.artifact_id];
+ assert.equal(artifact.context_qualification.semantic_delivery_complete,true);
+ assert.equal(out.job.coordination_release.termination_confirmed,true);
+ assert.equal((await api(f,{action:'apply',plan_id:prepared.p.id,review_id:artifact.id})).applied,true);
+ assert.equal(classificationFor(read(f),read(f).records.old).disposition,'represented');
+});
+
+test('prompt-derived premature Pass fails delivery while proper unread Blocked remains an artifact',async()=>{
+ for(const mode of ['premature','blocked']){
+  const f=fixture(),prepared=await prepare(f),out=await wireReview(f,prepared,mode);
+  assert.equal(out.delivered.size,0);assert.equal(out.complete,false);
+  if(mode==='premature'){
+   assert.equal(out.job.status,'failed');assert.match(out.job.error,/not completely delivered/);
+  }else{
+   assert.equal(out.job.status,'completed',out.job.error);
+   const artifact=read(f).records[out.job.artifact_id];
+   assert.equal(artifact.review.verdict,'Blocked');assert.equal(artifact.review.permitted_action,'hold');
+   assert.ok(artifact.content.trim());assert.ok(artifact.review.blockers.length);
+   assert.equal(artifact.context_qualification,undefined);
+  }
+  await assert.rejects(api(f,{action:'apply',plan_id:prepared.p.id,review_id:out.job.artifact_id??'missing'}));
+  assert.equal(read(f).context_classifications?.old,undefined);
+ }
+});

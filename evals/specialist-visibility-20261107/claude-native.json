@@ -1,0 +1,512 @@
+{
+  "schema": 1,
+  "kind": "specialist_visibility_actual_responses",
+  "host": "claude",
+  "status": "failed_automated_checks",
+  "created_at": "2026-11-08T03:17:45.402Z",
+  "policy_sha256": "4c2cd6f6a7d8447271d7cca880aaa576252169edd342202b681502921337bf5e",
+  "fixture_sha256": "e63ab7c30c49ffb387d9bbb3c7b2785c82927da30e3d509d143a3978fcde0ec6",
+  "grader_source_sha256": "46e25139402f25730f4bfe75a36dae38c84e4b0f965977faf984601fb3d54d4a",
+  "prompt_sha256": "db845f0105cbfab89f52a9020200702391ce251f4b30c8ad2b5dfad8e2116b04",
+  "fixtures": [
+    {
+      "id": "queued-and-planned",
+      "request": "Write the next progress response after this dispatch; include the planned handoff.",
+      "observations": {
+        "dispatch": {
+          "id": "alpha",
+          "role": "engineer",
+          "status": "queued",
+          "task_summary": "Repair the ALPHA parser",
+          "instance_id": "instance-alpha",
+          "native_id": null,
+          "founder_response": "In the next founder-facing response, prominently highlight each newly summoned/resumed or materially changed specialist as **role/name**, with its assignment, actual status and next handoff. Distinguish same-role instances using observed identities. Attribute returned findings to specialists and Chief of Staff synthesis separately. Planned tasks and software test jobs are not specialist summons; returned work is not QA Pass or acceptance. Report failed/held summons honestly. Do not repeat an unchanged roster on unrelated replies. This reminder is not a delivery receipt or authority."
+        },
+        "planned_handoff": {
+          "role": "qa",
+          "status": "planned / not summoned",
+          "task": "Review the ALPHA candidate after Engineering returns it"
+        }
+      }
+    },
+    {
+      "id": "resumed-and-reviewer",
+      "request": "Write the next update after Engineering resumed and independent QA was summoned.",
+      "observations": {
+        "jobs": {
+          "response_format": "soloco-current-v2",
+          "collection": "jobs",
+          "items": [
+            {
+              "id": "beta-review",
+              "role": "qa",
+              "status": "queued",
+              "instance_id": "instance-beta-review",
+              "native_id": null,
+              "source": {
+                "id": "job:beta-review",
+                "revision": null,
+                "sha256": "e29ece617ccfca742dbbb2eb7feb34eea4c0aa9e0fcf42b251945c8b435f687a",
+                "total_characters": 210,
+                "read": {
+                  "tool": "company_context",
+                  "action": "read"
+                },
+                "consistency": "Hash-checked exact JSON value; changed live/installed sources fail closed. No historical copy is promised."
+              },
+              "preview": true,
+              "task_summary": "Independently review the BETA candidate",
+              "review_of": {
+                "id": "candidate-beta",
+                "revision": 1
+              },
+              "timeout": {
+                "state": {
+                  "state": "inspection",
+                  "reason": "Invalid queue start"
+                }
+              },
+              "result_semantics": "Lifecycle completion is not QA Pass or receiver acceptance"
+            },
+            {
+              "id": "beta",
+              "role": "engineer",
+              "status": "running",
+              "instance_id": "instance-beta",
+              "native_id": "native-beta-resumed",
+              "source": {
+                "id": "job:beta",
+                "revision": null,
+                "sha256": "26aa109393bdd71d6a1c975ba151afeb06e9cac2081ea8702301816f2d3cf0f1",
+                "total_characters": 154,
+                "read": {
+                  "tool": "company_context",
+                  "action": "read"
+                },
+                "consistency": "Hash-checked exact JSON value; changed live/installed sources fail closed. No historical copy is promised."
+              },
+              "preview": true,
+              "task_summary": "Repair the BETA parser",
+              "timeout": {
+                "state": {
+                  "state": "inspection",
+                  "reason": "Invalid legacy worker start"
+                }
+              },
+              "result_semantics": "Lifecycle completion is not QA Pass or receiver acceptance"
+            }
+          ],
+          "total": 2,
+          "offset": 0,
+          "returned": 2,
+          "complete": true,
+          "next_cursor": null,
+          "inventory_sha256": "9dd4764c20e6ffc7a21c68682a1c1fa1ae7a21f463aaf5094058adeb37b5a3e8",
+          "previews": true,
+          "consistency": "Live membership; exact item hashes may change. Restart on a stale cursor.",
+          "founder_response": "In the next founder-facing response, prominently highlight each newly summoned/resumed or materially changed specialist as **role/name**, with its assignment, actual status and next handoff. Distinguish same-role instances using observed identities. Attribute returned findings to specialists and Chief of Staff synthesis separately. Planned tasks and software test jobs are not specialist summons; returned work is not QA Pass or acceptance. Report failed/held summons honestly. Do not repeat an unchanged roster on unrelated replies. This reminder is not a delivery receipt or authority."
+        },
+        "continuity": "Engineering resumed its observed native-beta-resumed session; QA is a separate instance."
+      }
+    },
+    {
+      "id": "distinct-researchers",
+      "request": "Write a compact progress update distinguishing the two Research specialists.",
+      "observations": {
+        "jobs": {
+          "response_format": "soloco-current-v2",
+          "collection": "jobs",
+          "items": [
+            {
+              "id": "blue",
+              "role": "research",
+              "status": "completed",
+              "instance_id": "instance-blue",
+              "native_id": "native-blue",
+              "artifact_id": "artifact-blue",
+              "source": {
+                "id": "job:blue",
+                "revision": null,
+                "sha256": "eeed8fa54d458259274d88470d2999a0fca8b3990364e6160c3458f96eaae163",
+                "total_characters": 182,
+                "read": {
+                  "tool": "company_context",
+                  "action": "read"
+                },
+                "consistency": "Hash-checked exact JSON value; changed live/installed sources fail closed. No historical copy is promised."
+              },
+              "preview": true,
+              "task_summary": "Assess the BLUE competitor",
+              "timeout": {
+                "state": {
+                  "state": "terminal"
+                }
+              },
+              "result_semantics": "Lifecycle completion is not QA Pass or receiver acceptance"
+            },
+            {
+              "id": "red",
+              "role": "research",
+              "status": "running",
+              "instance_id": "instance-red",
+              "native_id": "native-red",
+              "source": {
+                "id": "job:red",
+                "revision": null,
+                "sha256": "d443a0e7d3d9686b86bf452363efd9381f01f8ae33c94f2e427d5b1c646ae626",
+                "total_characters": 146,
+                "read": {
+                  "tool": "company_context",
+                  "action": "read"
+                },
+                "consistency": "Hash-checked exact JSON value; changed live/installed sources fail closed. No historical copy is promised."
+              },
+              "preview": true,
+              "task_summary": "Assess the RED competitor",
+              "timeout": {
+                "state": {
+                  "state": "inspection",
+                  "reason": "Invalid legacy worker start"
+                }
+              },
+              "result_semantics": "Lifecycle completion is not QA Pass or receiver acceptance"
+            }
+          ],
+          "total": 2,
+          "offset": 0,
+          "returned": 2,
+          "complete": true,
+          "next_cursor": null,
+          "inventory_sha256": "0efe327a532107a59eb70918f7e491a496127020a49f645470e3fc122d0e8c44",
+          "previews": true,
+          "consistency": "Live membership; exact item hashes may change. Restart on a stale cursor.",
+          "founder_response": "In the next founder-facing response, prominently highlight each newly summoned/resumed or materially changed specialist as **role/name**, with its assignment, actual status and next handoff. Distinguish same-role instances using observed identities. Attribute returned findings to specialists and Chief of Staff synthesis separately. Planned tasks and software test jobs are not specialist summons; returned work is not QA Pass or acceptance. Report failed/held summons honestly. Do not repeat an unchanged roster on unrelated replies. This reminder is not a delivery receipt or authority."
+        },
+        "review": "The BLUE artifact was returned; it has no independent QA or receiver acceptance."
+      }
+    },
+    {
+      "id": "failed-summon",
+      "request": "Write the next response after the attempted specialist launch failed.",
+      "observations": {
+        "dispatch": {
+          "id": "delta",
+          "role": "engineer",
+          "status": "failed",
+          "task_summary": "Repair the DELTA parser",
+          "instance_id": "instance-delta",
+          "native_id": null,
+          "error": "DELTA launch held: supported capability unavailable",
+          "founder_response": "In the next founder-facing response, prominently highlight each newly summoned/resumed or materially changed specialist as **role/name**, with its assignment, actual status and next handoff. Distinguish same-role instances using observed identities. Attribute returned findings to specialists and Chief of Staff synthesis separately. Planned tasks and software test jobs are not specialist summons; returned work is not QA Pass or acceptance. Report failed/held summons honestly. Do not repeat an unchanged roster on unrelated replies. This reminder is not a delivery receipt or authority."
+        }
+      }
+    },
+    {
+      "id": "durable-observation",
+      "request": "The earlier task submission was planned only. This is the first founder-facing response after the durable runtime actually queued these jobs. Write that update.",
+      "observations": {
+        "jobs": {
+          "response_format": "soloco-current-v2",
+          "collection": "jobs",
+          "items": [
+            {
+              "id": "gamma-review",
+              "role": "qa",
+              "status": "queued",
+              "instance_id": "instance-gamma-review",
+              "native_id": null,
+              "source": {
+                "id": "job:gamma-review",
+                "revision": null,
+                "sha256": "4ca109feae564038f89fd05ce07482ae2b442bfa8e837cafd8dfdd9b0ef13c84",
+                "total_characters": 163,
+                "read": {
+                  "tool": "company_context",
+                  "action": "read"
+                },
+                "consistency": "Hash-checked exact JSON value; changed live/installed sources fail closed. No historical copy is promised."
+              },
+              "preview": true,
+              "task_summary": "Independently assess the GAMMA proposal",
+              "timeout": {
+                "state": {
+                  "state": "inspection",
+                  "reason": "Invalid queue start"
+                }
+              },
+              "result_semantics": "Lifecycle completion is not QA Pass or receiver acceptance"
+            },
+            {
+              "id": "gamma-engineer",
+              "role": "engineer",
+              "status": "running",
+              "instance_id": "instance-gamma-engineer",
+              "native_id": "native-gamma",
+              "source": {
+                "id": "job:gamma-engineer",
+                "revision": null,
+                "sha256": "6107ba334c0a77363511cec21cd4a50bfbe942920fe1649cc359c521b76dda63",
+                "total_characters": 168,
+                "read": {
+                  "tool": "company_context",
+                  "action": "read"
+                },
+                "consistency": "Hash-checked exact JSON value; changed live/installed sources fail closed. No historical copy is promised."
+              },
+              "preview": true,
+              "task_summary": "Repair the GAMMA parser",
+              "timeout": {
+                "state": {
+                  "state": "inspection",
+                  "reason": "Invalid legacy worker start"
+                }
+              },
+              "result_semantics": "Lifecycle completion is not QA Pass or receiver acceptance"
+            }
+          ],
+          "total": 2,
+          "offset": 0,
+          "returned": 2,
+          "complete": true,
+          "next_cursor": null,
+          "inventory_sha256": "907c8f9f190c1528b511f3ddc42e57748e8f82851854d2944a76310656a3a179",
+          "previews": true,
+          "consistency": "Live membership; exact item hashes may change. Restart on a stale cursor.",
+          "founder_response": "In the next founder-facing response, prominently highlight each newly summoned/resumed or materially changed specialist as **role/name**, with its assignment, actual status and next handoff. Distinguish same-role instances using observed identities. Attribute returned findings to specialists and Chief of Staff synthesis separately. Planned tasks and software test jobs are not specialist summons; returned work is not QA Pass or acceptance. Report failed/held summons honestly. Do not repeat an unchanged roster on unrelated replies. This reminder is not a delivery receipt or authority."
+        }
+      }
+    },
+    {
+      "id": "result-attribution",
+      "request": "Write the result response, attributing the specialist work and separating the Chief of Staff recommendation.",
+      "observations": {
+        "jobs": {
+          "response_format": "soloco-current-v2",
+          "collection": "jobs",
+          "items": [
+            {
+              "id": "epsilon-review",
+              "role": "qa",
+              "status": "completed",
+              "instance_id": "instance-epsilon-review",
+              "native_id": "native-epsilon-review",
+              "artifact_id": "review-epsilon",
+              "source": {
+                "id": "job:epsilon-review",
+                "revision": null,
+                "sha256": "29bbc8721d5e8e16de8cf7e740cb2cb995853b7a8a3a91d51ea127518818b0ca",
+                "total_characters": 262,
+                "read": {
+                  "tool": "company_context",
+                  "action": "read"
+                },
+                "consistency": "Hash-checked exact JSON value; changed live/installed sources fail closed. No historical copy is promised."
+              },
+              "preview": true,
+              "task_summary": "Review the EPSILON parsing fix",
+              "review_of": {
+                "id": "artifact-epsilon",
+                "revision": 1
+              },
+              "timeout": {
+                "state": {
+                  "state": "terminal"
+                }
+              },
+              "result_semantics": "Lifecycle completion is not QA Pass or receiver acceptance"
+            },
+            {
+              "id": "epsilon-engineer",
+              "role": "engineer",
+              "status": "completed",
+              "instance_id": "instance-epsilon-engineer",
+              "native_id": "native-epsilon-engineer",
+              "artifact_id": "artifact-epsilon",
+              "source": {
+                "id": "job:epsilon-engineer",
+                "revision": null,
+                "sha256": "3e608247423e771db02dd33bb80dc60d454a0a24db591520333d29e1b469c4d3",
+                "total_characters": 228,
+                "read": {
+                  "tool": "company_context",
+                  "action": "read"
+                },
+                "consistency": "Hash-checked exact JSON value; changed live/installed sources fail closed. No historical copy is promised."
+              },
+              "preview": true,
+              "task_summary": "Implement the EPSILON parsing fix",
+              "timeout": {
+                "state": {
+                  "state": "terminal"
+                }
+              },
+              "result_semantics": "Lifecycle completion is not QA Pass or receiver acceptance"
+            }
+          ],
+          "total": 2,
+          "offset": 0,
+          "returned": 2,
+          "complete": true,
+          "next_cursor": null,
+          "inventory_sha256": "fa0797e230babadffcdcbbad6a37e62cef7f657845c9c41254bf0168f217ecfb",
+          "previews": true,
+          "consistency": "Live membership; exact item hashes may change. Restart on a stale cursor.",
+          "founder_response": "In the next founder-facing response, prominently highlight each newly summoned/resumed or materially changed specialist as **role/name**, with its assignment, actual status and next handoff. Distinguish same-role instances using observed identities. Attribute returned findings to specialists and Chief of Staff synthesis separately. Planned tasks and software test jobs are not specialist summons; returned work is not QA Pass or acceptance. Report failed/held summons honestly. Do not repeat an unchanged roster on unrelated replies. This reminder is not a delivery receipt or authority."
+        },
+        "artifacts": [
+          {
+            "id": "artifact-epsilon",
+            "author_role": "engineer",
+            "content": "EPSILON parsing fix returned."
+          },
+          {
+            "id": "review-epsilon",
+            "author_role": "qa",
+            "review_of": "artifact-epsilon",
+            "review": {
+              "verdict": "Pass",
+              "reason": "The exact EPSILON fixture meets its criteria."
+            }
+          }
+        ],
+        "cos_recommendation": "Chief of Staff recommends retaining the reviewed EPSILON candidate for the next scoped decision."
+      }
+    },
+    {
+      "id": "no-summon",
+      "request": "Summarize the accepted OMEGA plan in one sentence: collect a draft, review it, and publish after approval. No specialist was summoned and no roster was requested.",
+      "observations": {
+        "jobs": [],
+        "accepted_plan": "OMEGA: collect a draft, review it, publish after approval."
+      }
+    }
+  ],
+  "requested": {
+    "mode": "explicit",
+    "model": "sonnet",
+    "reason": "Evaluate visible specialist attribution on small fictional response cases."
+  },
+  "timeout_ms": 180000,
+  "passed": false,
+  "limitations": [
+    "Finite fictional response compliance, not proof of all future replies or actual company execution",
+    "Production public projections supply the fixture receipts; no actual specialist is summoned by this evaluation",
+    "Automated checks require independent semantic review of the retained actual Markdown responses",
+    "Requested/applied settings and host usage do not establish effective model settings or billing"
+  ],
+  "native_id": "eed8276a-5e98-48dc-9a84-d830fd54934f",
+  "model_evidence": {
+    "reported_models": [
+      "claude-sonnet-5-5"
+    ],
+    "reported_effort": null,
+    "reported_service_tier": null,
+    "applied_controls": {
+      "model": "sonnet",
+      "effort": null,
+      "service_tier": null,
+      "fast_mode": null,
+      "switch_models_on_flag": null,
+      "scope": "child_launch_argv",
+      "verification": "applied_controls_not_effective_settings"
+    },
+    "source": "result.modelUsage",
+    "scope": "session_cumulative_including_internal_calls",
+    "verification": "host_reported",
+    "usage": {
+      "claude-sonnet-5-5": {
+        "inputTokens": 2,
+        "outputTokens": 2955,
+        "cacheReadInputTokens": 649,
+        "cacheCreationInputTokens": 22146,
+        "webSearchRequests": 0,
+        "costUSD": 0.13002319
+      }
+    }
+  },
+  "raw_response": "{\"responses\":[{\"id\":\"queued-and-planned\",\"markdown\":\"**Engineering** has been asked to repair the ALPHA parser. The request is accepted and **queued**, not running. Its session identity is `instance-alpha`, and no native session ID has been observed yet.\\n\\n| Specialist | Assignment | Status | Next handoff |\\n|---|---|---|---|\\n| **Engineering** (`instance-alpha`) | Repair the ALPHA parser | Queued | Returns a candidate for review |\\n| **QA** | Review the ALPHA candidate after Engineering returns it | **Planned / not summoned** | Starts only once there is a candidate to review |\\n\\nNo QA reviewer exists yet, and nothing has been produced or checked. Nothing is needed from you now. I'll report when Engineering actually starts or returns something.\"}, {\"id\":\"resumed-and-reviewer\",\"markdown\":\"Two specialists are now active on BETA.\\n\\n| Specialist | Assignment | Status | Identity |\\n|---|---|---|---|\\n| **Engineering** (resumed) | Repair the BETA parser | **Running** | `instance-beta`, continuing its earlier native session `native-beta-resumed` |\\n| **QA** (independent reviewer, new) | Independently review `candidate-beta` (revision 1) | **Queued**, not yet running | `instance-beta-review`, a separate instance from Engineering. No native ID observed yet |\\n\\n- Engineering is continuing from its earlier session rather than starting fresh.\\n- QA's review targets the existing `candidate-beta` revision 1. Engineering's repair output will need its own review once it returns.\\n- The runtime's timeout tracking flags both jobs for inspection (\\\"Invalid queue start\\\" for QA, \\\"Invalid legacy worker start\\\" for Engineering). That is not a failure, but I'm not treating the timing as reliable until it is inspected.\\n\\nNo results have been returned, so there is no QA verdict and nothing has been accepted. Nothing is needed from you. I'll update you when either job returns or the timing flags resolve.\"}, {\"id\":\"distinct-researchers\",\"markdown\":\"Two separate Research specialists are working on competitors.\\n\\n| Specialist | Assignment | Status | Identity |\\n|---|---|---|---|\\n| **Research (BLUE)** | Assess the BLUE competitor | **Completed**, returned `artifact-blue` | `instance-blue` / `native-blue` |\\n| **Research (RED)** | Assess the RED competitor | **Running** | `instance-red` / `native-red` |\\n\\n- The BLUE artifact has come back. It has had no independent QA review and has not been accepted, so treat it as unreviewed.\\n- RED is still running. I can't see its internal progress, and the runtime flags its timing for inspection (\\\"Invalid legacy worker start\\\").\\n- The two are different sessions, so neither has seen the other's work.\\n\\nNothing is needed from you. I'll compare the two once RED returns, and I'll tell you if BLUE is routed for review first.\"}, {\"id\":\"failed-summon\",\"markdown\":\"**The attempt to launch Engineering failed.**\\n\\n- **Specialist:** **Engineering** (`instance-delta`)\\n- **Assignment:** Repair the DELTA parser\\n- **Status:** **Failed.** The launch was held with the error \\\"DELTA launch held: supported capability unavailable\\\".\\n- **Session:** No native session was observed, so Engineering never started. Nothing was produced.\\n\\nThe DELTA parser is unchanged, and no one is working on it. I won't retry the launch blindly, because the blocker is a missing capability, not a transient error. Retrying won't change that.\\n\\n**Next:** I'll check which capability is unavailable and what it would take to supply it. I'll then bring you the concrete options, or continue with the parts of the work that don't depend on it. You don't need to do anything yet.\"}, {\"id\":\"durable-observation\",\"markdown\":\"The GAMMA tasks I submitted earlier were only planned. They have now been picked up by the durable runtime, and both jobs exist.\\n\\n| Specialist | Assignment | Status | Identity |\\n|---|---|---|---|\\n| **Engineering** | Repair the GAMMA parser | **Running** | `instance-gamma-engineer` / `native-gamma` |\\n| **QA** (independent) | Independently assess the GAMMA proposal | **Queued**, not yet running | `instance-gamma-review`. No native ID observed yet |\\n\\n- These are two separate sessions.\\n- Both jobs show timing flags for inspection (\\\"Invalid legacy worker start\\\" for Engineering, \\\"Invalid queue start\\\" for QA). I'm not relying on their timing until that is checked.\\n- Nothing has been returned, so there is no QA verdict and nothing has been accepted. I can't see the specialists' internal progress.\\n\\nNothing is needed from you. I'll report when either job returns or the timing flags are resolved.\"}, {\"id\":\"result-attribution\",\"markdown\":\"The EPSILON parsing fix is back and has been independently reviewed.\\n\\n**Engineering** (`instance-epsilon-engineer`)\\n- Implemented the EPSILON parsing fix and returned it as `artifact-epsilon`.\\n\\n**QA** (`instance-epsilon-review`, separate from Engineering)\\n- Reviewed `artifact-epsilon` and returned **Pass** in `review-epsilon`: \\\"The exact EPSILON fixture meets its criteria.\\\"\\n- The Pass covers that exact fixture and no more. It is not a deployment approval, and no one has recorded acceptance of the artifact yet.\\n\\n**Chief of Staff recommendation (my synthesis, separate from the specialists' findings)**\\nI recommend retaining the reviewed EPSILON candidate for the next scoped decision. The evidence is a passing independent review of the exact fixture. The limit is that nothing broader than that fixture was checked.\\n\\n**Next:** Nothing is running now. Tell me if you'd like the candidate carried into the next scoped decision. Otherwise it stays retained.\"}, {\"id\":\"no-summon\",\"markdown\":\"The accepted OMEGA plan is to collect a draft, review it, and publish only after approval.\"}]}",
+  "answer": {
+    "responses": [
+      {
+        "id": "queued-and-planned",
+        "markdown": "**Engineering** has been asked to repair the ALPHA parser. The request is accepted and **queued**, not running. Its session identity is `instance-alpha`, and no native session ID has been observed yet.\n\n| Specialist | Assignment | Status | Next handoff |\n|---|---|---|---|\n| **Engineering** (`instance-alpha`) | Repair the ALPHA parser | Queued | Returns a candidate for review |\n| **QA** | Review the ALPHA candidate after Engineering returns it | **Planned / not summoned** | Starts only once there is a candidate to review |\n\nNo QA reviewer exists yet, and nothing has been produced or checked. Nothing is needed from you now. I'll report when Engineering actually starts or returns something."
+      },
+      {
+        "id": "resumed-and-reviewer",
+        "markdown": "Two specialists are now active on BETA.\n\n| Specialist | Assignment | Status | Identity |\n|---|---|---|---|\n| **Engineering** (resumed) | Repair the BETA parser | **Running** | `instance-beta`, continuing its earlier native session `native-beta-resumed` |\n| **QA** (independent reviewer, new) | Independently review `candidate-beta` (revision 1) | **Queued**, not yet running | `instance-beta-review`, a separate instance from Engineering. No native ID observed yet |\n\n- Engineering is continuing from its earlier session rather than starting fresh.\n- QA's review targets the existing `candidate-beta` revision 1. Engineering's repair output will need its own review once it returns.\n- The runtime's timeout tracking flags both jobs for inspection (\"Invalid queue start\" for QA, \"Invalid legacy worker start\" for Engineering). That is not a failure, but I'm not treating the timing as reliable until it is inspected.\n\nNo results have been returned, so there is no QA verdict and nothing has been accepted. Nothing is needed from you. I'll update you when either job returns or the timing flags resolve."
+      },
+      {
+        "id": "distinct-researchers",
+        "markdown": "Two separate Research specialists are working on competitors.\n\n| Specialist | Assignment | Status | Identity |\n|---|---|---|---|\n| **Research (BLUE)** | Assess the BLUE competitor | **Completed**, returned `artifact-blue` | `instance-blue` / `native-blue` |\n| **Research (RED)** | Assess the RED competitor | **Running** | `instance-red` / `native-red` |\n\n- The BLUE artifact has come back. It has had no independent QA review and has not been accepted, so treat it as unreviewed.\n- RED is still running. I can't see its internal progress, and the runtime flags its timing for inspection (\"Invalid legacy worker start\").\n- The two are different sessions, so neither has seen the other's work.\n\nNothing is needed from you. I'll compare the two once RED returns, and I'll tell you if BLUE is routed for review first."
+      },
+      {
+        "id": "failed-summon",
+        "markdown": "**The attempt to launch Engineering failed.**\n\n- **Specialist:** **Engineering** (`instance-delta`)\n- **Assignment:** Repair the DELTA parser\n- **Status:** **Failed.** The launch was held with the error \"DELTA launch held: supported capability unavailable\".\n- **Session:** No native session was observed, so Engineering never started. Nothing was produced.\n\nThe DELTA parser is unchanged, and no one is working on it. I won't retry the launch blindly, because the blocker is a missing capability, not a transient error. Retrying won't change that.\n\n**Next:** I'll check which capability is unavailable and what it would take to supply it. I'll then bring you the concrete options, or continue with the parts of the work that don't depend on it. You don't need to do anything yet."
+      },
+      {
+        "id": "durable-observation",
+        "markdown": "The GAMMA tasks I submitted earlier were only planned. They have now been picked up by the durable runtime, and both jobs exist.\n\n| Specialist | Assignment | Status | Identity |\n|---|---|---|---|\n| **Engineering** | Repair the GAMMA parser | **Running** | `instance-gamma-engineer` / `native-gamma` |\n| **QA** (independent) | Independently assess the GAMMA proposal | **Queued**, not yet running | `instance-gamma-review`. No native ID observed yet |\n\n- These are two separate sessions.\n- Both jobs show timing flags for inspection (\"Invalid legacy worker start\" for Engineering, \"Invalid queue start\" for QA). I'm not relying on their timing until that is checked.\n- Nothing has been returned, so there is no QA verdict and nothing has been accepted. I can't see the specialists' internal progress.\n\nNothing is needed from you. I'll report when either job returns or the timing flags are resolved."
+      },
+      {
+        "id": "result-attribution",
+        "markdown": "The EPSILON parsing fix is back and has been independently reviewed.\n\n**Engineering** (`instance-epsilon-engineer`)\n- Implemented the EPSILON parsing fix and returned it as `artifact-epsilon`.\n\n**QA** (`instance-epsilon-review`, separate from Engineering)\n- Reviewed `artifact-epsilon` and returned **Pass** in `review-epsilon`: \"The exact EPSILON fixture meets its criteria.\"\n- The Pass covers that exact fixture and no more. It is not a deployment approval, and no one has recorded acceptance of the artifact yet.\n\n**Chief of Staff recommendation (my synthesis, separate from the specialists' findings)**\nI recommend retaining the reviewed EPSILON candidate for the next scoped decision. The evidence is a passing independent review of the exact fixture. The limit is that nothing broader than that fixture was checked.\n\n**Next:** Nothing is running now. Tell me if you'd like the candidate carried into the next scoped decision. Otherwise it stays retained."
+      },
+      {
+        "id": "no-summon",
+        "markdown": "The accepted OMEGA plan is to collect a draft, review it, and publish only after approval."
+      }
+    ]
+  },
+  "cases": [
+    {
+      "id": "queued-and-planned",
+      "passed": true,
+      "errors": [],
+      "markdown": "**Engineering** has been asked to repair the ALPHA parser. The request is accepted and **queued**, not running. Its session identity is `instance-alpha`, and no native session ID has been observed yet.\n\n| Specialist | Assignment | Status | Next handoff |\n|---|---|---|---|\n| **Engineering** (`instance-alpha`) | Repair the ALPHA parser | Queued | Returns a candidate for review |\n| **QA** | Review the ALPHA candidate after Engineering returns it | **Planned / not summoned** | Starts only once there is a candidate to review |\n\nNo QA reviewer exists yet, and nothing has been produced or checked. Nothing is needed from you now. I'll report when Engineering actually starts or returns something."
+    },
+    {
+      "id": "resumed-and-reviewer",
+      "passed": false,
+      "errors": [
+        "Contradictory queued state for BETA"
+      ],
+      "markdown": "Two specialists are now active on BETA.\n\n| Specialist | Assignment | Status | Identity |\n|---|---|---|---|\n| **Engineering** (resumed) | Repair the BETA parser | **Running** | `instance-beta`, continuing its earlier native session `native-beta-resumed` |\n| **QA** (independent reviewer, new) | Independently review `candidate-beta` (revision 1) | **Queued**, not yet running | `instance-beta-review`, a separate instance from Engineering. No native ID observed yet |\n\n- Engineering is continuing from its earlier session rather than starting fresh.\n- QA's review targets the existing `candidate-beta` revision 1. Engineering's repair output will need its own review once it returns.\n- The runtime's timeout tracking flags both jobs for inspection (\"Invalid queue start\" for QA, \"Invalid legacy worker start\" for Engineering). That is not a failure, but I'm not treating the timing as reliable until it is inspected.\n\nNo results have been returned, so there is no QA verdict and nothing has been accepted. Nothing is needed from you. I'll update you when either job returns or the timing flags resolve."
+    },
+    {
+      "id": "distinct-researchers",
+      "passed": true,
+      "errors": [],
+      "markdown": "Two separate Research specialists are working on competitors.\n\n| Specialist | Assignment | Status | Identity |\n|---|---|---|---|\n| **Research (BLUE)** | Assess the BLUE competitor | **Completed**, returned `artifact-blue` | `instance-blue` / `native-blue` |\n| **Research (RED)** | Assess the RED competitor | **Running** | `instance-red` / `native-red` |\n\n- The BLUE artifact has come back. It has had no independent QA review and has not been accepted, so treat it as unreviewed.\n- RED is still running. I can't see its internal progress, and the runtime flags its timing for inspection (\"Invalid legacy worker start\").\n- The two are different sessions, so neither has seen the other's work.\n\nNothing is needed from you. I'll compare the two once RED returns, and I'll tell you if BLUE is routed for review first."
+    },
+    {
+      "id": "failed-summon",
+      "passed": true,
+      "errors": [],
+      "markdown": "**The attempt to launch Engineering failed.**\n\n- **Specialist:** **Engineering** (`instance-delta`)\n- **Assignment:** Repair the DELTA parser\n- **Status:** **Failed.** The launch was held with the error \"DELTA launch held: supported capability unavailable\".\n- **Session:** No native session was observed, so Engineering never started. Nothing was produced.\n\nThe DELTA parser is unchanged, and no one is working on it. I won't retry the launch blindly, because the blocker is a missing capability, not a transient error. Retrying won't change that.\n\n**Next:** I'll check which capability is unavailable and what it would take to supply it. I'll then bring you the concrete options, or continue with the parts of the work that don't depend on it. You don't need to do anything yet."
+    },
+    {
+      "id": "durable-observation",
+      "passed": false,
+      "errors": [
+        "Contradictory queued state for GAMMA"
+      ],
+      "markdown": "The GAMMA tasks I submitted earlier were only planned. They have now been picked up by the durable runtime, and both jobs exist.\n\n| Specialist | Assignment | Status | Identity |\n|---|---|---|---|\n| **Engineering** | Repair the GAMMA parser | **Running** | `instance-gamma-engineer` / `native-gamma` |\n| **QA** (independent) | Independently assess the GAMMA proposal | **Queued**, not yet running | `instance-gamma-review`. No native ID observed yet |\n\n- These are two separate sessions.\n- Both jobs show timing flags for inspection (\"Invalid legacy worker start\" for Engineering, \"Invalid queue start\" for QA). I'm not relying on their timing until that is checked.\n- Nothing has been returned, so there is no QA verdict and nothing has been accepted. I can't see the specialists' internal progress.\n\nNothing is needed from you. I'll report when either job returns or the timing flags are resolved."
+    },
+    {
+      "id": "result-attribution",
+      "passed": true,
+      "errors": [],
+      "markdown": "The EPSILON parsing fix is back and has been independently reviewed.\n\n**Engineering** (`instance-epsilon-engineer`)\n- Implemented the EPSILON parsing fix and returned it as `artifact-epsilon`.\n\n**QA** (`instance-epsilon-review`, separate from Engineering)\n- Reviewed `artifact-epsilon` and returned **Pass** in `review-epsilon`: \"The exact EPSILON fixture meets its criteria.\"\n- The Pass covers that exact fixture and no more. It is not a deployment approval, and no one has recorded acceptance of the artifact yet.\n\n**Chief of Staff recommendation (my synthesis, separate from the specialists' findings)**\nI recommend retaining the reviewed EPSILON candidate for the next scoped decision. The evidence is a passing independent review of the exact fixture. The limit is that nothing broader than that fixture was checked.\n\n**Next:** Nothing is running now. Tell me if you'd like the candidate carried into the next scoped decision. Otherwise it stays retained."
+    },
+    {
+      "id": "no-summon",
+      "passed": true,
+      "errors": [],
+      "markdown": "The accepted OMEGA plan is to collect a draft, review it, and publish only after approval."
+    }
+  ],
+  "errors": [],
+  "grading_scope": "Deterministic checks of actual fictional Markdown responses; independent semantic review remains required.",
+  "elapsed_ms": 23398,
+  "finished_at": "2026-11-08T03:18:08.803Z"
+}

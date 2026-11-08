@@ -9,6 +9,8 @@ import { jobTimeoutState } from './timeout.mjs';
 export const MODEL_MAX_BYTES=30000;
 export const REPLY_MAX_BYTES=65536;
 export const RESPONSE_FORMAT='soloco-current-v2';
+export const SPECIALIST_REPORTING='In the next founder-facing response, prominently highlight each newly summoned/resumed or materially changed specialist as **role/name**, with its assignment, actual status and next handoff. Distinguish same-role instances using observed identities. Attribute returned findings to specialists and Chief of Staff synthesis separately. Planned tasks and software test jobs are not specialist summons; returned work is not QA Pass or acceptance. Report failed/held summons honestly. Do not repeat an unchanged roster on unrelated replies. This reminder is not a delivery receipt or authority.';
+const jobCollection=collection=>['jobs','active_jobs','claimed_jobs'].includes(collection);
 const bytes=value=>Buffer.byteLength(value,'utf8');
 export const modelText=value=>JSON.stringify(value);
 export function toolResult(value) { return {content:[{type:'text',text:modelText(value)}]}; }
@@ -126,13 +128,17 @@ export function itemView(value,id,collection='records') {
   return view;
 }
 export function mutationView(value,id,collection='records') {
-  // Preserve exact small legacy receipts; growing records switch explicitly to
+  // Preserve small legacy receipt fields; growing records switch explicitly to
   // a preview and exact handle instead of accumulating revision history in chat.
-  if(fits(value))return value;
+  // Reporting belongs only to the public projection: canonical job bytes remain
+  // unchanged so context proofs and exact source handles still bind the source.
+  const receipt=jobCollection(collection)?{...value,founder_response:SPECIALIST_REPORTING}:value;
+  if(fits(receipt))return receipt;
   const prefix=collection==='jobs'?'job:':`@public:${collection}:`;
   const key=collection==='records'?id:id.startsWith(prefix)?id.slice(prefix.length):id;
   id=storageSourceId(collection,key);
   const view=itemView(value,id,collection);
+  if(jobCollection(collection))view.founder_response=SPECIALIST_REPORTING;
   if(id.startsWith('@public:key:'))view.storage_key_source=sourceReference(key,id.replace('@public:key:','@public:keyname:'));
   return view;
 }
@@ -170,6 +176,7 @@ export function publicPage(state,{collection='records',cursor,offset,limit=8}={}
   const start=cursor===undefined?(offset??0):decodeCursor(cursor,collection,inventory);
   if(!Number.isSafeInteger(start)||start<0||start>total)throw Error('Invalid public page offset');
   const page={response_format:RESPONSE_FORMAT,collection,items:[],total,offset:start,returned:0,complete:false,next_cursor:null,inventory_sha256:inventory,previews:true,consistency:'Live membership; exact item hashes may change. Restart on a stale cursor.'};
+  if(jobCollection(collection))page.founder_response=SPECIALIST_REPORTING;
   for(const row of reader?reader.rows(collection,start,limit):rows.slice(start,start+limit)) {
     let item=itemView(row.value,row.id,collection);
     if(bytes(JSON.stringify(item))>(collection==='active_jobs'?1800:5000))item={...pick(row.value,['id','kind','role','status']),source:item.source,...(collection==='active_jobs'?{timeout:{state:jobTimeoutState(row.value,Date.now())}}:{}),preview:true,detail_not_inlined:true};
