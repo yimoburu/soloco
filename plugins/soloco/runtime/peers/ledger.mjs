@@ -35,7 +35,8 @@ function peerConnectionEnded(db){
 import {DatabaseSync} from 'node:sqlite';
 import fs from 'node:fs';
 import path from 'node:path';
-import {createHash} from 'node:crypto';
+import {createHash,randomUUID} from 'node:crypto';
+import {REVIEW_SELECTION_RECIPE,REVIEW_PRODUCER_RECIPE,extractReviewSelection,reviewReference,reviewScope} from './review-selection.mjs';
 
 export const PEER_PROTOCOL='peer-cos-v1';
 export const PEER_LAYOUT=5;
@@ -43,6 +44,18 @@ export const FAMILIES=Object.freeze(['control','principals','grants','commands',
 const families=new Set(FAMILIES);
 const MAX_VALUE_BYTES=1_000_000;
 const MAX_FILTERED_ROWS=10_000;
+// Materialization admission, not measured JS heap/RSS or whole-process limits.
+// Classifier arrays admit at most 10,000 revisions, 8 MiB canonical UTF-8,
+// and 16 MiB of encoded selected fields plus a 256-unit charge per row for
+// numeric fields, references and framing. The charge is an accounting policy,
+// not a claim about a JS engine's object size. Decoding expands bounded input;
+// caller write buffers, SQLite work/storage and total audit IO are separate.
+// Explicit audits page over-row histories only after aggregate admission and
+// return uncertainty after complete verification, never a clean prefix.
+export const REVIEW_SELECTION_HISTORY_BYTES=8*1024*1024;
+export const REVIEW_SELECTION_HISTORY_COST=16*1024*1024;
+export const REVIEW_SELECTION_AUDIT_PAGE_SIZE=100;
+const REVIEW_SELECTION_ROW_COST=256;
 const ZERO='0'.repeat(64);
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 const own=(v,k)=>Object.prototype.hasOwnProperty.call(v,k);
@@ -129,6 +142,29 @@ function selectedKeys(selected){
     if(entries.length>256)throw Error('Peer filter expansion is too large');
   }return entries.map(canonical);
 }
+const selectionSchema={
+  peer_review_recipe:'CREATE TABLE peer_review_recipe(id INTEGER PRIMARY KEY CHECK(id=1),recipe TEXT NOT NULL,producer_recipe TEXT NOT NULL,schema_sha256 TEXT NOT NULL,generation INTEGER NOT NULL)',
+  peer_review_selection:'CREATE TABLE peer_review_selection(review_id TEXT PRIMARY KEY,revision INTEGER NOT NULL,sha256 TEXT NOT NULL,anchor TEXT,outcome TEXT NOT NULL,scope TEXT,adverse INTEGER NOT NULL,subject_family TEXT,subject_id TEXT,subject_revision INTEGER,subject_sha256 TEXT)',
+  peer_review_dirty:'CREATE TABLE peer_review_dirty(review_id TEXT PRIMARY KEY)',
+  peer_review_errors:'CREATE TABLE peer_review_errors(review_id TEXT PRIMARY KEY,revision INTEGER NOT NULL,sha256 TEXT NOT NULL,message TEXT NOT NULL)',
+  peer_review_subject:'CREATE INDEX peer_review_subject ON peer_review_selection(subject_family,subject_id,subject_revision,subject_sha256,review_id)',
+  peer_review_scope:'CREATE INDEX peer_review_scope ON peer_review_selection(adverse,scope,review_id)',
+  peer_review_insert:"CREATE TRIGGER peer_review_insert AFTER INSERT ON peer_rows WHEN NEW.family='reviews' BEGIN INSERT INTO peer_review_dirty SELECT NEW.id WHERE NOT EXISTS(SELECT 1 FROM peer_review_dirty WHERE review_id=NEW.id); END",
+  peer_review_update:"CREATE TRIGGER peer_review_update AFTER UPDATE ON peer_rows WHEN NEW.family='reviews' OR OLD.family='reviews' BEGIN INSERT INTO peer_review_dirty SELECT NEW.id WHERE NOT EXISTS(SELECT 1 FROM peer_review_dirty WHERE review_id=NEW.id); INSERT INTO peer_review_dirty SELECT OLD.id WHERE OLD.family='reviews' AND NOT EXISTS(SELECT 1 FROM peer_review_dirty WHERE review_id=OLD.id); END",
+  peer_review_delete:"CREATE TRIGGER peer_review_delete BEFORE DELETE ON peer_rows WHEN OLD.family='reviews' BEGIN SELECT RAISE(ABORT,'Physical review deletion is forbidden'); END",
+};
+for(const [table,prefix] of [['peer_review_selection','projection'],['peer_review_errors','error']])for(const op of ['INSERT','UPDATE','DELETE']){
+  const side=op==='DELETE'?'OLD':'NEW',mark=side=>`INSERT INTO peer_review_dirty SELECT ${side}.review_id WHERE NOT EXISTS(SELECT 1 FROM peer_review_dirty WHERE review_id=${side}.review_id);`;
+  selectionSchema[`peer_review_${prefix}_${op.toLowerCase()}`]=`CREATE TRIGGER peer_review_${prefix}_${op.toLowerCase()} AFTER ${op} ON ${table} BEGIN ${mark(side)}${op==='UPDATE'?mark('OLD'):''} END`;
+}
+const normalizedSQL=sql=>sql.replace(/\s+/g,' ').trim();
+const selectionSchemaHash=hash(canonical(Object.fromEntries(Object.entries(selectionSchema).map(([name,sql])=>[name,normalizedSQL(sql)]))));
+function selectionError(code,message){throw Object.assign(Error(message),{code});}
+function installSelection(db){
+  for(const sql of Object.values(selectionSchema))db.exec(sql);
+  const generation=db.prepare("SELECT generation FROM peer_generations WHERE family='reviews'").get().generation;
+  db.prepare('INSERT INTO peer_review_recipe VALUES(1,?,?,?,?)').run(REVIEW_SELECTION_RECIPE,REVIEW_PRODUCER_RECIPE,selectionSchemaHash,generation);
+}
 
 // Checked migration/operator path or isolated fictional fixtures only.
 export function installPeerSchema(db,{company_id,legacy_snapshot_sha256=null}={}){
@@ -155,6 +191,7 @@ export function installPeerSchema(db,{company_id,legacy_snapshot_sha256=null}={}
       CREATE TRIGGER peer_events_delete BEFORE DELETE ON peer_events BEGIN SELECT RAISE(ABORT,'Peer event history is immutable'); END;`);
     db.prepare('INSERT INTO peer_meta VALUES(1,?,?,?,?)').run(PEER_PROTOCOL,company_id,legacy_snapshot_sha256,ZERO);
     for(const name of FAMILIES)db.prepare('INSERT INTO peer_generations VALUES(?,0,0)').run(name);
+    installSelection(db);
     db.exec('RELEASE peer_schema_install');
   }catch(error){db.exec('ROLLBACK TO peer_schema_install; RELEASE peer_schema_install');throw error;}
 }
@@ -297,7 +334,146 @@ export class PeerLedger{
     if(complete&&((items.at(-1)?.seq??after)!==head.total||previous!==head.sha256))throw Error('Peer event terminal head mismatch');
     return {items,complete,next_cursor:items.at(-1)?.seq??after,total:head.total};
   }
-  #transaction(type,principal,fn,write,external=false){
+  #selectionRead(checked,sql,method,...args){const statement=checked(()=>this.query(sql));return checked(()=>statement[method](...args));}
+  #selectionCapability(checked,{clean=false}={}){
+    const names=Object.keys(selectionSchema),objects=this.#selectionRead(checked,`SELECT name,sql FROM sqlite_master WHERE name IN (${names.map(()=>'?').join(',')})`,'all',...names);
+    if(objects.length!==names.length||objects.some(v=>normalizedSQL(v.sql??'')!==normalizedSQL(selectionSchema[v.name])))selectionError('REVIEW_SELECTION_CAPABILITY','Checked review selection capability/schema required');
+    const recipe=this.#selectionRead(checked,'SELECT * FROM peer_review_recipe WHERE id=1','get');
+    if(recipe?.recipe!==REVIEW_SELECTION_RECIPE||recipe.producer_recipe!==REVIEW_PRODUCER_RECIPE||recipe.schema_sha256!==selectionSchemaHash)selectionError('REVIEW_SELECTION_CAPABILITY','Incompatible review selection/producer recipe');
+    if(clean){
+      if(this.#selectionRead(checked,'SELECT review_id FROM peer_review_dirty LIMIT 1','get'))selectionError('REVIEW_SELECTION_DIRTY','Review selection has unrefreshed canonical changes');
+      if(this.#selectionRead(checked,'SELECT review_id FROM peer_review_errors LIMIT 1','get'))selectionError('REVIEW_SELECTION_INTEGRITY','Review selection has unknown production integrity');
+      const generation=this.#selectionRead(checked,"SELECT generation FROM peer_generations WHERE family='reviews'",'get')?.generation;
+      if(recipe.generation!==generation)selectionError('REVIEW_SELECTION_DIRTY','Review selection generation is incomplete');
+    }
+    return recipe;
+  }
+  #selectionFacts(current,pending,checked,initial=new Map(),fullAudit=false){
+    const capacity=()=>({outcome:'INTEGRITY_UNKNOWN',anchor:null,subject:null,scope:null,adverse:['Fail','Blocked'].includes(current.value?.verdict),origin:'unknown',error:'Review retained classification exceeds 10,000 exact revisions'});
+    if(current.revision>MAX_FILTERED_ROWS&&!fullAudit)return capacity();
+    // These aggregate queries return scalars, not retained body arrays. Include
+    // repeated IDs/hashes and row framing: many tiny bodies are not free.
+    const volume=this.#selectionRead(checked,`SELECT COUNT(*) AS count,COALESCE(SUM(length(CAST(bytes AS BLOB))),0) AS utf8_bytes,COALESCE(SUM(length(CAST(bytes AS BLOB))+length(CAST(family AS BLOB))+length(CAST(id AS BLOB))+length(CAST(sha256 AS BLOB))+${REVIEW_SELECTION_ROW_COST}),0) AS materialization_cost,MIN(revision) AS first_revision,MAX(revision) AS last_revision FROM peer_versions WHERE family='reviews' AND id=?`,'get',current.id);
+    if(!Number.isSafeInteger(volume?.count)||volume.count<0||!Number.isSafeInteger(volume.utf8_bytes)||volume.utf8_bytes<0||!Number.isSafeInteger(volume.materialization_cost)||volume.materialization_cost<volume.utf8_bytes)selectionError('REVIEW_SELECTION_INTEGRITY','Invalid review history aggregate');
+    if(fullAudit&&(volume.count!==current.revision||volume.first_revision!==1||volume.last_revision!==current.revision))selectionError('REVIEW_SELECTION_INTEGRITY','Canonical review history is incomplete or noncontiguous');
+    const excess=volume.utf8_bytes>REVIEW_SELECTION_HISTORY_BYTES
+      ?`Review retained classification exceeds aggregate UTF-8 history byte budget: actual ${volume.utf8_bytes}, limit ${REVIEW_SELECTION_HISTORY_BYTES}`
+      :volume.materialization_cost>REVIEW_SELECTION_HISTORY_COST
+        ?`Review retained classification exceeds encoded-field/framing materialization cost budget: actual ${volume.materialization_cost}, limit ${REVIEW_SELECTION_HISTORY_COST}`:null;
+    if(excess){
+      if(fullAudit)selectionError('REVIEW_SELECTION_CAPACITY',excess);
+      // Unknown is bound to this current revision. No partial facts qualify it;
+      // raw verdicts and production anchors remain in immutable source history.
+      return {...capacity(),error:excess};
+    }
+    if(!fullAudit&&volume.count>MAX_FILTERED_ROWS)return capacity();
+    if(fullAudit&&current.revision>MAX_FILTERED_ROWS){
+      // History-sized IO is intentional. Each completed SQL page is bounded;
+      // there is no live SQLite iterator or accumulated decoded history here.
+      let after=0,expected=1,lastHash=null;
+      for(;;){
+        const page=this.#selectionRead(checked,`SELECT family,id,revision,sha256,bytes FROM peer_versions WHERE family='reviews' AND id=? AND revision>? ORDER BY revision LIMIT ${REVIEW_SELECTION_AUDIT_PAGE_SIZE}`,'all',current.id,after);
+        if(!page.length)break;
+        for(const row of page){if(row.revision!==expected++)selectionError('REVIEW_SELECTION_INTEGRITY','Canonical review history is incomplete or noncontiguous');checked(()=>decode(row.bytes,row.sha256));lastHash=row.sha256;}
+        after=page.at(-1).revision;
+      }
+      if(expected-1!==current.revision||lastHash!==current.sha256)selectionError('REVIEW_SELECTION_INTEGRITY','Canonical review history changed during audit');
+      return capacity();
+    }
+    const history=this.#selectionRead(checked,"SELECT family,id,revision,sha256,bytes FROM peer_versions WHERE family='reviews' AND id=? ORDER BY revision LIMIT 10001",'all',current.id).map(({bytes,...row})=>({...row,value:checked(()=>decode(bytes,row.sha256))}));
+    if(fullAudit&&(history.length!==current.revision||history.some((row,i)=>row.revision!==i+1)||history.at(-1)?.sha256!==current.sha256))selectionError('REVIEW_SELECTION_INTEGRITY','Canonical review history is incomplete or noncontiguous');
+    if(current.revision>MAX_FILTERED_ROWS)return capacity();
+    const resolve=r=>{
+      checked(()=>{if(!r||Object.keys(r).sort().join(',')!=='family,id,revision,sha256')throw Error('Private exact production reference required');family(r.family);exact(r.id,'production identity',2000);positive(r.revision,'production revision');digest(r.sha256);});
+      const final=pending.get(canonical([r.family,r.id]));
+      const original=initial.get(canonical([r.family,r.id]));
+      if(original!==undefined&&r.revision>original&&(!final||r.revision!==final.revision))return null;
+      if(final?.revision===r.revision&&final.sha256!==r.sha256)return null;
+      const row=this.#selectionRead(checked,'SELECT family,id,revision,sha256,bytes FROM peer_versions WHERE family=? AND id=? AND revision=?','get',r.family,r.id,r.revision);
+      if(!row||row.sha256!==r.sha256)return null;
+      const value=checked(()=>decode(row.bytes,row.sha256));
+      if(final?.revision===r.revision&&canonical(final.value)!==canonical(value))throw Error('Final pending production binding changed');
+      return {family:row.family,id:row.id,revision:row.revision,sha256:row.sha256,value};
+    };
+    const facts=checked(()=>extractReviewSelection({current,history,resolve,canonical,hash}));
+    if(facts.anchor?.review&&!resolve(facts.anchor.review))return {...facts,outcome:'INTEGRITY_UNKNOWN',error:'Production anchor is not committed history or a final pending version'};
+    return facts;
+  }
+  #selectionMetadata(current,facts){return {review_id:current.id,revision:current.revision,sha256:current.sha256,anchor:facts.anchor?canonical(facts.anchor):null,outcome:facts.outcome,scope:facts.scope,adverse:Number(facts.adverse),subject_family:facts.subject?.family??null,subject_id:facts.subject?.id??null,subject_revision:facts.subject?.revision??null,subject_sha256:facts.subject?.sha256??null};}
+  *#reviewIds(checked){
+    let after=null;
+    for(;;){
+      const tail=`FROM peer_rows WHERE family='reviews'${after===null?'':' AND id>?'} ORDER BY id LIMIT ${REVIEW_SELECTION_AUDIT_PAGE_SIZE}`,args=after===null?[]:[after];
+      // Bound variable-width identity metadata before retrieving its array.
+      // A supported 2,000-UTF-16-unit identity needs at most 6,000 UTF-8 bytes.
+      const size=this.#selectionRead(checked,`SELECT COUNT(*) AS count,COALESCE(MAX(length(CAST(id AS BLOB))),0) AS max_id_bytes FROM (SELECT id ${tail})`,'get',...args);
+      if(!Number.isSafeInteger(size?.count)||size.count<0||size.count>REVIEW_SELECTION_AUDIT_PAGE_SIZE||!Number.isSafeInteger(size.max_id_bytes)||size.max_id_bytes<0||size.max_id_bytes>6000)selectionError('REVIEW_SELECTION_INTEGRITY','Invalid or oversized review audit identity page');
+      const page=this.#selectionRead(checked,`SELECT id ${tail}`,'all',...args);
+      if(page.length!==size.count)selectionError('REVIEW_SELECTION_INTEGRITY','Review audit identity page changed');
+      if(!page.length)return;
+      // This generator yields only IDs from completed bounded arrays. Every
+      // resume reaches checked work before another yield; early close owns no
+      // StatementSync iterator, and the caller retains transaction cleanup.
+      for(const row of page){checked(()=>exact(row.id,'review identity',2000));yield row.id;}
+      const next=page.at(-1).id;if(next===after)selectionError('REVIEW_SELECTION_INTEGRITY','Nonprogressing review audit cursor');after=next;
+    }
+  }
+  #refreshSelection(ids,pending,checked,initial=new Map(),fullAudit=false){
+    for(const id of ids){
+      const raw=this.#selectionRead(checked,"SELECT * FROM peer_rows WHERE family='reviews' AND id=?",'get',id);
+      if(!raw)selectionError('REVIEW_SELECTION_INTEGRITY','Canonical review disappeared during refresh');
+      const current=checked(()=>envelope(raw)),final=pending.get(canonical(['reviews',id]));
+      if(final&&(final.revision!==current.revision||final.sha256!==current.sha256))throw Error('Final review binding differs from pending production');
+      const facts=this.#selectionFacts(current,pending,checked,initial,fullAudit),m=this.#selectionMetadata(current,facts);
+      this.#selectionRead(checked,'INSERT INTO peer_review_selection VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(review_id) DO UPDATE SET revision=excluded.revision,sha256=excluded.sha256,anchor=excluded.anchor,outcome=excluded.outcome,scope=excluded.scope,adverse=excluded.adverse,subject_family=excluded.subject_family,subject_id=excluded.subject_id,subject_revision=excluded.subject_revision,subject_sha256=excluded.subject_sha256','run',...Object.values(m));
+      this.#selectionRead(checked,'DELETE FROM peer_review_errors WHERE review_id=?','run',id);
+      if(facts.error)this.#selectionRead(checked,'INSERT INTO peer_review_errors VALUES(?,?,?,?)','run',id,current.revision,current.sha256,facts.error);
+      this.#selectionRead(checked,'DELETE FROM peer_review_dirty WHERE review_id=?','run',id);
+    }
+    if(!this.#selectionRead(checked,'SELECT review_id FROM peer_review_dirty LIMIT 1','get'))this.#selectionRead(checked,"UPDATE peer_review_recipe SET generation=(SELECT generation FROM peer_generations WHERE family='reviews') WHERE id=1",'run');
+  }
+  #auditSelection(pending,checked){
+    this.#selectionCapability(checked);
+    if(this.#selectionRead(checked,"SELECT v.id FROM peer_versions v WHERE v.family='reviews' AND NOT EXISTS(SELECT 1 FROM peer_rows r WHERE r.family='reviews' AND r.id=v.id) LIMIT 1",'get'))selectionError('REVIEW_SELECTION_INTEGRITY','Orphan review history requires disposition');
+    if(this.#selectionRead(checked,"SELECT p.review_id FROM peer_review_selection p WHERE NOT EXISTS(SELECT 1 FROM peer_rows r WHERE r.family='reviews' AND r.id=p.review_id) LIMIT 1",'get')||this.#selectionRead(checked,"SELECT e.review_id FROM peer_review_errors e WHERE NOT EXISTS(SELECT 1 FROM peer_rows r WHERE r.family='reviews' AND r.id=e.review_id) LIMIT 1",'get'))selectionError('REVIEW_SELECTION_INTEGRITY','Orphan review selection metadata');
+    let reviews=0,errors=0;
+    for(const id of this.#reviewIds(checked)){
+      const current=checked(()=>this.#get('reviews',id)),facts=this.#selectionFacts(current,pending,checked,new Map(),true),expected=this.#selectionMetadata(current,facts);
+      const actual=this.#selectionRead(checked,'SELECT * FROM peer_review_selection WHERE review_id=?','get',current.id);
+      if(!actual||canonical(actual)!==canonical(expected))selectionError('REVIEW_SELECTION_INTEGRITY','Exact review projection audit failed');
+      const error=this.#selectionRead(checked,'SELECT * FROM peer_review_errors WHERE review_id=?','get',current.id);
+      if(facts.error?(!error||error.revision!==current.revision||error.sha256!==current.sha256||error.message!==facts.error):Boolean(error))selectionError('REVIEW_SELECTION_INTEGRITY','Review error coverage audit failed');
+      reviews++;if(facts.error)errors++;
+    }
+    if(this.#selectionRead(checked,'SELECT review_id FROM peer_review_dirty LIMIT 1','get'))selectionError('REVIEW_SELECTION_DIRTY','Review selection has dirty records');
+    const recipe=this.#selectionCapability(checked),generation=this.#selectionRead(checked,"SELECT generation FROM peer_generations WHERE family='reviews'",'get').generation;
+    if(recipe.generation!==generation)selectionError('REVIEW_SELECTION_DIRTY','Review selection generation audit failed');
+    return {recipe:REVIEW_SELECTION_RECIPE,reviews,errors,clean:errors===0};
+  }
+  #queryReviews(options,checked,snapshot){
+    const input=checked(()=>JSON.parse(canonical(options))),keys=Object.keys(input);
+    if(keys.some(k=>!['subjects','scopes','limit','cursor'].includes(k)))throw Error('Unknown review selection option');
+    const subjects=own(input,'subjects')?input.subjects:[],requested=own(input,'scopes')?input.scopes:[],limit=own(input,'limit')?input.limit:50;
+    if(!Array.isArray(subjects)||subjects.length>100||!Array.isArray(requested)||requested.length>16||!Number.isSafeInteger(limit)||limit<1||limit>100)throw Error('Invalid bounded review selection');
+    const refs=subjects.map(reviewReference),scopes=requested.length?[...new Set([...requested.map(reviewScope),'*','unknown'])].sort():[];
+    if(new Set(refs.map(canonical)).size!==refs.length||new Set(requested.map(reviewScope)).size!==requested.length)throw Error('Duplicate review selectors');
+    const selectors={subjects:refs.sort((a,b)=>canonical(a).localeCompare(canonical(b))),scopes},selector=hash(canonical(selectors)),recipe=this.#selectionCapability(checked,{clean:true});
+    let after='';
+    if(own(input,'cursor')){let c;try{c=JSON.parse(Buffer.from(exact(input.cursor,'review cursor',16000),'base64url').toString('utf8'));}catch{throw Error('Invalid review selection cursor');}
+      if(c.recipe!==REVIEW_SELECTION_RECIPE||c.snapshot!==snapshot||c.generation!==recipe.generation||c.selector!==selector||typeof c.after!=='string')throw Error('Stale or mismatched review selection cursor');after=exact(c.after,'review cursor identity',2000);}
+    const ids=new Set(),add=rows=>{for(const row of rows){ids.add(row.review_id);if(ids.size>MAX_FILTERED_ROWS)selectionError('LOOKUP_CAPACITY','10,000 matching review selection bound exceeded');}};
+    for(const r of selectors.subjects)add(this.#selectionRead(checked,'SELECT review_id FROM peer_review_selection INDEXED BY peer_review_subject WHERE subject_family=? AND subject_id=? AND subject_revision=? AND subject_sha256=? ORDER BY review_id LIMIT 10001','all',r.family,r.id,r.revision,r.sha256));
+    for(const scope of scopes)add(this.#selectionRead(checked,'SELECT review_id FROM peer_review_selection INDEXED BY peer_review_scope WHERE adverse=1 AND scope=? ORDER BY review_id LIMIT 10001','all',scope));
+    const ordered=[...ids].sort();if(after&&!ids.has(after))throw Error('Review selection cursor anchor unavailable');
+    const remaining=ordered.filter(id=>id>after),chosen=remaining.slice(0,limit),items=[];
+    for(const id of chosen){
+      const metadata=this.#selectionRead(checked,'SELECT revision,sha256 FROM peer_review_selection WHERE review_id=?','get',id),row=checked(()=>this.#get('reviews',id));
+      if(!row||row.revision!==metadata?.revision||row.sha256!==metadata.sha256)selectionError('REVIEW_SELECTION_INTEGRITY','Selected review binding differs from projection');items.push(row);
+    }
+    this.#selectionCapability(checked,{clean:true});const complete=remaining.length<=limit;
+    return checked(()=>({items,total:ordered.length,complete,next_cursor:complete?null:Buffer.from(canonical({recipe:REVIEW_SELECTION_RECIPE,snapshot,generation:recipe.generation,selector,after:chosen.at(-1)})).toString('base64url'),recipe:REVIEW_SELECTION_RECIPE}));
+  }
+  #transaction(type,principal,fn,write,external=false,maintenance=null){
     if(this.inTransaction)throw Error('Nested peer transaction is forbidden');
     if(typeof fn!=='function')throw Error('Peer transaction callback required');
     if(['[object AsyncFunction]','[object GeneratorFunction]','[object AsyncGeneratorFunction]'].includes(Object.prototype.toString.call(fn)))throw Error('Models, network calls and asynchronous work are forbidden inside peer transactions');
@@ -314,15 +490,17 @@ export class PeerLedger{
       safe=false;startAttempted=true;
       db.exec(external?'SAVEPOINT peer_migration_write':write?'BEGIN IMMEDIATE':'BEGIN');begun=true;active=true;
       const head=this.#head(),sequence=head.total+1;positive(sequence,'next event sequence');
-      const changes=[],events=[],pending=new Map();
+      const changes=[],events=[],pending=new Map(),initial=new Map();
       // Fence history before preparing the first modifying statement. A failed
       // mutation poisons this transaction even if the callback catches it.
-      let rowMutationStarted=false,mutationFailed=false;
-      const guard=()=>{
+      let rowMutationStarted=false,mutationFailed=false,finalizing=false;
+      const snapshot=randomUUID();
+      const boundary=()=>{
         if(!active||!this.inTransaction||!fence.owns(token))throw Error('Peer transaction handle expired');
         if(db.isTransaction!==true)throw Error('Peer transaction connection is no longer active');
         if(mutationFailed)throw Error('Peer transaction contains a failed row mutation; rollback required');
       };
+      const guard=()=>{boundary();if(finalizing)throw Error('Peer public handle is closed during final review maintenance');};
       const get=(f,id)=>{
         const key=canonical([f,id]);
         if(pending.has(key))return structuredClone(pending.get(key));
@@ -387,6 +565,15 @@ export class PeerLedger{
           collectionGuard();
           return this.#list(f,o,checked);
         },
+        queryCurrentReviews:(options={})=>{
+          const selectionGuard=()=>{guard();if(external||rowMutationStarted)throw Error('Review selection requires an owning snapshot before pending writes');};
+          const checked=operation=>{
+            selectionGuard();let result;
+            try{result=operation();}catch(error){try{selectionGuard();}catch(boundaryError){throw new AggregateError([error,boundaryError],'Review selection failed after transaction boundary changed');}throw error;}
+            selectionGuard();return result;
+          };
+          return this.#queryReviews(options,checked,snapshot);
+        },
         count:(f,o={})=>{guard();return this.#count(f,filters(o));},
         events:o=>{guard();return this.#events(o);},
         resolveLegacy:ref=>{
@@ -404,6 +591,7 @@ export class PeerLedger{
           const sha256=hash(bytes);if(current&&current.sha256===sha256)return current;
           const revision=expected_revision+1;positive(revision,'revision');
           const normalized=JSON.parse(bytes),dim=dimensions(normalized),created_seq=current?.created_seq??sequence;
+          const identity=canonical([f,id]);if(!initial.has(identity))initial.set(identity,current?.revision??0);
           rowMutationStarted=true;
           try{
             this.query('INSERT INTO peer_versions VALUES(?,?,?,?,?)').run(f,id,revision,sha256,bytes);
@@ -417,12 +605,27 @@ export class PeerLedger{
         },
         event:(kind,payload)=>{guard();if(!write)throw Error('Peer read snapshots cannot append events');exact(kind,'event type');events.push({type:kind,payload:JSON.parse(canonical(payload))});}
       });
-      const result=fn(tx);
+      let result=fn(tx);
       if(result&&typeof result.then==='function'){
         if(result instanceof Promise)Promise.prototype.then.call(result,undefined,()=>{});
         throw Error('Models, network calls and asynchronous work are forbidden inside peer transactions');
       }
       guard();
+      const reviewIds=[...new Set(changes.filter(c=>c.family==='reviews').map(c=>c.id))];
+      if(maintenance||reviewIds.length){
+        finalizing=true;
+        const checked=operation=>{boundary();let value;try{value=operation();}catch(error){try{boundary();}catch(boundaryError){throw new AggregateError([error,boundaryError],'Review maintenance lost transaction boundary');}throw error;}boundary();return value;};
+        const installed=this.#selectionRead(checked,"SELECT 1 FROM sqlite_master WHERE type='table' AND name='peer_review_recipe'",'get');
+        if(maintenance==='upgrade'){
+          if(!installed)checked(()=>installSelection(db));else this.#selectionCapability(checked);
+          if(this.#selectionRead(checked,"SELECT v.id FROM peer_versions v WHERE v.family='reviews' AND NOT EXISTS(SELECT 1 FROM peer_rows r WHERE r.family='reviews' AND r.id=v.id) LIMIT 1",'get'))selectionError('REVIEW_SELECTION_INTEGRITY','Orphan canonical review history blocks upgrade');
+          const ids=this.#reviewIds(checked);
+          this.#selectionRead(checked,'DELETE FROM peer_review_selection','run');this.#selectionRead(checked,'DELETE FROM peer_review_errors','run');this.#selectionRead(checked,'DELETE FROM peer_review_dirty','run');
+          this.#refreshSelection(ids,pending,checked,new Map(),true);result=this.#auditSelection(pending,checked);
+        }else if(maintenance==='audit'){result=this.#auditSelection(pending,checked);}
+        else if(installed){this.#selectionCapability(checked);this.#refreshSelection(reviewIds,pending,checked,initial);}
+        finalizing=false;guard();
+      }
       active=false;
       if(write&&(changes.length||events.length)){
         const currentHead=this.#head();
@@ -467,6 +670,11 @@ export class PeerLedger{
   write(type,principal,fn){return this.#transaction(type,typeof principal==='object'&&principal!==null?principal.principal_id:principal,fn,true);}
   // Caller owns commit/rollback. A savepoint contains failed ledger mutations.
   writeWithin(type,principal,fn){if(this.ownsDb)throw Error('External migration transaction required');return this.#transaction(type,principal,fn,true,true);}
+  upgradeReviewSelection({retained_copy=false,producer_recipe=null}={}){
+    if(retained_copy!==true||producer_recipe!==REVIEW_PRODUCER_RECIPE)throw Error('Explicit retained-copy and supported producer recipe admission required');
+    return this.#transaction('peer.review-selection.upgrade','operator',()=>null,true,false,'upgrade');
+  }
+  auditReviewSelection(){return this.#transaction(null,null,()=>null,false,false,'audit');}
   events(options){return this.read(tx=>tx.events(options));}
   verify({after=0,limit=100}={}){return this.events({after,limit});}
   close(){

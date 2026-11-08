@@ -1765,3 +1765,1335 @@ test('collection pagination retains its owning WAL snapshot across another conne
   assert.deepEqual(snapshot(f),writerState);
  }finally{armed=false;other?.close();f.close();}
 });
+
+// External P1 review-selection mechanics. These fixtures exercise the candidate
+// index and its integrity boundary; they establish no native review qualification.
+const selectionRecipe='peer-review-selection-v1';
+const selectionEmpty=()=>({items:[],total:0,complete:true,next_cursor:null,recipe:selectionRecipe});
+const selectionRef=row=>({family:row.family??'reviews',id:row.id,revision:row.revision,sha256:row.sha256});
+function selectionState(f){
+ const db=new DatabaseSync(f.file);
+ try{
+  const names=db.prepare("SELECT name FROM sqlite_schema WHERE type='table' AND name LIKE 'peer_%' ORDER BY name").all().map(r=>r.name);
+  return Object.fromEntries(names.map(name=>[name,db.prepare(`SELECT * FROM "${name}" ORDER BY rowid`).all()]));
+ }finally{db.close();}
+}
+
+test('review selection fresh capability is read-only and explicit empty selectors return complete evidence',()=>{
+ const f=peerFixture();try{
+  const before=selectionState(f);
+  for(const options of [{subjects:[],scopes:[]},{subjects:[],scopes:['repo/app']},{subjects:[],scopes:['*','unknown','repo/app'],limit:1}]){
+   assert.deepEqual(f.ledger.read(tx=>tx.queryCurrentReviews(options)),selectionEmpty());
+   assert.deepEqual(f.ledger.write('selection.empty.noop','founder',tx=>tx.queryCurrentReviews(options)),selectionEmpty());
+  }
+  assert.deepEqual(selectionState(f),before,'candidate discovery performs no repair or incidental write');
+ }finally{f.close();}
+});
+
+test('review selection rejects malformed or unbounded selectors while preserving an owning read',()=>{
+ const f=peerFixture();try{
+  const ref={family:'proposals',id:'selection-subject',revision:1,sha256:'a'.repeat(64)};
+  const invalid=[
+   {subjects:[],scopes:[],extra:true},
+   {subjects:'not-an-array',scopes:[]},
+   {subjects:[{...ref,revision:0}],scopes:[]},
+   {subjects:[{...ref,sha256:'not-a-hash'}],scopes:[]},
+   {subjects:[{...ref,extra:true}],scopes:[]},
+   {subjects:Array.from({length:101},(_,i)=>({...ref,id:`s${i}`})),scopes:[]},
+   {subjects:[],scopes:'repo/app'},
+   {subjects:[],scopes:[42]},
+   {subjects:[],scopes:['']},
+   {subjects:[],scopes:Array.from({length:17},(_,i)=>`scope-${i}`)},
+   ...[0,-1,101,1.5,'1',null].map(limit=>({subjects:[],scopes:[],limit})),
+   {subjects:[],scopes:[],cursor:'not-base64-json'}
+  ];
+  const before=selectionState(f);
+  f.ledger.read(tx=>{
+   for(const options of invalid){
+    assert.throws(()=>tx.queryCurrentReviews(options),undefined,JSON.stringify(options));
+    assert.deepEqual(tx.queryCurrentReviews({subjects:[],scopes:[]}),selectionEmpty(),'malformed selection cannot poison a healthy read-only owner');
+   }
+   assert.deepEqual(tx.queryCurrentReviews({subjects:Array.from({length:100},(_,i)=>({...ref,id:`valid-${i}`})),scopes:Array.from({length:16},(_,i)=>`scope-${i}`),limit:100}),selectionEmpty());
+  });
+  assert.deepEqual(selectionState(f),before);
+ }finally{f.close();}
+});
+
+test('review selection handles expire and physical writes fence discovery while successful no-ops preserve it',()=>{
+ const f=peerFixture();try{
+  const old=f.ledger.write('selection.guard.seed','founder',tx=>tx.put('notices','selection-guard',{status:'open',scope:'repo/app'},0));
+  const options={subjects:[],scopes:['repo/app']};
+  let escaped;
+  f.ledger.read(tx=>{escaped=tx;assert.deepEqual(tx.queryCurrentReviews(options),selectionEmpty());});
+  assert.throws(()=>escaped.queryCurrentReviews(options),/expired/i);
+  const before=selectionState(f);
+  f.ledger.write('selection.guard.noop','founder',tx=>{
+   assert.deepEqual(tx.put('notices',old.id,old.value,old.revision),old);
+   assert.deepEqual(tx.queryCurrentReviews(options),selectionEmpty());
+  });
+  assert.deepEqual(selectionState(f),before);
+  assert.throws(()=>f.ledger.write('selection.guard.rollback','founder',tx=>{
+   escaped=tx;
+   tx.put('notices',old.id,{...old.value,content:'real change'},old.revision);
+   assert.throws(()=>tx.queryCurrentReviews(options),/pending writes|mutation|after.*write/i);
+   throw Error('deliberate selection rollback');
+  }),/deliberate selection rollback/);
+  assert.throws(()=>escaped.queryCurrentReviews(options),/expired/i);
+  assert.deepEqual(selectionState(f),before);
+ }finally{f.close();}
+});
+
+const {createHash:selectionCreateHash}=await import('node:crypto');
+const selectionRawHash=text=>selectionCreateHash('sha256').update(text).digest('hex');
+function selectionProduction(label,subject,{scope='foreign-scope',verdict='Pass',definitionScope=scope}={}){
+ // Deliberately synthetic P1 structural evidence. These exact records satisfy
+ // extraction linkage only and are never used to claim P2 authority/independence.
+ const taskId=`selection-task-${label}`,attemptId=`selection-attempt-${label}`,native=`synthetic-selection-native-${label}`;
+ const reviewId=peerDigest(['review',taskId,attemptId]);
+ const raw={subject,verdict,reason:`Synthetic index mechanics ${label}`,blockers:verdict==='Pass'?[]:[`Synthetic ${verdict}`]};
+ const output=canonical({review:raw}),outputHash=selectionRawHash(output),contextHash=peerDigest(['synthetic-context',label]);
+ const observation={kind:'runtime_observation',status:'recorded',action:'task/finish',task_id:taskId,attempt_id:attemptId,scope,
+  output_sha256:outputHash,native_id:native,context_sha256:contextHash,termination_confirmed:true,review:raw};
+ const observationRow={family:'effects',id:peerDigest(['runtime-observation',taskId,attemptId,'task/finish']),revision:1,sha256:peerDigest(observation),value:observation};
+ const task={status:'returned',scope,definition:{scope:definitionScope},review_id:reviewId,review_of:subject,
+  attempt:{id:attemptId,native_id:native,termination_confirmed:true,context:{sha256:contextHash}},
+  result:{output,output_sha256:outputHash,native_id:native,error:null,termination_confirmed:true,observation:selectionRef(observationRow)}};
+ const taskRow={family:'tasks',id:taskId,revision:1,sha256:peerDigest(task),value:task};
+ const review={status:'accepted',scope,task_id:taskId,...raw,native_id:native,context_sha256:contextHash,output_sha256:outputHash,termination_confirmed:true,
+  proof:{protocol:'peer-runtime-observation-v1',task:selectionRef(taskRow),observation:selectionRef(observationRow)}};
+ const reviewRow={family:'reviews',id:reviewId,revision:1,sha256:peerDigest(review),value:review};
+ return {task:taskRow,observation:observationRow,review:reviewRow};
+}
+function selectionPutProduction(tx,production,order=['observation','task','review']){
+ for(const key of order){const row=production[key];assert.deepEqual(selectionRef({...tx.put(row.family,row.id,row.value,0),family:row.family}),selectionRef(row));}
+ return production.review;
+}
+function selectionSubject(f,label='subject'){
+ return selectionRef({...f.ledger.write('selection.synthetic.subject','founder',tx=>tx.put('proposals',`selection-${label}`,{status:'pending',scope:'subject-scope',synthetic:'P1 index mechanics only'},0)),family:'proposals'});
+}
+function selectionSeed(f,productions,{batch=25,order}={}){
+ for(let offset=0;offset<productions.length;offset+=batch)f.ledger.write('selection.synthetic.production','founder',tx=>{
+  for(const production of productions.slice(offset,offset+batch))selectionPutProduction(tx,production,order);
+ });
+}
+
+test('review selection derives protected facts from the final transaction write set in every producer ordering',()=>{
+ for(const order of [['observation','task','review'],['review','task','observation'],['task','review','observation']]){
+  const f=peerFixture();try{
+   const subject=selectionSubject(f),production=selectionProduction(order.join('-'),subject,{scope:'repo/app',verdict:'Blocked'});
+   selectionSeed(f,[production],{order});
+   const before=selectionState(f);
+   const page=f.ledger.read(tx=>tx.queryCurrentReviews({subjects:[],scopes:['repo/app']}));
+   assert.deepEqual(page.items.map(selectionRef),[selectionRef(production.review)]);
+   assert.deepEqual(page.items[0].value,production.review.value);
+   assert.equal(page.total,1);assert.equal(page.complete,true);assert.equal(page.next_cursor,null);assert.equal(page.recipe,selectionRecipe);
+   assert.deepEqual(selectionState(f),before);
+  }finally{f.close();}
+ }
+});
+
+test('review selection unions exact cross-scope subjects with requested global and unknown adverse scopes without duplicate rows',()=>{
+ const f=peerFixture();try{
+  const subject=selectionSubject(f),other=selectionSubject(f,'other');
+  const productions=[
+   selectionProduction('scope-exact-pass',subject,{scope:'unrelated',verdict:'Pass'}),
+   selectionProduction('scope-exact-fail',subject,{scope:'repo/app',verdict:'Fail'}),
+   selectionProduction('scope-local',other,{scope:'repo/app',verdict:'Blocked'}),
+   selectionProduction('scope-global',other,{scope:'*',verdict:'Fail'}),
+   selectionProduction('scope-unknown',other,{scope:'unknown',verdict:'Blocked'}),
+   selectionProduction('scope-unrelated',other,{scope:'unrelated',verdict:'Blocked'})
+  ];
+  selectionSeed(f,productions);
+  const expected=productions.slice(0,5).map(p=>p.review).sort((a,b)=>a.id.localeCompare(b.id));
+  f.ledger.read(tx=>{
+   const options={subjects:[subject],scopes:['repo/app'],limit:2};
+   const pages=[],items=[];let cursor;
+   do{const page=tx.queryCurrentReviews({...options,...(cursor?{cursor}:{})});pages.push(page);items.push(...page.items);cursor=page.next_cursor;}while(cursor);
+   assert.deepEqual(items.map(selectionRef),expected.map(selectionRef));
+   assert.equal(new Set(items.map(r=>r.id)).size,5);
+   for(const page of pages)assert.equal(page.total,5);
+   assert.equal(pages.at(-1).complete,true);
+   const exact=tx.queryCurrentReviews({subjects:[subject],scopes:[]});
+   assert.deepEqual(exact.items.map(selectionRef),productions.slice(0,2).map(p=>p.review).sort((a,b)=>a.id.localeCompare(b.id)).map(selectionRef));
+  });
+ }finally{f.close();}
+});
+
+const selectionIntegrity=error=>{
+ assert.equal(error.code,'REVIEW_SELECTION_INTEGRITY');
+ assert.match(error.message,/review|selection|projection|integrity|dirty/i);
+ assert.notEqual(error.code,'REVIEW_HELD','integrity uncertainty is not a semantic Fail veto');
+ return true;
+};
+
+test('review selection holds every protected current alias contradiction and repairs only by a retained new exact revision',()=>{
+ const changes=[
+  ['status',v=>({...v,status:'pending'})],
+  ['subject',v=>({...v,subject:{...v.subject,id:'different-subject'}})],
+  ['scope',v=>({...v,scope:'different-scope'})],
+  ['verdict',v=>({...v,verdict:'Pass',blockers:[]})],
+  ['proof-task',v=>({...v,proof:{...v.proof,task:{...v.proof.task,id:'benign-substituted-task'}}})],
+  ['stripped-runtime',v=>({...v,verdict:'Pass',blockers:[],proof:{protocol:'peer-native-review-v1'}})],
+  ['combined',v=>({...v,status:'pending',scope:'different-scope',subject:{...v.subject,id:'different-subject'},verdict:'Pass',blockers:[],proof:{protocol:'peer-native-review-v1'}})]
+ ];
+ for(const [label,change] of changes){
+  const f=peerFixture();try{
+   const subject=selectionSubject(f),production=selectionProduction(`alias-${label}`,subject,{scope:'foreign-scope',verdict:'Fail'});
+   selectionSeed(f,[production]);
+   assert.deepEqual(f.ledger.read(tx=>tx.queryCurrentReviews({subjects:[subject],scopes:[]})).items.map(selectionRef),[selectionRef(production.review)]);
+   let contradictory=change(production.review.value);
+   if(label==='proof-task'){
+    const benign=selectionProduction('benign-substitute',selectionSubject(f,'benign-subject'),{verdict:'Pass'});
+    selectionSeed(f,[benign]);
+    contradictory={...production.review.value,proof:{...production.review.value.proof,task:selectionRef(benign.task)}};
+   }
+   const bad=f.ledger.write('selection.synthetic.alias-change','founder',tx=>tx.put('reviews',production.review.id,contradictory,1));
+   assert.equal(bad.revision,2,'generic canonical updates retain the contradictory evidence rather than deleting it');
+   const before=selectionState(f);
+   assert.throws(()=>f.ledger.read(tx=>tx.queryCurrentReviews({subjects:[],scopes:['unrelated-request']})),selectionIntegrity,label);
+   assert.deepEqual(selectionState(f),before);
+   const replacement=selectionProduction(`replacement-${label}`,subject,{scope:'foreign-scope',verdict:'Pass'});
+   selectionSeed(f,[replacement]);
+   assert.throws(()=>f.ledger.read(tx=>tx.queryCurrentReviews({subjects:[],scopes:[]})),selectionIntegrity,'a different positive review cannot repair lost binding');
+   const repaired=f.ledger.write('selection.synthetic.binding-correction','founder',tx=>tx.put('reviews',production.review.id,production.review.value,2));
+   assert.equal(repaired.revision,3);
+   f.ledger.read(tx=>{
+    const selected=tx.queryCurrentReviews({subjects:[subject],scopes:[]});
+    assert.equal(selected.total,2);
+    assert.deepEqual(selected.items.find(r=>r.id===production.review.id),repaired);
+    assert.deepEqual(tx.getVersion(selectionRef(bad)).value,bad.value,'the contradictory historical revision remains available');
+    assert.deepEqual(tx.getVersion(selectionRef(production.review)).value,production.review.value);
+   });
+  }finally{f.close();}
+ }
+});
+
+test('review selection keeps demonstrably manual legacy Pass discoverable without permitting stripped protected origin to become manual',()=>{
+ const f=peerFixture();try{
+  const subject=selectionSubject(f);
+  const manual=f.ledger.write('selection.synthetic.manual','founder',tx=>tx.put('reviews','manual',{status:'accepted',scope:'legacy-scope',subject,verdict:'Pass',blockers:[],reviewer_principal_id:'synthetic-manual',termination_confirmed:true,proof:{protocol:'peer-native-review-v1'}},0));
+  assert.deepEqual(f.ledger.read(tx=>tx.queryCurrentReviews({subjects:[],scopes:['legacy-scope']})),selectionEmpty());
+  assert.deepEqual(f.ledger.read(tx=>tx.queryCurrentReviews({subjects:[subject],scopes:[]})).items,[manual]);
+  const production=selectionProduction('manual-coexists-protected',subject,{scope:'repo/app',verdict:'Pass'});
+  selectionSeed(f,[production]);
+  assert.equal(f.ledger.read(tx=>tx.queryCurrentReviews({subjects:[subject],scopes:[]})).total,2,'manual prefix does not block a separate protected production');
+  const impossibleId='a'.repeat(64);
+  f.ledger.write('selection.synthetic.ambiguous-origin','founder',tx=>tx.put('reviews',impossibleId,manual.value,0));
+  assert.throws(()=>f.ledger.read(tx=>tx.queryCurrentReviews({subjects:[],scopes:['different']})),selectionIntegrity,'a producer-shaped identifier without complete provenance is never silently exempted');
+ }finally{f.close();}
+});
+
+test('review selection holds missing malformed or wrong exact protected raw evidence instead of following latest task data',()=>{
+ for(const mode of ['missing-output','malformed-output','wrong-task-hash','missing-observation']){
+  const f=peerFixture();try{
+   const subject=selectionSubject(f),production=selectionProduction(`raw-${mode}`,subject,{verdict:'Blocked'});
+   if(mode==='missing-output'||mode==='malformed-output'){
+    production.task.value.result.output=mode==='missing-output'?null:'{';
+    production.task.sha256=peerDigest(production.task.value);
+    production.review.value.proof.task=selectionRef(production.task);
+   }
+   if(mode==='wrong-task-hash')production.review.value.proof.task.sha256='f'.repeat(64);
+   if(mode==='missing-observation')production.review.value.proof.observation.id='missing-exact-observation';
+   production.review.sha256=peerDigest(production.review.value);
+   selectionSeed(f,[production]);
+   assert.throws(()=>f.ledger.read(tx=>tx.queryCurrentReviews({subjects:[],scopes:['unrelated']})),selectionIntegrity,mode);
+   assert.deepEqual(f.ledger.read(tx=>tx.get('reviews',production.review.id)).value,production.review.value,'unknown extraction retains canonical evidence for an authorized correction');
+  }finally{f.close();}
+ }
+});
+
+test('review selection scans indexed matches rather than hydrating 10001 unrelated protected bodies and holds 10001 genuine matches',()=>{
+ const f=peerFixture();try{
+  const foreign=selectionSubject(f,'scale-foreign'),target=selectionSubject(f,'scale-target');
+  const unrelated=Array.from({length:10001},(_,i)=>selectionProduction(`scale-${String(i).padStart(5,'0')}`,foreign,{scope:'foreign-scale',verdict:'Fail'}));
+  selectionSeed(f,unrelated.slice(0,10000));
+  const atBound=f.ledger.read(tx=>tx.queryCurrentReviews({subjects:[foreign],scopes:[],limit:1}));
+  assert.equal(atBound.total,10000);assert.equal(atBound.items.length,1);assert.equal(atBound.complete,false);
+  const scopeAtBound=f.ledger.read(tx=>tx.queryCurrentReviews({subjects:[],scopes:['foreign-scale'],limit:1}));
+  assert.equal(scopeAtBound.total,10000);assert.equal(scopeAtBound.items.length,1);assert.equal(scopeAtBound.complete,false);
+  selectionSeed(f,unrelated.slice(10000));
+  const relevant=selectionProduction('scale-relevant',target,{scope:'repo/app',verdict:'Blocked'});
+  selectionSeed(f,[relevant]);
+  const bodyIds=new Set(),plans=[],original=f.ledger.query;
+  f.ledger.query=function(sql,...parameters){
+   const statement=Reflect.apply(original,this,[sql,...parameters]);
+   if(!/^\s*SELECT\b/i.test(sql))return statement;
+   return new Proxy(statement,{get(object,key){
+    const value=Reflect.get(object,key,object);
+    if(typeof value!=='function')return value;
+    if(!['get','all'].includes(key))return value.bind(object);
+    return (...args)=>{
+     if(/peer_review_selection/.test(sql))plans.push(...f.ledger.db.prepare('EXPLAIN QUERY PLAN '+sql).all(...args).map(r=>r.detail));
+     const result=Reflect.apply(value,object,args);
+     for(const row of Array.isArray(result)?result:[result])if(row?.family==='reviews'&&Object.hasOwn(row,'bytes'))bodyIds.add(row.id);
+     return result;
+    };
+   }});
+  };
+  try{
+   const scoped=f.ledger.read(tx=>tx.queryCurrentReviews({subjects:[],scopes:['repo/app']}));
+   assert.deepEqual(scoped.items.map(selectionRef),[selectionRef(relevant.review)]);
+   assert.equal(scoped.total,1);
+   assert.deepEqual([...bodyIds],[relevant.review.id],'no unrelated current review body is hydrated');
+   assert.ok(plans.some(detail=>/peer_review_scope/.test(detail)),`scope selection must use its candidate index: ${plans.join('; ')}`);
+   bodyIds.clear();plans.length=0;
+   assert.throws(()=>f.ledger.read(tx=>tx.queryCurrentReviews({subjects:[foreign],scopes:[]})),error=>{
+    assert.equal(error.code,'LOOKUP_CAPACITY');return true;
+   });
+   assert.equal(bodyIds.size,0,'capacity overflow is detected before hydrating a truncated candidate page');
+   assert.ok(plans.some(detail=>/peer_review_subject/.test(detail)),`exact subject selection must use its candidate index: ${plans.join('; ')}`);
+   bodyIds.clear();plans.length=0;
+   assert.throws(()=>f.ledger.read(tx=>tx.queryCurrentReviews({subjects:[],scopes:['foreign-scale']})),error=>{
+    assert.equal(error.code,'LOOKUP_CAPACITY');return true;
+   });
+   assert.equal(bodyIds.size,0,'scope overflow is also detected before current bodies are hydrated');
+   assert.ok(plans.some(detail=>/peer_review_scope/.test(detail)),`adverse scope overflow must use its candidate index: ${plans.join('; ')}`);
+   assert.equal(plans.some(detail=>/TEMP B-TREE/i.test(detail)),false,'bounded scope arms must not sort the unrelated global candidate population');
+   const bounded=f.ledger.read(tx=>tx.queryCurrentReviews({subjects:[target],scopes:['repo/app'],limit:1}));
+   assert.equal(bounded.total,1,'overlap is deduplicated before applying the match bound');
+   assert.deepEqual(bounded.items.map(selectionRef),[selectionRef(relevant.review)]);
+  }finally{f.ledger.query=original;}
+ }finally{f.close();}
+});
+
+test('review selection cursors bind exact selector and owning snapshot lifetime without silently restarting',()=>{
+ const f=peerFixture();try{
+  const subject=selectionSubject(f),productions=Array.from({length:3},(_,i)=>selectionProduction(`cursor-${i}`,subject,{scope:'repo/app'}));
+  selectionSeed(f,productions);
+  const ordered=productions.map(p=>p.review).sort((a,b)=>a.id.localeCompare(b.id)),options={subjects:[subject],scopes:[],limit:1};
+  let escapedCursor,handle;
+  const before=selectionState(f);
+  f.ledger.read(tx=>{
+   handle=tx;
+   const first=tx.queryCurrentReviews(options);escapedCursor=first.next_cursor;
+   assert.deepEqual(first.items.map(selectionRef),[selectionRef(ordered[0])]);
+   assert.throws(()=>tx.queryCurrentReviews({...options,subjects:[{...subject,id:'other-subject'}],cursor:first.next_cursor}),/cursor|selector/i);
+   assert.throws(()=>tx.queryCurrentReviews({...options,scopes:['repo/app'],cursor:first.next_cursor}),/cursor|selector/i);
+   const parsed=JSON.parse(Buffer.from(first.next_cursor,'base64url').toString('utf8'));
+   const forged=Buffer.from(JSON.stringify({...parsed,recipe:'unknown-selection-recipe'})).toString('base64url');
+   assert.throws(()=>tx.queryCurrentReviews({...options,cursor:forged}),/cursor|recipe/i);
+   const second=tx.queryCurrentReviews({...options,cursor:first.next_cursor}),third=tx.queryCurrentReviews({...options,cursor:second.next_cursor});
+   assert.deepEqual(second.items.map(selectionRef),[selectionRef(ordered[1])]);
+   assert.deepEqual(third.items.map(selectionRef),[selectionRef(ordered[2])]);
+   assert.equal(third.total,3);assert.equal(third.complete,true);assert.equal(third.next_cursor,null);
+  });
+  assert.throws(()=>handle.queryCurrentReviews({...options,cursor:escapedCursor}),/expired/i);
+  assert.throws(()=>f.ledger.read(tx=>tx.queryCurrentReviews({...options,cursor:escapedCursor})),/cursor|snapshot|stale/i,'even an unchanged generation cannot authorize an escaped snapshot cursor');
+  assert.deepEqual(selectionState(f),before);
+ }finally{f.close();}
+});
+
+const {REVIEW_PRODUCER_RECIPE:selectionProducerRecipe}=await import('../plugins/soloco/runtime/peers/review-selection.mjs');
+function selectionSQL(f,fn){const db=new DatabaseSync(f.file);try{return fn(db);}finally{db.close();}}
+function selectionLegacyCopy(f){
+ // A retained isolated fixture is downgraded to the accepted pre-query schema.
+ // This is migration mechanics, never an operation on an actual company.
+ selectionSQL(f,db=>{
+  const objects=db.prepare("SELECT type,name FROM sqlite_schema WHERE name LIKE 'peer_review_%' ORDER BY CASE type WHEN 'trigger' THEN 0 WHEN 'index' THEN 1 ELSE 2 END").all();
+  for(const {type,name} of objects)db.exec(`DROP ${type.toUpperCase()} "${name}"`);
+ });
+}
+const selectionUpgrade=f=>f.ledger.upgradeReviewSelection({retained_copy:true,producer_recipe:selectionProducerRecipe});
+
+test('review selection requires explicit retained-copy producer admission and audits a complete legacy rebuild without rewriting canonical history',()=>{
+ const f=peerFixture();try{
+  const subject=selectionSubject(f),productions=[selectionProduction('upgrade-pass',subject),selectionProduction('upgrade-fail',subject,{scope:'repo/app',verdict:'Fail'})];
+  selectionSeed(f,productions);
+  const canonicalBefore=snapshot(f);
+  selectionLegacyCopy(f);
+  const legacy=selectionState(f);
+  assert.throws(()=>f.ledger.read(tx=>tx.queryCurrentReviews({subjects:[subject],scopes:[]})),error=>{assert.equal(error.code,'REVIEW_SELECTION_CAPABILITY');return true;});
+  for(const options of [{},{retained_copy:true},{retained_copy:false,producer_recipe:selectionProducerRecipe},{retained_copy:true,producer_recipe:'unsupported-production'}])assert.throws(()=>f.ledger.upgradeReviewSelection(options),/retained|producer|admission/i);
+  assert.deepEqual(selectionState(f),legacy,'ordinary reads and missing migration authorization never install a fallback');
+  const result=selectionUpgrade(f);
+  assert.equal(result.reviews,2);assert.equal(result.errors,0);assert.equal(result.clean,true);assert.equal(result.recipe,selectionRecipe);
+  assert.deepEqual(snapshot(f),canonicalBefore,'rebuilding derived selection must not rewrite canonical rows, versions, events or memberships');
+  assert.deepEqual(f.ledger.auditReviewSelection(),result);
+  assert.equal(f.ledger.read(tx=>tx.queryCurrentReviews({subjects:[subject],scopes:[]})).total,2);
+ }finally{f.close();}
+});
+
+test('review selection audit detects equal-count missing-extra projection coverage and wrong exact hashes',()=>{
+ for(const mode of ['missing-extra','wrong-hash']){
+  const f=peerFixture();try{
+   const subject=selectionSubject(f),production=selectionProduction(`audit-${mode}`,subject);
+   selectionSeed(f,[production]);
+   selectionSQL(f,db=>{
+    if(mode==='missing-extra')db.prepare('UPDATE peer_review_selection SET review_id=? WHERE review_id=?').run('orphan-projection',production.review.id);
+    else db.prepare('UPDATE peer_review_selection SET sha256=? WHERE review_id=?').run('e'.repeat(64),production.review.id);
+    // Isolated corruption fixture: erase the trigger alarm to prove a full audit
+    // compares identities and hashes, rather than accepting equal row counts.
+    db.exec('DELETE FROM peer_review_dirty');
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM peer_review_selection').get().n,1);
+   });
+   const before=selectionState(f);
+   assert.throws(()=>f.ledger.auditReviewSelection(),error=>{assert.equal(error.code,'REVIEW_SELECTION_INTEGRITY');return true;});
+   assert.deepEqual(selectionState(f),before,'a read-only audit cannot repair evidence under inspection');
+   assert.equal(selectionUpgrade(f).clean,true,'an explicit full rebuild may repair derived metadata');
+   assert.equal(f.ledger.read(tx=>tx.queryCurrentReviews({subjects:[subject],scopes:[]})).total,1);
+  }finally{f.close();}
+ }
+});
+
+test('review selection legacy upgrade rejects orphan missing-first or missing-middle immutable history and publishes no partial capability',()=>{
+ for(const mode of ['orphan','missing-first','missing-middle']){
+  const f=peerFixture();try{
+   const subject=selectionSubject(f),production=selectionProduction(`legacy-${mode}`,subject);
+   selectionSeed(f,[production]);
+   if(mode==='missing-middle'){
+    f.ledger.write('selection.synthetic.legacy-revision-two','founder',tx=>tx.put('reviews',production.review.id,{...production.review.value,synthetic_revision:2},1));
+    f.ledger.write('selection.synthetic.legacy-revision-three','founder',tx=>tx.put('reviews',production.review.id,{...production.review.value,synthetic_revision:3},2));
+   }
+   selectionLegacyCopy(f);
+   selectionSQL(f,db=>{
+    if(mode==='orphan')db.prepare("DELETE FROM peer_rows WHERE family='reviews' AND id=?").run(production.review.id);
+    else{
+     db.exec('DROP TRIGGER peer_history_delete');
+     db.prepare("DELETE FROM peer_versions WHERE family='reviews' AND id=? AND revision=?").run(production.review.id,mode==='missing-middle'?2:1);
+    }
+   });
+   const before=selectionState(f);
+   assert.throws(()=>selectionUpgrade(f),/review|version|history|binding|canonical/i);
+   assert.deepEqual(selectionState(f),before,'failed migration rolls back schema admission and all derived writes');
+   assert.throws(()=>f.ledger.read(tx=>tx.queryCurrentReviews({subjects:[],scopes:[]})),error=>{assert.equal(error.code,'REVIEW_SELECTION_CAPABILITY');return true;});
+  }finally{f.close();}
+ }
+});
+
+test('review selection dirty triggers fence older-writer updates and canonical review deletion remains forbidden',()=>{
+ const f=peerFixture();try{
+  const subject=selectionSubject(f),production=selectionProduction('old-writer',subject,{scope:'repo/app',verdict:'Fail'});
+  selectionSeed(f,[production]);
+  const canonicalBefore=snapshot(f);
+  selectionSQL(f,db=>{
+   // Exercise an older cooperating writer's actual canonical UPDATE boundary;
+   // no refresher is invoked. Identical bytes isolate the trigger mechanism.
+   db.prepare("UPDATE peer_rows SET bytes=bytes WHERE family='reviews' AND id=?").run(production.review.id);
+   assert.equal(db.prepare('SELECT review_id FROM peer_review_dirty').get().review_id,production.review.id);
+  });
+  const before=selectionState(f);
+  assert.throws(()=>f.ledger.read(tx=>tx.queryCurrentReviews({subjects:[],scopes:['repo/app']})),error=>{assert.equal(error.code,'REVIEW_SELECTION_DIRTY');return true;});
+  assert.deepEqual(selectionState(f),before);
+  assert.throws(()=>selectionSQL(f,db=>db.prepare("DELETE FROM peer_rows WHERE family='reviews' AND id=?").run(production.review.id)),/deletion|forbidden/i);
+  assert.equal(selectionUpgrade(f).clean,true);
+  assert.deepEqual(snapshot(f),canonicalBefore);
+  assert.equal(f.ledger.read(tx=>tx.queryCurrentReviews({subjects:[],scopes:['repo/app']})).total,1);
+ }finally{f.close();}
+});
+
+test('review selection absence or alteration of an index trigger or capability recipe fails closed without scanning bodies',()=>{
+ for(const mode of ['index','trigger','recipe']){
+  const f=peerFixture();try{
+   const subject=selectionSubject(f),production=selectionProduction(`schema-${mode}`,subject);
+   selectionSeed(f,[production]);
+   selectionSQL(f,db=>{
+    if(mode==='index')db.exec('DROP INDEX peer_review_subject');
+    if(mode==='trigger')db.exec('DROP TRIGGER peer_review_update');
+    if(mode==='recipe')db.prepare('UPDATE peer_review_recipe SET recipe=? WHERE id=1').run('incompatible-recipe');
+   });
+   const before=selectionState(f),queries=[],original=f.ledger.query;
+   f.ledger.query=function(sql,...args){queries.push(sql);return Reflect.apply(original,this,[sql,...args]);};
+   try{
+    assert.throws(()=>f.ledger.read(tx=>tx.queryCurrentReviews({subjects:[subject],scopes:[]})),error=>{assert.equal(error.code,'REVIEW_SELECTION_CAPABILITY');return true;});
+   }finally{f.ledger.query=original;}
+   assert.equal(queries.some(sql=>/SELECT .*FROM peer_rows WHERE family='reviews'/i.test(sql)),false,'missing capability cannot invoke a global canonical-body fallback');
+   assert.deepEqual(selectionState(f),before);
+  }finally{f.close();}
+ }
+});
+
+test('review selection refresh and later event-flush failures roll back canonical history projection dirty state and generation together',()=>{
+ for(const point of ['refresh','event-flush']){
+  let armed=false,hits=0;
+  const injected=Error(`synthetic selection ${point} failure`),f=peerFixture({onQuery:q=>{
+   if(!armed||!(point==='refresh'?q.sql.startsWith('INSERT INTO peer_review_selection'):q.sql.startsWith('INSERT INTO peer_events')))return;
+   armed=false;hits++;throw injected;
+  }});
+  try{
+   const subject=selectionSubject(f),production=selectionProduction(`rollback-${point}`,subject,{scope:'repo/app',verdict:'Blocked'}),before=selectionState(f);
+   armed=true;
+   assert.throws(()=>f.ledger.write('selection.synthetic.rollback','founder',tx=>{
+    selectionPutProduction(tx,production,['review','task','observation']);tx.event('synthetic.selection.buffered',{point});
+   }),error=>{assert.equal(error,injected);return true;});
+   assert.equal(hits,1);assert.deepEqual(selectionState(f),before);
+   const fresh=new PeerLedger(f.root);try{
+    fresh.read(tx=>{
+     for(const row of [production.review,production.task,production.observation])assert.equal(tx.get(row.family,row.id),null);
+     assert.deepEqual(tx.queryCurrentReviews({subjects:[subject],scopes:['repo/app']}),selectionEmpty());
+    });
+    assert.equal(fresh.auditReviewSelection().clean,true);
+   }finally{fresh.close();}
+  }finally{armed=false;f.close();}
+ }
+});
+
+test('review selection interrupted retained-copy rebuild rolls back its capability and every partial projection row',()=>{
+ let armed=false,hits=0;
+ const injected=Error('synthetic second projection refresh failure'),f=peerFixture({onQuery:q=>{
+  if(!armed||!q.sql.startsWith('INSERT INTO peer_review_selection'))return;
+  if(++hits===2){armed=false;throw injected;}
+ }});
+ try{
+  const subject=selectionSubject(f);
+  selectionSeed(f,[selectionProduction('upgrade-interrupt-a',subject),selectionProduction('upgrade-interrupt-b',subject)]);
+  selectionLegacyCopy(f);const before=selectionState(f);armed=true;
+  assert.throws(()=>selectionUpgrade(f),error=>{assert.equal(error,injected);return true;});
+  assert.equal(hits,2);assert.deepEqual(selectionState(f),before);
+  assert.throws(()=>f.ledger.read(tx=>tx.queryCurrentReviews({subjects:[subject],scopes:[]})),error=>{assert.equal(error.code,'REVIEW_SELECTION_CAPABILITY');return true;});
+  assert.equal(selectionUpgrade(f).reviews,2);
+ }finally{armed=false;f.close();}
+});
+
+test('review selection refuses an intermediate pending producing-task version despite its retained exact bytes',()=>{
+ const f=peerFixture();try{
+  const subject=selectionSubject(f),production=selectionProduction('intermediate-pending',subject,{scope:'repo/app',verdict:'Fail'});
+  f.ledger.write('selection.synthetic.intermediate','founder',tx=>{
+   selectionPutProduction(tx,production);
+   tx.put('tasks',production.task.id,{...production.task.value,synthetic_later_revision:true},1);
+  });
+  assert.throws(()=>f.ledger.read(tx=>tx.queryCurrentReviews({subjects:[subject],scopes:['repo/app']})),selectionIntegrity,'immutable intermediate evidence cannot replace the producer’s final pending exact version');
+  assert.equal(f.ledger.read(tx=>tx.get('tasks',production.task.id)).revision,2);
+ }finally{f.close();}
+});
+
+const selectionHookPoints={
+ capability:sql=>sql.startsWith('SELECT name,sql FROM sqlite_master'),
+ dirty:sql=>sql==='SELECT review_id FROM peer_review_dirty LIMIT 1',
+ subject:sql=>sql.startsWith('SELECT review_id FROM peer_review_selection INDEXED BY peer_review_subject'),
+ body:sql=>sql==='SELECT * FROM peer_rows WHERE family=? AND id=?'
+};
+test('review selection query hooks cannot return old evidence after a real same-handle mutation at capability candidate or body boundaries',()=>{
+ for(const [point,match] of Object.entries(selectionHookPoints)){
+  let armed=false,active,hits=0;
+  const f=peerFixture({onQuery:q=>{
+   if(!armed||!match(q.sql))return;
+   armed=false;hits++;active.put('notices',`selection-hook-${point}`,{status:'open',scope:'repo/app'},0);
+  }});
+  try{
+   const subject=selectionSubject(f),production=selectionProduction(`hook-${point}`,subject);selectionSeed(f,[production]);
+   const before=selectionState(f);let returned=false;
+   assert.throws(()=>f.ledger.write('selection.synthetic.hook.rollback','founder',tx=>{
+    active=tx;armed=true;
+    assert.throws(()=>{tx.queryCurrentReviews({subjects:[subject],scopes:[]});returned=true;},/pending writes|mutation|after.*write/i);
+    assert.equal(hits,1);assert.equal(returned,false);
+    assert.throws(()=>tx.queryCurrentReviews({subjects:[subject],scopes:[]}),/pending writes|mutation|after.*write/i);
+    throw Error('deliberate selection hook rollback');
+   }),/deliberate selection hook rollback/);
+   active=null;assert.deepEqual(selectionState(f),before);
+  }finally{armed=false;active=null;f.close();}
+ }
+});
+
+test('review selection permits guarded read-only telemetry and successful no-op hook writes without changing evidence',()=>{
+ for(const [point,match] of Object.entries(selectionHookPoints)){
+  let armed=false,active,old,hits=0;
+  const f=peerFixture({onQuery:q=>{
+   if(!armed||!match(q.sql))return;
+   armed=false;hits++;
+   assert.deepEqual(active.get('notices',old.id),old);
+   assert.deepEqual(active.put('notices',old.id,old.value,old.revision),old);
+   assert.deepEqual(active.queryCurrentReviews({subjects:[],scopes:[]}),selectionEmpty(),'nested read-only discovery is supported');
+  }});
+  try{
+   const subject=selectionSubject(f),production=selectionProduction(`noop-${point}`,subject);selectionSeed(f,[production]);
+   old=f.ledger.write('selection.synthetic.noop.seed','founder',tx=>tx.put('notices','selection-noop',{status:'open',scope:'repo/app'},0));
+   const before=selectionState(f);
+   f.ledger.write('selection.synthetic.noop','founder',tx=>{
+    active=tx;armed=true;
+    assert.deepEqual(tx.queryCurrentReviews({subjects:[subject],scopes:[]}).items.map(selectionRef),[selectionRef(production.review)]);
+   });
+   active=null;assert.equal(hits,1);assert.deepEqual(selectionState(f),before);
+  }finally{armed=false;active=null;f.close();}
+ }
+});
+
+test('review selection revalidates after actual statement retrieval before returning a candidate page',()=>{
+ const f=peerFixture();let active,armed=false,hits=0;const original=f.ledger.query;
+ try{
+  const subject=selectionSubject(f),production=selectionProduction('post-result',subject);selectionSeed(f,[production]);
+  const before=selectionState(f);
+  f.ledger.query=function(sql,...parameters){
+   const statement=Reflect.apply(original,this,[sql,...parameters]);
+   if(!sql.startsWith('SELECT review_id FROM peer_review_selection INDEXED BY peer_review_subject'))return statement;
+   return new Proxy(statement,{get(object,key){
+    const value=Reflect.get(object,key,object);if(typeof value!=='function')return value;
+    if(key!=='all')return value.bind(object);
+    return (...args)=>{
+     const result=Reflect.apply(value,object,args);
+     if(armed){armed=false;hits++;active.put('notices','selection-after-result',{status:'open',scope:'repo/app'},0);}
+     return result;
+    };
+   }});
+  };
+  assert.throws(()=>f.ledger.write('selection.synthetic.post-result','founder',tx=>{
+   active=tx;armed=true;
+   assert.throws(()=>tx.queryCurrentReviews({subjects:[subject],scopes:[]}),/pending writes|mutation|after.*write/i);
+   assert.equal(hits,1);
+   throw Error('deliberate selection post-result rollback');
+  }),/deliberate selection post-result rollback/);
+  active=null;assert.deepEqual(selectionState(f),before);
+ }finally{armed=false;active=null;f.ledger.query=original;f.close();}
+});
+
+test('review selection final refresh closes public handles and preserves the physical connection owner against sibling wrappers',()=>{
+ let armed=false,active,hits=0,owner,sibling;
+ const f=peerFixture(),db=new DatabaseSync(f.file);
+ owner=new PeerLedger(f.root,{connection:db,onQuery:q=>{
+  if(!armed||!q.sql.startsWith('INSERT INTO peer_review_selection'))return;
+  armed=false;hits++;
+  assert.throws(()=>active.queryCurrentReviews({subjects:[],scopes:[]}),/closed|maintenance/i);
+  assert.throws(()=>active.getVersion({family:'proposals',id:'anything',revision:1,sha256:'a'.repeat(64)}),/closed|maintenance/i);
+  assert.throws(()=>active.put('notices','selection-final-reentry',{status:'open'},0),/closed|maintenance/i);
+  assert.throws(()=>owner.read(()=>{}),/Nested|active/i);
+  assert.throws(()=>sibling.read(tx=>tx.queryCurrentReviews({subjects:[],scopes:[]})),/active transaction owner|ownership/i);
+ }});
+ sibling=new PeerLedger(f.root,{connection:db});
+ try{
+  const subject=selectionSubject(f),production=selectionProduction('final-refresh',subject);
+  armed=true;
+  owner.write('selection.synthetic.final-refresh','founder',tx=>{active=tx;selectionPutProduction(tx,production);});
+  active=null;assert.equal(hits,1);
+  assert.equal(sibling.read(tx=>tx.queryCurrentReviews({subjects:[subject],scopes:[]})).total,1,'the owner releases only after final refresh commits');
+  assert.equal(f.ledger.read(tx=>tx.get('notices','selection-final-reentry')),null);
+ }finally{armed=false;active=null;owner.close();sibling.close();db.close();f.close();}
+});
+
+test('review selection excludes borrowed outer transactions without disturbing supported savepoint writes',()=>{
+ const f=peerFixture(),db=new DatabaseSync(f.file),borrowed=new PeerLedger(f.root,{connection:db});
+ try{
+  const subject=selectionSubject(f),production=selectionProduction('borrowed',subject);selectionSeed(f,[production]);
+  const before=selectionState(f);db.exec('BEGIN IMMEDIATE');
+  borrowed.writeWithin('selection.synthetic.borrowed','founder',tx=>{
+   assert.throws(()=>tx.queryCurrentReviews({subjects:[subject],scopes:[]}),/external|owning|borrowed/i);
+   tx.put('notices','selection-outer-pending',{status:'open',scope:'repo/app'},0);
+  });
+  assert.equal(db.isTransaction,true);
+  assert.equal(f.ledger.read(tx=>tx.get('notices','selection-outer-pending')),null);
+  db.exec('ROLLBACK');assert.deepEqual(selectionState(f),before);
+ }finally{if(db.isTransaction)db.exec('ROLLBACK');borrowed.close();db.close();f.close();}
+});
+
+test('review selection owning WAL snapshot keeps stable pages while another connection commits a new review generation',()=>{
+ let armed=false,hits=0,other,future;
+ const f=peerFixture({onQuery:q=>{
+  if(!armed||q.sql!=='SELECT * FROM peer_review_recipe WHERE id=1')return;
+  armed=false;hits++;
+  other.write('selection.synthetic.wal.future','founder',tx=>selectionPutProduction(tx,future));
+ }});
+ try{
+  const subject=selectionSubject(f),productions=Array.from({length:3},(_,i)=>selectionProduction(`wal-${i}`,subject));
+  selectionSeed(f,productions);future=selectionProduction('wal-future',subject);other=new PeerLedger(f.root);
+  const ordered=productions.map(p=>p.review).sort((a,b)=>a.id.localeCompare(b.id)),options={subjects:[subject],scopes:[],limit:1};
+  f.ledger.read(tx=>{
+   armed=true;
+   let cursor;const items=[];
+   do{
+    const page=tx.queryCurrentReviews({...options,...(cursor?{cursor}:{})});
+    assert.equal(page.total,3);items.push(...page.items);cursor=page.next_cursor;
+   }while(cursor);
+   assert.equal(hits,1);assert.deepEqual(items.map(selectionRef),ordered.map(selectionRef));
+   assert.equal(tx.get('reviews',future.review.id),null);
+  });
+  assert.equal(f.ledger.read(tx=>tx.queryCurrentReviews({subjects:[subject],scopes:[]})).total,4);
+  assert.equal(f.ledger.auditReviewSelection().clean,true);
+ }finally{armed=false;other?.close();f.close();}
+});
+
+test('review selection preserves normalized global production scope and rejects missing or null current scope aliases',()=>{
+ for(const mode of ['missing','null']){
+  const f=peerFixture();try{
+   const subject=selectionSubject(f),production=selectionProduction(`global-scope-${mode}`,subject,{scope:'*',definitionScope:null,verdict:'Pass'});
+   selectionSeed(f,[production]);
+   assert.deepEqual(f.ledger.read(tx=>tx.queryCurrentReviews({subjects:[subject],scopes:[]})).items.map(selectionRef),[selectionRef(production.review)]);
+   const changed={...production.review.value};if(mode==='missing')delete changed.scope;else changed.scope=null;
+   f.ledger.write('selection.synthetic.global-scope-alias','founder',tx=>tx.put('reviews',production.review.id,changed,1));
+   assert.throws(()=>f.ledger.read(tx=>tx.queryCurrentReviews({subjects:[],scopes:['unrelated']})),selectionIntegrity,'a nonadverse raw result cannot conceal a production alias contradiction');
+  }finally{f.close();}
+ }
+});
+
+test('review selection classifies generic null or array production support as integrity unknown without aborting its canonical write',()=>{
+ for(const mode of ['null-task','array-task','invalid-attempt','null-observation','array-observation']){
+  const f=peerFixture();try{
+   const subject=selectionSubject(f),production=selectionProduction(`shape-${mode}`,subject,{verdict:'Pass'});
+   if(mode==='null-task')production.task.value=null;
+   if(mode==='array-task')production.task.value=[];
+   if(mode==='invalid-attempt')production.task.value.attempt=17;
+   if(mode.endsWith('observation')){
+    production.observation.value=mode==='null-observation'?null:[];
+    production.observation.sha256=peerDigest(production.observation.value);
+    production.task.value.result.observation=selectionRef(production.observation);
+    production.review.value.proof.observation=selectionRef(production.observation);
+   }
+   production.task.sha256=peerDigest(production.task.value);
+   production.review.value.proof.task=selectionRef(production.task);production.review.sha256=peerDigest(production.review.value);
+   selectionSeed(f,[production]);
+   assert.deepEqual(f.ledger.read(tx=>tx.get('tasks',production.task.id)).value,production.task.value);
+   assert.throws(()=>f.ledger.read(tx=>tx.queryCurrentReviews({subjects:[],scopes:[]})),error=>{assert.equal(error.code,'REVIEW_SELECTION_INTEGRITY');return true;},mode);
+  }finally{f.close();}
+ }
+});
+
+test('review selection query-hook errors retain identity and also report a simultaneously changed ownership boundary',()=>{
+ for(const modifies of [false,true]){
+  let armed=false,active,hits=0;
+  const injected=Error('synthetic selection query failure'),f=peerFixture({onQuery:q=>{
+   if(!armed||q.sql!=='SELECT * FROM peer_review_recipe WHERE id=1')return;
+   armed=false;hits++;
+   if(modifies)active.put('notices','selection-error-mutation',{status:'open'},0);
+   throw injected;
+  }});
+  try{
+   const subject=selectionSubject(f),production=selectionProduction(`error-${modifies}`,subject);selectionSeed(f,[production]);
+   const before=selectionState(f);
+   assert.throws(()=>f.ledger.write('selection.synthetic.error-rollback','founder',tx=>{
+    active=tx;armed=true;
+    assert.throws(()=>tx.queryCurrentReviews({subjects:[subject],scopes:[]}),error=>{
+     if(modifies){assert.ok(error instanceof AggregateError);assert.equal(error.errors[0],injected);assert.match(error.errors[1].message,/pending writes|mutation|after.*write/i);}
+     else assert.equal(error,injected);
+     return true;
+    });
+    assert.equal(hits,1);
+    if(modifies)assert.throws(()=>tx.queryCurrentReviews({subjects:[subject],scopes:[]}),/pending writes|mutation|after.*write/i);
+    else assert.equal(tx.queryCurrentReviews({subjects:[subject],scopes:[]}).total,1);
+    throw Error('deliberate selection error rollback');
+   }),/deliberate selection error rollback/);
+   active=null;assert.deepEqual(selectionState(f),before);
+  }finally{armed=false;active=null;f.close();}
+ }
+});
+
+test('review selection detects physical transaction loss before and after actual candidate retrieval and expires the owner handle',()=>{
+ for(const point of ['before','after']){
+  const f=peerFixture(),db=new DatabaseSync(f.file),owner=new PeerLedger(f.root,{connection:db});
+  let armed=false,hits=0,escaped;const original=owner.query;
+  try{
+   const subject=selectionSubject(f),production=selectionProduction(`physical-${point}`,subject);selectionSeed(f,[production]);
+   const before=selectionState(f);
+   owner.query=function(sql,...parameters){
+    const match=sql.startsWith('SELECT review_id FROM peer_review_selection INDEXED BY peer_review_subject');
+    if(armed&&match&&point==='before'){armed=false;hits++;db.exec('ROLLBACK');}
+    const statement=Reflect.apply(original,this,[sql,...parameters]);
+    if(!match||point!=='after')return statement;
+    return new Proxy(statement,{get(object,key){
+     const value=Reflect.get(object,key,object);if(typeof value!=='function')return value;
+     if(key!=='all')return value.bind(object);
+     return (...args)=>{const result=Reflect.apply(value,object,args);if(armed){armed=false;hits++;db.exec('ROLLBACK');}return result;};
+    }});
+   };
+   assert.throws(()=>owner.read(tx=>{escaped=tx;armed=true;return tx.queryCurrentReviews({subjects:[subject],scopes:[]});}),error=>{
+    const messages=[error,...(error.errors??[])].map(e=>e.message).join(' ');
+    assert.match(messages,/transaction|boundary|rollback|owner/i);return true;
+   });
+   assert.equal(hits,1);assert.equal(db.isTransaction,false);
+   assert.throws(()=>escaped.queryCurrentReviews({subjects:[subject],scopes:[]}),/expired/i);
+   assert.deepEqual(selectionState(f),before);
+   assert.equal(owner.read(tx=>tx.queryCurrentReviews({subjects:[subject],scopes:[]})).total,1,'an ended owning rollback releases its fence for a fresh snapshot');
+  }finally{armed=false;owner.query=original;if(db.isTransaction)db.exec('ROLLBACK');owner.close();db.close();f.close();}
+ }
+});
+
+test('review selection bounds its own retained classification at 10000 revisions without hydrating oversized history on an ordinary write',()=>{
+ const f=peerFixture();try{
+  const subject=selectionSubject(f,'retained-bound');selectionLegacyCopy(f);
+  const manual={status:'accepted',scope:'manual-history',subject,verdict:'Pass',blockers:[],proof:{protocol:'peer-native-review-v1'}};
+  // Genuine accepted-P1 CAS/history/event writes, batched while capability is
+  // absent. This is a synthetic manual record, not a protected native review.
+  for(let start=1;start<=10000;start+=50)f.ledger.write('selection.synthetic.manual-history','founder',tx=>{
+   for(let revision=start;revision<start+50;revision++)tx.put('reviews','manual-retained-history',{...manual,synthetic_revision:revision},revision-1);
+  });
+  assert.equal(selectionUpgrade(f).clean,true);
+  const atBound=f.ledger.read(tx=>tx.queryCurrentReviews({subjects:[subject],scopes:[]}));
+  assert.equal(atBound.total,1);assert.equal(atBound.items[0].revision,10000);
+  const queries=[],original=f.ledger.query;
+  f.ledger.query=function(sql,...args){queries.push(sql);return Reflect.apply(original,this,[sql,...args]);};
+  try{
+   const retained=f.ledger.write('selection.synthetic.oversized-history','founder',tx=>tx.put('reviews','manual-retained-history',{...manual,synthetic_revision:10001},10000));
+   assert.equal(retained.revision,10001);
+  }finally{f.ledger.query=original;}
+  assert.equal(queries.some(sql=>/FROM peer_versions WHERE family='reviews' AND id=\? ORDER BY revision/.test(sql)),false,'ordinary classification rejects the known oversized revision count before reading retained review bodies');
+  assert.throws(()=>f.ledger.read(tx=>tx.queryCurrentReviews({subjects:[],scopes:['unrelated']})),error=>{assert.equal(error.code,'REVIEW_SELECTION_INTEGRITY');return true;});
+  selectionSQL(f,db=>{
+   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM peer_versions WHERE family='reviews' AND id=?").get('manual-retained-history').n,10001);
+   assert.match(db.prepare('SELECT message FROM peer_review_errors WHERE review_id=?').get('manual-retained-history').message,/10,000|10000/);
+  });
+ }finally{f.close();}
+});
+
+// Native Engineering additions for the scope-string boundary. All preceding
+// accepted and external-proposal tests remain unchanged. These are fictional
+// SQLite/extraction mechanics, not native review or business qualification.
+const {extractReviewSelection:nativeExtractReviewSelection}=await import('../plugins/soloco/runtime/peers/review-selection.mjs');
+function nativeScopeFacts(tx,row){
+ const current=tx.getVersion(selectionRef(row));
+ assert.equal(current.revision,1,'these fixtures have one exact retained review revision');
+ return nativeExtractReviewSelection({current,history:[current],resolve:r=>tx.getVersion(r),canonical,hash:selectionRawHash});
+}
+
+test('native: scope selectors reject isolated surrogates before SQL while valid Unicode retains exact indexed identity',()=>{
+ const f=peerFixture();
+ try{
+  const subject=selectionSubject(f,'native-unicode-scopes');
+  const scopes=[
+   'scope-\ud83d\ude00',
+   'scope-\ufffd',
+   'scope-\u96ea',
+   'scope-\u00e9',
+   'scope-e\u0301',
+   ' scope-\ud83d\ude00 ',
+   'scope-\u{10400}',
+   '\u{1f600}\u{1f680}'
+  ];
+  assert.equal(new Set(scopes).size,scopes.length);
+  const productions=scopes.map((scope,i)=>selectionProduction(`native-unicode-${i}`,subject,{scope,verdict:i%2?'Blocked':'Fail'}));
+  selectionSeed(f,productions);
+  const before=selectionState(f);
+  f.ledger.read(tx=>{
+   for(let i=0;i<scopes.length;i++){
+    const page=tx.queryCurrentReviews({subjects:[],scopes:[scopes[i]]});
+    assert.equal(page.total,1,'each exact scope selects only its own adverse record');
+    assert.equal(page.complete,true);assert.equal(page.next_cursor,null);
+    assert.deepEqual(page.items.map(selectionRef),[selectionRef(productions[i].review)]);
+    assert.deepEqual(page.items[0].value,productions[i].review.value);
+    const facts=nativeScopeFacts(tx,productions[i].review);
+    assert.equal(facts.outcome,'PROTECTED');assert.equal(facts.error,null);
+    assert.equal(facts.scope,scopes[i],'no trimming, Unicode normalization or replacement is allowed');
+    assert.equal(facts.adverse,true);
+    const metadata=before.peer_review_selection.find(row=>row.review_id===productions[i].review.id);
+    assert.equal(metadata.scope,scopes[i],'the real SQLite projection preserves the same exact valid string');
+    assert.equal(metadata.outcome,'PROTECTED');
+   }
+   assert.equal(tx.queryCurrentReviews({subjects:[subject],scopes:[]}).total,scopes.length);
+  });
+  assert.deepEqual(selectionState(f),before);
+  const invalid=[
+   '\ud800','\udc00',
+   'scope-\ud800','scope-\udbff','scope-\udc00','scope-\udfff',
+   'scope-\ud800x','scope-\udc00\ud800',
+   'scope-\ud800\ud800','scope-\udfff\udfff'
+  ];
+  const queries=[],originalHook=f.ledger.onQuery;
+  f.ledger.onQuery=q=>{queries.push(q.sql);originalHook?.(q);};
+  try{
+   for(const mode of ['read','write']){
+    const callback=tx=>{
+     for(const scope of invalid){
+      queries.length=0;
+      assert.throws(()=>tx.queryCurrentReviews({subjects:[],scopes:[scope]}),/Invalid production scope/);
+      assert.deepEqual(queries,[],'invalid scope must reject before preparing selection SQL');
+      const recovered=tx.queryCurrentReviews({subjects:[],scopes:[scopes[1]]});
+      assert.deepEqual(recovered.items.map(selectionRef),[selectionRef(productions[1].review)],'U+FFFD remains a distinct valid scope and the owner remains usable');
+     }
+    };
+    if(mode==='read')f.ledger.read(callback);
+    else f.ledger.write('native.scope-selector.no-mutation','founder',callback);
+    assert.deepEqual(selectionState(f),before,'invalid selectors and valid reads change no canonical or projection table');
+   }
+  }finally{f.ledger.onQuery=originalHook;}
+  assert.deepEqual(selectionState(f),before);
+ }finally{f.close();}
+});
+
+test('native: invalid production scope remains integrity unknown with raw adversity retained even behind a stored Pass',()=>{
+ for(const [label,invalidScope] of [['high','production-\ud800'],['low','production-\udfff']]){
+  for(const verdict of ['Fail','Blocked'])for(const storedVerdict of [verdict,'Pass']){
+   const f=peerFixture();
+   try{
+    const subject=selectionSubject(f,`native-invalid-${label}-${verdict}-${storedVerdict}`);
+    // The malformed scope is inside canonical production evidence. Top-level
+    // indexed scopes remain valid, so the real ledger can retain that evidence
+    // without relying on any unestablished SQLite surrogate-conversion behavior.
+    const production=selectionProduction(`native-invalid-${label}-${verdict}-${storedVerdict}`,subject,{scope:'native-valid-indexed-scope',definitionScope:invalidScope,verdict});
+    if(storedVerdict==='Pass'){
+     production.review.value={...production.review.value,verdict:'Pass',blockers:[]};
+     production.review.sha256=peerDigest(production.review.value);
+    }
+    selectionSeed(f,[production]);
+    const before=selectionState(f),metadata=before.peer_review_selection.find(row=>row.review_id===production.review.id);
+    assert.ok(metadata);
+    assert.equal(metadata.outcome,'INTEGRITY_UNKNOWN');
+    assert.equal(metadata.adverse,1,'known raw Fail/Blocked remains adverse even if the stored alias is Pass');
+    assert.equal(metadata.scope,null,'an invalid production scope is not coerced into indexed scope membership');
+    assert.equal(metadata.subject_family,subject.family);
+    assert.equal(metadata.subject_id,subject.id);
+    assert.equal(metadata.subject_revision,subject.revision);
+    assert.equal(metadata.subject_sha256,subject.sha256);
+    const error=before.peer_review_errors.find(row=>row.review_id===production.review.id);
+    assert.ok(error);assert.match(error.message,/Invalid production scope/);
+    f.ledger.read(tx=>{
+     const facts=nativeScopeFacts(tx,production.review);
+     assert.equal(facts.outcome,'INTEGRITY_UNKNOWN');
+     assert.equal(facts.origin,'runtime');assert.equal(facts.scope,null);
+     assert.equal(facts.adverse,true,'scope validation must not erase an already observed negative verdict');
+     assert.deepEqual(facts.subject,subject);
+     assert.deepEqual(facts.anchor.review,selectionRef(production.review));
+     assert.deepEqual(facts.anchor.task,selectionRef(production.task));
+     assert.match(facts.error,/Invalid production scope/);
+     assert.equal(tx.getVersion(selectionRef(production.task)).value.definition.scope,invalidScope,'the original UTF-16 evidence remains exact canonical history');
+     assert.deepEqual(tx.getVersion(selectionRef(production.review)).value,production.review.value);
+     assert.throws(()=>tx.queryCurrentReviews({subjects:[subject],scopes:[]}),selectionIntegrity);
+     assert.throws(()=>tx.queryCurrentReviews({subjects:[],scopes:['unrelated']}),selectionIntegrity);
+     assert.throws(()=>tx.queryCurrentReviews({subjects:[],scopes:[]}),selectionIntegrity);
+    });
+    assert.deepEqual(selectionState(f),before,'extraction and held selection perform no corrective writes');
+    const fresh=new PeerLedger(f.root);
+    try{
+     assert.throws(()=>fresh.read(tx=>tx.queryCurrentReviews({subjects:[],scopes:['unrelated']})),selectionIntegrity);
+     assert.deepEqual(fresh.read(tx=>tx.get('reviews',production.review.id)).value,production.review.value);
+    }finally{fresh.close();}
+    assert.equal(f.ledger.verify().complete,true,'retained canonical evidence remains ledger-valid despite selection integrity uncertainty');
+    assert.deepEqual(selectionState(f),before);
+   }finally{f.close();}
+  }
+ }
+});
+
+// Independently adopted external171 capacity/error-origin regression proposal,
+// with native framing-cost, complete-history and late-interruption additions.
+// External provenance: chat 01a1b6e7-daaf-70c3-b54a-37ad8e16ee51 root/helpers.
+// All preceding native79 source remains unchanged. Fictional SQLite mechanics
+// establish neither native reviewer qualification nor measured process RSS.
+function byteSizedValue(base,ordinal,size,{unicode=true}={}){
+ const value={...base,synthetic_revision:ordinal,synthetic_padding:''};
+ const overhead=Buffer.byteLength(canonical(value)),available=size-overhead;
+ assert.ok(Number.isSafeInteger(available)&&available>=0,'fixture bytes include the complete canonical envelope');
+ const unit=unicode?'雪😀':'a',unitBytes=Buffer.byteLength(unit);
+ value.synthetic_padding=unit.repeat(Math.floor(available/unitBytes))+'a'.repeat(available%unitBytes);
+ assert.equal(Buffer.byteLength(canonical(value)),size);
+ assert.ok(size<1_000_000,'each record remains below the existing P1 row limit');
+ return value;
+}
+function byteManualBase(subject){return {status:'accepted',scope:'byte-history',subject,verdict:'Pass',blockers:[],proof:{protocol:'peer-native-review-v1'}};}
+function byteHistoryTotals(f,id){return selectionSQL(f,db=>db.prepare("SELECT COUNT(*) AS revisions,SUM(length(CAST(bytes AS BLOB))) AS utf8,SUM(length(bytes)) AS codepoints FROM peer_versions WHERE family='reviews' AND id=?").get(id));}
+function byteSQLDigest(f){
+ return selectionSQL(f,db=>{
+  const result={schema:selectionRawHash(JSON.stringify(db.prepare("SELECT type,name,tbl_name,sql FROM sqlite_schema WHERE name LIKE 'peer_%' ORDER BY type,name").all()))},tables=db.prepare("SELECT name FROM sqlite_schema WHERE type='table' AND name LIKE 'peer_%' ORDER BY name").all();
+  for(const {name} of tables){
+   const hash=selectionCreateHash('sha256');
+   for(const row of db.prepare(`SELECT * FROM "${name}" ORDER BY rowid`).iterate())hash.update(JSON.stringify(row)+'\n');
+   result[name]=hash.digest('hex');
+  }
+  return result;
+ });
+}
+function byteQueryTrace(ledger){
+ const original=ledger.query,calls=[];
+ ledger.query=function(sql,...parameters){
+  const statement=Reflect.apply(original,this,[sql,...parameters]);
+  return new Proxy(statement,{get(object,key){
+   const value=Reflect.get(object,key,object);if(typeof value!=='function')return value;
+   if(!['get','all','run'].includes(key))return value.bind(object);
+   return (...args)=>{
+    const result=Reflect.apply(value,object,args),rows=key==='all'?result:key==='get'&&result?[result]:[];
+    calls.push({sql,method:key,args,rows:rows.length,body_bytes:rows.reduce((sum,row)=>sum+(typeof row?.bytes==='string'?Buffer.byteLength(row.bytes):0),0)});
+    return result;
+   };
+  }});
+ };
+ return {calls,restore(){ledger.query=original;}};
+}
+function byteHistoryBodies(trace,id){return trace.calls.filter(call=>call.method==='all'&&/FROM peer_versions/.test(call.sql)&&/\bbytes\b/.test(call.sql)&&call.args.includes(id));}
+const {REVIEW_SELECTION_HISTORY_BYTES:byteHistoryLimit,REVIEW_SELECTION_HISTORY_COST:byteHistoryCost,REVIEW_SELECTION_AUDIT_PAGE_SIZE:byteAuditPageSize}=await import('../plugins/soloco/runtime/peers/ledger.mjs');
+const byteAggregateCall=call=>/SUM\s*\(/i.test(call.sql)&&/length\s*\(\s*CAST\s*\(\s*bytes\s+AS\s+BLOB\s*\)/i.test(call.sql)&&/peer_versions/.test(call.sql);
+function byteSeedManualPrefix(f,id,base){
+ const values=Array.from({length:9},(_,i)=>byteSizedValue(base,i+1,900000));
+ selectionLegacyCopy(f);
+ f.ledger.write('external.byte.manual-prefix','founder',tx=>{
+  for(let i=0;i<values.length;i++)tx.put('reviews',id,values[i],i);
+ });
+ assert.equal(selectionUpgrade(f).clean,true);
+ return values;
+}
+function byteMetadata(f,id){return selectionSQL(f,db=>({metadata:db.prepare('SELECT * FROM peer_review_selection WHERE review_id=?').get(id),error:db.prepare('SELECT * FROM peer_review_errors WHERE review_id=?').get(id)}));}
+
+test('adopted byte bound: below at and above UTF-8 budget count persisted bytes before hydrating history',()=>{
+ assert.equal(byteHistoryLimit,8*1024*1024);
+ for(const delta of [-1,0,1]){
+  const f=peerFixture();try{
+   const subject=selectionSubject(f,`byte-bound-${delta}`),id=`manual-byte-bound-${delta}`,base=byteManualBase(subject);
+   const values=byteSeedManualPrefix(f,id,base),target=byteHistoryLimit+delta;
+   const last=byteSizedValue(base,10,target-values.reduce((sum,value)=>sum+Buffer.byteLength(canonical(value)),0));
+   const trace=byteQueryTrace(f.ledger);let current;
+   try{current=f.ledger.write('external.byte.threshold-write','founder',tx=>tx.put('reviews',id,last,9));}finally{trace.restore();}
+   assert.equal(current.revision,10);assert.equal(current.sha256,peerDigest(last));
+   const totals=byteHistoryTotals(f,id);
+   assert.equal(totals.revisions,10);assert.equal(totals.utf8,target);
+   const jsUnits=[...values,last].reduce((sum,value)=>sum+canonical(value).length,0);
+   assert(jsUnits<byteHistoryLimit,'UTF-16 length would incorrectly admit the over-budget Unicode history');
+   assert(totals.codepoints<jsUnits);assert(jsUnits<totals.utf8);
+   const aggregate=trace.calls.findIndex(byteAggregateCall),bodies=byteHistoryBodies(trace,id);
+   assert(aggregate>=0);
+   const {metadata,error}=byteMetadata(f,id);
+   assert.equal(metadata.revision,current.revision);assert.equal(metadata.sha256,current.sha256);
+   if(delta<=0){
+    assert.equal(metadata.outcome,'MANUAL_NONADVERSE');assert.equal(error,undefined);
+    assert.equal(bodies.reduce((sum,call)=>sum+call.rows,0),10);
+    assert.equal(bodies.reduce((sum,call)=>sum+call.body_bytes,0),target);
+    assert(trace.calls.indexOf(bodies[0])>aggregate);
+    assert.deepEqual(f.ledger.read(tx=>tx.queryCurrentReviews({subjects:[subject],scopes:[]})).items,[current]);
+    assert.equal(f.ledger.auditReviewSelection().clean,true);
+   }else{
+    assert.equal(metadata.outcome,'INTEGRITY_UNKNOWN');assert.ok(error);
+    assert.equal(error.revision,current.revision);assert.equal(error.sha256,current.sha256);
+    assert(error.message.includes(String(target)));assert(error.message.includes(String(byteHistoryLimit)));
+    assert.equal(bodies.length,0,'oversized history cannot reach a body-returning all()');
+    assert.throws(()=>f.ledger.read(tx=>tx.queryCurrentReviews({subjects:[],scopes:[]})),selectionIntegrity);
+    const beforeNoop=byteSQLDigest(f),noopTrace=byteQueryTrace(f.ledger);
+    try{assert.deepEqual(f.ledger.write('external.byte.unknown-noop','founder',tx=>tx.put('reviews',id,last,current.revision)),current);}finally{noopTrace.restore();}
+    assert.equal(byteHistoryBodies(noopTrace,id).length,0);
+    assert.deepEqual(byteSQLDigest(f),beforeNoop,'a no-op cannot clear uncertainty');
+    for(const operation of ['audit','upgrade']){
+     if(operation==='upgrade')selectionLegacyCopy(f);
+     const before=byteSQLDigest(f),maintenanceTrace=byteQueryTrace(f.ledger);
+     try{
+      assert.throws(()=>operation==='audit'?f.ledger.auditReviewSelection():selectionUpgrade(f),failure=>{
+       assert.equal(failure.code,'REVIEW_SELECTION_CAPACITY');
+       assert(failure.message.includes(String(target)));assert(failure.message.includes(String(byteHistoryLimit)));return true;
+      });
+     }finally{maintenanceTrace.restore();}
+     assert.equal(byteHistoryBodies(maintenanceTrace,id).length,0);
+     assert.deepEqual(byteSQLDigest(f),before,'capacity rejection restores schema and every canonical/derived table');
+    }
+    assert.throws(()=>f.ledger.read(tx=>tx.queryCurrentReviews({subjects:[],scopes:[]})),failure=>{assert.equal(failure.code,'REVIEW_SELECTION_CAPABILITY');return true;});
+    assert.equal(byteHistoryTotals(f,id).utf8,target);
+   }
+  }finally{f.close();}
+ }
+});
+
+test('adopted byte bound: oversized protected negative and a late Pass alias retain history without reusing a clean prefix',()=>{
+ const f=peerFixture();try{
+  const subject=selectionSubject(f,'negative-byte-history'),production=selectionProduction('negative-byte-history',subject,{scope:'foreign-byte',verdict:'Fail'});
+  selectionSeed(f,[production]);selectionLegacyCopy(f);
+  const base=production.review.value,firstBytes=Buffer.byteLength(canonical(base));
+  f.ledger.write('external.byte.negative-prefix','founder',tx=>{
+   for(let revision=2;revision<=10;revision++)tx.put('reviews',production.review.id,byteSizedValue(base,revision,900000),revision-1);
+  });
+  assert.equal(selectionUpgrade(f).clean,true);
+  const prefix=byteMetadata(f,production.review.id).metadata;
+  assert.equal(prefix.outcome,'PROTECTED');assert.equal(prefix.adverse,1);
+  const target=byteHistoryLimit+1,last=byteSizedValue(base,11,target-firstBytes-9*900000),trace=byteQueryTrace(f.ledger);let current;
+  try{current=f.ledger.write('external.byte.negative-overflow','founder',tx=>tx.put('reviews',production.review.id,last,10));}finally{trace.restore();}
+  assert.equal(byteHistoryBodies(trace,production.review.id).length,0);
+  assert.equal(byteHistoryTotals(f,production.review.id).utf8,target);
+  const {metadata,error}=byteMetadata(f,production.review.id);
+  assert.equal(metadata.outcome,'INTEGRITY_UNKNOWN');assert.equal(metadata.adverse,1);assert.equal(metadata.revision,11);assert.equal(metadata.sha256,current.sha256);
+  assert.ok(error);assert(error.message.includes(String(target)));
+  const alias={...last,verdict:'Pass',blockers:[],scope:'different',subject:{...subject,id:'different'}};
+  const late=f.ledger.write('native.byte.late-alias','founder',tx=>tx.put('reviews',production.review.id,alias,11));
+  assert.equal(byteMetadata(f,late.id).metadata.outcome,'INTEGRITY_UNKNOWN');
+  f.ledger.read(tx=>{
+   assert.deepEqual(tx.getVersion(selectionRef(production.review)).value,base);
+   assert.deepEqual(tx.getVersion(selectionRef(production.review)).value.proof,base.proof,'the original exact anchor remains canonical evidence');
+   const original=tx.getVersion(selectionRef(production.task)).value;
+   assert.equal(JSON.parse(original.result.output).review.verdict,'Fail');
+   assert.deepEqual(tx.get('reviews',late.id),late);
+   assert.throws(()=>tx.queryCurrentReviews({subjects:[],scopes:['unrelated']}),selectionIntegrity);
+   assert.throws(()=>tx.queryCurrentReviews({subjects:[subject],scopes:[]}),selectionIntegrity);
+  });
+  const before=byteSQLDigest(f);
+  assert.throws(()=>f.ledger.auditReviewSelection(),failure=>{assert.equal(failure.code,'REVIEW_SELECTION_CAPACITY');return true;});
+  assert.deepEqual(byteSQLDigest(f),before);
+ }finally{f.close();}
+});
+
+function byteAssertOuterPages(trace,total){
+ const pages=trace.calls.filter(call=>call.method==='all'&&/FROM peer_rows/.test(call.sql)&&/ORDER BY id/i.test(call.sql));
+ assert(pages.length>=2);
+ for(const page of pages){
+  assert.match(page.sql,/\bLIMIT\b/i);
+  assert(page.rows<=byteAuditPageSize);assert.equal(page.body_bytes,0);
+ }
+ assert(pages.reduce((sum,page)=>sum+page.rows,0)>=total);
+ assert.equal(trace.calls.some(call=>call.method==='all'&&/FROM peer_rows/.test(call.sql)&&call.body_bytes>0),false);
+}
+test('adopted byte bound: maintenance pages current identities and late interruption cannot publish a clean prefix',()=>{
+ assert.equal(byteAuditPageSize,100);
+ const f=peerFixture();try{
+  const subject=selectionSubject(f,'outer-byte-pages'),base=byteManualBase(subject),total=107;
+  for(let offset=0;offset<total;offset+=25)f.ledger.write('external.byte.outer-fixtures','founder',tx=>{
+   for(let i=offset;i<Math.min(total,offset+25);i++)tx.put('reviews',`manual-byte-page-${String(i).padStart(4,'0')}`,{...base,synthetic_ordinal:i},0);
+  });
+  const before=byteSQLDigest(f),auditTrace=byteQueryTrace(f.ledger);let audited;
+  try{audited=f.ledger.auditReviewSelection();}finally{auditTrace.restore();}
+  assert.equal(audited.clean,true);assert.equal(audited.reviews,total);byteAssertOuterPages(auditTrace,total);
+  assert.deepEqual(byteSQLDigest(f),before);
+  const canonicalBefore=snapshot(f);selectionLegacyCopy(f);
+  const upgradeTrace=byteQueryTrace(f.ledger);let upgraded;
+  try{upgraded=selectionUpgrade(f);}finally{upgradeTrace.restore();}
+  assert.equal(upgraded.clean,true);assert.equal(upgraded.reviews,total);byteAssertOuterPages(upgradeTrace,total);
+  assert.deepEqual(snapshot(f),canonicalBefore);
+  assert.equal(f.ledger.read(tx=>tx.queryCurrentReviews({subjects:[subject],scopes:[],limit:1})).total,total);
+  for(const operation of ['audit','upgrade']){
+   if(operation==='upgrade')selectionLegacyCopy(f);
+   const saved=byteSQLDigest(f),injected=Error('native late second identity page failure'),original=f.ledger.onQuery;
+   let pages=0,refreshed=0;
+   f.ledger.onQuery=q=>{
+    original?.(q);
+    if(q.sql.startsWith('INSERT INTO peer_review_selection'))refreshed++;
+    if(q.sql.startsWith("SELECT id FROM peer_rows WHERE family='reviews'")&&++pages===2)throw injected;
+   };
+   try{assert.throws(()=>operation==='audit'?f.ledger.auditReviewSelection():selectionUpgrade(f),failure=>{assert.equal(failure,injected);return true;});}finally{f.ledger.onQuery=original;}
+   assert.equal(pages,2);
+   if(operation==='upgrade')assert.equal(refreshed,100,'a complete first page was really refreshed before the fault');
+   else assert.equal(refreshed,0);
+   assert.deepEqual(byteSQLDigest(f),saved);
+   if(operation==='upgrade'){
+    assert.throws(()=>f.ledger.read(tx=>tx.queryCurrentReviews({subjects:[subject],scopes:[]})),failure=>{assert.equal(failure.code,'REVIEW_SELECTION_CAPABILITY');return true;});
+    assert.equal(selectionUpgrade(f).clean,true);
+   }
+  }
+ }finally{f.close();}
+});
+
+test('adopted byte bound: preflight closes public handles and preserves physical connection ownership',()=>{
+ let armed=false,active,current,sibling,hits=0;
+ const f=peerFixture({onQuery:q=>{
+  if(!armed||!byteAggregateCall({sql:q.sql}))return;
+  armed=false;hits++;
+  assert.throws(()=>active.queryCurrentReviews({subjects:[],scopes:[]}),/closed|maintenance/i);
+  assert.throws(()=>active.getVersion(selectionRef(current)),/closed|maintenance/i);
+  assert.throws(()=>active.list('reviews'),/closed|maintenance/i);
+  assert.throws(()=>active.put('reviews',current.id,current.value,current.revision),/closed|maintenance/i);
+  assert.throws(()=>sibling.read(tx=>tx.queryCurrentReviews({subjects:[],scopes:[]})),/active transaction owner|ownership/i);
+ }});
+ try{
+  const subject=selectionSubject(f,'guarded-byte-preflight'),base=byteManualBase(subject);
+  const old=f.ledger.write('external.byte.guard-seed','founder',tx=>tx.put('reviews','manual-byte-guard',{...base,synthetic_revision:1},0));
+  sibling=new PeerLedger(f.root,{connection:f.ledger.db});armed=true;
+  f.ledger.write('external.byte.guard-refresh','founder',tx=>{active=tx;current=tx.put('reviews',old.id,{...base,synthetic_revision:2},old.revision);});
+  assert.equal(hits,1);assert.throws(()=>active.queryCurrentReviews({subjects:[],scopes:[]}),/expired/i);active=null;
+  assert.deepEqual(sibling.read(tx=>tx.queryCurrentReviews({subjects:[subject],scopes:[]})).items,[current]);
+  assert.equal(f.ledger.auditReviewSelection().clean,true);
+ }finally{armed=false;active=null;sibling?.close();f.close();}
+});
+
+test('adopted byte bound: preflight errors late flush errors and physical loss roll back complete refresh',()=>{
+ for(const point of ['byte-preflight','event-flush','physical-loss']){
+  let armed=false,active,hits=0;
+  const injected=Error(`external byte ${point} fault`),f=peerFixture({onQuery:q=>{
+   const match=point==='event-flush'?q.sql.startsWith('INSERT INTO peer_events'):byteAggregateCall({sql:q.sql});
+   if(!armed||!match)return;
+   armed=false;hits++;
+   if(point==='physical-loss')f.ledger.db.exec('ROLLBACK');else throw injected;
+  }});
+  try{
+   const subject=selectionSubject(f,`byte-fault-${point}`),base=byteManualBase(subject);
+   const old=f.ledger.write('external.byte.fault-seed','founder',tx=>tx.put('reviews',`manual-byte-fault-${point}`,{...base,synthetic_revision:1},0));
+   const before=byteSQLDigest(f),trace=byteQueryTrace(f.ledger);armed=true;
+   try{
+    assert.throws(()=>f.ledger.write('external.byte.fault-refresh','founder',tx=>{
+     active=tx;tx.put('reviews',old.id,{...base,synthetic_revision:2},old.revision);tx.event('external.byte.buffered',{point});
+    }),failure=>{
+     if(point==='physical-loss')assert.match([failure,...(failure.errors??[])].map(e=>e.message).join(' '),/transaction|boundary|rollback|owner/i);
+     else assert.equal(failure,injected);
+     return true;
+    });
+   }finally{trace.restore();}
+   assert.equal(hits,1);assert.throws(()=>active.queryCurrentReviews({subjects:[],scopes:[]}),/expired/i);active=null;
+   if(point!=='event-flush')assert.equal(byteHistoryBodies(trace,old.id).length,0);
+   assert.deepEqual(byteSQLDigest(f),before);
+   const fresh=new PeerLedger(f.root);try{
+    assert.deepEqual(fresh.read(tx=>tx.get('reviews',old.id)),old);
+    assert.deepEqual(fresh.read(tx=>tx.queryCurrentReviews({subjects:[subject],scopes:[]})).items,[old]);
+    assert.equal(fresh.auditReviewSelection().clean,true);
+   }finally{fresh.close();}
+  }finally{armed=false;active=null;f.close();}
+ }
+});
+
+const {reviewScope:callbackValidationScope}=await import('../plugins/soloco/runtime/peers/review-selection.mjs');
+const callbackExactHistorySQL='SELECT family,id,revision,sha256,bytes FROM peer_versions WHERE family=? AND id=? AND revision=?';
+function callbackValidationError(){
+ let failure;try{callbackValidationScope(42);}catch(error){failure=error;}
+ assert.ok(failure instanceof Error);assert.match(failure.message,/Invalid production scope/);return failure;
+}
+test('adopted callback origin: task or observation hook failure propagates its exact helper error and rolls back production',()=>{
+ for(const [target,ordinal] of [['task',1],['observation',2]]){
+  const injected=callbackValidationError();let armed=false,reads=0,hits=0,escaped;
+  const f=peerFixture({onQuery:q=>{
+   if(!armed||q.sql!==callbackExactHistorySQL)return;
+   if(++reads!==ordinal)return;
+   armed=false;hits++;throw injected;
+  }});
+  try{
+   const subject=selectionSubject(f,`callback-${target}`),production=selectionProduction(`callback-${target}`,subject,{scope:'callback-scope',verdict:'Blocked'}),before=byteSQLDigest(f);
+   let observed;armed=true;
+   try{f.ledger.write('external.callback.production','founder',tx=>{escaped=tx;selectionPutProduction(tx,production);});}catch(error){observed=error;}
+   assert.equal(hits,1);assert.equal(reads,ordinal);
+   assert.equal(observed,injected,'a callback-origin FactError cannot be committed as semantic Unknown');
+   assert.deepEqual(byteSQLDigest(f),before);
+   assert.throws(()=>escaped.queryCurrentReviews({subjects:[],scopes:[]}),/expired/i);
+   const fresh=new PeerLedger(f.root);try{
+    fresh.read(tx=>{
+     for(const row of [production.review,production.task,production.observation])assert.equal(tx.get(row.family,row.id),null);
+     assert.deepEqual(tx.queryCurrentReviews({subjects:[subject],scopes:[]}),selectionEmpty());
+    });
+   }finally{fresh.close();}
+  }finally{armed=false;f.close();}
+ }
+});
+
+test('adopted callback origin: audit and upgrade preserve callback identity and restore all schema and table state',()=>{
+ for(const operation of ['audit','upgrade'])for(const [target,ordinal] of [['task',1],['observation',2]]){
+  const injected=callbackValidationError();let armed=false,reads=0,hits=0;
+  const f=peerFixture({onQuery:q=>{
+   if(!armed||q.sql!==callbackExactHistorySQL)return;
+   if(++reads!==ordinal)return;
+   armed=false;hits++;throw injected;
+  }});
+  try{
+   const subject=selectionSubject(f,`callback-${operation}-${target}`),production=selectionProduction(`callback-${operation}-${target}`,subject,{scope:'callback-scope',verdict:'Fail'});
+   selectionSeed(f,[production]);
+   assert.equal(byteMetadata(f,production.review.id).metadata.outcome,'PROTECTED');
+   if(operation==='upgrade')selectionLegacyCopy(f);
+   const before=byteSQLDigest(f);armed=true;
+   assert.throws(()=>operation==='audit'?f.ledger.auditReviewSelection():selectionUpgrade(f),failure=>{assert.equal(failure,injected);return true;});
+   assert.equal(hits,1);assert.equal(reads,ordinal);assert.deepEqual(byteSQLDigest(f),before);
+   if(operation==='upgrade'){
+    assert.throws(()=>f.ledger.read(tx=>tx.queryCurrentReviews({subjects:[subject],scopes:[]})),failure=>{assert.equal(failure.code,'REVIEW_SELECTION_CAPABILITY');return true;});
+    assert.equal(selectionUpgrade(f).clean,true);
+   }
+   assert.equal(f.ledger.auditReviewSelection().clean,true);
+   assert.deepEqual(f.ledger.read(tx=>tx.queryCurrentReviews({subjects:[subject],scopes:[]})).items.map(selectionRef),[selectionRef(production.review)]);
+  }finally{armed=false;f.close();}
+ }
+});
+
+test('adopted callback origin: genuine malformed evidence still commits Unknown and retains raw negativity',()=>{
+ const f=peerFixture();try{
+  const subject=selectionSubject(f,'genuine-validation-origin'),production=selectionProduction('genuine-validation-origin',subject,{scope:'valid-indexed-scope',definitionScope:42,verdict:'Fail'});
+  production.review.value={...production.review.value,verdict:'Pass',blockers:[]};production.review.sha256=peerDigest(production.review.value);
+  const before=byteSQLDigest(f);selectionSeed(f,[production]);
+  assert.notDeepEqual(byteSQLDigest(f),before);
+  const {metadata,error}=byteMetadata(f,production.review.id);
+  assert.equal(metadata.outcome,'INTEGRITY_UNKNOWN');assert.equal(metadata.adverse,1);
+  assert.equal(error.message,callbackValidationError().message);
+  assert.equal(metadata.revision,production.review.revision);assert.equal(metadata.sha256,production.review.sha256);
+  f.ledger.read(tx=>{
+   assert.deepEqual(tx.get('reviews',production.review.id).value,production.review.value);
+   assert.deepEqual(tx.getVersion(selectionRef(production.review)).value,production.review.value);
+   const original=tx.getVersion(selectionRef(production.task)).value;
+   assert.equal(original.definition.scope,42);assert.equal(JSON.parse(original.result.output).review.verdict,'Fail');
+   assert.throws(()=>tx.queryCurrentReviews({subjects:[],scopes:[]}),selectionIntegrity);
+  });
+  for(const audited of [f.ledger.auditReviewSelection(),selectionUpgrade(f)]){
+   assert.equal(audited.clean,false);assert.equal(audited.errors,1);assert.equal(audited.reviews,1);
+  }
+  assert.equal(f.ledger.verify().complete,true);
+ }finally{f.close();}
+});
+
+test('native framing admission: tiny unsupported bodies with long identities cannot bypass materialization cost',()=>{
+ const f=peerFixture();try{
+  const id='manual-'+ '雪'.repeat(1900);
+  selectionLegacyCopy(f);
+  // Actual supported CAS writes, not fabricated SQL query results. Alternating
+  // primitive values force revisions while keeping total canonical payload tiny.
+  for(let start=1;start<=2700;start+=50)f.ledger.write('native.framing.prefix','founder',tx=>{
+   for(let revision=start;revision<start+50;revision++)tx.put('reviews',id,revision%2===1,revision-1);
+  });
+  const prefixTrace=byteQueryTrace(f.ledger);let admitted;
+  try{admitted=selectionUpgrade(f);}finally{prefixTrace.restore();}
+  assert.equal(admitted.clean,false);assert.equal(admitted.errors,1);
+  assert.match(byteMetadata(f,id).error.message,/Unsupported review record shape/,'below the resource limit real shape validation remains reachable');
+  assert.equal(byteHistoryBodies(prefixTrace,id).some(call=>call.rows===2700),true);
+  assert(byteHistoryTotals(f,id).utf8<20000);
+  for(let start=2701;start<=3000;start+=50)f.ledger.write('native.framing.extend','founder',tx=>{
+   for(let revision=start;revision<start+50;revision++)tx.put('reviews',id,revision%2===1,revision-1);
+  });
+  const last=f.ledger.read(tx=>tx.get('reviews',id)),trace=byteQueryTrace(f.ledger);
+  let next;
+  try{next=f.ledger.write('native.framing.over-limit','founder',tx=>tx.put('reviews',id,true,last.revision));}finally{trace.restore();}
+  assert.equal(next.revision,3001,'row count remains well below the ordinary 10,000 bound');
+  assert(byteHistoryTotals(f,id).utf8<20000,'payload-only admission would incorrectly allow this history');
+  const {metadata,error}=byteMetadata(f,id);
+  assert.equal(metadata.outcome,'INTEGRITY_UNKNOWN');assert.equal(metadata.revision,next.revision);assert.equal(metadata.sha256,next.sha256);
+  assert.match(error.message,/encoded-field\/framing materialization cost/);assert(error.message.includes(String(byteHistoryCost)));
+  assert.equal(byteHistoryBodies(trace,id).length,0,'the resource rejection precedes the history body array');
+  assert.throws(()=>f.ledger.read(tx=>tx.queryCurrentReviews({subjects:[],scopes:[]})),selectionIntegrity);
+  for(const operation of ['audit','upgrade']){
+   const before=byteSQLDigest(f),maintenanceTrace=byteQueryTrace(f.ledger);
+   try{assert.throws(()=>operation==='audit'?f.ledger.auditReviewSelection():selectionUpgrade(f),failure=>{
+    assert.equal(failure.code,'REVIEW_SELECTION_CAPACITY');assert.match(failure.message,/encoded-field\/framing/);return true;
+   });}finally{maintenanceTrace.restore();}
+   assert.equal(byteHistoryBodies(maintenanceTrace,id).length,0);
+   assert.deepEqual(byteSQLDigest(f),before);
+  }
+  assert.equal(f.ledger.verify({limit:100}).complete,true);
+ }finally{f.close();}
+});
+
+test('native complete audit: over-row histories use bounded pages and late corruption or a missing middle never becomes a clean prefix',()=>{
+ const f=peerFixture();try{
+  const id='manual-small-over-row-history',total=10002;
+  selectionLegacyCopy(f);
+  for(let start=1;start<=total;start+=50)f.ledger.write('native.audit.small-history','founder',tx=>{
+   for(let revision=start;revision<=Math.min(total,start+49);revision++)tx.put('reviews',id,revision%2===1,revision-1);
+  });
+  const trace=byteQueryTrace(f.ledger);let result;
+  try{result=selectionUpgrade(f);}finally{trace.restore();}
+  assert.equal(result.clean,false);assert.equal(result.errors,1);assert.equal(result.reviews,1);
+  const bodies=byteHistoryBodies(trace,id);
+  assert(bodies.length>100);
+  assert(bodies.every(call=>call.rows<=100&&/revision>\?/.test(call.sql)&&/LIMIT 100\b/.test(call.sql)));
+  assert.equal(bodies.reduce((sum,call)=>sum+call.rows,0),2*total,'refresh and independent audit each inspect the entire retained sequence');
+  assert.match(byteMetadata(f,id).error.message,/10,000/);
+  assert(byteHistoryTotals(f,id).utf8<100000);
+  assert.throws(()=>f.ledger.read(tx=>tx.queryCurrentReviews({subjects:[],scopes:[]})),selectionIntegrity);
+  const stable=byteSQLDigest(f);
+  assert.equal(f.ledger.auditReviewSelection().clean,false);
+  assert.deepEqual(byteSQLDigest(f),stable);
+  // Controlled corruption in the isolated fixture, beyond the first 100 pages.
+  // Current head/creation metadata remains intact so the full audit must reach
+  // this late historical row instead of failing a convenient current-row check.
+  selectionSQL(f,db=>{
+   db.exec('DROP TRIGGER peer_history_update');
+   db.prepare("UPDATE peer_versions SET sha256=? WHERE family='reviews' AND id=? AND revision=10001").run('e'.repeat(64),id);
+  });
+  for(const operation of ['audit','upgrade']){
+   const before=byteSQLDigest(f),lateTrace=byteQueryTrace(f.ledger);
+   try{assert.throws(()=>operation==='audit'?f.ledger.auditReviewSelection():selectionUpgrade(f),/hash|capacity mismatch/);}finally{lateTrace.restore();}
+   assert(byteHistoryBodies(lateTrace,id).some(call=>call.args[1]>=10000),'actual late body retrieval occurred');
+   assert.deepEqual(byteSQLDigest(f),before);
+  }
+  selectionSQL(f,db=>{
+   db.prepare("UPDATE peer_versions SET sha256=? WHERE family='reviews' AND id=? AND revision=10001").run(peerDigest(true),id);
+   db.exec('DROP TRIGGER peer_history_delete');
+   db.prepare("DELETE FROM peer_versions WHERE family='reviews' AND id=? AND revision=9999").run(id);
+  });
+  for(const operation of ['audit','upgrade']){
+   const before=byteSQLDigest(f),missingTrace=byteQueryTrace(f.ledger);
+   try{assert.throws(()=>operation==='audit'?f.ledger.auditReviewSelection():selectionUpgrade(f),/incomplete|noncontiguous/);}finally{missingTrace.restore();}
+   assert.equal(byteHistoryBodies(missingTrace,id).length,0,'scalar complete-count check detects the missing middle before hydration');
+   assert.deepEqual(byteSQLDigest(f),before);
+  }
+  assert.throws(()=>f.ledger.read(tx=>tx.queryCurrentReviews({subjects:[],scopes:[]})),selectionIntegrity);
+ }finally{f.close();}
+});
+
+test('native callback origin: changed existing protected review preserves its prior clean projection when resolver telemetry fails',()=>{
+ const injected=callbackValidationError();let armed=false,hits=0,escaped;
+ const f=peerFixture({onQuery:q=>{
+  if(!armed||q.sql!==callbackExactHistorySQL)return;
+  armed=false;hits++;throw injected;
+ }});
+ try{
+  const subject=selectionSubject(f,'existing-callback'),production=selectionProduction('existing-callback',subject,{scope:'callback-scope',verdict:'Fail'});
+  selectionSeed(f,[production]);
+  const old=f.ledger.read(tx=>tx.get('reviews',production.review.id)),nextValue={...old.value,synthetic_revision:2};
+  const proposed={family:'reviews',id:old.id,revision:2,sha256:peerDigest(nextValue)},before=byteSQLDigest(f);
+  armed=true;
+  assert.throws(()=>f.ledger.write('native.callback.existing-change','founder',tx=>{
+   escaped=tx;tx.put('reviews',old.id,nextValue,old.revision);tx.event('native.callback.buffered',{});
+  }),failure=>{assert.equal(failure,injected);return true;});
+  assert.equal(hits,1);assert.deepEqual(byteSQLDigest(f),before);
+  assert.throws(()=>escaped.get('reviews',old.id),/expired/);
+  const fresh=new PeerLedger(f.root);try{
+   assert.deepEqual(fresh.read(tx=>tx.get('reviews',old.id)),old);
+   assert.throws(()=>fresh.read(tx=>tx.getVersion(proposed)),/unavailable/);
+   assert.deepEqual(fresh.read(tx=>tx.queryCurrentReviews({subjects:[subject],scopes:[]})).items,[old]);
+   assert.equal(fresh.auditReviewSelection().clean,true);
+  }finally{fresh.close();}
+ }finally{armed=false;f.close();}
+});
