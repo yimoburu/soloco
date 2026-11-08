@@ -39,10 +39,27 @@ export function fingerprintValidation(input) {
   // put raw secrets or environment data into a durable reuse receipt.
   return hash(JSON.stringify(canonical({...input,files,tests:[...input.tests].sort()})));
 }
+// Runtime-attested, inspectable evidence for independent reuse qualification.
+// Raw environment values and host dependency/permission paths remain hashed.
+// Redacted commitments do not let a reviewer recompute the private fingerprint.
+export function validationManifest(input) {
+  const validation_fingerprint=fingerprintValidation(input);
+  const visible=new Set(['node','--permission','--test','--test-isolation=none','--experimental-test-isolation=none','--test-concurrency=1','--test-reporter=tap','--test-force-exit',...input.tests.map(p=>'./'+p)]);
+  return {version:1,validation_fingerprint,attestation:'runtime_captured_inputs; redacted commitments are not independent recomputation',
+    files:input.files.map(f=>({...f})).sort((a,b)=>a.path.localeCompare(b.path)),tests:[...input.tests].sort(),
+    command:input.command.map(argument=>visible.has(argument)?{argument}:{argument_sha256:hash(argument)}),command_sha256:hash(JSON.stringify(input.command)),
+    runtime:{node:input.runtime.node,platform:input.runtime.platform,arch:input.runtime.arch,os_release:input.runtime.os_release,system_build:input.runtime.system_build,executable_sha256:input.runtime.executable_sha256,runner_sha256:input.runtime.runner_sha256,dependencies:input.runtime.dependencies.map(d=>({path_sha256:hash(d.path),sha256:d.sha256}))},
+    sandbox:{...input.sandbox},environment_sha256:hash(JSON.stringify(canonical(input.environment))),limits:{...input.limits}};
+}
+export function validationManifestMatches(receipt) {
+  const d=receipt?.development,manifest=d?.validation_manifest,bound=d?.result?.validation_manifest_sha256;
+  if(manifest===undefined&&bound===undefined)return true; // Preserve legacy receipts.
+  return plain(manifest)&&manifest.version===1&&sha(bound)&&hash(JSON.stringify(manifest))===bound&&manifest.validation_fingerprint===d.validation_fingerprint;
+}
 export function validateReusableReceipt(receipt,fingerprint) {
   if(!sha(fingerprint)||!plain(receipt)||receipt.kind!=='artifact'||receipt.status!=='Submitted'||receipt.author_role!=='runtime')return false;
   const d=receipt.development,r=d?.result;
-  return d?.type==='test' && d.validation_fingerprint===fingerprint && plain(r)
+  return d?.type==='test' && d.validation_fingerprint===fingerprint && validationManifestMatches(receipt) && plain(r)
     && r.status==='passed' && r.exit_code===0 && r.tests_executed===true
     && r.reused!==true && !r.reuse && !r.error && !r.output_truncated && r.signal==null
     && sha(d.receipt_sha256) && d.receipt_sha256===hash(JSON.stringify(r))

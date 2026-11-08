@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {fingerprintValidation,validateReusableReceipt,confirmValidationFingerprint} from '../plugins/soloco/runtime/validation-cache.mjs';
+import {fingerprintValidation,validationManifest,validationManifestMatches,validateReusableReceipt,confirmValidationFingerprint} from '../plugins/soloco/runtime/validation-cache.mjs';
 const hash=s=>createHash('sha256').update(s).digest('hex');
 const input=()=>({files:[{path:'x.mjs',sha256:hash('code')},{path:'x.test.mjs',sha256:hash('test')}],tests:['x.test.mjs'],command:['node','--test','x.test.mjs'],runtime:{node:'v25',platform:'darwin',arch:'arm64',os_release:'fixture-kernel',system_build:'fixture-build',dependencies:[{path:'/fixture/library',sha256:'a'.repeat(64)}],executable_sha256:hash('node'),runner_sha256:hash('runner')},sandbox:{backend:'seatbelt',policy_sha256:hash('policy')},environment:{LANG:'C'},limits:{timeout_ms:1000,max_output_bytes:10000}});
 function receipt(fingerprint){const result={status:'passed',exit_code:0,tests_executed:true,signal:null};return {kind:'artifact',status:'Submitted',author_role:'runtime',content:JSON.stringify(result),development:{type:'test',validation_fingerprint:fingerprint,result,receipt_sha256:hash(JSON.stringify(result))}};}
@@ -25,4 +25,15 @@ test('post-execution confirmation holds toolchain changes and incomplete redisco
  assert.throws(()=>confirmValidationFingerprint(before,fingerprintValidation(changed)),/changed during execution/);
  changed.runtime.dependencies[1].sha256=hash('in-place update');assert.throws(()=>confirmValidationFingerprint(before,fingerprintValidation(changed)),/changed during execution/);
  assert.throws(()=>confirmValidationFingerprint(before,undefined),/changed during execution/);
+});
+test('new review manifests expose exact toolchain commitments without raw host paths or environment values',()=>{
+ const v=input();v.environment.PRIVATE_FIXTURE_KEY='never-publish-this-value';v.runtime.dependencies[0].path='/private/fictional-owner/library';v.command.push('/private/fictional-owner/argument');
+ const fp=fingerprintValidation(v),manifest=validationManifest(v),wire=JSON.stringify(manifest);
+ assert.equal(manifest.validation_fingerprint,fp);assert.equal(manifest.runtime.node,v.runtime.node);assert.deepEqual(manifest.files,v.files);
+ for(const hidden of ['never-publish-this-value','PRIVATE_FIXTURE_KEY','/private/fictional-owner'])assert(!wire.includes(hidden));
+ const r=receipt(fp);r.development.validation_manifest=manifest;r.development.result.validation_manifest_sha256=hash(wire);r.content=JSON.stringify(r.development.result);r.development.receipt_sha256=hash(r.content);
+ assert.equal(validationManifestMatches(r),true);assert.equal(validateReusableReceipt(r,fp),true);
+ for(const mutate of [r=>r.development.validation_manifest.runtime.node='changed',r=>delete r.development.validation_manifest,r=>r.development.result.validation_manifest_sha256=hash('fake')]){const altered=structuredClone(r);mutate(altered);assert.equal(validateReusableReceipt(altered,fp),false);}
+ const old=receipt(fp),before=JSON.stringify(old);assert.equal(validateReusableReceipt(old,fp),true);assert.equal(JSON.stringify(old),before);
+ delete v.runtime.dependencies;assert.throws(()=>validationManifest(v),/dependencies/);
 });
