@@ -10,6 +10,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { withStore, stamp, id, digest, notice, noLink, upgradePending, compatibleRuntime } from './store.mjs';
 import { runModel, parseArtifact } from './adapters.mjs';
+import {sessionTitle} from './session-naming.mjs';
 import { assignmentContext, contextMatches, contextBudgetForJob } from './context.mjs';
 import { handoverReviewEligible, completedWithinReviewWindow } from './handover.mjs';
 import { dataDir } from './engine.mjs';
@@ -151,11 +152,14 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
         runtimeContextBytes=next;
         runtimeRequestUsage.push({request_utf8_bytes:Buffer.byteLength(request,'utf8'),request_utf16_characters:request.length});
       }
+      let displayTitle;
+      try {displayTitle=sessionTitle(state.roles[job.role]?.name??job.role,job.instance_id);}catch{} // Optional presentation must not hold model work.
       invoked=true;
       // A prior read round proves only that earlier process closed. Failure of
       // this invocation still needs its own termination evidence for release.
       output=undefined;
       output=await model(job.host,session,request,dir,remaining,job.model_selection??null,{
+        sessionTitle:displayTitle,sessionNameDirectory:dir,
         signal:controller.signal,timeoutReason:timeout.timeout_reason,maxOutputCharacters:context.qualification?(context.packet.profile?context.qualification.limits.output_wire_bytes*6+16384:100000):Math.max(2000000,contextBudgetForJob(state,job)),
         ...((job.handover_review_window_minutes||context.stream)&&overallTiming?{executionDeadlineAt:Date.parse(overallTiming.execution_deadline_at)}:{}),
         onSpawn:(job.handover_review_window_minutes||context.stream||round===0)?timing=>{

@@ -4,11 +4,31 @@ import os from 'node:os';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { normalizeTimeout, executionTiming, MIN_EXECUTION_TIMEOUT_MS, STARTUP_TIMEOUT_MS, TERMINATION_GRACE_MS } from './timeout.mjs';
+import {claudeNameSupport,nameCodexSession,writeNamingReceipt} from './session-naming.mjs';
 
 const ownFile=fileURLToPath(import.meta.url);
 const modelId=value=>typeof value==='string' && /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/.test(value);
 const effortId=value=>typeof value==='string' && /^[a-z][a-z0-9_-]{0,24}$/.test(value);
 const catalogCache=new Map();
+// Display metadata is deliberately outside model results and canonical evidence.
+// Serialize concurrent names for one native; later role changes win without
+// awaiting a cosmetic operation in the execution/acceptance path.
+const pendingNames=new Map();
+function scheduleSessionName(host,command,nativeId,title,directory,supported,rename=nameCodexSession) {
+  const key=JSON.stringify([host,nativeId]),prior=pendingNames.get(key);
+  if(prior?.title===title)return;
+  let complete;const promise=new Promise(resolve=>{complete=resolve;});
+  const request={title,promise};pendingNames.set(key,request);
+  setImmediate(()=>{
+    Promise.resolve(prior?.promise).then(async()=>{
+      let receipt;
+      try {
+        receipt=host==='codex'?await rename(command,nativeId,title):{host,native_id:nativeId,title,status:supported?'requested':'unsupported',verification:supported?'launch_argv_only':'unverified'};
+      } catch {receipt={host,native_id:nativeId,title,status:'failed',verification:'unverified',error:'Session display-name update failed'};}
+      try {writeNamingReceipt(directory,{...receipt,at:new Date().toISOString()});}catch{} // Cosmetic diagnostics never affect task success.
+    }).catch(()=>{}).finally(()=>{if(pendingNames.get(key)===request)pendingNames.delete(key);complete();});
+  });
+}
 const observability={codex:'exec output does not verify effective model, effort or service tier; requested and applied settings remain distinct from observations',claude:'modelUsage reports cumulative session usage, which can include internal calls; it does not verify assignment model, effective effort, fast mode or service tier'};
 
 export function executable(host) {
@@ -295,6 +315,11 @@ export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selectio
     const unschedule = options.clearTimeout ?? clearTimeout;
     for (const fn of [startProcess, resolveCommand, now, schedule, unschedule]) if (typeof fn !== 'function') throw new Error('Invalid lifecycle dependency');
     if (options.onSpawn !== undefined && typeof options.onSpawn !== 'function') throw new Error('Invalid onSpawn callback');
+    const title=options.sessionTitle;
+    if(title!==undefined&&(typeof title!=='string'||!title.trim()||title.length>200||/[\u0000-\u001f\u007f]/.test(title)))throw Error('Invalid session display title');
+    if(options.sessionNameSupport!==undefined&&typeof options.sessionNameSupport!=='boolean')throw Error('Invalid session naming capability');
+    if(options.renameSession!==undefined&&typeof options.renameSession!=='function')throw Error('Invalid session naming dependency');
+    if(options.probeSessionName!==undefined&&typeof options.probeSessionName!=='function')throw Error('Invalid session naming capability probe');
     const signal = options.signal;
     if (signal !== undefined && (!signal || typeof signal.aborted !== 'boolean' || typeof signal.addEventListener !== 'function' || typeof signal.removeEventListener !== 'function')) throw new Error('Invalid cancellation signal');
     const errorFor = (message, code) => Object.assign(new Error(message), {code});
@@ -311,10 +336,21 @@ export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selectio
     const env = {...process.env, COMPANY_WORKER:'1'};
     delete env.CLAUDECODE; // A new standalone process, not a nested Claude agent.
     const command = resolveCommand(host);
+    const namingSupported=Boolean(title&&host==='claude'&&(options.sessionNameSupport??(options.probeSessionName??claudeNameSupport)(command)));
+    if(namingSupported)args.push('--name',title);
+    // Synchronous executable/capability lookup must never admit a provider
+    // process after its original deadline. No model child exists at this gate.
+    if(absoluteDeadline!==undefined&&readNow()>=absoluteDeadline)throw Object.assign(errorFor('Role review deadline reached before launch','ROLE_TIMEOUT'),{termination_confirmed:true});
+    if(readNow()>=startupDeadline)throw Object.assign(errorFor('Role startup deadline reached before launch','ROLE_STARTUP_TIMEOUT'),{termination_confirmed:true});
     // Resolution can invoke a supplied synchronous dependency that cancels.
     if (signal?.aborted) throw errorFor('Role session cancelled before launch', 'ROLE_ABORTED');
     const child = startProcess(command, args, {cwd,env,stdio:['pipe','pipe','pipe']});
     let stdout='', stderr='', failure=null, settled=false, closed=false;
+    const named=new Set();let namingBuffer='';
+    const observedName=id=>{
+      if(!title||typeof id!=='string'||!id.trim()||named.has(id)||(nativeId&&id!==nativeId))return;
+      named.add(id);scheduleSessionName(host,command,id,title,options.sessionNameDirectory,namingSupported,options.renameSession);
+    };
     let spawned=false, executionDeadline=null;
     let startupTimer=null, executionTimer=null, killTimer=null;
     const listeners=[];
@@ -343,8 +379,9 @@ export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selectio
           catch(parseError) {error.rejected_output=parseError.rejected_output;}
         }
         error.termination_confirmed=closed;
+        if(host==='claude')observedName(error.rejected_output?.native_id);
         reject(error);
-      } else resolve(result);
+      } else {observedName(result?.native_id);resolve(result);}
     };
     const send = name => {
       if (closed || settled) return;
@@ -422,6 +459,17 @@ export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selectio
     listen(child.stdout, 'data', chunk => {
       if (settled || failure || expired()) return;
       stdout += chunk;
+      // Observe only host-issued identities; final stream validation remains
+      // unchanged. Naming never consumes, rewrites or accepts an artifact.
+      if(title&&host==='codex'&&!named.size) {
+        namingBuffer+=chunk;
+        let newline;
+        while((newline=namingBuffer.indexOf('\n'))>=0) {
+          const line=namingBuffer.slice(0,newline);namingBuffer=namingBuffer.slice(newline+1);
+          try {const event=JSON.parse(line);if(event.type==='thread.started')observedName(event.thread_id);}catch{}
+        }
+        if(namingBuffer.length>16384)namingBuffer='';
+      }
       if (stdout.length > outputLimit) stop(errorFor('Role output exceeded limit', 'ROLE_OUTPUT_LIMIT'), readNow()+TERMINATION_GRACE_MS);
     });
     listen(child.stderr, 'data', chunk => {
