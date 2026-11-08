@@ -1,0 +1,1274 @@
+{
+  "schema": 1,
+  "kind": "sanitized_bounded_native_qualification",
+  "current_catalog": {
+    "model": "gpt-6-astra",
+    "models_available": 1,
+    "efforts": [
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+      "max",
+      "ultra"
+    ],
+    "paid_speed_enabled": false
+  },
+  "matched": {
+    "protocol": {
+      "version": 1,
+      "kind": "counterbalanced_accepted_workflows",
+      "orders": [
+        [
+          "serial",
+          "concurrent"
+        ],
+        [
+          "concurrent",
+          "serial"
+        ],
+        [
+          "serial",
+          "concurrent"
+        ],
+        [
+          "concurrent",
+          "serial"
+        ]
+      ],
+      "criteria": {
+        "pairs": 4,
+        "critical_false_acceptances": 0,
+        "missed_required_results": 0,
+        "noninferiority_margin_errors": 0,
+        "max_generation_attempts_per_arm": 2,
+        "max_native_calls_total": 32,
+        "latency_improvement_required": false
+      },
+      "comparison": "Same immutable extraction/coding/review workload and explicit task controls in both schedules; four fresh pairs with balanced schedule order. Only independent extraction and bounded coding overlap; QA waits for both and actual tests.",
+      "limitations": [
+        "Repeated small fictional task, not broad production competence or statistical non-inferiority",
+        "Eight arms do not support reliable population-tail or causal founder-benefit claims",
+        "Human active minutes and interruptions are unobserved; harness attention events are separately labeled",
+        "Provider effective settings, token usage, billing and savings remain unknown unless actually observed",
+        "Coupled-work decisions and harmful-splitting behavior require separate cases; this fixture must not be relabeled as coupled work"
+      ],
+      "selections": {
+        "research": {
+          "mode": "explicit",
+          "model": "gpt-6-astra",
+          "effort": "low",
+          "speed": "host_default",
+          "reason": "Exact fictional extraction with deterministic acceptance; same choice in both matched schedules."
+        },
+        "engineer": {
+          "mode": "explicit",
+          "model": "gpt-6-astra",
+          "effort": "medium",
+          "speed": "host_default",
+          "reason": "Bounded pure parser repair with immutable executed tests; same choice in both schedules."
+        },
+        "qa": {
+          "mode": "explicit",
+          "model": "gpt-6-astra",
+          "effort": "high",
+          "speed": "host_default",
+          "reason": "Independent exact-candidate acceptance and seeded boundary review; same choice in both schedules."
+        }
+      },
+      "suite_sha256": "89459a25eb70cab0e2607394901850a902c3801245df031f757a6b3b7a4551a7",
+      "source_manifest_sha256": "493e3df8a444e5c55c694ee5507324867242a03e434f9166314139083b25c20c"
+    },
+    "source_verified": true,
+    "strict_predeclared_controls_verified": true,
+    "assessment": {
+      "passed": true,
+      "errors": [],
+      "pairs": [
+        {
+          "pair": 1,
+          "order": [
+            "serial",
+            "concurrent"
+          ],
+          "passed": true,
+          "quality_errors": 0,
+          "errors": [],
+          "arm_errors": [
+            {
+              "mode": "serial",
+              "errors": []
+            },
+            {
+              "mode": "concurrent",
+              "errors": []
+            }
+          ],
+          "source_verification_required": true,
+          "serial_ms": 48638.747625,
+          "concurrent_ms": 36133.879875,
+          "descriptive_only": true,
+          "causal_speedup_established": false
+        },
+        {
+          "pair": 2,
+          "order": [
+            "concurrent",
+            "serial"
+          ],
+          "passed": true,
+          "quality_errors": 0,
+          "errors": [],
+          "arm_errors": [
+            {
+              "mode": "concurrent",
+              "errors": []
+            },
+            {
+              "mode": "serial",
+              "errors": []
+            }
+          ],
+          "source_verification_required": true,
+          "serial_ms": 53505.36508300001,
+          "concurrent_ms": 39368.84233300001,
+          "descriptive_only": true,
+          "causal_speedup_established": false
+        },
+        {
+          "pair": 3,
+          "order": [
+            "serial",
+            "concurrent"
+          ],
+          "passed": true,
+          "quality_errors": 0,
+          "errors": [],
+          "arm_errors": [
+            {
+              "mode": "serial",
+              "errors": []
+            },
+            {
+              "mode": "concurrent",
+              "errors": []
+            }
+          ],
+          "source_verification_required": true,
+          "serial_ms": 49453.12062500001,
+          "concurrent_ms": 39533.47200000001,
+          "descriptive_only": true,
+          "causal_speedup_established": false
+        },
+        {
+          "pair": 4,
+          "order": [
+            "concurrent",
+            "serial"
+          ],
+          "passed": true,
+          "quality_errors": 0,
+          "errors": [],
+          "arm_errors": [
+            {
+              "mode": "concurrent",
+              "errors": []
+            },
+            {
+              "mode": "serial",
+              "errors": []
+            }
+          ],
+          "source_verification_required": true,
+          "serial_ms": 61224.86154199997,
+          "concurrent_ms": 37859.249416999985,
+          "descriptive_only": true,
+          "causal_speedup_established": false
+        }
+      ],
+      "model_calls": 24,
+      "by_mode": {
+        "serial": {
+          "trials": 4,
+          "accepted": 4,
+          "median_ms": 51479.24285400001,
+          "observed_max_ms": 61224.86154199997,
+          "model_calls": 12,
+          "repairs": 0,
+          "failed_test_attempts": 0,
+          "software_attention_events": 0,
+          "human_active_minutes": null,
+          "human_interruptions": null
+        },
+        "concurrent": {
+          "trials": 4,
+          "accepted": 4,
+          "median_ms": 38614.045874999996,
+          "observed_max_ms": 39533.47200000001,
+          "model_calls": 12,
+          "repairs": 0,
+          "failed_test_attempts": 0,
+          "software_attention_events": 0,
+          "human_active_minutes": null,
+          "human_interruptions": null
+        }
+      },
+      "descriptive_only": true,
+      "causal_speedup_established": false,
+      "population_tail_established": false,
+      "founder_effort_established": false
+    },
+    "arms": [
+      {
+        "pair": 1,
+        "mode": "serial",
+        "accepted": true,
+        "elapsed_ms": 48638.747625,
+        "model_calls": 3,
+        "repairs": 0,
+        "failed_test_attempts": 0,
+        "software_attention_events": 0,
+        "human_active_minutes": null,
+        "human_interruptions": null,
+        "extraction_exact": true,
+        "original_source_unchanged": true,
+        "seeded_original_test_failed": true,
+        "actual_candidate_tests_executed": true,
+        "actual_candidate_test_status": "passed",
+        "independent_native_qa": true,
+        "qa_verdict": "Pass",
+        "source_integrated": false,
+        "requested": {
+          "research": {
+            "mode": "explicit",
+            "model": "gpt-6-astra",
+            "effort": "low",
+            "speed": "host_default",
+            "reason": "Exact fictional extraction with deterministic acceptance; same choice in both matched schedules."
+          },
+          "engineer": {
+            "mode": "explicit",
+            "model": "gpt-6-astra",
+            "effort": "medium",
+            "speed": "host_default",
+            "reason": "Bounded pure parser repair with immutable executed tests; same choice in both schedules."
+          },
+          "qa": {
+            "mode": "explicit",
+            "model": "gpt-6-astra",
+            "effort": "high",
+            "speed": "host_default",
+            "reason": "Independent exact-candidate acceptance and seeded boundary review; same choice in both schedules."
+          }
+        },
+        "applied_controls": [
+          {
+            "role": "research",
+            "model": "gpt-6-astra",
+            "effort": "low",
+            "service_tier": null,
+            "fast_mode": null,
+            "switch_models_on_flag": null,
+            "scope": "child_launch_argv",
+            "verification": "applied_controls_not_effective_settings"
+          },
+          {
+            "role": "engineer",
+            "model": "gpt-6-astra",
+            "effort": "medium",
+            "service_tier": null,
+            "fast_mode": null,
+            "switch_models_on_flag": null,
+            "scope": "child_launch_argv",
+            "verification": "applied_controls_not_effective_settings"
+          },
+          {
+            "role": "qa",
+            "model": "gpt-6-astra",
+            "effort": "high",
+            "service_tier": null,
+            "fast_mode": null,
+            "switch_models_on_flag": null,
+            "scope": "child_launch_argv",
+            "verification": "applied_controls_not_effective_settings"
+          }
+        ],
+        "effective_settings_observed": false
+      },
+      {
+        "pair": 1,
+        "mode": "concurrent",
+        "accepted": true,
+        "elapsed_ms": 36133.879875,
+        "model_calls": 3,
+        "repairs": 0,
+        "failed_test_attempts": 0,
+        "software_attention_events": 0,
+        "human_active_minutes": null,
+        "human_interruptions": null,
+        "extraction_exact": true,
+        "original_source_unchanged": true,
+        "seeded_original_test_failed": true,
+        "actual_candidate_tests_executed": true,
+        "actual_candidate_test_status": "passed",
+        "independent_native_qa": true,
+        "qa_verdict": "Pass",
+        "source_integrated": false,
+        "requested": {
+          "research": {
+            "mode": "explicit",
+            "model": "gpt-6-astra",
+            "effort": "low",
+            "speed": "host_default",
+            "reason": "Exact fictional extraction with deterministic acceptance; same choice in both matched schedules."
+          },
+          "engineer": {
+            "mode": "explicit",
+            "model": "gpt-6-astra",
+            "effort": "medium",
+            "speed": "host_default",
+            "reason": "Bounded pure parser repair with immutable executed tests; same choice in both schedules."
+          },
+          "qa": {
+            "mode": "explicit",
+            "model": "gpt-6-astra",
+            "effort": "high",
+            "speed": "host_default",
+            "reason": "Independent exact-candidate acceptance and seeded boundary review; same choice in both schedules."
+          }
+        },
+        "applied_controls": [
+          {
+            "role": "research",
+            "model": "gpt-6-astra",
+            "effort": "low",
+            "service_tier": null,
+            "fast_mode": null,
+            "switch_models_on_flag": null,
+            "scope": "child_launch_argv",
+            "verification": "applied_controls_not_effective_settings"
+          },
+          {
+            "role": "engineer",
+            "model": "gpt-6-astra",
+            "effort": "medium",
+            "service_tier": null,
+            "fast_mode": null,
+            "switch_models_on_flag": null,
+            "scope": "child_launch_argv",
+            "verification": "applied_controls_not_effective_settings"
+          },
+          {
+            "role": "qa",
+            "model": "gpt-6-astra",
+            "effort": "high",
+            "service_tier": null,
+            "fast_mode": null,
+            "switch_models_on_flag": null,
+            "scope": "child_launch_argv",
+            "verification": "applied_controls_not_effective_settings"
+          }
+        ],
+        "effective_settings_observed": false
+      },
+      {
+        "pair": 2,
+        "mode": "concurrent",
+        "accepted": true,
+        "elapsed_ms": 39368.84233300001,
+        "model_calls": 3,
+        "repairs": 0,
+        "failed_test_attempts": 0,
+        "software_attention_events": 0,
+        "human_active_minutes": null,
+        "human_interruptions": null,
+        "extraction_exact": true,
+        "original_source_unchanged": true,
+        "seeded_original_test_failed": true,
+        "actual_candidate_tests_executed": true,
+        "actual_candidate_test_status": "passed",
+        "independent_native_qa": true,
+        "qa_verdict": "Pass",
+        "source_integrated": false,
+        "requested": {
+          "research": {
+            "mode": "explicit",
+            "model": "gpt-6-astra",
+            "effort": "low",
+            "speed": "host_default",
+            "reason": "Exact fictional extraction with deterministic acceptance; same choice in both matched schedules."
+          },
+          "engineer": {
+            "mode": "explicit",
+            "model": "gpt-6-astra",
+            "effort": "medium",
+            "speed": "host_default",
+            "reason": "Bounded pure parser repair with immutable executed tests; same choice in both schedules."
+          },
+          "qa": {
+            "mode": "explicit",
+            "model": "gpt-6-astra",
+            "effort": "high",
+            "speed": "host_default",
+            "reason": "Independent exact-candidate acceptance and seeded boundary review; same choice in both schedules."
+          }
+        },
+        "applied_controls": [
+          {
+            "role": "research",
+            "model": "gpt-6-astra",
+            "effort": "low",
+            "service_tier": null,
+            "fast_mode": null,
+            "switch_models_on_flag": null,
+            "scope": "child_launch_argv",
+            "verification": "applied_controls_not_effective_settings"
+          },
+          {
+            "role": "engineer",
+            "model": "gpt-6-astra",
+            "effort": "medium",
+            "service_tier": null,
+            "fast_mode": null,
+            "switch_models_on_flag": null,
+            "scope": "child_launch_argv",
+            "verification": "applied_controls_not_effective_settings"
+          },
+          {
+            "role": "qa",
+            "model": "gpt-6-astra",
+            "effort": "high",
+            "service_tier": null,
+            "fast_mode": null,
+            "switch_models_on_flag": null,
+            "scope": "child_launch_argv",
+            "verification": "applied_controls_not_effective_settings"
+          }
+        ],
+        "effective_settings_observed": false
+      },
+      {
+        "pair": 2,
+        "mode": "serial",
+        "accepted": true,
+        "elapsed_ms": 53505.36508300001,
+        "model_calls": 3,
+        "repairs": 0,
+        "failed_test_attempts": 0,
+        "software_attention_events": 0,
+        "human_active_minutes": null,
+        "human_interruptions": null,
+        "extraction_exact": true,
+        "original_source_unchanged": true,
+        "seeded_original_test_failed": true,
+        "actual_candidate_tests_executed": true,
+        "actual_candidate_test_status": "passed",
+        "independent_native_qa": true,
+        "qa_verdict": "Pass",
+        "source_integrated": false,
+        "requested": {
+          "research": {
+            "mode": "explicit",
+            "model": "gpt-6-astra",
+            "effort": "low",
+            "speed": "host_default",
+            "reason": "Exact fictional extraction with deterministic acceptance; same choice in both matched schedules."
+          },
+          "engineer": {
+            "mode": "explicit",
+            "model": "gpt-6-astra",
+            "effort": "medium",
+            "speed": "host_default",
+            "reason": "Bounded pure parser repair with immutable executed tests; same choice in both schedules."
+          },
+          "qa": {
+            "mode": "explicit",
+            "model": "gpt-6-astra",
+            "effort": "high",
+            "speed": "host_default",
+            "reason": "Independent exact-candidate acceptance and seeded boundary review; same choice in both schedules."
+          }
+        },
+        "applied_controls": [
+          {
+            "role": "research",
+            "model": "gpt-6-astra",
+            "effort": "low",
+            "service_tier": null,
+            "fast_mode": null,
+            "switch_models_on_flag": null,
+            "scope": "child_launch_argv",
+            "verification": "applied_controls_not_effective_settings"
+          },
+          {
+            "role": "engineer",
+            "model": "gpt-6-astra",
+            "effort": "medium",
+            "service_tier": null,
+            "fast_mode": null,
+            "switch_models_on_flag": null,
+            "scope": "child_launch_argv",
+            "verification": "applied_controls_not_effective_settings"
+          },
+          {
+            "role": "qa",
+            "model": "gpt-6-astra",
+            "effort": "high",
+            "service_tier": null,
+            "fast_mode": null,
+            "switch_models_on_flag": null,
+            "scope": "child_launch_argv",
+            "verification": "applied_controls_not_effective_settings"
+          }
+        ],
+        "effective_settings_observed": false
+      },
+      {
+        "pair": 3,
+        "mode": "serial",
+        "accepted": true,
+        "elapsed_ms": 49453.12062500001,
+        "model_calls": 3,
+        "repairs": 0,
+        "failed_test_attempts": 0,
+        "software_attention_events": 0,
+        "human_active_minutes": null,
+        "human_interruptions": null,
+        "extraction_exact": true,
+        "original_source_unchanged": true,
+        "seeded_original_test_failed": true,
+        "actual_candidate_tests_executed": true,
+        "actual_candidate_test_status": "passed",
+        "independent_native_qa": true,
+        "qa_verdict": "Pass",
+        "source_integrated": false,
+        "requested": {
+          "research": {
+            "mode": "explicit",
+            "model": "gpt-6-astra",
+            "effort": "low",
+            "speed": "host_default",
+            "reason": "Exact fictional extraction with deterministic acceptance; same choice in both matched schedules."
+          },
+          "engineer": {
+            "mode": "explicit",
+            "model": "gpt-6-astra",
+            "effort": "medium",
+            "speed": "host_default",
+            "reason": "Bounded pure parser repair with immutable executed tests; same choice in both schedules."
+          },
+          "qa": {
+            "mode": "explicit",
+            "model": "gpt-6-astra",
+            "effort": "high",
+            "speed": "host_default",
+            "reason": "Independent exact-candidate acceptance and seeded boundary review; same choice in both schedules."
+          }
+        },
+        "applied_controls": [
+          {
+            "role": "research",
+            "model": "gpt-6-astra",
+            "effort": "low",
+            "service_tier": null,
+            "fast_mode": null,
+            "switch_models_on_flag": null,
+            "scope": "child_launch_argv",
+            "verification": "applied_controls_not_effective_settings"
+          },
+          {
+            "role": "engineer",
+            "model": "gpt-6-astra",
+            "effort": "medium",
+            "service_tier": null,
+            "fast_mode": null,
+            "switch_models_on_flag": null,
+            "scope": "child_launch_argv",
+            "verification": "applied_controls_not_effective_settings"
+          },
+          {
+            "role": "qa",
+            "model": "gpt-6-astra",
+            "effort": "high",
+            "service_tier": null,
+            "fast_mode": null,
+            "switch_models_on_flag": null,
+            "scope": "child_launch_argv",
+            "verification": "applied_controls_not_effective_settings"
+          }
+        ],
+        "effective_settings_observed": false
+      },
+      {
+        "pair": 3,
+        "mode": "concurrent",
+        "accepted": true,
+        "elapsed_ms": 39533.47200000001,
+        "model_calls": 3,
+        "repairs": 0,
+        "failed_test_attempts": 0,
+        "software_attention_events": 0,
+        "human_active_minutes": null,
+        "human_interruptions": null,
+        "extraction_exact": true,
+        "original_source_unchanged": true,
+        "seeded_original_test_failed": true,
+        "actual_candidate_tests_executed": true,
+        "actual_candidate_test_status": "passed",
+        "independent_native_qa": true,
+        "qa_verdict": "Pass",
+        "source_integrated": false,
+        "requested": {
+          "research": {
+            "mode": "explicit",
+            "model": "gpt-6-astra",
+            "effort": "low",
+            "speed": "host_default",
+            "reason": "Exact fictional extraction with deterministic acceptance; same choice in both matched schedules."
+          },
+          "engineer": {
+            "mode": "explicit",
+            "model": "gpt-6-astra",
+            "effort": "medium",
+            "speed": "host_default",
+            "reason": "Bounded pure parser repair with immutable executed tests; same choice in both schedules."
+          },
+          "qa": {
+            "mode": "explicit",
+            "model": "gpt-6-astra",
+            "effort": "high",
+            "speed": "host_default",
+            "reason": "Independent exact-candidate acceptance and seeded boundary review; same choice in both schedules."
+          }
+        },
+        "applied_controls": [
+          {
+            "role": "research",
+            "model": "gpt-6-astra",
+            "effort": "low",
+            "service_tier": null,
+            "fast_mode": null,
+            "switch_models_on_flag": null,
+            "scope": "child_launch_argv",
+            "verification": "applied_controls_not_effective_settings"
+          },
+          {
+            "role": "engineer",
+            "model": "gpt-6-astra",
+            "effort": "medium",
+            "service_tier": null,
+            "fast_mode": null,
+            "switch_models_on_flag": null,
+            "scope": "child_launch_argv",
+            "verification": "applied_controls_not_effective_settings"
+          },
+          {
+            "role": "qa",
+            "model": "gpt-6-astra",
+            "effort": "high",
+            "service_tier": null,
+            "fast_mode": null,
+            "switch_models_on_flag": null,
+            "scope": "child_launch_argv",
+            "verification": "applied_controls_not_effective_settings"
+          }
+        ],
+        "effective_settings_observed": false
+      },
+      {
+        "pair": 4,
+        "mode": "concurrent",
+        "accepted": true,
+        "elapsed_ms": 37859.249416999985,
+        "model_calls": 3,
+        "repairs": 0,
+        "failed_test_attempts": 0,
+        "software_attention_events": 0,
+        "human_active_minutes": null,
+        "human_interruptions": null,
+        "extraction_exact": true,
+        "original_source_unchanged": true,
+        "seeded_original_test_failed": true,
+        "actual_candidate_tests_executed": true,
+        "actual_candidate_test_status": "passed",
+        "independent_native_qa": true,
+        "qa_verdict": "Pass",
+        "source_integrated": false,
+        "requested": {
+          "research": {
+            "mode": "explicit",
+            "model": "gpt-6-astra",
+            "effort": "low",
+            "speed": "host_default",
+            "reason": "Exact fictional extraction with deterministic acceptance; same choice in both matched schedules."
+          },
+          "engineer": {
+            "mode": "explicit",
+            "model": "gpt-6-astra",
+            "effort": "medium",
+            "speed": "host_default",
+            "reason": "Bounded pure parser repair with immutable executed tests; same choice in both schedules."
+          },
+          "qa": {
+            "mode": "explicit",
+            "model": "gpt-6-astra",
+            "effort": "high",
+            "speed": "host_default",
+            "reason": "Independent exact-candidate acceptance and seeded boundary review; same choice in both schedules."
+          }
+        },
+        "applied_controls": [
+          {
+            "role": "research",
+            "model": "gpt-6-astra",
+            "effort": "low",
+            "service_tier": null,
+            "fast_mode": null,
+            "switch_models_on_flag": null,
+            "scope": "child_launch_argv",
+            "verification": "applied_controls_not_effective_settings"
+          },
+          {
+            "role": "engineer",
+            "model": "gpt-6-astra",
+            "effort": "medium",
+            "service_tier": null,
+            "fast_mode": null,
+            "switch_models_on_flag": null,
+            "scope": "child_launch_argv",
+            "verification": "applied_controls_not_effective_settings"
+          },
+          {
+            "role": "qa",
+            "model": "gpt-6-astra",
+            "effort": "high",
+            "service_tier": null,
+            "fast_mode": null,
+            "switch_models_on_flag": null,
+            "scope": "child_launch_argv",
+            "verification": "applied_controls_not_effective_settings"
+          }
+        ],
+        "effective_settings_observed": false
+      },
+      {
+        "pair": 4,
+        "mode": "serial",
+        "accepted": true,
+        "elapsed_ms": 61224.86154199997,
+        "model_calls": 3,
+        "repairs": 0,
+        "failed_test_attempts": 0,
+        "software_attention_events": 0,
+        "human_active_minutes": null,
+        "human_interruptions": null,
+        "extraction_exact": true,
+        "original_source_unchanged": true,
+        "seeded_original_test_failed": true,
+        "actual_candidate_tests_executed": true,
+        "actual_candidate_test_status": "passed",
+        "independent_native_qa": true,
+        "qa_verdict": "Pass",
+        "source_integrated": false,
+        "requested": {
+          "research": {
+            "mode": "explicit",
+            "model": "gpt-6-astra",
+            "effort": "low",
+            "speed": "host_default",
+            "reason": "Exact fictional extraction with deterministic acceptance; same choice in both matched schedules."
+          },
+          "engineer": {
+            "mode": "explicit",
+            "model": "gpt-6-astra",
+            "effort": "medium",
+            "speed": "host_default",
+            "reason": "Bounded pure parser repair with immutable executed tests; same choice in both schedules."
+          },
+          "qa": {
+            "mode": "explicit",
+            "model": "gpt-6-astra",
+            "effort": "high",
+            "speed": "host_default",
+            "reason": "Independent exact-candidate acceptance and seeded boundary review; same choice in both schedules."
+          }
+        },
+        "applied_controls": [
+          {
+            "role": "research",
+            "model": "gpt-6-astra",
+            "effort": "low",
+            "service_tier": null,
+            "fast_mode": null,
+            "switch_models_on_flag": null,
+            "scope": "child_launch_argv",
+            "verification": "applied_controls_not_effective_settings"
+          },
+          {
+            "role": "engineer",
+            "model": "gpt-6-astra",
+            "effort": "medium",
+            "service_tier": null,
+            "fast_mode": null,
+            "switch_models_on_flag": null,
+            "scope": "child_launch_argv",
+            "verification": "applied_controls_not_effective_settings"
+          },
+          {
+            "role": "qa",
+            "model": "gpt-6-astra",
+            "effort": "high",
+            "service_tier": null,
+            "fast_mode": null,
+            "switch_models_on_flag": null,
+            "scope": "child_launch_argv",
+            "verification": "applied_controls_not_effective_settings"
+          }
+        ],
+        "effective_settings_observed": false
+      }
+    ]
+  },
+  "qualification": {
+    "protocol": {
+      "version": 1,
+      "kind": "bounded_fictional_coordination_and_task_qualification",
+      "model": "gpt-6-astra",
+      "speed": "host_default",
+      "calls_max": 12,
+      "repair_allowance": 0,
+      "criteria": {
+        "all_trials_pass": true,
+        "critical_false_acceptances": 0,
+        "missed_seeded_blockers": 0,
+        "noninferiority_margin_errors": 0
+      },
+      "coordination": {
+        "trials": 3,
+        "cases_per_trial": 8,
+        "effort": "medium",
+        "expected": "Existing exact eight-case coordination grader, including keep coupled, concurrent isolated checks then QA, covered repair and legitimate hold"
+      },
+      "outcomes": {
+        "trials_per_case": 3,
+        "cases": [
+          "extraction",
+          "coding",
+          "review"
+        ],
+        "efforts": {
+          "extraction": "low",
+          "coding": "medium",
+          "review": "high"
+        },
+        "order": [
+          [
+            "extraction",
+            "coding",
+            "review"
+          ],
+          [
+            "coding",
+            "review",
+            "extraction"
+          ],
+          [
+            "review",
+            "extraction",
+            "coding"
+          ]
+        ]
+      },
+      "stop": "Any failed result, parsing/provider error or source drift stops all remaining calls; no retry/reset",
+      "limitations": [
+        "Only the current exact catalog model is available; no multi-model choice, monetary saving or effective-provider claim",
+        "Fictional coordination decisions do not establish actual harmful-splitting overhead",
+        "Human founder effort unobserved; no synthetic substitute"
+      ]
+    },
+    "passed": true,
+    "source_verified": true,
+    "calls": 12,
+    "by_case": {
+      "coordination": {
+        "trials": 3,
+        "passed": 3,
+        "median_ms": 15755.137625000003,
+        "observed_max_ms": 15877.762833,
+        "cases_per_trial": 8,
+        "repair_count": 0
+      },
+      "extraction": {
+        "trials": 3,
+        "passed": 3,
+        "median_ms": 9668.783041999995,
+        "observed_max_ms": 10188.238375,
+        "cases_per_trial": 1,
+        "repair_count": 0
+      },
+      "coding": {
+        "trials": 3,
+        "passed": 3,
+        "median_ms": 11204.564209000004,
+        "observed_max_ms": 11793.871083999999,
+        "cases_per_trial": 1,
+        "actual_test_executions": 3,
+        "repair_count": 0
+      },
+      "review": {
+        "trials": 3,
+        "passed": 3,
+        "median_ms": 8815.992583999992,
+        "observed_max_ms": 9496.637666999988,
+        "cases_per_trial": 1,
+        "critical_seeded_blockers_per_trial": 4,
+        "missed_blockers": 0,
+        "repair_count": 0
+      }
+    },
+    "trials": [
+      {
+        "case_id": "coordination",
+        "trial": 1,
+        "passed": true,
+        "elapsed_ms": 15877.762833,
+        "requested": {
+          "mode": "explicit",
+          "model": "gpt-6-astra",
+          "effort": "medium",
+          "reason": "Frozen three-trial fictional policy qualification; no company actions, retries or unsupported speed",
+          "speed": "host_default"
+        },
+        "cases": [
+          {
+            "id": "simple",
+            "passed": true,
+            "error_count": 0
+          },
+          {
+            "id": "covered-repair",
+            "passed": true,
+            "error_count": 0
+          },
+          {
+            "id": "independent-validation",
+            "passed": true,
+            "error_count": 0
+          },
+          {
+            "id": "coupled",
+            "passed": true,
+            "error_count": 0
+          },
+          {
+            "id": "exhausted",
+            "passed": true,
+            "error_count": 0
+          },
+          {
+            "id": "advisory",
+            "passed": true,
+            "error_count": 0
+          },
+          {
+            "id": "material-update",
+            "passed": true,
+            "error_count": 0
+          },
+          {
+            "id": "unsupported",
+            "passed": true,
+            "error_count": 0
+          }
+        ]
+      },
+      {
+        "case_id": "coordination",
+        "trial": 2,
+        "passed": true,
+        "elapsed_ms": 15755.137625000003,
+        "requested": {
+          "mode": "explicit",
+          "model": "gpt-6-astra",
+          "effort": "medium",
+          "reason": "Frozen three-trial fictional policy qualification; no company actions, retries or unsupported speed",
+          "speed": "host_default"
+        },
+        "cases": [
+          {
+            "id": "simple",
+            "passed": true,
+            "error_count": 0
+          },
+          {
+            "id": "covered-repair",
+            "passed": true,
+            "error_count": 0
+          },
+          {
+            "id": "independent-validation",
+            "passed": true,
+            "error_count": 0
+          },
+          {
+            "id": "coupled",
+            "passed": true,
+            "error_count": 0
+          },
+          {
+            "id": "exhausted",
+            "passed": true,
+            "error_count": 0
+          },
+          {
+            "id": "advisory",
+            "passed": true,
+            "error_count": 0
+          },
+          {
+            "id": "material-update",
+            "passed": true,
+            "error_count": 0
+          },
+          {
+            "id": "unsupported",
+            "passed": true,
+            "error_count": 0
+          }
+        ]
+      },
+      {
+        "case_id": "coordination",
+        "trial": 3,
+        "passed": true,
+        "elapsed_ms": 15708.552624999997,
+        "requested": {
+          "mode": "explicit",
+          "model": "gpt-6-astra",
+          "effort": "medium",
+          "reason": "Frozen three-trial fictional policy qualification; no company actions, retries or unsupported speed",
+          "speed": "host_default"
+        },
+        "cases": [
+          {
+            "id": "simple",
+            "passed": true,
+            "error_count": 0
+          },
+          {
+            "id": "covered-repair",
+            "passed": true,
+            "error_count": 0
+          },
+          {
+            "id": "independent-validation",
+            "passed": true,
+            "error_count": 0
+          },
+          {
+            "id": "coupled",
+            "passed": true,
+            "error_count": 0
+          },
+          {
+            "id": "exhausted",
+            "passed": true,
+            "error_count": 0
+          },
+          {
+            "id": "advisory",
+            "passed": true,
+            "error_count": 0
+          },
+          {
+            "id": "material-update",
+            "passed": true,
+            "error_count": 0
+          },
+          {
+            "id": "unsupported",
+            "passed": true,
+            "error_count": 0
+          }
+        ]
+      },
+      {
+        "case_id": "extraction",
+        "trial": 1,
+        "passed": true,
+        "elapsed_ms": 10188.238375,
+        "requested": {
+          "mode": "explicit",
+          "model": "gpt-6-astra",
+          "effort": "low",
+          "reason": "Predeclared bounded fictional extraction qualification; no fallback, retry, paid speed or source/company mutation",
+          "speed": "host_default"
+        }
+      },
+      {
+        "case_id": "coding",
+        "trial": 1,
+        "passed": true,
+        "elapsed_ms": 9358.620333000006,
+        "requested": {
+          "mode": "explicit",
+          "model": "gpt-6-astra",
+          "effort": "medium",
+          "reason": "Predeclared bounded fictional coding qualification; no fallback, retry, paid speed or source/company mutation",
+          "speed": "host_default"
+        },
+        "actual_test_receipt": {
+          "status": "passed",
+          "exit_code": 0,
+          "tests_executed": true
+        }
+      },
+      {
+        "case_id": "review",
+        "trial": 1,
+        "passed": true,
+        "elapsed_ms": 9496.637666999988,
+        "requested": {
+          "mode": "explicit",
+          "model": "gpt-6-astra",
+          "effort": "high",
+          "reason": "Predeclared bounded fictional review qualification; no fallback, retry, paid speed or source/company mutation",
+          "speed": "host_default"
+        }
+      },
+      {
+        "case_id": "coding",
+        "trial": 2,
+        "passed": true,
+        "elapsed_ms": 11204.564209000004,
+        "requested": {
+          "mode": "explicit",
+          "model": "gpt-6-astra",
+          "effort": "medium",
+          "reason": "Predeclared bounded fictional coding qualification; no fallback, retry, paid speed or source/company mutation",
+          "speed": "host_default"
+        },
+        "actual_test_receipt": {
+          "status": "passed",
+          "exit_code": 0,
+          "tests_executed": true
+        }
+      },
+      {
+        "case_id": "review",
+        "trial": 2,
+        "passed": true,
+        "elapsed_ms": 8815.992583999992,
+        "requested": {
+          "mode": "explicit",
+          "model": "gpt-6-astra",
+          "effort": "high",
+          "reason": "Predeclared bounded fictional review qualification; no fallback, retry, paid speed or source/company mutation",
+          "speed": "host_default"
+        }
+      },
+      {
+        "case_id": "extraction",
+        "trial": 2,
+        "passed": true,
+        "elapsed_ms": 8372.230625000011,
+        "requested": {
+          "mode": "explicit",
+          "model": "gpt-6-astra",
+          "effort": "low",
+          "reason": "Predeclared bounded fictional extraction qualification; no fallback, retry, paid speed or source/company mutation",
+          "speed": "host_default"
+        }
+      },
+      {
+        "case_id": "review",
+        "trial": 3,
+        "passed": true,
+        "elapsed_ms": 8178.1855420000065,
+        "requested": {
+          "mode": "explicit",
+          "model": "gpt-6-astra",
+          "effort": "high",
+          "reason": "Predeclared bounded fictional review qualification; no fallback, retry, paid speed or source/company mutation",
+          "speed": "host_default"
+        }
+      },
+      {
+        "case_id": "extraction",
+        "trial": 3,
+        "passed": true,
+        "elapsed_ms": 9668.783041999995,
+        "requested": {
+          "mode": "explicit",
+          "model": "gpt-6-astra",
+          "effort": "low",
+          "reason": "Predeclared bounded fictional extraction qualification; no fallback, retry, paid speed or source/company mutation",
+          "speed": "host_default"
+        }
+      },
+      {
+        "case_id": "coding",
+        "trial": 3,
+        "passed": true,
+        "elapsed_ms": 11793.871083999999,
+        "requested": {
+          "mode": "explicit",
+          "model": "gpt-6-astra",
+          "effort": "medium",
+          "reason": "Predeclared bounded fictional coding qualification; no fallback, retry, paid speed or source/company mutation",
+          "speed": "host_default"
+        },
+        "actual_test_receipt": {
+          "status": "passed",
+          "exit_code": 0,
+          "tests_executed": true
+        }
+      }
+    ]
+  },
+  "totals": {
+    "native_calls": 36,
+    "predeclared_max_native_calls": 44,
+    "repairs": 0,
+    "failed_candidate_test_attempts": 0
+  },
+  "validation": {
+    "node_version": "v22.23.2",
+    "focused_tests": {
+      "accepted_workflow": 7,
+      "repeated_workflow": 4,
+      "coordination_and_integration": 10,
+      "selection": 11,
+      "total": 32,
+      "failures": 0,
+      "skips": 0
+    },
+    "build_plugin_check": true,
+    "diff_check": true
+  },
+  "unknowns": {
+    "effective_model": null,
+    "effective_effort": null,
+    "effective_service_tier": null,
+    "token_usage": null,
+    "billing": null,
+    "human_active_minutes": null,
+    "human_interruptions": null,
+    "human_rebriefing": null
+  },
+  "remaining_acceptance": {
+    "actual_coupled_or_harmful_splitting_accepted_workflow": false,
+    "broader_production_workload": false,
+    "multiple_model_comparison": false,
+    "human_founder_effort_observed": false,
+    "statistical_quality_noninferiority": false,
+    "causal_speedup": false,
+    "reliable_population_latency_tail": false
+  },
+  "privacy": {
+    "raw_host_diagnostics_published": false,
+    "raw_model_outputs_published": false,
+    "native_identifiers_published": false,
+    "actual_company_mutated": false
+  }
+}

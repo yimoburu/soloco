@@ -18,7 +18,20 @@ export const protocol=Object.freeze({version:1,kind:'accepted_candidate_format_c
   acceptance:'Real production dispatch and worker produce a retained exact candidate. Actual sandboxed tests must pass; a different native QA must permit the exact candidate and actual receipt; the fixture receiver then calls production accept. Exact grading additionally compares all complete candidate bytes against the known fixture.',
   limitations:['One observation per arm; descriptive results cannot establish statistical quality noninferiority, production reliability, cost savings or causal latency gains.','Only manually supplied fictional modules and fixed tests are shared with the existing host model. Synthetic company binding and grant are fixture data; no actual company state or authority changes.','Requested/applied model controls differ from effective provider settings; missing observations remain unknown.','All failed or uncertain calls stay retained and hold that case without retry. Source integration, installation and deployment are outside this evaluation.']});
 const bytes=value=>Buffer.byteLength(JSON.stringify(value));
-const selections={engineer:{mode:'explicit',model:'gpt-6.1-sol',effort:'medium',speed:'host_default',reason:'Exact one-character fictional module repairs; identical model controls in all format arms.'},qa:{mode:'explicit',model:'gpt-6.1-sol',effort:'high',speed:'host_default',reason:'Independent complete candidate, actual receipt and exact fixture preservation review; identical controls in all arms.'}};
+export const defaultSelections={engineer:{mode:'explicit',model:'gpt-6.1-sol',effort:'medium',speed:'host_default',reason:'Exact one-character fictional module repairs; identical model controls in all format arms.'},qa:{mode:'explicit',model:'gpt-6.1-sol',effort:'high',speed:'host_default',reason:'Independent complete candidate, actual receipt and exact fixture preservation review; identical controls in all arms.'}};
+export function modelSelections(model='gpt-6.1-sol',engineerEffort='medium',qaEffort='high'){
+  return Object.fromEntries(Object.entries(defaultSelections).map(([role,value])=>[role,{...value,model,effort:role==='engineer'?engineerEffort:qaEffort}]));
+}
+export function validateModelSelections(selections,catalog){
+  if(!catalog?.supported)throw Error('A supported current host catalog is required');
+  for(const role of ['engineer','qa']){const selected=selections?.[role],entry=catalog.models?.find(m=>m.id===selected?.model);
+    if(selected?.mode!=='explicit'||selected.speed!=='host_default'||!entry||!entry.supported_efforts?.includes(selected.effort))throw Error('Predeclared '+role+' model/effort is not supported by the inspected host catalog');}
+  return true;
+}
+export function matchesModelPolicy(call,selections=defaultSelections){
+  const expected=selections?.[call?.role],actual=call?.requested;
+  return !!expected&&!!actual&&['mode','model','effort','speed','reason'].every(key=>actual[key]===expected[key]);
+}
 export function sourceIdentity(base=fileURLToPath(new URL('../',import.meta.url))){
   const files=[];
   const walk=dir=>{for(const e of fs.readdirSync(path.join(base,dir),{withFileTypes:true})){const p=path.posix.join(dir,e.name);if(e.isDirectory())walk(p);else if(e.isFile())files.push({path:p,sha256:digest(fs.readFileSync(path.join(base,p)))});}};
@@ -67,7 +80,7 @@ export function contractModel({count=1,format='files',badCandidate=false,qaVerdi
   return {native_id:id('contract-double'),text:JSON.stringify(output),model_evidence:{verification:'synthetic_contract_double'}};
 };}
 
-export async function runCase({directory,count,format,native=false,model,sharedBudget={calls:0},runtimeReady,runtimeCatalog,sourceManifest=sourceIdentity()}){
+export async function runCase({directory,count,format,native=false,model,sharedBudget={calls:0},runtimeReady,runtimeCatalog,sourceManifest=sourceIdentity(),selections=defaultSelections}){
   if(!protocol.fixture.formats.includes(format))throw Error('Unsupported format');
   const root=path.join(directory,`${count}-${format}`);fs.mkdirSync(root,{recursive:true});
   const args={root,session_id:id('fictional-founder'),epoch:1},data=fixture(count);
@@ -81,7 +94,7 @@ export async function runCase({directory,count,format,native=false,model,sharedB
     acceptance:'Change every module exported value from0 to1 and preserve every other byte. Fixed tests and exact complete expected hashes must pass; current independent QA must permit the exact candidate and actual test receipt.',
     stop_conditions:'One generation only. Stop on failed tests, invalid/incomplete output, uncertain provider/process outcome, changed source/scope, backend error or nonpassing independent QA. No repairs or automatic retries.',data_policy:'Only the manually supplied fictional modules, their fixed tests and this fixture evidence may be shared with the existing host model.',source_instruction:'Fictional fixture grants inspection/sharing of the declared fictional modules and tests for this bounded format comparison.',max_attempts:1,timeout_ms:protocol.limits.test_timeout_ms,max_output_bytes:20000,max_bytes:protocol.limits.scope_max_bytes,expires_at:new Date(Date.now()+3600000).toISOString()},'codex');
   await engine.develop({...args,action:'authorize',plan_id:plan.id,scope_sha256:plan.development.scope_sha256,model_data_approved:true,source_instruction:'Fictional fixture grant authorizes this exact one-attempt scope, selected output format, actual isolated tests, fresh independent QA and retained-candidate acceptance only.'},'codex');
-  const report={count,format,execution:native?'native_cli':'synthetic_contract_double',root,source_manifest_sha256:sourceManifest.manifest_sha256,scope_sha256:plan.development.scope_sha256,fixture_sha256:digest(JSON.stringify(data)),module_bytes:data.sources.map(f=>Buffer.byteLength(f.content)),source_bytes:bytes(data.sources),expected_candidate_bytes:bytes([...data.expected,data.test].sort((a,b)=>a.path.localeCompare(b.path))),events:[],calls:[],attempts:[],accepted:false,errors:[],repairs:0,stage:'producer',precheck:{status:precheck.status,exit_code:precheck.exit_code,tests_executed:precheck.tests_executed}};
+  const report={count,format,model_selection_policy:structuredClone(selections),model_selection_policy_sha256:digest(JSON.stringify(selections)),execution:native?'native_cli':'synthetic_contract_double',root,source_manifest_sha256:sourceManifest.manifest_sha256,scope_sha256:plan.development.scope_sha256,fixture_sha256:digest(JSON.stringify(data)),module_bytes:data.sources.map(f=>Buffer.byteLength(f.content)),source_bytes:bytes(data.sources),expected_candidate_bytes:bytes([...data.expected,data.test].sort((a,b)=>a.path.localeCompare(b.path))),events:[],calls:[],attempts:[],accepted:false,errors:[],repairs:0,stage:'producer',precheck:{status:precheck.status,exit_code:precheck.exit_code,tests_executed:precheck.tests_executed}};
   const started=performance.now(),checkpoint=()=>fs.writeFileSync(path.join(root,'qualification-local.json'),JSON.stringify(report,null,2)+'\n');
   const {dispatch,event}=createWorkflow({args,report,started,native,model:model??contractModel({count,format}),sharedBudget,maxCalls:protocol.criteria.max_native_calls_total,runtimeReady,runtimeCatalog,checkpoint,selections,timeoutMs:protocol.limits.native_timeout_ms,
     taskByRole:{engineer:`Change each authorized module's exported value from 0 to 1. Preserve every other character including all padding. The fixed read-only tests and original failure are supplied. Return only the selected scope output_format ${format}; never elide unchanged content in full-file mode. This is one attempt without repair.`,qa:'Independently review the entire exact retained candidate, fixed read-only tests, original failure, reconstructed diff and actual runtime receipt. Verify each exported value changed0 to1 and all remaining bytes are preserved. Pass only with real passed tests and no blocker. Return the exact candidate and receipt hashes permitting accept_local_development.'}});
@@ -108,14 +121,14 @@ export async function runCase({directory,count,format,native=false,model,sharedB
   return report;
 }
 
-export function assess(cases,sourceVerification=null){
+export function assess(cases,sourceVerification=null,selections=defaultSelections){
   const list=Array.isArray(cases)?cases:[],expected=new Set(['1-files','1-patches','3-files','3-patches']),seen=new Set(list.map(c=>`${c?.count}-${c?.format}`));
   const identities=list.length===4&&seen.size===4&&[...seen].every(k=>expected.has(k))&&new Set(list.map(c=>c.execution)).size===1&&['native_cli','synthetic_contract_double'].includes(list[0]?.execution)&&new Set(list.map(c=>c.source_manifest_sha256)).size===1&&sha(list[0]?.source_manifest_sha256);
   const valid=c=>{
     if(!c||![1,3].includes(c.count)||!Array.isArray(c.calls)||!Array.isArray(c.attempts)||!Array.isArray(c.errors)||!Array.isArray(c.events))return false;
     const author=c.calls.find(x=>x?.role==='engineer'),reviewer=c.calls.find(x=>x?.role==='qa'),attempt=c.attempts[0],candidateHash=c.generation?.candidate_sha256;
     return c.accepted===true&&c.exact_fixture_match===true&&c.original_source_unchanged===true&&c.repairs===0&&c.errors.length===0&&!c.calls.some(x=>!x||x.error)&&!c.events.some(x=>!x||x.type==='held')&&
-      c.calls.length===2&&c.calls.filter(x=>x.role==='engineer').length===1&&c.calls.filter(x=>x.role==='qa').length===1&&c.calls.every(x=>nonempty(x.native_id)&&nonempty(x.job_id)&&x.requested?.mode==='explicit'&&x.requested.model==='gpt-6.1-sol'&&x.requested.speed==='host_default'&&x.requested.effort===(x.role==='engineer'?'medium':'high'))&&
+      c.calls.length===2&&c.calls.filter(x=>x.role==='engineer').length===1&&c.calls.filter(x=>x.role==='qa').length===1&&c.calls.every(x=>nonempty(x.native_id)&&nonempty(x.job_id)&&matchesModelPolicy(x,selections))&&(c.model_selection_policy===undefined?JSON.stringify(selections)===JSON.stringify(defaultSelections):JSON.stringify(c.model_selection_policy)===JSON.stringify(selections)&&c.model_selection_policy_sha256===digest(JSON.stringify(selections)))&&
       c.fixture_sha256===digest(JSON.stringify(fixture(c.count)))&&c.precheck?.tests_executed===true&&c.precheck.status==='failed'&&Number.isInteger(c.precheck.exit_code)&&c.precheck.exit_code!==0&&Number.isFinite(c.elapsed_ms)&&c.elapsed_ms>0&&
       sha(candidateHash)&&nonempty(c.generation.candidate_id)&&c.generation.native_id===author.native_id&&c.generation.byte_accounting?.format===c.format&&c.review?.verdict==='Pass'&&nonempty(c.review.id)&&c.review.native_id===reviewer.native_id&&c.review.author_native_id===author.native_id&&reviewer.native_id!==author.native_id&&
       c.events.some(e=>e.type==='returned'&&e.role==='engineer'&&e.job_id===author.job_id&&e.artifact_id===c.generation.candidate_id)&&c.events.some(e=>e.type==='returned'&&e.role==='qa'&&e.job_id===reviewer.job_id&&e.artifact_id===c.review.id)&&
@@ -126,16 +139,20 @@ export function assess(cases,sourceVerification=null){
   return {passed:identities&&sourceMatched&&list.every(valid),unique_expected_cases:identities,source_verification_required:sourceVerification!==null,source_verification_passed:sourceMatched,accepted_cases:list.filter(valid).length,total_cases:list.length,critical_false_acceptances:list.filter(c=>c?.accepted&&!valid(c)).length,statistical_noninferiority_established:false,causal_latency_improvement_established:false};
 }
 async function main(argv){
-  if(argv.length!==2||!['--native','--contract-double'].includes(argv[0]))throw Error('Use --native|--contract-double NEW_OUTPUT_DIRECTORY');
+  if(![2,5].includes(argv.length)||!['--native','--contract-double'].includes(argv[0]))throw Error('Use --native|--contract-double NEW_OUTPUT_DIRECTORY [MODEL ENGINEER_EFFORT QA_EFFORT]');
+  const selections=modelSelections(...argv.slice(2));
   const native=argv[0]==='--native',directory=path.resolve(argv[1]);if(fs.existsSync(directory))throw Error('Preserve evidence: choose a new output directory');fs.mkdirSync(directory,{recursive:true});
-  process.env.COMPANY_PLUGIN_DATA=path.join(directory,'fixture-bindings');const sourceManifest=sourceIdentity(),runProtocol={...protocol,source_identity:sourceManifest};fs.writeFileSync(path.join(directory,'predeclared-protocol.json'),JSON.stringify(runProtocol,null,2)+'\n',{flag:'wx'});
+  process.env.COMPANY_PLUGIN_DATA=path.join(directory,'fixture-bindings');const sourceManifest=sourceIdentity(),runProtocol={...protocol,model_selection_policy:selections,model_selection_policy_sha256:digest(JSON.stringify(selections)),source_identity:sourceManifest};fs.writeFileSync(path.join(directory,'predeclared-protocol.json'),JSON.stringify(runProtocol,null,2)+'\n',{flag:'wx'});
+  fs.writeFileSync(path.join(directory,'frozen-source-identity.json'),JSON.stringify(sourceManifest,null,2)+'\n',{flag:'wx'});
+  for(const file of sourceManifest.files){const destination=path.join(directory,'frozen-source',file.path);fs.mkdirSync(path.dirname(destination),{recursive:true});fs.copyFileSync(path.join(fileURLToPath(new URL('../',import.meta.url)),file.path),destination,fs.constants.COPYFILE_EXCL);}
   const capability=sandboxCapability();if(!capability.supported)throw Error(capability.blocker);
   const ready=native?readiness('codex'):null,catalog=native?modelCatalog('codex'):null;if(native&&(!ready.available||!ready.authenticated))throw Error(ready.error??'Native CLI is unavailable or unauthenticated');
+  if(native)validateModelSelections(selections,catalog);
   const cases=[],sharedBudget={calls:0};let result;
   for(const [count,format] of protocol.fixture.module_counts.flatMap(count=>protocol.fixture.formats.map(format=>[count,format]))){
-    const observation=await runCase({directory,count,format,native,sharedBudget,runtimeReady:ready,runtimeCatalog:catalog,sourceManifest});cases.push(observation);
+    const observation=await runCase({directory,count,format,native,sharedBudget,runtimeReady:ready,runtimeCatalog:catalog,sourceManifest,selections});cases.push(observation);
     const {after:source_identity_after,verification:source_verification}=captureSourceVerification(sourceManifest);
-    result=assess(cases,source_verification);
+    result=assess(cases,source_verification,selections);
     fs.writeFileSync(path.join(directory,'report.json'),JSON.stringify({protocol:runProtocol,source_identity_after,source_verification,execution:native?'native_cli':'synthetic_contract_double',cases:cases.map(publicReport),assessment:result},null,2)+'\n');console.log(JSON.stringify({count,format,accepted:cases.at(-1).accepted,metrics:cases.at(-1).metrics,errors:cases.at(-1).errors,source_verification}));
     if(!source_verification.passed||cases.at(-1).calls.some(c=>c.error?.termination_confirmed!==true&&c.error))break;
   }

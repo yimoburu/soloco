@@ -1,0 +1,426 @@
+(node:94350) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+TAP version 13
+# Subtest: actual contract-double candidates accept; duplicated arms, negative reviews, call failures and changed bindings cannot pass assessment
+ok 1 - actual contract-double candidates accept; duplicated arms, negative reviews, call failures and changed bindings cannot pass assessment
+  ---
+  duration_ms: 6631.150083
+  type: 'test'
+  ...
+# Subtest: assessor rejects missing identities, contradictory tests, unexecuted originals and repairs beyond the fixed protocol
+ok 2 - assessor rejects missing identities, contradictory tests, unexecuted originals and repairs beyond the fixed protocol
+  ---
+  duration_ms: 49.299584
+  type: 'test'
+  ...
+# Subtest: candidate comparison holds source/runtime drift and failed fingerprint capture
+ok 3 - candidate comparison holds source/runtime drift and failed fingerprint capture
+  ---
+  duration_ms: 233.878667
+  type: 'test'
+  ...
+# Subtest: CLI stops the entire matrix after its first case when source changes in flight
+ok 4 - CLI stops the entire matrix after its first case when source changes in flight
+  ---
+  duration_ms: 2411.260708
+  type: 'test'
+  ...
+# Subtest: exact fixture mismatch and independent QA hold retain output without acceptance or retry
+ok 5 - exact fixture mismatch and independent QA hold retain output without acceptance or retry
+  ---
+  duration_ms: 1968.103959
+  type: 'test'
+  ...
+# Subtest: fresh comparison binds supported predeclared model controls instead of silently substituting the historical model
+ok 6 - fresh comparison binds supported predeclared model controls instead of silently substituting the historical model
+  ---
+  duration_ms: 10.767292
+  type: 'test'
+  ...
+# Subtest: fresh QA cannot accept a passing candidate after its declared or retrieved supplemental evidence changes
+ok 7 - fresh QA cannot accept a passing candidate after its declared or retrieved supplemental evidence changes
+  ---
+  duration_ms: 2813.3415
+  type: 'test'
+  ...
+# Subtest: changed supplemental evidence blocks test admission without consuming a test attempt
+ok 8 - changed supplemental evidence blocks test admission without consuming a test attempt
+  ---
+  duration_ms: 530.431875
+  type: 'test'
+  ...
+# Subtest: unchanged retrieved evidence survives unrelated classified updates and generation/review notices
+ok 9 - unchanged retrieved evidence survives unrelated classified updates and generation/review notices
+  ---
+  duration_ms: 1161.666458
+  type: 'test'
+  ...
+# Subtest: supplemental mutation during native tests aborts and quarantines the retained outcome
+ok 10 - supplemental mutation during native tests aborts and quarantines the retained outcome
+  ---
+  duration_ms: 1189.203292
+  type: 'test'
+  ...
+# Subtest: qualified exact reuse cannot bypass the new candidate supplemental bindings
+ok 11 - qualified exact reuse cannot bypass the new candidate supplemental bindings
+  ---
+  duration_ms: 2680.832167
+  type: 'test'
+  ...
+# Subtest: supplemental candidates retain failed evidence and permit fresh bounded repair
+ok 12 - supplemental candidates retain failed evidence and permit fresh bounded repair
+  ---
+  duration_ms: 2328.364334
+  type: 'test'
+  ...
+# Subtest: development capability fails closed without a supported sandbox, and MCP preserves binding
+ok 13 - development capability fails closed without a supported sandbox, and MCP preserves binding
+  ---
+  duration_ms: 20.846667
+  type: 'test'
+  ...
+# Subtest: installed development capability does not silently authorize older teams or modified governance
+ok 14 - installed development capability does not silently authorize older teams or modified governance
+  ---
+  duration_ms: 0.597375
+  type: 'test'
+  ...
+# Subtest: pinned v0.5.0 preserves authorized development and original source after a runtime update
+ok 15 - pinned v0.5.0 preserves authorized development and original source after a runtime update
+  ---
+  duration_ms: 192.955166
+  type: 'test'
+  ...
+# Subtest: pinned v0.6.0 preserves authorized development and original source after a runtime update
+ok 16 - pinned v0.6.0 preserves authorized development and original source after a runtime update
+  ---
+  duration_ms: 113.837583
+  type: 'test'
+  ...
+# Subtest: pinned v0.6.1 preserves authorized development and original source after a runtime update
+ok 17 - pinned v0.6.1 preserves authorized development and original source after a runtime update
+  ---
+  duration_ms: 167.441083
+  type: 'test'
+  ...
+# Subtest: pinned v0.6.2 preserves authorized development and original source after a runtime update
+ok 18 - pinned v0.6.2 preserves authorized development and original source after a runtime update
+  ---
+  duration_ms: 505.7255
+  type: 'test'
+  ...
+# Subtest: pinned v0.6.3 preserves authorized development and original source after a runtime update
+ok 19 - pinned v0.6.3 preserves authorized development and original source after a runtime update
+  ---
+  duration_ms: 681.145667
+  type: 'test'
+  ...
+# Subtest: pinned v0.6.4 preserves authorized development and original source after a runtime update
+ok 20 - pinned v0.6.4 preserves authorized development and original source after a runtime update
+  ---
+  duration_ms: 109.848333
+  type: 'test'
+  ...
+# Subtest: pinned v0.6.5 preserves authorized development and original source after a runtime update
+ok 21 - pinned v0.6.5 preserves authorized development and original source after a runtime update
+  ---
+  duration_ms: 457.7735
+  type: 'test'
+  ...
+# Subtest: pinned v0.6.6 preserves authorized development and original source after a runtime update
+ok 22 - pinned v0.6.6 preserves authorized development and original source after a runtime update
+  ---
+  duration_ms: 251.001708
+  type: 'test'
+  ...
+# Subtest: pinned v0.6.7 preserves authorized development and original source after a runtime update
+ok 23 - pinned v0.6.7 preserves authorized development and original source after a runtime update
+  ---
+  duration_ms: 349.619833
+  type: 'test'
+  ...
+# Subtest: pinned v0.7.1 preserves authorized development and original source after a runtime update
+ok 24 - pinned v0.7.1 preserves authorized development and original source after a runtime update
+  ---
+  duration_ms: 65.828667
+  type: 'test'
+  ...
+# Subtest: pinned v0.7.2 preserves authorized development and original source after a runtime update
+ok 25 - pinned v0.7.2 preserves authorized development and original source after a runtime update
+  ---
+  duration_ms: 384.180875
+  type: 'test'
+  ...
+# Subtest: pinned v0.7.3 preserves authorized development and original source after a runtime update
+ok 26 - pinned v0.7.3 preserves authorized development and original source after a runtime update
+  ---
+  duration_ms: 76.074
+  type: 'test'
+  ...
+# Subtest: pinned v0.7.4 preserves authorized development and original source after a runtime update
+ok 27 - pinned v0.7.4 preserves authorized development and original source after a runtime update
+  ---
+  duration_ms: 112.158292
+  type: 'test'
+  ...
+# Subtest: v0.19 development candidate preparation preserves pinned company state and authority
+ok 28 - v0.19 development candidate preparation preserves pinned company state and authority
+  ---
+  duration_ms: 160.00775
+  type: 'test'
+  ...
+# Subtest: v0.20 development candidate preparation preserves pinned company state and authority
+ok 29 - v0.20 development candidate preparation preserves pinned company state and authority
+  ---
+  duration_ms: 89.734041
+  type: 'test'
+  ...
+# Subtest: an actual isolated edit-test-review loop retains usable candidate and leaves original source untouched
+ok 30 - an actual isolated edit-test-review loop retains usable candidate and leaves original source untouched
+  ---
+  duration_ms: 672.996833
+  type: 'test'
+  ...
+# Subtest: scope needs exact authorization and explicit source-sharing consent, not a draft decision
+ok 31 - scope needs exact authorization and explicit source-sharing consent, not a draft decision
+  ---
+  duration_ms: 25.472875
+  type: 'test'
+  ...
+# Subtest: scopes reject undeclared reads, traversal, hidden files, symlinks, collisions and unbounded work
+ok 32 - scopes reject undeclared reads, traversal, hidden files, symlinks, collisions and unbounded work
+  ---
+  duration_ms: 56.594208
+  type: 'test'
+  ...
+# Subtest: source mutation and new-path collision invalidate the displayed scope before authorization
+ok 33 - source mutation and new-path collision invalidate the displayed scope before authorization
+  ---
+  duration_ms: 32.537125
+  type: 'test'
+  ...
+# Subtest: development records are immutable through the generic record tool
+ok 34 - development records are immutable through the generic record tool
+  ---
+  duration_ms: 80.69425
+  type: 'test'
+  ...
+# Subtest: workers reject missing, additional and oversized generated paths without modifying source
+ok 35 - workers reject missing, additional and oversized generated paths without modifying source
+  ---
+  duration_ms: 106.374
+  type: 'test'
+  ...
+# Subtest: a failed test and independent failed review permit bounded repair under the same standing grant
+ok 36 - a failed test and independent failed review permit bounded repair under the same standing grant
+  ---
+  duration_ms: 1699.720417
+  type: 'test'
+  ...
+# Subtest: model-written test claims cannot replace the actual runtime receipt
+ok 37 - model-written test claims cannot replace the actual runtime receipt
+  ---
+  duration_ms: 27.427875
+  type: 'test'
+  ...
+# Subtest: acceptance rejects wrong receipt hash, wrong action and reviewer reuse of the author native session
+ok 38 - acceptance rejects wrong receipt hash, wrong action and reviewer reuse of the author native session
+  ---
+  duration_ms: 2978.666125
+  type: 'test'
+  ...
+# Subtest: candidate tampering after test execution cannot inherit a passing review
+ok 39 - candidate tampering after test execution cannot inherit a passing review
+  ---
+  duration_ms: 1066.420625
+  type: 'test'
+  ...
+# Subtest: a test attempt is never repeated on the same candidate and expired grants cannot dispatch
+ok 40 - a test attempt is never repeated on the same candidate and expired grants cannot dispatch
+  ---
+  duration_ms: 2525.404541
+  type: 'test'
+  ...
+# Subtest: pause or revoke during an active test aborts it and retains a quarantined outcome
+ok 41 - pause or revoke during an active test aborts it and retains a quarantined outcome
+  ---
+  duration_ms: 2066.144125
+  type: 'test'
+  ...
+# Subtest: source changes and handover prevent acceptance without erasing prior evidence
+ok 42 - source changes and handover prevent acceptance without erasing prior evidence
+  ---
+  duration_ms: 1861.896042
+  type: 'test'
+  ...
+# Subtest: stdio MCP remains responsive to founder pause while a detached test runs
+ok 43 - stdio MCP remains responsive to founder pause while a detached test runs
+  ---
+  duration_ms: 961.176333
+  type: 'test'
+  ...
+# Subtest: a candidate and its QA review may emit valid notices without invalidating their own outputs
+ok 44 - a candidate and its QA review may emit valid notices without invalidating their own outputs
+  ---
+  duration_ms: 804.786
+  type: 'test'
+  ...
+# Subtest: local test dispatch shares the global three-active-job limit
+ok 45 - local test dispatch shares the global three-active-job limit
+  ---
+  duration_ms: 86.274458
+  type: 'test'
+  ...
+# Subtest: receipt acceptance verifies runtime provenance and completed execution, not payload hash alone
+ok 46 - receipt acceptance verifies runtime provenance and completed execution, not payload hash alone
+  ---
+  duration_ms: 1584.807959
+  type: 'test'
+  ...
+# Subtest: source-sharing consent precedes file inspection; planning review grants no execution authority
+ok 47 - source-sharing consent precedes file inspection; planning review grants no execution authority
+  ---
+  duration_ms: 17.065917
+  type: 'test'
+  ...
+# Subtest: a new external notice referencing a QA artifact still invalidates that earlier review
+ok 48 - a new external notice referencing a QA artifact still invalidates that earlier review
+  ---
+  duration_ms: 704.65325
+  type: 'test'
+  ...
+# Subtest: a generic-only QA Pass stays inspectable but cannot accept; a complete fresh review can
+ok 49 - a generic-only QA Pass stays inspectable but cannot accept; a complete fresh review can
+  ---
+  duration_ms: 936.096167
+  type: 'test'
+  ...
+# Subtest: exact published development compatibility retains sandbox and team restrictions
+ok 50 - exact published development compatibility retains sandbox and team restrictions
+  ---
+  duration_ms: 42.0905
+  type: 'test'
+  ...
+# Subtest: base-bound patches reconstruct a large complete candidate through real tests and independent acceptance
+ok 51 - base-bound patches reconstruct a large complete candidate through real tests and independent acceptance
+  ---
+  duration_ms: 1097.124541
+  type: 'test'
+  ...
+# Subtest: lowering configuration holds existing larger scopes and raising it never enlarges authorized bytes
+ok 52 - lowering configuration holds existing larger scopes and raising it never enlarges authorized bytes
+  ---
+  duration_ms: 131.347833
+  type: 'test'
+  ...
+# Subtest: patch shape, exact base and scope violations fail without creating a materialized candidate
+ok 53 - patch shape, exact base and scope violations fail without creating a materialized candidate
+  ---
+  duration_ms: 452.869833
+  type: 'test'
+  ...
+# Subtest: supported pure rename preserves a development grant but unknown decisions still revoke
+ok 54 - supported pure rename preserves a development grant but unknown decisions still revoke
+  ---
+  duration_ms: 136.897209
+  type: 'test'
+  ...
+# Subtest: actual qualified validation reuse retains original execution and still requires new independent QA
+ok 55 - actual qualified validation reuse retains original execution and still requires new independent QA
+  ---
+  duration_ms: 3110.511167
+  type: 'test'
+  ...
+# Subtest: qualified validation reuse requires the original QA job to own the exact review and target
+ok 56 - qualified validation reuse requires the original QA job to own the exact review and target
+  ---
+  duration_ms: 17651.636083
+  type: 'test'
+  ...
+# Subtest: reuse acceptance rechecks the exact qualification producer and native identity after reuse
+ok 57 - reuse acceptance rechecks the exact qualification producer and native identity after reuse
+  ---
+  duration_ms: 7959.850875
+  type: 'test'
+  ...
+# Subtest: reuse publication quarantines a source receipt changed at the writer fence
+ok 58 - reuse publication quarantines a source receipt changed at the writer fence
+  ---
+  duration_ms: 1280.296167
+  type: 'test'
+  ...
+# Subtest: unchanged-state polling still cancels generation at scope expiry
+ok 59 - unchanged-state polling still cancels generation at scope expiry
+  ---
+  duration_ms: 825.940542
+  type: 'test'
+  ...
+# Subtest: unchanged database polling still cancels generation when external project ceiling is lowered
+ok 60 - unchanged database polling still cancels generation when external project ceiling is lowered
+  ---
+  duration_ms: 560.208958
+  type: 'test'
+  ...
+# Subtest: post-execution input tampering holds the receipt while retaining actual executed evidence
+ok 61 - post-execution input tampering holds the receipt while retaining actual executed evidence
+  ---
+  duration_ms: 1206.243208
+  type: 'test'
+  ...
+# Subtest: scoped extraction binds actual development test controller, candidate and native producer closure
+ok 62 - scoped extraction binds actual development test controller, candidate and native producer closure
+  ---
+  duration_ms: 911.03125
+  type: 'test'
+  ...
+# Subtest: patches use exact unshifted positions, preserve CRLF/Unicode and support empty identity edits
+ok 63 - patches use exact unshifted positions, preserve CRLF/Unicode and support empty identity edits
+  ---
+  duration_ms: 0.165166
+  type: 'test'
+  ...
+# Subtest: patches reject stale bases, ambiguous/overlapping ranges, undeclared operations and invalid text
+ok 64 - patches reject stale bases, ambiguous/overlapping ranges, undeclared operations and invalid text
+  ---
+  duration_ms: 0.21275
+  type: 'test'
+  ...
+# Subtest: UTF-8/JSON budgets report exact boundary, one-byte excess and escaping overhead
+ok 65 - UTF-8/JSON budgets report exact boundary, one-byte excess and escaping overhead
+  ---
+  duration_ms: 0.05925
+  type: 'test'
+  ...
+# Subtest: persistent ceilings default safely, support larger budgets and reject malformed values/links
+ok 66 - persistent ceilings default safely, support larger budgets and reject malformed values/links
+  ---
+  duration_ms: 76.977417
+  type: 'test'
+  ...
+# Subtest: schema is root-specific and call validation cannot inherit another company ceiling
+ok 67 - schema is root-specific and call validation cannot inherit another company ceiling
+  ---
+  duration_ms: 30.254208
+  type: 'test'
+  ...
+# Subtest: failed materialization retains staging evidence and never exposes a partial candidate
+ok 68 - failed materialization retains staging evidence and never exposes a partial candidate
+  ---
+  duration_ms: 133.550416
+  type: 'test'
+  ...
+# Subtest: invalid configuration blocks development without hiding pause and diagnostic schemas
+ok 69 - invalid configuration blocks development without hiding pause and diagnostic schemas
+  ---
+  duration_ms: 16.870625
+  type: 'test'
+  ...
+1..69
+# tests 69
+# suites 0
+# pass 69
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 81552.092375

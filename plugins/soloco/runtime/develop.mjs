@@ -1,4 +1,4 @@
-import {fingerprintValidation,validateReusableReceipt,confirmValidationFingerprint} from './validation-cache.mjs';
+import {validationManifest,validationManifestMatches,validateReusableReceipt,confirmValidationFingerprint} from './validation-cache.mjs';
 import {presentationOnly,relevantRecord} from './current-state.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -114,7 +114,7 @@ export function developmentBundle(s,job,artifact,root=process.cwd()) {
 export function developmentPrompt(s,job,target) {
   if(job.development_id && s.records[job.development_id]?.development.scope.output_format==='patches')return `Bounded local development candidate. Return patches:[{path,base_sha256,edits:[{start,end,text}]}] for EVERY existing write_path. base_sha256 must match the scoped source; offsets are ordered, non-overlapping UTF-16 positions in that exact original text, not shifted by prior edits. For authorized new paths only, use {path,base_sha256:null,content}. No deletion, fuzzy hunks, commands or direct writes. The runtime reconstructs complete retained candidates, validates budgets, runs authorized tests and supplies exact full candidates to independent QA. Return blocked:"reason" without patches if unable. Existing limits and authority remain unchanged.`;
   if(job.development_id)return `Bounded local development candidate. Return complete files:[{path,content}] for EVERY write_path in the supplied scope; keep unchanged files unchanged. No tools, direct edits, installs, network, external actions or test-execution claims. The runtime will create a separate candidate and run the exact authorized Node tests. If requirements cannot be met return blocked:"reason" without files. Repairs retain all previous failures and stay inside the same scope.`;
-  if(target?.development?.type==='test')return `Independent LOCAL DEVELOPMENT acceptance review. Inspect the supplied candidate files, changes, scope, original inputs, and actual runtime test receipt. A model claim is not test evidence. Reused receipts explicitly did not execute again; inspect the linked original runtime receipt and applicability. Optionally qualify future exact deterministic reuse only after checking the complete source/tests/environment: include review.deterministic_validation:{permitted_action:"reuse_exact_validation",fingerprint:the supplied validation_fingerprint,dependencies_complete:true,external_state:false}. Omit that field if tests use clock/random/outside state or dependency completeness is unproven. No broad execution or integration authority is granted. Review must include permitted_action:"accept_local_development" (or "hold"), candidate_sha256:"${target.development.candidate_sha256}", receipt_sha256:"${target.development.receipt_sha256}", blockers:[]. Pass only if actual tests passed, evidence fits acceptance and no blockers remain. Preserve failed attempts. You did not independently execute these tests; attribute execution to the runtime.`;
+  if(target?.development?.type==='test')return `Independent LOCAL DEVELOPMENT acceptance review. Inspect the supplied candidate files, changes, scope, original inputs, and actual runtime test receipt. A model claim is not test evidence. Reused receipts explicitly did not execute again; inspect the linked original runtime receipt and applicability. New receipts include validation_manifest: runtime-attested source/test, command, Node/toolchain, dependency, sandbox, environment and limit commitments bound by the receipt result's validation_manifest_sha256. Host paths and environment values remain redacted hashes; this is runtime evidence, not your independent recomputation of private values. Optionally qualify future exact deterministic reuse only after checking the complete source/tests/environment: include review.deterministic_validation:{permitted_action:"reuse_exact_validation",fingerprint:the supplied validation_fingerprint,dependencies_complete:true,external_state:false}. Omit that field if tests use clock/random/outside state or dependency completeness is unproven. No broad execution or integration authority is granted. Review must include permitted_action:"accept_local_development" (or "hold"), candidate_sha256:"${target.development.candidate_sha256}", receipt_sha256:"${target.development.receipt_sha256}", blockers:[]. Pass only if actual tests passed, evidence fits acceptance and no blockers remain. Preserve failed attempts. You did not independently execute these tests; attribute execution to the runtime.`;
   return '';
 }
 function candidateOf(s,p,key,fresh=true) {
@@ -229,7 +229,7 @@ function queueRun(a,host) {
   return withStore(a.root,db=>db.read().jobs[jobId]);
 }
 export async function executeDevelopmentTest(root,jobId) {
-  let a,host,p,c,reuseSource,reuseQualification,reuseProducer,reuseAuthor,validationFingerprint;
+  let a,host,p,c,reuseSource,reuseQualification,reuseProducer,reuseAuthor,validationFingerprint,manifest;
   withStore(root,db=>db.transaction('development.test_started',s=>{
     const j=s.jobs[jobId];if(!j||j.kind!=='development_test')throw new Error('Unknown local test job');
     a={root,session_id:j.session_id,epoch:j.epoch};host=j.host;
@@ -249,7 +249,7 @@ export async function executeDevelopmentTest(root,jobId) {
   const eligible=()=>withStore(a.root,db=>{const s=db.read();owner(s,a.session_id,host,a.epoch);const current=planOf(s,p.id);authorized(s,current,a.root);if(s.jobs[jobId].status!=='running')throw new Error('Test cancelled');sourceMatches(a.root,current);if(!supplementalMatches(s,s.jobs[c.job_id]))throw new Error('Candidate supplemental evidence changed');});
   try {
     eligible();const directory=reuseSource?candidateDir(a.root,p,c):makeCandidate(a.root,p,c);verifyCandidate(a.root,p,c);
-    const fingerprint=()=>fingerprintValidation({files:c.development.files.map(f=>({path:f.path,sha256:digest(f.content)})),tests:p.development.scope.test_paths,...validationEnvironment(directory,p.development.scope.test_paths),limits:{timeout_ms:p.development.scope.timeout_ms,max_output_bytes:p.development.scope.max_output_bytes}});
+    const fingerprint=()=>{const input={files:c.development.files.map(f=>({path:f.path,sha256:digest(f.content)})),tests:p.development.scope.test_paths,...validationEnvironment(directory,p.development.scope.test_paths),limits:{timeout_ms:p.development.scope.timeout_ms,max_output_bytes:p.development.scope.max_output_bytes}};manifest=validationManifest(input);return manifest.validation_fingerprint;};
     validationFingerprint=fingerprint();
     timer=setInterval(()=>{try{eligible();}catch{stale=true;abort.abort();}},100);
     if(reuseSource){if(!validateReusableReceipt(reuseSource,validationFingerprint))throw Error('Reuse fingerprint or successful execution evidence does not match');
@@ -259,7 +259,7 @@ export async function executeDevelopmentTest(root,jobId) {
     // Fresh library discovery and byte reads bind both actual execution and the
     // no-execution reuse path. A changed/unknown environment never emits Pass.
     confirmValidationFingerprint(validationFingerprint,fingerprint());
-  } catch(error) {validationFingerprint=undefined;result={...(result??{exit_code:null,tests_executed:false}),status:'failed',error:error.message};}
+  } catch(error) {validationFingerprint=undefined;manifest=undefined;result={...(result??{exit_code:null,tests_executed:false}),status:'failed',error:error.message};}
   finally {clearInterval(timer);}
   let receipt;
   withStore(a.root,db=>db.transaction('development.test_finished',s=>{
@@ -267,8 +267,8 @@ export async function executeDevelopmentTest(root,jobId) {
     // cannot cover a change between the last eligibility check and this write.
     try{owner(s,a.session_id,host,a.epoch);authorized(s,planOf(s,p.id),a.root);sourceMatches(a.root,p);if(s.jobs[jobId].status!=='running'||!supplementalMatches(s,s.jobs[c.job_id]))stale=true;}catch{stale=true;}
     if(reuseSource&&!reuseQualificationMatches(s,s.records[reuseSource.id],reuseQualification,reuseProducer,reuseAuthor))stale=true;
-    const key=id('test-receipt'),payload={...result,candidate_sha256:c.development.candidate_sha256,test_paths:p.development.scope.test_paths,timeout_ms:p.development.scope.timeout_ms,max_output_bytes:p.development.scope.max_output_bytes,directory:candidateDir(a.root,p,c),finished_at:stamp()};
-    receipt=s.records[key]={id:key,kind:'artifact',author_role:'runtime',author_instance:jobId,revision:1,status:stale?'Quarantined':'Submitted',created_at:stamp(),content:JSON.stringify(payload),development:{type:'test',...(validationFingerprint?{validation_fingerprint:validationFingerprint}:{}),...(reuseSource?{reused_from:reuseSource.id,reuse_qualification:reuseQualification,reuse_qualification_producer:reuseProducer,reuse_candidate_producer:reuseAuthor}:{}),plan_id:p.id,candidate_id:c.id,candidate_sha256:c.development.candidate_sha256,result:payload,receipt_sha256:digest(JSON.stringify(payload))}};
+    const key=id('test-receipt'),payload={...result,...(manifest?{validation_manifest_sha256:digest(JSON.stringify(manifest))}:{}),candidate_sha256:c.development.candidate_sha256,test_paths:p.development.scope.test_paths,timeout_ms:p.development.scope.timeout_ms,max_output_bytes:p.development.scope.max_output_bytes,directory:candidateDir(a.root,p,c),finished_at:stamp()};
+    receipt=s.records[key]={id:key,kind:'artifact',author_role:'runtime',author_instance:jobId,revision:1,status:stale?'Quarantined':'Submitted',created_at:stamp(),content:JSON.stringify(payload),development:{type:'test',...(validationFingerprint?{validation_fingerprint:validationFingerprint,validation_manifest:manifest}:{}),...(reuseSource?{reused_from:reuseSource.id,reuse_qualification:reuseQualification,reuse_qualification_producer:reuseProducer,reuse_candidate_producer:reuseAuthor}:{}),plan_id:p.id,candidate_id:c.id,candidate_sha256:c.development.candidate_sha256,result:payload,receipt_sha256:digest(JSON.stringify(payload))}};
     if(reuseSource)s.records[c.id].development.validation_directory_relative=c.development.validation_directory_relative;
     s.records[c.id].development.run={job_id:jobId,status:stale?'quarantined':'completed',receipt_id:key};
     Object.assign(s.jobs[jobId],{status:stale?'quarantined':'completed',finished_at:stamp(),artifact_id:key});
@@ -289,8 +289,8 @@ if(process.argv[1] && path.resolve(process.argv[1])===fileURLToPath(import.meta.
   }));}
 }
 
-function validTestExecution(state,receipt) {
-  const d=receipt?.development,r=d?.result;if(!d||!r)return false;
+export function validTestExecution(state,receipt) {
+  const d=receipt?.development,r=d?.result;if(!d||!r||!validationManifestMatches(receipt))return false;
   if(!d.reused_from)return r.tests_executed===true&&r.reused!==true;
   const origin=state.records[d.reused_from],j=state.jobs[origin?.author_instance],c=state.records[origin?.development?.candidate_id];
   return r.reused===true&&r.tests_executed===false&&r.reused_from===origin?.id&&j?.id===origin?.author_instance&&j?.kind==='development_test'&&j.status==='completed'&&j.artifact_id===origin.id&&j.candidate_id===c?.id&&j.development_id===origin.development.plan_id&&c?.development?.run?.receipt_id===origin.id&&c.development.run.job_id===j.id&&d.candidate_sha256===origin.development.candidate_sha256&&reuseQualificationMatches(state,origin,d.reuse_qualification,d.reuse_qualification_producer,d.reuse_candidate_producer)&&!negativeValidationReview(state,origin)&&validateReusableReceipt(origin,d.validation_fingerprint);

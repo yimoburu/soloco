@@ -1,0 +1,170 @@
+{
+  "schema": 1,
+  "claim": "Bounded fictional actual native session replacement",
+  "status": "passed_bounded_native_replacement",
+  "source": {
+    "commit": "eb329e3c56c26e396e8a0a16a58cdc3a114f1595",
+    "tree": "015551be78fcae1bd69084d1bd8ce640b2f21ac4",
+    "harness_sha256": "82735bad08b830a40eaaab61039b3d8279e4bc4fcc5f5b354489cf076a18fd46"
+  },
+  "post_run_source_verification": {
+    "checked_before_any_source_change": true,
+    "commit": "eb329e3c56c26e396e8a0a16a58cdc3a114f1595",
+    "tree": "015551be78fcae1bd69084d1bd8ce640b2f21ac4",
+    "clean": true,
+    "harness_sha256": "82735bad08b830a40eaaab61039b3d8279e4bc4fcc5f5b354489cf076a18fd46",
+    "passed": true
+  },
+  "protocol": {
+    "version": 1,
+    "kind": "native_session_replacement",
+    "max_calls": 14,
+    "timeout_ms": 180000,
+    "max_reconstruction_characters": 128000,
+    "criteria": {
+      "distinct_actual_owner_sessions": true,
+      "distinct_actual_worker_sessions": true,
+      "independent_exact_state_qa": true,
+      "obsolete_claim_rejected": true,
+      "all_obligations_preserved": true,
+      "stale_owner_fenced": true,
+      "old_attempts_unchanged": true
+    },
+    "limitations": [
+      "Single fictional cold-start replacement, not accumulated private-company continuity or founder benefit.",
+      "Lifecycle bindings are synthetic; this does not qualify real host Hooks UI, Sidebar, live-process crash replacement or cross-host recovery.",
+      "Native processes close before replacement; retained session IDs prove separate model histories, not a killed live model process.",
+      "No actual-company action, team adoption, install or business execution.",
+      "Provider-added context, effective settings, billing and human interruptions remain unobserved."
+    ]
+  },
+  "requested": {
+    "model": "gpt-6-astra",
+    "cos_effort": "high",
+    "worker_effort": "low",
+    "qa_effort": "high",
+    "speed": "host_default"
+  },
+  "effective_settings": "unverified",
+  "checks": {
+    "distinct_actual_owner_sessions": true,
+    "distinct_actual_worker_sessions": true,
+    "independent_exact_state_qa": true,
+    "obsolete_claim_rejected": true,
+    "all_obligations_preserved": true,
+    "stale_owner_fenced": true,
+    "old_attempts_unchanged": true
+  },
+  "closure_confirmed": true,
+  "distinct_native_histories": [
+    "6cb6690a6895be8489a5bd397ae3b9b8c236856206384755e1883ec13c4a032b",
+    "f660f3d080b6076eb3556e25779268541f785bc85dc3295568e96c22ae239f79",
+    "23b1c3fc3464967332c3d2eb62139ac5c1ba8373dbd5c6a93c62e0ba5a5c5ff5",
+    "099709009c2b61395a99b73c9c29891c07f7685f59e6fd42fe2ccbafb8d56945",
+    "6d3ba2c6f5c75b3adc6adf93ab7191bd2d592a9e172d48c20aeeaf3fde63758c"
+  ],
+  "reconstruction": {
+    "subject_sha256": "eaccaeb80ae989c1d4ff5970344080e00e0c071097b60554b65f360098ae843a",
+    "source_sha256": "36b86592dfab4008187b1615a53c9344628f196d1a10e410e4cff4c275d2adba",
+    "characters": 81394
+  },
+  "review": {
+    "verdict": "Pass",
+    "review_id": "artifact-7a034767-69ae-4756-a673-29a2de78d42c"
+  },
+  "model_calls": 8,
+  "elapsed_wall_ms": 183310,
+  "control_latency": {
+    "samples": 4,
+    "median_ms": 21.11725000000024,
+    "observed_max_ms": 65.20270899997558
+  },
+  "calls": [
+    {
+      "label": "outgoing-cos",
+      "prompt_bytes": 223,
+      "prompt_sha256": "9787e01b57d6e832654892a43c522be1659577e3d1aec92a5b9503bf1194b51c",
+      "output_bytes": 106,
+      "output_sha256": "97b9cba5dcb03e439774513064bccde5cb2e4a4c28db25a0eaf19765a7562908",
+      "elapsed_ms": 10775.313334,
+      "native_id_sha256": "6cb6690a6895be8489a5bd397ae3b9b8c236856206384755e1883ec13c4a032b"
+    },
+    {
+      "label": "outgoing-worker",
+      "prompt_bytes": 22904,
+      "prompt_sha256": "cf3beb535fcaedb2b8aa48dc287d86b276c0a9e82ba3c661390b354a1cb7ae2d",
+      "output_bytes": 449,
+      "output_sha256": "693c3b539b6cc8a7ae098f6a3d443547f0a1b799ce91088b624dba1915942fa7",
+      "elapsed_ms": 10297.827834000002,
+      "native_id_sha256": "23b1c3fc3464967332c3d2eb62139ac5c1ba8373dbd5c6a93c62e0ba5a5c5ff5"
+    },
+    {
+      "label": "incoming-cos-cold",
+      "prompt_bytes": 286,
+      "prompt_sha256": "d88906a92ed4a4178c40866797b9c9ff1f66293884f4a3e2875c1a08eb0b92a1",
+      "output_bytes": 227,
+      "output_sha256": "41830bbc25d169574e8befbffdfc25cf23213f58ae359e94b40ccdd16b3e08a0",
+      "elapsed_ms": 11201.255541000002,
+      "native_id_sha256": "f660f3d080b6076eb3556e25779268541f785bc85dc3295568e96c22ae239f79"
+    },
+    {
+      "label": "incoming-cos-reconstruction",
+      "prompt_bytes": 89208,
+      "prompt_sha256": "7ccfe5632bf013f8529bae1f303cc466f535383cfa1c5b9c989a4b2db1f52e62",
+      "output_bytes": 7978,
+      "output_sha256": "641f38c26b92bd7875e7ab5560f9006dd80701806277c21717cbb6f58f8f5955",
+      "elapsed_ms": 44772.026874999996,
+      "native_id_sha256": "f660f3d080b6076eb3556e25779268541f785bc85dc3295568e96c22ae239f79"
+    },
+    {
+      "label": "independent-handover-qa",
+      "prompt_bytes": 22294,
+      "prompt_sha256": "ee75797955fd280a1cd34a6185770c100ce35480bed4d86f0771a435e7d22fdb",
+      "output_bytes": 385,
+      "output_sha256": "8e0abb754f67bf7f9e8680c172d3dc0f0c10704aae70dde89dbd93ec0ad9aedd",
+      "elapsed_ms": 17374.97025,
+      "native_id_sha256": "6d3ba2c6f5c75b3adc6adf93ab7191bd2d592a9e172d48c20aeeaf3fde63758c"
+    },
+    {
+      "label": "independent-handover-qa",
+      "prompt_bytes": 86560,
+      "prompt_sha256": "9e42138ef570c38835aca7d1a2f07e83efe4e111dd9491fb975ccaf8cb537970",
+      "output_bytes": 133,
+      "output_sha256": "14b68c90f1308afebcf390aaf2c4a14c27a5ec7959e54efc67a013d560009e8c",
+      "elapsed_ms": 30158.96362499999,
+      "native_id_sha256": "6d3ba2c6f5c75b3adc6adf93ab7191bd2d592a9e172d48c20aeeaf3fde63758c"
+    },
+    {
+      "label": "independent-handover-qa",
+      "prompt_bytes": 12434,
+      "prompt_sha256": "524841a1c3d6dd9c7a6e70f3cf2a3421f2ba48697d9676f6926fc3b8b53a813e",
+      "output_bytes": 3371,
+      "output_sha256": "6010e600107e2c2841955785627402036b35f29a45e24b2b2faf0464c905547f",
+      "elapsed_ms": 43915.32124999999,
+      "native_id_sha256": "6d3ba2c6f5c75b3adc6adf93ab7191bd2d592a9e172d48c20aeeaf3fde63758c"
+    },
+    {
+      "label": "incoming-worker",
+      "prompt_bytes": 23651,
+      "prompt_sha256": "443a6c32ca7c48a964ef5608c6dd21cb6dfa4d0b514503a6a8764b891da75ff5",
+      "output_bytes": 449,
+      "output_sha256": "693c3b539b6cc8a7ae098f6a3d443547f0a1b799ce91088b624dba1915942fa7",
+      "elapsed_ms": 12954.411458000017,
+      "native_id_sha256": "099709009c2b61395a99b73c9c29891c07f7685f59e6fd42fe2ccbafb8d56945"
+    }
+  ],
+  "human_observations": null,
+  "prior_held_attempt": {
+    "source": {
+      "commit": "6e72c811a3d07b07e7b2faef75f5107f3d469acf",
+      "tree": "8765c36da5ee899c0dfa956c852880c4c937724e",
+      "harness_sha256": "0cd46bce69312dc3ca3a34906cd583de1cc65b3a60e4820d793762a03908d0b9"
+    },
+    "status": "held",
+    "calls": 1,
+    "reason": "Public control argument validation stopped the first harness; source was repaired before the separate second run.",
+    "receipt_sha256": "b3275aae3f0e0712a483347e2a539654d09ff376d73deaf3643cdb5e8251a4df"
+  },
+  "local_original_report_sha256": "cc521bef2497d68a8ca2e6499a35b29f1e6dbf2809bb67458056649d4f5d18a7",
+  "publication": "Strict allowlist: raw model outputs, provider diagnostics, account data, native IDs and local paths excluded."
+}

@@ -1,0 +1,311 @@
+{
+  "version": 1,
+  "issue": 13,
+  "status": "engineering_defects_fixed_native_acceptance_incomplete",
+  "final_software_revision": "8e4801703ce056e0f6a9cbc92fd3ebced2da613a",
+  "native_trials": [
+    {
+      "trial": "A",
+      "status": "held",
+      "source_revision": "65df7293cca26a76f50425385cb967f7b96586dc",
+      "source_manifest_sha256": "df43ac5a0a88fd37ce62a959b2c80dde6fc1240b82da5d06eb5a663ac1fdd381",
+      "source_unchanged_during_trial": true,
+      "report_sha256": "431a5a4dd30b94b73bf49d0a82345797d6e46145be7b04fa739f611e14506754",
+      "node": "v22.23.2",
+      "requested_model": "gpt-6-astra",
+      "requested_efforts": {
+        "engineer": "medium",
+        "qa": "high"
+      },
+      "requested_speed": "host_default",
+      "effective_provider_controls": "unverified",
+      "max_native_invocations": 21,
+      "hold_reason": "classification supplemental read rejected a maximum-length request beyond short-source EOF",
+      "scales": [
+        {
+          "scale": 1,
+          "archive_records": 1,
+          "archive_content_bytes": 610,
+          "elapsed_ms": 56080.816708,
+          "model_invocations": 3,
+          "model_work_ms": 54733.844123999996,
+          "prompt_bytes": 93606,
+          "output_bytes": 4065,
+          "accepted_outcomes": 1,
+          "runtime_decision_required_notices": 0,
+          "bootstrap_classified_records": 0,
+          "arms": [
+            {
+              "mode": "unclassified_executed",
+              "accepted": true,
+              "elapsed_ms": 44506.42375,
+              "metrics": {
+                "model_calls": 2,
+                "prompt_bytes": 66541,
+                "output_bytes": 3931,
+                "model_work_ms": 43313.824666,
+                "retries": 0,
+                "actual_test_executions": 1,
+                "tests_reused": 0,
+                "attention_events": 0
+              },
+              "author_semantic_grade": {
+                "passed": true,
+                "missed_blockers": 0,
+                "unresolved_sources_omitted": 0,
+                "wrong_allowed_actions": 0,
+                "extra_blockers": 0
+              },
+              "independent_qa_semantic_grade": {
+                "passed": true,
+                "missed_blockers": 0,
+                "unresolved_sources_omitted": 0,
+                "wrong_allowed_actions": 0,
+                "extra_blockers": 0
+              },
+              "candidate_sha256": "33512c46ca2d47f68639c8e06c0e1254311593a8264b83dee8eea44465cb2778",
+              "receipt_sha256": "23c5c46edcde7c95592c537703cee44ba600a1563d7989621960494e63a99d4f",
+              "reuse_explicitly_qualified": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "trial": "B",
+      "status": "held",
+      "source_revision": "c059a683090fbfbb0654148dcd44d4ca9a201b7c",
+      "source_manifest_sha256": "99117f6b6fbbd4461036d1e0a621d6c3c6ca990a316b636de44efbe558e74726",
+      "source_unchanged_during_trial": true,
+      "report_sha256": "f2c51fa82e44eba47c3983ed9b32cd660cc1760b030024c026bc044f1fd29c0d",
+      "node": "v22.23.2",
+      "requested_model": "gpt-6-astra",
+      "requested_efforts": {
+        "engineer": "medium",
+        "qa": "high"
+      },
+      "requested_speed": "host_default",
+      "effective_provider_controls": "unverified",
+      "max_native_invocations": 30,
+      "hold_reason": "independent QA accepted the current candidate but did not qualify future deterministic reuse because inspectable environment/dependency metadata was absent",
+      "scales": [
+        {
+          "scale": 1,
+          "archive_records": 1,
+          "archive_content_bytes": 610,
+          "elapsed_ms": 116156.811708,
+          "model_invocations": 6,
+          "model_work_ms": 113278.97621000002,
+          "prompt_bytes": 191777,
+          "output_bytes": 8952,
+          "accepted_outcomes": 2,
+          "runtime_decision_required_notices": 0,
+          "bootstrap_classified_records": 1,
+          "arms": [
+            {
+              "mode": "unclassified_executed",
+              "accepted": true,
+              "elapsed_ms": 45239.676833000005,
+              "metrics": {
+                "model_calls": 2,
+                "prompt_bytes": 66972,
+                "output_bytes": 4196,
+                "model_work_ms": 44355.223167000004,
+                "retries": 0,
+                "actual_test_executions": 1,
+                "tests_reused": 0,
+                "attention_events": 0
+              },
+              "author_semantic_grade": {
+                "passed": true,
+                "missed_blockers": 0,
+                "unresolved_sources_omitted": 0,
+                "wrong_allowed_actions": 0,
+                "extra_blockers": 0
+              },
+              "independent_qa_semantic_grade": {
+                "passed": true,
+                "missed_blockers": 0,
+                "unresolved_sources_omitted": 0,
+                "wrong_allowed_actions": 0,
+                "extra_blockers": 0
+              },
+              "candidate_sha256": "33512c46ca2d47f68639c8e06c0e1254311593a8264b83dee8eea44465cb2778",
+              "receipt_sha256": "2cb47ebc2d9003331d7c277aab78d6c82316b5b1d776b9019e60b33a7ac8936f",
+              "reuse_explicitly_qualified": false
+            },
+            {
+              "mode": "classified_executed",
+              "accepted": true,
+              "elapsed_ms": 33764.644208,
+              "metrics": {
+                "model_calls": 2,
+                "prompt_bytes": 66951,
+                "output_bytes": 2135,
+                "model_work_ms": 32727.32320900001,
+                "retries": 0,
+                "actual_test_executions": 1,
+                "tests_reused": 0,
+                "attention_events": 0
+              },
+              "author_semantic_grade": {
+                "passed": true,
+                "missed_blockers": 0,
+                "unresolved_sources_omitted": 0,
+                "wrong_allowed_actions": 0,
+                "extra_blockers": 0
+              },
+              "independent_qa_semantic_grade": {
+                "passed": true,
+                "missed_blockers": 0,
+                "unresolved_sources_omitted": 0,
+                "wrong_allowed_actions": 0,
+                "extra_blockers": 0
+              },
+              "candidate_sha256": "33512c46ca2d47f68639c8e06c0e1254311593a8264b83dee8eea44465cb2778",
+              "receipt_sha256": "a136da9786ec95a4e1b52bcb20d4c25fbbd481b66fe41d6c952d090e07fab5f2",
+              "reuse_explicitly_qualified": false
+            },
+            {
+              "mode": "classified_reused",
+              "accepted": false,
+              "elapsed_ms": 15991.69462499999,
+              "metrics": {
+                "model_calls": 1,
+                "prompt_bytes": 30489,
+                "output_bytes": 671,
+                "model_work_ms": 15415.309417000011,
+                "retries": 0,
+                "actual_test_executions": 0,
+                "tests_reused": 0,
+                "attention_events": 1
+              },
+              "author_semantic_grade": {
+                "passed": true,
+                "missed_blockers": 0,
+                "unresolved_sources_omitted": 0,
+                "wrong_allowed_actions": 0,
+                "extra_blockers": 0
+              },
+              "independent_qa_semantic_grade": null,
+              "candidate_sha256": null,
+              "receipt_sha256": null,
+              "reuse_explicitly_qualified": null
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "software_logs": [
+    {
+      "log_name": "final-broad.tap",
+      "sha256": "a609733365991ed5e73378e07d3c318f059c731243e1bfdf49251b28a6872e63",
+      "status": "incomplete_terminated",
+      "counts": {},
+      "completed_ok_lines": 68
+    },
+    {
+      "log_name": "final-focused.tap",
+      "sha256": "aea388c5f40570dbe6e8a55402c704f8170412d9c4d3d03d548c9f88f052ded5",
+      "status": "completed",
+      "counts": {
+        "tests": 13,
+        "pass": 13,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      "completed_ok_lines": 13
+    },
+    {
+      "log_name": "focused-eof-corrected.tap",
+      "sha256": "4330bc9661e5fb200c58b2ed20e698ce3785cd8891d621ecbfe42aa321609cdd",
+      "status": "completed",
+      "counts": {
+        "tests": 13,
+        "pass": 13,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      "completed_ok_lines": 13
+    },
+    {
+      "log_name": "focused-eof.tap",
+      "sha256": "014d49fa92182a1afbc608118cad156d27690c56d7253cedeea73e0e9a3a5d70",
+      "status": "completed",
+      "counts": {
+        "tests": 12,
+        "pass": 11,
+        "fail": 1,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      "completed_ok_lines": 11
+    },
+    {
+      "log_name": "focused.tap",
+      "sha256": "121ecda7ae1473a787e67340a719322f9edd1847a8e68f95134a4aa0234e58c6",
+      "status": "completed",
+      "counts": {
+        "tests": 10,
+        "pass": 10,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      "completed_ok_lines": 10
+    },
+    {
+      "log_name": "manifest-final.tap",
+      "sha256": "b0f103c89aacfa8a3c326cd78e95c0751dc6d0b29a04471dbdcfa8210ca0cc09",
+      "status": "completed",
+      "counts": {
+        "tests": 18,
+        "pass": 18,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      "completed_ok_lines": 18
+    },
+    {
+      "log_name": "manifest-focused.tap",
+      "sha256": "9689a879396096fb47bf01ad6ee3ae58c07d043a04b51a83610d973a916c2dd7",
+      "status": "completed",
+      "counts": {
+        "tests": 18,
+        "pass": 18,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      "completed_ok_lines": 18
+    }
+  ],
+  "additional_verified_software_run": {
+    "source_revision": "65df729",
+    "tests": 66,
+    "pass": 66,
+    "fail": 0,
+    "skipped": 0,
+    "cancelled": 0,
+    "duration_ms": 94321.721416,
+    "evidence": "terminal tool receipt; broad development/coordination/evaluator run"
+  },
+  "build_and_drift": "passed",
+  "limitations": [
+    "Native trials are fresh fictional fixtures; no actual company, installation, adoption or original source integration changed.",
+    "Only the 1x archive ran; no 10x/100x accepted outcomes were established.",
+    "Manifest evidence repair was tested with software doubles and actual sandbox execution; no third native trial was run.",
+    "No intended-private-corpus bootstrap, native continuity or accepted-native-reuse claim.",
+    "No human founder experiment; attention events are software harness counters.",
+    "Raw native outputs, host diagnostics, identifiers, private paths and environment values are excluded from this summary."
+  ],
+  "independent_code_review": {
+    "source_revision": "8e4801703ce056e0f6a9cbc92fd3ebced2da613a",
+    "decision": "approved",
+    "scope": "binding, privacy and legacy compatibility; code review only, no native acceptance claim"
+  }
+}

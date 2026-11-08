@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "files": [
+    {
+      "path": "repeated-workflow-eval.mjs.frozen",
+      "sha256": "89459a25eb70cab0e2607394901850a902c3801245df031f757a6b3b7a4551a7",
+      "provenance": "Recovered byte-for-byte by reversing only the known post-run control-binding delta; exact SHA matches the original predeclared executed suite."
+    },
+    {
+      "path": "accepted-workflow-eval.mjs.frozen",
+      "sha256": "324307e11e76643cdc7e4ac3694609acbfdfef9c9dc495f89ac5348cd40422fa",
+      "provenance": "Unchanged exact-model override source; exact SHA matches the executed source manifest."
+    },
+    {
+      "path": "workflow-runtime.mjs.frozen",
+      "sha256": "d57c3849562dd4d486f8b3b21262c0108f39ea311b7eafdb950f2666b59808b5",
+      "provenance": "Unchanged production-path evaluator driver; exact SHA matches the executed source manifest."
+    }
+  ],
+  "native_calls_added": 0,
+  "old_results_changed": false
+}

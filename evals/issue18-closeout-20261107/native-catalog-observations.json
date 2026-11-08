@@ -1,0 +1,377 @@
+{
+  "source": "Read-only retained canonical dispatch jobs; advertised model choices, requested/applied controls and reported observations are distinct.",
+  "entries": [
+    {
+      "count": 1,
+      "format": "files",
+      "role": "engineer",
+      "job_id": "job-7e83f3dd-c7c5-4937-9257-505b9491e886",
+      "cli_version": "codex-cli 0.154.0",
+      "requested": {
+        "mode": "explicit",
+        "model": "gpt-6-astra",
+        "effort": "high",
+        "reason": "Exact one-character fictional module repairs; identical model controls in all format arms.",
+        "speed": "host_default"
+      },
+      "catalog_at_dispatch": {
+        "source": "host_catalog",
+        "model": {
+          "id": "gpt-6-astra",
+          "name": "GPT-6-Astra",
+          "description": "Frontier intelligence for the most demanding work.",
+          "supported_efforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max",
+            "ultra"
+          ],
+          "effort_support": "host_catalog",
+          "default_effort": "low",
+          "is_default": true,
+          "serviceTiers": [],
+          "additionalSpeedTiers": []
+        },
+        "speed_support": {
+          "host_default": true,
+          "fast_disabled": false,
+          "evidence": "no_verified_explicit_fast_off_control",
+          "default_service_tier": null,
+          "default_speed": "unverified",
+          "paid_tiers_enabled": false
+        }
+      },
+      "model_evidence": {
+        "reported_models": [],
+        "reported_effort": null,
+        "reported_service_tier": null,
+        "applied_controls": {
+          "model": "gpt-6-astra",
+          "effort": "high",
+          "service_tier": null,
+          "fast_mode": null,
+          "switch_models_on_flag": null,
+          "scope": "child_launch_argv",
+          "verification": "applied_controls_not_effective_settings"
+        },
+        "source": "exec_json",
+        "scope": "assignment",
+        "verification": "unverified"
+      },
+      "native_id_sha256": "e3cd1f5ee991542fc764a0847d5fd6ef6928740582a5e043be152573b1535e9a",
+      "process_closed": true
+    },
+    {
+      "count": 1,
+      "format": "patches",
+      "role": "engineer",
+      "job_id": "job-2ce377b5-7c0a-4055-aef5-23876df83d26",
+      "cli_version": "codex-cli 0.154.0",
+      "requested": {
+        "mode": "explicit",
+        "model": "gpt-6-astra",
+        "effort": "high",
+        "reason": "Exact one-character fictional module repairs; identical model controls in all format arms.",
+        "speed": "host_default"
+      },
+      "catalog_at_dispatch": {
+        "source": "host_catalog",
+        "model": {
+          "id": "gpt-6-astra",
+          "name": "GPT-6-Astra",
+          "description": "Frontier intelligence for the most demanding work.",
+          "supported_efforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max",
+            "ultra"
+          ],
+          "effort_support": "host_catalog",
+          "default_effort": "low",
+          "is_default": true,
+          "serviceTiers": [],
+          "additionalSpeedTiers": []
+        },
+        "speed_support": {
+          "host_default": true,
+          "fast_disabled": false,
+          "evidence": "no_verified_explicit_fast_off_control",
+          "default_service_tier": null,
+          "default_speed": "unverified",
+          "paid_tiers_enabled": false
+        }
+      },
+      "model_evidence": {
+        "reported_models": [],
+        "reported_effort": null,
+        "reported_service_tier": null,
+        "applied_controls": {
+          "model": "gpt-6-astra",
+          "effort": "high",
+          "service_tier": null,
+          "fast_mode": null,
+          "switch_models_on_flag": null,
+          "scope": "child_launch_argv",
+          "verification": "applied_controls_not_effective_settings"
+        },
+        "source": "exec_json",
+        "scope": "assignment",
+        "verification": "unverified"
+      },
+      "native_id_sha256": "f911660571b7bc799ec9730a5fe4b0c608b0a6322a9edccc797dc143c85edb3c",
+      "process_closed": true
+    },
+    {
+      "count": 1,
+      "format": "patches",
+      "role": "qa",
+      "job_id": "job-ed94dfc5-8d08-4752-9738-c9075e82c7c8",
+      "cli_version": "codex-cli 0.154.0",
+      "requested": {
+        "mode": "explicit",
+        "model": "gpt-6-astra",
+        "effort": "high",
+        "reason": "Independent complete candidate, actual receipt and exact fixture preservation review; identical controls in all arms.",
+        "speed": "host_default"
+      },
+      "catalog_at_dispatch": {
+        "source": "host_catalog",
+        "model": {
+          "id": "gpt-6-astra",
+          "name": "GPT-6-Astra",
+          "description": "Frontier intelligence for the most demanding work.",
+          "supported_efforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max",
+            "ultra"
+          ],
+          "effort_support": "host_catalog",
+          "default_effort": "low",
+          "is_default": true,
+          "serviceTiers": [],
+          "additionalSpeedTiers": []
+        },
+        "speed_support": {
+          "host_default": true,
+          "fast_disabled": false,
+          "evidence": "no_verified_explicit_fast_off_control",
+          "default_service_tier": null,
+          "default_speed": "unverified",
+          "paid_tiers_enabled": false
+        }
+      },
+      "model_evidence": {
+        "reported_models": [],
+        "reported_effort": null,
+        "reported_service_tier": null,
+        "applied_controls": {
+          "model": "gpt-6-astra",
+          "effort": "high",
+          "service_tier": null,
+          "fast_mode": null,
+          "switch_models_on_flag": null,
+          "scope": "child_launch_argv",
+          "verification": "applied_controls_not_effective_settings"
+        },
+        "source": "exec_json",
+        "scope": "assignment",
+        "verification": "unverified"
+      },
+      "native_id_sha256": "bff8d3a2694b906ddaa8ac50207cb988405915f876c2428014d3b15376a484c3",
+      "process_closed": true
+    },
+    {
+      "count": 3,
+      "format": "files",
+      "role": "engineer",
+      "job_id": "job-dcccbb59-ae17-4297-9c1f-4dfb2b9cea29",
+      "cli_version": "codex-cli 0.154.0",
+      "requested": {
+        "mode": "explicit",
+        "model": "gpt-6-astra",
+        "effort": "high",
+        "reason": "Exact one-character fictional module repairs; identical model controls in all format arms.",
+        "speed": "host_default"
+      },
+      "catalog_at_dispatch": {
+        "source": "host_catalog",
+        "model": {
+          "id": "gpt-6-astra",
+          "name": "GPT-6-Astra",
+          "description": "Frontier intelligence for the most demanding work.",
+          "supported_efforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max",
+            "ultra"
+          ],
+          "effort_support": "host_catalog",
+          "default_effort": "low",
+          "is_default": true,
+          "serviceTiers": [],
+          "additionalSpeedTiers": []
+        },
+        "speed_support": {
+          "host_default": true,
+          "fast_disabled": false,
+          "evidence": "no_verified_explicit_fast_off_control",
+          "default_service_tier": null,
+          "default_speed": "unverified",
+          "paid_tiers_enabled": false
+        }
+      },
+      "model_evidence": {
+        "reported_models": [],
+        "reported_effort": null,
+        "reported_service_tier": null,
+        "applied_controls": {
+          "model": "gpt-6-astra",
+          "effort": "high",
+          "service_tier": null,
+          "fast_mode": null,
+          "switch_models_on_flag": null,
+          "scope": "child_launch_argv",
+          "verification": "applied_controls_not_effective_settings"
+        },
+        "source": "exec_json",
+        "scope": "assignment",
+        "verification": "unverified"
+      },
+      "native_id_sha256": "f63b7c693ea34be1ec7003865039719803d1343acd8d94ccaaff12e18a7f9ac5",
+      "process_closed": true
+    },
+    {
+      "count": 3,
+      "format": "patches",
+      "role": "engineer",
+      "job_id": "job-a4621742-18ef-4e1b-bb6d-a91953af826f",
+      "cli_version": "codex-cli 0.154.0",
+      "requested": {
+        "mode": "explicit",
+        "model": "gpt-6-astra",
+        "effort": "high",
+        "reason": "Exact one-character fictional module repairs; identical model controls in all format arms.",
+        "speed": "host_default"
+      },
+      "catalog_at_dispatch": {
+        "source": "host_catalog",
+        "model": {
+          "id": "gpt-6-astra",
+          "name": "GPT-6-Astra",
+          "description": "Frontier intelligence for the most demanding work.",
+          "supported_efforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max",
+            "ultra"
+          ],
+          "effort_support": "host_catalog",
+          "default_effort": "low",
+          "is_default": true,
+          "serviceTiers": [],
+          "additionalSpeedTiers": []
+        },
+        "speed_support": {
+          "host_default": true,
+          "fast_disabled": false,
+          "evidence": "no_verified_explicit_fast_off_control",
+          "default_service_tier": null,
+          "default_speed": "unverified",
+          "paid_tiers_enabled": false
+        }
+      },
+      "model_evidence": {
+        "reported_models": [],
+        "reported_effort": null,
+        "reported_service_tier": null,
+        "applied_controls": {
+          "model": "gpt-6-astra",
+          "effort": "high",
+          "service_tier": null,
+          "fast_mode": null,
+          "switch_models_on_flag": null,
+          "scope": "child_launch_argv",
+          "verification": "applied_controls_not_effective_settings"
+        },
+        "source": "exec_json",
+        "scope": "assignment",
+        "verification": "unverified"
+      },
+      "native_id_sha256": "9ad05a443091ca63983d430cdf106abdd68bde66e967c6345f18c0893a60241f",
+      "process_closed": true
+    },
+    {
+      "count": 3,
+      "format": "patches",
+      "role": "qa",
+      "job_id": "job-fc8af85f-bf96-4f18-bf72-a35e34342cf8",
+      "cli_version": "codex-cli 0.154.0",
+      "requested": {
+        "mode": "explicit",
+        "model": "gpt-6-astra",
+        "effort": "high",
+        "reason": "Independent complete candidate, actual receipt and exact fixture preservation review; identical controls in all arms.",
+        "speed": "host_default"
+      },
+      "catalog_at_dispatch": {
+        "source": "host_catalog",
+        "model": {
+          "id": "gpt-6-astra",
+          "name": "GPT-6-Astra",
+          "description": "Frontier intelligence for the most demanding work.",
+          "supported_efforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max",
+            "ultra"
+          ],
+          "effort_support": "host_catalog",
+          "default_effort": "low",
+          "is_default": true,
+          "serviceTiers": [],
+          "additionalSpeedTiers": []
+        },
+        "speed_support": {
+          "host_default": true,
+          "fast_disabled": false,
+          "evidence": "no_verified_explicit_fast_off_control",
+          "default_service_tier": null,
+          "default_speed": "unverified",
+          "paid_tiers_enabled": false
+        }
+      },
+      "model_evidence": {
+        "reported_models": [],
+        "reported_effort": null,
+        "reported_service_tier": null,
+        "applied_controls": {
+          "model": "gpt-6-astra",
+          "effort": "high",
+          "service_tier": null,
+          "fast_mode": null,
+          "switch_models_on_flag": null,
+          "scope": "child_launch_argv",
+          "verification": "applied_controls_not_effective_settings"
+        },
+        "source": "exec_json",
+        "scope": "assignment",
+        "verification": "unverified"
+      },
+      "native_id_sha256": "31d97a33bb8166b0a0b712338cfd4cf3bbe43b48dddc1a7f84a1d5db81fa8f2b",
+      "process_closed": true
+    }
+  ]
+}
