@@ -25,6 +25,8 @@ export const qualificationTests=Object.freeze([
   'operating-control','operating-state','public-response','scoped-context',
   'scoped-corpus-runtime','upgrade','upgrade-incremental',
 ].map(name=>`tests/${name}.test.mjs`).sort());
+// Historical receipt-producing workflow contracts for optional verification.
+// The lightweight check.mjs workflows do not emit these receipts.
 export const workflowPolicies=Object.freeze({
   '.github/workflows/ci.yml':{lanes:['regression-22','compatibility-26','build'],jobs:['Tests Node 22','Compatibility Node 26','Build and drift'],gate:'CI gate'},
   '.github/workflows/qualification.yml':{lanes:['tests-22'],jobs:['Full qualification Node 22'],gate:null},
