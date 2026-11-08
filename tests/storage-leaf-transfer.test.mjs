@@ -20,8 +20,8 @@ const sha=value=>createHash('sha256').update(value).digest('hex');
 const newPath=name=>path.join(temporary,name);
 const longKey='long-'+ 'x'.repeat(520);
 const unsafeKey='exact\0\ud800';
-function fixture() {
-  const root=fs.mkdtempSync(path.join(temporary,'company-')),store=new storage.Store(root,true);
+function fixture(root=fs.mkdtempSync(path.join(temporary,'company-'))) {
+  const store=new storage.Store(root,true);
   store.transaction('fictional.seed',()=>({
     id:'fictional-storage-leaves',name:'Fictional',idea:'Preservation fixture',schema:2,
     plugin_version:'0.7.6',runtime_version:'0.7.6',phase:'Frame',mode:'preparation',paused:true,
@@ -61,6 +61,71 @@ function fixture() {
   assert.equal(store.storageInfo().format,'normalized-v4');
   return store;
 }
+
+// The selected executor fixture changes only creation of the two real links.
+// Ordinary source tests still create those links directly on their test host.
+const fixedFixtureSelection={protocol:'scratch-fixture-contract-v1',factory:'p5-transfer-two-real-links-v1'};
+function selectedFixture(){
+  const manifestPath=process.env.SOLOCO_TEST_FIXTURE_MANIFEST;
+  if(manifestPath===undefined){assert.equal(process.env.SOLOCO_TEST_FIXTURE_MANIFEST_SHA256,undefined);return null;}
+  const scratch=fs.realpathSync(os.tmpdir());
+  assert.equal(manifestPath,path.join(scratch,'fixtures','manifest.json'));
+  const raw=fs.readFileSync(manifestPath);
+  assert.ok(raw.length<=4096);
+  assert.match(process.env.SOLOCO_TEST_FIXTURE_MANIFEST_SHA256??'',/^[a-f0-9]{64}$/);
+  assert.equal(sha(raw),process.env.SOLOCO_TEST_FIXTURE_MANIFEST_SHA256);
+  const manifest=JSON.parse(raw);
+  assert.equal(manifest.protocol,fixedFixtureSelection.protocol);
+  assert.equal(manifest.factory,fixedFixtureSelection.factory);
+  assert.deepEqual(manifest.identity.selection,fixedFixtureSelection);
+  assert.equal(manifest.scratch_root,scratch);
+  assert.equal(manifest.company_root,'cases/transfer-faults/company');
+  assert.equal(manifest.target_relative_path,'cases/transfer-faults/company/.company/evidence.txt');
+  assert.equal(manifest.target_absent_at_setup,true);
+  assert.deepEqual(manifest.links.map(link=>link.id),['company-entry','backup-entry']);
+  for(const link of manifest.links){
+    assert.equal(link.staged_relative_path,'fixtures/links/'+link.id);
+    assert.equal(link.target_relative_path,manifest.target_relative_path);
+    assert.equal(link.target_absent_at_setup,true);
+    assert.equal(link.symbolic_link,true);
+    assert.match(link.dev,/^\d+$/);assert.match(link.ino,/^\d+$/);
+    assert.equal(link.readlink_target,path.join(scratch,manifest.target_relative_path));
+  }
+  assert.equal(process.permission.has('fs'),false,'the fixture preserves partial Node filesystem grants');
+  assert.equal(process.permission.has('fs.read',scratch),true);
+  assert.equal(process.permission.has('fs.write',scratch),true);
+  return {manifest,scratch,root:path.join(scratch,manifest.company_root)};
+}
+function selectedEmptyCompanyRoot(){
+  const selected=selectedFixture();if(!selected)return undefined;
+  assert.equal(fs.realpathSync.native(selected.root),selected.root);
+  const stat=fs.lstatSync(selected.root);
+  assert.equal(stat.isDirectory(),true);assert.equal(stat.isSymbolicLink(),false);
+  assert.deepEqual(fs.readdirSync(selected.root),[],'the parent supplies no company data or database');
+  return selected.root;
+}
+function createRealEvidenceLink(id,destination,store){
+  const selected=selectedFixture(),target=path.join(store.dir,'evidence.txt');
+  if(!selected){fs.symlinkSync(target,destination);return;}
+  const {manifest,scratch,root}=selected;
+  assert.equal(store.root,root);
+  const link=manifest.links.find(entry=>entry.id===id);assert.ok(link);
+  assert.equal(target,path.join(scratch,link.target_relative_path));
+  const evidence=fs.lstatSync(target);
+  assert.equal(evidence.isFile(),true);assert.equal(evidence.isSymbolicLink(),false);assert.equal(evidence.nlink,1);
+  assert.equal(fs.readFileSync(target,'utf8'),'original fixture evidence');
+  assert.equal(destination,id==='company-entry'?path.join(store.dir,'linked-evidence'):path.join(newPath('backup-faults'),'.company','evidence.txt'));
+  assert.throws(()=>fs.lstatSync(destination),error=>error.code==='ENOENT');
+  const staged=path.join(scratch,link.staged_relative_path),before=fs.lstatSync(staged,{bigint:true});
+  assert.equal(before.isSymbolicLink(),true);
+  assert.equal(String(before.dev),link.dev);assert.equal(String(before.ino),link.ino);
+  assert.equal(fs.readlinkSync(staged),target);
+  fs.renameSync(staged,destination);
+  const after=fs.lstatSync(destination,{bigint:true});
+  assert.equal(after.isSymbolicLink(),true);assert.equal(after.dev,before.dev);assert.equal(after.ino,before.ino);
+  assert.equal(fs.readlinkSync(destination),target);
+  assert.equal(fs.readFileSync(destination,'utf8'),'original fixture evidence');
+}
 test('real VACUUM backup and restore preserve database, snapshot vault and file inventory without ownership transfer',()=>{
   const store=fixture();let restored;
   try {
@@ -93,7 +158,7 @@ test('real VACUUM backup and restore preserve database, snapshot vault and file 
 });
 
 test('transfer rejects changed and linked inputs and retains incomplete copies for inspection',()=>{
-  const store=fixture();try {
+  const store=fixture(selectedEmptyCompanyRoot());try {
     fs.writeFileSync(path.join(store.dir,'evidence.txt'),'original fixture evidence');
     const backup=newPath('backup-faults');backupCompany(store,backup);
     const source=path.join(backup,'.company','evidence.txt'),raw=fs.readFileSync(source);
@@ -110,13 +175,13 @@ test('transfer rejects changed and linked inputs and retains incomplete copies f
     assert.equal(fs.existsSync(path.join(target,'.company','company.sqlite')),true);
     assert.equal(fs.readFileSync(path.join(target,'.company','evidence.txt'),'utf8'),'fault after actual copy');
     // Real source link rejection occurs after the database VACUUM is retained.
-    fs.symlinkSync(path.join(store.dir,'evidence.txt'),path.join(store.dir,'linked-evidence'));
+    createRealEvidenceLink('company-entry',path.join(store.dir,'linked-evidence'),store);
     const linked=newPath('backup-linked');
     try{assert.throws(()=>backupCompany(store,linked),/Links\/special transfer files refused/);}finally{fs.unlinkSync(path.join(store.dir,'linked-evidence'));}
     assert.equal(fs.existsSync(path.join(linked,'.company','company.sqlite')),true);
     assert.equal(fs.existsSync(path.join(linked,'manifest.json')),false);
     // The input is checked again for links before any destination is created.
-    fs.unlinkSync(source);fs.symlinkSync(path.join(store.dir,'evidence.txt'),source);
+    fs.unlinkSync(source);createRealEvidenceLink('backup-entry',source,store);
     const linkRestore=newPath('restore-linked');
     try{assert.throws(()=>restoreCompany(backup,linkRestore),/Linked backup path refused/);assert.equal(fs.existsSync(linkRestore),false);}finally{fs.unlinkSync(source);fs.writeFileSync(source,raw);}
     // A real intervening company commit makes backup completion uncertain.

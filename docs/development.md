@@ -92,6 +92,18 @@ Startup and the separate test watchdog each probe the selected trusted Node exec
 
 The grant binds scope, ownership/team and governing intent/decisions. Routine failures and review results do not revoke it; all remain evidence in fresh assignment context. Repairs consume remaining attempts. Changed original inputs, boundaries, expiry, pause/revocation or ownership prevent acceptance. Tests recheck eligibility while running and stop on cancellation. An uncertain or interrupted run retains its intent and holds further work until inspected; no automatic retry. Test workers count toward existing active-job limits and continuity checks. Failed output envelopes retain bounded rejected evidence and precise errors on their jobs; they never route partial messages or become accepted artifacts.
 
+### Fixed transfer test fixture
+
+`company_develop plan` optionally accepts `test_fixture: {protocol: "scratch-fixture-contract-v1", factory: "p5-transfer-two-real-links-v1"}`. This closed selector has no path, target, command or content options. Selection, template and factory-source commitments enter the scope before authorization. The fixture cannot be added or changed at `run`; changed factory bytes require a newly valid binding. Omitting the selector preserves ordinary test behavior.
+
+The trusted watchdog validates the regular candidate first, then prepares one empty fixed company directory and exactly two real links to an initially absent evidence file inside its owned scratch directory. The constrained child still has candidate-read/scratch-write-only filesystem grants and the same OS, network and process restrictions. Transfer tests initialize the real database and consume the precreated link inodes with checked renames; their backup, restore and rejection assertions remain real. This does not enable child-created links or arbitrary privileged setup.
+
+Static factory identity is fingerprinted separately from each run's actual scratch, link inode/device, manifest and child-environment evidence. Receipts retain pre-child setup observations and truthful cleanup/closure results. A missing watchdog result or uncertain closure does not prove cleanup. Fixture-bearing runs are not eligible for validation reuse. A compatible v0.7.7 runtime supports v0.7.6 state without adopting a different pinned team or governance.
+
+### Transfer destination spelling
+
+Backup and restore destinations require exact canonical absolute spelling. Raw parent components, dot components, repeated/trailing separators and native aliases whose existing prefix resolves to another spelling are refused. Resolve the existing parent with native `realpath` before appending a new destination name. Only `lstat`'s `ENOENT` means an absent suffix; permission, loop, non-directory and I/O errors propagate. Parents are checked again after creation and the final directory is created exclusively, preserving other writers' output on `EEXIST`. These path checks do not promise atomic protection against concurrent link swaps.
+
 ## Efficient retained development candidates
 
 The project may persist `{"max_bytes_ceiling": 400000}` in `.company/development.json`. This is a bounded regular UTF-8 JSON file (at most 4096 bytes), not a model-produced instruction or an authority grant. The only supported key is `max_bytes_ceiling`, a safe integer from 1,000 through 1,000,000. Missing configuration preserves the 100,000-byte default; malformed, extra-key, linked or oversized configuration fails closed. No installed-cache edits or external service are needed. Prototype limits are unchanged.

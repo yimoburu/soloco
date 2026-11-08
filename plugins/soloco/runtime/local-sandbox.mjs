@@ -10,6 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import {assertTestFixtureIdentity,prepareTestFixture,cleanupTestFixture,scratchIdentity,fixtureEnvironmentBindings} from './test-fixtures.mjs';
 
 const BACKEND='macos-seatbelt-node';
 const node=fs.realpathSync(process.execPath);
@@ -79,8 +80,10 @@ export function sandboxProfile(directory,scratch) {
 (allow file-write* (subpath ${quote(scratch)}) (literal "/dev/null"))
 `;
 }
-function environment(scratch) {
-  return {PATH:'/usr/bin:/bin',HOME:scratch,TMPDIR:scratch,TMP:scratch,TEMP:scratch,LANG:'C',LC_ALL:'C',OPENSSL_CONF:'/dev/null',NODE_DISABLE_COLORS:'1'};
+function environment(scratch,fixtureSetup) {
+  // Build a closed environment; inherited fixture variables are never forwarded.
+  return {PATH:'/usr/bin:/bin',HOME:scratch,TMPDIR:scratch,TMP:scratch,TEMP:scratch,LANG:'C',LC_ALL:'C',OPENSSL_CONF:'/dev/null',NODE_DISABLE_COLORS:'1',
+    ...(fixtureSetup?{SOLOCO_TEST_FIXTURE_MANIFEST:fixtureSetup.manifest_path,SOLOCO_TEST_FIXTURE_MANIFEST_SHA256:fixtureSetup.manifest_sha256}:{})};
 }
 // Probe only the trusted runtime with fixed code, never a candidate file or cwd.
 // Exported for deterministic flag-selection tests; production uses spawnSync.
@@ -135,7 +138,7 @@ function checkDirectory(directory) {
     }
   };walk(real);return real;
 }
-export async function runLocalTests({directory,test_paths,timeout_ms=30000,max_output_bytes=100000,signal}={}) {
+export async function runLocalTests({directory,test_paths,timeout_ms=30000,max_output_bytes=100000,signal,testFixture}={}) {
   const root=checkDirectory(directory);
   if(!Array.isArray(test_paths) || !test_paths.length || test_paths.length>64 || new Set(test_paths).size!==test_paths.length)throw new Error('Supply 1 to 64 unique test paths');
   const paths=test_paths.map(file=>{
@@ -144,23 +147,26 @@ export async function runLocalTests({directory,test_paths,timeout_ms=30000,max_o
   });
   if(!Number.isInteger(timeout_ms) || timeout_ms<100 || timeout_ms>300000)throw new Error('Test timeout must be 100 to 300000 ms');
   if(!Number.isInteger(max_output_bytes) || max_output_bytes<1024 || max_output_bytes>1000000)throw new Error('Test output limit must be 1024 to 1000000 bytes');
+  const fixture=testFixture===undefined?undefined:assertTestFixtureIdentity(testFixture);
+  const noFixtureSetup=fixture?{test_fixture:{identity:fixture,setup:null,termination_confirmed:true,cleanup:{status:'not_needed',reason:'Fixture setup and child execution have not started'}}}:{};
   const available=sandboxCapability();
-  if(!available.supported)return {status:'blocked',exit_code:null,signal:null,stdout:'',stderr:'',duration_ms:0,isolation:null,tests_executed:false,blocker:available.blocker};
-  if(signal?.aborted)return {status:'aborted',exit_code:null,signal:null,stdout:'',stderr:'',duration_ms:0,isolation:BACKEND,tests_executed:false};
+  if(!available.supported)return {status:'blocked',exit_code:null,signal:null,stdout:'',stderr:'',duration_ms:0,isolation:null,tests_executed:false,blocker:available.blocker,...noFixtureSetup};
+  if(signal?.aborted)return {status:'aborted',exit_code:null,signal:null,stdout:'',stderr:'',duration_ms:0,isolation:BACKEND,tests_executed:false,...noFixtureSetup};
   const scratch=path.join(root,'.scratch');fs.mkdirSync(scratch,{mode:0o700});
   // A detached trusted watchdog outlives this caller and kills the sandbox on IPC loss.
   // Test code cannot fork, signal the watchdog, or access its IPC channel.
   const started=Date.now();
   try {
     return await new Promise(resolve=>{
-      let done=false, sandboxPid=null, errorText='';
-      const helper=spawn(node,[fileURLToPath(import.meta.url),'--watch-tests',JSON.stringify({root,scratch,paths,timeout_ms,max_output_bytes})],{env:{PATH:'/usr/bin:/bin',OPENSSL_CONF:'/dev/null'},stdio:['ignore','ignore','pipe','ipc'],detached:true});
+      let done=false, sandboxPid=null, errorText='',fixtureSetup=null;
+      const helper=spawn(node,[fileURLToPath(import.meta.url),'--watch-tests',JSON.stringify({root,scratch,paths,timeout_ms,max_output_bytes,...(fixture?{testFixture:fixture,scratch_identity:scratchIdentity(scratch)}:{})})],{env:{PATH:'/usr/bin:/bin',OPENSSL_CONF:'/dev/null'},stdio:['ignore','ignore','pipe','ipc'],detached:true});
       const abort=()=>{if(helper.connected)helper.send({type:'abort'},()=>{});};
       const finish=result=>{
         if(done)return;done=true;clearTimeout(timer);signal?.removeEventListener('abort',abort);
         if(helper.connected)helper.disconnect();resolve(result);
       };
-      const failed=message=>({status:'error',exit_code:null,signal:null,stdout:'',stderr:errorText,duration_ms:Date.now()-started,isolation:BACKEND,tests_executed:false,error:message});
+      const failed=message=>({status:'error',exit_code:null,signal:null,stdout:'',stderr:errorText,duration_ms:Date.now()-started,isolation:BACKEND,tests_executed:false,error:message,
+        ...(fixture?{test_fixture:{identity:fixture,setup:fixtureSetup,termination_confirmed:false,cleanup:{status:'not_attempted',reason:'Watchdog/child closure is unconfirmed; owned scratch retained for inspection'}}}:{})});
       const timer=setTimeout(()=>{
         if(sandboxPid)try{process.kill(-sandboxPid,'SIGKILL');}catch{}
         helper.kill('SIGKILL');finish(failed('Test watchdog did not finish within its deadline'));
@@ -168,22 +174,37 @@ export async function runLocalTests({directory,test_paths,timeout_ms=30000,max_o
       signal?.addEventListener('abort',abort,{once:true});if(signal?.aborted)abort();
       helper.stderr.on('data',chunk=>{if(errorText.length<2000)errorText+=chunk.toString().slice(0,2000-errorText.length);});
       helper.on('message',message=>{
+        if(fixture && message?.type==='prepared')fixtureSetup=message.setup;
         if(message?.type==='started' && Number.isInteger(message.pid))sandboxPid=message.pid;
         if(message?.type==='result')finish(message.result);
       });
       helper.on('error',error=>finish(failed(error.message)));
       helper.on('exit',()=>{if(!done){if(sandboxPid)try{process.kill(-sandboxPid,'SIGKILL');}catch{}finish(failed('Test watchdog exited without a receipt'));}});
     });
-  } finally {fs.rmSync(scratch,{recursive:true,force:true});}
+  } finally {
+    // Fixture watchdogs attest their cleanup after actual child closure. A lost
+    // watchdog result cannot justify deleting possibly live/changed scratch.
+    if(!fixture)fs.rmSync(scratch,{recursive:true,force:true});
+  }
 }
-async function executeTests({root,scratch,paths,timeout_ms,max_output_bytes,signal,onStart}) {
+async function executeTests({root,scratch,paths,timeout_ms,max_output_bytes,signal,onStart,onPrepared,testFixture,scratch_identity}) {
   const started=Date.now();
+  let fixtureSetup=null,result;
   try {
-    return await new Promise(resolve=>{
+    if(testFixture!==undefined){
+      const owned=scratchIdentity(scratch);
+      if(scratch!==path.join(root,'.scratch')||!scratch_identity||JSON.stringify(owned)!==JSON.stringify(scratch_identity))throw Error('Fixture scratch ownership binding changed');
+      fixtureSetup=prepareTestFixture(scratch,testFixture);
+      fixtureSetup.child_environment_sha256=cryptoHash(JSON.stringify(environment(scratch,fixtureSetup)));
+      onPrepared?.(fixtureSetup);
+      if(signal?.aborted){result={status:'aborted',exit_code:null,signal:null,stdout:'',stderr:'',duration_ms:Date.now()-started,isolation:BACKEND,tests_executed:false,test_execution_attempted:false};return result;}
+    }
+    result=await new Promise(resolve=>{
       let reason=null,size=0,out=[],err=[],done=false,spawnError=null;
-      const child=spawn('/usr/bin/sandbox-exec',['-p',sandboxProfile(root,scratch),node,...testArguments(root,scratch,paths)],{cwd:root,env:environment(scratch),stdio:['ignore','pipe','pipe'],detached:true});
+      let spawned=false;
+      const child=spawn('/usr/bin/sandbox-exec',['-p',sandboxProfile(root,scratch),node,...testArguments(root,scratch,paths)],{cwd:root,env:environment(scratch,fixtureSetup),stdio:['ignore','pipe','pipe'],detached:true});
       const stop=why=>{if(done)return;if(!reason)reason=why;try{process.kill(-child.pid,'SIGKILL');}catch{child.kill('SIGKILL');}};
-      child.once('spawn',()=>onStart?.(child.pid));
+      child.once('spawn',()=>{spawned=true;onStart?.(child.pid);});
       const timer=setTimeout(()=>stop('timeout'),timeout_ms);
       const abort=()=>stop('aborted');signal?.addEventListener('abort',abort,{once:true});
       if(signal?.aborted)abort();
@@ -196,9 +217,21 @@ async function executeTests({root,scratch,paths,timeout_ms,max_output_bytes,sign
         if(done)return;done=true;clearTimeout(timer);signal?.removeEventListener('abort',abort);
         resolve({status:reason??(spawnError?'error':code===0?'passed':'failed'),exit_code:code,signal:killedBy,stdout:Buffer.concat(out).toString('utf8'),stderr:Buffer.concat(err).toString('utf8'),duration_ms:Date.now()-started,isolation:BACKEND,test_execution_attempted:!spawnError,tests_executed:Buffer.concat(out).toString('utf8').includes('TAP version 13'),output_truncated:size>max_output_bytes,...(spawnError?{error:spawnError}:{}),limits:{timeout_ms,max_output_bytes}});
       };
-      child.on('error',error=>{spawnError=error.message;finish(null,null);});child.on('close',finish);
+      child.on('error',error=>{spawnError=error.message;if(!testFixture||!spawned)finish(null,null);else stop('error');});child.on('close',finish);
     });
-  } finally {fs.rmSync(scratch,{recursive:true,force:true});}
+    return result;
+  } catch(error) {
+    if(!testFixture)throw error;
+    result={status:'error',exit_code:null,signal:null,stdout:'',stderr:'',duration_ms:Date.now()-started,isolation:BACKEND,tests_executed:false,test_execution_attempted:false,error:String(error.message)};
+    return result;
+  } finally {
+    if(testFixture){
+      const cleanup=cleanupTestFixture(scratch,scratch_identity);
+      // finally mutates the retained result before its Promise resolves.
+      if(result){result.test_fixture={identity:testFixture,setup:fixtureSetup,termination_confirmed:true,cleanup};
+        if(cleanup.status!=='confirmed'){result.original_status=result.status;result.status='error';result.error='Fixture cleanup failed; no successful validation is established';}}
+    }else fs.rmSync(scratch,{recursive:true,force:true});
+  }
 }
 
 if(process.argv[1] && path.resolve(process.argv[1])===fileURLToPath(import.meta.url) && process.argv[2]==='--watch-tests') {
@@ -207,7 +240,9 @@ if(process.argv[1] && path.resolve(process.argv[1])===fileURLToPath(import.meta.
   process.on('message',message=>{if(message?.type==='abort')controller.abort();});
   process.once('SIGTERM',()=>controller.abort());process.once('SIGINT',()=>controller.abort());
   try {
-    const result=await executeTests({...JSON.parse(process.argv[3]),signal:controller.signal,onStart:pid=>{if(process.connected)process.send({type:'started',pid},()=>{});}});
+    const result=await executeTests({...JSON.parse(process.argv[3]),signal:controller.signal,
+      onPrepared:setup=>{if(process.connected)process.send({type:'prepared',setup},()=>{});else controller.abort();},
+      onStart:pid=>{if(process.connected)process.send({type:'started',pid},()=>{});}});
     if(process.connected)process.send({type:'result',result},()=>process.disconnect());
   } catch(error) {
     if(process.connected)process.send({type:'result',result:{status:'error',exit_code:null,signal:null,stdout:'',stderr:'',duration_ms:0,isolation:BACKEND,tests_executed:false,error:error.message}},()=>process.disconnect());
@@ -216,16 +251,20 @@ if(process.argv[1] && path.resolve(process.argv[1])===fileURLToPath(import.meta.
 
 // Exact hermetic execution identity for reuse; caller hashes this descriptor and
 // must never persist raw environment values. Includes observable absolute paths.
-export function validationEnvironment(directory,test_paths) {
+export function validationEnvironment(directory,test_paths,{testFixture}={}) {
   // Re-discover load commands as well as re-hashing bytes: cached directories
   // cannot establish completeness after an in-place dynamic-library update.
   runtimePaths=undefined;runtimeDependencyFiles=undefined;libraries();
   const build=spawnSync('/usr/bin/sw_vers',['-buildVersion'],{encoding:'utf8',timeout:1000,maxBuffer:1000,env:{PATH:'/usr/bin:/bin',LANG:'C'}});
   if(build.status!==0||!build.stdout.trim())throw Error('Cannot fingerprint system build for validation reuse');
-  const dependencies=runtimeDependencyFiles.map(file=>({path:file,sha256:cryptoHash(fs.readFileSync(file))}));
+  // The trusted fixture module is loaded even in no-fixture mode. Bind this new
+  // JavaScript dependency too; runner-only hashing would miss its replacement.
+  const dependencies=[...runtimeDependencyFiles,fileURLToPath(new URL('./test-fixtures.mjs',import.meta.url))]
+    .sort().map(file=>({path:file,sha256:cryptoHash(fs.readFileSync(file))}));
   const scratch=path.join(directory,'.scratch');
   return {command:testArguments(directory,scratch,test_paths.map(p=>'./'+p)),
     runtime:{node:process.version,platform:process.platform,arch:process.arch,os_release:os.release(),system_build:build.stdout.trim(),dependencies,
       executable_sha256:cryptoHash(fs.readFileSync(node)),runner_sha256:cryptoHash(fs.readFileSync(fileURLToPath(import.meta.url)))},
-    sandbox:{backend:BACKEND,policy_sha256:cryptoHash(sandboxProfile(directory,scratch))},environment:environment(scratch)};
+    sandbox:{backend:BACKEND,policy_sha256:cryptoHash(sandboxProfile(directory,scratch))},environment:environment(scratch),
+    ...(testFixture===undefined?{}:{fixture_environment:fixtureEnvironmentBindings(testFixture)})};
 }

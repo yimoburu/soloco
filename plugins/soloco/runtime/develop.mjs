@@ -4,11 +4,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { isDeepStrictEqual } from 'node:util';
 import { VERSION, V018_GOVERNANCE_SHA256, V019_GOVERNANCE_SHA256, V020_GOVERNANCE_SHA256, installedTeam, digest, id, stamp, requireText, withStore, owner, folder, noLink, notice } from './store.mjs';
 import { contextMatches, supplementalMatches } from './context.mjs';
 import { sandboxCapability, runLocalTests, validationEnvironment } from './local-sandbox.mjs';
 import { developmentLimits, assertByteBudget, developmentTransportBudget } from './development-limits.mjs';
 import { reconstructPatch, validText } from './development-patch.mjs';
+import { testFixtureIdentity, assertTestFixtureIdentity } from './test-fixtures.mjs';
 
 // A supported local executor, not a general permission to operate a business.
 // Preserve exact v0.18/v0.19/v0.20 contracts without adopting the installed instructions.
@@ -16,10 +18,11 @@ export function developmentCapability(s,root=process.cwd()) {
   let configuration,configuration_error=null;
   try{configuration=developmentLimits(root);}catch(error){configuration_error=error.message;configuration={max_bytes:0,per_file_max_bytes:0,source:'invalid'};}
   const executor=sandboxCapability();
-  const blocker=configuration_error??(!executor.supported ? executor.blocker : s && (!['0.5.0','0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7','0.6.8','0.6.9','0.6.10','0.6.11','0.6.12','0.6.13','0.7.0','0.7.1','0.7.2','0.7.3','0.7.4','0.7.5',VERSION].includes(s.plugin_version) || ![installedTeam().governance_sha256,V020_GOVERNANCE_SHA256,V019_GOVERNANCE_SHA256,V018_GOVERNANCE_SHA256].includes(s.governance_sha256))
+  const blocker=configuration_error??(!executor.supported ? executor.blocker : s && (!['0.5.0','0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7','0.6.8','0.6.9','0.6.10','0.6.11','0.6.12','0.6.13','0.7.0','0.7.1','0.7.2','0.7.3','0.7.4','0.7.5','0.7.6',VERSION].includes(s.plugin_version) || ![installedTeam().governance_sha256,V020_GOVERNANCE_SHA256,V019_GOVERNANCE_SHA256,V018_GOVERNANCE_SHA256].includes(s.governance_sha256))
     ? 'Explicitly adopt the installed development-capable team and compatible governance first' : null);
   return {supported:executor.supported,eligible:s ? !blocker : null,blocker,executor,
     output:'Retained, independently reviewable local candidate; original source is unchanged',
+    test_fixtures:{supported:executor.supported,selection_stage:'plan',selectors:[{protocol:'scratch-fixture-contract-v1',factory:'p5-transfer-two-real-links-v1'}],validation_reuse:false},
     limits:{test_runner:'Node built-in tests',network:false,package_installation:false,source_integration:false,
       max_files:32,max_bytes:configuration.max_bytes,per_file_max_bytes:configuration.per_file_max_bytes,max_attempts:10,max_test_ms:120000,configuration,context_admission_characters:configuration_error?null:developmentTransportBudget(configuration.max_bytes),model_context_fit:"unverified; host/model limits may be lower"},
     data_policy:'Founder selects source paths and data policy. Authorized contents are sent to the existing host model.'};
@@ -52,6 +55,7 @@ function readSource(root,p,limit=developmentLimits(root).max_bytes) {
   return {path:p,content,sha256:digest(content)};
 }
 function sourceMatches(root,p) {
+  if(p.development.scope.test_fixture!==undefined)assertTestFixtureIdentity(p.development.scope.test_fixture);
   for(const f of p.development.scope.sources)if(readSource(root,f.path,p.development.scope.max_bytes).sha256!==f.sha256)throw new Error('Original source changed; prepare a new scope');
   for(const f of p.development.scope.write_paths)if(!p.development.scope.read_paths.includes(f) && fs.existsSync(sourceFile(root,f)))throw new Error('An authorized new path now exists in original source; prepare a new scope');
 }
@@ -65,6 +69,7 @@ function planOf(s,key) {
 function authority(s,planId) {return digest(JSON.stringify({owner:s.owner,team:s.team_sha256,records:Object.values(s.records).filter(r=>['intent','decision'].includes(r.kind)&&!presentationOnly(r)&&relevantRecord(s,r,{role:'engineer',context_scope:planId}))}));}
 function authorized(s,p,root=process.cwd()) {
   const scope=p.development.scope;
+  if(scope.test_fixture!==undefined)assertTestFixtureIdentity(scope.test_fixture);
   if(scope.max_bytes>developmentLimits(root).max_bytes)throw new Error("Configured development ceiling was lowered below this scope; restore configuration or prepare a smaller new scope");
   capable(s,root);
   const g=p.development.authorization;
@@ -114,7 +119,7 @@ export function developmentBundle(s,job,artifact,root=process.cwd()) {
 export function developmentPrompt(s,job,target) {
   if(job.development_id && s.records[job.development_id]?.development.scope.output_format==='patches')return `Bounded local development candidate. Return patches:[{path,base_sha256,edits:[{start,end,text}]}] for EVERY existing write_path. base_sha256 must match the scoped source; offsets are ordered, non-overlapping UTF-16 positions in that exact original text, not shifted by prior edits. For authorized new paths only, use {path,base_sha256:null,content}. No deletion, fuzzy hunks, commands or direct writes. The runtime reconstructs complete retained candidates, validates budgets, runs authorized tests and supplies exact full candidates to independent QA. Return blocked:"reason" without patches if unable. Existing limits and authority remain unchanged.`;
   if(job.development_id)return `Bounded local development candidate. Return complete files:[{path,content}] for EVERY write_path in the supplied scope; keep unchanged files unchanged. No tools, direct edits, installs, network, external actions or test-execution claims. The runtime will create a separate candidate and run the exact authorized Node tests. If requirements cannot be met return blocked:"reason" without files. Repairs retain all previous failures and stay inside the same scope.`;
-  if(target?.development?.type==='test')return `Independent LOCAL DEVELOPMENT acceptance review. Inspect the supplied candidate files, changes, scope, original inputs, and actual runtime test receipt. A model claim is not test evidence. Reused receipts explicitly did not execute again; inspect the linked original runtime receipt and applicability. New receipts include validation_manifest: runtime-attested source/test, command, Node/toolchain, dependency, sandbox, environment and limit commitments bound by the receipt result's validation_manifest_sha256. Host paths and environment values remain redacted hashes; this is runtime evidence, not your independent recomputation of private values. Optionally qualify future exact deterministic reuse only after checking the complete source/tests/environment: include review.deterministic_validation:{permitted_action:"reuse_exact_validation",fingerprint:the supplied validation_fingerprint,dependencies_complete:true,external_state:false}. Omit that field if tests use clock/random/outside state or dependency completeness is unproven. No broad execution or integration authority is granted. Review must include permitted_action:"accept_local_development" (or "hold"), candidate_sha256:"${target.development.candidate_sha256}", receipt_sha256:"${target.development.receipt_sha256}", blockers:[]. Pass only if actual tests passed, evidence fits acceptance and no blockers remain. Preserve failed attempts. You did not independently execute these tests; attribute execution to the runtime.`;
+  if(target?.development?.type==='test')return `Independent LOCAL DEVELOPMENT acceptance review. Inspect the supplied candidate files, changes, scope, original inputs, and actual runtime test receipt. A model claim is not test evidence. Reused receipts explicitly did not execute again; inspect the linked original runtime receipt and applicability. New receipts include validation_manifest: runtime-attested source/test, command, Node/toolchain, dependency, sandbox, environment and limit commitments bound by the receipt result's validation_manifest_sha256. Host paths and environment values remain redacted hashes; this is runtime evidence, not your independent recomputation of private values. ${target.development.validation_manifest?.test_fixture?'This fixture-bearing execution is explicitly NOT qualified for validation reuse. Do not include review.deterministic_validation; a passing local development review grants no reuse qualification.':'Optionally qualify future exact deterministic reuse only after checking the complete source/tests/environment: include review.deterministic_validation:{permitted_action:"reuse_exact_validation",fingerprint:the supplied validation_fingerprint,dependencies_complete:true,external_state:false}. Omit that field if tests use clock/random/outside state or dependency completeness is unproven.'} No broad execution or integration authority is granted. Review must include permitted_action:"accept_local_development" (or "hold"), candidate_sha256:"${target.development.candidate_sha256}", receipt_sha256:"${target.development.receipt_sha256}", blockers:[]. Pass only if actual tests passed, evidence fits acceptance and no blockers remain. Preserve failed attempts. You did not independently execute these tests; attribute execution to the runtime.`;
   return '';
 }
 function candidateOf(s,p,key,fresh=true) {
@@ -155,6 +160,8 @@ function verifyCandidate(root,p,c) {
   walk(dir);if(expected.size)throw new Error('Candidate files are missing');return dir;
 }
 export async function developmentAction(a,host) {
+  if(Object.hasOwn(a,'test_fixture')&&a.action!=='plan')throw Error('test_fixture is selectable only when creating a development plan');
+  if(Object.hasOwn(a,'test_fixture')&&a.test_fixture===undefined)throw Error('test_fixture must be an explicit closed selector object');
   if(!Number.isInteger(a.epoch))throw new Error('Supply current ownership epoch');
   if(a.action==='inspect')return withStore(a.root,db=>{const s=db.read();owner(s,a.session_id,host,a.epoch);return {capability:developmentCapability(s,a.root),records:Object.values(s.records).filter(r=>r.development)};});
   if(a.action==='run')return queueRun(a,host);
@@ -165,6 +172,7 @@ export async function developmentAction(a,host) {
       if(s.paused)throw new Error('Company is paused');
       requireText(a.source_instruction,'source_instruction');
       if(a.model_data_approved!==true)throw new Error('Explicitly approve selected source inspection and sharing with the host model before planning');
+      const test_fixture=testFixtureIdentity(a.test_fixture);
       const read_paths=paths(a.read_paths,'read_paths',true),write_paths=paths(a.write_paths,'write_paths'),test_paths=paths(a.test_paths,'test_paths');
       const all=[...new Set([...read_paths,...write_paths])].sort(),lower=all.map(p=>p.toLowerCase());
       if(all.length>32 || new Set(lower).size!==all.length || lower.some(p=>lower.some(q=>q!==p&&q.startsWith(p+'/'))))throw new Error('Conflicting or excessive scope paths');
@@ -178,7 +186,7 @@ export async function developmentAction(a,host) {
       const source_bytes=assertByteBudget(sources,a.max_bytes,'Sources');
       const expires=Date.parse(a.expires_at);if(!Number.isFinite(expires)||expires<=Date.now()||expires>Date.now()+30*86400000)throw new Error('Expiry must be within thirty days');
       const scope={read_paths,write_paths,test_paths,sources,output_format,source_bytes,configured_ceiling:configuration.max_bytes,transport_max_characters:developmentTransportBudget(a.max_bytes),acceptance:requireText(a.acceptance,'acceptance'),stop_conditions:requireText(a.stop_conditions,'stop_conditions'),data_policy:requireText(a.data_policy,'data_policy'),source_instruction:a.source_instruction,
-        max_attempts:a.max_attempts,timeout_ms:a.timeout_ms,max_output_bytes:a.max_output_bytes,max_bytes:a.max_bytes,expires_at:new Date(expires).toISOString(),test_runner:'node --test',network:false,source_integration:false};
+        max_attempts:a.max_attempts,timeout_ms:a.timeout_ms,max_output_bytes:a.max_output_bytes,max_bytes:a.max_bytes,expires_at:new Date(expires).toISOString(),test_runner:'node --test',network:false,source_integration:false,...(test_fixture?{test_fixture}:{})};
       const key=id('development');result=s.records[key]={id:key,kind:'artifact',author_role:'runner',author_instance:a.session_id,revision:1,status:'Draft',created_at:stamp(),content:'Bounded local development scope. Selected source contents will be shared with the host model. Original source stays unchanged; candidate edits and isolated Node tests only.',development:{type:'plan',scope,scope_sha256:digest(JSON.stringify(scope)),attempts:[]}};
     } else {
       const p=planOf(s,a.plan_id);
@@ -211,6 +219,7 @@ function queueRun(a,host) {
   let p,c,jobId=id('test');
   withStore(a.root,db=>db.transaction('development.test_reserved',s=>{
     owner(s,a.session_id,host,a.epoch);p=planOf(s,a.plan_id);authorized(s,p,a.root);sourceMatches(a.root,p);c=candidateOf(s,p,a.candidate_id);
+    if(p.development.scope.test_fixture!==undefined&&a.reuse_receipt_id!==undefined)throw Error('Validation reuse for fixture-bearing scopes is not qualified');
     if(Object.values(s.jobs).filter(j=>['queued','running'].includes(j.status)).length>=3)throw new Error('Three assignments already active; wait for a result');
     if(c.development.run)throw new Error('Candidate already has a test attempt; inspect it, never retry uncertain execution');
     if(Object.values(s.jobs).some(j=>j.development_id===p.id&&['queued','running'].includes(j.status)))throw new Error('Scope already has active work');
@@ -235,6 +244,7 @@ export async function executeDevelopmentTest(root,jobId) {
     a={root,session_id:j.session_id,epoch:j.epoch};host=j.host;
     owner(s,a.session_id,host,a.epoch);p=planOf(s,j.development_id);authorized(s,p,root);sourceMatches(root,p);c=candidateOf(s,p,j.candidate_id);
     if(j.status!=='queued')throw new Error('Local test is no longer eligible');
+    if(p.development.scope.test_fixture!==undefined&&j.reuse_receipt_id!==undefined)throw Error('Validation reuse for fixture-bearing scopes is not qualified');
     if(j.reuse_receipt_id){const t=s.records[j.reuse_receipt_id],origin=s.jobs[t?.author_instance],prior=s.records[t?.development?.candidate_id],priorPlan=s.records[t?.development?.plan_id];
       if(!t||origin?.id!==t.author_instance||origin?.kind!=='development_test'||origin.status!=='completed'||origin.artifact_id!==t.id||origin.candidate_id!==prior?.id||origin.development_id!==priorPlan?.id||prior?.development?.run?.receipt_id!==t.id||prior.development.run.job_id!==origin.id||t.development.candidate_sha256!==c.development.candidate_sha256||!priorPlan)throw Error('Reuse source lacks canonical completed runtime provenance');
       if(negativeValidationReview(s,t))throw Error('Validation source has an unresolved negative review');
@@ -249,12 +259,12 @@ export async function executeDevelopmentTest(root,jobId) {
   const eligible=()=>withStore(a.root,db=>{const s=db.read();owner(s,a.session_id,host,a.epoch);const current=planOf(s,p.id);authorized(s,current,a.root);if(s.jobs[jobId].status!=='running')throw new Error('Test cancelled');sourceMatches(a.root,current);if(!supplementalMatches(s,s.jobs[c.job_id]))throw new Error('Candidate supplemental evidence changed');});
   try {
     eligible();const directory=reuseSource?candidateDir(a.root,p,c):makeCandidate(a.root,p,c);verifyCandidate(a.root,p,c);
-    const fingerprint=()=>{const input={files:c.development.files.map(f=>({path:f.path,sha256:digest(f.content)})),tests:p.development.scope.test_paths,...validationEnvironment(directory,p.development.scope.test_paths),limits:{timeout_ms:p.development.scope.timeout_ms,max_output_bytes:p.development.scope.max_output_bytes}};manifest=validationManifest(input);return manifest.validation_fingerprint;};
+    const fingerprint=()=>{if(p.development.scope.test_fixture!==undefined)assertTestFixtureIdentity(p.development.scope.test_fixture);const input={files:c.development.files.map(f=>({path:f.path,sha256:digest(f.content)})),tests:p.development.scope.test_paths,...validationEnvironment(directory,p.development.scope.test_paths,p.development.scope.test_fixture===undefined?undefined:{testFixture:p.development.scope.test_fixture}),limits:{timeout_ms:p.development.scope.timeout_ms,max_output_bytes:p.development.scope.max_output_bytes},...(p.development.scope.test_fixture!==undefined?{test_fixture:p.development.scope.test_fixture}:{})};manifest=validationManifest(input);return manifest.validation_fingerprint;};
     validationFingerprint=fingerprint();
     timer=setInterval(()=>{try{eligible();}catch{stale=true;abort.abort();}},100);
     if(reuseSource){if(!validateReusableReceipt(reuseSource,validationFingerprint))throw Error('Reuse fingerprint or successful execution evidence does not match');
       result={...reuseSource.development.result,tests_executed:false,reused:true,reused_from:reuseSource.id,original_tests_executed:true};
-    }else result=await runLocalTests({directory,test_paths:p.development.scope.test_paths,timeout_ms:p.development.scope.timeout_ms,max_output_bytes:p.development.scope.max_output_bytes,signal:abort.signal});
+    }else result=await runLocalTests({directory,test_paths:p.development.scope.test_paths,timeout_ms:p.development.scope.timeout_ms,max_output_bytes:p.development.scope.max_output_bytes,signal:abort.signal,...(p.development.scope.test_fixture!==undefined?{testFixture:p.development.scope.test_fixture}:{})});
     verifyCandidate(a.root,p,c);
     // Fresh library discovery and byte reads bind both actual execution and the
     // no-execution reuse path. A changed/unknown environment never emits Pass.
@@ -291,6 +301,9 @@ if(process.argv[1] && path.resolve(process.argv[1])===fileURLToPath(import.meta.
 
 export function validTestExecution(state,receipt) {
   const d=receipt?.development,r=d?.result;if(!d||!r||!validationManifestMatches(receipt))return false;
+  const fixture=state.records?.[d.plan_id]?.development?.scope?.test_fixture;
+  if(fixture!==undefined){if(d.reused_from||!isDeepStrictEqual(d.validation_manifest?.test_fixture,fixture))return false;}
+  else if(r.test_fixture!==undefined||d.validation_manifest?.test_fixture!==undefined)return false;
   if(!d.reused_from)return r.tests_executed===true&&r.reused!==true;
   const origin=state.records[d.reused_from],j=state.jobs[origin?.author_instance],c=state.records[origin?.development?.candidate_id];
   return r.reused===true&&r.tests_executed===false&&r.reused_from===origin?.id&&j?.id===origin?.author_instance&&j?.kind==='development_test'&&j.status==='completed'&&j.artifact_id===origin.id&&j.candidate_id===c?.id&&j.development_id===origin.development.plan_id&&c?.development?.run?.receipt_id===origin.id&&c.development.run.job_id===j.id&&d.candidate_sha256===origin.development.candidate_sha256&&reuseQualificationMatches(state,origin,d.reuse_qualification,d.reuse_qualification_producer,d.reuse_candidate_producer)&&!negativeValidationReview(state,origin)&&validateReusableReceipt(origin,d.validation_fingerprint);

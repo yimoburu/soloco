@@ -325,7 +325,7 @@ else {
   } finally {process.env.PATH=oldPath;}
 });
 
-for(const [version,governance,pluginVersion=installedTeam().plugin_version] of [['0.18',v018Governance],['0.19',v019Governance],['0.20',v020Governance,'0.7.5']])test(`v${version} pinned company retains its original prototype grant across source update`,async()=>{
+for(const [version,governance,pluginVersion=installedTeam().plugin_version,label=''] of [['0.18',v018Governance],['0.19',v019Governance],['0.20',v020Governance,'0.7.5'],['0.20',v020Governance,'0.7.6',' with 0.7.6 team']])test(`v${version}${label} pinned company retains its original prototype grant across source update`,async()=>{
   const a=setup();
   withStore(a.root,db=>db.transaction('test.pin_governance',s=>{
     s.plugin_version=pluginVersion;s.runtime_version=pluginVersion;
