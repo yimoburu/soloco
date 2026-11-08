@@ -13,11 +13,22 @@ import {operatingContext} from './operating-state.mjs';
 import { buildEvidence, projectionPreview, evidencePage, readEvidence, createDeliveryLedger, recordDelivery, validateCitations, validateSemanticDelivery, admitPrompt, recordResponse, boundedReplayBatches, RESPONSE_RESERVE } from './upgrade-evidence.mjs';
 
 export const INCREMENTAL_WORKFLOW = 'incremental-v1';
+export const INCREMENTAL_V2 = 'incremental-v2';
+const accelerated = u => u?.workflow===INCREMENTAL_V2;
+const COMBINED_LIMIT=128000;
+function executionMode(u,pages=u.evidence?.pages??[]) {
+  return accelerated(u)?pages.length===1 && pages[0].end-pages[0].offset<=COMBINED_LIMIT?'combined-v1':'pipelined-v1':'serial-v1';
+}
+function combined(u) {
+  if(!accelerated(u))return false;
+  if(u.evidence?.execution_mode!==executionMode(u))throw Error('Upgrade execution mode changed');
+  return u.evidence.execution_mode==='combined-v1';
+}
 const rulesHash = () => digest(['upgrade.mjs','upgrade-evidence.mjs','current-state.mjs','snapshot.mjs','selection.mjs'].map(file=>fs.readFileSync(path.join(PACKAGE,'runtime',file),'utf8')).join('\n'));
 const workflowContract = u => digest(JSON.stringify(Object.fromEntries(['workflow','workflow_rules_sha256','created_at','epoch','host','owner_session_id','candidate_hash','checkpoint_sha256','history_sha256','review_deadline_policy','review_window_minutes','deadline_ms','call_timeout_minutes','model_selection_sha256','context_mode','governance_policy','governance_instruction','source_instruction'].map(key=>[key,u[key]]).concat(Object.hasOwn(u,'operating_input')?['operating_input','snapshot_protocol','previous','candidate','model_catalog','takeover_instruction'].map(key=>[key,u[key]]):[]))));
 function incremental(u) {
   const marked=u.workflow!==undefined || u.workflow_rules_sha256!==undefined || u.evidence?.workflow!==undefined || u.evidence?.workflow_contract_sha256!==undefined;
-  if (marked && (u.workflow!==INCREMENTAL_WORKFLOW || u.evidence?.workflow!==u.workflow || u.workflow_rules_sha256!==u.evidence?.workflow_rules_sha256)) throw Error('Upgrade workflow protocol changed; recover before retrying');
+  if (marked && (![INCREMENTAL_WORKFLOW,INCREMENTAL_V2].includes(u.workflow) || u.evidence?.workflow!==u.workflow || u.workflow_rules_sha256!==u.evidence?.workflow_rules_sha256)) throw Error('Upgrade workflow protocol changed; recover before retrying');
   return marked;
 }
 function stopped(worker) {
@@ -49,6 +60,7 @@ function frozenOperatingInput(s,u) {
   if(!Object.hasOwn(u,'operating_input'))return undefined;
   if(!incremental(u)||u.context_mode!=='current'||u.snapshot_protocol!==1)throw Error('Invalid prospective operating upgrade mode');
   const fields=new Set('snapshot_protocol context_mode id operating_input status created_at call_timeout_minutes evidence review_window_minutes review_deadline_policy deadline_ms history_sha256 epoch host model_selection model_selection_sha256 model_catalog previous candidate candidate_hash checkpoint checkpoint_sha256 governance_policy governance_instruction source_instruction takeover_instruction workflow workflow_rules_sha256 owner_session_id steps worker continuations started_at probe_instance reviewer_instance probe_status review_status calls probe_native_id reviewer_native_id cos_pages qa_pages replays deliveries final_packets probe review checked_at error failed_at recovered_at applied_at applied_epoch verified_at'.split(' '));
+  if(accelerated(u))fields.add('timings');
   if(Object.keys(u).some(key=>!fields.has(key)))throw Error('Unrecognized prospective upgrade journal field');
   const captured=captureSnapshotDependencies(s,()=>resolveSnapshot(s,u.operating_input),
     {root:{input:u.operating_input,checkpoint:u.checkpoint,history:shallowSnapshotHistory(s,{current:false}).upgrade_history}});
@@ -75,13 +87,14 @@ function workEstimate(u) {
     try{parseArtifact(call?.text);}catch{return false;}
     return ![...(u[`${step.role}_pages`]??[]),u[step.role==='cos'?'probe':'review']].some(result=>result?.call_id===step.id);
   }).length;
-  return {workflow:u.workflow,acceptance:false,forecast:true,context_fit_verified:false,
+  const isCombined=pages!==null&&accelerated(u)&&executionMode(u)==='combined-v1';
+  return {workflow:u.workflow,execution_mode:pages===null?null:executionMode(u),acceptance:false,forecast:true,context_fit_verified:false,
     pages,completed_cos_pages:u.cos_pages?.length??0,completed_qa_pages:u.qa_pages?.length??0,
     remaining:pages===null?null:{cos_pages:pages-(u.cos_pages?.length??0),qa_pages:pages-(u.qa_pages?.length??0),cos_final:u.probe?0:1,qa_final:u.review?0:1},
     retained_outputs_awaiting_validation:unvalidated,
-    minimum_remaining_calls:pages===null?null:Math.max(0,2*pages-(u.cos_pages?.length??0)-(u.qa_pages?.length??0)+(u.probe?0:1)+(u.review?0:1)-unvalidated),
+    minimum_remaining_calls:pages===null?null:Math.max(0,(isCombined?0:2*pages-(u.cos_pages?.length??0)-(u.qa_pages?.length??0))+(u.probe?0:1)+(u.review?0:1)-unvalidated),
     additional_calls:'Retrieval and transport-bounded replay may add calls; final findings packing is measured when available.',
-    observed:{started_calls:steps.length,returned_calls:calls.length,input_characters:steps.reduce((n,c)=>n+c.budget.prompt_characters,0),output_characters:calls.reduce((n,c)=>n+(c.response_characters??0),0),estimated_input_tokens:steps.reduce((n,c)=>n+c.budget.estimated_prompt_tokens,0),estimated_output_tokens:calls.reduce((n,c)=>n+(c.estimated_response_tokens??0),0)},
+    observed:{started_calls:steps.length,returned_calls:calls.length,input_characters:steps.reduce((n,c)=>n+c.budget.prompt_characters,0),output_characters:calls.reduce((n,c)=>n+(c.response_characters??0),0),estimated_input_tokens:steps.reduce((n,c)=>n+c.budget.estimated_prompt_tokens,0),estimated_output_tokens:calls.reduce((n,c)=>n+(c.estimated_response_tokens??0),0),...(u.timings?{timing:{...u.timings,model_work_ms:calls.reduce((n,c)=>n+(Number.isFinite(c.elapsed_ms)?c.elapsed_ms:0),0),model_calls_measured:calls.filter(c=>Number.isFinite(c.elapsed_ms)).length,scope:'Observed local wall durations; model work sums overlapping calls and is not elapsed upgrade time.'}}:{})},
     blocked_reason:u.error??(steps.some(c=>c.state!=='returned')?'Ambiguous native call: closure unproved':!stopped(u.worker)?'Rehearsal worker is still running or unknown':Date.now()>=deadline(u)?'Original deadline expired':null)};
 }
 
@@ -133,6 +146,10 @@ const checkpointHash = s => digest(JSON.stringify(checkpoint(s,{shallow:s.upgrad
 function savedCheckpointIntegrity(u,expected=u.evidence?.checkpoint_sha256??u.checkpoint_sha256) {
   if(incremental(u) && u.workflow_rules_sha256!==rulesHash()) throw Error('Upgrade workflow rules changed; recover before retrying');
   if(incremental(u) && workflowContract(u)!==u.evidence.workflow_contract_sha256)throw Error('Frozen upgrade workflow contract changed');
+  if(accelerated(u)&&u.timings!==undefined) {
+    const keys=new Set(['preparation_ms','evidence_ms','worker_wall_ms','worker_runs','last_run_wall_ms']);
+    if(!u.timings||typeof u.timings!=='object'||Array.isArray(u.timings)||Object.entries(u.timings).some(([key,value])=>!keys.has(key)||!Number.isFinite(value)||value<0||(key==='worker_runs'&&!Number.isInteger(value))))throw Error('Invalid upgrade timing metadata');
+  }
   if (u.checkpoint_sha256!==expected || digest(JSON.stringify(u.checkpoint))!==expected) throw new Error('Saved upgrade checkpoint or pinned hash changed; recover before retrying');
   if (Object.hasOwn(u.evidence??{},'review_deadline_policy') && (u.review_deadline_policy!==u.evidence.review_deadline_policy || u.deadline_ms!==u.evidence.deadline_ms)) throw new Error('Upgrade deadline policy changed; recover before retrying');
   callMinutes(u);
@@ -171,10 +188,24 @@ function report(s) {
   if(work && ['queued','checking','ready'].includes(s.upgrade.status))try{continuationGuard(s,s.upgrade);}catch(error){work.blocked_reason=error.message;}
   return {company_id:s.id,owner:s.owner,paused:s.paused,plugin_version:s.plugin_version,runtime_version:s.runtime_version,upgrade:s.upgrade?{...upgradeSummary(s.upgrade),...(work?{work}:{})}:null};
 }
-export const upgradeGuidance = `Company upgrade maintenance: use company_status and company_upgrade inspect to compare the installed candidate with this company's pinned team. Installing a package does not authorize adoption. Only proceed after the founder asks to upgrade. Preserve governance by default; show the actual differences and obtain explicit direction before choosing installed governance. Pause/reconcile active assignments, then prepare with the inspected candidate_hash, current expected_epoch, and exact source_instruction. Optional prepare-only call_timeout_minutes accepts integer 10 (default) or 30, fixed for every CoS and independent QA call on a fresh attempt and capped by any remaining overall window. It never extends an existing attempt. Optional prepare-only review_window_minutes accepts 45 (default), 90, or null for explicitly no overall deadline on a fresh attempt; it never extends an existing deadline or grants authority. For NEW attempts choose workflow="incremental-v1" explicitly; omission preserves the legacy workflow. Incremental QA pages receive exact raw pages and corresponding CoS findings; final QA always receives the complete exact proposed handover and all required findings directly or through bounded replay. Inspect work forecasts and measured traffic separately from QA acceptance; hashes never prove semantic understanding or native context fit. Only an interrupted nonfailed incremental attempt can use company_upgrade resume, with exact current owner/epoch/candidate and explicit source_instruction, before its original deadline and after worker termination is proved with no ambiguous native call. Resume preserves identities, receipts and all allowances; a lost call start is held without retry. Preparation launches a fresh CoS rehearsal and an independent QA session without business tools. Poll company_wait/status; do not claim roles started until reported. When ready, apply the same upgrade_id, then verify it. Reopen company_open to load the adopted pinned CoS instructions before resuming; resume only if covered by the founder's request. On failed/interrupted checks, inspect and recover the previous definitions; never retry silently, reset records, or bypass the hold. Recovery keeps new company facts and uses this runtime, not an older binary. Prefer the current owning chat. If continuing in a different founder chat, pause first and supply the exact founder instruction as takeover_instruction; preparation transfers ownership and revokes the old epoch. If the previous coordinator disappeared during a pending upgrade, recover it with an explicit takeover_instruction before preparing again. No upgrade grants business execution authority.`;
+export const upgradeGuidance = `Company upgrade maintenance: use company_status and company_upgrade inspect to compare the installed candidate with this company's pinned team. Installing a package does not authorize adoption. Only proceed after the founder asks to upgrade. Preserve governance by default; show the actual differences and obtain explicit direction before choosing installed governance. Pause/reconcile active assignments, then prepare with the inspected candidate_hash, current expected_epoch, and exact source_instruction. Optional prepare-only call_timeout_minutes accepts integer 10 (default) or 30, fixed for every CoS and independent QA call on a fresh attempt and capped by any remaining overall window. It never extends an existing attempt. Optional prepare-only review_window_minutes accepts 45 (default), 90, or null for explicitly no overall deadline on a fresh attempt; it never extends an existing deadline or grants authority. Fresh inspect/prepare defaults to workflow="incremental-v2" and current context. Inspect selection workflow/input eligibility before prepare. When accepted operating state exists, v2 validates and captures it automatically; invalid accepted evidence holds without falling back. Explicit context_mode="full" selects full history. Explicit incremental-v1 or legacy selects a prior protocol for a fresh attempt; existing attempts keep their original protocol and allowances. Incremental QA pages receive exact raw pages and corresponding CoS findings; final QA always receives the complete exact proposed handover and all required findings directly or through bounded replay. Inspect work forecasts and measured traffic separately from QA acceptance; hashes never prove semantic understanding or native context fit. Only an interrupted nonfailed incremental attempt can use company_upgrade resume, with exact current owner/epoch/candidate and explicit source_instruction, before its original deadline and after worker termination is proved with no ambiguous native call. Resume preserves identities, receipts and all allowances; a lost call start is held without retry. Preparation launches a fresh CoS rehearsal and an independent QA session without business tools. Poll company_wait/status; do not claim roles started until reported. When ready, apply the same upgrade_id, then verify it. Reopen company_open to load the adopted pinned CoS instructions before resuming; resume only if covered by the founder's request. On failed/interrupted checks, inspect and recover the previous definitions; never retry silently, reset records, or bypass the hold. Recovery keeps new company facts and uses this runtime, not an older binary. Prefer the current owning chat. If continuing in a different founder chat, pause first and supply the exact founder instruction as takeover_instruction; preparation transfers ownership and revokes the old epoch. If the previous coordinator disappeared during a pending upgrade, recover it with an explicit takeover_instruction before preparing again. No upgrade grants business execution authority.`;
+
+function upgradeSelection(s,a,{existingAttempt=false}={}) {
+  const u=existingAttempt?s.upgrade:null;
+  const workflow=u?(u.workflow??'legacy'):(a.workflow??'incremental-v2');
+  const contextMode=u?(u.context_mode??'full'):(a.context_mode??'current');
+  const accepted=u?Boolean(u.operating_input):Boolean(s.operating_state)&&contextMode==='current'
+    &&(workflow==='incremental-v2'||(workflow===INCREMENTAL_WORKFLOW&&a.context_mode==='current'));
+  return {workflow,context_mode:contextMode,
+    input_mode:accepted?'accepted-operating-state':contextMode==='current'?'current-projection':'full-history',
+    existing_attempt:Boolean(u),accepted_operating_state_available:Boolean(s.operating_state),
+    eligible:!u||u.status!=='failed',hold_reason:u?.status==='failed'?(u.error??'Failed upgrade requires recovery'):null,preview_only:true,
+    ...(accepted?{required_call_timeout_minutes:10,required_review_window_minutes:45}:{}),
+    ...(u?{execution_mode:u.evidence?.execution_mode??null}:{execution_mode:'determined-after-preparation-measurement'})};
+}
 
 export function upgrade(a,host,{launch=launchUpgrade,check=readiness,catalog=modelCatalog}={}) {
-  if (Object.hasOwn(a,'workflow') && (a.action!=='prepare' || a.workflow!==INCREMENTAL_WORKFLOW)) throw Error('workflow is prepare-only incremental-v1');
+  if (Object.hasOwn(a,'workflow') && (!['prepare','inspect'].includes(a.action) || !['legacy',INCREMENTAL_WORKFLOW,'incremental-v2'].includes(a.workflow))) throw Error('workflow is inspect/prepare legacy, incremental-v1 or incremental-v2');
   if (Object.hasOwn(a,'call_timeout_minutes')) {
     if (a.action!=='prepare') throw new Error('call_timeout_minutes is only supported for upgrade prepare');
     if (![10,30].includes(a.call_timeout_minutes)) throw new Error('call_timeout_minutes must be 10 or 30');
@@ -188,13 +219,26 @@ export function upgrade(a,host,{launch=launchUpgrade,check=readiness,catalog=mod
   binding(a,host);
   if (a.action==='inspect') return withStore(a.root,db=>{
     const s=db.read();compatible(s);const old=pinned(s),next=candidate(s,a.governance);
-    const pendingOperating=s.upgrade?.operating_input&&['queued','checking','ready'].includes(s.upgrade.status)&&a.context_mode!=='full';
-    if(pendingOperating)continuationGuard(s,s.upgrade);
-    const operatingInput=pendingOperating?frozenOperatingInput(s,s.upgrade):a.context_mode==='current'&&s.operating_state
-      ? {protocol:OPERATING_INPUT,context:operatingContext(s),candidate:next,candidate_hash:teamHash(next),pinned:old,preparation_owner:{...s.owner,session_id:a.session_id,epoch:s.owner.epoch+1},source_instruction:null}:undefined;
-    return upgradeInspectionView({...report(s),projection_preview:projectionPreview(pendingOperating?s.upgrade.checkpoint:checkpoint(s),shallowSnapshotHistory(s).upgrade_history,pendingOperating?null:shallowSnapshotHistory(s).upgrade??null,{currentState:a.context_mode!=='full',checkpointContinuity:true,snapshotState:s,contextState:s,operatingInput}),candidate_hash:teamHash(next),candidate_version:VERSION,changes:{roles:Object.keys(next.roles).filter(k=>JSON.stringify(old.roles[k])!==JSON.stringify(next.roles[k])),cos_instructions_changed:old.cos_instructions!==next.cos_instructions,governance_changed:old.governance!==next.governance},governance:{policy:a.governance??'preserve',current:s.governance,installed:installedTeam().governance},prior_instructions:old.cos_instructions,candidate_instructions:next.cos_instructions},{old,next,installed:installedTeam()});
+    const existingAttempt=Boolean(upgradePending(s));
+    const selection=upgradeSelection(s,a,{existingAttempt});
+    const pendingOperating=existingAttempt&&Boolean(s.upgrade.operating_input);
+    let operatingInput,projection;
+    try {
+      if(pendingOperating&&['queued','checking','ready'].includes(s.upgrade.status))continuationGuard(s,s.upgrade);
+      operatingInput=pendingOperating?frozenOperatingInput(s,s.upgrade):selection.input_mode==='accepted-operating-state'
+        ? {protocol:OPERATING_INPUT,context:operatingContext(s),candidate:next,candidate_hash:teamHash(next),pinned:old,preparation_owner:{...s.owner,session_id:a.session_id,epoch:s.owner.epoch+1},source_instruction:null}:undefined;
+      projection=projectionPreview(pendingOperating?s.upgrade.checkpoint:checkpoint(s),shallowSnapshotHistory(s).upgrade_history,pendingOperating?null:shallowSnapshotHistory(s).upgrade??null,{currentState:selection.context_mode!=='full',checkpointContinuity:true,snapshotState:s,contextState:s,operatingInput});
+      if(operatingInput)projection.workflow=selection.workflow;
+    } catch(error) {
+      if(existingAttempt||selection.workflow!=='incremental-v2')throw error;
+      selection.eligible=false;selection.hold_reason=String(error.message).slice(0,1000);
+      projection={kind:'upgrade-input-held',held:true,acceptance:false,time_forecast:false,reason:selection.hold_reason};
+    }
+    return upgradeInspectionView({...report(s),selection,projection_preview:projection,candidate_hash:teamHash(next),candidate_version:VERSION,changes:{roles:Object.keys(next.roles).filter(k=>JSON.stringify(old.roles[k])!==JSON.stringify(next.roles[k])),cos_instructions_changed:old.cos_instructions!==next.cos_instructions,governance_changed:old.governance!==next.governance},governance:{policy:a.governance??'preserve',current:s.governance,installed:installedTeam().governance},prior_instructions:old.cos_instructions,candidate_instructions:next.cos_instructions},{old,next,installed:installedTeam()});
   });
   if (a.action==='prepare') {
+    const prepareStarted=performance.now();
+    const workflow=a.workflow??'incremental-v2';
     const reviewWindowMinutes=Object.hasOwn(a,'review_window_minutes')?a.review_window_minutes:REHEARSAL_TIMEOUT_MS/60000;
     requireText(a.source_instruction,'source_instruction');
     const metadata=a.model_selection?.mode==='explicit' || a.model_selection?.speed==='fast_disabled'?catalog(host):null;
@@ -214,10 +258,11 @@ export function upgrade(a,host,{launch=launchUpgrade,check=readiness,catalog=mod
       if (teamHash(next)!==a.candidate_hash) throw new Error('Candidate changed; inspect again');
       if (s.schema===SCHEMA && teamHash(previous)===teamHash(next)) throw new Error('This team is already adopted');
       if (next.governance!==s.governance) requireText(a.governance_instruction,'explicit governance_instruction');
-      if(s.operating_state&&a.workflow===INCREMENTAL_WORKFLOW&&a.context_mode==='current'
-        &&((a.call_timeout_minutes??10)!==10||reviewWindowMinutes!==45))throw Error('Prospective operating upgrade requires original ten-minute calls and 45-minute rehearsal ceiling');
+      const route=upgradeSelection(s,a);
+      if(route.input_mode==='accepted-operating-state'
+        &&((a.call_timeout_minutes??10)!==10||reviewWindowMinutes!==45))throw Error('Accepted operating upgrade requires ten-minute calls and a 45-minute rehearsal ceiling; requested allowances were not changed');
       const attemptId=id('upgrade');
-      const operatingInput=s.operating_state&&a.workflow===INCREMENTAL_WORKFLOW&&a.context_mode==='current'
+      const operatingInput=route.input_mode==='accepted-operating-state'
         ? captureOperatingInput(s,a,next,attemptId,host):undefined;
       if (s.upgrade) (s.upgrade_history??=[]).push(s.upgrade);
       // Schema 2 fences v0.1.0 coordinators even if they refresh the ownership epoch.
@@ -226,13 +271,14 @@ export function upgrade(a,host,{launch=launchUpgrade,check=readiness,catalog=mod
       decision(s,a,'prepare_team_upgrade');
       const snapshot=checkpoint(s);
       // Bind the selected call cap before launch; inventory fills in the evidence pages later.
-      s.upgrade={snapshot_protocol:1,context_mode:a.context_mode??'current',id:attemptId,...(operatingInput?{operating_input:operatingInput}:{}),status:'queued',created_at:stamp(),call_timeout_minutes:a.call_timeout_minutes??10,evidence:{call_timeout_minutes:a.call_timeout_minutes??10,pages:[]},review_window_minutes:reviewWindowMinutes,review_deadline_policy:reviewWindowMinutes===null?'none':'finite',deadline_ms:reviewWindowMinutes===null?null:Date.now()+reviewWindowMinutes*60000,history_sha256:historyHash(s,true),epoch:s.owner.epoch,host,model_selection:selection,model_selection_sha256:digest(JSON.stringify(selection)),...(metadata?{model_catalog:{source:metadata.source,...(selection.mode==='explicit'?{model:metadata.models.find(m=>m.id===selection.model)}:{}),speed_support:metadata.speed_support}}:{}),previous,candidate:next,candidate_hash:teamHash(next),checkpoint:snapshot,checkpoint_sha256:digest(JSON.stringify(snapshot)),governance_policy:a.governance??'preserve',governance_instruction:a.governance_instruction??null,source_instruction:a.source_instruction,takeover_instruction:a.takeover_instruction??null};
-      if(a.workflow===INCREMENTAL_WORKFLOW) {
+      s.upgrade={snapshot_protocol:1,context_mode:route.context_mode,id:attemptId,...(operatingInput?{operating_input:operatingInput}:{}),status:'queued',created_at:stamp(),call_timeout_minutes:a.call_timeout_minutes??10,evidence:{call_timeout_minutes:a.call_timeout_minutes??10,pages:[]},review_window_minutes:reviewWindowMinutes,review_deadline_policy:reviewWindowMinutes===null?'none':'finite',deadline_ms:reviewWindowMinutes===null?null:Date.now()+reviewWindowMinutes*60000,history_sha256:historyHash(s,true),epoch:s.owner.epoch,host,model_selection:selection,model_selection_sha256:digest(JSON.stringify(selection)),...(metadata?{model_catalog:{source:metadata.source,...(selection.mode==='explicit'?{model:metadata.models.find(m=>m.id===selection.model)}:{}),speed_support:metadata.speed_support}}:{}),previous,candidate:next,candidate_hash:teamHash(next),checkpoint:snapshot,checkpoint_sha256:digest(JSON.stringify(snapshot)),governance_policy:a.governance??'preserve',governance_instruction:a.governance_instruction??null,source_instruction:a.source_instruction,takeover_instruction:a.takeover_instruction??null};
+      if([INCREMENTAL_WORKFLOW,'incremental-v2'].includes(workflow)) {
         const u=s.upgrade;
-        Object.assign(u,{workflow:a.workflow,workflow_rules_sha256:rulesHash(),owner_session_id:a.session_id,steps:[]});
+        Object.assign(u,{workflow,workflow_rules_sha256:rulesHash(),owner_session_id:a.session_id,steps:[]});
         Object.assign(u.evidence,{workflow:u.workflow,workflow_rules_sha256:u.workflow_rules_sha256,checkpoint_sha256:u.checkpoint_sha256,review_deadline_policy:u.review_deadline_policy,deadline_ms:u.deadline_ms,model_selection_sha256:u.model_selection_sha256});
         u.evidence.workflow_contract_sha256=workflowContract(u);
       }
+      if(workflow==='incremental-v2')s.upgrade.timings={preparation_ms:Math.max(0,performance.now()-prepareStarted)};
       return s;
     }));
     try {launch(a.root,s.upgrade.id);} catch(error) {failUpgrade(a.root,s.upgrade.id,error);}
@@ -342,6 +388,7 @@ function validateCoverage(value,u,subject,ledger) {
 function validatePageCoverage(u) {
   const e=u.evidence;
   const modern=incremental(u);
+  const isCombined=combined(u);
   if(modern)validateIncrementalReceipts(u);
   for (const role of ['cos','qa']) {
     const findings=u[`${role}_pages`];
@@ -350,9 +397,15 @@ function validatePageCoverage(u) {
       const f=findings[i];
       if (f.page_id!==e.pages[i].page_id || f.range_sha256!==e.pages[i].range_sha256) throw new Error('Page coverage hash mismatch');
       if (role==='qa') {
-        validatePageVerdict(f.artifact.review);
+        if(isCombined)validateVerdict(f.artifact.review);else validatePageVerdict(f.artifact.review);
         if (f.artifact.review.verdict!=='Pass') throw new Error('Unresolved QA page blocker');
       }
+    }
+    if(isCombined) {
+      const final=u[role==='cos'?'probe':'review'];
+      if(!final || JSON.stringify(findings[0])!==JSON.stringify({page_id:e.pages[0].page_id,range_sha256:e.pages[0].range_sha256,...final})
+          || (u.replays??[]).length || Object.hasOwn(u,'final_packets'))throw Error('Combined upgrade page and final proof differ');
+      continue;
     }
     if(modern && u.final_packets?.[role]?.mode==='inline') {
       const packet=u.final_packets[role];
@@ -374,6 +427,7 @@ function validatePageCoverage(u) {
 }
 function validateIncrementalReceipts(u) {
   const calls=u.calls??[],steps=u.steps??[];
+  const isCombined=combined(u);
   if(calls.length!==steps.length || new Set(steps.map(step=>step.id)).size!==steps.length)throw Error('Missing or duplicate canonical call receipt');
   const natives={},used={cos:0,qa:0};
   for(const step of steps) {
@@ -408,9 +462,9 @@ function validateIncrementalReceipts(u) {
     }
   }
   for(const role of ['cos','qa']) {
-    for(const [index,result] of (u[`${role}_pages`]??[]).entries())validateResult(result,role,'page',u.evidence.pages[index]?.page_id);
+    for(const [index,result] of (u[`${role}_pages`]??[]).entries())validateResult(result,role,isCombined?'synthesis':'page',u.evidence.pages[index]?.page_id);
     const final=u[role==='cos'?'probe':'review'];
-    if(final)validateResult(final,role,'synthesis','final');
+    if(final)validateResult(final,role,'synthesis',isCombined?u.evidence.pages[0]?.page_id:'final');
   }
   // Bind every final QA round to the proposal actually supplied, independently
   // of a later, internally consistent rewrite of the accepted CoS output.
@@ -436,6 +490,9 @@ function validateReview(review,passPermission) {
 }
 
 export async function rehearse(root,uid,model=runModel,workerToken='') {
+  const runStarted=performance.now(),controllers=new Set();
+  let pipelineError;
+  const abortWork=error=>{pipelineError??=error;for(const controller of controllers)controller.abort(pipelineError);};
   // Claim before entering the failure handler: a second worker must never fail
   // or close the worker that already owns this attempt.
   let token,startupHeld=false;
@@ -461,7 +518,9 @@ export async function rehearse(root,uid,model=runModel,workerToken='') {
       else {u.probe_instance=id('upgrade-cos');u.reviewer_instance=id('upgrade-qa');}
       u.probe_status=incremental(u)&&u.probe?'completed':'running';u.review_status=incremental(u)&&u.probe?'running':'planned';return s;
     }));
+    const evidenceStarted=performance.now();
     const u=initial.upgrade,modern=incremental(u),subject=upgradeSubject(initial,u);
+    const evidenceMs=Math.max(0,performance.now()-evidenceStarted);
     const pages=subject.pages.map(page=>evidencePage(subject,page));
     const frozenOwner=JSON.stringify(initial.owner);
     function guard(s,status='checking') {
@@ -479,7 +538,7 @@ export async function rehearse(root,uid,model=runModel,workerToken='') {
           || teamHash(s.upgrade.candidate)!==u.candidate_hash
           || teamHash(candidate(s,u.governance_policy))!==u.candidate_hash) throw new Error('Upgrade changed during rehearsal or deadline expired');
     }
-    function check() {withStore(root,db=>guard(db.read()));}
+    function check() {if(pipelineError)throw pipelineError;withStore(root,db=>guard(db.read()));}
     function publish(event,edit) {
       check();
       withStore(root,db=>db.transaction(event,s=>{guard(s);edit(s.upgrade);return s;}));
@@ -499,12 +558,13 @@ export async function rehearse(root,uid,model=runModel,workerToken='') {
       });
     }
     publish('upgrade.inventory',a=>{
+      if(accelerated(a)){a.timings??={};a.timings.evidence_ms=(a.timings.evidence_ms??0)+evidenceMs;}
       if(modern && a.evidence.inventory_sha256) {
         if(a.evidence.inventory_sha256!==subject.inventory_sha256 || JSON.stringify(a.evidence.pages)!==JSON.stringify(pages.map(({text,...metadata})=>metadata)))throw Error('Frozen inventory changed');
         validateIncrementalReceipts(a);return;
       }
       a.evidence={...(modern?{workflow:u.workflow,workflow_rules_sha256:u.workflow_rules_sha256,workflow_contract_sha256:u.evidence.workflow_contract_sha256}:{}),...(Object.hasOwn(u,'call_timeout_minutes')?{call_timeout_minutes:u.call_timeout_minutes}:{}),review_deadline_policy:u.review_deadline_policy,deadline_ms:u.deadline_ms,model_selection_sha256:u.model_selection_sha256,checkpoint_sha256:subject.checkpoint_sha256,inventory_sha256:subject.inventory_sha256,history_sha256:subject.history_sha256,
-        counts:subject.inventory.counts,pages:pages.map(({text,...metadata})=>metadata)};
+        counts:subject.inventory.counts,pages:pages.map(({text,...metadata})=>metadata),...(accelerated(u)?{execution_mode:executionMode(u,pages)}:{})};
       a.cos_pages=[];a.qa_pages=[];a.replays=[];
     });
     const sessions={cos:{native:null,ledger:null,used:0,instance:u.probe_instance},qa:{native:null,ledger:null,used:0,instance:u.reviewer_instance}};
@@ -538,9 +598,11 @@ Protocol: Return JSON only matching response_contract.required_json_shape for th
           Blocked:{permitted_action:'hold',blockers:'Nonempty array of named unresolved blockers'}}}:{}),
         reads_only_shape:{reads:[{source_id:citation.source_id,sha256:citation.sha256,offset:citation.offset,length:citation.length}]},
         reads_rule:'Exactly one top-level key: reads. Use 1..4 requests, each exactly source_id, sha256, offset, length; <=32768 UTF-16 units per range, <=16 read rounds. This sample requests an exact frozen excerpt; choose other known ranges as needed.'};
-      return JSON.stringify({protocol:modern?'soloco-upgrade-incremental-v1':'soloco-upgrade-pages-v2',role,instructions,authority,required_review,response_contract,...data});
+      return JSON.stringify({protocol:accelerated(u)?'soloco-upgrade-incremental-v2':modern?'soloco-upgrade-incremental-v1':'soloco-upgrade-pages-v2',role,instructions,authority,required_review,response_contract,...data});
     }
     let callCursor=0;
+    const roleSteps=Object.fromEntries(['cos','qa'].map(role=>[role,(u.steps??[]).filter(step=>step.role===role)]));
+    const roleCursors={cos:0,qa:0};
     async function invoke(role,task,deliveries=[]) {
       const session=sessions[role];
       let data=task,delivering=deliveries;
@@ -552,7 +614,7 @@ Protocol: Return JSON only matching response_contract.required_json_shape for th
         const inputHash=digest(prompt);
         const proposalBinding=modern && role==='qa' && task.phase==='synthesis'
           ? {proposed_handover_sha256:digest(JSON.stringify(task.proposed_handover))}:{};
-        const prior=modern?u.steps?.[callCursor++]:null;
+        const prior=modern?(accelerated(u)?roleSteps[role][roleCursors[role]++]:u.steps?.[callCursor++]):null;
         if(prior && (prior.id!==callId || prior.input_sha256!==inputHash || JSON.stringify(prior.budget)!==JSON.stringify(budget)
             || prior.proposed_handover_sha256!==proposalBinding.proposed_handover_sha256))throw Error('Retained step identity, exact input or accounting changed');
         const dir=path.join(dataDir(),'sessions',session.instance);noLink(dir);fs.mkdirSync(dir,{recursive:true,mode:0o700});
@@ -560,10 +622,12 @@ Protocol: Return JSON only matching response_contract.required_json_shape for th
         if(remaining<1000)throw new Error('Upgrade deadline expired before native call');
         let output;
         const controller=new AbortController();
+        controllers.add(controller);
         const timer=Number.isFinite(deadline(u))?setTimeout(()=>controller.abort(),deadline(u)-Date.now()):null;
         const requested=structuredClone(u.model_selection??null);
         const unknownEvidence={reported_models:[],reported_effort:null,reported_service_tier:null,applied_controls:null,verification:'unverified',source:'not_reported',scope:'unknown'};
         let eligibilityError;
+        let modelStarted,modelElapsed;
         const poll=modern&&!prior?setInterval(()=>{try{check();}catch(error){eligibilityError=error;controller.abort(error);}},100):null;
         try {
           if(prior) {
@@ -571,13 +635,15 @@ Protocol: Return JSON only matching response_contract.required_json_shape for th
             if(!output || prior.state!=='returned' || digest(output.text)!==prior.output_sha256)throw Error('Missing canonical completed call receipt');
           } else {
             if(modern)publish('upgrade.call_started',a=>a.steps.push({id:callId,role,phase:task.phase,input_sha256:inputHash,...(u.operating_input?{operating_input_sha256:u.operating_input.immutable_snapshot.sha256}:{}),...proposalBinding,budget,requested_native_id:session.native,state:'started',started_at:stamp(),worker_token:token}));
+            modelStarted=performance.now();
             output=await model(u.host,session.native,prompt,dir,remaining,structuredClone(requested),{timeoutContext:'upgrade-call',timeoutReason:'Runtime execution ceiling capped by remaining immutable upgrade rehearsal deadline',signal:controller.signal});
+            modelElapsed=Math.max(0,performance.now()-modelStarted);
           }
         }
-        catch(error) {if(!prior)retain(role,{...(modern?{call_id:callId,input_sha256:inputHash}:{}),phase:task.phase,model_selection:requested,model_evidence:unknownEvidence,error:error.message,...(error.code?{error_code:error.code}:{}),budget,completed_at:stamp()});throw error;}
-        finally {if(timer!==null)clearTimeout(timer);if(poll!==null)clearInterval(poll);}
+        catch(error) {if(!prior)retain(role,{...(modern?{call_id:callId,input_sha256:inputHash}:{}),phase:task.phase,model_selection:requested,model_evidence:unknownEvidence,error:error.message,...(error.code?{error_code:error.code}:{}),...(error.rejected_output?{rejected_output:error.rejected_output}:{}),...(accelerated(u)&&modelStarted!==undefined?{elapsed_ms:Math.max(0,performance.now()-modelStarted)}:{}),budget,completed_at:stamp()});throw error;}
+        finally {controllers.delete(controller);if(timer!==null)clearTimeout(timer);if(poll!==null)clearInterval(poll);}
         const completedAt=prior?output.completed_at:stamp();
-        if(!prior)retain(role,{...(modern?{call_id:callId,input_sha256:inputHash,...proposalBinding}:{}),phase:task.phase,model_selection:requested,model_evidence:output.model_evidence??unknownEvidence,native_id:output.native_id??null,text:output.text,budget,response_characters:typeof output.text==='string'?output.text.length:null,estimated_response_tokens:typeof output.text==='string'?Math.ceil(output.text.length/4):null,completed_at:completedAt});
+        if(!prior)retain(role,{...(modern?{call_id:callId,input_sha256:inputHash,...proposalBinding}:{}),phase:task.phase,model_selection:requested,model_evidence:output.model_evidence??unknownEvidence,native_id:output.native_id??null,text:output.text,budget,response_characters:typeof output.text==='string'?output.text.length:null,estimated_response_tokens:typeof output.text==='string'?Math.ceil(output.text.length/4):null,...(accelerated(u)?{elapsed_ms:modelElapsed}:{}),completed_at:completedAt});
         if(eligibilityError)throw eligibilityError;
         check();
         requireText(output.native_id,'native session ID');
@@ -618,9 +684,9 @@ Protocol: Return JSON only matching response_contract.required_json_shape for th
       validateCitations(subject,result.artifact.citations,sessions[role].ledger);
       if(!result.artifact.citations.some(c=>c.source_id===page.source_id && Number.isSafeInteger(c.offset)
           && c.offset>=page.offset && c.offset+c.length<=page.end))throw new Error('Page findings must cite this delivered semantic page');
-      if(role==='qa')validatePageVerdict(result.artifact.review);
+      if(role==='qa'){if(accelerated(u)&&executionMode(u,pages)==='combined-v1')validateVerdict(result.artifact.review);else validatePageVerdict(result.artifact.review);}
     }
-    for(const page of pages) {
+    async function cosPage(page) {
       const result=await invoke('cos',{phase:'page',page,total_pages:pages.length},[page]);
       validateFinding(result,page,'cos');
       publish('upgrade.cos_page',a=>{
@@ -628,6 +694,7 @@ Protocol: Return JSON only matching response_contract.required_json_shape for th
         if(prior){if(JSON.stringify(prior)!==JSON.stringify(finding))throw Error('Completed CoS finding changed');}
         else a.cos_pages.push(finding);
       });
+      return result;
     }
     async function replay(role,findings) {
       const cos=modern&&role==='qa'?withStore(root,db=>db.read().upgrade.cos_pages):null;
@@ -660,14 +727,17 @@ Protocol: Return JSON only matching response_contract.required_json_shape for th
       await replay(role,findings);
       return {...task,coverage,required_findings_delivery:'All findings in the preceding bounded replay batches; retain every blocker.'};
     }
-    const probe=await invoke('cos',await finalTask('cos',{phase:'synthesis',task:'Reconstruct all pages from durable findings; return final continuity and exact citations. Report uncertainty and all open obligations.'},withStore(root,db=>db.read().upgrade.cos_pages)));
-    publish('upgrade.probe_returned',a=>{a.probe=probe;});
-    validateCoverage(probe.artifact,u,subject,sessions.cos.ledger);
-    publish('upgrade.probe_completed',a=>{a.probe_status='completed';a.review_status='running';});
-    for(let i=0;i<pages.length;i++) {
-      const page=pages[i],finding=withStore(root,db=>db.read().upgrade.cos_pages[i]);
+    async function cosFinal() {
+      const result=await invoke('cos',await finalTask('cos',{phase:'synthesis',task:'Reconstruct all pages from durable findings; return final continuity and exact citations. Report uncertainty and all open obligations.'},withStore(root,db=>db.read().upgrade.cos_pages)));
+      validateCoverage(result.artifact,u,subject,sessions.cos.ledger);
+      publish('upgrade.probe_completed',a=>{a.probe=result;a.probe_status='completed';a.review_status='running';});
+      return result;
+    }
+    async function qaPage(page,probe) {
+      const finding=withStore(root,db=>db.read().upgrade.cos_pages.find(f=>f.page_id===page.page_id));
+      publish('upgrade.qa_started',a=>{a.review_status='running';});
       const result=await invoke('qa',{phase:'page',page,total_pages:pages.length,cos_findings:finding,...(!modern?{proposed_handover:probe.artifact}:{})},[page]);
-      // Retain negative verdicts before validation so later Pass cannot clear them.
+      // A negative is retained before validation and before aborting its sibling.
       publish('upgrade.qa_page_returned',a=>{
         const value={page_id:page.page_id,range_sha256:page.range_sha256,...result},prior=modern&&a.qa_pages.find(f=>f.page_id===page.page_id);
         if(prior){if(JSON.stringify(prior)!==JSON.stringify(value))throw Error('Completed QA finding changed');}
@@ -676,8 +746,33 @@ Protocol: Return JSON only matching response_contract.required_json_shape for th
       validateFinding(result,page,'qa');
       if(modern&&result.artifact.review.verdict!=='Pass')throw Error(`${result.artifact.review.verdict}: ${result.artifact.review.reason}`);
     }
+    let probe,review;
+    if(accelerated(u)&&executionMode(u,pages)==='combined-v1') {
+      const page=pages[0];
+      probe=await invoke('cos',{phase:'synthesis',page,total_pages:1,task:'Combined single-page reconstruction: the supplied page is the COMPLETE semantic input. Return the complete final handover and continuity; no separate page finding or synthesis will follow.'},[page]);
+      validateFinding(probe,page,'cos');validateCoverage(probe.artifact,u,subject,sessions.cos.ledger);
+      publish('upgrade.cos_page',a=>{a.cos_pages=[{page_id:page.page_id,range_sha256:page.range_sha256,...probe}];a.probe=probe;a.probe_status='completed';a.review_status='running';});
+      review=await invoke('qa',{phase:'synthesis',page,total_pages:1,cos_findings:probe.artifact,proposed_handover:probe.artifact,task:'Independently review the COMPLETE supplied semantic page and exact proposed handover. This single final review covers the sole page and final continuity together. Return apply_preparation_team only for a substantive Pass with no blockers.'},[page]);
+      publish('upgrade.qa_page_returned',a=>{a.qa_pages=[{page_id:page.page_id,range_sha256:page.range_sha256,...review}];a.review=review;});
+      validateFinding(review,page,'qa');
+    } else if(accelerated(u)) {
+      // Each role has one ordered native session. Only the two roles overlap.
+      const available=pages.map(()=>{let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};});
+      const failed=error=>{abortWork(error);for(const item of available)item.resolve({error:pipelineError});throw pipelineError;};
+      const producer=(async()=>{for(let i=0;i<pages.length;i++){await cosPage(pages[i]);available[i].resolve({ready:true});}return cosFinal();})().catch(failed);
+      const consumer=(async()=>{for(let i=0;i<pages.length;i++){const state=await available[i].promise;if(state.error)throw state.error;check();await qaPage(pages[i]);}})().catch(failed);
+      const outcomes=await Promise.allSettled([producer,consumer]);
+      const failure=outcomes.find(result=>result.status==='rejected');
+      if(failure)throw pipelineError??failure.reason;
+      probe=outcomes[0].value;
+    } else {
+      for(const page of pages)await cosPage(page);
+      probe=await cosFinal();
+      for(const page of pages)await qaPage(page,probe);
+    }
     if(modern){validateSemanticDelivery(subject,sessions.cos.ledger);validateSemanticDelivery(subject,sessions.qa.ledger);}
-    const review=await invoke('qa',await finalTask('qa',{phase:'synthesis',proposed_handover:probe.artifact,task:'Judge all raw semantic pages, corresponding CoS findings and unresolved page blockers. Return substantive continuity, citations and final permission-specific review.'},withStore(root,db=>db.read().upgrade.qa_pages)));
+    if(!review)review=await invoke('qa',await finalTask('qa',{phase:'synthesis',proposed_handover:probe.artifact,task:'Judge all raw semantic pages, corresponding CoS findings and unresolved page blockers. Return substantive continuity, citations and final permission-specific review.'},withStore(root,db=>db.read().upgrade.qa_pages)));
+    if(accelerated(u)&&['cos','qa'].some(role=>roleCursors[role]<roleSteps[role].length))throw Error('Retained upgrade contains an unconsumed task step');
     publish('upgrade.review_returned',a=>{a.review=review;});
     validateCoverage(review.artifact,u,subject,sessions.qa.ledger);
     validateVerdict(review.artifact.review);
@@ -695,6 +790,7 @@ Protocol: Return JSON only matching response_contract.required_json_shape for th
   } catch(error) {failUpgrade(root,uid,error);}
   finally {if(token)withStore(root,db=>db.transaction('upgrade.worker_closed',s=>{
     const u=s.upgrade?.id===uid?s.upgrade:s.upgrade_history?.find(a=>a.id===uid);
+    if(accelerated(u)&&u?.worker?.token===token){const elapsed=Math.max(0,performance.now()-runStarted);u.timings??={};u.timings.worker_wall_ms=(u.timings.worker_wall_ms??0)+elapsed;u.timings.worker_runs=(u.timings.worker_runs??0)+1;u.timings.last_run_wall_ms=elapsed;}
     if(u?.worker?.token===token)Object.assign(u.worker,{state:'closed',closed_at:stamp()});return s;
   }));}
 }

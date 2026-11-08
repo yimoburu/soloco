@@ -37,9 +37,9 @@ function setup(host='codex') {
 }
 function prepare(a,host='codex',extra={}) {
   const {model_selection,review_window_minutes,call_timeout_minutes,...inspectionExtra}=extra;
-  const args={...a,...inspectionExtra,action:'inspect'};
+  const args={...a,workflow:'legacy',...inspectionExtra,action:'inspect'};
   const inspection=upgrade(args,host);
-  return upgrade({...args,action:'prepare',candidate_hash:inspection.candidate_hash,source_instruction:'Upgrade my company team and resume after successful checks',...extra},host,{...options,catalog:()=>selectionCatalog});
+  return upgrade({...args,workflow:'legacy',action:'prepare',candidate_hash:inspection.candidate_hash,source_instruction:'Upgrade my company team and resume after successful checks',...extra},host,{...options,catalog:()=>selectionCatalog});
 }
 function modelFor(a,{verdict='Pass',sameId=false,omit=false}={}) {
   const sessions=new Map();
@@ -97,8 +97,8 @@ test('invalid review windows and non-prepare use reject before readiness, catalo
   const forbidden=()=>{throw new Error('Unexpected external boundary');};
   const deps={launch:forbidden,check:forbidden,catalog:forbidden};
   for(const value of [undefined,false,true,'45','90',0,-45,44,46,60,89,91,45.5,90.1,NaN,Infinity,[],{},new Number(90)]) {
-    assert.throws(()=>upgrade({...args,action:'prepare',review_window_minutes:value},'codex',deps),/review_window_minutes/);
-    await assert.rejects(call('company_upgrade',{...args,action:'prepare',review_window_minutes:value},'codex'),/review_window_minutes/);
+    assert.throws(()=>upgrade({...args,workflow:'legacy',action:'prepare',review_window_minutes:value},'codex',deps),/review_window_minutes/);
+    await assert.rejects(call('company_upgrade',{...args,workflow:'legacy',action:'prepare',review_window_minutes:value},'codex'),/review_window_minutes/);
     assert.deepEqual(read(a),before);
   }
   for(const action of ['inspect','apply','verify','recover','unknown'])for(const value of [45,90,null]) {
@@ -276,16 +276,16 @@ test('upgrade selection rejects incompatible actions and invalid controls withou
     {...selected,speed:'fast_disabled'}, {...selected,service_tier:'priority'},
     [], 'fixture-model'
   ]) {
-    assert.throws(()=>upgrade({...args,action:'prepare',model_selection:request},'codex',deps));
+    assert.throws(()=>upgrade({...args,workflow:'legacy',action:'prepare',model_selection:request},'codex',deps));
     assert.deepEqual(read(a),before);
   }
-  assert.throws(()=>upgrade({...args,action:'prepare',model_selection:selected},'codex',{...deps,catalog:()=>({supported:false,error:'synthetic unavailable'})}),/unavailable/);
+  assert.throws(()=>upgrade({...args,workflow:'legacy',action:'prepare',model_selection:selected},'codex',{...deps,catalog:()=>({supported:false,error:'synthetic unavailable'})}),/unavailable/);
   assert.deepEqual(read(a),before);assert.equal(checks,0);assert.equal(launches,0);
 });
 
 test('one catalog-validated selection persists and reaches fresh independent roles, retrieval, replay and synthesis unchanged',async()=>{
   const a=setup(),inspection=upgrade({...a,action:'inspect'},'codex');let discoveries=0;
-  const p=upgrade({...a,action:'prepare',candidate_hash:inspection.candidate_hash,source_instruction:'Upgrade fictional team',call_timeout_minutes:30,model_selection:{...selected,reason:`  ${selected.reason}  `}},'codex',{
+  const p=upgrade({...a,workflow:'legacy',action:'prepare',candidate_hash:inspection.candidate_hash,source_instruction:'Upgrade fictional team',call_timeout_minutes:30,model_selection:{...selected,reason:`  ${selected.reason}  `}},'codex',{
     ...options,catalog:host=>{assert.equal(host,'codex');discoveries++;return selectionCatalog;}
   });
   assert.equal(discoveries,1);assert.deepEqual(exactSource(a,'codex',p.upgrade.source).model_selection,selected);
@@ -330,7 +330,7 @@ test('omitted, deliberate default and legacy upgrade selections preserve compati
   for(const request of [undefined,{mode:'default',reason:'Keep host defaults'},'legacy']) {
     const a=setup(),inspection=upgrade({...a,action:'inspect'},'codex');
     const expected=request==='legacy'?null:request??null;
-    const p=upgrade({...a,action:'prepare',candidate_hash:inspection.candidate_hash,source_instruction:'Upgrade fictional team',...(expected?{model_selection:expected}:{})},'codex',{
+    const p=upgrade({...a,workflow:'legacy',action:'prepare',candidate_hash:inspection.candidate_hash,source_instruction:'Upgrade fictional team',...(expected?{model_selection:expected}:{})},'codex',{
       ...options,catalog:()=>{throw new Error('Default must not discover models');}
     });
     if(request==='legacy')withStore(a.root,db=>db.transaction('test.legacy_attempt',s=>{
@@ -351,7 +351,7 @@ test('omitted, deliberate default and legacy upgrade selections preserve compati
 test('Claude upgrade selection shares supported controls across both roles and rejects unverified effort before preparation',async()=>{
   const a=setup('claude'),before=read(a),inspection=upgrade({...a,action:'inspect'},'claude');
   const request={mode:'explicit',model:'fixture-model',speed:'fast_disabled',reason:'Synthetic supported controls'};
-  assert.throws(()=>upgrade({...a,action:'prepare',candidate_hash:inspection.candidate_hash,source_instruction:'Upgrade fictional team',model_selection:{...request,effort:'high'}},'claude',{
+  assert.throws(()=>upgrade({...a,workflow:'legacy',action:'prepare',candidate_hash:inspection.candidate_hash,source_instruction:'Upgrade fictional team',model_selection:{...request,effort:'high'}},'claude',{
     ...options,catalog:()=>selectionCatalog
   }),/effort support is unverified/);
   assert.deepEqual(read(a),before);
@@ -493,8 +493,8 @@ test('failed review, incomplete coverage and reused native identity all prevent 
 
 test('unsupported state, stale candidate, missing login and duplicate prepare make no adoption',()=>{
   const a=setup(),inspection=upgrade({...a,action:'inspect'},'codex');
-  assert.throws(()=>upgrade({...a,action:'prepare',candidate_hash:'stale',source_instruction:'upgrade'},'codex',options),/Candidate changed/);
-  assert.throws(()=>upgrade({...a,action:'prepare',candidate_hash:inspection.candidate_hash,source_instruction:'upgrade'},'codex',{...options,check:()=>({available:true,authenticated:false})}),/signed in/);
+  assert.throws(()=>upgrade({...a,workflow:'legacy',action:'prepare',candidate_hash:'stale',source_instruction:'upgrade'},'codex',options),/Candidate changed/);
+  assert.throws(()=>upgrade({...a,workflow:'legacy',action:'prepare',candidate_hash:inspection.candidate_hash,source_instruction:'upgrade'},'codex',{...options,check:()=>({available:true,authenticated:false})}),/signed in/);
   const p=prepare(a);
   assert.throws(()=>prepare({...a,expected_epoch:p.owner.epoch}),/pending/);
   withStore(a.root,db=>db.transaction('test.incompatible',s=>{s.mode='execution';return s;}));
@@ -603,7 +603,7 @@ else {
       const args={root:a.root,session_id:a.session_id};
       const inspection=await call('company_upgrade',{...args,action:'inspect'},host);
       const selection=host==='claude'?{mode:'explicit',model:'sonnet',reason:'Synthetic public upgrade fixture'}:undefined;
-      const started=await call('company_upgrade',{...args,action:'prepare',expected_epoch:1,candidate_hash:inspection.candidate_hash,source_instruction:'Upgrade this team',...(selection?{model_selection:selection}:{})},host);
+      const started=await call('company_upgrade',{...args,workflow:'legacy',action:'prepare',expected_epoch:1,candidate_hash:inspection.candidate_hash,source_instruction:'Upgrade this team',...(selection?{model_selection:selection}:{})},host);
       const s=await call('company_wait',{...args,seconds:10},host);
       assert.equal(s.upgrade.status,'ready',s.upgrade.error);
       const exact=exactSource(args,host,s.upgrade.source);assert.notEqual(exact.probe.native_id,exact.review.native_id);
@@ -643,7 +643,7 @@ test('parallel prepare attempts cannot acquire the same upgrade epoch',async()=>
   const {spawn}=await import('node:child_process');
   const a=setup(),inspection=upgrade({...a,action:'inspect'},'codex');
   const url=new URL('../plugins/soloco/runtime/upgrade.mjs',import.meta.url).href;
-  const args={...a,action:'prepare',candidate_hash:inspection.candidate_hash,source_instruction:'Upgrade'};
+  const args={...a,workflow:'legacy',action:'prepare',candidate_hash:inspection.candidate_hash,source_instruction:'Upgrade'};
   const script=`import {upgrade} from ${JSON.stringify(url)};try{upgrade(${JSON.stringify(args)},'codex',{launch:()=>{},check:()=>({available:true,authenticated:true})});}catch{process.exitCode=1;}`;
   const codes=await Promise.all([1,2].map(()=>new Promise(resolve=>{const child=spawn(process.execPath,['--no-warnings','--input-type=module','-e',script],{stdio:'ignore'});child.on('close',resolve);})));
   assert.deepEqual(codes.sort(),[0,1]);assert.equal(read(a).owner.epoch,2);

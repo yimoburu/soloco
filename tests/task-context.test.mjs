@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
-import {withStore,digest} from '../plugins/soloco/runtime/store.mjs';
+import {withStore,digest,teamHash} from '../plugins/soloco/runtime/store.mjs';
 import {submitTask,amendTask,sendTaskMessage,disposePeerMessage} from '../plugins/soloco/runtime/tasks.mjs';
 import {setRuntimeControl} from '../plugins/soloco/runtime/task-runtime-authority.mjs';
 import {installTaskIndex} from '../plugins/soloco/runtime/task-index.mjs';
@@ -17,10 +17,11 @@ process.env.COMPANY_PLUGIN_DATA=path.join(tmp,'plugin-data');
 test.after(()=>fs.rmSync(tmp,{recursive:true,force:true}));
 const read=f=>withStore(f.root,db=>db.read());
 function change(f,fn){return withStore(f.root,db=>{let result;db.transaction('fictional.task-context',s=>{result=fn(s);return s;});return result;});}
-function fixture(){
+function fixture({cosInstructions}={}){
   const f={root:fs.mkdtempSync(path.join(tmp,'company-')),session_id:'fictional-founder',epoch:1,source_instruction:'Fixture authorizes bounded read-only preparation only; no external action.'};
   engine.bind(f.root,f.session_id,'codex');engine.open({...f,idea:'Fictional async context tests'},'codex');
   withStore(f.root,db=>db.migrate());
+  if(cosInstructions!==undefined)change(f,s=>{s.cos_instructions=cosInstructions;s.team_sha256=teamHash(s);});
   change(f,s=>setRuntimeControl(s,{...f,action:'start'},'codex'));
   engine.save({...f,id:'current-input',kind:'artifact',content:'Exact current evidence; failures and uncertain effects remain unresolved.'},'codex');
   engine.save({...f,id:'global-rule',kind:'decision',content:'Do not contact anyone or retry uncertain work.'},'codex');
@@ -93,7 +94,9 @@ test('unclassified evidence is retained and required packet overflow is explicit
 });
 
 test('1x/10x/100x canonical resolved archive grows without growing fixed task working context',async()=>{
-  const f=fixture(),id=task(f),j=job(f,id),metrics=[];let prior=0;
+  // Hold the fictional company charter constant: the archive-growth ratio must
+  // measure archived evidence, independent of installed CoS instruction length.
+  const f=fixture({cosInstructions:'FICTIONAL scaling fixture: retain all restrictions, failures, uncertainty and exact handoffs. No external effects or retries.'}),id=task(f),j=job(f,id),metrics=[];let prior=0;
   for(const scale of [1,10,100]){
     const ids=[];
     for(let n=prior;n<scale;n++){
@@ -105,10 +108,10 @@ test('1x/10x/100x canonical resolved archive grows without growing fixed task wo
     assert(!context.text.includes('FICTIONAL INERT ARCHIVE ONLY'));
     metrics.push({scale,archive_bytes:Buffer.byteLength(JSON.stringify(state)),context_bytes:context.context_bytes,hash:context.hash});prior=scale;
   }
+  console.log('FICTIONAL accepted archive task context '+JSON.stringify(metrics));
   assert.equal(new Set(metrics.map(m=>m.context_bytes)).size,1);
   assert.equal(new Set(metrics.map(m=>m.hash)).size,1);
   assert(metrics[2].archive_bytes>metrics[0].archive_bytes*3);
-  console.log('FICTIONAL accepted archive task context '+JSON.stringify(metrics));
 });
 
 test('completely qualified unrelated sources stay outside context; unqualified receipt evidence is not erased',async()=>{

@@ -27,7 +27,7 @@ function prepare({large=false,legacy=false}={}) {
   });
   withStore(root,db=>db.migrate());
   const inspection=upgrade({...a,action:'inspect'},'codex');
-  const p=upgrade({...a,action:'prepare',candidate_hash:inspection.candidate_hash,source_instruction:'Upgrade this fictional company using bounded incremental continuity',...(!legacy?{workflow:'incremental-v1'}:{})},'codex',opts);
+  const p=upgrade({...a,action:'prepare',candidate_hash:inspection.candidate_hash,source_instruction:'Upgrade this fictional company using bounded incremental continuity',workflow:legacy?'legacy':'incremental-v1'},'codex',opts);
   return {...a,upgrade_id:p.upgrade.id,candidate_hash:inspection.candidate_hash,expected_epoch:p.owner.epoch};
 }
 const resume=a=>upgrade({...a,action:'resume',source_instruction:'Continue this exact interrupted upgrade under its original limits'},'codex',opts);
@@ -40,13 +40,13 @@ async function continueWorker(a,model=contractModel()) {
   const token=read(a).upgrade.worker?.token;
   await rehearse(a.root,a.upgrade_id,model,token);
 }
-test('public schema exposes prospective workflow and explicit resume without changing legacy default',async()=>{
+test('public schema exposes new defaults and explicit historical protocols without rewriting stored attempts',async()=>{
   const schema=toolList.find(t=>t.name==='company_upgrade').inputSchema;
   assert.ok(schema.properties.action.enum.includes('resume'));
-  assert.deepEqual(schema.properties.workflow.enum,['incremental-v1']);
+  assert.deepEqual(schema.properties.workflow.enum,['legacy','incremental-v1','incremental-v2']);
   const a=prepare({legacy:true});assert.equal(read(a).upgrade.workflow,undefined);
   assert.throws(()=>resume(a),/workflow/);
-  await assert.rejects(call('company_upgrade',{root:a.root,session_id:a.session_id,action:'inspect',workflow:'incremental-v1'},'codex'),/prepare-only/);
+  await assert.rejects(call('company_upgrade',{root:a.root,session_id:a.session_id,action:'inspect',workflow:'future'},'codex'),/workflow/);
 });
 test('many-page prepare inspect rehearse apply verify reduces calls and repeated input while final QA sees complete proposal, findings, negatives and coverage',async()=>{
   const totals=[];

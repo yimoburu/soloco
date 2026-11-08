@@ -1,9 +1,61 @@
-# Prospective incremental upgrade rehearsal
+# Incremental upgrade rehearsal
 
-For a **new** authorized attempt, inspect the candidate and prepare with
-`workflow: "incremental-v1"`. Omission deliberately retains the existing workflow;
-existing attempts never acquire incremental acceptance rules. This source repair
-does not change the package version, pinned teams, governance or SPEC.
+## Fresh-attempt selection
+
+Fresh `inspect` and authorized `prepare` calls default to `incremental-v2` with
+current context. Inspection reports `selection`: effective workflow, context mode,
+input source, existing-attempt status and an eligibility hold. This is a preview;
+prepare revalidates the exact live inputs before changing the company or launching.
+
+When a real accepted `operating_state` exists, v2 automatically validates its
+complete current meaning and captures the accepted operating input. Missing,
+expired, dirty or otherwise invalid accepted evidence holds; it never silently
+falls back to a different review input. Without an accepted operating publication,
+current projection remains available and does not claim whole-history bootstrap.
+Explicit `context_mode: "full"` selects whole-history review.
+
+Explicit `workflow: "incremental-v1"` or `"legacy"` selects the respective prior
+protocol on a fresh request. Legacy requests store the original unmarked workflow
+contract. Existing unmarked/v1 attempts retain their original controller, receipts,
+limits and validators. V1 accepted operating input still requires explicit current
+context. Existing attempts never acquire v2 rules through inspection or resume.
+
+The accepted operating path retains its ten-minute call and 45-minute overall
+policy. Incompatible requested allowances hold before launch; selection never
+changes an allowance silently. Compatible runtime installation still preserves
+pinned team/governance without an adoption rehearsal.
+
+## V2 review execution
+
+After the exact prepared input is frozen, v2 selects a combined review when its
+complete semantic stream fits one page of at most 128,000 UTF-16 units. One CoS
+call reconstructs the complete handover; one distinct QA call receives the same
+complete page and exact proposed handover. The two final artifacts also provide
+the sole page-coverage proofs. Their canonical task IDs and proposal bindings
+must agree exactly. Retrieval requests may add calls, and an oversized actual
+request holds without truncation or an automatic retry.
+
+Larger v2 inputs pipeline page review: QA can inspect a completed CoS finding
+while CoS processes the next page. Each role still uses one ordered native session
+and has at most one invocation in flight. Final QA waits for the complete CoS
+proposal and all page findings. An error or negative review aborts further work,
+retains observed returns, and waits for both role invocations to settle before
+closing the worker. A timed-out or ambiguous call remains held.
+
+V2 continuation matches retained calls in each role's exact order, regenerates
+prompts and budgets, and reuses only canonical completed steps. It does not depend
+on which role happened to return first. Changing execution mode, proposal,
+receipts, ownership, inputs or allowances holds the attempt. Apply/readback and
+any required independent operating-delta publication remain separate boundaries.
+
+[Timing and comparison](upgrade-performance.md) separates actual local preparation,
+evidence processing, model waits and worker wall time. Controlled-delay fixture
+results are synthetic; they do not establish real-company upgrade latency.
+
+## Retained incremental-v1 contract
+
+The following describes the existing v1 page/replay contract. V2 execution and
+measurements are recorded separately; historical v1 evidence keeps its exact scope.
 
 The workflow sends every exact raw semantic page to fresh CoS and independent QA
 native identities. QA page input contains that page and its corresponding CoS
