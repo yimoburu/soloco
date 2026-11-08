@@ -1,5 +1,8 @@
 # Node 22 CI feedback and qualification
 
+Historical measurement and policy. See [current CI](ci.md) for the lighter
+required checks and manual qualification.
+
 PR #34's original required Node 22 job combined routine regression with long
 whole-history qualification. The complete local suite took 349.69 seconds.
 The replacement PR regression tier passed 679 tests in 39.02 seconds on Node
