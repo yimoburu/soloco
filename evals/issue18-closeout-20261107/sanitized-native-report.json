@@ -1,0 +1,1339 @@
+{
+  "protocol": {
+    "version": 1,
+    "kind": "accepted_candidate_format_comparison",
+    "design_base_revision": "9c0cb8a9d40da42242787b1bbaacfa11ba37acdc",
+    "fixture": {
+      "module_bytes": 32768,
+      "module_counts": [
+        1,
+        3
+      ],
+      "formats": [
+        "files",
+        "patches"
+      ]
+    },
+    "criteria": {
+      "max_native_calls_total": 8,
+      "max_generation_attempts_per_case": 1,
+      "max_test_attempts_per_case": 1,
+      "max_qa_attempts_per_case": 1,
+      "critical_false_acceptances": 0,
+      "quality_error_margin": 0,
+      "latency_improvement_required": false
+    },
+    "limits": {
+      "scope_max_bytes": 200000,
+      "configuration_ceiling": 200000,
+      "native_timeout_ms": 300000,
+      "test_timeout_ms": 10000,
+      "test_wait_ms": 20000
+    },
+    "order": "one-file files, one-file patches, three-file files, three-file patches; sequential, no retries",
+    "acceptance": "Real production dispatch and worker produce a retained exact candidate. Actual sandboxed tests must pass; a different native QA must permit the exact candidate and actual receipt; the fixture receiver then calls production accept. Exact grading additionally compares all complete candidate bytes against the known fixture.",
+    "limitations": [
+      "One observation per arm; descriptive results cannot establish statistical quality noninferiority, production reliability, cost savings or causal latency gains.",
+      "Only manually supplied fictional modules and fixed tests are shared with the existing host model. Synthetic company binding and grant are fixture data; no actual company state or authority changes.",
+      "Requested/applied model controls differ from effective provider settings; missing observations remain unknown.",
+      "All failed or uncertain calls stay retained and hold that case without retry. Source integration, installation and deployment are outside this evaluation."
+    ],
+    "model_selection_policy": {
+      "engineer": {
+        "mode": "explicit",
+        "model": "gpt-6-astra",
+        "effort": "high",
+        "speed": "host_default",
+        "reason": "Exact one-character fictional module repairs; identical model controls in all format arms."
+      },
+      "qa": {
+        "mode": "explicit",
+        "model": "gpt-6-astra",
+        "effort": "high",
+        "speed": "host_default",
+        "reason": "Independent complete candidate, actual receipt and exact fixture preservation review; identical controls in all arms."
+      }
+    },
+    "model_selection_policy_sha256": "d2858b348eb81193be20d3875613d9bd3bbcfdb5e7f66da2be0c2afecd1b1efe",
+    "source_identity": {
+      "design_base_revision": "9c0cb8a9d40da42242787b1bbaacfa11ba37acdc",
+      "git_head": "5cab6ec3ba0308dd4707892962366d32be5ba729",
+      "identity_rule": "Exact file manifest controls applicability; a design baseline or Git HEAD alone is insufficient.",
+      "files": [
+        {
+          "path": "plugins/soloco/.claude-plugin/plugin.json",
+          "sha256": "0716d2a8aeb0e0f7f94810b812a00d139595e96941863704a938fe98af38f717"
+        },
+        {
+          "path": "plugins/soloco/.codex-plugin/plugin.json",
+          "sha256": "ad849fe62cc79a2826e99e2681d546a7845dc7689858f6358ca99e99331a436f"
+        },
+        {
+          "path": "plugins/soloco/.mcp.codex.json",
+          "sha256": "c2d5fd4bfdf7fb9b4801368096b66d4a904a3a94295c816e5c24683f09ed9421"
+        },
+        {
+          "path": "plugins/soloco/.mcp.json",
+          "sha256": "b6efeebb4f8ed3b045b82f584c2f1a91b172e0994c819a56b87e4069324ae81d"
+        },
+        {
+          "path": "plugins/soloco/assets/governance.md",
+          "sha256": "4bd0af7032d870195b2992e850b1dc9a50a9b9e59a3ec27267b7b0752cca57a9"
+        },
+        {
+          "path": "plugins/soloco/assets/roles.json",
+          "sha256": "7e9f4f387f3622123fe8dbd69dd3cf0aa17943628d71ff03971d4ab4a8abd7ba"
+        },
+        {
+          "path": "plugins/soloco/compat/company-0.1.0.md",
+          "sha256": "bb6c3dbb6e7a03d033b7c39dccc59c31738369ffccc4fe6ff609d679e0eacc74"
+        },
+        {
+          "path": "plugins/soloco/hooks/claude.json",
+          "sha256": "128ecd4ef0c0ef53dc1a4634c65b2a1be39973096eaabaeebc3e784ebec53d5f"
+        },
+        {
+          "path": "plugins/soloco/hooks/codex.json",
+          "sha256": "882fce45b5791f8f51b2093526419fa6ab4ae2a118e597a20dc7c3b8112205a2"
+        },
+        {
+          "path": "plugins/soloco/runtime/adapters.mjs",
+          "sha256": "301f83d6a23b4e15381cf29e75696e02ec0d9318c25cdf369c727662464ae77f"
+        },
+        {
+          "path": "plugins/soloco/runtime/context-qualification.mjs",
+          "sha256": "b9d38ede62ae1029c929524440102a709fc22e3ecda56dbd2709f6c4448f6f64"
+        },
+        {
+          "path": "plugins/soloco/runtime/context.mjs",
+          "sha256": "b746deff534a5ae9fc1a315ec4948803a1f7222246a4b4ce5743aa09b4c8c948"
+        },
+        {
+          "path": "plugins/soloco/runtime/coordination.mjs",
+          "sha256": "9076e0347ac544f751296a81b4d39f495634190a7fd3ecf5da47d5b363268ee3"
+        },
+        {
+          "path": "plugins/soloco/runtime/corpus-structure.mjs",
+          "sha256": "e17f389f3b86ab43551108a5c6edbc2d77d219609abf7ab00cff557fc9c9ad5b"
+        },
+        {
+          "path": "plugins/soloco/runtime/current-state.mjs",
+          "sha256": "6f7c61213b3e998525526e2d0989ea897f380708c7bf3a447976c632d18228e2"
+        },
+        {
+          "path": "plugins/soloco/runtime/develop.mjs",
+          "sha256": "02892501fcfe91ba971b93984e97809f0247781ad83682c984c3783f22e987f4"
+        },
+        {
+          "path": "plugins/soloco/runtime/development-limits.mjs",
+          "sha256": "fb6b6065019c652fc27a198994cca3a248652890df5d322a9b6428ba5ccfea6a"
+        },
+        {
+          "path": "plugins/soloco/runtime/development-patch.mjs",
+          "sha256": "a36bbefb6c28579a33d97709aabcf80fbde95520a6fd1a4a02e687bba11dd27d"
+        },
+        {
+          "path": "plugins/soloco/runtime/engine.mjs",
+          "sha256": "bbc46767802a58849d085e3c9ca7d596b57815195420e17c32173828e8c6d63f"
+        },
+        {
+          "path": "plugins/soloco/runtime/handover.mjs",
+          "sha256": "6aa9e0b4d0178d105006b58b2b4cc5ff6c52388cd1915704d8edc4549add1fe9"
+        },
+        {
+          "path": "plugins/soloco/runtime/hooks.mjs",
+          "sha256": "119f3cc8a7dee8152caa3686bc2bd2a396b4eda1ad9360a1a075e2938ccf18ac"
+        },
+        {
+          "path": "plugins/soloco/runtime/legacy-operating.mjs",
+          "sha256": "47fca09ae9e6fefe48dbf922a6538818d856579c3fae64e8cfc5f0fd203e8f2d"
+        },
+        {
+          "path": "plugins/soloco/runtime/local-sandbox.mjs",
+          "sha256": "e093897316b8bb4d1fe8e9306d0a0ed8145901b8fafd5641bd681ce309ce1343"
+        },
+        {
+          "path": "plugins/soloco/runtime/main.mjs",
+          "sha256": "33b4c8ca9a2370e4540769826b5a6caadb1ce879c7177517a2f2b5e8b4fad370"
+        },
+        {
+          "path": "plugins/soloco/runtime/operating-control.mjs",
+          "sha256": "47e2a0c8b15128ea6f39b7bfc14cb6adc385b90b132c9df8e16d9274abbdd35d"
+        },
+        {
+          "path": "plugins/soloco/runtime/operating-state.mjs",
+          "sha256": "0881264ce4c0223e2ebfea5e88bfdd15407b4ffa06bbf33eb0892b743df22d83"
+        },
+        {
+          "path": "plugins/soloco/runtime/outcome.mjs",
+          "sha256": "1e6c8f324e83e1c06cb3618192f8929d896f629b7c8f06561dc0ed3b645e54de"
+        },
+        {
+          "path": "plugins/soloco/runtime/progress-view.mjs",
+          "sha256": "bbcea8afc8760d365ac84f395e3cafb07aa26a06bf12f71b670fe7a9d08ad839"
+        },
+        {
+          "path": "plugins/soloco/runtime/progress.mjs",
+          "sha256": "977ed14281cf7de7054babb75d953a5dc6bbf7c319e1fba3e81eeffce6812080"
+        },
+        {
+          "path": "plugins/soloco/runtime/prototype.mjs",
+          "sha256": "f780edabba24ded41bcd6204dde8c1f57ef4401456dc8f0a9b79908c50d94068"
+        },
+        {
+          "path": "plugins/soloco/runtime/public-response.mjs",
+          "sha256": "ce7e04e25904b36c0d4356593837151590763c66aa47a3a98ad4f913bb99e58e"
+        },
+        {
+          "path": "plugins/soloco/runtime/qualification-frame.mjs",
+          "sha256": "96b837a42a0c7a92d66d81956b985d64c4387141a9f93007c65beb433f582eed"
+        },
+        {
+          "path": "plugins/soloco/runtime/record-storage.mjs",
+          "sha256": "fd91001c7ac8fe256e3ad1cbf7c888691d1000873bbbed3afc894cb789a17173"
+        },
+        {
+          "path": "plugins/soloco/runtime/recovery.mjs",
+          "sha256": "c821e1120e72a316106763badbeae14ec4ec7d4466e8444de5774dcde9d33795"
+        },
+        {
+          "path": "plugins/soloco/runtime/scoped-context.mjs",
+          "sha256": "9945bfcb79bae54a855b0ec3248e37571818d86efa95c66f8a7621070ccfd2bc"
+        },
+        {
+          "path": "plugins/soloco/runtime/scoped-stream.mjs",
+          "sha256": "7bc83d0f2a9852868553d913b126583946d159b502adef07938e38f90ad5f16a"
+        },
+        {
+          "path": "plugins/soloco/runtime/selection.mjs",
+          "sha256": "55505fa53d69b28aed8394a291ad5473fcecff9f4d4b8b01ed3b397b26015214"
+        },
+        {
+          "path": "plugins/soloco/runtime/snapshot.mjs",
+          "sha256": "660a89aa41ffed18f6358e33d7efaf2db96b0c7b5d6807ae4f2dce939d69f7fb"
+        },
+        {
+          "path": "plugins/soloco/runtime/storage-transfer.mjs",
+          "sha256": "2ea96610ab528d61471ee35c0482fb62b76be090f5f7bd22cc2489486a8155c3"
+        },
+        {
+          "path": "plugins/soloco/runtime/store.mjs",
+          "sha256": "2e1efebfed7f8159f072c9ccbc3774ded2d86c7c7e9a608f0e0c7d48e1544d07"
+        },
+        {
+          "path": "plugins/soloco/runtime/supervisor.mjs",
+          "sha256": "b6fa3b23aae98aa6e3aef8e915c1ac7b9e61964650987bd8d65a402795a11789"
+        },
+        {
+          "path": "plugins/soloco/runtime/task-context.mjs",
+          "sha256": "9706d12c3d3ec27d8deaf3971cb4458e296a45a42190a4c8c251e4060c7b2e0d"
+        },
+        {
+          "path": "plugins/soloco/runtime/task-index.mjs",
+          "sha256": "a8967fd0600e52e7f9ad6c82c9e48a497eb2ec4b8f2c3f8c326804358e3af363"
+        },
+        {
+          "path": "plugins/soloco/runtime/task-runtime-authority.mjs",
+          "sha256": "a602b66638a06995ecb138c12fa0f97e95830ff6b8a968d806acca411b46b27e"
+        },
+        {
+          "path": "plugins/soloco/runtime/task-runtime.mjs",
+          "sha256": "75c2182743e9dd5f6c505dbd99fc3e6396330f46b9394b2d68ef2377b61015d4"
+        },
+        {
+          "path": "plugins/soloco/runtime/tasks.mjs",
+          "sha256": "c110b62983a5c5ff6b3231ed3a08432ad80498a4b0cb5dd452a38a4f02714d0b"
+        },
+        {
+          "path": "plugins/soloco/runtime/timeout.mjs",
+          "sha256": "586c5f44f98742320119f0b42d0612dd79cf970f4e858f05e7d65953c31951a4"
+        },
+        {
+          "path": "plugins/soloco/runtime/upgrade-evidence.mjs",
+          "sha256": "b3a8f0bf7f8c8b2def98ba3cd926c9b24932275fb65a96908a8a27e7ed1c8708"
+        },
+        {
+          "path": "plugins/soloco/runtime/upgrade.mjs",
+          "sha256": "84b46d19f42ff3e87955874437dd22158f37b396964ea88611f21b3f34a71507"
+        },
+        {
+          "path": "plugins/soloco/runtime/validation-cache.mjs",
+          "sha256": "872415f42c63e015d159e5374d45b6de453dd7e8a873eb7f70473e6395b4354d"
+        },
+        {
+          "path": "plugins/soloco/runtime/worker.mjs",
+          "sha256": "ed89d476cdb174855e710d53b8cd60100222df5ee5917b5640de20ba035a0d4d"
+        },
+        {
+          "path": "plugins/soloco/scripts/run.sh",
+          "sha256": "128358b0c3d5b3f95b1584b3bcac9c8db23df86171a063591e1fd7e965b0c59b"
+        },
+        {
+          "path": "plugins/soloco/skills/setup/SKILL.md",
+          "sha256": "60c3572ecdd27b6bfeaba25ebcfa54c28ee2dc7e8ee80b7dbeff67e35e595247"
+        },
+        {
+          "path": "plugins/soloco/skills/soloco/SKILL.md",
+          "sha256": "e7031d075ecb3380c8ba683b66269ddba5c27144ce806dd2cd12b43a1b3132ff"
+        },
+        {
+          "path": "SPEC.md",
+          "sha256": "4bd0af7032d870195b2992e850b1dc9a50a9b9e59a3ec27267b7b0752cca57a9"
+        },
+        {
+          "path": "tests/candidate-format-qualification.test.mjs",
+          "sha256": "e25f320414630e078d49ce296064afe2a699067bb3f5fdd3ff1d07196bbec56e"
+        },
+        {
+          "path": "tools/candidate-format-qualification.mjs",
+          "sha256": "f14c8356e3f364104f712548ef58c015aba4e9ec9674d54cd70989d96d2da0e2"
+        },
+        {
+          "path": "tools/verify-candidate-format-qualification.mjs",
+          "sha256": "0f23881e5569e6f8d38705aca590ea53d771079ac75213025a8c77b6b109cef0"
+        },
+        {
+          "path": "tools/workflow-runtime.mjs",
+          "sha256": "d57c3849562dd4d486f8b3b21262c0108f39ea311b7eafdb950f2666b59808b5"
+        }
+      ],
+      "manifest_sha256": "fcd15309c283eef4dc025889a7524d99c4e5213900c2f4aa8a4b545ff83ed4eb",
+      "node": {
+        "version": "v22.23.2",
+        "platform": "darwin",
+        "arch": "arm64",
+        "executable_sha256": "18e387c90ab8a8400183e8bdd396376e1e875b91b4c874b894dcade7b35bf572"
+      }
+    }
+  },
+  "source_identity_after": {
+    "design_base_revision": "9c0cb8a9d40da42242787b1bbaacfa11ba37acdc",
+    "git_head": "5cab6ec3ba0308dd4707892962366d32be5ba729",
+    "identity_rule": "Exact file manifest controls applicability; a design baseline or Git HEAD alone is insufficient.",
+    "files": [
+      {
+        "path": "plugins/soloco/.claude-plugin/plugin.json",
+        "sha256": "0716d2a8aeb0e0f7f94810b812a00d139595e96941863704a938fe98af38f717"
+      },
+      {
+        "path": "plugins/soloco/.codex-plugin/plugin.json",
+        "sha256": "ad849fe62cc79a2826e99e2681d546a7845dc7689858f6358ca99e99331a436f"
+      },
+      {
+        "path": "plugins/soloco/.mcp.codex.json",
+        "sha256": "c2d5fd4bfdf7fb9b4801368096b66d4a904a3a94295c816e5c24683f09ed9421"
+      },
+      {
+        "path": "plugins/soloco/.mcp.json",
+        "sha256": "b6efeebb4f8ed3b045b82f584c2f1a91b172e0994c819a56b87e4069324ae81d"
+      },
+      {
+        "path": "plugins/soloco/assets/governance.md",
+        "sha256": "4bd0af7032d870195b2992e850b1dc9a50a9b9e59a3ec27267b7b0752cca57a9"
+      },
+      {
+        "path": "plugins/soloco/assets/roles.json",
+        "sha256": "7e9f4f387f3622123fe8dbd69dd3cf0aa17943628d71ff03971d4ab4a8abd7ba"
+      },
+      {
+        "path": "plugins/soloco/compat/company-0.1.0.md",
+        "sha256": "bb6c3dbb6e7a03d033b7c39dccc59c31738369ffccc4fe6ff609d679e0eacc74"
+      },
+      {
+        "path": "plugins/soloco/hooks/claude.json",
+        "sha256": "128ecd4ef0c0ef53dc1a4634c65b2a1be39973096eaabaeebc3e784ebec53d5f"
+      },
+      {
+        "path": "plugins/soloco/hooks/codex.json",
+        "sha256": "882fce45b5791f8f51b2093526419fa6ab4ae2a118e597a20dc7c3b8112205a2"
+      },
+      {
+        "path": "plugins/soloco/runtime/adapters.mjs",
+        "sha256": "301f83d6a23b4e15381cf29e75696e02ec0d9318c25cdf369c727662464ae77f"
+      },
+      {
+        "path": "plugins/soloco/runtime/context-qualification.mjs",
+        "sha256": "b9d38ede62ae1029c929524440102a709fc22e3ecda56dbd2709f6c4448f6f64"
+      },
+      {
+        "path": "plugins/soloco/runtime/context.mjs",
+        "sha256": "b746deff534a5ae9fc1a315ec4948803a1f7222246a4b4ce5743aa09b4c8c948"
+      },
+      {
+        "path": "plugins/soloco/runtime/coordination.mjs",
+        "sha256": "9076e0347ac544f751296a81b4d39f495634190a7fd3ecf5da47d5b363268ee3"
+      },
+      {
+        "path": "plugins/soloco/runtime/corpus-structure.mjs",
+        "sha256": "e17f389f3b86ab43551108a5c6edbc2d77d219609abf7ab00cff557fc9c9ad5b"
+      },
+      {
+        "path": "plugins/soloco/runtime/current-state.mjs",
+        "sha256": "6f7c61213b3e998525526e2d0989ea897f380708c7bf3a447976c632d18228e2"
+      },
+      {
+        "path": "plugins/soloco/runtime/develop.mjs",
+        "sha256": "02892501fcfe91ba971b93984e97809f0247781ad83682c984c3783f22e987f4"
+      },
+      {
+        "path": "plugins/soloco/runtime/development-limits.mjs",
+        "sha256": "fb6b6065019c652fc27a198994cca3a248652890df5d322a9b6428ba5ccfea6a"
+      },
+      {
+        "path": "plugins/soloco/runtime/development-patch.mjs",
+        "sha256": "a36bbefb6c28579a33d97709aabcf80fbde95520a6fd1a4a02e687bba11dd27d"
+      },
+      {
+        "path": "plugins/soloco/runtime/engine.mjs",
+        "sha256": "bbc46767802a58849d085e3c9ca7d596b57815195420e17c32173828e8c6d63f"
+      },
+      {
+        "path": "plugins/soloco/runtime/handover.mjs",
+        "sha256": "6aa9e0b4d0178d105006b58b2b4cc5ff6c52388cd1915704d8edc4549add1fe9"
+      },
+      {
+        "path": "plugins/soloco/runtime/hooks.mjs",
+        "sha256": "119f3cc8a7dee8152caa3686bc2bd2a396b4eda1ad9360a1a075e2938ccf18ac"
+      },
+      {
+        "path": "plugins/soloco/runtime/legacy-operating.mjs",
+        "sha256": "47fca09ae9e6fefe48dbf922a6538818d856579c3fae64e8cfc5f0fd203e8f2d"
+      },
+      {
+        "path": "plugins/soloco/runtime/local-sandbox.mjs",
+        "sha256": "e093897316b8bb4d1fe8e9306d0a0ed8145901b8fafd5641bd681ce309ce1343"
+      },
+      {
+        "path": "plugins/soloco/runtime/main.mjs",
+        "sha256": "33b4c8ca9a2370e4540769826b5a6caadb1ce879c7177517a2f2b5e8b4fad370"
+      },
+      {
+        "path": "plugins/soloco/runtime/operating-control.mjs",
+        "sha256": "47e2a0c8b15128ea6f39b7bfc14cb6adc385b90b132c9df8e16d9274abbdd35d"
+      },
+      {
+        "path": "plugins/soloco/runtime/operating-state.mjs",
+        "sha256": "0881264ce4c0223e2ebfea5e88bfdd15407b4ffa06bbf33eb0892b743df22d83"
+      },
+      {
+        "path": "plugins/soloco/runtime/outcome.mjs",
+        "sha256": "1e6c8f324e83e1c06cb3618192f8929d896f629b7c8f06561dc0ed3b645e54de"
+      },
+      {
+        "path": "plugins/soloco/runtime/progress-view.mjs",
+        "sha256": "bbcea8afc8760d365ac84f395e3cafb07aa26a06bf12f71b670fe7a9d08ad839"
+      },
+      {
+        "path": "plugins/soloco/runtime/progress.mjs",
+        "sha256": "977ed14281cf7de7054babb75d953a5dc6bbf7c319e1fba3e81eeffce6812080"
+      },
+      {
+        "path": "plugins/soloco/runtime/prototype.mjs",
+        "sha256": "f780edabba24ded41bcd6204dde8c1f57ef4401456dc8f0a9b79908c50d94068"
+      },
+      {
+        "path": "plugins/soloco/runtime/public-response.mjs",
+        "sha256": "ce7e04e25904b36c0d4356593837151590763c66aa47a3a98ad4f913bb99e58e"
+      },
+      {
+        "path": "plugins/soloco/runtime/qualification-frame.mjs",
+        "sha256": "96b837a42a0c7a92d66d81956b985d64c4387141a9f93007c65beb433f582eed"
+      },
+      {
+        "path": "plugins/soloco/runtime/record-storage.mjs",
+        "sha256": "fd91001c7ac8fe256e3ad1cbf7c888691d1000873bbbed3afc894cb789a17173"
+      },
+      {
+        "path": "plugins/soloco/runtime/recovery.mjs",
+        "sha256": "c821e1120e72a316106763badbeae14ec4ec7d4466e8444de5774dcde9d33795"
+      },
+      {
+        "path": "plugins/soloco/runtime/scoped-context.mjs",
+        "sha256": "9945bfcb79bae54a855b0ec3248e37571818d86efa95c66f8a7621070ccfd2bc"
+      },
+      {
+        "path": "plugins/soloco/runtime/scoped-stream.mjs",
+        "sha256": "7bc83d0f2a9852868553d913b126583946d159b502adef07938e38f90ad5f16a"
+      },
+      {
+        "path": "plugins/soloco/runtime/selection.mjs",
+        "sha256": "55505fa53d69b28aed8394a291ad5473fcecff9f4d4b8b01ed3b397b26015214"
+      },
+      {
+        "path": "plugins/soloco/runtime/snapshot.mjs",
+        "sha256": "660a89aa41ffed18f6358e33d7efaf2db96b0c7b5d6807ae4f2dce939d69f7fb"
+      },
+      {
+        "path": "plugins/soloco/runtime/storage-transfer.mjs",
+        "sha256": "2ea96610ab528d61471ee35c0482fb62b76be090f5f7bd22cc2489486a8155c3"
+      },
+      {
+        "path": "plugins/soloco/runtime/store.mjs",
+        "sha256": "2e1efebfed7f8159f072c9ccbc3774ded2d86c7c7e9a608f0e0c7d48e1544d07"
+      },
+      {
+        "path": "plugins/soloco/runtime/supervisor.mjs",
+        "sha256": "b6fa3b23aae98aa6e3aef8e915c1ac7b9e61964650987bd8d65a402795a11789"
+      },
+      {
+        "path": "plugins/soloco/runtime/task-context.mjs",
+        "sha256": "9706d12c3d3ec27d8deaf3971cb4458e296a45a42190a4c8c251e4060c7b2e0d"
+      },
+      {
+        "path": "plugins/soloco/runtime/task-index.mjs",
+        "sha256": "a8967fd0600e52e7f9ad6c82c9e48a497eb2ec4b8f2c3f8c326804358e3af363"
+      },
+      {
+        "path": "plugins/soloco/runtime/task-runtime-authority.mjs",
+        "sha256": "a602b66638a06995ecb138c12fa0f97e95830ff6b8a968d806acca411b46b27e"
+      },
+      {
+        "path": "plugins/soloco/runtime/task-runtime.mjs",
+        "sha256": "75c2182743e9dd5f6c505dbd99fc3e6396330f46b9394b2d68ef2377b61015d4"
+      },
+      {
+        "path": "plugins/soloco/runtime/tasks.mjs",
+        "sha256": "c110b62983a5c5ff6b3231ed3a08432ad80498a4b0cb5dd452a38a4f02714d0b"
+      },
+      {
+        "path": "plugins/soloco/runtime/timeout.mjs",
+        "sha256": "586c5f44f98742320119f0b42d0612dd79cf970f4e858f05e7d65953c31951a4"
+      },
+      {
+        "path": "plugins/soloco/runtime/upgrade-evidence.mjs",
+        "sha256": "b3a8f0bf7f8c8b2def98ba3cd926c9b24932275fb65a96908a8a27e7ed1c8708"
+      },
+      {
+        "path": "plugins/soloco/runtime/upgrade.mjs",
+        "sha256": "84b46d19f42ff3e87955874437dd22158f37b396964ea88611f21b3f34a71507"
+      },
+      {
+        "path": "plugins/soloco/runtime/validation-cache.mjs",
+        "sha256": "872415f42c63e015d159e5374d45b6de453dd7e8a873eb7f70473e6395b4354d"
+      },
+      {
+        "path": "plugins/soloco/runtime/worker.mjs",
+        "sha256": "ed89d476cdb174855e710d53b8cd60100222df5ee5917b5640de20ba035a0d4d"
+      },
+      {
+        "path": "plugins/soloco/scripts/run.sh",
+        "sha256": "128358b0c3d5b3f95b1584b3bcac9c8db23df86171a063591e1fd7e965b0c59b"
+      },
+      {
+        "path": "plugins/soloco/skills/setup/SKILL.md",
+        "sha256": "60c3572ecdd27b6bfeaba25ebcfa54c28ee2dc7e8ee80b7dbeff67e35e595247"
+      },
+      {
+        "path": "plugins/soloco/skills/soloco/SKILL.md",
+        "sha256": "e7031d075ecb3380c8ba683b66269ddba5c27144ce806dd2cd12b43a1b3132ff"
+      },
+      {
+        "path": "SPEC.md",
+        "sha256": "4bd0af7032d870195b2992e850b1dc9a50a9b9e59a3ec27267b7b0752cca57a9"
+      },
+      {
+        "path": "tests/candidate-format-qualification.test.mjs",
+        "sha256": "e25f320414630e078d49ce296064afe2a699067bb3f5fdd3ff1d07196bbec56e"
+      },
+      {
+        "path": "tools/candidate-format-qualification.mjs",
+        "sha256": "f14c8356e3f364104f712548ef58c015aba4e9ec9674d54cd70989d96d2da0e2"
+      },
+      {
+        "path": "tools/verify-candidate-format-qualification.mjs",
+        "sha256": "0f23881e5569e6f8d38705aca590ea53d771079ac75213025a8c77b6b109cef0"
+      },
+      {
+        "path": "tools/workflow-runtime.mjs",
+        "sha256": "d57c3849562dd4d486f8b3b21262c0108f39ea311b7eafdb950f2666b59808b5"
+      }
+    ],
+    "manifest_sha256": "fcd15309c283eef4dc025889a7524d99c4e5213900c2f4aa8a4b545ff83ed4eb",
+    "node": {
+      "version": "v22.23.2",
+      "platform": "darwin",
+      "arch": "arm64",
+      "executable_sha256": "18e387c90ab8a8400183e8bdd396376e1e875b91b4c874b894dcade7b35bf572"
+    }
+  },
+  "source_verification": {
+    "passed": true,
+    "status": "matched",
+    "before_manifest_sha256": "fcd15309c283eef4dc025889a7524d99c4e5213900c2f4aa8a4b545ff83ed4eb",
+    "after_manifest_sha256": "fcd15309c283eef4dc025889a7524d99c4e5213900c2f4aa8a4b545ff83ed4eb",
+    "errors": []
+  },
+  "execution": "native_cli",
+  "cases": [
+    {
+      "count": 1,
+      "format": "files",
+      "model_selection_policy": {
+        "engineer": {
+          "mode": "explicit",
+          "model": "gpt-6-astra",
+          "effort": "high",
+          "speed": "host_default",
+          "reason": "Exact one-character fictional module repairs; identical model controls in all format arms."
+        },
+        "qa": {
+          "mode": "explicit",
+          "model": "gpt-6-astra",
+          "effort": "high",
+          "speed": "host_default",
+          "reason": "Independent complete candidate, actual receipt and exact fixture preservation review; identical controls in all arms."
+        }
+      },
+      "model_selection_policy_sha256": "d2858b348eb81193be20d3875613d9bd3bbcfdb5e7f66da2be0c2afecd1b1efe",
+      "execution": "native_cli",
+      "source_manifest_sha256": "fcd15309c283eef4dc025889a7524d99c4e5213900c2f4aa8a4b545ff83ed4eb",
+      "scope_sha256": "90c832c2947d4730aff5adbb83829ffe35f7f1cd3d250331039f8b144c096a7d",
+      "fixture_sha256": "491835db654f1899f8d84ef708824ed5b3bcd4aa4225dfcc6da7e68f92f88296",
+      "module_bytes": [
+        32768
+      ],
+      "source_bytes": 33535,
+      "expected_candidate_bytes": 34032,
+      "events": [
+        {
+          "type": "dispatch",
+          "at_ms": 74.92558299999996,
+          "role": "engineer",
+          "job_id": "job-7e83f3dd-c7c5-4937-9257-505b9491e886",
+          "control_ms": 74.68450000000007
+        },
+        {
+          "type": "held",
+          "at_ms": 60674.1115,
+          "stage": "producer",
+          "reason_category": "producer_blocked_fixture_fidelity"
+        }
+      ],
+      "calls": [
+        {
+          "role": "engineer",
+          "job_id": "job-7e83f3dd-c7c5-4937-9257-505b9491e886",
+          "prompt_bytes": 59973,
+          "prompt_sha256": "d7ba044d5c323bd99d74d8484d78e3687409210fcd82590bbd08c2e60c237057",
+          "started_ms": 143.754416,
+          "requested": {
+            "mode": "explicit",
+            "model": "gpt-6-astra",
+            "effort": "high",
+            "reason": "Exact one-character fictional module repairs; identical model controls in all format arms.",
+            "speed": "host_default"
+          },
+          "native_id": "e3cd1f5ee991542fc764a0847d5fd6ef6928740582a5e043be152573b1535e9a",
+          "output_bytes": 474,
+          "output_sha256": "c42e40ed0ffd2058238e13f4fdc0630bf3abb866ad8734447d5d1081cef341c1",
+          "model_evidence": {
+            "reported_models": [],
+            "reported_effort": null,
+            "reported_service_tier": null,
+            "applied_controls": {
+              "model": "gpt-6-astra",
+              "effort": "high",
+              "service_tier": null,
+              "fast_mode": null,
+              "switch_models_on_flag": null,
+              "scope": "child_launch_argv",
+              "verification": "applied_controls_not_effective_settings"
+            },
+            "source": "exec_json",
+            "scope": "assignment",
+            "verification": "unverified"
+          },
+          "duration_ms": 60373.88675
+        }
+      ],
+      "attempts": [],
+      "accepted": false,
+      "errors": [
+        {
+          "code": "WORKER_NOT_COMPLETED",
+          "termination_confirmed": null,
+          "category": "producer_blocked_fixture_fidelity"
+        }
+      ],
+      "repairs": 0,
+      "stage": "producer",
+      "precheck": {
+        "status": "failed",
+        "exit_code": 1,
+        "tests_executed": true
+      },
+      "held_stage": "producer",
+      "elapsed_ms": 60674.185458,
+      "original_source_unchanged": true,
+      "generation_validation": {
+        "outcome": "producer_blocked",
+        "producer_block": {
+          "present": true,
+          "category": "byte_exact_unchanged_padding_uncertain"
+        },
+        "exact_fixture_match": null
+      },
+      "metrics": {
+        "model_calls": 1,
+        "producer_calls": 1,
+        "qa_calls": 0,
+        "repairs": 0,
+        "producer_blocks": 1,
+        "invalid_or_incomplete_outputs": 0,
+        "exact_fixture_mismatches": 0,
+        "prompt_bytes": 59973,
+        "output_bytes": 474,
+        "time_to_accepted_result_ms": null
+      }
+    },
+    {
+      "count": 1,
+      "format": "patches",
+      "model_selection_policy": {
+        "engineer": {
+          "mode": "explicit",
+          "model": "gpt-6-astra",
+          "effort": "high",
+          "speed": "host_default",
+          "reason": "Exact one-character fictional module repairs; identical model controls in all format arms."
+        },
+        "qa": {
+          "mode": "explicit",
+          "model": "gpt-6-astra",
+          "effort": "high",
+          "speed": "host_default",
+          "reason": "Independent complete candidate, actual receipt and exact fixture preservation review; identical controls in all arms."
+        }
+      },
+      "model_selection_policy_sha256": "d2858b348eb81193be20d3875613d9bd3bbcfdb5e7f66da2be0c2afecd1b1efe",
+      "execution": "native_cli",
+      "source_manifest_sha256": "fcd15309c283eef4dc025889a7524d99c4e5213900c2f4aa8a4b545ff83ed4eb",
+      "scope_sha256": "a7883756c1591dcc7f32b9dc34d886f56200b6106c2eaadfe12f29234f2e19ab",
+      "fixture_sha256": "491835db654f1899f8d84ef708824ed5b3bcd4aa4225dfcc6da7e68f92f88296",
+      "module_bytes": [
+        32768
+      ],
+      "source_bytes": 33535,
+      "expected_candidate_bytes": 34032,
+      "events": [
+        {
+          "type": "dispatch",
+          "at_ms": 22.430874999998196,
+          "role": "engineer",
+          "job_id": "job-2ce377b5-7c0a-4055-aef5-23876df83d26",
+          "control_ms": 22.39562499999738
+        },
+        {
+          "type": "returned",
+          "at_ms": 14854.615584,
+          "role": "engineer",
+          "job_id": "job-2ce377b5-7c0a-4055-aef5-23876df83d26",
+          "artifact_id": "artifact-e334fa6a-e9ef-48ac-8c7a-b8cd3af3b436"
+        },
+        {
+          "type": "tests_queued",
+          "at_ms": 14925.859375,
+          "job_id": "test-04971614-9b15-49fc-a843-a6b8a8a24912"
+        },
+        {
+          "type": "dispatch",
+          "at_ms": 15850.254916999998,
+          "role": "qa",
+          "job_id": "job-ed94dfc5-8d08-4752-9738-c9075e82c7c8",
+          "control_ms": 42.234792000002926
+        },
+        {
+          "type": "returned",
+          "at_ms": 40056.822209000005,
+          "role": "qa",
+          "job_id": "job-ed94dfc5-8d08-4752-9738-c9075e82c7c8",
+          "artifact_id": "artifact-a46a5977-6a79-4717-879f-a6b092874092"
+        },
+        {
+          "type": "receiver_accepted",
+          "at_ms": 40109.98433399999,
+          "candidate_sha256": "14591e4ef821625f21a0f2120453a5570d8e1c59267b75515e44f21138d2ed38",
+          "receipt_sha256": "a212c17884a89ac856a5a82f872131eb71625b24c9ee53c5910b5c5545b08030"
+        }
+      ],
+      "calls": [
+        {
+          "role": "engineer",
+          "job_id": "job-2ce377b5-7c0a-4055-aef5-23876df83d26",
+          "prompt_bytes": 60235,
+          "prompt_sha256": "89d4f48ab3ebd9bdd257fe372d05cf45fa99c33edf9d63670314054ace17e176",
+          "started_ms": 33.64937500000087,
+          "requested": {
+            "mode": "explicit",
+            "model": "gpt-6-astra",
+            "effort": "high",
+            "reason": "Exact one-character fictional module repairs; identical model controls in all format arms.",
+            "speed": "host_default"
+          },
+          "native_id": "f911660571b7bc799ec9730a5fe4b0c608b0a6322a9edccc797dc143c85edb3c",
+          "output_bytes": 417,
+          "output_sha256": "d90f30098c3133e9f1051f94470975733d3ed28d03a6d2a7bbfa483789eaecbd",
+          "model_evidence": {
+            "reported_models": [],
+            "reported_effort": null,
+            "reported_service_tier": null,
+            "applied_controls": {
+              "model": "gpt-6-astra",
+              "effort": "high",
+              "service_tier": null,
+              "fast_mode": null,
+              "switch_models_on_flag": null,
+              "scope": "child_launch_argv",
+              "verification": "applied_controls_not_effective_settings"
+            },
+            "source": "exec_json",
+            "scope": "assignment",
+            "verification": "unverified"
+          },
+          "duration_ms": 14667.79195900001
+        },
+        {
+          "role": "qa",
+          "job_id": "job-ed94dfc5-8d08-4752-9738-c9075e82c7c8",
+          "prompt_bytes": 100189,
+          "prompt_sha256": "9eb0d186cfb510fbf5434c406844ae9c553e7d03ed0f5e4776e389cf9eb7ca89",
+          "started_ms": 15906.820374999996,
+          "requested": {
+            "mode": "explicit",
+            "model": "gpt-6-astra",
+            "effort": "high",
+            "reason": "Independent complete candidate, actual receipt and exact fixture preservation review; identical controls in all arms.",
+            "speed": "host_default"
+          },
+          "native_id": "bff8d3a2694b906ddaa8ac50207cb988405915f876c2428014d3b15376a484c3",
+          "output_bytes": 1763,
+          "output_sha256": "a02b5c6b114263143a0c557d1af10b3426bece0baf500528b892c83c15656357",
+          "model_evidence": {
+            "reported_models": [],
+            "reported_effort": null,
+            "reported_service_tier": null,
+            "applied_controls": {
+              "model": "gpt-6-astra",
+              "effort": "high",
+              "service_tier": null,
+              "fast_mode": null,
+              "switch_models_on_flag": null,
+              "scope": "child_launch_argv",
+              "verification": "applied_controls_not_effective_settings"
+            },
+            "source": "exec_json",
+            "scope": "assignment",
+            "verification": "unverified"
+          },
+          "duration_ms": 24125.086749999988
+        }
+      ],
+      "attempts": [
+        {
+          "test_job_id": "test-04971614-9b15-49fc-a843-a6b8a8a24912",
+          "receipt_id": "test-receipt-ae7bca96-4b89-4fe7-86c1-32db8025301a",
+          "receipt_sha256": "a212c17884a89ac856a5a82f872131eb71625b24c9ee53c5910b5c5545b08030",
+          "result": {
+            "status": "passed",
+            "exit_code": 0,
+            "signal": null,
+            "stdout": "TAP version 13\n# Subtest: exact values and complete unchanged module bytes\nok 1 - exact values and complete unchanged module bytes\n  ---\n  duration_ms: 0.737125\n  type: 'test'\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 8.5425\n",
+            "stderr": "",
+            "duration_ms": 118,
+            "isolation": "macos-seatbelt-node",
+            "test_execution_attempted": true,
+            "tests_executed": true,
+            "output_truncated": false,
+            "limits": {
+              "timeout_ms": 10000,
+              "max_output_bytes": 20000
+            },
+            "candidate_sha256": "14591e4ef821625f21a0f2120453a5570d8e1c59267b75515e44f21138d2ed38",
+            "test_paths": [
+              "fixture.test.mjs"
+            ],
+            "timeout_ms": 10000,
+            "max_output_bytes": 20000,
+            "finished_at": "2026-11-08T04:34:18.328Z"
+          },
+          "test_elapsed_ms": 940.2797080000018
+        }
+      ],
+      "accepted": true,
+      "errors": [],
+      "repairs": 0,
+      "stage": "accepted",
+      "precheck": {
+        "status": "failed",
+        "exit_code": 1,
+        "tests_executed": true
+      },
+      "generation": {
+        "candidate_id": "artifact-e334fa6a-e9ef-48ac-8c7a-b8cd3af3b436",
+        "native_id": "f911660571b7bc799ec9730a5fe4b0c608b0a6322a9edccc797dc143c85edb3c",
+        "candidate_sha256": "14591e4ef821625f21a0f2120453a5570d8e1c59267b75515e44f21138d2ed38",
+        "byte_accounting": {
+          "format": "patches",
+          "generated_bytes": 149,
+          "candidate_bytes": 34032,
+          "source_bytes": 34184,
+          "patches": [
+            {
+              "path": "module-0.mjs",
+              "base_sha256": "092aaf1d41c4ed97dac065053aa75da9c664c5df467e79b3287c04b84d51a818",
+              "edits": [
+                {
+                  "start": 21,
+                  "end": 22,
+                  "text": "1"
+                }
+              ]
+            }
+          ],
+          "patch_sha256": "27a594af5003e42bb2982b83f555399f17858bd249988caf3cac8aa26e7e9138"
+        }
+      },
+      "exact_fixture_match": true,
+      "review": {
+        "id": "artifact-a46a5977-6a79-4717-879f-a6b092874092",
+        "native_id": "bff8d3a2694b906ddaa8ac50207cb988405915f876c2428014d3b15376a484c3",
+        "author_native_id": "f911660571b7bc799ec9730a5fe4b0c608b0a6322a9edccc797dc143c85edb3c",
+        "verdict": "Pass",
+        "candidate_sha256": "14591e4ef821625f21a0f2120453a5570d8e1c59267b75515e44f21138d2ed38",
+        "receipt_sha256": "a212c17884a89ac856a5a82f872131eb71625b24c9ee53c5910b5c5545b08030"
+      },
+      "acceptance": {
+        "at": "2026-11-08T04:34:42.629Z",
+        "review_id": "artifact-a46a5977-6a79-4717-879f-a6b092874092",
+        "candidate_sha256": "14591e4ef821625f21a0f2120453a5570d8e1c59267b75515e44f21138d2ed38",
+        "receipt_sha256": "a212c17884a89ac856a5a82f872131eb71625b24c9ee53c5910b5c5545b08030",
+        "source_integrated": false
+      },
+      "elapsed_ms": 40109.99425,
+      "original_source_unchanged": true,
+      "generation_validation": {
+        "outcome": "candidate_returned",
+        "producer_block": null,
+        "exact_fixture_match": true
+      },
+      "metrics": {
+        "model_calls": 2,
+        "producer_calls": 1,
+        "qa_calls": 1,
+        "repairs": 0,
+        "producer_blocks": 0,
+        "invalid_or_incomplete_outputs": 0,
+        "exact_fixture_mismatches": 0,
+        "prompt_bytes": 160424,
+        "output_bytes": 2180,
+        "time_to_accepted_result_ms": 40109.99425
+      }
+    },
+    {
+      "count": 3,
+      "format": "files",
+      "model_selection_policy": {
+        "engineer": {
+          "mode": "explicit",
+          "model": "gpt-6-astra",
+          "effort": "high",
+          "speed": "host_default",
+          "reason": "Exact one-character fictional module repairs; identical model controls in all format arms."
+        },
+        "qa": {
+          "mode": "explicit",
+          "model": "gpt-6-astra",
+          "effort": "high",
+          "speed": "host_default",
+          "reason": "Independent complete candidate, actual receipt and exact fixture preservation review; identical controls in all arms."
+        }
+      },
+      "model_selection_policy_sha256": "d2858b348eb81193be20d3875613d9bd3bbcfdb5e7f66da2be0c2afecd1b1efe",
+      "execution": "native_cli",
+      "source_manifest_sha256": "fcd15309c283eef4dc025889a7524d99c4e5213900c2f4aa8a4b545ff83ed4eb",
+      "scope_sha256": "e359b002d7b5ac903a669528fcdc2da4ac759e24bae206e8487418189f4dc757",
+      "fixture_sha256": "6ac1ff6793b49be70e19d31260e8bfcec21e5813e70e8e7a2a3e01009e6aeaaf",
+      "module_bytes": [
+        32768,
+        32768,
+        32768
+      ],
+      "source_bytes": 100603,
+      "expected_candidate_bytes": 101610,
+      "events": [
+        {
+          "type": "dispatch",
+          "at_ms": 19.207792000001064,
+          "role": "engineer",
+          "job_id": "job-dcccbb59-ae17-4297-9c1f-4dfb2b9cea29",
+          "control_ms": 19.173582999996142
+        },
+        {
+          "type": "held",
+          "at_ms": 59619.747166999994,
+          "stage": "producer",
+          "reason_category": "producer_blocked_fixture_fidelity"
+        }
+      ],
+      "calls": [
+        {
+          "role": "engineer",
+          "job_id": "job-dcccbb59-ae17-4297-9c1f-4dfb2b9cea29",
+          "prompt_bytes": 127766,
+          "prompt_sha256": "b67255c1dff713b02e0eef767d73337009a5b2dd10b22d2f9e87620af4b7c1bf",
+          "started_ms": 108.67070899999817,
+          "requested": {
+            "mode": "explicit",
+            "model": "gpt-6-astra",
+            "effort": "high",
+            "reason": "Exact one-character fictional module repairs; identical model controls in all format arms.",
+            "speed": "host_default"
+          },
+          "native_id": "f63b7c693ea34be1ec7003865039719803d1343acd8d94ccaaff12e18a7f9ac5",
+          "output_bytes": 665,
+          "output_sha256": "5c95260702d64149f1dd9b5c0dd8de8dcf59fb3f49162c435d246e0e8b3a28cf",
+          "model_evidence": {
+            "reported_models": [],
+            "reported_effort": null,
+            "reported_service_tier": null,
+            "applied_controls": {
+              "model": "gpt-6-astra",
+              "effort": "high",
+              "service_tier": null,
+              "fast_mode": null,
+              "switch_models_on_flag": null,
+              "scope": "child_launch_argv",
+              "verification": "applied_controls_not_effective_settings"
+            },
+            "source": "exec_json",
+            "scope": "assignment",
+            "verification": "unverified"
+          },
+          "duration_ms": 59422.892458999995
+        }
+      ],
+      "attempts": [],
+      "accepted": false,
+      "errors": [
+        {
+          "code": "WORKER_NOT_COMPLETED",
+          "termination_confirmed": null,
+          "category": "producer_blocked_fixture_fidelity"
+        }
+      ],
+      "repairs": 0,
+      "stage": "producer",
+      "precheck": {
+        "status": "failed",
+        "exit_code": 1,
+        "tests_executed": true
+      },
+      "held_stage": "producer",
+      "elapsed_ms": 59619.75566699999,
+      "original_source_unchanged": true,
+      "generation_validation": {
+        "outcome": "producer_blocked",
+        "producer_block": {
+          "present": true,
+          "category": "byte_exact_unchanged_padding_uncertain"
+        },
+        "exact_fixture_match": null
+      },
+      "metrics": {
+        "model_calls": 1,
+        "producer_calls": 1,
+        "qa_calls": 0,
+        "repairs": 0,
+        "producer_blocks": 1,
+        "invalid_or_incomplete_outputs": 0,
+        "exact_fixture_mismatches": 0,
+        "prompt_bytes": 127766,
+        "output_bytes": 665,
+        "time_to_accepted_result_ms": null
+      }
+    },
+    {
+      "count": 3,
+      "format": "patches",
+      "model_selection_policy": {
+        "engineer": {
+          "mode": "explicit",
+          "model": "gpt-6-astra",
+          "effort": "high",
+          "speed": "host_default",
+          "reason": "Exact one-character fictional module repairs; identical model controls in all format arms."
+        },
+        "qa": {
+          "mode": "explicit",
+          "model": "gpt-6-astra",
+          "effort": "high",
+          "speed": "host_default",
+          "reason": "Independent complete candidate, actual receipt and exact fixture preservation review; identical controls in all arms."
+        }
+      },
+      "model_selection_policy_sha256": "d2858b348eb81193be20d3875613d9bd3bbcfdb5e7f66da2be0c2afecd1b1efe",
+      "execution": "native_cli",
+      "source_manifest_sha256": "fcd15309c283eef4dc025889a7524d99c4e5213900c2f4aa8a4b545ff83ed4eb",
+      "scope_sha256": "89b23f04d02e2ab06b6f30fb9ae53040471738e1ed29a6ee7ee6700b35134ab4",
+      "fixture_sha256": "6ac1ff6793b49be70e19d31260e8bfcec21e5813e70e8e7a2a3e01009e6aeaaf",
+      "module_bytes": [
+        32768,
+        32768,
+        32768
+      ],
+      "source_bytes": 100603,
+      "expected_candidate_bytes": 101610,
+      "events": [
+        {
+          "type": "dispatch",
+          "at_ms": 83.19599999999627,
+          "role": "engineer",
+          "job_id": "job-a4621742-18ef-4e1b-bb6d-a91953af826f",
+          "control_ms": 83.16029200001503
+        },
+        {
+          "type": "returned",
+          "at_ms": 20293.422332999995,
+          "role": "engineer",
+          "job_id": "job-a4621742-18ef-4e1b-bb6d-a91953af826f",
+          "artifact_id": "artifact-612f7878-488f-4605-ad12-dcbe7c4400b7"
+        },
+        {
+          "type": "tests_queued",
+          "at_ms": 20364.462374999974,
+          "job_id": "test-188b4651-d9f1-4169-b5d9-a0a2263b2251"
+        },
+        {
+          "type": "dispatch",
+          "at_ms": 21358.545541999978,
+          "role": "qa",
+          "job_id": "job-fc8af85f-bf96-4f18-bf72-a35e34342cf8",
+          "control_ms": 47.85891600002651
+        },
+        {
+          "type": "returned",
+          "at_ms": 45825.885332999984,
+          "role": "qa",
+          "job_id": "job-fc8af85f-bf96-4f18-bf72-a35e34342cf8",
+          "artifact_id": "artifact-911cae45-b8a2-4923-9859-2eec52f8a39b"
+        },
+        {
+          "type": "receiver_accepted",
+          "at_ms": 45879.142332999996,
+          "candidate_sha256": "fddafee2e21c49325791a7b90768f6c3a987e91d09697bb4d6873d5a131e86fe",
+          "receipt_sha256": "ec65f998bd086bc6f9221ff24f8c6a0d74cd9b913cd969747c8890b65476f70a"
+        }
+      ],
+      "calls": [
+        {
+          "role": "engineer",
+          "job_id": "job-a4621742-18ef-4e1b-bb6d-a91953af826f",
+          "prompt_bytes": 128026,
+          "prompt_sha256": "30beaed428294dbb0448a67cc29948e5c96b0c3ee34537cfff3afd43166e3762",
+          "started_ms": 120.07333299997845,
+          "requested": {
+            "mode": "explicit",
+            "model": "gpt-6-astra",
+            "effort": "high",
+            "reason": "Exact one-character fictional module repairs; identical model controls in all format arms.",
+            "speed": "host_default"
+          },
+          "native_id": "9ad05a443091ca63983d430cdf106abdd68bde66e967c6345f18c0893a60241f",
+          "output_bytes": 705,
+          "output_sha256": "6b521bf0fef70278c4acd007fc8447ece06cd8faae71f6d8153fd9519bb52d93",
+          "model_evidence": {
+            "reported_models": [],
+            "reported_effort": null,
+            "reported_service_tier": null,
+            "applied_controls": {
+              "model": "gpt-6-astra",
+              "effort": "high",
+              "service_tier": null,
+              "fast_mode": null,
+              "switch_models_on_flag": null,
+              "scope": "child_launch_argv",
+              "verification": "applied_controls_not_effective_settings"
+            },
+            "source": "exec_json",
+            "scope": "assignment",
+            "verification": "unverified"
+          },
+          "duration_ms": 19990.55937500001
+        },
+        {
+          "role": "qa",
+          "job_id": "job-fc8af85f-bf96-4f18-bf72-a35e34342cf8",
+          "prompt_bytes": 236232,
+          "prompt_sha256": "1082a647eb8a513802b8f14de18b6afd461bb163e2d4cb5b207428575ca5678a",
+          "started_ms": 21426.80587499999,
+          "requested": {
+            "mode": "explicit",
+            "model": "gpt-6-astra",
+            "effort": "high",
+            "reason": "Independent complete candidate, actual receipt and exact fixture preservation review; identical controls in all arms.",
+            "speed": "host_default"
+          },
+          "native_id": "31d97a33bb8166b0a0b712338cfd4cf3bbe43b48dddc1a7f84a1d5db81fa8f2b",
+          "output_bytes": 1920,
+          "output_sha256": "634009239bd45f0eb57af03060471fe214edb6841cb467f83cb4cf8987769da8",
+          "model_evidence": {
+            "reported_models": [],
+            "reported_effort": null,
+            "reported_service_tier": null,
+            "applied_controls": {
+              "model": "gpt-6-astra",
+              "effort": "high",
+              "service_tier": null,
+              "fast_mode": null,
+              "switch_models_on_flag": null,
+              "scope": "child_launch_argv",
+              "verification": "applied_controls_not_effective_settings"
+            },
+            "source": "exec_json",
+            "scope": "assignment",
+            "verification": "unverified"
+          },
+          "duration_ms": 24299.54029199999
+        }
+      ],
+      "attempts": [
+        {
+          "test_job_id": "test-188b4651-d9f1-4169-b5d9-a0a2263b2251",
+          "receipt_id": "test-receipt-fe5467de-470f-4792-9311-b18386c2b913",
+          "receipt_sha256": "ec65f998bd086bc6f9221ff24f8c6a0d74cd9b913cd969747c8890b65476f70a",
+          "result": {
+            "status": "passed",
+            "exit_code": 0,
+            "signal": null,
+            "stdout": "TAP version 13\n# Subtest: exact values and complete unchanged module bytes\nok 1 - exact values and complete unchanged module bytes\n  ---\n  duration_ms: 0.918042\n  type: 'test'\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 1\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 10.712584\n",
+            "stderr": "",
+            "duration_ms": 130,
+            "isolation": "macos-seatbelt-node",
+            "test_execution_attempted": true,
+            "tests_executed": true,
+            "output_truncated": false,
+            "limits": {
+              "timeout_ms": 10000,
+              "max_output_bytes": 20000
+            },
+            "candidate_sha256": "fddafee2e21c49325791a7b90768f6c3a987e91d09697bb4d6873d5a131e86fe",
+            "test_paths": [
+              "fixture.test.mjs"
+            ],
+            "timeout_ms": 10000,
+            "max_output_bytes": 20000,
+            "finished_at": "2026-11-08T04:36:04.557Z"
+          },
+          "test_elapsed_ms": 1005.601708000002
+        }
+      ],
+      "accepted": true,
+      "errors": [],
+      "repairs": 0,
+      "stage": "accepted",
+      "precheck": {
+        "status": "failed",
+        "exit_code": 1,
+        "tests_executed": true
+      },
+      "generation": {
+        "candidate_id": "artifact-612f7878-488f-4605-ad12-dcbe7c4400b7",
+        "native_id": "9ad05a443091ca63983d430cdf106abdd68bde66e967c6345f18c0893a60241f",
+        "candidate_sha256": "fddafee2e21c49325791a7b90768f6c3a987e91d09697bb4d6873d5a131e86fe",
+        "byte_accounting": {
+          "format": "patches",
+          "generated_bytes": 445,
+          "candidate_bytes": 101610,
+          "source_bytes": 101914,
+          "patches": [
+            {
+              "path": "module-0.mjs",
+              "base_sha256": "092aaf1d41c4ed97dac065053aa75da9c664c5df467e79b3287c04b84d51a818",
+              "edits": [
+                {
+                  "start": 21,
+                  "end": 22,
+                  "text": "1"
+                }
+              ]
+            },
+            {
+              "path": "module-1.mjs",
+              "base_sha256": "092aaf1d41c4ed97dac065053aa75da9c664c5df467e79b3287c04b84d51a818",
+              "edits": [
+                {
+                  "start": 21,
+                  "end": 22,
+                  "text": "1"
+                }
+              ]
+            },
+            {
+              "path": "module-2.mjs",
+              "base_sha256": "092aaf1d41c4ed97dac065053aa75da9c664c5df467e79b3287c04b84d51a818",
+              "edits": [
+                {
+                  "start": 21,
+                  "end": 22,
+                  "text": "1"
+                }
+              ]
+            }
+          ],
+          "patch_sha256": "627079ead8fa97ce9c957e2b802e0164f7cb8bf5544aabcd9dd03ae9d741f389"
+        }
+      },
+      "exact_fixture_match": true,
+      "review": {
+        "id": "artifact-911cae45-b8a2-4923-9859-2eec52f8a39b",
+        "native_id": "31d97a33bb8166b0a0b712338cfd4cf3bbe43b48dddc1a7f84a1d5db81fa8f2b",
+        "author_native_id": "9ad05a443091ca63983d430cdf106abdd68bde66e967c6345f18c0893a60241f",
+        "verdict": "Pass",
+        "candidate_sha256": "fddafee2e21c49325791a7b90768f6c3a987e91d09697bb4d6873d5a131e86fe",
+        "receipt_sha256": "ec65f998bd086bc6f9221ff24f8c6a0d74cd9b913cd969747c8890b65476f70a"
+      },
+      "acceptance": {
+        "at": "2026-11-08T04:36:29.163Z",
+        "review_id": "artifact-911cae45-b8a2-4923-9859-2eec52f8a39b",
+        "candidate_sha256": "fddafee2e21c49325791a7b90768f6c3a987e91d09697bb4d6873d5a131e86fe",
+        "receipt_sha256": "ec65f998bd086bc6f9221ff24f8c6a0d74cd9b913cd969747c8890b65476f70a",
+        "source_integrated": false
+      },
+      "elapsed_ms": 45879.153416999994,
+      "original_source_unchanged": true,
+      "generation_validation": {
+        "outcome": "candidate_returned",
+        "producer_block": null,
+        "exact_fixture_match": true
+      },
+      "metrics": {
+        "model_calls": 2,
+        "producer_calls": 1,
+        "qa_calls": 1,
+        "repairs": 0,
+        "producer_blocks": 0,
+        "invalid_or_incomplete_outputs": 0,
+        "exact_fixture_mismatches": 0,
+        "prompt_bytes": 364258,
+        "output_bytes": 2625,
+        "time_to_accepted_result_ms": 45879.153416999994
+      }
+    }
+  ],
+  "assessment": {
+    "passed": false,
+    "unique_expected_cases": true,
+    "source_verification_required": true,
+    "source_verification_passed": true,
+    "accepted_cases": 2,
+    "total_cases": 4,
+    "critical_false_acceptances": 0,
+    "statistical_noninferiority_established": false,
+    "causal_latency_improvement_established": false
+  },
+  "public_redactions": {
+    "cli_warnings": "Native host diagnostics remain local; omitted from this public copy.",
+    "original_local_report_sha256": "25d94c5b20b693a5e2e4b5509480d2c007b11d15c804787c78226a57293cac2c",
+    "blocked_native_output": "Raw blocked output and worker error text remain local; only known fictional outcome categories, original text hashes/byte counts and error codes are public."
+  }
+}
