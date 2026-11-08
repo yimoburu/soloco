@@ -327,6 +327,24 @@ test('restore preserves accepted exact evidence, a queued obligation and an unpr
  }finally{f.close();fs.rmSync(transfer,{recursive:true,force:true});}
 });
 
+test('real context overflow holds before any execution and never retries',()=>{
+ const f=fixture();try{
+  const t=f.submit('context-capacity');
+  engine.save({...f.args,epoch:1,id:'oversize-unknown',kind:'artifact',content:'保留未知限制😀'.repeat(6000)},host);
+  const before=f.read();let calls=0,launches=0,error;
+  const queue=(root,key)=>{calls++;try{return engine.queueRuntimeTask(root,key,{check:ready,launch:()=>{launches++;return child();}});}catch(e){error=e;throw e;}};
+  tickRuntime(f.root,{queue});const s=f.read(),r=s.records[t.id].runtime_task;
+  assert.equal(r.state,'needs_attention');assert.equal(r.attention_code,'CONTEXT_CAPACITY');assert.equal(r.attention,error.message);
+  const m=/^Task context Held: required coherent packet exceeds 65536 UTF-8bytes \(actual (\d+)\); coverage incomplete; widen retrieval or split the task; nothing was truncated$/.exec(r.attention);
+  assert(m);assert(Number(m[1])>65536);assert.equal(r.attempts.length,0);
+  assert.deepEqual(s.jobs,before.jobs);assert.deepEqual(Object.keys(s.sessions),Object.keys(before.sessions));assert.equal(resourceClaims(s).length,0);
+  for(const action of ['checkpoint','inspect']){const v=taskAction({...f.args,action,task_id:t.id},host),x=action==='checkpoint'?v.recovery:v.tasks[0].recovery;assert.deepEqual([x.code,x.owner,x.automatic,x.retry_execution],['CONTEXT_CAPACITY','cos',false,false]);}
+  tickRuntime(f.root,{queue});const last=f.read();assert.deepEqual([calls,launches],[1,0]);
+  for(const key of ['jobs','sessions','notices'])assert.deepEqual(last[key],s[key]);
+  assert.deepEqual(last.records,s.records);
+ }finally{f.close();}
+});
+
 test('scheduler retries only typed pre-execution waits and retains misleading unknown failures',async()=>{
  const {SchedulingHold}=await import('../plugins/soloco/runtime/recovery.mjs');
  const f=fixture();

@@ -1,4 +1,4 @@
-import {taskRecovery} from './recovery.mjs';
+import {SchedulingHold,taskRecovery} from './recovery.mjs';
 // Ordinary async-task working context. This is a derived view of canonical
 // records, not an applicability classifier, acceptance receipt or authority.
 import {digest,owner,upgradePending} from './store.mjs';
@@ -217,7 +217,7 @@ export function taskAssignmentContext(state,job,{budget}={}){
     supplemental_evidence:{protocol:'record-reads-v1',available:true,sources:job.supplemental_sources??[],lookup:'company_context inspect/read',rule:'Exact known source IDs, revisions and hashes only. Missing evidence requires a bounded read or a Held result; native conversation memory is not current authority.'}
   };
   const text=JSON.stringify(packet),size=bytes(text);
-  if(size>limit)fail(`required coherent packet exceeds ${limit} UTF-8bytes (actual ${size}); coverage incomplete; widen retrieval or split the task; nothing was truncated`);
+  if(size>limit)throw new SchedulingHold('CONTEXT_CAPACITY',`Task context Held: required coherent packet exceeds ${limit} UTF-8bytes (actual ${size}); coverage incomplete; widen retrieval or split the task; nothing was truncated`);
   // Only already delivered bodies whose exact source still resolves can be
   // reread. Historical delivery projections never masquerade as current handles.
   const required_sources=[...new Map([...source.records,...source.execution].filter(entry=>{
