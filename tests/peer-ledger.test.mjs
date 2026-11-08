@@ -3097,3 +3097,519 @@ test('native callback origin: changed existing protected review preserves its pr
   }finally{fresh.close();}
  }finally{armed=false;f.close();}
 });
+
+// Public-put call fence. The complete preceding accepted90 prefix is unchanged.
+// Independently adopted/revised external proposal 11521b027483ff54:
+// chat 01a1b6e7-daaf-70c3-b54a-37ad8e16ee51; root, review_visibility,
+// session_naming_review and visibility_evaluator. Native revisions extend early
+// canonical, real SELECT-return, error-origin, savepoint and physical-loss cases.
+// All fixtures are fictional. Real SQLite results are never fabricated.
+const putFencePoints={
+ current:sql=>sql==='SELECT * FROM peer_rows WHERE family=? AND id=?',
+ history:sql=>sql==='INSERT INTO peer_versions VALUES(?,?,?,?,?)',
+ row:sql=>sql.startsWith('INSERT INTO peer_rows VALUES'),
+ decrement:sql=>sql.startsWith('UPDATE peer_membership SET count=count-1'),
+ membership:sql=>sql.startsWith('INSERT INTO peer_membership'),
+ generation:sql=>sql.startsWith('UPDATE peer_generations SET generation=generation+1')
+};
+function putFenceContains(error,expected){
+ if(expected instanceof RegExp?expected.test(String(error?.message)):error===expected)return true;
+ return error instanceof AggregateError&&error.errors.some(item=>putFenceContains(item,expected));
+}
+const putFencePoison=error=>{assert.match(String(error?.message),/failed row mutation.*rollback required/i);return true;};
+function putFenceDigest(f,connection=null){
+ const db=connection??new DatabaseSync(f.file);
+ try{
+  const result={schema:selectionRawHash(JSON.stringify(db.prepare('SELECT type,name,tbl_name,sql FROM sqlite_schema ORDER BY type,name').all()))};
+  const tables=db.prepare("SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all();
+  for(const {name} of tables){
+   const digest=selectionCreateHash('sha256');let rows=0;
+   for(const row of db.prepare(`SELECT * FROM "${name}" ORDER BY rowid`).iterate()){digest.update(JSON.stringify(row)+'\n');rows++;}
+   result[name]={rows,sha256:digest.digest('hex')};
+  }
+  return result;
+ }finally{if(!connection)db.close();}
+}
+function putFenceSeed(f){
+ return f.ledger.write('put-fence.seed','founder',tx=>tx.put('homes','put-fence-home',{status:'current',scope:'alpha',principal_id:'founder',content:'Committed home before the call fence.'},0));
+}
+function putFenceUnexpected(tx){
+ return tx.put('notices','put-fence-unexpected',{status:'pending',scope:'alpha',principal_id:'founder',kind:'must_know',content:'Required evidence cannot enter through an active put.'},0);
+}
+function putFenceTarget(old,mode='update'){
+ const id=mode==='create'?'put-fence-created':old.id,expected=mode==='create'?0:old.revision;
+ const value=mode==='noop'?old.value:{...old.value,content:'Guarded candidate '+mode};
+ return {id,expected,value,reference:{family:'homes',id,revision:expected+1,sha256:peerDigest(value)}};
+}
+function putFenceStage(tx,old){
+ tx.put('commands','put-fence-receipt',{status:'recorded',scope:'alpha',principal_id:'founder',synthetic:'receipt rollback coverage'},0);
+ tx.put('reviews','put-fence-staged-review',{status:'accepted',scope:'alpha',subject:historyReference(old,'homes'),verdict:'Pass',blockers:[],proof:{protocol:'peer-native-review-v1'}},0);
+ tx.event('put-fence.buffered-receipt',{id:'put-fence-receipt'});
+}
+function putFenceNoUnexpected(calls){
+ assert.equal(calls.some(call=>call.method==='run'&&call.sql==='INSERT INTO peer_versions VALUES(?,?,?,?,?)'&&call.args[0]==='notices'&&call.args[1]==='put-fence-unexpected'),false,'the denied nested call executes no history INSERT');
+}
+function putFenceAssertRollback(f,before,old,proposed=null){
+ assert.equal(f.ledger.db.isTransaction,false);
+ assert.deepEqual(putFenceDigest(f),before,'schema and every fixture table return to the original committed state');
+ const fresh=new PeerLedger(f.root);
+ try{
+  fresh.write('put-fence.fresh-noop','founder',tx=>{
+   assert.deepEqual(tx.get('homes',old.id),old);
+   assert.deepEqual(tx.put('homes',old.id,old.value,old.revision),old);
+   assert.deepEqual(tx.getVersion(historyReference(old,'homes')).value,old.value);
+   if(proposed){
+    assert.throws(()=>tx.getVersion(proposed),/historical version is unavailable/);
+    if(proposed.id!==old.id)assert.equal(tx.get('homes',proposed.id),null);
+   }
+   assert.equal(tx.get('notices','put-fence-unexpected'),null);
+   assert.equal(tx.get('commands','put-fence-receipt'),null);
+   assert.equal(tx.get('reviews','put-fence-staged-review'),null);
+  });
+  assert.equal(fresh.verify().complete,true);
+  assert.equal(fresh.auditReviewSelection().clean,true);
+ }finally{fresh.close();}
+ assert.deepEqual(putFenceDigest(f),before,'independent reopen and successful no-op introduce no event or derived-state drift');
+}
+
+test('put fence: escaped nested denial is retained at current lookup and every physical preparation stage',()=>{
+ for(const mode of ['create','update'])for(const [point,match] of Object.entries(putFencePoints)){
+  if(mode==='create'&&point==='decrement')continue;
+  let armed=false,active,escaped,hits=0,nested;
+  const f=peerFixture({onQuery:q=>{
+   if(!armed||!match(q.sql))return;
+   armed=false;hits++;
+   try{putFenceUnexpected(active);}catch(error){nested=error;throw error;}
+  }});
+  try{
+   const old=putFenceSeed(f),target=putFenceTarget(old,mode),before=putFenceDigest(f),trace=byteQueryTrace(f.ledger);
+   try{
+    assert.throws(()=>f.ledger.write('put-fence.escaped','founder',tx=>{
+     active=tx;escaped=tx;tx.event('put-fence.buffered-before-denial',{});armed=true;
+     tx.put('homes',target.id,target.value,target.expected);
+    }),error=>{
+     assert.ok(nested);assert.match(nested.message,/Reentrant peer row mutation.*rollback required/);
+     assert.ok(putFenceContains(error,nested),'retain the exact nested denial in the boundary error');
+     assert.ok(putFenceContains(error,/failed row mutation/));return true;
+    });
+   }finally{trace.restore();}
+   active=null;assert.equal(hits,1);putFenceNoUnexpected(trace.calls);
+   if(point==='current'||point==='history')assert.equal(trace.calls.some(call=>call.method==='run'),false,'denial before first execution permits no physical outer write');
+   assert.throws(()=>escaped.get('homes',old.id),/expired/);
+   assert.throws(()=>escaped.put('notices','expired-put',{},0),/expired/);
+   putFenceAssertRollback(f,before,old,target.reference);
+  }finally{armed=false;active=null;f.close();}
+ }
+});
+
+test('put fence: caught nested changes no-ops and malformed attempts poison even normal callback completion',()=>{
+ const cases=[...Object.keys(putFencePoints).map(point=>({point,outer:'update',nested:'change'})),
+  {point:'current',outer:'create',nested:'change'},
+  {point:'current',outer:'noop',nested:'change'},
+  {point:'current',outer:'update',nested:'noop'},
+  {point:'current',outer:'update',nested:'malformed'}];
+ for(const item of cases){
+  let armed=false,active,old,hits=0,nested,outerError,escaped,callbackReturned=false,callStart=0;
+  const f=peerFixture({onQuery:q=>{
+   if(!armed||!putFencePoints[item.point](q.sql))return;
+   armed=false;hits++;
+   try{
+    if(item.nested==='noop')active.put('homes',old.id,old.value,old.revision);
+    else if(item.nested==='malformed')active.put('not-a-family',null,undefined,-1);
+    else putFenceUnexpected(active);
+   }catch(error){nested=error;}
+  }});
+  try{
+   old=putFenceSeed(f);const target=putFenceTarget(old,item.outer),before=putFenceDigest(f),trace=byteQueryTrace(f.ledger);
+   try{
+    assert.throws(()=>f.ledger.write('put-fence.swallowed','founder',tx=>{
+     active=tx;escaped=tx;putFenceStage(tx,old);
+     assert.equal(f.ledger.db.prepare('SELECT review_id FROM peer_review_dirty WHERE review_id=?').get('put-fence-staged-review').review_id,'put-fence-staged-review','a real dirty review precedes the denied call');
+     callStart=trace.calls.length;armed=true;
+     try{tx.put('homes',target.id,target.value,target.expected);}catch(error){outerError=error;}
+     assert.ok(nested);assert.match(nested.message,/Reentrant peer row mutation.*rollback required/);
+     assert.ok(outerError);putFencePoison(outerError);
+     const beforeLate=trace.calls.length;
+     for(const operation of [
+      ()=>tx.get('homes',old.id),()=>tx.put('notices','after-denial',{},0),
+      ()=>tx.getVersion(historyReference(old,'homes')),()=>tx.list('homes'),
+      ()=>tx.count('homes'),()=>tx.events(),()=>tx.event('after.denial',{}),
+      ()=>tx.resolveLegacy({sha256:old.sha256}),()=>tx.queryCurrentReviews({subjects:[],scopes:[]})
+     ])assert.throws(operation,putFencePoison);
+     assert.equal(trace.calls.length,beforeLate,'terminal poison rejects later handle calls before SQL');
+     callbackReturned=true;return 'every failure was swallowed';
+    }),putFencePoison);
+   }finally{trace.restore();}
+   active=null;assert.equal(callbackReturned,true);assert.equal(hits,1);
+   putFenceNoUnexpected(trace.calls);
+   if(item.point==='current'||item.point==='history')assert.equal(trace.calls.slice(callStart).some(call=>call.method==='run'),false,'the poisoned outer put adds no physical changes after the earlier staged writes');
+   assert.throws(()=>escaped.get('homes',old.id),/expired/);
+   putFenceAssertRollback(f,before,old,target.reference);
+  }finally{armed=false;active=null;f.close();}
+ }
+});
+
+test('put fence: real current-row and modifying-statement returns cannot escape a caught denial or replace a provider error',()=>{
+ const cases=[];
+ for(const mode of ['create','update','noop'])for(const point of Object.keys(putFencePoints)){
+  if(mode==='noop'&&point!=='current'||mode==='create'&&point==='decrement')continue;
+  cases.push({mode,point});
+ }
+ for(const {mode,point} of cases)for(const throwsAfter of [false,true]){
+  const f=peerFixture(),original=f.ledger.query,runs=[];
+  let active,armed=false,hits=0,nested,escaped,callbackReturned=false;
+  const injected=Error('put-fence provider completion error');
+  try{
+   const old=putFenceSeed(f),target=putFenceTarget(old,mode),before=putFenceDigest(f);
+   const method=point==='current'?'get':'run';
+   f.ledger.query=function(sql,...parameters){
+    const statement=Reflect.apply(original,this,[sql,...parameters]);
+    return new Proxy(statement,{get(object,key){
+     const value=Reflect.get(object,key,object);if(typeof value!=='function')return value;
+     if(!['get','run'].includes(key))return value.bind(object);
+     return (...args)=>{
+      const result=Reflect.apply(value,object,args);
+      if(key==='run')runs.push({sql,args});
+      if(armed&&key===method&&putFencePoints[point](sql)){
+       armed=false;hits++;
+       if(point==='current')assert.equal(result?.id,mode==='create'?undefined:old.id,'the actual SELECT returned its real current-row result');
+       try{putFenceUnexpected(active);}catch(error){nested=error;}
+       if(throwsAfter)throw injected;
+      }
+      return result;
+     };
+    }});
+   };
+   assert.throws(()=>f.ledger.write('put-fence.after-provider','founder',tx=>{
+    active=tx;escaped=tx;armed=true;
+    assert.throws(()=>tx.put('homes',target.id,target.value,target.expected),error=>{
+     assert.ok(putFenceContains(error,/failed row mutation/));
+     if(throwsAfter)assert.ok(putFenceContains(error,injected),'retain the original provider exception by identity');
+     return true;
+    });
+    assert.ok(nested);assert.match(nested.message,/Reentrant peer row mutation/);
+    callbackReturned=true;return 'caught provider boundary failure';
+   }),putFencePoison);
+   active=null;f.ledger.query=original;
+   assert.equal(hits,1);assert.equal(callbackReturned,true);
+   if(point==='current')assert.equal(runs.length,0,'no physical statement follows a poisoned current-row retrieval');
+   else{assert.ok(runs.length>0);assert.ok(putFencePoints[point](runs.at(-1).sql),'no later physical statement follows the actual targeted execution');}
+   assert.equal(runs.some(run=>run.sql==='INSERT INTO peer_versions VALUES(?,?,?,?,?)'&&run.args[0]==='notices'),false);
+   assert.throws(()=>escaped.put('homes',target.id,target.value,target.expected),/expired/);
+   putFenceAssertRollback(f,before,old,target.reference);
+  }finally{armed=false;active=null;f.ledger.query=original;f.close();}
+ }
+});
+
+test('put fence: early canonical inspection traps cannot admit nested writes or conceal poisoned validation failures',()=>{
+ for(const point of ['getPrototypeOf','ownKeys','getOwnPropertyDescriptor'])for(const behavior of ['caught','escaped','provider','malformed']){
+  const f=peerFixture();let active,armed=false,hits=0,nested,escaped,callbackReturned=false;
+  const injected=Error('put-fence canonical provider failure');
+  try{
+   const old=putFenceSeed(f),target=putFenceTarget(old),before=putFenceDigest(f),trace=byteQueryTrace(f.ledger);
+   const value=behavior==='malformed'?{...target.value,unsupported:undefined}:target.value;
+   const proxy=new Proxy(value,{[point](...args){
+    if(armed){
+     armed=false;hits++;
+     try{putFenceUnexpected(active);}catch(error){nested=error;if(behavior==='escaped')throw error;}
+     if(behavior==='provider')throw injected;
+    }
+    return Reflect[point](...args);
+   }});
+   try{
+    assert.throws(()=>f.ledger.write('put-fence.canonical','founder',tx=>{
+     active=tx;escaped=tx;armed=true;
+     assert.throws(()=>tx.put('homes',old.id,proxy,old.revision),error=>{
+      assert.ok(putFenceContains(error,/failed row mutation/));
+      if(behavior==='escaped')assert.ok(putFenceContains(error,nested));
+      if(behavior==='provider')assert.ok(putFenceContains(error,injected));
+      if(behavior==='malformed')assert.ok(putFenceContains(error,/JSON/),'retain the validation error as well as terminal poison');
+      return true;
+     });
+     assert.ok(nested);assert.match(nested.message,/Reentrant peer row mutation/);
+     assert.throws(()=>tx.put('homes',old.id,old.value,old.revision),putFencePoison);
+     callbackReturned=true;return 'canonical error caught';
+    }),putFencePoison);
+   }finally{trace.restore();}
+   active=null;assert.equal(hits,1);assert.equal(callbackReturned,true);
+   assert.equal(trace.calls.some(call=>call.method==='run'),false,'canonical reentry is denied before the first modifying statement');
+   putFenceNoUnexpected(trace.calls);
+   assert.throws(()=>escaped.getVersion(historyReference(old,'homes')),/expired/);
+   putFenceAssertRollback(f,before,old,behavior==='malformed'?null:target.reference);
+  }finally{armed=false;active=null;f.close();}
+ }
+});
+
+test('put fence: validation failures sequential real puts repeated history and successful no-ops release only the call flag',()=>{
+ const f=peerFixture();try{
+  const old=putFenceSeed(f),ref=historyReference(old,'homes');let accessed=false,first,second,last;
+  const accessor={};Object.defineProperty(accessor,'value',{enumerable:true,get(){accessed=true;return 1;}});
+  const before=putFenceDigest(f);
+  f.ledger.write('put-fence.validation-recovery','founder',tx=>{
+   const invalid=[
+    ()=>tx.put('not-a-family','x',{},0),()=>tx.put('homes','',{},0),
+    ()=>tx.put('homes',old.id,old.value,-1),()=>tx.put('homes',old.id,old.value,old.revision+1),
+    ()=>tx.put('homes','invalid-json',{bad:undefined},0),()=>tx.put('homes','invalid-accessor',accessor,0),
+    ()=>tx.put('homes','oversized',{text:'x'.repeat(1_000_000)},0)
+   ];
+   for(const operation of invalid){
+    assert.throws(operation);
+    assert.deepEqual(tx.put('homes',old.id,old.value,old.revision),old,'a rejected outer call must release its local flag');
+    assert.deepEqual(tx.getVersion(ref).value,old.value,'recoverable validation must not set physical mutation or terminal poison');
+   }
+  });
+  assert.equal(accessed,false);assert.deepEqual(putFenceDigest(f),before);
+  f.ledger.read(tx=>{
+   for(let i=0;i<2;i++){
+    assert.throws(()=>tx.put('homes',old.id,old.value,old.revision),/cannot write/);
+    assert.deepEqual(tx.getVersion(ref).value,old.value);
+   }
+  });
+  assert.deepEqual(putFenceDigest(f),before);
+  f.ledger.write('put-fence.sequential','founder',tx=>{
+   first=tx.put('notices','put-fence-sequential-a',{status:'pending',scope:'alpha',content:'First'},0);
+   assert.deepEqual(tx.put('notices',first.id,first.value,first.revision),first);
+   second=tx.put('notices',first.id,{...first.value,content:'Second'},first.revision);
+   assert.deepEqual(tx.put('notices',second.id,second.value,second.revision),second);
+   last=tx.put('notices','put-fence-sequential-b',{status:'pending',scope:'beta',content:'Separate row'},0);
+  });
+  assert.equal(first.revision,1);assert.equal(second.revision,2);assert.equal(last.revision,1);
+  const fresh=new PeerLedger(f.root);try{
+   fresh.read(tx=>{
+    assert.deepEqual(tx.get('notices',second.id),second);assert.deepEqual(tx.get('notices',last.id),last);
+    assert.deepEqual(tx.getVersion(historyReference(first,'notices')).value,first.value);
+    assert.deepEqual(tx.getVersion(historyReference(second,'notices')).value,second.value);
+    for(const id of ['invalid-json','invalid-accessor','oversized'])assert.equal(tx.get('homes',id),null);
+   });
+   const stable=putFenceDigest(f);
+   fresh.write('put-fence.noop-only','founder',tx=>{
+    assert.deepEqual(tx.put('notices',second.id,second.value,second.revision),second);
+    assert.deepEqual(tx.put('notices',last.id,last.value,last.revision),last);
+    assert.deepEqual(tx.getVersion(historyReference(second,'notices')).value,second.value);
+   });
+   assert.deepEqual(putFenceDigest(f),stable);assert.equal(fresh.verify().complete,true);
+  }finally{fresh.close();}
+ }finally{f.close();}
+});
+
+test('put fence: ordinary get and historical READ hooks still permit real or no-op puts outside an active put',()=>{
+ for(const point of ['get','history'])for(const mode of ['change','noop']){
+  let active,armed=false,hits=0,notice,changed;
+  const match=point==='get'?putFencePoints.current:sql=>sql===callbackExactHistorySQL;
+  const f=peerFixture({onQuery:q=>{
+   if(!armed||!match(q.sql))return;
+   armed=false;hits++;
+   changed=active.put('notices',notice.id,mode==='change'?{...notice.value,content:'Explicitly reconciled read-hook change.'}:notice.value,notice.revision);
+  }});
+  try{
+   notice=f.ledger.write('put-fence.read-seed','founder',tx=>tx.put('notices','put-fence-read-notice',{status:'pending',scope:'alpha',content:'Before read hook'},0));
+   const source=f.ledger.write('put-fence.history-seed','founder',tx=>tx.put('tasks','put-fence-read-source',{status:'planned',scope:'alpha'},0));
+   const reference=historyReference(source),before=putFenceDigest(f);
+   f.ledger.write('put-fence.read-hook','founder',tx=>{
+    active=tx;armed=true;
+    const read=()=>point==='get'?tx.get('tasks',source.id):tx.getVersion(reference);
+    if(mode==='change'&&point==='history')assert.throws(read,/owning snapshot before pending writes/i);
+    else assert.deepEqual(read().value,source.value);
+    if(mode==='change'){
+     assert.deepEqual(tx.get('notices',notice.id),changed);
+     tx.event('put-fence.read-hook-reconciled',{id:notice.id});
+    }
+   });
+   active=null;assert.equal(hits,1);
+   if(mode==='change'){
+    assert.equal(changed.revision,2);assert.deepEqual(f.ledger.read(tx=>tx.get('notices',notice.id)),changed);
+   }else{assert.deepEqual(changed,notice);assert.deepEqual(putFenceDigest(f),before);}
+   assert.equal(f.ledger.verify().complete,true);
+  }finally{armed=false;active=null;f.close();}
+ }
+});
+
+test('put fence: read-only telemetry inside an active put remains supported with the existing historical and collection guards',()=>{
+ for(const mode of ['create','update','noop'])for(const point of ['current','history','row','generation']){
+  if(mode==='noop'&&point!=='current')continue;
+  let active,armed=false,old,hits=0;
+  const f=peerFixture({onQuery:q=>{
+   if(!armed||!putFencePoints[point](q.sql))return;
+   armed=false;hits++;
+   assert.equal(active.get('control','company').value.paused,false);
+   assert.equal(active.count('tasks'),0);
+   if(point==='current'){
+    assert.deepEqual(active.getVersion(historyReference(old,'homes')).value,old.value);
+    assert.equal(active.list('homes').total,1);
+    assert.deepEqual(active.queryCurrentReviews({subjects:[],scopes:[]}),selectionEmpty());
+   }else{
+    assert.throws(()=>active.getVersion(historyReference(old,'homes')),/before pending writes/);
+    assert.throws(()=>active.list('homes'),/List after pending writes/);
+    assert.throws(()=>active.queryCurrentReviews({subjects:[],scopes:[]}),/before pending writes/);
+   }
+  }});
+  try{
+   old=putFenceSeed(f);const target=putFenceTarget(old,mode),before=putFenceDigest(f);
+   const result=f.ledger.write('put-fence.read-only-telemetry','founder',tx=>{
+    active=tx;armed=true;return tx.put('homes',target.id,target.value,target.expected);
+   });
+   active=null;assert.equal(hits,1);
+   assert.equal(result.revision,mode==='noop'?old.revision:target.expected+1);
+   assert.deepEqual(result.value,target.value);
+   const fresh=new PeerLedger(f.root);try{
+    assert.deepEqual(fresh.read(tx=>tx.get('homes',target.id)),result);
+    assert.deepEqual(fresh.read(tx=>tx.getVersion(historyReference(old,'homes'))).value,old.value);
+    assert.equal(fresh.read(tx=>tx.list('homes')).total,mode==='create'?2:1);
+    assert.equal(fresh.verify().complete,true);
+   }finally{fresh.close();}
+   if(mode==='noop')assert.deepEqual(putFenceDigest(f),before);
+  }finally{armed=false;active=null;f.close();}
+ }
+});
+
+test('put fence: poisoned external savepoints roll back receipts and dirty reviews while preserving caller work and later savepoints',()=>{
+ for(const point of ['current','history','row','generation']){
+  const f=peerFixture(),db=new DatabaseSync(f.file);
+  let armed=false,active,hits=0,nested,escaped,callbackReturned=false;
+  const shared=new PeerLedger(f.root,{connection:db,onQuery:q=>{
+   if(!armed||!putFencePoints[point](q.sql))return;
+   armed=false;hits++;
+   try{putFenceUnexpected(active);}catch(error){nested=error;}
+  }}),sibling=new PeerLedger(f.root,{connection:db});
+  try{
+   const old=putFenceSeed(f),target=putFenceTarget(old),before=putFenceDigest(f),eventsBefore=f.ledger.events().total;
+   db.exec('BEGIN IMMEDIATE');
+   const retained=shared.writeWithin('put-fence.caller-before','founder',tx=>tx.put('notices','put-fence-caller-retained',{status:'pending',scope:'alpha',content:'Caller work before failing savepoint'},0));
+   const callerState=putFenceDigest(f,db);
+   assert.throws(()=>shared.writeWithin('put-fence.failed-savepoint','founder',tx=>{
+    active=tx;escaped=tx;putFenceStage(tx,old);armed=true;
+    assert.throws(()=>tx.put('homes',target.id,target.value,target.expected),putFencePoison);
+    assert.ok(nested);assert.match(nested.message,/Reentrant peer row mutation/);
+    callbackReturned=true;return 'savepoint failure swallowed';
+   }),putFencePoison);
+   active=null;assert.equal(callbackReturned,true);assert.equal(hits,1);
+   assert.equal(db.isTransaction,true,'the caller retains its actual outer transaction');
+   assert.deepEqual(putFenceDigest(f,db),callerState,'only the failed savepoint is rolled back, including earlier staged receipt and dirty review');
+   assert.deepEqual(putFenceDigest(f),before,'another connection still sees the prior committed state');
+   assert.throws(()=>escaped.put('homes',old.id,old.value,old.revision),/expired/);
+   const following=sibling.writeWithin('put-fence.caller-after','founder',tx=>{
+    assert.deepEqual(tx.get('notices',retained.id),retained);
+    assert.deepEqual(tx.put('homes',old.id,old.value,old.revision),old);
+    assert.throws(()=>tx.getVersion(historyReference(old,'homes')),/external transactions are excluded/);
+    return tx.put('notices','put-fence-caller-following',{status:'pending',scope:'beta',content:'Later independent savepoint'},0);
+   });
+   assert.equal(db.isTransaction,true);db.exec('COMMIT');
+   const fresh=new PeerLedger(f.root);try{
+    fresh.read(tx=>{
+     assert.deepEqual(tx.get('homes',old.id),old);
+     assert.deepEqual(tx.get('notices',retained.id),retained);
+     assert.deepEqual(tx.get('notices',following.id),following);
+     assert.equal(tx.get('notices','put-fence-unexpected'),null);
+     assert.equal(tx.get('commands','put-fence-receipt'),null);
+     assert.equal(tx.get('reviews','put-fence-staged-review'),null);
+     assert.throws(()=>tx.getVersion(target.reference),/unavailable/);
+    });
+    assert.equal(fresh.events().total,eventsBefore+2,'the failed savepoint contributes no event or receipt');
+    assert.equal(fresh.verify().complete,true);assert.equal(fresh.auditReviewSelection().clean,true);
+   }finally{fresh.close();}
+  }finally{armed=false;active=null;if(db.isTransaction)db.exec('ROLLBACK');shared.close();sibling.close();db.close();f.close();}
+ }
+});
+
+test('put fence: ordinary provider errors preserve identity and pre-mutation recovery without clearing physical-mutation poison',()=>{
+ for(const point of ['current','history'])for(const phase of ['prepare','result']){
+  let armed=false,hits=0,escaped,callbackReturned=false;
+  const injected=Error('put-fence ordinary provider '+point+' '+phase);
+  const f=peerFixture({onQuery:q=>{
+   if(!armed||phase!=='prepare'||!putFencePoints[point](q.sql))return;
+   armed=false;hits++;throw injected;
+  }}),original=f.ledger.query;
+  try{
+   const old=putFenceSeed(f),target=putFenceTarget(old),before=putFenceDigest(f);
+   f.ledger.query=function(sql,...parameters){
+    const statement=Reflect.apply(original,this,[sql,...parameters]);
+    if(!armed||phase!=='result'||!putFencePoints[point](sql))return statement;
+    armed=false;const method=point==='current'?'get':'run';
+    return {[method](...args){
+     statement[method](...args);hits++;throw injected;
+    }};
+   };
+   const callback=tx=>{
+    escaped=tx;armed=true;
+    assert.throws(()=>tx.put('homes',target.id,target.value,target.expected),error=>{assert.equal(error,injected);return true;});
+    assert.equal(hits,1);
+    if(point==='current'){
+     assert.deepEqual(putFenceDigest(f,f.ledger.db),before);
+     assert.deepEqual(tx.getVersion(historyReference(old,'homes')).value,old.value);
+     assert.deepEqual(tx.put('homes',old.id,old.value,old.revision),old);
+     callbackReturned=true;return tx.put('homes',target.id,target.value,target.expected);
+    }
+    assert.throws(()=>tx.put('homes',old.id,old.value,old.revision),putFencePoison);
+    callbackReturned=true;return 'physical failure swallowed';
+   };
+   if(point==='current'){
+    const changed=f.ledger.write('put-fence.provider-recovered','founder',callback);
+    assert.equal(changed.revision,2);assert.equal(changed.sha256,target.reference.sha256);
+    assert.deepEqual(f.ledger.read(tx=>tx.get('homes',old.id)),changed);
+    assert.deepEqual(f.ledger.read(tx=>tx.getVersion(historyReference(old,'homes'))).value,old.value);
+    assert.equal(f.ledger.verify().complete,true);
+   }else{
+    assert.throws(()=>f.ledger.write('put-fence.provider-poison','founder',callback),putFencePoison);
+    putFenceAssertRollback(f,before,old,target.reference);
+    const fresh=new PeerLedger(f.root);try{
+     const changed=fresh.write('put-fence.provider-fresh-write','founder',tx=>tx.put('homes',target.id,target.value,target.expected));
+     assert.equal(changed.sha256,target.reference.sha256);assert.equal(fresh.verify().complete,true);
+    }finally{fresh.close();}
+   }
+   assert.equal(callbackReturned,true);assert.equal(hits,1);
+   assert.throws(()=>escaped.get('homes',old.id),/expired/);
+  }finally{armed=false;f.ledger.query=original;f.close();}
+ }
+});
+
+test('put fence: physical transaction loss during preparation or real statement return cannot permit an autocommit write or successful result',()=>{
+ for(const point of ['current','history'])for(const phase of ['prepare','result'])for(const throwsAfter of [false,true]){
+  let armed=false,hits=0,escaped,observed,callbackReturned=false;
+  const injected=Error('put-fence provider error with physical transaction loss');
+  const f=peerFixture({onQuery:q=>{
+   if(!armed||phase!=='prepare'||!putFencePoints[point](q.sql))return;
+   armed=false;hits++;
+   // Controlled trusted-host loss of the real transaction, not confinement.
+   f.ledger.db.exec('ROLLBACK');
+   if(throwsAfter)throw injected;
+  }}),original=f.ledger.query,runs=[];
+  try{
+   const old=putFenceSeed(f),target=putFenceTarget(old),before=putFenceDigest(f);
+   const method=point==='current'?'get':'run';
+   f.ledger.query=function(sql,...parameters){
+    const statement=Reflect.apply(original,this,[sql,...parameters]);
+    return new Proxy(statement,{get(object,key){
+     const value=Reflect.get(object,key,object);if(typeof value!=='function')return value;
+     if(!['get','run'].includes(key))return value.bind(object);
+     return (...args)=>{
+      const result=Reflect.apply(value,object,args);
+      if(key==='run')runs.push({sql,args});
+      if(armed&&phase==='result'&&key===method&&putFencePoints[point](sql)){
+       armed=false;hits++;f.ledger.db.exec('ROLLBACK');
+       if(throwsAfter)throw injected;
+      }
+      return result;
+     };
+    }});
+   };
+   assert.throws(()=>f.ledger.write('put-fence.physical-loss','founder',tx=>{
+    escaped=tx;armed=true;
+    assert.throws(()=>tx.put('homes',target.id,target.value,target.expected),error=>{
+     observed=error;assert.ok(putFenceContains(error,/transaction.*active|transaction boundary/i));
+     if(throwsAfter)assert.ok(putFenceContains(error,injected),'provider identity survives simultaneous physical loss');
+     return true;
+    });
+    assert.throws(()=>tx.get('homes',old.id),/transaction.*active/i);
+    callbackReturned=true;return 'lost transaction failure swallowed';
+   }),error=>{assert.ok(putFenceContains(error,/transaction|rollback/i));return true;});
+   f.ledger.query=original;
+   assert.ok(observed);assert.equal(hits,1);assert.equal(callbackReturned,true);
+   if(point==='current'||phase==='prepare')assert.equal(runs.length,0,'a prepared statement must not execute after transaction loss');
+   else{assert.equal(runs.length,1);assert.ok(putFencePoints.history(runs[0].sql),'the sole executed INSERT was rolled back before its result escaped');}
+   assert.throws(()=>escaped.put('homes',target.id,target.value,target.expected),/expired/);
+   putFenceAssertRollback(f,before,old,target.reference);
+   const recovered=f.ledger.write('put-fence.physical-recovery','founder',tx=>tx.put('homes',target.id,target.value,target.expected));
+   assert.equal(recovered.sha256,target.reference.sha256);assert.equal(f.ledger.verify().complete,true);
+  }finally{armed=false;f.ledger.query=original;f.close();}
+ }
+});

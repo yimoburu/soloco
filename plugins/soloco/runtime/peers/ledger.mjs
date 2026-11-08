@@ -493,7 +493,7 @@ export class PeerLedger{
       const changes=[],events=[],pending=new Map(),initial=new Map();
       // Fence history before preparing the first modifying statement. A failed
       // mutation poisons this transaction even if the callback catches it.
-      let rowMutationStarted=false,mutationFailed=false,finalizing=false;
+      let rowMutationStarted=false,mutationFailed=false,finalizing=false,putInProgress=false;
       const snapshot=randomUUID();
       const boundary=()=>{
         if(!active||!this.inTransaction||!fence.owns(token))throw Error('Peer transaction handle expired');
@@ -583,25 +583,60 @@ export class PeerLedger{
           return JSON.parse(bytes);
         },
         put:(f,id,value,expected_revision=0)=>{
-          guard();if(!write)throw Error('Peer read snapshots cannot write');family(f);exact(id,'row identity',2000);
-          if(!Number.isSafeInteger(expected_revision)||expected_revision<0)throw Error('Expected peer revision is required');
-          const current=get(f,id);
-          if((current?.revision??0)!==expected_revision)throw Error('Peer revision conflict; reload exact state');
-          const bytes=canonical(value);if(Buffer.byteLength(bytes)>MAX_VALUE_BYTES)throw Error('Peer value exceeds bounded row capacity');
-          const sha256=hash(bytes);if(current&&current.sha256===sha256)return current;
-          const revision=expected_revision+1;positive(revision,'revision');
-          const normalized=JSON.parse(bytes),dim=dimensions(normalized),created_seq=current?.created_seq??sequence;
-          const identity=canonical([f,id]);if(!initial.has(identity))initial.set(identity,current?.revision??0);
-          rowMutationStarted=true;
+          guard();
+          // Independently revised from the attributed external put-fence proposal.
+          // Denial precedes argument inspection, including no-op/malformed calls.
+          // A denied nested call must not enter the owner's finally block.
+          if(putInProgress){mutationFailed=true;throw Error('Reentrant peer row mutation is forbidden; rollback required');}
+          putInProgress=true;
           try{
-            this.query('INSERT INTO peer_versions VALUES(?,?,?,?,?)').run(f,id,revision,sha256,bytes);
-            this.query('INSERT INTO peer_rows VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(family,id) DO UPDATE SET revision=excluded.revision,sha256=excluded.sha256,bytes=excluded.bytes,status=excluded.status,principal_id=excluded.principal_id,task_id=excluded.task_id,scope=excluded.scope').run(f,id,revision,sha256,bytes,created_seq,dim.status,dim.principal_id,dim.task_id,dim.scope);
-            if(current)for(const key of selectors(dimensions(current.value))){const r=this.query('UPDATE peer_membership SET count=count-1 WHERE family=? AND selector=? AND count>0').run(f,key);if(r.changes!==1)throw Error('Peer membership predecessor missing');}
-            for(const key of selectors(dim))this.query('INSERT INTO peer_membership VALUES(?,?,1) ON CONFLICT(family,selector) DO UPDATE SET count=count+1').run(f,key);
-            if(this.query('UPDATE peer_generations SET generation=generation+1,count=count+? WHERE family=?').run(current?0:1,f).changes!==1)throw Error('Peer family generation is missing');
-            changes.push({family:f,id,revision,sha256,previous_sha256:current?.sha256??null});
-            const result={id,revision,sha256,created_seq,value:normalized};pending.set(canonical([f,id]),structuredClone(result));return result;
-          }catch(error){mutationFailed=true;throw error;}
+            // Query preparation, actual retrieval/execution and canonical input
+            // inspection can run synchronous caller code. Preserve an original
+            // failure and report a simultaneous boundary failure separately.
+            const checked=operation=>{
+              guard();let result;
+              try{result=operation();}catch(error){
+                try{guard();}catch(boundaryError){
+                  throw new AggregateError([error,boundaryError],'Peer put failed after its transaction boundary changed');
+                }
+                throw error;
+              }
+              guard();return result;
+            };
+            checked(()=>{
+              if(!write)throw Error('Peer read snapshots cannot write');
+              family(f);exact(id,'row identity',2000);
+              if(!Number.isSafeInteger(expected_revision)||expected_revision<0)throw Error('Expected peer revision is required');
+            });
+            const current=checked(()=>get(f,id));
+            if((current?.revision??0)!==expected_revision)throw Error('Peer revision conflict; reload exact state');
+            const bytes=checked(()=>canonical(value));if(Buffer.byteLength(bytes)>MAX_VALUE_BYTES)throw Error('Peer value exceeds bounded row capacity');
+            const sha256=hash(bytes);
+            if(current&&current.sha256===sha256){guard();return current;}
+            const revision=expected_revision+1;positive(revision,'revision');
+            const normalized=checked(()=>JSON.parse(bytes)),dim=checked(()=>dimensions(normalized)),created_seq=current?.created_seq??sequence;
+            const identity=canonical([f,id]);if(!initial.has(identity))initial.set(identity,current?.revision??0);
+            rowMutationStarted=true;
+            const run=(sql,...parameters)=>{
+              const statement=checked(()=>this.query(sql));
+              return checked(()=>statement.run(...parameters));
+            };
+            try{
+              run('INSERT INTO peer_versions VALUES(?,?,?,?,?)',f,id,revision,sha256,bytes);
+              run('INSERT INTO peer_rows VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(family,id) DO UPDATE SET revision=excluded.revision,sha256=excluded.sha256,bytes=excluded.bytes,status=excluded.status,principal_id=excluded.principal_id,task_id=excluded.task_id,scope=excluded.scope',f,id,revision,sha256,bytes,created_seq,dim.status,dim.principal_id,dim.task_id,dim.scope);
+              if(current)for(const key of selectors(dimensions(current.value))){const r=run('UPDATE peer_membership SET count=count-1 WHERE family=? AND selector=? AND count>0',f,key);if(checked(()=>r.changes)!==1)throw Error('Peer membership predecessor missing');}
+              for(const key of selectors(dim))run('INSERT INTO peer_membership VALUES(?,?,1) ON CONFLICT(family,selector) DO UPDATE SET count=count+1',f,key);
+              const generation=run('UPDATE peer_generations SET generation=generation+1,count=count+? WHERE family=?',current?0:1,f);
+              if(checked(()=>generation.changes)!==1)throw Error('Peer family generation is missing');
+              guard();
+              changes.push({family:f,id,revision,sha256,previous_sha256:current?.sha256??null});
+              const result={id,revision,sha256,created_seq,value:normalized};pending.set(canonical([f,id]),structuredClone(result));return result;
+            }catch(error){mutationFailed=true;throw error;}
+          }finally{
+            // This call owns only this flag. Poison, lifetime and the physical
+            // connection owner remain controlled by the enclosing transaction.
+            putInProgress=false;
+          }
         },
         event:(kind,payload)=>{guard();if(!write)throw Error('Peer read snapshots cannot append events');exact(kind,'event type');events.push({type:kind,payload:JSON.parse(canonical(payload))});}
       });
