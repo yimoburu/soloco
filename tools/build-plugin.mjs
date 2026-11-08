@@ -9,7 +9,7 @@ function publish(relative, content) {
   } else fs.writeFileSync(file, content);
 }
 publish('../plugins/soloco/assets/governance.md',fs.readFileSync(new URL('../SPEC.md',import.meta.url)));
-const version = fs.readFileSync(new URL('../plugins/soloco/runtime/store.mjs',import.meta.url),'utf8').match(/export const VERSION = '([^']+)'/)[1];
+const version = fs.readFileSync(new URL('../plugins/soloco/runtime/team-source.mjs',import.meta.url),'utf8').match(/export const VERSION = '([^']+)'/)[1];
 for (const host of ['codex','claude']) {
   const relative=`../plugins/soloco/.${host}-plugin/plugin.json`;
   const manifest=JSON.parse(fs.readFileSync(new URL(relative,import.meta.url)));
