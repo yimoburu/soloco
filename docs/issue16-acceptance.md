@@ -2,6 +2,8 @@
 
 Branch: `codex/issue-16-cos-coordination`. This is a repository candidate, not an installed/adopted team or a claim that production behavior has changed. SPEC and governing rules are unchanged. Historical pinned instructions/charters remain unchanged until applicable adoption.
 
+Fresh follow-up: [2026-11-07 repeated native qualification](issue16-repeated-evaluation-2026-11-07.md) records four counterbalanced accepted-workflow pairs and twelve separate current-host task/policy calls. It fixes the evaluator's unavailable hardcoded model, preserves original receipts, and keeps actual human-effort and harmful-splitting acceptance gaps open.
+
 ## Implementation and evidence matrix
 
 | Preserved scope | Implementation | Validation and practical limits |

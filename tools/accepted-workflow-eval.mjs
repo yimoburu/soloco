@@ -25,7 +25,10 @@ const safeError=e=>({message:String(e.message).slice(0,2000),code:e.code??null,t
 const elapsed=started=>performance.now()-started;
 export const baseRevision='9c0cb8a9d40da42242787b1bbaacfa11ba37acdc';
 export function sourceIdentity(base=fileURLToPath(new URL('../',import.meta.url))){const files=[];const walk=dir=>{for(const entry of fs.readdirSync(path.join(base,dir),{withFileTypes:true})){const name=path.posix.join(dir,entry.name);if(entry.isDirectory())walk(name);else if(entry.isFile())files.push({path:name,sha256:digest(fs.readFileSync(path.join(base,name)))});}};walk('plugins/soloco');for(const name of ['SPEC.md','tools/accepted-workflow-eval.mjs','tools/workflow-runtime.mjs','tests/accepted-workflow-eval.test.mjs'])files.push({path:name,sha256:digest(fs.readFileSync(path.join(base,name)))});files.sort((a,b)=>a.path.localeCompare(b.path));let observed_git_revision=null;const top=spawnSync('git',['-C',base,'rev-parse','--show-toplevel'],{encoding:'utf8'});if(top.status===0&&fs.realpathSync(top.stdout.trim())===fs.realpathSync(base)){const head=spawnSync('git',['-C',base,'rev-parse','HEAD'],{encoding:'utf8'});if(head.status===0&&/^[a-f0-9]{40}$/.test(head.stdout.trim()))observed_git_revision=head.stdout.trim();}return {design_base_revision:baseRevision,observed_git_revision,files,manifest_sha256:digest(JSON.stringify(files)),node:{version:process.version,platform:process.platform,arch:process.arch,executable_sha256:digest(fs.readFileSync(process.execPath))}};}
-const selections={research:{mode:'explicit',model:'gpt-6.1-sol',effort:'low',speed:'host_default',reason:'Exact fictional extraction with deterministic acceptance; same choice in both matched schedules.'},engineer:{mode:'explicit',model:'gpt-6.1-sol',effort:'medium',speed:'host_default',reason:'Bounded pure parser repair with immutable executed tests; same choice in both schedules.'},qa:{mode:'explicit',model:'gpt-6.1-sol',effort:'high',speed:'host_default',reason:'Independent exact-candidate acceptance and seeded boundary review; same choice in both schedules.'}};
+export function workflowSelections(modelId='gpt-6.1-sol') {
+ if(typeof modelId!=='string'||!modelId.trim())throw Error('Choose one exact host-catalog model; no fallback is permitted');
+ return {research:{mode:'explicit',model:modelId,effort:'low',speed:'host_default',reason:'Exact fictional extraction with deterministic acceptance; same choice in both matched schedules.'},engineer:{mode:'explicit',model:modelId,effort:'medium',speed:'host_default',reason:'Bounded pure parser repair with immutable executed tests; same choice in both schedules.'},qa:{mode:'explicit',model:modelId,effort:'high',speed:'host_default',reason:'Independent exact-candidate acceptance and seeded boundary review; same choice in both schedules.'}};
+}
 export function contractModel({badFirst=false,qaVerdict='Pass',throwFor=null}={}) {let generation=0;return async ({job,target},host,native,prompt,cwd,timeout,selection,options)=>{
  options.onSpawn(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));
  if(throwFor===job.role)throw Object.assign(Error('Injected uncertain provider failure'),{termination_confirmed:false});
@@ -36,7 +39,7 @@ export function contractModel({badFirst=false,qaVerdict='Pass',throwFor=null}={}
  await new Promise(r=>setTimeout(r,10));
  return {native_id:id('contract-double'),text:JSON.stringify(envelope),model_evidence:{verification:'synthetic_contract_double'}};
 };}
-export async function runArm({directory,mode,native=false,model=contractModel(),sharedBudget={calls:0},runtimeReady,runtimeCatalog}){
+export async function runArm({directory,mode,native=false,model=contractModel(),modelId='gpt-6.1-sol',sharedBudget={calls:0},maxCalls=protocol.criteria.max_native_calls_total,runtimeReady,runtimeCatalog}){
  if(!['serial','concurrent'].includes(mode))throw Error('Choose serial or concurrent');
  const root=path.join(directory,mode);fs.mkdirSync(root,{recursive:true});
  const args={root,session_id:id('fictional-founder'),epoch:1};
@@ -48,11 +51,12 @@ export async function runArm({directory,mode,native=false,model=contractModel(),
  const plan=await engine.develop({...args,action:'plan',model_data_approved:true,read_paths:['port.mjs','port.test.mjs'],write_paths:['port.mjs'],test_paths:['port.test.mjs'],
  acceptance:criteria.join(' '),stop_conditions:'Stop on uncertain execution, changed scope, backend error, failed independent QA or exhausted two generation attempts. No installs, network in tests, source integration or external actions.',data_policy:'Only the manually supplied fictional parser, tests and extraction brief may go to existing host model.',source_instruction:'Fictional fixture authorizes inspection and sharing of these two fixture files for this matched local evaluation.',max_attempts:2,timeout_ms:5000,max_output_bytes:20000,max_bytes:20000,expires_at:new Date(Date.now()+3600000).toISOString()},'codex');
  await engine.develop({...args,action:'authorize',plan_id:plan.id,scope_sha256:plan.development.scope_sha256,model_data_approved:true,source_instruction:'Fictional test grant: allow this exact fixture scope, executed tests, independent review and acceptance; at most two generations.'},'codex');
+ const selections=workflowSelections(modelId);
  const report={mode,execution:native?'native_cli':'synthetic_contract_double',root,fixture_sha256:digest(JSON.stringify({criteria,initialSource,testSource})),selections,events:[],calls:[],attempts:[],accepted:false,errors:[],founder_requests:[],precheck:{status:precheck.status,exit_code:precheck.exit_code,tests_executed:precheck.tests_executed}};
  const started=performance.now();
  const event=(type,extra={})=>{const v={type,at_ms:elapsed(started),...extra};report.events.push(v);return v;};
  const checkpoint=()=>fs.writeFileSync(path.join(root,'workflow-local.json'),JSON.stringify(report,null,2)+'\n');
- const {dispatch}=createWorkflow({args,report,started,native,model,sharedBudget,maxCalls:protocol.criteria.max_native_calls_total,runtimeReady,runtimeCatalog,checkpoint,selections,taskByRole:role=>role==='research'?'Extract these exact fictional criteria in order. Return content as a JSON string containing {"criteria":[...]}. Preserve exact text. Brief: '+JSON.stringify(criteria):role==='engineer'?'Repair parsePort in the exact supplied scope. The original test failure is supplied. Preserve the read-only acceptance tests; return only port.mjs in files.':'Independently inspect exact candidate, immutable tests, actual runtime receipt and extracted criteria. Pass only when all criteria and actual passing execution are evidenced. Return exact required candidate and receipt hashes. No execution claims.'});
+ const {dispatch}=createWorkflow({args,report,started,native,model,sharedBudget,maxCalls,runtimeReady,runtimeCatalog,checkpoint,selections,taskByRole:role=>role==='research'?'Extract these exact fictional criteria in order. Return content as a JSON string containing {"criteria":[...]}. Preserve exact text. Brief: '+JSON.stringify(criteria):role==='engineer'?'Repair parsePort in the exact supplied scope. The original test failure is supplied. Preserve the read-only acceptance tests; return only port.mjs in files.':'Independently inspect exact candidate, immutable tests, actual runtime receipt and extracted criteria. Pass only when all criteria and actual passing execution are evidenced. Return exact required candidate and receipt hashes. No execution claims.'});
  try {
   let extraction,generation;
   if(mode==='serial'){extraction=await dispatch('research');generation=await dispatch('engineer',{development_id:plan.id,input_ids:[failure.id]});}
@@ -122,17 +126,17 @@ export function assessPair(arms,sourceVerification=null){
  return {passed:errors.length===0&&arm_errors.every(a=>!a.errors.length),quality_errors:arm_errors.filter(a=>a.errors.length).length,errors,arm_errors,source_verification_required:sourceVerification!==null,serial_ms:list.find(a=>a?.mode==='serial')?.elapsed_ms??null,concurrent_ms:list.find(a=>a?.mode==='concurrent')?.elapsed_ms??null,descriptive_only:true,causal_speedup_established:false};
 }
 async function main(argv){
- if(argv.length<2||!['--native','--contract-double'].includes(argv[0]))throw Error('Use --native|--contract-double NEW_OUTPUT_DIRECTORY');
- const native=argv[0]==='--native',directory=path.resolve(argv[1]);
+ if(![2,4].includes(argv.length)||!['--native','--contract-double'].includes(argv[0])||(argv.length===4&&argv[2]!=='--model'))throw Error('Use --native|--contract-double NEW_OUTPUT_DIRECTORY [--model EXACT_CATALOG_MODEL]');
+ const native=argv[0]==='--native',directory=path.resolve(argv[1]),modelId=argv[3]??'gpt-6.1-sol';
  if(fs.existsSync(directory))throw Error('Choose a new output directory; preserve prior failures');
  fs.mkdirSync(directory,{recursive:true});process.env.COMPANY_PLUGIN_DATA=path.join(directory,'fixture-bindings');
- fs.writeFileSync(path.join(directory,'predeclared-protocol.json'),JSON.stringify(protocol,null,2)+'\n',{flag:'wx'});
+ fs.writeFileSync(path.join(directory,'predeclared-protocol.json'),JSON.stringify({...protocol,selections:workflowSelections(modelId)},null,2)+'\n',{flag:'wx'});
  const capability=sandboxCapability();if(!capability.supported)throw Error(capability.blocker);
  const ready=native?readiness('codex'):null,catalog=native?modelCatalog('codex'):null;if(native&&!ready.available)throw Error(ready.error);
  const source_identity=sourceIdentity();fs.writeFileSync(path.join(directory,'source-identity.json'),JSON.stringify(source_identity,null,2)+'\n',{flag:'wx'});
  const arms=[],sharedBudget={calls:0};let result;
  for(const mode of ['serial','concurrent']){
-  const arm=await runArm({directory,mode,native,sharedBudget,runtimeReady:ready,runtimeCatalog:catalog});arms.push(arm);
+  const arm=await runArm({directory,mode,native,modelId,sharedBudget,runtimeReady:ready,runtimeCatalog:catalog});arms.push(arm);
   const {after:source_identity_after,verification:source_verification}=captureSourceVerification(source_identity);
   result=assessPair(arms,source_verification);
   const report={protocol,source_identity,source_identity_after,source_verification,execution:native?'native_cli':'synthetic_contract_double',arms:arms.map(publicReport),assessment:result};
