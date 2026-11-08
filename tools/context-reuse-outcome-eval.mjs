@@ -10,6 +10,7 @@ import {readiness,modelCatalog} from '../plugins/soloco/runtime/adapters.mjs';
 import {runLocalTests,sandboxCapability} from '../plugins/soloco/runtime/local-sandbox.mjs';
 import {executionTiming} from '../plugins/soloco/runtime/timeout.mjs';
 import {bindCoordination} from '../plugins/soloco/runtime/coordination.mjs';
+import {validationManifestMatches} from '../plugins/soloco/runtime/validation-cache.mjs';
 import {createWorkflow,read,waitTest,publicReport} from './workflow-runtime.mjs';
 import {sourceIdentity,captureSourceVerification,correctSource} from './accepted-workflow-eval.mjs';
 
@@ -46,7 +47,10 @@ export function contractModel(){return async({job,target},host,native,prompt,cwd
  const value={content:JSON.stringify(expected),messages:[],notices:[]};
  if(job.development_id)value.files=[{path:'port.mjs',content:correctSource}];
  if(target?.context_classification_plan)value.review={verdict:'Pass',reason:'Synthetic complete inert-archive qualification; not native evidence.',permitted_action:'apply_context_classification',plan_sha256:digest(JSON.stringify(target.context_classification_plan)),blockers:[]};
- else if(job.role==='qa')value.review={verdict:'Pass',reason:'Synthetic exact-candidate review; not native evidence.',permitted_action:'accept_local_development',candidate_sha256:target.development.candidate_sha256,receipt_sha256:target.development.receipt_sha256,blockers:[],deterministic_validation:{permitted_action:'reuse_exact_validation',fingerprint:target.development.validation_fingerprint,dependencies_complete:true,external_state:false}};
+ else if(job.role==='qa'){
+  assert(validationManifestMatches(target));assert.equal(target.development.validation_manifest.runtime.node,process.version);assert(prompt.includes('validation_manifest_sha256'));assert.equal(target.development.validation_manifest.files.length,2);
+  value.review={verdict:'Pass',reason:'Synthetic exact-candidate review; not native evidence.',permitted_action:'accept_local_development',candidate_sha256:target.development.candidate_sha256,receipt_sha256:target.development.receipt_sha256,blockers:[],deterministic_validation:{permitted_action:'reuse_exact_validation',fingerprint:target.development.validation_fingerprint,dependencies_complete:true,external_state:false}};
+ }
  return {native_id:native??id('synthetic-only'),text:JSON.stringify(value),model_evidence:{verification:'synthetic_contract_double'}};
 };}
 const failure=e=>({message:String(e.message).slice(0,2000),code:e.code??null,termination_confirmed:e.termination_confirmed??null});
@@ -109,7 +113,7 @@ export async function runScale({directory,scale,native=false,model=contractModel
   const reused=report.arms.at(-1).receipt,origin=state.records[original.receipt.id],qa=state.records[origin.development.acceptance.review_id],author=state.records[origin.development.candidate_id];
   assert.doesNotThrow(()=>bindCoordination(state,{depends_on:[reused.test_job_id]}));
   report.reuse_dependency_tamper_rejections=0;
-  for(const mutate of [s=>s.jobs[qa.job_id].native_id=s.jobs[author.job_id].native_id,s=>s.jobs[author.job_id].coordination_release.termination_confirmed=false,s=>s.records[origin.id].development.result.output='Changed exact original runtime output',s=>s.records[qa.id].review.deterministic_validation.dependencies_complete=false]){
+  for(const mutate of [s=>s.jobs[qa.job_id].native_id=s.jobs[author.job_id].native_id,s=>s.jobs[author.job_id].coordination_release.termination_confirmed=false,s=>s.records[origin.id].development.result.output='Changed exact original runtime output',s=>s.records[qa.id].review.deterministic_validation.dependencies_complete=false,s=>s.records[origin.id].development.validation_manifest.runtime.node='changed',s=>delete s.records[origin.id].development.validation_manifest,s=>s.records[reused.id].development.validation_manifest.runtime.node='changed']){
    const changed=structuredClone(state);mutate(changed);assert.throws(()=>bindCoordination(changed,{depends_on:[reused.test_job_id]}));report.reuse_dependency_tamper_rejections++;
   }
   report.classified_source_ids=Object.keys(state.context_classifications);assert.deepEqual(report.classified_source_ids.sort(),archive.sort());report.original_source_unchanged=fs.readFileSync(path.join(root,'port.mjs'),'utf8')===initialSource;assert(report.original_source_unchanged);report.accepted=true;
