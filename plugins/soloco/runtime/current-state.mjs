@@ -399,6 +399,11 @@ export function reviewedContext(state) {
 export function contextRead(state,{id,sha256,offset=0,length=16000}) {
   const record=contextSource(state,id);if(!record||digest(JSON.stringify(record))!==sha256)throw Error('Missing or changed supplemental source');
   const text=JSON.stringify(record);
-  if(!Number.isSafeInteger(offset)||offset<0||!Number.isSafeInteger(length)||length<1||length>32768||offset+length>text.length)throw Error('Invalid supplemental evidence range');
-  return {id,revision:record.revision??null,sha256,offset,length,text:text.slice(offset,offset+length),total_characters:text.length};
+  const split=index=>index>0&&index<text.length&&/[\uD800-\uDBFF]/.test(text[index-1])&&/[\uDC00-\uDFFF]/.test(text[index]);
+  if(!Number.isSafeInteger(offset)||offset<0||offset>=text.length||split(offset)||!Number.isSafeInteger(length)||length<1||length>32768)throw Error('Invalid supplemental evidence range');
+  // The request is a maximum range, as in public exact reads. A specialist need
+  // not know a short source's serialized length before its first bounded read.
+  let end=Math.min(text.length,offset+length);if(split(end))end--;
+  if(end===offset)throw Error('Invalid supplemental evidence range: length cannot fit one complete character');
+  return {id,revision:record.revision??null,sha256,offset,length:end-offset,text:text.slice(offset,end),total_characters:text.length,next_offset:end<text.length?end:null,complete:end===text.length};
 }

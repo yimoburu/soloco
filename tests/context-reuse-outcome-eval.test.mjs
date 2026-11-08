@@ -26,7 +26,8 @@ test('real worker, sandbox, native provenance contracts and fresh receiving QA a
  assert.deepEqual(r.arms.map(a=>a.receipt.tests_executed),[true,true,false]);
  assert.deepEqual(r.arms.map(a=>a.receipt.reused),[false,false,true]);
  assert.equal(r.arms[2].receipt.reused_from,r.arms[0].receipt.id);
- assert.equal(r.calls.length,7);assert.equal(r.classified_source_ids.length,1);
+ assert.equal(r.calls.length,8);assert.equal(r.classified_source_ids.length,1);
  assert.equal(r.reuse_dependency_tamper_rejections,4);
+ assert.equal(r.bootstrap.retrieved_ranges.length,1);const range=r.bootstrap.retrieved_ranges[0];assert(range.total_characters<16000);assert.equal(range.length,range.total_characters);assert.equal(range.offset,0);
  assert.equal(r.original_source_unchanged,true);
 });

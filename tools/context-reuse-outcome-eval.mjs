@@ -16,7 +16,7 @@ import {sourceIdentity,captureSourceVerification,correctSource} from './accepted
 export const protocol=Object.freeze({version:1,kind:'native_context_and_reuse_accepted_outcome',
  scales:[1,10,100],archive_records_per_scale:1,archive_padding_characters:400,
  order:['unclassified_executed','classified_executed','classified_reused'],
- criteria:{critical_false_acceptances:0,missed_blockers:0,unresolved_sources_omitted:0,incorrect_reuses:0,max_generation_attempts_per_scale:3,max_native_calls_total:21,max_model_invocation_ms:180000,latency_improvement_required:false,max_optimized_prompt_growth_ratio:1.25},
+ criteria:{critical_false_acceptances:0,missed_blockers:0,unresolved_sources_omitted:0,incorrect_reuses:0,max_generation_attempts_per_scale:3,max_native_calls_total:30,max_model_invocation_ms:180000,latency_improvement_required:false,max_optimized_prompt_growth_ratio:1.25},
  limitations:['Fictional bounded 1/10/100-record archive; not private intended-corpus bootstrap or production fit','Three ordered descriptive observations per scale, not randomized trials or causal speedup evidence','Attention is harness needs-attention and runtime notice counts, not natural founder behavior','No upgrade adoption or continuity rehearsal; existing continuity regressions remain separate','Reported requested/applied model controls do not verify effective provider settings','One attempt per declared stage; all failures remain held without retries','Reuse must retain original native producer, executed receipt, independent native QA and fresh receiving QA; tests did not execute again']});
 
 const facts=[
@@ -41,15 +41,16 @@ export function gradeSummary(content){
  return {passed:missed_blockers===0&&unresolved_sources_omitted===0&&wrong_allowed_actions===0&&extra('blocked_action_ids').length===0&&extra('unresolved_source_ids').length===0,missed_blockers,unresolved_sources_omitted,wrong_allowed_actions,extra_blockers:extra('blocked_action_ids').length};
 }
 export function contractModel(){return async({job,target},host,native,prompt,cwd,timeout,selection,options)=>{
- options.onSpawn(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));
+ options.onSpawn?.(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));
+ if(target?.context_classification_plan&&!native){const source=target.context_classification_plan.sources[0];return {native_id:'synthetic-reader-'+job.id,text:JSON.stringify({reads:[{id:source.id,sha256:source.sha256,offset:0,length:16000}]}),model_evidence:{verification:'synthetic_contract_double'}};}
  const value={content:JSON.stringify(expected),messages:[],notices:[]};
  if(job.development_id)value.files=[{path:'port.mjs',content:correctSource}];
  if(target?.context_classification_plan)value.review={verdict:'Pass',reason:'Synthetic complete inert-archive qualification; not native evidence.',permitted_action:'apply_context_classification',plan_sha256:digest(JSON.stringify(target.context_classification_plan)),blockers:[]};
  else if(job.role==='qa')value.review={verdict:'Pass',reason:'Synthetic exact-candidate review; not native evidence.',permitted_action:'accept_local_development',candidate_sha256:target.development.candidate_sha256,receipt_sha256:target.development.receipt_sha256,blockers:[],deterministic_validation:{permitted_action:'reuse_exact_validation',fingerprint:target.development.validation_fingerprint,dependencies_complete:true,external_state:false}};
- return {native_id:id('synthetic-only'),text:JSON.stringify(value),model_evidence:{verification:'synthetic_contract_double'}};
+ return {native_id:native??id('synthetic-only'),text:JSON.stringify(value),model_evidence:{verification:'synthetic_contract_double'}};
 };}
 const failure=e=>({message:String(e.message).slice(0,2000),code:e.code??null,termination_confirmed:e.termination_confirmed??null});
-function identity(){const value=sourceIdentity();for(const name of ['tools/context-reuse-outcome-eval.mjs','tests/context-reuse-outcome-eval.test.mjs'])value.files.push({path:name,sha256:digest(fs.readFileSync(new URL('../'+name,import.meta.url)))});value.files.sort((a,b)=>a.path.localeCompare(b.path));value.manifest_sha256=digest(JSON.stringify(value.files));return value;}
+function identity(){const value=sourceIdentity();for(const name of ['tools/context-reuse-outcome-eval.mjs','tests/context-reuse-outcome-eval.test.mjs','tests/supplemental-eof.test.mjs'])value.files.push({path:name,sha256:digest(fs.readFileSync(new URL('../'+name,import.meta.url)))});value.files.sort((a,b)=>a.path.localeCompare(b.path));value.manifest_sha256=digest(JSON.stringify(value.files));return value;}
 export async function runScale({directory,scale,native=false,model=contractModel(),runtimeReady,runtimeCatalog,modelId='gpt-6-astra',sharedBudget={calls:0}}){
  assert(protocol.scales.includes(scale));
  if(!native)runtimeCatalog??={supported:true,source:'synthetic_contract_double',models:[{id:modelId,supported_efforts:['medium','high']}],speed_support:{host_default:true}};
@@ -97,8 +98,8 @@ export async function runScale({directory,scale,native=false,model=contractModel
  try{
   await accept(false);
   const qualificationStarted=performance.now(),classification=engine.contextControl({...args,action:'plan',record_ids:archive,disposition:'resolved'},'codex');
-  const {dispatch}=createWorkflow({args,report,started,native,model,sharedBudget,maxCalls:protocol.criteria.max_native_calls_total,runtimeReady,runtimeCatalog,checkpoint,selections,taskByRole:()=> 'Independently read every exact proposed resolved source and the active fictional restrictions. Approve omission of only the inert completed retired layout trials if no continuing obligation, grant, failure, dissent or unknown applicability is lost. Keep the six unresolved restrictions and current intent mandatory. Return an evidence-based context classification review; hold uncertainty.',timeoutMs:protocol.criteria.max_model_invocation_ms});
-  const qualified=await dispatch('qa',{review_of:classification.id});assert.equal(qualified.artifact.review?.verdict,'Pass');engine.contextControl({...args,action:'apply',plan_id:classification.id,review_id:qualified.artifact.id},'codex');report.bootstrap={elapsed_ms:performance.now()-qualificationStarted,plan_id:classification.id,review_id:qualified.artifact.id,native_id:qualified.job.native_id,classified_records:archive.length};
+  const {dispatch}=createWorkflow({args,report,started,native,model,sharedBudget,maxCalls:protocol.criteria.max_native_calls_total,runtimeReady,runtimeCatalog,checkpoint,selections,taskByRole:()=> 'Independently read every exact proposed resolved source and the active fictional restrictions. Complete selected source bodies are inline; use the supported supplemental protocol for independently chosen additional exact inspection when needed. Approve omission of only the inert completed retired layout trials if no continuing obligation, grant, failure, dissent or unknown applicability is lost. Keep the six unresolved restrictions and current intent mandatory. Return an evidence-based context classification review; hold uncertainty.',timeoutMs:protocol.criteria.max_model_invocation_ms});
+  const qualified=await dispatch('qa',{review_of:classification.id});assert.equal(qualified.artifact.review?.verdict,'Pass');engine.contextControl({...args,action:'apply',plan_id:classification.id,review_id:qualified.artifact.id},'codex');report.bootstrap={elapsed_ms:performance.now()-qualificationStarted,plan_id:classification.id,review_id:qualified.artifact.id,native_id:qualified.job.native_id,classified_records:archive.length,retrieved_ranges:(qualified.job.retrieved_inputs??[]).map(r=>({offset:r.offset,length:r.length,total_characters:r.total_characters}))};
   // Classification changes governing membership. Respect the old grant's
   // revocation by creating a new explicitly authorized fixture scope.
   plan=await createPlan(2);
