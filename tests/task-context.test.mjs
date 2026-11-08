@@ -111,11 +111,16 @@ test('1x/10x/100x canonical resolved archive grows without growing fixed task wo
     await qualify(f,ids);
     const state=read(f),context=taskAssignmentContext(state,j);
     assert(!context.text.includes('FICTIONAL INERT ARCHIVE ONLY'));
-    metrics.push({scale,archive_bytes:Buffer.byteLength(JSON.stringify(state)),context_bytes:context.context_bytes,hash:context.hash});prior=scale;
+    const archived=Object.values(state.records).filter(r=>r.id?.startsWith('archive-'));
+    assert.equal(archived.length,scale);
+    metrics.push({scale,archive_bytes:Buffer.byteLength(JSON.stringify(state)),archive_content_bytes:archived.reduce((sum,r)=>sum+Buffer.byteLength(r.content),0),context_bytes:context.context_bytes,hash:context.hash});prior=scale;
   }
   assert.equal(new Set(metrics.map(m=>m.context_bytes)).size,1);
   assert.equal(new Set(metrics.map(m=>m.hash)).size,1);
-  assert(metrics[2].archive_bytes>metrics[0].archive_bytes*3);
+  // Compare the growing archive content itself: pinned instructions and
+  // qualification receipts add fixed overhead unrelated to the scale factor.
+  assert(metrics[2].archive_content_bytes>=metrics[0].archive_content_bytes*100);
+  assert(metrics[2].archive_bytes>metrics[0].archive_bytes);
   console.log('FICTIONAL accepted archive task context '+JSON.stringify(metrics));
 });
 

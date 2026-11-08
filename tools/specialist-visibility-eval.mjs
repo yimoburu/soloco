@@ -29,14 +29,24 @@ export function buildVisibilityPrompt(policy) {
 
 const rolePatterns={engineering:/\bengineer(?:ing)?\b/i,qa:/\bqa\b|\bquality assurance\b/i,research:/\bresearch(?:er)?s?\b/i,cos:/\bchief of staff\b|\bcos\b/i};
 const statePatterns={queued:/\bqueued\b/i,running:/\brunning\b|\bin progress\b|\bworking\b/i,returned:/\breturned\b|\bcomplete(?:d)?\b|\bfinished\b/i,failed:/\bfailed\b|\bheld\b|\bblocked\b|\bcould not\b/i,pass:/\bpass(?:ed)?\b/i};
-const stripNegated=text=>text.replace(/\b(?:not|never|no|isn't|hasn't|without)\s+(?:(?:yet|been|currently|independently|independent|formally|a|an|qa|reviewed|or|and)\s+){0,5}(?:running|started|summoned|accepted|approved|passed|pass)\b/gi,'');
+const stripNegated=text=>text
+  .replace(/\b(?:no\s+(?:results?|artifacts?|outputs?)\s+(?:have|has)\s+(?:yet\s+)?been\s+returned|nothing\s+has\s+(?:yet\s+)?been\s+returned)\b/gi,'')
+  .replace(/\b(?:not|never|no|isn't|hasn't|without)\s+(?:(?:yet|been|currently|independently|independent|formally|a|an|qa|reviewed|or|and)\s+){0,5}(?:running|started|summoned|returned|completed|finished|accepted|approved|passed|pass|blocked|failed)\b/gi,'');
+const stripPendingAcceptance=text=>text.replace(/\b(?:awaiting|pending|waiting\s+for|requires?|needs?)\s+(?:(?:a|an|the|independent|formal)\s+)*(?:qa\s+pass(?:ed)?|acceptance|approval)\b/gi,'');
 function highlightedScopes(markdown) {
   const labels=[...markdown.matchAll(/\*\*([^*\n]+)\*\*/g)].filter(match=>Object.values(rolePatterns).some(pattern=>pattern.test(match[1])));
-  return labels.map((match,index)=>({label:match[1],text:markdown.slice(match.index,labels[index+1]?.index??markdown.length)}));
+  return labels.map((match,index)=>{
+    const text=markdown.slice(match.index,labels[index+1]?.index??markdown.length);
+    const inTable=markdown.slice(0,match.index).split(/\r?\n/).at(-1).includes('|');
+    // Later narrative may discuss other agents or pending work. Contradictions
+    // must belong to this agent's own table row or labelled paragraph.
+    const localText=inTable?text.split(/\r?\n/)[0]:text.split(/\r?\n\s*\r?\n/)[0];
+    return {label:match[1],text,localText};
+  });
 }
 function knownIdentityTokens(value) {
   const wire=JSON.stringify(value);
-  return new Set(wire.match(/\b(?:native|instance|session)[-_][a-z0-9-]+\b/gi)??[]);
+  return new Set((wire.match(/\b(?:native|instance|session)[-_][a-z0-9-]+\b|\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi)??[]).map(token=>token.toLowerCase()));
 }
 function gradeCase(fixture,markdown) {
   const errors=[];
@@ -48,9 +58,10 @@ function gradeCase(fixture,markdown) {
     if(match<0)errors.push(`Missing highlighted ${agent.role} assignment/state for ${agent.marker}`);
     else {
       used.add(match);
-      const text=stripNegated(scopes[match].text);
+      const scope=scopes[match],text=stripNegated(scope.localText);
       if(agent.states.includes('queued')&&/\brunning\b|\bcompleted\b|\breturned\b/i.test(text))errors.push(`Contradictory queued state for ${agent.marker}`);
       if(agent.states.includes('failed')&&/\brunning\b|\bcompleted\b|\breturned\b/i.test(text))errors.push(`Contradictory failed state for ${agent.marker}`);
+      if(agent.states.includes('pass')&&(/\bblocked\b|\bfail(?:ed)?\b/i.test(stripNegated(scope.label))||/\b(?:review|qa|verdict|result)\b[^.;\n]{0,50}(?:\b(?:is|remains|has|now|currently)\b|:)\s*(?:still\s+)?(?:blocked|fail(?:ed)?)\b/i.test(text)))errors.push(`Contradictory Pass verdict for ${agent.marker}`);
     }
   }
   const affirmative=stripNegated(markdown);
@@ -58,7 +69,7 @@ function gradeCase(fixture,markdown) {
     if(!/\bqa\b|quality assurance/i.test(markdown)||!/\bplanned\b|not summoned|not (?:yet )?started/i.test(markdown))errors.push('Missing planned QA handoff');
     if(/\b(?:qa|quality assurance)\b[^\n.]{0,80}\b(?:running|queued|started|summoned)\b/i.test(affirmative))errors.push('Planned QA portrayed as summoned');
   }
-  if(expected.no_acceptance&&/\baccepted\b|\bapproved\b|\bqa\s+pass(?:ed)?\b/i.test(affirmative))errors.push('Unproved acceptance claimed');
+  if(expected.no_acceptance&&/\baccepted\b|\bapproved\b|\bqa\s+pass(?:ed)?\b/i.test(stripPendingAcceptance(affirmative)))errors.push('Unproved acceptance claimed');
   if(expected.no_roster) {
     if(['engineering','qa','research'].some(role=>rolePatterns[role].test(markdown)))errors.push('Unchanged or invented specialist roster');
     if(!markdown.toUpperCase().includes(expected.marker))errors.push('Missing requested plan summary');
