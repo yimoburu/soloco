@@ -96,7 +96,7 @@ test('same child boundaries',async()=>{
  assert.throws(()=>spawnSync(process.execPath,['-e','console.log("escaped")']));
  assert.throws(()=>new Worker('console.log("escaped")',{eval:true}));
  assert.throws(()=>process.dlopen({exports:{}},new URL('./fixture-addon.node',import.meta.url).pathname),error=>['ERR_DLOPEN_DISABLED','ERR_ACCESS_DENIED'].includes(error.code));
- await new Promise((resolve,reject)=>{const socket=net.connect({host:'127.0.0.1',port:9});socket.on('connect',()=>{socket.destroy();reject(Error('network escaped'));});socket.on('error',error=>{try{assert.ok(['EPERM','EACCES'].includes(error.code),error.code);resolve();}catch(e){reject(e);}});});
+ await new Promise((resolve,reject)=>{const socket=net.connect({host:'127.0.0.1',port:9});socket.on('connect',()=>{socket.destroy();reject(Error('network escaped'));});socket.on('error',error=>{try{assert.ok(['EPERM','EACCES','ERR_ACCESS_DENIED'].includes(error.code),error.code);resolve();}catch(e){reject(e);}});});
 });`);
   fs.writeFileSync(path.join(a.directory,'fixture-addon.node'),'not a native addon; the permission check must run before loading');
   const result=await runLocalTests({...a,testFixture:identity});
