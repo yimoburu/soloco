@@ -92,17 +92,33 @@ test('gate uses only required job results and rejects failed, skipped or cancell
 });
 test('ordinary checks succeed for edited local source and propagate actual test failures',()=>{
   const repo=directory();fs.mkdirSync(path.join(repo,'tests'));
+  const probe=()=>({supported:true,backend:'macos-seatbelt-node'}); // Fictional capability for tiny command-result fixtures.
   fs.writeFileSync(path.join(repo,'tests/a.test.mjs'),"import test from 'node:test';test('fixture pass',()=>{});\n");
   for(const args of [['init'],['add','.'],['-c','user.name=Fiction','-c','user.email=fiction@example.invalid','commit','-m','fixture']])assert.equal(spawnSync('git',args,{cwd:repo}).status,0);
   fs.writeFileSync(path.join(repo,'candidate.txt'),'uncommitted local edit');assert.equal(source(repo).dirty,true);
-  assert.equal(check('regression-22',repo),0);
+  assert.equal(check('regression-22',repo,probe),0);
   fs.writeFileSync(path.join(repo,'tests/a.test.mjs'),"import test from 'node:test';test('fixture failure',()=>{throw Error('actual test failure')});\n");
-  assert.equal(check('regression-22',repo),1);
+  assert.equal(check('regression-22',repo,probe),1);
+});
+test('every ordinary test lane holds before executing tests when actual sandbox startup is unsupported',()=>{
+  const repo=directory();fs.mkdirSync(path.join(repo,'tests'));
+  const marker=path.join(repo,'tests-ran');
+  for(const file of compatibilityTests)fs.writeFileSync(path.join(repo,file),`import fs from 'node:fs';fs.writeFileSync(${JSON.stringify(marker)},'ran');\n`);
+  for(const lane of ['regression-22','tests-22','compatibility-26']) {
+    let probes=0;
+    assert.throws(()=>check(lane,repo,()=>{
+      probes++;return {supported:false,backend:null,blocker:'Fictional Seatbelt startup denied'};
+    }),/actual macOS Seatbelt required: Fictional Seatbelt startup denied/);
+    assert.equal(probes,1);assert.equal(fs.existsSync(marker),false);
+    assert.throws(()=>check(lane,repo,()=>({supported:true,backend:'unverified'})),/unsupported sandbox backend/);
+    assert.equal(fs.existsSync(marker),false);
+  }
 });
 test('ordinary checks propagate a failing build and refuse an empty test selection',()=>{
   const repo=directory();fs.mkdirSync(path.join(repo,'tools'));fs.mkdirSync(path.join(repo,'tests'));
   fs.writeFileSync(path.join(repo,'tools/build-plugin.mjs'),'process.exitCode=7;');
-  assert.equal(check('build',repo),7);assert.throws(()=>check('regression-22',repo),/no tests selected/);
+  assert.equal(check('build',repo,()=>{throw Error('build must not require a sandbox');}),7);
+  assert.throws(()=>check('regression-22',repo),/no tests selected/);
 });
 test('remote artifacts cannot hide changed or missing command logs behind a fresh archive digest',async()=>{
   for(const mutation of ['changed','missing']){

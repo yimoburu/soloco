@@ -1,12 +1,18 @@
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {inventory,lanes,requireThat,selectedTests} from './evidence.mjs';
+import {sandboxCapability} from '../../plugins/soloco/runtime/local-sandbox.mjs';
 
 // Ordinary CI and local checks use command results. Provenance receipts are optional.
-export function check(lane,root=process.cwd()) {
+export function check(lane,root=process.cwd(),probe=sandboxCapability) {
   requireThat(lanes.includes(lane),'unknown check lane');
   const tests=lane==='build'?[]:selectedTests(lane,inventory(root));
   requireThat(lane==='build'||tests.length>0,'no tests selected');
+  if(lane!=='build') {
+    const capability=probe();
+    requireThat(capability.supported && capability.backend==='macos-seatbelt-node',
+      `actual macOS Seatbelt required: ${capability.blocker??'unsupported sandbox backend'}`);
+  }
   const commands=lane==='build'
     ? [[process.execPath,['tools/build-plugin.mjs','--check']],['git',['diff','--check']]]
     : [[process.execPath,['--no-warnings','--test','--test-concurrency=4','--test-reporter=tap',...tests]]];

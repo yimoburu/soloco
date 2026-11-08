@@ -21,8 +21,11 @@ existing seventeen expensive historical qualification files in
 
 Ordinary checks use command exit codes. Passing checks succeed on edited local
 source; missing provenance metadata, a missing artifact or an unavailable upload
-service does not turn passing tests into a CI failure. Node's test runner reports
-any skipped tests normally. Diagnostic logs upload on a best-effort basis. Bash
+service does not turn passing tests into a CI failure. Every test lane first
+requires successful startup of the actual macOS Seatbelt backend; unsupported
+isolation fails before tests start, rather than passing with sandbox tests skipped.
+Node's test runner reports other skipped tests normally. Diagnostic logs upload on
+a best-effort basis. Bash
 pipe failure handling preserves test/build failures when output passes through
 `tee`. Source CI uses read-only repository permissions and invokes no model CLI.
 
