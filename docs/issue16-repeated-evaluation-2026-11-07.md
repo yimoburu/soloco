@@ -37,6 +37,8 @@ The source/runtime fingerprints matched before and after all eight arms. The ori
 
 Sanitized numeric evidence and exact public-source fingerprints are retained in `evals/issue16-qualification-20261107/`. Raw diagnostics, native identifiers and model outputs remain local; the generic `publicReport()` helper alone does not remove host diagnostic text and must not be treated as publication sanitization.
 
+The [frozen code manifest](../evals/issue16-qualification-20261107/frozen-code-manifest.json) makes the exact executed evaluator code publicly reviewable. The original repeated harness was recovered after execution by reversing only the three known control-binding edits, then matching its bytes to the original predeclared SHA above. The accepted-workflow override and workflow driver snapshots match their executed source-manifest hashes directly. These code-only snapshots add no model calls and change no original result.
+
 ## Separate current-host task and policy qualification
 
 A separate prospective protocol capped this qualification at twelve calls and allowed no repairs or retries; the first unsuccessful result would stop all remaining calls. It used three eight-case coordination trials and three trials each of exact extraction, parser generation with actual sandbox tests, and consequential review of four seeded acceptance defects. Outcome-case order rotated across repetitions. All twelve calls passed, with stable public-source/grader fingerprints; all original outputs remain locally retained.
