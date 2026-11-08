@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {SchedulingHold} from '../plugins/soloco/runtime/recovery.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -86,9 +87,16 @@ test('new applicable membership, source changes, task amendments, controls and i
 test('unclassified evidence is retained and required packet overflow is explicit, never truncation',()=>{
   const f=fixture(),id=task(f),j=job(f,id);
   engine.save({...f,id:'unknown-history',kind:'artifact',content:'A possibly material legacy restriction. '.repeat(2000)},'codex');
-  assert.throws(()=>taskAssignmentContext(read(f),j),/Held.*coverage incomplete.*nothing was truncated/);
+  const s=read(f),original=structuredClone(s.records['unknown-history']),c=taskAssignmentContext(s,j,{budget:200000});
+  let packet;
+  assert.throws(()=>{packet=taskAssignmentContext(s,j);},error=>{
+    assert(error instanceof SchedulingHold);assert.equal(error.code,'CONTEXT_CAPACITY');
+    assert.equal(error.message,`Task context Held: required coherent packet exceeds 65536 UTF-8bytes (actual ${Buffer.byteLength(c.text)}); coverage incomplete; widen retrieval or split the task; nothing was truncated`);
+    return /Held.*coverage incomplete.*nothing was truncated/.test(error.message);
+  });
+  assert.equal(packet,undefined);
+  assert.deepEqual(read(f).records['unknown-history'],original);
   assert.equal(read(f).records['unknown-history'].content.length,'A possibly material legacy restriction. '.repeat(2000).length);
-  const c=taskAssignmentContext(read(f),j,{budget:200000});
   assert.match(c.text,/possibly material legacy restriction/);
 });
 
