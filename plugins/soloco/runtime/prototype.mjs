@@ -1,7 +1,7 @@
 import {presentationOnly,relevantRecord} from './current-state.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
-import { VERSION, V018_GOVERNANCE_SHA256, V019_GOVERNANCE_SHA256, V020_GOVERNANCE_SHA256, installedTeam, digest, id, stamp, requireText, withStore, owner, folder, noLink, notice } from './store.mjs';
+import { VERSION, V018_GOVERNANCE_SHA256, V019_GOVERNANCE_SHA256, V020_GOVERNANCE_SHA256, V021_GOVERNANCE_SHA256, installedTeam, digest, id, stamp, requireText, withStore, owner, folder, noLink, notice } from './store.mjs';
 import { contextMatches } from './context.mjs';
 
 const LIMIT = 100000;
@@ -14,8 +14,8 @@ export const prototypeLimits = Object.freeze({
 });
 export function prototypeCapability(s) {
   // Preserve exact v0.17/v0.18/v0.19/v0.20 contracts without adopting the source contract.
-  const supportedGovernance=[installedTeam().governance_sha256,V020_GOVERNANCE_SHA256,V019_GOVERNANCE_SHA256,V018_GOVERNANCE_SHA256,'5f0699c046128d71a42731acdfddaaab4b911361521015def133adcfbdb8fcb9'];
-  const blocker = !s ? null : !['0.4.0','0.4.1','0.5.0','0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7','0.6.8','0.6.9','0.6.10','0.6.11','0.6.12','0.6.13','0.7.0','0.7.1','0.7.2','0.7.3','0.7.4','0.7.5',VERSION].includes(s.plugin_version)
+  const supportedGovernance=[installedTeam().governance_sha256,V021_GOVERNANCE_SHA256,V020_GOVERNANCE_SHA256,V019_GOVERNANCE_SHA256,V018_GOVERNANCE_SHA256,'5f0699c046128d71a42731acdfddaaab4b911361521015def133adcfbdb8fcb9'];
+  const blocker = !s ? null : !['0.4.0','0.4.1','0.5.0','0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7','0.6.8','0.6.9','0.6.10','0.6.11','0.6.12','0.6.13','0.7.0','0.7.1','0.7.2','0.7.3','0.7.4','0.7.5','0.7.6',VERSION].includes(s.plugin_version)
     ? 'Pinned team does not support this prototype workflow. Explicitly adopt a supported team and governance before requesting prototype authorization.'
     : !supportedGovernance.includes(s.governance_sha256)
       ? 'Pinned governance does not support this prototype contract. Review and explicitly adopt the installed governance; more reviews cannot enable it.' : null;

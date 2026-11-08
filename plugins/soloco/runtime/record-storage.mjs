@@ -24,6 +24,7 @@ function layoutVersion(db,reprepare=true) {
     if(!statements.exists.get())return 0;
     statements.version??=db.prepare('SELECT version FROM company_layout WHERE id=1');
     const version=statements.version.get()?.version;
+    if(version===5)throw Error('Peer coordination storage requires its authenticated broker; legacy writer fenced');
     if(![1,2,3,4].includes(version))throw Error('Unknown or corrupt company storage layout; migration compatibility required');
     return version;
   }catch(error){
