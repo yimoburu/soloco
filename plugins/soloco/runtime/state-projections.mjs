@@ -49,7 +49,7 @@ export function publicEntries(state,collection) {
 export function usageView(state) {
   let assignments=0,missing_reasons=0,with_applied_controls=0,with_host_reported_models=0;
   for(const job of values(state.jobs)) {
-    if(job?.kind==='development_test'||job?.type==='development_test')continue;
+    if(['development_test','development_preflight'].includes(job?.kind)||['development_test','development_preflight'].includes(job?.type))continue;
     assignments++;if(typeof job?.model_selection?.reason!=='string'||!job.model_selection.reason.trim())missing_reasons++;
     if(job?.model_evidence?.applied_controls)with_applied_controls++;
     if(job?.model_evidence?.reported_models?.length)with_host_reported_models++;

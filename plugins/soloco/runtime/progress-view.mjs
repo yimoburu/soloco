@@ -26,7 +26,10 @@ export function progressSnapshot(state={}, {recentJobs=20}={}) {
     review_of:reference(r.review_of),
     ...(r.review?{review:pick(r.review,['verdict','permitted_action','candidate_sha256','receipt_sha256'])}:{}),
     ...(r.quarantined_files?{quarantined_files:{count:rows(r.quarantined_files).length}}:{}),
-    ...(r.development?{development:{...pick(r.development,['type','plan_id','candidate_id','candidate_sha256','receipt_sha256']),
+    ...(r.preflight_qualification?{preflight_qualification:pick(r.preflight_qualification,['protocol','plan_id','binding_sha256'])}:{}),
+    ...(r.development?{development:{...pick(r.development,['type','plan_id','candidate_id','candidate_sha256','receipt_sha256','protocol','status','generation_permission','allowance_reset','preflight_recovery']),
+      ...(r.development.subject?{subject:pick(r.development.subject,['plan_id','candidate_id','candidate_sha256','job_id','receipt_id','receipt_sha256'])}:{}),
+      ...(Array.isArray(r.development.run_history)?{run_history:r.development.run_history.map(run=>pick(run,['job_id','receipt_id','status']))}:{}),
       run:r.development.run?pick(r.development.run,['job_id','receipt_id','status']):null,
       result:r.development.result?pick(r.development.result,['tests_executed','status','exit_code']):null,
       acceptance:r.development.acceptance?pick(r.development.acceptance,['at','review_id','candidate_sha256','receipt_sha256','source_integrated']):null}}:{}),
@@ -43,7 +46,11 @@ export function progressSnapshot(state={}, {recentJobs=20}={}) {
   for(const n of notices) {
     if(jobs.some(j=>j.id===n.reference)) selected.add(n.reference);
     const r=recMap.get(n.reference);
-    const producer=r?.job_id ?? (r?.development?.type==='test'?r.author_instance:null);
+    let producer=r?.job_id ?? (r?.development?.type==='test'?r.author_instance:null);
+    if(r?.development?.type==='preflight_diagnostic'){
+      const claims=jobs.filter(j=>j.artifact_id===r.id),job=claims.length===1?claims[0]:null;
+      producer=r.author_role==='runtime'&&Number.isSafeInteger(r.revision)&&r.revision>0&&job?.kind==='development_preflight'&&job.id===r.author_instance&&(r.job_id==null||r.job_id===job.id)?job.id:null;
+    }
     if(jobs.some(j=>j.id===producer)) selected.add(producer);
   }
   const initial=selected.size;
@@ -108,7 +115,7 @@ function nodeLines(n,p) {
     `${n.id} · ${n.role ?? 'unknown role'} · ${n.actor} · ${n.status ?? 'unknown'}`,
     `Summoned by: ${n.requester?`${n.requester.role} ${n.requester.session_id} (${n.requester.host}, epoch ${n.requester.epoch})`:'unknown (historical requester not recorded)'}`,
     `Instance: ${n.instance_id ?? 'unknown'}; native: ${n.native_id ?? (n.actor==='software'?'not a native agent session':'not yet observed')}`,
-    `Task label: ${n.task ?? (n.actor==='software'?'Run bounded candidate tests (runtime job)':'unknown (no task_summary recorded)')}${n.task_truncated?` [full instructions excluded; ${n.task_characters} characters; see job ${n.id}]`:''}`,
+    `Task label: ${n.task ?? (n.kind==='development_preflight'?'Fingerprint validation environment (runtime diagnostic)':n.actor==='software'?'Run bounded candidate tests (runtime job)':'unknown (no task_summary recorded)')}${n.task_truncated?` [full instructions excluded; ${n.task_characters} characters; see job ${n.id}]`:''}`,
     `Expected deliverable: ${n.expected_deliverable ?? 'unknown (not recorded)'}`,
     `Returned artifact: ${refLabel(n.returned)}${n.rejected_output?'; rejected response retained outside this view':''}`,
     `Inputs omitted from this label: ${n.omitted_inputs}; founder-context references omitted: ${n.omitted_context_inputs}.`,
@@ -147,8 +154,8 @@ export function renderProgress(p,format='text',{renderId}={}) {
   if(typeof renderId!=='string' || !/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(renderId)) throw new Error('HTML requires renderId: 1–64 ASCII letters, digits, underscore or hyphen, starting with a letter; unique per mounted fragment');
   const rootId=`soloco-progress-${renderId}-root`, scope=`#${rootId}`;
   const domId=id=>`soloco-progress-${renderId}-${ids.get(id)}`;
-  const role=n=>n?.actor==='software'?'Runtime tests':({engineer:'Engineering',engineering:'Engineering',qa:'QA',designer:'Design',runner:'Chief of Staff'}[n?.role] ?? n?.role ?? 'Unknown role');
-  const task=n=>n.summary ?? n.task ?? (n.actor==='software'?'Run candidate tests':'Task summary unknown');
+  const role=n=>n?.kind==='development_preflight'?'Runtime diagnostic':n?.actor==='software'?'Runtime tests':({engineer:'Engineering',engineering:'Engineering',qa:'QA',designer:'Design',runner:'Chief of Staff'}[n?.role] ?? n?.role ?? 'Unknown role');
+  const task=n=>n.summary ?? n.task ?? (n.kind==='development_preflight'?'Fingerprint validation environment':n.actor==='software'?'Run candidate tests':'Task summary unknown');
   const recordOwner=id=>{const r=p.evidence.find(r=>r.id===id);return r?.job_id ?? r?.author_instance;};
   const owner=e=>{
     if(e.entity==='job')return e.id;

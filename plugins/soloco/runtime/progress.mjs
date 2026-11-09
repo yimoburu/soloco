@@ -24,7 +24,18 @@ const ref = r => ({id:r.id,revision:r.revision ?? null});
 // Canonical role catalog; context kinds come from engine.save/control and the
 // planning APIs. These fields also survive the public snapshot whitelist.
 const specialistRoles = new Set(['pm','research','designer','engineer','qa','architect','frontend','backend','release','growth','support','legal','security','finance']);
-const contextKind = r => (r.author_role === 'runner' && ['intent','plan','decision','preference','artifact'].includes(r.kind))
+const preflightContext = r => r.kind === 'artifact' && (
+  r.author_role === 'runtime' && r.status === 'Submitted'
+    && r.preflight_qualification?.protocol === 'legacy-M98-preflight-qualification-target-v1'
+    && typeof r.preflight_qualification.plan_id === 'string' && !!r.preflight_qualification.plan_id
+    && /^[a-f0-9]{64}$/.test(r.preflight_qualification.binding_sha256 ?? '')
+  || r.author_role === 'human_founder' && r.status === 'Recorded'
+    && r.development?.type === 'preflight_recovery_request'
+    && r.development.protocol === 'original-grant-validation-recovery-v1'
+    && r.development.status === 'consumed' && r.development.generation_permission === false && r.development.allowance_reset === false
+    && ['plan_id','candidate_id','job_id','receipt_id'].every(key => typeof r.development.subject?.[key] === 'string' && !!r.development.subject[key])
+);
+const contextKind = r => preflightContext(r) || (r.author_role === 'runner' && ['intent','plan','decision','preference','artifact'].includes(r.kind))
   || (r.author_role === 'human_founder' && r.kind === 'decision');
 const positiveRevision = r => Number.isInteger(r.revision) && r.revision > 0;
 // Missing/undefined survives assignmentContext and its JSON round trip; null,
@@ -61,7 +72,8 @@ export function progressFor(snapshot = {}) {
   // A context role cannot also claim a job producer, including via artifact_id.
   function producerFor(record) {
     if (producers.has(record.id)) return producers.get(record.id);
-    const softwareReceipt = record.author_role === 'runtime' && record.development?.type === 'test';
+    const softwareReceipt = record.author_role === 'runtime' && ['test','preflight_diagnostic'].includes(record.development?.type);
+    const softwareKind = record.development?.type === 'preflight_diagnostic' ? 'development_preflight' : 'development_test';
     const claimedId = softwareReceipt ? record.author_instance : record.job_id;
     const job = jobs.get(claimedId);
     const claims = outputClaims.get(record.id) ?? [];
@@ -75,7 +87,7 @@ export function progressFor(snapshot = {}) {
     } else if (nonJob && record.job_id == null) {
       contexts.set(record.id,positiveRevision(record) || unversionedControl(record));
     } else if (job && positiveRevision(record) && (softwareReceipt
-      ? job.kind === 'development_test' && job.artifact_id === record.id
+      ? job.kind === softwareKind && job.artifact_id === record.id
       : specialistRoles.has(record.author_role ?? job.role) && specialistRoles.has(job.role)
         && (record.author_role == null || record.author_role === job.role) && job.kind !== 'development_test' && (job.artifact_id == null || job.artifact_id === record.id))) {
       resolved = job;
@@ -122,7 +134,7 @@ export function progressFor(snapshot = {}) {
     const node = {
       id:job.id,role:job.role ?? null,instance_id:job.instance_id ?? null,
       native_id:job.native_id ?? null,kind:job.kind ?? null,
-      actor:job.kind === 'development_test' ? 'software' : 'specialist',
+      actor:['development_test','development_preflight'].includes(job.kind) ? 'software' : 'specialist',
       task:job.task ?? null,summary:job.task_summary ?? (typeof job.task === 'string' ? job.task.slice(0,120) : null),
       status:job.status ?? null,returned:returnedRef,
       inputs:copy(job.inputs ?? []),review_of:copy(job.review_of ?? null),
@@ -141,11 +153,19 @@ export function progressFor(snapshot = {}) {
     if (job.kind === 'development_test') {
       const candidate = records.get(job.candidate_id), d = candidate?.development;
       const receipt = records.get(job.artifact_id), t = receipt?.development;
+      const request = records.get(d?.preflight_recovery), recovery = request?.development;
+      const prior = Array.isArray(d?.run_history) ? d.run_history.find(run => run.job_id === job.id && run.receipt_id === job.artifact_id && run.status === 'completed') : null;
+      const historical = prior && preflightContext(request ?? {}) && recovery?.type === 'preflight_recovery_request'
+        && recovery.subject.plan_id === d.plan_id && recovery.subject.candidate_id === candidate.id
+        && recovery.subject.job_id === job.id && recovery.subject.receipt_id === job.artifact_id
+        && recovery.subject.candidate_sha256 === d.candidate_sha256 && recovery.subject.receipt_sha256 === t?.receipt_sha256
+        && job.status === 'completed';
+      const run = d?.run?.job_id === job.id ? d.run : historical ? prior : null;
       const bound = d?.type === 'candidate' && candidate.status === 'Submitted'
-        && d.plan_id === job.development_id && d.run?.job_id === job.id
+        && d.plan_id === job.development_id && run?.job_id === job.id
         && typeof d.candidate_sha256 === 'string' && !!d.candidate_sha256
         && (!job.artifact_id || (receipt && producerFor(receipt)?.id === job.id
-          && d.run.receipt_id === receipt.id && t?.candidate_id === candidate.id
+          && run.receipt_id === receipt.id && t?.candidate_id === candidate.id
           && t.plan_id === d.plan_id && t.candidate_sha256 === d.candidate_sha256));
       if (bound) producer(ref(candidate),job.id,'candidate');
       else diagnostic('unresolved_candidate',{job_id:job.id,candidate_id:job.candidate_id ?? null});

@@ -37,8 +37,9 @@ export function fingerprintValidation(input) {
   if(!Array.isArray(input.tests)||!input.tests.length||new Set(input.tests).size!==input.tests.length||input.tests.some(p=>!files.some(f=>f.path===p)))throw new Error('Tests must reference complete manifest');
   if(!Array.isArray(input.command)||!input.command.length)throw new Error('Missing validation command');
   input.command.forEach(v=>text(v,'command argument'));
-  exact(input.runtime,['node','platform','arch','os_release','system_build','dependencies','executable_sha256','runner_sha256'],'runtime');
+  exact(input.runtime,['node','platform','arch','os_release','system_build','system_descriptor','dependencies','executable_sha256','runner_sha256'],'runtime');
   for(const k of ['node','platform','arch','os_release','system_build'])text(input.runtime[k],k);
+  if(input.runtime.system_descriptor!==undefined){exact(input.runtime.system_descriptor,['protocol','sha256'],'system descriptor');if(Object.keys(input.runtime.system_descriptor).length!==2||input.runtime.system_descriptor.protocol!=='apple-system-version-plist-v1'||!sha(input.runtime.system_descriptor.sha256))throw Error('Invalid system descriptor commitment');}
   if(!Array.isArray(input.runtime.dependencies)||!input.runtime.dependencies.length)throw Error('Missing runtime dependencies');
   for(const d of input.runtime.dependencies){exact(d,['path','sha256'],'runtime dependency');text(d.path,'dependency path');if(!sha(d.sha256))throw Error('Missing runtime dependency bytes');}
   if(new Set(input.runtime.dependencies.map(d=>d.path)).size!==input.runtime.dependencies.length)throw Error('Duplicate runtime dependency');
@@ -66,7 +67,7 @@ export function validationManifest(input) {
     ...(Object.hasOwn(input,'test_fixture')?{test_fixture:fixtureIdentity(input.test_fixture),fixture_environment:fixtureEnvironmentBinding(input.fixture_environment),environment_binding:'base environment committed below; fixture environment values attested in per-run setup',reuse_policy:'fixture_reuse_not_qualified'}:{}),
     files:input.files.map(f=>({...f})).sort((a,b)=>a.path.localeCompare(b.path)),tests:[...input.tests].sort(),
     command:input.command.map(argument=>visible.has(argument)?{argument}:{argument_sha256:hash(argument)}),command_sha256:hash(JSON.stringify(input.command)),
-    runtime:{node:input.runtime.node,platform:input.runtime.platform,arch:input.runtime.arch,os_release:input.runtime.os_release,system_build:input.runtime.system_build,executable_sha256:input.runtime.executable_sha256,runner_sha256:input.runtime.runner_sha256,dependencies:input.runtime.dependencies.map(d=>({path_sha256:hash(d.path),sha256:d.sha256}))},
+    runtime:{node:input.runtime.node,platform:input.runtime.platform,arch:input.runtime.arch,os_release:input.runtime.os_release,system_build:input.runtime.system_build,...(input.runtime.system_descriptor?{system_descriptor:{...input.runtime.system_descriptor}}:{}),executable_sha256:input.runtime.executable_sha256,runner_sha256:input.runtime.runner_sha256,dependencies:input.runtime.dependencies.map(d=>({path_sha256:hash(d.path),sha256:d.sha256}))},
     sandbox:{...input.sandbox},environment_sha256:hash(JSON.stringify(canonical(input.environment))),limits:{...input.limits}};
 }
 export function validationManifestMatches(receipt) {
