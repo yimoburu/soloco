@@ -1,6 +1,7 @@
 # SPEC v0.21 reconciliation
 
-Current source baseline: merged main `4e9e434` (PR #56), November 9, 2026 UTC.
+This assessment covers peer/storage baseline main `4e9e434` (PR #56) and the
+lossless development-review transport described below, November 9, 2026 UTC.
 This includes the peer foundations, bounded storage core, executor/fixture fixes,
 durable observation journal and storage transfer qualification described below.
 Contract: [SPEC.md](../SPEC.md), SHA-256
@@ -82,7 +83,7 @@ it from attention views but does not discard its conditions from assignment inpu
 | S076 / 76 | Mandatory trust/professional review before exposure | legal/security roles; worker tools disabled; sandbox | Limited: professional advice/real external exposure not supported; no prompt substitutes for professional review. |
 | S078 / 78 | Review value/economics/workload; maintain under current authority | skill/finance roles; `tools/outcome-observations.mjs`; [founder-benefit acceptance](founder-benefit-acceptance.md) | Limited/Judgment: supplied observations are attributable inputs; founder minutes, comparative costs, longitudinal value and business effect remain unmeasured. Live external business operations remain unavailable. |
 | S082 / 82 | One authoritative home; consequential findings/dissent retained | `store.mjs`, `operating-state.mjs`, exact source APIs; operating/storage/invariant tests | Mixed: physical preservation tested; semantic home selection requires independent acceptance. |
-| S084 / 84 | Complete usable current context; missing meaning holds | context/task/scoped/qualification modules; `spec-invariants`, `claude-catalog`, task/scoped/qualification tests | Mixed: continuing notice conditions and unknown model-speed semantics stay compulsory; exact projection/delivery checks do not establish native understanding or large-history fit. |
+| S084 / 84 | Complete usable current context; missing meaning holds | context/task/scoped/qualification modules, `worker.mjs`, `development-file-bodies.mjs`; invariant, task/scoped/qualification and file-body tests | Mixed: lossless file sharing preserves canonical context and all selected memberships; continuing notice conditions remain compulsory. Exact delivery checks do not establish native understanding or universal large-history fit. |
 | S086 / 86 | Preserve lineage/failures/uncertainty; attributable correction | `engine.mjs`, `worker.mjs`, `snapshot.mjs`; notice, negative-retention and snapshot tests; supplied outcome comparison | Software/Judgment: original dispositions/failed attempts remain; repair and observation references cannot relabel them or manufacture a causal improvement. |
 | S090 / 90 | Identity, assets, notices and history survive rename/update/uninstall | company-local store, `engine.mjs`, `storage-transfer.mjs`; rename/version/transfer tests | Mixed: tested source paths; product/desktop uninstall behavior needs host-specific acceptance. |
 | S092 / 92 | State outside caches; pinned definitions; explicit migration | `store.mjs`, `upgrade.mjs`, `storage-transfer.mjs`; runtime-version/transfer/upgrade tests | Software; unknown compatibility holds. |
@@ -118,6 +119,15 @@ storage tests do not regrade the historical candidate-format comparison.
 Counts across lanes overlap. These results do not establish installation,
 company adoption, native-host behavior, human workload reduction or business
 benefit. Historical failures, source pins and verdicts below remain retained.
+
+The bounded lossless development-review component passed 22 canonical confined
+tests and fresh independent native QA. Its exact changed source also passed 88
+ordinary tests and 11 controlled worker fixtures; these counts overlap. The
+worker shares only identical complete file strings for applicable development
+QA and verifies exact restoration. Canonical selection, records, assignment
+hashes, currentness and limits remain unchanged. This does not establish active
+package installation, full native worker lifecycle, provider capacity, peer-mode
+or durable continuity qualification.
 
 ## Earlier contradictions repaired
 

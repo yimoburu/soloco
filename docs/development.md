@@ -14,7 +14,7 @@ v0.7.3 packages the accepted proactive CoS behavior and SPEC v0.20 alongside the
 
 v0.7.3 packages the proactive CoS instructions and SPEC v0.20, with explicit published v0.7.2 compatibility. See [release validation](release-v0.7.3-validation.md). Existing company pins remain unchanged until checked adoption.
 
-The current v0.7.6 source carries SPEC v0.21. Its notice, follow-through and
+The current v0.7.7 source carries SPEC v0.21. Its notice, follow-through and
 current-meaning clarifications have separate contract identity; exact published
 v0.20 remains eligible for the existing local development/prototype workflows.
 The frozen v0.20 fixture and both explicit capability allowlists prevent a source
@@ -47,6 +47,7 @@ Choose the smallest change that satisfies a concrete need and the contract. Reus
 | `runtime/upgrade-evidence.mjs` | Frozen semantic projections, deterministic pages, source registry, exact excerpt retrieval, independent delivery ledgers and prompt budgets |
 | `runtime/upgrade.mjs` | Candidate inspection, native CoS/QA continuity checks, explicit adoption, verification, and definition recovery |
 | `runtime/adapters.mjs`, `worker.mjs` | Start/resume native standalone role processes and publish their results |
+| `runtime/development-file-bodies.mjs` | Lossless ordinary development-review presentation with exact restoration |
 | `runtime/selection.mjs` | Validate requested model settings and derive activity from existing jobs |
 | `runtime/context.mjs` | Complete bounded assignment packs and dependency checks |
 | `assets/` | Bundled governance and the canonical proposed role catalog |
@@ -91,6 +92,12 @@ Runtime receipts record the candidate, exact test paths/configuration, isolation
 Startup and the separate test watchdog each probe the selected trusted Node executable for `--test-isolation=none`, falling back to `--experimental-test-isolation=none`. This supports compatible Node 22 sandbox launch as well as newer flag spellings. Each probe evaluates only a fixed empty expression outside the candidate directory, with a scrubbed environment, a one-second timeout and a 10,000-byte output bound. The selected spelling is cached per process and used with the existing sandbox and Node permissions. If neither spelling works, execution fails closed with a diagnostic; candidate code never runs outside Seatbelt.
 
 The grant binds scope, ownership/team and governing intent/decisions. Routine failures and review results do not revoke it; all remain evidence in fresh assignment context. Repairs consume remaining attempts. Changed original inputs, boundaries, expiry, pause/revocation or ownership prevent acceptance. Tests recheck eligibility while running and stop on cancellation. An uncertain or interrupted run retains its intent and holds further work until inspected; no automatic retry. Test workers count toward existing active-job limits and continuity checks. Failed output envelopes retain bounded rejected evidence and precise errors on their jobs; they never route partial messages or become accepted artifacts.
+
+### Lossless development review presentation
+
+Ordinary QA of a runtime-attributed local development test may share identical complete file bodies through registered backward aliases. Original and candidate memberships, paths, revisions, metadata and all other evidence remain separate. The worker verifies exact restoration before model delivery. The original canonical context text, assignment hash, stored records, source and receipt hashes, currentness checks and authority remain unchanged.
+
+The delivered explanation distinguishes the digest of the exact original context text from the existing semantic assignment hash, which may omit the company name. Nonapplicable and special contexts retain their original presentation; malformed applicable references hold the review. This changes neither source budgets nor host/model limits, and does not guarantee that every valid source scope fits a model. Source qualification and installation of the active runtime remain separate steps.
 
 ### Fixed transfer test fixture
 
