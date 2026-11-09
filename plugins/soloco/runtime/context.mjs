@@ -19,7 +19,7 @@ export function contextBudgetForJob(state,job) {
   const target=state.records[job.review_of?.id];
   if(target?.scoped_context_target)return SCOPED_LIMITS.input_bytes;
   if(target?.context_qualification_target)return QUALIFICATION_LIMITS.input_bytes;
-  const planId=job.development_id??target?.development?.plan_id;
+  const planId=job.development_id??target?.development?.plan_id??target?.preflight_qualification?.plan_id;
   const scope=planId&&state.records[planId]?.development?.scope;
   return scope?.transport_max_characters===undefined?CONTEXT_LIMIT:developmentTransportBudget(scope.max_bytes);
 }
@@ -54,6 +54,7 @@ export function assignmentContext(state, job) {
     if(!state.records[developmentId]) throw new Error('Development scope missing');
     ids.add(developmentId);
     if(target?.development?.candidate_id)ids.add(target.development.candidate_id);
+    if(target?.development?.preflight_recovery_id){const recovery=state.records[target.development.preflight_recovery_id];if(!recovery)throw Error('Recovery request missing');ids.add(recovery.id);ids.add(recovery.development.subject.receipt_id);ids.add(recovery.development.diagnostic_id);if(recovery.development.proof.legacy)ids.add(recovery.development.proof.legacy.id);}
     if(target?.development?.reused_from)ids.add(target.development.reused_from);
     if(target?.development?.reuse_qualification)ids.add(target.development.reuse_qualification.id);
   }

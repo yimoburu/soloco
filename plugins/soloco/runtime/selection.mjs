@@ -40,7 +40,7 @@ export function selectionUsage(state) {
   const groups=new Map();
   let assignments=0,missingReasons=0,withAppliedControls=0,withReportedModels=0;
   for(const job of Object.values(state.jobs??{})) {
-    if(job.kind==='development_test'||job.type==='development_test')continue;
+    if(['development_test','development_preflight'].includes(job.kind)||['development_test','development_preflight'].includes(job.type))continue;
     assignments++;
     const request=job.model_selection??{mode:'default'};
     if(!request.reason?.trim())missingReasons++;
@@ -67,10 +67,10 @@ export function activityFor(state) {
   const current=new Set([...jobs.filter(j=>['queued','running'].includes(j.status)),...jobs.slice(0,8)].map(j=>j.id));
   return jobs.filter(j=>current.has(j.id)).map(j=>{
     const artifact=state.records?.[j.artifact_id],review=artifact?.kind==='review'&&artifact.status==='Submitted'?artifact.review:null;
-    const selection=j.model_selection??{mode:'default'},software=j.kind==='development_test';
+    const selection=j.model_selection??{mode:'default'},diagnostic=j.kind==='development_preflight',software=j.kind==='development_test'||diagnostic;
     const evidence=software?{reported_models:[],reported_effort:null,reported_service_tier:null,applied_controls:null,verification:'not_applicable',source:'software',scope:'no_model_call'}:{reported_models:[],reported_effort:null,reported_service_tier:null,applied_controls:null,verification:'unverified',source:'not_reported',scope:'unknown',...j.model_evidence};
-    return {job_id:j.id,agent:software?'Test runner (software)':state.roles?.[j.role]?.name??j.role,
-      instance_id:j.instance_id??null,task:j.task_summary??(j.task??'Run authorized local tests').replace(/\s+/g,' ').slice(0,160),
+    return {job_id:j.id,agent:diagnostic?'Fingerprint diagnostic (software)':software?'Test runner (software)':state.roles?.[j.role]?.name??j.role,
+      instance_id:j.instance_id??null,task:j.task_summary??(j.task??(diagnostic?'Fingerprint validation environment':'Run authorized local tests')).replace(/\s+/g,' ').slice(0,160),
       status:j.status==='completed'?'returned':j.status,
       requested_model:software?null:selection.mode==='explicit'?selection.model:'Host default',requested_effort:software?null:selection.effort??null,
       requested_speed:software?null:selection.speed??'host_default',selection_reason:software?null:selection.reason??null,

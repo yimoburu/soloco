@@ -2,7 +2,7 @@
 
 This assessment covers peer/storage baseline main `4e9e434` (PR #56) and the
 lossless development-review transport, mechanical legacy-writer archive fence
-and current peer publication-policy and scheduler components described below,
+and current peer publication-policy, scheduler and test-preflight recovery components described below,
 November 9, 2026 UTC.
 This includes the peer foundations, bounded storage core, executor/fixture fixes,
 durable observation journal and storage transfer qualification described below.
@@ -79,7 +79,7 @@ it from attention views but does not discard its conditions from assignment inpu
 | S062 / 62 | Detect stalls and recover/escalate within authority | `timeout.mjs`, `recovery.mjs`, worker/supervisor and notices; timeout/cancellation/task-runtime tests | Limited: only typed unstarted capacity/resource holds may wait automatically; attempted/uncertain or unknown failures need attention. No guaranteed out-of-band founder notification. |
 | S066 / 66 | Bounded choose/assign/evidence/review/record/continue loop | task dependencies, optional outcome hypotheses, opt-in operating proposals and supplied-observation tool | Mixed: continuation stays within existing permission; an output, proposal, test or completed protocol is not observed founder/business benefit. |
 | S068 / 68 | Agreed outcomes/evidence/limits and retained counterevidence | scope/task validation, `outcome.mjs`, `current-state.mjs`, `worker.mjs`; outcome/task/negative-retention tests | Mixed: objective, expected effect, observation and assessment period can be retained with exact inputs; sufficiency and measurement validity require independent judgment. |
-| S070 / 70 | Honest Pass/Fail/Blocked; bounded repair and permitted next action | `worker.mjs`, `develop.mjs`, `tasks.mjs`; `spec-invariants`, `develop`, `tasks` tests | Software: Pass with explicit nonempty/malformed blockers rejected; omission remains legacy-compatible. |
+| S070 / 70 | Honest Pass/Fail/Blocked; bounded repair and permitted next action | `worker.mjs`, `develop.mjs`, `tasks.mjs`; `spec-invariants`, `develop`, `test-preflight-recovery`, `tasks` tests | Software: Pass with explicit nonempty/malformed blockers rejected; omission remains legacy-compatible. Explicit preflight recovery retains the failed attempt and every generation charge; started or uncertain execution stays held. |
 | S072 / 72 | Correct order of review, authorization, execution; exact candidate | `develop.mjs`, `prototype.mjs`, `handover.mjs`, `upgrade.mjs`; their lifecycle/negative tests | Software within declared workflows; no broader business grant implied. |
 | S074 / 74 | Scoped reviewed artifacts; distinct generation/run/integration permissions | `develop.mjs`, `prototype.mjs`, `local-sandbox.mjs`; corresponding tests | Limited: retained local candidate and Node tests; source integration/deployment unsupported by company runtime. |
 | S076 / 76 | Mandatory trust/professional review before exposure | legal/security roles; worker tools disabled; sandbox | Limited: professional advice/real external exposure not supported; no prompt substitutes for professional review. |
@@ -148,12 +148,35 @@ routing, actual-company adoption and durable continuity require their own
 acceptance. The component guide retains its original preparation framing;
 this section records the later native qualification.
 
+The compatible test-controller extension adds explicit diagnostics and one-use
+recovery for a canonically proven pre-execution fingerprint failure. A protected
+legacy target supplies the complete historical runtime and installation evidence
+for a distinct native qualification review. That review can qualify the failure
+stage; it cannot accept candidate code. Recovery preserves the original valid
+grant, source bytes, expiry, failed receipt and spent generations. A fresh
+canonical test result and separate independent code QA still precede acceptance.
+Currentness and uncertainty are rechecked throughout the run. Directory reads
+precede the final pure expiry checks at receipt publication and acceptance.
+
+All eight affected test roots passed in a complete 230-case ordinary SDK run
+on the initial source. Later privacy and software-job corrections have separate
+focused checks; final-tree hosted results are recorded with the pull request.
+Two causal expiry failures and earlier failed/incomplete runs remain recorded.
+Diagnostics retain typed/hash-only errors and remain software in usage and
+progress views. These are controlled source regressions, separate from a native legacy
+qualification, live worker diagnostic, recovered candidate execution or company
+acceptance. The historical fingerprint subcause remains unknown. SPEC v0.21,
+the adopted team and runtime release version are unchanged; see
+`test-preflight-recovery.md` for the supported protocol and limits.
+
 | Source | Completed checks | Exact scope |
 |---|---|---|
 | PR #55 head `d78c379` | [Source CI](https://github.com/yimoburu/soloco/actions/runs/42544202815): 1,348 Node 22 tests; [qualification](https://github.com/yimoburu/soloco/actions/runs/42544267521): 1,760 full Node 22 tests and 478 Node 26 compatibility tests | All 130 journal cases passed in each selected lane; zero failures, cancellations, skips or todos |
 | PR #55 merge `aac2537` | [Post-merge Source CI](https://github.com/yimoburu/soloco/actions/runs/42545682958): 1,348 Node 22 tests, build/drift and gate | Actual merged checkout; full/compatibility counts above belong to the head with the identical tree |
 | PR #56 head `a1e6294` | [Source CI](https://github.com/yimoburu/soloco/actions/runs/42547912998): 1,348 Node 22 tests; [qualification](https://github.com/yimoburu/soloco/actions/runs/42547915993): 1,760 full Node 22 tests and 478 Node 26 compatibility tests | All 45 storage cases passed in both Node 22 lanes; 29 selected storage cases passed in Node 26; zero failures, cancellations, skips or todos |
 | PR #56 merge `4e9e434` | [Post-merge Source CI](https://github.com/yimoburu/soloco/actions/runs/42549433821): 1,348 Node 22 tests, build/drift and gate | Actual merged checkout; its tree equals the qualified head tree |
+| PR #61 head `2cc37e0` | [Source CI](https://github.com/yimoburu/soloco/actions/runs/42693268997): 1,606 Node 22 tests; [qualification](https://github.com/yimoburu/soloco/actions/runs/42693323026): 2,018 full Node 22 tests and 736 Node 26 compatibility tests | All 202 journal/scheduler cases passed in each selected lane; zero failures, cancellations, skips or todos |
+| PR #61 merge `3d65268` | [Post-merge Source CI](https://github.com/yimoburu/soloco/actions/runs/42695347401): 1,606 Node 22 tests, build/drift and gate | Actual merged checkout with the identical qualified head tree; native 202-case qualification remains separate |
 
 Counts across lanes overlap. These results do not establish installation,
 company adoption, native-host behavior, human workload reduction or business

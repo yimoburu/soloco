@@ -6,6 +6,7 @@ const cryptoHash=v=>createHash('sha256').update(v).digest('hex');
 // tests_executed means the test harness produced evidence, not that any test is adequate.
 // Untrusted test output can lie: independent acceptance must inspect source and evidence.
 import fs from 'node:fs';
+import {readSystemBuildDescriptor} from './system-build.mjs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
@@ -255,15 +256,14 @@ export function validationEnvironment(directory,test_paths,{testFixture}={}) {
   // Re-discover load commands as well as re-hashing bytes: cached directories
   // cannot establish completeness after an in-place dynamic-library update.
   runtimePaths=undefined;runtimeDependencyFiles=undefined;libraries();
-  const build=spawnSync('/usr/bin/sw_vers',['-buildVersion'],{encoding:'utf8',timeout:1000,maxBuffer:1000,env:{PATH:'/usr/bin:/bin',LANG:'C'}});
-  if(build.status!==0||!build.stdout.trim())throw Error('Cannot fingerprint system build for validation reuse');
+  const build=readSystemBuildDescriptor();
   // The trusted fixture module is loaded even in no-fixture mode. Bind this new
   // JavaScript dependency too; runner-only hashing would miss its replacement.
-  const dependencies=[...runtimeDependencyFiles,fileURLToPath(new URL('./test-fixtures.mjs',import.meta.url))]
+  const dependencies=[...runtimeDependencyFiles,fileURLToPath(new URL('./test-fixtures.mjs',import.meta.url)),fileURLToPath(new URL('./system-build.mjs',import.meta.url))]
     .sort().map(file=>({path:file,sha256:cryptoHash(fs.readFileSync(file))}));
   const scratch=path.join(directory,'.scratch');
   return {command:testArguments(directory,scratch,test_paths.map(p=>'./'+p)),
-    runtime:{node:process.version,platform:process.platform,arch:process.arch,os_release:os.release(),system_build:build.stdout.trim(),dependencies,
+    runtime:{node:process.version,platform:process.platform,arch:process.arch,os_release:os.release(),system_build:build.system_build,system_descriptor:{protocol:build.protocol,sha256:build.descriptor_sha256},dependencies,
       executable_sha256:cryptoHash(fs.readFileSync(node)),runner_sha256:cryptoHash(fs.readFileSync(fileURLToPath(import.meta.url)))},
     sandbox:{backend:BACKEND,policy_sha256:cryptoHash(sandboxProfile(directory,scratch))},environment:environment(scratch),
     ...(testFixture===undefined?{}:{fixture_environment:fixtureEnvironmentBindings(testFixture)})};
