@@ -1,7 +1,7 @@
 # Current capability map
 
-This map describes source based on main `f359cc7` (PR #60), plus the peer
-scheduler component below. It includes the
+This map describes source based on main `3d65268` (PR #61), plus the compatible
+test-preflight recovery component below. It includes the
 peer foundations (PR #49), bounded storage core (PR #51), executor and fixture
 fixes (PR #52/#53), durable observation journal (PR #55), and storage transfer
 qualification (PR #56) and lossless development-review transport (PR #58).
@@ -17,6 +17,7 @@ Historical reports retain their original source identities and verdicts.
 | Typed scheduling/recovery causes | `recovery.mjs`, `coordination.mjs` | `task-runtime.test.mjs`, coordination suites | No automatic retry of an attempted/uncertain task |
 | Opt-in operating proposal continuation | `operating-state.mjs`, `worker.mjs` | `operating-control.test.mjs`, final five-call native proposal evaluation | Only exact new read-only proposals; legacy and changed meaning remain conservative |
 | Retained code changes, execution and acceptance | `develop.mjs`, `local-sandbox.mjs` | `develop.test.mjs`, accepted-workflow evaluator | No automatic integration or deployment |
+| Explicit test-preflight recovery | `develop.mjs`, `system-build.mjs`, `validation-cache.mjs`, `context.mjs` | Complete development/sandbox/transport/cache roots; causal expiry/privacy checks, recovery and software-job regressions; exact historical runtime fixtures | One-use recovery retains the original grant, expiry, failed receipt and spent generations. Started or uncertain execution stays held. Diagnostics remain software jobs in usage and progress views. The legacy route requires separate current native source qualification; actual candidate tests and independent code QA remain necessary. Source checks do not establish live recovery; see `test-preflight-recovery.md` |
 | Review independence and continuing notice conditions | `worker.mjs`, `engine.mjs`, context and prototype modules | `spec-invariants.test.mjs`, context/prototype tests | Native identity and immutable dispositions are enforced; semantic adequacy and authority still require judgment |
 | Complete compulsory catalog evidence | `upgrade-evidence.mjs` | `claude-catalog.test.mjs`, retained PR #37 before/after probes | Unknown model-speed values stay mandatory; delivery does not prove model understanding |
 | Supplied local observation comparison | `tools/outcome-observations.mjs` | `outcome-observations.test.mjs` | Exact supplied inputs; independent measurement validity and causal impact unestablished |

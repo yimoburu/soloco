@@ -37,7 +37,7 @@ export const compatibilityTests=Object.freeze([
   'cancellation-finalization','ci-evidence','claude-terminal-state','development-file-bodies','hooks','indexed-public-reads',
   'local-sandbox-flags','local-sandbox','local-sandbox-fixture','normalized-read-atomicity','peer-admission-provider-errors','peer-legacy-writer-fence','peer-observation-journal','peer-publication-policy','peer-scheduler','peer-scheduler-admission-provider-errors','plugin',
   'runtime-version-fence','selection-adapter','storage-intake','storage-layout-repairs',
-  'storage-transfer-integrity','storage-leaf-transfer','storage-transfer-paths','test-fixtures','task-index','task-runtime','tasks',
+  'storage-transfer-integrity','storage-leaf-transfer','storage-transfer-paths','system-build','test-fixtures','test-preflight-recovery','task-index','task-runtime','tasks',
   'timeout','timeout-wiring','upgrade-adapter',
 ].map(name=>`tests/${name}.test.mjs`).sort());
 export function laneCoverage(lane) {
