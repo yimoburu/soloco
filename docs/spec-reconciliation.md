@@ -1,8 +1,8 @@
 # SPEC v0.21 reconciliation
 
 This assessment covers peer/storage baseline main `4e9e434` (PR #56) and the
-lossless development-review transport and mechanical legacy-writer archive
-fence described below, November 9, 2026 UTC.
+lossless development-review transport, mechanical legacy-writer archive fence
+and current peer publication-policy component described below, November 9, 2026 UTC.
 This includes the peer foundations, bounded storage core, executor/fixture fixes,
 durable observation journal and storage transfer qualification described below.
 Contract: [SPEC.md](../SPEC.md), SHA-256
@@ -119,6 +119,19 @@ independent native QA and receiver acceptance qualify that retained component.
 The original writer fixture remains an exact test asset. No production company
 migration or resume, protected host enrollment, allowance conversion or new
 spending is authorized by this component. Current company rules stay pinned.
+
+The peer model now exposes protected, read-only publication-policy evidence with
+fresh authority, capacity and historical participant identities, a final uncached
+owning-snapshot check and a common expiry cutoff. Provider-origin admission
+errors retain their original Error/cause/AggregateError identities before any
+semantic-denial classification; genuine semantic denials remain durable.
+An external source candidate was adopted unchanged by a native Engineer and
+passed the complete policy91 and provider15 roots in a fresh 106-case confined
+run, independent native QA and receiver acceptance. The original model98 root
+remains unchanged and passed in the whole ordinary 204-case regression run.
+These overlapping counts qualify the local library component. Production
+publisher consumption and the scheduler's corrected dependency composition need
+separate acceptance; the earlier scheduler QA Fail retains its verdict.
 
 | Source | Completed checks | Exact scope |
 |---|---|---|
