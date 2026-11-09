@@ -3,10 +3,11 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 const safe=p=>typeof p==='string'&&p.length<=500&&!p.startsWith('/')&&p.split('/').every(s=>s&&s!=='.'&&s!=='..'&&!s.includes('\\'));
-// Require exact canonical spelling before normalization can erase traversal.
+// Reject raw traversal and aliases before any normalization or filesystem work.
 function transferPath(directory){
- if(!path.isAbsolute(directory??''))throw Error('Absolute transfer path required');
- if(directory.split(path.sep==='\\'?/[\\/]/:/\//).includes('..'))throw Error('Parent traversal in transfer path refused');
+ if(typeof directory!=='string'||!path.isAbsolute(directory))throw Error('Absolute transfer path required');
+ const components=(path.sep==='/'?directory:directory.replaceAll('\\','/')).split('/');
+ if(components.includes('..'))throw Error('Parent traversal in transfer path refused');
  if(directory!==path.resolve(directory))throw Error('Canonical absolute transfer path required');
  return directory;
 }
@@ -16,7 +17,6 @@ function prospective(directory){
   let stat;
   try{stat=fs.lstatSync(parent);}
   catch(error){
-   // Permission, I/O, loop and non-directory errors do not mean "absent".
    if(error?.code!=='ENOENT')throw error;
    const next=path.dirname(parent);
    if(next===parent)throw Error('Transfer ancestor missing');
@@ -24,8 +24,7 @@ function prospective(directory){
   }
   if(stat.isSymbolicLink())throw Error('Linked transfer ancestor refused');
   if(!stat.isDirectory())throw Error('Transfer ancestor must be a directory');
-  // Check the whole existing prefix without probing unreadable parents above
-  // the candidate's read grant. Native aliases and linked ancestors are refused.
+  // Resolve the complete existing prefix without probing above the read grant.
   const real=fs.realpathSync.native(parent);
   if(real!==parent)throw Error('Linked or noncanonical transfer ancestor refused');
   return path.join(real,...suffix);
@@ -38,8 +37,7 @@ function fresh(directory){
  catch(error){if(error?.code!=='ENOENT')throw error;}
  prospective(directory);
  fs.mkdirSync(path.dirname(directory),{recursive:true,mode:0o700});
- // Recheck newly created parents, then create the final leaf exclusively.
- // Path checks do not claim atomic protection against concurrent link swaps.
+ // Observe intervening changes after mkdir; this is not an atomic link-swap fence.
  prospective(directory);
  fs.mkdirSync(directory,{mode:0o700});
 }
