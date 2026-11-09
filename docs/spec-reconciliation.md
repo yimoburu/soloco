@@ -2,7 +2,8 @@
 
 This assessment covers peer/storage baseline main `4e9e434` (PR #56) and the
 lossless development-review transport, mechanical legacy-writer archive fence
-and current peer publication-policy component described below, November 9, 2026 UTC.
+and current peer publication-policy and scheduler components described below,
+November 9, 2026 UTC.
 This includes the peer foundations, bounded storage core, executor/fixture fixes,
 durable observation journal and storage transfer qualification described below.
 Contract: [SPEC.md](../SPEC.md), SHA-256
@@ -104,8 +105,8 @@ the storage transfer guard and real-link regression tests while retaining the
 current version checks and portable path suite.
 
 These are scoped source and executable checks, not complete peer-mode or
-actual-company acceptance. The journal has no production scheduler caller in
-this baseline. Scheduler composition, protected host enrollment and replacement,
+actual-company acceptance. The scheduler library now consumes the journal and
+current model; it has no production company route. Protected host enrollment and replacement,
 production publication-policy qualification and durable continuity remain open.
 The four acceptance gaps #13, #16, #18 and #30 below remain open. New successful
 storage tests do not regrade the historical candidate-format comparison.
@@ -130,8 +131,22 @@ passed the complete policy91 and provider15 roots in a fresh 106-case confined
 run, independent native QA and receiver acceptance. The original model98 root
 remains unchanged and passed in the whole ordinary 204-case regression run.
 These overlapping counts qualify the local library component. Production
-publisher consumption and the scheduler's corrected dependency composition need
-separate acceptance; the earlier scheduler QA Fail retains its verdict.
+publisher consumption needs separate acceptance; the earlier scheduler QA Fail
+retains its verdict.
+
+The corrected scheduler component preserves all 130 journal and 69 scheduler
+cases and adds three recovery cases against the actual admission provider path.
+A native Engineer adopted the external source unchanged. A fresh confined run
+passed all 202 cases; a distinct native QA returned Pass, followed by owner
+acceptance. Complete source and assessment delivery to that review is evidenced.
+The host recorded one compaction before the verdict. The accepted scope has no
+zero-compaction condition; acceptance claims neither guaranteed final-turn
+retention nor semantic loss from that event. This bounded component result does
+not qualify the host transport generally. The original failed scheduler review
+and historical held attempts remain unchanged. Protected enrollment, production
+routing, actual-company adoption and durable continuity require their own
+acceptance. The component guide retains its original preparation framing;
+this section records the later native qualification.
 
 | Source | Completed checks | Exact scope |
 |---|---|---|
