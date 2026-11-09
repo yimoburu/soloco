@@ -21,6 +21,7 @@ const now=()=>new Date().toISOString();
 function hold(code,message){throw Object.assign(Error(message),{code});}
 function text(v,label,max=2000){if(typeof v!=='string'||!v.trim()||v.length>max||v.includes('\0'))hold('INVALID_INPUT',`${label} requires bounded nonempty text`);return v;}
 function bounded(v,label,max=64000){const bytes=canonical(v);if(Buffer.byteLength(bytes)>max)hold('EVIDENCE_CAPACITY',`${label} exceeds capacity`);return JSON.parse(bytes);}
+function publicationMetadata(value,label){const result=bounded(value,label,16000);if(!result||typeof result!=='object'||Array.isArray(result))hold('INVALID_INPUT',`${label} requires a complete object`);return result;}
 const ref=(family,row)=>({family,id:row.id,revision:row.revision,sha256:row.sha256});
 const order=(a,b)=>a<b?-1:a>b?1:0;
 function all(tx,family,filter={}){
@@ -787,9 +788,129 @@ function evidenceAnalysis(tx,budget=semanticBudget(tx)){
     const rebuilt=buildContext(tx,{principal_id:seal.reviewer},old);
     return rebuilt.sha256===seal.taskSeal.context.sha256&&rebuilt.text===seal.taskSeal.context.text;
   };
-  return {current,currentTask:row=>current(taskSeal(row).declared),historical:historicalWalk,implicatedHomes,reviewSeal,homeSeal,pendingReviewEligible,taskSeal};
+  let identityInventory=null;const identityFacts=new Map();
+  const principalIdentity=id=>{
+    if(identityFacts.has(id))return identityFacts.get(id);
+    const principal=tx.get('principals',text(id,'identity principal',200));need(principal,'Identity principal missing');
+    preparationBudget(tx).retain('principals',principal);
+    const natives=new Set(),proofs=[];
+    if(principal.value.native_id!==undefined&&principal.value.native_id!==null)natives.add(text(principal.value.native_id,'current native identity',300));
+    // Current-owner indexing alone loses transferred-away production. Inspect
+    // the complete bounded task-head set, then seal only matching P2 tasks.
+    // Private software trackers have no P2 definition/attempt/result and supply
+    // no native facts. No unrelated archive is promoted to an ancestry edge.
+    if(!identityInventory){
+      const heads=new Map(),people=new Map();
+      for(const task of all(tx,'tasks')){
+        heads.set(task.id,task);const value=task.value,transfers=Array.isArray(value.transfers)?value.transfers:[];
+        if(!value.definition&&!value.attempt&&!Object.hasOwn(value,'result'))continue;
+        const ids=new Set([value.principal_id,value.owner_principal_id,value.definition?.owner_principal_id,value.attempt?.context?.task?.owner_principal_id,...transfers.flatMap(t=>[t?.from,t?.to])]);
+        for(const person of ids)if(typeof person==='string'){if(!people.has(person))people.set(person,new Set());people.get(person).add(task.id);}
+      }
+      identityInventory={heads,people};
+    }
+    const produced=new Set();
+    for(const effect of all(tx,'effects',{principal_id:id}))if(effect.value.kind==='native')produced.add(text(effect.value.task_id,'identity production task',200));
+    const selected=new Set([...(identityInventory.people.get(id)??[]),...produced]);
+    for(const taskId of selected){
+      const task=identityInventory.heads.get(taskId);need(task,'Identity production task head missing');const value=task.value;
+      touch(ref('tasks',task));const seal=taskSeal(task);need(seal.actors.includes(id),'Identity task ownership unproven');
+      if(seal.context){const admitted=historical(seal.context.principal);if(admitted.value.native_id!==undefined&&admitted.value.native_id!==null)text(admitted.value.native_id,'historical native identity',300);}
+      const aliases=[...new Set(seal.natives.map(native=>text(native,'protected native identity',300)))].sort();
+      for(const native of aliases)natives.add(native);
+      if(aliases.length)proofs.push({task_ref:ref('tasks',task),owner_principal_ids:[...new Set(seal.actors)].sort(),producer_principal_id:seal.producer,admitted_principal_ref:copy(seal.context.principal),observation_ref:value.result?.observation?copy(value.result.observation):null,native_ids:aliases});
+    }
+    proofs.sort((a,b)=>order(canonical(a.task_ref),canonical(b.task_ref)));
+    const result={protocol:'peer-principal-native-aliases-v1',principal_ref:ref('principals',principal),native_ids:[...natives].sort(),proofs};identityFacts.set(id,result);return result;
+  };
+  return {current,currentTask:row=>current(taskSeal(row).declared),historical:historicalWalk,implicatedHomes,reviewSeal,homeSeal,pendingReviewEligible,taskSeal,principalIdentity};
 }
 function lineage(tx,subject){const graph=evidenceAnalysis(tx);graph.current([subject]);return graph.historical([subject]);}
+
+// Trusted host composition only, not a model tool or authentication interface.
+// Use the existing owning P1 snapshot BEFORE any put. This function opens no
+// transaction, writes no rows and returns plain evidence, never a grant/Boolean.
+export function publicationPolicyEvidence(provider,actor,args={}){
+  const input=bounded(args,'publication policy request',100000),who=copy(actor);
+  const keys=['subject_ref','review_refs','grant_id','grant_generation','action','expected_authority_sha256'];
+  if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(k=>!keys.includes(k)))hold('INVALID_INPUT','Unsupported publication policy request');
+  const action=text(input.action,'publication action',100);if(!action.startsWith('github/'))hold('INVALID_INPUT','Exact github publication action required');
+  const methods=['get','getVersion','list','count','queryCurrentReviews','resolveLegacy'],view={};
+  for(const method of methods){if(typeof provider?.[method]!=='function')hold('LINEAGE_REQUIRED','Complete owning read provider required');view[method]=(...values)=>provider[method](...values);}
+  const tx=trackedReads(Object.freeze(view)),prep=preparationBudget(tx);
+  const subject=reviewReference(input.subject_ref);if(subject.family!=='proposals')hold('PROPOSAL_INVALID','Exact publication proposal required');
+  const proposal=resolve(tx,subject),p=proposal.value;if(p.status!=='proposed')hold('PROPOSAL_INVALID','Proposed publication subject required');
+  const metadata={github_publication:publicationMetadata(p.github_publication,'GitHub subject')};
+  if(Object.hasOwn(p,'github_atomic_publication'))metadata.github_atomic_publication=publicationMetadata(p.github_atomic_publication,'GitHub atomic subject');
+  const repo=repository(`${text(metadata.github_publication.owner,'repository owner',200)}/${text(metadata.github_publication.repo,'repository name',200)}`);
+  const scope=scopeOf(p.scope),resources=canonicalResources(tx,[{kind:'repo',repository:repo}]);
+  const auth=authorize(tx,who,action,{grant_id:input.grant_id,grant_generation:input.grant_generation,scope,resources});
+  const retain=(family,row)=>row?prep.retain(family,row):null;
+  const authBinding=value=>({control:{id:value.control.id,value:copy(retain('control',value.control).value)},principal:{id:value.principal.id,value:copy(retain('principals',value.principal).value)},grant:value.grant?grantBinding(retain('grants',value.grant)):null});
+  const publisher=authBinding(auth);
+  const used=(value,key)=>{const n=value?.[key]??0;if(!Number.isSafeInteger(n)||n<0)hold('POLICY_INVALID','Actual usage counter is invalid');return n;};
+  const capacityPart=(n,limit)=>{if(!Number.isSafeInteger(limit)||limit<1)hold('POLICY_INVALID','Finite remaining capacity required');return {used:n,limit,remaining:Math.max(0,limit-n)};};
+  // Counter-only rows may be absent before first use. Only their known counter
+  // values are excluded; any other field remains authority-binding material.
+  const usageMetadata=(id,row)=>{const {model_calls,...value}=row?.value??{};return {id,value};};
+  const capacityEvidence=current=>{
+    const limits=policy(current.control),usage=retain('control',tx.get('control','usage')),principalUsage=retain('control',tx.get('control',`usage:${current.principal.id}`));
+    const capacity={global:capacityPart(used(usage?.value,'model_calls'),limits.max_model_calls),principal:{principal_id:current.principal.id,...capacityPart(used(principalUsage?.value,'model_calls'),limits.principal_model_calls??limits.max_model_calls)},grant:current.grant?{grant_id:current.grant.id,...capacityPart(used(current.grant.value,'used_model_calls'),current.grant.value.max_model_calls)}:null};
+    capacity.remaining_model_calls=Math.min(capacity.global.remaining,capacity.principal.remaining,...(capacity.grant?[capacity.grant.remaining]:[]));
+    if(!capacity.remaining_model_calls)hold('MODEL_BUDGET','Current publication authority has exhausted capacity');
+    return {capacity,usage,principalUsage,usage_metadata:{global:usageMetadata('usage',usage),principal:usageMetadata(`usage:${current.principal.id}`,principalUsage)}};
+  };
+  const initialCapacity=capacityEvidence(auth);
+  const home=tx.get('homes',text(p.home_id,'proposal home',200));if(p.base)resolve(tx,p.base);else if(home)hold('HOME_CHANGED','Concurrent home');
+  const reviewRows=currentReviewRows(tx),selected=sources(tx,scope,[],reviewRows);
+  if(selected.membership.conflicts.length)hold('CONTEXT_CONFLICT','Unresolved applicable conflict');
+  if(!same(selected.membership,p.membership))hold('CONTEXT_CHANGED','Applicable membership changed');
+  if(!Array.isArray(p.readset)||p.readset.length>MAX_ROWS)hold('SOURCE_INVALID','Complete proposal readset required');
+  for(const r of p.readset)resolve(tx,r);
+  reviewRows.subjects([subject]);
+  const graph=evidenceAnalysis(tx);graph.current([subject]);const contributors=graph.historical([subject]);
+  if(!Array.isArray(input.review_refs)||!input.review_refs.length||input.review_refs.length>100)hold('REVIEW_REQUIRED','Exact independent publication review required');
+  const review_refs=input.review_refs.map(reviewReference),seen=new Set(),reviews=[],review_authorities=[],review_authority_inputs=[];
+  const reviewAuthority=({reference,seal,head})=>{
+    const original=seal.task.value;
+    const reviewerAuth=authorize(tx,{principal_id:seal.reviewer},'task/submit',{grant_id:original.grant_id,grant_generation:original.grant_generation,scope:original.scope,resources:original.resources});
+    const currentOwner=head.value.owner_principal_id===seal.reviewer?null:authorize(tx,{principal_id:head.value.owner_principal_id},'task/submit',{grant_id:head.value.grant_id,grant_generation:head.value.grant_generation,scope:head.value.scope,resources:head.value.resources});
+    return {review_ref:reference,original_reviewer:authBinding(reviewerAuth),current_task_owner:currentOwner?authBinding(currentOwner):null};
+  };
+  for(const reference of review_refs){
+    if(reference.family!=='reviews'||seen.has(reference.id))hold('REVIEW_REQUIRED','Distinct exact review references required');seen.add(reference.id);
+    const review=resolve(tx,reference);
+    if(!observedReview(tx,review,{pending:true})||review.value.verdict!=='Pass'||!same(review.value.subject,subject))hold('REVIEW_REQUIRED','Protected exact independent Pass required');
+    if(!graph.pendingReviewEligible(review))hold('CONTEXT_CHANGED','Review context no longer current');
+    const seal=graph.reviewSeal(review),head=retain('tasks',tx.get('tasks',seal.task.id));
+    reviews.push({review_ref:reference,task_ref:seal.taskRef,current_task_ref:ref('tasks',head),observation_ref:copy(review.value.proof.observation),reviewer_principal_id:seal.reviewer,native_id:seal.native,context_sha256:review.value.context_sha256,output_sha256:review.value.output_sha256});
+    const authorityInput={reference,seal,head};review_authority_inputs.push(authorityInput);review_authorities.push(reviewAuthority(authorityInput));
+  }
+  for(const adverse of reviewRows.adverse())if(same(adverse.subject,subject)){if(adverse.error)throw adverse.error;hold('REVIEW_HELD','Retained negative review requires a changed proposal');}
+  const interested=new Set([...contributors.principals,...review_authorities.flatMap(a=>[a.original_reviewer.principal.id,...(a.current_task_owner?[a.current_task_owner.principal.id]:[])])]);
+  const identity_facts={protocol:'peer-publication-native-identities-v1',publisher:graph.principalIdentity(auth.principal.id),interested:[...interested].sort().map(id=>graph.principalIdentity(id))};
+  if(!same(review_authority_inputs.map(reviewAuthority),review_authorities))hold('AUTHORITY_CHANGED','Review authority changed during policy verification');
+  const finalAuth=authorize(tx,who,action,{grant_id:input.grant_id,grant_generation:input.grant_generation,scope,resources}),fresh=capacityEvidence(finalAuth);
+  if(!same(authBinding(finalAuth),publisher)||!same(fresh.usage_metadata,initialCapacity.usage_metadata))hold('AUTHORITY_CHANGED','Publication authority changed during policy verification');
+  // Uncached owning P1 guard AFTER every provider read. A modifying read hook
+  // must not leave cached identity evidence usable; exact no-op puts stay valid.
+  const snapshot=tx.getVersion(subject);
+  if(!snapshot||snapshot.family!==subject.family||!same(ref(subject.family,snapshot),subject)||!same(snapshot.value,proposal.value))hold('LINEAGE_REQUIRED','Final owning snapshot subject binding changed');
+  // One final cutoff covers every grant after the last provider read, so later
+  // proof/capacity work cannot leave an earlier review authority expired.
+  const cutoff=Date.now(),grants=[publisher.grant,...review_authorities.flatMap(a=>[a.original_reviewer.grant,a.current_task_owner?.grant])].filter(Boolean);
+  if(grants.some(g=>!Number.isFinite(Date.parse(g.value.expires_at))||Date.parse(g.value.expires_at)<=cutoff))hold('GRANT_INVALID','Current publication and review grants required at final cutoff');
+  const {capacity,usage,principalUsage,usage_metadata}=fresh;
+  const authority_binding={protocol:'peer-publication-authority-v1',action,scope,resources,subject_ref:subject,review_refs,metadata,reviews,review_authorities,publisher,usage_metadata,readset:copy(p.readset),membership:copy(selected.membership)};
+  const authority_sha256=digest(authority_binding);
+  if(input.expected_authority_sha256!==undefined&&(typeof input.expected_authority_sha256!=='string'||!/^[a-f0-9]{64}$/.test(input.expected_authority_sha256)||input.expected_authority_sha256!==authority_sha256))hold('AUTHORITY_CHANGED','Publication authority binding changed');
+  // Capacity and current raw row identities are fresh observations, not part of
+  // the stable authority digest. No allowance is reserved, spent or refunded.
+  // Known aliases are fresh proof facts, not a counter-sensitive request lease.
+  // Consumers must check them each time; new nonoverlapping production can be
+  // safe while the unchanged semantic authority SHA remains stable.
+  return bounded({protocol:'peer-publication-policy-v1',subject_ref:subject,review_refs,metadata,reviews,contributors,identity_facts,authority_binding,authority_sha256,capacity,current_sources:{control:ref('control',finalAuth.control),principal:ref('principals',finalAuth.principal),grant:finalAuth.grant?ref('grants',finalAuth.grant):null,global_usage:usage?ref('control',usage):null,principal_usage:principalUsage?ref('control',principalUsage):null},boundary:'Trusted P2 policy evidence only; no P4/App/GitHub qualification, transport, claim, native authentication or new authority.'},'publication policy evidence',REVIEW_PREPARATION_BYTES);
+}
 function exclusions(args){const ids=args.exclude_task_ids??[];if(!Array.isArray(ids)||ids.length>MAX_ROWS||new Set(ids).size!==ids.length||ids.some(id=>typeof id!=='string'||!id||id.length>200))hold('INVALID_INPUT','At most 10,000 distinct excluded task IDs');return new Set(ids);}
 // Compatible task/host result shape. P3 may accumulate excluded held IDs up to
 // the full 10,000-row queue bound; fairness advances only on admitted execution.
@@ -876,7 +997,7 @@ function mutate(tx,actor,principal,c,action,args,protectedCall){
       usage=tx.get('control','usage');principalUsage=tx.get('control',`usage:${t.owner_principal_id}`);used=usage?.value.model_calls??0;usedPrincipal=principalUsage?.value.model_calls??0;
       if(used>=policy(c).max_model_calls||usedPrincipal>=(policy(c).principal_model_calls??policy(c).max_model_calls)||auth.grant&&(auth.grant.value.used_model_calls??0)>=auth.grant.value.max_model_calls)hold('MODEL_BUDGET','Model budget exhausted');
       context=buildContext(tx,actor,task);if(context.membership.conflicts.length)hold('CONTEXT_CONFLICT','Unresolved applicable conflict');
-    }catch(error){if(['RESOURCE_BUSY','RESOURCE_AUTHORITY','CONTEXT_CAPACITY','CONTEXT_CONFLICT','GRANT_INVALID','GRANT_CHANGED','MODEL_BUDGET','PRINCIPAL_INACTIVE','SOURCE_CHANGED','DEPENDENCY_CYCLE','LEGACY_SOURCE_MISSING','DEFINITION_CHANGED'].includes(error.code))return {admitted:false,code:error.code,reason:error.message};throw error;}
+    }catch(error){if(readFailure(tx,error))throw error;if(['RESOURCE_BUSY','RESOURCE_AUTHORITY','CONTEXT_CAPACITY','CONTEXT_CONFLICT','GRANT_INVALID','GRANT_CHANGED','MODEL_BUDGET','PRINCIPAL_INACTIVE','SOURCE_CHANGED','DEPENDENCY_CYCLE','LEGACY_SOURCE_MISSING','DEFINITION_CHANGED'].includes(error.code))return {admitted:false,code:error.code,reason:error.message};throw error;}
     const effectId=digest(['native-effect',task.id,t.definition_revision]);if(tx.get('effects',effectId))hold('ATTEMPT_CONSUMED','Effect already reserved');
     const request={kind:'native',task_id:task.id,definition_sha256:t.definition_sha256,context_sha256:context.sha256},attempt={id:digest(['attempt',task.id,t.definition_revision]),effect_id:effectId,request_sha256:digest(request),definition_revision:t.definition_revision,context,policy_generation:c.value.policy_generation,pause_generation:c.value.pause_generation,admitted_at:now(),termination_confirmed:false,model_calls:1};
     claimResources(tx,task);
@@ -924,7 +1045,9 @@ function mutate(tx,actor,principal,c,action,args,protectedCall){
   if(action==='home/propose'){
     const scope=scopeOf(args.scope),id=text(args.home_id,'home_id',200);authorize(tx,actor,action,{...args,scope,resources:[{kind:'home',id}]});const home=tx.get('homes',id);if((home?.revision??0)!==(args.expected_revision??0))hold('HOME_CHANGED','Base revision changed');if(home&&scopeOf(home.value.scope)!==scope)hold('HOME_SCOPE','Home scope cannot be relabeled');
     const dependencies=args.dependencies??[];if(!Array.isArray(dependencies)||dependencies.length>100)hold('DEPENDENCY_INVALID','At most 100 home dependencies');for(const d of dependencies){if(d.family!=='homes')hold('DEPENDENCY_INVALID','Home dependencies required');resolve(tx,d);}
-    semanticInputs(tx,args.input_refs??[]);const selected=sources(tx,scope,[...(args.input_refs??[]),...dependencies]),content=bounded(args.content,'home content');return tx.put('proposals',digest(['proposal',principal.id,args.operation_id]),{status:'proposed',principal_id:principal.id,scope,home_id:id,base:home?ref('homes',home):null,content,dependencies:copy(dependencies),readset:selected.sources.map(({value,legacy_value,...r})=>r),membership:selected.membership,...(args.github_publication?{github_publication:bounded(args.github_publication,'GitHub subject',16000)}:{}),created_at:now()},0);
+    const atomic=Object.hasOwn(args,'github_atomic_publication')?publicationMetadata(args.github_atomic_publication,'GitHub atomic subject'):undefined;
+    if(atomic!==undefined)publicationMetadata(args.github_publication,'GitHub subject');
+    semanticInputs(tx,args.input_refs??[]);const selected=sources(tx,scope,[...(args.input_refs??[]),...dependencies]),content=bounded(args.content,'home content');return tx.put('proposals',digest(['proposal',principal.id,args.operation_id]),{status:'proposed',principal_id:principal.id,scope,home_id:id,base:home?ref('homes',home):null,content,dependencies:copy(dependencies),readset:selected.sources.map(({value,legacy_value,...r})=>r),membership:selected.membership,...(args.github_publication?{github_publication:bounded(args.github_publication,'GitHub subject',16000)}:{}),...(atomic===undefined?{}:{github_atomic_publication:atomic}),created_at:now()},0);
   }
   if(action==='home/publish'){
     const proposal=tx.get('proposals',text(args.proposal_id,'proposal_id',200));if(proposal?.value.status!=='proposed')hold('PROPOSAL_INVALID','Proposed home required');const p=proposal.value;authorize(tx,actor,action,{...args,scope:p.scope,resources:[{kind:'home',id:p.home_id}]});const home=tx.get('homes',p.home_id);if(p.base)resolve(tx,p.base);else if(home)hold('HOME_CHANGED','Concurrent home');
