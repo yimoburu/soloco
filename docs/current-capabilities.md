@@ -1,8 +1,10 @@
 # Current capability map
 
-This map describes the combined source candidate based on `4038e0f`, incorporating
-main `79550fd`, the founder-outcome work and SPEC safeguards. SPEC v0.21 adds
-three enduring clarifications; exact published v0.20 compatibility remains.
+This map describes merged source through main `4e9e434` (PR #56), including the
+peer foundations (PR #49), bounded storage core (PR #51), executor and fixture
+fixes (PR #52/#53), durable observation journal (PR #55), and storage transfer
+qualification (PR #56). SPEC v0.21 retains the mission and 47 normative rows;
+exact published v0.20 compatibility remains.
 Source availability, execution evidence and company adoption are separate.
 Historical reports retain their original source identities and verdicts.
 
@@ -17,8 +19,11 @@ Historical reports retain their original source identities and verdicts.
 | Complete compulsory catalog evidence | `upgrade-evidence.mjs` | `claude-catalog.test.mjs`, retained PR #37 before/after probes | Unknown model-speed values stay mandatory; delivery does not prove model understanding |
 | Supplied local observation comparison | `tools/outcome-observations.mjs` | `outcome-observations.test.mjs` | Exact supplied inputs; independent measurement validity and causal impact unestablished |
 | History qualification and operating publication | Scoped/context/operating modules | Historical qualification suites | Real accumulated-history bootstrap is separate from scripted proof validation |
+| Peer coordination foundations | `peers/ledger.mjs`, `peers/model.mjs`, `peers/review-selection.mjs`, `peers/github.mjs` | `peer-ledger.test.mjs`, `peer-model.test.mjs`, `peer-github.test.mjs` | Library checks do not qualify the complete peer scheduler, protected host transport or production publication policy |
+| Durable peer observation journal | `peers/observation-journal.mjs` | Complete 130-case `peer-observation-journal.test.mjs`, included in PR #55/#56 CI | Protected observation, immutable producer evidence and lost-acknowledgment recovery are library checks; scheduler integration and native-host replacement remain open |
+| Storage leaf transfer and path checks | `storage-transfer.mjs`, `record-storage.mjs`, `snapshot.mjs` | Six storage test roots, 45 cases in PR #56's Node 22 source/full runs; 29 selected cases in Node 26 compatibility | Real-link rejection and staged-transfer checks are tested; no atomic filesystem swap guarantee or company continuity acceptance |
 
-See `founder-outcome-implementation.md` for the founder candidate's pinned
+See `founder-outcome-implementation.md` for the historical founder candidate's pinned
 executed validation, `spec-reconciliation.md` for the combined claim/evidence
 map, and `founder-benefit-acceptance.md` for prospective human/outcome measures.
 No row establishes installation, actual-company adoption, real customer benefit

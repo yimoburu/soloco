@@ -1,8 +1,9 @@
 # SPEC v0.21 reconciliation
 
-Current integration base: `4038e0f`, November 7, 2026, combining main
-`79550fd` (including PR #37), SPEC repairs `70ade7b`, and founder-outcome
-candidate `eeef357`. Contract: [SPEC.md](../SPEC.md), SHA-256
+Current source baseline: merged main `4e9e434` (PR #56), November 9, 2026 UTC.
+This includes the peer foundations, bounded storage core, executor/fixture fixes,
+durable observation journal and storage transfer qualification described below.
+Contract: [SPEC.md](../SPEC.md), SHA-256
 `4bd0af7032d870195b2992e850b1dc9a50a9b9e59a3ec27267b7b0752cca57a9`.
 
 v0.21 clarifies only existing paragraphs 30, 46 and 96: continuing notice
@@ -13,6 +14,8 @@ stable. Existing companies retain their adopted rules; exact published v0.20
 remains explicitly supported for the existing local artifact workflows.
 No installation, source update or passing test adopts v0.21 for a company.
 
+The earlier combined source `4038e0f` incorporated main `79550fd` (including
+PR #37), SPEC repairs `70ade7b`, and founder-outcome candidate `eeef357`.
 Earlier reconciliation began at `7b6d6d5`; its integrated v0.20 implementation
 pin was `46226dc`, and its full-suite pin was `9160c26`. Historical evidence
 below retains those identities and verdicts. It does not attest to this later
@@ -89,7 +92,34 @@ it from attention views but does not discard its conditions from assignment inpu
 | S102 / 102 | Simplest sufficient implementation; narrower limits disclosed | existing record/runtime architecture; README and developer guide | Judgment/Limited: source review checks proportionality; no full-conformance inference from disclosure. |
 | S104 / 104 | Observable failure/staleness/replacement checks; explicit rule adoption | full repository tests, native acceptance fixture, generated-governance check | Mixed: executed receipts and independent review below; open behavioral claims remain open. |
 
-## Contradictions repaired in this candidate
+## Merged peer and storage evidence
+
+The mission and enduring requirements remain unchanged. PR #49 added peer
+ledger, authority/review and publication foundations; PR #51 added the bounded
+storage core; PR #52/#53 corrected executor/fixture behavior. PR #55 added the
+durable observation journal and its complete 130-case suite. PR #56 integrated
+the storage transfer guard and real-link regression tests while retaining the
+current version checks and portable path suite.
+
+These are scoped source and executable checks, not complete peer-mode or
+actual-company acceptance. The journal has no production scheduler caller in
+this baseline. Scheduler composition, protected host enrollment and replacement,
+production publication-policy qualification and durable continuity remain open.
+The four acceptance gaps #13, #16, #18 and #30 below remain open. New successful
+storage tests do not regrade the historical candidate-format comparison.
+
+| Source | Completed checks | Exact scope |
+|---|---|---|
+| PR #55 head `d78c379` | [Source CI](https://github.com/yimoburu/soloco/actions/runs/42544202815): 1,348 Node 22 tests; [qualification](https://github.com/yimoburu/soloco/actions/runs/42544267521): 1,760 full Node 22 tests and 478 Node 26 compatibility tests | All 130 journal cases passed in each selected lane; zero failures, cancellations, skips or todos |
+| PR #55 merge `aac2537` | [Post-merge Source CI](https://github.com/yimoburu/soloco/actions/runs/42545682958): 1,348 Node 22 tests, build/drift and gate | Actual merged checkout; full/compatibility counts above belong to the head with the identical tree |
+| PR #56 head `a1e6294` | [Source CI](https://github.com/yimoburu/soloco/actions/runs/42547912998): 1,348 Node 22 tests; [qualification](https://github.com/yimoburu/soloco/actions/runs/42547915993): 1,760 full Node 22 tests and 478 Node 26 compatibility tests | All 45 storage cases passed in both Node 22 lanes; 29 selected storage cases passed in Node 26; zero failures, cancellations, skips or todos |
+| PR #56 merge `4e9e434` | [Post-merge Source CI](https://github.com/yimoburu/soloco/actions/runs/42549433821): 1,348 Node 22 tests, build/drift and gate | Actual merged checkout; its tree equals the qualified head tree |
+
+Counts across lanes overlap. These results do not establish installation,
+company adoption, native-host behavior, human workload reduction or business
+benefit. Historical failures, source pins and verdicts below remain retained.
+
+## Earlier contradictions repaired
 
 1. Ordinary reviews could publish a Pass under the producer's actual native
    session despite distinct role-instance IDs. All review publication now checks
