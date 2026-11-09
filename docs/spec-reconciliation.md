@@ -1,7 +1,8 @@
 # SPEC v0.21 reconciliation
 
 This assessment covers peer/storage baseline main `4e9e434` (PR #56) and the
-lossless development-review transport described below, November 9, 2026 UTC.
+lossless development-review transport and mechanical legacy-writer archive
+fence described below, November 9, 2026 UTC.
 This includes the peer foundations, bounded storage core, executor/fixture fixes,
 durable observation journal and storage transfer qualification described below.
 Contract: [SPEC.md](../SPEC.md), SHA-256
@@ -85,8 +86,8 @@ it from attention views but does not discard its conditions from assignment inpu
 | S082 / 82 | One authoritative home; consequential findings/dissent retained | `store.mjs`, `operating-state.mjs`, exact source APIs; operating/storage/invariant tests | Mixed: physical preservation tested; semantic home selection requires independent acceptance. |
 | S084 / 84 | Complete usable current context; missing meaning holds | context/task/scoped/qualification modules, `worker.mjs`, `development-file-bodies.mjs`; invariant, task/scoped/qualification and file-body tests | Mixed: lossless file sharing preserves canonical context and all selected memberships; continuing notice conditions remain compulsory. Exact delivery checks do not establish native understanding or universal large-history fit. |
 | S086 / 86 | Preserve lineage/failures/uncertainty; attributable correction | `engine.mjs`, `worker.mjs`, `snapshot.mjs`; notice, negative-retention and snapshot tests; supplied outcome comparison | Software/Judgment: original dispositions/failed attempts remain; repair and observation references cannot relabel them or manufacture a causal improvement. |
-| S090 / 90 | Identity, assets, notices and history survive rename/update/uninstall | company-local store, `engine.mjs`, `storage-transfer.mjs`; rename/version/transfer tests | Mixed: tested source paths; product/desktop uninstall behavior needs host-specific acceptance. |
-| S092 / 92 | State outside caches; pinned definitions; explicit migration | `store.mjs`, `upgrade.mjs`, `storage-transfer.mjs`; runtime-version/transfer/upgrade tests | Software; unknown compatibility holds. |
+| S090 / 90 | Identity, assets, notices and history survive rename/update/uninstall | company-local store, `engine.mjs`, `storage-transfer.mjs`, `peers/migration.mjs`; rename/version/transfer and legacy-writer-fence tests | Mixed: tested source paths and mechanical archive protection; product/desktop uninstall behavior and actual-company adoption need separate acceptance. |
+| S092 / 92 | State outside caches; pinned definitions; explicit migration | `store.mjs`, `upgrade.mjs`, `storage-transfer.mjs`, `peers/migration.mjs`; runtime-version/transfer/upgrade and legacy-writer-fence tests | Software within the scoped mechanical fence; production migration, protected identity and original obligation preservation remain unqualified. Unknown compatibility holds. |
 | S094 / 94 | Independent reconstruction, explicit adoption, authority revocation | `handover.mjs`, `upgrade.mjs`; handover/upgrade/operating tests | Mixed: mechanical gates tested; actual-company large-history acceptance remains open. |
 | S096 / 96 | Independently checked current meaning, applicable changes and selective history; no blind retry | tasks/supervisor, handover/operating/scoped context; task-runtime-crash, recovery, outcome and handover tests | Mixed: pending proposals/attempts and closure states survive; realistic bootstrap and actual CoS/worker model-session replacement remain separate native acceptance. Unknown obligations cannot be omitted. |
 | S098 / 98 | Checked recoverable continuity, not universal uninterrupted sessions | checked handover/recovery APIs and documented host limits | Limited: no zero-downtime or universal-host promise. |
@@ -108,6 +109,16 @@ this baseline. Scheduler composition, protected host enrollment and replacement,
 production publication-policy qualification and durable continuity remain open.
 The four acceptance gaps #13, #16, #18 and #30 below remain open. New successful
 storage tests do not regrade the historical candidate-format comparison.
+
+The mechanical legacy-writer fence adds persistent SQL archive guards before
+schema/layout work, checked layout transition, backup retention and rollback.
+Its complete 49-case suite exercises the exact historical writer, already-open
+handles, prepared statements and preexisting input-schema triggers. A native
+Engineer adopted the external source unchanged; a fresh confined 49-case run,
+independent native QA and receiver acceptance qualify that retained component.
+The original writer fixture remains an exact test asset. No production company
+migration or resume, protected host enrollment, allowance conversion or new
+spending is authorized by this component. Current company rules stay pinned.
 
 | Source | Completed checks | Exact scope |
 |---|---|---|
