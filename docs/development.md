@@ -95,7 +95,7 @@ The grant binds scope, ownership/team and governing intent/decisions. Routine fa
 
 ### Lossless development review presentation
 
-Ordinary QA of a runtime-attributed local development test may share identical complete file bodies through registered backward aliases. Original and candidate memberships, paths, revisions, metadata and all other evidence remain separate. The worker verifies exact restoration before model delivery. The original canonical context text, assignment hash, stored records, source and receipt hashes, currentness checks and authority remain unchanged.
+Ordinary QA of a runtime-attributed local development test may share identical complete file bodies through registered backward aliases. Original and candidate memberships, paths, revisions, metadata and all other evidence remain separate. The worker validates applicable evidence and verifies exact restoration before considering a different presentation. It shares bodies only when the complete prompt, including its explanation, is strictly smaller in both UTF-16 characters and UTF-8 bytes; equality or growth retains the exact original prompt. The original canonical context text, assignment hash, stored records, source and receipt hashes, currentness checks and authority remain unchanged.
 
 The delivered explanation distinguishes the digest of the exact original context text from the existing semantic assignment hash, which may omit the company name. Nonapplicable and special contexts retain their original presentation; malformed applicable references hold the review. This changes neither source budgets nor host/model limits, and does not guarantee that every valid source scope fits a model. Source qualification and installation of the active runtime remain separate steps.
 

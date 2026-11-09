@@ -167,5 +167,7 @@ export function renderDevelopmentReviewContext(context, job) {
   if (digest(JSON.stringify(candidate.development.files)) !== candidate.development.candidate_sha256 || digest(JSON.stringify(plan.development.scope)) !== plan.development.scope_sha256) fail('review file or scope commitment mismatch');
   const shared = shareDevelopmentFileBodies(context.text, context.hash, reviewOf);
   if (restoreDevelopmentFileBodies(shared.text, shared.original_sha256, context.hash, reviewOf) !== context.text) fail('exact render roundtrip failed');
-  return shared.geometry.alias_count === 0 || shared.text.length >= context.text.length ? context.text : shared.text;
+  // Compatibility callers receive only a validated context candidate; the
+  // worker still compares the complete original and alternate prompts.
+  return shared.geometry.alias_count === 0 || shared.text.length >= context.text.length || Buffer.byteLength(shared.text, 'utf8') >= Buffer.byteLength(context.text, 'utf8') ? context.text : shared.text;
 }

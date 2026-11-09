@@ -367,10 +367,15 @@ const workerPromptAssembly = (() => {
   assert.equal(sourceText.indexOf(startMarker, start + startMarker.length), -1);
   assert.equal(sourceText.indexOf(endMarker, end + endMarker.length), -1);
   const fragment = sourceText.slice(start, end);
-  assert.ok(fragment.includes('const assignmentPromptText=renderDevelopmentReviewContext(context,job);'));
+  // The renderer remains the existing injected dependency. Its validation must
+  // precede assembly; the selected context must precede the final prompt value.
+  assert.ok(fragment.includes('const renderedAssignmentPromptText=renderDevelopmentReviewContext(context,job);'));
+  assert.ok(fragment.indexOf('const renderedAssignmentPromptText=') < fragment.indexOf('const assemblePrompt='));
   assert.ok(fragment.indexOf('const assignmentPromptText=') < fragment.indexOf('const prompt='));
   assert.ok(sourceText.indexOf('      output=await model(', end) > end, 'this source seam precedes the existing model call');
-  return compileFunction(fragment + '\nreturn {prompt, assignmentPromptText, fileBodySharingInstruction, reviewShape};\n',
+  // Expose actual local strings for boundary assertions, including a rejected
+  // alternate. No test recreates the worker's preamble or transport header.
+  return compileFunction(fragment + '\nreturn {prompt, assignmentPromptText, fileBodySharingInstruction, reviewShape, renderedAssignmentPromptText, sharingInstruction, originalPrompt, sharedPrompt};\n',
     ['state', 'job', 'context', 'renderDevelopmentReviewContext', 'digest', 'prototypePrompt', 'developmentPrompt'],
     {filename:url.href + '#focused-prompt-assembly'});
 })();
@@ -499,4 +504,200 @@ test('actual worker assembly adds no transport explanation when sharing has no p
     assert.doesNotMatch(rendered.prompt, /Lossless development QA transport/);
     assertProbeUnchanged(probe);
   }
+});
+
+// Complete-prompt regressions run the same actual worker statements above.
+// An identity renderer supplies only the exact original-presentation control;
+// every assessed alternate uses the real production renderer and codec.
+const originalWorkerPrompt = probe => workerPromptAssembly(probe.state, probe.job, probe.context,
+  context => context.text, digest, () => 'INERT_PROTOTYPE_PROMPT', () => 'INERT_DEVELOPMENT_PROMPT').prompt;
+
+function assertExactOriginalPrompt(probe, rendered) {
+  const control = originalWorkerPrompt(probe);
+  assert.equal(rendered.originalPrompt, control);
+  assert.equal(rendered.prompt, control);
+  assert.equal(rendered.assignmentPromptText, probe.context.text);
+  assert.equal(rendered.fileBodySharingInstruction, '');
+  assertProbeUnchanged(probe);
+}
+
+function rebindQaFixture(fixture) {
+  fixture.p.development.scope_sha256 = digest(JSON.stringify(fixture.p.development.scope));
+  fixture.c.development.scope_sha256 = fixture.p.development.scope_sha256;
+  fixture.c.development.candidate_sha256 = digest(JSON.stringify(fixture.c.development.files));
+  fixture.receipt.development.candidate_sha256 = fixture.c.development.candidate_sha256;
+  return fixture;
+}
+
+function fixtureWithFilename(body, filename) {
+  const fixture = qaFixture(body);
+  fixture.p.development.scope.sources[0].path = filename;
+  fixture.p.development.scope.read_paths = [filename];
+  fixture.p.development.scope.write_paths = [filename];
+  fixture.c.development.files[0].path = filename;
+  fixture.c.development.changes[0].path = filename;
+  fixture.receipt.development.validation_manifest.files[0].path = filename;
+  return rebindQaFixture(fixture);
+}
+
+// Find an exact equality from the real assembled strings, without estimating
+// the explanation or copying a formatter. A missing equality is a test failure.
+// The bounded search varies only the synthetic repeated body length.
+function exactPromptEquality(unit, filename, measure) {
+  const evaluate = count => {
+    const body = unit.repeat(count);
+    const fixture = filename === null ? qaFixture(body) : fixtureWithFilename(body, filename);
+    const probe = sourceProbe(fixture), rendered = probe.invoke();
+    const saving = rendered.renderedAssignmentPromptText === probe.context.text ? -Infinity
+      : measure(rendered.originalPrompt) - measure(rendered.sharedPrompt);
+    return {probe, rendered, saving};
+  };
+  let low = 1, high = 8192;
+  assert.ok(evaluate(high).saving > 0, 'a real alternate must bracket the equality boundary');
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    if (evaluate(middle).saving >= 0) high = middle;
+    else low = middle + 1;
+  }
+  const found = evaluate(low);
+  assert.notEqual(found.rendered.renderedAssignmentPromptText, found.probe.context.text);
+  assert.equal(found.saving, 0, 'the actual complete prompt must reach exact equality');
+  return found;
+}
+
+test('actual worker rejects the complete ASCII counterexample despite a positive context saving', () => {
+  const fixture = qaFixture('x'.repeat(830)), probe = sourceProbe(fixture), rendered = probe.invoke();
+  assert.equal(probe.context.text.length, 3767);
+  assert.equal(rendered.renderedAssignmentPromptText.length, 3766);
+  assert.equal(rendered.originalPrompt.length, 7377);
+  assert.equal(rendered.sharedPrompt.length, 8412);
+  assert.equal(Buffer.byteLength(rendered.originalPrompt, 'utf8'), 7377);
+  assert.equal(Buffer.byteLength(rendered.sharedPrompt, 'utf8'), 8412);
+  assert.ok(rendered.sharingInstruction.length > probe.context.text.length - rendered.renderedAssignmentPromptText.length);
+  assert.equal(restoreDevelopmentFileBodies(rendered.renderedAssignmentPromptText, digest(probe.context.text), probe.context.hash, fixture.reviewOf), probe.context.text);
+  assert.deepEqual(probe.calls.map(call => call.name), ['prototype', 'development']);
+  assertExactOriginalPrompt(probe, rendered);
+});
+
+test('actual worker rejects the Unicode filename counterexample when only complete UTF16 shrinks', () => {
+  const filename = '文'.repeat(80) + '.mjs';
+  assert.equal(Buffer.byteLength(filename, 'utf8'), 244);
+  const fixture = fixtureWithFilename('x'.repeat(2026), filename);
+  const probe = sourceProbe(fixture), rendered = probe.invoke();
+  assert.notEqual(rendered.renderedAssignmentPromptText, probe.context.text);
+  assert.equal(rendered.originalPrompt.length, 10231);
+  assert.equal(rendered.sharedPrompt.length, 10230);
+  assert.equal(Buffer.byteLength(rendered.originalPrompt, 'utf8'), 11191);
+  assert.equal(Buffer.byteLength(rendered.sharedPrompt, 'utf8'), 11510);
+  assert.equal(restoreDevelopmentFileBodies(rendered.renderedAssignmentPromptText, digest(probe.context.text), probe.context.hash, fixture.reviewOf), probe.context.text);
+  assertExactOriginalPrompt(probe, rendered);
+});
+
+test('actual worker retains the exact complete original for valid tiny and unique active frames', () => {
+  const unique = qaFixture('x'.repeat(830));
+  unique.c.development.files[0].content = 'A distinct complete candidate body';
+  rebindQaFixture(unique);
+  for (const fixture of [qaFixture(''), qaFixture('x'), unique]) {
+    const probe = sourceProbe(fixture), rendered = probe.invoke();
+    assert.deepEqual(probe.calls.map(call => call.name), ['prototype', 'development']);
+    assertExactOriginalPrompt(probe, rendered);
+  }
+});
+
+test('actual worker falls back at exact complete ASCII equality in both measures', () => {
+  const {probe, rendered} = exactPromptEquality('x', null, text => text.length);
+  assert.ok(rendered.sharingInstruction.length > 0);
+  assert.equal(rendered.sharedPrompt.length, rendered.originalPrompt.length);
+  assert.equal(Buffer.byteLength(rendered.sharedPrompt, 'utf8'), Buffer.byteLength(rendered.originalPrompt, 'utf8'));
+  assertExactOriginalPrompt(probe, rendered);
+});
+
+test('actual worker requires strict UTF16 benefit even when complete UTF8 is already smaller', () => {
+  const {probe, rendered} = exactPromptEquality('文', null, text => text.length);
+  assert.equal(rendered.sharedPrompt.length, rendered.originalPrompt.length);
+  assert.ok(Buffer.byteLength(rendered.sharedPrompt, 'utf8') < Buffer.byteLength(rendered.originalPrompt, 'utf8'));
+  assertExactOriginalPrompt(probe, rendered);
+});
+
+test('actual worker requires strict UTF8 benefit even when complete UTF16 is already smaller', () => {
+  const {probe, rendered} = exactPromptEquality('x', '文'.repeat(80) + '.mjs', text => Buffer.byteLength(text, 'utf8'));
+  assert.ok(rendered.sharedPrompt.length < rendered.originalPrompt.length);
+  assert.equal(Buffer.byteLength(rendered.sharedPrompt, 'utf8'), Buffer.byteLength(rendered.originalPrompt, 'utf8'));
+  assertExactOriginalPrompt(probe, rendered);
+});
+
+test('actual worker selects a genuine complete benefit in both measures without changing canonical evidence', () => {
+  const fixture = fixtureWithFilename('export const value = "你好😀";\r\n'.repeat(2000), '文'.repeat(80) + '.mjs');
+  const negative = {id:'complete-benefit-prior-failure', kind:'review', revision:1, content:'Preserve this earlier failure', review:{verdict:'Fail', reason:'Retained synthetic counterevidence', blockers:['Separate unresolved fixture limitation']}};
+  fixture.value.records.push(negative);
+  fixture.value.assignment.extra = {file_body_alias_v1:999};
+  const semanticHash = digest(JSON.stringify({...fixture.value, name:undefined}));
+  const probe = sourceProbe(fixture, {hash:semanticHash}, {task:'Actual unchanged framing with Unicode 文😀 and full evidence. '.repeat(50)});
+  const inputs = probe.context.inputs, text = probe.context.text, hash = probe.context.hash;
+  const rendered = probe.invoke();
+  assert.equal(rendered.originalPrompt, originalWorkerPrompt(probe));
+  assert.notEqual(rendered.prompt, rendered.originalPrompt);
+  assert.equal(rendered.prompt, rendered.sharedPrompt);
+  assert.equal(rendered.assignmentPromptText, rendered.renderedAssignmentPromptText);
+  assert.equal(rendered.fileBodySharingInstruction, rendered.sharingInstruction);
+  assert.ok(rendered.prompt.length < rendered.originalPrompt.length);
+  assert.ok(Buffer.byteLength(rendered.prompt, 'utf8') < Buffer.byteLength(rendered.originalPrompt, 'utf8'));
+  assert.ok(rendered.prompt.includes('Assignment context: ' + rendered.fileBodySharingInstruction + rendered.assignmentPromptText + '\nThe pack contains pinned governance'));
+  assert.ok(rendered.prompt.includes(probe.job.task));
+  const wire = JSON.parse(rendered.assignmentPromptText);
+  assert.notEqual(digest(text), semanticHash);
+  assert.equal(wire.canonical_context_sha256, digest(text));
+  assert.equal(wire.assignment_context_sha256, semanticHash);
+  assert.equal(restoreDevelopmentFileBodies(rendered.assignmentPromptText, digest(text), semanticHash, fixture.reviewOf), text);
+  assert.deepEqual(wire.context.records.find(record => record.id === negative.id), negative);
+  assert.deepEqual(wire.context.records.find(record => record.id === fixture.receipt.id), fixture.receipt);
+  assert.deepEqual(wire.context.assignment.extra, {file_body_alias_v1:999});
+  assert.equal(probe.context.inputs, inputs);
+  assert.equal(probe.context.text, text);
+  assert.equal(probe.context.hash, hash);
+  assert.deepEqual(probe.calls.map(call => call.name), ['prototype', 'development']);
+  assertProbeUnchanged(probe);
+});
+
+test('nonbeneficial active frames still reject malformed typed evidence before prompt helpers', () => {
+  const factories = [
+    () => qaFixture(''),
+    () => qaFixture('x'.repeat(830)),
+    () => fixtureWithFilename('x'.repeat(2026), '文'.repeat(80) + '.mjs')
+  ];
+  const changes = [
+    fixture => { fixture.p.development.scope.sources[0].sha256 = '0'.repeat(64); },
+    fixture => { fixture.c.development.files[0].content = {file_body_alias_v1:0}; },
+    fixture => { fixture.c.development.files.push({...fixture.c.development.files[0]}); },
+    fixture => { fixture.p.development.scope.sources[0].content = {file_body_alias_v1:0}; },
+    fixture => { delete fixture.c.development.files[0].path; },
+    fixture => { fixture.c.development.files[0].content = '\0'; }
+  ];
+  for (const make of factories) {
+    const valid = sourceProbe(make()), rendered = valid.invoke();
+    assertExactOriginalPrompt(valid, rendered);
+    for (const change of changes) {
+      const fixture = make();
+      change(fixture);
+      // Keep outer candidate/scope commitments coherent so the malformed typed
+      // membership or body itself must be rejected, even at fallback sizes.
+      rebindQaFixture(fixture);
+      const probe = sourceProbe(fixture);
+      assert.throws(probe.invoke, /Invalid development file body sharing/);
+      assert.equal(probe.calls.length, 0);
+      assertProbeUnchanged(probe);
+    }
+  }
+});
+
+test('compatible two-argument rendering retains canonical text when aliases reduce UTF16 but grow UTF8', () => {
+  const fixture = fixtureWithFilename('x'.repeat(1100), '文'.repeat(80) + '.mjs');
+  const probe = sourceProbe(fixture);
+  const shared = shareDevelopmentFileBodies(probe.context.text, probe.context.hash, fixture.reviewOf);
+  assert.ok(shared.text.length < probe.context.text.length);
+  assert.ok(Buffer.byteLength(shared.text, 'utf8') > Buffer.byteLength(probe.context.text, 'utf8'));
+  assert.equal(restoreDevelopmentFileBodies(shared.text, digest(probe.context.text), probe.context.hash, fixture.reviewOf), probe.context.text);
+  assert.equal(renderDevelopmentReviewContext(probe.context, probe.job), probe.context.text);
+  const rendered = probe.invoke();
+  assertExactOriginalPrompt(probe, rendered);
 });

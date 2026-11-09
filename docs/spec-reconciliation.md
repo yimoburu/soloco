@@ -120,11 +120,13 @@ Counts across lanes overlap. These results do not establish installation,
 company adoption, native-host behavior, human workload reduction or business
 benefit. Historical failures, source pins and verdicts below remain retained.
 
-The bounded lossless development-review component passed 22 canonical confined
-tests and fresh independent native QA. Its exact changed source also passed 88
-ordinary tests and 11 controlled worker fixtures; these counts overlap. The
-worker shares only identical complete file strings for applicable development
-QA and verifies exact restoration. Canonical selection, records, assignment
+The bounded lossless development-review component passed 31 canonical confined
+tests and fresh independent native QA. Its exact changed source also passed 112
+ordinary tests across five whole roots and 11 controlled worker fixtures;
+these counts overlap. The worker shares only identical complete file strings
+for applicable development QA, validates them before fallback and verifies
+exact restoration. Both complete-prompt UTF-16 and UTF-8 sizes must strictly
+decrease after including the actual explanation. Canonical selection, records, assignment
 hashes, currentness and limits remain unchanged. This does not establish active
 package installation, full native worker lifecycle, provider capacity, peer-mode
 or durable continuity qualification.
