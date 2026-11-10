@@ -150,10 +150,31 @@ tuple passes the whole 35-case operating-state root. These are separate runs;
 complete hosted qualification must cover the final committed integration.
 
 See `development-review-continuation.md` and `ordinary-model-process-closure.md`
-for supported calls and limits. These source changes do not establish the
-pending native P4 code review or any actual managed-CoS adoption. SPEC v0.22
-and the proposed peer architecture still require their separate reconciliation
-and acceptance.
+for supported calls and limits. These source changes enabled the separate P4
+review and local acceptance described below. Actual managed-CoS adoption,
+SPEC v0.22 and the proposed peer architecture still require their separate
+reconciliation and acceptance.
+
+## Controlled P4 code acceptance
+
+The exact retained P4 candidate passed its canonical 326-case execution and a
+distinct native independent code review under a new bounded review-only
+authorization. The physical-delivery audit verified the 71 whole inline
+records and complete 88-source required manifest, with 62 requested ranges
+matched to successful delivery and actual USER frames. All 17 CLI invocations
+closed before the fixed review deadline; the owner then accepted that exact
+candidate and historical receipt once.
+
+The integrated component consumes typed P2 publication evidence and checks the
+current task, grant, policy, source subject, reviews and atomic candidate.
+Its three whole roots are GitHub98, atomic132 and policy96. Ordinary repository
+integration checks and hosted CI remain distinct from the historical canonical
+execution and native judgment. No original generation, recovery, expiry,
+failed review or unknown reservation was reset.
+
+This is controlled library/source evidence. It does not establish a genuine
+account or protected host publisher, full peer routing, company adoption,
+durable continuity or observed founder benefit.
 
 ## Merged peer and storage evidence
 

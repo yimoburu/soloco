@@ -1,6 +1,7 @@
 // Original host draft retained in lineage; independently revised P4 component candidate.
 import { createHash } from 'node:crypto';
 import { canonical as strictCanonical } from './ledger.mjs';
+import { publicationPolicyEvidence, canonicalResources, resourceOverlap } from './model.mjs';
 
 const API_VERSION = '2026-03-10';
 const TERMINAL_CLAIMS = new Set(['released', 'completed', 'closed', 'cancelled', 'failed']);
@@ -22,6 +23,43 @@ function refPath(branch) {
   need(typeof branch === 'string' && branch.length > 0 && !/[\x00-\x20~^:?*\[\\]/.test(branch) && !branch.includes('..') && !branch.includes('@{') && !branch.startsWith('/') && !branch.endsWith('/') && !branch.endsWith('.') && !branch.split('/').some(p => !p || p.startsWith('.') || p.endsWith('.lock')), 'INVALID_BRANCH');
   return branch.split('/').map(encodeURIComponent).join('/');
 }
+const atomicFields = ['protocol', 'api_host', 'repository_node_id', 'base_ref', 'head_ref', 'before_base_oid', 'before_head_oid', 'after_oid', 'prepared_merge_oid', 'prepared_tree_oid', 'prepared_parents'];
+const exactFields = (value, keys) => value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every(key => Object.hasOwn(value, key));
+function normalizeAtomic(input, binding) {
+  const value = clone(input); need(exactFields(value, atomicFields), 'INVALID_ATOMIC_CONTRACT');
+  need(value.protocol === 'github-atomic-refs-v1', 'INVALID_ATOMIC_PROTOCOL');
+  let host; try { host = new URL(`https://${value.api_host}`); } catch { fail('INVALID_ATOMIC_HOST'); }
+  need(typeof value.api_host === 'string' && host.host === value.api_host && host.pathname === '/' && !host.username && !host.password && !host.search && !host.hash, 'INVALID_ATOMIC_HOST');
+  identifier(value.repository_node_id);
+  for (const key of ['base_ref', 'head_ref']) { need(typeof value[key] === 'string' && value[key].startsWith('refs/heads/'), 'INVALID_ATOMIC_REF'); refPath(value[key].slice(11)); }
+  need(value.base_ref !== value.head_ref, 'ATOMIC_REFS_MUST_DIFFER');
+  for (const key of ['before_base_oid', 'before_head_oid', 'after_oid', 'prepared_merge_oid', 'prepared_tree_oid']) { oid(value[key]); need(!/^0+$/.test(value[key]), 'ATOMIC_CREATE_DELETE_FORBIDDEN'); }
+  need(value.after_oid === value.prepared_merge_oid && value.after_oid !== value.before_base_oid && value.after_oid !== value.before_head_oid, 'ATOMIC_PREPARED_COMMIT_REQUIRED');
+  need(Array.isArray(value.prepared_parents) && value.prepared_parents.length === 2 && value.prepared_parents[0] === value.before_base_oid && value.prepared_parents[1] === value.before_head_oid, 'ATOMIC_PREPARED_PARENTS_MISMATCH');
+  need([value.before_head_oid, value.after_oid, value.prepared_tree_oid].every(item => item.length === value.before_base_oid.length), 'ATOMIC_OID_FORMAT_MISMATCH');
+  if (binding) need(value.before_base_oid === binding.base_sha && value.before_head_oid === binding.head_sha && value.prepared_tree_oid === binding.tree_sha && value.base_ref === `refs/heads/${binding.base_branch}`, 'ATOMIC_REVIEWED_BINDING_MISMATCH');
+  return Object.fromEntries(atomicFields.map(key => [key, value[key]]));
+}
+function atomicRefUpdates(value) {
+  return [{name:value.base_ref, beforeOid:value.before_base_oid, afterOid:value.after_oid, force:false}, {name:value.head_ref, beforeOid:value.before_head_oid, afterOid:value.before_head_oid, force:false}];
+}
+const qualificationFields = ['protocol', 'mode', 'qualified', 'scope', 'api_host', 'repository_node_id', 'repository', 'app_id', 'check_name', 'harness_sha256', 'policy_sha256', 'evidence_sha256'];
+function atomicQualification(input, contract, binding, issuer) {
+  need(input && typeof input === 'object', 'ATOMIC_MODE_NOT_QUALIFIED');
+  const value = clone(input);
+  need(exactFields(value, qualificationFields) && value.protocol === 'github-atomic-qualified-mode-v1' && value.mode === 'controlled-test' && value.qualified === true && value.scope === 'synthetic-mocked-transport-only', 'ATOMIC_MODE_NOT_QUALIFIED');
+  need(value.api_host === contract.api_host && value.repository_node_id === contract.repository_node_id, 'ATOMIC_QUALIFICATION_TARGET_MISMATCH');
+  need(typeof value.repository === 'string' && value.repository.split('/').length === 2 && value.repository === value.repository.split('/').map(slug).join('/'), 'ATOMIC_QUALIFICATION_TARGET_MISMATCH');
+  positive(value.app_id); identifier(value.check_name); digest(value.harness_sha256); digest(value.policy_sha256); digest(value.evidence_sha256);
+  if (binding) need(value.repository === `${binding.owner}/${binding.repo}` && value.app_id === binding.expected_app_id && value.check_name === binding.check_name && value.harness_sha256 === binding.harness_sha256 && value.policy_sha256 === binding.policy_sha256, 'ATOMIC_QUALIFICATION_POLICY_MISMATCH');
+  if (issuer) need(value.app_id === issuer.app_id && value.check_name === issuer.check_name && value.harness_sha256 === issuer.harness_sha256 && value.policy_sha256 === issuer.policy_sha256, 'ATOMIC_QUALIFICATION_POLICY_MISMATCH');
+  return Object.fromEntries(qualificationFields.map(key => [key, value[key]]));
+}
+function validateAtomicObservation(contract, observation, repository, after = false) {
+  need(observation.api_host === contract.api_host && observation.repository_node_id === contract.repository_node_id && observation.repository === repository && observation.base_ref === contract.base_ref && observation.head_ref === contract.head_ref, 'ATOMIC_TARGET_MISMATCH');
+  need(observation.prepared_merge_oid === contract.prepared_merge_oid && observation.prepared_tree_oid === contract.prepared_tree_oid && canonical(observation.prepared_parents) === canonical(contract.prepared_parents), 'ATOMIC_PREPARED_COMMIT_MISMATCH');
+  need(observation.head_oid === contract.before_head_oid && observation.base_oid === (after ? contract.after_oid : contract.before_base_oid), 'ATOMIC_REFS_CHANGED');
+}
 function reviewSnapshot(input) {
   const review = clone(input);
   const value = {
@@ -40,8 +78,8 @@ function reviewSnapshot(input) {
  * No physical credential isolation is established by this module.
  */
 export class GitHubClient {
-  #token; #fetch; #base; #version;
-  constructor({ token, fetch = globalThis.fetch, apiBase = 'https://api.github.com', apiVersion = API_VERSION } = {}) {
+  #token; #fetch; #base; #version; #atomicQualification; #injectedTransport;
+  constructor({ token, fetch = globalThis.fetch, apiBase = 'https://api.github.com', apiVersion = API_VERSION, atomicQualification: qualification } = {}) {
     need((typeof token === 'string' && token.length > 0) || typeof token === 'function', 'GITHUB_TOKEN_REQUIRED');
     need(typeof fetch === 'function', 'FETCH_REQUIRED');
     let base;
@@ -49,6 +87,8 @@ export class GitHubClient {
     need(base.protocol === 'https:' && !base.username && !base.password && !base.search && !base.hash, 'INVALID_API_BASE');
     need(typeof apiVersion === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(apiVersion), 'INVALID_API_VERSION');
     this.#token = token; this.#fetch = fetch; this.#base = base.toString().replace(/\/$/, ''); this.#version = apiVersion;
+    this.#atomicQualification = qualification === undefined ? null : clone(qualification);
+    this.#injectedTransport = fetch !== globalThis.fetch;
   }
   static reviewSnapshot(value) { return reviewSnapshot(value); }
   async #request(path, { method = 'GET', body, statuses = [200] } = {}) {
@@ -102,6 +142,9 @@ export class GitHubClient {
       base_branch: branch, base_repository: pr.base.repo.full_name.toLowerCase(),
       merge_commit_sha: pr.merged === true ? oid(pr.merge_commit_sha) : null,
     };
+    // Legacy observations retain their existing shape when no branch was
+    // supplied; atomic publication additionally requires the actual PR head ref.
+    if (typeof pr.head.ref === 'string') { refPath(pr.head.ref); result.head_branch = pr.head.ref; }
     const { data: head } = await this.#request(`${path}/git/commits/${result.head_sha}`);
     result.tree_sha = oid(head.tree?.sha);
     need(Array.isArray(head.parents), 'GITHUB_INVALID_RESPONSE');
@@ -116,13 +159,14 @@ export class GitHubClient {
     }
     return result;
   }
-  async inspect(value, checkName) {
+  async inspect(value, checkName) { return this.#inspect(value, checkName); }
+  async #inspect(value, checkName, checkCommit) {
     identifier(checkName);
     const observation = await this.observe(value); const path = pathFor(value);
     const [repoReply, protectionReply, ancestryReply, checks, rawReviews] = await Promise.all([
       this.#request(path), this.#request(`${path}/branches/${encodeURIComponent(observation.base_branch)}/protection`),
       this.#request(`${path}/compare/${observation.base_sha}...${observation.head_sha}`),
-      this.#pages(`${path}/commits/${observation.head_sha}/check-runs?filter=latest`, 'check_runs'),
+      this.#pages(`${path}/commits/${checkCommit ?? observation.head_sha}/check-runs?filter=latest`, 'check_runs'),
       this.#pages(`${path}/pulls/${positive(value.number)}/reviews`),
     ]);
     const repo = repoReply.data; const protection = protectionReply.data; const ancestry = ancestryReply.data;
@@ -152,6 +196,12 @@ export class GitHubClient {
       checks: checks.map(check => ({ id: check.id, name: check.name, app_id: check.app?.id, head_sha: check.head_sha, status: check.status, conclusion: check.conclusion, external_id: check.external_id ?? '', completed_at: check.completed_at ?? null })),
       reviews, review_permissions: permissions,
     };
+  }
+  async inspectAtomic(value, checkName, input) {
+    const binding = normalizeBinding(value), contract = this.#atomicContract(normalizeAtomic(input, binding));
+    const qualification = this.#qualifiedAtomic(contract, binding);
+    const result = await this.#inspect(value, checkName, contract.after_oid);
+    return {...result, checked_commit_sha:contract.after_oid, atomic_qualification_sha256:publicationDigest(qualification)};
   }
   async updateBranch(value) {
     const { status } = await this.#request(`${pathFor(value)}/pulls/${positive(value.number)}/update-branch`, {
@@ -187,6 +237,38 @@ export class GitHubClient {
     if (status === 404) return { status: 'expired' };
     need(['pending', 'merged', 'failed', 'enqueued'].includes(data.status), 'GITHUB_INVALID_MERGE_RECEIPT');
     return { status: data.status, ...(data.status === 'merged' ? { merge_commit_sha: oid(data.details?.sha) } : {}) };
+  }
+  #atomicContract(value) {
+    const contract = normalizeAtomic(value), base = new URL(this.#base);
+    need(base.host === contract.api_host && base.pathname === '/', 'ATOMIC_API_HOST_MISMATCH');
+    return contract;
+  }
+  #qualifiedAtomic(contract, binding) {
+    const qualification = atomicQualification(this.#atomicQualification, contract, binding);
+    // This source qualifies controlled transport only. A synthetic qualification
+    // never enables the ordinary default network transport or a live App mode.
+    need(this.#injectedTransport, 'ATOMIC_CONTROLLED_TRANSPORT_REQUIRED');
+    return qualification;
+  }
+  async #graphql(query, variables) {
+    const {data} = await this.#request('/graphql', {method:'POST', body:{query, variables}});
+    need((data.errors === undefined || Array.isArray(data.errors) && data.errors.length === 0) && data.data && typeof data.data === 'object' && !Array.isArray(data.data), 'GITHUB_GRAPHQL_UNKNOWN');
+    return data.data;
+  }
+  async observeAtomicRefs(input) {
+    const contract = this.#atomicContract(input);
+    const data = await this.#graphql('query SoloCoAtomicRead($repositoryId:ID!,$baseRef:String!,$headRef:String!,$mergeOid:GitObjectID!){node(id:$repositoryId){__typename ... on Repository{id nameWithOwner base:ref(qualifiedName:$baseRef){name prefix target{__typename oid}} head:ref(qualifiedName:$headRef){name prefix target{__typename oid}} prepared:object(oid:$mergeOid){__typename oid ... on Commit{tree{oid} parents(first:3){totalCount nodes{oid} pageInfo{hasNextPage}}}}}}}', {repositoryId:contract.repository_node_id, baseRef:contract.base_ref, headRef:contract.head_ref, mergeOid:contract.prepared_merge_oid});
+    const repo = data.node, prepared = repo?.prepared, parents = prepared?.parents;
+    need(repo?.__typename === 'Repository' && repo.id === contract.repository_node_id && typeof repo.nameWithOwner === 'string' && repo.base?.target?.__typename === 'Commit' && repo.head?.target?.__typename === 'Commit' && prepared?.__typename === 'Commit' && prepared.oid === contract.prepared_merge_oid, 'GITHUB_INVALID_ATOMIC_READBACK');
+    need(`${repo.base.prefix}${repo.base.name}` === contract.base_ref && `${repo.head.prefix}${repo.head.name}` === contract.head_ref && parents?.totalCount === 2 && Array.isArray(parents.nodes) && parents.nodes.length === 2 && parents.pageInfo?.hasNextPage === false, 'GITHUB_INVALID_ATOMIC_READBACK');
+    return {api_host:contract.api_host, repository_node_id:repo.id, repository:repo.nameWithOwner.toLowerCase(), base_ref:contract.base_ref, head_ref:contract.head_ref, base_oid:oid(repo.base.target.oid), head_oid:oid(repo.head.target.oid), prepared_merge_oid:oid(prepared.oid), prepared_tree_oid:oid(prepared.tree?.oid), prepared_parents:parents.nodes.map(parent => oid(parent.oid))};
+  }
+  async updateRefs(input, requestDigest) {
+    const contract = this.#atomicContract(input); this.#qualifiedAtomic(contract); digest(requestDigest);
+    const data = await this.#graphql('mutation SoloCoAtomicRefs($input:UpdateRefsInput!){updateRefs(input:$input){clientMutationId}}', {input:{repositoryId:contract.repository_node_id, clientMutationId:requestDigest, refUpdates:atomicRefUpdates(contract)}});
+    need(exactFields(data.updateRefs, ['clientMutationId']) && data.updateRefs.clientMutationId === requestDigest, 'GITHUB_INVALID_ATOMIC_RECEIPT');
+    // Correlation only: clientMutationId is not a remote idempotency guarantee.
+    return {status:'acknowledged', client_mutation_id:requestDigest};
   }
 }
 
@@ -248,17 +330,28 @@ export function publicationCheckId({ binding, subject_ref, review_refs }) {
 export function trustedCICheckId({ binding, name }) {
   return `soloco-ci-v1:${publicationDigest({ head_sha: oid(binding.head_sha), tree_sha: oid(binding.tree_sha), harness_sha256: digest(binding.harness_sha256), policy_sha256: digest(binding.policy_sha256), name: identifier(name) })}`;
 }
+export function atomicPublicationCheckId({binding, atomic, qualification, subject_ref, review_refs}) {
+  const normalized = normalizeBinding(binding), contract = normalizeAtomic(atomic, normalized), mode = atomicQualification(qualification, contract, normalized);
+  return `soloco-peer-atomic-v1:${publicationDigest({binding:normalized, atomic:contract, qualification:mode, subject_ref, review_refs})}`;
+}
+export function atomicCICheckId({binding, atomic, qualification, name}) {
+  const normalized = normalizeBinding(binding), contract = normalizeAtomic(atomic, normalized), mode = atomicQualification(qualification, contract, normalized);
+  return `soloco-ci-atomic-v1:${publicationDigest({prepared_merge_oid:contract.prepared_merge_oid, tree_sha:contract.prepared_tree_oid, ordered_parents:contract.prepared_parents, atomic:contract, qualification:mode, harness_sha256:normalized.harness_sha256, policy_sha256:normalized.policy_sha256, name:identifier(name)})}`;
+}
 function normalizeIssuer(input) {
   const issuer = clone(input);
   need(issuer && Array.isArray(issuer.required_checks) && issuer.required_checks.length > 0, 'OPERATOR_TRUSTED_CI_REQUIRED');
   const result = { app_id: positive(issuer.app_id), check_name: identifier(issuer.check_name), harness_sha256: digest(issuer.harness_sha256), policy_sha256: digest(issuer.policy_sha256), required_checks: issuer.required_checks.map(check => ({ name: identifier(check.name), app_id: positive(check.app_id) })) };
+  if (issuer.atomic_qualification !== undefined) result.atomic_qualification = clone(issuer.atomic_qualification);
   need(new Set([result.check_name, ...result.required_checks.map(check => check.name)]).size === result.required_checks.length + 1, 'UNIQUE_CHECK_NAMES_REQUIRED'); return result;
 }
 function matchIssuer(binding, issuer) {
   need(binding.expected_app_id === issuer.app_id && binding.check_name === issuer.check_name && binding.harness_sha256 === issuer.harness_sha256 && binding.policy_sha256 === issuer.policy_sha256, 'OPERATOR_POLICY_MISMATCH');
 }
-function validatePolicy(binding, observation, issuer, checkId, gate = true) {
+function validatePolicy(binding, observation, issuer, checkId, gate = true, atomicCheck = null) {
   matchIssuer(binding, issuer); const repository = `${binding.owner}/${binding.repo}`;
+  const checkedCommit = atomicCheck?.atomic.after_oid ?? binding.head_sha;
+  if (atomicCheck) need(observation.checked_commit_sha === checkedCommit && observation.atomic_qualification_sha256 === publicationDigest(atomicCheck.qualification), 'ATOMIC_CHECK_INSPECTION_MISMATCH');
   need(observation.owner === binding.owner && observation.repo === binding.repo && observation.number === binding.number && observation.repository_owner_type === 'User' && observation.repository_name === repository, 'PERSONAL_REPOSITORY_REQUIRED');
   need(observation.head_repository === repository && observation.base_repository === repository, 'SAME_REPOSITORY_HEAD_REQUIRED');
   need(observation.head_sha === binding.head_sha && observation.tree_sha === binding.tree_sha && observation.base_branch === binding.base_branch, 'SOURCE_CHANGED_REVALIDATE');
@@ -270,10 +363,11 @@ function validatePolicy(binding, observation, issuer, checkId, gate = true) {
   need(required.length === 1 && required[0].app_id === binding.expected_app_id, 'EXPECTED_APP_NOT_REQUIRED');
   const checks = observation.checks.filter(check => check.name === binding.check_name);
   need(!checks.some(check => check.app_id !== binding.expected_app_id), 'TRUSTED_CHECK_WRONG_APP');
-  if (gate) need(checks.length === 1 && checks[0].app_id === binding.expected_app_id && checks[0].head_sha === binding.head_sha && checks[0].status === 'completed' && checks[0].conclusion === 'success' && checks[0].external_id === checkId, 'TRUSTED_CHECK_NOT_SUCCESSFUL');
+  if (gate) need(checks.length === 1 && checks[0].app_id === binding.expected_app_id && checks[0].head_sha === checkedCommit && checks[0].status === 'completed' && checks[0].conclusion === 'success' && checks[0].external_id === checkId, 'TRUSTED_CHECK_NOT_SUCCESSFUL');
   for (const requiredCheck of issuer.required_checks) {
     const ci = observation.checks.filter(check => check.name === requiredCheck.name);
-    need(ci.length === 1 && ci[0].app_id === requiredCheck.app_id && ci[0].head_sha === binding.head_sha && ci[0].status === 'completed' && ci[0].conclusion === 'success' && ci[0].external_id === trustedCICheckId({ binding, name: requiredCheck.name }), 'TRUSTED_CI_NOT_SUCCESSFUL');
+    const ciId = atomicCheck ? atomicCICheckId({...atomicCheck, binding, name:requiredCheck.name}) : trustedCICheckId({binding, name:requiredCheck.name});
+    need(ci.length === 1 && ci[0].app_id === requiredCheck.app_id && ci[0].head_sha === checkedCommit && ci[0].status === 'completed' && ci[0].conclusion === 'success' && ci[0].external_id === ciId, 'TRUSTED_CI_NOT_SUCCESSFUL');
   }
   need(Number.isSafeInteger(p.required_native_approvals) && p.required_native_approvals >= 0, 'INVALID_NATIVE_REVIEW_POLICY');
   const latest = new Map(); const reviewIds = new Set();
@@ -294,8 +388,8 @@ function validatePolicy(binding, observation, issuer, checkId, gate = true) {
   }
   need(eligible.size >= Math.max(binding.required_native_approvals, p.required_native_approvals), 'NATIVE_REVIEW_REQUIRED');
 }
-function validateOpen(binding, observation, issuer, checkId, gate = true) {
-  validatePolicy(binding, observation, issuer, checkId, gate);
+function validateOpen(binding, observation, issuer, checkId, gate = true, atomicCheck = null) {
+  validatePolicy(binding, observation, issuer, checkId, gate, atomicCheck);
   need(observation.state === 'open' && observation.draft === false && observation.merged === false, 'PR_NOT_OPEN');
   need(observation.base_sha === binding.base_sha, 'SOURCE_CHANGED_REVALIDATE');
   need(observation.contains_current_base === true, 'BRANCH_UPDATE_REQUIRED');
@@ -311,7 +405,9 @@ function mergedExactly(binding, observation, expectedCommit) {
  * Ledger principal strings supply attribution only. No candidate code executes.
  * Lists precede writes. No transaction spans await. Admission is the local
  * linearization point: later revocation cannot unsend an already admitted request.
- * GitHub supplies head CAS only; changed merged base/tree is a retained violation.
+ * The legacy merge path supplies head CAS only; changed merged base/tree is a
+ * retained violation. The additive atomic lane guards both refs and records
+ * exact readback facts without semantic acceptance or reservation release.
  */
 export class MergePublisher {
   #ledger; #client; #principal; #authorize; #update; #overlap; #clock; #issuer;
@@ -327,7 +423,7 @@ export class MergePublisher {
     const control = tx.get('control', 'company'); const grant = tx.get('grants', value.grant_id);
     need(control?.value.protocol === 'peer-cos-v1' && control.value.paused === false, 'PUBLICATION_PAUSED_OR_NOT_ADOPTED');
     need(grant && Number.isSafeInteger(grant.value.generation) && grant.value.generation > 0 && Number.isSafeInteger(control.value.policy_generation) && Number.isSafeInteger(control.value.pause_generation), 'PUBLICATION_FENCE_REQUIRED');
-    const principals = value.kind === 'github-publication' ? validateCanonicalReviews(tx, value, value.binding) : [tx.get('principals', value.principal_id)];
+    const principals = ['github-publication', 'github-atomic-publication'].includes(value.kind) ? validateCanonicalReviews(tx, value, value.binding) : [tx.get('principals', value.principal_id)];
     need(principals.every(row => row?.value.status === 'active'), 'PRINCIPAL_NOT_ACTIVE');
     const view = Object.freeze({ get: (family, id) => tx.get(family, id), list: (family, options) => tx.list(family, options), count: (family, options) => tx.count(family, options) });
     let permitted;
@@ -385,7 +481,7 @@ export class MergePublisher {
         need(['prepared', 'waiting_check'].includes(existing.value.status), 'PUBLICATION_HELD_NEW_CANDIDATE_REQUIRED');
         this.#context(tx, existing.value, 'github/prepare'); this.#reserved(tx, existing.value); return existing.value;
       }
-      const queue = rows(tx, 'tasks', { status: 'queued', scope: value.resource }).filter(row => row.value.kind === 'github-publication').sort((a, b) => a.value.sequence - b.value.sequence);
+      const queue = rows(tx, 'tasks', { status: 'queued', scope: value.resource }).filter(row => ['github-publication', 'github-atomic-publication'].includes(row.value.kind)).sort((a, b) => a.value.sequence - b.value.sequence);
       need(queue[0]?.id === task.id, 'NOT_NEXT_PUBLICATION_CANDIDATE'); this.#context(tx, value, 'github/prepare');
       const claim_id = this.#claim(tx, id, value.resource);
       const effect = { ...value, claim_id, status: 'prepared', dispatched: false, prepared_at: this.#now() };
@@ -420,7 +516,8 @@ export class MergePublisher {
     });
   }
   #checkRequest(effect) {
-    return { kind: 'github-check', publication_id: effect.id, owner: effect.binding.owner, repo: effect.binding.repo, number: effect.binding.number, name: effect.binding.check_name, head_sha: effect.binding.head_sha, external_id: publicationCheckId(effect), issuer_sha256: publicationDigest(this.#issuer) };
+    const atomic = effect.kind === 'github-atomic-publication';
+    return { kind: 'github-check', publication_id: effect.id, owner: effect.binding.owner, repo: effect.binding.repo, number: effect.binding.number, name: effect.binding.check_name, head_sha: atomic ? effect.atomic.after_oid : effect.binding.head_sha, external_id: atomic ? atomicPublicationCheckId(effect) : publicationCheckId(effect), issuer_sha256: publicationDigest(this.#issuer) };
   }
   #checkContract(tx, effect, observation = null) {
     const row = tx.get('effects', `github-check:${effect.id}`);
@@ -437,7 +534,7 @@ export class MergePublisher {
   #guard(effect, action) {
     this.#ledger.read(tx => {
       this.#context(tx, effect, action); this.#reserved(tx, effect);
-      if (action === 'github/publish' || action === 'github/accept') this.#checkContract(tx, effect);
+      if (['github/publish', 'github/accept', 'github/atomic-publish'].includes(action)) this.#checkContract(tx, effect);
     });
   }
   async #preflight(effect, gate, action) {
@@ -666,5 +763,334 @@ export class MergePublisher {
         this.#release(tx, value); tx.put('effects', id, value, row.revision); return value;
       });
     } catch (error) { return this.#record(id, { status: 'unknown', reason: reason(error, 'BRANCH_UPDATE_ACCEPTANCE_BLOCKED') }); }
+  }
+
+  // Additive controlled transport lane. Its observation is a ref fact only;
+  // neither an ACK nor exact readback publishes semantic acceptance or releases
+  // a claim. The frozen P2 producer/authorizer/shared-claim seams remain separate.
+  #atomicEnvelope(value) {
+    return Object.fromEntries(['kind', 'id', 'principal_id', 'authorization_scope', 'scope', 'subject_ref', 'review_refs', 'grant_id', 'task_id', 'binding', 'atomic', 'qualification', 'issuer', 'resource', 'context_sha256'].map(key => [key, value[key]]));
+  }
+  #atomicStatic(tx, value) {
+    need(value?.kind === 'github-atomic-publication' && value.principal_id === this.#principal, 'ATOMIC_EFFECT_NOT_FOUND');
+    const task = tx.get('tasks', `github-atomic-publication:${value.id}`);
+    need(task?.value.kind === value.kind && task.value.request_sha256 === value.request_sha256 && publicationDigest(this.#atomicEnvelope(value)) === value.request_sha256 && publicationDigest(this.#atomicEnvelope(task.value)) === value.request_sha256, 'ATOMIC_REQUEST_BINDING_MISMATCH');
+    normalizeAtomic(value.atomic, value.binding);
+    atomicQualification(value.qualification, value.atomic, value.binding, value.issuer);
+  }
+  #atomicContext(tx, value, action) {
+    this.#atomicStatic(tx, value);
+    need(publicationDigest(value.issuer) === publicationDigest(this.#issuer), 'ATOMIC_ISSUER_CONFIGURATION_CHANGED');
+    const qualification = atomicQualification(this.#issuer.atomic_qualification, value.atomic, value.binding, this.#issuer);
+    need(publicationDigest(qualification) === publicationDigest(value.qualification), 'ATOMIC_QUALIFICATION_CHANGED');
+    const subject = exactRow(tx, value.subject_ref);
+    need(publicationDigest(normalizeAtomic(subject.value.github_atomic_publication, value.binding)) === publicationDigest(value.atomic), 'ATOMIC_SUBJECT_BINDING_MISMATCH');
+    this.#context(tx, value, action); this.#reserved(tx, value);
+    this.#checkContract(tx, value);
+  }
+  enqueueAtomic(input) {
+    const request = clone(input);
+    need(exactFields(request, ['id', 'subject_ref', 'review_refs', 'grant_id', 'task_id']), 'INVALID_ATOMIC_REQUEST');
+    const {id, subject_ref, review_refs, grant_id, task_id} = request;
+    identifier(id); identifier(grant_id); identifier(task_id);
+    need(typeof this.#client.inspectAtomic === 'function' && typeof this.#client.observeAtomicRefs === 'function' && typeof this.#client.updateRefs === 'function', 'ATOMIC_CLIENT_REQUIRED');
+    return this.#write('github.atomic.queued', tx => {
+      const subject = exactRow(tx, subject_ref), binding = normalizeBinding(subject.value.github_publication);
+      const atomic = normalizeAtomic(subject.value.github_atomic_publication, binding); matchIssuer(binding, this.#issuer);
+      const qualification = atomicQualification(this.#issuer.atomic_qualification, atomic, binding, this.#issuer);
+      const value = {kind:'github-atomic-publication', id, principal_id:this.#principal, authorization_scope:subject.value.scope ?? `repo:${binding.owner}/${binding.repo}`, scope:`repo:${binding.owner}/${binding.repo}`, subject_ref, review_refs, grant_id, task_id, binding, atomic, qualification, issuer:clone(this.#issuer), resource:`repo:${binding.owner}/${binding.repo}`};
+      value.context_sha256 = this.#context(tx, value, 'github/atomic-prepare');
+      const request_sha256 = publicationDigest(value), prior = tx.get('tasks', `github-atomic-publication:${id}`), existing = tx.get('effects', id);
+      if (prior) { need(prior.value.request_sha256 === request_sha256, 'EFFECT_ID_PAYLOAD_MISMATCH'); return prior; }
+      need(!existing, 'EFFECT_ID_PAYLOAD_MISMATCH');
+      const sequence = tx.get('control', 'github-publication-sequence'), next = (sequence?.value.next ?? 0) + 1; positive(next);
+      tx.put('control', 'github-publication-sequence', {next}, sequence?.revision ?? 0);
+      return tx.put('tasks', `github-atomic-publication:${id}`, {...value, request_sha256, sequence:next, status:'queued'}, 0);
+    });
+  }
+  #prepareAtomic(id) {
+    return this.#write('github.atomic.prepared', tx => {
+      const task = tx.get('tasks', `github-atomic-publication:${identifier(id)}`); need(task, 'ATOMIC_PUBLICATION_NOT_QUEUED');
+      const existing = tx.get('effects', id);
+      if (existing) { this.#atomicStatic(tx, existing.value); return existing.value; }
+      const value = task.value;
+      need(value.kind === 'github-atomic-publication' && publicationDigest(this.#atomicEnvelope(value)) === value.request_sha256, 'ATOMIC_REQUEST_BINDING_MISMATCH');
+      need(publicationDigest(value.issuer) === publicationDigest(this.#issuer), 'ATOMIC_ISSUER_CONFIGURATION_CHANGED');
+      need(publicationDigest(atomicQualification(this.#issuer.atomic_qualification, value.atomic, value.binding, this.#issuer)) === publicationDigest(value.qualification), 'ATOMIC_QUALIFICATION_CHANGED');
+      const subject = exactRow(tx, value.subject_ref);
+      need(publicationDigest(normalizeAtomic(subject.value.github_atomic_publication, value.binding)) === publicationDigest(value.atomic), 'ATOMIC_SUBJECT_BINDING_MISMATCH');
+      this.#context(tx, value, 'github/atomic-prepare');
+      const queue = rows(tx, 'tasks', {status:'queued', scope:value.resource}).filter(row => ['github-publication', 'github-atomic-publication'].includes(row.value.kind)).sort((a, b) => a.value.sequence - b.value.sequence);
+      need(queue[0]?.id === task.id, 'NOT_NEXT_PUBLICATION_CANDIDATE');
+      const claim_id = this.#claim(tx, id, value.resource);
+      const effect = {...value, claim_id, status:'prepared', dispatched:false, semantic_acceptance:false, prepared_at:this.#now()};
+      tx.put('effects', id, effect, 0);
+      tx.put('tasks', task.id, {...value, status:'prepared'}, task.revision);
+      tx.event('github.atomic.prepared', {id, request_sha256:value.request_sha256});
+      return effect;
+    });
+  }
+  #recordAtomic(id, patch) {
+    return this.#write('github.atomic.observed', tx => {
+      const row = tx.get('effects', identifier(id)); need(row, 'ATOMIC_EFFECT_NOT_FOUND');
+      this.#atomicStatic(tx, row.value); this.#reserved(tx, row.value);
+      if (row.value.status === 'observed' || row.value.status === 'held') return row.value;
+      if (patch.status === 'held' && row.value.dispatched) return row.value;
+      const value = {...row.value, ...clone(patch), semantic_acceptance:false, observed_at:this.#now()};
+      tx.put('effects', id, value, row.revision);
+      const task = tx.get('tasks', `github-atomic-publication:${id}`);
+      tx.put('tasks', task.id, {...task.value, status:value.status === 'held' ? 'held' : 'waiting'}, task.revision);
+      tx.event('github.atomic.observed', {id, request_sha256:value.request_sha256, status:value.status, reason:value.reason ?? null, semantic_acceptance:false});
+      return value;
+    });
+  }
+  async #atomicPreflight(effect) {
+    let inspection;
+    for (let pass = 0; pass < 2; pass++) {
+      this.#ledger.read(tx => this.#atomicContext(tx, effect, 'github/atomic-publish'));
+      inspection = clone(await this.#client.inspectAtomic(effect.binding, effect.binding.check_name, clone(effect.atomic)));
+      validateOpen(effect.binding, inspection, this.#issuer, atomicPublicationCheckId(effect), true, {atomic:effect.atomic, qualification:effect.qualification});
+      need(`refs/heads/${inspection.head_branch}` === effect.atomic.head_ref, 'ATOMIC_PR_HEAD_REF_MISMATCH');
+      this.#ledger.read(tx => this.#atomicContext(tx, effect, 'github/atomic-publish'));
+    }
+    return inspection;
+  }
+  async publishAtomic(id) {
+    const effect = this.#prepareAtomic(id);
+    if (effect.dispatched) return this.reconcileAtomic(id);
+    if (effect.status === 'held') return effect;
+    let inspection, prepared;
+    try {
+      this.#ledger.read(tx => this.#atomicContext(tx, effect, 'github/atomic-publish'));
+      inspection = await this.#atomicPreflight(effect);
+      prepared = clone(await this.#client.observeAtomicRefs(clone(effect.atomic)));
+      validateAtomicObservation(effect.atomic, prepared, `${effect.binding.owner}/${effect.binding.repo}`);
+      this.#ledger.read(tx => this.#atomicContext(tx, effect, 'github/atomic-publish'));
+    } catch (error) { return this.#recordAtomic(id, {status:'held', reason:reason(error, 'ATOMIC_PREFLIGHT_UNKNOWN')}); }
+    let admission;
+    try { admission = this.#write('github.atomic.dispatch_admitted', tx => {
+      const row = tx.get('effects', id); need(row, 'ATOMIC_EFFECT_NOT_FOUND'); this.#atomicStatic(tx, row.value);
+      if (row.value.dispatched || row.value.status === 'held') return {send:false, value:row.value};
+      need(row.value.status === 'prepared', 'ATOMIC_EFFECT_NOT_PREPARED');
+      this.#atomicContext(tx, row.value, 'github/atomic-publish');
+      this.#checkContract(tx, row.value, inspection);
+      const value = {...row.value, status:'dispatch_admitted', dispatched:true, dispatch_admitted_at:this.#now(), prepared_observation:prepared, native_review_snapshots:inspection.reviews};
+      tx.put('effects', id, value, row.revision);
+      tx.event('github.atomic.dispatch_admitted', {id, request_sha256:value.request_sha256, ref_updates:atomicRefUpdates(value.atomic)});
+      return {send:true, value};
+    }); } catch (error) { return this.#recordAtomic(id, {status:'held', reason:reason(error, 'ATOMIC_ADMISSION_UNKNOWN_NO_RETRY')}); }
+    if (!admission.send) return admission.value.dispatched ? this.reconcileAtomic(id) : admission.value;
+    try {
+      const receipt = clone(await this.#client.updateRefs(clone(admission.value.atomic), admission.value.request_sha256));
+      need(exactFields(receipt, ['status', 'client_mutation_id']) && receipt.status === 'acknowledged' && receipt.client_mutation_id === admission.value.request_sha256, 'GITHUB_INVALID_ATOMIC_RECEIPT');
+      return this.#recordAtomic(id, {status:'pending', reason:'ATOMIC_ACK_REQUIRES_EXACT_READBACK', mutation_ack:receipt});
+    } catch { return this.#recordAtomic(id, {status:'unknown', reason:'ATOMIC_RECEIPT_UNKNOWN_NO_RETRY'}); }
+  }
+  async reconcileAtomic(id) {
+    const effect = this.#ledger.read(tx => {
+      const row = tx.get('effects', identifier(id)); need(row, 'ATOMIC_EFFECT_NOT_FOUND');
+      this.#atomicStatic(tx, row.value); this.#reserved(tx, row.value); return row.value;
+    });
+    need(effect.dispatched === true, 'ATOMIC_EFFECT_NOT_DISPATCHED');
+    if (effect.status === 'observed') return effect;
+    let observation;
+    try {
+      observation = clone(await this.#client.observeAtomicRefs(clone(effect.atomic)));
+      validateAtomicObservation(effect.atomic, observation, `${effect.binding.owner}/${effect.binding.repo}`, true);
+    } catch (error) { return this.#recordAtomic(id, {status:'unknown', reason:reason(error, 'ATOMIC_READBACK_UNKNOWN_NO_RETRY')}); }
+    const receipt = {protocol:'github-atomic-ref-observation-v1', request_sha256:effect.request_sha256, atomic:effect.atomic, qualification:effect.qualification, binding:effect.binding, subject_ref:effect.subject_ref, review_refs:effect.review_refs, observation, semantic_acceptance:false};
+    return this.#recordAtomic(id, {status:'observed', reason:'EXACT_REF_STATE_OBSERVED_NOT_SEMANTIC_ACCEPTANCE', receipt, receipt_sha256:publicationDigest(receipt)});
+  }
+}
+
+const POLICY_CONSUMER = 'peer-p2-publication-consumer-v1';
+const POLICY_ACTION = 'github/atomic-publish';
+const policyProviderErrors = new WeakSet();
+const policySemanticErrors = new WeakSet();
+function policyReadView(tx) {
+  need(['get','getVersion','list','count','queryCurrentReviews','resolveLegacy'].every(method => typeof tx?.[method] === 'function'), 'READ_PROVIDER_REQUIRED');
+  return Object.freeze(Object.fromEntries(['get','getVersion','list','count','queryCurrentReviews','resolveLegacy'].map(method => [method, (...args) => {
+    try { return tx[method](...args); } catch (error) { if (error && typeof error === 'object') policyProviderErrors.add(error); throw error; }
+  }])));
+}
+function policyReason(error, fallback) { return internalErrors.has(error) || policySemanticErrors.has(error) ? error.code : fallback; }
+const policyReference = (family, row) => ({family, id:row.id, revision:row.revision, sha256:row.sha256});
+
+/** Controlled-only P2 policy consumer, Option A: mutual exclusion, NOT a P2 task
+ * handoff. The protected software publisher owns a held repo claim without any
+ * task_id. P2 task closure cannot release it. No release capability is supplied.
+ * The actual P2 policy is the last semantic/provider read before each admission;
+ * its typed result is never replaced by a Boolean or relabeled legacy proof.
+ */
+export class PolicyAtomicPublisher {
+  #ledger; #client; #principal; #issuer; #clock;
+  constructor(options = {}) {
+    need(options && Object.keys(options).every(key => ['ledger','client','principal','issuer','clock'].includes(key)), 'INVALID_POLICY_PUBLISHER_OPTIONS');
+    const {ledger, client, principal, issuer, clock = () => new Date().toISOString()} = options;
+    need(ledger && typeof ledger.read === 'function' && typeof ledger.write === 'function', 'LEDGER_REQUIRED');
+    need(client && ['inspectAtomic','observeAtomicRefs','updateRefs'].every(key => typeof client[key] === 'function'), 'ATOMIC_CLIENT_REQUIRED');
+    need(typeof clock === 'function', 'INVALID_CLOCK');
+    this.#ledger=ledger; this.#client=client; this.#principal=identifier(principal); this.#issuer=normalizeIssuer(issuer); this.#clock=clock;
+    need(this.#issuer.atomic_qualification?.mode === 'controlled-test', 'ATOMIC_MODE_NOT_QUALIFIED');
+  }
+  #write(type, fn) { return this.#ledger.write(type, this.#principal, fn); }
+  #now() { const value=this.#clock(); need(typeof value === 'string' && Number.isFinite(Date.parse(value)), 'INVALID_CLOCK'); return value; }
+  #envelope(value) {
+    return Object.fromEntries(['kind','consumer_protocol','policy_action','id','principal_id','subject_ref','review_refs','grant_id','authorization_scope','scope','resource','binding','source_metadata','atomic','qualification','issuer','policy_authority_sha256','policy_authority_binding'].map(key => [key,value[key]]));
+  }
+  #static(view, value) {
+    need(value?.kind === 'github-atomic-publication' && value.consumer_protocol === POLICY_CONSUMER && value.policy_action === POLICY_ACTION && value.principal_id === this.#principal, 'POLICY_ATOMIC_EFFECT_NOT_FOUND');
+    const tracker=view.get('tasks', `github-atomic-publication:${value.id}`);
+    need(tracker && publicationDigest(this.#envelope(value)) === value.request_sha256 && publicationDigest(this.#envelope(tracker.value)) === value.request_sha256 && tracker.value.request_sha256 === value.request_sha256, 'ATOMIC_REQUEST_BINDING_MISMATCH');
+    need(publicationDigest(value.issuer) === publicationDigest(this.#issuer), 'ATOMIC_ISSUER_CONFIGURATION_CHANGED');
+    normalizeAtomic(value.atomic,value.binding);
+    need(publicationDigest(atomicQualification(this.#issuer.atomic_qualification,value.atomic,value.binding,this.#issuer)) === publicationDigest(value.qualification), 'ATOMIC_QUALIFICATION_CHANGED');
+    return tracker;
+  }
+  #claimValue(value, resource) {
+    const authority=value.policy_authority_binding;
+    return {kind:'github-policy-publication',consumer_protocol:POLICY_CONSUMER,mode:'controlled-test',status:'held',resource,resources:[resource],effect_id:value.id,principal_id:this.#principal,request_sha256:value.request_sha256,subject_ref:value.subject_ref,policy_authority_sha256:value.policy_authority_sha256,grant_id:value.grant_id,grant_generation:authority.publisher.grant?.value.generation ?? null,policy_generation:authority.publisher.control.value.policy_generation,pause_generation:authority.publisher.control.value.pause_generation,publisher_generation:authority.publisher.principal.value.generation};
+  }
+  #claimPlan(view, value, required = false) {
+    const claim_id=`github-policy-publication:${value.resource}`, resource=canonicalResources(view,[{kind:'repo',repository:value.resource.slice(5)}])[0];
+    const prior=view.get('claims',claim_id);
+    const own=prior?.value;
+    if(own && !TERMINAL_CLAIMS.has(own.status ?? own.state)) need(value.policy_authority_binding && own.effect_id === value.id && canonical(own) === canonical(this.#claimValue(value,resource)), 'PUBLICATION_RESERVATION_LOST');
+    if(required) need(own?.status === 'held' && value.claim_id === claim_id && canonical(value.claim_ref) === canonical(policyReference('claims',prior)), 'PUBLICATION_RESERVATION_LOST');
+    const total=view.count('claims',{});need(Number.isSafeInteger(total) && total >= 0 && total <= 1000,'PUBLICATION_QUEUE_TOO_LARGE');
+    for(const row of rows(view,'claims')) {
+      if(TERMINAL_CLAIMS.has(row.value.status ?? row.value.state)) continue;
+      if(row.id === claim_id && own?.effect_id === value.id) continue;
+      const resources=row.value.resources ?? (row.value.resource ? [row.value.resource] : []);
+      need(Array.isArray(resources) && resources.length > 0, 'UNCLASSIFIED_RESOURCE_CLAIM');
+      for(const other of resources) {
+        const normalized=canonicalResources(view,[other])[0];
+        need(normalized.key === other.key, 'UNCLASSIFIED_RESOURCE_CLAIM');
+        need(!resourceOverlap(resource,normalized), 'PUBLICATION_RESOURCE_RESERVED');
+      }
+    }
+    return {claim_id,resource,prior};
+  }
+  #owned(view, value) {
+    const row=view.get('claims',value.claim_id);
+    const resource={kind:'repo',repository:value.resource.slice(5),key:value.resource};
+    need(row && canonical(row.value) === canonical(this.#claimValue(value,resource)) && canonical(policyReference('claims',row)) === canonical(value.claim_ref), 'PUBLICATION_RESERVATION_LOST');
+    return row;
+  }
+  #check(view, value, observation = null) {
+    const row=view.get('effects',`github-check:${value.id}`); if(!row) return;
+    const request={kind:'github-check',publication_id:value.id,owner:value.binding.owner,repo:value.binding.repo,number:value.binding.number,name:value.binding.check_name,head_sha:value.atomic.after_oid,external_id:atomicPublicationCheckId(value),issuer_sha256:publicationDigest(this.#issuer)},check=row.value;
+    need(check.id === row.id && check.request_sha256 === publicationDigest(request) && Object.entries(request).every(([key,item]) => check[key] === item), 'CHECK_REQUEST_BINDING_MISMATCH');
+    need(!['failed','closed'].includes(check.status), 'CHECK_TERMINALLY_CLOSED');
+    need(check.status === 'succeeded' && Number.isSafeInteger(check.check_id) && check.check_id > 0, 'CHECK_CREATION_UNRESOLVED');
+    if(observation) {
+      const checks=observation.checks.filter(item => item.name === request.name);
+      need(checks.length === 1 && checks[0].id === check.check_id && checks[0].app_id === this.#issuer.app_id && checks[0].head_sha === request.head_sha && checks[0].external_id === request.external_id && checks[0].status === 'completed' && checks[0].conclusion === 'success', 'CHECK_REMOTE_ID_MISMATCH');
+    }
+  }
+  #policy(view, value, expected = true) {
+    let facts;
+    try { facts=publicationPolicyEvidence(view,{principal_id:this.#principal},{subject_ref:value.subject_ref,review_refs:value.review_refs,grant_id:value.grant_id,action:POLICY_ACTION,...(expected ? {expected_authority_sha256:value.policy_authority_sha256} : {})}); }
+    catch(error) { if(error && typeof error === 'object') policySemanticErrors.add(error); throw error; }
+    // Everything after the actual P2 call is pure; no provider read may follow.
+    need(facts.protocol === 'peer-publication-policy-v1' && facts.authority_binding.protocol === 'peer-publication-authority-v1' && publicationDigest(facts.authority_binding) === facts.authority_sha256 && canonical(facts.subject_ref) === canonical(value.subject_ref) && canonical(facts.review_refs) === canonical(value.review_refs) && canonical(facts.metadata) === canonical(value.source_metadata) && Number.isSafeInteger(facts.capacity.remaining_model_calls) && facts.capacity.remaining_model_calls > 0, 'POLICY_SUBJECT_BINDING_MISMATCH');
+    if(expected) need(canonical(facts.authority_binding) === canonical(value.policy_authority_binding), 'POLICY_AUTHORITY_BINDING_MISMATCH');
+    need(facts.authority_binding.publisher.principal.id === this.#principal && facts.authority_binding.publisher.principal.value.kind === 'publisher', 'SOFTWARE_PUBLISHER_REQUIRED');
+    const authorities=facts.authority_binding.review_authorities, excluded=new Set([...facts.contributors.principals,...authorities.flatMap(a => [a.original_reviewer.principal.id,...(a.current_task_owner ? [a.current_task_owner.principal.id] : [])])]);
+    need(!excluded.has(this.#principal), 'PUBLISHER_NOT_INDEPENDENT');
+    const identities=facts.identity_facts;
+    need(identities?.protocol === 'peer-publication-native-identities-v1' && identities.publisher && Array.isArray(identities.interested), 'PROTECTED_NATIVE_IDENTITIES_REQUIRED');
+    const identityShape=identity => identity?.protocol === 'peer-principal-native-aliases-v1' && identity.principal_ref?.family === 'principals' && Array.isArray(identity.native_ids) && identity.native_ids.every(native => typeof native === 'string' && native.length > 0 && native.length <= 300) && new Set(identity.native_ids).size === identity.native_ids.length;
+    need(identityShape(identities.publisher) && canonical(identities.publisher.principal_ref) === canonical(facts.current_sources.principal) && identities.interested.every(identityShape), 'PROTECTED_NATIVE_IDENTITIES_REQUIRED');
+    const identityPeople=new Set(identities.interested.map(identity => identity.principal_ref.id));
+    need(identityPeople.size === identities.interested.length && identityPeople.size === excluded.size && [...excluded].every(id => identityPeople.has(id)), 'PROTECTED_NATIVE_IDENTITIES_REQUIRED');
+    const native=facts.authority_binding.publisher.principal.value.native_id;
+    need(!native || identities.publisher.native_ids.includes(native), 'PROTECTED_NATIVE_IDENTITIES_REQUIRED');
+    const natives=new Set([...facts.contributors.natives,...facts.reviews.map(r => r.native_id),...authorities.flatMap(a => [a.original_reviewer.principal.value.native_id,a.current_task_owner?.principal.value.native_id]).filter(Boolean),...identities.interested.flatMap(identity => identity.native_ids)]);
+    need(!identities.publisher.native_ids.some(alias => natives.has(alias)), 'PUBLISHER_NOT_INDEPENDENT');
+    need(new Set(facts.reviews.map(r => r.reviewer_principal_id)).size === facts.reviews.length, 'INDEPENDENT_REVIEW_REQUIRED');
+    return facts;
+  }
+  enqueueAtomic(input) {
+    const request=clone(input); need(exactFields(request,['id','subject_ref','review_refs','grant_id']), 'INVALID_POLICY_ATOMIC_REQUEST');
+    const {id,subject_ref,review_refs,grant_id}=request;identifier(id);identifier(grant_id);
+    return this.#write('github.policy.atomic.queued',tx => {
+      const view=policyReadView(tx), subject=exactRow(view,subject_ref),binding=normalizeBinding(subject.value.github_publication),atomic=normalizeAtomic(subject.value.github_atomic_publication,binding);
+      need(binding.author_principal_id === subject.value.principal_id, 'SUBJECT_AUTHOR_MISMATCH');matchIssuer(binding,this.#issuer);
+      const qualification=atomicQualification(this.#issuer.atomic_qualification,atomic,binding,this.#issuer);
+      const value={kind:'github-atomic-publication',consumer_protocol:POLICY_CONSUMER,policy_action:POLICY_ACTION,id,principal_id:this.#principal,subject_ref,review_refs,grant_id,authorization_scope:subject.value.scope,scope:`repo:${binding.owner}/${binding.repo}`,resource:`repo:${binding.owner}/${binding.repo}`,binding,source_metadata:{github_publication:clone(subject.value.github_publication),github_atomic_publication:clone(subject.value.github_atomic_publication)},atomic,qualification,issuer:clone(this.#issuer)};
+      const prior=view.get('tasks',`github-atomic-publication:${id}`),existing=view.get('effects',id),sequence=view.get('control','github-publication-sequence');
+      rows(view,'tasks',{status:'queued',scope:value.resource});this.#claimPlan(view,prior?.value ?? value);this.#check(view,value);
+      const next=(sequence?.value.next ?? 0)+1;positive(next);
+      const facts=this.#policy(view,value,false);value.policy_authority_sha256=facts.authority_sha256;value.policy_authority_binding=facts.authority_binding;
+      const request_sha256=publicationDigest(this.#envelope(value));
+      if(prior) { need(prior.value.request_sha256 === request_sha256, 'EFFECT_ID_PAYLOAD_MISMATCH');return prior; }
+      need(!existing, 'EFFECT_ID_PAYLOAD_MISMATCH');
+      tx.put('control','github-publication-sequence',{next},sequence?.revision ?? 0);
+      return tx.put('tasks',`github-atomic-publication:${id}`,{...value,request_sha256,sequence:next,status:'queued'},0);
+    });
+  }
+  #prepare(id) {
+    return this.#write('github.policy.atomic.prepared',tx => {
+      const view=policyReadView(tx),task=view.get('tasks',`github-atomic-publication:${identifier(id)}`);need(task,'ATOMIC_PUBLICATION_NOT_QUEUED');
+      const existing=view.get('effects',id),value=existing?.value ?? task.value;this.#static(view,value);
+      if(existing && (value.dispatched || value.status === 'held')) { this.#owned(view,value);return value; }
+      const queue=rows(view,'tasks',{status:'queued',scope:value.resource}).filter(row => ['github-publication','github-atomic-publication'].includes(row.value.kind)).sort((a,b) => a.value.sequence-b.value.sequence);
+      if(!existing) need(queue[0]?.id === task.id,'NOT_NEXT_PUBLICATION_CANDIDATE');
+      const plan=this.#claimPlan(view,value,Boolean(existing));this.#check(view,value);const prepared_at=this.#now();
+      this.#policy(view,value);
+      if(existing) return value;
+      const claim=tx.put('claims',plan.claim_id,this.#claimValue(value,plan.resource),plan.prior?.revision ?? 0);
+      const effect={...value,claim_id:claim.id,claim_ref:policyReference('claims',claim),status:'prepared',dispatched:false,semantic_acceptance:false,prepared_at};
+      tx.put('effects',id,effect,0);tx.put('tasks',task.id,{...task.value,status:'prepared'},task.revision);tx.event('github.policy.atomic.prepared',{id,request_sha256:value.request_sha256});return effect;
+    });
+  }
+  #gate(value, observation = null) {
+    return this.#ledger.read(tx => {const view=policyReadView(tx);this.#static(view,value);this.#claimPlan(view,value,true);this.#check(view,value,observation);return this.#policy(view,value);});
+  }
+  #record(id, patch) {
+    return this.#write('github.policy.atomic.observed',tx => {
+      const view=policyReadView(tx),row=view.get('effects',identifier(id));need(row,'ATOMIC_EFFECT_NOT_FOUND');const task=this.#static(view,row.value);this.#owned(view,row.value);
+      if(row.value.status === 'observed' || row.value.status === 'held') return row.value;
+      // An earlier caller's failed preflight cannot replace a durable dispatch.
+      if(row.value.dispatched && patch.status === 'held') return row.value;
+      const value={...row.value,...clone(patch),semantic_acceptance:false,observed_at:this.#now()};
+      tx.put('effects',id,value,row.revision);tx.put('tasks',task.id,{...task.value,status:value.status === 'held' ? 'held' : 'waiting'},task.revision);tx.event('github.policy.atomic.observed',{id,request_sha256:value.request_sha256,status:value.status,reason:value.reason ?? null,semantic_acceptance:false});return value;
+    });
+  }
+  async publishAtomic(id) {
+    const effect=this.#prepare(id);if(effect.dispatched) return this.reconcileAtomic(id);if(effect.status === 'held') return effect;
+    let inspection,prepared;
+    try {
+      for(let pass=0;pass<2;pass++) {
+        this.#gate(effect);
+        inspection=clone(await this.#client.inspectAtomic(clone(effect.binding),effect.binding.check_name,clone(effect.atomic)));
+        validateOpen(effect.binding,inspection,this.#issuer,atomicPublicationCheckId(effect),true,{atomic:effect.atomic,qualification:effect.qualification});need(`refs/heads/${inspection.head_branch}` === effect.atomic.head_ref,'ATOMIC_PR_HEAD_REF_MISMATCH');this.#gate(effect,inspection);
+      }
+      prepared=clone(await this.#client.observeAtomicRefs(clone(effect.atomic)));validateAtomicObservation(effect.atomic,prepared,`${effect.binding.owner}/${effect.binding.repo}`);this.#gate(effect,inspection);
+    } catch(error) { if(policyProviderErrors.has(error)) throw error;return this.#record(id,{status:'held',reason:policyReason(error,'ATOMIC_PREFLIGHT_UNKNOWN')}); }
+    let admission;
+    try { admission=this.#write('github.policy.atomic.dispatch_admitted',tx => {
+      const view=policyReadView(tx),row=view.get('effects',id);need(row,'ATOMIC_EFFECT_NOT_FOUND');this.#static(view,row.value);
+      if(row.value.dispatched || row.value.status === 'held') return {send:false,value:row.value};
+      need(row.value.status === 'prepared','ATOMIC_EFFECT_NOT_PREPARED');this.#claimPlan(view,row.value,true);this.#check(view,row.value,inspection);const dispatch_admitted_at=this.#now();
+      this.#policy(view,row.value);
+      const value={...row.value,status:'dispatch_admitted',dispatched:true,dispatch_admitted_at,prepared_observation:prepared,native_review_snapshots:inspection.reviews};tx.put('effects',id,value,row.revision);tx.event('github.policy.atomic.dispatch_admitted',{id,request_sha256:value.request_sha256,ref_updates:atomicRefUpdates(value.atomic)});return {send:true,value};
+    }); } catch(error) { if(policyProviderErrors.has(error) || !internalErrors.has(error) && !policySemanticErrors.has(error)) throw error;return this.#record(id,{status:'held',reason:policyReason(error,'ATOMIC_ADMISSION_UNKNOWN_NO_RETRY')}); }
+    if(!admission.send) return admission.value.dispatched ? this.reconcileAtomic(id) : admission.value;
+    let receipt;
+    try {
+      receipt=clone(await this.#client.updateRefs(clone(admission.value.atomic),admission.value.request_sha256));need(exactFields(receipt,['status','client_mutation_id']) && receipt.status === 'acknowledged' && receipt.client_mutation_id === admission.value.request_sha256,'GITHUB_INVALID_ATOMIC_RECEIPT');
+    } catch { return this.#record(id,{status:'unknown',reason:'ATOMIC_RECEIPT_UNKNOWN_NO_RETRY'}); }
+    return this.#record(id,{status:'pending',reason:'ATOMIC_ACK_REQUIRES_EXACT_READBACK',mutation_ack:receipt});
+  }
+  async reconcileAtomic(id) {
+    const effect=this.#ledger.read(tx => {const view=policyReadView(tx),row=view.get('effects',identifier(id));need(row,'ATOMIC_EFFECT_NOT_FOUND');this.#static(view,row.value);this.#owned(view,row.value);return row.value;});
+    need(effect.dispatched === true,'ATOMIC_EFFECT_NOT_DISPATCHED');if(effect.status === 'observed') return effect;
+    let observation;
+    try {observation=clone(await this.#client.observeAtomicRefs(clone(effect.atomic)));validateAtomicObservation(effect.atomic,observation,`${effect.binding.owner}/${effect.binding.repo}`,true);}
+    catch(error) {return this.#record(id,{status:'unknown',reason:reason(error,'ATOMIC_READBACK_UNKNOWN_NO_RETRY')});}
+    const receipt={protocol:'github-atomic-ref-observation-v1',consumer_protocol:POLICY_CONSUMER,policy_authority_sha256:effect.policy_authority_sha256,request_sha256:effect.request_sha256,atomic:effect.atomic,qualification:effect.qualification,binding:effect.binding,subject_ref:effect.subject_ref,review_refs:effect.review_refs,observation,semantic_acceptance:false};
+    return this.#record(id,{status:'observed',reason:'EXACT_REF_STATE_OBSERVED_NOT_SEMANTIC_ACCEPTANCE',receipt,receipt_sha256:publicationDigest(receipt)});
   }
 }
