@@ -202,6 +202,34 @@ This is controlled library/source evidence. It does not establish a genuine
 account or protected host publisher, full peer routing, company adoption,
 durable continuity or observed founder benefit.
 
+## Controlled P8a pending-membership component
+
+A distinct standalone Engineering session adopted four scoped, externally
+prepared source changes. Its nine-file candidate passed a fresh confined run
+of the four complete membership, legacy-readiness, publication-policy and
+provider-error roots: 179 cases, comprising all 177 original cases and two
+added regression families. No failures, cancellations, skips or output
+truncation occurred. Independent native QA and owner acceptance must bind this
+exact candidate and runtime receipt before integration. Their outcomes are
+retained separately from the test run.
+
+The library separates pending reconstruction and provisional review from active
+business membership. It retains shared allowance, attempts, reservations,
+attributable outputs, independence and currentness checks, and atomic activation
+or replacement. An own imported legacy marker, including standalone
+`legacy_ready`, holds fresh admission without treating nested opaque user data
+as an import marker. Provider-origin errors propagate unchanged instead of
+being committed as ordinary completion quarantine; genuine local expiry keeps
+its existing raw-output and closure handling.
+
+These controls are source and component evidence. The synthetic host observations
+and trusted constructor boundaries do not prove operator authentication, actual
+protected host enrollment, company migration, durable replacement continuity or
+the complete peer architecture. The original two held Engineering generations
+remain spent; their failures and notices survive. The third generation consumed
+the remaining allowance. No new generation, recovery, expiry or unknown-session
+reset follows from passing tests. SPEC and governance adoption remain separate.
+
 ## Merged peer and storage evidence
 
 The mission and enduring requirements remain unchanged. PR #49 added peer

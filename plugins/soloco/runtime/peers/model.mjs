@@ -262,6 +262,12 @@ function plannedWrite(ledger,type,principal,fn){
   });
 }
 function control(tx){const c=tx.get('control','company');if(c?.value.protocol!==PROTOCOL)hold('PROTOCOL_REQUIRED','Checked peer adoption required');return c;}
+// P5's existing provenance is an unresolved origin, never a readiness flag.
+// Partial/malformed markers cannot grant fresh authority. A future typed
+// obligation transition is separate; no caller-supplied "ready" clears this.
+function legacyOriginHold(c){
+  if(Object.hasOwn(c.value,'legacy_source_cut_sha256')||Object.hasOwn(c.value,'legacy_backup')||Object.hasOwn(c.value,'legacy_ready'))hold('AUTHORITY_CHANGED','Legacy adoption origin remains unqualified; original scoped attempts, expiry and uncertain obligations require a qualified transition');
+}
 function member(tx,actor){
   if(!actor||typeof actor!=='object'||Object.keys(actor).length!==1||!Object.hasOwn(actor,'principal_id'))hold('AUTHENTICATION_REQUIRED','Use only a trusted-internal principal reference');
   const row=tx.get('principals',text(actor.principal_id,'principal_id',200));if(row?.value.status!=='active')hold('PRINCIPAL_INACTIVE','Principal is inactive');return row;
@@ -310,6 +316,7 @@ export function resourceOverlap(a,b){if(a.key===b.key)return true;if(a.kind==='r
 function contains(a,b){return a.key===b.key||a.kind==='repo'&&a.repository===b.repository||a.worktree_id&&a.worktree_id===b.worktree_id&&(a.kind==='worktree'||a.kind==='path'&&b.kind==='path'&&b.path.startsWith(a.path+'/'));}
 export function authorize(tx,actor,action,args={}){
   const c=control(tx),p=member(tx,actor);policy(c);
+  if(['task/submit','task/claim','home/publish'].includes(action)||action.startsWith('github/'))legacyOriginHold(c);
   if(c.value.paused&&(['task/submit','task/claim','home/publish'].includes(action)||action.startsWith('github/')))hold('PAUSED','Pause fences admission and publication');
   // Required notices are a role right, not discretionary grant authority.
   if(action==='notice/create')return {control:c,principal:p,grant:null};
@@ -549,12 +556,11 @@ function evidenceAnalysis(tx,budget=semanticBudget(tx)){
     if(aliases.has(id))return aliases.get(id);
     const p=tx.get('principals',id);need(p,'Contributor principal missing');
     const result={principals:new Set([id]),natives:new Set()};aliases.set(id,result);
-    if(p.value.native_id)result.natives.add(p.value.native_id);
-    // Existing indexed alias lookup only. These tasks do not become material
-    // ancestors, and unrelated archive bodies are never enumerated globally.
+    for(const incarnation of membershipAncestors(tx,p))if(incarnation.value.native_id)result.natives.add(incarnation.value.native_id);
+    // Preserve the established graph alias predicate; the separate private
+    // lifecycle consumer below verifies a whole production seal as well.
     for(const task of all(tx,'tasks',{principal_id:id})){
-      const r=task.value.result;if(!r?.observation)continue;
-      const o=resolve(tx,r.observation);
+      const r=task.value.result;if(!r?.observation)continue;const o=resolve(tx,r.observation);
       need(o.value.kind==='runtime_observation'&&o.value.task_id===task.id&&o.value.native_id===r.native_id,'Contributor observation mismatch');
       if(r.native_id)result.natives.add(r.native_id);
     }
@@ -794,7 +800,7 @@ function evidenceAnalysis(tx,budget=semanticBudget(tx)){
     const principal=tx.get('principals',text(id,'identity principal',200));need(principal,'Identity principal missing');
     preparationBudget(tx).retain('principals',principal);
     const natives=new Set(),proofs=[];
-    if(principal.value.native_id!==undefined&&principal.value.native_id!==null)natives.add(text(principal.value.native_id,'current native identity',300));
+    for(const incarnation of membershipAncestors(tx,principal))if(incarnation.value.native_id!==undefined&&incarnation.value.native_id!==null)natives.add(text(incarnation.value.native_id,'current/historical membership native identity',300));
     // Current-owner indexing alone loses transferred-away production. Inspect
     // the complete bounded task-head set, then seal only matching P2 tasks.
     // Private software trackers have no P2 definition/attempt/result and supply
@@ -826,6 +832,61 @@ function evidenceAnalysis(tx,budget=semanticBudget(tx)){
   return {current,currentTask:row=>current(taskSeal(row).declared),historical:historicalWalk,implicatedHomes,reviewSeal,homeSeal,pendingReviewEligible,taskSeal,principalIdentity};
 }
 function lineage(tx,subject){const graph=evidenceAnalysis(tx);graph.current([subject]);return graph.historical([subject]);}
+
+// Private membership composition only. Historical incarnation bindings remain
+// evidence after replacement; a new native cannot erase the old aliases.
+function membershipAncestors(tx,principal){
+  const prep=preparationBudget(tx),rows=[prep.retain('principals',principal)],seen=new Set([canonical(ref('principals',principal))]);let current=principal;
+  while(current.value.membership_previous){
+    const previous=exactReference(current.value.membership_previous),key=canonical(previous);
+    if(previous.family!=='principals'||previous.id!==principal.id||previous.revision>=current.revision||seen.has(key)||rows.length>=MAX_ROWS)hold('LINEAGE_REQUIRED','Invalid membership incarnation history');
+    if(typeof tx.getVersion!=='function')hold('LINEAGE_REQUIRED','Exact membership history reader required');
+    const row=tx.getVersion(previous);
+    if(!row||row.sha256!==previous.sha256||row.revision!==previous.revision||peerDigest(row.value)!==previous.sha256||!Number.isSafeInteger(row.value.generation)||row.value.generation>current.value.generation)hold('LINEAGE_REQUIRED','Membership incarnation history changed');
+    rows.push(prep.retain('principals',row,{historical:true}));seen.add(key);current=row;
+  }
+  return rows;
+}
+
+export function membershipPrincipalAliases(provider,principal_id){
+  const tx=trackedReads(provider),id=text(principal_id,'contributor principal',200),p=tx.get('principals',id);
+  if(!p)hold('LINEAGE_REQUIRED','Contributor principal missing');
+  const natives=new Set();
+  // The shared P2 identity predicate includes transferred-away production and
+  // its complete admission/context/task/effect/raw-output seals. A protocol or
+  // current-owner label alone cannot manufacture or omit a native alias.
+  const facts=evidenceAnalysis(tx).principalIdentity(id);for(const native of facts.native_ids)natives.add(native);
+  const probe=tx.getVersion(ref('principals',p));if(!probe||probe.sha256!==p.sha256||peerDigest(probe.value)!==p.sha256)hold('SOURCE_CHANGED','Owning membership identity snapshot changed');
+  return {principals:[id],natives:[...natives].sort()};
+}
+
+// A read-only projection for the separate pending-membership leaf. It does not
+// activate an actor, invent a task, open a transaction or grant authority. The
+// owning P1 provider must be used before any put. Actual host authentication is
+// a later protected-composition prerequisite, never a request field.
+export function membershipPolicyEvidence(provider,args={}){
+  const input=bounded(args,'membership context request',100000),keys=['principal_id','scope','input_refs','enrollment_id'];
+  if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(k=>!keys.includes(k)))hold('INVALID_INPUT','Closed membership context request required');
+  const principalId=text(input.principal_id,'membership principal',200),enrollmentId=text(input.enrollment_id,'enrollment id',200),scope=scopeOf(input.scope),methods=['get','getVersion','list','count','queryCurrentReviews','resolveLegacy'],view={};
+  for(const method of methods){if(typeof provider?.[method]!=='function')hold('LINEAGE_REQUIRED','Complete owning membership provider required');view[method]=(...values)=>provider[method](...values);}
+  const tx=trackedReads(Object.freeze(view)),c=control(tx),limits=policy(c);legacyOriginHold(c);semanticInputs(tx,input.input_refs??[]);
+  const selected=sources(tx,scope,input.input_refs??[],currentReviewRows(tx));
+  if(selected.membership.conflicts.length)hold('CONTEXT_CONFLICT','Applicable reconstruction conflict');
+  const graph=evidenceAnalysis(tx),references=selected.sources.map(({family,id,revision,sha256})=>({family,id,revision,sha256}));
+  const contributors=references.length?graph.historical(references):{principals:[],natives:[]};
+  const normalizedGrant=row=>{const {used_model_calls,...value}=row.value;return {id:row.id,value};};
+  const usage=id=>{const row=tx.get('control',id),{model_calls,...value}=row?.value??{};return {id,value};};
+  const owned=(family,status)=>all(tx,family,{principal_id:principalId,status}).filter(row=>!(row.value.kind==='membership_execution'&&row.value.membership_id===enrollmentId));
+  const body={protocol:'peer-membership-context-v1',control:{id:c.id,value:copy(c.value)},resources:tx.get('control','resources'),scope,
+    active_principals:all(tx,'principals',{status:'active'}),
+    grants:all(tx,'grants',{status:'active'}).filter(row=>['*','unknown',scope].includes(row.value.scope)).map(normalizedGrant),
+    usage_metadata:{global:usage('usage'),principal:usage(`usage:${principalId}`)},
+    ...selected,owned_work:owned('tasks',['planned','pending','running','unknown','quarantined','failed','cancelled']),
+    owned_reservations:{slots:owned('slots',['active','unknown']),effects:owned('effects',['reserved','sent','unknown']),claims:owned('claims','held')},contributors};
+  const encoded=canonical(body),utf8_bytes=Buffer.byteLength(encoded);if(utf8_bytes>limits.max_context_bytes)hold('CONTEXT_CAPACITY','Complete reconstruction context exceeds existing policy');
+  const probe=tx.getVersion(ref('control',c));if(!probe||probe.sha256!==c.sha256||peerDigest(probe.value)!==c.sha256)hold('SOURCE_CHANGED','Owning reconstruction snapshot changed');
+  return {body,text:encoded,sha256:digest(encoded),utf8_bytes,contributors};
+}
 
 // Trusted host composition only, not a model tool or authentication interface.
 // Use the existing owning P1 snapshot BEFORE any put. This function opens no
@@ -955,15 +1016,37 @@ function command(tx,actor,action,args,protectedCall){
   if(prior){if(prior.value.request_sha256!==hash)hold('REPLAY_MISMATCH','Operation already names a different request');return copy(prior.value.result);}
   const principal=member(tx,actor),c=control(tx);policy(c);const result=mutate(tx,actor,principal,c,action,args,protectedCall);tx.put('commands',id,{principal_id:actor.principal_id,operation_id:operation,action,request_sha256:hash,result:bounded(result,'receipt',800000),created_at:now()},0);return result;
 }
-function run(ledger,actor,action,args,protectedCall){
+function run(ledger,actor,action,args,protectedCall,binding=null){
   // Validate before reading fields; accessors, custom prototypes, undefined,
   // symbols, sparse arrays, nonfinite numbers and lossy values fail as in P1.
   const a=copy(actor),input=bounded(args,'request',1000000);text(action,'action',100);
   if(scopeInputActions.has(action))scopeOf(input.scope);
   if(observationActions.has(action)&&!protectedCall)hold('OBSERVER_REQUIRED','Observation actions require the separate trusted host interface');
-  return plannedWrite(ledger,action,a.principal_id,tx=>{member(tx,a);return command(tx,a,action,input,protectedCall);});
+  return plannedWrite(ledger,action,a.principal_id,tx=>{const p=member(tx,a);if(binding)checkBoundPrincipal(p,binding);else if(p.value.membership_qualification)hold('BOUND_CONNECTION_REQUIRED','Managed principal requires a protected bound connection');return command(tx,a,action,input,protectedCall);});
 }
 export function execute(ledger,actor,action,args={}){return run(ledger,actor,action,args,false);}
+
+function checkBoundPrincipal(principal,binding){
+  if(principal.id!==binding.principal_id||principal.value.generation!==binding.generation||principal.value.native_id!==binding.native_id||!['cos','reviewer','specialist'].includes(principal.value.kind))hold('PRINCIPAL_CHANGED','Protected principal incarnation changed');
+}
+// Trusted factory, never a model tool. Authentication must already have bound
+// this connection outside model arguments. Generation checks occur in the SAME
+// P1 transaction/snapshot as command/replay/inspection, not a broker pre-read.
+export function bindPeerPrincipal(ledger,binding){
+  const b=copy(binding);
+  if(!b||typeof b!=='object'||Array.isArray(b)||Object.keys(b).sort().join(',')!=='generation,native_id,principal_id'||!Number.isSafeInteger(b.generation)||b.generation<1)hold('AUTHENTICATION_REQUIRED','Closed protected principal binding required');
+  text(b.principal_id,'bound principal',200);text(b.native_id,'bound native identity',300);
+  const company=ledger.company_id,root=ledger.root,actor={principal_id:b.principal_id};
+  ledger.read(tx=>checkBoundPrincipal(member(tx,actor),b));
+  const input=args=>{
+    if(ledger.company_id!==company||ledger.root!==root)hold('AUTHENTICATION_REQUIRED','Protected company connection changed');
+    const value=bounded(args,'bound request',1000000);
+    if(!value||typeof value!=='object'||Array.isArray(value))hold('INVALID_INPUT','Bound request object required');
+    for(const key of ['root','company_id','actor','principal_id','session_id','generation','native_id','thread_id','turn_id','attempt_id','incarnation','runtime_observer','observer_capability'])if(Object.hasOwn(value,key))hold('ACTOR_ARGUMENT','Identity cannot come from model arguments');
+    return value;
+  };
+  return Object.freeze({execute:(action,args={})=>run(ledger,actor,action,input(args),false,b),inspect:(action,args={})=>inspectBound(ledger,actor,action,input(args),b)});
+}
 export function createRuntimeObserver(ledger,{principal_id='scheduler'}={}){
   // Host-owned capability by reachability. Do not export this factory through
   // tool dispatch. Calling it is not native qualification or authentication.
@@ -977,7 +1060,7 @@ function mutate(tx,actor,principal,c,action,args,protectedCall){
     if(old)hold('GRANT_EXISTS','Create a new grant');member(tx,{principal_id:args.to_principal_id});if(!Array.isArray(args.actions)||!args.actions.length||args.actions.length>100||args.actions.some(a=>typeof a!=='string'||!a||a.length>100)||!Number.isFinite(Date.parse(args.expires_at))||Date.parse(args.expires_at)<=Date.now()||args.max_model_calls!==undefined&&(!Number.isSafeInteger(args.max_model_calls)||args.max_model_calls<1))hold('GRANT_INVALID','Bounded grant policy required');
     return tx.put('grants',id,{principal_id:args.to_principal_id,status:'active',generation:1,policy_generation:c.value.policy_generation,scope:scopeOf(args.scope),actions:[...new Set(args.actions)].sort(),resources:canonicalResources(tx,args.resources),expires_at:args.expires_at,source_instruction:text(args.source_instruction,'source instruction',4000),max_model_calls:Math.min(args.max_model_calls??policy(c).max_model_calls,policy(c).max_model_calls),used_model_calls:0},0);
   }
-  if(['company/pause','company/resume'].includes(action)){if(!founder(c,principal))hold('FOUNDER_REQUIRED','Founder control required');text(args.source_instruction,'source instruction',4000);return tx.put('control','company',{...c.value,paused:action==='company/pause',pause_generation:c.value.pause_generation+1},c.revision);}
+  if(['company/pause','company/resume'].includes(action)){if(!founder(c,principal))hold('FOUNDER_REQUIRED','Founder control required');text(args.source_instruction,'source instruction',4000);if(action==='company/resume')legacyOriginHold(c);return tx.put('control','company',{...c.value,paused:action==='company/pause',pause_generation:c.value.pause_generation+1},c.revision);}
   if(action==='task/submit'){
     const scope=scopeOf(args.scope),resources=canonicalResources(tx,args.resources),auth=authorize(tx,actor,action,{...args,scope,resources}),p=policy(c);
     if(count(tx,'tasks',{status:['planned','pending']})>=p.queue_limit||count(tx,'tasks',{status:['planned','pending'],principal_id:principal.id})>=p.principal_queue_limit)hold('QUEUE_CAPACITY','Queue full');
@@ -987,7 +1070,7 @@ function mutate(tx,actor,principal,c,action,args,protectedCall){
     return tx.put('tasks',id,{...definition,definition,status:'planned',definition_revision:1,definition_sha256:digest(definition),attempt:null,principal_id:principal.id,created_at:now()},0);
   }
   if(action==='task/admit'){
-    if(!trusted(principal))hold('SCHEDULER_REQUIRED','Runtime admission required');const status=runtimeStatus(tx);if(status.paused)return {admitted:false,code:'PAUSED',reason:'Company paused'};if(!status.available_slots)return {admitted:false,code:'CAPACITY_BUSY',reason:'Active or uncertain execution holds capacity'};
+    if(!trusted(principal))hold('SCHEDULER_REQUIRED','Runtime admission required');legacyOriginHold(c);const status=runtimeStatus(tx);if(status.paused)return {admitted:false,code:'PAUSED',reason:'Company paused'};if(!status.available_slots)return {admitted:false,code:'CAPACITY_BUSY',reason:'Active or uncertain execution holds capacity'};
     const task=peek(tx,args);if(!task)return {admitted:false,code:'NO_WORK',reason:'No unexcluded pending work'};if(args.task_id&&args.task_id!==task.id)return {admitted:false,code:'FAIRNESS_CHANGED',reason:'Selection changed'};const t=task.value;
     // Expected admission holds must occur before planning resource mutations.
     let auth,context,usage,principalUsage,used,usedPrincipal;
@@ -1008,7 +1091,7 @@ function mutate(tx,actor,principal,c,action,args,protectedCall){
   }
   if(action.startsWith('task/')){
     const task=tx.get('tasks',text(args.task_id,'task_id',200));if(!task)hold('TASK_MISSING','Missing task');const t=task.value;
-    if(action==='task/claim'){taskAuthority(tx,actor,task,action);if(c.value.paused)hold('PAUSED','Company paused');if(t.attempt||!['planned','pending'].includes(t.status))hold('ATTEMPT_CONSUMED','Task is not unattempted');claimResources(tx,task);return tx.put('tasks',task.id,{...t,status:'pending'},task.revision);}
+    if(action==='task/claim'){taskAuthority(tx,actor,task,action);legacyOriginHold(c);if(c.value.paused)hold('PAUSED','Company paused');if(t.attempt||!['planned','pending'].includes(t.status))hold('ATTEMPT_CONSUMED','Task is not unattempted');claimResources(tx,task);return tx.put('tasks',task.id,{...t,status:'pending'},task.revision);}
     if(action==='task/transfer'){
       taskAuthority(tx,actor,task,action);const to=member(tx,{principal_id:args.to_principal_id}),auth=authorize(tx,{principal_id:to.id},'task/submit',{grant_id:args.to_grant_id,scope:t.scope,resources:t.resources}),claims=all(tx,'claims',{task_id:task.id,status:'held'});
       const result=tx.put('tasks',task.id,{...t,owner_principal_id:to.id,principal_id:to.id,grant_id:auth.grant?.id??null,grant_generation:auth.grant?.value.generation??null,transfers:[...(t.transfers??[]),{from:t.owner_principal_id,to:to.id,at:now(),attempt_id:t.attempt?.id??null}]},task.revision);for(const claim of claims)tx.put('claims',claim.id,{...claim.value,principal_id:to.id},claim.revision);return result;
@@ -1083,5 +1166,8 @@ function mutate(tx,actor,principal,c,action,args,protectedCall){
   hold('ACTION_UNKNOWN','Unsupported peer action');
 }
 export function inspect(ledger,actor,action,args={}){
-  const a=copy(actor),input=bounded(args,'inspection',1000000);return ledger.read(tx=>{const p=member(tx,a),c=control(tx);policy(c);if(action==='runtime/status')return runtimeStatus(tx);if(action==='task/peek'){if(!trusted(p))hold('SCHEDULER_REQUIRED','Runtime selection required');const task=peek(tx,input);return {task,host:task?tx.get('principals',task.value.owner_principal_id)?.value.host??'codex':null,traversal:{matching_row_limit:MAX_ROWS,exclusion_limit:MAX_ROWS,fairness_advances_on_admission:true}};}if(action==='task/context')return buildContext(tx,a,tx.get('tasks',text(input.task_id,'task id',200)));if(action==='task/get'){const task=tx.get('tasks',text(input.task_id,'task id',200));if(task&&task.value.owner_principal_id!==p.id&&!trusted(p)&&!founder(c,p))hold('TASK_OWNER','Task owner required');return task;}if(action==='list'){if(!['tasks','homes','proposals','conflicts','notices','messages','grants','claims','effects'].includes(input.family))hold('FAMILY_INVALID','Inspectable family required');return tx.list(input.family,{limit:Math.min(input.limit??20,100),cursor:input.cursor,status:input.status,...(founder(c,p)||trusted(p)?{}:{principal_id:p.id}),...(input.scope?{scope:input.scope}:{})});}hold('ACTION_UNKNOWN','Unsupported inspection');});
+  return inspectBound(ledger,actor,action,args);
+}
+function inspectBound(ledger,actor,action,args={},binding=null){
+  const a=copy(actor),input=bounded(args,'inspection',1000000);return ledger.read(tx=>{const p=member(tx,a),c=control(tx);if(binding)checkBoundPrincipal(p,binding);else if(p.value.membership_qualification)hold('BOUND_CONNECTION_REQUIRED','Managed principal requires a protected bound connection');policy(c);if(action==='runtime/status')return runtimeStatus(tx);if(action==='task/peek'){if(!trusted(p))hold('SCHEDULER_REQUIRED','Runtime selection required');const task=peek(tx,input);return {task,host:task?tx.get('principals',task.value.owner_principal_id)?.value.host??'codex':null,traversal:{matching_row_limit:MAX_ROWS,exclusion_limit:MAX_ROWS,fairness_advances_on_admission:true}};}if(action==='task/context')return buildContext(tx,a,tx.get('tasks',text(input.task_id,'task id',200)));if(action==='task/get'){const task=tx.get('tasks',text(input.task_id,'task id',200));if(task&&task.value.owner_principal_id!==p.id&&!trusted(p)&&!founder(c,p))hold('TASK_OWNER','Task owner required');return task;}if(action==='list'){if(!['tasks','homes','proposals','conflicts','notices','messages','grants','claims','effects'].includes(input.family))hold('FAMILY_INVALID','Inspectable family required');return tx.list(input.family,{limit:Math.min(input.limit??20,100),cursor:input.cursor,status:input.status,...(founder(c,p)||trusted(p)?{}:{principal_id:p.id}),...(input.scope?{scope:input.scope}:{})});}hold('ACTION_UNKNOWN','Unsupported inspection');});
 }
