@@ -123,6 +123,8 @@ function rejectedNegative(state,subject){
   }
   if(typeof raw!=='string')return true;
   let parsed;try{parsed=JSON.parse(raw.trim().replace(/^```(?:json)?\s*/,'').replace(/\s*```$/,''));}catch{return true;}
+  if(!object(parsed?.review)||!['Pass','Fail','Blocked'].includes(parsed.review.verdict)||!text(parsed.review.reason))return true;
+  if(parsed.review.verdict==='Pass'&&parsed.review.blockers!==undefined&&(!Array.isArray(parsed.review.blockers)||parsed.review.blockers.length))return true;
   if([parsed?.review?.verdict,parsed?.qualification_result?.verdict].some(v=>['Fail','Blocked'].includes(v)))return true;
  }
  return false;
