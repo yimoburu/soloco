@@ -30,7 +30,139 @@ COMPILED_SOURCE_SCHEMA = "soloco-compiled-native-inputs-v1"
 MAX_COMPILED_MANIFEST_BYTES = 16 * 1024 * 1024
 TOP = {"schema", "status", "upstream", "source_cut", "overlay", "cargo_lock", "toolchain", "build", "qualified_binary", "runtime_integration"}
 CACHE_METADATA = (".package-cache", ".package-cache-mutate", ".global-cache", ".global-cache-shm", ".global-cache-wal", ".global-cache-journal")
-SYSTEM_READ_ROOTS = ("/System/Library", "/System/iOSSupport/System/Library", "/usr/lib", "/usr/share", "/usr/bin", "/bin", "/sbin", "/Library/Developer/CommandLineTools", "/Applications/Xcode.app/Contents/Developer", "/private/var/db/dyld")
+SYSTEM_READ_ROOTS = ("/System/Library", "/System/iOSSupport/System/Library", "/usr/lib", "/usr/share", "/usr/bin", "/bin", "/sbin", "/private/var/db/dyld")
+
+SELECTED_XCODE = Path('/Applications/Xcode-26.3.0.app/Contents/Developer')
+SELECTED_TOOLCHAIN = SELECTED_XCODE / "Toolchains/XcodeDefault.xctoolchain"
+SELECTED_SDK = SELECTED_XCODE / "Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
+SELECTED_CLANG = SELECTED_TOOLCHAIN / "usr/bin/clang"
+SELECTED_LINK = Path("/private/var/db/xcode_select_link")
+# Qualified user-owned build input, NOT root-owned OS trust. /Applications is
+# the explicitly observed root:admin0775 ancestor, mutable by host administrators.
+SELECTED_SDK_DIRS = [{'path': '/Applications', 'uid': 0, 'gid': 80, 'mode': '0o775'},
+ {'path': '/Applications/Xcode-26.3.0.app', 'uid': 502, 'gid': 20, 'mode': '0o755'},
+ {'path': '/Applications/Xcode-26.3.0.app/Contents', 'uid': 502, 'gid': 20, 'mode': '0o755'},
+ {'path': '/Applications/Xcode-26.3.0.app/Contents/Developer', 'uid': 502, 'gid': 20, 'mode': '0o755'},
+ {'path': '/Applications/Xcode-26.3.0.app/Contents/Developer/Toolchains',
+  'uid': 502,
+  'gid': 20,
+  'mode': '0o755'},
+ {'path': '/Applications/Xcode-26.3.0.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain',
+  'uid': 502,
+  'gid': 20,
+  'mode': '0o755'},
+ {'path': '/Applications/Xcode-26.3.0.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr',
+  'uid': 502,
+  'gid': 20,
+  'mode': '0o755'},
+ {'path': '/Applications/Xcode-26.3.0.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin',
+  'uid': 502,
+  'gid': 20,
+  'mode': '0o755'},
+ {'path': '/Applications/Xcode-26.3.0.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib',
+  'uid': 502,
+  'gid': 20,
+  'mode': '0o755'},
+ {'path': '/Applications/Xcode-26.3.0.app/Contents/Developer/usr',
+  'uid': 502,
+  'gid': 20,
+  'mode': '0o755'},
+ {'path': '/Applications/Xcode-26.3.0.app/Contents/Developer/usr/lib',
+  'uid': 502,
+  'gid': 20,
+  'mode': '0o755'},
+ {'path': '/Applications/Xcode-26.3.0.app/Contents/Developer/usr/share',
+  'uid': 502,
+  'gid': 20,
+  'mode': '0o755'},
+ {'path': '/Applications/Xcode-26.3.0.app/Contents/Developer/Platforms',
+  'uid': 502,
+  'gid': 20,
+  'mode': '0o755'},
+ {'path': '/Applications/Xcode-26.3.0.app/Contents/Developer/Platforms/MacOSX.platform',
+  'uid': 502,
+  'gid': 20,
+  'mode': '0o755'},
+ {'path': '/Applications/Xcode-26.3.0.app/Contents/Developer/Platforms/MacOSX.platform/Developer',
+  'uid': 502,
+  'gid': 20,
+  'mode': '0o755'},
+ {'path': '/Applications/Xcode-26.3.0.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs',
+  'uid': 502,
+  'gid': 20,
+  'mode': '0o755'},
+ {'path': '/Applications/Xcode-26.3.0.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk',
+  'uid': 502,
+  'gid': 20,
+  'mode': '0o755'}]
+SELECTED_SDK_PINS = [{'path': '/Applications/Xcode-26.3.0.app/Contents/Info.plist',
+  'bytes': 32909,
+  'sha256': 'efa845c252a042614fd125371903f6cace479d39cb0a6127d5598c8c2ff505bd',
+  'uid': 502,
+  'gid': 20,
+  'mode': '0o644'},
+ {'path': '/Applications/Xcode-26.3.0.app/Contents/version.plist',
+  'bytes': 523,
+  'sha256': '79504c54fc47124dbc5945b628d9c9071923a57c0cd109ff5afdd7884c1c889c',
+  'uid': 502,
+  'gid': 20,
+  'mode': '0o644'},
+ {'path': '/Applications/Xcode-26.3.0.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/ToolchainInfo.plist',
+  'bytes': 95,
+  'sha256': 'b2e3b746c87ddfd6d2145656d87569054807e2196d6f46ef09dec3923ed31541',
+  'uid': 502,
+  'gid': 20,
+  'mode': '0o644'},
+ {'path': '/Applications/Xcode-26.3.0.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang',
+  'bytes': 132016384,
+  'sha256': 'c9126cf1970fb63c344ecc7b2cde016d0d4c125e07d2d74d0c0b4edaf853e65a',
+  'uid': 502,
+  'gid': 20,
+  'mode': '0o755'},
+ {'path': '/Applications/Xcode-26.3.0.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld',
+  'bytes': 2192304,
+  'sha256': '3f4c03061fd7d1e895413133794632131c962c3df56266913741eb0733335166',
+  'uid': 502,
+  'gid': 20,
+  'mode': '0o755'},
+ {'path': '/Applications/Xcode-26.3.0.app/Contents/Developer/usr/lib/libxcrun.dylib',
+  'bytes': 292080,
+  'sha256': '99669d600d1b18e89e190a6e88283a9d5f468036c374b6ef270845a38066593d',
+  'uid': 502,
+  'gid': 20,
+  'mode': '0o755'},
+ {'path': '/Applications/Xcode-26.3.0.app/Contents/Developer/Platforms/MacOSX.platform/Info.plist',
+  'bytes': 1205,
+  'sha256': '87e75a890876356f4f791b127cb784249508c7a7573a95b73423670cd3eb90e9',
+  'uid': 502,
+  'gid': 20,
+  'mode': '0o644'},
+ {'path': '/Applications/Xcode-26.3.0.app/Contents/Developer/Platforms/MacOSX.platform/version.plist',
+  'bytes': 523,
+  'sha256': 'a0f85b545ea6cc2b3c5af1ea2ad7450f3d6f3b110fafbebea87bd706fcb3ee5c',
+  'uid': 502,
+  'gid': 20,
+  'mode': '0o644'},
+ {'path': '/Applications/Xcode-26.3.0.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/SDKSettings.json',
+  'bytes': 7627,
+  'sha256': '95882a9cea02396e76f3e406a5728269b2a1a11bcd241430a84c9e63d09a6cd3',
+  'uid': 502,
+  'gid': 20,
+  'mode': '0o644'},
+ {'path': '/Applications/Xcode-26.3.0.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/SDKSettings.plist',
+  'bytes': 5346,
+  'sha256': '03cb7d21a91023f6dff9ea019a3710061e2eb570bdb260faf4daa74151abf15d',
+  'uid': 502,
+  'gid': 20,
+  'mode': '0o644'},
+ {'path': '/Applications/Xcode-26.3.0.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/CoreServices/SystemVersion.plist',
+  'bytes': 599,
+  'sha256': 'bbee56e8dec30b911827919becab1004954b2fd415b0971cc1b126479b0d77a0',
+  'uid': 502,
+  'gid': 20,
+  'mode': '0o444'}]
+SELECTED_SDK_READ_ROOTS = (SELECTED_TOOLCHAIN, SELECTED_SDK, SELECTED_XCODE / "usr/lib", SELECTED_XCODE / "usr/share")
+SELECTED_SDK_METADATA_READS = (SELECTED_XCODE.parent / "Info.plist", SELECTED_XCODE.parent / "version.plist", SELECTED_XCODE / "Platforms/MacOSX.platform/Info.plist", SELECTED_XCODE / "Platforms/MacOSX.platform/version.plist")
 
 SYSCTL_READ_RULE = '(allow sysctl-read\n  (sysctl-name "hw.activecpu")\n  (sysctl-name "hw.busfrequency_compat")\n  (sysctl-name "hw.byteorder")\n  (sysctl-name "hw.cacheconfig")\n  (sysctl-name "hw.cachelinesize_compat")\n  (sysctl-name "hw.cpufamily")\n  (sysctl-name "hw.cpufrequency_compat")\n  (sysctl-name "hw.cputype")\n  (sysctl-name "hw.l1dcachesize_compat")\n  (sysctl-name "hw.l1icachesize_compat")\n  (sysctl-name "hw.l2cachesize_compat")\n  (sysctl-name "hw.l3cachesize_compat")\n  (sysctl-name "hw.logicalcpu_max")\n  (sysctl-name "hw.machine")\n  (sysctl-name "hw.model")\n  (sysctl-name "hw.memsize")\n  (sysctl-name "hw.ncpu")\n  (sysctl-name "hw.nperflevels")\n  ; Chrome locks these CPU feature detection down a bit more tightly,\n  ; but mostly for fingerprinting concerns which isn\'t an issue for codex.\n  (sysctl-name-prefix "hw.optional.arm.")\n  (sysctl-name-prefix "hw.optional.armv8_")\n  (sysctl-name "hw.packages")\n  (sysctl-name "hw.pagesize_compat")\n  (sysctl-name "hw.pagesize")\n  (sysctl-name "hw.physicalcpu")\n  (sysctl-name "hw.physicalcpu_max")\n  (sysctl-name "hw.logicalcpu")\n  (sysctl-name "hw.cpufrequency")\n  (sysctl-name "hw.tbfrequency_compat")\n  (sysctl-name "hw.vectorunit")\n  (sysctl-name "machdep.cpu.brand_string")\n  (sysctl-name "kern.argmax")\n  (sysctl-name "kern.hostname")\n  (sysctl-name "kern.maxfilesperproc")\n  (sysctl-name "kern.maxproc")\n  (sysctl-name "kern.osproductversion")\n  (sysctl-name "kern.osrelease")\n  (sysctl-name "kern.ostype")\n  (sysctl-name "kern.osvariant_status")\n  (sysctl-name "kern.osversion")\n  (sysctl-name "kern.secure_kernel")\n  ; Python\'s ProcessPoolExecutor queries this through sysconf(_SC_SEM_NSEMS_MAX).\n  (sysctl-name "kern.sysv.semmns")\n  (sysctl-name "kern.usrstack64")\n  (sysctl-name "kern.version")\n  (sysctl-name "sysctl.proc_cputype")\n  (sysctl-name "vm.loadavg")\n  (sysctl-name-prefix "hw.perflevel")\n  (sysctl-name-prefix "kern.proc.pgrp.")\n  (sysctl-name-prefix "kern.proc.pid.")\n  (sysctl-name-prefix "net.routetable.")\n)\n'
 
@@ -311,6 +443,47 @@ def validate_openssl_config():
     return path
 
 
+def selected_sdk_metadata(info, expected, directory=False):
+    kind = stat.S_ISDIR(info.st_mode) if directory else stat.S_ISREG(info.st_mode)
+    need(kind and info.st_uid == expected["uid"] and info.st_gid == expected["gid"] and stat.S_IMODE(info.st_mode) == int(expected["mode"], 8), "selected SDK ownership/type/mode changed")
+    return {"uid": info.st_uid, "gid": info.st_gid, "mode": oct(stat.S_IMODE(info.st_mode)), "dev": info.st_dev, "ino": info.st_ino}
+
+
+def selected_sdk_file_pin(expected):
+    path = regular(Path(expected["path"]))
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    try:
+        before = os.fstat(fd)
+        metadata = selected_sdk_metadata(before, expected)
+        need(before.st_nlink == 1 and before.st_size == expected["bytes"], "selected SDK file metadata changed")
+        digest = hashlib.sha256()
+        remaining = expected["bytes"]
+        while remaining:
+            data = os.read(fd, min(1024 * 1024, remaining))
+            need(data, "selected SDK file shortened")
+            digest.update(data)
+            remaining -= len(data)
+        need(not os.read(fd, 1), "selected SDK file grew")
+        after, current = os.fstat(fd), path.lstat()
+        need(all(getattr(before, key) == getattr(after, key) == getattr(current, key) for key in ("st_dev", "st_ino", "st_size", "st_mtime_ns", "st_ctime_ns", "st_mode", "st_uid", "st_gid", "st_nlink")), "selected SDK file changed during verification")
+        need(digest.hexdigest() == expected["sha256"], "selected SDK file hash changed; source review required")
+    finally:
+        os.close(fd)
+    return {"path": str(path), "bytes": expected["bytes"], "sha256": expected["sha256"], **metadata}
+
+
+def validate_selected_sdk():
+    link = SELECTED_LINK.lstat()
+    need(stat.S_ISLNK(link.st_mode) and link.st_uid == 0 and link.st_gid == 0 and os.readlink(SELECTED_LINK) == str(SELECTED_XCODE) and SELECTED_LINK.resolve() == SELECTED_XCODE, "unsupported selected Xcode; no SDK substitution permitted")
+    directories = []
+    for expected in SELECTED_SDK_DIRS:
+        path = no_links(Path(expected["path"]))
+        need(path.resolve() == path, "selected SDK path alias refused")
+        directories.append({"path": str(path), **selected_sdk_metadata(path.lstat(), expected, directory=True)})
+    files = [selected_sdk_file_pin(expected) for expected in SELECTED_SDK_PINS]
+    return {"schema": "soloco-selected-private-Xcode-input-v1", "developer_dir": str(SELECTED_XCODE), "sdk_root": str(SELECTED_SDK), "compiler": str(SELECTED_CLANG), "Xcode_version": "26.3", "Xcode_build": "17C529", "macOS_SDK_version": "26.2", "macOS_SDK_build": "25C58", "selection_link": {"path": str(SELECTED_LINK), "target": str(SELECTED_XCODE), "uid": link.st_uid, "gid": link.st_gid, "dev": link.st_dev, "ino": link.st_ino}, "directories": directories, "files": files, "trust_boundary": "UID502 user-owned exact selected input; root:admin0775 Applications ancestor remains administrator-mutable. Full SDK headers/resources are not all byte-pinned. Not hostile-host atomicity or byte-identical reproducibility."}
+
+
 def build_domain(source, prefix, cache, output):
     roots = [no_links(p) for p in (source, prefix, cache, output)]
     for index, left in enumerate(roots):
@@ -318,8 +491,11 @@ def build_domain(source, prefix, cache, output):
         for right in roots[index + 1:]:
             need(not paths_overlap(left, right), "build inputs/output must be disjoint")
     source, prefix, cache, output = roots
+    for private in roots:
+        need(not paths_overlap(private, SELECTED_XCODE.parent.parent), "private build input/output overlaps selected Xcode")
     openssl_config = validate_openssl_config()
-    reads = [source, prefix, cache, output, *map(Path, SYSTEM_READ_ROOTS)]
+    validate_selected_sdk()
+    reads = [source, prefix, cache, output, *map(Path, SYSTEM_READ_ROOTS), *SELECTED_SDK_READ_ROOTS]
     # Source-generated positive read/write sets. No ambient home, arbitrary
     # profile text, credentials, caller ready flag or direct-Cargo fallback.
     profile = "(version 1)\n(deny default)\n(deny network*)\n"
@@ -328,13 +504,16 @@ def build_domain(source, prefix, cache, output):
     profile += "(allow signal (target same-sandbox))\n"
     profile += "(allow file-read-metadata)\n"
     profile += "(allow file-read-data (literal " + sb_string(openssl_config) + "))\n"
+    profile += "(allow file-read-data " + " ".join("(literal " + sb_string(p) + ")" for p in SELECTED_SDK_METADATA_READS) + ")\n"
     profile += '(allow file-read* file-test-existence (literal "/"))\n'
-    profile += "(allow file-map-executable (subpath "+sb_string(prefix)+") (subpath "+sb_string(output)+') (subpath "/usr/lib"))\n'
+    profile += "(allow file-map-executable (subpath "+sb_string(prefix)+") (subpath "+sb_string(output)+') (subpath "/usr/lib") (subpath '+sb_string(SELECTED_TOOLCHAIN)+") (subpath "+sb_string(SELECTED_XCODE / "usr/lib")+"))\n"
     profile += "(allow file-read* file-test-existence " + " ".join("(subpath " + sb_string(p) + ")" for p in reads) + " (literal \"/dev/null\") (literal \"/dev/random\") (literal \"/dev/urandom\"))\n"
     profile += "(allow file-write* (subpath " + sb_string(output) + ") " + " ".join("(literal " + sb_string(cache / name) + ")" for name in CACHE_METADATA) + " (literal \"/dev/null\"))\n"
     profile += "(allow mach-lookup (global-name \"com.apple.system.logger\"))\n"
     env = {
-        "PATH": str(prefix / "bin") + ":/usr/bin:/bin:/usr/sbin:/sbin", "LANG": "C", "LC_ALL": "C",
+        "PATH": str(prefix / "bin") + ":" + str(SELECTED_TOOLCHAIN / "usr/bin") + ":/usr/bin:/bin:/usr/sbin:/sbin", "LANG": "C", "LC_ALL": "C",
+        "DEVELOPER_DIR": str(SELECTED_XCODE), "SDKROOT": str(SELECTED_SDK),
+        "CC": str(SELECTED_CLANG), "CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER": str(SELECTED_CLANG),
         "CARGO_HOME": str(cache), "CARGO_TARGET_DIR": str(output / "target"),
         "RUSTC": str(prefix / "bin/rustc"), "RUSTDOC": str(prefix / "bin/rustdoc"),
         "TMPDIR": str(output / "tmp"), "TMP": str(output / "tmp"), "TEMP": str(output / "tmp"),
@@ -393,6 +572,7 @@ def build(args):
     output = fresh_directory(args.output, (root, prepared, prefix, cache))
     need(1 <= args.timeout <= 1200, "source build timeout must be 1..1200 seconds")
     argv, env, profile = build_domain(source, prefix, cache, output)
+    selected_sdk = validate_selected_sdk()
     compiled_manifest_bytes = compiled_source_manifest_bytes(expected)
     output.mkdir(mode=0o700)
     (output / "tmp").mkdir()
@@ -404,7 +584,7 @@ def build(args):
     # Never inherit a caller association, guessed input digest or output hash.
     env["SOLOCO_SOURCE_MANIFEST_SHA256"] = source_association["sha256"]
     (output / "build-domain.sb").write_text(profile)
-    write_json(output / "plan.json", {"argv": argv, "environment": env, "manifest_sha256": MANIFEST_SHA256, "timeout_seconds": args.timeout, "build_domain_sha256": sha(profile.encode()), "network_containment": "required source-generated macOS Seatbelt network denial; source/toolchain read-only; exact output/cache-metadata writes", "system_openssl_config": {"path": str(OPENSSL_CONFIG), "bytes": OPENSSL_CONFIG_BYTES, "sha256": OPENSSL_CONFIG_SHA256}, "compiled_source_manifest": source_association, "native_qualified": False})
+    write_json(output / "plan.json", {"argv": argv, "environment": env, "manifest_sha256": MANIFEST_SHA256, "timeout_seconds": args.timeout, "build_domain_sha256": sha(profile.encode()), "network_containment": "required source-generated macOS Seatbelt network denial; source/toolchain read-only; exact output/cache-metadata writes", "system_openssl_config": {"path": str(OPENSSL_CONFIG), "bytes": OPENSSL_CONFIG_BYTES, "sha256": OPENSSL_CONFIG_SHA256}, "compiled_source_manifest": source_association, "selected_sdk": selected_sdk, "native_qualified": False})
     started = time.monotonic()
     state, result = "failed", None
     with (output / "stdout.log").open("xb") as stdout, (output / "stderr.log").open("xb") as stderr:
@@ -419,11 +599,12 @@ def build(args):
                 pass
             result = process.wait(timeout=5)
             state = "timeout-held"
-    receipt = {"schema": "soloco-native-source-build-receipt-v1", "status": state, "manifest_sha256": MANIFEST_SHA256, "exit_code": result, "elapsed_seconds": time.monotonic() - started, "compiled_source_manifest": source_association, "binary": None, "native_qualified": False, "source_slot_populated": False, "descendant_or_remote_closure": "not established"}
+    receipt = {"schema": "soloco-native-source-build-receipt-v1", "status": state, "manifest_sha256": MANIFEST_SHA256, "exit_code": result, "elapsed_seconds": time.monotonic() - started, "compiled_source_manifest": source_association, "selected_sdk": selected_sdk, "binary": None, "native_qualified": False, "source_slot_populated": False, "descendant_or_remote_closure": "not established"}
     try:
         need(sha(regular(args.manifest).read_bytes()) == MANIFEST_SHA256, "source-owned manifest changed during build")
         need(verify_compiled_source_manifest(compiled_manifest_path, compiled_manifest_bytes) == source_association, "compiled-source association changed during build")
         validate_openssl_config()
+        need(validate_selected_sdk() == selected_sdk, "selected SDK changed during build")
         verify_complete_files(source, expected)
         verify_complete_files(prefix, toolchain, max_bytes=MAX_TOOLCHAIN_BYTES)
         if state == "compiled-source-only":

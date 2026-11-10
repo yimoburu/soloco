@@ -191,3 +191,35 @@ complete-inventory generation, changed inputs/artifacts, retained final binding
 and caller environment/CLI rejection. Successful compiler returns and output
 bytes in these tests are explicit temporary mocks; no compiler or OS child is
 executed and no genuine compilation receipt is produced.
+
+
+## Selected Xcode environment (V7)
+
+V7 supports the observed selected Xcode 26.3 build17C529 at
+`/Applications/Xcode-26.3.0.app/Contents/Developer`, its canonical macOS26.2
+SDK build25C58 and exact clang/linker/libxcrun and version metadata pins.
+This is a **UID502 user-owned private build input**, not root-owned system trust.
+Its source-fixed directory ownership and modes are checked honestly, including
+`/Applications` as root:admin0775. Administrators and the input owner can change
+that host namespace; no hostile-ancestor atomicity is claimed. No ownership,
+installation, SDK selection or host configuration is changed.
+
+The root-owned original selection link must still name that exact developer
+root. Source code fixes `DEVELOPER_DIR`, `SDKROOT`, `CC` and the Rust target
+linker; inherited overrides cannot select another compiler or SDK. No CLT or
+unversioned Xcode fallback read grant remains. Reads cover only the selected
+compiler toolchain, canonical SDK, developer usr/lib and usr/share plus four
+literal version metadata files. Executable mapping adds only the selected
+toolchain and developer usr/lib. Network remains denied and the SDK receives
+no write grant. Unsupported paths, ownership/mode changes, altered selection
+or changed pinned bytes hold before output/spawn.
+
+Plan and receipt retain the selected environment, actual compiler/linker and
+SDK/version metadata file hashes and directory identities; the tool rechecks
+those inputs before compiled status. Full raw SDK headers/resources are not
+all byte-pinned: this is an explicit qualified host-environment boundary,
+not byte-identical reproducibility or whole-host/compiler/native qualification.
+The unchanged V6 tiny Cargo control failed because its policy excluded the
+actual selected SDK; that failure remains retained. V7 source/fixture checks
+alone do not claim an actual compile, repair of the full Codex build or native
+qualification. Qualified binary remains null and the source-owned slot empty.
