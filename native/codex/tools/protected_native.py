@@ -21,6 +21,9 @@ TARGET = "aarch64-apple-darwin"
 SANDBOX = Path("/usr/bin/sandbox-exec")
 MANIFEST = Path(__file__).resolve().parents[1] / "source-package.json"
 MANIFEST_SHA256 = "6f5db46ba1460fdea73463f5c55286d6e224e23f8540d645d81ece2307afc2ed"
+OPENSSL_CONFIG = Path("/private/etc/ssl/openssl.cnf")
+OPENSSL_CONFIG_BYTES = 745
+OPENSSL_CONFIG_SHA256 = "025f5e31cd7b2248a0a661d8d346452c31d98e280f3420c3f6017c74c829ae73"
 MAX_BYTES = 128 * 1024 * 1024
 MAX_TOOLCHAIN_BYTES = 2 * 1024 * 1024 * 1024
 TOP = {"schema", "status", "upstream", "source_cut", "overlay", "cargo_lock", "toolchain", "build", "qualified_binary", "runtime_integration"}
@@ -279,6 +282,33 @@ def validate_cache(cache):
         need(entry.is_dir() if entry.name in ("registry", "git") else entry.is_file(), "unexpected Cargo cache entry type")
 
 
+def system_config_metadata(info, directory=False):
+    kind = stat.S_ISDIR(info.st_mode) if directory else stat.S_ISREG(info.st_mode)
+    need(kind and info.st_uid == 0 and not info.st_mode & 0o022, "root-owned non-writable system configuration required")
+    if not directory:
+        need(info.st_nlink == 1 and stat.S_IMODE(info.st_mode) == 0o644, "system configuration must be a single regular0644 file")
+
+
+def validate_openssl_config():
+    # A source-owned OS dependency, never an environment-selected crypto policy.
+    path = regular(OPENSSL_CONFIG)
+    for ancestor in path.parents:
+        system_config_metadata(ancestor.lstat(), directory=True)
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    try:
+        before = os.fstat(fd)
+        system_config_metadata(before)
+        need(before.st_size == OPENSSL_CONFIG_BYTES, "system OpenSSL configuration size changed; review required")
+        data = os.read(fd, OPENSSL_CONFIG_BYTES + 1)
+        after = os.fstat(fd)
+        current = path.lstat()
+        need(all(getattr(before, key) == getattr(after, key) == getattr(current, key) for key in ("st_dev", "st_ino", "st_size", "st_mtime_ns", "st_ctime_ns", "st_mode", "st_uid", "st_nlink")), "system OpenSSL configuration changed during verification")
+        need(len(data) == OPENSSL_CONFIG_BYTES and sha(data) == OPENSSL_CONFIG_SHA256, "system OpenSSL configuration bytes changed; includes or policy changes require review")
+    finally:
+        os.close(fd)
+    return path
+
+
 def build_domain(source, prefix, cache, output):
     roots = [no_links(p) for p in (source, prefix, cache, output)]
     for index, left in enumerate(roots):
@@ -286,6 +316,7 @@ def build_domain(source, prefix, cache, output):
         for right in roots[index + 1:]:
             need(not paths_overlap(left, right), "build inputs/output must be disjoint")
     source, prefix, cache, output = roots
+    openssl_config = validate_openssl_config()
     reads = [source, prefix, cache, output, *map(Path, SYSTEM_READ_ROOTS)]
     # Source-generated positive read/write sets. No ambient home, arbitrary
     # profile text, credentials, caller ready flag or direct-Cargo fallback.
@@ -294,6 +325,7 @@ def build_domain(source, prefix, cache, output):
     profile += SYSCTL_READ_RULE
     profile += "(allow signal (target same-sandbox))\n"
     profile += "(allow file-read-metadata)\n"
+    profile += "(allow file-read-data (literal " + sb_string(openssl_config) + "))\n"
     profile += '(allow file-read* file-test-existence (literal "/"))\n'
     profile += "(allow file-map-executable (subpath "+sb_string(prefix)+") (subpath "+sb_string(output)+') (subpath "/usr/lib"))\n'
     profile += "(allow file-read* file-test-existence " + " ".join("(subpath " + sb_string(p) + ")" for p in reads) + " (literal \"/dev/null\") (literal \"/dev/random\") (literal \"/dev/urandom\"))\n"
@@ -341,7 +373,7 @@ def build(args):
     output.mkdir(mode=0o700)
     (output / "tmp").mkdir()
     (output / "build-domain.sb").write_text(profile)
-    write_json(output / "plan.json", {"argv": argv, "environment": env, "manifest_sha256": MANIFEST_SHA256, "timeout_seconds": args.timeout, "build_domain_sha256": sha(profile.encode()), "network_containment": "required source-generated macOS Seatbelt network denial; source/toolchain read-only; exact output/cache-metadata writes", "native_qualified": False})
+    write_json(output / "plan.json", {"argv": argv, "environment": env, "manifest_sha256": MANIFEST_SHA256, "timeout_seconds": args.timeout, "build_domain_sha256": sha(profile.encode()), "network_containment": "required source-generated macOS Seatbelt network denial; source/toolchain read-only; exact output/cache-metadata writes", "system_openssl_config": {"path": str(OPENSSL_CONFIG), "bytes": OPENSSL_CONFIG_BYTES, "sha256": OPENSSL_CONFIG_SHA256}, "native_qualified": False})
     started = time.monotonic()
     state, result = "failed", None
     with (output / "stdout.log").open("xb") as stdout, (output / "stderr.log").open("xb") as stderr:
@@ -359,6 +391,7 @@ def build(args):
     receipt = {"schema": "soloco-native-source-build-receipt-v1", "status": state, "manifest_sha256": MANIFEST_SHA256, "exit_code": result, "elapsed_seconds": time.monotonic() - started, "binary": None, "native_qualified": False, "source_slot_populated": False, "descendant_or_remote_closure": "not established"}
     try:
         need(sha(regular(args.manifest).read_bytes()) == MANIFEST_SHA256, "source-owned manifest changed during build")
+        validate_openssl_config()
         verify_complete_files(source, expected)
         verify_complete_files(prefix, toolchain, max_bytes=MAX_TOOLCHAIN_BYTES)
         if state == "compiled-source-only":

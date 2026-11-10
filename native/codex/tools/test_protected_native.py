@@ -4,6 +4,7 @@ import importlib.util
 import contextlib
 import io
 import json
+import stat
 from pathlib import Path
 import tarfile
 import tempfile
@@ -14,9 +15,14 @@ from unittest.mock import patch
 SPEC = importlib.util.spec_from_file_location("delivery_tool", Path(__file__).with_name("protected_native.py"))
 TOOL = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(TOOL)
+VALIDATE_OPENSSL_CONFIG = TOOL.validate_openssl_config
 
 
 class TemporaryDataChecks(unittest.TestCase):
+    def setUp(self):
+        # Pure CI never consults the runner's real system crypto configuration.
+        self.config_guard = self.enterContext(patch.object(TOOL, "validate_openssl_config", return_value=TOOL.OPENSSL_CONFIG))
+
     def test_duplicate_json_keys_are_rejected(self):
         with self.assertRaisesRegex(ValueError, "duplicate"):
             json.loads('{"status":"pending","status":"frozen-source-unqualified"}', object_pairs_hook=TOOL.unique_object)
@@ -278,6 +284,77 @@ class TemporaryDataChecks(unittest.TestCase):
             (cache / "credentials.toml").write_text("fixture-only")
             with self.assertRaisesRegex(ValueError, "unreviewed"):
                 TOOL.validate_cache(cache)
+
+    def test_system_config_metadata_rejects_owner_mode_links_and_type(self):
+        good = dict(st_mode=stat.S_IFREG | 0o644, st_uid=0, st_nlink=1)
+        TOOL.system_config_metadata(SimpleNamespace(**good))
+        TOOL.system_config_metadata(SimpleNamespace(st_mode=stat.S_IFDIR | 0o755, st_uid=0), directory=True)
+        for change in ({"st_uid": 501}, {"st_mode": stat.S_IFREG | 0o664}, {"st_mode": stat.S_IFREG | 0o755}, {"st_nlink": 2}, {"st_mode": stat.S_IFDIR | 0o644}):
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                TOOL.system_config_metadata(SimpleNamespace(**{**good, **change}))
+        with self.assertRaises(ValueError):
+            TOOL.system_config_metadata(SimpleNamespace(st_mode=stat.S_IFDIR | 0o777, st_uid=0), directory=True)
+
+    def test_exact_system_config_fixture_is_readonly_and_verified(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp).resolve() / "openssl.cnf"
+            data = b"[ req ]\n# pure fixture, not system policy\n"
+            path.write_bytes(data)
+            before = path.stat()
+            with patch.object(TOOL, "OPENSSL_CONFIG", path), patch.object(TOOL, "OPENSSL_CONFIG_BYTES", len(data)), patch.object(TOOL, "OPENSSL_CONFIG_SHA256", TOOL.sha(data)), patch.object(TOOL, "system_config_metadata") as ownership:
+                self.assertEqual(VALIDATE_OPENSSL_CONFIG(), path)
+                self.assertEqual(ownership.call_count, len(path.parents) + 1)
+            after = path.stat()
+            self.assertEqual(path.read_bytes(), data)
+            self.assertEqual((before.st_ino, before.st_mode, before.st_mtime_ns), (after.st_ino, after.st_mode, after.st_mtime_ns))
+
+    def test_changed_system_config_or_include_requires_review(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp).resolve() / "openssl.cnf"
+            original = b"[ req ]\n"
+            for data in (b"[ bad ]\n", original + b".include /private/config\n"):
+                path.write_bytes(data)
+                with patch.object(TOOL, "OPENSSL_CONFIG", path), patch.object(TOOL, "OPENSSL_CONFIG_BYTES", len(original)), patch.object(TOOL, "OPENSSL_CONFIG_SHA256", TOOL.sha(original)), patch.object(TOOL, "system_config_metadata"):
+                    with self.assertRaisesRegex(ValueError, "configuration (size|bytes) changed"):
+                        VALIDATE_OPENSSL_CONFIG()
+
+    def test_system_config_symlink_is_refused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp).resolve()
+            (base / "original").write_bytes(b"fixture")
+            alias = base / "openssl.cnf"
+            alias.symlink_to(base / "original")
+            with patch.object(TOOL, "OPENSSL_CONFIG", alias), self.assertRaisesRegex(ValueError, "symlink"):
+                VALIDATE_OPENSSL_CONFIG()
+
+    def test_system_crypto_read_is_one_literal_without_policy_override(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp).resolve()
+            _, env, profile = TOOL.build_domain(*(base / x for x in ("source", "prefix", "cache", "output")))
+            self.config_guard.assert_called_once_with()
+            self.assertIn('(allow file-read-data (literal "/private/etc/ssl/openssl.cnf"))', profile)
+            self.assertNotIn('(subpath "/private/etc', profile)
+            self.assertNotIn('(subpath "/etc', profile)
+            self.assertNotIn("OPENSSL_CONF", env)
+            self.assertTrue({"HOME", "CODEX_HOME"}.isdisjoint(env))
+            self.assertIn('(deny network*)', profile)
+            self.assertNotIn('/private/etc/ssl/openssl.cnf', next(x for x in profile.splitlines() if x.startswith('(allow file-write*')))
+
+    def test_unreviewed_system_config_holds_before_output_or_spawn(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp).resolve()
+            prepared, prefix, cache = [base / x for x in ("prepared", "prefix", "cache")]
+            source = prepared / "source"
+            (source / "codex-rs").mkdir(parents=True)
+            (prefix / "bin").mkdir(parents=True)
+            (cache / "registry").mkdir(parents=True)
+            record = {"schema": "soloco-prepared-native-source-v1", "manifest_sha256": TOOL.MANIFEST_SHA256, "files": [], "source_compiled": False, "native_qualified": False}
+            (prepared / "prepared-source.json").write_text(json.dumps(record))
+            args = argparse.Namespace(manifest=TOOL.MANIFEST, prepared=prepared, toolchain=prefix, cargo_home=cache, output=base / "output", timeout=5)
+            with patch.object(TOOL, "require_build_domain", return_value=TOOL.SANDBOX), patch.object(TOOL, "package", return_value=(base / "package", {}, [], [], [])), patch.object(TOOL, "verify_complete_files"), patch.object(TOOL, "validate_openssl_config", side_effect=ValueError("system configuration requires review")), patch.object(TOOL.subprocess, "Popen", side_effect=AssertionError("must not spawn")):
+                with self.assertRaisesRegex(ValueError, "configuration requires review"):
+                    TOOL.build(args)
+            self.assertFalse(args.output.exists())
 
     def test_failed_sandbox_never_falls_back_to_direct_cargo(self):
         with tempfile.TemporaryDirectory() as tmp:

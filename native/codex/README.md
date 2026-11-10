@@ -125,8 +125,32 @@ toolchain, new output and `/usr/lib`, narrows system reads to explicit library
 roots and uses the exact pinned hardware/OS sysctl-name set instead of global
 sysctl read. Broad `/System` and its Data-volume aliases are excluded.
 
-The final exact profile passed system `true` and the existing controlled C file,
+The exact V4 profile passed system `true` and the existing controlled C file,
 loopback and owned-child cases on this host. Baseline, confined and Data-alias
 runs are separate overlapping evidence. They do not establish Cargo build
 compatibility, every credential interface, other hosts or native qualification.
 The exact source/evidence cut and original failures must accompany integration.
+
+
+The V5 system-dependency repair permits only a read of the literal
+`/private/etc/ssl/openssl.cnf`. Pinned Cargo's LibreSSL startup attempted that
+system configuration before `--version` and V4 correctly denied it; the original
+failure remains retained. The tool validates symlink-free root-owned ancestors,
+a root-owned single regular0644 file and the exact reviewed745 bytes/SHA-256
+`025f5e31cd7b2248a0a661d8d346452c31d98e280f3420c3f6017c74c829ae73`
+before output creation or spawn, then rechecks after a build. These reviewed
+bytes contain only request/subject/attribute definitions, with no include,
+provider or module directive. Any changed policy or dependency holds for review.
+The tool neither selects a user configuration nor sets `OPENSSL_CONF`, disables
+crypto policy, broadens `/private/etc` reads or grants system-config writes.
+
+The original V4 C controls remain exact historical evidence; V5 adds only this
+fixed, validated read. Separate pinned Cargo/Rustc `--version` observations test
+startup only and do not qualify compilation, provider/account use, general
+credential containment or native operation. This host system-config commitment
+is a build-environment qualification boundary; other OS configuration bytes
+require a reviewed source change. Pure fixture checks use temporary bytes and
+mock ownership separately from strict metadata checks, never the CI host's real
+crypto configuration. There are 32 pure checks after these six additions. Both pinned 1.95.0 version
+commands exited successfully under V5 on the observed host with empty stderr;
+all owned process groups were observed absent.
