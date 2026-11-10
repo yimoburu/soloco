@@ -28,6 +28,8 @@ import {readTaskState,updateTaskIndex} from './task-index.mjs';
 import {specialistAction,isSpecialistRecord,prepareSpecialistAssignment,specialistSessionKey,specialistContext} from './specialists.mjs';
 
 const busy = state => Object.values(state.jobs??{}).filter(j => ['queued','running'].includes(j?.status));
+// Terminal status does not prove that a started model process has closed.
+const occupiedJobs = state => Object.values(state.jobs??{}).filter(j=>['queued','running'].includes(j.status)||(j.runtime_task||j.started_at)&&['cancelled','interrupted','failed'].includes(j.status)&&j.coordination_release?.termination_confirmed!==true);
 export function dataDir() {
   return process.env.COMPANY_PLUGIN_DATA || process.env.PLUGIN_DATA || process.env.CLAUDE_PLUGIN_DATA || path.join(os.homedir(),'.cache','soloco');
 }
@@ -320,7 +322,8 @@ export function dispatch(args,host,{launch=launchWorker,check=readiness,catalog=
     if(s.paused && !handoverReviewEligible(s,args)&&!qualificationMaintenanceEligible(s,args)&&!scoped.scopedMaintenanceEligible(s,args)&&!operatingMaintenanceEligible(s,args)) throw new Error('Company is paused; only current handover QA or explicitly authorized read-only qualification may run');
     if(reviewWindow&&!freshHandoverReviewEligible(s,args))throw Error('Review window is only for a fresh current paused streamed handover QA');
     if(!Object.hasOwn(s.roles,args.role)) throw new Error('Role is absent from the pinned team catalog');
-    if(busy(s).length>=3) throw new Error('Three assignments already active; wait for a result');
+    const occupied=occupiedJobs(s);
+    if(occupied.length>=3)throw new SchedulingHold(occupied.some(j=>!['queued','running'].includes(j.status))?'EXECUTION_UNCERTAIN':'CAPACITY_BUSY','Three assignments already active or uncertain; wait for confirmed process closure or a result');
     const target=args.review_of && Object.hasOwn(s.records,args.review_of) ? s.records[args.review_of] : null;
     if(args.review_of && !target) throw new Error('Review target not found');
     const specialist=args.specialist_ref===undefined?null:prepareSpecialistAssignment(s,args,{reserve:true});
@@ -331,7 +334,7 @@ export function dispatch(args,host,{launch=launchWorker,check=readiness,catalog=
     if(session && busy(s).some(j=>j.instance_id===session.instance_id)) throw new Error('This role session already has an assignment');
     if(session && session.host!==host) throw new Error('Role belongs to another host; perform company handover first');
     if(session && target?.author_instance===session.instance_id) throw new Error('Authors cannot independently review their own artifact');
-    if(fresh && session && Object.values(s.jobs).some(j=>j.instance_id===session.instance_id && j.coordination_release?.termination_confirmed!==true && (!['completed','quarantined'].includes(j.status) || j.coordination?.resources?.length)))throw new Error('Prior role session execution is uncertain; inspect and confirm process closure before requesting a fresh session');
+    if(session && Object.values(s.jobs).some(j=>j.instance_id===session.instance_id && j.coordination_release?.termination_confirmed!==true && (!['completed','quarantined'].includes(j.status) || j.coordination?.resources?.length)))throw new Error('Prior role session execution is uncertain; inspect and confirm process closure before reusing or replacing it');
     if(session && (qualification || fresh || selectionKey(session.model_selection)!==selectionKey(selection))) {
       (s.retired_sessions??=[]).push({...session,retired_at:stamp(),reason:qualification?'qualification_fresh_node':fresh?'fresh_session_requested':'model_selection_changed',...(fresh?{fresh_session_reason:freshReason,replacement_job_id:jobId}:{})});session=null;
     }
@@ -395,7 +398,7 @@ export function queueRuntimeTask(root,taskId,{launch=launchWorker,check=readines
     if(runtime_instance_id!==undefined&&(current.instance_id!==runtime_instance_id||s.records['async-runtime-control'].runtime_control.pid!==supervisor_pid))throw new SchedulingHold('GENERATION_CHANGED','Supervisor generation changed before queue commit');
     if(JSON.stringify(current)!==JSON.stringify(grant))throw Error('Runtime task grant changed before queue commit');
     const ready=taskReady(s,record);if(!ready.ready)throw new SchedulingHold(ready.recovery?.code,ready.reason);
-    const occupied=Object.values(s.jobs??{}).filter(j=>['queued','running'].includes(j.status)||(j.runtime_task||j.started_at)&&['cancelled','interrupted','failed'].includes(j.status)&&j.coordination_release?.termination_confirmed!==true);
+    const occupied=occupiedJobs(s);
     if(occupied.length>=3)throw new SchedulingHold(occupied.some(j=>!['queued','running'].includes(j.status))?'EXECUTION_UNCERTAIN':'CAPACITY_BUSY','Scheduling capacity occupied by active or uncertain processes');
     for(const jid of ready.required_context_jobs??[]){const prior=s.jobs[jid];if(prior?.context_sha256&&!contextMatches(s,prior,prior.context_sha256))throw new SchedulingHold('CONTEXT_CHANGED','Prerequisite task context is stale; inspect current evidence before continuing');}
     const specialist=spec.specialist_ref===undefined?null:prepareSpecialistAssignment(s,spec,{reserve:true});

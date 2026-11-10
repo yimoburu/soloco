@@ -529,3 +529,29 @@ test('operating format6 requires acceptance of new profile semantics and then bi
   assert.equal(completed.status,'completed',completed.error);
   assert.deepEqual(f.read().operating_state.plan,packet.checkpoint.acceptance[0]);
 }));
+
+
+test('parsed but rejected specialist QA judgments remain held when unreadable or contradictory',async t=>{
+  for(const variant of ['unknown-verdict','missing-review','pass-with-blockers','pass-with-malformed-blockers'])await t.test(variant,()=>fixture('codex',async f=>{
+    const policy=authorize(f),profile=create(f,policy),producer=await finish(f,queue(f,profile));
+    assert.equal(producer.status,'completed',producer.error);
+    const output=f.read().records[producer.artifact_id];
+    const queued=engine.dispatch({...f.args,role:'qa',review_of:output.id,task:'Independently review the exact specialist output; unknown judgment must remain inspectable.'},f.host,launch);
+    const review=variant==='missing-review'?undefined:{verdict:variant==='unknown-verdict'?'Unknown':'Pass',reason:'FICTIONAL missing evidence.',...(variant==='pass-with-blockers'?{blockers:['Required evidence is missing.']}:variant==='pass-with-malformed-blockers'?{blockers:'Required evidence is missing.'}:{})};
+    const raw=JSON.stringify({content:'FICTIONAL cannot determine this judgment from supplied evidence.',...(review?{review}:{})});
+    await work(f.args.root,queued.id,async(_host,_native,_prompt,_directory,timeout,_selection,options)=>{
+      options.onSpawn?.(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));
+      return {native_id:'fictional-parsed-rejected-'+variant,text:raw};
+    });
+    const failed=f.read().jobs[queued.id];
+    assert.equal(failed.status,'failed');assert.equal(failed.artifact_id,undefined);assert.equal(failed.rejected_output.text,raw);
+    const original=structuredClone(failed.rejected_output),later=await independentReview(f,profile,output,{native_id:'fictional-later-pass-'+variant});
+    assert.equal(later.job.status,'completed',later.job.error);
+    let held;
+    try{f.action('assess',{profile_ref:reference(profile.record),output_ref:reference(output),review_ref:reference(later.record)});}catch(error){held=error;}
+    assert(held,'Unreadable or contradictory rejected QA judgment must hold later acceptance');
+    assert.match(held.message,/unresolved negative or uninspectable rejected output review/);
+    assert.deepEqual(f.read().jobs[queued.id].rejected_output,original);
+    t.diagnostic(JSON.stringify({variant,prior_status:failed.status,raw_retained:true,later_status:later.job.status,assessment:'held',reason:held.message}));
+  }));
+});

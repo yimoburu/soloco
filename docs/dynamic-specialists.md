@@ -79,7 +79,12 @@ operation replay never extend expiry or replenish spent assignments.
 - Revocation captures exact already-completed output witnesses, so two commits
   in the same millisecond cannot erase earlier evidence or permit active work.
   Retained rejected/quarantined native negative reviews remain counterevidence
-  to a later Pass; unreadable relevant evidence holds acceptance.
+  to a later Pass; unknown, missing, contradictory or unreadable relevant
+  judgments hold acceptance. A rejected Pass with unresolved or malformed
+  blockers cannot silently disappear from that check.
+- Unconfirmed prior execution cannot resume or replace the same native session.
+  Active and uncertain started executions occupy the existing three-assignment
+  capacity; defining a new specialty cannot clear that uncertainty or its claims.
 - Formats 3/5/6 and durable format 7 must bind the full specialization and count
   it against existing budgets. Unsupported prototype/development, handover,
   scoped qualification or specialized review combinations fail before queueing.
