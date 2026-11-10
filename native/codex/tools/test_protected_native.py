@@ -1,0 +1,311 @@
+"""Pure temporary-data checks. No upstream checkout, compiler or native action."""
+import argparse
+import importlib.util
+import contextlib
+import io
+import json
+from pathlib import Path
+import tarfile
+import tempfile
+from types import SimpleNamespace
+import unittest
+from unittest.mock import patch
+
+SPEC = importlib.util.spec_from_file_location("delivery_tool", Path(__file__).with_name("protected_native.py"))
+TOOL = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(TOOL)
+
+
+class TemporaryDataChecks(unittest.TestCase):
+    def test_duplicate_json_keys_are_rejected(self):
+        with self.assertRaisesRegex(ValueError, "duplicate"):
+            json.loads('{"status":"pending","status":"frozen-source-unqualified"}', object_pairs_hook=TOOL.unique_object)
+
+    def test_noncanonical_paths_are_rejected(self):
+        for name in ("/outside", "../outside", "a/../outside", "a//b", "a/./b", "a\\b", "", ".", "a\0b", "a\nb"):
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                TOOL.relative(name)
+
+    def test_valid_relative_path_is_unchanged(self):
+        self.assertEqual(TOOL.relative("codex-rs/core/src/lib.rs"), "codex-rs/core/src/lib.rs")
+
+    def test_extra_inventory_fields_are_rejected(self):
+        with self.assertRaises(ValueError):
+            TOOL.rows([{"path": "source", "bytes": 1, "sha256": "a" * 64, "mode": "100644", "ready": True}])
+
+    def test_duplicate_inventory_entries_are_rejected(self):
+        row = {"path": "source", "bytes": 1, "sha256": "a" * 64, "mode": "100644"}
+        with self.assertRaises(ValueError):
+            TOOL.rows([row, row])
+
+    def test_unlisted_source_file_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            (root / "source").write_bytes(b"source")
+            (root / "extra").write_bytes(b"config")
+            row = {"path": "source", "bytes": 6, "sha256": TOOL.sha(b"source"), "mode": "100644"}
+            with self.assertRaisesRegex(ValueError, "unlisted"):
+                TOOL.verify_complete_files(root, [row])
+
+    def test_executable_distinction_is_verified(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            (root / "source").write_bytes(b"source")
+            (root / "source").chmod(0o644)
+            row = {"path": "source", "bytes": 6, "sha256": TOOL.sha(b"source"), "mode": "100755"}
+            with self.assertRaisesRegex(ValueError, "executable"):
+                TOOL.verify_complete_files(root, [row])
+
+    def test_symbolic_input_is_not_followed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            (root / "original").write_bytes(b"original")
+            (root / "alias").symlink_to(root / "original")
+            with self.assertRaisesRegex(ValueError, "symlink"):
+                TOOL.regular(root / "alias")
+
+    def test_changed_pinned_bytes_are_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            p = root / "source"
+            p.write_bytes(b"before")
+            pin = {"path": "source", "bytes": 6, "sha256": TOOL.sha(b"before")}
+            p.write_bytes(b"after!")
+            with self.assertRaisesRegex(ValueError, "hash"):
+                TOOL.read_pin(root, pin)
+
+    def test_new_output_must_not_overlap_source(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            with self.assertRaisesRegex(ValueError, "overlap"):
+                TOOL.fresh_directory(root / "new", (root,))
+            self.assertFalse((root / "new").exists())
+
+    def test_existing_output_is_preserved(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            (root / "keep").write_bytes(b"keep")
+            with self.assertRaises(ValueError):
+                TOOL.fresh_directory(root)
+            self.assertEqual((root / "keep").read_bytes(), b"keep")
+
+    def test_physical_aliases_are_detected_without_case_folding(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            source, alias = root / "source", root / "SOURCE"
+            source.mkdir()
+            if alias.exists():
+                with self.assertRaisesRegex(ValueError, "overlap"):
+                    TOOL.fresh_directory(alias / "output", (source,))
+                with self.assertRaisesRegex(ValueError, "disjoint"):
+                    TOOL.build_domain(source, root / "prefix", root / "cache", alias / "output")
+                self.assertFalse((source / "output").exists())
+            else:
+                alias.mkdir()
+                self.assertEqual(TOOL.fresh_directory(alias / "output", (source,)), alias / "output")
+            first, second = root / "first", root / "second"
+            first.write_bytes(b"fixture")
+            second.hardlink_to(first)
+            self.assertTrue(TOOL.paths_overlap(first, second))
+
+    def test_copy_checks_before_writing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            row = {"path": "new/source", "bytes": 6, "sha256": TOOL.sha(b"before"), "mode": "100644"}
+            with self.assertRaises(ValueError):
+                TOOL.install_bytes(Path(tmp).resolve(), row, b"after!")
+            self.assertFalse((Path(tmp) / "new").exists())
+
+    def test_exact_copy_is_readonly(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            row = {"path": "new/source", "bytes": 6, "sha256": TOOL.sha(b"before"), "mode": "100644"}
+            TOOL.install_bytes(root, row, b"before")
+            self.assertEqual((root / "new/source").read_bytes(), b"before")
+            self.assertEqual((root / "new/source").stat().st_mode & 0o777, 0o444)
+
+    def test_pending_manifest_does_not_create_output_or_start_cargo(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            manifest = {key: None for key in TOOL.TOP}
+            manifest.update(schema=TOOL.SCHEMA, status="pending-corrected-source")
+            p = root / "source-package.json"
+            p.write_text(json.dumps(manifest))
+            args = argparse.Namespace(manifest=p, archive=root / "absent.tar.gz", output=root / "not-created")
+            with patch.object(TOOL.subprocess, "Popen", side_effect=AssertionError("must not execute")):
+                with self.assertRaisesRegex(ValueError, "source-owned manifest"):
+                    TOOL.prepare(args)
+                with patch.object(TOOL, "require_build_domain", return_value=TOOL.SANDBOX):
+                    with self.assertRaisesRegex(ValueError, "source-owned manifest"):
+                        TOOL.build(args)
+            self.assertFalse(args.output.exists())
+
+    def test_unknown_manifest_fields_remain_held(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp).resolve() / "source-package.json"
+            p.write_text(json.dumps({**{key: None for key in TOOL.TOP}, "schema": TOOL.SCHEMA, "ready_override": True}))
+            with self.assertRaisesRegex(ValueError, "source-owned manifest"):
+                TOOL.package(p)
+
+    def test_source_manifest_is_parsed_from_the_hashed_bytes(self):
+        original = Path.read_text
+
+        def reject_reopen(path, *args, **kwargs):
+            if path == TOOL.MANIFEST:
+                raise AssertionError("manifest must not be reopened after hash validation")
+            return original(path, *args, **kwargs)
+
+        with patch.object(Path, "read_text", new=reject_reopen):
+            _, manifest, upstream, toolchain, composed = TOOL.package(TOOL.MANIFEST)
+        self.assertIsNone(manifest["qualified_binary"])
+        self.assertEqual((len(upstream), len(toolchain), len(composed)), (9264, 153, 9274))
+
+    def test_archive_copy_uses_only_registered_members(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            payload = root / "package"
+            payload.mkdir()
+            (payload / "lock").write_bytes(b"new-lock")
+            archive = root / "input.tar.gz"
+            with tarfile.open(archive, "w:gz") as stream:
+                for name, data in [("codex-" + TOOL.COMMIT + "/codex-rs/Cargo.lock", b"old-lock"), ("../../escaped", b"never-copy")]:
+                    member = tarfile.TarInfo(name)
+                    member.size, member.mode = len(data), 0o644
+                    stream.addfile(member, io.BytesIO(data))
+            old = {"path": "codex-rs/Cargo.lock", "bytes": 8, "sha256": TOOL.sha(b"old-lock"), "mode": "100644"}
+            new = {**old, "sha256": TOOL.sha(b"new-lock")}
+            m = {"upstream": {"archive_sha256": TOOL.sha(archive.read_bytes())}, "overlay": [], "cargo_lock": {"path": "lock", "bytes": 8, "sha256": TOOL.sha(b"new-lock")}}
+            manifest = payload / "fixture.json"
+            manifest.write_text("fixture, not production authority")
+            args = argparse.Namespace(manifest=manifest, archive=archive, output=root / "output")
+            # A private test double supplies DATA, never an accepted source cut.
+            with patch.object(TOOL, "package", return_value=(payload, m, [old], [], [new])), contextlib.redirect_stdout(io.StringIO()):
+                TOOL.prepare(args)
+            self.assertEqual((args.output / "source/codex-rs/Cargo.lock").read_bytes(), b"new-lock")
+            receipt = json.loads((args.output / "prepared-source.json").read_text())
+            self.assertFalse(receipt["source_compiled"])
+            self.assertFalse(receipt["native_qualified"])
+            self.assertFalse((root / "escaped").exists())
+
+    def test_wrong_archive_hash_creates_no_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            archive = root / "input.tar.gz"
+            archive.write_bytes(b"unapproved")
+            args = argparse.Namespace(manifest=root / "unused", archive=archive, output=root / "output")
+            with patch.object(TOOL, "package", return_value=(root / "package", {"upstream": {"archive_sha256": "0" * 64}}, [], [], [])):
+                with self.assertRaisesRegex(ValueError, "exact upstream"):
+                    TOOL.prepare(args)
+            self.assertFalse(args.output.exists())
+
+    def test_required_source_generated_domain_and_environment(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp).resolve()
+            source, prefix, cache, output = [base / x for x in ("source", "prefix", "cache", "output")]
+            with patch.dict(TOOL.os.environ, {"HOME": "/fixture-home", "CODEX_HOME": "/fixture-codex", "AWS_ACCESS_KEY_ID": "fixture-only"}):
+                argv, env, profile = TOOL.build_domain(source, prefix, cache, output)
+            self.assertEqual(argv[:3], ["/usr/bin/sandbox-exec", "-p", profile])
+            self.assertEqual(argv[3], str(prefix / "bin/cargo"))
+            self.assertIn("(deny default)", profile)
+            self.assertIn("(deny network*)", profile)
+            self.assertNotIn("(allow default)", profile)
+            self.assertIn("(allow signal (target same-sandbox))", profile)
+            self.assertNotIn("process-fork signal", profile)
+            self.assertNotIn("fixture-home", profile)
+            self.assertTrue({"HOME", "CODEX_HOME", "AWS_ACCESS_KEY_ID"}.isdisjoint(env))
+            self.assertEqual(env["GIT_CONFIG_GLOBAL"], "/dev/null")
+            self.assertEqual(env["GIT_CONFIG_SYSTEM"], "/dev/null")
+            self.assertEqual(env["GIT_CONFIG_NOSYSTEM"], "1")
+            self.assertEqual(env["GIT_TERMINAL_PROMPT"], "0")
+            settings = {env["GIT_CONFIG_KEY_" + str(i)]: env["GIT_CONFIG_VALUE_" + str(i)] for i in range(int(env["GIT_CONFIG_COUNT"]))}
+            self.assertEqual(settings["credential.helper"], "")
+            self.assertEqual(settings["protocol.allow"], "never")
+            writes = next(line for line in profile.splitlines() if line.startswith("(allow file-write*"))
+            self.assertIn('(subpath "' + str(output) + '")', writes)
+            self.assertNotIn('(subpath "' + str(cache) + '")', writes)
+            self.assertNotIn(str(source), writes)
+            self.assertNotIn(str(prefix), writes)
+            for name in TOOL.CACHE_METADATA:
+                self.assertIn('(literal "' + str(cache / name) + '")', writes)
+
+    def test_missing_or_unsupported_build_domain_never_spawns(self):
+        with patch.object(TOOL.subprocess, "Popen", side_effect=AssertionError("must not spawn")):
+            with patch.object(TOOL.sys, "platform", "linux"):
+                with self.assertRaisesRegex(ValueError, "macOS"):
+                    TOOL.build(argparse.Namespace())
+            with tempfile.TemporaryDirectory() as tmp:
+                with patch.object(TOOL.sys, "platform", "darwin"), patch.object(TOOL.os, "uname", return_value=SimpleNamespace(machine="arm64")), patch.object(TOOL, "SANDBOX", Path(tmp).resolve() / "missing"):
+                    with self.assertRaises(OSError):
+                        TOOL.build(argparse.Namespace())
+
+    def test_loader_minimum_keeps_root_read_literal_and_no_speculative_grants(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp).resolve()
+            source, prefix, cache, output = [base / x for x in ("source", "prefix", "cache", "output")]
+            _, _, profile = TOOL.build_domain(source, prefix, cache, output)
+            self.assertIn('(allow file-read* file-test-existence (literal "/"))', profile)
+            self.assertNotIn('(subpath "/")', profile)
+            self.assertIn('(allow file-map-executable (subpath "'+str(prefix)+'") (subpath "'+str(output)+'") (subpath "/usr/lib"))', profile)
+            self.assertNotIn('(allow process-info*', profile)
+            self.assertNotIn('opendirectoryd.libinfo', profile)
+            self.assertNotIn('(allow system-mac-syscall', profile)
+            self.assertNotIn('(allow mach-lookup)', profile)
+
+    def test_platform_reads_exclude_data_volume_and_process_arguments(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp).resolve()
+            _, _, profile = TOOL.build_domain(*(base / x for x in ("source", "prefix", "cache", "output")))
+            self.assertNotIn('(subpath "/System")', profile)
+            self.assertNotIn('/System/Volumes/Data', profile)
+            self.assertNotIn('(subpath "/Library/Developer")', profile)
+            self.assertIn('(subpath "/System/Library")', profile)
+            self.assertIn('(sysctl-name "hw.ncpu")', profile)
+            self.assertNotIn('(allow sysctl-read)', profile)
+            self.assertNotIn('kern.procargs2', profile)
+
+    def test_ambiguous_or_overlapping_build_roots_are_rejected(self):
+        for text in ('/fixture/quote"', "/fixture/back\\slash", "/fixture/new\nline"):
+            with self.subTest(text=text), self.assertRaisesRegex(ValueError, "Seatbelt"):
+                TOOL.sb_string(text)
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp).resolve()
+            with self.assertRaisesRegex(ValueError, "disjoint"):
+                TOOL.build_domain(base / "source", base / "prefix", base / "prefix/cache", base / "output")
+
+    def test_cache_config_and_credentials_remain_held(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = Path(tmp).resolve()
+            (cache / "registry").mkdir()
+            (cache / "credentials.toml").write_text("fixture-only")
+            with self.assertRaisesRegex(ValueError, "unreviewed"):
+                TOOL.validate_cache(cache)
+
+    def test_failed_sandbox_never_falls_back_to_direct_cargo(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp).resolve()
+            prepared, prefix, cache = [base / x for x in ("prepared", "prefix", "cache")]
+            source = prepared / "source"
+            (source / "codex-rs").mkdir(parents=True)
+            (prefix / "bin").mkdir(parents=True)
+            (cache / "registry").mkdir(parents=True)
+            (source / "codex-rs/Cargo.lock").write_bytes(b"lock")
+            (prefix / "bin/cargo").write_bytes(b"cargo!")
+            (prefix / "bin/cargo").chmod(0o755)
+            sr = {"path": "codex-rs/Cargo.lock", "bytes": 4, "sha256": TOOL.sha(b"lock"), "mode": "100644"}
+            tr = {"path": "bin/cargo", "bytes": 6, "sha256": TOOL.sha(b"cargo!"), "mode": "100755"}
+            (prepared / "prepared-source.json").write_text(json.dumps({"schema": "soloco-prepared-native-source-v1", "manifest_sha256": TOOL.MANIFEST_SHA256, "files": [sr], "source_compiled": False, "native_qualified": False}))
+            args = argparse.Namespace(manifest=TOOL.MANIFEST, prepared=prepared, toolchain=prefix, cargo_home=cache, output=base / "output", timeout=5)
+            with patch.object(TOOL, "require_build_domain", return_value=TOOL.SANDBOX), patch.object(TOOL, "package", return_value=(base / "package", {}, [], [tr], [sr])), patch.object(TOOL.subprocess, "Popen", return_value=SimpleNamespace(wait=lambda timeout: 1)) as spawn, contextlib.redirect_stdout(io.StringIO()):
+                result = TOOL.build(args)
+            self.assertEqual(result, 1)
+            self.assertEqual(spawn.call_count, 1)
+            self.assertEqual(spawn.call_args.args[0][:2], ["/usr/bin/sandbox-exec", "-p"])
+            self.assertEqual(spawn.call_args.kwargs["stdin"], TOOL.subprocess.DEVNULL)
+            self.assertTrue({"HOME", "CODEX_HOME"}.isdisjoint(spawn.call_args.kwargs["env"]))
+            receipt = json.loads((args.output / "receipt.json").read_text())
+            self.assertEqual(receipt["status"], "failed")
+            self.assertFalse(receipt["native_qualified"])
+            self.assertIsNone(receipt["binary"])
+
+
+if __name__ == "__main__":
+    unittest.main()

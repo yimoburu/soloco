@@ -1,0 +1,403 @@
+#!/usr/bin/env python3
+"""Prepare and build a pinned companion source package; never install or qualify it."""
+import argparse
+import hashlib
+import io
+import json
+import os
+from pathlib import Path, PurePosixPath
+import re
+import signal
+import stat
+import subprocess
+import sys
+import tarfile
+import time
+
+SCHEMA = "soloco-protected-native-source-package-v1"
+COMMIT = "c40729ea5cf8e947481b130c59807273eda2f8e9"
+TREE = "078c14cecf94b522a2eff48b30996bf3f4d1bf7a"
+TARGET = "aarch64-apple-darwin"
+SANDBOX = Path("/usr/bin/sandbox-exec")
+MANIFEST = Path(__file__).resolve().parents[1] / "source-package.json"
+MANIFEST_SHA256 = "6f5db46ba1460fdea73463f5c55286d6e224e23f8540d645d81ece2307afc2ed"
+MAX_BYTES = 128 * 1024 * 1024
+MAX_TOOLCHAIN_BYTES = 2 * 1024 * 1024 * 1024
+TOP = {"schema", "status", "upstream", "source_cut", "overlay", "cargo_lock", "toolchain", "build", "qualified_binary", "runtime_integration"}
+CACHE_METADATA = (".package-cache", ".package-cache-mutate", ".global-cache", ".global-cache-shm", ".global-cache-wal", ".global-cache-journal")
+SYSTEM_READ_ROOTS = ("/System/Library", "/System/iOSSupport/System/Library", "/usr/lib", "/usr/share", "/usr/bin", "/bin", "/sbin", "/Library/Developer/CommandLineTools", "/Applications/Xcode.app/Contents/Developer", "/private/var/db/dyld")
+
+SYSCTL_READ_RULE = '(allow sysctl-read\n  (sysctl-name "hw.activecpu")\n  (sysctl-name "hw.busfrequency_compat")\n  (sysctl-name "hw.byteorder")\n  (sysctl-name "hw.cacheconfig")\n  (sysctl-name "hw.cachelinesize_compat")\n  (sysctl-name "hw.cpufamily")\n  (sysctl-name "hw.cpufrequency_compat")\n  (sysctl-name "hw.cputype")\n  (sysctl-name "hw.l1dcachesize_compat")\n  (sysctl-name "hw.l1icachesize_compat")\n  (sysctl-name "hw.l2cachesize_compat")\n  (sysctl-name "hw.l3cachesize_compat")\n  (sysctl-name "hw.logicalcpu_max")\n  (sysctl-name "hw.machine")\n  (sysctl-name "hw.model")\n  (sysctl-name "hw.memsize")\n  (sysctl-name "hw.ncpu")\n  (sysctl-name "hw.nperflevels")\n  ; Chrome locks these CPU feature detection down a bit more tightly,\n  ; but mostly for fingerprinting concerns which isn\'t an issue for codex.\n  (sysctl-name-prefix "hw.optional.arm.")\n  (sysctl-name-prefix "hw.optional.armv8_")\n  (sysctl-name "hw.packages")\n  (sysctl-name "hw.pagesize_compat")\n  (sysctl-name "hw.pagesize")\n  (sysctl-name "hw.physicalcpu")\n  (sysctl-name "hw.physicalcpu_max")\n  (sysctl-name "hw.logicalcpu")\n  (sysctl-name "hw.cpufrequency")\n  (sysctl-name "hw.tbfrequency_compat")\n  (sysctl-name "hw.vectorunit")\n  (sysctl-name "machdep.cpu.brand_string")\n  (sysctl-name "kern.argmax")\n  (sysctl-name "kern.hostname")\n  (sysctl-name "kern.maxfilesperproc")\n  (sysctl-name "kern.maxproc")\n  (sysctl-name "kern.osproductversion")\n  (sysctl-name "kern.osrelease")\n  (sysctl-name "kern.ostype")\n  (sysctl-name "kern.osvariant_status")\n  (sysctl-name "kern.osversion")\n  (sysctl-name "kern.secure_kernel")\n  ; Python\'s ProcessPoolExecutor queries this through sysconf(_SC_SEM_NSEMS_MAX).\n  (sysctl-name "kern.sysv.semmns")\n  (sysctl-name "kern.usrstack64")\n  (sysctl-name "kern.version")\n  (sysctl-name "sysctl.proc_cputype")\n  (sysctl-name "vm.loadavg")\n  (sysctl-name-prefix "hw.perflevel")\n  (sysctl-name-prefix "kern.proc.pgrp.")\n  (sysctl-name-prefix "kern.proc.pid.")\n  (sysctl-name-prefix "net.routetable.")\n)\n'
+
+def need(ok, message):
+    if not ok:
+        raise ValueError(message)
+
+
+def sha(data):
+    return hashlib.sha256(data).hexdigest()
+
+
+def unique_object(pairs):
+    result = {}
+    for key, value in pairs:
+        need(key not in result, "duplicate JSON key: " + key)
+        result[key] = value
+    return result
+
+
+def load(path):
+    return json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=unique_object)
+
+
+def exact(value, keys):
+    return isinstance(value, dict) and set(value) == set(keys)
+
+
+def relative(value):
+    need(isinstance(value, str) and value and "\\" not in value and not any(ord(c) < 32 or ord(c) == 127 for c in value), "invalid relative path")
+    p = PurePosixPath(value)
+    need(p.parts and not p.is_absolute() and all(x not in (".", "..") for x in p.parts) and str(p) == value, "noncanonical relative path")
+    return value
+
+
+def no_links(path):
+    path = Path(os.path.abspath(path))
+    for item in [path, *path.parents]:
+        if item.exists() or item.is_symlink():
+            need(not item.is_symlink(), "symlink path refused: " + str(item))
+    return path
+
+
+def regular(path):
+    p = no_links(path)
+    st = p.lstat()
+    need(stat.S_ISREG(st.st_mode), "regular file required: " + str(p))
+    return p
+
+
+def read_pin(root, pin):
+    need(exact(pin, {"path", "bytes", "sha256"}), "closed artifact pin required")
+    p = regular(root / relative(pin["path"]))
+    need(isinstance(pin["bytes"], int) and 0 <= pin["bytes"] <= MAX_BYTES and p.stat().st_size == pin["bytes"], "artifact size changed")
+    data = p.read_bytes()
+    need(sha(data) == pin["sha256"], "artifact hash changed: " + pin["path"])
+    return data
+
+
+def rows(value, max_bytes=MAX_BYTES):
+    need(isinstance(value, list) and 0 < len(value) <= 12000, "bounded complete file inventory required")
+    seen = set()
+    for row in value:
+        need(exact(row, {"path", "bytes", "sha256", "mode"}), "closed file row required")
+        key = relative(row["path"])
+        need(key not in seen and isinstance(row["bytes"], int) and row["bytes"] >= 0 and isinstance(row["sha256"], str) and re.fullmatch("[0-9a-f]{64}", row["sha256"]), "invalid file row")
+        need(row["mode"] in ("100644", "100755"), "unsupported source mode")
+        seen.add(key)
+    need([r["path"] for r in value] == sorted(seen), "inventory must be sorted and unique")
+    need(sum(r["bytes"] for r in value) <= max_bytes, "source inventory exceeds bound")
+    return value
+
+
+def verify_files(root, inventory, max_bytes=MAX_BYTES):
+    for row in rows(inventory, max_bytes=max_bytes):
+        p = regular(root / row["path"])
+        need(p.stat().st_size == row["bytes"] and sha(p.read_bytes()) == row["sha256"], "source changed: " + row["path"])
+
+
+def verify_complete_files(root, inventory, max_bytes=MAX_BYTES):
+    verify_files(root, inventory, max_bytes=max_bytes)
+    found = set()
+    for p in root.rglob("*"):
+        need(not p.is_symlink(), "unlisted symlink refused")
+        mode = p.lstat().st_mode
+        need(stat.S_ISREG(mode) or stat.S_ISDIR(mode), "nonregular input refused")
+        if stat.S_ISREG(mode):
+            found.add(p.relative_to(root).as_posix())
+    need(found == {r["path"] for r in inventory}, "unlisted or missing source/toolchain file")
+    for row in inventory:
+        actual = "100755" if (root / row["path"]).stat().st_mode & 0o111 else "100644"
+        need(actual == row["mode"], "executable distinction changed: " + row["path"])
+
+
+def package(manifest):
+    root = regular(manifest).parent
+    manifest_bytes = manifest.read_bytes()
+    need(sha(manifest_bytes) == MANIFEST_SHA256, "source-owned manifest hash changed; runtime manifests cannot select source")
+    m = json.loads(manifest_bytes, object_pairs_hook=unique_object)
+    need(exact(m, TOP) and m["schema"] == SCHEMA, "unsupported source-package schema")
+    need(m["status"] == "frozen-source-unqualified", "source package is pending or unsupported")
+    need(m["qualified_binary"] is None, "this source tool cannot consume or mint native qualification")
+    u = m["upstream"]
+    need(exact(u, {"repository", "commit", "tree", "archive_sha256", "inventory", "attribution"}) and u["repository"] == "https://github.com/openai/codex" and u["commit"] == COMMIT and u["tree"] == TREE, "unsupported upstream revision")
+    need(isinstance(u["attribution"], list) and u["attribution"], "upstream attribution required")
+    for attribution in u["attribution"]:
+        read_pin(root, attribution)
+    upstream = rows(json.loads(read_pin(root, u["inventory"]), object_pairs_hook=unique_object))
+    need(len(upstream) == 9264 and all(r["path"].startswith("codex-rs/") for r in upstream), "complete pinned Rust source inventory required")
+    cut = m["source_cut"]
+    need(exact(cut, {"handoff", "bindings", "patch", "review_state"}) and cut["review_state"] == "independent-review-required", "source cut must retain its review boundary")
+    for key in ("handoff", "bindings", "patch"):
+        read_pin(root, cut[key])
+    original = {r["path"]: r for r in upstream}
+    need(isinstance(m["overlay"], list) and 0 < len(m["overlay"]) <= 100, "bounded overlay required")
+    expected = dict(original)
+    seen = set()
+    for change in m["overlay"]:
+        need(exact(change, {"target", "before_sha256", "payload", "mode"}), "closed overlay row required")
+        target = relative(change["target"])
+        need(target.startswith("codex-rs/") and target != "codex-rs/Cargo.lock" and target not in seen, "unsupported or duplicate overlay target")
+        need(change["before_sha256"] == original.get(target, {}).get("sha256") and change["mode"] in ("100644", "100755"), "overlay base or mode changed")
+        data = read_pin(root, change["payload"])
+        expected[target] = {"path": target, "bytes": len(data), "sha256": sha(data), "mode": change["mode"]}
+        seen.add(target)
+    lock = read_pin(root, m["cargo_lock"])
+    expected["codex-rs/Cargo.lock"] = {"path": "codex-rs/Cargo.lock", "bytes": len(lock), "sha256": sha(lock), "mode": "100644"}
+    t = m["toolchain"]
+    need(exact(t, {"release", "target", "inventory", "official_manifest", "archives"}) and t["release"] == "1.95.0" and t["target"] == TARGET, "unsupported toolchain")
+    toolchain = rows(json.loads(read_pin(root, t["inventory"]), object_pairs_hook=unique_object), max_bytes=MAX_TOOLCHAIN_BYTES)
+    need(len(toolchain) == 153, "complete pinned toolchain inventory required")
+    read_pin(root, t["official_manifest"])
+    need(isinstance(t["archives"], list) and len(t["archives"]) == 3, "three official component commitments required")
+    need({a.get("component") for a in t["archives"] if isinstance(a, dict)} == {"rustc", "cargo", "rust-std"}, "complete unique component set required")
+    for archive in t["archives"]:
+        need(exact(archive, {"component", "url", "sha256"}) and archive["component"] in ("rustc", "cargo", "rust-std") and archive["url"].startswith("https://static.rust-lang.org/dist/") and re.fullmatch("[0-9a-f]{64}", archive["sha256"]), "unsupported component commitment")
+    b = m["build"]
+    need(b == {"package": "codex-app-server-client", "binary": "codex-soloco-protected-host", "target": TARGET, "profile": "release", "environment": {"SOLOCO_PROTECTED_HOST_BUILD": "1"}}, "unsupported build recipe")
+    need(m["runtime_integration"] == "separate-joined-runtime-review-required", "runtime integration is not qualified by this package")
+    return root, m, upstream, toolchain, sorted(expected.values(), key=lambda r: r["path"])
+
+
+def paths_overlap(left, right):
+    if left == right or left in right.parents or right in left.parents:
+        return True
+    # Case aliases and mount spellings cannot be decided by case-folding text.
+    # Compare each existing root with actual ancestor device/inode identities.
+    for root, candidate in ((left, right), (right, left)):
+        if not root.exists():
+            continue
+        root_stat = root.stat()
+        identity = (root_stat.st_dev, root_stat.st_ino)
+        for ancestor in (candidate, *candidate.parents):
+            if ancestor.exists():
+                current = ancestor.stat()
+                if identity == (current.st_dev, current.st_ino):
+                    return True
+    return False
+
+
+def fresh_directory(path, exclusions=()):
+    p = no_links(path)
+    need(not p.exists() and p.parent.is_dir(), "explicit new output directory with existing parent required")
+    for old in exclusions:
+        old = no_links(old)
+        need(not paths_overlap(p, old), "output overlaps a source or cache")
+    return p
+
+
+def write_json(path, value):
+    with path.open("x", encoding="utf-8") as stream:
+        json.dump(value, stream, indent=2)
+        stream.write("\n")
+
+
+def install_bytes(root, row, data):
+    need(len(data) == row["bytes"] and sha(data) == row["sha256"], "copy input changed")
+    target = root / relative(row["path"])
+    target.parent.mkdir(parents=True, exist_ok=True)
+    # Only the newly created private output is mutable. No source is replaced.
+    if target.exists():
+        regular(target).chmod(0o600)
+    with target.open("wb") as stream:
+        stream.write(data)
+    target.chmod(0o555 if row["mode"] == "100755" else 0o444)
+
+
+def prepare(args):
+    root, m, upstream, _, expected = package(args.manifest)
+    archive_path = regular(args.archive)
+    need(archive_path.stat().st_size <= MAX_BYTES, "upstream archive exceeds bound")
+    archive_bytes = archive_path.read_bytes()
+    need(sha(archive_bytes) == m["upstream"]["archive_sha256"], "exact upstream commit archive required")
+    output = fresh_directory(args.output, (root, archive_path))
+    archive = tarfile.open(fileobj=io.BytesIO(archive_bytes), mode="r:gz")
+    prefix = "codex-" + COMMIT + "/"
+    members = {}
+    for member in archive.getmembers():
+        need(member.name not in members, "duplicate archive member")
+        members[member.name] = member
+
+    def original(row):
+        member = members.get(prefix + row["path"])
+        need(member is not None and member.isfile() and member.size == row["bytes"], "upstream archive member changed")
+        mode = "100755" if member.mode & 0o111 else "100644"
+        need(mode == row["mode"], "upstream archive executable distinction changed")
+        with archive.extractfile(member) as stream:
+            data = stream.read(MAX_BYTES + 1)
+        need(len(data) == row["bytes"] and sha(data) == row["sha256"], "upstream archive source hash changed")
+        return data
+
+    for row in upstream:
+        original(row)
+    # All package and source inputs are verified before the first mutation.
+    output.mkdir(mode=0o700)
+    workspace = output / "source"
+    workspace.mkdir()
+    for row in upstream:
+        install_bytes(workspace, row, original(row))
+    archive.close()
+    for change in m["overlay"]:
+        row = next(r for r in expected if r["path"] == change["target"])
+        install_bytes(workspace, row, read_pin(root, change["payload"]))
+    install_bytes(workspace, next(r for r in expected if r["path"] == "codex-rs/Cargo.lock"), read_pin(root, m["cargo_lock"]))
+    verify_complete_files(workspace, expected)
+    write_json(output / "prepared-source.json", {"schema": "soloco-prepared-native-source-v1", "manifest_sha256": MANIFEST_SHA256, "files": expected, "source_compiled": False, "native_qualified": False})
+    print(json.dumps({"status": "prepared-source-only", "files": len(expected), "native_qualified": False}))
+
+
+def require_build_domain():
+    need(sys.platform == "darwin" and os.uname().machine == "arm64", "only the pinned macOS arm64 source recipe is supported")
+    executor = regular(SANDBOX)
+    info = executor.stat()
+    need(info.st_uid == 0 and info.st_mode & 0o111 and not info.st_mode & 0o022, "original root-owned macOS sandbox executor required")
+    return executor
+
+
+def sb_string(path):
+    text = str(path)
+    need(Path(text).is_absolute() and not any(ord(c) < 32 or ord(c) == 127 or c in '\\"' for c in text), "unsupported Seatbelt path spelling")
+    return '"' + text + '"'
+
+
+def validate_cache(cache):
+    need(cache.is_dir(), "explicit prepopulated private Cargo cache required")
+    entries = list(cache.iterdir())
+    need(any(p.name in ("registry", "git") and p.is_dir() for p in entries), "prepopulated Cargo source cache required")
+    for entry in entries:
+        need(entry.name in {"registry", "git", *CACHE_METADATA}, "Cargo cache has unreviewed config, credential or executable entries")
+        need(not entry.is_symlink(), "Cargo cache symlink refused")
+        need(entry.is_dir() if entry.name in ("registry", "git") else entry.is_file(), "unexpected Cargo cache entry type")
+
+
+def build_domain(source, prefix, cache, output):
+    roots = [no_links(p) for p in (source, prefix, cache, output)]
+    for index, left in enumerate(roots):
+        need(left.parent != left, "filesystem root is not a private build input")
+        for right in roots[index + 1:]:
+            need(not paths_overlap(left, right), "build inputs/output must be disjoint")
+    source, prefix, cache, output = roots
+    reads = [source, prefix, cache, output, *map(Path, SYSTEM_READ_ROOTS)]
+    # Source-generated positive read/write sets. No ambient home, arbitrary
+    # profile text, credentials, caller ready flag or direct-Cargo fallback.
+    profile = "(version 1)\n(deny default)\n(deny network*)\n"
+    profile += "(allow process-exec process-fork)\n"
+    profile += SYSCTL_READ_RULE
+    profile += "(allow signal (target same-sandbox))\n"
+    profile += "(allow file-read-metadata)\n"
+    profile += '(allow file-read* file-test-existence (literal "/"))\n'
+    profile += "(allow file-map-executable (subpath "+sb_string(prefix)+") (subpath "+sb_string(output)+') (subpath "/usr/lib"))\n'
+    profile += "(allow file-read* file-test-existence " + " ".join("(subpath " + sb_string(p) + ")" for p in reads) + " (literal \"/dev/null\") (literal \"/dev/random\") (literal \"/dev/urandom\"))\n"
+    profile += "(allow file-write* (subpath " + sb_string(output) + ") " + " ".join("(literal " + sb_string(cache / name) + ")" for name in CACHE_METADATA) + " (literal \"/dev/null\"))\n"
+    profile += "(allow mach-lookup (global-name \"com.apple.system.logger\"))\n"
+    env = {
+        "PATH": str(prefix / "bin") + ":/usr/bin:/bin:/usr/sbin:/sbin", "LANG": "C", "LC_ALL": "C",
+        "CARGO_HOME": str(cache), "CARGO_TARGET_DIR": str(output / "target"),
+        "RUSTC": str(prefix / "bin/rustc"), "RUSTDOC": str(prefix / "bin/rustdoc"),
+        "TMPDIR": str(output / "tmp"), "TMP": str(output / "tmp"), "TEMP": str(output / "tmp"),
+        "CLANG_MODULE_CACHE_PATH": str(output / "clang-module-cache"),
+        "SOLOCO_PROTECTED_HOST_BUILD": "1", "CARGO_NET_OFFLINE": "true", "CARGO_NET_RETRY": "0",
+        "CARGO_REGISTRY_GLOBAL_CREDENTIAL_PROVIDERS": "", "CARGO_HTTP_PROXY": "",
+        "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_SYSTEM": "/dev/null", "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_TERMINAL_PROMPT": "0", "GIT_ASKPASS": "/usr/bin/false", "SSH_ASKPASS": "/usr/bin/false", "GCM_INTERACTIVE": "Never",
+    }
+    settings = [("credential.helper", ""), ("credential.interactive", "false"), ("core.askPass", "/usr/bin/false"), ("core.sshCommand", "/usr/bin/false"), ("core.hooksPath", "/dev/null"), ("core.fsmonitor", "false"), ("protocol.allow", "never"), ("http.proxy", ""), ("gc.auto", "0"), ("maintenance.auto", "false")]
+    env["GIT_CONFIG_COUNT"] = str(len(settings))
+    for index, (key, value) in enumerate(settings):
+        env["GIT_CONFIG_KEY_" + str(index)] = key
+        env["GIT_CONFIG_VALUE_" + str(index)] = value
+    cargo = [str(prefix / "bin/cargo"), "build", "--locked", "--offline", "--release", "--target", TARGET, "-p", "codex-app-server-client", "--bin", "codex-soloco-protected-host", "-j2", "--color", "never"]
+    return [str(SANDBOX), "-p", profile, *cargo], env, profile
+
+
+def build(args):
+    require_build_domain()  # Missing/unsupported domain holds before any spawn.
+    root, m, _, toolchain, expected = package(args.manifest)
+    prepared = no_links(args.prepared)
+    source = prepared / "source"
+    record = load(regular(prepared / "prepared-source.json"))
+    need(record == {"schema": "soloco-prepared-native-source-v1", "manifest_sha256": MANIFEST_SHA256, "files": expected, "source_compiled": False, "native_qualified": False}, "prepared source binding changed")
+    prefix = no_links(args.toolchain)
+    cache = no_links(args.cargo_home)
+    validate_cache(cache)
+    verify_complete_files(source, expected)
+    verify_complete_files(prefix, toolchain, max_bytes=MAX_TOOLCHAIN_BYTES)
+    for ancestor in [source / "codex-rs", source, prepared, *prepared.parents]:
+        if ancestor == source / "codex-rs":
+            continue  # The exact workspace .cargo files are pinned source.
+        need(not (ancestor / ".cargo/config").exists() and not (ancestor / ".cargo/config.toml").exists(), "unreviewed ancestor Cargo config")
+    output = fresh_directory(args.output, (root, prepared, prefix, cache))
+    need(1 <= args.timeout <= 1200, "source build timeout must be 1..1200 seconds")
+    argv, env, profile = build_domain(source, prefix, cache, output)
+    output.mkdir(mode=0o700)
+    (output / "tmp").mkdir()
+    (output / "build-domain.sb").write_text(profile)
+    write_json(output / "plan.json", {"argv": argv, "environment": env, "manifest_sha256": MANIFEST_SHA256, "timeout_seconds": args.timeout, "build_domain_sha256": sha(profile.encode()), "network_containment": "required source-generated macOS Seatbelt network denial; source/toolchain read-only; exact output/cache-metadata writes", "native_qualified": False})
+    started = time.monotonic()
+    state, result = "failed", None
+    with (output / "stdout.log").open("xb") as stdout, (output / "stderr.log").open("xb") as stderr:
+        process = subprocess.Popen(argv, cwd=source / "codex-rs", env=env, stdin=subprocess.DEVNULL, stdout=stdout, stderr=stderr, start_new_session=True)
+        try:
+            result = process.wait(timeout=args.timeout)
+            state = "compiled-source-only" if result == 0 else "failed"
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            result = process.wait(timeout=5)
+            state = "timeout-held"
+    receipt = {"schema": "soloco-native-source-build-receipt-v1", "status": state, "manifest_sha256": MANIFEST_SHA256, "exit_code": result, "elapsed_seconds": time.monotonic() - started, "binary": None, "native_qualified": False, "source_slot_populated": False, "descendant_or_remote_closure": "not established"}
+    try:
+        need(sha(regular(args.manifest).read_bytes()) == MANIFEST_SHA256, "source-owned manifest changed during build")
+        verify_complete_files(source, expected)
+        verify_complete_files(prefix, toolchain, max_bytes=MAX_TOOLCHAIN_BYTES)
+        if state == "compiled-source-only":
+            binary = regular(output / "target" / TARGET / "release/codex-soloco-protected-host")
+            receipt["binary"] = {"path": str(binary), "bytes": binary.stat().st_size, "sha256": sha(binary.read_bytes())}
+    except Exception as error:
+        receipt["status"] = "changed-input-or-output-held"
+        receipt["verification_error"] = str(error)
+    write_json(output / "receipt.json", receipt)
+    print(json.dumps(receipt))
+    return 0 if receipt["status"] == "compiled-source-only" else 1
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    sub = parser.add_subparsers(dest="action", required=True)
+    sub.add_parser("verify", help="verify the frozen source payload; no execution")
+    p = sub.add_parser("prepare", help="copy exact pinned source into a new directory")
+    p.add_argument("--archive", type=Path, required=True)
+    p.add_argument("--output", type=Path, required=True)
+    b = sub.add_parser("build", help="explicit offline source compilation; never install or launch")
+    for name in ("prepared", "toolchain", "cargo-home", "output"):
+        b.add_argument("--" + name, type=Path, required=True)
+    b.add_argument("--timeout", type=int, default=1200)
+    args = parser.parse_args()
+    args.manifest = MANIFEST
+    if args.action == "prepare":
+        prepare(args)
+    elif args.action == "build":
+        return build(args)
+    else:
+        _, _, upstream, toolchain, composed = package(args.manifest)
+        print(json.dumps({"status": "frozen-source-only", "upstream_files": len(upstream), "toolchain_files": len(toolchain), "composed_files": len(composed), "native_qualified": False}))
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except (ValueError, OSError, KeyError, TypeError, json.JSONDecodeError) as error:
+        print("Held: " + str(error), file=sys.stderr)
+        sys.exit(2)

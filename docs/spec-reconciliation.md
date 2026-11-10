@@ -181,6 +181,31 @@ new generation, test, recovery, validation reuse, refund, source integration or
 expiry extension. SPEC, governing pins and company adoption remain unchanged.
 See `development-retention-review.md` for the exact supported workflow.
 
+## Portable protected companion source dependency
+
+The repository now contains the separate `native/codex/` source recipe. It pins
+upstream Codex commit `c40729ea5cf8e947481b130c59807273eda2f8e9`, the complete
+9,264-file regular Rust source inventory, 41 exact companion overlay files, the
+accepted offline Cargo lock and the official Rust 1.95.0 macOS arm64 toolchain.
+The source-owned manifest hash is checked before copying inputs or creating an
+output. Upstream attribution is retained. CI verifies the actual payload and
+runs the 26 pure temporary-data checks as required build checks.
+
+This is source delivery for existing S009, S018, S058, S062, S068, S070, S084,
+S092 and S104 boundaries. It changes no normative row, company governance pin,
+accepted operating state or installed runtime. Source preparation and an
+explicit confined offline build are distinct operations; neither installs or
+qualifies the companion. The qualified binary slot remains empty. Full runtime
+composition, actual build receipts, independent native host/account acceptance,
+continuity and the peer acceptance matrix remain separate requirements.
+
+The delivered V4 policy passed controlled startup and 19-case file, loopback and
+owned-child checks on the observed macOS host. Baseline, confined and Data-volume
+alias runs overlap; they are not 57 distinct cases or proof of Cargo/native
+compatibility. Earlier pre-main aborts remain failures. The complete pinned
+source recipe and its supported limits are documented in
+[`native/codex/README.md`](../native/codex/README.md).
+
 ## Controlled P4 code acceptance
 
 The exact retained P4 candidate passed its canonical 326-case execution and a

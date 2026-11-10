@@ -111,3 +111,12 @@ The strict receipt runner and remote verifier remain optional tools for
 requirements are separate from ordinary CI success.
 They do not turn current sharded diagnostic logs or the Linux aggregate job into
 a historical whole-suite macOS receipt. See [implementation workflow and timing](implementation-speed.md).
+
+### Pinned companion source checks
+
+The required Build and drift job also verifies the source-owned
+`native/codex/` manifest and all pinned payload bytes, then runs its 26 pure
+Python temporary-data checks. These checks do not download upstream source,
+compile Rust, invoke the sandbox executor, install a toolchain or start a
+native/model session. The explicit macOS offline build and native qualification
+remain separate from this source-delivery check.
