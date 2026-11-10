@@ -189,14 +189,17 @@ upstream Codex commit `c40729ea5cf8e947481b130c59807273eda2f8e9`, the complete
 accepted offline Cargo lock and the official Rust 1.95.0 macOS arm64 toolchain.
 The source-owned manifest hash is checked before copying inputs or creating an
 output. Upstream attribution is retained. CI verifies the actual payload and
-runs the 32 pure temporary-data checks as required build checks.
+runs the 39 pure temporary-data checks as required build checks.
 
 This is source delivery for existing S009, S018, S058, S062, S068, S070, S084,
 S092 and S104 boundaries. It changes no normative row, company governance pin,
 accepted operating state or installed runtime. The V5 build policy adds only a literal read of the fixed root-owned system
 OpenSSL config, with exact bytes/metadata checked before output and after build.
 Its pinned Cargo/Rustc version checks passed; original V4 Cargo startup denial
-remains a retained failure. Source preparation and an
+remains a retained failure. The V6 build recipe derives the compiler association
+from a deterministic manifest of all validated Rust source inputs. The plan
+and receipt retain its exact artifact; a caller hash cannot select the identity.
+This closes a source-producer gap without qualifying or running a binary. Source preparation and an
 explicit confined offline build are distinct operations; neither installs or
 qualifies the companion. The qualified binary slot remains empty. Full runtime
 composition, actual build receipts, independent native host/account acceptance,

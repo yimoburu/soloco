@@ -154,3 +154,40 @@ mock ownership separately from strict metadata checks, never the CI host's real
 crypto configuration. There are 32 pure checks after these six additions. Both pinned 1.95.0 version
 commands exited successfully under V5 on the observed host with empty stderr;
 all owned process groups were observed absent.
+
+
+## Compiled source association (V6)
+
+Before compilation the tool verifies every actual prepared source byte and
+logical Git executable distinction. It derives a source-owned
+`compiled-source-manifest.json` in the new build output, with schema
+`soloco-compiled-native-inputs-v1`, the pinned upstream commit/tree, source-package
+manifest SHA-256 and the complete source inventory (9,274 rows for package6f5).
+Each row retains path, bytes, SHA-256 and logical Git mode. Serialization is
+Python JSON with sorted object keys, compact separators, `ensure_ascii=True`,
+UTF-8 encoding and exactly one terminal newline. The artifact is bounded to
+16MiB and made read-only. It contains no output binary hash or self-hash.
+
+The tool hashes the exact written bytes and sets the child build environment's
+`SOLOCO_SOURCE_MANIFEST_SHA256` to that digest, satisfying the companion's
+compile-time `option_env!` association. No CLI argument or inherited environment
+can select that value. The plan and final receipt retain artifact schema, path,
+byte count and SHA-256; the tool rechecks those exact bytes and complete source
+and toolchain inputs before reporting a compiled output. Changed or missing
+association artifacts hold even after a zero compiler return.
+
+A future independently reviewed source-owned executable slot must map its
+`source_manifest_path` and `source_manifest_sha256` to this retained artifact,
+and separately bind the actual output binary, lock, toolchain and build receipt.
+The artifact describes source inputs, so no binary/self-hash fixed point occurs.
+It is an input association, not independent review, execution authority, native
+qualification or evidence that a build happened. This source-preparation cut
+runs no compiler/version/OS child; the slot remains empty and qualified binary
+remains null.
+
+
+V6 adds seven pure checks, bringing the suite to 39. They cover deterministic
+complete-inventory generation, changed inputs/artifacts, retained final binding
+and caller environment/CLI rejection. Successful compiler returns and output
+bytes in these tests are explicit temporary mocks; no compiler or OS child is
+executed and no genuine compilation receipt is produced.

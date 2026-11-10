@@ -18,6 +18,24 @@ SPEC.loader.exec_module(TOOL)
 VALIDATE_OPENSSL_CONFIG = TOOL.validate_openssl_config
 
 
+def pure_build_fixture(tmp):
+    """Small synthetic bytes, never an accepted source or actual executable."""
+    base = Path(tmp).resolve()
+    prepared, prefix, cache = [base / x for x in ("prepared", "prefix", "cache")]
+    source = prepared / "source"
+    (source / "codex-rs").mkdir(parents=True)
+    (prefix / "bin").mkdir(parents=True)
+    (cache / "registry").mkdir(parents=True)
+    (source / "codex-rs/Cargo.lock").write_bytes(b"lock")
+    (prefix / "bin/cargo").write_bytes(b"cargo!")
+    (prefix / "bin/cargo").chmod(0o755)
+    sr = {"path": "codex-rs/Cargo.lock", "bytes": 4, "sha256": TOOL.sha(b"lock"), "mode": "100644"}
+    tr = {"path": "bin/cargo", "bytes": 6, "sha256": TOOL.sha(b"cargo!"), "mode": "100755"}
+    (prepared / "prepared-source.json").write_text(json.dumps({"schema": "soloco-prepared-native-source-v1", "manifest_sha256": TOOL.MANIFEST_SHA256, "files": [sr], "source_compiled": False, "native_qualified": False}))
+    args = argparse.Namespace(manifest=TOOL.MANIFEST, prepared=prepared, toolchain=prefix, cargo_home=cache, output=base / "output", timeout=5)
+    return base, args, sr, tr
+
+
 class TemporaryDataChecks(unittest.TestCase):
     def setUp(self):
         # Pure CI never consults the runner's real system crypto configuration.
@@ -355,6 +373,114 @@ class TemporaryDataChecks(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "configuration requires review"):
                     TOOL.build(args)
             self.assertFalse(args.output.exists())
+
+    def test_complete_manifest_generation_is_deterministic_and_not_self_referential(self):
+        _, _, _, _, expected = TOOL.package(TOOL.MANIFEST)
+        first = TOOL.compiled_source_manifest_bytes(expected)
+        second = TOOL.compiled_source_manifest_bytes(expected)
+        self.assertEqual(first, second)
+        value = json.loads(first)
+        self.assertEqual(value["files_count"], 9274)
+        self.assertEqual(value["files"], expected)
+        self.assertEqual(value["source_package_sha256"], TOOL.MANIFEST_SHA256)
+        self.assertEqual(value["upstream"], {"commit": TOOL.COMMIT, "tree": TOOL.TREE})
+        self.assertEqual(value["schema"], "soloco-compiled-native-inputs-v1")
+        self.assertEqual(set(value), {"schema", "upstream", "source_package_sha256", "files_count", "files"})
+        self.assertEqual(first, (json.dumps(value, sort_keys=True, ensure_ascii=True, separators=(",", ":")) + "\n").encode("utf-8"))
+        self.assertLessEqual(len(first), 16 * 1024 * 1024)
+
+    def test_manifest_generation_rejects_invalid_modes_paths_and_capacity(self):
+        row = {"path": "codex-rs/source", "bytes": 1, "sha256": "a" * 64, "mode": "100644"}
+        for changed in ({**row, "mode": "100777"}, {**row, "path": "outside/source"}):
+            with self.subTest(row=changed), self.assertRaises(ValueError):
+                TOOL.compiled_source_manifest_bytes([changed])
+        with patch.object(TOOL, "MAX_COMPILED_MANIFEST_BYTES", 1), self.assertRaisesRegex(ValueError, "runtime association bound"):
+            TOOL.compiled_source_manifest_bytes([row])
+
+    def test_changed_source_holds_before_manifest_output_or_spawn(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base, args, sr, tr = pure_build_fixture(tmp)
+            (args.prepared / "source/codex-rs/Cargo.lock").write_bytes(b"FAIL")
+            with patch.object(TOOL, "require_build_domain", return_value=TOOL.SANDBOX), patch.object(TOOL, "package", return_value=(base / "package", {}, [], [tr], [sr])), patch.object(TOOL.subprocess, "Popen", side_effect=AssertionError("must not spawn")):
+                with self.assertRaisesRegex(ValueError, "source changed"):
+                    TOOL.build(args)
+            self.assertFalse(args.output.exists())
+
+    def test_pure_mock_success_binds_exact_artifact_and_ignores_caller_hash(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base, args, sr, tr = pure_build_fixture(tmp)
+            observed = {}
+            def fake_spawn(argv, **kwargs):
+                data = (args.output / "compiled-source-manifest.json").read_bytes()
+                observed["digest"] = TOOL.sha(data)
+                self.assertEqual(kwargs["env"]["SOLOCO_SOURCE_MANIFEST_SHA256"], observed["digest"])
+                self.assertNotEqual(observed["digest"], "f" * 64)
+                self.assertEqual(set(json.loads(data)), {"schema", "upstream", "source_package_sha256", "files_count", "files"})
+                binary = args.output / "target" / TOOL.TARGET / "release/codex-soloco-protected-host"
+                binary.parent.mkdir(parents=True)
+                binary.write_bytes(b"PURE TEST DATA, NEVER EXECUTED")
+                return SimpleNamespace(wait=lambda timeout: 0)
+            with patch.dict(TOOL.os.environ, {"SOLOCO_SOURCE_MANIFEST_SHA256": "f" * 64}), patch.object(TOOL, "require_build_domain", return_value=TOOL.SANDBOX), patch.object(TOOL, "package", return_value=(base / "package", {}, [], [tr], [sr])), patch.object(TOOL.subprocess, "Popen", side_effect=fake_spawn) as spawn, contextlib.redirect_stdout(io.StringIO()):
+                result = TOOL.build(args)
+            self.assertEqual(result, 0)
+            self.assertEqual(spawn.call_count, 1)
+            plan = json.loads((args.output / "plan.json").read_text())
+            receipt = json.loads((args.output / "receipt.json").read_text())
+            binding = receipt["compiled_source_manifest"]
+            self.assertEqual(binding, plan["compiled_source_manifest"])
+            self.assertEqual(binding["sha256"], observed["digest"])
+            self.assertEqual(set(binding), {"schema", "path", "bytes", "sha256"})
+            self.assertEqual(Path(binding["path"]).stat().st_mode & 0o777, 0o444)
+            self.assertEqual(receipt["binary"]["sha256"], TOOL.sha(b"PURE TEST DATA, NEVER EXECUTED"))
+            self.assertFalse(receipt["native_qualified"])
+            self.assertFalse(receipt["source_slot_populated"])
+            self.assertEqual(plan["environment"]["SOLOCO_SOURCE_MANIFEST_SHA256"], binding["sha256"])
+
+    def test_pure_mock_zero_exit_cannot_accept_changed_manifest(self):
+        for change in ("bytes", "missing", "mode", "symlink"):
+            with self.subTest(change=change), tempfile.TemporaryDirectory() as tmp:
+                base, args, sr, tr = pure_build_fixture(tmp)
+                def fake_spawn(argv, **kwargs):
+                    artifact = args.output / "compiled-source-manifest.json"
+                    if change == "bytes":
+                        data = artifact.read_bytes().replace(b'"files"', b'"FILES"', 1)
+                        artifact.chmod(0o600);artifact.write_bytes(data);artifact.chmod(0o444)
+                    elif change == "missing":
+                        artifact.unlink()
+                    elif change == "mode":
+                        artifact.chmod(0o644)
+                    else:
+                        artifact.unlink();artifact.symlink_to(args.prepared / "prepared-source.json")
+                    return SimpleNamespace(wait=lambda timeout: 0)
+                with patch.object(TOOL, "require_build_domain", return_value=TOOL.SANDBOX), patch.object(TOOL, "package", return_value=(base / "package", {}, [], [tr], [sr])), patch.object(TOOL.subprocess, "Popen", side_effect=fake_spawn), contextlib.redirect_stdout(io.StringIO()):
+                    result = TOOL.build(args)
+                self.assertEqual(result, 1)
+                receipt = json.loads((args.output / "receipt.json").read_text())
+                self.assertEqual(receipt["status"], "changed-input-or-output-held")
+                self.assertIsNone(receipt["binary"])
+                self.assertFalse(receipt["native_qualified"])
+
+    def test_pure_mock_zero_exit_cannot_accept_changed_actual_source(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base, args, sr, tr = pure_build_fixture(tmp)
+            def fake_spawn(argv, **kwargs):
+                (args.prepared / "source/codex-rs/Cargo.lock").write_bytes(b"FAIL")
+                return SimpleNamespace(wait=lambda timeout: 0)
+            with patch.object(TOOL, "require_build_domain", return_value=TOOL.SANDBOX), patch.object(TOOL, "package", return_value=(base / "package", {}, [], [tr], [sr])), patch.object(TOOL.subprocess, "Popen", side_effect=fake_spawn), contextlib.redirect_stdout(io.StringIO()):
+                result = TOOL.build(args)
+            self.assertEqual(result, 1)
+            receipt = json.loads((args.output / "receipt.json").read_text())
+            self.assertEqual(receipt["status"], "changed-input-or-output-held")
+            self.assertIn("source changed", receipt["verification_error"])
+            self.assertIsNone(receipt["binary"])
+
+    def test_cli_cannot_select_a_compiled_source_hash(self):
+        values = ["tool", "build", "--prepared", "/fixture/prepared", "--toolchain", "/fixture/toolchain", "--cargo-home", "/fixture/cache", "--output", "/fixture/output", "--source-manifest-sha256", "f" * 64]
+        errors = io.StringIO()
+        with patch.object(TOOL.sys, "argv", values), patch.object(TOOL, "build", side_effect=AssertionError("must not build")), contextlib.redirect_stderr(errors), self.assertRaises(SystemExit) as result:
+            TOOL.main()
+        self.assertEqual(result.exception.code, 2)
+        self.assertIn("unrecognized arguments", errors.getvalue())
 
     def test_failed_sandbox_never_falls_back_to_direct_cargo(self):
         with tempfile.TemporaryDirectory() as tmp:
