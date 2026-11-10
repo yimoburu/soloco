@@ -26,6 +26,8 @@ OPENSSL_CONFIG_BYTES = 745
 OPENSSL_CONFIG_SHA256 = "025f5e31cd7b2248a0a661d8d346452c31d98e280f3420c3f6017c74c829ae73"
 MAX_BYTES = 128 * 1024 * 1024
 MAX_TOOLCHAIN_BYTES = 2 * 1024 * 1024 * 1024
+COMPILED_SOURCE_SCHEMA = "soloco-compiled-native-inputs-v1"
+MAX_COMPILED_MANIFEST_BYTES = 16 * 1024 * 1024
 TOP = {"schema", "status", "upstream", "source_cut", "overlay", "cargo_lock", "toolchain", "build", "qualified_binary", "runtime_integration"}
 CACHE_METADATA = (".package-cache", ".package-cache-mutate", ".global-cache", ".global-cache-shm", ".global-cache-wal", ".global-cache-journal")
 SYSTEM_READ_ROOTS = ("/System/Library", "/System/iOSSupport/System/Library", "/usr/lib", "/usr/share", "/usr/bin", "/bin", "/sbin", "/Library/Developer/CommandLineTools", "/Applications/Xcode.app/Contents/Developer", "/private/var/db/dyld")
@@ -351,6 +353,27 @@ def build_domain(source, prefix, cache, output):
     return [str(SANDBOX), "-p", profile, *cargo], env, profile
 
 
+def compiled_source_manifest_bytes(expected):
+    # expected is derived only by the source-owned package() producer, after the
+    # actual complete source inventory has passed pre-build verification.
+    files = rows(expected)
+    need(all(row["path"].startswith("codex-rs/") for row in files), "compiled source must describe only the pinned Rust tree")
+    value = {"schema": COMPILED_SOURCE_SCHEMA, "upstream": {"commit": COMMIT, "tree": TREE},
+             "source_package_sha256": MANIFEST_SHA256, "files_count": len(files), "files": files}
+    data = (json.dumps(value, sort_keys=True, ensure_ascii=True, separators=(",", ":")) + "\n").encode("utf-8")
+    need(len(data) <= MAX_COMPILED_MANIFEST_BYTES, "compiled-source manifest exceeds runtime association bound")
+    return data
+
+
+def verify_compiled_source_manifest(path, expected_bytes):
+    artifact = regular(path)
+    info = artifact.stat()
+    need(info.st_nlink == 1 and stat.S_IMODE(info.st_mode) == 0o444 and info.st_size == len(expected_bytes), "compiled-source manifest metadata changed")
+    data = artifact.read_bytes()
+    need(data == expected_bytes, "compiled-source manifest bytes changed")
+    return {"schema": COMPILED_SOURCE_SCHEMA, "path": str(artifact), "bytes": len(data), "sha256": sha(data)}
+
+
 def build(args):
     require_build_domain()  # Missing/unsupported domain holds before any spawn.
     root, m, _, toolchain, expected = package(args.manifest)
@@ -370,10 +393,18 @@ def build(args):
     output = fresh_directory(args.output, (root, prepared, prefix, cache))
     need(1 <= args.timeout <= 1200, "source build timeout must be 1..1200 seconds")
     argv, env, profile = build_domain(source, prefix, cache, output)
+    compiled_manifest_bytes = compiled_source_manifest_bytes(expected)
     output.mkdir(mode=0o700)
     (output / "tmp").mkdir()
+    compiled_manifest_path = output / "compiled-source-manifest.json"
+    with compiled_manifest_path.open("xb") as stream:
+        stream.write(compiled_manifest_bytes)
+    compiled_manifest_path.chmod(0o444)
+    source_association = verify_compiled_source_manifest(compiled_manifest_path, compiled_manifest_bytes)
+    # Never inherit a caller association, guessed input digest or output hash.
+    env["SOLOCO_SOURCE_MANIFEST_SHA256"] = source_association["sha256"]
     (output / "build-domain.sb").write_text(profile)
-    write_json(output / "plan.json", {"argv": argv, "environment": env, "manifest_sha256": MANIFEST_SHA256, "timeout_seconds": args.timeout, "build_domain_sha256": sha(profile.encode()), "network_containment": "required source-generated macOS Seatbelt network denial; source/toolchain read-only; exact output/cache-metadata writes", "system_openssl_config": {"path": str(OPENSSL_CONFIG), "bytes": OPENSSL_CONFIG_BYTES, "sha256": OPENSSL_CONFIG_SHA256}, "native_qualified": False})
+    write_json(output / "plan.json", {"argv": argv, "environment": env, "manifest_sha256": MANIFEST_SHA256, "timeout_seconds": args.timeout, "build_domain_sha256": sha(profile.encode()), "network_containment": "required source-generated macOS Seatbelt network denial; source/toolchain read-only; exact output/cache-metadata writes", "system_openssl_config": {"path": str(OPENSSL_CONFIG), "bytes": OPENSSL_CONFIG_BYTES, "sha256": OPENSSL_CONFIG_SHA256}, "compiled_source_manifest": source_association, "native_qualified": False})
     started = time.monotonic()
     state, result = "failed", None
     with (output / "stdout.log").open("xb") as stdout, (output / "stderr.log").open("xb") as stderr:
@@ -388,9 +419,10 @@ def build(args):
                 pass
             result = process.wait(timeout=5)
             state = "timeout-held"
-    receipt = {"schema": "soloco-native-source-build-receipt-v1", "status": state, "manifest_sha256": MANIFEST_SHA256, "exit_code": result, "elapsed_seconds": time.monotonic() - started, "binary": None, "native_qualified": False, "source_slot_populated": False, "descendant_or_remote_closure": "not established"}
+    receipt = {"schema": "soloco-native-source-build-receipt-v1", "status": state, "manifest_sha256": MANIFEST_SHA256, "exit_code": result, "elapsed_seconds": time.monotonic() - started, "compiled_source_manifest": source_association, "binary": None, "native_qualified": False, "source_slot_populated": False, "descendant_or_remote_closure": "not established"}
     try:
         need(sha(regular(args.manifest).read_bytes()) == MANIFEST_SHA256, "source-owned manifest changed during build")
+        need(verify_compiled_source_manifest(compiled_manifest_path, compiled_manifest_bytes) == source_association, "compiled-source association changed during build")
         validate_openssl_config()
         verify_complete_files(source, expected)
         verify_complete_files(prefix, toolchain, max_bytes=MAX_TOOLCHAIN_BYTES)
