@@ -35,9 +35,9 @@ export function workflowPolicy(workflow){requireThat(Object.hasOwn(workflowPolic
 // Runtime-sensitive compatibility coverage; the full suite remains mandatory on Node 22.
 export const compatibilityTests=Object.freeze([
   'cancellation-finalization','ci-evidence','claude-terminal-state','development-file-bodies','development-receipt-json','dynamic-specialists-integration','hooks','indexed-public-reads',
-  'code-review-window','code-review-inline-reread','continuation-review-transport','development-review-continuation','model-process-adapter-late-close','model-process-closure','review-continuation-central','review-continuation-grant-window',
+  'code-review-window','code-review-inline-reread','continuation-review-transport','development-review-continuation','development-retention-repair','development-retention-worker','model-process-adapter-late-close','model-process-closure','review-continuation-central','review-continuation-grant-window',
   'local-sandbox-flags','local-sandbox','local-sandbox-fixture','normalized-read-atomicity','peer-admission-provider-errors','peer-github','peer-github-atomic','peer-github-policy','peer-legacy-adoption-readiness','peer-legacy-writer-fence','peer-membership','peer-observation-journal','peer-publication-policy','peer-scheduler','peer-scheduler-admission-provider-errors','plugin',
-  'runtime-version-fence','selection-adapter','session-uncertainty','specialists','specialists-interface','storage-intake','storage-layout-repairs',
+  'retention-primary-transport','runtime-version-fence','selection-adapter','session-uncertainty','specialists','specialists-interface','storage-intake','storage-layout-repairs',
   'storage-transfer-integrity','storage-leaf-transfer','storage-transfer-paths','system-build','test-fixtures','test-preflight-recovery','task-index','task-runtime','tasks',
   'timeout','timeout-wiring','upgrade-adapter',
 ].map(name=>`tests/${name}.test.mjs`).sort());

@@ -1,3 +1,4 @@
+import {validateRetentionRepairAcceptance,assertRetentionRepairCommit} from './development-retention-repair.mjs';
 import {validationManifest,validationManifestMatches,validateReusableReceipt,confirmValidationFingerprint} from './validation-cache.mjs';
 import {presentationOnly,relevantRecord} from './current-state.mjs';
 import fs from 'node:fs';
@@ -171,7 +172,7 @@ export async function developmentAction(a,host,internal={}) {
   if(a.action==='diagnose_preflight')return queueDiagnostic(a,host,internal);
   if(a.action==='recover_preflight')return queueRecovery(a,host,internal);
   if(a.action==='run')return queueRun(a,host,internal);
-  let result;
+  let result,retentionControl=null;
   withStore(a.root,db=>db.transaction(`development.${a.action}`,s=>{
     owner(s,a.session_id,host,a.epoch);capable(s,a.root);
     if(a.action==='plan') {
@@ -216,14 +217,17 @@ export async function developmentAction(a,host,internal={}) {
         candidateOf(s,p,c?.id,false);verifyCandidate(a.root,p,c);
         if(d.candidate_sha256!==c.development.candidate_sha256||d.receipt_sha256!==a.receipt_sha256)throw new Error('Receipt/candidate mismatch');
         if(r?.kind!=='review'||r.status!=='Submitted'||r.author_role!=='qa'||r.review_of?.id!==t.id||r.review_of.revision!==t.revision||j?.status!=='completed'||!contextMatches(s,j,j.context_sha256)||!j.native_id||j.native_id===s.jobs[c.job_id]?.native_id||r.author_instance===c.author_instance||v?.verdict!=='Pass'||v.permitted_action!=='accept_local_development'||v.candidate_sha256!==d.candidate_sha256||v.receipt_sha256!==d.receipt_sha256||!Array.isArray(v.blockers)||v.blockers.length)throw new Error('A fresh independent QA Pass must accept this exact tested candidate');
-        if(Object.values(s.records).some(x=>x.kind==='review'&&x.status==='Submitted'&&x.review_of?.id===t.id&&['Fail','Blocked'].includes(x.review?.verdict)))throw new Error('This candidate has a failed/blocked review; repair under remaining scope');
+        const retention=j.retention_repair_id===undefined?null:validateRetentionRepairAcceptance(s,j,r,{root:a.root});
+        if(retention)retentionControl=retention.control;
+        if(Object.values(s.records).some(x=>x.kind==='review'&&x.status==='Submitted'&&x.review_of?.id===t.id&&['Fail','Blocked'].includes(x.review?.verdict)&&!retention?.clearedReviewIds.has(x.id)))throw new Error('This candidate has a failed/blocked review; repair under remaining scope');
         if(d.acceptance)throw new Error('Candidate was already accepted; inspect its receipt');
         const acceptedDirectory=candidateDir(a.root,p,c),acceptedAt=stamp();recoveryTime(p);
-        result=d.acceptance={at:acceptedAt,review_id:r.id,candidate_sha256:d.candidate_sha256,receipt_sha256:d.receipt_sha256,directory:acceptedDirectory,source_integrated:false};
+        result=d.acceptance={at:acceptedAt,review_id:r.id,candidate_sha256:d.candidate_sha256,receipt_sha256:d.receipt_sha256,directory:acceptedDirectory,source_integrated:false,...(retention?{retention_repair:retention.binding}:{})};
+        if(retentionControl){retentionControl.accepted_receipt_id=t.id;retentionControl.acceptance_sha256=digest(JSON.stringify(result));}
       } else throw new Error('Unknown development action');
     }
     s.runtime_version=VERSION;return s;
-  }));return result;
+  },{beforeCommit:(_db,next)=>{if(retentionControl)assertRetentionRepairCommit(next,retentionControl);}}));return result;
 }
 function queueRun(a,host,internal={}) {
   let p,c,jobId=id('test');
@@ -326,6 +330,7 @@ export function validTestExecution(state,receipt) {
 // expiry. This verifier never authorizes generation, testing, recovery or reuse,
 // and never asks a changed current authority to equal a historical context hash.
 export const developmentReviewAuthority = authority;
+export function liveDevelopmentReviewSubject(s,a,root){const p=planOf(s,a.plan_id);authorized(s,p,root);return developmentReviewSubject(s,a,root);}
 export function developmentReviewSubject(s,a,root) {
   const p=planOf(s,a.plan_id),d=p.development,scope=d.scope;
   if(s.paused||d.revoked||!d.authorization)throw Error('Review subject is paused, revoked or lacks original authorization');

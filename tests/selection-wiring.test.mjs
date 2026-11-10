@@ -10,6 +10,7 @@ import * as coordination from '../plugins/soloco/runtime/coordination.mjs';
 import {normalizeHandoverReviewWindow,normalizeCodeReviewWindow} from '../plugins/soloco/runtime/timeout.mjs';
 import {reviewContinuationAssignment} from '../plugins/soloco/runtime/development-review-continuation.mjs';
 import {codeReviewWindowSubject} from '../plugins/soloco/runtime/code-review-window.mjs';
+import * as retentionRepair from '../plugins/soloco/runtime/development-retention-repair.mjs';
 
 // Execute the actual main/engine bodies with controlled boundary dependencies.
 // No production store operation, adapter call, subprocess, CLI, network or timer is executed.
@@ -76,7 +77,7 @@ function harness(host='claude') {
     if(typeof value!=='string'||!value.trim()||value.length>max)throw new Error('Invalid '+label);
     return value;
   };
-  const deps={outcomeSchema,scoped,...coordination,operatingMaintenanceEligible,reviewContinuationAssignment,codeReviewWindowSubject,
+  const deps={outcomeSchema,scoped,...coordination,...retentionRepair,operatingMaintenanceEligible,reviewContinuationAssignment,codeReviewWindowSubject,
     path,os:{homedir:()=>'/unused'},fs:{existsSync:()=>true},
     process:{cwd:()=>process.cwd(),env:{},execPath:'/unused/node',argv:[]},
     PACKAGE:'/unused',VERSION:'fixture',SCHEMA:2,

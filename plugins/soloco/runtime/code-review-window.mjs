@@ -1,3 +1,4 @@
+import {resolveRetentionRepair} from './development-retention-repair.mjs';
 import {reviewContinuationSubject} from './development-review-continuation.mjs';
 // Private dispatch validation; a longer fixed review window grants no action
 // under an expired development grant and cannot replace an uncertain session.
@@ -7,6 +8,7 @@ import {validateRecordReadDelivery} from './record-read-delivery.mjs';
 const sha=v=>typeof v==='string'&&/^[a-f0-9]{64}$/.test(v);
 const ref=r=>({id:r.id,revision:r.revision,sha256:digest(JSON.stringify(r))});
 export function codeReviewWindowSubject(state,args,{fresh=true,root=process.cwd()}={}) {
+  const repair=resolveRetentionRepair(state,args,{root});if(repair)return {protocol:'development-code-review-window-subject-v1',retention_repair:{id:repair.ticket.id,revision:repair.ticket.revision,sha256:digest(JSON.stringify(repair.ticket))},receipt:repair.subject.receipt,candidate:repair.subject.candidate,plan:repair.subject.plan,controller_sha256:repair.subject.controller.sha256,candidate_sha256:repair.subject.candidate_sha256,receipt_sha256:repair.subject.receipt_sha256};
   const continuation=reviewContinuationSubject(state,args,{fresh,root});if(continuation){
     const p=state.records[args.review_of].development.proposal;
     if(fresh&&Date.now()+p.code_review_window_minutes*60000>Date.parse(p.expires_at))throw Object.assign(Error('Insufficient authorized time for the complete fixed code review window'),{code:'SCOPE_WINDOW_UNAVAILABLE'});

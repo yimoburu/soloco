@@ -1,3 +1,4 @@
+import {retentionRepairContextInputs} from './development-retention-repair.mjs';
 import {reviewContinuationContextInputs} from './development-review-continuation.mjs';
 import {operatingReviewContext,operatingContext} from './operating-state.mjs';
 import {scopedAssignment,scopedMatches,isScopedJob,SCOPED_LIMITS} from './scoped-context.mjs';
@@ -54,6 +55,7 @@ export function assignmentContext(state, job) {
   }
   const target=state.records[job.review_of?.id];
   for(const key of reviewContinuationContextInputs(state,target))ids.add(key);
+  for(const key of retentionRepairContextInputs(state,job))ids.add(key);
   const developmentId=job.development_id ?? target?.development?.plan_id;
   if(developmentId) {
     if(!state.records[developmentId]) throw new Error('Development scope missing');
