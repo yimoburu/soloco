@@ -1,3 +1,5 @@
+import {developmentReviewContinuationAction,reviewContinuationAssignment} from './development-review-continuation.mjs';
+import {codeReviewWindowSubject} from './code-review-window.mjs';
 import {SchedulingHold} from './recovery.mjs';
 import {OPERATING_PROTOCOL,validateOperatingRecord,proposeOperatingState,publishOperatingState,operatingInspection,operatingMaintenanceEligible,operatingContext,admitOperatingAssignment} from './operating-state.mjs';
 import {mechanicalOperatingControl} from './operating-control.mjs';
@@ -14,13 +16,14 @@ import { spawn } from 'node:child_process';
 import { PACKAGE, VERSION, stamp, id, digest, folder, noLink, withStore, owner, notice, requireText, SCHEMA, installedTeam, teamHash, upgradePending, compatibleRuntime } from './store.mjs';
 import { readiness, modelCatalog } from './adapters.mjs';
 import { normalizeSelection, selectionKey } from './selection.mjs';
+import {reconcileStoredModelProcessClosure} from './model-process-closure.mjs';
 import { normalizeCoordination, bindCoordination } from './coordination.mjs';
 import { progressSnapshot, renderProgress } from './progress-view.mjs';
 import { beginHandover, submitReconstruction, handoverReviewEligible, freshHandoverReviewEligible, verifyHandoverAcceptance, handoverSubject, inspectHandover, reconstructionReceipt, admitHandover } from './handover.mjs';
 import { assignmentContext, contextMatches } from './context.mjs';
 import { developmentAction, developmentCapability, developmentAssignment } from './develop.mjs';
 import { prototypeAction, prototypeCapability, prototypeAssignment } from './prototype.mjs';
-import { TIMEOUT_POLICY_VERSION, normalizeTimeout, normalizeHandoverReviewWindow, jobTimeoutState } from './timeout.mjs';
+import { TIMEOUT_POLICY_VERSION, normalizeTimeout, normalizeHandoverReviewWindow, normalizeCodeReviewWindow, jobTimeoutState } from './timeout.mjs';
 import {taskAction,runtimeAction} from './task-runtime.mjs';
 import {taskRecord,taskReady,bindTaskAttempt} from './tasks.mjs';
 import {runtimeGrant,runtimeControlBinding} from './task-runtime-authority.mjs';
@@ -93,7 +96,7 @@ export function operationReceipt(args,host,result,operation) {
 export function inspectionPage(args,host,collection) {
   binding(args,host);return withStore(args.root,db=>db.readSnapshot(()=>publicPage(db.publicState(),{collection})));
 }
-export function develop(args,host) { binding(args,host); return developmentAction(args,host); }
+export function develop(args,host) { binding(args,host); return ['prepare_review_continuation','authorize_review_continuation','accept_review_continuation'].includes(args.action)?developmentReviewContinuationAction(args,host):developmentAction(args,host); }
 export function prototype(args,host) { binding(args,host); return prototypeAction(args,host); }
 export function tasks(args,host){binding(args,host);return taskAction(args,host);}
 export function runtime(args,host){binding(args,host);return runtimeAction(args,host);}
@@ -308,9 +311,11 @@ export function dispatch(args,host,{launch=launchWorker,check=readiness,catalog=
   if(args.next_handoff!==undefined)requireText(args.next_handoff,'next_handoff',200);
   const timeout=normalizeTimeout({timeout_ms:args.timeout_ms,timeout_reason:args.timeout_reason});
   const reviewWindow=normalizeHandoverReviewWindow(args);
+  const codeWindow=normalizeCodeReviewWindow(args);
   if (args.role==='runner') throw new Error('Choose a specialist role from company_open');
   binding(args,host);
   if(reviewWindow)withStore(args.root,db=>{const s=db.read();owner(s,args.session_id,host,args.epoch);if(!freshHandoverReviewEligible(s,args))throw Error('Review window is only for a fresh current paused streamed handover QA');});
+  if(codeWindow)withStore(args.root,db=>{const s=db.read();owner(s,args.session_id,host,args.epoch);codeReviewWindowSubject(s,args,{root:args.root});});
   withStore(args.root,db=>{const s=db.read();owner(s,args.session_id,host,args.epoch);if(args.model_selection!==undefined&&!['0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7','0.6.8','0.6.9','0.6.10','0.6.11','0.6.12','0.6.13','0.7.0','0.7.1','0.7.2','0.7.3','0.7.4','0.7.5','0.7.6',VERSION].includes(s.plugin_version))throw new Error('Explicitly adopt the model-selection team before using model_selection');});
   const inventory=args.model_selection?.mode==='explicit' || args.model_selection?.speed==='fast_disabled'?catalog(host):null;
   const selection=normalizeSelection(args.model_selection,host,inventory);
@@ -324,6 +329,7 @@ export function dispatch(args,host,{launch=launchWorker,check=readiness,catalog=
     if(!Object.hasOwn(s.roles,args.role)) throw new Error('Role is absent from the pinned team catalog');
     const occupied=occupiedJobs(s);
     if(occupied.length>=3)throw new SchedulingHold(occupied.some(j=>!['queued','running'].includes(j.status))?'EXECUTION_UNCERTAIN':'CAPACITY_BUSY','Three assignments already active or uncertain; wait for confirmed process closure or a result');
+    const codeSubject=codeWindow?codeReviewWindowSubject(s,args,{root:args.root}):null;
     const target=args.review_of && Object.hasOwn(s.records,args.review_of) ? s.records[args.review_of] : null;
     if(args.review_of && !target) throw new Error('Review target not found');
     const specialist=args.specialist_ref===undefined?null:prepareSpecialistAssignment(s,args,{reserve:true});
@@ -359,7 +365,7 @@ export function dispatch(args,host,{launch=launchWorker,check=readiness,catalog=
     const coordination=bindCoordination(s,args);
     const inputs=[...new Set([...(args.input_ids??[]),...(specialist?.input_ids??[]),...handoverInputs,...profileReviewInputs,...(coordination?.dependencies??[]).map(d=>d.artifact_id)])];
     if(!Array.isArray(inputs) || inputs.some(k=>typeof k!=='string' || !Object.hasOwn(s.records,k))) throw new Error('An input record is missing');
-    const job={...(coordination?{coordination}:{}),...(args.expected_deliverable===undefined?{}:{expected_deliverable:args.expected_deliverable}),requester:{role:'runner',session_id:s.owner.session_id,host:s.owner.host,epoch:s.owner.epoch},id:jobId,role:args.role,session_key:key,instance_id:session.instance_id,native_id:session.native_id,host,epoch:s.owner.epoch,status:'queued',task:args.task,...(args.evidence_ids?{supplemental_sources:args.evidence_ids.map(key=>{const value=contextSource(s,key);if(!value)throw Error('Supplemental source missing');return recordReference(value,key);})}:{}),context_format:target?.context_classification_plan?.version===2?4:s.operating_state&&!target&&!args.prototype_id&&!args.development_id?6:3,...(args.context_scope?{context_scope:requireText(args.context_scope,'context_scope',160)}:{}),timeout_policy_version:TIMEOUT_POLICY_VERSION,...timeout,...(reviewWindow??{}),model_selection:selection,cli_version:ready.version,task_summary:args.task_summary??null,next_handoff:args.next_handoff??null,...(inventory?{model_catalog:{source:inventory.source,...(selection.mode==='explicit'?{model:inventory.models.find(m=>m.id===selection.model)}:{}),speed_support:inventory.speed_support}}:{}),inputs:inputs.map(k=>({id:k,revision:s.records[k].revision})),review_of:target?{id:target.id,revision:target.revision}:null,...(args.prototype_id?{prototype_id:args.prototype_id}:{}),...(args.development_id?{development_id:args.development_id}:{}),created_at:stamp()};
+    const job={...(coordination?{coordination}:{}),...(args.expected_deliverable===undefined?{}:{expected_deliverable:args.expected_deliverable}),requester:{role:'runner',session_id:s.owner.session_id,host:s.owner.host,epoch:s.owner.epoch},id:jobId,role:args.role,session_key:key,instance_id:session.instance_id,native_id:session.native_id,host,epoch:s.owner.epoch,status:'queued',task:args.task,...(args.evidence_ids?{supplemental_sources:args.evidence_ids.map(key=>{const value=contextSource(s,key);if(!value)throw Error('Supplemental source missing');return recordReference(value,key);})}:{}),context_format:target?.context_classification_plan?.version===2?4:s.operating_state&&!target&&!args.prototype_id&&!args.development_id?6:3,...(args.context_scope?{context_scope:requireText(args.context_scope,'context_scope',160)}:{}),timeout_policy_version:TIMEOUT_POLICY_VERSION,...timeout,...(reviewWindow??{}),...(codeWindow?{...codeWindow,code_review_subject:codeSubject}:{}),model_selection:selection,cli_version:ready.version,task_summary:args.task_summary??null,next_handoff:args.next_handoff??null,...(inventory?{model_catalog:{source:inventory.source,...(selection.mode==='explicit'?{model:inventory.models.find(m=>m.id===selection.model)}:{}),speed_support:inventory.speed_support}}:{}),inputs:inputs.map(k=>({id:k,revision:s.records[k].revision})),review_of:target?{id:target.id,revision:target.revision}:null,...(args.prototype_id?{prototype_id:args.prototype_id}:{}),...(args.development_id?{development_id:args.development_id}:{}),created_at:stamp()};
     if(specialist)job.specialist=specialist.binding;
     if(args.output_contract!==undefined){if(args.output_contract!=='operating-proposal-v1'||job.context_format!==6)throw Error('Operating proposal contract requires an ordinary accepted-checkpoint assignment');job.output_contract=args.output_contract;}
     if(fresh)Object.assign(job,{fresh_session:true,fresh_session_reason:freshReason});
@@ -367,6 +373,7 @@ export function dispatch(args,host,{launch=launchWorker,check=readiness,catalog=
     // explicit set before context assembly adds mandatory governing evidence.
     if(specialist)prepareSpecialistAssignment(s,{...args,input_ids:inputs});
     prototypeAssignment(s,job,true);developmentAssignment(s,job,true,args.root);
+    reviewContinuationAssignment(s,job,{reserve:true,root:args.root});
     const context=assignmentContext(s,job);
     if(job.context_format===6){job.inputs=context.inputs;job.context_sha256=context.hash;admitOperatingAssignment(s,job);}
     if(specialist)prepareSpecialistAssignment(s,{...args,input_ids:inputs},{reserve:true});
@@ -429,9 +436,16 @@ export function queueRuntimeTask(root,taskId,{launch=launchWorker,check=readines
   return {task_id:taskId,job_id:jobId,instance_id:instance,status:result.jobs[jobId].status,native_id:null,native_identity:'not_observed_until_native_return'};
 }
 export function control(args,host) {
-  if(!['pause','resume','handover','rename'].includes(args.action)) throw new Error('Unknown control action');
+  if(!['pause','resume','handover','rename','reconcile_process_closure'].includes(args.action)) throw new Error('Unknown control action');
   binding(args,host);
   requireText(args.source_instruction,'source_instruction');
+  if(args.action==='reconcile_process_closure'){
+    if(Object.keys(args).some(k=>!['root','session_id','action','expected_epoch','source_instruction','job_id'].includes(k)))throw Error('Closure reconciliation accepts only the existing job identity, never process/proof assertions');
+    requireText(args.job_id,'job_id',200);
+    return withStore(args.root,db=>{let changed=false;const result=db.transaction('job.process_closure_reconciled',s=>{owner(s,args.session_id,host,args.expected_epoch);const job=s.jobs?.[args.job_id];changed=reconcileStoredModelProcessClosure(db,job);return s;});
+      return {job_id:args.job_id,closure_reconciled:changed,termination_confirmed:result.jobs[args.job_id].coordination_release.termination_confirmed,status:result.jobs[args.job_id].status,original_failure:result.jobs[args.job_id].execution_failure??null,semantic_acceptance:false,execution_resumed:false,new_model_calls:0};});
+  }
+  if(args.job_id!==undefined)throw Error('job_id is only supported for process closure reconciliation');
   return withStore(args.root,db=>{const result=db.transaction(`company.${args.action}`,s=>{
     if (!s || ![1,SCHEMA].includes(s.schema)) throw new Error('Unsupported company version');
     if (args.action!=='pause') {

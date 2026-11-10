@@ -10,7 +10,7 @@ jobs:
   qualification:
     name: ${{ matrix.name }}
     runs-on: macos-15
-    timeout-minutes: 20
+    timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:

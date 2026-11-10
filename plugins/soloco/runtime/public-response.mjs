@@ -89,6 +89,7 @@ export function itemView(value,id,collection='records') {
     if(v.model_selection)view.model_selection=pick(v.model_selection,['mode','model','effort','speed','reason']);
     if(v.model_evidence)view.model_evidence={...pick(v.model_evidence,['verification','source','scope','reported_effort','reported_service_tier']),preview:true,exact_source:ref};
     if(v.coordination)view.coordination={dependencies:v.coordination.dependencies?.length??0,resources:v.coordination.resources?.length??0,preview:true,exact_source:ref};
+    if(v.model_process_tracking)view.model_process={current_invocation:v.model_process_tracking.current,invocations:v.model_process_tracking.invocations?.length??0,observed_closed:v.model_process_tracking.invocations?.filter(x=>x.closure?.observation==='original-child-close').length??0,meaning:'Original CLI child closure only; no descendant or QA acceptance claim',exact_source:ref};
     if(v.coordination_release)view.coordination_release=pick(v.coordination_release,['termination_confirmed','reason','at']);
     view.result_semantics='Lifecycle completion is not QA Pass or receiver acceptance';
   }

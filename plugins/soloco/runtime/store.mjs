@@ -35,6 +35,15 @@ export function noLink(file) {
   try { if (fs.lstatSync(file).isSymbolicLink()) throw new Error(`Refusing linked company record: ${file}`); }
   catch (error) { if (error.code !== 'ENOENT') throw error; }
 }
+// Trusted synchronous final guard, immediately before issuing COMMIT after all
+// storage/event work. COMMIT completion latency is not a zero-time promise.
+export const STORE_PRECOMMIT_GUARD_VERSION=1;
+function checkBeforeCommit(check,db,state){
+  if(check===undefined)return;
+  if(typeof check!=='function')throw Error('beforeCommit must be a private synchronous function');
+  const result=check(db,state);
+  if(result!==undefined){if(result&&typeof result.then==='function')Promise.resolve(result).catch(()=>{});throw Error('beforeCommit must complete synchronously without a return value');}
+}
 export class Store {
   constructor(root, create = false) {
     this.root = folder(root);
@@ -153,8 +162,8 @@ export class Store {
     }catch(error){this.db.exec('ROLLBACK');throw error;}
     finally{this.inTransaction=false;}
   }
-  selectedTransaction(type,options,fn,{afterWrite}={}) {
-    if(!normalizedLayout(this.db))return this.transaction(type,s=>fn(s),{afterWrite});
+  selectedTransaction(type,options,fn,{afterWrite,beforeCommit}={}) {
+    if(!normalizedLayout(this.db))return this.transaction(type,s=>fn(s),{afterWrite,beforeCommit});
     this.db.exec('BEGIN IMMEDIATE');this.inTransaction=true;
     try {
       const metadata=captureStorageMetadata(this.db);
@@ -171,6 +180,7 @@ export class Store {
       writeNormalizedSelection(this.db,changes);
       if(afterWrite)afterWrite(this.db,state);
       insertStorageEvent(this.db,type,{revision:state.revision,owner:state.owner},metadata);
+      checkBeforeCommit(beforeCommit,this.db,state);
       this.db.exec('COMMIT');this.snapshotState(state);return result;
     }catch(error){this.db.exec('ROLLBACK');throw error;}
     finally {this.inTransaction=false;}
@@ -182,7 +192,7 @@ export class Store {
       return row ? this.snapshotState(JSON.parse(row.value)) : null;
     });
   }
-  transaction(type, fn, {afterWrite}={}) {
+  transaction(type, fn, {afterWrite,beforeCommit}={}) {
     this.db.exec('BEGIN IMMEDIATE');this.inTransaction=true;
     try {
       const metadata=normalizedLayout(this.db)?captureStorageMetadata(this.db):null;
@@ -195,6 +205,7 @@ export class Store {
       else this.db.prepare('INSERT INTO company VALUES (1,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value').run(JSON.stringify(next));
       if(afterWrite)afterWrite(this.db,next);
       insertStorageEvent(this.db,type,{revision:next.revision,owner:next.owner},metadata);
+      checkBeforeCommit(beforeCommit,this.db,next);
       this.db.exec('COMMIT');
       return this.snapshotState(next);
     } catch (error) { this.db.exec('ROLLBACK'); throw error; }

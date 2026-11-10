@@ -322,6 +322,58 @@ export function validTestExecution(state,receipt) {
   return r.reused===true&&r.tests_executed===false&&r.reused_from===origin?.id&&j?.id===origin?.author_instance&&j?.kind==='development_test'&&j.status==='completed'&&j.artifact_id===origin.id&&j.candidate_id===c?.id&&j.development_id===origin.development.plan_id&&c?.development?.run?.receipt_id===origin.id&&c.development.run.job_id===j.id&&d.candidate_sha256===origin.development.candidate_sha256&&reuseQualificationMatches(state,origin,d.reuse_qualification,d.reuse_qualification_producer,d.reuse_candidate_producer)&&!negativeValidationReview(state,origin)&&validateReusableReceipt(origin,d.validation_fingerprint);
 }
 
+// A prospective review-only grant may inspect historical executed evidence after
+// expiry. This verifier never authorizes generation, testing, recovery or reuse,
+// and never asks a changed current authority to equal a historical context hash.
+export const developmentReviewAuthority = authority;
+export function developmentReviewSubject(s,a,root) {
+  const p=planOf(s,a.plan_id),d=p.development,scope=d.scope;
+  if(s.paused||d.revoked||!d.authorization)throw Error('Review subject is paused, revoked or lacks original authorization');
+  if(scope.max_bytes>developmentLimits(root).max_bytes)throw Error('Review exceeds current configured ceiling');
+  sourceMatches(root,p);
+  const c=candidateOf(s,p,a.candidate_id,false),producer=s.jobs[c.job_id],t=s.records[a.receipt_id],v=t?.development,controller=s.jobs[t?.author_instance];
+  if(c.kind!=='artifact'||c.author_role!=='engineer'||producer?.role!=='engineer'||producer.development_id!==p.id||producer.artifact_id!==c.id||producer.instance_id!==c.author_instance||!producer.native_id||producer.coordination_release?.termination_confirmed!==true)throw Error('Review needs the closed original native candidate producer');
+  verifyCandidate(root,p,c);
+  const reconstructed=developmentBundleForReview(scope,c);
+  if(JSON.stringify(reconstructed)!==JSON.stringify(c.development.files))throw Error('Cumulative candidate patches or frozen sources changed');
+  if(t?.kind!=='artifact'||t.status!=='Submitted'||t.author_role!=='runtime'||v?.type!=='test'||v.plan_id!==p.id||v.candidate_id!==c.id||v.candidate_sha256!==c.development.candidate_sha256||v.receipt_sha256!==a.receipt_sha256||v.receipt_sha256!==digest(JSON.stringify(v.result))||t.content!==JSON.stringify(v.result)
+    ||controller?.kind!=='development_test'||controller.status!=='completed'||controller.artifact_id!==t.id||controller.candidate_id!==c.id||controller.development_id!==p.id||controller.reuse_receipt_id!==undefined||c.development.run?.job_id!==controller.id||c.development.run?.receipt_id!==t.id||c.development.run?.status!=='completed'
+    ||!v.validation_manifest||!validTestExecution(s,t)||v.reused_from!==undefined||v.result.reused!==undefined||v.result.status!=='passed'||v.result.exit_code!==0||v.result.error||v.result.output_truncated||v.result.signal!=null)throw Error('Review needs the exact genuine non-reused passing runtime receipt');
+  const manifest=v.validation_manifest;
+  if(JSON.stringify(manifest.files)!==JSON.stringify(c.development.files.map(f=>({path:f.path,sha256:digest(f.content)})).sort((a,b)=>a.path.localeCompare(b.path)))||JSON.stringify(manifest.tests)!==JSON.stringify([...scope.test_paths].sort())||JSON.stringify(v.result.test_paths)!==JSON.stringify(scope.test_paths)||manifest.limits?.timeout_ms!==scope.timeout_ms||manifest.limits?.max_output_bytes!==scope.max_output_bytes||v.result.timeout_ms!==scope.timeout_ms||v.result.max_output_bytes!==scope.max_output_bytes||v.result.directory!==candidateDir(root,p,c))throw Error('Historical manifest must bind every candidate, test and limit');
+  const history=[];
+  if(v.preflight_recovery_id!==undefined) {
+    const g=s.records[v.preflight_recovery_id],r=g?.development,old=s.records[r?.subject?.receipt_id],oldJob=s.jobs[r?.subject?.job_id],diag=s.records[r?.diagnostic_id],dj=s.jobs[diag?.author_instance];
+    if(g?.kind!=='artifact'||g.author_role!=='human_founder'||g.status!=='Recorded'||r?.type!=='preflight_recovery_request'||r.protocol!=='original-grant-validation-recovery-v1'||r.status!=='consumed'||r.job_id!==controller.id||c.development.preflight_recovery!==g.id||r.generation_permission!==false||r.allowance_reset!==false||r.authority_sha256!==d.authorization.authority_sha256||r.expires_at!==scope.expires_at||r.subject.plan_id!==p.id||r.subject.scope_sha256!==d.scope_sha256||r.subject.candidate_id!==c.id||r.subject.candidate_sha256!==v.candidate_sha256||digest(JSON.stringify(old))!==r.subject.receipt_record_sha256||old?.development?.receipt_sha256!==r.subject.receipt_sha256||digest(JSON.stringify(oldJob))!==r.subject.job_sha256||!c.development.run_history?.some(run=>run.job_id===oldJob.id&&run.receipt_id===old.id&&run.status==='completed'))throw Error('Consumed recovery or original failed history changed');
+    if(diag?.development?.type!=='preflight_diagnostic'||diag.status!=='Submitted'||diag.author_role!=='runtime'||diag.development.receipt_sha256!==r.diagnostic_sha256||digest(JSON.stringify(diag.development.result))!==r.diagnostic_sha256||diag.content!==JSON.stringify(diag.development.result)||diag.development.result.status!=='passed'||diag.development.result.tests_executed!==false||diag.development.result.launch_intent!==false||dj?.kind!=='development_preflight'||dj.status!=='completed'||dj.artifact_id!==diag.id)throw Error('Consumed recovery diagnostic history changed');
+    history.push(g,old,diag);
+    if(r.proof.legacy) {
+      const proof=r.proof.legacy,q=s.records[proof.id],qj=s.jobs[q?.job_id],target=s.records[q?.review_of?.id],review=q?.review,restored=structuredClone(c);
+      delete restored.development.preflight_recovery;delete restored.development.run_history;restored.development.run={...proof.candidate_run};
+      if(digest(JSON.stringify(q))!==proof.sha256||digest(JSON.stringify(qj))!==proof.producer_sha256||digest(JSON.stringify(restored))!==proof.candidate_record_sha256||q?.status!=='Submitted'||q.author_role!=='qa'||qj?.status!=='completed'||qj.artifact_id!==q.id||qj.instance_id!==q.author_instance||!qj.native_id||qj.coordination_release?.termination_confirmed!==true||qj.context_sha256!==proof.context_sha256||review?.verdict!=='Pass'||review.permitted_action!=='qualify_preflight_recovery'||review.preflight_recovery?.receipt_sha256!==old.development.receipt_sha256||review.preflight_recovery?.candidate_sha256!==v.candidate_sha256||review.preflight_recovery?.target_sha256!==digest(JSON.stringify(target))||review.preflight_recovery?.basis!=='qualified-exact-source-first-fingerprint-inference'||review.preflight_recovery?.uncertainty!=='historical-launch-not-attested'||!Array.isArray(review.blockers)||review.blockers.length||[producer.native_id,producer.instance_id].includes(qj.native_id))throw Error('Historical legacy qualification changed');
+      for(const ref of [...proof.evidence,...proof.input_records]) {
+        const record=ref.id===c.id?restored:s.records[ref.id];
+        if(!record||record.revision!==ref.revision||digest(JSON.stringify(record))!==ref.sha256)throw Error('Historical qualification evidence changed');
+      }
+      // The full historical target already contains these exact source and
+      // installation bodies. Keep their checks above without duplicating them
+      // as a new model requalification requirement.
+      history.push(q,target);
+    } else if(!r.proof.execution_provenance||JSON.stringify(r.proof.execution_provenance)!==JSON.stringify(old.development.result.execution_provenance))throw Error('Recovery requires retained historical execution proof');
+  }
+  return {plan:p,candidate:c,receipt:t,producer,controller,history};
+}
+function developmentBundleForReview(scope,c) {
+  if(c.development.generation?.format==='patches') {
+    const patches=c.development.generation.patches;
+    if(!Array.isArray(patches)||digest(JSON.stringify(patches))!==c.development.generation.patch_sha256||JSON.stringify(patches.map(f=>f.path).sort())!==JSON.stringify(scope.write_paths))throw Error('Original cumulative patches are missing');
+    return [...scope.sources.filter(f=>!scope.write_paths.includes(f.path)).map(({path,content})=>({path,content})),...patches.map(f=>({path:f.path,content:reconstructPatch(scope.sources.find(x=>x.path===f.path)?.content,f)}))].sort((a,b)=>a.path.localeCompare(b.path));
+  }
+  for(const f of scope.sources.filter(f=>!scope.write_paths.includes(f.path)))if(c.development.files.find(x=>x.path===f.path)?.content!==f.content)throw Error('Read-only candidate source changed');
+  if(JSON.stringify(c.development.files.map(f=>f.path).sort())!==JSON.stringify([...new Set([...scope.read_paths,...scope.write_paths])].sort()))throw Error('Candidate file set changed');
+  return c.development.files;
+}
+
 // Historical deterministic evidence does not need today's unrelated task context,
 // but its original independent reviewer must still own the exact canonical Pass.
 function validationQualification(state,receipt,candidate) {

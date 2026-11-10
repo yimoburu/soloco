@@ -369,7 +369,7 @@ const workerPromptAssembly = (() => {
   const fragment = sourceText.slice(start, end);
   // The renderer remains the existing injected dependency. Its validation must
   // precede assembly; the selected context must precede the final prompt value.
-  assert.ok(fragment.includes('const renderedAssignmentPromptText=renderDevelopmentReviewContext(context,job);'));
+  assert.ok(fragment.includes("target?.development?.type==='review_continuation'?renderContinuationAwareReviewContext(context,job):renderDevelopmentReviewContext(context,job)"), 'typed continuation is scoped; ordinary renderer remains the existing dependency');
   assert.ok(fragment.indexOf('const renderedAssignmentPromptText=') < fragment.indexOf('const assemblePrompt='));
   assert.ok(fragment.indexOf('const assignmentPromptText=') < fragment.indexOf('const prompt='));
   assert.ok(sourceText.indexOf('      output=await model(', end) > end, 'this source seam precedes the existing model call');

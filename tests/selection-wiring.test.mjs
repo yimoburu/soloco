@@ -7,7 +7,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
 import * as coordination from '../plugins/soloco/runtime/coordination.mjs';
-import {normalizeHandoverReviewWindow} from '../plugins/soloco/runtime/timeout.mjs';
+import {normalizeHandoverReviewWindow,normalizeCodeReviewWindow} from '../plugins/soloco/runtime/timeout.mjs';
+import {reviewContinuationAssignment} from '../plugins/soloco/runtime/development-review-continuation.mjs';
+import {codeReviewWindowSubject} from '../plugins/soloco/runtime/code-review-window.mjs';
 
 // Execute the actual main/engine bodies with controlled boundary dependencies.
 // No production store operation, adapter call, subprocess, CLI, network or timer is executed.
@@ -74,7 +76,7 @@ function harness(host='claude') {
     if(typeof value!=='string'||!value.trim()||value.length>max)throw new Error('Invalid '+label);
     return value;
   };
-  const deps={outcomeSchema,scoped,...coordination,operatingMaintenanceEligible,
+  const deps={outcomeSchema,scoped,...coordination,operatingMaintenanceEligible,reviewContinuationAssignment,codeReviewWindowSubject,
     path,os:{homedir:()=>'/unused'},fs:{existsSync:()=>true},
     process:{cwd:()=>process.cwd(),env:{},execPath:'/unused/node',argv:[]},
     PACKAGE:'/unused',VERSION:'fixture',SCHEMA:2,
@@ -110,7 +112,7 @@ function harness(host='claude') {
     prototypeAction:()=>{},prototypeCapability:()=>({}),prototypeAssignment:()=>{},
     TIMEOUT_POLICY_VERSION:1,MIN_EXECUTION_TIMEOUT_MS:1000,MAX_EXECUTION_TIMEOUT_MS:600000,
     // Timeout is an unchanged boundary in this focused wiring test.
-    normalizeTimeout:({timeout_ms,timeout_reason})=>({timeout_ms:timeout_ms??180000,timeout_reason:timeout_reason??'Fixture default'}),normalizeHandoverReviewWindow,
+    normalizeTimeout:({timeout_ms,timeout_reason})=>({timeout_ms:timeout_ms??180000,timeout_reason:timeout_reason??'Fixture default'}),normalizeHandoverReviewWindow,normalizeCodeReviewWindow,
     jobTimeoutState:()=>({state:'terminal'}),
     spawn:(...args)=>{launches.push(args);return {on:()=>{},unref:()=>{}};},
     hooks:()=>{},upgrade:()=>{},upgradeGuidance:''

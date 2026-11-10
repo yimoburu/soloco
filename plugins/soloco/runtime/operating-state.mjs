@@ -1,3 +1,5 @@
+import {recordReadDeliveryPhase,recordReadDeliveryAdvance} from './record-read-delivery.mjs';
+import {modelProcessTransition,modelProcessPhase} from './model-process-closure.mjs';
 // Prospective only. Canonical classifications remain the preservation authority.
 import {producerClosure,scopedPlanView,CORPUS_PARTITIONER} from './scoped-context.mjs';
 import {retainSnapshot,captureSnapshotDependencies,validateSnapshotDependencies,operatingIntake,inheritSnapshots,hasSnapshotReferences,snapshotReference,snapshotEntryReference,resolveSnapshot,resolveSnapshotEntry,legacyHandoverSource} from './snapshot.mjs';
@@ -326,7 +328,7 @@ export function proposeOperatingState(s,args){
 }
 // Runtime-owned bounded preparation assignment. The immutable admission binds
 // every static field and exact input body; lifecycle metadata grants no authority.
-const assignmentMutable=['native_id','status','worker_pid','started_at','finished_at','execution_started_at','execution_deadline_at','termination_deadline_at','model_evidence','retrieved_inputs','proposal_reads','artifact_id','coordination_release'];
+const assignmentMutable=['delivered_record_reads','model_process_tracking','native_id','status','worker_pid','started_at','finished_at','execution_started_at','execution_deadline_at','termination_deadline_at','model_evidence','retrieved_inputs','proposal_reads','artifact_id','coordination_release'];
 const assignmentStatic=j=>Object.fromEntries(Object.entries(j).filter(([k])=>!assignmentMutable.includes(k)&&k!=='operating_admission'));
 export function admitOperatingAssignment(s,j){
   operatingContext(s);
@@ -405,14 +407,23 @@ function inputUnchanged(s,snapshot,planId){
   const ordinary=new Set(Object.values(s.jobs??{}).filter(j=>assignmentSafe(s,j)&&intake.events.some(event=>event.type==='job.queued'&&event.changes.some(c=>!c.before&&c.after?.family==='jobs'&&c.after.key===j.id&&same(JSON.parse(c.after.raw).operating_admission,j.operating_admission)&&assignmentSafe(s,JSON.parse(c.after.raw))))).map(j=>j.id));
   for(const event of intake.events)for(const change of event.changes){
     const ref=change.after??change.before;
-    if(ref?.family==='jobs'&&b.jobs.has(ref.key)&&event.payload?.storage_delta&&!['job.queued','job.started','job.execution_started','job.evidence_read','job.evidence_delivered','job.operating_evidence_delivered','job.completed'].includes(event.type))fail('DIRTY unsupported proof metadata producer');
+    if(ref?.family==='jobs'&&b.jobs.has(ref.key)&&event.payload?.storage_delta&&!['job.queued','job.started','job.execution_started','job.model_process.requested','job.model_process.born','job.model_process.closed','job.record_reads_delivered','job.evidence_read','job.evidence_delivered','job.operating_evidence_delivered','job.completed'].includes(event.type))fail('DIRTY unsupported proof metadata producer');
+    if(ref?.family==='jobs'&&event.type.startsWith('job.model_process.')){const before=change.before?JSON.parse(change.before.raw):null,after=change.after?JSON.parse(change.after.raw):null;if(!modelProcessTransition(before,after,event.type)||!same(Object.fromEntries(Object.entries(before??{}).filter(([k])=>k!=='model_process_tracking')),Object.fromEntries(Object.entries(after??{}).filter(([k])=>k!=='model_process_tracking'))))fail('DIRTY original model process producer changed');}
+    if(ref?.family==='jobs'&&event.type==='job.record_reads_delivered'){
+      const before=change.before?JSON.parse(change.before.raw):null,after=change.after?JSON.parse(change.after.raw):null;
+      if(!before||!after||!recordReadDeliveryAdvance(before.delivered_record_reads,after.delivered_record_reads)||!same(Object.fromEntries(Object.entries(before).filter(([k])=>k!=='delivered_record_reads')),Object.fromEntries(Object.entries(after).filter(([k])=>k!=='delivered_record_reads'))))fail('DIRTY record READ delivery producer changed');
+    }
     if(ref?.family!=='jobs'||!ordinary.has(ref.key))continue;
     const before=change.before?JSON.parse(change.before.raw):null,after=change.after?JSON.parse(change.after.raw):null;
     const fields={
       'job.queued':null,
       'job.started':['status','started_at','worker_pid'],
+      'job.model_process.requested':['model_process_tracking'],
+      'job.model_process.born':['model_process_tracking'],
+      'job.model_process.closed':['model_process_tracking'],
       'job.execution_started':['execution_started_at','execution_deadline_at','termination_deadline_at'],
       'job.evidence_read':['retrieved_inputs','proposal_reads'],
+      'job.record_reads_delivered':['delivered_record_reads'],
       'job.completed':['status','artifact_id','finished_at','native_id','coordination_release','model_evidence']
     };
     if(!Object.hasOwn(fields,event.type)||!after)fail('DIRTY unsupported assignment metadata producer');
@@ -436,6 +447,8 @@ function inputUnchanged(s,snapshot,planId){
     for(const key of [...assignmentMutable,'handover_reads','operating_delivery']){
       if(!Object.hasOwn(value,key)||key==='status')continue;
       if(key==='native_id'&&value[key]===null)continue;
+      if(key==='delivered_record_reads'){if(!recordReadDeliveryPhase(value[key],current[key]))return false;continue;}
+      if(key==='model_process_tracking'){if(!modelProcessPhase(value[key],current[key]))return false;continue;}
       if(['retrieved_inputs','handover_reads','proposal_reads'].includes(key)){
         if(!Array.isArray(value[key])||!Array.isArray(current[key])||!value[key].every((v,i)=>same(v,current[key][i])))return false;
       }else if(!same(value[key],current[key]))return false;

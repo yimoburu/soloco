@@ -1,9 +1,9 @@
 # SPEC v0.21 reconciliation
 
-This assessment covers peer/storage baseline main `4e9e434` (PR #56) and the
-lossless development-review transport, mechanical legacy-writer archive fence
-and current peer publication-policy, scheduler and test-preflight recovery components described below,
-November 9, 2026 UTC.
+This assessment covers main `94391ac` (PR #64, including PR #65 corrections)
+and the compatible review-maintenance components below, November 9, 2026 Pacific.
+It retains the peer/storage, lossless transport, mechanical archive fence,
+publication-policy, scheduler and test-preflight evidence with its original pins.
 This includes the peer foundations, bounded storage core, executor/fixture fixes,
 durable observation journal and storage transfer qualification described below.
 Contract: [SPEC.md](../SPEC.md), SHA-256
@@ -95,6 +95,66 @@ it from attention views but does not discard its conditions from assignment inpu
 | S102 / 102 | Simplest sufficient implementation; narrower limits disclosed | existing record/runtime architecture; README and developer guide | Judgment/Limited: source review checks proportionality; no full-conformance inference from disclosure. |
 | S104 / 104 | Observable failure/staleness/replacement checks; explicit rule adoption | full repository tests, native acceptance fixture, generated-governance check | Mixed: executed receipts and independent review below; open behavioral claims remain open. |
 
+## Compatible review recovery maintenance
+
+The new review-continuation path implements existing S014, S017, S028, S058,
+S062, S068, S070, S072, S074, S084 and S086; it changes no normative row or
+adopted company rule. A new current authorization binds one fresh independent
+review and local acceptance to an unchanged historical candidate, actual test
+receipt and retained failure evidence. The old scope remains expired, its
+spent generations and consumed recovery remain charged, and its unclosed
+review session retains its reservation. Historical execution is not relabeled
+as execution under the new runtime. Generation, testing, recovery, integration
+and business action require their own applicable authority.
+
+New opt-in code-QA windows retain one fixed absolute deadline across all READ
+continuations and judgment, with bounded individual calls and a grant cutoff.
+Publication checks the QA cutoff immediately before SQLite COMMIT, after
+storage/event writes. Later acceptance checks timely historical review,
+confirmed closure, exact provenance, current authority and the separate grant;
+it does not revive the earlier attempt. No hard real-time COMMIT completion or
+provider-termination guarantee follows from a software cutoff.
+
+The delivery ledger distinguishes retrieval from a valid response by the same
+native session. A Pass requires whole inline evidence or a hash-checked whole
+READ interval union. A continuation-aware outer transport keeps the new
+review target distinct from its historical receipt and restores the exact
+original canonical context. Physical native delivery needs its own audit;
+transport roundtrip and response bookkeeping do not prove understanding or
+retention after compaction.
+
+Within an explicit code-QA window, frozen references to initially supplied
+records permit optional re-reading. The original ID, revision and full-record
+hash must still match the current source. Native identity, four-range requests,
+sixteen rounds and 32,768-character ranges remain enforced. Availability of
+these reads does not establish that recovery after compaction fits those bounds.
+
+Private original-ChildProcess observers retain late close evidence after a
+timeout. Typed, attributable storage history permits separate idempotent
+closure reconciliation without changing the failed result or reviving output.
+This proves the direct CLI child's closure only. Missing historical birth/close
+evidence, descendant closure, actual peer-host enrollment, company adoption
+and the complete peer architecture remain unqualified by these components.
+
+The frozen source preparation covers 204 nonoverlapping controlled conditions
+across three recorded executions: twelve whole roots with 185 passes, the
+corrected whole 15-case timeout VM root, and the new whole four-case grant
+regression root. This is not one final all-green aggregate or full-repository
+qualification. The VM correction imports its real module dependency; original
+assertions remain. Earlier failed/incomplete runs and their uncertainty remain
+retained. Final integration and hosted checks are reported separately.
+
+The later inline re-read component has 115 passing controlled conditions across
+seven whole roots on its frozen tuple. The combined worker and fixture batching
+tuple passes the whole 35-case operating-state root. These are separate runs;
+complete hosted qualification must cover the final committed integration.
+
+See `development-review-continuation.md` and `ordinary-model-process-closure.md`
+for supported calls and limits. These source changes do not establish the
+pending native P4 code review or any actual managed-CoS adoption. SPEC v0.22
+and the proposed peer architecture still require their separate reconciliation
+and acceptance.
+
 ## Merged peer and storage evidence
 
 The mission and enduring requirements remain unchanged. PR #49 added peer
@@ -179,6 +239,8 @@ the adopted team and runtime release version are unchanged; see
 | PR #61 merge `3d65268` | [Post-merge Source CI](https://github.com/yimoburu/soloco/actions/runs/42695347401): 1,606 Node 22 tests, build/drift and gate | Actual merged checkout with the identical qualified head tree; native 202-case qualification remains separate |
 | PR #62 head `d46cf4d` | [Source CI](https://github.com/yimoburu/soloco/actions/runs/42716095177): 1,715 Node 22 tests; [qualification](https://github.com/yimoburu/soloco/actions/runs/42716104684): 2,127 full Node 22 tests and 845 Node 26 compatibility tests | Exact reviewed recovery source; zero failures, cancellations, skips or todos |
 | PR #62 merge `c8c317c` | [Post-merge Source CI](https://github.com/yimoburu/soloco/actions/runs/42718592217): 1,715 Node 22 tests, build/drift and gate | Actual merged checkout with the identical qualified head tree; live operations require their own evidence |
+| PR #64 head `ec468e6` | [Source CI](https://github.com/yimoburu/soloco/actions/runs/42731657838): 1,811 Node 22 tests; [qualification](https://github.com/yimoburu/soloco/actions/runs/42731706910): 2,223 full Node 22 tests and 941 Node 26 compatibility tests | Exact combined receipt-sharing and specialist-correction head; zero failures, cancellations, skips or todos |
+| PR #64 merge `94391ac` | [Post-merge Source CI](https://github.com/yimoburu/soloco/actions/runs/42734123287): 1,811 Node 22 tests, build/drift and gate | Actual merged checkout with the identical qualified tree; this does not establish native code acceptance or peer operation |
 
 Counts across lanes overlap. These results do not establish installation,
 company adoption, native-host behavior, human workload reduction or business

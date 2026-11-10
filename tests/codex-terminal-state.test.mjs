@@ -20,10 +20,12 @@ const warning={type:'error',message:'Reconnecting 2/5 (workspace routing discove
 const message=text=>({type:'item.completed',item:{type:'agent_message',text}});
 const wire=events=>events.map(e=>typeof e==='string'?e:JSON.stringify(e)).join('\n')+'\n';
 const negative=(verdict='Blocked',content='Fictional unresolved negative')=>JSON.stringify({content,messages:[],notices:[],review:{verdict,reason:'Prior failure remains unresolved',permitted_action:'hold',blockers:['No retry']}});
+// Synthetic original-child identity; no OS process or PID observation.
+let nextSyntheticPid=731000;
 function adapter(events,{code=0,limit}={}) {
  return (host,native,prompt,cwd,timeout,selection,options={})=>runModel(host,native,prompt,cwd,timeout,selection,{
-  ...options,...(limit?{maxOutputCharacters:limit}:{}),resolveExecutable:()=>'/fictional/codex',spawn:()=>{
-   const child=new EventEmitter();child.stdin=new EventEmitter();child.stdout=new EventEmitter();child.stderr=new EventEmitter();
+  ...options,sessionTitle:undefined,...(limit?{maxOutputCharacters:limit}:{}),resolveExecutable:()=>'/fictional/codex',spawn:()=>{
+   const child=new EventEmitter();child.pid=++nextSyntheticPid;child.stdin=new EventEmitter();child.stdout=new EventEmitter();child.stderr=new EventEmitter();
    child.kill=()=>{queueMicrotask(()=>child.emit('close',null));return true;};
    child.stdin.end=()=>queueMicrotask(()=>{child.emit('spawn');child.stdout.emit('data',wire(typeof events==='function'?events(prompt):events));child.emit('close',code);});
    return child;

@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import {createHash,randomUUID} from 'node:crypto';
 import path from 'node:path';
 import os from 'node:os';
 import { spawn, spawnSync } from 'node:child_process';
@@ -315,6 +316,8 @@ export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selectio
     const unschedule = options.clearTimeout ?? clearTimeout;
     for (const fn of [startProcess, resolveCommand, now, schedule, unschedule]) if (typeof fn !== 'function') throw new Error('Invalid lifecycle dependency');
     if (options.onSpawn !== undefined && typeof options.onSpawn !== 'function') throw new Error('Invalid onSpawn callback');
+    const observeProcess=options.onModelProcess!==undefined||options.onModelClosure!==undefined;
+    if(observeProcess&&(typeof options.onModelProcess!=='function'||typeof options.onModelClosure!=='function'))throw Error('Paired private model process observers required');
     const title=options.sessionTitle;
     if(title!==undefined&&(typeof title!=='string'||!title.trim()||title.length>200||/[\u0000-\u001f\u007f]/.test(title)))throw Error('Invalid session display title');
     if(options.sessionNameSupport!==undefined&&typeof options.sessionNameSupport!=='boolean')throw Error('Invalid session naming capability');
@@ -353,6 +356,23 @@ export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selectio
     };
     let spawned=false, executionDeadline=null;
     let startupTimer=null, executionTimer=null, killTimer=null;
+    let processBirth=null,processClosure=false;
+    const processHash=value=>createHash('sha256').update(value).digest('hex');
+    const observeBirth=()=>{
+      if(!observeProcess||processBirth)return;
+      if(!Number.isSafeInteger(child.pid)||child.pid<=0)throw Error('Actual model process PID unavailable');
+      const birth={protocol:'ordinary-model-process-birth-v1',launch_id:randomUUID(),host,pid:child.pid,worker_pid:process.pid,spawned_at:new Date(readNow()).toISOString(),command_sha256:processHash(command),argv_sha256:processHash(JSON.stringify(args)),cwd_sha256:processHash(cwd)};
+      const returned=options.onModelProcess(birth);
+      if(returned&&typeof returned.then==='function')throw Error('Model process birth must be durably synchronous');
+      processBirth=Object.freeze(birth);
+    };
+    const observeClose=(code,signal)=>{
+      if(!observeProcess||processClosure||!processBirth)return;processClosure=true;
+      const receipt={protocol:'ordinary-model-process-close-v1',birth_sha256:processHash(JSON.stringify(processBirth)),closed_at:new Date(readNow()).toISOString(),exit_code:Number.isInteger(code)?code:null,signal:typeof signal==='string'?signal:null,observation:'original-child-close'};
+      // Observation failure leaves durable uncertainty; it never changes the
+      // already-settled timeout/result or invents a public success response.
+      try{const returned=options.onModelClosure(processBirth,receipt);if(returned&&typeof returned.then==='function')returned.catch(()=>{});}catch{}
+    };
     const listeners=[];
     const listen = (emitter, event, handler) => {
       emitter.on(event, handler);
@@ -365,8 +385,14 @@ export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selectio
     };
     const cleanup = () => {
       clear('startup'); clear('execution'); clear('kill');
-      for (const [emitter,event,handler] of listeners) emitter.removeListener(event,handler);
-      listeners.length=0;
+      for (const [emitter,event,handler] of listeners) {
+        const originalChildObserver=emitter===child&&(['close','error'].includes(event)||event==='spawn'&&!processBirth);
+        const originalPipeError=event==='error'&&[child.stdout,child.stderr,child.stdin].includes(emitter);
+        if(observeProcess&&!closed&&(originalChildObserver||originalPipeError))continue;
+        emitter.removeListener(event,handler);
+      }
+      if(observeProcess&&!closed){child.stdout.resume?.();child.stderr.resume?.();}
+      if(!observeProcess||closed)listeners.length=0;
       signal?.removeEventListener('abort', onAbort);
     };
     const finish = (error, result) => {
@@ -430,6 +456,7 @@ export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selectio
     };
     listen(child, 'error', onProcessError);
     listen(child, 'spawn', () => {
+      try{observeBirth();}catch(error){if(!settled)stop(error,readNow()+TERMINATION_GRACE_MS);return;}
       if (settled || failure || spawned || expired()) return;
       const at=readNow();
       const duration=Math.min(policy.timeout_ms,absoluteDeadline===undefined?policy.timeout_ms:absoluteDeadline-at);
@@ -479,9 +506,12 @@ export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selectio
     listen(child.stdout, 'error', onProcessError);
     listen(child.stderr, 'error', onProcessError);
     listen(child.stdin, 'error', onProcessError);
-    listen(child, 'close', code => {
+    listen(child, 'close', (code,signal) => {
+      closed=true;observeClose(code,signal);
+      // Actual close ends all original child and pipe observations, including
+      // harmless errors retained while the timed-out pipes drained.
+      cleanup();
       if (settled) return;
-      closed=true;
       // Clock checks fence late success even if timer callbacks were delayed.
       expired();
       if (failure) return finish(failure);
