@@ -141,6 +141,7 @@ export function progressFor(snapshot = {}) {
       rejected_output:copy(job.rejected_output ?? null)
     };
     if (own(job,'requester')) node.requester = copy(job.requester);
+    if (own(job,'specialist')) node.specialist = copy(job.specialist);
     node.context_inputs = (Array.isArray(job.inputs) ? job.inputs : []).filter(r => contextReference(records.get(r?.id),r)).map(copy);
     if (own(job,'expected_deliverable')) node.expected_deliverable = copy(job.expected_deliverable);
     if (own(job,'next_handoff')) node.next_handoff = copy(job.next_handoff);

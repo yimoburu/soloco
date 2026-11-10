@@ -1,6 +1,6 @@
 # Current capability map
 
-This map describes source based on main `c8c317c` (PR #62), plus the compatible
+This map describes source based on main `1919a5b` (PR #63), plus the compatible
 development-review receipt presentation extension below. It includes the
 peer foundations (PR #49), bounded storage core (PR #51), executor and fixture
 fixes (PR #52/#53), durable observation journal (PR #55), and storage transfer
@@ -12,6 +12,7 @@ Historical reports retain their original source identities and verdicts.
 
 | Capability | Source | Executable evidence | Present boundary |
 |---|---|---|---|
+| Bounded temporary specialist expertise | `specialists.mjs`, engine/context/worker/task integration, `company_specialists` | `specialists.test.mjs`, `specialists-interface.test.mjs`, `dynamic-specialists-integration.test.mjs`; actual engine/SQLite/MCP/worker paths with explicit injected native outputs | Standing-policy creation, full context, separate sessions, expiry/revocation and independent result evidence are source checks. These fixtures do not establish native competence, peer production routing, installation, company adoption or founder benefit; see `dynamic-specialists.md` |
 | Durable preparation and independent dependency gates | `task-runtime.mjs`, `tasks.mjs` | `task-runtime-acceptance.test.mjs`, `task-runtime.test.mjs` | Existing native evidence in issue #30; full company/session replacement still requires its own trial |
 | Explicit outcome hypotheses and cold reconstruction | `outcome.mjs`, `task-context.mjs` | `tasks.test.mjs`, `task-context.test.mjs`, real-source self-improvement trial | Task acceptance is not observed business impact |
 | Typed scheduling/recovery causes | `recovery.mjs`, `coordination.mjs` | `task-runtime.test.mjs`, coordination suites | No automatic retry of an attempted/uncertain task |

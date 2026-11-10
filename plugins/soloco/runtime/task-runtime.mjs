@@ -67,11 +67,17 @@ export function taskAction(args,host,{wake=ensureSupervisor}={}) {
         return result;
       }
       // End the read snapshot before acquiring the write transaction below.
-      return {writeState:extraRecords(db,loaded.state,args,host)};
+      // New profile references are not yet part of any indexed task closure.
+      // Admission also needs the complete current revocation/assignment ledger,
+      // including writes arriving after this read snapshot. Validate those
+      // optional definitions in the existing full semantic transaction below.
+      const fullState=['submit','amend'].includes(args.action)&&(args.spec?.specialist_ref!==undefined||loaded.state.records?.[args.task_id]?.runtime_task?.spec?.specialist_ref!==undefined);
+      return {writeState:fullState?loaded.state:extraRecords(db,loaded.state,args,host),fullState};
     });
   });
   if(!result.writeState)return result;
-  const written=withStore(args.root,db=>selected(db,'task.'+args.action,result.writeState,state=>{
+  const written=withStore(args.root,db=>{
+   const write=state=>{
     let r;
     if(args.action==='submit')r=submitTask(state,args,host);
     else if(args.action==='amend')r=amendTask(state,args,host);
@@ -79,7 +85,10 @@ export function taskAction(args,host,{wake=ensureSupervisor}={}) {
     else if(args.action==='message')r=sendTaskMessage(state,args,host);
     else r=disposeTaskMessage(state,args,host);
     return r.runtime_task?compactTask(r):{id:r.id,status:r.status,revision:r.revision,source:source(r)};
-  }));
+   };
+   if(!result.fullState)return selected(db,'task.'+args.action,result.writeState,write);
+   let value;db.transaction('task.'+args.action,state=>{value=write(state);return state;},{afterWrite:updateTaskIndex});return value;
+  });
   registered.add(folder(args.root));
   let wakeup;try{wakeup=wake(args.root);}catch(e){wakeup={started:false,needs_attention:e.message};}
   return {...written,wakeup};
