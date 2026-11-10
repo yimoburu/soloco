@@ -155,6 +155,32 @@ review and local acceptance described below. Actual managed-CoS adoption,
 SPEC v0.22 and the proposed peer architecture still require their separate
 reconciliation and acceptance.
 
+## Review after loss of primary evidence
+
+A separate one-use retention-review ticket binds a live original grant, exact
+unchanged candidate, genuine non-reused passing receipt and a closed independent
+Blocked review. It preserves the original review and adverse history. Ordinary
+acceptance remains blocked without the exact separately checked clearing
+judgment; other adverse candidate evidence continues to hold the work.
+
+The worker completes the required historical reads, then supplies the whole
+current governing controls, original sources, candidate, runtime receipt and
+prior review together in one deterministic primary frame. Lossless aliases must
+restore the exact canonical values. The runtime checks currentness before
+sending and after the call closes, records actual same-native delivery, and
+requires a verdict-only response afterward. Missing, changed, oversized or
+uncertain evidence holds; a model-supplied acknowledgment grants no permission.
+Ambiguous model JSON, including duplicate object keys, is rejected before
+normalization. A review's own published notices and messages remain recorded
+without invalidating its input snapshot; other jobs' changes remain current.
+
+Controlled source tests exercise lifecycle, parser, transport, expiry and commit
+boundaries. They do not establish a real native semantic Pass. Actual review and
+owner acceptance remain necessary for the named candidate. The ticket grants no
+new generation, test, recovery, validation reuse, refund, source integration or
+expiry extension. SPEC, governing pins and company adoption remain unchanged.
+See `development-retention-review.md` for the exact supported workflow.
+
 ## Controlled P4 code acceptance
 
 The exact retained P4 candidate passed its canonical 326-case execution and a

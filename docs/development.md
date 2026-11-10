@@ -340,6 +340,14 @@ The existing direct normalized raw read API verifies the current pointer and
 original in one SQLite read snapshot per range, avoiding raw-source serialization.
 Assembled/alias/legacy sources retain their exact existing fallback.
 
+## Closed QA evidence-retention blocks
+
+[Retention-review repair](development-retention-review.md) provides one bounded,
+prospective review of an unchanged candidate and its original executed receipt.
+It preserves the original Blocked judgment and requires independent clearing of
+every exact blocker, complete final primary delivery and full code acceptance.
+Ordinary negative-review and expired-scope continuation rules remain enforced.
+
 ## Repository CI
 
 See [source CI and evidence verification](ci.md) for the required macOS Node matrix, generated-drift check, retained receipts, local commands and remote provenance boundaries.

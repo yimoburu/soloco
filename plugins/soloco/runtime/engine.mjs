@@ -1,3 +1,4 @@
+import {retentionReviewAction,resolveRetentionRepair,retentionRepairSessionKey,retentionRepairContextInputs,assertRetentionRepairCommit} from './development-retention-repair.mjs';
 import {developmentReviewContinuationAction,reviewContinuationAssignment} from './development-review-continuation.mjs';
 import {codeReviewWindowSubject} from './code-review-window.mjs';
 import {SchedulingHold} from './recovery.mjs';
@@ -96,7 +97,7 @@ export function operationReceipt(args,host,result,operation) {
 export function inspectionPage(args,host,collection) {
   binding(args,host);return withStore(args.root,db=>db.readSnapshot(()=>publicPage(db.publicState(),{collection})));
 }
-export function develop(args,host) { binding(args,host); return ['prepare_review_continuation','authorize_review_continuation','accept_review_continuation'].includes(args.action)?developmentReviewContinuationAction(args,host):developmentAction(args,host); }
+export function develop(args,host) { binding(args,host); return ['prepare_retention_review','authorize_retention_review'].includes(args.action)?retentionReviewAction(args,host):['prepare_review_continuation','authorize_review_continuation','accept_review_continuation'].includes(args.action)?developmentReviewContinuationAction(args,host):developmentAction(args,host); }
 export function prototype(args,host) { binding(args,host); return prototypeAction(args,host); }
 export function tasks(args,host){binding(args,host);return taskAction(args,host);}
 export function runtime(args,host){binding(args,host);return runtimeAction(args,host);}
@@ -125,10 +126,10 @@ export function specialists(args,host){
   }));
   let result;update(args,host,'specialist.'+args.action,state=>{result=specialistAction(state,args,options);});return result;
 }
-function update(args, host, type, fn, selection=null) {
+function update(args, host, type, fn, selection=null,beforeCommit=null) {
   binding(args,host);
   if (!Number.isInteger(args.epoch)) throw new Error('Supply the current ownership epoch from company_status');
-  return withStore(args.root, db => {const mutate=state=>{owner(state,args.session_id,host,args.epoch);if(state.operating_state||type.startsWith('operating.'))bindOperatingIntake(state,db);fn(state);state.runtime_version=VERSION;return state;};return selection&&db.selectedTransaction?db.selectedTransaction(type,selection,mutate):db.transaction(type,mutate);});
+  return withStore(args.root, db => {const mutate=state=>{owner(state,args.session_id,host,args.epoch);if(state.operating_state||type.startsWith('operating.'))bindOperatingIntake(state,db);fn(state);state.runtime_version=VERSION;return state;};return selection&&db.selectedTransaction?db.selectedTransaction(type,selection,mutate):db.transaction(type,mutate,beforeCommit?{beforeCommit}:{});});
 }
 export function open(args, host) {
   binding(args,host);
@@ -322,7 +323,7 @@ export function dispatch(args,host,{launch=launchWorker,check=readiness,catalog=
   const ready=check(host);
   if (!ready.available) throw new Error(ready.error);
   if (ready.authenticated===false) throw new Error(`${host} CLI is not signed in. Complete its normal login before starting specialists.`);
-  const jobId=id('job');
+  const jobId=id('job');let retentionControl=null;
   const state=update(args,host,'job.queued',s=>{
     if(s.paused && !handoverReviewEligible(s,args)&&!qualificationMaintenanceEligible(s,args)&&!scoped.scopedMaintenanceEligible(s,args)&&!operatingMaintenanceEligible(s,args)) throw new Error('Company is paused; only current handover QA or explicitly authorized read-only qualification may run');
     if(reviewWindow&&!freshHandoverReviewEligible(s,args))throw Error('Review window is only for a fresh current paused streamed handover QA');
@@ -333,7 +334,8 @@ export function dispatch(args,host,{launch=launchWorker,check=readiness,catalog=
     const target=args.review_of && Object.hasOwn(s.records,args.review_of) ? s.records[args.review_of] : null;
     if(args.review_of && !target) throw new Error('Review target not found');
     const specialist=args.specialist_ref===undefined?null:prepareSpecialistAssignment(s,args,{reserve:true});
-    const key=specialist?specialistSessionKey(args.role,specialist.binding):target ? `${args.role}:review:${target.id}:${target.revision}` : args.prototype_id ? `${args.role}:prototype:${jobId}` : args.development_id ? `${args.role}:development:${jobId}` : args.role;
+    const repair=resolveRetentionRepair(s,{...args,...timeout,...codeWindow},{root:args.root});
+    const key=repair?retentionRepairSessionKey(repair.ticket):specialist?specialistSessionKey(args.role,specialist.binding):target ? `${args.role}:review:${target.id}:${target.revision}` : args.prototype_id ? `${args.role}:prototype:${jobId}` : args.development_id ? `${args.role}:development:${jobId}` : args.role;
     const qualification=Boolean(target?.context_qualification_target||target?.scoped_context_target);
     if(qualification&&(args.role!=='qa'||args.prototype_id||args.development_id||args.input_ids?.length||args.evidence_ids?.length))throw Error('Qualification requires separate bounded QA without extra inputs');
     let session=s.sessions[key];
@@ -363,9 +365,9 @@ export function dispatch(args,host,{launch=launchWorker,check=readiness,catalog=
       }
     }
     const coordination=bindCoordination(s,args);
-    const inputs=[...new Set([...(args.input_ids??[]),...(specialist?.input_ids??[]),...handoverInputs,...profileReviewInputs,...(coordination?.dependencies??[]).map(d=>d.artifact_id)])];
+    const inputs=[...new Set([...(args.input_ids??[]),...retentionRepairContextInputs(s,args),...(specialist?.input_ids??[]),...handoverInputs,...profileReviewInputs,...(coordination?.dependencies??[]).map(d=>d.artifact_id)])];
     if(!Array.isArray(inputs) || inputs.some(k=>typeof k!=='string' || !Object.hasOwn(s.records,k))) throw new Error('An input record is missing');
-    const job={...(coordination?{coordination}:{}),...(args.expected_deliverable===undefined?{}:{expected_deliverable:args.expected_deliverable}),requester:{role:'runner',session_id:s.owner.session_id,host:s.owner.host,epoch:s.owner.epoch},id:jobId,role:args.role,session_key:key,instance_id:session.instance_id,native_id:session.native_id,host,epoch:s.owner.epoch,status:'queued',task:args.task,...(args.evidence_ids?{supplemental_sources:args.evidence_ids.map(key=>{const value=contextSource(s,key);if(!value)throw Error('Supplemental source missing');return recordReference(value,key);})}:{}),context_format:target?.context_classification_plan?.version===2?4:s.operating_state&&!target&&!args.prototype_id&&!args.development_id?6:3,...(args.context_scope?{context_scope:requireText(args.context_scope,'context_scope',160)}:{}),timeout_policy_version:TIMEOUT_POLICY_VERSION,...timeout,...(reviewWindow??{}),...(codeWindow?{...codeWindow,code_review_subject:codeSubject}:{}),model_selection:selection,cli_version:ready.version,task_summary:args.task_summary??null,next_handoff:args.next_handoff??null,...(inventory?{model_catalog:{source:inventory.source,...(selection.mode==='explicit'?{model:inventory.models.find(m=>m.id===selection.model)}:{}),speed_support:inventory.speed_support}}:{}),inputs:inputs.map(k=>({id:k,revision:s.records[k].revision})),review_of:target?{id:target.id,revision:target.revision}:null,...(args.prototype_id?{prototype_id:args.prototype_id}:{}),...(args.development_id?{development_id:args.development_id}:{}),created_at:stamp()};
+    const job={...(repair?{retention_repair_id:repair.ticket.id}:{}),...(coordination?{coordination}:{}),...(args.expected_deliverable===undefined?{}:{expected_deliverable:args.expected_deliverable}),requester:{role:'runner',session_id:s.owner.session_id,host:s.owner.host,epoch:s.owner.epoch},id:jobId,role:args.role,session_key:key,instance_id:session.instance_id,native_id:session.native_id,host,epoch:s.owner.epoch,status:'queued',task:args.task,...(args.evidence_ids?{supplemental_sources:args.evidence_ids.map(key=>{const value=contextSource(s,key);if(!value)throw Error('Supplemental source missing');return recordReference(value,key);})}:{}),context_format:target?.context_classification_plan?.version===2?4:s.operating_state&&!target&&!args.prototype_id&&!args.development_id?6:3,...(args.context_scope?{context_scope:requireText(args.context_scope,'context_scope',160)}:{}),timeout_policy_version:TIMEOUT_POLICY_VERSION,...timeout,...(reviewWindow??{}),...(codeWindow?{...codeWindow,code_review_subject:codeSubject}:{}),model_selection:selection,cli_version:ready.version,task_summary:args.task_summary??null,next_handoff:args.next_handoff??null,...(inventory?{model_catalog:{source:inventory.source,...(selection.mode==='explicit'?{model:inventory.models.find(m=>m.id===selection.model)}:{}),speed_support:inventory.speed_support}}:{}),inputs:inputs.map(k=>({id:k,revision:s.records[k].revision})),review_of:target?{id:target.id,revision:target.revision}:null,...(args.prototype_id?{prototype_id:args.prototype_id}:{}),...(args.development_id?{development_id:args.development_id}:{}),created_at:stamp()};
     if(specialist)job.specialist=specialist.binding;
     if(args.output_contract!==undefined){if(args.output_contract!=='operating-proposal-v1'||job.context_format!==6)throw Error('Operating proposal contract requires an ordinary accepted-checkpoint assignment');job.output_contract=args.output_contract;}
     if(fresh)Object.assign(job,{fresh_session:true,fresh_session_reason:freshReason});
@@ -374,12 +376,13 @@ export function dispatch(args,host,{launch=launchWorker,check=readiness,catalog=
     if(specialist)prepareSpecialistAssignment(s,{...args,input_ids:inputs});
     prototypeAssignment(s,job,true);developmentAssignment(s,job,true,args.root);
     reviewContinuationAssignment(s,job,{reserve:true,root:args.root});
+    if(repair)retentionControl=resolveRetentionRepair(s,job,{reserve:true,root:args.root}).control;
     const context=assignmentContext(s,job);
     if(job.context_format===6){job.inputs=context.inputs;job.context_sha256=context.hash;admitOperatingAssignment(s,job);}
     if(specialist)prepareSpecialistAssignment(s,{...args,input_ids:inputs},{reserve:true});
     s.jobs[jobId]={...job,inputs:context.inputs,context_sha256:context.hash};
     s.runtime_version=VERSION;
-  });
+  },null,(_db,next)=>{if(retentionControl)assertRetentionRepairCommit(next,retentionControl);});
   try {
     const worker=launch(args.root,jobId);
     worker.on('error',error=>withStore(args.root,db=>db.transaction('job.spawn_failed',s=>{s.jobs[jobId].status='failed';s.jobs[jobId].error=error.message;s.jobs[jobId].coordination_release={termination_confirmed:true,reason:'worker_spawn_failed',at:stamp()};notice(s,'must_know','Unable to start specialist session.',jobId);return s;})));
