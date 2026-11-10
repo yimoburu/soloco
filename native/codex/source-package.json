@@ -1,0 +1,504 @@
+{
+  "schema": "soloco-protected-native-source-package-v1",
+  "status": "frozen-source-unqualified",
+  "upstream": {
+    "repository": "https://github.com/openai/codex",
+    "commit": "c40729ea5cf8e947481b130c59807273eda2f8e9",
+    "tree": "078c14cecf94b522a2eff48b30996bf3f4d1bf7a",
+    "archive_sha256": "473fbbe3523605050abd0606b28d88b06f194b42653a66c23ca2d5f86043725a",
+    "inventory": {
+      "path": "pins/upstream-c407-files.json",
+      "bytes": 1944745,
+      "sha256": "c8fe940866a0b85af27568d0518ff4d6338e994b49efc1e0e096d5bcbed78b0f"
+    },
+    "attribution": [
+      {
+        "path": "upstream-LICENSE",
+        "bytes": 10926,
+        "sha256": "d17f227e4df5da1600391338865ce0f3055211760a36688f816941d58232d8dc"
+      },
+      {
+        "path": "upstream-NOTICE",
+        "bytes": 242,
+        "sha256": "9d71575ecfd9a843fc1677b0efb08053c6ba9fd686a0de1a6f5382fd3c220915"
+      }
+    ]
+  },
+  "source_cut": {
+    "handoff": {
+      "path": "pins/corrected-source-handoff.json",
+      "bytes": 1457,
+      "sha256": "5a43acb85656aa2f2dc6a52b91ab5d88741d69bf27bd1c0368ec1d59664e9a61"
+    },
+    "bindings": {
+      "path": "pins/corrected-source-bindings.json",
+      "bytes": 57834,
+      "sha256": "a22ecc4be62062b4e37933f0bfa725acae27c688617b1e0d3a80b393b4103d33"
+    },
+    "patch": {
+      "path": "patches/c407-companion-corrected-source.patch",
+      "bytes": 176644,
+      "sha256": "752bc6157b258e93977933a7e75cd710bdc3b79364832dcbd588b50397c2b487"
+    },
+    "review_state": "independent-review-required"
+  },
+  "overlay": [
+    {
+      "target": "codex-rs/app-server/Cargo.toml",
+      "before_sha256": "cceb3af7ee41633a33b14f55f1193b32fc75afb830c0dfa22393cf24af3d6f3d",
+      "payload": {
+        "path": "overlay/codex-rs/app-server/Cargo.toml",
+        "bytes": 5466,
+        "sha256": "3b30430d955e39c5b4627b3c482040c95a649fe0e05e54106a2b7e910aff30ec"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/app-server/src/application_network.rs",
+      "before_sha256": "c712033949fa73f753c7145710b20025ade26531ef74089e623c92d6162bb5e0",
+      "payload": {
+        "path": "overlay/codex-rs/app-server/src/application_network.rs",
+        "bytes": 6694,
+        "sha256": "a3bdc6c612501a59f55bf080eaf9577fb5005ee61e227bb84daea273fcdaee2c"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/app-server/src/config_manager.rs",
+      "before_sha256": "64568b07bc395b5fcd8f37a3dc062c81a3fd1657a0f9dad6a59db163af5e0a5e",
+      "payload": {
+        "path": "overlay/codex-rs/app-server/src/config_manager.rs",
+        "bytes": 34181,
+        "sha256": "4793ed7939039c85faa9c43f2b962e1ecc7579fd5d0c4173599153c8304e5bc4"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/app-server/src/in_process.rs",
+      "before_sha256": "8a64137ba4cb99112d51da630a7928da0460cf1ef982dc4a40b3b6811fb507af",
+      "payload": {
+        "path": "overlay/codex-rs/app-server/src/in_process.rs",
+        "bytes": 65400,
+        "sha256": "1dea7a13183fc66a8633a4660187fffa5cfa506378ca8ef24725fac7676d9926"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/app-server/src/in_process_bootstrap.rs",
+      "before_sha256": "ac55bf9996090f0d7ef425bbc4308f3791e257167ec141f8542e80d51483d4bb",
+      "payload": {
+        "path": "overlay/codex-rs/app-server/src/in_process_bootstrap.rs",
+        "bytes": 8462,
+        "sha256": "03a868ebabadb7dc7a1f8b3ca3753ef0ab47e55bb960ebec99485b3401fcbe6e"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/app-server/src/lib.rs",
+      "before_sha256": "a44b0266619d6adda0c1e7135d5be18e6581cff44307e78097efecc5195f8b6c",
+      "payload": {
+        "path": "overlay/codex-rs/app-server/src/lib.rs",
+        "bytes": 65384,
+        "sha256": "4d0c3e4092b836e17b30a417173ffa1d04fb30af83961efbe01e6f9fb10a4975"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/app-server/src/protected_host.rs",
+      "before_sha256": null,
+      "payload": {
+        "path": "overlay/codex-rs/app-server/src/protected_host.rs",
+        "bytes": 12344,
+        "sha256": "098dd0393d8006dbd7f168cae2c8b92e842aa816d6c284a25108a801384fcca7"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/app-server/src/protected_paths.rs",
+      "before_sha256": null,
+      "payload": {
+        "path": "overlay/codex-rs/app-server/src/protected_paths.rs",
+        "bytes": 6484,
+        "sha256": "21a414cc95e5e256f8cd1d25b6a85f4a0bbc3bc0ba55e5295cb093c23ad4cd1d"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/app-server-client/Cargo.toml",
+      "before_sha256": "9f941218c5bc7932bf1d675cbea2715820a563a41e5d871dd45207e1c285ba3e",
+      "payload": {
+        "path": "overlay/codex-rs/app-server-client/Cargo.toml",
+        "bytes": 1422,
+        "sha256": "bc77f4e4d93015b8e20a9fe0178862cc5043955d3e470044a1882c06f0e6b725"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/app-server-client/src/bin/soloco_protected_host.rs",
+      "before_sha256": null,
+      "payload": {
+        "path": "overlay/codex-rs/app-server-client/src/bin/soloco_protected_host.rs",
+        "bytes": 19962,
+        "sha256": "7ac91f862467c70d04c1cc08d418806757bbae5c9110f7f2068cf0246c56133a"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/app-server-client/src/lib.rs",
+      "before_sha256": "3ab3d894c169989ba9319fb4c7fb9daf09a9de53a2ff80b739ff38abde0f2f75",
+      "payload": {
+        "path": "overlay/codex-rs/app-server-client/src/lib.rs",
+        "bytes": 90784,
+        "sha256": "5bbc0f8cfa27ad8a98a52c747da0de255ed665920d78f60c5c6795c2f7b7a316"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/codex-api/Cargo.toml",
+      "before_sha256": "f836d8b371da62849dee27b70c352b63fded2ad473b95a72ea66892580b704c5",
+      "payload": {
+        "path": "overlay/codex-rs/codex-api/Cargo.toml",
+        "bytes": 1527,
+        "sha256": "5a6899d7bd3e40614c7bc6b99b29e2d4ed0726f16ae0cce1aba12ef08bddde87"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/codex-api/src/endpoint/images.rs",
+      "before_sha256": "23efc36e7326062481453182eab8be96019732e427cc8fac23e0c25832a95aa4",
+      "payload": {
+        "path": "overlay/codex-rs/codex-api/src/endpoint/images.rs",
+        "bytes": 13826,
+        "sha256": "50311705778d96585f44e5693d9203b1ee44ae6b72ed3fbd7199f951659efa0c"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/codex-api/src/endpoint/memories.rs",
+      "before_sha256": "5097333e373a0e8965296185843350acbf77f5ec095eb7149b5b74d601e905a8",
+      "payload": {
+        "path": "overlay/codex-rs/codex-api/src/endpoint/memories.rs",
+        "bytes": 7095,
+        "sha256": "281e57eaffe3063940d01d193952886e23de13a3d9739fcbbad9ca8b3f4ba279"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/codex-api/src/endpoint/models.rs",
+      "before_sha256": "accf041a6bae9c4dcd88ad6ffd1ea17c3c6e4d6785d42cbadb0767d5b0d1ffd6",
+      "payload": {
+        "path": "overlay/codex-rs/codex-api/src/endpoint/models.rs",
+        "bytes": 14834,
+        "sha256": "219beb06576eb03e4f98c70264fb3a3e8e9ef25f1a48c87473418c4edbf15e1f"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/codex-api/src/endpoint/realtime_call.rs",
+      "before_sha256": "c9a987c05dadabb620dfaea38e8b739735efaf3f931daeec7c59d69f56788252",
+      "payload": {
+        "path": "overlay/codex-rs/codex-api/src/endpoint/realtime_call.rs",
+        "bytes": 27572,
+        "sha256": "4a38426cdd200b86c354a2bd683d27473370b70d5caf09d053f60d159f4b9f66"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/codex-api/src/endpoint/responses.rs",
+      "before_sha256": "4f2fff3da4ca3ca9fcfa40ada8e98a0229af296094e03febb4d823f32ef932c8",
+      "payload": {
+        "path": "overlay/codex-rs/codex-api/src/endpoint/responses.rs",
+        "bytes": 5166,
+        "sha256": "9f0b1199276786d58654469da1d7bcb69de8a82e87b396393843e1531c0aaefd"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/codex-api/src/endpoint/responses_websocket/connector.rs",
+      "before_sha256": "6ba68aa7e9495768bd90bcac2271c4a81dc6880606412405e25131df76e2425d",
+      "payload": {
+        "path": "overlay/codex-rs/codex-api/src/endpoint/responses_websocket/connector.rs",
+        "bytes": 2204,
+        "sha256": "d876c4eb8ef4c1c32a8da297c904f4032c2053e2822055550c6a94c420f86f64"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/codex-api/src/endpoint/responses_websocket.rs",
+      "before_sha256": "454f4282f7b935e8eff1ad6a744c6b95d7c50a078db9747a157eb8b439e72393",
+      "payload": {
+        "path": "overlay/codex-rs/codex-api/src/endpoint/responses_websocket.rs",
+        "bytes": 56125,
+        "sha256": "7f9fae726ef43eadbf411916f49a5dc33dfbfbed4b38bd8ef2aa4c0d58a37174"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/codex-api/src/endpoint/search.rs",
+      "before_sha256": "28c31b17215094c4651bf2dd2ae5c26c9dd2186db77c78ed6f318562d1c8af21",
+      "payload": {
+        "path": "overlay/codex-rs/codex-api/src/endpoint/search.rs",
+        "bytes": 11746,
+        "sha256": "31bb5c1d3122faa13e2585add98512ff9e92b4ed9a15bc2b7c7d63be170ce403"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/codex-api/src/endpoint/session.rs",
+      "before_sha256": "355cc0f030ab32d21b3e6fcce569a15a59958fecdda85423bf05642497bdb1eb",
+      "payload": {
+        "path": "overlay/codex-rs/codex-api/src/endpoint/session.rs",
+        "bytes": 5028,
+        "sha256": "e470c03e4ab45fffa9f6c3aeb2c188618f950a81c06b68f5b3ad0cd6e5adf559"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/codex-api/src/lib.rs",
+      "before_sha256": "5093646bef6b38ba47c5ea1d22492baf1f3196eab30e3e3332d12d8b69acaebc",
+      "payload": {
+        "path": "overlay/codex-rs/codex-api/src/lib.rs",
+        "bytes": 5373,
+        "sha256": "ca84295151464f6e6abfd98f3a3fc94b14ed1c8b49ab5f71c692530113ffb488"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/codex-api/src/protected_peer/source_gate_tests.rs",
+      "before_sha256": null,
+      "payload": {
+        "path": "overlay/codex-rs/codex-api/src/protected_peer/source_gate_tests.rs",
+        "bytes": 1574,
+        "sha256": "c050c2df27461591450f6d81eb5b9a91c6ae2f6f673ad16cae028a324c82eb78"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/codex-api/src/protected_peer/startup.rs",
+      "before_sha256": null,
+      "payload": {
+        "path": "overlay/codex-rs/codex-api/src/protected_peer/startup.rs",
+        "bytes": 5526,
+        "sha256": "a7cbf0191243951ce3fc2f8245e21625ad392fbc54346e8b0631e6c02b2ca472"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/codex-api/src/protected_peer.rs",
+      "before_sha256": null,
+      "payload": {
+        "path": "overlay/codex-rs/codex-api/src/protected_peer.rs",
+        "bytes": 26255,
+        "sha256": "61ddcbbaac31bd2e36248483ff4254495ef7c945978584dd40a53cfbeb107e21"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/codex-api/src/protected_peer_responses_tools.json",
+      "before_sha256": null,
+      "payload": {
+        "path": "overlay/codex-rs/codex-api/src/protected_peer_responses_tools.json",
+        "bytes": 2038,
+        "sha256": "04811953467e598da671fb72aafe202ee716a10c10dcf5497bd81f51729da5f1"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/core/src/agents_md.rs",
+      "before_sha256": "a8b5595ece62750ba9e8885a6f27c63b305a83a4fd732d523ec0c19380c0233f",
+      "payload": {
+        "path": "overlay/codex-rs/core/src/agents_md.rs",
+        "bytes": 22773,
+        "sha256": "ae7ba676438e3471a9a0953d7a6b0962fada13536a20977c00111f5346940258"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/core/src/client.rs",
+      "before_sha256": "662cf64d10f4b0d7eaf3ad046e53b1eb6dcf8dfb3cb5a425a3c8c222adc05da5",
+      "payload": {
+        "path": "overlay/codex-rs/core/src/client.rs",
+        "bytes": 138292,
+        "sha256": "73c7e46d6ca8d1d770fa3d57817beceaf8c6d4d311e5f87fd4c955e1b60b3891"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/core/src/client_common.rs",
+      "before_sha256": "43a540ecd99856644ec01c57708838779b118c3b583e218c9ef307e0dcefcb4b",
+      "payload": {
+        "path": "overlay/codex-rs/core/src/client_common.rs",
+        "bytes": 5043,
+        "sha256": "dcc746954b4c76547f5ef6fe33bd8fb9993a2bee120bbc5c18da9c86ccef94fa"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/core/src/compact_remote_v2_attempt.rs",
+      "before_sha256": "42e81a425a5f652f7e9ee281279d83cc65f9d8b54ad26c632b19ed8f75212e9f",
+      "payload": {
+        "path": "overlay/codex-rs/core/src/compact_remote_v2_attempt.rs",
+        "bytes": 12079,
+        "sha256": "e432919411793715a558e79d8352b3c75269a3b622771bc5d7ad7cbd43f6d3be"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/core/src/lib.rs",
+      "before_sha256": "03e6a93a787b8f3537e6780cc74245cb2b88e96e170a8ed587e73fbd446be600",
+      "payload": {
+        "path": "overlay/codex-rs/core/src/lib.rs",
+        "bytes": 10102,
+        "sha256": "eb23ca1128952d8482109a82cdcb9e3664068bbc967b24d3590bd042d53f9874"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/core/src/protected_provenance.rs",
+      "before_sha256": null,
+      "payload": {
+        "path": "overlay/codex-rs/core/src/protected_provenance.rs",
+        "bytes": 4461,
+        "sha256": "cf0c67e16a92f9393d730b949ce9339edb8f92a50bb8ffcc93567716cc60b00e"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/core/src/session/session.rs",
+      "before_sha256": "b6196ae8d707a3a3ac2bebc488cdb3aa88f0660e4a5ebc9a8ac3fa13f53cf680",
+      "payload": {
+        "path": "overlay/codex-rs/core/src/session/session.rs",
+        "bytes": 100997,
+        "sha256": "ebce43e532baa4b543dbb29ce264f16f0868a0b4271254ba553819ff3802c530"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/core/src/session/turn.rs",
+      "before_sha256": "cd2f3c0f347641afc1a11ac720c5779dd5ec373dd872c6c8b9174436181c6408",
+      "payload": {
+        "path": "overlay/codex-rs/core/src/session/turn.rs",
+        "bytes": 145527,
+        "sha256": "fd2cf42848886027eb239aa4c81381cc0271279b33d5082fd81f20ba633f534e"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/core/src/tools/router.rs",
+      "before_sha256": "e6a7ef92ce0455ace849927c6431334af984e144c8d008af65887c8db5ef7fec",
+      "payload": {
+        "path": "overlay/codex-rs/core/src/tools/router.rs",
+        "bytes": 17825,
+        "sha256": "4d29b5b1dcc742ac10a4d3f2e70b481f3088507c75e4ea98d869844e7a9784d3"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/core/src/tools/spec_plan.rs",
+      "before_sha256": "d2bc16c3fb57c9cb7459efff6723f8bd14fa079ab531de2afe0616d28a5bc2ce",
+      "payload": {
+        "path": "overlay/codex-rs/core/src/tools/spec_plan.rs",
+        "bytes": 66967,
+        "sha256": "67e14255c4605a11853bee67a8421eae81a9f30a0274647e5bbb70d61e5a6ce3"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/http-client/src/lib.rs",
+      "before_sha256": "6a59498dd073628e5d0892c93f66d8fcaa9c4c6dea559516680b12b41544c196",
+      "payload": {
+        "path": "overlay/codex-rs/http-client/src/lib.rs",
+        "bytes": 4784,
+        "sha256": "46de73eea141d024dbdd35c2bfbdce25fba05514ec1729aac55b528e0ae13e4d"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/http-client/src/network_policy.rs",
+      "before_sha256": "c03b5523fdc4ee6d030fb361e57bc61d93dc97503871254a4e1401138fddab05",
+      "payload": {
+        "path": "overlay/codex-rs/http-client/src/network_policy.rs",
+        "bytes": 12642,
+        "sha256": "c82685cdb6fd77fccab5709be58b8d914182314ee9b18efef92b6cb6dbc82de0"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/http-client/src/protected_auth_fence.rs",
+      "before_sha256": null,
+      "payload": {
+        "path": "overlay/codex-rs/http-client/src/protected_auth_fence.rs",
+        "bytes": 5980,
+        "sha256": "e11caf97333ba5586b72d142575e4336ff599dc1897badc3160c311986922d94"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/login/src/auth/manager.rs",
+      "before_sha256": "584348a470e6d7f147962bf5d642d23859f60a85772aac1e916032d414756a90",
+      "payload": {
+        "path": "overlay/codex-rs/login/src/auth/manager.rs",
+        "bytes": 149628,
+        "sha256": "914ec2015faae4957a6ca993368022a8c70a6c30d33b2aa08702783800323396"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/login/src/auth/protected_send_tests.rs",
+      "before_sha256": null,
+      "payload": {
+        "path": "overlay/codex-rs/login/src/auth/protected_send_tests.rs",
+        "bytes": 2518,
+        "sha256": "3f17e850d18845c574fd93d6b229e026235335ba7f3bed2e0053005b3c09eb17"
+      },
+      "mode": "100644"
+    }
+  ],
+  "cargo_lock": {
+    "path": "pins/Cargo.lock",
+    "bytes": 411935,
+    "sha256": "bc987be42085779f61268adb2105dee446adece60c36ffa6a9bbdb1bd23b5a0c"
+  },
+  "toolchain": {
+    "release": "1.95.0",
+    "target": "aarch64-apple-darwin",
+    "inventory": {
+      "path": "pins/rust-1.95.0-aarch64-apple-darwin-files.json",
+      "bytes": 29886,
+      "sha256": "fbc78ff4c89e7028e0ce1931454d7d2df8f56443494c182574c76c83d5084cff"
+    },
+    "official_manifest": {
+      "path": "pins/channel-rust-1.95.0.toml",
+      "bytes": 848342,
+      "sha256": "821ff14e4c4a1cbe1e8915f35aff0a3fbbdf8d293ad48ab8f31e3b0440c581f9"
+    },
+    "archives": [
+      {
+        "component": "rustc",
+        "url": "https://static.rust-lang.org/dist/2026-04-16/rustc-1.95.0-aarch64-apple-darwin.tar.xz",
+        "sha256": "149e85a285b6eba58eb6c8bdf7deb1b93763890598e62cb635a712e3a8454f04"
+      },
+      {
+        "component": "cargo",
+        "url": "https://static.rust-lang.org/dist/2026-04-16/cargo-1.95.0-aarch64-apple-darwin.tar.xz",
+        "sha256": "6c2ffed8e1ac9cf4dc9e80f282a869a6b237a153e7c55cca039d33de29d80aaf"
+      },
+      {
+        "component": "rust-std",
+        "url": "https://static.rust-lang.org/dist/2026-04-16/rust-std-1.95.0-aarch64-apple-darwin.tar.xz",
+        "sha256": "9b30089b0f767cb91b2190ffec55a9beeb2a21a1405d8da0f664d7e09d08e6d8"
+      }
+    ]
+  },
+  "build": {
+    "package": "codex-app-server-client",
+    "binary": "codex-soloco-protected-host",
+    "target": "aarch64-apple-darwin",
+    "profile": "release",
+    "environment": {
+      "SOLOCO_PROTECTED_HOST_BUILD": "1"
+    }
+  },
+  "qualified_binary": null,
+  "runtime_integration": "separate-joined-runtime-review-required"
+}

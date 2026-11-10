@@ -1,0 +1,4166 @@
+--- a/codex-rs/app-server/Cargo.toml
++++ b/codex-rs/app-server/Cargo.toml
+@@ -35,6 +35,7 @@
+     "ws",
+ ] }
+ codex-analytics = { workspace = true }
++codex-api = { workspace = true }
+ codex-app-server-daemon = { workspace = true }
+ codex-arg0 = { workspace = true }
+ codex-aws-auth = { workspace = true }
+--- a/codex-rs/app-server/src/application_network.rs
++++ b/codex-rs/app-server/src/application_network.rs
+@@ -53,13 +53,17 @@
+             )
+             .await?;
+             let application = sources.compose(Default::default())?;
+-            self.local_network_policy
+-                .publish(local_revision, destination_policy(application.as_ref()));
++            let policy = destination_policy(application.as_ref());
++            if self.borrowed_auth_policy {
++                if !self.local_network_policy.policy().observes_destination_policy(&policy) {
++                    return Err(io::Error::other("borrowed local policy mismatch"));
++                }
++            } else { self.local_network_policy.publish(local_revision, policy); }
+             Ok(sources)
+         }
+         .await;
+         if result.is_err() {
+-            self.local_network_policy.unavailable(local_revision);
++            if !self.borrowed_auth_policy { self.local_network_policy.unavailable(local_revision); }
+             self.fail_application_policy(application_revision)?;
+         }
+         result
+@@ -97,7 +101,11 @@
+                 let mut current = self.network_policy_snapshot.write().map_err(|_| {
+                     io::Error::other("application network policy snapshot lock poisoned")
+                 })?;
+-                if !self.network_policy.publish(revision, policy.clone()) {
++                let matches_owner = if self.borrowed_auth_policy {
++                    self.network_policy.policy().revision() == revision &&
++                        self.network_policy.policy().observes_destination_policy(&policy)
++                } else { self.network_policy.publish(revision, policy.clone()) };
++                if !matches_owner {
+                     *current = None;
+                     return Err(io::Error::other(NetworkPolicyDenied::Revoked));
+                 }
+@@ -153,7 +161,7 @@
+             .network_policy_snapshot
+             .write()
+             .map_err(|_| io::Error::other("application network policy snapshot lock poisoned"))?;
+-        self.network_policy.unavailable(revision);
++        if !self.borrowed_auth_policy { self.network_policy.unavailable(revision); }
+         *current = None;
+         Ok(())
+     }
+--- a/codex-rs/app-server/src/config_manager.rs
++++ b/codex-rs/app-server/src/config_manager.rs
+@@ -53,6 +53,8 @@
+     network_policy: codex_http_client::NetworkPolicyController,
+     local_network_policy: codex_http_client::NetworkPolicyController,
+     network_policy_reload: Arc<tokio::sync::Semaphore>,
++    borrowed_auth_policy: bool,
++    borrowed_auth_route: Option<codex_login::AuthRouteConfig>,
+     network_policy_snapshot: Arc<RwLock<Option<Arc<ApplicationPolicySnapshot>>>>,
+     /// Captured before config loading so a reload also revokes pending startups.
+     mcp_ema_cancellation: Arc<Mutex<EmaCancellationRoots>>,
+@@ -112,6 +114,8 @@
+             network_policy,
+             local_network_policy: Default::default(),
+             network_policy_reload: Arc::new(tokio::sync::Semaphore::new(/*permits*/ 1)),
++            borrowed_auth_policy: false,
++            borrowed_auth_route: None,
+             network_policy_snapshot: Arc::default(),
+             mcp_ema_cancellation: Arc::default(),
+         }
+@@ -156,6 +160,12 @@
+     ) -> Self {
+         self.network_policy = policy.effective;
+         self.local_network_policy = policy.local;
++        self
++    }
++
++    pub(crate) fn with_borrowed_auth_policy(mut self, route: Option<codex_login::AuthRouteConfig>) -> Self {
++        self.borrowed_auth_policy = route.is_some();
++        self.borrowed_auth_route = route;
+         self
+     }
+ 
+@@ -775,7 +785,7 @@
+ 
+     fn apply_network_policy(&self, config: &mut Config) {
+         config.application_network_policy = self.network_policy.policy();
+-        config.application_auth_route_config = Some(
++        config.application_auth_route_config = Some(self.borrowed_auth_route.clone().unwrap_or_else(||
+             codex_login::AuthRouteConfig::from_http_client_factory(
+                 config
+                     .http_client_factory()
+@@ -785,8 +795,8 @@
+                 config
+                     .http_client_factory()
+                     .with_network_policy(self.local_network_policy.policy()),
+-            ),
+-        );
++            )
++        ));
+     }
+ 
+     fn apply_arg0_paths(&self, config: &mut Config) {
+--- a/codex-rs/app-server/src/in_process.rs
++++ b/codex-rs/app-server/src/in_process.rs
+@@ -174,6 +174,8 @@
+     pub initialize: InitializeParams,
+     /// Capacity used for all runtime queues (clamped to at least 1).
+     pub channel_capacity: usize,
++    /// Source-owned retained no-follow directory identities; no serialized constructor.
++    pub protected_paths: Option<Arc<crate::protected_paths::ScopePathBinding>>,
+ }
+ 
+ /// Event emitted from the app-server to the in-process client.
+@@ -291,11 +293,15 @@
+     client: InProcessClientSender,
+     event_rx: mpsc::Receiver<InProcessServerEvent>,
+     runtime_handle: tokio::task::JoinHandle<()>,
++    initialization_response: Option<Result>,
+     #[cfg(test)]
+     _test_codex_home: Option<tempfile::TempDir>,
+ }
+ 
+ impl InProcessClientHandle {
++    /// Actual successful initialize payload retained from the original runtime.
++    pub fn initialization_response(&self) -> Option<&Result> { self.initialization_response.as_ref() }
++
+     /// Sends a typed client request into the in-process runtime.
+     ///
+     /// The returned value is a transport-level `IoResult` containing either a
+@@ -382,7 +388,20 @@
+ /// This function sends `initialize` followed by `initialized` before returning
+ /// the handle, so callers receive a ready-to-use runtime. If initialize fails,
+ /// the runtime is shut down and an `InvalidData` error is returned.
+-pub async fn start(mut args: InProcessStartArgs) -> IoResult<InProcessClientHandle> {
++pub async fn start(args: InProcessStartArgs) -> IoResult<InProcessClientHandle> {
++    start_owned(args, None).await
++}
++
++/// Reuses an original managed-auth object without moving/exporting any credential.
++/// The trusted embedder must supply its same policy controllers; arbitrary Arc is not proof.
++pub async fn start_with_existing_auth_manager(args: InProcessStartArgs,
++    original: Arc<codex_login::AuthManager>) -> IoResult<InProcessClientHandle> {
++    if args.enable_codex_api_key_env { return Err(IoError::new(ErrorKind::PermissionDenied, "environment auth forbidden")); }
++    original.validate_scoped_runtime_auth(&args.config.auth_config())?;
++    start_owned(args, Some(original)).await
++}
++
++async fn start_owned(mut args: InProcessStartArgs, original: Option<Arc<codex_login::AuthManager>>) -> IoResult<InProcessClientHandle> {
+     if let Ok(Some(err)) = check_execpolicy_for_warnings(&args.config.config_layer_stack).await {
+         let (path, range) = crate::exec_policy_warning_location(&err);
+         args.config_warnings.push(ConfigWarningNotification {
+@@ -393,7 +412,10 @@
+         });
+     }
+     let initialize = args.initialize.clone();
+-    let client = Box::pin(start_uninitialized(args)).await?;
++    if codex_core::protected_peer_enabled() && original.is_none() {
++        return Err(IoError::new(ErrorKind::PermissionDenied, "protected runtime requires original AuthManager"));
++    }
++    let mut client = Box::pin(start_uninitialized_owned(args, original)).await?;
+ 
+     let initialize_response = client
+         .request(ClientRequest::Initialize {
+@@ -401,13 +423,14 @@
+             params: initialize,
+         })
+         .await?;
+-    if let Err(error) = initialize_response {
+-        let _ = client.shutdown().await;
+-        return Err(IoError::new(
+-            ErrorKind::InvalidData,
+-            format!("in-process initialize failed: {}", error.message),
+-        ));
+-    }
++    let initialization_response = match initialize_response {
++        Ok(payload) => payload,
++        Err(error) => {
++            let _ = client.shutdown().await;
++            return Err(IoError::new(ErrorKind::InvalidData, format!("in-process initialize failed: {}", error.message)));
++        }
++    };
++    client.initialization_response = Some(initialization_response);
+     client.notify(ClientNotification::Initialized)?;
+ 
+     Ok(client)
+@@ -432,7 +455,14 @@
+     }
+ }
+ 
+-async fn start_uninitialized(mut args: InProcessStartArgs) -> IoResult<InProcessClientHandle> {
++async fn start_uninitialized(args: InProcessStartArgs) -> IoResult<InProcessClientHandle> {
++    start_uninitialized_owned(args, None).await
++}
++
++async fn start_uninitialized_owned(mut args: InProcessStartArgs, original: Option<Arc<codex_login::AuthManager>>) -> IoResult<InProcessClientHandle> {
++    let protected_paths = args.protected_paths.clone();
++    if codex_core::protected_peer_enabled() && protected_paths.is_none() { return Err(IoError::new(ErrorKind::PermissionDenied,"original scoped directory binding unavailable")); }
++    if let Some(paths) = &protected_paths { paths.verify_before_mutable_start()?; }
+     let config_manager = ConfigManager::new(
+         args.config.codex_home.to_path_buf(),
+         args.cli_overrides,
+@@ -442,22 +472,24 @@
+         args.arg0_paths.clone(),
+         args.thread_config_loader,
+     )
+-    .with_embedded_network_policy(args.embedded_network_policy);
++    .with_embedded_network_policy(args.embedded_network_policy)
++    .with_borrowed_auth_policy(original.as_ref().map(|auth| auth.runtime_config().auth_route_config));
+     // Keep the caller's project context independent of any fallback policy config.
+     let startup_cwd =
+         (!args.config.config_layer_stack.is_projectless()).then(|| args.config.cwd.to_path_buf());
+-    let auth_manager = bootstrap::configure(
+-        &config_manager,
+-        &mut args.config,
+-        args.enable_codex_api_key_env,
+-    )
+-    .await?;
++    let auth_manager = match original {
++        Some(original) => bootstrap::configure_existing(&config_manager, &mut args.config, original).await?,
++        None => bootstrap::configure(&config_manager, &mut args.config, args.enable_codex_api_key_env).await?,
++    };
++    if let Some(paths) = &protected_paths { paths.verify_before_mutable_start()?; }
+     let channel_capacity = args.channel_capacity.max(1);
+     let installation_id = resolve_installation_id(&args.config.codex_home).await?;
+     let (client_tx, mut client_rx) = mpsc::channel::<InProcessClientMessage>(channel_capacity);
+     let (event_tx, event_rx) = mpsc::channel::<InProcessServerEvent>(channel_capacity);
+ 
+     let runtime_handle = tokio::spawn(async move {
++        let _retained_original_paths = protected_paths;
++        if let Some(paths) = &_retained_original_paths { if paths.verify_before_mutable_start().is_err() { return; } }
+         let (outgoing_tx, outgoing_rx) = mpsc::channel::<OutgoingEnvelope>(channel_capacity);
+         let analytics_events_client =
+             analytics_events_client_from_config(Arc::clone(&auth_manager), args.config.as_ref());
+@@ -848,6 +880,7 @@
+     });
+ 
+     Ok(InProcessClientHandle {
++        initialization_response: None,
+         client: InProcessClientSender { client_tx },
+         event_rx,
+         runtime_handle,
+@@ -908,6 +941,7 @@
+             .await
+             .expect("state db should initialize for in-process test");
+         let args = InProcessStartArgs {
++            protected_paths: None,
+             arg0_paths: Arg0DispatchPaths::default(),
+             config,
+             cli_overrides: Vec::new(),
+@@ -1108,6 +1142,7 @@
+             let _ = done_tx.send(());
+         });
+         let client = InProcessClientHandle {
++            initialization_response: None,
+             client: InProcessClientSender { client_tx },
+             event_rx,
+             runtime_handle,
+--- a/codex-rs/app-server/src/in_process_bootstrap.rs
++++ b/codex-rs/app-server/src/in_process_bootstrap.rs
+@@ -172,6 +172,28 @@
+     Ok(auth_manager)
+ }
+ 
++/// Preserve the actual manager and its private credential storage; only scoped config changes.
++pub(super) async fn configure_existing(config_manager: &ConfigManager, config: &mut Arc<Config>,
++    original: Arc<AuthManager>) -> IoResult<Arc<AuthManager>> {
++    original.validate_scoped_runtime_auth(&config.auth_config())?;
++    config_manager.update_managed_config_loader(original.clone(), config);
++    let effective = config_manager.load_startup_config(Some(config.cwd.to_path_buf())).await?.config;
++    original.validate_scoped_runtime_auth(&effective.auth_config())?;
++    config.validate_windows_mxc_requirement_from(&effective)?;
++    // Keep the caller's scoped state, project, and provider. Apply only the effective auth requirements.
++    let config = Arc::make_mut(config);
++    config.chatgpt_base_url = effective.chatgpt_base_url;
++    config.chatgpt_base_url_is_explicit = effective.chatgpt_base_url_is_explicit;
++    config.enforce_residency = effective.enforce_residency;
++    config.application_network_policy = effective.application_network_policy;
++    config.application_auth_route_config = effective.application_auth_route_config;
++    config.forced_login_method = effective.forced_login_method;
++    config.forced_chatgpt_workspace_id = effective.forced_chatgpt_workspace_id;
++    original.validate_scoped_runtime_auth(&config.auth_config())?;
++    codex_login::default_client::set_default_client_residency_requirement(config.enforce_residency.value());
++    Ok(original)
++}
++
+ #[cfg(test)]
+ #[path = "in_process_bootstrap_tests.rs"]
+ mod tests;
+--- a/codex-rs/app-server/src/lib.rs
++++ b/codex-rs/app-server/src/lib.rs
+@@ -106,6 +106,9 @@
+ mod command_exec;
+ mod config_layer;
+ mod startup_config;
++/// Same-process original managed-host composition; never stock executable qualification.
++pub mod protected_host;
++pub mod protected_paths;
+ pub use startup_config::StartupConfigArgs;
+ pub use startup_config::print_startup_config;
+ 
+@@ -517,6 +520,10 @@
+     auth: WebsocketAuthSettings,
+     runtime_options: AppServerRuntimeOptions,
+ ) -> IoResult<AppServerExit> {
++    if codex_core::protected_peer_enabled() {
++        return Err(std::io::Error::new(ErrorKind::PermissionDenied,
++            "protected standalone CLI has no original AuthManager association"));
++    }
+     let cloud_skill_provider = match runtime_options.cloud_skills_snapshot {
+         Some(path) => {
+             let provider = tokio::task::spawn_blocking(move || {
+--- /dev/null
++++ b/codex-rs/app-server/src/protected_host.rs
+@@ -0,0 +1,197 @@
++//! Real standard-bootstrap owner and same-process scoped runtime composition.
++//! Opaque ownership here is source association, not qualification of the installed app.
++use crate::config_manager::ConfigManager;
++use crate::in_process::{self, EmbeddedNetworkPolicy, InProcessClientHandle, InProcessStartArgs};
++use codex_arg0::Arg0DispatchPaths;
++use codex_config::{CloudConfigBundleLoader, LoaderOverrides, NoopThreadConfigLoader};
++use codex_core::config::{Config, ConfigBuilder, find_codex_home};
++use codex_login::AuthManager;
++use codex_utils_absolute_path::AbsolutePathBuf;
++use codex_utils_cli::CliConfigOverrides;
++use std::{io, path::PathBuf, sync::Arc};
++use std::sync::atomic::{AtomicBool, Ordering};
++
++pub struct OriginalManagedHost { inner: Arc<OriginalHost> }
++struct OriginalHost {
++    auth: Arc<AuthManager>, config: Arc<Config>, network: EmbeddedNetworkPolicy,
++    bootstrap: codex_api::protected_peer::OriginalBootstrapClaim,
++    loader: CloudConfigBundleLoader, loader_overrides: LoaderOverrides,
++    cli_overrides: Vec<(String, toml::Value)>, arg0: Arg0DispatchPaths,
++}
++pub struct ProtectedManagedScope {
++    owner: Arc<OriginalHost>, config: Arc<Config>, loader_overrides: LoaderOverrides,
++    cli_overrides: Vec<(String, toml::Value)>,
++    consumed: AtomicBool,
++    paths: Arc<crate::protected_paths::ScopePathBinding>,
++}
++fn denied(reason: &str) -> io::Error { io::Error::new(io::ErrorKind::PermissionDenied, reason) }
++
++/// Inspect the actual typed default object selected by the original manager.
++/// Disabled/absent is not local; no Boolean label or discovery-only API is used.
++fn require_local_default_environment(environment: Option<Arc<codex_exec_server::Environment>>) -> io::Result<()> {
++    let environment = environment.ok_or_else(|| denied("default executor is absent or unqualified for this native scope"))?;
++    if environment.is_remote() {
++        return Err(denied("remote executor is not qualified for this native scope"));
++    }
++    Ok(())
++}
++
++impl OriginalManagedHost {
++    /// This source entry is called inside the native embedding host. It uses the normal
++    /// standard bootstrap and constructs its original manager there. No credential is
++    /// accepted as an argument, copied, returned or serialized. No environment changes.
++    pub async fn bootstrap(startup: codex_api::protected_peer::NativeStartup,
++        arg0: Arg0DispatchPaths, overrides: CliConfigOverrides,
++        loader_overrides: LoaderOverrides) -> io::Result<Self> {
++        if !codex_core::protected_peer_enabled() { return Err(denied("protected source build required")); }
++        if loader_overrides.ignore_managed_requirements || loader_overrides.ignore_login_requirements {
++            return Err(denied("original managed/login requirements cannot be bypassed"));
++        }
++        let home = find_codex_home()?;
++        let claim = startup.claim_bootstrap(home.as_path()).map_err(io::Error::other)?;
++        let network = EmbeddedNetworkPolicy::load(&loader_overrides).await;
++        let cli_overrides = overrides.parse_overrides().map_err(io::Error::other)?;
++        let manager = ConfigManager::new(home.to_path_buf(), cli_overrides.clone(),
++            loader_overrides.clone(), true, Default::default(), arg0.clone(),
++            Arc::new(NoopThreadConfigLoader)).with_embedded_network_policy(network.clone());
++        // This is the original native app-server's existing standard managed bootstrap.
++        let loaded = manager.load_managed_startup_config(std::env::current_dir().ok()).await?;
++        let config = loaded.config?;
++        config.validate_windows_mxc_requirement()?;
++        config.auth_config().validate()?;
++        let auth = AuthManager::shared_from_config(&config, false).await.map_err(io::Error::other)?;
++        auth.validate_scoped_runtime_auth(&config.auth_config())?;
++        manager.update_managed_config_loader(auth.clone(), &config);
++        manager.sync_default_client_residency_requirement().await;
++        let state = *auth.auth_change_state_receiver().borrow();
++        codex_api::protected_peer::observe_original_bootstrap(&claim, serde_json::json!({
++            "config_layers": codex_core::protected_config_source_records(&config),
++            "auth_owner_generation":state.owner_generation,"auth_revision":state.generation
++        })).await.map_err(io::Error::other)?;
++        Ok(Self { inner: Arc::new(OriginalHost { auth, config: Arc::new(config), network, bootstrap: claim,
++            loader: manager.current_managed_config_loader(), loader_overrides, cli_overrides, arg0 }) })
++    }
++
++    /// Creates an isolated runtime configuration with original managed auth/network policy.
++    /// Existing directories are required; this API does not install or broaden a sandbox.
++    pub async fn prepare_scope(&self, state_root: AbsolutePathBuf, cwd: AbsolutePathBuf)
++        -> io::Result<ProtectedManagedScope> {
++        let root = std::fs::canonicalize(state_root.as_path())?;
++        if root.to_str()!=Some(self.inner.bootstrap.state_root()) || cwd.as_path().to_str()!=Some(self.inner.bootstrap.cwd()) {
++            return Err(denied("scope differs from original pre-auth challenge"));
++        }
++        let owner_home = std::fs::canonicalize(self.inner.config.codex_home.as_path())?;
++        if root == PathBuf::from("/") || root.starts_with(&owner_home) || owner_home.starts_with(&root) {
++            return Err(denied("runtime state must be separate from original credential home"));
++        }
++        #[cfg(unix)] {
++            use std::os::unix::fs::PermissionsExt;
++            if std::fs::metadata(&root)?.permissions().mode() & 0o077 != 0 {
++                return Err(denied("runtime state directory must be private"));
++            }
++        }
++        #[cfg(not(unix))] { return Err(denied("unqualified scoped host platform")); }
++        let mut loader_overrides = self.inner.loader_overrides.clone();
++        loader_overrides.ignore_user_config = true;
++        loader_overrides.ignore_project_config = true;
++        loader_overrides.user_config_path = None;
++        loader_overrides.user_config_profile = None;
++        // Carry non-credential native auth preferences explicitly. The scoped home
++        // has no user credential/config copy; managed requirements still apply last.
++        let mut cli_overrides = self.inner.cli_overrides.clone();
++        let owner = self.inner.config.as_ref();
++        cli_overrides.push(("cli_auth_credentials_store".into(), toml::Value::try_from(owner.cli_auth_credentials_store_mode).map_err(io::Error::other)?));
++        cli_overrides.push(("chatgpt_base_url".into(), toml::Value::String(owner.chatgpt_base_url.clone())));
++        if let Some(method) = owner.forced_login_method {
++            cli_overrides.push(("forced_login_method".into(), toml::Value::try_from(method).map_err(io::Error::other)?));
++        }
++        if let Some(workspaces) = &owner.forced_chatgpt_workspace_id {
++            cli_overrides.push(("forced_chatgpt_workspace_id".into(), toml::Value::try_from(workspaces).map_err(io::Error::other)?));
++        }
++        for (name, feature) in [("secret_auth_storage", codex_features::Feature::SecretAuthStorage),
++            ("respect_system_proxy", codex_features::Feature::RespectSystemProxy),
++            ("system_proxy_fallback", codex_features::Feature::SystemProxyFallback),
++            ("psp", codex_features::Feature::Psp)] {
++            cli_overrides.push((format!("features.{name}"), toml::Value::Boolean(owner.features.enabled(feature))));
++        }
++        let mut config = ConfigBuilder::default().codex_home(root.clone())
++            .cli_overrides(cli_overrides.clone()).loader_overrides(loader_overrides.clone())
++            .strict_config(true).cloud_config_bundle(self.inner.loader.clone())
++            .fallback_cwd(Some(cwd.to_path_buf())).build().await?;
++        self.inner.network.bind_config(&mut config);
++        config.application_auth_route_config = Some(self.inner.config.auth_route_config());
++        if config.codex_home.as_path() != root || !config.sqlite_config().home().starts_with(&root) ||
++            !config.log_dir.starts_with(&root) {
++            return Err(denied("scoped configuration redirects mutable state outside its root"));
++        }
++        let paths = crate::protected_paths::ScopePathBinding::capture(&root, &[config.sqlite_config().home().to_path_buf(),config.log_dir.clone()])?;
++        self.inner.auth.validate_scoped_runtime_auth(&config.auth_config())?;
++        Ok(ProtectedManagedScope { owner: self.inner.clone(), config: Arc::new(config),
++            loader_overrides, cli_overrides, paths, consumed: AtomicBool::new(false) })
++    }
++}
++
++impl ProtectedManagedScope {
++    /// The caller may use this exact Arc to assemble the ordinary typed start arguments.
++    /// The scope retains another strong reference, so mutable replacement breaks identity.
++    pub fn config(&self) -> Arc<Config> { self.config.clone() }
++
++    pub async fn start(self, mut args: InProcessStartArgs) -> io::Result<InProcessClientHandle> {
++        if self.consumed.swap(true, Ordering::SeqCst) { return Err(denied("scoped start already consumed")); }
++        if !Arc::ptr_eq(&args.config, &self.config) || args.enable_codex_api_key_env ||
++            args.state_db.is_some() || args.log_db.is_some() {
++            return Err(denied("foreign scoped configuration/auth/storage handle"));
++        }
++        require_local_default_environment(args.environment_manager.default_environment())?;
++        self.paths.verify_before_mutable_start()?;
++        args.protected_paths = Some(self.paths.clone());
++        self.owner.auth.validate_scoped_runtime_auth(&self.config.auth_config())?;
++        args.arg0_paths = self.owner.arg0.clone();
++        args.cli_overrides = self.cli_overrides;
++        args.loader_overrides = self.loader_overrides;
++        args.cloud_config_bundle = self.owner.loader.clone();
++        args.embedded_network_policy = self.owner.network.clone();
++        // The exact same manager Arc and same controller objects reach scoped startup.
++        // There is no credential IPC, environment rewrite, or second scoped auth load.
++        in_process::start_with_existing_auth_manager(args, self.owner.auth.clone()).await
++    }
++}
++
++#[cfg(test)]
++mod controlled_environment_tests {
++    use super::*;
++    use codex_exec_server::{Environment, EnvironmentManager};
++    use codex_http_client::{HttpClientFactory, OutboundProxyPolicy};
++
++    #[test]
++    fn absent_actual_default_executor_remains_held() {
++        let manager=EnvironmentManager::without_environments(HttpClientFactory::new(OutboundProxyPolicy::ReqwestDefault));
++        assert!(manager.default_environment().is_none());
++        let error=require_local_default_environment(manager.default_environment()).unwrap_err();
++        assert_eq!(error.kind(),io::ErrorKind::PermissionDenied);
++        assert_eq!(error.to_string(),"default executor is absent or unqualified for this native scope");
++    }
++
++    #[tokio::test]
++    async fn actual_local_default_passes_only_this_executor_kind_boundary() {
++        // LocalProcess::default starts an in-memory notification drain task, so
++        // use the real current-thread runtime. No exec/filesystem method is used.
++        let manager=EnvironmentManager::default_for_tests();
++        assert!(!manager.default_environment().expect("actual local object").is_remote());
++        assert!(require_local_default_environment(manager.default_environment()).is_ok());
++        // This result is not host/auth/model/native or whole-domain qualification.
++    }
++
++    #[test]
++    fn actual_lazy_remote_object_remains_held_without_connection() {
++        // Pinned Environment::create_for_tests -> create_inner -> remote_with_transport
++        // only constructs LazyRemoteExecServerClient. Do NOT add it to a manager or
++        // call start_connecting/get/status/exec/filesystem: those can start IO.
++        // Plain #[test] intentionally constructs no Tokio runtime or provider.
++        let environment=Environment::create_for_tests(Some("ws://controlled.invalid:1".into())).expect("actual lazy remote object");
++        assert!(environment.is_remote());
++        let error=require_local_default_environment(Some(Arc::new(environment))).unwrap_err();
++        assert_eq!(error.kind(),io::ErrorKind::PermissionDenied);
++        assert_eq!(error.to_string(),"remote executor is not qualified for this native scope");
++    }
++}
+--- /dev/null
++++ b/codex-rs/app-server/src/protected_paths.rs
+@@ -0,0 +1,111 @@
++//! Original retained directory identities and no-follow pre-open traversal.
++//! Legacy path-only consumers still do not gain an atomic descriptor-relative VFS.
++use std::{io, path::{Path, PathBuf}, sync::Arc};
++#[cfg(unix)]
++use std::os::{fd::{AsRawFd, FromRawFd, OwnedFd}, unix::ffi::OsStrExt};
++
++#[cfg(unix)]
++struct Directory { fd: OwnedFd, dev: u64, ino: u64 }
++#[cfg(unix)]
++struct NamedDirectory { parent: Arc<Directory>, name: std::ffi::CString, directory: Arc<Directory> }
++pub struct ScopePathBinding {
++    #[cfg(unix)]
++    chain: Vec<NamedDirectory>,
++    root: PathBuf, paths: Vec<PathBuf>,
++}
++fn denied() -> io::Error { io::Error::new(io::ErrorKind::PermissionDenied, "scoped mutable directory identity/link/containment unavailable") }
++#[cfg(unix)]
++fn owned(fd: i32) -> io::Result<Arc<Directory>> {
++    if fd < 0 { return Err(io::Error::last_os_error()); }
++    let fd = unsafe { OwnedFd::from_raw_fd(fd) };
++    let mut stat = std::mem::MaybeUninit::<libc::stat>::uninit();
++    if unsafe { libc::fstat(fd.as_raw_fd(), stat.as_mut_ptr()) } != 0 { return Err(io::Error::last_os_error()); }
++    let stat = unsafe { stat.assume_init() };
++    if stat.st_mode & libc::S_IFMT != libc::S_IFDIR { return Err(denied()); }
++    Ok(Arc::new(Directory { fd, dev: stat.st_dev as u64, ino: stat.st_ino as u64 }))
++}
++#[cfg(unix)]
++fn open_child(parent: &Directory, name: &std::ffi::CString, create: bool) -> io::Result<Arc<Directory>> {
++    let flags = libc::O_RDONLY | libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC;
++    let mut fd = unsafe { libc::openat(parent.fd.as_raw_fd(), name.as_ptr(), flags) };
++    if fd < 0 && create && io::Error::last_os_error().kind()==io::ErrorKind::NotFound {
++        if unsafe { libc::mkdirat(parent.fd.as_raw_fd(), name.as_ptr(), 0o700) } != 0 &&
++            io::Error::last_os_error().kind()!=io::ErrorKind::AlreadyExists { return Err(io::Error::last_os_error()); }
++        // EEXIST is not trusted: the actual next component must open O_NOFOLLOW.
++        fd = unsafe { libc::openat(parent.fd.as_raw_fd(), name.as_ptr(), flags) };
++    }
++    owned(fd)
++}
++impl ScopePathBinding {
++    pub(crate) fn capture(root: &Path, paths: &[PathBuf]) -> io::Result<Arc<Self>> {
++        if !root.is_absolute() || root==Path::new("/") || std::fs::canonicalize(root)?!=root ||
++            paths.iter().any(|path|!path.is_absolute() || !path.starts_with(root)) { return Err(denied()); }
++        #[cfg(not(unix))] { let _=paths; return Err(denied()); }
++        #[cfg(unix)] {
++            let slash = std::ffi::CString::new("/").map_err(|_|denied())?;
++            let first = owned(unsafe { libc::open(slash.as_ptr(), libc::O_RDONLY|libc::O_DIRECTORY|libc::O_NOFOLLOW|libc::O_CLOEXEC) })?;
++            let mut chain = Vec::new(); let mut parent=first;
++            for component in root.components() {
++                let std::path::Component::Normal(component)=component else {
++                    if matches!(component,std::path::Component::RootDir) { continue; } return Err(denied());
++                };
++                let name=std::ffi::CString::new(component.as_bytes()).map_err(|_|denied())?;
++                let directory=open_child(&parent,&name,false)?;
++                chain.push(NamedDirectory { parent:parent.clone(),name,directory:directory.clone() });parent=directory;
++            }
++            let root_directory=parent;
++            for path in paths {
++                let relative=path.strip_prefix(root).map_err(|_|denied())?;
++                let mut parent=root_directory.clone();
++                for component in relative.components() {
++                    let std::path::Component::Normal(component)=component else { return Err(denied()); };
++                    let name=std::ffi::CString::new(component.as_bytes()).map_err(|_|denied())?;
++                    let directory=open_child(&parent,&name,true)?;
++                    chain.push(NamedDirectory { parent:parent.clone(),name,directory:directory.clone() });parent=directory;
++                }
++            }
++            let value=Arc::new(Self { chain,root:root.to_path_buf(),paths:paths.to_vec() });
++            value.verify_before_mutable_start()?;Ok(value)
++        }
++    }
++    pub(crate) fn verify_before_mutable_start(&self) -> io::Result<()> {
++        #[cfg(not(unix))] { return Err(denied()); }
++        #[cfg(unix)] {
++            if std::fs::canonicalize(&self.root)?!=self.root { return Err(denied()); }
++            for item in &self.chain {
++                let actual=open_child(&item.parent,&item.name,false)?;
++                if actual.dev!=item.directory.dev || actual.ino!=item.directory.ino { return Err(denied()); }
++            }
++            for path in &self.paths { if !std::fs::canonicalize(path)?.starts_with(&self.root) { return Err(denied()); } }
++            Ok(())
++        }
++    }
++}
++
++#[cfg(all(test,unix))]
++mod tests {
++    use super::*;
++    #[test]
++    fn actual_log_symlink_outside_root_is_rejected_before_mutable_open() {
++        let test=tempfile::tempdir().unwrap();let root=test.path().join("scope");let outside=test.path().join("outside");
++        std::fs::create_dir(&root).unwrap();std::fs::create_dir(&outside).unwrap();let root=std::fs::canonicalize(root).unwrap();
++        std::os::unix::fs::symlink(&outside,root.join("log")).unwrap();
++        assert!(ScopePathBinding::capture(&root,&[root.join("log")]).is_err());
++        assert_eq!(std::fs::read_dir(outside).unwrap().count(),0);
++    }
++    #[test]
++    fn sqlite_ancestor_symlink_cannot_pass_lexical_containment() {
++        let test=tempfile::tempdir().unwrap();let root=test.path().join("scope");let outside=test.path().join("outside");
++        std::fs::create_dir(&root).unwrap();std::fs::create_dir(&outside).unwrap();let root=std::fs::canonicalize(root).unwrap();
++        std::os::unix::fs::symlink(&outside,root.join("db")).unwrap();
++        assert!(ScopePathBinding::capture(&root,&[root.join("db/sqlite")]).is_err());
++        assert!(!outside.join("sqlite").exists());
++    }
++    #[test]
++    fn replaced_ancestor_invalidates_original_retained_directory_identity() {
++        let test=tempfile::tempdir().unwrap();let root=test.path().join("scope");std::fs::create_dir(&root).unwrap();let root=std::fs::canonicalize(root).unwrap();
++        let retained=ScopePathBinding::capture(&root,&[root.join("log/cache")]).unwrap();
++        std::fs::rename(root.join("log"),root.join("old-log")).unwrap();std::fs::create_dir(root.join("log")).unwrap();
++        assert!(retained.verify_before_mutable_start().is_err());
++    }
++}
+--- a/codex-rs/app-server-client/Cargo.toml
++++ b/codex-rs/app-server-client/Cargo.toml
+@@ -3,6 +3,10 @@
+ version.workspace = true
+ edition.workspace = true
+ license.workspace = true
++
++[[bin]]
++name = "codex-soloco-protected-host"
++path = "src/bin/soloco_protected_host.rs"
+ 
+ [lib]
+ name = "codex_app_server_client"
+@@ -14,6 +18,8 @@
+ 
+ [dependencies]
+ codex-app-server = { workspace = true }
++codex-api = { workspace = true }
++codex-utils-cli = { workspace = true }
+ codex-app-server-protocol = { workspace = true }
+ codex-app-server-transport = { workspace = true }
+ codex-arg0 = { workspace = true }
+@@ -28,7 +34,7 @@
+ futures = { workspace = true }
+ serde = { workspace = true }
+ serde_json = { workspace = true }
+-tokio = { workspace = true, features = ["sync", "time", "rt"] }
++tokio = { workspace = true, features = ["sync", "time", "rt", "macros", "rt-multi-thread", "io-std", "io-util"] }
+ tokio-tungstenite = { workspace = true }
+ toml = { workspace = true }
+ tracing = { workspace = true }
+--- /dev/null
++++ b/codex-rs/app-server-client/src/bin/soloco_protected_host.rs
+@@ -0,0 +1,298 @@
++//! Concrete bounded stdio companion. No auth constructor precedes original FD startup.
++use codex_app_server::{in_process::InProcessServerEvent, protected_host::OriginalManagedHost};
++use codex_app_server_client::{InProcessAppServerClient, InProcessClientStartArgs};
++use codex_app_server_protocol::{ClientRequest, InitializeParams, JSONRPCMessage, RequestId};
++use codex_arg0::Arg0DispatchPaths;
++use codex_config::LoaderOverrides;
++use codex_exec_server::EnvironmentManager;
++use codex_feedback::CodexFeedback;
++use codex_protocol::protocol::SessionSource;
++use codex_utils_absolute_path::AbsolutePathBuf;
++use codex_utils_cli::CliConfigOverrides;
++use serde_json::{Value, json};
++use serde::de::{DeserializeSeed, MapAccess, SeqAccess, Visitor};
++use std::{collections::BTreeSet, io, path::PathBuf, sync::Arc};
++use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncWrite, AsyncWriteExt, BufReader};
++use std::{future::Future, time::Duration};
++use tokio::time::Instant;
++const FRAME:usize=100_000;
++const TOTAL:usize=4_000_000;
++const FRAMES:usize=256;
++
++// One final absolute lifetime from BEFORE startup. Cleanup uses this same final
++// deadline; it never adds a fresh timeout after the operation budget expires.
++const LIFETIME:Duration=Duration::from_secs(120);
++const CLEANUP_RESERVE:Duration=Duration::from_secs(5);
++async fn before_deadline<T>(deadline:Instant,operation:impl Future<Output=io::Result<T>>)->io::Result<T>{
++ tokio::select! {biased;
++  _=tokio::time::sleep_until(deadline)=>Err(held("absolute deadline; completion unknown")),
++  result=operation=>result,
++ }
++}
++async fn bounded_operation<T>(deadline:Instant,writer_failure:impl Future<Output=io::Result<()>>,operation:impl Future<Output=io::Result<T>>)->io::Result<T>{
++ // This select surrounds the WHOLE operation. A selected inner branch awaiting
++ // send/resolve/reject cannot suspend polling of writer failure or the deadline.
++ tokio::select! {biased;
++  _=tokio::time::sleep_until(deadline)=>Err(held("absolute operation deadline; completion unknown")),
++  result=writer_failure=>Err(held(if result.is_err(){"original stdout failed; completion unknown"}else{"original stdout closed during operation"})),
++  result=operation=>result,
++ }
++}
++async fn write_output<W:AsyncWrite+Unpin>(mut stdout:W,mut output_rx:tokio::sync::mpsc::Receiver<Value>)->io::Result<()>{
++ let(mut total,mut frames)=(0usize,0usize);
++ while let Some(value)=output_rx.recv().await {
++  let mut bytes=serde_json::to_vec(&value).map_err(io::Error::other)?;bytes.push(b'\n');
++  total+=bytes.len();frames+=1;if bytes.len()>FRAME||total>TOTAL||frames>FRAMES{return Err(held("original output bound"));}
++  stdout.write_all(&bytes).await?;stdout.flush().await?;
++ }Ok(())
++}
++fn held(reason: &'static str)->io::Error {io::Error::new(io::ErrorKind::PermissionDenied,reason)}
++fn closed(value:&Value,keys:&[&str])->bool {value.as_object().is_some_and(|v|v.len()==keys.len()&&keys.iter().all(|k|v.contains_key(*k)))}
++// The original native boundary rejects duplicate keys itself. It does not rely
++// on an upstream Node parser or serde_json::Value's last-key-wins behavior.
++struct StrictValue { depth:usize }
++struct StrictVisitor { depth:usize }
++impl<'de> DeserializeSeed<'de> for StrictValue {
++ type Value=Value;
++ fn deserialize<D:serde::Deserializer<'de>>(self,d:D)->Result<Value,D::Error>{
++  if self.depth>32{return Err(serde::de::Error::custom("original JSON depth"));}
++  d.deserialize_any(StrictVisitor{depth:self.depth})
++ }
++}
++impl<'de> Visitor<'de> for StrictVisitor {
++ type Value=Value;
++ fn expecting(&self,f:&mut std::fmt::Formatter<'_>)->std::fmt::Result{f.write_str("bounded unique-key JSON")}
++ fn visit_bool<E:serde::de::Error>(self,v:bool)->Result<Value,E>{Ok(Value::Bool(v))}
++ fn visit_i64<E:serde::de::Error>(self,v:i64)->Result<Value,E>{Ok(Value::Number(v.into()))}
++ fn visit_u64<E:serde::de::Error>(self,v:u64)->Result<Value,E>{Ok(Value::Number(v.into()))}
++ fn visit_f64<E:serde::de::Error>(self,v:f64)->Result<Value,E>{serde_json::Number::from_f64(v).map(Value::Number).ok_or_else(||E::custom("non-finite JSON"))}
++ fn visit_str<E:serde::de::Error>(self,v:&str)->Result<Value,E>{Ok(Value::String(v.to_owned()))}
++ fn visit_string<E:serde::de::Error>(self,v:String)->Result<Value,E>{Ok(Value::String(v))}
++ fn visit_none<E:serde::de::Error>(self)->Result<Value,E>{Ok(Value::Null)}
++ fn visit_unit<E:serde::de::Error>(self)->Result<Value,E>{Ok(Value::Null)}
++ fn visit_seq<A:SeqAccess<'de>>(self,mut a:A)->Result<Value,A::Error>{let mut v=Vec::new();while let Some(item)=a.next_element_seed(StrictValue{depth:self.depth+1})?{v.push(item);}Ok(Value::Array(v))}
++ fn visit_map<A:MapAccess<'de>>(self,mut a:A)->Result<Value,A::Error>{
++  let mut v=serde_json::Map::new();while let Some(key)=a.next_key::<String>()?{
++   if v.contains_key(&key){return Err(serde::de::Error::custom("duplicate original JSON key"));}
++   let item=a.next_value_seed(StrictValue{depth:self.depth+1})?;v.insert(key,item);
++  }Ok(Value::Object(v))
++ }
++}
++fn strict_json(bytes:&[u8])->io::Result<Value>{
++ let mut d=serde_json::Deserializer::from_slice(bytes);
++ let value=StrictValue{depth:0}.deserialize(&mut d).map_err(|_|held("original unique-key JSON"))?;
++ d.end().map_err(|_|held("original trailing JSON"))?;Ok(value)
++}
++struct FrameReader<R> { input:R, pending:Vec<u8>, total:usize, frames:usize }
++impl<R:AsyncBufRead+Unpin> FrameReader<R> {
++fn new(input:R)->Self {Self {input,pending:Vec::new(),total:0,frames:0}}
++async fn next(&mut self)->io::Result<Option<Value>> {
++    loop {
++        let bytes=self.input.fill_buf().await?;
++        if bytes.is_empty(){return if self.pending.is_empty(){Ok(None)}else{Err(held("unterminated original input"))};}
++        let end=bytes.iter().position(|b|*b==b'\n');let take=end.unwrap_or(bytes.len());
++        let consumed=take+usize::from(end.is_some());
++        if self.pending.len()+consumed>FRAME||self.total+consumed>TOTAL{return Err(held("original input frame/total bound"));}
++        // Persistent pending bytes survive cancellation when an event wins select!.
++        self.pending.extend_from_slice(&bytes[..take]);self.input.consume(consumed);self.total+=consumed;
++        if end.is_some(){
++            self.frames+=1;if self.frames>FRAMES{return Err(held("original input frame capacity"));}
++            if self.pending.is_empty(){return Err(held("empty original input"));}
++            let frame=std::mem::take(&mut self.pending);
++            let value=strict_json(&frame)?;
++            return Ok(Some(value));
++        }
++    }
++}
++}
++async fn write_frame(output:&tokio::sync::mpsc::Sender<Value>,value:Value)->io::Result<()> {
++    output.send(value).await.map_err(|_|held("original stdout unavailable"))
++}
++fn paths()->io::Result<(PathBuf,PathBuf)> {
++    let args:Vec<_>=std::env::args_os().skip(1).collect();
++    if args.len()!=5||args[0]!="--soloco-protected-host-v2"||args[1]!="--state-root"||args[3]!="--cwd" {return Err(held("exact companion entry arguments required"));}
++    let root=PathBuf::from(&args[2]);let cwd=PathBuf::from(&args[4]);
++    if !root.is_absolute()||!cwd.is_absolute()||std::fs::canonicalize(&root)?!=root||std::fs::canonicalize(&cwd)?!=cwd {return Err(held("original canonical scope required"));}
++    Ok((root,cwd))
++}
++async fn run()->io::Result<()> {
++    let final_deadline=Instant::now()+LIFETIME;
++    let operation_deadline=final_deadline-CLEANUP_RESERVE;
++    let(root,cwd)=paths()?;
++    let startup=before_deadline(operation_deadline,async {codex_api::protected_peer::begin_original_companion(&root,&cwd).await.map_err(io::Error::other)}).await?;
++    let mut input=FrameReader::new(BufReader::new(tokio::io::stdin()));
++    let initialize=before_deadline(operation_deadline.min(Instant::now()+Duration::from_secs(5)),input.next()).await?.ok_or_else(||held("original initialize missing"))?;
++    if !closed(&initialize,&["id","method","params"])||initialize["method"]!="initialize" {return Err(held("exact original initialize required"));}
++    let id:RequestId=serde_json::from_value(initialize["id"].clone()).map_err(|_|held("initialize identity"))?;
++    let init:InitializeParams=serde_json::from_value(initialize["params"].clone()).map_err(|_|held("typed initialize"))?;
++    let required_human_approval=init.capabilities.as_ref().is_some_and(|caps|caps.required_human_approval);
++    if !init.capabilities.as_ref().is_some_and(|caps|caps.experimental_api){return Err(held("original dynamic-tool protocol capability missing"));}
++    let arg0=Arg0DispatchPaths::default();
++    // This actual native bootstrap consumes the source-owned startup claim and checks
++    // unchanged original home BEFORE constructing or loading any AuthManager.
++    let host=before_deadline(operation_deadline,OriginalManagedHost::bootstrap(startup,arg0.clone(),CliConfigOverrides::default(),LoaderOverrides::default())).await?;
++    let scope=before_deadline(operation_deadline,host.prepare_scope(AbsolutePathBuf::from_absolute_path(root)?,AbsolutePathBuf::from_absolute_path(cwd)?)).await?;
++    let config=scope.config();
++    let environments=Arc::new(before_deadline(operation_deadline,async {EnvironmentManager::from_env(None,config.http_client_factory()).await.map_err(io::Error::other)}).await?);
++    let args=InProcessClientStartArgs {
++        required_human_approval,arg0_paths:arg0,config,cli_overrides:Vec::new(),loader_overrides:LoaderOverrides::default(),
++        strict_config:true,cloud_config_bundle:Default::default(),embedded_network_policy:Default::default(),feedback:CodexFeedback::new(),
++        log_db:None,state_db:None,environment_manager:environments,config_warnings:Vec::new(),session_source:SessionSource::VSCode,
++        enable_codex_api_key_env:false,client_name:init.client_info.name,client_version:init.client_info.version,
++        experimental_api:true,mcp_server_openai_form_elicitation:false,opt_out_notification_methods:Vec::new(),channel_capacity:32,
++    };
++    let(mut client,receipt)=before_deadline(operation_deadline,InProcessAppServerClient::start_with_original_host_and_receipt(args,scope)).await?;
++    let(output,output_rx)=tokio::sync::mpsc::channel::<Value>(32);
++    let mut writer=tokio::spawn(write_output(tokio::io::stdout(),output_rx));
++    let mut writer_observed=false;
++    let mut pending=BTreeSet::new();let mut server_pending=BTreeSet::new();let mut requests=tokio::task::JoinSet::new();
++    let mut initialized=false;let mut inputs=1usize;
++    let writer_failure=async {let result=(&mut writer).await;writer_observed=true;result.map_err(io::Error::other)?};
++    let outcome:io::Result<()>=bounded_operation(operation_deadline,writer_failure,async {
++        write_frame(&output,json!({"id":id,"result":receipt})).await?;
++        loop {tokio::select! {
++            joined=requests.join_next(),if !requests.is_empty()=>{
++                let(key,reply)=joined.ok_or_else(||held("request join missing"))?.map_err(io::Error::other)??;
++                if !pending.remove(&key){return Err(held("request identity replay"));}write_frame(&output,reply).await?;
++            },
++            event=client.next_event()=>{
++                match event.ok_or_else(||held("original runtime event stream closed"))? {
++                    InProcessServerEvent::ServerNotification(value)=>write_frame(&output,serde_json::to_value(value).map_err(io::Error::other)?).await?,
++                    InProcessServerEvent::ServerRequest(value)=>{
++                        let value=serde_json::to_value(value).map_err(io::Error::other)?;
++                        if value["method"]!="item/tool/call" {return Err(held("unsupported original server request"));}
++                        let key=serde_json::to_string(&value["id"]).map_err(io::Error::other)?;
++                        if !server_pending.insert(key){return Err(held("server request replay"));}write_frame(&output,value).await?;
++                    },
++                    InProcessServerEvent::Lagged{..}=>return Err(held("original event loss")),
++                }
++            },
++            value=input.next()=>{
++                let Some(value)=value? else{return if pending.is_empty()&&server_pending.is_empty(){Ok(())}else{Err(held("EOF with outstanding original operations"))};};
++                inputs+=1;if inputs>FRAMES{return Err(held("original input frame capacity"));}
++                if closed(&value,&["method"])&&value["method"]=="initialized" {
++                    if initialized{return Err(held("initialized replay"));}initialized=true;continue;
++                }
++                if !initialized{return Err(held("initialized notification required"));}
++                if value.get("method").is_some(){
++                    let request:ClientRequest=serde_json::from_value(value).map_err(|_|held("typed original request"))?;
++                    if !["config/read","configRequirements/read","permissionProfile/list","mcpServerStatus/list","app/installed","thread/start","thread/resume","turn/start","turn/interrupt"].contains(&request.method_name()){return Err(held("unsupported original method"));}
++                    if pending.len()>=4{return Err(held("original request concurrency"));}
++                    let id=request.id().clone();let key=serde_json::to_string(&id).map_err(io::Error::other)?;
++                    if !pending.insert(key.clone()){return Err(held("request replay"));}let sender=client.request_handle();
++                    requests.spawn(async move {let result=sender.request(request).await?;let reply=match result{Ok(value)=>json!({"id":id,"result":value}),Err(error)=>json!({"id":id,"error":error})};Ok::<_,io::Error>((key,reply))});
++                }else{
++                    let message:JSONRPCMessage=serde_json::from_value(value).map_err(|_|held("typed original tool reply"))?;
++                    match message {
++                        JSONRPCMessage::Response(response)=>{let key=serde_json::to_string(&response.id).map_err(io::Error::other)?;if !server_pending.remove(&key){return Err(held("unowned tool reply"));}client.resolve_server_request(response.id,response.result).await?;},
++                        JSONRPCMessage::Error(response)=>{let key=serde_json::to_string(&response.id).map_err(io::Error::other)?;if !server_pending.remove(&key){return Err(held("unowned tool error"));}client.reject_server_request(response.id,response.error).await?;},
++                        _=>return Err(held("unsupported original notification")),
++                    }
++                }
++            }
++        }}
++    }).await;
++    requests.abort_all();drop(output);
++    let cleanup=before_deadline(final_deadline,async {
++        while requests.join_next().await.is_some(){}
++        let shutdown=client.shutdown().await;
++        if !writer_observed {let result=(&mut writer).await;writer_observed=true;result.map_err(io::Error::other)??;}
++        shutdown
++    }).await;
++    if cleanup.is_err(){
++        // Do not await again after the SAME final deadline. Process failure is
++        // containment, never a claim that unresolved native/remote work closed.
++        requests.abort_all();if !writer_observed {writer.abort();}
++        return Err(held("cleanup unknown within absolute lifetime"));
++    }
++    outcome
++}
++#[tokio::main]
++async fn main(){
++    if let Err(error)=run().await {
++        // No stderr write/flush is awaited after the final deadline. Parent
++        // observes exit 2 as Held/unknown, never as a local or remote close proof.
++        let cleanup_unknown=error.to_string()=="cleanup unknown within absolute lifetime";
++        std::process::exit(if cleanup_unknown {3}else{2});
++    }
++}
++
++#[cfg(test)]
++mod controlled_source_tests {
++ use super::*;
++ // These controlled cases use actual mpsc/send and write_output paths. They
++ // open no native host, auth, provider, network, company or source-build slot.
++ #[tokio::test]
++ async fn full_output_queue_cannot_hide_operation_deadline(){
++  let(output,_rx)=tokio::sync::mpsc::channel(1);output.send(json!({"first":1})).await.unwrap();
++  let entered=std::sync::atomic::AtomicBool::new(false);
++  let result=bounded_operation(Instant::now()+Duration::from_millis(20),std::future::pending(),async {
++   entered.store(true,std::sync::atomic::Ordering::SeqCst);write_frame(&output,json!({"blocked":2})).await
++  }).await;
++  assert!(entered.load(std::sync::atomic::Ordering::SeqCst));
++  assert_eq!(result.unwrap_err().to_string(),"absolute operation deadline; completion unknown");
++  assert_eq!(output.capacity(),0); // selected branch really remained backpressured
++ }
++ #[tokio::test]
++ async fn actual_writer_failure_preempts_a_selected_blocked_branch(){
++  let(pipe,reader)=tokio::io::duplex(1);let(writer_tx,writer_rx)=tokio::sync::mpsc::channel(1);
++  writer_tx.send(json!({"original":"larger than the one byte pipe"})).await.unwrap();
++  let mut writer=tokio::spawn(write_output(pipe,writer_rx));
++  let(output,_rx)=tokio::sync::mpsc::channel(1);output.send(json!({"first":1})).await.unwrap();
++  let entered=std::sync::atomic::AtomicBool::new(false);
++  let failure=async {
++   // The original writer is polled and blocked on its actual write. Closing
++   // the controlled read end produces its real BrokenPipe/IO failure.
++   tokio::time::sleep(Duration::from_millis(20)).await;drop(reader);
++   (&mut writer).await.map_err(io::Error::other)?
++  };
++  let result=bounded_operation(Instant::now()+Duration::from_secs(1),failure,async {
++   entered.store(true,std::sync::atomic::Ordering::SeqCst);write_frame(&output,json!({"blocked":2})).await
++  }).await;
++  assert!(entered.load(std::sync::atomic::Ordering::SeqCst));
++  assert_eq!(result.unwrap_err().to_string(),"original stdout failed; completion unknown");
++ }
++ #[tokio::test]
++ async fn blocked_original_writer_cleanup_uses_same_final_deadline(){
++  let start=Instant::now();let final_deadline=start+Duration::from_millis(60);
++  let(pipe,_reader)=tokio::io::duplex(1);let(output,rx)=tokio::sync::mpsc::channel(1);
++  output.send(json!({"original":"bytes cannot fit in the controlled unread pipe"})).await.unwrap();
++  let mut writer=tokio::spawn(write_output(pipe,rx));
++  let operation=bounded_operation(final_deadline-Duration::from_millis(30),std::future::pending(),std::future::pending::<io::Result<()>>()).await;
++  assert!(operation.is_err());drop(output);
++  let cleanup=before_deadline(final_deadline,async {(&mut writer).await.map_err(io::Error::other)?}).await;
++  assert_eq!(cleanup.unwrap_err().to_string(),"absolute deadline; completion unknown");
++  writer.abort(); // No unbounded join after the original final deadline.
++  assert!(Instant::now()-start<Duration::from_secs(1));
++ }
++ #[tokio::test]
++ async fn already_expired_startup_cut_never_polls_startup_or_cleanup(){
++  let entered=std::sync::atomic::AtomicBool::new(false);
++  let result=before_deadline(Instant::now()-Duration::from_millis(1),async {
++   entered.store(true,std::sync::atomic::Ordering::SeqCst);Ok(())
++  }).await;
++  assert!(result.is_err());assert!(!entered.load(std::sync::atomic::Ordering::SeqCst));
++ }
++ #[test]
++ fn duplicate_nested_original_keys_hold(){
++  assert!(strict_json(br#"{"id":1,"params":{"tool":"safe","tool":"other"}}"#).is_err());
++  assert!(strict_json(br#"{"id":1,"id":2}"#).is_err());
++ }
++ #[test]
++ fn exact_initialized_envelope_survives_strict_parser(){
++  let value=strict_json(br#"{"method":"initialized"}"#).expect("actual idless envelope");
++  assert!(closed(&value,&["method"]));assert_eq!(value["method"],"initialized");
++ }
++ #[test]
++ fn excessive_nested_original_input_holds(){
++  let bytes=format!("{}0{}","[".repeat(34),"]".repeat(34));assert!(strict_json(bytes.as_bytes()).is_err());
++ }
++ #[tokio::test]
++ async fn cancelled_reader_retains_original_partial_frame(){
++  let(mut producer,consumer)=tokio::io::duplex(256);let mut reader=FrameReader::new(BufReader::new(consumer));
++  producer.write_all(br#"{"method":"init"#).await.expect("partial fixture");
++  assert!(tokio::time::timeout(std::time::Duration::from_millis(10),reader.next()).await.is_err());
++  producer.write_all(b"ialized\"}\n").await.expect("remaining fixture");
++  assert_eq!(reader.next().await.expect("actual parser").expect("actual frame"),json!({"method":"initialized"}));
++ }
++}
+--- a/codex-rs/app-server-client/src/lib.rs
++++ b/codex-rs/app-server-client/src/lib.rs
+@@ -281,6 +281,7 @@
+     fn into_runtime_start_args(self) -> InProcessStartArgs {
+         let initialize = self.initialize_params();
+         InProcessStartArgs {
++            protected_paths: None,
+             arg0_paths: self.arg0_paths,
+             config: self.config,
+             cli_overrides: self.cli_overrides,
+@@ -372,8 +373,30 @@
+     /// Request queues remain bounded without blocking on unread notifications.
+     pub async fn start(args: InProcessClientStartArgs) -> IoResult<Self> {
+         let channel_capacity = args.channel_capacity.max(1);
+-        let mut handle =
+-            codex_app_server::in_process::start(args.into_runtime_start_args()).await?;
++        let handle = codex_app_server::in_process::start(args.into_runtime_start_args()).await?;
++        Self::from_started_handle(handle, channel_capacity)
++    }
++
++    /// Uses the actual standard-bootstrap owner and its opaque, one-use scoped config.
++    /// Preserves the ordinary facade's command queue, event routing and shutdown code.
++    pub async fn start_with_original_host(args: InProcessClientStartArgs,
++        scope: codex_app_server::protected_host::ProtectedManagedScope) -> IoResult<Self> {
++        let channel_capacity = args.channel_capacity.max(1);
++        let handle = scope.start(args.into_runtime_start_args()).await?;
++        Self::from_started_handle(handle, channel_capacity)
++    }
++
++    /// Preserves the actual initialization payload for a transparent stdio adapter.
++    pub async fn start_with_original_host_and_receipt(args: InProcessClientStartArgs,
++        scope: codex_app_server::protected_host::ProtectedManagedScope) -> IoResult<(Self, serde_json::Value)> {
++        let channel_capacity=args.channel_capacity.max(1);
++        let handle=scope.start(args.into_runtime_start_args()).await?;
++        let receipt=handle.initialization_response().cloned().ok_or_else(||IoError::new(ErrorKind::InvalidData,"original initialize receipt unavailable"))?;
++        Ok((Self::from_started_handle(handle,channel_capacity)?,receipt))
++    }
++
++    fn from_started_handle(mut handle: codex_app_server::in_process::InProcessClientHandle,
++        channel_capacity: usize) -> IoResult<Self> {
+         let request_sender = handle.sender();
+         let (command_tx, mut command_rx) = mpsc::channel::<ClientCommand>(channel_capacity);
+         // e9996ec62a preserved transcript events by awaiting a bounded queue, but that can
+--- a/codex-rs/codex-api/Cargo.toml
++++ b/codex-rs/codex-api/Cargo.toml
+@@ -16,6 +16,8 @@
+ codex-websocket-client = { workspace = true }
+ futures = { workspace = true }
+ http = { workspace = true }
++libc = { workspace = true }
++sha2 = { workspace = true }
+ rustls = { workspace = true }
+ schemars = { workspace = true }
+ serde = { workspace = true, features = ["derive"] }
+--- a/codex-rs/codex-api/src/endpoint/images.rs
++++ b/codex-rs/codex-api/src/endpoint/images.rs
+@@ -46,7 +46,7 @@
+     }
+ }
+ 
+-impl<T: HttpTransport> ImagesClient<T> {
++impl<T: HttpTransport + 'static> ImagesClient<T> {
+     pub fn new(transport: T, provider: Provider, auth: SharedAuthProvider) -> Self {
+         Self {
+             session: EndpointSession::new(transport, provider, auth),
+--- a/codex-rs/codex-api/src/endpoint/memories.rs
++++ b/codex-rs/codex-api/src/endpoint/memories.rs
+@@ -16,7 +16,7 @@
+     session: EndpointSession<T>,
+ }
+ 
+-impl<T: HttpTransport> MemoriesClient<T> {
++impl<T: HttpTransport + 'static> MemoriesClient<T> {
+     pub fn new(transport: T, provider: Provider, auth: SharedAuthProvider) -> Self {
+         Self {
+             session: EndpointSession::new(transport, provider, auth),
+--- a/codex-rs/codex-api/src/endpoint/models.rs
++++ b/codex-rs/codex-api/src/endpoint/models.rs
+@@ -17,7 +17,7 @@
+     session: EndpointSession<T>,
+ }
+ 
+-impl<T: HttpTransport> ModelsClient<T> {
++impl<T: HttpTransport + 'static> ModelsClient<T> {
+     pub fn new(transport: T, provider: Provider, auth: SharedAuthProvider) -> Self {
+         Self {
+             session: EndpointSession::new(transport, provider, auth),
+--- a/codex-rs/codex-api/src/endpoint/realtime_call.rs
++++ b/codex-rs/codex-api/src/endpoint/realtime_call.rs
+@@ -46,7 +46,7 @@
+     session: &'a Value,
+ }
+ 
+-impl<T: HttpTransport> RealtimeCallClient<T> {
++impl<T: HttpTransport + 'static> RealtimeCallClient<T> {
+     pub fn new(transport: T, provider: Provider, auth: SharedAuthProvider) -> Self {
+         Self {
+             session: EndpointSession::new(transport, provider, auth),
+--- a/codex-rs/codex-api/src/endpoint/responses.rs
++++ b/codex-rs/codex-api/src/endpoint/responses.rs
+@@ -38,12 +38,16 @@
+     pub turn_state: Option<Arc<OnceLock<String>>>,
+ }
+ 
+-impl<T: HttpTransport> ResponsesClient<T> {
++impl<T: HttpTransport + 'static> ResponsesClient<T> {
+     pub fn new(transport: T, provider: Provider, auth: SharedAuthProvider) -> Self {
+         Self {
+             session: EndpointSession::new(transport, provider, auth),
+             sse_telemetry: None,
+         }
++    }
++
++    pub fn with_protected_step(self, step: crate::protected_peer::SourceStep) -> Self {
++        Self { session: self.session.with_protected_step(step), sse_telemetry: self.sse_telemetry }
+     }
+ 
+     pub fn with_telemetry(
+--- a/codex-rs/codex-api/src/endpoint/responses_websocket/connector.rs
++++ b/codex-rs/codex-api/src/endpoint/responses_websocket/connector.rs
+@@ -30,6 +30,9 @@
+         turn_state: Option<Arc<OnceLock<String>>>,
+         telemetry: Option<Arc<dyn WebsocketTelemetry>>,
+     ) -> Result<ResponsesWebsocketConnection, ApiError> {
++        if crate::protected_peer::enabled() {
++            return Err(ApiError::Stream("protected WebSocket connector HOLD".to_string()));
++        }
+         let ws_url = self
+             .provider
+             .websocket_url_for_path(RESPONSES_PATH)
+--- a/codex-rs/codex-api/src/endpoint/responses_websocket.rs
++++ b/codex-rs/codex-api/src/endpoint/responses_websocket.rs
+@@ -257,6 +257,9 @@
+         connection_reused: bool,
+         turn_state: Option<Arc<OnceLock<String>>>,
+     ) -> Result<ResponseStream, ApiError> {
++        if crate::protected_peer::enabled() {
++            return Err(ApiError::Stream("protected WebSocket send HOLD".to_string()));
++        }
+         let (tx_event, rx_event) =
+             mpsc::channel::<std::result::Result<ResponseEvent, ApiError>>(1600);
+         let (tx_interrupt, rx_interrupt) = oneshot::channel();
+@@ -438,6 +441,9 @@
+         turn_state: Option<Arc<OnceLock<String>>>,
+         telemetry: Option<Arc<dyn WebsocketTelemetry>>,
+     ) -> Result<ResponsesWebsocketConnection, ApiError> {
++        if crate::protected_peer::enabled() {
++            return Err(ApiError::Stream("protected WebSocket transport HOLD".to_string()));
++        }
+         let connector = WebSocketConnector::new(http_client_factory)
+             .map_err(|err| ApiError::Stream(format!("failed to configure websocket TLS: {err}")))?;
+         self.connect_with_connector(
+@@ -464,6 +470,11 @@
+         default_headers: HeaderMap,
+         immediate_close_timeout: Duration,
+     ) -> Result<ResponsesWebsocketProbe, ResponsesWebsocketProbeError> {
++        if crate::protected_peer::enabled() {
++            return Err(ResponsesWebsocketProbeError::before_upgrade(
++                ApiError::Stream("protected WebSocket probe HOLD".to_string()),
++                ResponsesWebsocketProbeFailureStage::Unknown));
++        }
+         let ws_url = self
+             .provider
+             .websocket_url_for_path(RESPONSES_PATH)
+--- a/codex-rs/codex-api/src/endpoint/search.rs
++++ b/codex-rs/codex-api/src/endpoint/search.rs
+@@ -18,7 +18,7 @@
+     session: EndpointSession<T>,
+ }
+ 
+-impl<T: HttpTransport> SearchClient<T> {
++impl<T: HttpTransport + 'static> SearchClient<T> {
+     pub fn new(transport: T, provider: Provider, auth: SharedAuthProvider) -> Self {
+         Self {
+             session: EndpointSession::new(transport, provider, auth),
+--- a/codex-rs/codex-api/src/endpoint/session.rs
++++ b/codex-rs/codex-api/src/endpoint/session.rs
+@@ -21,15 +21,17 @@
+     provider: Provider,
+     auth: SharedAuthProvider,
+     request_telemetry: Option<Arc<dyn RequestTelemetry>>,
++    protected_step: Option<crate::protected_peer::SourceStep>,
+ }
+ 
+-impl<T: HttpTransport> EndpointSession<T> {
++impl<T: HttpTransport + 'static> EndpointSession<T> {
+     pub(crate) fn new(transport: T, provider: Provider, auth: SharedAuthProvider) -> Self {
+         Self {
+             transport,
+             provider,
+             auth,
+             request_telemetry: None,
++            protected_step: None,
+         }
+     }
+ 
+@@ -38,6 +40,11 @@
+         request: Option<Arc<dyn RequestTelemetry>>,
+     ) -> Self {
+         self.request_telemetry = request;
++        self
++    }
++
++    pub(crate) fn with_protected_step(mut self, step: crate::protected_peer::SourceStep) -> Self {
++        self.protected_step = Some(step);
+         self
+     }
+ 
+@@ -88,6 +95,9 @@
+     where
+         C: Fn(&mut Request),
+     {
++        if crate::protected_peer::enabled() {
++            return Err(ApiError::Stream("protected non-Responses endpoint HOLD".to_string()));
++        }
+         let body = body.map(RequestBody::Json);
+         let make_request = || {
+             let mut req = self.make_request(&method, path, &extra_headers, body.as_ref());
+@@ -145,7 +155,8 @@
+                 let transport = &self.transport;
+                 async move {
+                     let req = auth.apply_auth(req).await.map_err(TransportError::from)?;
+-                    transport.stream(req).await
++                    // Auth may replace the whole request. The gate observes its returned value.
++                    crate::protected_peer::stream(transport, req, self.protected_step.as_ref(), &self.auth).await
+                 }
+             },
+         )
+--- a/codex-rs/codex-api/src/lib.rs
++++ b/codex-rs/codex-api/src/lib.rs
+@@ -7,6 +7,8 @@
+ mod guardian_assessment;
+ pub(crate) mod images;
+ pub(crate) mod provider;
++/// Protected source adapter; observations do not qualify an executable.
++pub mod protected_peer;
+ pub(crate) mod rate_limits;
+ pub(crate) mod requests;
+ mod responses_headers;
+--- /dev/null
++++ b/codex-rs/codex-api/src/protected_peer/source_gate_tests.rs
+@@ -0,0 +1,28 @@
++//! Controlled source scheduling cases, no native transport/auth/model operation.
++use super::*;
++#[tokio::test]
++async fn cancelled_sender_cannot_be_overtaken_by_already_queued_sender() {
++    let unknown=AtomicBool::new(false);let mutex=tokio::sync::Mutex::new(());
++    let owned=mutex.lock().await;let a=OperationGuard {armed:true,unknown:&unknown};
++    let entered=tokio::sync::Notify::new();let started=AtomicBool::new(false);
++    let queued=async {
++        ensure_known(&unknown)?;entered.notify_one();
++        let _original=lock_original_known(&mutex,&unknown).await?;
++        started.store(true,Ordering::SeqCst);Ok::<(),TransportError>(())
++    };
++    let cancelled=async { entered.notified().await;drop(a);drop(owned); };
++    let (result,())=tokio::join!(queued,cancelled);
++    assert!(result.is_err());assert!(!started.load(Ordering::SeqCst));
++}
++#[tokio::test]
++async fn cancellation_during_awaited_permit_prevents_transport_poll() {
++    let unknown=AtomicBool::new(false);let entered=tokio::sync::Notify::new();let released=tokio::sync::Notify::new();
++    let started=AtomicBool::new(false);let a=OperationGuard {armed:true,unknown:&unknown};
++    let waiting=async {
++        let result=await_original_known(&unknown,async {entered.notify_one();released.notified().await;}).await;
++        if result.is_ok() {started.store(true,Ordering::SeqCst);}result
++    };
++    let cancelled=async {entered.notified().await;drop(a);released.notify_one();};
++    let (result,())=tokio::join!(waiting,cancelled);
++    assert!(result.is_err());assert!(!started.load(Ordering::SeqCst));
++}
+--- /dev/null
++++ b/codex-rs/codex-api/src/protected_peer/startup.rs
+@@ -0,0 +1,85 @@
++//! Original inherited startup ownership. No auth constructor runs before this cut.
++use super::*;
++use std::{io::Read, path::Path, sync::atomic::AtomicBool};
++
++pub struct NativeStartup { claim: OriginalBootstrapClaim }
++pub struct OriginalBootstrapClaim {
++    pub(super) nonce: String, pub(super) slot_id: String,
++    pub(super) executable_sha256: String, pub(super) source_manifest_sha256: String,
++    pub(super) original_home_sha256: String, pub(super) state_root: String, pub(super) cwd: String,
++    consumed: AtomicBool,
++}
++static STARTED: AtomicBool = AtomicBool::new(false);
++
++impl NativeStartup {
++    pub fn claim_bootstrap(self, actual_home: &Path) -> Result<OriginalBootstrapClaim, TransportError> {
++        if self.claim.consumed.swap(true, Ordering::SeqCst) ||
++            hash(actual_home.to_string_lossy().as_bytes()) != self.claim.original_home_sha256 {
++            return Err(hold("original host context mismatch before auth"));
++        }
++        Ok(self.claim)
++    }
++}
++impl OriginalBootstrapClaim {
++    pub fn state_root(&self) -> &str { &self.state_root }
++    pub fn cwd(&self) -> &str { &self.cwd }
++}
++fn executable_hash() -> Result<String, TransportError> {
++    let path = std::env::current_exe().map_err(|_| hold("original executable identity"))?;
++    let mut file = std::fs::File::open(path).map_err(|_| hold("original executable read"))?;
++    let before = file.metadata().map_err(|_| hold("original executable metadata"))?;
++    if !before.is_file() || before.len() > 2_147_483_648 { return Err(hold("original executable bound")); }
++    let mut sha = Sha256::new(); let mut buffer = [0u8; 65536]; let mut read = 0u64;
++    loop { let n = file.read(&mut buffer).map_err(|_| hold("original executable hash"))?;
++        if n == 0 { break; } read += n as u64; if read > before.len() { return Err(hold("executable changed")); } sha.update(&buffer[..n]); }
++    let after = file.metadata().map_err(|_| hold("original executable metadata"))?;
++    if read != before.len() || after.len() != before.len() || after.modified().ok() != before.modified().ok() {
++        return Err(hold("original executable changed"));
++    }
++    Ok(format!("{:x}", sha.finalize()))
++}
++
++/// Called by the actual companion executable before OriginalManagedHost::bootstrap.
++/// Runtime flags cannot replace compile/output association or the original FD challenge.
++pub async fn begin_original_companion(state_root: &Path, cwd: &Path) -> Result<NativeStartup, TransportError> {
++    if !enabled() || STARTED.swap(true, Ordering::SeqCst) { return Err(hold("unqualified/repeated companion startup")); }
++    #[cfg(not(unix))] { let _ = (state_root, cwd); return Err(hold("unsupported native host")); }
++    #[cfg(unix)] {
++        let owner = channel().await?;
++        let mut state = owner.lock().await;
++        let challenge: Challenge = tokio::time::timeout(std::time::Duration::from_secs(5), state.read())
++            .await.map_err(|_| hold("pre-auth challenge deadline"))??;
++        validate_challenge(&challenge)?;
++        let compiled = option_env!("SOLOCO_SOURCE_MANIFEST_SHA256").ok_or_else(|| hold("unassociated source build"))?;
++        if compiled != challenge.source_manifest_sha256 || executable_hash()? != challenge.executable_sha256 ||
++            state_root.to_str() != Some(challenge.state_root.as_str()) || cwd.to_str() != Some(challenge.cwd.as_str()) ||
++            challenge.original_home_sha256.as_ref().is_none_or(|v| v.len()!=64 || !v.bytes().all(|b| b.is_ascii_hexdigit())) {
++            return Err(hold("source/output/scope/original-context association unproved before auth"));
++        }
++        let claim = OriginalBootstrapClaim { nonce: challenge.nonce.clone(), slot_id: challenge.slot_id.clone(),
++            executable_sha256: challenge.executable_sha256.clone(), source_manifest_sha256: challenge.source_manifest_sha256.clone(),
++            original_home_sha256: challenge.original_home_sha256.clone().ok_or_else(|| hold("missing original host"))?,
++            state_root: challenge.state_root.clone(), cwd: challenge.cwd.clone(), consumed: AtomicBool::new(false) };
++        state.challenge = Some(challenge);
++        Ok(NativeStartup { claim })
++    }
++}
++
++/// Only the opaque original-bootstrap claim can emit this lifecycle observation.
++/// Records describe actual original loaders; they do not assert ready/qualified.
++pub async fn observe_original_bootstrap(claim: &OriginalBootstrapClaim, records: Value) -> Result<(), TransportError> {
++    #[cfg(not(unix))] { let _ = (claim, records); return Err(hold("unsupported native host")); }
++    #[cfg(unix)] {
++        let owner = channel().await?; let mut state = owner.lock().await;
++        if !claim.consumed.load(Ordering::SeqCst) || state.host_observation.is_some() ||
++            state.challenge.as_ref().is_none_or(|c| c.nonce != claim.nonce) { return Err(hold("foreign/replayed original bootstrap")); }
++        let facts = json!({"protocol":PROTOCOL,"kind":"host_bootstrap","nonce":claim.nonce,
++            "pid":std::process::id(),"slot_id":claim.slot_id,"executable_sha256":claim.executable_sha256,
++            "source_manifest_sha256":claim.source_manifest_sha256,"original_home_sha256":claim.original_home_sha256,
++            "state_root":claim.state_root,"cwd":claim.cwd,"host_instance_id":Uuid::new_v4().to_string(),"sources":records});
++        tokio::time::timeout(std::time::Duration::from_secs(5), state.write(&facts)).await
++            .map_err(|_| hold("bootstrap observation deadline"))??;
++        state.host_observation = Some(facts);
++        Ok(())
++    }
++}
+--- /dev/null
++++ b/codex-rs/codex-api/src/protected_peer.rs
+@@ -0,0 +1,436 @@
++//! Source-owned protected Responses producer for the exact c407 source candidate.
++//! A frame describes an observation, never qualification of this executable or its owner.
++//! Only the original inherited supervisor pipes can return a one-use send permit.
++use codex_client::{HttpTransport, Request, Response, ReqwestTransport, StreamResponse, TransportError};
++use futures::StreamExt;
++use http::Method;
++use serde::{Deserialize, Serialize};
++use serde_json::{Value, json};
++use sha2::{Digest, Sha256};
++use std::sync::{Arc, Mutex};
++use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
++use uuid::Uuid;
++
++mod startup;
++#[cfg(test)]
++mod source_gate_tests;
++pub use startup::{NativeStartup, OriginalBootstrapClaim, begin_original_companion, observe_original_bootstrap};
++
++const PROTOCOL: &str = "soloco-protected-backend-permit-v2";
++const COMMIT: &str = "c40729ea5cf8e947481b130c59807273eda2f8e9";
++const MAX_FRAME: usize = 100_000;
++const MAX_BODY: usize = 4_000_000;
++static NEXT_RUNTIME: AtomicU64 = AtomicU64::new(1);
++static UNKNOWN: AtomicBool = AtomicBool::new(false);
++struct OperationGuard<'a> { armed: bool, unknown: &'a AtomicBool }
++impl Drop for OperationGuard<'_> {
++    fn drop(&mut self) { if self.armed { self.unknown.store(true, Ordering::SeqCst); } }
++}
++async fn lock_original_known<'a,T>(mutex: &'a tokio::sync::Mutex<T>, unknown: &AtomicBool)
++    -> Result<tokio::sync::MutexGuard<'a,T>,TransportError> {
++    let guard=mutex.lock().await;ensure_known(unknown)?;Ok(guard)
++}
++async fn await_original_known<F: std::future::Future>(unknown: &AtomicBool, wait: F) -> Result<F::Output,TransportError> {
++    let result=wait.await;ensure_known(unknown)?;Ok(result)
++}
++fn ensure_known(unknown: &AtomicBool) -> Result<(), TransportError> {
++    if unknown.load(Ordering::SeqCst) { Err(hold("unknown prior operation/cancellation")) } else { Ok(()) }
++}
++
++/// A compile-time control selection, NOT a runtime/source-build qualification.
++pub fn enabled() -> bool {
++    option_env!("SOLOCO_PROTECTED_HOST_BUILD") == Some("1")
++}
++
++fn hold(reason: &str) -> TransportError {
++    TransportError::Build(format!("protected peer HOLD: {reason}"))
++}
++pub fn source_bytes_sha256(bytes: &[u8]) -> String { hash(bytes) }
++
++#[derive(Debug, Clone, Serialize)]
++pub struct SourceProvenance {
++    original_sampling_input_sha256: String, sources: Value, unknown_origins: Vec<String>,
++}
++impl SourceProvenance {
++    pub fn from_original_loaders(original_sampling_input_sha256: String, sources: Value, unknown_origins: Vec<String>) -> Self {
++        let mut unknown_origins=unknown_origins;
++        for missing in ["input_message_to_rendered_source_spans_not_retained", "restored_history_instruction_origins_not_retained"] {
++            if !unknown_origins.iter().any(|item|item==missing) { unknown_origins.push(missing.into()); }
++        }
++        Self { original_sampling_input_sha256, sources, unknown_origins }
++    }
++}
++
++fn hash(bytes: &[u8]) -> String {
++    format!("{:x}", Sha256::digest(bytes))
++}
++fn json_hash(value: &Value) -> Result<String, TransportError> {
++    serde_json::to_vec(value).map(|v| hash(&v)).map_err(|_| hold("JSON encoding"))
++}
++
++#[derive(Debug, Default)]
++struct Generations {
++    profile: Option<String>, services: Option<String>, instructions: Option<String>,
++    profile_generation: u64, services_generation: u64, instruction_generation: u64,
++    next_step: u64,
++}
++
++/// Created by the original ModelClientState constructor, shared by its clones.
++/// No constructor accepts proof flags, source labels, callbacks, or generations.
++#[derive(Debug, Clone)]
++pub struct SourceRuntime {
++    generation: u64,
++    state: Arc<Mutex<Generations>>,
++}
++impl Default for SourceRuntime {
++    fn default() -> Self { Self::new() }
++}
++impl SourceRuntime {
++    pub fn new() -> Self {
++        Self { generation: NEXT_RUNTIME.fetch_add(1, Ordering::SeqCst), state: Arc::default() }
++    }
++    /// Metadata is copied at the original core call site; it is not proof of auth ownership.
++    pub fn step(&self, thread_id: String, turn_id: Option<String>, auth_owner: Option<u64>,
++                auth_revision: Option<u64>, runtime_id: Option<String>, provenance: Option<Arc<SourceProvenance>>) -> SourceStep {
++        SourceStep { runtime: self.clone(), thread_id, turn_id, auth_owner, auth_revision,
++            runtime_id, provenance, request_id: Uuid::new_v4().to_string(), consumed: Arc::new(AtomicBool::new(false)) }
++    }
++}
++
++#[derive(Debug, Clone)]
++pub struct SourceStep {
++    runtime: SourceRuntime, thread_id: String, turn_id: Option<String>,
++    auth_owner: Option<u64>, auth_revision: Option<u64>, runtime_id: Option<String>, provenance: Option<Arc<SourceProvenance>>,
++    request_id: String, consumed: Arc<AtomicBool>,
++}
++/// The original native transport object, not a caller callback or qualification label.
++/// Its constructor accepts the real concrete transport, never an HttpTransport implementation.
++pub struct ProtectedGatewayTransport { inner: ReqwestTransport, instance_id: String, auth: Option<codex_http_client::AuthSendLease>, auth_provider: Option<crate::SharedAuthProvider> }
++pub fn bind_native_gateway(inner: ReqwestTransport, auth: Option<codex_http_client::AuthSendLease>,
++    auth_provider: Option<crate::SharedAuthProvider>) -> ProtectedGatewayTransport {
++    ProtectedGatewayTransport { inner, auth, auth_provider, instance_id: if enabled() { Uuid::new_v4().to_string() } else { String::new() } }
++}
++impl HttpTransport for ProtectedGatewayTransport {
++    async fn execute(&self, request: Request) -> Result<Response, TransportError> {
++        if enabled() { return Err(hold("native gateway non-Responses route")); }
++        self.inner.execute(request).await
++    }
++    async fn stream(&self, request: Request) -> Result<StreamResponse, TransportError> {
++        if enabled() { return Err(hold("native gateway requires original final-step cut")); }
++        self.inner.stream(request).await
++    }
++}
++
++#[derive(Deserialize)]
++#[serde(deny_unknown_fields)]
++struct Challenge {
++    protocol: String, kind: String, nonce: String, pid: u32,
++    upstream_url: String, slot_id: String, executable_sha256: String, source_manifest_sha256: String,
++    state_root: String, cwd: String, original_home_sha256: Option<String>,
++}
++fn validate_challenge(challenge: &Challenge) -> Result<(), TransportError> {
++    let url = url::Url::parse(&challenge.upstream_url).map_err(|_| hold("upstream URL"))?;
++    let hash = |v: &str| v.len()==64 && v.bytes().all(|b| b.is_ascii_hexdigit());
++    if challenge.protocol != PROTOCOL || challenge.kind != "challenge" || challenge.pid != std::process::id() ||
++        !hash(&challenge.nonce) || !hash(&challenge.executable_sha256) || !hash(&challenge.source_manifest_sha256) ||
++        challenge.slot_id.is_empty() || challenge.slot_id.len()>200 ||
++        !std::path::Path::new(&challenge.state_root).is_absolute() || !std::path::Path::new(&challenge.cwd).is_absolute() ||
++        url.scheme() != "https" || url.host_str().is_none() || !url.username().is_empty() || url.password().is_some() ||
++        url.query().is_some() || url.fragment().is_some() || !url.path().ends_with("/responses") {
++        return Err(hold("original v2 challenge binding"));
++    }
++    Ok(())
++}
++#[derive(Deserialize)]
++#[serde(deny_unknown_fields)]
++struct Permit {
++    protocol: String, kind: String, nonce: String, pid: u32, sequence: u64,
++    binding_sha256: String, request_sha256: String, request_id: String,
++    gateway_instance_id: String,
++}
++#[derive(Serialize)]
++struct FinalObservation<'a> {
++    protocol: &'static str, kind: &'static str, nonce: &'a str, pid: u32, sequence: u64,
++    source_commit: &'static str, producer_module_sha256: String, tool_resource_sha256: String,
++    host_instance_id: &'a str,
++    runtime_generation: u64, profile_generation: u64, services_generation: u64,
++    instruction_generation: u64, thread_id: &'a str, turn_id: &'a str, step_id: u64,
++    auth_owner_generation: u64, auth_revision: u64, auth_send_epoch: u64, runtime_id: &'a Option<String>,
++    request_id: &'a str, gateway_instance_id: &'a str, method: &'a str, url: &'a str,
++    request_sha256: String, request_bytes: usize, context_sha256: String,
++    input_text_sha256s: Vec<String>,
++    ordered_instructions: Vec<Value>, ordered_instructions_sha256: String,
++    profile: Value, tools: Value, provenance: &'a Option<Arc<SourceProvenance>>,
++}
++
++fn generation(previous: &mut Option<String>, current: String, n: &mut u64) -> Result<(), TransportError> {
++    if previous.as_ref() != Some(&current) {
++        *n = n.checked_add(1).ok_or_else(|| hold("generation overflow"))?;
++        *previous = Some(current);
++    }
++    Ok(())
++}
++
++fn observation<'a>(request: &'a Request, body: &[u8], step: &'a SourceStep, gateway: &'a ProtectedGatewayTransport,
++                   challenge: &'a Challenge, host_instance_id: &'a str, sequence: u64) -> Result<FinalObservation<'a>, TransportError> {
++    if step.runtime.generation == 0 || step.runtime.generation == u64::MAX {
++        return Err(hold("runtime generation exhausted"));
++    }
++    let turn_id = step.turn_id.as_deref().filter(|s| !s.is_empty()).ok_or_else(|| hold("missing original turn"))?;
++    if step.thread_id.is_empty() { return Err(hold("missing original thread")); }
++    let auth_owner = step.auth_owner.ok_or_else(|| hold("normal auth owner unobserved"))?;
++    let auth_revision = step.auth_revision.ok_or_else(|| hold("normal auth revision unobserved"))?;
++    let live_auth = gateway.auth.as_ref().ok_or_else(|| hold("original same-manager send lease unavailable"))?;
++    live_auth.check().map_err(|_| hold("original auth changed after provider callback"))?;
++    if live_auth.auth_owner_generation() != auth_owner || live_auth.auth_revision() != auth_revision {
++        return Err(hold("copied setup metadata differs from original live lease"));
++    }
++    if request.method != Method::POST || request.url != challenge.upstream_url ||
++        request.headers.contains_key(http::header::CONTENT_ENCODING) {
++        return Err(hold("final gateway/request-id/compression mismatch"));
++    }
++    let mut document: Value = serde_json::from_slice(body).map_err(|_| hold("final JSON body"))?;
++    let root = document.as_object_mut().ok_or_else(|| hold("final body object"))?;
++    let tools = root.get("tools").cloned().ok_or_else(|| hold("missing full offered inventory"))?;
++    let expected: Value = serde_json::from_str(include_str!("protected_peer_responses_tools.json"))
++        .map_err(|_| hold("compiled tool resource"))?;
++    if tools != expected { return Err(hold("full original five-tool/schema equality")); }
++    let input = root.get("input").and_then(Value::as_array).ok_or_else(|| hold("ordered input"))?;
++    if input.iter().any(|v| v.get("type").and_then(Value::as_str) == Some("additional_tools")) {
++        return Err(hold("unqualified restored/deferred offered inventory"));
++    }
++    let context_sha256 = json_hash(&Value::Array(input.clone()))?;
++    let input_text_sha256s = input.iter().flat_map(|item|item.get("content").and_then(Value::as_array).into_iter().flatten())
++        .filter_map(|content|content.get("text").and_then(Value::as_str)).map(|text|hash(text.as_bytes())).collect();
++    let ordered_instructions: Vec<Value> = input.iter().enumerate().filter_map(|(index, item)| {
++        let role = item.get("role").and_then(Value::as_str)?;
++        matches!(role, "system" | "developer").then(|| json!({"input_index": index, "item": item}))
++    }).collect();
++    let instructions_hash = json_hash(&Value::Array(ordered_instructions.clone()))?;
++    root.remove("input"); root.remove("tools"); root.remove("client_metadata");
++    let profile = document;
++    let profile_hash = json_hash(&profile)?;
++    let services_hash = json_hash(&tools)?;
++    let mut state = step.runtime.state.lock().map_err(|_| hold("runtime state poisoned"))?;
++    // Destructure to keep disjoint mutable field borrows explicit.
++    let Generations { profile: old_profile, services: old_services, instructions: old_instructions,
++        profile_generation, services_generation, instruction_generation, next_step } = &mut *state;
++    generation(old_profile, profile_hash, profile_generation)?;
++    generation(old_services, services_hash, services_generation)?;
++    generation(old_instructions, instructions_hash.clone(), instruction_generation)?;
++    *next_step = next_step.checked_add(1).ok_or_else(|| hold("step overflow"))?;
++    Ok(FinalObservation { protocol: PROTOCOL, kind: "final_request", nonce: &challenge.nonce,
++        pid: std::process::id(), sequence, source_commit: COMMIT,
++        producer_module_sha256: hash(include_bytes!("protected_peer.rs")),
++        tool_resource_sha256: hash(include_bytes!("protected_peer_responses_tools.json")),
++        host_instance_id, runtime_generation: step.runtime.generation, profile_generation: *profile_generation,
++        services_generation: *services_generation, instruction_generation: *instruction_generation,
++        thread_id: &step.thread_id, turn_id, step_id: *next_step, auth_owner_generation: auth_owner,
++        auth_revision, auth_send_epoch: live_auth.epoch(), runtime_id: &step.runtime_id, request_id: &step.request_id,
++        gateway_instance_id: &gateway.instance_id, method: request.method.as_str(), url: &request.url,
++        request_sha256: hash(body), request_bytes: body.len(), context_sha256,
++        input_text_sha256s, ordered_instructions, ordered_instructions_sha256: instructions_hash, profile, tools, provenance: &step.provenance })
++}
++
++#[cfg(unix)]
++mod pipe {
++    use super::*;
++    use std::io;
++    use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
++    use tokio::io::unix::AsyncFd;
++    pub(super) struct Pipe(AsyncFd<OwnedFd>);
++    impl Pipe {
++        pub(super) fn inherited(fd: i32) -> io::Result<Self> {
++            // Only fixed descriptors inherited from the original launch; no path/env override.
++            let mut stat = std::mem::MaybeUninit::<libc::stat>::uninit();
++            if unsafe { libc::fstat(fd, stat.as_mut_ptr()) } != 0 { return Err(io::Error::last_os_error()); }
++            // Establish that the inherited descriptor is open before claiming ownership.
++            let owned = unsafe { OwnedFd::from_raw_fd(fd) };
++            let mode = unsafe { stat.assume_init() }.st_mode & libc::S_IFMT;
++            // libuv may implement Node's original anonymous stdio pipes as socketpairs.
++            if mode != libc::S_IFIFO && mode != libc::S_IFSOCK {
++                return Err(io::Error::other("protected descriptor is not original pipe"));
++            }
++            let flags = unsafe { libc::fcntl(fd, libc::F_GETFL) };
++            let descriptor_flags = unsafe { libc::fcntl(fd, libc::F_GETFD) };
++            if flags < 0 || descriptor_flags < 0 || unsafe { libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK) } < 0 ||
++                unsafe { libc::fcntl(fd, libc::F_SETFD, descriptor_flags | libc::FD_CLOEXEC) } < 0 {
++                return Err(io::Error::last_os_error());
++            }
++            Ok(Self(AsyncFd::new(owned)?))
++        }
++        pub(super) async fn read_byte(&self) -> io::Result<u8> {
++            loop {
++                let mut ready = self.0.readable().await?;
++                match ready.try_io(|fd| {
++                    let mut byte = 0u8;
++                    let n = unsafe { libc::read(fd.get_ref().as_raw_fd(), (&mut byte as *mut u8).cast(), 1) };
++                    if n == 1 { Ok(byte) } else if n == 0 { Err(io::Error::from(io::ErrorKind::UnexpectedEof)) }
++                    else { Err(io::Error::last_os_error()) }
++                }) { Ok(result) => return result, Err(_) => continue }
++            }
++        }
++        pub(super) async fn write(&self, bytes: &[u8]) -> io::Result<()> {
++            let mut offset = 0;
++            while offset < bytes.len() {
++                let mut ready = self.0.writable().await?;
++                match ready.try_io(|fd| {
++                    let n = unsafe { libc::write(fd.get_ref().as_raw_fd(), bytes[offset..].as_ptr().cast(), bytes.len()-offset) };
++                    if n > 0 { Ok(n as usize) } else if n == 0 { Err(io::Error::from(io::ErrorKind::WriteZero)) }
++                    else { Err(io::Error::last_os_error()) }
++                }) { Ok(Ok(n)) => offset += n, Ok(Err(e)) => return Err(e), Err(_) => continue }
++            }
++            Ok(())
++        }
++    }
++}
++
++#[cfg(unix)]
++struct Channel {
++    incoming: pipe::Pipe, outgoing: pipe::Pipe, challenge: Option<Challenge>,
++    sequence: u64, unresolved: Option<String>, poisoned: bool, host_observation: Option<Value>,
++}
++#[cfg(unix)]
++impl Channel {
++    async fn read<T: serde::de::DeserializeOwned>(&self) -> Result<T, TransportError> {
++        let mut bytes = Vec::new();
++        loop {
++            let byte = self.incoming.read_byte().await.map_err(|_| hold("original control pipe closed/error"))?;
++            if byte == b'\n' { break; }
++            if bytes.len() == MAX_FRAME { return Err(hold("control frame byte limit")); }
++            bytes.push(byte);
++        }
++        serde_json::from_slice(&bytes).map_err(|_| hold("strict control frame"))
++    }
++    async fn write(&self, value: &impl Serialize) -> Result<(), TransportError> {
++        let mut bytes = serde_json::to_vec(value).map_err(|_| hold("witness encoding"))?;
++        if bytes.len() > MAX_FRAME { return Err(hold("witness frame byte limit")); }
++        bytes.push(b'\n');
++        self.outgoing.write(&bytes).await.map_err(|_| hold("original witness pipe closed/error"))
++    }
++    async fn write_observation(&self, facts: &impl Serialize) -> Result<String, TransportError> {
++        // Hash the exact original serialization; no cross-language reserialization assumption.
++        let observed = serde_json::to_vec(facts).map_err(|_| hold("observation encoding"))?;
++        let binding = hash(&observed);
++        let mut frame = format!("{{\"binding_sha256\":\"{binding}\",\"observation\":").into_bytes();
++        frame.extend_from_slice(&observed); frame.push(b'}');
++        if frame.len() > MAX_FRAME { return Err(hold("witness frame byte limit")); }
++        frame.push(b'\n');
++        self.outgoing.write(&frame).await.map_err(|_| hold("original witness pipe closed/error"))?;
++        Ok(binding)
++    }
++    async fn permit(&mut self, request: &Request, body: &[u8], step: &SourceStep, gateway: &ProtectedGatewayTransport) -> Result<(), TransportError> {
++        if self.poisoned || self.unresolved.is_some() { return Err(hold("unresolved prior backend operation")); }
++        if self.host_observation.is_none() || self.challenge.is_none() {
++            return Err(hold("original pre-auth challenge/bootstrap observation unavailable"));
++        }
++        self.sequence = self.sequence.checked_add(1).ok_or_else(|| hold("channel sequence overflow"))?;
++        let challenge = self.challenge.as_ref().ok_or_else(|| hold("missing challenge"))?;
++        let host_id = self.host_observation.as_ref().and_then(|h| h.get("host_instance_id")).and_then(Value::as_str)
++            .ok_or_else(|| hold("original host instance unavailable"))?;
++        let facts = observation(request, body, step, gateway, challenge, host_id, self.sequence)?;
++        let binding = self.write_observation(&facts).await?;
++        let permit: Permit = self.read().await?;
++        if permit.protocol != PROTOCOL || permit.kind != "send_permit" || permit.nonce != challenge.nonce ||
++            permit.pid != std::process::id() || permit.sequence != self.sequence || permit.binding_sha256 != binding ||
++            permit.request_sha256 != hash(body) || permit.request_id != step.request_id ||
++            permit.gateway_instance_id != gateway.instance_id {
++            return Err(hold("one-use original request/gateway permit mismatch"));
++        }
++        // A consumed permit reserves this operation. Errors/cancellation cannot unreserve it.
++        self.unresolved = Some(step.request_id.clone());
++        Ok(())
++    }
++}
++#[cfg(unix)]
++static CHANNEL: tokio::sync::OnceCell<Result<tokio::sync::Mutex<Channel>, String>> = tokio::sync::OnceCell::const_new();
++#[cfg(unix)]
++async fn channel() -> Result<&'static tokio::sync::Mutex<Channel>, TransportError> {
++    // Initialization failure is retained: a later call must not re-claim recycled fd numbers.
++    let result = CHANNEL.get_or_init(|| async {
++        let outgoing = pipe::Pipe::inherited(3).map_err(|_| "original FD3 unavailable".to_string())?;
++        let incoming = pipe::Pipe::inherited(4).map_err(|_| "original FD4 unavailable".to_string())?;
++        Ok(tokio::sync::Mutex::new(Channel { incoming, outgoing, challenge: None, sequence: 0, unresolved: None, poisoned: false, host_observation: None }))
++    }).await;
++    result.as_ref().map_err(|reason| hold(reason))
++}
++
++/// The single actual HTTP cut. Auth has already run and may have replaced the request.
++/// No async/caller mutation is allowed between permit validation and transport invocation.
++pub(crate) async fn stream<T: HttpTransport + 'static>(transport: &T, request: Request, step: Option<&SourceStep>, auth_provider: &crate::SharedAuthProvider)
++    -> Result<StreamResponse, TransportError> {
++    if !enabled() { return transport.stream(request).await; }
++    #[cfg(not(unix))]
++    { let _ = (transport, request, step, auth_provider); Err(hold("unsupported inherited-pipe host")) }
++    #[cfg(unix)]
++    {
++        // Concrete type identity is required. No caller boolean or trait proof callback.
++        let gateway = (transport as &dyn std::any::Any).downcast_ref::<ProtectedGatewayTransport>()
++            .ok_or_else(|| hold("unbound stock/foreign upstream transport"))?;
++        if !gateway.auth_provider.as_ref().is_some_and(|original| Arc::ptr_eq(original, auth_provider)) {
++            return Err(hold("foreign authentication provider object"));
++        }
++        ensure_known(&UNKNOWN)?;
++        let step = step.ok_or_else(|| hold("missing original ModelClient step"))?;
++        if step.consumed.swap(true, Ordering::SeqCst) { return Err(hold("step already consumed")); }
++        let request = request.into_prepared().map_err(TransportError::Build)?;
++        let prepared = request.prepare_body_for_send().map_err(TransportError::Build)?;
++        let body = prepared.body.as_ref().ok_or_else(|| hold("missing final body"))?;
++        if body.is_empty() || body.len() > MAX_BODY { return Err(hold("final body byte limit")); }
++        let owner = channel().await?;
++        let guard = OperationGuard { armed: true, unknown: &UNKNOWN };
++        let mut state = lock_original_known(owner,&UNKNOWN).await?;
++        let permit = await_original_known(&UNKNOWN,tokio::time::timeout(std::time::Duration::from_secs(5), state.permit(&request, body, step, gateway))).await;
++        if !matches!(permit, Ok(Ok(Ok(())))) { state.poisoned = true; return Err(hold("permit failed/timed out")); }
++        if let Err(error) = ensure_known(&UNKNOWN) { state.poisoned = true; return Err(error); }
++        drop(state);
++        // Recheck AFTER the awaited supervisor permit as well as after authentication.
++        // The original manager owns this read lease; no callback supplies a verdict.
++        let live_auth = gateway.auth.as_ref().ok_or_else(|| hold("missing original live auth lease"))?.clone();
++        live_auth.check().map_err(|_| hold("original auth changed during permit wait"))?;
++        let url = url::Url::parse(&request.url).map_err(|_| hold("final URL"))?;
++        let network_permit = live_auth.authorize(&url).map_err(|_| hold("original account-bound egress revoked"))?;
++        ensure_known(&UNKNOWN)?;
++        let result = live_auth.run(&network_permit, gateway.inner.stream(request)).await;
++        let response = match result {
++            Err(_) => { owner.lock().await.poisoned = true; return Err(hold("original auth/policy revoked at transport cut")); },
++            Ok(result) => match result {
++            Ok(response) => response,
++            Err(error) => { owner.lock().await.poisoned = true; return Err(error); }
++            }
++        };
++        let StreamResponse { status, headers, bytes } = response;
++        {
++            let state=owner.lock().await;
++            let frame=json!({"protocol":PROTOCOL,"kind":"transport_headers","nonce":state.challenge.as_ref().map(|c|c.nonce.as_str()),
++                "pid":std::process::id(),"sequence":state.sequence,"request_id":step.request_id,
++                "gateway_instance_id":gateway.instance_id,"status":status.as_u16()});
++            tokio::time::timeout(std::time::Duration::from_secs(5),state.write(&frame)).await
++                .map_err(|_|hold("actual transport header observation deadline"))??;
++        }
++        let request_id = step.request_id.clone();
++        // EOF is local observed transport-body closure, not remote model/backend-domain death.
++        let bytes = futures::stream::unfold((bytes, owner, request_id, false, guard, live_auth, network_permit), |(mut bytes, owner, request_id, ended, mut guard, live_auth, network_permit)| async move {
++            if ended { return None; }
++            let next = match live_auth.run(&network_permit, bytes.next()).await {
++                Ok(next) => next,
++                Err(_) => Some(Err(hold("original auth/policy revoked while response outstanding"))),
++            };
++            match next {
++                Some(Ok(chunk)) => Some((Ok(chunk), (bytes, owner, request_id, false, guard, live_auth, network_permit))),
++                Some(Err(error)) => { owner.lock().await.poisoned = true; Some((Err(error), (bytes, owner, request_id, true, guard, live_auth, network_permit))) },
++                None => {
++                    let mut state = owner.lock().await;
++                    if state.unresolved.as_ref() != Some(&request_id) { state.poisoned = true; return None; }
++                    let frame = json!({"protocol":PROTOCOL,"kind":"local_body_eof","request_id":request_id,
++                        "sequence":state.sequence,"pid":std::process::id(),"remote_domain_closed":false});
++                    let result = tokio::time::timeout(std::time::Duration::from_secs(5), state.write(&frame)).await;
++                    if matches!(result, Ok(Ok(()))) { state.unresolved = None; guard.armed = false; }
++                    else { state.poisoned = true; }
++                    None
++                }
++            }
++        });
++        Ok(StreamResponse { status, headers, bytes: Box::pin(bytes) })
++    }
++}
+--- /dev/null
++++ b/codex-rs/codex-api/src/protected_peer_responses_tools.json
+@@ -0,0 +1 @@
++[{"description":"Private ordinary source protocol; capability is supplied by the protected composition, never by model identity fields.","name":"soloco_context_header","parameters":{"additionalProperties":false,"properties":{},"required":[],"type":"object"},"strict":false,"type":"function"},{"description":"Private ordinary source protocol; capability is supplied by the protected composition, never by model identity fields.","name":"soloco_context_read","parameters":{"additionalProperties":false,"properties":{"length":{"type":"integer"},"offset":{"type":"integer"},"sha256":{"type":"string"}},"required":["sha256","offset","length"],"type":"object"},"strict":false,"type":"function"},{"description":"Private ordinary source protocol; capability is supplied by the protected composition, never by model identity fields.","name":"soloco_context_submit","parameters":{"additionalProperties":false,"properties":{"content":{"type":"string"},"operation_id":{"type":"string"},"sha256":{"type":"string"}},"required":["operation_id","sha256","content"],"type":"object"},"strict":false,"type":"function"},{"description":"Private ordinary source protocol; capability is supplied by the protected composition, never by model identity fields.","name":"soloco_peer_execute","parameters":{"additionalProperties":false,"properties":{"action":{"enum":["task/submit","task/claim","task/cancel","task/transfer","home/propose","home/publish","message/send","notice/create","conflict/create","conflict/resolve","software-publication/prepare"],"type":"string"},"args":{"properties":{},"type":"object"}},"required":["action","args"],"type":"object"},"strict":false,"type":"function"},{"description":"Private ordinary source protocol; capability is supplied by the protected composition, never by model identity fields.","name":"soloco_peer_inspect","parameters":{"additionalProperties":false,"properties":{"action":{"type":"string"},"args":{"properties":{},"type":"object"}},"required":["action","args"],"type":"object"},"strict":false,"type":"function"}]
+--- a/codex-rs/core/src/agents_md.rs
++++ b/codex-rs/core/src/agents_md.rs
+@@ -152,6 +152,8 @@
+             Err(err) if err.kind() == io::ErrorKind::NotFound => continue,
+             Err(err) => return Err(err),
+         };
++        let original_file_bytes_sha256 = codex_api::protected_peer::source_bytes_sha256(&data);
++        let original_file_bytes = data.len();
+         let size = data.len() as u64;
+         if size > remaining {
+             data.truncate(remaining as usize);
+@@ -170,6 +172,10 @@
+             loaded.entries.push(InstructionEntry {
+                 contents: text,
+                 provenance: InstructionProvenance::Project {
++                    original_file_bytes_sha256, original_file_bytes,
++                    consumed_bytes_sha256: codex_api::protected_peer::source_bytes_sha256(&data),
++                    consumed_bytes: data.len(), truncated: size > remaining,
++                    decoded_lossy: std::str::from_utf8(&data).is_err(),
+                     source_path: p,
+                     environment_id: environment_id.to_string(),
+                     cwd: cwd.clone(),
+@@ -485,6 +491,31 @@
+         }
+     }
+ 
++    /// ORIGINAL read receipts, distinct from reconstructed instruction text hashes.
++    pub(crate) fn protected_source_records(&self) -> serde_json::Value {
++        let mut records = Vec::new();
++        for (kind, instructions) in [("host_user", &self.user_instructions), ("host_thread", &self.thread_instructions)] {
++            if let Some(instructions) = instructions { records.push(serde_json::json!({
++                "kind":kind,"source_path":instructions.source.as_ref().map(|p|p.as_path().display().to_string()),
++                "decoded_text_sha256":codex_api::protected_peer::source_bytes_sha256(instructions.text.as_bytes()),
++                "original_file_bytes_sha256":null,"origin_limit":"original read receipt not retained by Instructions"})); }
++        }
++        for entry in &self.entries {
++            records.push(match &entry.provenance {
++                InstructionProvenance::Project { source_path, environment_id, cwd, original_file_bytes_sha256,
++                    original_file_bytes, consumed_bytes_sha256, consumed_bytes, truncated, decoded_lossy } => serde_json::json!({
++                    "kind":"project_file","source_path":source_path.to_string(),"environment_id":environment_id,
++                    "cwd":cwd.to_string(),"original_file_bytes_sha256":original_file_bytes_sha256,
++                    "original_file_bytes":original_file_bytes,"consumed_bytes_sha256":consumed_bytes_sha256,
++                    "consumed_bytes":consumed_bytes,"truncated":truncated,"decoded_lossy":decoded_lossy,
++                    "decoded_text_sha256":codex_api::protected_peer::source_bytes_sha256(entry.contents.as_bytes())}),
++                InstructionProvenance::Internal => serde_json::json!({"kind":"internal","original_file_bytes_sha256":null,
++                    "decoded_text_sha256":codex_api::protected_peer::source_bytes_sha256(entry.contents.as_bytes()),"origin_limit":"internal producer source not retained"}),
++            });
++        }
++        serde_json::Value::Array(records)
++    }
++
+     /// Returns the AGENTS.md files that supplied instruction entries.
+     pub fn sources(&self) -> impl Iterator<Item = PathUri> + '_ {
+         self.user_instructions
+@@ -538,6 +569,8 @@
+ enum InstructionProvenance {
+     /// Workspace instructions discovered from project AGENTS.md files.
+     Project {
++        original_file_bytes_sha256: String, original_file_bytes: usize,
++        consumed_bytes_sha256: String, consumed_bytes: usize, truncated: bool, decoded_lossy: bool,
+         /// Exact AGENTS.md file, distinct from the environment's selected cwd.
+         source_path: PathUri,
+         environment_id: String,
+--- a/codex-rs/core/src/client.rs
++++ b/codex-rs/core/src/client.rs
+@@ -208,6 +208,8 @@
+ #[derive(Debug)]
+ struct ModelClientState {
+     thread_id: ThreadId,
++    protected_runtime: codex_api::protected_peer::SourceRuntime,
++    protected_auth_policy: Option<std::result::Result<codex_login::AuthConfig, String>>,
+     provider: SharedModelProvider,
+     workspace_routing: WorkspaceRoutingContext,
+     auth_env_telemetry: AuthEnvTelemetry,
+@@ -254,7 +256,9 @@
+ impl CurrentClientSetup {
+     fn build_api_transport(&self, endpoint: &str) -> Result<ReqwestTransport> {
+         let api_provider = &self.api_provider;
+-        let redirect_policy = if api_provider
++        let redirect_policy = if codex_api::protected_peer::enabled() {
++            ClientRedirectPolicy::Reject
++        } else if api_provider
+             .headers
+             .contains_key(codex_model_provider::ACCOUNT_ROUTING_HEADER)
+         {
+@@ -617,6 +621,9 @@
+         Self {
+             state: Arc::new(ModelClientState {
+                 thread_id,
++                protected_runtime: codex_api::protected_peer::SourceRuntime::new(),
++                protected_auth_policy: model_provider.auth_manager().map(|manager|
++                    manager.scoped_runtime_policy().map_err(|e| e.to_string())),
+                 provider: model_provider,
+                 workspace_routing,
+                 auth_env_telemetry,
+@@ -632,7 +639,7 @@
+                 output_token_replay_enabled,
+                 include_attestation,
+                 attestation_provider,
+-                disable_websockets: AtomicBool::new(false),
++                disable_websockets: AtomicBool::new(codex_api::protected_peer::enabled()),
+                 agent_identity_session_fallback: AgentIdentitySessionFallback::default(),
+                 cached_websocket_session: StdMutex::new(WebsocketSession::default()),
+                 last_inference_tools: StdMutex::new(None),
+@@ -1875,6 +1882,7 @@
+ 
+ impl ResponsesHttpExecutor<'_> {
+     fn responses_request_compression(&self, auth: Option<&CodexAuth>) -> Compression {
++        if codex_api::protected_peer::enabled() { return Compression::None; }
+         if self.client.state.enable_request_compression
+             && auth.is_some_and(CodexAuth::uses_codex_backend)
+             && self.client.state.provider.info().is_openai()
+@@ -1923,6 +1931,15 @@
+         let mut provider_auth_recovery_attempted = false;
+         let mut pending_retry = PendingUnauthorizedRetry::default();
+         loop {
++            if codex_api::protected_peer::enabled() {
++                let policy = self.client.state.protected_auth_policy.as_ref()
++                    .and_then(|value| value.as_ref().ok()).ok_or_else(||
++                        self.client.state.provider.map_api_error(ApiError::Stream("original auth policy HOLD".to_string())))?;
++                let manager = self.client.state.provider.auth_manager().ok_or_else(||
++                    self.client.state.provider.map_api_error(ApiError::Stream("original auth manager HOLD".to_string())))?;
++                manager.validate_scoped_runtime_auth(policy).map_err(|e|
++                    self.client.state.provider.map_api_error(ApiError::Stream(e.to_string())))?;
++            }
+             let client_setup = self
+                 .client
+                 .current_client_setup(ClientRouting::Workspace)
+@@ -1942,7 +1959,37 @@
+                 .client
+                 .responses_headers(client_setup.auth.as_ref(), &model_info.slug);
+             tracing::Span::current().record("api.path", "/responses");
+-            let transport = client_setup.build_api_transport("/responses")?;
++            let mut protected_api_auth = None;
++            let live_auth = if codex_api::protected_peer::enabled() {
++                let policy = self.client.state.protected_auth_policy.as_ref().and_then(|p| p.as_ref().ok())
++                    .ok_or_else(|| self.client.state.provider.map_api_error(ApiError::Stream("original policy missing".to_string())))?;
++                let manager = self.client.state.provider.auth_manager().ok_or_else(||
++                    self.client.state.provider.map_api_error(ApiError::Stream("original manager missing".to_string())))?;
++                let owner = client_setup.auth_owner_generation.ok_or_else(|| self.client.state.provider.map_api_error(ApiError::Stream("original owner missing".to_string())))?;
++                let revision = client_setup.auth_revision.ok_or_else(|| self.client.state.provider.map_api_error(ApiError::Stream("original revision missing".to_string())))?;
++                // Alternate runtime/command/custom-provider authentication is not this
++                // original first-party managed-owner path. Do not silently reuse it.
++                if self.client.runtime_auth.is_some() || self.client.state.provider.runtime_auth().is_some() ||
++                    client_setup.runtime_id.is_some() || !self.client.state.provider.info().is_openai() ||
++                    self.client.state.provider.info().has_command_auth() || self.client.state.provider.info().auth.is_some() ||
++                    client_setup.agent_identity_telemetry.is_some() {
++                    return Err(self.client.state.provider.map_api_error(ApiError::Stream("alternate protected auth path HOLD".to_string())));
++                }
++                let selected = client_setup.auth.as_ref().filter(|auth| auth.uses_codex_backend()).ok_or_else(||
++                    self.client.state.provider.map_api_error(ApiError::Stream("original managed backend auth missing".to_string())))?;
++                let current = manager.auth_change_state_for(selected).ok_or_else(||
++                    self.client.state.provider.map_api_error(ApiError::Stream("foreign/stale selected credential source".to_string())))?;
++                if current.owner_generation != owner || current.generation != revision {
++                    return Err(self.client.state.provider.map_api_error(ApiError::Stream("original selected auth changed".to_string())));
++                }
++                // This is the existing concrete native provider factory, supplied the
++                // SAME actual manager Arc, never a caller qualification callback.
++                protected_api_auth = Some(codex_model_provider::auth_provider_from_auth_manager(manager.clone(), selected));
++                Some(manager.protected_send_lease(owner, revision, policy).map_err(|e|
++                    self.client.state.provider.map_api_error(ApiError::Stream(e.to_string())))?)
++            } else { None };
++            let transport = codex_api::protected_peer::bind_native_gateway(
++                client_setup.build_api_transport("/responses")?, live_auth, protected_api_auth.clone());
+             let request_auth_context = AuthRequestTelemetryContext::new(
+                 client_setup.auth.as_ref().map(CodexAuth::auth_mode),
+                 client_setup.api_auth.as_ref(),
+@@ -2023,9 +2070,14 @@
+             let client = ApiResponsesClient::new(
+                 transport,
+                 client_setup.api_provider,
+-                client_setup.api_auth,
++                protected_api_auth.unwrap_or(client_setup.api_auth),
+             )
+             .with_telemetry(Some(request_telemetry), Some(sse_telemetry));
++            let client = if codex_api::protected_peer::enabled() {
++                client.with_protected_step(self.client.state.protected_runtime.step(
++                    self.client.state.thread_id.to_string(), responses_metadata.turn_id.clone(),
++                    client_setup.auth_owner_generation, client_setup.auth_revision, client_setup.runtime_id.clone(), prompt.protected_provenance.clone()))
++            } else { client };
+             let stream_result = client.stream_request(request, options).await;
+ 
+             match stream_result {
+--- a/codex-rs/core/src/client_common.rs
++++ b/codex-rs/core/src/client_common.rs
+@@ -23,6 +23,7 @@
+ pub struct Prompt {
+     /// Conversation context input items.
+     pub input: Vec<ResponseItem>,
++    pub(crate) protected_provenance: Option<Arc<codex_api::protected_peer::SourceProvenance>>,
+ 
+     /// Tool definitions to inject into this request, empty when supplied by history.
+     pub(crate) tools: Arc<[ToolSpec]>,
+@@ -45,6 +46,7 @@
+     fn default() -> Self {
+         Self {
+             input: Vec::new(),
++            protected_provenance: None,
+             tools: Arc::default(),
+             parallel_tool_calls: false,
+             base_instructions: BaseInstructions::default(),
+--- a/codex-rs/core/src/compact_remote_v2_attempt.rs
++++ b/codex-rs/core/src/compact_remote_v2_attempt.rs
+@@ -176,6 +176,7 @@
+     let tool_router = &step_context.tool_router;
+     input.push(ResponseItem::CompactionTrigger {});
+     let prompt = Prompt {
++        protected_provenance: None, // Compaction source origins are not yet retained; protected send holds.
+         input,
+         tools: if tools_in_history {
+             Arc::default()
+--- a/codex-rs/core/src/lib.rs
++++ b/codex-rs/core/src/lib.rs
+@@ -4,6 +4,12 @@
+ // user-visible output must go through the appropriate abstraction (e.g.,
+ // the TUI or the tracing stack).
+ #![deny(clippy::print_stdout, clippy::print_stderr)]
++
++/// Compile-time adapter selection, not executable qualification.
++pub fn protected_peer_enabled() -> bool { codex_api::protected_peer::enabled() }
++
++mod protected_provenance;
++pub use protected_provenance::config_source_records as protected_config_source_records;
+ 
+ mod apply_patch;
+ mod apps;
+--- /dev/null
++++ b/codex-rs/core/src/protected_provenance.rs
+@@ -0,0 +1,56 @@
++//! Snapshots from ORIGINAL materialized loaders and the exact captured StepContext.
++//! Semantic/config hashes are labelled separately from original file-byte receipts.
++use crate::{config::Config, session::step_context::StepContext};
++use codex_api::protected_peer::{SourceProvenance, source_bytes_sha256};
++use codex_config::ConfigLayerSource;
++use codex_protocol::models::{BaseInstructions, ResponseItem};
++use serde_json::{Value, json};
++use std::sync::Arc;
++
++pub fn config_source_records(config: &Config) -> Value {
++    let records: Vec<Value> = config.config_layer_stack.layers_low_to_high().map(|layer| {
++        let (kind, descriptor, file) = match &layer.name {
++            ConfigLayerSource::PackagedDefaults { file } => ("packaged_defaults", json!({}), Some(file.as_path().display().to_string())),
++            ConfigLayerSource::System { file } => ("system", json!({}), Some(file.as_path().display().to_string())),
++            ConfigLayerSource::User { file, profile } => ("user", json!({"profile":profile}), Some(file.as_path().display().to_string())),
++            ConfigLayerSource::LegacyManagedConfigTomlFromFile { file } => ("legacy_managed_file", json!({}), Some(file.as_path().display().to_string())),
++            ConfigLayerSource::Mdm { domain, key } => ("mdm", json!({"domain":domain,"key":key}), None),
++            ConfigLayerSource::EnterpriseManaged { id, name } => ("enterprise_managed", json!({"id":id,"name":name}), None),
++            ConfigLayerSource::Project { dot_codex_folder } => ("project", json!({"dot_codex_folder":dot_codex_folder.as_path().display().to_string(),"exact_config_file":"unknown: not retained by ConfigLayerSource"}), None),
++            ConfigLayerSource::SessionFlags => ("session_flags", json!({"source":"typed startup overrides"}), None),
++            ConfigLayerSource::LegacyManagedConfigTomlFromMdm => ("legacy_mdm", json!({}), None),
++        };
++        json!({"origin_kind":kind,"origin_descriptor":descriptor,"file_path":file,
++            "materialized_layer_version":layer.version,"disabled":layer.disabled_reason.is_some(),
++            "disabled_reason_sha256":layer.disabled_reason.as_ref().map(|text|source_bytes_sha256(text.as_bytes())),
++            "retained_source_utf8_sha256":layer.raw_toml().map(|text|source_bytes_sha256(text.as_bytes())),
++            "file_byte_receipt":"UTF-8 bytes retained by original loader when present; never a later filesystem reread"})
++    }).collect();
++    Value::Array(records)
++}
++
++pub(crate) fn capture(input: &[ResponseItem], step: &StepContext, base: &BaseInstructions)
++    -> Option<Arc<SourceProvenance>> {
++    if !codex_api::protected_peer::enabled() { return None; }
++    let mut unknown = vec!["input_message_to_rendered_source_spans_not_retained".to_string(),
++        "restored_history_instruction_origins_not_retained".to_string()];
++    let agents = step.loaded_agents_md.as_ref().map(|loaded|loaded.protected_source_records());
++    if let Some(records) = &agents {
++        if records.as_array().is_some_and(|items|items.iter().any(|item|item.get("original_file_bytes_sha256").is_some_and(Value::is_null))) {
++            unknown.push("host_user_or_thread_instruction_original_read_receipt_not_retained".into());
++        }
++    }
++    let origin = match step.settings.model_info.origin {
++        codex_protocol::openai_models::ModelOrigin::Bundled => "bundled",
++        codex_protocol::openai_models::ModelOrigin::Provider => { unknown.push("provider_catalog_response_origin_receipt_not_retained".into()); "provider" },
++        codex_protocol::openai_models::ModelOrigin::ExplicitConfig => "explicit_config",
++        codex_protocol::openai_models::ModelOrigin::Synthetic => { unknown.push("synthetic_model_metadata_has_no_authoritative_catalog_origin".into()); "synthetic" },
++    };
++    let sources = json!({"config_layers":config_source_records(&step.turn.config),"agents_md":agents,
++        "model_catalog":{"slug":step.settings.model_info.slug,"origin_class":origin},
++        "base_instructions":{"text_sha256":source_bytes_sha256(base.text.as_bytes()),"declared_provenance":format!("{:?}",base.provenance)},
++        "tool_router":step.tool_router.protected_source_record(),
++        "capture_site":{"module":file!(),"line":line!(),"phase":"original build_prompt StepContext before wire normalization"}});
++    let input = serde_json::to_vec(input).ok()?;
++    Some(Arc::new(SourceProvenance::from_original_loaders(source_bytes_sha256(&input), sources, unknown)))
++}
+--- a/codex-rs/core/src/session/session.rs
++++ b/codex-rs/core/src/session/session.rs
+@@ -1069,6 +1069,13 @@
+                     Arc::default()
+                 }
+             });
++        let tool_policy = if codex_api::protected_peer::enabled() {
++            let allowed_tools = ["soloco_context_header", "soloco_context_read", "soloco_context_submit",
++                "soloco_peer_execute", "soloco_peer_inspect"].into_iter()
++                .map(codex_protocol::ToolName::plain).filter(|name| tool_policy.allows(name)).collect();
++            Arc::new(codex_extension_api::ToolPolicy { allowed_tools: Some(allowed_tools),
++                require_managed_sandbox: true, require_unified_exec: true, expose_additional_permissions: false })
++        } else { tool_policy };
+         let mcp_thread_init = thread_extension_init.clone();
+         let thread_extension_data = codex_extension_api::ExtensionData::new_with_init(
+             thread_id.to_string(),
+--- a/codex-rs/core/src/session/turn.rs
++++ b/codex-rs/core/src/session/turn.rs
+@@ -1755,7 +1755,9 @@
+     incremental_tools: bool,
+ ) -> Prompt {
+     let turn_context = &step_context.turn;
++    let protected_provenance = crate::protected_provenance::capture(&input, step_context, &base_instructions);
+     Prompt {
++        protected_provenance,
+         input,
+         tools: if incremental_tools {
+             Arc::default()
+--- a/codex-rs/core/src/tools/router.rs
++++ b/codex-rs/core/src/tools/router.rs
+@@ -157,6 +157,18 @@
+                 .iter()
+                 .all(|name| router.exposes_tool(name));
+         router
++    }
++
++    pub(crate) fn protected_source_record(&self) -> serde_json::Value {
++        let registered: Vec<_> = self.registry.entries().map(|tool|serde_json::json!({
++            "name":tool.runtime.tool_name().to_string(),"third_party":tool.runtime.is_third_party_tool(),
++            "mcp_server":tool.runtime.mcp_server_name(),"spec":tool.spec()})).collect();
++        serde_json::json!({"capture_phase":"original finalized ToolRouter","registered":registered,
++            "model_visible_specs":self.model_visible_specs,"tool_mode":format!("{:?}",self.tool_mode),
++            "tool_policy":{"allowed_tools":self.registry.tool_policy.allowed_tools,
++                "require_managed_sandbox":self.registry.tool_policy.require_managed_sandbox,
++                "require_unified_exec":self.registry.tool_policy.require_unified_exec,
++                "expose_additional_permissions":self.registry.tool_policy.expose_additional_permissions}})
+     }
+ 
+     pub(crate) fn model_visible_specs(&self) -> Arc<[ToolSpec]> {
+--- a/codex-rs/core/src/tools/spec_plan.rs
++++ b/codex-rs/core/src/tools/spec_plan.rs
+@@ -173,11 +173,11 @@
+         &mut registry,
+     );
+     append_dynamic_tool_runtimes(dynamic_tools, &mut registry);
+-    let hosted_specs = hosted_model_tool_specs(
+-        turn_context,
+-        model_info,
+-        standalone_web_search_tool.as_slice(),
+-    );
++    let hosted_specs = if codex_api::protected_peer::enabled() {
++        Vec::new()
++    } else {
++        hosted_model_tool_specs(turn_context, model_info, standalone_web_search_tool.as_slice())
++    };
+ 
+     finalize_tool_router(
+         turn_context,
+--- a/codex-rs/http-client/src/lib.rs
++++ b/codex-rs/http-client/src/lib.rs
+@@ -50,6 +50,8 @@
+ pub use crate::network_policy::NetworkPolicyController;
+ pub use crate::network_policy::NetworkPolicyDenied;
+ pub use crate::network_policy::NetworkPolicyRevision;
++mod protected_auth_fence;
++pub use protected_auth_fence::{AuthSendFence, AuthSendLease};
+ pub use crate::openai_endpoints::OpenAiDestination;
+ pub use crate::openai_endpoints::classify_openai_api_url;
+ pub use crate::openai_endpoints::is_openai_api_url;
+--- a/codex-rs/http-client/src/network_policy.rs
++++ b/codex-rs/http-client/src/network_policy.rs
+@@ -195,6 +195,11 @@
+             endpoints: None,
+             account: None,
+         }
++    }
++
++    /// Read-only equality against the live owner policy; never publishes or grants access.
++    pub fn observes_destination_policy(&self, expected: &DestinationPolicy) -> bool {
++        self.state.as_ref().is_some_and(|state| lock_state(state).policy.as_ref() == Some(expected))
+     }
+ 
+     /// Narrows a bootstrap client's existing local policy to exact endpoint URLs.
+--- /dev/null
++++ b/codex-rs/http-client/src/protected_auth_fence.rs
+@@ -0,0 +1,118 @@
++//! Live send fence. The real AuthManager owns the producer; transports receive read leases.
++//! A lease contains no credential and is not source-build/owner qualification by itself.
++use crate::{NetworkPermit, NetworkPolicy, NetworkPolicyRevision};
++use std::{future::Future, io};
++use tokio::sync::watch;
++use url::Url;
++
++pub struct AuthSendFence { epoch: watch::Sender<u64> }
++impl Default for AuthSendFence { fn default() -> Self { Self { epoch: watch::channel(0).0 } } }
++impl AuthSendFence {
++    /// Terminal for this original protected owner. No runtime reset/ready flag exists.
++    pub fn revoke(&self) { self.epoch.send_modify(|n| *n = u64::MAX); }
++    pub fn advance(&self) { self.epoch.send_modify(|n| *n = n.saturating_add(1)); }
++    pub fn lease(&self, policy: NetworkPolicy, owner: u64, revision: u64) -> io::Result<AuthSendLease> {
++        if !policy.is_managed() || *self.epoch.borrow() == u64::MAX { return Err(io::Error::other("unmanaged/exhausted auth send owner")); }
++        Ok(AuthSendLease { expected_epoch: *self.epoch.borrow(), epoch: self.epoch.subscribe(),
++            policy_revision: policy.revision(), policy, owner, revision })
++    }
++}
++#[derive(Clone)]
++pub struct AuthSendLease {
++    expected_epoch: u64, epoch: watch::Receiver<u64>, policy: NetworkPolicy,
++    policy_revision: NetworkPolicyRevision, owner: u64, revision: u64,
++}
++impl AuthSendLease {
++    pub fn auth_owner_generation(&self) -> u64 { self.owner }
++    pub fn auth_revision(&self) -> u64 { self.revision }
++    pub fn epoch(&self) -> u64 { self.expected_epoch }
++    pub fn check(&self) -> io::Result<()> {
++        if self.expected_epoch == u64::MAX || self.epoch.has_changed().is_err() ||
++            *self.epoch.borrow() != self.expected_epoch || self.policy.revision() != self.policy_revision {
++            return Err(io::Error::other("original live auth/policy owner changed"));
++        }
++        Ok(())
++    }
++    pub fn authorize(&self, url: &Url) -> io::Result<NetworkPermit> {
++        self.check()?;
++        self.policy.acquire(url).map_err(io::Error::other)
++    }
++    /// Runs the actual original transport future while observing owner revocation.
++    /// This future is an operation, never a caller qualification predicate.
++    pub async fn run<T>(&self, permit: &NetworkPermit, operation: impl Future<Output=T>) -> io::Result<T> {
++        self.check()?; permit.check().map_err(io::Error::other)?;
++        let mut changes = self.epoch.clone();
++        // Compare again after subscribing; an intervening change cannot disappear.
++        if *changes.borrow_and_update() != self.expected_epoch { return Err(io::Error::other("stale original auth lease")); }
++        let result = tokio::select! {
++            biased;
++            _ = changes.changed() => Err(io::Error::other("original auth revoked during transport")),
++            result = permit.run(operation) => result.map_err(io::Error::other),
++        };
++        self.check()?; permit.check().map_err(io::Error::other)?;
++        result
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use crate::{DestinationPolicy, NetworkPolicyController};
++    use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
++
++    fn lease(fence: &AuthSendFence) -> AuthSendLease {
++        let controller = NetworkPolicyController::default();
++        let policy = controller.policy();
++        assert!(controller.publish(policy.revision(), DestinationPolicy::Unrestricted));
++        fence.lease(policy.for_current_account(), 4, 9).unwrap()
++    }
++
++    #[tokio::test]
++    async fn owner_change_after_permit_wait_prevents_transport_poll() {
++        let owner = AuthSendFence::default();
++        let lease = lease(&owner);
++        let permit = lease.authorize(&Url::parse("https://example.invalid/responses").unwrap()).unwrap();
++        tokio::task::yield_now().await; // completed awaited supervisor-permit boundary
++        owner.advance();
++        let started = Arc::new(AtomicBool::new(false));
++        let observe = started.clone();
++        let result = lease.run(&permit, async move { observe.store(true, Ordering::SeqCst); }).await;
++        assert!(result.is_err());
++        assert!(!started.load(Ordering::SeqCst));
++    }
++
++    #[tokio::test]
++    async fn owner_revocation_drops_an_outstanding_operation() {
++        let owner = AuthSendFence::default();
++        let lease = lease(&owner);
++        let permit = lease.authorize(&Url::parse("https://example.invalid/responses").unwrap()).unwrap();
++        let started = Arc::new(tokio::sync::Notify::new());
++        let entered = started.clone();
++        let dropped = Arc::new(AtomicBool::new(false));
++        struct DropFlag(Arc<AtomicBool>);
++        impl Drop for DropFlag { fn drop(&mut self) { self.0.store(true, Ordering::SeqCst); } }
++        let track = dropped.clone();
++        let operation = async move { let _guard = DropFlag(track); entered.notify_one(); std::future::pending::<()>().await };
++        let (result, ()) = tokio::join!(lease.run(&permit, operation), async {
++            started.notified().await; owner.advance();
++        });
++        assert!(result.is_err());
++        assert!(lease.check().is_err());
++        assert!(dropped.load(Ordering::SeqCst));
++    }
++
++    #[tokio::test]
++    async fn account_policy_revocation_cancels_an_outstanding_operation() {
++        let owner = AuthSendFence::default();
++        let controller = NetworkPolicyController::default();
++        let policy = controller.policy();
++        assert!(controller.publish(policy.revision(), DestinationPolicy::Unrestricted));
++        let lease = owner.lease(policy.clone().for_current_account(), 4, 9).unwrap();
++        let permit = lease.authorize(&Url::parse("https://example.invalid/responses").unwrap()).unwrap();
++        let started = tokio::sync::Notify::new();
++        let (result, ()) = tokio::join!(lease.run(&permit, async {
++            started.notify_one(); std::future::pending::<()>().await
++        }), async { started.notified().await; policy.invalidate(); });
++        assert!(result.is_err());
++    }
++}
+--- a/codex-rs/login/src/auth/manager.rs
++++ b/codex-rs/login/src/auth/manager.rs
+@@ -1948,6 +1948,21 @@
+ }
+ 
+ /// Internal cached auth state.
++struct ProtectedCacheWrite<'a> {
++    guard: std::sync::RwLockWriteGuard<'a, CachedAuth>,
++    fence: &'a codex_http_client::AuthSendFence,
++}
++impl std::ops::Deref for ProtectedCacheWrite<'_> {
++    type Target=CachedAuth;
++    fn deref(&self)->&CachedAuth { &self.guard }
++}
++impl std::ops::DerefMut for ProtectedCacheWrite<'_> {
++    fn deref_mut(&mut self)->&mut CachedAuth { &mut self.guard }
++}
++impl Drop for ProtectedCacheWrite<'_> {
++    fn drop(&mut self) { if std::thread::panicking() { self.fence.revoke(); } }
++}
++
+ #[derive(Clone)]
+ struct CachedAuth {
+     auth: Option<CodexAuth>,
+@@ -2204,6 +2219,7 @@
+     inner: RwLock<CachedAuth>,
+     auth_change_tx: watch::Sender<u64>,
+     auth_change_state_tx: watch::Sender<AuthChangeState>,
++    protected_send_fence: codex_http_client::AuthSendFence,
+     workspace_routing_resolver: OnceLock<Weak<dyn WorkspaceRoutingResolver>>,
+     enable_codex_api_key_env: bool,
+     auth_credentials_store_mode: AuthCredentialsStoreMode,
+@@ -2369,6 +2385,7 @@
+             }),
+             auth_change_tx,
+             auth_change_state_tx: watch::channel(AuthChangeState::default()).0,
++            protected_send_fence: codex_http_client::AuthSendFence::default(),
+             workspace_routing_resolver: OnceLock::new(),
+             enable_codex_api_key_env,
+             auth_credentials_store_mode,
+@@ -2407,6 +2424,7 @@
+             inner: RwLock::new(cached),
+             auth_change_tx,
+             auth_change_state_tx: watch::channel(AuthChangeState::default()).0,
++            protected_send_fence: codex_http_client::AuthSendFence::default(),
+             workspace_routing_resolver: OnceLock::new(),
+             enable_codex_api_key_env: false,
+             auth_credentials_store_mode: AuthCredentialsStoreMode::File,
+@@ -2439,6 +2457,7 @@
+             inner: RwLock::new(cached),
+             auth_change_tx,
+             auth_change_state_tx: watch::channel(AuthChangeState::default()).0,
++            protected_send_fence: codex_http_client::AuthSendFence::default(),
+             workspace_routing_resolver: OnceLock::new(),
+             enable_codex_api_key_env: false,
+             auth_credentials_store_mode: AuthCredentialsStoreMode::File,
+@@ -2475,6 +2494,7 @@
+             inner: RwLock::new(cached),
+             auth_change_tx,
+             auth_change_state_tx: watch::channel(AuthChangeState::default()).0,
++            protected_send_fence: codex_http_client::AuthSendFence::default(),
+             workspace_routing_resolver: OnceLock::new(),
+             enable_codex_api_key_env: false,
+             auth_credentials_store_mode: AuthCredentialsStoreMode::File,
+@@ -2518,6 +2538,7 @@
+             }),
+             auth_change_tx,
+             auth_change_state_tx: watch::channel(AuthChangeState::default()).0,
++            protected_send_fence: codex_http_client::AuthSendFence::default(),
+             workspace_routing_resolver: OnceLock::new(),
+             enable_codex_api_key_env: false,
+             auth_credentials_store_mode: AuthCredentialsStoreMode::File,
+@@ -2542,12 +2563,20 @@
+         })
+     }
+ 
++    fn protected_cache_write(&self)->Result<ProtectedCacheWrite<'_>,()> {
++        match self.inner.write() {
++            Ok(guard)=>Ok(ProtectedCacheWrite {guard,fence:&self.protected_send_fence}),
++            Err(_)=>{self.protected_send_fence.revoke();Err(())}
++        }
++    }
++
+     /// Current cached auth (clone) without attempting a refresh.
+     pub fn auth_cached(&self) -> Option<CodexAuth> {
+-        self.inner
+-            .read()
+-            .ok()
+-            .and_then(|cached| cached.auth.clone())
++        let modes = match self.allowed_auth_modes.read() { Ok(modes) => modes,
++            Err(_) => { self.protected_send_fence.revoke(); return None; } };
++        let cached = match self.inner.read() { Ok(cached) => cached,
++            Err(_) => { self.protected_send_fence.revoke(); return None; } };
++        cached.auth.as_ref().filter(|auth| modes.as_ref().is_none_or(|modes|modes.contains(&auth.api_auth_mode()))).cloned()
+     }
+ 
+     /// Current revisions if the selected credential still belongs to this manager's source.
+@@ -2836,13 +2865,16 @@
+     /// Pins the stored credential kind before any subsequent load or hydration.
+     /// This prevents a running client from silently acquiring a different kind of secret.
+     pub fn restrict_auth_modes(&self, mut modes: Vec<AuthMode>) -> std::io::Result<()> {
++        self.protected_send_fence.advance();
+         let mut allowed = self
+             .allowed_auth_modes
+             .write()
+-            .map_err(|_| std::io::Error::other("credential policy is unavailable"))?;
++            .map_err(|_| { self.protected_send_fence.revoke(); std::io::Error::other("credential policy is unavailable") })?;
+         if let Some(previous) = allowed.as_ref() {
+             modes.retain(|mode| previous.contains(mode));
+         }
++        // Also invalidate leases issued by a reader already in progress when restriction began.
++        self.protected_send_fence.advance();
+         *allowed = Some(modes);
+         Ok(())
+     }
+@@ -2946,7 +2978,7 @@
+         attempted_auth: &CodexAuth,
+         error: &RefreshTokenFailedError,
+     ) {
+-        if let Ok(mut guard) = self.inner.write() {
++        if let Ok(mut guard) = self.protected_cache_write() {
+             let current_auth_matches =
+                 Self::auths_equal_for_refresh(Some(attempted_auth), guard.auth.as_ref());
+             if current_auth_matches {
+@@ -3028,7 +3060,8 @@
+     }
+ 
+     fn set_cached_auth(&self, new_auth: Option<CodexAuth>) -> bool {
+-        let Ok(mut guard) = self.inner.write() else {
++        let Ok(mut guard) = self.protected_cache_write() else {
++            self.protected_send_fence.revoke();
+             return false;
+         };
+         self.set_cached_auth_locked(&mut guard, new_auth)
+@@ -3039,7 +3072,8 @@
+         generation: u64,
+         auth: Option<CodexAuth>,
+     ) -> Option<AuthReload> {
+-        let mut guard = self.inner.write().ok()?;
++        let mut guard = match self.protected_cache_write() { Ok(guard) => guard,
++            Err(_) => { self.protected_send_fence.revoke(); return None; } };
+         if self.auth_change_state_tx.borrow().generation != generation {
+             return None;
+         }
+@@ -3052,11 +3086,13 @@
+         })
+     }
+ 
+-    fn invalidate_pending_auth_reads(&self) {
+-        if let Ok(_guard) = self.inner.write() {
+-            self.auth_change_state_tx
+-                .send_modify(|state| state.generation += 1);
+-        }
++    fn invalidate_pending_auth_reads(&self) -> std::io::Result<()> {
++        // Logout ends this protected owner even if its cache is unavailable. The
++        // terminal fence is independent of the fallible cache lock and precedes I/O.
++        self.protected_send_fence.revoke();
++        let _guard = self.protected_cache_write().map_err(|_| std::io::Error::other("credential cache unavailable during logout"))?;
++        self.auth_change_state_tx.send_modify(|state| state.generation = state.generation.saturating_add(1));
++        Ok(())
+     }
+ 
+     fn set_cached_auth_locked(&self, guard: &mut CachedAuth, new_auth: Option<CodexAuth>) -> bool {
+@@ -3075,6 +3111,7 @@
+         if auth_changed_for_refresh {
+             guard.permanent_refresh_failure = None;
+         }
++        if changed || auth_changed_for_refresh { self.protected_send_fence.advance(); }
+         guard.auth = new_auth;
+         if auth_changed_for_refresh {
+             self.auth_change_state_tx.send_modify(|state| {
+@@ -3120,7 +3157,7 @@
+         })?;
+         *external_auth_slot = Some(external_auth);
+         drop(external_auth_slot);
+-        if let Ok(mut guard) = self.inner.write() {
++        if let Ok(mut guard) = self.protected_cache_write() {
+             guard.permanent_refresh_failure = None;
+         }
+         self.commit_external_auth(auth)
+@@ -3141,6 +3178,7 @@
+         if let Ok(mut guard) = self.forced_chatgpt_workspace_id.write()
+             && *guard != workspace_id
+         {
++            self.protected_send_fence.advance();
+             *guard = workspace_id;
+         }
+     }
+@@ -3189,6 +3227,56 @@
+ 
+     pub fn codex_api_key_env_enabled(&self) -> bool {
+         self.enable_codex_api_key_env
++    }
++
++    /// Copies policy only; credentials stay private to this exact original manager.
++    pub fn scoped_runtime_policy(&self) -> std::io::Result<AuthConfig> {
++        let workspaces = self.forced_chatgpt_workspace_id.read()
++            .map_err(|_| std::io::Error::other("auth policy lock poisoned"))?.clone();
++        Ok(AuthConfig { codex_home: self.codex_home.clone(),
++            auth_credentials_store_mode: self.auth_credentials_store_mode,
++            keyring_backend_kind: self.keyring_backend_kind, forced_login_method: self.forced_login_method,
++            forced_chatgpt_workspace_id: workspaces, managed_auth_policy: self.managed_auth_policy.clone(),
++            chatgpt_base_url: self.chatgpt_base_url.clone(), auth_route_config: self.auth_route_config.clone() })
++    }
++
++    /// Exact policy compatibility, not proof that an arbitrary Arc belongs to the host.
++    /// The original credential home remains owned here; requested runtime home may differ.
++    pub fn validate_scoped_runtime_auth(&self, requested: &AuthConfig) -> std::io::Result<()> {
++        requested.validate()?;
++        let mut actual = self.scoped_runtime_policy()?;
++        actual.codex_home = requested.codex_home.clone();
++        if self.enable_codex_api_key_env || actual != *requested {
++            return Err(std::io::Error::new(std::io::ErrorKind::PermissionDenied, "original auth policy mismatch"));
++        }
++        let modes = self.allowed_auth_modes.read().map_err(|_| { self.protected_send_fence.revoke(); std::io::Error::other("credential modes unavailable") })?;
++        let cached = self.inner.read().map_err(|_| { self.protected_send_fence.revoke(); std::io::Error::other("auth state lock poisoned") })?;
++        if !cached.auth.as_ref().is_some_and(|auth| requested.allows_auth(auth) && modes.as_ref().is_none_or(|modes|modes.contains(&auth.api_auth_mode()))) {
++            return Err(std::io::Error::new(std::io::ErrorKind::PermissionDenied, "original cached auth unavailable/disallowed"));
++        }
++        Ok(())
++    }
++
++    /// Binds a read lease to this real manager while its credential and workspace locks
++    /// prevent changes. No credential leaves the original native manager/provider domain.
++    pub fn protected_send_lease(&self, expected_owner: u64, expected_revision: u64,
++        requested: &AuthConfig) -> std::io::Result<codex_http_client::AuthSendLease> {
++        requested.validate()?;
++        let workspaces = self.forced_chatgpt_workspace_id.read().map_err(|_| std::io::Error::other("workspace policy lock poisoned"))?;
++        let modes = self.allowed_auth_modes.read().map_err(|_| { self.protected_send_fence.revoke(); std::io::Error::other("credential modes unavailable") })?;
++        let cached = self.inner.read().map_err(|_| { self.protected_send_fence.revoke(); std::io::Error::other("auth state lock poisoned") })?;
++        let state = *self.auth_change_state_tx.borrow();
++        let actual = AuthConfig { codex_home: requested.codex_home.clone(),
++            auth_credentials_store_mode: self.auth_credentials_store_mode,
++            keyring_backend_kind: self.keyring_backend_kind, forced_login_method: self.forced_login_method,
++            forced_chatgpt_workspace_id: workspaces.clone(), managed_auth_policy: self.managed_auth_policy.clone(),
++            chatgpt_base_url: self.chatgpt_base_url.clone(), auth_route_config: self.auth_route_config.clone() };
++        if self.enable_codex_api_key_env || actual != *requested || state.owner_generation != expected_owner ||
++            state.generation != expected_revision || !cached.auth.as_ref().is_some_and(|auth| requested.allows_auth(auth) && modes.as_ref().is_none_or(|modes|modes.contains(&auth.api_auth_mode()))) {
++            return Err(std::io::Error::other("original auth/policy setup became stale"));
++        }
++        self.protected_send_fence.lease(self.application_network_policy().for_current_account(),
++            state.owner_generation, state.generation)
+     }
+ 
+     /// Returns policy only; independent credential managers own their own state and lifecycle.
+@@ -3467,20 +3555,22 @@
+     /// callers immediately observe the unauthenticated state.
+     pub async fn logout(&self) -> std::io::Result<bool> {
+         self.ensure_logout_allowed()?;
++        self.invalidate_pending_auth_reads()?;
+         let removed = logout_all_stores(
+             &self.codex_home,
+             self.auth_credentials_store_mode,
+             self.keyring_backend_kind,
+         )?;
+         // Always reload to clear cached auth, even if no stored credentials were present.
+-        self.invalidate_pending_auth_reads();
+         self.clear_external_auth();
+         self.reload().await;
++        if self.inner.is_poisoned() { return Err(std::io::Error::other("credential cache unavailable after logout")); }
+         Ok(removed)
+     }
+ 
+     pub async fn logout_with_revoke(&self) -> std::io::Result<bool> {
+         self.ensure_logout_allowed()?;
++        self.invalidate_pending_auth_reads()?;
+         let auth_dot_json = self
+             .auth_cached()
+             .and_then(|auth| auth.get_current_auth_json());
+@@ -3494,9 +3584,9 @@
+             self.keyring_backend_kind,
+         )?;
+         // Always reload to clear cached auth, even if no stored credentials were present.
+-        self.invalidate_pending_auth_reads();
+         self.clear_external_auth();
+         self.reload().await;
++        if self.inner.is_poisoned() { return Err(std::io::Error::other("credential cache unavailable after logout")); }
+         Ok(result)
+     }
+ 
+@@ -3699,6 +3789,10 @@
+ }
+ 
+ #[cfg(test)]
++#[path = "protected_send_tests.rs"]
++mod protected_send_tests;
++
++#[cfg(test)]
+ #[path = "auth_tests.rs"]
+ mod tests;
+ 
+--- /dev/null
++++ b/codex-rs/login/src/auth/protected_send_tests.rs
+@@ -0,0 +1,57 @@
++//! Controlled source cases: fake in-memory credentials, no account/storage/network operation.
++use super::*;
++use codex_http_client::{AuthSendLease, DestinationPolicy, NetworkPolicyController};
++use std::panic::{AssertUnwindSafe, catch_unwind};
++
++fn lease(manager: &AuthManager) -> AuthSendLease {
++    let controller = NetworkPolicyController::default();
++    let policy = controller.policy();
++    assert!(controller.publish(policy.revision(), DestinationPolicy::Unrestricted));
++    manager.protected_send_fence.lease(policy.for_current_account(), 0, 0).unwrap()
++}
++fn poison_cache(manager: &AuthManager) {
++    assert!(catch_unwind(AssertUnwindSafe(|| {
++        let _guard = manager.inner.write().unwrap();
++        panic!("controlled cache-poison source fixture");
++    })).is_err());
++}
++#[test]
++fn actual_mode_restriction_invalidates_lease_and_hides_disallowed_cached_kind() {
++    let manager = AuthManager::from_auth_for_testing(CodexAuth::from_api_key("controlled-memory-only"));
++    let prior = lease(&manager);
++    assert!(manager.auth_cached().is_some());
++    manager.restrict_auth_modes(vec![AuthMode::Chatgpt]).unwrap();
++    assert!(prior.check().is_err());
++    assert!(manager.auth_cached().is_none());
++    let policy = manager.scoped_runtime_policy().unwrap();
++    assert!(manager.validate_scoped_runtime_auth(&policy).is_err());
++}
++#[test]
++fn poisoned_invalidation_is_terminal_before_any_logout_io() {
++    let manager = AuthManager::from_optional_auth_for_testing(None);
++    let prior = lease(&manager);
++    poison_cache(&manager);
++    assert!(manager.invalidate_pending_auth_reads().is_err());
++    assert!(prior.check().is_err());
++    let controller = NetworkPolicyController::default();
++    assert!(manager.protected_send_fence.lease(controller.policy(), 0, 0).is_err());
++}
++#[test]
++fn poisoned_cache_publication_cannot_leave_existing_lease_valid() {
++    let manager = AuthManager::from_optional_auth_for_testing(None);
++    let prior = lease(&manager);
++    poison_cache(&manager);
++    assert!(!manager.set_cached_auth(None));
++    assert!(prior.check().is_err());
++}
++#[test]
++fn panic_in_actual_cache_writer_revokes_before_lock_poison_is_observed() {
++    let manager=AuthManager::from_optional_auth_for_testing(None);
++    let prior=lease(&manager);
++    assert!(catch_unwind(AssertUnwindSafe(|| {
++        let _original=manager.protected_cache_write().unwrap();
++        panic!("controlled actual cache-writer unwind");
++    })).is_err());
++    assert!(manager.inner.is_poisoned());
++    assert!(prior.check().is_err());
++}
+--- a/codex-rs/Cargo.lock
++++ b/codex-rs/Cargo.lock
+@@ -287,7 +287,7 @@
+ 
+ [[package]]
+ name = "app_test_support"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "base64 0.22.1",
+@@ -1888,7 +1888,7 @@
+ 
+ [[package]]
+ name = "codex-agent-extension"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "codex-core",
+@@ -1900,7 +1900,7 @@
+ 
+ [[package]]
+ name = "codex-agent-graph-store"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-protocol",
+  "codex-state",
+@@ -1915,7 +1915,7 @@
+ 
+ [[package]]
+ name = "codex-agent-identity"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "base64 0.22.1",
+@@ -1935,7 +1935,7 @@
+ 
+ [[package]]
+ name = "codex-agent-message-board-client"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "chrono",
+@@ -1958,7 +1958,7 @@
+ 
+ [[package]]
+ name = "codex-agent-message-board-extension"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-extension-api",
+  "codex-message-board",
+@@ -1972,7 +1972,7 @@
+ 
+ [[package]]
+ name = "codex-agent-roles"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-config",
+  "codex-file-system",
+@@ -1985,7 +1985,7 @@
+ 
+ [[package]]
+ name = "codex-analytics"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-app-server-protocol",
+  "codex-git-utils",
+@@ -2008,7 +2008,7 @@
+ 
+ [[package]]
+ name = "codex-ansi-escape"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "ansi-to-tui",
+  "pretty_assertions",
+@@ -2019,7 +2019,7 @@
+ 
+ [[package]]
+ name = "codex-api"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "assert_matches",
+@@ -2035,6 +2035,7 @@
+  "eventsource-stream",
+  "futures",
+  "http 1.4.0",
++ "libc",
+  "pretty_assertions",
+  "rcgen",
+  "regex-lite",
+@@ -2042,6 +2043,7 @@
+  "schemars 0.8.22",
+  "serde",
+  "serde_json",
++ "sha2 0.10.9",
+  "tempfile",
+  "thiserror 2.0.18",
+  "tokio",
+@@ -2057,7 +2059,7 @@
+ 
+ [[package]]
+ name = "codex-app-server"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "app_test_support",
+@@ -2066,6 +2068,7 @@
+  "chrono",
+  "clap",
+  "codex-analytics",
++ "codex-api",
+  "codex-app-server-daemon",
+  "codex-app-server-protocol",
+  "codex-app-server-transport",
+@@ -2174,8 +2177,9 @@
+ 
+ [[package]]
+ name = "codex-app-server-client"
+-version = "0.0.0"
+-dependencies = [
++version = "0.167.0-alpha.3.2"
++dependencies = [
++ "codex-api",
+  "codex-app-server",
+  "codex-app-server-protocol",
+  "codex-app-server-transport",
+@@ -2187,6 +2191,7 @@
+  "codex-protocol",
+  "codex-uds",
+  "codex-utils-absolute-path",
++ "codex-utils-cli",
+  "codex-utils-rustls-provider",
+  "futures",
+  "pretty_assertions",
+@@ -2202,7 +2207,7 @@
+ 
+ [[package]]
+ name = "codex-app-server-daemon"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "blake3",
+@@ -2232,7 +2237,7 @@
+ 
+ [[package]]
+ name = "codex-app-server-protocol"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "codex-app-server-protocol-noop-macros",
+@@ -2266,11 +2271,11 @@
+ 
+ [[package]]
+ name = "codex-app-server-protocol-noop-macros"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ 
+ [[package]]
+ name = "codex-app-server-test-client"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "clap",
+@@ -2292,7 +2297,7 @@
+ 
+ [[package]]
+ name = "codex-app-server-transport"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "axum",
+  "base64 0.22.1",
+@@ -2335,7 +2340,7 @@
+ 
+ [[package]]
+ name = "codex-apply-patch"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "assert_cmd",
+@@ -2355,7 +2360,7 @@
+ 
+ [[package]]
+ name = "codex-arg0"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "codex-apply-patch",
+@@ -2378,7 +2383,7 @@
+ 
+ [[package]]
+ name = "codex-async-utils"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "pretty_assertions",
+  "rand 0.9.3",
+@@ -2388,7 +2393,7 @@
+ 
+ [[package]]
+ name = "codex-attachment-store"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "pretty_assertions",
+  "serde",
+@@ -2398,7 +2403,7 @@
+ 
+ [[package]]
+ name = "codex-aws-auth"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "aws-config",
+  "aws-credential-types",
+@@ -2424,7 +2429,7 @@
+ 
+ [[package]]
+ name = "codex-backend-client"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "codex-api",
+@@ -2444,7 +2449,7 @@
+ 
+ [[package]]
+ name = "codex-backend-openapi-models"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "serde",
+  "serde_json",
+@@ -2453,7 +2458,7 @@
+ 
+ [[package]]
+ name = "codex-build-info"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-install-context",
+  "pretty_assertions",
+@@ -2466,7 +2471,7 @@
+ 
+ [[package]]
+ name = "codex-bwrap"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "cc",
+  "libc",
+@@ -2475,7 +2480,7 @@
+ 
+ [[package]]
+ name = "codex-chatgpt"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "clap",
+@@ -2497,7 +2502,7 @@
+ 
+ [[package]]
+ name = "codex-cli"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "app_test_support",
+@@ -2601,7 +2606,7 @@
+ 
+ [[package]]
+ name = "codex-client"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-http-client",
+  "eventsource-stream",
+@@ -2615,7 +2620,7 @@
+ 
+ [[package]]
+ name = "codex-cloud-client"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "async-stream",
+@@ -2639,7 +2644,7 @@
+ 
+ [[package]]
+ name = "codex-cloud-config"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "base64 0.22.1",
+  "chrono",
+@@ -2667,7 +2672,7 @@
+ 
+ [[package]]
+ name = "codex-cloud-tasks"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "chrono",
+@@ -2700,7 +2705,7 @@
+ 
+ [[package]]
+ name = "codex-cloud-tasks-client"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "chrono",
+@@ -2715,7 +2720,7 @@
+ 
+ [[package]]
+ name = "codex-cloud-tasks-mock-client"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "chrono",
+  "codex-cloud-tasks-client",
+@@ -2724,7 +2729,7 @@
+ 
+ [[package]]
+ name = "codex-code-mode"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-code-mode-protocol",
+  "codex-http-client",
+@@ -2748,7 +2753,7 @@
+ 
+ [[package]]
+ name = "codex-code-mode-host"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "axum",
+@@ -2779,7 +2784,7 @@
+ 
+ [[package]]
+ name = "codex-code-mode-protocol"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-protocol",
+  "glob",
+@@ -2797,7 +2802,7 @@
+ 
+ [[package]]
+ name = "codex-code-mode-runtime"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "base64 0.22.1",
+  "codex-code-mode-protocol",
+@@ -2819,11 +2824,11 @@
+ 
+ [[package]]
+ name = "codex-collaboration-mode-templates"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ 
+ [[package]]
+ name = "codex-config"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "base64 0.22.1",
+@@ -2877,7 +2882,7 @@
+ 
+ [[package]]
+ name = "codex-config-schema"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "clap",
+@@ -2886,7 +2891,7 @@
+ 
+ [[package]]
+ name = "codex-connectors"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "arc-swap",
+@@ -2908,7 +2913,7 @@
+ 
+ [[package]]
+ name = "codex-connectors-extension"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-connectors",
+  "codex-core-plugins",
+@@ -2922,7 +2927,7 @@
+ 
+ [[package]]
+ name = "codex-context-fragments"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-protocol",
+  "codex-protocol-test-support",
+@@ -2933,7 +2938,7 @@
+ 
+ [[package]]
+ name = "codex-core"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "arc-swap",
+@@ -3083,7 +3088,7 @@
+ 
+ [[package]]
+ name = "codex-core-api"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-analytics",
+  "codex-app-server-protocol",
+@@ -3106,7 +3111,7 @@
+ 
+ [[package]]
+ name = "codex-core-plugin-common"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-utils-absolute-path",
+  "semver",
+@@ -3117,7 +3122,7 @@
+ 
+ [[package]]
+ name = "codex-core-plugins"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "chrono",
+@@ -3174,7 +3179,7 @@
+ 
+ [[package]]
+ name = "codex-diagnostics"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "libc",
+  "pretty_assertions",
+@@ -3182,7 +3187,7 @@
+ 
+ [[package]]
+ name = "codex-direct-tool-timing"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-utils-critical-path",
+  "pretty_assertions",
+@@ -3193,7 +3198,7 @@
+ 
+ [[package]]
+ name = "codex-exec"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "assert_cmd",
+@@ -3246,7 +3251,7 @@
+ 
+ [[package]]
+ name = "codex-exec-server"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "arc-swap",
+@@ -3319,7 +3324,7 @@
+ 
+ [[package]]
+ name = "codex-exec-server-cli"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "assert_matches",
+@@ -3363,7 +3368,7 @@
+ 
+ [[package]]
+ name = "codex-exec-server-protocol"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "base64 0.22.1",
+  "codex-file-system",
+@@ -3381,7 +3386,7 @@
+ 
+ [[package]]
+ name = "codex-exec-server-test-support"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "codex-exec-server",
+@@ -3396,7 +3401,7 @@
+ 
+ [[package]]
+ name = "codex-execpolicy"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "caseless",
+@@ -3416,7 +3421,7 @@
+ 
+ [[package]]
+ name = "codex-experimental-api-macros"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "proc-macro2",
+  "quote",
+@@ -3425,7 +3430,7 @@
+ 
+ [[package]]
+ name = "codex-extension-api"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-api",
+  "codex-config",
+@@ -3448,7 +3453,7 @@
+ 
+ [[package]]
+ name = "codex-extension-items"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-utils-absolute-path",
+  "pretty_assertions",
+@@ -3460,7 +3465,7 @@
+ 
+ [[package]]
+ name = "codex-external-agent-migration"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "chrono",
+  "codex-analytics",
+@@ -3491,7 +3496,7 @@
+ 
+ [[package]]
+ name = "codex-features"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-network-proxy",
+  "codex-protocol",
+@@ -3505,7 +3510,7 @@
+ 
+ [[package]]
+ name = "codex-feedback"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "bytes",
+@@ -3533,7 +3538,7 @@
+ 
+ [[package]]
+ name = "codex-file-search"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "clap",
+@@ -3549,7 +3554,7 @@
+ 
+ [[package]]
+ name = "codex-file-system"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "bytes",
+  "codex-protocol",
+@@ -3563,7 +3568,7 @@
+ 
+ [[package]]
+ name = "codex-file-watcher"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "notify",
+  "pretty_assertions",
+@@ -3574,7 +3579,7 @@
+ 
+ [[package]]
+ name = "codex-git-attribution"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-backend-client",
+  "codex-extension-api",
+@@ -3587,7 +3592,7 @@
+ 
+ [[package]]
+ name = "codex-git-utils"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "chrono",
+@@ -3615,7 +3620,7 @@
+ 
+ [[package]]
+ name = "codex-goal-extension"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "chrono",
+@@ -3640,7 +3645,7 @@
+ 
+ [[package]]
+ name = "codex-guardian-context"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-context-fragments",
+  "codex-history",
+@@ -3654,7 +3659,7 @@
+ 
+ [[package]]
+ name = "codex-guardian-reviewer"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "codex-analytics",
+@@ -3690,7 +3695,7 @@
+ 
+ [[package]]
+ name = "codex-guardian-v2"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "codex-analytics",
+@@ -3729,7 +3734,7 @@
+ 
+ [[package]]
+ name = "codex-guardian-v3"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-message-board",
+  "codex-protocol",
+@@ -3738,7 +3743,7 @@
+ 
+ [[package]]
+ name = "codex-history"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "codex-protocol",
+@@ -3750,7 +3755,7 @@
+ 
+ [[package]]
+ name = "codex-history-notes-extension"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-analytics",
+  "codex-client",
+@@ -3776,7 +3781,7 @@
+ 
+ [[package]]
+ name = "codex-home"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-extension-api",
+  "codex-utils-absolute-path",
+@@ -3788,7 +3793,7 @@
+ 
+ [[package]]
+ name = "codex-hooks"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "async-channel",
+@@ -3817,7 +3822,7 @@
+ 
+ [[package]]
+ name = "codex-http-client"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "bytes",
+  "codex-utils-cargo-bin",
+@@ -3857,7 +3862,7 @@
+ 
+ [[package]]
+ name = "codex-image-generation-extension"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "base64 0.22.1",
+  "codex-api",
+@@ -3889,7 +3894,7 @@
+ 
+ [[package]]
+ name = "codex-install-context"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-utils-absolute-path",
+  "codex-utils-home-dir",
+@@ -3902,7 +3907,7 @@
+ 
+ [[package]]
+ name = "codex-keyring-store"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "keyring",
+  "pretty_assertions",
+@@ -3913,7 +3918,7 @@
+ 
+ [[package]]
+ name = "codex-linux-sandbox"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "clap",
+  "codex-core",
+@@ -3942,7 +3947,7 @@
+ 
+ [[package]]
+ name = "codex-lmstudio"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-core",
+  "codex-http-client",
+@@ -3956,7 +3961,7 @@
+ 
+ [[package]]
+ name = "codex-login"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "base64 0.22.1",
+@@ -4004,7 +4009,7 @@
+ 
+ [[package]]
+ name = "codex-mcp"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "arc-swap",
+@@ -4049,7 +4054,7 @@
+ 
+ [[package]]
+ name = "codex-mcp-extension"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "axum",
+@@ -4082,7 +4087,7 @@
+ 
+ [[package]]
+ name = "codex-memories-extension"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-core",
+  "codex-extension-api",
+@@ -4104,7 +4109,7 @@
+ 
+ [[package]]
+ name = "codex-memories-read"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-protocol",
+  "codex-shell-command",
+@@ -4114,7 +4119,7 @@
+ 
+ [[package]]
+ name = "codex-memories-write"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "chrono",
+@@ -4151,7 +4156,7 @@
+ 
+ [[package]]
+ name = "codex-mermaid"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "insta",
+  "pretty_assertions",
+@@ -4160,7 +4165,7 @@
+ 
+ [[package]]
+ name = "codex-message-board"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "base64 0.22.1",
+  "caseless",
+@@ -4185,7 +4190,7 @@
+ 
+ [[package]]
+ name = "codex-message-board-mcp"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-attachment-store",
+  "codex-message-board",
+@@ -4199,7 +4204,7 @@
+ 
+ [[package]]
+ name = "codex-message-history"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-config",
+  "memchr",
+@@ -4213,7 +4218,7 @@
+ 
+ [[package]]
+ name = "codex-model-provider"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "base64 0.22.1",
+  "chrono",
+@@ -4252,7 +4257,7 @@
+ 
+ [[package]]
+ name = "codex-model-provider-info"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-client",
+  "codex-http-client",
+@@ -4270,7 +4275,7 @@
+ 
+ [[package]]
+ name = "codex-models-manager"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "chrono",
+  "codex-http-client",
+@@ -4289,7 +4294,7 @@
+ 
+ [[package]]
+ name = "codex-multi-env-copy-file"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "codex-config",
+@@ -4315,7 +4320,7 @@
+ 
+ [[package]]
+ name = "codex-mxc-sandbox"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "codex-network-proxy",
+@@ -4336,7 +4341,7 @@
+ 
+ [[package]]
+ name = "codex-network-proxy"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "aws-credential-types",
+@@ -4387,7 +4392,7 @@
+ 
+ [[package]]
+ name = "codex-ollama"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "assert_matches",
+  "async-stream",
+@@ -4407,7 +4412,7 @@
+ 
+ [[package]]
+ name = "codex-otel"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "bytes",
+  "chrono",
+@@ -4446,7 +4451,7 @@
+ 
+ [[package]]
+ name = "codex-otel-trace-websocket"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "axum",
+@@ -4457,7 +4462,7 @@
+ 
+ [[package]]
+ name = "codex-plugin"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-config",
+  "codex-core-plugin-common",
+@@ -4472,7 +4477,7 @@
+ 
+ [[package]]
+ name = "codex-plugin-host"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-utils-cargo-bin",
+  "codex-utils-process",
+@@ -4489,7 +4494,7 @@
+ 
+ [[package]]
+ name = "codex-process-hardening"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "libc",
+  "pretty_assertions",
+@@ -4497,7 +4502,7 @@
+ 
+ [[package]]
+ name = "codex-prompts"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "codex-collaboration-mode-templates",
+@@ -4515,7 +4520,7 @@
+ 
+ [[package]]
+ name = "codex-protocol"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "chardetng",
+@@ -4561,14 +4566,14 @@
+ 
+ [[package]]
+ name = "codex-protocol-test-support"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-protocol",
+ ]
+ 
+ [[package]]
+ name = "codex-queue-extension"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "codex-core",
+@@ -4589,7 +4594,7 @@
+ 
+ [[package]]
+ name = "codex-realtime-webrtc"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "codex-build-info",
+@@ -4608,7 +4613,7 @@
+ 
+ [[package]]
+ name = "codex-response-debug-context"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "base64 0.22.1",
+  "codex-api",
+@@ -4619,7 +4624,7 @@
+ 
+ [[package]]
+ name = "codex-responses-api-proxy"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "bytes",
+@@ -4643,7 +4648,7 @@
+ 
+ [[package]]
+ name = "codex-rmcp-client"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "axum",
+@@ -4694,7 +4699,7 @@
+ 
+ [[package]]
+ name = "codex-rollout"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "chrono",
+@@ -4727,7 +4732,7 @@
+ 
+ [[package]]
+ name = "codex-rollout-trace"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "codex-code-mode",
+@@ -4744,7 +4749,7 @@
+ 
+ [[package]]
+ name = "codex-runtime-agent-instance"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "base64 0.22.1",
+  "codex-agent-identity",
+@@ -4770,7 +4775,7 @@
+ 
+ [[package]]
+ name = "codex-sandboxing"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "codex-mxc-sandbox",
+@@ -4798,7 +4803,7 @@
+ 
+ [[package]]
+ name = "codex-secrets"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "age",
+  "anyhow",
+@@ -4819,7 +4824,7 @@
+ 
+ [[package]]
+ name = "codex-shell-command"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "base64 0.22.1",
+@@ -4842,7 +4847,7 @@
+ 
+ [[package]]
+ name = "codex-skills"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-protocol",
+  "codex-shell-command",
+@@ -4859,7 +4864,7 @@
+ 
+ [[package]]
+ name = "codex-skills-extension"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "assert_matches",
+  "blake3",
+@@ -4899,7 +4904,7 @@
+ 
+ [[package]]
+ name = "codex-state"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "chrono",
+@@ -4928,7 +4933,7 @@
+ 
+ [[package]]
+ name = "codex-stdio-to-uds"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "codex-uds",
+@@ -4940,7 +4945,7 @@
+ 
+ [[package]]
+ name = "codex-tcp-tunnel"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "bytes",
+@@ -4961,7 +4966,7 @@
+ 
+ [[package]]
+ name = "codex-terminal-detection"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "pretty_assertions",
+  "tracing",
+@@ -4969,7 +4974,7 @@
+ 
+ [[package]]
+ name = "codex-test-binary-support"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-arg0",
+  "tempfile",
+@@ -4977,7 +4982,7 @@
+ 
+ [[package]]
+ name = "codex-thread-manager-sample"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "clap",
+@@ -4988,7 +4993,7 @@
+ 
+ [[package]]
+ name = "codex-thread-store"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "chrono",
+  "codex-app-server-protocol",
+@@ -5019,7 +5024,7 @@
+ 
+ [[package]]
+ name = "codex-tools"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "bitflags 2.13.1",
+  "codex-attachment-store",
+@@ -5045,7 +5050,7 @@
+ 
+ [[package]]
+ name = "codex-tui"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "app_test_support",
+@@ -5173,7 +5178,7 @@
+ 
+ [[package]]
+ name = "codex-uds"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "async-io",
+  "libc",
+@@ -5187,7 +5192,7 @@
+ 
+ [[package]]
+ name = "codex-user-verification"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "base64 0.22.1",
+  "block2",
+@@ -5208,7 +5213,7 @@
+ 
+ [[package]]
+ name = "codex-utils-absolute-path"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "dirs",
+  "dunce",
+@@ -5222,14 +5227,14 @@
+ 
+ [[package]]
+ name = "codex-utils-approval-presets"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-protocol",
+ ]
+ 
+ [[package]]
+ name = "codex-utils-audio"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "base64 0.22.1",
+  "codex-protocol",
+@@ -5243,7 +5248,7 @@
+ 
+ [[package]]
+ name = "codex-utils-cache"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "lru",
+  "sha1 0.10.6",
+@@ -5252,7 +5257,7 @@
+ 
+ [[package]]
+ name = "codex-utils-cargo-bin"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "assert_cmd",
+  "runfiles",
+@@ -5261,7 +5266,7 @@
+ 
+ [[package]]
+ name = "codex-utils-cli"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "clap",
+  "codex-protocol",
+@@ -5273,22 +5278,22 @@
+ 
+ [[package]]
+ name = "codex-utils-critical-path"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "pretty_assertions",
+ ]
+ 
+ [[package]]
+ name = "codex-utils-elapsed"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ 
+ [[package]]
+ name = "codex-utils-fuzzy-match"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ 
+ [[package]]
+ name = "codex-utils-git-discovery"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-git-utils",
+  "codex-utils-absolute-path",
+@@ -5301,14 +5306,14 @@
+ 
+ [[package]]
+ name = "codex-utils-head-tail-buffer"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "pretty_assertions",
+ ]
+ 
+ [[package]]
+ name = "codex-utils-home-dir"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-utils-absolute-path",
+  "dirs",
+@@ -5318,7 +5323,7 @@
+ 
+ [[package]]
+ name = "codex-utils-image"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "base64 0.22.1",
+  "codex-utils-cache",
+@@ -5332,7 +5337,7 @@
+ 
+ [[package]]
+ name = "codex-utils-json-to-toml"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "pretty_assertions",
+  "serde_json",
+@@ -5341,7 +5346,7 @@
+ 
+ [[package]]
+ name = "codex-utils-oss"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-core",
+  "codex-lmstudio",
+@@ -5351,7 +5356,7 @@
+ 
+ [[package]]
+ name = "codex-utils-output-truncation"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-protocol",
+  "codex-utils-string",
+@@ -5361,7 +5366,7 @@
+ 
+ [[package]]
+ name = "codex-utils-path"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-utils-absolute-path",
+  "dunce",
+@@ -5372,7 +5377,7 @@
+ 
+ [[package]]
+ name = "codex-utils-path-uri"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "base64 0.22.1",
+  "codex-utils-absolute-path",
+@@ -5388,7 +5393,7 @@
+ 
+ [[package]]
+ name = "codex-utils-plugins"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-exec-server",
+  "codex-exec-server-protocol",
+@@ -5402,7 +5407,7 @@
+ 
+ [[package]]
+ name = "codex-utils-process"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "pretty_assertions",
+  "tokio",
+@@ -5410,7 +5415,7 @@
+ 
+ [[package]]
+ name = "codex-utils-pty"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "codex-utils-cargo-bin",
+@@ -5429,7 +5434,7 @@
+ 
+ [[package]]
+ name = "codex-utils-readiness"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "assert_matches",
+  "thiserror 2.0.18",
+@@ -5439,7 +5444,7 @@
+ 
+ [[package]]
+ name = "codex-utils-redacted-string"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "schemars 0.8.22",
+  "serde",
+@@ -5447,14 +5452,14 @@
+ 
+ [[package]]
+ name = "codex-utils-rustls-provider"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "rustls",
+ ]
+ 
+ [[package]]
+ name = "codex-utils-sandbox-summary"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-protocol",
+  "codex-utils-absolute-path",
+@@ -5464,7 +5469,7 @@
+ 
+ [[package]]
+ name = "codex-utils-sleep-inhibitor"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "core-foundation 0.9.4",
+  "libc",
+@@ -5474,14 +5479,14 @@
+ 
+ [[package]]
+ name = "codex-utils-stream-parser"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "pretty_assertions",
+ ]
+ 
+ [[package]]
+ name = "codex-utils-string"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "pretty_assertions",
+  "regex-lite",
+@@ -5491,14 +5496,14 @@
+ 
+ [[package]]
+ name = "codex-utils-template"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "pretty_assertions",
+ ]
+ 
+ [[package]]
+ name = "codex-v8-poc"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "pretty_assertions",
+  "v8",
+@@ -5506,7 +5511,7 @@
+ 
+ [[package]]
+ name = "codex-voice-host"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "codex-install-context",
+@@ -5533,7 +5538,7 @@
+ 
+ [[package]]
+ name = "codex-web-search-extension"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-api",
+  "codex-core",
+@@ -5557,7 +5562,7 @@
+ 
+ [[package]]
+ name = "codex-websocket-auth"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "base64 0.22.1",
+@@ -5576,7 +5581,7 @@
+ 
+ [[package]]
+ name = "codex-websocket-client"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-http-client",
+  "codex-utils-rustls-provider",
+@@ -5592,7 +5597,7 @@
+ 
+ [[package]]
+ name = "codex-windows-sandbox"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "base64 0.22.1",
+@@ -5622,7 +5627,7 @@
+ 
+ [[package]]
+ name = "codex-windows-sandbox-service"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "codex-cloud-config",
+@@ -5640,14 +5645,14 @@
+ 
+ [[package]]
+ name = "codex-windows-sandbox-test-support"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "dirs",
+ ]
+ 
+ [[package]]
+ name = "codex-workload-identity"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "codex-http-client",
+  "pretty_assertions",
+@@ -5662,7 +5667,7 @@
+ 
+ [[package]]
+ name = "codex-worktree"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "codex-git-utils",
+@@ -5915,7 +5920,7 @@
+ 
+ [[package]]
+ name = "core_test_support"
+-version = "0.0.0"
++version = "0.167.0-alpha.3.2"
+ dependencies = [
+  "anyhow",
+  "assert_cmd",
