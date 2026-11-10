@@ -177,6 +177,8 @@ the adopted team and runtime release version are unchanged; see
 | PR #56 merge `4e9e434` | [Post-merge Source CI](https://github.com/yimoburu/soloco/actions/runs/42549433821): 1,348 Node 22 tests, build/drift and gate | Actual merged checkout; its tree equals the qualified head tree |
 | PR #61 head `2cc37e0` | [Source CI](https://github.com/yimoburu/soloco/actions/runs/42693268997): 1,606 Node 22 tests; [qualification](https://github.com/yimoburu/soloco/actions/runs/42693323026): 2,018 full Node 22 tests and 736 Node 26 compatibility tests | All 202 journal/scheduler cases passed in each selected lane; zero failures, cancellations, skips or todos |
 | PR #61 merge `3d65268` | [Post-merge Source CI](https://github.com/yimoburu/soloco/actions/runs/42695347401): 1,606 Node 22 tests, build/drift and gate | Actual merged checkout with the identical qualified head tree; native 202-case qualification remains separate |
+| PR #62 head `d46cf4d` | [Source CI](https://github.com/yimoburu/soloco/actions/runs/42716095177): 1,715 Node 22 tests; [qualification](https://github.com/yimoburu/soloco/actions/runs/42716104684): 2,127 full Node 22 tests and 845 Node 26 compatibility tests | Exact reviewed recovery source; zero failures, cancellations, skips or todos |
+| PR #62 merge `c8c317c` | [Post-merge Source CI](https://github.com/yimoburu/soloco/actions/runs/42718592217): 1,715 Node 22 tests, build/drift and gate | Actual merged checkout with the identical qualified head tree; live operations require their own evidence |
 
 Counts across lanes overlap. These results do not establish installation,
 company adoption, native-host behavior, human workload reduction or business
@@ -192,6 +194,22 @@ decrease after including the actual explanation. Canonical selection, records, a
 hashes, currentness and limits remain unchanged. This does not establish active
 package installation, full native worker lifecycle, provider capacity, peer-mode
 or durable continuity qualification.
+
+The compatible receipt extension removes one duplicate serialized value from
+the current runtime test receipt when its content is exactly the JSON spelling
+of its complete literal result. A closed registry binds the record identity,
+serialization and commitments. Restoration checks the original canonical
+context through the existing file-body codec. Prior failures, other records and
+unequal content retain their full representations. The worker references the
+whole task already in context only when it exactly matches the outer task;
+the original complete-template fallback and both size checks remain.
+
+Complete file-body31, receipt10 and timeout-wiring15 roots passed 56 ordinary
+source checks with exact before/after source bindings. The timeout harness uses
+the new renderer and retains its existing purposes. Canonical context hashing,
+authority, expiry, attempts, validation providers and acceptance checks are
+unchanged. Source checks and saved-frame measurements remain separate from
+fresh installed packet fit, native semantic review and company acceptance.
 
 ## Earlier contradictions repaired
 
