@@ -1,0 +1,49 @@
+name: Merge readiness
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review, converted_to_draft, auto_merge_enabled, auto_merge_disabled]
+concurrency:
+  group: merge-readiness-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+  pull-requests: read
+jobs:
+  readiness:
+    name: Merge readiness
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      # Read metadata only: never check out or execute PR code with a token.
+      # Drafts intentionally stay red so marking ready cannot reuse a green
+      # policy result obtained before QA and owner acceptance.
+      # This stateless check accepts only explicit readiness/auto-merge events;
+      # metadata edits or reopening cannot clear a changed-head hold.
+      - name: Require native auto-merge for the current ready head
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          node <<'NODE'
+          async function main() {
+            const event = JSON.parse(require('node:fs').readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'));
+            const number = event.pull_request?.number;
+            const expectedHead = event.pull_request?.head?.sha;
+            if (!Number.isSafeInteger(number) || number < 1 || !expectedHead) throw Error('Missing pull request identity.');
+            const response = await fetch(`${process.env.GITHUB_API_URL}/repos/${process.env.GITHUB_REPOSITORY}/pulls/${number}`, {
+              headers: {Authorization: `Bearer ${process.env.GITHUB_TOKEN}`, Accept: 'application/vnd.github+json'},
+              signal: AbortSignal.timeout(20000)
+            });
+            if (!response.ok) throw Error(`Cannot verify merge readiness (HTTP ${response.status}).`);
+            const pr = await response.json();
+            if (pr.number !== number) throw Error('GitHub returned a different pull request.');
+            if (pr.state !== 'open' || pr.base?.ref !== 'main') throw Error('Expected an open pull request targeting main.');
+            if (pr.head?.sha !== expectedHead) throw Error('Stale event: the pull request head changed. Reconcile the current head.');
+            if (pr.draft !== false) throw Error('Draft hold: complete required QA and owner acceptance before marking ready.');
+            if (event.action === 'synchronize') throw Error('New head: return to draft, review and accept this head, then mark ready and enable auto-merge again.');
+            if (!pr.auto_merge) throw Error('Enable auto-merge and confirm it, or use gh pr merge --auto --match-head-commit for the accepted head.');
+            if (!['ready_for_review', 'auto_merge_enabled'].includes(event.action)) throw Error('Readiness hold: mark the accepted head ready and explicitly enable auto-merge again.');
+            console.log(`Native auto-merge is enabled for ready PR #${number} at ${expectedHead}. Required CI still governs merging.`);
+          }
+          main().catch(error => { console.error(error.message); process.exitCode = 1; });
+          NODE

@@ -9,8 +9,45 @@ Routine pull requests, main pushes and manual Source CI runs require two checks:
 **CI gate** keeps its existing name and succeeds when both jobs succeed. It uses
 GitHub's dependency results directly, without API calls, tokens, artifact checks
 or source-provenance approval. Failed, cancelled or unexpectedly skipped required
-jobs still fail the gate. Configure branch protection to require `CI gate` if
-merge protection is desired.
+jobs still fail the gate. Branch protection on `main` requires `CI gate` and
+`Merge readiness`, including for administrators.
+
+## Required auto-merge
+
+Every CoS and replacement session follows [AGENTS.md](../AGENTS.md): keep a PR
+draft until its exact head has the required review, QA and owner acceptance,
+then mark it ready and enable native GitHub auto-merge. The assigned integrator
+verifies the request and owns delivery through merge, without another routine
+founder prompt.
+
+**Merge readiness** is a separate read-only Ubuntu job. It reads the live PR
+through GitHub's API; it does not check out or execute PR code, run a model,
+change the PR, or rerun Source CI. It passes only for an open, non-draft PR into
+`main`, with the event's exact current head and an enabled auto-merge request.
+Drafts and ready PRs without auto-merge intentionally remain unsuccessful in
+this check; their ordinary test/build results are independent.
+
+The job runs on PR creation, reopening, head updates, draft/ready transitions and
+auto-merge enable/disable events. Only an explicit ready or auto-merge-enable
+event can pass it. A head update or reopening holds readiness even when GitHub
+retains the previous auto-merge request; metadata edits cannot clear that hold.
+Before another push, disable auto-merge and return the PR to draft; after the
+required new-head review, repeat the ready/enable sequence. Superseded readiness
+runs are cancelled.
+
+Arm auto-merge using the authenticated CoS/integrator account, either in the UI
+(**Enable auto-merge → Confirm auto-merge**) or with:
+
+```sh
+gh pr merge <PR> --auto --merge --match-head-commit <accepted-head-sha>
+```
+
+The workflow itself has read-only permissions. It does not merge using
+`GITHUB_TOKEN`, so it does not suppress the normal main-push Source CI run.
+GitHub state is a mechanical prerequisite; the check cannot certify native QA
+or company acceptance. Keep those exact-head records and existing holds.
+
+## Test selection
 
 Node 26 compatibility and the complete historical Node 22 suite are available in
 **Full qualification**, started manually from Actions. They do not run on every
