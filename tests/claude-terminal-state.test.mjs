@@ -11,10 +11,12 @@ import {work} from '../plugins/soloco/runtime/worker.mjs';
 
 const negative=JSON.stringify({content:'Fictional unresolved condition.',messages:[],notices:[],review:{verdict:'Blocked',reason:'Evidence is incomplete.'}});
 const result=(extra={})=>({type:'result',subtype:'success',session_id:'fictional-native',result:negative,...extra});
+// Synthetic original-child identity; no OS process or PID observation.
+let nextSyntheticPid=732000;
 function adapter(value,{code=0,limit}={}) {
   return (host,native,prompt,cwd,timeout,selection,options={})=>runModel(host,native,prompt,cwd,timeout,selection,{
-    ...options,...(limit?{maxOutputCharacters:limit}:{}),resolveExecutable:()=>'/fictional/claude',spawn:()=>{
-      const child=new EventEmitter();child.stdin=new EventEmitter();child.stdout=new EventEmitter();child.stderr=new EventEmitter();
+    ...options,sessionTitle:undefined,...(limit?{maxOutputCharacters:limit}:{}),resolveExecutable:()=>'/fictional/claude',spawn:()=>{
+      const child=new EventEmitter();child.pid=++nextSyntheticPid;child.stdin=new EventEmitter();child.stdout=new EventEmitter();child.stderr=new EventEmitter();
       child.kill=()=>{queueMicrotask(()=>child.emit('close',null));return true;};
       child.stdin.end=()=>queueMicrotask(()=>{child.emit('spawn');child.stdout.emit('data',JSON.stringify(value));child.emit('close',code);});
       return child;
