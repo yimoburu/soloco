@@ -2,8 +2,9 @@
 
 Routine pull requests, main pushes and manual Source CI runs require two checks:
 
-- **Tests Node 22** runs the existing regression selection on macOS, including
-  authorization, cancellation, storage integrity and sandbox tests.
+- **Tests Node 22** aggregates two isolated macOS regression shards, including
+  authorization, cancellation, storage integrity and sandbox tests. Each shard
+  runs complete test files; their exact union is the existing regression selection.
 - **Build and drift** checks generated package files and whitespace on Linux.
 
 **CI gate** keeps its existing name and succeeds when both jobs succeed. It uses
@@ -11,6 +12,9 @@ GitHub's dependency results directly, without API calls, tokens, artifact checks
 or source-provenance approval. Failed, cancelled or unexpectedly skipped required
 jobs still fail the gate. Branch protection on `main` requires `CI gate` and
 `Merge readiness`, including for administrators.
+
+The two aggregate jobs use fail-closed shell checks without a checkout or Node
+setup. Every actual test shard still requires the real macOS Seatbelt backend.
 
 ## Required auto-merge
 
@@ -50,8 +54,15 @@ or company acceptance. Keep those exact-head records and existing holds.
 ## Test selection
 
 Node 26 compatibility and the complete historical Node 22 suite are available in
-**Full qualification**, started manually from Actions. They do not run on every
-PR update or main push. The full suite remains unchanged. The regression selector
+**Full qualification**. Adding `qualification-ready` to a frozen draft PR starts
+both lanes against that event's exact head. Manual Actions dispatch also accepts
+an optional exact 40-character commit SHA. Qualification does not run on every
+PR update or main push. If a labeled candidate changes, remove/reapply the label
+or dispatch the new exact SHA; the previous result stays scoped to the old head.
+Keep the PR draft until qualification required for its head is complete, since
+native auto-merge does not wait for optional checks automatically.
+
+The full suite remains unchanged. The regression selector
 continues to include new test files automatically and explicitly excludes the
 existing seventeen expensive historical qualification files in
 `tools/ci/evidence.mjs`.
@@ -75,6 +86,13 @@ node tools/ci/check.mjs regression-22
 node tools/ci/check.mjs build
 ```
 
+To run the same whole-file partitions separately:
+
+```sh
+node tools/ci/check.mjs regression-22 --shard 1/2
+node tools/ci/check.mjs regression-22 --shard 2/2
+```
+
 For explicit qualification, use Node 22 for the full suite or Node 26 for
 compatibility:
 
@@ -91,3 +109,5 @@ for tests and five minutes for build.
 The strict receipt runner and remote verifier remain optional tools for
 [historical evidence verification](ci-evidence.md). Their receipt/provenance
 requirements are separate from ordinary CI success.
+They do not turn current sharded diagnostic logs or the Linux aggregate job into
+a historical whole-suite macOS receipt. See [implementation workflow and timing](implementation-speed.md).
