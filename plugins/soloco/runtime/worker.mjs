@@ -124,6 +124,9 @@ export async function work(root, jobId, model = runModel) {
     const charter=state.roles[job.role];
     const roleName=job.specialist?specialistName(state,job):charter.name;
     const target=job.review_of?state.records[job.review_of.id]:null;
+    // Optional re-delivery is limited to exact records already supplied in
+    // this explicit code review. It adds no source, request round or time.
+    const inlineCodeReviewReads=job.code_review_window_minutes?Object.freeze(JSON.parse(context.text).records.map(r=>Object.freeze({id:r.id,revision:r.revision,sha256:digest(JSON.stringify(r))}))):[];
     const continuationGrantDeadline=target?.development?.type==='review_continuation'?Date.parse(target.development.proposal.expires_at):null;
     const specialistReview=target?.job_id&&state.jobs[target.job_id]?.specialist;
     const reviewShape=target?{...(specialistReview?{permitted_action:'accept_specialist_output or hold',blockers:[]}:{}),...(target.operating_plan?{permitted_action:'publish_operating_state or hold',plan_sha256:digest(JSON.stringify(target.operating_plan)),preservation_complete:true,interaction_complete:true,authority_checked:true,blockers:[]}:{}),...(target.handover?{permitted_action:'resume_handover or hold',subject_sha256:target.handover.subject_sha256,blockers:[]}:{}),...(target.context_classification_plan?{permitted_action:'apply_context_classification or hold',plan_sha256:digest(JSON.stringify(target.context_classification_plan)),blockers:[]}:{}),verdict:'Pass or Fail or Blocked',reason:'evidence-based explanation',
@@ -316,7 +319,7 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
         request=JSON.stringify(packet);
         continue;
       }
-      const allowed=[...(job.supplemental_sources??[]),...(target?.context_classification_plan?.sources??[]),...(context.required_sources??[])];
+      const allowed=[...(job.supplemental_sources??[]),...(target?.context_classification_plan?.sources??[]),...(context.required_sources??[]),...inlineCodeReviewReads];
       if(envelope.reads.some(r=>!allowed.some(a=>a.id===r.id&&a.sha256===r.sha256)))throw Error('Supplemental read is outside the assignment evidence allowlist');
       const reads=withStore(root,db=>{const s=db.read();eligibility(s);return envelope.reads.map(r=>contextRead(s,r));});
       for(const read of reads)supplemental.push({id:read.id,revision:read.revision,sha256:read.sha256,offset:read.offset,length:read.length,total_characters:read.total_characters});

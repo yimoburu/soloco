@@ -123,6 +123,12 @@ original canonical context. Physical native delivery needs its own audit;
 transport roundtrip and response bookkeeping do not prove understanding or
 retention after compaction.
 
+Within an explicit code-QA window, frozen references to initially supplied
+records permit optional re-reading. The original ID, revision and full-record
+hash must still match the current source. Native identity, four-range requests,
+sixteen rounds and 32,768-character ranges remain enforced. Availability of
+these reads does not establish that recovery after compaction fits those bounds.
+
 Private original-ChildProcess observers retain late close evidence after a
 timeout. Typed, attributable storage history permits separate idempotent
 closure reconciliation without changing the failed result or reviving output.
@@ -137,6 +143,11 @@ regression root. This is not one final all-green aggregate or full-repository
 qualification. The VM correction imports its real module dependency; original
 assertions remain. Earlier failed/incomplete runs and their uncertainty remain
 retained. Final integration and hosted checks are reported separately.
+
+The later inline re-read component has 115 passing controlled conditions across
+seven whole roots on its frozen tuple. The combined worker and fixture batching
+tuple passes the whole 35-case operating-state root. These are separate runs;
+complete hosted qualification must cover the final committed integration.
 
 See `development-review-continuation.md` and `ordinary-model-process-closure.md`
 for supported calls and limits. These source changes do not establish the
