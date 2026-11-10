@@ -79,6 +79,8 @@ export function itemView(value,id,collection='records') {
   if(v.next_handoff!==undefined)view.next_handoff={description:cut(v.next_handoff),status:'planned'};
   if(v.review)view.review=pick(v.review,['verdict','permitted_action']);
   if(v.review_of)view.review_of=pick(v.review_of,['id','revision']);
+  if(v.specialist?.type)view.specialist={...pick(v.specialist,['type','disposition']),...(v.specialist.type==='profile'?{...pick(v.specialist.definition,['base_role','expires_at','max_assignments']),name:cut(v.specialist.definition?.charter?.name,80)}:{}),...(v.specialist.type==='policy'?pick(v.specialist.policy,['scope','expires_at','max_profiles','max_assignments']):{}),meaning:'Creation is not competence certification; exact definitions and review evidence require the source.'};
+  else if(v.specialist)view.specialist={base_role:v.role,profile:pick(v.specialist.profile,['id','revision','sha256']),policy:pick(v.specialist.policy,['id','revision','sha256']),meaning:'Temporary expertise metadata; the base role retains authority. Creation is not competence certification.'};
   if(v.acceptance)view.acceptance={recorded:true,preview:true,source:ref};
   if(['jobs','active_jobs','claimed_jobs'].includes(collection)) {
     view.timeout={...pick(v,['timeout_policy_version','timeout_ms','timeout_reason','execution_started_at','execution_deadline_at']),state:jobTimeoutState(v,Date.now())};

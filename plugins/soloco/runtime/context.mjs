@@ -9,6 +9,7 @@ import {buildQualificationReviewFrame} from './qualification-frame.mjs';
 import {hasSnapshotReferences,inheritSnapshots} from './snapshot.mjs';
 import {qualificationAssignment,qualificationMatches,QUALIFICATION_LIMITS} from './context-qualification.mjs';
 import {taskAssignmentContext,taskContextMatches,TASK_CONTEXT_BUDGET} from './task-context.mjs';
+import {specialistContext} from './specialists.mjs';
 
 export const CONTEXT_LIMIT = 200000;
 const required = record => ['intent', 'decision', 'preference'].includes(record.kind)
@@ -26,12 +27,14 @@ export function contextBudgetForJob(state,job) {
 
 // Every supplied fact is a dependency. Never silently trim a constraint or input.
 export function assignmentContext(state, job) {
+  if(job.specialist!==undefined&&(![3,5,6,7].includes(job.context_format)||job.review_of||job.prototype_id||job.development_id))throw Error('Specialist profile is unsupported for this assignment context');
   if(job.context_format===7)return taskAssignmentContext(state,job);
+  const specialist=job.specialist===undefined?{}:{specialist:specialistContext(state,job)};
   const operatingReview=operatingReviewContext(state,job);if(operatingReview)return operatingReview;
   if(job.context_format===6){
     const checkpoint=operatingContext(state,{scope:job.context_scope??'*',job_id:job.id});
     const records=(job.inputs??[]).map(ref=>{const r=state.records[ref.id];if(!r||r.revision!==ref.revision)throw Error('Assignment input version changed');return r;});
-    const text=JSON.stringify({protocol:'operating-assignment-v1',checkpoint,charter:state.roles[job.role],assignment:{task:job.task,...(job.output_contract?{output_contract:job.output_contract,output_rule:'Return an unaccepted proposal only. It changes no current knowledge or authority. Surface discovered restrictions, contradictions and uncertain obligations as notices; required notices are never suppressed. Return only content, messages and notices.'}:{}),context_scope:job.context_scope??'*',coordination:job.coordination??null,model_selection:job.model_selection??{mode:'default'}},records,supplemental_evidence:{protocol:'record-reads-v1',available:true,sources:job.supplemental_sources??[],lookup:'company_context inspect/read',rule:job.output_contract==='operating-proposal-v1'?'Read only IDs explicitly listed in supplemental_evidence.sources. The complete inline records and checkpoint homes are supplied evidence. Checkpoint acceptance receipts are provenance, not a request to repeat publication review. If sources is empty, supplemental reads are unavailable; use the supplied evidence and disclose any substantive gap.':'Request exact known source IDs and hashes; missing input holds work'}});
+    const text=JSON.stringify({protocol:'operating-assignment-v1',checkpoint,charter:state.roles[job.role],...specialist,assignment:{task:job.task,...(job.output_contract?{output_contract:job.output_contract,output_rule:'Return an unaccepted proposal only. It changes no current knowledge or authority. Surface discovered restrictions, contradictions and uncertain obligations as notices; required notices are never suppressed. Return only content, messages and notices.'}:{}),context_scope:job.context_scope??'*',coordination:job.coordination??null,model_selection:job.model_selection??{mode:'default'}},records,supplemental_evidence:{protocol:'record-reads-v1',available:true,sources:job.supplemental_sources??[],lookup:'company_context inspect/read',rule:job.output_contract==='operating-proposal-v1'?'Read only IDs explicitly listed in supplemental_evidence.sources. The complete inline records and checkpoint homes are supplied evidence. Checkpoint acceptance receipts are provenance, not a request to repeat publication review. If sources is empty, supplemental reads are unavailable; use the supplied evidence and disclose any substantive gap.':'Request exact known source IDs and hashes; missing input holds work'}});
     if(text.length>CONTEXT_LIMIT)throw Error('Operating assignment exceeds supported coherent context; Held');
     return {text,hash:digest(text),inputs:records.map(r=>({id:r.id,revision:r.revision}))};
   }
@@ -67,7 +70,7 @@ export function assignmentContext(state, job) {
   const pack = {
     company_id: state.id, name: state.name, idea: state.idea,
     mode: state.mode, phase: state.phase, team_sha256: state.team_sha256,
-    governance: state.governance, charter: state.roles[job.role], records,
+    governance: state.governance, charter: state.roles[job.role], ...specialist, records,
     // Resolution ends pending attention; its conditions remain company evidence.
     notices: state.notices.map(({deliveries, seen_at, ...n}) => n),
     messages: state.messages.filter(m => m.to === job.role),

@@ -3,6 +3,7 @@ import {taskRecovery,recoveryCode,SchedulingHold,schedulingRecovery} from './rec
 import {owner,digest,stamp,requireText} from './store.mjs';
 import {normalizeCoordination,bindCoordination} from './coordination.mjs';
 import {normalizeTimeout} from './timeout.mjs';
+import {prepareSpecialistAssignment,validateSpecialistBindingShape} from './specialists.mjs';
 
 export const TASK_PROTOCOL='async-task-v1';
 export const TASK_STATES=['planned','queued','running','returned','accepted','needs_attention','cancelling','cancelled'];
@@ -10,7 +11,7 @@ const taskKeys=['version','operation_id','command_sha256','owner','definition_re
 const recordKeys=['id','kind','status','author_role','author_instance','revision','content','created_at','updated_at','runtime_task'];
 const ownerKeys=['host','session_id','epoch'];
 const attemptKeys=['job_id','instance_id','definition_revision','definition_sha256','created_at','artifact_id','finished_at'];
-const specKeys=['role','task','input_ids','evidence_ids','peer_task_ids','resources','context_scope','expected_deliverable','acceptance','depends_on','review_task_id','model_selection','timeout_ms','timeout_reason','source_instruction','max_attempts','outcome'];
+const specKeys=['role','task','input_ids','evidence_ids','peer_task_ids','resources','context_scope','expected_deliverable','acceptance','depends_on','review_task_id','model_selection','timeout_ms','timeout_reason','source_instruction','max_attempts','outcome','specialist_ref'];
 const allowed=(v,keys)=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).every(k=>keys.includes(k));
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const copy=v=>JSON.parse(JSON.stringify(v));
@@ -39,10 +40,15 @@ function normalizeSpec(value,state,source){
   if(role==='runner'||!Object.hasOwn(state.roles??{},role))throw Error('Choose a specialist from the pinned role catalog');
   const task=requireText(value.task,'task',20000),acceptance=requireText(value.acceptance,'acceptance',4000);
   const expected_deliverable=requireText(value.expected_deliverable,'expected_deliverable',300);
-  const input_ids=names(value.input_ids,'input_ids');
+  let input_ids=names(value.input_ids,'input_ids',value.specialist_ref===undefined?100:102);
   if(input_ids.some(key=>!Object.hasOwn(state.records??{},key)))throw Error('Task input record is missing');
   const evidence_ids=names(value.evidence_ids,'evidence_ids');
   if(evidence_ids.some(key=>!Object.hasOwn(state.records??{},key)))throw Error('Task supplemental evidence record is missing');
+  if(value.specialist_ref!==undefined){
+    if(value.review_task_id!==undefined&&value.review_task_id!==null)throw Error('Temporary specialist profiles cannot perform review assignments');
+    const prepared=prepareSpecialistAssignment(state,{...value,role,task,input_ids,evidence_ids});
+    input_ids=names([...new Set([...input_ids,...prepared.input_ids])],'input_ids',102);
+  }
   const peer_task_ids=names(value.peer_task_ids,'peer_task_ids',16);
   if(peer_task_ids.some(key=>!same(taskRecord(state,key).runtime_task.owner,state.owner)))throw Error('Task peer recipients must share the current owner and epoch');
   const resources=normalizeCoordination({resources:value.resources}).resources;
@@ -63,6 +69,7 @@ function normalizeSpec(value,state,source){
     if(!selectionShape(m)||JSON.stringify(m).length>2000)throw Error('Invalid task model selection');
     spec.model_selection=copy(m);
   }
+  if(value.specialist_ref!==undefined)spec.specialist_ref=copy(value.specialist_ref);
   if(value.outcome!==undefined){spec.outcome=validateOutcome(value.outcome);for(const id of spec.outcome.evidence_ids)if(!input_ids.includes(id))throw Error('Outcome evidence must be supplied as exact task inputs');}
   return spec;
 }
@@ -73,10 +80,14 @@ function assertInputBindings(state,record){
 }
 export const taskDefinitionHash=spec=>digest(JSON.stringify(spec));
 function validateSpec(spec){
+  if(spec.specialist_ref!==undefined){
+    const r=spec.specialist_ref;
+    if(!allowed(r,['id','revision','sha256'])||Object.keys(r).length!==3||!identifier(r.id)||!Number.isSafeInteger(r.revision)||r.revision<1||!/^[a-f0-9]{64}$/.test(r.sha256??'')||spec.review_task_id!==null)throw Error('Invalid canonical specialist profile reference');
+  }
   if(spec.outcome!==undefined){validateOutcome(spec.outcome);if(spec.outcome.evidence_ids.some(id=>!spec.input_ids?.includes(id)))throw Error('Outcome evidence must remain exact task inputs');}
   if(!allowed(spec,specKeys)||typeof spec.role!=='string'||spec.role==='runner'||typeof spec.task!=='string'||!spec.task.trim()||spec.task.length>20000||typeof spec.acceptance!=='string'||!spec.acceptance.trim()||spec.acceptance.length>4000||typeof spec.expected_deliverable!=='string'||!spec.expected_deliverable.trim()||spec.expected_deliverable.length>300||typeof spec.source_instruction!=='string'||!spec.source_instruction.trim()||spec.source_instruction.length>4000||typeof spec.context_scope!=='string'||!spec.context_scope.trim()||spec.context_scope.length>160||spec.max_attempts!==1||!Number.isSafeInteger(spec.timeout_ms)||spec.timeout_ms<1000||spec.timeout_ms>600000)throw Error('Invalid canonical async task specification');
   if(!Array.isArray(spec.input_ids)||!Array.isArray(spec.evidence_ids)||!Array.isArray(spec.peer_task_ids)||!Array.isArray(spec.resources))throw Error('Canonical task input/resource arrays are missing');
-  names(spec.input_ids,'input_ids');names(spec.evidence_ids,'evidence_ids');names(spec.peer_task_ids,'peer_task_ids',16);normalizeCoordination({resources:spec.resources});
+  names(spec.input_ids,'input_ids',spec.specialist_ref===undefined?100:102);names(spec.evidence_ids,'evidence_ids');names(spec.peer_task_ids,'peer_task_ids',16);normalizeCoordination({resources:spec.resources});
   if(!Array.isArray(spec.depends_on)||spec.depends_on.length>16||spec.depends_on.some(d=>!allowed(d,['task_id','gate'])||typeof d.task_id!=='string'||!d.task_id.startsWith('async-task-')||!['output','accepted','test'].includes(d.gate))||new Set(spec.depends_on.map(d=>d.task_id)).size!==spec.depends_on.length||!(spec.review_task_id===null||typeof spec.review_task_id==='string'&&spec.review_task_id.startsWith('async-task-')))throw Error('Invalid canonical async task prerequisites');
   normalizeTimeout({timeout_ms:spec.timeout_ms,timeout_reason:spec.timeout_reason});
   if(spec.model_selection!==undefined&&!selectionShape(spec.model_selection))throw Error('Invalid canonical task model selection');
@@ -259,6 +270,7 @@ export function taskReady(state,record){
     if(!same(state.owner,t.owner))throw new SchedulingHold('AUTHORITY_CHANGED','Task owner or epoch changed');
     if(state.paused)throw new SchedulingHold('PAUSED','Company is paused');
     if(t.state!=='planned'||t.attempts.length)throw Error('Task is not a fresh planned assignment');
+    if(t.spec.specialist_ref!==undefined)prepareSpecialistAssignment(state,t.spec);
     assertTaskPrerequisites(state,record);
     const jobs=[],required=[],inputs=new Set(t.spec.input_ids);
     for(const dep of t.spec.depends_on){const r=taskRecord(state,dep.task_id);const item=output(state,r,dep.gate);jobs.push(item.job.id);required.push(item.job.id);inputs.add(item.artifact.id);if(item.reference.subject)inputs.add(item.reference.subject.id);}
@@ -275,6 +287,10 @@ export function bindTaskAttempt(state,record,job){
   const view={...state,jobs:Object.fromEntries(Object.entries(state.jobs??{}).filter(([key])=>key!==job?.id))};
   const ready=taskReady(view,record);if(!ready.ready)throw new SchedulingHold(ready.recovery?.code,ready.reason);
   const t=record.runtime_task;
+  if(t.spec.specialist_ref!==undefined){
+    const prepared=prepareSpecialistAssignment(state,t.spec);
+    if(!validateSpecialistBindingShape(job?.specialist)||!same(job.specialist,prepared.binding))throw Error('Queued specialist binding differs from the exact task profile');
+  }else if(job?.specialist!==undefined)throw Error('Unprofiled task cannot acquire a specialist binding');
   if(!job||typeof job.id!=='string'||typeof job.instance_id!=='string'||job.status!=='queued'||job.role!==t.spec.role||job.task!==t.spec.task||job.epoch!==t.owner.epoch||job.host!==t.owner.host)throw Error('Queued job does not match the authorized task');
   if(!same(job.coordination?.resources??[],ready.resources)||!same((job.coordination?.dependencies??[]).map(d=>d.job_id).sort(),ready.depends_on.slice().sort()))throw Error('Queued task resource/dependency bindings changed');
   if((job.review_of?.id??null)!==ready.review_of||ready.input_ids.some(key=>!job.inputs?.some(ref=>ref.id===key&&Object.hasOwn(state.records,key)&&(state.records[key].revision??null)===ref.revision)))throw Error('Queued task evidence/review bindings changed');

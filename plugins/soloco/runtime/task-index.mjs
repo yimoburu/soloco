@@ -122,6 +122,7 @@ export function readTaskState(db,{task_ids=[],message_ids=[],include_messages=tr
           for(const d of t.spec?.depends_on??[])ids.add(d.task_id);if(t.spec?.review_task_id)ids.add(t.spec.review_task_id);for(const key of t.spec?.peer_task_ids??[])ids.add(key);
           for(const a of t.attempts??[])if(a.job_id)jobs.add(a.job_id);
           for(const key of [...(t.spec?.input_ids??[]),...(t.spec?.evidence_ids??[])])sources.add(key);
+          if(t.spec?.specialist_ref?.id)sources.add(t.spec.specialist_ref.id);
           if(include_messages&&inboxTargets.has(r.id)&&!page.uninitialized){const inbox=messageKeys(db,r.id,{limit:100});if(!inbox.complete)throw Error('Task inbox requires explicit bounded reconciliation before full working context');for(const key of inbox.ids)ids.add(key);}
         }
         const m=r.runtime_message;if(m){ids.add(m.to_task_id);if(m.from_task_id)ids.add(m.from_task_id);if(m.from_attempt_id)jobs.add(m.from_attempt_id);if(m.disposition?.attempt_id)jobs.add(m.disposition.attempt_id);}
@@ -131,6 +132,8 @@ export function readTaskState(db,{task_ids=[],message_ids=[],include_messages=tr
         const output=r.runtime_output;if(output&&typeof output.task_id==='string'&&taskPattern.test(output.task_id)){ids.add(output.task_id);if(typeof r.job_id==='string'&&r.job_id.length<=2000)jobs.add(r.job_id);}
       }
       for(const j of Object.values(state.jobs??{})){
+        if(j.specialist?.profile?.id)sources.add(j.specialist.profile.id);
+        if(j.specialist?.policy?.id)sources.add(j.specialist.policy.id);
         if(j.runtime_task?.id)ids.add(j.runtime_task.id);if(j.artifact_id)sources.add(j.artifact_id);if(j.review_of?.id)sources.add(j.review_of.id);
         for(const r of [...(j.inputs??[]),...(j.supplemental_sources??[]),...(j.retrieved_inputs??[])])if(r.id){if(r.id.startsWith('job:'))jobs.add(r.id.slice(4));else if(!r.id.startsWith('@public:'))sources.add(r.id);}
       }

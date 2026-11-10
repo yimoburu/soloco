@@ -65,6 +65,22 @@ Use **one active environment at a time**. To switch, pause the company in the ol
 
 ## See who is working, with the right model for the task
 
+The fourteen shipped specialist roles are starter charters, not an exhaustive
+taxonomy of expertise. With the optional temporary-specialist capability, say:
+“We need an inventory-risk analyst for this question. Define the expertise and
+use our existing preparation limits.” Under an explicit bounded creation policy,
+the CoS can create a task-specific specialist, give it a distinct session, and
+retain its charter and results. The underlying approved role keeps its execution
+permissions; a new title adds no tools, spending or business authority.
+
+Temporary specialists expire or can be revoked. Creating one is not competence
+certification: actual output still needs the required independent review and
+receiver acceptance. Usage and observed results are inspectable; improvements in
+cost, missed issues or founder workload require actual outcome evidence. See
+[temporary specialists](docs/dynamic-specialists.md) for the supported ordinary
+and durable preparation paths, limits and qualification boundaries. Existing
+company instructions and policies are not replaced by installing source changes.
+
 Before dispatch, the CoS chooses an adequate model, effort and speed, plus a separate timeout, based on task complexity, ambiguity, consequence of error, inputs and outputs, latency, and relevant prior outcomes. Use supported choices within existing limits and give a concise rationale; a justified choice may be reused for comparable work until demands, support or observed quality change. A reasoned host default is the fallback. Simple replies need no delegation. You choose the CoS chat model in the host UI.
 
 Whenever a specialist is summoned or resumed, the next response prominently highlights its **role/name**, assignment, actual status and next handoff. Returned work is attributed to its specialist; Chief of Staff synthesis is labeled separately. Planned agents remain clearly marked as not summoned. At the start of substantive work, the CoS gives a compact update like this illustrative example:
