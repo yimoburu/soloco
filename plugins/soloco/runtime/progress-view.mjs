@@ -1,10 +1,16 @@
 import { progressFor } from './progress.mjs';
+import {specialistName} from './specialists.mjs';
 
 const active = j => ['queued','running'].includes(j.status);
 const rows = v => Array.isArray(v) ? v : Object.values(v ?? {});
 const clip = (v,n=240) => typeof v === 'string' ? v.slice(0,n) : null;
 const pick = (v,keys) => Object.fromEntries(keys.filter(k=>v?.[k] !== undefined).map(k=>[k,v[k]]));
 const reference = v => v ? pick(v,['id','revision']) : null;
+function specialistLabel(state,job) {
+  if(!job.specialist)return {};
+  let name=null;try{name=specialistName(state,job);}catch{}
+  return {specialist:{name:clip(name,200),base_role:job.role??null,profile:pick(job.specialist.profile,['id','revision','sha256']),definition_verified:typeof name==='string',meaning:'Task-specific expertise; base-role authority and independent acceptance remain separate.'}};
+}
 
 // Public boundary: whitelist before projection, then window jobs/evidence/events.
 // The foundation remains a lossless pure diagnostic API for trusted callers.
@@ -12,6 +18,7 @@ export function progressSnapshot(state={}, {recentJobs=20}={}) {
   if (!Number.isInteger(recentJobs) || recentJobs<1 || recentJobs>50) throw new Error('recentJobs must be 1 to 50');
   const jobs=rows(state.jobs).map(j=>({
     ...pick(j,['id','role','instance_id','native_id','kind','status','created_at','started_at','execution_started_at','finished_at','artifact_id','candidate_id','development_id']),
+    ...specialistLabel(state,j),
     task:clip(j.task_summary,160),task_summary:clip(j.task_summary,160),
     task_characters:typeof j.task==='string'?j.task.length:0,
     inputs:rows(j.inputs).map(reference),review_of:reference(j.review_of),
@@ -112,7 +119,7 @@ const refLabel = r => r ? `${r.id}@${r.revision ?? '?'}` : 'none recorded';
 function nodeLines(n,p) {
   const incoming=p.graph.edges.filter(e=>e.to===n.id);
   return [
-    `${n.id} · ${n.role ?? 'unknown role'} · ${n.actor} · ${n.status ?? 'unknown'}`,
+    `${n.id} · ${n.specialist?.name??n.role??'unknown role'}${n.specialist?` (base role: ${n.role??'unknown'}; temporary expertise)` : ''} · ${n.actor} · ${n.status ?? 'unknown'}`,
     `Summoned by: ${n.requester?`${n.requester.role} ${n.requester.session_id} (${n.requester.host}, epoch ${n.requester.epoch})`:'unknown (historical requester not recorded)'}`,
     `Instance: ${n.instance_id ?? 'unknown'}; native: ${n.native_id ?? (n.actor==='software'?'not a native agent session':'not yet observed')}`,
     `Task label: ${n.task ?? (n.kind==='development_preflight'?'Fingerprint validation environment (runtime diagnostic)':n.actor==='software'?'Run bounded candidate tests (runtime job)':'unknown (no task_summary recorded)')}${n.task_truncated?` [full instructions excluded; ${n.task_characters} characters; see job ${n.id}]`:''}`,
@@ -146,7 +153,7 @@ export function renderProgress(p,format='text',{renderId}={}) {
     'CHRONOLOGY — recorded events',...p.events.map(eventLine),'DIAGNOSTICS',...p.diagnostics.map(d=>JSON.stringify(d)),...p.coverage.limitations].map(literal).join('\n');
   // Mermaid labels use generated IDs and numeric entity encoding exclusively.
   const mmLabel = v => Array.from(String(v)).map(c=>`#${c.codePointAt(0)};`).join('');
-  const mermaid=['flowchart LR',...p.nodes.map(n=>`${ids.get(n.id)}["${mmLabel(`${n.role ?? 'unknown'}: ${n.summary ?? n.task ?? n.id} (${n.status})`)}"]`),...p.graph.edges.map(e=>`${ids.get(e.from)} -->|${e.type}| ${ids.get(e.to)}`)].join('\n');
+  const mermaid=['flowchart LR',...p.nodes.map(n=>`${ids.get(n.id)}["${mmLabel(`${n.specialist?.name??n.role??'unknown'}${n.specialist?` [base: ${n.role??'unknown'}]`:''}: ${n.summary ?? n.task ?? n.id} (${n.status})`)}"]`),...p.graph.edges.map(e=>`${ids.get(e.from)} -->|${e.type}| ${ids.get(e.to)}`)].join('\n');
   if(format==='text')return text;
   if(format==='mermaid')return {mermaid,text};
   if(format!=='html')throw new Error('Unknown render format');
@@ -154,7 +161,7 @@ export function renderProgress(p,format='text',{renderId}={}) {
   if(typeof renderId!=='string' || !/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(renderId)) throw new Error('HTML requires renderId: 1–64 ASCII letters, digits, underscore or hyphen, starting with a letter; unique per mounted fragment');
   const rootId=`soloco-progress-${renderId}-root`, scope=`#${rootId}`;
   const domId=id=>`soloco-progress-${renderId}-${ids.get(id)}`;
-  const role=n=>n?.kind==='development_preflight'?'Runtime diagnostic':n?.actor==='software'?'Runtime tests':({engineer:'Engineering',engineering:'Engineering',qa:'QA',designer:'Design',runner:'Chief of Staff'}[n?.role] ?? n?.role ?? 'Unknown role');
+  const role=n=>n?.kind==='development_preflight'?'Runtime diagnostic':n?.actor==='software'?'Runtime tests':n?.specialist?.name?`${n.specialist.name} (base: ${n.role??'unknown'})`:({engineer:'Engineering',engineering:'Engineering',qa:'QA',designer:'Design',runner:'Chief of Staff'}[n?.role] ?? n?.role ?? 'Unknown role');
   const task=n=>n.summary ?? n.task ?? (n.kind==='development_preflight'?'Fingerprint validation environment':n.actor==='software'?'Run candidate tests':'Task summary unknown');
   const recordOwner=id=>{const r=p.evidence.find(r=>r.id===id);return r?.job_id ?? r?.author_instance;};
   const owner=e=>{

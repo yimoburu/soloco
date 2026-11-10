@@ -5,6 +5,7 @@ import {buildEvidence,readEvidence,validateSemanticDelivery} from './upgrade-evi
 import {digest,id,stamp} from './store.mjs';
 import {reviewedContext,recordReference,contextSource,currentExtensions,proofJobSafe,rejectedJobIdentities,canonicalEvidenceNodes} from './current-state.mjs';
 import {mechanicalOperatingControl} from './operating-control.mjs';
+import {specialistContext,validateSpecialistBindingShape} from './specialists.mjs';
 const sha=v=>digest(JSON.stringify(v));
 export const OPERATING_PROTOCOL='operating-state-v1';
 const fail=m=>{throw Error('Operating state Held: '+m);};
@@ -334,6 +335,7 @@ export function admitOperatingAssignment(s,j){
 }
 function assignmentSafe(s,j){
   try{
+    if(j.specialist!==undefined)specialistContext(s,j);
     const {operating_admission,output_contract,proposal_reads,...base}=j,a=resolveSnapshot(s,operating_admission);
     const producer=output_contract===undefined?'runtime-bounded-read-only-v1':output_contract==='operating-proposal-v1'?'runtime-bounded-proposal-v1':null;
     if(!closed(a,['producer','checkpoint','owner','assignment','inputs','authority',...(output_contract==='operating-proposal-v1'?['input_bodies']:[])])||(!producer||a.producer!==producer)||a.authority!=='preparation only; native tools disabled; no spending or exposure authority'||!same(a.checkpoint,s.operating_state?.plan)||!same(a.owner,s.owner)||!same(a.assignment,assignmentStatic(j))||!proofJobSafe(base)||j.context_format!==6||j.review_of!==null||!['queued','running','completed'].includes(j.status)||s.mode!=='preparation')return false;
@@ -443,7 +445,7 @@ function inputUnchanged(s,snapshot,planId){
   const allowed=(family,key,value)=>{
     if(family==='records')return (b.ids.has(key)||commands.has(key)||proposals.has(key))&&same(value,s.records[key]);
     if(family==='jobs')return (b.jobs.has(key)&&reviewJobSafe(value,Boolean(s.records[value.review_of?.id]?.handover))||ordinary.has(key)&&assignmentSafe(s,value))&&same(stable(value),stable(s.jobs[key]))&&phaseSafe(value,s.jobs[key]);
-    if(family==='sessions')return Object.values(s.jobs??{}).some(j=>(b.jobs.has(j.id)||ordinary.has(j.id))&&j.session_key===key&&closed(value,['instance_id','role','native_id','host','model_selection'])&&value.instance_id===j.instance_id&&value.role===j.role&&value.host===j.host&&same(value.model_selection,j.model_selection)&&[null,j.native_id].includes(value.native_id));
+    if(family==='sessions')return Object.values(s.jobs??{}).some(j=>(b.jobs.has(j.id)||ordinary.has(j.id))&&j.session_key===key&&closed(value,['instance_id','role','native_id','host','model_selection','specialist'])&&(value.specialist===undefined?j.specialist===undefined:validateSpecialistBindingShape(value.specialist)&&same(value.specialist,j.specialist))&&value.instance_id===j.instance_id&&value.role===j.role&&value.host===j.host&&same(value.model_selection,j.model_selection)&&[null,j.native_id].includes(value.native_id));
     if(family==='root'&&roots.has(key))return roots.get(key).some(v=>same(v,value));
     if(family==='root'&&key==='operating_state')return sha(value)===snapshot.base||same(value,s.operating_state);
     if(family==='shape')return ['records','jobs','sessions'].includes(key)&&value==='object';

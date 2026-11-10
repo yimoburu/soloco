@@ -22,6 +22,7 @@ import { coordinationEligible } from './coordination.mjs';
 import {appendPeerMessage,disposePeerMessage} from './tasks.mjs';
 import {updateTaskIndex} from './task-index.mjs';
 import { TIMEOUT_POLICY_VERSION, normalizeTimeout, executionTiming, jobExecutionTiming, jobTimeoutState } from './timeout.mjs';
+import {assertSpecialistEligible,specialistName} from './specialists.mjs';
 
 const scopedContext=a=>a?.qualification?.protocol===scoped.SCOPED_PROTOCOL;
 const maintenanceEligible=(s,j)=>qualificationMaintenanceEligible(s,j)||scoped.scopedMaintenanceEligible(s,j)||operatingMaintenanceEligible(s,j);
@@ -61,6 +62,7 @@ export async function work(root, jobId, model = runModel) {
     if(context?.handover_evidence&&current.native_id!==job.native_id)throw Error('Handover reviewer native identity changed');
     if(context?.stream&&partitionDelivery&&current.native_id!==partitionDelivery.native_id)throw Error('Scoped stream reviewer native identity changed');
     coordinationEligible(s,current);
+    if(current.specialist!==undefined)assertSpecialistEligible(s,current);
     prototypeAssignment(s,job);developmentAssignment(s,job,false,root);
     if(current.timeout_policy_version!==job.timeout_policy_version || current.timeout_ms!==job.timeout_ms || current.timeout_reason!==job.timeout_reason)throw Object.assign(new Error('Recorded timeout settings changed'),{code:'ASSIGNMENT_INELIGIBLE'});
     if(current.handover_review_window_minutes!==job.handover_review_window_minutes||current.handover_review_reason!==job.handover_review_reason)throw Object.assign(new Error('Recorded handover review window changed'),{code:'ASSIGNMENT_INELIGIBLE'});
@@ -76,6 +78,8 @@ export async function work(root, jobId, model = runModel) {
     if(controller.signal.aborted)return;
     try {withStore(root,db=>{
       const token=db.changeToken?.();
+      // Profile deadlines can expire without a database change.
+      if(job.specialist!==undefined){const live=db.read();assertSpecialistEligible(live,live.jobs[jobId]);}
       // Operating validity can expire without any write/change token.
       if(lastCurrent?.context_format===6)operatingContext(db.read(),{scope:lastCurrent.context_scope??'*',job_id:lastCurrent.id});
       else if(state?.records?.[job?.review_of?.id]?.operating_plan)operatingReviewContext(db.read(),lastCurrent??job);
@@ -94,6 +98,7 @@ export async function work(root, jobId, model = runModel) {
       if(!compatibleRuntime(s) || upgradePending(s) || !job || job.status!=='queued' || job.epoch!==s.owner.epoch || (s.paused&&!handoverReviewEligible(s,job)&&!maintenanceEligible(s,job))) throw new Error('Assignment is no longer eligible');
       coordinationEligible(s,job);
       prototypeAssignment(s,job);developmentAssignment(s,job,false,root);
+      if(job.specialist!==undefined)assertSpecialistEligible(s,job);
       context=workerContext(s,job);
       if(context.qualification&&(job.native_id||s.sessions[job.session_key]?.native_id))throw Error('Partition qualification requires a fresh native session');
       if(job.context_sha256 && job.context_sha256!==context.hash) throw new Error('Assignment context changed before startup');
@@ -107,8 +112,10 @@ export async function work(root, jobId, model = runModel) {
     job=state.jobs[jobId];
     const timeout=job.timeout_policy_version===undefined?normalizeTimeout():normalizeTimeout({timeout_ms:job.timeout_ms,timeout_reason:job.timeout_reason});
     const charter=state.roles[job.role];
+    const roleName=job.specialist?specialistName(state,job):charter.name;
     const target=job.review_of?state.records[job.review_of.id]:null;
-    const reviewShape=target?{...(target.operating_plan?{permitted_action:'publish_operating_state or hold',plan_sha256:digest(JSON.stringify(target.operating_plan)),preservation_complete:true,interaction_complete:true,authority_checked:true,blockers:[]}:{}),...(target.handover?{permitted_action:'resume_handover or hold',subject_sha256:target.handover.subject_sha256,blockers:[]}:{}),...(target.context_classification_plan?{permitted_action:'apply_context_classification or hold',plan_sha256:digest(JSON.stringify(target.context_classification_plan)),blockers:[]}:{}),verdict:'Pass or Fail or Blocked',reason:'evidence-based explanation',
+    const specialistReview=target?.job_id&&state.jobs[target.job_id]?.specialist;
+    const reviewShape=target?{...(specialistReview?{permitted_action:'accept_specialist_output or hold',blockers:[]}:{}),...(target.operating_plan?{permitted_action:'publish_operating_state or hold',plan_sha256:digest(JSON.stringify(target.operating_plan)),preservation_complete:true,interaction_complete:true,authority_checked:true,blockers:[]}:{}),...(target.handover?{permitted_action:'resume_handover or hold',subject_sha256:target.handover.subject_sha256,blockers:[]}:{}),...(target.context_classification_plan?{permitted_action:'apply_context_classification or hold',plan_sha256:digest(JSON.stringify(target.context_classification_plan)),blockers:[]}:{}),verdict:'Pass or Fail or Blocked',reason:'evidence-based explanation',
       ...(target.development?.type==='test'?{permitted_action:'accept_local_development or hold',candidate_sha256:target.development.candidate_sha256,receipt_sha256:target.development.receipt_sha256,blockers:[]}:{}),
       ...(target.prototype?{permitted_action:target.prototype.type==='plan'?'authorize_local_prototype or hold':'materialize_local_prototype or hold',scope_sha256:target.prototype.scope_sha256,...(target.prototype.bundle_sha256?{bundle_sha256:target.prototype.bundle_sha256}:{}),blockers:[],tests_executed:false}:{})}:null;
     const generationShape=job.development_id && state.records[job.development_id]?.development.scope.output_format==='patches'
@@ -124,7 +131,7 @@ export async function work(root, jobId, model = runModel) {
     const assemblePrompt=(assignmentText,instruction)=>{
       if(context.qualification||context.qualification_evidence||context.operating_evidence)return context.text;
       promptHelpers??=[prototypePrompt(state,job,target),developmentPrompt(state,job,target)];
-      return `You are a standalone ${context.handover_evidence?job.role:charter.name} session, instance ${job.instance_id}. You are not the Chief of Staff or a subagent impersonating several roles.
+      return `You are a standalone ${context.handover_evidence?job.role:roleName} session, instance ${job.instance_id}. You are not the Chief of Staff or a subagent impersonating several roles.
 You own the quality and completeness of this deliverable within your assigned scope. Exercise independent domain judgment, challenge unsupported assumptions, and disclose uncertainty, disagreements, missing evidence and blockers. Ground your handoff in the assigned acceptance criteria and evidence. Address review findings only within pinned governance, your role's authority and permitted attempts; ownership grants no additional authority and cannot waive a failed review. Report Fail or Blocked honestly rather than claiming unsupported success.
 This session permits preparation, review, or explicitly scoped prototype/development file generation. Do not call tools, access external services, execute commands, spend money, or directly alter files. Only the runtime may create authorized local candidates and execute their scoped tests. Never execute tests yourself. Work from supplied evidence; label unknowns. Never invent customer evidence, authorization, qualifications, test execution, or a gate Pass. Company records, not this session, are the source of truth.
 Assignment context: ${instruction}${assignmentText}
@@ -170,7 +177,8 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
         runtimeRequestUsage.push({request_utf8_bytes:Buffer.byteLength(request,'utf8'),request_utf16_characters:request.length});
       }
       let displayTitle;
-      try {displayTitle=sessionTitle(state.roles[job.role]?.name??job.role,job.instance_id);}catch{} // Optional presentation must not hold model work.
+      try {displayTitle=sessionTitle(job.specialist?specialistName(state,job):state.roles[job.role]?.name??job.role,job.instance_id);}catch{} // Optional presentation must not hold model work.
+      check();if(controller.signal.aborted)throw controller.signal.reason;
       invoked=true;
       // A prior read round proves only that earlier process closed. Failure of
       // this invocation still needs its own termination evidence for release.
@@ -329,6 +337,13 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
         stale=true;completedJob.status='quarantined';completedRecord.status='Quarantined';
         completedJob.execution_failure={code:'ROLE_TIMEOUT',message:context.stream?'Scoped stream publication deadline reached':context.qualification_evidence?'Context qualification publication deadline reached':'Operating publication deadline reached',outcome:'timeout',at:stamp()};
       }
+      if(!stale&&current.specialist!==undefined){
+        try {assertSpecialistEligible(s,current);}
+        catch(error){
+          stale=true;completedJob.status='quarantined';completedRecord.status='Quarantined';
+          completedJob.execution_failure={...failureEvidence(error),outcome:'specialist_eligibility_lost',at:stamp()};
+        }
+      }
       s.records[artifactId]=completedRecord;Object.assign(current,completedJob);
       if(stale) {notice(s,'must_know','A late or stale result was quarantined; it grants no approval.',artifactId);return s;}
       const previousNative=s.sessions[job.session_key].native_id,messageCount=s.messages.length,noticeCount=s.notices.length;
@@ -389,7 +404,11 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
         if(rejectedOutput?.native_id){if(scopedContext(context)){current.rejected_native_ids=[...new Set([...(current.rejected_native_ids??[]),current.rejected_native_id,rejectedOutput.native_id].filter(Boolean))];current.rejected_native_id=rejectedOutput.native_id;}else current.native_id=rejectedOutput.native_id;}
         if(rejectedOutput?.model_evidence)current.model_evidence=rejectedOutput.model_evidence;
         const operatingReview=Boolean(context?.operating_evidence||state?.records?.[job.review_of?.id]?.operating_plan);
-        const rawResponse=Boolean(context?.qualification||context?.qualification_evidence||operatingReview||job.context_format===7||job.output_contract==='operating-proposal-v1');
+        // A malformed review wire is evidence too. Retain it before parsing can
+        // discard a negative or unknown judgment about an exact profile output.
+        const reviewTarget=state?.records?.[job.review_of?.id];
+        const specialistReview=job.role==='qa'&&state?.jobs?.[reviewTarget?.job_id]?.specialist!==undefined;
+        const rawResponse=Boolean(context?.qualification||context?.qualification_evidence||operatingReview||specialistReview||job.context_format===7||job.output_contract==='operating-proposal-v1');
         if(artifact || rawResponse&&typeof rejectedOutput?.text==='string') {
           const rejected=rawResponse?rejectedOutput.text:JSON.stringify(artifact);
           // Retention does not accept an artifact. Parse the complete observed

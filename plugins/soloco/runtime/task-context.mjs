@@ -8,6 +8,7 @@ import {validateTaskRecord,isTaskBookkeeping,isTaskScopedMessage,isTaskOutput,is
 import {runtimeControlBinding,isRuntimeBookkeeping} from './task-runtime-authority.mjs';
 import {bindCoordination} from './coordination.mjs';
 import {normalizeTimeout} from './timeout.mjs';
+import {specialistContext,validateSpecialistBindingShape} from './specialists.mjs';
 
 export const TASK_CONTEXT_PROTOCOL='async-task-context-v1';
 export const TASK_CONTEXT_BUDGET=64*1024;
@@ -54,6 +55,7 @@ function runtimeJobBookkeeping(state,job,currentJob){
     if(job.runtime_context_usage!==undefined&&!runtimeUsageSafe(job.runtime_context_usage))return false;
     const {runtime_task,runtime_context_usage,requester,coordination:ignored,...legacy}=job;
     if(!proofJobSafe(legacy))return false;
+    if(job.specialist)specialistContext(state,job);
     if(job.status==='completed'){
       const output=state.records?.[job.artifact_id];
       return isTaskOutput(state,output)||currentJob.id===job.id&&isTaskOwnOutput(state,currentJob,output);
@@ -90,6 +92,9 @@ function taskForJob(state,job){
   if(binding.definition_revision!==task.definition_revision||binding.definition_sha256!==task.definition_sha256)fail('task definition superseded');
   if(!equal(task.owner,state.owner)||job.epoch!==undefined&&job.epoch!==state.owner.epoch||job.host!==undefined&&job.host!==task.owner.host)fail('task owner epoch or host changed');
   if(job.role!==task.spec.role||job.task!==task.spec.task||(job.context_scope??'*')!==(task.spec.context_scope??'*'))fail('assignment does not match task definition');
+  if(task.spec.specialist_ref!==undefined){
+    if(!validateSpecialistBindingShape(job.specialist)||!equal(job.specialist.profile,task.spec.specialist_ref))fail('specialist assignment differs from task definition');
+  }else if(job.specialist!==undefined)fail('unprofiled task acquired a specialist binding');
   owner(state,task.owner.session_id,task.owner.host,task.owner.epoch);
   if(state.mode!=='preparation')fail('only the current bounded preparation contract is supported');
   if(['cancelling','cancelled'].includes(task.state))fail('task was cancelled');
@@ -207,6 +212,7 @@ export function taskAssignmentContext(state,job,{budget}={}){
   const messages=(state.messages??[]).filter(m=>m.to===job.role&&m.job_id!==job.id);
   const packet={
     protocol:TASK_CONTEXT_PROTOCOL,controls:controls(state),runtime:runtimeControlBinding(state),governance:state.governance,charter:state.roles[job.role],
+    ...(job.specialist?{specialist:specialistContext(state,job)}:{}),
     task:{source:taskDefinitionBinding(record),owner:task.owner,spec:task.spec},
     peer_targets:peerTargets(state,task),
     assignment:{job_id:job.id??null,instance_id:job.instance_id??null,requester:job.requester??null,role:job.role,task:job.task,context_scope:task.spec.context_scope??'*',review_of:job.review_of??null,coordination:job.coordination??null,model_selection:job.model_selection??{mode:'default'}},

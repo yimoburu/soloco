@@ -25,6 +25,7 @@ import {taskAction,runtimeAction} from './task-runtime.mjs';
 import {taskRecord,taskReady,bindTaskAttempt} from './tasks.mjs';
 import {runtimeGrant,runtimeControlBinding} from './task-runtime-authority.mjs';
 import {readTaskState,updateTaskIndex} from './task-index.mjs';
+import {specialistAction,isSpecialistRecord,prepareSpecialistAssignment,specialistSessionKey,specialistContext} from './specialists.mjs';
 
 const busy = state => Object.values(state.jobs??{}).filter(j => ['queued','running'].includes(j?.status));
 export function dataDir() {
@@ -94,6 +95,31 @@ export function develop(args,host) { binding(args,host); return developmentActio
 export function prototype(args,host) { binding(args,host); return prototypeAction(args,host); }
 export function tasks(args,host){binding(args,host);return taskAction(args,host);}
 export function runtime(args,host){binding(args,host);return runtimeAction(args,host);}
+export function specialists(args,host){
+  binding(args,host);
+  const options={host,reviewCurrent:(state,job,hash)=>{
+    // Assessment consumes the exact QA output as a verdict, not as a new input
+    // to that same QA invocation. Every other negative remains current evidence.
+    const current=state.jobs?.[job.id],output=current?.artifact_id&&state.records?.[current.artifact_id];
+    const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+    const keys=['id','kind','content','author_role','author_instance','revision','status','job_id','inputs','retrieved_inputs','review_of','review','created_at'];
+    if(current?.status==='completed'&&current.role==='qa'&&current.native_id&&current.coordination_release?.termination_confirmed===true
+      &&output?.id===current.artifact_id&&output.kind==='review'&&output.status==='Submitted'&&output.revision===1
+      &&output.job_id===current.id&&output.author_role===current.role&&output.author_instance===current.instance_id
+      &&['Fail','Blocked'].includes(output.review?.verdict)&&same(output.review_of,current.review_of)&&same(output.inputs,current.inputs)
+      &&Object.keys(output).every(key=>keys.includes(key))&&!current.inputs.some(ref=>ref.id===output.id)){
+      const view=inheritSnapshots(state,{...state,records:Object.fromEntries(Object.entries(state.records).filter(([id])=>id!==output.id))});
+      return contextMatches(view,current,hash);
+    }
+    return contextMatches(state,job,hash);
+  }};
+  if(args.action==='inspect')return withStore(args.root,db=>db.readSnapshot(()=>{
+    const state=db.read();owner(state,args.session_id,host,args.epoch);
+    const result=specialistAction(state,args,options);
+    return {...result,items:result.items.map(record=>itemView(record,storageSourceId('records',record.id),'records'))};
+  }));
+  let result;update(args,host,'specialist.'+args.action,state=>{result=specialistAction(state,args,options);});return result;
+}
 function update(args, host, type, fn, selection=null) {
   binding(args,host);
   if (!Number.isInteger(args.epoch)) throw new Error('Supply the current ownership epoch from company_status');
@@ -243,9 +269,11 @@ export function save(args,host) {
   if (args.kind==='preference' && (!['explicit','inferred'].includes(args.basis) || !args.source_reference)) throw new Error('Preferences need explicit/inferred basis and source_reference');
   if(args.context_obligations!==undefined&&(args.context_obligations?.version!==1||!['artifact','decision','intent','preference'].includes(args.kind)||typeof args.context_obligations.scope!=='string'||!args.context_obligations.scope.trim()))throw Error('Versioned context_obligations requires scope and a current artifact record');
   const recordId=args.id ?? id(args.kind);
+  if(typeof recordId==='string'&&/^specialist-[a-f0-9]{32}$/.test(recordId))throw Error('Specialist records require company_specialists');
   if (!/^[a-zA-Z0-9][a-zA-Z0-9:_-]{0,200}$/.test(recordId) || ['constructor','prototype','__proto__'].includes(recordId)) throw new Error('Invalid record ID');
   const state=update(args,host,'record.saved',s=>{
     const old=s.records[recordId];
+    if(isSpecialistRecord(old)||old?.specialist!==undefined)throw Error('Specialist records are immutable; use company_specialists');
     if(old?.handover)throw new Error('Handover reconstructions are immutable; submit a new reconstruction');
     if(old?.development) throw new Error('Development records are immutable; use company_develop');
     if(old?.prototype) throw new Error('Prototype records are immutable; use company_prototype or create a new scope');
@@ -269,6 +297,7 @@ export function dispatch(args,host,{launch=launchWorker,check=readiness,catalog=
   const freshReason=fresh?requireText(args.fresh_session_reason,'fresh_session_reason',300).trim():null;
   if(!fresh && args.fresh_session_reason!==undefined)throw new Error('fresh_session_reason requires fresh_session: true');
   if(fresh && (args.review_of!==undefined || args.prototype_id!==undefined || args.development_id!==undefined))throw new Error('fresh_session is only for ordinary specialist assignments; review and scoped generation retain their existing session lifecycle');
+  if(args.specialist_ref!==undefined&&(args.review_of!==undefined||args.prototype_id!==undefined||args.development_id!==undefined||args.handover_review_window_minutes!==undefined))throw Error('Temporary specialist profiles support ordinary assignments only');
   normalizeCoordination(args);
   if (!Number.isInteger(args.epoch)) throw new Error('Supply the current ownership epoch from company_status');
   if(args.task_summary!==undefined)requireText(args.task_summary,'task_summary',160);
@@ -294,7 +323,8 @@ export function dispatch(args,host,{launch=launchWorker,check=readiness,catalog=
     if(busy(s).length>=3) throw new Error('Three assignments already active; wait for a result');
     const target=args.review_of && Object.hasOwn(s.records,args.review_of) ? s.records[args.review_of] : null;
     if(args.review_of && !target) throw new Error('Review target not found');
-    const key=target ? `${args.role}:review:${target.id}:${target.revision}` : args.prototype_id ? `${args.role}:prototype:${jobId}` : args.development_id ? `${args.role}:development:${jobId}` : args.role;
+    const specialist=args.specialist_ref===undefined?null:prepareSpecialistAssignment(s,args,{reserve:true});
+    const key=specialist?specialistSessionKey(args.role,specialist.binding):target ? `${args.role}:review:${target.id}:${target.revision}` : args.prototype_id ? `${args.role}:prototype:${jobId}` : args.development_id ? `${args.role}:development:${jobId}` : args.role;
     const qualification=Boolean(target?.context_qualification_target||target?.scoped_context_target);
     if(qualification&&(args.role!=='qa'||args.prototype_id||args.development_id||args.input_ids?.length||args.evidence_ids?.length))throw Error('Qualification requires separate bounded QA without extra inputs');
     let session=s.sessions[key];
@@ -305,20 +335,38 @@ export function dispatch(args,host,{launch=launchWorker,check=readiness,catalog=
     if(session && (qualification || fresh || selectionKey(session.model_selection)!==selectionKey(selection))) {
       (s.retired_sessions??=[]).push({...session,retired_at:stamp(),reason:qualification?'qualification_fresh_node':fresh?'fresh_session_requested':'model_selection_changed',...(fresh?{fresh_session_reason:freshReason,replacement_job_id:jobId}:{})});session=null;
     }
-    if(!session) session=s.sessions[key]={instance_id:id(args.role),role:args.role,native_id:null,host,model_selection:selection};
+    if(!session) session=s.sessions[key]={instance_id:id(args.role),role:args.role,native_id:null,host,model_selection:selection,...(specialist?{specialist:specialist.binding}:{})};
+    if(specialist){
+      if(JSON.stringify(session.specialist)!==JSON.stringify(specialist.binding))throw Error('Specialist session binding changed');
+    }else if(session.specialist!==undefined)throw Error('Generic role session cannot reuse a specialist profile');
     if(target?.author_instance===session.instance_id) throw new Error('Authors cannot independently review their own artifact');
     if(session.host!==host) throw new Error('Role belongs to another host; perform company handover first');
     if(args.input_ids!==undefined && !Array.isArray(args.input_ids))throw new Error('input_ids must be an array');
     const handoverInputs=qualification?[]:target?.handover?.input_refs?.map(r=>r.id)??[];
+    const profileProducer=target?.job_id&&s.jobs[target.job_id]?.specialist?s.jobs[target.job_id]:null;
+    const profileReviewInputs=[];
+    if(profileProducer&&args.role==='qa'){
+      if(profileProducer.artifact_id!==target.id)throw Error('Specialist review target lacks its exact producer output binding');
+      specialistContext(s,profileProducer);
+      for(const ref of profileProducer.inputs??[]){
+        if(!s.records[ref.id]||s.records[ref.id].revision!==ref.revision)throw Error('Specialist producer input changed before independent review');
+        profileReviewInputs.push(ref.id);
+      }
+    }
     const coordination=bindCoordination(s,args);
-    const inputs=[...new Set([...(args.input_ids??[]),...handoverInputs,...(coordination?.dependencies??[]).map(d=>d.artifact_id)])];
+    const inputs=[...new Set([...(args.input_ids??[]),...(specialist?.input_ids??[]),...handoverInputs,...profileReviewInputs,...(coordination?.dependencies??[]).map(d=>d.artifact_id)])];
     if(!Array.isArray(inputs) || inputs.some(k=>typeof k!=='string' || !Object.hasOwn(s.records,k))) throw new Error('An input record is missing');
     const job={...(coordination?{coordination}:{}),...(args.expected_deliverable===undefined?{}:{expected_deliverable:args.expected_deliverable}),requester:{role:'runner',session_id:s.owner.session_id,host:s.owner.host,epoch:s.owner.epoch},id:jobId,role:args.role,session_key:key,instance_id:session.instance_id,native_id:session.native_id,host,epoch:s.owner.epoch,status:'queued',task:args.task,...(args.evidence_ids?{supplemental_sources:args.evidence_ids.map(key=>{const value=contextSource(s,key);if(!value)throw Error('Supplemental source missing');return recordReference(value,key);})}:{}),context_format:target?.context_classification_plan?.version===2?4:s.operating_state&&!target&&!args.prototype_id&&!args.development_id?6:3,...(args.context_scope?{context_scope:requireText(args.context_scope,'context_scope',160)}:{}),timeout_policy_version:TIMEOUT_POLICY_VERSION,...timeout,...(reviewWindow??{}),model_selection:selection,cli_version:ready.version,task_summary:args.task_summary??null,next_handoff:args.next_handoff??null,...(inventory?{model_catalog:{source:inventory.source,...(selection.mode==='explicit'?{model:inventory.models.find(m=>m.id===selection.model)}:{}),speed_support:inventory.speed_support}}:{}),inputs:inputs.map(k=>({id:k,revision:s.records[k].revision})),review_of:target?{id:target.id,revision:target.revision}:null,...(args.prototype_id?{prototype_id:args.prototype_id}:{}),...(args.development_id?{development_id:args.development_id}:{}),created_at:stamp()};
+    if(specialist)job.specialist=specialist.binding;
     if(args.output_contract!==undefined){if(args.output_contract!=='operating-proposal-v1'||job.context_format!==6)throw Error('Operating proposal contract requires an ordinary accepted-checkpoint assignment');job.output_contract=args.output_contract;}
     if(fresh)Object.assign(job,{fresh_session:true,fresh_session_reason:freshReason});
+    // Dependencies add explicit data after initial admission. Check that final
+    // explicit set before context assembly adds mandatory governing evidence.
+    if(specialist)prepareSpecialistAssignment(s,{...args,input_ids:inputs});
     prototypeAssignment(s,job,true);developmentAssignment(s,job,true,args.root);
     const context=assignmentContext(s,job);
     if(job.context_format===6){job.inputs=context.inputs;job.context_sha256=context.hash;admitOperatingAssignment(s,job);}
+    if(specialist)prepareSpecialistAssignment(s,{...args,input_ids:inputs},{reserve:true});
     s.jobs[jobId]={...job,inputs:context.inputs,context_sha256:context.hash};
     s.runtime_version=VERSION;
   });
@@ -350,6 +398,8 @@ export function queueRuntimeTask(root,taskId,{launch=launchWorker,check=readines
     const occupied=Object.values(s.jobs??{}).filter(j=>['queued','running'].includes(j.status)||(j.runtime_task||j.started_at)&&['cancelled','interrupted','failed'].includes(j.status)&&j.coordination_release?.termination_confirmed!==true);
     if(occupied.length>=3)throw new SchedulingHold(occupied.some(j=>!['queued','running'].includes(j.status))?'EXECUTION_UNCERTAIN':'CAPACITY_BUSY','Scheduling capacity occupied by active or uncertain processes');
     for(const jid of ready.required_context_jobs??[]){const prior=s.jobs[jid];if(prior?.context_sha256&&!contextMatches(s,prior,prior.context_sha256))throw new SchedulingHold('CONTEXT_CHANGED','Prerequisite task context is stale; inspect current evidence before continuing');}
+    const specialist=spec.specialist_ref===undefined?null:prepareSpecialistAssignment(s,spec,{reserve:true});
+    if(specialist&&ready.review_of)throw Error('Temporary specialist profiles cannot be independent review assignments');
     const target=ready.review_of?s.records[ready.review_of]:null;
     if(target?.author_instance===instance)throw Error('A task author cannot review its own result');
     const job={id:jobId,role:spec.role,session_key:sessionKey,instance_id:instance,native_id:null,host,epoch:s.owner.epoch,status:'queued',task:spec.task,
@@ -360,11 +410,15 @@ export function queueRuntimeTask(root,taskId,{launch=launchWorker,check=readines
       inputs:ready.input_ids.map(key=>({id:key,revision:s.records[key].revision??null})),review_of:target?{id:target.id,revision:target.revision}:null,
       timeout_policy_version:TIMEOUT_POLICY_VERSION,...timeout,model_selection:selection,cli_version:readyHost.version??null,task_summary:spec.expected_deliverable,next_handoff:'Runtime validates the exact result and wakes eligible dependent tasks',created_at:stamp(),
       ...(inventory?{model_catalog:{source:inventory.source,model:inventory.models.find(m=>m.id===selection.model),speed_support:inventory.speed_support}}:{})};
-    s.sessions[sessionKey]={instance_id:instance,role:spec.role,native_id:null,host,model_selection:selection};
+    if(specialist)job.specialist=specialist.binding;
+    s.sessions[sessionKey]={instance_id:instance,role:spec.role,native_id:null,host,model_selection:selection,...(specialist?{specialist:specialist.binding}:{})};
+    if(specialist)prepareSpecialistAssignment(s,{...spec,input_ids:ready.input_ids});
     const context=assignmentContext(s,job);job.inputs=context.inputs;job.context_sha256=context.hash;
     // Context assembly may add current constraints, but declared dependency
     // outputs must remain exact explicit inputs at the atomic attempt fence.
-    bindTaskAttempt(s,record,job);s.jobs[jobId]=job;s.runtime_version=VERSION;
+    bindTaskAttempt(s,record,job);
+    if(specialist)prepareSpecialistAssignment(s,{...spec,input_ids:ready.input_ids},{reserve:true});
+    s.jobs[jobId]=job;s.runtime_version=VERSION;
     return s;
   },{afterWrite:updateTaskIndex}));
   try{const child=launch(root,jobId);child.on('error',error=>withStore(root,db=>db.transaction('task.spawn_failed',s=>{const j=s.jobs[jobId];if(j?.status==='queued'){j.status='failed';j.error=error.message;j.coordination_release={termination_confirmed:true,reason:'worker_spawn_failed',at:stamp()};}return s;})));child.unref();}
