@@ -2,12 +2,19 @@ import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {inventory,lanes,requireThat,selectedTests} from './evidence.mjs';
 import {sandboxCapability} from '../../plugins/soloco/runtime/local-sandbox.mjs';
+import {selectShard} from './shards.mjs';
 
 // Ordinary CI and local checks use command results. Provenance receipts are optional.
-export function check(lane,root=process.cwd(),probe=sandboxCapability) {
+export function check(lane,root=process.cwd(),probe=sandboxCapability,{shard}={}) {
   requireThat(lanes.includes(lane),'unknown check lane');
-  const tests=lane==='build'?[]:selectedTests(lane,inventory(root));
+  requireThat(shard===undefined||lane==='regression-22','sharding is supported only for regression-22');
+  let tests=lane==='build'?[]:selectedTests(lane,inventory(root));
   requireThat(lane==='build'||tests.length>0,'no tests selected');
+  if(shard!==undefined) {
+    const selected=selectShard(tests,shard);
+    tests=selected.files;
+    console.log(`CI shard ${selected.index}/${selected.total}: ${tests.length}/${selected.selected_total} whole test files; selected inventory sha256=${selected.inventory_sha256}`);
+  }
   if(lane!=='build') {
     const capability=probe();
     requireThat(capability.supported && capability.backend==='macos-seatbelt-node',
@@ -25,6 +32,10 @@ export function check(lane,root=process.cwd(),probe=sandboxCapability) {
   return 0;
 }
 if(process.argv[1]===fileURLToPath(import.meta.url)) {
-  try {process.exitCode=check(process.argv[2]);}
+  try {
+    const [lane,...args]=process.argv.slice(2);
+    requireThat(args.length===0||(args.length===2&&args[0]==='--shard'),'usage: check.mjs LANE [--shard INDEX/TOTAL]');
+    process.exitCode=check(lane,process.cwd(),sandboxCapability,args.length?{shard:args[1]}:{});
+  }
   catch(error){console.error(error.message);process.exitCode=1;}
 }
