@@ -1,3 +1,5 @@
+import {resolveRetentionRepair,retentionRepairPrimarySnapshot,validateRetentionRepairPublication,assertRetentionRepairCommit} from './development-retention-repair.mjs';
+import {buildRetentionRepairInitialPrompt,buildRetentionRepairFinal,beginRetentionPrimaryDelivery,confirmRetentionPrimaryDelivery,validateRetentionPrimaryDelivery,retentionRepairHistoryComplete,parseRetentionRepairEnvelope,assertRetentionRepairCallBudget,RETENTION_FRAME_CHARACTERS,RETENTION_MAX_HISTORY_ROUNDS} from './retention-primary-transport.mjs';
 import {reviewContinuationAssignment,reviewContinuationCandidate,reviewContinuationPrompt,validateReviewContinuationPublication,assertReviewContinuationCommit} from './development-review-continuation.mjs';
 import {renderContinuationAwareReviewContext,CONTINUATION_REVIEW_TRANSPORT} from './continuation-review-transport.mjs';
 import {beginRecordReadDelivery,appendRecordReadDelivery} from './record-read-delivery.mjs';
@@ -60,6 +62,7 @@ export async function work(root, jobId, model = runModel) {
   let deliveryLedger,pendingDelivery,partitionDelivery,scopedStreamLedger;
   let pendingRecordReads=[];
   let overallTiming,operatingNative,runtimeContextBytes=0;
+  let repair=null,retentionSnapshot=null,retentionFinalFrame=null,retentionPublicationControl=null,retentionFinalArtifact=null;
   const runtimeRequestUsage=[];
   const eligibility=s=>{
     const current=s.jobs[jobId];
@@ -70,18 +73,19 @@ export async function work(root, jobId, model = runModel) {
     coordinationEligible(s,current);
     if(current.specialist!==undefined)assertSpecialistEligible(s,current);
     prototypeAssignment(s,job);developmentAssignment(s,job,false,root);
+    const repairCurrent=resolveRetentionRepair(s,current,{root,phase:current.execution_started_at?'execution':'admission'});
     const continuation=s.records[job.review_of?.id]?.development?.type==='review_continuation'?reviewContinuationAssignment(s,current,{root}):null;
     if(continuation&&!current.execution_started_at&&Date.now()+current.code_review_window_minutes*60000>Date.parse(continuation.development.proposal.expires_at))throw Object.assign(Error('Insufficient authorized time for the complete fixed code review window'),{code:'SCOPE_WINDOW_UNAVAILABLE'});
     if(current.timeout_policy_version!==job.timeout_policy_version || current.timeout_ms!==job.timeout_ms || current.timeout_reason!==job.timeout_reason)throw Object.assign(new Error('Recorded timeout settings changed'),{code:'ASSIGNMENT_INELIGIBLE'});
     if(current.handover_review_window_minutes!==job.handover_review_window_minutes||current.handover_review_reason!==job.handover_review_reason)throw Object.assign(new Error('Recorded handover review window changed'),{code:'ASSIGNMENT_INELIGIBLE'});
     if(current.code_review_window_minutes!==job.code_review_window_minutes||current.code_review_reason!==job.code_review_reason||JSON.stringify(current.code_review_subject)!==JSON.stringify(job.code_review_subject))throw Object.assign(new Error('Recorded code review window changed'),{code:'ASSIGNMENT_INELIGIBLE'});
-    if(job.code_review_window_minutes&&JSON.stringify(codeReviewWindowSubject(s,{role:job.role,review_of:job.review_of.id},{fresh:false,root}))!==JSON.stringify(job.code_review_subject))throw Object.assign(new Error('Code review subject lineage changed'),{code:'ASSIGNMENT_INELIGIBLE'});
+    if(job.code_review_window_minutes&&JSON.stringify(codeReviewWindowSubject(s,current.retention_repair_id?{...current,review_of:current.review_of.id}:{role:job.role,review_of:job.review_of.id},{fresh:false,root}))!==JSON.stringify(job.code_review_subject))throw Object.assign(new Error('Code review subject lineage changed'),{code:'ASSIGNMENT_INELIGIBLE'});
     if((job.handover_review_window_minutes||job.code_review_window_minutes)&&overallTiming&&['execution_started_at','execution_deadline_at','termination_deadline_at'].some(k=>current[k]!==overallTiming[k]))throw Object.assign(new Error('Recorded execution timing changed'),{code:'ASSIGNMENT_INELIGIBLE'});
     const timing=jobTimeoutState(current,Date.now());
     if(['inspection','overdue','terminating'].includes(timing.state))throw Object.assign(new Error(timing.state==='inspection'?'Assignment timing requires inspection: '+timing.reason:`Assignment ${timing.phase} deadline reached`),{code:timing.state==='inspection'?'INVALID_EXECUTION_TIMING':timing.phase==='execution'?'ROLE_TIMEOUT':'STARTUP_TIMEOUT'});
     for(const ref of supplemental)if(digest(JSON.stringify(contextSource(s,ref.id)))!==ref.sha256)throw Error('Supplemental evidence changed');
-    const grant=s.records[job.development_id??job.prototype_id];lastGrantExpiry=Date.parse(continuation?.development?.proposal?.expires_at??grant?.development?.scope?.expires_at??grant?.prototype?.scope?.expires_at??'');
-    lastDevelopmentMaxBytes=job.development_id?grant?.development?.scope?.max_bytes:undefined;
+    const grant=s.records[job.development_id??job.prototype_id];lastGrantExpiry=Date.parse(repairCurrent?.proposal?.expires_at??continuation?.development?.proposal?.expires_at??grant?.development?.scope?.expires_at??grant?.prototype?.scope?.expires_at??'');
+    lastDevelopmentMaxBytes=repairCurrent?s.records[repairCurrent.subject.plan.id]?.development?.scope?.max_bytes:job.development_id?grant?.development?.scope?.max_bytes:undefined;
     return current;
   };
   const check=()=>{
@@ -109,6 +113,7 @@ export async function work(root, jobId, model = runModel) {
       coordinationEligible(s,job);
       prototypeAssignment(s,job);developmentAssignment(s,job,false,root);if(s.records[job.review_of?.id]?.development?.type==='review_continuation')reviewContinuationAssignment(s,job,{root});
       if(job.specialist!==undefined)assertSpecialistEligible(s,job);
+      repair=resolveRetentionRepair(s,job,{root});
       context=workerContext(s,job);
       if(context.qualification&&(job.native_id||s.sessions[job.session_key]?.native_id))throw Error('Partition qualification requires a fresh native session');
       if(job.context_sha256 && job.context_sha256!==context.hash) throw new Error('Assignment context changed before startup');
@@ -121,13 +126,14 @@ export async function work(root, jobId, model = runModel) {
     claimed=true; // Only a committed queued -> running transition owns this execution.
     job=state.jobs[jobId];
     const timeout=job.timeout_policy_version===undefined?normalizeTimeout():normalizeTimeout({timeout_ms:job.timeout_ms,timeout_reason:job.timeout_reason});
+    if(repair)retentionSnapshot=retentionRepairPrimarySnapshot(state,job,{root,contextText:context.text});
     const charter=state.roles[job.role];
     const roleName=job.specialist?specialistName(state,job):charter.name;
     const target=job.review_of?state.records[job.review_of.id]:null;
     // Optional re-delivery is limited to exact records already supplied in
     // this explicit code review. It adds no source, request round or time.
     const inlineCodeReviewReads=job.code_review_window_minutes?Object.freeze(JSON.parse(context.text).records.map(r=>Object.freeze({id:r.id,revision:r.revision,sha256:digest(JSON.stringify(r))}))):[];
-    const continuationGrantDeadline=target?.development?.type==='review_continuation'?Date.parse(target.development.proposal.expires_at):null;
+    const continuationGrantDeadline=job.retention_repair_id?Date.parse(retentionSnapshot.subject?.expires_at??repair.proposal.expires_at):target?.development?.type==='review_continuation'?Date.parse(target.development.proposal.expires_at):null;
     const specialistReview=target?.job_id&&state.jobs[target.job_id]?.specialist;
     const reviewShape=target?{...(specialistReview?{permitted_action:'accept_specialist_output or hold',blockers:[]}:{}),...(target.operating_plan?{permitted_action:'publish_operating_state or hold',plan_sha256:digest(JSON.stringify(target.operating_plan)),preservation_complete:true,interaction_complete:true,authority_checked:true,blockers:[]}:{}),...(target.handover?{permitted_action:'resume_handover or hold',subject_sha256:target.handover.subject_sha256,blockers:[]}:{}),...(target.context_classification_plan?{permitted_action:'apply_context_classification or hold',plan_sha256:digest(JSON.stringify(target.context_classification_plan)),blockers:[]}:{}),verdict:'Pass or Fail or Blocked',reason:'evidence-based explanation',
       ...(target.development?.type==='test'?{permitted_action:'accept_local_development or hold',candidate_sha256:target.development.candidate_sha256,receipt_sha256:target.development.receipt_sha256,blockers:[]}:{}),
@@ -168,7 +174,7 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
     const useSharedPrompt=renderedAssignmentPromptText!==context.text && sharedPrompt.length<originalPrompt.length && Buffer.byteLength(sharedPrompt,'utf8')<Buffer.byteLength(originalPrompt,'utf8');
     const assignmentPromptText=useSharedPrompt?renderedAssignmentPromptText:context.text;
     const fileBodySharingInstruction=useSharedPrompt?sharingInstruction:'';
-    const prompt=useSharedPrompt?sharedPrompt:originalPrompt;
+    const prompt=job.retention_repair_id?buildRetentionRepairInitialPrompt(state,job,context,retentionSnapshot).text:useSharedPrompt?sharedPrompt:originalPrompt;
     const dir=path.join(dataDir(),'sessions',job.instance_id);
     noLink(dir);fs.mkdirSync(dir,{recursive:true,mode:0o700});
     controller=new AbortController();
@@ -177,9 +183,12 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
     if(controller.signal.aborted)throw controller.signal.reason;
     try {
       let session=job.native_id,request=prompt;
+      let retentionPhase=repair?'initial':null,retentionCalls=0,retentionHistoryRounds=0;
       const handoverDeadline=context.handover_evidence?Date.now()+(job.handover_review_window_minutes?job.handover_review_window_minutes*60000:timeout.timeout_ms):null;
       pendingDelivery=context.initial_delivery;
-      for(let round=0;frozenEvidence||context.stream||round<=16;round++){
+      for(let round=0;frozenEvidence||context.stream||(repair?retentionPhase!=='done':round<=16);round++){
+      let retentionEnvelope=null;
+      if(repair){assertRetentionRepairCallBudget({native_calls:retentionCalls,history_rounds:retentionHistoryRounds,phase:retentionPhase});if(request.length>RETENTION_FRAME_CHARACTERS)throw Error('Complete retention initial/READ/final frame exceeds historical character bound');}
       const remaining=lastCurrent?.execution_deadline_at?Math.min(timeout.timeout_ms,Date.parse(lastCurrent.execution_deadline_at)-Date.now()):handoverDeadline?Math.min(timeout.timeout_ms,handoverDeadline-Date.now()):timeout.timeout_ms;
       if(remaining<1000)throw Error('Insufficient execution time for supplemental read');
       if(context.qualification&&Buffer.byteLength(request,'utf8')>(scopedContext(context)?scoped.SCOPED_LIMITS:context.qualification.limits).input_bytes)throw Error('Partition qualification request overflow; nothing was truncated');
@@ -202,6 +211,10 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
       const invocation={invocation_id:id('model-invocation'),job_id:job.id,instance_id:job.instance_id,worker_pid:process.pid,host:job.host,requested_at:new Date(callRequestedAt).toISOString()};
       let originalProcessBirth=null,originalProcessReceipt=null;
       withStore(root,db=>db.transaction('job.model_process.requested',s=>{requestModelProcess(eligibility(s),invocation);return s;}));
+      if(repair&&retentionPhase==='final')withStore(root,db=>db.transaction('job.retention_primary_requested',s=>{
+        const current=eligibility(s);beginRetentionPrimaryDelivery(current,{native_id:session,request,frame:retentionFinalFrame,invocation_id:invocation.invocation_id});return s;
+      },{beforeCommit:(_db,next)=>assertRetentionRepairCommit(next,repair.control)}));
+      if(repair)retentionCalls++;
       const recordOriginalClose=(birth,receipt)=>{
         if(!originalProcessBirth||JSON.stringify(birth)!==JSON.stringify(originalProcessBirth))throw Error('Original model process identity changed');
         withStore(root,db=>db.transaction('job.model_process.closed',s=>{recordModelProcessClosure(s.jobs[jobId],invocation,birth,receipt);return s;}));
@@ -244,7 +257,7 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
             if(continuationGrantDeadline!==null&&Date.parse(overallTiming.execution_deadline_at)>continuationGrantDeadline)throw Object.assign(Error('Complete code review window exceeds its new authorization deadline'),{code:'SCOPE_WINDOW_UNAVAILABLE'});
             Object.assign(current,overallTiming);
             return s;
-          },continuationGrantDeadline===null?{}:{beforeCommit:(_db,nextState)=>{assertReviewContinuationCommit(nextState,{owner:target.development.proposal.owner,expires_at:target.development.proposal.expires_at});}}));
+          },continuationGrantDeadline===null?{}:{beforeCommit:(_db,nextState)=>{if(repair)assertRetentionRepairCommit(nextState,repair.control);else assertReviewContinuationCommit(nextState,{owner:target.development.proposal.owner,expires_at:target.development.proposal.expires_at});}}));
           spawned=true;
           // Keep the immutable local policy in step only for legacy callback upgrades.
           if(job.timeout_policy_version===undefined)Object.assign(job,{timeout_policy_version:TIMEOUT_POLICY_VERSION,...timeout});
@@ -264,16 +277,38 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
         if(!output.native_id)throw Error('Successful initial record delivery lacks a native identity');
         withStore(root,db=>db.transaction('job.record_reads_delivered',s=>{
           const current=eligibility(s);if(current.delivered_record_reads!==undefined)throw Error('Initial record delivery was already recorded');
-          current.delivered_record_reads=beginRecordReadDelivery({native_id:output.native_id,assignment_context_sha256:context.hash,request,delivered_at:stamp()});return s;
+          current.delivered_record_reads=beginRecordReadDelivery({native_id:output.native_id,assignment_context_sha256:context.hash,request,delivered_at:stamp()});if(repair)current.native_id=output.native_id;return s;
         }));
       }
       if(job.code_review_window_minutes&&pendingRecordReads.length){
         if(!output.native_id)throw Error('Successful record READ delivery lacks a native identity');
         withStore(root,db=>db.transaction('job.record_reads_delivered',s=>{
           const current=eligibility(s);
-          current.delivered_record_reads=appendRecordReadDelivery(current.delivered_record_reads,pendingRecordReads,{native_id:output.native_id,request,round,delivered_at:stamp()});return s;
+          current.delivered_record_reads=appendRecordReadDelivery(current.delivered_record_reads,pendingRecordReads,{native_id:output.native_id,request,round:repair?retentionHistoryRounds:round,delivered_at:stamp()});return s;
         }));
         pendingRecordReads=[];
+      }
+
+      if(repair){
+        if(!callTiming||!originalProcessBirth||!originalProcessReceipt||controller.signal.aborted)throw Error('Retention phase lacks original successful process/timing evidence');
+        const response=parseRetentionRepairEnvelope(output.text,{phase:retentionPhase});
+        if(retentionPhase==='final'){
+          const finalArtifact=parseArtifact(response.normalized);
+          withStore(root,db=>db.transaction('job.retention_primary_delivered',s=>{
+            const current=eligibility(s),fresh=retentionRepairPrimarySnapshot(s,current,{root,contextText:context.text});
+            if(buildRetentionRepairFinal(fresh,current).text!==request)throw Error('Final primary/current controls changed before successful delivery');
+            confirmRetentionPrimaryDelivery(current,{native_id:output.native_id,request,invocation_id:invocation.invocation_id,delivered_at:stamp()});validateRetentionPrimaryDelivery(current,fresh);return s;
+          },{beforeCommit:(_db,next)=>assertRetentionRepairCommit(next,repair.control)}));
+          retentionFinalArtifact=finalArtifact;retentionPhase='done';break;
+        }
+        if(response.kind==='ready'){
+          const next=withStore(root,db=>{
+            const s=db.read(),current=eligibility(s),fresh=retentionRepairPrimarySnapshot(s,current,{root,contextText:context.text});
+            if(!retentionRepairHistoryComplete(fresh,current))throw Error('Readiness acknowledgement before complete required history');return buildRetentionRepairFinal(fresh,current);
+          });
+          retentionFinalFrame=next;retentionPhase='final';session=output.native_id;request=next.text;continue;
+        }
+        retentionEnvelope=response.value;
       }
 
       if(context.stream){
@@ -299,10 +334,11 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
         if(context.operating_evidence)operatingNative=output.native_id;
         pendingDelivery=[];
       }
-      let envelope;try{envelope=JSON.parse(output.text);}catch{break;}
-      if(!Object.hasOwn(envelope,'reads'))break;
+      let envelope;if(repair)envelope=retentionEnvelope;else try{envelope=JSON.parse(output.text);}catch{break;}
+      if(!Object.hasOwn(envelope,'reads')){if(repair)throw Error('Retention history incomplete before mandatory final primary phase');break;}
       if(context.qualification)throw Error('Partition qualification is one complete bounded delivery; supplemental reads require a new decomposition');
       if((!frozenEvidence&&(![3,6,7].includes(job.context_format)||round===16))||Object.keys(envelope).length!==1||!Array.isArray(envelope.reads)||envelope.reads.length<1||envelope.reads.length>4)throw Error('Invalid bounded supplemental read');
+      if(repair){if(retentionHistoryRounds>=RETENTION_MAX_HISTORY_ROUNDS)throw Error('Retention history exhausted reserved final call budget; no extra invocation');retentionHistoryRounds++;retentionPhase='history';}
       if(session&&session!==output.native_id)throw Error('Supplemental read changed native identity');
       session=output.native_id;if(!session)throw Error('Supplemental read missing native identity');
       if(frozenEvidence){
@@ -343,7 +379,8 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
     check();
     if((job.timeout_policy_version!==undefined||context.qualification) && !spawned && !controller.signal.aborted)throw Object.assign(new Error('Adapter returned without actual execution timing'),{code:'MISSING_EXECUTION_TIMING'});
     if(!output.native_id) throw new Error('Host returned no resumable session identity');
-    artifact=context.qualification?JSON.parse(output.text):parseArtifact(output.text);
+    artifact=repair?retentionFinalArtifact:context.qualification?JSON.parse(output.text):parseArtifact(output.text);
+    if(repair&&!artifact)throw Error('Retention review never reached its controlled final verdict');
     if(job.output_contract==='operating-proposal-v1'&&Object.keys(artifact).some(k=>!['content','messages','notices'].includes(k)))throw Error('Operating proposal has unsupported fields; retain the rejected result for reconciliation');
     if(job.output_contract==='operating-proposal-v1'){for(const n of artifact.notices??[])if(Object.keys(n).some(k=>!['kind','summary'].includes(k)))throw Error('Operating proposal notice has unknown fields');for(const m of artifact.messages??[])if(Object.keys(m).some(k=>!['to','content'].includes(k)))throw Error('Operating proposal message has unknown fields');}
     validateEnvelope(artifact,state.roles);
@@ -379,7 +416,7 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
       const bundle=stale||job.development_id?null:prototypeBundle(s,job,artifact);
       const development=stale||!job.development_id?null:developmentBundle(s,job,artifact,root);
       const artifactId=id(stale?'quarantined':'artifact');
-      const completedRecord={id:artifactId,kind:target?'review':'artifact',content:artifact.content,author_role:job.role,author_instance:job.instance_id,revision:1,status:stale?'Quarantined':'Submitted',job_id:job.id,inputs:job.inputs,...(job.runtime_task?{runtime_output:{version:1,task_id:job.runtime_task.id,definition_revision:job.runtime_task.definition_revision,definition_sha256:job.runtime_task.definition_sha256}}:{}),...(supplemental.length?{retrieved_inputs:[...supplemental]}:{}),...(current.delivered_record_reads?{delivered_record_reads:current.delivered_record_reads}:{}),review_of:job.review_of,review:artifact.review??null,...(qualificationReceipt?{context_qualification:qualificationReceipt}:{}),...(context.qualification?{qualification_result:artifact.qualification_result}:{}),...(context.handover_evidence?{handover_evidence:{semantic_delivery_complete:artifact.review?.verdict==='Pass'&&!controller.signal.aborted,subject_sha256:target.handover.subject_sha256,reconstruction_sha256:digest(JSON.stringify(target)),native_id:output.native_id,citations:artifact.citations,reads:handoverReads}}:{}),...(bundle?{prototype:bundle}:{}),...(development?{development}:{}),...(stale && artifact.files?{quarantined_files:artifact.files}:{}),...(stale && artifact.patches?{quarantined_patches:artifact.patches}:{}),created_at:stamp()};
+      const completedRecord={id:artifactId,kind:target?'review':'artifact',content:artifact.content,author_role:job.role,author_instance:job.instance_id,revision:1,status:stale?'Quarantined':'Submitted',job_id:job.id,inputs:job.inputs,...(job.runtime_task?{runtime_output:{version:1,task_id:job.runtime_task.id,definition_revision:job.runtime_task.definition_revision,definition_sha256:job.runtime_task.definition_sha256}}:{}),...(supplemental.length?{retrieved_inputs:[...supplemental]}:{}),...(current.delivered_record_reads?{delivered_record_reads:current.delivered_record_reads}:{}),...(current.retention_primary_delivery?{retention_primary_delivery:current.retention_primary_delivery}:{}),review_of:job.review_of,review:artifact.review??null,...(qualificationReceipt?{context_qualification:qualificationReceipt}:{}),...(context.qualification?{qualification_result:artifact.qualification_result}:{}),...(context.handover_evidence?{handover_evidence:{semantic_delivery_complete:artifact.review?.verdict==='Pass'&&!controller.signal.aborted,subject_sha256:target.handover.subject_sha256,reconstruction_sha256:digest(JSON.stringify(target)),native_id:output.native_id,citations:artifact.citations,reads:handoverReads}}:{}),...(bundle?{prototype:bundle}:{}),...(development?{development}:{}),...(stale && artifact.files?{quarantined_files:artifact.files}:{}),...(stale && artifact.patches?{quarantined_patches:artifact.patches}:{}),created_at:stamp()};
       const completedJob={...current};
       completedJob.coordination_release={termination_confirmed:true,reason:'model_process_closed',at:stamp()};
       completedJob.status=stale?'quarantined':'completed';completedJob.artifact_id=artifactId;completedJob.finished_at=stamp();completedJob.native_id=output.native_id;
@@ -391,6 +428,7 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
       }
       if(job.code_review_window_minutes&&!stale&&artifact.review?.verdict==='Pass')validateCodeReviewDelivery(s,completedJob,completedRecord,context.text);
       if(!stale&&target?.development?.type==='review_continuation')validateReviewContinuationPublication(s,completedJob,completedRecord,{root});
+      if(!stale&&repair)retentionPublicationControl=validateRetentionRepairPublication(s,completedJob,completedRecord,{root})?.control;
       // Reconstruct and hash everything before this exclusive publication fence.
       // Timer callbacks may be delayed while synchronous validation is running.
       if((context.stream||context.qualification_evidence||target?.operating_plan)&&jobTimeoutState(current,Date.now()).state!=='executing'){
@@ -442,6 +480,7 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
     },{afterWrite:job?.runtime_task?updateTaskIndex:undefined,beforeCommit:job?.code_review_window_minutes?(_db,nextState)=>{
       const cutoff=Date.parse(overallTiming?.execution_deadline_at??'');
       if(!Number.isFinite(cutoff)||Date.now()>=cutoff)throw Object.assign(Error('Code review final pre-COMMIT deadline reached'),{code:'ROLE_TIMEOUT'});
+      if(repair)assertRetentionRepairCommit(nextState,retentionPublicationControl??repair.control);
       const target=nextState.records[job.review_of?.id];if(target?.development?.type==='review_continuation')assertReviewContinuationCommit(nextState,{owner:target.development.proposal.owner,expires_at:target.development.proposal.expires_at});
     }:undefined}));
   } catch(error) {
@@ -478,7 +517,7 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
         // discard a negative or unknown judgment about an exact profile output.
         const reviewTarget=state?.records?.[job.review_of?.id];
         const specialistReview=job.role==='qa'&&state?.jobs?.[reviewTarget?.job_id]?.specialist!==undefined;
-        const rawResponse=Boolean(context?.qualification||context?.qualification_evidence||operatingReview||specialistReview||job.context_format===7||job.output_contract==='operating-proposal-v1');
+        const rawResponse=Boolean(repair||context?.qualification||context?.qualification_evidence||operatingReview||specialistReview||job.context_format===7||job.output_contract==='operating-proposal-v1');
         if(artifact || rawResponse&&typeof rejectedOutput?.text==='string') {
           const rejected=rawResponse?rejectedOutput.text:JSON.stringify(artifact);
           // Retention does not accept an artifact. Parse the complete observed
