@@ -299,18 +299,31 @@ test('deleting and restoring an exact accepted source or pending proposal remain
  }
 });
 
-test('legacy format6 packets preserve the actual v0.7.5 context hash',async()=>{
+test('legacy format6 packets preserve the actual v0.7.5 context hash',async t=>{
  const {spawnSync}=await import('node:child_process');const {pathToFileURL}=await import('node:url');
+ const {compileFunction}=await import('node:vm');
  const dir=path.join(tmp,'legacy075');fs.mkdirSync(dir);
  const archive=spawnSync('git',['archive','38d95fd6463fedef68e61737bdb2d4af4b05c756','plugins/soloco'],{cwd:path.resolve(import.meta.dirname,'..'),maxBuffer:20000000});assert.equal(archive.status,0);
  assert.equal(spawnSync('tar',['-xf','-','-C',dir],{input:archive.stdout}).status,0);
  const oldContext=await import(pathToFileURL(path.join(dir,'plugins/soloco/runtime/context.mjs')));
  const oldStore=await import(pathToFileURL(path.join(dir,'plugins/soloco/runtime/store.mjs')));
- const f=fixture();await publish(f);
- const j=engine.dispatch({...f,role:'engineer',task:'Legacy bounded read-only assignment'},'codex',launch);
- const current=read(f),old=oldStore.withStore(f.root,db=>db.read());
- const previous=oldContext.assignmentContext(old,old.jobs[j.id]),next=assignmentContext(current,current.jobs[j.id]);
+ const oldEngine=await import(pathToFileURL(path.join(dir,'plugins/soloco/runtime/engine.mjs')));
+ const oldMain=await import(pathToFileURL(path.join(dir,'plugins/soloco/runtime/main.mjs')));
+ const oldWorker=await import(pathToFileURL(path.join(dir,'plugins/soloco/runtime/worker.mjs')));
+ const oldTiming=await import(pathToFileURL(path.join(dir,'plugins/soloco/runtime/timeout.mjs')));
+ // Reuse the actual shared fixture workflow, with every producer dependency
+ // supplied by v0.7.5. A current worker adds fields the old closed index rejects.
+ const source=fs.readFileSync(import.meta.filename,'utf8'),start=source.indexOf('const sha=v=>'),end=source.indexOf('async function transfer(){');assert.ok(start>=0&&end>start);
+ const helpers=source.slice(start,end);
+ const oldHelpers=compileFunction(helpers+'\nreturn {fixture,publish,read,launch};',['assert','fs','path','tmp','engine','call','withStore','digest','teamHash','assignmentContext','work','executionTiming'],{filename:import.meta.filename,lineOffset:18})(assert,fs,path,tmp,oldEngine,oldMain.call,oldStore.withStore,oldStore.digest,oldStore.teamHash,oldContext.assignmentContext,oldWorker.work,oldTiming.executionTiming);
+ const f=oldHelpers.fixture();await oldHelpers.publish(f);
+ const j=oldEngine.dispatch({...f,role:'engineer',task:'Legacy bounded read-only assignment'},'codex',oldHelpers.launch);
+ // Freeze the old oracle before the current Store reads this genuine old state.
+ const old=oldHelpers.read(f),previous=oldContext.assignmentContext(old,old.jobs[j.id]);
+ const oldProof={archive_sha256:digest(archive.stdout),runtime_version:old.runtime_version,context_format:old.jobs[j.id].context_format,text_sha256:digest(previous.text),context_sha256:previous.hash,job_context_sha256:old.jobs[j.id].context_sha256,tracked_jobs:Object.values(old.jobs).filter(job=>Object.hasOwn(job,'model_process_tracking')).length,shared_helpers_sha256:digest(helpers),modules:Object.fromEntries(['engine','main','store','context','worker','timeout'].map(name=>[name,digest(fs.readFileSync(path.join(dir,'plugins/soloco/runtime',name+'.mjs')))]))};
+ const current=read(f),next=assignmentContext(current,current.jobs[j.id]);
  assert.equal(next.text,previous.text);assert.equal(next.hash,previous.hash);assert.equal(current.jobs[j.id].context_sha256,previous.hash);
+ t.diagnostic(JSON.stringify({fixture:'actual-v075-producer-before-current-read',commit:'38d95fd6463fedef68e61737bdb2d4af4b05c756',...oldProof}));
 });
 
 test('proposal notice reference fields are rejected with exact evidence retained',async()=>{
