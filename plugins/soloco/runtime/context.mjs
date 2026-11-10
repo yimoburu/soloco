@@ -1,3 +1,4 @@
+import {reviewContinuationContextInputs} from './development-review-continuation.mjs';
 import {operatingReviewContext,operatingContext} from './operating-state.mjs';
 import {scopedAssignment,scopedMatches,isScopedJob,SCOPED_LIMITS} from './scoped-context.mjs';
 import { handoverReviewContext } from './handover.mjs';
@@ -52,6 +53,7 @@ export function assignmentContext(state, job) {
     ids.add(prototypeId);
   }
   const target=state.records[job.review_of?.id];
+  for(const key of reviewContinuationContextInputs(state,target))ids.add(key);
   const developmentId=job.development_id ?? target?.development?.plan_id;
   if(developmentId) {
     if(!state.records[developmentId]) throw new Error('Development scope missing');

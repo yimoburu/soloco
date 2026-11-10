@@ -1,3 +1,5 @@
+import {validCodeReviewMetadata} from './code-review-metadata.mjs';
+import {validModelProcessTracking} from './model-process-closure.mjs';
 import {validateScopedExclusion,validateCorpusExclusion,CORPUS_PRESERVATION,SCOPED_PROTOCOL,producerClosure} from './scoped-context.mjs';
 import {validateOperatingIndex} from './operating-state.mjs';
 import {digest,requireText} from './store.mjs';
@@ -7,18 +9,21 @@ import {buildQualificationEvidence,knownModelCatalog} from './upgrade-evidence.m
 import {validateQualificationExclusion,QUALIFICATION_PROTOCOL} from './context-qualification.mjs';
 const fields=['id','kind','author_role','recorded_by','content','status','action','previous_name','name','created_at'];
 const knownStateFields=new Set(['id','name','idea','owner','schema','runtime_version','plugin_version','revision','created_at','updated_at','paused','mode','phase','team_sha256','governance','governance_sha256','cos_instructions','roles','records','jobs','sessions','notices','messages','upgrade','upgrade_history','retired_sessions','context_classifications','context_last_plan','handover']);
-const proofJobFields=new Set(['specialist','id','role','instance_id','session_key','native_id','host','epoch','status','artifact_id','review_of','inputs','context_format','context_scope','context_sha256','task','task_summary','next_handoff','model_selection','model_catalog','model_evidence','cli_version','requester','coordination','coordination_release','qualification_hold','expected_deliverable','supplemental_sources','retrieved_inputs','created_at','started_at','finished_at','worker_pid','timeout_policy_version','timeout_minutes','timeout_ms','timeout_reason','execution_started_at','execution_deadline_at','termination_deadline_at']);
+const proofJobFields=new Set(['code_review_window_minutes','code_review_reason','code_review_subject','delivered_record_reads','model_process_tracking','specialist','id','role','instance_id','session_key','native_id','host','epoch','status','artifact_id','review_of','inputs','context_format','context_scope','context_sha256','task','task_summary','next_handoff','model_selection','model_catalog','model_evidence','cli_version','requester','coordination','coordination_release','qualification_hold','expected_deliverable','supplemental_sources','retrieved_inputs','created_at','started_at','finished_at','worker_pid','timeout_policy_version','timeout_minutes','timeout_ms','timeout_reason','execution_started_at','execution_deadline_at','termination_deadline_at']);
 const keysOnly=(v,keys)=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).every(k=>keys.includes(k));
 export function proofJobSafe(job) {
   if(job&&Object.hasOwn(job,'specialist')&&!validateSpecialistBindingShape(job.specialist))return false;
   if(Object.keys(job).some(k=>!proofJobFields.has(k)))return false;
+  if(!validCodeReviewMetadata(job))return false;
   if(job.qualification_hold!==undefined&&(!job.qualification_hold||typeof job.qualification_hold!=='object'||Array.isArray(job.qualification_hold)))return false;
   for(const key of ['review_of','requester','model_selection','model_catalog','model_evidence','coordination_release'])if(job[key]!==undefined&&job[key]!==null&&(typeof job[key]!=='object'||Array.isArray(job[key])))return false;
   const scalarObject=(value,keys)=>keysOnly(value,keys)&&Object.values(value).every(v=>v===null||typeof v!=='object');
   const refs=(value,keys)=>Array.isArray(value)&&value.every(r=>keysOnly(r,keys)&&Object.values(r).every(v=>v===null||typeof v!=='object'));
   for(const [key,value] of Object.entries(job)){
     if(value===null||typeof value!=='object')continue;
-    if(key==='specialist'){if(!validateSpecialistBindingShape(value))return false;}
+    if(key==='code_review_subject'||key==='delivered_record_reads'){if(!validCodeReviewMetadata(job))return false;}
+    else if(key==='model_process_tracking'){if(!validModelProcessTracking(value))return false;}
+    else if(key==='specialist'){if(!validateSpecialistBindingShape(value))return false;}
     else if(key==='inputs'){if(!refs(value,['id','revision']))return false;}
     else if(key==='supplemental_sources'||key==='retrieved_inputs'){if(!refs(value,['id','revision','sha256','offset','length','total_characters']))return false;}
     else if(key==='review_of'){if(!scalarObject(value,['id','revision']))return false;}

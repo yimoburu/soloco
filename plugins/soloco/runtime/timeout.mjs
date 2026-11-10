@@ -63,17 +63,33 @@ export function normalizeHandoverReviewWindow(input = {}) {
 }
 
 function jobReviewWindow(job) {
+  const code=normalizeCodeReviewWindow(job);
+  if(code){
+    if(job.handover_review_window_minutes!==undefined||job.handover_review_reason!==undefined||job.timeout_policy_version!==TIMEOUT_POLICY_VERSION||job.role!=='qa'||typeof job.review_of?.id!=='string'||job.prototype_id||job.development_id||job.specialist||job.code_review_subject?.protocol!=='development-code-review-window-subject-v1')throw Error('Code review window requires a fresh bound runtime-test QA job');
+    if(job.code_review_reason!==code.code_review_reason)throw Error('Noncanonical recorded code review reason');
+    return {...code,minutes:code.code_review_window_minutes};
+  }
   const window=normalizeHandoverReviewWindow(job);
   if(window&&(job.timeout_policy_version!==TIMEOUT_POLICY_VERSION||job.role!=='qa'||typeof job.review_of?.id!=='string'||job.prototype_id||job.development_id))throw Error('Review window requires a fresh ordinary handover QA job');
   if(window&&job.handover_review_reason!==window.handover_review_reason)throw Error('Noncanonical recorded handover review reason');
-  return window;
+  return window?{...window,minutes:window.handover_review_window_minutes}:null;
+}
+
+// Prospective overall review timing only. This grants no data-sharing,
+// generation, test, acceptance or expiry authority to an existing scope/job.
+export function normalizeCodeReviewWindow(input={}) {
+  const minutes=input.code_review_window_minutes,reason=input.code_review_reason;
+  if(minutes===undefined&&reason===undefined)return null;
+  if(![30,45].includes(minutes))throw Error('Choose a fresh code review window of 30 or 45 minutes');
+  if(typeof reason!=='string'||!reason.trim()||reason.length>300)throw Error('Code review reason must be nonempty and at most 300 characters');
+  return {code_review_window_minutes:minutes,code_review_reason:reason.trim()};
 }
 
 export function jobExecutionTiming(spawnedAt,job) {
   const timing=executionTiming(spawnedAt,{timeout_ms:job.timeout_ms,timeout_reason:job.timeout_reason});
   const window=jobReviewWindow(job);
   if(!window)return timing;
-  const deadline=add(instant(spawnedAt,'execution start'),window.handover_review_window_minutes*60000);
+  const deadline=add(instant(spawnedAt,'execution start'),window.minutes*60000);
   return {...timing,execution_deadline_at:new Date(deadline).toISOString(),termination_deadline_at:new Date(add(deadline,TERMINATION_GRACE_MS)).toISOString()};
 }
 
@@ -111,7 +127,7 @@ export function jobTimeoutState(job, now) {
       if (job.status !== 'running') return inspect('Execution timing on a queued job');
       phase = 'execution';
       start = instant(job.execution_started_at, 'execution start');
-      deadline = add(start, window?window.handover_review_window_minutes*60000:policy.timeout_ms);
+      deadline = add(start, window?window.minutes*60000:policy.timeout_ms);
       if (instant(job.execution_deadline_at, 'recorded execution deadline') !== deadline) return inspect('Execution deadline disagrees with recorded policy');
       if(window&&instant(job.termination_deadline_at,'recorded termination deadline')!==add(deadline,TERMINATION_GRACE_MS))return inspect('Termination deadline disagrees with recorded review window');
     } else if (legacy && job.status === 'running') {

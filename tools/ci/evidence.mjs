@@ -35,6 +35,7 @@ export function workflowPolicy(workflow){requireThat(Object.hasOwn(workflowPolic
 // Runtime-sensitive compatibility coverage; the full suite remains mandatory on Node 22.
 export const compatibilityTests=Object.freeze([
   'cancellation-finalization','ci-evidence','claude-terminal-state','development-file-bodies','development-receipt-json','dynamic-specialists-integration','hooks','indexed-public-reads',
+  'code-review-window','continuation-review-transport','development-review-continuation','model-process-adapter-late-close','model-process-closure','review-continuation-central','review-continuation-grant-window',
   'local-sandbox-flags','local-sandbox','local-sandbox-fixture','normalized-read-atomicity','peer-admission-provider-errors','peer-legacy-writer-fence','peer-observation-journal','peer-publication-policy','peer-scheduler','peer-scheduler-admission-provider-errors','plugin',
   'runtime-version-fence','selection-adapter','session-uncertainty','specialists','specialists-interface','storage-intake','storage-layout-repairs',
   'storage-transfer-integrity','storage-leaf-transfer','storage-transfer-paths','system-build','test-fixtures','test-preflight-recovery','task-index','task-runtime','tasks',
