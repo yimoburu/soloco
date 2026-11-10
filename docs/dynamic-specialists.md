@@ -90,6 +90,10 @@ operation replay never extend expiry or replenish spent assignments.
 - Peer-host enrollment, peer production routing and company adoption remain
   separately qualified work. This capability initially uses the existing
   owning-CoS preparation path and does not claim a deployed peer runtime.
+- Profile task admission/readiness uses complete semantic state to check the
+  current revocation and assignment ledger. Closures without profile tasks retain
+  their indexed path. This feature does not establish archive-independent read
+  cost or improve the existing full-state transaction scaling boundary.
 
 ## Evaluation
 

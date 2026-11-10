@@ -105,7 +105,7 @@ test('real lazy team assets, policy selection, fallback and exact hash tuple sur
   const assets=[
     ['assets/governance.md','4bd0af7032d870195b2992e850b1dc9a50a9b9e59a3ec27267b7b0752cca57a9'],
     ['assets/roles.json','7e9f4f387f3622123fe8dbd69dd3cf0aa17943628d71ff03971d4ab4a8abd7ba'],
-    ['skills/soloco/SKILL.md','e7031d075ecb3380c8ba683b66269ddba5c27144ce806dd2cd12b43a1b3132ff'],
+    ['skills/soloco/SKILL.md','1280f549411160d90bdfd9c56e31c11c60afcd3b7fb053564d6fdff4c486b159'],
     ['compat/company-0.1.0.md','bb6c3dbb6e7a03d033b7c39dccc59c31738369ffccc4fe6ff609d679e0eacc74']
   ];
   const texts=assets.map(([relative,expected])=>{const value=fs.readFileSync(path.join(team.PACKAGE,relative),'utf8');assert.equal(sha(value),expected);return value;});

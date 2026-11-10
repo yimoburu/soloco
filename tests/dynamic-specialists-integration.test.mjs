@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
 import {call as publicCall} from '../plugins/soloco/runtime/main.mjs';
-import {withStore,digest} from '../plugins/soloco/runtime/store.mjs';
+import {withStore,digest,Store} from '../plugins/soloco/runtime/store.mjs';
 import {reference} from '../plugins/soloco/runtime/specialists.mjs';
 import {assignmentContext,contextMatches} from '../plugins/soloco/runtime/context.mjs';
 import {taskAssignmentContext,taskContextMatches} from '../plugins/soloco/runtime/task-context.mjs';
@@ -16,6 +16,7 @@ import {sessionTitle} from '../plugins/soloco/runtime/session-naming.mjs';
 import {executionTiming} from '../plugins/soloco/runtime/timeout.mjs';
 import {operatingContext} from '../plugins/soloco/runtime/operating-state.mjs';
 import {resolveSnapshot} from '../plugins/soloco/runtime/snapshot.mjs';
+import {installTaskIndex} from '../plugins/soloco/runtime/task-index.mjs';
 
 // Only the engine, store, worker, context and validation paths are real. Native
 // outputs and judgments below are explicit injected fixtures, never models or
@@ -102,6 +103,57 @@ for(const mode of ['ordinary','durable'])for(const supplied of ['omitted','empty
   assert(context.text.includes(state.records['domain-input'].content),'native context contains the complete frozen data body, beyond its hash');
   const completed=await finish(f,queued);
   assert.equal(completed.status,'completed',completed.error);
+}));
+
+for(const action of ['submit','amend'])for(const supplied of ['omitted','empty','subset'])test(`public durable ${action}/${supplied}: complete profile authority and data survive selected storage`,()=>fixture('codex',async f=>{
+  engine.save({...f.args,id:'second-domain-input',kind:'artifact',content:'FICTIONAL second mandatory input.'},f.host);
+  const data=['domain-input','second-domain-input'],policy=authorize(f,{input_ids:data}),profile=create(f,policy,{input_ids:data});
+  withStore(f.args.root,db=>installTaskIndex(db));
+  f.change(s=>setRuntimeControl(s,{...f.args,action:'stop',source_instruction:instruction},f.host));
+  const call=args=>publicCall('company_tasks',{...f.args,source_instruction:instruction,...args},f.host);
+  const before=f.read();
+  const target=action==='amend'?await call({action:'submit',operation_id:'public-original',spec:{role:'engineer',task:'Original unprofiled preparation.',acceptance:'State unknowns.',expected_deliverable:'Original brief.'}}):null;
+  const inputs=supplied==='omitted'?{}:{input_ids:supplied==='empty'?[]:['domain-input']};
+  const result=await call({action,operation_id:'public-profile-'+action,...(target?{task_id:target.id,expected_definition_revision:1}:{}),spec:{role:profile.definition.base_role,task:profile.definition.task,acceptance:profile.definition.acceptance,expected_deliverable:'Complete supplied-source assessment.',specialist_ref:reference(profile.record),...inputs}});
+  const state=f.read(),task=state.records[result.id].runtime_task;
+  assert.equal(result.state,'planned');assert.equal(result.wakeup.started,false);
+  assert.deepEqual(new Set(task.spec.input_ids),new Set([...data,policy.id,profile.record.id]));
+  assert.deepEqual(task.spec.specialist_ref,reference(profile.record));
+  for(const id of data)assert(task.input_bindings.some(r=>r.id===id&&r.sha256===reference(state.records[id]).sha256));
+  assert.deepEqual(state.jobs,before.jobs,'a public definition write never starts a native worker');
+}));
+
+test('public durable task admission and inspection retain current revocation evidence',()=>fixture('codex',async f=>{
+  const policy=authorize(f),profile=create(f,policy);
+  withStore(f.args.root,db=>installTaskIndex(db));
+  f.change(s=>setRuntimeControl(s,{...f.args,action:'stop',source_instruction:instruction},f.host));
+  const args={...f.args,action:'submit',operation_id:'public-before-revoke',source_instruction:instruction,spec:{role:profile.definition.base_role,task:profile.definition.task,acceptance:profile.definition.acceptance,expected_deliverable:'Bounded brief.',specialist_ref:reference(profile.record)}};
+  const submitted=await publicCall('company_tasks',args,f.host);
+  f.action('revoke',{target_ref:reference(policy)});
+  const before=f.read();
+  await assert.rejects(publicCall('company_tasks',{...args,operation_id:'public-after-revoke'},f.host),/revok|inactive|held/i);
+  assert.deepEqual(f.read(),before);
+  const view=await publicCall('company_tasks',{...f.args,action:'inspect',task_id:submitted.id},f.host);
+  assert.equal(view.tasks[0].readiness.ready,false);assert.match(view.tasks[0].readiness.reason,/revok|inactive|held/i);
+}));
+
+test('public durable admission rechecks a revocation committed after its selected read',()=>fixture('codex',async f=>{
+  const policy=authorize(f),profile=create(f,policy);
+  withStore(f.args.root,db=>installTaskIndex(db));
+  f.change(s=>setRuntimeControl(s,{...f.args,action:'stop',source_instruction:instruction},f.host));
+  const transaction=Store.prototype.transaction;let interleaved=false;
+  Store.prototype.transaction=function(type,...rest){
+    if(type==='task.submit'&&!interleaved){interleaved=true;f.action('revoke',{target_ref:reference(profile.record)});}
+    return transaction.call(this,type,...rest);
+  };
+  try{
+    await assert.rejects(publicCall('company_tasks',{...f.args,action:'submit',operation_id:'public-racing-revocation',source_instruction:instruction,spec:{role:profile.definition.base_role,task:profile.definition.task,acceptance:profile.definition.acceptance,expected_deliverable:'Bounded brief.',specialist_ref:reference(profile.record)}},f.host),/revok|inactive|held/i);
+  }finally{Store.prototype.transaction=transaction;}
+  assert.equal(interleaved,true);
+  const state=f.read();
+  assert(Object.values(state.records).some(r=>r.specialist?.type==='revocation'));
+  assert.equal(Object.values(state.records).some(r=>r.runtime_task),false);
+  assert.equal(Object.keys(state.jobs).length,0);
 }));
 
 test('the complete 100-source caller bound still permits the two mandatory trusted profile records',()=>fixture('codex',async f=>{

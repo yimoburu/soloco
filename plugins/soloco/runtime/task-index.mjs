@@ -142,6 +142,10 @@ export function readTaskState(db,{task_ids=[],message_ids=[],include_messages=tr
     // Qualification can require legacy originals and unknown root extensions.
     // Preserve the conservative full-state semantic path; index filtering alone
     // never grants semantic permission to omit company evidence.
-    return {state:semantic?db.read():state,page};
+    // Profile readiness depends on current revocations and lifetime assignment
+    // usage beyond this task's prerequisite closure. A selected preview cannot
+    // certify that those omitted records are absent.
+    const profiled=Object.values(state.records??{}).some(r=>r.runtime_task?.spec?.specialist_ref!==undefined);
+    return {state:semantic||profiled?db.read():state,page};
   });
 }
