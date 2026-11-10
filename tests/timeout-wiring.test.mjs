@@ -9,7 +9,7 @@ import path from 'node:path';
 import vm from 'node:vm';
 import * as coordination from '../plugins/soloco/runtime/coordination.mjs';
 import * as timeout from '../plugins/soloco/runtime/timeout.mjs';
-import {renderDevelopmentReviewContext} from '../plugins/soloco/runtime/development-file-bodies.mjs';
+import {renderDevelopmentReviewContext} from '../plugins/soloco/runtime/development-receipt-json.mjs';
 
 // Evaluate actual module bodies with explicit boundary doubles. No real
 // model, subprocess, CLI, network, or production store is opened. Public
