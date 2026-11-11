@@ -44,7 +44,6 @@ jobs:
       - name: Run complete qualification shard
         run: |
           node tools/ci/check.mjs tests-22 --shard "$CI_SHARD" 2>&1 | tee "$RUNNER_TEMP/qualification.log"
-          node tools/ci/qualification-shards.mjs --collect "$CI_SHARD" "$RUNNER_TEMP/qualification.log"
       - name: Upload diagnostic log (optional)
         if: always()
         continue-on-error: true

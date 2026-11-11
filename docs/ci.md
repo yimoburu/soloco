@@ -67,8 +67,13 @@ exact union is the complete current test inventory, including new files. The
 stable **Full qualification Node 22** aggregate requires both shards to succeed;
 failed, cancelled or skipped shards hold it. Each shard keeps the existing
 40-minute job timeout, Seatbelt requirement and Node file concurrency of four.
-Its local collector requires a complete TAP plan and zero failures,
-cancellations, skips or todos before success. Diagnostic uploads stay optional.
+Each sharded command requires Node's real CLI exit to succeed, then checks the
+actual cumulative `test:summary` from a separate custom reporter channel. The
+reporter emits only after its event stream closes; a missing, truncated or
+invalid summary, mismatched source root or selected file set, or any outer
+failure, cancellation, skip or todo, holds the
+shard. TAP stays diagnostic: expected failing child fixtures may write their own
+TAP and totals without becoming outer test failures. Diagnostic uploads stay optional.
 Node 26 compatibility, routine regression and the required CI gate are unchanged.
 
 Placement uses the source-owned cost hints in
@@ -76,8 +81,11 @@ Placement uses the source-owned cost hints in
 These partial case-duration sums are scheduling hints, not per-file wall times or
 a measured speedup. New or unmeasured files receive a declared default weight and
 remain required. The command prints the inventory and cost-table hashes; its
-collector emits a local shard summary with the exact file list and counts.
-This summary is distinct from historical whole-suite provenance receipts.
+collector reads at most 64KiB from a fresh temporary summary file and prints a
+local shard summary with the exact file list and outer counts. This is local
+selection/result diagnostics, not a legacy provenance receipt, native
+qualification or new acceptance authority. The strict legacy TAP/provenance
+parser is unchanged and is not used to parse these composed diagnostic logs.
 
 The full suite remains unchanged. The regression selector
 continues to include new test files automatically and explicitly excludes the

@@ -1,8 +1,8 @@
 import fs from 'node:fs';
+import path from 'node:path';
 import {createHash} from 'node:crypto';
-import {fileURLToPath} from 'node:url';
 import {isUtf8} from 'node:buffer';
-import {inventory,selectedTests,requireThat,tapCounts} from './evidence.mjs';
+import {requireThat} from './evidence.mjs';
 import {parseShard,partitionTests,validatePartition} from './shards.mjs';
 
 export const qualificationShardCount=2;
@@ -45,40 +45,49 @@ export function qualificationPrelude(selected) {
   return `CI full shard ${selected.index}/${selected.total}: ${selected.files.length}/${selected.selected_total} whole test files; inventory sha256=${selected.inventory_sha256}; cost hints sha256=${selected.cost_hints_sha256}; unknown costs=${selected.unknown_cost_files.length}`;
 }
 
-export function qualificationSummary(text,selected) {
-  const prefix=qualificationPrelude(selected)+'\n';
-  requireThat(typeof text==='string'&&text.startsWith(prefix+'TAP version 13\n'),'missing or changed full qualification shard prelude');
-  const tap=text.slice(prefix.length),counts=tapCounts(tap);
-  return {schema:'ci-qualification-shard-summary-v1',lane:'tests-22',shard:selected.index,total:selected.total,
+export function qualificationSummary(text,selected,root=process.cwd()) {
+  requireThat(typeof text==='string'&&Buffer.byteLength(text)<=65536,'qualification summary exceeds 64KiB');
+  const record=JSON.parse(text);
+  requireThat(JSON.stringify(record)+'\n'===text,'incomplete or noncanonical qualification summary');
+  const keys=(value,expected)=>value&&typeof value==='object'&&!Array.isArray(value)
+    &&JSON.stringify(Object.keys(value).sort())===JSON.stringify([...expected].sort());
+  requireThat(keys(record,['schema','node_version','completed','root','files','summary'])
+    &&record.schema==='ci-qualification-outer-events-v1'&&record.completed===true
+    &&typeof record.node_version==='string'&&/^22\.\d+\.\d+$/.test(record.node_version),'invalid outer qualification event record');
+  requireThat(record.root===path.resolve(root)&&Array.isArray(record.files)
+    &&record.files.every(fileName)&&new Set(record.files).size===record.files.length
+    &&JSON.stringify(record.files)===JSON.stringify([...selected.files].sort()),'wrong root or incomplete/misrouted qualification file summaries');
+  const summary=record.summary;
+  requireThat(keys(summary,['counts','duration_ms','success'])&&summary.success===true
+    &&Number.isFinite(summary.duration_ms)&&summary.duration_ms>=0,'unsuccessful or invalid cumulative qualification summary');
+  const c=summary.counts;
+  requireThat(keys(c,['tests','suites','passed','failed','cancelled','skipped','todo','topLevel'])
+    &&Object.values(c).every(n=>Number.isSafeInteger(n)&&n>=0),'invalid cumulative qualification counts');
+  requireThat(c.tests>0&&c.passed===c.tests&&c.failed===0&&c.cancelled===0&&c.skipped===0&&c.todo===0
+    &&c.topLevel>0&&c.topLevel<=c.tests+c.suites,'outer qualification failed, skipped, cancelled, todo or zero execution');
+  const counts={tests:c.tests,suites:c.suites,pass:c.passed,fail:c.failed,cancelled:c.cancelled,skipped:c.skipped,todo:c.todo,executed:c.tests};
+  return {schema:'ci-qualification-shard-summary-v2',lane:'tests-22',shard:selected.index,total:selected.total,
     inventory_sha256:selected.inventory_sha256,selected_total:selected.selected_total,files:selected.files,
     cost_hints_sha256:selected.cost_hints_sha256,unknown_cost_files:selected.unknown_cost_files,
     cost_source:{commit:qualificationCosts.source_commit,run:qualificationCosts.run,job:qualificationCosts.job},
-    tap_sha256:hash(tap),counts,scope:'Local complete shard TAP and file selection only; no historical whole-suite or native qualification receipt',measured_speedup:null};
+    outer_events_sha256:hash(text),node_version:record.node_version,counts,
+    scope:'Local CLI-success outer reporter counts and file selection only; no historical whole-suite, native or authority receipt',measured_speedup:null};
 }
 
-export function collectQualification(file,selected) {
+export function collectQualification(file,selected,root=process.cwd()) {
   const fd=fs.openSync(file,fs.constants.O_RDONLY|fs.constants.O_NOFOLLOW|fs.constants.O_NONBLOCK);
   try {
-    const before=fs.fstatSync(fd),limit=64*1024*1024;
-    requireThat(before.isFile()&&before.nlink===1&&before.size<=limit,'qualification log must be a regular single-link 64MiB-or-smaller file');
+    const before=fs.fstatSync(fd),limit=65536;
+    requireThat(before.isFile()&&before.nlink===1&&before.size<=limit,'qualification summary must be a regular single-link 64KiB-or-smaller file');
     const chunks=[];let size=0;
     for(;;) {
       const buffer=Buffer.alloc(Math.min(65536,limit-size+1)),count=fs.readSync(fd,buffer,0,buffer.length,null);
       if(!count)break;
-      size+=count;requireThat(size<=limit,'qualification log exceeds 64MiB');chunks.push(buffer.subarray(0,count));
+      size+=count;requireThat(size<=limit,'qualification summary exceeds 64KiB');chunks.push(buffer.subarray(0,count));
     }
     const after=fs.fstatSync(fd);
-    requireThat(size===before.size&&['dev','ino','size','mtimeMs','ctimeMs','nlink'].every(key=>before[key]===after[key]),'qualification log changed during collection');
-    const raw=Buffer.concat(chunks);requireThat(isUtf8(raw),'qualification log must be UTF-8');
-    return qualificationSummary(raw.toString('utf8'),selected);
+    requireThat(size===before.size&&['dev','ino','size','mtimeMs','ctimeMs','nlink'].every(key=>before[key]===after[key]),'qualification summary changed during collection');
+    const raw=Buffer.concat(chunks);requireThat(isUtf8(raw),'qualification summary must be UTF-8');
+    return qualificationSummary(raw.toString('utf8'),selected,root);
   } finally {fs.closeSync(fd);}
-}
-
-if(process.argv[1]===fileURLToPath(import.meta.url)) {
-  try {
-    const [action,shard,file,...extra]=process.argv.slice(2);
-    requireThat(action==='--collect'&&typeof file==='string'&&!extra.length,'usage: qualification-shards.mjs --collect INDEX/TOTAL LOG');
-    const selected=selectQualificationShard(selectedTests('tests-22',inventory(process.cwd())),shard);
-    console.log(JSON.stringify(collectQualification(file,selected)));
-  } catch(error) {console.error(error.message);process.exitCode=1;}
 }
