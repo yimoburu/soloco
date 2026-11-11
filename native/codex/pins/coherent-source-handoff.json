@@ -9,7 +9,7 @@
   "rust_tests_authored": 169,
   "rust_tests_status": "AUTHORED_UNRUN_FOR_NEW_SOURCE_TUPLE",
   "complete_logical_files": 9307,
-  "overlay_files": 153,
+  "overlay_files": 154,
   "ordered_source_composition": [
     {
       "order": 1,
@@ -178,6 +178,12 @@
       "component": "root-native-guardian-models-coherent-source-preparation-v1",
       "artifact": "handoff.DATA.json",
       "sha256": "6ee54de41344d9704e27c435f8cf83ffeb687e4b63a2fe7a4a953a12d78a6863"
+    },
+    {
+      "order": 29,
+      "component": "root-native-rollout-schema-description-fixture-source-preparation-v2",
+      "artifact": "handoff.DATA.json",
+      "sha256": "76f858c26b94155987c29805001311d03a927d59a906f4d910fd297234af0dd7"
     }
   ],
   "accepted_lock_sha256": "040a380b1611e90ccf63cdcefc1a2d215e229053181d8dee497c659a477f47ec",
@@ -189,7 +195,7 @@
   "format_source_cut_sha256": "3b0e077cc3e4a38e521c0d268efadaa7df309612622c951bf38fb229989db37d",
   "format_source_bindings_sha256": "536e8668778d2de23fba9a98a4772d15ef864069e66a3e1d3811399b60cee0b3",
   "format_source_materialization_sha256": "50297a1849fb5b6bf0539360088d81ef3db3e8beeea631d7b142b77dea858476",
-  "source_graph_vector_sha256": "45a95bd839ffbc662a318f94c490f4c6ae548dc8ae1c734b7655657b6bf77a54",
+  "source_graph_vector_sha256": "77ea459e7555e0ca7a7270fd9a42b805db52b2d1dacd8efbd9ac815ab783bb0b",
   "source_format_delta": {
     "parent_portable_handoff_sha256": "c75ee77de8458c672622363bd02656e0a2075f67bdf5c2ba89aef40b7565edb4",
     "parent_coherent_handoff_sha256": "67ad9bf2fe5e16cc671a520b0af737b1dbfc430d3f2ed8d2f9184bf5b3524a23",
@@ -197,7 +203,7 @@
     "removed_ASCII_EOL_spaces": 18,
     "scope": "Only source-code trailing whitespace outside literals/comments; source-byte associations change and need their own qualification"
   },
-  "source_graph_bytes": 92058140,
+  "source_graph_bytes": 92058144,
   "eof_source_handoff_sha256": "db544a4699e562d8af4a1f128ac2769ef7b25813783a049933e1f35811765517",
   "lifetime_source_handoff_sha256": "34392507e7d695b4ef42bd74d422f48a213e302ef35dbc34e647c500ed5ae4b8",
   "lifetime_source_cut_sha256": "6e2764f7d19ee0e530fdd4aa08c4a9a0dfb2d35535cebff8e5d0a581d614d1a7",
@@ -233,9 +239,9 @@
     "prior_test_compile": "First8-library no-run failed11 actual cfg(test) errors; receipt715bc991dd38a20aade118c824084021fea42eedaa6c0f674d55c7b0cd22fc3c remains FAILED",
     "new_graph": "Whole source/package/compiled-input association changes even with identical production bytes; new593 compilation/tests/native remain unproved"
   },
-  "continuation_source_handoff_sha256": "6ee54de41344d9704e27c435f8cf83ffeb687e4b63a2fe7a4a953a12d78a6863",
-  "continuation_source_bindings_sha256": "2545a7ec9d9dae19e64028ddd11b07fc84fd612a2171508c672a7f1d94095f4e",
-  "continuation_source_materialization_sha256": "627b0b5556ce97a39b0cf2655cefeafd436dad138e331512db6b6934d076c3f7",
+  "continuation_source_handoff_sha256": "76f858c26b94155987c29805001311d03a927d59a906f4d910fd297234af0dd7",
+  "continuation_source_bindings_sha256": "f3fd28080f262b996318ca59e575fc6ee72ef5cd0d10f0c45976f08023a9a463",
+  "continuation_source_materialization_sha256": "2e4aeaebd9a7a854e93b842a3905e4259680ccfd4276a91c5357298f0353737b",
   "continuation_boundary": {
     "source_mechanics": "Original protected logical-SSE/typed-item lineage; fixed-five actual pending/decoder return; same-owner post-effective v5 context handshake; fresh later-step projection retains source while requiring new send guards",
     "resource_sha256": "832fdd1c965fa0e834c030f7c1e5636e2f32636b0df899ba8aa0fa940e9032fc",
@@ -305,5 +311,17 @@
     "all_169_status": "UNBUILT_UNRUN_FOR_NEW_TUPLE",
     "source_boundary": "Providerbase,Renderer/private default catalog binding,resource832f and all other source rows unchanged.",
     "qualification": "Source only; old A558 compilation/ordinary and protected failures retain original scope. No new Rust/compiler/test/native qualification, actual private source manifest or binary/runtime slot."
+  },
+  "rollout_schema_description_fixture_successor": {
+    "parent_package_handoff_sha256": "df77f5a9684f7c48e50590f9656bb98a86fa53e7ff77b3d7b186efb80ada351c",
+    "source_handoff_sha256": "76f858c26b94155987c29805001311d03a927d59a906f4d910fd297234af0dd7",
+    "source_bindings_sha256": "f3fd28080f262b996318ca59e575fc6ee72ef5cd0d10f0c45976f08023a9a463",
+    "source_materialization_sha256": "2e4aeaebd9a7a854e93b842a3905e4259680ccfd4276a91c5357298f0353737b",
+    "fixture_proof_sha256": "663a9b7cb3fabfba1706b8f73854650699bf1b760117c57f753c81d3ac8994e9",
+    "scope": "One existing compressed stable export; exactly one decoded RolloutLine.json description substring. Every other decoded byte and JSON value, all Rust bodies and all other9306 source rows unchanged.",
+    "changed_schema_fields_other_than_description": 0,
+    "changed_Rust_bodies": 0,
+    "authored_definitions_unchanged": 169,
+    "qualification": "New complete source identity unbuilt/unrun. Parent45a compiler and169 protected acceptance and ordinary adverse results remain parent-only; no actual compiled-manifest or qualified binary/runtime association."
   }
 }

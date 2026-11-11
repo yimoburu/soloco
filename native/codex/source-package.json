@@ -27,18 +27,18 @@
   "source_cut": {
     "handoff": {
       "path": "pins/coherent-source-handoff.json",
-      "bytes": 20220,
-      "sha256": "e807a3f31d3fb93d1046d1480e216558f56073f81056a55fd7e4c9b70500f723"
+      "bytes": 21596,
+      "sha256": "52d8b788835a0e22499faf5d13d417df83ed6f577e7128f97086df0d307ecda1"
     },
     "bindings": {
       "path": "pins/coherent-source-bindings.json",
       "bytes": 1953423,
-      "sha256": "6ca879e4e9a21377c5a2799874be484ab37944bd136086c3659f377e0bdecbce"
+      "sha256": "c5428db46b83bc8630fa92b60581cb42fc34d277c5707dcd0ccec50484f787cf"
     },
     "patch": {
       "path": "patches/c407-coherent-original-provenance.patch",
-      "bytes": 741276,
-      "sha256": "b1a5b87e611f2ee101b249de0c8decd9548e9c565d82db9f5b4fa921cae0e61e"
+      "bytes": 1164123,
+      "sha256": "0d1177c38da9c22dc96d625474033c8ee24fffcacd143e5a5b4bc15129a34850"
     },
     "review_state": "independent-review-required"
   },
@@ -70,6 +70,16 @@
         "path": "overlay/codex-rs/app-server-client/src/lib.rs",
         "bytes": 90784,
         "sha256": "5bbc0f8cfa27ad8a98a52c747da0de255ed665920d78f60c5c6795c2f7b7a316"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/app-server-protocol/schema/precomputed/app-server-exports-stable.json.zst",
+      "before_sha256": "5a93be76c2f389899b3a201bb470d69e48ac01ddc5233a431613bbff5a634a7f",
+      "payload": {
+        "path": "overlay/codex-rs/app-server-protocol/schema/precomputed/app-server-exports-stable.json.zst",
+        "bytes": 163907,
+        "sha256": "77c581894f3beba5585e1af5b4c2f822a9a10f878b5c971a447cf48c0971896b"
       },
       "mode": "100644"
     },

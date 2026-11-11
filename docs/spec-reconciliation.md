@@ -710,9 +710,9 @@ qualify later graphs. The source-only verifier for the A558 package exited
 successfully; the 49-case Python evidence is parent-scoped, with no new run
 claimed for this tuple. Source-pinned authoring metadata retains its original meaning.
 
-### Current coherent continuation candidate
+### Parent 45a continuation evidence
 
-The current PR #78 candidate has 153 overlays and 166 portable payloads composing
+The retained PR #78 parent has 153 overlays and 166 portable payloads composing
 9,307 logical Rust files and 92,058,140 bytes. Its source vector is
 `45a95bd839ffbc662a318f94c490f4c6ae548dc8ae1c734b7655657b6bf77a54`, package digest
 `965f08805e6d71a7df9030a02906d181da871f7e83682df3604eddfebb42f703`, and original builder digest
@@ -726,7 +726,7 @@ The private Session models GET path requires a bodyless GET and checks the actua
 post-auth method, exact URL, body and response limit before transport. ModelsClient
 uses that path and adds six regression definitions. All previous 163 authored
 definitions and assertions, including the model-provider/default-catalogue auth,
-cache and ownership checks, are preserved; the current total is 169.
+cache and ownership checks, are preserved; that parent total is 169.
 
 Generic protected non-Responses execution still Holds. Catalogue GET admission
 permits transport only; it does not confer original instruction or catalogue
@@ -748,7 +748,7 @@ That build executed no Rust tests. The three fresh normal helpers then compiled
 successfully with `profile.test=false`; their 20,045-byte receipt is
 `7e4617e7c957091503504c475a7ceffbb31165abd2e3703d9f758369cdb4a2ba`, retained at
 `root-bound-coherent45a-three-helper-build-v1/helper-build-v1/parent-evidence/ordinary-local-helpers/ACTUAL.DATA.json`.
-Both exact receipt bodies were verified against these hashes and the current
+Both exact receipt bodies were verified against these hashes and the parent
 45a source vector. All original processes, output streams and groups closed;
 source, toolchain and platform postchecks passed.
 
@@ -811,3 +811,89 @@ an original positive startup and continuation must then establish that join.
 Separate controlled Node mechanics cannot substitute for those producers.
 The qualified executable and runtime slots remain empty. Historical compilation
 and failed test-build receipts retain their exact original source scope.
+
+
+The later independent parent 45a ordinary assessment is
+`9e4862a37fba77a522c2f9651cdda5cdd5da8c8d1382ec6469bb7ba3f984b8cc`
+(7,185 bytes), retained at
+`root-independent-current45a-source-recipe-readiness-assessment-v1/assessment.DATA.json`.
+Its 107,360-byte ordinary observation union,
+`26a22a540ec90dae7e72e610d8910350160417be949536348c91deab7b2a0ba3`, is retained at
+`root-independent-current45a-source-recipe-readiness-assessment-v1/ordinary-authored169-union.DATA.json`.
+It verifies 169 distinct authored observations once: 97 from the first three roots,
+40 from Core, and 32 from the remaining eleven roots, with no missing/extra/overlap.
+All 21 baseline failures remain recorded; this union is not a whole-15 Pass.
+The independent protected readback is
+`d614d2ac9a2cff75be10be69f67bb3916b4289a7d20e307ff930e8dc83981bb1`
+(95,743 bytes) at
+`root-independent-current45a-protected25-result-readback-v1/review.DATA.json`;
+it verifies the parent's 25 selections, 185 cases and all 169 authored checks above.
+
+The separate seven-case setup diagnostic completed within its original 300-second
+whole limit. Every exact existing case passed, original processes/streams/groups
+closed, and source/toolchain/SDK/sealed-input postchecks passed. Receipt
+`d57c3ebb19039989d885abd289ad816ed6d25ef5c6ee8b09cf172fc4f55c0d1f`
+(23,129 bytes) is at
+`root-coherent45a-seven-setup-case-diagnostics-preparation-v1/actual-seven/evidence/ACTUAL.DATA.json`.
+Those observations use parent 45a and retain the original failed baseline cases;
+they do not imply a rerun or full-suite acceptance of the successor.
+
+### Current coherent continuation candidate
+
+At the November 11, 2026 source checkpoint, PR #78 carries the 77ea fixture successor:
+154 overlays, 167 portable payloads, 9,307 logical files and 92,058,144 bytes. Its vector is
+`77ea459e7555e0ca7a7270fd9a42b805db52b2d1dacd8efbd9ac815ab783bb0b`, package digest
+`f85caf3208b08049a13773e6cbe1d638f7e21bf648db376a1b3a4a2ccab7d11e`, and builder digest
+`6bf1d04d011cf37486b564cabe0d517b7f72d05f32e83d5ac104a5b4be3377b6`.
+The corrected canonical handoff is
+`76f858c26b94155987c29805001311d03a927d59a906f4d910fd297234af0dd7` at
+`root-native-rollout-schema-description-fixture-source-preparation-v2/handoff.DATA.json`;
+the portable handoff is
+`5c3db2f87748ef50b10ea56110e3b505bcc2c3966745d245c33022d004d2450f` at
+`root-native-rollout-schema-description-fixture-package-preparation-v2/handoff.DATA.json`.
+
+The closed parent diagnostic
+`f714bd28367505ea7f8503b7ce77668ea70d09563410434e2d92069c9b15bfea`
+(662,114 bytes), at
+`root-coherent45a-remaining11-execution-preparation-v1/ACTUAL-closed-appserver-protocol-diagnostic.DATA.json`,
+identified exactly one documentation mismatch in
+`schema/precomputed/app-server-exports-stable.json.zst`.
+Its inner `RolloutLine.json` description still named `codex_rollout` while the
+current Rustdoc correctly names the canonical parser exported by `codex_history`.
+Only that literal description substring changes; the decoded archive is otherwise
+byte-identical, schema fields and runtime witness exclusions are unchanged, and
+no schema regeneration occurs. The compressed archive grows by four bytes.
+Every Rust body, the other 9,306 complete-source rows and all 169 authored names
+are identical to 45a. The old failure remains part of the retained 21-case baseline.
+
+The actual one-file application exited 0. Its 3,349-byte handoff,
+`d590988f8076d3eb8d228dfb86577dafe5b073a3984a96aba281bd03d8679e8d`, is at
+`root-schema-description-one-file-workingcopy-preparation-v1/handoff.DATA.json`.
+The 4,718,610-byte complete-source proof,
+`35b08440724e7c67444d3376d17632aa5c2a1bb77d78a1170b07c85d93a28f23`, is at
+`root-schema-description-one-file-workingcopy-preparation-v1/ACTUAL-complete-schema-description-workingcopy.DATA.json`.
+The original builder verified all 9,307 bodies/modes once; all other 9,306 physical
+metadata rows were preserved. Its actual Rust-only compiled-input manifest DATA is
+`bb61707d5201531b81b76adda738dba33ab6072c587d708a98005a4dddc3b1fe`
+(1,674,491 bytes), at
+`root-schema-description-one-file-workingcopy-preparation-v1/original-rust-source-manifest.json`.
+The once-only source CLI verification exited 0 with 9,264 upstream/153 toolchain/
+9,307 composed rows and native qualification false. Its 2,453-byte receipt is
+`98485fada1568f94a6fb6bf9f624d8b7a056964d58f7192179bfc8184ed9cbfb` at
+`root-native-rollout-schema-description-fixture-package-preparation-v2/ROOT-ACTUAL-source-CLI-once-v1/ACTUAL.DATA.json`.
+Frozen as-created authoring metadata stays unchanged; the actual CLI receipt is separate.
+
+This dated checkpoint has prepared affected validation as one fresh ordinary
+app-server-protocol LIBtest no-run build followed by its whole 323-case root,
+retaining the original ignored schema-write fixture. It claims no fresh result
+for that sequence. [PR #78](https://github.com/yimoburu/soloco/pull/78) records the
+exact current-head result and acceptance. Parent 45a compilation, protected 169 checks and
+ordinary 169 observations remain evidence for its byte-identical Rust bodies;
+they are not a new complete-source or binary qualification for 77ea.
+No fresh 15-target/protected/production-companion build is claimed for 77ea.
+The parent normal binary 5c65521c and manifest a8c72 retain their old association;
+the new manifest bb617 is source DATA, not a native executable capability.
+The matching Node TaskHost/frame/static build-descriptor/private-FD adapter is
+still missing. Original native startup/continuation, account/corpus acceptance,
+continuity and company adoption remain unproved; qualified executable/runtime
+slots stay NULL. Normative SPEC v0.21 and its governance commitment above, and adopted v0.20, remain unchanged.

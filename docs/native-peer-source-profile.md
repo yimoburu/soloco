@@ -134,7 +134,7 @@ stack overflow; eleven roots remain unrun. Protected compilation completed those
 executed, with 161 passing and 18 failing cases in catalogue paths. These results
 and their exact failed receipts remain historical in the reconciliation record.
 
-The current coherent candidate has 153 overlays, 166 portable payloads, 9,307
+The 45a parent has 153 overlays, 166 portable payloads, 9,307
 logical files and 92,058,140 bytes, with source vector
 `45a95bd839ffbc662a318f94c490f4c6ae548dc8ae1c734b7655657b6bf77a54`, package
 `965f08805e6d71a7df9030a02906d181da871f7e83682df3604eddfebb42f703`, and builder
@@ -165,10 +165,42 @@ claimed by that checkpoint. [PR #78](https://github.com/yimoburu/soloco/pull/78)
 tracks exact current-head ordinary-suite acceptance. The run reuses verified read-only ordinary execution copies;
 product source and compiler receipts are unchanged. Genuine native acceptance
 is not established.
-Exact current source, manifest and verified closed build receipts are in the
+Exact parent source, manifest and verified closed build receipts are in the
 [reconciliation record](spec-reconciliation.md#current-coherent-continuation-candidate).
 Earlier 009 compilation and failed execution receipts retain their original
 scope. Package checks, compilation and staging do not establish a qualified
 binary, Node interpreter/static-slot join, account or corpus acceptance,
 continuity, or company adoption. Native-qualified executable and runtime slots
 remain empty; the embedded resource's source-pinned authoring status is unchanged.
+
+
+## Current schema-description fixture successor
+
+The current PR #78 source has 154 overlays, 167 portable payloads, 9,307 logical
+files and 92,058,144 bytes. Its source vector is
+`77ea459e7555e0ca7a7270fd9a42b805db52b2d1dacd8efbd9ac815ab783bb0b`, package
+`f85caf3208b08049a13773e6cbe1d638f7e21bf648db376a1b3a4a2ccab7d11e`, and builder
+`6bf1d04d011cf37486b564cabe0d517b7f72d05f32e83d5ac104a5b4be3377b6`.
+Only the stable compressed schema export changes: one `RolloutLine.json`
+description names the canonical parser exported by `codex_history`. All other
+decoded bytes and schema fields, every Rust body, the other 9,306 logical rows,
+and all 169 authored names are unchanged. No schema regeneration or wire-field
+change is involved.
+
+The parent 45a evidence now includes all 169 authored ordinary observations once
+across the closed 97 + 40 + 32 union. Protected checks passed 185 cases, including
+all 169 authored definitions. All 21 baseline failures remain adverse; the union does not establish a whole-15 Pass. Seven
+separate setup diagnostics passed under the bounded private-CWD/temp-alias
+runtime, with complete closure and input postchecks, on parent 45a only.
+
+The one-file application, original full-graph verification and source-only CLI
+check completed. The actual 77ea Rust-only manifest is input DATA. At the
+November 11, 2026 source checkpoint, affected validation was prepared as one
+ordinary app-server-protocol library-test build and its complete 323-case root.
+[PR #78](https://github.com/yimoburu/soloco/pull/78) records the exact current-head
+result and acceptance. This checkpoint supplies no fresh 15-target/protected or
+production-companion build for 77ea. Parent 45a's production binary and manifest
+retain their original source association. The missing Node adapter, genuine
+native positive, account/corpus qualification, continuity and adoption remain
+separate; qualified executable/runtime slots remain empty. Exact hashes and
+receipts are in the [reconciliation record](spec-reconciliation.md#current-coherent-continuation-candidate).

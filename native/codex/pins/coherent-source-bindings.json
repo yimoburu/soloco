@@ -2689,8 +2689,8 @@
   },
   {
     "path": "codex-rs/app-server-protocol/schema/precomputed/app-server-exports-stable.json.zst",
-    "bytes": 163903,
-    "sha256": "5a93be76c2f389899b3a201bb470d69e48ac01ddc5233a431613bbff5a634a7f",
+    "bytes": 163907,
+    "sha256": "77c581894f3beba5585e1af5b4c2f822a9a10f878b5c971a447cf48c0971896b",
     "mode": "100644"
   },
   {
