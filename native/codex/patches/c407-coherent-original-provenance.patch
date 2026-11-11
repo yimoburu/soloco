@@ -4510,7 +4510,7 @@
  mod apps;
 --- /dev/null
 +++ b/codex-rs/core/src/original_instruction_renderer.rs
-@@ -0,0 +1,591 @@
+@@ -0,0 +1,593 @@
 +//! Private original instruction renderer receipts. Runtime facts, never grants.
 +//! Only concrete original rendering sites mint these values. Protocol carriers
 +//! transport data; labels, equal text and deserialized metadata mint nothing.
@@ -4886,7 +4886,9 @@
 +pub(crate) fn admit_original_history_renderer(envelope: &mut codex_history::ResponseItemEnvelope, original_live: bool) {
 +    let witness = envelope.item.take_original_instruction_rendering();
 +    // Do not trust a copied harness-level capsule on generic injection/replay.
-+    envelope.metadata.get_or_insert_default().original_instruction_rendering = None;
++    if let Some(metadata) = envelope.metadata.as_mut() {
++        metadata.original_instruction_rendering = None;
++    }
 +    if !original_live { return; }
 +    if !matches!(&envelope.item, ResponseItem::Message { .. }) { return; }
 +    let single;
@@ -5040,7 +5042,7 @@
 +        let bytes = serde_json::to_vec(&encoded).ok()?;
 +        if bytes.len() > MAX_RENDER_SOURCE_BYTES { return None; }
 +        expected.push(ResponseItem::AdditionalTools {
-+            id:Some(codex_protocol::models::ResponseItemId::with_suffix("at",uuid::Uuid::new_v5(&namespace,&bytes))),
++            id:Some(codex_protocol::ResponseItemId::with_suffix("at",uuid::Uuid::new_v5(&namespace,&bytes))),
 +            role:"developer".to_owned(),tools:Arc::from(encoded),
 +        });
 +        Some(Arc::<[u8]>::from(bytes))
@@ -5048,7 +5050,7 @@
 +    let base_index = expected.len();
 +    if !base.text.is_empty() {
 +        let mut prefix = ContextualUserFragment::into(crate::context::BaseInstructionsFragment(base.text.clone()));
-+        prefix.set_id(Some(codex_protocol::models::ResponseItemId::with_suffix("msg",
++        prefix.set_id(Some(codex_protocol::ResponseItemId::with_suffix("msg",
 +            uuid::Uuid::new_v5(&namespace,base.text.as_bytes()))));
 +        expected.push(prefix);
 +    }
@@ -5104,10 +5106,11 @@
 +mod tests;
 --- /dev/null
 +++ b/codex-rs/core/src/original_instruction_renderer_tests.rs
-@@ -0,0 +1,269 @@
+@@ -0,0 +1,287 @@
 +//! Authored source-only; no compiler, test or native receipt is implied.
 +use super::*;
-+use codex_protocol::models::{ContentItem, ContentItemKind, ResponseItemId};
++use codex_protocol::models::{ContentItem, ContentItemKind};
++use codex_protocol::ResponseItemId;
 +
 +async fn fresh_original() -> (Session, StepContext, BaseInstructions) {
 +    let (session,mut turn)=crate::session::tests::make_session_and_context().await;
@@ -5373,6 +5376,23 @@
 +    // become a fresh source-owned declaration merely by matching encoded bytes.
 +    let mut restored=vec![prefix];restored.extend(before);
 +    assert!(original_wire_projection(&base,&restored,&after,controls(),&tools).is_none());
++}
++
++#[test]
++fn plain_no_capsule_keeps_absent_harness_metadata_for_both_history_routes() {
++    let item: ResponseItem = serde_json::from_value(json!({
++        "type":"message", "role":"user",
++        "content":[{"type":"input_text", "text":"ordinary unchanged input"}]
++    })).unwrap();
++    for original_live in [false, true] {
++        let original = codex_history::ResponseItemEnvelope::new(item.clone());
++        assert!(original.metadata.is_none());
++        let mut actual = original.clone();
++        admit_original_history_renderer(&mut actual, original_live);
++        assert_eq!(actual.item, original.item);
++        assert!(actual.metadata.is_none());
++        assert_eq!(actual, original);
++    }
 +}
 --- /dev/null
 +++ b/codex-rs/core/src/original_instruction_resources.rs

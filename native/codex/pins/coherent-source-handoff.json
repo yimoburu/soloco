@@ -6,7 +6,7 @@
   "original_coherent_bindings_sha256": "074802c878f106af12c6adaba349db932932d5ce461e597b421e36614470b1d4",
   "original_materialization_plan_sha256": "22c2428e90c39f5f88c98ddab4f21bc7b28daee81b4d8a34a552273e87c17c7c",
   "original_backend_source_handoff_sha256": "5a43acb85656aa2f2dc6a52b91ab5d88741d69bf27bd1c0368ec1d59664e9a61",
-  "rust_tests_authored": 109,
+  "rust_tests_authored": 110,
   "rust_tests_status": "UNRUN",
   "complete_logical_files": 9294,
   "overlay_files": 112,
@@ -76,6 +76,24 @@
       "component": "root-original-rollout-path-lifetime-source-preparation-v1",
       "artifact": "handoff.DATA.json",
       "sha256": "34392507e7d695b4ef42bd74d422f48a213e302ef35dbc34e647c500ed5ae4b8"
+    },
+    {
+      "order": 12,
+      "component": "root-original-renderer-response-id-source-preparation-v1",
+      "artifact": "handoff.DATA.json",
+      "sha256": "58e3ed4be51f7797a5ea0b150f32b5585a6db298e662a857b59b12436429ed44"
+    },
+    {
+      "order": 13,
+      "component": "root-original-renderer-empty-metadata-source-preparation-v1",
+      "artifact": "handoff.DATA.json",
+      "sha256": "0952a7af5547d3324b9f8449f36ff2a106b5a5fae808df516c79f88d970aad13"
+    },
+    {
+      "order": 14,
+      "component": "root-original-renderer-empty-metadata-source-preparation-v1/ROOT-independent-renderer-repair-source-review-v1",
+      "artifact": "review.DATA.json",
+      "sha256": "f45561a9bb26b5bb5bda9c6153b2e0057d5f9f154de304defe7e5d7e928e2c37"
     }
   ],
   "accepted_lock_sha256": "040a380b1611e90ccf63cdcefc1a2d215e229053181d8dee497c659a477f47ec",
@@ -87,7 +105,7 @@
   "format_source_cut_sha256": "3b0e077cc3e4a38e521c0d268efadaa7df309612622c951bf38fb229989db37d",
   "format_source_bindings_sha256": "536e8668778d2de23fba9a98a4772d15ef864069e66a3e1d3811399b60cee0b3",
   "format_source_materialization_sha256": "50297a1849fb5b6bf0539360088d81ef3db3e8beeea631d7b142b77dea858476",
-  "source_graph_vector_sha256": "ea3c810e2b11c3137127c3e5bdcd4df916493573620f8c064d1322ffe6f9fa70",
+  "source_graph_vector_sha256": "f48b1619d8bf858c20583dacb718433955a2ebe3ae95977bb04cd1cde0538dd4",
   "source_format_delta": {
     "parent_portable_handoff_sha256": "c75ee77de8458c672622363bd02656e0a2075f67bdf5c2ba89aef40b7565edb4",
     "parent_coherent_handoff_sha256": "67ad9bf2fe5e16cc671a520b0af737b1dbfc430d3f2ed8d2f9184bf5b3524a23",
@@ -95,18 +113,29 @@
     "removed_ASCII_EOL_spaces": 18,
     "scope": "Only source-code trailing whitespace outside literals/comments; source-byte associations change and need their own qualification"
   },
-  "source_graph_bytes": 91881820,
+  "source_graph_bytes": 91882557,
   "eof_source_handoff_sha256": "db544a4699e562d8af4a1f128ac2769ef7b25813783a049933e1f35811765517",
   "lifetime_source_handoff_sha256": "34392507e7d695b4ef42bd74d422f48a213e302ef35dbc34e647c500ed5ae4b8",
   "lifetime_source_cut_sha256": "6e2764f7d19ee0e530fdd4aa08c4a9a0dfb2d35535cebff8e5d0a581d614d1a7",
   "lifetime_source_bindings_sha256": "e20ab6c6a62d2af182a81ca1d1190fe0a4b5aaa30d2dde557e285cebfc90273c",
   "lifetime_source_materialization_sha256": "97d4d6659e2b4cfeed41d9db35c6a463e8074f4fbeb34a7bb85951a4d94d692c",
-  "distinct_authored_rust_tests_manifest_sha256": "d4b73c3daf9537400e2581a6fa9375e7607979e0c1839279ac32ad350a2e2700",
+  "distinct_authored_rust_tests_manifest_sha256": "e6642e0a75413f5c80b0f2495e137d5306bc9cab82204e1874b54aff5db15c1c",
   "source_repair": {
     "parent_portable_handoff_sha256": "c0672a939f0941471e07b0249cb4841052d3b4f3fa502c72b67b85ecb1e7a608",
     "EOF": "One extra final LF removed from rollout_decode.rs; retain one final LF",
     "lifetime": "Own original rollout PathBuf and move into existing static blocking-reader callback; source-authored original-read test added",
     "previous_failed_compiler_receipt_sha256": "f897dbfd1c4da0a67e9f33b9f8d979da4f2be459d72d378a840270abc1bd51c8",
     "qualification": "Old failed compiler stays failed; new source needs its own checks/build/native acceptance"
+  },
+  "renderer_public_type_handoff_sha256": "58e3ed4be51f7797a5ea0b150f32b5585a6db298e662a857b59b12436429ed44",
+  "renderer_absent_metadata_handoff_sha256": "0952a7af5547d3324b9f8449f36ff2a106b5a5fae808df516c79f88d970aad13",
+  "renderer_source_bindings_sha256": "e6d9840930773554717e92b728b7ae4c529b6958d9f13eaf87912098df3ce4df",
+  "renderer_materialization_sha256": "54797169136dc7044d33cb319d314f0e5a62b5deaa712cacca682045dc2a7da8",
+  "renderer_repair_review_sha256": "f45561a9bb26b5bb5bda9c6153b2e0057d5f9f154de304defe7e5d7e928e2c37",
+  "renderer_repair_scope": {
+    "compiler_finding": "E0603 private ResponseItemId path; production qualifiers and test import use the public crate-root export",
+    "source_confirmed_regression": "Clear only an existing harness metadata value; preserve absent metadata without a renderer capsule",
+    "tests": "New ordinary None/no-capsule regression covers both history-route booleans; AUTHORED_UNRUN",
+    "qualification": "Source repair only; failed runs remain failed; no ordinary/protected/native success inferred"
   }
 }

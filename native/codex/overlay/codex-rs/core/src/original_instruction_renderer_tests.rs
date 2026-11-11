@@ -1,6 +1,7 @@
 //! Authored source-only; no compiler, test or native receipt is implied.
 use super::*;
-use codex_protocol::models::{ContentItem, ContentItemKind, ResponseItemId};
+use codex_protocol::models::{ContentItem, ContentItemKind};
+use codex_protocol::ResponseItemId;
 
 async fn fresh_original() -> (Session, StepContext, BaseInstructions) {
     let (session,mut turn)=crate::session::tests::make_session_and_context().await;
@@ -266,4 +267,21 @@ async fn fresh_rlite_prefix_uses_real_typed_encoder_and_changed_inventory_is_hel
     // become a fresh source-owned declaration merely by matching encoded bytes.
     let mut restored=vec![prefix];restored.extend(before);
     assert!(original_wire_projection(&base,&restored,&after,controls(),&tools).is_none());
+}
+
+#[test]
+fn plain_no_capsule_keeps_absent_harness_metadata_for_both_history_routes() {
+    let item: ResponseItem = serde_json::from_value(json!({
+        "type":"message", "role":"user",
+        "content":[{"type":"input_text", "text":"ordinary unchanged input"}]
+    })).unwrap();
+    for original_live in [false, true] {
+        let original = codex_history::ResponseItemEnvelope::new(item.clone());
+        assert!(original.metadata.is_none());
+        let mut actual = original.clone();
+        admit_original_history_renderer(&mut actual, original_live);
+        assert_eq!(actual.item, original.item);
+        assert!(actual.metadata.is_none());
+        assert_eq!(actual, original);
+    }
 }

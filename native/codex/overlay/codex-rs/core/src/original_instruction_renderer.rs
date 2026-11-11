@@ -373,7 +373,9 @@ pub(crate) fn bind_assembled_message(item: &mut ResponseItem, parts: Option<Orig
 pub(crate) fn admit_original_history_renderer(envelope: &mut codex_history::ResponseItemEnvelope, original_live: bool) {
     let witness = envelope.item.take_original_instruction_rendering();
     // Do not trust a copied harness-level capsule on generic injection/replay.
-    envelope.metadata.get_or_insert_default().original_instruction_rendering = None;
+    if let Some(metadata) = envelope.metadata.as_mut() {
+        metadata.original_instruction_rendering = None;
+    }
     if !original_live { return; }
     if !matches!(&envelope.item, ResponseItem::Message { .. }) { return; }
     let single;
@@ -527,7 +529,7 @@ pub(crate) fn original_wire_projection(base: &BaseInstructions, before: &[Respon
         let bytes = serde_json::to_vec(&encoded).ok()?;
         if bytes.len() > MAX_RENDER_SOURCE_BYTES { return None; }
         expected.push(ResponseItem::AdditionalTools {
-            id:Some(codex_protocol::models::ResponseItemId::with_suffix("at",uuid::Uuid::new_v5(&namespace,&bytes))),
+            id:Some(codex_protocol::ResponseItemId::with_suffix("at",uuid::Uuid::new_v5(&namespace,&bytes))),
             role:"developer".to_owned(),tools:Arc::from(encoded),
         });
         Some(Arc::<[u8]>::from(bytes))
@@ -535,7 +537,7 @@ pub(crate) fn original_wire_projection(base: &BaseInstructions, before: &[Respon
     let base_index = expected.len();
     if !base.text.is_empty() {
         let mut prefix = ContextualUserFragment::into(crate::context::BaseInstructionsFragment(base.text.clone()));
-        prefix.set_id(Some(codex_protocol::models::ResponseItemId::with_suffix("msg",
+        prefix.set_id(Some(codex_protocol::ResponseItemId::with_suffix("msg",
             uuid::Uuid::new_v5(&namespace,base.text.as_bytes()))));
         expected.push(prefix);
     }

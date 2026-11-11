@@ -261,7 +261,22 @@ shape. A later typecheck reached the original reader and found a borrowed-path
 lifetime error in its blocking callback. The repair retains an owned copy of the
 same path; both failed runs remain recorded. The new source tuple requires its
 own compilation and affected tests.
-This addition changes no normative SPEC row or adopted company rule.
+
+A subsequent ordinary Core typecheck reported E0603 because the renderer
+referenced `ResponseItemId` through a private module import. The source repair
+uses the existing public crate-root export in production and in the matching
+test import. Separately, source review—not a failed execution—identified witness
+cleanup changing ordinary envelopes from absent metadata to an empty metadata
+value. Cleanup now clears only existing metadata; a new plain-envelope
+regression covers both history routes without supplying a renderer capsule.
+
+The current tuple contains 110 distinct authored Rust test definitions, all
+unrun. The package's 49 pure Python checks and source verification cover recipe
+integrity and explicit mocks; they establish no ordinary/protected Rust pass,
+qualified binary, account/OS acceptance or native CoS workflow. The repaired
+tuple still requires its affected compilation, tests and applicable independent
+acceptance. Prior failures retain their original results. This addition changes
+no normative SPEC row or adopted company rule.
 
 ## Controlled P4 code acceptance
 

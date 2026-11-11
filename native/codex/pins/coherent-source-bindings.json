@@ -17965,14 +17965,14 @@
   },
   {
     "path": "codex-rs/core/src/original_instruction_renderer.rs",
-    "bytes": 37615,
-    "sha256": "7a259982476d0c967c1dc1df76b111cb78685eedaab6570a149388acfa8a6254",
+    "bytes": 37633,
+    "sha256": "7fd5a7f55d206b53e366f74e84cb9a11fc25a25e402fb35b4c59d50e97c85e00",
     "mode": "100644"
   },
   {
     "path": "codex-rs/core/src/original_instruction_renderer_tests.rs",
-    "bytes": 16043,
-    "sha256": "5f8c26894e03e218fe63128db02a476a481361fe640c09bc91886c5b8c5736f0",
+    "bytes": 16762,
+    "sha256": "3920658c4942d3c073b7e9c22ae5c9ce282a512ec56b6a7c8e4213498a16fe2a",
     "mode": "100644"
   },
   {
