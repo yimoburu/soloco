@@ -1,4 +1,5 @@
 import {retentionReviewAction,resolveRetentionRepair,retentionRepairSessionKey,retentionRepairContextInputs,assertRetentionRepairCommit} from './development-retention-repair.mjs';
+import {retentionReviewAdmissionPreflight,assertRetentionReviewPreflightCommit} from './review-preflight.mjs';
 import {developmentReviewContinuationAction,reviewContinuationAssignment} from './development-review-continuation.mjs';
 import {codeReviewWindowSubject} from './code-review-window.mjs';
 import {SchedulingHold} from './recovery.mjs';
@@ -20,6 +21,7 @@ import { normalizeSelection, selectionKey } from './selection.mjs';
 import {reconcileStoredModelProcessClosure} from './model-process-closure.mjs';
 import { normalizeCoordination, bindCoordination } from './coordination.mjs';
 import { progressSnapshot, renderProgress } from './progress-view.mjs';
+import {progressObservations} from './progress-observations.mjs';
 import { beginHandover, submitReconstruction, handoverReviewEligible, freshHandoverReviewEligible, verifyHandoverAcceptance, handoverSubject, inspectHandover, reconstructionReceipt, admitHandover } from './handover.mjs';
 import { assignmentContext, contextMatches } from './context.mjs';
 import { developmentAction, developmentCapability, developmentAssignment } from './develop.mjs';
@@ -237,12 +239,14 @@ export async function wait(args,host) {
 // Read only: unlike status, never reconciles jobs or writes receipts.
 export function progress(args,host) {
   binding(args,host);
-  if (!['json','html','text','mermaid'].includes(args.format ?? 'json')) throw new Error('Unknown progress format');
+  if (!['json','html','text','mermaid','observations'].includes(args.format ?? 'json')) throw new Error('Unknown progress format');
   if (args.recent_jobs !== undefined && (!Number.isInteger(args.recent_jobs) || args.recent_jobs < 1 || args.recent_jobs > 50)) throw new Error('recent_jobs must be 1 to 50');
+  if(args.format==='observations'&&args.action!==undefined)throw Error('Observations use cursor pages, not progress artifact reads');
   if(args.action==='read')return readProgressArtifact(args,host);
   return withStore(args.root,db=>db.readSnapshot(()=>{
     const state=db.read();
     if (!state) throw new Error('Company initialization is incomplete; use company_open');
+    if(args.format==='observations')return progressObservations(state,args);
     const projection=progressSnapshot(state,{recentJobs:args.recent_jobs ?? 20});
     const result=args.format && args.format !== 'json' ? renderProgress(projection,args.format,{renderId:args.render_id}) : projection;
     if(fits(result))return result;
@@ -323,7 +327,7 @@ export function dispatch(args,host,{launch=launchWorker,check=readiness,catalog=
   const ready=check(host);
   if (!ready.available) throw new Error(ready.error);
   if (ready.authenticated===false) throw new Error(`${host} CLI is not signed in. Complete its normal login before starting specialists.`);
-  const jobId=id('job');let retentionControl=null;
+  const jobId=id('job');let retentionControl=null,retentionPreflight=null;
   const state=update(args,host,'job.queued',s=>{
     if(s.paused && !handoverReviewEligible(s,args)&&!qualificationMaintenanceEligible(s,args)&&!scoped.scopedMaintenanceEligible(s,args)&&!operatingMaintenanceEligible(s,args)) throw new Error('Company is paused; only current handover QA or explicitly authorized read-only qualification may run');
     if(reviewWindow&&!freshHandoverReviewEligible(s,args))throw Error('Review window is only for a fresh current paused streamed handover QA');
@@ -378,11 +382,12 @@ export function dispatch(args,host,{launch=launchWorker,check=readiness,catalog=
     reviewContinuationAssignment(s,job,{reserve:true,root:args.root});
     if(repair)retentionControl=resolveRetentionRepair(s,job,{reserve:true,root:args.root}).control;
     const context=assignmentContext(s,job);
+    if(repair)retentionPreflight=retentionReviewAdmissionPreflight(s,{...job,inputs:context.inputs,context_sha256:context.hash},context,{validateCurrent:()=>{retentionControl=resolveRetentionRepair(s,job,{reserve:true,root:args.root}).control;}}).commit;
     if(job.context_format===6){job.inputs=context.inputs;job.context_sha256=context.hash;admitOperatingAssignment(s,job);}
     if(specialist)prepareSpecialistAssignment(s,{...args,input_ids:inputs},{reserve:true});
     s.jobs[jobId]={...job,inputs:context.inputs,context_sha256:context.hash};
     s.runtime_version=VERSION;
-  },null,(_db,next)=>{if(retentionControl)assertRetentionRepairCommit(next,retentionControl);});
+  },null,(_db,next)=>{if(retentionControl)assertRetentionRepairCommit(next,retentionControl);if(retentionPreflight)assertRetentionReviewPreflightCommit(next,next.jobs[jobId],retentionPreflight);});
   try {
     const worker=launch(args.root,jobId);
     worker.on('error',error=>withStore(args.root,db=>db.transaction('job.spawn_failed',s=>{s.jobs[jobId].status='failed';s.jobs[jobId].error=error.message;s.jobs[jobId].coordination_release={termination_confirmed:true,reason:'worker_spawn_failed',at:stamp()};notice(s,'must_know','Unable to start specialist session.',jobId);return s;})));

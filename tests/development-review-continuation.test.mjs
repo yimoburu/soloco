@@ -10,6 +10,7 @@ import {digest,id,installedTeam,teamHash,VERSION,withStore,Store} from '../plugi
 import {validationManifest} from '../plugins/soloco/runtime/validation-cache.mjs';
 import {developmentReviewAuthority,developmentReviewSubject} from '../plugins/soloco/runtime/develop.mjs';
 import {assignmentContext} from '../plugins/soloco/runtime/context.mjs';
+import {developmentDeliveryAction,DEVELOPMENT_ACCEPTANCE_REPORT_PROTOCOL,developmentDeliverySnapshotValue} from '../plugins/soloco/runtime/development-delivery.mjs';
 import {prepareReviewContinuation,authorizeReviewContinuation,reviewContinuationSubject,reviewContinuationAssignment,reviewContinuationContextInputs,reviewContinuationCandidate,reviewContinuationRequiredEvidence,validateReviewContinuationPublication,acceptReviewContinuation,developmentReviewContinuationAction} from '../plugins/soloco/runtime/development-review-continuation.mjs';
 
 const base=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-review-continuation-'));
@@ -196,4 +197,16 @@ for(const layout of ['legacy','normalized'])for(const action of ['authorize_revi
     assert.throws(()=>developmentReviewContinuationAction(args,'codex'),/expired/);
   } finally {Date.now=now;Store.prototype.transaction=original;}
   assert.equal(crossed,true);assert.deepEqual(read(a),before);
+});
+
+test('new continuation acceptance retains its canonical report at its own home without rewriting the receipt',()=>{
+ const a=fixture(),target=authorized(a),key=queued(a,target),pair=closedPair(a,key);publish(a,pair);const before=read(a);
+ const accepted=developmentReviewContinuationAction({...a,action:'accept_review_continuation',target_id:target.id,target_sha256:hash(target),review_id:pair.record.id,candidate_sha256:target.development.proposal.subject.candidate_sha256,receipt_sha256:a.receipt_sha256},'codex'),s=read(a),report=accepted.development.acceptance_report;
+ assert.equal(report.protocol,DEVELOPMENT_ACCEPTANCE_REPORT_PROTOCOL);assert.equal(report.acceptance_kind,'review-continuation');assert.equal(accepted.development.acceptance_report_sha256,hash(report));
+ assert.deepEqual(s.records.receipt,before.records.receipt);assert.deepEqual(s.records.plan,before.records.plan);assert.deepEqual(s.jobs['prior-unknown'],before.jobs['prior-unknown']);assert.deepEqual(developmentDeliverySnapshotValue(s,report.receipt_before_acceptance),before.records.receipt);assert.equal(report.repository_head.status,'unobserved');
+ const args={root:a.root,session_id:a.session_id,epoch:a.epoch,action:'acceptance_report',plan_id:'plan',receipt_id:'receipt',acceptance_id:accepted.id};
+ const result=developmentDeliveryAction(args,'codex');assert.equal(result.status,'observed');assert.equal(result.report_sha256,accepted.development.acceptance_report_sha256);assert.equal(result.acceptance_id,accepted.id);assert.equal(result.source_integration,false);
+ const unchanged=read(a);assert.throws(()=>change(a,state=>acceptReviewContinuation(state,{...a,target_id:target.id,target_sha256:hash(target),review_id:pair.record.id,candidate_sha256:target.development.proposal.subject.candidate_sha256,receipt_sha256:a.receipt_sha256},a.root)),/already locally accepted/);assert.deepEqual(read(a),unchanged);
+ change(a,state=>{delete state.records[accepted.id].development.acceptance_report;delete state.records[accepted.id].development.acceptance_report_sha256;delete state.records[accepted.id].development.plan_id;});
+ const legacy=read(a),unavailable=developmentDeliveryAction(args,'codex');assert.equal(unavailable.reason,'legacy_continuation_acceptance_report_unavailable');assert.deepEqual(read(a),legacy);
 });

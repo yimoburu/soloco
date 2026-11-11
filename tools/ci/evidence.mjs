@@ -34,6 +34,7 @@ export const workflowPolicies=Object.freeze({
 export function workflowPolicy(workflow){requireThat(Object.hasOwn(workflowPolicies,workflow),'unsupported workflow');return workflowPolicies[workflow];}
 // Runtime-sensitive compatibility coverage; the full suite remains mandatory on Node 22.
 export const compatibilityTests=Object.freeze([
+  'deterministic-audit-cache','development-delivery','followup-interface','implementation-observations','implementation-timing','review-admission-preflight','review-preflight','tool-error',
   'cancellation-finalization','ci-evidence','claude-terminal-state','development-file-bodies','development-receipt-json','dynamic-specialists-integration','hooks','indexed-public-reads',
   'code-review-window','code-review-inline-reread','continuation-review-transport','development-review-continuation','development-retention-repair','development-retention-worker','model-process-adapter-late-close','model-process-closure','review-continuation-central','review-continuation-grant-window',
   'local-sandbox-flags','local-sandbox','local-sandbox-fixture','normalized-read-atomicity','peer-admission-provider-errors','peer-github','peer-github-atomic','peer-github-policy','peer-legacy-adoption-readiness','peer-legacy-writer-fence','peer-membership','peer-observation-journal','peer-publication-policy','peer-scheduler','peer-scheduler-admission-provider-errors','plugin',

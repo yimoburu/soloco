@@ -4,6 +4,7 @@ import {digest,id,stamp,owner,requireText,withStore,STORE_PRECOMMIT_GUARD_VERSIO
 import {developmentReviewAuthority,developmentReviewSubject} from './develop.mjs';
 import {assignmentContext,contextMatches} from './context.mjs';
 import {contextSource} from './current-state.mjs';
+import {createDevelopmentAcceptanceReport,continuationAcceptanceFacts} from './development-delivery.mjs';
 
 export const REVIEW_CONTINUATION_PROTOCOL='development-review-local-acceptance-continuation-v1';
 if(STORE_PRECOMMIT_GUARD_VERSION!==1)throw Error('Continuation requires the private final pre-COMMIT guard; old SDK is unsupported');
@@ -204,21 +205,24 @@ export function validateReviewContinuationPublication(s,job,record,{root=process
   } else if(v.permitted_action!=='hold')throw Error('Negative continuation review cannot permit acceptance');
   time(p.expires_at);return t;
 }
-export function acceptReviewContinuation(s,a,root) {
+export function acceptReviewContinuation(s,a,root,{storageFormat='legacy-json'}={}) {
   primary(s,a);const t=targetOf(s,a.target_id,root),review=s.records[a.review_id],job=s.jobs[review?.job_id];
   const validated=validateReviewContinuationPublication(s,job??{},review??{},{root,phase:'acceptance'});
   if(validated?.id!==t.id||review?.review?.verdict!=='Pass')throw Error('Local acceptance requires this exact continuation Pass');
   if(review?.review_of?.id!==t.id||a.target_sha256!==hash(t)||a.candidate_sha256!==t.development.proposal.subject.candidate_sha256||a.receipt_sha256!==t.development.proposal.subject.receipt_sha256)throw Error('Local continuation acceptance subject mismatch');
   if(Object.values(s.records).some(r=>r.development?.type==='review_continuation_acceptance'&&r.development.target_id===t.id))throw Error('Continuation was already locally accepted; inspect original record');
   const key=id('review-continuation-acceptance');time(t.development.proposal.expires_at);
-  return s.records[key]={id:key,kind:'artifact',author_role:'runtime',author_instance:a.session_id,revision:1,status:'Submitted',created_at:stamp(),content:'Local development code accepted under an explicit prospective continuation only. No source integration, production/host proof, old-process release, new validation execution or allowance reset.',development:{type:'review_continuation_acceptance',protocol:REVIEW_CONTINUATION_PROTOCOL,target_id:t.id,target_sha256:hash(t),review:ref(review),candidate_id:t.development.candidate_id,receipt_id:t.development.receipt_id,candidate_sha256:a.candidate_sha256,receipt_sha256:a.receipt_sha256,current_authority_sha256:t.development.authorization.authority_sha256,source_integrated:false,old_scope_unchanged:true,old_unknown_reservation_preserved:true}};
+  const record=s.records[key]={id:key,kind:'artifact',author_role:'runtime',author_instance:a.session_id,revision:1,status:'Submitted',created_at:stamp(),content:'Local development code accepted under an explicit prospective continuation only. No source integration, production/host proof, old-process release, new validation execution or allowance reset.',development:{type:'review_continuation_acceptance',protocol:REVIEW_CONTINUATION_PROTOCOL,plan_id:t.development.plan_id,target_id:t.id,target_sha256:hash(t),review:ref(review),candidate_id:t.development.candidate_id,receipt_id:t.development.receipt_id,candidate_sha256:a.candidate_sha256,receipt_sha256:a.receipt_sha256,current_authority_sha256:t.development.authorization.authority_sha256,source_integrated:false,old_scope_unchanged:true,old_unknown_reservation_preserved:true}};
+  const p=s.records[t.development.plan_id],candidate=s.records[t.development.candidate_id],receipt=s.records[t.development.receipt_id];
+  const report=createDevelopmentAcceptanceReport(s,p,candidate,receipt,review,job,continuationAcceptanceFacts(record),{storageFormat,acceptanceHome:record});
+  record.development.acceptance_report=report.report;record.development.acceptance_report_sha256=report.sha256;return record;
 }
 export function developmentReviewContinuationAction(a,host) {
   const args={...a,host};let result,control;
   if(a.action==='prepare_review_continuation')return withStore(a.root,db=>db.readSnapshot(()=>prepareReviewContinuation(db.read(),args,a.root)));
   if(!['authorize_review_continuation','accept_review_continuation'].includes(a.action))throw Error('Unknown continuation action');
   withStore(a.root,db=>db.transaction('development.'+a.action,s=>{
-    result=a.action==='authorize_review_continuation'?authorizeReviewContinuation(s,args,a.root):acceptReviewContinuation(s,args,a.root);
+    result=a.action==='authorize_review_continuation'?authorizeReviewContinuation(s,args,a.root):acceptReviewContinuation(s,args,a.root,{storageFormat:db.storageInfo().format});
     const target=a.action==='authorize_review_continuation'?result:s.records[a.target_id];
     control={owner:{...target.development.proposal.owner},expires_at:target.development.proposal.expires_at};return s;
   },{beforeCommit:(_db,nextState)=>{assertReviewContinuationCommit(nextState,control);}}));return result;
