@@ -71,10 +71,20 @@ function put(db,family,key,position,value,encoding='json') {
   if(hasEncoding(db))db.prepare('INSERT INTO state_entries(family,key,position,sha256,encoding) VALUES(?,?,?,?,?) ON CONFLICT(family,key) DO UPDATE SET position=excluded.position,sha256=excluded.sha256,encoding=excluded.encoding WHERE state_entries.sha256<>excluded.sha256 OR state_entries.position<>excluded.position OR state_entries.encoding<>excluded.encoding').run(family,key,position,sha,encoding);
   else db.prepare('INSERT INTO state_entries(family,key,position,sha256) VALUES(?,?,?,?) ON CONFLICT(family,key) DO UPDATE SET position=excluded.position,sha256=excluded.sha256 WHERE state_entries.sha256<>excluded.sha256 OR state_entries.position<>excluded.position').run(family,key,position,sha);
 }
+function immutableReadFailure(reason,sha,actual_sha256) {
+  const details={reason,...(sha?{sha256:sha}:{}),...(actual_sha256?{actual_sha256}:{})};
+  // Public tool errors retain only the message. Include bounded verified hash
+  // locators there as well, never the unavailable/corrupt body or unchecked input.
+  return Object.assign(Error('Immutable storage value missing or hash mismatch: '+JSON.stringify(details)),{code:'ERR_IMMUTABLE_STORAGE_VALUE',details});
+}
 export function readImmutable(db,sha) {
-  const bytes=db.prepare('SELECT bytes FROM immutable_values WHERE sha256=?').get(sha)?.bytes;
-  if(typeof bytes!=='string'||hash(bytes)!==sha)throw Error('Immutable storage value missing or hash mismatch');
-  return bytes;
+  if(typeof sha!=='string'||sha.length!==64||!/^[a-f0-9]{64}$/.test(sha))throw immutableReadFailure('invalid_reference');
+  const row=db.prepare('SELECT bytes FROM immutable_values WHERE sha256=?').get(sha);
+  if(!row)throw immutableReadFailure('missing',sha);
+  if(typeof row.bytes!=='string')throw immutableReadFailure('non_text',sha);
+  const actual=hash(row.bytes);
+  if(actual!==sha)throw immutableReadFailure('hash_mismatch',sha,actual);
+  return row.bytes;
 }
 // Capturing a snapshot must never install a layout or advance a writer fence.
 export function flushSnapshots(db,...states) {
