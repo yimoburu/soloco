@@ -154,6 +154,12 @@
       "component": "root-native-live-context-history-test-repair-source-preparation-v1",
       "artifact": "handoff.DATA.json",
       "sha256": "92716c6974ae7b777236e057f032c2db825e6f4471a00f31cd1c1f50475a25d2"
+    },
+    {
+      "order": 25,
+      "component": "root-native927-test-fixture-reconciliation-source-preparation-v1",
+      "artifact": "handoff.DATA.json",
+      "sha256": "2bf25a1a0b15b8e686476ce5ce9234c6a10af1223898e937a1d74b374b9ff29b"
     }
   ],
   "accepted_lock_sha256": "040a380b1611e90ccf63cdcefc1a2d215e229053181d8dee497c659a477f47ec",
@@ -165,7 +171,7 @@
   "format_source_cut_sha256": "3b0e077cc3e4a38e521c0d268efadaa7df309612622c951bf38fb229989db37d",
   "format_source_bindings_sha256": "536e8668778d2de23fba9a98a4772d15ef864069e66a3e1d3811399b60cee0b3",
   "format_source_materialization_sha256": "50297a1849fb5b6bf0539360088d81ef3db3e8beeea631d7b142b77dea858476",
-  "source_graph_vector_sha256": "fb7453a0ba43696e25ea0696b2afa3c58a51ef2b0a7dcbf0bb67983c7a2296f3",
+  "source_graph_vector_sha256": "ae174eeb450a3ceafafe4a6ebadf59b0eb71477098afaedfa1a27078fb92c693",
   "source_format_delta": {
     "parent_portable_handoff_sha256": "c75ee77de8458c672622363bd02656e0a2075f67bdf5c2ba89aef40b7565edb4",
     "parent_coherent_handoff_sha256": "67ad9bf2fe5e16cc671a520b0af737b1dbfc430d3f2ed8d2f9184bf5b3524a23",
@@ -173,13 +179,13 @@
     "removed_ASCII_EOL_spaces": 18,
     "scope": "Only source-code trailing whitespace outside literals/comments; source-byte associations change and need their own qualification"
   },
-  "source_graph_bytes": 92049749,
+  "source_graph_bytes": 92049728,
   "eof_source_handoff_sha256": "db544a4699e562d8af4a1f128ac2769ef7b25813783a049933e1f35811765517",
   "lifetime_source_handoff_sha256": "34392507e7d695b4ef42bd74d422f48a213e302ef35dbc34e647c500ed5ae4b8",
   "lifetime_source_cut_sha256": "6e2764f7d19ee0e530fdd4aa08c4a9a0dfb2d35535cebff8e5d0a581d614d1a7",
   "lifetime_source_bindings_sha256": "e20ab6c6a62d2af182a81ca1d1190fe0a4b5aaa30d2dde557e285cebfc90273c",
   "lifetime_source_materialization_sha256": "97d4d6659e2b4cfeed41d9db35c6a463e8074f4fbeb34a7bb85951a4d94d692c",
-  "distinct_authored_rust_tests_manifest_sha256": "77497e844526904e28acefa49ce6616891caba6d7e475dae4899ec1756410ed8",
+  "distinct_authored_rust_tests_manifest_sha256": "fbb9877c1876c67009b76bda56e453bcaefda06537675a3eef316458e6694543",
   "source_repair": {
     "parent_portable_handoff_sha256": "c0672a939f0941471e07b0249cb4841052d3b4f3fa502c72b67b85ecb1e7a608",
     "EOF": "One extra final LF removed from rollout_decode.rs; retain one final LF",
@@ -209,9 +215,9 @@
     "prior_test_compile": "First8-library no-run failed11 actual cfg(test) errors; receipt715bc991dd38a20aade118c824084021fea42eedaa6c0f674d55c7b0cd22fc3c remains FAILED",
     "new_graph": "Whole source/package/compiled-input association changes even with identical production bytes; new593 compilation/tests/native remain unproved"
   },
-  "continuation_source_handoff_sha256": "92716c6974ae7b777236e057f032c2db825e6f4471a00f31cd1c1f50475a25d2",
-  "continuation_source_bindings_sha256": "eced3c4724f839d876bbeacd0c26794c9c62101712b4c2963517280d3b27b0c5",
-  "continuation_source_materialization_sha256": "256cc0b1e7b9d020b8203bf9a8c8896e9608b91611dd3edcefd963ae803041a5",
+  "continuation_source_handoff_sha256": "2bf25a1a0b15b8e686476ce5ce9234c6a10af1223898e937a1d74b374b9ff29b",
+  "continuation_source_bindings_sha256": "998121ae0fcd7a443efb1296989125272a1c5837e26ba7b29c3cb8d9ece1decd",
+  "continuation_source_materialization_sha256": "d35158d3b0be182cbf81687dd45ed1ed8d6e2c2a411a1fa98f257588401de2e4",
   "continuation_boundary": {
     "source_mechanics": "Original protected logical-SSE/typed-item lineage; fixed-five actual pending/decoder return; same-owner post-effective v5 context handshake; fresh later-step projection retains source while requiring new send guards",
     "resource_sha256": "832fdd1c965fa0e834c030f7c1e5636e2f32636b0df899ba8aa0fa940e9032fc",
@@ -237,5 +243,15 @@
     "review_sha256": "30bd4dc036d982e109f16915b0d4afb1bce1eed8a1d53da3af1600761f881ae3",
     "scope": "One test uses actual RolloutItem::ResponseItem durable wire adapter; all assertions and163definitions retained. Production and protocol unchanged.",
     "qualification": "Source only; no new49receipt or Rust/compiler/native acceptance. Prior actual4aebmanifest data is historical for old901tuple."
+  },
+  "three_test_fixture_reconciliation": {
+    "parent_package_handoff_sha256": "70aab893e6e72e7a12012c70abb1df0cae6a296205aa49972418adf5b9c7d057",
+    "source_handoff_sha256": "2bf25a1a0b15b8e686476ce5ce9234c6a10af1223898e937a1d74b374b9ff29b",
+    "source_bindings_sha256": "998121ae0fcd7a443efb1296989125272a1c5837e26ba7b29c3cb8d9ece1decd",
+    "source_materialization_sha256": "d35158d3b0be182cbf81687dd45ed1ed8d6e2c2a411a1fa98f257588401de2e4",
+    "causal_note_sha256": "16ef2489d9b863b341ac84dbc7482b402d262943248d49610a1321e3a41b0b9b",
+    "scope": "Three existing test fixtures only: one identical existing managed-config isolation override through initial builder and subsequent loads; one thread-provider fixture override; one positive API owner clone retaining the caller owner. Zero production bytes, unchanged assertions/definitions, no production lifetime weakening.",
+    "closed_V6_evidence": "009 appserver432pass/6fail; API231pass/1fail. Five managed-preferences failures and one dropped-positive-owner failure. Separate EPERM ancestor-grant gap belongs to runner; no Rust fix. Old graph/evidence preserved and cannot regain Pass from this new source preparation.",
+    "qualification": "Source only. No new49Python tests, Rust compiler/tests, native model or runtime-slot acceptance. Old compiled-manifest data is historical, not this tuple."
   }
 }

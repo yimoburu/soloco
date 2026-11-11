@@ -416,7 +416,7 @@ async fn wire_factory_preserves_all_old_holds_and_exact_after_bytes_without_inte
     // validates every permitted prefix and normalization before calling this API.
     let after = b"[ {\"type\":\"message\",\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"accepted\"}]} ]";
     let facts = json!({"scope":"unqualified API wire double","ready":true,"verdict":"Pass","unknown_origins":[]});
-    let bound = runtime.bind_original_wire_projection(&provenance, owner, cut.serialized_input(), after, &facts).unwrap();
+    let bound = runtime.bind_original_wire_projection(&provenance, owner.clone(), cut.serialized_input(), after, &facts).unwrap();
     assert_eq!(bound.unknown_origins, provenance.unknown_origins);
     assert_eq!(bound.original_sampling_input_sha256, hash(cut.serialized_input()));
     assert_eq!(bound.sources["original_wire_projection"]["source_facts"], facts);

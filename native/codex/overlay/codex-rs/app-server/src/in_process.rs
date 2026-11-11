@@ -934,20 +934,13 @@ mod tests {
     use std::path::Path;
     use tempfile::TempDir;
 
-    async fn build_test_config(codex_home: &Path) -> Config {
-        match ConfigBuilder::default()
+    async fn build_test_config(codex_home: &Path, loader_overrides: LoaderOverrides) -> Config {
+        ConfigBuilder::default()
             .codex_home(codex_home.to_path_buf())
+            .loader_overrides(loader_overrides)
             .build()
             .await
-        {
-            Ok(config) => config,
-            Err(_) => Config::load_default_with_cli_overrides_for_codex_home(
-                codex_home.to_path_buf(),
-                Vec::new(),
-            )
-            .await
-            .expect("default config should load"),
-        }
+            .expect("in-process fixture config should load")
     }
 
     async fn start_test_client_with_options(
@@ -956,7 +949,9 @@ mod tests {
         capabilities: Option<codex_app_server_protocol::InitializeCapabilities>,
     ) -> InProcessClientHandle {
         let codex_home = TempDir::new().expect("temp dir");
-        let config = Arc::new(build_test_config(codex_home.path()).await);
+        let loader_overrides = LoaderOverrides::without_managed_config_for_tests();
+        let config =
+            Arc::new(build_test_config(codex_home.path(), loader_overrides.clone()).await);
         let state_db = codex_rollout::state_db::try_init(config.as_ref())
             .await
             .expect("state db should initialize for in-process test");
@@ -965,7 +960,7 @@ mod tests {
             arg0_paths: Arg0DispatchPaths::default(),
             config,
             cli_overrides: Vec::new(),
-            loader_overrides: LoaderOverrides::default(),
+            loader_overrides,
             strict_config: false,
             cloud_config_bundle: CloudConfigBundleLoader::default(),
             embedded_network_policy: Default::default(),

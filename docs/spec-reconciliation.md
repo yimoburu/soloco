@@ -298,11 +298,31 @@ The additional repair changes only that history test to use the same durable
 intact. Production bytes and all 110 definitions are unchanged. The new complete
 source vector is
 `009d905360ddd1a900947dcf12fdfa656e2a64e1fed14f7aa51780aff92f77e5`.
-Its package passed 49 unchanged pure Python checks and source verification;
-Rust test compilation, test execution, protected positives, a qualified
-executable and native CoS acceptance remain pending. The separate live-history
-and context-handshake work is outside this package. No normative SPEC row or
-adopted company rule changes.
+Its package passed 49 unchanged pure Python checks and source verification.
+The eight ordinary library harnesses and whole extension harness then compiled,
+and the three required local helper executables built successfully. The same
+nine test harnesses also compiled under the protected build environment and its
+original compiled-input association. These are compilation results, with no test
+execution or qualified executable implied. The ordinary harness receipt is
+`ae63816e54008144fc99930ea250a98f1920771844a6205635dacf2a02bb15e9`, helper receipt
+`21b4c51e5d05667041a5f5b942dad9944c91e841bcad057b3088a426679fbdd4`, and protected
+test-build receipt
+`51046670fe42b76e8239444bd3f5b69c96c3a23624ca9fb50e09c20506a108ee`.
+
+The first ordinary whole-nine-root execution (V5) aborted in the app-server
+harness with a stack overflow. V6 used the pinned upstream 8 MiB test-stack
+baseline: app-server completed with 432 passed and six failed, API with 231 passed
+and one failed, and config with 414 passed. Core subsequently aborted with another
+stack overflow before its whole-root summary. Its fourteen world-state snapshots
+and a guardian snapshot also failed to read their baked-in earlier source paths
+under the test domain. Those denied reads did not compare snapshot contents.
+Both executions remain failures; the remaining roots did not run and no complete
+110-case authored or whole-nine-root pass is claimed. The retained V5 and V6
+receipts are `d7ad8eb4947eeb26d32fc35a8c5641a97170907a2b7e8bf58353967254f65a2d` and
+`42733b94285d310f378d29666b0b63fecd4c86f7634ae3eb81c7b863df941947`.
+Protected positive execution, a qualified executable and native CoS acceptance
+remain pending. The continuation below is a different source graph. No normative
+SPEC row or adopted company rule changes.
 
 ## Controlled P4 code acceptance
 
@@ -599,8 +619,19 @@ acceptance gaps or establish actual-company adoption.
 The separate continuation change implements source mechanics for live response
 and fixed-tool history, and context acknowledgement by the same scoped owner.
 It preserves private origin checks, exact supported wire mappings, fresh send
-fences and uncertain outcomes. Its source package contains 150 overlays and
-9,307 logical Rust files, with 163 authored test definitions.
+fences and uncertain outcomes. The current package contains 151 overlays and
+9,307 logical Rust files, totaling 92,049,728 bytes, with source vector
+`ae174eeb450a3ceafafe4a6ebadf59b0eb71477098afaedfa1a27078fb92c693` and package digest
+`4453e55b86e607fecc2383fe2643b281a01e482df5872564ea3294f29edd680e`.
+
+Its three test-fixture changes carry the existing managed-config isolation
+override through initial configuration and reload, use that helper for the
+provider fixture, and retain the positive API fixture's real caller owner.
+Production source, all assertions and all 163 authored definitions remain intact.
+This exact graph has not been compiled or tested; its 163 authored definitions
+remain UNRUN. Earlier graph hashes and receipts above retain their historical
+scope and do not qualify it. Its source-only verifier exited successfully; the
+49-case Python evidence is parent-scoped, with no new run claimed for this tuple.
 
 Package checks and source review do not change a SPEC acceptance row to passed.
 Rust compilation, whole local test roots, protected positive cases, genuine

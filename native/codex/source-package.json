@@ -27,18 +27,18 @@
   "source_cut": {
     "handoff": {
       "path": "pins/coherent-source-handoff.json",
-      "bytes": 14248,
-      "sha256": "ce4588e8cddf6a1a50fcdb8be0a463b3a65ca6c43b7bc7d8321f67002a46e4c9"
+      "bytes": 15853,
+      "sha256": "9f42c51e59d782d440c1753d8c0c9ca8f6e53f630462869dddd65cdcf53bc5cf"
     },
     "bindings": {
       "path": "pins/coherent-source-bindings.json",
       "bytes": 1953423,
-      "sha256": "1ddfc99910e9ea09434c6901879c00336888783cb7f8d200b7319ba615ce3cba"
+      "sha256": "c1a025c4bcade4ece116dc5a3d8a2aa69507bcc28824cd11a9b23304dda0d290"
     },
     "patch": {
       "path": "patches/c407-coherent-original-provenance.patch",
-      "bytes": 728654,
-      "sha256": "0a81ed90636497d5c9e87c71424ea637b81bf2348b2d4a8648198ecbf16706a7"
+      "bytes": 730838,
+      "sha256": "f77200aa1215ca0e9aea8f316775aefe6db6060099cd9a513debd337f74ecaa6"
     },
     "review_state": "independent-review-required"
   },
@@ -148,8 +148,8 @@
       "before_sha256": "8a64137ba4cb99112d51da630a7928da0460cf1ef982dc4a40b3b6811fb507af",
       "payload": {
         "path": "overlay/codex-rs/app-server/src/in_process.rs",
-        "bytes": 66663,
-        "sha256": "1d3f2e2c597d51cec6e60d94a7b35ff06d9ad0c6d76dc7580cf71e0226169eaf"
+        "bytes": 66609,
+        "sha256": "3c42ccc2c762bd3619eb682fb7ff3e4a86bbd6a8cf25271366af38cb017803fb"
       },
       "mode": "100644"
     },
@@ -210,6 +210,16 @@
         "path": "overlay/codex-rs/app-server/src/request_processors/feedback_processor.rs",
         "bytes": 37540,
         "sha256": "a6a98dbabc7833c6c399af7a79996f65913708eb75adfe483721baca28248c74"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/app-server/src/request_processors/thread_processor_tests.rs",
+      "before_sha256": "a5adc268ade812dc03db6556c617e9a2906a882f7642d667d160d18fdddf2566",
+      "payload": {
+        "path": "overlay/codex-rs/app-server/src/request_processors/thread_processor_tests.rs",
+        "bytes": 54168,
+        "sha256": "150e9adbb031e5f90d9f4cb07f075290171f6081fc14843ab6a26db63265a744"
       },
       "mode": "100644"
     },
@@ -428,8 +438,8 @@
       "before_sha256": null,
       "payload": {
         "path": "overlay/codex-rs/codex-api/src/protected_peer/original_ingress_tests.rs",
-        "bytes": 32516,
-        "sha256": "98c9abf0e85a34f83b35461f27b2b81d974e7c512a635560864a4fd77dc67f63"
+        "bytes": 32524,
+        "sha256": "f4a36044ca58be2d4230a84e6ae3e7d90b01046e9fecb01abe96c8759c525b21"
       },
       "mode": "100644"
     },

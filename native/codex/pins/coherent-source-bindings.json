@@ -8305,8 +8305,8 @@
   },
   {
     "path": "codex-rs/app-server/src/in_process.rs",
-    "bytes": 66663,
-    "sha256": "1d3f2e2c597d51cec6e60d94a7b35ff06d9ad0c6d76dc7580cf71e0226169eaf",
+    "bytes": 66609,
+    "sha256": "3c42ccc2c762bd3619eb682fb7ff3e4a86bbd6a8cf25271366af38cb017803fb",
     "mode": "100644"
   },
   {
@@ -8857,8 +8857,8 @@
   },
   {
     "path": "codex-rs/app-server/src/request_processors/thread_processor_tests.rs",
-    "bytes": 54143,
-    "sha256": "a5adc268ade812dc03db6556c617e9a2906a882f7642d667d160d18fdddf2566",
+    "bytes": 54168,
+    "sha256": "150e9adbb031e5f90d9f4cb07f075290171f6081fc14843ab6a26db63265a744",
     "mode": "100644"
   },
   {
@@ -13633,8 +13633,8 @@
   },
   {
     "path": "codex-rs/codex-api/src/protected_peer/original_ingress_tests.rs",
-    "bytes": 32516,
-    "sha256": "98c9abf0e85a34f83b35461f27b2b81d974e7c512a635560864a4fd77dc67f63",
+    "bytes": 32524,
+    "sha256": "f4a36044ca58be2d4230a84e6ae3e7d90b01046e9fecb01abe96c8759c525b21",
     "mode": "100644"
   },
   {

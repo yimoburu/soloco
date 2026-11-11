@@ -44,12 +44,13 @@ same owner and exact pre/post input bytes. The final API boundary still checks
 the entire source-owned five-tool inventory. Ordinary Responses input retains
 its separate exact normalization path.
 
-This profile does not supply original ancestry for default incremental-tool
-history, omitted base/tool state, model-response history, tool results, media,
+This fresh instruction profile alone does not supply original ancestry for default
+incremental-tool history, omitted base/tool state, model-response history, tool results, media,
 compaction, restored history or unsupported extension/managed instruction
 producers. Those paths remain held until their actual producers and projections
 are implemented and qualified. A fresh-request source test is not an end-to-end
-CoS workflow.
+CoS workflow. The continuation below adds source mechanics for supported live
+responses and fixed-tool results; executable qualification remains separate.
 
 ## Source and binary association
 
@@ -99,8 +100,18 @@ the exact context contract, and installs the private decoder before spawning the
 runtime. Native observations describe native-owned facts. Node interpreter and
 source facts require a separate source-owned association.
 
-These are source changes awaiting Rust compilation and test execution. The
-portable graph has 9,307 files and 163 authored test definitions. Python package
+The current source graph has 151 overlays, 9,307 logical files and 92,049,728 bytes,
+with source vector
+`ae174eeb450a3ceafafe4a6ebadf59b0eb71477098afaedfa1a27078fb92c693` and package
+`4453e55b86e607fecc2383fe2643b281a01e482df5872564ea3294f29edd680e`.
+Three fixture repairs use the existing managed-config isolation helper for initial
+configuration and reload, isolate the provider fixture, and retain the positive
+API fixture's strong owner while preserving its production Weak checks.
+Production bytes and all 163 authored definitions and assertions are unchanged.
+
+This exact graph awaits Rust compilation and test execution; all 163 authored
+definitions remain UNRUN for it. Earlier 009 compilation and failed execution
+receipts remain historical for their original graph. Python package
 checks and source verification do not establish a Core/native positive, a
 qualified binary, account or corpus acceptance, continuity, or company adoption.
 Build and runtime slots remain empty.

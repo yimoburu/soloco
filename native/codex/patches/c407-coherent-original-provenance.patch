@@ -743,7 +743,40 @@
          client: InProcessClientSender { client_tx },
          event_rx,
          runtime_handle,
-@@ -908,6 +961,7 @@
+@@ -881,20 +934,13 @@
+     use std::path::Path;
+     use tempfile::TempDir;
+ 
+-    async fn build_test_config(codex_home: &Path) -> Config {
+-        match ConfigBuilder::default()
++    async fn build_test_config(codex_home: &Path, loader_overrides: LoaderOverrides) -> Config {
++        ConfigBuilder::default()
+             .codex_home(codex_home.to_path_buf())
++            .loader_overrides(loader_overrides)
+             .build()
+             .await
+-        {
+-            Ok(config) => config,
+-            Err(_) => Config::load_default_with_cli_overrides_for_codex_home(
+-                codex_home.to_path_buf(),
+-                Vec::new(),
+-            )
+-            .await
+-            .expect("default config should load"),
+-        }
++            .expect("in-process fixture config should load")
+     }
+ 
+     async fn start_test_client_with_options(
+@@ -903,15 +949,18 @@
+         capabilities: Option<codex_app_server_protocol::InitializeCapabilities>,
+     ) -> InProcessClientHandle {
+         let codex_home = TempDir::new().expect("temp dir");
+-        let config = Arc::new(build_test_config(codex_home.path()).await);
++        let loader_overrides = LoaderOverrides::without_managed_config_for_tests();
++        let config =
++            Arc::new(build_test_config(codex_home.path(), loader_overrides.clone()).await);
+         let state_db = codex_rollout::state_db::try_init(config.as_ref())
              .await
              .expect("state db should initialize for in-process test");
          let args = InProcessStartArgs {
@@ -751,7 +784,12 @@
              arg0_paths: Arg0DispatchPaths::default(),
              config,
              cli_overrides: Vec::new(),
-@@ -1108,6 +1162,7 @@
+-            loader_overrides: LoaderOverrides::default(),
++            loader_overrides,
+             strict_config: false,
+             cloud_config_bundle: CloudConfigBundleLoader::default(),
+             embedded_network_policy: Default::default(),
+@@ -1108,6 +1157,7 @@
              let _ = done_tx.send(());
          });
          let client = InProcessClientHandle {
@@ -1411,6 +1449,17 @@
                          text: "actual developer prompt".to_string(),
                          provenance: None,
                      }),
+--- a/codex-rs/app-server/src/request_processors/thread_processor_tests.rs
++++ b/codex-rs/app-server/src/request_processors/thread_processor_tests.rs
+@@ -664,7 +664,7 @@
+         let config_manager = ConfigManager::new(
+             temp_dir.path().to_path_buf(),
+             Vec::new(),
+-            LoaderOverrides::default(),
++            LoaderOverrides::without_managed_config_for_tests(),
+             /*strict_config*/ false,
+             CloudConfigBundleLoader::default(),
+             Arg0DispatchPaths::default(),
 --- a/codex-rs/codex-api/Cargo.toml
 +++ b/codex-rs/codex-api/Cargo.toml
 @@ -5,6 +5,7 @@
@@ -4745,7 +4794,7 @@
 +    // validates every permitted prefix and normalization before calling this API.
 +    let after = b"[ {\"type\":\"message\",\"role\":\"user\",\"content\":[{\"type\":\"input_text\",\"text\":\"accepted\"}]} ]";
 +    let facts = json!({"scope":"unqualified API wire double","ready":true,"verdict":"Pass","unknown_origins":[]});
-+    let bound = runtime.bind_original_wire_projection(&provenance, owner, cut.serialized_input(), after, &facts).unwrap();
++    let bound = runtime.bind_original_wire_projection(&provenance, owner.clone(), cut.serialized_input(), after, &facts).unwrap();
 +    assert_eq!(bound.unknown_origins, provenance.unknown_origins);
 +    assert_eq!(bound.original_sampling_input_sha256, hash(cut.serialized_input()));
 +    assert_eq!(bound.sources["original_wire_projection"]["source_facts"], facts);

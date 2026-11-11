@@ -8,7 +8,7 @@ establish an independently accepted executable.
 `source-package.json` pins OpenAI Codex commit
 `c40729ea5cf8e947481b130c59807273eda2f8e9`, tree
 `078c14cecf94b522a2eff48b30996bf3f4d1bf7a`, its 9,264 regular Rust source files,
-the exact 150-file coherent overlay, accepted Cargo lock 040a,
+the exact 151-file coherent overlay, accepted Cargo lock 040a,
 and the official 153-file Rust 1.95.0 macOS arm64 toolchain.
 The complete reconstructed graph has 9307 logical files. The
 source-owned overlay count is exact; missing and excess entries hold.
@@ -16,6 +16,11 @@ source-owned overlay count is exact; missing and excess entries hold.
 byte commitment and logical executable distinction. The portable lineage
 record retains the original frozen source cuts and ordered composition hashes.
 The prior package 6f5 is historical and does not qualify this graph.
+
+The current graph has 9,307 files and 92,049,728 bytes, with source vector
+`ae174eeb450a3ceafafe4a6ebadf59b0eb71477098afaedfa1a27078fb92c693`.
+Its source-package digest is
+`4453e55b86e607fecc2383fe2643b281a01e482df5872564ea3294f29edd680e`.
 
 See [the native peer source profile](../../docs/native-peer-source-profile.md)
 for the genuine explicit nonincremental RLite source path, supported original
@@ -25,10 +30,11 @@ complete original producer chain stays Held. No context limit is relaxed.
 
 This prospective continuation source adds original protected logical-SSE/item lineage,
 fixed-five original pending/native-return ancestry, and the same-owner v5 resource
-context handshake. These source mechanics remain uncompiled and unrun here. Genuine
-Core/native/account, Node interpreter/static-slot and complete-context qualification
-remain Held; the existing profile document needs its separately reviewed continuation
-amendment. The 163 authored Rust definitions are all UNRUN.
+context handshake. This current graph has not been compiled or tested; its 163
+authored Rust definitions remain UNRUN. Earlier compilation and failed execution
+results retain their exact scope in the
+[reconciliation record](../../docs/spec-reconciliation.md). Genuine Core/native/account,
+Node interpreter/static-slot and complete-context qualification remain Held.
 
 ## Prepare source without downloads
 
@@ -128,13 +134,21 @@ inside those tests are explicit mocks. The checks do not run Cargo, the compiler
 OS controls, native/provider/account operations or installation. This package
 marks no MC acceptance row passed and grants no new attempt or allowance.
 
-This separate source derivative carries three compile-readiness repairs: two
+An earlier source derivative carried three compile-readiness repairs: two
 private protocol getter call sites use only admitted concrete variant handling,
 and the history fixture retains the actual CatalogModel wrapper. It preserves
-all origin, admission and byte-equality guards. These repairs remain uncompiled;
-all 163 Rust definitions remain UNRUN. No native or SPEC acceptance is inferred.
+all origin, admission and byte-equality guards. Those changes remain in the
+current uncompiled graph; no native or SPEC acceptance is inferred.
 
-A separate one-test derivative uses the existing RolloutItem::ResponseItem durable
-wire adapter for runtime-witness replay coverage. Production, protocol and163
-authored UNRUN definitions are unchanged. The earlier49Python receipt applies
-to its parent package only; no new49or Rust/native qualification is inferred.
+An earlier one-test derivative used the existing `RolloutItem::ResponseItem` durable
+wire adapter for runtime-witness replay coverage. It changed no production code,
+protocol or authored definition. The earlier 49-case Python receipt applies to
+its parent package only; no new 49-case run or Rust/native qualification is inferred.
+
+The current source-only derivative repairs three existing test fixtures: existing
+managed-config isolation covers initial config and subsequent reloads, one provider
+fixture uses that same helper, and the positive API fixture retains its real caller
+owner through the projection assertion. All production bytes, assertions and 163
+authored definitions are preserved. The closed 009/V5 and 009/V6 failures remain historical.
+A runner ancestor-permission failure is separate. No Rust/compiler/native result,
+new 49-case Python receipt, compiled binary or runtime slot is established here.
