@@ -8,27 +8,27 @@ establish an independently accepted executable.
 `source-package.json` pins OpenAI Codex commit
 `c40729ea5cf8e947481b130c59807273eda2f8e9`, tree
 `078c14cecf94b522a2eff48b30996bf3f4d1bf7a`, its 9,264 regular Rust source files,
-the exact 112-file coherent overlay, accepted Cargo lock 040a,
+the exact 150-file coherent overlay, accepted Cargo lock 040a,
 and the official 153-file Rust 1.95.0 macOS arm64 toolchain.
-The complete reconstructed graph has 9294 logical files. The
+The complete reconstructed graph has 9307 logical files. The
 source-owned overlay count is exact; missing and excess entries hold.
 `pins/coherent-source-bindings.json` must equal every reconstructed path,
 byte commitment and logical executable distinction. The portable lineage
 record retains the original frozen source cuts and ordered composition hashes.
 The prior package 6f5 is historical and does not qualify this graph.
 
-This derivative repairs one history unit-test fixture to persist through the
-existing `RolloutItem::ResponseItem` wire adapter. All production bytes,
-original assertions and 110 authored test definitions are retained. The earlier
-ordinary no-run build failed with two E0277 errors; six library harnesses linked,
-the extension was not dispatched, and no Rust test ran. That failure remains
-historical. This package establishes no new Rust compilation or runtime result.
-
 See [the native peer source profile](../../docs/native-peer-source-profile.md)
 for the genuine explicit nonincremental RLite source path, supported original
 instruction producers, remaining history boundaries and SPEC mapping.
 Restored, compacted, incremental/deferred or originless content without a
 complete original producer chain stays Held. No context limit is relaxed.
+
+This prospective continuation source adds original protected logical-SSE/item lineage,
+fixed-five original pending/native-return ancestry, and the same-owner v5 resource
+context handshake. These source mechanics remain uncompiled and unrun here. Genuine
+Core/native/account, Node interpreter/static-slot and complete-context qualification
+remain Held; the existing profile document needs its separately reviewed continuation
+amendment. The 163 authored Rust definitions are all UNRUN.
 
 ## Prepare source without downloads
 
@@ -88,7 +88,7 @@ source and toolchain paths must be disjoint, including physical path aliases.
 ## Complete compiled-input association
 
 Before compilation every prepared source byte and logical mode is verified.
-The tool derives `compiled-source-manifest.json` from all 9294
+The tool derives `compiled-source-manifest.json` from all 9307
 validated rows, the upstream commit/tree and the fixed source-package digest.
 Schema is `soloco-compiled-native-inputs-v1`; serialization is Python JSON with
 sorted keys, compact separators, `ensure_ascii=True`, UTF-8 and one terminal
@@ -127,3 +127,14 @@ There are 49 pure Python checks. Temporary compiler outputs and successful exits
 inside those tests are explicit mocks. The checks do not run Cargo, the compiler,
 OS controls, native/provider/account operations or installation. This package
 marks no MC acceptance row passed and grants no new attempt or allowance.
+
+This separate source derivative carries three compile-readiness repairs: two
+private protocol getter call sites use only admitted concrete variant handling,
+and the history fixture retains the actual CatalogModel wrapper. It preserves
+all origin, admission and byte-equality guards. These repairs remain uncompiled;
+all 163 Rust definitions remain UNRUN. No native or SPEC acceptance is inferred.
+
+A separate one-test derivative uses the existing RolloutItem::ResponseItem durable
+wire adapter for runtime-witness replay coverage. Production, protocol and163
+authored UNRUN definitions are unchanged. The earlier49Python receipt applies
+to its parent package only; no new49or Rust/native qualification is inferred.

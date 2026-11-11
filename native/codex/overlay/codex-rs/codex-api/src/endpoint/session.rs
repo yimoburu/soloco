@@ -8,7 +8,7 @@ use codex_client::Request;
 use codex_client::RequestBody;
 use codex_client::RequestTelemetry;
 use codex_client::Response;
-use codex_client::StreamResponse;
+use crate::protected_peer::original_history::OriginalStreamResponse;
 use codex_client::TransportError;
 use http::HeaderMap;
 use http::Method;
@@ -136,7 +136,7 @@ impl<T: HttpTransport + 'static> EndpointSession<T> {
         extra_headers: HeaderMap,
         body: Option<EncodedJsonBody>,
         configure: C,
-    ) -> Result<StreamResponse, ApiError>
+    ) -> Result<OriginalStreamResponse, ApiError>
     where
         C: Fn(&mut Request),
     {

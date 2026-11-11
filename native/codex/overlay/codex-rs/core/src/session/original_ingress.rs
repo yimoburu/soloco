@@ -76,6 +76,7 @@ impl SessionIngress {
         if !Arc::ptr_eq(&self.owner, session.original_provenance_owner()) { return None; }
         let mut accepted = Vec::new();
         let mut generated = Vec::new();
+        let mut live=Vec::new();
         for span in capture.spans() {
             let envelope = envelopes.get(span.index())?;
             if let Some(witness) = envelope.metadata.as_ref().and_then(|metadata|
@@ -84,6 +85,9 @@ impl SessionIngress {
                 if !span.user() || !Arc::ptr_eq(&self.owner, &witness.owner.upgrade()?) { return None; }
                 accepted.push((span.index(), witness.original.clone()));
                 continue;
+            }
+            if let Some(witness)=crate::original_live_history::bind_materialization(session,envelope,span.receipt()?,&self.original) {
+                live.push((span.index(),witness));continue;
             }
             // Only this concrete Core validator can construct the typed value.
             // JSON source facts and a generic envelope never select authority.
@@ -96,7 +100,7 @@ impl SessionIngress {
             let original = self.original.bind_original_generated_materialization(receipt, rendering.source_facts())?;
             generated.push((span.index(), original));
         }
-        self.original.seal_original_mixed_projection(capture, &accepted, &generated)
+        self.original.seal_original_live_projection(capture, &accepted, &generated,&live)
     }
 }
 

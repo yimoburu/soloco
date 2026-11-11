@@ -174,7 +174,9 @@ pub(super) async fn configure(
 
 /// Preserve the actual manager and its private credential storage; only scoped config changes.
 pub(super) async fn configure_existing(config_manager: &ConfigManager, config: &mut Arc<Config>,
-    original: Arc<AuthManager>) -> IoResult<Arc<AuthManager>> {
+    original: Arc<AuthManager>, scope_owner: Option<&crate::protected_host::OriginalScopedOwner>)
+    -> IoResult<Arc<AuthManager>> {
+    if let Some(owner) = scope_owner { owner.validate_before_reload(&original, config)?; }
     if codex_core::protected_peer_enabled() {
         crate::protected_host::require_source_owned_instruction_profile(&config.features)?;
     }
@@ -192,15 +194,20 @@ pub(super) async fn configure_existing(config_manager: &ConfigManager, config: &
     original.validate_scoped_runtime_auth(&effective.auth_config())?;
     config.validate_windows_mxc_requirement_from(&effective)?;
     // Keep the caller's scoped state, project, and provider. Apply only the effective auth requirements.
-    let config = Arc::make_mut(config);
-    config.chatgpt_base_url = effective.chatgpt_base_url;
-    config.chatgpt_base_url_is_explicit = effective.chatgpt_base_url_is_explicit;
-    config.enforce_residency = effective.enforce_residency;
-    config.application_network_policy = effective.application_network_policy;
-    config.application_auth_route_config = effective.application_auth_route_config;
-    config.forced_login_method = effective.forced_login_method;
-    config.forced_chatgpt_workspace_id = effective.forced_chatgpt_workspace_id;
-    original.validate_scoped_runtime_auth(&config.auth_config())?;
+    {
+        let config = Arc::make_mut(config);
+        config.chatgpt_base_url = effective.chatgpt_base_url;
+        config.chatgpt_base_url_is_explicit = effective.chatgpt_base_url_is_explicit;
+        config.enforce_residency = effective.enforce_residency;
+        config.application_network_policy = effective.application_network_policy;
+        config.application_auth_route_config = effective.application_auth_route_config;
+        config.forced_login_method = effective.forced_login_method;
+        config.forced_chatgpt_workspace_id = effective.forced_chatgpt_workspace_id;
+        original.validate_scoped_runtime_auth(&config.auth_config())?;
+    }
+    // Acknowledge the same ORIGINAL owner and actual final configuration before
+    // start_uninitialized_owned creates installation state or spawns a runtime.
+    if let Some(owner) = scope_owner { owner.observe_after_reload(&original, config).await?; }
     codex_login::default_client::set_default_client_residency_requirement(config.enforce_residency.value());
     Ok(original)
 }

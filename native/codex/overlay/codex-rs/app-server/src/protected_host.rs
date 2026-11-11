@@ -27,6 +27,64 @@ pub struct ProtectedManagedScope {
 }
 fn denied(reason: &str) -> io::Error { io::Error::new(io::ErrorKind::PermissionDenied, reason) }
 
+/// Source-private original scope ownership. The initial Config Arc is checked
+/// before reload; after Arc::make_mut, the ACTUAL resulting typed Config is
+/// checked independently. Neither JSON nor a generic start can construct this.
+pub(crate) struct OriginalScopedOwner {
+    owner: Arc<OriginalHost>, initial_config: Arc<Config>,
+}
+impl OriginalScopedOwner {
+    pub(crate) async fn into_decoder_runtime(self,auth:&Arc<AuthManager>,actual_config:&Arc<Config>)->io::Result<Arc<OriginalScopedDecoderRuntime>> {
+        if !Arc::ptr_eq(auth,&self.owner.auth){return Err(denied("original decoder AuthManager changed"));}
+        require_source_owned_instruction_profile(&actual_config.features)?;
+        require_original_managed_provider(&self.owner.config.model_provider_id,&self.owner.config.model_provider,&actual_config.model_provider_id,&actual_config.model_provider)?;
+        auth.validate_scoped_runtime_auth(&actual_config.auth_config())?;
+        // configure_existing already completed this SAME owner's original
+        // context acknowledgement using the actual effective Config. The API
+        // issuer independently requires that current receipt when selected.
+        let issuer=codex_api::protected_peer::mint_original_native_decoder(&self.owner.bootstrap).await.map_err(io::Error::other)?;
+        Ok(Arc::new(OriginalScopedDecoderRuntime{owner:self.owner,actual_config:actual_config.clone(),issuer}))
+    }
+    fn new(owner: Arc<OriginalHost>, initial_config: Arc<Config>) -> Self {
+        Self { owner, initial_config }
+    }
+    pub(crate) fn validate_before_reload(&self, auth: &Arc<AuthManager>, config: &Arc<Config>) -> io::Result<()> {
+        if !Arc::ptr_eq(auth, &self.owner.auth) || !Arc::ptr_eq(config, &self.initial_config) {
+            return Err(denied("foreign original scoped context owner"));
+        }
+        require_source_owned_instruction_profile(&config.features)?;
+        require_original_managed_provider(&self.owner.config.model_provider_id, &self.owner.config.model_provider,
+            &config.model_provider_id, &config.model_provider)
+    }
+    pub(crate) async fn observe_after_reload(&self, auth: &Arc<AuthManager>, actual_config: &Arc<Config>) -> io::Result<()> {
+        if !Arc::ptr_eq(auth, &self.owner.auth) {
+            return Err(denied("original scoped AuthManager changed"));
+        }
+        require_source_owned_instruction_profile(&actual_config.features)?;
+        require_original_managed_provider(&self.owner.config.model_provider_id, &self.owner.config.model_provider,
+            &actual_config.model_provider_id, &actual_config.model_provider)?;
+        // configure_existing has just validated this actual resulting auth
+        // config. Keep the same manager; do not introduce another auth load.
+        codex_api::protected_peer::observe_original_context_contract(&self.owner.bootstrap).await.map_err(io::Error::other)
+    }
+}
+
+
+pub(crate) struct OriginalScopedDecoderRuntime {
+    owner:Arc<OriginalHost>,actual_config:Arc<Config>,
+    issuer:Arc<codex_api::protected_peer::OriginalNativeDecoderIssuer>,
+}
+impl OriginalScopedDecoderRuntime {
+    pub(crate) fn decode(&self,exchange:&codex_protocol::dynamic_tools::original_exchange::OriginalDynamicExchange,
+        input:codex_api::protected_peer::OriginalNativeClientReturn)->Option<codex_protocol::dynamic_tools::DynamicToolResponse> {
+        if self.owner.auth.validate_scoped_runtime_auth(&self.actual_config.auth_config()).is_err()
+            ||require_source_owned_instruction_profile(&self.actual_config.features).is_err() {
+            exchange.observe_unresolved();return None;
+        }
+        Some(self.issuer.decode(exchange,input))
+    }
+}
+
 /// Inspect the actual typed default object selected by the original manager.
 /// Disabled/absent is not local; no Boolean label or discovery-only API is used.
 fn require_local_default_environment(environment: Option<Arc<codex_exec_server::Environment>>) -> io::Result<()> {
@@ -198,7 +256,8 @@ impl ProtectedManagedScope {
         args.embedded_network_policy = self.owner.network.clone();
         // The exact same manager Arc and same controller objects reach scoped startup.
         // There is no credential IPC, environment rewrite, or second scoped auth load.
-        in_process::start_with_existing_auth_manager(args, self.owner.auth.clone()).await
+        let scope_owner = OriginalScopedOwner::new(self.owner.clone(), self.config.clone());
+        in_process::start_with_original_scoped_owner(args, self.owner.auth.clone(), scope_owner).await
     }
 }
 

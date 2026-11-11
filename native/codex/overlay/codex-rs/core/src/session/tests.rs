@@ -13352,6 +13352,7 @@ async fn tool_calls_reopen_mailbox_delivery_for_current_turn() {
         internal_chat_message_metadata_passthrough: None,
     };
     let mut ctx = HandleOutputCtx {
+        original_output:None,
         sess: Arc::clone(&sess),
         step_context: StepContext::for_test(Arc::clone(&tc)),
         turn_store: Arc::new(codex_extension_api::ExtensionData::new(tc.sub_id.clone())),

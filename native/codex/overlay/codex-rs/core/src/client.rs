@@ -2793,6 +2793,17 @@ where
                 break;
             };
             match event {
+                Ok(ResponseEvent::OriginalOutputItemDone(mut original)) => {
+                    if original.item().id().is_none_or(|id|id.is_empty()) {
+                        original.assign_missing_id(active_item_id.take().or_else(||original.item().id_prefix().map(ResponseItemId::new)));
+                    }
+                    active_item_id=None;
+                    if collect_output_items {items_added.push(original.item().clone());}
+                    if tx_event.send(Ok(ResponseEvent::OriginalOutputItemDone(original))).await.is_err() {
+                        inference_trace_attempt.record_cancelled(STREAM_DROPPED_REASON,upstream_request_id,&items_added);
+                        return;
+                    }
+                }
                 Ok(ResponseEvent::OutputItemDone(mut item)) => {
                     // Assign IDs after interceptors, which may replace provider items.
                     // Reuse the added event's ID so tracing and the harness agree.

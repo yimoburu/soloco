@@ -593,3 +593,18 @@ Neither historical package proves this combined contract's native understanding.
 Final integration receipts must name the new clean source, completed checks and
 remaining limits. Updating this ledger or publishing v0.21 cannot close the native
 acceptance gaps or establish actual-company adoption.
+
+## Continuation source evidence
+
+The separate continuation change implements source mechanics for live response
+and fixed-tool history, and context acknowledgement by the same scoped owner.
+It preserves private origin checks, exact supported wire mappings, fresh send
+fences and uncertain outcomes. Its source package contains 150 overlays and
+9,307 logical Rust files, with 163 authored test definitions.
+
+Package checks and source review do not change a SPEC acceptance row to passed.
+Rust compilation, whole local test roots, protected positive cases, genuine
+Core/native execution, Node integration, account and corpus qualification,
+continuity and company adoption retain their separate evidence requirements.
+The qualified executable and runtime slots remain empty. Historical compilation
+and failed test-build receipts retain their exact original source scope.

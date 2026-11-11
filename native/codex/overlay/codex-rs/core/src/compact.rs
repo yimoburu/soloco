@@ -859,6 +859,7 @@ async fn drain_to_completed(
         };
         match event {
             // Keep each attempt isolated until the response completes successfully.
+            Ok(ResponseEvent::OriginalOutputItemDone(_))=>return Err(CodexErr::Stream("protected compaction source ancestry unsupported HOLD".into())),
             Ok(ResponseEvent::OutputItemDone(item)) => output.push(item),
             Ok(ResponseEvent::ServerReasoningIncluded(included)) => {
                 includes_reasoning = included;

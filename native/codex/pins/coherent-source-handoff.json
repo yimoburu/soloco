@@ -6,10 +6,10 @@
   "original_coherent_bindings_sha256": "074802c878f106af12c6adaba349db932932d5ce461e597b421e36614470b1d4",
   "original_materialization_plan_sha256": "22c2428e90c39f5f88c98ddab4f21bc7b28daee81b4d8a34a552273e87c17c7c",
   "original_backend_source_handoff_sha256": "5a43acb85656aa2f2dc6a52b91ab5d88741d69bf27bd1c0368ec1d59664e9a61",
-  "rust_tests_authored": 110,
+  "rust_tests_authored": 163,
   "rust_tests_status": "UNRUN",
-  "complete_logical_files": 9294,
-  "overlay_files": 112,
+  "complete_logical_files": 9307,
+  "overlay_files": 150,
   "ordered_source_composition": [
     {
       "order": 1,
@@ -109,9 +109,51 @@
     },
     {
       "order": 17,
+      "component": "root-native-live-context-coherent-source-preparation-v1",
+      "artifact": "handoff.DATA.json",
+      "sha256": "27443093ad1ec81f6cfbb2bce2e776b1c0ad07f54590dd4d364d13190df45295"
+    },
+    {
+      "order": 18,
+      "component": "ROOT-independent-coherent-native-source-review-v1",
+      "artifact": "review.DATA.json",
+      "sha256": "bbb42870d1de257f5f5723c67847dd93244be155cfa031e4fde6e42185e1435f"
+    },
+    {
+      "order": 19,
+      "component": "root-native-live-context-test-repairs-source-preparation-v1",
+      "artifact": "handoff.DATA.json",
+      "sha256": "0275845d1fa4239a3a0715b31adef6b98cd430c1122690a4290eb2435abc9c6a"
+    },
+    {
+      "order": 20,
+      "component": "root-native-live-context-compile-readiness-source-preparation-v1",
+      "artifact": "handoff.DATA.json",
+      "sha256": "901ccb1ae925c07a7d13770dbac314d1ac9b08a292e8f0dce79d6c24fd914e5d"
+    },
+    {
+      "order": 21,
+      "component": "root-native-live-context-compile-readiness-source-preparation-v1",
+      "artifact": "ROOT-independent-compile-readiness-repair-review-v1.DATA.json",
+      "sha256": "203f93c8274edfd58cb11ce9b79a0316cc23c0bc8c6701c3343999076e064740"
+    },
+    {
+      "order": 22,
       "component": "root-original-history-witness-test-compile-repair-source-preparation-v1",
       "artifact": "handoff.DATA.json",
       "sha256": "7c0f6e1e6114c9d0784d53c83f6860afeb0c05939fe8d12d7208129dcfc08428"
+    },
+    {
+      "order": 23,
+      "component": "root-original-history-witness-test-compile-repair-source-preparation-v1",
+      "artifact": "ROOT-independent-history-wire-repair-review-v1.DATA.json",
+      "sha256": "30bd4dc036d982e109f16915b0d4afb1bce1eed8a1d53da3af1600761f881ae3"
+    },
+    {
+      "order": 24,
+      "component": "root-native-live-context-history-test-repair-source-preparation-v1",
+      "artifact": "handoff.DATA.json",
+      "sha256": "92716c6974ae7b777236e057f032c2db825e6f4471a00f31cd1c1f50475a25d2"
     }
   ],
   "accepted_lock_sha256": "040a380b1611e90ccf63cdcefc1a2d215e229053181d8dee497c659a477f47ec",
@@ -123,7 +165,7 @@
   "format_source_cut_sha256": "3b0e077cc3e4a38e521c0d268efadaa7df309612622c951bf38fb229989db37d",
   "format_source_bindings_sha256": "536e8668778d2de23fba9a98a4772d15ef864069e66a3e1d3811399b60cee0b3",
   "format_source_materialization_sha256": "50297a1849fb5b6bf0539360088d81ef3db3e8beeea631d7b142b77dea858476",
-  "source_graph_vector_sha256": "009d905360ddd1a900947dcf12fdfa656e2a64e1fed14f7aa51780aff92f77e5",
+  "source_graph_vector_sha256": "fb7453a0ba43696e25ea0696b2afa3c58a51ef2b0a7dcbf0bb67983c7a2296f3",
   "source_format_delta": {
     "parent_portable_handoff_sha256": "c75ee77de8458c672622363bd02656e0a2075f67bdf5c2ba89aef40b7565edb4",
     "parent_coherent_handoff_sha256": "67ad9bf2fe5e16cc671a520b0af737b1dbfc430d3f2ed8d2f9184bf5b3524a23",
@@ -131,13 +173,13 @@
     "removed_ASCII_EOL_spaces": 18,
     "scope": "Only source-code trailing whitespace outside literals/comments; source-byte associations change and need their own qualification"
   },
-  "source_graph_bytes": 91884290,
+  "source_graph_bytes": 92049749,
   "eof_source_handoff_sha256": "db544a4699e562d8af4a1f128ac2769ef7b25813783a049933e1f35811765517",
   "lifetime_source_handoff_sha256": "34392507e7d695b4ef42bd74d422f48a213e302ef35dbc34e647c500ed5ae4b8",
   "lifetime_source_cut_sha256": "6e2764f7d19ee0e530fdd4aa08c4a9a0dfb2d35535cebff8e5d0a581d614d1a7",
   "lifetime_source_bindings_sha256": "e20ab6c6a62d2af182a81ca1d1190fe0a4b5aaa30d2dde557e285cebfc90273c",
   "lifetime_source_materialization_sha256": "97d4d6659e2b4cfeed41d9db35c6a463e8074f4fbeb34a7bb85951a4d94d692c",
-  "distinct_authored_rust_tests_manifest_sha256": "e6642e0a75413f5c80b0f2495e137d5306bc9cab82204e1874b54aff5db15c1c",
+  "distinct_authored_rust_tests_manifest_sha256": "77497e844526904e28acefa49ce6616891caba6d7e475dae4899ec1756410ed8",
   "source_repair": {
     "parent_portable_handoff_sha256": "c0672a939f0941471e07b0249cb4841052d3b4f3fa502c72b67b85ecb1e7a608",
     "EOF": "One extra final LF removed from rollout_decode.rs; retain one final LF",
@@ -167,13 +209,33 @@
     "prior_test_compile": "First8-library no-run failed11 actual cfg(test) errors; receipt715bc991dd38a20aade118c824084021fea42eedaa6c0f674d55c7b0cd22fc3c remains FAILED",
     "new_graph": "Whole source/package/compiled-input association changes even with identical production bytes; new593 compilation/tests/native remain unproved"
   },
-  "history_witness_wire_test_repair_handoff_sha256": "7c0f6e1e6114c9d0784d53c83f6860afeb0c05939fe8d12d7208129dcfc08428",
-  "history_witness_wire_test_repair_bindings_sha256": "e6b15597708cb69dd8661228af2f6903142c8dcbc3b42b6d8009dcf3248b8cc9",
-  "history_witness_wire_test_repair_scope": {
-    "source": "Exactly one history test file. All production source bytes, all original assertions and all110 authored definitions remain unchanged.",
-    "repair": "Use existing RolloutItem::ResponseItem serialization/deserialization wire adapter; require ResponseItem before the unchanged witness-leak/replay/equality assertions. No production serde derives or alternative wire format.",
-    "prior_ordinary_no_run": "FAILED with two E0277 history test compile errors; retained final receipt2a7b56872c99dea64891284b60694a8f608c227d0ed5cbff29f338fe7c0e04cb and independent raw readback971a8c83b777de8a5a792e1291a53b49fc54ea81b7dc5a8edfd26d6453075704. Six library harnesses linked; extension not dispatched; no Rust test executed.",
-    "prior_protected_plan": "Exact593 canonical1120 plan remains uncompiled historical. This source graph and package require a new compiled-input association.",
-    "new_result": "Source-only derivative. No new Rust compilation, test execution, native acceptance or slot population."
+  "continuation_source_handoff_sha256": "92716c6974ae7b777236e057f032c2db825e6f4471a00f31cd1c1f50475a25d2",
+  "continuation_source_bindings_sha256": "eced3c4724f839d876bbeacd0c26794c9c62101712b4c2963517280d3b27b0c5",
+  "continuation_source_materialization_sha256": "256cc0b1e7b9d020b8203bf9a8c8896e9608b91611dd3edcefd963ae803041a5",
+  "continuation_boundary": {
+    "source_mechanics": "Original protected logical-SSE/typed-item lineage; fixed-five actual pending/decoder return; same-owner post-effective v5 context handshake; fresh later-step projection retains source while requiring new send guards",
+    "resource_sha256": "832fdd1c965fa0e834c030f7c1e5636e2f32636b0df899ba8aa0fa940e9032fc",
+    "evidence": "Source-only graph; no new compilation, Rust test, genuine Core/native/account/P5/corpus or Node/static slot acceptance",
+    "unsupported": "Restored/forked/incremental/deferred/compacted/originless history, actual hooks/interceptors and undeclared media transformations stay Held",
+    "Node_facts": "Rust compiled manifest is Rust-only; distinct original Node source/interpreter/profile closure still requires separate qualified outer recipe. No Node pins echoed as native observations."
+  },
+  "continuation_component_review_sha256": [
+    "79f57490d6da52a3594d85a7d1e30ef734630f90b421b4f0cd04cb95b1defa10",
+    "bbb42870d1de257f5f5723c67847dd93244be155cfa031e4fde6e42185e1435f",
+    "203f93c8274edfd58cb11ce9b79a0316cc23c0bc8c6701c3343999076e064740"
+  ],
+  "compile_readiness_repair": {
+    "parent_portable_handoff_sha256": "e3ce01c18e04d0c1f53dc69fd379c75eb344200d8f1f1bcac66e90add71e2153",
+    "source_handoff_sha256": "901ccb1ae925c07a7d13770dbac314d1ac9b08a292e8f0dce79d6c24fd914e5d",
+    "source_review_sha256": "203f93c8274edfd58cb11ce9b79a0316cc23c0bc8c6701c3343999076e064740",
+    "changed_source_files": 3,
+    "scope": "Two private protocol getter call sites replaced with supported concrete typed handling; actual CatalogModel fixture wrapper retained. Admission guards and expected/actual byte equality preserved. No Rust compile/test/native success claimed."
+  },
+  "history_wire_test_repair": {
+    "parent_portable_handoff_sha256": "aa4f4a32eb48d3364ba1d7df82bc4cb05fae166cb44dd4c2cf77387dcd119cd3",
+    "repair_handoff_sha256": "7c0f6e1e6114c9d0784d53c83f6860afeb0c05939fe8d12d7208129dcfc08428",
+    "review_sha256": "30bd4dc036d982e109f16915b0d4afb1bce1eed8a1d53da3af1600761f881ae3",
+    "scope": "One test uses actual RolloutItem::ResponseItem durable wire adapter; all assertions and163definitions retained. Production and protocol unchanged.",
+    "qualification": "Source only; no new49receipt or Rust/compiler/native acceptance. Prior actual4aebmanifest data is historical for old901tuple."
   }
 }

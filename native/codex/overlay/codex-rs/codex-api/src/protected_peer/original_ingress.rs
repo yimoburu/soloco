@@ -130,6 +130,42 @@ struct OriginalWireMaterialization {
     source_facts: Arc<Value>,
 }
 
+/// Original transport ownership retained after the request send fence is released.
+/// History lineage is not a fresh send permit or a claim that an old epoch is current.
+#[derive(Clone)]
+pub(super) struct OriginalResponseAuthority { session: Weak<IngressSession> }
+impl OriginalResponseAuthority {
+    pub(super) fn matches_core(&self, owner: &Arc<CoreOwner>) -> bool {
+        self.session.upgrade().is_some_and(|session| !session.closed.load(Ordering::SeqCst)
+            && session.issuer.upgrade().is_some()
+            && session.core_owner.as_ref().and_then(Weak::upgrade).is_some_and(|actual|Arc::ptr_eq(&actual,owner)))
+    }
+}
+
+#[derive(Clone)]
+pub struct OriginalLiveInputWitness {
+    session: Weak<IngressSession>, occurrence: u64, materialized: Arc<[u8]>,
+    model: super::original_history::OriginalResponseItem, facts: Arc<Value>,
+    native:Option<codex_protocol::dynamic_tools::original_exchange::OriginalDynamicReturn>,
+}
+impl std::fmt::Debug for OriginalLiveInputWitness {
+    fn fmt(&self,f:&mut std::fmt::Formatter<'_>)->std::fmt::Result {
+        f.debug_struct("OriginalLiveInputWitness").field("occurrence",&self.occurrence).finish_non_exhaustive()
+    }
+}
+impl OriginalLiveInputWitness {
+    fn current(&self)->bool {
+        if !self.model.complete_original_response(){return false;}
+        let Some(session)=self.session.upgrade() else{return false;};
+        let Some(owner)=session.core_owner.as_ref().and_then(Weak::upgrade) else{return false;};
+        self.native.as_ref().is_none_or(|returned|returned.still_original(&owner)
+            && returned.witness::<super::original_native_decoder::OriginalNativeDynamicReturn>()
+                .is_some_and(|proof|proof.matches_original(&self.model,returned.exchange())))
+    }
+    pub fn occurrence(&self)->u64 {self.occurrence}
+    pub fn materialized_bytes(&self)->&[u8] {&self.materialized}
+}
+
 /// Exact current sampling projection, owned by the Session and runtime issuer.
 /// The Weak reference does not keep a closed/dropped Session alive.
 #[derive(Clone)]
@@ -140,6 +176,7 @@ pub struct OriginalSessionInputProjection {
     sampling: Arc<[u8]>,
     occurrences: Arc<[(usize, u64)]>,
     generated: Arc<[(usize, OriginalGeneratedInputWitness)]>,
+    live: Arc<[(usize, OriginalLiveInputWitness)]>,
     wire: Option<OriginalWireMaterialization>,
 }
 impl std::fmt::Debug for OriginalSessionInputProjection {
@@ -150,11 +187,20 @@ impl std::fmt::Debug for OriginalSessionInputProjection {
     }
 }
 impl OriginalSessionInputProjection {
+    pub(super) fn response_authority(&self,runtime:&SourceRuntime)->Result<OriginalResponseAuthority,TransportError> {
+        let session=self.checked_runtime(runtime)?;
+        Ok(OriginalResponseAuthority {session:Arc::downgrade(&session)})
+    }
+    pub(super) fn covers_live(&self,index:usize)->bool {self.live.iter().any(|(i,_)|*i==index)}
+    pub(super) fn live_source_facts(&self)->Vec<Value> {
+        self.live.iter().map(|(index,witness)|serde_json::json!({"input_index":index,
+            "occurrence":witness.occurrence,"model_source":witness.model.source_facts(),"core_source":witness.facts.as_ref()})).collect()
+    }
     pub fn revision(&self) -> u64 { self.revision }
     pub fn latest_order(&self) -> u64 { self.latest_order }
 
     pub(super) fn matches_capture(&self, capture: &OriginalInputCapture) -> bool {
-        if self.sampling.as_ref() != capture.serialized_input() { return false; }
+        if self.sampling.as_ref() != capture.serialized_input() || self.live.iter().any(|(_,w)|!w.current()) { return false; }
         if self.occurrences.len() != capture.spans().len()
             || self.occurrences.iter().zip(capture.spans()).any(|((index, occurrence), span)|
                 span.index()!=*index || span.receipt().is_none_or(|receipt|receipt.occurrence()!=*occurrence))
@@ -219,7 +265,7 @@ impl OriginalSessionInputProjection {
     }
 
     fn check_revision(&self, session: &IngressSession, data: &IngressData) -> Result<(), TransportError> {
-        if session.closed.load(Ordering::SeqCst)
+        if self.live.iter().any(|(_,w)|!w.current()) || session.closed.load(Ordering::SeqCst)
             || session.core_owner.as_ref().and_then(Weak::upgrade).is_none()
             || session.epoch.load(Ordering::SeqCst) != self.revision
             || data.revision != self.revision || data.latest_accepted != Some(self.latest_order)
@@ -235,7 +281,7 @@ impl OriginalSessionInputProjection {
         let session = self.checked_session(runtime, body)?;
         let data = Arc::clone(&session.data).read_owned().await;
         self.check_revision(&session, &data)?;
-        Ok(OriginalIngressSendGuard { session, data, revision: self.revision, latest_order: self.latest_order })
+        Ok(OriginalIngressSendGuard { session, data, revision: self.revision, latest_order: self.latest_order,live:self.live.clone() })
     }
 }
 
@@ -244,6 +290,7 @@ pub(super) struct OriginalIngressSendGuard {
     data: OwnedRwLockReadGuard<IngressData>,
     revision: u64,
     latest_order: u64,
+    live:Arc<[(usize,OriginalLiveInputWitness)]>,
 }
 impl OriginalIngressSendGuard {
     /// Holds the actual Session read fence through original gateway send, with
@@ -257,7 +304,7 @@ impl OriginalIngressSendGuard {
             let Ok(_dispatch) = self.session.dispatch.lock() else {
                 return std::task::Poll::Ready(Err(hold("original Session dispatch fence poisoned")));
             };
-            if self.session.closed.load(Ordering::SeqCst)
+            if self.live.iter().any(|(_,w)|!w.current()) || self.session.closed.load(Ordering::SeqCst)
                 || self.session.issuer.upgrade().is_none()
                 || self.session.core_owner.as_ref().and_then(Weak::upgrade).is_none()
                 || self.session.epoch.load(Ordering::SeqCst) != self.revision
@@ -376,7 +423,7 @@ impl OriginalSessionIngress {
 
     pub fn seal_original_projection(&self, capture: &OriginalInputCapture,
         accepted: &[(usize, OriginalAcceptedInputWitness)]) -> Option<OriginalSessionInputProjection> {
-        self.seal_projection(capture, accepted, None)
+        self.seal_projection(capture, accepted, None, &[])
     }
 
     /// Exact union of actual accepted input and privately validated renderer
@@ -384,11 +431,42 @@ impl OriginalSessionIngress {
     pub fn seal_original_mixed_projection(&self, capture: &OriginalInputCapture,
         accepted: &[(usize, OriginalAcceptedInputWitness)], generated: &[(usize, OriginalGeneratedInputWitness)])
         -> Option<OriginalSessionInputProjection> {
-        self.seal_projection(capture, accepted, Some(generated))
+        self.seal_projection(capture, accepted, Some(generated), &[])
     }
 
+    /// Core calls this only after downcasting its private original producer capsule.
+    /// Exact owning allocation and the original model response remain mandatory.
+    pub fn bind_original_live_materialization(&self, receipt:&OriginalItemReceipt,
+        owner:Arc<CoreOwner>, model:super::original_history::OriginalResponseItem, facts:Value,
+        expected:&[u8],native:Option<codex_protocol::dynamic_tools::original_exchange::OriginalDynamicReturn>)->Option<OriginalLiveInputWitness> {
+        let actual=self.state.core_owner.as_ref()?.upgrade()?;
+        let model_session=model.authority().session.upgrade()?;
+        if !Arc::ptr_eq(&actual,&owner) || !Arc::ptr_eq(&model_session,&self.state)
+            || !model.complete_original_response() || self.state.closed.load(Ordering::SeqCst)
+            || receipt.original_read().is_some() || receipt.original_user_input_bytes().is_some()
+            || receipt.original_materialized_bytes()!=expected || receipt.projected_bytes()!=expected
+            || expected.len()>MAX_BODY || serde_json::to_vec(&facts).ok()?.len()>MAX_BODY {return None;}
+        if let Some(returned)=&native {
+            if !returned.still_original(&owner)||!returned.witness::<super::original_native_decoder::OriginalNativeDynamicReturn>()?
+                .matches_original(&model,returned.exchange()){return None;}
+            let materialized:codex_protocol::models::ResponseItem=serde_json::from_slice(expected).ok()?;
+            if !matches!((&materialized,model.item()),
+                (codex_protocol::models::ResponseItem::FunctionCallOutput{call_id:out,..},codex_protocol::models::ResponseItem::FunctionCall{call_id:call,..}) if out.as_deref()==Some(call.as_str())){return None;}
+        } else {
+            let typed:codex_protocol::models::ResponseItem=serde_json::from_slice(expected).ok()?;
+            if !model.accepts_history_stamp(&typed){return None;}
+        }
+        Some(OriginalLiveInputWitness {session:Arc::downgrade(&self.state),occurrence:receipt.occurrence(),
+            materialized:Arc::from(expected),model,facts:Arc::new(facts),native})
+    }
+    pub fn seal_original_live_projection(&self,capture:&OriginalInputCapture,
+        accepted:&[(usize,OriginalAcceptedInputWitness)],generated:&[(usize,OriginalGeneratedInputWitness)],
+        live:&[(usize,OriginalLiveInputWitness)])->Option<OriginalSessionInputProjection> {
+        self.seal_projection(capture,accepted,Some(generated),live)
+    }
     fn seal_projection(&self, capture: &OriginalInputCapture,
-        accepted: &[(usize, OriginalAcceptedInputWitness)], generated: Option<&[(usize, OriginalGeneratedInputWitness)]>)
+        accepted: &[(usize, OriginalAcceptedInputWitness)], generated: Option<&[(usize, OriginalGeneratedInputWitness)]>,
+        live:&[(usize,OriginalLiveInputWitness)])
         -> Option<OriginalSessionInputProjection> {
         if !capture.complete() || capture.spans().is_empty()
             || self.state.closed.load(Ordering::SeqCst) || self.state.issuer.upgrade().is_none() { return None; }
@@ -430,8 +508,18 @@ impl OriginalSessionIngress {
                     || receipt.original_materialized_bytes() != witness.materialized.as_ref()
                     || receipt.projected_bytes() != witness.materialized.as_ref() { return None; }
             }
-            if indices.len() != capture.spans().len() { return None; }
         }
+        for (index,witness) in live {
+            let span=capture.spans().get(*index)?;let receipt=span.receipt()?;
+            if span.user() || span.instruction() || span.index()!=*index
+                || !indices.insert(*index) || !occurrences.insert(witness.occurrence)
+                || !Arc::ptr_eq(&witness.session.upgrade()?,&self.state)
+                || !witness.model.complete_original_response() || receipt.occurrence()!=witness.occurrence
+                || receipt.original_read().is_some() || receipt.original_user_input_bytes().is_some()
+                || receipt.original_materialized_bytes()!=witness.materialized.as_ref()
+                || receipt.projected_bytes()!=witness.materialized.as_ref() {return None;}
+        }
+        if generated.is_some() && indices.len()!=capture.spans().len() {return None;}
         if !latest_present || self.state.epoch.load(Ordering::SeqCst) != data.revision
             || self.state.closed.load(Ordering::SeqCst) { return None; }
         Some(OriginalSessionInputProjection {
@@ -439,7 +527,7 @@ impl OriginalSessionIngress {
             sampling: Arc::from(capture.serialized_input()),
             occurrences: capture.spans().iter().map(|span|
                 Some((span.index(),span.receipt()?.occurrence()))).collect::<Option<Vec<_>>>()?.into(),
-            generated: Arc::from(generated.unwrap_or_default()), wire: None,
+            generated: Arc::from(generated.unwrap_or_default()), live:Arc::from(live), wire: None,
         })
     }
 

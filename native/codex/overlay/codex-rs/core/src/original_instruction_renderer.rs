@@ -516,11 +516,10 @@ pub(crate) fn original_wire_projection(base: &BaseInstructions, before: &[Respon
     let proof = base.original_instruction_rendering.downcast_ref::<BaseRendering>()?;
     proof.owner.upgrade()?;
     if proof.output.as_ref() != base.text { return None; }
-    // Media transformations and every non-message producer require their own
-    // original exact projection; this initial path does not infer those links.
-    if !before.iter().all(|item|matches!(item, ResponseItem::Message { role, content, .. }
-        if matches!(role.as_str(), "user"|"developer"|"system") &&
-        content.iter().all(|part|matches!(part,codex_protocol::models::ContentItem::InputText { .. })))) { return None; }
+    // Mechanical native DTO mapping only. Every non-user live item still
+    // requires its independent private Core/API model/tool origin and current
+    // Session/runtime receipt at final binding/send; matching DTOs grant nothing.
+    if !before.iter().all(crate::original_live_history::supported_wire_item) { return None; }
     let mut expected = Vec::with_capacity(before.len()+2);
     let namespace = uuid::Uuid::new_v5(&uuid::Uuid::NAMESPACE_OID,controls.thread_id.as_bytes());
     let fresh_r_lite_inventory = if controls.use_responses_lite && !tools.is_empty() {

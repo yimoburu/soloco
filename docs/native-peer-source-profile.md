@@ -83,3 +83,24 @@ remain visible; declaring this bounded profile cannot substitute for a missing
 invariant inside a claimed supported workflow. See
 [the reconciliation record](spec-reconciliation.md) for the exact integrated
 source and executed evidence.
+
+## Continuation source under qualification
+
+The continuation adds runtime ancestry from an actual protected response through
+its logical SSE payload, typed item and supported Core history transformations.
+Fixed-tool results retain the original call, arguments, private pending reply and
+native decoder association. Later sampling may reuse eligible history, while
+each new send still requires current ownership, authentication and egress checks.
+Incomplete responses, missing EOF, unsupported transformations and uncertain
+effects remain held.
+
+One original scoped owner validates the effective configuration, acknowledges
+the exact context contract, and installs the private decoder before spawning the
+runtime. Native observations describe native-owned facts. Node interpreter and
+source facts require a separate source-owned association.
+
+These are source changes awaiting Rust compilation and test execution. The
+portable graph has 9,307 files and 163 authored test definitions. Python package
+checks and source verification do not establish a Core/native positive, a
+qualified binary, account or corpus acceptance, continuity, or company adoption.
+Build and runtime slots remain empty.

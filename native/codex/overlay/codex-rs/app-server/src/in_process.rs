@@ -389,7 +389,7 @@ impl InProcessClientHandle {
 /// the handle, so callers receive a ready-to-use runtime. If initialize fails,
 /// the runtime is shut down and an `InvalidData` error is returned.
 pub async fn start(args: InProcessStartArgs) -> IoResult<InProcessClientHandle> {
-    start_owned(args, None).await
+    start_owned(args, None, None).await
 }
 
 /// Reuses an original managed-auth object without moving/exporting any credential.
@@ -398,10 +398,22 @@ pub async fn start_with_existing_auth_manager(args: InProcessStartArgs,
     original: Arc<codex_login::AuthManager>) -> IoResult<InProcessClientHandle> {
     if args.enable_codex_api_key_env { return Err(IoError::new(ErrorKind::PermissionDenied, "environment auth forbidden")); }
     original.validate_scoped_runtime_auth(&args.config.auth_config())?;
-    start_owned(args, Some(original)).await
+    start_owned(args, Some(original), None).await
 }
 
-async fn start_owned(mut args: InProcessStartArgs, original: Option<Arc<codex_login::AuthManager>>) -> IoResult<InProcessClientHandle> {
+/// Original protected scope only; constructor ownership is private to the
+/// actual scoped Config/manager composition. No caller verdict callback.
+pub(crate) async fn start_with_original_scoped_owner(args: InProcessStartArgs,
+    original: Arc<codex_login::AuthManager>, scope_owner: crate::protected_host::OriginalScopedOwner)
+    -> IoResult<InProcessClientHandle> {
+    if args.enable_codex_api_key_env { return Err(IoError::new(ErrorKind::PermissionDenied, "environment auth forbidden")); }
+    scope_owner.validate_before_reload(&original, &args.config)?;
+    original.validate_scoped_runtime_auth(&args.config.auth_config())?;
+    start_owned(args, Some(original), Some(scope_owner)).await
+}
+
+async fn start_owned(mut args: InProcessStartArgs, original: Option<Arc<codex_login::AuthManager>>,
+    scope_owner: Option<crate::protected_host::OriginalScopedOwner>) -> IoResult<InProcessClientHandle> {
     if let Ok(Some(err)) = check_execpolicy_for_warnings(&args.config.config_layer_stack).await {
         let (path, range) = crate::exec_policy_warning_location(&err);
         args.config_warnings.push(ConfigWarningNotification {
@@ -415,7 +427,7 @@ async fn start_owned(mut args: InProcessStartArgs, original: Option<Arc<codex_lo
     if codex_core::protected_peer_enabled() && original.is_none() {
         return Err(IoError::new(ErrorKind::PermissionDenied, "protected runtime requires original AuthManager"));
     }
-    let mut client = Box::pin(start_uninitialized_owned(args, original)).await?;
+    let mut client = Box::pin(start_uninitialized_owned(args, original, scope_owner)).await?;
 
     let initialize_response = client
         .request(ClientRequest::Initialize {
@@ -456,10 +468,11 @@ async fn run_outbound_router(
 }
 
 async fn start_uninitialized(args: InProcessStartArgs) -> IoResult<InProcessClientHandle> {
-    start_uninitialized_owned(args, None).await
+    start_uninitialized_owned(args, None, None).await
 }
 
-async fn start_uninitialized_owned(mut args: InProcessStartArgs, original: Option<Arc<codex_login::AuthManager>>) -> IoResult<InProcessClientHandle> {
+async fn start_uninitialized_owned(mut args: InProcessStartArgs, original: Option<Arc<codex_login::AuthManager>>,
+    scope_owner: Option<crate::protected_host::OriginalScopedOwner>) -> IoResult<InProcessClientHandle> {
     let protected_paths = args.protected_paths.clone();
     if codex_core::protected_peer_enabled() && protected_paths.is_none() { return Err(IoError::new(ErrorKind::PermissionDenied,"original scoped directory binding unavailable")); }
     if let Some(paths) = &protected_paths { paths.verify_before_mutable_start()?; }
@@ -478,8 +491,14 @@ async fn start_uninitialized_owned(mut args: InProcessStartArgs, original: Optio
     let startup_cwd =
         (!args.config.config_layer_stack.is_projectless()).then(|| args.config.cwd.to_path_buf());
     let auth_manager = match original {
-        Some(original) => bootstrap::configure_existing(&config_manager, &mut args.config, original).await?,
+        Some(original) => bootstrap::configure_existing(&config_manager, &mut args.config, original, scope_owner.as_ref()).await?,
         None => bootstrap::configure(&config_manager, &mut args.config, args.enable_codex_api_key_env).await?,
+    };
+    // Same private owner: effective checks and original context ack have
+    // completed inside configure_existing. Install its decoder before spawn.
+    let original_decoder=match scope_owner {
+        Some(owner)=>Some(owner.into_decoder_runtime(&auth_manager,&args.config).await?),
+        None=>None,
     };
     if let Some(paths) = &protected_paths { paths.verify_before_mutable_start()?; }
     let channel_capacity = args.channel_capacity.max(1);
@@ -498,7 +517,8 @@ async fn start_uninitialized_owned(mut args: InProcessStartArgs, original: Optio
         let (process_reply_tx, mut process_reply_rx) = mpsc::channel(channel_capacity);
         let outgoing_message_sender = Arc::new(
             OutgoingMessageSender::new(outgoing_tx, analytics_events_client.clone())
-                .with_process_reply_sender(process_reply_tx),
+                .with_process_reply_sender(process_reply_tx)
+                .with_original_decoder(original_decoder),
         );
 
         let log_write_warning = crate::log_write_warning::LogWriteWarningReporter::new(

@@ -82,6 +82,11 @@ pub struct CodexHarnessMetadata {
     #[schemars(skip)]
     pub original_session_ingress: Option<OriginalProducerWitness>,
 
+    /// Private actual Core model/tool producer capsule, never restored from JSON.
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub original_live_history: Option<OriginalProducerWitness>,
+
     /// Opaque private instruction renderer witness; independent of ingress.
     #[serde(skip)]
     #[schemars(skip)]

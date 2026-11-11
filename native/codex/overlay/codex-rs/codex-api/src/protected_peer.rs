@@ -11,14 +11,22 @@ use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use uuid::Uuid;
 
+mod context_contract;
+pub use context_contract::validate_original_context_source_request;
 mod startup;
 mod original_ingress;
+pub(crate) mod original_history;
+mod original_native_decoder;
+pub use original_native_decoder::{OriginalNativeDecoderIssuer,OriginalNativeDynamicReturn,OriginalNativeClientReturn};
+pub use startup::mint_original_native_decoder;
+pub use original_history::OriginalResponseItem;
+pub use original_ingress::OriginalLiveInputWitness;
 pub use original_ingress::{OriginalAcceptedInputWitness, OriginalGeneratedInputWitness, OriginalSessionIngress, OriginalSessionInputProjection};
 #[cfg(test)]
 mod source_gate_tests;
 #[cfg(test)]
 mod original_capture_tests;
-pub use startup::{NativeStartup, OriginalBootstrapClaim, begin_original_companion, observe_original_bootstrap};
+pub use startup::{NativeStartup, OriginalBootstrapClaim, begin_original_companion, observe_original_bootstrap, observe_original_context_contract};
 
 const PROTOCOL: &str = "soloco-protected-backend-permit-v2";
 const COMMIT: &str = "c40729ea5cf8e947481b130c59807273eda2f8e9";
@@ -104,7 +112,7 @@ impl SourceProvenance {
         // attest the absence or complete ancestry of restored history.
         if !ingress_bound { missing("restored_history_instruction_origins_not_retained"); }
         let origin_chain_complete = ingress_bound && capture.complete()
-            && !capture.spans().is_empty() && capture.spans().iter().all(|span|span.user() || generated(span.index()))
+            && !capture.spans().is_empty() && capture.spans().iter().all(|span|span.user() || generated(span.index()) || session_projection.as_ref().is_some_and(|p|p.covers_live(span.index())))
             && !user_chain_unknown && !capture.restored_upstream_chain_unknown()
             && !capture.spans().iter().any(|span|span.receipt().is_some_and(|receipt|
                 receipt.original_materialized_bytes()!=receipt.projected_bytes()));
@@ -131,7 +139,7 @@ impl SourceProvenance {
         if capture.spans().iter().any(|span| span.instruction() && !generated(span.index())) {
             missing("instruction_message_original_loader_chain_not_retained");
         }
-        if capture.spans().iter().any(|span| !span.user() && !span.instruction() && !generated(span.index())) {
+        if capture.spans().iter().any(|span| !span.user() && !span.instruction() && !generated(span.index()) && !session_projection.as_ref().is_some_and(|p|p.covers_live(span.index()))) {
             missing("non_user_input_original_producer_chain_not_retained");
         }
         if capture.spans().iter().any(|span| span.receipt().is_some_and(|receipt|
@@ -168,6 +176,7 @@ impl SourceProvenance {
                 "original_session_revision":session_projection.as_ref().map(|projection|projection.revision()),
                 "latest_accepted_order":session_projection.as_ref().map(|projection|projection.latest_order()),
                 "original_generated_sources":session_projection.as_ref().map(|projection|projection.generated_source_facts()),
+                "original_live_sources":session_projection.as_ref().map(|projection|projection.live_source_facts()),
                 "array_separators":"canonical array delimiters/commas are structural bytes, not source text",
                 "raw_file_or_wire_receipt":false}));
         } else {
@@ -245,6 +254,8 @@ struct Challenge {
     protocol: String, kind: String, nonce: String, pid: u32,
     upstream_url: String, slot_id: String, executable_sha256: String, source_manifest_sha256: String,
     state_root: String, cwd: String, original_home_sha256: Option<String>,
+    #[serde(default)]
+    context_contract: Option<context_contract::ContextContractRequest>,
 }
 fn validate_challenge(challenge: &Challenge) -> Result<(), TransportError> {
     let url = url::Url::parse(&challenge.upstream_url).map_err(|_| hold("upstream URL"))?;
@@ -496,6 +507,8 @@ mod pipe {
 struct Channel {
     incoming: pipe::Pipe, outgoing: pipe::Pipe, challenge: Option<Challenge>,
     sequence: u64, unresolved: Option<String>, poisoned: bool, host_observation: Option<Value>,
+    scope_context_receipt: Option<context_contract::OriginalScopeContextReceipt>,
+    scope_context_attempted: bool,
 }
 #[cfg(unix)]
 impl Channel {
@@ -535,6 +548,7 @@ impl Channel {
         let challenge = self.challenge.as_ref().ok_or_else(|| hold("missing challenge"))?;
         let host_id = self.host_observation.as_ref().and_then(|h| h.get("host_instance_id")).and_then(Value::as_str)
             .ok_or_else(|| hold("original host instance unavailable"))?;
+        context_contract::require_original_scope_for_send(challenge, host_id, self.scope_context_receipt.as_ref())?;
         let facts = observation(request, body, step, gateway, challenge, host_id, self.sequence)?;
         let binding = self.write_observation(&facts).await?;
         let permit: Permit = self.read().await?;
@@ -557,7 +571,7 @@ async fn channel() -> Result<&'static tokio::sync::Mutex<Channel>, TransportErro
     let result = CHANNEL.get_or_init(|| async {
         let outgoing = pipe::Pipe::inherited(3).map_err(|_| "original FD3 unavailable".to_string())?;
         let incoming = pipe::Pipe::inherited(4).map_err(|_| "original FD4 unavailable".to_string())?;
-        Ok(tokio::sync::Mutex::new(Channel { incoming, outgoing, challenge: None, sequence: 0, unresolved: None, poisoned: false, host_observation: None }))
+        Ok(tokio::sync::Mutex::new(Channel { incoming, outgoing, challenge: None, sequence: 0, unresolved: None, poisoned: false, host_observation: None, scope_context_receipt: None, scope_context_attempted: false }))
     }).await;
     result.as_ref().map_err(|reason| hold(reason))
 }
@@ -565,8 +579,8 @@ async fn channel() -> Result<&'static tokio::sync::Mutex<Channel>, TransportErro
 /// The single actual HTTP cut. Auth has already run and may have replaced the request.
 /// No async/caller mutation is allowed between permit validation and transport invocation.
 pub(crate) async fn stream<T: HttpTransport + 'static>(transport: &T, request: Request, step: Option<&SourceStep>, auth_provider: &crate::SharedAuthProvider)
-    -> Result<StreamResponse, TransportError> {
-    if !enabled() { return transport.stream(request).await; }
+    -> Result<original_history::OriginalStreamResponse, TransportError> {
+    if !enabled() { return transport.stream(request).await.map(|response|original_history::OriginalStreamResponse {response,original:None}); }
     #[cfg(not(unix))]
     { let _ = (transport, request, step, auth_provider); Err(hold("unsupported inherited-pipe host")) }
     #[cfg(unix)]
@@ -616,6 +630,9 @@ pub(crate) async fn stream<T: HttpTransport + 'static>(transport: &T, request: R
             Err(error) => { owner.lock().await.poisoned = true; return Err(error); }
             }
         };
+        let startup_identity={let state=owner.lock().await;
+            original_native_decoder::OriginalStartupIdentity::observe(&state)?};
+        let original = original_history::OriginalResponseDecoder::returned(step, body, startup_identity)?;
         let StreamResponse { status, headers, bytes } = response;
         {
             let state=owner.lock().await;
@@ -648,6 +665,6 @@ pub(crate) async fn stream<T: HttpTransport + 'static>(transport: &T, request: R
                 }
             }
         });
-        Ok(StreamResponse { status, headers, bytes: Box::pin(bytes) })
+        Ok(original_history::OriginalStreamResponse { response: StreamResponse { status, headers, bytes: Box::pin(bytes) }, original: Some(original) })
     }
 }

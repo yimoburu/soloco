@@ -55,7 +55,6 @@ use crate::stream_events_utils::handle_output_item_done;
 use crate::stream_events_utils::last_assistant_message_from_item;
 use crate::stream_events_utils::mark_thread_memory_mode_polluted_if_external_context;
 use crate::stream_events_utils::raw_assistant_output_text_from_item;
-use crate::stream_events_utils::record_completed_response_item_with_finalized_facts;
 use crate::tasks::emit_compact_metric;
 use crate::tools::ToolRouter;
 use crate::tools::context::SharedTurnDiffTracker;
@@ -2640,6 +2639,7 @@ async fn handle_assistant_item_done_in_plan_mode(
     state: &mut PlanModeStreamState,
     previously_active_item: Option<&TurnItem>,
     last_agent_message: &mut Option<String>,
+    original_output:Option<codex_api::protected_peer::OriginalResponseItem>,
 ) -> bool {
     let turn_context = &step_context.turn;
     if let ResponseItem::Message { role, .. } = item
@@ -2670,11 +2670,11 @@ async fn handle_assistant_item_done_in_plan_mode(
             .as_ref()
             .and_then(|facts| facts.last_agent_message.clone());
 
-        record_completed_response_item_with_finalized_facts(
+        crate::stream_events_utils::record_completed_response_item_original(
             sess,
             step_context,
             item,
-            finalized_facts.as_ref(),
+            finalized_facts.as_ref(),original_output,
         )
         .await;
         if let Some(agent_message) = final_last_agent_message {
@@ -3001,12 +3001,17 @@ async fn try_run_sampling_request(
             }
         };
 
+        let (event,mut original_output)=match event {
+            ResponseEvent::OriginalOutputItemDone(original)=>(ResponseEvent::OutputItemDone(original.item().clone()),Some(original)),
+            event=>(event,None),
+        };
         sess.services
             .session_telemetry
             .record_responses(&handle_responses, &event);
         record_turn_ttft_metric(&turn_context, &event).await;
 
         match event {
+            ResponseEvent::OriginalOutputItemDone(_)=>unreachable!("original response normalized above"),
             ResponseEvent::Created { response_id } => {
                 response_id_for_assessment.clone_from(&response_id);
                 if let Some(response_id) = response_id {
@@ -3035,6 +3040,7 @@ async fn try_run_sampling_request(
                         })
                     });
                 assign_missing_streamed_response_item_id(&mut item, active_item.as_ref());
+                if let Some(original)=original_output.as_mut(){original.assign_missing_id(item.id().cloned());}
                 sess.reserve_assistant_message_order(&turn_context, &item)
                     .await;
                 if analytics_tool_call_ids.len() < MAX_ANALYTICS_TOOL_CALL_IDS_PER_RESPONSE {
@@ -3086,7 +3092,7 @@ async fn try_run_sampling_request(
                         &item,
                         state,
                         previously_streamed_item.as_ref(),
-                        &mut last_agent_message,
+                        &mut last_agent_message,original_output.clone(),
                     )
                     .await
                 {
@@ -3098,6 +3104,7 @@ async fn try_run_sampling_request(
                     Arc::make_mut(&mut tool_runtime.step_context).serving_assessment = assessment;
                 }
                 let mut ctx = HandleOutputCtx {
+                    original_output,
                     sess: sess.clone(),
                     step_context: Arc::clone(&step_context),
                     turn_store: Arc::clone(&turn_store),
