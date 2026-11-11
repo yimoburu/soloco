@@ -16,6 +16,7 @@ SPEC = importlib.util.spec_from_file_location("delivery_tool", Path(__file__).wi
 TOOL = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(TOOL)
 VALIDATE_OPENSSL_CONFIG = TOOL.validate_openssl_config
+VALIDATE_SELECTED_SDK = TOOL.validate_selected_sdk
 
 
 def pure_build_fixture(tmp):
@@ -40,6 +41,7 @@ class TemporaryDataChecks(unittest.TestCase):
     def setUp(self):
         # Pure CI never consults the runner's real system crypto configuration.
         self.config_guard = self.enterContext(patch.object(TOOL, "validate_openssl_config", return_value=TOOL.OPENSSL_CONFIG))
+        self.sdk_guard = self.enterContext(patch.object(TOOL, "validate_selected_sdk", return_value={"schema": "PURE_MOCK_SELECTED_SDK_NO_HOST_READ"}))
 
     def test_duplicate_json_keys_are_rejected(self):
         with self.assertRaisesRegex(ValueError, "duplicate"):
@@ -268,7 +270,9 @@ class TemporaryDataChecks(unittest.TestCase):
             _, _, profile = TOOL.build_domain(source, prefix, cache, output)
             self.assertIn('(allow file-read* file-test-existence (literal "/"))', profile)
             self.assertNotIn('(subpath "/")', profile)
-            self.assertIn('(allow file-map-executable (subpath "'+str(prefix)+'") (subpath "'+str(output)+'") (subpath "/usr/lib"))', profile)
+            mapping = next(line for line in profile.splitlines() if line.startswith("(allow file-map-executable"))
+            for allowed in (prefix, output, Path("/usr/lib"), TOOL.SELECTED_TOOLCHAIN, TOOL.SELECTED_XCODE / "usr/lib"):
+                self.assertIn('(subpath "'+str(allowed)+'")', mapping)
             self.assertNotIn('(allow process-info*', profile)
             self.assertNotIn('opendirectoryd.libinfo', profile)
             self.assertNotIn('(allow system-mac-syscall', profile)
@@ -481,6 +485,125 @@ class TemporaryDataChecks(unittest.TestCase):
             TOOL.main()
         self.assertEqual(result.exception.code, 2)
         self.assertIn("unrecognized arguments", errors.getvalue())
+
+    def test_selected_SDK_owner_modes_are_exact_and_not_falsely_root_trusted(self):
+        expected = {"uid": 502, "gid": 20, "mode": "0o755"}
+        good = dict(st_mode=stat.S_IFDIR | 0o755, st_uid=502, st_gid=20, st_dev=1, st_ino=2)
+        result = TOOL.selected_sdk_metadata(SimpleNamespace(**good), expected, directory=True)
+        self.assertEqual(result["uid"], 502)
+        for change in ({"st_uid": 0}, {"st_gid": 80}, {"st_mode": stat.S_IFDIR | 0o777}, {"st_mode": stat.S_IFLNK | 0o755}):
+            with self.subTest(change=change), self.assertRaisesRegex(ValueError, "ownership/type/mode"):
+                TOOL.selected_sdk_metadata(SimpleNamespace(**{**good, **change}), expected, directory=True)
+        parent = SimpleNamespace(st_mode=stat.S_IFDIR | 0o775, st_uid=0, st_gid=80, st_dev=1, st_ino=1)
+        TOOL.selected_sdk_metadata(parent, {"uid": 0, "gid": 80, "mode": "0o775"}, directory=True)
+
+    def test_selected_SDK_file_fixture_pin_checks_actual_bytes_and_links(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp).resolve() / "clang-fixture"
+            p.write_bytes(b"fixture compiler, not executable");p.chmod(0o644)
+            info = p.stat()
+            row = {"path": str(p), "bytes": info.st_size, "sha256": TOOL.sha(p.read_bytes()), "uid": info.st_uid, "gid": info.st_gid, "mode": "0o644"}
+            self.assertEqual(TOOL.selected_sdk_file_pin(row)["sha256"], row["sha256"])
+            p.write_bytes(b"X" * info.st_size)
+            with self.assertRaisesRegex(ValueError, "hash changed"):
+                TOOL.selected_sdk_file_pin(row)
+            p.unlink();p.symlink_to(Path(tmp).resolve() / "elsewhere")
+            with self.assertRaisesRegex(ValueError, "symlink"):
+                TOOL.selected_sdk_file_pin(row)
+
+    def test_selected_SDK_fixture_requires_original_selection_and_canonical_roots(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp).resolve();developer = base / "Developer";developer.mkdir()
+            fixture = developer / "clang";fixture.write_bytes(b"pure fixture");fixture.chmod(0o644)
+            link = base / "selected";link.symlink_to(developer)
+            d = developer.stat();f = fixture.stat();original = Path.lstat
+            def root_link(path, *args, **kwargs):
+                actual = original(path, *args, **kwargs)
+                if path == link:
+                    return SimpleNamespace(st_mode=actual.st_mode, st_uid=0, st_gid=0, st_dev=actual.st_dev, st_ino=actual.st_ino)
+                return actual
+            directories = [{"path": str(developer), "uid": d.st_uid, "gid": d.st_gid, "mode": oct(d.st_mode & 0o777)}]
+            pins = [{"path": str(fixture), "bytes": f.st_size, "sha256": TOOL.sha(fixture.read_bytes()), "uid": f.st_uid, "gid": f.st_gid, "mode": "0o644"}]
+            with patch.object(TOOL, "SELECTED_LINK", link), patch.object(TOOL, "SELECTED_XCODE", developer), patch.object(TOOL, "SELECTED_SDK_DIRS", directories), patch.object(TOOL, "SELECTED_SDK_PINS", pins), patch.object(Path, "lstat", new=root_link):
+                value = VALIDATE_SELECTED_SDK()
+                self.assertEqual(value["selection_link"]["target"], str(developer))
+                self.assertEqual(value["files"][0]["sha256"], pins[0]["sha256"])
+                link.unlink();link.symlink_to(base / "unreviewed")
+                with self.assertRaisesRegex(ValueError, "unsupported selected Xcode"):
+                    VALIDATE_SELECTED_SDK()
+                link.unlink();link.symlink_to(developer)
+                alias = base / "alias";alias.symlink_to(developer)
+                with patch.object(TOOL, "SELECTED_SDK_DIRS", [{**directories[0], "path": str(alias)}]), self.assertRaisesRegex(ValueError, "symlink"):
+                    VALIDATE_SELECTED_SDK()
+
+    def test_selected_SDK_read_map_and_environment_are_source_fixed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp).resolve()
+            ambient = {"DEVELOPER_DIR": "/fixture/other-Xcode", "SDKROOT": "/fixture/other-SDK", "CC": "/fixture/cc", "CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER": "/fixture/ld"}
+            with patch.dict(TOOL.os.environ, ambient):
+                _, env, profile = TOOL.build_domain(*(base / x for x in ("source", "prefix", "cache", "output")))
+            self.assertEqual(env["DEVELOPER_DIR"], str(TOOL.SELECTED_XCODE))
+            self.assertEqual(env["SDKROOT"], str(TOOL.SELECTED_SDK))
+            self.assertEqual(env["CC"], str(TOOL.SELECTED_CLANG))
+            self.assertEqual(env["CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER"], str(TOOL.SELECTED_CLANG))
+            for value in ambient.values():self.assertNotIn(value, json.dumps(env))
+            for allowed in TOOL.SELECTED_SDK_READ_ROOTS:self.assertIn('(subpath "'+str(allowed)+'")', profile)
+            mapping = next(x for x in profile.splitlines() if x.startswith('(allow file-map-executable'))
+            self.assertIn(str(TOOL.SELECTED_TOOLCHAIN), mapping)
+            self.assertIn(str(TOOL.SELECTED_XCODE / "usr/lib"), mapping)
+            self.assertNotIn(str(TOOL.SELECTED_SDK), mapping)
+            writes = next(x for x in profile.splitlines() if x.startswith('(allow file-write*'))
+            self.assertNotIn('/Applications', writes)
+            self.assertNotIn('(subpath "/Applications")', profile)
+            self.assertNotIn('(subpath "/private")', profile)
+            self.assertNotIn('/Library/Developer/CommandLineTools', profile)
+            self.assertNotIn('/Applications/Xcode.app/', profile)
+            self.assertIn('(deny network*)', profile)
+            self.assertTrue({"HOME", "CODEX_HOME"}.isdisjoint(env))
+
+    def test_private_build_roots_cannot_grant_writes_inside_selected_Xcode(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp).resolve();app = base / "Xcode.app";app.mkdir()
+            developer = app / "Contents/Developer"
+            output = app / "new-output"
+            with patch.object(TOOL, "SELECTED_XCODE", developer), self.assertRaisesRegex(ValueError, "overlaps selected Xcode"):
+                TOOL.build_domain(base / "source", base / "prefix", base / "cache", output)
+            self.assertFalse(output.exists())
+            with patch.object(TOOL, "SELECTED_XCODE", developer), self.assertRaisesRegex(ValueError, "overlaps selected Xcode"):
+                TOOL.build_domain(base / "source", base / "prefix", app / "cache", base / "output")
+
+    def test_unqualified_selected_SDK_holds_before_output_or_spawn(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base, args, sr, tr = pure_build_fixture(tmp)
+            with patch.object(TOOL, "require_build_domain", return_value=TOOL.SANDBOX), patch.object(TOOL, "package", return_value=(base / "package", {}, [], [tr], [sr])), patch.object(TOOL, "validate_selected_sdk", side_effect=ValueError("selected SDK changed")), patch.object(TOOL.subprocess, "Popen", side_effect=AssertionError("must not spawn")):
+                with self.assertRaisesRegex(ValueError, "selected SDK changed"):
+                    TOOL.build(args)
+            self.assertFalse(args.output.exists())
+
+    def test_pure_mock_success_retains_the_observed_selected_SDK_binding(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base, args, sr, tr = pure_build_fixture(tmp)
+            def fake_spawn(argv, **kwargs):
+                binary = args.output / "target" / TOOL.TARGET / "release/codex-soloco-protected-host"
+                binary.parent.mkdir(parents=True);binary.write_bytes(b"PURE MOCK SDK BUILD")
+                return SimpleNamespace(wait=lambda timeout: 0)
+            with patch.object(TOOL, "require_build_domain", return_value=TOOL.SANDBOX), patch.object(TOOL, "package", return_value=(base / "package", {}, [], [tr], [sr])), patch.object(TOOL.subprocess, "Popen", side_effect=fake_spawn), contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(TOOL.build(args), 0)
+            plan = json.loads((args.output / "plan.json").read_text());receipt = json.loads((args.output / "receipt.json").read_text())
+            self.assertEqual(plan["selected_sdk"], receipt["selected_sdk"])
+            self.assertEqual(receipt["selected_sdk"], {"schema": "PURE_MOCK_SELECTED_SDK_NO_HOST_READ"})
+            self.assertFalse(receipt["native_qualified"])
+
+    def test_pure_mock_zero_exit_holds_on_changed_selected_SDK(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base, args, sr, tr = pure_build_fixture(tmp)
+            before, after = {"observed": "fixture-before"}, {"observed": "fixture-after"}
+            with patch.object(TOOL, "require_build_domain", return_value=TOOL.SANDBOX), patch.object(TOOL, "package", return_value=(base / "package", {}, [], [tr], [sr])), patch.object(TOOL, "validate_selected_sdk", side_effect=[before, before, after]), patch.object(TOOL.subprocess, "Popen", return_value=SimpleNamespace(wait=lambda timeout: 0)), contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(TOOL.build(args), 1)
+            receipt = json.loads((args.output / "receipt.json").read_text())
+            self.assertEqual(receipt["status"], "changed-input-or-output-held")
+            self.assertIn("selected SDK changed", receipt["verification_error"])
+            self.assertIsNone(receipt["binary"])
 
     def test_failed_sandbox_never_falls_back_to_direct_cargo(self):
         with tempfile.TemporaryDirectory() as tmp:

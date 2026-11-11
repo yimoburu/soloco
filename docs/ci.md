@@ -115,7 +115,7 @@ a historical whole-suite macOS receipt. See [implementation workflow and timing]
 ### Pinned companion source checks
 
 The required Build and drift job also verifies the source-owned
-`native/codex/` manifest and all pinned payload bytes, then runs its 39 pure
+`native/codex/` manifest and all pinned payload bytes, then runs its 47 pure
 Python temporary-data checks. These checks do not download upstream source,
 compile Rust, invoke the sandbox executor, install a toolchain or start a
 native/model session. The explicit macOS offline build and native qualification
