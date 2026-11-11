@@ -275,24 +275,26 @@ export function portfolioContext(state,{task_ids,scope='*',limit=20,budget,curso
   try{const p=reviewedContext(state);constraintRefs=currentRecords(state,{role:'runner',context_scope:scope},p).filter(r=>!isTaskBookkeeping(state,r)&&!isRuntimeBookkeeping(state,r)&&!isTaskScopedMessage(state,r)&&!isTaskOutput(state,r)).map(r=>recordReference(r)).sort((a,b)=>a.id.localeCompare(b.id));}catch(error){constraint_error=error.message;}
   let runtime;try{const binding=runtimeControlBinding(state);runtime={state:binding.enabled?'enabled':'stopped',binding};}catch(error){runtime={state:'needs_attention',reason:error.message};}
   const pendingNotices=(state.notices??[]).filter(n=>!n.resolution);
-  const result={protocol:'async-portfolio-v1',controls:controls(state),runtime,scope,summary_only:true,decision_ready:false,
-    tasks:{items:[],total:matches.length,offset,returned:0,complete:false,next_cursor:null,inventory_sha256:inventory},
-    constraints:{sources:[],total:constraintRefs.length,complete:constraint_error===null,reason:constraint_error,requires_exact_retrieval:true},
-    notices:{items:[],total:pendingNotices.length,complete:pendingNotices.length===0,lookup:'Inspect unresolved_notices and exact-read its source handle; delivery is not acknowledgment.'},
+  // Price final control metadata before packing. False is the larger JSON
+  // boolean, so proving complete membership can only release that reserved byte.
+  const result={protocol:'async-portfolio-v1',controls:controls(state),runtime,scope,summary_only:true,decision_ready:false,complete:false,
+    tasks:{items:[],total:matches.length,offset,returned:0,complete:false,next_cursor:null,inventory_sha256:inventory,
+      ...(offset<matches.length?{reason:'A single task brief does not fit; increase the bounded budget or inspect that exact task. No zero-progress continuation was issued.'}:{})},
+    constraints:{sources:[],total:constraintRefs.length,complete:false,reason:constraint_error,requires_exact_retrieval:true},
+    notices:{items:[],total:pendingNotices.length,complete:false,lookup:'Inspect unresolved_notices and exact-read its source handle; delivery is not acknowledgment.'},
     coverage:{native_history:'not a source of current company authority',semantic_evidence_complete:false,rule:'Portfolio metadata does not replace exact task definitions, governing sources or required independent acceptance.'}};
   if(bytes(result)>ceiling)throw Error('Portfolio control header exceeds budget; request a larger bounded budget');
   for(const record of matches.slice(offset,offset+limit)){
-    const item=brief(state,record),candidate={...result,tasks:{...result.tasks,items:[...result.tasks.items,item]}};
+    const items=[...result.tasks.items,brief(state,record)],complete=offset+items.length===matches.length;
+    const candidate={...result,tasks:{...result.tasks,items,returned:items.length,complete,
+      next_cursor:complete?null:Buffer.from(JSON.stringify({inventory,offset:offset+items.length})).toString('base64url')}};
+    delete candidate.tasks.reason;
     if(bytes(candidate)>ceiling)break;
-    result.tasks.items.push(item);
+    result.tasks=candidate.tasks;
   }
-  result.tasks.returned=result.tasks.items.length;
   result.tasks.complete=offset+result.tasks.returned===matches.length;
-  if(!result.tasks.complete){
-    if(result.tasks.returned)result.tasks.next_cursor=Buffer.from(JSON.stringify({inventory,offset:offset+result.tasks.returned})).toString('base64url');
-    else result.tasks.reason='A single task brief does not fit; increase the bounded budget or inspect that exact task. No zero-progress continuation was issued.';
-  }
-  for(const source of constraintRefs){const candidate={...result,constraints:{...result.constraints,sources:[...result.constraints.sources,source]}};if(bytes(candidate)>ceiling){result.constraints.complete=false;break;}result.constraints.sources.push(source);}
+  for(const source of constraintRefs){const candidate={...result,constraints:{...result.constraints,sources:[...result.constraints.sources,source]}};if(bytes(candidate)>ceiling)break;result.constraints.sources.push(source);}
+  result.constraints.complete=constraint_error===null&&result.constraints.sources.length===constraintRefs.length;
   for(const n of pendingNotices){const value={id:n.id,kind:n.kind,summary:n.summary,reference:n.reference};const candidate={...result,notices:{...result.notices,items:[...result.notices.items,value]}};if(bytes(candidate)>ceiling)break;result.notices.items.push(value);}
   result.notices.complete=result.notices.items.length===pendingNotices.length;
   result.complete=result.tasks.complete&&result.constraints.complete&&result.notices.complete;
