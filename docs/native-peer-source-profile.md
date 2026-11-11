@@ -70,6 +70,12 @@ A later source change requires a new complete input manifest and affected
 qualification. Historical source tests, tiny build controls and an older
 unassociated development binary keep their original meanings.
 
+The [component descriptor DATA library](component-descriptor-data.md) inspects an
+originally selected build without making it executable. It preserves the raw
+package/receipt JSON, original-to-sealed path mapping and read-only file semantics.
+Its opaque DATA handle is not an interpreter, execution grant or runtime slot;
+the missing deployment, Node closure and private-FD boundaries below still apply.
+
 ## SPEC reconciliation
 
 This source profile implements mechanical evidence and currentness checks within
