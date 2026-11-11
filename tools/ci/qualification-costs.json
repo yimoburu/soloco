@@ -1,0 +1,30 @@
+{
+  "protocol": "qualification-file-cost-hints-v1",
+  "source_commit": "0be18d34b4f375f769f64f8cab217e3468968519",
+  "run": 42936349555,
+  "job": 130247258429,
+  "scope": "Partial sums of uniquely source-mapped top-level TAP durations. Placement hints only, not per-file wall time or an ETA; unknown and future files remain required.",
+  "unknown_cost_ms": 5000,
+  "costs_ms": {
+    "tests/bootstrap-home-repair.test.mjs": 575544,
+    "tests/complete-group-extraction.test.mjs": 421362,
+    "tests/context-qualification.test.mjs": 90006,
+    "tests/corpus-fit-delivery.test.mjs": 61859,
+    "tests/corpus-phased-delivery.test.mjs": 64392,
+    "tests/corpus-preservation-storage.test.mjs": 195590,
+    "tests/develop.test.mjs": 73806,
+    "tests/handover.test.mjs": 290353,
+    "tests/initial-home-publication.test.mjs": 238302,
+    "tests/initial-proposed-homes.test.mjs": 132591,
+    "tests/operating-control.test.mjs": 120684,
+    "tests/operating-state.test.mjs": 328456,
+    "tests/operating-upgrade.test.mjs": 94531,
+    "tests/peer-ledger.test.mjs": 90372,
+    "tests/peer-model.test.mjs": 239578,
+    "tests/public-response.test.mjs": 61016,
+    "tests/scoped-context.test.mjs": 221941,
+    "tests/scoped-corpus-runtime.test.mjs": 212655,
+    "tests/upgrade-incremental.test.mjs": 52444,
+    "tests/upgrade.test.mjs": 118257
+  }
+}
