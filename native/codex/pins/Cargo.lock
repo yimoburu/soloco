@@ -2028,6 +2028,7 @@ dependencies = [
  "bytes",
  "chrono",
  "codex-client",
+ "codex-history",
  "codex-http-client",
  "codex-protocol",
  "codex-utils-rustls-provider",
@@ -4278,6 +4279,7 @@ name = "codex-models-manager"
 version = "0.167.0-alpha.3.2"
 dependencies = [
  "chrono",
+ "codex-api",
  "codex-http-client",
  "codex-login",
  "codex-otel",

@@ -298,7 +298,8 @@ impl ToolRouter {
                 let retain_native_call = self
                     .registry
                     .registered_tool(&tool_name)
-                    .is_some_and(|tool| tool.native_review == NativeReview::Required);
+                    .is_some_and(|tool| tool.native_review == NativeReview::Required)
+                    || crate::protected_peer_enabled(); // retain original DATA; not a review/source verdict
                 let (arguments, encrypted_function_args) = if retain_native_call {
                     (arguments.clone(), encrypted_function_args.clone())
                 } else {

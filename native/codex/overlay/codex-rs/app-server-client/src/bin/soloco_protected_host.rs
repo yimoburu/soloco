@@ -175,6 +175,9 @@ async fn run()->io::Result<()> {
                 }
                 if !initialized{return Err(held("initialized notification required"));}
                 if value.get("method").is_some(){
+                    // Pure fixed-frame check on the ACTUAL original input; never
+                    // await Channel here or rewrite opaque business JSON bytes.
+                    codex_api::protected_peer::validate_original_context_source_request(&value).map_err(io::Error::other)?;
                     let request:ClientRequest=serde_json::from_value(value).map_err(|_|held("typed original request"))?;
                     if !["config/read","configRequirements/read","permissionProfile/list","mcpServerStatus/list","app/installed","thread/start","thread/resume","turn/start","turn/interrupt"].contains(&request.method_name()){return Err(held("unsupported original method"));}
                     if pending.len()>=4{return Err(held("original request concurrency"));}

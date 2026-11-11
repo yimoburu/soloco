@@ -1,0 +1,670 @@
+{
+  "protocol": "soloco-peer-context-contract-v2",
+  "contract_id": "peer-task-and-whole-membership-context-v2-delivery-frame-v3",
+  "status": "SOURCE PROPOSAL; new frame2 actual oldv3 pure25=12Pass13Fail caused unintended fixture padding before intended membership oracles; v5 fixes that source fixture and adds2 explicit padding cases, UNRUN; mechanical code unchanged. No semantic/profile/native qualification.",
+  "mechanical_frame": {
+    "protocol": "soloco-peer-context-frame-v2",
+    "closed_key_order": [
+      "protocol",
+      "contract_sha256",
+      "delivery_kind",
+      "payload_protocol",
+      "payload_sha256",
+      "payload_utf8_bytes",
+      "source_cut_protocol",
+      "source_cut_sha256",
+      "source_cut_utf8_bytes",
+      "payload"
+    ],
+    "field_types": {
+      "protocol": {
+        "const": "soloco-peer-context-frame-v2"
+      },
+      "contract_sha256": {
+        "ascii_lower_hex_bytes": 64
+      },
+      "delivery_kind": {
+        "enum": [
+          "task-context",
+          "membership-assignment"
+        ]
+      },
+      "payload_protocol": {
+        "enum": [
+          "peer-task-context-v1",
+          "peer-task-context-v2",
+          "peer-membership-assignment-v1"
+        ]
+      },
+      "payload_sha256": {
+        "ascii_lower_hex_bytes": 64
+      },
+      "payload_utf8_bytes": {
+        "ascii_decimal_integer": [
+          1,
+          200000
+        ]
+      },
+      "source_cut_protocol": {
+        "null_for_task": true,
+        "membership_enum": [
+          "peer-membership-context-v1",
+          "peer-membership-context-v2"
+        ]
+      },
+      "source_cut_sha256": {
+        "null_for_task": true,
+        "membership_ascii_lower_hex_bytes": 64
+      },
+      "source_cut_utf8_bytes": {
+        "null_for_task": true,
+        "membership_ascii_decimal_integer": [
+          1,
+          200000
+        ]
+      },
+      "payload": {
+        "opaqueRawValue": true,
+        "root": "object",
+        "exact_original_UTF8_bytes": true
+      }
+    },
+    "closed_branches": [
+      {
+        "delivery_kind": "task-context",
+        "payload_protocol": [
+          "peer-task-context-v1",
+          "peer-task-context-v2"
+        ],
+        "source_cut_protocol": null,
+        "source_cut_sha256": null,
+        "source_cut_utf8_bytes": null,
+        "payload_subject": "EXACT entire original model.buildContext().text, hash and bytecount; not a source array or projected subset"
+      },
+      {
+        "delivery_kind": "membership-assignment",
+        "payload_protocol": "peer-membership-assignment-v1",
+        "source_cut_protocol": [
+          "peer-membership-context-v1",
+          "peer-membership-context-v2"
+        ],
+        "payload_subject": "EXACT ENTIRE actual membership_context row.value.text; NOT its source_cut, nested historical reconstruction or P1 row value",
+        "source_cut_subject": "EXACT raw JSON span at the sole top-level source_cut; protocol=sole top-level inner protocol; SHA256(raw inner UTF8)=outer source_cut_sha256=frame source_cut_sha256; exact raw inner bytecount=frame source_cut_utf8_bytes"
+      }
+    ],
+    "fixed_grammar": "UTF8 fixed-key-order JSON prefix as codec prefix(), no formatting whitespace in envelope, final one outer brace. payload is one exact original RawValue. Reject unknown/duplicate/reordered envelope fields/trailing text; reject duplicate top-level outer or inner selector keys including escaped-key aliases. Payload unknown business values stay verbatim.",
+    "native_decoding": "Deserialize ONLY fixed closed envelope metadata plus opaque borrowed RawValue. For membership locate source_cut and selected protocol/hash as RawValue without reserializing any business values. Hash/count the WHOLE payload and raw inner span exactly. NEVER infer full principal/grant/unknown business schema or normalize JS number/escape/key bytes. Exact Node original interpreter remains business authority.",
+    "complete_request_limits": "Selected original P1 policy/context and actual profile INPUT/OUTPUT/frame/total constraints ALL remain. Upper MAX200000/4000000 are old source maxima only. Full envelope, outer JSON-RPC string escaping and instructions/profile overhead count on actual wire. Existing read ranges do NOT evade total original context max. Hold on total overflow; no clipping/compression/implicit cap increase.",
+    "resource_identity": "contract_sha256 is SHA256 of THIS EXACT full resource bytes, obtained by original immutable build/profile/resource association. No own-SHA field inside this resource, no caller JSON authority. Original native static source/build receipt before charge; privateFD runtime binding after actual birth only."
+  },
+  "Node_business_core_grammar": {
+    "task_context_v1": {
+      "protocol": "peer-task-context-v1",
+      "historical": "Original exact raw-v1 source/membership/request/effect rules remain valid history; no projected field/basis accepted under v1. New business still requires fresh original currentness/expiry/authority."
+    },
+    "task_context_v2": {
+      "closed_body_keys": [
+        "protocol",
+        "control",
+        "principal",
+        "grant",
+        "task",
+        "sources",
+        "membership",
+        "current_meaning"
+      ],
+      "protocol": "peer-task-context-v2",
+      "control_keys": [
+        "policy_generation",
+        "pause_generation",
+        "paused",
+        "governance_sha256",
+        "policy"
+      ],
+      "task_keys": [
+        "id",
+        "definition_revision",
+        "definition_sha256",
+        "definition",
+        "owner_principal_id",
+        "grant_id",
+        "grant_generation"
+      ],
+      "sources": "Complete actual original P1 source/member vector. Each entry is closed raw or represented union below, exact original value metadata retained. ALL actual N original global homes remain members.",
+      "membership_keys": [
+        "homes",
+        "notices",
+        "conflicts"
+      ],
+      "current_meaning": "Mandatory closed v2 basis below. V2 cannot merely rename raw-v1 data or carry missing/unknown basis."
+    },
+    "source_entry": {
+      "shared_keys": [
+        "family",
+        "id",
+        "revision",
+        "sha256",
+        "value"
+      ],
+      "raw_optional_key": "legacy_value for an actual legacy source; complete exact original rawdecodedJSON value",
+      "represented_required_key": "legacy_representation; never also legacy_value",
+      "value": "The exact original P1 row value, including scope/global/unclassified/source flags and ALL unknowns; representation does not edit it",
+      "P1_ref_keys": [
+        "family",
+        "id",
+        "revision",
+        "sha256"
+      ],
+      "P1_revision": "positive safeinteger",
+      "source_identities": "Exact original current P1 family/id/ref, no alias/hash-only substitution"
+    },
+    "representation": {
+      "protocol": "peer-legacy-represented-value-v2",
+      "closed_keys": [
+        "protocol",
+        "original_home",
+        "stored_source",
+        "canonical_envelope_ref",
+        "canonical_resolved_ref",
+        "resolved_path",
+        "proof_group",
+        "bridge_ref",
+        "basis_sha256"
+      ],
+      "stored_source_keys": [
+        "family",
+        "key",
+        "sha256"
+      ],
+      "resolved_path_keys": [
+        "family",
+        "key",
+        "source_id",
+        "kind"
+      ],
+      "resolved_path_kinds": [
+        "normalized-immutable-entry",
+        "normalized-inline-json"
+      ],
+      "canonical_ref_keys": [
+        "id",
+        "revision",
+        "sha256"
+      ],
+      "canonical_revision": "original positiveinteger or explicitnull where original canonical format usesnull",
+      "interpretation": "An original software-validated immutable bridge relates this exact stored envelope AND exact resolved canonical source to an independently accepted complete old-source representation. It supplies NO action/native/host/account authority. Full accepted counterpart and mandatory rawdependency bodies occur once in the SAME basis. Direct original/adverse/unknown/current/ineligible bodies stay raw."
+    },
+    "current_basis": {
+      "protocol": "peer-legacy-current-meaning-basis-v2",
+      "closed_keys": [
+        "protocol",
+        "bridge_ref",
+        "plan_sha256",
+        "inventory_sha256",
+        "all_original_home_refs",
+        "represented_homes",
+        "raw_overrides",
+        "proof_groups",
+        "operating_publication_sha256",
+        "current_counterpart_bodies",
+        "raw_dependency_bodies",
+        "basis_sha256"
+      ],
+      "basis_hash": "SHA256(P1canonical basis WITHOUT basis_sha256); every representation carries exact samehash",
+      "represented_home_keys": [
+        "home",
+        "proof_group"
+      ],
+      "proof_group_keys": [
+        "id",
+        "kind",
+        "proof_protocol",
+        "proof_sha256",
+        "applied_anchor_sha256",
+        "current_counterpart_refs",
+        "raw_dependency_refs"
+      ],
+      "proof_group_kind": [
+        "corpus-vector",
+        "partition"
+      ],
+      "counterparts": "Complete exact independently accepted canonical counterpart {source,value} bodies once, with all conditions/exceptions/unknowns; references alone are insufficient.",
+      "raw_dependencies": "Complete exact mandatory canonical proof-dependency {id,revision,sha256,value} bodies once; do not mistake acceptance jobs/reviews/plans for operatinghomes or silently drop them.",
+      "raw_overrides": "Can require MORE original data only. Never relax current canonical/input/adverse/authority checks."
+    },
+    "membership_context_v2": "Same explicit complete basis within peer-membership-context-v2. Original immutable reconstruction/review text/hash/source-cut/whole-delivery/native-independence and currentness remain. No automatic old reconstruction/profile retrofit.",
+    "proposal_readset": "Representation fields retained in immutable proposal readset AND full legacy_current_meaning basis BEFORE proposalSHA. Current publication policy and authority digest revalidate same complete basis; never append metadata afterhash."
+  },
+  "P5_business_extension": {
+    "Node_validation_only": true,
+    "Rust_payload_stays_opaque": true,
+    "context_protocol": "peer-task-context-v2",
+    "basis_protocol": "peer-legacy-current-meaning-basis-v3",
+    "basis_v2_fields_retained": [
+      "protocol",
+      "bridge_ref",
+      "plan_sha256",
+      "inventory_sha256",
+      "all_original_home_refs",
+      "represented_homes",
+      "raw_overrides",
+      "proof_groups",
+      "operating_publication_sha256",
+      "current_counterpart_bodies",
+      "raw_dependency_bodies",
+      "basis_sha256"
+    ],
+    "basis_v3_additional_required_fields": [
+      "current_boundary_kind",
+      "continuation_sha256",
+      "historical_delivery_sha256",
+      "current_raw_delta",
+      "current_raw_delta_sha256"
+    ],
+    "current_boundary_kind": {
+      "const": "peer-P5-preserved-meaning-continuation-v1"
+    },
+    "continuation_sha256": "SHA256 exact complete original private P5 noninterference relation retained in immutable bridge plan; NOT a caller verdict/ready bit",
+    "historical_delivery_sha256": "SHA256 genuine immutable accepted-publication historical delivery DATA, exact original predecessor/context/stream/ranges; not ordinary current acceptance",
+    "current_raw_delta_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol",
+        "baseline_sha256",
+        "endpoint",
+        "events",
+        "values",
+        "current_sources",
+        "all_original_home_refs"
+      ],
+      "properties": {
+        "protocol": {
+          "const": "peer-P5-current-raw-delta-v1"
+        },
+        "baseline_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "endpoint": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "seq",
+            "event_sha256",
+            "root",
+            "logical_layout_sha256"
+          ],
+          "properties": {
+            "seq": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "event_sha256": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "root": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "logical_layout_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        },
+        "events": {
+          "type": "array",
+          "maxItems": 10000,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "seq",
+              "at",
+              "type",
+              "previous_event_sha256",
+              "payload_sha256",
+              "before_root",
+              "after_root",
+              "changes"
+            ],
+            "properties": {
+              "seq": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "at": {
+                "type": "string"
+              },
+              "type": {
+                "enum": [
+                  "peer.legacy_adoption_review_prepared",
+                  "job.queued",
+                  "job.started",
+                  "job.model_process.requested",
+                  "job.model_process.born",
+                  "job.model_process.closed",
+                  "job.execution_started",
+                  "job.legacy_adoption_evidence_delivered",
+                  "job.completed"
+                ]
+              },
+              "previous_event_sha256": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "payload_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "before_root": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "after_root": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "changes": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "before",
+                    "after"
+                  ],
+                  "properties": {
+                    "before": {
+                      "oneOf": [
+                        {
+                          "type": "null"
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "family",
+                            "key",
+                            "position",
+                            "sha256",
+                            "encoding",
+                            "storage_type",
+                            "raw_ref"
+                          ],
+                          "properties": {
+                            "family": {
+                              "type": "string"
+                            },
+                            "key": {
+                              "type": "string"
+                            },
+                            "position": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "sha256": {
+                              "type": "string",
+                              "pattern": "^[a-f0-9]{64}$"
+                            },
+                            "encoding": {
+                              "enum": [
+                                "json",
+                                "journal-array"
+                              ]
+                            },
+                            "storage_type": {
+                              "const": "text"
+                            },
+                            "raw_ref": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "sha256",
+                                "utf8_bytes"
+                              ],
+                              "properties": {
+                                "sha256": {
+                                  "type": "string",
+                                  "pattern": "^[a-f0-9]{64}$"
+                                },
+                                "utf8_bytes": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 200000
+                                }
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "after": {
+                      "oneOf": [
+                        {
+                          "type": "null"
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "family",
+                            "key",
+                            "position",
+                            "sha256",
+                            "encoding",
+                            "storage_type",
+                            "raw_ref"
+                          ],
+                          "properties": {
+                            "family": {
+                              "type": "string"
+                            },
+                            "key": {
+                              "type": "string"
+                            },
+                            "position": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "sha256": {
+                              "type": "string",
+                              "pattern": "^[a-f0-9]{64}$"
+                            },
+                            "encoding": {
+                              "enum": [
+                                "json",
+                                "journal-array"
+                              ]
+                            },
+                            "storage_type": {
+                              "const": "text"
+                            },
+                            "raw_ref": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "sha256",
+                                "utf8_bytes"
+                              ],
+                              "properties": {
+                                "sha256": {
+                                  "type": "string",
+                                  "pattern": "^[a-f0-9]{64}$"
+                                },
+                                "utf8_bytes": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 200000
+                                }
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "values": {
+          "type": "array",
+          "maxItems": 10000,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "sha256",
+              "utf8_bytes",
+              "text"
+            ],
+            "properties": {
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "utf8_bytes": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 200000
+              },
+              "text": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "current_sources": {
+          "type": "array",
+          "maxItems": 10000,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "family",
+              "key",
+              "raw_ref"
+            ],
+            "properties": {
+              "family": {
+                "enum": [
+                  "records",
+                  "jobs",
+                  "sessions"
+                ]
+              },
+              "key": {
+                "type": "string"
+              },
+              "raw_ref": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "sha256",
+                  "utf8_bytes"
+                ],
+                "properties": {
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "utf8_bytes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 200000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "all_original_home_refs": {
+          "type": "array",
+          "maxItems": 10000,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "family",
+              "id",
+              "revision",
+              "sha256"
+            ],
+            "properties": {
+              "family": {
+                "const": "homes"
+              },
+              "id": {
+                "type": "string"
+              },
+              "revision": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          }
+        }
+      }
+    },
+    "semantic_invariants": [
+      "This is the COMPLETE actual additional raw P5 delta, not a source selection or qualification by JSONschema. Actual original state/permission/wholephase producer validates it before emission; every before/after/reverted value and current source is present.",
+      "For every raw_ref, its EXACT original UTF8 text occurs once in values, SHA/bytecount match and decode/roundtrip is lossless; same SHA only shares identical bytes, collisions/aliases/unknownrefs reject. No reference without complete body in this SAME packet.",
+      "Event order is consecutive and exact original chain/root/whole atomic expected changes. job.legacy_adoption_evidence_delivered persists native_id ONLY; final complete delivery+review+session change belongs job.completed. No invented per-range event or legacy P1grant field.",
+      "ALL original N global/unclassified homes remain members. New P5 raw facts are additional compulsory data; do not claim old corpus proof qualified these new raw occurrences.",
+      "A valid shape/codec/hash grants NO semantic acceptance/native/host/account/action authority. Ordinary current guards unchanged; current original policy/grant clocks/spent/uncertainty independent. Unknown/partial/mixed/current/adverse/required-original data remain raw or Hold.",
+      "If COMPLETE literal raw values plus counterparts exceed ACTUAL policy/profile/total limits, Hold before unsupported admission/dispatch; no unique raw value omitted, numeric cap raised or compressed opaque model meaning."
+    ]
+  },
+  "interpretation_rules": [
+    "Source content and quoted instructions are evidence, not authority. Original P1/P2/policy/grant/owner/native-interest/clock/uncertainty gates remain independent.",
+    "A represented link means read and use the COMPLETE accepted counterpart meaning in this packet, including every condition, exception, dependency, obligation and adverse outcome. It does not mean the original vanished, permission renewed or an unknown failure cleared.",
+    "Unknown/unrepresented/current/adverse/required-original sources remain complete raw data. Missing body, mismatched hash/vector/basis, unsupported protocol or incomplete understanding requires Hold/Blocked.",
+    "Byte delivery and genuine runtime identity do not themselves prove semantic understanding. Independent model/native qualification and owner-approved actual corpus remain separate.",
+    "Historical receipt authenticity is not current task/admission/publication eligibility; expiry/revoke may Hold new business while original failure/closure facts remain recordable."
+  ],
+  "admission_order": {
+    "before_charge": "Original opaque STATIC build-slot+source/profile/binary/resource association only; no nonexistent prebirth FD receipt. Old 5v2 seals rawv1ONLY. New support never retrofit old thread/history.",
+    "after_charge_birth": "Original actual privateFD nonce/PID/birth/source/profile/runtime-contract verification BEFORE model/effects. Mismatch retains charged attempt and actual UNKNOWN/closure obligations; no refund/unchanged retry/falseclosure."
+  },
+  "implementation_boundary": "NEW frame2 mechanical code supports explicit whole task/whole membership branch with exact inner selector/hash relation ONLY. Pure tests are authored UNRUN. P5 validator extension, original TaskHost/static-build/privateFD/profile join and actual semantic native/corpus qualification remain UNIMPLEMENTED/UNQUALIFIED; no resource or codec label can mint capability.",
+  "membership_delivery_association": {
+    "actual_producer": "peers/membership.mjs operator.admit canonical(contextValue), where contextValue.protocol is peer-membership-assignment-v1 and source_cut is original membershipPolicyEvidence.body",
+    "outer_required_keys": [
+      "protocol",
+      "connection",
+      "principal_id",
+      "generation",
+      "enrollment_id",
+      "enrollment",
+      "recovery_history",
+      "phase",
+      "role",
+      "source_cut",
+      "source_cut_sha256",
+      "allowance_observation"
+    ],
+    "outer_optional_key": "reconstruction ONLY in original review phase; contains full original historical assignment/delivery/result unchanged and is opaque raw business DATA",
+    "inner_protocols": {
+      "peer-membership-context-v1": "original raw basis with original exact policy/source/currentness constraints",
+      "peer-membership-context-v2": "new exact full current_meaning basis; requires NEW creation-only interpreter profile + original complete producer/consumer validation. Old seals cannot be relabeled"
+    },
+    "P1_row_reference": "phase.value.context_ref is exact original reference to work_items/membership_context P1 VALUE. Its sha256 authenticates canonical ROW VALUE, not the assignment text. The row.value.sha256 is SHA256(row.value.text) and is the frame.payload_sha256. Never substitute these two hashes.",
+    "inner_relation": "row.value.source_cut_sha256 = parsed outer.source_cut_sha256 = frame.source_cut_sha256 = SHA256(exact raw outer.source_cut span). Outer row/context/ref, current original enrollment+phase+native+process+whole reads and current scope all remain independently checked by original software.",
+    "no_authority": "Framing is lossless transport DATA only. It neither accepts corpus/P5 semantics nor mints profile/runtime/actor/account/budget/company/native authority. Old raw-v1 producer history remains authentic under old exact rules; current new business still needs original freshness.",
+    "raw_value_producer_precondition": "For the exact pinned Node model membershipPolicyEvidence, encoded=canonical(body) and snapshot.sha256=digest(encoded); the exact pinned membership producer embeds body in canonical(contextValue), so inner raw span equals encoded with NO leading/trailing formatting. Outer assignment SHA, inner source-cut SHA and P1 row-ref SHA stay separate. This is an exact source-derived association, NOT a universal future-producer equivalence. The codec does not recanonicalize business JSON; hashing optional colon formatting as inner business data Holds. Future producer encodings require explicit original source/profile agreement."
+  }
+}

@@ -9,6 +9,8 @@
 pub fn protected_peer_enabled() -> bool { codex_api::protected_peer::enabled() }
 
 mod protected_provenance;
+pub(crate) mod original_instruction_renderer;
+mod original_instruction_resources;
 pub use protected_provenance::config_source_records as protected_config_source_records;
 
 mod apply_patch;
@@ -278,3 +280,5 @@ pub mod otel_init;
 // Captured environment bindings can be passed back to ThreadManager by internal reviewers.
 pub use environment_selection::TurnEnvironmentSnapshot;
 pub use environment_selection::validate_environment_ids_and_cwds;
+
+pub(crate) mod original_live_history;

@@ -1,11 +1,14 @@
 # SPEC v0.21 reconciliation
 
-This assessment covers main `94391ac` (PR #64, including PR #65 corrections)
-and the compatible review-maintenance components below, November 9, 2026 Pacific.
+The historical assessment below covered main `94391ac` (PR #64, including PR #65
+corrections) and compatible review-maintenance components on November 9, 2026 Pacific.
 It retains the peer/storage, lossless transport, mechanical archive fence,
 publication-policy, scheduler and test-preflight evidence with its original pins.
 This includes the peer foundations, bounded storage core, executor/fixture fixes,
 durable observation journal and storage transfer qualification described below.
+The continuation composition in PR #78 is identified by its source graph and
+validation receipts below. Those records retain their candidate scope separately
+from the historical main pin.
 Contract: [SPEC.md](../SPEC.md), SHA-256
 `4bd0af7032d870195b2992e850b1dc9a50a9b9e59a3ec27267b7b0752cca57a9`.
 
@@ -229,6 +232,100 @@ alias runs overlap; they are not 57 distinct cases or proof of Cargo/native
 compatibility. Earlier pre-main aborts remain failures. The complete pinned
 source recipe and its supported limits are documented in
 [`native/codex/README.md`](../native/codex/README.md).
+
+## Original session and instruction source provenance
+
+The original-provenance source component extends the mechanical checks for
+S014, S018, S028, S058, S068, S070, S072, S074, S084 and S086. Actual Core
+admission owns typed user input and its materialization. Private Session and
+ModelClient ownership bind supported original instruction renderers, live
+history occurrences and the exact final wire transformation. Runtime-only
+witnesses do not survive serialization or acquire authority from matching text.
+
+The explicit protected scoped profile selects nonincremental tools and checks
+the actual effective feature set, including after configuration reload. It
+supports the genuine fresh RLite prefix encoder with the complete fixed
+five-tool inventory; immutable model catalog fields and original managed auth
+remain separate. See [the source profile](native-peer-source-profile.md) for
+producer boundaries and exact unsupported histories.
+
+Source preparation does not establish end-to-end operation. Default incremental
+tool history, model responses, tool results, restored/compacted ancestry, media
+and unresolved instruction producers remain held. Original normal-host account
+and OS mode, a qualified binary, actual peer reconstruction and company adoption
+still require their applicable source implementation and acceptance. A source
+profile or a fresh-request test cannot close S005, S020, S024, S094 or S096.
+
+The earlier component typecheck failed because a flattened rollout line did not
+implement the requested deserialization trait. Its failed result is retained.
+The joined source reuses the original complete rollout decoder for both the
+reader and provenance validator; it does not substitute a reduced history
+shape. A later typecheck reached the original reader and found a borrowed-path
+lifetime error in its blocking callback. The repair retains an owned copy of the
+same path; both failed runs remain recorded. The new source tuple requires its
+own compilation and affected tests.
+
+A subsequent ordinary Core typecheck reported E0603 because the renderer
+referenced `ResponseItemId` through a private module import. The source repair
+uses the existing public crate-root export in production and in the matching
+test import. Separately, source review—not a failed execution—identified witness
+cleanup changing ordinary envelopes from absent metadata to an empty metadata
+value. Cleanup now clears only existing metadata; a new plain-envelope
+regression covers both history routes without supplying a renderer capsule.
+
+The ordinary check of all nine affected libraries passed on source vector
+`f48b1619d8bf858c20583dacb718433955a2ebe3ae95977bb04cd1cde0538dd4`.
+Both original processes closed, and complete source/toolchain integrity checks
+passed. The following eight-library test compilation with `--no-run` failed
+with eleven test-code errors: five ambiguous macro uses, two uses of an
+unsupported envelope serialization interface, and four project-document fixture
+initializers missing new provenance fields. The extension target did not start,
+and no Rust test executed.
+
+The repair changes only three test files. It explicitly imports the existing
+assertion macro, uses the real durable `RolloutItem` adapter, and derives fixture
+metadata from declared original and consumed bytes. Prior assertions and all
+110 authored definitions remain; the invalid-UTF-8 check is strengthened.
+Production source bytes remain unchanged. The complete input graph nevertheless
+has a new source vector, `59398124268e7be3f4dd32a1a18eb1878ffc922029e29ddc37d15fc01c3c5149`,
+and requires its own package and compiled-input manifest identities.
+
+That package passed 49 pure Python checks and source verification. Its next
+ordinary test build linked six library test executables, then failed with two
+envelope serialization errors in a history fixture. The extension target did
+not start, and no test executed. All original processes closed and source,
+toolchain and platform checks passed; the failed run remains recorded.
+
+The additional repair changes only that history test to use the same durable
+`RolloutItem` adapter. Private-witness replay and value-equality assertions remain
+intact. Production bytes and all 110 definitions are unchanged. The new complete
+source vector is
+`009d905360ddd1a900947dcf12fdfa656e2a64e1fed14f7aa51780aff92f77e5`.
+Its package passed 49 unchanged pure Python checks and source verification.
+The eight ordinary library harnesses and whole extension harness then compiled,
+and the three required local helper executables built successfully. The same
+nine test harnesses also compiled under the protected build environment and its
+original compiled-input association. These are compilation results, with no test
+execution or qualified executable implied. The ordinary harness receipt is
+`ae63816e54008144fc99930ea250a98f1920771844a6205635dacf2a02bb15e9`, helper receipt
+`21b4c51e5d05667041a5f5b942dad9944c91e841bcad057b3088a426679fbdd4`, and protected
+test-build receipt
+`51046670fe42b76e8239444bd3f5b69c96c3a23624ca9fb50e09c20506a108ee`.
+
+The first ordinary whole-nine-root execution (V5) aborted in the app-server
+harness with a stack overflow. V6 used the pinned upstream 8 MiB test-stack
+baseline: app-server completed with 432 passed and six failed, API with 231 passed
+and one failed, and config with 414 passed. Core subsequently aborted with another
+stack overflow before its whole-root summary. Its fourteen world-state snapshots
+and a guardian snapshot also failed to read their baked-in earlier source paths
+under the test domain. Those denied reads did not compare snapshot contents.
+Both executions remain failures; the remaining roots did not run and no complete
+110-case authored or whole-nine-root pass is claimed. The retained V5 and V6
+receipts are `d7ad8eb4947eeb26d32fc35a8c5641a97170907a2b7e8bf58353967254f65a2d` and
+`42733b94285d310f378d29666b0b63fecd4c86f7634ae3eb81c7b863df941947`.
+Protected positive execution, a qualified executable and native CoS acceptance
+remain pending. The continuation below is a different source graph. No normative
+SPEC row or adopted company rule changes.
 
 ## Controlled P4 code acceptance
 
@@ -519,3 +616,284 @@ Neither historical package proves this combined contract's native understanding.
 Final integration receipts must name the new clean source, completed checks and
 remaining limits. Updating this ledger or publishing v0.21 cannot close the native
 acceptance gaps or establish actual-company adoption.
+
+## Continuation source evidence
+
+The historical A558 continuation subject implements source mechanics for live response
+and fixed-tool history, and context acknowledgement by the same scoped owner.
+It preserves private origin checks, exact supported wire mappings, fresh send
+fences and uncertain outcomes. That package contains 152 overlays and
+9,307 logical Rust files, totaling 92,049,762 bytes, with source vector
+`a558137845eb0e49259ffc67408e3ac4edbeb273d57a37fe687fbd7b1294f56f` and package digest
+`cd43a6ff2b6564bfc2c1c2d8eec76f1d4498375696578970b533343c5f65e351`.
+
+The preceding continuation graph, vector
+`ae174eeb450a3ceafafe4a6ebadf59b0eb71477098afaedfa1a27078fb92c693` with package
+`4453e55b86e607fecc2383fe2643b281a01e482df5872564ea3294f29edd680e`, failed its
+first ordinary test-compilation group with one E0061 error: a legacy plan-mode
+test supplied seven arguments after its callee gained an eighth optional original
+response argument. The extension and companion-bin harness phases did not start,
+and no Rust tests executed. All original processes closed; source, toolchain and
+platform postchecks passed. The retained failed receipt is
+`38bffa3a96bb4462b15a50ec9d716c9475e2390eebd208c5302592eb9daf9aaf`.
+
+Its three test-fixture changes carry the existing managed-config isolation
+override through initial configuration and reload, use that helper for the
+provider fixture, and retain the positive API fixture's real caller owner.
+Production source, all assertions and all 163 authored definitions remain intact.
+The additional legacy plan-mode fixture now passes `None` for that optional
+argument: it has no original response receipt. Actual production calls already
+pass their captured original output; production provenance guards are unchanged.
+This same a558 graph subsequently exposed a stale ordinary compilation-cache
+variant. The first 13 library harnesses compiled, but the extension phase failed
+with E0432/E0433 after Cargo reused an older normal `codex-protocol` variant whose
+relative dep-info omitted `original_exchange`; the companion-bin phase did not
+start. The failed receipt
+`2e3c6398a769401cf1270331baf79b02749eb52057c041297b87c707430b1164` and separate
+cache readback `450ed3a3b5b2b3264d8c8533562aac09eff36afa19559f0bc120bb3720543f64`
+retain that partial result and its completed process/input postchecks.
+
+The repair changed only timestamps in the mutable source copy, leaving every
+source byte, mode, inode and link count intact. The original builder verified all
+9,307 source bodies and membership once afterward. Barrier receipt
+`cd069879d2223066fb55e3ac3c8a202494412e709ca2d290cf3c061bcea9c415` and physical proof
+`7b58a6f271d42787c6944e8c5dbcf3db1063f389dad771d92ab7f3e15892cb94` retain that
+metadata-only change. The logical a558 graph, CD43 package and canonical compiled-input
+manifest `3e97a06e5f5ab9f3b2273aa1626726b527f0cdbabfed3f4374afdf608d2ad0ee` are unchanged.
+No source repair, feature change, cache deletion or governance adoption follows
+from that timestamp operation.
+
+The next ordinary build completed all 13 library harnesses, the whole extension
+harness and the companion-bin unit-test harness, with receipt
+`85777abc2f82578b204d5925ec6f13018cafaf285b471a5dc8f3eab313fc32fd`.
+Separate Root readback
+`fc60ab9836da02d9729169b17d49da19e0d2b7440e6d39f9e81863bcd3ec2f7a` confirmed that the
+normal protocol variant was rebuilt (`fresh:false`) and its actual dep-info
+included `original_exchange`; freshness was not inferred from the timestamp.
+The three fresh normal helpers then compiled with receipt
+`99870a67aa1be206eee7399197f72e83567d7a944d1cd50e04b28e0eb2899d67` and separate Root
+closed-input readback
+`15ded8203fa1dae67e6313bfb379cbf6ffcbf58b13ff68238f9ee32301420785`.
+All original compiler processes closed and source, toolchain and platform
+postchecks passed. These are compilation results, not Rust test results.
+
+All 18 ordinary executables were staged read-only outside the mutable compiler
+target. Parent-held descriptor verification bound the copies, totaling
+2,981,329,672 bytes, in checkpoint
+`b33d90f4be7488d71f5dcf193a91618ee843001da413ae28a18b64d4d9859098`.
+The ordinary run passed three complete roots (application server 438, API 275,
+configuration 414), then Core aborted in the guardian retry fixture. Its explicit
+4 MiB inner thread overrode the declared 32 MiB environment setting. Receipt
+`8323b0e6a1b31b022842731ef58b49f3f7c6fc57335bb48a5e9cd75a0aba0a5f` retains the
+abort, missing Core summary and eleven unrun roots. Source, toolchain, platform,
+snapshot, staged-file and original-process closure checks passed.
+
+Protected compilation completed 15 test harnesses and the separate normal
+production companion binary, receipt
+`c5d423b8ffa46fa0ea5bcc15f154bec8346b6711bb73e92769044de5b6247efa`.
+Root readback `9c0094e1211b770c177c947f2e6f4d972f142088ec8700ffbc8885ca04a78058`
+retains the eight logs and actual API unit/normal-library compile flags.
+All 25 whole-module/extension selections then executed 179 cases: 161 passed and
+18 failed in the model-catalog and model-provider paths. Receipt
+`9c911c0e0577574a58f072999a4da028f6b02c7ff5481ea5baaceac6e21d57fe` retains this
+failed result; all process, source, platform and staged-file postchecks passed.
+Root rehashed all 58 logs across both executions in
+`a05af0ad8289a121fc86e2635c33342141d2551d99cc32656b87abeef8108978`.
+
+The intended private original-catalogue producer was blocked by the generic
+protected non-Responses guard. That failure and the guardian stack overflow led
+to the separate coherent candidate described below. The A558 results retain
+their original scope and do not qualify the successor.
+
+Earlier graph hashes and receipts retain their historical scope and do not
+qualify later graphs. The source-only verifier for the A558 package exited
+successfully; the 49-case Python evidence is parent-scoped, with no new run
+claimed for this tuple. Source-pinned authoring metadata retains its original meaning.
+
+### Parent 45a continuation evidence
+
+The retained PR #78 parent has 153 overlays and 166 portable payloads composing
+9,307 logical Rust files and 92,058,140 bytes. Its source vector is
+`45a95bd839ffbc662a318f94c490f4c6ae548dc8ae1c734b7655657b6bf77a54`, package digest
+`965f08805e6d71a7df9030a02906d181da871f7e83682df3604eddfebb42f703`, and original builder digest
+`c180a867995bebfe75e494ec527d395d6b3d451fbda625da4598f1677b598ad1`.
+The separate canonical and portable source reviews cleared this composition;
+the source-only package verifier exited successfully once, with no new 49-case run.
+
+Three source paths differ from A558. The guardian test's inner thread now reads
+valid `RUST_MIN_STACK` as `usize`, retaining its original 4 MiB fallback and minimum.
+The private Session models GET path requires a bodyless GET and checks the actual
+post-auth method, exact URL, body and response limit before transport. ModelsClient
+uses that path and adds six regression definitions. All previous 163 authored
+definitions and assertions, including the model-provider/default-catalogue auth,
+cache and ownership checks, are preserved; that parent total is 169.
+
+Generic protected non-Responses execution still Holds. Catalogue GET admission
+permits transport only; it does not confer original instruction or catalogue
+authority. The private default-catalogue bindings and current auth checks remain
+required, and the provider-base/renderer qualification boundary remains Held.
+
+The actual three-file source application exited successfully. Full-source proof
+`ea4c84f5b614ec31e8cf7ea39650c3863f10081b81f2c224d77bdffb99d881a8` records the
+verified graph and preserved metadata for the other 9,304 files. The original
+builder produced Rust-only compiled-input manifest DATA
+`a8c72c5c43e4865a6468b4d6d01ff25be57e5b35a6d817562f0f9665d1c32ce6`.
+That manifest is input data, not a compiled binary or runtime capability.
+
+Ordinary compilation closed successfully for all 15 test harnesses, each with
+`profile.test=true`. Its 65,077-byte receipt is
+`b203c235d5495cc7e4eab154e75d9a21fec7a22ed9fb908c263ae198e5ed30e0`, retained at
+`root-bound-coherent45a-ordinary-fifteen-no-run-v1/parent-evidence/ordinary-typechecks/ACTUAL.DATA.json`.
+That build executed no Rust tests. The three fresh normal helpers then compiled
+successfully with `profile.test=false`; their 20,045-byte receipt is
+`7e4617e7c957091503504c475a7ceffbb31165abd2e3703d9f758369cdb4a2ba`, retained at
+`root-bound-coherent45a-three-helper-build-v1/helper-build-v1/parent-evidence/ordinary-local-helpers/ACTUAL.DATA.json`.
+Both exact receipt bodies were verified against these hashes and the parent
+45a source vector. All original processes, output streams and groups closed;
+source, toolchain and platform postchecks passed.
+
+Protected compilation then passed for 15 test harnesses and one normal production
+binary, with 76,547-byte receipt
+`9db95ef79ffd896d9abee04e338cbc36df0da3152fa87816ca1063b746ea1a33` at
+`root-bound-coherent45a-protected-build-v1/parent-evidence/protected-builds/ACTUAL.DATA.json`.
+All 25 protected whole-module/extension selections passed: 185 cases, including
+all 169 authored definitions once and 16 preserved baseline cases, with zero
+failures. The 168,369-byte execution receipt is
+`6c18b5700ff631e0585c8816d17ffbbadb23a65a949cbffe5da6268e825d51d8` at
+`root-bound-coherent45a-protected-module-execution-v1/actual-protected-modules-v1/evidence/ACTUAL.DATA.json`.
+Original process/stream/group closure and source, toolchain, platform, historical
+snapshot and sealed-file postchecks passed. The separate normal production
+binary was sealed as an unqualified component and was not executed.
+
+The first 45a ordinary whole-root run used runtime helper DAA4 and closed Held at
+the original 3,590-second operation cutoff. Three complete roots passed
+(application server 438, API 281, configuration 414); Core supplied no final
+summary and eleven later roots did not run. The 251,197-byte receipt is
+`c733ac777047e63be6fcb188106f2d90f1ecee3808dcb968a2b83a678c062a53` at
+`root-bound-coherent45a-ordinary15-execution-v1/actual-ordinary-v1/evidence/ACTUAL.DATA.json`.
+The original controller sent one SIGKILL while its Core child remained unreaped;
+exit -9, complete output EOF, reaping and group absence were observed within the
+original final deadline. Read-only postchecks finished at 12:02:21 UTC on
+November 11, 2026: source, toolchain, SDK, historical snapshots and sealed files
+were unchanged. This remains a failed ordinary attempt, not a 169-check Pass.
+
+A separate Python-only paired fixture then compared unchanged DAA4 with reviewed
+runtime helper BB6D. The 10,239-byte receipt is
+`ef478332d4327b0708c3fa1377d261ccd5f87b936984d26e76ae832dc2a236b2` at
+`root-coherent45a-python-hook-paired-probe-preparation-v1/actual-paired/evidence/ACTUAL.DATA.json`.
+DAA4's actual dyld diagnostic reported a sandbox-blocked open of the selected
+Xcode `Python3.framework/Versions/3.9/Python3`. BB6D produced the original fixture's
+expected allow JSON and exact input log. Both owned processes closed completely;
+the pair took 2.5976 seconds. The policy change adds only read/map access to the
+selected Xcode Python alias/framework and literal ancestor traversal. Product
+source, compiler inputs, binaries, network/write rules and native authority did
+not change.
+
+The paired result strongly supports the missing Python grant as the cause of the
+old hook wait; it does not establish an actual Core `HookCompleted` event or a
+passing whole Core root. At the November 11, 2026, 12:02 UTC checkpoint, a fresh
+BB6D whole-15-root run was active (session 91300, preflight/staging); this checkpoint
+claims no corrected whole-suite Pass. [PR #78](https://github.com/yimoburu/soloco/pull/78)
+tracks the exact current-head ordinary-suite result and acceptance. The run uses verified read-only
+ordinary execution copies; the 45a source and compiler receipts above are unchanged.
+The shared mutable compiler target now contains protected outputs and supplies no
+ordinary execution identity. The older A558 failures and this DAA4 Hold retain
+their original scopes; source-pinned authoring metadata retains its as-created meaning.
+
+Package checks, source review, compilation and staging do not change a SPEC
+acceptance row to passed. Whole local test roots, protected positive cases, genuine
+Core/native execution, Node integration, account and corpus qualification,
+continuity and company adoption retain their separate evidence requirements.
+This change does not add the Node TaskHost, matching frame interpreter or static
+build-descriptor/private-FD adapter. A coherent adapter must bind the exact
+resource, request profile, Rust source, compiled-input manifest and executable;
+an original positive startup and continuation must then establish that join.
+Separate controlled Node mechanics cannot substitute for those producers.
+The qualified executable and runtime slots remain empty. Historical compilation
+and failed test-build receipts retain their exact original source scope.
+
+
+The later independent parent 45a ordinary assessment is
+`9e4862a37fba77a522c2f9651cdda5cdd5da8c8d1382ec6469bb7ba3f984b8cc`
+(7,185 bytes), retained at
+`root-independent-current45a-source-recipe-readiness-assessment-v1/assessment.DATA.json`.
+Its 107,360-byte ordinary observation union,
+`26a22a540ec90dae7e72e610d8910350160417be949536348c91deab7b2a0ba3`, is retained at
+`root-independent-current45a-source-recipe-readiness-assessment-v1/ordinary-authored169-union.DATA.json`.
+It verifies 169 distinct authored observations once: 97 from the first three roots,
+40 from Core, and 32 from the remaining eleven roots, with no missing/extra/overlap.
+All 21 baseline failures remain recorded; this union is not a whole-15 Pass.
+The independent protected readback is
+`d614d2ac9a2cff75be10be69f67bb3916b4289a7d20e307ff930e8dc83981bb1`
+(95,743 bytes) at
+`root-independent-current45a-protected25-result-readback-v1/review.DATA.json`;
+it verifies the parent's 25 selections, 185 cases and all 169 authored checks above.
+
+The separate seven-case setup diagnostic completed within its original 300-second
+whole limit. Every exact existing case passed, original processes/streams/groups
+closed, and source/toolchain/SDK/sealed-input postchecks passed. Receipt
+`d57c3ebb19039989d885abd289ad816ed6d25ef5c6ee8b09cf172fc4f55c0d1f`
+(23,129 bytes) is at
+`root-coherent45a-seven-setup-case-diagnostics-preparation-v1/actual-seven/evidence/ACTUAL.DATA.json`.
+Those observations use parent 45a and retain the original failed baseline cases;
+they do not imply a rerun or full-suite acceptance of the successor.
+
+### Current coherent continuation candidate
+
+At the November 11, 2026 source checkpoint, PR #78 carries the 77ea fixture successor:
+154 overlays, 167 portable payloads, 9,307 logical files and 92,058,144 bytes. Its vector is
+`77ea459e7555e0ca7a7270fd9a42b805db52b2d1dacd8efbd9ac815ab783bb0b`, package digest
+`f85caf3208b08049a13773e6cbe1d638f7e21bf648db376a1b3a4a2ccab7d11e`, and builder digest
+`6bf1d04d011cf37486b564cabe0d517b7f72d05f32e83d5ac104a5b4be3377b6`.
+The corrected canonical handoff is
+`76f858c26b94155987c29805001311d03a927d59a906f4d910fd297234af0dd7` at
+`root-native-rollout-schema-description-fixture-source-preparation-v2/handoff.DATA.json`;
+the portable handoff is
+`5c3db2f87748ef50b10ea56110e3b505bcc2c3966745d245c33022d004d2450f` at
+`root-native-rollout-schema-description-fixture-package-preparation-v2/handoff.DATA.json`.
+
+The closed parent diagnostic
+`f714bd28367505ea7f8503b7ce77668ea70d09563410434e2d92069c9b15bfea`
+(662,114 bytes), at
+`root-coherent45a-remaining11-execution-preparation-v1/ACTUAL-closed-appserver-protocol-diagnostic.DATA.json`,
+identified exactly one documentation mismatch in
+`schema/precomputed/app-server-exports-stable.json.zst`.
+Its inner `RolloutLine.json` description still named `codex_rollout` while the
+current Rustdoc correctly names the canonical parser exported by `codex_history`.
+Only that literal description substring changes; the decoded archive is otherwise
+byte-identical, schema fields and runtime witness exclusions are unchanged, and
+no schema regeneration occurs. The compressed archive grows by four bytes.
+Every Rust body, the other 9,306 complete-source rows and all 169 authored names
+are identical to 45a. The old failure remains part of the retained 21-case baseline.
+
+The actual one-file application exited 0. Its 3,349-byte handoff,
+`d590988f8076d3eb8d228dfb86577dafe5b073a3984a96aba281bd03d8679e8d`, is at
+`root-schema-description-one-file-workingcopy-preparation-v1/handoff.DATA.json`.
+The 4,718,610-byte complete-source proof,
+`35b08440724e7c67444d3376d17632aa5c2a1bb77d78a1170b07c85d93a28f23`, is at
+`root-schema-description-one-file-workingcopy-preparation-v1/ACTUAL-complete-schema-description-workingcopy.DATA.json`.
+The original builder verified all 9,307 bodies/modes once; all other 9,306 physical
+metadata rows were preserved. Its actual Rust-only compiled-input manifest DATA is
+`bb61707d5201531b81b76adda738dba33ab6072c587d708a98005a4dddc3b1fe`
+(1,674,491 bytes), at
+`root-schema-description-one-file-workingcopy-preparation-v1/original-rust-source-manifest.json`.
+The once-only source CLI verification exited 0 with 9,264 upstream/153 toolchain/
+9,307 composed rows and native qualification false. Its 2,453-byte receipt is
+`98485fada1568f94a6fb6bf9f624d8b7a056964d58f7192179bfc8184ed9cbfb` at
+`root-native-rollout-schema-description-fixture-package-preparation-v2/ROOT-ACTUAL-source-CLI-once-v1/ACTUAL.DATA.json`.
+Frozen as-created authoring metadata stays unchanged; the actual CLI receipt is separate.
+
+This dated checkpoint has prepared affected validation as one fresh ordinary
+app-server-protocol LIBtest no-run build followed by its whole 323-case root,
+retaining the original ignored schema-write fixture. It claims no fresh result
+for that sequence. [PR #78](https://github.com/yimoburu/soloco/pull/78) records the
+exact current-head result and acceptance. Parent 45a compilation, protected 169 checks and
+ordinary 169 observations remain evidence for its byte-identical Rust bodies;
+they are not a new complete-source or binary qualification for 77ea.
+No fresh 15-target/protected/production-companion build is claimed for 77ea.
+The parent normal binary 5c65521c and manifest a8c72 retain their old association;
+the new manifest bb617 is source DATA, not a native executable capability.
+The matching Node TaskHost/frame/static build-descriptor/private-FD adapter is
+still missing. Original native startup/continuation, account/corpus acceptance,
+continuity and company adoption remain unproved; qualified executable/runtime
+slots stay NULL. Normative SPEC v0.21 and its governance commitment above, and adopted v0.20, remain unchanged.

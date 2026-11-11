@@ -1,5 +1,6 @@
 """Pure temporary-data checks. No upstream checkout, compiler or native action."""
 import argparse
+import copy
 import importlib.util
 import contextlib
 import io
@@ -16,6 +17,7 @@ SPEC = importlib.util.spec_from_file_location("delivery_tool", Path(__file__).wi
 TOOL = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(TOOL)
 VALIDATE_OPENSSL_CONFIG = TOOL.validate_openssl_config
+COHERENT_SOURCE_FILES = 9307
 VALIDATE_SELECTED_SDK = TOOL.validate_selected_sdk
 
 
@@ -183,7 +185,51 @@ class TemporaryDataChecks(unittest.TestCase):
         with patch.object(Path, "read_text", new=reject_reopen):
             _, manifest, upstream, toolchain, composed = TOOL.package(TOOL.MANIFEST)
         self.assertIsNone(manifest["qualified_binary"])
-        self.assertEqual((len(upstream), len(toolchain), len(composed)), (9264, 153, 9274))
+        self.assertEqual((len(upstream), len(toolchain), len(composed)), (9264, 153, COHERENT_SOURCE_FILES))
+
+    @contextlib.contextmanager
+    def source_owned_manifest_fixture(self, manifest, extra_bytes=None):
+        """Pure mutation fixture; no runtime manifest-selection API exists."""
+        encoded = (json.dumps(manifest, indent=2) + "\n").encode()
+        original = Path.read_bytes
+        replacements = {TOOL.MANIFEST: encoded, **(extra_bytes or {})}
+        def read_bytes(path):
+            return replacements[path] if path in replacements else original(path)
+        with patch.object(Path, "read_bytes", new=read_bytes), patch.object(TOOL, "MANIFEST_SHA256", TOOL.sha(encoded)):
+            yield
+
+    def test_missing_or_excess_overlay_rejected_before_payload_or_spawn(self):
+        manifest = json.loads(TOOL.MANIFEST.read_bytes())
+        self.assertEqual(len(manifest["overlay"]), TOOL.OVERLAY_COUNT)
+        original_read_pin = TOOL.read_pin
+        def no_overlay_read(root, artifact):
+            self.assertFalse(artifact["path"].startswith("overlay/"), "count guard must reject before reading overlay payloads")
+            return original_read_pin(root, artifact)
+        for change in ("missing", "excess"):
+            with self.subTest(change=change):
+                altered = copy.deepcopy(manifest)
+                if change == "missing":
+                    altered["overlay"].pop()
+                else:
+                    altered["overlay"].append(copy.deepcopy(altered["overlay"][0]))
+                with self.source_owned_manifest_fixture(altered), patch.object(TOOL, "read_pin", side_effect=no_overlay_read), patch.object(TOOL.subprocess, "Popen", side_effect=AssertionError("must not spawn")):
+                    with self.assertRaisesRegex(ValueError, "exact reviewed overlay count"):
+                        TOOL.package(TOOL.MANIFEST)
+
+    def test_complete_coherent_binding_cannot_disagree_with_reconstructed_source(self):
+        manifest = json.loads(TOOL.MANIFEST.read_bytes())
+        binding = manifest["source_cut"]["bindings"]
+        path = TOOL.MANIFEST.parent / binding["path"]
+        original = path.read_bytes()
+        rows = json.loads(original)
+        rows[0]["sha256"] = "0" * 64
+        changed = (json.dumps(rows, indent=2) + "\n").encode()
+        self.assertEqual(len(original), len(changed), "same-size original-pin fixture")
+        altered = copy.deepcopy(manifest)
+        altered["source_cut"]["bindings"]["sha256"] = TOOL.sha(changed)
+        with self.source_owned_manifest_fixture(altered, {path:changed}), patch.object(TOOL.subprocess, "Popen", side_effect=AssertionError("must not spawn")):
+            with self.assertRaisesRegex(ValueError, "complete coherent source binding"):
+                TOOL.package(TOOL.MANIFEST)
 
     def test_archive_copy_uses_only_registered_members(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -384,7 +430,7 @@ class TemporaryDataChecks(unittest.TestCase):
         second = TOOL.compiled_source_manifest_bytes(expected)
         self.assertEqual(first, second)
         value = json.loads(first)
-        self.assertEqual(value["files_count"], 9274)
+        self.assertEqual(value["files_count"], COHERENT_SOURCE_FILES)
         self.assertEqual(value["files"], expected)
         self.assertEqual(value["source_package_sha256"], TOOL.MANIFEST_SHA256)
         self.assertEqual(value["upstream"], {"commit": TOOL.COMMIT, "tree": TOOL.TREE})

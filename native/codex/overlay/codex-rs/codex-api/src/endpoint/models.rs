@@ -5,6 +5,7 @@ use crate::provider::Provider;
 use bytes::Bytes;
 use codex_client::HttpTransport;
 use codex_client::RequestTelemetry;
+use codex_client::ReqwestTransport;
 use codex_protocol::openai_models::ModelInfo;
 use codex_protocol::openai_models::ModelsResponse;
 use http::HeaderMap;
@@ -15,6 +16,82 @@ use url::Url;
 
 pub struct ModelsClient<T: HttpTransport> {
     session: EndpointSession<T>,
+}
+
+/// A decoded response owned by the original concrete HTTP request. There is no
+/// public constructor or deserializer: supplied bytes and generic transports
+/// cannot manufacture this observation.
+pub struct OriginalModelsResponse {
+    response_instance: String,
+    body: Bytes,
+    request_url: String,
+    etag: Option<String>,
+    models: Vec<ModelInfo>,
+}
+
+impl std::fmt::Debug for OriginalModelsResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Catalog URLs may contain credentials; raw values are deliberate getters.
+        f.debug_struct("OriginalModelsResponse")
+            .field("body_bytes", &self.body.len())
+            .field("models", &self.models.len())
+            .finish_non_exhaustive()
+    }
+}
+
+impl OriginalModelsResponse {
+    /// Fresh occurrence minted by this concrete successful request, never caller supplied.
+    pub fn response_instance(&self) -> &str {
+        &self.response_instance
+    }
+
+    pub fn raw_body(&self) -> &[u8] {
+        &self.body
+    }
+
+    /// The exact requested URL, not a claim about a redirect's final destination.
+    pub fn request_url(&self) -> &str {
+        &self.request_url
+    }
+
+    pub fn etag(&self) -> Option<&str> {
+        self.etag.as_deref()
+    }
+
+    pub fn models(&self) -> &[ModelInfo] {
+        &self.models
+    }
+}
+
+fn decode_models(body: &[u8]) -> Result<Vec<ModelInfo>, ApiError> {
+    let ModelsResponse { models } = serde_json::from_slice::<ModelsResponse>(body).map_err(|e| {
+        ApiError::Stream(format!(
+            "failed to decode models response: {:?} at line {} column {} (body: {} bytes)",
+            e.classify(), e.line(), e.column(), body.len()
+        ))
+    })?;
+    Ok(models)
+}
+
+impl ModelsClient<ReqwestTransport> {
+    /// Observe actual response bytes while using the same auth, request, limits,
+    /// retries and decoder as the ordinary endpoint. Only this concrete path
+    /// creates an original response receipt.
+    pub async fn list_models_observed(
+        &self,
+        request_url: String,
+        extra_headers: HeaderMap,
+        response_body_limit_bytes: Option<usize>,
+    ) -> Result<OriginalModelsResponse, ApiError> {
+        let (body, etag) = self
+            .list_models_raw(request_url.clone(), extra_headers, response_body_limit_bytes)
+            .await?;
+        let models = decode_models(&body)?;
+        Ok(OriginalModelsResponse {
+            response_instance: uuid::Uuid::new_v4().to_string(),
+            body, request_url, etag, models,
+        })
+    }
 }
 
 impl<T: HttpTransport + 'static> ModelsClient<T> {
@@ -76,16 +153,7 @@ impl<T: HttpTransport + 'static> ModelsClient<T> {
         let (body, header_etag) = self
             .list_models_raw(request_url, extra_headers, response_body_limit_bytes)
             .await?;
-        let ModelsResponse { models } =
-            serde_json::from_slice::<ModelsResponse>(&body).map_err(|e| {
-                ApiError::Stream(format!(
-                    "failed to decode models response: {:?} at line {} column {} (body: {} bytes)",
-                    e.classify(),
-                    e.line(),
-                    e.column(),
-                    body.len()
-                ))
-            })?;
+        let models = decode_models(&body)?;
 
         Ok((models, header_etag))
     }
@@ -102,15 +170,10 @@ impl<T: HttpTransport + 'static> ModelsClient<T> {
     ) -> Result<(Bytes, Option<String>), ApiError> {
         let resp = self
             .session
-            .execute_with(
-                Method::GET,
-                Self::path(),
+            .execute_models_get(
+                request_url,
                 extra_headers,
-                /*body*/ None,
-                move |req| {
-                    req.url.clone_from(&request_url);
-                    req.response_body_limit_bytes = response_body_limit_bytes;
-                },
+                response_body_limit_bytes,
             )
             .await?;
 
@@ -430,5 +493,176 @@ mod tests {
 
         assert_eq!(models.len(), 0);
         assert_eq!(etag, Some("\"abc\"".to_string()));
+    }
+
+    // Authored source tests only: these require a separately authorized test run.
+    #[tokio::test]
+    async fn concrete_observation_retains_exact_noncanonical_response_bytes() {
+        use wiremock::Mock;
+        use wiremock::MockServer;
+        use wiremock::ResponseTemplate;
+        use wiremock::matchers::method;
+        use wiremock::matchers::path;
+
+        let server = MockServer::start().await;
+        let raw = "{\n  \"models\" : []\n}\n";
+        Mock::given(method("GET"))
+            .and(path("/models"))
+            .respond_with(ResponseTemplate::new(200)
+                .set_body_raw(raw, "application/json")
+                .insert_header("etag", "\"original\""))
+            .expect(1)
+            .mount(&server)
+            .await;
+        let transport = ReqwestTransport::from_http_client(
+            codex_http_client::HttpClientBuilder::new().build_direct().unwrap(),
+        );
+        let url = format!("{}/models?catalog-token=fixture-only", server.uri());
+        let client = ModelsClient::new(transport, provider(&server.uri()), Arc::new(DummyAuth));
+        let observed = client.list_models_observed(url.clone(), HeaderMap::new(), Some(4096))
+            .await.unwrap();
+        assert_eq!(observed.raw_body(), raw.as_bytes());
+        assert_eq!(observed.request_url(), url);
+        assert_eq!(observed.etag(), Some("\"original\""));
+        assert!(observed.models().is_empty());
+        assert_ne!(observed.raw_body(), serde_json::to_vec(&ModelsResponse { models: vec![] }).unwrap());
+        assert!(!format!("{observed:?}").contains("catalog-token"));
+        assert!(!format!("{observed:?}").contains(raw));
+    }
+
+    #[derive(Clone, Copy)]
+    enum ModelsAuthReplacement {
+        ExactScope,
+        Method,
+        Url,
+        Body,
+        Limit,
+    }
+
+    struct ReplacingModelsAuth {
+        replacement: ModelsAuthReplacement,
+    }
+
+    impl AuthProvider for ReplacingModelsAuth {
+        fn add_auth_headers(&self, headers: &mut HeaderMap) -> Result<(), AuthError> {
+            headers.insert(http::header::AUTHORIZATION, "Bearer replacement".parse().unwrap());
+            Ok(())
+        }
+
+        fn apply_auth(&self, request: Request) -> AuthProviderFuture<'_> {
+            Box::pin(async move {
+                // Exercise the documented whole-request replacement contract.
+                let mut replacement = Request::new(Method::GET, request.url);
+                replacement.headers = request.headers;
+                replacement.response_body_limit_bytes = request.response_body_limit_bytes;
+                self.add_auth_headers(&mut replacement.headers)?;
+                match self.replacement {
+                    ModelsAuthReplacement::ExactScope => {}
+                    ModelsAuthReplacement::Method => replacement.method = Method::POST,
+                    ModelsAuthReplacement::Url => replacement.url.push_str("&retargeted=1"),
+                    ModelsAuthReplacement::Body => {
+                        replacement.body = Some(codex_client::RequestBody::Json(json!({"unexpected": true})));
+                    }
+                    ModelsAuthReplacement::Limit => replacement.response_body_limit_bytes = None,
+                }
+                Ok(replacement)
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn whole_request_auth_replacement_preserves_models_get_scope() {
+        let transport = CapturingTransport::default();
+        let provider = provider("https://example.com/api/codex");
+        let url = ModelsClient::<CapturingTransport>::request_url(&provider, "0.99.0");
+        let client = ModelsClient::new(
+            transport.clone(), provider,
+            Arc::new(ReplacingModelsAuth { replacement: ModelsAuthReplacement::ExactScope }),
+        );
+        let (models, _) = client.list_models(url.clone(), HeaderMap::new(), Some(64)).await.unwrap();
+        assert!(models.is_empty());
+        let request = transport.last_request.lock().unwrap();
+        let request = request.as_ref().unwrap();
+        assert_eq!(request.method, Method::GET);
+        assert_eq!(request.url, url);
+        assert!(request.body.is_none());
+        assert_eq!(request.response_body_limit_bytes, Some(64));
+        assert_eq!(request.headers[http::header::AUTHORIZATION], "Bearer replacement");
+    }
+
+    async fn assert_models_auth_scope_replacement(replacement: ModelsAuthReplacement) {
+        let transport = CapturingTransport::default();
+        let provider = provider("https://example.com/api/codex");
+        let url = ModelsClient::<CapturingTransport>::request_url(&provider, "0.99.0");
+        let client = ModelsClient::new(
+            transport.clone(), provider,
+            Arc::new(ReplacingModelsAuth { replacement }),
+        );
+        let result = client.list_models(url.clone(), HeaderMap::new(), Some(64)).await;
+        if crate::protected_peer::enabled() {
+            assert!(matches!(result,
+                Err(ApiError::Transport(TransportError::Build(message)))
+                    if message == "protected models GET scope HOLD"));
+            assert!(transport.last_request.lock().unwrap().is_none());
+        } else {
+            // Ordinary auth providers keep their existing returned-request behavior.
+            result.unwrap();
+            let request = transport.last_request.lock().unwrap();
+            let request = request.as_ref().unwrap();
+            assert_eq!(request.headers[http::header::AUTHORIZATION], "Bearer replacement");
+            match replacement {
+                ModelsAuthReplacement::ExactScope => unreachable!(),
+                ModelsAuthReplacement::Method => assert_eq!(request.method, Method::POST),
+                ModelsAuthReplacement::Url => assert_eq!(request.url, format!("{url}&retargeted=1")),
+                ModelsAuthReplacement::Body => assert_eq!(
+                    request.body, Some(codex_client::RequestBody::Json(json!({"unexpected": true})))),
+                ModelsAuthReplacement::Limit => assert_eq!(request.response_body_limit_bytes, None),
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn protected_models_get_rejects_post_auth_method_replacement() {
+        assert_models_auth_scope_replacement(ModelsAuthReplacement::Method).await;
+    }
+
+    #[tokio::test]
+    async fn protected_models_get_rejects_post_auth_url_replacement() {
+        assert_models_auth_scope_replacement(ModelsAuthReplacement::Url).await;
+    }
+
+    #[tokio::test]
+    async fn protected_models_get_rejects_post_auth_body_replacement() {
+        assert_models_auth_scope_replacement(ModelsAuthReplacement::Body).await;
+    }
+
+    #[tokio::test]
+    async fn protected_models_get_rejects_post_auth_response_limit_replacement() {
+        assert_models_auth_scope_replacement(ModelsAuthReplacement::Limit).await;
+    }
+
+    #[tokio::test]
+    async fn protected_generic_endpoint_execution_still_holds_models() {
+        let transport = CapturingTransport::default();
+        let session = EndpointSession::new(
+            transport.clone(), provider("https://example.com/api/codex"), Arc::new(DummyAuth),
+        );
+        let configured = std::sync::atomic::AtomicUsize::new(0);
+        let result = session.execute_with(Method::GET, "models", HeaderMap::new(), None, |_| {
+            configured.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        }).await;
+        if crate::protected_peer::enabled() {
+            assert!(matches!(result, Err(ApiError::Stream(message))
+                if message == "protected non-Responses endpoint HOLD"));
+            assert_eq!(configured.load(std::sync::atomic::Ordering::SeqCst), 0);
+            assert!(transport.last_request.lock().unwrap().is_none());
+            assert!(matches!(session.execute(Method::GET, "models", HeaderMap::new(), None).await,
+                Err(ApiError::Stream(message)) if message == "protected non-Responses endpoint HOLD"));
+            assert!(transport.last_request.lock().unwrap().is_none());
+        } else {
+            result.unwrap();
+            assert_eq!(configured.load(std::sync::atomic::Ordering::SeqCst), 1);
+            assert!(transport.last_request.lock().unwrap().is_some());
+        }
     }
 }
