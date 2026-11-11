@@ -920,6 +920,16 @@ and compiled-input DATA manifest
 Eight Rust paths change, including eleven new pure test definitions; parent
 builds and observations do not qualify these changed bytes.
 
+Fresh ordinary evidence for this successor passed 1,100 Node cases across 26
+roots, twelve separate loopback broker/launch-preparation cases and 49 Python
+producer cases. A network-denied offline operation checked metadata for the five
+affected libraries and companion entry point, compiled two library harnesses
+and passed all eleven new pure Rust tests. Its receipt
+`27e502b9f9edb5debafdb58b2ac7c24effa01b690c6e0c547ae4faa9a58d6bc6`
+records 459.7 seconds, complete output, retained-leader/stdio observations and
+unchanged source/toolchain/SDK postchecks. It supplies no production companion
+link/launch or descendant/remote closure evidence.
+
 The source guards support S018, S028, S056, S058, S084 and S086 without upgrading
 their existing assessment. Complete wire-size checks precede reservations and
 charges. The new active-task route is confined to read-only foundation callbacks;

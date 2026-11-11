@@ -106,6 +106,16 @@ Ordinary tests cover exact frames, raw observation hashing, port negotiation,
 precharge holds, immutable deployment mechanics, broker rejection/backpressure,
 actual launch-preparation control flow and safe child-lifecycle handling.
 Synthetic predecessors and children in these tests establish mechanics only.
+For this source cut, 1,100 ordinary Node tests across 26 roots, twelve separate
+loopback broker/launch-preparation tests and 49 Python producer tests passed.
+Offline Rust checks covered the five affected libraries and companion entry-point
+metadata; two library harnesses compiled and all eleven new pure tests passed.
+That network-denied run took 459.7 seconds, retained complete logs and observed
+original leaders plus stdout/stderr EOF, with unchanged source/toolchain/SDK
+postchecks. Its receipt is
+`27e502b9f9edb5debafdb58b2ac7c24effa01b690c6e0c547ae4faa9a58d6bc6`.
+It did not link or launch the production companion or establish descendant closure.
+
 Actual selected deployment/startup, account access, native continuation, realistic
 replacement/continuity and company adoption require separate evidence and bounds.
 SPEC v0.21 and existing company ownership/authority remain unchanged.

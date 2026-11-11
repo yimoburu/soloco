@@ -13,9 +13,13 @@ The derived compiled-input DATA digest is `af7c8cc78011e7775945ed757fe346c2feea2
 it is not a compiled artifact or qualified binary.
 
 Eight Rust paths change. Eleven new pure Rust regressions accompany the existing
-169 authored checks, for 180 definitions. Those new Rust checks are authored and
-unrun at this source checkpoint. No new build, selected component, account run,
-native acceptance or closure is inferred from source preparation. Legacy slots
+169 authored checks, for 180 definitions. The affected five libraries and normal
+companion entry point passed offline metadata checks; the two library harnesses
+compiled and all eleven new pure tests passed (seven HTTP, four API). The run
+was network-denied and did not link or launch the production companion. Receipt
+`27e502b9f9edb5debafdb58b2ac7c24effa01b690c6e0c547ae4faa9a58d6bc6`
+retains the exact inputs, logs, harnesses and postchecks. No selected component,
+account run, native acceptance or whole-domain closure is inferred. Legacy slots
 remain empty; a derived executable association additionally requires a genuine
 original selection, separate deployment and the fixed Node loader.
 
