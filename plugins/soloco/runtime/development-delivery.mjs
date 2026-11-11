@@ -194,6 +194,34 @@ function boundedReply(receipt,result){
   compact={...compact,handoff:null,transition:null,handoff_inline:false,handoff_source:{record:source,path_in_record:receipt.development.delivery?['development','delivery']:[...reportPath,'initial_handoff'],value_kind:receipt.development.delivery?'stored-progress':'initial-handoff-only',progress_sha256:result.handoff_sha256}};
   need(fits(compact),'exact delivery handles exceed the public response budget');return compact;
 }
+
+// Presentation of an already successful mutation only. Keep the established
+// acceptance fields even when its new historical report is too large for MCP.
+// This never changes canonical acceptance bytes or any before-COMMIT hash.
+export function boundedDevelopmentAcceptanceReply(a,host,result){
+  const continuation=a.action==='accept_review_continuation';
+  need(a.action==='accept'||continuation,'unsupported public acceptance reply');
+  const report=continuation?result?.development?.acceptance_report:result?.report;
+  const reportSha=continuation?result?.development?.acceptance_report_sha256:result?.report_sha256;
+  need(report?.protocol===DEVELOPMENT_ACCEPTANCE_REPORT_PROTOCOL&&hex(reportSha)&&hash(report)===reportSha,'returned canonical acceptance report changed');
+  const canonicalSha=hash(result);
+  const compact=continuation?{...result,development:{...result.development,acceptance_report:null},acceptance_report_inline:false,canonical_acceptance_record_sha256:canonicalSha}
+    :{...result,report:null,report_inline:false,canonical_acceptance_sha256:canonicalSha};
+  compact.report_sha256=reportSha;
+  compact.retrieval='The acceptance operation returned successfully. Read the exact canonical acceptance home/report through company_context ranges; do not repeat acceptance to retrieve its report.';
+  try{
+    Object.assign(compact,withStore(a.root,db=>db.readSnapshot(()=>{
+      const s=db.read();owner(s,a.session_id,host,a.epoch);
+      const selected=acceptedReport(s,{plan_id:continuation?result.development.plan_id:a.plan_id,receipt_id:continuation?result.development.receipt_id:a.receipt_id,...(continuation?{acceptance_id:result.id}:{})});
+      need(selected.report&&selected.report_sha256===reportSha,'returned report no longer matches the canonical acceptance home');
+      if(continuation)need(hash(selected.home)===canonicalSha,'returned continuation acceptance home changed after acceptance');
+      else need(hash(selected.home.development.acceptance)===canonicalSha,'returned acceptance no longer matches its canonical receipt');
+      const source=sourceReference(selected.home,storageSourceId('records',selected.home.id)),acceptancePath=continuation?[]:['development','acceptance'],reportPath=continuation?['development','acceptance_report']:['development','acceptance','report'];
+      return {acceptance_source:{record:source,path_in_record:acceptancePath,sha256:canonicalSha},report_source:{record:source,path_in_record:reportPath,sha256:reportSha}};
+    })));
+  }catch(error){compact.acceptance_source=null;compact.report_source=null;compact.readback_hold='The operation returned, but exact current readback is unavailable: '+String(error?.message??error).slice(0,300);}
+  need(fits(compact),'established acceptance facts exceed the public response budget');return compact;
+}
 function inspected(s,a){
   const accepted=acceptedReport(s,a);if(!accepted.report)return {status:accepted.status,reason:accepted.reason,report:null,source_integration:false,external_actions_authorized:false};
   const {progress}=progressOf(s,accepted);

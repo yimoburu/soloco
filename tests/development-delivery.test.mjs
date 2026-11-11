@@ -5,7 +5,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {id,digest,withStore} from '../plugins/soloco/runtime/store.mjs';
+import {id,digest,withStore,Store} from '../plugins/soloco/runtime/store.mjs';
+import {call} from '../plugins/soloco/runtime/main.mjs';
+import {fits,rpcReply,toolResult} from '../plugins/soloco/runtime/public-response.mjs';
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
 import {developmentAssignment} from '../plugins/soloco/runtime/develop.mjs';
 import {assignmentContext} from '../plugins/soloco/runtime/context.mjs';
@@ -18,6 +20,7 @@ const home=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'soloco-developm
 process.env.COMPANY_PLUGIN_DATA=path.join(home,'isolated-registry');
 test.after(()=>{if(oldData===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=oldData;fs.rmSync(home,{recursive:true,force:true});});
 const read=a=>withStore(a.root,db=>db.read());
+async function publicReport(a,source){let text='',offset=0;do{const page=await call('company_context',{root:a.root,session_id:a.session_id,epoch:a.epoch,action:'read',id:source.record.id,sha256:source.record.sha256,offset,length:16000},'codex');assert.equal(page.offset,text.length);assert.equal(page.sha256,source.record.sha256);text+=page.text;offset=page.next_offset;}while(offset!==null);assert.equal(digest(text),source.record.sha256);const report=source.path_in_record.reduce((value,key)=>value[key],JSON.parse(text));assert.equal(hash(report),source.sha256);return report;}
 const change=(a,fn)=>withStore(a.root,db=>db.transaction('controlled.delivery-fixture',s=>{fn(s);return s;}));
 const ref=value=>({id:value.id,revision:value.revision??null,sha256:hash(value)});
 const contact=name=>({host:'codex',session_id:'controlled-'+name,name});
@@ -89,9 +92,23 @@ test('individually valid capture swaps cannot rewrite accepted QA or candidate l
  for(const normalized of [false,true]){const f=await ready({normalized}),other=await review(f.a,f.t);await accept(f.a,f.p,f.t,other);change(f.a,s=>{const d=s.records[f.t.id].development.acceptance;d.report.qa_record=structuredClone(d.report.retained_history.records.find(v=>v.id===f.r.id));d.report.qa_job=structuredClone(d.report.retained_history.jobs.find(v=>v.id===f.r.job_id));d.report_sha256=hash(d.report);});await assert.rejects(inspect(f.a,f.p,f.t,'acceptance_report'),/QA record\/job\/subject/);}
 });
 
-test('large complete reports return bounded exact receipt handles instead of truncated source',async()=>{
- const a=setup(),spec=contract(a,{interfaces:Array.from({length:5},(_,i)=>({id:'complete-interface-'+i,description:'z'.repeat(10000),paths:['value.mjs']}))}),p=await plan(a,{delivery_contract:spec});await authorize(a,p);const c=await candidate(a,p),t=await receipt(a,p,c),r=await review(a,t),acceptance=await accept(a,p,t,r),result=await inspect(a,p,t,'acceptance_report');
+for(const readbackFails of [false,true])test('real MCP oversized acceptance preserves established facts and immutable report'+(readbackFails?' when fresh readback fails':''),async()=>{
+ const a=setup(),spec=contract(a,{interfaces:Array.from({length:5},(_,i)=>({id:'complete-interface-'+i,description:'z'.repeat(10000),paths:['value.mjs']}))}),p=await plan(a,{delivery_contract:spec});await authorize(a,p);const c=await candidate(a,p),t=await receipt(a,p,c),r=await review(a,t);
+ const args={...a,action:'accept',plan_id:p.id,receipt_id:t.id,review_id:r.id,receipt_sha256:t.development.receipt_sha256},original=Store.prototype.readSnapshot;let publicAcceptance,readbackAttempts=0;
+ try{
+  if(readbackFails)Store.prototype.readSnapshot=function(fn){if(this.inTransaction)return original.call(this,fn);const current=original.call(this,()=>this.read());if(current.records[t.id]?.development.acceptance){readbackAttempts++;throw Error('controlled post-commit readback failure');}return original.call(this,fn);};
+  publicAcceptance=await call('company_develop',args,'codex');
+ }finally{Store.prototype.readSnapshot=original;}
+ const canonical=read(a),acceptance=canonical.records[t.id].development.acceptance,result=await inspect(a,p,t,'acceptance_report');
+ assert.equal(fits(acceptance),false,'the real successful mutation exceeds the MCP budget');
+ for(const key of ['at','review_id','candidate_sha256','receipt_sha256','directory','source_integrated'])assert.deepEqual(publicAcceptance[key],acceptance[key]);
+ assert.equal(publicAcceptance.source_integrated,false);assert.equal(publicAcceptance.report,null);assert.equal(publicAcceptance.report_inline,false);assert.equal(publicAcceptance.report_sha256,hash(acceptance.report));assert.equal(publicAcceptance.canonical_acceptance_sha256,hash(acceptance));assert.equal(fits(publicAcceptance),true);assert.ok(Buffer.byteLength(JSON.stringify(rpcReply(1,toolResult(publicAcceptance))))<65536);
+ assert.match(publicAcceptance.retrieval,/do not repeat acceptance/i);
+ if(readbackFails){assert.equal(readbackAttempts,1);assert.equal(publicAcceptance.acceptance_source,null);assert.equal(publicAcceptance.report_source,null);assert.match(publicAcceptance.readback_hold,/post-commit readback failure/);}
+ else{assert.equal(publicAcceptance.acceptance_source.record.sha256,hash(canonical.records[t.id]));assert.deepEqual(publicAcceptance.acceptance_source.path_in_record,['development','acceptance']);assert.equal(publicAcceptance.acceptance_source.sha256,hash(acceptance));assert.equal(publicAcceptance.report_source.record.sha256,hash(canonical.records[t.id]));assert.deepEqual(publicAcceptance.report_source.path_in_record,['development','acceptance','report']);assert.equal(publicAcceptance.report_source.sha256,hash(acceptance.report));}
  assert.equal(result.report,null);assert.equal(result.report_inline,false);assert.equal(result.report_source.sha256,acceptance.report_sha256);assert.deepEqual(result.report_source.path_in_record,['development','acceptance','report']);assert.equal(result.report_source.record.sha256,hash(read(a).records[t.id]));assert.ok(Buffer.byteLength(JSON.stringify(result))<30000);assert.equal(developmentDeliverySnapshotValue(read(a),acceptance.report.plan_preimage).development.scope.delivery_contract.interfaces[4].description.length,10000);
+ assert.deepEqual(await publicReport(a,readbackFails?result.report_source:publicAcceptance.report_source),acceptance.report);
+ await assert.rejects(call('company_develop',args,'codex'));assert.deepEqual(read(a),canonical,'presentation and rejected replay cannot change immutable acceptance');
 });
 
 test('held/unaccepted and legacy accepted receipts do not acquire fabricated reports',async()=>{

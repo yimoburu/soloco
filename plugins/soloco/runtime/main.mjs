@@ -15,7 +15,7 @@ import { prototypeCapability } from './prototype.mjs';
 import { MIN_EXECUTION_TIMEOUT_MS, MAX_EXECUTION_TIMEOUT_MS } from './timeout.mjs';
 import {watchRuntimeHosts} from './task-runtime.mjs';
 import {toolError} from './tool-error.mjs';
-import {developmentDeliveryContractSchema,developmentDeliveryTransitionFields} from './development-delivery.mjs';
+import {developmentDeliveryContractSchema,developmentDeliveryTransitionFields,boundedDevelopmentAcceptanceReply} from './development-delivery.mjs';
 
 const string={type:'string'};
 const modelSelection={type:'object',properties:{mode:{enum:['default','explicit']},model:string,effort:string,speed:{enum:['host_default','fast_disabled']},reason:{type:'string',maxLength:300}},required:['mode','reason'],additionalProperties:false};
@@ -88,6 +88,11 @@ export async function call(name,args,host) {
   if(name==='company_develop' && args.max_bytes!==undefined && args.max_bytes>developmentLimits(args.root).max_bytes)throw new Error('max_bytes exceeds this company configured ceiling; inspect company_develop capability');
   const result=await def[4](args,host);
   if(fits(result))return result;
+  let presentationHold;
+  if(name==='company_develop'&&['accept','accept_review_continuation'].includes(args.action)) {
+    try{return boundedDevelopmentAcceptanceReply(args,host,result);}
+    catch(error){presentationHold='Acceptance returned, but its public presentation is unavailable: '+String(error?.message??error).slice(0,300);}
+  }
   if(name==='company_handover'&&args.action==='read')throw Error('Exact handover range exceeds the public reply budget; no range delivered. Request a smaller length using the same subject/source/hash/offset.');
   // The operation already returned successfully. Never turn an oversized receipt
   // into an error inviting a duplicate mutation. Expose persisted truth instead.
@@ -104,6 +109,7 @@ export async function call(name,args,host) {
     return {response_format:'soloco-current-v2',operation:name,action:args.action??null,hold:'Inspection exceeds the public budget. No complete inspection was delivered.',retrieval:'Use company_context inspect/read for exact company sources; narrow the requested diagnostic view.'};
   }
   const receipt={response_format:'soloco-current-v2',operation:name,action:args.action??null,operation_returned:true,result_not_inlined:true,note:'The operation returned; this is not QA acceptance or authority. Do not repeat the mutation to retrieve its result.'};
+  if(presentationHold)receipt.presentation_hold=presentationHold;
   // Storage manifests and hook migration backups already have exact files. Keep
   // their paths and measured file hashes, never create a giant response archive.
   if(name==='company_storage'&&['backup','restore'].includes(args.action)) {
@@ -122,7 +128,8 @@ export async function call(name,args,host) {
     receipt.next_step=result.next_step;
     if(fits(receipt))return receipt;
   }
-  try {Object.assign(receipt,engine.operationReceipt(args,host,result,name));}catch(error){receipt.attribution_hold='Readback failed; inspect persisted sources before further action. Do not repeat the mutation.';receipt.current_readback_error=String(error.message).slice(0,300);}
+  const attributionArgs=name==='company_develop'&&args.action==='accept'&&args.receipt_id?{...args,plan_id:args.receipt_id}:args;
+  try {Object.assign(receipt,engine.operationReceipt(attributionArgs,host,result,name));}catch(error){receipt.attribution_hold='Readback failed; inspect persisted sources before further action. Do not repeat the mutation.';receipt.current_readback_error=String(error.message).slice(0,300);}
   // Attribution survives even when a detailed persisted preview cannot fit.
   if(!fits(receipt))delete receipt.result;
   if(!fits(receipt))delete receipt.sources;

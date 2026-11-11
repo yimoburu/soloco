@@ -2,7 +2,7 @@ import * as reviewContinuation from '../plugins/soloco/runtime/development-revie
 import * as retentionRepair from '../plugins/soloco/runtime/development-retention-repair.mjs';
 import * as modelProcessClosure from '../plugins/soloco/runtime/model-process-closure.mjs';
 import {outcomeSchema} from '../plugins/soloco/runtime/outcome.mjs';
-import {developmentDeliveryContractSchema,developmentDeliveryTransitionFields} from '../plugins/soloco/runtime/development-delivery.mjs';
+import {developmentDeliveryContractSchema,developmentDeliveryTransitionFields,boundedDevelopmentAcceptanceReply} from '../plugins/soloco/runtime/development-delivery.mjs';
 import * as scopedStream from '../plugins/soloco/runtime/scoped-stream.mjs';
 import * as scoped from '../plugins/soloco/runtime/scoped-context.mjs';
 import * as publicResponse from '../plugins/soloco/runtime/public-response.mjs';
@@ -26,12 +26,12 @@ function load(name,deps,names) {
   source=source.replace(/\bexport (?=(?:async )?function|const|let|class)/g,'');
   return vm.runInNewContext(source+'\n;({'+names.join(',')+'});',deps,{filename:name});
 }
-function harness() {
+function harness(publicOverrides={}) {
   let now=1000000,sequence=0,state={schema:2,plugin_version:'test',owner:{epoch:1,session_id:'founder',host:'codex'},paused:false,roles:{engineer:{name:'Engineer'}},records:{},jobs:{},sessions:{},notices:[],messages:[]};
   let matches=true,scope=true,beforeTransaction;
   const intervals=new Set(),launches=[];
   const iso=()=>new Date(now).toISOString();
-  const deps={...reviewContinuation,...retentionRepair,...modelProcessClosure,requestModelProcess:(job,value)=>modelProcessClosure.requestModelProcess(job,structuredClone(value)),outcomeSchema,developmentDeliveryContractSchema,developmentDeliveryTransitionFields,renderDevelopmentReviewContext,Buffer,...scopedStream,scoped:{...scoped},...publicResponse,...coordination,...timeout,path,os:{homedir:()=>'/unused'},fs:{existsSync:()=>true,mkdirSync:()=>{}},process:{cwd:()=>process.cwd(),env:{},pid:42,execPath:'/unused/node',argv:[]},Date:class extends Date {static now(){return now;}},AbortController,
+  const deps={...reviewContinuation,...retentionRepair,...modelProcessClosure,requestModelProcess:(job,value)=>modelProcessClosure.requestModelProcess(job,structuredClone(value)),outcomeSchema,developmentDeliveryContractSchema,developmentDeliveryTransitionFields,boundedDevelopmentAcceptanceReply,renderDevelopmentReviewContext,Buffer,...scopedStream,scoped:{...scoped},...publicResponse,...coordination,...timeout,path,os:{homedir:()=>'/unused'},fs:{existsSync:()=>true,mkdirSync:()=>{}},process:{cwd:()=>process.cwd(),env:{},pid:42,execPath:'/unused/node',argv:[]},Date:class extends Date {static now(){return now;}},AbortController,
     PACKAGE:'/unused',VERSION:'test',SCHEMA:2,stamp:iso,id:p=>p+'-'+(++sequence),digest:()=> 'binding',folder:x=>x,noLink:()=>{},
     withStore:(root,fn)=>fn({readSnapshot:fn=>fn(),publicReconciliationState:()=>null,read:()=>structuredClone(state),transaction:(type,change)=>{if(beforeTransaction){const hook=beforeTransaction;beforeTransaction=undefined;hook(type);}const next=change(structuredClone(state));state=structuredClone(next);return structuredClone(state);}}),
     owner:(s,session,host,epoch)=>{if(s.owner.session_id!==session || s.owner.host!==host || (epoch!==undefined && s.owner.epoch!==epoch))throw new Error('Stale owner');},
@@ -48,8 +48,9 @@ function harness() {
     setInterval:(fn,ms)=>{assert.equal(ms,100);intervals.add(fn);return fn;},clearInterval:fn=>intervals.delete(fn),
     spawn:(...args)=>{launches.push(args);return {on:()=>{},unref:()=>{}};},hooks:()=>{},upgrade:()=>{},upgradeGuidance:''};
   const engine=load('engine.mjs',deps,['dispatch','status','control','wait']);
+  Object.assign(engine,publicOverrides);
   const worker=load('worker.mjs',deps,['work']);
-  const main=load('main.mjs',{...deps,engine},['toolList','call']);
+  const main=load('main.mjs',{...deps,engine},['toolList','call','boundedDevelopmentAcceptanceReply']);
   const args={root:'/fixture',session_id:'founder',epoch:1,role:'engineer',task:'A bounded fixture assignment'};
   return {deps,engine,worker,main,args,intervals,launches,get state(){return state;},set now(v){now=v;},get now(){return now;},mutate:fn=>fn(state),tick:()=>{for(const fn of [...intervals])fn();},mismatch:()=>{matches=false;},revoke:()=>{scope=false;},before:fn=>{beforeTransaction=fn;},dispatch:settings=>engine.dispatch({...args,...settings},'codex')};
 }
@@ -58,11 +59,26 @@ const spawnAt=(h,options,limit,reason)=>options.onSpawn(timeout.executionTiming(
 
 test('VM main uses the actual exported delivery schemas alongside timeout policy',async()=>{
   const h=harness(),schema=h.main.toolList.find(t=>t.name==='company_develop').inputSchema;
+  assert.equal(h.main.boundedDevelopmentAcceptanceReply,boundedDevelopmentAcceptanceReply);
   assert.equal(JSON.stringify(schema.properties.delivery_contract),JSON.stringify(developmentDeliveryContractSchema));
   for(const [name,value]of Object.entries(developmentDeliveryTransitionFields))assert.equal(JSON.stringify(schema.properties[name]),JSON.stringify(value));
   assert.equal(schema.properties.timeout_ms.maximum,120000);
   await assert.rejects(h.main.call('company_develop',{root:'/fixture',session_id:'founder',epoch:1,action:'inspect',delivery_contract:{}},'codex'),/only when creating/);
   assert.equal(h.launches.length,0);
+});
+
+test('post-success acceptance formatter failure remains a bounded success receipt even without readback',async()=>{
+  let mutations=0;const h=harness({develop:()=>{mutations++;return {source_integrated:false,report:null,retained:'z'.repeat(40000)};},operationReceipt:()=>{throw Error('controlled readback unavailable');}});
+  const result=await h.main.call('company_develop',{root:'/fixture',session_id:'founder',epoch:1,action:'accept',plan_id:'plan',receipt_id:'receipt',review_id:'qa',receipt_sha256:'a'.repeat(64)},'codex');
+  assert.equal(mutations,1);assert.equal(result.operation_returned,true);assert.equal(result.isError,undefined);assert.equal(result.result_not_inlined,true);assert.match(result.presentation_hold,/returned canonical acceptance report changed/);assert.match(result.current_readback_error,/controlled readback unavailable/);assert.match(result.note,/Do not repeat the mutation/);assert.equal(publicResponse.fits(result),true);
+});
+
+test('post-success acceptance formatter overflow retains exact persisted receipt attribution',async()=>{
+  let mutations=0,attribution;
+  const report={protocol:'development-acceptance-report-v1'},report_sha256=(await import('../plugins/soloco/runtime/store.mjs')).digest(JSON.stringify(report));
+  const h=harness({develop:()=>{mutations++;return {source_integrated:false,report,report_sha256,retention_repair:{historical:'z'.repeat(40000)}};},operationReceipt:args=>{attribution=args.plan_id;return {operation_source:{id:'records/receipt',sha256:'b'.repeat(64)}};}});
+  const result=await h.main.call('company_develop',{root:'/fixture',session_id:'founder',epoch:1,action:'accept',plan_id:'plan',receipt_id:'receipt',review_id:'qa',receipt_sha256:'a'.repeat(64)},'codex');
+  assert.equal(mutations,1);assert.equal(result.operation_returned,true);assert.equal(result.isError,undefined);assert.match(result.presentation_hold,/established acceptance facts exceed/);assert.equal(attribution,'receipt');assert.equal(result.operation_source.id,'records/receipt');assert.equal(publicResponse.fits(result),true);
 });
 
 test('dispatch validates and persists policy, and main keeps software-test limits separate',async()=>{

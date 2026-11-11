@@ -61,6 +61,18 @@ are checked together. A local source/candidate commitment is distinct from a
 repository head: the report explicitly leaves the GitHub head unobserved. Actual
 integration evidence must bind its own current head and acceptance report.
 
+Acceptance replies preserve their existing acceptance fields and artifact IDs.
+When the report exceeds the public budget, only its body is withheld; the reply
+includes its hash, the canonical acceptance hash and exact `report_source`
+parent-record/path references. Read and verify the complete parent before using
+the nested report. A concurrent handoff can change a continuation's containing
+record: unavailable or changed readback produces an explicit hold without
+changing the successful acceptance. Retrieve the persisted evidence rather than
+repeating the mutation.
+If the remaining acceptance facts also exceed the budget, the successful
+operation receipt discloses `presentation_hold` and supplies available persisted
+attribution; presentation failure never changes the mutation into a tool error.
+
 ## Record an accountable handoff
 
 Acceptance records QA to the registered owner. The declared next stages are
