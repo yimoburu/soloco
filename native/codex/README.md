@@ -1,11 +1,36 @@
 # Pinned SoloCo companion source
 
+## Executable bridge source successor
+
+The current source-only candidate adds an original fixed-loopback HTTP factory
+and bootstrap route for the [Node executable bridge](../../docs/protected-peer-bridge.md).
+It retains original Rust authentication/TLS and disables proxy fallback. It has
+9,309 logical files, 92,071,707 bytes and 158 overlays;
+source vector `5612af8c980fa84df37ad53c5b441698e2a4bce11667fa8529fa987a2343aefd`,
+package `11dce050e14c48ed20dac9052ec096f3fbd94717603035b22f56f7af851ce84c` and
+builder `6edb4fb2eff2e84c2a3850dae6a15d3e270898e1a43615de98bc9d536d92acde`.
+The derived compiled-input DATA digest is `af7c8cc78011e7775945ed757fe346c2feea2605f8dec0e663b5307ec8852a66`;
+it is not a compiled artifact or qualified binary.
+
+Eight Rust paths change. Eleven new pure Rust regressions accompany the existing
+169 authored checks, for 180 definitions. The affected five libraries and normal
+companion entry point passed offline metadata checks; the two library harnesses
+compiled and all eleven new pure tests passed (seven HTTP, four API). The run
+was network-denied and did not link or launch the production companion. Receipt
+`27e502b9f9edb5debafdb58b2ac7c24effa01b690c6e0c547ae4faa9a58d6bc6`
+retains the exact inputs, logs, harnesses and postchecks. No selected component,
+account run, native acceptance or whole-domain closure is inferred. Legacy slots
+remain empty; a derived executable association additionally requires a genuine
+original selection, separate deployment and the fixed Node loader.
+
+## Parent source lineage and evidence
+
 This directory delivers the separate `codex-soloco-protected-host` source recipe.
 The qualified executable slot remains empty and `qualified_binary` is null.
 Source preparation and pure checks do not authorize a native/model attempt or
 establish an independently accepted executable.
 
-`source-package.json` pins OpenAI Codex commit
+The parent package pinned OpenAI Codex commit
 `c40729ea5cf8e947481b130c59807273eda2f8e9`, tree
 `078c14cecf94b522a2eff48b30996bf3f4d1bf7a`, its 9,264 regular Rust source files,
 the exact 154-file coherent overlay, accepted Cargo lock 040a,
@@ -17,7 +42,7 @@ byte commitment and logical executable distinction. The portable lineage
 record retains the original frozen source cuts and ordered composition hashes.
 The prior package 6f5 is historical and does not qualify this graph.
 
-The current graph has 9,307 files and 92,058,144 bytes, with source vector
+That parent graph has 9,307 files and 92,058,144 bytes, with source vector
 `77ea459e7555e0ca7a7270fd9a42b805db52b2d1dacd8efbd9ac815ab783bb0b`.
 Its source-package digest is
 `f85caf3208b08049a13773e6cbe1d638f7e21bf648db376a1b3a4a2ccab7d11e`;
@@ -63,7 +88,7 @@ across the closed 97 + 40 + 32 portions. All 21 baseline failures remain recorde
 this is not a whole-15 Pass. Its 25 protected selections passed 185 cases, including all 169 authored checks, and
 seven separate setup diagnostics passed on that same parent source.
 
-The current 77ea successor changes only one description substring inside the
+The historical 77ea successor changes only one description substring inside the
 stable compressed `RolloutLine.json` export, naming the canonical parser exported
 by `codex_history`. Every other decoded byte/schema field, every Rust body and
 all other 9,306 logical rows remain unchanged. The one-file application, full
@@ -86,9 +111,9 @@ barrier remain historical in the
 They do not qualify this successor. Genuine Core/native/account, Node
 interpreter/static-slot, corpus, continuity and adoption remain unproved;
 qualified executable and runtime slots stay empty.
-The matching Node TaskHost, frame interpreter and static build-descriptor/private-FD
-adapter are separate missing integration work; this Rust source package does not
-provide them.
+The matching Node TaskHost/frame/deployment/private-FD bridge is now implemented
+as a separate source composition; its actual executable/native qualification
+remains unproved. See the current successor and bridge boundaries above.
 
 ## Prepare source without downloads
 
@@ -148,7 +173,7 @@ source and toolchain paths must be disjoint, including physical path aliases.
 ## Complete compiled-input association
 
 Before compilation every prepared source byte and logical mode is verified.
-The tool derives `compiled-source-manifest.json` from all 9307
+The tool derives `compiled-source-manifest.json` from all current declared
 validated rows, the upstream commit/tree and the fixed source-package digest.
 Schema is `soloco-compiled-native-inputs-v1`; serialization is Python JSON with
 sorted keys, compact separators, `ensure_ascii=True`, UTF-8 and one terminal

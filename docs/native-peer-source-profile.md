@@ -73,8 +73,9 @@ unassociated development binary keep their original meanings.
 The [component descriptor DATA library](component-descriptor-data.md) inspects an
 originally selected build without making it executable. It preserves the raw
 package/receipt JSON, original-to-sealed path mapping and read-only file semantics.
-Its opaque DATA handle is not an interpreter, execution grant or runtime slot;
-the missing deployment, Node closure and private-FD boundaries below still apply.
+Its opaque DATA handle is not an interpreter, execution grant or runtime slot.
+The separate executable bridge below implements deployment, Node loading and
+private-FD joins in source; their genuine runtime qualification remains required.
 
 ## SPEC reconciliation
 
@@ -106,12 +107,14 @@ the exact context contract, and installs the private decoder before spawning the
 runtime. Native observations describe native-owned facts. Node interpreter and
 source facts require a separate source-owned association.
 
-This Rust source package does not supply the Node TaskHost, matching frame
-interpreter or static build-descriptor/private-FD adapter. That adapter must bind
-the exact implemented resource, request profile, Rust source, compiled-input
-manifest and executable before an original startup acknowledgement and a genuine
-continuation can be qualified. Passing the Rust component tests supplies none of
-those missing Node producers.
+The [executable bridge source](protected-peer-bridge.md) now supplies the Node
+TaskHost/interpreter, original-selected deployment association and private-FD
+adapter. Its fixed CONNECT route retains original Rust authentication and TLS.
+It binds the resource, current source manifest, actual executable, Node loader,
+owned listener and original scoped acknowledgement. Source implementation and
+synthetic checks do not qualify actual deployment, account access, continuation,
+group/remote closure or company adoption. Active-task effects remain restricted
+until their transaction-local fence has a separately accepted profile.
 
 The historical A558 source graph has 152 overlays, 9,307 logical files and 92,049,762 bytes,
 with source vector
@@ -180,9 +183,9 @@ continuity, or company adoption. Native-qualified executable and runtime slots
 remain empty; the embedded resource's source-pinned authoring status is unchanged.
 
 
-## Current schema-description fixture successor
+## Historical schema-description fixture successor
 
-The current PR #78 source has 154 overlays, 167 portable payloads, 9,307 logical
+The PR #78 parent source has 154 overlays, 167 portable payloads, 9,307 logical
 files and 92,058,144 bytes. Its source vector is
 `77ea459e7555e0ca7a7270fd9a42b805db52b2d1dacd8efbd9ac815ab783bb0b`, package
 `f85caf3208b08049a13773e6cbe1d638f7e21bf648db376a1b3a4a2ccab7d11e`, and builder
@@ -206,7 +209,8 @@ ordinary app-server-protocol library-test build and its complete 323-case root.
 [PR #78](https://github.com/yimoburu/soloco/pull/78) records the exact current-head
 result and acceptance. This checkpoint supplies no fresh 15-target/protected or
 production-companion build for 77ea. Parent 45a's production binary and manifest
-retain their original source association. The missing Node adapter, genuine
-native positive, account/corpus qualification, continuity and adoption remain
+retain their original source association. At that checkpoint the Node adapter
+was missing; the separate bridge above now supplies its source composition.
+Genuine native positive, account/corpus qualification, continuity and adoption remain
 separate; qualified executable/runtime slots remain empty. Exact hashes and
 receipts are in the [reconciliation record](spec-reconciliation.md#current-coherent-continuation-candidate).

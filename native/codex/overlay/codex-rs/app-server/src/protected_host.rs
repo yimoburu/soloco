@@ -15,7 +15,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 pub struct OriginalManagedHost { inner: Arc<OriginalHost> }
 struct OriginalHost {
     auth: Arc<AuthManager>, config: Arc<Config>, network: EmbeddedNetworkPolicy,
-    bootstrap: codex_api::protected_peer::OriginalBootstrapClaim,
+    bootstrap: Arc<codex_api::protected_peer::OriginalBootstrapClaim>,
     loader: CloudConfigBundleLoader, loader_overrides: LoaderOverrides,
     cli_overrides: Vec<(String, toml::Value)>, arg0: Arg0DispatchPaths,
 }
@@ -144,12 +144,13 @@ impl OriginalManagedHost {
             return Err(denied("original managed/login requirements cannot be bypassed"));
         }
         let home = find_codex_home()?;
-        let claim = startup.claim_bootstrap(home.as_path()).map_err(io::Error::other)?;
+        let claim = Arc::new(startup.claim_bootstrap(home.as_path()).map_err(io::Error::other)?);
         let network = EmbeddedNetworkPolicy::load(&loader_overrides).await;
         let cli_overrides = overrides.parse_overrides().map_err(io::Error::other)?;
         let manager = ConfigManager::new(home.to_path_buf(), cli_overrides.clone(),
             loader_overrides.clone(), true, Default::default(), arg0.clone(),
-            Arc::new(NoopThreadConfigLoader)).with_embedded_network_policy(network.clone());
+            Arc::new(NoopThreadConfigLoader)).with_embedded_network_policy(network.clone())
+            .with_original_bootstrap_claim(claim.clone());
         // This is the original native app-server's existing standard managed bootstrap.
         let loaded = manager.load_managed_startup_config(std::env::current_dir().ok()).await?;
         let config = loaded.config?;

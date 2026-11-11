@@ -55,6 +55,7 @@ pub(crate) struct ConfigManager {
     network_policy_reload: Arc<tokio::sync::Semaphore>,
     borrowed_auth_policy: bool,
     borrowed_auth_route: Option<codex_login::AuthRouteConfig>,
+    original_bootstrap: Option<Arc<codex_api::protected_peer::OriginalBootstrapClaim>>,
     network_policy_snapshot: Arc<RwLock<Option<Arc<ApplicationPolicySnapshot>>>>,
     /// Captured before config loading so a reload also revokes pending startups.
     mcp_ema_cancellation: Arc<Mutex<EmaCancellationRoots>>,
@@ -116,6 +117,7 @@ impl ConfigManager {
             network_policy_reload: Arc::new(tokio::sync::Semaphore::new(/*permits*/ 1)),
             borrowed_auth_policy: false,
             borrowed_auth_route: None,
+            original_bootstrap: None,
             network_policy_snapshot: Arc::default(),
             mcp_ema_cancellation: Arc::default(),
         }
@@ -166,6 +168,13 @@ impl ConfigManager {
     pub(crate) fn with_borrowed_auth_policy(mut self, route: Option<codex_login::AuthRouteConfig>) -> Self {
         self.borrowed_auth_policy = route.is_some();
         self.borrowed_auth_route = route;
+        self
+    }
+
+    /// Source-private original owner, installed before the first managed load.
+    /// Ordinary configuration/JSON cannot register a proxy witness here.
+    pub(crate) fn with_original_bootstrap_claim(mut self, claim: Arc<codex_api::protected_peer::OriginalBootstrapClaim>) -> Self {
+        self.original_bootstrap = Some(claim);
         self
     }
 
@@ -287,7 +296,7 @@ impl ConfigManager {
             .build()
             .await?;
         self.check_application_policy_load(&policy_load)?;
-        self.apply_network_policy(&mut config);
+        self.apply_network_policy(&mut config)?;
         self.apply_runtime_feature_enablement(&mut config);
         self.apply_arg0_paths(&mut config);
         config.config_layer_stack = config
@@ -313,7 +322,7 @@ impl ConfigManager {
             codex_home,
         )
         .await?;
-        self.apply_network_policy(&mut config);
+        self.apply_network_policy(&mut config)?;
         self.apply_runtime_feature_enablement(&mut config);
         self.apply_arg0_paths(&mut config);
         config.config_layer_stack = config
@@ -342,7 +351,7 @@ impl ConfigManager {
             AbsolutePathBuf::from_absolute_path(&self.codex_home)?,
         )
         .await?;
-        self.apply_network_policy(&mut config);
+        self.apply_network_policy(&mut config)?;
         self.apply_runtime_feature_enablement(&mut config);
         self.apply_arg0_paths(&mut config);
         config.config_layer_stack = config
@@ -503,7 +512,7 @@ impl ConfigManager {
             .cloud_config_bundle(CloudConfigBundleLoader::default())
             .build()
             .await?;
-        self.apply_network_policy(&mut config);
+        self.apply_network_policy(&mut config)?;
         self.apply_runtime_feature_enablement(&mut config);
         self.apply_arg0_paths(&mut config);
         config.config_layer_stack = config
@@ -733,7 +742,7 @@ impl ConfigManager {
             .await;
         let mut config = result?;
         self.check_application_policy_load(&policy_load)?;
-        self.apply_network_policy(&mut config);
+        self.apply_network_policy(&mut config)?;
         self.apply_runtime_feature_enablement(&mut config);
         self.apply_arg0_paths(&mut config);
         config.config_layer_stack = config
@@ -783,20 +792,21 @@ impl ConfigManager {
             .unwrap_or_default()
     }
 
-    fn apply_network_policy(&self, config: &mut Config) {
+    fn apply_network_policy(&self, config: &mut Config) -> std::io::Result<()> {
         config.application_network_policy = self.network_policy.policy();
-        config.application_auth_route_config = Some(self.borrowed_auth_route.clone().unwrap_or_else(||
-            codex_login::AuthRouteConfig::from_http_client_factory(
-                config
-                    .http_client_factory()
-                    .with_network_policy(self.network_policy.policy()),
-            )
-            .with_local_bootstrap_factory(
-                config
-                    .http_client_factory()
-                    .with_network_policy(self.local_network_policy.policy()),
-            )
-        ));
+        if let Some(original) = &self.borrowed_auth_route {
+            config.application_auth_route_config = Some(original.clone());
+        } else {
+            let mut effective = config.http_client_factory().with_network_policy(self.network_policy.policy());
+            let mut local = config.http_client_factory().with_network_policy(self.local_network_policy.policy());
+            if let Some(original) = &self.original_bootstrap {
+                effective = original.bind_original_http_client_factory(effective).map_err(std::io::Error::other)?;
+                local = original.bind_original_http_client_factory(local).map_err(std::io::Error::other)?;
+            }
+            config.application_auth_route_config = Some(codex_login::AuthRouteConfig::from_http_client_factory(effective)
+                .with_local_bootstrap_factory(local));
+        }
+        Ok(())
     }
 
     fn apply_arg0_paths(&self, config: &mut Config) {

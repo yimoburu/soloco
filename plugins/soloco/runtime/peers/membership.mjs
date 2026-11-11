@@ -6,6 +6,7 @@
 // grants/tasks/claims/effects. Model connections must use bindPeerPrincipal;
 // managed IDs are rejected by raw execute/inspect without the protected binding.
 import {canonical,peerDigest} from './ledger.mjs';
+import {prepareOriginalProjectedMembershipContext,prepareOriginalPeerContextDelivery,checkOriginalPeerMembershipRestriction} from './peer-context-interpreter.mjs';
 import {membershipPolicyEvidence,membershipPrincipalAliases,bindPeerPrincipal,digest,REVIEW_PREPARATION_BYTES} from './model.mjs';
 import {parseReviewOutput,reviewReference,reviewScope} from './review-selection.mjs';
 
@@ -112,25 +113,33 @@ export function createMembershipLifecycle(ledger,options={}){
       tx.finalCheck(()=>expiry(input.expires_at));
       return result;
     });},
-    admit(args){const a=closed(args,['operation_id','enrollment_id','phase','reviewer_principal_id']);return command('operator','admit',a,tx=>roleAuth(tx,'operator'),(tx,input)=>{
+    admit(args,privateRestriction=null){const a=closed(args,['operation_id','enrollment_id','phase','reviewer_principal_id']);return command('operator','admit',a,tx=>roleAuth(tx,'operator'),(tx,input)=>{
       const e=enrollment(tx,input.enrollment_id),c=checkEnrollment(tx,e),v=e.value,key=phaseKey(v.enrollment_id,input.phase);if(tx.get('work_items',key))fail('ATTEMPT_CONSUMED','Membership phase already has an attempt');
-      let principal=tx.get('principals',v.principal_id),reconstruction=null,reconstructionAssignment=null,reconstructionDelivery=null;
+      let principal=tx.get('principals',v.principal_id),reviewerId=null,newReviewer=null,reconstruction=null,reconstructionAssignment=null,reconstructionDelivery=null;
       if(input.phase==='review'){
         const recon=phase(tx,v.enrollment_id,'reconstruction');reconstruction=getExact(tx,recon.value.result_ref);if(reconstruction.value.status!=='returned'||!reconstruction.value.termination_confirmed)fail('RECONSTRUCTION_REQUIRED','Completed observed reconstruction required');
         const producerContext=context(tx,recon);reconstructionAssignment={context_ref:recon.value.context_ref,sha256:producerContext.value.sha256,text:producerContext.value.text};reconstructionDelivery={read_ranges:copy(recon.value.reads),submission_sha256:recon.value.submission?.sha256??null};
-        const reviewerId=text(input.reviewer_principal_id,'private reviewer',200);if(reviewerId===v.principal_id)fail('REVIEW_INDEPENDENCE','Reconstruction author cannot review');
+        reviewerId=text(input.reviewer_principal_id,'private reviewer',200);if(reviewerId===v.principal_id)fail('REVIEW_INDEPENDENCE','Reconstruction author cannot review');
         principal=tx.get('principals',reviewerId);if(principal&&!ROLES.includes(principal.value.kind))fail('ROLE_INVALID','Private nonprivileged reviewer required');
         if(principal&&!['active','pending'].includes(principal.value.status))fail('PRINCIPAL_INACTIVE','Private reviewer is inactive');
-        if(!principal)principal=tx.put('principals',reviewerId,{principal_id:reviewerId,kind:'reviewer',host:v.host,status:'pending',generation:1,native_id:null,private_reviewer:true},0);
+        if(!principal)newReviewer={principal_id:reviewerId,kind:'reviewer',host:v.host,status:'pending',generation:1,native_id:null,private_reviewer:true};
       }else if(input.reviewer_principal_id!==undefined)fail('INVALID_INPUT','Reviewer belongs only to review admission');
       const snapshot=evidence(tx,e);if(reconstruction&&reconstruction.value.source_cut_sha256!==snapshot.sha256)fail('CONTEXT_CHANGED','Reconstruction is no longer current');
-      const global=tx.get('control','usage'),personal=tx.get('control',`usage:${principal.id}`),limits=c.value.policy;
+      const principalId=principal?.id??reviewerId,generation=input.phase==='reconstruction'?v.generation:principal?.value.generation??1;
+      const global=tx.get('control','usage'),personal=tx.get('control',`usage:${principalId}`),limits=c.value.policy;
       if(used(global)>=limits.max_model_calls||used(personal)>=(limits.principal_model_calls??limits.max_model_calls)||v.used_model_calls>=v.max_model_calls)fail('MODEL_BUDGET','Existing shared model allowance exhausted');
       if(tx.count('slots',{status:['active','unknown']})>=limits.worker_cap)fail('CAPACITY_BUSY','Existing active/unknown execution holds capacity');
       const enrollmentAuthority=stableEnrollment(e),enrollmentSha=peerDigest(enrollmentAuthority),history=recoveryHistory(tx,e),recoverySha=peerDigest(history);
-      const contextValue={protocol:'peer-membership-assignment-v1',connection,principal_id:principal.id,generation:input.phase==='reconstruction'?v.generation:principal.value.generation,enrollment_id:v.enrollment_id,enrollment:enrollmentAuthority,recovery_history:history,phase:input.phase,role:input.phase==='reconstruction'?v.role:'reviewer',source_cut:snapshot.body,source_cut_sha256:snapshot.sha256,allowance_observation:{global_used_after:used(global)+1,principal_used_after:used(personal)+1,enrollment_used_after:v.used_model_calls+1},...(reconstruction?{reconstruction:{reference:ref('work_items',reconstruction),value:reconstruction.value,assignment:reconstructionAssignment,delivery:reconstructionDelivery}}:{})};
+      const contextValue={protocol:'peer-membership-assignment-v1',connection,principal_id:principalId,generation,enrollment_id:v.enrollment_id,enrollment:enrollmentAuthority,recovery_history:history,phase:input.phase,role:input.phase==='reconstruction'?v.role:'reviewer',source_cut:snapshot.body,source_cut_sha256:snapshot.sha256,allowance_observation:{global_used_after:used(global)+1,principal_used_after:used(personal)+1,enrollment_used_after:v.used_model_calls+1},...(reconstruction?{reconstruction:{reference:ref('work_items',reconstruction),value:reconstruction.value,assignment:reconstructionAssignment,delivery:reconstructionDelivery}}:{})};
       const encoded=canonical(contextValue);if(Buffer.byteLength(encoded)>limits.max_context_bytes)fail('CONTEXT_CAPACITY','Complete private assignment exceeds existing context policy');
-      const contextId=`membership-context:${v.enrollment_id}:${input.phase}`,contextRow=tx.put('work_items',contextId,{kind:'membership_context',status:'frozen',membership_id:v.enrollment_id,principal_id:principal.id,text:encoded,sha256:digest(encoded),enrollment_sha256:enrollmentSha,recovery_sha256:recoverySha,source_cut_sha256:snapshot.sha256,subject:reconstruction?ref('work_items',reconstruction):null,contributors:snapshot.contributors},0),attemptId=peerDigest(['peer-membership-attempt-v1',connectionHash,v.enrollment_id,input.phase]),executionId=`membership-execution:${attemptId}`;
+      // The original static interpreter and whole-wire restriction are software
+      // support only. An unavailable/forged capability holds before the FIRST
+      // buffered put; an unborn process/FD acknowledgement is not required.
+      prepareOriginalProjectedMembershipContext(encoded,snapshot);
+      const deliveryContract=privateRestriction!==null?checkOriginalPeerMembershipRestriction(privateRestriction,encoded,snapshot):null;
+      if(snapshot.body.protocol==='peer-membership-context-v2'&&!deliveryContract)fail('CONTEXT_INTERPRETER_UNAVAILABLE','Original whole-wire restriction required before new projected admission');
+      if(newReviewer)principal=tx.put('principals',reviewerId,newReviewer,0);
+      const contextId=`membership-context:${v.enrollment_id}:${input.phase}`,contextRow=tx.put('work_items',contextId,{kind:'membership_context',status:'frozen',...(deliveryContract?{delivery_contract:deliveryContract}:{}),membership_id:v.enrollment_id,principal_id:principal.id,text:encoded,sha256:digest(encoded),enrollment_sha256:enrollmentSha,recovery_sha256:recoverySha,source_cut_sha256:snapshot.sha256,subject:reconstruction?ref('work_items',reconstruction):null,contributors:snapshot.contributors},0),attemptId=peerDigest(['peer-membership-attempt-v1',connectionHash,v.enrollment_id,input.phase]),executionId=`membership-execution:${attemptId}`;
       const p=tx.put('work_items',key,{kind:'membership_phase',status:'reserved',membership_id:v.enrollment_id,phase:input.phase,principal_id:principal.id,principal_ref:ref('principals',principal),generation:contextValue.generation,attempt_id:attemptId,context_ref:ref('work_items',contextRow),execution_id:executionId,reads:[],submission:null,native_id:null,process:null,result_ref:null},0);
       tx.put('slots',executionId,{kind:'membership_execution',status:'active',membership_id:v.enrollment_id,principal_id:principal.id,attempt_id:attemptId},0);tx.put('effects',executionId,{kind:'membership_execution',status:'reserved',membership_id:v.enrollment_id,principal_id:principal.id,attempt_id:attemptId,termination_confirmed:false},0);
       tx.put('control','usage',{...(global?.value??{}),model_calls:used(global)+1},global?.revision??0);tx.put('control',`usage:${principal.id}`,{...(personal?.value??{}),model_calls:used(personal)+1},personal?.revision??0);tx.put('work_items',e.id,{...v,used_model_calls:v.used_model_calls+1},e.revision);
@@ -157,6 +166,13 @@ export function createMembershipLifecycle(ledger,options={}){
   });
 
   const host=Object.freeze({
+    prepareDelivery(args,interpreter){const a=closed(args,['enrollment_id','phase','attempt_id']);connectionGuard();return ledger.read(tx=>{
+      roleAuth(tx,'host');const {e,p}=checkedPhase(tx,a);phaseCurrent(tx,e,p);
+      if(!['reserved','running'].includes(p.value.status)||p.value.result_ref)fail('PHASE_CLOSED','Exact uncompleted original phase required');
+      const c=context(tx,p);fresh(tx,e,c);const assignment=JSON.parse(c.value.text),raw=canonical(assignment.source_cut);
+      if(digest(raw)!==c.value.source_cut_sha256)fail('SOURCE_CHANGED','Original inner context bytes changed');
+      return prepareOriginalPeerContextDelivery(interpreter,{delivery_kind:'membership-assignment',payload_protocol:assignment.protocol,payload_text:c.value.text,payload_sha256:c.value.sha256,payload_utf8_bytes:Buffer.byteLength(c.value.text),source_cut_protocol:assignment.source_cut.protocol,source_cut_sha256:c.value.source_cut_sha256,source_cut_utf8_bytes:Buffer.byteLength(raw)});
+    });},
     bind(args){const a=closed(args,['operation_id','enrollment_id','phase','attempt_id','native_id','observed_process']);return command('host','bind',a,tx=>roleAuth(tx,'host'),(tx,input)=>{
       const {e,p}=checkedPhase(tx,input);if(p.value.native_id||p.value.result_ref||!['reserved','unknown'].includes(p.value.status))fail('BINDING_IMMUTABLE','Original native binding is immutable');
       const native=text(input.native_id,'host-observed native identity',300),process=processIdentity(input.observed_process);

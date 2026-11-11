@@ -13,8 +13,8 @@ import {formatContextBuildInputData,formatContextBuildOutputData,createContextBu
 const HERE=fileURLToPath(import.meta.url),REPO=path.resolve(fileURLToPath(new URL('../../../../',import.meta.url)));
 const ENTRY=path.join(REPO,'tools/build-peer-context.mjs'),NATIVE=path.join(REPO,'native/codex');
 const ROOT=path.join(REPO,'work/peer-context-component'),JOURNAL=path.join(ROOT,'journal.sqlite'),ANCHOR=path.join(ROOT,'journal-anchor.json');
-const PACKAGE_SHA='f85caf3208b08049a13773e6cbe1d638f7e21bf648db376a1b3a4a2ccab7d11e';
-const DRIVER_SHA='6bf1d04d011cf37486b564cabe0d517b7f72d05f32e83d5ac104a5b4be3377b6';
+const PACKAGE_SHA='11dce050e14c48ed20dac9052ec096f3fbd94717603035b22f56f7af851ce84c';
+const DRIVER_SHA='6edb4fb2eff2e84c2a3850dae6a15d3e270898e1a43615de98bc9d536d92acde';
 const DATA_SHA='64b3b0cd592956a1effc2971350c4d4b66a861b4de0eee361e1024d2418184c8';
 const COMMIT='c40729ea5cf8e947481b130c59807273eda2f8e9',TREE='078c14cecf94b522a2eff48b30996bf3f4d1bf7a';
 const TARGET='aarch64-apple-darwin',PYTHON='/usr/bin/python3',BUILD_SECONDS=1200;

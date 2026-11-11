@@ -8,6 +8,7 @@
 // Review output contract: canonical JSON {review:{subject,verdict,reason,blockers}}.
 // Synthetic observer fixtures establish mechanics, never native qualification.
 import {createHash,randomUUID} from 'node:crypto';
+import {prepareOriginalProjectedTaskContext} from './peer-context-interpreter.mjs';
 import {canonical,peerDigest,FAMILIES} from './ledger.mjs';
 import {REVIEW_SELECTION_RECIPE,extractReviewSelection,parseReviewOutput,reviewReference,reviewScope} from './review-selection.mjs';
 
@@ -56,7 +57,7 @@ const readFailure=(tx,error)=>Boolean(tx[readFailuresKey]?.has(error));
 function trackedReads(tx){
   if(tx[readFailuresKey])return tx;
   const failures=new Set(),wrapped={...tx,[readFailuresKey]:failures,[preparationBudgetKey]:newPreparationBudget(),[semanticBudgetKey]:newSemanticBudget()};
-  for(const method of ['get','getVersion','list','count','queryCurrentReviews','resolveLegacy'])if(typeof tx[method]==='function')wrapped[method]=(...args)=>{try{return tx[method](...args);}catch(error){failures.add(error);throw error;}};
+  for(const method of ['get','getVersion','list','count','events','queryCurrentReviews','resolveLegacy'])if(typeof tx[method]==='function')wrapped[method]=(...args)=>{try{return tx[method](...args);}catch(error){failures.add(error);throw error;}};
   return Object.freeze(wrapped);
 }
 function newSemanticBudget(){
@@ -202,6 +203,7 @@ function plannedWrite(ledger,type,principal,fn){
       sequence:base.sequence,
       get,
       getVersion,
+      events:options=>{guard();if(changes.size||typeof base.events!=='function')hold('TRANSACTION_EXPIRED','Original event history must be read before planning writes');return base.events(options);},
       queryCurrentReviews:selectedReviews,
       list:(f,o={})=>{
         checkFamily(f);const limit=o.limit??100;
@@ -1080,6 +1082,9 @@ function mutate(tx,actor,principal,c,action,args,protectedCall){
       usage=tx.get('control','usage');principalUsage=tx.get('control',`usage:${t.owner_principal_id}`);used=usage?.value.model_calls??0;usedPrincipal=principalUsage?.value.model_calls??0;
       if(used>=policy(c).max_model_calls||usedPrincipal>=(policy(c).principal_model_calls??policy(c).max_model_calls)||auth.grant&&(auth.grant.value.used_model_calls??0)>=auth.grant.value.max_model_calls)hold('MODEL_BUDGET','Model budget exhausted');
       context=buildContext(tx,actor,task);if(context.membership.conflicts.length)hold('CONTEXT_CONFLICT','Unresolved applicable conflict');
+      // Source-owned SOFTWARE support is checked after the original context
+      // reads and before any resource, attempt, effect or allowance put.
+      prepareOriginalProjectedTaskContext(context,tx);
     }catch(error){if(readFailure(tx,error))throw error;if(['RESOURCE_BUSY','RESOURCE_AUTHORITY','CONTEXT_CAPACITY','CONTEXT_CONFLICT','GRANT_INVALID','GRANT_CHANGED','MODEL_BUDGET','PRINCIPAL_INACTIVE','SOURCE_CHANGED','DEPENDENCY_CYCLE','LEGACY_SOURCE_MISSING','DEFINITION_CHANGED'].includes(error.code))return {admitted:false,code:error.code,reason:error.message};throw error;}
     const effectId=digest(['native-effect',task.id,t.definition_revision]);if(tx.get('effects',effectId))hold('ATTEMPT_CONSUMED','Effect already reserved');
     const request={kind:'native',task_id:task.id,definition_sha256:t.definition_sha256,context_sha256:context.sha256},attempt={id:digest(['attempt',task.id,t.definition_revision]),effect_id:effectId,request_sha256:digest(request),definition_revision:t.definition_revision,context,policy_generation:c.value.policy_generation,pause_generation:c.value.pause_generation,admitted_at:now(),termination_confirmed:false,model_calls:1};

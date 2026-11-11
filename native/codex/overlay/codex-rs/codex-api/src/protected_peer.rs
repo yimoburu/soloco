@@ -256,6 +256,8 @@ struct Challenge {
     state_root: String, cwd: String, original_home_sha256: Option<String>,
     #[serde(default)]
     context_contract: Option<context_contract::ContextContractRequest>,
+    #[serde(default)]
+    loopback_proxy_port: Option<u16>,
 }
 fn validate_challenge(challenge: &Challenge) -> Result<(), TransportError> {
     let url = url::Url::parse(&challenge.upstream_url).map_err(|_| hold("upstream URL"))?;
@@ -263,6 +265,8 @@ fn validate_challenge(challenge: &Challenge) -> Result<(), TransportError> {
     if challenge.protocol != PROTOCOL || challenge.kind != "challenge" || challenge.pid != std::process::id() ||
         !hash(&challenge.nonce) || !hash(&challenge.executable_sha256) || !hash(&challenge.source_manifest_sha256) ||
         challenge.slot_id.is_empty() || challenge.slot_id.len()>200 ||
+        challenge.loopback_proxy_port == Some(0) ||
+        challenge.loopback_proxy_port.is_some() && !challenge.nonce.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)) ||
         !std::path::Path::new(&challenge.state_root).is_absolute() || !std::path::Path::new(&challenge.cwd).is_absolute() ||
         url.scheme() != "https" || url.host_str().is_none() || !url.username().is_empty() || url.password().is_some() ||
         url.query().is_some() || url.fragment().is_some() || !url.path().ends_with("/responses") {

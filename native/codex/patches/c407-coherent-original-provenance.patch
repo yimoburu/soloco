@@ -20163,3 +20163,359 @@ z<<cyP^JQf>30_Kd8{4q9J+sU3RaGTsN3Fw((Z2@1Bui|l$#8Rz<qAAe)Aj&4WPm7S
 zrDs?|H%)~a@k)X_Axa8(ZJ%073jASBZsf#4!x<i7=%2@&7kIsdikN4X&gO80?!{d%
 C3nLr=
 
+
+# Executable peer bridge fixed-loopback source successor
+--- a/codex-rs/app-server/src/config_manager.rs
++++ b/codex-rs/app-server/src/config_manager.rs
+@@ -57,0 +58 @@
++    original_bootstrap: Option<Arc<codex_api::protected_peer::OriginalBootstrapClaim>>,
+@@ -118,0 +120 @@
++            original_bootstrap: None,
+@@ -168,0 +171,7 @@
++        self
++    }
++
++    /// Source-private original owner, installed before the first managed load.
++    /// Ordinary configuration/JSON cannot register a proxy witness here.
++    pub(crate) fn with_original_bootstrap_claim(mut self, claim: Arc<codex_api::protected_peer::OriginalBootstrapClaim>) -> Self {
++        self.original_bootstrap = Some(claim);
+@@ -290 +299 @@
+-        self.apply_network_policy(&mut config);
++        self.apply_network_policy(&mut config)?;
+@@ -316 +325 @@
+-        self.apply_network_policy(&mut config);
++        self.apply_network_policy(&mut config)?;
+@@ -345 +354 @@
+-        self.apply_network_policy(&mut config);
++        self.apply_network_policy(&mut config)?;
+@@ -506 +515 @@
+-        self.apply_network_policy(&mut config);
++        self.apply_network_policy(&mut config)?;
+@@ -736 +745 @@
+-        self.apply_network_policy(&mut config);
++        self.apply_network_policy(&mut config)?;
+@@ -786 +795 @@
+-    fn apply_network_policy(&self, config: &mut Config) {
++    fn apply_network_policy(&self, config: &mut Config) -> std::io::Result<()> {
+@@ -788,12 +797,13 @@
+-        config.application_auth_route_config = Some(self.borrowed_auth_route.clone().unwrap_or_else(||
+-            codex_login::AuthRouteConfig::from_http_client_factory(
+-                config
+-                    .http_client_factory()
+-                    .with_network_policy(self.network_policy.policy()),
+-            )
+-            .with_local_bootstrap_factory(
+-                config
+-                    .http_client_factory()
+-                    .with_network_policy(self.local_network_policy.policy()),
+-            )
+-        ));
++        if let Some(original) = &self.borrowed_auth_route {
++            config.application_auth_route_config = Some(original.clone());
++        } else {
++            let mut effective = config.http_client_factory().with_network_policy(self.network_policy.policy());
++            let mut local = config.http_client_factory().with_network_policy(self.local_network_policy.policy());
++            if let Some(original) = &self.original_bootstrap {
++                effective = original.bind_original_http_client_factory(effective).map_err(std::io::Error::other)?;
++                local = original.bind_original_http_client_factory(local).map_err(std::io::Error::other)?;
++            }
++            config.application_auth_route_config = Some(codex_login::AuthRouteConfig::from_http_client_factory(effective)
++                .with_local_bootstrap_factory(local));
++        }
++        Ok(())
+--- a/codex-rs/app-server/src/protected_host.rs
++++ b/codex-rs/app-server/src/protected_host.rs
+@@ -18 +18 @@
+-    bootstrap: codex_api::protected_peer::OriginalBootstrapClaim,
++    bootstrap: Arc<codex_api::protected_peer::OriginalBootstrapClaim>,
+@@ -147 +147 @@
+-        let claim = startup.claim_bootstrap(home.as_path()).map_err(io::Error::other)?;
++        let claim = Arc::new(startup.claim_bootstrap(home.as_path()).map_err(io::Error::other)?);
+@@ -152 +152,2 @@
+-            Arc::new(NoopThreadConfigLoader)).with_embedded_network_policy(network.clone());
++            Arc::new(NoopThreadConfigLoader)).with_embedded_network_policy(network.clone())
++            .with_original_bootstrap_claim(claim.clone());
+--- a/codex-rs/codex-api/src/protected_peer/startup.rs
++++ b/codex-rs/codex-api/src/protected_peer/startup.rs
+@@ -9,0 +10 @@
++    loopback_proxy_port: Option<u16>,
+@@ -27,0 +29,15 @@
++
++    /// Only the consumed original pre-auth claim supplies this fixed transport
++    /// hop. The factory retains its cookies and destination policy; this creates
++    /// no authentication owner, request permit or replacement HTTP transport.
++    pub fn bind_original_http_client_factory(&self, factory: codex_http_client::HttpClientFactory)
++        -> Result<codex_http_client::HttpClientFactory, TransportError> {
++        if !self.consumed.load(Ordering::SeqCst) {
++            return Err(hold("original host claim required before HTTP factory binding"));
++        }
++        match self.loopback_proxy_port {
++            Some(port) => factory.with_protected_loopback_proxy(port, &self.nonce)
++                .map_err(|_| hold("original fixed loopback route changed")),
++            None => Ok(factory),
++        }
++    }
+@@ -65 +81,2 @@
+-            state_root: challenge.state_root.clone(), cwd: challenge.cwd.clone(), context_selection, consumed: AtomicBool::new(false), decoder_issued:AtomicBool::new(false) };
++            state_root: challenge.state_root.clone(), cwd: challenge.cwd.clone(), loopback_proxy_port:challenge.loopback_proxy_port,
++            context_selection, consumed: AtomicBool::new(false), decoder_issued:AtomicBool::new(false) };
+@@ -80 +97 @@
+-        let facts = json!({"protocol":PROTOCOL,"kind":"host_bootstrap","nonce":claim.nonce,
++        let mut facts = json!({"protocol":PROTOCOL,"kind":"host_bootstrap","nonce":claim.nonce,
+@@ -83,0 +101,3 @@
++        // None retains the original legacy frame byte schema. The source-bound
++        // selected port is inspectable; proxy authorization itself is not logged.
++        if let Some(port) = claim.loopback_proxy_port { facts["loopback_proxy_port"] = json!(port); }
+@@ -89,0 +110,4 @@
++
++#[cfg(test)]
++#[path = "startup_loopback_tests.rs"]
++mod loopback_source_tests;
+--- a/codex-rs/codex-api/src/protected_peer/startup_loopback_tests.rs
++++ b/codex-rs/codex-api/src/protected_peer/startup_loopback_tests.rs
+@@ -0,0 +1,64 @@
++//! Source-only private fixtures. These do not invoke original FD startup, an
++//! AuthManager, a native host, a provider, a socket or a source-build capability.
++use super::*;
++use codex_http_client::{HttpClientFactory, OutboundProxyPolicy, OutboundProxyRoute};
++
++fn fixture(port: Option<u16>) -> NativeStartup {
++    NativeStartup { claim: OriginalBootstrapClaim {
++        nonce: "a".repeat(64), slot_id: "synthetic-source-slot".into(),
++        executable_sha256: "b".repeat(64), source_manifest_sha256: "c".repeat(64),
++        original_home_sha256: hash(b"/synthetic-original-home"),
++        state_root: "/synthetic-state".into(), cwd: "/synthetic-project".into(),
++        loopback_proxy_port: port, context_selection: None,
++        consumed: AtomicBool::new(false), decoder_issued: AtomicBool::new(false),
++    } }
++}
++fn challenge(port: Option<serde_json::Value>) -> serde_json::Value {
++    let mut value = json!({"protocol":PROTOCOL,"kind":"challenge","nonce":"a".repeat(64),
++        "pid":std::process::id(),"upstream_url":"https://example.invalid/responses",
++        "slot_id":"synthetic-source-slot","executable_sha256":"b".repeat(64),
++        "source_manifest_sha256":"c".repeat(64),"state_root":"/synthetic-state",
++        "cwd":"/synthetic-project","original_home_sha256":"d".repeat(64)});
++    if let Some(port) = port { value["loopback_proxy_port"] = port; }
++    value
++}
++
++#[test]
++fn private_challenge_accepts_only_optional_nonzero_u16_proxy_port() {
++    let legacy: Challenge = serde_json::from_value(challenge(None)).unwrap();
++    assert_eq!(legacy.loopback_proxy_port, None);
++    assert!(validate_challenge(&legacy).is_ok());
++    let selected: Challenge = serde_json::from_value(challenge(Some(json!(23456)))).unwrap();
++    assert_eq!(selected.loopback_proxy_port, Some(23456));
++    assert!(validate_challenge(&selected).is_ok());
++    let zero: Challenge = serde_json::from_value(challenge(Some(json!(0)))).unwrap();
++    assert!(validate_challenge(&zero).is_err());
++    let mut uppercase = challenge(Some(json!(23456))); uppercase["nonce"] = json!("A".repeat(64));
++    assert!(validate_challenge(&serde_json::from_value::<Challenge>(uppercase).unwrap()).is_err());
++    for invalid in [json!(-1),json!(65536),json!(1.5),json!("23456")] {
++        assert!(serde_json::from_value::<Challenge>(challenge(Some(invalid))).is_err());
++    }
++}
++
++#[test]
++fn unconsumed_original_claim_cannot_bind_a_factory() {
++    let startup = fixture(Some(23456));
++    assert!(startup.claim.bind_original_http_client_factory(HttpClientFactory::new(OutboundProxyPolicy::ReqwestDefault)).is_err());
++}
++
++#[test]
++fn consumed_original_claim_retains_its_exact_fixed_proxy_without_fallback() {
++    let claim = fixture(Some(23456)).claim_bootstrap(Path::new("/synthetic-original-home")).unwrap();
++    let factory = claim.bind_original_http_client_factory(HttpClientFactory::new(OutboundProxyPolicy::RespectSystemProxy).with_system_proxy_fallback()).unwrap();
++    assert_eq!(factory.resolve_proxy_route("https://example.invalid/responses"), OutboundProxyRoute::Proxy {
++        url: format!("http://soloco:{}@127.0.0.1:23456", "a".repeat(64)), no_proxy: None,
++    });
++    assert!(!factory.with_system_proxy_fallback().allows_system_proxy_fallback());
++}
++
++#[test]
++fn legacy_claim_keeps_original_factory_and_no_new_route() {
++    let claim = fixture(None).claim_bootstrap(Path::new("/synthetic-original-home")).unwrap();
++    let factory = HttpClientFactory::new(OutboundProxyPolicy::ReqwestDefault).with_system_proxy_fallback();
++    assert_eq!(claim.bind_original_http_client_factory(factory.clone()).unwrap(), factory);
++}
+--- a/codex-rs/codex-api/src/protected_peer.rs
++++ b/codex-rs/codex-api/src/protected_peer.rs
+@@ -258,0 +259,2 @@
++    #[serde(default)]
++    loopback_proxy_port: Option<u16>,
+@@ -265,0 +268,2 @@
++        challenge.loopback_proxy_port == Some(0) ||
++        challenge.loopback_proxy_port.is_some() && !challenge.nonce.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)) ||
+--- a/codex-rs/core/src/config/mod.rs
++++ b/codex-rs/core/src/config/mod.rs
+@@ -1819,4 +1819,9 @@
+-            factory.with_chatgpt_cookies([HeaderValue::from_static("oai-chat-psp=true")])
+-        } else {
+-            factory
+-        }
++            factory = factory.with_chatgpt_cookies([HeaderValue::from_static("oai-chat-psp=true")]);
++        }
++        // The original scoped owner retains its actual managed auth route. Keep
++        // only that source-bound loopback CONNECT hop when rebuilding provider,
++        // model or plugin factories; effective features/cookies/policy stay here.
++        if let Some(original) = &self.application_auth_route_config {
++            factory = factory.with_protected_loopback_proxy_from(original.http_client_factory());
++        }
++        factory
+--- a/codex-rs/http-client/src/outbound_proxy.rs
++++ b/codex-rs/http-client/src/outbound_proxy.rs
+@@ -169,0 +170,3 @@
++    // Original protected startup may pin one literal loopback CONNECT route.
++    // The URL contains a transient nonce and must retain Proxy's redacted Debug.
++    protected_loopback_proxy: Option<OutboundProxyRoute>,
+@@ -178,0 +182 @@
++            && self.protected_loopback_proxy == other.protected_loopback_proxy
+@@ -198,0 +203 @@
++            .field("protected_loopback_proxy", &self.protected_loopback_proxy)
+@@ -210,0 +216 @@
++            protected_loopback_proxy: None,
+@@ -244,0 +251,31 @@
++    /// Mechanical transport configuration, not authentication or egress authority.
++    /// The original protected bootstrap supplies its private-FD port and nonce;
++    /// destination admission still belongs to the retained application policy.
++    /// TLS and credentials remain in the original destination client. Only the
++    /// CONNECT hop receives Basic authentication with user `soloco` and nonce.
++    pub fn with_protected_loopback_proxy(mut self, port: u16, nonce: &str) -> io::Result<Self> {
++        if port == 0 || nonce.len() != 64 || !nonce.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)) {
++            return Err(io::Error::new(io::ErrorKind::PermissionDenied, "invalid protected loopback route"));
++        }
++        let route = OutboundProxyRoute::Proxy {
++            url: format!("http://soloco:{nonce}@127.0.0.1:{port}"),
++            no_proxy: None,
++        };
++        if self.protected_loopback_proxy.as_ref().is_some_and(|current| current != &route) {
++            return Err(io::Error::new(io::ErrorKind::PermissionDenied, "protected loopback route changed"));
++        }
++        self.protected_loopback_proxy = Some(route);
++        self.system_proxy_fallback = false;
++        Ok(self)
++    }
++
++    /// Retain only the original protected route while resolving this Config's
++    /// own features, cookies and live destination policy. No credential moves.
++    pub fn with_protected_loopback_proxy_from(mut self, original: &Self) -> Self {
++        if let Some(route) = &original.protected_loopback_proxy {
++            self.protected_loopback_proxy = Some(route.clone());
++            self.system_proxy_fallback = false;
++        }
++        self
++    }
++
+@@ -248 +285 @@
+-        self.system_proxy_fallback = true;
++        self.system_proxy_fallback = self.protected_loopback_proxy.is_none();
+@@ -253,0 +291 @@
++            && self.protected_loopback_proxy.is_none()
+@@ -286,0 +325,3 @@
++        if let Some(route) = &self.protected_loopback_proxy {
++            return route.clone();
++        }
+@@ -299,0 +341,3 @@
++        if let Some(route) = &self.protected_loopback_proxy {
++            return Ok(route.clone());
++        }
+@@ -904,0 +949,4 @@
++
++#[cfg(test)]
++#[path = "protected_loopback_proxy_tests.rs"]
++mod protected_loopback_proxy_tests;
+--- a/codex-rs/http-client/src/protected_loopback_proxy_tests.rs
++++ b/codex-rs/http-client/src/protected_loopback_proxy_tests.rs
+@@ -0,0 +1,92 @@
++//! Controlled source tests. No network, auth, provider, socket or native host.
++use super::*;
++
++fn nonce() -> String { "a".repeat(64) }
++fn fixed(policy: OutboundProxyPolicy) -> HttpClientFactory {
++    HttpClientFactory::new(policy)
++        .with_system_proxy_fallback()
++        .with_protected_loopback_proxy(23456, &nonce()).unwrap()
++}
++fn expected_route() -> OutboundProxyRoute {
++    OutboundProxyRoute::Proxy {
++        url: format!("http://soloco:{}@127.0.0.1:23456", nonce()), no_proxy: None,
++    }
++}
++
++#[test]
++fn fixed_loopback_precedes_default_and_system_discovery_without_fallback() {
++    for policy in [OutboundProxyPolicy::ReqwestDefault, OutboundProxyPolicy::RespectSystemProxy] {
++        let factory = fixed(policy).with_system_proxy_fallback();
++        assert_eq!(factory.resolve_proxy_route("https://example.invalid/responses"), expected_route());
++        assert!(!factory.allows_system_proxy_fallback());
++        assert!(!factory.system_proxy_fallback);
++    }
++}
++
++#[tokio::test]
++async fn async_resolution_uses_the_same_fixed_route_without_system_lookup() {
++    for policy in [OutboundProxyPolicy::ReqwestDefault, OutboundProxyPolicy::RespectSystemProxy] {
++        assert_eq!(fixed(policy).resolve_proxy_route_async("https://example.invalid/responses".into()).await.unwrap(), expected_route());
++    }
++}
++
++#[test]
++fn fixed_route_retains_cookies_and_current_destination_policy() {
++    let controller = crate::NetworkPolicyController::default();
++    let policy = controller.policy();
++    let factory = HttpClientFactory::new(OutboundProxyPolicy::RespectSystemProxy)
++        .with_network_policy(policy.clone())
++        .with_chatgpt_cookies([HeaderValue::from_static("synthetic-cookie=true")])
++        .with_protected_loopback_proxy(23456, &nonce()).unwrap();
++    assert_eq!(factory.network_policy(), &policy);
++    assert!(factory.has_chatgpt_cookies());
++    assert_eq!(factory.clone(), factory);
++    assert_eq!(factory.resolve_proxy_route("https://example.invalid/"), expected_route());
++}
++
++#[test]
++fn rebuilt_factory_inherits_only_original_fixed_route() {
++    let controller = crate::NetworkPolicyController::default();
++    let policy = controller.policy();
++    let rebuilt = HttpClientFactory::new(OutboundProxyPolicy::RespectSystemProxy)
++        .with_network_policy(policy.clone())
++        .with_chatgpt_cookies([HeaderValue::from_static("different-synthetic-cookie=true")])
++        .with_system_proxy_fallback()
++        .with_protected_loopback_proxy_from(&fixed(OutboundProxyPolicy::ReqwestDefault));
++    assert_eq!(rebuilt.outbound_proxy_policy(), OutboundProxyPolicy::RespectSystemProxy);
++    assert_eq!(rebuilt.network_policy(), &policy);
++    assert!(rebuilt.has_chatgpt_cookies());
++    assert_eq!(rebuilt.resolve_proxy_route("https://example.invalid/"), expected_route());
++    assert!(!rebuilt.allows_system_proxy_fallback());
++}
++
++#[test]
++fn ordinary_factories_preserve_transport_default_behavior() {
++    let ordinary = HttpClientFactory::new(OutboundProxyPolicy::ReqwestDefault).with_system_proxy_fallback();
++    let inherited = ordinary.clone().with_protected_loopback_proxy_from(&HttpClientFactory::new(OutboundProxyPolicy::RespectSystemProxy));
++    assert_eq!(inherited, ordinary);
++    assert!(inherited.allows_system_proxy_fallback());
++    assert_eq!(inherited.resolve_proxy_route("https://example.invalid/"), OutboundProxyRoute::TransportDefault);
++}
++
++#[test]
++fn fixed_route_rejects_zero_port_invalid_token_and_changes() {
++    assert!(HttpClientFactory::new(OutboundProxyPolicy::ReqwestDefault).with_protected_loopback_proxy(0, &nonce()).is_err());
++    for invalid in [String::new(), "short".into(), "g".repeat(64), "a".repeat(65), "A".repeat(64)] {
++        assert!(HttpClientFactory::new(OutboundProxyPolicy::ReqwestDefault).with_protected_loopback_proxy(23456, &invalid).is_err());
++    }
++    assert!(fixed(OutboundProxyPolicy::ReqwestDefault).with_protected_loopback_proxy(23457, &nonce()).is_err());
++    assert!(fixed(OutboundProxyPolicy::ReqwestDefault).with_protected_loopback_proxy(23456, &"b".repeat(64)).is_err());
++    assert!(fixed(OutboundProxyPolicy::ReqwestDefault).with_protected_loopback_proxy(23456, &nonce()).is_ok());
++}
++
++#[test]
++fn transient_connect_token_is_redacted_from_factory_and_route_debug() {
++    let factory = fixed(OutboundProxyPolicy::RespectSystemProxy);
++    let route = factory.resolve_proxy_route("https://example.invalid/");
++    for diagnostic in [format!("{factory:?}"), format!("{route:?}")] {
++        assert!(!diagnostic.contains(&nonce()));
++        assert!(!diagnostic.contains("soloco:"));
++        assert!(diagnostic.contains("<redacted>"));
++    }
++}
