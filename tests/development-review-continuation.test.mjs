@@ -10,17 +10,24 @@ import {digest,id,installedTeam,teamHash,VERSION,withStore,Store} from '../plugi
 import {validationManifest} from '../plugins/soloco/runtime/validation-cache.mjs';
 import {developmentReviewAuthority,developmentReviewSubject} from '../plugins/soloco/runtime/develop.mjs';
 import {assignmentContext} from '../plugins/soloco/runtime/context.mjs';
+import {bind} from '../plugins/soloco/runtime/engine.mjs';
+import {call} from '../plugins/soloco/runtime/main.mjs';
+import {fits,rpcReply,toolResult} from '../plugins/soloco/runtime/public-response.mjs';
+import {developmentDeliveryAction,DEVELOPMENT_ACCEPTANCE_REPORT_PROTOCOL,developmentDeliverySnapshotValue,createDevelopmentDeliveryContract,DEVELOPMENT_DELIVERY_CONTRACT_PROTOCOL} from '../plugins/soloco/runtime/development-delivery.mjs';
 import {prepareReviewContinuation,authorizeReviewContinuation,reviewContinuationSubject,reviewContinuationAssignment,reviewContinuationContextInputs,reviewContinuationCandidate,reviewContinuationRequiredEvidence,validateReviewContinuationPublication,acceptReviewContinuation,developmentReviewContinuationAction} from '../plugins/soloco/runtime/development-review-continuation.mjs';
 
-const base=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-review-continuation-'));
-test.after(()=>fs.rmSync(base,{recursive:true,force:true}));
+const base=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-review-continuation-')),oldData=process.env.COMPANY_PLUGIN_DATA;
+process.env.COMPANY_PLUGIN_DATA=path.join(base,'isolated-registry');
+test.after(()=>{if(oldData===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=oldData;fs.rmSync(base,{recursive:true,force:true});});
 const hash=x=>digest(JSON.stringify(x)),read=a=>withStore(a.root,db=>db.read());
+async function publicReport(a,source){let text='',offset=0;do{const page=await call('company_context',{root:a.root,session_id:a.session_id,epoch:a.epoch,action:'read',id:source.record.id,sha256:source.record.sha256,offset,length:16000},'codex');assert.equal(page.offset,text.length);assert.equal(page.sha256,source.record.sha256);text+=page.text;offset=page.next_offset;}while(offset!==null);assert.equal(digest(text),source.record.sha256);const report=source.path_in_record.reduce((value,key)=>value[key],JSON.parse(text));assert.equal(hash(report),source.sha256);return report;}
 const change=(a,fn)=>withStore(a.root,db=>db.transaction('controlled.continuation-fixture',s=>{fn(s);return s;}));
-function fixture({recovery=true,legacy=true}={}) {
+function fixture({recovery=true,legacy=true,delivery=false}={}) {
   const root=fs.realpathSync(fs.mkdtempSync(path.join(base,'case-'))),a={root,session_id:id('owner'),host:'codex',epoch:1},team=installedTeam();
   const originals=[{path:'helper.mjs',content:'export const helper=1;\n'},{path:'value.mjs',content:'export const value=0;\n'},{path:'value.test.mjs',content:'// Controlled historical test source, never executed by this fixture.\n'}],files=structuredClone(originals);files[1].content='export const value=42;\n';
   for(const f of originals)fs.writeFileSync(path.join(root,f.path),f.content);
   const scope={read_paths:originals.map(f=>f.path),write_paths:['value.mjs'],test_paths:['value.test.mjs'],sources:originals.map(f=>({...f,sha256:digest(f.content)})),max_bytes:20000,max_attempts:2,timeout_ms:1000,max_output_bytes:10000,transport_max_characters:360000,expires_at:'2001-01-01T00:00:00.000Z',acceptance:'All scoped controlled code and strong assertions.',stop_conditions:'No execution or integration rights from review.',data_policy:'Synthetic controlled fixtures only.',output_format:'patches'};
+  if(delivery){const contact=name=>({host:'codex',session_id:'controlled-'+name,name});scope.delivery_contract=createDevelopmentDeliveryContract({records:{}},scope,{protocol:DEVELOPMENT_DELIVERY_CONTRACT_PROTOCOL,interfaces:[],dependency_refs:[],required_test_roots:scope.test_paths,integrator:contact('integrator'),observer:contact('observer'),installer:contact('installer')});}
   const patch={path:'value.mjs',base_sha256:digest(originals[1].content),edits:[{start:0,end:originals[1].content.length,text:files[1].content}]};
   const p={id:'plan',kind:'artifact',revision:1,status:'Draft',content:'Expired original controlled scope.',development:{type:'plan',scope,scope_sha256:hash(scope),attempts:['old-generation-1','producer']}};
   const producer={id:'producer',role:'engineer',instance_id:'engineer-original',native_id:'native-original',status:'completed',development_id:p.id,artifact_id:'candidate',inputs:[],supplemental_sources:[],coordination_release:{termination_confirmed:true,reason:'model_process_closed'}};
@@ -196,4 +203,36 @@ for(const layout of ['legacy','normalized'])for(const action of ['authorize_revi
     assert.throws(()=>developmentReviewContinuationAction(args,'codex'),/expired/);
   } finally {Date.now=now;Store.prototype.transaction=original;}
   assert.equal(crossed,true);assert.deepEqual(read(a),before);
+});
+
+test('new continuation acceptance retains its canonical report at its own home without rewriting the receipt',()=>{
+ const a=fixture(),target=authorized(a),key=queued(a,target),pair=closedPair(a,key);publish(a,pair);const before=read(a);
+ const accepted=developmentReviewContinuationAction({...a,action:'accept_review_continuation',target_id:target.id,target_sha256:hash(target),review_id:pair.record.id,candidate_sha256:target.development.proposal.subject.candidate_sha256,receipt_sha256:a.receipt_sha256},'codex'),s=read(a),report=accepted.development.acceptance_report;
+ assert.equal(report.protocol,DEVELOPMENT_ACCEPTANCE_REPORT_PROTOCOL);assert.equal(report.acceptance_kind,'review-continuation');assert.equal(accepted.development.acceptance_report_sha256,hash(report));
+ assert.deepEqual(s.records.receipt,before.records.receipt);assert.deepEqual(s.records.plan,before.records.plan);assert.deepEqual(s.jobs['prior-unknown'],before.jobs['prior-unknown']);assert.deepEqual(developmentDeliverySnapshotValue(s,report.receipt_before_acceptance),before.records.receipt);assert.equal(report.repository_head.status,'unobserved');
+ const args={root:a.root,session_id:a.session_id,epoch:a.epoch,action:'acceptance_report',plan_id:'plan',receipt_id:'receipt',acceptance_id:accepted.id};
+ const result=developmentDeliveryAction(args,'codex');assert.equal(result.status,'observed');assert.equal(result.report_sha256,accepted.development.acceptance_report_sha256);assert.equal(result.acceptance_id,accepted.id);assert.equal(result.source_integration,false);
+ const unchanged=read(a);assert.throws(()=>change(a,state=>acceptReviewContinuation(state,{...a,target_id:target.id,target_sha256:hash(target),review_id:pair.record.id,candidate_sha256:target.development.proposal.subject.candidate_sha256,receipt_sha256:a.receipt_sha256},a.root)),/already locally accepted/);assert.deepEqual(read(a),unchanged);
+ change(a,state=>{delete state.records[accepted.id].development.acceptance_report;delete state.records[accepted.id].development.acceptance_report_sha256;delete state.records[accepted.id].development.plan_id;});
+ const legacy=read(a),unavailable=developmentDeliveryAction(args,'codex');assert.equal(unavailable.reason,'legacy_continuation_acceptance_report_unavailable');assert.deepEqual(read(a),legacy);
+});
+
+for(const racedTransition of [false,true])test('real MCP oversized continuation acceptance preserves artifact facts'+(racedTransition?' while a real handoff precedes readback':' and exact immutable report handles'),async()=>{
+ const a=fixture({delivery:true});bind(a.root,a.session_id,'codex');
+ change(a,s=>{s.jobs['prior-unknown'].retained_diagnostic='z'.repeat(40000);s.records['failure-home'].content=JSON.stringify({canonical_public_terminal_job:{complete_data:{value:s.jobs['prior-unknown']}}});});a.prior_job_sha256=hash(read(a).jobs['prior-unknown']);
+ const target=authorized(a),key=queued(a,target),pair=closedPair(a,key);publish(a,pair);const before=read(a),args={root:a.root,session_id:a.session_id,epoch:a.epoch,action:'accept_review_continuation',target_id:target.id,target_sha256:hash(target),review_id:pair.record.id,candidate_sha256:target.development.proposal.subject.candidate_sha256,receipt_sha256:a.receipt_sha256};
+ const original=Store.prototype.readSnapshot;let result,transition;
+ try{
+  if(racedTransition)Store.prototype.readSnapshot=function(fn){if(this.inTransaction)return original.call(this,fn);const current=original.call(this,()=>this.read()),accepted=Object.values(current.records).find(r=>r.development?.type==='review_continuation_acceptance');if(accepted&&!transition){transition={pending:true};const selection={root:a.root,session_id:a.session_id,epoch:a.epoch,plan_id:'plan',receipt_id:'receipt',acceptance_id:accepted.id},inspection=developmentDeliveryAction({...selection,action:'delivery_inspect'},'codex'),record=read(a).records.contract;transition=developmentDeliveryAction({...selection,action:'delivery_transition',report_sha256:inspection.report_sha256,expected_handoff_sha256:inspection.handoff_sha256,transition_id:'controlled-raced-transition',to_stage:'integrator',reported_outcome:'completed',evidence_refs:[{id:record.id,revision:record.revision,sha256:hash(record)}],source_instruction:'Controlled attributable handoff observation between acceptance and public readback.'},'codex');}return original.call(this,fn);};
+  result=await call('company_develop',args,'codex');
+ }finally{Store.prototype.readSnapshot=original;}
+ const s=read(a),canonical=s.records[result.id],report=canonical.development.acceptance_report;
+ assert.equal(fits(canonical),false);assert.equal(fits(result),true);assert.ok(Buffer.byteLength(JSON.stringify(rpcReply(1,toolResult(result))))<65536);
+ const returnedHome=structuredClone(canonical);delete returnedHome.development.delivery;const expected=structuredClone(returnedHome);expected.development.acceptance_report=null;for(const [name,value]of Object.entries(expected))assert.deepEqual(result[name],value);
+ assert.equal(result.id,canonical.id);assert.equal(result.development.source_integrated,false);assert.equal(result.development.old_scope_unchanged,true);assert.equal(result.development.old_unknown_reservation_preserved,true);assert.equal(result.acceptance_report_inline,false);assert.equal(result.canonical_acceptance_record_sha256,hash(returnedHome));assert.equal(result.report_sha256,hash(report));assert.equal(result.development.acceptance_report_sha256,hash(report));
+ if(racedTransition){assert.equal(transition.current_receiver.stage,'integrator');assert.equal(canonical.development.delivery.transitions.length,1);assert.equal(result.acceptance_source,null);assert.equal(result.report_source,null);assert.match(result.readback_hold,/home changed after acceptance/);assert.notEqual(result.canonical_acceptance_record_sha256,hash(canonical));}
+ else{assert.deepEqual(result.acceptance_source.path_in_record,[]);assert.equal(result.acceptance_source.sha256,hash(canonical));assert.equal(result.acceptance_source.record.sha256,hash(canonical));assert.deepEqual(result.report_source.path_in_record,['development','acceptance_report']);assert.equal(result.report_source.sha256,hash(report));assert.equal(result.report_source.record.sha256,hash(canonical));}assert.match(result.retrieval,/do not repeat acceptance/i);
+ const reportSource=racedTransition?developmentDeliveryAction({root:a.root,session_id:a.session_id,epoch:a.epoch,action:'acceptance_report',plan_id:'plan',receipt_id:'receipt',acceptance_id:canonical.id},'codex').report_source:result.report_source;assert.deepEqual(await publicReport(a,reportSource),report);
+ assert.deepEqual(s.records.receipt,before.records.receipt);assert.deepEqual(s.records.plan,before.records.plan);assert.deepEqual(s.jobs['prior-unknown'],before.jobs['prior-unknown']);
+ await assert.rejects(call('company_develop',args,'codex'),/already locally accepted/);assert.deepEqual(read(a),s);
 });

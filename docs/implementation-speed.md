@@ -22,10 +22,32 @@ After the auto-merge policy merged in PR #70, the two owners coordinated a narro
 follow-up to `docs/ci.md` for sharding and qualification. Its auto-merge guidance
 is preserved verbatim; this is the only shared documentation path.
 
-The implementation tools below do not write company records, consume a review
-ticket, invoke a model, install a plugin, or adopt governance. Keep frozen exports
+The frozen-input CLI tools below do not write company records, consume a review
+ticket, invoke a model, install a plugin, or adopt governance. The runtime
+follow-ups use existing guarded transactions as described below. Keep frozen exports
 and raw company evidence outside the Git checkout. Publish only reviewed source,
 tests, and appropriately scoped evidence summaries.
+
+## Six runtime follow-ups
+
+The source implementation adds the following paths to the existing workflows.
+Component fixtures use controlled specialist outputs and do not establish
+native understanding, actual-company acceptance, adoption or measured speedup.
+
+| Follow-up | Implemented behavior | Evidence boundary |
+|---|---|---|
+| Admission preflight | Retention-review dispatch measures complete initial/history/final geometry before committing a queued job, session or one-use attempt. A hold rolls the transaction back. | Fresh current source, owner, authority, ticket, deadline, capacity and process guards remain mandatory. Ordinary and continuation review protocols retain their existing guards. |
+| Canonical acceptance | Guarded local acceptance creates one hash-bound report in its actual test receipt or new continuation acceptance home, retaining complete exact inputs, adverse history and clearing evidence. | The report records the successful existing gate; it cannot supply a verdict, authenticate a repository head or backfill a historical missing report. |
+| Frozen contracts | Optional complete development contracts bind interfaces, dependency snapshots, authorized test roots, independent-QA requirement and declared receivers/observer. | Source and dependency changes need the applicable new scope; declared contacts are not authenticated operators. |
+| Accountable handoffs | Compare-and-swap transitions reference that report and retain attributed evidence, with one current receiver and observer. | External outcomes remain operator-reported. Unknown/failed outcomes do not advance the receiver or authorize action. |
+| Exact structural reuse | Bounded process-local caching reuses only retention-review geometry for identical complete inputs, package dependencies, renderer policy and Node toolchain. | It never caches QA judgment, permission, current eligibility or process closure. |
+| Automatic observations | Read-only progress derives lifecycle timing and quality observations from complete canonical job/record snapshots. | Missing founder time, escaped defects, costs and unobserved phases stay unknown; recorded acceptance is not authenticated native quality. |
+
+The storage/continuity qualification chat owns its existing evidence and native
+qualification lane. These additions do not change the peer model, reader/layout,
+or the frozen D13 qualification oracle. The registered owner retains live company
+operations. See [delivery contracts and reports](development-delivery.md) and
+[the source architecture](architecture-current.md).
 
 ## Prepare once, then overlap independent work
 
@@ -57,6 +79,21 @@ native qualification. Source merge, installation, connected runtime behavior,
 and checked company adoption remain distinct.
 
 ## Review preflight
+
+Runtime retention-review admission now invokes the same pure geometry measurement
+used by the CLI. Complete frames must fit before the job and session become
+durable or the launch hook runs. Typed `REVIEW_PREFLIGHT_HELD` errors contain a
+bounded measured diagnostic. Its hash is an ephemeral commitment, with no
+persisted retrieval handle promised. Earlier canonical authority/deadline errors
+retain their original identities. No frame is shortened to obtain admission.
+
+Cache hits require an identical complete input hash and a manifest of the entire
+installed package, Node version/platform/architecture and execution options.
+Every lookup revalidates current sources and eligibility; the final commit guard
+checks the exact job/context, remaining window and loaded-package identity again.
+Changed on-disk package bytes require a runtime reload. No old loaded module can
+claim to have executed newly installed source. This cache covers deterministic
+geometry only; existing acceptance and semantic delivery validators still run.
 
 Use the read-only source utility on an explicitly supplied frozen JSON input:
 
@@ -149,6 +186,34 @@ receipt-producing workflows. A Linux aggregate job or sharded diagnostic log
 cannot be presented as a historical whole-suite macOS receipt.
 
 ## Measure elapsed time and rework
+
+Use `company_progress format: "observations"` with `root`, `session_id` and
+`recent_jobs: 1..50` to derive observations from the complete canonical read
+snapshot. Follow `next_cursor` until `complete`; changed source invalidates the
+cursor. This read does not reconcile jobs, stale reviews or modify company state.
+It includes separate notice retrieval. Observation pages are bounded to 25,000
+UTF-8 bytes before the small attention envelope and disclose omitted rows.
+
+For an explicit frozen export, without opening a live Store:
+
+```sh
+node tools/implementation-observations.mjs /absolute/path/to/frozen-observations.json
+```
+
+Use protocol `implementation-observations-input-v1`, complete `state.jobs` and
+`state.records`, and `origin` containing `observed_at`, exact
+`state_sha256: SHA256(JSON.stringify(state))`, and an explicit
+`collections_complete` declaration. Optional `options` contains `limit`,
+`offset` or `cursor`, `include_events` and explicit external observations.
+The CLI always labels origin `frozen-export`; hashes do not authenticate exporters.
+Canonical job/record timestamps automatically derive queue, preparation,
+execution, test, QA, acceptance and handoff windows. They are recorded wall-clock
+observations, not invented monotonic measurements. Software test launch through
+job completion includes controller overhead. No duration is advanced for an open
+span. External merge/install/defect/intervention observations need their own
+explicit source; an empty observation set is not a measured zero.
+
+The lower-level timing utility remains available for explicit phase observations:
 
 Use the timing report on explicit, attributable observations:
 

@@ -14,6 +14,7 @@ import { reconstructPatch, validText } from './development-patch.mjs';
 import {inheritSnapshots} from './snapshot.mjs';
 import {resourceClaims} from './state-projections.mjs';
 import { testFixtureIdentity, assertTestFixtureIdentity } from './test-fixtures.mjs';
+import {DEVELOPMENT_DELIVERY_ACTIONS,createDevelopmentDeliveryContract,validateDevelopmentDeliveryContract,createDevelopmentAcceptanceReport,developmentDeliveryAction} from './development-delivery.mjs';
 
 // A supported local executor, not a general permission to operate a business.
 // Preserve exact v0.18/v0.19/v0.20 contracts without adopting the installed instructions.
@@ -72,6 +73,7 @@ function planOf(s,key) {
 function authority(s,planId) {return digest(JSON.stringify({owner:s.owner,team:s.team_sha256,records:Object.values(s.records).filter(r=>['intent','decision'].includes(r.kind)&&!presentationOnly(r)&&relevantRecord(s,r,{role:'engineer',context_scope:planId}))}));}
 function authorized(s,p,root=process.cwd()) {
   const scope=p.development.scope;
+  validateDevelopmentDeliveryContract(s,scope);
   if(scope.test_fixture!==undefined)assertTestFixtureIdentity(scope.test_fixture);
   if(scope.max_bytes>developmentLimits(root).max_bytes)throw new Error("Configured development ceiling was lowered below this scope; restore configuration or prepare a smaller new scope");
   capable(s,root);
@@ -165,9 +167,12 @@ function verifyCandidate(root,p,c) {
   walk(dir);if(expected.size)throw new Error('Candidate files are missing');return dir;
 }
 export async function developmentAction(a,host,internal={}) {
+  if(Object.hasOwn(a,'delivery_contract')&&a.action!=='plan')throw Error('delivery_contract is selectable only when creating a development plan');
+  if(Object.hasOwn(a,'delivery_contract')&&a.delivery_contract===undefined)throw Error('delivery_contract must be an explicit complete contract');
   if(Object.hasOwn(a,'test_fixture')&&a.action!=='plan')throw Error('test_fixture is selectable only when creating a development plan');
   if(Object.hasOwn(a,'test_fixture')&&a.test_fixture===undefined)throw Error('test_fixture must be an explicit closed selector object');
   if(!Number.isInteger(a.epoch))throw new Error('Supply current ownership epoch');
+  if(DEVELOPMENT_DELIVERY_ACTIONS.includes(a.action))return developmentDeliveryAction(a,host);
   if(a.action==='inspect')return withStore(a.root,db=>{const s=db.read();owner(s,a.session_id,host,a.epoch);return {capability:developmentCapability(s,a.root),records:Object.values(s.records).filter(r=>r.development)};});
   if(a.action==='diagnose_preflight')return queueDiagnostic(a,host,internal);
   if(a.action==='recover_preflight')return queueRecovery(a,host,internal);
@@ -194,6 +199,7 @@ export async function developmentAction(a,host,internal={}) {
       const expires=Date.parse(a.expires_at);if(!Number.isFinite(expires)||expires<=Date.now()||expires>Date.now()+30*86400000)throw new Error('Expiry must be within thirty days');
       const scope={read_paths,write_paths,test_paths,sources,output_format,source_bytes,configured_ceiling:configuration.max_bytes,transport_max_characters:developmentTransportBudget(a.max_bytes),acceptance:requireText(a.acceptance,'acceptance'),stop_conditions:requireText(a.stop_conditions,'stop_conditions'),data_policy:requireText(a.data_policy,'data_policy'),source_instruction:a.source_instruction,
         max_attempts:a.max_attempts,timeout_ms:a.timeout_ms,max_output_bytes:a.max_output_bytes,max_bytes:a.max_bytes,expires_at:new Date(expires).toISOString(),test_runner:'node --test',network:false,source_integration:false,...(test_fixture?{test_fixture}:{})};
+      if(a.delivery_contract!==undefined)scope.delivery_contract=createDevelopmentDeliveryContract(s,scope,a.delivery_contract);
       const key=id('development');result=s.records[key]={id:key,kind:'artifact',author_role:'runner',author_instance:a.session_id,revision:1,status:'Draft',created_at:stamp(),content:'Bounded local development scope. Selected source contents will be shared with the host model. Original source stays unchanged; candidate edits and isolated Node tests only.',development:{type:'plan',scope,scope_sha256:digest(JSON.stringify(scope)),attempts:[]}};
     } else {
       const p=planOf(s,a.plan_id);
@@ -203,6 +209,7 @@ export async function developmentAction(a,host,internal={}) {
         if(s.paused||p.development.authorization||p.development.revoked)throw new Error('Scope is paused or already decided');
         if(a.scope_sha256!==p.development.scope_sha256 || a.model_data_approved!==true)throw new Error('Approve exact scope and model data sharing explicitly');
         if(Date.now()>=Date.parse(p.development.scope.expires_at))throw new Error('Scope expired');
+        validateDevelopmentDeliveryContract(s,p.development.scope);
         sourceMatches(a.root,p);const key=id('development-authorization');
         s.records[key]={id:key,kind:'decision',author_role:'human_founder',recorded_by:a.session_id,revision:1,status:'Recorded',content:requireText(a.source_instruction,'source_instruction'),scope_sha256:a.scope_sha256,plan_id:p.id,created_at:stamp()};
         p.development.authorization={decision_id:key,authority_sha256:authority(s,p.id)};result=p;
@@ -222,7 +229,9 @@ export async function developmentAction(a,host,internal={}) {
         if(Object.values(s.records).some(x=>x.kind==='review'&&x.status==='Submitted'&&x.review_of?.id===t.id&&['Fail','Blocked'].includes(x.review?.verdict)&&!retention?.clearedReviewIds.has(x.id)))throw new Error('This candidate has a failed/blocked review; repair under remaining scope');
         if(d.acceptance)throw new Error('Candidate was already accepted; inspect its receipt');
         const acceptedDirectory=candidateDir(a.root,p,c),acceptedAt=stamp();recoveryTime(p);
-        result=d.acceptance={at:acceptedAt,review_id:r.id,candidate_sha256:d.candidate_sha256,receipt_sha256:d.receipt_sha256,directory:acceptedDirectory,source_integrated:false,...(retention?{retention_repair:retention.binding}:{})};
+        const acceptance={at:acceptedAt,review_id:r.id,candidate_sha256:d.candidate_sha256,receipt_sha256:d.receipt_sha256,directory:acceptedDirectory,source_integrated:false,...(retention?{retention_repair:retention.binding}:{})};
+        const report=createDevelopmentAcceptanceReport(s,p,c,t,r,j,acceptance,{storageFormat:db.storageInfo().format});
+        result=d.acceptance={...acceptance,report:report.report,report_sha256:report.sha256};
         if(retentionControl){retentionControl.accepted_receipt_id=t.id;retentionControl.acceptance_sha256=digest(JSON.stringify(result));}
       } else throw new Error('Unknown development action');
     }
@@ -333,6 +342,7 @@ export const developmentReviewAuthority = authority;
 export function liveDevelopmentReviewSubject(s,a,root){const p=planOf(s,a.plan_id);authorized(s,p,root);return developmentReviewSubject(s,a,root);}
 export function developmentReviewSubject(s,a,root) {
   const p=planOf(s,a.plan_id),d=p.development,scope=d.scope;
+  validateDevelopmentDeliveryContract(s,scope);
   if(s.paused||d.revoked||!d.authorization)throw Error('Review subject is paused, revoked or lacks original authorization');
   if(scope.max_bytes>developmentLimits(root).max_bytes)throw Error('Review exceeds current configured ceiling');
   sourceMatches(root,p);

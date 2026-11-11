@@ -1,4 +1,5 @@
 import {outcomeSchema} from '../plugins/soloco/runtime/outcome.mjs';
+import {developmentDeliveryContractSchema,developmentDeliveryTransitionFields,boundedDevelopmentAcceptanceReply} from '../plugins/soloco/runtime/development-delivery.mjs';
 import * as scoped from '../plugins/soloco/runtime/scoped-context.mjs';
 import {operatingMaintenanceEligible} from '../plugins/soloco/runtime/operating-state.mjs';
 import test from 'node:test';
@@ -77,7 +78,7 @@ function harness(host='claude') {
     if(typeof value!=='string'||!value.trim()||value.length>max)throw new Error('Invalid '+label);
     return value;
   };
-  const deps={outcomeSchema,scoped,...coordination,...retentionRepair,operatingMaintenanceEligible,reviewContinuationAssignment,codeReviewWindowSubject,
+  const deps={outcomeSchema,developmentDeliveryContractSchema,developmentDeliveryTransitionFields,boundedDevelopmentAcceptanceReply,scoped,...coordination,...retentionRepair,operatingMaintenanceEligible,reviewContinuationAssignment,codeReviewWindowSubject,
     path,os:{homedir:()=>'/unused'},fs:{existsSync:()=>true},
     process:{cwd:()=>process.cwd(),env:{},execPath:'/unused/node',argv:[]},
     PACKAGE:'/unused',VERSION:'fixture',SCHEMA:2,
@@ -119,7 +120,7 @@ function harness(host='claude') {
     hooks:()=>{},upgrade:()=>{},upgradeGuidance:''
   };
   const engine=load('engine.mjs',deps,['dispatch']);
-  const main=load('main.mjs',{...deps,engine},['toolList','call']);
+  const main=load('main.mjs',{...deps,engine},['toolList','call','boundedDevelopmentAcceptanceReply']);
   const args={root:'/fixture',session_id:'founder',epoch:1,role:'engineer',task:'A bounded fixture assignment'};
   return {main,args,catalogs,launches,contexts,normalizations,transactions,
     call:settings=>main.call('company_dispatch',{...args,...settings},host),
@@ -129,6 +130,16 @@ function harness(host='claude') {
     finish:job=>{state.jobs[job.id].status='completed';state.sessions[job.session_key].native_id='native-fixture';}
   };
 }
+
+test('VM main binds the actual exported delivery schemas on both host selection paths',()=>{
+  for(const host of ['codex','claude']){
+    const h=harness(host),schema=plain(h.main.toolList.find(tool=>tool.name==='company_develop').inputSchema);
+    assert.equal(h.main.boundedDevelopmentAcceptanceReply,boundedDevelopmentAcceptanceReply);
+    assert.deepEqual(schema.properties.delivery_contract,developmentDeliveryContractSchema);
+    for(const [name,value]of Object.entries(developmentDeliveryTransitionFields))assert.deepEqual(schema.properties[name],value);
+    assert.equal(h.launches.length,0);assert.equal(h.catalogs.length,0);
+  }
+});
 
 test('dispatch schema admits only optional supported speed choices and preserves legacy requirements',()=>{
   const h=harness();

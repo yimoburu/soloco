@@ -26,6 +26,20 @@ contract or integration. A source or contract change requires affected-row revie
 
 ## Meaning of the assessments
 
+The source follow-ups based on main through PR #74 add automatic retention-review
+admission, exact deterministic geometry reuse, optional frozen delivery contracts,
+one canonical local acceptance report, attributed receiver transitions and
+read-only lifecycle observations. They support existing S014/S017/S028/S054,
+S058/S068/S070/S072/S074/S084/S086 without changing a normative row or adopting
+new company rules. Source/currentness and acceptance guards remain authoritative;
+reports, caches, declarations and timing cannot grant authority or supply native
+judgment. Their focused test roots are listed in
+[current capabilities](current-capabilities.md). Existing native and historical
+evidence below retains its original candidate and verdict. No new actual-company
+continuity, founder-benefit, installation or adoption claim follows from these
+source additions. See [implementation flow](implementation-speed.md) and
+[acceptance/handoff interfaces](development-delivery.md).
+
 - **Software**: a supported software invariant with executable checks; this does
   not assert that a model understood the evidence or made a sound business judgment.
 - **Judgment**: implemented in the CoS instructions/role charters, with mechanical
