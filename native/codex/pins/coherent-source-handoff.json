@@ -94,6 +94,18 @@
       "component": "root-original-renderer-empty-metadata-source-preparation-v1/ROOT-independent-renderer-repair-source-review-v1",
       "artifact": "review.DATA.json",
       "sha256": "f45561a9bb26b5bb5bda9c6153b2e0057d5f9f154de304defe7e5d7e928e2c37"
+    },
+    {
+      "order": 15,
+      "component": "root-original-provenance-test-compile-repairs-source-preparation-v1",
+      "artifact": "handoff.DATA.json",
+      "sha256": "9e7a6486b1b5ffac5740af36a8514d76989d2b16eeed1cc2e151d99284032f5c"
+    },
+    {
+      "order": 16,
+      "component": "root-original-provenance-test-compile-repairs-source-preparation-v1/ROOT-independent-test-compile-repair-source-review-v1",
+      "artifact": "review.DATA.json",
+      "sha256": "a70ba3f26439886b85f769544946693d6135b4102c87e03994b4ec864af14a9c"
     }
   ],
   "accepted_lock_sha256": "040a380b1611e90ccf63cdcefc1a2d215e229053181d8dee497c659a477f47ec",
@@ -105,7 +117,7 @@
   "format_source_cut_sha256": "3b0e077cc3e4a38e521c0d268efadaa7df309612622c951bf38fb229989db37d",
   "format_source_bindings_sha256": "536e8668778d2de23fba9a98a4772d15ef864069e66a3e1d3811399b60cee0b3",
   "format_source_materialization_sha256": "50297a1849fb5b6bf0539360088d81ef3db3e8beeea631d7b142b77dea858476",
-  "source_graph_vector_sha256": "f48b1619d8bf858c20583dacb718433955a2ebe3ae95977bb04cd1cde0538dd4",
+  "source_graph_vector_sha256": "59398124268e7be3f4dd32a1a18eb1878ffc922029e29ddc37d15fc01c3c5149",
   "source_format_delta": {
     "parent_portable_handoff_sha256": "c75ee77de8458c672622363bd02656e0a2075f67bdf5c2ba89aef40b7565edb4",
     "parent_coherent_handoff_sha256": "67ad9bf2fe5e16cc671a520b0af737b1dbfc430d3f2ed8d2f9184bf5b3524a23",
@@ -113,7 +125,7 @@
     "removed_ASCII_EOL_spaces": 18,
     "scope": "Only source-code trailing whitespace outside literals/comments; source-byte associations change and need their own qualification"
   },
-  "source_graph_bytes": 91882557,
+  "source_graph_bytes": 91884149,
   "eof_source_handoff_sha256": "db544a4699e562d8af4a1f128ac2769ef7b25813783a049933e1f35811765517",
   "lifetime_source_handoff_sha256": "34392507e7d695b4ef42bd74d422f48a213e302ef35dbc34e647c500ed5ae4b8",
   "lifetime_source_cut_sha256": "6e2764f7d19ee0e530fdd4aa08c4a9a0dfb2d35535cebff8e5d0a581d614d1a7",
@@ -137,5 +149,16 @@
     "source_confirmed_regression": "Clear only an existing harness metadata value; preserve absent metadata without a renderer capsule",
     "tests": "New ordinary None/no-capsule regression covers both history-route booleans; AUTHORED_UNRUN",
     "qualification": "Source repair only; failed runs remain failed; no ordinary/protected/native success inferred"
+  },
+  "test_compile_repair_handoff_sha256": "9e7a6486b1b5ffac5740af36a8514d76989d2b16eeed1cc2e151d99284032f5c",
+  "test_compile_repair_bindings_sha256": "26d78a0b321be19d97c5196c48b8ece0d92ca22495e27c9c52a4b674dd89ccc6",
+  "test_compile_repair_source_review_sha256": "a70ba3f26439886b85f769544946693d6135b4102c87e03994b4ec864af14a9c",
+  "test_compile_repair_scope": {
+    "source": "Exactly3 test-only files; all production source rows/modes unchanged from exactf48",
+    "changes": "Explicit existing assert_eq macro; real durable RolloutItemWire adapter; declared raw/prefix fixture bytes derive six ProjectDoc fields",
+    "assertions": "All prior assertions/test definitions retained; no new test cases; invalid UTF8 provenance assertion strengthened",
+    "prior_ordinary9": "Historical exactf48 ordinary production-library typecheck pass only; receipt prefix2874",
+    "prior_test_compile": "First8-library no-run failed11 actual cfg(test) errors; receipt715bc991dd38a20aade118c824084021fea42eedaa6c0f674d55c7b0cd22fc3c remains FAILED",
+    "new_graph": "Whole source/package/compiled-input association changes even with identical production bytes; new593 compilation/tests/native remain unproved"
   }
 }

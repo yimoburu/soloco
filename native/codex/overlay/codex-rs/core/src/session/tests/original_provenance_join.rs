@@ -1,6 +1,7 @@
 //! Controlled source integration only. No model is dispatched and the fixture's
 //! synthetic auth is not account/native qualification. Tests are authored UNRUN.
 use super::*;
+use pretty_assertions::assert_eq;
 use crate::original_instruction_renderer::{OriginalBaseSelection, original_renderer_frame, omit_plan_instructions};
 use crate::session::step_context::StepContext;
 use codex_protocol::models::BaseInstructionsProvenance;

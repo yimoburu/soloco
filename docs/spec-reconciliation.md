@@ -270,13 +270,29 @@ cleanup changing ordinary envelopes from absent metadata to an empty metadata
 value. Cleanup now clears only existing metadata; a new plain-envelope
 regression covers both history routes without supplying a renderer capsule.
 
-The current tuple contains 110 distinct authored Rust test definitions, all
-unrun. The package's 49 pure Python checks and source verification cover recipe
-integrity and explicit mocks; they establish no ordinary/protected Rust pass,
-qualified binary, account/OS acceptance or native CoS workflow. The repaired
-tuple still requires its affected compilation, tests and applicable independent
-acceptance. Prior failures retain their original results. This addition changes
-no normative SPEC row or adopted company rule.
+The ordinary check of all nine affected libraries passed on source vector
+`f48b1619d8bf858c20583dacb718433955a2ebe3ae95977bb04cd1cde0538dd4`.
+Both original processes closed, and complete source/toolchain integrity checks
+passed. The following eight-library test compilation with `--no-run` failed
+with eleven test-code errors: five ambiguous macro uses, two uses of an
+unsupported envelope serialization interface, and four project-document fixture
+initializers missing new provenance fields. The extension target did not start,
+and no Rust test executed.
+
+The repair changes only three test files. It explicitly imports the existing
+assertion macro, uses the real durable `RolloutItem` adapter, and derives fixture
+metadata from declared original and consumed bytes. Prior assertions and all
+110 authored definitions remain; the invalid-UTF-8 check is strengthened.
+Production source bytes remain unchanged. The complete input graph nevertheless
+has a new source vector, `59398124268e7be3f4dd32a1a18eb1878ffc922029e29ddc37d15fc01c3c5149`,
+and requires its own package and compiled-input manifest identities.
+
+The repaired package passed 49 pure Python checks and source verification.
+Those checks cover recipe integrity and explicit mocks. Rust test compilation,
+all 110 authored test cases, protected execution, a qualified executable and
+native CoS acceptance remain pending for this tuple. The separate live-history
+and context-handshake source work is outside this package. Prior failures retain
+their original results. No normative SPEC row or adopted company rule changes.
 
 ## Controlled P4 code acceptance
 

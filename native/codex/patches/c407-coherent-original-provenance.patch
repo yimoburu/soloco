@@ -3904,7 +3904,96 @@
          environment_id: String,
 --- a/codex-rs/core/src/agents_md_tests.rs
 +++ b/codex-rs/core/src/agents_md_tests.rs
-@@ -517,10 +517,7 @@
+@@ -402,12 +402,39 @@
+     }
+ }
+ 
+-fn project_provenance(path: AbsolutePathBuf, cwd: AbsolutePathBuf) -> InstructionProvenance {
++// Expected metadata comes only from declared fixture bytes, never loaded output.
++// Synthetic remote rendering fixtures do not mint an original runtime read witness.
++fn declared_project_provenance(
++    source_path: PathUri,
++    environment_id: &str,
++    cwd: PathUri,
++    original_bytes: &[u8],
++    consumed_bytes: &[u8],
++) -> InstructionProvenance {
++    assert!(original_bytes.starts_with(consumed_bytes));
+     InstructionProvenance::Project {
+-        source_path: PathUri::from_abs_path(&path),
+-        environment_id: "local".to_string(),
+-        cwd: PathUri::from_abs_path(&cwd),
+-    }
++        original_file_bytes_sha256: codex_api::protected_peer::source_bytes_sha256(original_bytes),
++        original_file_bytes: original_bytes.len(),
++        consumed_bytes_sha256: codex_api::protected_peer::source_bytes_sha256(consumed_bytes),
++        consumed_bytes: consumed_bytes.len(),
++        truncated: consumed_bytes.len() < original_bytes.len(),
++        decoded_lossy: std::str::from_utf8(consumed_bytes).is_err(),
++        source_path,
++        environment_id: environment_id.to_string(),
++        cwd,
++    }
++}
++
++fn project_provenance(
++    path: AbsolutePathBuf,
++    cwd: AbsolutePathBuf,
++    original_bytes: &[u8],
++    consumed_bytes: &[u8],
++) -> InstructionProvenance {
++    declared_project_provenance(
++        PathUri::from_abs_path(&path), "local", PathUri::from_abs_path(&cwd),
++        original_bytes, consumed_bytes,
++    )
+ }
+ 
+ #[test]
+@@ -429,11 +456,10 @@
+         thread_instructions: None,
+         entries: vec![InstructionEntry {
+             contents: "remote instructions".to_string(),
+-            provenance: InstructionProvenance::Project {
+-                source_path: source_path.clone(),
+-                environment_id: "remote".to_string(),
+-                cwd,
+-            },
++            provenance: declared_project_provenance(
++                source_path.clone(), "remote", cwd,
++                b"remote instructions", b"remote instructions",
++            ),
+         }],
+     };
+ 
+@@ -464,19 +490,17 @@
+         entries: vec![
+             InstructionEntry {
+                 contents: "POSIX instructions".to_string(),
+-                provenance: InstructionProvenance::Project {
+-                    source_path: posix_source.clone(),
+-                    environment_id: "posix".to_string(),
+-                    cwd: posix_cwd,
+-                },
++                provenance: declared_project_provenance(
++                    posix_source.clone(), "posix", posix_cwd,
++                    b"POSIX instructions", b"POSIX instructions",
++                ),
+             },
+             InstructionEntry {
+                 contents: "Windows instructions".to_string(),
+-                provenance: InstructionProvenance::Project {
+-                    source_path: windows_source.clone(),
+-                    environment_id: "windows".to_string(),
+-                    cwd: windows_cwd,
+-                },
++                provenance: declared_project_provenance(
++                    windows_source.clone(), "windows", windows_cwd,
++                    b"Windows instructions", b"Windows instructions",
++                ),
+             },
+         ],
+     };
+@@ -517,10 +541,7 @@
      config.cwd = root.abs();
      config.project_doc_max_bytes = limit;
  
@@ -3916,7 +4005,7 @@
      TestConfig {
          config,
          user_instructions,
-@@ -566,10 +563,7 @@
+@@ -566,10 +587,7 @@
  
      config.cwd = root.abs();
      config.project_doc_max_bytes = limit;
@@ -3928,7 +4017,55 @@
      TestConfig {
          config,
          user_instructions,
-@@ -1527,10 +1521,7 @@
+@@ -661,9 +679,17 @@
+     fs::write(&path, b"project\xFF doc").unwrap();
+ 
+     let config = make_config(&tmp, /*limit*/ 4096, /*instructions*/ None).await;
+-    let res = load_agents_md(&config).await.expect("doc expected").text();
++    let loaded = load_agents_md(&config).await.expect("doc expected");
++    let res = loaded.text();
+ 
+     assert_eq!(res, "project\u{FFFD} doc");
++    assert_eq!(loaded.entries, vec![InstructionEntry {
++        contents: "project\u{FFFD} doc".to_string(),
++        provenance: project_provenance(
++            config.cwd.join("AGENTS.md"), config.cwd.clone(),
++            b"project\xFF doc", b"project\xFF doc",
++        ),
++    }]);
+ }
+ 
+ /// Oversize file is truncated to `project_doc_max_bytes`.
+@@ -704,12 +730,12 @@
+                 contents: "root".to_string(),
+                 provenance: project_provenance(
+                     repo.path().join("AGENTS.md").abs(),
+-                    config.cwd.clone(),
++                    config.cwd.clone(), b"root", b"root",
+                 ),
+             },
+             InstructionEntry {
+                 contents: "abc".to_string(),
+-                provenance: project_provenance(config.cwd.join("AGENTS.md"), config.cwd.clone()),
++                provenance: project_provenance(config.cwd.join("AGENTS.md"), config.cwd.clone(), b"abcdef", b"abc"),
+             },
+         ],
+     };
+@@ -1395,11 +1421,11 @@
+         entries: vec![
+             InstructionEntry {
+                 contents: "root doc".to_string(),
+-                provenance: project_provenance(root_agents.clone(), cfg.cwd.clone()),
++                provenance: project_provenance(root_agents.clone(), cfg.cwd.clone(), b"root doc", b"root doc"),
+             },
+             InstructionEntry {
+                 contents: "crate doc".to_string(),
+-                provenance: project_provenance(crate_agents.clone(), cfg.cwd.clone()),
++                provenance: project_provenance(crate_agents.clone(), cfg.cwd.clone(), b"crate doc", b"crate doc"),
+             },
+         ],
+     };
+@@ -1527,14 +1553,11 @@
      let project_agents = cfg.cwd.join("AGENTS.md");
  
      let expected = LoadedAgentsMd {
@@ -3940,6 +4077,11 @@
          thread_instructions: None,
          entries: vec![InstructionEntry {
              contents: "project doc".to_string(),
+-            provenance: project_provenance(project_agents.clone(), cfg.cwd.clone()),
++            provenance: project_provenance(project_agents.clone(), cfg.cwd.clone(), b"project doc", b"project doc"),
+         }],
+     };
+     assert_eq!(loaded, expected);
 --- a/codex-rs/core/src/client.rs
 +++ b/codex-rs/core/src/client.rs
 @@ -208,6 +208,8 @@
@@ -5889,7 +6031,7 @@
 +mod tests;
 --- /dev/null
 +++ b/codex-rs/core/src/session/original_ingress/tests.rs
-@@ -0,0 +1,109 @@
+@@ -0,0 +1,113 @@
 +use super::*;
 +use codex_api::protected_peer::SourceRuntime;
 +use codex_protocol::models::ResponseItem;
@@ -5976,8 +6118,12 @@
 +    let mut duplicate = envelope("accepted once");
 +    ingress.bind_materialization(Some(1), &input("accepted once"), &mut duplicate).await;
 +    assert!(duplicate.metadata.as_ref().unwrap().original_session_ingress.is_none());
-+    let bytes = serde_json::to_vec(&original).unwrap();
-+    let mut restored: ResponseItemEnvelope = serde_json::from_slice(&bytes).unwrap();
++    let bytes = serde_json::to_vec(
++        &codex_history::RolloutItem::ResponseItem(original.clone()),
++    ).unwrap();
++    let codex_history::RolloutItem::ResponseItem(mut restored) =
++        serde_json::from_slice::<codex_history::RolloutItem>(&bytes).unwrap()
++    else { panic!("expected persisted response item"); };
 +    assert!(restored.metadata.as_ref().is_none_or(|metadata|metadata.original_session_ingress.is_none()));
 +    restored.observe_original_user_input(&input("accepted once"));
 +    restored.observe_original_prompt_projection();
@@ -6218,10 +6364,11 @@
 +mod original_provenance_join;
 --- /dev/null
 +++ b/codex-rs/core/src/session/tests/original_provenance_join.rs
-@@ -0,0 +1,142 @@
+@@ -0,0 +1,143 @@
 +//! Controlled source integration only. No model is dispatched and the fixture's
 +//! synthetic auth is not account/native qualification. Tests are authored UNRUN.
 +use super::*;
++use pretty_assertions::assert_eq;
 +use crate::original_instruction_renderer::{OriginalBaseSelection, original_renderer_frame, omit_plan_instructions};
 +use crate::session::step_context::StepContext;
 +use codex_protocol::models::BaseInstructionsProvenance;

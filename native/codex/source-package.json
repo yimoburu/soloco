@@ -27,18 +27,18 @@
   "source_cut": {
     "handoff": {
       "path": "pins/coherent-source-handoff.json",
-      "bytes": 7769,
-      "sha256": "a7198c0659acce9d99499d082def371cee8ee49eb33dbed606013ea609cd5d7b"
+      "bytes": 9515,
+      "sha256": "9f92fd23a62a289ce3efb64457ea6c1673f9a917c53da46ea5996e849d788cee"
     },
     "bindings": {
       "path": "pins/coherent-source-bindings.json",
       "bytes": 1950724,
-      "sha256": "031f4d0ba4c4e7ee86a7aeb5169aaf818afa30857c53cda9430a3c5e40981af8"
+      "sha256": "936b2121c99824969ee85e4bd45b74326b938b11217a3eea5a745a330884fccf"
     },
     "patch": {
       "path": "patches/c407-coherent-original-provenance.patch",
-      "bytes": 558678,
-      "sha256": "cb063e864722ef2f08e03ee4578b90bf13d400962771c455d0afb35503655d7e"
+      "bytes": 564571,
+      "sha256": "885c6eac41e0ac644086eb048d3003e8074ce90aee491e17e9208724d74f4004"
     },
     "review_state": "independent-review-required"
   },
@@ -448,8 +448,8 @@
       "before_sha256": "71c32ad8bc4cdfe79eb73da927d2e9dbb5426d7db714ab9dfdec4478d3fa3b12",
       "payload": {
         "path": "overlay/codex-rs/core/src/agents_md_tests.rs",
-        "bytes": 60432,
-        "sha256": "0b30618bb8d50b54cfa9b77d82bb0556bc7c77443120a79596520d237ea1820d"
+        "bytes": 61810,
+        "sha256": "a380d3812e15a8e951c3141ba3498d06ae28a21ac14118242a2ce6fc0c2b563d"
       },
       "mode": "100644"
     },
@@ -658,8 +658,8 @@
       "before_sha256": null,
       "payload": {
         "path": "overlay/codex-rs/core/src/session/original_ingress/tests.rs",
-        "bytes": 5861,
-        "sha256": "88086df5556f794b3dfa66047330da9240d4f3ce1b749be53b2f59fdbacec51d"
+        "bytes": 6041,
+        "sha256": "5605ed6b3c30c039b9ad7bbfdab96758d04d97daff10eabd65cc1b62b79e5c30"
       },
       "mode": "100644"
     },
@@ -718,8 +718,8 @@
       "before_sha256": null,
       "payload": {
         "path": "overlay/codex-rs/core/src/session/tests/original_provenance_join.rs",
-        "bytes": 8925,
-        "sha256": "7ed8fcfcbba6886f2c93b19a224aabbc7429c10586d7a09d6cd34552368dec44"
+        "bytes": 8959,
+        "sha256": "e5826e949da729598ba02970ad687f1a890fdeb96856d4e442989275730fb958"
       },
       "mode": "100644"
     },

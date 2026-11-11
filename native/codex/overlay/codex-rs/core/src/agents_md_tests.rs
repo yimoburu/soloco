@@ -402,12 +402,39 @@ fn resolved_local_environments<const N: usize>(
     }
 }
 
-fn project_provenance(path: AbsolutePathBuf, cwd: AbsolutePathBuf) -> InstructionProvenance {
+// Expected metadata comes only from declared fixture bytes, never loaded output.
+// Synthetic remote rendering fixtures do not mint an original runtime read witness.
+fn declared_project_provenance(
+    source_path: PathUri,
+    environment_id: &str,
+    cwd: PathUri,
+    original_bytes: &[u8],
+    consumed_bytes: &[u8],
+) -> InstructionProvenance {
+    assert!(original_bytes.starts_with(consumed_bytes));
     InstructionProvenance::Project {
-        source_path: PathUri::from_abs_path(&path),
-        environment_id: "local".to_string(),
-        cwd: PathUri::from_abs_path(&cwd),
+        original_file_bytes_sha256: codex_api::protected_peer::source_bytes_sha256(original_bytes),
+        original_file_bytes: original_bytes.len(),
+        consumed_bytes_sha256: codex_api::protected_peer::source_bytes_sha256(consumed_bytes),
+        consumed_bytes: consumed_bytes.len(),
+        truncated: consumed_bytes.len() < original_bytes.len(),
+        decoded_lossy: std::str::from_utf8(consumed_bytes).is_err(),
+        source_path,
+        environment_id: environment_id.to_string(),
+        cwd,
     }
+}
+
+fn project_provenance(
+    path: AbsolutePathBuf,
+    cwd: AbsolutePathBuf,
+    original_bytes: &[u8],
+    consumed_bytes: &[u8],
+) -> InstructionProvenance {
+    declared_project_provenance(
+        PathUri::from_abs_path(&path), "local", PathUri::from_abs_path(&cwd),
+        original_bytes, consumed_bytes,
+    )
 }
 
 #[test]
@@ -429,11 +456,10 @@ fn foreign_agents_md_uses_environment_native_paths() {
         thread_instructions: None,
         entries: vec![InstructionEntry {
             contents: "remote instructions".to_string(),
-            provenance: InstructionProvenance::Project {
-                source_path: source_path.clone(),
-                environment_id: "remote".to_string(),
-                cwd,
-            },
+            provenance: declared_project_provenance(
+                source_path.clone(), "remote", cwd,
+                b"remote instructions", b"remote instructions",
+            ),
         }],
     };
 
@@ -464,19 +490,17 @@ fn multi_environment_agents_md_renders_mixed_path_conventions() {
         entries: vec![
             InstructionEntry {
                 contents: "POSIX instructions".to_string(),
-                provenance: InstructionProvenance::Project {
-                    source_path: posix_source.clone(),
-                    environment_id: "posix".to_string(),
-                    cwd: posix_cwd,
-                },
+                provenance: declared_project_provenance(
+                    posix_source.clone(), "posix", posix_cwd,
+                    b"POSIX instructions", b"POSIX instructions",
+                ),
             },
             InstructionEntry {
                 contents: "Windows instructions".to_string(),
-                provenance: InstructionProvenance::Project {
-                    source_path: windows_source.clone(),
-                    environment_id: "windows".to_string(),
-                    cwd: windows_cwd,
-                },
+                provenance: declared_project_provenance(
+                    windows_source.clone(), "windows", windows_cwd,
+                    b"Windows instructions", b"Windows instructions",
+                ),
             },
         ],
     };
@@ -655,9 +679,17 @@ async fn project_doc_invalid_utf8_uses_lossy_text() {
     fs::write(&path, b"project\xFF doc").unwrap();
 
     let config = make_config(&tmp, /*limit*/ 4096, /*instructions*/ None).await;
-    let res = load_agents_md(&config).await.expect("doc expected").text();
+    let loaded = load_agents_md(&config).await.expect("doc expected");
+    let res = loaded.text();
 
     assert_eq!(res, "project\u{FFFD} doc");
+    assert_eq!(loaded.entries, vec![InstructionEntry {
+        contents: "project\u{FFFD} doc".to_string(),
+        provenance: project_provenance(
+            config.cwd.join("AGENTS.md"), config.cwd.clone(),
+            b"project\xFF doc", b"project\xFF doc",
+        ),
+    }]);
 }
 
 /// Oversize file is truncated to `project_doc_max_bytes`.
@@ -698,12 +730,12 @@ async fn total_byte_limit_truncates_later_project_docs() {
                 contents: "root".to_string(),
                 provenance: project_provenance(
                     repo.path().join("AGENTS.md").abs(),
-                    config.cwd.clone(),
+                    config.cwd.clone(), b"root", b"root",
                 ),
             },
             InstructionEntry {
                 contents: "abc".to_string(),
-                provenance: project_provenance(config.cwd.join("AGENTS.md"), config.cwd.clone()),
+                provenance: project_provenance(config.cwd.join("AGENTS.md"), config.cwd.clone(), b"abcdef", b"abc"),
             },
         ],
     };
@@ -1389,11 +1421,11 @@ async fn concatenates_root_and_cwd_docs() {
         entries: vec![
             InstructionEntry {
                 contents: "root doc".to_string(),
-                provenance: project_provenance(root_agents.clone(), cfg.cwd.clone()),
+                provenance: project_provenance(root_agents.clone(), cfg.cwd.clone(), b"root doc", b"root doc"),
             },
             InstructionEntry {
                 contents: "crate doc".to_string(),
-                provenance: project_provenance(crate_agents.clone(), cfg.cwd.clone()),
+                provenance: project_provenance(crate_agents.clone(), cfg.cwd.clone(), b"crate doc", b"crate doc"),
             },
         ],
     };
@@ -1525,7 +1557,7 @@ async fn instruction_sources_include_global_before_agents_md_docs() {
         thread_instructions: None,
         entries: vec![InstructionEntry {
             contents: "project doc".to_string(),
-            provenance: project_provenance(project_agents.clone(), cfg.cwd.clone()),
+            provenance: project_provenance(project_agents.clone(), cfg.cwd.clone(), b"project doc", b"project doc"),
         }],
     };
     assert_eq!(loaded, expected);

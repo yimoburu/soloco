@@ -84,8 +84,12 @@ async fn one_accepted_occurrence_cannot_be_consumed_twice_or_rebuilt_from_replay
     let mut duplicate = envelope("accepted once");
     ingress.bind_materialization(Some(1), &input("accepted once"), &mut duplicate).await;
     assert!(duplicate.metadata.as_ref().unwrap().original_session_ingress.is_none());
-    let bytes = serde_json::to_vec(&original).unwrap();
-    let mut restored: ResponseItemEnvelope = serde_json::from_slice(&bytes).unwrap();
+    let bytes = serde_json::to_vec(
+        &codex_history::RolloutItem::ResponseItem(original.clone()),
+    ).unwrap();
+    let codex_history::RolloutItem::ResponseItem(mut restored) =
+        serde_json::from_slice::<codex_history::RolloutItem>(&bytes).unwrap()
+    else { panic!("expected persisted response item"); };
     assert!(restored.metadata.as_ref().is_none_or(|metadata|metadata.original_session_ingress.is_none()));
     restored.observe_original_user_input(&input("accepted once"));
     restored.observe_original_prompt_projection();
