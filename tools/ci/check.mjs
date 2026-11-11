@@ -3,17 +3,18 @@ import {fileURLToPath} from 'node:url';
 import {inventory,lanes,requireThat,selectedTests} from './evidence.mjs';
 import {sandboxCapability} from '../../plugins/soloco/runtime/local-sandbox.mjs';
 import {selectShard} from './shards.mjs';
+import {selectQualificationShard,qualificationPrelude} from './qualification-shards.mjs';
 
 // Ordinary CI and local checks use command results. Provenance receipts are optional.
 export function check(lane,root=process.cwd(),probe=sandboxCapability,{shard}={}) {
   requireThat(lanes.includes(lane),'unknown check lane');
-  requireThat(shard===undefined||lane==='regression-22','sharding is supported only for regression-22');
+  requireThat(shard===undefined||['regression-22','tests-22'].includes(lane),'sharding is supported only for regression-22 or tests-22');
   let tests=lane==='build'?[]:selectedTests(lane,inventory(root));
   requireThat(lane==='build'||tests.length>0,'no tests selected');
   if(shard!==undefined) {
-    const selected=selectShard(tests,shard);
+    const selected=lane==='tests-22'?selectQualificationShard(tests,shard):selectShard(tests,shard);
     tests=selected.files;
-    console.log(`CI shard ${selected.index}/${selected.total}: ${tests.length}/${selected.selected_total} whole test files; selected inventory sha256=${selected.inventory_sha256}`);
+    console.log(lane==='tests-22'?qualificationPrelude(selected):`CI shard ${selected.index}/${selected.total}: ${tests.length}/${selected.selected_total} whole test files; selected inventory sha256=${selected.inventory_sha256}`);
   }
   if(lane!=='build') {
     const capability=probe();
