@@ -138,8 +138,15 @@ test('stream byte ceiling closes a valid synthetic tunnel rather than clipping o
   const broker=await createForTest(settings(),()=>net.connect({host:'127.0.0.1',port}));t.after(()=>broker.close());
   const client=await connect(broker.port);client.on('data',()=>{});client.write(request());
   await until(()=>broker.inspect().connections[0]?.outcome==='TUNNELED');
-  const ended=once(client,'close');client.end(Buffer.alloc(4*1024*1024+1,0x16));await ended;
+  // Destroying an over-limit tunnel can produce ECONNRESET before close. The
+  // close observation must survive that expected error; events.once(close)
+  // rejects on error even when the socket already has an error listener.
+  const errors=[];client.on('error',error=>errors.push(error.code));
+  const ended=new Promise(resolve=>client.once('close',resolve));
+  client.end(Buffer.alloc(4*1024*1024+1,0x16));await ended;
+  assert.ok(errors.every(code=>code==='ECONNRESET'),'only the expected limit-close reset is permitted');
   assert.equal(broker.inspect().connections[0].outcome,'stream-limit');assert.ok(received<4*1024*1024+1);
+  assert.equal((await broker.close()).local_tcp_closure,'OBSERVED');
 });
 
 test('absolute deadline includes startup and destroys retained owned TCP sockets',async t=>{
