@@ -4,6 +4,13 @@ The component library separates an inspectable build artifact from an executable
 deployment or active interpreter. It is not routed through company tools, and
 does not enable peer operation or supply execution permission.
 
+This developer library requires a complete repository checkout, including
+`tools/build-peer-context.mjs` and `native/codex`; importing it from an installed
+plugin alone is unsupported. The fixed original producer targets macOS arm64
+with Node 22 and requires its exact prepared source, pinned toolchain and Cargo
+cache under `work/peer-context-component`. Missing prerequisites produce a Hold;
+inspection does not provision them or start a build.
+
 `context-build-component.mjs` retains the original source-owned build operation,
 durable intent and selected capsule. `lookupOriginalSelectedContextComponentData()`
 accepts no arguments and returns an opaque, module-local DATA handle only after
