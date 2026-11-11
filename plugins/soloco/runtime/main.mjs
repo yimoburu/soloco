@@ -96,7 +96,9 @@ export async function call(name,args,host) {
   if(name==='company_handover'&&args.action==='read')throw Error('Exact handover range exceeds the public reply budget; no range delivered. Request a smaller length using the same subject/source/hash/offset.');
   // The operation already returned successfully. Never turn an oversized receipt
   // into an error inviting a duplicate mutation. Expose persisted truth instead.
-  const readOnly=['company_doctor','company_progress'].includes(name)||['inspect','read','prepare_retention_review','prepare_review_continuation','acceptance_report','delivery_inspect'].includes(args.action);
+  const readOnly=['company_doctor','company_progress'].includes(name)||['inspect','read','prepare_retention_review','prepare_review_continuation','acceptance_report','delivery_inspect'].includes(args.action)
+    ||name==='company_tasks'&&['context','checkpoint','inbox'].includes(args.action)
+    ||name==='company_runtime'&&args.action==='status';
   if(readOnly) {
     if(['company_develop','company_prototype'].includes(name)) {
       const compact={response_format:'soloco-current-v2',capability:result.capability,records:engine.inspectionPage(args,host,name==='company_develop'?'development':'prototype_plans'),retrieval:'Follow company_context inspect collection/next_cursor, then exact read of each source.'};
