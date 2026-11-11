@@ -8,7 +8,7 @@ establish an independently accepted executable.
 `source-package.json` pins OpenAI Codex commit
 `c40729ea5cf8e947481b130c59807273eda2f8e9`, tree
 `078c14cecf94b522a2eff48b30996bf3f4d1bf7a`, its 9,264 regular Rust source files,
-the exact 151-file coherent overlay, accepted Cargo lock 040a,
+the exact 152-file coherent overlay, accepted Cargo lock 040a,
 and the official 153-file Rust 1.95.0 macOS arm64 toolchain.
 The complete reconstructed graph has 9307 logical files. The
 source-owned overlay count is exact; missing and excess entries hold.
@@ -17,10 +17,10 @@ byte commitment and logical executable distinction. The portable lineage
 record retains the original frozen source cuts and ordered composition hashes.
 The prior package 6f5 is historical and does not qualify this graph.
 
-The current graph has 9,307 files and 92,049,728 bytes, with source vector
-`ae174eeb450a3ceafafe4a6ebadf59b0eb71477098afaedfa1a27078fb92c693`.
+The current graph has 9,307 files and 92,049,762 bytes, with source vector
+`a558137845eb0e49259ffc67408e3ac4edbeb273d57a37fe687fbd7b1294f56f`.
 Its source-package digest is
-`4453e55b86e607fecc2383fe2643b281a01e482df5872564ea3294f29edd680e`.
+`cd43a6ff2b6564bfc2c1c2d8eec76f1d4498375696578970b533343c5f65e351`.
 
 See [the native peer source profile](../../docs/native-peer-source-profile.md)
 for the genuine explicit nonincremental RLite source path, supported original
@@ -152,3 +152,10 @@ owner through the projection assertion. All production bytes, assertions and 163
 authored definitions are preserved. The closed 009/V5 and 009/V6 failures remain historical.
 A runner ancestor-permission failure is separate. No Rust/compiler/native result,
 new 49-case Python receipt, compiled binary or runtime slot is established here.
+
+An additional legacy plan-mode fixture passes `None` for the new optional original
+response argument: its fabricated assistant item has no original response receipt.
+Production calls and all assertions remain unchanged. The previous ae174 graph's
+ordinary test compilation failed at this missing argument before the extension or
+companion-bin harness phases started; no Rust tests ran. That failed build and its
+completed integrity checks remain historical in the reconciliation record.

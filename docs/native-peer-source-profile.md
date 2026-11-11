@@ -100,14 +100,18 @@ the exact context contract, and installs the private decoder before spawning the
 runtime. Native observations describe native-owned facts. Node interpreter and
 source facts require a separate source-owned association.
 
-The current source graph has 151 overlays, 9,307 logical files and 92,049,728 bytes,
+The current source graph has 152 overlays, 9,307 logical files and 92,049,762 bytes,
 with source vector
-`ae174eeb450a3ceafafe4a6ebadf59b0eb71477098afaedfa1a27078fb92c693` and package
-`4453e55b86e607fecc2383fe2643b281a01e482df5872564ea3294f29edd680e`.
+`a558137845eb0e49259ffc67408e3ac4edbeb273d57a37fe687fbd7b1294f56f` and package
+`cd43a6ff2b6564bfc2c1c2d8eec76f1d4498375696578970b533343c5f65e351`.
 Three fixture repairs use the existing managed-config isolation helper for initial
 configuration and reload, isolate the provider fixture, and retain the positive
 API fixture's strong owner while preserving its production Weak checks.
 Production bytes and all 163 authored definitions and assertions are unchanged.
+An additional legacy plan-mode fixture supplies the missing optional original
+response argument as `None`, preserving its actual lack of an original receipt.
+The earlier ae174 test compilation failed at this call; that failure and its
+completed integrity checks remain historical in the reconciliation record.
 
 This exact graph awaits Rust compilation and test execution; all 163 authored
 definitions remain UNRUN for it. Earlier 009 compilation and failed execution

@@ -27,18 +27,18 @@
   "source_cut": {
     "handoff": {
       "path": "pins/coherent-source-handoff.json",
-      "bytes": 15853,
-      "sha256": "9f42c51e59d782d440c1753d8c0c9ca8f6e53f630462869dddd65cdcf53bc5cf"
+      "bytes": 17146,
+      "sha256": "aa384aecae329a4ff5a90e8cf1488e4ad4e1dd289381407112cdac46805f9946"
     },
     "bindings": {
       "path": "pins/coherent-source-bindings.json",
       "bytes": 1953423,
-      "sha256": "c1a025c4bcade4ece116dc5a3d8a2aa69507bcc28824cd11a9b23304dda0d290"
+      "sha256": "609fb408adf68e632b04dd2dee5897c397327d0ab28570a8864a085d14cac246"
     },
     "patch": {
       "path": "patches/c407-coherent-original-provenance.patch",
-      "bytes": 730838,
-      "sha256": "f77200aa1215ca0e9aea8f316775aefe6db6060099cd9a513debd337f74ecaa6"
+      "bytes": 731102,
+      "sha256": "17a25a5efc3189443b182b7ea041f0986c2be77fe7152fd3f4def157a40a652a"
     },
     "review_state": "independent-review-required"
   },
@@ -970,6 +970,16 @@
         "path": "overlay/codex-rs/core/src/session/turn_input.rs",
         "bytes": 38980,
         "sha256": "371fd31ea9e03b1bf856cd9545d9d8aec20f760e6978eb174ce203318808626d"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/core/src/session/turn_tests.rs",
+      "before_sha256": "9321640d9dbb8914c5506bab919398a5007e510e9b5052bf7a83486805de70c3",
+      "payload": {
+        "path": "overlay/codex-rs/core/src/session/turn_tests.rs",
+        "bytes": 4338,
+        "sha256": "b5c6b3ff00ea69f4512422401f426ec6c5e44f90dd0f073139cb90893275ae2c"
       },
       "mode": "100644"
     },

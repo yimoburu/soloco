@@ -160,6 +160,12 @@
       "component": "root-native927-test-fixture-reconciliation-source-preparation-v1",
       "artifact": "handoff.DATA.json",
       "sha256": "2bf25a1a0b15b8e686476ce5ce9234c6a10af1223898e937a1d74b374b9ff29b"
+    },
+    {
+      "order": 26,
+      "component": "root-native-plan-mode-original-output-fixture-source-preparation-v1",
+      "artifact": "handoff.DATA.json",
+      "sha256": "1f65dddec573879785ce5d62a5e2045752d8238f1d96727f96564dd42ac98e0d"
     }
   ],
   "accepted_lock_sha256": "040a380b1611e90ccf63cdcefc1a2d215e229053181d8dee497c659a477f47ec",
@@ -171,7 +177,7 @@
   "format_source_cut_sha256": "3b0e077cc3e4a38e521c0d268efadaa7df309612622c951bf38fb229989db37d",
   "format_source_bindings_sha256": "536e8668778d2de23fba9a98a4772d15ef864069e66a3e1d3811399b60cee0b3",
   "format_source_materialization_sha256": "50297a1849fb5b6bf0539360088d81ef3db3e8beeea631d7b142b77dea858476",
-  "source_graph_vector_sha256": "ae174eeb450a3ceafafe4a6ebadf59b0eb71477098afaedfa1a27078fb92c693",
+  "source_graph_vector_sha256": "a558137845eb0e49259ffc67408e3ac4edbeb273d57a37fe687fbd7b1294f56f",
   "source_format_delta": {
     "parent_portable_handoff_sha256": "c75ee77de8458c672622363bd02656e0a2075f67bdf5c2ba89aef40b7565edb4",
     "parent_coherent_handoff_sha256": "67ad9bf2fe5e16cc671a520b0af737b1dbfc430d3f2ed8d2f9184bf5b3524a23",
@@ -179,13 +185,13 @@
     "removed_ASCII_EOL_spaces": 18,
     "scope": "Only source-code trailing whitespace outside literals/comments; source-byte associations change and need their own qualification"
   },
-  "source_graph_bytes": 92049728,
+  "source_graph_bytes": 92049762,
   "eof_source_handoff_sha256": "db544a4699e562d8af4a1f128ac2769ef7b25813783a049933e1f35811765517",
   "lifetime_source_handoff_sha256": "34392507e7d695b4ef42bd74d422f48a213e302ef35dbc34e647c500ed5ae4b8",
   "lifetime_source_cut_sha256": "6e2764f7d19ee0e530fdd4aa08c4a9a0dfb2d35535cebff8e5d0a581d614d1a7",
   "lifetime_source_bindings_sha256": "e20ab6c6a62d2af182a81ca1d1190fe0a4b5aaa30d2dde557e285cebfc90273c",
   "lifetime_source_materialization_sha256": "97d4d6659e2b4cfeed41d9db35c6a463e8074f4fbeb34a7bb85951a4d94d692c",
-  "distinct_authored_rust_tests_manifest_sha256": "fbb9877c1876c67009b76bda56e453bcaefda06537675a3eef316458e6694543",
+  "distinct_authored_rust_tests_manifest_sha256": "e5f8e7e9391ad66e7be31f60908d523ab88479561aafee637674b89a52539a07",
   "source_repair": {
     "parent_portable_handoff_sha256": "c0672a939f0941471e07b0249cb4841052d3b4f3fa502c72b67b85ecb1e7a608",
     "EOF": "One extra final LF removed from rollout_decode.rs; retain one final LF",
@@ -215,9 +221,9 @@
     "prior_test_compile": "First8-library no-run failed11 actual cfg(test) errors; receipt715bc991dd38a20aade118c824084021fea42eedaa6c0f674d55c7b0cd22fc3c remains FAILED",
     "new_graph": "Whole source/package/compiled-input association changes even with identical production bytes; new593 compilation/tests/native remain unproved"
   },
-  "continuation_source_handoff_sha256": "2bf25a1a0b15b8e686476ce5ce9234c6a10af1223898e937a1d74b374b9ff29b",
-  "continuation_source_bindings_sha256": "998121ae0fcd7a443efb1296989125272a1c5837e26ba7b29c3cb8d9ece1decd",
-  "continuation_source_materialization_sha256": "d35158d3b0be182cbf81687dd45ed1ed8d6e2c2a411a1fa98f257588401de2e4",
+  "continuation_source_handoff_sha256": "1f65dddec573879785ce5d62a5e2045752d8238f1d96727f96564dd42ac98e0d",
+  "continuation_source_bindings_sha256": "3fe21e4766c62eef21d8efeda8352728f5c9ae7e0339185fc43bf37f7785133b",
+  "continuation_source_materialization_sha256": "1d77d5f6458a683b798f7c8c22f6b76730ad4b309b1a77aaa536b092e30633fd",
   "continuation_boundary": {
     "source_mechanics": "Original protected logical-SSE/typed-item lineage; fixed-five actual pending/decoder return; same-owner post-effective v5 context handshake; fresh later-step projection retains source while requiring new send guards",
     "resource_sha256": "832fdd1c965fa0e834c030f7c1e5636e2f32636b0df899ba8aa0fa940e9032fc",
@@ -253,5 +259,15 @@
     "scope": "Three existing test fixtures only: one identical existing managed-config isolation override through initial builder and subsequent loads; one thread-provider fixture override; one positive API owner clone retaining the caller owner. Zero production bytes, unchanged assertions/definitions, no production lifetime weakening.",
     "closed_V6_evidence": "009 appserver432pass/6fail; API231pass/1fail. Five managed-preferences failures and one dropped-positive-owner failure. Separate EPERM ancestor-grant gap belongs to runner; no Rust fix. Old graph/evidence preserved and cannot regain Pass from this new source preparation.",
     "qualification": "Source only. No new49Python tests, Rust compiler/tests, native model or runtime-slot acceptance. Old compiled-manifest data is historical, not this tuple."
+  },
+  "plan_mode_original_output_test_fixture": {
+    "parent_package_handoff_sha256": "94c930c34a10754ee1a35100cb3aeb59d031e6dab98985847b4cd7f44e066b2e",
+    "source_handoff_sha256": "1f65dddec573879785ce5d62a5e2045752d8238f1d96727f96564dd42ac98e0d",
+    "source_bindings_sha256": "3fe21e4766c62eef21d8efeda8352728f5c9ae7e0339185fc43bf37f7785133b",
+    "source_materialization_sha256": "1d77d5f6458a683b798f7c8c22f6b76730ad4b309b1a77aaa536b092e30633fd",
+    "scope": "One legacy plan-mode fixture explicitly passes None for absent OriginalResponseItem. Only +34bytes in one existing testfile; production/assertions/163definitions unchanged. Actual productioncall already carries original_output.clone().",
+    "failure": "Actual ae174 first13Cargo failedE0061 atturn_tests.rs79; oldsource/failure retained. No physicalworkingcopy change, compiler retry or new qualification from this preparation.",
+    "all_canonical_Core_calls_checked_once": 627,
+    "qualification": "Source only; no new49receipt, Rustcompiler/tests/native acceptance or slot"
   }
 }

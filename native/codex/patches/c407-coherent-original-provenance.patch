@@ -9722,6 +9722,16 @@
          },
          SubmittedTurnInput::ResponseItem(item)
          | SubmittedTurnInput::AnnotatedResponseItem(AnnotatedResponseItem { item, .. })
+--- a/codex-rs/core/src/session/turn_tests.rs
++++ b/codex-rs/core/src/session/turn_tests.rs
+@@ -84,6 +84,7 @@
+         &mut state,
+         /*previously_active_item*/ None,
+         &mut last_agent_message,
++        /*original_output*/ None,
+     )
+     .await;
+ 
 --- a/codex-rs/core/src/session/world_state.rs
 +++ b/codex-rs/core/src/session/world_state.rs
 @@ -389,7 +389,7 @@

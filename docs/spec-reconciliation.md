@@ -619,15 +619,28 @@ acceptance gaps or establish actual-company adoption.
 The separate continuation change implements source mechanics for live response
 and fixed-tool history, and context acknowledgement by the same scoped owner.
 It preserves private origin checks, exact supported wire mappings, fresh send
-fences and uncertain outcomes. The current package contains 151 overlays and
-9,307 logical Rust files, totaling 92,049,728 bytes, with source vector
-`ae174eeb450a3ceafafe4a6ebadf59b0eb71477098afaedfa1a27078fb92c693` and package digest
-`4453e55b86e607fecc2383fe2643b281a01e482df5872564ea3294f29edd680e`.
+fences and uncertain outcomes. The current package contains 152 overlays and
+9,307 logical Rust files, totaling 92,049,762 bytes, with source vector
+`a558137845eb0e49259ffc67408e3ac4edbeb273d57a37fe687fbd7b1294f56f` and package digest
+`cd43a6ff2b6564bfc2c1c2d8eec76f1d4498375696578970b533343c5f65e351`.
+
+The preceding continuation graph, vector
+`ae174eeb450a3ceafafe4a6ebadf59b0eb71477098afaedfa1a27078fb92c693` with package
+`4453e55b86e607fecc2383fe2643b281a01e482df5872564ea3294f29edd680e`, failed its
+first ordinary test-compilation group with one E0061 error: a legacy plan-mode
+test supplied seven arguments after its callee gained an eighth optional original
+response argument. The extension and companion-bin harness phases did not start,
+and no Rust tests executed. All original processes closed; source, toolchain and
+platform postchecks passed. The retained failed receipt is
+`38bffa3a96bb4462b15a50ec9d716c9475e2390eebd208c5302592eb9daf9aaf`.
 
 Its three test-fixture changes carry the existing managed-config isolation
 override through initial configuration and reload, use that helper for the
 provider fixture, and retain the positive API fixture's real caller owner.
 Production source, all assertions and all 163 authored definitions remain intact.
+The additional legacy plan-mode fixture now passes `None` for that optional
+argument: it has no original response receipt. Actual production calls already
+pass their captured original output; production provenance guards are unchanged.
 This exact graph has not been compiled or tested; its 163 authored definitions
 remain UNRUN. Earlier graph hashes and receipts above retain their historical
 scope and do not qualify it. Its source-only verifier exited successfully; the
