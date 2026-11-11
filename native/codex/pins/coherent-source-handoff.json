@@ -106,6 +106,12 @@
       "component": "root-original-provenance-test-compile-repairs-source-preparation-v1/ROOT-independent-test-compile-repair-source-review-v1",
       "artifact": "review.DATA.json",
       "sha256": "a70ba3f26439886b85f769544946693d6135b4102c87e03994b4ec864af14a9c"
+    },
+    {
+      "order": 17,
+      "component": "root-original-history-witness-test-compile-repair-source-preparation-v1",
+      "artifact": "handoff.DATA.json",
+      "sha256": "7c0f6e1e6114c9d0784d53c83f6860afeb0c05939fe8d12d7208129dcfc08428"
     }
   ],
   "accepted_lock_sha256": "040a380b1611e90ccf63cdcefc1a2d215e229053181d8dee497c659a477f47ec",
@@ -117,7 +123,7 @@
   "format_source_cut_sha256": "3b0e077cc3e4a38e521c0d268efadaa7df309612622c951bf38fb229989db37d",
   "format_source_bindings_sha256": "536e8668778d2de23fba9a98a4772d15ef864069e66a3e1d3811399b60cee0b3",
   "format_source_materialization_sha256": "50297a1849fb5b6bf0539360088d81ef3db3e8beeea631d7b142b77dea858476",
-  "source_graph_vector_sha256": "59398124268e7be3f4dd32a1a18eb1878ffc922029e29ddc37d15fc01c3c5149",
+  "source_graph_vector_sha256": "009d905360ddd1a900947dcf12fdfa656e2a64e1fed14f7aa51780aff92f77e5",
   "source_format_delta": {
     "parent_portable_handoff_sha256": "c75ee77de8458c672622363bd02656e0a2075f67bdf5c2ba89aef40b7565edb4",
     "parent_coherent_handoff_sha256": "67ad9bf2fe5e16cc671a520b0af737b1dbfc430d3f2ed8d2f9184bf5b3524a23",
@@ -125,7 +131,7 @@
     "removed_ASCII_EOL_spaces": 18,
     "scope": "Only source-code trailing whitespace outside literals/comments; source-byte associations change and need their own qualification"
   },
-  "source_graph_bytes": 91884149,
+  "source_graph_bytes": 91884290,
   "eof_source_handoff_sha256": "db544a4699e562d8af4a1f128ac2769ef7b25813783a049933e1f35811765517",
   "lifetime_source_handoff_sha256": "34392507e7d695b4ef42bd74d422f48a213e302ef35dbc34e647c500ed5ae4b8",
   "lifetime_source_cut_sha256": "6e2764f7d19ee0e530fdd4aa08c4a9a0dfb2d35535cebff8e5d0a581d614d1a7",
@@ -160,5 +166,14 @@
     "prior_ordinary9": "Historical exactf48 ordinary production-library typecheck pass only; receipt prefix2874",
     "prior_test_compile": "First8-library no-run failed11 actual cfg(test) errors; receipt715bc991dd38a20aade118c824084021fea42eedaa6c0f674d55c7b0cd22fc3c remains FAILED",
     "new_graph": "Whole source/package/compiled-input association changes even with identical production bytes; new593 compilation/tests/native remain unproved"
+  },
+  "history_witness_wire_test_repair_handoff_sha256": "7c0f6e1e6114c9d0784d53c83f6860afeb0c05939fe8d12d7208129dcfc08428",
+  "history_witness_wire_test_repair_bindings_sha256": "e6b15597708cb69dd8661228af2f6903142c8dcbc3b42b6d8009dcf3248b8cc9",
+  "history_witness_wire_test_repair_scope": {
+    "source": "Exactly one history test file. All production source bytes, all original assertions and all110 authored definitions remain unchanged.",
+    "repair": "Use existing RolloutItem::ResponseItem serialization/deserialization wire adapter; require ResponseItem before the unchanged witness-leak/replay/equality assertions. No production serde derives or alternative wire format.",
+    "prior_ordinary_no_run": "FAILED with two E0277 history test compile errors; retained final receipt2a7b56872c99dea64891284b60694a8f608c227d0ed5cbff29f338fe7c0e04cb and independent raw readback971a8c83b777de8a5a792e1291a53b49fc54ea81b7dc5a8edfd26d6453075704. Six library harnesses linked; extension not dispatched; no Rust test executed.",
+    "prior_protected_plan": "Exact593 canonical1120 plan remains uncompiled historical. This source graph and package require a new compiled-input association.",
+    "new_result": "Source-only derivative. No new Rust compilation, test execution, native acceptance or slot population."
   }
 }

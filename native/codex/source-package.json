@@ -27,18 +27,18 @@
   "source_cut": {
     "handoff": {
       "path": "pins/coherent-source-handoff.json",
-      "bytes": 9515,
-      "sha256": "9f92fd23a62a289ce3efb64457ea6c1673f9a917c53da46ea5996e849d788cee"
+      "bytes": 11075,
+      "sha256": "0aa15ea885165ff9e2f2c346ea393101208e9aba7c8e1349bbcc2a289985105f"
     },
     "bindings": {
       "path": "pins/coherent-source-bindings.json",
       "bytes": 1950724,
-      "sha256": "936b2121c99824969ee85e4bd45b74326b938b11217a3eea5a745a330884fccf"
+      "sha256": "f1358da0393150b276fb69a9b251a25326f51922169026bb15fff1909cbc3d91"
     },
     "patch": {
       "path": "patches/c407-coherent-original-provenance.patch",
-      "bytes": 564571,
-      "sha256": "885c6eac41e0ac644086eb048d3003e8074ce90aee491e17e9208724d74f4004"
+      "bytes": 564714,
+      "sha256": "c608a62ceada2c5f1fab7fb9632d2091971e60b2cf98ab67a6112b0411908105"
     },
     "review_state": "independent-review-required"
   },
@@ -908,8 +908,8 @@
       "before_sha256": null,
       "payload": {
         "path": "overlay/codex-rs/history/src/original_provenance/tests.rs",
-        "bytes": 8538,
-        "sha256": "897a04407b0f30763cd0dbfcae7a2539e41a1d24b05ec1dc8b259492c9ad5454"
+        "bytes": 8679,
+        "sha256": "2b54f0254320f21dcdecf852e9048652f1397ea132d067249e4a28052ab4eda5"
       },
       "mode": "100644"
     },

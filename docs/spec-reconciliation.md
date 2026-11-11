@@ -287,12 +287,22 @@ Production source bytes remain unchanged. The complete input graph nevertheless
 has a new source vector, `59398124268e7be3f4dd32a1a18eb1878ffc922029e29ddc37d15fc01c3c5149`,
 and requires its own package and compiled-input manifest identities.
 
-The repaired package passed 49 pure Python checks and source verification.
-Those checks cover recipe integrity and explicit mocks. Rust test compilation,
-all 110 authored test cases, protected execution, a qualified executable and
-native CoS acceptance remain pending for this tuple. The separate live-history
-and context-handshake source work is outside this package. Prior failures retain
-their original results. No normative SPEC row or adopted company rule changes.
+That package passed 49 pure Python checks and source verification. Its next
+ordinary test build linked six library test executables, then failed with two
+envelope serialization errors in a history fixture. The extension target did
+not start, and no test executed. All original processes closed and source,
+toolchain and platform checks passed; the failed run remains recorded.
+
+The additional repair changes only that history test to use the same durable
+`RolloutItem` adapter. Private-witness replay and value-equality assertions remain
+intact. Production bytes and all 110 definitions are unchanged. The new complete
+source vector is
+`009d905360ddd1a900947dcf12fdfa656e2a64e1fed14f7aa51780aff92f77e5`.
+Its package passed 49 unchanged pure Python checks and source verification;
+Rust test compilation, test execution, protected positives, a qualified
+executable and native CoS acceptance remain pending. The separate live-history
+and context-handshake work is outside this package. No normative SPEC row or
+adopted company rule changes.
 
 ## Controlled P4 code acceptance
 

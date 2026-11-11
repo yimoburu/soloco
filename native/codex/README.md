@@ -17,6 +17,13 @@ byte commitment and logical executable distinction. The portable lineage
 record retains the original frozen source cuts and ordered composition hashes.
 The prior package 6f5 is historical and does not qualify this graph.
 
+This derivative repairs one history unit-test fixture to persist through the
+existing `RolloutItem::ResponseItem` wire adapter. All production bytes,
+original assertions and 110 authored test definitions are retained. The earlier
+ordinary no-run build failed with two E0277 errors; six library harnesses linked,
+the extension was not dispatched, and no Rust test ran. That failure remains
+historical. This package establishes no new Rust compilation or runtime result.
+
 See [the native peer source profile](../../docs/native-peer-source-profile.md)
 for the genuine explicit nonincremental RLite source path, supported original
 instruction producers, remaining history boundaries and SPEC mapping.

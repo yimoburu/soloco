@@ -148,9 +148,11 @@ fn opaque_runtime_witnesses_never_enter_json_or_change_history_value_equality() 
     metadata.original_session_ingress = Some(OriginalProducerWitness::new(secret.clone()));
     metadata.original_instruction_rendering = Some(OriginalProducerWitness::new(secret));
     assert_eq!(original, before);
-    let bytes = serde_json::to_vec(&original).unwrap();
+    let bytes = serde_json::to_vec(&crate::RolloutItem::ResponseItem(original.clone())).unwrap();
     assert!(!String::from_utf8_lossy(&bytes).contains("private runtime producer capsule"));
-    let replay: ResponseItemEnvelope = serde_json::from_slice(&bytes).unwrap();
+    let crate::RolloutItem::ResponseItem(replay) =
+        serde_json::from_slice::<crate::RolloutItem>(&bytes).unwrap()
+    else { panic!("expected persisted response item"); };
     assert!(replay.metadata.as_ref().is_none_or(|metadata|
         metadata.original_session_ingress.is_none() && metadata.original_instruction_rendering.is_none()));
     assert!(!format!("{:?}", original.metadata).contains("private runtime producer capsule"));
