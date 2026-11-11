@@ -1,38 +1,35 @@
-# Pinned SoloCo companion source dependency
+# Pinned SoloCo companion source
 
-This directory delivers the source recipe for the separate
-`codex-soloco-protected-host` executable. It does not replace an installed Codex
-CLI, install a toolchain, change configuration, authenticate, start a company or
-launch a native/model session. The source-owned qualified executable slot remains
-empty. A successful compile is not native qualification.
+This directory delivers the separate `codex-soloco-protected-host` source recipe.
+The qualified executable slot remains empty and `qualified_binary` is null.
+Source preparation and pure checks do not authorize a native/model attempt or
+establish an independently accepted executable.
 
-`source-package.json` pins official OpenAI Codex commit
+`source-package.json` pins OpenAI Codex commit
 `c40729ea5cf8e947481b130c59807273eda2f8e9`, tree
-`078c14cecf94b522a2eff48b30996bf3f4d1bf7a`, the complete regular Rust source
-inventory, the exact 41-file companion overlay, the accepted Cargo lock and the
-official Rust 1.95.0 macOS arm64 toolchain. The patch is a review artifact; the
-preparer copies hash-checked complete overlay files, avoiding patch fuzz or
-partial application. All input files are verified before output creation.
+`078c14cecf94b522a2eff48b30996bf3f4d1bf7a`, its 9,264 regular Rust source files,
+the exact 112-file coherent overlay, accepted Cargo lock 040a,
+and the official 153-file Rust 1.95.0 macOS arm64 toolchain.
+The complete reconstructed graph has 9294 logical files. The
+source-owned overlay count is exact; missing and excess entries hold.
+`pins/coherent-source-bindings.json` must equal every reconstructed path,
+byte commitment and logical executable distinction. The portable lineage
+record retains the original frozen source cuts and ordered composition hashes.
+The prior package 6f5 is historical and does not qualify this graph.
 
-The corrected source cut is `5a43acb8…`, retaining the old E0599 compiler failure
-and its repair. The accepted lock `bc987be4…` preserves all 1,308 original external
-package entries. Neither input is a build or independent native acceptance
-receipt. The full source/build and native qualification status must be reported
-from their separately observed receipts.
+See [the native peer source profile](../../docs/native-peer-source-profile.md)
+for the genuine explicit nonincremental RLite source path, supported original
+instruction producers, remaining history boundaries and SPEC mapping.
+Restored, compacted, incremental/deferred or originless content without a
+complete original producer chain stays Held. No context limit is relaxed.
 
-## Source preparation
+## Prepare source without downloads
 
-Use Python 3.11 or newer. Supply the already obtained exact upstream commit
-archive and a **new** output directory whose parent exists. This tool performs
-no download. It verifies the entire archive hash before reading the 9,264 pinned
-regular `codex-rs/` files; Git metadata and unlisted files are never copied. The upstream archive's special
-`codex-rs/vendor/bubblewrap/LICENSE` member was not part of that regular-source
-cut and is not dereferenced. Do not reinterpret this inventory as every upstream
-repository file or an independently checked Git checkout.
-
-The source tool pins its package-manifest hash in code and has no caller-selected
-manifest option. A changed source cut requires a reviewed source change. Exact
-upstream `LICENSE` and `NOTICE` texts are retained alongside the patch and overlay.
+Use Python 3.11 or newer, the already obtained exact upstream commit archive,
+and a new output directory whose parent exists. No installation or checkout
+mutation occurs. Input bytes and pins are verified before output creation.
+The review patch is informational: complete hash-checked overlay files are
+copied, without patch fuzz or partial application.
 
 ```sh
 python3 native/codex/tools/protected_native.py verify
@@ -41,34 +38,22 @@ python3 native/codex/tools/protected_native.py prepare \
   --output /absolute/new-companion-source
 ```
 
-All copied source files become read-only, retaining the source inventory's
-executable distinctions. The output contains `source/codex-rs/` and an exact
-`prepared-source.json`. Existing outputs are refused. Changed bytes, symlink
-inputs, traversal, duplicate JSON keys, unknown manifest fields, unsupported
-targets and pending packages hold; they do not select substitutes.
+Only the pinned regular `codex-rs/` archive members are copied. Git metadata,
+unlisted members and the skipped special bubblewrap LICENSE member are never
+followed. Exact upstream LICENSE and NOTICE attribution is retained here.
+This inventory is not every upstream repository file. Prepared files become
+read-only with their logical executable distinctions. Existing outputs,
+symlinks, traversal, changed bytes, unknown fields, unsupported inputs and
+unlisted source files hold.
+
+The tool embeds its fixed package-manifest digest. No caller manifest, CLI
+hash, environment value or readiness flag selects a source association.
 
 ## Explicit offline build
 
-The following command executes Cargo, build scripts, proc macros and the pinned
-compiler. Run it only within the independently reviewed source-build authority.
-The tool always uses the fixed root-owned macOS Seatbelt executor with a
-source-generated deny-default domain: network is denied; source/toolchain and
-explicit cache/system inputs are read-only; writes are confined to the new
-output and six exact Cargo metadata files. Missing/unsupported executor or profile
-failure never falls back to direct Cargo. A completed preparation does not
-authorize this command.
-
-Supply an existing private toolchain matching the pinned 153-file inventory and
-an already populated private Cargo cache without credentials/config files. No
-toolchain or dependency installation is performed. Child `HOME` and `CODEX_HOME`
-are omitted; ambient credential/configuration variables are not forwarded. Git
-system/global configuration, credential helpers/prompts, hooks, fsmonitor,
-network protocols and automatic maintenance are disabled. No home/configuration
-file is created or changed.
-The exact upstream workspace `.cargo` files remain pinned; additional ancestor
-Cargo configuration is refused. System linker/SDK differences remain a build
-environment qualification requirement, not a byte-for-byte reproducibility
-claim.
+Run the build only under separately reviewed build authority. It executes
+Cargo, build scripts, proc macros and the pinned compiler; preparation alone
+does not authorize it.
 
 ```sh
 python3 native/codex/tools/protected_native.py build \
@@ -79,147 +64,59 @@ python3 native/codex/tools/protected_native.py build \
 ```
 
 The fixed command uses `--locked --offline --release`, target
-`aarch64-apple-darwin`, two compilation jobs and
-`SOLOCO_PROTECTED_HOST_BUILD=1`. The original fixed build timeout defaults to
-1,200 seconds and may only be shortened. Output logs, exact command and selected
-environment, return status and actual binary hash/size are retained in the new
-build directory. There is no retry, installation, slot update or native launch.
-Source and toolchain files are checked again before the receipt can report a
-compiled output. Timeout, failed compilation and changed inputs remain failures.
-The receipt does not establish descendant, backend or remote closure.
+`aarch64-apple-darwin`, two jobs and `SOLOCO_PROTECTED_HOST_BUILD=1`.
+It requires an existing exact 153-file toolchain and an already populated
+private cache without credentials or configuration. There is no download,
+toolchain installation, retry, global configuration change or native launch.
 
-## Joining and qualification
+The root-owned macOS Seatbelt executor receives a source-generated deny-default
+domain. Network is denied; source, toolchain, explicit system/compiler inputs
+and cache bodies are read-only; writes are confined to the new output and six
+literal Cargo metadata files. Signals stay within the same sandbox. Unsupported
+executor/profile failure never falls back to direct Cargo. `HOME` and
+`CODEX_HOME` are omitted. Git global/system config, credentials, prompts, hooks,
+fsmonitor, protocols and automatic maintenance are suppressed. Output/cache,
+source and toolchain paths must be disjoint, including physical path aliases.
 
-The companion's 105-file Node graph in the source author's bindings is a component
-input, not the final SoloCo runtime. Reconcile its concrete new modules/changes
-with the current SDK and joined peer runtime under a new exact source manifest;
-do not overwrite the SDK with the component's older copies. Preserve the normal
-plugin packaging checks and all earlier failures.
+## Complete compiled-input association
 
-After genuine source build/tests, independently review the actual compiler,
-upstream/overlay/lock/toolchain, linker/SDK/environment, output and complete
-runtime association. Only then may a separately reviewed source change bind an
-exact executable in `protected-source-build-slot.mjs`. Runtime flags, JSON or
-user-supplied callbacks cannot qualify a build. This source package never fills
-that slot.
+Before compilation every prepared source byte and logical mode is verified.
+The tool derives `compiled-source-manifest.json` from all 9294
+validated rows, the upstream commit/tree and the fixed source-package digest.
+Schema is `soloco-compiled-native-inputs-v1`; serialization is Python JSON with
+sorted keys, compact separators, `ensure_ascii=True`, UTF-8 and one terminal
+newline. The artifact is at most 16 MiB and read-only. It contains no output
+binary hash or self-hash.
 
-Original authentication/egress permissions, complete provenance, the cold
-scheduler handoff, later path-only VFS containment and whole-domain closure
-remain separate native qualification requirements. The acceptance matrix stays
-unchanged; this package marks no MC row passed and grants no extra attempt,
-provider use, allowance reset or expiry extension.
+The exact retained bytes determine child
+`SOLOCO_SOURCE_MANIFEST_SHA256`. Callers cannot supply that value. Plan and
+receipt bind its path/schema/size/digest; the artifact, complete sources,
+toolchain and selected environment are rechecked before compiled status.
+Zero compiler exit with changed inputs/artifacts remains Held. An independently
+reviewed source-owned executable slot must later bind this actual artifact,
+binary hash, lock, toolchain and build receipt separately.
 
-The source-generated build domain permits only fixed system compiler roots and
-the system logger Mach service. Signals are restricted to the same sandbox;
-process-info and additional startup Mach/mac-syscall grants are omitted.
-Unsupported SDK locations/services hold and need
-a reviewed source change. No domain or compiler run is implied by pure profile
-checks. This bounded build policy is not general hostile-code or native
-qualification; descendant, backend and remote closure remain unproved.
+## Host and qualification boundary
 
-The first V3 deny-default profile aborted before C main on the observed host;
-those attempts provide no denial proof. The V4 repair allows reading/testing the
-literal root directory, following the pinned platform getcwd/startup rule,
-without granting its subtree. It permits executable maps only in the pinned
-toolchain, new output and `/usr/lib`, narrows system reads to explicit library
-roots and uses the exact pinned hardware/OS sysctl-name set instead of global
-sysctl read. Broad `/System` and its Data-volume aliases are excluded.
+The unchanged V7 host contract supports selected Xcode 26.3 build 17C529 and
+canonical macOS 26.2 SDK build 25C58 at the fixed versioned developer path.
+Exact clang/linker/libxcrun/version pins, selection link, ownership and modes
+are checked before and after build. These are honest UID 502 private inputs;
+`/Applications` remains root:admin 0775 and administrators/the owner can change
+that namespace. No ownership, SDK selection or installation is changed.
+Only the selected compiler/SDK subtrees and required version metadata are
+readable; no broad Applications/home/private read grant or SDK write grant is
+introduced. The original root-owned OpenSSL config is one exact hash-checked
+regular file with a literal read grant; changed content/includes require review.
+Inherited compiler, SDK, crypto-policy and authentication overrides are ignored.
 
-The exact V4 profile passed system `true` and the existing controlled C file,
-loopback and owned-child cases on this host. Baseline, confined and Data-alias
-runs are separate overlapping evidence. They do not establish Cargo build
-compatibility, every credential interface, other hosts or native qualification.
-The exact source/evidence cut and original failures must accompany integration.
+Full SDK headers/resources are not all byte-pinned. This host boundary is not
+byte-identical reproducibility, hostile-ancestor atomicity, general hostile-code
+containment or native qualification. Actual compiler/tests, executable/runtime
+association, accepted auth/egress, cold handoff and complete descendant/backend/
+remote closure require separate evidence. Old failures remain historical.
 
-
-The V5 system-dependency repair permits only a read of the literal
-`/private/etc/ssl/openssl.cnf`. Pinned Cargo's LibreSSL startup attempted that
-system configuration before `--version` and V4 correctly denied it; the original
-failure remains retained. The tool validates symlink-free root-owned ancestors,
-a root-owned single regular0644 file and the exact reviewed745 bytes/SHA-256
-`025f5e31cd7b2248a0a661d8d346452c31d98e280f3420c3f6017c74c829ae73`
-before output creation or spawn, then rechecks after a build. These reviewed
-bytes contain only request/subject/attribute definitions, with no include,
-provider or module directive. Any changed policy or dependency holds for review.
-The tool neither selects a user configuration nor sets `OPENSSL_CONF`, disables
-crypto policy, broadens `/private/etc` reads or grants system-config writes.
-
-The original V4 C controls remain exact historical evidence; V5 adds only this
-fixed, validated read. Separate pinned Cargo/Rustc `--version` observations test
-startup only and do not qualify compilation, provider/account use, general
-credential containment or native operation. This host system-config commitment
-is a build-environment qualification boundary; other OS configuration bytes
-require a reviewed source change. Pure fixture checks use temporary bytes and
-mock ownership separately from strict metadata checks, never the CI host's real
-crypto configuration. There are 32 pure checks after these six additions. Both pinned 1.95.0 version
-commands exited successfully under V5 on the observed host with empty stderr;
-all owned process groups were observed absent.
-
-
-## Compiled source association (V6)
-
-Before compilation the tool verifies every actual prepared source byte and
-logical Git executable distinction. It derives a source-owned
-`compiled-source-manifest.json` in the new build output, with schema
-`soloco-compiled-native-inputs-v1`, the pinned upstream commit/tree, source-package
-manifest SHA-256 and the complete source inventory (9,274 rows for package6f5).
-Each row retains path, bytes, SHA-256 and logical Git mode. Serialization is
-Python JSON with sorted object keys, compact separators, `ensure_ascii=True`,
-UTF-8 encoding and exactly one terminal newline. The artifact is bounded to
-16MiB and made read-only. It contains no output binary hash or self-hash.
-
-The tool hashes the exact written bytes and sets the child build environment's
-`SOLOCO_SOURCE_MANIFEST_SHA256` to that digest, satisfying the companion's
-compile-time `option_env!` association. No CLI argument or inherited environment
-can select that value. The plan and final receipt retain artifact schema, path,
-byte count and SHA-256; the tool rechecks those exact bytes and complete source
-and toolchain inputs before reporting a compiled output. Changed or missing
-association artifacts hold even after a zero compiler return.
-
-A future independently reviewed source-owned executable slot must map its
-`source_manifest_path` and `source_manifest_sha256` to this retained artifact,
-and separately bind the actual output binary, lock, toolchain and build receipt.
-The artifact describes source inputs, so no binary/self-hash fixed point occurs.
-It is an input association, not independent review, execution authority, native
-qualification or evidence that a build happened. This source-preparation cut
-runs no compiler/version/OS child; the slot remains empty and qualified binary
-remains null.
-
-
-V6 adds seven pure checks, bringing the suite to 39. They cover deterministic
-complete-inventory generation, changed inputs/artifacts, retained final binding
-and caller environment/CLI rejection. Successful compiler returns and output
-bytes in these tests are explicit temporary mocks; no compiler or OS child is
-executed and no genuine compilation receipt is produced.
-
-
-## Selected Xcode environment (V7)
-
-V7 supports the observed selected Xcode 26.3 build17C529 at
-`/Applications/Xcode-26.3.0.app/Contents/Developer`, its canonical macOS26.2
-SDK build25C58 and exact clang/linker/libxcrun and version metadata pins.
-This is a **UID502 user-owned private build input**, not root-owned system trust.
-Its source-fixed directory ownership and modes are checked honestly, including
-`/Applications` as root:admin0775. Administrators and the input owner can change
-that host namespace; no hostile-ancestor atomicity is claimed. No ownership,
-installation, SDK selection or host configuration is changed.
-
-The root-owned original selection link must still name that exact developer
-root. Source code fixes `DEVELOPER_DIR`, `SDKROOT`, `CC` and the Rust target
-linker; inherited overrides cannot select another compiler or SDK. No CLT or
-unversioned Xcode fallback read grant remains. Reads cover only the selected
-compiler toolchain, canonical SDK, developer usr/lib and usr/share plus four
-literal version metadata files. Executable mapping adds only the selected
-toolchain and developer usr/lib. Network remains denied and the SDK receives
-no write grant. Unsupported paths, ownership/mode changes, altered selection
-or changed pinned bytes hold before output/spawn.
-
-Plan and receipt retain the selected environment, actual compiler/linker and
-SDK/version metadata file hashes and directory identities; the tool rechecks
-those inputs before compiled status. Full raw SDK headers/resources are not
-all byte-pinned: this is an explicit qualified host-environment boundary,
-not byte-identical reproducibility or whole-host/compiler/native qualification.
-The unchanged V6 tiny Cargo control failed because its policy excluded the
-actual selected SDK; that failure remains retained. V7 source/fixture checks
-alone do not claim an actual compile, repair of the full Codex build or native
-qualification. Qualified binary remains null and the source-owned slot empty.
+There are 49 pure Python checks. Temporary compiler outputs and successful exits
+inside those tests are explicit mocks. The checks do not run Cargo, the compiler,
+OS controls, native/provider/account operations or installation. This package
+marks no MC acceptance row passed and grants no new attempt or allowance.

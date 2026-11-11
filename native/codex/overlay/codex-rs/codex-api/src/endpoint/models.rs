@@ -5,6 +5,7 @@ use crate::provider::Provider;
 use bytes::Bytes;
 use codex_client::HttpTransport;
 use codex_client::RequestTelemetry;
+use codex_client::ReqwestTransport;
 use codex_protocol::openai_models::ModelInfo;
 use codex_protocol::openai_models::ModelsResponse;
 use http::HeaderMap;
@@ -15,6 +16,82 @@ use url::Url;
 
 pub struct ModelsClient<T: HttpTransport> {
     session: EndpointSession<T>,
+}
+
+/// A decoded response owned by the original concrete HTTP request. There is no
+/// public constructor or deserializer: supplied bytes and generic transports
+/// cannot manufacture this observation.
+pub struct OriginalModelsResponse {
+    response_instance: String,
+    body: Bytes,
+    request_url: String,
+    etag: Option<String>,
+    models: Vec<ModelInfo>,
+}
+
+impl std::fmt::Debug for OriginalModelsResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Catalog URLs may contain credentials; raw values are deliberate getters.
+        f.debug_struct("OriginalModelsResponse")
+            .field("body_bytes", &self.body.len())
+            .field("models", &self.models.len())
+            .finish_non_exhaustive()
+    }
+}
+
+impl OriginalModelsResponse {
+    /// Fresh occurrence minted by this concrete successful request, never caller supplied.
+    pub fn response_instance(&self) -> &str {
+        &self.response_instance
+    }
+
+    pub fn raw_body(&self) -> &[u8] {
+        &self.body
+    }
+
+    /// The exact requested URL, not a claim about a redirect's final destination.
+    pub fn request_url(&self) -> &str {
+        &self.request_url
+    }
+
+    pub fn etag(&self) -> Option<&str> {
+        self.etag.as_deref()
+    }
+
+    pub fn models(&self) -> &[ModelInfo] {
+        &self.models
+    }
+}
+
+fn decode_models(body: &[u8]) -> Result<Vec<ModelInfo>, ApiError> {
+    let ModelsResponse { models } = serde_json::from_slice::<ModelsResponse>(body).map_err(|e| {
+        ApiError::Stream(format!(
+            "failed to decode models response: {:?} at line {} column {} (body: {} bytes)",
+            e.classify(), e.line(), e.column(), body.len()
+        ))
+    })?;
+    Ok(models)
+}
+
+impl ModelsClient<ReqwestTransport> {
+    /// Observe actual response bytes while using the same auth, request, limits,
+    /// retries and decoder as the ordinary endpoint. Only this concrete path
+    /// creates an original response receipt.
+    pub async fn list_models_observed(
+        &self,
+        request_url: String,
+        extra_headers: HeaderMap,
+        response_body_limit_bytes: Option<usize>,
+    ) -> Result<OriginalModelsResponse, ApiError> {
+        let (body, etag) = self
+            .list_models_raw(request_url.clone(), extra_headers, response_body_limit_bytes)
+            .await?;
+        let models = decode_models(&body)?;
+        Ok(OriginalModelsResponse {
+            response_instance: uuid::Uuid::new_v4().to_string(),
+            body, request_url, etag, models,
+        })
+    }
 }
 
 impl<T: HttpTransport + 'static> ModelsClient<T> {
@@ -76,16 +153,7 @@ impl<T: HttpTransport + 'static> ModelsClient<T> {
         let (body, header_etag) = self
             .list_models_raw(request_url, extra_headers, response_body_limit_bytes)
             .await?;
-        let ModelsResponse { models } =
-            serde_json::from_slice::<ModelsResponse>(&body).map_err(|e| {
-                ApiError::Stream(format!(
-                    "failed to decode models response: {:?} at line {} column {} (body: {} bytes)",
-                    e.classify(),
-                    e.line(),
-                    e.column(),
-                    body.len()
-                ))
-            })?;
+        let models = decode_models(&body)?;
 
         Ok((models, header_etag))
     }
@@ -430,5 +498,40 @@ mod tests {
 
         assert_eq!(models.len(), 0);
         assert_eq!(etag, Some("\"abc\"".to_string()));
+    }
+
+    // Authored source tests only: these require a separately authorized test run.
+    #[tokio::test]
+    async fn concrete_observation_retains_exact_noncanonical_response_bytes() {
+        use wiremock::Mock;
+        use wiremock::MockServer;
+        use wiremock::ResponseTemplate;
+        use wiremock::matchers::method;
+        use wiremock::matchers::path;
+
+        let server = MockServer::start().await;
+        let raw = "{\n  \"models\" : []\n}\n";
+        Mock::given(method("GET"))
+            .and(path("/models"))
+            .respond_with(ResponseTemplate::new(200)
+                .set_body_raw(raw, "application/json")
+                .insert_header("etag", "\"original\""))
+            .expect(1)
+            .mount(&server)
+            .await;
+        let transport = ReqwestTransport::from_http_client(
+            codex_http_client::HttpClientBuilder::new().build_direct().unwrap(),
+        );
+        let url = format!("{}/models?catalog-token=fixture-only", server.uri());
+        let client = ModelsClient::new(transport, provider(&server.uri()), Arc::new(DummyAuth));
+        let observed = client.list_models_observed(url.clone(), HeaderMap::new(), Some(4096))
+            .await.unwrap();
+        assert_eq!(observed.raw_body(), raw.as_bytes());
+        assert_eq!(observed.request_url(), url);
+        assert_eq!(observed.etag(), Some("\"original\""));
+        assert!(observed.models().is_empty());
+        assert_ne!(observed.raw_body(), serde_json::to_vec(&ModelsResponse { models: vec![] }).unwrap());
+        assert!(!format!("{observed:?}").contains("catalog-token"));
+        assert!(!format!("{observed:?}").contains(raw));
     }
 }

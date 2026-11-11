@@ -175,9 +175,20 @@ pub(super) async fn configure(
 /// Preserve the actual manager and its private credential storage; only scoped config changes.
 pub(super) async fn configure_existing(config_manager: &ConfigManager, config: &mut Arc<Config>,
     original: Arc<AuthManager>) -> IoResult<Arc<AuthManager>> {
+    if codex_core::protected_peer_enabled() {
+        crate::protected_host::require_source_owned_instruction_profile(&config.features)?;
+    }
     original.validate_scoped_runtime_auth(&config.auth_config())?;
     config_manager.update_managed_config_loader(original.clone(), config);
     let effective = config_manager.load_startup_config(Some(config.cwd.to_path_buf())).await?.config;
+    if codex_core::protected_peer_enabled() {
+        crate::protected_host::require_source_owned_instruction_profile(&effective.features)?;
+        // Scoped config already matched the retained original owner's provider.
+        // Recheck after the awaited effective-config reload before using it.
+        crate::protected_host::require_original_managed_provider(
+            &config.model_provider_id, &config.model_provider,
+            &effective.model_provider_id, &effective.model_provider)?;
+    }
     original.validate_scoped_runtime_auth(&effective.auth_config())?;
     config.validate_windows_mxc_requirement_from(&effective)?;
     // Keep the caller's scoped state, project, and provider. Apply only the effective auth requirements.

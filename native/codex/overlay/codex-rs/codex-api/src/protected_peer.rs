@@ -12,8 +12,12 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use uuid::Uuid;
 
 mod startup;
+mod original_ingress;
+pub use original_ingress::{OriginalAcceptedInputWitness, OriginalGeneratedInputWitness, OriginalSessionIngress, OriginalSessionInputProjection};
 #[cfg(test)]
 mod source_gate_tests;
+#[cfg(test)]
+mod original_capture_tests;
 pub use startup::{NativeStartup, OriginalBootstrapClaim, begin_original_companion, observe_original_bootstrap};
 
 const PROTOCOL: &str = "soloco-protected-backend-permit-v2";
@@ -50,6 +54,8 @@ pub fn source_bytes_sha256(bytes: &[u8]) -> String { hash(bytes) }
 #[derive(Debug, Clone, Serialize)]
 pub struct SourceProvenance {
     original_sampling_input_sha256: String, sources: Value, unknown_origins: Vec<String>,
+    #[serde(skip)]
+    session_projection: Option<OriginalSessionInputProjection>,
 }
 impl SourceProvenance {
     pub fn from_original_loaders(original_sampling_input_sha256: String, sources: Value, unknown_origins: Vec<String>) -> Self {
@@ -57,7 +63,117 @@ impl SourceProvenance {
         for missing in ["input_message_to_rendered_source_spans_not_retained", "restored_history_instruction_origins_not_retained"] {
             if !unknown_origins.iter().any(|item|item==missing) { unknown_origins.push(missing.into()); }
         }
-        Self { original_sampling_input_sha256, sources, unknown_origins }
+        Self { original_sampling_input_sha256, sources, unknown_origins, session_projection: None }
+    }
+
+    /// Records a typed runtime-only materialization cut. Serialized receipt
+    /// JSON is never restored as a capability. Public cross-crate materializers
+    /// do not establish the original accepting Session, which remains Held.
+    pub fn from_original_input_capture(capture: &codex_history::OriginalInputCapture,
+        sources: Value, unknown_origins: Vec<String>) -> Self {
+        Self::from_input_capture(capture, None, sources, unknown_origins)
+    }
+
+    /// Consumes an opaque projection produced by the original Session ingress.
+    /// The final actual ModelClient runtime and prepared input are checked again
+    /// at observation and under the original send fence after the permit wait.
+    pub fn from_original_session_input_capture(capture: &codex_history::OriginalInputCapture,
+        projection: OriginalSessionInputProjection, sources: Value, unknown_origins: Vec<String>) -> Self {
+        Self::from_input_capture(capture, Some(projection), sources, unknown_origins)
+    }
+
+    fn from_input_capture(capture: &codex_history::OriginalInputCapture,
+        projection: Option<OriginalSessionInputProjection>, mut sources: Value, mut unknown_origins: Vec<String>) -> Self {
+        let session_projection = projection.filter(|projection| projection.matches_capture(capture));
+        let ingress_bound = session_projection.is_some();
+        let generated = |index|session_projection.as_ref().is_some_and(|projection|projection.covers_generated(index));
+        let user_chain_unknown = capture.spans().iter().any(|span|span.user() && !generated(span.index())
+            && span.receipt().is_some_and(|receipt|receipt.original_read().is_none()
+                && receipt.original_user_input_bytes().is_none()));
+        let mut missing = |reason: &str| {
+            if !unknown_origins.iter().any(|value| value == reason) {
+                unknown_origins.push(reason.into());
+            }
+        };
+        // The history crate can retain an exact typed materialization, but its
+        // public cross-crate producer API cannot attest that the caller was the
+        // original accepting Session/transport. Empty input and caller-created
+        // typed receipts must not turn that absent ingress link into authority.
+        if !ingress_bound { missing("original_accepted_session_transport_binding_not_retained"); }
+        // Without that sealed ingress, a caller-created subset also cannot
+        // attest the absence or complete ancestry of restored history.
+        if !ingress_bound { missing("restored_history_instruction_origins_not_retained"); }
+        let origin_chain_complete = ingress_bound && capture.complete()
+            && !capture.spans().is_empty() && capture.spans().iter().all(|span|span.user() || generated(span.index()))
+            && !user_chain_unknown && !capture.restored_upstream_chain_unknown()
+            && !capture.spans().iter().any(|span|span.receipt().is_some_and(|receipt|
+                receipt.original_materialized_bytes()!=receipt.projected_bytes()));
+        if !origin_chain_complete {
+            missing("input_message_to_rendered_source_spans_not_retained");
+        }
+        if !capture.complete() || capture.restored_upstream_chain_unknown() {
+            missing("restored_history_instruction_origins_not_retained");
+        }
+        if user_chain_unknown {
+            missing("input_message_original_user_input_chain_not_retained");
+        }
+        if capture.restored_upstream_chain_unknown() {
+            missing("restored_history_upstream_original_chain_not_retained");
+        }
+        if capture.restored_instruction_ancestry_unknown() {
+            missing("restored_history_instruction_origins_not_retained");
+        }
+        if capture.restored_thread_metadata_unknown() {
+            missing("restored_history_thread_metadata_origin_not_retained");
+        }
+        // A real item/container observation is not an invented AGENTS/template
+        // ancestry link. Current unsupported instruction renderers remain Held.
+        if capture.spans().iter().any(|span| span.instruction() && !generated(span.index())) {
+            missing("instruction_message_original_loader_chain_not_retained");
+        }
+        if capture.spans().iter().any(|span| !span.user() && !span.instruction() && !generated(span.index())) {
+            missing("non_user_input_original_producer_chain_not_retained");
+        }
+        if capture.spans().iter().any(|span| span.receipt().is_some_and(|receipt|
+            receipt.original_materialized_bytes() != receipt.projected_bytes())) {
+            missing("input_projection_upstream_span_mapping_not_retained");
+        }
+        let spans = capture.spans().iter().map(|span| {
+            let (start, end) = span.byte_range();
+            let receipt = span.receipt().map(|receipt| {
+                let read = receipt.original_read().map(|(path, line, bytes)| json!({
+                    "path":path,"line":line,"original_line_utf8_payload_sha256":hash(bytes),
+                    "original_line_utf8_payload_bytes":bytes.len(),
+                    "scope":"captured line payload; original reader call-site is not a sealed capability; not a whole/compressed file hash",
+                    "original_thread_metadata_line_sha256":receipt.original_thread_metadata_bytes().map(hash),
+                    "original_thread_id":receipt.original_thread_id()}));
+                json!({"occurrence":receipt.occurrence(),
+                    "origin_kind":if read.is_some(){"original_rollout_read"}else if receipt.original_user_input_bytes().is_some(){"original_user_input_materialization"}else{"original_live_item_materialization"},
+                    "original_typed_user_input_sha256":receipt.original_user_input_bytes().map(hash),
+                    "original_typed_user_input_bytes":receipt.original_user_input_bytes().map(|bytes|bytes.len()),
+                    "original_item_materialization_sha256":hash(receipt.original_materialized_bytes()),
+                    "original_item_materialization_bytes":receipt.original_materialized_bytes().len(),
+                    "original_prompt_projection_sha256":hash(receipt.projected_bytes()),
+                    "original_prompt_projection_bytes":receipt.projected_bytes().len(),"original_read":read})
+            });
+            json!({"index":span.index(),"sampling_json_utf8_start":start,"sampling_json_utf8_end":end,
+                "instruction":span.instruction(),"original_renderer_bound":generated(span.index()),"original_receipt":receipt})
+        }).collect::<Vec<_>>();
+        if let Some(object) = sources.as_object_mut() {
+            object.insert("original_input_materialization".into(), json!({
+                "complete_occurrence_and_span_coverage":capture.complete(),"complete_original_origin_chain":origin_chain_complete,
+                "serialization":"original serde_json sampling-input array; UTF-8 byte offsets",
+                "sampling_input_bytes":capture.serialized_input().len(),"spans":spans,
+                "accepted_session_transport_binding":if ingress_bound {"opaque original Session/runtime issuer and current accepted occurrence"} else {"not retained by public cross-crate materializer API"},
+                "original_session_revision":session_projection.as_ref().map(|projection|projection.revision()),
+                "latest_accepted_order":session_projection.as_ref().map(|projection|projection.latest_order()),
+                "original_generated_sources":session_projection.as_ref().map(|projection|projection.generated_source_facts()),
+                "array_separators":"canonical array delimiters/commas are structural bytes, not source text",
+                "raw_file_or_wire_receipt":false}));
+        } else {
+            missing("original_source_record_shape_invalid");
+        }
+        Self { original_sampling_input_sha256:hash(capture.serialized_input()), sources, unknown_origins, session_projection }
     }
 }
 
@@ -81,13 +197,15 @@ struct Generations {
 pub struct SourceRuntime {
     generation: u64,
     state: Arc<Mutex<Generations>>,
+    ingress_issuer: Arc<original_ingress::RuntimeIngressIssuer>,
 }
 impl Default for SourceRuntime {
     fn default() -> Self { Self::new() }
 }
 impl SourceRuntime {
     pub fn new() -> Self {
-        Self { generation: NEXT_RUNTIME.fetch_add(1, Ordering::SeqCst), state: Arc::default() }
+        Self { generation: NEXT_RUNTIME.fetch_add(1, Ordering::SeqCst), state: Arc::default(),
+            ingress_issuer: Arc::new(original_ingress::RuntimeIngressIssuer::new()) }
     }
     /// Metadata is copied at the original core call site; it is not proof of auth ownership.
     pub fn step(&self, thread_id: String, turn_id: Option<String>, auth_owner: Option<u64>,
@@ -171,8 +289,101 @@ fn generation(previous: &mut Option<String>, current: String, n: &mut u64) -> Re
     Ok(())
 }
 
+/// Inventory equivalence is deliberately bounded to the same original five
+/// complete schemas. Called only after the final original wire proof matches.
+fn validated_offered_inventory(root: &serde_json::Map<String, Value>) -> Result<Value, TransportError> {
+    let expected: Value = serde_json::from_str(include_str!("protected_peer_responses_tools.json"))
+        .map_err(|_| hold("compiled tool resource"))?;
+    let input = root.get("input").and_then(Value::as_array).ok_or_else(||hold("ordered input"))?;
+    let additional: Vec<_> = input.iter().enumerate().filter(|(_,item)|
+        item.get("type").and_then(Value::as_str)==Some("additional_tools")).collect();
+    if let Some(tools) = root.get("tools") {
+        if tools != &expected || !additional.is_empty() {
+            return Err(hold("full original five-tool/schema equality or deferred offered inventory"));
+        }
+    } else {
+        let [(index, item)] = additional.as_slice() else {
+            return Err(hold("missing or duplicate original RLite offered inventory"));
+        };
+        if *index != 0 || item.get("role").and_then(Value::as_str)!=Some("developer") {
+            return Err(hold("original RLite inventory must be the first developer prefix"));
+        }
+        let namespace = json!([{"type":"namespace", "name":codex_protocol::DEFAULT_FUNCTION_NAMESPACE,
+            "description":"", "tools":expected.clone()}]);
+        if item.get("tools") != Some(&namespace) {
+            return Err(hold("full original RLite five-tool namespace/schema equality"));
+        }
+    }
+    Ok(expected)
+}
+
+#[cfg(test)]
+mod offered_inventory_tests {
+    use super::*;
+    fn ordinary() -> Value {
+        json!({"input":[{"type":"message","role":"user","content":[]}],
+            "tools":serde_json::from_str::<Value>(include_str!("protected_peer_responses_tools.json")).unwrap()})
+    }
+    fn rlite() -> Value {
+        let expected = ordinary()["tools"].clone();
+        json!({"input":[{"type":"additional_tools","id":"at_controlled_fixture","role":"developer",
+            "tools":[{"type":"namespace","name":codex_protocol::DEFAULT_FUNCTION_NAMESPACE,"description":"","tools":expected}]},
+            {"type":"message","role":"user","content":[]}]})
+    }
+    fn validate(value: &Value) -> Result<Value, TransportError> {
+        validated_offered_inventory(value.as_object().unwrap())
+    }
+    #[test]
+    fn ordinary_and_exact_rlite_namespace_report_only_the_canonical_five() {
+        let expected = ordinary()["tools"].clone();
+        assert_eq!(validate(&ordinary()).unwrap(), expected);
+        assert_eq!(validate(&rlite()).unwrap(), expected);
+    }
+    #[test]
+    fn ordinary_inventory_rejects_missing_extra_changed_schema_and_order() {
+        let mut missing = ordinary(); missing["tools"].as_array_mut().unwrap().pop();
+        let mut extra = ordinary(); extra["tools"].as_array_mut().unwrap().push(json!({"type":"function","name":"extra"}));
+        let mut changed = ordinary(); changed["tools"][0]["strict"] = json!(true);
+        let mut reordered = ordinary(); reordered["tools"].as_array_mut().unwrap().swap(0,1);
+        let mut absent = ordinary(); absent.as_object_mut().unwrap().remove("tools");
+        for value in [missing, extra, changed, reordered, absent] { assert!(validate(&value).is_err()); }
+    }
+    #[test]
+    fn rlite_requires_root_tools_absent_and_exactly_one_first_developer_prefix() {
+        let mut with_tools = rlite(); with_tools["tools"] = ordinary()["tools"].clone();
+        let mut null_tools = rlite(); null_tools["tools"] = Value::Null;
+        let mut misplaced = rlite(); misplaced["input"].as_array_mut().unwrap().swap(0,1);
+        let mut duplicate = rlite(); let prefix = duplicate["input"][0].clone(); duplicate["input"].as_array_mut().unwrap().push(prefix);
+        let mut wrong_role = rlite(); wrong_role["input"][0]["role"] = json!("user");
+        let mut absent = rlite(); absent["input"].as_array_mut().unwrap().remove(0);
+        for value in [with_tools,null_tools,misplaced,duplicate,wrong_role,absent] { assert!(validate(&value).is_err()); }
+    }
+    #[test]
+    fn rlite_namespace_type_name_description_and_complete_schema_must_match() {
+        let mut kind = rlite(); kind["input"][0]["tools"][0]["type"] = json!("function");
+        let mut name = rlite(); name["input"][0]["tools"][0]["name"] = json!("foreign");
+        let mut description = rlite(); description["input"][0]["tools"][0]["description"] = json!("changed");
+        let mut schema = rlite(); schema["input"][0]["tools"][0]["tools"][1]["parameters"]["additionalProperties"] = json!(true);
+        let mut strict = rlite(); strict["input"][0]["tools"][0]["tools"][0]["strict"] = json!(true);
+        for value in [kind,name,description,schema,strict] { assert!(validate(&value).is_err()); }
+    }
+    #[test]
+    fn rlite_rejects_missing_extra_reordered_tools_and_extra_namespaces() {
+        let mut missing = rlite(); missing["input"][0]["tools"][0]["tools"].as_array_mut().unwrap().pop();
+        let mut extra = rlite(); let duplicate = extra["input"][0]["tools"][0]["tools"][0].clone();
+        extra["input"][0]["tools"][0]["tools"].as_array_mut().unwrap().push(duplicate);
+        let mut reordered = rlite(); reordered["input"][0]["tools"][0]["tools"].as_array_mut().unwrap().swap(0,1);
+        let mut namespace = rlite(); let extra_namespace = namespace["input"][0]["tools"][0].clone();
+        namespace["input"][0]["tools"].as_array_mut().unwrap().push(extra_namespace);
+        for value in [missing,extra,reordered,namespace] { assert!(validate(&value).is_err()); }
+    }
+}
+
 fn observation<'a>(request: &'a Request, body: &[u8], step: &'a SourceStep, gateway: &'a ProtectedGatewayTransport,
                    challenge: &'a Challenge, host_instance_id: &'a str, sequence: u64) -> Result<FinalObservation<'a>, TransportError> {
+    let projection = step.provenance.as_ref().and_then(|provenance|provenance.session_projection.as_ref())
+        .ok_or_else(||hold("missing original Session and Core wire materialization"))?;
+    projection.check_final_request(&step.runtime, body)?;
     if step.runtime.generation == 0 || step.runtime.generation == u64::MAX {
         return Err(hold("runtime generation exhausted"));
     }
@@ -191,14 +402,10 @@ fn observation<'a>(request: &'a Request, body: &[u8], step: &'a SourceStep, gate
     }
     let mut document: Value = serde_json::from_slice(body).map_err(|_| hold("final JSON body"))?;
     let root = document.as_object_mut().ok_or_else(|| hold("final body object"))?;
-    let tools = root.get("tools").cloned().ok_or_else(|| hold("missing full offered inventory"))?;
-    let expected: Value = serde_json::from_str(include_str!("protected_peer_responses_tools.json"))
-        .map_err(|_| hold("compiled tool resource"))?;
-    if tools != expected { return Err(hold("full original five-tool/schema equality")); }
+    // Preserve the supervisor's canonical ordinary inventory only after exact
+    // equality of the actual ordinary list or actual fresh RLite namespace.
+    let tools = validated_offered_inventory(root)?;
     let input = root.get("input").and_then(Value::as_array).ok_or_else(|| hold("ordered input"))?;
-    if input.iter().any(|v| v.get("type").and_then(Value::as_str) == Some("additional_tools")) {
-        return Err(hold("unqualified restored/deferred offered inventory"));
-    }
     let context_sha256 = json_hash(&Value::Array(input.clone()))?;
     let input_text_sha256s = input.iter().flat_map(|item|item.get("content").and_then(Value::as_array).into_iter().flatten())
         .filter_map(|content|content.get("text").and_then(Value::as_str)).map(|text|hash(text.as_bytes())).collect();
@@ -384,6 +591,11 @@ pub(crate) async fn stream<T: HttpTransport + 'static>(transport: &T, request: R
         if !matches!(permit, Ok(Ok(Ok(())))) { state.poisoned = true; return Err(hold("permit failed/timed out")); }
         if let Err(error) = ensure_known(&UNKNOWN) { state.poisoned = true; return Err(error); }
         drop(state);
+        // The supervisor await can race a newly accepted input. Acquire the
+        // original Session read fence afterwards and validate that exact cut.
+        let projection = step.provenance.as_ref().and_then(|provenance|provenance.session_projection.as_ref())
+            .ok_or_else(||hold("missing original Session and Core wire materialization"))?;
+        let ingress_guard = projection.lock_for_send(&step.runtime, body).await?;
         // Recheck AFTER the awaited supervisor permit as well as after authentication.
         // The original manager owns this read lease; no callback supplies a verdict.
         let live_auth = gateway.auth.as_ref().ok_or_else(|| hold("missing original live auth lease"))?.clone();
@@ -391,7 +603,12 @@ pub(crate) async fn stream<T: HttpTransport + 'static>(transport: &T, request: R
         let url = url::Url::parse(&request.url).map_err(|_| hold("final URL"))?;
         let network_permit = live_auth.authorize(&url).map_err(|_| hold("original account-bound egress revoked"))?;
         ensure_known(&UNKNOWN)?;
-        let result = live_auth.run(&network_permit, gateway.inner.stream(request)).await;
+        let send = live_auth.run(&network_permit, gateway.inner.stream(request));
+        let result = match ingress_guard.run(send).await {
+            Ok(result) => result,
+            Err(error) => { owner.lock().await.poisoned = true; return Err(error); }
+        };
+        drop(ingress_guard);
         let response = match result {
             Err(_) => { owner.lock().await.poisoned = true; return Err(hold("original auth/policy revoked at transport cut")); },
             Ok(result) => match result {

@@ -1,0 +1,112 @@
+{
+  "schema": "soloco-portable-coherent-source-lineage-v1",
+  "status": "SOURCE_ONLY_UNQUALIFIED",
+  "original_coherent_handoff_sha256": "67ad9bf2fe5e16cc671a520b0af737b1dbfc430d3f2ed8d2f9184bf5b3524a23",
+  "original_coherent_cut_sha256": "71fc9d955703fb083280d78d4be560120233a3e857bf6ba67d8e7f2fb2c8d4a9",
+  "original_coherent_bindings_sha256": "074802c878f106af12c6adaba349db932932d5ce461e597b421e36614470b1d4",
+  "original_materialization_plan_sha256": "22c2428e90c39f5f88c98ddab4f21bc7b28daee81b4d8a34a552273e87c17c7c",
+  "original_backend_source_handoff_sha256": "5a43acb85656aa2f2dc6a52b91ab5d88741d69bf27bd1c0368ec1d59664e9a61",
+  "rust_tests_authored": 109,
+  "rust_tests_status": "UNRUN",
+  "complete_logical_files": 9294,
+  "overlay_files": 112,
+  "ordered_source_composition": [
+    {
+      "order": 1,
+      "component": "root-original-provenance-producers-source-preparation-v1",
+      "artifact": "handoff.DATA.json",
+      "sha256": "b18a06b14e9455592e2dfc42c9be6a79fe69d2ee8e364e3c699d9d9e299f781a"
+    },
+    {
+      "order": 2,
+      "component": "root-original-session-ingress-source-preparation-v2",
+      "artifact": "handoff.DATA.json",
+      "sha256": "d5e81af6e2e660331ac587f64d5b4ae03529812fb4e198e81cad0d63ef8c70f4"
+    },
+    {
+      "order": 3,
+      "component": "root-original-instruction-renderer-source-preparation-v1",
+      "artifact": "handoff.DATA.json",
+      "sha256": "ca9ee652f39428ff6bee55019e2814d11a0e88ce82cc2616a9284cdc55d00117"
+    },
+    {
+      "order": 4,
+      "component": "root-scoped-nonincremental-profile-source-preparation-v1",
+      "artifact": "handoff.DATA.json",
+      "sha256": "37435cf1b4c04a1c92e1edb8fc4f60bcb8697c29d73eaf336b93ded887cecb06"
+    },
+    {
+      "order": 5,
+      "component": "ROOT-independent-scoped-nonincremental-profile-source-review-v1",
+      "artifact": "review.DATA.json",
+      "sha256": "4f7c45000f0c0ed23da6d91631672bda124b0295f044f2211bb5253dd52cb700"
+    },
+    {
+      "order": 6,
+      "component": "root-original-provenance-coherent-join-source-preparation-v3",
+      "artifact": "handoff.DATA.json",
+      "sha256": "67ad9bf2fe5e16cc671a520b0af737b1dbfc430d3f2ed8d2f9184bf5b3524a23"
+    },
+    {
+      "order": 7,
+      "component": "root-original-provenance-coherent-join-source-preparation-v3",
+      "artifact": "FROZEN-source-cut-v3.DATA.json",
+      "sha256": "71fc9d955703fb083280d78d4be560120233a3e857bf6ba67d8e7f2fb2c8d4a9"
+    },
+    {
+      "order": 8,
+      "component": "root-original-provenance-coherent-join-source-preparation-v3",
+      "artifact": "complete-source-materialization.DATA.json",
+      "sha256": "22c2428e90c39f5f88c98ddab4f21bc7b28daee81b4d8a34a552273e87c17c7c"
+    },
+    {
+      "order": 9,
+      "component": "root-original-provenance-portable-source-format-preparation-v1/format-source",
+      "artifact": "handoff.DATA.json",
+      "sha256": "190113bad2b31e83df5be70ef3d45957f281307ca5bf03274448ae5845fc5ffb"
+    },
+    {
+      "order": 10,
+      "component": "root-original-provenance-portable-source-eof-preparation-v1/eof-source",
+      "artifact": "handoff.DATA.json",
+      "sha256": "db544a4699e562d8af4a1f128ac2769ef7b25813783a049933e1f35811765517"
+    },
+    {
+      "order": 11,
+      "component": "root-original-rollout-path-lifetime-source-preparation-v1",
+      "artifact": "handoff.DATA.json",
+      "sha256": "34392507e7d695b4ef42bd74d422f48a213e302ef35dbc34e647c500ed5ae4b8"
+    }
+  ],
+  "accepted_lock_sha256": "040a380b1611e90ccf63cdcefc1a2d215e229053181d8dee497c659a477f47ec",
+  "qualified_binary": null,
+  "runtime_slot": null,
+  "native_qualified": false,
+  "boundary": "Source recipe and immutable input associations only; no build/test/native acceptance or grant inferred",
+  "format_source_handoff_sha256": "190113bad2b31e83df5be70ef3d45957f281307ca5bf03274448ae5845fc5ffb",
+  "format_source_cut_sha256": "3b0e077cc3e4a38e521c0d268efadaa7df309612622c951bf38fb229989db37d",
+  "format_source_bindings_sha256": "536e8668778d2de23fba9a98a4772d15ef864069e66a3e1d3811399b60cee0b3",
+  "format_source_materialization_sha256": "50297a1849fb5b6bf0539360088d81ef3db3e8beeea631d7b142b77dea858476",
+  "source_graph_vector_sha256": "ea3c810e2b11c3137127c3e5bdcd4df916493573620f8c064d1322ffe6f9fa70",
+  "source_format_delta": {
+    "parent_portable_handoff_sha256": "c75ee77de8458c672622363bd02656e0a2075f67bdf5c2ba89aef40b7565edb4",
+    "parent_coherent_handoff_sha256": "67ad9bf2fe5e16cc671a520b0af737b1dbfc430d3f2ed8d2f9184bf5b3524a23",
+    "changed_files": 15,
+    "removed_ASCII_EOL_spaces": 18,
+    "scope": "Only source-code trailing whitespace outside literals/comments; source-byte associations change and need their own qualification"
+  },
+  "source_graph_bytes": 91881820,
+  "eof_source_handoff_sha256": "db544a4699e562d8af4a1f128ac2769ef7b25813783a049933e1f35811765517",
+  "lifetime_source_handoff_sha256": "34392507e7d695b4ef42bd74d422f48a213e302ef35dbc34e647c500ed5ae4b8",
+  "lifetime_source_cut_sha256": "6e2764f7d19ee0e530fdd4aa08c4a9a0dfb2d35535cebff8e5d0a581d614d1a7",
+  "lifetime_source_bindings_sha256": "e20ab6c6a62d2af182a81ca1d1190fe0a4b5aaa30d2dde557e285cebfc90273c",
+  "lifetime_source_materialization_sha256": "97d4d6659e2b4cfeed41d9db35c6a463e8074f4fbeb34a7bb85951a4d94d692c",
+  "distinct_authored_rust_tests_manifest_sha256": "d4b73c3daf9537400e2581a6fa9375e7607979e0c1839279ac32ad350a2e2700",
+  "source_repair": {
+    "parent_portable_handoff_sha256": "c0672a939f0941471e07b0249cb4841052d3b4f3fa502c72b67b85ecb1e7a608",
+    "EOF": "One extra final LF removed from rollout_decode.rs; retain one final LF",
+    "lifetime": "Own original rollout PathBuf and move into existing static blocking-reader callback; source-authored original-read test added",
+    "previous_failed_compiler_receipt_sha256": "f897dbfd1c4da0a67e9f33b9f8d979da4f2be459d72d378a840270abc1bd51c8",
+    "qualification": "Old failed compiler stays failed; new source needs its own checks/build/native acceptance"
+  }
+}

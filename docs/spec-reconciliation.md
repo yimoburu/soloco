@@ -230,6 +230,39 @@ compatibility. Earlier pre-main aborts remain failures. The complete pinned
 source recipe and its supported limits are documented in
 [`native/codex/README.md`](../native/codex/README.md).
 
+## Original session and instruction source provenance
+
+The original-provenance source component extends the mechanical checks for
+S014, S018, S028, S058, S068, S070, S072, S074, S084 and S086. Actual Core
+admission owns typed user input and its materialization. Private Session and
+ModelClient ownership bind supported original instruction renderers, live
+history occurrences and the exact final wire transformation. Runtime-only
+witnesses do not survive serialization or acquire authority from matching text.
+
+The explicit protected scoped profile selects nonincremental tools and checks
+the actual effective feature set, including after configuration reload. It
+supports the genuine fresh RLite prefix encoder with the complete fixed
+five-tool inventory; immutable model catalog fields and original managed auth
+remain separate. See [the source profile](native-peer-source-profile.md) for
+producer boundaries and exact unsupported histories.
+
+Source preparation does not establish end-to-end operation. Default incremental
+tool history, model responses, tool results, restored/compacted ancestry, media
+and unresolved instruction producers remain held. Original normal-host account
+and OS mode, a qualified binary, actual peer reconstruction and company adoption
+still require their applicable source implementation and acceptance. A source
+profile or a fresh-request test cannot close S005, S020, S024, S094 or S096.
+
+The earlier component typecheck failed because a flattened rollout line did not
+implement the requested deserialization trait. Its failed result is retained.
+The joined source reuses the original complete rollout decoder for both the
+reader and provenance validator; it does not substitute a reduced history
+shape. A later typecheck reached the original reader and found a borrowed-path
+lifetime error in its blocking callback. The repair retains an owned copy of the
+same path; both failed runs remain recorded. The new source tuple requires its
+own compilation and affected tests.
+This addition changes no normative SPEC row or adopted company rule.
+
 ## Controlled P4 code acceptance
 
 The exact retained P4 candidate passed its canonical 326-case execution and a

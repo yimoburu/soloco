@@ -20,10 +20,11 @@ TREE = "078c14cecf94b522a2eff48b30996bf3f4d1bf7a"
 TARGET = "aarch64-apple-darwin"
 SANDBOX = Path("/usr/bin/sandbox-exec")
 MANIFEST = Path(__file__).resolve().parents[1] / "source-package.json"
-MANIFEST_SHA256 = "6f5db46ba1460fdea73463f5c55286d6e224e23f8540d645d81ece2307afc2ed"
+MANIFEST_SHA256 = "cf9e698efe0816e905e944d08ef5f064a6003847c962eb98f025da95f30c3a35"
 OPENSSL_CONFIG = Path("/private/etc/ssl/openssl.cnf")
 OPENSSL_CONFIG_BYTES = 745
 OPENSSL_CONFIG_SHA256 = "025f5e31cd7b2248a0a661d8d346452c31d98e280f3420c3f6017c74c829ae73"
+OVERLAY_COUNT = 112
 MAX_BYTES = 128 * 1024 * 1024
 MAX_TOOLCHAIN_BYTES = 2 * 1024 * 1024 * 1024
 COMPILED_SOURCE_SCHEMA = "soloco-compiled-native-inputs-v1"
@@ -274,10 +275,10 @@ def package(manifest):
     need(len(upstream) == 9264 and all(r["path"].startswith("codex-rs/") for r in upstream), "complete pinned Rust source inventory required")
     cut = m["source_cut"]
     need(exact(cut, {"handoff", "bindings", "patch", "review_state"}) and cut["review_state"] == "independent-review-required", "source cut must retain its review boundary")
-    for key in ("handoff", "bindings", "patch"):
-        read_pin(root, cut[key])
+    cut_artifacts = {key: read_pin(root, cut[key]) for key in ("handoff", "bindings", "patch")}
     original = {r["path"]: r for r in upstream}
-    need(isinstance(m["overlay"], list) and 0 < len(m["overlay"]) <= 100, "bounded overlay required")
+    need(isinstance(m["overlay"], list) and OVERLAY_COUNT > 0 and len(m["overlay"]) == OVERLAY_COUNT,
+         "exact reviewed overlay count required")
     expected = dict(original)
     seen = set()
     for change in m["overlay"]:
@@ -290,6 +291,12 @@ def package(manifest):
         seen.add(target)
     lock = read_pin(root, m["cargo_lock"])
     expected["codex-rs/Cargo.lock"] = {"path": "codex-rs/Cargo.lock", "bytes": len(lock), "sha256": sha(lock), "mode": "100644"}
+    # This source-owned portable list is generated from the independently frozen
+    # coherent graph, not a runtime-supplied inventory. Pin equality must match
+    # every reconstructed overlay/lock path, logical mode and byte commitment.
+    declared = rows(json.loads(cut_artifacts["bindings"], object_pairs_hook=unique_object))
+    need(declared == sorted(expected.values(), key=lambda row: row["path"]),
+         "complete coherent source binding differs from reconstructed package")
     t = m["toolchain"]
     need(exact(t, {"release", "target", "inventory", "official_manifest", "archives"}) and t["release"] == "1.95.0" and t["target"] == TARGET, "unsupported toolchain")
     toolchain = rows(json.loads(read_pin(root, t["inventory"]), object_pairs_hook=unique_object), max_bytes=MAX_TOOLCHAIN_BYTES)

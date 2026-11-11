@@ -96,7 +96,7 @@ pub(super) async fn run_remote_compact_v2_attempt(
                     .raw_items()
                     .any(|item| matches!(item, ResponseItem::AdditionalTools { .. }));
             let base_instructions = if tools_in_history {
-                BaseInstructions {
+                BaseInstructions { original_instruction_rendering: Default::default(),
                     text: String::new(),
                     provenance: None,
                 }
@@ -253,7 +253,7 @@ pub(crate) async fn capture_background_input(
             .raw_items()
             .any(|item| matches!(item, ResponseItem::AdditionalTools { .. }))
     {
-        BaseInstructions {
+        BaseInstructions { original_instruction_rendering: Default::default(),
             text: String::new(),
             provenance: None,
         }

@@ -322,10 +322,7 @@ impl LoadedAgentsMd {
             return Self::default();
         }
         Self {
-            user_instructions: Some(Instructions {
-                text: contents,
-                source: Some(path),
-            }),
+            user_instructions: Some(Instructions::unattributed(contents, Some(path))),
             thread_instructions: None,
             entries: Vec::new(),
         }
@@ -495,10 +492,14 @@ impl LoadedAgentsMd {
     pub(crate) fn protected_source_records(&self) -> serde_json::Value {
         let mut records = Vec::new();
         for (kind, instructions) in [("host_user", &self.user_instructions), ("host_thread", &self.thread_instructions)] {
-            if let Some(instructions) = instructions { records.push(serde_json::json!({
-                "kind":kind,"source_path":instructions.source.as_ref().map(|p|p.as_path().display().to_string()),
-                "decoded_text_sha256":codex_api::protected_peer::source_bytes_sha256(instructions.text.as_bytes()),
-                "original_file_bytes_sha256":null,"origin_limit":"original read receipt not retained by Instructions"})); }
+            if let Some(instructions) = instructions {
+                let original = instructions.original_source_record();
+                records.push(serde_json::json!({
+                    "kind":kind,"source_path":instructions.source.as_ref().map(|p|p.as_path().display().to_string()),
+                    "decoded_text_sha256":codex_api::protected_peer::source_bytes_sha256(instructions.text.as_bytes()),
+                    "original_file_bytes_sha256":original.as_ref().and_then(|r|r.get("original_file_bytes_sha256")),
+                    "original_read":original,"origin_limit":if original.is_some(){None}else{Some("original provider read not retained or materialization changed")}}));
+            }
         }
         for entry in &self.entries {
             records.push(match &entry.provenance {

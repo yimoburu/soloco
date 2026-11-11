@@ -1766,7 +1766,7 @@ pub(crate) fn build_prompt(
         },
         parallel_tool_calls: true,
         base_instructions: if incremental_tools {
-            BaseInstructions {
+            BaseInstructions { original_instruction_rendering: Default::default(),
                 text: String::new(),
                 provenance: None,
             }
@@ -1844,12 +1844,18 @@ async fn run_sampling_request(
             sess.clone_history().await
         };
         let input_item_count = history.raw_items().len();
-        let mut prompt_input = history
-            .for_prompt(
+        let (mut prompt_input, original_prompt_envelopes) = if codex_api::protected_peer::enabled() {
+            let envelopes = history.for_prompt_annotated(
                 &step_context.settings.model_info.input_modalities,
                 sess.services.image_store.as_ref(),
-            )
-            .await;
+            ).await;
+            (envelopes.iter().map(|envelope| envelope.item.clone()).collect::<Vec<_>>(), Some(envelopes))
+        } else {
+            (history.for_prompt(
+                &step_context.settings.model_info.input_modalities,
+                sess.services.image_store.as_ref(),
+            ).await, None)
+        };
         sess.services
             .executed_tool_calls
             .attach_to_prompt(&mut prompt_input, &mut executed_tool_calls_by_output);
@@ -1870,6 +1876,11 @@ async fn run_sampling_request(
                 &responses_metadata,
             )
             .await?;
+        }
+        if let Some(envelopes) = &original_prompt_envelopes {
+            prompt.protected_provenance = crate::protected_provenance::capture_original_input(
+                &prompt.input, envelopes, step_context.as_ref(), &prompt.base_instructions,
+                sess.as_ref());
         }
         if first_attempt && turn_context.config.notify.is_some() {
             notify_messages = legacy_notify_input_messages(&prompt.input);

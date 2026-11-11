@@ -59,6 +59,7 @@ type McpToolApprovalMetadataMap =
 ///
 /// A session has at most 1 running task at a time, and can be interrupted by user input.
 pub(crate) struct Session {
+    pub(super) original_ingress: super::original_ingress::SessionIngress,
     pub(crate) thread_id: ThreadId,
     pub(crate) installation_id: String,
     pub(super) tx_event: Sender<Event>,
@@ -868,6 +869,20 @@ impl Session {
                 .model(),
             session_configuration.provider
         );
+        // This is the original FRESH selection, not a later recognition of a
+        // provenance label or an equal string restored from a rollout.
+        let original_base_instruction_selection =
+            if matches!(&initial_history, InitialHistory::New) {
+                if config.base_instructions.is_some() {
+                    crate::original_instruction_renderer::OriginalBaseSelection::render_fresh_config(&config)
+                } else {
+                    crate::original_instruction_renderer::OriginalBaseSelection::render_fresh_model(
+                        &model_info, models_manager.as_ref())
+                }
+            } else { None };
+        if let Some(original) = &original_base_instruction_selection {
+            session_configuration.base_instructions = original.rendered_text().to_owned();
+        }
         let base_instructions_provenance = if config.base_instructions.is_some() {
             Some(
                 config
@@ -876,7 +891,7 @@ impl Session {
                     .unwrap_or(BaseInstructionsProvenance::Custom),
             )
         } else if let Some(inherited_base_instructions) = initial_history.get_base_instructions() {
-            let BaseInstructions { text, provenance } = inherited_base_instructions;
+            let BaseInstructions { text, provenance , ..} = inherited_base_instructions;
             provenance.or_else(|| {
                 (text == render_model_instructions(&model_info)).then(|| {
                     BaseInstructionsProvenance::Model {
@@ -1115,7 +1130,7 @@ impl Session {
                             source: session_source,
                             thread_source: session_configuration.thread_source.clone(),
                             originator: session_configuration.originator.clone(),
-                            base_instructions: BaseInstructions {
+                            base_instructions: BaseInstructions { original_instruction_rendering: Default::default(),
                                 text: session_configuration.base_instructions.clone(),
                                 provenance: base_instructions_provenance.clone(),
                             },
@@ -1594,6 +1609,7 @@ impl Session {
                 }
             }
             state.base_instructions_provenance = base_instructions_provenance.clone();
+            state.original_base_instruction_selection = original_base_instruction_selection;
             // Restore a provided effort baseline before startup prewarm can establish a new one.
             if let Some(pin) = thread_extension_data.remove::<ReasoningEffortPin>() {
                 state.reasoning_effort_pin = pin.as_ref().clone();
@@ -1902,6 +1918,7 @@ impl Session {
             };
             let (mcp_prewarm_tx, mcp_prewarm_rx) = async_channel::bounded(1);
             let sess = Arc::new(Session {
+                original_ingress: super::original_ingress::SessionIngress::new(&services.model_client),
                 thread_id,
                 installation_id,
                 tx_event: tx_event.clone(),

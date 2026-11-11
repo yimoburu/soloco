@@ -62,6 +62,7 @@ pub use crate::endpoint::ImageRequestError;
 pub use crate::endpoint::ImagesClient;
 pub use crate::endpoint::MemoriesClient;
 pub use crate::endpoint::ModelsClient;
+pub use crate::endpoint::models::OriginalModelsResponse;
 pub use crate::endpoint::RealtimeCallClient;
 pub use crate::endpoint::RealtimeCallResponse;
 pub use crate::endpoint::RealtimeContextAppendChannel;

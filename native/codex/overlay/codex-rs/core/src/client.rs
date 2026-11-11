@@ -573,6 +573,29 @@ fn sideband_websocket_auth_headers(
 }
 
 impl ModelClient {
+    /// Only Core's original Session constructor obtains this actual runtime's
+    /// issuer. Generic providers/contributors never receive it or the Session.
+    pub(crate) fn original_session_ingress(&self, owner: Arc<dyn std::any::Any + Send + Sync>) -> codex_api::protected_peer::OriginalSessionIngress {
+        self.state.protected_runtime.original_session_ingress_for_core(owner)
+    }
+
+    /// The original final client projection, using this actual client's flags
+    /// and runtime. Callers cannot select an expected owner or a validator.
+    pub(crate) fn original_prepared_provenance(&self, prompt: &Prompt, model_info: &ModelInfo,
+        final_input: &[ResponseItem]) -> Option<Arc<codex_api::protected_peer::SourceProvenance>> {
+        let provenance = prompt.protected_provenance.as_ref()?;
+        let projection = crate::original_instruction_renderer::original_wire_projection(
+            &prompt.base_instructions, &prompt.input, final_input,
+            crate::original_instruction_renderer::OriginalWireControls {
+                thread_id:self.state.thread_id.to_string(),
+                use_responses_lite:model_info.use_responses_lite,
+                content_item_kinds_enabled:self.state.content_item_kinds_enabled,
+                is_openai:self.state.provider.info().is_openai(),
+            }, prompt.tools.as_ref())?;
+        self.state.protected_runtime.bind_original_wire_projection(provenance, projection.owner_token()?,
+            projection.original_input_bytes(), projection.final_input_bytes(), projection.source_facts()).map(Arc::new)
+    }
+
     #[allow(clippy::too_many_arguments)]
     /// Creates a new session-scoped `ModelClient`.
     ///
@@ -1087,6 +1110,7 @@ impl ModelClient {
                 "msg",
                 Uuid::new_v5(&prefix_namespace, prompt.base_instructions.text.as_bytes()),
             )));
+            crate::original_instruction_renderer::carry_base_prefix(&prompt.base_instructions, &mut instructions);
             prefix.push(instructions);
         }
         input.splice(0..0, prefix);
@@ -1188,6 +1212,17 @@ impl ModelClient {
             if !self.state.content_item_kinds_enabled {
                 item.clear_content_item_kinds();
             }
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn prepare_original_request_for_test(&self, request: &mut ResponsesApiRequest) {
+        self.prepare_response_items_for_request(&mut request.input);
+        if let Some(input) = tool_metadata::bounded_input(request, &request.input) {
+            if let Some(recorder) = &self.executed_tool_calls {
+                recorder.invalidate_wire_inventory_loss(&request.input, &input);
+            }
+            request.input = input;
         }
     }
 
@@ -2074,9 +2109,13 @@ impl ResponsesHttpExecutor<'_> {
             )
             .with_telemetry(Some(request_telemetry), Some(sse_telemetry));
             let client = if codex_api::protected_peer::enabled() {
+                // This concrete private helper validates the actual original
+                // prefix and permitted client normalization. Source-fact JSON
+                // and matching text alone never select the projection owner.
+                let provenance = self.client.original_prepared_provenance(prompt, model_info, &request.input);
                 client.with_protected_step(self.client.state.protected_runtime.step(
                     self.client.state.thread_id.to_string(), responses_metadata.turn_id.clone(),
-                    client_setup.auth_owner_generation, client_setup.auth_revision, client_setup.runtime_id.clone(), prompt.protected_provenance.clone()))
+                    client_setup.auth_owner_generation, client_setup.auth_revision, client_setup.runtime_id.clone(), provenance))
             } else { client };
             let stream_result = client.stream_request(request, options).await;
 
