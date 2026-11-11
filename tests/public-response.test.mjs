@@ -9,6 +9,9 @@ import { Store, withStore, VERSION, PACKAGE, digest, teamHash, installedTeam } f
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
 import {retainSnapshot} from '../plugins/soloco/runtime/snapshot.mjs';
 import { call, hook } from '../plugins/soloco/runtime/main.mjs';
+import {submitTask,sendTaskMessage} from '../plugins/soloco/runtime/tasks.mjs';
+import {installTaskIndex} from '../plugins/soloco/runtime/task-index.mjs';
+import {setRuntimeControl} from '../plugins/soloco/runtime/task-runtime-authority.mjs';
 import { currentView, publicPage, exactRead, mutationView, sourceReference, upgradeView, doctorView, fits, toolResult, rpcReply, MODEL_MAX_BYTES, REPLY_MAX_BYTES } from '../plugins/soloco/runtime/public-response.mjs';
 const base=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'public-response-')));
 process.env.COMPANY_PLUGIN_DATA=path.join(base,'data');
@@ -144,6 +147,122 @@ test('real open/status/wait and context paging; normalized wait avoids full stat
   const ref=page.items[0].source,chunk=await call('company_context',{...args,action:'read',id:ref.id,sha256:ref.sha256,length:32768},'codex');checkReply(chunk);assert.equal(chunk.offset,0);
   assert.equal(withStore(args.root,db=>db.read()).records.r0.content,noise.repeat(2000));
  }
+});
+
+test('oversized task portfolio reads return an inspection Hold without mutation bookkeeping',async()=>{
+ const args=fixture(true);
+ withStore(args.root,db=>db.transaction('fictional.portfolio',s=>{
+  for(let i=0;i<400;i++)s.records['fictional-constraint-'+i]={id:'fictional-constraint-'+i,kind:'decision',revision:1,content:'Retain this fictional condition and its unresolved effects.'};
+  return s;
+ }));
+ const query={...args,action:'context',context_scope:'fictional-trial',budget:200000,limit:1};
+ const before=withStore(args.root,db=>({state:db.read(),token:db.changeToken()}));
+ const portfolio=engine.tasks(query,'codex');
+ assert.equal(portfolio.tasks.total,0);
+ assert.equal(portfolio.constraints.complete,true);
+ assert.ok(portfolio.constraints.total>=400);
+ assert.equal(fits(portfolio),false,'fixture must exercise the public reply overflow');
+ const held=await call('company_tasks',query,'codex');checkReply(held);
+ assert.equal(held.operation,'company_tasks');assert.equal(held.action,'context');
+ assert.equal(held.operation_returned,undefined,'read overflow must not be reported as a returned mutation');
+ assert.equal(held.result_not_inlined,undefined);
+ assert.match(held.hold,/Inspection exceeds the public budget/);
+ assert.equal(held.operation_source,undefined);assert.equal(held.attribution_hold,undefined);
+ const page=await call('company_tasks',{...query,budget:16000},'codex');checkReply(page);
+ assert.equal(page.protocol,'async-portfolio-v1');assert.equal(page.complete,false);
+ assert.equal(page.constraints.total,portfolio.constraints.total);
+ assert.equal(page.constraints.complete,false);assert.ok(page.constraints.sources.length>0);
+ assert.ok(page.constraints.sources.length<page.constraints.total);
+ assert.ok(size(JSON.stringify(page))<=16000);
+ for(const budget of [15998,15999,16001,16002]){
+  const edge=await call('company_tasks',{...query,budget},'codex');checkReply(edge);
+  assert.equal(edge.protocol,'async-portfolio-v1');assert.equal(edge.complete,false);
+  assert.equal(edge.constraints.complete,false);assert.ok(size(JSON.stringify(edge))<=budget);
+  assert.deepEqual(edge.constraints.sources,portfolio.constraints.sources.slice(0,edge.constraints.sources.length));
+ }
+ const nearFullBudget=size(JSON.stringify(portfolio))-1;
+ const nearFull=engine.tasks({...query,budget:nearFullBudget},'codex');
+ assert.ok(size(JSON.stringify(nearFull))<=nearFullBudget);
+ assert.equal(nearFull.complete,false);assert.equal(nearFull.constraints.complete,false);
+ assert.ok(nearFull.constraints.sources.length<portfolio.constraints.sources.length);
+ const ref=page.constraints.sources.find(source=>source.id.startsWith('fictional-constraint-'));
+ assert.ok(ref?.sha256);assert.equal(page.constraints.requires_exact_retrieval,true);
+ const exact=await call('company_context',{...args,action:'read',id:ref.id,sha256:ref.sha256,length:32768},'codex');checkReply(exact);
+ assert.deepEqual(JSON.parse(exact.text),before.state.records[ref.id]);
+ const after=withStore(args.root,db=>({state:db.read(),token:db.changeToken()}));
+ assert.deepEqual(after,before,'oversized and narrowed read calls must not change persisted state or revision');
+});
+
+test('oversized task checkpoint and inbox retain read-only reply semantics',async()=>{
+ const args=fixture(true),setup={...args,epoch:1,source_instruction:'Create fictional read-only response fixtures; no worker execution.'};
+ let taskId;
+ withStore(args.root,db=>{
+  db.transaction('fictional.task-read-replies',s=>{
+   setRuntimeControl(s,{...setup,action:'start'},'codex');
+   const record=submitTask(s,{...setup,operation_id:'checkpoint',spec:{role:'research',task:noise.repeat(1000),acceptance:'Preserve all fictional evidence.',expected_deliverable:'A fictional checkpoint',context_scope:'fictional-trial'}},'codex');
+   taskId=record.id;
+   for(let i=0;i<40;i++)sendTaskMessage(s,{...setup,operation_id:'inbox-'+i,to_task_id:taskId,content:noise.repeat(15)},'codex');
+   return s;
+  });
+  installTaskIndex(db);
+ });
+ const before=withStore(args.root,db=>({state:db.read(),token:db.changeToken()}));
+ for(const action of ['checkpoint','inbox']){
+  const query={...args,action,task_id:taskId,...(action==='inbox'?{limit:100}:{})};
+  assert.equal(fits(engine.tasks(query,'codex')),false,action+' must exercise reply overflow');
+  const held=await call('company_tasks',query,'codex');checkReply(held);
+  assert.equal(held.operation,'company_tasks');assert.equal(held.action,action);
+  assert.equal(held.operation_returned,undefined,'read overflow must not be reported as a returned mutation');
+  assert.equal(held.result_not_inlined,undefined);
+  assert.match(held.hold,/Inspection exceeds the public budget/);
+  assert.equal(held.operation_source,undefined);assert.equal(held.attribution_hold,undefined);
+ }
+ const inbox=await call('company_tasks',{...args,action:'inbox',task_id:taskId,limit:1},'codex');checkReply(inbox);
+ assert.equal(inbox.returned,1);assert.equal(inbox.total,40);assert.equal(inbox.complete,false);
+ assert.ok(inbox.items[0].source.sha256);
+ const runtime=await call('company_runtime',{...args,action:'status'},'codex');checkReply(runtime);
+ assert.equal(runtime.protocol,'async-runtime-v1');assert.equal(runtime.supervisor_is_model,false);
+ assert.equal(runtime.operation_returned,undefined);
+ const after=withStore(args.root,db=>({state:db.read(),token:db.changeToken()}));
+ assert.deepEqual(after,before,'task reads and runtime status must preserve all fictional state');
+});
+
+test('tight task portfolio pages price cursors and no-progress metadata without changing state',async()=>{
+ const args=fixture(true),setup={...args,epoch:1,source_instruction:'Create fictional pagination fixtures; no worker execution.'},ids=[];
+ withStore(args.root,db=>{
+  db.transaction('fictional.task-pages',s=>{
+   setRuntimeControl(s,{...setup,action:'start'},'codex');
+   for(let i=0;i<3;i++)ids.push(submitTask(s,{...setup,operation_id:'page-'+i,spec:{role:'research',task:'Inspect fictional task '+i,acceptance:'Retain exact task membership.',expected_deliverable:noise.repeat(20),context_scope:'fictional-pages'}},'codex').id);
+   return s;
+  });
+  installTaskIndex(db);
+ });
+ const before=withStore(args.root,db=>({state:db.read(),token:db.changeToken()}));
+ const query={...args,action:'context',context_scope:'fictional-pages',limit:1,budget:200000};
+ const first=await call('company_tasks',query,'codex');checkReply(first);
+ assert.equal(first.tasks.returned,1);assert.ok(first.tasks.next_cursor);
+ const firstBytes=size(JSON.stringify(first));let stopped;
+ for(let budget=firstBytes-1;budget>=512;budget-=64){
+  const page=await call('company_tasks',{...query,budget},'codex');checkReply(page);
+  assert.ok(size(JSON.stringify(page))<=budget);assert.equal(page.complete,false);
+  if(!page.tasks.returned){stopped=page;break;}
+  assert.ok(page.tasks.next_cursor);
+ }
+ assert.ok(stopped,'a bounded no-progress reply must precede an unfit control header');
+ assert.equal(stopped.tasks.next_cursor,null);assert.equal(stopped.tasks.complete,false);
+ assert.match(stopped.tasks.reason,/No zero-progress continuation/);
+ const budget=firstBytes+4,seen=[];let cursor;
+ do{
+  const page=await call('company_tasks',{...query,budget,...(cursor?{cursor}:{})},'codex');checkReply(page);
+  assert.ok(size(JSON.stringify(page))<=budget);assert.equal(page.tasks.returned,1);
+  assert.equal(page.constraints.complete,true);assert.equal(page.notices.complete,true);
+  assert.ok(!seen.includes(page.tasks.items[0].source.id),'continuations must advance to a new task');
+  seen.push(page.tasks.items[0].source.id);cursor=page.tasks.next_cursor;
+  assert.equal(page.tasks.complete,cursor===null);assert.equal(page.complete,cursor===null);
+ }while(cursor);
+ assert.deepEqual(seen.toSorted(),ids.toSorted());
+ const after=withStore(args.root,db=>({state:db.read(),token:db.changeToken()}));
+ assert.deepEqual(after,before,'bounded task pagination must preserve persisted state and revision');
 });
 
 test('normalized-v2 lifecycle hints wait for active jobs and pending upgrades',async()=>{
