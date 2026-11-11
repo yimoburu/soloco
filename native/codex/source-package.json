@@ -27,18 +27,18 @@
   "source_cut": {
     "handoff": {
       "path": "pins/coherent-source-handoff.json",
-      "bytes": 17146,
-      "sha256": "aa384aecae329a4ff5a90e8cf1488e4ad4e1dd289381407112cdac46805f9946"
+      "bytes": 20220,
+      "sha256": "e807a3f31d3fb93d1046d1480e216558f56073f81056a55fd7e4c9b70500f723"
     },
     "bindings": {
       "path": "pins/coherent-source-bindings.json",
       "bytes": 1953423,
-      "sha256": "609fb408adf68e632b04dd2dee5897c397327d0ab28570a8864a085d14cac246"
+      "sha256": "6ca879e4e9a21377c5a2799874be484ab37944bd136086c3659f377e0bdecbce"
     },
     "patch": {
       "path": "patches/c407-coherent-original-provenance.patch",
-      "bytes": 731102,
-      "sha256": "17a25a5efc3189443b182b7ea041f0986c2be77fe7152fd3f4def157a40a652a"
+      "bytes": 741276,
+      "sha256": "b1a5b87e611f2ee101b249de0c8decd9548e9c565d82db9f5b4fa921cae0e61e"
     },
     "review_state": "independent-review-required"
   },
@@ -268,8 +268,8 @@
       "before_sha256": "accf041a6bae9c4dcd88ad6ffd1ea17c3c6e4d6785d42cbadb0767d5b0d1ffd6",
       "payload": {
         "path": "overlay/codex-rs/codex-api/src/endpoint/models.rs",
-        "bytes": 18711,
-        "sha256": "38dac479cd2d90a4ee570bca2d247e19b79c207f06184d18bf18d32793c0771c"
+        "bytes": 25035,
+        "sha256": "ece053b5a9db1432a5c6b7acb3518de3ec5d7362ddb819d9cce7dcb8bc57b47e"
       },
       "mode": "100644"
     },
@@ -328,8 +328,8 @@
       "before_sha256": "355cc0f030ab32d21b3e6fcce569a15a59958fecdda85423bf05642497bdb1eb",
       "payload": {
         "path": "overlay/codex-rs/codex-api/src/endpoint/session.rs",
-        "bytes": 5071,
-        "sha256": "4d36aaea70b6b9ddab2f9447ad34198866edcbe514fc82f9d31ccdeef19d4ade"
+        "bytes": 6913,
+        "sha256": "6ab55dd72182532e19925cb2ff37d9b0edbaca83bb93ceb4c7af9b66d4e30070"
       },
       "mode": "100644"
     },
@@ -750,6 +750,16 @@
         "path": "overlay/codex-rs/core/src/guardian/review_session_tests.rs",
         "bytes": 40717,
         "sha256": "bb0280edc1a32bba7ccb3053f95153068f635eaea4a86a0aaa0d9234d12a6604"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/core/src/guardian/tests.rs",
+      "before_sha256": "1615abbd5fb342da5f1bc92198a121d0c692ca9b97807052379ae9f6be0bec82",
+      "payload": {
+        "path": "overlay/codex-rs/core/src/guardian/tests.rs",
+        "bytes": 168212,
+        "sha256": "58253b0ea7313384a05594239fcbc1eab5ad2ece6c67e86f4e2ccf309c80e5d8"
       },
       "mode": "100644"
     },

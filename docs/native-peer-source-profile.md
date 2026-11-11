@@ -100,7 +100,14 @@ the exact context contract, and installs the private decoder before spawning the
 runtime. Native observations describe native-owned facts. Node interpreter and
 source facts require a separate source-owned association.
 
-The current source graph has 152 overlays, 9,307 logical files and 92,049,762 bytes,
+This Rust source package does not supply the Node TaskHost, matching frame
+interpreter or static build-descriptor/private-FD adapter. That adapter must bind
+the exact implemented resource, request profile, Rust source, compiled-input
+manifest and executable before an original startup acknowledgement and a genuine
+continuation can be qualified. Passing the Rust component tests supplies none of
+those missing Node producers.
+
+The historical A558 source graph has 152 overlays, 9,307 logical files and 92,049,762 bytes,
 with source vector
 `a558137845eb0e49259ffc67408e3ac4edbeb273d57a37fe687fbd7b1294f56f` and package
 `cd43a6ff2b6564bfc2c1c2d8eec76f1d4498375696578970b533343c5f65e351`.
@@ -113,9 +120,55 @@ response argument as `None`, preserving its actual lack of an original receipt.
 The earlier ae174 test compilation failed at this call; that failure and its
 completed integrity checks remain historical in the reconciliation record.
 
-This exact graph awaits Rust compilation and test execution; all 163 authored
-definitions remain UNRUN for it. Earlier 009 compilation and failed execution
-receipts remain historical for their original graph. Python package
-checks and source verification do not establish a Core/native positive, a
-qualified binary, account or corpus acceptance, continuity, or company adoption.
-Build and runtime slots remain empty.
+That graph's 15 ordinary test harnesses and three fresh normal helpers have
+compiled successfully, with closed-process and source/toolchain/platform
+postchecks. The preceding same-a558 stale protocol-cache failure remains failed;
+a metadata-only source timestamp barrier preserved every source byte and the
+actual subsequent protocol dep-info demonstrated the rebuild. Exact receipts and
+the read-only staging of all 18 executables are retained in the
+[reconciliation record](spec-reconciliation.md#continuation-source-evidence).
+
+Ordinary execution is held after three passing roots and a Core guardian-fixture
+stack overflow; eleven roots remain unrun. Protected compilation completed those
+15 harnesses and a separate normal production binary. All 25 protected selections
+executed, with 161 passing and 18 failing cases in catalogue paths. These results
+and their exact failed receipts remain historical in the reconciliation record.
+
+The current coherent candidate has 153 overlays, 166 portable payloads, 9,307
+logical files and 92,058,140 bytes, with source vector
+`45a95bd839ffbc662a318f94c490f4c6ae548dc8ae1c734b7655657b6bf77a54`, package
+`965f08805e6d71a7df9030a02906d181da871f7e83682df3604eddfebb42f703`, and builder
+`c180a867995bebfe75e494ec527d395d6b3d451fbda625da4598f1677b598ad1`.
+It retains the original 163 definitions and assertions and adds six API regression
+definitions, for 169 total. Only the guardian inner-thread stack configuration
+and the two API models/Session paths change from A558. The fixture honors valid
+`RUST_MIN_STACK` with its original 4 MiB fallback/minimum. The dedicated bodyless
+models GET verifies the actual post-auth method, URL, body and response limit.
+Generic non-Responses execution still Holds; successful catalogue transport does
+not create source authority or alter private default-catalogue auth/cache/owner
+checks. The provider-base/renderer qualification boundary remains Held.
+
+Actual source application and full graph verification completed; the new Rust-only
+manifest is input DATA. All 15 ordinary test harnesses and three fresh normal
+helpers compiled successfully, with original process/stream/group closure and
+source, toolchain and platform postchecks. The harness build ran no Rust tests.
+Protected compilation also passed for 15 harnesses and a separate normal binary.
+All 25 protected selections passed 185 cases, including all 169 authored checks,
+with process, input, snapshot and sealed-file postchecks. The normal production
+binary was not executed. The first 45a ordinary run closed Held at its original
+deadline after three passing roots and an incomplete Core hook wait. A Python-only
+pair demonstrated the missing Xcode Python framework grant under DAA4 and the
+expected fixture output under BB6D; this is not actual Core `HookCompleted`
+evidence. At the November 11, 2026, 12:02 UTC checkpoint, a fresh whole-15-root
+run with the reviewed BB6D policy was active; no corrected whole-suite Pass is
+claimed by that checkpoint. [PR #78](https://github.com/yimoburu/soloco/pull/78)
+tracks exact current-head ordinary-suite acceptance. The run reuses verified read-only ordinary execution copies;
+product source and compiler receipts are unchanged. Genuine native acceptance
+is not established.
+Exact current source, manifest and verified closed build receipts are in the
+[reconciliation record](spec-reconciliation.md#current-coherent-continuation-candidate).
+Earlier 009 compilation and failed execution receipts retain their original
+scope. Package checks, compilation and staging do not establish a qualified
+binary, Node interpreter/static-slot join, account or corpus acceptance,
+continuity, or company adoption. Native-qualified executable and runtime slots
+remain empty; the embedded resource's source-pinned authoring status is unchanged.

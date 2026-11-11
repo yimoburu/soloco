@@ -13405,8 +13405,8 @@
   },
   {
     "path": "codex-rs/codex-api/src/endpoint/models.rs",
-    "bytes": 18711,
-    "sha256": "38dac479cd2d90a4ee570bca2d247e19b79c207f06184d18bf18d32793c0771c",
+    "bytes": 25035,
+    "sha256": "ece053b5a9db1432a5c6b7acb3518de3ec5d7362ddb819d9cce7dcb8bc57b47e",
     "mode": "100644"
   },
   {
@@ -13537,8 +13537,8 @@
   },
   {
     "path": "codex-rs/codex-api/src/endpoint/session.rs",
-    "bytes": 5071,
-    "sha256": "4d36aaea70b6b9ddab2f9447ad34198866edcbe514fc82f9d31ccdeef19d4ade",
+    "bytes": 6913,
+    "sha256": "6ab55dd72182532e19925cb2ff37d9b0edbaca83bb93ceb4c7af9b66d4e30070",
     "mode": "100644"
   },
   {
@@ -17845,8 +17845,8 @@
   },
   {
     "path": "codex-rs/core/src/guardian/tests.rs",
-    "bytes": 168000,
-    "sha256": "1615abbd5fb342da5f1bc92198a121d0c692ca9b97807052379ae9f6be0bec82",
+    "bytes": 168212,
+    "sha256": "58253b0ea7313384a05594239fcbc1eab5ad2ece6c67e86f4e2ccf309c80e5d8",
     "mode": "100644"
   },
   {

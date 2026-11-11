@@ -170,15 +170,10 @@ impl<T: HttpTransport + 'static> ModelsClient<T> {
     ) -> Result<(Bytes, Option<String>), ApiError> {
         let resp = self
             .session
-            .execute_with(
-                Method::GET,
-                Self::path(),
+            .execute_models_get(
+                request_url,
                 extra_headers,
-                /*body*/ None,
-                move |req| {
-                    req.url.clone_from(&request_url);
-                    req.response_body_limit_bytes = response_body_limit_bytes;
-                },
+                response_body_limit_bytes,
             )
             .await?;
 
@@ -533,5 +528,141 @@ mod tests {
         assert_ne!(observed.raw_body(), serde_json::to_vec(&ModelsResponse { models: vec![] }).unwrap());
         assert!(!format!("{observed:?}").contains("catalog-token"));
         assert!(!format!("{observed:?}").contains(raw));
+    }
+
+    #[derive(Clone, Copy)]
+    enum ModelsAuthReplacement {
+        ExactScope,
+        Method,
+        Url,
+        Body,
+        Limit,
+    }
+
+    struct ReplacingModelsAuth {
+        replacement: ModelsAuthReplacement,
+    }
+
+    impl AuthProvider for ReplacingModelsAuth {
+        fn add_auth_headers(&self, headers: &mut HeaderMap) -> Result<(), AuthError> {
+            headers.insert(http::header::AUTHORIZATION, "Bearer replacement".parse().unwrap());
+            Ok(())
+        }
+
+        fn apply_auth(&self, request: Request) -> AuthProviderFuture<'_> {
+            Box::pin(async move {
+                // Exercise the documented whole-request replacement contract.
+                let mut replacement = Request::new(Method::GET, request.url);
+                replacement.headers = request.headers;
+                replacement.response_body_limit_bytes = request.response_body_limit_bytes;
+                self.add_auth_headers(&mut replacement.headers)?;
+                match self.replacement {
+                    ModelsAuthReplacement::ExactScope => {}
+                    ModelsAuthReplacement::Method => replacement.method = Method::POST,
+                    ModelsAuthReplacement::Url => replacement.url.push_str("&retargeted=1"),
+                    ModelsAuthReplacement::Body => {
+                        replacement.body = Some(codex_client::RequestBody::Json(json!({"unexpected": true})));
+                    }
+                    ModelsAuthReplacement::Limit => replacement.response_body_limit_bytes = None,
+                }
+                Ok(replacement)
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn whole_request_auth_replacement_preserves_models_get_scope() {
+        let transport = CapturingTransport::default();
+        let provider = provider("https://example.com/api/codex");
+        let url = ModelsClient::<CapturingTransport>::request_url(&provider, "0.99.0");
+        let client = ModelsClient::new(
+            transport.clone(), provider,
+            Arc::new(ReplacingModelsAuth { replacement: ModelsAuthReplacement::ExactScope }),
+        );
+        let (models, _) = client.list_models(url.clone(), HeaderMap::new(), Some(64)).await.unwrap();
+        assert!(models.is_empty());
+        let request = transport.last_request.lock().unwrap();
+        let request = request.as_ref().unwrap();
+        assert_eq!(request.method, Method::GET);
+        assert_eq!(request.url, url);
+        assert!(request.body.is_none());
+        assert_eq!(request.response_body_limit_bytes, Some(64));
+        assert_eq!(request.headers[http::header::AUTHORIZATION], "Bearer replacement");
+    }
+
+    async fn assert_models_auth_scope_replacement(replacement: ModelsAuthReplacement) {
+        let transport = CapturingTransport::default();
+        let provider = provider("https://example.com/api/codex");
+        let url = ModelsClient::<CapturingTransport>::request_url(&provider, "0.99.0");
+        let client = ModelsClient::new(
+            transport.clone(), provider,
+            Arc::new(ReplacingModelsAuth { replacement }),
+        );
+        let result = client.list_models(url.clone(), HeaderMap::new(), Some(64)).await;
+        if crate::protected_peer::enabled() {
+            assert!(matches!(result,
+                Err(ApiError::Transport(TransportError::Build(message)))
+                    if message == "protected models GET scope HOLD"));
+            assert!(transport.last_request.lock().unwrap().is_none());
+        } else {
+            // Ordinary auth providers keep their existing returned-request behavior.
+            result.unwrap();
+            let request = transport.last_request.lock().unwrap();
+            let request = request.as_ref().unwrap();
+            assert_eq!(request.headers[http::header::AUTHORIZATION], "Bearer replacement");
+            match replacement {
+                ModelsAuthReplacement::ExactScope => unreachable!(),
+                ModelsAuthReplacement::Method => assert_eq!(request.method, Method::POST),
+                ModelsAuthReplacement::Url => assert_eq!(request.url, format!("{url}&retargeted=1")),
+                ModelsAuthReplacement::Body => assert_eq!(
+                    request.body, Some(codex_client::RequestBody::Json(json!({"unexpected": true})))),
+                ModelsAuthReplacement::Limit => assert_eq!(request.response_body_limit_bytes, None),
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn protected_models_get_rejects_post_auth_method_replacement() {
+        assert_models_auth_scope_replacement(ModelsAuthReplacement::Method).await;
+    }
+
+    #[tokio::test]
+    async fn protected_models_get_rejects_post_auth_url_replacement() {
+        assert_models_auth_scope_replacement(ModelsAuthReplacement::Url).await;
+    }
+
+    #[tokio::test]
+    async fn protected_models_get_rejects_post_auth_body_replacement() {
+        assert_models_auth_scope_replacement(ModelsAuthReplacement::Body).await;
+    }
+
+    #[tokio::test]
+    async fn protected_models_get_rejects_post_auth_response_limit_replacement() {
+        assert_models_auth_scope_replacement(ModelsAuthReplacement::Limit).await;
+    }
+
+    #[tokio::test]
+    async fn protected_generic_endpoint_execution_still_holds_models() {
+        let transport = CapturingTransport::default();
+        let session = EndpointSession::new(
+            transport.clone(), provider("https://example.com/api/codex"), Arc::new(DummyAuth),
+        );
+        let configured = std::sync::atomic::AtomicUsize::new(0);
+        let result = session.execute_with(Method::GET, "models", HeaderMap::new(), None, |_| {
+            configured.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        }).await;
+        if crate::protected_peer::enabled() {
+            assert!(matches!(result, Err(ApiError::Stream(message))
+                if message == "protected non-Responses endpoint HOLD"));
+            assert_eq!(configured.load(std::sync::atomic::Ordering::SeqCst), 0);
+            assert!(transport.last_request.lock().unwrap().is_none());
+            assert!(matches!(session.execute(Method::GET, "models", HeaderMap::new(), None).await,
+                Err(ApiError::Stream(message)) if message == "protected non-Responses endpoint HOLD"));
+            assert!(transport.last_request.lock().unwrap().is_none());
+        } else {
+            result.unwrap();
+            assert_eq!(configured.load(std::sync::atomic::Ordering::SeqCst), 1);
+            assert!(transport.last_request.lock().unwrap().is_some());
+        }
     }
 }

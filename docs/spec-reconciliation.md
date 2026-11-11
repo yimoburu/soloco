@@ -1,11 +1,14 @@
 # SPEC v0.21 reconciliation
 
-This assessment covers main `94391ac` (PR #64, including PR #65 corrections)
-and the compatible review-maintenance components below, November 9, 2026 Pacific.
+The historical assessment below covered main `94391ac` (PR #64, including PR #65
+corrections) and compatible review-maintenance components on November 9, 2026 Pacific.
 It retains the peer/storage, lossless transport, mechanical archive fence,
 publication-policy, scheduler and test-preflight evidence with its original pins.
 This includes the peer foundations, bounded storage core, executor/fixture fixes,
 durable observation journal and storage transfer qualification described below.
+The continuation composition in PR #78 is identified by its source graph and
+validation receipts below. Those records retain their candidate scope separately
+from the historical main pin.
 Contract: [SPEC.md](../SPEC.md), SHA-256
 `4bd0af7032d870195b2992e850b1dc9a50a9b9e59a3ec27267b7b0752cca57a9`.
 
@@ -616,10 +619,10 @@ acceptance gaps or establish actual-company adoption.
 
 ## Continuation source evidence
 
-The separate continuation change implements source mechanics for live response
+The historical A558 continuation subject implements source mechanics for live response
 and fixed-tool history, and context acknowledgement by the same scoped owner.
 It preserves private origin checks, exact supported wire mappings, fresh send
-fences and uncertain outcomes. The current package contains 152 overlays and
+fences and uncertain outcomes. That package contains 152 overlays and
 9,307 logical Rust files, totaling 92,049,762 bytes, with source vector
 `a558137845eb0e49259ffc67408e3ac4edbeb273d57a37fe687fbd7b1294f56f` and package digest
 `cd43a6ff2b6564bfc2c1c2d8eec76f1d4498375696578970b533343c5f65e351`.
@@ -641,14 +644,170 @@ Production source, all assertions and all 163 authored definitions remain intact
 The additional legacy plan-mode fixture now passes `None` for that optional
 argument: it has no original response receipt. Actual production calls already
 pass their captured original output; production provenance guards are unchanged.
-This exact graph has not been compiled or tested; its 163 authored definitions
-remain UNRUN. Earlier graph hashes and receipts above retain their historical
-scope and do not qualify it. Its source-only verifier exited successfully; the
-49-case Python evidence is parent-scoped, with no new run claimed for this tuple.
+This same a558 graph subsequently exposed a stale ordinary compilation-cache
+variant. The first 13 library harnesses compiled, but the extension phase failed
+with E0432/E0433 after Cargo reused an older normal `codex-protocol` variant whose
+relative dep-info omitted `original_exchange`; the companion-bin phase did not
+start. The failed receipt
+`2e3c6398a769401cf1270331baf79b02749eb52057c041297b87c707430b1164` and separate
+cache readback `450ed3a3b5b2b3264d8c8533562aac09eff36afa19559f0bc120bb3720543f64`
+retain that partial result and its completed process/input postchecks.
 
-Package checks and source review do not change a SPEC acceptance row to passed.
-Rust compilation, whole local test roots, protected positive cases, genuine
+The repair changed only timestamps in the mutable source copy, leaving every
+source byte, mode, inode and link count intact. The original builder verified all
+9,307 source bodies and membership once afterward. Barrier receipt
+`cd069879d2223066fb55e3ac3c8a202494412e709ca2d290cf3c061bcea9c415` and physical proof
+`7b58a6f271d42787c6944e8c5dbcf3db1063f389dad771d92ab7f3e15892cb94` retain that
+metadata-only change. The logical a558 graph, CD43 package and canonical compiled-input
+manifest `3e97a06e5f5ab9f3b2273aa1626726b527f0cdbabfed3f4374afdf608d2ad0ee` are unchanged.
+No source repair, feature change, cache deletion or governance adoption follows
+from that timestamp operation.
+
+The next ordinary build completed all 13 library harnesses, the whole extension
+harness and the companion-bin unit-test harness, with receipt
+`85777abc2f82578b204d5925ec6f13018cafaf285b471a5dc8f3eab313fc32fd`.
+Separate Root readback
+`fc60ab9836da02d9729169b17d49da19e0d2b7440e6d39f9e81863bcd3ec2f7a` confirmed that the
+normal protocol variant was rebuilt (`fresh:false`) and its actual dep-info
+included `original_exchange`; freshness was not inferred from the timestamp.
+The three fresh normal helpers then compiled with receipt
+`99870a67aa1be206eee7399197f72e83567d7a944d1cd50e04b28e0eb2899d67` and separate Root
+closed-input readback
+`15ded8203fa1dae67e6313bfb379cbf6ffcbf58b13ff68238f9ee32301420785`.
+All original compiler processes closed and source, toolchain and platform
+postchecks passed. These are compilation results, not Rust test results.
+
+All 18 ordinary executables were staged read-only outside the mutable compiler
+target. Parent-held descriptor verification bound the copies, totaling
+2,981,329,672 bytes, in checkpoint
+`b33d90f4be7488d71f5dcf193a91618ee843001da413ae28a18b64d4d9859098`.
+The ordinary run passed three complete roots (application server 438, API 275,
+configuration 414), then Core aborted in the guardian retry fixture. Its explicit
+4 MiB inner thread overrode the declared 32 MiB environment setting. Receipt
+`8323b0e6a1b31b022842731ef58b49f3f7c6fc57335bb48a5e9cd75a0aba0a5f` retains the
+abort, missing Core summary and eleven unrun roots. Source, toolchain, platform,
+snapshot, staged-file and original-process closure checks passed.
+
+Protected compilation completed 15 test harnesses and the separate normal
+production companion binary, receipt
+`c5d423b8ffa46fa0ea5bcc15f154bec8346b6711bb73e92769044de5b6247efa`.
+Root readback `9c0094e1211b770c177c947f2e6f4d972f142088ec8700ffbc8885ca04a78058`
+retains the eight logs and actual API unit/normal-library compile flags.
+All 25 whole-module/extension selections then executed 179 cases: 161 passed and
+18 failed in the model-catalog and model-provider paths. Receipt
+`9c911c0e0577574a58f072999a4da028f6b02c7ff5481ea5baaceac6e21d57fe` retains this
+failed result; all process, source, platform and staged-file postchecks passed.
+Root rehashed all 58 logs across both executions in
+`a05af0ad8289a121fc86e2635c33342141d2551d99cc32656b87abeef8108978`.
+
+The intended private original-catalogue producer was blocked by the generic
+protected non-Responses guard. That failure and the guardian stack overflow led
+to the separate coherent candidate described below. The A558 results retain
+their original scope and do not qualify the successor.
+
+Earlier graph hashes and receipts retain their historical scope and do not
+qualify later graphs. The source-only verifier for the A558 package exited
+successfully; the 49-case Python evidence is parent-scoped, with no new run
+claimed for this tuple. Source-pinned authoring metadata retains its original meaning.
+
+### Current coherent continuation candidate
+
+The current PR #78 candidate has 153 overlays and 166 portable payloads composing
+9,307 logical Rust files and 92,058,140 bytes. Its source vector is
+`45a95bd839ffbc662a318f94c490f4c6ae548dc8ae1c734b7655657b6bf77a54`, package digest
+`965f08805e6d71a7df9030a02906d181da871f7e83682df3604eddfebb42f703`, and original builder digest
+`c180a867995bebfe75e494ec527d395d6b3d451fbda625da4598f1677b598ad1`.
+The separate canonical and portable source reviews cleared this composition;
+the source-only package verifier exited successfully once, with no new 49-case run.
+
+Three source paths differ from A558. The guardian test's inner thread now reads
+valid `RUST_MIN_STACK` as `usize`, retaining its original 4 MiB fallback and minimum.
+The private Session models GET path requires a bodyless GET and checks the actual
+post-auth method, exact URL, body and response limit before transport. ModelsClient
+uses that path and adds six regression definitions. All previous 163 authored
+definitions and assertions, including the model-provider/default-catalogue auth,
+cache and ownership checks, are preserved; the current total is 169.
+
+Generic protected non-Responses execution still Holds. Catalogue GET admission
+permits transport only; it does not confer original instruction or catalogue
+authority. The private default-catalogue bindings and current auth checks remain
+required, and the provider-base/renderer qualification boundary remains Held.
+
+The actual three-file source application exited successfully. Full-source proof
+`ea4c84f5b614ec31e8cf7ea39650c3863f10081b81f2c224d77bdffb99d881a8` records the
+verified graph and preserved metadata for the other 9,304 files. The original
+builder produced Rust-only compiled-input manifest DATA
+`a8c72c5c43e4865a6468b4d6d01ff25be57e5b35a6d817562f0f9665d1c32ce6`.
+That manifest is input data, not a compiled binary or runtime capability.
+
+Ordinary compilation closed successfully for all 15 test harnesses, each with
+`profile.test=true`. Its 65,077-byte receipt is
+`b203c235d5495cc7e4eab154e75d9a21fec7a22ed9fb908c263ae198e5ed30e0`, retained at
+`root-bound-coherent45a-ordinary-fifteen-no-run-v1/parent-evidence/ordinary-typechecks/ACTUAL.DATA.json`.
+That build executed no Rust tests. The three fresh normal helpers then compiled
+successfully with `profile.test=false`; their 20,045-byte receipt is
+`7e4617e7c957091503504c475a7ceffbb31165abd2e3703d9f758369cdb4a2ba`, retained at
+`root-bound-coherent45a-three-helper-build-v1/helper-build-v1/parent-evidence/ordinary-local-helpers/ACTUAL.DATA.json`.
+Both exact receipt bodies were verified against these hashes and the current
+45a source vector. All original processes, output streams and groups closed;
+source, toolchain and platform postchecks passed.
+
+Protected compilation then passed for 15 test harnesses and one normal production
+binary, with 76,547-byte receipt
+`9db95ef79ffd896d9abee04e338cbc36df0da3152fa87816ca1063b746ea1a33` at
+`root-bound-coherent45a-protected-build-v1/parent-evidence/protected-builds/ACTUAL.DATA.json`.
+All 25 protected whole-module/extension selections passed: 185 cases, including
+all 169 authored definitions once and 16 preserved baseline cases, with zero
+failures. The 168,369-byte execution receipt is
+`6c18b5700ff631e0585c8816d17ffbbadb23a65a949cbffe5da6268e825d51d8` at
+`root-bound-coherent45a-protected-module-execution-v1/actual-protected-modules-v1/evidence/ACTUAL.DATA.json`.
+Original process/stream/group closure and source, toolchain, platform, historical
+snapshot and sealed-file postchecks passed. The separate normal production
+binary was sealed as an unqualified component and was not executed.
+
+The first 45a ordinary whole-root run used runtime helper DAA4 and closed Held at
+the original 3,590-second operation cutoff. Three complete roots passed
+(application server 438, API 281, configuration 414); Core supplied no final
+summary and eleven later roots did not run. The 251,197-byte receipt is
+`c733ac777047e63be6fcb188106f2d90f1ecee3808dcb968a2b83a678c062a53` at
+`root-bound-coherent45a-ordinary15-execution-v1/actual-ordinary-v1/evidence/ACTUAL.DATA.json`.
+The original controller sent one SIGKILL while its Core child remained unreaped;
+exit -9, complete output EOF, reaping and group absence were observed within the
+original final deadline. Read-only postchecks finished at 12:02:21 UTC on
+November 11, 2026: source, toolchain, SDK, historical snapshots and sealed files
+were unchanged. This remains a failed ordinary attempt, not a 169-check Pass.
+
+A separate Python-only paired fixture then compared unchanged DAA4 with reviewed
+runtime helper BB6D. The 10,239-byte receipt is
+`ef478332d4327b0708c3fa1377d261ccd5f87b936984d26e76ae832dc2a236b2` at
+`root-coherent45a-python-hook-paired-probe-preparation-v1/actual-paired/evidence/ACTUAL.DATA.json`.
+DAA4's actual dyld diagnostic reported a sandbox-blocked open of the selected
+Xcode `Python3.framework/Versions/3.9/Python3`. BB6D produced the original fixture's
+expected allow JSON and exact input log. Both owned processes closed completely;
+the pair took 2.5976 seconds. The policy change adds only read/map access to the
+selected Xcode Python alias/framework and literal ancestor traversal. Product
+source, compiler inputs, binaries, network/write rules and native authority did
+not change.
+
+The paired result strongly supports the missing Python grant as the cause of the
+old hook wait; it does not establish an actual Core `HookCompleted` event or a
+passing whole Core root. At the November 11, 2026, 12:02 UTC checkpoint, a fresh
+BB6D whole-15-root run was active (session 91300, preflight/staging); this checkpoint
+claims no corrected whole-suite Pass. [PR #78](https://github.com/yimoburu/soloco/pull/78)
+tracks the exact current-head ordinary-suite result and acceptance. The run uses verified read-only
+ordinary execution copies; the 45a source and compiler receipts above are unchanged.
+The shared mutable compiler target now contains protected outputs and supplies no
+ordinary execution identity. The older A558 failures and this DAA4 Hold retain
+their original scopes; source-pinned authoring metadata retains its as-created meaning.
+
+Package checks, source review, compilation and staging do not change a SPEC
+acceptance row to passed. Whole local test roots, protected positive cases, genuine
 Core/native execution, Node integration, account and corpus qualification,
 continuity and company adoption retain their separate evidence requirements.
+This change does not add the Node TaskHost, matching frame interpreter or static
+build-descriptor/private-FD adapter. A coherent adapter must bind the exact
+resource, request profile, Rust source, compiled-input manifest and executable;
+an original positive startup and continuation must then establish that join.
+Separate controlled Node mechanics cannot substitute for those producers.
 The qualified executable and runtime slots remain empty. Historical compilation
 and failed test-build receipts retain their exact original source scope.

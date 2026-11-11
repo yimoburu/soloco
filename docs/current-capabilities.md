@@ -10,6 +10,14 @@ SPEC v0.21 retains the mission and 47 normative rows;
 exact published v0.20 compatibility remains.
 Source availability, execution evidence and company adoption are separate.
 Historical reports retain their original source identities and verdicts.
+The PR #78 continuation composition below adds bounded Rust source mechanics.
+The current 45a candidate has compiled all 15 ordinary harnesses and three fresh
+normal helpers. All 25 protected selections passed 185 cases, including all 169
+authored checks. The first 45a ordinary run closed Held; a Python-only policy
+comparison passed. At the November 11, 2026, 12:02 UTC checkpoint, fresh BB6D
+whole-root validation was active. [PR #78](https://github.com/yimoburu/soloco/pull/78)
+tracks exact current-head ordinary-suite acceptance. A558 failures remain historical.
+Installation and adoption require separate acceptance.
 The evidence-retention repair below adds a bounded review path, with native
 judgment and local acceptance still requiring their own exact evidence.
 
@@ -33,6 +41,7 @@ judgment and local acceptance still requiring their own exact evidence.
 | Complete compulsory catalog evidence | `upgrade-evidence.mjs` | `claude-catalog.test.mjs`, retained PR #37 before/after probes | Unknown model-speed values stay mandatory; delivery does not prove model understanding |
 | Supplied local observation comparison | `tools/outcome-observations.mjs` | `outcome-observations.test.mjs` | Exact supplied inputs; independent measurement validity and causal impact unestablished |
 | History qualification and operating publication | Scoped/context/operating modules | Historical qualification suites | Real accumulated-history bootstrap is separate from scripted proof validation |
+| Bounded original continuation and context delivery | `native/codex/overlay/`; [source profile](native-peer-source-profile.md) | 45a ordinary harness/helper compilation and protected build passed. All 25 protected selections passed 185 cases, including all 169 authored checks. The first ordinary run closed Held; the Python-only DAA4/BB6D comparison passed. At November 11, 2026, 12:02 UTC, fresh BB6D whole-15 validation was active. [PR #78](https://github.com/yimoburu/soloco/pull/78) tracks exact current-head ordinary acceptance; [reconciliation](spec-reconciliation.md#current-coherent-continuation-candidate) retains checkpoint receipts and historical failures. Source and compiled artifacts are unchanged. | The Python fixture is not Core hook-completion or native evidence. Read-only models GET admission confers no source authority; generic Holds and private catalogue auth/cache/owner checks remain. The provider-base/renderer boundary, genuine native continuation, Node interpreter/static-slot joins, account/corpus qualification, continuity and adoption remain unproved. The normal production binary was not executed. Qualified executable/runtime slots remain empty. |
 | Peer coordination foundations | `peers/ledger.mjs`, `peers/model.mjs`, `peers/review-selection.mjs`, `peers/github.mjs` | `peer-ledger.test.mjs`, `peer-model.test.mjs`, `peer-github.test.mjs` | Library checks do not qualify the complete peer scheduler, protected host transport or production publication policy |
 | Current peer publication-policy evidence | `peers/model.mjs` | Complete policy91 and admission-provider15 roots; 106 fresh confined cases, independent native QA and receiver acceptance; whole ordinary model98 retained in 204-case regression evidence | Read-only protected evidence checks current authority, historical participant identities and the final owning snapshot. Provider failures retain their original identity. Controlled publisher consumption is covered by the P4 component below; genuine protected account, host and publication qualification remains separate |
 | Controlled policy-bound atomic publication | `peers/github.mjs` | Whole GitHub98, atomic132 and policy96 roots; retained canonical326 execution, a distinct native QA Pass with complete required delivery, and owner local acceptance of that exact candidate | Typed P2 evidence, current task/grant/policy, exact base/head/candidate and retained uncertain effects are checked in the controlled library. Local acceptance and source integration do not qualify a real account/host publisher, release the old unknown QA session or adopt peer mode; see `peer-github-atomic.md` |

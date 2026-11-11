@@ -123,6 +123,51 @@ impl<T: HttpTransport + 'static> EndpointSession<T> {
         Ok(response)
     }
 
+    /// The metadata-only models route is separate from generic endpoint execution.
+    /// Auth still owns the returned request, but protected mode cannot broaden this
+    /// bodyless GET or change its selected route and per-request response limit.
+    pub(crate) async fn execute_models_get(
+        &self,
+        request_url: String,
+        extra_headers: HeaderMap,
+        response_body_limit_bytes: Option<usize>,
+    ) -> Result<Response, ApiError> {
+        let make_request = || {
+            let mut req = self.make_request(&Method::GET, "models", &extra_headers, None);
+            req.url.clone_from(&request_url);
+            req.response_body_limit_bytes = response_body_limit_bytes;
+            req
+        };
+
+        let response = run_with_request_telemetry(
+            self.provider.retry.to_policy(),
+            self.request_telemetry.clone(),
+            make_request,
+            |req| {
+                let auth = self.auth.clone();
+                let transport = &self.transport;
+                let request_url = &request_url;
+                async move {
+                    let req = auth.apply_auth(req).await.map_err(TransportError::from)?;
+                    if crate::protected_peer::enabled()
+                        && (req.method != Method::GET
+                            || req.url.as_str() != request_url.as_str()
+                            || req.body.is_some()
+                            || req.response_body_limit_bytes != response_body_limit_bytes)
+                    {
+                        return Err(TransportError::Build(
+                            "protected models GET scope HOLD".to_string(),
+                        ));
+                    }
+                    transport.execute(req).await
+                }
+            },
+        )
+        .await?;
+
+        Ok(response)
+    }
+
     #[instrument(
         name = "endpoint_session.stream_encoded_json_with",
         level = "info",
