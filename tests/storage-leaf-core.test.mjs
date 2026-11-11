@@ -292,9 +292,17 @@ test('frozen originals survive mutation and reopen; intake envelopes do not repl
         if(damage==='corrupt')store.db.prepare("UPDATE immutable_values SET bytes='null' WHERE sha256=?").run(innerHash);
         else store.db.prepare('DELETE FROM immutable_values WHERE sha256=?').run(innerHash);
         assert.deepEqual(store.readIntake(baseline,{values:true}),intact,'intake verifies row envelopes, not hidden nested originals');
-        assert.throws(()=>snapshotBytes(frozen,inner),/missing|hash mismatch|corrupt/);
-        assert.throws(()=>captureSnapshotDependencies(current,()=>true,{root:envelope}),/missing|hash mismatch|corrupt/);
-        assert.throws(()=>validateSnapshotDependencies(current,checked.dependencies),/missing|hash mismatch|corrupt/);
+        const diagnostic=error=>{
+          assert.equal(error.code,'ERR_IMMUTABLE_STORAGE_VALUE');
+          const details={reason:damage==='missing'?'missing':'hash_mismatch',sha256:innerHash,
+            ...(damage==='corrupt'?{actual_sha256:sha('null')}:{})};
+          assert.deepEqual(error.details,details);
+          assert.equal(error.message,'Immutable storage value missing or hash mismatch: '+JSON.stringify(details));
+          return true;
+        };
+        assert.throws(()=>snapshotBytes(frozen,inner),diagnostic);
+        assert.throws(()=>captureSnapshotDependencies(current,()=>true,{root:envelope}),diagnostic);
+        assert.throws(()=>validateSnapshotDependencies(current,checked.dependencies),diagnostic);
       }finally{store.db.prepare('INSERT OR REPLACE INTO immutable_values VALUES(?,?)').run(innerHash,raw);}
     }
     validateSnapshotDependencies(current,checked.dependencies);

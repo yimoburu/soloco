@@ -76,6 +76,8 @@ async function wiringScenario(moduleURL,mode,supported) {
   const {syncBuiltinESMExports}=await import('node:module');
   const {fileURLToPath}=await import('node:url');
   const {EventEmitter}=await import('node:events');
+  const {createHash,randomBytes}=await import('node:crypto');
+  const digest=value=>createHash('sha256').update(value).digest('hex');
   const root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'soloco-flag-wiring-')));
   const scratch=path.join(root,'.scratch');fs.mkdirSync(scratch);
   fs.writeFileSync(path.join(root,'sample.test.mjs'),'throw new Error("must never execute");');
@@ -114,11 +116,25 @@ async function wiringScenario(moduleURL,mode,supported) {
     return child;
   };
   syncBuiltinESMExports();
-  let receipt;
+  let receipt,payload,expectedBinding;
+  const messages=[];
   if(mode==='watchdog') {
-    process.argv=[process.execPath,fileURLToPath(moduleURL),'--watch-tests',JSON.stringify({root,scratch,paths:['./sample.test.mjs'],timeout_ms:100,max_output_bytes:1024})];
+    // This is supplied/mock wiring evidence, not actual IPC or OS authentication.
+    // Construct the production request shape without relaxing its source guards.
+    const st=fs.lstatSync(scratch,{bigint:true});
+    payload={root,scratch,paths:['./sample.test.mjs'],timeout_ms:100,max_output_bytes:1024,
+      scratch_identity:{path:fs.realpathSync(scratch),dev:String(st.dev),ino:String(st.ino)}};
+    const request={protocol:'owned-scratch-close-v1',request_id:randomBytes(32).toString('hex'),
+      runner_sha256:digest(fs.readFileSync(fileURLToPath(moduleURL))),
+      request_sha256:digest(JSON.stringify(payload)),controller_pid:process.ppid};
+    expectedBinding={...request,watchdog_pid:process.pid};
+    process.argv=[process.execPath,fileURLToPath(moduleURL),'--watch-tests',JSON.stringify({request,payload})];
     Object.defineProperty(process,'connected',{value:true});
-    process.send=(message,callback)=>{if(message.type==='result')receipt=message.result;callback?.();};
+    process.send=(message,callback)=>{
+      messages.push(structuredClone(message));
+      if(message.type==='result')receipt=message.result;
+      callback?.();
+    };
     process.disconnect=()=>{};
   }
   try {
@@ -134,6 +150,34 @@ async function wiringScenario(moduleURL,mode,supported) {
     } else {
       assert.equal(receipt.status,supported?'passed':'error',JSON.stringify(receipt));
       if(!supported)assert.match(receipt.error,/Node test isolation is unavailable/);
+      assert.deepEqual(messages.map(message=>message.type),supported?['ready','started','result']:['ready','result']);
+      for(const message of messages){
+        assert.deepEqual(message.binding,expectedBinding);
+        assert.deepEqual(Object.keys(message).sort(),
+          (message.type==='result'?['type','binding','result']:message.type==='started'?['type','binding','pid']:['type','binding']).sort());
+      }
+      assert.match(expectedBinding.request_id,/^[a-f0-9]{64}$/);
+      assert.equal(expectedBinding.controller_pid,process.ppid);assert.equal(expectedBinding.watchdog_pid,process.pid);
+      assert.equal(expectedBinding.runner_sha256,digest(fs.readFileSync(fileURLToPath(moduleURL))));
+      assert.equal(expectedBinding.request_sha256,digest(JSON.stringify(payload)));
+      const execution=receipt.local_execution;
+      assert.equal(execution.protocol,'owned-scratch-close-v1');
+      assert.deepEqual(execution.watchdog,expectedBinding);
+      assert.deepEqual(execution.scratch,payload.scratch_identity);
+      assert.equal(execution.termination_confirmed,true);
+      assert.equal(execution.closure_basis,supported?'child_close':'never_started');
+      assert.deepEqual(execution.child,supported
+        ?{launch_attempted:true,spawn_observed:true,close_observed:true,pid:123456}
+        :{launch_attempted:false,spawn_observed:false,close_observed:false,pid:null});
+      if(supported)assert.equal(messages[1].pid,execution.child.pid);
+      assert.deepEqual(execution.cleanup,{status:'confirmed',root_absent:true});
+      assert.equal(fs.existsSync(scratch),false);
+      assert.equal(receipt.test_execution_attempted,Boolean(supported));
+      assert.equal(receipt.tests_executed,Boolean(supported));assert.equal(receipt.output_truncated,false);
+      assert.equal(receipt.exit_code,supported?0:null);assert.equal(receipt.signal,null);
+      assert.deepEqual(receipt.limits,{timeout_ms:payload.timeout_ms,max_output_bytes:payload.max_output_bytes});
+      const captured=supported?Buffer.byteLength('TAP version 13')+1:0;
+      assert.deepEqual(receipt.output_bytes,{captured,observed:captured});
     }
     assert.deepEqual(probes,supported==='--test-isolation=none'?['--test-isolation=none']:['--test-isolation=none','--experimental-test-isolation=none']);
     assert.equal(launches.length,supported?1:0);
@@ -144,8 +188,12 @@ for(const mode of ['startup','watchdog'])for(const supported of [stable,experime
   test(`${mode} wiring selects ${supported??'neither spelling and fails closed'}`,()=>{
     const url=new URL('../plugins/soloco/runtime/local-sandbox.mjs',import.meta.url).href;
     const code=`(${wiringScenario.toString()})(${JSON.stringify(url)},${JSON.stringify(mode)},${JSON.stringify(supported)})`;
+    // Associate only defined temp selectors with the reviewed private parent TMP.
+    // Do not inherit arbitrary host/preload/secret/provider environment variables.
+    const wiringEnvironment={PATH:'/usr/bin:/bin',OPENSSL_CONF:'/dev/null'};
+    for(const key of ['TMPDIR','TMP','TEMP'])if(process.env[key]!==undefined)wiringEnvironment[key]=process.env[key];
     const result=spawnSync(process.execPath,['--input-type=module','--eval',`await ${code}`],{
-      env:{PATH:'/usr/bin:/bin',OPENSSL_CONF:'/dev/null'},encoding:'utf8',timeout:10000,maxBuffer:20000,
+      env:wiringEnvironment,encoding:'utf8',timeout:10000,maxBuffer:20000,
     });
     assert.equal(result.status,0,result.error?.message||result.stderr);
   });
