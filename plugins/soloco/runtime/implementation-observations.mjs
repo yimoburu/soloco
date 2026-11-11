@@ -300,4 +300,3 @@ export function implementationObservations(state,options={}){
  for(const item of items.slice(offset,offset+limit)){report.items.push(item);if(finish()>outputBytes){report.items.pop();break;}}
  obNeed(finish()<=outputBytes,'summary exceeds output bound');obNeed(report.returned>0||report.complete,'one observation exceeds output bound; reduce included events');return report;
 }
-

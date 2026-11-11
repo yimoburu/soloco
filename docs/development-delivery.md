@@ -26,7 +26,7 @@ those external sessions or grant them company ownership.
 
 ## Inspect one canonical acceptance report
 
-Only a successful existing `company_develop action: "accept"` creates protocol
+The ordinary path's successful `company_develop action: "accept"` creates protocol
 `development-acceptance-report-v1`, inside the accepted test receipt's immutable
 `development.acceptance`. It records the existing acceptance facts, exact plan,
 candidate, pre-acceptance receipt, QA and controller snapshots; actual test and

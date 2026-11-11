@@ -54,7 +54,8 @@ flowchart TB
     IN[Installation and host reload]
     AD[Checked company rule adoption and continuity]
   end
-  I --> GH --> IN --> AD
+  I --> GH --> IN
+  IN -->|when definitions or ownership change| AD
   subgraph Pending[Source libraries with production qualification still pending]
     PE[Peer model, scheduler, membership and protected observation journal]
     BR[Protected host identity, broker, routing and migration]
