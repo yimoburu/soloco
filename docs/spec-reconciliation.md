@@ -840,6 +840,10 @@ they do not imply a rerun or full-suite acceptance of the successor.
 
 ### Current coherent continuation candidate
 
+This section retains the dated PR #78 parent checkpoint. The executable bridge
+successor below supersedes its missing-adapter source assessment; all parent
+failures, receipts and qualification limits keep their original meaning.
+
 At the November 11, 2026 source checkpoint, PR #78 carries the 77ea fixture successor:
 154 overlays, 167 portable payloads, 9,307 logical files and 92,058,144 bytes. Its vector is
 `77ea459e7555e0ca7a7270fd9a42b805db52b2d1dacd8efbd9ac815ab783bb0b`, package digest
@@ -893,7 +897,38 @@ they are not a new complete-source or binary qualification for 77ea.
 No fresh 15-target/protected/production-companion build is claimed for 77ea.
 The parent normal binary 5c65521c and manifest a8c72 retain their old association;
 the new manifest bb617 is source DATA, not a native executable capability.
-The matching Node TaskHost/frame/static build-descriptor/private-FD adapter is
-still missing. Original native startup/continuation, account/corpus acceptance,
+At this parent checkpoint the matching Node TaskHost/frame/static build-descriptor/
+private-FD adapter was still missing. Original native startup/continuation, account/corpus acceptance,
 continuity and company adoption remain unproved; qualified executable/runtime
 slots stay NULL. Normative SPEC v0.21 and its governance commitment above, and adopted v0.20, remain unchanged.
+
+### Executable peer bridge source successor
+
+The [executable bridge](protected-peer-bridge.md) joins the original selected
+component to a separate executable deployment, fixed original Node namespaces,
+source-owned interpreter association, private-FD startup acknowledgement and
+exact five-tool declarations. Its owned CONNECT listener is bound into the
+original Rust bootstrap and HTTP factory, preserving original authentication
+and TLS with no proxy fallback. This is internal source composition; company MCP
+dispatch and adopted company state do not use it.
+
+The Rust successor has 9,309 logical files, 92,071,707 bytes and 158 overlays.
+Its package is `11dce050e14c48ed20dac9052ec096f3fbd94717603035b22f56f7af851ce84c`,
+builder `6edb4fb2eff2e84c2a3850dae6a15d3e270898e1a43615de98bc9d536d92acde`
+and compiled-input DATA manifest
+`af7c8cc78011e7775945ed757fe346c2feea2605f8dec0e663b5307ec8852a66`.
+Eight Rust paths change, including eleven new pure test definitions; parent
+builds and observations do not qualify these changed bytes.
+
+The source guards support S018, S028, S056, S058, S084 and S086 without upgrading
+their existing assessment. Complete wire-size checks precede reservations and
+charges. The new active-task route is confined to read-only foundation callbacks;
+general effects still need an independently reviewed task/attempt/context fence
+inside the same P2 write transaction, including replay. Original child exit,
+stream EOF and owned TCP closure remain separate from unknown group absence and
+remote-domain closure. The stronger physical-close gate remains Held.
+
+Actual selected deployment/startup, account access, native continuation, realistic
+replacement/continuity and company adoption remain unproved. Source test/build
+results are ordinary implementation evidence only. SPEC v0.21, adopted company
+rules, prior failures, unknown reservations and unresolved notices are unchanged.

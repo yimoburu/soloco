@@ -31,6 +31,19 @@ function fixture(t,options={}){
   return f;
 }
 
+test('v3 creation DATA without original interpreter support holds before task admission puts or model charge',t=>{
+  const f=fixture(t),task=f.submit();f.claim(task);
+  const owner=get(f,'principals','cos-a');
+  // This deliberately incomplete source-only trigger is NOT a genuine sealed
+  // thread. It must never turn serialized profile DATA into runtime support.
+  seed(f,'work_items','p8e:codex-thread:'+peerDigest(owner.value.native_id),{protocol:'p8e-stable-five-v3-context-contract-v1',evidence_scope:'SYNTHETIC_NEGATIVE_CONTROL_ONLY'});
+  const before=state(f);let puts=0;const write=f.ledger.write;
+  f.ledger.write=function(type,principal,callback){return write.call(this,type,principal,tx=>callback(type==='task/admit'?Object.freeze({...tx,put(...args){puts++;return tx.put(...args);}}):tx));};
+  try{assert.throws(()=>f.admit(task),code('CONTEXT_INTERPRETER_UNAVAILABLE'));}finally{f.ledger.write=write;}
+  assert.equal(puts,0);assert.deepEqual(state(f),before);
+  assert.equal(get(f,'control','usage'),null);assert.equal(get(f,'tasks',task.id).value.attempt,null);
+});
+
 test('strict canonical request semantics preserve own __proto__, Unicode and raw text hashes',t=>{
   const f=fixture(t),content=JSON.parse('{"__proto__":{"kept":true},"unicode":"雪😀","nested":{"unknown":{"x":1}}}');
   const p=f.propose('cos-a',{content});assert.equal(Object.hasOwn(p.value.content,'__proto__'),true);assert.equal(p.value.content.__proto__.kept,true);assert.equal(p.sha256,peerDigest(p.value));assert.equal(digest('abc'),'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');assert.equal(digest(content),peerDigest(content));

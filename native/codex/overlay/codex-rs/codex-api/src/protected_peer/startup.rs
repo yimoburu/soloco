@@ -7,6 +7,7 @@ pub struct OriginalBootstrapClaim {
     pub(super) nonce: String, pub(super) slot_id: String,
     pub(super) executable_sha256: String, pub(super) source_manifest_sha256: String,
     pub(super) original_home_sha256: String, pub(super) state_root: String, pub(super) cwd: String,
+    loopback_proxy_port: Option<u16>,
     context_selection: Option<super::context_contract::OriginalContextSelection>,
     consumed: AtomicBool,
     decoder_issued: AtomicBool,
@@ -25,6 +26,21 @@ impl NativeStartup {
 impl OriginalBootstrapClaim {
     pub fn state_root(&self) -> &str { &self.state_root }
     pub fn cwd(&self) -> &str { &self.cwd }
+
+    /// Only the consumed original pre-auth claim supplies this fixed transport
+    /// hop. The factory retains its cookies and destination policy; this creates
+    /// no authentication owner, request permit or replacement HTTP transport.
+    pub fn bind_original_http_client_factory(&self, factory: codex_http_client::HttpClientFactory)
+        -> Result<codex_http_client::HttpClientFactory, TransportError> {
+        if !self.consumed.load(Ordering::SeqCst) {
+            return Err(hold("original host claim required before HTTP factory binding"));
+        }
+        match self.loopback_proxy_port {
+            Some(port) => factory.with_protected_loopback_proxy(port, &self.nonce)
+                .map_err(|_| hold("original fixed loopback route changed")),
+            None => Ok(factory),
+        }
+    }
 }
 fn executable_hash() -> Result<String, TransportError> {
     let path = std::env::current_exe().map_err(|_| hold("original executable identity"))?;
@@ -62,7 +78,8 @@ pub async fn begin_original_companion(state_root: &Path, cwd: &Path) -> Result<N
         let claim = OriginalBootstrapClaim { nonce: challenge.nonce.clone(), slot_id: challenge.slot_id.clone(),
             executable_sha256: challenge.executable_sha256.clone(), source_manifest_sha256: challenge.source_manifest_sha256.clone(),
             original_home_sha256: challenge.original_home_sha256.clone().ok_or_else(|| hold("missing original host"))?,
-            state_root: challenge.state_root.clone(), cwd: challenge.cwd.clone(), context_selection, consumed: AtomicBool::new(false), decoder_issued:AtomicBool::new(false) };
+            state_root: challenge.state_root.clone(), cwd: challenge.cwd.clone(), loopback_proxy_port:challenge.loopback_proxy_port,
+            context_selection, consumed: AtomicBool::new(false), decoder_issued:AtomicBool::new(false) };
         super::context_contract::retain_original_context_selection(claim.context_selection.clone())?;
         state.challenge = Some(challenge);
         Ok(NativeStartup { claim })
@@ -77,16 +94,23 @@ pub async fn observe_original_bootstrap(claim: &OriginalBootstrapClaim, records:
         let owner = channel().await?; let mut state = owner.lock().await;
         if !claim.consumed.load(Ordering::SeqCst) || state.host_observation.is_some() ||
             state.challenge.as_ref().is_none_or(|c| c.nonce != claim.nonce) { return Err(hold("foreign/replayed original bootstrap")); }
-        let facts = json!({"protocol":PROTOCOL,"kind":"host_bootstrap","nonce":claim.nonce,
+        let mut facts = json!({"protocol":PROTOCOL,"kind":"host_bootstrap","nonce":claim.nonce,
             "pid":std::process::id(),"slot_id":claim.slot_id,"executable_sha256":claim.executable_sha256,
             "source_manifest_sha256":claim.source_manifest_sha256,"original_home_sha256":claim.original_home_sha256,
             "state_root":claim.state_root,"cwd":claim.cwd,"host_instance_id":Uuid::new_v4().to_string(),"sources":records});
+        // None retains the original legacy frame byte schema. The source-bound
+        // selected port is inspectable; proxy authorization itself is not logged.
+        if let Some(port) = claim.loopback_proxy_port { facts["loopback_proxy_port"] = json!(port); }
         tokio::time::timeout(std::time::Duration::from_secs(5), state.write(&facts)).await
             .map_err(|_| hold("bootstrap observation deadline"))??;
         state.host_observation = Some(facts);
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "startup_loopback_tests.rs"]
+mod loopback_source_tests;
 
 /// The original app-server scoped owner calls this only AFTER effective config,
 /// profile/provider and same AuthManager checks. The claim cannot be reconstructed.

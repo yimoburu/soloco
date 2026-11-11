@@ -105,6 +105,43 @@ function recoveryRequest(f,prior,args={}){
   return {operation_id:f.op('recover'),enrollment_id:'recovered-'+v.enrollment_id,principal_id:v.principal_id,role:v.role,host:v.host,scope:v.scope,input_refs:v.input_refs,expires_at:v.expires_at,expected_generation:prior.principal.value.generation,source_instruction:'Attributable pending recovery reason only; inherit the original authority, expiry and unused allowance.',...args};
 }
 
+test('forged whole-wire restrictions hold membership admission before any buffered put or model charge',t=>{
+  const f=fixture(t),enrollment=f.enroll(),before=state(f);let invoked=0,puts=0;
+  const write=f.ledger.write;
+  f.ledger.write=function(type,principal,callback){return write.call(this,type,principal,tx=>callback(type==='membership/admit'?Object.freeze({...tx,put(...args){puts++;return tx.put(...args);}}):tx));};
+  try{
+    for(const forged of [{},false,0,()=>{invoked++;},Object.freeze({protocol:'original-first-turn-wire-restriction-v1'})])
+      assert.throws(()=>f.service.operator.admit({operation_id:f.op('restricted-admit'),enrollment_id:enrollment.value.enrollment_id,phase:'reconstruction'},forged),error=>error.code==='CONTEXT_DELIVERY_ORIGINAL_REQUIRED');
+  }finally{f.ledger.write=write;}
+  assert.equal(invoked,0);assert.equal(puts,0);assert.deepEqual(state(f),before);assert.equal(get(f,'control','usage'),null);
+});
+
+test('membership delivery preparation is read-only and requires an original interpreter and exact current phase',t=>{
+  const f=fixture(t),enrollment=f.enroll(),admission=f.admit(enrollment),before=state(f);
+  const args={enrollment_id:enrollment.value.enrollment_id,phase:'reconstruction',attempt_id:admission.phase.value.attempt_id};
+  assert.throws(()=>f.service.host.prepareDelivery(args,{}),error=>error.code==='CONTEXT_INTERPRETER_UNAVAILABLE');
+  assert.deepEqual(state(f),before);
+  assert.throws(()=>f.service.host.prepareDelivery({...args,attempt_id:'different-attempt'},{}),error=>error.code==='ATTEMPT_CHANGED');
+  assert.deepEqual(state(f),before);assert.equal(get(f,'control','usage').value.model_calls,1);
+  f.service.operator.revoke({operation_id:f.op('revoke-prepared-source'),enrollment_id:enrollment.value.enrollment_id,source_instruction:'Synthetic explicit revoke; retain the reserved unknown attempt.'});
+  const revoked=state(f);
+  assert.throws(()=>f.service.host.prepareDelivery(args,{}),error=>error.code==='ENROLLMENT_CLOSED');
+  assert.deepEqual(state(f),revoked);
+});
+
+test('a forged review restriction cannot create its prospective private reviewer or consume a second model call',t=>{
+  const f=fixture(t),enrollment=f.enroll();reconstruction(f,enrollment);
+  const before=state(f),reviewer='prospective-restriction-reviewer';assert.equal(get(f,'principals',reviewer),null);
+  assert.throws(()=>f.service.operator.admit({operation_id:f.op('restricted-review'),enrollment_id:enrollment.value.enrollment_id,phase:'review',reviewer_principal_id:reviewer},{}),error=>error.code==='CONTEXT_DELIVERY_ORIGINAL_REQUIRED');
+  assert.deepEqual(state(f),before);assert.equal(get(f,'principals',reviewer),null);assert.equal(get(f,'control','usage').value.model_calls,1);
+});
+
+test('completed membership phases cannot prepare another original delivery',t=>{
+  const f=fixture(t),enrollment=f.enroll(),completed=reconstruction(f,enrollment),before=state(f);
+  assert.throws(()=>f.service.host.prepareDelivery(completed.observed.binding,{}),error=>error.code==='PHASE_CLOSED');
+  assert.deepEqual(state(f),before);
+});
+
 test('synthetic host fixture: pending reconstruction and private qualification activate a fresh member through real SQLite',t=>{
   const f=fixture(t),enrollment=f.enroll({principal_id:'new-cos'});
   assert.equal(get(f,'principals','new-cos').value.status,'pending');

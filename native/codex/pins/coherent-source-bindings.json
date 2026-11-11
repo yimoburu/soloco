@@ -8149,8 +8149,8 @@
   },
   {
     "path": "codex-rs/app-server/src/config_manager.rs",
-    "bytes": 34181,
-    "sha256": "4793ed7939039c85faa9c43f2b962e1ecc7579fd5d0c4173599153c8304e5bc4",
+    "bytes": 35030,
+    "sha256": "a73e02704b2351a3d3ff3f53333a6f2ffb2a89285ff4101f2db531a4933cbe6a",
     "mode": "100644"
   },
   {
@@ -8455,8 +8455,8 @@
   },
   {
     "path": "codex-rs/app-server/src/protected_host.rs",
-    "bytes": 24265,
-    "sha256": "d32fc8d24c731ee731297a51b7a5780ac752db84324ead6cf1307c17f0759bbc",
+    "bytes": 24338,
+    "sha256": "cfebc91353f977630ca425328142273c7983dd5d66189710ed0a7222a995ebd1",
     "mode": "100644"
   },
   {
@@ -13579,8 +13579,8 @@
   },
   {
     "path": "codex-rs/codex-api/src/protected_peer.rs",
-    "bytes": 42429,
-    "sha256": "d6fe4c46b2c7bb617c60b957049913bae9c0b8878566714a8fcf11fc0cba4106",
+    "bytes": 42687,
+    "sha256": "b4f5e15d6fcafe671f9c5a1b4a612f029d65be0128029ca60991f79f2fc0b28c",
     "mode": "100644"
   },
   {
@@ -13663,8 +13663,14 @@
   },
   {
     "path": "codex-rs/codex-api/src/protected_peer/startup.rs",
-    "bytes": 10049,
-    "sha256": "592f07b9251272ab82482a1d49091ebd87503150220732f397bf7e6bae0a748d",
+    "bytes": 11314,
+    "sha256": "0876d7bbd27476debf31d2cdb6ecdc6362bacefeec3f3537a42a9aab671567e4",
+    "mode": "100644"
+  },
+  {
+    "path": "codex-rs/codex-api/src/protected_peer/startup_loopback_tests.rs",
+    "bytes": 3588,
+    "sha256": "e5a367b52011825a7ea4ebd1ff65ed43f7be147c5f33283e21191af1cdea2de0",
     "mode": "100644"
   },
   {
@@ -16681,8 +16687,8 @@
   },
   {
     "path": "codex-rs/core/src/config/mod.rs",
-    "bytes": 216038,
-    "sha256": "800d64df4af1a4b0957ca0f8c28ceadce8e45c101380d89fadb3b288d0d1d2ce",
+    "bytes": 216451,
+    "sha256": "82b3acecd511297cd263e3b7eed143967eab77707d99083fdcf0ab977ddc8457",
     "mode": "100644"
   },
   {
@@ -28639,8 +28645,8 @@
   },
   {
     "path": "codex-rs/http-client/src/outbound_proxy.rs",
-    "bytes": 31788,
-    "sha256": "6775e619cfc8c95ae555681f59adf96c71e198217df268ff0224c6585eb7c4a4",
+    "bytes": 34299,
+    "sha256": "b27b6f0978a18a80b2d149916a239d90ab749be65d93d4a8b1a7c6018c2e9a21",
     "mode": "100644"
   },
   {
@@ -28677,6 +28683,12 @@
     "path": "codex-rs/http-client/src/protected_auth_fence.rs",
     "bytes": 5980,
     "sha256": "e11caf97333ba5586b72d142575e4336ff599dc1897badc3160c311986922d94",
+    "mode": "100644"
+  },
+  {
+    "path": "codex-rs/http-client/src/protected_loopback_proxy_tests.rs",
+    "bytes": 4606,
+    "sha256": "18c346b77d20ffb9c91f60dcbe4476b854d482fe5319e643a3e48a07d2afe178",
     "mode": "100644"
   },
   {

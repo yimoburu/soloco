@@ -5,6 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import {TextDecoder} from 'node:util';
 import {createHash} from 'node:crypto';
+import {inspectOriginalLoadedPeerBridge} from './context-component-deployment.mjs';
 const slots=Object.freeze([]);
 const fail=code=>{throw Object.assign(Error(code),{code});};
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
@@ -20,6 +21,7 @@ function pin(slot){
  return slot;
 }
 export function resolveOriginalCompanionBuildSlot(){
+ if(slots.length===0)return selectedComponentAssociation().selected;
  if(slots.length!==1)fail('SUPERVISOR_SOURCE_BUILD_UNQUALIFIED');
  const slot=slots[0];
  if(slot.source_commit!=='c40729ea5cf8e947481b130c59807273eda2f8e9'||!['executable_sha256','source_manifest_sha256','cargo_lock_sha256','toolchain_manifest_sha256','build_receipt_sha256'].every(k=>hash(slot[k]))||slot.entry!=='codex-soloco-protected-host'||slot.scope_policy!=='V4_SCOPED_LOOPBACK_ONLY')fail('SUPERVISOR_SOURCE_BUILD_UNQUALIFIED');
@@ -53,6 +55,7 @@ function asciiCanonical(value){
 /** Only source-owned EMPTY-by-default slots select these files. No caller path,
  * digest, runtime flag or ready/authenticated Boolean can select a descriptor. */
 export function resolveOriginalSourcePreparedCompanionBuildSlot(){
+ if(slots.length===0)return selectedComponentAssociation().selected;
  if(slots.length!==1)fail('SUPERVISOR_SOURCE_BUILD_UNQUALIFIED');
  const owned=slots[0],root=owned.artifact_root,home=path.resolve(os.homedir()),configured=process.env.CODEX_HOME;
  const configuredHome=typeof configured==='string'&&path.isAbsolute(configured)?path.resolve(configured):null;
@@ -148,12 +151,37 @@ function verifyContextAssociation(slot){
 export function resolveOriginalPeerContextInterpreter(){
  // No hook, filesystem/provider, environment or native operation before this
  // original source selection. Empty/old unassociated slots are a finite Hold.
+ if(slots.length===0){let current;try{current=selectedComponentAssociation();}catch{contextHold();}const h=Object.freeze(Object.create(null));contextHandles.set(h,{...current,source:'original-selected-component'});return h;}
  if(slots.length!==1||!slots[0].context_interpreter_recipe)contextHold();
  const selected=slots[0],association=verifyContextAssociation(selected),h=Object.freeze(Object.create(null));contextHandles.set(h,{selected,association});return h;
 }
-function originalContext(h){const r=contextHandles.get(h);if(!r||slots.length!==1||slots[0]!==r.selected)contextHold();return r;}
-export function assertOriginalPeerContextInterpreter(h,request){const r=originalContext(h),form=ownContext(request,['delivery_kind','payload_protocol','source_cut_protocol','basis_protocol']);if(!forms.some(v=>sameContext(v,form))||!sameContext(verifyContextAssociation(r.selected),r.association))contextHold();}
+function originalContext(h){const r=contextHandles.get(h);if(!r)contextHold();if(r.source==='original-selected-component'){let current;try{current=selectedComponentAssociation();}catch{contextHold();}if(!sameContext({selected:current.selected,association:current.association},r.sourceRecord))contextHold();return r;}if(slots.length!==1||slots[0]!==r.selected)contextHold();return r;}
+export function assertOriginalPeerContextInterpreter(h,request){const r=originalContext(h),form=ownContext(request,['delivery_kind','payload_protocol','source_cut_protocol','basis_protocol']);if(!forms.some(v=>sameContext(v,form))||r.source!=='original-selected-component'&&!sameContext(verifyContextAssociation(r.selected),r.association))contextHold();}
 export function assertOriginalPeerContextInterpreterFinal(h){originalContext(h);}
 export function inspectOriginalPeerContextInterpreter(h){return Object.freeze(copyContext(originalContext(h).association));}
 export function inspectOriginalPeerContextSlot(h){return Object.freeze(copyContext(originalContext(h).selected));}
 export function assertOriginalPeerContextSlot(h,declared){if(!sameContext(originalContext(h).selected,declared))contextHold();}
+
+// A distinct original producer path. EMPTY legacy slots remain unregistered;
+// no caller path/JSON/callback can create the selected build, deployment or
+// actually imported Node namespaces required by inspectOriginalLoadedPeerBridge.
+function selectedComponentAssociation(){
+ const d=inspectOriginalLoadedPeerBridge(),files=d.files;
+ if(d.native_qualified!==false||d.claims_released!==false||d.executable.mode!=='100555')contextHold();
+ const m=files.compiled_manifest,manifest=contextDocument({path:m.path,bytes:m.bytes,sha256:m.sha256},d.original_component_root);
+ const producer=manifest.files.find(r=>r.path==='codex-rs/codex-api/src/protected_peer.rs');
+ const tools=manifest.files.find(r=>r.path==='codex-rs/codex-api/src/protected_peer_responses_tools.json');
+ if(!producer||tools?.sha256!=='04811953467e598da671fb72aafe202ee716a10c10dcf5497bd81f51729da5f1')contextHold();
+ const nativeRef=name=>({path:files[name].path,bytes:files[name].bytes,sha256:files[name].sha256,original_path:files[name].original_path});
+ const selected={slot_id:'original-selected-component:'+d.intent_key,source_commit:commit,entry:'codex-soloco-protected-host',scope_policy:'V5_ORIGINAL_MANAGED_PRIVATE_FD',artifact_root:d.original_component_root,
+  executable_path:d.executable.path,executable_bytes:d.executable.bytes,executable_sha256:d.executable.sha256,
+  source_manifest_path:files.compiled_manifest.path,source_manifest_sha256:files.compiled_manifest.sha256,
+  source_package_path:files.source_package.path,source_package_sha256:files.source_package.sha256,
+  cargo_lock_path:files.cargo_lock.path,cargo_lock_sha256:files.cargo_lock.sha256,
+  toolchain_manifest_path:files.toolchain_manifest.path,toolchain_manifest_sha256:files.toolchain_manifest.sha256,
+  build_receipt_path:files.build_receipt.path,build_receipt_sha256:files.build_receipt.sha256,
+  native_context_contract:{mode:'original-selected-source-managed-host',scope_policy:'V5_ORIGINAL_MANAGED_PRIVATE_FD',original_home:d.original_home,original_home_sha256:d.original_home_sha256,upstream_url:'https://chatgpt.com/backend-api/codex/responses',final_request_contract:{mode:'original-live-scoped-source',producer_module_sha256:producer.sha256,tool_resource_sha256:tools.sha256}}};
+ const nodeRef=name=>{const p=fileURLToPath(new URL('./'+name,import.meta.url)),b=fs.readFileSync(p);return {path:p,bytes:b.length,sha256:digest(b)};};
+ const association={protocol:'soloco-peer-context-interpreter-binding-v1',recipe_sha256:digest(Buffer.from(asciiCanonical(d))),selection:copyContext(ORIGINAL_CONTEXT_SELECTION),supported_forms:copyContext(forms),native:{compiled_manifest:nativeRef('compiled_manifest'),source_package:nativeRef('source_package'),cargo_lock:nativeRef('cargo_lock'),toolchain_manifest:nativeRef('toolchain_manifest'),build_receipt:nativeRef('build_receipt'),executable:{path:d.executable.path,bytes:d.executable.bytes,sha256:d.executable.sha256},upstream:{commit,tree},entry:'codex-soloco-protected-host'},node:{...d.node,manifest:{path:path.join(d.original_component_root,'node-inputs.json'),sha256:d.node_manifest_sha256},codec:nodeRef('peer-delivery-frame.mjs'),resource:nodeRef('peer-context-contract-v2.json')}};
+ const sourceRecord={selected,association};return {selected:Object.freeze(selected),association:Object.freeze(association),sourceRecord};
+}

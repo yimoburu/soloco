@@ -37,7 +37,11 @@ function artifact(root,name,bytes){
 }
 async function fixture(t){
  const root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'soloco-producer-json-reader-')));
- const moduleRef=artifact(root,'reader-under-test.mjs',Buffer.concat([originalSource,Buffer.from(ACCESS)]));
+ // The exact source copy moves to a temporary directory. Rewrite only this
+ // static dependency URL in the TEST COPY; production bytes stay untouched.
+ const deploymentURL=pathToFileURL(path.join(REPO,'plugins/soloco/runtime/peers/context-component-deployment.mjs')).href;
+ const testSource=originalSource.toString('utf8').replace("'./context-component-deployment.mjs'",JSON.stringify(deploymentURL));
+ const moduleRef=artifact(root,'reader-under-test.mjs',Buffer.from(testSource+ACCESS));
  const api=await import(pathToFileURL(moduleRef.path).href);
  t.after(()=>{try{assert.ok(readStable(SOURCE).equals(originalSource));assert.ok(readStable(PACKAGE).equals(originalPackage));assert.equal(sha(readStable(moduleRef.path)),moduleRef.sha256);}finally{fs.rmSync(root,{recursive:true,force:true});}});
  return {root,api,readers:api.__producerJsonReaderTestAccess,pkg:artifact(root,'original-source-package.json',originalPackage)};
