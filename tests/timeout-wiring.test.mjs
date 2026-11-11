@@ -2,6 +2,7 @@ import * as reviewContinuation from '../plugins/soloco/runtime/development-revie
 import * as retentionRepair from '../plugins/soloco/runtime/development-retention-repair.mjs';
 import * as modelProcessClosure from '../plugins/soloco/runtime/model-process-closure.mjs';
 import {outcomeSchema} from '../plugins/soloco/runtime/outcome.mjs';
+import {developmentDeliveryContractSchema,developmentDeliveryTransitionFields} from '../plugins/soloco/runtime/development-delivery.mjs';
 import * as scopedStream from '../plugins/soloco/runtime/scoped-stream.mjs';
 import * as scoped from '../plugins/soloco/runtime/scoped-context.mjs';
 import * as publicResponse from '../plugins/soloco/runtime/public-response.mjs';
@@ -30,7 +31,7 @@ function harness() {
   let matches=true,scope=true,beforeTransaction;
   const intervals=new Set(),launches=[];
   const iso=()=>new Date(now).toISOString();
-  const deps={...reviewContinuation,...retentionRepair,...modelProcessClosure,requestModelProcess:(job,value)=>modelProcessClosure.requestModelProcess(job,structuredClone(value)),outcomeSchema,renderDevelopmentReviewContext,Buffer,...scopedStream,scoped:{...scoped},...publicResponse,...coordination,...timeout,path,os:{homedir:()=>'/unused'},fs:{existsSync:()=>true,mkdirSync:()=>{}},process:{cwd:()=>process.cwd(),env:{},pid:42,execPath:'/unused/node',argv:[]},Date:class extends Date {static now(){return now;}},AbortController,
+  const deps={...reviewContinuation,...retentionRepair,...modelProcessClosure,requestModelProcess:(job,value)=>modelProcessClosure.requestModelProcess(job,structuredClone(value)),outcomeSchema,developmentDeliveryContractSchema,developmentDeliveryTransitionFields,renderDevelopmentReviewContext,Buffer,...scopedStream,scoped:{...scoped},...publicResponse,...coordination,...timeout,path,os:{homedir:()=>'/unused'},fs:{existsSync:()=>true,mkdirSync:()=>{}},process:{cwd:()=>process.cwd(),env:{},pid:42,execPath:'/unused/node',argv:[]},Date:class extends Date {static now(){return now;}},AbortController,
     PACKAGE:'/unused',VERSION:'test',SCHEMA:2,stamp:iso,id:p=>p+'-'+(++sequence),digest:()=> 'binding',folder:x=>x,noLink:()=>{},
     withStore:(root,fn)=>fn({readSnapshot:fn=>fn(),publicReconciliationState:()=>null,read:()=>structuredClone(state),transaction:(type,change)=>{if(beforeTransaction){const hook=beforeTransaction;beforeTransaction=undefined;hook(type);}const next=change(structuredClone(state));state=structuredClone(next);return structuredClone(state);}}),
     owner:(s,session,host,epoch)=>{if(s.owner.session_id!==session || s.owner.host!==host || (epoch!==undefined && s.owner.epoch!==epoch))throw new Error('Stale owner');},
@@ -54,6 +55,15 @@ function harness() {
 }
 const response=()=>({native_id:'native-fixture',text:JSON.stringify({content:'Fixture output',messages:[],notices:[]})});
 const spawnAt=(h,options,limit,reason)=>options.onSpawn(timeout.executionTiming(h.now,{timeout_ms:limit,timeout_reason:reason}));
+
+test('VM main uses the actual exported delivery schemas alongside timeout policy',async()=>{
+  const h=harness(),schema=h.main.toolList.find(t=>t.name==='company_develop').inputSchema;
+  assert.equal(JSON.stringify(schema.properties.delivery_contract),JSON.stringify(developmentDeliveryContractSchema));
+  for(const [name,value]of Object.entries(developmentDeliveryTransitionFields))assert.equal(JSON.stringify(schema.properties[name]),JSON.stringify(value));
+  assert.equal(schema.properties.timeout_ms.maximum,120000);
+  await assert.rejects(h.main.call('company_develop',{root:'/fixture',session_id:'founder',epoch:1,action:'inspect',delivery_contract:{}},'codex'),/only when creating/);
+  assert.equal(h.launches.length,0);
+});
 
 test('dispatch validates and persists policy, and main keeps software-test limits separate',async()=>{
   const h=harness();
