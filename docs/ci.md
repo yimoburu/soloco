@@ -62,6 +62,31 @@ or dispatch the new exact SHA; the previous result stays scoped to the old head.
 Keep the PR draft until qualification required for its head is complete, since
 native auto-merge does not wait for optional checks automatically.
 
+Full Node 22 qualification runs two balanced, whole-file macOS shards. Their
+exact union is the complete current test inventory, including new files. The
+stable **Full qualification Node 22** aggregate requires both shards to succeed;
+failed, cancelled or skipped shards hold it. Each shard keeps the existing
+40-minute job timeout, Seatbelt requirement and Node file concurrency of four.
+Each sharded command requires Node's real CLI exit to succeed, then checks the
+actual cumulative `test:summary` from a separate custom reporter channel. The
+reporter emits only after its event stream closes; a missing, truncated or
+invalid summary, mismatched source root or selected file set, or any outer
+failure, cancellation, skip or todo, holds the
+shard. TAP stays diagnostic: expected failing child fixtures may write their own
+TAP and totals without becoming outer test failures. Diagnostic uploads stay optional.
+Node 26 compatibility, routine regression and the required CI gate are unchanged.
+
+Placement uses the source-owned cost hints in
+`tools/ci/qualification-costs.json`, derived from the exact linked public run.
+These partial case-duration sums are scheduling hints, not per-file wall times or
+a measured speedup. New or unmeasured files receive a declared default weight and
+remain required. The command prints the inventory and cost-table hashes; its
+collector reads at most 64KiB from a fresh temporary summary file and prints a
+local shard summary with the exact file list and outer counts. This is local
+selection/result diagnostics, not a legacy provenance receipt, native
+qualification or new acceptance authority. The strict legacy TAP/provenance
+parser is unchanged and is not used to parse these composed diagnostic logs.
+
 The full suite remains unchanged. The regression selector
 continues to include new test files automatically and explicitly excludes the
 existing seventeen expensive historical qualification files in
@@ -98,13 +123,16 @@ compatibility:
 
 ```sh
 node tools/ci/check.mjs tests-22
+node tools/ci/check.mjs tests-22 --shard 1/2
+node tools/ci/check.mjs tests-22 --shard 2/2
 node tools/ci/check.mjs compatibility-26
 ```
 
 Test jobs run on macOS because the sandbox tests exercise real Seatbelt isolation.
 Their checkout retains Git history for historical compatibility fixtures.
-Superseded PR runs are cancelled automatically. Job timeouts remain twenty minutes
-for tests and five minutes for build.
+Superseded PR runs are cancelled automatically. Routine job timeouts remain twenty minutes
+for regression and five minutes for build; full qualification retains forty
+minutes per macOS job.
 
 The strict receipt runner and remote verifier remain optional tools for
 [historical evidence verification](ci-evidence.md). Their receipt/provenance
