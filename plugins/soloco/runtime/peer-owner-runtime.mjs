@@ -89,18 +89,29 @@ function stat(file){try{return fs.lstatSync(file,{bigint:true});}catch(error){if
 function noLinks(file){
  for(let current=file;;current=path.dirname(current)){const s=stat(current);if(s?.isSymbolicLink())fail('OWNER_STORAGE_LINK');if(current===path.dirname(current))break;}
 }
+function checkSidecar(s,suffix){
+ const regular=s.isFile()&&!s.isSymbolicLink();
+ if(regular&&s.nlink===1n)return;
+ const type=regular?'regular':s.isSymbolicLink()?'symlink':s.isDirectory()?'directory':'other';
+ const links=typeof s.nlink==='bigint'&&s.nlink>=0n&&s.nlink<=99999999999999999999n?String(s.nlink):'unknown';
+ const detail=`component=${suffix==='-wal'?'wal':'shm'};type=${type};links=${links}`;
+ // A zero-link SQLite sidecar is retired, not a valid snapshot. Only the
+ // existing privately branded readonly-routing restart may discard it.
+ if(regular&&s.nlink===0n)fail('OWNER_STORAGE_CHANGED',`OWNER_STORAGE_CHANGED: retired SQLite sidecar;${detail}`);
+ fail('OWNER_STORAGE_LINK',`OWNER_STORAGE_LINK: linked company storage is unsupported;${detail}`);
+}
 function location(root){
  need(text(root,4000)&&path.isAbsolute(root),'OWNER_STORAGE_INPUT');noLinks(root);const namedRoot=stat(root);if(!namedRoot)return null;need(namedRoot.isDirectory(),'OWNER_STORAGE_INVALID');
  const real=fs.realpathSync(root),directory=path.join(real,'.company'),file=path.join(directory,'company.sqlite'),namedDirectory=stat(directory);if(!namedDirectory)return null;
  need(namedDirectory.isDirectory()&&!namedDirectory.isSymbolicLink(),'OWNER_STORAGE_LINK');
  const namedFile=stat(file);if(!namedFile){need(!stat(file+'-wal')&&!stat(file+'-shm'),'OWNER_STORAGE_LAYOUT');return null;}need(namedFile.isFile()&&!namedFile.isSymbolicLink()&&namedFile.nlink===1n,'OWNER_STORAGE_LINK');
- for(const suffix of ['-wal','-shm']){const s=stat(file+suffix);if(s)need(s.isFile()&&!s.isSymbolicLink()&&s.nlink===1n,'OWNER_STORAGE_LINK');}
+ for(const suffix of ['-wal','-shm']){const s=stat(file+suffix);if(s)checkSidecar(s,suffix);}
  return {root:real,directory,file,namedRoot,namedDirectory,namedFile};
 }
 function stable(where){
  noLinks(where.root);
  for(const [file,before] of [[where.root,where.namedRoot],[where.directory,where.namedDirectory],[where.file,where.namedFile]]){const now=stat(file);need(now&&!now.isSymbolicLink()&&sameNode(before,now),'OWNER_STORAGE_CHANGED');}
- for(const suffix of ['-wal','-shm']){const s=stat(where.file+suffix);if(s)need(s.isFile()&&!s.isSymbolicLink()&&s.nlink===1n,'OWNER_STORAGE_LINK');}
+ for(const suffix of ['-wal','-shm']){const s=stat(where.file+suffix);if(s)checkSidecar(s,suffix);}
 }
 function pinned(where){
  const {O_RDONLY,O_NOFOLLOW,O_DIRECTORY,O_NONBLOCK}=fs.constants;need([O_RDONLY,O_NOFOLLOW,O_DIRECTORY,O_NONBLOCK].every(Number.isInteger),'OWNER_STORAGE_UNSUPPORTED');
