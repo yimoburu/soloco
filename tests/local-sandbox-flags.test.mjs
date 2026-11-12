@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { selectTestIsolationFlag, inspectRuntimeLibrary } from '../plugins/soloco/runtime/local-sandbox.mjs';
@@ -48,7 +49,7 @@ test('probes use only trusted Node and fixed code with scrubbed environment and 
       assert.equal(node,fs.realpathSync(process.execPath));
       assert.deepEqual(args,[calls===1?stable:experimental,'--eval','']);
       assert.equal(options.cwd,path.dirname(node));
-      assert.equal(options.timeout,1000);assert.equal(options.maxBuffer,10000);
+      assert.equal(options.timeout,5000);assert.equal(options.maxBuffer,10000);
       assert.equal(options.killSignal,'SIGKILL');assert.equal(options.encoding,'utf8');
       assert.deepEqual(Object.keys(options.env).sort(),['PATH','HOME','TMPDIR','TMP','TEMP','LANG','LC_ALL','OPENSSL_CONF','NODE_DISABLE_COLORS'].sort());
       for(const key of keys)assert.equal(options.env[key],undefined);
@@ -65,9 +66,41 @@ test('installed trusted Node accepts the selected spelling',()=>{
   assert.ok([stable,experimental].includes(selectTestIsolationFlag()));
 });
 
+test('a cold trusted empty Node flag probe completes after one second inside its enforced startup budget',t=>{
+  const directory=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'soloco-cold-empty-node-probe-')));
+  t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+  const node=fs.realpathSync(process.execPath),wrapper=path.join(directory,'fixed-cold-node.mjs'),calls=[];
+  // This closed test harness replaces itself with the actual trusted Node.
+  // The selector's outer timeout therefore covers BOTH the startup delay and
+  // the unchanged empty eval, with no descendant or candidate test execution.
+  fs.writeFileSync(wrapper,`const node=${JSON.stringify(node)};
+const args=process.argv.slice(2);
+if(args.length!==3||!${JSON.stringify([stable,experimental])}.includes(args[0])||args[1]!=='--eval'||args[2]!=='')throw Error('Unexpected probe arguments');
+Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,1250);
+process.execve(node,[node,...args],process.env);
+`,{flag:'wx',mode:0o600});
+  const selected=selectTestIsolationFlag((executable,args,options)=>{
+    assert.equal(executable,node);assert.deepEqual(args.slice(1),['--eval','']);
+    assert.deepEqual(Object.keys(options.env).sort(),['PATH','HOME','TMPDIR','TMP','TEMP','LANG','LC_ALL','OPENSSL_CONF','NODE_DISABLE_COLORS'].sort());
+    assert.equal(options.cwd,path.dirname(node));assert.equal(options.killSignal,'SIGKILL');
+    const began=performance.now();
+    // Do not override timeout: an old selector's one-second budget must kill
+    // this actual delayed process instead of merely changing an assertion.
+    const result=spawnSync(executable,[wrapper,...args],options);
+    const observation={flag:args[0],timeout_ms:options.timeout,elapsed_ms:performance.now()-began,
+      status:result.status,signal:result.signal,error_code:result.error?.code??null};
+    calls.push(observation);t.diagnostic('Trusted empty-probe observation '+JSON.stringify(observation));
+    return result;
+  });
+  assert.deepEqual(calls.map(call=>call.flag),selected===stable?[stable]:[stable,experimental]);
+  assert.equal(new Set(calls.map(call=>call.flag)).size,calls.length,'Never retry the same flag');
+  for(const call of calls){assert(call.elapsed_ms>=1000);assert.equal(call.error_code,null);assert.equal(call.signal,null);}
+  assert.equal(calls.at(-1).status,0);
+});
+
 // Run wiring checks in fresh processes so builtin mocks and per-process caches
 // cannot affect other tests. No candidate code or OS sandbox is executed here.
-async function wiringScenario(moduleURL,mode,supported) {
+async function wiringScenario(moduleURL,mode,supported,probeFailure=null) {
   const assert=(await import('node:assert/strict')).default;
   const fs=(await import('node:fs')).default;
   const os=(await import('node:os')).default;
@@ -98,18 +131,19 @@ async function wiringScenario(moduleURL,mode,supported) {
   cp.spawnSync=(file,args,options)=>{
     if(file===process.execPath || file===fs.realpathSync(process.execPath)) {
       probes.push(args[0]);assert.deepEqual(args.slice(1),['--eval','']);
-      assert.equal(options.env.NODE_OPTIONS,undefined);assert.equal(options.timeout,1000);
+      assert.equal(options.env.NODE_OPTIONS,undefined);assert.equal(options.timeout,5000);
+      if(probeFailure==='timeout')return {status:null,signal:'SIGKILL',error:Object.assign(Error('fixed empty Node probe ETIMEDOUT'),{code:'ETIMEDOUT'}),stdout:'',stderr:''};
       return {status:args[0]===supported?0:9,stdout:'',stderr:'unsupported spelling'};
     }
     if(file==='/usr/bin/otool')return {status:0,stdout:'Node:\n'};
     assert.equal(mode,'startup');assert.equal(file,'/usr/bin/sandbox-exec');
-    checkLaunch(args);launches.push(args);
+    launches.push(args);checkLaunch(args);
     assert.equal(options.timeout,5000);
     return {status:0,stdout:'TAP version 13\nSOLOCO_SANDBOX_READY\n'};
   };
   cp.spawn=(file,args,options)=>{
     assert.equal(mode,'watchdog');assert.equal(file,'/usr/bin/sandbox-exec');
-    checkLaunch(args);launches.push(args);assert.equal(options.detached,true);
+    launches.push(args);checkLaunch(args);assert.equal(options.detached,true);
     assert.equal(options.cwd,root);assert.equal(options.env.NODE_OPTIONS,undefined);
     const child=new EventEmitter();child.stdout=new EventEmitter();child.stderr=new EventEmitter();child.pid=123456;
     setImmediate(()=>{child.emit('spawn');child.stdout.emit('data',Buffer.from('TAP version 13\n'));child.emit('close',0,null);});
@@ -145,11 +179,16 @@ async function wiringScenario(moduleURL,mode,supported) {
       assert.deepEqual(module.sandboxCapability(),available);
       if(!supported) {
         assert.match(available.blocker,/Node test isolation is unavailable/);
-        assert.equal((await module.runLocalTests({directory:root,test_paths:['sample.test.mjs']})).status,'blocked');
+        if(probeFailure==='timeout')assert.match(available.blocker,/ETIMEDOUT/);
+        const blocked=await module.runLocalTests({directory:root,test_paths:['sample.test.mjs'],timeout_ms:100,max_output_bytes:1024});
+        assert.equal(blocked.status,'blocked');assert.equal(blocked.tests_executed,false);
+        assert.equal(blocked.local_execution.closure_basis,'never_started');
+        assert.deepEqual(blocked.local_execution.child,{launch_attempted:false,spawn_observed:false,close_observed:false,pid:null});
       }
     } else {
       assert.equal(receipt.status,supported?'passed':'error',JSON.stringify(receipt));
       if(!supported)assert.match(receipt.error,/Node test isolation is unavailable/);
+      if(probeFailure==='timeout')assert.match(receipt.error,/ETIMEDOUT/);
       assert.deepEqual(messages.map(message=>message.type),supported?['ready','started','result']:['ready','result']);
       for(const message of messages){
         assert.deepEqual(message.binding,expectedBinding);
@@ -180,14 +219,17 @@ async function wiringScenario(moduleURL,mode,supported) {
       assert.deepEqual(receipt.output_bytes,{captured,observed:captured});
     }
     assert.deepEqual(probes,supported==='--test-isolation=none'?['--test-isolation=none']:['--test-isolation=none','--experimental-test-isolation=none']);
+    assert.equal(new Set(probes).size,probes.length,'Neither timed-out nor unsupported flags are retried');
     assert.equal(launches.length,supported?1:0);
   } finally {fs.rmSync(root,{recursive:true,force:true});}
 }
 
-for(const mode of ['startup','watchdog'])for(const supported of [stable,experimental,null]) {
-  test(`${mode} wiring selects ${supported??'neither spelling and fails closed'}`,()=>{
+for(const mode of ['startup','watchdog'])for(const {supported,probeFailure}of [
+  {supported:stable},{supported:experimental},{supported:null},{supported:null,probeFailure:'timeout'}
+]) {
+  test(`${mode} wiring selects ${probeFailure==='timeout'?'neither spelling after both probes time out':supported??'neither spelling and fails closed'}`,()=>{
     const url=new URL('../plugins/soloco/runtime/local-sandbox.mjs',import.meta.url).href;
-    const code=`(${wiringScenario.toString()})(${JSON.stringify(url)},${JSON.stringify(mode)},${JSON.stringify(supported)})`;
+    const code=`(${wiringScenario.toString()})(${JSON.stringify(url)},${JSON.stringify(mode)},${JSON.stringify(supported)},${JSON.stringify(probeFailure??null)})`;
     // Associate only defined temp selectors with the reviewed private parent TMP.
     // Do not inherit arbitrary host/preload/secret/provider environment variables.
     const wiringEnvironment={PATH:'/usr/bin:/bin',OPENSSL_CONF:'/dev/null'};
