@@ -10,6 +10,7 @@ const SEND_KEYS=['operation_id','to_principal_id','scope','subject_ref','governi
 const DECIDE_KEYS=['operation_id','handoff_ref','reason','source_instruction','grant_id','grant_generation'];
 const HANDOFF_KEYS=['kind','status','principal_id','scope','operation_id','sender','receiver','subject_ref','governing_refs','evidence_refs','limitations','source_instruction','authority_control','created_at'];
 const DECISION_KEYS=['kind','status','principal_id','scope','operation_id','handoff_ref','sender','receiver','subject_ref','governing_refs','evidence_refs','reason','source_instruction','authority_control','created_at'];
+const TASK_KEYS=['task_id','attempt_id','task_effect'];
 const localFailures=new WeakSet();
 // Ephemeral routing data only. A source-process restart deliberately requires
 // a fresh first page; no persisted cursor key or execution authority is minted.
@@ -67,6 +68,23 @@ function actualControl(tx,supplied=null){
 function timestamp(value){if(typeof value!=='string'||!Number.isFinite(Date.parse(value)))fail('HANDOFF_INVALID','Handoff timestamp is invalid');}
 const handoffId=(sender,operation)=>peerDigest(['peer-handoff-v1',sender,operation]);
 const decisionId=(handoff,receiver)=>peerDigest(['peer-handoff-disposition-v1',handoff,receiver]);
+function taskNamespace(value){
+  object(value,['protocol','task_id','attempt_id','authority_epoch','context_sha256','admission_producer','executor_incarnation_id','runtime_generation'],'source task namespace',true);
+  if(value.protocol!=='peer-task-effect-binding-v1'||!Number.isSafeInteger(value.authority_epoch)||value.authority_epoch<1||!Number.isSafeInteger(value.runtime_generation)||value.runtime_generation<1||!/^[a-f0-9]{64}$/.test(value.context_sha256??''))fail('HANDOFF_PROVENANCE','Source task namespace required');
+  text(value.task_id,'source task',200);text(value.attempt_id,'source attempt',200);text(value.executor_incarnation_id,'source executor incarnation',1000);
+  const producer=object(value.admission_producer,['event_seq','event_sha256','command'],'original admission producer',true);
+  if(!Number.isSafeInteger(producer.event_seq)||producer.event_seq<1||!/^[a-f0-9]{64}$/.test(producer.event_sha256??''))fail('HANDOFF_PROVENANCE','Original task admission producer required');
+  exactRef(producer.command,new Set(['commands']),'admission command');
+  return copy(value);
+}
+function taskAttribution(value){
+  const present=TASK_KEYS.filter(key=>Object.hasOwn(value,key));
+  if(!present.length)return null;
+  if(present.length!==TASK_KEYS.length)fail('HANDOFF_PROVENANCE','Complete source task attribution required');
+  const namespace=taskNamespace(value.task_effect);
+  if(value.task_id!==namespace.task_id||value.attempt_id!==namespace.attempt_id)fail('HANDOFF_PROVENANCE','Source task attribution aliases changed');
+  return namespace;
+}
 
 // A kind-shaped DATA row is insufficient. Require its exact immutable version,
 // real creation event and the matching source command's complete original result.
@@ -80,7 +98,11 @@ function origin(tx,row,action,producer){
   if(event?.seq!==row.created_seq||event.type!==action||event.principal_id!==producer||produced?.length!==1||commands?.length!==1||commands[0].revision!==1)fail('HANDOFF_PROVENANCE','Matching source handoff event required');
   const commandRef=exactRef(commands[0]&&{family:'commands',id:commands[0].id,revision:commands[0].revision,sha256:commands[0].sha256},new Set(['commands']),'source command');
   const command=history(tx,commandRef),value=command.value;
-  if(command.id!==peerDigest(['peer-command-v1',producer,row.value.operation_id])||value.principal_id!==producer||value.operation_id!==row.value.operation_id||value.action!==action||!/^[a-f0-9]{64}$/.test(value.request_sha256??'')||!same(value.result,row))fail('HANDOFF_PROVENANCE','Exact source command result required');
+  const namespace=taskAttribution(row.value),commandNamespace=taskAttribution(value);
+  if(Boolean(namespace)!==Boolean(commandNamespace)||namespace&&(!['handoff/accept','handoff/reject'].includes(action)||!same(namespace,commandNamespace)))fail('HANDOFF_PROVENANCE','Original task command attribution required');
+  const operation=text(value.operation_id,'source command operation',160),id=namespace?peerDigest(['peer-task-command-v1',producer,namespace,operation]):peerDigest(['peer-command-v1',producer,operation]);
+  const internalOperation=namespace?peerDigest(['peer-task-operation-v1',namespace,operation]):operation;
+  if(command.id!==id||value.principal_id!==producer||row.value.operation_id!==internalOperation||value.action!==action||!/^[a-f0-9]{64}$/.test(value.request_sha256??'')||!same(value.result,row))fail('HANDOFF_PROVENANCE','Exact source command result required');
   const head=tx.get('commands',command.id);
   if(!head||!same(reference('commands',head),commandRef)||!same(head.value,value))fail('HANDOFF_PROVENANCE','Immutable source command head changed');
 }
@@ -106,7 +128,8 @@ function decisionRecord(tx,row,handoff){
   const value=row?.value,action=value?.status==='accepted'?'handoff/accept':value?.status==='rejected'?'handoff/reject':null;
   origin(tx,row,action,value?.receiver?.id);
   try{
-    object(value,DECISION_KEYS,'handoff disposition',true);
+    const namespace=taskAttribution(value);
+    object(value,namespace?[...DECISION_KEYS,...TASK_KEYS]:DECISION_KEYS,'handoff disposition',true);
     const expected=handoff.value;
     if(value.kind!=='peer_handoff_disposition_v1'||!action||row.id!==decisionId(reference('work_items',handoff),expected.receiver)||value.principal_id!==expected.receiver.id||value.scope!==expected.scope||!same(value.handoff_ref,reference('work_items',handoff))||!same(value.sender,expected.sender)||!same(value.receiver,expected.receiver)||!same(value.subject_ref,expected.subject_ref)||!same(value.governing_refs,expected.governing_refs)||!same(value.evidence_refs,expected.evidence_refs))fail('HANDOFF_INVALID','Handoff disposition bindings changed');
     text(value.operation_id,'operation identity',160);text(value.reason,'receiver reason',4000);text(value.source_instruction,'source instruction',4000);timestamp(value.created_at);
@@ -119,6 +142,23 @@ function decisionRecord(tx,row,handoff){
 }
 function applicable(tx,value){
   for(const exact of [value.subject_ref,...value.governing_refs,...value.evidence_refs])current(tx,exact);
+}
+
+// Pure preparation, not admission or a readiness flag. The model places this
+// exact envelope inside the immutable task definition and checks its scope.
+// A verified decision is reported separately so a fresh attempt can reject it
+// without making the receiver's own acknowledgement change its assigned input.
+export function prepareHandoffTask(tx,principal,exactHandoffRef){
+  const receiver=actualPrincipal(tx,principal),exact=handoffRef(exactHandoffRef),handoff=current(tx,exact),value=handoffRecord(tx,handoff);
+  if(receiver.id!==value.receiver.id)fail('HANDOFF_RECEIVER','Only the intended actual receiver may prepare this handoff');
+  if(!same(reference('principals',receiver),value.receiver))fail('RECEIVER_CHANGED','Original intended receiver incarnation changed');
+  applicable(tx,value);
+  const input_refs=[...new Map([value.subject_ref,...value.evidence_refs,...value.governing_refs.filter(item=>SEMANTIC.has(item.family))].map(item=>[canonical(item),copy(item)])).values()];
+  if(input_refs.length>100)fail('SOURCE_INVALID','Complete handoff semantic inputs exceed capacity');
+  const governing_support=value.governing_refs.filter(item=>!SEMANTIC.has(item.family)).map(item=>({...copy(item),value:copy(current(tx,item).value)}));
+  const decision=tx.get('work_items',decisionId(exact,value.receiver));
+  if(decision)decisionRecord(tx,decision,handoff);
+  return {handoff_ref:exact,handoff_envelope:{protocol:'peer-task-handoff-envelope-v1',handoff_ref:copy(exact),value:copy(value),governing_support},input_refs,decision_ref:decision?reference('work_items',decision):null};
 }
 
 export function sendHandoff(tx,principal,control,args){
@@ -137,7 +177,7 @@ export function sendHandoff(tx,principal,control,args){
   return tx.put('work_items',id,value,0);
 }
 
-export function decideHandoff(tx,principal,action,args){
+export function decideHandoff(tx,principal,action,args,taskBinding=null){
   object(args,DECIDE_KEYS,'receiver disposition');optionalGrant(args);
   if(!['handoff/accept','handoff/reject'].includes(action))fail('INVALID_INPUT','Explicit accept or reject action required');
   const operation=text(args.operation_id,'operation_id',160),receiver=actualPrincipal(tx,principal),exact=handoffRef(args.handoff_ref),handoff=current(tx,exact),value=handoffRecord(tx,handoff);
@@ -146,9 +186,11 @@ export function decideHandoff(tx,principal,action,args){
   applicable(tx,value);
   const id=decisionId(exact,value.receiver),prior=tx.get('work_items',id);
   if(prior){decisionRecord(tx,prior,handoff);fail('HANDOFF_DECIDED','Handoff already has an immutable receiver decision');}
+  const namespace=taskBinding===null?null:taskNamespace(taskBinding);
   const company=actualControl(tx),decision={kind:'peer_handoff_disposition_v1',status:action==='handoff/accept'?'accepted':'rejected',principal_id:receiver.id,scope:value.scope,operation_id:operation,
     handoff_ref:exact,sender:copy(value.sender),receiver:reference('principals',receiver),subject_ref:copy(value.subject_ref),governing_refs:copy(value.governing_refs),evidence_refs:copy(value.evidence_refs),
-    reason:text(args.reason,'receiver reason',4000),source_instruction:text(args.source_instruction,'source instruction',4000),authority_control:reference('control',company),created_at:new Date().toISOString()};
+    reason:text(args.reason,'receiver reason',4000),source_instruction:text(args.source_instruction,'source instruction',4000),authority_control:reference('control',company),created_at:new Date().toISOString(),
+    ...(namespace?{task_id:namespace.task_id,attempt_id:namespace.attempt_id,task_effect:namespace}:{})};
   return tx.put('work_items',id,decision,0);
 }
 
