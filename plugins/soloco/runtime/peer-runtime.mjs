@@ -9,6 +9,8 @@ import * as model from './peers/model.mjs';
 import {reviewReference} from './peers/review-selection.mjs';
 import {createOriginalPeerProductionProvider,peerProductionRecipe} from './peers/production-host.mjs';
 import {createPeerProductionRouter} from './peers/production-router.mjs';
+import {assertPeerPublicOwnerCustody} from './peers/owner-handover.mjs';
+import {assertPeerOwnerOperatingState} from './peers/owner-operating-state.mjs';
 
 const services=new Map(),starting=new Map();
 const readActions=['status','inspect','read'];
@@ -82,21 +84,25 @@ function storage(root){
  if(!fs.existsSync(file))fail('PEER_ADOPTION_REQUIRED','Existing checked peer adoption required; this route never initializes storage');
  return {root:canonicalRoot,file};
 }
-function operator(tx,args,host){
+function operator(tx,args,host,ledger){
  const c=tx.get('control','company'),p=c&&tx.get('principals',c.value.founder_principal_id),legacy=p?.value.legacy_owner;
  if(c?.value.protocol!==PEER_PROTOCOL||p?.value.kind!=='founder'||p.value.status!=='active'||p.value.host!==host||!text(p.value.native_id,300)||legacy?.host!==host||legacy.session_id!==args.session_id||legacy.epoch!==args.epoch)fail('PEER_OPERATOR_REQUIRED','Current canonical founder operator and adopted owning session required');
+ const view={...tx,connection:{root:ledger.root,company_id:ledger.company_id,directory:ledger.directory}};
+ assertPeerPublicOwnerCustody(view);
+ if(!readActions.includes(args.action)&&args.action!=='stop')assertPeerOwnerOperatingState(view,'peer/runtime-'+args.action);
  return {control:c,principal:p,authority:peerDigest({company:c.value.founder_principal_id,principal:p})};
 }
 function readonly(root,args,host,fn){
  const where=storage(root);let db;
  try{
   db=new DatabaseSync(where.file,{readOnly:true});
+  const names=new Set(db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(r=>r.name));
+  if(!names.has('company_layout')||!names.has('peer_meta'))fail('PEER_ADOPTION_REQUIRED','Existing checked layout-5 adoption required');
   if(db.prepare('SELECT version FROM company_layout WHERE id=1').get()?.version!==PEER_LAYOUT||db.prepare('SELECT protocol FROM peer_meta WHERE id=1').get()?.protocol!==PEER_PROTOCOL)fail('PEER_ADOPTION_REQUIRED','Existing checked layout-5 adoption required');
   const ledger=new PeerLedger(where.root,{connection:db});
-  const authenticated=ledger.read(tx=>operator(tx,args,host));
+  const authenticated=ledger.read(tx=>operator(tx,args,host,ledger));
   return fn({ledger,...authenticated});
- }catch(error){if(String(error.code??'').startsWith('PEER_'))throw error;fail('PEER_ADOPTION_REQUIRED','Checked peer storage unavailable: '+String(error.message).slice(0,250));}
- finally{db?.close();}
+ }finally{db?.close();}
 }
 const boundary=(s,n)=>!(n>0&&n<s.length&&/[\uD800-\uDBFF]/.test(s[n-1])&&/[\uDC00-\uDFFF]/.test(s[n]));
 function selectedRecord(family,row,part){
@@ -140,14 +146,14 @@ function readRecord(tx,company_id,input){
  return result;
 }
 function live(service,args,host){
- const authority=service.ledger.read(tx=>operator(tx,args,host));
+ const authority=service.ledger.read(tx=>operator(tx,args,host,service.ledger));
  if(authority.authority!==service.authority)fail('PEER_OPERATOR_CHANGED','Runtime operator incarnation changed; stop and inspect');
  return authority;
 }
 function audit(service,args,host,event,{current=false}={}){
- const principal=service.ledger.read(tx=>operator(tx,args,host).principal.id);
+ const principal=service.ledger.read(tx=>operator(tx,args,host,service.ledger).principal.id);
  return service.ledger.write(event,principal,tx=>{
-  const actual=operator(tx,args,host);if(actual.principal.id!==principal||!current&&actual.authority!==service.authority)fail('PEER_OPERATOR_CHANGED');
+  const actual=operator(tx,args,host,service.ledger);if(actual.principal.id!==principal||!current&&actual.authority!==service.authority)fail('PEER_OPERATOR_CHANGED');
   tx.event(event,{source_instruction:args.source_instruction,session_id:args.session_id,epoch:args.epoch});
  });
 }
@@ -161,7 +167,7 @@ function drainStopped(root,service){
 export async function peerRuntimeAction(args,host){
  const input=request(args,host);
  if(['inspect','read'].includes(args.action))return readonly(args.root,args,host,({ledger})=>ledger.read(tx=>{
-  operator(tx,args,host);
+  operator(tx,args,host,ledger);
   return args.action==='inspect'?inspectRecords(tx,ledger.company_id,input):readRecord(tx,ledger.company_id,input);
  }));
  // Read-only preflight precedes every write connection or provider construction.
@@ -181,7 +187,7 @@ export async function peerRuntimeAction(args,host){
   const marker={cancelled:false};starting.set(checked.root,marker);let ledger,provider,router,owner;
   try{
    ledger=new PeerLedger(checked.root);
-   const current=ledger.read(tx=>operator(tx,args,host));if(current.authority!==checked.authority)fail('PEER_OPERATOR_CHANGED');
+   const current=ledger.read(tx=>operator(tx,args,host,ledger));if(current.authority!==checked.authority)fail('PEER_OPERATOR_CHANGED');
    peerProductionRecipe(current.control.value);
    if(typeof model.bindPeerProductionScheduler!=='function')fail('PEER_OPERATOR_PRODUCER_HELD','Original atomic operator authority producer required');
    const boundModel=model.bindPeerProductionScheduler(ledger);
