@@ -42,7 +42,7 @@ function afterOwnedCallback(f,type,change){
   f.ledger.guardedWrite=function(action,principal,callback,terminal){
     return Reflect.apply(original,this,[action,principal,tx=>{
       const result=callback(tx);
-      if(action===type){change(tx);hits++;}
+      if(action===type){hits++;change(tx);}
       return result;
     },terminal]);
   };
@@ -263,7 +263,7 @@ for(const scenario of ownerChanges)test('committed '+scenario.name+' fences the 
   assert.deepEqual(rows(f,'claims',{task_id:a.task.id,status:'held'}),claims);
 });
 
-for(const operation of ['task/admit','message/send'])test('owner mutation after real '+operation+' puts rolls back every staged row before commit',t=>{
+for(const operation of ['task/admit','message/send'])test('a late owner write after real '+operation+' puts rolls back every staged row before commit',t=>{
   const f=fixture(t),task=operation==='task/admit'?f.pending():null,a=operation==='message/send'?f.productionStart():null;
   const before=logicalSQLState(f),hook=afterOwnedCallback(f,operation,tx=>{
     const founder=tx.get('principals','founder');tx.put('principals',founder.id,{
@@ -271,7 +271,9 @@ for(const operation of ['task/admit','message/send'])test('owner mutation after 
     },founder.revision);
   });
   try{
-    assert.throws(()=>operation==='task/admit'?f.admit(task):a.client.execute('message/send',message('late-owner-drift')),code('PRODUCTION_OWNER_CHANGED'));
+    // Guarded admission now seals public writes before this callback returns.
+    // The ordinary message path retains its original final owner-drift check.
+    assert.throws(()=>operation==='task/admit'?f.admit(task):a.client.execute('message/send',message('late-owner-drift')),code(operation==='task/admit'?'AUTHORITY_CHANGED':'PRODUCTION_OWNER_CHANGED'));
   }finally{hook.restore();}
   assert.equal(hook.hits,1);assert.deepEqual(logicalSQLState(f),before);
   assert.equal(f.get('principals','founder').value.legacy_owner.epoch,1);

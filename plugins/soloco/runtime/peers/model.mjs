@@ -12,7 +12,7 @@ import {prepareOriginalProjectedTaskContext} from './peer-context-interpreter.mj
 import {canonical,peerDigest,FAMILIES} from './ledger.mjs';
 import {REVIEW_SELECTION_RECIPE,extractReviewSelection,parseReviewOutput,reviewReference,reviewScope} from './review-selection.mjs';
 import {assertOriginalPeerExecutorIncarnation} from './executor-incarnation.mjs';
-import {sendHandoff,decideHandoff,pendingHandoffs} from './handoff.mjs';
+import {sendHandoff,decideHandoff,pendingHandoffs,prepareHandoffTask} from './handoff.mjs';
 
 const PROTOCOL='peer-cos-v1',MAX_ROWS=10000;
 const outstanding=['reserved','sent','unknown'];
@@ -300,7 +300,7 @@ function plannedWrite(ledger,type,principal,fn,terminalGuard=null,onPlan=null){
         if(actual.revision!==row.revision||actual.sha256!==row.sha256)hold('PLAN_CHANGED','Committed reference differs from plan');
       }
       for(const e of events)base.event(e.type,e.payload);
-      if((type==='task/assign'||type==='home/publish'||type.startsWith('handoff/'))&&terminalGuard){
+      if((type==='task/assign'||type==='home/publish'||type.startsWith('handoff/')||onPlan)&&terminalGuard){
         if(typeof base.sealWrites!=='function')hold('AUTHORITY_CHANGED','Owning planned write closure required');
         base.sealWrites();
       }
@@ -591,11 +591,40 @@ function sources(tx,scope,input=[],reviewRows=currentReviewRows(tx)){
   for(const entry of values.values())if(entry.value.source?.kind==='legacy'){if(!tx.resolveLegacy)hold('LEGACY_SOURCE_MISSING','Legacy resolver required');entry.legacy_value=tx.resolveLegacy({sha256:entry.value.source.sha256});if(entry.legacy_value===undefined)hold('LEGACY_SOURCE_MISSING','Missing legacy source');}
   return {sources:[...values.values()].sort((a,b)=>order(canonical([a.family,a.id]),canonical([b.family,b.id]))),membership:Object.fromEntries(Object.entries(groups).map(([f,items])=>[f,items.map(r=>ref(f,r))]))};
 }
+function taskHandoffAliases(task){
+  const t=task.value,d=t.definition;
+  for(const field of ['handoff_ref','handoff_envelope'])if(Object.hasOwn(t,field)!==Object.hasOwn(d??{},field)||Object.hasOwn(t,field)&&!same(t[field],d[field]))hold('DEFINITION_CHANGED','Original task handoff aliases changed');
+  if(Object.hasOwn(t,'handoff_ref')!==Object.hasOwn(t,'handoff_envelope'))hold('DEFINITION_CHANGED','Complete original task handoff required');
+  return Object.hasOwn(t,'handoff_ref');
+}
+function taskHandoff(tx,receiver,task){
+  if(!taskHandoffAliases(task))return null;
+  const bindings=new Map(),view={...tx,get(family,id){
+    const row=tx.get(family,id);bindings.set(canonical([family,id]),{family,id,reference:row?ref(family,row):null});return row;
+  }};
+  const prepared=prepareHandoffTask(Object.freeze(view),receiver,task.value.handoff_ref),t=task.value;
+  if(scopeOf(prepared.handoff_envelope.value.scope)!==t.scope||!same(prepared.handoff_ref,t.handoff_ref)||!same(prepared.handoff_envelope,t.handoff_envelope))hold('HANDOFF_SCOPE','Task must retain its exact intended handoff and scope');
+  if(!Array.isArray(t.input_refs))hold('DEFINITION_CHANGED','Complete task input references required');
+  const supplied=new Set(t.input_refs.map(r=>canonical(semanticReference(r))));
+  if(prepared.input_refs.some(r=>!supplied.has(canonical(semanticReference(r)))))hold('DEFINITION_CHANGED','Task lost required handoff evidence');
+  if(prepared.decision_ref){
+    const decision=view.get(prepared.decision_ref.family,prepared.decision_ref.id)?.value,binding=decision?.task_effect;
+    if(!t.attempt||decision?.task_id!==task.id||decision.attempt_id!==t.attempt.id||binding?.protocol!=='peer-task-effect-binding-v1'||binding.task_id!==task.id||binding.attempt_id!==t.attempt.id||binding.context_sha256!==t.attempt.context?.sha256)hold('HANDOFF_DECIDED','Handoff already has another receiver decision');
+  }
+  return {...prepared,bindings:[...bindings.values()]};
+}
+function checkCurrentBindings(tx,bindings){
+  for(const expected of bindings??[]){
+    const row=tx.get(expected.family,expected.id);
+    if(expected.reference?(!row||!same(ref(expected.family,row),expected.reference)):row!==null&&row!==undefined)hold('AUTHORITY_CHANGED','Original checked task handoff source changed before commit');
+  }
+}
 export function buildContext(tx,actor,task){
   tx=trackedReads(tx);
   const p=member(tx,actor),c=control(tx),t=task?.value;if(!t)hold('TASK_MISSING','Exact task required');if(p.id!==t.owner_principal_id&&!trusted(p)&&!founder(c,p))hold('TASK_OWNER','Task owner required');
   if(!t.definition||digest(t.definition)!==t.definition_sha256)hold('DEFINITION_CHANGED','Exact original task definition required');
   const owner=member(tx,{principal_id:t.owner_principal_id}),auth=authorize(tx,{principal_id:owner.id},'task/submit',{grant_id:t.grant_id,grant_generation:t.grant_generation,scope:t.scope,resources:t.resources});
+  taskHandoff(tx,owner,task);
   const selected=sources(tx,t.scope,[...(t.input_refs??[]),...(t.review_of?[t.review_of]:[]),...(t.parent_ref?[t.parent_ref]:[])]);
   const body={protocol:'peer-task-context-v1',control:{policy_generation:c.value.policy_generation,pause_generation:c.value.pause_generation,paused:c.value.paused,governance_sha256:c.value.governance_sha256??null,policy:policy(c)},principal:ref('principals',owner),grant:auth.grant?grantBinding(auth.grant):{founder_principal_id:owner.id},task:{id:task.id,definition_revision:t.definition_revision,definition_sha256:t.definition_sha256,definition:t.definition,owner_principal_id:t.owner_principal_id,grant_id:t.grant_id,grant_generation:t.grant_generation},...selected};
   const encoded=canonical(body),size=Buffer.byteLength(encoded);if(size>policy(c).max_context_bytes)hold('CONTEXT_CAPACITY','Complete required context exceeds policy; no attempt consumed');return {...body,text:encoded,sha256:digest(encoded),hash:digest(encoded),utf8_bytes:size};
@@ -698,19 +727,30 @@ function evidenceAnalysis(tx,budget=semanticBudget(tx)){
     need(d&&digest(d)===t.definition_sha256,'Original task definition missing or changed');
     for(const field of ['input_refs','review_of','parent_task_id','parent_ref'])need(Object.hasOwn(d,field)&&Object.hasOwn(t,field)&&same(t[field],d[field]),'Declared task contribution references changed');
     for(const field of ['scope','host','role','stage','instructions','acceptance','resources','outcome'])need(same(t[field],d[field]),'Original task purpose changed');
+    const hasHandoff=taskHandoffAliases(row);
     const declared=refs(d.input_refs,'declared task inputs');
     if(d.review_of)declared.push(semanticReference(d.review_of));
     if(d.parent_task_id===null)need(d.parent_ref===null,'Exact declared parent provenance required');
     else{need(typeof d.parent_task_id==='string'&&d.parent_task_id,'Exact declared parent provenance required');const parent=one(d.parent_ref,'tasks','declared parent');need(parent.id===d.parent_task_id,'Exact declared parent provenance required');declared.push(parent);}
     let owner=text(d.owner_principal_id,'original task contributor',200);
-    const actors=[owner],transfers=t.transfers??[];
+    const actors=[owner],handoffNatives=[],transfers=t.transfers??[];
+    if(hasHandoff){
+      const envelope=d.handoff_envelope,handoffRef=one(d.handoff_ref,'work_items','task handoff'),handoff=historical(handoffRef);
+      need(envelope?.protocol==='peer-task-handoff-envelope-v1'&&same(envelope.handoff_ref,handoffRef)&&same(envelope.value,handoff.value)&&handoff.value.kind==='peer_handoff_v1'&&handoff.value.receiver?.id===d.owner_principal_id,'Original typed task handoff changed');
+      const senderRef=one(handoff.value.sender,'principals','handoff sender'),sender=historical(senderRef);
+      need(sender.value.principal_id===senderRef.id&&sender.value.status==='active','Original handoff sender attribution changed');
+      actors.push(senderRef.id);
+      if(typeof sender.value.native_id==='string'&&sender.value.native_id.trim())handoffNatives.push(text(sender.value.native_id,'original handoff sender native identity',300));
+      need(Array.isArray(envelope.governing_support)&&envelope.governing_support.length<=100,'Original handoff governing support missing');
+      for(const support of envelope.governing_support){const exact=reference(support);need(['control','principals','grants'].includes(exact.family)&&same(historical(exact).value,support.value),'Original handoff governing support changed');}
+    }
     need(Array.isArray(transfers),'Task transfer provenance missing');
     for(const transfer of transfers){
       need(only(transfer,['from','to','at','attempt_id'])&&transfer.from===owner&&typeof transfer.to==='string'&&Number.isFinite(Date.parse(transfer.at))&&(transfer.attempt_id===null||transfer.attempt_id===t.attempt?.id),'Task transfer chain changed');
       actors.push(transfer.from,transfer.to);owner=transfer.to;
     }
     need(owner===t.owner_principal_id&&t.principal_id===owner,'Task ownership differs from transfer provenance');
-    const seal={row,actors,natives:[],declared,historical:[],context:null,producer:null};
+    const seal={row,actors,natives:handoffNatives,declared,historical:[],context:null,producer:null};
     taskSeals.set(k,seal);
     const a=t.attempt;
     if(!a){need(!t.result,'Result has no admitted production attempt');return seal;}
@@ -883,6 +923,51 @@ function evidenceAnalysis(tx,budget=semanticBudget(tx)){
     need(review.value.verdict==='Pass'&&same(r.subject,proposalRef)&&p.home_id===row.id&&p.scope===h.scope&&same(p.content,h.content)&&same(p.dependencies,h.dependencies??[])&&same(p.base,h.previous??null),'Home accepted subject binding changed');
     return {proposal,review};
   };
+  const proposalTask=row=>{
+    const v=row.value,fields=['task_id','attempt_id','task_effect'],present=fields.filter(field=>Object.hasOwn(v,field));
+    if(!present.length){
+      if(row.revision>1){
+        const head=tx.get('proposals',row.id);
+        need(head&&Number.isSafeInteger(head.created_seq)&&head.created_seq>0,'Original proposal creation anchor required');
+        const event=tx.events({after:head.created_seq-1,limit:1}).items[0];
+        if(event?.type==='home/propose'){
+          const originals=event.payload.changes.filter(change=>change.family==='proposals'&&change.id===row.id&&change.revision===1);
+          need(originals.length===1,'Original proposal version required');
+          const original=historical(ref('proposals',originals[0]));
+          need(fields.every(field=>!Object.hasOwn(original.value,field)),'Original proposal task attribution was removed');
+        }
+      }
+      return null;
+    }
+    need(present.length===fields.length,'Complete proposal task attribution required');
+    const namespace=v.task_effect;
+    need(namespace&&Object.keys(namespace).sort().join(',')==='admission_producer,attempt_id,authority_epoch,context_sha256,executor_incarnation_id,protocol,runtime_generation,task_id'&&namespace.protocol==='peer-task-effect-binding-v1'&&typeof namespace.task_id==='string'&&namespace.task_id.trim()&&typeof namespace.attempt_id==='string'&&namespace.attempt_id.trim()&&namespace.task_id===v.task_id&&namespace.attempt_id===v.attempt_id&&Number.isSafeInteger(namespace.authority_epoch)&&namespace.authority_epoch>0&&Number.isSafeInteger(namespace.runtime_generation)&&namespace.runtime_generation>0&&typeof namespace.executor_incarnation_id==='string'&&namespace.executor_incarnation_id.trim()&&/^[a-f0-9]{64}$/.test(namespace.context_sha256??''),'Original proposal task namespace required');
+    const anchor=tx.get('proposals',row.id);
+    need(row.revision===1&&anchor&&Number.isSafeInteger(anchor.created_seq)&&anchor.created_seq>0,'Original proposal creation anchor required');
+    const event=tx.events({after:anchor.created_seq-1,limit:1}).items[0],changes=event?.payload?.changes;
+    const produced=changes?.filter(change=>change.family==='proposals'&&change.id===row.id&&change.revision===1&&change.sha256===row.sha256),commands=changes?.filter(change=>change.family==='commands');
+    need(event?.seq===anchor.created_seq&&event.type==='home/propose'&&event.principal_id===v.principal_id&&produced?.length===1&&commands?.length===1&&commands[0].revision===1,'Original task-produced proposal event required');
+    const commandRef=ref('commands',commands[0]),command=historical(commandRef),c=command.value;
+    need(typeof c.operation_id==='string'&&c.operation_id.trim()&&c.operation_id.length<=160&&c.action==='home/propose'&&c.principal_id===v.principal_id&&c.task_id===v.task_id&&c.attempt_id===v.attempt_id&&same(c.task_effect,namespace)&&/^[a-f0-9]{64}$/.test(c.request_sha256??''),'Original task-scoped proposal command required');
+    const operation=digest(['peer-task-operation-v1',namespace,c.operation_id]);
+    need(command.id===digest(['peer-task-command-v1',v.principal_id,namespace,c.operation_id])&&row.id===digest(['proposal',v.principal_id,operation])&&same(c.result,{id:row.id,revision:row.revision,sha256:row.sha256,created_seq:anchor.created_seq,value:v}),'Original proposal command result changed');
+    const commandHead=tx.get('commands',command.id);
+    need(commandHead&&same(ref('commands',commandHead),commandRef),'Original proposal command head changed');
+    const producer=namespace.admission_producer;
+    need(producer&&Object.keys(producer).sort().join(',')==='command,event_seq,event_sha256'&&Number.isSafeInteger(producer.event_seq)&&producer.event_seq>0&&producer.event_seq<anchor.created_seq&&/^[a-f0-9]{64}$/.test(producer.event_sha256??''),'Original proposal admission producer required');
+    const admissionRef=one(producer.command,'commands','proposal task admission command'),admission=historical(admissionRef),a=admission.value;
+    const admissionEvent=tx.events({after:producer.event_seq-1,limit:1}).items[0],admissionChanges=admissionEvent?.payload?.changes,admissionCommands=admissionChanges?.filter(change=>change.family==='commands');
+    need(admissionEvent?.seq===producer.event_seq&&admissionEvent.sha256===producer.event_sha256&&admissionEvent.type==='task/admit'&&a.action==='task/admit'&&a.principal_id===admissionEvent.principal_id&&admissionCommands?.length===1&&same(ref('commands',admissionCommands[0]),admissionRef),'Original proposal task admission event changed');
+    need(admissionRef.revision===1&&typeof a.operation_id==='string'&&a.operation_id.trim()&&a.operation_id.length<=160&&admission.id===digest(['peer-command-v1',a.principal_id,a.operation_id])&&/^[a-f0-9]{64}$/.test(a.request_sha256??''),'Original source admission command required');
+    const receipt=a.result,admitted=receipt?.task,taskRef=admitted?ref('tasks',admitted):null;
+    need(receipt?.admitted===true&&admitted?.id===v.task_id&&admitted.value?.status==='running'&&admitted.value.owner_principal_id===v.principal_id&&admitted.value.principal_id===v.principal_id&&admitted.value.scope===v.scope&&admitted.value.authority_epoch===namespace.authority_epoch&&admitted.value.attempt?.id===v.attempt_id&&admitted.value.attempt.effect_authority?.epoch===namespace.authority_epoch&&admitted.value.attempt.context?.sha256===namespace.context_sha256&&same(receipt.context,admitted.value.attempt.context),'Original proposal task/attempt/context binding changed');
+    need(admissionChanges.some(change=>change.family==='tasks'&&same(ref('tasks',change),taskRef)),'Admission event did not produce the original proposal task');
+    const original=historical(taskRef),admissionHead=tx.get('commands',admission.id);
+    need(same(original.value,admitted.value)&&admissionHead&&same(ref('commands',admissionHead),admissionRef),'Original proposal admission command or task changed');
+    need(Array.isArray(original.value.resources)&&original.value.resources.some(resource=>contains(resource,{kind:'home',id:v.home_id,key:`home:${v.home_id}`})),'Proposal is outside its original admitted task resource');
+    taskSeal(original);
+    return taskRef;
+  };
   // One finite typed edge table, consumed by both traversal purposes. Sealed
   // publication and review proofs are attribution edges, not live dependencies.
   const local=(r,row)=>{
@@ -893,7 +978,8 @@ function evidenceAnalysis(tx,budget=semanticBudget(tx)){
       case 'proposals':{
         const dependencies=refs(v.dependencies??[],'proposal dependencies');need(dependencies.every(d=>d.family==='homes'),'Proposal dependencies must name homes');
         const base=v.base?one(v.base,'homes','proposal base'):null;if(base)need(base.id===v.home_id,'Proposal base home identity changed');
-        n.actors=[v.principal_id];n.live=[...refs(v.readset??[],'proposal readset'),...dependencies,...(base?[base]:[])];n.past=n.live;break;
+        const producer=proposalTask(row);
+        n.actors=[v.principal_id];n.live=[...refs(v.readset??[],'proposal readset'),...dependencies,...(base?[base]:[])];n.past=[...n.live,...(producer?[producer]:[])];break;
       }
       case 'reviews':{const s=reviewSeal(row);n.actors=[s.reviewer];n.natives=[s.native];n.past=[s.subject,s.taskRef];n.review=s;break;}
       case 'homes':{
@@ -1234,7 +1320,17 @@ function run(ledger,actor,action,args,protectedCall,binding=null,production=null
   const a=copy(actor),input=bounded(args,'request',1000000);text(action,'action',100);
   if(scopeInputActions.has(action))scopeOf(input.scope);
   if(observationActions.has(action)&&!protectedCall)hold('OBSERVER_REQUIRED','Observation actions require the separate trusted host interface');
-  const guardedPlan=Boolean(production&&action==='home/publish'||action.startsWith('handoff/'));
+  // Route classification only. The owning write reselects and validates every
+  // authority; a legacy-to-typed selection race holds before any attempt put.
+  let typedAdmission=false;
+  if(action==='task/admit'&&typeof ledger.read==='function')typedAdmission=ledger.read(tx=>{
+    if(production)assertPeerProductionAuthority(tx,production,ledger);
+    if(!trusted(member(tx,a)))hold('SCHEDULER_REQUIRED','Runtime admission required');
+    const selected=peek(tx,input)?.value;
+    return Boolean(selected&&(Object.hasOwn(selected,'handoff_ref')||Object.hasOwn(selected.definition??{},'handoff_ref')));
+  });
+  const guardedPlan=Boolean(production&&['home/publish','task/admit'].includes(action)||typedAdmission||action.startsWith('handoff/')||['task/submit','task/assign'].includes(action)&&Object.hasOwn(input,'handoff_ref'));
+  if(guardedPlan&&typeof ledger.guardedWrite!=='function')hold('TASK_EFFECT_UNAVAILABLE','Owning guarded task or handoff plan required');
   let deadline=production||action==='task/assign'||guardedPlan?Date.now()+TASK_EFFECT_LEASE_MS:null,assignment=null,replay=false,operatorBindings=null,semanticPlan=null;
   const terminal=production||action==='task/assign'||guardedPlan?tx=>{
     if(production)assertPeerProductionAuthority(tx,production,ledger);
@@ -1281,9 +1377,9 @@ function run(ledger,actor,action,args,protectedCall,binding=null,production=null
       assignment=assignmentCommitBinding(tx,ledger,a,input,result);
       deadline=Math.min(deadline,assignment.expires_at_ms);
     }
-    if(production&&action==='task/admit'&&result?.admitted){
+    if(guardedPlan&&action==='task/admit'&&result?.admitted){
       const authority=result.task?.value.attempt?.effect_authority;
-      if(!authority?.production_authority||!same(authority.production_authority,production))hold('PRODUCTION_OWNER_CHANGED','Admission was not produced by this runtime owner');
+      if(production&&(!authority?.production_authority||!same(authority.production_authority,production)))hold('PRODUCTION_OWNER_CHANGED','Admission was not produced by this runtime owner');
       deadline=Math.min(deadline,Date.parse(authority.expires_at));
     }
     return result;
@@ -1372,11 +1468,13 @@ export function bindPeerPrincipal(ledger,binding){
   return connection;
 }
 
-const taskEffectActions=new Set(['message/send','notice/create','home/propose']);
+const taskEffectActions=new Set(['message/send','notice/create','home/propose','handoff/accept','handoff/reject']);
 const taskEffectActionKeys={
   'message/send':new Set(['operation_id','task_id','scope','grant_id','grant_generation','to_principal_id','content','summary','kind']),
   'notice/create':new Set(['operation_id','task_id','scope','grant_id','grant_generation','content','summary','kind']),
-  'home/propose':new Set(['operation_id','task_id','scope','grant_id','grant_generation','home_id','expected_revision','content','dependencies','input_refs'])
+  'home/propose':new Set(['operation_id','task_id','scope','grant_id','grant_generation','home_id','expected_revision','content','dependencies','input_refs']),
+  'handoff/accept':new Set(['operation_id','task_id','handoff_ref','reason','source_instruction']),
+  'handoff/reject':new Set(['operation_id','task_id','handoff_ref','reason','source_instruction'])
 };
 const taskEffectAuthorityArguments=['authority_epoch','authority_previous','authority_event_seq','effect_authority','effect_lease','lease','expires_at','deadline_at_ms','executor','executor_incarnation','admission_producer','task_effect'];
 function taskEffectRequest(source,args){
@@ -1388,6 +1486,14 @@ function taskEffectArguments(task,action,input){
   const t=task.value;
   if(Object.keys(input).some(key=>!taskEffectActionKeys[action].has(key)))hold('INVALID_INPUT','Unsupported task action argument');
   if(input.task_id!==undefined&&input.task_id!==task.id)hold('TASK_OWNER','Only the admitted task is available');
+  if(action==='handoff/accept'||action==='handoff/reject'){
+    if(!taskHandoffAliases(task))hold('HANDOFF_REQUIRED','Only this task\'s admitted typed handoff may be decided');
+    if(Object.hasOwn(input,'handoff_ref')){
+      if(!input.handoff_ref||Object.keys(input.handoff_ref).sort().join(',')!=='family,id,revision,sha256')hold('SOURCE_INVALID','Exact closed admitted handoff reference required');
+      if(!same(exactReference(input.handoff_ref),t.handoff_ref))hold('HANDOFF_RECEIVER','Only the exact admitted handoff is available');
+    }
+    return {...input,handoff_ref:copy(t.handoff_ref),scope:t.scope,grant_id:t.grant_id,grant_generation:t.grant_generation,resources:copy(t.resources)};
+  }
   if(input.scope!==undefined&&scopeOf(input.scope)!==t.scope||input.grant_id!==undefined&&input.grant_id!==t.grant_id||input.grant_generation!==undefined&&input.grant_generation!==t.grant_generation)hold('TASK_EFFECT_SCOPE','The action must use the admitted task scope and grant');
   const resources=action==='home/propose'?[{kind:'home',id:text(input.home_id,'home_id',200)}]:[];
   if(resources.some(resource=>!t.resources.some(bound=>contains(bound,{...resource,key:`home:${resource.id}`}))))hold('RESOURCE_AUTHORITY','The action is outside the admitted task resources');
@@ -1436,6 +1542,7 @@ function taskEffectState(raw,source,taskId,executor,seal=null,{context=true,acti
   if(ctx.protocol!=='peer-task-context-v1'||canonical(contextBody)!==encoded||digest(encoded)!==sha256||hash!==sha256||Buffer.byteLength(encoded)!==utf8_bytes)hold('TASK_AUTHORITY_CHANGED','Admitted context body differs from its sealed bytes');
   if(!t.definition||digest(t.definition)!==t.definition_sha256)hold('TASK_AUTHORITY_CHANGED','Original task definition changed');
   for(const field of ['scope','host','role','stage','instructions','acceptance','resources','outcome','input_refs','review_of','parent_task_id','parent_ref'])if(!Object.hasOwn(t,field)||!Object.hasOwn(t.definition,field)||!same(t[field],t.definition[field]))hold('TASK_AUTHORITY_CHANGED','Original task purpose or resource aliases changed');
+  taskHandoffAliases(task);
   if(Object.hasOwn(t,'assignment')!==Object.hasOwn(t.definition,'assignment')||Object.hasOwn(t,'assignment')&&!same(t.assignment,t.definition.assignment))hold('TASK_AUTHORITY_CHANGED','Original assignment provenance changed');
   if(!ctx||ctx.task?.id!==task.id||ctx.task.owner_principal_id!==principal.id||ctx.task.definition_revision!==t.definition_revision||ctx.task.definition_sha256!==t.definition_sha256||!same(ctx.task.definition,t.definition)||a.definition_revision!==t.definition_revision||a.model_calls!==1||a.id!==digest(['attempt',task.id,t.definition_revision])||ctx.principal?.id!==principal.id||ctx.principal.revision!==principal.revision||ctx.principal.sha256!==principal.sha256)hold('TASK_AUTHORITY_CHANGED','Admitted task/principal/context tuple changed');
   if(c.value.policy_generation!==a.policy_generation||c.value.pause_generation!==a.pause_generation||ctx.control?.policy_generation!==c.value.policy_generation||ctx.control?.pause_generation!==c.value.pause_generation||ctx.control?.governance_sha256!==(c.value.governance_sha256??null)||!same(ctx.control.policy,policy(c)))hold('AUTHORITY_CHANGED','Admitted control policy or pause generation changed');
@@ -1446,6 +1553,12 @@ function taskEffectState(raw,source,taskId,executor,seal=null,{context=true,acti
   const originalEffect={kind:'native',task_id:task.id,principal_id:principal.id,scope:t.scope,status:'reserved',request,request_sha256:digest(request),grant_id:t.grant_id,grant_generation:t.grant_generation,policy_generation:a.policy_generation,pause_generation:a.pause_generation,termination_confirmed:false};
   if(a.effect_id!==digest(['native-effect',task.id,t.definition_revision])||a.request_sha256!==digest(request)||effect?.revision!==1||effect.created_seq!==t.authority_event_seq||effect.sha256!==peerDigest(originalEffect)||slot?.value.status!=='active'||slot.value.task_id!==task.id||slot.value.principal_id!==principal.id||slot.value.attempt_id!==a.id||slot.value.effect_id!==effect.id)hold('TASK_RESERVATION_CHANGED','Original active task reservations required');
   if(context&&!validateContext(tx,ctx))hold('CONTEXT_CHANGED','Complete admitted context is no longer current');
+  const handoff=context?taskHandoff(tx,principal,task):null;
+  if(handoff){
+    const bindings=new Map(handoff.bindings.map(value=>[canonical([value.family,value.id]),value]));
+    for(const source of ctx.sources){const exact=semanticReference(source);bindings.set(canonical([exact.family,exact.id]),{family:exact.family,id:exact.id,reference:exact});}
+    handoff.bindings=[...bindings.values()];
+  }
   let producer;
   if(seal){
     producer=seal.producer;
@@ -1463,7 +1576,7 @@ function taskEffectState(raw,source,taskId,executor,seal=null,{context=true,acti
   const deadline=Math.min(expires,auth.grant?Date.parse(auth.grant.value.expires_at):Infinity,incarnation.deadline_at_ms);
   if(!Number.isSafeInteger(deadline)||deadline<=issued)hold('TASK_AUTHORITY_CHANGED','Finite source deadline required');
   if(context){const cutoff=Date.now();if(!Number.isFinite(cutoff)||cutoff>=deadline)hold('TASK_EFFECT_EXPIRED','Task effect lease expired before replay or effects');}
-  return {task,context:ctx,authority,producer,incarnation,deadline,args};
+  return {task,context:ctx,authority,producer,incarnation,deadline,args,handoff};
 }
 
 /** Trusted host composition only. Models receive only the returned execute /
@@ -1478,30 +1591,40 @@ export function bindPeerTaskEffects(originalConnection,selector,executor){
   const taskId=text(selected.task_id,'task id',200),{ledger,actor}=source;
   if(typeof ledger.guardedWrite!=='function')hold('TASK_EFFECT_UNAVAILABLE','Owning physical precommit guard required');
   let seal;
-  const terminal=(action=null,input=null)=>tx=>taskEffectState(tx,source,taskId,executor,seal,{context:false,action,input}).deadline;
+  const terminal=(action=null,input=null,bindings=()=>null)=>tx=>{
+    const state=taskEffectState(tx,source,taskId,executor,seal,{context:false,action,input});
+    checkCurrentBindings(tx,bindings());return state.deadline;
+  };
+  let initialHandoffBindings=null;
   ledger.guardedWrite('task/effect-bind',actor.principal_id,tx=>{
     const state=taskEffectState(tx,source,taskId,executor);
     const namespace={protocol:'peer-task-effect-binding-v1',task_id:taskId,attempt_id:state.task.value.attempt.id,authority_epoch:state.authority.epoch,context_sha256:state.context.sha256,admission_producer:state.producer,executor_incarnation_id:state.incarnation.incarnation_id,runtime_generation:state.incarnation.runtime_generation};
-    seal={namespace:copy(namespace),authority:copy(state.authority),previous:copy(state.task.value.authority_previous),producer:copy(state.producer),incarnation:copy(state.incarnation)};
-  },terminal());
+    seal={namespace:copy(namespace),authority:copy(state.authority),previous:copy(state.task.value.authority_previous),producer:copy(state.producer),incarnation:copy(state.incarnation),handoff_bindings:state.handoff?copy(state.handoff.bindings):null};
+    initialHandoffBindings=seal.handoff_bindings;
+    if(state.handoff){if(typeof tx.sealWrites!=='function')hold('TASK_EFFECT_UNAVAILABLE','Owning handoff write closure required');tx.sealWrites();}
+  },terminal(null,null,()=>initialHandoffBindings));
   return Object.freeze({
     execute(action,args={}){
       text(action,'task action',100);
       if(!taskEffectActions.has(action))hold('TASK_EFFECT_ACTION_HELD','This task action has no implemented guarded path');
       const input=taskEffectRequest(source,args);
+      let semanticPlan=null;
       return plannedWrite(ledger,action,actor.principal_id,tx=>{
         const state=taskEffectState(tx,source,taskId,executor,seal,{action,input});
         // Task authority precedes even a matching command receipt lookup.
         return command(tx,actor,action,state.args,false,seal.namespace);
-      },terminal(action,input));
+      },terminal(action,input,()=>semanticPlan?.bindings),seal.handoff_bindings?plan=>{semanticPlan=plan;}:null);
     },
     inspect(action,args={}){
       const input=taskEffectRequest(source,args);
       if(!['task/get','task/context'].includes(action)||Object.keys(input).some(key=>key!=='task_id')||input.task_id!==undefined&&input.task_id!==taskId)hold('TASK_EFFECT_ACTION_HELD','Only this admitted task can be inspected');
+      let handoffBindings=null;
       return ledger.guardedWrite(action,actor.principal_id,tx=>{
         const state=taskEffectState(tx,source,taskId,executor,seal);
+        handoffBindings=state.handoff?.bindings??null;
+        if(state.handoff){if(typeof tx.sealWrites!=='function')hold('TASK_EFFECT_UNAVAILABLE','Owning handoff write closure required');tx.sealWrites();}
         return copy(action==='task/get'?state.task:state.context);
-      },terminal());
+      },terminal(null,null,()=>handoffBindings));
     }
   });
 }
@@ -1512,6 +1635,7 @@ export function createRuntimeObserver(ledger,{principal_id='scheduler'}={}){
   return Object.freeze({record:(action,args)=>{if(!observationActions.has(action))hold('OBSERVER_ACTION','Unsupported observation action');return run(ledger,actor,action,args,true);}});
 }
 function mutate(tx,actor,principal,c,action,args,protectedCall,taskBinding=null,assignment=null){
+  if(['task/submit','task/assign'].includes(action)&&Object.hasOwn(args,'handoff_envelope'))hold('ACTOR_ARGUMENT','Task handoff envelopes are source-produced only');
   if(action==='grant/create'||action==='grant/revoke'){
     if(!founder(c,principal))hold('FOUNDER_REQUIRED','Founder grant control required');const id=text(args.grant_id,'grant_id',200),old=tx.get('grants',id);
     if(action==='grant/revoke'){if(!old)hold('GRANT_MISSING','Missing grant');return tx.put('grants',id,{...old.value,status:'revoked',generation:old.value.generation+1,revoked_at:now()},old.revision);}
@@ -1533,9 +1657,18 @@ function mutate(tx,actor,principal,c,action,args,protectedCall,taskBinding=null,
   if(action==='task/submit'){
     const scope=scopeOf(args.scope),resources=canonicalResources(tx,args.resources),auth=authorize(tx,actor,action,{...args,scope,resources}),p=policy(c);
     if(count(tx,'tasks',{status:['planned','pending']})>=p.queue_limit||count(tx,'tasks',{status:['planned','pending'],principal_id:principal.id})>=p.principal_queue_limit)hold('QUEUE_CAPACITY','Queue full');
-    const id=args.task_id?text(args.task_id,'task_id',200):digest(['task',principal.id,args.operation_id]);if(tx.get('tasks',id))hold('TASK_EXISTS','Task exists');const inputs=args.input_refs??[];if(!Array.isArray(inputs)||inputs.length>100)hold('SOURCE_INVALID','At most 100 input refs');semanticInputs(tx,inputs);if(args.review_of)resolve(tx,semanticReference(args.review_of));
+    const id=args.task_id?text(args.task_id,'task_id',200):digest(['task',principal.id,args.operation_id]);if(tx.get('tasks',id))hold('TASK_EXISTS','Task exists');let inputs=args.input_refs??[];if(!Array.isArray(inputs)||inputs.length>100)hold('SOURCE_INVALID','At most 100 input refs');
+    let handoff=null;
+    if(Object.hasOwn(args,'handoff_ref')){
+      handoff=prepareHandoffTask(tx,principal,args.handoff_ref);
+      if(handoff.decision_ref)hold('HANDOFF_DECIDED','Handoff already has an immutable receiver decision');
+      if(scopeOf(handoff.handoff_envelope.value.scope)!==scope)hold('HANDOFF_SCOPE','Task scope must match its intended handoff');
+      inputs=[...new Map([...inputs,...handoff.input_refs].map(r=>{const exact=semanticReference(r);return [canonical(exact),exact];})).values()];
+      if(inputs.length>100)hold('SOURCE_INVALID','Complete handoff task inputs exceed capacity');
+    }
+    semanticInputs(tx,inputs);if(args.review_of)resolve(tx,semanticReference(args.review_of));
     let parent=null;if(args.parent_task_id){parent=tx.get('tasks',text(args.parent_task_id,'parent task',200));if(!parent||parent.value.owner_principal_id!==principal.id||!['*',scope].includes(parent.value.scope))hold('PARENT_AUTHORITY','Parent owner/scope mismatch');}
-    const definition={owner_principal_id:principal.id,grant_id:auth.grant?.id??null,grant_generation:auth.grant?.value.generation??null,scope,host:principal.value.host??'codex',role:text(args.role,'role',100),stage:text(args.stage??'produce','stage',40),instructions:text(args.instructions??args.task,'instructions',20000),acceptance:text(args.acceptance,'acceptance',4000),resources,input_refs:copy(inputs),review_of:args.review_of?copy(args.review_of):null,parent_task_id:parent?.id??null,parent_ref:parent?ref('tasks',parent):null,outcome:args.outcome===undefined?null:bounded(args.outcome,'outcome',8000),...(assignment?{assignment:copy(assignment)}:{})};
+    const definition={owner_principal_id:principal.id,grant_id:auth.grant?.id??null,grant_generation:auth.grant?.value.generation??null,scope,host:principal.value.host??'codex',role:text(args.role,'role',100),stage:text(args.stage??'produce','stage',40),instructions:text(args.instructions??args.task,'instructions',20000),acceptance:text(args.acceptance,'acceptance',4000),resources,input_refs:copy(inputs),review_of:args.review_of?copy(args.review_of):null,parent_task_id:parent?.id??null,parent_ref:parent?ref('tasks',parent):null,outcome:args.outcome===undefined?null:bounded(args.outcome,'outcome',8000),...(assignment?{assignment:copy(assignment)}:{}),...(handoff?{handoff_ref:copy(handoff.handoff_ref),handoff_envelope:copy(handoff.handoff_envelope)}:{})};
     const value={...definition,definition,status:assignment?'pending':'planned',authority_epoch:1,authority_previous:null,authority_event_seq:tx.sequence,definition_revision:1,definition_sha256:digest(definition),attempt:null,principal_id:principal.id,created_at:now()};
     if(assignment)claimResources(tx,{id,value});
     return tx.put('tasks',id,value,0);
@@ -1543,6 +1676,7 @@ function mutate(tx,actor,principal,c,action,args,protectedCall,taskBinding=null,
   if(action==='task/admit'){
     if(!trusted(principal))hold('SCHEDULER_REQUIRED','Runtime admission required');legacyOriginHold(c);const status=runtimeStatus(tx);if(status.paused)return {admitted:false,code:'PAUSED',reason:'Company paused'};if(!status.available_slots)return {admitted:false,code:'CAPACITY_BUSY',reason:'Active or uncertain execution holds capacity'};
     const task=peek(tx,args);if(!task)return {admitted:false,code:'NO_WORK',reason:'No unexcluded pending work'};if(args.task_id&&args.task_id!==task.id)return {admitted:false,code:'FAIRNESS_CHANGED',reason:'Selection changed'};const t=task.value;
+    if((Object.hasOwn(t,'handoff_ref')||Object.hasOwn(t.definition??{},'handoff_ref'))&&!currentAuthorizationGrants.has(tx))hold('SOURCE_CHANGED','Task selection changed to a typed handoff; fresh guarded admission required');
     // Expected admission holds must occur before planning resource mutations.
     let auth,context,usage,principalUsage,used,usedPrincipal,effectAuthority;
     try{
@@ -1551,13 +1685,18 @@ function mutate(tx,actor,principal,c,action,args,protectedCall,taskBinding=null,
       usage=tx.get('control','usage');principalUsage=tx.get('control',`usage:${t.owner_principal_id}`);used=usage?.value.model_calls??0;usedPrincipal=principalUsage?.value.model_calls??0;
       if(used>=policy(c).max_model_calls||usedPrincipal>=(policy(c).principal_model_calls??policy(c).max_model_calls)||auth.grant&&(auth.grant.value.used_model_calls??0)>=auth.grant.value.max_model_calls)hold('MODEL_BUDGET','Model budget exhausted');
       context=buildContext(tx,actor,task);if(context.membership.conflicts.length)hold('CONTEXT_CONFLICT','Unresolved applicable conflict');
+      if(t.handoff_ref){
+        const unstable=t.handoff_envelope.value.governing_refs.some(r=>r.family==='grants'&&r.id===auth.grant?.id||r.family==='control'&&['usage',`usage:${t.owner_principal_id}`].includes(r.id));
+        const fairness=tx.get('control','fairness');
+        if(unstable||t.handoff_envelope.value.governing_refs.some(r=>r.family==='control'&&r.id==='fairness')&&!same(fairness?.value,{last_principal_id:t.owner_principal_id}))hold('SOURCE_CHANGED','Admission would change exact governing handoff evidence');
+      }
       // Source-owned SOFTWARE support is checked after the original context
       // reads and before any resource, attempt, effect or allowance put.
       prepareOriginalProjectedTaskContext(context,tx);
       const issued=Date.now(),expires=Math.min(issued+TASK_EFFECT_LEASE_MS,auth.grant?Date.parse(auth.grant.value.expires_at):Infinity);
       if(!Number.isSafeInteger(issued)||!Number.isSafeInteger(expires)||expires<=issued)hold('GRANT_INVALID','Admission authority expired during preparation');
       effectAuthority={protocol:'peer-task-effect-authority-v1',epoch:nextTaskAuthority(t),issued_at:new Date(issued).toISOString(),expires_at:new Date(expires).toISOString(),...(productionAdmissions.has(tx)?{production_authority:copy(productionAdmissions.get(tx))}:{})};
-    }catch(error){if(readFailure(tx,error))throw error;if(['RESOURCE_BUSY','RESOURCE_AUTHORITY','CONTEXT_CAPACITY','CONTEXT_CONFLICT','GRANT_INVALID','GRANT_CHANGED','MODEL_BUDGET','PRINCIPAL_INACTIVE','SOURCE_CHANGED','DEPENDENCY_CYCLE','LEGACY_SOURCE_MISSING','DEFINITION_CHANGED'].includes(error.code))return {admitted:false,code:error.code,reason:error.message};throw error;}
+    }catch(error){if(readFailure(tx,error))throw error;if(['RESOURCE_BUSY','RESOURCE_AUTHORITY','CONTEXT_CAPACITY','CONTEXT_CONFLICT','GRANT_INVALID','GRANT_CHANGED','MODEL_BUDGET','PRINCIPAL_INACTIVE','SOURCE_CHANGED','DEPENDENCY_CYCLE','LEGACY_SOURCE_MISSING','DEFINITION_CHANGED','HANDOFF_DECIDED'].includes(error.code))return {admitted:false,code:error.code,reason:error.message};throw error;}
     const effectId=digest(['native-effect',task.id,t.definition_revision]);if(tx.get('effects',effectId))hold('ATTEMPT_CONSUMED','Effect already reserved');
     const request={kind:'native',task_id:task.id,definition_sha256:t.definition_sha256,context_sha256:context.sha256},attempt={id:digest(['attempt',task.id,t.definition_revision]),effect_id:effectId,request_sha256:digest(request),definition_revision:t.definition_revision,context,policy_generation:c.value.policy_generation,pause_generation:c.value.pause_generation,admitted_at:effectAuthority.issued_at,effect_authority:effectAuthority,termination_confirmed:false,model_calls:1};
     claimResources(tx,task);
@@ -1615,11 +1754,13 @@ function mutate(tx,actor,principal,c,action,args,protectedCall,taskBinding=null,
     const exact=exactReference(args.handoff_ref);if(exact.family!=='work_items')hold('SOURCE_INVALID','Exact typed handoff required');
     const handoff=resolve(tx,exact),value=handoff.value;
     if(value.receiver?.id!==principal.id)hold('HANDOFF_RECEIVER','Only the actual intended receiver may decide');
-    authorize(tx,actor,action,{...args,scope:value.scope,resources:[]});
+    authorize(tx,actor,action,{...args,scope:value.scope,resources:taskBinding?args.resources:[]});
     const governed=(value.governing_refs??[]).map(exactReference);
     for(const source of governed)resolve(tx,source);
     evidenceAnalysis(tx).current([semanticReference(value.subject_ref),...(value.evidence_refs??[]).map(semanticReference),...governed.filter(source=>semanticFamilies.has(source.family))]);
-    return decideHandoff(tx,principal,action,args);
+    let decisionArgs=args;
+    if(taskBinding){const {task_id,scope,resources,...closed}=args;decisionArgs=closed;}
+    return decideHandoff(tx,principal,action,decisionArgs,taskBinding);
   }
   if(action==='home/propose'){
     const scope=scopeOf(args.scope),id=text(args.home_id,'home_id',200);authorize(tx,actor,action,{...args,scope,resources:[{kind:'home',id}]});const home=tx.get('homes',id);if((home?.revision??0)!==(args.expected_revision??0))hold('HOME_CHANGED','Base revision changed');if(home&&scopeOf(home.value.scope)!==scope)hold('HOME_SCOPE','Home scope cannot be relabeled');

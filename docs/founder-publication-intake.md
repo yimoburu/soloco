@@ -40,7 +40,38 @@ Independent review, logical-home publication and receiver acceptance remain sepa
 - Reading, sending, native return, QA and publication never imply acceptance.
   New source revisions require fresh applicability; historical decisions remain.
 - The public operator may act only as the actual founder receiver. It cannot
-  impersonate a named peer. Existing task clients retain their current action set.
+  impersonate a named peer. The foundation component leaves task clients unchanged.
+
+## Task-bound receiver producer
+
+The follow-up receiver path uses source-derived `handoff_ref` and a complete
+`handoff_envelope` inside the existing `context.task.definition`. It adds no
+siblings to `context.task` and admits no arbitrary `work_items` semantic inputs.
+The source verifies the original handoff, actual intended receiver, scope and
+current supporting versions, and expands legitimate semantic references into
+the existing bounded input list. Definition hashes and context budgets remain.
+
+Only `handoff/accept` and `handoff/reject` are added to a task-bound client, and
+only for its exact admitted handoff. The original attempt, context, executor,
+recipient grant, lease and physical commit checks still apply. Sending handoffs,
+publication and company control remain outside the task client. Its own decision
+preserves the original envelope; this is not a general exemption for mutations.
+
+Returned tasks and task-produced proposals retain the handoff sender and original
+input contributors for independent review. Proposal attribution follows verified
+immutable admission history, so finishing the producing task does not create a
+new live dependency or let its sender review its own contribution.
+
+A new admission cannot consume a handoff already decided elsewhere. Exact
+governing references that admission itself would change must hold before model
+charge, rather than create an immediately stale attempt. Generic historical
+receipt replay and a live task-effect replay retain their different authority
+checks.
+
+The protected callback transport must compose those two source verbs with the
+actual current-turn task client. Its tool-schema hash changes require a new
+qualified source profile. Old profiles retain their Hold; installation, fixtures
+or relabeling cannot supply that qualification.
 
 ## Verification and limits
 

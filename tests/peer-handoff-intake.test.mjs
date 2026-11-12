@@ -286,10 +286,12 @@ test('handoff decisions do not spend another model call or release genuinely UNK
   assert(rows(f,'claims').some(row=>row.value.status==='held'));assert(rows(f,'slots').some(row=>row.value.status==='unknown'));
 });
 
-test('an actual source-bound task client retains its closed action set and cannot decide handoffs or publish',t=>{
+test('an ordinary task cannot decide a handoff or access sending, publication and intake controls',t=>{
   const f=peerTaskEffectsFixture(t),a=f.start(),before=logicalSQLState(f);
-  for(const action of ['handoff/send','handoff/accept','handoff/reject','home/publish'])
+  for(const action of ['handoff/send','home/publish'])
     assert.throws(()=>a.client.execute(action,{operation_id:`task-held-${action}`}),code('TASK_EFFECT_ACTION_HELD'));
+  for(const action of ['handoff/accept','handoff/reject'])
+    assert.throws(()=>a.client.execute(action,{operation_id:`task-held-${action}`}),code('HANDOFF_REQUIRED'));
   assert.throws(()=>a.client.inspect('handoff/pending',{family:'work_items'}),code('TASK_EFFECT_ACTION_HELD'));
   assert.deepEqual(logicalSQLState(f),before);
 });
