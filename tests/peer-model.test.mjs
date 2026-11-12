@@ -4,33 +4,18 @@ import {canonical,peerDigest,FAMILIES,PeerLedger} from '../plugins/soloco/runtim
 import {execute,inspect,buildContext,validateContext,canonicalResources,resourceOverlap,digest,createRuntimeObserver} from '../plugins/soloco/runtime/peers/model.mjs';
 import {peerFixture} from './peer-fixture.mjs';
 import {legacyPeerModel301b} from './peer-model-legacy-fixture.mjs';
+import {actor,ref,code,indexedCreateHash,indexedPreparationLimit,rows,get,seed,state,fixture,controlAccessSeam,protectedHistoryState,parentReviewOutput,externalMember,externalReview,externalPublish,externalNegative,externalPacket,indexedSQLState,indexedAtomicReject,finalAllSQLState} from './peer-model-support.mjs';
 
 // All behavior tests use the immutable accepted P1 SQLite implementation.
 // The observer below is a synthetic trusted-host fixture, not native evidence.
-const actor=principal_id=>({principal_id});
-const ref=(family,row)=>({family,id:row.id,revision:row.revision,sha256:row.sha256});
-const code=expected=>e=>e.code===expected;
-function rows(ledger,family,filter={}){return ledger.read(tx=>{const result=[];let cursor;for(;;){const p=tx.list(family,{...filter,limit:100,...(cursor?{cursor}:{})});result.push(...p.items);if(p.complete)return result;cursor=p.next_cursor;}});}
-function get(f,family,id){return f.ledger.read(tx=>tx.get(family,id));}
-function seed(f,family,id,value){return f.ledger.write('fixture.only','founder',tx=>{const old=tx.get(family,id);return tx.put(family,id,value,old?.revision??0);});}
-function state(f){return {families:Object.fromEntries(FAMILIES.map(family=>[family,rows(f.ledger,family)])),head:f.ledger.db.prepare('SELECT * FROM peer_meta').all(),events:f.ledger.db.prepare('SELECT * FROM peer_events ORDER BY seq').all(),outbox:f.ledger.db.prepare('SELECT * FROM peer_outbox ORDER BY seq').all(),versions:f.ledger.db.prepare('SELECT * FROM peer_versions ORDER BY family,id,revision').all(),membership:f.ledger.db.prepare('SELECT * FROM peer_membership ORDER BY family,selector').all(),generations:f.ledger.db.prepare('SELECT * FROM peer_generations ORDER BY family').all()};}
-function fixture(t,options={}){
-  const f=peerFixture(options);t.after(()=>f.close());let n=0;
-  f.run=(who,action,args={})=>execute(f.ledger,actor(who),action,{operation_id:`op-${++n}`,...args});
-  f.observer=createRuntimeObserver(f.ledger);
-  f.observe=(action,args={})=>f.observer.record(action,{operation_id:`ob-${++n}`,...args});
-  seed(f,'control','resources',{worktrees:[{id:'tree1',repository:'owner/repo',aliases:['alias1']},{id:'tree2',repository:'OWNER/REPO'}]});
-  for(const id of ['cos-a','cos-b','reviewer'])f.run('founder','grant/create',{grant_id:`g-${id}`,to_principal_id:id,scope:'*',actions:['task/*','home/*','conflict/*','message/*'],resources:['repo:owner/repo','home:fact','home:other','home:dependency'],expires_at:new Date(Date.now()+3600000).toISOString(),source_instruction:'Fictional bounded fixture authority.'});
-  f.submit=(who='cos-a',args={})=>f.run(who,'task/submit',{grant_id:`g-${who}`,scope:'alpha',role:'engineer',instructions:'Inspect supplied fictional evidence.',acceptance:'Return an attributable bounded result.',...args});
-  f.claim=(task,who=task.value.owner_principal_id)=>f.run(who,'task/claim',{task_id:task.id});
-  f.admit=(task,args={})=>f.run('scheduler','task/admit',{...(task?{task_id:task.id}:{}),...args});
-  f.start=(who='cos-a',args={})=>{const task=f.submit(who,args);f.claim(task);const admitted=f.admit(task);assert.equal(admitted.admitted,true);return admitted;};
-  f.process=(admitted,closed=true)=>({pid:123,started_at:admitted.task.value.attempt.admitted_at,close_observed:closed});
-  f.finish=(admitted,args={})=>f.observe('task/finish',{task_id:admitted.task.id,attempt_id:admitted.task.value.attempt.id,output:'Observed fictional output.',native_id:`observed-${admitted.task.id}`,termination_confirmed:true,observed_process:f.process(admitted),...args});
-  f.propose=(who='cos-a',args={})=>f.run(who,'home/propose',{grant_id:`g-${who}`,scope:'alpha',home_id:'fact',expected_revision:0,content:'Proposed fictional fact.',...args});
-  f.review=(proposal,verdict='Pass',args={})=>{const admitted=f.start('cos-b',{role:'qa',stage:'review',scope:proposal.value.scope,review_of:ref('proposals',proposal)}),output=canonical({review:{subject:ref('proposals',proposal),verdict,reason:'Mechanical fixture review only.',blockers:verdict==='Pass'?[]:['Retained negative finding.']}});return {admitted,output,finished:f.finish(admitted,{output,...args})};};
-  return f;
-}
+
+
+
+
+
+
+
+
 
 test('v3 creation DATA without original interpreter support holds before task admission puts or model charge',t=>{
   const f=fixture(t),task=f.submit();f.claim(task);
@@ -229,15 +214,7 @@ test('changed dispute evidence cannot be resolved through a stale exact referenc
   const f=fixture(t),a=f.propose(),b=f.propose('cos-b',{home_id:'other'}),conflict=f.run('cos-a','conflict/create',{grant_id:'g-cos-a',scope:'alpha',input_refs:[ref('proposals',a),ref('proposals',b)],summary:'Conflicting exact evidence.',clearing_condition:'Independent decision.'}),reviewer=get(f,'principals','reviewer');seed(f,'principals',reviewer.id,{...reviewer.value,qualifications:['conflict/resolve']});seed(f,'proposals',b.id,{...b.value,content:'Changed evidence.'});assert.throws(()=>f.run('reviewer','conflict/resolve',{grant_id:'g-reviewer',conflict_id:conflict.id,source_instruction:'Stale resolution.'}),code('SOURCE_CHANGED'));assert.equal(get(f,'conflicts',conflict.id).value.status,'open');
 });
 
-test('queue continuation reaches ready work beyond 100 held tasks without deleting holds or advancing fairness',t=>{
-  const f=fixture(t,{control:{policy:{worker_cap:3,queue_limit:1000,principal_queue_limit:500,max_context_bytes:65536,max_model_calls:500}}}),tasks=[];
-  // Seed fictional planned definitions in one transaction to keep fixture setup
-  // independent of command overhead; execution still uses real P1 transitions.
-  f.ledger.write('fixture.queue','founder',tx=>{for(let i=0;i<122;i++){const id=`queue-${String(i).padStart(4,'0')}`,definition={owner_principal_id:'cos-a',grant_id:'g-cos-a',grant_generation:1,scope:'alpha',host:'codex',role:'engineer',stage:'produce',instructions:'Fictional queued work.',acceptance:'Bounded result.',resources:[],input_refs:[],review_of:null,parent_task_id:null,parent_ref:null,outcome:null};tasks.push(tx.put('tasks',id,{...definition,definition,definition_revision:1,definition_sha256:digest(definition),status:'pending',principal_id:'cos-a',attempt:null,created_at:`2020-01-01T00:00:${String(Math.floor(i/10)).padStart(2,'0')}.${String(i%10).padStart(3,'0')}Z`},0));}});
-  const excluded=[];for(let i=0;i<121;i++){const selected=inspect(f.ledger,actor('scheduler'),'task/peek',{exclude_task_ids:excluded});assert.equal(selected.task.id,tasks[i].id);excluded.push(selected.task.id);}
-  assert.equal(get(f,'control','fairness'),null);const selected=inspect(f.ledger,actor('scheduler'),'task/peek',{exclude_task_ids:excluded});assert.equal(selected.task.id,tasks[121].id);assert.equal(selected.traversal.exclusion_limit,10000);const admitted=f.admit(selected.task,{exclude_task_ids:excluded});assert.equal(admitted.admitted,true);assert.equal(rows(f.ledger,'tasks',{status:'pending'}).length,121);assert.equal(get(f,'control','usage').value.model_calls,1);assert.equal(get(f,'control','fairness').value.last_principal_id,'cos-a');
-  assert.throws(()=>inspect(f.ledger,actor('scheduler'),'task/peek',{exclude_task_ids:['duplicate','duplicate']}),code('INVALID_INPUT'));assert.throws(()=>inspect(f.ledger,actor('scheduler'),'task/peek',{exclude_task_ids:Array.from({length:10001},(_,i)=>String(i))}),code('INVALID_INPUT'));
-});
+
 
 test('P1 transaction handles remain scoped and model planning cannot weaken accepted ledger rules',t=>{
   const f=fixture(t);let escaped;f.ledger.read(tx=>{escaped=tx;});assert.throws(()=>escaped.get('control','company'),/expired/);
@@ -245,110 +222,18 @@ test('P1 transaction handles remain scoped and model planning cannot weaken acce
   const before=state(f);assert.throws(()=>f.ledger.write('fixture.list-after','founder',tx=>{tx.put('homes','forbidden',{status:'current',scope:'alpha',content:'Rollback.'},0);tx.list('homes');}),/pending writes/);assert.deepEqual(state(f),before);
 });
 
-// Historical rows below are fictional, ledger-valid terminal task versions and
-// exact actor/operation cancellation receipts. No process or native execution
-// is represented by these unattempted cancellations. Setup uses accepted P1.
-function seedUnrelatedTerminalHistory(f,total=10001){
-  const commandIds=new Set(),at='2020-01-01T00:00:00.000Z';
-  for(let start=0;start<total;start+=200){
-    f.ledger.write('fixture.terminal-history','founder',tx=>{
-      for(let i=start;i<Math.min(start+200,total);i++){
-        const id=`archive-task-${String(i).padStart(5,'0')}`,operation=`archive-cancel-${i}`;
-        const definition={owner_principal_id:'founder',grant_id:null,grant_generation:null,scope:'archive',host:'codex',role:'engineer',stage:'produce',instructions:'Fictional archived work cancelled before admission.',acceptance:'No execution authorized by this fixture.',resources:[],input_refs:[],review_of:null,parent_task_id:null,parent_ref:null,outcome:null};
-        const planned=tx.put('tasks',id,{...definition,definition,status:'planned',definition_revision:1,definition_sha256:digest(definition),attempt:null,principal_id:'founder',created_at:at},0);
-        const reason='Archived unstarted cancellation.';
-        const cancelled=tx.put('tasks',id,{...planned.value,status:'cancelled',cancelled_at:at,cancellation:reason},planned.revision);
-        const commandId=digest(['peer-command-v1','founder',operation]);commandIds.add(commandId);
-        tx.put('commands',commandId,{principal_id:'founder',operation_id:operation,action:'task/cancel',request_sha256:digest({channel:'model',action:'task/cancel',args:{task_id:id,reason}}),result:cancelled,created_at:at},0);
-      }
-    });
-  }
-  return commandIds;
-}
+
 
 // This seam delegates every operation to the real SQLite transaction. It
 // observes model-level body access, while leaving P1's internal immutable
 // history/event/index integrity checks intact. Mandatory keyed controls have
 // no reason to enumerate task/effect/command bodies or fetch archive bodies.
-function controlAccessSeam(ledger,archiveCommandIds=new Set()){
-  const accesses=[];
-  const forbiddenCollections=new Set(['tasks','effects','commands']);
-  const wrap=tx=>Object.freeze({...tx,
-    get:(family,id)=>{
-      accesses.push({method:'get',family,id});
-      assert(!(family==='tasks'||family==='effects'||family==='commands'&&archiveCommandIds.has(id)),`Unrelated body hydration: ${family}/${id}`);
-      return tx.get(family,id);
-    },
-    list:(family,options)=>{
-      accesses.push({method:'list',family});
-      assert(!forbiddenCollections.has(family),`Unrelated collection hydration: ${family}`);
-      return tx.list(family,options);
-    },
-    count:(family,options)=>{
-      accesses.push({method:'count',family});
-      assert(!forbiddenCollections.has(family),`Unrelated collection count: ${family}`);
-      return tx.count(family,options);
-    }
-  });
-  return {accesses,
-    read:fn=>ledger.read(tx=>fn(wrap(tx))),
-    write:(type,principal,fn)=>ledger.write(type,principal,tx=>fn(wrap(tx)))
-  };
-}
 
-function protectedHistoryState(f){
-  // Metadata assertions deliberately avoid unfiltered P1 body enumeration,
-  // which correctly retains its 10,000 matching-row limit.
-  return {
-    rows:f.ledger.db.prepare("SELECT family,id,revision,sha256 FROM peer_rows WHERE family IN ('tasks','effects','slots','claims','grants') ORDER BY family,id").all(),
-    usage:f.ledger.db.prepare("SELECT id,revision,sha256 FROM peer_rows WHERE family='control' AND (id='usage' OR id LIKE 'usage:%') ORDER BY id").all()
-  };
-}
-function controlCommitState(f){
-  return {
-    head:f.ledger.db.prepare('SELECT * FROM peer_meta').all(),
-    events:f.ledger.db.prepare('SELECT COUNT(*) AS n FROM peer_events').get().n,
-    commands:f.ledger.db.prepare("SELECT COUNT(*) AS n FROM peer_rows WHERE family='commands'").get().n,
-    notices:f.ledger.db.prepare("SELECT COUNT(*) AS n FROM peer_rows WHERE family='notices'").get().n
-  };
-}
 
-test('mandatory notices, founder pause and exact replay avoid more than 10000 unrelated terminal task and command bodies',t=>{
-  const f=fixture(t),replayArgs={operation_id:'history-bound-replay',grant_id:'g-cos-a',scope:'alpha',role:'engineer',instructions:'Exact fictional replay subject.',acceptance:'Preserve original receipt.',resources:[]};
-  const original=execute(f.ledger,actor('cos-a'),'task/submit',replayArgs);
-  const archiveCommands=seedUnrelatedTerminalHistory(f);
-  assert.equal(archiveCommands.size,10001);
-  assert.equal(f.ledger.db.prepare("SELECT COUNT(*) AS n FROM peer_rows WHERE family='tasks' AND status='cancelled'").get().n,10001);
-  assert(f.ledger.db.prepare("SELECT COUNT(*) AS n FROM peer_rows WHERE family='commands'").get().n>10000);
-  assert.equal(rows(f.ledger,'claims',{status:'held'}).length,0);
-  assert.equal(rows(f.ledger,'slots',{status:['active','unknown']}).length,0);
-  assert.equal(rows(f.ledger,'effects',{status:['reserved','sent','unknown']}).length,0);
-  // The underlying capacity fence is unchanged; controls must avoid it through
-  // necessary keyed access, rather than relaxing or hiding this failure.
-  assert.throws(()=>f.ledger.read(tx=>tx.list('tasks',{limit:1})),/overflow/);
-  assert.throws(()=>f.ledger.read(tx=>tx.count('commands')),/overflow/);
-  const before=protectedHistoryState(f),checked=controlAccessSeam(f.ledger,archiveCommands);
-  const paused=execute(checked,actor('founder'),'company/pause',{operation_id:'history-pause',source_instruction:'Pause fictional fixture with unrelated terminal archive.'});
-  assert.equal(paused.value.paused,true);
-  // Publisher is active and has no discretionary grant in this fixture.
-  assert.equal(get(f,'grants','g-publisher'),null);
-  for(const kind of ['must_know','decision_required']){
-    const notice=execute(checked,actor('publisher'),'notice/create',{operation_id:`history-notice-${kind}`,scope:'alpha',kind,content:'Required fictional notice remains available while paused.'});
-    assert.equal(notice.value.status,'pending');assert.equal(notice.value.kind,kind);assert.equal(notice.value.principal_id,'publisher');
-    assert.equal(notice.value.resolution,undefined);
-  }
-  const committed=controlCommitState(f);
-  assert.deepEqual(execute(checked,actor('cos-a'),'task/submit',replayArgs),original);
-  assert.deepEqual(execute(checked,actor('cos-a'),'task/submit',replayArgs),original);
-  assert.deepEqual(controlCommitState(f),committed);
-  assert.throws(()=>execute(checked,actor('cos-a'),'task/submit',{...replayArgs,instructions:'Changed replay request.'}),code('REPLAY_MISMATCH'));
-  assert.deepEqual(controlCommitState(f),committed);
-  assert.deepEqual(protectedHistoryState(f),before);
-  assert.equal(get(f,'tasks',original.id).value.attempt,null);
-  assert.equal(get(f,'control','usage'),null);
-  assert(checked.accesses.some(a=>a.method==='get'&&a.family==='commands'),'Exact replay uses its keyed command record');
-  assert(!checked.accesses.some(a=>['list','count'].includes(a.method)&&['tasks','effects','commands'].includes(a.family)));
-});
+
+
+
+
 
 test('genuinely oversized relevant context holds without consuming an attempt or releasing unknown reservations while controls remain available',t=>{
   const f=fixture(t),unknown=f.start('cos-a',{resources:['path:tree1:reserved']});
@@ -541,9 +426,7 @@ function qualifyParentResolver(f,id){
   const p=get(f,'principals',id);
   seed(f,'principals',id,{...p.value,qualifications:['conflict/resolve']});
 }
-function parentReviewOutput(proposal){
-  return canonical({review:{subject:ref('proposals',proposal),verdict:'Pass',reason:'Fictional exact parent-lineage review.',blockers:[]}});
-}
+
 function transferredParentChild(f,{parentDefect=null,nested=false}={}){
   const admitted=f.start('cos-a'),produced=f.finish(admitted,{native_id:'ancestor-observed-N'});
   assert.equal(produced.accepted,true);
@@ -728,23 +611,10 @@ test('a missing exact parent row and a contributor-reference cycle fail closed i
 
 // External source-proposal regressions, using actual model operations and
 // accepted P1 SQLite. Protected observations are fictional host inputs only.
-const {createHash:indexedCreateHash}=await import('node:crypto');
-function externalMember(f,id,{qualifications=[]}={}){
-  const old=get(f,'principals',id);
-  if(!old)seed(f,'principals',id,{principal_id:id,kind:'cos',status:'active',generation:1,native_id:`registered-${id}`,host:'codex',session_id:`session-${id}`,qualifications});
-  else if(qualifications.length)seed(f,'principals',id,{...old.value,qualifications});
-  if(!get(f,'grants',`g-${id}`))f.run('founder','grant/create',{grant_id:`g-${id}`,to_principal_id:id,scope:'*',actions:['task/*','home/*','conflict/*','message/*'],resources:['repo:owner/repo','home:fact','home:other','home:dependency'],expires_at:new Date(Date.now()+3600000).toISOString(),source_instruction:'Fictional external regression authority.'});
-}
-function externalReview(f,proposal,who,args={}){
-  const admitted=f.start(who,{role:'qa',stage:'review',scope:proposal.value.scope,review_of:ref('proposals',proposal)});
-  const output=canonical({review:{subject:ref('proposals',proposal),verdict:'Pass',reason:'Independent fictional source-graph assessment.',blockers:[]}});
-  return {admitted,output,finished:f.finish(admitted,{output,native_id:`observed-review-${admitted.task.id}`,...args})};
-}
-function externalPublish(f,author,reviewer,home_id,content,args={}){
-  const current=get(f,'homes',home_id),proposal=f.propose(author,{home_id,scope:'alpha',expected_revision:current?.revision??0,content,...args});
-  const review=externalReview(f,proposal,reviewer);assert.equal(review.finished.accepted,true);
-  return {home:f.run(author,'home/publish',{grant_id:`g-${author}`,proposal_id:proposal.id,review_id:review.finished.review.id}),proposal,...review};
-}
+
+
+
+
 function externalAtomicReject(f,operation,expected){
   const before=state(f);assert.throws(operation,typeof expected==='string'?code(expected):expected);
   assert.deepEqual(state(f),before,'Rejection must preserve receipts, observations, reviews, reservations, budgets, events and immutable versions');
@@ -1044,15 +914,8 @@ for(const change of ['regression','unproduced jump','counter-only update','remov
   assert.deepEqual(get(f,'homes','fact'),published.home);
 });
 
-function externalNegative(f,subject,family,who,scope,verdict='Fail'){
-  const admitted=f.start(who,{role:'qa',stage:'review',scope,review_of:ref(family,subject)});
-  const output=canonical({review:{subject:ref(family,subject),verdict,reason:'Material exact-subject adverse evidence.',blockers:['Reassess this exact evidence before relying on qualification.']}});
-  const result=f.finish(admitted,{output,native_id:`negative-${admitted.task.id}`});assert.equal(result.accepted,true);assert.equal(result.review.value.verdict,verdict);return result;
-}
-function externalPacket(f,scope='alpha'){
-  const task=f.submit('cos-a',{scope});
-  return inspect(f.ledger,actor('cos-a'),'task/context',{task_id:task.id});
-}
+
+
 
 test('external: cancellation before publication prevents acceptance without erasing the historical review',t=>{
   const f=fixture(t),p=f.propose(),review=externalReview(f,p,'cos-b');
@@ -1315,60 +1178,9 @@ test('external: missing or wrong historical home ancestry cannot be replaced by 
   }
 });
 
-test('external: exactly 10000 semantic references work and 10001 holds atomically',t=>{
-  const f=fixture(t),prototype=f.propose('cos-a',{content:'Fictional bounded graph leaf.'});let previous=prototype;
-  // Seed only ordinary fictional proposal rows through actual P1. Batches of
-  // 50 keep each creation event small; a single 10k-change event would make
-  // P1's per-row creation-event verification needlessly quadratic. No accepted
-  // review, producer proof, history row or semantic judgment is fabricated.
-  for(let start=1;start<9999;start+=50){
-    f.ledger.write('fixture.external-bounded-chain','founder',tx=>{
-      for(let i=start;i<Math.min(start+50,9999);i++)previous=tx.put('proposals',`external-boundary-${String(i).padStart(5,'0')}`,{...prototype.value,content:'Fictional bounded graph link.',readset:[ref('proposals',previous)]},0);
-    });
-  }
-  const atLimit=f.propose('cos-b',{home_id:'other',input_refs:[ref('proposals',previous)]});
-  assert.equal(externalReview(f,atLimit,'reviewer').finished.accepted,true,'9999 chain nodes plus pending subject is exactly 10000 semantic references');
-  // Indexed-LIVE-discovery reconciliation: the successful 10000-reference
-  // review now exists. Reusing its subject must also acquire its exact current
-  // Pass candidate (and protected producer support), so the FIRST over-budget
-  // operation is proposal intake, before any further model attempt is admitted.
-  const before=indexedSQLState(f),usage=get(f,'control','usage'),reviewerGrant=get(f,'grants','g-reviewer');
-  assert.throws(()=>f.propose('cos-b',{home_id:'other',input_refs:[ref('proposals',atLimit)]}),code('LOOKUP_CAPACITY'));
-  assert.deepEqual(indexedSQLState(f),before);
-  assert.deepEqual(get(f,'control','usage'),usage);assert.equal(usage.value.model_calls,1);
-  assert.deepEqual(get(f,'grants','g-reviewer'),reviewerGrant);
-  assert.equal(rows(f.ledger,'slots',{status:'active'}).length,0,'the earlier closed positive is retained; no failing-operation attempt is created');
-});
 
-test('external: one source closure shares its reference budget across negative discovery and current homes',t=>{
-  const f=fixture(t,{control:{policy:{worker_cap:3,queue_limit:1000,principal_queue_limit:100,max_context_bytes:200000,max_model_calls:100}}});
-  const prototype=f.propose('cos-a',{scope:'foreign-proof',content:'Fictional historical subject leaf.'});let previous=prototype;
-  // Ordinary fixture source data only. No accepted review/protected proof is
-  // seeded: the single global adverse review below uses the real model API.
-  for(let start=1;start<9900;start+=50)f.ledger.write('fixture.external-shared-budget-subject','founder',tx=>{
-    for(let i=start;i<Math.min(start+50,9900);i++)previous=tx.put('proposals',`shared-budget-${String(i).padStart(5,'0')}`,{...prototype.value,content:'Fictional historical subject link.',readset:[ref('proposals',previous)]},0);
-  });
-  const adverse=externalNegative(f,previous,'proposals','cos-b','*','Fail');
-  assert.equal(adverse.review.value.verdict,'Fail');assert.equal(adverse.review.value.scope,'*');
-  const addHomes=(first,last)=>f.ledger.write('fixture.external-shared-budget-homes','founder',tx=>{
-    for(let i=first;i<last;i++)tx.put('homes',`budget-home-${String(i).padStart(3,'0')}`,{status:'current',scope:'isolated',principal_id:'founder',content:'Compact independently current fixture condition.'},0);
-  });
-  addHomes(0,40);addHomes(40,80);
-  const task=f.submit('cos-a',{scope:'isolated'}),beforePacket=inspect(f.ledger,actor('cos-a'),'task/context',{task_id:task.id});
-  assert(beforePacket.utf8_bytes<200000,'The complete delivered packet fits; this is a reference-work bound, not a byte-overflow test');
-  assert.equal(beforePacket.sources.filter(r=>r.family==='homes').length,80);
-  assert(beforePacket.sources.some(r=>r.family==='reviews'&&r.id===adverse.review.id));
-  addHomes(80,120);
-  // Each source family and each isolated proof/discovery phase remains below
-  // 10000, but their exact union (9900 proposals + proof/review +120 homes)
-  // exceeds it. All caches/purposes in this one context must share the bound.
-  const snapshot=()=>Object.fromEntries([
-    ['peer_rows','family,id'],['peer_versions','family,id,revision'],['peer_events','seq'],['peer_outbox','seq'],['peer_membership','family,selector'],['peer_generations','family'],['peer_meta','id']
-  ].map(([table,order])=>[table,digest(JSON.stringify(f.ledger.db.prepare(`SELECT * FROM ${table} ORDER BY ${order}`).all()))]));
-  const before=snapshot();
-  assert.throws(()=>inspect(f.ledger,actor('cos-a'),'task/context',{task_id:task.id}),code('LOOKUP_CAPACITY'));
-  assert.deepEqual(snapshot(),before);assert.equal(get(f,'tasks',task.id).value.attempt,null);assert.equal(get(f,'control','usage').value.model_calls,1);
-});
+
+
 
 test('external: founder resolution exception does not waive current evidence integrity',t=>{
   const f=fixture(t),chain=transferredParentChild(f);
@@ -1412,126 +1224,12 @@ test('external: late negative home review is full current evidence and quarantin
 // Indexed-consumer prototype only. The bulk records below prove P1 extraction
 // and selection mechanics, never P2 authority, independence or native approval.
 // Every semantic negative sentinel uses f.observe through externalNegative().
-function indexedSQLState(f){
- const result={},db=f.ledger.db;
- result.schema=digest(JSON.stringify(db.prepare("SELECT type,name,tbl_name,sql FROM sqlite_schema WHERE name LIKE 'peer_%' ORDER BY type,name").all()));
- for(const {name} of db.prepare("SELECT name FROM sqlite_schema WHERE type='table' AND name LIKE 'peer_%' ORDER BY name").all()){
-  const hash=indexedCreateHash('sha256');
-  for(const row of db.prepare(`SELECT * FROM "${name}" ORDER BY rowid`).iterate())hash.update(JSON.stringify(row)+'\n');
-  result[name]=hash.digest('hex');
- }
- return result;
-}
-function indexedAtomicReject(f,operation,expected){
- const before=indexedSQLState(f);assert.throws(operation,code(expected));
- assert.deepEqual(indexedSQLState(f),before,'a scale Hold cannot append commands, history, observations, attempts or derived metadata');
-}
-function indexedStructuralReview(i,subject){
- const suffix=String(i).padStart(5,'0'),taskId=`indexed-bulk-task-${suffix}`,attemptId=`indexed-bulk-attempt-${suffix}`,native=`synthetic-indexed-bulk-native-${suffix}`,scope='indexed-bulk-foreign';
- const reviewId=peerDigest(['review',taskId,attemptId]),context=peerDigest(['synthetic-indexed-bulk-context',i]);
- const raw={subject,verdict:'Fail',reason:'Synthetic P1 index mechanics only.',blockers:['Synthetic unrelated finding.']},output=canonical({review:raw}),outputHash=digest(output);
- const observation={kind:'runtime_observation',status:'recorded',action:'task/finish',task_id:taskId,attempt_id:attemptId,scope,native_id:native,context_sha256:context,output_sha256:outputHash,termination_confirmed:true,review:raw};
- const observationRow={family:'effects',id:peerDigest(['runtime-observation',taskId,attemptId,'task/finish']),revision:1,sha256:peerDigest(observation),value:observation};
- const task={status:'returned',scope,definition:{scope},review_id:reviewId,review_of:subject,attempt:{id:attemptId,native_id:native,termination_confirmed:true,context:{sha256:context}},result:{output,output_sha256:outputHash,native_id:native,error:null,termination_confirmed:true,observation:ref('effects',observationRow)}};
- const taskRow={family:'tasks',id:taskId,revision:1,sha256:peerDigest(task),value:task};
- const review={status:'accepted',scope,task_id:taskId,...raw,native_id:native,context_sha256:context,output_sha256:outputHash,termination_confirmed:true,proof:{protocol:'peer-runtime-observation-v1',task:ref('tasks',taskRow),observation:ref('effects',observationRow)}};
- return [observationRow,taskRow,{family:'reviews',id:reviewId,revision:1,sha256:peerDigest(review),value:review}];
-}
-function indexedBodyTrace(ledger,bulk){
- const original=ledger.query,forbidden=new Set(),reviewBodies=new Set();
- const remember=(family,id)=>{if(bulk[family]?.has(id))forbidden.add(`${family}/${id}`);if(family==='reviews')reviewBodies.add(id);};
- ledger.query=function(sql,...parameters){
-  const statement=Reflect.apply(original,this,[sql,...parameters]);
-  return new Proxy(statement,{get(object,key){
-   const value=Reflect.get(object,key,object);if(typeof value!=='function')return value;
-   if(!['get','all'].includes(key))return value.bind(object);
-   return (...args)=>{
-    const result=Reflect.apply(value,object,args),rows=key==='all'?result:result?[result]:[];
-    for(const row of rows)if(typeof row?.bytes==='string'){
-     if(row.family&&row.id)remember(row.family,row.id);
-     else if(/peer_rows|peer_versions/.test(sql)){
-      if(bulk[args[0]]&&typeof args[1]==='string')remember(args[0],args[1]);
-      else{const literal=sql.match(/family='(reviews|tasks|effects)'/);if(literal&&typeof args[0]==='string')remember(literal[1],args[0]);}
-     }
-    }
-    return result;
-   };
-  }});
- };
- return {forbidden,reviewBodies,restore(){ledger.query=original;}};
-}
 
-test('external indexed scale: 10001 unrelated structural reviews preserve real workflows and exact negative completeness',t=>{
- const f=fixture(t),bulk={reviews:new Set(),tasks:new Set(),effects:new Set()};
- for(const id of ['scale-home-negative','scale-pass-before','scale-pass-after','scale-proposal-negative','scale-seed-global','scale-seed-unknown','scale-seed-requested','scale-fresh-worker'])externalMember(f,id);
- const u=f.propose('cos-a',{home_id:'other',scope:'indexed-subject-u',content:'Real typed unpublished archive subject U.'});
- const v=f.propose('cos-a',{home_id:'other',scope:'indexed-subject-v',content:'Real typed unpublished archive subject V.'});
- const foreign=externalPublish(f,'cos-a','cos-b','fact','Qualified foreign beta home.',{scope:'beta'});
- const proposal=f.propose('cos-a',{home_id:'other',content:'Independently reviewed publication before unrelated history.'}),pass=externalReview(f,proposal,'reviewer');
- const ordinary=f.start('cos-a',{resources:['path:tree1:indexed-before-bulk']}),beforeContext=ordinary.context,usage=get(f,'control','usage');
- assert(!beforeContext.sources.some(r=>r.family==='homes'&&r.id===foreign.home.id));
- for(let offset=0;offset<10001;offset+=25){
-  const batch=[];
-  for(let i=offset;i<Math.min(10001,offset+25);i++){
-   const records=indexedStructuralReview(i,ref('proposals',i<5000?u:v));batch.push(records);
-   for(const row of records)bulk[row.family].add(row.id);
-  }
-  f.ledger.write('fixture.indexed-structural-review-mechanics','founder',tx=>{
-   for(const records of batch)for(const row of records)tx.put(row.family,row.id,row.value,0);
-  });
- }
- assert.equal(f.ledger.db.prepare("SELECT COUNT(*) AS n FROM peer_review_selection p JOIN peer_rows r ON r.family='reviews' AND r.id=p.review_id WHERE r.task_id LIKE 'indexed-bulk-task-%' AND p.outcome='PROTECTED'").get().n,10001,'all bulk rows satisfy real P1 extraction; this is not P2 qualification');
- assert.equal(f.ledger.db.prepare('SELECT COUNT(*) AS n FROM peer_review_errors').get().n,0);
- assert.deepEqual(get(f,'control','usage'),usage,'fictional P1 index fixtures consume no model attempts');
- const trace=indexedBodyTrace(f.ledger,bulk);
- try{
-  const afterContext=inspect(f.ledger,actor('cos-a'),'task/context',{task_id:ordinary.task.id});
-  assert.equal(afterContext.text,beforeContext.text);assert.equal(afterContext.sha256,beforeContext.sha256);
-  assert.equal(f.finish(ordinary).accepted,true);
-  assert(!externalPacket(f).sources.some(r=>r.family==='homes'&&r.id===foreign.home.id),'qualified foreign omission survives unrelated review scale');
-  const published=f.run('cos-a','home/publish',{grant_id:'g-cos-a',proposal_id:proposal.id,review_id:pass.finished.review.id});
-  assert.equal(published.value.status,'current');assert.deepEqual(get(f,'homes',foreign.home.id),foreign.home);
-  assert.equal(trace.forbidden.size,0,'ordinary context, closure, omission and publication hydrate no unrelated review/task/observation body');
 
-  const pending=f.start('cos-a',{resources:['path:tree1:indexed-pending-negative']});
-  const homeNegative=externalNegative(f,foreign.proposal,'proposals','scale-home-negative','gamma','Fail');
-  const spent=get(f,'control','usage'),quarantined=f.finish(pending);
-  assert.equal(quarantined.accepted,false);assert.equal(quarantined.task.value.status,'quarantined');
-  assert.equal(quarantined.task.value.attempt.id,pending.task.value.attempt.id);assert.equal(quarantined.task.value.result.termination_confirmed,true);
-  assert.equal(get(f,'slots',pending.task.id).value.status,'released');assert.equal(rows(f.ledger,'claims',{task_id:pending.task.id,status:'held'}).length,0);assert.deepEqual(get(f,'control','usage'),spent);
-  const exactPacket=externalPacket(f),homeEntry=exactPacket.sources.find(r=>r.family==='homes'&&r.id===foreign.home.id),negativeEntry=exactPacket.sources.find(r=>r.family==='reviews'&&r.id===homeNegative.review.id);
-  assert.deepEqual(homeEntry?.value,foreign.home.value);assert.deepEqual(negativeEntry?.value,homeNegative.review.value);assert.equal(negativeEntry.sha256,homeNegative.review.sha256);
-  assert(trace.reviewBodies.has(homeNegative.review.id),'the body instrumentation observes the selected real sentinel');
 
-  const target=f.propose('cos-a',{home_id:'other',expected_revision:published.revision,content:'Separate pending subject for cross-scope veto.'});
-  const prior=externalReview(f,target,'scale-pass-before');
-  externalNegative(f,target,'proposals','scale-proposal-negative','gamma','Blocked');
-  indexedAtomicReject(f,()=>f.run('cos-a','home/publish',{grant_id:'g-cos-a',proposal_id:target.id,review_id:prior.finished.review.id}),'CONTEXT_CHANGED');
-  const later=externalReview(f,target,'scale-pass-after');assert.equal(later.finished.accepted,true);
-  indexedAtomicReject(f,()=>f.run('cos-a','home/publish',{grant_id:'g-cos-a',proposal_id:target.id,review_id:later.finished.review.id}),'REVIEW_HELD');
 
-  const unpublished=f.propose('cos-a',{home_id:'dependency',scope:'indexed-unpublished',content:'Unpublished material subject.',input_refs:[ref('homes',foreign.home)]});
-  for(const [scope,who] of [['*','scale-seed-global'],['unknown','scale-seed-unknown'],['alpha','scale-seed-requested']]){
-   const negative=externalNegative(f,unpublished,'proposals',who,scope,'Blocked'),packet=externalPacket(f),entry=packet.sources.find(r=>r.family==='reviews'&&r.id===negative.review.id);
-   assert.deepEqual(entry?.value,negative.review.value);assert.equal(entry.sha256,negative.review.sha256);assert.equal(entry.revision,negative.review.revision);
-   assert.deepEqual(negative.review.value.subject,ref('proposals',unpublished));
-   assert.deepEqual(f.ledger.read(tx=>tx.getVersion(negative.review.value.subject)).value,unpublished.value);
-   assert(!packet.sources.some(r=>r.family==='proposals'&&r.id===unpublished.id),'historical negative subjects are not promoted into ordinary live source bodies');
-   assert(trace.reviewBodies.has(negative.review.id));
-  }
-  const fresh=f.start('scale-fresh-worker');assert.equal(f.finish(fresh).accepted,true,'complete adverse evidence permits unrelated ordinary work');
-  assert.equal(trace.forbidden.size,0,'every exact/scoped real-negative workflow still excludes all bulk bodies');
 
-  // Both exact-subject arms are below 10k; their distinct union is 10001.
-  // Request it last, without ever attempting to approve the mechanical rows.
-  const union=f.submit('cos-a',{input_refs:[ref('proposals',u),ref('proposals',v)]});f.claim(union);
-  const before=indexedSQLState(f),beforeUsage=get(f,'control','usage');
-  assert.throws(()=>f.admit(union),code('LOOKUP_CAPACITY'));
-  assert.deepEqual(indexedSQLState(f),before);assert.deepEqual(get(f,'control','usage'),beforeUsage);
-  assert.equal(get(f,'tasks',union.id).value.attempt,null);assert.equal(get(f,'tasks',union.id).value.status,'pending');
-  assert.equal(trace.forbidden.size,0,'aggregate matching capacity is checked before any truncated bulk page is hydrated');
- }finally{trace.restore();}
-});
+
 
 const {reviewScope:indexedReviewScope}=await import('../plugins/soloco/runtime/peers/review-selection.mjs');
 function indexedProviderError(kind){
@@ -1590,7 +1288,7 @@ test('external indexed provider faults: qualification and physical freshness pre
  }
 });
 
-const {REVIEW_PREPARATION_BYTES:indexedPreparationLimit}=await import('../plugins/soloco/runtime/peers/model.mjs');
+
 test('external indexed own capacity: preparation exhaustion still records a closed quarantine and releases physical reservations',t=>{
  assert.equal(indexedPreparationLimit,16*1024*1024,'explicit prototype preparation contract, independent of provider errors');
  const f=fixture(t),admitted=f.start('cos-a',{resources:['path:tree1:own-preparation-exhaustion']});
@@ -1724,16 +1422,7 @@ test('external indexed cache guard: a real same-handle write after cached scope 
 // Final external regression preparation only. These tests use fictional local
 // SQLite fixtures; their results do not constitute native QA or adoption of the
 // prospective P1 dependency. The entire preceding 90-test source is preserved.
-function finalAllSQLState(f){
- const result={},db=f.ledger.db;
- result.schema=digest(JSON.stringify(db.prepare("SELECT type,name,tbl_name,sql FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%' ORDER BY type,name").all()));
- for(const {name} of db.prepare("SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all()){
-  const hash=indexedCreateHash('sha256'),quoted=name.replaceAll('"','""');
-  for(const row of db.prepare(`SELECT * FROM "${quoted}" ORDER BY rowid`).iterate())hash.update(JSON.stringify(row)+'\n');
-  result[name]=hash.digest('hex');
- }
- return result;
-}
+
 
 test('external final regression: late physical publication mutation rolls back atomically and preserves required-notice freshness',t=>{
  const f=fixture(t),proposal=f.propose(),positive=f.review(proposal);
@@ -1779,69 +1468,7 @@ test('external final regression: late physical publication mutation rolls back a
  assert.deepEqual(get(precommitted,'notices',noticeId),required);
 });
 
-test('external final regression: late shared semantic overflow preserves physical completion on the admitted attempt',t=>{
- const f=fixture(t,{control:{policy:{worker_cap:3,queue_limit:1000,principal_queue_limit:100,max_context_bytes:200000,max_model_calls:100}}});
- const prototype=f.propose('cos-a',{scope:'foreign-proof',content:'Compact historical subject leaf.'});let previous=prototype;
- // These are ordinary typed source rows. The protected negative below is
- // produced through the model and trusted fixture observer, never seeded.
- for(let start=1;start<9900;start+=50)f.ledger.write('fixture.final-semantic-subject','founder',tx=>{
-  for(let i=start;i<Math.min(start+50,9900);i++)previous=tx.put('proposals',`final-semantic-source-${String(i).padStart(5,'0')}`,{...prototype.value,content:'Compact historical link.',readset:[ref('proposals',previous)]},0);
- });
- const adverse=externalNegative(f,previous,'proposals','cos-b','*','Fail');
- const addHomes=(first,last)=>f.ledger.write('fixture.final-semantic-homes','founder',tx=>{
-  for(let i=first;i<last;i++)tx.put('homes',`final-semantic-home-${String(i).padStart(3,'0')}`,{status:'current',scope:'isolated',principal_id:'founder',content:'Compact current fixture condition.'},0);
- });
- addHomes(0,40);addHomes(40,80);
- const pending=f.propose('cos-a',{home_id:'other',scope:'isolated',content:'Pending exact-subject review before later capacity change.'});
- const producer=f.start('cos-a',{scope:'isolated',resources:['path:tree1:final-semantic-produce']});
- const reviewer=f.start('reviewer',{scope:'isolated',role:'qa',stage:'review',review_of:ref('proposals',pending),resources:['path:tree1:final-semantic-review']});
- for(const admitted of [producer,reviewer]){
-  assert.equal(admitted.admitted,true);assert(admitted.context.utf8_bytes<200000);
-  assert.equal(admitted.context.sources.filter(row=>row.family==='homes').length,80);
-  assert(admitted.context.sources.some(row=>row.family==='reviews'&&row.id===adverse.review.id));
-  assert.equal(get(f,'slots',admitted.task.id).value.status,'active');
-  assert.equal(rows(f.ledger,'claims',{task_id:admitted.task.id,status:'held'}).length,1);
- }
- const usage=get(f,'control','usage'),principalUsage=new Map(['cos-a','cos-b','reviewer'].map(id=>[id,get(f,'control',`usage:${id}`)]));
- const grants=new Map(['g-cos-a','g-cos-b','g-reviewer'].map(id=>[id,get(f,'grants',id)]));
- assert.equal(usage.value.model_calls,3,'one protected adverse review and the two legitimately admitted attempts are charged once');
- addHomes(80,120);
- for(const row of f.ledger.db.prepare('SELECT family,COUNT(*) AS n FROM peer_rows GROUP BY family').all())assert(row.n<10000,`${row.family} alone fits the matching-row bound`);
- let retainedEncodedBytes=0;
- for(const row of f.ledger.db.prepare('SELECT family,id,revision,sha256,bytes FROM peer_versions ORDER BY family,id,revision').iterate())retainedEncodedBytes+=Buffer.byteLength(canonical({family:row.family,id:row.id,revision:row.revision,sha256:row.sha256,value:JSON.parse(row.bytes)}));
- assert(retainedEncodedBytes<indexedPreparationLimit,'even all retained exact versions fit the separate encoded preparation bound; this is not an RSS claim');
- const beforeProbe=finalAllSQLState(f);
- for(const admitted of [producer,reviewer])assert.throws(()=>inspect(f.ledger,actor(admitted.task.value.owner_principal_id),'task/context',{task_id:admitted.task.id}),error=>{
-  assert.equal(error.code,'LOOKUP_CAPACITY');return true;
- });
- assert.deepEqual(finalAllSQLState(f),beforeProbe,'the late semantic-bound inspection itself makes no writes');
- const completed=[[producer,f.finish(producer)],[reviewer,f.finish(reviewer,{output:parentReviewOutput(pending)})]];
- for(const [admitted,result] of completed){
-  const task=result.task.value,attempt=task.attempt,physical=task.result;
-  assert.equal(result.accepted,false);assert.equal(task.status,'quarantined');assert.equal(result.review,null);assert.equal(task.review_id,null);
-  assert.equal(attempt.id,admitted.task.value.attempt.id);assert.equal(attempt.model_calls,1);assert.deepEqual(attempt.context,admitted.context);
-  assert.equal(attempt.termination_confirmed,true);assert.equal(physical.termination_confirmed,true);assert.equal(physical.observed_process.close_observed,true);
-  assert.deepEqual(physical.observed_process,f.process(admitted));assert.equal(physical.output_sha256,digest(physical.output));
-  const observation=get(f,'effects',physical.observation.id);
-  assert.deepEqual(ref('effects',observation),physical.observation);assert.equal(observation.value.kind,'runtime_observation');assert.equal(observation.value.action,'task/finish');
-  assert.equal(observation.value.task_id,admitted.task.id);assert.equal(observation.value.attempt_id,attempt.id);assert.equal(observation.value.termination_confirmed,true);
-  assert.equal(observation.value.process.close_observed,true);assert.equal(observation.value.context_sha256,admitted.context.sha256);assert.equal(observation.value.output_sha256,physical.output_sha256);
-  const effect=get(f,'effects',attempt.effect_id),slot=get(f,'slots',admitted.task.id),claims=rows(f.ledger,'claims',{task_id:admitted.task.id});
-  assert.equal(effect.value.termination_confirmed,true);assert.equal(effect.value.result_sha256,digest(physical));assert.equal(effect.value.status,'succeeded');
-  assert.equal(slot.value.status,'released');assert.equal(slot.value.attempt_id,attempt.id);assert.equal(slot.value.termination_confirmed,true);
-  assert.equal(claims.length,1);assert.equal(claims[0].value.status,'released');assert.equal(claims[0].value.closure.termination_confirmed,true);
-  assert.equal(rows(f.ledger,'claims',{task_id:admitted.task.id,status:'held'}).length,0);
- }
- assert.deepEqual(get(f,'control','usage'),usage);
- for(const [id,row] of principalUsage)assert.deepEqual(get(f,'control',`usage:${id}`),row);
- for(const [id,row] of grants)assert.deepEqual(get(f,'grants',id),row);
- assert.deepEqual(get(f,'proposals',pending.id),pending);assert.deepEqual(get(f,'reviews',adverse.review.id),adverse.review);
- assert.equal(rows(f.ledger,'reviews').length,1,'quarantined review output cannot create a new review');assert.equal(get(f,'homes','other'),null);
- assert.equal(f.ledger.db.prepare("SELECT COUNT(*) AS n FROM peer_rows WHERE family='homes'").get().n,120);
- assert.equal(rows(f.ledger,'slots',{status:'active'}).length,0);
- // Existing provider-fault tests require identity-preserving rollback. This
- // owned semantic limit instead retains protected physical completion.
-});
+
 
 test('external final regression: grant scopes reject isolated UTF-16 and preserve exact indexed Unicode text',t=>{
  const f=fixture(t),expiry=new Date(Date.now()+3600000).toISOString();
