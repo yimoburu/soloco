@@ -386,9 +386,11 @@ the storage transfer guard and real-link regression tests while retaining the
 current version checks and portable path suite.
 
 These are scoped source and executable checks, not complete peer-mode or
-actual-company acceptance. The scheduler library now consumes the journal and
-current model; it has no production company route. Protected host enrollment and replacement,
-production publication-policy qualification and durable continuity remain open.
+actual-company acceptance. The scheduler library consumes the journal and
+current model. The later source-level `company_peers` route is described in
+[peer production routing](peer-production-runtime.md). Actual protected host
+enrollment and replacement, native publication-policy qualification and durable
+company continuity remain open.
 The four acceptance gaps #13, #16, #18 and #30 below remain open. New successful
 storage tests do not regrade the historical candidate-format comparison.
 
@@ -424,8 +426,8 @@ The host recorded one compaction before the verdict. The accepted scope has no
 zero-compaction condition; acceptance claims neither guaranteed final-turn
 retention nor semantic loss from that event. This bounded component result does
 not qualify the host transport generally. The original failed scheduler review
-and historical held attempts remain unchanged. Protected enrollment, production
-routing, actual-company adoption and durable continuity require their own
+and historical held attempts remain unchanged. Protected enrollment, qualified
+production operation, actual-company adoption and durable continuity require their own
 acceptance. The component guide retains its original preparation framing;
 this section records the later native qualification.
 
@@ -909,8 +911,9 @@ component to a separate executable deployment, fixed original Node namespaces,
 source-owned interpreter association, private-FD startup acknowledgement and
 exact five-tool declarations. Its owned CONNECT listener is bound into the
 original Rust bootstrap and HTTP factory, preserving original authentication
-and TLS with no proxy fallback. This is internal source composition; company MCP
-dispatch and adopted company state do not use it.
+and TLS with no proxy fallback. This remains source composition. The later
+`company_peers` operator route can load it through the fixed provider and checked
+original recipe; native deployment and actual-company adoption remain unproved.
 
 The Rust successor has 9,309 logical files, 92,071,707 bytes and 158 overlays.
 Its package is `11dce050e14c48ed20dac9052ec096f3fbd94717603035b22f56f7af851ce84c`,
