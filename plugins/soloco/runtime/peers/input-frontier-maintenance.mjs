@@ -1,6 +1,7 @@
 // Fresh original maintenance admissions only. No public JSON proof/factory or
 // legacy reconstruction receipt can create one of these opaque capabilities.
 import {randomUUID} from 'node:crypto';
+import fs from 'node:fs';
 import {PeerLedger,FAMILIES,canonical,peerDigest} from './ledger.mjs';
 import * as deployment from './context-component-deployment.mjs';
 import * as domain from './protected-codex-domain.mjs';
@@ -10,8 +11,11 @@ import {readPeerInputOriginArchiveBodyFrom} from './input-frontier-archive.mjs';
 import {INPUT_FRONTIER,FRONTIER_CONTEXT,FRONTIER_LIMITS,FRONTIER_INSTRUCTION,capturePeerInputFrontierFrom,buildPeerInputFrontier,peerInputFrontierContext,peerInputArchiveGapSource,validatePeerInputFrontierOutput,isPeerInputFrontierValidationError,frontierCopy as copy,frontierSame as same,frontierRef as ref,frontierNeed as need,frontierData as data,frontierRows as rows,frontierHash as hash} from './input-frontier.mjs';
 // A fixed source dependency, never a caller validator. Missing source is a Hold
 // at use; importing this preparation module does not initialize a company.
+function fixedOptionalEntry(relative){const entry=fs.lstatSync(new URL(relative,import.meta.url),{throwIfNoEntry:false});if(entry===undefined)return false;need(entry.isFile()&&!entry.isSymbolicLink(),'FRONTIER_OPTIONAL_SOURCE_ENTRY_REQUIRED');return true;}
 let origin;
-try{origin=await import('./origin-quarantine.mjs');}catch(error){if(error.code!=='ERR_MODULE_NOT_FOUND'||!error.message.includes('/origin-quarantine.mjs'))throw error;}
+if(fixedOptionalEntry('./origin-quarantine.mjs'))origin=await import('./origin-quarantine.mjs');
+let selectedAuthority;
+if(fixedOptionalEntry('./origin-maintenance-authority.mjs'))selectedAuthority=await import('./origin-maintenance-authority.mjs');
 const apis=new WeakMap(),caps=new WeakMap(),consumed=new WeakSet(),key=(f,id)=>canonical([f,id]);
 const custodyChecks=new WeakMap();
 const bytes=v=>Buffer.byteLength(canonical(v));
@@ -19,7 +23,15 @@ const text=v=>typeof v==='string'&&v.trim()&&v.length<=4000&&!v.includes('\0');
 function exact(tx,r,kind){const row=tx.getVersion(r);need(row&&row.sha256===r.sha256&&peerDigest(row.value)===r.sha256&&(!kind||row.value.kind===kind),'FRONTIER_PROOF_CHANGED');return row;}
 function service(api){const s=apis.get(api);need(s,'FRONTIER_ORIGINAL_SERVICE_REQUIRED');return s;}
 function bound(s){for(const name of ['root','directory','company_id'])need(Object.getOwnPropertyDescriptor(s.ledger,name)?.value===s.connection[name],'FRONTIER_CONNECTION_CHANGED');}
-function authority(value){const {used_model_calls,used_review_calls,used_frontier_calls,used_frontier_reviews,...body}=value;return peerDigest(body);}
+// Fixed maintenance-launch composition only. No JSON/config/foreign namespace
+// can recreate the original service handle or choose a different connection.
+export function originalPeerInputFrontierMaintenanceLedger(api){const s=service(api);bound(s);s.ledger.read(tx=>current(s,tx));bound(s);return s.ledger;}
+function authority(value){
+ const {used_model_calls,used_review_calls,used_frontier_calls,used_frontier_reviews,used_frontier_seal_reviews,...body}=value;
+ if(['frontier_seal_protocol','frontier_seal_purpose','max_frontier_seal_reviews','used_frontier_seal_reviews'].some(k=>Object.hasOwn(value,k)))need(value.frontier_seal_protocol==='peer-origin-frontier-seal-purpose-v1'&&value.frontier_seal_purpose==='bounded-preparation-bootstrap'&&Number.isSafeInteger(value.max_frontier_seal_reviews)&&value.max_frontier_seal_reviews>0&&value.max_frontier_seal_reviews<=Math.min(value.max_model_calls,value.max_review_calls)&&Number.isSafeInteger(used_frontier_seal_reviews)&&used_frontier_seal_reviews>=0&&used_frontier_seal_reviews<=value.max_frontier_seal_reviews,'FRONTIER_AUTHORITY_REQUIRED');
+ return peerDigest(body);
+}
+function selectedMaintenance(tx,company_id){need(typeof selectedAuthority?.assertPeerOriginSelectedMaintenanceFrom==='function','FRONTIER_SELECTED_AUTHORITY_SOURCE_REQUIRED');const selected=selectedAuthority.assertPeerOriginSelectedMaintenanceFrom(tx,{company_id});need(selected?.protocol==='peer-origin-selected-maintenance-v1'&&Number.isSafeInteger(selected.pause_generation)&&selected.pause_generation>0,'FRONTIER_SELECTED_AUTHORITY_REQUIRED');return selected;}
 function current(s,tx){
  bound(s);const c=tx.get('control','company'),o=tx.get('control','origin'),p=c&&tx.get('principals',c.value.founder_principal_id),m=o?.value.maintenance;
  need(c?.value.protocol==='peer-cos-v1'&&c.value.paused===true&&o?.value.protocol==='peer-origin-quarantine-v1'&&same(c.value.origin,ref('control',o)),'FRONTIER_QUARANTINE_REQUIRED');
@@ -28,10 +40,11 @@ function current(s,tx){
  for(const field of ['max_model_calls','max_review_calls','max_frontier_calls','max_frontier_reviews'])need(Number.isSafeInteger(m[field])&&m[field]>0,'FRONTIER_AUTHORITY_REQUIRED');
  for(const field of ['used_model_calls','used_review_calls','used_frontier_calls','used_frontier_reviews'])need(Number.isSafeInteger(m[field])&&m[field]>=0,'FRONTIER_AUTHORITY_REQUIRED');
  need(m.max_frontier_calls<=m.max_model_calls&&m.max_frontier_reviews<=m.max_review_calls&&m.max_frontier_reviews<=m.max_frontier_calls&&Date.parse(m.expires_at)>Date.now(),'FRONTIER_AUTHORITY_REQUIRED');
+ const selected=selectedMaintenance(tx,s.connection.company_id);
  tx.deadline?.(Date.parse(m.expires_at));
  const pins=inspectPeerPinnedTeamFrom(tx,{company_id:s.connection.company_id});need(same(pins.reference,o.value.pinned_team),'FRONTIER_PIN_CHANGED');
  need(same(originSidecars(s.connection.directory),o.value.sidecar_frontier),'FRONTIER_LATE_SIDECAR_UNRECORDED');
- need(typeof origin?.assertPeerOriginLegacyFences==='function','FRONTIER_ORIGIN_SOURCE_REQUIRED');origin.assertPeerOriginLegacyFences(s.ledger.db);return {c,o,p,m,pins};
+ need(typeof origin?.assertPeerOriginLegacyFences==='function','FRONTIER_ORIGIN_SOURCE_REQUIRED');origin.assertPeerOriginLegacyFences(s.ledger.db);return {c,o,p,m,pins,selected};
 }
 // Read-first plan and terminal physical gate. Every namespace row is watched;
 // unrecognized/reentrant additions poison the snapshot rather than disappearing.
@@ -115,7 +128,7 @@ function command(tx,f,type,input,result){const id=f.id+':command:'+peerDigest([t
 function operationId(s,id){return 'input-frontier-operation:'+peerDigest([s.connection,s.actor,id]);}
 function logicalMaterial(frontier,node){
  const sourceValue=s=>{let value=JSON.parse(s.text);if(s.reference.family==='control'){
-  if(s.reference.id==='origin'&&value.maintenance){value=copy(value);for(const k of ['used_model_calls','used_review_calls','used_frontier_calls','used_frontier_reviews'])delete value.maintenance[k];}
+  if(s.reference.id==='origin'&&value.maintenance){value=copy(value);for(const k of ['used_model_calls','used_review_calls','used_frontier_calls','used_frontier_reviews',...(value.maintenance.frontier_seal_protocol==='peer-origin-frontier-seal-purpose-v1'&&value.maintenance.frontier_seal_purpose==='bounded-preparation-bootstrap'?['used_frontier_seal_reviews']:[])])delete value.maintenance[k];}
   if(s.reference.id==='usage'){value=copy(value);delete value.model_calls;}
   if(s.reference.id==='company'&&value.origin){value=copy(value);const original=frontier.sources.find(v=>v.role==='current'&&v.reference.family==='control'&&v.reference.id==='origin');value.origin={family:'control',id:value.origin.id,material_sha256:original?peerDigest(sourceValue(original)):null};}
  }return value;};
@@ -163,7 +176,7 @@ function covered(ranges,total){let at=0;for(const [start,end] of [...ranges].sor
 function admitted(r,tx,{native=false}={}){
  const state=liveFrontier(r.s,tx,r.frontier_id),admission=exact(tx,r.admission_ref,'input_frontier_admission'),phase=tx.get('work_items',r.phase_id),context=exact(tx,r.binding.context_ref,'input_frontier_context');
  need(same(admission.value.binding,r.binding)&&phase?.value.status===(native?'running':'reserved')&&same(phase.value.admission_ref,r.admission_ref)&&context.value.sha256===r.binding.context_sha256&&peerDigest(context.value.body)===context.value.sha256&&canonical(context.value.body)===context.value.text&&!r.finished,'FRONTIER_ADMISSION_INACTIVE');
- need(Date.now()<r.binding.deadline_at_ms&&(!native||r.native?.native_id===phase.value.native_id),'FRONTIER_ADMISSION_INACTIVE');const slot=tx.get('slots',r.execution_id),effect=tx.get('effects',r.execution_id);
+ need(r.binding.pause_generation===state.selected.pause_generation&&Date.now()<r.binding.deadline_at_ms&&(!native||r.native?.native_id===phase.value.native_id),'FRONTIER_ADMISSION_INACTIVE');const slot=tx.get('slots',r.execution_id),effect=tx.get('effects',r.execution_id);
  need(slot?.value.status==='active'&&effect?.value.status==='reserved'&&same(slot.value.admission_ref,r.admission_ref)&&same(effect.value.admission_ref,r.admission_ref),'FRONTIER_RESERVATION_CHANGED');return {...state,phase,context};
 }
 
@@ -202,7 +215,7 @@ export function prepareOriginalPeerInputFrontier(api,input){
  const s=service(api),a=data(input,['operation_id','frontier_id','node_id','stage']);need(text(a.operation_id)&&['produce','review'].includes(a.stage),'FRONTIER_INPUT');const fingerprint=peerDigest(a),prior=s.operations.get(a.operation_id);if(prior){need(prior.fingerprint===fingerprint,'FRONTIER_REPLAY_MISMATCH');assertOriginalPeerInputFrontier(prior.cap,{stage:original(prior.cap).native?'execution':'reserved'});return prior.cap;}
  const support=sourceSupport(),cap=Object.freeze({});let record,deadline;
  write(s,'input-frontier.admitted',tx=>{
-  const {c,o,m,p,f,frontier}=liveFrontier(s,tx,a.frontier_id),index=operationId(s,a.operation_id),persisted=tx.get('commands',index);if(persisted){need(persisted.value.kind==='input_frontier_operation'&&persisted.value.request_sha256===fingerprint&&persisted.value.operation==='admit','FRONTIER_REPLAY_MISMATCH');need(false,'FRONTIER_ORIGINAL_PROCESS_CONTINUATION_REQUIRED');}
+  const {c,o,m,p,f,frontier,selected}=liveFrontier(s,tx,a.frontier_id),index=operationId(s,a.operation_id),persisted=tx.get('commands',index);if(persisted){need(persisted.value.kind==='input_frontier_operation'&&persisted.value.request_sha256===fingerprint&&persisted.value.operation==='admit','FRONTIER_REPLAY_MISMATCH');need(false,'FRONTIER_ORIGINAL_PROCESS_CONTINUATION_REQUIRED');}
   need(!f.negative_refs.length&&!f.attempts.some(r=>r.node_id===a.node_id&&r.stage===a.stage),'FRONTIER_NEGATIVE_OR_DUPLICATE');const node=frontier.manifest.nodes.find(n=>n.id===a.node_id);need(node,'FRONTIER_NODE');
   const children=node.children.map(id=>{const result=proof(tx,f,id,'produce'),review=proof(tx,f,id,'review');need(result.output.verdict==='Pass'&&review.output.verdict==='Pass','FRONTIER_CHILDREN');return {node_id:id,result_ref:result.result_ref,review_ref:review.result_ref,output:result.output,native_id:result.native_id,review_native_id:review.native_id};}),fullProducer=a.stage==='review'?proof(tx,f,node.id,'produce'):null,producer=fullProducer?{node_id:fullProducer.node_id,result_ref:fullProducer.result_ref,native_id:fullProducer.native_id,output:fullProducer.output}:null;
   const target=logicalTarget(frontier,node,a.stage,o.value,m),targetId='input-frontier-target:'+peerDigest(target);need(!tx.get('commands',targetId),'FRONTIER_LOGICAL_TARGET_SPENT');
@@ -221,7 +234,7 @@ export function prepareOriginalPeerInputFrontier(api,input){
   const targetRow=tx.put('commands',targetId,{kind:'input_frontier_logical_target',frontier_id:f.id,node_id:node.id,stage:a.stage,target,spent:true,automatic_recovery:false},0);addOwn(f,'commands',targetId);
   const logical_source_refs=sourceRows.map(({id,target,row})=>{if(!row){row=tx.put('commands',id,{kind:'input_frontier_logical_source',frontier_id:f.id,target,automatic_recovery:false},0);addOwn(f,'commands',id);}return ref('commands',row);});
   const contextRow=tx.put('work_items',id+':context',{kind:'input_frontier_context',frontier_id:f.id,body:context.body,text:context.text,sha256:context.sha256},0);addOwn(f,'work_items',contextRow.id);
-  const binding={protocol:'peer-input-frontier-admission-v1',kind:a.stage==='review'?'input-frontier-review':'input-frontier-produce',frontier_id:f.id,frontier_sha256:frontier.sha256,node_id:a.node_id,stage:a.stage,logical_target_ref:ref('commands',targetRow),logical_source_refs,subject:context.subject,context_ref:ref('work_items',contextRow),context_sha256:context.sha256,deadline_at_ms:deadline,owner_epoch:p.value.legacy_owner.epoch};
+  const binding={protocol:'peer-input-frontier-admission-v1',kind:a.stage==='review'?'input-frontier-review':'input-frontier-produce',frontier_id:f.id,frontier_sha256:frontier.sha256,node_id:a.node_id,stage:a.stage,logical_target_ref:ref('commands',targetRow),logical_source_refs,subject:context.subject,context_ref:ref('work_items',contextRow),context_sha256:context.sha256,deadline_at_ms:deadline,owner_epoch:p.value.legacy_owner.epoch,pause_generation:selected.pause_generation};
   const before={model_calls:m.used_model_calls,review_calls:m.used_review_calls,frontier_calls:m.used_frontier_calls,frontier_reviews:m.used_frontier_reviews},after={model_calls:before.model_calls+1,review_calls:before.review_calls+(a.stage==='review'?1:0),frontier_calls:before.frontier_calls+1,frontier_reviews:before.frontier_reviews+(a.stage==='review'?1:0)};
   const nextMaintenance={...m,used_model_calls:after.model_calls,used_review_calls:after.review_calls,used_frontier_calls:after.frontier_calls,used_frontier_reviews:after.frontier_reviews},nextOrigin={...o.value,maintenance:nextMaintenance},nextUsage={...(global?.value??{}),model_calls:used+1};
   const authority_after={family:'control',id:o.id,revision:o.revision+1,sha256:peerDigest(nextOrigin)},global_after={family:'control',id:'usage',revision:(global?.revision??0)+1,sha256:peerDigest(nextUsage)};
@@ -280,7 +293,7 @@ export function recordOriginalPeerInputFrontierLateEvidence(cap,diagnosticToken)
 }
 
 export function inspectCheckedCurrentMeaningFrom(tx,{frontier_ref,root_result_ref},{ledger}={}){
- need(ledger instanceof PeerLedger,'FRONTIER_LEDGER_REQUIRED');const connection={root:ledger.root,directory:ledger.directory,company_id:ledger.company_id};
+ need(ledger instanceof PeerLedger,'FRONTIER_LEDGER_REQUIRED');const connection={root:ledger.root,directory:ledger.directory,company_id:ledger.company_id};selectedMaintenance(tx,connection.company_id);
  const row=exact(tx,frontier_ref,'input_frontier'),f=row.value;need(same(ref('work_items',tx.get('work_items',row.id)),frontier_ref)&&!f.negative_refs.length&&f.deadline_at_ms>Date.now(),'FRONTIER_QUALIFICATION_REQUIRED');const frontier=frontierFrom(tx,f),root=frontier.manifest.root;need(connection&&same(frontier.manifest.connection,{company_id:connection.company_id,root_sha256:hash(connection.root)})&&connection.directory===connection.root+'/.company','FRONTIER_CONNECTION_CHANGED');currentFrontier(tx,f,frontier.manifest);
  const originalOrigin=tx.get('control','origin');need(originalOrigin?.value.id===f.origin_id&&authority(originalOrigin.value.maintenance)===f.authority_sha256&&same(originSidecars(connection.directory),originalOrigin.value.sidecar_frontier),'FRONTIER_SOURCE_CHANGED');need(typeof origin?.assertPeerOriginLegacyFences==='function','FRONTIER_ORIGIN_SOURCE_REQUIRED');origin.assertPeerOriginLegacyFences(ledger.db);
  const result=assertPeerInputFrontierResultFrom(tx,root_result_ref,{frontier_id:f.id,node_id:root,stage:'produce'}),review=proof(tx,f,root,'review');need(result.output.verdict==='Pass'&&review.output.verdict==='Pass'&&same(review.context.producer.result_ref,root_result_ref),'FRONTIER_QUALIFICATION_REQUIRED');
@@ -291,6 +304,21 @@ export function inspectCheckedCurrentMeaningFrom(tx,{frontier_ref,root_result_re
  const markers=frontier.manifest.mandatory_markers,carried=result.output.items.flatMap(item=>item.marker_ids.map(id=>({id,kind:item.kind})));need(same([...new Set(carried.map(v=>v.id))].sort(),markers.map(m=>m.id).sort())&&carried.every(v=>markers.find(m=>m.id===v.id)?.item_kind===v.kind),'FRONTIER_MARKER_LOSS');
  const originRow=tx.get('control','origin'),usage=tx.get('control','usage'),body={protocol:'peer-checked-input-current-meaning-v1',connection:frontier.manifest.connection,frontier_ref,frontier_sha256:frontier.sha256,source_vector_sha256:frontier.manifest.source_vector_sha256,pinned_team:frontier.manifest.pinned_team,items:result.output.items,mandatory_frontier:markers,ordinary_actions_qualified:false,unresolved_scope_holds:markers.map(m=>({marker_id:m.id,scope:m.affected_scope,...(m.grants_new_acceptance===false?{grants_new_acceptance:false,new_closure_qualification:'UNKNOWN',recorded_state_reference:{marker_id:m.id,field:'original_recorded_frontier'}}:{acceptance:false,closure:'UNKNOWN'}),required_rule:'Hold affected ordinary action until its actual current scoped applicability/authority is qualified; this semantic representation alone never resolves it.'})),current_maintenance:{origin_ref:ref('control',originRow),authority:copy(originRow.value.maintenance),global_usage:usage?{reference:ref('control',usage),value:copy(usage.value)}:null},archive:{protocol:'peer-input-frontier-source-ranges-v1',frontier_ref,source_count:frontier.manifest.sources.length,manifest_text_sha256:f.manifest_text_sha256},qualification:{root_result_ref,root_review_ref:review.result_ref,deadline_at_ms:f.deadline_at_ms,claims:'Current semantic representation only; original pins, authority, UNKNOWN, failures and archive remain unchanged.'}};
  need(bytes(body)<=FRONTIER_LIMITS.context_bytes,'FRONTIER_CURRENT_MEANING_CAPACITY');return body;
+}
+
+// Historical SOURCE evidence only. It deliberately does NOT assert that the
+// original whole namespace is current after another producer changes it. The
+// fixed checkpoint consumer must independently replay the COMPLETE actual
+// committed interval and namespace, including any changed old owned rows.
+// All original strict proof/custody checks remain unchanged. The checkpoint
+// consumer supplies a fully authenticated exact historical preimage provider,
+// never a caller-selected filter or rewritten raw value.
+export function inspectOriginalPeerInputFrontierCheckpointEvidenceFrom(tx,{frontier_ref,root_result_ref},{ledger}={}){
+ need(ledger instanceof PeerLedger,'FRONTIER_LEDGER_REQUIRED');const row=exact(tx,frontier_ref,'input_frontier'),f=row.value;
+ need(same(ref('work_items',tx.get('work_items',row.id)),frontier_ref)&&!f.negative_refs.length,'FRONTIER_QUALIFICATION_REQUIRED');const frontier=frontierFrom(tx,f),connection={company_id:ledger.company_id,root_sha256:hash(ledger.root)};need(same(frontier.manifest.connection,connection)&&ledger.directory===ledger.root+'/.company','FRONTIER_CONNECTION_CHANGED');
+ const reviews=f.results.filter(v=>v.node_id===frontier.manifest.root&&v.stage==='review');need(reviews.length===1,'FRONTIER_QUALIFICATION_REQUIRED');const visiting=new Set(),memo=new Map(),result=originalResultFrom(tx,root_result_ref,{frontier_id:f.id,node_id:frontier.manifest.root,stage:'produce'},visiting,memo),review=originalResultFrom(tx,reviews[0].result_ref,{frontier_id:f.id,node_id:frontier.manifest.root,stage:'review'},visiting,memo);
+ need(result.output.verdict==='Pass'&&review.output.verdict==='Pass'&&same(review.context.producer.result_ref,root_result_ref),'FRONTIER_QUALIFICATION_REQUIRED');const originalOrigin=tx.get('control','origin');need(originalOrigin?.value.id===f.origin_id&&same(originSidecars(ledger.directory),originalOrigin.value.sidecar_frontier),'FRONTIER_SOURCE_CHANGED');need(typeof origin?.assertPeerOriginLegacyFences==='function','FRONTIER_ORIGIN_SOURCE_REQUIRED');origin.assertPeerOriginLegacyFences(ledger.db);
+ return {protocol:'peer-input-frontier-historical-checkpoint-evidence-v1',currentness_checked:false,connection,frontier_ref,root_result_ref,root_review_ref:review.result_ref,frontier_sha256:frontier.sha256,source_vector_sha256:frontier.manifest.source_vector_sha256,pinned_team:frontier.manifest.pinned_team,items:copy(result.output.items),mandatory_frontier:copy(frontier.manifest.mandatory_markers),contributors:[...new Set([...result.contributors,...review.contributors])].sort(),source_native_ids:[...sourceNatives(frontier)].sort(),deadline_at_ms:f.deadline_at_ms,ordinary_actions_qualified:false};
 }
 
 // Exact internal cold retrieval. Caller authenticates the current/pending owner
