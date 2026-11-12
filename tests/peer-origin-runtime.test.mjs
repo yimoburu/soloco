@@ -12,11 +12,13 @@ import {withPeerPublicStorage} from '../plugins/soloco/runtime/peer-owner-runtim
 import {peerOriginToolSchema,validatePeerOriginRequest,peerOriginRuntimeAction,preparePeerOriginMechanicalReviewRequest} from '../plugins/soloco/runtime/peer-origin-runtime.mjs';
 import {legacyEncodedReplyBytes} from '../plugins/soloco/runtime/peers/legacy-origin.mjs';
 import {SESSION,OTHER,actor,instruction,legacyFixture,logicalState,preparePlan,mechanical,quarantine,relocatedOriginRuntime,sourceFile,missingSourceFile,disposeOriginPublicFixture} from './peer-origin-public-fixture.mjs';
+import {fixture as selectedFixture,completeReview,disposeMechanicalPublicFixture} from './peer-origin-mechanical-public-fixture.mjs';
 
 // All databases, HOST metadata, context witnesses, closure journals and source
 // selection below are explicitly SYNTHETIC. No real company, native provider,
 // managed-hook trust, policy selection or native QA is performed or claimed.
 test.after(disposeOriginPublicFixture);
+test.after(disposeMechanicalPublicFixture);
 const hash=value=>createHash('sha256').update(value).digest('hex');
 const code=value=>error=>error?.code===value;
 const typed=error=>error instanceof Error;
@@ -25,7 +27,7 @@ const invoke=(args,action=peerOriginRuntimeAction,meta={threadId:SESSION,session
 function temp(t){const root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'soloco-origin-ingress-empty-')));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));return {root};}
 async function unchanged(f,operation,predicate=typed){const before=logicalState(f);await assert.rejects(operation,predicate);assert.deepEqual(logicalState(f),before);}
 async function applied(t,changes={},prepare=()=>{}){
- const f=legacyFixture(t,changes);prepare(f);const p=preparePlan(f),review_ids=mechanical(f,p),runtime=await relocatedOriginRuntime();
+ const f=selectedFixture(t,changes,prepare),p=f.planned,review_ids=completeReview(f),runtime=await f.runtime();
  const receipt=await invoke(req(f,'quarantine',{plan_id:p.plan_id,review_ids},{source_instruction:instruction}),runtime.peerOriginRuntimeAction);
  assert.equal(receipt.protocol,'peer-origin-applied-receipt-v1');return {...f,p,review_ids,runtime,receipt};
 }
@@ -96,17 +98,17 @@ test('missing checked-epoch plan producer holds without creating a plan or spend
  const f=legacyFixture(t),missing=sourceFile('no-checked-epoch-producer',`export {originSafeData,ORIGIN_PLAN_PROTOCOL,ORIGIN_LIMITS,ORIGIN_REVIEW_CONTEXT} from ${JSON.stringify(new URL('../plugins/soloco/runtime/peers/origin-plan.mjs',import.meta.url).href)};`),runtime=await relocatedOriginRuntime({planModule:missing});await unchanged(f,()=>invoke(req(f,'plan',f.input,{source_instruction:instruction}),runtime.peerOriginRuntimeAction),code('ORIGIN_PUBLIC_PLAN_EPOCH_PRODUCER_UNAVAILABLE'));
 });
 
-test('original mechanical review request is DATA with STRING review_of; missing fixed dispatcher holds before queueing',async t=>{
- const f=legacyFixture(t),p=preparePlan(f),args=req(f,'mechanical_review',{plan_id:p.plan_id},{source_instruction:instruction}),before=logicalState(f),prepared=await invoke(args,preparePeerOriginMechanicalReviewRequest);
- assert.equal(prepared.planned_not_dispatched,true);assert.equal(prepared.arguments.role,'qa');assert.equal(prepared.arguments.review_of,p.plan_id);assert.ok(prepared.arguments.task.includes(p.cut_sha256));assert.deepEqual(logicalState(f),before);
- const runtime=await relocatedOriginRuntime({engine:sourceFile('no-mechanical-dispatcher','export {};')});await unchanged(f,()=>invoke(args,runtime.peerOriginRuntimeAction),code('ORIGIN_MECHANICAL_DISPATCH_SOURCE_UNAVAILABLE'));
- mechanical(f,p);await unchanged(f,()=>invoke(args,preparePeerOriginMechanicalReviewRequest),code('ORIGIN_MECHANICAL_ATTEMPT_EXISTS'));
+test('original selected request binds exact grant and fixed engine DATA; missing dispatcher cannot queue or spend',async t=>{
+ const f=selectedFixture(t),p=f.planned,args=req(f,'mechanical_review',{plan_id:p.plan_id,grant_ref:f.grant_ref},{source_instruction:instruction}),before=logicalState(f),selectedRuntime=await f.runtime(),prepared=await invoke(args,selectedRuntime.preparePeerOriginMechanicalReviewRequest);
+ assert.equal(prepared.planned_not_dispatched,true);assert.deepEqual(prepared.arguments,{root:f.root,session_id:SESSION,epoch:9,input:{plan_id:p.plan_id,grant_ref:f.grant_ref}});assert.equal(prepared.context_sha256,f.packet.context_sha256);assert.equal(prepared.context_utf8_bytes,f.packet.context_utf8_bytes);assert.equal(prepared.context,undefined);assert.deepEqual(logicalState(f),before);
+ const runtime=await relocatedOriginRuntime({engine:sourceFile('no-mechanical-dispatcher','export {};'),planModule:f.planModulePath,quarantineModule:f.quarantineModulePath,mechanical:f.policyModulePath});await unchanged(f,()=>invoke(args,runtime.peerOriginRuntimeAction),code('ORIGIN_MECHANICAL_DISPATCH_SOURCE_UNAVAILABLE'));
+ completeReview(f);await unchanged(f,()=>invoke(args,selectedRuntime.preparePeerOriginMechanicalReviewRequest),code('ORIGIN_MECHANICAL_QA_SOURCE_CHANGED'));
 });
 
 test('fictional original mechanical preflight validates actual journal; JSON-shaped Pass cannot replace it',async t=>{
- const f=legacyFixture(t),p=preparePlan(f),runtime=await relocatedOriginRuntime(),before=logicalState(f);
+ const f=selectedFixture(t),p=f.planned,runtime=await f.runtime(),before=logicalState(f);
  await unchanged(f,()=>invoke(req(f,'mechanical_preflight',{plan_id:p.plan_id,review_ids:['invented-review']}),runtime.peerOriginRuntimeAction),code('ORIGIN_MECHANICAL_REVIEW_REQUIRED'));
- const review_ids=mechanical(f,p),completed=logicalState(f),checked=await invoke(req(f,'mechanical_preflight',{plan_id:p.plan_id,review_ids}),runtime.peerOriginRuntimeAction);
+ const review_ids=completeReview(f),completed=logicalState(f),checked=await invoke(req(f,'mechanical_preflight',{plan_id:p.plan_id,review_ids}),runtime.peerOriginRuntimeAction);
  assert.equal(checked.mechanical_preflight_passed,true);assert.equal(checked.quarantine_requires_current_revalidation,true);assert.equal(checked.authority_issued,false);assert.equal(checked.observed.length,1);assert.deepEqual(logicalState(f),completed);assert.notDeepEqual(completed,before);
 });
 

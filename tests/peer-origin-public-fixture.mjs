@@ -34,11 +34,11 @@ export const disposeOriginPublicFixture=()=>fs.rmSync(directory,{recursive:true,
 // synthetic producer dependencies above, or a fixed native entry chosen here
 // by trusted TEST source. No public request can supply any of these paths.
 let sequence=0;
-export async function relocatedOriginRuntime({launch,frontier,seal,engine,authority,planModule=path.join(directory,'origin-plan.mjs'),quarantineModule=path.join(directory,'origin-quarantine.mjs')}={}){
+export async function relocatedOriginRuntime({launch,frontier,seal,engine,authority,mechanical,planModule=path.join(directory,'origin-plan.mjs'),quarantineModule=path.join(directory,'origin-quarantine.mjs')}={}){
  let body=fs.readFileSync(path.join(runtime,'peer-origin-runtime.mjs'),'utf8');
  body=body.replace(/from '(\.\/?[^']+)'/g,(_,relative)=>'from '+JSON.stringify(url(path.resolve(runtime,relative))));
  body=body.replace(JSON.stringify(url(path.join(peers,'origin-plan.mjs'))),JSON.stringify(url(planModule))).replace(JSON.stringify(url(path.join(peers,'origin-quarantine.mjs'))),JSON.stringify(url(quarantineModule)));
- for(const [variable,relative,selected]of [['FRONTIER_URL','./peers/input-frontier-maintenance.mjs',frontier],['SEAL_URL','./peers/origin-frontier-seal.mjs',seal],['LAUNCH_URL','./peers/maintenance-launch.mjs',launch],['ENGINE_URL','./engine.mjs',engine],['AUTHORITY_URL','./peers/origin-maintenance-authority.mjs',authority]]){
+ for(const [variable,relative,selected]of [['FRONTIER_URL','./peers/input-frontier-maintenance.mjs',frontier],['SEAL_URL','./peers/origin-frontier-seal.mjs',seal],['LAUNCH_URL','./peers/maintenance-launch.mjs',launch],['ENGINE_URL','./engine.mjs',engine],['AUTHORITY_URL','./peers/origin-maintenance-authority.mjs',authority],['MECHANICAL_URL','./peers/origin-mechanical-qa-policy.mjs',mechanical]]){
   body=body.replace(`const ${variable}=new URL('${relative}',import.meta.url);`,`const ${variable}=new URL(${JSON.stringify(url(selected??path.resolve(runtime,relative)))});`);
  }
  const file=path.join(directory,`runtime-${++sequence}.mjs`);fs.writeFileSync(file,body);return import(url(file));

@@ -19,6 +19,7 @@ import vm from 'node:vm';
 import * as coordination from '../plugins/soloco/runtime/coordination.mjs';
 import * as timeout from '../plugins/soloco/runtime/timeout.mjs';
 import {renderDevelopmentReviewContext} from '../plugins/soloco/runtime/development-receipt-json.mjs';
+import {isOriginMechanicalQaTarget,workPeerOriginMechanicalQa} from '../plugins/soloco/runtime/origin-mechanical-qa-worker.mjs';
 
 // Evaluate actual module bodies with explicit boundary doubles. No real
 // model, subprocess, CLI, network, or production store is opened. Public
@@ -54,6 +55,9 @@ function harness(publicOverrides={}) {
     // This VM supplies a synthetic legacy Store; peer routing/storage behavior
     // is covered by the actual SQLite and root-ingress suites.
     peerOwnerRoutingStorageKind:()=> 'legacy',
+    // Explicit SYNTHETIC ordinary-only classification. Actual original plan
+    // target/queue/worker guards run in the dedicated real SQLite source suite.
+    isOriginMechanicalQaWorker:()=>false,isOriginMechanicalQaTarget,workPeerOriginMechanicalQa,
     spawn:(...args)=>{launches.push(args);return {on:()=>{},unref:()=>{}};},hooks:()=>{},upgrade:()=>{},upgradeGuidance:'',peerRuntimeFields,peerAdoptionToolSchema,peerOwnerToolSchema,peerOriginToolSchema,mcpCallerDiagnostic};
   const engine=load('engine.mjs',deps,['dispatch','status','control','wait']);
   Object.assign(engine,publicOverrides);

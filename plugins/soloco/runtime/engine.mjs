@@ -37,6 +37,8 @@ import {taskRecord,taskReady,bindTaskAttempt} from './tasks.mjs';
 import {runtimeGrant,runtimeControlBinding} from './task-runtime-authority.mjs';
 import {readTaskState,updateTaskIndex} from './task-index.mjs';
 import {specialistAction,isSpecialistRecord,prepareSpecialistAssignment,specialistSessionKey,specialistContext} from './specialists.mjs';
+import * as originMechanicalQa from './peers/origin-mechanical-qa-policy.mjs';
+import {qaData,qaRef,qaNeed,qaText,qaSame,qaCopy} from './peers/origin-mechanical-qa-contract.mjs';
 
 const busy = state => Object.values(state.jobs??{}).filter(j => ['queued','running'].includes(j?.status));
 // Terminal status does not prove that a started model process has closed.
@@ -385,7 +387,7 @@ export function dispatch(args,host,{launch=launchWorker,check=readiness,catalog=
   binding(args,host);
   if(reviewWindow)withStore(args.root,db=>{const s=db.read();owner(s,args.session_id,host,args.epoch);if(!freshHandoverReviewEligible(s,args))throw Error('Review window is only for a fresh current paused streamed handover QA');});
   if(codeWindow)withStore(args.root,db=>{const s=db.read();owner(s,args.session_id,host,args.epoch);codeReviewWindowSubject(s,args,{root:args.root});});
-  withStore(args.root,db=>{const s=db.read();owner(s,args.session_id,host,args.epoch);if(args.model_selection!==undefined&&!['0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7','0.6.8','0.6.9','0.6.10','0.6.11','0.6.12','0.6.13','0.7.0','0.7.1','0.7.2','0.7.3','0.7.4','0.7.5','0.7.6','0.7.7',VERSION].includes(s.plugin_version))throw new Error('Explicitly adopt the model-selection team before using model_selection');});
+  withStore(args.root,db=>{const s=db.read();owner(s,args.session_id,host,args.epoch);if(s.records?.[args.review_of]?.origin_quarantine_plan)throw Object.assign(Error('Use company_origin mechanical_review with the exact original grant'),{code:'ORIGIN_MECHANICAL_QA_FIXED_DISPATCH_REQUIRED'});if(args.model_selection!==undefined&&!['0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7','0.6.8','0.6.9','0.6.10','0.6.11','0.6.12','0.6.13','0.7.0','0.7.1','0.7.2','0.7.3','0.7.4','0.7.5','0.7.6','0.7.7',VERSION].includes(s.plugin_version))throw new Error('Explicitly adopt the model-selection team before using model_selection');});
   const inventory=args.model_selection?.mode==='explicit' || args.model_selection?.speed==='fast_disabled'?catalog(host):null;
   const selection=normalizeSelection(args.model_selection,host,inventory);
   const ready=check(host);
@@ -393,6 +395,7 @@ export function dispatch(args,host,{launch=launchWorker,check=readiness,catalog=
   if (ready.authenticated===false) throw new Error(`${host} CLI is not signed in. Complete its normal login before starting specialists.`);
   const jobId=id('job');let retentionControl=null,retentionPreflight=null;
   const state=update(args,host,'job.queued',s=>{
+    if(s.records?.[args.review_of]?.origin_quarantine_plan)throw Object.assign(Error('Use company_origin mechanical_review with the exact original grant'),{code:'ORIGIN_MECHANICAL_QA_FIXED_DISPATCH_REQUIRED'});
     if(s.paused && !handoverReviewEligible(s,args)&&!qualificationMaintenanceEligible(s,args)&&!scoped.scopedMaintenanceEligible(s,args)&&!operatingMaintenanceEligible(s,args)) throw new Error('Company is paused; only current handover QA or explicitly authorized read-only qualification may run');
     if(reviewWindow&&!freshHandoverReviewEligible(s,args))throw Error('Review window is only for a fresh current paused streamed handover QA');
     if(!Object.hasOwn(s.roles,args.role)) throw new Error('Role is absent from the pinned team catalog');
@@ -458,6 +461,28 @@ export function dispatch(args,host,{launch=launchWorker,check=readiness,catalog=
     worker.unref();
   } catch(error) {update(args,host,'job.spawn_failed',s=>{s.jobs[jobId].status='failed';s.jobs[jobId].error=error.message;s.jobs[jobId].coordination_release={termination_confirmed:true,reason:'worker_not_started',at:stamp()};});throw error;}
   return mutationView(state.jobs[jobId],'job:'+jobId,'jobs');
+}
+// Trusted engine join ONLY. Public callers provide closed DATA; neither an
+// ordinary dispatch flag nor a paused eligibility predicate can reserve this.
+export function dispatchPeerOriginMechanicalReview(request,host,{launch=launchWorker,check=readiness,catalog=modelCatalog}={}){
+ const args=qaData(request,['root','session_id','epoch','input']),input=qaData(args.input,['plan_id','grant_ref']);qaRef(input.grant_ref);
+ qaNeed(['codex','claude'].includes(host)&&qaText(args.root,4000)&&path.isAbsolute(args.root)&&qaText(args.session_id,200)&&Number.isSafeInteger(args.epoch)&&args.epoch>0&&qaText(input.plan_id,200),'ORIGIN_MECHANICAL_QA_INPUT');binding(args,host);
+ // Full original inventory/context/owner preflight comes BEFORE CLI probes.
+ const selected=withStore(args.root,store=>store.readSnapshot(()=>{const s=store.read();owner(s,args.session_id,host,args.epoch);const p=originMechanicalQa.preparePeerOriginMechanicalQaDispatchFrom(store.db,s,{expected_epoch:args.epoch,grant_ref:input.grant_ref});qaNeed(p.plan_ref.id===input.plan_id,'ORIGIN_MECHANICAL_QA_PLAN_CHANGED');return p;}));
+ const ready=check(host);qaNeed(ready?.available===true&&ready.authenticated===true,'ORIGIN_MECHANICAL_QA_CLI_UNAVAILABLE');
+ const advertised=catalog(host),selection=normalizeSelection(selected.job_template.model_selection,host,advertised);qaNeed(qaSame(selection,selected.job_template.model_selection),'ORIGIN_MECHANICAL_QA_MODEL_SELECTION_CHANGED');
+ let receipt,jobId;
+ const state=withStore(args.root,store=>store.transaction('job.queued',s=>{
+  owner(s,args.session_id,host,args.epoch);const fresh=originMechanicalQa.preparePeerOriginMechanicalQaDispatchFrom(store.db,s,{expected_epoch:args.epoch,grant_ref:input.grant_ref});qaNeed(qaSame(fresh,selected)&&fresh.plan_ref.id===input.plan_id,'ORIGIN_MECHANICAL_QA_DISPATCH_CHANGED');
+  const job={...qaCopy(fresh.job_template),created_at:stamp(),cli_version:ready.version};jobId=job.id;qaNeed(!s.jobs[job.id]&&!s.sessions[job.session_key]&&job.native_id===null,'ORIGIN_MECHANICAL_QA_FRESH_JOB_REQUIRED');
+  receipt=originMechanicalQa.reservePeerOriginMechanicalQaFrom(store,s,job,{expected_epoch:args.epoch,grant_ref:input.grant_ref});
+  s.jobs[job.id]=job;s.sessions[job.session_key]={instance_id:job.instance_id,role:job.role,host,native_id:null,model_selection:qaCopy(job.model_selection)};return s;
+ },{beforeCommit:(_db,next)=>{originMechanicalQa.assertOriginalPeerOriginMechanicalQaReservationCommitFrom(store,next,receipt);}}));
+ // The opaque reservation never leaves this SAME Store closure. A failed
+ // final provider read/deadline rolls back before launch; no generic fallback.
+ try{const worker=launch(args.root,jobId);worker.on('error',error=>withStore(args.root,store=>store.transaction('job.spawn_failed',s=>{const job=s.jobs[jobId];qaNeed(job?.status==='queued'&&!job.started_at,'ORIGIN_MECHANICAL_QA_JOB_CHANGED');job.status='failed';job.error=String(error.message).slice(0,1000);job.coordination_release={termination_confirmed:true,reason:'worker_spawn_failed',at:stamp()};return s;})));worker.unref();}
+ catch(error){withStore(args.root,store=>store.transaction('job.spawn_failed',s=>{const job=s.jobs[jobId];qaNeed(job?.status==='queued'&&!job.started_at,'ORIGIN_MECHANICAL_QA_JOB_CHANGED');job.status='failed';job.error=String(error.message).slice(0,1000);job.coordination_release={termination_confirmed:true,reason:'worker_not_started',at:stamp()};return s;}));throw error;}
+ return mutationView(state.jobs[jobId],'job:'+jobId,'jobs');
 }
 function launchWorker(root,jobId){return spawn(process.execPath,['--no-warnings',path.join(PACKAGE,'runtime/worker.mjs'),folder(root),jobId],{detached:true,stdio:'ignore',env:{...process.env,COMPANY_WORKER:'1'}});}
 // Internal runtime principal. No owner session is substituted into the public

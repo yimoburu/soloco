@@ -8,7 +8,7 @@ import path from 'node:path';
 import {Worker} from 'node:worker_threads';
 import {DatabaseSync} from 'node:sqlite';
 import {createHash} from 'node:crypto';
-import {peerOwnerStorageKind,peerOwnerRoutingStorageKind,peerOwnerRuntimeAction} from '../plugins/soloco/runtime/peer-owner-runtime.mjs';
+import {peerOwnerStorageKind,peerOwnerRoutingStorageKind,peerOwnerRuntimeAction,withPeerPublicStorage} from '../plugins/soloco/runtime/peer-owner-runtime.mjs';
 import {runWithMcpHostContext} from '../plugins/soloco/runtime/mcp-host-context.mjs';
 import {peerFixture} from './peer-fixture.mjs';
 import {captureLegacyPinnedTeam,legacySourceId} from '../plugins/soloco/runtime/peers/legacy-origin.mjs';
@@ -105,5 +105,67 @@ test('actual legacy engine open/status and startup hook use only the retried rou
  const args={root,session_id:ROOT,name:'SYNTHETIC source company',idea:'Fictional routing test only'};engine.bind(root,ROOT,'codex');engine.open(args,'codex');const file=path.join(root,'.company','company.sqlite');
  for(const invoke of [()=>engine.open(args,'codex'),()=>engine.status(args,'codex'),()=>main.hook({cwd:root,session_id:ROOT,hook_event_name:'SessionStart'},'codex')]){
   const race=changedProbe(file);try{const value=invoke();assert.ok(value&&typeof value==='object');assert.equal(race.changes,1);assert.equal(race.opens,2);}finally{race.restore();}
+ }
+});
+
+// Controlled branch evidence: these are real Stats from an opened, then
+// unlinked file, substituted at lstat. The separate genuine SQLite observation
+// proves that premise; this fixture does not claim an actual lstat race.
+function retiredStats(t){
+ const file=path.join(temp(t,'soloco-SOURCE-retired-stats-'),'retired');fs.writeFileSync(file,'retired sidecar fixture');
+ const fd=fs.openSync(file,'r');fs.unlinkSync(file);const value=fs.fstatSync(fd,{bigint:true});t.after(()=>fs.closeSync(fd));
+ assert.equal(value.isFile(),true);assert.equal(value.isSymbolicLink(),false);assert.equal(value.nlink,0n);return value;
+}
+function sidecarProbe(f,suffix,site,value,{every=false,armed=()=>true}={}){
+ const original=fs.lstatSync;let hits=0,locations=0;
+ fs.lstatSync=function(file,...args){
+  const stack=new Error().stack;
+  if(file===f.file&&stack.includes('at location ('))locations++;
+  if(file===f.file+suffix&&stack.includes(`at ${site} (`)&&armed()&&(every||hits===0)){hits++;return value;}
+  return Reflect.apply(original,this,[file,...args]);
+ };
+ return {get hits(){return hits;},get locations(){return locations;},restore(){fs.lstatSync=original;}};
+}
+test('retired original sidecars Hold directly while routing starts a fresh complete classification',t=>{
+ for(const suffix of ['-wal','-shm'])for(const site of ['location','stable']){
+  const f=legacy(t),before=sqlState(f.file),zero=retiredStats(t);let probe=sidecarProbe(f,suffix,site,zero);
+  try{assert.throws(()=>peerOwnerStorageKind(f.root),error=>error.code==='OWNER_STORAGE_CHANGED'&&error.message.includes(`component=${suffix.slice(1)}`)&&/type=regular;links=0/.test(error.message)&&!error.message.includes(f.root));assert.equal(probe.hits,1);}finally{probe.restore();}
+  probe=sidecarProbe(f,suffix,site,zero);
+  try{assert.equal(peerOwnerRoutingStorageKind(f.root),null);assert.equal(probe.hits,1);assert.equal(probe.locations,2,'routing restarts from a fresh original main-file stat');}finally{probe.restore();}
+  assert.equal(sqlState(f.file),before);
+ }
+});
+test('perpetually retired sidecars exhaust exactly three readonly probes',t=>{
+ for(const suffix of ['-wal','-shm'])for(const site of ['location','stable']){
+  const f=legacy(t),before=sqlState(f.file),probe=sidecarProbe(f,suffix,site,retiredStats(t),{every:true});
+  try{assert.throws(()=>peerOwnerRoutingStorageKind(f.root),code('OWNER_STORAGE_CHANGED'));assert.equal(probe.hits,3);assert.equal(probe.locations,3);}finally{probe.restore();}
+  assert.equal(sqlState(f.file),before);
+ }
+});
+test('a retired probe followed by actual hardlinked symlink or directory sidecars remains fatal',t=>{
+ for(const suffix of ['-wal','-shm'])for(const kind of ['hardlink','symlink','directory']){
+  const f=legacy(t),originalBytes=fs.readFileSync(f.file),other=path.join(f.root,'other');fs.writeFileSync(other,'not SQLite');
+  if(kind==='hardlink')fs.linkSync(other,f.file+suffix);else if(kind==='symlink')fs.symlinkSync(other,f.file+suffix);else fs.mkdirSync(f.file+suffix);
+  const probe=sidecarProbe(f,suffix,'location',retiredStats(t));
+  try{assert.throws(()=>peerOwnerRoutingStorageKind(f.root),error=>error.code==='OWNER_STORAGE_LINK'&&/linked/.test(error.message)&&error.message.includes(`component=${suffix.slice(1)}`)&&error.message.length<250&&!error.message.includes(f.root));assert.equal(probe.hits,1);assert.equal(probe.locations,2,'fatal links do not receive another retry');}finally{probe.restore();}
+  assert.deepEqual(fs.readFileSync(f.file),originalBytes);
+ }
+});
+test('sidecar provider lookalikes preserve identity and missing-main or main-hardlink storage still Holds',t=>{
+ for(const suffix of ['-wal','-shm']){
+  const f=legacy(t),original=fs.lstatSync,cause=Error('source cause'),member=Error('source member');
+  for(const sentinel of [Object.assign(Error('source provider'),{code:'OWNER_STORAGE_CHANGED'}),Object.assign(new AggregateError([member],'source group',{cause}),{code:'OWNER_STORAGE_CHANGED'})]){
+   let calls=0;fs.lstatSync=function(file,...args){if(file===f.file+suffix){calls++;throw sentinel;}return Reflect.apply(original,this,[file,...args]);};
+   try{assert.throws(()=>peerOwnerRoutingStorageKind(f.root),error=>error===sentinel);assert.equal(calls,1);if(sentinel instanceof AggregateError){assert.strictEqual(sentinel.cause,cause);assert.strictEqual(sentinel.errors[0],member);}}finally{fs.lstatSync=original;}
+  }
+  fs.unlinkSync(f.file);fs.writeFileSync(f.file+suffix,'orphan');assert.throws(()=>peerOwnerRoutingStorageKind(f.root),code('OWNER_STORAGE_LAYOUT'));
+ }
+ const f=legacy(t);fs.linkSync(f.file,f.file+'.hardlink');assert.throws(()=>peerOwnerRoutingStorageKind(f.root),code('OWNER_STORAGE_LINK'));
+});
+test('a retired post-invoke sidecar rejects the operation without replaying its callback',async t=>{
+ for(const suffix of ['-wal','-shm']){
+  const f=legacy(t),before=sqlState(f.file);let calls=0,armed=false;const probe=sidecarProbe(f,suffix,'stable',retiredStats(t),{armed:()=>armed});
+  try{await assert.rejects(withPeerPublicStorage(f.root,true,()=>{calls++;armed=true;return {read:true};}),code('OWNER_STORAGE_CHANGED'));assert.equal(calls,1);assert.equal(probe.hits,1);}finally{probe.restore();}
+  assert.equal(sqlState(f.file),before);
  }
 });
