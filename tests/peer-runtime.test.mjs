@@ -147,16 +147,19 @@ test('metadata changes and assignment require explicit source-composition start'
  assert.deepEqual(await peerRuntimeAction(request(f,'stop'),'codex'),{stopped:true,already_stopped:true,pending_preparation:false,physical_closure:'UNKNOWN'});
 });
 
-test('MCP entrypoint advertises closed DATA, requires hook binding and keeps status bounded',async t=>{
+test('MCP peer entrypoint advertises closed DATA and never treats a legacy binding as caller identity',async t=>{
  const f=fixture(t),data=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-peer-binding-')),old=process.env.COMPANY_PLUGIN_DATA;
  process.env.COMPANY_PLUGIN_DATA=data;t.after(()=>{if(old===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=old;fs.rmSync(data,{recursive:true,force:true});});
  const schema=toolList.find(v=>v.name==='company_peers').inputSchema;
  assert.equal(schema.additionalProperties,false);assert.equal(schema.properties.input.additionalProperties,false);assert(schema.required.includes('epoch'));assert.equal(Object.hasOwn(schema.properties,'provider'),false);
  assert(schema.properties.action.enum.includes('grant_create'));assert(schema.properties.action.enum.includes('grant_revoke'));assert.equal(schema.properties.input.properties.actions.maxItems,100);
- await assert.rejects(call('company_peers',request(f,'status'),'codex'),/No startup-hook binding/);
- for(const [action,input]of [['inspect',{family:'tasks'}],['read',{family:'tasks',id:'missing',revision:1,sha256:'0'.repeat(64)}]])await assert.rejects(call('company_peers',request(f,action,{input}),'codex'),/No startup-hook binding/);
- bind(f.root,session,'codex');const result=await call('company_peers',request(f,'status'),'codex');assert.equal(result.protocol,'peer-production-runtime-v1');assert.equal(result.started,false);assert(Buffer.byteLength(JSON.stringify(result))<4096);
- assert.equal((await call('company_peers',request(f,'inspect',{input:{family:'tasks'}}),'codex')).returned,0);
+ const before=fingerprint(f);
+ await assert.rejects(call('company_peers',request(f,'status'),'codex'),code('MCP_CODEX_ROOT_CALLER_REQUIRED'));
+ for(const [action,input]of [['inspect',{family:'tasks'}],['read',{family:'tasks',id:'missing',revision:1,sha256:'0'.repeat(64)}]])await assert.rejects(call('company_peers',request(f,action,{input}),'codex'),code('MCP_CODEX_ROOT_CALLER_REQUIRED'));
+ bind(f.root,session,'codex');
+ await assert.rejects(call('company_peers',request(f,'status'),'codex'),code('MCP_CODEX_ROOT_CALLER_REQUIRED'));
+ await assert.rejects(call('company_peers',request(f,'inspect',{input:{family:'tasks'}}),'codex'),code('MCP_CODEX_ROOT_CALLER_REQUIRED'));
+ assert.equal(fingerprint(f),before);
  await assert.rejects(call('company_peers',{...request(f,'status'),actor:'founder'},'codex'),/Unknown argument/);
 });
 

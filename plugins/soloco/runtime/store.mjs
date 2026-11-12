@@ -55,8 +55,16 @@ export class Store {
     for (const suffix of ['', '-wal', '-shm']) noLink(file + suffix);
     this.db = new DatabaseSync(file);
     this.inTransaction=false;
-    this.db.exec('PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;');
-    this.db.exec('CREATE TABLE IF NOT EXISTS company (id INTEGER PRIMARY KEY CHECK(id=1), value TEXT NOT NULL); CREATE TABLE IF NOT EXISTS events (seq INTEGER PRIMARY KEY, at TEXT NOT NULL, type TEXT NOT NULL, value TEXT NOT NULL);');
+    try {
+      this.db.exec('PRAGMA busy_timeout=5000;');
+      // Validate the existing layout before any legacy setup. In particular a
+      // peer database must not acquire legacy tables just because a supervisor
+      // or an incompatible public route tried to open it.
+      normalizedLayout(this.db);
+      if(this.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name IN ('peer_meta','peer_rows','peer_versions','peer_events') LIMIT 1").get())throw Error('Peer storage requires the peer runtime; legacy Store initialization is unavailable');
+      this.db.exec('PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;');
+      this.db.exec('CREATE TABLE IF NOT EXISTS company (id INTEGER PRIMARY KEY CHECK(id=1), value TEXT NOT NULL); CREATE TABLE IF NOT EXISTS events (seq INTEGER PRIMARY KEY, at TEXT NOT NULL, type TEXT NOT NULL, value TEXT NOT NULL);');
+    }catch(error){this.db.close();throw error;}
   }
   changeToken() { return this.db.prepare('SELECT COALESCE(MAX(seq),0) AS version FROM events').get().version; }
   captureIntakeBaseline() {return this.readSnapshot(()=>captureStorageBaseline(this.db));}

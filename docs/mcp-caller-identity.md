@@ -1,0 +1,65 @@
+# MCP caller context
+
+The fixed `main.serve` boundary captures `tools/call` `params._meta` in a private
+request scope. Tool arguments, a top-level JSON-RPC `_meta`, a binding file, a
+principal row and returned diagnostics cannot substitute for that context. The
+context expires when the complete awaited invocation returns or throws; detached
+asynchronous work cannot reuse it. Capturing metadata grants no authority.
+
+The reviewed Codex source contract supplies concrete `threadId` and root
+`sessionId` strings outside tool arguments. A descendant has its own thread ID
+while retaining the root session ID. New peer operations require a supported
+Codex context whose two UUIDs are equal and whose session exactly matches the
+requested `session_id`. The actor's `native_id` comes only from the observed
+thread ID. Generic UUID forms are accepted without changing their bytes or
+inventing a version-seven-only restriction.
+
+The source audit uses the upstream commit pinned in
+[the companion source package](../native/codex/README.md). Codex overwrites stale
+identity keys in object metadata, but non-object metadata remains unchanged and
+must be rejected. A host metadata extension runs after insertion, so the reviewed
+fixed host/stdio composition is a necessary trust assumption. JSON shape and a
+static executable version do not attest an installed host. Synthetic stdin tests
+establish these source mechanics, not connected-host or native qualification.
+
+## New peer access
+
+Every public `company_peers` operation, including status and persisted reads,
+requires this root caller context. This prevents an unqualified legacy path from
+becoming an alternative route into layout-5 peer data or production authority.
+The current managed hook record must also match the actor, canonical folder,
+plugin version/root and MCP data directory. Its bounded no-follow descriptor read
+checks actual file and directory identity and file stability. Binding-file
+existence alone is not identity proof.
+
+The peer runtime still checks the actual canonical founder, owner epoch and
+operation-specific grants, policy, qualification and physical commit fences.
+Caller identity does not create a grant, start a provider, qualify an executor or
+release a reservation. Unsupported clients, malformed/missing metadata,
+descendants and mismatched selectors Hold before peer access. Claude has no
+reviewed equivalent identity contract for these new routes.
+
+`company_doctor.caller_identity` reports bounded observations without exposing
+thread/session IDs. `authority_granted` and `native_qualification` remain false.
+These diagnostics are not tokens and cannot be submitted to obtain authority.
+
+## Legacy preparation and storage
+
+Legacy logical preparation, including layout-4 adoption preparation, retains its
+existing contract. The hook and missing/unsupported caller diagnostics explicitly
+use `LEGACY_UNQUALIFIED`; this does not qualify a new peer owner or production
+operation. This change does not claim that every legacy MCP mutation has been
+hardened to actual host identity.
+
+Legacy `Store` sets its connection-local lock timeout, then validates an existing
+storage layout and peer-schema markers before persistent PRAGMAs or table setup.
+Opening peer storage through the legacy
+supervisor or another incompatible legacy route therefore cannot create legacy
+`company`/`events` tables. Unsupported initialization closes its connection.
+Ordinary SQLite sidecar behavior is not a general zero-filesystem-I/O promise.
+
+Public owner handover, its narrow pending-owner lanes, layout-5 instruction
+loading, native maintenance and task-bound receiver profiles require their own
+reviewed producers and integration. They are not registered by this caller
+context change. Native qualification, original obligations, expired permissions
+and unknown closures remain separate gates.
