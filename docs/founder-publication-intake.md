@@ -37,6 +37,9 @@ Independent review, logical-home publication and receiver acceptance remain sepa
   returned work, unpublished proposals and incoming messages. Pages expose exact
   source/range/hash references, scanned counts and continuation without claiming
   a false total of pending decisions.
+- Continuations bind the exact receiver incarnation, company/root, control and
+  selectors. A source-process restart requires a fresh first page; reopening the
+  SQLite connection in the same process preserves valid continuations.
 - Reading, sending, native return, QA and publication never imply acceptance.
   New source revisions require fresh applicability; historical decisions remain.
 - The public operator may act only as the actual founder receiver. It cannot

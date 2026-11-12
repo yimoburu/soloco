@@ -1,6 +1,7 @@
 // Trusted internal storage helpers. The caller supplies an original bound
 // principal and enforces authorization, semantic lineage and the commit fence.
 // These records never authenticate an actor or authorize execution/publication.
+import {createHmac,randomBytes,timingSafeEqual} from 'node:crypto';
 import {canonical,peerDigest} from './ledger.mjs';
 
 const SEMANTIC=new Set(['tasks','homes','proposals','reviews','conflicts','notices','messages','deliveries']);
@@ -11,6 +12,9 @@ const HANDOFF_KEYS=['kind','status','principal_id','scope','operation_id','sende
 const DECISION_KEYS=['kind','status','principal_id','scope','operation_id','handoff_ref','sender','receiver','subject_ref','governing_refs','evidence_refs','reason','source_instruction','authority_control','created_at'];
 const TASK_KEYS=['task_id','attempt_id','task_effect'];
 const localFailures=new WeakSet();
+// Ephemeral routing data only. A source-process restart deliberately requires
+// a fresh first page; no persisted cursor key or execution authority is minted.
+const cursorKey=randomBytes(32),CURSOR_PROTOCOL='peer-receiver-intake-cursor-v1';
 const copy=value=>JSON.parse(canonical(value));
 const same=(a,b)=>canonical(a)===canonical(b);
 const reference=(family,row)=>({family,id:row.id,revision:row.revision,sha256:row.sha256});
@@ -195,6 +199,32 @@ function descriptor(family,row,intake_kind,state,reason=null){
   return {...reference(family,row),part:'value',available:true,content_sha256:peerDigest(row.value),total_characters:body.length,utf8_bytes:Buffer.byteLength(body),read:{tool:'company_peers',action:'read'},intake_kind,state,reason};
 }
 const information=(code,message)=>({code,message});
+function cursorFailure(){fail('INTAKE_CURSOR_INVALID','Stale or mismatched peer cursor; receiver intake must restart from a fresh first page');}
+function cursorSource(value){
+  if(!value)cursorFailure();
+  object(value,['company_id','root_sha256'],'source cursor namespace',true);
+  text(value.company_id,'cursor company',2000);
+  if(!/^[a-f0-9]{64}$/.test(value.root_sha256??''))cursorFailure();
+  return copy(value);
+}
+function continuation(cursor,binding){
+  if(typeof cursor!=='string'||cursor.length>16000)cursorFailure();
+  const parts=cursor.split('.');
+  if(parts.length!==2||parts.some(part=>!part||!/^[A-Za-z0-9_-]+$/.test(part)))cursorFailure();
+  const bytes=Buffer.from(parts[0],'base64url'),signature=Buffer.from(parts[1],'base64url');
+  if(bytes.toString('base64url')!==parts[0]||signature.toString('base64url')!==parts[1]||signature.length!==32)cursorFailure();
+  const expected=createHmac('sha256',cursorKey).update(bytes).digest();
+  if(!timingSafeEqual(signature,expected))cursorFailure();
+  let value;try{value=JSON.parse(bytes.toString('utf8'));}catch{cursorFailure();}
+  if(!value||Object.keys(value).sort().join(',')!=='binding,inner,protocol'||value.protocol!==CURSOR_PROTOCOL||canonical(value)!==bytes.toString('utf8')||!same(value.binding,binding)||typeof value.inner!=='string'||!value.inner||value.inner.length>16000)cursorFailure();
+  return value.inner;
+}
+function nextContinuation(inner,binding){
+  const bytes=Buffer.from(canonical({protocol:CURSOR_PROTOCOL,binding,inner}));
+  const cursor=bytes.toString('base64url')+'.'+createHmac('sha256',cursorKey).update(bytes).digest('base64url');
+  if(cursor.length>16000)cursorFailure();
+  return cursor;
+}
 function pendingHandoff(tx,row,viewer,isFounder){
   const raw=row.value;
   if(raw.kind!=='peer_handoff_v1')return null;
@@ -220,15 +250,17 @@ function pendingHandoff(tx,row,viewer,isFounder){
   }
 }
 
-export function pendingHandoffs(tx,principal,control,args={}){
+export function pendingHandoffs(tx,principal,control,args={},source=null){
   object(args,['family','scope','limit','cursor'],'pending intake request');
   const family=args.family??'work_items',limit=args.limit??20;
   if(!['work_items','tasks','proposals','messages'].includes(family)||!Number.isSafeInteger(limit)||limit<1||limit>50)fail('INVALID_INPUT','Supported intake family and limit 1..50 required');
   const viewer=actualPrincipal(tx,principal),company=actualControl(tx,control),isFounder=viewer.id===company.value.founder_principal_id&&viewer.value.kind==='founder';
-  const selected={limit,status:family==='tasks'?'returned':family==='proposals'?'proposed':'pending',...(args.scope===undefined?{}:{scope:text(args.scope,'scope',160)}),...(args.cursor===undefined?{}:{cursor:text(args.cursor,'cursor',16000)})};
+  const selected={limit,status:family==='tasks'?'returned':family==='proposals'?'proposed':'pending',...(args.scope===undefined?{}:{scope:text(args.scope,'scope',160)})};
   if(!isFounder&&['work_items','proposals'].includes(family))selected.principal_id=viewer.id;
+  const namespace=source===null?null:cursorSource(source),binding={source:namespace,receiver:reference('principals',viewer),control:reference('control',company),selector:{family,scope:args.scope??null,view_mode:isFounder?'founder':'receiver'}};
+  if(args.cursor!==undefined){if(!namespace)cursorFailure();selected.cursor=continuation(args.cursor,binding);}
   const page=tx.list(family,selected);
-  if(!page||!Array.isArray(page.items)||page.items.length>limit||!Number.isSafeInteger(page.total)||page.total<page.items.length||page.total>10000||typeof page.complete!=='boolean'||page.complete&&page.next_cursor!==null||!page.complete&&(!page.items.length||typeof page.next_cursor!=='string'||page.next_cursor===args.cursor))fail('LOOKUP_INCOMPLETE','Complete bounded candidate page required');
+  if(!page||!Array.isArray(page.items)||page.items.length>limit||!Number.isSafeInteger(page.total)||page.total<page.items.length||page.total>10000||typeof page.complete!=='boolean'||page.complete&&page.next_cursor!==null||!page.complete&&(!page.items.length||typeof page.next_cursor!=='string'||page.next_cursor===selected.cursor))fail('LOOKUP_INCOMPLETE','Complete bounded candidate page required');
   const items=[];
   for(const row of page.items){
     let item=null;const value=row.value;
@@ -244,5 +276,6 @@ export function pendingHandoffs(tx,principal,control,args={}){
     }
     if(item)items.push(item);
   }
-  return {items,scanned_count:page.items.length,total_candidates:page.total,complete:page.complete,next_cursor:page.next_cursor};
+  if(!page.complete&&!namespace)cursorFailure();
+  return {items,scanned_count:page.items.length,total_candidates:page.total,complete:page.complete,next_cursor:page.complete?null:nextContinuation(page.next_cursor,binding)};
 }
