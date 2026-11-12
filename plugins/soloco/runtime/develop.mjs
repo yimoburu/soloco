@@ -10,6 +10,7 @@ import { VERSION, V018_GOVERNANCE_SHA256, V019_GOVERNANCE_SHA256, V020_GOVERNANC
 import { contextMatches, supplementalMatches } from './context.mjs';
 import { sandboxCapability, runLocalTests, validationEnvironment } from './local-sandbox.mjs';
 import { developmentLimits, assertByteBudget, developmentTransportBudget } from './development-limits.mjs';
+import {developmentCandidateFiles} from './development-footprint.mjs';
 import { reconstructPatch, validText } from './development-patch.mjs';
 import {inheritSnapshots} from './snapshot.mjs';
 import {resourceClaims} from './state-projections.mjs';
@@ -114,7 +115,7 @@ export function developmentBundle(s,job,artifact,root=process.cwd()) {
     return {path:f.path,content};
   }).sort((a,b)=>a.path.localeCompare(b.path));
   if(JSON.stringify(changed.map(f=>f.path).sort())!==JSON.stringify(scope.write_paths))throw new Error('Output must match every permitted write path exactly');
-  const files=[...scope.sources.filter(f=>!scope.write_paths.includes(f.path)).map(({path,content})=>({path,content})),...changed].sort((a,b)=>a.path.localeCompare(b.path));
+  const files=developmentCandidateFiles(scope.sources,scope.write_paths,changed);
   const candidate_bytes=assertByteBudget(files,scope.max_bytes,'Candidate');
   return {type:'candidate',plan_id:p.id,scope_sha256:p.development.scope_sha256,files,
     candidate_sha256:digest(JSON.stringify(files)),generation:{format,generated_bytes,candidate_bytes,source_bytes:Buffer.byteLength(JSON.stringify(scope.sources)),...(format==='patches'?{patches:output,patch_sha256:digest(JSON.stringify(output))}:{})},
