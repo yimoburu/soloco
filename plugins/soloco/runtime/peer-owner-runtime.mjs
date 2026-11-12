@@ -14,7 +14,12 @@ import {legacyEncodedReplyBytes} from './peers/legacy-origin.mjs';
 
 const MAINTENANCE_URL=new URL('./peers/maintenance-launch.mjs',import.meta.url);
 const MAX_REPLY=24576,MAX_REQUEST=100000;
-const fail=(code,message=code)=>{throw Object.assign(Error(message),{code});};
+const storageChanges=new WeakSet();
+const fail=(code,message=code==='OWNER_STORAGE_LINK'?'OWNER_STORAGE_LINK: linked company storage is unsupported':code)=>{
+ const error=Object.assign(Error(message),{code});
+ if(code==='OWNER_STORAGE_CHANGED')storageChanges.add(error);
+ throw error;
+};
 const need=(yes,code)=>{if(!yes)fail(code);};
 const copy=v=>JSON.parse(canonical(v));
 const same=(a,b)=>canonical(a)===canonical(b);
@@ -127,6 +132,9 @@ function openedOriginalFile(pin){
  }
 }
 function layout(db){
+ // Connection-local only, matching the existing legacy Store's finite wait.
+ // A readonly schema probe may meet an ordinary concurrent legacy writer.
+ db.exec('PRAGMA busy_timeout=5000;');
  const names=new Set(db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(r=>r.name)),peer=[...names].some(n=>n.startsWith('peer_'));
  let version=null;
  if(names.has('company_layout')){const rows=db.prepare('SELECT id,version FROM company_layout').all();need(rows.length===1&&rows[0].id===1&&Number.isSafeInteger(rows[0].version),'OWNER_STORAGE_LAYOUT');version=rows[0].version;}
@@ -156,6 +164,15 @@ export function peerOwnerStorageKind(root){
  need(fs.realpathSync(root)===canonicalRoot,'OWNER_STORAGE_CHANGED');
  if(found?.kind!=='peer')return null;
  noLinks(root);return 'peer';
+}
+// Unqualified routing DATA only. Discard a failed readonly classification and
+// reopen from scratch; never repeat an actual operation or trust its old DB.
+// Error strings/codes/provider lookalikes cannot authorize this bounded retry.
+export function peerOwnerRoutingStorageKind(root){
+ for(let attempt=0;attempt<3;attempt++){
+  try{return peerOwnerStorageKind(root);}
+  catch(error){if(!storageChanges.has(error)||attempt===2)throw error;}
+ }
 }
 async function withLedger(root,readOnly,invoke){
  const found=storagePreflight(root);need(found?.kind==='peer','OWNER_PEER_ADOPTION_REQUIRED');const {where}=found,pin=pinned(where);let db;

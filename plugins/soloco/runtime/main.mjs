@@ -16,7 +16,7 @@ import { MIN_EXECUTION_TIMEOUT_MS, MAX_EXECUTION_TIMEOUT_MS } from './timeout.mj
 import {watchRuntimeHosts} from './task-runtime.mjs';
 import {peerRuntimeFields,stopPeerRuntimeHosts} from './peer-runtime.mjs';
 import {peerAdoptionToolSchema} from './peer-adoption-runtime.mjs';
-import {peerOwnerToolSchema,peerOwnerStorageKind} from './peer-owner-runtime.mjs';
+import {peerOwnerToolSchema,peerOwnerRoutingStorageKind} from './peer-owner-runtime.mjs';
 import {peerOriginToolSchema} from './peer-origin-runtime.mjs';
 import {runWithMcpHostContext,mcpCallerDiagnostic} from './mcp-host-context.mjs';
 import {toolError} from './tool-error.mjs';
@@ -191,7 +191,7 @@ export function hook(input,host) {
   const intent=/\b(start|run|create|resume)\b.{0,60}\b(company|startup|virtual team)\b/i.test(input.prompt??'');
   if(!hasCompany && !empty && !intent) return {};
   engine.bind(root,input.session_id,host);
-  if(hasCompany&&peerOwnerStorageKind(root)==='peer'){
+  if(hasCompany&&peerOwnerRoutingStorageKind(root)==='peer'){
     // Lifecycle input is an unqualified routing hint. Actual peer access still
     // requires the HOST tools/call metadata and the current managed-hook check.
     const pauseRequested=input.hook_event_name==='UserPromptSubmit'&&/^(?:please\s+)?pause(?:\s+(?:the\s+)?company)?[.!]?$/i.test((input.prompt??'').trim());
