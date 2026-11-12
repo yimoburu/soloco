@@ -135,3 +135,76 @@ adoption, the fixed distinct-context native bridge/drain producer, actual hook
 identity capture and layout5 successor instruction loading, and the shared
 model fence on ordinary grants/admission/publication while the incoming owner
 is pending or activated-but-paused. No installed-team fallback is permitted.
+
+## Changed pending subjects
+
+Original protected observations and required notices may legitimately change the
+business source while custody is pending. The original frozen subject remains
+immutable. Direct reconstruction against stale facts continues to Hold; refresh
+is an explicit attributed disposition under the original owner epoch and limits.
+
+| Lifecycle method | Source behavior |
+| --- | --- |
+| `previewSubjectRefresh({epoch})` | Read-only candidate hash, prior subject, current-head commitment and unchanged authority limits. |
+| `readSubjectRefresh({epoch, preview_sha256, offset, length})` | Complete bounded candidate ranges; no delivery credit or mutation. |
+| `refreshSubject({operation_id, epoch, source_instruction, previous_subject_ref, preview_sha256})` | Recomputes the exact candidate in the owning transaction and rejects any intervening change. Records the old/new subject and limits, then returns custody to pending. |
+| `readPreviousSubject({epoch, subject_ref, offset, length})` | Retrieves an immutable prior subject without satisfying current delivery. |
+
+The replacement subject excludes this handover's exact source-owned coordination
+rows and uses its checked original overrides. Actual changed business rows and
+their complete reachable immutable evidence remain material. Current pin,
+reviewer, grant, budget, worker capacity and original deadline checks still apply.
+Reserved/running reviews must record original uncertainty before refresh; refresh
+releases nothing and renews no allowance.
+
+Refresh clears current delivery and recovery binding. A superseded reconstruction
+stays retrievable because existing UNKNOWN recovery needs its immutable original.
+The new subject must be completely read, followed by a changed reconstruction or
+recovery disposition and fresh independent exact-subject review. An activated but
+paused owner returns to pending; its old acceptance cannot qualify the new subject.
+
+```mermaid
+flowchart LR
+  A[Changed source: Hold] --> B[Explicit checked preview and refresh]
+  B --> C[Pending: complete new delivery]
+  C --> D[New reconstruction or recovery]
+  D --> E[Fresh independent review]
+  E --> F[Activated and paused]
+  F --> G[Dedicated resume]
+```
+
+An exact refresh replay returns its original DATA only while the same fresh
+custodian and current replacement subject remain bound. It resets no coverage
+or limits. Later source changes remain held; a later replacement or expiry cannot
+be cleared by replaying an earlier refresh receipt.
+
+The narrow `peer-owner-subject-context-pool-v1` format preserves every original
+current/history row and its hash. Repeated valid task contexts share one complete
+structured value; their redundant text is restored as exact canonical JSON.
+Closed reference/escape descriptors distinguish literal business objects from
+encoding syntax. Decode verifies all row hashes, full source digest, character
+count and UTF-8 bytes. This is lossless source delivery, not a summary, qualified
+frontier or permission. The delivered encoded subject and QA context retain their
+existing 64 KiB bounds. Subject preparation is separately bounded to 16 MiB and
+10,000 rows; inability to represent the complete source still Holds.
+
+## Fixed wire preflight
+
+The fixed deployment must provide original opaque wire plans and a fixed owner
+instruction containing `PEER_OWNER_CONTEXT_POOL_INSTRUCTION`. Caller instructions,
+validator callbacks or JSON readiness cannot replace those source producers.
+
+Begin performs feasibility preflight before its first planned custody mutation.
+Unknown future reconstruction/history means this is never final QA readiness.
+Maintenance admission performs mandatory exact preflight of the final canonical
+context and predicted immutable references before its first planned put, slot or
+accounting charge. It stores the commitment in the original admission and keeps
+the opaque plan in its private capsule. Missing preflight support Holds both
+boundaries. The fixed host must reproduce/assert that plan and instruction before
+birth/send; native/helper integration remains separate.
+
+`prepareOriginalPeerOwnerMaintenanceContext` returns the wire commitment along
+with its exact readonly framing DATA. The trusted-only
+`originalPeerOwnerMaintenanceWirePlan(capability)` returns the original opaque
+plan after validating the live capsule. Neither API grants new model authority,
+native delivery, acceptance, closure or an additional attempt.

@@ -43,3 +43,10 @@ Same-owner pause/resume retains its existing behavior. Owner-control source
 fixtures with explicitly synthetic native seams establish source mechanics
 only. They do not establish deployed native qualification, adoption or operating
 readiness for an existing company.
+
+Cached ordinary-command replay now depends on readable current owner control.
+The owner proof precedes the business receipt lookup, including when the company
+currently has no handover marker. An unreadable control provider propagates its
+original failure and leaves SQL state unchanged. Healthy replay still returns
+the original receipt; it creates no new authority or work. The older promise of
+control-independent replay does not apply to this owner-aware boundary.

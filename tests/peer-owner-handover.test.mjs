@@ -22,7 +22,14 @@ fs.writeFileSync(path.join(directory,'model.mjs'),`export * from ${JSON.stringif
 // Fictional source-only original-origin acceptance; actual model stays held.
 export function assertPeerLegacyOriginReady(tx){const c=tx.get('control','company');if(c.value.synthetic_block_origin)throw Object.assign(Error('LEGACY_ORIGIN_HOLD'),{code:'LEGACY_ORIGIN_HOLD'});}
 `);
-fs.writeFileSync(path.join(directory,'deployment.mjs'),`export function inspectOriginalOwnerMaintenanceSupport(){return {protocol:'peer-owner-maintenance-assignment-v1',bridge_sha256:'a'.repeat(64),synthetic_source_test:true};}`);
+fs.writeFileSync(path.join(directory,'deployment.mjs'),`import {createHash} from 'node:crypto';
+import {PEER_OWNER_CONTEXT_POOL_INSTRUCTION} from ${JSON.stringify(url(path.join(peers,'owner-context-pool.mjs')))};
+const hash=value=>createHash('sha256').update(value).digest('hex'),plans=new WeakMap();
+export const OWNER_MAINTENANCE_INSTRUCTION='SYNTHETIC source-only fixed owner instruction. '+PEER_OWNER_CONTEXT_POOL_INSTRUCTION;
+export function inspectOriginalOwnerMaintenanceSupport(){return {protocol:'peer-owner-maintenance-assignment-v1',bridge_sha256:'a'.repeat(64),synthetic_source_test:true};}
+export function preflightOriginalOwnerMaintenanceContext({text,native_id}){const input=OWNER_MAINTENANCE_INSTRUCTION+'\\n'+text,frame=JSON.stringify({kind:'owner-maintenance',native_id,input}),plan=Object.freeze({});if(Buffer.byteLength(input)>100000)throw Object.assign(Error('SYNTHETIC fixed wire capacity'),{code:'OWNER_WIRE_CAPACITY'});plans.set(plan,{context_sha256:hash(text),native_id,instruction_sha256:hash(OWNER_MAINTENANCE_INSTRUCTION),frame_sha256:hash(frame),input_utf8_bytes:Buffer.byteLength(input),whole_rpc_utf8_bytes:Buffer.byteLength(JSON.stringify({jsonrpc:'2.0',id:1,method:'owner',params:{frame}})),frame_bytes:100000,wire_bytes:4000000,recipe_sha256:hash('SYNTHETIC fixed owner recipe')});return plan;}
+export function inspectOriginalOwnerMaintenancePreflight(plan){if(!plans.has(plan))throw Object.assign(Error('SYNTHETIC original wire plan required'),{code:'OWNER_WIRE_ORIGINAL_REQUIRED'});return structuredClone(plans.get(plan));}
+`);
 fs.writeFileSync(path.join(directory,'domain.mjs'),`
 const tokens=new WeakMap(),diagnostics=new WeakMap();
 export function mintSyntheticDrain(ledger,data){const token=Object.freeze({});tokens.set(token,{ledger,data});return token;}
@@ -31,7 +38,7 @@ export function assertOriginalProtectedOwnedTaskDiagnostic(token,{ledger,admissi
 export function assertOriginalProtectedOwnedTaskDrain(token,{ledger,admission_ref,context_sha256,kind}){const r=tokens.get(token);if(!r||r.ledger!==ledger||JSON.stringify(r.data.admission_ref)!==JSON.stringify(admission_ref)||r.data.context_sha256!==context_sha256||r.data.kind!==kind)throw Object.assign(Error('ORIGINAL_DRAIN_REQUIRED'),{code:'ORIGINAL_DRAIN_REQUIRED'});return r.data;}
 `);
 let relocated=fs.readFileSync(source,'utf8');
-for(const [name,target]of [['ledger',url(path.join(peers,'ledger.mjs'))],['model',url(path.join(directory,'model.mjs'))],['context-component-deployment',url(path.join(directory,'deployment.mjs'))],['review-selection',url(path.join(peers,'review-selection.mjs'))],['legacy-origin',url(path.join(peers,'legacy-origin.mjs'))],['owner-operating-state',url(path.join(peers,'owner-operating-state.mjs'))],['protected-codex-domain',url(path.join(directory,'domain.mjs'))]])relocated=relocated.replaceAll(`'./${name}.mjs'`,JSON.stringify(target));
+for(const [name,target]of [['ledger',url(path.join(peers,'ledger.mjs'))],['model',url(path.join(directory,'model.mjs'))],['context-component-deployment',url(path.join(directory,'deployment.mjs'))],['review-selection',url(path.join(peers,'review-selection.mjs'))],['legacy-origin',url(path.join(peers,'legacy-origin.mjs'))],['owner-operating-state',url(path.join(peers,'owner-operating-state.mjs'))],['owner-context-pool',url(path.join(peers,'owner-context-pool.mjs'))],['protected-codex-domain',url(path.join(directory,'domain.mjs'))]])relocated=relocated.replaceAll(`'./${name}.mjs'`,JSON.stringify(target));
 fs.writeFileSync(path.join(directory,'owner.mjs'),relocated);
 const core=await import(url(path.join(directory,'owner.mjs'))),domain=await import(url(path.join(directory,'domain.mjs')));
 test.after(()=>fs.rmSync(directory,{recursive:true,force:true}));

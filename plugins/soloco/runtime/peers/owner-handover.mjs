@@ -8,9 +8,13 @@ import * as deployment from './context-component-deployment.mjs';
 import {parseReviewOutput} from './review-selection.mjs';
 import {inspectPeerPinnedTeamFrom} from './legacy-origin.mjs';
 import {inspectPeerOwnerOperatingState} from './owner-operating-state.mjs';
+import {encodePeerOwnerSubject,decodePeerOwnerSubject,PEER_OWNER_CONTEXT_POOL_INSTRUCTION} from './owner-context-pool.mjs';
 
 const PROTOCOL='peer-owner-handover-v1',CONTEXT='peer-owner-maintenance-assignment-v1';
 const MAX_ROWS=10000,MAX_SUBJECT=65536,MAX_RECONSTRUCTION=8192,READ_UNITS=1024;
+// Local read preparation only. Delivered subject/context and native wire limits
+// remain unchanged; exceeding either bound Holds rather than dropping evidence.
+const MAX_SUBJECT_PREPARATION=16*1024*1024;
 const lifecycles=new WeakMap(),maintenance=new WeakMap();
 class OwnerError extends Error{}
 const fail=code=>{throw Object.assign(new OwnerError(code),{code});};
@@ -71,15 +75,29 @@ function support(){
  const value=deployment.inspectOriginalOwnerMaintenanceSupport();
  need(value?.protocol===CONTEXT&&sha(value.bridge_sha256),'OWNER_REVIEW_SOURCE_UNAVAILABLE');return copy(value);
 }
-function snapshot(tx,record,incoming){
+function wirePreflight(textValue,nativeId){
+ need(typeof deployment.preflightOriginalOwnerMaintenanceContext==='function'&&typeof deployment.inspectOriginalOwnerMaintenancePreflight==='function'&&typeof deployment.OWNER_MAINTENANCE_INSTRUCTION==='string','OWNER_WIRE_PREFLIGHT_UNAVAILABLE');
+ need(deployment.OWNER_MAINTENANCE_INSTRUCTION.includes(PEER_OWNER_CONTEXT_POOL_INSTRUCTION),'OWNER_WIRE_INSTRUCTION_CHANGED');
+ const plan=deployment.preflightOriginalOwnerMaintenanceContext({text:textValue,native_id:nativeId}),value=deployment.inspectOriginalOwnerMaintenancePreflight(plan);
+ need(value&&value.context_sha256===model.digest(textValue)&&value.native_id===nativeId&&value.instruction_sha256===model.digest(deployment.OWNER_MAINTENANCE_INSTRUCTION)&&sha(value.frame_sha256)&&sha(value.recipe_sha256)&&value.frame_bytes===100000&&value.wire_bytes===4000000&&Number.isSafeInteger(value.input_utf8_bytes)&&value.input_utf8_bytes>0&&value.input_utf8_bytes<=value.frame_bytes&&Number.isSafeInteger(value.whole_rpc_utf8_bytes)&&value.whole_rpc_utf8_bytes>0&&value.whole_rpc_utf8_bytes<=value.wire_bytes,'OWNER_WIRE_PREFLIGHT_CHANGED');
+ return {plan,commitment:copy(value)};
+}
+function predicted(family,id,value){return {family,id,revision:1,sha256:peerDigest(value)};}
+function snapshot(tx,record,incoming,refresh=null){
  const current=[],historical=[],queue=[],seen=new Set();let total=0;
  const add=(family,row,target)=>{
   const r=ref(family,row),k=canonical(r);if(seen.has(k))return;seen.add(k);need(seen.size<=MAX_ROWS,'OWNER_SUBJECT_CAPACITY');
   const item={...r,value:copy(row.value)};
   if(row.value.source?.kind==='legacy'){need(typeof tx.resolveLegacy==='function','OWNER_LEGACY_SOURCE_REQUIRED');item.legacy_value=tx.resolveLegacy({sha256:row.value.source.sha256});need(item.legacy_value!==undefined,'OWNER_LEGACY_SOURCE_REQUIRED');}
-  total+=bytes(item);need(total<=MAX_SUBJECT,'OWNER_SUBJECT_CAPACITY');target.push(item);queue.push(item.value);if(item.legacy_value!==undefined)queue.push(item.legacy_value);
+  total+=bytes(item);need(total<=(refresh?MAX_SUBJECT_PREPARATION:MAX_SUBJECT),'OWNER_SUBJECT_CAPACITY');target.push(item);queue.push(item.value);if(item.legacy_value!==undefined)queue.push(item.legacy_value);
  };
- for(const family of FAMILIES)for(const row of all(tx,family))add(family,row,current);
+ const allowed=new Set((refresh?.value.own_keys??[]).map(([f,id])=>key(f,id)));
+ for(const family of FAMILIES)for(const actual of all(tx,family)){
+  if(allowed.has(key(family,actual.id)))continue;
+  const replacement=refresh?.value.expected_overrides.find(o=>o.family===family&&o.id===actual.id);
+  if(replacement){need(same(ref(family,actual),replacement.current),'OWNER_SUBJECT_CHANGED');if(replacement.original)add(family,exact(tx,replacement.original),current);}
+  else add(family,actual,current);
+ }
  const walk=value=>{
   if(!value||typeof value!=='object')return;
   if(!Array.isArray(value)&&FAMILIES.includes(value.family)&&text(value.id,2000)&&Number.isSafeInteger(value.revision)&&value.revision>0&&sha(value.sha256)){
@@ -88,7 +106,8 @@ function snapshot(tx,record,incoming){
   for(const child of Object.values(value))walk(child);
  };
  for(let i=0;i<queue.length;i++)walk(queue[i]);
- const body={protocol:'peer-owner-subject-v1',company_id:record.connection.company_id,root_sha256:model.digest(record.connection.root),incoming,current,historical};
+ let body={protocol:'peer-owner-subject-v1',company_id:record.connection.company_id,root_sha256:model.digest(record.connection.root),incoming,current,historical};
+ if(refresh){const original=body;body=encodePeerOwnerSubject(original);need(same(decodePeerOwnerSubject(body),original),'OWNER_SUBJECT_ENCODING_INVALID');}
  need(bytes(body)<=MAX_SUBJECT,'OWNER_SUBJECT_CAPACITY');return {body,text:canonical(body),sha256:peerDigest(body),heads:current.map(({value,legacy_value,...r})=>r)};
 }
 function currentSubject(tx,h){
@@ -101,7 +120,26 @@ function currentSubject(tx,h){
   else heads.push(ref(family,row));
  }
  need(same(heads,v.base_heads),'OWNER_SUBJECT_CHANGED');
- const s=exact(tx,v.subject_ref);need(s.value.sha256===v.subject_sha256&&peerDigest(s.value.body)===v.subject_sha256&&canonical(s.value.body)===s.value.text,'OWNER_SOURCE_CHANGED');return s;
+ const s=exact(tx,v.subject_ref);need(s.value.sha256===v.subject_sha256&&peerDigest(s.value.body)===v.subject_sha256&&canonical(s.value.body)===s.value.text,'OWNER_SOURCE_CHANGED');
+ if(s.value.body.protocol==='peer-owner-subject-context-pool-v1')decodePeerOwnerSubject(s.value.body);return s;
+}
+function refreshAuthority(record,tx,epoch){
+ const {c,p:owner}=current(record,tx,epoch,{pending:true}),h=handover(tx,c);fresh(h);
+ need(c.value.paused===true&&h.value.epoch===epoch&&same(h.value.incoming,record.actor)&&['pending','reconstructed','recovery-held','activated'].includes(h.value.status),'OWNER_HANDOVER_CLOSED');
+ need(same(inspectPeerPinnedTeamFrom(tx,{company_id:record.connection.company_id}),h.value.pinned_team),'OWNER_PINNED_TEAM_CHANGED');
+ const originalGrant=exact(tx,h.value.review_grant),{p:reviewer,g}=reviewGrant(tx,originalGrant.id,originalGrant.value.generation,h.value.reviewer.id);
+ need(same(ref('principals',reviewer),h.value.reviewer),'OWNER_REVIEW_CHANGED');independent(tx,owner,reviewer,record.actor.native_id);
+ return {c,owner,h,reviewer,g};
+}
+function refreshPreview(record,tx,epoch){
+ const state=refreshAuthority(record,tx,epoch),{c,owner,h,reviewer,g}=state;
+ need(h.value.used_review_calls<h.value.max_review_calls,'OWNER_REVIEW_BUDGET');
+ need(!h.value.review_history.some(e=>['reserved','running'].includes(tx.get('work_items',e.phase_id)?.value.status)),'OWNER_REVIEW_UNCLOSED');
+ const capacity=reviewCapacity(tx,c,reviewer,g),subject=snapshot(tx,record,record.actor,h);
+ need(!same(subject.heads,h.value.base_heads)&&subject.sha256!==h.value.subject_sha256,'OWNER_SUBJECT_UNCHANGED');
+ const authority={original_deadline_at_ms:h.value.expires_at_ms,original_review_cap:h.value.max_review_calls,used_review_calls:h.value.used_review_calls,original_grant_ref:h.value.review_grant,current_grant_ref:ref('grants',g),reviewer_ref:ref('principals',reviewer),policy_generation:c.value.policy_generation,worker_cap:c.value.policy.worker_cap,remaining_grant_calls:g.value.max_model_calls-capacity.used,remaining_global_calls:c.value.policy.max_model_calls-capacity.global.used,remaining_personal_calls:(c.value.policy.principal_model_calls??c.value.policy.max_model_calls)-capacity.personal.used};
+ const binding={protocol:'peer-owner-subject-refresh-preview-v1',connection:record.connection,handover_ref:ref('work_items',h),epoch,previous_subject_ref:h.value.subject_ref,previous_subject_sha256:h.value.subject_sha256,target_subject_sha256:subject.sha256,source_heads_sha256:peerDigest(subject.heads),authority};
+ return {...state,capacity,subject,authority,preview_sha256:peerDigest(binding)};
 }
 function complete(ranges,length){let end=0;for(const r of [...ranges].sort((a,b)=>a.offset-b.offset)){if(r.offset>end)return false;end=Math.max(end,r.offset+r.length);}return end===length;}
 function merge(ranges,part){const result=[];for(const r of [...ranges,{offset:part.offset,length:part.length}].sort((a,b)=>a.offset-b.offset)){const last=result.at(-1);if(last&&r.offset<=last.offset+last.length)last.length=Math.max(last.offset+last.length,r.offset+r.length)-last.offset;else result.push({...r});}need(result.length<=128,'OWNER_READ_CAPACITY');return result;}
@@ -206,18 +244,54 @@ export function createPeerOwnerLifecycle({ledger,actor}){
     // owner; no preview/hash-only packet can pass a too-large subject.
     need(bytes({protocol:CONTEXT,subject:subject.body,reconstruction:'x'.repeat(MAX_RECONSTRUCTION),prior_attempts:[],authority:{source:native}})+4096<=Math.min(MAX_SUBJECT,c.value.policy.max_context_bytes),'OWNER_QA_CONTEXT_CAPACITY');
     const epoch=old.epoch+1,generation=p.value.generation+1;need(Number.isSafeInteger(epoch)&&Number.isSafeInteger(generation),'OWNER_GENERATION_CAPACITY');
+    const subjectValue={kind:'owner_handover_subject',body:subject.body,text:subject.text,sha256:subject.sha256},subjectRef=predicted('work_items',subjectId,subjectValue);
+    // This checks feasibility only. The actual future reconstruction, history
+    // and immutable admission receive a separate exact preflight before charge.
+    const feasibilityContext={protocol:CONTEXT,connection:copy(record.connection),owner_handover_id:id,owner_epoch:epoch,subject:{ref:subjectRef,sha256:subject.sha256,body:subject.body},reconstruction:{ref:{family:'work_items',id:id+':reconstruction:'+('f'.repeat(64)),revision:1,sha256:'f'.repeat(64)},sha256:model.digest('x'.repeat(MAX_RECONSTRUCTION)),content:'x'.repeat(MAX_RECONSTRUCTION),incoming:a},reviewer:{principal_ref:ref('principals',reviewer),native_id:reviewer.value.native_id},prior_attempts:[],prior_reconstructions:[],recovery_dispositions:[],prior_external_attempts:[],late_obligations:[],subject_refreshes:[],authority:{grant_ref:ref('grants',g),expires_at:new Date(expires).toISOString()}};
+    const feasibility=wirePreflight(canonical(feasibilityContext),reviewer.value.native_id);
     const revoked=tx.put('principals',p.id,{...p.value,status:'revoked',generation,revoked_for:id});
     const incoming=tx.put('principals',p.id,{...p.value,status:'pending',generation,native_id:a.native_id,host:a.host,legacy_owner:{host:a.host,session_id:a.session_id,epoch},membership_previous:ref('principals',revoked),owner_handover:id});
     const controlled=tx.put('control',c.id,{...c.value,paused:true,pause_generation:c.value.pause_generation+1,owner_handover:{id,epoch}});
-    const source=tx.put('work_items',subjectId,{kind:'owner_handover_subject',body:subject.body,text:subject.text,sha256:subject.sha256});
+    const source=tx.put('work_items',subjectId,subjectValue);need(same(ref('work_items',source),subjectRef),'OWNER_PLAN_CHANGED');
     const h={protocol:PROTOCOL,status:'pending',company_id:record.connection.company_id,pinned_team:pinned,founder_id:p.id,begin_operation_id:input.operation_id,previous_owner:copy(old),incoming:a,epoch,expires_at_ms:expires,
      expected_overrides:[{family:'control',id:c.id,original:ref('control',c),current:ref('control',controlled)},{family:'principals',id:p.id,original:ref('principals',p),current:ref('principals',incoming)}],base_heads:subject.heads,
-     subject_ref:ref('work_items',source),subject_sha256:subject.sha256,native_source:native,reviewer:ref('principals',reviewer),review_grant:ref('grants',g),max_review_calls:max,used_review_calls:0,
+     subject_ref:ref('work_items',source),subject_sha256:subject.sha256,native_source:native,begin_wire_feasibility:{stage:'feasibility-only',final_context:false,commitment:feasibility.commitment},reviewer:ref('principals',reviewer),review_grant:ref('grants',g),max_review_calls:max,used_review_calls:0,
      reads:[],reconstruction_ref:null,reconstruction_history:[],review_history:[],recovery_ref:null,recovery_history:[],recovery_delivery:null,own_keys:[['work_items',id],['work_items',subjectId]]};
     const result={handover_id:id,status:'pending',epoch,paused:true,subject_sha256:subject.sha256};const cmd=command(record,tx,'handover.begin',input,result,{id});h.begin_command_ref=ref('commands',tx.get('commands',cmd.id));own(h,'commands',cmd.id);tx.put('work_items',id,h);
     tx.event('owner.outgoing_revoked',{previous:ref('principals',p),revoked:ref('principals',revoked),incoming:ref('principals',incoming),source_instruction:input.source_instruction});return result;
    });},
-  inspect(args){const input=data(args,['epoch']);bound(record);return ledger.read(raw=>{const {provider:tx,failures}=providerFailures(raw),{c}=current(record,tx,input.epoch,{pending:true}),h=handover(tx,c);let held=null;try{fresh(h);currentSubject(tx,h);}catch(error){if(failures.has(error)||!((error instanceof OwnerError&&['OWNER_HANDOVER_EXPIRED','OWNER_SUBJECT_CHANGED','OWNER_SOURCE_CHANGED','OWNER_PINNED_TEAM_CHANGED'].includes(error.code))||['PEER_PINNED_TEAM_REQUIRED','PEER_PINNED_TEAM_CHANGED','LEGACY_PINNED_TEAM_REQUIRED','LEGACY_PINNED_TEAM_CHANGED'].includes(error.code)))throw error;held=error.code;}const s=exact(tx,h.value.subject_ref);return {protocol:PROTOCOL,handover_id:h.id,status:h.value.status,epoch:h.value.epoch,paused:c.value.paused,held,subject_sha256:h.value.subject_sha256,total_characters:s.value.text.length,reconstruction_ref:h.value.reconstruction_ref,review_history:h.value.review_history,expires_at_ms:h.value.expires_at_ms,used_review_calls:h.value.used_review_calls,max_review_calls:h.value.max_review_calls,physical_closure:'UNKNOWN'};});},
+  previewSubjectRefresh(args){const input=data(args,['epoch']);bound(record);return ledger.read(raw=>{
+   const preview=refreshPreview(record,{...raw,connection:record.connection},input.epoch);
+   return {protocol:'peer-owner-subject-refresh-preview-v1',handover_id:preview.h.id,epoch:input.epoch,previous_subject_ref:preview.h.value.subject_ref,previous_subject_sha256:preview.h.value.subject_sha256,target_subject_sha256:preview.subject.sha256,preview_sha256:preview.preview_sha256,total_characters:preview.subject.text.length,utf8_bytes:Buffer.byteLength(preview.subject.text),original_deadline_at_ms:preview.h.value.expires_at_ms,max_review_calls:preview.h.value.max_review_calls,used_review_calls:preview.h.value.used_review_calls,authority:preview.authority};
+  });},
+  readSubjectRefresh(args){const input=data(args,['epoch','preview_sha256','offset','length']);bound(record);return ledger.read(raw=>{
+   const preview=refreshPreview(record,{...raw,connection:record.connection},input.epoch);need(input.preview_sha256===preview.preview_sha256,'OWNER_SUBJECT_REFRESH_CHANGED');
+   const part=range(preview.subject.text,input.offset,input.length);return {preview_sha256:preview.preview_sha256,subject_sha256:preview.subject.sha256,...part,next_offset:part.offset+part.length,complete:part.offset+part.length===preview.subject.text.length};
+  });},
+  readPreviousSubject(args){const input=data(args,['epoch','subject_ref','offset','length']);bound(record);return ledger.read(raw=>{
+   const tx={...raw,connection:record.connection},{c}=current(record,tx,input.epoch,{pending:true}),h=handover(tx,c);
+   need((h.value.subject_history??[]).some(r=>same(r,input.subject_ref)),'OWNER_SOURCE_CHANGED');const subject=exact(tx,input.subject_ref);
+   need(subject.value.kind==='owner_handover_subject'&&subject.value.sha256===peerDigest(subject.value.body)&&subject.value.text===canonical(subject.value.body),'OWNER_SOURCE_CHANGED');
+   const part=range(subject.value.text,input.offset,input.length);return {historical:true,subject_ref:input.subject_ref,sha256:subject.value.sha256,...part,next_offset:part.offset+part.length,complete:part.offset+part.length===subject.value.text.length};
+  });},
+  refreshSubject(args){const input=data(args,['operation_id','epoch','source_instruction','previous_subject_ref','preview_sha256']);need(text(input.operation_id,160)&&text(input.source_instruction,4000)&&sha(input.preview_sha256),'OWNER_INPUT');
+   return write(record,'handover.subject-refresh',input,(tx,limit)=>{
+    const state=refreshAuthority(record,tx,input.epoch),{h,owner}=state;limit(Math.min(h.value.expires_at_ms,Date.parse(state.g.value.expires_at)));
+    const prior=command(record,tx,'handover.subject-refresh',input);if(prior.prior){need(same(h.value.subject_ref,prior.prior.subject_ref),'OWNER_REPLAY_MISMATCH');return prior.prior;}
+    need(same(input.previous_subject_ref,h.value.subject_ref),'OWNER_SUBJECT_REFRESH_CHANGED');const preview=refreshPreview(record,tx,input.epoch);need(input.preview_sha256===preview.preview_sha256,'OWNER_SUBJECT_REFRESH_CHANGED');
+    const id=h.id+':subject-refresh:'+peerDigest(input.operation_id),subjectId=id+':subject';need(!tx.get('work_items',id)&&!tx.get('work_items',subjectId),'OWNER_REPLAY_MISMATCH');
+    const subject=tx.put('work_items',subjectId,{kind:'owner_handover_subject',body:preview.subject.body,text:preview.subject.text,sha256:preview.subject.sha256});
+    const disposition=tx.put('work_items',id,{kind:'owner_handover_subject_refresh',protocol:'peer-owner-subject-refresh-v1',owner_handover_id:h.id,incoming:copy(record.actor),epoch:input.epoch,source_instruction:input.source_instruction,preview_sha256:preview.preview_sha256,previous_subject_ref:h.value.subject_ref,previous_subject_sha256:h.value.subject_sha256,subject_ref:ref('work_items',subject),subject_sha256:preview.subject.sha256,source_heads_sha256:peerDigest(preview.subject.heads),previous_reconstruction_ref:h.value.reconstruction_ref,previous_recovery_ref:h.value.recovery_ref,previous_acceptance_ref:owner.value.owner_acceptance??null,authority:preview.authority,authority_extended:false,old_reservations_released:false});
+    const v=copy(h.value);v.subject_history=[...(v.subject_history??[]),v.subject_ref];v.subject_refresh_history=[...(v.subject_refresh_history??[]),ref('work_items',disposition)];need(v.subject_history.length<=MAX_ROWS,'OWNER_SUBJECT_CAPACITY');
+    v.subject_ref=ref('work_items',subject);v.subject_sha256=preview.subject.sha256;v.base_heads=preview.subject.heads;v.status='pending';v.reads=[];v.recovery_ref=null;v.recovery_delivery=null;v.subject_refresh_ref=ref('work_items',disposition);
+    // The predecessor reconstruction remains immutable and superseded by its
+    // old subject hash. UNKNOWN recovery requires it; it cannot qualify this
+    // new subject, and its content must still change before new review.
+    if(owner.value.status==='active'){const pending=tx.put('principals',owner.id,{...owner.value,status:'pending',owner_acceptance_invalidated_by:ref('work_items',disposition)});override(v,'principals',owner,pending);}
+    for(const row of [subject,disposition])own(v,'work_items',row.id);
+    const result={status:'pending',epoch:input.epoch,subject_ref:v.subject_ref,subject_sha256:v.subject_sha256,refresh_ref:v.subject_refresh_ref,authority_extended:false,old_reservations_released:false};const cmd=command(record,tx,'handover.subject-refresh',input,result,h);own(v,'commands',cmd.id);tx.put('work_items',h.id,v);tx.event('owner.pending_subject_refreshed',{refresh_ref:v.subject_refresh_ref,previous_subject_ref:input.previous_subject_ref,subject_ref:v.subject_ref,source_instruction:input.source_instruction});return result;
+   });},
+  inspect(args){const input=data(args,['epoch']);bound(record);return ledger.read(raw=>{const {provider:tx,failures}=providerFailures(raw),{c}=current(record,tx,input.epoch,{pending:true}),h=handover(tx,c);let held=null;try{fresh(h);currentSubject(tx,h);}catch(error){if(failures.has(error)||!((error instanceof OwnerError&&['OWNER_HANDOVER_EXPIRED','OWNER_SUBJECT_CHANGED','OWNER_SOURCE_CHANGED','OWNER_PINNED_TEAM_CHANGED'].includes(error.code))||['PEER_PINNED_TEAM_REQUIRED','PEER_PINNED_TEAM_CHANGED','LEGACY_PINNED_TEAM_REQUIRED','LEGACY_PINNED_TEAM_CHANGED'].includes(error.code)))throw error;held=error.code;}const s=exact(tx,h.value.subject_ref);return {protocol:PROTOCOL,handover_id:h.id,status:h.value.status,epoch:h.value.epoch,paused:c.value.paused,held,subject_sha256:h.value.subject_sha256,total_characters:s.value.text.length,reconstruction_ref:h.value.reconstruction_ref,review_history:h.value.review_history,expires_at_ms:h.value.expires_at_ms,used_review_calls:h.value.used_review_calls,max_review_calls:h.value.max_review_calls,subject_refresh_ref:h.value.subject_refresh_ref??null,subject_history:h.value.subject_history??[],refresh_available:held==='OWNER_SUBJECT_CHANGED'&&c.value.paused===true&&h.value.status!=='resumed',physical_closure:'UNKNOWN'};});},
   read(args){const input=data(args,['operation_id','epoch','sha256','offset','length']);need(text(input.operation_id,160),'OWNER_INPUT');return write(record,'handover.read',input,(tx,limit)=>{const {c}=current(record,tx,input.epoch,{pending:true}),h=handover(tx,c);need(!['activated','resumed'].includes(h.value.status),'OWNER_HANDOVER_CLOSED');fresh(h);limit(h.value.expires_at_ms);const s=currentSubject(tx,h);need(input.sha256===s.value.sha256,'OWNER_SOURCE_CHANGED');const part=range(s.value.text,input.offset,input.length),prior=command(record,tx,'handover.read',input);if(prior.prior)return prior.prior;
     const result={handover_id:h.id,sha256:input.sha256,...part,next_offset:part.offset+part.length,complete:part.offset+part.length===s.value.text.length};need(bytes(result)<16000,'OWNER_READ_CAPACITY');const v=copy(h.value);v.reads=merge(v.reads,part);const cmd=command(record,tx,'handover.read',input,result,h);own(v,'commands',cmd.id);tx.put('work_items',h.id,v);return result;});},
   submit(args){const input=data(args,['operation_id','epoch','subject_sha256','content']);need(text(input.operation_id,160),'OWNER_INPUT');need(text(input.content,MAX_RECONSTRUCTION)&&bytes(input.content)<=MAX_RECONSTRUCTION,'OWNER_RECONSTRUCTION_CAPACITY');return write(record,'handover.submit',input,(tx,limit)=>{const {c}=current(record,tx,input.epoch,{pending:true}),h=handover(tx,c);need(!['activated','resumed'].includes(h.value.status),'OWNER_HANDOVER_CLOSED');fresh(h);limit(h.value.expires_at_ms);const s=currentSubject(tx,h);need(input.subject_sha256===s.value.sha256&&complete(h.value.reads,s.value.text.length),'OWNER_DELIVERY_INCOMPLETE');const prior=command(record,tx,'handover.submit',input);if(prior.prior)return prior.prior;
@@ -264,6 +338,7 @@ function admitted(r,tx){
  recoveryCurrent(tx,h);need(owner.value.status==='pending'&&c.value.paused===true&&h.value.status==='reconstructed'&&h.id===b.owner_handover_id&&same(h.value.reconstruction_ref,b.reconstruction_ref)&&same(h.value.native_source,support()),'OWNER_MAINTENANCE_CHANGED');
  const admission=exact(tx,b.admission_ref),{admission_ref,...body}=b;
  need(admission.value.kind==='owner_maintenance_admission'&&same(admission.value.binding,body),'OWNER_MAINTENANCE_CHANGED');
+ need(r.wire_plan&&same(deployment.inspectOriginalOwnerMaintenancePreflight(r.wire_plan),b.wire_commitment),'OWNER_WIRE_PREFLIGHT_CHANGED');
  const phase=tx.get('work_items',r.phase_id);
  need(phase?.value.kind==='owner_maintenance_phase'&&same(phase.value.admission_ref,b.admission_ref)&&['reserved','running'].includes(phase.value.status),'OWNER_MAINTENANCE_INACTIVE');
  const {p,g}=reviewGrant(tx,b.grant_ref.id,b.grant_generation,b.reviewer_principal_ref.id);
@@ -282,9 +357,14 @@ export function assertOriginalPeerOwnerMaintenance(capability,{ledger}={}){
 export function prepareOriginalPeerOwnerMaintenanceContext(capability){
  const r=original(capability);return r.record.ledger.read(raw=>{
   const {context}=admitted(r,{...raw,connection:r.record.connection});
-  return {text:context.value.text,sha256:context.value.sha256,utf8_bytes:Buffer.byteLength(context.value.text),context_ref:r.binding.context_ref,
+  return {text:context.value.text,sha256:context.value.sha256,utf8_bytes:Buffer.byteLength(context.value.text),context_ref:r.binding.context_ref,wire_commitment:copy(r.binding.wire_commitment),
    review_subject:{protocol:'peer-owner-handover-review-subject-v1',owner_handover_id:r.binding.owner_handover_id,subject_ref:r.binding.subject_ref,subject_sha256:r.binding.subject_sha256,reconstruction_ref:r.binding.reconstruction_ref}};
  });
+}
+// Fixed host composition only: the returned original opaque plan is neither
+// JSON authority nor a public/model tool. It remains bound to this live capsule.
+export function originalPeerOwnerMaintenanceWirePlan(capability){
+ const r=original(capability);assertOriginalPeerOwnerMaintenance(capability);return r.wire_plan;
 }
 
 /** Trusted source-only admission. No caller validator, proof, native identity,
@@ -295,6 +375,7 @@ export function prepareOriginalPeerOwnerMaintenance(lifecycle,args){
  const input=data(args,['operation_id','epoch']);need(text(input.operation_id,160),'OWNER_INPUT');
  const existing=record.caps.get(input.operation_id);
  if(existing){assertOriginalPeerOwnerMaintenance(existing);need(maintenance.get(existing).binding.owner_epoch===input.epoch,'OWNER_REPLAY_MISMATCH');return existing;}
+ let originalWirePlan=null;
  const result=write(record,'maintenance.admit',input,(tx,limit)=>{
   const {c,p:owner}=current(record,tx,input.epoch,{pending:true}),h=handover(tx,c);fresh(h);currentSubject(tx,h);limit(h.value.expires_at_ms);
   need(owner.value.status==='pending'&&c.value.paused===true&&h.value.status==='reconstructed'&&h.value.reconstruction_ref,'OWNER_RECONSTRUCTION_REQUIRED');
@@ -316,15 +397,20 @@ export function prepareOriginalPeerOwnerMaintenance(lifecycle,args){
   const context={protocol:CONTEXT,connection:copy(record.connection),owner_handover_id:h.id,owner_epoch:h.value.epoch,
    subject:{ref:h.value.subject_ref,sha256:h.value.subject_sha256,body:subject.value.body},
    reconstruction:{ref:h.value.reconstruction_ref,sha256:reconstruction.value.content_sha256,content:reconstruction.value.content,incoming:copy(record.actor)},
-   reviewer:{principal_ref:ref('principals',p),native_id:p.value.native_id},prior_attempts:previous,prior_reconstructions:priorReconstructions,recovery_dispositions:(h.value.recovery_history??[]).map(v=>({ref:v,body:exact(tx,v).value})),prior_external_attempts:(h.value.late_external_phase_ids??[]).length?recoverySubject(tx,h).body.attempts.filter(a=>!h.value.review_history.some(v=>v.phase_id===a.phase.ref.id)):[],late_obligations:(h.value.late_obligation_refs??[]).map(v=>({ref:v,body:exact(tx,v).value})),
+   reviewer:{principal_ref:ref('principals',p),native_id:p.value.native_id},prior_attempts:previous,prior_reconstructions:priorReconstructions,recovery_dispositions:(h.value.recovery_history??[]).map(v=>({ref:v,body:exact(tx,v).value})),prior_external_attempts:(h.value.late_external_phase_ids??[]).length?recoverySubject(tx,h).body.attempts.filter(a=>!h.value.review_history.some(v=>v.phase_id===a.phase.ref.id)):[],late_obligations:(h.value.late_obligation_refs??[]).map(v=>({ref:v,body:exact(tx,v).value})),subject_refreshes:(h.value.subject_refresh_history??[]).map(v=>({ref:v,body:exact(tx,v).value})),
    authority:{grant_ref:h.value.review_grant,expires_at:new Date(h.value.expires_at_ms).toISOString()}};
   const contextText=canonical(context);need(Buffer.byteLength(contextText)<=Math.min(MAX_SUBJECT,c.value.policy.max_context_bytes),'OWNER_QA_CONTEXT_CAPACITY');
   const id=peerDigest(['peer-owner-maintenance-v1',record.connection,h.id,input.operation_id]),admissionId='owner-maintenance-admission:'+id,phaseId='owner-maintenance-phase:'+id,contextId='owner-maintenance-context:'+id,execution='owner-maintenance-execution:'+id;
-  need(!tx.get('work_items',admissionId)&&!tx.get('slots',execution)&&!tx.get('effects',execution),'OWNER_MAINTENANCE_CONSUMED');
-  const cv=tx.put('work_items',contextId,{kind:'owner_maintenance_context',body:context,text:contextText,sha256:peerDigest(context)});
+  need(!tx.get('work_items',admissionId)&&!tx.get('work_items',contextId)&&!tx.get('work_items',phaseId)&&!tx.get('slots',execution)&&!tx.get('effects',execution),'OWNER_MAINTENANCE_CONSUMED');
+  const contextValue={kind:'owner_maintenance_context',body:context,text:contextText,sha256:peerDigest(context)},contextRef=predicted('work_items',contextId,contextValue);
+  const preflight=wirePreflight(contextText,p.value.native_id);originalWirePlan=preflight.plan;
   const binding={kind:'owner-handover-review',owner_handover_id:h.id,owner_epoch:h.value.epoch,subject_ref:h.value.subject_ref,subject_sha256:h.value.subject_sha256,reconstruction_ref:h.value.reconstruction_ref,
-   reviewer_principal_ref:ref('principals',p),native_id:p.value.native_id,grant_ref:h.value.review_grant,grant_generation:g.value.generation,grant_expires_at:g.value.expires_at,deadline_at_ms:h.value.expires_at_ms,context_sha256:cv.value.sha256,context_ref:ref('work_items',cv)};
-  const av=tx.put('work_items',admissionId,{kind:'owner_maintenance_admission',binding}),admissionRef=ref('work_items',av);
+   reviewer_principal_ref:ref('principals',p),native_id:p.value.native_id,grant_ref:h.value.review_grant,grant_generation:g.value.generation,grant_expires_at:g.value.expires_at,deadline_at_ms:h.value.expires_at_ms,context_sha256:contextValue.sha256,context_ref:contextRef,wire_commitment:preflight.commitment};
+  const admissionValue={kind:'owner_maintenance_admission',binding},admissionRef=predicted('work_items',admissionId,admissionValue);
+  // All exact immutable values, refs and fixed wire bytes exist before the
+  // first planned put, slot reservation or model-budget charge.
+  const cv=tx.put('work_items',contextId,contextValue),av=tx.put('work_items',admissionId,admissionValue);
+  need(same(ref('work_items',cv),contextRef)&&same(ref('work_items',av),admissionRef),'OWNER_PLAN_CHANGED');
   tx.put('work_items',phaseId,{kind:'owner_maintenance_phase',status:'reserved',admission_ref:admissionRef,context_ref:binding.context_ref,execution_id:execution,reads:[],submission:null,result_ref:null});
   tx.put('slots',execution,{kind:'owner_maintenance_slot',status:'active',principal_id:p.id,admission_ref:admissionRef,termination_confirmed:false});
   tx.put('effects',execution,{kind:'owner_maintenance_effect',status:'running',principal_id:p.id,action:'owner/handover-review',admission_ref:admissionRef,termination_confirmed:false});
@@ -335,7 +421,7 @@ export function prepareOriginalPeerOwnerMaintenance(lifecycle,args){
   tx.event('owner.review_admitted',{admission_ref:admissionRef,reviewer:binding.reviewer_principal_ref,context_sha256:binding.context_sha256});
   return {binding:{...binding,admission_ref:admissionRef},phase_id:phaseId};
  });
- const capability=Object.freeze(Object.create(null));maintenance.set(capability,{record,...result});record.caps.set(input.operation_id,capability);return capability;
+ const capability=Object.freeze(Object.create(null));maintenance.set(capability,{record,...result,wire_plan:originalWirePlan});record.caps.set(input.operation_id,capability);return capability;
 }
 
 /** The fixed native bridge retains this channel and registers it only for the

@@ -1940,7 +1940,7 @@ test('external preflush currentness: changed cached control founder and grant du
  }
 });
 
-test('external preflush currentness: read-only and successful no-op hooks preserve ordinary submission and control-independent replay',t=>{
+test('external preflush currentness: read-only and successful no-op hooks preserve submission and owner-aware replay',t=>{
  for(const mode of ['read-only','noop']){
   const f=fixture(t),trace=preflushCapture(f),args=preflushTaskArgs(`preflush-positive-${mode}`),control=get(f,'control','company'),grant=get(f,'grants','g-cos-a');
   const hook=preflushReadResult(f,'grants','g-cos-a',result=>{
@@ -1951,11 +1951,22 @@ test('external preflush currentness: read-only and successful no-op hooks preser
   try{submitted=execute(trace.ledger,actor('cos-a'),'task/submit',args);assert.equal(hook.hits,1);}finally{hook.restore();}
   assert.equal(submitted.value.status,'planned');assert.equal(submitted.value.attempt,null);assert.equal(trace.reviewQueries,0);
   assert.deepEqual(get(f,'control','company'),control);assert.deepEqual(get(f,'grants','g-cos-a'),grant);assert.equal(get(f,'control','usage'),null);
-  const beforeReplay=finalAllSQLState(f),probeCount=trace.versions.length;let unexpectedControlReads=0;
-  const unavailable=preflushReadResult(f,'control','company',()=>{unexpectedControlReads++;throw Error('Replay must not acquire a new control dependency.');});
-  try{assert.deepEqual(execute(trace.ledger,actor('cos-a'),'task/submit',args),submitted);}finally{unavailable.restore();}
-  assert.equal(unexpectedControlReads,0);assert.equal(trace.versions.length,probeCount+1,'replay still reaches the uncached owning-snapshot probe');
+  const beforeReplay=finalAllSQLState(f),probeCount=trace.versions.length;
+  assert.deepEqual(execute(trace.ledger,actor('cos-a'),'task/submit',args),submitted);
+  assert.equal(trace.versions.length,probeCount+1,'healthy replay still reaches the uncached owning-snapshot probe');
   assert.deepEqual(finalAllSQLState(f),beforeReplay);
+  for(const kind of ['Error','AggregateError']){
+   const cause=Error('Original control provider cause.'),member=Error('Original grouped control provider member.');
+   const failure=Object.assign(kind==='Error'?new Error('Canonical control provider is unavailable.',{cause}):new AggregateError([member],'Canonical control providers are unavailable.',{cause}),{code:'OWNER_NOT_RESUMED'});
+   const receiptId=digest(['peer-command-v1','cos-a',args.operation_id]),receiptRead=preflushReadResult(f,'commands',receiptId,()=>{});
+   const unavailable=preflushReadResult(f,'control','company',result=>{assert.equal(result.sha256,control.sha256);assert.equal(result.revision,control.revision);assert.equal(result.bytes,canonical(control.value));throw failure;});
+   try{
+    assert.throws(()=>execute(trace.ledger,actor('cos-a'),'task/submit',args),error=>{assert.equal(error,failure);assert.equal(error.cause,cause);if(kind==='AggregateError')assert.equal(error.errors[0],member);return true;});
+    assert.equal(unavailable.hits,1);assert.equal(receiptRead.hits,0,'current owner control must be checked before a cached business receipt');
+   }finally{unavailable.restore();receiptRead.restore();}
+   assert.equal(trace.versions.length,probeCount+1,'a provider failure is not normalized into a replay or another source probe');
+   assert.deepEqual(finalAllSQLState(f),beforeReplay,'unavailable canonical authority cannot change any user-table contents');
+  }
  }
 });
 
