@@ -8,11 +8,20 @@ import {validModelProcessTracking} from '../model-process-closure.mjs';
 import {canonical,peerDigest} from './ledger.mjs';
 
 export const LEGACY_ORIGIN_PROTOCOL='peer-legacy-origin-preparation-v2';
-export const LEGACY_ADOPTION_LIMITS=Object.freeze({source_rows:10000,source_bytes:64*1024*1024,source_value_bytes:16*1024*1024,inventory_bytes:4*1024*1024,intake_events:10000,intake_event_bytes:64*1024*1024,intake_archive_bytes:64*1024*1024,page_rows:100,page_bytes:32768,range_characters:16000});
+export const LEGACY_ADOPTION_LIMITS=Object.freeze({source_rows:10000,source_bytes:64*1024*1024,source_value_bytes:16*1024*1024,inventory_bytes:4*1024*1024,intake_events:10000,intake_event_bytes:64*1024*1024,intake_archive_bytes:64*1024*1024,page_rows:100,public_reply_bytes:24*1024,range_characters:4096});
 const hash=value=>createHash('sha256').update(value).digest('hex');
 const fail=(code,message=code)=>{throw Object.assign(Error(message),{code});};
 const own=(value,key)=>Object.prototype.hasOwnProperty.call(value,key);
 const copy=value=>JSON.parse(canonical(value));
+export const legacyEncodedReplyBytes=value=>Buffer.byteLength(JSON.stringify({content:[{type:'text',text:JSON.stringify(value)}]}));
+export function legacyReadReplyHold(retrieval){
+  const guidance=retrieval?JSON.stringify(retrieval):'{"action":"inspect","input":{"limit":1}}';
+  throw Object.assign(Error('Read-only reply exceeds the encoded 24576-byte limit; retrieve exact bounded evidence: '+guidance),{code:'LEGACY_READONLY_REPLY_CAPACITY',readonly:true,retrieval});
+}
+export function boundLegacyReadReply(value,retrieval){
+ if(legacyEncodedReplyBytes(value)>LEGACY_ADOPTION_LIMITS.public_reply_bytes)legacyReadReplyHold(retrieval);
+ return value;
+}
 export const legacySourceId=row=>'legacy-source:'+peerDigest({family:row.family,key:row.key,position:row.position,encoding:row.encoding,sha256:row.sha256});
 const pinnedParts=['plugin_version','governance','roles','cos_instructions'];
 const pinnedBody=(bundle,part)=>part==='roles'?bundle.roles_json:JSON.stringify(bundle[part]);
@@ -59,7 +68,7 @@ function peerPinnedRow(tx,company_id){
 // No nested transaction, mutation, actor authentication or permission issuance.
 export function inspectPeerPinnedTeamFrom(tx,{company_id}={}){
  const {reference,bundle}=peerPinnedRow(tx,company_id);
- return {protocol:'peer-pinned-team-evidence-v1',reference,bundle:copy(bundle),bundle_sha256:peerDigest(bundle),roles:JSON.parse(bundle.roles_json),sources:bundle.manifest.map(({part,sha256,characters,utf8_bytes})=>({part,sha256,characters,utf8_bytes,reference,read:{tool:'company_peers',action:'read_pinned'}}))};
+ return {protocol:'peer-pinned-team-evidence-v1',reference,bundle:copy(bundle),bundle_sha256:peerDigest(bundle),roles:JSON.parse(bundle.roles_json),sources:bundle.manifest.map(({part,sha256,characters,utf8_bytes})=>({part,sha256,characters,utf8_bytes,reference}))};
 }
 
 // Trusted read-only cold-start helpers. Caller authenticates the operator; these
@@ -67,21 +76,22 @@ export function inspectPeerPinnedTeamFrom(tx,{company_id}={}){
 export function inspectPeerPinnedTeam(ledger){
  return ledger.read(tx=>{
   const {reference,bundle,sources}=inspectPeerPinnedTeamFrom(tx,{company_id:ledger.company_id});
-  return {protocol:'peer-pinned-team-sources-v1',reference,plugin_version:bundle.plugin_version,team_sha256:bundle.team_sha256,governance_sha256:bundle.governance_sha256,lineage:copy(bundle.lineage),sources};
+  return boundLegacyReadReply({protocol:'peer-pinned-team-sources-v1',reference,plugin_version:bundle.plugin_version,team_sha256:bundle.team_sha256,governance_sha256:bundle.governance_sha256,lineage:copy(bundle.lineage),sources},{part:'plugin_version',reference,sha256:sources[0].sha256,offset:0,length:LEGACY_ADOPTION_LIMITS.range_characters});
  });
 }
-export function readPeerPinnedTeam(ledger,args){
+export function readPeerPinnedTeamFrom(tx,args,{company_id}={}){
  const input=copy(args);
  if(!input||Object.keys(input).some(key=>!['part','reference','sha256','offset','length'].includes(key))||!pinnedParts.includes(input.part)||!isHash(input.sha256))fail('PEER_PINNED_TEAM_INPUT');
- return ledger.read(tx=>{
-  const {reference,bundle}=peerPinnedRow(tx,ledger.company_id);if(canonical(input.reference)!==canonical(reference))fail('PEER_PINNED_TEAM_CHANGED');
+  const {reference,bundle}=peerPinnedRow(tx,company_id);if(canonical(input.reference)!==canonical(reference))fail('PEER_PINNED_TEAM_CHANGED');
   const body=pinnedBody(bundle,input.part),entry=bundle.manifest.find(value=>value.part===input.part),offset=input.offset??0,length=input.length??LEGACY_ADOPTION_LIMITS.range_characters;
   const split=index=>index>0&&index<body.length&&/[\uD800-\uDBFF]/.test(body[index-1])&&/[\uDC00-\uDFFF]/.test(body[index]);
   if(input.sha256!==entry.sha256)fail('PEER_PINNED_TEAM_CHANGED');
   if(!Number.isSafeInteger(offset)||offset<0||offset>=body.length||!Number.isSafeInteger(length)||length<1||length>LEGACY_ADOPTION_LIMITS.range_characters||split(offset))fail('PEER_PINNED_TEAM_RANGE');
   let end=Math.min(body.length,offset+length);if(split(end))end--;if(end===offset)fail('PEER_PINNED_TEAM_RANGE');
-  return {part:input.part,reference,sha256:entry.sha256,offset,length:end-offset,text:body.slice(offset,end),total_characters:body.length,next_offset:end<body.length?end:null,complete:end===body.length};
- });
+  return boundLegacyReadReply({part:input.part,reference,sha256:entry.sha256,offset,length:end-offset,text:body.slice(offset,end),total_characters:body.length,next_offset:end<body.length?end:null,complete:end===body.length},{part:input.part,reference,sha256:entry.sha256,offset,length:LEGACY_ADOPTION_LIMITS.range_characters});
+}
+export function readPeerPinnedTeam(ledger,args){
+ return ledger.read(tx=>readPeerPinnedTeamFrom(tx,args,{company_id:ledger.company_id}));
 }
 
 // This exact cut includes ordering, encodings and every current entry, including
