@@ -33,9 +33,10 @@ export function check(lane,root=process.cwd(),probe=sandboxCapability,{shard}={}
     const reporters=summaryFile?['--test-reporter=tap','--test-reporter-destination=stdout',
       `--test-reporter=${fileURLToPath(new URL('./qualification-reporter.mjs',import.meta.url))}`,
       `--test-reporter-destination=${summaryFile}`]:['--test-reporter=tap'];
+    const testConcurrency=lane==='regression-22'?2:4;
     const commands=lane==='build'
       ? [[process.execPath,['tools/build-plugin.mjs','--check']],['git',['diff','--check']]]
-      : [[process.execPath,['--no-warnings','--test','--test-concurrency=4',...reporters,...tests]]];
+      : [[process.execPath,['--no-warnings','--test',`--test-concurrency=${testConcurrency}`,...reporters,...tests]]];
     const env=Object.fromEntries(['PATH','TMPDIR','TMP','TEMP','SystemRoot'].filter(k=>process.env[k]!==undefined).map(k=>[k,process.env[k]]));
     for(const [command,args] of commands) {
       const result=spawnSync(command,args,{cwd:root,env,stdio:'inherit'});
