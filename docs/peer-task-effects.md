@@ -28,6 +28,9 @@ time and finite expiry. The lease lasts at most 120,000 milliseconds and is
 clamped to the task grant's expiry. Binding, reading, command replay and process
 observations do not extend it. Transfer, cancellation and terminal observations
 advance the task epoch; recording the original process does not.
+For an already accepted review, lawful later transfer/cancellation preserves its
+immutable historical proof. The history validator separately checks bounded,
+monotonic epoch progression; current task authority is still revoked.
 
 The client derives the admission producer from the native effect's creation
 sequence, the original scheduler `task/admit` event and its exact immutable

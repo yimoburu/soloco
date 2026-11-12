@@ -1015,6 +1015,34 @@ test('external: lawful postpublication transfer or cancellation preserves histor
   }
 });
 
+test('external: repeated lawful task revocations preserve accepted historical review evidence',t=>{
+  const f=fixture(t),published=externalPublish(f,'cos-a','cos-b','fact','Historical review remains attributable.');
+  const original=published.finished.task;
+  f.run('cos-b','task/transfer',{task_id:original.id,to_principal_id:'reviewer',to_grant_id:'g-reviewer'});
+  f.run('reviewer','task/cancel',{task_id:original.id,reason:'First later task-authority revocation.'});
+  const current=f.run('reviewer','task/cancel',{task_id:original.id,reason:'Second later task-authority revocation.'});
+  assert.equal(current.value.authority_epoch,original.value.authority_epoch+3);
+  assert.deepEqual(current.value.attempt,original.value.attempt);
+  assert.deepEqual(current.value.result,original.value.result);
+  const ordinary=f.start('cos-a',{scope:'beta'});
+  assert.equal(ordinary.context.sources.some(r=>r.family==='homes'&&r.id==='fact'),false);
+  assert.deepEqual(get(f,'homes','fact'),published.home);
+});
+
+for(const change of ['regression','unproduced jump','counter-only update','removed counter'])test('external: '+change+' cannot hide a historical review integrity gap',t=>{
+  const f=fixture(t),published=externalPublish(f,'cos-a','cos-b','fact','Keep unqualified history compulsory.'),original=published.finished.task;
+  const current=change==='counter-only update'?original:f.run('cos-b','task/transfer',{task_id:original.id,to_principal_id:'reviewer',to_grant_id:'g-reviewer'});
+  const value=structuredClone(current.value);
+  if(change==='regression')value.authority_epoch=original.value.authority_epoch-1;
+  else if(change==='unproduced jump')value.authority_epoch+=100;
+  else if(change==='counter-only update')value.authority_epoch++;
+  else delete value.authority_epoch;
+  seed(f,'tasks',current.id,value);
+  const ordinary=f.start('cos-a',{scope:'beta'});
+  assert.equal(ordinary.context.sources.some(r=>r.family==='homes'&&r.id==='fact'),true);
+  assert.deepEqual(get(f,'homes','fact'),published.home);
+});
+
 function externalNegative(f,subject,family,who,scope,verdict='Fail'){
   const admitted=f.start(who,{role:'qa',stage:'review',scope,review_of:ref(family,subject)});
   const output=canonical({review:{subject:ref(family,subject),verdict,reason:'Material exact-subject adverse evidence.',blockers:['Reassess this exact evidence before relying on qualification.']}});

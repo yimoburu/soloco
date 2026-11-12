@@ -694,7 +694,7 @@ function evidenceAnalysis(tx,budget=semanticBudget(tx)){
     const t=old.value,head=tx.get('tasks',old.id);need(head,'Current review task head missing');
     touch(ref('tasks',head));
     if(pending&&head.value.status!=='returned')hold('SOURCE_CHANGED','Exact source changed: tasks/'+old.id);
-    const mutable=new Set(['owner_principal_id','principal_id','grant_id','grant_generation','transfers']);
+    const mutable=new Set(['owner_principal_id','principal_id','grant_id','grant_generation','transfers','authority_epoch']);
     const stable=value=>Object.fromEntries(Object.entries(value).filter(([name])=>!mutable.has(name)));
     let continuation=head.value;
     if(!pending&&continuation.status==='cancelled'){
@@ -704,9 +704,23 @@ function evidenceAnalysis(tx,budget=semanticBudget(tx)){
       const {cancelled_at,cancellation,...value}=continuation;
       continuation={...value,status:'returned'};
     }
-    if(!same(stable(continuation),stable(t)))hold('SOURCE_CHANGED','Exact source changed: tasks/'+old.id);
     const before=t.transfers??[],after=head.value.transfers??[];
-    need(after.length>=before.length&&before.every((x,i)=>same(x,after[i])),'Completed review transfer history changed');taskSeal(head);
+    need(after.length>=before.length&&before.every((x,i)=>same(x,after[i])),'Completed review transfer history changed');
+    const oldEpoch=t.authority_epoch,currentEpoch=head.value.authority_epoch;
+    if(oldEpoch!==undefined||currentEpoch!==undefined){
+      need((oldEpoch===undefined||Number.isSafeInteger(oldEpoch)&&oldEpoch>0)&&Number.isSafeInteger(currentEpoch)&&currentEpoch>0,'Completed review task authority counter changed');
+      const difference=currentEpoch-(oldEpoch??0),revisions=head.revision-old.revision;
+      if(difference!==0){
+        // Current authority is revoked by these source lifecycle changes; it
+        // is not a typed revocation of the immutable accepted review result.
+        // At most one epoch can have been produced per committed row version.
+        need((after.length>before.length||head.value.status==='cancelled')&&difference>0&&difference<=revisions,'Unsupported completed review authority transition');
+      }else need(revisions===0,'Completed review lifecycle did not advance task authority');
+      const {authority_epoch,...value}=continuation;
+      continuation={...value,...(oldEpoch===undefined?{}:{authority_epoch:oldEpoch})};
+    }
+    if(!same(stable(continuation),stable(t)))hold('SOURCE_CHANGED','Exact source changed: tasks/'+old.id);
+    taskSeal(head);
     if(after.length===before.length)need(same(continuation,t),'Completed review ownership changed without a transfer');
     return head;
   };
