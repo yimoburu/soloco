@@ -117,10 +117,13 @@ through the task-effect client.
 
 Assignment validates the current activated peer membership and its exact
 reconstruction/independent qualification references. It applies the recipient's
-current task-submission grant, scope, resources, queue and model budgets. Founder
+current task-submission and claim permissions, scope, resources, queue and model budgets. Founder
 status supplies no replacement recipient grant or spending allowance. The
 founder remains the command/operator author; the selected peer is the task's
 actual accountable owner. The immutable definition records `assignment` origin.
+Assignment queues a pending task and acquires its declared resources in the
+same transaction. A conflict rolls back the task and command receipt; no manual
+recipient claim is needed. Ordinary `task/submit` still creates a planned task.
 Assignment itself neither dispatches a native session nor charges a model call.
 The normal scheduler still performs actual admission and its independent gates.
 
@@ -139,8 +142,12 @@ The source-produced `attempt.effect_authority.production_authority` contains the
 company/root binding, founder reference and original adopted owner.
 
 The task client checks that original seal at binding, every action/inspection,
-replay and terminal commit. Global context validation checks it when present;
-the production facade additionally rejects missing seals. The facade also
+replay and terminal commit. Global context validation retrieves the original
+immutable admission command and compares its authority with the current attempt.
+Removing a seal or substituting one shaped for a new owner cannot turn a
+production admission into a generic admission. Genuine generic admissions keep
+their original behavior. The production facade additionally requires a production
+seal. The facade also
 protects public founder assignment and grant mutations when the production host
 uses its retained methods. `assertCurrent()` supplies a read-only preflight for
 readiness/preparation; it is not a substitute for the atomic write guard.
@@ -152,6 +159,21 @@ separate reconciliation. Source-only runtime status remains available for bounde
 diagnostics. Genuine late process/result/closure observations stay recordable;
 stale-owner output is quarantined rather than accepted as new work. No observation
 or settled promise supplies missing whole-domain closure.
+
+## Historical compatibility
+
+Completed review proofs retain their original attempt and result after a lawful
+transfer or cancellation. New authority transitions must name their immediate
+immutable predecessor and exact producing event/command. Fieldless legacy
+history is checked across every task revision, so deleting later producer fields
+cannot hide an intervening modern authority transition.
+
+The owning P1 reader `getTaskHistory(fromRef,throughRef)` returns complete,
+contiguous exact task versions only. It rejects more than 10,000 revisions or
+16 MiB of UTF-8 bodies before materializing them, invalid endpoints, missing
+versions and noncanonical or mismatched hashes. Like other historical reads,
+it requires an owning snapshot before writes. Policy evidence readers forward
+this capability and event reads without granting write authority.
 
 ## Evidence still required
 

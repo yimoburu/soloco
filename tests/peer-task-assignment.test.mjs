@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {canonical} from '../plugins/soloco/runtime/peers/ledger.mjs';
-import {digest,execute} from '../plugins/soloco/runtime/peers/model.mjs';
+import {bindPeerProductionScheduler,createRuntimeObserver,digest,execute} from '../plugins/soloco/runtime/peers/model.mjs';
 import {createMembershipLifecycle} from '../plugins/soloco/runtime/peers/membership.mjs';
+import {PeerScheduler} from '../plugins/soloco/runtime/peers/scheduler.mjs';
 import {peerFixture} from './peer-fixture.mjs';
 
 // Actual SQLite and membership state transitions with explicitly SYNTHETIC
@@ -17,8 +18,8 @@ function state(f){
   return Object.fromEntries(tables.map(({name})=>[name,f.ledger.db.prepare('SELECT * FROM "'+name.replaceAll('"','""')+'"').all().map(row=>JSON.parse(JSON.stringify(row))).sort((a,b)=>canonical(a).localeCompare(canonical(b)))]));
 }
 function unchanged(f,operation,predicate){const before=state(f);assert.throws(operation,predicate);assert.deepEqual(state(f),before);}
-function fixture(t){
-  const f=peerFixture();t.after(()=>f.close());
+function fixture(t,options={}){
+  const f=peerFixture(options);t.after(()=>f.close());
   let n=0,pid=15000;
   f.op=prefix=>`${prefix}-${++n}`;
   f.get=(family,id)=>f.ledger.read(tx=>tx.get(family,id));
@@ -65,24 +66,77 @@ test('actual founder assigns a mechanically qualified recipient without imperson
   const request=f.request(),task=execute(f.ledger,actor('founder'),'task/assign',request);
   assert.equal(task.value.owner_principal_id,f.recipient);assert.equal(task.value.principal_id,f.recipient);
   assert.equal(task.value.definition.owner_principal_id,f.recipient);assert.equal(task.value.grant_id,f.authority.id);
-  assert.equal(task.value.status,'planned');assert.equal(task.value.attempt,null);
+  assert.equal(task.value.status,'pending');assert.equal(task.value.attempt,null);
   assert.deepEqual(task.value.assignment.operator,ref('principals',f.get('principals','founder')));
   assert.equal(task.value.assignment.operation_id,request.operation_id);assert.equal(task.value.assignment.source_instruction,request.source_instruction);
   assert.deepEqual(task.value.assignment,task.value.definition.assignment);
   const command=f.rows('commands').find(row=>row.value.action==='task/assign');
   assert.equal(command.value.principal_id,'founder');assert.equal(command.value.result.id,task.id);
   assert.deepEqual(f.get('control','usage'),beforeGlobal);assert.deepEqual(f.get('control',`usage:${f.recipient}`),beforePersonal);assert.deepEqual(f.get('grants',f.authority.id),beforeGrant);
-  assert.deepEqual(f.rows('slots'),beforeSlots);assert.deepEqual(f.rows('effects'),beforeEffects);assert.deepEqual(f.rows('claims'),[]);
-
-  const claimed=f.client.execute('task/claim',{operation_id:f.op('claim'),task_id:task.id});
-  assert.equal(claimed.value.owner_principal_id,f.recipient);assert.equal(claimed.value.status,'pending');
-  assert.equal(f.rows('claims',{task_id:task.id,status:'held'}).length,1);
+  assert.deepEqual(f.rows('slots'),beforeSlots);assert.deepEqual(f.rows('effects'),beforeEffects);
+  const claims=f.rows('claims',{task_id:task.id,status:'held'});
+  assert.equal(claims.length,1);assert.equal(claims[0].value.principal_id,f.recipient);
+  assert.deepEqual(claims[0].value.resource,task.value.resources[0]);
+  assert.equal(f.rows('commands').some(row=>row.value.action==='task/claim'),false);
   const admitted=f.run('scheduler','task/admit',{task_id:task.id});
   assert.equal(admitted.admitted,true);assert.equal(admitted.task.value.owner_principal_id,f.recipient);
   assert.equal(admitted.context.principal.id,f.recipient);assert.deepEqual(admitted.context.task.definition.assignment,task.value.assignment);
   assert.equal(f.get('control','usage').value.model_calls,beforeGlobal.value.model_calls+1);
   assert.equal(f.get('control',`usage:${f.recipient}`).value.model_calls,beforePersonal.value.model_calls+1);
   assert.equal(f.get('grants',f.authority.id).value.used_model_calls,1);
+});
+
+test('founder assignment reaches the bound production scheduler without a recipient claim',async t=>{
+  const f=fixture(t,{principals:{founder:{legacy_owner:{host:'codex',session_id:'SYNTHETIC-assignment-founder',epoch:1}}}}),production=bindPeerProductionScheduler(f.ledger);
+  const beforeGlobal=f.get('control','usage'),beforePersonal=f.get('control',`usage:${f.recipient}`),beforeGrant=f.get('grants',f.authority.id),beforeSlots=f.rows('slots');
+  const request=f.request(),task=production.execute(f.ledger,actor('founder'),'task/assign',request);
+  assert.equal(task.value.status,'pending');assert.equal(task.value.attempt,null);
+  assert.deepEqual(f.get('control','usage'),beforeGlobal);assert.deepEqual(f.get('control',`usage:${f.recipient}`),beforePersonal);
+  assert.deepEqual(f.get('grants',f.authority.id),beforeGrant);assert.deepEqual(f.rows('slots'),beforeSlots);
+  assert.equal(f.rows('claims',{task_id:task.id,status:'held'}).length,1);
+  const launches=[];let finish;
+  const scheduler=new PeerScheduler({ledger:f.ledger,principal_id:'scheduler',observer:createRuntimeObserver(f.ledger),model:production,readiness_ms:0,
+    executor:{
+      async probe({task:pending}){assert.equal(pending.id,task.id);assert.equal(pending.value.status,'pending');return {available:true,authenticated:true};},
+      execute(args){
+        launches.push(args);
+        const process={pid:15100,started_at:new Date().toISOString()};args.onProcess(process);
+        return new Promise(resolve=>{finish=()=>resolve({native_id:'SYNTHETIC-assignment-task',output:'SYNTHETIC scheduler output with exact task attribution.',termination_confirmed:true,observed_process:{...process,close_observed:true}});});
+      }
+    }});
+  try{
+    const tick=await scheduler.tick();assert.equal(tick.admitted,1);assert.equal(tick.launched,1);
+    assert.equal(launches.length,1);assert.equal(launches[0].task.id,task.id);
+    assert.equal(launches[0].context.principal.id,f.recipient);assert.deepEqual(launches[0].context.task.definition.assignment,task.value.assignment);
+    assert.equal(launches[0].task.value.attempt.effect_authority.production_authority.founder.id,'founder');
+    assert.equal(f.get('control','usage').value.model_calls,beforeGlobal.value.model_calls+1);
+    assert.equal(f.get('control',`usage:${f.recipient}`).value.model_calls,beforePersonal.value.model_calls+1);
+    assert.equal(f.get('grants',f.authority.id).value.used_model_calls,beforeGrant.value.used_model_calls+1);
+    assert.equal(f.rows('commands').some(row=>row.value.action==='task/claim'),false);
+    assert.equal(f.rows('claims',{task_id:task.id,status:'held'}).length,1);
+  }finally{scheduler.stop({abort_running:false});finish?.();await scheduler.drain();}
+  assert.equal(f.get('tasks',task.id).value.status,'returned');
+  assert.equal(f.get('slots',task.id).value.status,'released');
+});
+
+test('overlapping resources roll back the complete assignment without a model charge',t=>{
+  const f=fixture(t),first=f.assign(),request=f.request();
+  const beforeGlobal=f.get('control','usage'),beforePersonal=f.get('control',`usage:${f.recipient}`),beforeGrant=f.get('grants',f.authority.id),beforeSlots=f.rows('slots');
+  assert.equal(f.rows('claims',{task_id:first.id,status:'held'}).length,1);
+  unchanged(f,()=>execute(f.ledger,actor('founder'),'task/assign',request),code('RESOURCE_BUSY'));
+  assert.equal(f.get('tasks',request.task_id),null);assert.equal(f.rows('tasks').length,1);
+  assert.deepEqual(f.get('control','usage'),beforeGlobal);assert.deepEqual(f.get('control',`usage:${f.recipient}`),beforePersonal);
+  assert.deepEqual(f.get('grants',f.authority.id),beforeGrant);assert.deepEqual(f.rows('slots'),beforeSlots);
+});
+
+test('ordinary recipient submission remains planned until its explicit resource claim',t=>{
+  const f=fixture(t),beforeGlobal=f.get('control','usage'),beforePersonal=f.get('control',`usage:${f.recipient}`);
+  const task=f.client.execute('task/submit',{operation_id:f.op('submit'),task_id:f.op('ordinary-task'),grant_id:f.authority.id,scope:'alpha',role:'engineer',stage:'produce',instructions:'SYNTHETIC ordinary recipient task.',acceptance:'Keep explicit submission and claiming separate.',resources:[{kind:'home',id:'assignment-home'}]});
+  assert.equal(task.value.status,'planned');assert.equal(task.value.attempt,null);assert.equal(Object.hasOwn(task.value,'assignment'),false);
+  assert.equal(f.rows('claims',{task_id:task.id}).length,0);
+  const pending=f.client.execute('task/claim',{operation_id:f.op('claim'),task_id:task.id});
+  assert.equal(pending.value.status,'pending');assert.equal(f.rows('claims',{task_id:task.id,status:'held'}).length,1);
+  assert.deepEqual(f.get('control','usage'),beforeGlobal);assert.deepEqual(f.get('control',`usage:${f.recipient}`),beforePersonal);
 });
 
 test('assignment replay is idempotent and mismatched reuse cannot create another task',t=>{
@@ -168,6 +222,15 @@ test('recipient grant must include task submission and the assigned resource',t=
   unchanged(f,()=>f.assign({resources:[{kind:'home',id:'outside-grant'}]}),code('RESOURCE_AUTHORITY'));
 });
 
+test('submit-only grant cannot create a pending assignment or acquire resources',t=>{
+  const f=fixture(t),submitOnly=f.grant({actions:['task/submit']}),request=f.request({grant_id:submitOnly.id});
+  const beforeGlobal=f.get('control','usage'),beforePersonal=f.get('control',`usage:${f.recipient}`);
+  unchanged(f,()=>execute(f.ledger,actor('founder'),'task/assign',request),code('GRANT_INVALID'));
+  assert.equal(f.get('tasks',request.task_id),null);assert.equal(f.rows('claims',{task_id:request.task_id}).length,0);
+  assert.equal(f.rows('commands').some(row=>row.value.operation_id===request.operation_id),false);
+  assert.deepEqual(f.get('control','usage'),beforeGlobal);assert.deepEqual(f.get('control',`usage:${f.recipient}`),beforePersonal);
+});
+
 test('actual revoked grant and expired grant cannot authorize a new assignment',t=>{
   const f=fixture(t),expiring=f.grant({expires_at:new Date(Date.now()+1000).toISOString()});
   f.run('founder','grant/revoke',{grant_id:f.authority.id});
@@ -179,7 +242,6 @@ test('actual revoked grant and expired grant cannot authorize a new assignment',
 
 test('actual recipient grant model-call exhaustion blocks another assignment without resetting usage',t=>{
   const f=fixture(t),limited=f.grant({max_model_calls:1}),task=f.assign({grant_id:limited.id});
-  f.client.execute('task/claim',{operation_id:f.op('claim'),task_id:task.id});
   assert.equal(f.run('scheduler','task/admit',{task_id:task.id}).admitted,true);
   assert.equal(f.get('grants',limited.id).value.used_model_calls,1);
   unchanged(f,()=>f.assign({grant_id:limited.id}),code('MODEL_BUDGET'));

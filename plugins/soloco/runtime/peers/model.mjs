@@ -72,7 +72,7 @@ const readFailure=(tx,error)=>Boolean(tx[readFailuresKey]?.has(error));
 function trackedReads(tx){
   if(tx[readFailuresKey])return tx;
   const failures=new Set(),wrapped={...tx,[readFailuresKey]:failures,[preparationBudgetKey]:newPreparationBudget(),[semanticBudgetKey]:newSemanticBudget()};
-  for(const method of ['get','getVersion','list','count','events','queryCurrentReviews','resolveLegacy'])if(typeof tx[method]==='function')wrapped[method]=(...args)=>{try{return tx[method](...args);}catch(error){failures.add(error);throw error;}};
+  for(const method of ['get','getVersion','getTaskHistory','list','count','events','queryCurrentReviews','resolveLegacy'])if(typeof tx[method]==='function')wrapped[method]=(...args)=>{try{return tx[method](...args);}catch(error){failures.add(error);throw error;}};
   return Object.freeze(wrapped);
 }
 function newSemanticBudget(){
@@ -149,6 +149,17 @@ function plannedWrite(ledger,type,principal,fn,terminalGuard=null){
       if(!history.has(key)){prep.before(exact.family,true);const row=base.getVersion(exact);history.set(key,row?prep.retain(exact.family,row,{historical:true}):null);}
       guard();return history.get(key)?copy(history.get(key)):null;
     };
+    const getTaskHistory=(from,through)=>{
+      guard();
+      if(typeof base.getTaskHistory!=='function')hold('LINEAGE_REQUIRED','Complete immutable task history capability required');
+      const rows=base.getTaskHistory(exactReference(from),exactReference(through));
+      guard();
+      return rows.map(row=>{
+        const key=canonical(ref('tasks',row));
+        if(!history.has(key))history.set(key,prep.retain('tasks',row,{historical:true}));
+        return copy(history.get(key));
+      });
+    };
     const planningSnapshotGuard=()=>{
       guard();
       // run always reads this actor before command/replay lookup. Reuse that
@@ -219,6 +230,7 @@ function plannedWrite(ledger,type,principal,fn,terminalGuard=null){
       sequence:base.sequence,
       get,
       getVersion,
+      getTaskHistory,
       events:options=>{guard();if(changes.size||typeof base.events!=='function')hold('TRANSACTION_EXPIRED','Original event history must be read before planning writes');return base.events(options);},
       queryCurrentReviews:selectedReviews,
       list:(f,o={})=>{
@@ -566,7 +578,29 @@ export function buildContext(tx,actor,task){
   const body={protocol:'peer-task-context-v1',control:{policy_generation:c.value.policy_generation,pause_generation:c.value.pause_generation,paused:c.value.paused,governance_sha256:c.value.governance_sha256??null,policy:policy(c)},principal:ref('principals',owner),grant:auth.grant?grantBinding(auth.grant):{founder_principal_id:owner.id},task:{id:task.id,definition_revision:t.definition_revision,definition_sha256:t.definition_sha256,definition:t.definition,owner_principal_id:t.owner_principal_id,grant_id:t.grant_id,grant_generation:t.grant_generation},...selected};
   const encoded=canonical(body),size=Buffer.byteLength(encoded);if(size>policy(c).max_context_bytes)hold('CONTEXT_CAPACITY','Complete required context exceeds policy; no attempt consumed');return {...body,text:encoded,sha256:digest(encoded),hash:digest(encoded),utf8_bytes:size};
 }
-export function validateContext(tx,context){tx=trackedReads(tx);try{if(control(tx).value.paused)return false;const t=tx.get('tasks',context.task.id);if(!t||['cancelled','unknown','quarantined'].includes(t.value.status))return false;const current=buildContext(tx,{principal_id:t.value.owner_principal_id},t);if(Object.hasOwn(t.value.attempt?.effect_authority??{},'production_authority'))assertPeerProductionAuthority(tx,t.value.attempt.effect_authority.production_authority);return current.sha256===context.sha256&&current.text===context.text;}catch(error){if(readFailure(tx,error))throw error;return false;}}
+function originalTaskAdmission(tx,task){
+  const t=task.value,a=t.attempt,effectId=digest(['native-effect',task.id,t.definition_revision]),effect=tx.get('effects',effectId);
+  if(!a||effect?.value.kind!=='native'||effect.value.task_id!==task.id||!Number.isSafeInteger(effect.created_seq))hold('TASK_ADMISSION_REQUIRED','Original native admission required');
+  const event=tx.events({after:effect.created_seq-1,limit:1}).items[0],changes=event?.payload?.changes?.filter(c=>c.family==='commands');
+  if(event?.seq!==effect.created_seq||event.type!=='task/admit'||changes?.length!==1)hold('TASK_ADMISSION_REQUIRED','Original scheduler admission event required');
+  const command=tx.getVersion(ref('commands',changes[0])),v=command?.value,receipt=v?.result,original=receipt?.task?.value,admitted=original?.attempt;
+  if(v?.action!=='task/admit'||v.principal_id!==event.principal_id||receipt?.admitted!==true||receipt.task.id!==task.id||original.status!=='running'||original.definition_revision!==t.definition_revision||!same(original.definition,t.definition)||!admitted||admitted.effect_id!==effectId||a.id!==admitted.id||a.effect_id!==admitted.effect_id||a.request_sha256!==admitted.request_sha256||a.definition_revision!==admitted.definition_revision||a.admitted_at!==admitted.admitted_at||a.policy_generation!==admitted.policy_generation||a.pause_generation!==admitted.pause_generation||a.model_calls!==admitted.model_calls||!same(a.context,admitted.context)||!same(receipt.context,admitted.context))hold('TASK_ADMISSION_REQUIRED','Current attempt differs from original immutable admission');
+  if(Object.hasOwn(a,'effect_authority')!==Object.hasOwn(admitted,'effect_authority')||Object.hasOwn(admitted,'effect_authority')&&!same(a.effect_authority,admitted.effect_authority))hold('TASK_AUTHORITY_CHANGED','Original admission authority was removed or rewritten');
+  if(t.status==='running'&&admitted.effect_authority&&t.authority_epoch!==admitted.effect_authority.epoch)hold('TASK_AUTHORITY_CHANGED','Original running attempt authority was revoked');
+  return {task:original,context:receipt.context,authority:admitted.effect_authority??null};
+}
+export function validateContext(tx,context){
+  tx=trackedReads(tx);
+  try{
+    if(control(tx).value.paused)return false;
+    const task=tx.get('tasks',context.task.id);
+    if(!task||['cancelled','unknown','quarantined'].includes(task.value.status))return false;
+    const admission=task.value.attempt?originalTaskAdmission(tx,task):null;
+    const current=buildContext(tx,{principal_id:task.value.owner_principal_id},task);
+    if(admission?.authority&&Object.hasOwn(admission.authority,'production_authority'))assertPeerProductionAuthority(tx,admission.authority.production_authority);
+    return current.sha256===context.sha256&&current.text===context.text&&(!admission||same(admission.context,context));
+  }catch(error){if(readFailure(tx,error))throw error;return false;}
+}
 
 // Conservatively resolve all explicit contributor references. Missing author or
 // principal lineage is a hold, not permission to treat evidence as independent.
@@ -705,6 +739,33 @@ function evidenceAnalysis(tx,budget=semanticBudget(tx)){
     const {authority_epoch,authority_previous,authority_event_seq,...body}=value;
     return {...body,...(Object.hasOwn(previous,'authority_epoch')?{authority_epoch:previous.authority_epoch}:{}),...(Object.hasOwn(previous,'authority_previous')?{authority_previous:previous.authority_previous}:{}),...(Object.hasOwn(previous,'authority_event_seq')?{authority_event_seq:previous.authority_event_seq}:{})};
   };
+  const legacyReviewAuthorityHistory=(old,current)=>{
+    if(typeof tx.getTaskHistory!=='function')hold('LINEAGE_REQUIRED','Complete bounded legacy task history required');
+    const rows=tx.getTaskHistory(ref('tasks',old),ref('tasks',current));
+    need(Array.isArray(rows)&&rows.length===current.revision-old.revision+1&&rows[0]?.sha256===old.sha256&&rows.at(-1)?.sha256===current.sha256,'Complete legacy task history endpoints changed');
+    for(let i=0;i<rows.length;i++){
+      const row=rows[i],after=row.value;
+      need(row.family==='tasks'&&row.id===old.id&&row.revision===old.revision+i&&peerDigest(after)===row.sha256,'Legacy task history is incomplete or changed');
+      for(const field of ['authority_epoch','authority_previous','authority_event_seq'])need(!Object.hasOwn(after,field),'Legacy continuation hides an intervening authority producer');
+      const reference=ref('tasks',row),key=touch(reference);
+      if(!history.has(key))history.set(key,preparationBudget(tx).retain('tasks',row,{historical:true}));
+      if(!i)continue;
+      const before=rows[i-1].value,prior=before.transfers??[],next=after.transfers??[];
+      need(Array.isArray(prior)&&Array.isArray(next)&&['returned','cancelled'].includes(before.status),'Unsupported legacy review transition');
+      let normalized;
+      if(next.length===prior.length+1&&prior.every((v,j)=>same(v,next[j]))){
+        const transfer=next.at(-1);
+        need(only(transfer,['from','to','at','attempt_id'])&&transfer.from===before.owner_principal_id&&transfer.to===after.owner_principal_id&&after.principal_id===after.owner_principal_id&&Number.isFinite(Date.parse(transfer.at))&&transfer.attempt_id===(before.attempt?.id??null),'Legacy review transfer changed');
+        const {owner_principal_id,principal_id,grant_id,grant_generation,transfers,...body}=after;
+        normalized={...body,owner_principal_id:before.owner_principal_id,principal_id:before.principal_id,grant_id:before.grant_id,grant_generation:before.grant_generation,...(Object.hasOwn(before,'transfers')?{transfers:before.transfers}:{})};
+      }else{
+        need(same(next,prior)&&after.status==='cancelled'&&typeof after.cancelled_at==='string'&&Number.isFinite(Date.parse(after.cancelled_at))&&typeof after.cancellation==='string'&&after.cancellation.trim()&&after.cancellation.length<=2000&&!after.cancellation.includes('\0'),'Legacy review cancellation changed');
+        const {cancelled_at,cancellation,...body}=after;
+        normalized={...body,status:before.status,...(Object.hasOwn(before,'cancelled_at')?{cancelled_at:before.cancelled_at}:{}),...(Object.hasOwn(before,'cancellation')?{cancellation:before.cancellation}:{})};
+      }
+      need(same(normalized,before),'Unsupported legacy review history mutation');
+    }
+  };
   const reviewAuthorityHistory=(old,head)=>{
     let current=head,steps=0;
     while(current.revision!==old.revision||current.sha256!==old.sha256){
@@ -714,6 +775,7 @@ function evidenceAnalysis(tx,budget=semanticBudget(tx)){
         // Exact older proofs predate this producer. Preserve their existing
         // transfer/cancellation checks; they cannot supply a new task handle.
         need(old.value.authority_epoch===undefined&&!Object.hasOwn(current.value,'authority_previous')&&!Object.hasOwn(current.value,'authority_event_seq'),'Completed review authority history lost its producer');
+        legacyReviewAuthorityHistory(old,current);
         return;
       }
       const previousRef=one(current.value.authority_previous,'tasks','task authority predecessor');
@@ -954,6 +1016,7 @@ export function membershipPolicyEvidence(provider,args={}){
   if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(k=>!keys.includes(k)))hold('INVALID_INPUT','Closed membership context request required');
   const principalId=text(input.principal_id,'membership principal',200),enrollmentId=text(input.enrollment_id,'enrollment id',200),scope=scopeOf(input.scope),methods=['get','getVersion','list','count','queryCurrentReviews','resolveLegacy'],view={};
   for(const method of methods){if(typeof provider?.[method]!=='function')hold('LINEAGE_REQUIRED','Complete owning membership provider required');view[method]=(...values)=>provider[method](...values);}
+  for(const method of ['getTaskHistory','events'])if(typeof provider[method]==='function')view[method]=(...values)=>provider[method](...values);
   const tx=trackedReads(Object.freeze(view)),c=control(tx),limits=policy(c);legacyOriginHold(c);semanticInputs(tx,input.input_refs??[]);
   const selected=sources(tx,scope,input.input_refs??[],currentReviewRows(tx));
   if(selected.membership.conflicts.length)hold('CONTEXT_CONFLICT','Applicable reconstruction conflict');
@@ -983,6 +1046,7 @@ export function publicationPolicyEvidence(provider,actor,args={}){
   const action=text(input.action,'publication action',100);if(!action.startsWith('github/'))hold('INVALID_INPUT','Exact github publication action required');
   const methods=['get','getVersion','list','count','queryCurrentReviews','resolveLegacy'],view={};
   for(const method of methods){if(typeof provider?.[method]!=='function')hold('LINEAGE_REQUIRED','Complete owning read provider required');view[method]=(...values)=>provider[method](...values);}
+  for(const method of ['getTaskHistory','events'])if(typeof provider[method]==='function')view[method]=(...values)=>provider[method](...values);
   const tx=trackedReads(Object.freeze(view)),prep=preparationBudget(tx);
   const subject=reviewReference(input.subject_ref);if(subject.family!=='proposals')hold('PROPOSAL_INVALID','Exact publication proposal required');
   const proposal=resolve(tx,subject),p=proposal.value;if(p.status!=='proposed')hold('PROPOSAL_INVALID','Proposed publication subject required');
@@ -1357,6 +1421,7 @@ function mutate(tx,actor,principal,c,action,args,protectedCall,taskBinding=null,
     if(!founder(c,principal))hold('FOUNDER_REQUIRED','Actual founder operator required');
     const recipient=qualifiedTaskRecipient(tx,member(tx,{principal_id:text(args.to_principal_id,'recipient principal',200)})),owner={principal_id:recipient.id};
     const scope=scopeOf(args.scope),resources=canonicalResources(tx,args.resources),auth=authorize(tx,owner,'task/submit',{...args,scope,resources});
+    authorize(tx,owner,'task/claim',{...args,scope,resources});
     const used=id=>{const n=tx.get('control',id)?.value.model_calls??0;if(!Number.isSafeInteger(n)||n<0)hold('MODEL_BUDGET','Current model usage is invalid');return n;};
     const grantUsed=auth.grant?.value.used_model_calls??0,grantCap=auth.grant?.value.max_model_calls;
     if(!auth.grant||!Number.isSafeInteger(grantUsed)||grantUsed<0||!Number.isSafeInteger(grantCap)||grantCap<1||used('usage')>=policy(c).max_model_calls||used(`usage:${recipient.id}`)>=(policy(c).principal_model_calls??policy(c).max_model_calls)||grantUsed>=grantCap)hold('MODEL_BUDGET','Recipient task authority or model budget unavailable');
@@ -1369,7 +1434,9 @@ function mutate(tx,actor,principal,c,action,args,protectedCall,taskBinding=null,
     const id=args.task_id?text(args.task_id,'task_id',200):digest(['task',principal.id,args.operation_id]);if(tx.get('tasks',id))hold('TASK_EXISTS','Task exists');const inputs=args.input_refs??[];if(!Array.isArray(inputs)||inputs.length>100)hold('SOURCE_INVALID','At most 100 input refs');semanticInputs(tx,inputs);if(args.review_of)resolve(tx,semanticReference(args.review_of));
     let parent=null;if(args.parent_task_id){parent=tx.get('tasks',text(args.parent_task_id,'parent task',200));if(!parent||parent.value.owner_principal_id!==principal.id||!['*',scope].includes(parent.value.scope))hold('PARENT_AUTHORITY','Parent owner/scope mismatch');}
     const definition={owner_principal_id:principal.id,grant_id:auth.grant?.id??null,grant_generation:auth.grant?.value.generation??null,scope,host:principal.value.host??'codex',role:text(args.role,'role',100),stage:text(args.stage??'produce','stage',40),instructions:text(args.instructions??args.task,'instructions',20000),acceptance:text(args.acceptance,'acceptance',4000),resources,input_refs:copy(inputs),review_of:args.review_of?copy(args.review_of):null,parent_task_id:parent?.id??null,parent_ref:parent?ref('tasks',parent):null,outcome:args.outcome===undefined?null:bounded(args.outcome,'outcome',8000),...(assignment?{assignment:copy(assignment)}:{})};
-    return tx.put('tasks',id,{...definition,definition,status:'planned',authority_epoch:1,authority_previous:null,authority_event_seq:tx.sequence,definition_revision:1,definition_sha256:digest(definition),attempt:null,principal_id:principal.id,created_at:now()},0);
+    const value={...definition,definition,status:assignment?'pending':'planned',authority_epoch:1,authority_previous:null,authority_event_seq:tx.sequence,definition_revision:1,definition_sha256:digest(definition),attempt:null,principal_id:principal.id,created_at:now()};
+    if(assignment)claimResources(tx,{id,value});
+    return tx.put('tasks',id,value,0);
   }
   if(action==='task/admit'){
     if(!trusted(principal))hold('SCHEDULER_REQUIRED','Runtime admission required');legacyOriginHold(c);const status=runtimeStatus(tx);if(status.paused)return {admitted:false,code:'PAUSED',reason:'Company paused'};if(!status.available_slots)return {admitted:false,code:'CAPACITY_BUSY',reason:'Active or uncertain execution holds capacity'};

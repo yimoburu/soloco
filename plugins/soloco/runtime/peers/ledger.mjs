@@ -44,6 +44,7 @@ export const FAMILIES=Object.freeze(['control','principals','grants','commands',
 const families=new Set(FAMILIES);
 const MAX_VALUE_BYTES=1_000_000;
 const MAX_FILTERED_ROWS=10_000;
+const MAX_TASK_HISTORY_REVISIONS=10_000,MAX_TASK_HISTORY_BYTES=16*1024*1024;
 // Materialization admission, not measured JS heap/RSS or whole-process limits.
 // Classifier arrays admit at most 10,000 revisions, 8 MiB canonical UTF-8,
 // and 16 MiB of encoded selected fields plus a 256-unit charge per row for
@@ -504,7 +505,7 @@ export class PeerLedger{
       const changes=[],events=[],pending=new Map(),initial=new Map();
       // Fence history before preparing the first modifying statement. A failed
       // mutation poisons this transaction even if the callback catches it.
-      let rowMutationStarted=false,mutationFailed=false,finalizing=false,putInProgress=false;
+      let rowMutationStarted=false,mutationFailed=false,finalizing=false,putInProgress=false,taskHistoryCall=null;
       const snapshot=randomUUID();
       const boundary=()=>{
         if(!active||!this.inTransaction||!fence.owns(token))throw Error('Peer transaction handle expired');
@@ -555,6 +556,66 @@ export class PeerLedger{
           const value=checked(()=>decode(row.bytes,row.sha256));
           historicalGuard();
           return {family:r.family,id:r.id,revision:r.revision,sha256:r.sha256,value};
+        },
+        // Complete task-only canonical version evidence between two exact
+        // endpoints. This does not infer per-version event/producer provenance.
+        // Bounds account for stored UTF-8 bodies, not total JS heap or native
+        // context fit. Never return a clean prefix or skip an intermediate row.
+        getTaskHistory:(fromRef,throughRef)=>{
+          guard();
+          if(external||rowMutationStarted)throw Error('Peer task history requires an owning snapshot before pending writes; external transactions are excluded');
+          if(taskHistoryCall){taskHistoryCall.failure??=Error('Reentrant peer task history lookup is forbidden');throw taskHistoryCall.failure;}
+          const call={failure:null};taskHistoryCall=call;
+          const historicalGuard=()=>{
+            guard();
+            if(external||rowMutationStarted)throw Error('Peer task history requires an owning snapshot before pending writes; external transactions are excluded');
+            if(call.failure)throw call.failure;
+          };
+          const checked=operation=>{
+            historicalGuard();let value;
+            try{value=operation();}catch(error){
+              try{historicalGuard();}catch(boundaryError){throw new AggregateError([error,boundaryError],'Peer task history failed after its transaction boundary changed');}
+              throw error;
+            }
+            historicalGuard();return value;
+          };
+          try{
+            const [from,through]=checked(()=>JSON.parse(canonical([fromRef,throughRef])));
+            const span=checked(()=>{
+              for(const r of [from,through]){
+                if(!r||Array.isArray(r)||typeof r!=='object'||Object.keys(r).sort().join(',')!=='family,id,revision,sha256'||r.family!=='tasks')throw Error('Exact task history endpoints require family tasks, id, revision and sha256 only');
+                exact(r.id,'task history identity',2000);positive(r.revision,'task history revision');digest(r.sha256);
+              }
+              if(from.id!==through.id||from.revision>through.revision)throw Error('Task history endpoints require one ordered task range');
+              const count=through.revision-from.revision+1;
+              if(!Number.isSafeInteger(count)||count<1||count>MAX_TASK_HISTORY_REVISIONS)throw Error('Task history range exceeds 10000 revision capacity');
+              return count;
+            });
+            const parameters=['tasks',from.id,from.revision,through.revision,span+1];
+            // The PK range and SQL LIMIT bound the metadata scan before any
+            // body enters JavaScript. length(BLOB) counts persisted UTF-8 bytes.
+            const aggregate=this.#selectionRead(checked,'SELECT COUNT(*) AS row_count, COALESCE(SUM(byte_count),0) AS total_bytes FROM (SELECT length(CAST(bytes AS BLOB)) AS byte_count FROM peer_versions WHERE family=? AND id=? AND revision>=? AND revision<=? ORDER BY revision LIMIT ?)','get',...parameters);
+            const preflightBytes=checked(()=>{
+              const count=aggregate?.row_count,bytes=aggregate?.total_bytes;
+              if(count!==span)throw Error('Task history range is incomplete or has duplicate revisions');
+              if(!Number.isSafeInteger(bytes)||bytes<0||bytes>MAX_TASK_HISTORY_BYTES)throw Error('Task history exceeds 16 MiB byte capacity');
+              return bytes;
+            });
+            const rows=this.#selectionRead(checked,'SELECT family,id,revision,sha256,bytes FROM peer_versions WHERE family=? AND id=? AND revision>=? AND revision<=? ORDER BY revision LIMIT ?','all',...parameters);
+            checked(()=>{if(!Array.isArray(rows)||rows.length!==span)throw Error('Task history actual count differs from complete range');});
+            const result=[];let bytes=0;
+            for(let i=0;i<span;i++)result.push(checked(()=>{
+              const {family,id,revision,sha256,bytes:encoded}=rows[i]??{};
+              if(family!=='tasks'||id!==from.id||revision!==from.revision+i)throw Error('Task history row identity or revision order changed');
+              if(i===0&&sha256!==from.sha256||i===span-1&&sha256!==through.sha256)throw Error('Exact task history endpoint hash changed');
+              if(typeof encoded!=='string')throw Error('Task history canonical bytes are unavailable');
+              bytes+=Buffer.byteLength(encoded);
+              if(!Number.isSafeInteger(bytes)||bytes>MAX_TASK_HISTORY_BYTES)throw Error('Task history actual bytes exceed 16 MiB capacity');
+              return {family:'tasks',id,revision,sha256,value:decode(encoded,sha256)};
+            }));
+            checked(()=>{if(bytes!==preflightBytes)throw Error('Task history byte count changed after preflight');});
+            historicalGuard();return result;
+          }finally{if(taskHistoryCall===call)taskHistoryCall=null;}
         },
         list:(f,o)=>{
           const collectionGuard=()=>{

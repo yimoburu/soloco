@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {canonical,peerDigest,FAMILIES,PeerLedger} from '../plugins/soloco/runtime/peers/ledger.mjs';
 import {execute,inspect,buildContext,validateContext,canonicalResources,resourceOverlap,digest,createRuntimeObserver} from '../plugins/soloco/runtime/peers/model.mjs';
 import {peerFixture} from './peer-fixture.mjs';
+import {legacyPeerModel301b} from './peer-model-legacy-fixture.mjs';
 
 // All behavior tests use the immutable accepted P1 SQLite implementation.
 // The observer below is a synthetic trusted-host fixture, not native evidence.
@@ -2074,3 +2075,49 @@ for(const pointer of ['skips immediate predecessor','names another task'])test('
   assert.equal(ordinary.context.sources.some(r=>r.family==='homes'&&r.id==='fact'),true);
   assert.deepEqual(get(f,'homes','fact'),published.home);
 });
+
+const {execute:legacy301bExecute,createRuntimeObserver:legacy301bObserver}=await legacyPeerModel301b();
+function legacy301bPublished(t){
+  const f=fixture(t),modernRun=f.run,modernObserver=f.observer;let n=0;
+  const legacyRun=(who,action,args={})=>legacy301bExecute(f.ledger,actor(who),action,{operation_id:`legacy301b-${++n}`,...args});
+  f.run=legacyRun;f.observer=legacy301bObserver(f.ledger);
+  const published=externalPublish(f,'cos-a','cos-b','fact','Genuine public base301b legacy producer proof.'),original=published.finished.task;
+  for(const field of ['authority_epoch','authority_previous','authority_event_seq'])assert.equal(Object.hasOwn(original.value,field),false);
+  assert.equal(Object.hasOwn(original.value.attempt,'effect_authority'),false);
+  f.run=modernRun;f.observer=modernObserver;
+  return {f,published,original,legacyRun};
+}
+for(const transition of ['transfer','cancel']){
+  for(const strip of [false,true])test('genuine legacy301b '+transition+(strip?' followed by producer removal keeps history compulsory':' remains qualified after upgrade'),t=>{
+    const {f,published,original}=legacy301bPublished(t);
+    const current=transition==='transfer'
+      ?f.run('cos-b','task/transfer',{task_id:original.id,to_principal_id:'reviewer',to_grant_id:'g-reviewer'})
+      :f.run('cos-b','task/cancel',{task_id:original.id,reason:'Genuine post-upgrade lifecycle operation.'});
+    assert.equal(current.value.authority_epoch,1);
+    assert.deepEqual(current.value.authority_previous,ref('tasks',original));
+    assert(Number.isSafeInteger(current.value.authority_event_seq));
+    if(strip){
+      const value=structuredClone(current.value);
+      for(const field of ['authority_epoch','authority_previous','authority_event_seq'])delete value[field];
+      const altered=seed(f,'tasks',current.id,value);
+      assert.deepEqual(altered.value.attempt,original.value.attempt);
+      assert.deepEqual(altered.value.result,original.value.result);
+      assert.equal(altered.revision,current.revision+1);
+    }
+    const ordinary=f.start('cos-a',{scope:'beta'});
+    assert.equal(ordinary.context.sources.some(r=>r.family==='homes'&&r.id==='fact'),strip,
+      'A complete legacy history must retain any intervening modern authority producer.');
+    assert.deepEqual(get(f,'homes','fact'),published.home);
+  });
+  test('genuine legacy301b fieldless '+transition+' remains qualified through complete history',t=>{
+    const {f,published,original,legacyRun}=legacy301bPublished(t);
+    const current=transition==='transfer'
+      ?legacyRun('cos-b','task/transfer',{task_id:original.id,to_principal_id:'reviewer',to_grant_id:'g-reviewer'})
+      :legacyRun('cos-b','task/cancel',{task_id:original.id,reason:'Genuine pre-upgrade lifecycle operation.'});
+    for(const field of ['authority_epoch','authority_previous','authority_event_seq'])assert.equal(Object.hasOwn(current.value,field),false);
+    const ordinary=f.start('cos-a',{scope:'beta'});
+    assert.equal(ordinary.context.sources.some(r=>r.family==='homes'&&r.id==='fact'),false,
+      'Complete genuinely old producer history remains usable without minting new authority.');
+    assert.deepEqual(get(f,'homes','fact'),published.home);
+  });
+}
