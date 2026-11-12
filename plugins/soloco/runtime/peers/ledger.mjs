@@ -672,7 +672,11 @@ export class PeerLedger{
         // JSON-parse/re-encode whitespace, key escapes or original key order.
         // Absence is DATA null; corruption/provider errors are never missing.
         resolveLegacyText:ref=>{
-          const legacyGuard=()=>{guard();if(writesSealed)poisonSeal();if(external||rowMutationStarted)throw Error('Peer exact legacy text requires an owning snapshot before pending writes');if(legacyTextCall?.failure)throw legacyTextCall.failure;};
+          // Like writeGuard, latch a caught sealed attempt while this ORIGINAL
+          // transaction still owns its fence, even after its public handle
+          // expires during event/outbox/meta/terminal staging. Never poison a
+          // later transaction reached through an escaped old handle.
+          const legacyGuard=()=>{if(writesSealed&&this.inTransaction&&fence.owns(token)&&db.isTransaction===true)poisonSeal();guard();if(external||rowMutationStarted)throw Error('Peer exact legacy text requires an owning snapshot before pending writes');if(legacyTextCall?.failure)throw legacyTextCall.failure;};
           legacyGuard();if(legacyTextCall){legacyTextCall.failure??=Error('Reentrant exact legacy text lookup is forbidden');throw legacyTextCall.failure;}
           const call={failure:null};legacyTextCall=call;
           const checked=fn=>{legacyGuard();let value;try{value=fn();}catch(error){try{legacyGuard();}catch(boundaryError){throw new AggregateError([error,boundaryError],'Exact legacy text failed after its transaction boundary changed');}throw error;}legacyGuard();return value;};
