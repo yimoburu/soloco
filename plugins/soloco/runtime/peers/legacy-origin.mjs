@@ -196,3 +196,6 @@ export function authenticateLegacyOwner(db,{session_id,epoch},host){
 export function legacyOriginReadiness(snapshot){
  return {protocol:LEGACY_ORIGIN_PROTOCOL,company_id:snapshot.authority.company_id,owner:copy(snapshot.authority.owner),source_cut_sha256:snapshot.source_cut_sha256,origin_projection_sha256:snapshot.origin_projection_sha256,basis_sha256:snapshot.basis_sha256,current_source_inventory:{...snapshot.volume,complete:true,coverage:'All current normalized entries, ordering and encodings; archived-event/native and semantic qualification remain separate'},issue_count:snapshot.issues.length,execution:snapshot.execution,notices:snapshot.notices,capabilities:{readiness:true,plan:true,inspect:true,read:true,apply:false},ready_for_apply:false,limits:LEGACY_ADOPTION_LIMITS};
 }
+
+// Stable legacy-boundary export for fixed internal source consumers.
+export {assertPeerOriginSelectedMaintenanceFrom,assertPeerOriginMaintenancePauseFrom} from './origin-maintenance-authority.mjs';
