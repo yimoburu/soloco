@@ -211,6 +211,30 @@ export function bindOriginalProtectedTaskAdmission(owner,handle,ledger,task_id,c
  const r=record(owner,handle);if(Object.getPrototypeOf(ledger)!==PeerLedger.prototype||!text(task_id))fail('PROTECTED_CODEX_ORIGINAL_ADMISSION_HELD');
  const next={ledger,task_id,context:copy(context)};if(r.native_admission&&(r.native_admission.ledger!==ledger||r.native_admission.task_id!==task_id||!same(r.native_admission.context,context)))fail('PROTECTED_CODEX_ADMISSION_REUSED');r.native_admission=next;currentNativeTask(r);
 }
+// This producer is reachable only by the trusted TaskHost, after the ORIGINAL
+// launch has observed birth and correlated its native thread and turn. The
+// reader retained by the incarnation module is synchronous private state only:
+// it performs no ledger/provider I/O inside an effect's final COMMIT guard.
+export function observeOriginalProtectedPeerExecutorIncarnation(owner,handle,source,{deadline_at_ms,readTurn}={}){
+ const r=record(owner,handle),admission=r.native_admission;
+ if(r.executor_incarnation||!source||typeof source.observe!=='function'||typeof readTurn!=='function'||!Number.isSafeInteger(deadline_at_ms)||!Number.isSafeInteger(r.execution_deadline_ms)||deadline_at_ms>r.execution_deadline_ms)fail('PROTECTED_CODEX_EXECUTOR_SOURCE_REQUIRED');
+ companionArmed(r);
+ if(r.backend.last_step?.thread_id!==r.native_thread||r.backend.last_step?.turn_id!==r.native_turn)fail('PROTECTED_CODEX_FINAL_FACTS_HELD');
+ const admitted=currentNativeTask(r);
+ const principal_id=Reflect.apply(PeerLedger.prototype.read,admission.ledger,[tx=>{
+  const task=tx.get('tasks',admission.task_id),principal=task&&tx.get('principals',task.value.owner_principal_id);
+  if(task?.value.attempt?.id!==admitted.attempt_id||principal?.value.native_id!==admitted.native_id||principal.value.generation!==admitted.generation)fail('PROTECTED_CODEX_ORIGINAL_ADMISSION_HELD');
+  return principal.id;
+ }]);
+ const association={task_id:admitted.task_id,attempt_id:admitted.attempt_id,context_sha256:admitted.context_sha256,principal_id,generation:admitted.generation,native_id:admitted.native_id,turn_id:r.native_turn,process:{pid:r.birth?.pid,started_at:r.birth?.at},deadline_at_ms};
+ const current=()=>{
+  if(r.native_admission!==admission||r.state!=='born'||r.stopping||r.failed||r.exit_observed||r.close||r.closed||!r.child||r.child.exitCode!==null&&r.child.exitCode!==undefined||typeof r.child.signalCode==='string'||r.native_thread!==association.native_id||r.native_turn!==association.turn_id||r.birth?.pid!==association.process.pid||r.birth?.at!==association.process.started_at)fail('PROTECTED_CODEX_EXECUTOR_INACTIVE');
+  const turn=readTurn();
+  if(!turn||turn.state!=='running'||turn.yield_requested||turn.hold||turn.native_id!==association.native_id||turn.turn_id!==association.turn_id||turn.attempt_id!==association.attempt_id||turn.principal_id!==association.principal_id)fail('PROTECTED_CODEX_EXECUTOR_TURN_CHANGED');
+  return association;
+ };
+ const incarnation=source.observe(association,current);r.executor_incarnation=incarnation;return incarnation;
+}
 function currentNativeMembership(r){
  const a=r.membership_admission;if(!a||Object.getPrototypeOf(a.ledger)!==PeerLedger.prototype)fail('PROTECTED_CODEX_ORIGINAL_ADMISSION_HELD');
  return Reflect.apply(PeerLedger.prototype.read,a.ledger,[tx=>{
@@ -321,9 +345,9 @@ function backendFrame(r,frame,raw){
 
 /** Spawn the exact compiled executable/argv/env in its original OS policy. */
 export function spawnOriginalProtectedCodex(owner,handle){
- const r=record(owner,handle);if(r.consumed)fail('PROTECTED_CODEX_LAUNCH_CONSUMED');r.facade_handle=handle;if(r.context_interpreter&&(!r.context_delivery||!r.context_input))fail('PROTECTED_CODEX_CONTEXT_DELIVERY_HELD');
+ const r=record(owner,handle);if(r.consumed||r.stopping)fail('PROTECTED_CODEX_LAUNCH_CONSUMED');r.facade_handle=handle;if(r.context_interpreter&&(!r.context_delivery||!r.context_input))fail('PROTECTED_CODEX_CONTEXT_DELIVERY_HELD');
  if(r.plan.companion_slot?.scope_policy==='V5_ORIGINAL_MANAGED_PRIVATE_FD'){if(!r.connect_broker||r.connect_broker.port!==r.plan.gateway_port)fail('PROTECTED_CODEX_NATIVE_GATEWAY_HELD');currentNativeAuthority(r);}
- r.consumed=true;r.state='armed';
+ r.consumed=true;r.state='armed';r.execution_deadline_ms=Date.now()+TOTAL_MS;
  let plan;try{plan=claimOriginalCompiledCodexPlan(owner,r.compiledPlan);r.plan=plan;}catch(error){r.state='unknown';r.code='PROTECTED_CODEX_PLAN_HELD';throw error;}
  const facade=new EventEmitter();r.facade=facade;facades.set(facade,r);
  // Own an error sink before any child/provider can emit. Registered consumers
@@ -422,8 +446,15 @@ export function inspectOriginalProtectedCodexLaunch(owner,handle){
 /** Request cleanup of the original owned child. No returned Boolean implies close. */
 export function requestOriginalProtectedCodexStop(owner,handle){
  const r=record(owner,handle);
+ if(!r.facade&&!r.consumed){r.stopping=true;r.code??='PROTECTED_CODEX_STOPPED_BEFORE_SPAWN';void r.connect_broker?.close();}
  if(r.facade&&!r.closed&&!r.stopping)r.facade.kill('SIGTERM');
  return inspectOriginalProtectedCodexLaunch(owner,handle);
+}
+
+// Fixed provider composition may copy the original compiled launch DATA. This
+// does not expose an issuer, change the plan or attest native qualification.
+export function originalProtectedPeerLaunchConfiguration(owner,handle){
+ const r=record(owner,handle);return Object.freeze({cwd:r.plan.cwd,environment:Object.freeze(copy(r.plan.environment))});
 }
 
 

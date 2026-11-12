@@ -7,7 +7,7 @@
 // managed IDs are rejected by raw execute/inspect without the protected binding.
 import {canonical,peerDigest} from './ledger.mjs';
 import {prepareOriginalProjectedMembershipContext,prepareOriginalPeerContextDelivery,checkOriginalPeerMembershipRestriction} from './peer-context-interpreter.mjs';
-import {membershipPolicyEvidence,membershipPrincipalAliases,bindPeerPrincipal,digest,REVIEW_PREPARATION_BYTES} from './model.mjs';
+import {membershipPolicyEvidence,membershipPrincipalAliases,bindPeerPrincipal,digest,REVIEW_PREPARATION_BYTES,assertOriginalPeerProductionScheduler} from './model.mjs';
 import {parseReviewOutput,reviewReference,reviewScope} from './review-selection.mjs';
 
 const READ_LIMIT=8192,MAX_ROWS=10000,ROLES=['cos','reviewer','specialist'],PHASE_STATES=['reserved','running','unknown','closed'];
@@ -55,7 +55,14 @@ function plan(raw){
   }};
 }
 
-export function createMembershipLifecycle(ledger,options={}){
+export function createMembershipLifecycle(ledger,options={},productionFacade=null){
+  // The third argument is reachable only by trusted production composition;
+  // it is never copied from JSON options or supplied by a model tool.
+  if(productionFacade!==null){
+    assertOriginalPeerProductionScheduler(productionFacade,ledger);
+    if(typeof productionFacade.membershipWrite!=='function')fail('AUTHENTICATION_REQUIRED','Original production membership writer required');
+  }
+  const productionWrite=productionFacade===null?null:productionFacade.membershipWrite.bind(productionFacade);
   const o=closed(options,['operator_principal_id','observer_principal_id']),operatorId=text(o.operator_principal_id??'founder','operator principal',200),observerId=text(o.observer_principal_id??'scheduler','observer principal',200);
   const connection={company_id:ledger.company_id,root_sha256:digest(ledger.root)},connectionHash=peerDigest(connection);
   const auth=(tx,role)=>{const c=control(tx),id=role==='operator'?operatorId:observerId,p=tx.get('principals',id);if(!p||p.value.status!=='active'||role==='operator'&&(p.value.kind!=='founder'||c.value.founder_principal_id!==id)||role==='host'&&p.value.kind!=='scheduler')fail('AUTHENTICATION_REQUIRED','Protected operator/host composition required');return p;};
@@ -65,7 +72,8 @@ export function createMembershipLifecycle(ledger,options={}){
   function ledgerGeneration(r,tx){const row=tx.getVersion(r);if(!row||row.sha256!==r.sha256)fail('AUTHENTICATION_REQUIRED','Protected authority history unavailable');return row.value.generation;}
   function command(channel,action,a,authorize,fn){
     connectionGuard();const input=copy(a),operation=text(input.operation_id,'operation_id',160);
-    return ledger.write(`membership/${action}`,channel,raw=>{const p=plan(raw),tx=p.tx,actor=authorize(tx),id=peerDigest(['peer-membership-command-v1',connectionHash,channel,actor.id,actor.value.generation,operation]),request_sha256=peerDigest({action,input}),prior=tx.get('commands',id);
+    const write=channel==='operator'&&productionWrite?productionWrite:ledger.write.bind(ledger);
+    return write(`membership/${action}`,channel,raw=>{const p=plan(raw),tx=p.tx,actor=authorize(tx),id=peerDigest(['peer-membership-command-v1',connectionHash,channel,actor.id,actor.value.generation,operation]),request_sha256=peerDigest({action,input}),prior=tx.get('commands',id);
       if(prior){if(prior.value.request_sha256!==request_sha256)fail('REPLAY_MISMATCH','Membership operation already names a different request');p.flush();return copy(prior.value.result);}
       const result=copy(fn(tx,input,actor));tx.put('commands',id,{kind:'membership_command',principal_id:actor.id,operation_id:operation,channel,request_sha256,result},0);p.flush();return result;
     });

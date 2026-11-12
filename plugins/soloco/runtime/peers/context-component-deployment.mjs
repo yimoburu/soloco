@@ -102,8 +102,16 @@ export function inspectOriginalLoadedPeerBridge(...args){
 export function createOriginalLoadedTaskRuntime(options){
  inspectOriginalLoadedPeerBridge();
  if(!options||Object.getPrototypeOf(options)!==Object.prototype||!options.protected_launch||Object.keys(options).some(k=>!['owner','ledger','membership','launch','protected_launch','limits','scheduler_principal_id'].includes(k)))fail('COMPONENT_DEPLOYMENT_RUNTIME_ARGUMENT');
- // This candidate has no in-transaction active-task effect fence yet. Keep its
- // active callbacks on the existing read-only foundation facade; a different
- // accepted profile must supply that producer before enabling effects.
+ // Preserve the historical read-only foundation composition. The separate
+ // production composition below binds its source-produced task effect client.
  return loaded.host.createCodexTaskRuntime({...options,callback_restriction:'local-foundation-qualification'});
+}
+
+// A separate fixed composition keeps the historical foundation profile intact.
+// The TaskHost still requires the original protected launch and produces an
+// actual running-turn incarnation before binding the transaction-local client.
+export function createOriginalLoadedProductionTaskRuntime(options){
+ inspectOriginalLoadedPeerBridge();
+ if(!options||Object.getPrototypeOf(options)!==Object.prototype||!options.protected_launch||Object.keys(options).some(k=>!['owner','ledger','membership','launch','protected_launch','limits','scheduler_principal_id'].includes(k)))fail('COMPONENT_DEPLOYMENT_RUNTIME_ARGUMENT');
+ return loaded.host.createCodexTaskRuntime({...options,callback_restriction:'task-bound-effects'});
 }
