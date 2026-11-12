@@ -128,6 +128,31 @@ A raw actor string is not authentication. The production route must derive the
 founder operator from its protected connection, and must never bind or impersonate
 the requested recipient merely because a request named that principal.
 
+## Starting-owner fence for the autonomous scheduler
+
+`bindPeerProductionScheduler(ledger)` is a private source composition facade for
+the existing scheduler. It captures the canonical founder's exact row reference
+and adopted owner host/session/epoch itself. Callers cannot supply a matching
+owner object or validator to mint it. Production admission checks that original
+owner before replay/planning and again through `guardedWrite` after staging.
+The source-produced `attempt.effect_authority.production_authority` contains the
+company/root binding, founder reference and original adopted owner.
+
+The task client checks that original seal at binding, every action/inspection,
+replay and terminal commit. Global context validation checks it when present;
+the production facade additionally rejects missing seals. The facade also
+protects public founder assignment and grant mutations when the production host
+uses its retained methods. `assertCurrent()` supplies a read-only preflight for
+readiness/preparation; it is not a substitute for the atomic write guard.
+
+An owner change before admission commit rolls back tentative bookkeeping. An
+owner change after a successful admission does not refund the committed charge
+or release its reservations. It fences subsequent startup/actions and requires
+separate reconciliation. Source-only runtime status remains available for bounded
+diagnostics. Genuine late process/result/closure observations stay recordable;
+stale-owner output is quarantined rather than accepted as new work. No observation
+or settled promise supplies missing whole-domain closure.
+
 ## Evidence still required
 
 Temporary SQLite, synthetic source observers and induced provider/clock failures

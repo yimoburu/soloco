@@ -25,6 +25,8 @@ const now=()=>new Date().toISOString();
 export const TASK_EFFECT_LEASE_MS=120000;
 const boundPrincipalConnections=new WeakMap();
 const taskAssignmentConnections=new WeakMap();
+const productionAdmissions=new WeakMap();
+const productionSchedulers=new WeakMap();
 function nextTaskAuthority(value){
   const previous=value?.authority_epoch;
   if(previous!==undefined&&(!Number.isSafeInteger(previous)||previous<1))hold('TASK_AUTHORITY_CHANGED','Invalid task authority epoch');
@@ -290,6 +292,15 @@ function member(tx,actor){
 }
 const trusted=p=>p.value.kind==='scheduler';
 const founder=(c,p)=>p.id===c.value.founder_principal_id&&p.value.kind==='founder';
+// Read-only software currentness assertion, not an authentication/minting API.
+// Authorizing paths additionally bind the real ledger and original producer.
+export function assertPeerProductionAuthority(tx,expected,ledger=null){
+  if(!expected||Object.keys(expected).sort().join(',')!=='company_id,founder,legacy_owner,protocol,root_sha256'||expected.protocol!=='peer-production-authority-v1'||typeof expected.company_id!=='string'||!/^[a-f0-9]{64}$/.test(expected.root_sha256??''))hold('PRODUCTION_OWNER_CHANGED','Original production owner seal required');
+  const reference=exactReference(expected.founder),legacy=expected.legacy_owner;
+  if(reference.family!=='principals'||!legacy||Object.keys(legacy).sort().join(',')!=='epoch,host,session_id'||!['codex','claude'].includes(legacy.host)||typeof legacy.session_id!=='string'||!legacy.session_id.trim()||!Number.isSafeInteger(legacy.epoch)||legacy.epoch<1)hold('PRODUCTION_OWNER_CHANGED','Original adopted owner identity required');
+  const c=control(tx),principal=tx.get('principals',reference.id);
+  if(ledger&&(ledger.company_id!==expected.company_id||digest(ledger.root)!==expected.root_sha256)||c.value.founder_principal_id!==reference.id||principal?.value.kind!=='founder'||principal.value.status!=='active'||!same(ref('principals',principal),reference)||!principal.value.legacy_owner||!same(principal.value.legacy_owner,legacy)||principal.value.host!==legacy.host)hold('PRODUCTION_OWNER_CHANGED','Production runtime owning founder changed');
+}
 const scopeOf=v=>{
   const scope=v===undefined||v===null?'*':text(v,'scope',160);
   // SQLite TEXT and indexed selectors require Unicode scalar text. Under /u,
@@ -555,7 +566,7 @@ export function buildContext(tx,actor,task){
   const body={protocol:'peer-task-context-v1',control:{policy_generation:c.value.policy_generation,pause_generation:c.value.pause_generation,paused:c.value.paused,governance_sha256:c.value.governance_sha256??null,policy:policy(c)},principal:ref('principals',owner),grant:auth.grant?grantBinding(auth.grant):{founder_principal_id:owner.id},task:{id:task.id,definition_revision:t.definition_revision,definition_sha256:t.definition_sha256,definition:t.definition,owner_principal_id:t.owner_principal_id,grant_id:t.grant_id,grant_generation:t.grant_generation},...selected};
   const encoded=canonical(body),size=Buffer.byteLength(encoded);if(size>policy(c).max_context_bytes)hold('CONTEXT_CAPACITY','Complete required context exceeds policy; no attempt consumed');return {...body,text:encoded,sha256:digest(encoded),hash:digest(encoded),utf8_bytes:size};
 }
-export function validateContext(tx,context){tx=trackedReads(tx);try{if(control(tx).value.paused)return false;const t=tx.get('tasks',context.task.id);if(!t||['cancelled','unknown','quarantined'].includes(t.value.status))return false;const current=buildContext(tx,{principal_id:t.value.owner_principal_id},t);return current.sha256===context.sha256&&current.text===context.text;}catch(error){if(readFailure(tx,error))throw error;return false;}}
+export function validateContext(tx,context){tx=trackedReads(tx);try{if(control(tx).value.paused)return false;const t=tx.get('tasks',context.task.id);if(!t||['cancelled','unknown','quarantined'].includes(t.value.status))return false;const current=buildContext(tx,{principal_id:t.value.owner_principal_id},t);if(Object.hasOwn(t.value.attempt?.effect_authority??{},'production_authority'))assertPeerProductionAuthority(tx,t.value.attempt.effect_authority.production_authority);return current.sha256===context.sha256&&current.text===context.text;}catch(error){if(readFailure(tx,error))throw error;return false;}}
 
 // Conservatively resolve all explicit contributor references. Missing author or
 // principal lineage is a hold, not permission to treat evidence as independent.
@@ -1094,15 +1105,82 @@ function command(tx,actor,action,args,protectedCall,taskBinding=null){
   const mutationArgs=taskBinding?{...args,operation_id:digest(['peer-task-operation-v1',taskBinding,operation])}:args;
   const result=mutate(tx,actor,principal,c,action,mutationArgs,protectedCall,taskBinding);tx.put('commands',id,{principal_id:actor.principal_id,operation_id:operation,action,request_sha256:hash,...(taskBinding?{task_id:taskBinding.task_id,attempt_id:taskBinding.attempt_id,task_effect:copy(taskBinding)}:{}),result:bounded(result,'receipt',800000),created_at:now()},0);return result;
 }
-function run(ledger,actor,action,args,protectedCall,binding=null){
+function run(ledger,actor,action,args,protectedCall,binding=null,production=null){
   // Validate before reading fields; accessors, custom prototypes, undefined,
   // symbols, sparse arrays, nonfinite numbers and lossy values fail as in P1.
   const a=copy(actor),input=bounded(args,'request',1000000);text(action,'action',100);
   if(scopeInputActions.has(action))scopeOf(input.scope);
   if(observationActions.has(action)&&!protectedCall)hold('OBSERVER_REQUIRED','Observation actions require the separate trusted host interface');
-  return plannedWrite(ledger,action,a.principal_id,tx=>{const p=member(tx,a);if(binding)checkBoundPrincipal(p,binding);else if(p.value.membership_qualification)hold('BOUND_CONNECTION_REQUIRED','Managed principal requires a protected bound connection');if(action==='task/assign'){if(!founder(control(tx),p))hold('FOUNDER_REQUIRED','Actual founder operator required');taskAssignmentConnections.set(tx,{company_id:ledger.company_id,root_sha256:digest(ledger.root)});}return command(tx,a,action,input,protectedCall);});
+  let deadline=production?Date.now()+TASK_EFFECT_LEASE_MS:null;
+  const terminal=production?tx=>{assertPeerProductionAuthority(tx,production,ledger);return deadline;}:null;
+  return plannedWrite(ledger,action,a.principal_id,tx=>{
+    if(production){assertPeerProductionAuthority(tx,production,ledger);if(action==='task/admit')productionAdmissions.set(tx,production);}
+    const p=member(tx,a);if(binding)checkBoundPrincipal(p,binding);else if(p.value.membership_qualification)hold('BOUND_CONNECTION_REQUIRED','Managed principal requires a protected bound connection');
+    if(action==='task/assign'){if(!founder(control(tx),p))hold('FOUNDER_REQUIRED','Actual founder operator required');taskAssignmentConnections.set(tx,{company_id:ledger.company_id,root_sha256:digest(ledger.root)});}
+    const result=command(tx,a,action,input,protectedCall);
+    if(production&&action==='task/admit'&&result?.admitted){
+      const authority=result.task?.value.attempt?.effect_authority;
+      if(!authority?.production_authority||!same(authority.production_authority,production))hold('PRODUCTION_OWNER_CHANGED','Admission was not produced by this runtime owner');
+      deadline=Math.min(deadline,Date.parse(authority.expires_at));
+    }
+    return result;
+  },terminal);
 }
 export function execute(ledger,actor,action,args={}){return run(ledger,actor,action,args,false);}
+
+/** Private production composition. The owner seal is captured from canonical
+ * state; no caller-supplied owner reference/callback can mint it. Diagnostics
+ * and original closure observations are separate from new-work authority. */
+export function bindPeerProductionScheduler(ledger){
+  if(typeof ledger?.guardedWrite!=='function')hold('PRODUCTION_OWNER_CHANGED','Owning guarded ledger required');
+  const production=ledger.read(tx=>{
+    const c=control(tx),principal=tx.get('principals',c.value.founder_principal_id);
+    if(principal?.value.kind!=='founder'||principal.value.status!=='active'||!principal.value.legacy_owner)hold('PRODUCTION_OWNER_CHANGED','Canonical adopted founder required');
+    const value=bounded({protocol:'peer-production-authority-v1',company_id:ledger.company_id,root_sha256:digest(ledger.root),founder:ref('principals',principal),legacy_owner:principal.value.legacy_owner},'production owner seal',4000);
+    assertPeerProductionAuthority(tx,value,ledger);return value;
+  });
+  const current=()=>ledger.read(tx=>assertPeerProductionAuthority(tx,production,ledger));
+  const facade=Object.freeze({
+    execute(connection,actor,action,args={}){
+      if(connection!==ledger)hold('PRODUCTION_OWNER_CHANGED','Original production ledger required');
+      if(!['task/admit','task/assign','grant/create','grant/revoke'].includes(action))hold('PRODUCTION_ACTION_HELD','Unsupported production scheduler action');
+      return run(ledger,actor,action,args,false,null,production);
+    },
+    inspect(connection,actor,action,args={}){
+      if(connection!==ledger)hold('PRODUCTION_OWNER_CHANGED','Original production ledger required');
+      if(!['runtime/status','task/peek'].includes(action))hold('PRODUCTION_ACTION_HELD','Unsupported production scheduler inspection');
+      return inspectBound(ledger,actor,action,args,null,action==='runtime/status'?null:production);
+    },
+    validateContext(provider,context){
+      const tx=trackedReads(provider);
+      try{
+        const task=tx.get('tasks',context.task.id),authority=task?.value.attempt?.effect_authority?.production_authority;
+        if(!authority||!same(authority,production))return false;
+        assertPeerProductionAuthority(tx,production,ledger);
+        if(!validateContext(tx,context))return false;
+        assertPeerProductionAuthority(tx,production,ledger);return true;
+      }catch(error){if(readFailure(tx,error))throw error;return false;}
+    },
+    membershipWrite(type,principal,fn){
+      if(!['membership/enroll','membership/admit','membership/activate','membership/revoke'].includes(type)||principal!=='operator'||typeof fn!=='function')hold('PRODUCTION_ACTION_HELD','Trusted membership operator write required');
+      const deadline=Date.now()+TASK_EFFECT_LEASE_MS;
+      return ledger.guardedWrite(type,principal,tx=>{
+        assertPeerProductionAuthority(tx,production,ledger);
+        return fn(tx);
+      },tx=>{assertPeerProductionAuthority(tx,production,ledger);return deadline;});
+    },
+    assertCurrent:current
+  });
+  productionSchedulers.set(facade,{ledger,production});
+  return facade;
+}
+
+// Identity-only validation for the optional fixed production membership join.
+// It does not renew the captured owner or make matching DATA a capability.
+export function assertOriginalPeerProductionScheduler(facade,ledger){
+  const original=productionSchedulers.get(facade);
+  if(!original||original.ledger!==ledger)hold('PRODUCTION_OWNER_CHANGED','Original production scheduler capability required');
+}
 
 function checkBoundPrincipal(principal,binding){
   if(principal.id!==binding.principal_id||principal.value.generation!==binding.generation||principal.value.native_id!==binding.native_id||!['cos','reviewer','specialist'].includes(principal.value.kind))hold('PRINCIPAL_CHANGED','Protected principal incarnation changed');
@@ -1181,7 +1259,8 @@ function taskEffectState(raw,source,taskId,executor,seal=null,{context=true,acti
   if(!task||t.owner_principal_id!==principal.id)hold('TASK_OWNER','Current admitted task owner required');
   if(t.status!=='running'||Object.hasOwn(t,'result')||Object.hasOwn(t,'closure')||!a||a.termination_confirmed!==false)hold('TASK_INACTIVE','Only an intact running attempt can act');
   const authority=a.effect_authority;
-  if(!authority||Object.keys(authority).sort().join(',')!=='epoch,expires_at,issued_at,protocol'||authority.protocol!=='peer-task-effect-authority-v1'||!Number.isSafeInteger(t.authority_epoch)||t.authority_epoch<1||authority.epoch!==t.authority_epoch||!Object.hasOwn(t,'authority_previous')||!Number.isSafeInteger(t.authority_event_seq))hold('TASK_AUTHORITY_CHANGED','Source-produced current task authority required');
+  if(!authority||!['epoch,expires_at,issued_at,protocol','epoch,expires_at,issued_at,production_authority,protocol'].includes(Object.keys(authority).sort().join(','))||authority.protocol!=='peer-task-effect-authority-v1'||!Number.isSafeInteger(t.authority_epoch)||t.authority_epoch<1||authority.epoch!==t.authority_epoch||!Object.hasOwn(t,'authority_previous')||!Number.isSafeInteger(t.authority_event_seq))hold('TASK_AUTHORITY_CHANGED','Source-produced current task authority required');
+  if(Object.hasOwn(authority,'production_authority'))assertPeerProductionAuthority(tx,authority.production_authority,ledger);
   const issued=Date.parse(authority.issued_at),expires=Date.parse(authority.expires_at);
   if(typeof authority.issued_at!=='string'||typeof authority.expires_at!=='string'||!Number.isSafeInteger(issued)||!Number.isSafeInteger(expires)||new Date(issued).toISOString()!==authority.issued_at||new Date(expires).toISOString()!==authority.expires_at||expires<=issued||expires-issued>TASK_EFFECT_LEASE_MS||a.admitted_at!==authority.issued_at)hold('TASK_AUTHORITY_CHANGED','Source-produced finite task effect lease required');
   if(seal&&(t.authority_epoch!==seal.namespace.authority_epoch||t.authority_event_seq!==seal.producer.event_seq||!same(t.authority_previous,seal.previous)||a.id!==seal.namespace.attempt_id||a.context?.sha256!==seal.namespace.context_sha256||!same(authority,seal.authority)))hold('TASK_AUTHORITY_CHANGED','Task admission authority changed');
@@ -1209,6 +1288,7 @@ function taskEffectState(raw,source,taskId,executor,seal=null,{context=true,acti
   }else producer=taskEffectProducer(tx,task,effect);
   let args=null;
   if(action){args=taskEffectArguments(task,action,input);authorize(tx,actor,action,args);}
+  if(Object.hasOwn(authority,'production_authority'))assertPeerProductionAuthority(tx,authority.production_authority,ledger);
   // This source assertion is deliberately AFTER every SQL/context/provider
   // operation. It reads private original executor state, never model flags.
   const incarnation=assertOriginalPeerExecutorIncarnation(executor,{ledger,task_id:task.id,attempt_id:a.id,context_sha256:ctx.sha256});
@@ -1307,7 +1387,7 @@ function mutate(tx,actor,principal,c,action,args,protectedCall,taskBinding=null,
       prepareOriginalProjectedTaskContext(context,tx);
       const issued=Date.now(),expires=Math.min(issued+TASK_EFFECT_LEASE_MS,auth.grant?Date.parse(auth.grant.value.expires_at):Infinity);
       if(!Number.isSafeInteger(issued)||!Number.isSafeInteger(expires)||expires<=issued)hold('GRANT_INVALID','Admission authority expired during preparation');
-      effectAuthority={protocol:'peer-task-effect-authority-v1',epoch:nextTaskAuthority(t),issued_at:new Date(issued).toISOString(),expires_at:new Date(expires).toISOString()};
+      effectAuthority={protocol:'peer-task-effect-authority-v1',epoch:nextTaskAuthority(t),issued_at:new Date(issued).toISOString(),expires_at:new Date(expires).toISOString(),...(productionAdmissions.has(tx)?{production_authority:copy(productionAdmissions.get(tx))}:{})};
     }catch(error){if(readFailure(tx,error))throw error;if(['RESOURCE_BUSY','RESOURCE_AUTHORITY','CONTEXT_CAPACITY','CONTEXT_CONFLICT','GRANT_INVALID','GRANT_CHANGED','MODEL_BUDGET','PRINCIPAL_INACTIVE','SOURCE_CHANGED','DEPENDENCY_CYCLE','LEGACY_SOURCE_MISSING','DEFINITION_CHANGED'].includes(error.code))return {admitted:false,code:error.code,reason:error.message};throw error;}
     const effectId=digest(['native-effect',task.id,t.definition_revision]);if(tx.get('effects',effectId))hold('ATTEMPT_CONSUMED','Effect already reserved');
     const request={kind:'native',task_id:task.id,definition_sha256:t.definition_sha256,context_sha256:context.sha256},attempt={id:digest(['attempt',task.id,t.definition_revision]),effect_id:effectId,request_sha256:digest(request),definition_revision:t.definition_revision,context,policy_generation:c.value.policy_generation,pause_generation:c.value.pause_generation,admitted_at:effectAuthority.issued_at,effect_authority:effectAuthority,termination_confirmed:false,model_calls:1};
@@ -1396,6 +1476,8 @@ function mutate(tx,actor,principal,c,action,args,protectedCall,taskBinding=null,
 export function inspect(ledger,actor,action,args={}){
   return inspectBound(ledger,actor,action,args);
 }
-function inspectBound(ledger,actor,action,args={},binding=null){
-  const a=copy(actor),input=bounded(args,'inspection',1000000);return ledger.read(tx=>{const p=member(tx,a),c=control(tx);if(binding)checkBoundPrincipal(p,binding);else if(p.value.membership_qualification)hold('BOUND_CONNECTION_REQUIRED','Managed principal requires a protected bound connection');policy(c);if(action==='runtime/status')return runtimeStatus(tx);if(action==='task/peek'){if(!trusted(p))hold('SCHEDULER_REQUIRED','Runtime selection required');const task=peek(tx,input);return {task,host:task?tx.get('principals',task.value.owner_principal_id)?.value.host??'codex':null,traversal:{matching_row_limit:MAX_ROWS,exclusion_limit:MAX_ROWS,fairness_advances_on_admission:true}};}if(action==='task/context')return buildContext(tx,a,tx.get('tasks',text(input.task_id,'task id',200)));if(action==='task/get'){const task=tx.get('tasks',text(input.task_id,'task id',200));if(task&&task.value.owner_principal_id!==p.id&&!trusted(p)&&!founder(c,p))hold('TASK_OWNER','Task owner required');return task;}if(action==='list'){if(!['tasks','homes','proposals','conflicts','notices','messages','grants','claims','effects'].includes(input.family))hold('FAMILY_INVALID','Inspectable family required');return tx.list(input.family,{limit:Math.min(input.limit??20,100),cursor:input.cursor,status:input.status,...(founder(c,p)||trusted(p)?{}:{principal_id:p.id}),...(input.scope?{scope:input.scope}:{})});}hold('ACTION_UNKNOWN','Unsupported inspection');});
+function inspectBound(ledger,actor,action,args={},binding=null,production=null){
+  const a=copy(actor),input=bounded(args,'inspection',1000000),deadline=production?Date.now()+TASK_EFFECT_LEASE_MS:null;
+  const inspect=tx=>{if(production)assertPeerProductionAuthority(tx,production,ledger);const p=member(tx,a),c=control(tx);if(binding)checkBoundPrincipal(p,binding);else if(p.value.membership_qualification)hold('BOUND_CONNECTION_REQUIRED','Managed principal requires a protected bound connection');policy(c);if(action==='runtime/status')return runtimeStatus(tx);if(action==='task/peek'){if(!trusted(p))hold('SCHEDULER_REQUIRED','Runtime selection required');const task=peek(tx,input);return {task,host:task?tx.get('principals',task.value.owner_principal_id)?.value.host??'codex':null,traversal:{matching_row_limit:MAX_ROWS,exclusion_limit:MAX_ROWS,fairness_advances_on_admission:true}};}if(action==='task/context')return buildContext(tx,a,tx.get('tasks',text(input.task_id,'task id',200)));if(action==='task/get'){const task=tx.get('tasks',text(input.task_id,'task id',200));if(task&&task.value.owner_principal_id!==p.id&&!trusted(p)&&!founder(c,p))hold('TASK_OWNER','Task owner required');return task;}if(action==='list'){if(!['tasks','homes','proposals','conflicts','notices','messages','grants','claims','effects'].includes(input.family))hold('FAMILY_INVALID','Inspectable family required');return tx.list(input.family,{limit:Math.min(input.limit??20,100),cursor:input.cursor,status:input.status,...(founder(c,p)||trusted(p)?{}:{principal_id:p.id}),...(input.scope?{scope:input.scope}:{})});}hold('ACTION_UNKNOWN','Unsupported inspection');};
+  return production?ledger.guardedWrite(action,a.principal_id,inspect,tx=>{assertPeerProductionAuthority(tx,production,ledger);return deadline;}):ledger.read(inspect);
 }
