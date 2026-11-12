@@ -164,12 +164,12 @@ test('upgrade reuses the optional dispatch selection schema with unchanged requi
   assert.deepEqual(schema.properties.action.enum,['inspect','prepare','resume','apply','verify','recover']);
 });
 
-test('compatible patch preserves explicit model-selection dispatch for a pinned 0.7.6 team',async()=>{
-  const h=harness('codex');h.mutate(s=>{s.plugin_version='0.7.6';s.runtime_version='0.7.6';});
+for(const version of ['0.7.6','0.7.7'])test(`compatible patch preserves explicit model-selection dispatch for a pinned ${version} team`,async()=>{
+  const h=harness('codex');h.mutate(s=>{s.plugin_version=version;s.runtime_version=version;});
   const job=await h.call({model_selection:{mode:'default',reason:'Retain the supported pinned team'}});
   assert.equal(job.status,'queued');assert.equal(h.launches.length,1);
-  assert.equal(h.state.plugin_version,'0.7.6');
-  const unsupported=harness('codex');unsupported.mutate(s=>{s.plugin_version='0.7.8';});
+  assert.equal(h.state.plugin_version,version);
+  const unsupported=harness('codex');unsupported.mutate(s=>{s.plugin_version='999.0.0';});
   await assert.rejects(()=>unsupported.call({model_selection:{mode:'default',reason:'Unsupported future team'}}),/adopt the model-selection team/);
 });
 

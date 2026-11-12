@@ -23,8 +23,8 @@ assert.equal(extract.status,0,'Could not extract immutable published runtime');
 const legacy=await import(pathToFileURL(path.join(legacyDir,'plugins/soloco/runtime/engine.mjs')));
 const state=a=>withStore(a.root,db=>db.read());
 
-test('bounded-handover producer fences actual 0.6.10, 0.6.11, 0.6.12, 0.6.13, 0.7.0 and published 0.7.1/0.7.2/0.7.3/0.7.4 writers without adopting definitions',()=>{
- for(const [version,revision] of [['0.6.10','056c36e'],['0.6.11','b2e3974'],['0.6.12','964f90c'],['0.6.13','76d3e8d'],['0.7.0','7f7f085'],['0.7.1','1347f79c4249c8e4aba39ba372ad1376476f9a79'],['0.7.2','64bd2eb3ea3a047aba0eb284b6629414ae3ddbc6'],['0.7.3','a260eb802692c7f876fa1d35bd899efbd6042c8b'],['0.7.4','886e0e5eb9e0a97201ca7ab51c5002825db82329'],['0.7.5','38d95fd6463fedef68e61737bdb2d4af4b05c756']]) {
+test('bounded-handover producer fences actual 0.6.10, 0.6.11, 0.6.12, 0.6.13, 0.7.0 and published 0.7.1/0.7.2/0.7.3/0.7.4/0.7.7 writers without adopting definitions',()=>{
+ for(const [version,revision] of [['0.6.10','056c36e'],['0.6.11','b2e3974'],['0.6.12','964f90c'],['0.6.13','76d3e8d'],['0.7.0','7f7f085'],['0.7.1','1347f79c4249c8e4aba39ba372ad1376476f9a79'],['0.7.2','64bd2eb3ea3a047aba0eb284b6629414ae3ddbc6'],['0.7.3','a260eb802692c7f876fa1d35bd899efbd6042c8b'],['0.7.4','886e0e5eb9e0a97201ca7ab51c5002825db82329'],['0.7.5','38d95fd6463fedef68e61737bdb2d4af4b05c756'],['0.7.7','70ca420ac57819c04eb37c9071fda8a5b78c9e27']]) {
   const archived=spawnSync('git',['archive',revision,'plugins/soloco'],{cwd:repo,maxBuffer:20000000});
   assert.equal(archived.status,0);
   const dir=path.join(base,'producer-'+version);fs.mkdirSync(dir);
