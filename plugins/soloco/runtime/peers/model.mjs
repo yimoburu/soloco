@@ -13,6 +13,7 @@ import {canonical,peerDigest,FAMILIES} from './ledger.mjs';
 import {REVIEW_SELECTION_RECIPE,extractReviewSelection,parseReviewOutput,reviewReference,reviewScope} from './review-selection.mjs';
 import {assertOriginalPeerExecutorIncarnation} from './executor-incarnation.mjs';
 import {sendHandoff,decideHandoff,pendingHandoffs,prepareHandoffTask} from './handoff.mjs';
+import {assertPeerOwnerOperatingState} from './owner-operating-state.mjs';
 
 const PROTOCOL='peer-cos-v1',MAX_ROWS=10000;
 const outstanding=['reserved','sent','unknown'];
@@ -30,6 +31,9 @@ const productionAdmissions=new WeakMap();
 const productionSchedulers=new WeakMap();
 const productionPublications=new WeakMap();
 const currentAuthorizationGrants=new WeakMap();
+// Source-private transaction routing only. It is thrown before command lookup
+// or planning a mutation, never after an attempt, reservation or host effect.
+const ownerGuardUpgrade=Object.freeze(new Error('Owning guarded source plan required'));
 function nextTaskAuthority(value){
   const previous=value?.authority_epoch;
   if(previous!==undefined&&(!Number.isSafeInteger(previous)||previous<1))hold('TASK_AUTHORITY_CHANGED','Invalid task authority epoch');
@@ -618,6 +622,17 @@ function checkCurrentBindings(tx,bindings){
     const row=tx.get(expected.family,expected.id);
     if(expected.reference?(!row||!same(ref(expected.family,row),expected.reference)):row!==null&&row!==undefined)hold('AUTHORITY_CHANGED','Original checked task handoff source changed before commit');
   }
+}
+function ownerOperatingBinding(tx,action){
+  const bindings=new Map(),view={...tx,get:(family,id)=>{
+    const row=tx.get(family,id);
+    bindings.set(canonical([family,id]),{family,id,reference:row?ref(family,row):null});
+    return row;
+  }};
+  // Immutable history is verified only before real writes. The physical guard
+  // subsequently rechecks these current heads with its get-only provider.
+  const state=assertPeerOwnerOperatingState(view,action);
+  return {state,bindings:state.controlled?[...bindings.values()]:null};
 }
 export function buildContext(tx,actor,task){
   tx=trackedReads(tx);
@@ -1314,7 +1329,7 @@ function assignmentCommitBinding(tx,ledger,actor,args,result){
   }
   return {bindings:[...bindings.values()],expires_at_ms:Date.parse(auth.grant.value.expires_at)};
 }
-function run(ledger,actor,action,args,protectedCall,binding=null,production=null){
+function run(ledger,actor,action,args,protectedCall,binding=null,production=null,ownerGuarded=false){
   // Validate before reading fields; accessors, custom prototypes, undefined,
   // symbols, sparse arrays, nonfinite numbers and lossy values fail as in P1.
   const a=copy(actor),input=bounded(args,'request',1000000);text(action,'action',100);
@@ -1329,7 +1344,7 @@ function run(ledger,actor,action,args,protectedCall,binding=null,production=null
     const selected=peek(tx,input)?.value;
     return Boolean(selected&&(Object.hasOwn(selected,'handoff_ref')||Object.hasOwn(selected.definition??{},'handoff_ref')));
   });
-  const guardedPlan=Boolean(production&&['home/publish','task/admit'].includes(action)||typedAdmission||action.startsWith('handoff/')||['task/submit','task/assign'].includes(action)&&Object.hasOwn(input,'handoff_ref'));
+  const guardedPlan=Boolean(ownerGuarded||production&&['home/publish','task/admit'].includes(action)||typedAdmission||action.startsWith('handoff/')||['task/submit','task/assign'].includes(action)&&Object.hasOwn(input,'handoff_ref'));
   if(guardedPlan&&typeof ledger.guardedWrite!=='function')hold('TASK_EFFECT_UNAVAILABLE','Owning guarded task or handoff plan required');
   let deadline=production||action==='task/assign'||guardedPlan?Date.now()+TASK_EFFECT_LEASE_MS:null,assignment=null,replay=false,operatorBindings=null,semanticPlan=null;
   const terminal=production||action==='task/assign'||guardedPlan?tx=>{
@@ -1348,9 +1363,13 @@ function run(ledger,actor,action,args,protectedCall,binding=null,production=null
     }
     return deadline;
   }:null;
-  return plannedWrite(ledger,action,a.principal_id,tx=>{
+  try{return plannedWrite(ledger,action,a.principal_id,tx=>{
     if(production){assertPeerProductionAuthority(tx,production,ledger);if(action==='task/admit')productionAdmissions.set(tx,production);}
     const p=member(tx,a);if(binding)checkBoundPrincipal(p,binding);else if(p.value.membership_qualification)hold('BOUND_CONNECTION_REQUIRED','Managed principal requires a protected bound connection');
+    if(!(protectedCall&&observationActions.has(action))&&action!=='notice/create'){
+      const owner=assertPeerOwnerOperatingState(tx,action);
+      if(owner.controlled&&!guardedPlan)throw ownerGuardUpgrade;
+    }
     if(action.startsWith('handoff/')){
       if(!production&&!binding)hold('BOUND_CONNECTION_REQUIRED','Original protected receiver or sender connection required');
       if(production&&!founder(control(tx),p))hold('FOUNDER_REQUIRED','Public handoff operator is the actual founder only');
@@ -1386,7 +1405,13 @@ function run(ledger,actor,action,args,protectedCall,binding=null,production=null
   },terminal,guardedPlan?plan=>{
     semanticPlan=plan;
     for(const grant of plan.authorizing_grants)deadline=Math.min(deadline,grant.expires_at_ms);
-  }:null);
+  }:null);}catch(error){
+    if(error!==ownerGuardUpgrade||ownerGuarded)throw error;
+    // The first owning transaction has rolled back its reads. Reselect and
+    // validate everything in a fresh guarded transaction; no authority cache,
+    // model call, native attempt or renewed allowance crosses this boundary.
+    return run(ledger,a,action,input,protectedCall,binding,production,true);
+  }
 }
 export function execute(ledger,actor,action,args={}){return run(ledger,actor,action,args,false);}
 
@@ -1426,10 +1451,14 @@ export function bindPeerProductionScheduler(ledger){
     membershipWrite(type,principal,fn){
       if(!['membership/enroll','membership/admit','membership/activate','membership/revoke'].includes(type)||principal!=='operator'||typeof fn!=='function')hold('PRODUCTION_ACTION_HELD','Trusted membership operator write required');
       const deadline=Date.now()+TASK_EFFECT_LEASE_MS;
+      let ownerBindings=null;
       return ledger.guardedWrite(type,principal,tx=>{
         assertPeerProductionAuthority(tx,production,ledger);
-        return fn(tx);
-      },tx=>{assertPeerProductionAuthority(tx,production,ledger);return deadline;});
+        ownerBindings=ownerOperatingBinding(tx,type).bindings;
+        const result=fn(tx);
+        if(ownerBindings){if(typeof tx.sealWrites!=='function')hold('AUTHORITY_CHANGED','Owning membership write closure required');tx.sealWrites();}
+        return result;
+      },tx=>{assertPeerProductionAuthority(tx,production,ledger);checkCurrentBindings(tx,ownerBindings);return deadline;});
     },
     assertCurrent:current
   });
@@ -1525,6 +1554,7 @@ function taskEffectState(raw,source,taskId,executor,seal=null,{context=true,acti
   const tx=trackedReads(raw),{ledger,actor,binding}=source;
   if(ledger.company_id!==source.company||ledger.root!==source.root)hold('AUTHENTICATION_REQUIRED','Protected company connection changed');
   const principal=member(tx,actor);checkBoundPrincipal(principal,binding);
+  const owner=context&&action!=='notice/create'?ownerOperatingBinding(tx,action??'task/effect-bind'):null;
   const c=control(tx);policy(c);legacyOriginHold(c);
   if(c.value.paused)hold('PAUSED','Pause fences task effects');
   const task=tx.get('tasks',taskId),t=task?.value,a=t?.attempt;
@@ -1576,7 +1606,7 @@ function taskEffectState(raw,source,taskId,executor,seal=null,{context=true,acti
   const deadline=Math.min(expires,auth.grant?Date.parse(auth.grant.value.expires_at):Infinity,incarnation.deadline_at_ms);
   if(!Number.isSafeInteger(deadline)||deadline<=issued)hold('TASK_AUTHORITY_CHANGED','Finite source deadline required');
   if(context){const cutoff=Date.now();if(!Number.isFinite(cutoff)||cutoff>=deadline)hold('TASK_EFFECT_EXPIRED','Task effect lease expired before replay or effects');}
-  return {task,context:ctx,authority,producer,incarnation,deadline,args,handoff};
+  return {task,context:ctx,authority,producer,incarnation,deadline,args,handoff,owner};
 }
 
 /** Trusted host composition only. Models receive only the returned execute /
@@ -1599,9 +1629,9 @@ export function bindPeerTaskEffects(originalConnection,selector,executor){
   ledger.guardedWrite('task/effect-bind',actor.principal_id,tx=>{
     const state=taskEffectState(tx,source,taskId,executor);
     const namespace={protocol:'peer-task-effect-binding-v1',task_id:taskId,attempt_id:state.task.value.attempt.id,authority_epoch:state.authority.epoch,context_sha256:state.context.sha256,admission_producer:state.producer,executor_incarnation_id:state.incarnation.incarnation_id,runtime_generation:state.incarnation.runtime_generation};
-    seal={namespace:copy(namespace),authority:copy(state.authority),previous:copy(state.task.value.authority_previous),producer:copy(state.producer),incarnation:copy(state.incarnation),handoff_bindings:state.handoff?copy(state.handoff.bindings):null};
-    initialHandoffBindings=seal.handoff_bindings;
-    if(state.handoff){if(typeof tx.sealWrites!=='function')hold('TASK_EFFECT_UNAVAILABLE','Owning handoff write closure required');tx.sealWrites();}
+    seal={namespace:copy(namespace),authority:copy(state.authority),previous:copy(state.task.value.authority_previous),producer:copy(state.producer),incarnation:copy(state.incarnation),handoff_bindings:state.handoff?copy(state.handoff.bindings):null,owner_bindings:state.owner?.bindings??null};
+    initialHandoffBindings=[...(seal.handoff_bindings??[]),...(seal.owner_bindings??[])];
+    if(state.handoff||seal.owner_bindings){if(typeof tx.sealWrites!=='function')hold('TASK_EFFECT_UNAVAILABLE','Owning task write closure required');tx.sealWrites();}
   },terminal(null,null,()=>initialHandoffBindings));
   return Object.freeze({
     execute(action,args={}){
@@ -1613,7 +1643,7 @@ export function bindPeerTaskEffects(originalConnection,selector,executor){
         const state=taskEffectState(tx,source,taskId,executor,seal,{action,input});
         // Task authority precedes even a matching command receipt lookup.
         return command(tx,actor,action,state.args,false,seal.namespace);
-      },terminal(action,input,()=>semanticPlan?.bindings),seal.handoff_bindings?plan=>{semanticPlan=plan;}:null);
+      },terminal(action,input,()=>semanticPlan?.bindings),seal.handoff_bindings||seal.owner_bindings?plan=>{semanticPlan=plan;}:null);
     },
     inspect(action,args={}){
       const input=taskEffectRequest(source,args);
@@ -1621,8 +1651,8 @@ export function bindPeerTaskEffects(originalConnection,selector,executor){
       let handoffBindings=null;
       return ledger.guardedWrite(action,actor.principal_id,tx=>{
         const state=taskEffectState(tx,source,taskId,executor,seal);
-        handoffBindings=state.handoff?.bindings??null;
-        if(state.handoff){if(typeof tx.sealWrites!=='function')hold('TASK_EFFECT_UNAVAILABLE','Owning handoff write closure required');tx.sealWrites();}
+        handoffBindings=[...(state.handoff?.bindings??[]),...(state.owner?.bindings??[])];
+        if(state.handoff||state.owner?.bindings){if(typeof tx.sealWrites!=='function')hold('TASK_EFFECT_UNAVAILABLE','Owning task write closure required');tx.sealWrites();}
         return copy(action==='task/get'?state.task:state.context);
       },terminal(null,null,()=>handoffBindings));
     }
