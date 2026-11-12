@@ -13,6 +13,9 @@ import {validModelProcessTracking,modelProcessTransition} from '../model-process
 import {canonical,peerDigest} from './ledger.mjs';
 import {captureLegacyOrigin,authenticateLegacyOwner} from './legacy-origin.mjs';
 import {captureOriginSidecarContents,assertOriginSidecarCaptureSupport} from './origin-sidecar-capture.mjs';
+import {peerOriginPausedBootstrapPurpose} from './origin-paused-bootstrap-contract.mjs';
+import {qaPurpose} from './origin-mechanical-qa-contract.mjs';
+import * as mechanicalQa from './origin-mechanical-qa-policy.mjs';
 export {captureOriginSidecarContents} from './origin-sidecar-capture.mjs';
 
 export const ORIGIN_PLAN_PROTOCOL='peer-origin-quarantine-plan-v1';
@@ -63,15 +66,18 @@ function policy(value){
  originNeed(value&&Object.keys(value).sort().join(',')===keys.sort().join(',')&&keys.every(k=>Number.isSafeInteger(value[k])&&value[k]>0)&&value.worker_cap<=3&&value.queue_limit<=1000&&value.principal_queue_limit<=value.queue_limit&&value.max_context_bytes>=512&&value.max_context_bytes<=65536,'ORIGIN_NEW_POLICY_REQUIRED');return originCopy(value);
 }
 function recordPeerOriginQuarantinePlanSelected(root,actor,input,expected_epoch){
- const a=assertOriginActor(actor);input=originSafeData(input);originNeed(input&&['expires_at','maintenance','policy','source_instruction'].every(k=>Object.hasOwn(input,k))&&Object.keys(input).every(k=>['expires_at','maintenance','policy','source_instruction','frontier'].includes(k)),'ORIGIN_PLAN_INPUT');
+ const a=assertOriginActor(actor);input=originSafeData(input);originNeed(input&&['expires_at','maintenance','policy','source_instruction'].every(k=>Object.hasOwn(input,k))&&Object.keys(input).every(k=>['expires_at','maintenance','policy','source_instruction','frontier','frontier_seal','paused_bootstrap','mechanical_qa'].includes(k)),'ORIGIN_PLAN_INPUT');
  const end=Date.parse(input.expires_at);originNeed(text(input.source_instruction)&&end>Date.now()&&end<=Date.now()+7*86400000,'ORIGIN_PLAN_EXPIRY');
  const m=input.maintenance;originNeed(m&&Object.keys(m).sort().join(',')==='max_model_calls,max_review_calls,scope,source_instruction'&&m.scope==='*'&&text(m.source_instruction)&&Number.isSafeInteger(m.max_model_calls)&&m.max_model_calls>=2&&Number.isSafeInteger(m.max_review_calls)&&m.max_review_calls>=1&&m.max_review_calls<m.max_model_calls,'ORIGIN_MAINTENANCE_AUTHORITY_REQUIRED');
  let frontier=null;if(Object.hasOwn(input,'frontier')){const f=input.frontier;originNeed(f&&Object.keys(f).sort().join(',')==='max_model_calls,max_review_calls,protocol'&&f.protocol==='peer-origin-input-frontier-v1'&&Number.isSafeInteger(f.max_model_calls)&&f.max_model_calls>0&&f.max_model_calls<=m.max_model_calls&&Number.isSafeInteger(f.max_review_calls)&&f.max_review_calls>0&&f.max_review_calls<=f.max_model_calls&&f.max_review_calls<=m.max_review_calls,'ORIGIN_FRONTIER_SUBCAP_REQUIRED');frontier=originCopy(f);}
+ let frontier_seal=null;if(Object.hasOwn(input,'frontier_seal')){const f=input.frontier_seal;originNeed(f&&Object.keys(f).sort().join(',')==='max_reviews,protocol,purpose'&&f.protocol==='peer-origin-frontier-seal-purpose-v1'&&f.purpose==='bounded-preparation-bootstrap'&&Number.isSafeInteger(f.max_reviews)&&f.max_reviews>0&&f.max_reviews<=m.max_model_calls&&f.max_reviews<=m.max_review_calls,'ORIGIN_FRONTIER_SEAL_PURPOSE_REQUIRED');frontier_seal=originCopy(f);}
+ let mechanical_qa=null;if(Object.hasOwn(input,'mechanical_qa'))mechanical_qa=qaPurpose(input.mechanical_qa);
+ let paused_bootstrap=null;if(Object.hasOwn(input,'paused_bootstrap')){originNeed(frontier_seal,'ORIGIN_PAUSED_BOOTSTRAP_SEAL_PURPOSE_REQUIRED');paused_bootstrap=peerOriginPausedBootstrapPurpose(input.paused_bootstrap,m);}
  return withOriginLegacyStore(root,a,store=>{
   let result;store.transaction('origin.quarantine.planned',s=>{
    if(expected_epoch!==undefined)originNeed(s.owner?.epoch===expected_epoch,'ORIGIN_OWNER_EPOCH_CHANGED');owner(s,a.session_id,a.host,expected_epoch);originNeed(s.paused===true,'ORIGIN_PAUSE_REQUIRED');const cut=capturePeerOriginCut(store.db,{directory:store.dir});
    originNeed(cut.snapshot.execution.pending_jobs===0,'ORIGIN_ACTIVE_LEGACY_WORK');
-   const id='origin-quarantine-plan:'+randomUUID(),plan={protocol:ORIGIN_PLAN_PROTOCOL,plan_id:id,company_id:s.id,owner:originCopy(s.owner),actor:a,baseline:cut.baseline,cut:cut.body,cut_sha256:cut.sha256,policy:policy(input.policy),maintenance:originCopy(m),...(frontier?{frontier}:{}),expires_at:input.expires_at,source_instruction:input.source_instruction,exclusion_contract:'only-source-produced-mechanical-review-journal-v1',legacy_authority:'retired-without-conversion',execution_resumed:false};
+   const id='origin-quarantine-plan:'+randomUUID(),plan={protocol:ORIGIN_PLAN_PROTOCOL,plan_id:id,company_id:s.id,owner:originCopy(s.owner),actor:a,baseline:cut.baseline,cut:cut.body,cut_sha256:cut.sha256,policy:policy(input.policy),maintenance:originCopy(m),...(frontier?{frontier}:{}),...(frontier_seal?{frontier_seal}:{}),...(paused_bootstrap?{paused_bootstrap}:{}),...(mechanical_qa?{mechanical_qa}:{}),expires_at:input.expires_at,source_instruction:input.source_instruction,exclusion_contract:'only-source-produced-mechanical-review-journal-v1',legacy_authority:'retired-without-conversion',execution_resumed:false};
    const record={id,kind:'plan',status:'Draft',revision:1,author_role:'cos',author_instance:a.native_id,content:canonical(plan),origin_quarantine_plan:plan,created_at:new Date().toISOString()};originNeed(Buffer.byteLength(canonical(record))<=ORIGIN_LIMITS.value_bytes,'ORIGIN_PLAN_CAPACITY');
    s.records[id]=record;result={plan_id:id,plan_sha256:peerDigest(plan),cut_sha256:cut.sha256,expires_at:plan.expires_at};return s;
   },{beforeCommit:db=>{if(expected_epoch!==undefined){const entry=readNormalizedValue(db,{family:'root',key:'owner'}),actual=entry&&JSON.parse(entry.raw);originNeed(actual&&actual.session_id===a.session_id&&actual.host===a.host&&actual.epoch===expected_epoch,'ORIGIN_OWNER_EPOCH_CHANGED');}originNeed(Date.now()<end,'ORIGIN_PLAN_EXPIRED');}});return result;
@@ -106,7 +112,7 @@ export function inspectLegacyLocalReleaseFrom(db,job){
 }
 function reviewState(db,plan,job,review,state){
  originNeed(proofJobSafe(job)&&job.status==='completed'&&job.role==='qa'&&job.artifact_id===review.id&&job.review_of?.id===plan.plan_id&&job.review_of.revision===1&&review.job_id===job.id&&review.kind==='review'&&review.status==='Submitted'&&review.author_role==='qa'&&review.author_instance===job.instance_id&&review.revision===1&&originSame(review.review_of,job.review_of)&&job.coordination_release?.termination_confirmed===true&&text(job.native_id,300)&&job.native_id!==plan.actor.native_id&&review.author_instance!==plan.actor.native_id,'ORIGIN_MECHANICAL_REVIEW_REQUIRED');
- originNeed(contextMatches(state,job,job.context_sha256),'ORIGIN_MECHANICAL_CONTEXT_CHANGED');
+ if(plan.mechanical_qa){const checked=mechanicalQa.prepareOriginalPeerOriginMechanicalQaContextFrom(db,state,{job_id:job.id});originNeed(checked.sha256===job.context_sha256,'ORIGIN_MECHANICAL_CONTEXT_CHANGED');}else originNeed(contextMatches(state,job,job.context_sha256),'ORIGIN_MECHANICAL_CONTEXT_CHANGED');
  originNeed(validModelProcessTracking(job.model_process_tracking)&&job.model_process_tracking.invocations.every(i=>i.job_id===job.id&&i.instance_id===job.instance_id&&i.host===job.host&&i.worker_pid===job.worker_pid&&i.birth&&i.closure&&i.closure.exit_code===0&&i.closure.signal===null),'ORIGIN_MECHANICAL_CLOSURE_REQUIRED');
  const local=inspectLegacyLocalReleaseFrom(db,job);originNeed(local.proved===true&&local.release.seq>plan.baseline.seq&&local.events.every(e=>e.seq>plan.baseline.seq),'ORIGIN_MECHANICAL_CLOSURE_REQUIRED');
  originNeed(review.review?.verdict==='Pass'&&Array.isArray(review.review.blockers)&&review.review.blockers.length===0,'ORIGIN_MECHANICAL_NEGATIVE');
@@ -130,13 +136,15 @@ export function validatePeerOriginMechanicalReview(store,{plan_id,review_ids},ac
  const originalJobs=plan.cut.sources.filter(s=>s.family==='jobs').map(s=>JSON.parse(readImmutable(db,s.sha256))),originalSessions=plan.cut.sources.filter(s=>['sessions','retired_sessions'].includes(s.family)).map(s=>JSON.parse(readImmutable(db,s.sha256)));
  const excluded=nativeAliases({owner:plan.owner,jobs:Object.fromEntries(originalJobs.map(j=>[j.id,j])),sessions:Object.fromEntries(originalSessions.map((s,i)=>[i,s]))});originNeed(observed.every(o=>!excluded.has(o.native_id)),'ORIGIN_REVIEW_INDEPENDENCE');
  const intake=readStorageIntake(db,plan.baseline,{values:true}),jobIds=new Set(jobs.map(j=>j.id)),recordIds=new Set([plan_id,...review_ids]),instances=new Set(jobs.map(j=>j.instance_id)),tracking=new Map(),journal=new Map(),sessions=new Map();let planned=0;
- const types=new Set(['job.queued','job.started','job.model_process.requested','job.model_process.born','job.model_process.closed','job.execution_started','job.record_reads_delivered','job.completed']);
+ const selectedAdmin=plan.mechanical_qa?mechanicalQa.preparePeerOriginMechanicalQaAdministrativeFrom(db,state,{plan_ref:{id:record.id,revision:record.revision,sha256:originHash(JSON.stringify(record))},job_id:jobs[0].id}):null;
+ const types=new Set([...(selectedAdmin?['origin.mechanical_qa.packet_prepared','origin.mechanical_qa.grant_selected']:[]),'job.queued','job.started','job.model_process.requested','job.model_process.born','job.model_process.closed','job.execution_started','job.record_reads_delivered','job.completed']);
  for(const e of intake.events){
   originNeed(e.type==='origin.quarantine.planned'||types.has(e.type),'ORIGIN_REVIEW_JOURNAL_CHANGED');if(e.type==='origin.quarantine.planned')planned++;
   originNeed(originSame(e.payload.owner,plan.owner),'ORIGIN_REVIEW_JOURNAL_CHANGED');
   for(const change of e.changes){const r=change.after??change.before,k=logical(r.key),before=change.before?JSON.parse(change.before.raw):null,after=change.after?JSON.parse(change.after.raw):null;
    if(r.family==='root'&&k==='revision'){originNeed(Number.isSafeInteger(after)&&after===(before??-1)+1,'ORIGIN_REVIEW_JOURNAL_CHANGED');continue;}
    if(r.family==='root'&&k==='updated_at'){originNeed(typeof after==='string'&&Number.isFinite(Date.parse(after))&&Date.parse(after)<=Date.parse(e.at),'ORIGIN_REVIEW_JOURNAL_CHANGED');continue;}
+   if(selectedAdmin&&mechanicalQa.isPeerOriginMechanicalQaAdministrativeChange(selectedAdmin,e,change))continue;
    if(r.family==='records'){originNeed(recordIds.has(k)&&!before&&after?.revision===1&&(k===plan_id?e.type==='origin.quarantine.planned'&&originSame(after,record):e.type==='job.completed'&&originSame(after,state.records[k])),'ORIGIN_REVIEW_JOURNAL_CHANGED');continue;}
    if(r.family==='jobs'){
     originNeed(jobIds.has(k)&&after?.id===k&&after.role==='qa'&&after.review_of?.id===plan_id&&after.review_of.revision===1,'ORIGIN_REVIEW_JOURNAL_CHANGED');
@@ -162,3 +170,16 @@ export function validatePeerOriginMechanicalReview(store,{plan_id,review_ids},ac
  const current=capturePeerOriginCut(db,{directory:store.dir});originNeed(current.snapshot.execution.pending_jobs===0,'ORIGIN_ACTIVE_LEGACY_WORK');
  return {plan,record,observed,intake,current};
 }
+
+// Fixed public-source policy producers; actual prospective founder selection is
+// separate from plan DATA. These must never infer or reuse an old/R6 allowance.
+export function recordPeerOriginMechanicalQaDecisionAtEpoch(root,actor,epoch,input){const a=assertOriginActor(actor);return withOriginLegacyStore(root,a,s=>mechanicalQa.recordPeerOriginMechanicalQaDecisionFrom(s,a,epoch,input));}
+export function preparePeerOriginMechanicalQaPacketAtEpoch(root,actor,epoch,input){const a=assertOriginActor(actor);return withOriginLegacyStore(root,a,s=>mechanicalQa.preparePeerOriginMechanicalQaPacketFrom(s,a,epoch,input));}
+export function grantPeerOriginMechanicalQaPacketAtEpoch(root,actor,epoch,input){const a=assertOriginActor(actor);return withOriginLegacyStore(root,a,s=>mechanicalQa.grantPeerOriginMechanicalQaPacketFrom(s,a,epoch,input));}
+
+export function inspectPeerOriginMechanicalQaPacketAtEpoch(root,actor,epoch,input){const a=assertOriginActor(actor);return withOriginLegacyStore(root,a,s=>mechanicalQa.inspectPeerOriginMechanicalQaPacketFrom(s,a,epoch,input));}
+export function readPeerOriginMechanicalQaPacketAtEpoch(root,actor,epoch,input){const a=assertOriginActor(actor);return withOriginLegacyStore(root,a,s=>mechanicalQa.readPeerOriginMechanicalQaPacketFrom(s,a,epoch,input));}
+
+// Supported public adoption must select this strict validator. The older core
+// remains internal compatibility evidence, never a fallback launch/apply route.
+export function validateSelectedPeerOriginMechanicalReviewAtEpoch(store,input,actor,epoch){const a=assertOriginActor(actor),s=store.read();originNeed(Number.isSafeInteger(epoch)&&epoch>0&&s.owner?.epoch===epoch,'ORIGIN_OWNER_EPOCH_CHANGED');owner(s,a.session_id,a.host,epoch);originNeed(s.records?.[input.plan_id]?.origin_quarantine_plan?.mechanical_qa,'ORIGIN_MECHANICAL_QA_PURPOSE_REQUIRED');qaPurpose(s.records[input.plan_id].origin_quarantine_plan.mechanical_qa);return validatePeerOriginMechanicalReview(store,input,a);}
