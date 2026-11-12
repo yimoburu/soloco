@@ -64,7 +64,16 @@ results, native identities and negative refs. Unsupported revisions cannot
 hide new source rows, remove negatives or reset usage. Persistent operation
 indexes reject cold retries. A canonical logical-target fence spans captures;
 new frontier IDs, operation IDs and own accounting/reference churn do not make
-an unchanged original leaf/range/support subject new. No automatic recovery
+an unchanged original leaf/range/support subject new. An additional immutable
+whole normalized source fence, per extraction/integration and produce/review
+stage, belongs to the first frontier that admits it. It ignores raw pagination,
+unit ordinals and accounting digit widths. All original same-frontier units
+remain admissible; a new capture with any unchanged source overlap Holds even
+when it proposes a different range/support grouping. A truly different complete
+material body or nonoverlapping source can have a distinct target, while old
+UNKNOWN, spent calls and reservations remain retained. This conservative rule
+does not establish semantic independence of apparently changed material.
+No automatic recovery
 lane exists. Even a positive spent target is not rerun through a new capture
 in this initial implementation; cross-frontier reuse needs its own checked
 equivalence/recovery producer.

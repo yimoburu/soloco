@@ -126,14 +126,21 @@ function responseContract(subject,unit,children){
 }
 export function validatePeerInputFrontierOutput(raw,context){
  need(typeof raw==='string'&&Buffer.byteLength(raw)<=FRONTIER_LIMITS.output_bytes,'FRONTIER_OUTPUT_CAPACITY');let output;try{output=JSON.parse(raw);}catch{need(false,'FRONTIER_OUTPUT');}
+ // JSON.parse can produce noncanonical numbers (including -0/Infinity) or
+ // excessively nested model values. Check these in a bounded, pure walk
+ // before the shared canonical copier; never reclassify its provider errors.
+ const pending=[{value:output,depth:0}];let values=0;while(pending.length){const {value,depth}=pending.pop();need(++values<=FRONTIER_LIMITS.output_bytes&&depth<=64,'FRONTIER_OUTPUT');if(typeof value==='number')need(Number.isFinite(value)&&!Object.is(value,-0),'FRONTIER_OUTPUT');if(value&&typeof value==='object')for(const child of Object.values(value))pending.push({value:child,depth:depth+1});}
  const review=context.subject.stage==='review';frontierData(output,[...commonResponseKeys,...(review?[]:['items'])]);
  need(raw===canonical(output)&&output.protocol===(review?'peer-input-frontier-review-v1':'peer-input-frontier-result-v1')&&same(output.subject,context.subject)&&['Pass','Fail','Blocked'].includes(output.verdict)&&text(output.reason)&&Array.isArray(output.blockers)&&output.blockers.every(text),'FRONTIER_OUTPUT');
  const pass=output.verdict==='Pass';need(pass?output.exhaustive===true&&output.boundaries_complete===true&&output.blockers.length===0&&output.permitted_action===(review?'qualify_node':'continue'):output.permitted_action==='hold'&&output.blockers.length>0,'FRONTIER_OUTPUT');
  if(review)return output;
- need(Array.isArray(output.items)&&output.items.length<=100&&new Set(output.items.map(i=>i.id)).size===output.items.length,'FRONTIER_ITEMS');
+ need(Array.isArray(output.items)&&output.items.length<=100,'FRONTIER_ITEMS');
+ // Validate every JSON item's closed object shape before dereferencing it.
+ // A malformed model value is a branded output rejection, not a provider fault.
+ for(const item of output.items)frontierData(item,itemKeys);
+ need(new Set(output.items.map(i=>i.id)).size===output.items.length,'FRONTIER_ITEMS');
  const available=context.children.flatMap((c,slot)=>c.output.items.map(i=>({key:slot+'/'+i.id,item:i}))),seen=[];
  for(const item of output.items){
-  frontierData(item,itemKeys);
   need(text(item.id)&&item.id.length<=160&&kinds.includes(item.kind)&&text(item.text)&&text(item.scope)&&typeof item.conditions==='string'&&typeof item.uncertainty==='string'&&text(item.basis)&&Array.isArray(item.supports)&&Array.isArray(item.provenance)&&Array.isArray(item.marker_ids)&&new Set(item.marker_ids).size===item.marker_ids.length,'FRONTIER_ITEMS');
   if(context.unit){need(item.supports.length===0&&item.provenance.length>0&&item.provenance.every(p=>same(p,{source_id:context.unit.source_id,source_sha256:context.unit.source_sha256,range:context.unit.range,core:context.unit.core})),'FRONTIER_PROVENANCE');}
   else{need(item.provenance.length===0,'FRONTIER_PROVENANCE');const markers=new Set();for(const key of item.supports){const child=available.find(a=>a.key===key);need(child&&child.item.kind===item.kind,'FRONTIER_SUPPORT');seen.push(key);for(const id of child.item.marker_ids)markers.add(id);}need(same([...markers].sort(),[...item.marker_ids].sort()),'FRONTIER_MARKER_LOSS');}
