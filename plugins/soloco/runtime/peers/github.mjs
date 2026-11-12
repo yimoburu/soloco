@@ -908,8 +908,10 @@ const POLICY_ACTION = 'github/atomic-publish';
 const policyProviderErrors = new WeakSet();
 const policySemanticErrors = new WeakSet();
 function policyReadView(tx) {
-  need(['get','getVersion','list','count','queryCurrentReviews','resolveLegacy'].every(method => typeof tx?.[method] === 'function'), 'READ_PROVIDER_REQUIRED');
-  return Object.freeze(Object.fromEntries(['get','getVersion','list','count','queryCurrentReviews','resolveLegacy'].map(method => [method, (...args) => {
+  const required=['get','getVersion','list','count','queryCurrentReviews','resolveLegacy'];
+  need(required.every(method => typeof tx?.[method] === 'function'), 'READ_PROVIDER_REQUIRED');
+  const methods=[...required,...['events','getTaskHistory'].filter(method=>typeof tx[method]==='function')];
+  return Object.freeze(Object.fromEntries(methods.map(method => [method, (...args) => {
     try { return tx[method](...args); } catch (error) { if (error && typeof error === 'object') policyProviderErrors.add(error); throw error; }
   }])));
 }

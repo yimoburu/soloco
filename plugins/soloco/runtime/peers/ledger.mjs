@@ -44,6 +44,7 @@ export const FAMILIES=Object.freeze(['control','principals','grants','commands',
 const families=new Set(FAMILIES);
 const MAX_VALUE_BYTES=1_000_000;
 const MAX_FILTERED_ROWS=10_000;
+const MAX_TASK_HISTORY_REVISIONS=10_000,MAX_TASK_HISTORY_BYTES=16*1024*1024;
 // Materialization admission, not measured JS heap/RSS or whole-process limits.
 // Classifier arrays admit at most 10,000 revisions, 8 MiB canonical UTF-8,
 // and 16 MiB of encoded selected fields plus a 256-unit charge per row for
@@ -229,22 +230,27 @@ export class PeerLedger{
     }catch(e){if(this.ownsDb)this.db.close();throw e;}
   }
   query(sql,...parameters){this.onQuery?.({sql,parameters:parameters.length});return this.db.prepare(sql);}
-  #checkedRow(row){
-    const item=envelope(row);
-    const last=this.query('SELECT revision,sha256,bytes FROM peer_versions WHERE family=? AND id=? ORDER BY revision DESC LIMIT 1').get(row.family,row.id);
-    if(last?.revision!==row.revision||last?.sha256!==row.sha256||last?.bytes!==row.bytes)throw Error('Peer canonical row lost its exact immutable version binding');
-    decode(last.bytes,last.sha256);
-    const first=this.query('SELECT bytes FROM peer_events WHERE seq=?').get(row.created_seq);
-    if(!first)throw Error('Peer creation metadata has no event');
-    const event=this.#eventAt(row.created_seq);
-    if(!event.payload.changes.some(c=>c.family===row.family&&c.id===row.id&&c.revision===1))throw Error('Peer creation metadata differs from event');
+  #checkedRow(row,checked=operation=>operation()){
+    const item=checked(()=>envelope(row));
+    const last=this.#selectionRead(checked,'SELECT revision,sha256,bytes FROM peer_versions WHERE family=? AND id=? ORDER BY revision DESC LIMIT 1','get',row.family,row.id);
+    checked(()=>{
+      if(last?.revision!==row.revision||last?.sha256!==row.sha256||last?.bytes!==row.bytes)throw Error('Peer canonical row lost its exact immutable version binding');
+      decode(last.bytes,last.sha256);
+    });
+    const first=this.#selectionRead(checked,'SELECT bytes FROM peer_events WHERE seq=?','get',row.created_seq);
+    checked(()=>{if(!first)throw Error('Peer creation metadata has no event');});
+    const event=this.#eventAt(row.created_seq,checked);
+    checked(()=>{if(!event.payload.changes.some(c=>c.family===row.family&&c.id===row.id&&c.revision===1))throw Error('Peer creation metadata differs from event');});
     return item;
   }
-  #get(f,id){
-    family(f);exact(id,'row identity',2000);
-    const row=this.query('SELECT * FROM peer_rows WHERE family=? AND id=?').get(f,id);
-    if(!row){if(this.query('SELECT 1 FROM peer_versions WHERE family=? AND id=? LIMIT 1').get(f,id))throw Error('Peer canonical row is missing but history remains');return null;}
-    return this.#checkedRow(row);
+  #get(f,id,checked=operation=>operation()){
+    checked(()=>{family(f);exact(id,'row identity',2000);});
+    const row=this.#selectionRead(checked,'SELECT * FROM peer_rows WHERE family=? AND id=?','get',f,id);
+    if(!row){
+      const historical=this.#selectionRead(checked,'SELECT 1 FROM peer_versions WHERE family=? AND id=? LIMIT 1','get',f,id);
+      checked(()=>{if(historical)throw Error('Peer canonical row is missing but history remains');});return null;
+    }
+    return this.#checkedRow(row,checked);
   }
   #count(f,selected){
     const q=where(f,selected),keys=selectedKeys(selected);
@@ -286,8 +292,9 @@ export class PeerLedger{
     // This check also covers empty pages and the generation-bound cursor.
     return checked(()=>({items,total,complete,next_cursor:complete?null:Buffer.from(canonical({family:f,generation,filters:selected,after:chosen.at(-1).id})).toString('base64url')}));
   }
-  #eventAt(seq){
-    const row=this.query('SELECT * FROM peer_events WHERE seq=?').get(seq);
+  #eventAt(seq,checked=operation=>operation()){
+    const row=this.#selectionRead(checked,'SELECT * FROM peer_events WHERE seq=?','get',seq);
+    return checked(()=>{
     if(!row)throw Error('Peer event chain is incomplete');
     positive(row.seq,'event sequence');exact(row.type,'event type');exact(row.principal_id,'principal identity');digest(row.sha256);digest(row.previous_sha256);
     const payload=JSON.parse(row.bytes);
@@ -302,6 +309,7 @@ export class PeerLedger{
     const signed=canonical({seq:row.seq,type:row.type,principal_id:row.principal_id,payload,previous_sha256:row.previous_sha256});
     if(hash(signed)!==row.sha256)throw Error('Peer event hash changed');
     return {seq:row.seq,type:row.type,principal_id:row.principal_id,payload,sha256:row.sha256,previous_sha256:row.previous_sha256};
+    });
   }
   #head(){
     const meta=this.query('SELECT * FROM peer_meta WHERE id=1').get();
@@ -473,10 +481,14 @@ export class PeerLedger{
     this.#selectionCapability(checked,{clean:true});const complete=remaining.length<=limit;
     return checked(()=>({items,total:ordered.length,complete,next_cursor:complete?null:Buffer.from(canonical({recipe:REVIEW_SELECTION_RECIPE,snapshot,generation:recipe.generation,selector,after:chosen.at(-1)})).toString('base64url'),recipe:REVIEW_SELECTION_RECIPE}));
   }
-  #transaction(type,principal,fn,write,external=false,maintenance=null){
+  #transaction(type,principal,fn,write,external=false,maintenance=null,terminalGuard=null){
     if(this.inTransaction)throw Error('Nested peer transaction is forbidden');
     if(typeof fn!=='function')throw Error('Peer transaction callback required');
     if(['[object AsyncFunction]','[object GeneratorFunction]','[object AsyncGeneratorFunction]'].includes(Object.prototype.toString.call(fn)))throw Error('Models, network calls and asynchronous work are forbidden inside peer transactions');
+    if(terminalGuard!==null){
+      if(typeof terminalGuard!=='function'||typeof terminalGuard.then==='function'||['[object AsyncFunction]','[object GeneratorFunction]','[object AsyncGeneratorFunction]'].includes(Object.prototype.toString.call(terminalGuard)))throw Error('Synchronous peer terminal guard required');
+      if(external||this.db.isTransaction!==false)throw Error('Guarded peer operations require their own physical commit');
+    }
     if(write){exact(type,'event type');exact(principal,'principal identity');}
     const db=this.db,fence=this.#fence,token=fence.claim();
     let begun=false,active=false,safe=true,startAttempted=false;
@@ -493,14 +505,26 @@ export class PeerLedger{
       const changes=[],events=[],pending=new Map(),initial=new Map();
       // Fence history before preparing the first modifying statement. A failed
       // mutation poisons this transaction even if the callback catches it.
-      let rowMutationStarted=false,mutationFailed=false,finalizing=false,putInProgress=false;
+      let rowMutationStarted=false,mutationFailed=false,finalizing=false,putInProgress=false,taskHistoryCall=null,writesSealed=false,sealFailure=null;
       const snapshot=randomUUID();
       const boundary=()=>{
         if(!active||!this.inTransaction||!fence.owns(token))throw Error('Peer transaction handle expired');
         if(db.isTransaction!==true)throw Error('Peer transaction connection is no longer active');
+        if(sealFailure)throw sealFailure;
         if(mutationFailed)throw Error('Peer transaction contains a failed row mutation; rollback required');
       };
       const guard=()=>{boundary();if(finalizing)throw Error('Peer public handle is closed during final review maintenance');};
+      const poisonSeal=()=>{
+        mutationFailed=true;
+        sealFailure??=Object.assign(Error('Peer public writes were sealed; rollback required'),{code:'AUTHORITY_CHANGED'});
+        throw sealFailure;
+      };
+      const writeGuard=()=>{
+        // Include caught attempts during private maintenance/staging, while
+        // never letting an escaped handle poison a later connection owner.
+        if(writesSealed&&this.inTransaction&&fence.owns(token)&&db.isTransaction===true)poisonSeal();
+        guard();
+      };
       const get=(f,id)=>{
         const key=canonical([f,id]);
         if(pending.has(key))return structuredClone(pending.get(key));
@@ -508,6 +532,11 @@ export class PeerLedger{
       };
       const tx=Object.freeze({
         sequence,
+        ...(terminalGuard!==null?{sealWrites:()=>{
+          guard();
+          if(putInProgress)poisonSeal();
+          writesSealed=true;
+        }}:{}),
         get:(f,id)=>{guard();return get(f,id);},
         // Evidence only: exact canonical history bytes, not current authority or
         // per-version event/producer provenance. No created_seq is inferred.
@@ -544,6 +573,66 @@ export class PeerLedger{
           const value=checked(()=>decode(row.bytes,row.sha256));
           historicalGuard();
           return {family:r.family,id:r.id,revision:r.revision,sha256:r.sha256,value};
+        },
+        // Complete task-only canonical version evidence between two exact
+        // endpoints. This does not infer per-version event/producer provenance.
+        // Bounds account for stored UTF-8 bodies, not total JS heap or native
+        // context fit. Never return a clean prefix or skip an intermediate row.
+        getTaskHistory:(fromRef,throughRef)=>{
+          guard();
+          if(external||rowMutationStarted)throw Error('Peer task history requires an owning snapshot before pending writes; external transactions are excluded');
+          if(taskHistoryCall){taskHistoryCall.failure??=Error('Reentrant peer task history lookup is forbidden');throw taskHistoryCall.failure;}
+          const call={failure:null};taskHistoryCall=call;
+          const historicalGuard=()=>{
+            guard();
+            if(external||rowMutationStarted)throw Error('Peer task history requires an owning snapshot before pending writes; external transactions are excluded');
+            if(call.failure)throw call.failure;
+          };
+          const checked=operation=>{
+            historicalGuard();let value;
+            try{value=operation();}catch(error){
+              try{historicalGuard();}catch(boundaryError){throw new AggregateError([error,boundaryError],'Peer task history failed after its transaction boundary changed');}
+              throw error;
+            }
+            historicalGuard();return value;
+          };
+          try{
+            const [from,through]=checked(()=>JSON.parse(canonical([fromRef,throughRef])));
+            const span=checked(()=>{
+              for(const r of [from,through]){
+                if(!r||Array.isArray(r)||typeof r!=='object'||Object.keys(r).sort().join(',')!=='family,id,revision,sha256'||r.family!=='tasks')throw Error('Exact task history endpoints require family tasks, id, revision and sha256 only');
+                exact(r.id,'task history identity',2000);positive(r.revision,'task history revision');digest(r.sha256);
+              }
+              if(from.id!==through.id||from.revision>through.revision)throw Error('Task history endpoints require one ordered task range');
+              const count=through.revision-from.revision+1;
+              if(!Number.isSafeInteger(count)||count<1||count>MAX_TASK_HISTORY_REVISIONS)throw Error('Task history range exceeds 10000 revision capacity');
+              return count;
+            });
+            const parameters=['tasks',from.id,from.revision,through.revision,span+1];
+            // The PK range and SQL LIMIT bound the metadata scan before any
+            // body enters JavaScript. length(BLOB) counts persisted UTF-8 bytes.
+            const aggregate=this.#selectionRead(checked,'SELECT COUNT(*) AS row_count, COALESCE(SUM(byte_count),0) AS total_bytes FROM (SELECT length(CAST(bytes AS BLOB)) AS byte_count FROM peer_versions WHERE family=? AND id=? AND revision>=? AND revision<=? ORDER BY revision LIMIT ?)','get',...parameters);
+            const preflightBytes=checked(()=>{
+              const count=aggregate?.row_count,bytes=aggregate?.total_bytes;
+              if(count!==span)throw Error('Task history range is incomplete or has duplicate revisions');
+              if(!Number.isSafeInteger(bytes)||bytes<0||bytes>MAX_TASK_HISTORY_BYTES)throw Error('Task history exceeds 16 MiB byte capacity');
+              return bytes;
+            });
+            const rows=this.#selectionRead(checked,'SELECT family,id,revision,sha256,bytes FROM peer_versions WHERE family=? AND id=? AND revision>=? AND revision<=? ORDER BY revision LIMIT ?','all',...parameters);
+            checked(()=>{if(!Array.isArray(rows)||rows.length!==span)throw Error('Task history actual count differs from complete range');});
+            const result=[];let bytes=0;
+            for(let i=0;i<span;i++)result.push(checked(()=>{
+              const {family,id,revision,sha256,bytes:encoded}=rows[i]??{};
+              if(family!=='tasks'||id!==from.id||revision!==from.revision+i)throw Error('Task history row identity or revision order changed');
+              if(i===0&&sha256!==from.sha256||i===span-1&&sha256!==through.sha256)throw Error('Exact task history endpoint hash changed');
+              if(typeof encoded!=='string')throw Error('Task history canonical bytes are unavailable');
+              bytes+=Buffer.byteLength(encoded);
+              if(!Number.isSafeInteger(bytes)||bytes>MAX_TASK_HISTORY_BYTES)throw Error('Task history actual bytes exceed 16 MiB capacity');
+              return {family:'tasks',id,revision,sha256,value:decode(encoded,sha256)};
+            }));
+            checked(()=>{if(bytes!==preflightBytes)throw Error('Task history byte count changed after preflight');});
+            historicalGuard();return result;
+          }finally{if(taskHistoryCall===call)taskHistoryCall=null;}
         },
         list:(f,o)=>{
           const collectionGuard=()=>{
@@ -583,7 +672,7 @@ export class PeerLedger{
           return JSON.parse(bytes);
         },
         put:(f,id,value,expected_revision=0)=>{
-          guard();
+          writeGuard();
           // Independently revised from the attributed external put-fence proposal.
           // Denial precedes argument inspection, including no-op/malformed calls.
           // A denied nested call must not enter the owner's finally block.
@@ -638,7 +727,12 @@ export class PeerLedger{
             putInProgress=false;
           }
         },
-        event:(kind,payload)=>{guard();if(!write)throw Error('Peer read snapshots cannot append events');exact(kind,'event type');events.push({type:kind,payload:JSON.parse(canonical(payload))});}
+        event:(kind,payload)=>{
+          writeGuard();if(!write)throw Error('Peer read snapshots cannot append events');exact(kind,'event type');
+          const normalized=JSON.parse(canonical(payload));
+          if(terminalGuard!==null)writeGuard();
+          events.push({type:kind,payload:normalized});
+        }
       });
       let result=fn(tx);
       if(result&&typeof result.then==='function'){
@@ -671,6 +765,47 @@ export class PeerLedger{
         this.query('UPDATE peer_meta SET last_event_sha256=? WHERE id=1').run(sha256);
       }
       if(!fence.owns(token)||db.isTransaction!==true)throw Error('Peer transaction lost its connection owner before completion');
+      if(terminalGuard!==null){
+        // This private view exists only after ALL row/review/event/outbox/meta
+        // staging. It reads the physical owning snapshot, never the planner's
+        // cache, and does not reopen the already-expired public tx handle.
+        let terminalActive=true,reading=false,terminalFailure=null,deadline;
+        const state=()=>{
+          if(!terminalActive||!this.inTransaction||!fence.owns(token)||db.isTransaction!==true)throw Error('Peer terminal view expired or lost its connection owner');
+          if(sealFailure)throw sealFailure;
+          if(mutationFailed||putInProgress)throw Error('Peer terminal view has a failed or active row mutation');
+        };
+        const usable=()=>{state();if(terminalFailure)throw terminalFailure;};
+        const checked=operation=>{
+          usable();let value;
+          try{value=operation();}catch(error){
+            try{state();}catch(boundaryError){terminalFailure=new AggregateError([error,boundaryError],'Peer terminal read failed after its transaction boundary changed');throw terminalFailure;}
+            terminalFailure??=error;throw error;
+          }
+          try{usable();}catch(error){terminalFailure??=error;throw error;}
+          return value;
+        };
+        const view=Object.freeze({get:(f,id)=>{
+          usable();
+          if(reading){terminalFailure=Error('Reentrant peer terminal read is forbidden; rollback required');throw terminalFailure;}
+          reading=true;
+          try{return this.#get(f,id,checked);}finally{reading=false;}
+        }});
+        try{
+          deadline=terminalGuard(view);
+          if(deadline&&typeof deadline.then==='function'){
+            if(deadline instanceof Promise)Promise.prototype.then.call(deadline,undefined,()=>{});
+            throw Error('Asynchronous work is forbidden inside peer terminal guards');
+          }
+          usable();
+        }finally{terminalActive=false;}
+        if(typeof deadline!=='number'||!Number.isFinite(deadline))throw Error('Peer terminal guard requires a primitive finite deadline');
+        if(!fence.owns(token)||db.isTransaction!==true)throw Error('Peer transaction lost its connection owner before guarded commit');
+        // No provider/onQuery or host guard runs between this final clock
+        // sample and the actual owning COMMIT. A savepoint is not sufficient.
+        const cutoff=Date.now();
+        if(!Number.isFinite(cutoff)||cutoff>=deadline)throw Object.assign(Error('Peer task effect lease expired before physical commit'),{code:'TASK_EFFECT_EXPIRED'});
+      }
       db.exec(external?'RELEASE peer_migration_write':'COMMIT');
       safe=external?db.isTransaction===true:peerConnectionEnded(db);
       if(!safe)throw Error('Peer transaction completion state is uncertain');
@@ -703,6 +838,13 @@ export class PeerLedger{
   }
   read(fn){return this.#transaction(null,null,fn,false);}
   write(type,principal,fn){return this.#transaction(type,typeof principal==='object'&&principal!==null?principal.principal_id:principal,fn,true);}
+  // Trusted internal composition only. The caller must create terminalGuard
+  // from its opaque task authority; neither this ledger nor the callback may
+  // be supplied to a model. Even inspections/replays acquire BEGIN IMMEDIATE.
+  guardedWrite(type,principal,fn,terminalGuard){
+    if(terminalGuard===undefined||terminalGuard===null)throw Error('Synchronous peer terminal guard required');
+    return this.#transaction(type,typeof principal==='object'&&principal!==null?principal.principal_id:principal,fn,true,false,null,terminalGuard);
+  }
   // Caller owns commit/rollback. A savepoint contains failed ledger mutations.
   writeWithin(type,principal,fn){if(this.ownsDb)throw Error('External migration transaction required');return this.#transaction(type,principal,fn,true,true);}
   upgradeReviewSelection({retained_copy=false,producer_recipe=null}={}){

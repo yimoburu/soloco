@@ -8,6 +8,7 @@ import {canonical,peerDigest,PeerLedger,installPeerSchema} from '../plugins/solo
 import {execute,inspect,digest,bindPeerPrincipal,createRuntimeObserver,publicationPolicyEvidence} from '../plugins/soloco/runtime/peers/model.mjs';
 import {createMembershipLifecycle} from '../plugins/soloco/runtime/peers/membership.mjs';
 import {peerFixture} from './peer-fixture.mjs';
+import {legacyPeerModel301b} from './peer-model-legacy-fixture.mjs';
 
 // These are real SQLite/P1/P2 mechanics tests. Every host/native/process
 // observation below is an explicitly SYNTHETIC trusted-host unit fixture.
@@ -671,4 +672,43 @@ test('real membership finish rethrows provider failures with identity and rollba
   assert.equal(result.accepted,false);assert.equal(result.result.value.status,'quarantined');assert.equal(result.result.value.held,'EXPIRED');
   assert.equal(result.result.value.output,output);assert.equal(result.result.value.termination_confirmed,true);assert.equal(result.phase.value.status,'closed');
   assert.equal(get(f,'slots',result.phase.value.execution_id).value.status,'released');assert.equal(get(f,'control','usage').value.model_calls,1);
+});
+
+async function optionalProviderFinishFixture(t,method){
+  const f=fixture(t),producer=method==='getTaskHistory'?await legacyPeerModel301b():{execute,createRuntimeObserver};
+  const run=(who,action,args={})=>producer.execute(f.ledger,actor(who),action,{operation_id:f.op('original-producer'),...args});
+  for(const principal of ['cos-a','cos-b','reviewer'])run('founder','grant/create',{grant_id:'optional-provider-'+principal,to_principal_id:principal,scope:'*',actions:['task/*','home/*'],resources:[{kind:'home',id:'optional-provider-home'}],expires_at:new Date(Date.now()+3600000).toISOString(),source_instruction:'SYNTHETIC bounded original component producer grant.'});
+  const proposal=run('cos-a','home/propose',{grant_id:'optional-provider-cos-a',home_id:'optional-provider-home',scope:'beta',content:'A source-produced qualified beta home, unrelated to the incoming alpha scope.'});
+  const task=run('cos-b','task/submit',{grant_id:'optional-provider-cos-b',scope:'beta',role:'qa',stage:'review',instructions:'SYNTHETIC independent review of the exact proposal.',acceptance:'Return exact independent review JSON.',resources:[],review_of:ref('proposals',proposal)});
+  run('cos-b','task/claim',{task_id:task.id});
+  const admission=run('scheduler','task/admit',{task_id:task.id});assert.equal(admission.admitted,true);
+  const observer=producer.createRuntimeObserver(f.ledger),output=canonical({review:{subject:ref('proposals',proposal),verdict:'Pass',reason:'SYNTHETIC original component review; not native qualification.',blockers:[]}});
+  const finished=observer.record('task/finish',{operation_id:f.op('original-observation'),task_id:task.id,attempt_id:admission.task.value.attempt.id,output,native_id:'SYNTHETIC-optional-provider-'+method,termination_confirmed:true,observed_process:{pid:17001,started_at:new Date().toISOString(),close_observed:true}});
+  assert.equal(finished.accepted,true);
+  const home=run('cos-a','home/publish',{grant_id:'optional-provider-cos-a',proposal_id:proposal.id,review_id:finished.review.id});
+  assert.equal(home.value.status,'current');
+  const transferred=run('cos-b','task/transfer',{task_id:task.id,to_principal_id:'reviewer',to_grant_id:'optional-provider-reviewer'});
+  assert.equal(transferred.value.owner_principal_id,'reviewer');
+  assert.equal(Object.hasOwn(transferred.value,'authority_epoch'),method==='events');
+  // The actual current/legacy producer determines which complete history path
+  // is needed. No qualification flags or review proof bodies are hand-seeded.
+  const enrollment=f.enroll(),admitted=f.admit(enrollment),observed=observe(f,enrollment,admitted),consumed=consume(observed.channel);
+  const reconstructionOutput='SYNTHETIC complete reconstruction preserving exact scope, failures and authority.';
+  observed.channel.submit({operation_id:f.op('submit-optional-provider'),sha256:consumed.header.sha256,content:reconstructionOutput});
+  return {f,observed,output:reconstructionOutput};
+}
+
+for(const method of ['events','getTaskHistory'])for(const aggregate of [false,true])test(`optional membership ${method} preserves ${aggregate?'AggregateError':'Error'} provider identity through actual finish`,async t=>{
+  const {f,observed,output}=await optionalProviderFinishFixture(t,method),cause=Error('Retained optional provider cause'),inner=Error('Retained optional aggregate member');
+  const failure=Object.assign(aggregate?new AggregateError([inner],'Optional provider failed',{cause}):new Error('Optional provider failed',{cause}),{code:aggregate?'CONTEXT_CHANGED':'EXPIRED'});
+  const before=state(f),originalWrite=f.ledger.write;let injected=0,actual,result;
+  f.ledger.write=function(type,principal,callback){return originalWrite.call(this,type,principal,tx=>callback(type!=='membership/finish'?tx:Object.freeze({...tx,[method](){injected++;throw failure;}})));};
+  try{try{result=finish(f,observed,output);}catch(error){actual=error;}}finally{f.ledger.write=originalWrite;}
+  assert.equal(injected,1,'The source-produced transferred review must actually traverse this optional provider.');
+  assert.equal(actual,failure,`Provider failure must escape unchanged instead of becoming ${result?.result?.value?.status??'another result'}.`);
+  assert.deepEqual(state(f),before);
+  assert.equal(failure.cause,cause);if(aggregate)assert.equal(failure.errors[0],inner);
+  const phase=get(f,'work_items',`membership-phase:${observed.binding.enrollment_id}:reconstruction`);
+  assert.equal(phase.value.result_ref,null);assert.equal(phase.value.submission.content,output);
+  assert.equal(get(f,'slots',phase.value.execution_id).value.status,'active');
 });

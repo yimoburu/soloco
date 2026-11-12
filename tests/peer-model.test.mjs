@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {canonical,peerDigest,FAMILIES,PeerLedger} from '../plugins/soloco/runtime/peers/ledger.mjs';
 import {execute,inspect,buildContext,validateContext,canonicalResources,resourceOverlap,digest,createRuntimeObserver} from '../plugins/soloco/runtime/peers/model.mjs';
 import {peerFixture} from './peer-fixture.mjs';
+import {legacyPeerModel301b} from './peer-model-legacy-fixture.mjs';
 
 // All behavior tests use the immutable accepted P1 SQLite implementation.
 // The observer below is a synthetic trusted-host fixture, not native evidence.
@@ -1015,6 +1016,34 @@ test('external: lawful postpublication transfer or cancellation preserves histor
   }
 });
 
+test('external: repeated lawful task revocations preserve accepted historical review evidence',t=>{
+  const f=fixture(t),published=externalPublish(f,'cos-a','cos-b','fact','Historical review remains attributable.');
+  const original=published.finished.task;
+  f.run('cos-b','task/transfer',{task_id:original.id,to_principal_id:'reviewer',to_grant_id:'g-reviewer'});
+  f.run('reviewer','task/cancel',{task_id:original.id,reason:'First later task-authority revocation.'});
+  const current=f.run('reviewer','task/cancel',{task_id:original.id,reason:'Second later task-authority revocation.'});
+  assert.equal(current.value.authority_epoch,original.value.authority_epoch+3);
+  assert.deepEqual(current.value.attempt,original.value.attempt);
+  assert.deepEqual(current.value.result,original.value.result);
+  const ordinary=f.start('cos-a',{scope:'beta'});
+  assert.equal(ordinary.context.sources.some(r=>r.family==='homes'&&r.id==='fact'),false);
+  assert.deepEqual(get(f,'homes','fact'),published.home);
+});
+
+for(const change of ['regression','unproduced jump','counter-only update','removed counter'])test('external: '+change+' cannot hide a historical review integrity gap',t=>{
+  const f=fixture(t),published=externalPublish(f,'cos-a','cos-b','fact','Keep unqualified history compulsory.'),original=published.finished.task;
+  const current=change==='counter-only update'?original:f.run('cos-b','task/transfer',{task_id:original.id,to_principal_id:'reviewer',to_grant_id:'g-reviewer'});
+  const value=structuredClone(current.value);
+  if(change==='regression')value.authority_epoch=original.value.authority_epoch-1;
+  else if(change==='unproduced jump')value.authority_epoch+=100;
+  else if(change==='counter-only update')value.authority_epoch++;
+  else delete value.authority_epoch;
+  seed(f,'tasks',current.id,value);
+  const ordinary=f.start('cos-a',{scope:'beta'});
+  assert.equal(ordinary.context.sources.some(r=>r.family==='homes'&&r.id==='fact'),true);
+  assert.deepEqual(get(f,'homes','fact'),published.home);
+});
+
 function externalNegative(f,subject,family,who,scope,verdict='Fail'){
   const admitted=f.start(who,{role:'qa',stage:'review',scope,review_of:ref(family,subject)});
   const output=canonical({review:{subject:ref(family,subject),verdict,reason:'Material exact-subject adverse evidence.',blockers:['Reassess this exact evidence before relying on qualification.']}});
@@ -2000,3 +2029,95 @@ test('external preflush currentness: real final-probe failures preserve provider
   const retried=execute(trace.ledger,actor('cos-a'),'task/submit',args);assert.equal(retried.id,args.task_id);assert.equal(retried.value.attempt,null);assert.equal(get(f,'control','usage'),null);
  }
 });
+
+// Composed epoch provenance: a lawful earlier lifecycle operation cannot hide
+// an unsupported intermediate authority update. These remain fictional SQLite
+// source regressions, not runtime qualification or native process evidence.
+for(const transition of ['transfer','cancel'])test('external composed epoch provenance: counter-only increment after lawful '+transition+' keeps history compulsory',t=>{
+  const f=fixture(t),published=externalPublish(f,'cos-a','cos-b','fact','Retain the original accepted proof and later integrity gap.'),original=published.finished.task;
+  const current=transition==='transfer'
+    ?f.run('cos-b','task/transfer',{task_id:original.id,to_principal_id:'reviewer',to_grant_id:'g-reviewer'})
+    :f.run('cos-b','task/cancel',{task_id:original.id,reason:'Lawful cancellation before unsupported authority-only change.'});
+  const value={...structuredClone(current.value),authority_epoch:current.value.authority_epoch+1,
+    ...(Object.hasOwn(current.value,'authority_previous')?{authority_previous:ref('tasks',current)}:{})};
+  const altered=seed(f,'tasks',current.id,value);
+  assert.equal(altered.revision,current.revision+1);
+  assert.deepEqual(altered.value.attempt,original.value.attempt);
+  assert.deepEqual(altered.value.result,original.value.result);
+  const ordinary=f.start('cos-a',{scope:'beta'});
+  assert.equal(ordinary.context.sources.some(r=>r.family==='homes'&&r.id==='fact'),true,'a correct predecessor pointer does not turn an authority-only update into a supported lifecycle operation');
+  assert.deepEqual(get(f,'homes','fact'),published.home);
+});
+
+test('external composed epoch provenance: intermediate downgrade and restoration cannot hide behind a later lawful transfer',t=>{
+  const f=fixture(t),published=externalPublish(f,'cos-a','cos-b','fact','Keep intermediate invalid authority evidence visible.'),original=published.finished.task;
+  const transferred=f.run('cos-b','task/transfer',{task_id:original.id,to_principal_id:'reviewer',to_grant_id:'g-reviewer'});
+  const lowered=seed(f,'tasks',original.id,{...structuredClone(transferred.value),authority_epoch:original.value.authority_epoch,
+    ...(Object.hasOwn(transferred.value,'authority_previous')?{authority_previous:ref('tasks',transferred)}:{})});
+  const restored=seed(f,'tasks',original.id,{...structuredClone(lowered.value),authority_epoch:transferred.value.authority_epoch,
+    ...(Object.hasOwn(lowered.value,'authority_previous')?{authority_previous:ref('tasks',lowered)}:{})});
+  const current=f.run('reviewer','task/transfer',{task_id:original.id,to_principal_id:'cos-b',to_grant_id:'g-cos-b'});
+  assert.equal(current.revision,restored.revision+1);
+  assert.equal(current.value.authority_epoch,original.value.authority_epoch+2);
+  assert.deepEqual(current.value.attempt,original.value.attempt);
+  assert.deepEqual(current.value.result,original.value.result);
+  const ordinary=f.start('cos-a',{scope:'beta'});
+  assert.equal(ordinary.context.sources.some(r=>r.family==='homes'&&r.id==='fact'),true,'valid final task aliases do not repair a damaged intermediate authority chain');
+  assert.deepEqual(get(f,'homes','fact'),published.home);
+});
+
+for(const pointer of ['skips immediate predecessor','names another task'])test('external composed epoch provenance: authority predecessor '+pointer+' keeps history compulsory',t=>{
+  const f=fixture(t),published=externalPublish(f,'cos-a','cos-b','fact','Keep exact authority predecessor provenance.'),original=published.finished.task;
+  const transferred=f.run('cos-b','task/transfer',{task_id:original.id,to_principal_id:'reviewer',to_grant_id:'g-reviewer'});
+  const previous=pointer==='skips immediate predecessor'?ref('tasks',original):{...ref('tasks',transferred),id:transferred.id+'-different-task'};
+  seed(f,'tasks',original.id,{...structuredClone(transferred.value),status:'cancelled',cancelled_at:new Date().toISOString(),cancellation:'A shaped cancellation with a forged predecessor is not a supported transition.',authority_epoch:transferred.value.authority_epoch+1,authority_previous:previous});
+  const ordinary=f.start('cos-a',{scope:'beta'});
+  assert.equal(ordinary.context.sources.some(r=>r.family==='homes'&&r.id==='fact'),true);
+  assert.deepEqual(get(f,'homes','fact'),published.home);
+});
+
+const {execute:legacy301bExecute,createRuntimeObserver:legacy301bObserver}=await legacyPeerModel301b();
+function legacy301bPublished(t){
+  const f=fixture(t),modernRun=f.run,modernObserver=f.observer;let n=0;
+  const legacyRun=(who,action,args={})=>legacy301bExecute(f.ledger,actor(who),action,{operation_id:`legacy301b-${++n}`,...args});
+  f.run=legacyRun;f.observer=legacy301bObserver(f.ledger);
+  const published=externalPublish(f,'cos-a','cos-b','fact','Genuine public base301b legacy producer proof.'),original=published.finished.task;
+  for(const field of ['authority_epoch','authority_previous','authority_event_seq'])assert.equal(Object.hasOwn(original.value,field),false);
+  assert.equal(Object.hasOwn(original.value.attempt,'effect_authority'),false);
+  f.run=modernRun;f.observer=modernObserver;
+  return {f,published,original,legacyRun};
+}
+for(const transition of ['transfer','cancel']){
+  for(const strip of [false,true])test('genuine legacy301b '+transition+(strip?' followed by producer removal keeps history compulsory':' remains qualified after upgrade'),t=>{
+    const {f,published,original}=legacy301bPublished(t);
+    const current=transition==='transfer'
+      ?f.run('cos-b','task/transfer',{task_id:original.id,to_principal_id:'reviewer',to_grant_id:'g-reviewer'})
+      :f.run('cos-b','task/cancel',{task_id:original.id,reason:'Genuine post-upgrade lifecycle operation.'});
+    assert.equal(current.value.authority_epoch,1);
+    assert.deepEqual(current.value.authority_previous,ref('tasks',original));
+    assert(Number.isSafeInteger(current.value.authority_event_seq));
+    if(strip){
+      const value=structuredClone(current.value);
+      for(const field of ['authority_epoch','authority_previous','authority_event_seq'])delete value[field];
+      const altered=seed(f,'tasks',current.id,value);
+      assert.deepEqual(altered.value.attempt,original.value.attempt);
+      assert.deepEqual(altered.value.result,original.value.result);
+      assert.equal(altered.revision,current.revision+1);
+    }
+    const ordinary=f.start('cos-a',{scope:'beta'});
+    assert.equal(ordinary.context.sources.some(r=>r.family==='homes'&&r.id==='fact'),strip,
+      'A complete legacy history must retain any intervening modern authority producer.');
+    assert.deepEqual(get(f,'homes','fact'),published.home);
+  });
+  test('genuine legacy301b fieldless '+transition+' remains qualified through complete history',t=>{
+    const {f,published,original,legacyRun}=legacy301bPublished(t);
+    const current=transition==='transfer'
+      ?legacyRun('cos-b','task/transfer',{task_id:original.id,to_principal_id:'reviewer',to_grant_id:'g-reviewer'})
+      :legacyRun('cos-b','task/cancel',{task_id:original.id,reason:'Genuine pre-upgrade lifecycle operation.'});
+    for(const field of ['authority_epoch','authority_previous','authority_event_seq'])assert.equal(Object.hasOwn(current.value,field),false);
+    const ordinary=f.start('cos-a',{scope:'beta'});
+    assert.equal(ordinary.context.sources.some(r=>r.family==='homes'&&r.id==='fact'),false,
+      'Complete genuinely old producer history remains usable without minting new authority.');
+    assert.deepEqual(get(f,'homes','fact'),published.home);
+  });
+}
