@@ -911,8 +911,9 @@ component to a separate executable deployment, fixed original Node namespaces,
 source-owned interpreter association, private-FD startup acknowledgement and
 exact five-tool declarations. Its owned CONNECT listener is bound into the
 original Rust bootstrap and HTTP factory, preserving original authentication
-and TLS with no proxy fallback. This is internal source composition; company MCP
-dispatch and adopted company state do not use it.
+and TLS with no proxy fallback. This remains source composition. The later
+`company_peers` operator route can load it through the fixed provider and checked
+original recipe; native deployment and actual-company adoption remain unproved.
 
 The Rust successor has 9,309 logical files, 92,071,707 bytes and 158 overlays.
 Its package is `11dce050e14c48ed20dac9052ec096f3fbd94717603035b22f56f7af851ce84c`,
