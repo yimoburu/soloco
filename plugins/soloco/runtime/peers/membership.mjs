@@ -7,11 +7,14 @@
 // managed IDs are rejected by raw execute/inspect without the protected binding.
 import {canonical,peerDigest} from './ledger.mjs';
 import {prepareOriginalProjectedMembershipContext,prepareOriginalPeerContextDelivery,checkOriginalPeerMembershipRestriction} from './peer-context-interpreter.mjs';
-import {membershipPolicyEvidence,membershipPrincipalAliases,bindPeerPrincipal,digest,REVIEW_PREPARATION_BYTES,assertOriginalPeerProductionScheduler} from './model.mjs';
+import {membershipPolicyEvidence,membershipPrincipalAliases,bindPeerPrincipal,digest,REVIEW_PREPARATION_BYTES,assertOriginalPeerProductionScheduler,assertOriginalPeerBootstrapMembershipFacade} from './model.mjs';
 import {parseReviewOutput,reviewReference,reviewScope} from './review-selection.mjs';
+import {bootstrapMembershipEvidenceFrom,prepareBootstrapMembershipAssignment} from './bootstrap-membership-context.mjs';
+import {BOOTSTRAP_ASSIGNMENT,BOOTSTRAP_CONTEXT,bootstrapResponseContract,bootstrapKind} from './bootstrap-membership-contract.mjs';
 
 const READ_LIMIT=8192,MAX_ROWS=10000,ROLES=['cos','reviewer','specialist'],PHASE_STATES=['reserved','running','unknown','closed'];
 const preparationBudgets=new WeakMap(),providerFailures=new WeakMap();
+const bootstrapLifecycles=new WeakMap();
 const copy=v=>JSON.parse(canonical(v));
 const same=(a,b)=>canonical(a)===canonical(b);
 const fail=(code,message)=>{throw Object.assign(Error(message),{code});};
@@ -56,23 +59,36 @@ function plan(raw){
 }
 
 export function createMembershipLifecycle(ledger,options={},productionFacade=null){
+  return createLifecycle(ledger,options,productionFacade,null);
+}
+export function createOriginalPeerBootstrapMembershipLifecycle(ledger,facade){
+  const binding=assertOriginalPeerBootstrapMembershipFacade(facade,ledger);
+  return createLifecycle(ledger,{operator_principal_id:binding.operator_principal_id},null,facade);
+}
+export function originalPeerBootstrapMembershipPreparation(lifecycle,{enrollment_id,phase}){
+  const r=bootstrapLifecycles.get(lifecycle),p=r?.preparations.get(canonical([enrollment_id,phase]));if(!r||!p)fail('BOOTSTRAP_ORIGINAL_PREPARATION_REQUIRED','Same original bootstrap preparation required');return p;
+}
+export function assertOriginalPeerBootstrapMembershipPhaseFrom(lifecycle,tx,input){const r=bootstrapLifecycles.get(lifecycle);if(!r)fail('BOOTSTRAP_ORIGINAL_PREPARATION_REQUIRED','Original private lifecycle required');return r.phase(tx,input);}
+function createLifecycle(ledger,options,productionFacade,bootstrapFacade){
+  const bootstrap=bootstrapFacade===null?null:assertOriginalPeerBootstrapMembershipFacade(bootstrapFacade,ledger),preparations=new Map();
   // The third argument is reachable only by trusted production composition;
   // it is never copied from JSON options or supplied by a model tool.
   if(productionFacade!==null){
     assertOriginalPeerProductionScheduler(productionFacade,ledger);
     if(typeof productionFacade.membershipWrite!=='function')fail('AUTHENTICATION_REQUIRED','Original production membership writer required');
   }
-  const productionWrite=productionFacade===null?null:productionFacade.membershipWrite.bind(productionFacade);
+  const productionWrite=bootstrapFacade?bootstrapFacade.membershipWrite.bind(bootstrapFacade):productionFacade===null?null:productionFacade.membershipWrite.bind(productionFacade);
   const o=closed(options,['operator_principal_id','observer_principal_id']),operatorId=text(o.operator_principal_id??'founder','operator principal',200),observerId=text(o.observer_principal_id??'scheduler','observer principal',200);
   const connection={company_id:ledger.company_id,root_sha256:digest(ledger.root)},connectionHash=peerDigest(connection);
-  const auth=(tx,role)=>{const c=control(tx),id=role==='operator'?operatorId:observerId,p=tx.get('principals',id);if(!p||p.value.status!=='active'||role==='operator'&&(p.value.kind!=='founder'||c.value.founder_principal_id!==id)||role==='host'&&p.value.kind!=='scheduler')fail('AUTHENTICATION_REQUIRED','Protected operator/host composition required');return p;};
+  const auth=(tx,role)=>{const c=control(tx),id=role==='operator'||bootstrap?operatorId:observerId,p=tx.get('principals',id);if(!p||p.value.status!=='active'||(role==='operator'||bootstrap)&&(p.value.kind!=='founder'||c.value.founder_principal_id!==id)||role==='host'&&!bootstrap&&p.value.kind!=='scheduler')fail('AUTHENTICATION_REQUIRED','Protected operator/host composition required');return p;};
+  const request=(args,keys)=>closed(args,bootstrap?[...keys,'epoch']:keys);
   const original=ledger.read(tx=>({operator:ref('principals',auth(tx,'operator')),host:ref('principals',auth(tx,'host'))}));
   function connectionGuard(){if(ledger.company_id!==connection.company_id||digest(ledger.root)!==connection.root_sha256)fail('AUTHENTICATION_REQUIRED','Protected company connection changed');}
   function roleAuth(tx,role){const p=auth(tx,role);if(p.value.generation!==ledgerGeneration(original[role],tx))fail('AUTHENTICATION_REQUIRED','Protected operator/host incarnation changed');return p;}
   function ledgerGeneration(r,tx){const row=tx.getVersion(r);if(!row||row.sha256!==r.sha256)fail('AUTHENTICATION_REQUIRED','Protected authority history unavailable');return row.value.generation;}
   function command(channel,action,a,authorize,fn){
     connectionGuard();const input=copy(a),operation=text(input.operation_id,'operation_id',160);
-    const write=channel==='operator'&&productionWrite?productionWrite:ledger.write.bind(ledger);
+    const write=bootstrap?(type,channel,fn)=>productionWrite(type,channel,fn,input):channel==='operator'&&productionWrite?productionWrite:ledger.write.bind(ledger);
     return write(`membership/${action}`,channel,raw=>{const p=plan(raw),tx=p.tx,actor=authorize(tx),id=peerDigest(['peer-membership-command-v1',connectionHash,channel,actor.id,actor.value.generation,operation]),request_sha256=peerDigest({action,input}),prior=tx.get('commands',id);
       if(prior){if(prior.value.request_sha256!==request_sha256)fail('REPLAY_MISMATCH','Membership operation already names a different request');p.flush();return copy(prior.value.result);}
       const result=copy(fn(tx,input,actor));tx.put('commands',id,{kind:'membership_command',principal_id:actor.id,operation_id:operation,channel,request_sha256,result},0);p.flush();return result;
@@ -87,12 +103,12 @@ export function createMembershipLifecycle(ledger,options={},productionFacade=nul
   function checkEnrollment(tx,e){
     const v=e.value;if(v.status!=='pending')fail('ENROLLMENT_CLOSED','Enrollment is not pending');expiry(v.expires_at);
     const c=control(tx),operator=auth(tx,'operator'),index=tx.get('work_items',`membership-index:${v.principal_id}`),member=tx.get('principals',v.principal_id);
-    if(!same(ref('principals',operator),v.operator_ref)||c.value.paused||peerDigest(c.value)!==v.policy_sha256||c.value.policy_generation!==v.policy_generation||c.value.pause_generation!==v.pause_generation||index?.value.enrollment_id!==v.enrollment_id)fail('AUTHORITY_CHANGED','Membership control/authority changed');
+    if(!same(ref('principals',operator),v.operator_ref)||(bootstrap?c.value.paused!==true||v.bootstrap_protocol!=='peer-bootstrap-membership-enrollment-v1'||v.bootstrap_epoch!==operator.value.legacy_owner?.epoch:c.value.paused)||peerDigest(c.value)!==v.policy_sha256||c.value.policy_generation!==v.policy_generation||c.value.pause_generation!==v.pause_generation||index?.value.enrollment_id!==v.enrollment_id)fail('AUTHORITY_CHANGED','Membership control/authority changed');
     if(v.base_principal){if(!member||!same(ref('principals',member),v.base_principal)||member.value.status!=='active')fail('PRINCIPAL_CHANGED','Outgoing membership changed');}
     else if(member?.value.status!=='pending'||member.value.generation!==v.generation||member.value.enrollment_id!==v.enrollment_id)fail('PRINCIPAL_CHANGED','Pending membership changed');
     return c;
   }
-  function evidence(tx,e){return membershipPolicyEvidence(tx,{principal_id:e.value.principal_id,scope:e.value.scope,input_refs:e.value.input_refs,enrollment_id:e.value.enrollment_id});}
+  function evidence(tx,e){return bootstrap?bootstrapMembershipEvidenceFrom(tx,{ledger,actor:bootstrap.actor,input:{epoch:e.value.bootstrap_epoch,enrollment_id:e.value.enrollment_id,scope:e.value.scope},action:'membership/bootstrap',enrollment:e}):membershipPolicyEvidence(tx,{principal_id:e.value.principal_id,scope:e.value.scope,input_refs:e.value.input_refs,enrollment_id:e.value.enrollment_id});}
   function context(tx,p){const row=getExact(tx,p.value.context_ref);if(row.value.kind!=='membership_context'||row.value.sha256!==digest(row.value.text))fail('SOURCE_CHANGED','Private reconstruction context changed');return row;}
   const stableEnrollment=e=>{const {used_model_calls,...value}=e.value;return value;};
   function recoveryHistory(tx,e){const result=[],seen=new Set();let next=e.value.recovered_from;while(next){const key=canonical(next);if(seen.has(key)||result.length>=MAX_ROWS)fail('LINEAGE_REQUIRED','Invalid pending recovery history');seen.add(key);const old=getExact(tx,next);if(old.value.kind!=='membership_enrollment'||old.value.status!=='revoked'||old.value.principal_id!==e.value.principal_id||old.value.connection_sha256!==connectionHash)fail('LINEAGE_REQUIRED','Pending recovery authority history changed');const phases=[];for(const name of ['reconstruction','review']){const p=tx.get('work_items',phaseKey(old.value.enrollment_id,name));if(!p)continue;retain(tx,'work_items',p);const c=context(tx,p),r=p.value.result_ref?getExact(tx,p.value.result_ref):null;phases.push({reference:ref('work_items',p),value:p.value,assignment:{context_ref:p.value.context_ref,sha256:c.value.sha256,text:c.value.text},result:r?{reference:ref('work_items',r),value:r.value}:null});}result.push({reference:next,enrollment:old.value,phases});next=old.value.recovered_from;}return result;}
@@ -102,7 +118,7 @@ export function createMembershipLifecycle(ledger,options={},productionFacade=nul
   function independent(tx,e,reviewer,native,contributors){const a=aliases(tx,e.value.principal_id),r=aliases(tx,reviewer),excluded=new Set([...a.natives,...contributors.natives]);if(reviewer===e.value.principal_id||contributors.principals.includes(reviewer)||excluded.has(native)||r.natives.some(id=>excluded.has(id)))fail('REVIEW_INDEPENDENCE','Interested principal/native cannot qualify reconstruction');}
 
   const operator=Object.freeze({
-    enroll(args){const a=closed(args,['operation_id','enrollment_id','principal_id','role','host','scope','input_refs','expires_at','max_model_calls','expected_generation','source_instruction']);return command('operator','enroll',a,tx=>roleAuth(tx,'operator'),(tx,input,actor)=>{
+    enroll(args){const a=request(args,['operation_id','enrollment_id','principal_id','role','host','scope','input_refs','expires_at','max_model_calls','expected_generation','source_instruction']);return command('operator','enroll',a,tx=>roleAuth(tx,'operator'),(tx,input,actor)=>{
       const id=text(input.enrollment_id,'enrollment id',200),principalId=text(input.principal_id,'member principal',200),role=input.role??'cos',host=input.host??'codex',c=control(tx),old=tx.get('principals',principalId),index=tx.get('work_items',`membership-index:${principalId}`);
       if(!ROLES.includes(role)||!['codex','claude'].includes(host))fail('ROLE_INVALID','Nonprivileged managed role/host required');
       if(tx.get('work_items',enrollmentKey(id)))fail('ENROLLMENT_EXISTS','Enrollment identity is already spent');
@@ -116,12 +132,13 @@ export function createMembershipLifecycle(ledger,options={},productionFacade=nul
       const remaining=recovery?recovery.value.max_model_calls-recovery.value.used_model_calls:null,max=input.max_model_calls??(recovery?remaining:2);if(!Number.isSafeInteger(max)||max<1||max>c.value.policy.max_model_calls||recovery&&max>remaining)fail('MODEL_BUDGET','Only finite unspent existing membership allowance is available');
       if(recovery&&(recovery.value.status!=='revoked'||old.value.enrollment_id!==recovery.value.enrollment_id||input.expires_at!==recovery.value.expires_at||role!==recovery.value.role||host!==recovery.value.host||scope!==recovery.value.scope||!same(refs,recovery.value.input_refs)||!same(ref('principals',actor),recovery.value.operator_ref)||peerDigest(c.value)!==recovery.value.policy_sha256||c.value.policy_generation!==recovery.value.policy_generation||c.value.pause_generation!==recovery.value.pause_generation))fail('AUTHORITY_CHANGED','Pending recovery must carry the exact original authority and expiry');
       const value={kind:'membership_enrollment',status:'pending',enrollment_id:id,principal_id:principalId,generation,role,host,scope,input_refs:copy(refs),base_principal:old&&!recovery?ref('principals',old):null,operator_ref:ref('principals',actor),policy_sha256:peerDigest(c.value),policy_generation:c.value.policy_generation,pause_generation:c.value.pause_generation,expires_at:input.expires_at,max_model_calls:max,used_model_calls:0,source_instruction:text(input.source_instruction,'operator source instruction',4000),connection_sha256:connectionHash,...(recovery?{recovered_from:ref('work_items',recovery)}:{})};
+      if(bootstrap){value.bootstrap_protocol='peer-bootstrap-membership-enrollment-v1';value.bootstrap_epoch=input.epoch;}
       const result=tx.put('work_items',enrollmentKey(id),value,0);tx.put('work_items',`membership-index:${principalId}`,{kind:'membership_index',status:'pending',principal_id:principalId,enrollment_id:id},index?.revision??0);
       if(!old||recovery)tx.put('principals',principalId,{...(old?.value??{}),principal_id:principalId,kind:role,host,status:'pending',generation,native_id:null,enrollment_id:id,...(recovery?{membership_previous:ref('principals',old)}:{})},old?.revision??0);
       tx.finalCheck(()=>expiry(input.expires_at));
       return result;
     });},
-    admit(args,privateRestriction=null){const a=closed(args,['operation_id','enrollment_id','phase','reviewer_principal_id']);return command('operator','admit',a,tx=>roleAuth(tx,'operator'),(tx,input)=>{
+    admit(args,privateRestriction=null){const a=request(args,['operation_id','enrollment_id','phase','reviewer_principal_id']);let prepared=null;const result=command('operator','admit',a,tx=>roleAuth(tx,'operator'),(tx,input)=>{
       const e=enrollment(tx,input.enrollment_id),c=checkEnrollment(tx,e),v=e.value,key=phaseKey(v.enrollment_id,input.phase);if(tx.get('work_items',key))fail('ATTEMPT_CONSUMED','Membership phase already has an attempt');
       let principal=tx.get('principals',v.principal_id),reviewerId=null,newReviewer=null,reconstruction=null,reconstructionAssignment=null,reconstructionDelivery=null;
       if(input.phase==='review'){
@@ -139,21 +156,25 @@ export function createMembershipLifecycle(ledger,options={},productionFacade=nul
       if(tx.count('slots',{status:['active','unknown']})>=limits.worker_cap)fail('CAPACITY_BUSY','Existing active/unknown execution holds capacity');
       const enrollmentAuthority=stableEnrollment(e),enrollmentSha=peerDigest(enrollmentAuthority),history=recoveryHistory(tx,e),recoverySha=peerDigest(history);
       const contextValue={protocol:'peer-membership-assignment-v1',connection,principal_id:principalId,generation,enrollment_id:v.enrollment_id,enrollment:enrollmentAuthority,recovery_history:history,phase:input.phase,role:input.phase==='reconstruction'?v.role:'reviewer',source_cut:snapshot.body,source_cut_sha256:snapshot.sha256,allowance_observation:{global_used_after:used(global)+1,principal_used_after:used(personal)+1,enrollment_used_after:v.used_model_calls+1},...(reconstruction?{reconstruction:{reference:ref('work_items',reconstruction),value:reconstruction.value,assignment:reconstructionAssignment,delivery:reconstructionDelivery}}:{})};
+      if(bootstrap){if(snapshot.body.protocol!==BOOTSTRAP_CONTEXT||!Number.isSafeInteger(snapshot.deadline_at_ms)||snapshot.deadline_at_ms<=Date.now())fail('BOOTSTRAP_QUALIFIED_CONTEXT_SOURCE_REQUIRED','Original qualified bootstrap source required');contextValue.protocol=BOOTSTRAP_ASSIGNMENT;contextValue.response_contract=bootstrapResponseContract(input.phase);}
       const encoded=canonical(contextValue);if(Buffer.byteLength(encoded)>limits.max_context_bytes)fail('CONTEXT_CAPACITY','Complete private assignment exceeds existing context policy');
       // The original static interpreter and whole-wire restriction are software
       // support only. An unavailable/forged capability holds before the FIRST
       // buffered put; an unborn process/FD acknowledgement is not required.
-      prepareOriginalProjectedMembershipContext(encoded,snapshot);
-      const deliveryContract=privateRestriction!==null?checkOriginalPeerMembershipRestriction(privateRestriction,encoded,snapshot):null;
+      const bootstrapWire=bootstrap?prepareBootstrapMembershipAssignment(encoded):null;
+      if(!bootstrap)prepareOriginalProjectedMembershipContext(encoded,snapshot);
+      const deliveryContract=!bootstrap&&privateRestriction!==null?checkOriginalPeerMembershipRestriction(privateRestriction,encoded,snapshot):null;
       if(snapshot.body.protocol==='peer-membership-context-v2'&&!deliveryContract)fail('CONTEXT_INTERPRETER_UNAVAILABLE','Original whole-wire restriction required before new projected admission');
       if(newReviewer)principal=tx.put('principals',reviewerId,newReviewer,0);
       const contextId=`membership-context:${v.enrollment_id}:${input.phase}`,contextRow=tx.put('work_items',contextId,{kind:'membership_context',status:'frozen',...(deliveryContract?{delivery_contract:deliveryContract}:{}),membership_id:v.enrollment_id,principal_id:principal.id,text:encoded,sha256:digest(encoded),enrollment_sha256:enrollmentSha,recovery_sha256:recoverySha,source_cut_sha256:snapshot.sha256,subject:reconstruction?ref('work_items',reconstruction):null,contributors:snapshot.contributors},0),attemptId=peerDigest(['peer-membership-attempt-v1',connectionHash,v.enrollment_id,input.phase]),executionId=`membership-execution:${attemptId}`;
-      const p=tx.put('work_items',key,{kind:'membership_phase',status:'reserved',membership_id:v.enrollment_id,phase:input.phase,principal_id:principal.id,principal_ref:ref('principals',principal),generation:contextValue.generation,attempt_id:attemptId,context_ref:ref('work_items',contextRow),execution_id:executionId,reads:[],submission:null,native_id:null,process:null,result_ref:null},0);
+      const binding=bootstrap?{protocol:'peer-bootstrap-membership-binding-v1',connection:{root:ledger.root,company_id:ledger.company_id,directory:ledger.directory},epoch:input.epoch,enrollment_ref:ref('work_items',e),enrollment_id:v.enrollment_id,phase:input.phase,attempt_id:attemptId,principal_ref:ref('principals',principal),context_ref:ref('work_items',contextRow),context_sha256:contextRow.value.sha256,kind:bootstrapKind(input.phase),deadline_at_ms:Math.min(Date.parse(v.expires_at),snapshot.deadline_at_ms),source_cut_sha256:snapshot.sha256,owner_ref:ref('principals',auth(tx,'operator')),control_ref:ref('control',c)}:null;
+      const admission=bootstrap?tx.put('work_items','membership-admission:'+attemptId,{kind:'bootstrap_membership_admission',protocol:'peer-bootstrap-membership-admission-v1',binding,preflight_commitment:bootstrapWire.commitment},0):null;
+      const p=tx.put('work_items',key,{kind:'membership_phase',status:'reserved',membership_id:v.enrollment_id,phase:input.phase,principal_id:principal.id,principal_ref:ref('principals',principal),generation:contextValue.generation,attempt_id:attemptId,context_ref:ref('work_items',contextRow),execution_id:executionId,reads:[],submission:null,native_id:null,process:null,result_ref:null,...(bootstrap?{bootstrap_protocol:'peer-bootstrap-membership-phase-v1',admission_ref:ref('work_items',admission),creation_ref:null}:{})},0);
       tx.put('slots',executionId,{kind:'membership_execution',status:'active',membership_id:v.enrollment_id,principal_id:principal.id,attempt_id:attemptId},0);tx.put('effects',executionId,{kind:'membership_execution',status:'reserved',membership_id:v.enrollment_id,principal_id:principal.id,attempt_id:attemptId,termination_confirmed:false},0);
       tx.put('control','usage',{...(global?.value??{}),model_calls:used(global)+1},global?.revision??0);tx.put('control',`usage:${principal.id}`,{...(personal?.value??{}),model_calls:used(personal)+1},personal?.revision??0);tx.put('work_items',e.id,{...v,used_model_calls:v.used_model_calls+1},e.revision);
-      tx.finalCheck(()=>expiry(v.expires_at));return {phase:p,context:header(contextRow,p)};
-    });},
-    activate(args){const a=closed(args,['operation_id','enrollment_id','source_instruction']);return command('operator','activate',a,tx=>roleAuth(tx,'operator'),(tx,input)=>{
+      tx.finalCheck(()=>expiry(v.expires_at));if(bootstrap)prepared={binding:copy(binding),admission_ref:ref('work_items',admission),phase_ref:ref('work_items',p),plan:bootstrapWire.plan,text:encoded,commitment:copy(bootstrapWire.commitment)};return {phase:p,context:header(contextRow,p)};
+    });if(prepared)preparations.set(canonical([a.enrollment_id,a.phase]),prepared);return result;},
+    activate(args){const a=request(args,['operation_id','enrollment_id','source_instruction']);return command('operator','activate',a,tx=>roleAuth(tx,'operator'),(tx,input)=>{
       const e=enrollment(tx,input.enrollment_id);checkEnrollment(tx,e);text(input.source_instruction,'activation instruction',4000);
       const recon=phase(tx,e.value.enrollment_id,'reconstruction'),review=phase(tx,e.value.enrollment_id,'review'),r=getExact(tx,recon.value.result_ref),q=getExact(tx,review.value.result_ref),rc=context(tx,recon),qc=context(tx,review);
       if(r.value.status!=='returned'||q.value.status!=='returned'||!r.value.termination_confirmed||!q.value.termination_confirmed||q.value.review?.verdict!=='Pass'||!same(q.value.review.subject,ref('work_items',r)))fail('QUALIFICATION_REQUIRED','Exact completed independent private Pass required');
@@ -165,7 +186,7 @@ export function createMembershipLifecycle(ledger,options={},productionFacade=nul
       const principal=tx.put('principals',old.id,{...old.value,kind:e.value.role,host:e.value.host,status:'active',generation:e.value.generation,native_id:r.value.native_id,enrollment_id:e.value.enrollment_id,membership_previous:previous,membership_qualification:ref('work_items',q)},e.value.base_principal?old.revision+1:old.revision);
       const accepted=tx.put('work_items',e.id,{...e.value,status:'activated',activation:{principal:ref('principals',principal),reconstruction:ref('work_items',r),qualification:ref('work_items',q),source_instruction:input.source_instruction}},e.revision);tx.put('work_items',index.id,{...index.value,status:'activated'},index.revision);tx.event('membership.incoming_activated',{principal_id:principal.id,generation:principal.value.generation,enrollment_id:e.value.enrollment_id});tx.finalCheck(()=>expiry(e.value.expires_at));return {principal,enrollment:accepted,qualification:ref('work_items',q)};
     });},
-    revoke(args){const a=closed(args,['operation_id','enrollment_id','source_instruction']);return command('operator','revoke',a,tx=>roleAuth(tx,'operator'),(tx,input)=>{
+    revoke(args){const a=request(args,['operation_id','enrollment_id','source_instruction']);return command('operator','revoke',a,tx=>roleAuth(tx,'operator'),(tx,input)=>{
       const e=enrollment(tx,input.enrollment_id);if(e.value.status!=='pending')fail('ENROLLMENT_CLOSED','Only pending enrollment can be revoked');text(input.source_instruction,'revocation instruction',4000);const index=tx.get('work_items',`membership-index:${e.value.principal_id}`),pending=[];
       for(const name of ['reconstruction','review']){const p=tx.get('work_items',phaseKey(e.value.enrollment_id,name));if(p&&!p.value.result_ref){const slot=tx.get('slots',p.value.execution_id),effect=tx.get('effects',p.value.execution_id);pending.push({p,slot,effect});}}
       const result=tx.put('work_items',e.id,{...e.value,status:'revoked',revocation:{source_instruction:input.source_instruction}},e.revision);tx.put('work_items',index.id,{...index.value,status:'revoked'},index.revision);
@@ -219,5 +240,5 @@ export function createMembershipLifecycle(ledger,options={},productionFacade=nul
     });},
     activeClient(args){const a=closed(args,['enrollment_id']);connectionGuard();const binding=ledger.read(tx=>{roleAuth(tx,'host');const e=enrollment(tx,a.enrollment_id);if(e.value.status!=='activated')fail('QUALIFICATION_REQUIRED','Exact activated membership required');const p=tx.get('principals',e.value.principal_id);if(!p||!same(ref('principals',p),e.value.activation.principal))fail('PRINCIPAL_CHANGED','Activated incarnation changed');return {principal_id:p.id,generation:p.value.generation,native_id:p.value.native_id};});return bindPeerPrincipal(ledger,binding);}
   });
-  return Object.freeze({operator,host});
+  const api=Object.freeze(bootstrap?{operator}:{operator,host});if(bootstrap)bootstrapLifecycles.set(api,{ledger,preparations,phase(tx,input){const {e,p}=checkedPhase(tx,input);phaseCurrent(tx,e,p);const c=context(tx,p);fresh(tx,e,c);return {e,p,c};}});return api;
 }

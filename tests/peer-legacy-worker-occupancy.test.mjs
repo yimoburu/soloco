@@ -8,10 +8,17 @@ import os from 'node:os';
 import path from 'node:path';
 import {DatabaseSync} from 'node:sqlite';
 import {createHash} from 'node:crypto';
-import {writeNormalized,captureStorageMetadata,insertStorageEvent} from '../plugins/soloco/runtime/record-storage.mjs';
-import {requestModelProcess,recordModelProcessBirth,recordModelProcessClosure} from '../plugins/soloco/runtime/model-process-closure.mjs';
-import {PeerLedger,installPeerSchema,canonical,peerDigest} from '../plugins/soloco/runtime/peers/ledger.mjs';
-import {captureLegacyLocalWorkerOccupancyFrom as capture,inspectOriginalLegacyLocalWorkerOccupancy as inspect,inspectLegacyMaintenanceWorkerCapacityFrom as capacity} from '../plugins/soloco/runtime/peers/legacy-worker-occupancy.mjs';
+import {captureLegacyLocalWorkerOccupancyFrom as captureCurrentProductionSource} from '../plugins/soloco/runtime/peers/legacy-worker-occupancy.mjs';
+import {createLegacyWorkerRecipeRuntimeFixture,LEGACY_WORKER_RECIPE_SOURCE} from './legacy-worker-recipe-fixture.mjs';
+
+// Keep the complete original pinned SOURCE recipe, without reclassifying the
+// changed current engine as that recipe or accepting any historical job policy.
+const fixed=createLegacyWorkerRecipeRuntimeFixture();test.after(()=>fixed.dispose());
+const [storage,models,ledgerModule,observer]=await Promise.all(['record-storage.mjs','model-process-closure.mjs','peers/ledger.mjs','peers/legacy-worker-occupancy.mjs'].map(fixed.load));
+const {writeNormalized,captureStorageMetadata,insertStorageEvent}=storage;
+const {requestModelProcess,recordModelProcessBirth,recordModelProcessClosure}=models;
+const {PeerLedger,installPeerSchema,canonical,peerDigest}=ledgerModule;
+const {captureLegacyLocalWorkerOccupancyFrom:capture,inspectOriginalLegacyLocalWorkerOccupancy:inspect,inspectLegacyMaintenanceWorkerCapacityFrom:capacity}=observer;
 
 const digest=value=>createHash('sha256').update(value).digest('hex');
 const copy=value=>JSON.parse(JSON.stringify(value));
@@ -147,4 +154,12 @@ test('a provider-shaped event cannot relabel a different canonical writer as qua
 test('expanded current-reference volume is bounded independently of deduplicated vault bytes',t=>{
   const f=fixture(t),bytes=JSON.stringify('SYNTHETIC-expanded-'.repeat(60000)),sha=digest(bytes);f.db.prepare('INSERT INTO immutable_values VALUES(?,?)').run(sha,bytes);const insert=f.db.prepare("INSERT INTO state_entries VALUES('root',?,?,?,'json')");for(let n=0;n<80;n++)insert.run('SYNTHETIC-shared-'+n,1000+n,sha);
   assert.ok(f.db.prepare('SELECT SUM(length(CAST(bytes AS BLOB))) AS n FROM immutable_values').get().n<64*1024*1024);const before=snapshot(f.db);assert.throws(()=>f.readCapture(),e=>e.code==='LEGACY_WORKER_PREPARATION_CAPACITY');assert.equal(snapshot(f.db),before);
+});
+
+test('actual current production observer Holds the changed engine without changing any SQL row',t=>{
+  const f=fixture(t);f.add('current-engine-must-stay-unqualified');const before=snapshot(f.db);
+  const engine=fs.readFileSync(new URL('../plugins/soloco/runtime/engine.mjs',import.meta.url));
+  assert.notEqual(digest(engine),LEGACY_WORKER_RECIPE_SOURCE.engine_sha256,'This counter exercises the genuinely changed current production engine');
+  f.db.exec('BEGIN');try{assert.throws(()=>captureCurrentProductionSource(f.db),error=>error.code==='LEGACY_WORKER_POLICY_UNAVAILABLE');}finally{f.db.exec('ROLLBACK');}
+  assert.equal(snapshot(f.db),before);
 });

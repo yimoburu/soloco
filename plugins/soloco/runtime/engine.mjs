@@ -30,6 +30,8 @@ import { TIMEOUT_POLICY_VERSION, normalizeTimeout, normalizeHandoverReviewWindow
 import {taskAction,runtimeAction} from './task-runtime.mjs';
 import {peerRuntimeAction} from './peer-runtime.mjs';
 import {peerAdoptionRuntimeAction} from './peer-adoption-runtime.mjs';
+import {peerOwnerRuntimeAction,peerOwnerStorageKind,validatePeerOwnerRequest} from './peer-owner-runtime.mjs';
+import {peerOriginRuntimeAction,validatePeerOriginRequest} from './peer-origin-runtime.mjs';
 import {requireCodexRootActor} from './mcp-host-context.mjs';
 import {taskRecord,taskReady,bindTaskAttempt} from './tasks.mjs';
 import {runtimeGrant,runtimeControlBinding} from './task-runtime-authority.mjs';
@@ -150,6 +152,16 @@ export function peerCallerActor(args,host){
   return actor;
 }
 export function peers(args,host){peerCallerActor(args,host);return peerRuntimeAction(args,host);}
+export function ownerLifecycle(args,host){
+  const checked=validatePeerOwnerRequest(args,host);
+  peerCallerActor(checked,host);
+  return peerOwnerRuntimeAction(checked,host);
+}
+export function originLifecycle(args,host){
+  const checked=validatePeerOriginRequest(args,host);
+  peerCallerActor(checked,host);
+  return peerOriginRuntimeAction(checked,host);
+}
 export function peerAdoption(args,host){binding(args,host);return peerAdoptionRuntimeAction(args,host);}
 export function specialists(args,host){
   binding(args,host);
@@ -182,6 +194,9 @@ function update(args, host, type, fn, selection=null,beforeCommit=null) {
   return withStore(args.root, db => {const mutate=state=>{owner(state,args.session_id,host,args.epoch);if(state.operating_state||type.startsWith('operating.'))bindOperatingIntake(state,db);fn(state);state.runtime_version=VERSION;return state;};return selection&&db.selectedTransaction?db.selectedTransaction(type,selection,mutate):db.transaction(type,mutate,beforeCommit?{beforeCommit}:{});});
 }
 export function open(args, host) {
+  // Select the existing peer reader before constructing a legacy Store. This
+  // route never initializes/migrates peer storage or substitutes legacy identity.
+  if(peerOwnerStorageKind(args.root)==='peer')return ownerLifecycle({root:args.root,session_id:args.session_id,action:'status'},host);
   binding(args,host);
   const state=withStore(args.root, db => {
     const current=db.read();
@@ -195,6 +210,7 @@ export function open(args, host) {
   return result;
 }
 export function status(args, host) {
+  if(peerOwnerStorageKind(args.root)==='peer')return ownerLifecycle({root:args.root,session_id:args.session_id,action:'status'},host);
   binding(args,host);
   return withStore(args.root, db => {
     const needsReconciliation=j=>['overdue','inspection'].includes(jobTimeoutState(j,Date.now()).state);

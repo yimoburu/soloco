@@ -9,11 +9,13 @@
 // Synthetic observer fixtures establish mechanics, never native qualification.
 import {createHash,randomUUID} from 'node:crypto';
 import {prepareOriginalProjectedTaskContext} from './peer-context-interpreter.mjs';
-import {canonical,peerDigest,FAMILIES} from './ledger.mjs';
+import {canonical,peerDigest,FAMILIES,PeerLedger} from './ledger.mjs';
 import {REVIEW_SELECTION_RECIPE,extractReviewSelection,parseReviewOutput,reviewReference,reviewScope} from './review-selection.mjs';
 import {assertOriginalPeerExecutorIncarnation} from './executor-incarnation.mjs';
 import {sendHandoff,decideHandoff,pendingHandoffs,prepareHandoffTask} from './handoff.mjs';
 import {assertPeerOwnerOperatingState} from './owner-operating-state.mjs';
+import {assertPeerBootstrapOperationFrom} from './bootstrap-membership-context.mjs';
+import {bootstrapActor} from './bootstrap-membership-contract.mjs';
 
 const PROTOCOL='peer-cos-v1',MAX_ROWS=10000;
 const outstanding=['reserved','sent','unknown'];
@@ -29,6 +31,7 @@ const boundPrincipalConnections=new WeakMap();
 const taskAssignmentConnections=new WeakMap();
 const productionAdmissions=new WeakMap();
 const productionSchedulers=new WeakMap();
+const bootstrapMembershipFacades=new WeakMap();
 const productionPublications=new WeakMap();
 const currentAuthorizationGrants=new WeakMap();
 // Source-private transaction routing only. It is thrown before command lookup
@@ -1482,6 +1485,36 @@ export function bindPeerProductionScheduler(ledger){
 export function assertOriginalPeerProductionScheduler(facade,ledger){
   const original=productionSchedulers.get(facade);
   if(!original||original.ledger!==ledger)hold('PRODUCTION_OWNER_CHANGED','Original production scheduler capability required');
+}
+
+// Source-private membership-only paused composition. This service handle is
+// non-authorizing: every actual operation must load the genuine original
+// seal/checkpoint/selected finite purpose before any put or shared charge.
+export function createOriginalPeerBootstrapMembershipFacade({ledger,actor}){
+  if(Object.getPrototypeOf(ledger)!==PeerLedger.prototype)hold('BOOTSTRAP_LEDGER_REQUIRED','Original ledger required');
+  const a=bootstrapActor(actor),connection={root:ledger.root,company_id:ledger.company_id,directory:ledger.directory};
+  const operatorId=ledger.read(tx=>control(tx).value.founder_principal_id);
+  const actions=new Set(['membership/enroll','membership/admit','membership/activate','membership/revoke','bootstrap-membership.native_created','bootstrap-membership.read','bootstrap-membership.submitted','bootstrap-membership.completed','bootstrap-membership.unknown','bootstrap-membership.late_evidence']);
+  function write(type,channel,fn,input){
+    if(!actions.has(type)||typeof fn!=='function')hold('BOOTSTRAP_ACTION_HELD','Closed bootstrap action required');
+    for(const k of ['root','company_id','directory'])if(Object.getOwnPropertyDescriptor(ledger,k)?.value!==connection[k])hold('BOOTSTRAP_CONNECTION_CHANGED','Original bootstrap connection changed');
+    let deadline,expected;
+    return ledger.guardedWrite(type,type.startsWith('membership/')?a.session_id:'source-observer:bootstrap-membership',raw=>{
+      const proof=assertPeerBootstrapOperationFrom(raw,{ledger,actor:a,input,action:type}),enrollment=input.enrollment_id&&raw.get('work_items','membership:'+input.enrollment_id);deadline=Math.min(proof.deadline_at_ms,Date.parse(enrollment?.value.expires_at??input.expires_at));
+      if(enrollment)for(const phase of ['reconstruction','review']){const p=raw.get('work_items','membership-phase:'+input.enrollment_id+':'+phase);if(p?.value.bootstrap_protocol==='peer-bootstrap-membership-phase-v1'){const a=raw.getVersion(p.value.admission_ref);if(a?.value.protocol!=='peer-bootstrap-membership-admission-v1'||a.sha256!==p.value.admission_ref.sha256||!Number.isSafeInteger(a.value.binding?.deadline_at_ms))hold('BOOTSTRAP_ORIGINAL_ADMISSION_REQUIRED','Original phase deadline required');deadline=Math.min(deadline,a.value.binding.deadline_at_ms);}}
+      if(!Number.isSafeInteger(deadline)||deadline<=Date.now())hold('BOOTSTRAP_EXPIRED','Original finite bootstrap purpose required');
+      const current=new Map();let n=0;
+      for(const family of FAMILIES)for(const row of all(raw,family)){if(++n>MAX_ROWS)hold('BOOTSTRAP_CAPACITY','Complete original bootstrap namespace required');current.set(canonical([family,row.id]),{family,id:row.id,row});}
+      const snapshot=raw.get('control','company');let started=false;
+      const provider={...raw,get(f,id){const row=raw.get(f,id),k=canonical([f,id]);if(!current.has(k))current.set(k,{family:f,id,row});return row;},put(f,id,value,revision){if(!started){const probe=raw.getVersion(ref('control',snapshot));if(!probe||probe.sha256!==snapshot.sha256||peerDigest(probe.value)!==snapshot.sha256)hold('BOOTSTRAP_SOURCE_CHANGED','Original prewrite snapshot required');started=true;}const row=raw.put(f,id,value,revision);current.set(canonical([f,id]),{family:f,id,row});return row;}};
+      const result=fn(provider);if(typeof raw.sealWrites!=='function')hold('BOOTSTRAP_COMMIT_REQUIRED','Original write seal required');raw.sealWrites();expected=[...current.values()];
+      for(const x of expected)if(!same(raw.get(x.family,x.id),x.row))hold('BOOTSTRAP_SOURCE_CHANGED','Bootstrap source/postimage changed');return result;
+    },tx=>{for(const k of ['root','company_id','directory'])if(Object.getOwnPropertyDescriptor(ledger,k)?.value!==connection[k])hold('BOOTSTRAP_CONNECTION_CHANGED','Original bootstrap connection changed');for(const x of expected)if(!same(tx.get(x.family,x.id),x.row))hold('BOOTSTRAP_SOURCE_CHANGED','Original bootstrap physical postimage changed');return deadline;});
+  }
+  const facade=Object.freeze({membershipWrite:write});bootstrapMembershipFacades.set(facade,{ledger,actor:a,operatorId,connection});return facade;
+}
+export function assertOriginalPeerBootstrapMembershipFacade(facade,ledger){
+  const r=bootstrapMembershipFacades.get(facade);if(!r||r.ledger!==ledger)hold('BOOTSTRAP_ORIGINAL_FACADE_REQUIRED','Original same-ledger bootstrap facade required');return {operator_principal_id:r.operatorId,actor:copy(r.actor)};
 }
 
 function checkBoundPrincipal(principal,binding){
