@@ -111,6 +111,7 @@ function plannedWrite(ledger,type,principal,fn,terminalGuard=null,onPlan=null){
   return write(rawBase=>{
     const base=trackedReads(rawBase),prep=preparationBudget(base),budget=semanticBudget(base);
     const known=new Set(FAMILIES),keys=new Map(),history=new Map(),collections=new Map(),changes=new Map(),generations=new Map(),events=[];
+    const collectionViews=new Map();
     const reviewQueries=new Map(),reviewBodies=new Map(),reviewSnapshot=randomUUID();
     const filterKeys=['status','principal_id','task_id','scope'];
     let active=true;
@@ -141,6 +142,11 @@ function plannedWrite(ledger,type,principal,fn,terminalGuard=null,onPlan=null){
     };
     const materialize=(f,selected)=>{
       checkFamily(f);const key=canonical([f,selected]);
+      const generation=generations.get(f)??0,cached=collectionViews.get(key);
+      // Reuse only this owning transaction's derived order. Raw collection
+      // reads, retained bodies and final source guards keep their existing path.
+      // Preparation failure must still take the original closure-budget path.
+      if(!prep.failed()&&cached?.generation===generation)return cached.rows;
       if(!collections.has(key))collections.set(key,all(base,f,selected));
       const result=new Map(collections.get(key).map(row=>[row.id,row]));
       for(const change of changes.values())if(change.family===f){
@@ -148,7 +154,12 @@ function plannedWrite(ledger,type,principal,fn,terminalGuard=null,onPlan=null){
         if(matches(change.row,selected))result.set(change.row.id,prep.retain(f,change.row));
       }
       if(result.size>MAX_ROWS)hold('LOOKUP_CAPACITY','10,000 matching-row lookup bound exceeded');
-      return [...result.values()].sort((a,b)=>order(a.id,b.id));
+      const rows=[...result.values()].sort((a,b)=>order(a.id,b.id));
+      if(!prep.failed()){
+        if(!collectionViews.has(key)&&collectionViews.size>=64)collectionViews.delete(collectionViews.keys().next().value);
+        collectionViews.set(key,{generation,rows});
+      }
+      return rows;
     };
     const getVersion=r=>{
       guard();const exact=exactReference(r),key=canonical(exact);

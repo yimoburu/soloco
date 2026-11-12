@@ -95,12 +95,14 @@ function environment(scratch,fixtureSetup) {
     ...(fixtureSetup?{SOLOCO_TEST_FIXTURE_MANIFEST:fixtureSetup.manifest_path,SOLOCO_TEST_FIXTURE_MANIFEST_SHA256:fixtureSetup.manifest_sha256}:{})};
 }
 // Probe only the trusted runtime with fixed code, never a candidate file or cwd.
+// Cold Node startup can exceed one second on a loaded host. Each fixed flag
+// probe has a five-second startup bound; candidate execution keeps its own limit.
 // Exported for deterministic flag-selection tests; production uses spawnSync.
 export function selectTestIsolationFlag(probe=spawnSync) {
   const failures=[];
   for(const flag of ['--test-isolation=none','--experimental-test-isolation=none']) {
     try {
-      const result=probe(node,[flag,'--eval',''],{cwd:path.dirname(node),env:environment(os.tmpdir()),encoding:'utf8',timeout:1000,maxBuffer:10000,killSignal:'SIGKILL'});
+      const result=probe(node,[flag,'--eval',''],{cwd:path.dirname(node),env:environment(os.tmpdir()),encoding:'utf8',timeout:5000,maxBuffer:10000,killSignal:'SIGKILL'});
       if(!result.error && !result.signal && result.status===0)return flag;
       failures.push(`${flag}: ${String(result.error?.message || result.stderr || result.signal || `exit ${result.status}`).trim().slice(0,200)}`);
     } catch(error) {failures.push(`${flag}: ${String(error.message).slice(0,200)}`);}
