@@ -30,6 +30,7 @@ import {appendPeerMessage,disposePeerMessage} from './tasks.mjs';
 import {updateTaskIndex} from './task-index.mjs';
 import { TIMEOUT_POLICY_VERSION, normalizeTimeout, executionTiming, jobExecutionTiming, jobTimeoutState } from './timeout.mjs';
 import {assertSpecialistEligible,specialistName} from './specialists.mjs';
+import {isOriginMechanicalQaWorker,workPeerOriginMechanicalQa} from './origin-mechanical-qa-worker.mjs';
 
 const scopedContext=a=>a?.qualification?.protocol===scoped.SCOPED_PROTOCOL;
 const maintenanceEligible=(s,j)=>qualificationMaintenanceEligible(s,j)||scoped.scopedMaintenanceEligible(s,j)||operatingMaintenanceEligible(s,j);
@@ -57,6 +58,8 @@ function failureEvidence(error) {
 }
 
 export async function work(root, jobId, model = runModel) {
+  const mechanical=withStore(root,store=>store.readSnapshot(()=>{const state=store.read();return isOriginMechanicalQaWorker(state,state.jobs?.[jobId]);}));
+  if(mechanical)return workPeerOriginMechanicalQa(root,jobId,model);
   let job, state, context, output, artifact, controller, monitor, claimed=false,spawned=false,invoked=false,lastToken,lastCurrent,lastGrantExpiry,lastDevelopmentMaxBytes;
   const supplemental=[],handoverReads=[];
   let deliveryLedger,pendingDelivery,partitionDelivery,scopedStreamLedger;
@@ -109,6 +112,9 @@ export async function work(root, jobId, model = runModel) {
   try {
     state=withStore(root,db=>db.transaction('job.started',s=>{
       job=s.jobs[jobId];
+      // Non-authorizing startup classification may race. An ACTUAL mechanical
+      // target can never fall through into the ordinary claim/context path.
+      if(isOriginMechanicalQaWorker(s,job))throw Object.assign(Error('Use original fixed mechanical QA worker'),{code:'ORIGIN_MECHANICAL_QA_FIXED_WORKER_REQUIRED'});
       if(!compatibleRuntime(s) || upgradePending(s) || !job || job.status!=='queued' || job.epoch!==s.owner.epoch || (s.paused&&!handoverReviewEligible(s,job)&&!maintenanceEligible(s,job))) throw new Error('Assignment is no longer eligible');
       coordinationEligible(s,job);
       prototypeAssignment(s,job);developmentAssignment(s,job,false,root);if(s.records[job.review_of?.id]?.development?.type==='review_continuation')reviewContinuationAssignment(s,job,{root});
@@ -484,6 +490,7 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
       const target=nextState.records[job.review_of?.id];if(target?.development?.type==='review_continuation')assertReviewContinuationCommit(nextState,{owner:target.development.proposal.owner,expires_at:target.development.proposal.expires_at});
     }:undefined}));
   } catch(error) {
+    if(!claimed&&error.code==='ORIGIN_MECHANICAL_QA_FIXED_WORKER_REQUIRED')throw error;
     const rejectedOutput=output??error.rejected_output;
     const unowned=Symbol('unowned worker');
     try {withStore(root,db=>db.transaction('job.failed',s=>{
