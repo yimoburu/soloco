@@ -460,3 +460,25 @@ test('a production admission with its whole current attempt removed stays invali
   assert.deepEqual(f.get('effects',effect.id),effect);assert.deepEqual(f.get('slots',slot.id),slot);
   assert.equal(f.get('control','usage').value.model_calls,1);
 });
+
+for(const status of ['planned','pending'])test('an admitted task cannot regain a fresh '+status+' preview by changing its mutable definition revision',t=>{
+  const f=fixture(t),task=f.pending(),admitted=f.run('scheduler','task/admit',{task_id:task.id});assert.equal(admitted.admitted,true);
+  assert.equal(f.ledger.read(tx=>model.validateContext(tx,admitted.context)),true);
+  const originalDefinition=reference('tasks',task),effect=f.get('effects',admitted.task.value.attempt.effect_id),slot=f.get('slots',task.id);
+  const claims=rows(f,'claims',{task_id:task.id,status:'held'});
+  f.seed('tasks',task.id,v=>({...v,attempt:null,status,definition_revision:2}));
+  const current=f.get('tasks',task.id);assert.equal(current.value.definition_revision,2);assert.equal(current.value.attempt,null);
+  assert.equal(f.get('effects',model.digest(['native-effect',task.id,2])),null,'the new mutable revision would miss the occupied original effect');
+  assert.deepEqual(f.ledger.read(tx=>tx.getVersion(originalDefinition)).value.definition,task.value.definition);
+  assert.equal(f.ledger.read(tx=>tx.getVersion(originalDefinition)).value.definition_revision,1);
+  const preview=f.connection.inspect('task/context',{task_id:task.id});
+  assert.equal(preview.task.definition_revision,2);assert.notEqual(preview.sha256,admitted.context.sha256);
+  const before=logicalSQLState(f);
+  assert.equal(f.ledger.read(tx=>model.validateContext(tx,preview)),false,'a freshly built mutable-head context cannot replace the immutable creation definition');
+  assert.equal(f.ledger.read(tx=>model.validateContext(tx,admitted.context)),false);
+  assert.equal(f.ledger.read(tx=>f.facade.validateContext(tx,preview)),false);
+  assert.deepEqual(logicalSQLState(f),before,'validation neither repairs the corrupted task nor releases its occupied attempt');
+  assert.deepEqual(f.get('effects',effect.id),effect);assert.deepEqual(f.get('slots',slot.id),slot);
+  assert.deepEqual(rows(f,'claims',{task_id:task.id,status:'held'}),claims);
+  assert.equal(f.get('control','usage').value.model_calls,1);assert.equal(f.get('grants','grant-cos-a').value.used_model_calls,1);
+});

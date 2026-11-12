@@ -128,6 +128,14 @@ Assignment checks the validated recipient, qualification, grant, controls and
 resource bindings again after SQL staging. Its physical commit deadline is
 capped by the recipient's actual grant expiry; late drift or expiry rolls back
 the task, claims and receipt together.
+After planning flushes its rows and events, the owning guarded transaction
+seals public writes. A later `put` or event attempt poisons the whole transaction,
+even if its error is caught. Private P1 final staging and terminal reads continue.
+This also prevents an unknown conflicting claim or queue entry being appended
+after the resource and queue checks.
+An exact assignment receipt replay returns the original receipt without new
+work, claims or charges. It retains the current founder/production-owner fence
+and does not require unused recipient budget after that work was admitted.
 Assignment itself neither dispatches a native session nor charges a model call.
 The normal scheduler still performs actual admission and its independent gates.
 
@@ -148,6 +156,8 @@ company/root binding, founder reference and original adopted owner.
 The task client checks that original seal at binding, every action/inspection,
 replay and terminal commit. Global context validation retrieves the original
 immutable admission command and compares its authority with the current attempt.
+The task's ledger-owned creation event anchors its original immutable definition
+and revision, so rewriting a mutable revision cannot hide a prior admission.
 Removing a seal or substituting one shaped for a new owner cannot turn a
 production admission into a generic admission. Genuine generic admissions keep
 their original behavior. The production facade additionally requires a production

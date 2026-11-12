@@ -287,6 +287,10 @@ function plannedWrite(ledger,type,principal,fn,terminalGuard=null){
         if(actual.revision!==row.revision||actual.sha256!==row.sha256)hold('PLAN_CHANGED','Committed reference differs from plan');
       }
       for(const e of events)base.event(e.type,e.payload);
+      if(type==='task/assign'&&terminalGuard){
+        if(typeof base.sealWrites!=='function')hold('AUTHORITY_CHANGED','Owning assignment write closure required');
+        base.sealWrites();
+      }
       return output;
     }finally{active=false;}
   });
@@ -578,6 +582,15 @@ export function buildContext(tx,actor,task){
   const body={protocol:'peer-task-context-v1',control:{policy_generation:c.value.policy_generation,pause_generation:c.value.pause_generation,paused:c.value.paused,governance_sha256:c.value.governance_sha256??null,policy:policy(c)},principal:ref('principals',owner),grant:auth.grant?grantBinding(auth.grant):{founder_principal_id:owner.id},task:{id:task.id,definition_revision:t.definition_revision,definition_sha256:t.definition_sha256,definition:t.definition,owner_principal_id:t.owner_principal_id,grant_id:t.grant_id,grant_generation:t.grant_generation},...selected};
   const encoded=canonical(body),size=Buffer.byteLength(encoded);if(size>policy(c).max_context_bytes)hold('CONTEXT_CAPACITY','Complete required context exceeds policy; no attempt consumed');return {...body,text:encoded,sha256:digest(encoded),hash:digest(encoded),utf8_bytes:size};
 }
+function originalTaskDefinition(tx,task){
+  if(!Number.isSafeInteger(task.created_seq)||task.created_seq<1)hold('DEFINITION_CHANGED','Original task creation metadata required');
+  const event=tx.events({after:task.created_seq-1,limit:1}).items[0];
+  const changes=event?.payload?.changes?.filter(change=>change.family==='tasks'&&change.id===task.id&&change.revision===1);
+  if(event?.seq!==task.created_seq||!['task/submit','task/assign'].includes(event.type)||changes?.length!==1)hold('DEFINITION_CHANGED','Original task creation event required');
+  const original=tx.getVersion(ref('tasks',changes[0]))?.value,current=task.value;
+  if(!original||original.definition_revision!==current.definition_revision||original.definition_sha256!==current.definition_sha256||!same(original.definition,current.definition)||digest(original.definition)!==original.definition_sha256)hold('DEFINITION_CHANGED','Immutable original task definition changed');
+  return original.definition_revision;
+}
 function originalTaskAdmission(tx,task){
   const t=task.value,a=t.attempt,effectId=digest(['native-effect',task.id,t.definition_revision]),effect=tx.get('effects',effectId);
   if(!a||effect?.value.kind!=='native'||effect.value.task_id!==task.id||!Number.isSafeInteger(effect.created_seq))hold('TASK_ADMISSION_REQUIRED','Original native admission required');
@@ -595,8 +608,9 @@ export function validateContext(tx,context){
     if(control(tx).value.paused)return false;
     const task=tx.get('tasks',context.task.id);
     if(!task||['cancelled','unknown','quarantined'].includes(task.value.status))return false;
+    const definitionRevision=originalTaskDefinition(tx,task);
     if(!task.value.attempt&&!['planned','pending'].includes(task.value.status))return false;
-    const nativeEffect=tx.get('effects',digest(['native-effect',task.id,task.value.definition_revision]));
+    const nativeEffect=tx.get('effects',digest(['native-effect',task.id,definitionRevision]));
     const admission=task.value.attempt||nativeEffect?originalTaskAdmission(tx,task):null;
     const current=buildContext(tx,{principal_id:task.value.owner_principal_id},task);
     if(admission?.authority&&Object.hasOwn(admission.authority,'production_authority'))assertPeerProductionAuthority(tx,admission.authority.production_authority);
@@ -1161,12 +1175,12 @@ function processEvidence(args,t,closed){
   return p;
 }
 function observation(tx,actor,t,action,args,extra={}){const id=digest(['runtime-observation',t.id,t.value.attempt.id,action]);if(tx.get('effects',id))hold('OBSERVATION_EXISTS','Observation is immutable');return tx.put('effects',id,{kind:'runtime_observation',status:'recorded',principal_id:actor.principal_id,scope:t.value.scope,task_id:t.id,attempt_id:t.value.attempt.id,action,...extra,at:now()},0);}
-function command(tx,actor,action,args,protectedCall,taskBinding=null){
+function command(tx,actor,action,args,protectedCall,taskBinding=null,onReplay=null){
   for(const key of ['actor','session_id','principal_id','runtime_observer','observer_capability'])if(Object.hasOwn(args,key))hold('ACTOR_ARGUMENT','Identity/capability cannot come from request fields');
   const operation=text(args.operation_id,'operation_id',160),payload=copy(args);delete payload.operation_id;
   const id=taskBinding?digest(['peer-task-command-v1',actor.principal_id,taskBinding,operation]):digest(['peer-command-v1',actor.principal_id,operation]);
   const hash=taskBinding?digest({channel:'task-effect',authority:taskBinding,action,args:payload}):digest({channel:protectedCall?'runtime-observer':'model',action,args:payload}),prior=tx.get('commands',id);
-  if(prior){if(prior.value.request_sha256!==hash||taskBinding&&!same(prior.value.task_effect,taskBinding))hold('REPLAY_MISMATCH','Operation already names a different request');return copy(prior.value.result);}
+  if(prior){if(prior.value.request_sha256!==hash||taskBinding&&!same(prior.value.task_effect,taskBinding))hold('REPLAY_MISMATCH','Operation already names a different request');if(onReplay)onReplay();return copy(prior.value.result);}
   const principal=member(tx,actor),c=control(tx);policy(c);
   const mutationArgs=taskBinding?{...args,operation_id:digest(['peer-task-operation-v1',taskBinding,operation])}:args;
   const result=mutate(tx,actor,principal,c,action,mutationArgs,protectedCall,taskBinding);tx.put('commands',id,{principal_id:actor.principal_id,operation_id:operation,action,request_sha256:hash,...(taskBinding?{task_id:taskBinding.task_id,attempt_id:taskBinding.attempt_id,task_effect:copy(taskBinding)}:{}),result:bounded(result,'receipt',800000),created_at:now()},0);return result;
@@ -1202,21 +1216,26 @@ function run(ledger,actor,action,args,protectedCall,binding=null,production=null
   const a=copy(actor),input=bounded(args,'request',1000000);text(action,'action',100);
   if(scopeInputActions.has(action))scopeOf(input.scope);
   if(observationActions.has(action)&&!protectedCall)hold('OBSERVER_REQUIRED','Observation actions require the separate trusted host interface');
-  let deadline=production||action==='task/assign'?Date.now()+TASK_EFFECT_LEASE_MS:null,assignment=null;
+  let deadline=production||action==='task/assign'?Date.now()+TASK_EFFECT_LEASE_MS:null,assignment=null,replay=false,operatorBindings=null;
   const terminal=production||action==='task/assign'?tx=>{
     if(production)assertPeerProductionAuthority(tx,production,ledger);
     if(action==='task/assign'){
-      if(!assignment)hold('AUTHORITY_CHANGED','Original assignment authority binding required');
-      for(const expected of assignment.bindings)if(!same(tx.get(expected.family,expected.id),expected.row))hold('AUTHORITY_CHANGED','Assignment authority changed before commit');
+      const bindings=replay?operatorBindings:assignment?.bindings;
+      if(!bindings)hold('AUTHORITY_CHANGED','Original assignment authority binding required');
+      for(const expected of bindings)if(!same(tx.get(expected.family,expected.id),expected.row))hold('AUTHORITY_CHANGED','Assignment authority changed before commit');
     }
     return deadline;
   }:null;
   return plannedWrite(ledger,action,a.principal_id,tx=>{
     if(production){assertPeerProductionAuthority(tx,production,ledger);if(action==='task/admit')productionAdmissions.set(tx,production);}
     const p=member(tx,a);if(binding)checkBoundPrincipal(p,binding);else if(p.value.membership_qualification)hold('BOUND_CONNECTION_REQUIRED','Managed principal requires a protected bound connection');
-    if(action==='task/assign'){if(!founder(control(tx),p))hold('FOUNDER_REQUIRED','Actual founder operator required');taskAssignmentConnections.set(tx,{company_id:ledger.company_id,root_sha256:digest(ledger.root)});}
-    const result=command(tx,a,action,input,protectedCall);
     if(action==='task/assign'){
+      const c=control(tx);if(!founder(c,p))hold('FOUNDER_REQUIRED','Actual founder operator required');
+      operatorBindings=[{family:'control',id:c.id,row:copy(c)},{family:'principals',id:p.id,row:copy(p)}];
+      taskAssignmentConnections.set(tx,{company_id:ledger.company_id,root_sha256:digest(ledger.root)});
+    }
+    const result=command(tx,a,action,input,protectedCall,null,()=>{replay=true;});
+    if(action==='task/assign'&&!replay){
       assignment=assignmentCommitBinding(tx,ledger,a,input,result);
       deadline=Math.min(deadline,assignment.expires_at_ms);
     }

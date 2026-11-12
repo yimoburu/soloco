@@ -505,14 +505,26 @@ export class PeerLedger{
       const changes=[],events=[],pending=new Map(),initial=new Map();
       // Fence history before preparing the first modifying statement. A failed
       // mutation poisons this transaction even if the callback catches it.
-      let rowMutationStarted=false,mutationFailed=false,finalizing=false,putInProgress=false,taskHistoryCall=null;
+      let rowMutationStarted=false,mutationFailed=false,finalizing=false,putInProgress=false,taskHistoryCall=null,writesSealed=false,sealFailure=null;
       const snapshot=randomUUID();
       const boundary=()=>{
         if(!active||!this.inTransaction||!fence.owns(token))throw Error('Peer transaction handle expired');
         if(db.isTransaction!==true)throw Error('Peer transaction connection is no longer active');
+        if(sealFailure)throw sealFailure;
         if(mutationFailed)throw Error('Peer transaction contains a failed row mutation; rollback required');
       };
       const guard=()=>{boundary();if(finalizing)throw Error('Peer public handle is closed during final review maintenance');};
+      const poisonSeal=()=>{
+        mutationFailed=true;
+        sealFailure??=Object.assign(Error('Peer public writes were sealed; rollback required'),{code:'AUTHORITY_CHANGED'});
+        throw sealFailure;
+      };
+      const writeGuard=()=>{
+        // Include caught attempts during private maintenance/staging, while
+        // never letting an escaped handle poison a later connection owner.
+        if(writesSealed&&this.inTransaction&&fence.owns(token)&&db.isTransaction===true)poisonSeal();
+        guard();
+      };
       const get=(f,id)=>{
         const key=canonical([f,id]);
         if(pending.has(key))return structuredClone(pending.get(key));
@@ -520,6 +532,11 @@ export class PeerLedger{
       };
       const tx=Object.freeze({
         sequence,
+        ...(terminalGuard!==null?{sealWrites:()=>{
+          guard();
+          if(putInProgress)poisonSeal();
+          writesSealed=true;
+        }}:{}),
         get:(f,id)=>{guard();return get(f,id);},
         // Evidence only: exact canonical history bytes, not current authority or
         // per-version event/producer provenance. No created_seq is inferred.
@@ -655,7 +672,7 @@ export class PeerLedger{
           return JSON.parse(bytes);
         },
         put:(f,id,value,expected_revision=0)=>{
-          guard();
+          writeGuard();
           // Independently revised from the attributed external put-fence proposal.
           // Denial precedes argument inspection, including no-op/malformed calls.
           // A denied nested call must not enter the owner's finally block.
@@ -710,7 +727,12 @@ export class PeerLedger{
             putInProgress=false;
           }
         },
-        event:(kind,payload)=>{guard();if(!write)throw Error('Peer read snapshots cannot append events');exact(kind,'event type');events.push({type:kind,payload:JSON.parse(canonical(payload))});}
+        event:(kind,payload)=>{
+          writeGuard();if(!write)throw Error('Peer read snapshots cannot append events');exact(kind,'event type');
+          const normalized=JSON.parse(canonical(payload));
+          if(terminalGuard!==null)writeGuard();
+          events.push({type:kind,payload:normalized});
+        }
       });
       let result=fn(tx);
       if(result&&typeof result.then==='function'){
@@ -750,6 +772,7 @@ export class PeerLedger{
         let terminalActive=true,reading=false,terminalFailure=null,deadline;
         const state=()=>{
           if(!terminalActive||!this.inTransaction||!fence.owns(token)||db.isTransaction!==true)throw Error('Peer terminal view expired or lost its connection owner');
+          if(sealFailure)throw sealFailure;
           if(mutationFailed||putInProgress)throw Error('Peer terminal view has a failed or active row mutation');
         };
         const usable=()=>{state();if(terminalFailure)throw terminalFailure;};

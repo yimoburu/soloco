@@ -178,6 +178,49 @@ test('assignment replay is idempotent and mismatched reuse cannot create another
   assert.equal(f.rows('tasks').length,1);
 });
 
+test('assignment receipt replay after a normal admission does not reauthorize the consumed one-call grant',t=>{
+  const f=fixture(t,{principals:{founder:{legacy_owner:{host:'codex',session_id:'SYNTHETIC-assignment-admitted-replay',epoch:1}}}}),production=bindPeerProductionScheduler(f.ledger);
+  f.authority=f.grant({max_model_calls:1});
+  const request=f.request(),assigned=production.execute(f.ledger,actor('founder'),'task/assign',request);
+  const admitted=production.execute(f.ledger,actor('scheduler'),'task/admit',{operation_id:f.op('admit-replay'),task_id:assigned.id});
+  assert.equal(admitted.admitted,true);assert.equal(f.get('grants',f.authority.id).value.used_model_calls,1);
+  const before=state(f);
+  assert.deepEqual(production.execute(f.ledger,actor('founder'),'task/assign',request),assigned);
+  assert.deepEqual(state(f),before);assert.equal(f.get('tasks',assigned.id).value.status,'running');
+  assert.equal(f.get('slots',assigned.id).value.status,'active');
+});
+
+test('assignment receipt replay after a lawful transfer returns the original receipt without reclaiming resources',t=>{
+  const f=fixture(t,{principals:{founder:{legacy_owner:{host:'codex',session_id:'SYNTHETIC-assignment-transfer-replay',epoch:1}}}}),production=bindPeerProductionScheduler(f.ledger);
+  const request=f.request(),assigned=production.execute(f.ledger,actor('founder'),'task/assign',request),recipientGrant=f.grant({to_principal_id:'cos-b'});
+  const transferred=f.run('founder','task/transfer',{task_id:assigned.id,to_principal_id:'cos-b',to_grant_id:recipientGrant.id});
+  assert.equal(transferred.value.owner_principal_id,'cos-b');
+  const before=state(f);
+  assert.deepEqual(production.execute(f.ledger,actor('founder'),'task/assign',request),assigned);
+  assert.deepEqual(state(f),before);assert.deepEqual(f.get('tasks',assigned.id),transferred);
+  const claims=f.rows('claims',{task_id:assigned.id,status:'held'});assert.equal(claims.length,1);assert(claims.every(row=>row.value.principal_id==='cos-b'));
+});
+
+for(const grantState of ['revoked','expired'])test('closed assignment receipt replay with '+grantState+' grant returns history without creating work',t=>{
+  const f=fixture(t,{principals:{founder:{legacy_owner:{host:'codex',session_id:'SYNTHETIC-assignment-closed-replay',epoch:1}}}}),production=bindPeerProductionScheduler(f.ledger);
+  const request=f.request(),assigned=production.execute(f.ledger,actor('founder'),'task/assign',request);
+  const admitted=production.execute(f.ledger,actor('scheduler'),'task/admit',{operation_id:f.op('admit-closed-replay'),task_id:assigned.id});
+  assert.equal(admitted.admitted,true);
+  const finished=createRuntimeObserver(f.ledger).record('task/finish',{operation_id:f.op('finish-closed-replay'),task_id:assigned.id,attempt_id:admitted.task.value.attempt.id,
+    native_id:'SYNTHETIC-assignment-closed-replay',output:'SYNTHETIC closed task result retained for historical replay.',termination_confirmed:true,
+    observed_process:{pid:15200,started_at:admitted.task.value.attempt.admitted_at,close_observed:true}});
+  assert.equal(finished.accepted,true);assert.equal(f.get('slots',assigned.id).value.status,'released');
+  if(grantState==='revoked')f.run('founder','grant/revoke',{grant_id:f.authority.id});
+  const original=Date.now;
+  try{
+    if(grantState==='expired')Date.now=()=>Date.parse(f.authority.value.expires_at);
+    const before=state(f);
+    assert.deepEqual(production.execute(f.ledger,actor('founder'),'task/assign',request),assigned);
+    assert.deepEqual(state(f),before);assert.deepEqual(f.get('tasks',assigned.id),finished.task);
+    assert.equal(f.rows('claims',{task_id:assigned.id,status:'held'}).length,0);
+  }finally{Date.now=original;}
+});
+
 test('nonfounder principals and the qualified recipient cannot assign work or replay the founder operation',t=>{
   const f=fixture(t),request=f.request();execute(f.ledger,actor('founder'),'task/assign',request);
   for(const who of ['cos-a','scheduler','publisher'])unchanged(f,()=>execute(f.ledger,actor(who),'task/assign',request),code('FOUNDER_REQUIRED'));
@@ -345,7 +388,7 @@ const terminalAssignmentChanges=[
     const resources=[{kind:'path',worktree_id:'assignment-tree',path:'evidence.mjs'}];f.authority=f.grant({resources});return {resources};
   },change:value=>({...value,worktrees:value.worktrees.map(tree=>({...tree,repository:'fictional/replaced-assignment'}))})}
 ];
-for(const scenario of terminalAssignmentChanges)test('assignment physical precommit: staged '+scenario.name+' rolls back the whole assignment',t=>{
+for(const scenario of terminalAssignmentChanges)test('assignment physical precommit: attempted late '+scenario.name+' write rolls back the whole assignment',t=>{
   const f=fixture(t,{principals:{founder:{legacy_owner:{host:'codex',session_id:'SYNTHETIC-assignment-final-authority',epoch:1}}}}),production=bindPeerProductionScheduler(f.ledger);
   const request=f.request(scenario.prepare?.(f)??{}),before=state(f),beforeGlobal=f.get('control','usage'),beforePersonal=f.get('control',`usage:${f.recipient}`);
   const hook=afterAssignmentStaging(f,request,tx=>{
@@ -354,9 +397,33 @@ for(const scenario of terminalAssignmentChanges)test('assignment physical precom
   });
   try{assert.throws(()=>production.execute(f.ledger,actor('founder'),'task/assign',request),code('AUTHORITY_CHANGED'));}
   finally{hook.restore();}
-  assert.equal(hook.hits,1,'the controlled same-transaction change follows real task and claim staging');
-  assert.deepEqual(state(f),before,'terminal rejection rolls back authority mutation, task, claim, command, event, history and outbox');
+  assert.equal(hook.hits,1,'the controlled late-write attempt follows real task and claim staging');
+  assert.deepEqual(state(f),before,'late-write rejection rolls back task, claim, command, event, history and outbox');
   assert.equal(f.get('tasks',request.task_id),null);assert.equal(f.rows('claims',{task_id:request.task_id}).length,0);
   assert.equal(f.rows('commands').some(row=>row.value.operation_id===request.operation_id),false);
   assert.deepEqual(f.get('control','usage'),beforeGlobal);assert.deepEqual(f.get('control',`usage:${f.recipient}`),beforePersonal);
+});
+
+for(const addition of ['competing held claim','unplanned pending task'])test('assignment physical precommit: caught late '+addition+' insertion still poisons the transaction',t=>{
+  const f=fixture(t,{principals:{founder:{legacy_owner:{host:'codex',session_id:'SYNTHETIC-assignment-late-addition',epoch:1}}}}),production=bindPeerProductionScheduler(f.ledger);
+  if(addition==='unplanned pending task')f.update('control','company',value=>({...value,policy:{...value.policy,queue_limit:1,principal_queue_limit:1}}));
+  const request=f.request(),before=state(f),extraTaskId='SYNTHETIC-unplanned-task';let attempted;
+  const hook=afterAssignmentStaging(f,request,tx=>{
+    const assigned=tx.get('tasks',request.task_id);
+    try{
+      if(addition==='competing held claim'){
+        const resource=assigned.value.resources[0];
+        tx.put('claims',digest(['claim',extraTaskId,resource.key]),{task_id:extraTaskId,principal_id:'cos-b',scope:assigned.value.scope,resource,status:'held',definition_revision:1},0);
+      }else{
+        const definition={...assigned.value.definition,resources:[]};
+        tx.put('tasks',extraTaskId,{...assigned.value,resources:[],definition,definition_sha256:digest(definition)},0);
+      }
+    }catch(error){attempted=error;}
+  });
+  try{assert.throws(()=>production.execute(f.ledger,actor('founder'),'task/assign',request),code('AUTHORITY_CHANGED'));}
+  finally{hook.restore();}
+  assert.equal(hook.hits,1);assert.equal(attempted?.code,'AUTHORITY_CHANGED','the forbidden public put fails even when its error is caught');
+  assert.deepEqual(state(f),before,'catching a late write error cannot commit the assignment, competing rows, receipts, history, event or outbox');
+  assert.equal(f.get('tasks',request.task_id),null);assert.equal(f.get('tasks',extraTaskId),null);
+  assert.equal(f.rows('claims',{task_id:request.task_id}).length,0);assert.equal(f.rows('claims',{task_id:extraTaskId}).length,0);
 });

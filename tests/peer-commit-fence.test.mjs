@@ -206,3 +206,111 @@ test('ordinary read/write APIs retain synchronous behavior and never acquire a t
     assert.throws(()=>f.ledger.write('ordinary.async','cos-a',async()=>{}),/asynchronous work/);
   }finally{exec.restore();f.close();}
 });
+
+test('guarded seal is idempotent, read-only and preserves genuine pre-seal rows/events plus private staging',()=>{
+  const queries=[],f=peerFixture({onQuery:({sql})=>queries.push(sql)}),exec=traceCommits(f.ledger);
+  try{
+    const deadline=future();queries.length=0;let publicTx;
+    const row=f.ledger.guardedWrite('task.sealed-flush','cos-a',tx=>{
+      publicTx=tx;const value=put(tx);tx.event('before.seal',{id:value.id});
+      const before=queries.length;
+      assert.equal(tx.sealWrites(),undefined);assert.equal(tx.sealWrites(),undefined);
+      assert.equal(queries.length,before,'the seal itself issues no SQL or event');
+      assert.equal(tx.get('notices',value.id).sha256,value.sha256);
+      assert.equal(tx.get('principals','cos-a').id,'cos-a');
+      return value;
+    },view=>{assert.equal(view.get('notices','guarded-notice').value.content,'verified staging');return deadline;});
+    assert.equal(f.ledger.read(tx=>tx.get('notices',row.id)).sha256,row.sha256);
+    const event=f.ledger.events().items.at(-1);
+    assert.equal(event.type,'task.sealed-flush');assert.deepEqual(event.payload.events,[{type:'before.seal',payload:{id:row.id}}]);
+    for(const sql of ['INSERT INTO peer_events VALUES(?,?,?,?,?,?)','INSERT INTO peer_outbox(seq) VALUES(?)','UPDATE peer_meta SET last_event_sha256=? WHERE id=1'])assert.ok(queries.includes(sql));
+    assert.equal(exec.trace[0],'BEGIN IMMEDIATE');assert.equal(exec.trace[1],'COMMIT');
+    assert.throws(()=>publicTx.sealWrites(),/expired/);
+  }finally{exec.restore();f.close();}
+});
+
+for(const operation of ['put','event'])for(const caught of [false,true])test(`sealed ${operation} ${caught?'caught':'escaped'} attempt poisons all staged changes`,()=>{
+  const f=peerFixture(),exec=traceCommits(f.ledger);let entered=false,terminal=0;
+  try{
+    const before=snapshot(f),deadline=future();
+    assert.throws(()=>f.ledger.guardedWrite('task.sealed-poison','cos-a',tx=>{
+      put(tx);tx.event('before.seal',{});tx.sealWrites();
+      const attempt=()=>{entered=true;if(operation==='put')tx.put('claims','late-overlapping-claim',{status:'held',task_id:'other-task'},0);else tx.event('late.event',{});};
+      if(caught)assert.throws(attempt,error=>error.code==='AUTHORITY_CHANGED');else attempt();
+      return 'must not commit';
+    },()=>{terminal++;return deadline;}),error=>error.code==='AUTHORITY_CHANGED');
+    assert.equal(entered,true);assert.equal(terminal,0);
+    assert.deepEqual(exec.trace,['BEGIN IMMEDIATE','ROLLBACK']);assert.deepEqual(snapshot(f),before);
+  }finally{exec.restore();f.close();}
+});
+
+test('sealed no-op and malformed writes reject before inspecting arguments and cannot clear poison',()=>{
+  const f=peerFixture();let inspected=0;
+  try{
+    const before=snapshot(f),deadline=future();
+    assert.throws(()=>f.ledger.guardedWrite('task.sealed-closed','cos-a',tx=>{
+      const row=put(tx);tx.sealWrites();
+      const value=new Proxy({},{ownKeys(){inspected++;throw Error('must not inspect');}});
+      for(const attempt of [()=>tx.put('notices',row.id,row.value,row.revision),()=>tx.put(null,null,value,-1),()=>tx.event(null,value)])assert.throws(attempt,error=>error.code==='AUTHORITY_CHANGED');
+      assert.throws(()=>tx.sealWrites(),error=>error.code==='AUTHORITY_CHANGED');
+    },()=>deadline),error=>error.code==='AUTHORITY_CHANGED');
+    assert.equal(inspected,0);assert.deepEqual(snapshot(f),before);
+  }finally{f.close();}
+});
+
+test('a seal without writes adds no rows/event and leaves ordinary transaction shapes unchanged',()=>{
+  const f=peerFixture();
+  try{
+    const before=snapshot(f),deadline=future();
+    f.ledger.guardedWrite('task.empty-seal','cos-a',tx=>{tx.sealWrites();assert.equal(tx.get('principals','cos-a').id,'cos-a');},()=>deadline);
+    assert.deepEqual(snapshot(f),before);
+    f.ledger.read(tx=>assert.equal(Object.hasOwn(tx,'sealWrites'),false));
+    f.ledger.write('ordinary.no-seal','cos-a',tx=>{assert.equal(Object.hasOwn(tx,'sealWrites'),false);});
+    assert.deepEqual(snapshot(f),before);
+  }finally{f.close();}
+});
+
+for(const point of ['private-flush','terminal'])test(`caught write attempt during ${point} after seal still rolls back`,()=>{
+  const f=peerFixture(),exec=traceCommits(f.ledger);let publicTx,injected=0;
+  try{
+    const before=snapshot(f),deadline=future();
+    f.ledger.onQuery=({sql})=>{
+      if(point==='private-flush'&&sql==='INSERT INTO peer_outbox(seq) VALUES(?)'){
+        injected++;assert.throws(()=>publicTx.put('claims','late-claim',{status:'held'},0),error=>error.code==='AUTHORITY_CHANGED');
+      }
+    };
+    assert.throws(()=>f.ledger.guardedWrite('task.sealed-late','cos-a',tx=>{publicTx=tx;put(tx);tx.sealWrites();},()=>{
+      if(point==='terminal'){injected++;assert.throws(()=>publicTx.event('late.event',{}),error=>error.code==='AUTHORITY_CHANGED');}
+      return deadline;
+    }),error=>error.code==='AUTHORITY_CHANGED');
+    assert.equal(injected,1);assert.deepEqual(exec.trace,['BEGIN IMMEDIATE','ROLLBACK']);assert.deepEqual(snapshot(f),before);
+  }finally{f.ledger.onQuery=null;exec.restore();f.close();}
+});
+
+test('escaped sealed handles cannot poison a later owning transaction',()=>{
+  const f=peerFixture();let escaped;
+  try{
+    const deadline=future();f.ledger.guardedWrite('task.completed-seal','cos-a',tx=>{escaped=tx;tx.sealWrites();},()=>deadline);
+    f.ledger.write('ordinary.after-seal','cos-a',tx=>{
+      assert.throws(()=>escaped.put('notices','late',{},0),/expired/);
+      assert.throws(()=>escaped.event('late',{}),/expired/);
+      assert.throws(()=>escaped.sealWrites(),/expired/);
+      tx.put('notices','fresh-notice',{status:'pending'},0);
+    });
+    assert.equal(f.ledger.read(tx=>tx.get('notices','fresh-notice')).id,'fresh-notice');
+  }finally{f.close();}
+});
+
+test('reentrant sealing inside an active put cannot admit an incomplete write',()=>{
+  const f=peerFixture();let txHandle,injected=0;
+  try{
+    const before=snapshot(f),deadline=future();
+    f.ledger.onQuery=({sql})=>{
+      if(sql==='INSERT INTO peer_versions VALUES(?,?,?,?,?)'){
+        injected++;assert.throws(()=>txHandle.sealWrites(),error=>error.code==='AUTHORITY_CHANGED');
+      }
+    };
+    assert.throws(()=>f.ledger.guardedWrite('task.reentrant-seal','cos-a',tx=>{txHandle=tx;put(tx);},()=>deadline),error=>error.code==='AUTHORITY_CHANGED');
+    assert.equal(injected,1);assert.deepEqual(snapshot(f),before);
+  }finally{f.ledger.onQuery=null;f.close();}
+});
