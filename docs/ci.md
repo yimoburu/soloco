@@ -129,6 +129,11 @@ node tools/ci/check.mjs compatibility-26
 ```
 
 Test jobs run on macOS because the sandbox tests exercise real Seatbelt isolation.
+Ordinary source regression pins the standard `macos-15-intel` runner to avoid
+observed ARM runner acquisition failures. Node 22, both complete shards and all
+required checks remain in force. The separate full-qualification workflow keeps
+its approved runner configuration; Intel source CI does not qualify an ARM native
+binary, profile or account.
 Their checkout retains Git history for historical compatibility fixtures.
 Superseded PR runs are cancelled automatically. Routine job timeouts remain twenty minutes
 for regression and five minutes for build; full qualification retains forty
