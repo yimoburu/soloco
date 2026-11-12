@@ -411,11 +411,15 @@ export function buildEvidence(checkpoint, history = [], { wholeBodyAliases = tru
     // Comparing complete token text retains duplicate keys, precision-changing
     // numbers and noncanonical lexemes as literal raw evidence instead.
     const source = register(location, 'json-content', raw, 'text', 'original-json-content');
-    const decodedLocation = { ...location, scope: `decoded:${JSON.stringify([location.scope, location.path])}`, path: '' };
+    // Decoding quoted evidence does not attach its runtime-shaped values to
+    // this company's vault. Preserve those locators as data, even if their
+    // hashes happen to exist locally. child() carries this internal boundary.
+    const decodedLocation = { ...location, scope: `decoded:${JSON.stringify([location.scope, location.path])}`, path: '', runtime_references: false };
     return { format: 'derived-json', raw: reference(source), value: walk(parsed, decodedLocation, { files: true }) };
   }
 
   function walk(value, location, policy = {}) {
+    const runtimeReferences = location.runtime_references !== false;
     const occurrence = location.scope === 'history' && bodyOccurrences.get(location.path);
     if (occurrence) {
       const { group, representation } = occurrence;
@@ -452,8 +456,8 @@ export function buildEvidence(checkpoint, history = [], { wholeBodyAliases = tru
     const release = policy.files && releaseBundle(value);
     for (const [key, originalItem] of Object.entries(value)) {
       let item=originalItem;
-      const immutableSlot=(key==='checkpoint'&&policy.entityKind==='history-attempt')
-        ||(key==='subject'&&typeof value.subject_sha256==='string'&&Array.isArray(value.input_refs));
+      const immutableSlot=runtimeReferences&&((key==='checkpoint'&&policy.entityKind==='history-attempt')
+        ||(key==='subject'&&typeof value.subject_sha256==='string'&&Array.isArray(value.input_refs)));
       if(immutableSlot&&snapshotReference(item)){
         if(!snapshotState)hold('immutable snapshot resolver missing');
         const ref=snapshotReference(item);
@@ -470,7 +474,7 @@ export function buildEvidence(checkpoint, history = [], { wholeBodyAliases = tru
         snapshotEntries.set(ref.sha256,reference(original));
         item=JSON.parse(raw);
       }
-      if(checkpointContinuity&&key==='subject'&&exactKeys(item,['retained_handover_subject'],['retained_handover_subject'])) {
+      if(runtimeReferences&&checkpointContinuity&&key==='subject'&&exactKeys(item,['retained_handover_subject'],['retained_handover_subject'])) {
         const locator=item.retained_handover_subject;
         if(!exactKeys(locator,['record_id','sha256'],['record_id','sha256'])||typeof locator.record_id!=='string'
           ||!own(retainedHandoverRecords,locator.record_id))hold('retained handover source missing');
@@ -489,10 +493,10 @@ export function buildEvidence(checkpoint, history = [], { wholeBodyAliases = tru
           { ...child(at, index), parent_source_id: location.owner_source_id }, 'record', policy.artifact));
       } else if (policy.entityKind === 'record' && policy.artifact && key === 'content' && typeof item === 'string') {
         result[key] = decodedContent(item, at);
-      } else if ((policy.entityKind === 'history-attempt' && key === 'checkpoint' && checkpointSnapshot(item))
+      } else if (runtimeReferences&&((policy.entityKind === 'history-attempt' && key === 'checkpoint' && checkpointSnapshot(item))
           || (checkpointContinuity && key === 'subject' && typeof value.id==='string'
             && typeof value.subject_sha256==='string' && object(value.incoming_owner)
-            && Array.isArray(value.input_refs) && handoverSnapshot(item))) {
+            && Array.isArray(value.input_refs) && handoverSnapshot(item)))) {
         if (!checkpointContinuity) result[key] = externalize(item, at, 'prior-full-checkpoint-snapshot', 'json');
         else {
           const original = register(at, 'payload', serialize(item), 'json', 'prior-full-checkpoint-snapshot');
@@ -553,7 +557,8 @@ export function buildEvidence(checkpoint, history = [], { wholeBodyAliases = tru
   }
 
   function entry(value, location, kind, inheritedArtifact = false, initialPolicy = {}) {
-    const locator=['record','job','history-attempt'].includes(kind)&&snapshotEntryReference(value);
+    const runtimeReferences = location.runtime_references !== false;
+    const locator=runtimeReferences&&['record','job','history-attempt'].includes(kind)&&snapshotEntryReference(value);
     let originalRaw=null;
     if(locator){
       const original=originalEntry(value);value=original.value;originalRaw=original.raw;
@@ -566,7 +571,7 @@ export function buildEvidence(checkpoint, history = [], { wholeBodyAliases = tru
     }
     const raw = originalRaw??serialize(value);
     const source = register(at, kind, raw, 'json');
-    if(kind==='record'&&value?.handover&&(locator||snapshotReference(value.handover.subject))){
+    if(runtimeReferences&&kind==='record'&&value?.handover&&(locator||snapshotReference(value.handover.subject))){
       const original=retainedHandoverRecords[value.id];
       if(original){
         const raw=serialize(original);
@@ -574,7 +579,7 @@ export function buildEvidence(checkpoint, history = [], { wholeBodyAliases = tru
         if(!own(sources,id))register({scope:'retained-handover',path:pointer('/records',value.id)},'original-handover-record',raw,'json','immutable-reconstruction-original',id);
       }
     }
-    if(currentState&&object(value)&&typeof value.id==='string'){
+    if(runtimeReferences&&currentState&&object(value)&&typeof value.id==='string'){
       const key=location.collection_key??value.id;
       const id=kind==='record'?key:kind==='job'?'job:'+key:kind==='history-attempt'?'upgrade:'+value.id:null;
       const original=id&&contextSource(reviewState,id);
@@ -587,7 +592,7 @@ export function buildEvidence(checkpoint, history = [], { wholeBodyAliases = tru
         return {source:reference(source),reviewed_archive:true};
       }
     }
-    const equalityKey = kind + ':' + hash(raw);
+    const equalityKey = (runtimeReferences ? 'runtime:' : 'data:') + kind + ':' + hash(raw);
     if (checkpointContinuity && continuityEntries.get(equalityKey)?.raw === raw) {
       return {source:reference(source), same_as:continuityEntries.get(equalityKey).semantic};
     }
