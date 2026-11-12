@@ -566,6 +566,10 @@ test('compatibility stored classification pages preserve replacements, invalid p
 });
 
 test('compatibility fictional doctor catalogs retain provider advertised choices and exact continuation over public call and stdio',async()=>{
+ const directIdentity={identity_basis:'LEGACY_UNQUALIFIED',context_active:false,host_supported:false,host_matches:false,metadata_supplied:false,metadata_object:false,identity_fields_data:false,observed:false,root:false,selector_observed:false,selector_matches:false,authority_granted:false,native_qualification:false};
+ // Stdio establishes a request scope even when it supplies no identity metadata.
+ // Its observations differ from a direct call, without granting authority.
+ const stdioDoctor=value=>({...value,caller_identity:{...directIdentity,context_active:true,host_supported:true,host_matches:true}});
  const bin=fs.mkdtempSync(path.join(base,'fake-bin-')),executable=path.join(bin,'codex');
  const models=Array.from({length:60},(_,i)=>({model:'fictional-model-'+i,displayName:'Fictional model '+i,description:'Fictional advertised metadata. '.repeat(16),supportedReasoningEfforts:[{reasoningEffort:'low'},{reasoningEffort:'high'}],defaultReasoningEffort:'high',isDefault:i===3,serviceTiers:[{id:'fictional-tier',name:'Fictional',description:'Only advertised, not enabled'}],defaultServiceTier:'fictional-tier',additionalSpeedTiers:['fictional-fast']}));
  fs.writeFileSync(executable,'#!'+process.execPath+'\n'+String.raw`
@@ -581,11 +585,11 @@ else if(args[0]==='app-server'){
  const oldPath=process.env.PATH;process.env.PATH=bin;
  try {
   const {modelCatalog}=await import('../plugins/soloco/runtime/adapters.mjs'),catalog=modelCatalog('codex',{refresh:true});assert.equal(catalog.supported,true);assert.equal(catalog.models.length,60);assert.ok(size(JSON.stringify(catalog))>39000);
-  const doctor=await call('company_doctor',{},'codex');checkReply(doctor);assert.equal(doctor.models.supported,true);assert.equal(doctor.models.models.length,60);assert.equal(doctor.models.window.complete,true);assert.equal(doctor.models.source,'host_catalog');assert.deepEqual(doctor.models.observability,catalog.observability);assert.deepEqual(doctor.models.speed_support,catalog.speed_support);
+  const doctor=await call('company_doctor',{},'codex');checkReply(doctor);assert.deepEqual(doctor.caller_identity,directIdentity);assert.equal(doctor.models.supported,true);assert.equal(doctor.models.models.length,60);assert.equal(doctor.models.window.complete,true);assert.equal(doctor.models.source,'host_catalog');assert.deepEqual(doctor.models.observability,catalog.observability);assert.deepEqual(doctor.models.speed_support,catalog.speed_support);
   const compact=model=>{const {name,description,serviceTiers,...v}=model;return {...v,serviceTiers:serviceTiers.map(({name,description,...tier})=>tier)};};
-  assert.deepEqual(doctor.models.models,catalog.models.map(compact));assert.deepEqual(stdio([['company_doctor',{}]])[0],doctor);
+  assert.deepEqual(doctor.models.models,catalog.models.map(compact));assert.deepEqual(stdio([['company_doctor',{}]])[0],stdioDoctor(doctor));
   let page=await call('company_doctor',{limit:7},'codex'),all=[...page.models.models],requests=[['company_doctor',{limit:7}]],expected=[page];
-  while(page.models.window.next_cursor){const a={cursor:page.models.window.next_cursor,limit:7};page=await call('company_doctor',a,'codex');checkReply(page);assert.equal(page.models.window.offset,all.length);all.push(...page.models.models);requests.push(['company_doctor',a]);expected.push(page);}assert.deepEqual(all,doctor.models.models);assert.deepEqual(stdio(requests),expected);
+  while(page.models.window.next_cursor){const a={cursor:page.models.window.next_cursor,limit:7};page=await call('company_doctor',a,'codex');checkReply(page);assert.deepEqual(page.caller_identity,directIdentity);assert.equal(page.models.window.offset,all.length);all.push(...page.models.models);requests.push(['company_doctor',a]);expected.push(page);}assert.deepEqual(all,doctor.models.models);assert.deepEqual(stdio(requests),expected.map(stdioDoctor));
   const changed={...doctor,models:{...catalog,models:catalog.models.slice(1)}};
   assert.throws(()=>doctorView(changed,{cursor:expected[0].models.window.next_cursor,limit:7}),/Stale|invalid/);
   // Bounded valid fields can also exceed the compact budget; real cursor pages still work.
