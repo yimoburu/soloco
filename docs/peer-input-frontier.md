@@ -9,10 +9,41 @@ resolved legacy originals, all four exact pinned-team parts, and original
 sidecars. It preserves unknown fields. It never substitutes installed pins or
 uses a caller-selected omission flag. Canonical legacy classifications and
 their proof material remain input; no classification or archive provenance is
-silently promoted to new semantic authority. Unconsumed historical immutable
-archive handles have explicit global missing-meaning markers, not a claim of
-complete history or semantic obsolescence. Exact bounded archive reads remain
-available and do not qualify anything.
+silently promoted to new semantic authority. The fixed typed-origin archive
+producer materializes every original declared page/index body occurrence into
+real source text before any model charge. Unsupported/untyped declarations or
+missing bodies retain explicit global UNKNOWN markers and exact handles.
+Exact bounded archive reads remain available and do not qualify anything.
+
+`input-frontier-archive.mjs` binds the complete original `origin.quarantined`
+event and immutable origin revision 1, exact current manifest, all ordered page
+refs/indexes, descriptor count/hash and complete source-cut provenance. It
+preflights all descriptors and aggregate declared bytes before fetching any
+body. Equal hashes at distinct page/index occurrences remain distinct input.
+The fixed `tx.resolveLegacyText({sha256})` reader preserves raw whitespace,
+escaped keys, key order and UTF8; it checks the 16MiB body and 64MiB aggregate
+snapshot bounds before body allocation. Hash/UTF8 corruption and provider
+errors fail closed. Missing bytes are explicit null/UNKNOWN, never an empty
+body. It exposes no path, callback, arbitrary query or authority. Read-before-
+write, owning snapshot, reentrancy, sealed-write poison and provider-error
+identity remain enforced; the old parsed legacy reader is unchanged.
+
+Native source units contain actual complete archived bytes/ranges, rather than
+handles treated as delivery. Unsupported but retained UTF8 bodies use a lossless
+opaque UNKNOWN wrapper. Every archived body carries a bounded original recorded
+status/acceptance/QA/closure frontier and spent units. Historical accepted work
+stays recorded as accepted: `grants_new_acceptance:false` means materialization
+grants no new acceptance, not that it erases old acceptance. Complete retained
+bytes still do not imply complete original model output/history, semantic
+understanding, current applicability or authority. Genuine fresh extraction,
+independent review and the complete original DAG remain necessary.
+
+Capture reports full source bytes/occurrences, unavailable archive occurrences
+and required original calls/reviews. The unchanged finite whole-plan budget,
+bookkeeping, 64KiB context and escaped first-RPC preflights still precede charge.
+These are bounded source/retention checks, not measured company fit or IO/heap
+cost. Cold range reconstruction can reread the complete bounded frontier;
+actual large-company cost and semantic success remain unmeasured.
 
 Original sidecars become exact UTF8 or typed opaque/base64 UNKNOWN input. Their
 full captured bytes are copied into immutable P1 pages during preparation;
