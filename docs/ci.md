@@ -22,6 +22,15 @@ to reduce overlapping fixture work. It changes no selected files, assertions,
 sandbox requirements, test/startup budgets or job timeouts; its effect on
 contention and elapsed time still requires current hosted-run evidence.
 
+Routine shard selection places `peer-input-frontier.test.mjs` and
+`peer-origin-frontier-seal.test.mjs` first in separate selected argument lists,
+then distributes all remaining files in lexical order. These two advisory
+priorities change placement only. The selected inventory and digest, automatic
+inclusion of new files, generic lexical partitions, and full-qualification cost
+hints are unchanged. Argument order does not establish actual Node start order
+or a wall-time improvement; a fresh hosted run must establish whether the
+unchanged twenty-minute job budget fits.
+
 ## Required auto-merge
 
 Every CoS and replacement session follows [AGENTS.md](../AGENTS.md): keep a PR
