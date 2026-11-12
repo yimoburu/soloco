@@ -7,7 +7,7 @@ import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
 import {check} from '../tools/ci/check.mjs';
 import {inventory,qualificationTests,selectedTests} from '../tools/ci/evidence.mjs';
-import {parseShard,partitionTests,regressionShardCount,selectShard,validatePartition} from '../tools/ci/shards.mjs';
+import {parseShard,partitionTests,regressionShardCount,routineRegressionShardCount,selectShard,validatePartition} from '../tools/ci/shards.mjs';
 import {partitionQualification,selectQualificationShard,qualificationPrelude,qualificationSummary,collectQualification} from '../tools/ci/qualification-shards.mjs';
 import qualificationReporter from '../tools/ci/qualification-reporter.mjs';
 
@@ -35,16 +35,17 @@ test('whole-file shards are deterministic, nonoverlapping and cover every curren
 
 test('routine selection separates long pipelines without dropping current or future files',()=>{
   const selected=selectedTests('regression-22',inventory(root));
-  const values=['1/2','2/2'],partition=values.map(value=>selectShard(selected,value));
+  const values=Array.from({length:routineRegressionShardCount},(_,i)=>`${i+1}/${routineRegressionShardCount}`),partition=values.map(value=>selectShard(selected,value));
   assert.deepEqual(partition,values.map(value=>selectShard([...selected].reverse(),value)));
   const flattened=partition.flatMap(shard=>shard.files);
   assert.equal(new Set(flattened).size,selected.length);
   assert.deepEqual([...flattened].sort(),[...selected].sort());
-  assert.deepEqual(partition.map(shard=>shard.files[0]),[
+  assert.deepEqual(partition.slice(0,2).map(shard=>shard.files[0]),[
     'tests/peer-input-frontier.test.mjs','tests/peer-origin-frontier-seal.test.mjs',
   ],'the two advisory pipelines are first in separate selected argument lists');
-  assert.equal(partition[0].inventory_sha256,partition[1].inventory_sha256);
-  assert.equal(partition[0].selected_total,selected.length);
+  for(const shard of partition){assert.equal(shard.inventory_sha256,partition[0].inventory_sha256);assert.equal(shard.selected_total,selected.length);}
+  assert.ok(Math.max(...partition.map(shard=>shard.files.length))-Math.min(...partition.map(shard=>shard.files.length))<=1);
+  validatePartition(selected,partition,routineRegressionShardCount);
   const future='tests/future-unmeasured-pipeline.test.mjs';
   const expanded=values.map(value=>selectShard([...selected,future],value));
   assert.deepEqual(expanded.flatMap(shard=>shard.files).sort(),[...selected,future].sort());
@@ -52,7 +53,7 @@ test('routine selection separates long pipelines without dropping current or fut
   for(const total of [1,2,3])validatePartition(selected,Array.from({length:total},(_,i)=>selectShard(selected,`${i+1}/${total}`)),total);
   // Generic lexical partitions remain the input to full qualification. With no
   // advisory pipelines present, routine fixture selection keeps that behavior.
-  for(const [i,value]of values.entries())assert.deepEqual(selectShard(files,value).files,partitionTests(files)[i].files);
+  for(const [i,value]of ['1/2','2/2'].entries())assert.deepEqual(selectShard(files,value).files,partitionTests(files)[i].files);
 });
 
 test('missing, duplicate, empty and wrong-identity shards cannot certify coverage',()=>{
@@ -77,28 +78,33 @@ test('shard arguments reject malformed or executable text without coercion',()=>
   assert.throws(()=>check('build',root,()=>{throw Error('must not probe');},{shard:'1/2'}),/only for regression/);
 });
 
-test('two shard executions run each selected fixture exactly once and propagate failures',()=>{
+test('three routine shard commands run each selected fixture exactly once and propagate failures',()=>{
   const repo=fixture();fs.mkdirSync(path.join(repo,'tests'));
   const marker=path.join(repo,'executed.txt');
   const fixtureFiles=['a','b','c'].map(name=>`tests/${name}.test.mjs`);
   for(const file of fixtureFiles)fs.writeFileSync(path.join(repo,file),`import fs from 'node:fs';import test from 'node:test';test(${JSON.stringify(file)},()=>fs.appendFileSync(${JSON.stringify(marker)},${JSON.stringify(file+'\n')}));\n`);
   let probes=0;
   const probe=()=>{probes++;return {supported:true,backend:'macos-seatbelt-node'};}; // Controlled tiny command fixture, not sandbox qualification.
-  assert.equal(check('regression-22',repo,probe,{shard:'1/2'}),0);
-  assert.deepEqual(fs.readFileSync(marker,'utf8').trim().split('\n').sort(),selectShard(fixtureFiles,'1/2').files);
-  assert.equal(check('regression-22',repo,probe,{shard:'2/2'}),0);
+  const executed=[];
+  for(let index=1;index<=routineRegressionShardCount;index++){
+    const shard=`${index}/${routineRegressionShardCount}`;
+    assert.equal(check('regression-22',repo,probe,{shard}),0);
+    executed.push(...selectShard(fixtureFiles,shard).files);
+    assert.deepEqual(fs.readFileSync(marker,'utf8').trim().split('\n').sort(),[...executed].sort());
+  }
   assert.deepEqual(fs.readFileSync(marker,'utf8').trim().split('\n').sort(),fixtureFiles);
-  assert.equal(probes,2,'every shard probes the actual backend before executing tests');
-  const failing=selectShard(fixtureFiles,'2/2').files[0];
+  assert.equal(probes,routineRegressionShardCount,'every shard probes the actual backend before executing tests');
+  const failingShard=`${routineRegressionShardCount}/${routineRegressionShardCount}`;
+  const failing=selectShard(fixtureFiles,failingShard).files[0];
   fs.writeFileSync(path.join(repo,failing),"import test from 'node:test';test('actual fixture failure',()=>{throw Error('retain failure');});\n");
-  assert.equal(check('regression-22',repo,probe,{shard:'2/2'}),1);
+  assert.equal(check('regression-22',repo,probe,{shard:failingShard}),1);
 });
 
-test('unsupported Seatbelt holds both shards before any fixture executes',()=>{
+test('unsupported Seatbelt holds all three routine shards before any fixture executes',()=>{
   const repo=fixture();fs.mkdirSync(path.join(repo,'tests'));
   const marker=path.join(repo,'executed');
-  for(const name of ['a','b'])fs.writeFileSync(path.join(repo,'tests',`${name}.test.mjs`),`import fs from 'node:fs';fs.writeFileSync(${JSON.stringify(marker)},'ran');\n`);
-  for(const shard of ['1/2','2/2'])assert.throws(()=>check('regression-22',repo,()=>({supported:false,blocker:'controlled denial'}),{shard}),/actual macOS Seatbelt required: controlled denial/);
+  for(const name of ['a','b','c'])fs.writeFileSync(path.join(repo,'tests',`${name}.test.mjs`),`import fs from 'node:fs';fs.writeFileSync(${JSON.stringify(marker)},'ran');\n`);
+  for(let index=1;index<=routineRegressionShardCount;index++)assert.throws(()=>check('regression-22',repo,()=>({supported:false,blocker:'controlled denial'}),{shard:`${index}/${routineRegressionShardCount}`}),/actual macOS Seatbelt required: controlled denial/);
   assert.equal(fs.existsSync(marker),false);
 });
 
@@ -115,8 +121,13 @@ function bash(script,env={}) {
 }
 
 test('both public CI gates fail closed for every non-success dependency result',()=>{
-  assert.match(ci,/shard: \[1, 2\]/);
-  assert.match(ci,/CI_SHARD: \$\{\{ matrix.shard \}\}\/2/);
+  assert.equal(routineRegressionShardCount,3);
+  assert.match(ci,/shard: \[1, 2, 3\]/);
+  assert.match(ci,/name: Regression Node 22 \(\$\{\{ matrix.shard \}\}\/3\)/);
+  assert.match(ci,/CI_SHARD: \$\{\{ matrix.shard \}\}\/3/);
+  const workers=ci.split('\n  regression:\n')[1].split('\n  tests:\n')[0];
+  assert.match(workers,/timeout-minutes: 20/);assert.match(workers,/runs-on: macos-15-intel/);assert.match(workers,/fail-fast: false/);
+  assert.doesNotMatch(workers,/^    continue-on-error:/m);
   const aggregate=ci.split('\n  tests:\n')[1].split('\n  build:\n')[0];
   assert.match(aggregate,/name: Tests Node 22/);
   assert.match(aggregate,/if: always\(\)/);
