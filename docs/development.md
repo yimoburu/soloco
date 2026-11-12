@@ -14,7 +14,7 @@ v0.7.3 packages the accepted proactive CoS behavior and SPEC v0.20 alongside the
 
 v0.7.3 packages the proactive CoS instructions and SPEC v0.20, with explicit published v0.7.2 compatibility. See [release validation](release-v0.7.3-validation.md). Existing company pins remain unchanged until checked adoption.
 
-The current v0.7.7 source carries SPEC v0.21. Its notice, follow-through and
+The current v0.7.8 source carries SPEC v0.21. Its notice, follow-through and
 current-meaning clarifications have separate contract identity; exact published
 v0.20 remains eligible for the existing local development/prototype workflows.
 The frozen v0.20 fixture and both explicit capability allowlists prevent a source
@@ -22,6 +22,15 @@ update from forcing adoption. Historical v0.20 release receipts below keep their
 original scope. See [founder-benefit acceptance](founder-benefit-acceptance.md)
 for prospective outcome measurements and [SPEC reconciliation](spec-reconciliation.md)
 for current claim/evidence boundaries.
+
+v0.7.8 packages the current runtime under a distinct version and retains explicit
+v0.7.7 runtime, pinned-team and capability compatibility. Publish changed runtime
+payloads with a new package version so installation uses a distinct cache
+directory and generated Codex MCP launch path. Replacing files under an unchanged
+version can leave an existing MCP process using its previously imported modules.
+A fresh hook binding establishes that the hook ran; verify the connected MCP
+version and affected tool behavior after host reload to establish activation.
+The version change alone does not establish that the host reloaded the server.
 
 ## Design rule: less is more
 
@@ -105,7 +114,7 @@ The delivered explanation distinguishes the digest of the exact original context
 
 The trusted watchdog validates the regular candidate first, then prepares one empty fixed company directory and exactly two real links to an initially absent evidence file inside its owned scratch directory. The constrained child still has candidate-read/scratch-write-only filesystem grants and the same OS, network and process restrictions. Transfer tests initialize the real database and consume the precreated link inodes with checked renames; their backup, restore and rejection assertions remain real. This does not enable child-created links or arbitrary privileged setup.
 
-Static factory identity is fingerprinted separately from each run's actual scratch, link inode/device, manifest and child-environment evidence. Receipts retain pre-child setup observations and truthful cleanup/closure results. A missing watchdog result or uncertain closure does not prove cleanup. Fixture-bearing runs are not eligible for validation reuse. A compatible v0.7.7 runtime supports v0.7.6 state without adopting a different pinned team or governance.
+Static factory identity is fingerprinted separately from each run's actual scratch, link inode/device, manifest and child-environment evidence. Receipts retain pre-child setup observations and truthful cleanup/closure results. A missing watchdog result or uncertain closure does not prove cleanup. Fixture-bearing runs are not eligible for validation reuse. A compatible v0.7.8 runtime supports v0.7.6 and v0.7.7 state without adopting a different pinned team or governance.
 
 ### Transfer destination spelling
 

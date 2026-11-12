@@ -249,7 +249,7 @@ test('old pinned teams or preserved governance disclose blockers rather than sil
 });
 test('contract simplification retains known prototype governance without allowing unknown rules or teams',()=>{
   const previous='5f0699c046128d71a42731acdfddaaab4b911361521015def133adcfbdb8fcb9';
-  for(const plugin_version of ['0.4.0','0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7','0.7.1','0.7.2','0.7.3',installedTeam().plugin_version]) {
+  for(const plugin_version of ['0.4.0','0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7','0.7.1','0.7.2','0.7.3','0.7.7',installedTeam().plugin_version]) {
     for(const governance_sha256 of [previous,digest(v018Governance),digest(v019Governance),digest(v020Governance),installedTeam().governance_sha256])
       assert.equal(prototypeCapability({plugin_version,governance_sha256}).eligible,true);
     assert.equal(prototypeCapability({plugin_version,governance_sha256:digest('Unknown rules')}).eligible,false);
@@ -325,7 +325,7 @@ else {
   } finally {process.env.PATH=oldPath;}
 });
 
-for(const [version,governance,pluginVersion=installedTeam().plugin_version,label=''] of [['0.18',v018Governance],['0.19',v019Governance],['0.20',v020Governance,'0.7.5'],['0.20',v020Governance,'0.7.6',' with 0.7.6 team']])test(`v${version}${label} pinned company retains its original prototype grant across source update`,async()=>{
+for(const [version,governance,pluginVersion=installedTeam().plugin_version,label=''] of [['0.18',v018Governance],['0.19',v019Governance],['0.20',v020Governance,'0.7.5'],['0.20',v020Governance,'0.7.6',' with 0.7.6 team'],['0.20',v020Governance,'0.7.7',' with 0.7.7 team']])test(`v${version}${label} pinned company retains its original prototype grant across source update`,async()=>{
   const a=setup();
   withStore(a.root,db=>db.transaction('test.pin_governance',s=>{
     s.plugin_version=pluginVersion;s.runtime_version=pluginVersion;
