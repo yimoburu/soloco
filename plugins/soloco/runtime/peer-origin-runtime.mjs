@@ -21,6 +21,7 @@ const SEAL_URL=new URL('./peers/origin-frontier-seal.mjs',import.meta.url);
 const LAUNCH_URL=new URL('./peers/maintenance-launch.mjs',import.meta.url);
 const ENGINE_URL=new URL('./engine.mjs',import.meta.url);
 const AUTHORITY_URL=new URL('./peers/origin-maintenance-authority.mjs',import.meta.url);
+const MECHANICAL_URL=new URL('./peers/origin-mechanical-qa-policy.mjs',import.meta.url);
 const fail=(code,message=code)=>{throw Object.assign(Error(message),{code});};
 const need=(value,code,message)=>{if(!value)fail(code,message);};
 const same=(a,b)=>canonical(a)===canonical(b);
@@ -39,11 +40,21 @@ const budgets=object({scope:{enum:['*']},source_instruction:str(4000),max_model_
 const frontier=object({protocol:{enum:['peer-origin-input-frontier-v1']},max_model_calls:integer(),max_review_calls:integer()});
 const frontierSeal=object({protocol:{enum:['peer-origin-frontier-seal-purpose-v1']},purpose:{enum:['bounded-preparation-bootstrap']},max_reviews:integer()});
 const segment=object({source_id:str(2000),sha256:sha,offset:integer(0),length:integer()});
+const legacyRef=object({id:str(200),revision:integer(),sha256:sha});
+const primaryMessage=object({host:{enum:['codex']},chat_id:str(300),turn_id:str(300),message_id:str(300),content_sha256:sha,quote:str(20000)});
+const mechanicalLimits=object({max_attempts:{enum:[1]},max_native_calls:integer(1,17),max_context_utf8_bytes:integer(512,200000),timeout_ms:integer(1000,600000)});
+const mechanicalModel=object({mode:{enum:['explicit']},model:{...str(128),pattern:'^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$'},reason:str(300),effort:{enum:['none','minimal','low','medium','high','xhigh','max','ultra']},speed:{enum:['host_default']}},['mode','model','reason']);
+const mechanicalPurpose=object({protocol:{enum:['peer-origin-mechanical-qa-purpose-v1']},purpose:{enum:['quarantine-transition-review-only']},decision_ref:legacyRef});
+const mechanicalActions=Object.freeze({mechanical_decision:'recordPeerOriginMechanicalQaDecisionAtEpoch',mechanical_packet:'preparePeerOriginMechanicalQaPacketAtEpoch',mechanical_grant:'grantPeerOriginMechanicalQaPacketAtEpoch',mechanical_packet_inspect:'inspectPeerOriginMechanicalQaPacketAtEpoch',mechanical_packet_read:'readPeerOriginMechanicalQaPacketAtEpoch'});
 const fields={
  status:object({}),
- plan:object({expires_at:str(100),policy,maintenance:budgets,frontier,frontier_seal:frontierSeal},['expires_at','policy','maintenance']),
+ plan:object({expires_at:str(100),policy,maintenance:budgets,frontier,frontier_seal:frontierSeal,mechanical_qa:mechanicalPurpose},['expires_at','policy','maintenance']),
  plan_inspect:object({plan_id:str(2000)}),plan_read:object({plan_id:str(2000),...range}),
- mechanical_review:object({plan_id:str(2000)}),mechanical_preflight:object({plan_id:str(2000),review_ids:strings}),
+ mechanical_decision:object({operation_id:str(160),primary_human_message:primaryMessage,expires_at:str(100),limits:mechanicalLimits,model_selection:mechanicalModel}),
+ mechanical_packet:object({operation_id:str(160),plan_ref:legacyRef}),
+ mechanical_grant:object({operation_id:str(160),packet_ref:legacyRef,primary_human_message:primaryMessage,expires_at:str(100)}),
+ mechanical_packet_inspect:object({packet_ref:legacyRef}),mechanical_packet_read:object({packet_ref:legacyRef,...range}),
+ mechanical_review:object({plan_id:str(2000),grant_ref:legacyRef}),mechanical_preflight:object({plan_id:str(2000),review_ids:strings}),
  quarantine:object({plan_id:str(2000),review_ids:strings}),
  manifest_inspect:object({section,page:integer(0)},['section']),manifest_read:object({section,page:integer(0),...range},['section','sha256','offset','length']),
  source_read:object({source_id:str(2000),...range}),observe_sidecars:object({}),
@@ -57,7 +68,7 @@ const fields={
  frontier_archive_read:object({frontier_ref:ref,...range}),
  final_seal_review:object({operation_id:str(160),frontier_ref:ref,root_result_ref:ref}),final_seal_apply:object({review_ref:ref})
 };
-const sourceActions=new Set(['plan','mechanical_review','quarantine','observe_sidecars','maintenance_run','range_seal','frontier_capture','frontier_run','final_seal_review','final_seal_apply']);
+const sourceActions=new Set(['plan','mechanical_decision','mechanical_packet','mechanical_grant','mechanical_review','quarantine','observe_sidecars','maintenance_run','range_seal','frontier_capture','frontier_run','final_seal_review','final_seal_apply']);
 const mutatingPeerActions=new Set(['observe_sidecars','maintenance_run','range_seal','frontier_capture','frontier_run','final_seal_review','final_seal_apply']);
 const union=Object.assign({},...Object.values(fields).map(s=>s.properties));
 export const peerOriginToolSchema=Object.freeze({name:'company_origin',description:'Checked original origin plan/mechanical review/quarantine and bounded peer-origin retrieval through the actual root HOST caller and current managed-hook. Original current owner/epoch, typed custody, genuine review, fixed native source, finite purpose, context and physical fences remain required. No caller actor/provider/launch/native proof/readiness flag. Missing supported producers Hold before admission; reading never selects a policy or grants authority.',inputSchema:object({root:str(4000),session_id:str(200),epoch:integer(),action:{enum:Object.keys(fields)},source_instruction:str(4000),input:object(union,[])},['root','session_id','epoch','action'])});
@@ -145,14 +156,17 @@ function returned(result,args,extra={}){
 // wrapper must revalidate eligibility/max-one-attempt in its queue transaction.
 export async function preparePeerOriginMechanicalReviewRequest(request,host){
  const args=validatePeerOriginRequest(request,host);need(args.action==='mechanical_review','ORIGIN_PUBLIC_INPUT');requireCodexRootActor({host,session_id:args.session_id});
- return withPeerPublicStorage(args.root,true,where=>{
+ return withPeerPublicStorage(args.root,true,async where=>{
   need(where.kind==='legacy','ORIGIN_LAYOUT4_REQUIRED');where.db.exec('BEGIN');
   const {plan:p,state}=legacyPlan(where.db,args,host,args.input.plan_id);need(state.paused===true&&Date.parse(p.expires_at)>Date.now(),'ORIGIN_PLAN_EXPIRED');
-  const jobs=readNormalized(where.db,{rootKeys:[],entities:{jobs:null},validateKeys:false}).jobs??{};
-  need(!Object.values(jobs).some(job=>(typeof job.review_of==='string'?job.review_of:job.review_of?.id)===p.plan_id),'ORIGIN_MECHANICAL_ATTEMPT_EXISTS');
+  const source=await fixedModule(MECHANICAL_URL,'ORIGIN_MECHANICAL_QA_SOURCE_UNAVAILABLE');
+  need(typeof source.preparePeerOriginMechanicalQaDispatchFrom==='function','ORIGIN_MECHANICAL_QA_SOURCE_UNAVAILABLE');
+  const prepared=source.preparePeerOriginMechanicalQaDispatchFrom(where.db,readNormalized(where.db),{expected_epoch:args.epoch,grant_ref:args.input.grant_ref});
+  need(prepared.plan_ref?.id===p.plan_id,'ORIGIN_MECHANICAL_QA_PLAN_CHANGED');
   return bounded({protocol:'peer-origin-mechanical-dispatch-request-v1',planned_not_dispatched:true,plan_id:p.plan_id,plan_sha256:peerDigest(p),cut_sha256:p.cut_sha256,
-   arguments:{root:args.root,session_id:args.session_id,epoch:args.epoch,role:'qa',review_of:p.plan_id,task:'Independently review the COMPLETE exact origin quarantine plan and original context. Preserve all original UNKNOWN, expired/spent limits and old units. No execution or ordinary authority. Return the original mechanical-review contract only when supported by evidence; otherwise retain Fail or Blocked. Required exact binding DATA: '+canonical({protocol:planSource.ORIGIN_REVIEW_CONTEXT,permitted_action:'quarantine_peer_origin',plan_sha256:peerDigest(p),cut_sha256:p.cut_sha256,legacy_authority:'retired-without-conversion',execution_resumed:false}),acceptance:'Independent exact mechanical review; no native/semantic inference from hashes. Full original context, source provenance and closure required.',task_summary:'Review exact original origin quarantine plan',expected_deliverable:'Attributable mechanical review with exact plan/cut binding and preserved blockers',next_handoff:'Owning CoS checks exact mechanical preflight before quarantine'},
-   required_dispatch_guard:'Current owner/epoch and original plan eligibility plus no existing plan QA job must be rechecked inside the actual queue write. This DATA alone cannot enqueue.'});
+   grant_ref:args.input.grant_ref,packet_ref:prepared.packet_ref,context_sha256:prepared.context.sha256,context_utf8_bytes:prepared.context.utf8_bytes,deadline_at_ms:prepared.deadline_at_ms,
+   arguments:{root:args.root,session_id:args.session_id,epoch:args.epoch,input:{plan_id:p.plan_id,grant_ref:args.input.grant_ref}},
+   required_dispatch_guard:'Revalidate the exact original decision, packet, grant and execution inventory inside the owning queue write; retain its original private reservation receipt for the LAST commit fence. This DATA alone cannot enqueue.'});
  });
 }
 
@@ -161,7 +175,14 @@ export async function peerOriginRuntimeAction(request,host){
  if(args.action==='mechanical_review'){
   await preparePeerOriginMechanicalReviewRequest(args,host);
   const engine=await fixedModule(ENGINE_URL,'ORIGIN_MECHANICAL_DISPATCH_SOURCE_UNAVAILABLE');need(typeof engine.dispatchPeerOriginMechanicalReview==='function','ORIGIN_MECHANICAL_DISPATCH_SOURCE_UNAVAILABLE');
-  return returned(await engine.dispatchPeerOriginMechanicalReview(args,host),args);
+  return returned(await engine.dispatchPeerOriginMechanicalReview({root:args.root,session_id:args.session_id,epoch:args.epoch,input:{plan_id:input.plan_id,grant_ref:input.grant_ref}},host),args);
+ }
+ if(Object.hasOwn(mechanicalActions,args.action)){
+  await withPeerPublicStorage(args.root,true,where=>{need(where.kind==='legacy','ORIGIN_LAYOUT4_REQUIRED');where.db.exec('BEGIN');legacyHead(where.db,args,host);});
+  const name=mechanicalActions[args.action];need(typeof planSource[name]==='function','ORIGIN_MECHANICAL_QA_SOURCE_UNAVAILABLE');
+  const read=args.action==='mechanical_packet_read',historical=args.action==='mechanical_packet_inspect'||read;
+  const invoke=value=>{const result=planSource[name](args.root,actor,args.epoch,historical?value:{...value,source_instruction:args.source_instruction});return read?{...result,next_offset:result.complete?null:result.offset+result.length}:result;};
+  return read?exactBoundedRead(invoke,input):returned(await invoke(input),args);
  }
  if(['plan','mechanical_preflight','quarantine'].includes(args.action)){
   await withPeerPublicStorage(args.root,true,where=>{need(where.kind==='legacy','ORIGIN_LAYOUT4_REQUIRED');where.db.exec('BEGIN');legacyHead(where.db,args,host);if(args.action!=='plan')legacyPlan(where.db,args,host,input.plan_id);});
@@ -170,11 +191,12 @@ export async function peerOriginRuntimeAction(request,host){
    return returned(await planSource.recordPeerOriginQuarantinePlanAtEpoch(args.root,actor,args.epoch,{...input,source_instruction:args.source_instruction}),args);
   }
   if(args.action==='mechanical_preflight')return planSource.withOriginLegacyStore(args.root,actor,store=>store.readSnapshot(()=>{
-   authenticateLegacyOwner(store.db,args,host);const checked=planSource.validatePeerOriginMechanicalReview(store,input,actor);
+   authenticateLegacyOwner(store.db,args,host);need(typeof planSource.validateSelectedPeerOriginMechanicalReviewAtEpoch==='function','ORIGIN_MECHANICAL_QA_SOURCE_UNAVAILABLE');const checked=planSource.validateSelectedPeerOriginMechanicalReviewAtEpoch(store,input,actor,args.epoch);
    need(checked.plan.owner.epoch===args.epoch,'ORIGIN_PUBLIC_OWNER_REQUIRED');
    return bounded({protocol:'peer-origin-mechanical-preflight-v1',plan_id:checked.plan.plan_id,plan_sha256:peerDigest(checked.plan),cut_sha256:checked.current.sha256,review_ids:input.review_ids,observed:checked.observed,mechanical_preflight_passed:true,quarantine_requires_current_revalidation:true,execution_resumed:false,authority_issued:false});
   }));
-  const result=quarantine.quarantinePeerOrigin(args.root,actor,{...input,source_instruction:args.source_instruction});
+  need(typeof quarantine.quarantinePeerOriginAtEpoch==='function','ORIGIN_PUBLIC_QUARANTINE_EPOCH_PRODUCER_UNAVAILABLE');
+  const result=quarantine.quarantinePeerOriginAtEpoch(args.root,actor,args.epoch,{...input,source_instruction:args.source_instruction});
   // Apply has crossed the layout fence. Reopen through the strict H5 path,
   // never through the legacy Store, and project the original persisted row.
   // An oversized backup manifest is available by exact current row reference;
