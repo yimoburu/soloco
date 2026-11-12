@@ -113,11 +113,16 @@ export async function peerRuntimeAction(args,host){
  // Read-only preflight precedes every write connection or provider construction.
  const checked=readonly(args.root,args,host,({ledger,principal,control,authority})=>({root:ledger.root,company_id:ledger.company_id,principal_id:principal.id,authority,...(args.action==='status'?{state:model.inspect(ledger,{principal_id:principal.id},'runtime/status'),recipe_present:Boolean(control.value.activation?.environment?.peer_runtime)}:{})}));
  if(args.action==='status'){
-  const service=services.get(checked.root);
-  return {protocol:'peer-production-runtime-v1',company_id:checked.company_id,...checked.state,started:Boolean(service&&!service.stopping&&service.authority===checked.authority),stopping:Boolean(service?.stopping),operator_changed:Boolean(service&&service.authority!==checked.authority),starting:starting.has(checked.root),launch_recipe_present:checked.recipe_present,...(service?.drain_error?{drain_error:service.drain_error}:{}),qualification:'Source routing status only; native acceptance and physical closure are separate'};
+  const service=services.get(checked.root),local=service?.router.snapshot(service.owner);
+  return {protocol:'peer-production-runtime-v1',company_id:checked.company_id,...checked.state,started:Boolean(service&&!service.stopping&&!local.stopped&&service.authority===checked.authority),held:Boolean(local?.stopped&&!service?.stopping),stopping:Boolean(service?.stopping),operator_changed:Boolean(service&&service.authority!==checked.authority),starting:starting.has(checked.root),...(local?{router:local}:{}),launch_recipe_present:checked.recipe_present,...(service?.drain_error?{drain_error:service.drain_error}:{}),qualification:'Source routing status only; native acceptance and physical closure are separate'};
  }
  if(args.action==='start'){
-  if(services.has(checked.root)){const existing=services.get(checked.root);if(existing.stopping)fail('PEER_RUNTIME_STOPPING','Prior local runtime drain remains held');live(existing,args,host);return {started:true,already_started:true,company_id:checked.company_id};}
+  if(services.has(checked.root)){
+   const existing=services.get(checked.root);if(existing.stopping)fail('PEER_RUNTIME_STOPPING','Prior local runtime drain remains held');live(existing,args,host);
+   const local=existing.router.snapshot(existing.owner);
+   if(local.stopped)return {started:false,already_started:false,held:true,code:'PEER_RUNTIME_HELD',company_id:checked.company_id,router:local,physical_closure:'UNKNOWN'};
+   return {started:true,already_started:true,company_id:checked.company_id};
+  }
   if(starting.has(checked.root))fail('PEER_RUNTIME_STARTING');
   const marker={cancelled:false};starting.set(checked.root,marker);let ledger,provider,router,owner;
   try{

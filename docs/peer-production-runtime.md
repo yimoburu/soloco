@@ -61,6 +61,9 @@ stale local service; the stop audit identifies that current operator. Other
 mutations reject the stale service. A replacement start stays held until the
 previous local drain settles. That local drain does not erase earlier unknown
 slots, effects, processes or charged attempts, or prove physical closure.
+Status reports the router's actual stopped or held state. Repeating `start`
+on a held local router preserves that hold and reports `started: false`;
+retaining its service record does not mean its scheduler is running.
 
 ## Checked adoption and remaining holds
 

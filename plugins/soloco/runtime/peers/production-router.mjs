@@ -105,6 +105,9 @@ export function createPeerProductionRouter({owner,ledger,provider,scheduler_prin
     try{currentAuthority(g);const result=await schedulerTick();currentAuthority(g);return result;}
     catch(error){return {held:true,code:String(error?.code??'ROUTER_AUTHORITY_HELD').slice(0,160)};}
   };
+  const snapshot=()=>({protocol:'peer-production-router-v1',stopped,authority_held:authorityHeld,running:!!scheduler.timer,stage_pending:stagePending,
+    prepared:prepared.size,pending_preparations:[...prepared].filter(e=>!e.handle).length,
+    stop_errors:stopErrors,...(lastStopError?{last_stop_error:{...lastStopError}}:{})});
   const router={
     enroll(token,input){requireOwner(token);currentAuthority(generation);return membership.operator.enroll(input);},
     stage(token,input){
@@ -129,11 +132,10 @@ export function createPeerProductionRouter({owner,ledger,provider,scheduler_prin
     revoke(token,input){requireOwner(token);currentAuthority(generation);return membership.operator.revoke(input);},
     start(token){requireOwner(token);currentAuthority(generation);scheduler.start();return {started:true};},
     tick(token){requireOwner(token);currentAuthority(generation);return scheduler.tick();},
+    snapshot(token){requireOwner(token);return snapshot();},
     async status(token){
       requireOwner(token);const state=await scheduler.status();
-      return {...state,router:{protocol:'peer-production-router-v1',stopped,authority_held:authorityHeld,running:!!scheduler.timer,stage_pending:stagePending,
-        prepared:prepared.size,pending_preparations:[...prepared].filter(e=>!e.handle).length,
-        stop_errors:stopErrors,...(lastStopError?{last_stop_error:lastStopError}:{})}};
+      return {...state,router:snapshot()};
     },
     async stop(token){
       requireOwner(token);

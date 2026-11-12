@@ -115,7 +115,7 @@ test('grant routes accept only their bounded grant DATA and reject assignment or
 async function sourceCopy(t){
  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-peer-route-copy-'));
  const dependency=path.join(directory,'provider.mjs');
- fs.writeFileSync(dependency,`let gate=null,release=null,calls=0;export function hold(){gate=new Promise(r=>release=r);}export function resume(){release?.();gate=null;}export function count(){return calls;}export function createOriginalPeerProductionProvider(){return {async initialize(){calls++;if(gate)await gate;},async readiness({host}){return {host,available:true,authenticated:true};},async prepare(){throw Error('Native/provider execution forbidden in public route fixture');}};}`);
+ fs.writeFileSync(dependency,`let gate=null,release=null,calls=0,prepares=0;export function hold(){gate=new Promise(r=>release=r);}export function resume(){release?.();gate=null;}export function count(){return calls;}export function prepareCount(){return prepares;}export function createOriginalPeerProductionProvider(){return {async initialize(){calls++;if(gate)await gate;},async readiness({host}){return {host,available:true,authenticated:true};},async prepare(){prepares++;throw Error('Native/provider execution forbidden in public route fixture');}};}`);
  const original=new URL('../plugins/soloco/runtime/peer-runtime.mjs',import.meta.url),provider=new URL('./peers/production-host.mjs',original);
  let source=fs.readFileSync(original,'utf8').replace(/from '(\.\/[^']+)'/g,(_,relative)=>`from '${new URL(relative,original).href}'`);
  source=source.replace(`import {createOriginalPeerProductionProvider,peerProductionRecipe} from '${provider.href}';`,`import {peerProductionRecipe} from '${provider.href}';\nimport {createOriginalPeerProductionProvider} from '${pathToFileURL(dependency).href}';`);
@@ -140,6 +140,29 @@ test('controlled source-copy start routes actual enrollment and cancels a pendin
  assert.equal((await runtime.peerRuntimeAction(request(f,'start'),'codex')).started,true);
  const enrolled=await runtime.peerRuntimeAction(request(f,'enroll',{input:{operation_id:'new-enrollment',enrollment_id:'route-enrollment',principal_id:'new-cos',expires_at:new Date(Date.now()+60000).toISOString(),expected_generation:0}}),'codex');
  assert.equal(enrolled.value.status,'pending');assert.equal(enrolled.value.principal_id,'new-cos');assert.equal(enrolled.value.source_instruction,instruction);
+ await runtime.peerRuntimeAction(request(f,'stop'),'codex');await new Promise(setImmediate);
+});
+
+test('public status and repeated start retain a router hold after one recoverable authority-read error',async t=>{
+ const f=fixture(t,{control:recipeControl(),principals:{founder}}),{runtime,fake}=await sourceCopy(t);
+ await runtime.peerRuntimeAction(request(f,'start'),'codex');
+ const service=runtime.__fixtureService(fs.realpathSync(f.root));
+ // Drain the initial empty tick before inserting one source observation error.
+ await service.router.tick(service.owner);
+ const original=service.ledger.read;let failures=0;
+ service.ledger.read=function(...args){
+  if(failures++===0)throw Object.assign(Error('Synthetic recoverable authority read failure'),{code:'SYNTHETIC_AUTHORITY_READ'});
+  return Reflect.apply(original,this,args);
+ };
+ try{await assert.rejects(Promise.resolve().then(()=>service.router.tick(service.owner)),code('SYNTHETIC_AUTHORITY_READ'));}
+ finally{service.ledger.read=original;}
+ const local=await service.router.status(service.owner);assert.equal(local.router.stopped,true);assert.equal(local.router.authority_held,true);assert.equal(local.router.running,false);
+ const events=f.ledger.db.prepare('SELECT count(*) n FROM peer_events').get().n;
+ const state=await runtime.peerRuntimeAction(request(f,'status'),'codex');
+ assert.equal(state.operator_changed,false);assert.equal(state.started,false);assert.equal(state.router.stopped,true);assert.equal(state.router.authority_held,true);assert.equal(state.router.running,false);
+ const repeated=await runtime.peerRuntimeAction(request(f,'start'),'codex');assert.equal(repeated.started,false);assert.equal(repeated.held,true);
+ assert.equal(fake.count(),1);assert.equal(fake.prepareCount(),0);assert.equal(runtime.__fixtureService(fs.realpathSync(f.root)),service);
+ assert.equal(f.ledger.read(tx=>tx.get('control','usage')),null);assert.equal(f.ledger.db.prepare('SELECT count(*) n FROM peer_events').get().n,events);
  await runtime.peerRuntimeAction(request(f,'stop'),'codex');await new Promise(setImmediate);
 });
 
@@ -191,7 +214,7 @@ for(const action of ['assign','grant_create','grant_revoke'])test('public '+acti
 test('current canonical successor can stop a stale service, with current attribution and no replacement during drain',async t=>{
  const f=fixture(t),{runtime}=await sourceCopy(t),serviceLedger=new PeerLedger(f.root),owner=Symbol('fictional-retained-owner');
  let stops=0,release;const waiting=new Promise(resolve=>release=resolve);
- runtime.__installFixtureService(fs.realpathSync(f.root),{ledger:serviceLedger,owner,principal_id:'founder',authority:'outdated-authority',router:{stop(token){assert.equal(token,owner);stops++;return {stopped:true};},drain(token){assert.equal(token,owner);return waiting;}}});
+ runtime.__installFixtureService(fs.realpathSync(f.root),{ledger:serviceLedger,owner,principal_id:'founder',authority:'outdated-authority',router:{snapshot(token){assert.equal(token,owner);return {stopped:stops>0,authority_held:false,running:false};},stop(token){assert.equal(token,owner);stops++;return {stopped:true};},drain(token){assert.equal(token,owner);return waiting;}}});
  t.after(()=>release());
  f.ledger.write('fixture.successor','founder',tx=>{
   tx.put('principals','new-founder',{principal_id:'new-founder',kind:'founder',status:'active',generation:1,native_id:'new-founder-native',host:'codex',legacy_owner:{host:'codex',session_id:'new-session',epoch:8}},0);
