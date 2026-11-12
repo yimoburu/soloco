@@ -2028,3 +2028,49 @@ test('external preflush currentness: real final-probe failures preserve provider
   const retried=execute(trace.ledger,actor('cos-a'),'task/submit',args);assert.equal(retried.id,args.task_id);assert.equal(retried.value.attempt,null);assert.equal(get(f,'control','usage'),null);
  }
 });
+
+// Composed epoch provenance: a lawful earlier lifecycle operation cannot hide
+// an unsupported intermediate authority update. These remain fictional SQLite
+// source regressions, not runtime qualification or native process evidence.
+for(const transition of ['transfer','cancel'])test('external composed epoch provenance: counter-only increment after lawful '+transition+' keeps history compulsory',t=>{
+  const f=fixture(t),published=externalPublish(f,'cos-a','cos-b','fact','Retain the original accepted proof and later integrity gap.'),original=published.finished.task;
+  const current=transition==='transfer'
+    ?f.run('cos-b','task/transfer',{task_id:original.id,to_principal_id:'reviewer',to_grant_id:'g-reviewer'})
+    :f.run('cos-b','task/cancel',{task_id:original.id,reason:'Lawful cancellation before unsupported authority-only change.'});
+  const value={...structuredClone(current.value),authority_epoch:current.value.authority_epoch+1,
+    ...(Object.hasOwn(current.value,'authority_previous')?{authority_previous:ref('tasks',current)}:{})};
+  const altered=seed(f,'tasks',current.id,value);
+  assert.equal(altered.revision,current.revision+1);
+  assert.deepEqual(altered.value.attempt,original.value.attempt);
+  assert.deepEqual(altered.value.result,original.value.result);
+  const ordinary=f.start('cos-a',{scope:'beta'});
+  assert.equal(ordinary.context.sources.some(r=>r.family==='homes'&&r.id==='fact'),true,'a correct predecessor pointer does not turn an authority-only update into a supported lifecycle operation');
+  assert.deepEqual(get(f,'homes','fact'),published.home);
+});
+
+test('external composed epoch provenance: intermediate downgrade and restoration cannot hide behind a later lawful transfer',t=>{
+  const f=fixture(t),published=externalPublish(f,'cos-a','cos-b','fact','Keep intermediate invalid authority evidence visible.'),original=published.finished.task;
+  const transferred=f.run('cos-b','task/transfer',{task_id:original.id,to_principal_id:'reviewer',to_grant_id:'g-reviewer'});
+  const lowered=seed(f,'tasks',original.id,{...structuredClone(transferred.value),authority_epoch:original.value.authority_epoch,
+    ...(Object.hasOwn(transferred.value,'authority_previous')?{authority_previous:ref('tasks',transferred)}:{})});
+  const restored=seed(f,'tasks',original.id,{...structuredClone(lowered.value),authority_epoch:transferred.value.authority_epoch,
+    ...(Object.hasOwn(lowered.value,'authority_previous')?{authority_previous:ref('tasks',lowered)}:{})});
+  const current=f.run('reviewer','task/transfer',{task_id:original.id,to_principal_id:'cos-b',to_grant_id:'g-cos-b'});
+  assert.equal(current.revision,restored.revision+1);
+  assert.equal(current.value.authority_epoch,original.value.authority_epoch+2);
+  assert.deepEqual(current.value.attempt,original.value.attempt);
+  assert.deepEqual(current.value.result,original.value.result);
+  const ordinary=f.start('cos-a',{scope:'beta'});
+  assert.equal(ordinary.context.sources.some(r=>r.family==='homes'&&r.id==='fact'),true,'valid final task aliases do not repair a damaged intermediate authority chain');
+  assert.deepEqual(get(f,'homes','fact'),published.home);
+});
+
+for(const pointer of ['skips immediate predecessor','names another task'])test('external composed epoch provenance: authority predecessor '+pointer+' keeps history compulsory',t=>{
+  const f=fixture(t),published=externalPublish(f,'cos-a','cos-b','fact','Keep exact authority predecessor provenance.'),original=published.finished.task;
+  const transferred=f.run('cos-b','task/transfer',{task_id:original.id,to_principal_id:'reviewer',to_grant_id:'g-reviewer'});
+  const previous=pointer==='skips immediate predecessor'?ref('tasks',original):{...ref('tasks',transferred),id:transferred.id+'-different-task'};
+  seed(f,'tasks',original.id,{...structuredClone(transferred.value),status:'cancelled',cancelled_at:new Date().toISOString(),cancellation:'A shaped cancellation with a forged predecessor is not a supported transition.',authority_epoch:transferred.value.authority_epoch+1,authority_previous:previous});
+  const ordinary=f.start('cos-a',{scope:'beta'});
+  assert.equal(ordinary.context.sources.some(r=>r.family==='homes'&&r.id==='fact'),true);
+  assert.deepEqual(get(f,'homes','fact'),published.home);
+});
