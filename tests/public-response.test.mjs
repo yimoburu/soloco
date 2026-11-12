@@ -588,7 +588,8 @@ else if(args[0]==='app-server'){
   const doctor=await call('company_doctor',{},'codex');checkReply(doctor);assert.deepEqual(doctor.caller_identity,directIdentity);assert.equal(doctor.models.supported,true);assert.equal(doctor.models.models.length,60);assert.equal(doctor.models.window.complete,true);assert.equal(doctor.models.source,'host_catalog');assert.deepEqual(doctor.models.observability,catalog.observability);assert.deepEqual(doctor.models.speed_support,catalog.speed_support);
   const compact=model=>{const {name,description,serviceTiers,...v}=model;return {...v,serviceTiers:serviceTiers.map(({name,description,...tier})=>tier)};};
   assert.deepEqual(doctor.models.models,catalog.models.map(compact));assert.deepEqual(stdio([['company_doctor',{}]])[0],stdioDoctor(doctor));
-  let page=await call('company_doctor',{limit:7},'codex'),all=[...page.models.models],requests=[['company_doctor',{limit:7}]],expected=[page];
+  let page=await call('company_doctor',{limit:7},'codex');assert.deepEqual(page.caller_identity,directIdentity);
+  let all=[...page.models.models],requests=[['company_doctor',{limit:7}]],expected=[page];
   while(page.models.window.next_cursor){const a={cursor:page.models.window.next_cursor,limit:7};page=await call('company_doctor',a,'codex');checkReply(page);assert.deepEqual(page.caller_identity,directIdentity);assert.equal(page.models.window.offset,all.length);all.push(...page.models.models);requests.push(['company_doctor',a]);expected.push(page);}assert.deepEqual(all,doctor.models.models);assert.deepEqual(stdio(requests),expected.map(stdioDoctor));
   const changed={...doctor,models:{...catalog,models:catalog.models.slice(1)}};
   assert.throws(()=>doctorView(changed,{cursor:expected[0].models.window.next_cursor,limit:7}),/Stale|invalid/);
