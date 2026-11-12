@@ -277,6 +277,16 @@ export function assertOriginalPeerOwnerMaintenance(capability,{ledger}={}){
  const r=original(capability,ledger);return r.record.ledger.read(raw=>{admitted(r,{...raw,connection:r.record.connection});return copy(r.binding);});
 }
 
+// Fixed trusted framing preparation only. Returning the complete canonical
+// input does not record a native read or manufacture a delivery observation.
+export function prepareOriginalPeerOwnerMaintenanceContext(capability){
+ const r=original(capability);return r.record.ledger.read(raw=>{
+  const {context}=admitted(r,{...raw,connection:r.record.connection});
+  return {text:context.value.text,sha256:context.value.sha256,utf8_bytes:Buffer.byteLength(context.value.text),context_ref:r.binding.context_ref,
+   review_subject:{protocol:'peer-owner-handover-review-subject-v1',owner_handover_id:r.binding.owner_handover_id,subject_ref:r.binding.subject_ref,subject_sha256:r.binding.subject_sha256,reconstruction_ref:r.binding.reconstruction_ref}};
+ });
+}
+
 /** Trusted source-only admission. No caller validator, proof, native identity,
  * executor factory or new permission is accepted. This spends existing budget
  * exactly once before a process may be launched. */
