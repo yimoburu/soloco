@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import {canonical,PeerLedger,peerDigest} from '../plugins/soloco/runtime/peers/ledger.mjs';
+import {pendingHandoffs} from '../plugins/soloco/runtime/peers/handoff.mjs';
 import * as model from '../plugins/soloco/runtime/peers/model.mjs';
 import {peerFixture} from './peer-fixture.mjs';
 import {peerTaskEffectsFixture,logicalSQLState,reference,rows} from './peer-task-effects-fixture.mjs';
@@ -69,6 +71,21 @@ function fixture(t){
 }
 function unchanged(f,operation,predicate){
   const before=logicalSQLState(f);assert.throws(operation,typeof predicate==='string'?code(predicate):predicate);assert.deepEqual(logicalSQLState(f),before);
+}
+function noCandidateList(f,operation,predicate='INTAKE_CURSOR_INVALID'){
+  const original=f.ledger.query,seen=[];
+  f.ledger.query=function(sql,...parameters){if(sql==='SELECT generation FROM peer_generations WHERE family=?')seen.push(parameters[0]);return Reflect.apply(original,this,[sql,...parameters]);};
+  try{unchanged(f,operation,predicate);}finally{f.ledger.query=original;}
+  assert.deepEqual(seen,[],'the receiver/source cursor must be checked before tx.list');
+}
+function cursorCandidates(f,family){
+  if(family==='work_items'){f.send();f.send();return 'cos-b';}
+  if(family==='messages'){
+    for(let n=0;n<3;n++)f.exec('cos-a','message/send',{grant_id:'handoff-grant-cos-a',scope:'alpha',to_principal_id:n%2?'cos-a':'cos-b',content:`Fictional receiver cursor message ${n}.`});
+    return 'cos-b';
+  }
+  if(family==='tasks'){for(const who of ['cos-a','cos-b'])f.finish(f.start(who));return 'cos-a';}
+  return 'cos-a'; // The fixture already contains two authored proposals.
 }
 function commandFor(f,who,operation_id){
   const found=rows(f,'commands',{principal_id:who}).filter(row=>row.value.operation_id===operation_id);
@@ -313,6 +330,89 @@ test('pending selectors are bounded and a cursor cannot be replayed for another 
   unchanged(f,()=>f.pending('cos-b',{family:'principals'}),'INVALID_INPUT');
   unchanged(f,()=>f.pending('reviewer',{limit:1,cursor:page.next_cursor}),/Stale or mismatched peer cursor/);
   unchanged(f,()=>f.pending('cos-b',{limit:1,cursor:page.next_cursor,scope:'beta'}),/Stale or mismatched peer cursor/);
+});
+
+for(const family of ['work_items','tasks','proposals','messages'])test(`${family} intake rejects another actual receiver's cursor before listing candidates`,t=>{
+  const f=fixture(t),who=cursorCandidates(f,family),page=f.pending(who,{family,limit:1});assert(page.next_cursor);
+  noCandidateList(f,()=>f.pending(who==='cos-a'?'cos-b':'cos-a',{family,limit:1,cursor:page.next_cursor}));
+  assert.doesNotThrow(()=>f.pending(who,{family,limit:1,cursor:page.next_cursor}));
+});
+
+for(const family of ['work_items','tasks','proposals','messages'])test(`${family} intake rejects a predecessor incarnation's cursor after a genuine rebind`,t=>{
+  const f=fixture(t),who=cursorCandidates(f,family),page=f.pending(who,{family,limit:1});assert(page.next_cursor);
+  f.corrupt('principals',who,value=>({...value,generation:value.generation+1,native_id:`${who}-cursor-successor`}));
+  f.clients[who]=f.bind(who);
+  noCandidateList(f,()=>f.pending(who,{family,limit:1,cursor:page.next_cursor}));
+  assert.doesNotThrow(()=>f.pending(who,{family,limit:1}));
+});
+
+test('intake cursor family, scope and founder view cannot be relabelled by the caller',t=>{
+  const f=fixture(t);cursorCandidates(f,'messages');
+  const page=f.pending('cos-b',{family:'messages',scope:'alpha',limit:1});assert(page.next_cursor);
+  noCandidateList(f,()=>f.pending('cos-b',{family:'tasks',scope:'alpha',limit:1,cursor:page.next_cursor}));
+  noCandidateList(f,()=>f.pending('cos-b',{family:'messages',scope:'beta',limit:1,cursor:page.next_cursor}));
+  noCandidateList(f,()=>f.pending('cos-b',{family:'messages',limit:1,cursor:page.next_cursor}));
+  const founder=model.bindPeerProductionScheduler(f.ledger),founderPage=founder.inspect(f.ledger,actor('founder'),'handoff/pending',{family:'proposals',limit:1});assert(founderPage.next_cursor);
+  f.corrupt('control','company',value=>({...value,founder_principal_id:'cos-a'}));
+  // The production facade itself also fences this owner change. Exercise the
+  // pure selector directly to prove its view binding without inventing a new
+  // public founder/peer authentication path.
+  noCandidateList(f,()=>f.ledger.read(tx=>pendingHandoffs(tx,tx.get('principals','founder'),tx.get('control','company'),{family:'proposals',limit:1,cursor:founderPage.next_cursor},{company_id:f.ledger.company_id,root_sha256:model.digest(f.ledger.root)})));
+});
+
+test('intake cursor signature rejects altered receiver, selection and inner P1 cursor',t=>{
+  const f=fixture(t);cursorCandidates(f,'messages');
+  const cursor=f.pending('cos-b',{family:'messages',limit:1}).next_cursor;assert(cursor);
+  const [body,signature]=cursor.split('.'),original=JSON.parse(Buffer.from(body,'base64url').toString('utf8'));
+  for(const change of [value=>{value.binding.receiver.id='cos-a';},value=>{value.binding.selector.family='tasks';},value=>{value.inner+='A';}]){
+    const altered=copy(original);change(altered);
+    const token=Buffer.from(canonical(altered)).toString('base64url')+'.'+signature;
+    noCandidateList(f,()=>f.pending('cos-b',{family:'messages',limit:1,cursor:token}));
+  }
+  const wrongSignature=signature[0]==='A'?'B'+signature.slice(1):'A'+signature.slice(1);
+  for(const token of [body+'.'+wrongSignature,body,original.inner,cursor+'.extra'])noCandidateList(f,()=>f.pending('cos-b',{family:'messages',limit:1,cursor:token}));
+});
+
+test('identical receiver and company labels in another root cannot reuse an intake cursor',t=>{
+  const f=fixture(t),other=fixture(t);cursorCandidates(f,'messages');cursorCandidates(other,'messages');
+  assert.equal(f.ledger.company_id,other.ledger.company_id);assert.deepEqual(f.get('principals','cos-b'),other.get('principals','cos-b'));
+  const cursor=f.pending('cos-b',{family:'messages',limit:1}).next_cursor;assert(cursor);
+  noCandidateList(other,()=>other.pending('cos-b',{family:'messages',limit:1,cursor}));
+  assert.doesNotThrow(()=>other.pending('cos-b',{family:'messages',limit:1}));
+});
+
+test('empty filtered incoming-message pages keep a valid continuation and do not use a sender filter',t=>{
+  const f=fixture(t),operations=Array.from({length:4},(_,n)=>`incoming-page-${n}`).sort((a,b)=>peerDigest(['messages','cos-a',a]).localeCompare(peerDigest(['messages','cos-a',b])));
+  const messages=operations.map((operation_id,n)=>f.exec('cos-a','message/send',{operation_id,grant_id:'handoff-grant-cos-a',scope:'alpha',to_principal_id:n===0?'cos-a':'cos-b',content:`Fictional ordered incoming message ${n}.`}));
+  const before=logicalSQLState(f),first=f.pending('cos-b',{family:'messages',limit:1});
+  assert.deepEqual(first.items,[]);assert.equal(first.scanned_count,1);assert.equal(first.total_candidates,4);assert.equal(first.complete,false);assert(first.next_cursor);
+  const seen=[];let cursor=first.next_cursor,scanned=first.scanned_count;
+  for(;;){const page=f.pending('cos-b',{family:'messages',limit:2,cursor});scanned+=page.scanned_count;seen.push(...page.items.map(item=>item.id));if(page.complete){assert.equal(page.next_cursor,null);break;}cursor=page.next_cursor;}
+  assert.equal(scanned,4);assert.deepEqual(seen.sort(),messages.slice(1).map(row=>row.id).sort());assert.deepEqual(logicalSQLState(f),before);
+});
+
+test('intake preserves the inner P1 generation guard after the outer binding validates',t=>{
+  const f=fixture(t);cursorCandidates(f,'messages');const page=f.pending('cos-b',{family:'messages',limit:1});assert(page.next_cursor);
+  f.exec('cos-a','message/send',{grant_id:'handoff-grant-cos-a',scope:'alpha',to_principal_id:'cos-b',content:'A later source message invalidates the P1 generation.'});
+  unchanged(f,()=>f.pending('cos-b',{family:'messages',limit:1,cursor:page.next_cursor}),error=>error.code===undefined&&/Stale or mismatched peer cursor/.test(error.message));
+});
+
+test('intake continuation survives a full temporary database reopen in the same source process',t=>{
+  const f=peerFixture();let ledger=f.ledger;
+  t.after(()=>{ledger.close();fs.rmSync(f.root,{recursive:true,force:true});});
+  model.execute(ledger,actor('founder'),'grant/create',{operation_id:'reopen-grant',grant_id:'reopen-message-grant',to_principal_id:'cos-a',scope:'alpha',actions:['message/send'],resources:[],expires_at:new Date(Date.now()+3600000).toISOString(),source_instruction:'Fictional cold-reopen source fixture.'});
+  const bind=who=>{const p=ledger.read(tx=>tx.get('principals',who));return model.bindPeerPrincipal(ledger,{principal_id:who,generation:p.value.generation,native_id:p.value.native_id});};
+  const sender=bind('cos-a'),messages=Array.from({length:3},(_,n)=>sender.execute('message/send',{operation_id:`reopen-message-${n}`,grant_id:'reopen-message-grant',scope:'alpha',to_principal_id:'cos-b',content:`Fictional cold-reopen message ${n}.`}));
+  const first=bind('cos-b').inspect('handoff/pending',{family:'messages',limit:1});assert(first.next_cursor);ledger.close();ledger=new PeerLedger(f.root);
+  const next=bind('cos-b').inspect('handoff/pending',{family:'messages',limit:50,cursor:first.next_cursor});
+  assert.equal(next.complete,true);assert.equal(next.total_candidates,3);assert.equal(next.scanned_count,2);
+  assert.deepEqual([...first.items,...next.items].map(item=>item.id).sort(),messages.map(row=>row.id).sort());
+});
+
+test('a fresh source-module cursor key requires an explicit first-page restart',async t=>{
+  const f=fixture(t);cursorCandidates(f,'messages');const cursor=f.pending('cos-b',{family:'messages',limit:1}).next_cursor;assert(cursor);
+  const fresh=await import('../plugins/soloco/runtime/peers/handoff.mjs?fresh-cursor-source-key');
+  noCandidateList(f,()=>f.ledger.read(tx=>fresh.pendingHandoffs(tx,tx.get('principals','cos-b'),tx.get('control','company'),{family:'messages',limit:1,cursor},{company_id:f.ledger.company_id,root_sha256:model.digest(f.ledger.root)})),error=>error.code==='INTAKE_CURSOR_INVALID'&&/restart from a fresh first page/.test(error.message));
 });
 
 for(const kind of ['Error','AggregateError'])test(`handoff preserves original provider ${kind} identity and rolls back every staged row`,t=>{
