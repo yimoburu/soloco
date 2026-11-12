@@ -112,11 +112,49 @@ test('grant routes accept only their bounded grant DATA and reject assignment or
 // controlled no-native dependency. Actual public request/authentication/routing
 // and actual SQLite/P3 software still execute. The private registry seam exists
 // only in this temporary copy, never in the production module or MCP schema.
-async function sourceCopy(t){
+async function sourceCopy(t,{syntheticFlow=false}={}){
  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-peer-route-copy-'));
  const dependency=path.join(directory,'provider.mjs');
- fs.writeFileSync(dependency,`let gate=null,release=null,calls=0,prepares=0;export function hold(){gate=new Promise(r=>release=r);}export function resume(){release?.();gate=null;}export function count(){return calls;}export function prepareCount(){return prepares;}export function createOriginalPeerProductionProvider(){return {async initialize(){calls++;if(gate)await gate;},async readiness({host}){return {host,available:true,authenticated:true};},async prepare(){prepares++;throw Error('Native/provider execution forbidden in public route fixture');}};}`);
  const original=new URL('../plugins/soloco/runtime/peer-runtime.mjs',import.meta.url),provider=new URL('./peers/production-host.mjs',original);
+ fs.writeFileSync(dependency,`
+import assert from 'node:assert/strict';
+import {canonical} from '${new URL('./peers/ledger.mjs',original).href}';
+import {createMembershipLifecycle} from '${new URL('./peers/membership.mjs',original).href}';
+import {bindPeerProductionScheduler} from '${new URL('./peers/model.mjs',original).href}';
+const SYNTHETIC_FLOW=${syntheticFlow};
+let gate=null,release=null,calls=0,prepares=0,serial=0,pid=8100;
+const stats={stages:[],executions:[],stops:0},op=prefix=>'public-source-flow-'+prefix+'-'+(++serial);
+export function hold(){gate=new Promise(r=>release=r);}
+export function resume(){release?.();gate=null;}
+export function count(){return calls;}
+export function prepareCount(){return prepares;}
+export function flowStats(){return JSON.parse(JSON.stringify(stats));}
+export function createOriginalPeerProductionProvider({owner,ledger}){
+ const founder=SYNTHETIC_FLOW?ledger.read(tx=>tx.get('control','company').value.founder_principal_id):null;
+ const membership=SYNTHETIC_FLOW?createMembershipLifecycle(ledger,{operator_principal_id:founder},bindPeerProductionScheduler(ledger)):null;
+ function syntheticStage(input){
+  stats.stages.push(input.phase);
+  const admitted=membership.operator.admit({operation_id:op('admit'),enrollment_id:input.enrollment_id,phase:input.phase,...(input.reviewer_principal_id?{reviewer_principal_id:input.reviewer_principal_id}:{})});
+  const binding={enrollment_id:input.enrollment_id,phase:input.phase,attempt_id:admitted.phase.value.attempt_id};
+  const observed_process={pid:++pid,started_at:new Date().toISOString()};
+  membership.host.bind({operation_id:op('bind'),...binding,native_id:'synthetic-public-native-'+pid,observed_process});
+  const channel=membership.host.channel(binding),header=channel.header();let offset=0;
+  while(offset<header.total_characters){const part=channel.read({sha256:header.sha256,offset,length:Math.min(8192,header.total_characters-offset)});assert(part.next_offset>offset);offset=part.next_offset;}
+  const output=input.phase==='review'?canonical({review:{subject:header.subject,verdict:'Pass',reason:'Independent synthetic source-flow review only; no native qualification.',blockers:[]}}):'Synthetic reconstruction retains complete current scope and uncertainty; no native qualification.';
+  channel.submit({operation_id:op('submit'),sha256:header.sha256,content:output});
+  return membership.host.finish({operation_id:op('finish'),...binding,output,termination_confirmed:true,observed_process:{...observed_process,close_observed:true}});
+ }
+ return {async initialize(){calls++;if(gate)await gate;},async readiness({host}){return {host,available:true,authenticated:true};},async prepare(){
+  prepares++;if(!SYNTHETIC_FLOW)throw Error('Native/provider execution forbidden in public route fixture');
+  return {runtime:{stage(token,input){assert.equal(token,owner);return syntheticStage(input);},executor:{execute(args){
+   stats.executions.push(args.task.value.attempt.id);
+   const observed_process={pid:++pid,started_at:new Date().toISOString()};args.onProcess(observed_process);
+   const native_id=ledger.read(tx=>tx.get('principals',args.task.value.owner_principal_id).value.native_id);
+   return {native_id,output:'Synthetic public source-flow task output; no native/model execution.',termination_confirmed:true,observed_process:{...observed_process,close_observed:true}};
+  }}},stop(){stats.stops++;}};
+ }};
+}
+`);
  let source=fs.readFileSync(original,'utf8').replace(/from '(\.\/[^']+)'/g,(_,relative)=>`from '${new URL(relative,original).href}'`);
  source=source.replace(`import {createOriginalPeerProductionProvider,peerProductionRecipe} from '${provider.href}';`,`import {peerProductionRecipe} from '${provider.href}';\nimport {createOriginalPeerProductionProvider} from '${pathToFileURL(dependency).href}';`);
  source+='\nexport function __installFixtureService(root,service){services.set(root,service);}\nexport function __fixtureService(root){return services.get(root);}\n';
@@ -187,6 +225,38 @@ test('controlled public grant routes retain actual founder attribution, recipien
  assert.equal(f.ledger.db.prepare("SELECT principal_id FROM peer_events WHERE type='grant/revoke' ORDER BY seq DESC LIMIT 1").get().principal_id,'founder');
  assert.throws(()=>f.ledger.read(tx=>authorize(tx,{principal_id:'cos-a'},'message/send',allowed)),code('GRANT_INVALID'));
  await runtime.peerRuntimeAction(request(f,'stop'),'codex');await new Promise(setImmediate);
+});
+
+test('public source lifecycle reaches a scheduled result after activation, grant and assignment without manual claim',async t=>{
+ const f=fixture(t,{control:recipeControl(),principals:{founder}}),{runtime,fake}=await sourceCopy(t,{syntheticFlow:true});
+ const row=(family,id)=>f.ledger.read(tx=>tx.get(family,id));
+ const operation=(action,input)=>runtime.peerRuntimeAction(request(f,action,input===undefined?{}:{input}),'codex');
+ // Every process/native/close fact below is supplied by the explicit temporary
+ // synthetic provider. Public routing, membership, P1/P2, founder/grant checks,
+ // queue selection and observer persistence use their actual implementations.
+ await operation('start');
+ const enrollment=await operation('enroll',{operation_id:'flow-enroll',enrollment_id:'public-flow-enrollment',principal_id:'public-flow-peer',role:'cos',host:'codex',scope:'alpha',input_refs:[],expires_at:new Date(Date.now()+3600000).toISOString(),max_model_calls:2,expected_generation:0});
+ const stage={enrollment_id:enrollment.value.enrollment_id,instruction:'Reconstruct exact source context; retain uncertainty and synthetic provenance.'};
+ assert.equal((await operation('stage',{...stage,phase:'reconstruction'})).accepted,true);
+ assert.equal((await operation('stage',{...stage,phase:'review',reviewer_principal_id:'public-flow-independent-reviewer'})).accepted,true);
+ const activated=await operation('activate',{operation_id:'flow-activate',enrollment_id:enrollment.value.enrollment_id});
+ assert.equal(activated.principal.id,'public-flow-peer');assert.equal(activated.principal.value.status,'active');
+ assert.notEqual(activated.qualification.id,activated.enrollment.value.activation.reconstruction.id);
+ const grant=await operation('grant_create',{operation_id:'flow-grant',grant_id:'public-flow-grant',to_principal_id:activated.principal.id,scope:'alpha',actions:['task/submit','task/claim'],resources:['home:public-flow-output'],expires_at:new Date(Date.now()+3600000).toISOString(),max_model_calls:1});
+ const assignment={operation_id:'flow-assign',task_id:'public-flow-task',to_principal_id:activated.principal.id,grant_id:grant.id,grant_generation:grant.value.generation,scope:'alpha',role:'research',stage:'produce',instructions:'Return one bounded synthetic source result.',acceptance:'Retain founder attribution, recipient grant and exact synthetic output.',resources:['home:public-flow-output']};
+ const assigned=await operation('assign',assignment);assert.equal(assigned.value.status,'pending');
+ assert.equal(assigned.value.owner_principal_id,activated.principal.id);assert.equal(assigned.value.definition.assignment.operator.id,'founder');assert.equal(assigned.value.definition.assignment.source_instruction,instruction);
+ const service=runtime.__fixtureService(fs.realpathSync(f.root));
+ await operation('tick');await service.router.drain(service.owner);
+ const returned=row('tasks',assigned.id);assert.equal(returned.value.status,'returned');assert.equal(returned.value.result.output,'Synthetic public source-flow task output; no native/model execution.');assert.equal(returned.value.grant_id,grant.id);
+ assert.equal(returned.value.attempt.effect_authority.production_authority.founder.id,'founder');assert.equal(row('slots',assigned.id).value.status,'released');
+ const stats=fake.flowStats();assert.deepEqual(stats.stages,['reconstruction','review']);assert.deepEqual(stats.executions,[returned.value.attempt.id]);assert.equal(stats.stops,3);assert.equal(fake.prepareCount(),3);
+ assert.equal(row('control','usage').value.model_calls,3);assert.equal(row('control','usage:'+activated.principal.id).value.model_calls,2);assert.equal(row('grants',grant.id).value.used_model_calls,1);assert.equal(row('work_items','membership:'+enrollment.value.enrollment_id).value.used_model_calls,2);
+ const commands=f.ledger.read(tx=>tx.list('commands',{limit:100}).items);
+ assert.equal(commands.filter(r=>r.value.action==='task/admit'&&r.value.result?.admitted===true).length,1);assert.equal(commands.filter(r=>r.value.action==='task/claim').length,0);
+ assert.deepEqual(await operation('assign',assignment),assigned);
+ await operation('tick');await service.router.drain(service.owner);assert.equal(fake.flowStats().executions.length,1);assert.equal(row('control','usage').value.model_calls,3);
+ await operation('stop');await new Promise(setImmediate);
 });
 
 for(const action of ['assign','grant_create','grant_revoke'])test('public '+action+' uses its captured atomic operator model when ownership changes after precheck',async t=>{
