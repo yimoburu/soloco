@@ -56,6 +56,16 @@ this on its owning tracked pre-write provider, then preserves exact current-row
 bindings through its sealed physical commit guard. P1 historical readers cannot
 run after puts or through the terminal view, which exposes only `get`.
 
+Before dedicated resume, recovery binds the exact current old phases and
+reservations. After genuine dedicated resume, a phase may advance only through
+verified source late-evidence appends: each immutable evidence record binds the
+original admission/context, and its deterministic required notice proves the
+exact before/after phase rows. Other phase fields and current slot/effect refs
+stay unchanged. This permits notice-only late facts and an explicit owner pause
+without reopening old authority or hiding arbitrary edits. A supported notice
+resolution preserves its original immutable source version. Pending/activated
+handover invalidation still uses strict current evidence.
+
 The fixed native bridge uses these internal capabilities:
 
 - `prepareOriginalPeerOwnerMaintenance(lifecycle, {operation_id, epoch})`
@@ -65,6 +75,11 @@ The fixed native bridge uses these internal capabilities:
 - `assertOriginalPeerOwnerMaintenance(capability, {ledger})` checks that exact
   pending owner, subject, reconstruction, reviewer, grant, phase and deadline.
   Inspecting a capability returns DATA and cannot reconstruct one.
+- `prepareOriginalPeerOwnerMaintenanceContext(capability)` returns exact
+  complete `text`, `sha256`, `utf8_bytes`, `context_ref` and `review_subject` for
+  fixed trusted framing. It is read-only and neither charges another call nor
+  records native reviewer coverage. Actual source association and delivery stay
+  separate; the private channel still requires complete genuine read coverage.
 - `originalPeerOwnerMaintenanceChannel(capability)` supplies bounded exact
   context reads and a first immutable output submission. The complete context
   must be read before submission. The channel is private to the original
