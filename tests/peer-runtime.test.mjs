@@ -16,10 +16,12 @@ import {call,toolList} from '../plugins/soloco/runtime/main.mjs';
 const session='fictional-founder-session';
 const founder={legacy_owner:{host:'codex',session_id:session,epoch:7}};
 const instruction='Operate only this isolated fictional source fixture.';
-const request=(f,action,extra={})=>({root:f.root,session_id:session,epoch:7,action,...(action==='status'?{}:{source_instruction:instruction}),...extra});
+const request=(f,action,extra={})=>({root:f.root,session_id:session,epoch:7,action,...(['status','inspect','read'].includes(action)?{}:{source_instruction:instruction}),...extra});
 function fixture(t,options={}){const f=peerFixture({principals:{founder},...options});t.after(()=>{stopPeerRuntimeHosts();f.close();});return f;}
 const code=expected=>error=>error.code===expected;
 const sha=file=>createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+const readSelector=(source,extra={})=>({family:source.family,id:source.id,revision:source.revision,sha256:source.sha256,part:source.part,...extra});
+const fingerprint=f=>peerDigest(Object.fromEntries(['peer_rows','peer_versions','peer_events','peer_outbox','peer_meta','peer_generations','peer_membership'].map(table=>[table,f.ledger.db.prepare('SELECT * FROM '+table).all()])));
 
 test('peer status reads existing checked storage without starting a provider or changing peer rows',async t=>{
  const f=fixture(t),before=f.ledger.read(tx=>({events:f.ledger.db.prepare('SELECT count(*) n FROM peer_events').get().n,control:tx.get('control','company')}));
@@ -27,6 +29,62 @@ test('peer status reads existing checked storage without starting a provider or 
  assert.equal(state.protocol,'peer-production-runtime-v1');assert.equal(state.company_id,f.ledger.company_id);assert.equal(state.started,false);assert.equal(state.starting,false);assert.equal(state.launch_recipe_present,false);assert.equal(state.available_slots,3);
  assert.deepEqual(f.ledger.read(tx=>({events:f.ledger.db.prepare('SELECT count(*) n FROM peer_events').get().n,control:tx.get('control','company')})),before);
  assert.equal(fs.existsSync(path.join(f.root,'.company','peer-execution')),false);
+});
+
+test('public peer inspection pages compact exact metadata with real bounded cursors and no context dump',async t=>{
+ const f=fixture(t),ids=Array.from({length:12},(_,i)=>String(i).padStart(2,'0')+'x'.repeat(1800));
+ f.ledger.write('fixture.large-public-page','founder',tx=>{
+  for(const id of ids)tx.put('tasks',id,{status:'returned',scope:'alpha',owner_principal_id:'cos-a',attempt:{context:{text:'SECRET_CONTEXT_MUST_NOT_BE_IN_PAGE'.repeat(300)}},result:{output:'Scoped persisted output.'}},0);
+  tx.put('tasks','pending-task',{status:'pending',scope:'beta'},0);
+  for(const family of ['notices','messages','proposals','reviews','homes','deliveries','work_items','grants','conflicts'])tx.put(family,'public-row',{kind:'fictional',status:'current',scope:'alpha',content:'Explicitly retrieved source value.'},0);
+ });
+ const before=fingerprint(f),input={family:'tasks',status:'returned',scope:'alpha',limit:50};
+ let page=await peerRuntimeAction(request(f,'inspect',{input}),'codex'),seen=[];
+ assert(page.effective_limit<50);assert.equal(page.complete,false);assert.equal(page.total,ids.length);
+ assert.equal(JSON.stringify(page).includes('SECRET_CONTEXT_MUST_NOT_BE_IN_PAGE'),false);
+ assert.equal(Object.hasOwn(page.items[0],'value'),false);assert.equal(page.items[0].source.content_sha256,page.items[0].source.sha256);
+ await assert.rejects(peerRuntimeAction(request(f,'inspect',{input:{...input,scope:'beta',cursor:page.next_cursor}}),'codex'),/cursor/);
+ for(let pages=0;pages<20;pages++){
+  assert(Buffer.byteLength(JSON.stringify(page))<=24000);seen.push(...page.items.map(item=>item.source.id));
+  if(page.complete)break;
+  assert(page.next_cursor);page=await peerRuntimeAction(request(f,'inspect',{input:{...input,cursor:page.next_cursor}}),'codex');
+ }
+ assert.deepEqual(seen,ids);assert.equal(new Set(seen).size,ids.length);
+ for(const family of ['notices','messages','proposals','reviews','homes','deliveries','work_items','grants','conflicts'])assert.equal((await peerRuntimeAction(request(f,'inspect',{input:{family,scope:'alpha'}}),'codex')).items[0].source.family,family);
+ assert.equal(fingerprint(f),before);
+});
+
+test('exact public result ranges bind the current parent and selected hash, respect Unicode and reject drift',async t=>{
+ const f=fixture(t),result={output:'α😀'+'z'.repeat(5000),accepted:false};
+ f.ledger.write('fixture.public-result','founder',tx=>{tx.put('tasks','read-task',{status:'returned',scope:'alpha',attempt:{context:{text:'PRIVATE_CONTEXT_NOT_IN_RESULT'}},result},0);tx.put('tasks','no-result',{status:'pending'},0);});
+ const before=fingerprint(f),page=await peerRuntimeAction(request(f,'inspect',{input:{family:'tasks',part:'result',status:'returned'}}),'codex'),source=page.items[0].source;
+ assert.equal(source.available,true);assert.equal(source.content_sha256,peerDigest(result));assert.notEqual(source.content_sha256,source.sha256);
+ const first=await peerRuntimeAction(request(f,'read',{input:readSelector(source)}),'codex');assert(first.text.length<=4096);assert.equal(first.complete,false);assert.equal(first.text.includes('PRIVATE_CONTEXT_NOT_IN_RESULT'),false);
+ const emoji=first.text.indexOf('😀');assert(emoji>=0);
+ await assert.rejects(peerRuntimeAction(request(f,'read',{input:readSelector(source,{offset:emoji+1,length:2})}),'codex'),code('PEER_RECORD_RANGE'));
+ await assert.rejects(peerRuntimeAction(request(f,'read',{input:readSelector(source,{offset:emoji,length:1})}),'codex'),code('PEER_RECORD_RANGE'));
+ const beforeEmoji=await peerRuntimeAction(request(f,'read',{input:readSelector(source,{offset:0,length:emoji+1})}),'codex');assert.equal(beforeEmoji.next_offset,emoji);
+ let offset=0,body='';for(let ranges=0;ranges<10;ranges++){
+  const part=await peerRuntimeAction(request(f,'read',{input:readSelector(source,{offset})}),'codex');assert.equal(part.offset,offset);assert.deepEqual(part.source,source);body+=part.text;offset=part.next_offset;if(part.complete)break;assert(offset>part.offset);
+ }
+ assert.equal(offset,source.total_characters);assert.equal(Buffer.byteLength(body),source.utf8_bytes);assert.equal(peerDigest(JSON.parse(body)),source.content_sha256);assert.deepEqual(JSON.parse(body),result);
+ const pending=(await peerRuntimeAction(request(f,'inspect',{input:{family:'tasks',part:'result',status:'pending'}}),'codex')).items[0].source;assert.equal(pending.available,false);
+ await assert.rejects(peerRuntimeAction(request(f,'read',{input:readSelector(pending)}),'codex'),code('PEER_RECORD_PART_MISSING'));
+ await assert.rejects(peerRuntimeAction(request(f,'read',{input:readSelector(source,{sha256:'0'.repeat(64)})}),'codex'),code('PEER_RECORD_CHANGED'));
+ assert.equal(fingerprint(f),before);
+ f.ledger.write('fixture.public-result-drift','founder',tx=>{const old=tx.get('tasks',source.id);tx.put('tasks',old.id,{...old.value,result:{output:'Current correction'}},old.revision);});
+ assert(f.ledger.read(tx=>tx.getVersion({family:source.family,id:source.id,revision:source.revision,sha256:source.sha256})));
+ await assert.rejects(peerRuntimeAction(request(f,'read',{input:readSelector(source)}),'codex'),code('PEER_RECORD_CHANGED'));
+ const current=(await peerRuntimeAction(request(f,'inspect',{input:{family:'tasks',part:'result',status:'returned'}}),'codex')).items[0].source;assert(current.revision>source.revision);assert.notEqual(current.content_sha256,source.content_sha256);
+});
+
+test('public read requests reject unbounded families, paths, ranges and accessor or proxy selectors',async()=>{
+ const base={root:'/does-not-exist-public-peer-read',session_id:session,epoch:7,action:'read',input:{family:'tasks',id:'t',revision:1,sha256:'0'.repeat(64)}};
+ for(const extra of [{family:'control'},{part:'result.output'},{path:['result']},{revision:0},{sha256:'bad'},{offset:-1},{length:0},{length:4097},{provider:{}},{principal_id:'founder'}])await assert.rejects(peerRuntimeAction({...base,input:{...base.input,...extra}},'codex'),code('PEER_RUNTIME_INPUT'));
+ await assert.rejects(peerRuntimeAction({...base,input:{...base.input,family:'notices',part:'result'}},'codex'),code('PEER_RUNTIME_INPUT'));
+ await assert.rejects(peerRuntimeAction({...base,action:'inspect',input:{family:'tasks',limit:51}},'codex'),code('PEER_RUNTIME_INPUT'));
+ let observed=0;const proxy=new Proxy(base.input,{getOwnPropertyDescriptor(){observed++;throw Error('Proxy trap must not execute');}});
+ await assert.rejects(peerRuntimeAction({...base,input:proxy},'codex'),code('PEER_RUNTIME_INPUT'));assert.equal(observed,0);
 });
 
 test('operator status rejects another chat, wrong host, stale epoch and revoked canonical founder',async t=>{
@@ -96,7 +154,9 @@ test('MCP entrypoint advertises closed DATA, requires hook binding and keeps sta
  assert.equal(schema.additionalProperties,false);assert.equal(schema.properties.input.additionalProperties,false);assert(schema.required.includes('epoch'));assert.equal(Object.hasOwn(schema.properties,'provider'),false);
  assert(schema.properties.action.enum.includes('grant_create'));assert(schema.properties.action.enum.includes('grant_revoke'));assert.equal(schema.properties.input.properties.actions.maxItems,100);
  await assert.rejects(call('company_peers',request(f,'status'),'codex'),/No startup-hook binding/);
+ for(const [action,input]of [['inspect',{family:'tasks'}],['read',{family:'tasks',id:'missing',revision:1,sha256:'0'.repeat(64)}]])await assert.rejects(call('company_peers',request(f,action,{input}),'codex'),/No startup-hook binding/);
  bind(f.root,session,'codex');const result=await call('company_peers',request(f,'status'),'codex');assert.equal(result.protocol,'peer-production-runtime-v1');assert.equal(result.started,false);assert(Buffer.byteLength(JSON.stringify(result))<4096);
+ assert.equal((await call('company_peers',request(f,'inspect',{input:{family:'tasks'}}),'codex')).returned,0);
  await assert.rejects(call('company_peers',{...request(f,'status'),actor:'founder'},'codex'),/Unknown argument/);
 });
 
@@ -181,6 +241,21 @@ test('controlled source-copy start routes actual enrollment and cancels a pendin
  await runtime.peerRuntimeAction(request(f,'stop'),'codex');await new Promise(setImmediate);
 });
 
+test('persisted public reads work after stop and a cold module restart without provider calls or writes',async t=>{
+ const f=fixture(t,{control:recipeControl(),principals:{founder}}),warm=await sourceCopy(t);
+ f.ledger.write('fixture.cold-public-result','founder',tx=>tx.put('tasks','persisted-result',{status:'returned',scope:'alpha',result:{output:'Persisted source result available after host restart.'}},0));
+ await warm.runtime.peerRuntimeAction(request(f,'start'),'codex');await warm.runtime.peerRuntimeAction(request(f,'stop'),'codex');await new Promise(setImmediate);
+ const before=fingerprint(f),cold=await sourceCopy(t);
+ for(const {runtime,fake}of [warm,cold]){
+  const page=await runtime.peerRuntimeAction(request(f,'inspect',{input:{family:'tasks',part:'result',status:'returned'}}),'codex'),source=page.items[0].source;
+  const part=await runtime.peerRuntimeAction(request(f,'read',{input:readSelector(source)}),'codex');assert.equal(JSON.parse(part.text).output,'Persisted source result available after host restart.');assert.equal(part.complete,true);
+  await assert.rejects(runtime.peerRuntimeAction(request(f,'inspect',{session_id:'another-chat',input:{family:'tasks'}}),'codex'),code('PEER_OPERATOR_REQUIRED'));
+  await assert.rejects(runtime.peerRuntimeAction(request(f,'read',{epoch:6,input:readSelector(source)}),'codex'),code('PEER_OPERATOR_REQUIRED'));
+  assert.equal(fake.prepareCount(),0);
+ }
+ assert.equal(warm.fake.count(),1);assert.equal(cold.fake.count(),0);assert.equal((await cold.runtime.peerRuntimeAction(request(f,'status'),'codex')).started,false);assert.equal(fingerprint(f),before);
+});
+
 test('public status and repeated start retain a router hold after one recoverable authority-read error',async t=>{
  const f=fixture(t,{control:recipeControl(),principals:{founder}}),{runtime,fake}=await sourceCopy(t);
  await runtime.peerRuntimeAction(request(f,'start'),'codex');
@@ -248,7 +323,12 @@ test('public source lifecycle reaches a scheduled result after activation, grant
  assert.equal(assigned.value.owner_principal_id,activated.principal.id);assert.equal(assigned.value.definition.assignment.operator.id,'founder');assert.equal(assigned.value.definition.assignment.source_instruction,instruction);
  const service=runtime.__fixtureService(fs.realpathSync(f.root));
  await operation('tick');await service.router.drain(service.owner);
- const returned=row('tasks',assigned.id);assert.equal(returned.value.status,'returned');assert.equal(returned.value.result.output,'Synthetic public source-flow task output; no native/model execution.');assert.equal(returned.value.grant_id,grant.id);
+ const returned=row('tasks',assigned.id);assert.equal(returned.value.status,'returned');assert.equal(returned.value.grant_id,grant.id);
+ const page=await operation('inspect',{family:'tasks',part:'result',status:'returned',principal_id:activated.principal.id}),persisted=page.items.find(item=>item.source.id===assigned.id);assert(persisted);
+ let resultBody='',offset=0;for(let ranges=0;ranges<10;ranges++){
+  const part=await operation('read',readSelector(persisted.source,{offset}));assert.equal(part.offset,offset);resultBody+=part.text;offset=part.next_offset;if(part.complete)break;assert(offset>part.offset);
+ }
+ assert.equal(offset,persisted.source.total_characters);assert.equal(peerDigest(JSON.parse(resultBody)),persisted.source.content_sha256);assert.equal(JSON.parse(resultBody).output,'Synthetic public source-flow task output; no native/model execution.');
  assert.equal(returned.value.attempt.effect_authority.production_authority.founder.id,'founder');assert.equal(row('slots',assigned.id).value.status,'released');
  const stats=fake.flowStats();assert.deepEqual(stats.stages,['reconstruction','review']);assert.deepEqual(stats.executions,[returned.value.attempt.id]);assert.equal(stats.stops,3);assert.equal(fake.prepareCount(),3);
  assert.equal(row('control','usage').value.model_calls,3);assert.equal(row('control','usage:'+activated.principal.id).value.model_calls,2);assert.equal(row('grants',grant.id).value.used_model_calls,1);assert.equal(row('work_items','membership:'+enrollment.value.enrollment_id).value.used_model_calls,2);

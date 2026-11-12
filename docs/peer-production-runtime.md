@@ -31,6 +31,8 @@ closed `input` object.
 | Action | Behavior |
 | --- | --- |
 | `status` | Reads existing checked peer storage through a read-only connection. Does not load a bridge or start a provider. |
+| `inspect` | Pages compact metadata and exact current source references from fixed peer record families, without returning task contexts. |
+| `read` | Reads canonical current value or task-result ranges by exact parent revision/hash; no historical fallback. |
 | `start` | Loads the fixed original bridge and adoption-bound launch recipe, then starts the software scheduler in this MCP process. |
 | `enroll` | Creates a bounded pending enrollment through the canonical operator lifecycle. |
 | `stage` | Runs one fresh reconstruction or independent review phase through the same original provider. |
@@ -53,6 +55,31 @@ allowance. A task-bound peer callback cannot invoke either operator route.
 Task assignment and grant changes use the original source-owned operator model
 binding captured at start. Its same-transaction and final commit checks reject
 an operator transition between the public precheck and the durable write.
+
+`inspect` and `read` need no `source_instruction`, runtime start or retained
+service. They authenticate the current canonical operator in the same read-only
+snapshot as the selected records and work after a host restart. Allowed families
+are `tasks`, `notices`, `messages`, `proposals`, `reviews`, `homes`, `deliveries`,
+`work_items`, `grants` and `conflicts`. Inspection accepts bounded `status`,
+`principal_id`, `task_id` and `scope` filters, a P1 cursor and a limit of 1–50
+(default 20). It may return a smaller same-snapshot page to keep metadata within
+24 KB; always follow its actual `next_cursor`. A changed collection makes an old
+cursor stale and requires a fresh inspection.
+
+Each source reference includes the full parent `{family,id,revision,sha256}`,
+static `part`, selected `content_sha256`, `total_characters` and `utf8_bytes`.
+`part` defaults to `value`; `result` selects only a task's persisted result and
+avoids streaming its attempt context. A task without a result reports that part
+unavailable. `read` takes the parent reference plus optional `part`, `offset` and
+`length`. Its default and maximum length are 4096 UTF-16 units; boundaries never
+split a surrogate pair. Concatenate ordered `text` fragments using the returned
+`next_offset` until `complete`, then verify the selected canonical content hash.
+Any current parent revision/hash drift fails closed even when old history exists.
+
+These readers expose persisted evidence only. Public receiver acknowledgement,
+acceptance and publication routes remain unavailable; a proposal's existence or
+retrieval does not make it accepted, published or authorized for a business
+effect. This change adds no business write permission.
 
 Operational actions require an explicitly started runtime. Stopping while its
 bridge is loading cancels that pending start. Closing the MCP input stops its
