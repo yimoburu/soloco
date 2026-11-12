@@ -12,6 +12,7 @@ import {hasSnapshotReferences,inheritSnapshots} from './snapshot.mjs';
 import {qualificationAssignment,qualificationMatches,QUALIFICATION_LIMITS} from './context-qualification.mjs';
 import {taskAssignmentContext,taskContextMatches,TASK_CONTEXT_BUDGET} from './task-context.mjs';
 import {specialistContext} from './specialists.mjs';
+import {createOriginMechanicalQaWire} from './peers/origin-mechanical-qa-wire-contract.mjs';
 
 export const CONTEXT_LIMIT = 200000;
 const required = record => ['intent', 'decision', 'preference'].includes(record.kind)
@@ -44,6 +45,16 @@ export function assignmentContext(state, job) {
   const qualification=qualificationAssignment(state,job);if(qualification)return qualification;
   const handover=handoverReviewContext(state,job);if(handover)return handover;
   if(job.context_format===4)return qualificationReviewContext(state,job);
+  const {pack,records,bounded,prototypeId,developmentId}=assignmentPack(state,job,specialist);
+  const text = JSON.stringify(pack);
+  const limit=contextBudgetForJob(state,job);
+  if (text.length > limit) throw new Error(`Assignment context exceeds ${limit} characters (actual ${text.length}); narrow the assignment or review and compact records. Nothing was truncated. Host/model context fit remains unverified`);
+  const hashText=bounded&&(prototypeId||developmentId)?JSON.stringify({...pack,name:undefined}):text;
+  return {text, hash: digest(hashText), inputs: records.map(r => ({id:r.id, revision:r.revision}))};
+}
+
+// Private exact pack composition, shared without a generic budget override.
+function assignmentPack(state,job,specialist){
   const bounded=[3,5].includes(job.context_format),projection=bounded?reviewedContext(state):null;
   const ids = new Set((job.context_format===5?currentRecords(state,job,projection):bounded?governingRecords(state,job,projection):Object.values(state.records).filter(required)).map(r => r.id));
   const classificationPlan=state.records[job.review_of?.id]?.context_classification_plan;
@@ -86,11 +97,16 @@ export function assignmentContext(state, job) {
   if(job.context_format===5)pack.current_execution_evidence=currentExecutionEvidence(state,job,projection);
   if(job.context_format===5&&hasSnapshotReferences({records,execution:pack.current_execution_evidence,extensions:pack.state_extensions??{}}))throw Error('Unqualified referenced evidence remains current; obtain exact independent qualification before ordinary dispatch');
   if(classificationPlan)pack.classification_evidence=[...classificationPlan.sources,...(classificationPlan.counterparts??[])];
-  const text = JSON.stringify(pack);
-  const limit=contextBudgetForJob(state,job);
-  if (text.length > limit) throw new Error(`Assignment context exceeds ${limit} characters (actual ${text.length}); narrow the assignment or review and compact records. Nothing was truncated. Host/model context fit remains unverified`);
-  const hashText=bounded&&(prototypeId||developmentId)?JSON.stringify({...pack,name:undefined}):text;
-  return {text, hash: digest(hashText), inputs: records.map(r => ({id:r.id, revision:r.revision}))};
+  return {pack,records,bounded,prototypeId,developmentId};
+}
+
+// Fixed mechanical DATA representation only. All execution authority remains
+// in the original policy/owning Store path; this cannot authorize dispatch.
+export function originMechanicalQaAssignmentContext(state,job,plan_ref){
+  if(job.role!=='qa'||job.context_format!==3||job.specialist!==undefined||job.prototype_id!==undefined||job.development_id!==undefined||job.context_scope!==undefined||job.review_of?.id!==plan_ref.id||job.review_of.revision!==plan_ref.revision)throw Error('ORIGIN_MECHANICAL_QA_CONTEXT_PURPOSE');
+  const {pack,records}=assignmentPack(state,job,{});
+  const context=createOriginMechanicalQaWire(JSON.stringify(pack),plan_ref);
+  return {context,inputs:records.map(r=>({id:r.id,revision:r.revision}))};
 }
 
 export function qualificationReviewContext(state,job) {
