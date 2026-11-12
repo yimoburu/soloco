@@ -101,19 +101,27 @@ test('expiry, pause, revocation and canonical owner replacement do not erase ori
   assert.equal(f.get('notices',receipt.notice_ref.id).value.observed_current_owner.legacy_owner.epoch,2);
 });
 
-for(const variant of ['json','other-ledger','other-admission','owner-kind','wrong-context','wrong-native','wrong-process'])test(`reject ${variant} evidence without writes`,async t=>{
+for(const variant of ['json','other-ledger','other-admission','owner-kind','wrong-context'])test(`reject ${variant} evidence without writes`,async t=>{
   const f=peerTaskEffectsFixture(t),a=f.start(),admission=original(f,a),d=diagnostic(f,a,admission);let token=d.token;
   if(variant==='json')token=d.data;
   if(variant==='other-ledger')token=domain.mint(f.other,admission,a.context.sha256,d.data);
   if(variant==='other-admission')token=domain.mint(f.ledger,{...admission,id:'another'},a.context.sha256,d.data);
   if(variant==='owner-kind')token=diagnostic(f,a,admission,{kind:'owner-handover-review'}).token;
   if(variant==='wrong-context')token=diagnostic(f,a,admission,{context_sha256:'0'.repeat(64)}).token;
-  if(variant==='wrong-native')token=diagnostic(f,a,admission,{native_id:'other-native',thread_id:'other-native'}).token;
-  if(variant==='wrong-process'){
-    f.finish(a,{error:'Original uncertainty.',termination_confirmed:false});
-    token=diagnostic(f,a,admission,{process:{...a.association.process,pid:a.association.process.pid+1}}).token;
-  }
   const before=logicalSQLState(f);await assert.rejects(record(f.ledger,admission,token));assert.deepEqual(logicalSQLState(f),before);
+});
+
+for(const variant of ['missing-native','discrepant-native','discrepant-process'])test(`retain actual source ${variant} as uncertainty without identity authority`,async t=>{
+  const f=peerTaskEffectsFixture(t),a=f.start(),admission=original(f,a);
+  f.finish(a,{error:'Original uncertainty.',termination_confirmed:false});
+  const extra=variant==='missing-native'?{native_id:null,thread_id:null,turn_id:null}:
+    variant==='discrepant-native'?{native_id:'unexpected-native',thread_id:'unexpected-native'}:
+    {process:{...a.association.process,pid:a.association.process.pid+1}};
+  const d=diagnostic(f,a,admission,extra),before=protectedState(f,a),receipt=await record(f.ledger,admission,d.token);
+  const notice=f.get('notices',receipt.notice_ref.id);
+  assert.deepEqual(notice.value.observation,d.data);assert.deepEqual(protectedState(f,a),before);
+  assert.equal(notice.value.identity[variant==='discrepant-process'?'process':'native'],variant==='missing-native'?'not-observed':'discrepant');
+  assert.equal(notice.value.acceptance_authority,false);assert.equal(notice.value.reservation_release_authority,false);
 });
 
 test('non-admission commands and unavailable actual native producer cannot create evidence',async t=>{

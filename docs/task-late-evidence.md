@@ -8,9 +8,10 @@ This is an internal software API, never a model tool or a JSON proof issuer.
 The original protected host must supply its opaque diagnostic token for kind
 `task`. The consumer checks that token against the same ledger, immutable
 `task/admit` command and complete original context. It verifies the admission's
-creation event, task and principal history, then checks any recorded original
-process identity. A copied object, another admission, another ledger, an owner
-maintenance observation or a changed native/process cannot substitute.
+creation event, task and principal history, then compares recorded identities.
+A copied object, another admission, another ledger or an owner maintenance
+observation cannot substitute. Missing or discrepant identities in a genuine
+source observation remain explicit uncertainty; they create no identity proof.
 
 One deterministic notice contains the complete observation. Identical facts
 deduplicate even after an authorized notice disposition; the immutable original

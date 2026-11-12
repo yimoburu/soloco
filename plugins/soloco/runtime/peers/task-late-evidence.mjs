@@ -52,16 +52,20 @@ function currentTask(tx,original,observation){
   need(attempt?.id===original.task.value.attempt.id&&
     same(attempt.context,original.context)&&
     task.value.definition_sha256===original.task.value.definition_sha256);
-  need(observation.native_id===original.principal.value.native_id&&
-    observation.thread_id===observation.native_id&&observation.process&&
+  need((observation.native_id===null||typeof observation.native_id==='string')&&
+    (observation.thread_id===null||typeof observation.thread_id==='string')&&observation.process&&
     Number.isSafeInteger(observation.process.pid)&&observation.process.pid>0&&
     Number.isFinite(Date.parse(observation.process.started_at)));
-  for(const process of [attempt.process,task.value.result?.observed_process,task.value.closure?.observed_process]){
-    if(!process)continue;
-    need(process.pid===observation.process.pid&&
-      (process.started_at??process.execution_started_at)===observation.process.started_at);
-  }
-  return task;
+  const recordedProcesses=[attempt.process,task.value.result?.observed_process,task.value.closure?.observed_process].filter(Boolean);
+  // Original-source contradictions are material negative facts too. The
+  // opaque launch/admission token establishes their origin; an absent or
+  // mismatching observed identity must never become accepted task authority.
+  const identity={expected_native_id:original.principal.value.native_id,
+    native:observation.native_id===null&&observation.thread_id===null?'not-observed':
+      observation.native_id===original.principal.value.native_id&&observation.thread_id===observation.native_id?'matches-original':'discrepant',
+    process:!recordedProcesses.length?'not-previously-recorded':recordedProcesses.every(process=>
+      process.pid===observation.process.pid&&(process.started_at??process.execution_started_at)===observation.process.started_at)?'matches-original':'discrepant'};
+  return {task,identity};
 }
 function retainedNotice(tx,current,admission,observation){
   const event=tx.events({after:current.created_seq-1,limit:1}).items[0];
@@ -80,7 +84,8 @@ function retainedNotice(tx,current,admission,observation){
  * A current task result, slot, grant, owner or first verdict is never replaced.
  * The native publisher must call this only for a failed original launch. */
 export async function recordOriginalPeerTaskLateEvidence(ledger,original_admission_ref,diagnosticToken){
-  need(Object.getPrototypeOf(ledger)===PeerLedger.prototype,'TASK_LATE_LEDGER_REQUIRED');
+  need(ledger&&Object.getPrototypeOf(ledger)===PeerLedger.prototype&&
+    typeof ledger.guardedWrite==='function','TASK_LATE_LEDGER_REQUIRED');
   const admission=admissionReference(original_admission_ref);
   const connection={root:ledger.root,company_id:ledger.company_id,directory:ledger.directory};
   const original=ledger.read(tx=>originalAdmission(tx,admission));
@@ -100,8 +105,9 @@ export async function recordOriginalPeerTaskLateEvidence(ledger,original_admissi
   });
   const deadline=Date.now()+30000; // Local commit bound; no model allowance.
   return ledger.guardedWrite('task.source-late-evidence',OBSERVER,tx=>{
+    need(typeof tx.sealWrites==='function','TASK_LATE_GUARD_REQUIRED');
     const currentOriginal=originalAdmission(tx,admission);
-    const task=currentTask(tx,currentOriginal,observation),company=tx.get('control','company');
+    const {task,identity}=currentTask(tx,currentOriginal,observation),company=tx.get('control','company');
     need(company?.value.protocol==='peer-cos-v1');
     const owner=tx.get('principals',company.value.founder_principal_id),previous=tx.get('notices',id);
     need(owner);
@@ -117,7 +123,7 @@ export async function recordOriginalPeerTaskLateEvidence(ledger,original_admissi
       principal_id:currentOriginal.task.value.owner_principal_id,task_id:task.id,
       source_observer:OBSERVER,source_observer_only:true,required_handoff:true,uncertain_obligation:true,
       original_admission_ref:admission,original_task_ref:ref('tasks',currentOriginal.task),
-      original_context_sha256:currentOriginal.context.sha256,observation_sha256,observation:copy(observation),
+      original_context_sha256:currentOriginal.context.sha256,observation_sha256,observation:copy(observation),identity,
       observed_current_owner:{principal_ref:ref('principals',owner),legacy_owner:copy(owner.value.legacy_owner??null)},
       acceptance_authority:false,reservation_release_authority:false,created_at:new Date().toISOString(),
       content:'Material original task evidence arrived after a failed launch. Inspect these exact facts and their obligations; preserve the original result, verdict, spend and reservations. This notice grants no acceptance, closure, retry or owner authority.'};
