@@ -34,7 +34,10 @@ also prevents a planned DAG from exhausting P1's one-million-byte row cap.
 Each extraction or integration has a separately charged producer and a fresh,
 independent review. Every original context is a closed
 `peer-input-frontier-assignment-v1`; there is no cumulative streaming/history
-assumption. A fixed original interpreter and whole first-RPC preflight must
+assumption. Its `response_contract` supplies the complete actual closed output
+grammar, concrete subject/provenance, marker/support rules and verdict actions.
+It is grammar DATA, never a prefilled judgment or permission. The fixed original
+interpreter and whole first-RPC preflight must
 accept the exact context and fixed instruction BEFORE FIRST put or charge.
 An opaque plan is retained and passed intact to the future fixed adapter.
 64KiB JSON alone does not prove the original 100,000-byte escaped RPC fits.
