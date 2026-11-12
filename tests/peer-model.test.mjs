@@ -1157,7 +1157,11 @@ test('external: deep current home closure holds at real context capacity without
     for(let i=start;i<start+50;i++)previous=tx.put('homes',`deep-${String(i).padStart(4,'0')}`,{status:'current',scope:'alpha',principal_id:'founder',content:'Complete deep current condition.',dependencies:previous?[ref('homes',previous)]:[]},0);
   });
   const task=f.submit('cos-a'),started=performance.now();
-  externalAtomicReject(f,()=>inspect(f.ledger,actor('cos-a'),'task/context',{task_id:task.id}),'CONTEXT_CAPACITY');
+  // Snapshot every physical user table and schema without repeatedly entering
+  // logical source enumeration just to verify that rejection wrote nothing.
+  const before=finalAllSQLState(f);
+  assert.throws(()=>inspect(f.ledger,actor('cos-a'),'task/context',{task_id:task.id}),code('CONTEXT_CAPACITY'));
+  assert.deepEqual(finalAllSQLState(f),before,'Rejection must preserve every user table and schema');
   f.claim(task);const admitted=f.admit(task);
   assert.equal(admitted.admitted,false);assert.equal(admitted.code,'CONTEXT_CAPACITY');
   assert.equal(get(f,'tasks',task.id).value.attempt,null);assert.equal(get(f,'control','usage'),null);assert.equal(get(f,'grants','g-cos-a').value.used_model_calls,0);
