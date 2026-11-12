@@ -123,6 +123,9 @@ export function createPeerOriginMaintenance({ledger,actor}){
  need(Object.getPrototypeOf(ledger)===PeerLedger.prototype,'ORIGIN_LEDGER_REQUIRED');const a=assertOriginActor(actor),s={ledger,actor:a,connection:{root:ledger.root,company_id:ledger.company_id,directory:ledger.directory},operations:new Map()};
  const api=Object.freeze({inspect:()=>ledger.read(tx=>{const {c,o}=current(s,tx);return {protocol:ORIGIN_QUARANTINE_PROTOCOL,origin_ref:ref('control',o),status:o.value.status,paused:c.value.paused,maintenance:copy(o.value.maintenance),manifest:copy(o.value.manifest),legacy_reservations:o.value.legacy_unknown_reservations,late_obligation_refs:o.value.late_obligation_refs};})});services.set(api,s);return api;
 }
+// Fixed high-level native launcher only. The exact original service owns its
+// ledger/actor; no JSON, inherited service, callback or override reconstructs it.
+export function originalPeerOriginMaintenanceLedger(api){need(arguments.length===1,'ORIGIN_ORIGINAL_SERVICE_REQUIRED');const s=service(api);bound(s);s.ledger.read(tx=>current(s,tx));return s.ledger;}
 export function prepareOriginalPeerOriginMaintenance(api,input){
  const s=service(api),a=data(input,['operation_id','kind','segments'],['reconstruction_ref']);need(text(a.operation_id,160)&&Array.isArray(a.segments)&&a.segments.length>0&&a.segments.length<=64&&kinds.includes(a.kind)&&(a.kind==='peer-origin-review')===Boolean(a.reconstruction_ref),'ORIGIN_INPUT');
  const hash=peerDigest(a),prior=s.operations.get(a.operation_id);if(prior){need(prior.hash===hash,'ORIGIN_REPLAY_MISMATCH');const old=original(prior.cap);s.ledger.read(tx=>admitted(old,tx,{native:Boolean(old.native)}));return prior.cap;}
