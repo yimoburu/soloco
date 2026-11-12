@@ -10,7 +10,7 @@ import {peerFixture} from './peer-fixture.mjs';
 import {legacySourceId} from '../plugins/soloco/runtime/peers/legacy-origin.mjs';
 import {createPeerExecutorIncarnationSource} from '../plugins/soloco/runtime/peers/executor-incarnation.mjs';
 
-// Isolated composition of exact frozen ec6795f owner-core logic and the actual
+// Isolated composition of reviewed 7cdd753 owner-core logic and the actual
 // shared model. The relocation below replaces ONLY explicitly SYNTHETIC
 // native/deployment/origin dependencies used by that core's source tests.
 // Seeded reviewer qualification/pinned legacy facts are fixture INPUT DATA;
