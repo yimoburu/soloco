@@ -14,13 +14,13 @@ defaults:
     shell: bash
 jobs:
   regression:
-    name: Regression Node 22 (${{ matrix.shard }}/2)
+    name: Regression Node 22 (${{ matrix.shard }}/3)
     runs-on: macos-15-intel
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2]
+        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -32,7 +32,7 @@ jobs:
           node-version: '22'
       - name: Regression tests
         env:
-          CI_SHARD: ${{ matrix.shard }}/2
+          CI_SHARD: ${{ matrix.shard }}/3
         run: node tools/ci/check.mjs regression-22 --shard "$CI_SHARD" 2>&1 | tee "$RUNNER_TEMP/tests.log"
       - name: Upload diagnostic log (optional)
         if: always()
