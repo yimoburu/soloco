@@ -10,7 +10,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {Store,installedTeam,teamHash} from '../plugins/soloco/runtime/store.mjs';
 import {canonical,peerDigest,PeerLedger} from '../plugins/soloco/runtime/peers/ledger.mjs';
 import {peerAdoptionRuntimeAction,peerAdoptionToolSchema} from '../plugins/soloco/runtime/peer-adoption-runtime.mjs';
-import {authenticateLegacyOwner,captureLegacyOrigin,inspectPeerPinnedTeamFrom,inspectPeerPinnedTeam,readPeerPinnedTeam,LEGACY_ADOPTION_LIMITS} from '../plugins/soloco/runtime/peers/legacy-origin.mjs';
+import {authenticateLegacyOwner,captureLegacyOrigin,inspectPeerPinnedTeamFrom,inspectPeerPinnedTeam,readPeerPinnedTeam,readPeerPinnedTeamFrom,legacyEncodedReplyBytes,LEGACY_ADOPTION_LIMITS} from '../plugins/soloco/runtime/peers/legacy-origin.mjs';
 import {preparePeerAdoptionV2,assertPeerAdoptionV2ApplyReady} from '../plugins/soloco/runtime/peers/migration-v2.mjs';
 import {fixture as scopedFixture,home,extraction,domainArgs,review as scopedReview,aggregate} from './support/scoped-home-fixture.mjs';
 import {peerFixture} from './peer-fixture.mjs';
@@ -112,7 +112,7 @@ test('actual legacy scoped producer lineage is reused as a frontier without mint
  const args={root:f.root,session_id:f.session_id,epoch:f.epoch,action:'readiness'},r=peerAdoptionRuntimeAction(args,'codex');
  if(!r.origin_projection_sha256){const db=new DatabaseSync(path.join(f.root,'.company','company.sqlite'),{readOnly:true});try{db.exec('BEGIN');assert.fail(captureLegacyOrigin(db).qualification_error?.stack??'Missing projection without retained qualification cause');}finally{db.close();}}
  assert.ok(r.origin_projection_sha256);assert.equal(r.ready_for_apply,false);assert.equal(r.execution.whole_domain_qualified,false);
- let offset=0,body='';do{const range=peerAdoptionRuntimeAction({...args,action:'read',input:{target:'projection',sha256:r.origin_projection_sha256,basis_sha256:r.basis_sha256,offset,length:16000}},'codex');body+=range.text;offset=range.next_offset;}while(offset!==null);
+ let offset=0,body='';do{const range=peerAdoptionRuntimeAction({...args,action:'read',input:{target:'projection',sha256:r.origin_projection_sha256,basis_sha256:r.basis_sha256,offset,length:4096}},'codex');body+=range.text;offset=range.next_offset;}while(offset!==null);
  const projection=JSON.parse(body);assert.equal(projection.protocol,'legacy-classification-frontier-v1');assert.ok(projection.classifications.some(c=>c.id==='archive'));assert.ok(projection.mandatory.includes(original.id));assert.ok(projection.proofs.length>0);assert.ok(projection.proof_jobs.length>0);assert.ok(projection.unclassified_sources.length>0);assert.equal(peerDigest(projection),r.origin_projection_sha256);
  const db=new DatabaseSync(path.join(f.root,'.company','company.sqlite'));try{const event=db.prepare("SELECT seq,value FROM events WHERE type='record.saved' ORDER BY seq LIMIT 1").get(),value=JSON.parse(event.value);value.fictional_tampering='Changes no current record but invalidates actual producer proof';db.prepare('UPDATE events SET value=? WHERE seq=?').run(JSON.stringify(value),event.seq);}finally{db.close();}
  const held=peerAdoptionRuntimeAction(args,'codex');assert.equal(held.origin_projection_sha256,null);assert.notEqual(held.basis_sha256,r.basis_sha256);
@@ -183,6 +183,8 @@ test('cold layout5 reads preserve all exact original pinned parts and legacy rol
  const actual={};for(const header of headers.sources){let offset=0,body='';do{const value=readPeerPinnedTeam(peer.ledger,{part:header.part,reference:header.reference,sha256:header.sha256,offset,length:4000});body+=value.text;offset=value.next_offset;}while(offset!==null);assert.equal(hash(body),header.sha256);actual[header.part]=JSON.parse(body);}
  assert.equal(hash(JSON.stringify([actual.plugin_version,actual.governance,actual.roles,actual.cos_instructions])),source.pinned_team.team_sha256);assert.equal(JSON.stringify(actual.roles),source.pinned_team.roles_json);
  const evidence=peer.ledger.read(tx=>inspectPeerPinnedTeamFrom(tx,{company_id:peer.ledger.company_id}));assert.equal(evidence.bundle_sha256,peerDigest(source.pinned_team));assert.equal(JSON.stringify(evidence.roles),source.pinned_team.roles_json);
+ const sameSnapshot=peer.ledger.read(tx=>{const header=inspectPeerPinnedTeamFrom(tx,{company_id:peer.ledger.company_id}).sources.find(s=>s.part==='roles');return readPeerPinnedTeamFrom(tx,{part:header.part,reference:header.reference,sha256:header.sha256},{company_id:peer.ledger.company_id});});
+ assert.equal(sameSnapshot.length,Math.min(source.pinned_team.roles_json.length,4096));assert.ok(legacyEncodedReplyBytes(sameSnapshot)<=24576);
 });
 
 test('missing or drifted canonical pin record/reference/legacy bytes hold cold loading',t=>{
@@ -190,4 +192,31 @@ test('missing or drifted canonical pin record/reference/legacy bytes hold cold l
  const {peer}=pinnedFixture(t),headers=inspectPeerPinnedTeam(peer.ledger),header=headers.sources[0];
  assert.throws(()=>readPeerPinnedTeam(peer.ledger,{part:header.part,reference:header.reference,sha256:'f'.repeat(64)}),code('PEER_PINNED_TEAM_CHANGED'));
  const sha=peer.ledger.read(tx=>tx.get('control','pinned-team').value.bundle.manifest[0].source.sha256);peer.ledger.db.prepare("UPDATE immutable_values SET bytes='changed original pin' WHERE sha256=?").run(sha);assert.throws(()=>inspectPeerPinnedTeam(peer.ledger),/Legacy immutable evidence is missing or changed/);
+});
+
+for(const [name,value] of [['escaped ASCII','"\\'.repeat(10000)],['CJK','雪'.repeat(6000)+'😀']])test(`encoded reply budgets retain complete exact ${name} source through 4096-unit ranges`,t=>{
+ const f=fixture(t,{unknown_future:value}),r=f.run('readiness'),source=fullPage(f,'sources').find(s=>s.sha256===hash(JSON.stringify(value))),before=snapshot(f.db);let offset=0,body='';
+ do{const range=f.run('read',{target:'source',source_id:source.source_id,basis_sha256:r.basis_sha256,sha256:source.sha256,offset});assert.ok(range.length<=4096);assert.ok(legacyEncodedReplyBytes(range)<=24576);body+=range.text;offset=range.next_offset;}while(offset!==null);
+ assert.equal(body,JSON.stringify(value));assert.deepEqual(snapshot(f.db),before);assert.throws(()=>f.run('read',{target:'source',source_id:source.source_id,basis_sha256:r.basis_sha256,sha256:source.sha256,length:4097}),code('LEGACY_ADOPTION_INPUT'));
+});
+
+test('pages shrink inside the original snapshot by full encoded budget and keep exact continuations',t=>{
+ const f=fixture(t),sha=f.db.prepare("SELECT sha256 FROM state_entries WHERE family='records' AND key='held'").get().sha256;
+ for(let n=0;n<5;n++)f.db.prepare("INSERT INTO state_entries(family,key,position,sha256,encoding) VALUES(?,? ,0,?,'json')").run('"\\'.repeat(1000)+n,'fictional',sha);
+ const expected=f.run('readiness').current_source_inventory.rows,all=[];let cursor,pages=0,basis;
+ do{const page=f.run('inspect',{kind:'sources',limit:100,...(cursor?{cursor}:{})});assert.ok(legacyEncodedReplyBytes(page)<=24576);assert.ok(page.returned>0);if(!basis)basis=page.basis_sha256;else assert.equal(page.basis_sha256,basis);all.push(...page.items.map(item=>item.source_id));cursor=page.next_cursor;pages++;assert.equal(page.complete,cursor===null);}while(cursor);
+ assert.ok(pages>1);assert.equal(all.length,expected);assert.equal(new Set(all).size,expected);
+});
+
+test('one oversized source descriptor returns typed readonly Hold with exact bounded retrieval, never an empty complete page',t=>{
+ const f=fixture(t),sha=f.db.prepare("SELECT sha256 FROM state_entries WHERE family='records' AND key='held'").get().sha256;
+ f.db.prepare("INSERT INTO state_entries(family,key,position,sha256,encoding) VALUES(?,? ,0,?,'json')").run('"\\'.repeat(8000),'fictional',sha);
+ let held;assert.throws(()=>f.run('inspect',{kind:'sources',limit:100}),error=>{held=error;return error.code==='LEGACY_READONLY_REPLY_CAPACITY'&&error.readonly===true;});
+ const guidance=held.retrieval;assert.equal(guidance.action,'read');assert.equal(guidance.input.target,'source');assert.equal(guidance.input.length,4096);assert.ok(held.message.includes(guidance.input.sha256));const range=f.run('read',guidance.input);assert.equal(hash(range.text),sha);assert.ok(legacyEncodedReplyBytes(range)<=24576);
+});
+
+test('oversized readiness is a typed readonly Hold and plan remains bounded exact evidence rather than a mutation receipt',t=>{
+ const f=fixture(t,{id:'"\\'.repeat(8000)});let held;assert.throws(()=>f.run('readiness'),error=>{held=error;return error.code==='LEGACY_READONLY_REPLY_CAPACITY'&&error.readonly===true;});
+ const range=f.run('read',held.retrieval.input);assert.ok(legacyEncodedReplyBytes(range)<=24576);assert.equal(range.complete,false);
+ const expires_at=new Date(Date.now()+3600000).toISOString(),p=f.run('plan',{expires_at},{source_instruction:'Fictional exact adoption preparation.'});assert.ok(legacyEncodedReplyBytes(p)<=24576);assert.equal(p.status,'preparation-held');assert.equal(Object.hasOwn(p,'operation_source'),false);
 });

@@ -6,7 +6,7 @@ import {types} from 'node:util';
 import {DatabaseSync} from 'node:sqlite';
 import {readImmutable} from './record-storage.mjs';
 import {canonical,peerDigest} from './peers/ledger.mjs';
-import {LEGACY_ADOPTION_LIMITS,authenticateLegacyOwner,captureLegacyOrigin,legacyOriginReadiness} from './peers/legacy-origin.mjs';
+import {LEGACY_ADOPTION_LIMITS,authenticateLegacyOwner,captureLegacyOrigin,legacyOriginReadiness,boundLegacyReadReply,legacyEncodedReplyBytes,legacyReadReplyHold} from './peers/legacy-origin.mjs';
 import {preparePeerAdoptionV2} from './peers/migration-v2.mjs';
 
 const fail=code=>{throw Object.assign(Error(code),{code});};
@@ -52,7 +52,7 @@ function exactRange(body,sha256,input,basis_sha256){
  if(offset>=body.length||split(offset))fail('LEGACY_RANGE_INVALID');
  let end=Math.min(body.length,offset+length);if(split(end))end--;
  if(end===offset)fail('LEGACY_RANGE_INVALID');
- return {sha256,basis_sha256,offset,length:end-offset,text:body.slice(offset,end),total_characters:body.length,next_offset:end<body.length?end:null,complete:end===body.length};
+ return boundLegacyReadReply({sha256,basis_sha256,offset,length:end-offset,text:body.slice(offset,end),total_characters:body.length,next_offset:end<body.length?end:null,complete:end===body.length},{sha256,basis_sha256,offset,length:LEGACY_ADOPTION_LIMITS.range_characters});
 }
 function page(items,kind,input,basis_sha256){
  let offset=0;
@@ -61,17 +61,19 @@ function page(items,kind,input,basis_sha256){
   if(!plain(cursor)||Object.keys(cursor).sort().join(',')!=='basis_sha256,kind,offset'||cursor.basis_sha256!==basis_sha256||cursor.kind!==kind||!Number.isSafeInteger(cursor.offset)||cursor.offset<0||cursor.offset>items.length)fail('LEGACY_CURSOR_CHANGED');
   offset=cursor.offset;
  }
- const limit=input.limit??20,selected=[];let bytes=2;
+ const limit=input.limit??20,selected=[];
+ const response=()=>{const next=offset+selected.length,complete=next===items.length;return {kind,basis_sha256,items:selected.slice(),total:items.length,offset,returned:selected.length,complete,next_cursor:complete?null:Buffer.from(canonical({kind,basis_sha256,offset:next})).toString('base64url')};};
  for(let index=offset;index<items.length&&selected.length<limit;index++){
-  const item=items[index],size=Buffer.byteLength(canonical(item))+1;
-  if(bytes+size>LEGACY_ADOPTION_LIMITS.page_bytes){if(!selected.length)fail('LEGACY_PAGE_CAPACITY');break;}
-  selected.push(item);bytes+=size;
+  const item=items[index];selected.push(item);
+  if(legacyEncodedReplyBytes(response())>LEGACY_ADOPTION_LIMITS.public_reply_bytes){
+   selected.pop();if(!selected.length)legacyReadReplyHold({action:'read',input:{target:'source',source_id:item.source_id,sha256:item.sha256,basis_sha256,offset:0,length:LEGACY_ADOPTION_LIMITS.range_characters}});
+   break;
+  }
  }
- const next=offset+selected.length,complete=next===items.length;
- return {kind,basis_sha256,items:selected,total:items.length,offset,returned:selected.length,complete,next_cursor:complete?null:Buffer.from(canonical({kind,basis_sha256,offset:next})).toString('base64url')};
+ return boundLegacyReadReply(response(),{action:'inspect',input:{kind,basis_sha256,limit:1}});
 }
 
-export const peerAdoptionToolSchema=Object.freeze({name:'company_peer_adoption',description:'Read-only current-owner readiness and exact bounded preparation for existing normalized-v4 state. Does not adopt, migrate, resume, grant authority or start sessions.',inputSchema:{type:'object',properties:{root:{type:'string',maxLength:4000},session_id:{type:'string',maxLength:200},epoch:{type:'integer',minimum:1},action:{enum:['readiness','plan','inspect','read']},source_instruction:{type:'string',minLength:1,maxLength:4000},input:{type:'object',properties:{expires_at:{type:'string',maxLength:100},kind:{enum:['sources','issues']},target:{enum:['source','plan','projection']},limit:{type:'integer',minimum:1,maximum:100},cursor:{type:'string',maxLength:2000},basis_sha256:{type:'string',pattern:'^[a-f0-9]{64}$'},sha256:{type:'string',pattern:'^[a-f0-9]{64}$'},source_id:{type:'string',pattern:'^legacy-source:[a-f0-9]{64}$'},offset:{type:'integer',minimum:0},length:{type:'integer',minimum:1,maximum:16000}},additionalProperties:false}},required:['root','session_id','epoch','action'],additionalProperties:false}});
+export const peerAdoptionToolSchema=Object.freeze({name:'company_peer_adoption',description:'Read-only current-owner readiness and exact bounded preparation for existing normalized-v4 state. Does not adopt, migrate, resume, grant authority or start sessions.',inputSchema:{type:'object',properties:{root:{type:'string',maxLength:4000},session_id:{type:'string',maxLength:200},epoch:{type:'integer',minimum:1},action:{enum:['readiness','plan','inspect','read']},source_instruction:{type:'string',minLength:1,maxLength:4000},input:{type:'object',properties:{expires_at:{type:'string',maxLength:100},kind:{enum:['sources','issues']},target:{enum:['source','plan','projection']},limit:{type:'integer',minimum:1,maximum:100},cursor:{type:'string',maxLength:2000},basis_sha256:{type:'string',pattern:'^[a-f0-9]{64}$'},sha256:{type:'string',pattern:'^[a-f0-9]{64}$'},source_id:{type:'string',pattern:'^legacy-source:[a-f0-9]{64}$'},offset:{type:'integer',minimum:0},length:{type:'integer',minimum:1,maximum:4096}},additionalProperties:false}},required:['root','session_id','epoch','action'],additionalProperties:false}});
 
 export function peerAdoptionRuntimeAction(args,host){
  const input=request(args,host),where=storage(args.root);let db,transaction=false;
@@ -81,11 +83,15 @@ export function peerAdoptionRuntimeAction(args,host){
   authenticateLegacyOwner(db,args,host);
   const snapshot=captureLegacyOrigin(db);
   if(input.basis_sha256!==undefined&&input.basis_sha256!==snapshot.basis_sha256)fail('LEGACY_SOURCE_CHANGED');
-  if(args.action==='readiness')return legacyOriginReadiness(snapshot);
+  if(args.action==='readiness'){
+   const original=snapshot.sources.find(row=>row.family==='root'&&row.key==='id');
+   return boundLegacyReadReply(legacyOriginReadiness(snapshot),{action:'read',input:{target:'source',source_id:original.source_id,sha256:original.sha256,basis_sha256:snapshot.basis_sha256,offset:0,length:LEGACY_ADOPTION_LIMITS.range_characters}});
+  }
   if(args.action==='inspect')return page(input.kind==='sources'?snapshot.sources.map(({key,...row})=>row):snapshot.issues,input.kind,input,snapshot.basis_sha256);
   if(args.action==='plan'){
    const plan=preparePeerAdoptionV2(snapshot,{expires_at:input.expires_at,source_instruction:args.source_instruction}),body=canonical(plan);
-   return {protocol:plan.protocol,status:plan.status,permitted_action:plan.permitted_action,ready_for_apply:false,issue_count:plan.issues.length,source_cut_sha256:plan.source_cut_sha256,source:source(body,'plan',snapshot.basis_sha256,{expires_at:plan.expires_at}),instruction_sha256:peerDigest(args.source_instruction),expires_at:plan.expires_at};
+   const result={protocol:plan.protocol,status:plan.status,permitted_action:plan.permitted_action,ready_for_apply:false,issue_count:plan.issues.length,source_cut_sha256:plan.source_cut_sha256,source:source(body,'plan',snapshot.basis_sha256,{expires_at:plan.expires_at}),instruction_sha256:peerDigest(args.source_instruction),expires_at:plan.expires_at};
+   return boundLegacyReadReply(result,{action:'read',input:{target:'plan',sha256:result.source.sha256,basis_sha256:snapshot.basis_sha256,expires_at:plan.expires_at,offset:0,length:LEGACY_ADOPTION_LIMITS.range_characters}});
   }
   let body,sha256;
   if(input.target==='source'){

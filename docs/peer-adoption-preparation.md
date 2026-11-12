@@ -28,8 +28,11 @@ read-only connection and transaction. Its additional preparation admission is
 measured whole-process memory or physical-I/O limits. Failure or over-capacity
 never returns a clean prefix.
 
-`inspect` pages `sources` or `issues`; pages contain at most 100 rows and 32,768
-canonical UTF-8 item bytes. Source pages omit raw storage keys and supply stable
+`inspect` pages `sources` or `issues`; pages contain at most 100 rows and their
+complete encoded MCP text envelope is at most 24,576 UTF-8 bytes. Pages shrink
+inside the same snapshot while retaining exact offsets and continuations. A
+single oversized item returns a typed read-only Hold with an exact bounded source
+retrieval pointer; it never becomes an empty or falsely complete page. Source pages omit raw storage keys and supply stable
 hash locators. A cursor binds the entire current preparation basis. A tail page
 with `complete: true` is pagination metadata, not proof that a native reviewer
 received earlier pages or understood their meaning.
@@ -37,7 +40,7 @@ received earlier pages or understood their meaning.
 `read` requires the exact basis and source hash. Source reads return original
 stored JSON; journal descriptors remain descriptors and their child entries are
 separate inventory members. Plan/projection reads return canonical JSON. Ranges
-are at most 16,000 UTF-16 source units and preserve surrogate-pair boundaries.
+default to and admit at most 4,096 UTF-16 source units and preserve surrogate-pair boundaries.
 Any current source, order, encoding, owner or pin change invalidates prior basis
 handles. Follow all continuations for the selected complete value.
 
@@ -77,6 +80,17 @@ bounded original JSON values for `plugin_version`, `governance`, `roles` and
 `cos_instructions` after cold restart. Each read rechecks the canonical bundle and
 reference. Caller authentication and eventual public hook/open registration are
 separate integration work; these helpers issue no ownership or execution grant.
+`readPeerPinnedTeamFrom(tx,args,{company_id})` applies the identical validation and
+range logic inside an already owning snapshot, so a transport can authenticate
+and read atomically. Internal source headers deliberately advertise no presumed
+public route for a restricted pending successor. The transport must add only its
+actual supported retrieval handle. Full-bundle inspection is internal evidence;
+compact headers and all exact range responses enforce the 24 KiB encoded budget.
+
+Readiness and plan replies enforce the same encoded budget and return a typed
+read-only Hold with exact retrieval guidance if exceeded. No over-budget read is
+converted into a mutation receipt. Encoding admission measures the complete
+`{content:[{type:'text',text:JSON.stringify(value)}]}` envelope, including escaping.
 
 Existing `reviewedContext`/classification validators derive the legacy frontier.
 Missing, stale or invalid classifications Hold. Unclassified sources remain
