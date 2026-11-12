@@ -16,6 +16,8 @@ import { MIN_EXECUTION_TIMEOUT_MS, MAX_EXECUTION_TIMEOUT_MS } from './timeout.mj
 import {watchRuntimeHosts} from './task-runtime.mjs';
 import {peerRuntimeFields,stopPeerRuntimeHosts} from './peer-runtime.mjs';
 import {peerAdoptionToolSchema} from './peer-adoption-runtime.mjs';
+import {peerOwnerToolSchema,peerOwnerRoutingStorageKind} from './peer-owner-runtime.mjs';
+import {peerOriginToolSchema} from './peer-origin-runtime.mjs';
 import {runWithMcpHostContext,mcpCallerDiagnostic} from './mcp-host-context.mjs';
 import {toolError} from './tool-error.mjs';
 import {developmentDeliveryContractSchema,developmentDeliveryTransitionFields,boundedDevelopmentAcceptanceReply} from './development-delivery.mjs';
@@ -30,6 +32,8 @@ const specialistDefinition={type:'object',properties:{base_role:string,charter:s
 const taskSpec={type:'object',properties:{outcome:outcomeSchema,role:string,specialist_ref:specialistRef,task:string,acceptance:{type:'string',maxLength:4000},expected_deliverable:{type:'string',maxLength:300},context_scope:{type:'string',maxLength:160},input_ids:{type:'array',items:string,maxItems:102,description:'At most100 caller data IDs; specialist tasks may also retain the2exact policy/profile IDs added by the runtime.'},evidence_ids:{type:'array',items:string,maxItems:100},peer_task_ids:{type:'array',items:string,maxItems:16},resources:{type:'array',items:string,maxItems:16},depends_on:{type:'array',maxItems:16,items:{type:'object',properties:{task_id:string,gate:{enum:['output','accepted','test']}},required:['task_id','gate'],additionalProperties:false}},review_task_id:string,model_selection:modelSelection,timeout_ms:{type:'integer',minimum:MIN_EXECUTION_TIMEOUT_MS,maximum:MAX_EXECUTION_TIMEOUT_MS},timeout_reason:{type:'string',maxLength:300},max_attempts:{type:'integer',const:1}},required:['role','task','acceptance','expected_deliverable'],additionalProperties:false};
 const definitions=[
   [peerAdoptionToolSchema.name,peerAdoptionToolSchema.description,peerAdoptionToolSchema.inputSchema.properties,peerAdoptionToolSchema.inputSchema.required,engine.peerAdoption],
+  [peerOwnerToolSchema.name,peerOwnerToolSchema.description,peerOwnerToolSchema.inputSchema.properties,peerOwnerToolSchema.inputSchema.required,engine.ownerLifecycle],
+  [peerOriginToolSchema.name,peerOriginToolSchema.description,peerOriginToolSchema.inputSchema.properties,peerOriginToolSchema.inputSchema.required,engine.originLifecycle],
   ['company_peers','Operate the fixed peer-CoS runtime after an existing checked layout-5 adoption. Requires actual Codex root tool-call metadata matching session_id, a current managed hook record, the adopted canonical founder and current epoch. Caller arguments or binding-file existence cannot supply identity. Missing/unsupported host metadata Holds every peer operation, including reads. Status and bounded persisted inspect/read work without starting a provider. Inspect returns metadata/current source references; read requires exact current revision/hash, optionally task result only, in ranges no larger than4096characters. Explicit start loads only the reviewed original bridge/launch recipe; missing qualification stays held. Enroll, reconstruct, independently review and activate through the same membership lifecycle. Only the actual founder can create/revoke bounded grants; assign uses the recipient existing grant while retaining founder attribution. No tool-selected provider, actor, readiness, native proof or adoption shortcut. Stop preserves uncertain physical reservations. Reading proposals does not accept or publish them.',{...common,...peerRuntimeFields},['root','session_id','epoch','action'],engine.peers],
   ['company_specialists','Create bounded temporary expertise profiles under an explicit founder-authorized preparation policy. Retains the pinned base role and all existing authority, tool, budget, review and lifecycle gates. authorize/create/revoke/assess require the real owner, current epoch, source_instruction and replay-safe operation_id. A custom name is not competence certification. assess binds an actual completed profile output to an exact independent native QA review; it cannot publish, deploy or grant business authority. inspect is bounded and read-only; follow exact source handles for full charters.',{...common,action:{enum:['authorize','create','inspect','revoke','assess']},epoch:{type:'integer'},source_instruction:string,operation_id:{type:'string',minLength:1,maxLength:160},policy:specialistPolicy,policy_ref:specialistRef,definition:specialistDefinition,target_ref:specialistRef,profile_ref:specialistRef,output_ref:specialistRef,review_ref:specialistRef,filter:{enum:['policy','profile','revocation','assessment']},limit:{type:'integer',minimum:1,maximum:50},cursor:string},['root','session_id','action'],engine.specialists],
   ['company_tasks','Persist bounded preparation tasks and exact prerequisites for background follow-through. The runtime is software, not another AI supervisor. Submit/amend/cancel/message/dispose require the actual owning session, epoch, source_instruction and replay-safe operation_id. Existing pause, scope, review and one-attempt limits remain. Read inspect/context/checkpoint/inbox in bounded pages; incomplete context grants no permission. Planned tasks have no native session yet.',{...common,action:{enum:['submit','amend','cancel','inspect','context','checkpoint','message','inbox','dispose']},epoch:{type:'integer'},source_instruction:string,operation_id:{type:'string',maxLength:160},spec:taskSpec,task_id:string,expected_definition_revision:{type:'integer',minimum:1},to_task_id:string,content:{type:'string',maxLength:20000},message_id:string,disposition:{type:'string',maxLength:4000},limit:{type:'integer',minimum:1,maximum:100},cursor:string,after:string,context_scope:{type:'string',maxLength:160},budget:{type:'integer',minimum:512,maximum:200000}},['root','session_id','action'],engine.tasks],
@@ -113,6 +117,20 @@ export async function call(name,args,host) {
     catch(error){presentationHold='Acceptance returned, but its public presentation is unavailable: '+String(error?.message??error).slice(0,300);}
   }
   if(name==='company_handover'&&args.action==='read')throw Error('Exact handover range exceeds the public reply budget; no range delivered. Request a smaller length using the same subject/source/hash/offset.');
+  if(name==='company_owner'){
+    // The peer runtime bounds delivery before crediting a range or changing
+    // custody. Never send an owner receipt through legacy Store readback.
+    return {protocol:'peer-owner-presentation-hold-v1',operation:name,action:args.action,operation_returned:true,result_not_inlined:true,delivery_complete:false,
+      ...(typeof args.input?.operation_id==='string'?{operation_id:args.input.operation_id}:{}),
+      retrieval:{tool:'company_owner',action:'inspect',epoch:args.epoch},
+      note:'Inspect the exact persisted owner state and read its source. Do not repeat the operation to retrieve its result. This response is not review acceptance or authority.'};
+  }
+  if(name==='company_origin'){
+    return {protocol:'peer-origin-presentation-hold-v1',operation:name,action:args.action,operation_returned:true,result_not_inlined:true,delivery_complete:false,
+      ...(typeof args.input?.operation_id==='string'?{operation_id:args.input.operation_id}:{}),
+      retrieval:{tool:'company_origin',action:'status',epoch:args.epoch},
+      note:'Inspect the persisted origin and follow its exact source handles. Do not repeat an operation to retrieve its result. This receipt grants no execution or qualification.'};
+  }
   // The operation already returned successfully. Never turn an oversized receipt
   // into an error inviting a duplicate mutation. Expose persisted truth instead.
   const readOnly=['company_doctor','company_progress','company_peer_adoption'].includes(name)||['inspect','read','prepare_retention_review','prepare_review_continuation','acceptance_report','delivery_inspect'].includes(args.action)
@@ -173,6 +191,17 @@ export function hook(input,host) {
   const intent=/\b(start|run|create|resume)\b.{0,60}\b(company|startup|virtual team)\b/i.test(input.prompt??'');
   if(!hasCompany && !empty && !intent) return {};
   engine.bind(root,input.session_id,host);
+  if(hasCompany&&peerOwnerRoutingStorageKind(root)==='peer'){
+    // Lifecycle input is an unqualified routing hint. Actual peer access still
+    // requires the HOST tools/call metadata and the current managed-hook check.
+    const pauseRequested=input.hook_event_name==='UserPromptSubmit'&&/^(?:please\s+)?pause(?:\s+(?:the\s+)?company)?[.!]?$/i.test((input.prompt??'').trim());
+    const context={plugin:'SoloCo',host,session_id:input.session_id,root,storage_layout:5,identity_basis:'LEGACY_UNQUALIFIED',native_identity_proof:false,
+      instruction_loading:'Call company_open through the actual root MCP caller, then retrieve every original pinned part through company_owner pinned_inspect/pinned_read. This startup hint does not establish instruction delivery, custody or native qualification.',
+      notices:{complete:false,retrieval:{tool:'company_owner',action:'status'}},
+      notice_rule:'Retrieve all notice pages and exact summaries through company_owner context_inspect/context_read. Delivery does not acknowledge, resolve or authorize a notice.',
+      ...(pauseRequested?{pause_requested:true,pause_applied:false,control_retrieval:{tool:'company_owner',action:'pause'}}:{})};
+    return {hookSpecificOutput:{hookEventName:input.hook_event_name,additionalContext:JSON.stringify(context)},systemMessage:pauseRequested?'Company pause requested. Apply it through the actual root caller using company_owner pause and the current epoch; this hook did not apply the control change.':'Company uses peer storage. Open it through the actual root MCP caller to load complete pinned instructions and notices.'};
+  }
   let state=null;
   if(hasCompany) {
     state=withStore(root,db=>db.readSelected({rootKeys:['schema','runtime_version','plugin_version','team_sha256','governance','governance_sha256','cos_instructions','roles','owner','paused','revision','updated_at'],entities:{notices:null,upgrade:['status']}}));

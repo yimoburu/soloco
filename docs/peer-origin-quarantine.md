@@ -232,6 +232,15 @@ public apply surface are unchanged. Explicit resume, ordinary membership/tasks,
 environment qualification, scalable frontier and publication remain separately
 reviewed joins.
 
+The public legacy-plan producer must use
+`recordPeerOriginQuarantinePlanAtEpoch(root, actor, epoch, input)`. Its explicit
+positive epoch is checked against the current owner inside the original writer
+transaction before capture or staging, then against the exact normalized owner
+at the terminal commit fence. A same-session takeover invalidates the old epoch.
+Missing exports or stale epochs Hold; public routing cannot fall back to the
+legacy internal epochless helper. These checks do not grant mechanical QA or
+maintenance execution.
+
 ## Original selected pause generation
 
 New quarantine authority explicitly stores `maintenance.pause_generation` in the
