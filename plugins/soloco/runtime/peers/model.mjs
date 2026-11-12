@@ -12,6 +12,7 @@ import {prepareOriginalProjectedTaskContext} from './peer-context-interpreter.mj
 import {canonical,peerDigest,FAMILIES} from './ledger.mjs';
 import {REVIEW_SELECTION_RECIPE,extractReviewSelection,parseReviewOutput,reviewReference,reviewScope} from './review-selection.mjs';
 import {assertOriginalPeerExecutorIncarnation} from './executor-incarnation.mjs';
+import {sendHandoff,decideHandoff,pendingHandoffs} from './handoff.mjs';
 
 const PROTOCOL='peer-cos-v1',MAX_ROWS=10000;
 const outstanding=['reserved','sent','unknown'];
@@ -314,6 +315,9 @@ function control(tx){const c=tx.get('control','company');if(c?.value.protocol!==
 function legacyOriginHold(c){
   if(Object.hasOwn(c.value,'legacy_source_cut_sha256')||Object.hasOwn(c.value,'legacy_backup')||Object.hasOwn(c.value,'legacy_ready'))hold('AUTHORITY_CHANGED','Legacy adoption origin remains unqualified; original scoped attempts, expiry and uncertain obligations require a qualified transition');
 }
+// Pure currentness assertion for trusted owner composition. The supplied
+// provider must be the caller's original owning snapshot; success mints nothing.
+export function assertPeerLegacyOriginReady(provider){legacyOriginHold(control(trackedReads(provider)));}
 function member(tx,actor){
   if(!actor||typeof actor!=='object'||Object.keys(actor).length!==1||!Object.hasOwn(actor,'principal_id'))hold('AUTHENTICATION_REQUIRED','Use only a trusted-internal principal reference');
   const row=tx.get('principals',text(actor.principal_id,'principal_id',200));if(row?.value.status!=='active')hold('PRINCIPAL_INACTIVE','Principal is inactive');return row;
@@ -1251,6 +1255,10 @@ function run(ledger,actor,action,args,protectedCall,binding=null,production=null
   return plannedWrite(ledger,action,a.principal_id,tx=>{
     if(production){assertPeerProductionAuthority(tx,production,ledger);if(action==='task/admit')productionAdmissions.set(tx,production);}
     const p=member(tx,a);if(binding)checkBoundPrincipal(p,binding);else if(p.value.membership_qualification)hold('BOUND_CONNECTION_REQUIRED','Managed principal requires a protected bound connection');
+    if(action.startsWith('handoff/')){
+      if(!production&&!binding)hold('BOUND_CONNECTION_REQUIRED','Original protected receiver or sender connection required');
+      if(production&&!founder(control(tx),p))hold('FOUNDER_REQUIRED','Public handoff operator is the actual founder only');
+    }
     if(production&&action==='home/publish'){
       if(!founder(control(tx),p))hold('FOUNDER_REQUIRED','Actual founder publication required');
       if(Object.keys(input).some(key=>!['operation_id','proposal_ref','review_ref','source_instruction'].includes(key)))hold('INVALID_INPUT','Unsupported founder publication field');
@@ -1265,6 +1273,10 @@ function run(ledger,actor,action,args,protectedCall,binding=null,production=null
       taskAssignmentConnections.set(tx,{company_id:ledger.company_id,root_sha256:digest(ledger.root)});
     }
     const result=command(tx,a,action,input,protectedCall,null,()=>{replay=true;});
+    if(production&&action==='home/publish'){
+      const publication=result?.publication;
+      if(!result?.home||!publication||Object.keys(result).sort().join(',')!=='home,publication'||publication.id!==digest(['founder-home-publication-v1',p.id,input.operation_id])||publication.value?.kind!=='founder_home_publication_v1'||!same(publication.value.home,ref('homes',result.home))||!same(publication.value.proposal,input.proposal_ref)||!same(publication.value.review,input.review_ref)||publication.value.operator?.id!==p.id||publication.value.source_instruction!==input.source_instruction)hold('PUBLICATION_PRODUCER_REQUIRED','Original founder publication receipt required');
+    }
     if(action==='task/assign'&&!replay){
       assignment=assignmentCommitBinding(tx,ledger,a,input,result);
       deadline=Math.min(deadline,assignment.expires_at_ms);
@@ -1297,12 +1309,12 @@ export function bindPeerProductionScheduler(ledger){
   const facade=Object.freeze({
     execute(connection,actor,action,args={}){
       if(connection!==ledger)hold('PRODUCTION_OWNER_CHANGED','Original production ledger required');
-      if(!['task/admit','task/assign','grant/create','grant/revoke','home/publish'].includes(action))hold('PRODUCTION_ACTION_HELD','Unsupported production scheduler action');
+      if(!['task/admit','task/assign','grant/create','grant/revoke','home/publish','handoff/send','handoff/accept','handoff/reject'].includes(action))hold('PRODUCTION_ACTION_HELD','Unsupported production scheduler action');
       return run(ledger,actor,action,args,false,null,production);
     },
     inspect(connection,actor,action,args={}){
       if(connection!==ledger)hold('PRODUCTION_OWNER_CHANGED','Original production ledger required');
-      if(!['runtime/status','task/peek'].includes(action))hold('PRODUCTION_ACTION_HELD','Unsupported production scheduler inspection');
+      if(!['runtime/status','task/peek','handoff/pending'].includes(action))hold('PRODUCTION_ACTION_HELD','Unsupported production scheduler inspection');
       return inspectBound(ledger,actor,action,args,null,action==='runtime/status'?null:production);
     },
     validateContext(provider,context){
@@ -1590,6 +1602,25 @@ function mutate(tx,actor,principal,c,action,args,protectedCall,taskBinding=null,
     }
     hold('ACTION_UNKNOWN','Unsupported task action');
   }
+  if(action==='handoff/send'){
+    const subject=semanticReference(args.subject_ref),row=resolve(tx,subject),scope=scopeOf(args.scope);
+    if(scopeOf(row.value.scope)!==scope)hold('HANDOFF_SCOPE','Handoff subject scope cannot be relabeled');
+    authorize(tx,actor,action,{...args,scope,resources:[]});
+    const governed=(args.governing_refs??[]).map(exactReference);
+    for(const source of governed)resolve(tx,source);
+    evidenceAnalysis(tx).current([subject,...(args.evidence_refs??[]).map(semanticReference),...governed.filter(source=>semanticFamilies.has(source.family))]);
+    return sendHandoff(tx,principal,c,args);
+  }
+  if(action==='handoff/accept'||action==='handoff/reject'){
+    const exact=exactReference(args.handoff_ref);if(exact.family!=='work_items')hold('SOURCE_INVALID','Exact typed handoff required');
+    const handoff=resolve(tx,exact),value=handoff.value;
+    if(value.receiver?.id!==principal.id)hold('HANDOFF_RECEIVER','Only the actual intended receiver may decide');
+    authorize(tx,actor,action,{...args,scope:value.scope,resources:[]});
+    const governed=(value.governing_refs??[]).map(exactReference);
+    for(const source of governed)resolve(tx,source);
+    evidenceAnalysis(tx).current([semanticReference(value.subject_ref),...(value.evidence_refs??[]).map(semanticReference),...governed.filter(source=>semanticFamilies.has(source.family))]);
+    return decideHandoff(tx,principal,action,args);
+  }
   if(action==='home/propose'){
     const scope=scopeOf(args.scope),id=text(args.home_id,'home_id',200);authorize(tx,actor,action,{...args,scope,resources:[{kind:'home',id}]});const home=tx.get('homes',id);if((home?.revision??0)!==(args.expected_revision??0))hold('HOME_CHANGED','Base revision changed');if(home&&scopeOf(home.value.scope)!==scope)hold('HOME_SCOPE','Home scope cannot be relabeled');
     const dependencies=args.dependencies??[];if(!Array.isArray(dependencies)||dependencies.length>100)hold('DEPENDENCY_INVALID','At most 100 home dependencies');for(const d of dependencies){if(d.family!=='homes')hold('DEPENDENCY_INVALID','Home dependencies required');resolve(tx,d);}
@@ -1598,6 +1629,7 @@ function mutate(tx,actor,principal,c,action,args,protectedCall,taskBinding=null,
     semanticInputs(tx,args.input_refs??[]);const selected=sources(tx,scope,[...(args.input_refs??[]),...dependencies]),content=bounded(args.content,'home content');return tx.put('proposals',digest(['proposal',principal.id,args.operation_id]),{status:'proposed',principal_id:principal.id,scope,home_id:id,base:home?ref('homes',home):null,content,dependencies:copy(dependencies),readset:selected.sources.map(({value,legacy_value,...r})=>r),membership:selected.membership,...(taskBinding?{task_id:taskBinding.task_id,attempt_id:taskBinding.attempt_id,task_effect:copy(taskBinding)}:{}),...(args.github_publication?{github_publication:bounded(args.github_publication,'GitHub subject',16000)}:{}),...(atomic===undefined?{}:{github_atomic_publication:atomic}),created_at:now()},0);
   }
   if(action==='home/publish'){
+    if(!productionPublications.has(tx)&&(Object.hasOwn(args,'proposal_ref')||Object.hasOwn(args,'review_ref')))hold('PRODUCTION_ACTION_HELD','Exact-reference founder publication requires its original production channel');
     const proposal=args.proposal_ref?resolve(tx,exactReference(args.proposal_ref)):tx.get('proposals',text(args.proposal_id,'proposal_id',200));if(proposal?.value.status!=='proposed')hold('PROPOSAL_INVALID','Proposed home required');const p=proposal.value;authorize(tx,actor,action,{...args,scope:p.scope,resources:[{kind:'home',id:p.home_id}]});const home=tx.get('homes',p.home_id);if(p.base)resolve(tx,p.base);else if(home)hold('HOME_CHANGED','Concurrent home');
     const reviewRows=currentReviewRows(tx),selected=sources(tx,p.scope,[],reviewRows);if(selected.membership.conflicts.length)hold('CONTEXT_CONFLICT','Unresolved applicable conflict');if(!same(selected.membership,p.membership))hold('CONTEXT_CHANGED','Applicable membership changed');for(const r of p.readset)resolve(tx,r);
     const subject=ref('proposals',proposal);reviewRows.subjects([subject]);evidenceAnalysis(tx).current([subject]);const review=args.review_ref?resolve(tx,exactReference(args.review_ref)):tx.get('reviews',text(args.review_id,'review_id',200));if(!review||!observedReview(tx,review,{pending:true})||review.value.verdict!=='Pass'||!same(review.value.subject,subject))hold('REVIEW_REQUIRED','Protected exact independent Pass required');
@@ -1639,6 +1671,6 @@ export function inspect(ledger,actor,action,args={}){
 }
 function inspectBound(ledger,actor,action,args={},binding=null,production=null){
   const a=copy(actor),input=bounded(args,'inspection',1000000),deadline=production?Date.now()+TASK_EFFECT_LEASE_MS:null;
-  const inspect=tx=>{if(production)assertPeerProductionAuthority(tx,production,ledger);const p=member(tx,a),c=control(tx);if(binding)checkBoundPrincipal(p,binding);else if(p.value.membership_qualification)hold('BOUND_CONNECTION_REQUIRED','Managed principal requires a protected bound connection');policy(c);if(action==='runtime/status')return runtimeStatus(tx);if(action==='task/peek'){if(!trusted(p))hold('SCHEDULER_REQUIRED','Runtime selection required');const task=peek(tx,input);return {task,host:task?tx.get('principals',task.value.owner_principal_id)?.value.host??'codex':null,traversal:{matching_row_limit:MAX_ROWS,exclusion_limit:MAX_ROWS,fairness_advances_on_admission:true}};}if(action==='task/context')return buildContext(tx,a,tx.get('tasks',text(input.task_id,'task id',200)));if(action==='task/get'){const task=tx.get('tasks',text(input.task_id,'task id',200));if(task&&task.value.owner_principal_id!==p.id&&!trusted(p)&&!founder(c,p))hold('TASK_OWNER','Task owner required');return task;}if(action==='list'){if(!['tasks','homes','proposals','conflicts','notices','messages','grants','claims','effects'].includes(input.family))hold('FAMILY_INVALID','Inspectable family required');return tx.list(input.family,{limit:Math.min(input.limit??20,100),cursor:input.cursor,status:input.status,...(founder(c,p)||trusted(p)?{}:{principal_id:p.id}),...(input.scope?{scope:input.scope}:{})});}hold('ACTION_UNKNOWN','Unsupported inspection');};
+  const inspect=tx=>{if(production)assertPeerProductionAuthority(tx,production,ledger);const p=member(tx,a),c=control(tx);if(binding)checkBoundPrincipal(p,binding);else if(p.value.membership_qualification)hold('BOUND_CONNECTION_REQUIRED','Managed principal requires a protected bound connection');policy(c);if(action==='handoff/pending'){if(!production&&!binding)hold('BOUND_CONNECTION_REQUIRED','Original protected receiver connection required');if(production&&!founder(c,p))hold('FOUNDER_REQUIRED','Public intake operator is the actual founder only');return pendingHandoffs(tx,p,c,input);}if(action==='runtime/status')return runtimeStatus(tx);if(action==='task/peek'){if(!trusted(p))hold('SCHEDULER_REQUIRED','Runtime selection required');const task=peek(tx,input);return {task,host:task?tx.get('principals',task.value.owner_principal_id)?.value.host??'codex':null,traversal:{matching_row_limit:MAX_ROWS,exclusion_limit:MAX_ROWS,fairness_advances_on_admission:true}};}if(action==='task/context')return buildContext(tx,a,tx.get('tasks',text(input.task_id,'task id',200)));if(action==='task/get'){const task=tx.get('tasks',text(input.task_id,'task id',200));if(task&&task.value.owner_principal_id!==p.id&&!trusted(p)&&!founder(c,p))hold('TASK_OWNER','Task owner required');return task;}if(action==='list'){if(!['tasks','homes','proposals','conflicts','notices','messages','grants','claims','effects'].includes(input.family))hold('FAMILY_INVALID','Inspectable family required');return tx.list(input.family,{limit:Math.min(input.limit??20,100),cursor:input.cursor,status:input.status,...(founder(c,p)||trusted(p)?{}:{principal_id:p.id}),...(input.scope?{scope:input.scope}:{})});}hold('ACTION_UNKNOWN','Unsupported inspection');};
   return production?ledger.guardedWrite(action,a.principal_id,inspect,tx=>{assertPeerProductionAuthority(tx,production,ledger);return deadline;}):ledger.read(inspect);
 }

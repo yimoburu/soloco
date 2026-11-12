@@ -101,6 +101,39 @@ test('legacy generic home publication still accepts IDs and returns its original
   assert.equal(f.rows('work_items').length,0);
 });
 
+test('generic exact-reference fields require the private production publication boundary',t=>{
+  const f=fixture(t),request=f.request(f.prepare());
+  rejectedUnchanged(f,()=>execute(f.ledger,actor('founder'),'home/publish',request),codes('INVALID_INPUT','PRODUCTION_ACTION_HELD','PRODUCTION_OWNER_CHANGED','FOUNDER_PUBLICATION_REQUIRED'));
+  assert.equal(f.get('homes','fact'),null);assert.equal(f.rows('work_items').length,0);
+  assert.equal(f.rows('commands').some(row=>row.value.operation_id===request.operation_id),false);
+});
+
+test('production replay cannot return a generic exact-reference receipt as its audit wrapper',t=>{
+  const f=fixture(t),request=f.request(f.prepare());let generic,denial;
+  try{generic=execute(f.ledger,actor('founder'),'home/publish',request);}catch(error){denial=error;}
+  if(denial)assert(codes('INVALID_INPUT','PRODUCTION_ACTION_HELD','PRODUCTION_OWNER_CHANGED','FOUNDER_PUBLICATION_REQUIRED')(denial));
+  else assert.equal(generic?.value?.status,'current','the pre-fix producer creates an ordinary raw home receipt');
+  const before=sqlState(f);let result,replayFailure;
+  try{result=f.publish(request);}catch(error){replayFailure=error;}
+  if(replayFailure){
+    assert.equal(denial,undefined,'denying a generic attempt must leave a fresh valid production request usable');
+    assert(codes('REPLAY_MISMATCH','PRODUCTION_ACTION_HELD','PRODUCTION_OWNER_CHANGED','FOUNDER_PUBLICATION_REQUIRED','PUBLICATION_PRODUCER_REQUIRED')(replayFailure));
+    assert.deepEqual(sqlState(f),before);
+  }else{
+    assert.deepEqual(Object.keys(result).sort(),['home','publication'],'the protected boundary never reports a raw generic receipt as an audited founder publication');
+    assert.deepEqual(f.get('work_items',result.publication.id),result.publication);
+    assert.deepEqual(result.publication.value.home,ref('homes',result.home));
+    assert.deepEqual(result.publication.value.proposal,request.proposal_ref);assert.deepEqual(result.publication.value.review,request.review_ref);
+  }
+});
+
+test('legacy ID operation cannot be replayed through the exact-reference production boundary',t=>{
+  const f=fixture(t),prepared=f.prepare(),request=f.request(prepared);
+  const generic=execute(f.ledger,actor('founder'),'home/publish',{operation_id:request.operation_id,proposal_id:prepared.proposal.id,review_id:prepared.review.id});
+  assert.equal(generic.value.status,'current');assert.equal(f.rows('work_items').length,0);
+  rejectedUnchanged(f,()=>f.publish(request),code('REPLAY_MISMATCH'));
+});
+
 test('an actual task client retains its closed action set for founder publication',t=>{
   const f=peerTaskEffectsFixture(t),admitted=f.start(),before=sqlState(f);
   assert.throws(()=>admitted.client.execute('home/publish',{operation_id:'SYNTHETIC-task-cannot-publish',proposal_ref:{family:'proposals',id:'p',revision:1,sha256:'0'.repeat(64)},review_ref:{family:'reviews',id:'r',revision:1,sha256:'0'.repeat(64)},source_instruction:'No task-bound capability can become founder publication.'}),code('TASK_EFFECT_ACTION_HELD'));
