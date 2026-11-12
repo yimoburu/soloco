@@ -151,6 +151,12 @@ test('late diagnostics after dedicated recovery resume preserve ordinary work an
   assert.equal(f.get('notices',late.notice_ref.id).value.required_handoff,true);
   const message=f.client.execute('message/send',f.messageArgs());assert.equal(message.value.status,'pending');
   assert.deepEqual(f.get('control','usage'),usage);assert.equal(f.ledger.read(inspectPeerOwnerOperatingState).ordinary_allowed,true);
+  const resolved=f.run('founder','notice/resolve',{notice_id:late.notice_ref.id,source_instruction:'SYNTHETIC explicit disposition preserves all continuing uncertainty.'});
+  assert.equal(resolved.value.status,'resolved');assert.equal(resolved.value.continuing_conditions_preserved,true);
+  assert.equal(f.ledger.read(tx=>tx.getVersion(late.notice_ref)).value.status,'pending','original notice remains immutable producer evidence');
+  assert.equal(f.client.execute('message/send',f.messageArgs()).value.status,'pending');
+  assert.equal(f.get('work_items',original.binding.admission_ref.id.replace('admission:','phase:')).value.status,'unknown');
+  assert.deepEqual(f.get('control','usage'),usage);
 });
 
 test('same-owner generic pause/resume behavior and original legacy origin hold are preserved',t=>{

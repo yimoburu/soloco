@@ -12,6 +12,12 @@ their exact supporting versions. Mutable readiness flags and caller claims do
 not qualify it. The reader imports only the ledger; it creates no transactions,
 model calls, native capabilities or grants. Existing legacy-origin denials remain.
 
+After dedicated resume, verified source diagnostics can append an old phase and
+require a notice without silently blocking ordinary work. The reader verifies
+that exact append lineage and retains the original UNKNOWN slot/effect checks.
+A supported notice disposition preserves its immutable first version; it does
+not release uncertainty. Pending or activated handovers retain stricter checks.
+
 An ordinary command under a controlled handover uses the guarded planning path.
 When an existing unguarded path first discovers that state, a source-private
 identity signal aborts the read-only transaction before command lookup or any
