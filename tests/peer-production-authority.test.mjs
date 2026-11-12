@@ -412,3 +412,51 @@ test('a fresh-owner-shaped mutable seal cannot replace the original immutable pr
   assert.deepEqual(f.ledger.read(tx=>tx.getVersion(immutable)).value.result.task.value.attempt.effect_authority,original);
   assert.equal(f.get('control','usage').value.model_calls,1);
 });
+
+for(const status of ['running','pending','planned'])test('a genuinely admitted generic task cannot become an unattempted '+status+' preview by nulling its attempt',t=>{
+  const f=fixture(t),task=f.pending(),admitted=f.run('scheduler','task/admit',{task_id:task.id});assert.equal(admitted.admitted,true);
+  assert.equal(f.ledger.read(tx=>model.validateContext(tx,admitted.context)),true);
+  const effect=f.get('effects',admitted.task.value.attempt.effect_id),slot=f.get('slots',task.id),claims=rows(f,'claims',{task_id:task.id,status:'held'});
+  assert.equal(effect.value.kind,'native');assert.equal(effect.value.status,'reserved');assert.equal(slot.value.status,'active');
+  const command=rows(f,'commands').find(row=>row.value.action==='task/admit'&&row.value.result?.task?.id===task.id);assert(command);
+  const immutable=reference('commands',command);
+  f.seed('tasks',task.id,v=>({...v,status,attempt:null}));
+  assert.equal(f.get('tasks',task.id).value.attempt,null);assert.equal(f.get('tasks',task.id).value.status,status);
+  const before=logicalSQLState(f);
+  assert.equal(f.ledger.read(tx=>model.validateContext(tx,admitted.context)),false,'the canonical native effect still requires its immutable original admission');
+  assert.equal(currentContext(f,admitted),false);assert.deepEqual(logicalSQLState(f),before);
+  assert.deepEqual(f.ledger.read(tx=>tx.getVersion(immutable)).value.result,admitted);
+  assert.deepEqual(f.get('effects',effect.id),effect);assert.deepEqual(f.get('slots',slot.id),slot);
+  assert.deepEqual(rows(f,'claims',{task_id:task.id,status:'held'}),claims);
+  assert.equal(f.get('control','usage').value.model_calls,1);assert.equal(f.get('grants','grant-cos-a').value.used_model_calls,1);
+});
+
+for(const status of ['planned','pending'])test('a genuinely unattempted '+status+' task retains its valid generic context preview',t=>{
+  const f=fixture(t),task=f.submit();
+  if(status==='pending')f.run('cos-a','task/claim',{task_id:task.id});
+  const current=f.get('tasks',task.id);assert.equal(current.value.status,status);assert.equal(current.value.attempt,null);
+  const nativeId=model.digest(['native-effect',task.id,current.value.definition_revision]);
+  assert.equal(f.get('effects',nativeId),null);assert.equal(f.get('slots',task.id),null);
+  const preview=f.connection.inspect('task/context',{task_id:task.id}),before=logicalSQLState(f);
+  assert.equal(f.ledger.read(tx=>model.validateContext(tx,preview)),true);
+  assert.equal(f.ledger.read(tx=>f.facade.validateContext(tx,preview)),false,'an unattempted preview is not production dispatch authority');
+  assert.deepEqual(logicalSQLState(f),before);assert.equal(f.get('control','usage'),null);
+  assert.equal(f.get('grants','grant-cos-a').value.used_model_calls,0);
+  assert.equal(rows(f,'claims',{task_id:task.id,status:'held'}).length,status==='pending'?1:0);
+});
+
+test('a production admission with its whole current attempt removed stays invalid under the unchanged owner',t=>{
+  const f=fixture(t),a=f.productionStart(),effect=f.get('effects',a.task.value.attempt.effect_id),slot=f.get('slots',a.task.id);
+  const command=rows(f,'commands').find(row=>row.value.action==='task/admit'&&row.value.result?.task?.id===a.task.id);assert(command);
+  assert.equal(f.ledger.read(tx=>model.validateContext(tx,a.context)),true);
+  f.seed('tasks',a.task.id,v=>({...v,attempt:null}));assert.doesNotThrow(()=>f.facade.assertCurrent());
+  const before=logicalSQLState(f);
+  assert.equal(currentContext(f,a),false);assert.equal(f.ledger.read(tx=>model.validateContext(tx,a.context)),false);
+  unchanged(f,()=>a.client.execute('message/send',message('removed-production-attempt')),'TASK_INACTIVE');
+  assert.deepEqual(logicalSQLState(f),before);
+  assert.deepEqual(f.ledger.read(tx=>tx.getVersion(reference('commands',command))).value.result,{
+    admitted:true,task:a.task,context:a.context,host:a.host
+  });
+  assert.deepEqual(f.get('effects',effect.id),effect);assert.deepEqual(f.get('slots',slot.id),slot);
+  assert.equal(f.get('control','usage').value.model_calls,1);
+});

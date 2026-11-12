@@ -124,6 +124,10 @@ actual accountable owner. The immutable definition records `assignment` origin.
 Assignment queues a pending task and acquires its declared resources in the
 same transaction. A conflict rolls back the task and command receipt; no manual
 recipient claim is needed. Ordinary `task/submit` still creates a planned task.
+Assignment checks the validated recipient, qualification, grant, controls and
+resource bindings again after SQL staging. Its physical commit deadline is
+capped by the recipient's actual grant expiry; late drift or expiry rolls back
+the task, claims and receipt together.
 Assignment itself neither dispatches a native session nor charges a model call.
 The normal scheduler still performs actual admission and its independent gates.
 

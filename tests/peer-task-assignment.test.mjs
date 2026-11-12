@@ -18,6 +18,37 @@ function state(f){
   return Object.fromEntries(tables.map(({name})=>[name,f.ledger.db.prepare('SELECT * FROM "'+name.replaceAll('"','""')+'"').all().map(row=>JSON.parse(JSON.stringify(row))).sort((a,b)=>canonical(a).localeCompare(canonical(b)))]));
 }
 function unchanged(f,operation,predicate){const before=state(f);assert.throws(operation,predicate);assert.deepEqual(state(f),before);}
+function afterFinalMetadata(f,change){
+  const original=f.ledger.query;let hits=0;
+  f.ledger.query=function(sql,...parameters){
+    const statement=Reflect.apply(original,this,[sql,...parameters]);
+    if(sql!=='UPDATE peer_meta SET last_event_sha256=? WHERE id=1')return statement;
+    return new Proxy(statement,{get(target,key){
+      if(key==='run')return(...values)=>{const result=target.run(...values);hits++;change();return result;};
+      const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;
+    }});
+  };
+  return {get hits(){return hits;},restore:()=>{f.ledger.query=original;}};
+}
+function afterAssignmentStaging(f,request,change){
+  const original=f.ledger.guardedWrite;let hits=0;
+  f.ledger.guardedWrite=function(type,principal,callback,terminal){
+    return Reflect.apply(original,this,[type,principal,tx=>{
+      const result=callback(tx);
+      if(type==='task/assign'){
+        const task=tx.get('tasks',request.task_id);
+        assert.equal(task?.value.status,'pending');assert.equal(task.value.attempt,null);
+        for(const resource of task.value.resources){
+          const claim=tx.get('claims',digest(['claim',task.id,resource.key]));
+          assert.equal(claim?.value.status,'held');assert.equal(claim.value.principal_id,f.recipient);
+        }
+        hits++;change(tx);
+      }
+      return result;
+    },terminal]);
+  };
+  return {get hits(){return hits;},restore:()=>{f.ledger.guardedWrite=original;}};
+}
 function fixture(t,options={}){
   const f=peerFixture(options);t.after(()=>f.close());
   let n=0,pid=15000;
@@ -275,4 +306,57 @@ test('paused company and held legacy origin cannot acquire a new assigned task',
   f.run('founder','company/resume',{source_instruction:'SYNTHETIC founder resume.'});
   f.update('control','company',value=>({...value,legacy_ready:true}));
   unchanged(f,()=>f.assign(),code('AUTHORITY_CHANGED'));
+});
+
+for(const atExpiry of [false,true])test('assignment physical precommit: final metadata clock '+(atExpiry?'at grant expiry rolls back':'before grant expiry permits pending work without a charge'),t=>{
+  const f=fixture(t,{principals:{founder:{legacy_owner:{host:'codex',session_id:'SYNTHETIC-assignment-final-clock',epoch:1}}}}),production=bindPeerProductionScheduler(f.ledger);
+  const original=Date.now;let clock=original();Date.now=()=>clock;
+  let hook;
+  try{
+    const expires=clock+1000;f.authority=f.grant({expires_at:new Date(expires).toISOString()});
+    const request=f.request(),before=state(f),beforeGlobal=f.get('control','usage'),beforePersonal=f.get('control',`usage:${f.recipient}`),beforeGrant=f.get('grants',f.authority.id),beforeSlots=f.rows('slots'),beforeEffects=f.rows('effects');
+    hook=afterFinalMetadata(f,()=>{clock=expires-(atExpiry?0:1);});
+    if(atExpiry){
+      assert.throws(()=>production.execute(f.ledger,actor('founder'),'task/assign',request),code('TASK_EFFECT_EXPIRED'));
+      assert.deepEqual(state(f),before,'expiry rolls back task, claim, command, versions, event, outbox and usage together');
+      assert.equal(f.get('tasks',request.task_id),null);assert.equal(f.rows('claims',{task_id:request.task_id}).length,0);
+      assert.equal(f.rows('commands').some(row=>row.value.operation_id===request.operation_id),false);
+    }else{
+      const task=production.execute(f.ledger,actor('founder'),'task/assign',request);
+      assert.equal(task.value.status,'pending');assert.equal(task.value.attempt,null);
+      assert.equal(f.rows('claims',{task_id:task.id,status:'held'}).length,1);
+      assert.equal(f.rows('commands').filter(row=>row.value.operation_id===request.operation_id).length,1);
+    }
+    assert.equal(hook.hits,1,'clock changed after the real final metadata statement completed');
+    assert.deepEqual(f.get('control','usage'),beforeGlobal);assert.deepEqual(f.get('control',`usage:${f.recipient}`),beforePersonal);
+    assert.deepEqual(f.get('grants',f.authority.id),beforeGrant);assert.deepEqual(f.rows('slots'),beforeSlots);assert.deepEqual(f.rows('effects'),beforeEffects);
+  }finally{hook?.restore();Date.now=original;}
+});
+
+const terminalAssignmentChanges=[
+  {name:'recipient grant revocation',family:'grants',id:f=>f.authority.id,change:value=>({...value,status:'revoked',generation:value.generation+1})},
+  {name:'recipient grant action removal',family:'grants',id:f=>f.authority.id,change:value=>({...value,actions:['task/submit']})},
+  {name:'company pause',family:'control',id:()=> 'company',change:value=>({...value,paused:true,pause_generation:value.pause_generation+1})},
+  {name:'recipient incarnation replacement',family:'principals',id:f=>f.recipient,change:value=>({...value,generation:value.generation+1,native_id:'SYNTHETIC-replaced-assignment-peer'})},
+  {name:'current recipient qualification failure',family:'work_items',id:f=>f.activated.qualification.id,change:value=>({...value,status:'failed'})},
+  {name:'exhausted global model budget',family:'control',id:()=> 'usage',change:(value,f,tx)=>({...value,model_calls:tx.get('control','company').value.policy.max_model_calls})},
+  {name:'registered worktree repository change',family:'control',id:()=> 'resources',prepare:f=>{
+    f.ledger.write('SYNTHETIC-assignment-resource-registry','founder',tx=>tx.put('control','resources',{worktrees:[{id:'assignment-tree',repository:'fictional/assignment',aliases:[]}]},0));
+    const resources=[{kind:'path',worktree_id:'assignment-tree',path:'evidence.mjs'}];f.authority=f.grant({resources});return {resources};
+  },change:value=>({...value,worktrees:value.worktrees.map(tree=>({...tree,repository:'fictional/replaced-assignment'}))})}
+];
+for(const scenario of terminalAssignmentChanges)test('assignment physical precommit: staged '+scenario.name+' rolls back the whole assignment',t=>{
+  const f=fixture(t,{principals:{founder:{legacy_owner:{host:'codex',session_id:'SYNTHETIC-assignment-final-authority',epoch:1}}}}),production=bindPeerProductionScheduler(f.ledger);
+  const request=f.request(scenario.prepare?.(f)??{}),before=state(f),beforeGlobal=f.get('control','usage'),beforePersonal=f.get('control',`usage:${f.recipient}`);
+  const hook=afterAssignmentStaging(f,request,tx=>{
+    const row=tx.get(scenario.family,scenario.id(f));
+    tx.put(scenario.family,row.id,scenario.change(row.value,f,tx),row.revision);
+  });
+  try{assert.throws(()=>production.execute(f.ledger,actor('founder'),'task/assign',request),code('AUTHORITY_CHANGED'));}
+  finally{hook.restore();}
+  assert.equal(hook.hits,1,'the controlled same-transaction change follows real task and claim staging');
+  assert.deepEqual(state(f),before,'terminal rejection rolls back authority mutation, task, claim, command, event, history and outbox');
+  assert.equal(f.get('tasks',request.task_id),null);assert.equal(f.rows('claims',{task_id:request.task_id}).length,0);
+  assert.equal(f.rows('commands').some(row=>row.value.operation_id===request.operation_id),false);
+  assert.deepEqual(f.get('control','usage'),beforeGlobal);assert.deepEqual(f.get('control',`usage:${f.recipient}`),beforePersonal);
 });

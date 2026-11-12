@@ -39,7 +39,7 @@ const boundary=(s,n)=>!(n>0&&n<s.length&&/[\uD800-\uDBFF]/.test(s[n-1])&&/[\uDC0
 // explicit revocation-before-activation history within the one atomic commit.
 function plan(raw){
   const failures=new Set(),provider={...raw};
-  for(const method of ['get','getVersion','list','count','queryCurrentReviews','resolveLegacy'])if(typeof raw[method]==='function')provider[method]=(...args)=>{try{return raw[method](...args);}catch(error){failures.add(error);throw error;}};
+  for(const method of ['get','getVersion','getTaskHistory','events','list','count','queryCurrentReviews','resolveLegacy'])if(typeof raw[method]==='function')provider[method]=(...args)=>{try{return raw[method](...args);}catch(error){failures.add(error);throw error;}};
   const writes=[],latest=new Map(),reads=new Map(),events=[],finalChecks=[],snapshot=provider.get('control','company');
   if(!snapshot)fail('POLICY_INVALID','Owning company snapshot required');
   const tx={...provider,get:(f,id)=>{const k=canonical([f,id]);if(latest.has(k))return copy(latest.get(k));if(!reads.has(k))reads.set(k,provider.get(f,id));const row=reads.get(k);return row?copy(row):null;},
