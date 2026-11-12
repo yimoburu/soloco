@@ -61,6 +61,25 @@ function readSubject(f){
   assert.equal(peerDigest(JSON.parse(text)),header.subject_sha256);return {header,body:JSON.parse(text),text};
 }
 
+test('the original public intent is the first physical put, before custody revocation, while the subject retains its issued preimage',t=>{
+  const f=fixture(t),intent=issue(f),original=f.ledger.guardedWrite,puts=[];
+  f.ledger.guardedWrite=function(type,principal,callback,terminal){
+    return Reflect.apply(original,this,[type,principal,raw=>callback(Object.freeze({...raw,put(...args){
+      const [family,id,value]=args;puts.push({family,id,status:value.status??null});return raw.put(...args);
+    }})),terminal]);
+  };
+  let begun;try{begun=f.incoming.beginFromIntent(beginArgs(f,intent));}finally{f.ledger.guardedWrite=original;}
+  assert.equal(begun.status,'pending');
+  assert.deepEqual(puts[0],{family:'work_items',id:intent.ref.id,status:'consumed'});
+  const revoked=puts.findIndex(row=>row.family==='principals'&&row.status==='revoked'),pending=puts.findIndex(row=>row.family==='principals'&&row.status==='pending');
+  assert(revoked>0&&pending>revoked,'original custody revocation still precedes pending successor activation inside the same plan');
+  const h=f.get('work_items',begun.handover_id).value,source=f.get('work_items',h.subject_ref.id).value.body.current.find(row=>row.family==='work_items'&&row.id===intent.ref.id);
+  assert.equal(source.value.status,'issued');assert.equal(source.sha256,intent.ref.sha256);
+  const current=reference('work_items',f.get('work_items',intent.ref.id)),override=h.expected_overrides.find(row=>row.family==='work_items'&&row.id===intent.ref.id);
+  assert.deepEqual(override.original,intent.ref);assert.deepEqual(override.current,current);assert.deepEqual(h.public_transfer_binding.consumed_intent_ref,current);
+  assert.equal(custody(f).controlled,true);
+});
+
 test('an original outgoing decision and intent support complete public custody through independent review and dedicated resume',async t=>{
   const f=fixture(t),decision=record(f),intent=issue(f,decision);
   assert.equal(f.incoming.begin,undefined,'public callers cannot reach the source-private unbound begin');

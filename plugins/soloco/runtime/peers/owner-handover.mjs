@@ -328,6 +328,11 @@ function createLifecycle({ledger,actor},publicMode){
     // and immutable admission receive a separate exact preflight before charge.
     const feasibilityContext={protocol:CONTEXT,connection:copy(record.connection),owner_handover_id:id,owner_epoch:epoch,subject:{ref:subjectRef,sha256:subject.sha256,body:subject.body},reconstruction:{ref:{family:'work_items',id:id+':reconstruction:'+('f'.repeat(64)),revision:1,sha256:'f'.repeat(64)},sha256:model.digest('x'.repeat(MAX_RECONSTRUCTION)),content:'x'.repeat(MAX_RECONSTRUCTION),incoming:a},reviewer:{principal_ref:ref('principals',reviewer),native_id:reviewer.value.native_id},prior_attempts:[],prior_reconstructions:[],recovery_dispositions:[],prior_external_attempts:[],late_obligations:[],subject_refreshes:[],authority:{grant_ref:ref('grants',g),expires_at:new Date(expires).toISOString()}};
     const feasibility=wirePreflight(canonical(feasibilityContext),reviewer.value.native_id);
+    // All authority, source and whole-wire feasibility reads have completed.
+    // Consume the original public intent as the FIRST planned/physical put,
+    // before revoking custody. The frozen subject above retains its issued
+    // preimage; the override below binds that source to this consumed version.
+    const consumed=transfer?tx.put('work_items',transfer.row.id,{...transfer.row.value,status:'consumed',consumed_event_seq:tx.sequence,consumption:{handover_id:id,incoming:a,owner_epoch:epoch,begin_request:copy(input)}}):null;
     const revoked=tx.put('principals',p.id,{...p.value,status:'revoked',generation,revoked_for:id});
     const incoming=tx.put('principals',p.id,{...p.value,status:'pending',generation,native_id:a.native_id,host:a.host,legacy_owner:{host:a.host,session_id:a.session_id,epoch},membership_previous:ref('principals',revoked),owner_handover:id});
     const controlled=tx.put('control',c.id,{...c.value,paused:true,pause_generation:c.value.pause_generation+1,owner_handover:{id,epoch}});
@@ -337,7 +342,6 @@ function createLifecycle({ledger,actor},publicMode){
      subject_ref:ref('work_items',source),subject_sha256:subject.sha256,native_source:native,begin_wire_feasibility:{stage:'feasibility-only',final_context:false,commitment:feasibility.commitment},reviewer:ref('principals',reviewer),review_grant:ref('grants',g),max_review_calls:max,used_review_calls:0,
      reads:[],reconstruction_ref:null,reconstruction_history:[],review_history:[],recovery_ref:null,recovery_history:[],recovery_delivery:null,own_keys:[['work_items',id],['work_items',subjectId]]};
     if(transfer){
-     const consumed=tx.put('work_items',transfer.row.id,{...transfer.row.value,status:'consumed',consumed_event_seq:tx.sequence,consumption:{handover_id:id,incoming:a,owner_epoch:epoch,begin_request:copy(input)}});
      override(h,'work_items',transfer.current,consumed);h.public_transfer_binding={protocol:OWNER_TRANSFER_BINDING,connection:copy(record.connection),decision_ref:transfer.row.value.decision_ref,issued_intent_ref:ref('work_items',transfer.row),consumed_intent_ref:ref('work_items',consumed)};
      tx.event('owner.transfer_intent_consumed',{handover_id:id,issued_intent_ref:ref('work_items',transfer.row),consumed_intent_ref:ref('work_items',consumed)});
     }
