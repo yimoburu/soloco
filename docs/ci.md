@@ -16,6 +16,12 @@ jobs still fail the gate. Branch protection on `main` requires `CI gate` and
 The two aggregate jobs use fail-closed shell checks without a checkout or Node
 setup. Every actual test shard still requires the real macOS Seatbelt backend.
 
+Routine regression uses two Node test-file workers per shard; full Node 22
+qualification and Node 26 compatibility keep four. This scheduling choice aims
+to reduce overlapping fixture work. It changes no selected files, assertions,
+sandbox requirements, test/startup budgets or job timeouts; its effect on
+contention and elapsed time still requires current hosted-run evidence.
+
 ## Required auto-merge
 
 Every CoS and replacement session follows [AGENTS.md](../AGENTS.md): keep a PR
@@ -74,7 +80,7 @@ invalid summary, mismatched source root or selected file set, or any outer
 failure, cancellation, skip or todo, holds the
 shard. TAP stays diagnostic: expected failing child fixtures may write their own
 TAP and totals without becoming outer test failures. Diagnostic uploads stay optional.
-Node 26 compatibility, routine regression and the required CI gate are unchanged.
+Node 26 compatibility and the required CI gate are unchanged.
 
 Placement uses the source-owned cost hints in
 `tools/ci/qualification-costs.json`, derived from the exact linked public run.
