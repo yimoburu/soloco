@@ -78,3 +78,19 @@ recognizes administrative rows only through the fixed private journal proof.
 Existing internal compatibility helpers remain historical library paths, not a
 supported public fallback. No full mechanical-QA/public/native qualification is
 claimed by this held interface.
+
+The current-source reader now replays every original queued job revision and
+session change through the complete authenticated storage interval. Each
+model-process request/birth/close must be an actual canonical job delta, obey
+the original runtime transition grammar, preserve every other job field and
+bind the original job, instance, worker and host. Other job phases preserve the
+tracking journal exactly. Native-call spend derives from the original request
+history; deleting or restoring current tracking cannot replenish it. A pending
+original invocation blocks another request even while the numerical cap has
+room. Request/child-close observations retain their narrow original scope;
+they do not prove global or remote-domain closure or free capacity.
+
+Transient task/lane changes remain disqualifying after current shape is
+restored. Unsupported phase/session changes Hold rather than being treated as
+administrative history. Genuine execution cardinality and source/native gates
+still apply before any run; the fixture inventory is not their qualification.
