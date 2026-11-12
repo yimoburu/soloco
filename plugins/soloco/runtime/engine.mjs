@@ -28,6 +28,7 @@ import { developmentAction, developmentCapability, developmentAssignment } from 
 import { prototypeAction, prototypeCapability, prototypeAssignment } from './prototype.mjs';
 import { TIMEOUT_POLICY_VERSION, normalizeTimeout, normalizeHandoverReviewWindow, normalizeCodeReviewWindow, jobTimeoutState } from './timeout.mjs';
 import {taskAction,runtimeAction} from './task-runtime.mjs';
+import {peerRuntimeAction} from './peer-runtime.mjs';
 import {taskRecord,taskReady,bindTaskAttempt} from './tasks.mjs';
 import {runtimeGrant,runtimeControlBinding} from './task-runtime-authority.mjs';
 import {readTaskState,updateTaskIndex} from './task-index.mjs';
@@ -103,6 +104,7 @@ export function develop(args,host) { binding(args,host); return ['prepare_retent
 export function prototype(args,host) { binding(args,host); return prototypeAction(args,host); }
 export function tasks(args,host){binding(args,host);return taskAction(args,host);}
 export function runtime(args,host){binding(args,host);return runtimeAction(args,host);}
+export function peers(args,host){binding(args,host);return peerRuntimeAction(args,host);}
 export function specialists(args,host){
   binding(args,host);
   const options={host,reviewCurrent:(state,job,hash)=>{

@@ -5,11 +5,14 @@ import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {bindPeerTaskEffects} from '../plugins/soloco/runtime/peers/model.mjs';
+import * as model from '../plugins/soloco/runtime/peers/model.mjs';
+import {canonical,peerDigest} from '../plugins/soloco/runtime/peers/ledger.mjs';
 import {createPeerExecutorIncarnationSource,assertOriginalPeerExecutorIncarnation} from '../plugins/soloco/runtime/peers/executor-incarnation.mjs';
 import {peerTaskEffectsFixture,rows,logicalSQLState} from './peer-task-effects-fixture.mjs';
 
 const MODULE=fileURLToPath(new URL('../plugins/soloco/runtime/peers/protected-codex-domain.mjs',import.meta.url));
 const code=expected=>error=>error?.code===expected;
+const productionHold=code('PRODUCTION_OWNER_CHANGED');
 const message=operation_id=>({operation_id,to_principal_id:'cos-b',content:'Composed offline fixture handoff.'});
 
 // Original production launch/observer bodies, real P1 admission and SQLite
@@ -17,11 +20,12 @@ const message=operation_id=>({operation_id,to_principal_id:'cos-b',content:'Comp
 // are synthetic. These tests make no native/provider/account/OS operation and
 // establish no native acceptance or physical closure. Private fixture exports
 // exist solely in a temporary exact-source copy, never in production.
-async function composed(t){
- const f=peerTaskEffectsFixture(t,{peerFixtureOptions:{principals:{'cos-a':{membership_qualification:{SYNTHETIC_ONLY:true}}}}});
+async function composed(t,{production=false}={}){
+ const f=peerTaskEffectsFixture(t,{peerFixtureOptions:{principals:{founder:{legacy_owner:{host:'codex',session_id:'synthetic-owner-session',epoch:1}},'cos-a':{membership_qualification:{SYNTHETIC_ONLY:true}}}}});
  const submitted=f.connection.execute('task/submit',{operation_id:'composed-submit',grant_id:'grant-cos-a',scope:'alpha',role:'engineer',instructions:'Inspect synthetic offline evidence.',acceptance:'Retain attributable scoped handoff.',resources:['home:fact']});
  f.connection.execute('task/claim',{operation_id:'composed-claim',task_id:submitted.id});
- const admitted=f.run('scheduler','task/admit',{task_id:submitted.id});assert.equal(admitted.admitted,true);
+ const scheduler=production?model.bindPeerProductionScheduler(f.ledger):null;
+ const admitted=scheduler?scheduler.execute(f.ledger,{principal_id:'scheduler'},'task/admit',{operation_id:'composed-production-admit',task_id:submitted.id}):f.run('scheduler','task/admit',{task_id:submitted.id});assert.equal(admitted.admitted,true);
  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-composed-executor-'));
  let domain,shim,source,child;
  t.after(()=>{
@@ -88,8 +92,49 @@ export function __syntheticTurnDrift(owner,handle,turn_id){record(owner,handle).
  let turn={state:'running',yield_requested:false,hold:null,native_id:f.binding.native_id,turn_id:'synthetic-composed-turn',attempt_id:admitted.task.value.attempt.id,principal_id:f.binding.principal_id};
  const incarnation=domain.observeOriginalProtectedPeerExecutorIncarnation(owner,handle,source,{deadline_at_ms:Date.parse(admitted.task.value.attempt.effect_authority.expires_at),readTurn:()=>turn});
  const client=bindPeerTaskEffects(f.connection,{task_id:admitted.task.id},incarnation);
- return {...f,...admitted,domain,owner,handle,source,incarnation,client,process,child:shim.child,setTurn:value=>{turn=value;}};
+ return {...f,...admitted,domain,owner,handle,source,incarnation,client,process,scheduler,child:shim.child,setTurn:value=>{turn=value;}};
 }
+
+test('the production scheduler admission composes through the original executor and physical effect commit',async t=>{
+ const f=await composed(t,{production:true});
+ assert(f.task.value.attempt.effect_authority.production_authority);
+ const result=f.client.execute('message/send',message('production-composed-send')),committed=logicalSQLState(f);
+ assert.equal(result.value.task_id,f.task.id);assert.equal(rows(f,'messages').length,1);
+ assert.deepEqual(f.client.execute('message/send',message('production-composed-send')),result);
+ assert.deepEqual(logicalSQLState(f),committed);
+});
+
+test('replacing the production operator fences an otherwise current executor and exact message replay',async t=>{
+ const f=await composed(t,{production:true}),args=message('production-owner-replay');f.client.execute('message/send',args);
+ f.seed('principals','founder',value=>({...value,legacy_owner:{...value.legacy_owner,epoch:2}}));
+ const before=logicalSQLState(f);
+ assert.throws(()=>f.client.execute('message/send',args),productionHold);
+ assert.throws(()=>f.client.execute('message/send',message('production-owner-new')),productionHold);
+ assert.throws(()=>f.client.inspect('task/get',{}),productionHold);
+ assert.deepEqual(logicalSQLState(f),before);assert.equal(rows(f,'messages').length,1);
+});
+
+test('production operator drift after metadata staging rolls back the original composed effect transaction',async t=>{
+ const f=await composed(t,{production:true}),before=logicalSQLState(f),original=f.ledger.query;let staged=0;
+ const founder=f.get('principals','founder'),changed={...founder.value,legacy_owner:{...founder.value.legacy_owner,epoch:2}},bytes=canonical(changed),sha256=peerDigest(changed);
+ f.ledger.query=function(sql,...params){
+  const statement=Reflect.apply(original,this,[sql,...params]);
+  if(sql!=='UPDATE peer_meta SET last_event_sha256=? WHERE id=1')return statement;
+  return new Proxy(statement,{get(target,key){
+   if(key==='run')return(...values)=>{
+    const result=target.run(...values);staged++;
+    // Controlled same-connection mutation in the isolated fixture only. The
+    // final guard must reread the actual original SQL rows after all staging.
+    f.ledger.db.prepare('INSERT INTO peer_versions(family,id,revision,sha256,bytes) VALUES(?,?,?,?,?)').run('principals','founder',founder.revision+1,sha256,bytes);
+    f.ledger.db.prepare("UPDATE peer_rows SET revision=?,sha256=?,bytes=? WHERE family='principals' AND id='founder'").run(founder.revision+1,sha256,bytes);
+    return result;
+   };
+   const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;
+  }});
+ };
+ try{assert.throws(()=>f.client.execute('message/send',message('production-final-owner-drift')),productionHold);}finally{f.ledger.query=original;}
+ assert.equal(staged,1);assert.deepEqual(logicalSQLState(f),before);assert.equal(rows(f,'messages').length,0);
+});
 
 test('original protected executor observer composes with the task client and same physical ledger',async t=>{
  const f=await composed(t),binding=assertOriginalPeerExecutorIncarnation(f.incarnation,{ledger:f.ledger,task_id:f.task.id,attempt_id:f.task.value.attempt.id,context_sha256:f.context.sha256});

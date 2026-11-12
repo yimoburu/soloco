@@ -2,6 +2,7 @@ import * as reviewContinuation from '../plugins/soloco/runtime/development-revie
 import * as retentionRepair from '../plugins/soloco/runtime/development-retention-repair.mjs';
 import * as modelProcessClosure from '../plugins/soloco/runtime/model-process-closure.mjs';
 import {outcomeSchema} from '../plugins/soloco/runtime/outcome.mjs';
+import {peerRuntimeFields} from '../plugins/soloco/runtime/peer-runtime.mjs';
 import {developmentDeliveryContractSchema,developmentDeliveryTransitionFields,boundedDevelopmentAcceptanceReply} from '../plugins/soloco/runtime/development-delivery.mjs';
 import * as scopedStream from '../plugins/soloco/runtime/scoped-stream.mjs';
 import * as scoped from '../plugins/soloco/runtime/scoped-context.mjs';
@@ -46,7 +47,7 @@ function harness(publicOverrides={}) {
     developmentBundle:()=>null,prototypeBundle:()=>null,developmentPrompt:()=>'',prototypePrompt:()=>'',
     parseArtifact:JSON.parse,runModel:()=>{throw new Error('Real model forbidden');},dataDir:()=>'/unused',
     setInterval:(fn,ms)=>{assert.equal(ms,100);intervals.add(fn);return fn;},clearInterval:fn=>intervals.delete(fn),
-    spawn:(...args)=>{launches.push(args);return {on:()=>{},unref:()=>{}};},hooks:()=>{},upgrade:()=>{},upgradeGuidance:''};
+    spawn:(...args)=>{launches.push(args);return {on:()=>{},unref:()=>{}};},hooks:()=>{},upgrade:()=>{},upgradeGuidance:'',peerRuntimeFields};
   const engine=load('engine.mjs',deps,['dispatch','status','control','wait']);
   Object.assign(engine,publicOverrides);
   const worker=load('worker.mjs',deps,['work']);

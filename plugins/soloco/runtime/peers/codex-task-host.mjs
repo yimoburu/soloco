@@ -95,7 +95,10 @@ export function createCodexTaskRuntime({owner,ledger,membership,launch,qualifica
       const changes=event.payload.changes.filter(c=>c.family==='commands');if(changes.length!==1)fail('HOST_ADMISSION_PRODUCER');
       const change=changes[0],command=tx.getVersion({family:'commands',id:change.id,revision:change.revision,sha256:change.sha256}),v=command?.value;
       if(v?.action!=='task/admit'||v.principal_id!==scheduler_principal_id||v.result?.admitted!==true||v.result.task.id!==task.id||v.result.task.value.attempt.id!==a.id||!same(v.result.context,context))fail('HOST_ADMISSION_PRODUCER');
-      if(callback_restriction==='task-bound-effects'&&(!a.effect_authority?.production_authority||!same(a.effect_authority,v.result.task.value.attempt.effect_authority)))fail('HOST_PRODUCTION_ADMISSION_REQUIRED');
+      if(callback_restriction==='task-bound-effects'){
+        if(!a.effect_authority?.production_authority||!same(a.effect_authority,v.result.task.value.attempt.effect_authority)||typeof model.assertPeerProductionAuthority!=='function')fail('HOST_PRODUCTION_ADMISSION_REQUIRED');
+        model.assertPeerProductionAuthority(tx,a.effect_authority.production_authority,ledger);
+      }
       const binding=active(tx,current);
       // Pure terminal cutoff after ALL provider/history/current-principal reads.
       // No provider callback runs between this check and the returned snapshot.
