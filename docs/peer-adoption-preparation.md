@@ -2,8 +2,9 @@
 
 `peer-adoption-runtime.mjs` supplies a bounded, authenticated read-only entry for
 an existing normalized-v4 company. It is separate from the normal layout-5 peer
-runtime. Its exported schema is available for a reviewed MCP registration; this
-source cut does not register a tool by itself.
+runtime. The public `company_peer_adoption` tool registers its exact exported
+schema and checks the existing startup-hook binding before entering the helper.
+All four actions are read-only preparation, including `plan`.
 
 The actions are `readiness`, `plan`, `inspect` and `read`. Every action checks the
 exact current canonical owner host, chat identity and epoch before reading the
@@ -13,6 +14,12 @@ resume or migration action. The entry opens SQLite read-only and uses one read
 snapshot; it does not open a writable `Store`, initialize tables, create a backup
 or call the unpublished v1 `adoptPeers`. Ordinary SQLite reader sidecar behavior
 is not claimed as a general no-filesystem-I/O guarantee.
+
+Public capacity holds preserve the helper's typed code and exact bounded
+retrieval pointer through MCP serialization. No page or range is delivered by a
+hold, and it never becomes a mutation receipt. Follow the pointer through
+`company_peer_adoption`; exact plan reads also repeat the original preparation
+instruction. Registration adds no apply or execution route.
 
 ## Exact bounded evidence
 

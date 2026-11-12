@@ -93,6 +93,25 @@ async function readBody(f,target,source,{source_id,expires_at,length=1000,source
  }
  assert.fail('Exact public ranges did not make bounded progress');
 }
+function assertPublicCapacityHold(value,action){
+ assert.equal(value.protocol,'peer-adoption-public-hold-v1');assert.equal(value.code,'LEGACY_READONLY_REPLY_CAPACITY');assert.equal(value.action,action);assert.equal(value.status,'held');assert.equal(value.delivered,false);assert.equal(value.complete,false);assert.equal(value.execution_authorized,false);assert.equal(typedHold(value),true);
+ const guidance=value.retrieval;assert(guidance&&typeof guidance==='object');assert.equal(guidance.action,'read');assert.equal(guidance.input.target,'source');assert.match(guidance.input.source_id,/^legacy-source:[a-f0-9]{64}$/);assert.match(guidance.input.sha256,/^[a-f0-9]{64}$/);assert.match(guidance.input.basis_sha256,/^[a-f0-9]{64}$/);assert.equal(guidance.input.offset,0);
+ const wire=JSON.parse(rpcReply('h'.repeat(256),toolResult(value)));
+ assert.deepEqual(JSON.parse(wire.result.content[0].text).retrieval,guidance,'Structured exact retrieval must survive the final toolResult/RPC encoding unchanged');
+ return guidance;
+}
+async function followExactSourcePointer(f,guidance){
+ // The FIRST request is the actual action/input supplied by the source core,
+ // without reconstructing its selector or dropping basis/hash/range fields.
+ let range=await f.run(guidance.action,guidance.input),body='',offset=0;
+ for(let turns=0;turns<100;turns++){
+  assert.equal(range.sha256,guidance.input.sha256);assert.equal(range.basis_sha256,guidance.input.basis_sha256);assert.equal(range.offset,offset);assert.equal(range.length,range.text.length);body+=range.text;
+  if(range.complete){assert.equal(range.next_offset,null);assert.equal(body.length,range.total_characters);assert.equal(rawHash(body),guidance.input.sha256);return body;}
+  assert.equal(range.next_offset,offset+range.text.length);assert(range.next_offset>offset);offset=range.next_offset;
+  range=await f.run(guidance.action,{...guidance.input,offset});
+ }
+ assert.fail('The exact capacity-hold source pointer did not reach a bounded complete result');
+}
 
 test('public discovery and actual dispatch expose preparation only, with hook and canonical owner gates',async t=>{
  const f=fixture(t,{bound:false}),schema=publicSchema(f.root),before=fingerprint(f.db);
@@ -147,6 +166,25 @@ for(const [name,text]of [['escaped','"\\\n\t\u0001'.repeat(10000)],['CJK','é›ªæ¼
 test('largest advertised public inventory pages preserve their real cursor and complete collection under reply budgets',async t=>{
  const records=Object.fromEntries(Array.from({length:240},(_,i)=>{const id='fictional-'+String(i).padStart(3,'0');return [id,{id,kind:'artifact',revision:1,content:'UNKNOWN; spent allowance; preserve original '+i}];})),f=fixture(t,{changes:{records}}),before=fingerprint(f.db),schema=publicSchema(f.root),readiness=await f.run('readiness');
  const inventory=await pages(f,'sources',{limit:schema.properties.input.properties.limit.maximum,basis_sha256:readiness.basis_sha256});assert.equal(inventory.items.length,readiness.current_source_inventory.rows);assert.equal(new Set(inventory.items.map(item=>item.source_id)).size,inventory.items.length);assert.equal(fingerprint(f.db),before);
+});
+
+test('oversized actual readiness preserves its typed readonly hold and exact source pointer through public RPC',async t=>{
+ const id='"\\'.repeat(8000),f=fixture(t,{changes:{id}}),before=fingerprint(f.db);
+ const held=await f.run('readiness'),guidance=assertPublicCapacityHold(held,'readiness');
+ assert.equal(guidance.input.sha256,rawHash(JSON.stringify(id)));assert.equal(guidance.input.length,publicSchema(f.root).properties.input.properties.length.maximum);
+ const raw=await followExactSourcePointer(f,guidance);assert.equal(JSON.parse(raw),id);assert.equal(raw,JSON.stringify(id));
+ const expires_at=new Date(Date.now()+3600000).toISOString(),prepared=await f.run('plan',{expires_at},{source_instruction:INSTRUCTION});assert.equal(prepared.status,'preparation-held');assert.equal(prepared.ready_for_apply,false);assert.equal(Object.hasOwn(prepared,'operation_source'),false);
+ const plan=JSON.parse(await readBody(f,'plan',prepared.source,{expires_at}));assert.equal(typeof plan.authority?.company_id,'string');assert.equal(rawHash(plan.authority.company_id),rawHash(id));assert.equal(plan.authority.company_id.length,id.length);assert.equal(plan.native_qualification,false);
+ assert.equal(fingerprint(f.db),before);assert.equal(fs.existsSync(path.join(f.root,'.company','backups')),false);
+});
+
+test('one oversized actual descriptor returns a structured no-delivery hold with an executable exact source pointer',async t=>{
+ const f=fixture(t),sha256=f.db.prepare("SELECT sha256 FROM state_entries WHERE family='records' AND key='held'").get().sha256;
+ f.db.prepare("INSERT INTO state_entries(family,key,position,sha256,encoding) VALUES(?,? ,0,?,'json')").run('"\\'.repeat(8000),'fictional',sha256);
+ const before=fingerprint(f.db),held=await f.run('inspect',{kind:'sources',limit:publicSchema(f.root).properties.input.properties.limit.maximum}),guidance=assertPublicCapacityHold(held,'inspect');
+ assert.equal(guidance.input.sha256,sha256);assert.equal(guidance.input.length,publicSchema(f.root).properties.input.properties.length.maximum);
+ const raw=await followExactSourcePointer(f,guidance);assert.deepEqual(JSON.parse(raw),f.initial.records.held);
+ assert.equal(fingerprint(f.db),before);assert.equal(fs.existsSync(path.join(f.root,'.company','backups')),false);
 });
 
 test('public preparation rejects missing and layout5 state without initializing or migrating it',async t=>{

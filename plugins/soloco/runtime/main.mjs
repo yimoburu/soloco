@@ -71,6 +71,15 @@ function existingFileSource(file,read) {
   catch(error){source.hold='Existing output could not be read back. Inspect the exact path; do not repeat the mutation.';source.readback_error=String(error.message).slice(0,300);}
   return source;
 }
+function adoptionReadHold(action,code,retrieval,basis) {
+  const hold={protocol:'peer-adoption-public-hold-v1',code,action,status:'held',delivered:false,complete:false,execution_authorized:false,hold:'The complete requested read-only preparation reply exceeds the public budget; no page or range was delivered.',retrieval};
+  if(typeof basis==='string'&&/^[a-f0-9]{64}$/.test(basis))hold.basis_sha256=basis;
+  if(!fits(hold)) {
+    hold.retrieval='No complete retrieval pointer was delivered. Request a smaller page or range through company_peer_adoption with the original cursor/hash/basis/offset.';
+    hold.retrieval_not_inlined=true;
+  }
+  return hold;
+}
 export async function call(name,args,host) {
   const def=definitions.find(d=>d[0]===name);if(!def)throw new Error('Unknown tool');
   if(!args || typeof args!=='object' || Array.isArray(args))throw new Error('Tool arguments must be an object');
@@ -90,7 +99,12 @@ export async function call(name,args,host) {
     normalizeTestFixture(args.test_fixture);
   }
   if(name==='company_develop' && args.max_bytes!==undefined && args.max_bytes>developmentLimits(args.root).max_bytes)throw new Error('max_bytes exceeds this company configured ceiling; inspect company_develop capability');
-  const result=await def[4](args,host);
+  let result;
+  try {result=await def[4](args,host);}
+  catch(error) {
+    if(name==='company_peer_adoption'&&error?.code==='LEGACY_READONLY_REPLY_CAPACITY'&&error.readonly===true)return adoptionReadHold(args.action,error.code,error.retrieval);
+    throw error;
+  }
   if(fits(result))return result;
   let presentationHold;
   if(name==='company_develop'&&['accept','accept_review_continuation'].includes(args.action)) {
@@ -105,10 +119,8 @@ export async function call(name,args,host) {
     ||['company_runtime','company_peers'].includes(name)&&args.action==='status';
   if(readOnly) {
     if(name==='company_peer_adoption') {
-      const hold={protocol:'peer-adoption-public-hold-v1',code:'LEGACY_ADOPTION_REPLY_CAPACITY',action:args.action,delivered:false,complete:false,hold:'The complete requested preparation reply exceeds the public budget; no page or range was delivered.',retrieval:args.action==='inspect'?'Request a smaller limit with the same cursor and basis_sha256 through company_peer_adoption.':args.action==='read'?'Request a smaller length with the same target, source/hash, basis_sha256 and offset through company_peer_adoption.':'Use company_peer_adoption inspect/read to retrieve exact bounded preparation evidence; this hold grants no adoption or execution authority.'};
-      const basis=result?.basis_sha256??result?.source?.basis_sha256;
-      if(typeof basis==='string'&&/^[a-f0-9]{64}$/.test(basis))hold.basis_sha256=basis;
-      return hold;
+      const retrieval=args.action==='inspect'?'Request a smaller limit with the same cursor and basis_sha256 through company_peer_adoption.':args.action==='read'?'Request a smaller length with the same target, source/hash, basis_sha256 and offset through company_peer_adoption.':'Use company_peer_adoption inspect/read to retrieve exact bounded preparation evidence; this hold grants no adoption or execution authority.';
+      return adoptionReadHold(args.action,'LEGACY_ADOPTION_REPLY_CAPACITY',retrieval,result?.basis_sha256??result?.source?.basis_sha256);
     }
     if(['company_develop','company_prototype'].includes(name)) {
       const compact={response_format:'soloco-current-v2',capability:result.capability,records:engine.inspectionPage(args,host,name==='company_develop'?'development':'prototype_plans'),retrieval:'Follow company_context inspect collection/next_cursor, then exact read of each source.'};
