@@ -1,5 +1,6 @@
 import {outcomeSchema} from '../plugins/soloco/runtime/outcome.mjs';
 import {peerRuntimeFields} from '../plugins/soloco/runtime/peer-runtime.mjs';
+import {peerAdoptionToolSchema} from '../plugins/soloco/runtime/peer-adoption-runtime.mjs';
 import {developmentDeliveryContractSchema,developmentDeliveryTransitionFields,boundedDevelopmentAcceptanceReply} from '../plugins/soloco/runtime/development-delivery.mjs';
 import * as scoped from '../plugins/soloco/runtime/scoped-context.mjs';
 import {operatingMaintenanceEligible} from '../plugins/soloco/runtime/operating-state.mjs';
@@ -118,7 +119,7 @@ function harness(host='claude') {
     normalizeTimeout:({timeout_ms,timeout_reason})=>({timeout_ms:timeout_ms??180000,timeout_reason:timeout_reason??'Fixture default'}),normalizeHandoverReviewWindow,normalizeCodeReviewWindow,
     jobTimeoutState:()=>({state:'terminal'}),
     spawn:(...args)=>{launches.push(args);return {on:()=>{},unref:()=>{}};},
-    hooks:()=>{},upgrade:()=>{},upgradeGuidance:'',peerRuntimeFields
+    hooks:()=>{},upgrade:()=>{},upgradeGuidance:'',peerRuntimeFields,peerAdoptionToolSchema
   };
   const engine=load('engine.mjs',deps,['dispatch']);
   const main=load('main.mjs',{...deps,engine},['toolList','call','boundedDevelopmentAcceptanceReply']);

@@ -29,6 +29,7 @@ import { prototypeAction, prototypeCapability, prototypeAssignment } from './pro
 import { TIMEOUT_POLICY_VERSION, normalizeTimeout, normalizeHandoverReviewWindow, normalizeCodeReviewWindow, jobTimeoutState } from './timeout.mjs';
 import {taskAction,runtimeAction} from './task-runtime.mjs';
 import {peerRuntimeAction} from './peer-runtime.mjs';
+import {peerAdoptionRuntimeAction} from './peer-adoption-runtime.mjs';
 import {taskRecord,taskReady,bindTaskAttempt} from './tasks.mjs';
 import {runtimeGrant,runtimeControlBinding} from './task-runtime-authority.mjs';
 import {readTaskState,updateTaskIndex} from './task-index.mjs';
@@ -105,6 +106,7 @@ export function prototype(args,host) { binding(args,host); return prototypeActio
 export function tasks(args,host){binding(args,host);return taskAction(args,host);}
 export function runtime(args,host){binding(args,host);return runtimeAction(args,host);}
 export function peers(args,host){binding(args,host);return peerRuntimeAction(args,host);}
+export function peerAdoption(args,host){binding(args,host);return peerAdoptionRuntimeAction(args,host);}
 export function specialists(args,host){
   binding(args,host);
   const options={host,reviewCurrent:(state,job,hash)=>{
