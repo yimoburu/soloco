@@ -1,0 +1,147 @@
+# Bounded original input frontier
+
+This is a prospective SOURCE component. It has no public tool, installed native
+selector or execution permission. Existing owner v1 and its 64KiB/no-attempt
+Hold are unchanged. Ed's lossless owner context pool/v2 is a separate codec.
+
+The producer captures every current P1 row and reachable immutable peer body,
+resolved legacy originals, all four exact pinned-team parts, and original
+sidecars. It preserves unknown fields. It never substitutes installed pins or
+uses a caller-selected omission flag. Canonical legacy classifications and
+their proof material remain input; no classification or archive provenance is
+silently promoted to new semantic authority. The fixed typed-origin archive
+producer materializes every original declared page/index body occurrence into
+real source text before any model charge. Unsupported/untyped declarations or
+missing bodies retain explicit global UNKNOWN markers and exact handles.
+Exact bounded archive reads remain available and do not qualify anything.
+
+`input-frontier-archive.mjs` binds the complete original `origin.quarantined`
+event and immutable origin revision 1, exact current manifest, all ordered page
+refs/indexes, descriptor count/hash and complete source-cut provenance. It
+preflights all descriptors and aggregate declared bytes before fetching any
+body. Equal hashes at distinct page/index occurrences remain distinct input.
+The fixed `tx.resolveLegacyText({sha256})` reader preserves raw whitespace,
+escaped keys, key order and UTF8; it checks the 16MiB body and 64MiB aggregate
+snapshot bounds before body allocation. Hash/UTF8 corruption and provider
+errors fail closed. Missing bytes are explicit null/UNKNOWN, never an empty
+body. It exposes no path, callback, arbitrary query or authority. Read-before-
+write, owning snapshot, reentrancy, sealed-write poison and provider-error
+identity remain enforced; the old parsed legacy reader is unchanged.
+
+Native source units contain actual complete archived bytes/ranges, rather than
+handles treated as delivery. Unsupported but retained UTF8 bodies use a lossless
+opaque UNKNOWN wrapper. Every archived body carries a bounded original recorded
+status/acceptance/QA/closure frontier and spent units. Historical accepted work
+stays recorded as accepted: `grants_new_acceptance:false` means materialization
+grants no new acceptance, not that it erases old acceptance. Complete retained
+bytes still do not imply complete original model output/history, semantic
+understanding, current applicability or authority. Genuine fresh extraction,
+independent review and the complete original DAG remain necessary.
+
+Capture reports full source bytes/occurrences, unavailable archive occurrences
+and required original calls/reviews. The unchanged finite whole-plan budget,
+bookkeeping, 64KiB context and escaped first-RPC preflights still precede charge.
+These are bounded source/retention checks, not measured company fit or IO/heap
+cost. Cold range reconstruction can reread the complete bounded frontier;
+actual large-company cost and semantic success remain unmeasured.
+
+Original sidecars become exact UTF8 or typed opaque/base64 UNKNOWN input. Their
+full captured bytes are copied into immutable P1 pages during preparation;
+cold reads use those pages after a filename changes. A changed current sidecar
+invalidates qualification. Original files and the verified origin backup stay
+preserved. Binary meaning is unknown, never safe absence.
+
+The hard bounds are 64MiB of materialized source text, 10,000 current/reachable
+peer rows, an 8MiB manifest, 8,000-byte core units with 128-character boundary
+overlap, two-child reconciliation, 12,000-byte native outputs and a COMPLETE
+per-admission context of min(65,536, original policy.max_context_bytes). These
+are accounting/retention bounds, not peak-memory, IO or hidden model-context
+attestations. If complete markers or distinct semantic effects cannot fit,
+the producer Holds; it does not truncate or raise a cap. Actual company fit,
+model-call cost and semantic success have not been measured.
+Before the first call, a conservative 950,000-byte complete bookkeeping bound
+also prevents a planned DAG from exhausting P1's one-million-byte row cap.
+
+Each extraction or integration has a separately charged producer and a fresh,
+independent review. Every original context is a closed
+`peer-input-frontier-assignment-v1`; there is no cumulative streaming/history
+assumption. Its `response_contract` supplies the complete actual closed output
+grammar, concrete subject/provenance, marker/support rules and verdict actions.
+It is grammar DATA, never a prefilled judgment or permission. The fixed original
+interpreter and whole first-RPC preflight must
+accept the exact context and fixed instruction BEFORE FIRST put or charge.
+An opaque plan is retained and passed intact to the future fixed adapter.
+64KiB JSON alone does not prove the original 100,000-byte escaped RPC fits.
+
+The original paused origin maintenance authority must explicitly select
+`frontier_protocol: peer-origin-input-frontier-v1`, finite frontier call/review
+subcaps and counters. Subcaps stay inside the unchanged original totals and
+deadline. Missing fields Hold. The COMPLETE prospective DAG must fit remaining
+original calls/reviews/global budget before its first call. Every admission
+rechecks actual owner, pins, complete current namespace, real capacity, authority
+and deadline. No historical grant, attempt or unit is converted or reset.
+
+Opaque admissions bind original ledger/root, immutable context/admission,
+original native birth, whole first RPC, full actual channel read coverage and
+first immutable output. Completion requires the original owned-task-drain token
+and exact actual terminal output. Matching process/output/Pass JSON is not a
+capability. Only branded output-validation failures become rejected outputs;
+provider/storage/unexpected failures roll back and do not consume the drain or
+release a reservation. There is no group/remote/whole-domain closure claim.
+
+Immutable original P1 capture/admit/create/complete/UNKNOWN/late events rebuild
+all bookkeeping: owned keys/current refs, source control overrides, attempts,
+results, native identities and negative refs. Unsupported revisions cannot
+hide new source rows, remove negatives or reset usage. Persistent operation
+indexes reject cold retries. A canonical logical-target fence spans captures;
+new frontier IDs, operation IDs and own accounting/reference churn do not make
+an unchanged original leaf/range/support subject new. An additional immutable
+whole normalized source fence, per extraction/integration and produce/review
+stage, belongs to the first frontier that admits it. It ignores raw pagination,
+unit ordinals and accounting digit widths. All original same-frontier units
+remain admissible; a new capture with any unchanged source overlap Holds even
+when it proposes a different range/support grouping. A truly different complete
+material body or nonoverlapping source can have a distinct target, while old
+UNKNOWN, spent calls and reservations remain retained. This conservative rule
+does not establish semantic independence of apparently changed material.
+No automatic recovery
+lane exists. Even a positive spent target is not rerun through a new capture
+in this initial implementation; cross-frontier reuse needs its own checked
+equivalence/recovery producer.
+
+Every mandatory marker retains exact original source/ref/status/units/negative
+verdict, acceptance:false, closure:UNKNOWN, complete retained-record ranges and
+known missing portions. Extraction must carry it in the exact source-selected
+finding kind. Integration must preserve every child item through exactly one
+kind-preserving supports edge and carry the exact marker union. Genuine
+independent review, not hashes or marker coverage, attests complete semantic
+effects, conditions, counterevidence and cross-child/global interfaces. Missing
+meaning stays explicit global uncertainty. A final qualified representation
+contains real semantic items plus the complete marker frontier and readable
+original/DAG handles. It never accepts business outputs, releases reservations,
+grants budget or qualifies affected ordinary action.
+
+`inspectCheckedCurrentMeaningFrom(tx, refs, {ledger})` verifies the complete
+original durable DAG, charges, current heads, original authority, expiry,
+independence, pins, markers and source custody. It returns DATA only. Source
+index/range/archive readers have 4096-character ranges and a complete encoded
+24KiB reply bound; page shrinking preserves exact next offsets and complete
+flags. Reading never counts as native delivery or semantic qualification.
+
+`owner-qualified-subject.mjs` prepares bounded pre-revocation subject DATA from
+that checked representation and actual canonical authority. Its prospective
+subject is `peer-owner-qualified-subject-v1`; its prospective assignment is
+`peer-owner-maintenance-assignment-v3`. It does not join owner begin/recovery,
+revoke/activate/resume, successor instruction loading or native routing. The
+future owning lifecycle must validate actual source-owned transition overrides,
+complete reconstruction/history, actual incoming identity and separate owner
+QA, plus the same original precharge wire gate. No caller can supply an exclude
+list, claimed complete history or a receipt to bypass those future gates.
+
+The SOURCE tests use real disposable SQLite/P1 and actual legacy trigger checks,
+plus the actual compiled C reader, held FD3 and frame checks through an explicitly
+SYNTHETIC source deployment selection. Native birth/drain/interpreter seams
+remain SYNTHETIC. Default missing production reader and native forms Hold before
+source writes/admission respectively. These tests are not
+company-native QA, actual provider/model execution, owner activation, migration,
+installation, R6 retry, permission, notice resolution or source acceptance.

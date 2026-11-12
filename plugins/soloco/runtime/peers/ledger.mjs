@@ -96,6 +96,8 @@ export function canonical(value){
   return JSON.stringify(visit(value));
 }
 export const peerDigest=value=>hash(canonical(value));
+// Exact immutable text custody, not a native-context or semantic fit claim.
+export const PEER_LEGACY_TEXT_LIMITS=Object.freeze({body_bytes:16*1024*1024,total_bytes:64*1024*1024});
 const exact=(v,label,max=300)=>{
   if(typeof v!=='string'||!v.trim()||v.length>max||v.includes('\0')||/[\ud800-\udfff]/u.test(v))throw Error(`Invalid peer ${label}`);
   return v;
@@ -505,7 +507,8 @@ export class PeerLedger{
       const changes=[],events=[],pending=new Map(),initial=new Map();
       // Fence history before preparing the first modifying statement. A failed
       // mutation poisons this transaction even if the callback catches it.
-      let rowMutationStarted=false,mutationFailed=false,finalizing=false,putInProgress=false,taskHistoryCall=null,writesSealed=false,sealFailure=null;
+      let rowMutationStarted=false,mutationFailed=false,finalizing=false,putInProgress=false,taskHistoryCall=null,writesSealed=false,sealFailure=null,legacyTextCall=null,legacyTextBytes=0;
+      const legacyTextCache=new Map();
       const snapshot=randomUUID();
       const boundary=()=>{
         if(!active||!this.inTransaction||!fence.owns(token))throw Error('Peer transaction handle expired');
@@ -665,6 +668,31 @@ export class PeerLedger{
         },
         count:(f,o={})=>{guard();return this.#count(f,filters(o));},
         events:o=>{guard();return this.#events(o);},
+        // Original held-snapshot RAW bytes. Unlike resolveLegacy, this does not
+        // JSON-parse/re-encode whitespace, key escapes or original key order.
+        // Absence is DATA null; corruption/provider errors are never missing.
+        resolveLegacyText:ref=>{
+          // Like writeGuard, latch a caught sealed attempt while this ORIGINAL
+          // transaction still owns its fence, even after its public handle
+          // expires during event/outbox/meta/terminal staging. Never poison a
+          // later transaction reached through an escaped old handle.
+          const legacyGuard=()=>{if(writesSealed&&this.inTransaction&&fence.owns(token)&&db.isTransaction===true)poisonSeal();guard();if(external||rowMutationStarted)throw Error('Peer exact legacy text requires an owning snapshot before pending writes');if(legacyTextCall?.failure)throw legacyTextCall.failure;};
+          legacyGuard();if(legacyTextCall){legacyTextCall.failure??=Error('Reentrant exact legacy text lookup is forbidden');throw legacyTextCall.failure;}
+          const call={failure:null};legacyTextCall=call;
+          const checked=fn=>{legacyGuard();let value;try{value=fn();}catch(error){try{legacyGuard();}catch(boundaryError){throw new AggregateError([error,boundaryError],'Exact legacy text failed after its transaction boundary changed');}throw error;}legacyGuard();return value;};
+          const read=(sql,...args)=>{const statement=checked(()=>this.query(sql));return checked(()=>statement.get(...args));};
+          try{
+            const r=checked(()=>JSON.parse(canonical(ref)));if(!r||Array.isArray(r)||Object.keys(r).join(',')!=='sha256'||!/^[a-f0-9]{64}$/.test(r.sha256??''))throw Error('Exact legacy text reference requires sha256 only');
+            if(legacyTextCache.has(r.sha256))return legacyTextCache.get(r.sha256);
+            const size=read('SELECT typeof(bytes) AS storage_type,length(CAST(bytes AS BLOB)) AS utf8_bytes FROM immutable_values WHERE sha256=?',r.sha256);if(!size)return null;
+            if(size.storage_type!=='text'||!Number.isSafeInteger(size.utf8_bytes)||size.utf8_bytes<0||size.utf8_bytes>PEER_LEGACY_TEXT_LIMITS.body_bytes||legacyTextBytes+size.utf8_bytes>PEER_LEGACY_TEXT_LIMITS.total_bytes)throw Error('Exact legacy text exceeds its original bounded UTF8 custody limits');
+            // Reserve aggregate bytes before the only body-fetch/allocation.
+            legacyTextBytes+=size.utf8_bytes;
+            const row=read('SELECT bytes,CAST(bytes AS BLOB) AS raw FROM immutable_values WHERE sha256=?',r.sha256);
+            if(typeof row?.bytes!=='string'||!(row.raw instanceof Uint8Array)||row.raw.byteLength!==size.utf8_bytes||Buffer.byteLength(row.bytes)!==size.utf8_bytes||!Buffer.from(row.bytes).equals(Buffer.from(row.raw))||hash(row.raw)!==r.sha256||hash(row.bytes)!==r.sha256)throw Error('Exact legacy immutable text is corrupt or not lossless UTF8');
+            legacyGuard();legacyTextCache.set(r.sha256,row.bytes);return row.bytes;
+          }finally{if(legacyTextCall===call)legacyTextCall=null;}
+        },
         resolveLegacy:ref=>{
           guard();if(!ref||!/^[a-f0-9]{64}$/.test(ref.sha256??''))throw Error('Exact legacy immutable reference required');
           const bytes=this.query('SELECT bytes FROM immutable_values WHERE sha256=?').get(ref.sha256)?.bytes;
