@@ -5,7 +5,7 @@ import {randomUUID} from 'node:crypto';
 import {PeerLedger,FAMILIES,canonical,peerDigest} from './ledger.mjs';
 import * as deployment from './context-component-deployment.mjs';
 import * as domain from './protected-codex-domain.mjs';
-import {inspectPeerPinnedTeamFrom} from './legacy-origin.mjs';
+import {inspectPeerPinnedTeamFrom,assertPeerOriginSelectedMaintenanceFrom} from './legacy-origin.mjs';
 import {assertPeerOriginLegacyFences,ORIGIN_QUARANTINE_PROTOCOL} from './origin-quarantine.mjs';
 import {assertOriginActor,originSafeData,originSidecars,ORIGIN_LIMITS,originHash,originNeed as need,originSame as same,originCopy as copy,originRef as ref} from './origin-plan.mjs';
 import {ORIGIN_MAINTENANCE_INSTRUCTION} from './origin-maintenance-instruction.mjs';
@@ -27,8 +27,9 @@ function current(s,tx){
  bound(s);const c=tx.get('control','company'),o=tx.get('control','origin'),p=c&&tx.get('principals',c.value.founder_principal_id);
  need(c?.value.protocol==='peer-cos-v1'&&c.value.paused===true&&o?.value.protocol===ORIGIN_QUARANTINE_PROTOCOL&&same(c.value.origin,ref('control',o))&&o.value.company_id===s.connection.company_id,'ORIGIN_QUARANTINE_REQUIRED');
  need(p?.value.kind==='founder'&&p.value.status==='active'&&p.value.host===s.actor.host&&p.value.native_id===s.actor.native_id&&p.value.legacy_owner?.session_id===s.actor.session_id&&same(p.value.legacy_owner,o.value.owner),'ORIGIN_OWNER_CHANGED');
+ const selection=assertPeerOriginSelectedMaintenanceFrom(tx,{company_id:s.connection.company_id});
  const pins=inspectPeerPinnedTeamFrom(tx,{company_id:s.connection.company_id});need(same(pins.reference,o.value.pinned_team),'ORIGIN_PINNED_TEAM_CHANGED');
- need(same(originSidecars(s.connection.directory),o.value.sidecar_frontier),'ORIGIN_LATE_SIDECAR_UNRECORDED');return {c,o,p,pins};
+ need(same(originSidecars(s.connection.directory),o.value.sidecar_frontier),'ORIGIN_LATE_SIDECAR_UNRECORDED');return {c,o,p,pins,selection};
 }
 function terminal(s,deadline){assertPeerOriginLegacyFences(s.ledger.db);return deadline;}
 // Plan all reads and writes before P1 mutation, seal the public write handle,
@@ -99,6 +100,7 @@ function produced(tx,r,type){const current=tx.get(r.family,r.id);need(current&&s
 function resultFrom(tx,r,kind){
  const row=exact(tx,r,'origin_maintenance_result'),current=tx.get('work_items',row.id);need(current&&same(ref('work_items',current),r)&&row.revision===1&&row.value.status==='returned'&&row.value.kind_name===kind&&row.value.protocol==='peer-origin-original-result-v1'&&row.value.source_observer==='fixed-original-origin-maintenance','ORIGIN_ORIGINAL_RESULT_REQUIRED');
  const a=exact(tx,row.value.admission_ref,'origin_maintenance_admission'),birth=exact(tx,row.value.creation_ref,'origin_maintenance_creation'),context=exact(tx,a.value.binding.context_ref,'origin_maintenance_context');
+ const selection=assertPeerOriginSelectedMaintenanceFrom(tx);need(Number.isSafeInteger(a.value.binding.pause_generation)&&a.value.binding.pause_generation===selection.pause_generation,'ORIGIN_MAINTENANCE_SELECTED_PAUSE_REQUIRED');
  checkedWireReceipt(a.value.first_rpc,context.value.text,context.value.body.authority.peer_policy);
  need(row.value.context_sha256===a.value.binding.context_sha256&&context.value.sha256===row.value.context_sha256&&peerDigest(context.value.body)===context.value.sha256&&context.value.text===canonical(context.value.body)&&birth.value.protocol==='peer-origin-original-creation-record-v1'&&same(birth.value.admission_ref,row.value.admission_ref)&&birth.value.context_sha256===row.value.context_sha256&&birth.value.facts.native_id===row.value.native_id&&row.value.native_id===row.value.drain.native_id&&row.value.drain.kind===kind&&row.value.drain.context_sha256===row.value.context_sha256&&same(row.value.drain.admission_ref,row.value.admission_ref)&&row.value.drain.terminal_status==='completed'&&originHash(row.value.text)===row.value.output_sha256&&same(JSON.parse(row.value.text),row.value.output),'ORIGIN_ORIGINAL_RESULT_REQUIRED');
  const admissionEvent=produced(tx,row.value.admission_ref,'origin.maintenance.admitted');produced(tx,row.value.creation_ref,'origin.maintenance.native_created');
@@ -108,8 +110,8 @@ function resultFrom(tx,r,kind){
  produced(tx,r,'origin.maintenance.completed');return {row,admission:a,birth,context};
 }
 function admitted(r,tx,{native=false}={}){
- const {c,o,p,pins}=current(r.s,tx),a=exact(tx,r.admission_ref,'origin_maintenance_admission'),phase=tx.get('work_items',r.phase_id),context=exact(tx,r.binding.context_ref,'origin_maintenance_context'),slot=tx.get('slots',r.execution_id),effect=tx.get('effects',r.execution_id);
- need(same(a.value.binding,r.binding)&&same(o.value.current_cut_sha256,r.binding.source_cut_sha256)&&phase?.value.kind==='origin_maintenance_phase'&&['reserved','running'].includes(phase.value.status)&&same(phase.value.admission_ref,r.admission_ref)&&context.value.sha256===r.binding.context_sha256&&context.value.text===canonical(context.value.body)&&peerDigest(context.value.body)===context.value.sha256&&same(pins,r.pins)&&same(support(),r.support),'ORIGIN_MAINTENANCE_CHANGED');
+ const {c,o,p,pins,selection}=current(r.s,tx),a=exact(tx,r.admission_ref,'origin_maintenance_admission'),phase=tx.get('work_items',r.phase_id),context=exact(tx,r.binding.context_ref,'origin_maintenance_context'),slot=tx.get('slots',r.execution_id),effect=tx.get('effects',r.execution_id);
+ need(Number.isSafeInteger(r.binding.pause_generation)&&r.binding.pause_generation===selection.pause_generation&&same(a.value.binding,r.binding)&&same(o.value.current_cut_sha256,r.binding.source_cut_sha256)&&phase?.value.kind==='origin_maintenance_phase'&&['reserved','running'].includes(phase.value.status)&&same(phase.value.admission_ref,r.admission_ref)&&context.value.sha256===r.binding.context_sha256&&context.value.text===canonical(context.value.body)&&peerDigest(context.value.body)===context.value.sha256&&same(pins,r.pins)&&same(support(),r.support),'ORIGIN_MAINTENANCE_CHANGED');
  need(slot?.value.kind==='origin_maintenance_execution'&&slot.value.status==='active'&&same(slot.value.admission_ref,r.admission_ref)&&effect?.value.kind==='origin_maintenance_execution'&&['reserved','sent'].includes(effect.value.status)&&same(effect.value.admission_ref,r.admission_ref)&&effect.value.termination_confirmed===false,'ORIGIN_RESERVATION_CHANGED');
  need(o.value.maintenance.status==='active'&&maintenanceAuthority(o.value.maintenance)===r.binding.maintenance_authority_sha256&&peerDigest(c.value.policy)===r.binding.policy_sha256&&same(o.value.late_obligation_refs,context.value.body.late_obligation_refs),'ORIGIN_MAINTENANCE_AUTHORITY_CHANGED');
  need(peerDigest(originReviewRows(tx,o.value.id).map(row=>({ref:ref('work_items',row),body:row.value})))===r.binding.prior_reviews_sha256,'ORIGIN_REVIEW_FRONTIER_CHANGED');
@@ -125,8 +127,9 @@ export function prepareOriginalPeerOriginMaintenance(api,input){
  const s=service(api),a=data(input,['operation_id','kind','segments'],['reconstruction_ref']);need(text(a.operation_id,160)&&Array.isArray(a.segments)&&a.segments.length>0&&a.segments.length<=64&&kinds.includes(a.kind)&&(a.kind==='peer-origin-review')===Boolean(a.reconstruction_ref),'ORIGIN_INPUT');
  const hash=peerDigest(a),prior=s.operations.get(a.operation_id);if(prior){need(prior.hash===hash,'ORIGIN_REPLAY_MISMATCH');const old=original(prior.cap);s.ledger.read(tx=>admitted(old,tx,{native:Boolean(old.native)}));return prior.cap;}
  const sourceSupport=support(),cap=Object.freeze({});need(typeof deployment.preflightOriginalOriginMaintenanceContext==='function'&&typeof deployment.inspectOriginalOriginMaintenancePreflight==='function','ORIGIN_WIRE_SOURCE_UNAVAILABLE');let record,deadline;
+ s.ledger.read(tx=>current(s,tx));
  write(s,'origin.maintenance.admitted','founder',tx=>{
-  const {c,o,pins}=current(s,tx),operation_id='origin-maintenance-operation:'+peerDigest([s.connection.company_id,s.actor,a.operation_id]),previous=tx.get('commands',operation_id);if(previous){need(previous.value.request_sha256===hash,'ORIGIN_REPLAY_MISMATCH');need(false,'ORIGIN_ORIGINAL_PROCESS_CONTINUATION_REQUIRED');}
+  const {c,o,pins,selection}=current(s,tx),operation_id='origin-maintenance-operation:'+peerDigest([s.connection.company_id,s.actor,a.operation_id]),previous=tx.get('commands',operation_id);if(previous){need(previous.value.request_sha256===hash,'ORIGIN_REPLAY_MISMATCH');need(false,'ORIGIN_ORIGINAL_PROCESS_CONTINUATION_REQUIRED');}
   const {m,global,used}=capacity(tx,c,o);deadline=Math.min(Date.parse(m.expires_at),Date.parse(o.value.backup?.expires_at??m.expires_at));
   if(a.kind==='peer-origin-review')need(m.used_review_calls<m.max_review_calls,'ORIGIN_MAINTENANCE_BUDGET');
   let reconstruction=null;if(a.reconstruction_ref){const proof=resultFrom(tx,a.reconstruction_ref,'peer-origin-reconstruction');need(proof.row.value.origin_id===o.value.id,'ORIGIN_RECONSTRUCTION_REQUIRED');reconstruction={ref:a.reconstruction_ref,result:proof.row.value.output,native_id:proof.row.value.native_id};}
@@ -137,7 +140,7 @@ export function prepareOriginalPeerOriginMaintenance(api,input){
   need(contextBytes(body)<=Math.min(ORIGIN_LIMITS.context_bytes,c.value.policy.max_context_bytes),'ORIGIN_CONTEXT_CAPACITY');
   const wire=preflight(body);
   const context=tx.put('work_items',id+':context',{kind:'origin_maintenance_context',body,text:canonical(body),sha256:peerDigest(body)},0);
-  const binding={protocol:'peer-origin-maintenance-admission-v1',kind:a.kind,origin_id:o.value.id,company_id:s.connection.company_id,source_cut_sha256:o.value.current_cut_sha256,context_ref:ref('work_items',context),context_sha256:context.value.sha256,subject,subject_sha256:body.subject_sha256,deadline_at_ms:deadline,participant_id:id+':participant',reconstruction_ref:a.reconstruction_ref??null,maintenance_authority_sha256:maintenanceAuthority(m),policy_sha256:peerDigest(c.value.policy),prior_reviews_sha256:peerDigest(prior_reviews),obligation_frontier_sha256:peerDigest(current_obligations)};
+  const binding={protocol:'peer-origin-maintenance-admission-v1',pause_generation:selection.pause_generation,kind:a.kind,origin_id:o.value.id,company_id:s.connection.company_id,source_cut_sha256:o.value.current_cut_sha256,context_ref:ref('work_items',context),context_sha256:context.value.sha256,subject,subject_sha256:body.subject_sha256,deadline_at_ms:deadline,participant_id:id+':participant',reconstruction_ref:a.reconstruction_ref??null,maintenance_authority_sha256:maintenanceAuthority(m),policy_sha256:peerDigest(c.value.policy),prior_reviews_sha256:peerDigest(prior_reviews),obligation_frontier_sha256:peerDigest(current_obligations)};
   // The admission contains no circular self reference. Its immutable reference
   // is retained privately and returned separately to the original native binder.
   const admission=tx.put('work_items',id+':admission',{kind:'origin_maintenance_admission',binding,source_support:sourceSupport,first_rpc:wire.receipt,operation_id:a.operation_id,operation_sha256:hash},0),admission_ref=ref('work_items',admission);
@@ -227,6 +230,7 @@ export function sealPeerOrigin(api,input){
 // Pure-source consumer for a future coordinated model join. This function grants
 // no task authority; caller must separately validate NEW grants and capacity.
 export function assertPeerOriginScopeFrom(tx,{scope,action}){
+ assertPeerOriginSelectedMaintenanceFrom(tx);
  const c=tx.get('control','company'),o=tx.get('control','origin');need(o?.value.protocol===ORIGIN_QUARANTINE_PROTOCOL&&o.value.status==='sealed'&&same(c.value.origin,ref('control',o))&&o.value.seal_ref,'ORIGIN_SEAL_REQUIRED');const seal=exact(tx,o.value.seal_ref,'origin_obligation_seal');need(seal.value.source_cut_sha256===o.value.current_cut_sha256&&seal.value.original_sources_sha256===o.value.manifest.original_sources.sha256&&same(seal.value.legacy_reservations_preserved,o.value.legacy_unknown_reservations)&&seal.value.mapping_sha256===peerDigest(seal.value.mappings),'ORIGIN_SEAL_CHANGED');
  const checked=[];for(const r of seal.value.qualification_refs){const q=resultFrom(tx,r,'peer-origin-review');need(q.row.value.output.verdict==='Pass'&&q.row.value.output.blockers.length===0,'ORIGIN_INDEPENDENT_PASS_REQUIRED');const reconstruction=resultFrom(tx,q.row.value.output.reconstruction_ref,'peer-origin-reconstruction');need(reconstruction.row.value.native_id!==q.row.value.native_id,'ORIGIN_REVIEW_INDEPENDENCE');for(const m of reconstruction.row.value.output.mappings)checked.push({...m,qualification_ref:r,reconstruction_ref:q.row.value.output.reconstruction_ref});}need(same(checked,seal.value.mappings),'ORIGIN_SEAL_CHANGED');
  const superseded=new Set(seal.value.qualification_refs.flatMap(r=>resultFrom(tx,r,'peer-origin-review').row.value.output.superseded_review_refs??[]).map(canonical));for(const old of overlappingNegatives(tx,o.value.id,checked))need(superseded.has(canonical(ref('work_items',old))),'ORIGIN_ORIGINAL_NEGATIVE_REMAINS');

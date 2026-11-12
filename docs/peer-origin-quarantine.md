@@ -240,3 +240,23 @@ at the terminal commit fence. A same-session takeover invalidates the old epoch.
 Missing exports or stale epochs Hold; public routing cannot fall back to the
 legacy internal epochless helper. These checks do not grant mechanical QA or
 maintenance execution.
+
+## Original selected pause generation
+
+New quarantine authority explicitly stores `maintenance.pause_generation` in the
+same original `origin.quarantined` event as its actual paused company generation.
+The fixed `assertPeerOriginSelectedMaintenanceFrom` reader authenticates that
+original origin and companion company version, validates the unchanged selected
+authority apart from five named spend counters, and compares the actual current
+company generation. It never snapshots a later generation to renew an old grant.
+Missing old bindings, unsupported field/counter additions and current rebinding
+are Holds. Original records and spent counters remain retained.
+
+An original range admission also binds its selected pause generation. Reserved
+assertion, preflight/context/channel access, native bind, positive completion,
+new admission and scoped readiness recheck the actual selection. A later genuine
+`company/pause` is a barrier even when the company was already paused. Negative
+UNKNOWN recording and original late custody retain their original nonauthorizing
+paths after that barrier; they neither renew authority nor release old slots.
+Provider exceptions propagate unchanged. Missing or malformed source selection
+evidence is rejected before dereferencing unsupported payload/version shapes.
