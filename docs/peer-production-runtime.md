@@ -5,13 +5,16 @@ peer provider, the membership lifecycle and the peer scheduler. It accepts only
 bounded JSON data. A request cannot choose an implementation, issuer, bound
 principal connection, native proof, readiness result or launch callback.
 
-The public operator is the existing adopted canonical founder. Every call
-requires the managed startup-hook binding and the exact founder's adopted
-`legacy_owner` host, session and epoch. The founder principal comes from
-`control/company`, never from a selected recipient. This retains the existing
-logical MCP owner boundary; hook metadata is not a new native identity proof.
-Native peer callbacks instead use the original TaskHost connection and its
-source-correlated executor incarnation.
+The public operator is the existing adopted canonical founder. Every MCP call
+requires actual Codex root tool-call metadata matching the session selector and
+a current managed hook record, then the exact founder's adopted `legacy_owner`
+host, session and epoch. A binding file or caller-selected session alone cannot
+supply identity. The founder principal comes from `control/company`, never from a
+selected recipient. See the [caller context contract](mcp-caller-identity.md) for
+the fixed host/stdio trust assumption and unsupported-host behavior; source
+metadata checks are not installed-host or native qualification. Native peer
+callbacks use the original TaskHost connection and its source-correlated executor
+incarnation.
 
 The runtime retains the exact canonical founder reference that started it.
 Its private scheduler binding checks that reference inside production admission

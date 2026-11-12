@@ -30,6 +30,7 @@ import { TIMEOUT_POLICY_VERSION, normalizeTimeout, normalizeHandoverReviewWindow
 import {taskAction,runtimeAction} from './task-runtime.mjs';
 import {peerRuntimeAction} from './peer-runtime.mjs';
 import {peerAdoptionRuntimeAction} from './peer-adoption-runtime.mjs';
+import {requireCodexRootActor} from './mcp-host-context.mjs';
 import {taskRecord,taskReady,bindTaskAttempt} from './tasks.mjs';
 import {runtimeGrant,runtimeControlBinding} from './task-runtime-authority.mjs';
 import {readTaskState,updateTaskIndex} from './task-index.mjs';
@@ -105,7 +106,50 @@ export function develop(args,host) { binding(args,host); return ['prepare_retent
 export function prototype(args,host) { binding(args,host); return prototypeAction(args,host); }
 export function tasks(args,host){binding(args,host);return taskAction(args,host);}
 export function runtime(args,host){binding(args,host);return runtimeAction(args,host);}
-export function peers(args,host){binding(args,host);return peerRuntimeAction(args,host);}
+// New peer authority never falls back to a caller-selected session or a legacy
+// binding file. The fixed MCP ingress supplies identity; the current binding is
+// an additional lifecycle/source consistency check, not a native proof.
+export function peerCallerActor(args,host){
+  const actor=requireCodexRootActor({host,session_id:args.session_id});
+  const fail=()=>{throw Object.assign(Error('PEER_CURRENT_HOOK_REQUIRED: New peer access requires a current matching managed startup-hook record; a legacy binding is not caller identity.'),{code:'PEER_CURRENT_HOOK_REQUIRED'});};
+  const sameNode=(a,b)=>a.dev===b.dev&&a.ino===b.ino&&a.mode===b.mode;
+  const stableFile=(a,b)=>sameNode(a,b)&&a.size===b.size&&a.nlink===b.nlink&&a.mtimeNs===b.mtimeNs&&a.ctimeNs===b.ctimeNs;
+  if(typeof args.root!=='string'||!path.isAbsolute(args.root))fail();
+  const root=folder(args.root),directory=dataDir(),name=digest(JSON.stringify([root,host,actor.session_id]))+'.json';
+  if(!path.isAbsolute(directory))fail();
+  const {O_RDONLY,O_NOFOLLOW,O_DIRECTORY,O_NONBLOCK}=fs.constants;
+  if(!Number.isInteger(O_NOFOLLOW)||!Number.isInteger(O_DIRECTORY)||!Number.isInteger(O_NONBLOCK))fail();
+  const descriptors=[];let current;
+  try{
+    const namedData=fs.lstatSync(directory,{bigint:true});
+    if(!namedData.isDirectory()||namedData.isSymbolicLink())fail();
+    const realData=fs.realpathSync(directory),bindings=path.join(realData,'bindings'),file=path.join(bindings,name);
+    const dataFd=fs.openSync(realData,O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_NONBLOCK);descriptors.push(dataFd);
+    const dataBefore=fs.fstatSync(dataFd,{bigint:true});
+    if(!dataBefore.isDirectory()||!sameNode(namedData,dataBefore))fail();
+    const namedDirectory=fs.lstatSync(bindings,{bigint:true});
+    if(!namedDirectory.isDirectory()||namedDirectory.isSymbolicLink())fail();
+    const directoryFd=fs.openSync(bindings,O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_NONBLOCK);descriptors.push(directoryFd);
+    const directoryBefore=fs.fstatSync(directoryFd,{bigint:true});
+    if(!directoryBefore.isDirectory()||!sameNode(namedDirectory,directoryBefore))fail();
+    const fd=fs.openSync(file,O_RDONLY|O_NOFOLLOW|O_NONBLOCK);descriptors.push(fd);
+    const before=fs.fstatSync(fd,{bigint:true});
+    if(!before.isFile()||before.nlink!==1n||before.size<0n||before.size>65536n)fail();
+    const bytes=Buffer.alloc(Number(before.size)+1);let read=0;
+    while(read<bytes.length){const count=fs.readSync(fd,bytes,read,bytes.length-read,read);if(!count)break;read+=count;}
+    const after=fs.fstatSync(fd,{bigint:true}),namedFile=fs.lstatSync(file,{bigint:true});
+    const directoryAfter=fs.fstatSync(directoryFd,{bigint:true}),dataAfter=fs.fstatSync(dataFd,{bigint:true});
+    const dataNameAfter=fs.lstatSync(directory,{bigint:true}),directoryNameAfter=fs.lstatSync(bindings,{bigint:true});
+    if(read!==Number(before.size)||!stableFile(before,after)||!stableFile(after,namedFile)||namedFile.isSymbolicLink()||!sameNode(directoryBefore,directoryAfter)||!sameNode(directoryAfter,directoryNameAfter)||directoryNameAfter.isSymbolicLink()||!sameNode(dataBefore,dataAfter)||!sameNode(dataAfter,dataNameAfter)||dataNameAfter.isSymbolicLink())fail();
+    const raw=bytes.subarray(0,read),text=raw.toString('utf8');
+    if(!Buffer.from(text,'utf8').equals(raw))fail();
+    current=JSON.parse(text);
+  }catch{fail();}
+  finally{for(const fd of descriptors.reverse())try{fs.closeSync(fd);}catch{}}
+  if(!current||Array.isArray(current)||current.root!==root||current.host!==actor.host||current.session_id!==actor.session_id||current.plugin_version!==VERSION||current.plugin_root!==PACKAGE||current.data_directory!==directory||typeof current.at!=='string'||!Number.isFinite(Date.parse(current.at)))fail();
+  return actor;
+}
+export function peers(args,host){peerCallerActor(args,host);return peerRuntimeAction(args,host);}
 export function peerAdoption(args,host){binding(args,host);return peerAdoptionRuntimeAction(args,host);}
 export function specialists(args,host){
   binding(args,host);
