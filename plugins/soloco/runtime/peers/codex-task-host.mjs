@@ -1,8 +1,9 @@
 import {prepareOriginalPeerContextDelivery,originalPeerContextCreationCommitment,originalPeerTaskInstruction} from './peer-context-interpreter.mjs';
 import {inspectOriginalPeerContextSlot} from './protected-source-build-slot.mjs';
 import {restrictFoundationCallbacks} from './foundation-callback-boundary.mjs';
-// Unrouted trusted composition. No actual profile/operator/tools issuer exists
-// here. Controlled transports and private function reachability are not auth.
+import {createPeerExecutorIncarnationSource} from './executor-incarnation.mjs';
+// Trusted TaskHost leaf. The fixed production provider supplies an original
+// protected launch; controlled transports alone never establish qualification.
 import path from 'node:path';
 import {spawn} from 'node:child_process';
 import {TextDecoder} from 'node:util';
@@ -11,7 +12,7 @@ import * as model from './model.mjs';
 import {PeerScheduler,createNativeExecutor} from './scheduler.mjs';
 import {createPeerHostProtocol,stableTaskHostTools} from './host-protocol.mjs';
 import {CODEX_BINARY,createCodexMembershipHost,decodeHostFrame} from './codex-host.mjs';
-import {originalProtectedPeerContextInterpreter,assertOriginalProtectedPeerContextStatic,bindOriginalProtectedPeerContext,bindOriginalProtectedTaskAdmission,bindOriginalProtectedMembershipAdmission,isOriginalProtectedCompanionLaunch,isOriginalProtectedCodexLaunch,bindOriginalProtectedCodexLaunch,spawnOriginalProtectedCodex,inspectOriginalProtectedCodexLaunch,assertOriginalProtectedCodexBoundary} from './protected-codex-domain.mjs';
+import {originalProtectedPeerContextInterpreter,assertOriginalProtectedPeerContextStatic,bindOriginalProtectedPeerContext,bindOriginalProtectedTaskAdmission,bindOriginalProtectedMembershipAdmission,isOriginalProtectedCompanionLaunch,isOriginalProtectedCodexLaunch,bindOriginalProtectedCodexLaunch,spawnOriginalProtectedCodex,inspectOriginalProtectedCodexLaunch,assertOriginalProtectedCodexBoundary,observeOriginalProtectedPeerExecutorIncarnation,requestOriginalProtectedCodexStop} from './protected-codex-domain.mjs';
 
 export const STABLE_TOOL_SHA256=peerDigest(stableTaskHostTools());
 const names=['profile','instructions','external','actor','closure','tools'];
@@ -39,11 +40,13 @@ export function createCodexTaskRuntime({owner,ledger,membership,launch,qualifica
   if(typeof owner!=='symbol'||!ledger?.read||!ledger?.write||!membership?.host?.activeClient||typeof spawn_child!=='function')fail('HOST_DEPENDENCY');
   if(protected_launch!==undefined&&(!isOriginalProtectedCodexLaunch(owner,protected_launch)||spawn_child!==spawn))fail('HOST_ORIGINAL_PROTECTED_LAUNCH_REQUIRED');
   if(software_prepare!==null&&typeof software_prepare!=='function')fail('HOST_DEPENDENCY');
-  if(callback_restriction!==undefined&&callback_restriction!=='local-foundation-qualification')fail('HOST_ARGUMENT');
+  if(callback_restriction!==undefined&&!['local-foundation-qualification','task-bound-effects'].includes(callback_restriction))fail('HOST_ARGUMENT');
   if(callback_restriction&&software_prepare!==null)fail('HOST_FOUNDATION_ACTION_HELD');
+  if(callback_restriction==='task-bound-effects'&&(!protected_launch||!isOriginalProtectedCompanionLaunch(owner,protected_launch)||typeof model.bindPeerTaskEffects!=='function'))fail('HOST_TASK_EFFECTS_PRODUCER_HELD');
   const config=copy(launch),launchSHA=peerDigest(config),guards=qualification&&{...qualification};
   const interpreter=protected_launch===undefined?null:originalProtectedPeerContextInterpreter(owner,protected_launch),creationProtocol=interpreter?'p8e-stable-five-v3-context-contract-v1':'p8e-stable-five-v2',creationCommitment=interpreter?originalPeerContextCreationCommitment(interpreter):null;
-  if(interpreter&&inspectOriginalPeerContextSlot(interpreter).scope_policy==='V5_ORIGINAL_MANAGED_PRIVATE_FD'&&callback_restriction!=='local-foundation-qualification')fail('HOST_FOUNDATION_ACTION_HELD');
+  if(interpreter&&inspectOriginalPeerContextSlot(interpreter).scope_policy==='V5_ORIGINAL_MANAGED_PRIVATE_FD'&&!['local-foundation-qualification','task-bound-effects'].includes(callback_restriction))fail('HOST_FOUNDATION_ACTION_HELD');
+  const effectSource=callback_restriction==='task-bound-effects'?createPeerExecutorIncarnationSource(ledger):null;
   if(protected_launch!==undefined)bindOriginalProtectedCodexLaunch(owner,protected_launch,config);
   if(!config||typeof config.cwd!=='string'||!config.cwd.startsWith('/')||typeof config.profile_id!=='string'||!Array.isArray(config.instruction_sources))fail('HOST_ARGUMENT');
   const bound={total_ms:60000,grace_ms:250,term_ms:500,kill_ms:1000,frame_bytes:100000,wire_bytes:2000000,transcript_bytes:2000000,...limits};
@@ -92,6 +95,7 @@ export function createCodexTaskRuntime({owner,ledger,membership,launch,qualifica
       const changes=event.payload.changes.filter(c=>c.family==='commands');if(changes.length!==1)fail('HOST_ADMISSION_PRODUCER');
       const change=changes[0],command=tx.getVersion({family:'commands',id:change.id,revision:change.revision,sha256:change.sha256}),v=command?.value;
       if(v?.action!=='task/admit'||v.principal_id!==scheduler_principal_id||v.result?.admitted!==true||v.result.task.id!==task.id||v.result.task.value.attempt.id!==a.id||!same(v.result.context,context))fail('HOST_ADMISSION_PRODUCER');
+      if(callback_restriction==='task-bound-effects'&&(!a.effect_authority?.production_authority||!same(a.effect_authority,v.result.task.value.attempt.effect_authority)))fail('HOST_PRODUCTION_ADMISSION_REQUIRED');
       const binding=active(tx,current);
       // Pure terminal cutoff after ALL provider/history/current-principal reads.
       // No provider callback runs between this check and the returned snapshot.
@@ -116,7 +120,7 @@ export function createCodexTaskRuntime({owner,ledger,membership,launch,qualifica
         report=await activeTurn({owner,launch:config,admitted,context:args.context,signal:args.signal,spawn:options.spawn,protectedLaunch:protected_launch,now,limits:bound,
           checks:(stage,extra,which)=>checks(stage,{task_id:args.task.id,binding:admitted.binding,...extra},which),
           current:()=>{const fresh=admission(args.task,args.context);if(!same(fresh.binding,admitted.binding))fail('HOST_ACTIVE_BINDING_HELD');},
-          software_prepare,contextDelivery,callbackRestriction:callback_restriction,bind:()=>membership.host.activeClient({enrollment_id:admitted.binding.enrollment_id}),
+          software_prepare,contextDelivery,callbackRestriction:callback_restriction,effectSource,bind:()=>membership.host.activeClient({enrollment_id:admitted.binding.enrollment_id}),
           onSpawn:process=>options.onSpawn({...process}),onQualifiedClose:()=>{qualifiedClose=true;if(rawClose)args.onClosure?.(rawClose);}});
         if(report.error)throw Object.assign(Error(report.error.message),{code:report.error.code,rejected_output:{native_id:report.native_id,text:report.output??''},termination_confirmed:qualifiedClose});
         return {native_id:report.native_id,text:report.output};
@@ -132,11 +136,14 @@ export function createCodexTaskRuntime({owner,ledger,membership,launch,qualifica
   return Object.freeze({
     async stage(token,input){requireOwner(token);if(reports.length>=128)fail('HOST_EVIDENCE_CAPACITY');checks('before_stage');const wrapped=Object.fromEntries(['profile','instructions','external','actor','closure'].map(name=>[name,b=>checks(b.stage,{membership:b},[name,...(name==='external'?['tools']:[])])]));const host=createCodexMembershipHost({owner,membership,launch:config,qualification:wrapped,...(protected_launch===undefined?{spawn_child}:{protected_launch}),...(protected_launch!==undefined&&isOriginalProtectedCompanionLaunch(owner,protected_launch)?{on_admission:phase=>{bindOriginalProtectedMembershipAdmission(owner,protected_launch,ledger,phase);}}:{}),now,limits:bound,tool_profile:interpreter?'stable-five-v3-context-contract-v1':'stable-five-v2',on_thread:creation});const result=await host.run(owner,input);reports.push({membership:copy(input),report:host.evidence(owner),result});return result;},
     executor,scheduler,
+    stop(token){requireOwner(token);effectSource?.stop();scheduler.stop();if(protected_launch)requestOriginalProtectedCodexStop(owner,protected_launch);return {stopped:true,closure:'UNKNOWN'};},
     inspect(token){requireOwner(token);return {tools_sha256:STABLE_TOOL_SHA256,reports:reports.map(r=>({task_id:r.task_id,attempt_id:r.attempt_id,report:r.report,result:r.result})),boundary:'Controlled source facts only; genuine profile/operator/restored-tools/closure qualification remains required'};}
   });
 }
 
-async function activeTurn({owner,launch,admitted,context,signal,spawn,protectedLaunch,now,limits,checks,current,bind,onSpawn,onQualifiedClose,software_prepare,contextDelivery,callbackRestriction}){
+async function activeTurn({owner,launch,admitted,context,signal,spawn,protectedLaunch,now,limits,checks,current,bind,onSpawn,onQualifiedClose,software_prepare,contextDelivery,callbackRestriction,effectSource}){
+  const effectDeadline=Date.now()+limits.total_ms;
+  let incarnation=null,effectClient=null;
   let softwareOutstanding=0,cliQualified=false;const softwareOperations=[];
   const combinedClose=()=>{if(cliQualified&&softwareOutstanding===0&&!physicalQualified){physicalQualified=true;onQualifiedClose();}};
   let child,process,protocol,callbacks,threadRequest,buffer='',physicalQualified=false,ended=false,closing=false,done=false,error=null,result=null,wireBytes=0,retained=0;
@@ -144,8 +151,8 @@ async function activeTurn({owner,launch,admitted,context,signal,spawn,protectedL
   const promise=new Promise(r=>{resolve=r;});
   const timer=(fn,ms)=>{const t=setTimeout(()=>{timers.delete(t);fn();},ms);timers.add(t);};
   const remember=e=>{error??={code:String(e.code??'HOST_ERROR'),message:String(e.message??e)};};
-  const finish=()=>{if(done)return;done=true;for(const t of timers)clearTimeout(t);signal?.removeEventListener('abort',cancel);const evidence=protocol?.evidence(owner);resolve({native_id:evidence?.native_id??null,output:evidence?.raw_final_output??null,error,process,qualified_close:physicalQualified,software_operations:copy(softwareOperations),transcript});};
-  const shutdown=()=>{if(closing||done)return;closing=true;try{child?.stdin.end();}catch(e){remember(e);}timer(()=>{if(done)return;try{child?.kill('SIGTERM');}catch(e){remember(e);}timer(()=>{if(done)return;try{child?.kill('SIGKILL');}catch(e){remember(e);}timer(finish,limits.kill_ms);},limits.term_ms);},limits.grace_ms);};
+  const finish=()=>{if(done)return;done=true;effectSource?.stop();for(const t of timers)clearTimeout(t);signal?.removeEventListener('abort',cancel);const evidence=protocol?.evidence(owner);resolve({native_id:evidence?.native_id??null,output:evidence?.raw_final_output??null,error,process,qualified_close:physicalQualified,software_operations:copy(softwareOperations),transcript});};
+  const shutdown=()=>{if(closing||done)return;closing=true;effectSource?.stop();try{child?.stdin.end();}catch(e){remember(e);}timer(()=>{if(done)return;try{child?.kill('SIGTERM');}catch(e){remember(e);}timer(()=>{if(done)return;try{child?.kill('SIGKILL');}catch(e){remember(e);}timer(finish,limits.kill_ms);},limits.term_ms);},limits.grace_ms);};
   const hold=e=>{remember(e);shutdown();if(!child)finish();};
   const cancel=()=>{try{protocol?.yield(owner);}catch(e){remember(e);}hold(signal?.reason??Object.assign(Error('Cancelled'),{code:'HOST_CANCELLED'}));};
   const retain=(direction,line)=>{const bytes=Buffer.byteLength(line);if(retained+bytes>limits.transcript_bytes)fail('HOST_TRANSCRIPT_BOUND');retained+=bytes;transcript.push({direction,text:line});};
@@ -195,7 +202,27 @@ async function activeTurn({owner,launch,admitted,context,signal,spawn,protectedL
           const value=await software_prepare({args:copy(args),binding:copy(binding),current:fresh,signal,onClosure});
           fresh();if(!closed)fail('HOST_SOFTWARE_CLOSURE_UNQUALIFIED');preparationReply(value,args);operation.result_sha256=peerDigest(value);return copy(value);
         }}:{}),
-        bindNative(){checks('before_bind');current();const original=bind(),client=callbackRestriction?restrictFoundationCallbacks(original,admitted.receipt.task.id):original;return {guard:()=>{checks('callback_guard');current();},client:{execute:(action,args)=>{checks('callback_execute');current();return client.execute(action,args);},inspect:(action,args)=>{checks('callback_inspect');current();return client.inspect(action,args);}}};},
+        bindNative(){
+          checks('before_bind');current();const original=bind(),foundation=restrictFoundationCallbacks(original,admitted.receipt.task.id);
+          const taskBound=()=>{
+            if(!effectSource||!protectedLaunch||closing||done||error)fail('HOST_TASK_EFFECTS_PRODUCER_HELD');
+            if(!effectClient){
+              incarnation=observeOriginalProtectedPeerExecutorIncarnation(owner,protectedLaunch,effectSource,{deadline_at_ms:effectDeadline,readTurn:()=>{if(closing||done||error)fail('HOST_TASK_EFFECTS_OBSOLETE');return protocol.snapshot(owner);}});
+              effectClient=model.bindPeerTaskEffects(original,{task_id:admitted.receipt.task.id},incarnation);
+            }
+            return effectClient;
+          };
+          const client=callbackRestriction==='task-bound-effects'?{
+            execute:(action,args)=>taskBound().execute(action,args),
+            // The internal context read precedes turn/start; dynamic callbacks
+            // require the correlated running turn and its original incarnation.
+            inspect:(action,args)=>protocol.snapshot(owner).state==='thread_ready'?foundation.inspect(action,args):taskBound().inspect(action,args)
+          }:callbackRestriction?foundation:original;
+          return {guard:()=>{checks(['starting_thread','thread_ready'].includes(protocol.snapshot(owner).state)?'before_context':'callback_guard');current();},client:{execute:(action,args)=>{checks('callback_execute');current();return client.execute(action,args);},inspect:(action,args)=>{
+            const internal=protocol.snapshot(owner).state==='thread_ready'&&action==='task/context'&&args&&Object.keys(args).length===1&&args.task_id===admitted.receipt.task.id;
+            checks(internal?'before_context':'callback_inspect');current();return client.inspect(action,args);
+          }}};
+        },
         finish:packet=>copy(packet),limits:{input_bytes:Math.max(100000,Buffer.byteLength(context.text)+4096)}});protocol.start(owner);
     }catch(e){hold(e);}});
     signal?.addEventListener('abort',cancel,{once:true});timer(()=>hold(Object.assign(Error('Finite turn deadline'),{code:'HOST_DEADLINE'})),limits.total_ms);

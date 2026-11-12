@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {EventEmitter} from 'node:events';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {createCodexTaskRuntime,STABLE_TOOL_SHA256} from '../plugins/soloco/runtime/peers/codex-task-host.mjs';
 import {createCodexMembershipHost,decodeHostFrame} from '../plugins/soloco/runtime/peers/codex-host.mjs';
@@ -153,6 +154,76 @@ test('the protected spawn branch resolves original launch inspection and preserv
     current(){},bind(){assert.fail('No protocol binding allowed');},spawn(){assert.fail('Stock spawn must not run');},onSpawn:packet=>{observed=packet;},onQualifiedClose(){assert.fail('No genuine closure qualification');}});
   assert.deepEqual(observed,{pid:54321,started_at:'2026-11-11T00:01:02.003Z'});assert.equal(clockReads,0);
   assert.equal(report.error.code,'SYNTHETIC_SPAWN_STOP');assert.equal(report.qualified_close,false);assert.equal(report.native_id,null);
+});
+
+test('pre-turn context bootstrap uses foundation inspection while dynamic callbacks retain guards and the actual task binder',async t=>{
+  const root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'soloco-task-context-bootstrap-')));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const production=fileURLToPath(new URL('../plugins/soloco/runtime/peers/codex-task-host.mjs',import.meta.url)),original=fs.readFileSync(production,'utf8');
+  const url=name=>pathToFileURL(path.join(path.dirname(production),name)).href;
+  const domain=path.join(root,'synthetic-context-domain.mjs'),protocol=path.join(root,'observed-real-protocol.mjs'),model=path.join(root,'observed-real-model.mjs');
+  // Exact source TEST COPY: the real wire protocol still drives all states.
+  // The emitter is no child; the plain observer marker is no incarnation.
+  // Forward the real model binder so it must reject our untrusted connection.
+  fs.writeFileSync(domain,'export * from '+JSON.stringify(url('protected-codex-domain.mjs'))+';\nexport const probe={child:null,observations:[]};\nexport function spawnOriginalProtectedCodex(){queueMicrotask(()=>probe.child.emit("spawn"));return probe.child;}\nexport function inspectOriginalProtectedCodexLaunch(){return {birth:{pid:54322,at:"2026-11-11T00:02:03.004Z"}};}\nexport function observeOriginalProtectedPeerExecutorIncarnation(...args){probe.observations.push(args);return Object.freeze({synthetic_marker_only:true});}\n');
+  fs.writeFileSync(protocol,'export * from '+JSON.stringify(url('host-protocol.mjs'))+';\nimport {createPeerHostProtocol as actual} from '+JSON.stringify(url('host-protocol.mjs'))+';\nexport const probe={caps:null};\nexport function createPeerHostProtocol(options){return actual({...options,bindNative(...args){const bound=options.bindNative(...args);probe.caps=bound;return bound;}});}\n');
+  fs.writeFileSync(model,'export * from '+JSON.stringify(url('model.mjs'))+';\nimport {bindPeerTaskEffects as actual} from '+JSON.stringify(url('model.mjs'))+';\nexport const calls=[];\nexport function bindPeerTaskEffects(...args){calls.push(args);return actual(...args);}\n');
+  const redirects={'./protected-codex-domain.mjs':domain,'./host-protocol.mjs':protocol,'./model.mjs':model};
+  const source=original.replace(/from '(\.\/[^']+)'/g,(_whole,specifier)=>'from '+JSON.stringify(pathToFileURL(redirects[specifier]??path.resolve(path.dirname(production),specifier)).href));
+  const file=path.join(root,'context-bootstrap-under-test.mjs');fs.writeFileSync(file,source+'\nexport {activeTurn as __testOnlyActiveTurn};\n');
+  const [{__testOnlyActiveTurn:turn},{probe:domainProbe},{probe:protocolProbe},{calls:binderCalls}]=await Promise.all([import(pathToFileURL(file).href),import(pathToFileURL(domain).href),import(pathToFileURL(protocol).href),import(pathToFileURL(model).href)]);
+  const child=new EventEmitter();child.pid=54322;child.stdout=new EventEmitter();child.stderr=new EventEmitter();child.stdin=new EventEmitter();child.kill=()=>true;domainProbe.child=child;
+  const owner=Symbol('synthetic bootstrap owner'),native='11111111-1111-7111-8111-111111111111',stages=[],inspections=[],frames=[];
+  const context={sha256:peerDigest('synthetic exact context'),text:'Synthetic exact context.'};
+  const task={id:'synthetic-own-task',value:{status:'running',owner_principal_id:'cos-a',attempt:{id:'synthetic-own-attempt'}}};
+  const admitted={receipt:{admitted:true,task,context},binding:{native_id:native,principal_id:'cos-a',generation:1,enrollment_id:'synthetic-enrollment'}};
+  let turnStarted=false,closed=false,testFailure=null,stops=0;
+  const send=frame=>child.stdout.emit('data',JSON.stringify(frame)+'\n');
+  const close=()=>{if(closed)return;closed=true;queueMicrotask(()=>{child.stdout.emit('end');child.emit('close',0,null);});};
+  child.stdin.end=close;
+  child.stdin.write=line=>{
+    const frame=JSON.parse(line);frames.push(frame);
+    queueMicrotask(()=>{try{
+      if(frame.method==='initialize')send({id:frame.id,result:{}});
+      else if(frame.method==='thread/resume')send({id:frame.id,result:{thread:{id:native,sessionId:'22222222-2222-7222-8222-222222222222',parentThreadId:null,forkedFromId:null,turns:[],canAcceptDirectInput:true,ephemeral:false},cwd:launch.cwd,runtimeWorkspaceRoots:[launch.cwd],activePermissionProfile:{id:launch.profile_id},approvalPolicy:'never',instructionSources:launch.instruction_sources}});
+      else if(frame.method==='turn/start'){
+        turnStarted=true;send({id:frame.id,result:{turn:{id:'synthetic-current-turn',status:'inProgress'}}});
+        const caps=protocolProbe.caps;caps.guard();
+        assert.throws(()=>caps.client.inspect('task/get',{task_id:task.id}),code('AUTHENTICATION_REQUIRED'));
+        assert.throws(()=>caps.client.execute('notice/create',{operation_id:'synthetic-dynamic-operation'}),code('AUTHENTICATION_REQUIRED'));
+        close();
+      }
+    }catch(error){testFailure=error;child.emit('error',error);}});
+    return true;
+  };
+  const originalClient={execute(){assert.fail('Dynamic mutation must never fall back to the original client');},inspect(action,args){
+    inspections.push([action,args]);assert.equal(turnStarted,false);assert.equal(action,'task/context');assert.deepEqual(args,{task_id:task.id});
+    // These are distinct from the internal exact own-task/context read. They
+    // must hit dynamic guard stages even during the pre-turn window.
+    assert.throws(()=>protocolProbe.caps.client.inspect('runtime/status',{}),code('SYNTHETIC_CALLBACK_INSPECT_HELD'));
+    assert.throws(()=>protocolProbe.caps.client.inspect('task/get',{task_id:task.id}),code('SYNTHETIC_CALLBACK_INSPECT_HELD'));
+    assert.throws(()=>protocolProbe.caps.client.inspect('task/get',{task_id:'other-task'}),code('SYNTHETIC_CALLBACK_INSPECT_HELD'));
+    assert.throws(()=>protocolProbe.caps.client.inspect('task/context',{task_id:'other-task'}),code('SYNTHETIC_CALLBACK_INSPECT_HELD'));
+    assert.throws(()=>protocolProbe.caps.client.inspect('task/context',{task_id:task.id,extra:true}),code('SYNTHETIC_CALLBACK_INSPECT_HELD'));
+    assert.throws(()=>protocolProbe.caps.client.execute('notice/create',{}),code('SYNTHETIC_CALLBACK_EXECUTE_HELD'));
+    return context;
+  }};
+  const report=await turn({owner,launch,admitted,context,protectedLaunch:{synthetic_test_only:true},effectSource:{stop(){stops++;}},callbackRestriction:'task-bound-effects',now:()=>0,
+    limits:{total_ms:500,grace_ms:1,term_ms:1,kill_ms:1,frame_bytes:100000,wire_bytes:200000,transcript_bytes:200000},
+    checks(stage){stages.push({stage,turn_started:turnStarted});
+      if(stage==='callback_guard'&&!turnStarted)throw Object.assign(Error('Dynamic guard requires turn/start.'),{code:'SYNTHETIC_PRETURN_GUARD_HELD'});
+      if(!turnStarted&&stage==='callback_inspect')throw Object.assign(Error('Dynamic inspection held.'),{code:'SYNTHETIC_CALLBACK_INSPECT_HELD'});
+      if(!turnStarted&&stage==='callback_execute')throw Object.assign(Error('Dynamic mutation held.'),{code:'SYNTHETIC_CALLBACK_EXECUTE_HELD'});
+      if(stage==='physical_close')throw Object.assign(Error('No genuine closure qualification.'),{code:'SYNTHETIC_CLOSURE_HELD'});
+    },current(){},bind:()=>originalClient,spawn(){assert.fail('No stock/native child');},onSpawn(){},onQualifiedClose(){assert.fail('No native closure qualification');}});
+  if(testFailure)throw testFailure;
+  assert.equal(frames.filter(f=>f.method==='turn/start').length,1);assert.match(frames.find(f=>f.method==='turn/start').params.input[0].text,/Synthetic exact context/);
+  assert.deepEqual(inspections,[['task/context',{task_id:task.id}]]);
+  assert(stages.filter(s=>s.stage==='before_context'&&!s.turn_started).length>=3);
+  assert.equal(stages.some(s=>s.stage==='callback_guard'&&!s.turn_started),false);
+  assert(stages.some(s=>s.stage==='callback_guard'&&s.turn_started));
+  assert.equal(binderCalls.length,2);assert.equal(domainProbe.observations.length,2);
+  for(const [connection,selector,marker]of binderCalls){assert.equal(connection,originalClient);assert.deepEqual(selector,{task_id:task.id});assert.deepEqual(marker,{synthetic_marker_only:true});}
+  assert.equal(report.error.code,'SYNTHETIC_CLOSURE_HELD');assert.equal(report.qualified_close,false);assert(stops>0);
 });
 
 function stagedMembership(t,{on_admission,stop_before_spawn=false}={}){
