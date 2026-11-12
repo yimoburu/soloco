@@ -33,6 +33,28 @@ test('whole-file shards are deterministic, nonoverlapping and cover every curren
   assert.equal(first.files.length+second.files.length,selected.length);
 });
 
+test('routine selection separates long pipelines without dropping current or future files',()=>{
+  const selected=selectedTests('regression-22',inventory(root));
+  const values=['1/2','2/2'],partition=values.map(value=>selectShard(selected,value));
+  assert.deepEqual(partition,values.map(value=>selectShard([...selected].reverse(),value)));
+  const flattened=partition.flatMap(shard=>shard.files);
+  assert.equal(new Set(flattened).size,selected.length);
+  assert.deepEqual([...flattened].sort(),[...selected].sort());
+  assert.deepEqual(partition.map(shard=>shard.files[0]),[
+    'tests/peer-input-frontier.test.mjs','tests/peer-origin-frontier-seal.test.mjs',
+  ],'the two advisory pipelines are first in separate selected argument lists');
+  assert.equal(partition[0].inventory_sha256,partition[1].inventory_sha256);
+  assert.equal(partition[0].selected_total,selected.length);
+  const future='tests/future-unmeasured-pipeline.test.mjs';
+  const expanded=values.map(value=>selectShard([...selected,future],value));
+  assert.deepEqual(expanded.flatMap(shard=>shard.files).sort(),[...selected,future].sort());
+  assert.equal(expanded.flatMap(shard=>shard.files).filter(file=>file===future).length,1);
+  for(const total of [1,2,3])validatePartition(selected,Array.from({length:total},(_,i)=>selectShard(selected,`${i+1}/${total}`)),total);
+  // Generic lexical partitions remain the input to full qualification. With no
+  // advisory pipelines present, routine fixture selection keeps that behavior.
+  for(const [i,value]of values.entries())assert.deepEqual(selectShard(files,value).files,partitionTests(files)[i].files);
+});
+
 test('missing, duplicate, empty and wrong-identity shards cannot certify coverage',()=>{
   const partition=partitionTests(files);
   const alter=fn=>{const value=structuredClone(partition);fn(value);return value;};
