@@ -99,6 +99,9 @@ QA, plus the same original precharge wire gate. No caller can supply an exclude
 list, claimed complete history or a receipt to bypass those future gates.
 
 The SOURCE tests use real disposable SQLite/P1 and actual legacy trigger checks,
-with explicitly SYNTHETIC native birth/drain/interpreter seams. They are not
+plus the actual compiled C reader, held FD3 and frame checks through an explicitly
+SYNTHETIC source deployment selection. Native birth/drain/interpreter seams
+remain SYNTHETIC. Default missing production reader and native forms Hold before
+source writes/admission respectively. These tests are not
 company-native QA, actual provider/model execution, owner activation, migration,
 installation, R6 retry, permission, notice resolution or source acceptance.
