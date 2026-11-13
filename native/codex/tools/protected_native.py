@@ -20,7 +20,7 @@ TREE = "078c14cecf94b522a2eff48b30996bf3f4d1bf7a"
 TARGET = "aarch64-apple-darwin"
 SANDBOX = Path("/usr/bin/sandbox-exec")
 MANIFEST = Path(__file__).resolve().parents[1] / "source-package.json"
-MANIFEST_SHA256 = "11dce050e14c48ed20dac9052ec096f3fbd94717603035b22f56f7af851ce84c"
+MANIFEST_SHA256 = "c103b27a9c458c0989c7766a769ab1644e3663307e72274906c6d362fdd64c15"
 OPENSSL_CONFIG = Path("/private/etc/ssl/openssl.cnf")
 OPENSSL_CONFIG_BYTES = 745
 OPENSSL_CONFIG_SHA256 = "025f5e31cd7b2248a0a661d8d346452c31d98e280f3420c3f6017c74c829ae73"
@@ -29,7 +29,9 @@ MAX_BYTES = 128 * 1024 * 1024
 MAX_TOOLCHAIN_BYTES = 2 * 1024 * 1024 * 1024
 COMPILED_SOURCE_SCHEMA = "soloco-compiled-native-inputs-v1"
 MAX_COMPILED_MANIFEST_BYTES = 16 * 1024 * 1024
-TOP = {"schema", "status", "upstream", "source_cut", "overlay", "cargo_lock", "toolchain", "build", "qualified_binary", "runtime_integration"}
+TOP = {"schema", "status", "upstream", "source_cut", "overlay", "cargo_lock", "toolchain", "build", "qualified_binary", "runtime_integration", "sidecar_capture"}
+SIDECAR_SOURCE = "plugins/soloco/helpers/origin-sidecar-capture.c"
+SIDECAR_FLAGS = ["-std=c11", "-O2", "-Wall", "-Wextra", "-Werror", "-target", "arm64-apple-macos11.0"]
 CACHE_METADATA = (".package-cache", ".package-cache-mutate", ".global-cache", ".global-cache-shm", ".global-cache-wal", ".global-cache-journal")
 SYSTEM_READ_ROOTS = ("/System/Library", "/System/iOSSupport/System/Library", "/usr/lib", "/usr/share", "/usr/bin", "/bin", "/sbin", "/private/var/db/dyld")
 
@@ -308,8 +310,64 @@ def package(manifest):
         need(exact(archive, {"component", "url", "sha256"}) and archive["component"] in ("rustc", "cargo", "rust-std") and archive["url"].startswith("https://static.rust-lang.org/dist/") and re.fullmatch("[0-9a-f]{64}", archive["sha256"]), "unsupported component commitment")
     b = m["build"]
     need(b == {"package": "codex-app-server-client", "binary": "codex-soloco-protected-host", "target": TARGET, "profile": "release", "environment": {"SOLOCO_PROTECTED_HOST_BUILD": "1"}}, "unsupported build recipe")
+    sidecar_source(root, m)
     need(m["runtime_integration"] == "separate-joined-runtime-review-required", "runtime integration is not qualified by this package")
     return root, m, upstream, toolchain, sorted(expected.values(), key=lambda r: r["path"])
+
+
+def sidecar_source(root, manifest):
+    helper = manifest["sidecar_capture"]
+    need(exact(helper, {"protocol", "source", "binary", "arguments", "target", "flags"})
+         and helper["protocol"] == "soloco-origin-sidecar-source-build-v1"
+         and helper["binary"] == "origin-sidecar-capture"
+         and helper["arguments"] == ["origin-sidecar-capture-v1"]
+         and helper["target"] == "arm64-apple-macos11.0" and helper["flags"] == SIDECAR_FLAGS,
+         "unsupported fixed sidecar helper recipe")
+    need(isinstance(helper["source"], dict) and helper["source"].get("path") == SIDECAR_SOURCE,
+         "sidecar helper source must be the fixed original module")
+    return read_pin(root.parents[1], helper["source"])
+
+
+def sidecar_build_plan(root, manifest, output, profile):
+    source = sidecar_source(root, manifest)
+    source_copy, binary = output / "origin-sidecar-capture.c", output / "origin-sidecar-capture"
+    with source_copy.open("xb") as stream:
+        stream.write(source)
+    source_copy.chmod(0o444)
+    # Canonical C ALONE: no caller compiler, program, include interposer,
+    # environment-selected SDK or test source can enter this build recipe.
+    argv = [str(SANDBOX), "-p", profile, str(SELECTED_CLANG), *SIDECAR_FLAGS,
+            "-isysroot", str(SELECTED_SDK), str(source_copy), "-o", str(binary)]
+    return argv, {"protocol": "soloco-origin-sidecar-source-build-v1",
+                  "source": manifest["sidecar_capture"]["source"],
+                  "source_copy": str(source_copy), "compiler_argv": argv[3:],
+                  "arguments": ["origin-sidecar-capture-v1"], "binary": None,
+                  "native_qualified": False}
+
+
+def build_sidecar(argv, env, output, record, deadline):
+    code, state = None, "failed"
+    with (output / "sidecar-stdout.log").open("xb") as stdout, (output / "sidecar-stderr.log").open("xb") as stderr:
+        process = subprocess.Popen(argv, env=env, stdin=subprocess.DEVNULL,
+                                   stdout=stdout, stderr=stderr, start_new_session=True)
+        try:
+            code = process.wait(timeout=max(0.001, min(30, deadline - time.monotonic())))
+            state = "compiled-source-only" if code == 0 else "failed"
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            code = process.wait(timeout=5)
+            state = "timeout-held"
+    result = {**record, "status": state, "exit_code": code}
+    if state == "compiled-source-only":
+        binary = regular(output / "origin-sidecar-capture")
+        need(binary.stat().st_size <= 16 * 1024 * 1024, "sidecar helper binary capacity")
+        binary.chmod(0o555)
+        result["binary"] = {"path": str(binary), "bytes": binary.stat().st_size,
+                            "sha256": sha(binary.read_bytes()), "mode": "100555"}
+    return result
 
 
 def paths_overlap(left, right):
@@ -591,22 +649,29 @@ def build(args):
     # Never inherit a caller association, guessed input digest or output hash.
     env["SOLOCO_SOURCE_MANIFEST_SHA256"] = source_association["sha256"]
     (output / "build-domain.sb").write_text(profile)
-    write_json(output / "plan.json", {"argv": argv, "environment": env, "manifest_sha256": MANIFEST_SHA256, "timeout_seconds": args.timeout, "build_domain_sha256": sha(profile.encode()), "network_containment": "required source-generated macOS Seatbelt network denial; source/toolchain read-only; exact output/cache-metadata writes", "system_openssl_config": {"path": str(OPENSSL_CONFIG), "bytes": OPENSSL_CONFIG_BYTES, "sha256": OPENSSL_CONFIG_SHA256}, "compiled_source_manifest": source_association, "selected_sdk": selected_sdk, "native_qualified": False})
+    helper_argv, helper_plan = sidecar_build_plan(root, m, output, profile)
+    write_json(output / "plan.json", {"argv": argv, "sidecar_capture": helper_plan, "environment": env, "manifest_sha256": MANIFEST_SHA256, "timeout_seconds": args.timeout, "build_domain_sha256": sha(profile.encode()), "network_containment": "required source-generated macOS Seatbelt network denial; source/toolchain read-only; exact output/cache-metadata writes", "system_openssl_config": {"path": str(OPENSSL_CONFIG), "bytes": OPENSSL_CONFIG_BYTES, "sha256": OPENSSL_CONFIG_SHA256}, "compiled_source_manifest": source_association, "selected_sdk": selected_sdk, "native_qualified": False})
     started = time.monotonic()
-    state, result = "failed", None
+    deadline = started + args.timeout
+    helper = build_sidecar(helper_argv, env, output, helper_plan, deadline)
+    state, result = helper["status"], helper["exit_code"]
     with (output / "stdout.log").open("xb") as stdout, (output / "stderr.log").open("xb") as stderr:
-        process = subprocess.Popen(argv, cwd=source / "codex-rs", env=env, stdin=subprocess.DEVNULL, stdout=stdout, stderr=stderr, start_new_session=True)
-        try:
-            result = process.wait(timeout=args.timeout)
-            state = "compiled-source-only" if result == 0 else "failed"
-        except subprocess.TimeoutExpired:
-            try:
-                os.killpg(process.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-            result = process.wait(timeout=5)
-            state = "timeout-held"
-    receipt = {"schema": "soloco-native-source-build-receipt-v1", "status": state, "manifest_sha256": MANIFEST_SHA256, "exit_code": result, "elapsed_seconds": time.monotonic() - started, "compiled_source_manifest": source_association, "selected_sdk": selected_sdk, "binary": None, "native_qualified": False, "source_slot_populated": False, "descendant_or_remote_closure": "not established"}
+        if state == "compiled-source-only":
+            if time.monotonic() >= deadline:
+                result, state = -9, "timeout-held"
+            else:
+                process = subprocess.Popen(argv, cwd=source / "codex-rs", env=env, stdin=subprocess.DEVNULL, stdout=stdout, stderr=stderr, start_new_session=True)
+                try:
+                    result = process.wait(timeout=max(0.001, deadline - time.monotonic()))
+                    state = "compiled-source-only" if result == 0 else "failed"
+                except subprocess.TimeoutExpired:
+                    try:
+                        os.killpg(process.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                    result = process.wait(timeout=5)
+                    state = "timeout-held"
+    receipt = {"schema": "soloco-native-source-build-receipt-v1", "status": state, "manifest_sha256": MANIFEST_SHA256, "exit_code": result, "elapsed_seconds": time.monotonic() - started, "compiled_source_manifest": source_association, "selected_sdk": selected_sdk, "sidecar_capture": helper, "binary": None, "native_qualified": False, "source_slot_populated": False, "descendant_or_remote_closure": "not established"}
     try:
         need(sha(regular(args.manifest).read_bytes()) == MANIFEST_SHA256, "source-owned manifest changed during build")
         need(verify_compiled_source_manifest(compiled_manifest_path, compiled_manifest_bytes) == source_association, "compiled-source association changed during build")
@@ -614,6 +679,15 @@ def build(args):
         need(validate_selected_sdk() == selected_sdk, "selected SDK changed during build")
         verify_complete_files(source, expected)
         verify_complete_files(prefix, toolchain, max_bytes=MAX_TOOLCHAIN_BYTES)
+        need(sidecar_source(root, m) == regular(output / "origin-sidecar-capture.c").read_bytes()
+             and stat.S_IMODE((output / "origin-sidecar-capture.c").stat().st_mode) == 0o444,
+             "fixed sidecar source changed during build")
+        if helper["status"] == "compiled-source-only":
+            helper_binary = regular(output / "origin-sidecar-capture")
+            need(stat.S_IMODE(helper_binary.stat().st_mode) == 0o555
+                 and helper["binary"] == {"path": str(helper_binary), "bytes": helper_binary.stat().st_size,
+                                          "sha256": sha(helper_binary.read_bytes()), "mode": "100555"},
+                 "fixed sidecar helper changed during build")
         if state == "compiled-source-only":
             binary = regular(output / "target" / TARGET / "release/codex-soloco-protected-host")
             receipt["binary"] = {"path": str(binary), "bytes": binary.stat().st_size, "sha256": sha(binary.read_bytes())}

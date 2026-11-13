@@ -13,11 +13,15 @@ import {formatContextBuildInputData,formatContextBuildOutputData,createContextBu
 const HERE=fileURLToPath(import.meta.url),REPO=path.resolve(fileURLToPath(new URL('../../../../',import.meta.url)));
 const ENTRY=path.join(REPO,'tools/build-peer-context.mjs'),NATIVE=path.join(REPO,'native/codex');
 const ROOT=path.join(REPO,'work/peer-context-component'),JOURNAL=path.join(ROOT,'journal.sqlite'),ANCHOR=path.join(ROOT,'journal-anchor.json');
-const PACKAGE_SHA='11dce050e14c48ed20dac9052ec096f3fbd94717603035b22f56f7af851ce84c';
-const DRIVER_SHA='6edb4fb2eff2e84c2a3850dae6a15d3e270898e1a43615de98bc9d536d92acde';
+const PACKAGE_SHA='c103b27a9c458c0989c7766a769ab1644e3663307e72274906c6d362fdd64c15';
+const DRIVER_SHA='99c1723444f39e73059b5eadc1f089751739832dfafba2a0a149cadf172298b5';
 const DATA_SHA='64b3b0cd592956a1effc2971350c4d4b66a861b4de0eee361e1024d2418184c8';
 const COMMIT='c40729ea5cf8e947481b130c59807273eda2f8e9',TREE='078c14cecf94b522a2eff48b30996bf3f4d1bf7a';
 const TARGET='aarch64-apple-darwin',PYTHON='/usr/bin/python3',BUILD_SECONDS=1200;
+const SIDECAR='plugins/soloco/helpers/origin-sidecar-capture.c';
+const SIDECAR_FLAGS=['-std=c11','-O2','-Wall','-Wextra','-Werror','-target','arm64-apple-macos11.0'];
+const SELECTED_CLANG='/Applications/Xcode-26.3.0.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang';
+const SELECTED_SDK='/Applications/Xcode-26.3.0.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk';
 const MAX_FILE=128*1024*1024,MAX_NODE=64*1024*1024;
 const errors=new WeakMap(),pending=new Map();let issuer;
 // These handles identify inspected component DATA only, never executable support.
@@ -69,7 +73,7 @@ function rows(value,maximum=128*1024*1024){
 function treeRows(root,prefix='',maximumFile=MAX_FILE,maximumTotal=MAX_FILE,sourceOnly=false){
  noLinks(root);if(!fs.lstatSync(root).isDirectory())fail('COMPONENT_INPUT_COMPOSITION_UNAVAILABLE');const result=[];let total=0,visited=0;
  function walk(directory,base,depth=0){if(depth>32)fail('COMPONENT_SOURCE_CHANGED');for(const name of fs.readdirSync(directory).sort()){if(++visited>40000)fail('COMPONENT_SOURCE_CHANGED');relative(name);const p=path.join(directory,name),st=fs.lstatSync(p),key=base?base+'/'+name:name;
-  if(sourceOnly&&(name.startsWith('.env')||(st.isDirectory()&&name.startsWith('.')&&!['.codex-plugin','.claude-plugin'].includes(name))||(st.isFile()&&!/\.(mjs|json|md|sh|svg|txt)$/.test(name)&&!['LICENSE','NOTICE'].includes(name))))fail('COMPONENT_INPUT_COMPOSITION_UNAVAILABLE');
+  if(sourceOnly&&(name.startsWith('.env')||(st.isDirectory()&&name.startsWith('.')&&!['.codex-plugin','.claude-plugin'].includes(name))||(st.isFile()&&key!==SIDECAR&&!/\.(mjs|json|md|sh|svg|txt)$/.test(name)&&!['LICENSE','NOTICE'].includes(name))))fail('COMPONENT_INPUT_COMPOSITION_UNAVAILABLE');
   if(st.isDirectory())walk(p,key,depth+1);else if(st.isFile()&&!st.isSymbolicLink()&&st.nlink===1){total+=st.size;if(result.length>=20000||total>maximumTotal)fail('COMPONENT_SOURCE_CHANGED');const b=stableRead(p,maximumFile);result.push({path:key,bytes:b.length,sha256:sha(b),mode:st.mode&0o111?'100755':'100644'});}else fail('COMPONENT_SOURCE_CHANGED');}}
  walk(root,prefix);return result.sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0);
 }
@@ -94,6 +98,8 @@ function collectInputs(){
  for(const r of bindings)if(!r.path.startsWith('codex-rs/'))fail('COMPONENT_SOURCE_CHANGED');
  const compiledBytes=Buffer.from(canonical({schema:'soloco-compiled-native-inputs-v1',upstream:{commit:COMMIT,tree:TREE},source_package_sha256:PACKAGE_SHA,files_count:bindings.length,files:bindings}));
  for(const pin of [pkg.source_cut.handoff,pkg.source_cut.patch,pkg.upstream.inventory,...pkg.upstream.attribution,...pkg.overlay.map(v=>v.payload),pkg.cargo_lock,pkg.toolchain.official_manifest])readPin(NATIVE,pin);
+ const sidecarSource=stableRead(path.join(REPO,SIDECAR)),helper=pkg.sidecar_capture;
+ if(!exact(helper,['protocol','source','binary','arguments','target','flags'])||helper.protocol!=='soloco-origin-sidecar-source-build-v1'||!same(helper.source,{path:SIDECAR,...ref(sidecarSource)})||helper.binary!=='origin-sidecar-capture'||!same(helper.arguments,['origin-sidecar-capture-v1'])||helper.target!=='arm64-apple-macos11.0'||!same(helper.flags,SIDECAR_FLAGS))fail('COMPONENT_SOURCE_CHANGED');
  const nodeRows=treeRows(path.join(REPO,'plugins/soloco'),'plugins/soloco',MAX_NODE,MAX_NODE,true);nodeRows.push({path:'tools/build-peer-context.mjs',...ref(stableRead(ENTRY)),mode:'100644'});nodeRows.sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0);rows(nodeRows,MAX_NODE);
  const nodeBytes=Buffer.from(canonical({schema:'soloco-node-peer-context-inputs-v1',files:nodeRows,roots:nodeRows.map(v=>v.path),edges:[]}));
  const codec=stableRead(path.join(path.dirname(HERE),'peer-delivery-frame.mjs')),resource=stableRead(path.join(path.dirname(HERE),'peer-context-contract-v2.json'));
@@ -195,15 +201,17 @@ function runDriver(c,paths,state,work){
   }catch{if(!child)for(const fd of [stdout,stderr])if(fd!==undefined)try{fs.closeSync(fd);}catch{}unknown(state.intent_key);finish({state:unknown(state.intent_key),output:null});}
  });
 }
-function verifyReceipt(receipt,output,manifestBytes,binaryBytes){
+function verifyReceipt(receipt,output,manifestBytes,binaryBytes,helperBytes){
  const binary=path.join(output,'target',TARGET,'release/codex-soloco-protected-host');
  if(!object(receipt)||receipt.schema!=='soloco-native-source-build-receipt-v1'||receipt.status!=='compiled-source-only'||receipt.exit_code!==0||receipt.manifest_sha256!==PACKAGE_SHA||receipt.native_qualified!==false||receipt.source_slot_populated!==false||receipt.descendant_or_remote_closure!=='not established'||!same(receipt.compiled_source_manifest,{schema:'soloco-compiled-native-inputs-v1',path:path.join(output,'compiled-source-manifest.json'),...ref(manifestBytes)})||!same(receipt.binary,{path:binary,...ref(binaryBytes)}))fail('COMPONENT_BUILD_RECEIPT_CHANGED');
+ const h=receipt.sidecar_capture,source=stableRead(path.join(REPO,SIDECAR)),helperBinary=path.join(output,'origin-sidecar-capture'),sourceCopy=path.join(output,'origin-sidecar-capture.c');
+ if(!h||h.protocol!=='soloco-origin-sidecar-source-build-v1'||h.status!=='compiled-source-only'||h.exit_code!==0||h.native_qualified!==false||!same(h.source,{path:SIDECAR,...ref(source)})||h.source_copy!==sourceCopy||!same(h.arguments,['origin-sidecar-capture-v1'])||!same(h.compiler_argv,[SELECTED_CLANG,...SIDECAR_FLAGS,'-isysroot',SELECTED_SDK,sourceCopy,'-o',helperBinary])||!same(h.binary,{path:helperBinary,...ref(helperBytes),mode:'100555'})||receipt.selected_sdk?.compiler!==SELECTED_CLANG||receipt.selected_sdk?.sdk_root!==SELECTED_SDK)fail('COMPONENT_BUILD_RECEIPT_CHANGED');
 }
 function successfulReceipt(c,output){
  const receiptBytes=stableRead(path.join(output,'receipt.json'),16*1024*1024),receipt=parse(receiptBytes),manifestBytes=stableRead(path.join(output,'compiled-source-manifest.json'),16*1024*1024);
  const binary=path.join(output,'target',TARGET,'release/codex-soloco-protected-host');
  if(!manifestBytes.equals(c.compiledBytes))fail('COMPONENT_BUILD_RECEIPT_CHANGED');
- const binaryBytes=stableRead(binary,256*1024*1024);verifyReceipt(receipt,output,manifestBytes,binaryBytes);return {receiptBytes,manifestBytes,binaryBytes,receipt,binary};
+ const binaryBytes=stableRead(binary,256*1024*1024),helperBytes=stableRead(path.join(output,'origin-sidecar-capture'),16*1024*1024);if((fs.lstatSync(path.join(output,'origin-sidecar-capture')).mode&0o777)!==0o555)fail('COMPONENT_BUILD_RECEIPT_CHANGED');verifyReceipt(receipt,output,manifestBytes,binaryBytes,helperBytes);return {receiptBytes,manifestBytes,binaryBytes,helperBytes,receipt,binary};
 }
 function sealComponent(c,state,output){
  if(collectInputs().commitment.input_key!==c.commitment.input_key)fail('COMPONENT_SOURCE_CHANGED');const built=successfulReceipt(c,output);
@@ -212,6 +220,7 @@ function sealComponent(c,state,output){
  const manifest=copy(path.join(output,'compiled-source-manifest.json'),'native/compiled-source-manifest.json',ref(built.manifestBytes));
  const receipt=copy(path.join(output,'receipt.json'),'native/build-receipt.json',ref(built.receiptBytes));
  const executable=copy(built.binary,'native/executable',ref(built.binaryBytes));
+ copy(path.join(output,'origin-sidecar-capture'),'native/origin-sidecar-capture',ref(built.helperBytes));
  copy(path.join(NATIVE,'source-package.json'),'native/source-package.json',c.inputs.native.source_package);copy(path.join(NATIVE,c.pkg.cargo_lock.path),'native/Cargo.lock',c.inputs.native.cargo_lock);copy(path.join(NATIVE,c.pkg.toolchain.official_manifest.path),'native/toolchain-manifest.toml',c.inputs.native.toolchain_manifest);
  for(const row of c.nodeRows)copy(path.join(REPO,row.path),'node-source/'+row.path,{bytes:row.bytes,sha256:row.sha256});
  writeImmutable(path.join(staging,'node-inputs.json'),c.nodeBytes);writeImmutable(path.join(staging,'node-profile.json'),c.profileBytes);writeImmutable(path.join(staging,'selection.json'),c.selectionBytes);
@@ -233,11 +242,11 @@ function lookupComponent(c,state,selection){
  const expected=new Set([...capsule.files.map(v=>v.path),'capsule-manifest.json','output.json']);const actual=treeRows(directory,'',256*1024*1024,512*1024*1024);if(actual.length!==expected.size||actual.some(v=>!expected.has(v.path)||(fs.lstatSync(path.join(directory,v.path)).mode&0o777)!==0o444))fail('COMPONENT_ARTIFACT_CHANGED');for(const r of capsule.files){const bytes=stableRead(path.join(directory,r.path),256*1024*1024);if(!same(ref(bytes),{bytes:r.bytes,sha256:r.sha256}))fail('COMPONENT_ARTIFACT_CHANGED');}
  if(!stableRead(path.join(directory,'node-inputs.json'),16*1024*1024).equals(c.nodeBytes)||!stableRead(path.join(directory,'node-profile.json'),16*1024*1024).equals(c.profileBytes)||!stableRead(path.join(directory,'selection.json'),16*1024*1024).equals(c.selectionBytes))fail('COMPONENT_ARTIFACT_CHANGED');
  const recipeBytes=stableRead(path.join(directory,'recipe.json'),16*1024*1024);if(!same(ref(recipeBytes),record.recipe))fail('COMPONENT_ARTIFACT_CHANGED');const recipe=parse(recipeBytes);
- if(!exact(recipe,['protocol','result_kind','input_key','intent_key','reservation_sha256','process_sha256','domain_closure','original_build_receipt','copies','node_manifest'])||recipe.protocol!=='soloco-context-component-copy-recipe-v1'||recipe.result_kind!=='COMPILED_COMPONENT'||recipe.input_key!==state.input_key||recipe.intent_key!==state.intent_key||recipe.reservation_sha256!==state.reservation_sha256||recipe.process_sha256!==state.process_sha256||recipe.domain_closure!=='unestablished'||!same(recipe.node_manifest,c.inputs.node.manifest)||!Array.isArray(recipe.copies)||recipe.copies.length!==c.nodeRows.length+6)fail('COMPONENT_ARTIFACT_CHANGED');
- const originals=new Map([[path.join(ROOT,'operations',state.intent_key,'compiler-output/compiled-source-manifest.json'),'native/compiled-source-manifest.json'],[path.join(ROOT,'operations',state.intent_key,'compiler-output/receipt.json'),'native/build-receipt.json'],[path.join(ROOT,'operations',state.intent_key,'compiler-output/target',TARGET,'release/codex-soloco-protected-host'),'native/executable'],[path.join(NATIVE,'source-package.json'),'native/source-package.json'],[path.join(NATIVE,c.pkg.cargo_lock.path),'native/Cargo.lock'],[path.join(NATIVE,c.pkg.toolchain.official_manifest.path),'native/toolchain-manifest.toml'],...c.nodeRows.map(v=>[path.join(REPO,v.path),'node-source/'+v.path])]);
+ if(!exact(recipe,['protocol','result_kind','input_key','intent_key','reservation_sha256','process_sha256','domain_closure','original_build_receipt','copies','node_manifest'])||recipe.protocol!=='soloco-context-component-copy-recipe-v1'||recipe.result_kind!=='COMPILED_COMPONENT'||recipe.input_key!==state.input_key||recipe.intent_key!==state.intent_key||recipe.reservation_sha256!==state.reservation_sha256||recipe.process_sha256!==state.process_sha256||recipe.domain_closure!=='unestablished'||!same(recipe.node_manifest,c.inputs.node.manifest)||!Array.isArray(recipe.copies)||recipe.copies.length!==c.nodeRows.length+7)fail('COMPONENT_ARTIFACT_CHANGED');
+ const originals=new Map([[path.join(ROOT,'operations',state.intent_key,'compiler-output/origin-sidecar-capture'),'native/origin-sidecar-capture'],[path.join(ROOT,'operations',state.intent_key,'compiler-output/compiled-source-manifest.json'),'native/compiled-source-manifest.json'],[path.join(ROOT,'operations',state.intent_key,'compiler-output/receipt.json'),'native/build-receipt.json'],[path.join(ROOT,'operations',state.intent_key,'compiler-output/target',TARGET,'release/codex-soloco-protected-host'),'native/executable'],[path.join(NATIVE,'source-package.json'),'native/source-package.json'],[path.join(NATIVE,c.pkg.cargo_lock.path),'native/Cargo.lock'],[path.join(NATIVE,c.pkg.toolchain.official_manifest.path),'native/toolchain-manifest.toml'],...c.nodeRows.map(v=>[path.join(REPO,v.path),'node-source/'+v.path])]);
  for(const mapping of recipe.copies){if(!exact(mapping,['original_path','sealed_path','bytes','sha256'])||originals.get(mapping.original_path)!==mapping.sealed_path)fail('COMPONENT_ARTIFACT_CHANGED');originals.delete(mapping.original_path);const b=stableRead(path.join(directory,relative(mapping.sealed_path)),256*1024*1024);if(!same(ref(b),{bytes:mapping.bytes,sha256:mapping.sha256}))fail('COMPONENT_ARTIFACT_CHANGED');}if(originals.size)fail('COMPONENT_ARTIFACT_CHANGED');
  const receiptBytes=stableRead(path.join(directory,'native/build-receipt.json'),16*1024*1024),receipt=parse(receiptBytes),manifestBytes=stableRead(path.join(directory,'native/compiled-source-manifest.json'),16*1024*1024),binaryBytes=stableRead(path.join(directory,'native/executable'),256*1024*1024);
- if(!same(ref(receiptBytes),record.build_receipt)||!same(recipe.original_build_receipt,record.build_receipt)||!same(ref(manifestBytes),record.compiled_manifest)||!manifestBytes.equals(c.compiledBytes)||!same(ref(binaryBytes),record.executable))fail('COMPONENT_ARTIFACT_CHANGED');verifyReceipt(receipt,path.join(ROOT,'operations',state.intent_key,'compiler-output'),manifestBytes,binaryBytes);
+ if(!same(ref(receiptBytes),record.build_receipt)||!same(recipe.original_build_receipt,record.build_receipt)||!same(ref(manifestBytes),record.compiled_manifest)||!manifestBytes.equals(c.compiledBytes)||!same(ref(binaryBytes),record.executable))fail('COMPONENT_ARTIFACT_CHANGED');verifyReceipt(receipt,path.join(ROOT,'operations',state.intent_key,'compiler-output'),manifestBytes,binaryBytes,stableRead(path.join(directory,'native/origin-sidecar-capture'),16*1024*1024));
  const command=Object.freeze({protocol:'soloco-context-component-command-v1',status:'COMPILED_COMPONENT',result_kind:'COMPILED_COMPONENT',input_key:state.input_key,intent_key:state.intent_key,output_sha256:formatted.sha256,domain_closure:'unestablished',qualified_interpreter:'HELD',claims_released:false});
  if(selection===SELECTED_COMPONENT_DATA){
   // Retain original bytes and documents from this SAME verified lookup. This

@@ -39,11 +39,53 @@ def pure_build_fixture(tmp):
     return base, args, sr, tr
 
 
+def pure_build_package(base, sr, tr):
+    """Closed fictional helper source at the canonical path; no SDK or compile."""
+    root = base / "native/codex"
+    root.mkdir(parents=True)
+    source = base / TOOL.SIDECAR_SOURCE
+    source.parent.mkdir(parents=True)
+    data = b"/* PURE FIXTURE C, NEVER COMPILED */\n"
+    source.write_bytes(data)
+    manifest = {"sidecar_capture": {
+        "protocol": "soloco-origin-sidecar-source-build-v1",
+        "source": {"path": TOOL.SIDECAR_SOURCE, "bytes": len(data), "sha256": TOOL.sha(data)},
+        "binary": "origin-sidecar-capture", "arguments": ["origin-sidecar-capture-v1"],
+        "target": "arm64-apple-macos11.0", "flags": list(TOOL.SIDECAR_FLAGS)}}
+    return root, manifest, [], [tr], [sr]
+
+
 class TemporaryDataChecks(unittest.TestCase):
     def setUp(self):
         # Pure CI never consults the runner's real system crypto configuration.
         self.config_guard = self.enterContext(patch.object(TOOL, "validate_openssl_config", return_value=TOOL.OPENSSL_CONFIG))
         self.sdk_guard = self.enterContext(patch.object(TOOL, "validate_selected_sdk", return_value={"schema": "PURE_MOCK_SELECTED_SDK_NO_HOST_READ"}))
+
+    @contextlib.contextmanager
+    def pure_mock_sidecar_build(self, args):
+        """Only the helper compiler is mocked; real plan/source checks remain."""
+        def helper(argv, env, output, record, deadline):
+            source_copy = args.output / "origin-sidecar-capture.c"
+            binary = args.output / "origin-sidecar-capture"
+            self.assertEqual(output, args.output)
+            self.assertEqual(argv[:2], [str(TOOL.SANDBOX), "-p"])
+            self.assertEqual(record["compiler_argv"], [str(TOOL.SELECTED_CLANG), *TOOL.SIDECAR_FLAGS,
+                             "-isysroot", str(TOOL.SELECTED_SDK), str(source_copy), "-o", str(binary)])
+            self.assertEqual(argv[3:], record["compiler_argv"])
+            self.assertEqual(record["source_copy"], str(source_copy))
+            self.assertEqual(source_copy.read_bytes(), (args.output.parent / TOOL.SIDECAR_SOURCE).read_bytes())
+            self.assertEqual(source_copy.stat().st_mode & 0o777, 0o444)
+            self.assertEqual(record["arguments"], ["origin-sidecar-capture-v1"])
+            self.assertIsNone(record["binary"])
+            self.assertFalse(record["native_qualified"])
+            data = b"PURE MOCK HELPER, NEVER EXECUTED"
+            binary.write_bytes(data)
+            binary.chmod(0o555)
+            return {**record, "status": "compiled-source-only", "exit_code": 0,
+                    "binary": {"path": str(binary), "bytes": len(data),
+                               "sha256": TOOL.sha(data), "mode": "100555"}}
+        with patch.object(TOOL, "build_sidecar", side_effect=helper) as build:
+            yield build
 
     def test_duplicate_json_keys_are_rejected(self):
         with self.assertRaisesRegex(ValueError, "duplicate"):
@@ -273,7 +315,10 @@ class TemporaryDataChecks(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp).resolve()
             source, prefix, cache, output = [base / x for x in ("source", "prefix", "cache", "output")]
-            with patch.dict(TOOL.os.environ, {"HOME": "/fixture-home", "CODEX_HOME": "/fixture-codex", "AWS_ACCESS_KEY_ID": "fixture-only"}):
+            ambient = {**vars(TOOL.os), "environ": {**TOOL.os.environ,
+                       "HOME": "/fixture-home", "CODEX_HOME": "/fixture-codex", "AWS_ACCESS_KEY_ID": "fixture-only"}}
+            # Adversarial DATA only; never change the process HOME/CODEX_HOME.
+            with patch.object(TOOL, "os", SimpleNamespace(**ambient)):
                 argv, env, profile = TOOL.build_domain(source, prefix, cache, output)
             self.assertEqual(argv[:3], ["/usr/bin/sandbox-exec", "-p", profile])
             self.assertEqual(argv[3], str(prefix / "bin/cargo"))
@@ -451,7 +496,7 @@ class TemporaryDataChecks(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             base, args, sr, tr = pure_build_fixture(tmp)
             (args.prepared / "source/codex-rs/Cargo.lock").write_bytes(b"FAIL")
-            with patch.object(TOOL, "require_build_domain", return_value=TOOL.SANDBOX), patch.object(TOOL, "package", return_value=(base / "package", {}, [], [tr], [sr])), patch.object(TOOL.subprocess, "Popen", side_effect=AssertionError("must not spawn")):
+            with self.pure_mock_sidecar_build(args) as helper_build, patch.object(TOOL, "require_build_domain", return_value=TOOL.SANDBOX), patch.object(TOOL, "package", return_value=pure_build_package(base, sr, tr)), patch.object(TOOL.subprocess, "Popen", side_effect=AssertionError("must not spawn")):
                 with self.assertRaisesRegex(ValueError, "source changed"):
                     TOOL.build(args)
             self.assertFalse(args.output.exists())
@@ -470,10 +515,11 @@ class TemporaryDataChecks(unittest.TestCase):
                 binary.parent.mkdir(parents=True)
                 binary.write_bytes(b"PURE TEST DATA, NEVER EXECUTED")
                 return SimpleNamespace(wait=lambda timeout: 0)
-            with patch.dict(TOOL.os.environ, {"SOLOCO_SOURCE_MANIFEST_SHA256": "f" * 64}), patch.object(TOOL, "require_build_domain", return_value=TOOL.SANDBOX), patch.object(TOOL, "package", return_value=(base / "package", {}, [], [tr], [sr])), patch.object(TOOL.subprocess, "Popen", side_effect=fake_spawn) as spawn, contextlib.redirect_stdout(io.StringIO()):
+            with self.pure_mock_sidecar_build(args) as helper_build, patch.dict(TOOL.os.environ, {"SOLOCO_SOURCE_MANIFEST_SHA256": "f" * 64}), patch.object(TOOL, "require_build_domain", return_value=TOOL.SANDBOX), patch.object(TOOL, "package", return_value=pure_build_package(base, sr, tr)), patch.object(TOOL.subprocess, "Popen", side_effect=fake_spawn) as spawn, contextlib.redirect_stdout(io.StringIO()):
                 result = TOOL.build(args)
             self.assertEqual(result, 0)
             self.assertEqual(spawn.call_count, 1)
+            self.assertEqual(helper_build.call_count, 1)
             plan = json.loads((args.output / "plan.json").read_text())
             receipt = json.loads((args.output / "receipt.json").read_text())
             binding = receipt["compiled_source_manifest"]
@@ -485,6 +531,11 @@ class TemporaryDataChecks(unittest.TestCase):
             self.assertFalse(receipt["native_qualified"])
             self.assertFalse(receipt["source_slot_populated"])
             self.assertEqual(plan["environment"]["SOLOCO_SOURCE_MANIFEST_SHA256"], binding["sha256"])
+            helper = receipt["sidecar_capture"]
+            self.assertEqual(helper["status"], "compiled-source-only")
+            self.assertEqual(helper["binary"]["sha256"], TOOL.sha(b"PURE MOCK HELPER, NEVER EXECUTED"))
+            self.assertEqual(helper["binary"]["mode"], "100555")
+            self.assertFalse(helper["native_qualified"])
 
     def test_pure_mock_zero_exit_cannot_accept_changed_manifest(self):
         for change in ("bytes", "missing", "mode", "symlink"):
@@ -502,7 +553,7 @@ class TemporaryDataChecks(unittest.TestCase):
                     else:
                         artifact.unlink();artifact.symlink_to(args.prepared / "prepared-source.json")
                     return SimpleNamespace(wait=lambda timeout: 0)
-                with patch.object(TOOL, "require_build_domain", return_value=TOOL.SANDBOX), patch.object(TOOL, "package", return_value=(base / "package", {}, [], [tr], [sr])), patch.object(TOOL.subprocess, "Popen", side_effect=fake_spawn), contextlib.redirect_stdout(io.StringIO()):
+                with self.pure_mock_sidecar_build(args) as helper_build, patch.object(TOOL, "require_build_domain", return_value=TOOL.SANDBOX), patch.object(TOOL, "package", return_value=pure_build_package(base, sr, tr)), patch.object(TOOL.subprocess, "Popen", side_effect=fake_spawn), contextlib.redirect_stdout(io.StringIO()):
                     result = TOOL.build(args)
                 self.assertEqual(result, 1)
                 receipt = json.loads((args.output / "receipt.json").read_text())
@@ -516,7 +567,7 @@ class TemporaryDataChecks(unittest.TestCase):
             def fake_spawn(argv, **kwargs):
                 (args.prepared / "source/codex-rs/Cargo.lock").write_bytes(b"FAIL")
                 return SimpleNamespace(wait=lambda timeout: 0)
-            with patch.object(TOOL, "require_build_domain", return_value=TOOL.SANDBOX), patch.object(TOOL, "package", return_value=(base / "package", {}, [], [tr], [sr])), patch.object(TOOL.subprocess, "Popen", side_effect=fake_spawn), contextlib.redirect_stdout(io.StringIO()):
+            with self.pure_mock_sidecar_build(args) as helper_build, patch.object(TOOL, "require_build_domain", return_value=TOOL.SANDBOX), patch.object(TOOL, "package", return_value=pure_build_package(base, sr, tr)), patch.object(TOOL.subprocess, "Popen", side_effect=fake_spawn), contextlib.redirect_stdout(io.StringIO()):
                 result = TOOL.build(args)
             self.assertEqual(result, 1)
             receipt = json.loads((args.output / "receipt.json").read_text())
@@ -621,7 +672,7 @@ class TemporaryDataChecks(unittest.TestCase):
     def test_unqualified_selected_SDK_holds_before_output_or_spawn(self):
         with tempfile.TemporaryDirectory() as tmp:
             base, args, sr, tr = pure_build_fixture(tmp)
-            with patch.object(TOOL, "require_build_domain", return_value=TOOL.SANDBOX), patch.object(TOOL, "package", return_value=(base / "package", {}, [], [tr], [sr])), patch.object(TOOL, "validate_selected_sdk", side_effect=ValueError("selected SDK changed")), patch.object(TOOL.subprocess, "Popen", side_effect=AssertionError("must not spawn")):
+            with self.pure_mock_sidecar_build(args) as helper_build, patch.object(TOOL, "require_build_domain", return_value=TOOL.SANDBOX), patch.object(TOOL, "package", return_value=pure_build_package(base, sr, tr)), patch.object(TOOL, "validate_selected_sdk", side_effect=ValueError("selected SDK changed")), patch.object(TOOL.subprocess, "Popen", side_effect=AssertionError("must not spawn")):
                 with self.assertRaisesRegex(ValueError, "selected SDK changed"):
                     TOOL.build(args)
             self.assertFalse(args.output.exists())
@@ -633,7 +684,7 @@ class TemporaryDataChecks(unittest.TestCase):
                 binary = args.output / "target" / TOOL.TARGET / "release/codex-soloco-protected-host"
                 binary.parent.mkdir(parents=True);binary.write_bytes(b"PURE MOCK SDK BUILD")
                 return SimpleNamespace(wait=lambda timeout: 0)
-            with patch.object(TOOL, "require_build_domain", return_value=TOOL.SANDBOX), patch.object(TOOL, "package", return_value=(base / "package", {}, [], [tr], [sr])), patch.object(TOOL.subprocess, "Popen", side_effect=fake_spawn), contextlib.redirect_stdout(io.StringIO()):
+            with self.pure_mock_sidecar_build(args) as helper_build, patch.object(TOOL, "require_build_domain", return_value=TOOL.SANDBOX), patch.object(TOOL, "package", return_value=pure_build_package(base, sr, tr)), patch.object(TOOL.subprocess, "Popen", side_effect=fake_spawn), contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(TOOL.build(args), 0)
             plan = json.loads((args.output / "plan.json").read_text());receipt = json.loads((args.output / "receipt.json").read_text())
             self.assertEqual(plan["selected_sdk"], receipt["selected_sdk"])
@@ -644,7 +695,7 @@ class TemporaryDataChecks(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             base, args, sr, tr = pure_build_fixture(tmp)
             before, after = {"observed": "fixture-before"}, {"observed": "fixture-after"}
-            with patch.object(TOOL, "require_build_domain", return_value=TOOL.SANDBOX), patch.object(TOOL, "package", return_value=(base / "package", {}, [], [tr], [sr])), patch.object(TOOL, "validate_selected_sdk", side_effect=[before, before, after]), patch.object(TOOL.subprocess, "Popen", return_value=SimpleNamespace(wait=lambda timeout: 0)), contextlib.redirect_stdout(io.StringIO()):
+            with self.pure_mock_sidecar_build(args) as helper_build, patch.object(TOOL, "require_build_domain", return_value=TOOL.SANDBOX), patch.object(TOOL, "package", return_value=pure_build_package(base, sr, tr)), patch.object(TOOL, "validate_selected_sdk", side_effect=[before, before, after]), patch.object(TOOL.subprocess, "Popen", return_value=SimpleNamespace(wait=lambda timeout: 0)), contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(TOOL.build(args), 1)
             receipt = json.loads((args.output / "receipt.json").read_text())
             self.assertEqual(receipt["status"], "changed-input-or-output-held")
@@ -666,10 +717,11 @@ class TemporaryDataChecks(unittest.TestCase):
             tr = {"path": "bin/cargo", "bytes": 6, "sha256": TOOL.sha(b"cargo!"), "mode": "100755"}
             (prepared / "prepared-source.json").write_text(json.dumps({"schema": "soloco-prepared-native-source-v1", "manifest_sha256": TOOL.MANIFEST_SHA256, "files": [sr], "source_compiled": False, "native_qualified": False}))
             args = argparse.Namespace(manifest=TOOL.MANIFEST, prepared=prepared, toolchain=prefix, cargo_home=cache, output=base / "output", timeout=5)
-            with patch.object(TOOL, "require_build_domain", return_value=TOOL.SANDBOX), patch.object(TOOL, "package", return_value=(base / "package", {}, [], [tr], [sr])), patch.object(TOOL.subprocess, "Popen", return_value=SimpleNamespace(wait=lambda timeout: 1)) as spawn, contextlib.redirect_stdout(io.StringIO()):
+            with self.pure_mock_sidecar_build(args) as helper_build, patch.object(TOOL, "require_build_domain", return_value=TOOL.SANDBOX), patch.object(TOOL, "package", return_value=pure_build_package(base, sr, tr)), patch.object(TOOL.subprocess, "Popen", return_value=SimpleNamespace(wait=lambda timeout: 1)) as spawn, contextlib.redirect_stdout(io.StringIO()):
                 result = TOOL.build(args)
             self.assertEqual(result, 1)
             self.assertEqual(spawn.call_count, 1)
+            self.assertEqual(helper_build.call_count, 1)
             self.assertEqual(spawn.call_args.args[0][:2], ["/usr/bin/sandbox-exec", "-p"])
             self.assertEqual(spawn.call_args.kwargs["stdin"], TOOL.subprocess.DEVNULL)
             self.assertTrue({"HOME", "CODEX_HOME"}.isdisjoint(spawn.call_args.kwargs["env"]))

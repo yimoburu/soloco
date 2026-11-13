@@ -10,11 +10,11 @@ import {createHash} from 'node:crypto';
 
 const REPO=fileURLToPath(new URL('../../../../',import.meta.url));
 const ROOT=path.join(REPO,'work/peer-context-component/deployments');
-const EXPECTED_PACKAGE='11dce050e14c48ed20dac9052ec096f3fbd94717603035b22f56f7af851ce84c';
-const EXPECTED_MANIFEST='af7c8cc78011e7775945ed757fe346c2feea2605f8dec0e663b5307ec8852a66';
+const EXPECTED_PACKAGE='c103b27a9c458c0989c7766a769ab1644e3663307e72274906c6d362fdd64c15';
+const EXPECTED_MANIFEST='b43e9c06b7e67c7b5b19eb38b8b68101e4580a99cc9d4f7b65beb4de8a1ee12a';
 const HOST='plugins/soloco/runtime/peers/codex-task-host.mjs';
 const INTERPRETER='plugins/soloco/runtime/peers/peer-context-interpreter.mjs';
-const pins=new WeakMap();let loaded=null,producer=null;
+const pins=new WeakMap(),sidecarPrograms=new WeakMap();let loaded=null,producer=null;
 // General P2 libraries also import the slot guard in installed plugins. Delay
 // the repository-only producer's eager entry/source reads until an explicit
 // original deployment/load operation; ordinary imports and Holds need no repo.
@@ -34,7 +34,7 @@ function read(file,maximum=256*1024*1024){
  try{const before=fs.fstatSync(fd),b=fs.readFileSync(fd),after=fs.fstatSync(fd),now=fs.lstatSync(file);if(b.length!==before.size||['dev','ino','mode','uid','gid','nlink','size','mtimeMs','ctimeMs'].some(k=>named[k]!==before[k]||before[k]!==after[k]||after[k]!==now[k]))fail('COMPONENT_DEPLOYMENT_CHANGED');return b;}finally{fs.closeSync(fd);}
 }
 const ref=b=>({bytes:b.length,sha256:digest(b)});
-function pin(file,expected,mode){const b=read(file);if(!same(ref(b),expected)||(fs.lstatSync(file).mode&0o777)!==mode)fail('COMPONENT_DEPLOYMENT_CHANGED');return b;}
+function pin(file,expected,mode,maximum=256*1024*1024){const b=read(file,maximum);if(!same(ref(b),expected)||(fs.lstatSync(file).mode&0o777)!==mode)fail('COMPONENT_DEPLOYMENT_CHANGED');return b;}
 function sync(directory){const fd=fs.openSync(directory,fs.constants.O_RDONLY|fs.constants.O_NOFOLLOW);try{fs.fsyncSync(fd);}finally{fs.closeSync(fd);}}
 function mkdir(directory){noLinks(directory);try{fs.mkdirSync(directory,{mode:0o700});sync(path.dirname(directory));}catch(e){if(e.code!=='EEXIST')throw e;}const s=fs.lstatSync(directory);if(!s.isDirectory()||s.uid!==process.getuid()||(s.mode&0o077))fail('COMPONENT_DEPLOYMENT_PATH');}
 function immutable(file,b,mode){const fd=fs.openSync(file,fs.constants.O_WRONLY|fs.constants.O_CREAT|fs.constants.O_EXCL|fs.constants.O_NOFOLLOW,0o600);try{fs.writeFileSync(fd,b);fs.fchmodSync(fd,mode);fs.fsyncSync(fd);}finally{fs.closeSync(fd);}sync(path.dirname(file));}
@@ -42,8 +42,8 @@ function selected(){if(!producer)fail('COMPONENT_DEPLOYMENT_NOT_LOADED');const h
 function selection(data){
  if(data.protocol!=='soloco-selected-context-component-data-v1'||data.kind!=='SELECTED_COMPILED_COMPONENT_DATA'||data.command.status!=='COMPILED_COMPONENT'||data.native_qualified!==false||data.claims_released!==false)fail('COMPONENT_DEPLOYMENT_ORIGINAL_REQUIRED');
  const copies=new Map(data.copies.map(r=>[r.sealed_path,r]));
- const native=name=>{const p=copies.get('native/'+name);if(!p||p.bytes<1)fail('COMPONENT_DEPLOYMENT_CHANGED');const location=path.join(data.component_root,p.sealed_path);pin(location,{bytes:p.bytes,sha256:p.sha256},0o444);return {path:location,bytes:p.bytes,sha256:p.sha256,original_path:p.original_path};};
- const files={executable:native('executable'),compiled_manifest:native('compiled-source-manifest.json'),build_receipt:native('build-receipt.json'),source_package:native('source-package.json'),cargo_lock:native('Cargo.lock'),toolchain_manifest:native('toolchain-manifest.toml')};
+ const native=name=>{const p=copies.get('native/'+name);if(!p||p.bytes<1)fail('COMPONENT_DEPLOYMENT_CHANGED');const location=path.join(data.component_root,p.sealed_path);pin(location,{bytes:p.bytes,sha256:p.sha256},0o444,name==='origin-sidecar-capture'?16*1024*1024:256*1024*1024);return {path:location,bytes:p.bytes,sha256:p.sha256,original_path:p.original_path};};
+ const files={executable:native('executable'),sidecar_capture:native('origin-sidecar-capture'),compiled_manifest:native('compiled-source-manifest.json'),build_receipt:native('build-receipt.json'),source_package:native('source-package.json'),cargo_lock:native('Cargo.lock'),toolchain_manifest:native('toolchain-manifest.toml')};
  if(files.source_package.sha256!==EXPECTED_PACKAGE||files.compiled_manifest.sha256!==EXPECTED_MANIFEST)fail('COMPONENT_DEPLOYMENT_SOURCE_UNSUPPORTED');
  const profile=data.node_profile.record;
  if(profile.version!==process.version||profile.platform!==process.platform||profile.arch!==process.arch||!same(profile.exec_argv,process.execArgv)||!same(profile.node,ref(read(fs.realpathSync(process.execPath)))))fail('COMPONENT_DEPLOYMENT_NODE_CHANGED');
@@ -57,9 +57,9 @@ function selection(data){
 function prepared(data){
  const s=selection(data),directory=path.join(ROOT,s.intent_key),file=path.join(directory,'deployment.json');noLinks(directory);
  const record=JSON.parse(read(file,1024*1024).toString('utf8'));
- const expected={...s,executable:{path:path.join(directory,'codex-soloco-protected-host'),bytes:s.files.executable.bytes,sha256:s.files.executable.sha256,mode:'100555'}};
+ const expected={...s,executable:{path:path.join(directory,'codex-soloco-protected-host'),bytes:s.files.executable.bytes,sha256:s.files.executable.sha256,mode:'100555'},sidecar_capture_executable:{path:path.join(directory,'origin-sidecar-capture'),bytes:s.files.sidecar_capture.bytes,sha256:s.files.sidecar_capture.sha256,mode:'100555'}};
  if(!same(record,expected)||!read(file,1024*1024).equals(Buffer.from(canonical(expected)))||(fs.lstatSync(file).mode&0o777)!==0o444||(fs.lstatSync(directory).mode&0o777)!==0o555)fail('COMPONENT_DEPLOYMENT_CHANGED');
- pin(expected.executable.path,{bytes:expected.executable.bytes,sha256:expected.executable.sha256},0o555);return expected;
+ pin(expected.executable.path,{bytes:expected.executable.bytes,sha256:expected.executable.sha256},0o555);pin(expected.sidecar_capture_executable.path,{bytes:expected.sidecar_capture_executable.bytes,sha256:expected.sidecar_capture_executable.sha256},0o555,16*1024*1024);return expected;
 }
 
 /** Explicit file preparation only. Fixed source-owned destination; no spawn. */
@@ -70,12 +70,13 @@ async function prepareDeployment(){
  await originalProducer();const {h,data}=selected(),s=selection(data),directory=path.join(ROOT,s.intent_key);
  mkdir(ROOT);
  if(!fs.existsSync(directory)){
-  mkdir(directory);const executable={path:path.join(directory,'codex-soloco-protected-host'),bytes:s.files.executable.bytes,sha256:s.files.executable.sha256,mode:'100555'};
+  mkdir(directory);const executable={path:path.join(directory,'codex-soloco-protected-host'),bytes:s.files.executable.bytes,sha256:s.files.executable.sha256,mode:'100555'},sidecar_capture_executable={path:path.join(directory,'origin-sidecar-capture'),bytes:s.files.sidecar_capture.bytes,sha256:s.files.sidecar_capture.sha256,mode:'100555'};
   // A crash leaves an unselected incomplete directory. Never overwrite, repair
   // or promote it on retry; the complete exact recipe below must already exist.
   immutable(executable.path,read(s.files.executable.path),0o555);
+  immutable(sidecar_capture_executable.path,read(s.files.sidecar_capture.path,16*1024*1024),0o555);
   producer.inspectOriginalSelectedContextComponentData(h);
-  immutable(path.join(directory,'deployment.json'),Buffer.from(canonical({...s,executable})),0o444);
+  immutable(path.join(directory,'deployment.json'),Buffer.from(canonical({...s,executable,sidecar_capture_executable})),0o444);
   fs.chmodSync(directory,0o555);sync(directory);sync(ROOT);
  }
  const record=prepared(producer.inspectOriginalSelectedContextComponentData(h)),handle=Object.freeze(Object.create(null));pins.set(handle,{original:h,record});return handle;
@@ -114,4 +115,22 @@ export function createOriginalLoadedProductionTaskRuntime(options){
  inspectOriginalLoadedPeerBridge();
  if(!options||Object.getPrototypeOf(options)!==Object.prototype||!options.protected_launch||Object.keys(options).some(k=>!['owner','ledger','membership','launch','protected_launch','limits','scheduler_principal_id'].includes(k)))fail('COMPONENT_DEPLOYMENT_RUNTIME_ARGUMENT');
  return loaded.host.createCodexTaskRuntime({...options,callback_restriction:'task-bound-effects'});
+}
+
+function originalSidecarProgramRecord(){
+ const bridge=inspectOriginalLoadedPeerBridge(),pkg=JSON.parse(read(bridge.files.source_package.path,16*1024*1024).toString('utf8')),sourcePath='plugins/soloco/helpers/origin-sidecar-capture.c',source=read(path.join(REPO,sourcePath),1024*1024);
+ if(pkg.sidecar_capture?.protocol!=='soloco-origin-sidecar-source-build-v1'||!same(pkg.sidecar_capture.source,{path:sourcePath,...ref(source)})||!same(pkg.sidecar_capture.arguments,['origin-sidecar-capture-v1'])||!bridge.sidecar_capture_executable||bridge.sidecar_capture_executable.mode!=='100555')fail('ORIGIN_SIDECAR_PROGRAM_UNAVAILABLE');
+ return {protocol:'soloco-original-origin-sidecar-capture-program-v1',executable:copy(bridge.sidecar_capture_executable),source_sha256:digest(source),source_package_sha256:bridge.files.source_package.sha256,compiled_manifest_sha256:bridge.files.compiled_manifest.sha256,component_intent_key:bridge.intent_key,argv:['origin-sidecar-capture-v1'],native_qualified:false};
+}
+/** No caller path/descriptor/program and no compilation at capture time. The
+ * selected NEW build/capsule/deployment must already exist and remain current. */
+export function prepareOriginalOriginSidecarCaptureProgram(...args){
+ if(args.length)fail('ORIGIN_SIDECAR_PROGRAM_UNAVAILABLE');let record;
+ try{record=originalSidecarProgramRecord();}catch{fail('ORIGIN_SIDECAR_PROGRAM_UNAVAILABLE');}
+ const h=Object.freeze(Object.create(null));sidecarPrograms.set(h,{original:loaded.original,record});return h;
+}
+export function inspectOriginalOriginSidecarCaptureProgram(h,...args){
+ const r=sidecarPrograms.get(h);if(args.length||!r)fail('ORIGIN_SIDECAR_ORIGINAL_PROGRAM_REQUIRED');
+ let current;try{current=originalSidecarProgramRecord();}catch{fail('ORIGIN_SIDECAR_PROGRAM_UNAVAILABLE');}
+ if(loaded.original!==r.original||!same(current,r.record))fail('ORIGIN_SIDECAR_PROGRAM_CHANGED');return Object.freeze(copy(r.record));
 }
