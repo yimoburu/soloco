@@ -1,0 +1,447 @@
+{
+  "schema": "soloco-portable-coherent-source-lineage-v1",
+  "status": "SOURCE_ONLY_UNQUALIFIED",
+  "original_coherent_handoff_sha256": "67ad9bf2fe5e16cc671a520b0af737b1dbfc430d3f2ed8d2f9184bf5b3524a23",
+  "original_coherent_cut_sha256": "71fc9d955703fb083280d78d4be560120233a3e857bf6ba67d8e7f2fb2c8d4a9",
+  "original_coherent_bindings_sha256": "074802c878f106af12c6adaba349db932932d5ce461e597b421e36614470b1d4",
+  "original_materialization_plan_sha256": "22c2428e90c39f5f88c98ddab4f21bc7b28daee81b4d8a34a552273e87c17c7c",
+  "original_backend_source_handoff_sha256": "5a43acb85656aa2f2dc6a52b91ab5d88741d69bf27bd1c0368ec1d59664e9a61",
+  "rust_tests_authored": 180,
+  "rust_tests_status": "AUTHORED_UNRUN_FOR_NEW_SOURCE_TUPLE",
+  "complete_logical_files": 9309,
+  "overlay_files": 158,
+  "ordered_source_composition": [
+    {
+      "order": 1,
+      "component": "root-original-provenance-producers-source-preparation-v1",
+      "artifact": "handoff.DATA.json",
+      "sha256": "b18a06b14e9455592e2dfc42c9be6a79fe69d2ee8e364e3c699d9d9e299f781a"
+    },
+    {
+      "order": 2,
+      "component": "root-original-session-ingress-source-preparation-v2",
+      "artifact": "handoff.DATA.json",
+      "sha256": "d5e81af6e2e660331ac587f64d5b4ae03529812fb4e198e81cad0d63ef8c70f4"
+    },
+    {
+      "order": 3,
+      "component": "root-original-instruction-renderer-source-preparation-v1",
+      "artifact": "handoff.DATA.json",
+      "sha256": "ca9ee652f39428ff6bee55019e2814d11a0e88ce82cc2616a9284cdc55d00117"
+    },
+    {
+      "order": 4,
+      "component": "root-scoped-nonincremental-profile-source-preparation-v1",
+      "artifact": "handoff.DATA.json",
+      "sha256": "37435cf1b4c04a1c92e1edb8fc4f60bcb8697c29d73eaf336b93ded887cecb06"
+    },
+    {
+      "order": 5,
+      "component": "ROOT-independent-scoped-nonincremental-profile-source-review-v1",
+      "artifact": "review.DATA.json",
+      "sha256": "4f7c45000f0c0ed23da6d91631672bda124b0295f044f2211bb5253dd52cb700"
+    },
+    {
+      "order": 6,
+      "component": "root-original-provenance-coherent-join-source-preparation-v3",
+      "artifact": "handoff.DATA.json",
+      "sha256": "67ad9bf2fe5e16cc671a520b0af737b1dbfc430d3f2ed8d2f9184bf5b3524a23"
+    },
+    {
+      "order": 7,
+      "component": "root-original-provenance-coherent-join-source-preparation-v3",
+      "artifact": "FROZEN-source-cut-v3.DATA.json",
+      "sha256": "71fc9d955703fb083280d78d4be560120233a3e857bf6ba67d8e7f2fb2c8d4a9"
+    },
+    {
+      "order": 8,
+      "component": "root-original-provenance-coherent-join-source-preparation-v3",
+      "artifact": "complete-source-materialization.DATA.json",
+      "sha256": "22c2428e90c39f5f88c98ddab4f21bc7b28daee81b4d8a34a552273e87c17c7c"
+    },
+    {
+      "order": 9,
+      "component": "root-original-provenance-portable-source-format-preparation-v1/format-source",
+      "artifact": "handoff.DATA.json",
+      "sha256": "190113bad2b31e83df5be70ef3d45957f281307ca5bf03274448ae5845fc5ffb"
+    },
+    {
+      "order": 10,
+      "component": "root-original-provenance-portable-source-eof-preparation-v1/eof-source",
+      "artifact": "handoff.DATA.json",
+      "sha256": "db544a4699e562d8af4a1f128ac2769ef7b25813783a049933e1f35811765517"
+    },
+    {
+      "order": 11,
+      "component": "root-original-rollout-path-lifetime-source-preparation-v1",
+      "artifact": "handoff.DATA.json",
+      "sha256": "34392507e7d695b4ef42bd74d422f48a213e302ef35dbc34e647c500ed5ae4b8"
+    },
+    {
+      "order": 12,
+      "component": "root-original-renderer-response-id-source-preparation-v1",
+      "artifact": "handoff.DATA.json",
+      "sha256": "58e3ed4be51f7797a5ea0b150f32b5585a6db298e662a857b59b12436429ed44"
+    },
+    {
+      "order": 13,
+      "component": "root-original-renderer-empty-metadata-source-preparation-v1",
+      "artifact": "handoff.DATA.json",
+      "sha256": "0952a7af5547d3324b9f8449f36ff2a106b5a5fae808df516c79f88d970aad13"
+    },
+    {
+      "order": 14,
+      "component": "root-original-renderer-empty-metadata-source-preparation-v1/ROOT-independent-renderer-repair-source-review-v1",
+      "artifact": "review.DATA.json",
+      "sha256": "f45561a9bb26b5bb5bda9c6153b2e0057d5f9f154de304defe7e5d7e928e2c37"
+    },
+    {
+      "order": 15,
+      "component": "root-original-provenance-test-compile-repairs-source-preparation-v1",
+      "artifact": "handoff.DATA.json",
+      "sha256": "9e7a6486b1b5ffac5740af36a8514d76989d2b16eeed1cc2e151d99284032f5c"
+    },
+    {
+      "order": 16,
+      "component": "root-original-provenance-test-compile-repairs-source-preparation-v1/ROOT-independent-test-compile-repair-source-review-v1",
+      "artifact": "review.DATA.json",
+      "sha256": "a70ba3f26439886b85f769544946693d6135b4102c87e03994b4ec864af14a9c"
+    },
+    {
+      "order": 17,
+      "component": "root-native-live-context-coherent-source-preparation-v1",
+      "artifact": "handoff.DATA.json",
+      "sha256": "27443093ad1ec81f6cfbb2bce2e776b1c0ad07f54590dd4d364d13190df45295"
+    },
+    {
+      "order": 18,
+      "component": "ROOT-independent-coherent-native-source-review-v1",
+      "artifact": "review.DATA.json",
+      "sha256": "bbb42870d1de257f5f5723c67847dd93244be155cfa031e4fde6e42185e1435f"
+    },
+    {
+      "order": 19,
+      "component": "root-native-live-context-test-repairs-source-preparation-v1",
+      "artifact": "handoff.DATA.json",
+      "sha256": "0275845d1fa4239a3a0715b31adef6b98cd430c1122690a4290eb2435abc9c6a"
+    },
+    {
+      "order": 20,
+      "component": "root-native-live-context-compile-readiness-source-preparation-v1",
+      "artifact": "handoff.DATA.json",
+      "sha256": "901ccb1ae925c07a7d13770dbac314d1ac9b08a292e8f0dce79d6c24fd914e5d"
+    },
+    {
+      "order": 21,
+      "component": "root-native-live-context-compile-readiness-source-preparation-v1",
+      "artifact": "ROOT-independent-compile-readiness-repair-review-v1.DATA.json",
+      "sha256": "203f93c8274edfd58cb11ce9b79a0316cc23c0bc8c6701c3343999076e064740"
+    },
+    {
+      "order": 22,
+      "component": "root-original-history-witness-test-compile-repair-source-preparation-v1",
+      "artifact": "handoff.DATA.json",
+      "sha256": "7c0f6e1e6114c9d0784d53c83f6860afeb0c05939fe8d12d7208129dcfc08428"
+    },
+    {
+      "order": 23,
+      "component": "root-original-history-witness-test-compile-repair-source-preparation-v1",
+      "artifact": "ROOT-independent-history-wire-repair-review-v1.DATA.json",
+      "sha256": "30bd4dc036d982e109f16915b0d4afb1bce1eed8a1d53da3af1600761f881ae3"
+    },
+    {
+      "order": 24,
+      "component": "root-native-live-context-history-test-repair-source-preparation-v1",
+      "artifact": "handoff.DATA.json",
+      "sha256": "92716c6974ae7b777236e057f032c2db825e6f4471a00f31cd1c1f50475a25d2"
+    },
+    {
+      "order": 25,
+      "component": "root-native927-test-fixture-reconciliation-source-preparation-v1",
+      "artifact": "handoff.DATA.json",
+      "sha256": "2bf25a1a0b15b8e686476ce5ce9234c6a10af1223898e937a1d74b374b9ff29b"
+    },
+    {
+      "order": 26,
+      "component": "root-native-plan-mode-original-output-fixture-source-preparation-v1",
+      "artifact": "handoff.DATA.json",
+      "sha256": "1f65dddec573879785ce5d62a5e2045752d8238f1d96727f96564dd42ac98e0d"
+    },
+    {
+      "order": 27,
+      "component": "root-native-guardian-inner-stack-fixture-source-preparation-v1",
+      "artifact": "handoff.DATA.json",
+      "sha256": "acda72caea0fef6970db316465495c2ff312ddb72a3479b27d8e55ab918eb521"
+    },
+    {
+      "order": 28,
+      "component": "root-native-guardian-models-coherent-source-preparation-v1",
+      "artifact": "handoff.DATA.json",
+      "sha256": "6ee54de41344d9704e27c435f8cf83ffeb687e4b63a2fe7a4a953a12d78a6863"
+    },
+    {
+      "order": 29,
+      "component": "root-native-rollout-schema-description-fixture-source-preparation-v2",
+      "artifact": "handoff.DATA.json",
+      "sha256": "76f858c26b94155987c29805001311d03a927d59a906f4d910fd297234af0dd7"
+    },
+    {
+      "order": 30,
+      "component": "executable-peer-fixed-loopback-source-v1",
+      "artifact": "SOURCE-SUCCESSOR.DATA.json",
+      "sha256": "89d72fc7ae837b547209934fddb83f5f46b50a3ac435693f27579dc2dadbd1aa"
+    }
+  ],
+  "accepted_lock_sha256": "040a380b1611e90ccf63cdcefc1a2d215e229053181d8dee497c659a477f47ec",
+  "qualified_binary": null,
+  "runtime_slot": null,
+  "native_qualified": false,
+  "boundary": "Source recipe and immutable input associations only; no build/test/native acceptance or grant inferred",
+  "format_source_handoff_sha256": "190113bad2b31e83df5be70ef3d45957f281307ca5bf03274448ae5845fc5ffb",
+  "format_source_cut_sha256": "3b0e077cc3e4a38e521c0d268efadaa7df309612622c951bf38fb229989db37d",
+  "format_source_bindings_sha256": "536e8668778d2de23fba9a98a4772d15ef864069e66a3e1d3811399b60cee0b3",
+  "format_source_materialization_sha256": "50297a1849fb5b6bf0539360088d81ef3db3e8beeea631d7b142b77dea858476",
+  "source_graph_vector_sha256": "5612af8c980fa84df37ad53c5b441698e2a4bce11667fa8529fa987a2343aefd",
+  "source_format_delta": {
+    "parent_portable_handoff_sha256": "c75ee77de8458c672622363bd02656e0a2075f67bdf5c2ba89aef40b7565edb4",
+    "parent_coherent_handoff_sha256": "67ad9bf2fe5e16cc671a520b0af737b1dbfc430d3f2ed8d2f9184bf5b3524a23",
+    "changed_files": 15,
+    "removed_ASCII_EOL_spaces": 18,
+    "scope": "Only source-code trailing whitespace outside literals/comments; source-byte associations change and need their own qualification"
+  },
+  "source_graph_bytes": 92071707,
+  "eof_source_handoff_sha256": "db544a4699e562d8af4a1f128ac2769ef7b25813783a049933e1f35811765517",
+  "lifetime_source_handoff_sha256": "34392507e7d695b4ef42bd74d422f48a213e302ef35dbc34e647c500ed5ae4b8",
+  "lifetime_source_cut_sha256": "6e2764f7d19ee0e530fdd4aa08c4a9a0dfb2d35535cebff8e5d0a581d614d1a7",
+  "lifetime_source_bindings_sha256": "e20ab6c6a62d2af182a81ca1d1190fe0a4b5aaa30d2dde557e285cebfc90273c",
+  "lifetime_source_materialization_sha256": "97d4d6659e2b4cfeed41d9db35c6a463e8074f4fbeb34a7bb85951a4d94d692c",
+  "distinct_authored_rust_tests_manifest_sha256": "2b037106bf4afc3e456bcc9b8590721c281e0ce55377a5ea20b0559277187a13",
+  "source_repair": {
+    "parent_portable_handoff_sha256": "c0672a939f0941471e07b0249cb4841052d3b4f3fa502c72b67b85ecb1e7a608",
+    "EOF": "One extra final LF removed from rollout_decode.rs; retain one final LF",
+    "lifetime": "Own original rollout PathBuf and move into existing static blocking-reader callback; source-authored original-read test added",
+    "previous_failed_compiler_receipt_sha256": "f897dbfd1c4da0a67e9f33b9f8d979da4f2be459d72d378a840270abc1bd51c8",
+    "qualification": "Old failed compiler stays failed; new source needs its own checks/build/native acceptance"
+  },
+  "renderer_public_type_handoff_sha256": "58e3ed4be51f7797a5ea0b150f32b5585a6db298e662a857b59b12436429ed44",
+  "renderer_absent_metadata_handoff_sha256": "0952a7af5547d3324b9f8449f36ff2a106b5a5fae808df516c79f88d970aad13",
+  "renderer_source_bindings_sha256": "e6d9840930773554717e92b728b7ae4c529b6958d9f13eaf87912098df3ce4df",
+  "renderer_materialization_sha256": "54797169136dc7044d33cb319d314f0e5a62b5deaa712cacca682045dc2a7da8",
+  "renderer_repair_review_sha256": "f45561a9bb26b5bb5bda9c6153b2e0057d5f9f154de304defe7e5d7e928e2c37",
+  "renderer_repair_scope": {
+    "compiler_finding": "E0603 private ResponseItemId path; production qualifiers and test import use the public crate-root export",
+    "source_confirmed_regression": "Clear only an existing harness metadata value; preserve absent metadata without a renderer capsule",
+    "tests": "New ordinary None/no-capsule regression covers both history-route booleans; AUTHORED_UNRUN",
+    "qualification": "Source repair only; failed runs remain failed; no ordinary/protected/native success inferred"
+  },
+  "test_compile_repair_handoff_sha256": "9e7a6486b1b5ffac5740af36a8514d76989d2b16eeed1cc2e151d99284032f5c",
+  "test_compile_repair_bindings_sha256": "26d78a0b321be19d97c5196c48b8ece0d92ca22495e27c9c52a4b674dd89ccc6",
+  "test_compile_repair_source_review_sha256": "a70ba3f26439886b85f769544946693d6135b4102c87e03994b4ec864af14a9c",
+  "test_compile_repair_scope": {
+    "source": "Exactly3 test-only files; all production source rows/modes unchanged from exactf48",
+    "changes": "Explicit existing assert_eq macro; real durable RolloutItemWire adapter; declared raw/prefix fixture bytes derive six ProjectDoc fields",
+    "assertions": "All prior assertions/test definitions retained; no new test cases; invalid UTF8 provenance assertion strengthened",
+    "prior_ordinary9": "Historical exactf48 ordinary production-library typecheck pass only; receipt prefix2874",
+    "prior_test_compile": "First8-library no-run failed11 actual cfg(test) errors; receipt715bc991dd38a20aade118c824084021fea42eedaa6c0f674d55c7b0cd22fc3c remains FAILED",
+    "new_graph": "Whole source/package/compiled-input association changes even with identical production bytes; new593 compilation/tests/native remain unproved"
+  },
+  "continuation_source_handoff_sha256": "76f858c26b94155987c29805001311d03a927d59a906f4d910fd297234af0dd7",
+  "continuation_source_bindings_sha256": "f3fd28080f262b996318ca59e575fc6ee72ef5cd0d10f0c45976f08023a9a463",
+  "continuation_source_materialization_sha256": "2e4aeaebd9a7a854e93b842a3905e4259680ccfd4276a91c5357298f0353737b",
+  "continuation_boundary": {
+    "source_mechanics": "Original protected logical-SSE/typed-item lineage; fixed-five actual pending/decoder return; same-owner post-effective v5 context handshake; fresh later-step projection retains source while requiring new send guards",
+    "resource_sha256": "832fdd1c965fa0e834c030f7c1e5636e2f32636b0df899ba8aa0fa940e9032fc",
+    "evidence": "Source-only graph; no new compilation, Rust test, genuine Core/native/account/P5/corpus or Node/static slot acceptance",
+    "unsupported": "Restored/forked/incremental/deferred/compacted/originless history, actual hooks/interceptors and undeclared media transformations stay Held",
+    "Node_facts": "Rust compiled manifest is Rust-only; distinct original Node source/interpreter/profile closure still requires separate qualified outer recipe. No Node pins echoed as native observations."
+  },
+  "continuation_component_review_sha256": [
+    "79f57490d6da52a3594d85a7d1e30ef734630f90b421b4f0cd04cb95b1defa10",
+    "bbb42870d1de257f5f5723c67847dd93244be155cfa031e4fde6e42185e1435f",
+    "203f93c8274edfd58cb11ce9b79a0316cc23c0bc8c6701c3343999076e064740"
+  ],
+  "compile_readiness_repair": {
+    "parent_portable_handoff_sha256": "e3ce01c18e04d0c1f53dc69fd379c75eb344200d8f1f1bcac66e90add71e2153",
+    "source_handoff_sha256": "901ccb1ae925c07a7d13770dbac314d1ac9b08a292e8f0dce79d6c24fd914e5d",
+    "source_review_sha256": "203f93c8274edfd58cb11ce9b79a0316cc23c0bc8c6701c3343999076e064740",
+    "changed_source_files": 3,
+    "scope": "Two private protocol getter call sites replaced with supported concrete typed handling; actual CatalogModel fixture wrapper retained. Admission guards and expected/actual byte equality preserved. No Rust compile/test/native success claimed."
+  },
+  "history_wire_test_repair": {
+    "parent_portable_handoff_sha256": "aa4f4a32eb48d3364ba1d7df82bc4cb05fae166cb44dd4c2cf77387dcd119cd3",
+    "repair_handoff_sha256": "7c0f6e1e6114c9d0784d53c83f6860afeb0c05939fe8d12d7208129dcfc08428",
+    "review_sha256": "30bd4dc036d982e109f16915b0d4afb1bce1eed8a1d53da3af1600761f881ae3",
+    "scope": "One test uses actual RolloutItem::ResponseItem durable wire adapter; all assertions and163definitions retained. Production and protocol unchanged.",
+    "qualification": "Source only; no new49receipt or Rust/compiler/native acceptance. Prior actual4aebmanifest data is historical for old901tuple."
+  },
+  "three_test_fixture_reconciliation": {
+    "parent_package_handoff_sha256": "70aab893e6e72e7a12012c70abb1df0cae6a296205aa49972418adf5b9c7d057",
+    "source_handoff_sha256": "2bf25a1a0b15b8e686476ce5ce9234c6a10af1223898e937a1d74b374b9ff29b",
+    "source_bindings_sha256": "998121ae0fcd7a443efb1296989125272a1c5837e26ba7b29c3cb8d9ece1decd",
+    "source_materialization_sha256": "d35158d3b0be182cbf81687dd45ed1ed8d6e2c2a411a1fa98f257588401de2e4",
+    "causal_note_sha256": "16ef2489d9b863b341ac84dbc7482b402d262943248d49610a1321e3a41b0b9b",
+    "scope": "Three existing test fixtures only: one identical existing managed-config isolation override through initial builder and subsequent loads; one thread-provider fixture override; one positive API owner clone retaining the caller owner. Zero production bytes, unchanged assertions/definitions, no production lifetime weakening.",
+    "closed_V6_evidence": "009 appserver432pass/6fail; API231pass/1fail. Five managed-preferences failures and one dropped-positive-owner failure. Separate EPERM ancestor-grant gap belongs to runner; no Rust fix. Old graph/evidence preserved and cannot regain Pass from this new source preparation.",
+    "qualification": "Source only. No new49Python tests, Rust compiler/tests, native model or runtime-slot acceptance. Old compiled-manifest data is historical, not this tuple."
+  },
+  "plan_mode_original_output_test_fixture": {
+    "parent_package_handoff_sha256": "94c930c34a10754ee1a35100cb3aeb59d031e6dab98985847b4cd7f44e066b2e",
+    "source_handoff_sha256": "1f65dddec573879785ce5d62a5e2045752d8238f1d96727f96564dd42ac98e0d",
+    "source_bindings_sha256": "3fe21e4766c62eef21d8efeda8352728f5c9ae7e0339185fc43bf37f7785133b",
+    "source_materialization_sha256": "1d77d5f6458a683b798f7c8c22f6b76730ad4b309b1a77aaa536b092e30633fd",
+    "scope": "One legacy plan-mode fixture explicitly passes None for absent OriginalResponseItem. Only +34bytes in one existing testfile; production/assertions/163definitions unchanged. Actual productioncall already carries original_output.clone().",
+    "failure": "Actual ae174 first13Cargo failedE0061 atturn_tests.rs79; oldsource/failure retained. No physicalworkingcopy change, compiler retry or new qualification from this preparation.",
+    "all_canonical_Core_calls_checked_once": 627,
+    "qualification": "Source only; no new49receipt, Rustcompiler/tests/native acceptance or slot"
+  },
+  "guardian_inner_stack_test_fixture": {
+    "parent_package_handoff_sha256": "36f6b7853bbc056a79d87259ffb57bd26f20d4db498ebc1ef9661afa759cc265",
+    "source_handoff_sha256": "acda72caea0fef6970db316465495c2ff312ddb72a3479b27d8e55ab918eb521",
+    "source_bindings_sha256": "d4081f11744d11fdc386e88dbfb0007c8ba058ac49357e9676c4037cfcbd9d63",
+    "source_materialization_sha256": "07035e943c9084b9cd65b0faa47874114cdfda58567edb57608da2d9f1f2249c",
+    "scope": "Existing guardian test inner std::thread stack_size parses RUST_MIN_STACK as usize, falling back to and clamped to the original4MiB minimum. Only +212bytes in one existing test file. Spawn/runtime/test body, assertions,163definitions and all production bytes unchanged.",
+    "failure": "Original a558 whole-root run aborted atCore guardian inner thread despite32MiB runner default. Failed receipt8323/crash diagnosis remain historical. No conclusion32MiB is sufficient before new execution.",
+    "qualification": "New source only, unbuilt/unrun; no new49receipt, native acceptance, actual compiled manifest or binary/runtime slot."
+  },
+  "guardian_models_coherent_join": {
+    "parent_guardian_package_handoff_sha256": "3db91e55ce757d6b85005539d515a3cfcd682ceaa0c1ca87225bbfc1dc63c05a",
+    "coherent_source_handoff_sha256": "6ee54de41344d9704e27c435f8cf83ffeb687e4b63a2fe7a4a953a12d78a6863",
+    "API_component_handoff_sha256": "8f499de6422797155be6f88778810f943fc507ac731cd6d9f32b1f40b22891ed",
+    "API_independent_source_review_sha256": "2d14244ac4349102008392d9faff8bb53e9d08f634dfc792eacac49a5ae7ea88",
+    "source_bindings_sha256": "2545a7ec9d9dae19e64028ddd11b07fc84fd612a2171508c672a7f1d94095f4e",
+    "source_materialization_sha256": "627b0b5556ce97a39b0cf2655cefeafd436dad138e331512db6b6934d076c3f7",
+    "scope": "Disjoint guardian inner-stack fixture and two reviewed API postimages. Dedicated crate-private read-only models GET verifies protected post-auth method/body/exactURL/response-limit before transport; generic execute Holds and private original catalogue authority remain.",
+    "preserved_authored_definitions": 163,
+    "new_API_regressions": 6,
+    "authored_definitions": 169,
+    "all_169_status": "UNBUILT_UNRUN_FOR_NEW_TUPLE",
+    "source_boundary": "Providerbase,Renderer/private default catalog binding,resource832f and all other source rows unchanged.",
+    "qualification": "Source only; old A558 compilation/ordinary and protected failures retain original scope. No new Rust/compiler/test/native qualification, actual private source manifest or binary/runtime slot."
+  },
+  "rollout_schema_description_fixture_successor": {
+    "parent_package_handoff_sha256": "df77f5a9684f7c48e50590f9656bb98a86fa53e7ff77b3d7b186efb80ada351c",
+    "source_handoff_sha256": "76f858c26b94155987c29805001311d03a927d59a906f4d910fd297234af0dd7",
+    "source_bindings_sha256": "f3fd28080f262b996318ca59e575fc6ee72ef5cd0d10f0c45976f08023a9a463",
+    "source_materialization_sha256": "2e4aeaebd9a7a854e93b842a3905e4259680ccfd4276a91c5357298f0353737b",
+    "fixture_proof_sha256": "663a9b7cb3fabfba1706b8f73854650699bf1b760117c57f753c81d3ac8994e9",
+    "scope": "One existing compressed stable export; exactly one decoded RolloutLine.json description substring. Every other decoded byte and JSON value, all Rust bodies and all other9306 source rows unchanged.",
+    "changed_schema_fields_other_than_description": 0,
+    "changed_Rust_bodies": 0,
+    "authored_definitions_unchanged": 169,
+    "qualification": "New complete source identity unbuilt/unrun. Parent45a compiler and169 protected acceptance and ordinary adverse results remain parent-only; no actual compiled-manifest or qualified binary/runtime association."
+  },
+  "original_169_authored_rust_tests_manifest_sha256": "769e875e181952d3027fd2d05aa1ad9283f67ee48f46e264f498949bcf2c840a",
+  "executable_peer_fixed_loopback_successor": {
+    "protocol": "soloco-executable-peer-fixed-loopback-source-successor-v1",
+    "scope": "source-only fixed original HTTP factory/private bootstrap route; no executable/native qualification",
+    "parent_package_sha256": "f85caf3208b08049a13773e6cbe1d638f7e21bf648db376a1b3a4a2ccab7d11e",
+    "parent_source_vector_sha256": "77ea459e7555e0ca7a7270fd9a42b805db52b2d1dacd8efbd9ac815ab783bb0b",
+    "source_vector_sha256": "5612af8c980fa84df37ad53c5b441698e2a4bce11667fa8529fa987a2343aefd",
+    "files": [
+      {
+        "target": "codex-rs/app-server/src/config_manager.rs",
+        "prior_sha256": "4793ed7939039c85faa9c43f2b962e1ecc7579fd5d0c4173599153c8304e5bc4",
+        "current_bytes": 35030,
+        "current_sha256": "a73e02704b2351a3d3ff3f53333a6f2ffb2a89285ff4101f2db531a4933cbe6a",
+        "upstream_preimage_sha256": "64568b07bc395b5fcd8f37a3dc062c81a3fd1657a0f9dad6a59db163af5e0a5e"
+      },
+      {
+        "target": "codex-rs/app-server/src/protected_host.rs",
+        "prior_sha256": "d32fc8d24c731ee731297a51b7a5780ac752db84324ead6cf1307c17f0759bbc",
+        "current_bytes": 24338,
+        "current_sha256": "cfebc91353f977630ca425328142273c7983dd5d66189710ed0a7222a995ebd1",
+        "upstream_preimage_sha256": null
+      },
+      {
+        "target": "codex-rs/codex-api/src/protected_peer/startup.rs",
+        "prior_sha256": "592f07b9251272ab82482a1d49091ebd87503150220732f397bf7e6bae0a748d",
+        "current_bytes": 11314,
+        "current_sha256": "0876d7bbd27476debf31d2cdb6ecdc6362bacefeec3f3537a42a9aab671567e4",
+        "upstream_preimage_sha256": null
+      },
+      {
+        "target": "codex-rs/codex-api/src/protected_peer/startup_loopback_tests.rs",
+        "prior_sha256": null,
+        "current_bytes": 3588,
+        "current_sha256": "e5a367b52011825a7ea4ebd1ff65ed43f7be147c5f33283e21191af1cdea2de0",
+        "upstream_preimage_sha256": null
+      },
+      {
+        "target": "codex-rs/codex-api/src/protected_peer.rs",
+        "prior_sha256": "d6fe4c46b2c7bb617c60b957049913bae9c0b8878566714a8fcf11fc0cba4106",
+        "current_bytes": 42687,
+        "current_sha256": "b4f5e15d6fcafe671f9c5a1b4a612f029d65be0128029ca60991f79f2fc0b28c",
+        "upstream_preimage_sha256": null
+      },
+      {
+        "target": "codex-rs/core/src/config/mod.rs",
+        "prior_sha256": "800d64df4af1a4b0957ca0f8c28ceadce8e45c101380d89fadb3b288d0d1d2ce",
+        "current_bytes": 216451,
+        "current_sha256": "82b3acecd511297cd263e3b7eed143967eab77707d99083fdcf0ab977ddc8457",
+        "upstream_preimage_sha256": "800d64df4af1a4b0957ca0f8c28ceadce8e45c101380d89fadb3b288d0d1d2ce"
+      },
+      {
+        "target": "codex-rs/http-client/src/outbound_proxy.rs",
+        "prior_sha256": "6775e619cfc8c95ae555681f59adf96c71e198217df268ff0224c6585eb7c4a4",
+        "current_bytes": 34299,
+        "current_sha256": "b27b6f0978a18a80b2d149916a239d90ab749be65d93d4a8b1a7c6018c2e9a21",
+        "upstream_preimage_sha256": "6775e619cfc8c95ae555681f59adf96c71e198217df268ff0224c6585eb7c4a4"
+      },
+      {
+        "target": "codex-rs/http-client/src/protected_loopback_proxy_tests.rs",
+        "prior_sha256": null,
+        "current_bytes": 4606,
+        "current_sha256": "18c346b77d20ffb9c91f60dcbe4476b854d482fe5319e643a3e48a07d2afe178",
+        "upstream_preimage_sha256": null
+      }
+    ],
+    "new_test_definitions": [
+      {
+        "path": "codex-rs/codex-api/src/protected_peer/startup_loopback_tests.rs",
+        "name": "private_challenge_accepts_only_optional_nonzero_u16_proxy_port"
+      },
+      {
+        "path": "codex-rs/codex-api/src/protected_peer/startup_loopback_tests.rs",
+        "name": "unconsumed_original_claim_cannot_bind_a_factory"
+      },
+      {
+        "path": "codex-rs/codex-api/src/protected_peer/startup_loopback_tests.rs",
+        "name": "consumed_original_claim_retains_its_exact_fixed_proxy_without_fallback"
+      },
+      {
+        "path": "codex-rs/codex-api/src/protected_peer/startup_loopback_tests.rs",
+        "name": "legacy_claim_keeps_original_factory_and_no_new_route"
+      },
+      {
+        "path": "codex-rs/http-client/src/protected_loopback_proxy_tests.rs",
+        "name": "fixed_loopback_precedes_default_and_system_discovery_without_fallback"
+      },
+      {
+        "path": "codex-rs/http-client/src/protected_loopback_proxy_tests.rs",
+        "name": "async_resolution_uses_the_same_fixed_route_without_system_lookup"
+      },
+      {
+        "path": "codex-rs/http-client/src/protected_loopback_proxy_tests.rs",
+        "name": "fixed_route_retains_cookies_and_current_destination_policy"
+      },
+      {
+        "path": "codex-rs/http-client/src/protected_loopback_proxy_tests.rs",
+        "name": "rebuilt_factory_inherits_only_original_fixed_route"
+      },
+      {
+        "path": "codex-rs/http-client/src/protected_loopback_proxy_tests.rs",
+        "name": "ordinary_factories_preserve_transport_default_behavior"
+      },
+      {
+        "path": "codex-rs/http-client/src/protected_loopback_proxy_tests.rs",
+        "name": "fixed_route_rejects_zero_port_invalid_token_and_changes"
+      },
+      {
+        "path": "codex-rs/http-client/src/protected_loopback_proxy_tests.rs",
+        "name": "transient_connect_token_is_redacted_from_factory_and_route_debug"
+      }
+    ],
+    "tests_executed": false,
+    "native_qualified": false
+  }
+}

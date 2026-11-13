@@ -1,0 +1,920 @@
+[
+  {
+    "path": "bin/cargo",
+    "bytes": 31232696,
+    "sha256": "c512bff73c86143b557463f021d0c3d5b0490d97d65040ba59ea2b3427784758",
+    "mode": "100755"
+  },
+  {
+    "path": "bin/rust-gdb",
+    "bytes": 980,
+    "sha256": "557985ec5a31f5617d25d26bd6fe23c4b8d6f85b1498e1aae82831ca0d7f17fe",
+    "mode": "100755"
+  },
+  {
+    "path": "bin/rust-gdbgui",
+    "bytes": 2160,
+    "sha256": "bc60613775a098e59b49fa4584cea73631697fe1456c44284c337d6700340315",
+    "mode": "100755"
+  },
+  {
+    "path": "bin/rust-lldb",
+    "bytes": 1060,
+    "sha256": "142c31bb3900c03b2b71693b6bd16d6da1174971d93628506db8438050fa69d7",
+    "mode": "100755"
+  },
+  {
+    "path": "bin/rustc",
+    "bytes": 412504,
+    "sha256": "b829b733131d4e1673eeebd1f34d06ae1e9ff4977b051313cf42e2a9e79ecf1c",
+    "mode": "100755"
+  },
+  {
+    "path": "bin/rustdoc",
+    "bytes": 11710264,
+    "sha256": "59bc6a1caf617032284a2edc2aa03916396e70589c435a8b51e3957887f90ce5",
+    "mode": "100755"
+  },
+  {
+    "path": "etc/bash_completion.d/cargo",
+    "bytes": 11147,
+    "sha256": "550c5fc0196b45bd950c8aa1da27259be44324674e8ead4dc572f9a7a176614e",
+    "mode": "100644"
+  },
+  {
+    "path": "etc/target-spec-json-schema.json",
+    "bytes": 25497,
+    "sha256": "4758912a1f680a33c9ea29cc94940e49f1cfe7ca47f6a2b08eadea6de234cce0",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/librustc-stable_rt.asan.dylib",
+    "bytes": 4503168,
+    "sha256": "8bcf06d48726932f7ff7ef30cb5aa7d45a11614b6101543ec18ab41aa1692f9f",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/librustc-stable_rt.lsan.dylib",
+    "bytes": 1844016,
+    "sha256": "976d82808e5cd9a7fb71fc4bcf4cc5ed31b957f0ba9d82e1580e2d288172e54c",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/librustc-stable_rt.rtsan.dylib",
+    "bytes": 1543024,
+    "sha256": "1e791dfea52b4d6dc441f75784605eefe8b5099f8f9dd70fe2c16db1d87d8854",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/librustc-stable_rt.tsan.dylib",
+    "bytes": 3852496,
+    "sha256": "2f48772b6ba4150ac7c864dd1dccba81960be9d0e3904f40e8e58c98f3c0eed1",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/librustc_driver-eea6b8737cd03a8e.dylib",
+    "bytes": 203876200,
+    "sha256": "d41766d9ed6e9c7959eeb7678b9a6bb301f70948664cd39a8a0d2d83ad23d54e",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/bin/gcc-ld/ld.lld",
+    "bytes": 376576,
+    "sha256": "415de9de6d3b522b3410e8c24409d95aff703511b4700f427faa7d85378fac68",
+    "mode": "100755"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/bin/gcc-ld/ld64.lld",
+    "bytes": 376576,
+    "sha256": "415de9de6d3b522b3410e8c24409d95aff703511b4700f427faa7d85378fac68",
+    "mode": "100755"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/bin/gcc-ld/lld-link",
+    "bytes": 376576,
+    "sha256": "415de9de6d3b522b3410e8c24409d95aff703511b4700f427faa7d85378fac68",
+    "mode": "100755"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/bin/gcc-ld/wasm-ld",
+    "bytes": 376576,
+    "sha256": "415de9de6d3b522b3410e8c24409d95aff703511b4700f427faa7d85378fac68",
+    "mode": "100755"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/bin/rust-lld",
+    "bytes": 130957808,
+    "sha256": "96df7b3559f741be99cc2047cfaff84eeb5367dc9268a87c22ac9d376d98c60b",
+    "mode": "100755"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/bin/rust-objcopy",
+    "bytes": 5339280,
+    "sha256": "eaef4f1b3d003e17e16174cfb471ee7eb811d749a9f6cf70c6d590849cd51f28",
+    "mode": "100755"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/bin/wasm-component-ld",
+    "bytes": 4541968,
+    "sha256": "5ed46177a30d2f0e6e6b79c9140d2fe65dbd1b7cc53f7bf81243955a474655f6",
+    "mode": "100755"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/libaddr2line-97baf34dac76a634.rlib",
+    "bytes": 26544,
+    "sha256": "3cdef70bb1438277a4b5a6f3f6f03e5594c998ba39dc5a6ef88efc8a5a3eb30a",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/libaddr2line-97baf34dac76a634.rmeta",
+    "bytes": 466382,
+    "sha256": "1b2d75a6b7a73c772e51393f38c8e92e915f2f770b07476625abca4c366bfcd9",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/libadler2-b3027e57d0f1d7f0.rlib",
+    "bytes": 8208,
+    "sha256": "87f4eda749e87b8bc2a8ac6f1e74de01ba7f90ea1d8d7a8b0f937766dee2a265",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/libadler2-b3027e57d0f1d7f0.rmeta",
+    "bytes": 20348,
+    "sha256": "092e6bc112958d41ad77628276ef0a9382151b69a852d88b785358126c1c6103",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/liballoc-27f2e54513492a5b.rlib",
+    "bytes": 709208,
+    "sha256": "5e6f6cfbaf3eed434035b39c90d82d214ca0d4b67b86f30b7a88837ce375f538",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/liballoc-27f2e54513492a5b.rmeta",
+    "bytes": 7302848,
+    "sha256": "903ae4b01101b6170cfadfa3f9bbfd742dca8a8a0980c3f4260992dc22c6422e",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/libcfg_if-f48fb0bfdb32cc1e.rlib",
+    "bytes": 4216,
+    "sha256": "a0f675b68e381ac0162796ab12b1337823bd03fe89ab421bf2f24cfb7e83f295",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/libcfg_if-f48fb0bfdb32cc1e.rmeta",
+    "bytes": 5493,
+    "sha256": "0be5c69bb0aad664a28c5bf0b55ec83ad287c7f723a62b3dda09462ffe5762f9",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/libcompiler_builtins-da5ac53f4a183f75.rlib",
+    "bytes": 3291616,
+    "sha256": "10c965331110c1c53556eab71fe6db80f199a71c1f746d68eafba96f4ac841cb",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/libcompiler_builtins-da5ac53f4a183f75.rmeta",
+    "bytes": 1987805,
+    "sha256": "40f541962fbbb796f9880575f500fd4671a8f95c15b055fcf4a7f80672b3a05c",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/libcore-871f345264ba13dd.rlib",
+    "bytes": 2463776,
+    "sha256": "40074b19e085ce8ee9559582a6be145d7bb99de0b12fd095c1d12f21710198e9",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/libcore-871f345264ba13dd.rmeta",
+    "bytes": 50868896,
+    "sha256": "030e6ab0c084d0454e8ee762c3671c923f32b7529ab5800dd6edd00b7c822ff5",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/libgetopts-4409557bcb151114.rlib",
+    "bytes": 611928,
+    "sha256": "a228c0296878b52e413e0033da608e7abe8d90844599d60e542b1dc168f66693",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/libgetopts-4409557bcb151114.rmeta",
+    "bytes": 215166,
+    "sha256": "e9ffe810438d3fddf6c48ba171a34efd1a112b503b138cd8efced803eba2f9db",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/libgimli-710b978a6e7f8872.rlib",
+    "bytes": 738392,
+    "sha256": "fec448f05ee8447c7f7b566533226b85bc50372e59b40c551658c01e9d4509cd",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/libgimli-710b978a6e7f8872.rmeta",
+    "bytes": 5294920,
+    "sha256": "25406e647171676f1d9045e11cd75fdbc54b7f6719633ef963b230352bd33d2f",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/libhashbrown-76edcfff92e1fd47.rlib",
+    "bytes": 34152,
+    "sha256": "5687e4940e1413bde9e1c07a3a7ec9b4e21864ed4c766287705032f1cd37e1c9",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/libhashbrown-76edcfff92e1fd47.rmeta",
+    "bytes": 1618434,
+    "sha256": "b692236b1136ae34c8a44c188723f83f277cf65c699afea8da3ac1f9657c823e",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/liblibc-2d1423290f1ed328.rlib",
+    "bytes": 14400,
+    "sha256": "b15dfaad6c0cc1e205dd73604c58dcfc3f7742a987139408d3fe3fb86598886a",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/liblibc-2d1423290f1ed328.rmeta",
+    "bytes": 2299119,
+    "sha256": "54e6e4fb403cab60693b58ba28a0aeeec29768961e89461e7734b9e0adcc22f4",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/libmemchr-98367e4b3983da35.rlib",
+    "bytes": 190224,
+    "sha256": "0ad82f8c8303ac7181eba8700ea08fa100e95811e75945963cad4995bd07c41e",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/libmemchr-98367e4b3983da35.rmeta",
+    "bytes": 959350,
+    "sha256": "a25663bf6cea4beaf999e7c132cfda68278a1f920f06596768f8a6fcc974eaa7",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/libminiz_oxide-571d19c55fdaabed.rlib",
+    "bytes": 89016,
+    "sha256": "47990188ad00c76e4a98e68a68ac4db35d83583a1e5307c392dd77ac086ffb73",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/libminiz_oxide-571d19c55fdaabed.rmeta",
+    "bytes": 125577,
+    "sha256": "ceabd7f5f1a6312cc943f0df0c412deef37f4ce4ac9519f31d67fab8d83b6293",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/libobject-a29b3bb9e63ad803.rlib",
+    "bytes": 173000,
+    "sha256": "53adada58ec7893351c75d596f50d44e852ce6e51e28f967be2146e47d2b3912",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/libobject-a29b3bb9e63ad803.rmeta",
+    "bytes": 8460854,
+    "sha256": "30aa90c25108092f34032b5a81d86ab9e8068286809477e6bb6ba8578232c85e",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/libpanic_abort-5a568c11acd6701d.rlib",
+    "bytes": 9000,
+    "sha256": "0f31eb022bd8856e2ddc689e993f460528f545ecd275f1acf502d16fd5ce7c66",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/libpanic_abort-5a568c11acd6701d.rmeta",
+    "bytes": 2906,
+    "sha256": "e0fba69860b9919e8ae0a7db3094d570f65d441db7ff31f81f9b22de77c6e6a8",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/libpanic_unwind-f63ec5b6ab7e4580.rlib",
+    "bytes": 31840,
+    "sha256": "a0c61395d268ce723a23067b56ff526ee239b987b9c1a210d24cfdb3feaa66ae",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/libpanic_unwind-f63ec5b6ab7e4580.rmeta",
+    "bytes": 7154,
+    "sha256": "c9fec36e61a03f3a058b963bce8fc0270fd64bb88804fedb79ad0cc1fe2ff56a",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/libproc_macro-b2df7becc8165bcb.rlib",
+    "bytes": 3141744,
+    "sha256": "07fa79b4c10f55291bc9d7c76c2976461cedb2d4b55da06b8fd40718024387d1",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/libproc_macro-b2df7becc8165bcb.rmeta",
+    "bytes": 1101517,
+    "sha256": "9eb0c59443c16eb55756081c8ab6f7ce947a8c2d90247125ca99a558532b8a91",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/libprofiler_builtins-6649f735c9ab3586.rlib",
+    "bytes": 298872,
+    "sha256": "4aa38191d27769b2309212fd6a5329584e7c422925f1d52c5e99b9fa8239fa2f",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/libprofiler_builtins-6649f735c9ab3586.rmeta",
+    "bytes": 1334,
+    "sha256": "e9ce13623f5c02db388598f4dca35412d6c0b1fab84fced60897a8e928b7b31b",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/librustc-stable_rt.asan.dylib",
+    "bytes": 4503168,
+    "sha256": "8bcf06d48726932f7ff7ef30cb5aa7d45a11614b6101543ec18ab41aa1692f9f",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/librustc-stable_rt.lsan.dylib",
+    "bytes": 1844016,
+    "sha256": "976d82808e5cd9a7fb71fc4bcf4cc5ed31b957f0ba9d82e1580e2d288172e54c",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/librustc-stable_rt.rtsan.dylib",
+    "bytes": 1543024,
+    "sha256": "1e791dfea52b4d6dc441f75784605eefe8b5099f8f9dd70fe2c16db1d87d8854",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/librustc-stable_rt.tsan.dylib",
+    "bytes": 3852496,
+    "sha256": "2f48772b6ba4150ac7c864dd1dccba81960be9d0e3904f40e8e58c98f3c0eed1",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/librustc_demangle-1b0862f4834fc89c.rlib",
+    "bytes": 205064,
+    "sha256": "e480d2ddf08e8622abea05f42e2093b31250cd7945e8bf39e54b4ca815c67d4b",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/librustc_demangle-1b0862f4834fc89c.rmeta",
+    "bytes": 91261,
+    "sha256": "75312713519df442b6c4d111c8f2eddb87a34373f855cff3f861e1fe7810b0f2",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/librustc_literal_escaper-5f2e6c3644adb640.rlib",
+    "bytes": 4360,
+    "sha256": "6d98c24bce3f7345b87eaab9e3fe0788ddd7dd67eca6f7bebd212e1d60d3585c",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/librustc_literal_escaper-5f2e6c3644adb640.rmeta",
+    "bytes": 122429,
+    "sha256": "785a790d39a86ab805936d370fc4f8c704eeb33aa39ec7ac22324514c7b63d2c",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/librustc_std_workspace_alloc-6df298fbf7f6f10b.rlib",
+    "bytes": 4416,
+    "sha256": "801e21d7f401446243861c48f41b72d6aa1db8642f03b25e33b6029c85d3b3cf",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/librustc_std_workspace_alloc-6df298fbf7f6f10b.rmeta",
+    "bytes": 2149,
+    "sha256": "ad7b9bba122e71d2f0013089de2cd571d26078a959d6c883d705507caa7f6479",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/librustc_std_workspace_core-78867bca7a418012.rlib",
+    "bytes": 4416,
+    "sha256": "049c04df5d4b50a3b49649c2d9556dc77306c87c248f1b1a2ea5c7d5d33d6952",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/librustc_std_workspace_core-78867bca7a418012.rmeta",
+    "bytes": 5805,
+    "sha256": "998049e865c8b155cb8581cfa2880b1aee538dc209bd628b09e71a1edd6b0f0d",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/librustc_std_workspace_std-036ed47b4c729746.rlib",
+    "bytes": 4416,
+    "sha256": "a1ed9aedd8c46493c69b5562c52a3fc59ae97b9b0220a47485621cfe0ba71a2e",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/librustc_std_workspace_std-036ed47b4c729746.rmeta",
+    "bytes": 6951,
+    "sha256": "979db35bb06b10f40cc6aabf1b6cd166be1ba01ec1ba11c45b92a725af968ca9",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/libstd-09bec66e14073fe6.dylib",
+    "bytes": 1451616,
+    "sha256": "c2d7f24d421eb1c074b4d8ea7e3322772681cd6bee9dde89557421808b174fc4",
+    "mode": "100755"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/libstd-09bec66e14073fe6.rlib",
+    "bytes": 9539032,
+    "sha256": "4ad1c4e712b013147dca4e6cf0c30360959f5999f18bd51e45e0735d3054a464",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/libstd-09bec66e14073fe6.rmeta",
+    "bytes": 8410996,
+    "sha256": "51a386f4d4eb86fc195bd2b1680820c299c50ce793bb9332ad10e2576ed13e29",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/libstd_detect-c2d961f54f972754.rlib",
+    "bytes": 65520,
+    "sha256": "f9ceffd236e2931df942d4d0c54dabe32bb53e30988732da240439b00b836ac0",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/libstd_detect-c2d961f54f972754.rmeta",
+    "bytes": 280574,
+    "sha256": "b2a74d6fd5f082fab4d51d39af772de019f75f990af341a0c88fef63a05317ca",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/libsysroot-f22a1b6cb0a0e8ac.rlib",
+    "bytes": 4304,
+    "sha256": "f73e5600e44154b429c40776f2ce710901abf33a468a9cfa4074e1b95c70bcbc",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/libsysroot-f22a1b6cb0a0e8ac.rmeta",
+    "bytes": 2222,
+    "sha256": "7dde3483e581f277661d0acf57ae83ed1a4de7b7fea22962403d05743b462365",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/libtest-edb0939a1f950e0e.rlib",
+    "bytes": 5812664,
+    "sha256": "f8978661ef23ec0ad7afd86e42edad4830176612baf3f281a64c35a7b7aef0b2",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/libtest-edb0939a1f950e0e.rmeta",
+    "bytes": 992369,
+    "sha256": "41e463d491e0b3439f2bd118856f6263e6591312b23c9fa5e7a5d766cc21ea65",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/libunwind-05d4ae7ab29d97df.rlib",
+    "bytes": 4272,
+    "sha256": "a42bb45c33ec5c82969c61095452facd71c85647afda64f9848b9643342dc029",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/aarch64-apple-darwin/lib/libunwind-05d4ae7ab29d97df.rmeta",
+    "bytes": 20099,
+    "sha256": "3f42a8292442a11409e0a7c41f107d806d4f4216f289b5b6dec91f179f1d8f2d",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/components",
+    "bytes": 42,
+    "sha256": "97130f6d259f301910e6655c91cba30202d483e239c8441de291997b6dcf1240",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/etc/gdb_load_rust_pretty_printers.py",
+    "bytes": 504,
+    "sha256": "a32e7857651bc7ed7c52dfc71131cbbea01a5cd1886399876032c4de60fa4886",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/etc/gdb_lookup.py",
+    "bytes": 3763,
+    "sha256": "818a6b374ccadd535bf0c30b0fbf17861fdfe231d42bd7069d8cffff7a571b97",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/etc/gdb_providers.py",
+    "bytes": 15951,
+    "sha256": "75cef8535fe4e581a036e4860c1b1fb28c32dab43afadd348c20f94c169a4382",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/etc/lldb_commands",
+    "bytes": 5950,
+    "sha256": "fd612f214b349941ee37153fbf5e6b698a20abf1fb470d9bc29f7e5d0330c4f6",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/etc/lldb_lookup.py",
+    "bytes": 6029,
+    "sha256": "70ecb41fa5f72718d5ef10a12f038d00de5616de1e5ac0fec4ee145625152916",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/etc/lldb_providers.py",
+    "bytes": 48164,
+    "sha256": "6acd9ff6b02fcab177057d9690b41d56740fc470de4f5bd1d0bc087d4e03d761",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/etc/rust_types.py",
+    "bytes": 4386,
+    "sha256": "60f1a53d1fb0b6b394440588b94f36a472f5303965a58b87d1240c8aa4c81762",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/install.log",
+    "bytes": 88120,
+    "sha256": "c74165585b7298b2fef8b0a20399c128b0b0dab9642ac44a52a6adb2d20be3d2",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/manifest-cargo",
+    "bytes": 6988,
+    "sha256": "43ff0fe49cc5dc10ead650b7379c6823c1d399d0f98fdd7f9249885d1be58291",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/manifest-rust-std-aarch64-apple-darwin",
+    "bytes": 11940,
+    "sha256": "330eab2e5afbea5fbd3f757f8fc026c96f7e2cf70265147a0ae83fb0c9d14dfb",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/manifest-rustc",
+    "bytes": 7069,
+    "sha256": "c9aa1cec06b7b68b0782e4d8e85e433c43ce0d2ca5d2089905d19b7145feacfe",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/rust-installer-version",
+    "bytes": 2,
+    "sha256": "1121cfccd5913f0a63fec40a6ffd44ea64f9dc135c66634ba001d10bcf4302a2",
+    "mode": "100644"
+  },
+  {
+    "path": "lib/rustlib/uninstall.sh",
+    "bytes": 29344,
+    "sha256": "154455acfbef45eab3bb41d4fc5106e253861c0b2f83ee0312eede46f9526d4c",
+    "mode": "100755"
+  },
+  {
+    "path": "libexec/rust-analyzer-proc-macro-srv",
+    "bytes": 1454880,
+    "sha256": "05fce7ce75a9c37822aeaed51044a3d2545453f4557e2f01168ac34dbe0e7ef0",
+    "mode": "100755"
+  },
+  {
+    "path": "share/doc/cargo/LICENSE-APACHE",
+    "bytes": 10860,
+    "sha256": "8ada45cd9f843acf64e4722ae262c622a2b3b3007c7310ef36ac1061a30f6adb",
+    "mode": "100644"
+  },
+  {
+    "path": "share/doc/cargo/LICENSE-MIT",
+    "bytes": 1023,
+    "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+    "mode": "100644"
+  },
+  {
+    "path": "share/doc/cargo/LICENSE-THIRD-PARTY",
+    "bytes": 68430,
+    "sha256": "cbc759b1f17a2ac38fe3eb9e9563b1a08ba0f900611c49faaf68b46907b6d898",
+    "mode": "100644"
+  },
+  {
+    "path": "share/doc/cargo/README.md",
+    "bytes": 4855,
+    "sha256": "d9b7b448fdd1bcdff86dc4034733602b8bcb60bdc1a14c37148525b67a157054",
+    "mode": "100644"
+  },
+  {
+    "path": "share/doc/rust/COPYRIGHT-library.html",
+    "bytes": 425661,
+    "sha256": "90567e2718bf7fd65a71a3a43c5596488e80e5f51ed02bfea6fec54458b5f3d1",
+    "mode": "100644"
+  },
+  {
+    "path": "share/doc/rust/COPYRIGHT.html",
+    "bytes": 14263576,
+    "sha256": "9bd02a099a3f9fdf977f9dd6ea3dc664723e992a267d86f447ea9e7d068824ac",
+    "mode": "100644"
+  },
+  {
+    "path": "share/doc/rust/README.md",
+    "bytes": 3304,
+    "sha256": "b3f6ef2fef88b98cb9ec013a5c86213095e53e40eb228679574e4d06517f33c8",
+    "mode": "100644"
+  },
+  {
+    "path": "share/doc/rust/licenses/Apache-2.0.txt",
+    "bytes": 10280,
+    "sha256": "074e6e32c86a4c0ef8b3ed25b721ca23aca83df277cd88106ef7177c354615ff",
+    "mode": "100644"
+  },
+  {
+    "path": "share/doc/rust/licenses/BSD-2-Clause.txt",
+    "bytes": 1267,
+    "sha256": "f32fb3b417a194167cfad068223fc975ba96c5960513a10f66a3c28720aec1df",
+    "mode": "100644"
+  },
+  {
+    "path": "share/doc/rust/licenses/CC-BY-SA-4.0.txt",
+    "bytes": 20137,
+    "sha256": "23ee78c8bae49cf08ea2f0c84945c66b987ebe4520881fb51b3dad4fb43d07c2",
+    "mode": "100644"
+  },
+  {
+    "path": "share/doc/rust/licenses/GCC-exception-3.1.txt",
+    "bytes": 3320,
+    "sha256": "a3966c9410ef94a1efbfa9ec04e9c1994026a70623fbf0885ce36737bfba3b54",
+    "mode": "100644"
+  },
+  {
+    "path": "share/doc/rust/licenses/GPL-2.0-only.txt",
+    "bytes": 17642,
+    "sha256": "54b212ba1f97f6948fa5486239ab505dd820b02e50cbfd296b4062c8609a70af",
+    "mode": "100644"
+  },
+  {
+    "path": "share/doc/rust/licenses/GPL-3.0-or-later.txt",
+    "bytes": 34795,
+    "sha256": "05315fce6c35f79b8a35454828995fa26336f235895ac64557abc028f4ffcea2",
+    "mode": "100644"
+  },
+  {
+    "path": "share/doc/rust/licenses/ISC.txt",
+    "bytes": 730,
+    "sha256": "0ff61769b238634e042ab759dddfd104a8e69d091e3600ae3410e401a6164381",
+    "mode": "100644"
+  },
+  {
+    "path": "share/doc/rust/licenses/LLVM-exception.txt",
+    "bytes": 919,
+    "sha256": "e34c58338bd89d43e709e226610d8f32b3e3c47f4ad9a99a8dc1d4ac7842488e",
+    "mode": "100644"
+  },
+  {
+    "path": "share/doc/rust/licenses/MIT.txt",
+    "bytes": 1078,
+    "sha256": "b85dcd3e453d05982552c52b5fc9e0bdd6d23c6f8e844b984a88af32570b0cc0",
+    "mode": "100644"
+  },
+  {
+    "path": "share/doc/rust/licenses/NCSA.txt",
+    "bytes": 1676,
+    "sha256": "39cb0234065c92b9e6cee3830cbb52b1aa289aa8fe9ba2e66730fec5cf05c630",
+    "mode": "100644"
+  },
+  {
+    "path": "share/doc/rust/licenses/OFL-1.1.txt",
+    "bytes": 4016,
+    "sha256": "8eea8287e5876b539670cadb82e99f9a7afddec6f6730811be1daf25d2e9bcfd",
+    "mode": "100644"
+  },
+  {
+    "path": "share/doc/rust/licenses/Unicode-3.0.txt",
+    "bytes": 1995,
+    "sha256": "f5062c9a188d81dfe66b56db4182dcf9e4b17c0d9b0d311a8e20b3a1b075c443",
+    "mode": "100644"
+  },
+  {
+    "path": "share/man/man1/cargo-add.1",
+    "bytes": 10793,
+    "sha256": "e37eb5889856fcb19ff43dd2a7952aef092d8a5fc1f808b200a3c99d18c7dd79",
+    "mode": "100644"
+  },
+  {
+    "path": "share/man/man1/cargo-bench.1",
+    "bytes": 20458,
+    "sha256": "51cc284d3718901a71ac8b2e812b2317890b1377f641eaf8989e865ccdcd8c05",
+    "mode": "100644"
+  },
+  {
+    "path": "share/man/man1/cargo-build.1",
+    "bytes": 16636,
+    "sha256": "ea0cb3adad4278bb427abb8fd7d2a96eff295d5b13a3f1d5c4b0933d5b3da9b0",
+    "mode": "100644"
+  },
+  {
+    "path": "share/man/man1/cargo-check.1",
+    "bytes": 16316,
+    "sha256": "006c2a65dc3a8a5c56e351511678748c3bbdd3c3eeb5bfcf95b9e20828b04505",
+    "mode": "100644"
+  },
+  {
+    "path": "share/man/man1/cargo-clean.1",
+    "bytes": 7810,
+    "sha256": "ac1056f03dccba5d6a082f4491e83498507e0984a34551d7be7d4c1b4dfc7273",
+    "mode": "100644"
+  },
+  {
+    "path": "share/man/man1/cargo-doc.1",
+    "bytes": 14756,
+    "sha256": "679cbbbb74c0352ea0d295a9d573419bb9533d10868866e260781caeffdd97bd",
+    "mode": "100644"
+  },
+  {
+    "path": "share/man/man1/cargo-fetch.1",
+    "bytes": 6940,
+    "sha256": "014fd2e78b79fe9134f5e3fc38e8a2906d2a3f4ca6ba4a236ae13aefdae70ec5",
+    "mode": "100644"
+  },
+  {
+    "path": "share/man/man1/cargo-fix.1",
+    "bytes": 19437,
+    "sha256": "5c7c676229879e262a3135298c22800c5c1afb57710ec19cc6dd2c8d23224ea6",
+    "mode": "100644"
+  },
+  {
+    "path": "share/man/man1/cargo-generate-lockfile.1",
+    "bytes": 5940,
+    "sha256": "9d673faf1b7c2bb645e1711592440da8d681c8a99744a8f8a927d6144446bc48",
+    "mode": "100644"
+  },
+  {
+    "path": "share/man/man1/cargo-help.1",
+    "bytes": 4887,
+    "sha256": "70802931560ae6e6028f054896046b410d0e569f26111effe1ded8d0ad57463b",
+    "mode": "100644"
+  },
+  {
+    "path": "share/man/man1/cargo-info.1",
+    "bytes": 6117,
+    "sha256": "7bfd5996cd2fc7ddc3921be5013d2acd4de6425ac1856aa4b365fbb6f11e5e3b",
+    "mode": "100644"
+  },
+  {
+    "path": "share/man/man1/cargo-init.1",
+    "bytes": 5324,
+    "sha256": "574759d2269dff096b1c04bc1ae906c3a80389830966e6b5b2130410181f3a9d",
+    "mode": "100644"
+  },
+  {
+    "path": "share/man/man1/cargo-install.1",
+    "bytes": 18319,
+    "sha256": "3c068e1c8a345ad6e64cd535db30fb25642d61936abf5bd8e309c3602b75429a",
+    "mode": "100644"
+  },
+  {
+    "path": "share/man/man1/cargo-locate-project.1",
+    "bytes": 4665,
+    "sha256": "021abaf05ac72ac32bb7373ed9805bba19e204db25675895d2d41c013646f8d4",
+    "mode": "100644"
+  },
+  {
+    "path": "share/man/man1/cargo-login.1",
+    "bytes": 4791,
+    "sha256": "53a957a73cfcac30b751a5c6277f94b5a8511ce3cc2af144678a285a598c417a",
+    "mode": "100644"
+  },
+  {
+    "path": "share/man/man1/cargo-logout.1",
+    "bytes": 4843,
+    "sha256": "0f98f10235921e4fd2dd82e76c7fbf551121bef88cf8ef28027072c5d3ff5857",
+    "mode": "100644"
+  },
+  {
+    "path": "share/man/man1/cargo-metadata.1",
+    "bytes": 21988,
+    "sha256": "572a3e2f8d7753855d6dab6941961deb5ac9b99c9ad7d4d3423d8e5f6bc61196",
+    "mode": "100644"
+  },
+  {
+    "path": "share/man/man1/cargo-new.1",
+    "bytes": 5136,
+    "sha256": "920fa6698c28a2f5c2b2cfe69d1e4599e2698a0bceb3d514f19d891ec23b446b",
+    "mode": "100644"
+  },
+  {
+    "path": "share/man/man1/cargo-owner.1",
+    "bytes": 5750,
+    "sha256": "23e71b0c6b5f2701f978b818420835db0e74a938dccdc251ddb2f1c163f20d3d",
+    "mode": "100644"
+  },
+  {
+    "path": "share/man/man1/cargo-package.1",
+    "bytes": 15808,
+    "sha256": "7c2c62f0aa11d7fbb4a5095377316b9a691deb594168ae886cd0a7aa9ea157ff",
+    "mode": "100644"
+  },
+  {
+    "path": "share/man/man1/cargo-pkgid.1",
+    "bytes": 7457,
+    "sha256": "f9353443ca1c342f95845579e56dd69410e7517116dd76efda9ab3845c074058",
+    "mode": "100644"
+  },
+  {
+    "path": "share/man/man1/cargo-publish.1",
+    "bytes": 12669,
+    "sha256": "6d4859d5a12d4a8c814cc50b389d2f3d286bc6baae59d5c70e4cebb40058216c",
+    "mode": "100644"
+  },
+  {
+    "path": "share/man/man1/cargo-remove.1",
+    "bytes": 6289,
+    "sha256": "ba248f85986b141882454f3313eafb5a64a8f244b6abcbb1f9e7114c56fbfbf2",
+    "mode": "100644"
+  },
+  {
+    "path": "share/man/man1/cargo-report-future-incompatibilities.1",
+    "bytes": 5917,
+    "sha256": "a7642c840631e5659ef653271035760b1dc6c3fcf998b8d347fb49965a3ad35a",
+    "mode": "100644"
+  },
+  {
+    "path": "share/man/man1/cargo-report.1",
+    "bytes": 4918,
+    "sha256": "be9d8fe4a569a90e7e5d48c35c5daa74d1728133dc0f43240121654045b6f815",
+    "mode": "100644"
+  },
+  {
+    "path": "share/man/man1/cargo-run.1",
+    "bytes": 12398,
+    "sha256": "85650a39631df37c75e2d894e723710c39f65b86096c4330ede6a99c3b4fd0be",
+    "mode": "100644"
+  },
+  {
+    "path": "share/man/man1/cargo-rustc.1",
+    "bytes": 17558,
+    "sha256": "b7fba799920da5bb8c510e8c9e3c91bde56abb6feb705efeca9a3a42d15cccf2",
+    "mode": "100644"
+  },
+  {
+    "path": "share/man/man1/cargo-rustdoc.1",
+    "bytes": 16140,
+    "sha256": "9c558ed0899cf8e966d417dc2fea86d837c88b854bcdb0c62c30656fc41949d0",
+    "mode": "100644"
+  },
+  {
+    "path": "share/man/man1/cargo-search.1",
+    "bytes": 4200,
+    "sha256": "4761782dd91b5c471bf1b3fc5a3c7912c3c6935706383f3b2b44efb3a1893bea",
+    "mode": "100644"
+  },
+  {
+    "path": "share/man/man1/cargo-test.1",
+    "bytes": 22004,
+    "sha256": "daa865ffe6624ad518390a328d2632a4a6eacfafdfacf99b9c13d6f4d0c6a358",
+    "mode": "100644"
+  },
+  {
+    "path": "share/man/man1/cargo-tree.1",
+    "bytes": 17052,
+    "sha256": "9b0213fbb4e50ccaffc3bf1ab5bd3f7a50204059262f3b194dc99c12535f0ebb",
+    "mode": "100644"
+  },
+  {
+    "path": "share/man/man1/cargo-uninstall.1",
+    "bytes": 4467,
+    "sha256": "145d9580dc8a5e5a73cc4a8dd27827e0413e2bad589b2e62fa4dff8798ffc980",
+    "mode": "100644"
+  },
+  {
+    "path": "share/man/man1/cargo-update.1",
+    "bytes": 8144,
+    "sha256": "b4fd2b6269aff5ee8eb696273315056d94c9de231130b7d6d2e68d98298662d9",
+    "mode": "100644"
+  },
+  {
+    "path": "share/man/man1/cargo-vendor.1",
+    "bytes": 7441,
+    "sha256": "a8c4742f6b0b6d46da8b9cdc69766412efa72e02bf307753242c51394815bce4",
+    "mode": "100644"
+  },
+  {
+    "path": "share/man/man1/cargo-version.1",
+    "bytes": 664,
+    "sha256": "1dc8ad353b33ef871660f7d5af5e977b07a32bf718adce2deb85efdd5568e44b",
+    "mode": "100644"
+  },
+  {
+    "path": "share/man/man1/cargo-yank.1",
+    "bytes": 8274,
+    "sha256": "a324983332e33580330c0902af4ee7713940bf219c44a1e3a12fc9b8b0d58309",
+    "mode": "100644"
+  },
+  {
+    "path": "share/man/man1/cargo.1",
+    "bytes": 11180,
+    "sha256": "c483b800c9aceb307fb15ea4138783838cb379b6f4e306a8dabe84af8fd4b01d",
+    "mode": "100644"
+  },
+  {
+    "path": "share/man/man1/rustc.1",
+    "bytes": 9169,
+    "sha256": "7c1064dc3ad4e2bc9624058a42d0d4bcd501d1895e1e328e434d7dd1306ed559",
+    "mode": "100644"
+  },
+  {
+    "path": "share/man/man1/rustdoc.1",
+    "bytes": 3601,
+    "sha256": "12589c7d0539e29d7d15711b3adf28ef7d2344d0705357a90ee103e41818ef71",
+    "mode": "100644"
+  },
+  {
+    "path": "share/zsh/site-functions/_cargo",
+    "bytes": 24396,
+    "sha256": "2ba73906f7446d884ed5c466ed851046e6df6620c8d9cd02f192dfb784a6cb98",
+    "mode": "100644"
+  }
+]
