@@ -44,10 +44,22 @@ function harness(publicOverrides={}) {
   let now=1000000,sequence=0,state={schema:2,plugin_version:'test',owner:{epoch:1,session_id:'founder',host:'codex'},paused:false,roles:{engineer:{name:'Engineer'}},records:{},jobs:{},sessions:{},notices:[],messages:[]};
   let matches=true,scope=true,beforeTransaction;
   const intervals=new Set(),launches=[];
+  // Closed fictional metadata for this stripped-import VM only. These numbers
+  // are not actual files, SQLite custody, host identity or closure evidence.
+  const vmPhysical=new Map([['/fixture',{ino:1n,directory:true}],['/fixture/.company',{ino:2n,directory:true}],['/fixture/.company/company.sqlite',{ino:3n,directory:false}]]);
+  const vmFs={existsSync:()=>true,mkdirSync:()=>{},
+    realpathSync:file=>{assert.equal(file,'/fixture','VM monitor may resolve only its fixed fictional root');return file;},
+    lstatSync:(file,options)=>{
+      assert.equal(options?.bigint,true);assert.deepEqual(Object.keys(options),['bigint']);
+      const entry=vmPhysical.get(file);assert.ok(entry,'Unknown VM physical metadata path');
+      return {dev:1n,ino:entry.ino,isSymbolicLink:()=>false,isDirectory:()=>entry.directory,isFile:()=>!entry.directory};
+    }};
   const iso=()=>new Date(now).toISOString();
-  const deps={...reviewContinuation,...retentionRepair,...modelProcessClosure,requestModelProcess:(job,value)=>modelProcessClosure.requestModelProcess(job,structuredClone(value)),outcomeSchema,developmentDeliveryContractSchema,developmentDeliveryTransitionFields,boundedDevelopmentAcceptanceReply,renderDevelopmentReviewContext,Buffer,...scopedStream,scoped:{...scoped},...publicResponse,...coordination,...timeout,path,os:{homedir:()=>'/unused'},fs:{existsSync:()=>true,mkdirSync:()=>{}},process:{cwd:()=>process.cwd(),env:{},pid:42,execPath:'/unused/node',argv:[]},Date:class extends Date {static now(){return now;}},AbortController,
+  const deps={...reviewContinuation,...retentionRepair,...modelProcessClosure,requestModelProcess:(job,value)=>modelProcessClosure.requestModelProcess(job,structuredClone(value)),outcomeSchema,developmentDeliveryContractSchema,developmentDeliveryTransitionFields,boundedDevelopmentAcceptanceReply,renderDevelopmentReviewContext,Buffer,...scopedStream,scoped:{...scoped},...publicResponse,...coordination,...timeout,path,os:{homedir:()=>'/unused'},fs:vmFs,process:{cwd:()=>process.cwd(),env:{},pid:42,execPath:'/unused/node',argv:[]},Date:class extends Date {static now(){return now;}},AbortController,
     PACKAGE:'/unused',VERSION:'test',SCHEMA:2,stamp:iso,id:p=>p+'-'+(++sequence),digest:()=> 'binding',folder:x=>x,noLink:()=>{},
-    withStore:(root,fn)=>fn({readSnapshot:fn=>fn(),publicReconciliationState:()=>null,read:()=>structuredClone(state),transaction:(type,change)=>{if(beforeTransaction){const hook=beforeTransaction;beforeTransaction=undefined;hook(type);}const next=change(structuredClone(state));state=structuredClone(next);return structuredClone(state);}}),
+    // No changeToken is supplied: every VM tick must revalidate the mutable
+    // controlled state, including non-store context/scope boundary doubles.
+    withStore:(root,fn)=>fn({root,readSnapshot:fn=>fn(),publicReconciliationState:()=>null,read:()=>structuredClone(state),transaction:(type,change)=>{if(beforeTransaction){const hook=beforeTransaction;beforeTransaction=undefined;hook(type);}const next=change(structuredClone(state));state=structuredClone(next);return structuredClone(state);}}),
     owner:(s,session,host,epoch)=>{if(s.owner.session_id!==session || s.owner.host!==host || (epoch!==undefined && s.owner.epoch!==epoch))throw new Error('Stale owner');},
     notice:(s,kind,summary,reference)=>{const n={kind,summary,reference};s.notices.push(n);return n;},
     requireText:(v,label,max=20000)=>{if(typeof v!=='string'||!v.trim()||v.length>max)throw new Error('Invalid '+label);return v;},

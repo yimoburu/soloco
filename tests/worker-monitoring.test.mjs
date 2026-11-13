@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import childProcess from 'node:child_process';
+import {syncBuiltinESMExports} from 'node:module';
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
 import {call} from '../plugins/soloco/runtime/main.mjs';
 import {Store,withStore,digest,teamHash} from '../plugins/soloco/runtime/store.mjs';
@@ -10,6 +12,7 @@ import {reference} from '../plugins/soloco/runtime/specialists.mjs';
 import {assignmentContext} from '../plugins/soloco/runtime/context.mjs';
 import {operatingContext} from '../plugins/soloco/runtime/operating-state.mjs';
 import {developmentAssignment} from '../plugins/soloco/runtime/develop.mjs';
+import {sandboxProfile} from '../plugins/soloco/runtime/local-sandbox.mjs';
 import {executionTiming} from '../plugins/soloco/runtime/timeout.mjs';
 import {work} from '../plugins/soloco/runtime/worker.mjs';
 
@@ -23,11 +26,66 @@ const hash=value=>digest(JSON.stringify(value));
 const result=(job,extra={})=>({native_id:'fictional-monitor-'+job.id,text:JSON.stringify({content:'FICTIONAL bounded monitor fixture output; no native acceptance.',messages:[],notices:[],...extra})});
 const spawn=(timeout,options)=>options.onSpawn?.(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));
 
+async function fixedCapabilityBoundary(fn){
+  // engine.open/plan may inspect the local execution capability. This fixture
+  // never runs those OS probes: only the three closed source-owned probe forms
+  // below receive SYNTHETIC results. The module's capability cache is therefore
+  // fictional for this isolated test process, never OS qualification.
+  const methods=['spawn','spawnSync','exec','execSync','execFile','execFileSync','fork','ChildProcess','_forkChild'].filter(name=>Object.hasOwn(childProcess,name));
+  const original=Object.fromEntries(methods.map(name=>[name,childProcess[name]])),effects=[],unexpected=[];
+  const node=fs.realpathSync(process.execPath);
+  const reject=(method,args)=>{unexpected.push({method,command:String(args[0])});throw Error('FICTIONAL monitor boundary denies unknown child_process call: '+method);};
+  const environment=scratch=>({PATH:'/usr/bin:/bin',HOME:scratch,TMPDIR:scratch,TMP:scratch,TEMP:scratch,LANG:'C',LC_ALL:'C',OPENSSL_CONF:'/dev/null',NODE_DISABLE_COLORS:'1'});
+  const optionKeys=(options,keys)=>assert.deepEqual(Object.keys(options).sort(),keys.slice().sort());
+  for(const name of methods)childProcess[name]=(...args)=>reject(name,args);
+  childProcess.spawnSync=(command,args,options)=>{
+    try{
+      assert(Array.isArray(args));assert(options&&typeof options==='object');
+      if(command==='/usr/bin/otool'){
+        assert.deepEqual(args,['-L',node]);optionKeys(options,['encoding','timeout','maxBuffer','killSignal','env']);
+        assert.equal(options.encoding,'utf8');assert(options.timeout>0&&options.timeout<=5000);assert.equal(options.maxBuffer,100000);assert.equal(options.killSignal,'SIGKILL');assert.deepEqual(options.env,{PATH:'/usr/bin:/bin'});
+        effects.push({kind:'SYNTHETIC fixed runtime-library capability probe',command,argument_count:args.length});
+        return {status:0,signal:null,stdout:node+':\n',stderr:''};
+      }
+      if(command===node){
+        assert.equal(args.length,3);assert(['--test-isolation=none','--experimental-test-isolation=none'].includes(args[0]));assert.deepEqual(args.slice(1),['--eval','']);
+        optionKeys(options,['cwd','env','encoding','timeout','maxBuffer','killSignal']);
+        assert.equal(options.cwd,path.dirname(node));assert.deepEqual(options.env,environment(os.tmpdir()));assert.equal(options.encoding,'utf8');assert.equal(options.timeout,5000);assert.equal(options.maxBuffer,10000);assert.equal(options.killSignal,'SIGKILL');
+        effects.push({kind:'SYNTHETIC fixed Node-flag capability probe',command,argument_count:args.length});
+        return {status:0,signal:null,stdout:'',stderr:''};
+      }
+      if(command==='/usr/bin/sandbox-exec'){
+        optionKeys(options,['cwd','env','encoding','timeout','maxBuffer','killSignal']);
+        const directory=options.cwd,scratch=path.join(directory,'scratch'),probe=path.join(directory,'probe.test.mjs');
+        assert.equal(directory,fs.realpathSync(directory));assert.equal(path.dirname(directory),fs.realpathSync(os.tmpdir()));assert(path.basename(directory).startsWith('soloco-sandbox-check-'));
+        const fixedProbe="import test from 'node:test';test('sandbox startup',()=>process.stdout.write('SOLOCO_SANDBOX_READY\\n'));\n";
+        assert.equal(fs.readFileSync(probe,'utf8'),fixedProbe);
+        assert.equal(args.length,12);assert.equal(args[0],'-p');assert.equal(args[1],sandboxProfile(directory,scratch));assert.equal(args[2],node);
+        assert.deepEqual(args.slice(3,7),['--permission','--allow-fs-read='+directory,'--allow-fs-write='+scratch,'--test']);
+        assert(['--test-isolation=none','--experimental-test-isolation=none'].includes(args[7]));
+        assert.deepEqual(args.slice(8),['--test-concurrency=1','--test-reporter=tap','--test-force-exit','./probe.test.mjs']);
+        assert.deepEqual(options.env,environment(scratch));assert.equal(options.encoding,'utf8');assert.equal(options.timeout,5000);assert.equal(options.maxBuffer,10000);assert.equal(options.killSignal,'SIGKILL');
+        effects.push({kind:'SYNTHETIC fixed Seatbelt-startup capability probe',command,argument_count:args.length});
+        return {status:0,signal:null,stdout:'TAP version 13\nSOLOCO_SANDBOX_READY\n',stderr:''};
+      }
+    }catch(error){unexpected.push({method:'spawnSync',command:String(command),reason:error.message});throw error;}
+    return reject('spawnSync',[command,args,options]);
+  };
+  syncBuiltinESMExports();
+  try{return await fn(effects);}
+  finally{
+    for(const name of methods)childProcess[name]=original[name];
+    syncBuiltinESMExports();
+    assert.deepEqual(unexpected,[],'No child_process operation outside the fixed fictional capability census is allowed');
+  }
+}
+
 async function fixture(fn,{domainInput=true}={}){
+  return fixedCapabilityBoundary(async effects=>{
   const base=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'soloco-worker-monitor-'))),previous=process.env.COMPANY_PLUGIN_DATA;
   process.env.COMPANY_PLUGIN_DATA=path.join(base,'bindings');
   const args={root:path.join(base,'company'),session_id:'fictional-monitor-founder',epoch:1};fs.mkdirSync(args.root);
-  const f={base,args,sequence:0,read:()=>withStore(args.root,db=>db.read())};
+  const f={base,args,effects,sequence:0,read:()=>withStore(args.root,db=>db.read())};
   f.change=change=>withStore(args.root,db=>{let value;db.transaction('fictional.monitor.fixture',s=>{value=change(s);return s;});return value;});
   f.action=(action,extra={})=>engine.specialists({...args,action,operation_id:'monitor-'+(++f.sequence),source_instruction:instruction,...extra},'codex');
   try{
@@ -41,6 +99,7 @@ async function fixture(fn,{domainInput=true}={}){
     if(previous===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=previous;
     fs.rmSync(base,{recursive:true,force:true});
   }
+  });
 }
 function ordinary(f,extra={}){
   return engine.dispatch({...f.args,role:'engineer',task:'Read the exact fictional input and retain its uncertainty.',input_ids:['domain-input'],timeout_ms:600000,timeout_reason:'Bounded fictional monitor controls, not an actual model call.',...extra},'codex',launch);
