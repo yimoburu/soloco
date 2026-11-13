@@ -61,7 +61,14 @@ export function packageContextProducer(check=false){
 }
 // The loader resolves entry-path aliases; argv may retain their logical spelling.
 // Compare the same physical file so an explicit CLI call cannot silently no-op.
-if(process.argv[1]&&fs.realpathSync(path.resolve(process.argv[1]))===fs.realpathSync(fileURLToPath(import.meta.url))){
+function invokedAsMain(){
+ if(!process.argv[1])return false;
+ let entry;
+ try{entry=fs.realpathSync(path.resolve(process.argv[1]));}
+ catch(error){if(error.code==='ENOENT'||error.code==='ENOTDIR')return false;throw error;}
+ return entry===fs.realpathSync(fileURLToPath(import.meta.url));
+}
+if(invokedAsMain()){
  need(process.argv.length===2||(process.argv.length===3&&process.argv[2]==='--check'),'only --check is supported');
  packageContextProducer(process.argv[2]==='--check');
 }

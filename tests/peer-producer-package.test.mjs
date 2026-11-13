@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import {fileURLToPath} from 'node:url';
+import {fileURLToPath,pathToFileURL} from 'node:url';
 import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 
@@ -34,7 +34,11 @@ function aliasedRoot(root){
 }
 
 test('fixed recipe packager reconstructs all 169 original assets with exact bytes modes and inventory',t=>{
- const f=fixture(t);passed(run(aliasedRoot(f.root)));const seal=JSON.parse(fs.readFileSync(f.seal));
+ const f=fixture(t),missing=path.join(f.root,'missing-non-main-entry');
+ const importOnly=`if(process.argv[1]!==${JSON.stringify(missing)})throw Error('IMPORT_FIXTURE_ARGUMENT');const p=await import(${JSON.stringify(pathToFileURL(path.join(f.root,'tools/package-context-producer.mjs')).href)});if(typeof p.packageContextProducer!=='function')throw Error('IMPORT_EXPORT_MISSING');process.stdout.write('IMPORTED_ONLY\\n');`;
+ const imported=spawnSync(process.execPath,['--input-type=module','--eval',importOnly,missing],{encoding:'utf8',timeout:5000,maxBuffer:65536});
+ passed(imported);assert.equal(imported.stdout,'IMPORTED_ONLY\n');assert.equal(fs.existsSync(f.seal),false);
+ passed(run(aliasedRoot(f.root)));const seal=JSON.parse(fs.readFileSync(f.seal));
  assert.deepEqual(Object.keys(seal).sort(),['build_driver','files','protocol','source_package']);
  assert.equal(seal.protocol,'soloco-packaged-native-recipe-v1');assert.equal(seal.files.length,169);
  const expected=f.rows.map(row=>{const bytes=fs.readFileSync(path.join(f.root,'native/codex',row.path));assert.deepEqual(fs.readFileSync(path.join(f.native,row.path)),bytes);assert.equal(fs.statSync(path.join(f.native,row.path)).mode&0o777,row.mode==='100755'?0o755:0o644);return {path:row.path,bytes:bytes.length,sha256:hash(bytes),mode:row.mode};});
