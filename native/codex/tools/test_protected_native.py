@@ -112,7 +112,9 @@ class TemporaryDataChecks(unittest.TestCase):
 
     def test_packaged_request_derives_only_fixed_paths_and_timeout_without_environment(self):
         with self.pure_packaged_fixture() as (package, workspace, request, package_read, _):
-            with patch.dict(TOOL.os.environ, {"COMPANY_PLUGIN_DATA": "/wrong/data", "CODEX_HOME": "/wrong/home", "MANIFEST": "/wrong/manifest", "CC": "/wrong/compiler"}):
+            ambient = dict(vars(TOOL.os))
+            ambient["environ"] = {"COMPANY_PLUGIN_DATA": "/wrong/data", "CODEX_HOME": "/wrong/home", "MANIFEST": "/wrong/manifest", "CC": "/wrong/compiler"}
+            with patch.object(TOOL, "os", SimpleNamespace(**ambient)):
                 args = TOOL.packaged_build_args(json.dumps(request))
             self.assertEqual(args.manifest, package / "producer-inputs/native/codex/source-package.json")
             self.assertEqual(args.prepared, workspace / "inputs" / TOOL.MANIFEST_SHA256 / "prepared")
