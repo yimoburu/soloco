@@ -1813,7 +1813,7 @@ function mutate(tx,actor,principal,c,action,args,protectedCall,taskBinding=null,
   }
   if(action==='task/admit'){
     if(!trusted(principal))hold('SCHEDULER_REQUIRED','Runtime admission required');ordinaryOriginFrom(tx,'task/admit');const status=runtimeStatus(tx);if(status.paused)return {admitted:false,code:'PAUSED',reason:'Company paused'};if(!status.available_slots)return {admitted:false,code:'CAPACITY_BUSY',reason:'Active or uncertain execution holds capacity'};
-    const task=peek(tx,args);if(!task)return {admitted:false,code:'NO_WORK',reason:'No unexcluded pending work'};if(args.task_id&&args.task_id!==task.id)return {admitted:false,code:'FAIRNESS_CHANGED',reason:'Selection changed'};const t=task.value;ordinaryOriginFrom(tx,'task/admit',task);
+    const task=peek(tx,args);if(!task)return {admitted:false,code:'NO_WORK',reason:'No unexcluded pending work'};if(args.task_id&&args.task_id!==task.id)return {admitted:false,code:'FAIRNESS_CHANGED',reason:'Selection changed'};const t=task.value,ordinary=ordinaryOriginFrom(tx,'task/admit',task);
     if((Object.hasOwn(t,'handoff_ref')||Object.hasOwn(t.definition??{},'handoff_ref'))&&!currentAuthorizationGrants.has(tx))hold('SOURCE_CHANGED','Task selection changed to a typed handoff; fresh guarded admission required');
     // Expected admission holds must occur before planning resource mutations.
     let auth,context,usage,principalUsage,used,usedPrincipal,effectAuthority;
@@ -1831,7 +1831,10 @@ function mutate(tx,actor,principal,c,action,args,protectedCall,taskBinding=null,
       // Source-owned SOFTWARE support is checked after the original context
       // reads and before any resource, attempt, effect or allowance put.
       prepareOriginalProjectedTaskContext(context,tx);
-      const issued=Date.now(),expires=Math.min(issued+TASK_EFFECT_LEASE_MS,auth.grant?Date.parse(auth.grant.value.expires_at):Infinity);
+      // The actual task's original qualification is captured above. Persist its
+      // cutoff in the existing lease so every private launch/permit/broker
+      // inherits it, even if later provider reads cross that deadline.
+      const issued=Date.now(),expires=Math.min(issued+TASK_EFFECT_LEASE_MS,auth.grant?Date.parse(auth.grant.value.expires_at):Infinity,ordinary?.deadline_at_ms??Infinity);
       if(!Number.isSafeInteger(issued)||!Number.isSafeInteger(expires)||expires<=issued)hold('GRANT_INVALID','Admission authority expired during preparation');
       effectAuthority={protocol:'peer-task-effect-authority-v1',epoch:nextTaskAuthority(t),issued_at:new Date(issued).toISOString(),expires_at:new Date(expires).toISOString(),...(productionAdmissions.has(tx)?{production_authority:copy(productionAdmissions.get(tx))}:{})};
     }catch(error){if(readFailure(tx,error))throw error;if(['RESOURCE_BUSY','RESOURCE_AUTHORITY','CONTEXT_CAPACITY','CONTEXT_CONFLICT','GRANT_INVALID','GRANT_CHANGED','MODEL_BUDGET','PRINCIPAL_INACTIVE','SOURCE_CHANGED','DEPENDENCY_CYCLE','LEGACY_SOURCE_MISSING','DEFINITION_CHANGED','HANDOFF_DECIDED'].includes(error.code))return {admitted:false,code:error.code,reason:error.message};throw error;}

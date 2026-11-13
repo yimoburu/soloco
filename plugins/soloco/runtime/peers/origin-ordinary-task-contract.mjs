@@ -25,7 +25,8 @@ export function ordinaryNativeDataScope(value){const v=ordinaryData(value,['prot
 // Lossless compulsory worker DATA, never a readiness or Native capability.
 // No task scope filter may remove original RAW, global or UNKNOWN occurrences.
 export function peerOrdinaryOriginCompulsoryContext(proof){
- const v=ordinaryData({qualification_ref:proof.qualification_ref,complete_raw:proof.complete_raw,incidence:proof.incidence},['qualification_ref','complete_raw','incidence']);ordinaryReference(v.qualification_ref,'work_items');
+ ordinaryNeed(Number.isSafeInteger(proof?.deadline_at_ms)&&proof.deadline_at_ms>0,'ORIGIN_ORDINARY_TASK_DEADLINE_REQUIRED');
+ const v=ordinaryData({qualification_ref:proof.qualification_ref,deadline_at_ms:proof.deadline_at_ms,complete_raw:proof.complete_raw,incidence:proof.incidence},['qualification_ref','deadline_at_ms','complete_raw','incidence']);ordinaryReference(v.qualification_ref,'work_items');
  ordinaryNeed(Array.isArray(v.complete_raw)&&Array.isArray(v.incidence)&&v.complete_raw.length===v.incidence.length,'ORIGIN_ORDINARY_TASK_RAW_INCOMPLETE');
  for(let i=0;i<v.complete_raw.length;i++){const raw=v.complete_raw[i],edge=v.incidence[i];ordinaryNeed(raw&&edge&&raw.source_id===edge.source_id&&ordinarySame(raw.reference,edge.source_ref)&&edge.disposition==='compulsory-complete-raw'&&edge.scope==='*'&&edge.semantic_home_qualified===false&&edge.body_sha256===peerDigest(raw),'ORIGIN_ORDINARY_TASK_INCIDENCE_CHANGED');}
  return {protocol:'peer-origin-ordinary-task-compulsory-context-v1',mode:'complete-raw',...v};

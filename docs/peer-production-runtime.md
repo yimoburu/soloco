@@ -147,3 +147,7 @@ The pre-ordinary generated Native recipe is stale. The new family remains held u
 The task journal grammar accepts one exact `dispatch_admitted` payload only for successful task admission, bound to the same task, attempt, effect and pause/policy generations. Denied admission, reads, unchanged receipts and other ordinary task mutations accept no nested custom events.
 
 Journal producers are limited to task submit, assign, claim, admit, cancel, process, finish and closure. Consumer/helper names do not grant task-write recipes. Empty read guards produce no peer event and are not historical exemptions.
+
+Ordinary task admission stores the earliest of the original task-bound qualification deadline, task grant expiry and existing 120-second effect lease. The compulsory context retains that same immutable qualification cutoff. Existing original launch, spawn, Native permit and broker clocks inherit the shortened stored lease; a currentness check before later reads cannot extend it.
+
+Trial limitation: the existing task host requests its own callback budget (normally 60 seconds). If the original qualification has less time remaining, callback incarnation binding can conservatively Hold while the qualification is still live. This v6 cutoff repair adds no host-budget exception; a genuine trial needs an applicable remaining window or separately reviewed budget handling.
