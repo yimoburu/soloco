@@ -233,7 +233,7 @@ test('cancelling committed producer or review evidence revokes readiness without
       assert.throws(()=>engine.dispatch({...f.args,epoch:1,role:'growth',task:'Consume the explicitly named fictional job.',depends_on:[jobId]},'codex',{check:()=>({available:true,authenticated:true,version:'fictional-contract-adapter'}),launch:inertChild}),/cancelled/,'legacy dispatch cannot bypass an async task cancellation by naming its job');
       if(phase==='negative-review')return; // Declared negative inputs are repair evidence, not positive readiness.
       const explicit=await f.submit('explicit-cancelled-output',{role:'engineer',input_ids:[artifactId]});
-      const current=f.read(),spec=current.records[explicit.id].runtime_task.spec,prospective={id:'prospective-cancelled-input',role:spec.role,task:spec.task,host:'codex',epoch:1,context_scope:spec.context_scope,inputs:[{id:artifactId,revision:1}],review_of:null,runtime_task:{id:explicit.id,definition_revision:explicit.definition_revision,definition_sha256:explicit.definition_sha256}};
+      const current=f.read(),spec=current.records[explicit.id].runtime_task.spec,prospective={id:'prospective-cancelled-input',context_format:7,role:spec.role,task:spec.task,host:'codex',epoch:1,context_scope:spec.context_scope,inputs:[{id:artifactId,revision:1}],review_of:null,runtime_task:{id:explicit.id,definition_revision:explicit.definition_revision,definition_sha256:explicit.definition_sha256}};
       assert.equal(taskReady(current,current.records[explicit.id]).ready,false);
       assert.throws(()=>taskAssignmentContext(current,prospective),/cancelled/);assert.throws(()=>f.queue(explicit.id),/cancelled/);
       assert.equal(f.read().records[explicit.id].runtime_task.attempts.length,0);

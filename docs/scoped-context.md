@@ -593,6 +593,27 @@ operating homes, a paused company, the current owner and existing read-only
 maintenance authority, and normalized-v4 intake. This permission represents
 existing evidence; it grants no execution, allowance renewal or governance change.
 
+An explicit `frozen_intake: "initial-v1"` plan may instead derive that policy from
+`corpus_plan_id` naming a current extraction-only corpus parent with
+`intrinsic-body-96k-v1`. Supply the complete `physical-shared-v1`
+`semantic_partition` for the parent's frozen manifest, the initial-home policy,
+`maintenance: true` and the exact instruction. Optional batching/source arguments
+must match the parent. The parent must retain current-owner, current-control,
+nonrevoked paused read-only maintenance. Existing corpus source/producer checks
+and a frozen/current global-boundary comparison use its original notice adapter;
+new ordinary material, messages or unknown extensions Hold. Zero typed homes and
+the genuine normalized intake provider remain required.
+
+The child clones the exact frozen original, projection, vector, intrinsic units
+and producer closures; it never rebuilds a manifest from current state or changes
+the parent. Its explicit parent provenance, partition, intake and recomputed
+incidence produce a NEW extraction identity. Earlier extraction receipts cannot
+be reused merely because bodies are unchanged. Parent revocation or drift remains
+a barrier on cold validation. Derived children cannot be recaptured or chained.
+Unmarked `corpus_plan_id` reuse still cannot add or change a partition/home policy.
+Creating this plan creates no extraction target, model call, proposed home,
+publication, classification, notice disposition, resume or allowance reset.
+
 After canonical intrinsic extraction, `company_save` may prepare a new artifact
 with `bootstrap_plan_id`, its complete `operating_record`, and globally mandatory
 context. `operating_record.evidence_refs` contains plain literal source IDs, as in

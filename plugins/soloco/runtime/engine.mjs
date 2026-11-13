@@ -683,7 +683,7 @@ function readPublicExact(db,args){return db.readSnapshot(()=>{
 // Explicit operations only. Neither API is called automatically on an existing company.
 export function contextControl(args,host) {
   binding(args,host);
-  if(args.home_intake_policy!==undefined||args.batching_policy!==undefined||args.semantic_partition?.context_policy!==undefined||args.semantic_partition?.shared_selection_ids!==undefined){
+  if(args.frozen_intake!==undefined||args.home_intake_policy!==undefined||args.batching_policy!==undefined||args.semantic_partition?.context_policy!==undefined||args.semantic_partition?.shared_selection_ids!==undefined){
     if(args.delivery_schema!==undefined||args.raw_review_ids!==undefined||args.action!=='plan'||args.protocol!==scoped.SCOPED_PROTOCOL||args.partitioner!==scoped.CORPUS_PARTITIONER)throw Error('Physical/batching policy requires an explicit scoped corpus plan');
     return scopedControl(args,host);
   }

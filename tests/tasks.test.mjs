@@ -200,7 +200,7 @@ test('known bookkeeping fields reject object-valued qualifiers and malformed tim
   for(const mutate of [a=>a.created_at={hidden:'x'},a=>a.artifact_id={hidden:'x'},a=>a.finished_at='invalid',a=>a.definition_sha256=['hidden']]){const copy=structuredClone(queued);mutate(copy.records[task.id].runtime_task.attempts[0]);assert.equal(isTaskBookkeeping(copy,copy.records[task.id]),false);}
 }));
 
-function unrelatedPacket(state,record){const spec=record.runtime_task.spec;return JSON.parse(taskAssignmentContext(state,{id:'fictional-prospective-unrelated',role:spec.role,task:spec.task,epoch:state.owner.epoch,context_scope:spec.context_scope,inputs:[],review_of:null,runtime_task:taskDefinitionBinding(record)}).text);}
+function unrelatedPacket(state,record){const spec=record.runtime_task.spec;return JSON.parse(taskAssignmentContext(state,{id:'fictional-prospective-unrelated',context_format:7,role:spec.role,task:spec.task,epoch:state.owner.epoch,context_scope:spec.context_scope,inputs:[],review_of:null,runtime_task:taskDefinitionBinding(record)}).text);}
 
 test('cancel preserves verbatim attributed source intent, replay and compulsory unrelated-task context',()=>fixture(({identity,write,read})=>{
   write(s=>setRuntimeControl(s,{...identity,action:'start',source_instruction:'Prepare only the bounded fictional task context in this test.'},'codex'));

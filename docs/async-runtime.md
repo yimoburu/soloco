@@ -138,3 +138,11 @@ visible prompt/read/response guard and the worker's response reserve. Even a
 complete initial packet and passing synthetic tests do not establish provider fit
 or actual company semantic acceptance. Source support alone adopts no company
 policy, unpauses no work and performs no qualification.
+
+A corpus proof also binds its complete frozen source census. Submitting another
+task or binding its attempt can change that census before the task context's
+later bookkeeping filter runs. That filter does not extend corpus eligibility:
+an invalidated notice proof restores raw evidence and may Hold the packet or
+invalidate its queued hash. Single-source scoped preservation instead rechecks
+its exact notice, homes, producer and governing conditions. Neither path promises
+automatic eligibility for future tasks.

@@ -23,6 +23,7 @@ export const CORPUS_INTRINSIC_BATCHING='intrinsic-body-96k-v1';
 export const CORPUS_PHYSICAL_CONTEXT='physical-shared-v1';
 export const COMPLETE_GROUP_RANGES='complete-group-ranges-v1';
 export const INITIAL_PROPOSED_HOMES='initial-proposed-homes-v1';
+export const FROZEN_INITIAL_INTAKE='initial-v1';
 const conclusionsDelivery=marker=>[CORPUS_FIT_DELIVERY,CORPUS_PHASED_DELIVERY].includes(marker);
 const phasedDomain=t=>t.delivery_schema===CORPUS_PHASED_DELIVERY&&t.phase==='applicability'&&!t.interface_keys.length;
 const CORPUS_INCIDENCE='corpus-provenance-incidence-v1';
@@ -324,7 +325,7 @@ function corpusIncidenceDerivation(m,c){
   }
   return derived;
 }
-const corpusIdentity=c=>sha({partitioner:CORPUS_PARTITIONER,projection:c.projection,selected_sources:c.selected_sources,units:c.units,producer_closures:c.producer_closures,...(c.batching_policy?{batching_policy:c.batching_policy}:{}),...(c.incidence?{incidence:c.incidence}:{}),...(c.semantic_partition?{semantic_partition:c.semantic_partition}:{}),...(c.home_intake?{home_intake:c.home_intake}:{})});
+const corpusIdentity=c=>sha({partitioner:CORPUS_PARTITIONER,projection:c.projection,selected_sources:c.selected_sources,units:c.units,producer_closures:c.producer_closures,...(c.batching_policy?{batching_policy:c.batching_policy}:{}),...(c.incidence?{incidence:c.incidence}:{}),...(c.semantic_partition?{semantic_partition:c.semantic_partition}:{}),...(c.home_intake?{home_intake:c.home_intake}:{}),...(c.frozen_intake?{frozen_intake:c.frozen_intake}:{})});
 function corpusRuntimeRecord(s,r){
   if(r.operating_record||r.bootstrap_home_provenance)return false;
   const common=['id','kind','revision','status','author_role','author_instance','created_at'];
@@ -332,10 +333,35 @@ function corpusRuntimeRecord(s,r){
   return extra!==null&&Object.keys(r).every(k=>[...common,...extra].includes(k));
 }
 
-function bootstrapBoundary(s){const g=globalSubject(s,null,['*'],[],true);delete g.governing;return g;}
+function bootstrapBoundary(s,noticeSources){const g=globalSubject(s,null,['*'],[],true,noticeSources);delete g.governing;return g;}
+function frozenIntakeAuthority(s,p){
+  const a=p?.context_maintenance;
+  if(s.paused!==true||a?.readonly!==true||a.revoked_at||!same(a.owner,s.owner)||a.controls_sha256!==qualificationControlHash(s)||!text(a.source_instruction))fail('frozen intake parent owner/epoch/pause/control/revocation changed');
+}
+function frozenIntakeParent(s,p,currentCapsule){
+  frozenIntakeAuthority(s,p);
+  const v=p?.scoped_context_plan;
+  if(v?.partitioner!==CORPUS_PARTITIONER||v.frozen_intake!==undefined||v.home_intake_policy!==undefined)fail('frozen intake requires an original extraction-only corpus parent');
+  const capsule=resolveSnapshot(s,v.capsule);
+  if(capsule.frozen_intake!==undefined||capsule.home_intake!==undefined||capsule.batching_policy!==CORPUS_INTRINSIC_BATCHING)fail('frozen intake parent policy changed');
+  // Only this child's existing canonical proposed-home intake can accompany the
+  // parent structural validation. Unmarked parent reads retain their old rules.
+  const prior=plan(s,p,currentCapsule),frozen=inheritSnapshots(s,resolveSnapshot(s,prior.c.original));
+  if(!same(bootstrapBoundary(s,prior.material.notice_sources===NOTICE_SOURCES),bootstrapBoundary(frozen,prior.material.notice_sources===NOTICE_SOURCES)))fail('frozen intake global boundary changed');
+  return prior;
+}
+function validateFrozenIntake(s,v,c){
+  if(!c.frozen_intake){if(v.frozen_intake!==undefined)fail('frozen intake marker changed');return;}
+  const d=c.frozen_intake;closed(d,['version','parent','parent_capsule','parent_extraction_identity'],'frozen intake derivation');
+  if(d.version!==1||v.frozen_intake!==FROZEN_INITIAL_INTAKE||!c.home_intake)fail('invalid frozen intake derivation');
+  const parent=exact(s,d.parent),prior=frozenIntakeParent(s,parent,c);
+  if(!same(d.parent_capsule,prior.v.capsule)||d.parent_extraction_identity!==prior.v.extraction_identity)fail('frozen intake original parent changed');
+  for(const key of ['projection','original','selected_sources','units','producer_closures','batching_policy'])if(!same(c[key],prior.c[key]))fail('frozen intake parent material changed '+key);
+}
 function bootstrapCurrent(s,p,c){
   const a=p.context_maintenance,h=c.home_intake;
-  if(!h||s.paused!==true||!same(h.owner,s.owner)||!same(a?.owner,s.owner)||a?.readonly!==true||a.revoked_at||a.controls_sha256!==qualificationControlHash(s)||h.controls_sha256!==qualificationControlHash(s)||!same(h.boundary,bootstrapBoundary(s)))fail('initial home owner/epoch/pause/current authority changed');
+  const noticeSources=c.frozen_intake?corpusGraph(s,c.projection).material.notice_sources===NOTICE_SOURCES:undefined;
+  if(!h||s.paused!==true||!same(h.owner,s.owner)||!same(a?.owner,s.owner)||a?.readonly!==true||a.revoked_at||a.controls_sha256!==qualificationControlHash(s)||h.controls_sha256!==qualificationControlHash(s)||!same(h.boundary,bootstrapBoundary(s,noticeSources)))fail('initial home owner/epoch/pause/current authority changed');
 }
 function bootstrapEnvelope(r,binding){
   const fields=['id','kind','content','operating_record','author_role','author_instance','revision','status','source_reference','basis','updated_at','previous','bootstrap_home_provenance',...(r?.context_obligations?['context_obligations']:[])];
@@ -410,12 +436,23 @@ function corpusLive(s,c,m){
   for(const [id,j] of Object.entries(s.jobs??{}))if(!known.has('job:'+id)&&!operating.jobs.has(id)&&(!s.records[j.review_of?.id]?.scoped_context_target||!proofJobSafe(Object.fromEntries(Object.entries(j).filter(([k])=>!['qualification_delivery','error','execution_failure','rejected_output','rejected_native_ids','rejected_native_id'].includes(k))))))fail('corpus current job membership added '+id);
   for(const u of [s.upgrade,...(s.upgrade_history??[])].filter(Boolean))if(!known.has('upgrade:'+u.id))fail('corpus upgrade membership added');
 }
-function captureCorpus(s,{source_id,corpus_plan_id,selected_source_ids,semantic_partition,batching_policy,home_intake_policy,maintenance,source_instruction}){
+function captureCorpus(s,{source_id,corpus_plan_id,selected_source_ids,semantic_partition,batching_policy,home_intake_policy,maintenance,source_instruction,frozen_intake}){
   if(home_intake_policy!==undefined&&home_intake_policy!==INITIAL_PROPOSED_HOMES)fail('unknown home intake policy');
-  if(home_intake_policy!==undefined&&corpus_plan_id)fail('home intake policy requires a fresh plan');
+  if(frozen_intake!==undefined&&(frozen_intake!==FROZEN_INITIAL_INTAKE||!corpus_plan_id||home_intake_policy!==INITIAL_PROPOSED_HOMES||!semantic_partition))fail('explicit frozen initial intake requires parent, home policy and partition');
+  if(home_intake_policy!==undefined&&corpus_plan_id&&frozen_intake===undefined)fail('home intake policy requires a fresh plan');
   if(batching_policy!==undefined&&batching_policy!==CORPUS_INTRINSIC_BATCHING)fail('unknown corpus batching policy');
   let c,m;
-  if(corpus_plan_id){const prior=plan(s,source(s,corpus_plan_id));if(prior.v.partitioner!==CORPUS_PARTITIONER)fail('exact corpus plan required');c=prior.c;m=prior.material;if(batching_policy!==undefined&&batching_policy!==c.batching_policy)fail('frozen batching policy changed');if(semantic_partition&&!same(semantic_partition,c.semantic_partition))fail('frozen semantic partition changed');if(selected_source_ids&&!same(selected_source_ids,c.selected_sources))fail('selected corpus membership changed');}
+  if(corpus_plan_id){
+    const parent=source(s,corpus_plan_id),prior=frozen_intake?frozenIntakeParent(s,parent):plan(s,parent);
+    if(prior.v.partitioner!==CORPUS_PARTITIONER)fail('exact corpus plan required');c=frozen_intake?JSON.parse(json(prior.c)):prior.c;m=prior.material;
+    if(!frozen_intake&&c.frozen_intake)fail('frozen intake child cannot be recaptured');
+    if(batching_policy!==undefined&&batching_policy!==c.batching_policy)fail('frozen batching policy changed');
+    if(selected_source_ids&&!same(selected_source_ids,c.selected_sources))fail('selected corpus membership changed');
+    if(frozen_intake){
+      validateCorpusPartition(m,semantic_partition);c.semantic_partition=JSON.parse(json(semantic_partition));
+      c.frozen_intake={version:1,parent:scopedReference(parent),parent_capsule:JSON.parse(json(prior.v.capsule)),parent_extraction_identity:prior.v.extraction_identity};
+    }else if(semantic_partition&&!same(semantic_partition,c.semantic_partition))fail('frozen semantic partition changed');
+  }
   else {
     ids(selected_source_ids,'explicit selected corpus sources',false);
     m=buildLegacyCoherentPlan(s,selected_source_ids.some(id=>isCanonicalNoticeSource(s,id))?{notice_sources:NOTICE_SOURCES}:{});
@@ -424,13 +461,13 @@ function captureCorpus(s,{source_id,corpus_plan_id,selected_source_ids,semantic_
     c={...(batching_policy?{batching_policy}:{}),...(semantic_partition?{semantic_partition}:{}),projection:retainSnapshot(s,m),original:retainSnapshot(s,s),selected_sources:[...selected_source_ids],units:corpusUnits(m,batching_policy?undefined:semantic_partition),producer_closures:Object.fromEntries(m.sources.map(r=>[r.source.id,producerClosure(s,source(s,r.source.id),r.source.id)]))};
   }
   if(home_intake_policy){
-    if(batching_policy!==CORPUS_INTRINSIC_BATCHING||semantic_partition?.context_policy!==CORPUS_PHYSICAL_CONTEXT||s.paused!==true||maintenance!==true||!text(source_instruction)||Object.values(s.records??{}).some(r=>resolveSnapshotEntry(s,r).operating_record))fail('initial proposed homes require zero typed homes, physical partition, intrinsic batching and paused read-only maintenance');
-    c.home_intake={policy:home_intake_policy,owner:{...s.owner},controls_sha256:qualificationControlHash(s),boundary:bootstrapBoundary(s),baseline:operatingIntake(s).baseline};
+    if((frozen_intake?c.batching_policy:batching_policy)!==CORPUS_INTRINSIC_BATCHING||semantic_partition?.context_policy!==CORPUS_PHYSICAL_CONTEXT||s.paused!==true||maintenance!==true||!text(source_instruction)||Object.values(s.records??{}).some(r=>resolveSnapshotEntry(s,r).operating_record))fail('initial proposed homes require zero typed homes, physical partition, intrinsic batching and paused read-only maintenance');
+    c.home_intake={policy:home_intake_policy,owner:{...s.owner},controls_sha256:qualificationControlHash(s),boundary:bootstrapBoundary(s,frozen_intake?m.notice_sources===NOTICE_SOURCES:undefined),baseline:operatingIntake(s).baseline};
   }
-  if(!corpus_plan_id)c.incidence=corpusIncidenceDerivation(m,c).descriptor;
+  if(!corpus_plan_id||frozen_intake)c.incidence=corpusIncidenceDerivation(m,c).descriptor;
   if(!c.selected_sources.includes(source_id))fail('source outside explicit selected corpus membership');
   corpusLive(s,c,m);
-  return {protocol:SCOPED_PROTOCOL,version:1,partitioner:CORPUS_PARTITIONER,source:scopedReference(source(s,c.selected_sources[0]),c.selected_sources[0]),selected_source_ids:[...c.selected_sources],...(c.home_intake?{home_intake_policy:c.home_intake.policy}:{}),...(c.batching_policy?{batching_policy:c.batching_policy}:{}),...(c.incidence?{incidence_protocol:CORPUS_INCIDENCE}:{}),extraction_identity:corpusIdentity(c),projection_sha256:sha(m),capsule:retainSnapshot(s,c),units:c.units};
+  return {protocol:SCOPED_PROTOCOL,version:1,partitioner:CORPUS_PARTITIONER,source:scopedReference(source(s,c.selected_sources[0]),c.selected_sources[0]),selected_source_ids:[...c.selected_sources],...(c.home_intake?{home_intake_policy:c.home_intake.policy}:{}),...(c.frozen_intake?{frozen_intake:FROZEN_INITIAL_INTAKE}:{}),...(c.batching_policy?{batching_policy:c.batching_policy}:{}),...(c.incidence?{incidence_protocol:CORPUS_INCIDENCE}:{}),extraction_identity:corpusIdentity(c),projection_sha256:sha(m),capsule:retainSnapshot(s,c),units:c.units};
 }
 // Child positions always name the original frozen batch, never another child.
 function corpusSelection(v,id){
@@ -800,6 +837,7 @@ export function captureScopedPlan(s,args){
   if(!s.owner?.session_id||!Number.isSafeInteger(s.owner.epoch))fail('owner required');
   if(args.unit_selection_schema!==undefined||args.delivery_schema!==undefined||args.raw_review_ids!==undefined)fail('delivery options require a new target');
   if(args.home_intake_policy!==undefined&&partitioner!==CORPUS_PARTITIONER)fail('home intake policy requires fresh corpus plan');
+  if(args.frozen_intake!==undefined&&partitioner!==CORPUS_PARTITIONER)fail('frozen intake requires explicit corpus plan');
   if(args.batching_policy!==undefined&&partitioner!==CORPUS_PARTITIONER||args.semantic_partition?.context_policy!==undefined&&partitioner!==CORPUS_PARTITIONER)fail('physical/batching policy requires fresh corpus plan');
   if(!args.corpus_plan_id)for(const id of [source_id,...(Array.isArray(args.selected_source_ids)?args.selected_source_ids:[])])if(hasCanonicalNoticeSource(s,id)&&Object.hasOwn(s.records??{},id))noticeSource(s,id);
   if(partitioner===CORPUS_PARTITIONER)return captureCorpus(s,args);
@@ -812,13 +850,13 @@ export function captureScopedPlan(s,args){
   const extraction_identity=sha(extractionSubject(sourceRef,producer,producer_closure.length>1?producer_closure:undefined,raw,units));
   return {protocol:SCOPED_PROTOCOL,version:1,source:sourceRef,extraction_identity,projection_sha256:digest(raw),capsule:retainSnapshot(s,capsule),units};
 }
-function plan(s,p){
-  if(evaluation?.plans.has(p))return evaluation.plans.get(p);
+function plan(s,p,currentCapsule){
+  if(!currentCapsule&&evaluation?.plans.has(p))return evaluation.plans.get(p);
   const v=p?.scoped_context_plan;if(v?.protocol!==SCOPED_PROTOCOL||v.version!==1)fail('scoped plan missing');
   if(v.partitioner!==undefined&&v.partitioner!==COHERENT_PARTITIONER&&v.partitioner!==CORPUS_PARTITIONER)fail('unknown frozen partitioner');
   if(v.partitioner===CORPUS_PARTITIONER){
     const c=resolveSnapshot(s,v.capsule);
-    closed(c,['projection','original','selected_sources','units','producer_closures',...(c?.incidence?['incidence']:[]),...(c?.semantic_partition?['semantic_partition']:[]),...(c?.batching_policy!==undefined?['batching_policy']:[]),...(c?.home_intake?['home_intake']:[])],'corpus capsule');
+    closed(c,['projection','original','selected_sources','units','producer_closures',...(c?.incidence?['incidence']:[]),...(c?.semantic_partition?['semantic_partition']:[]),...(c?.batching_policy!==undefined?['batching_policy']:[]),...(c?.home_intake?['home_intake']:[]),...(c?.frozen_intake?['frozen_intake']:[])],'corpus capsule');
     if(c.batching_policy!==undefined&&c.batching_policy!==CORPUS_INTRINSIC_BATCHING||v.batching_policy!==c.batching_policy)fail('frozen batching policy changed');
     if(c.home_intake){closed(c.home_intake,['policy','owner','controls_sha256','boundary','baseline'],'home intake');if(v.home_intake_policy!==INITIAL_PROPOSED_HOMES||c.home_intake.policy!==INITIAL_PROPOSED_HOMES||c.batching_policy!==CORPUS_INTRINSIC_BATCHING||c.semantic_partition?.context_policy!==CORPUS_PHYSICAL_CONTEXT)fail('invalid frozen home intake policy');}else if(v.home_intake_policy!==undefined)fail('home intake policy changed');
     const {material,units,projection_sha256}=corpusGraph(s,c.projection);
@@ -827,7 +865,7 @@ function plan(s,p){
     if(c.selected_sources.some(id=>isCanonicalNoticeSource(s,id))!==(material.notice_sources===NOTICE_SOURCES))fail('corpus canonical notice derivation changed');
     if(c.selected_sources.some(id=>material.sources.filter(r=>r.source.id===id).length!==1)||!material.sources.some(r=>same(r.source,v.source)))fail('corpus selected source membership changed');
     if(digest(snapshotBytes(s,c.original))!==material.baseline.state_sha256)fail('corpus complete original changed');
-    corpusLive(s,c,material);exact(s,v.source);
+    validateFrozenIntake(s,v,c);corpusLive(s,currentCapsule??c,material);exact(s,v.source);
     if(!same(v.selected_source_ids,c.selected_sources)||v.source.id!==c.selected_sources[0]||!same(c.units,c.batching_policy?units:c.semantic_partition?corpusUnits(material,c.semantic_partition):units)||!same(v.units,c.units)||v.extraction_identity!==corpusIdentity(c)||v.projection_sha256!==projection_sha256)fail('corpus identity/coverage changed');
     let incidence;
     if(c.incidence){
@@ -842,7 +880,7 @@ function plan(s,p){
       }else fail('unknown corpus incidence representation');
     }else if(v.incidence_protocol!==undefined)fail('incompatible corpus incidence claim');
     // Keep the stored capsule exact: recapture must never persist this closure.
-    const result={v,c,material,incidence};evaluation?.plans.set(p,result);return result;
+    const result={v,c,material,incidence};if(!currentCapsule)evaluation?.plans.set(p,result);return result;
   }
   if(v.partitioner===COHERENT_PARTITIONER){
     const original=exact(s,v.source),c=resolveSnapshot(s,v.capsule),material=resolveSnapshot(s,c.projection);
