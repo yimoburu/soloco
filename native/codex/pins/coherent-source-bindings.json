@@ -13579,20 +13579,26 @@
   },
   {
     "path": "codex-rs/codex-api/src/protected_peer.rs",
-    "bytes": 42687,
-    "sha256": "b4f5e15d6fcafe671f9c5a1b4a612f029d65be0128029ca60991f79f2fc0b28c",
+    "bytes": 44951,
+    "sha256": "654c56e6bf8f3696483f9edb4fbd95274b56a092060209b0e5b79a576c6843f5",
+    "mode": "100644"
+  },
+  {
+    "path": "codex-rs/codex-api/src/protected_peer/bootstrap_membership_readonly3_contract_v1.json",
+    "bytes": 2427,
+    "sha256": "cd1ce3adaad300721e47238292ce15dc41f7007b6e415b76c005e93419656ed4",
     "mode": "100644"
   },
   {
     "path": "codex-rs/codex-api/src/protected_peer/context_contract.rs",
-    "bytes": 12785,
-    "sha256": "4d6145c58327188c229526b18640263b4d0ccd563eef8e78dfa26213281a1917",
+    "bytes": 17191,
+    "sha256": "b52cc2af30a011f52b4cc3e4ccddd49031374eca0852615e0a5663f0d11ef8b0",
     "mode": "100644"
   },
   {
     "path": "codex-rs/codex-api/src/protected_peer/context_contract/frame.rs",
-    "bytes": 9819,
-    "sha256": "d5009009688d454357a25dce88ba5c1a0196791d46b17b1835b1a97471327fc4",
+    "bytes": 11945,
+    "sha256": "7a05c9f17acb7f8c847dae2379c4eae034220deab4e4c78f9d2c850b17a147e8",
     "mode": "100644"
   },
   {
@@ -13603,8 +13609,8 @@
   },
   {
     "path": "codex-rs/codex-api/src/protected_peer/context_contract/tests.rs",
-    "bytes": 8410,
-    "sha256": "b2c9e94ee8c8d4ef6c168e4a08678229c8da1351e431558d8a48aebb528d330e",
+    "bytes": 20669,
+    "sha256": "2e8366236b4f31303e6c803e383f0db39f6d991890298f1d8fa5d42831b480cb",
     "mode": "100644"
   },
   {
@@ -13615,14 +13621,14 @@
   },
   {
     "path": "codex-rs/codex-api/src/protected_peer/original_history.rs",
-    "bytes": 10245,
-    "sha256": "c0e44b6388cf8fd71665586bf778e523999f5da5b3c34ab333ce3e5121c3ec8c",
+    "bytes": 13920,
+    "sha256": "529dc6180d98d503d456259ec51f5f1273a9aff15bc5106c92299fc70202d7b0",
     "mode": "100644"
   },
   {
     "path": "codex-rs/codex-api/src/protected_peer/original_history_tests.rs",
-    "bytes": 15150,
-    "sha256": "512477288a88188f665f9e25a15c9787d888f289e0be50137ce8594c529637b4",
+    "bytes": 33575,
+    "sha256": "2e887a76bc8e7b22d6141d4fbae2a489860d2811914c2bc21f577f27b8eb7060",
     "mode": "100644"
   },
   {
@@ -13639,8 +13645,8 @@
   },
   {
     "path": "codex-rs/codex-api/src/protected_peer/original_native_decoder.rs",
-    "bytes": 6023,
-    "sha256": "44b4b6c45f466d51f63945bbc4f384b392318662df23eb19a9a5d13e9a3d5b6e",
+    "bytes": 6641,
+    "sha256": "21da19ca598b56bf584952f426a6227a514152a5ff88068e8719566b45b63928",
     "mode": "100644"
   },
   {
@@ -13735,8 +13741,8 @@
   },
   {
     "path": "codex-rs/codex-api/src/sse/responses.rs",
-    "bytes": 78560,
-    "sha256": "e5485bfb6a14a7a28ac867f06d02adc3fcc4e518e2de4b7e89980d85e52ff262",
+    "bytes": 78770,
+    "sha256": "6487688955b36a178b18759ae2d178274e1b4918b240ee317fe29aa167d63493",
     "mode": "100644"
   },
   {

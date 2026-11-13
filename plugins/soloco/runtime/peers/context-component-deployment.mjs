@@ -13,8 +13,8 @@ export {preflightOriginalBootstrapMembershipContext,inspectOriginalBootstrapMemb
 const REPO=fileURLToPath(new URL('../../../../',import.meta.url));
 const DEVELOPER=Object.freeze({lookup:'lookupOriginalSelectedContextComponentData',inspect:'inspectOriginalSelectedContextComponentData',layout:originalDeveloperComponentLayout}),PACKAGED=Object.freeze({lookup:'lookupOriginalSelectedPackagedContextComponentData',inspect:'inspectOriginalSelectedPackagedContextComponentData',layout:originalPackagedComponentLayout});
 const deploymentRoot=service=>path.join(originalComponentLayoutPaths(service.layout()).durable_root,'deployments');
-const EXPECTED_PACKAGE='c103b27a9c458c0989c7766a769ab1644e3663307e72274906c6d362fdd64c15';
-const EXPECTED_MANIFEST='b43e9c06b7e67c7b5b19eb38b8b68101e4580a99cc9d4f7b65beb4de8a1ee12a';
+const EXPECTED_PACKAGE='b040811c46db685f647bfaf5bac3db26aa055035553ee83b8e2bc228f048f55c';
+const EXPECTED_MANIFEST='13b54fb0381f0deef62d47070feb3022177cbe003e60010333729313aebe956b';
 const HOST='plugins/soloco/runtime/peers/codex-task-host.mjs';
 const INTERPRETER='plugins/soloco/runtime/peers/peer-context-interpreter.mjs';
 const pins=new WeakMap(),sidecarPrograms=new WeakMap();let loaded=null,producer=null,loadService=null,loadPromise=null;

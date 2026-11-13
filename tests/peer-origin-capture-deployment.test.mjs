@@ -36,7 +36,7 @@ function manifest(){const pkg=JSON.parse(bytes('native/codex/source-package.json
 
 test('new fixed package/driver/builder/deployment tuple binds the unchanged complete native source cut',()=>{
  const p=bytes('native/codex/source-package.json'),pkg=JSON.parse(p),driver=bytes('native/codex/tools/protected_native.py').toString(),builder=bytes(BUILDER).toString(),deployment=bytes(DEPLOYMENT).toString();
- assert.equal(pkg.overlay.length,158);assert.equal(pkg.qualified_binary,null);
+ assert.equal(pkg.overlay.length,159);assert.equal(pkg.qualified_binary,null);
  assert.deepEqual(pkg.sidecar_capture,{protocol:'soloco-origin-sidecar-source-build-v1',source:{path:SOURCE,...ref(bytes(SOURCE))},binary:'origin-sidecar-capture',arguments:['origin-sidecar-capture-v1'],target:'arm64-apple-macos11.0',flags:FLAGS});
  assert.equal(driver.match(/MANIFEST_SHA256 = "([a-f0-9]{64})"/)[1],hash(p));
  assert.equal(constant(builder,'PACKAGE_SHA'),hash(p));assert.equal(constant(builder,'DRIVER_SHA'),hash(bytes('native/codex/tools/protected_native.py')));
