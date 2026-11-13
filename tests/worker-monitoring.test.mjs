@@ -37,7 +37,7 @@ async function fixedCapabilityBoundary(fn){
   const reject=(method,args)=>{unexpected.push({method,command:String(args[0])});throw Error('FICTIONAL monitor boundary denies unknown child_process call: '+method);};
   const environment=scratch=>({PATH:'/usr/bin:/bin',HOME:scratch,TMPDIR:scratch,TMP:scratch,TEMP:scratch,LANG:'C',LC_ALL:'C',OPENSSL_CONF:'/dev/null',NODE_DISABLE_COLORS:'1'});
   const optionKeys=(options,keys)=>assert.deepEqual(Object.keys(options).sort(),keys.slice().sort());
-  for(const name of methods)childProcess[name]=(...args)=>reject(name,args);
+  for(const name of methods)childProcess[name]=function(...args){return reject(name,args);};
   childProcess.spawnSync=(command,args,options)=>{
     try{
       assert(Array.isArray(args));assert(options&&typeof options==='object');
