@@ -1,0 +1,325 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import * as engine from '../plugins/soloco/runtime/engine.mjs';
+import {call} from '../plugins/soloco/runtime/main.mjs';
+import {Store,withStore,digest,teamHash} from '../plugins/soloco/runtime/store.mjs';
+import {reference} from '../plugins/soloco/runtime/specialists.mjs';
+import {assignmentContext} from '../plugins/soloco/runtime/context.mjs';
+import {operatingContext} from '../plugins/soloco/runtime/operating-state.mjs';
+import {developmentAssignment} from '../plugins/soloco/runtime/develop.mjs';
+import {executionTiming} from '../plugins/soloco/runtime/timeout.mjs';
+import {work} from '../plugins/soloco/runtime/worker.mjs';
+
+// These fixtures exercise real Engine, normalized Store, context and worker
+// transitions. All model outputs/semantic judgments are explicit fictional
+// injected doubles. No native process, provider, sandbox test or company data.
+const launch={check:()=>({available:true,authenticated:true,version:'FICTIONAL MONITOR ADAPTER'}),launch:()=>({on(){return this;},unref(){}})};
+const instruction='Only this fictional bounded preparation; no external execution, authority, retry or spending.';
+const future=ms=>new Date(Date.now()+ms).toISOString();
+const hash=value=>digest(JSON.stringify(value));
+const result=(job,extra={})=>({native_id:'fictional-monitor-'+job.id,text:JSON.stringify({content:'FICTIONAL bounded monitor fixture output; no native acceptance.',messages:[],notices:[],...extra})});
+const spawn=(timeout,options)=>options.onSpawn?.(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));
+
+async function fixture(fn,{domainInput=true}={}){
+  const base=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'soloco-worker-monitor-'))),previous=process.env.COMPANY_PLUGIN_DATA;
+  process.env.COMPANY_PLUGIN_DATA=path.join(base,'bindings');
+  const args={root:path.join(base,'company'),session_id:'fictional-monitor-founder',epoch:1};fs.mkdirSync(args.root);
+  const f={base,args,sequence:0,read:()=>withStore(args.root,db=>db.read())};
+  f.change=change=>withStore(args.root,db=>{let value;db.transaction('fictional.monitor.fixture',s=>{value=change(s);return s;});return value;});
+  f.action=(action,extra={})=>engine.specialists({...args,action,operation_id:'monitor-'+(++f.sequence),source_instruction:instruction,...extra},'codex');
+  try{
+    engine.bind(args.root,args.session_id,'codex');engine.open({...args,idea:'Fictional worker-monitor regression only'},'codex');
+    engine.control({root:args.root,session_id:args.session_id,expected_epoch:1,action:'pause',source_instruction:'pause'},'codex');
+    engine.storageControl({...args,action:'migrate',source_instruction:'Migrate this disposable fictional fixture only.'},'codex');
+    engine.control({root:args.root,session_id:args.session_id,expected_epoch:1,action:'resume',source_instruction:'resume'},'codex');
+    if(domainInput)engine.save({...args,id:'domain-input',kind:'artifact',content:'FICTIONAL unresolved condition; no measured benefit or permission.'},'codex');
+    await fn(f);
+  }finally{
+    if(previous===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=previous;
+    fs.rmSync(base,{recursive:true,force:true});
+  }
+}
+function ordinary(f,extra={}){
+  return engine.dispatch({...f.args,role:'engineer',task:'Read the exact fictional input and retain its uncertainty.',input_ids:['domain-input'],timeout_ms:600000,timeout_reason:'Bounded fictional monitor controls, not an actual model call.',...extra},'codex',launch);
+}
+function specialist(f,{profileExpires=future(60000),policyExpires=future(120000)}={}){
+  const policyReceipt=f.action('authorize',{policy:{base_roles:['engineer'],input_ids:['domain-input'],scope:'*',expires_at:policyExpires,max_profiles:3,max_assignments:6}});
+  const policy=f.read().records[policyReceipt.id];
+  const definition={base_role:'engineer',charter:{name:'Fictional monitor specialist',mission:'Retain the supplied unresolved condition.',inputs:'Exact fictional input only.',outputs:'One bounded read-only report.',block:'Missing inputs or authority.',success:'Preserve uncertainty.',failure:'Claim execution or permission.',phase:'This monitor fixture only.'},task:'Preserve the fictional unresolved condition.',acceptance:'No omission or new authority.',input_ids:['domain-input'],expires_at:profileExpires,max_assignments:3};
+  const profileReceipt=f.action('create',{policy_ref:reference(policy),definition}),profile=f.read().records[profileReceipt.id];
+  const job=engine.dispatch({...f.args,role:'engineer',task:definition.task,input_ids:definition.input_ids,specialist_ref:reference(profile),timeout_ms:600000,timeout_reason:'Bounded fictional specialist monitor control.'},'codex',launch);
+  return {job,profile,policy};
+}
+function home(f,id,scope='*',{expires_at=null,dependencies=[]}={}){
+  engine.save({...f.args,id,kind:'artifact',content:'FICTIONAL current obligation '+id,
+    operating_record:{version:1,kind:'obligation',scope,owner:'runner',conditions:'Always retain the condition.',exceptions:'None',clearing:'Independent exact disposition',expires_at,dependencies,authority_refs:[],evidence_refs:[id]}},'codex');
+}
+async function operating(f,{validUntil=null,homeExpires=null,dependencyExpires=null,reviewOnly=false}={}){
+  // All unqualified fixture input is deliberately represented as an explicit
+  // current home before the real operating publication protocol is exercised.
+  assert.equal(f.read().records['domain-input'],undefined,'operating fixture starts without an unqualified legacy input');
+  f.change(s=>{s.roles={qa:{name:'QA'},engineer:{name:'Engineering'}};s.governance='Read only; no external authority.';s.cos_instructions='Preserve every condition and unknown.';s.team_sha256=teamHash(s);});
+  home(f,'condition','a',{expires_at:homeExpires,dependencies:['dependency']});home(f,'dependency','b',{expires_at:dependencyExpires});home(f,'unrelated','c');
+  const plan=await call('company_context',{...f.args,protocol:'operating-state-v1',action:'plan',source_instruction:instruction,valid_until:validUntil},'codex');
+  assert.deepEqual(plan.frontier,[]);
+  const queued=engine.dispatch({...f.args,role:'qa',review_of:plan.id,task:'Independently review every fictional operating condition.',timeout_ms:600000,timeout_reason:'Fictional publication and monitor fixture.'},'codex',launch);
+  if(reviewOnly)return {job:queued,plan};
+  const packet=assignmentContext(f.read(),f.read().jobs[queued.id]),evidence=packet.operating_evidence;
+  const ranges=evidence?Object.values(evidence.sources).flatMap(source=>{const out=[];for(let offset=0;offset<source.length;offset+=16000)out.push({source_id:source.source_id,sha256:source.sha256,offset,length:Math.min(16000,source.length-offset)});return out;}):[];
+  let first=true;
+  await work(f.args.root,queued.id,async(_h,_n,_p,_d,timeout,_s,options)=>{
+    if(first){spawn(timeout,options);first=false;}
+    if(ranges.length)return {native_id:'fictional-monitor-'+queued.id,text:JSON.stringify({reads:ranges.splice(0,4)})};
+    return result(queued,{review:{verdict:'Pass',reason:'FICTIONAL semantic judgment only.',permitted_action:'publish_operating_state',plan_sha256:hash(f.read().records[plan.id].operating_plan),preservation_complete:true,interaction_complete:true,authority_checked:true,blockers:[]}});
+  });
+  const done=f.read().jobs[queued.id];assert.equal(done.status,'completed',done.error);
+  await call('company_context',{...f.args,protocol:'operating-state-v1',action:'apply',plan_id:plan.id,review_id:done.artifact_id},'codex');
+  assert.doesNotThrow(()=>operatingContext(f.read(),{scope:'a'}));
+  const job=engine.dispatch({...f.args,role:'engineer',task:'Use only the accepted fictional operating conditions.',context_scope:'a',timeout_ms:600000,timeout_reason:'Fictional operating monitor fixture.'},'codex',launch);
+  assert.equal(f.read().jobs[job.id].context_format,6);return {job,plan};
+}
+async function development(f){
+  fs.writeFileSync(path.join(f.args.root,'sum.mjs'),'export const sum = values => 0;\n');
+  fs.writeFileSync(path.join(f.args.root,'.company','development.json'),JSON.stringify({max_bytes_ceiling:100000}));
+  const plan=await engine.develop({...f.args,action:'plan',model_data_approved:true,read_paths:['sum.mjs'],write_paths:['sum.mjs','sum.test.mjs'],test_paths:['sum.test.mjs'],acceptance:'A retained fictional candidate only; no tests are run by this fixture.',stop_conditions:'Stop on undeclared files or external action.',data_policy:'Only these manually authored fictional files.',source_instruction:instruction,max_attempts:1,timeout_ms:3000,max_output_bytes:10000,max_bytes:20000,expires_at:future(60000)},'codex');
+  await engine.develop({...f.args,action:'authorize',plan_id:plan.id,scope_sha256:plan.development.scope_sha256,model_data_approved:true,source_instruction:instruction},'codex');
+  // Match the existing real development-worker fixture: queue and bind through
+  // the actual development admission, without launching a development test.
+  const key='fictional-development-'+(++f.sequence),instance='fictional-instance-'+key;
+  f.change(s=>{const job={id:key,role:'engineer',instance_id:instance,session_key:instance,host:'codex',native_id:null,epoch:1,status:'queued',task:'Honor the complete fictional development scope.',inputs:[],review_of:null,development_id:plan.id,created_at:new Date().toISOString()};developmentAssignment(s,job,true,f.args.root);const context=assignmentContext(s,job);s.jobs[key]={...job,inputs:context.inputs,context_sha256:context.hash};s.sessions[instance]={instance_id:instance,role:'engineer',host:'codex',native_id:null};});
+  return {job:{id:key},plan,files:[{path:'sum.mjs',content:'export const sum = values => values.reduce((a,b)=>a+b,0);\n'},{path:'sum.test.mjs',content:"import test from 'node:test';test('fictional source only',()=>{});\n"}]};
+}
+
+async function monitoring(fn){
+  const originalSet=globalThis.setInterval,originalClear=globalThis.clearInterval,originalRead=Store.prototype.read;
+  const handles=[];let active=null;const reads=new Map();
+  globalThis.setInterval=(callback,delay,...args)=>{
+    if(delay!==100)return originalSet(callback,delay,...args);
+    const handle={callback:()=>callback(...args),active:true};handles.push(handle);return handle;
+  };
+  globalThis.clearInterval=handle=>{if(handles.includes(handle))handle.active=false;else originalClear(handle);};
+  Store.prototype.read=function(...args){if(active!==null)reads.set(this.root,(reads.get(this.root)??0)+1);return originalRead.apply(this,args);};
+  const control={
+    tick(index=handles.length-1){const handle=handles[index];assert(handle?.active,'the actual worker timer is active');active=index;try{handle.callback();}finally{active=null;}},
+    reads:root=>reads.get(fs.realpathSync(root))??0,
+    inTick:()=>active!==null,
+    live:()=>handles.filter(handle=>handle.active).length,
+    handles
+  };
+  try{return await fn(control);}finally{Store.prototype.read=originalRead;globalThis.setInterval=originalSet;globalThis.clearInterval=originalClear;for(const handle of handles)assert.equal(handle.active,false,'every actual worker monitor was cleared');}
+}
+async function controlled(f,job,control,invoke,{files,review}={}){
+  await work(f.args.root,job.id,async(_h,_n,_p,_d,timeout,_s,options)=>{spawn(timeout,options);control.tick();await invoke(options);return result(job,{...(files?{files}:{}),...(review?{review}: {})});});
+  return f.read().jobs[job.id];
+}
+function held(f,job){const current=f.read().jobs[job.id];assert.notEqual(current.status,'completed',current.error);assert.equal(Object.values(f.read().records).filter(r=>r.job_id===job.id&&r.status==='Submitted').length,0);return current;}
+
+// 1. Hydration counts, including the specialized and operating paths that used
+// to hydrate lifetime state on every unchanged monitor tick.
+for(const lane of ['ordinary','specialist','operating','operating-review'])test(lane+': unchanged canonical token does not rehydrate whole state',{concurrency:false},async t=>{
+  t.mock.timers.enable({apis:['Date'],now:Date.now()});
+  await fixture(async f=>{
+    const selected=lane==='specialist'?specialist(f):lane==='operating'?await operating(f):lane==='operating-review'?await operating(f,{reviewOnly:true}):{job:ordinary(f)};
+    await monitoring(async control=>{
+      const review=lane==='operating-review'?{verdict:'Blocked',reason:'FICTIONAL review intentionally withheld.'}:undefined;
+      const done=await controlled(f,selected.job,control,async options=>{
+        const before=control.reads(f.args.root);for(let i=0;i<12;i++)control.tick();
+        assert.equal(control.reads(f.args.root),before);assert.equal(options.signal.aborted,false);
+      },{review});assert.equal(done.status,'completed',done.error);
+      assert.equal(control.live(),0);
+    });
+  },{domainInput:!lane.startsWith('operating')});
+});
+
+// 2. A supported canonical mutation invalidates all reused structural facts.
+test('changed event token hydrates once and a relevant source change aborts',{concurrency:false},async t=>{
+  t.mock.timers.enable({apis:['Date'],now:Date.now()});await fixture(async f=>{
+    const {job}=specialist(f);
+    await monitoring(async control=>{
+      await controlled(f,job,control,async options=>{
+        const before=control.reads(f.args.root);f.change(s=>{s.records['domain-input'].content+=' New unresolved condition.';s.records['domain-input'].revision++;});
+        control.tick();assert.equal(control.reads(f.args.root),before+1);assert.equal(options.signal.aborted,true);
+      });held(f,job);
+    });
+  });
+});
+test('a harmless canonical rename refreshes the token without cancelling disjoint work',{concurrency:false},async t=>{
+  t.mock.timers.enable({apis:['Date'],now:Date.now()});await fixture(async f=>{
+    const job=ordinary(f);
+    await monitoring(async control=>{
+      const done=await controlled(f,job,control,async options=>{
+        const before=control.reads(f.args.root),name=f.read().name;
+        engine.control({root:f.args.root,session_id:f.args.session_id,expected_epoch:1,action:'rename',name:'Fictional renamed company',expected_name:name,source_instruction:'Rename the company to Fictional renamed company'},'codex');
+        control.tick();assert.equal(control.reads(f.args.root),before+1);assert.equal(options.signal.aborted,false);
+        control.tick();assert.equal(control.reads(f.args.root),before+1);
+      });assert.equal(done.status,'completed',done.error);
+    });
+  });
+});
+
+// 3. Unknown/error token and an incomplete refresh never reuse a prior success.
+for(const mode of ['unknown-token','token-error','refresh-error'])test(mode+': no stale monitor success survives',{concurrency:false},async t=>{
+  t.mock.timers.enable({apis:['Date'],now:Date.now()});await fixture(async f=>{
+    const {job}=specialist(f);
+    await monitoring(async control=>{
+      const token=Store.prototype.changeToken,read=Store.prototype.read;
+      try{
+        const done=await controlled(f,job,control,async options=>{
+          const before=control.reads(f.args.root);
+          if(mode==='unknown-token')Store.prototype.changeToken=()=>undefined;
+          else if(mode==='token-error')Store.prototype.changeToken=()=>{throw Error('FICTIONAL token read failure');};
+          else {f.change(s=>{s.monitor_fixture_revision=true;});Store.prototype.read=function(...args){if(this.root===f.args.root)throw Error('FICTIONAL complete refresh failure');return read.apply(this,args);};}
+          control.tick();
+          if(mode==='unknown-token'){assert.equal(options.signal.aborted,false);assert.equal(control.reads(f.args.root),before+1);control.tick();assert.equal(control.reads(f.args.root),before+2);}
+          else {assert.equal(options.signal.aborted,true);control.tick();assert.equal(options.signal.aborted,true);}
+          Store.prototype.changeToken=token;Store.prototype.read=read;
+        });if(mode==='unknown-token')assert.equal(done.status,'completed',done.error);else held(f,job);
+      }finally{Store.prototype.changeToken=token;Store.prototype.read=read;}
+    });
+  });
+});
+
+// 4. Both specialist clocks remain live even when no database value changes.
+// A valid profile cannot outlive its policy: the policy case uses their shared cutoff.
+for(const which of ['profile','policy'])test(which+': unchanged-token expiry aborts and retains definition',{concurrency:false},async t=>{
+  const start=Date.now();t.mock.timers.enable({apis:['Date'],now:start});await fixture(async f=>{
+    const cut=start+60000,{job,profile,policy}=specialist(f,{profileExpires:new Date(cut).toISOString(),policyExpires:new Date(which==='policy'?cut:cut+60000).toISOString()}),before=f.read().records;
+    await monitoring(async control=>{
+      await controlled(f,job,control,async options=>{const reads=control.reads(f.args.root);t.mock.timers.tick(cut-Date.now());control.tick();assert.equal(options.signal.aborted,true);assert.equal(control.reads(f.args.root),reads);});
+      held(f,job);assert.deepEqual(f.read().records[profile.id],before[profile.id]);assert.deepEqual(f.read().records[policy.id],before[policy.id]);
+    });
+  });
+});
+
+// 5. Revocation remains a current canonical fact, never a cached allowance.
+for(const which of ['profile','policy'])test(which+': canonical revocation invalidates the monitor cache',{concurrency:false},async t=>{
+  t.mock.timers.enable({apis:['Date'],now:Date.now()});await fixture(async f=>{
+    const selected=specialist(f),before=f.read().records[selected.profile.id];
+    await monitoring(async control=>{
+      await controlled(f,selected.job,control,async options=>{const reads=control.reads(f.args.root);f.action('revoke',{target_ref:reference(selected[which])});control.tick();assert.equal(options.signal.aborted,true);assert.equal(control.reads(f.args.root),reads+1);});
+      held(f,selected.job);assert.deepEqual(f.read().records[selected.profile.id],before);
+    });
+  });
+});
+
+// 6. Scope dependency closure contributes every applicable home expiry.
+for(const which of ['checkpoint','home','dependency'])test('operating '+which+': expiry is checked without hydration',{concurrency:false},async t=>{
+  const start=Date.now();t.mock.timers.enable({apis:['Date'],now:start});await fixture(async f=>{
+    const cut=new Date(start+60000).toISOString(),selected=await operating(f,{validUntil:which==='checkpoint'?cut:null,homeExpires:which==='home'?cut:null,dependencyExpires:which==='dependency'?cut:null});
+    await monitoring(async control=>{
+      await controlled(f,selected.job,control,async options=>{const reads=control.reads(f.args.root);t.mock.timers.tick(Date.parse(cut)-Date.now());control.tick();assert.equal(options.signal.aborted,true);assert.equal(control.reads(f.args.root),reads);});held(f,selected.job);
+    });
+  },{domainInput:false});
+});
+
+// 7. A publication review retains its own plan clock, without changing which
+// proposed home expiries the original review/publication protocols enforce.
+test('operating plan review expires without a canonical write',{concurrency:false},async t=>{
+  const start=Date.now();t.mock.timers.enable({apis:['Date'],now:start});await fixture(async f=>{
+    const cut=new Date(start+60000).toISOString(),selected=await operating(f,{validUntil:cut,reviewOnly:true});
+    await monitoring(async control=>{
+      await controlled(f,selected.job,control,async options=>{t.mock.timers.tick(Date.parse(cut)-Date.now());control.tick();assert.equal(options.signal.aborted,true);},{review:{verdict:'Blocked',reason:'FICTIONAL expired review; no publication.'}});held(f,selected.job);assert.equal(f.read().operating_state,undefined);
+    });
+  },{domainInput:false});
+});
+
+// 8. External development limits and time crossing during that file read.
+for(const mode of ['lowered-ceiling','expiry-during-config-read'])test(mode+': unchanged-token external checks stay fresh',{concurrency:false},async t=>{
+  t.mock.timers.enable({apis:['Date'],now:Date.now()});await fixture(async f=>{
+    const selected=await development(f),config=path.join(f.args.root,'.company','development.json');
+    await monitoring(async control=>{
+      const read=fs.readSync;
+      try{
+        await controlled(f,selected.job,control,async options=>{
+          const reads=control.reads(f.args.root);
+          if(mode==='lowered-ceiling')fs.writeFileSync(config,JSON.stringify({max_bytes_ceiling:1000}));
+          else {let crossed=false;fs.readSync=function(...args){const value=read.apply(this,args);if(!crossed){crossed=true;t.mock.timers.tick(Date.parse(selected.plan.development.scope.expires_at)-Date.now());}return value;};}
+          control.tick();assert.equal(options.signal.aborted,true);assert.equal(control.reads(f.args.root),reads);
+          assert.match(options.signal.reason.message,mode==='lowered-ceiling'?/ceiling.*lowered/:/expired/);fs.readSync=read;
+        },{files:selected.files});held(f,selected.job);
+      }finally{fs.readSync=read;}
+    });
+  });
+});
+
+// 9. The same event sequence on a copied/replaced root/store is not the same
+// canonical incarnation. Replacement is held before old cutoffs can be reused.
+for(const which of ['sqlite','company-directory','root','stat-error'])test(which+': physical incarnation loss fails closed',{concurrency:false},async t=>{
+  t.mock.timers.enable({apis:['Date'],now:Date.now()});await fixture(async f=>{
+    const {job}=specialist(f);
+    await monitoring(async control=>{
+      const lstat=fs.lstatSync;
+      try{
+        await controlled(f,job,control,async options=>{
+          const reads=control.reads(f.args.root);
+          if(which==='stat-error')fs.lstatSync=function(file,...rest){if(file===path.join(f.args.root,'.company','company.sqlite'))throw Error('FICTIONAL physical stat failure');return lstat.call(this,file,...rest);};
+          else {const selected=which==='sqlite'?path.join(f.args.root,'.company','company.sqlite'):which==='company-directory'?path.join(f.args.root,'.company'):f.args.root,old=selected+'-old-monitor';fs.renameSync(selected,old);fs.cpSync(old,selected,{recursive:which!=='sqlite'});}
+          control.tick();assert.equal(options.signal.aborted,true);assert.equal(control.reads(f.args.root),reads);fs.lstatSync=lstat;
+        });held(f,job);
+      }finally{fs.lstatSync=lstat;}
+    });
+  });
+});
+for(const phase of ['inside-snapshot','after-snapshot-body'])test(phase+': physical replacement during a check cannot publish cached facts',{concurrency:false},async t=>{
+  t.mock.timers.enable({apis:['Date'],now:Date.now()});await fixture(async f=>{
+    const {job}=specialist(f),snapshot=Store.prototype.readSnapshot;let replaced=false;
+    const replace=()=>{const selected=path.join(f.args.root,'.company'),old=selected+'-old-snapshot';fs.renameSync(selected,old);fs.cpSync(old,selected,{recursive:true});replaced=true;};
+    await monitoring(async control=>{
+      try{
+        await controlled(f,job,control,async options=>{
+          Store.prototype.readSnapshot=function(fn){return snapshot.call(this,()=>{
+            if(control.inTick()&&this.root===f.args.root&&!replaced&&phase==='inside-snapshot')replace();
+            const value=fn();
+            if(control.inTick()&&this.root===f.args.root&&!replaced&&phase==='after-snapshot-body')replace();
+            return value;
+          });};
+          control.tick();assert.equal(replaced,true);assert.equal(options.signal.aborted,true);Store.prototype.readSnapshot=snapshot;
+        });held(f,job);
+      }finally{Store.prototype.readSnapshot=snapshot;}
+    });
+  });
+});
+
+// 10. Final publication still validates real current state, independently of a
+// successful monitor tick; per-worker state and timer cleanup remain isolated.
+test('revocation after final monitor check is caught by the unchanged publication transaction',{concurrency:false},async t=>{
+  t.mock.timers.enable({apis:['Date'],now:Date.now()});await fixture(async f=>{
+    const selected=specialist(f),transaction=Store.prototype.transaction;let changed=false;
+    try{
+      await monitoring(async control=>{
+        Store.prototype.transaction=function(type,...args){if(type==='job.completed'&&this.root===f.args.root&&!changed){changed=true;f.action('revoke',{target_ref:reference(selected.profile)});}return transaction.call(this,type,...args);};
+        await controlled(f,selected.job,control,async options=>{assert.equal(options.signal.aborted,false);});held(f,selected.job);assert.equal(changed,true);
+      });
+    }finally{Store.prototype.transaction=transaction;}
+  });
+});
+test('two live workers keep separate root stamps, deadlines and timer cleanup',{concurrency:false},async t=>{
+  const start=Date.now();t.mock.timers.enable({apis:['Date'],now:start});await fixture(async first=>{
+    const a=specialist(first,{profileExpires:new Date(start+60000).toISOString()});
+    await fixture(async second=>{
+      const b=specialist(second,{profileExpires:new Date(start+120000).toISOString(),policyExpires:new Date(start+180000).toISOString()});
+      await monitoring(async control=>{
+        let releaseA,releaseB,readyA,readyB;const enteredA=new Promise(resolve=>{readyA=resolve;}),enteredB=new Promise(resolve=>{readyB=resolve;});
+        const runA=work(first.args.root,a.job.id,async(_h,_n,_p,_d,timeout,_s,options)=>{spawn(timeout,options);control.tick(0);readyA(options);await new Promise(resolve=>{releaseA=resolve;});return result(a.job);});
+        const optionsA=await enteredA;
+        const runB=work(second.args.root,b.job.id,async(_h,_n,_p,_d,timeout,_s,options)=>{spawn(timeout,options);control.tick(1);readyB(options);await new Promise(resolve=>{releaseB=resolve;});return result(b.job);});
+        const optionsB=await enteredB;
+        try{assert.equal(control.live(),2);t.mock.timers.tick(start+60000-Date.now());control.tick(0);control.tick(1);assert.equal(optionsA.signal.aborted,true);assert.equal(optionsB.signal.aborted,false);}
+        finally{releaseA();releaseB();await Promise.all([runA,runB]);}
+        held(first,a.job);assert.equal(second.read().jobs[b.job.id].status,'completed');assert.equal(control.live(),0);
+      });
+    });
+  });
+});
+test('an injected model error still clears its actual monitor and retains a failed attempt',{concurrency:false},async t=>{
+  t.mock.timers.enable({apis:['Date'],now:Date.now()});await fixture(async f=>{
+    const {job}=specialist(f);
+    await monitoring(async control=>{
+      await work(f.args.root,job.id,async(_h,_n,_p,_d,timeout,_s,options)=>{spawn(timeout,options);control.tick();throw Error('FICTIONAL injected model error; closure unknown.');});
+      const stopped=held(f,job);assert.equal(stopped.status,'failed');assert.equal(control.live(),0);assert.match(stopped.error,/FICTIONAL injected model error/);
+    });
+  });
+});
