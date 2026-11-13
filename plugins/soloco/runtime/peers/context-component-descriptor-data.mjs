@@ -12,6 +12,7 @@ const NATIVE=Object.freeze({
   source_package:'native/source-package.json',
   cargo_lock:'native/Cargo.lock',
   toolchain_manifest:'native/toolchain-manifest.toml',
+  sidecar_capture:'native/origin-sidecar-capture',
   executable:'native/executable',
 });
 const nativeNames=new Set(Object.values(NATIVE));
@@ -80,8 +81,8 @@ function projectSelectedContextComponentDescriptorData(data){
   }
   const native={};
   for(const [name,sealedPath] of Object.entries(NATIVE)){
-    const copy=sealed.get(sealedPath),file=files.get(sealedPath);if(!copy||copy.bytes<1||file.mode!=='100644')fail();
-    native[name]=name==='executable'?{...copy,usage:'READ_ONLY_COMPONENT_BYTES',executable:false,deployment_required:true}:copy;
+    const copy=sealed.get(sealedPath),file=files.get(sealedPath);if(!copy||copy.bytes<1||file.mode!=='100644'||(name==='sidecar_capture'&&copy.bytes>16*1024*1024))fail();
+    native[name]=name==='executable'||name==='sidecar_capture'?{...copy,usage:'READ_ONLY_COMPONENT_BYTES',executable:false,deployment_required:true}:copy;
   }
   for(const name of ['compiled_manifest','build_receipt','executable']){
     pin(record[name]);if(!samePin(record[name],native[name]))fail();

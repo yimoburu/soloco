@@ -36,7 +36,10 @@ The original receipt still names the original build output; those paths are not
 required to equal the later sealed-copy paths. Missing, duplicate, escaping or
 inconsistent mappings are rejected.
 
-The sealed native executable is a read-only component file. Inspection labels it
+The sealed native executable and `native/origin-sidecar-capture` helper are
+read-only component files. The helper must have positive size at most 16 MiB and
+the same sealed pin in the recipe and capsule, with logical mode `100644`.
+Inspection labels both
 `READ_ONLY_COMPONENT_BYTES`, with `executable:false` and
 `deployment_required:true`. It does not add execute permission or turn the
 component into a runnable slot. An executable deployment needs its own explicit
