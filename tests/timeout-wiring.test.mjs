@@ -67,6 +67,7 @@ function harness(publicOverrides={}) {
     // target/queue/worker guards run in the dedicated real SQLite source suite.
     isOriginMechanicalQaWorker:()=>false,isOriginMechanicalQaTarget,workPeerOriginMechanicalQa,
     spawn:(...args)=>{launches.push(args);return {on:()=>{},unref:()=>{}};},hooks:()=>{},upgrade:()=>{},upgradeGuidance:'',peerRuntimeFields,peerAdoptionToolSchema,peerOwnerToolSchema,peerOriginToolSchema,mcpCallerDiagnostic};
+  Object.assign(deps,load('plugin-data.mjs',deps,['dataDir']));
   const engine=load('engine.mjs',deps,['dispatch','status','control','wait']);
   Object.assign(engine,publicOverrides);
   const worker=load('worker.mjs',deps,['work']);
