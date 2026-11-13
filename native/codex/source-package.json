@@ -1669,6 +1669,28 @@
       "SOLOCO_PROTECTED_HOST_BUILD": "1"
     }
   },
+  "sidecar_capture": {
+    "protocol": "soloco-origin-sidecar-source-build-v1",
+    "source": {
+      "path": "plugins/soloco/helpers/origin-sidecar-capture.c",
+      "bytes": 9071,
+      "sha256": "ca4fb0f201842555b651b7f2b49d9839fbe1d18006edf42f09209d58d45c452f"
+    },
+    "binary": "origin-sidecar-capture",
+    "arguments": [
+      "origin-sidecar-capture-v1"
+    ],
+    "target": "arm64-apple-macos11.0",
+    "flags": [
+      "-std=c11",
+      "-O2",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-target",
+      "arm64-apple-macos11.0"
+    ]
+  },
   "qualified_binary": null,
   "runtime_integration": "separate-joined-runtime-review-required"
 }
