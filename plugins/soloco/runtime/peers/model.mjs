@@ -16,6 +16,7 @@ import {sendHandoff,decideHandoff,pendingHandoffs,prepareHandoffTask} from './ha
 import {assertPeerOwnerOperatingState} from './owner-operating-state.mjs';
 import {assertPeerBootstrapOperationFrom} from './bootstrap-membership-context.mjs';
 import {bootstrapActor} from './bootstrap-membership-contract.mjs';
+import {assertOriginalPeerMaintenanceExecutionCapacityInTransactionFrom as assertInventoryInTransaction,prepareOriginalPeerExecutionLaunchFrom as prepareInventoryLaunch} from './prospective-local-worker-inventory-producer.mjs';
 
 const PROTOCOL='peer-cos-v1',MAX_ROWS=10000;
 const outstanding=['reserved','sent','unknown'];
@@ -110,7 +111,9 @@ const reviewMatches=(facts,selectors)=>selectors.subjects.some(r=>same(r,facts.s
 // list-after-write fence. BEGIN IMMEDIATE supplies the snapshot/write boundary.
 // Requested collections retain P1's 10,000 matching-row capacity limit.
 function plannedWrite(ledger,type,principal,fn,terminalGuard=null,onPlan=null){
-  const write=terminalGuard?callback=>ledger.guardedWrite(type,principal,callback,terminalGuard):callback=>ledger.write(type,principal,callback);
+  let inventoryRef=null;const inventoryAdmission=['task/admit','membership/admit'].includes(type),inventoryDeadline=Date.now()+TASK_EFFECT_LEASE_MS;
+  const terminal=view=>{if(inventoryRef)assertInventoryInTransaction(ledger,view,{stage:'existing',admission_ref:inventoryRef});return terminalGuard?terminalGuard(view):inventoryDeadline;};
+  const write=terminalGuard||inventoryAdmission?callback=>ledger.guardedWrite(type,principal,callback,terminal):callback=>ledger.write(type,principal,callback);
   return write(rawBase=>{
     const base=trackedReads(rawBase),prep=preparationBudget(base),budget=semanticBudget(base);
     const known=new Set(FAMILIES),keys=new Map(),history=new Map(),collections=new Map(),changes=new Map(),generations=new Map(),events=[];
@@ -312,13 +315,19 @@ function plannedWrite(ledger,type,principal,fn,terminalGuard=null,onPlan=null){
         for(const {family,row} of changes.values())add(family,row.id,row);
         onPlan({bindings:[...bindings.values()],authorizing_grants:[...currentAuthorizationGrants.get(tx).values()]});
       }
+      if(inventoryAdmission&&[...changes.values()].some(c=>c.family==='slots'&&!c.previous&&c.row.value.status==='active')){
+        const admissions=[...changes.values()].filter(c=>c.family==='commands'&&(type==='task/admit'?c.row.value.action==='task/admit'&&c.row.value.result?.admitted===true:c.row.value.kind==='membership_command'&&c.row.value.channel==='operator'&&c.row.value.result?.phase));
+        if(admissions.length!==1)hold('ORIGINAL_EXECUTION_ADMISSION_REQUIRED','Exact original task admission required');
+        const phase=admissions[0].row.value.result?.phase;inventoryRef=type==='task/admit'?ref('commands',admissions[0].row):phase.value.admission_ref??ref('work_items',phase);assertInventoryInTransaction(ledger,rawBase,{stage:'reserve'});
+      }
       active=false;
       for(const {family,row,expected} of changes.values()){
         const actual=base.put(family,row.id,row.value,expected);
         if(actual.revision!==row.revision||actual.sha256!==row.sha256)hold('PLAN_CHANGED','Committed reference differs from plan');
       }
       for(const e of events)base.event(e.type,e.payload);
-      if((type==='task/assign'||type==='home/publish'||type.startsWith('handoff/')||onPlan)&&terminalGuard){
+      if(inventoryRef)prepareInventoryLaunch(ledger,rawBase,{admission_ref:inventoryRef});
+      if(inventoryRef||(type==='task/assign'||type==='home/publish'||type.startsWith('handoff/')||type.startsWith('membership/')||onPlan)&&terminalGuard){
         if(typeof base.sealWrites!=='function')hold('AUTHORITY_CHANGED','Owning planned write closure required');
         base.sealWrites();
       }
@@ -1466,11 +1475,10 @@ export function bindPeerProductionScheduler(ledger){
       if(!['membership/enroll','membership/admit','membership/activate','membership/revoke'].includes(type)||principal!=='operator'||typeof fn!=='function')hold('PRODUCTION_ACTION_HELD','Trusted membership operator write required');
       const deadline=Date.now()+TASK_EFFECT_LEASE_MS;
       let ownerBindings=null;
-      return ledger.guardedWrite(type,principal,tx=>{
+      return plannedWrite(ledger,type,principal,tx=>{
         assertPeerProductionAuthority(tx,production,ledger);
         ownerBindings=ownerOperatingBinding(tx,type).bindings;
         const result=fn(tx);
-        if(ownerBindings){if(typeof tx.sealWrites!=='function')hold('AUTHORITY_CHANGED','Owning membership write closure required');tx.sealWrites();}
         return result;
       },tx=>{assertPeerProductionAuthority(tx,production,ledger);checkCurrentBindings(tx,ownerBindings);return deadline;});
     },
@@ -1498,8 +1506,11 @@ export function createOriginalPeerBootstrapMembershipFacade({ledger,actor}){
   function write(type,channel,fn,input){
     if(!actions.has(type)||typeof fn!=='function')hold('BOOTSTRAP_ACTION_HELD','Closed bootstrap action required');
     for(const k of ['root','company_id','directory'])if(Object.getOwnPropertyDescriptor(ledger,k)?.value!==connection[k])hold('BOOTSTRAP_CONNECTION_CHANGED','Original bootstrap connection changed');
-    let deadline,expected;
+    let deadline,expected,inventoryRef;
+    const admitting=type==='membership/admit',inventoryChecked=admitting||['bootstrap-membership.native_created','bootstrap-membership.read','bootstrap-membership.submitted','bootstrap-membership.completed'].includes(type);
     return ledger.guardedWrite(type,type.startsWith('membership/')?a.session_id:'source-observer:bootstrap-membership',raw=>{
+      if(admitting){const phase=raw.get('work_items','membership-phase:'+input.enrollment_id+':'+input.phase);if(phase?.value.admission_ref){inventoryRef=copy(phase.value.admission_ref);assertInventoryInTransaction(ledger,raw,{stage:'existing',admission_ref:inventoryRef});}else assertInventoryInTransaction(ledger,raw,{stage:'reserve'});}
+      else if(inventoryChecked){const phase=raw.get('work_items','membership-phase:'+input.enrollment_id+':'+input.phase);if(!phase?.value.admission_ref)hold('ORIGINAL_EXECUTION_ADMISSION_REQUIRED','Exact bootstrap admission required');inventoryRef=copy(phase.value.admission_ref);assertInventoryInTransaction(ledger,raw,{stage:'existing',admission_ref:inventoryRef});}
       const proof=assertPeerBootstrapOperationFrom(raw,{ledger,actor:a,input,action:type}),enrollment=input.enrollment_id&&raw.get('work_items','membership:'+input.enrollment_id);deadline=Math.min(proof.deadline_at_ms,Date.parse(enrollment?.value.expires_at??input.expires_at));
       if(enrollment)for(const phase of ['reconstruction','review']){const p=raw.get('work_items','membership-phase:'+input.enrollment_id+':'+phase);if(p?.value.bootstrap_protocol==='peer-bootstrap-membership-phase-v1'){const a=raw.getVersion(p.value.admission_ref);if(a?.value.protocol!=='peer-bootstrap-membership-admission-v1'||a.sha256!==p.value.admission_ref.sha256||!Number.isSafeInteger(a.value.binding?.deadline_at_ms))hold('BOOTSTRAP_ORIGINAL_ADMISSION_REQUIRED','Original phase deadline required');deadline=Math.min(deadline,a.value.binding.deadline_at_ms);}}
       if(!Number.isSafeInteger(deadline)||deadline<=Date.now())hold('BOOTSTRAP_EXPIRED','Original finite bootstrap purpose required');
@@ -1507,9 +1518,9 @@ export function createOriginalPeerBootstrapMembershipFacade({ledger,actor}){
       for(const family of FAMILIES)for(const row of all(raw,family)){if(++n>MAX_ROWS)hold('BOOTSTRAP_CAPACITY','Complete original bootstrap namespace required');current.set(canonical([family,row.id]),{family,id:row.id,row});}
       const snapshot=raw.get('control','company');let started=false;
       const provider={...raw,get(f,id){const row=raw.get(f,id),k=canonical([f,id]);if(!current.has(k))current.set(k,{family:f,id,row});return row;},put(f,id,value,revision){if(!started){const probe=raw.getVersion(ref('control',snapshot));if(!probe||probe.sha256!==snapshot.sha256||peerDigest(probe.value)!==snapshot.sha256)hold('BOOTSTRAP_SOURCE_CHANGED','Original prewrite snapshot required');started=true;}const row=raw.put(f,id,value,revision);current.set(canonical([f,id]),{family:f,id,row});return row;}};
-      const result=fn(provider);if(typeof raw.sealWrites!=='function')hold('BOOTSTRAP_COMMIT_REQUIRED','Original write seal required');raw.sealWrites();expected=[...current.values()];
+      const result=fn(provider);if(admitting){const phase=raw.get('work_items','membership-phase:'+input.enrollment_id+':'+input.phase);if(!phase?.value.admission_ref)hold('ORIGINAL_EXECUTION_ADMISSION_REQUIRED','Exact bootstrap admission required');inventoryRef=copy(phase.value.admission_ref);if(phase.created_seq===raw.sequence)prepareInventoryLaunch(ledger,raw,{admission_ref:inventoryRef});}if(typeof raw.sealWrites!=='function')hold('BOOTSTRAP_COMMIT_REQUIRED','Original write seal required');raw.sealWrites();expected=[...current.values()];
       for(const x of expected)if(!same(raw.get(x.family,x.id),x.row))hold('BOOTSTRAP_SOURCE_CHANGED','Bootstrap source/postimage changed');return result;
-    },tx=>{for(const k of ['root','company_id','directory'])if(Object.getOwnPropertyDescriptor(ledger,k)?.value!==connection[k])hold('BOOTSTRAP_CONNECTION_CHANGED','Original bootstrap connection changed');for(const x of expected)if(!same(tx.get(x.family,x.id),x.row))hold('BOOTSTRAP_SOURCE_CHANGED','Original bootstrap physical postimage changed');return deadline;});
+    },tx=>{for(const k of ['root','company_id','directory'])if(Object.getOwnPropertyDescriptor(ledger,k)?.value!==connection[k])hold('BOOTSTRAP_CONNECTION_CHANGED','Original bootstrap connection changed');for(const x of expected)if(!same(tx.get(x.family,x.id),x.row))hold('BOOTSTRAP_SOURCE_CHANGED','Original bootstrap physical postimage changed');if(inventoryRef)assertInventoryInTransaction(ledger,tx,{stage:'existing',admission_ref:inventoryRef});return deadline;});
   }
   const facade=Object.freeze({membershipWrite:write});bootstrapMembershipFacades.set(facade,{ledger,actor:a,operatorId,connection});return facade;
 }

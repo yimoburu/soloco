@@ -5,8 +5,10 @@ import path from 'node:path';
 import os from 'node:os';
 import {TextDecoder} from 'node:util';
 import {createHash} from 'node:crypto';
-import {inspectOriginalLoadedPeerBridge} from './context-component-deployment.mjs';
+import {inspectOriginalLoadedPeerBridge,isOriginalLoadedPeerBridgeUnavailable} from './context-component-deployment.mjs';
 import {BOOTSTRAP_CONTEXT_SELECTION,BOOTSTRAP_PROFILE} from './bootstrap-membership-delivery-frame.mjs';
+import {INPUT_FRONTIER_CONTEXT_SELECTION,INPUT_FRONTIER_PROFILE} from './input-frontier-wire.mjs';
+import {ORIGIN_MAINTENANCE_CONTEXT_SELECTION,ORIGIN_MAINTENANCE_PROFILE,ORIGIN_FINAL_REVIEW_CONTEXT_SELECTION,ORIGIN_FINAL_REVIEW_PROFILE} from './origin-maintenance-wire.mjs';
 import {originalDeveloperComponentLayout,originalPackagedComponentLayout,originalComponentLayoutPaths,originalComponentNodePath,inspectOriginalComponentLayout} from './context-component-layout.mjs';
 const slots=Object.freeze([]);
 const fail=code=>{throw Object.assign(Error(code),{code});};
@@ -228,6 +230,7 @@ function selectedBootstrapComponentAssociation(){
  };
  const codec=nodeRef('bootstrap-membership-delivery-frame.mjs'),nodeResource=nodeRef('bootstrap-membership-readonly3-contract-v1.json'),preflight=nodeRef('bootstrap-membership-preflight.mjs');
  nodeRef('protected-source-build-slot.mjs');nodeRef('context-component-deployment.mjs');nodeRef('peer-context-interpreter.mjs');
+ const runtime=Object.fromEntries(['bootstrap-membership-native-runner.mjs','bootstrap-membership-host-protocol.mjs','bootstrap-membership.mjs','policy-supervisor.mjs','protected-context-channel.mjs','protected-codex-domain.mjs'].map(name=>[name,nodeRef(name)]));
  if(nodeResource.bytes!==resource.bytes||nodeResource.sha256!==resource.sha256)contextHold();
  const nativeRef=name=>({path:files[name].path,bytes:files[name].bytes,sha256:files[name].sha256,original_path:files[name].original_path});
  const selected={slot_id:'original-selected-bootstrap-component:'+d.intent_key,source_commit:commit,entry:'codex-soloco-protected-host',scope_policy:'V5_ORIGINAL_MANAGED_PRIVATE_FD',artifact_root:d.original_component_root,
@@ -238,7 +241,7 @@ function selectedBootstrapComponentAssociation(){
   toolchain_manifest_path:files.toolchain_manifest.path,toolchain_manifest_sha256:files.toolchain_manifest.sha256,
   build_receipt_path:files.build_receipt.path,build_receipt_sha256:files.build_receipt.sha256,
   native_context_contract:{mode:'original-selected-source-managed-host',scope_policy:'V5_ORIGINAL_MANAGED_PRIVATE_FD',original_home:d.original_home,original_home_sha256:d.original_home_sha256,upstream_url:'https://chatgpt.com/backend-api/codex/responses',final_request_contract:{mode:'original-live-scoped-source',producer_module_sha256:producer.sha256,tool_resource_sha256:resource.sha256}}};
- const association={protocol:'soloco-bootstrap-membership-interpreter-binding-v1',recipe_sha256:digest(Buffer.from(asciiCanonical({deployment:d,selection:BOOTSTRAP_CONTEXT_SELECTION,codec,resource:nodeResource,preflight}))),selection:copyContext(BOOTSTRAP_CONTEXT_SELECTION),supported_forms:copyContext(bootstrapForms),native:{compiled_manifest:nativeRef('compiled_manifest'),source_package:nativeRef('source_package'),cargo_lock:nativeRef('cargo_lock'),toolchain_manifest:nativeRef('toolchain_manifest'),build_receipt:nativeRef('build_receipt'),executable:{path:d.executable.path,bytes:d.executable.bytes,sha256:d.executable.sha256},upstream:{commit,tree},entry:'codex-soloco-protected-host'},node:{...d.node,manifest:{path:manifestPath,bytes:manifestSize,sha256:d.node_manifest_sha256},codec,resource:nodeResource,preflight,profile:BOOTSTRAP_PROFILE}};
+ const association={protocol:'soloco-bootstrap-membership-interpreter-binding-v1',recipe_sha256:digest(Buffer.from(asciiCanonical({deployment:d,selection:BOOTSTRAP_CONTEXT_SELECTION,codec,resource:nodeResource,preflight,runtime}))),selection:copyContext(BOOTSTRAP_CONTEXT_SELECTION),supported_forms:copyContext(bootstrapForms),native:{compiled_manifest:nativeRef('compiled_manifest'),source_package:nativeRef('source_package'),cargo_lock:nativeRef('cargo_lock'),toolchain_manifest:nativeRef('toolchain_manifest'),build_receipt:nativeRef('build_receipt'),executable:{path:d.executable.path,bytes:d.executable.bytes,sha256:d.executable.sha256},upstream:{commit,tree},entry:'codex-soloco-protected-host'},node:{...d.node,manifest:{path:manifestPath,bytes:manifestSize,sha256:d.node_manifest_sha256},codec,resource:nodeResource,preflight,runtime,profile:BOOTSTRAP_PROFILE}};
  return {selected,association};
 }
 export function resolveOriginalBootstrapMembershipInterpreter(...args){
@@ -250,3 +253,197 @@ function originalBootstrapContext(h){
 }
 export function assertOriginalBootstrapMembershipInterpreterFinal(h){originalBootstrapContext(h);}
 export function inspectOriginalBootstrapMembershipInterpreter(h){return Object.freeze(copyContext(originalBootstrapContext(h).association));}
+export function isOriginalBootstrapMembershipInterpreter(h){return Boolean(h&&bootstrapContextHandles.has(h));}
+export function inspectOriginalBootstrapMembershipSlot(h){return Object.freeze(copyContext(originalBootstrapContext(h).sourceRecord.selected));}
+export function assertOriginalBootstrapMembershipSlot(h,slot){if(!sameContext(originalBootstrapContext(h).sourceRecord.selected,slot))contextHold();}
+export function originalBootstrapCompanionSlotMatches(slot){try{return slots.length===0&&sameContext(selectedBootstrapComponentAssociation().selected,slot);}catch{return false;}}
+
+// A distinct fixed frontier selection; ordinary and bootstrap resolvers above
+// do not accept these handles, and no JSON profile can mint one.
+const inputFrontierContextHandles=new WeakMap();
+const inputFrontierForms=Object.freeze([Object.freeze({delivery_kind:'input-frontier-assignment',payload_protocol:'peer-input-frontier-assignment-v1',source_cut_protocol:null,basis_protocol:null})]);
+function selectedInputFrontierComponentAssociation(){
+ const d=inspectOriginalLoadedPeerBridge(),files=d.files;
+ if(d.layout){const packageRoot=fileURLToPath(new URL('../../',import.meta.url)).replace(/\/$/,'');if(d.layout.kind!=='packaged-plugin-v1'||d.layout.package_root!==packageRoot||d.layout.source_root!==packageRoot||d.node.root!==packageRoot)contextHold();}
+ const layout=d.layout?originalPackagedComponentLayout():originalDeveloperComponentLayout(),layoutPaths=originalComponentLayoutPaths(layout);
+ if(d.node.root!==layoutPaths.source_root||d.layout&&!sameContext(d.layout,inspectOriginalComponentLayout(layout)))contextHold();
+ if(d.native_qualified!==false||d.claims_released!==false||d.executable.mode!=='100555'||d.node.profile!=='original-node-peer-context-interpreter-v1')contextHold();
+ const m=files.compiled_manifest,manifest=contextDocument({path:m.path,bytes:m.bytes,sha256:m.sha256},d.original_component_root);
+ const producer=manifest.files.find(r=>r.path==='codex-rs/codex-api/src/protected_peer.rs');
+ const contract=manifest.files.find(r=>r.path==='codex-rs/codex-api/src/protected_peer/context_contract.rs');
+ const frame=manifest.files.find(r=>r.path==='codex-rs/codex-api/src/protected_peer/context_contract/frame.rs');
+ const resource=manifest.files.find(r=>r.path==='codex-rs/codex-api/src/protected_peer/input_frontier_readonly3_contract_v1.json');
+ if(!producer||!contract||!frame||resource?.bytes!==2697||resource.sha256!==INPUT_FRONTIER_CONTEXT_SELECTION.resource_sha256)contextHold();
+ // The original deployment rechecks its selected full native and Node input
+ // inventories. Additionally bind each newly used module and resource to that
+ // exact immutable inventory and this original module realm, not a caller path.
+ const manifestPath=path.join(d.original_component_root,'node-inputs.json'),manifestSize=fs.lstatSync(manifestPath).size;
+ const nodeManifest=contextDocument({path:manifestPath,bytes:manifestSize,sha256:d.node_manifest_sha256},d.original_component_root);
+ if(nodeManifest.schema!=='soloco-node-peer-context-inputs-v1'||!Array.isArray(nodeManifest.files))contextHold();
+ const nodeRef=name=>{
+  const relative='plugins/soloco/runtime/peers/'+name,p=fileURLToPath(new URL('./'+name,import.meta.url)),row=nodeManifest.files.find(r=>r.path===relative);
+  if(!row||p!==originalComponentNodePath(layout,relative)||!Number.isSafeInteger(row.bytes)||row.bytes<1||row.bytes>1024*1024||!hash(row.sha256)||row.mode!=='100644')contextHold();
+  const named=fs.lstatSync(p);if(!named.isFile()||named.isSymbolicLink()||named.nlink!==1||named.size!==row.bytes||fs.realpathSync(p)!==p)contextHold();
+  const fd=fs.openSync(p,fs.constants.O_RDONLY|(fs.constants.O_NOFOLLOW??0));let bytes;
+  try{
+   const before=fs.fstatSync(fd),keys=['dev','ino','size','mtimeMs','ctimeMs','mode','uid','nlink'];if(keys.some(k=>named[k]!==before[k]))contextHold();
+   bytes=Buffer.alloc(row.bytes);let offset=0;while(offset<bytes.length){const n=fs.readSync(fd,bytes,offset,Math.min(65536,bytes.length-offset),offset);if(!n)contextHold();offset+=n;}
+   if(fs.readSync(fd,Buffer.alloc(1),0,1,row.bytes)!==0)contextHold();
+   const after=fs.fstatSync(fd),now=fs.lstatSync(p);if(keys.some(k=>before[k]!==after[k]||before[k]!==now[k]))contextHold();
+  }finally{fs.closeSync(fd);}
+  if(bytes.length!==row.bytes||digest(bytes)!==row.sha256)contextHold();return {path:p,bytes:bytes.length,sha256:row.sha256};
+ };
+ const codec=nodeRef('input-frontier-wire.mjs'),nodeResource=nodeRef('input-frontier-readonly3-contract-v1.json'),preflight=nodeRef('input-frontier-wire.mjs');
+ nodeRef('protected-source-build-slot.mjs');nodeRef('context-component-deployment.mjs');nodeRef('peer-context-interpreter.mjs');nodeRef('prospective-local-worker-inventory-producer.mjs');
+ if(nodeResource.bytes!==resource.bytes||nodeResource.sha256!==resource.sha256)contextHold();
+ const nativeRef=name=>({path:files[name].path,bytes:files[name].bytes,sha256:files[name].sha256,original_path:files[name].original_path});
+ const selected={slot_id:'original-selected-input-frontier-component:'+d.intent_key,source_commit:commit,entry:'codex-soloco-protected-host',scope_policy:'V5_ORIGINAL_MANAGED_PRIVATE_FD',artifact_root:d.original_component_root,
+  executable_path:d.executable.path,executable_bytes:d.executable.bytes,executable_sha256:d.executable.sha256,
+  source_manifest_path:files.compiled_manifest.path,source_manifest_sha256:files.compiled_manifest.sha256,
+  source_package_path:files.source_package.path,source_package_sha256:files.source_package.sha256,
+  cargo_lock_path:files.cargo_lock.path,cargo_lock_sha256:files.cargo_lock.sha256,
+  toolchain_manifest_path:files.toolchain_manifest.path,toolchain_manifest_sha256:files.toolchain_manifest.sha256,
+  build_receipt_path:files.build_receipt.path,build_receipt_sha256:files.build_receipt.sha256,
+  native_context_contract:{mode:'original-selected-source-managed-host',scope_policy:'V5_ORIGINAL_MANAGED_PRIVATE_FD',original_home:d.original_home,original_home_sha256:d.original_home_sha256,upstream_url:'https://chatgpt.com/backend-api/codex/responses',final_request_contract:{mode:'original-live-scoped-source',producer_module_sha256:producer.sha256,tool_resource_sha256:resource.sha256}}};
+ const association={protocol:'soloco-input-frontier-interpreter-binding-v1',recipe_sha256:digest(Buffer.from(asciiCanonical({deployment:d,selection:INPUT_FRONTIER_CONTEXT_SELECTION,codec,resource:nodeResource,preflight}))),selection:copyContext(INPUT_FRONTIER_CONTEXT_SELECTION),supported_forms:copyContext(inputFrontierForms),native:{compiled_manifest:nativeRef('compiled_manifest'),source_package:nativeRef('source_package'),cargo_lock:nativeRef('cargo_lock'),toolchain_manifest:nativeRef('toolchain_manifest'),build_receipt:nativeRef('build_receipt'),executable:{path:d.executable.path,bytes:d.executable.bytes,sha256:d.executable.sha256},upstream:{commit,tree},entry:'codex-soloco-protected-host'},node:{...d.node,manifest:{path:manifestPath,bytes:manifestSize,sha256:d.node_manifest_sha256},codec,resource:nodeResource,preflight,profile:INPUT_FRONTIER_PROFILE}};
+ return {selected,association};
+}
+export function resolveOriginalInputFrontierInterpreter(...args){
+ if(args.length||slots.length!==0)contextHold();let current;try{current=selectedInputFrontierComponentAssociation();}catch{contextHold();}
+ const h=Object.freeze(Object.create(null));inputFrontierContextHandles.set(h,{sourceRecord:copyContext(current),association:current.association});return h;
+}
+function originalInputFrontierContext(h){
+ const r=inputFrontierContextHandles.get(h);if(!r)contextHold();let current;try{current=selectedInputFrontierComponentAssociation();}catch{contextHold();}if(!sameContext(current,r.sourceRecord))contextHold();return r;
+}
+export function assertOriginalInputFrontierInterpreterFinal(h){originalInputFrontierContext(h);}
+export function inspectOriginalInputFrontierInterpreter(h){return Object.freeze(copyContext(originalInputFrontierContext(h).association));}
+
+export function isOriginalInputFrontierInterpreter(h){return inputFrontierContextHandles.has(h);}
+export function inspectOriginalInputFrontierSlot(h){return Object.freeze(copyContext(originalInputFrontierContext(h).sourceRecord.selected));}
+export function assertOriginalInputFrontierSlot(h,declared){if(!sameContext(originalInputFrontierContext(h).sourceRecord.selected,declared))contextHold();}
+
+// New fixed original readonly3 family; never an ordinary/bootstrap alias.
+const originMaintenanceContextHandles=new WeakMap();
+const originMaintenanceForms=Object.freeze([Object.freeze({delivery_kind:'origin-maintenance-assignment',payload_protocol:'peer-origin-maintenance-context-v1',source_cut_protocol:null,basis_protocol:null})]);
+function selectedOriginMaintenanceComponentAssociation(){
+ const d=inspectOriginalLoadedPeerBridge(),files=d.files;
+ if(d.layout){const packageRoot=fileURLToPath(new URL('../../',import.meta.url)).replace(/\/$/,'');if(d.layout.kind!=='packaged-plugin-v1'||d.layout.package_root!==packageRoot||d.layout.source_root!==packageRoot||d.node.root!==packageRoot)contextHold();}
+ const layout=d.layout?originalPackagedComponentLayout():originalDeveloperComponentLayout(),layoutPaths=originalComponentLayoutPaths(layout);
+ if(d.node.root!==layoutPaths.source_root||d.layout&&!sameContext(d.layout,inspectOriginalComponentLayout(layout)))contextHold();
+ if(d.native_qualified!==false||d.claims_released!==false||d.executable.mode!=='100555'||d.node.profile!=='original-node-peer-context-interpreter-v1')contextHold();
+ const m=files.compiled_manifest,manifest=contextDocument({path:m.path,bytes:m.bytes,sha256:m.sha256},d.original_component_root);
+ const producer=manifest.files.find(r=>r.path==='codex-rs/codex-api/src/protected_peer.rs');
+ const contract=manifest.files.find(r=>r.path==='codex-rs/codex-api/src/protected_peer/context_contract.rs');
+ const frame=manifest.files.find(r=>r.path==='codex-rs/codex-api/src/protected_peer/context_contract/frame.rs');
+ const resource=manifest.files.find(r=>r.path==='codex-rs/codex-api/src/protected_peer/origin_maintenance_readonly3_contract_v1.json');
+ if(!producer||!contract||!frame||resource?.bytes!==3122||resource.sha256!==ORIGIN_MAINTENANCE_CONTEXT_SELECTION.resource_sha256)contextHold();
+ // The original deployment rechecks its selected full native and Node input
+ // inventories. Additionally bind each newly used module and resource to that
+ // exact immutable inventory and this original module realm, not a caller path.
+ const manifestPath=path.join(d.original_component_root,'node-inputs.json'),manifestSize=fs.lstatSync(manifestPath).size;
+ const nodeManifest=contextDocument({path:manifestPath,bytes:manifestSize,sha256:d.node_manifest_sha256},d.original_component_root);
+ if(nodeManifest.schema!=='soloco-node-peer-context-inputs-v1'||!Array.isArray(nodeManifest.files))contextHold();
+ const nodeRef=name=>{
+  const relative='plugins/soloco/runtime/peers/'+name,p=fileURLToPath(new URL('./'+name,import.meta.url)),row=nodeManifest.files.find(r=>r.path===relative);
+  if(!row||p!==originalComponentNodePath(layout,relative)||!Number.isSafeInteger(row.bytes)||row.bytes<1||row.bytes>1024*1024||!hash(row.sha256)||row.mode!=='100644')contextHold();
+  const named=fs.lstatSync(p);if(!named.isFile()||named.isSymbolicLink()||named.nlink!==1||named.size!==row.bytes||fs.realpathSync(p)!==p)contextHold();
+  const fd=fs.openSync(p,fs.constants.O_RDONLY|(fs.constants.O_NOFOLLOW??0));let bytes;
+  try{
+   const before=fs.fstatSync(fd),keys=['dev','ino','size','mtimeMs','ctimeMs','mode','uid','nlink'];if(keys.some(k=>named[k]!==before[k]))contextHold();
+   bytes=Buffer.alloc(row.bytes);let offset=0;while(offset<bytes.length){const n=fs.readSync(fd,bytes,offset,Math.min(65536,bytes.length-offset),offset);if(!n)contextHold();offset+=n;}
+   if(fs.readSync(fd,Buffer.alloc(1),0,1,row.bytes)!==0)contextHold();
+   const after=fs.fstatSync(fd),now=fs.lstatSync(p);if(keys.some(k=>before[k]!==after[k]||before[k]!==now[k]))contextHold();
+  }finally{fs.closeSync(fd);}
+  if(bytes.length!==row.bytes||digest(bytes)!==row.sha256)contextHold();return {path:p,bytes:bytes.length,sha256:row.sha256};
+ };
+ const codec=nodeRef('origin-maintenance-wire.mjs'),nodeResource=nodeRef('origin-maintenance-readonly3-contract-v1.json'),preflight=nodeRef('origin-maintenance-wire.mjs');
+ nodeRef('protected-source-build-slot.mjs');nodeRef('context-component-deployment.mjs');nodeRef('peer-context-interpreter.mjs');nodeRef('prospective-local-worker-inventory-producer.mjs');nodeRef('origin-maintenance-host.mjs');nodeRef('maintenance-launch.mjs');nodeRef('origin-maintenance.mjs');nodeRef('origin-frontier-seal.mjs');nodeRef('owner-handover.mjs');nodeRef('origin-maintenance-instruction.mjs');nodeRef('origin-frontier-seal-instruction.mjs');nodeRef('owner-context-pool.mjs');
+ if(nodeResource.bytes!==resource.bytes||nodeResource.sha256!==resource.sha256)contextHold();
+ const nativeRef=name=>({path:files[name].path,bytes:files[name].bytes,sha256:files[name].sha256,original_path:files[name].original_path});
+ const selected={slot_id:'original-selected-origin-maintenance-component:'+d.intent_key,source_commit:commit,entry:'codex-soloco-protected-host',scope_policy:'V5_ORIGINAL_MANAGED_PRIVATE_FD',artifact_root:d.original_component_root,
+  executable_path:d.executable.path,executable_bytes:d.executable.bytes,executable_sha256:d.executable.sha256,
+  source_manifest_path:files.compiled_manifest.path,source_manifest_sha256:files.compiled_manifest.sha256,
+  source_package_path:files.source_package.path,source_package_sha256:files.source_package.sha256,
+  cargo_lock_path:files.cargo_lock.path,cargo_lock_sha256:files.cargo_lock.sha256,
+  toolchain_manifest_path:files.toolchain_manifest.path,toolchain_manifest_sha256:files.toolchain_manifest.sha256,
+  build_receipt_path:files.build_receipt.path,build_receipt_sha256:files.build_receipt.sha256,
+  native_context_contract:{mode:'original-selected-source-managed-host',scope_policy:'V5_ORIGINAL_MANAGED_PRIVATE_FD',original_home:d.original_home,original_home_sha256:d.original_home_sha256,upstream_url:'https://chatgpt.com/backend-api/codex/responses',final_request_contract:{mode:'original-live-scoped-source',producer_module_sha256:producer.sha256,tool_resource_sha256:resource.sha256}}};
+ const association={protocol:'soloco-origin-maintenance-interpreter-binding-v1',recipe_sha256:digest(Buffer.from(asciiCanonical({deployment:d,selection:ORIGIN_MAINTENANCE_CONTEXT_SELECTION,codec,resource:nodeResource,preflight}))),selection:copyContext(ORIGIN_MAINTENANCE_CONTEXT_SELECTION),supported_forms:copyContext(originMaintenanceForms),native:{compiled_manifest:nativeRef('compiled_manifest'),source_package:nativeRef('source_package'),cargo_lock:nativeRef('cargo_lock'),toolchain_manifest:nativeRef('toolchain_manifest'),build_receipt:nativeRef('build_receipt'),executable:{path:d.executable.path,bytes:d.executable.bytes,sha256:d.executable.sha256},upstream:{commit,tree},entry:'codex-soloco-protected-host'},node:{...d.node,manifest:{path:manifestPath,bytes:manifestSize,sha256:d.node_manifest_sha256},codec,resource:nodeResource,preflight,profile:ORIGIN_MAINTENANCE_PROFILE}};
+ return {selected,association};
+}
+export function resolveOriginalOriginMaintenanceInterpreter(...args){
+ if(args.length||slots.length!==0)contextHold();let current;try{current=selectedOriginMaintenanceComponentAssociation();}catch(error){if(isOriginalLoadedPeerBridgeUnavailable(error))contextHold();throw error;}
+ const h=Object.freeze(Object.create(null));originMaintenanceContextHandles.set(h,{sourceRecord:copyContext(current),association:current.association});return h;
+}
+function originalOriginMaintenanceContext(h){
+ const r=originMaintenanceContextHandles.get(h);if(!r)contextHold();let current;try{current=selectedOriginMaintenanceComponentAssociation();}catch(error){if(isOriginalLoadedPeerBridgeUnavailable(error))contextHold();throw error;}if(!sameContext(current,r.sourceRecord))contextHold();return r;
+}
+export function assertOriginalOriginMaintenanceInterpreterFinal(h){originalOriginMaintenanceContext(h);}
+export function inspectOriginalOriginMaintenanceInterpreter(h){return Object.freeze(copyContext(originalOriginMaintenanceContext(h).association));}
+
+export function isOriginalOriginMaintenanceInterpreter(h){return originMaintenanceContextHandles.has(h);}
+export function inspectOriginalOriginMaintenanceSlot(h){return Object.freeze(copyContext(originalOriginMaintenanceContext(h).sourceRecord.selected));}
+export function assertOriginalOriginMaintenanceSlot(h,declared){if(!sameContext(originalOriginMaintenanceContext(h).sourceRecord.selected,declared))contextHold();}
+
+// New fixed original readonly3 family; never an ordinary/bootstrap alias.
+const originFinalReviewContextHandles=new WeakMap();
+const originFinalReviewForms=Object.freeze([Object.freeze({delivery_kind:'origin-frontier-seal-assignment',payload_protocol:'peer-origin-frontier-seal-context-v1',source_cut_protocol:null,basis_protocol:null}),Object.freeze({delivery_kind:'owner-maintenance-assignment',payload_protocol:'peer-owner-maintenance-assignment-v1',source_cut_protocol:null,basis_protocol:null})]);
+function selectedOriginFinalReviewComponentAssociation(){
+ const d=inspectOriginalLoadedPeerBridge(),files=d.files;
+ if(d.layout){const packageRoot=fileURLToPath(new URL('../../',import.meta.url)).replace(/\/$/,'');if(d.layout.kind!=='packaged-plugin-v1'||d.layout.package_root!==packageRoot||d.layout.source_root!==packageRoot||d.node.root!==packageRoot)contextHold();}
+ const layout=d.layout?originalPackagedComponentLayout():originalDeveloperComponentLayout(),layoutPaths=originalComponentLayoutPaths(layout);
+ if(d.node.root!==layoutPaths.source_root||d.layout&&!sameContext(d.layout,inspectOriginalComponentLayout(layout)))contextHold();
+ if(d.native_qualified!==false||d.claims_released!==false||d.executable.mode!=='100555'||d.node.profile!=='original-node-peer-context-interpreter-v1')contextHold();
+ const m=files.compiled_manifest,manifest=contextDocument({path:m.path,bytes:m.bytes,sha256:m.sha256},d.original_component_root);
+ const producer=manifest.files.find(r=>r.path==='codex-rs/codex-api/src/protected_peer.rs');
+ const contract=manifest.files.find(r=>r.path==='codex-rs/codex-api/src/protected_peer/context_contract.rs');
+ const frame=manifest.files.find(r=>r.path==='codex-rs/codex-api/src/protected_peer/context_contract/frame.rs');
+ const resource=manifest.files.find(r=>r.path==='codex-rs/codex-api/src/protected_peer/origin_final_review_readonly3_contract_v1.json');
+ if(!producer||!contract||!frame||resource?.bytes!==3476||resource.sha256!==ORIGIN_FINAL_REVIEW_CONTEXT_SELECTION.resource_sha256)contextHold();
+ // The original deployment rechecks its selected full native and Node input
+ // inventories. Additionally bind each newly used module and resource to that
+ // exact immutable inventory and this original module realm, not a caller path.
+ const manifestPath=path.join(d.original_component_root,'node-inputs.json'),manifestSize=fs.lstatSync(manifestPath).size;
+ const nodeManifest=contextDocument({path:manifestPath,bytes:manifestSize,sha256:d.node_manifest_sha256},d.original_component_root);
+ if(nodeManifest.schema!=='soloco-node-peer-context-inputs-v1'||!Array.isArray(nodeManifest.files))contextHold();
+ const nodeRef=name=>{
+  const relative='plugins/soloco/runtime/peers/'+name,p=fileURLToPath(new URL('./'+name,import.meta.url)),row=nodeManifest.files.find(r=>r.path===relative);
+  if(!row||p!==originalComponentNodePath(layout,relative)||!Number.isSafeInteger(row.bytes)||row.bytes<1||row.bytes>1024*1024||!hash(row.sha256)||row.mode!=='100644')contextHold();
+  const named=fs.lstatSync(p);if(!named.isFile()||named.isSymbolicLink()||named.nlink!==1||named.size!==row.bytes||fs.realpathSync(p)!==p)contextHold();
+  const fd=fs.openSync(p,fs.constants.O_RDONLY|(fs.constants.O_NOFOLLOW??0));let bytes;
+  try{
+   const before=fs.fstatSync(fd),keys=['dev','ino','size','mtimeMs','ctimeMs','mode','uid','nlink'];if(keys.some(k=>named[k]!==before[k]))contextHold();
+   bytes=Buffer.alloc(row.bytes);let offset=0;while(offset<bytes.length){const n=fs.readSync(fd,bytes,offset,Math.min(65536,bytes.length-offset),offset);if(!n)contextHold();offset+=n;}
+   if(fs.readSync(fd,Buffer.alloc(1),0,1,row.bytes)!==0)contextHold();
+   const after=fs.fstatSync(fd),now=fs.lstatSync(p);if(keys.some(k=>before[k]!==after[k]||before[k]!==now[k]))contextHold();
+  }finally{fs.closeSync(fd);}
+  if(bytes.length!==row.bytes||digest(bytes)!==row.sha256)contextHold();return {path:p,bytes:bytes.length,sha256:row.sha256};
+ };
+ const codec=nodeRef('origin-maintenance-wire.mjs'),nodeResource=nodeRef('origin-final-review-readonly3-contract-v1.json'),preflight=nodeRef('origin-maintenance-wire.mjs');
+ nodeRef('protected-source-build-slot.mjs');nodeRef('context-component-deployment.mjs');nodeRef('peer-context-interpreter.mjs');nodeRef('prospective-local-worker-inventory-producer.mjs');nodeRef('origin-maintenance-host.mjs');nodeRef('maintenance-launch.mjs');nodeRef('origin-maintenance.mjs');nodeRef('origin-frontier-seal.mjs');nodeRef('owner-handover.mjs');nodeRef('origin-maintenance-instruction.mjs');nodeRef('origin-frontier-seal-instruction.mjs');nodeRef('owner-context-pool.mjs');
+ if(nodeResource.bytes!==resource.bytes||nodeResource.sha256!==resource.sha256)contextHold();
+ const nativeRef=name=>({path:files[name].path,bytes:files[name].bytes,sha256:files[name].sha256,original_path:files[name].original_path});
+ const selected={slot_id:'original-selected-origin-final-review-component:'+d.intent_key,source_commit:commit,entry:'codex-soloco-protected-host',scope_policy:'V5_ORIGINAL_MANAGED_PRIVATE_FD',artifact_root:d.original_component_root,
+  executable_path:d.executable.path,executable_bytes:d.executable.bytes,executable_sha256:d.executable.sha256,
+  source_manifest_path:files.compiled_manifest.path,source_manifest_sha256:files.compiled_manifest.sha256,
+  source_package_path:files.source_package.path,source_package_sha256:files.source_package.sha256,
+  cargo_lock_path:files.cargo_lock.path,cargo_lock_sha256:files.cargo_lock.sha256,
+  toolchain_manifest_path:files.toolchain_manifest.path,toolchain_manifest_sha256:files.toolchain_manifest.sha256,
+  build_receipt_path:files.build_receipt.path,build_receipt_sha256:files.build_receipt.sha256,
+  native_context_contract:{mode:'original-selected-source-managed-host',scope_policy:'V5_ORIGINAL_MANAGED_PRIVATE_FD',original_home:d.original_home,original_home_sha256:d.original_home_sha256,upstream_url:'https://chatgpt.com/backend-api/codex/responses',final_request_contract:{mode:'original-live-scoped-source',producer_module_sha256:producer.sha256,tool_resource_sha256:resource.sha256}}};
+ const association={protocol:'soloco-origin-final-review-interpreter-binding-v1',recipe_sha256:digest(Buffer.from(asciiCanonical({deployment:d,selection:ORIGIN_FINAL_REVIEW_CONTEXT_SELECTION,codec,resource:nodeResource,preflight}))),selection:copyContext(ORIGIN_FINAL_REVIEW_CONTEXT_SELECTION),supported_forms:copyContext(originFinalReviewForms),native:{compiled_manifest:nativeRef('compiled_manifest'),source_package:nativeRef('source_package'),cargo_lock:nativeRef('cargo_lock'),toolchain_manifest:nativeRef('toolchain_manifest'),build_receipt:nativeRef('build_receipt'),executable:{path:d.executable.path,bytes:d.executable.bytes,sha256:d.executable.sha256},upstream:{commit,tree},entry:'codex-soloco-protected-host'},node:{...d.node,manifest:{path:manifestPath,bytes:manifestSize,sha256:d.node_manifest_sha256},codec,resource:nodeResource,preflight,profile:ORIGIN_FINAL_REVIEW_PROFILE}};
+ return {selected,association};
+}
+export function resolveOriginalOriginFinalReviewInterpreter(...args){
+ if(args.length||slots.length!==0)contextHold();let current;try{current=selectedOriginFinalReviewComponentAssociation();}catch(error){if(isOriginalLoadedPeerBridgeUnavailable(error))contextHold();throw error;}
+ const h=Object.freeze(Object.create(null));originFinalReviewContextHandles.set(h,{sourceRecord:copyContext(current),association:current.association});return h;
+}
+function originalOriginFinalReviewContext(h){
+ const r=originFinalReviewContextHandles.get(h);if(!r)contextHold();let current;try{current=selectedOriginFinalReviewComponentAssociation();}catch(error){if(isOriginalLoadedPeerBridgeUnavailable(error))contextHold();throw error;}if(!sameContext(current,r.sourceRecord))contextHold();return r;
+}
+export function assertOriginalOriginFinalReviewInterpreterFinal(h){originalOriginFinalReviewContext(h);}
+export function inspectOriginalOriginFinalReviewInterpreter(h){return Object.freeze(copyContext(originalOriginFinalReviewContext(h).association));}
+
+export function isOriginalOriginFinalReviewInterpreter(h){return originFinalReviewContextHandles.has(h);}
+export function inspectOriginalOriginFinalReviewSlot(h){return Object.freeze(copyContext(originalOriginFinalReviewContext(h).sourceRecord.selected));}
+export function assertOriginalOriginFinalReviewSlot(h,declared){if(!sameContext(originalOriginFinalReviewContext(h).sourceRecord.selected,declared))contextHold();}

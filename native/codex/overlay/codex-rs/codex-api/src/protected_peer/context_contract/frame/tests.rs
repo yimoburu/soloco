@@ -3,6 +3,206 @@ use super::*;
 use super::super::{RESOURCE_SHA256, select_original_context_contract, validate_selected_turn_input};
 use serde_json::json;
 
+// New fixed range/final-review families, AUTHORED_UNRUN. These are raw
+// mechanical guards, never original admission, permission or closure evidence.
+fn origin_framed(payload:&str,delivery:&str,protocol:&str,contract:&str,cut:Option<(&str,&str)>)->String {
+    framed(payload,delivery,protocol,cut).replacen(RESOURCE_SHA256,contract,1)
+}
+fn origin_payload(kind:&str)->String {
+    format!(r#"{{"protocol":"peer-origin-maintenance-context-v1","kind":"{kind}","opaque":{{"unsafe":9007199254740993,"lexeme":1.2300e+10,"unicode":"雪😀","escaped":"\ud800","\ud800":"literal lone key","negative":[null,false,"UNKNOWN"]}}}}"#)
+}
+fn owner_payload()->&'static str {
+    r#"{"protocol":"peer-owner-maintenance-assignment-v1","kind":"owner-handover-review","fresh_review_purpose":"peer-owner-maintenance-fresh-purpose-v1","opaque":{"unsafe":9007199254740993,"escaped":"\ud800","unknown":false}}"#
+}
+#[test]
+fn origin_whole_range_both_kinds_and_final_review_forms_preserve_exact_raw_data() {
+    for kind in ["peer-origin-reconstruction","peer-origin-review"] {
+        let payload=origin_payload(kind);let contract=super::super::ORIGIN_MAINTENANCE_RESOURCE_SHA256;
+        let text=origin_framed(&payload,"origin-maintenance-assignment","peer-origin-maintenance-context-v1",contract,None);
+        let decoded=decode_origin_maintenance_frame(&text,contract,100000).unwrap();
+        assert_eq!(decoded.payload,payload);assert_eq!(decoded.payload_sha256,hash(payload.as_bytes()));assert_eq!(decoded.payload_utf8_bytes,payload.len());
+        assert!(decoded.source_cut.is_none());assert!(decoded.source_cut_sha256.is_none());assert!(decoded.source_cut_utf8_bytes.is_none());
+    }
+    for (delivery,protocol,payload) in [
+        ("origin-frontier-seal-assignment","peer-origin-frontier-seal-context-v1",r#"{"protocol":"peer-origin-frontier-seal-context-v1","kind":"peer-origin-frontier-seal-review","original_units":{"unsafe":9007199254740993,"escaped":"\ud800"}}"#),
+        ("owner-maintenance-assignment","peer-owner-maintenance-assignment-v1",owner_payload())] {
+        let contract=super::super::ORIGIN_FINAL_REVIEW_RESOURCE_SHA256;
+        let text=origin_framed(payload,delivery,protocol,contract,None);
+        let decoded=decode_origin_final_review_frame(&text,contract,100000).unwrap();assert_eq!(decoded.payload,payload);assert!(decoded.source_cut.is_none());
+    }
+}
+#[test]
+fn origin_constructor_family_rejects_old_delivery_even_with_replaced_resource_hash() {
+    for (contract,profile) in [(super::super::ORIGIN_MAINTENANCE_RESOURCE_SHA256,super::super::OriginalToolProfile::OriginMaintenanceReadonlyThree),
+        (super::super::ORIGIN_FINAL_REVIEW_RESOURCE_SHA256,super::super::OriginalToolProfile::OriginFinalReviewReadonlyThree)] {
+        for (kind,protocol) in [("task-context","peer-task-context-v2"),("membership-assignment","peer-membership-assignment-v1"),
+            ("bootstrap-membership-assignment","peer-bootstrap-membership-assignment-v1"),("input-frontier-assignment","peer-input-frontier-assignment-v1")] {
+            let payload=format!("{{\"protocol\":\"{protocol}\"}}");let text=origin_framed(&payload,kind,protocol,contract,None);
+            assert!(decode_selected_frame(&text,contract,100000,profile).is_err(),"{kind}");
+        }
+    }
+    let payload=origin_payload("peer-origin-review");let range=origin_framed(&payload,"origin-maintenance-assignment","peer-origin-maintenance-context-v1",super::super::ORIGIN_MAINTENANCE_RESOURCE_SHA256,None);
+    let owner=origin_framed(owner_payload(),"owner-maintenance-assignment","peer-owner-maintenance-assignment-v1",super::super::ORIGIN_FINAL_REVIEW_RESOURCE_SHA256,None);
+    assert!(decode_origin_final_review_frame(&range,super::super::ORIGIN_MAINTENANCE_RESOURCE_SHA256,100000).is_err());
+    assert!(decode_origin_maintenance_frame(&owner,super::super::ORIGIN_FINAL_REVIEW_RESOURCE_SHA256,100000).is_err());
+    let cross=owner.replacen(super::super::ORIGIN_FINAL_REVIEW_RESOURCE_SHA256,super::super::ORIGIN_MAINTENANCE_RESOURCE_SHA256,1);
+    assert!(decode_origin_maintenance_frame(&cross,super::super::ORIGIN_MAINTENANCE_RESOURCE_SHA256,100000).is_err());
+}
+#[test]
+fn origin_fixed_kind_and_fresh_owner_purpose_selectors_cannot_be_relabelled() {
+    let range_hash=super::super::ORIGIN_MAINTENANCE_RESOURCE_SHA256;
+    for kind in ["task","input-frontier-review","owner-handover-review","peer-origin-frontier-seal-review"] {
+        let payload=origin_payload(kind);let text=origin_framed(&payload,"origin-maintenance-assignment","peer-origin-maintenance-context-v1",range_hash,None);
+        assert!(decode_origin_maintenance_frame(&text,range_hash,100000).is_err(),"{kind}");
+    }
+    let hash=super::super::ORIGIN_FINAL_REVIEW_RESOURCE_SHA256;
+    for payload in [owner_payload().replace("peer-owner-maintenance-fresh-purpose-v1","peer-owner-maintenance-assignment-v1"),
+        owner_payload().replace(",\"fresh_review_purpose\":\"peer-owner-maintenance-fresh-purpose-v1\"",""),
+        owner_payload().replace("owner-handover-review","peer-origin-frontier-seal-review")] {
+        let text=origin_framed(&payload,"owner-maintenance-assignment","peer-owner-maintenance-assignment-v1",hash,None);
+        assert!(decode_origin_final_review_frame(&text,hash,100000).is_err());
+    }
+    let wrong=r#"{"protocol":"peer-origin-frontier-seal-context-v1","kind":"owner-handover-review","fresh_review_purpose":"peer-owner-maintenance-fresh-purpose-v1"}"#;
+    let text=origin_framed(wrong,"origin-frontier-seal-assignment","peer-origin-frontier-seal-context-v1",hash,None);
+    assert!(decode_origin_final_review_frame(&text,hash,100000).is_err());
+}
+#[test]
+fn origin_escaped_selectors_accept_but_duplicate_decoded_selector_keys_hold() {
+    let contract=super::super::ORIGIN_FINAL_REVIEW_RESOURCE_SHA256;
+    let escaped=r#" {"pro\u0074ocol":"peer-owner-maintenance-assignment-v1","k\u0069nd":"owner-handover-review","fresh_review_purpose":"peer-owner-maintenance-fresh-purpose-v1","opaque":"\ud800"} "#;
+    let text=origin_framed(escaped,"owner-maintenance-assignment","peer-owner-maintenance-assignment-v1",contract,None);
+    assert_eq!(decode_origin_final_review_frame(&text,contract,100000).unwrap().payload,escaped);
+    for duplicate in [r#", "\u006bind":"owner-handover-review""#,r#", "\u0066resh_review_purpose":"peer-owner-maintenance-fresh-purpose-v1""#,r#", "\u0070rotocol":"peer-owner-maintenance-assignment-v1""#] {
+        let payload=format!("{}{}{}",&owner_payload()[..owner_payload().len()-1],duplicate,"}");
+        let text=origin_framed(&payload,"owner-maintenance-assignment","peer-owner-maintenance-assignment-v1",contract,None);
+        assert!(decode_origin_final_review_frame(&text,contract,100000).is_err());
+    }
+}
+#[test]
+fn origin_new_deliveries_require_null_inner_cut_and_exact_hash_length_envelope() {
+    let contract=super::super::ORIGIN_MAINTENANCE_RESOURCE_SHA256;let payload=origin_payload("peer-origin-reconstruction");
+    let text=origin_framed(&payload,"origin-maintenance-assignment","peer-origin-maintenance-context-v1",contract,None);
+    let inner=r#"{"protocol":"peer-membership-context-v2"}"#;
+    let inner_text=origin_framed(&payload,"origin-maintenance-assignment","peer-origin-maintenance-context-v1",contract,Some((inner,"peer-membership-context-v2")));
+    assert!(decode_origin_maintenance_frame(&inner_text,contract,100000).is_err());
+    for changed in [text.replace("9007199254740993","9007199254740992"),
+        text.replacen(&format!("\"payload_utf8_bytes\":{}",payload.len()),&format!("\"payload_utf8_bytes\":{}",payload.len()-1),1),
+        text.replacen("\"source_cut_protocol\":null","\"source_cut_protocol\":\"peer-origin-maintenance-context-v1\"",1),
+        text.replacen("\"protocol\":\"soloco-peer-context-frame-v2\"","\"protocol\":\"soloco-peer-context-frame-v1\"",1),
+        format!("{} ",text),text.replacen("{","{\"ready\":true,",1)] {
+        assert!(decode_origin_maintenance_frame(&changed,contract,100000).is_err());
+    }
+}
+#[test]
+fn origin_new_payload_and_total_frame_caps_remain_separate_fixed_bounds() {
+    for (delivery,protocol,kind,contract,profile) in [
+        ("origin-maintenance-assignment","peer-origin-maintenance-context-v1","peer-origin-review",super::super::ORIGIN_MAINTENANCE_RESOURCE_SHA256,super::super::OriginalToolProfile::OriginMaintenanceReadonlyThree),
+        ("origin-frontier-seal-assignment","peer-origin-frontier-seal-context-v1","peer-origin-frontier-seal-review",super::super::ORIGIN_FINAL_REVIEW_RESOURCE_SHA256,super::super::OriginalToolProfile::OriginFinalReviewReadonlyThree)] {
+        let prefix=format!("{{\"protocol\":\"{protocol}\",\"kind\":\"{kind}\",\"opaque\":\"");let suffix="\"}";
+        for size in [65536,65537] {
+            let payload=format!("{prefix}{}{suffix}","x".repeat(size-prefix.len()-suffix.len()));
+            let text=origin_framed(&payload,delivery,protocol,contract,None);
+            assert_eq!(decode_selected_frame(&text,contract,100000,profile).is_ok(),size==65536);
+            if size==65536 {assert!(decode_selected_frame(&text,contract,text.len(),profile).is_ok());assert!(decode_selected_frame(&text,contract,text.len()-1,profile).is_err());}
+        }
+        let payload=format!("{{\"protocol\":\"{protocol}\",\"kind\":\"{kind}\"}}");let text=origin_framed(&payload,delivery,protocol,contract,None);
+        assert!(decode_selected_frame(&text,contract,0,profile).is_err());
+        if profile==super::super::OriginalToolProfile::OriginMaintenanceReadonlyThree {assert!(decode_origin_maintenance_frame(&text,contract,100001).is_err());}
+        else {assert!(decode_origin_final_review_frame(&text,contract,100001).is_err());}
+    }
+}
+
+// Additive frontier cases: AUTHORED_UNRUN, mechanical SOURCE controls only.
+fn frontier_framed(payload:&str,protocol:&str,cut:Option<(&str,&str)>)->String {
+    framed(payload,"input-frontier-assignment",protocol,cut)
+        .replacen(RESOURCE_SHA256,super::super::FRONTIER_RESOURCE_SHA256,1)
+}
+fn frontier_payload()->&'static str {
+    r#"{"protocol":"peer-input-frontier-assignment-v1","subject":{"kind":"extract","stage":"produce"},"opaque":{"number":9007199254740993,"lexeme":1.2300e+10,"unicode":"雪😀","escaped":"\ud800","negative":[null,false,"UNKNOWN"]}}"#
+}
+
+#[test]
+fn frontier_preserves_exact_whole_raw_assignment_without_a_synthetic_inner_cut() {
+    let payload=frontier_payload();let text=frontier_framed(payload,"peer-input-frontier-assignment-v1",None);
+    let decoded=decode_input_frontier_frame(&text,super::super::FRONTIER_RESOURCE_SHA256,100000).unwrap();
+    assert_eq!(decoded.payload.as_bytes(),payload.as_bytes());assert_eq!(decoded.payload_utf8_bytes,payload.len());
+    assert_eq!(decoded.payload_sha256,hash(payload.as_bytes()));
+    assert!(decoded.source_cut.is_none());assert!(decoded.source_cut_sha256.is_none());
+    assert!(decoded.source_cut_utf8_bytes.is_none());
+    let escaped=r#" {"pro\u0074ocol":"\u0070eer-input-frontier-assignment-v1","raw":1.2300e+10,"unknown":false} "#;
+    let text=frontier_framed(escaped,"peer-input-frontier-assignment-v1",None);
+    assert_eq!(decode_input_frontier_frame(&text,super::super::FRONTIER_RESOURCE_SHA256,100000).unwrap().payload,escaped);
+}
+
+#[test]
+fn frontier_never_aliases_task_ordinary_membership_bootstrap_or_an_inner_cut() {
+    let payload=frontier_payload();let text=frontier_framed(payload,"peer-input-frontier-assignment-v1",None);
+    assert!(decode_original_frame(&text,super::super::FRONTIER_RESOURCE_SHA256,100000).is_err());
+    assert!(decode_bootstrap_frame(&text,super::super::FRONTIER_RESOURCE_SHA256,100000).is_err());
+    for (kind,protocol) in [("task-context","peer-task-context-v2"),
+        ("membership-assignment","peer-membership-assignment-v1"),
+        ("bootstrap-membership-assignment","peer-bootstrap-membership-assignment-v1")] {
+        let changed=text.replace("\"delivery_kind\":\"input-frontier-assignment\"",&format!("\"delivery_kind\":\"{kind}\""))
+            .replace("\"payload_protocol\":\"peer-input-frontier-assignment-v1\"",&format!("\"payload_protocol\":\"{protocol}\""));
+        assert!(decode_input_frontier_frame(&changed,super::super::FRONTIER_RESOURCE_SHA256,100000).is_err());
+    }
+    let inner=r#"{"protocol":"peer-bootstrap-membership-context-v1"}"#;
+    let changed=frontier_framed(payload,"peer-input-frontier-assignment-v1",Some((inner,"peer-bootstrap-membership-context-v1")));
+    assert!(decode_input_frontier_frame(&changed,super::super::FRONTIER_RESOURCE_SHA256,100000).is_err());
+    assert!(decode_input_frontier_frame(&text,RESOURCE_SHA256,100000).is_err());
+    assert!(decode_input_frontier_frame(&text,super::super::BOOTSTRAP_RESOURCE_SHA256,100000).is_err());
+}
+
+#[test]
+fn frontier_closed_envelope_and_duplicate_decoded_assignment_keys_are_held() {
+    let text=frontier_framed(frontier_payload(),"peer-input-frontier-assignment-v1",None);
+    for changed in [text.replace("\"payload\":","\"extra\":null,\"payload\":"),
+        text.replace("\"payload\":","\"payload_utf8_bytes\":1,\"payload\":"),
+        text.replacen("{\"protocol\":","{ \"protocol\":",1),format!("{text} "),
+        text.replace("\"source_cut_protocol\":null,","")] {
+        assert!(decode_input_frontier_frame(&changed,super::super::FRONTIER_RESOURCE_SHA256,100000).is_err());
+    }
+    for payload in [r#"{"protocol":"peer-input-frontier-assignment-v1","\u0070rotocol":"peer-input-frontier-assignment-v1"}"#,
+        r#"{"protocol":"peer-input-frontier-assignment-v1","scope":false,"\u0073cope":false}"#,
+        r#"{"protocol":"peer-input-frontier-assignment-v1","protocol":null}"#,
+        r#"{"protocol":"peer-task-context-v2"}"#,
+        r#"{"protocol":true}"#,r#"["frontier"]"#,
+        r#"{"protocol":"peer-input-frontier-assignment-v1""#] {
+        let changed=frontier_framed(payload,"peer-input-frontier-assignment-v1",None);
+        assert!(decode_input_frontier_frame(&changed,super::super::FRONTIER_RESOURCE_SHA256,100000).is_err());
+    }
+}
+
+#[test]
+fn frontier_hash_and_utf8_byte_counts_do_not_normalize_opaque_data() {
+    let payload=frontier_payload();let text=frontier_framed(payload,"peer-input-frontier-assignment-v1",None);
+    for changed in [text.replace("雪","雨"),text.replace("1.2300e+10","1.23e10"),
+        text.replace(&format!("\"payload_utf8_bytes\":{}",payload.len()),
+            &format!("\"payload_utf8_bytes\":{}",payload.chars().count())),
+        text.replacen(&hash(payload.as_bytes()),&"f".repeat(64),1)] {
+        assert!(decode_input_frontier_frame(&changed,super::super::FRONTIER_RESOURCE_SHA256,100000).is_err());
+    }
+}
+
+#[test]
+fn frontier_payload_and_whole_frame_limits_are_separate_and_not_raised_to_ordinary() {
+    let hash=super::super::FRONTIER_RESOURCE_SHA256;
+    let text=frontier_framed(frontier_payload(),"peer-input-frontier-assignment-v1",None);
+    assert!(decode_input_frontier_frame(&text,hash,text.len()).is_ok());
+    assert!(decode_input_frontier_frame(&text,hash,text.len()-1).is_err());
+    assert!(decode_input_frontier_frame(&text,hash,0).is_err());
+    assert!(decode_input_frontier_frame(&text,hash,100001).is_err());
+    let prefix="{\"protocol\":\"peer-input-frontier-assignment-v1\",\"opaque\":\"";
+    let suffix="\"}";
+    for size in [65536usize,65537] {
+        let payload=format!("{prefix}{}{suffix}","x".repeat(size-prefix.len()-suffix.len()));
+        assert_eq!(payload.len(),size);
+        let text=frontier_framed(&payload,"peer-input-frontier-assignment-v1",None);
+        assert!(text.len()<100000);
+        assert_eq!(decode_input_frontier_frame(&text,hash,100000).is_ok(),size==65536);
+    }
+}
+
 fn framed(payload:&str,kind:&str,protocol:&str,cut:Option<(&str,&str)>) -> String {
     let (cut_protocol,cut_sha,cut_bytes)=match cut {
         Some((raw,protocol))=>(Some(protocol.to_string()),Some(hash(raw.as_bytes())),Some(raw.len())),

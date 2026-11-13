@@ -16,6 +16,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
+import {createHash} from 'node:crypto';
 import * as coordination from '../plugins/soloco/runtime/coordination.mjs';
 import * as timeout from '../plugins/soloco/runtime/timeout.mjs';
 import {renderDevelopmentReviewContext} from '../plugins/soloco/runtime/development-receipt-json.mjs';
@@ -44,10 +45,49 @@ function harness(publicOverrides={}) {
   let now=1000000,sequence=0,state={schema:2,plugin_version:'test',owner:{epoch:1,session_id:'founder',host:'codex'},paused:false,roles:{engineer:{name:'Engineer'}},records:{},jobs:{},sessions:{},notices:[],messages:[]};
   let matches=true,scope=true,beforeTransaction;
   const intervals=new Set(),launches=[];
+  // Conditional VM sentinels never reach the canonical producer or adapter.
+  // Actual Original custody is covered by the real SQLite regression roots.
+  const vmLaunches=new WeakMap(),vmStores=new WeakMap(),vmInspectors=new Map();let vmBirthSequence=0;
   const iso=()=>new Date(now).toISOString();
+  // These identities and loans exist ONLY in this stripped-import VM. The
+  // synthetic Store has no SQLite/Original provenance, and neither its loans
+  // nor launch sentinels are passed to a canonical capability consumer.
+  const vmCustody=subject=>{
+    const record=vmStores.get(subject),active=record?.active;
+    assert.ok(record?.open&&active,'VM-only Store transaction required');
+    const check=()=>assert.ok(record.open&&record.active===active,'VM-only transaction scope expired');
+    return {db:record.db,scope:active.scope,mode:'write',type:active.type,state:active.state,assert:check};
+  };
+  const vmRetainCutoff=(subject,proof,issuer)=>{
+    const loan=vmCustody(subject),record=vmStores.get(subject),inspect=vmInspectors.get(issuer);
+    assert.equal(typeof inspect,'function','Only fixed VM engine/worker proof issuers are supported');
+    const facts=inspect(proof,loan.db);loan.assert();
+    assert.ok(Number.isSafeInteger(facts.deadline_at_ms)&&facts.deadline_at_ms>=0);
+    assert.ok(facts.code===null||typeof facts.code==='string');assert.equal(typeof facts.message,'string');
+    if(!record.active.cutoff||facts.deadline_at_ms<record.active.cutoff.deadline_at_ms)record.active.cutoff=Object.freeze({...facts});
+  };
+  const vmWithStore=(_root,fn)=>{
+    const db=Object.freeze({prepare:sql=>{
+      assert.equal(sql,"SELECT 1 FROM sqlite_master WHERE type='table' AND name='company_layout'",'VM fixture has no general SQL capability');
+      return {get:()=>undefined}; // explicitly synthetic legacy fallback only
+    }}),record={db,open:true,active:null};
+    const store={db,readSnapshot:callback=>callback(),publicReconciliationState:()=>null,read:()=>structuredClone(state),transaction:(type,change,options={})=>{
+      assert.equal(record.active,null,'No nested VM write scope');
+      if(beforeTransaction){const hook=beforeTransaction;beforeTransaction=undefined;hook(type);}
+      const active={scope:Object.freeze(Object.create(null)),type,state:structuredClone(state),cutoff:null,launches:[]};record.active=active;
+      try{
+        const next=change(active.state);active.state=next;
+        options.afterWrite?.(db,next);options.beforeCommit?.(db,next);
+        if(active.cutoff&&now>=active.cutoff.deadline_at_ms)throw Object.assign(new Error(active.cutoff.message),active.cutoff.code===null?{}:{code:active.cutoff.code});
+        state=structuredClone(next);for(const launch of active.launches)launch.armed=true;return structuredClone(state);
+      }finally{for(const launch of active.launches)if(!launch.armed)launch.invalid=true;record.active=null;}
+    }};
+    vmStores.set(store,record);vmStores.set(db,record);
+    try{return fn(store);}finally{record.open=false;}
+  };
   const deps={...reviewContinuation,...retentionRepair,...modelProcessClosure,requestModelProcess:(job,value)=>modelProcessClosure.requestModelProcess(job,structuredClone(value)),outcomeSchema,developmentDeliveryContractSchema,developmentDeliveryTransitionFields,boundedDevelopmentAcceptanceReply,renderDevelopmentReviewContext,Buffer,...scopedStream,scoped:{...scoped},...publicResponse,...coordination,...timeout,path,os:{homedir:()=>'/unused'},fs:{existsSync:()=>true,mkdirSync:()=>{}},process:{cwd:()=>process.cwd(),env:{},pid:42,execPath:'/unused/node',argv:[]},Date:class extends Date {static now(){return now;}},AbortController,
     PACKAGE:'/unused',VERSION:'test',SCHEMA:2,stamp:iso,id:p=>p+'-'+(++sequence),digest:()=> 'binding',folder:x=>x,noLink:()=>{},
-    withStore:(root,fn)=>fn({readSnapshot:fn=>fn(),publicReconciliationState:()=>null,read:()=>structuredClone(state),transaction:(type,change)=>{if(beforeTransaction){const hook=beforeTransaction;beforeTransaction=undefined;hook(type);}const next=change(structuredClone(state));state=structuredClone(next);return structuredClone(state);}}),
+    withStore:vmWithStore,originalStoreExecutionCustodyFrom:vmCustody,retainOriginalStoreCommitCutoffFrom:vmRetainCutoff,
     owner:(s,session,host,epoch)=>{if(s.owner.session_id!==session || s.owner.host!==host || (epoch!==undefined && s.owner.epoch!==epoch))throw new Error('Stale owner');},
     notice:(s,kind,summary,reference)=>{const n={kind,summary,reference};s.notices.push(n);return n;},
     requireText:(v,label,max=20000)=>{if(typeof v!=='string'||!v.trim()||v.length>max)throw new Error('Invalid '+label);return v;},
@@ -59,6 +99,11 @@ function harness(publicOverrides={}) {
     developmentLimits:()=>({max_bytes:100000}),developmentCapability:()=>({}),prototypeCapability:()=>({}),developmentAction:()=>{},prototypeAction:()=>{},
     developmentBundle:()=>null,prototypeBundle:()=>null,developmentPrompt:()=>'',prototypePrompt:()=>'',
     parseArtifact:JSON.parse,runModel:()=>{throw new Error('Real model forbidden');},dataDir:()=>'/unused',
+    recordOriginalWorkerAssignmentFrom:(store,current,job)=>{assert.equal(vmCustody(store).state,current);return job;},
+    prepareOriginalWorkerLaunchFrom:(store,current,input)=>{assert.equal(vmCustody(store).state,current);const token=Object.freeze(Object.create(null)),launch={kind:input.kind,used:false,armed:false,invalid:false};vmLaunches.set(token,launch);vmStores.get(store).active.launches.push(launch);return token;},
+    spawnOriginalWorkerLaunch:(token,...args)=>{const launch=vmLaunches.get(token);assert.ok(launch?.armed&&!launch.invalid&&!launch.used&&launch.kind==='worker');launch.used=true;return deps.spawn(...args);},
+    // No actual Original child is created or privately branded by this VM.
+    cleanupOriginalWorkerLaunchFailure:()=>false,originalWorkerFailedLaunchClosed:()=>null,
     setInterval:(fn,ms)=>{assert.equal(ms,100);intervals.add(fn);return fn;},clearInterval:fn=>intervals.delete(fn),
     // This VM supplies a synthetic legacy Store; peer routing/storage behavior
     // is covered by the actual SQLite and root-ingress suites.
@@ -68,9 +113,24 @@ function harness(publicOverrides={}) {
     isOriginMechanicalQaWorker:()=>false,isOriginMechanicalQaTarget,workPeerOriginMechanicalQa,
     spawn:(...args)=>{launches.push(args);return {on:()=>{},unref:()=>{}};},hooks:()=>{},upgrade:()=>{},upgradeGuidance:'',peerRuntimeFields,peerAdoptionToolSchema,peerOwnerToolSchema,peerOriginToolSchema,mcpCallerDiagnostic};
   Object.assign(deps,load('plugin-data.mjs',deps,['dataDir']));
-  const engine=load('engine.mjs',deps,['dispatch','status','control','wait']);
+  const engine=load('engine.mjs',deps,['dispatch','status','control','wait','inspectOriginalEngineCommitCutoffFrom']);
+  vmInspectors.set('engine',engine.inspectOriginalEngineCommitCutoffFrom);
   Object.assign(engine,publicOverrides);
-  const worker=load('worker.mjs',deps,['work']);
+  const worker=load('worker.mjs',deps,['work','inspectOriginalWorkerCommitCutoffFrom']);
+  vmInspectors.set('worker',worker.inspectOriginalWorkerCommitCutoffFrom);
+  const sourceWork=worker.work;
+  worker.work=(root,jobId,runner,...rest)=>sourceWork(root,jobId,typeof runner==='function'?async(...args)=>{
+    const options=args[6],launch=vmLaunches.get(options.originalExecutionLaunch);
+    assert.ok(launch?.armed&&!launch.invalid&&!launch.used&&launch.kind==='model');launch.used=true;
+    // The controlled adapter's resolved promise means its fictional child
+    // closed. Preserve every request round through explicit conditional
+    // birth/close DATA instead of erasing an earlier unobserved invocation.
+    const birth={protocol:'ordinary-model-process-birth-v1',launch_id:'SYNTHETIC-VM-'+(++vmBirthSequence),host:args[0],pid:10000+vmBirthSequence,worker_pid:42,spawned_at:iso(),command_sha256:'a'.repeat(64),argv_sha256:'b'.repeat(64),cwd_sha256:'c'.repeat(64)};
+    options.onModelProcess(birth);
+    const close=()=>options.onModelClosure(birth,{protocol:'ordinary-model-process-close-v1',birth_sha256:createHash('sha256').update(JSON.stringify(birth)).digest('hex'),closed_at:iso(),exit_code:0,signal:null,observation:'original-child-close'});
+    try{const result=await runner(...args);if(result?.termination_confirmed!==false)close();return result;}
+    catch(error){if(error?.termination_confirmed===true)close();throw error;}
+  }:runner,...rest);
   const main=load('main.mjs',{...deps,engine},['toolList','call','boundedDevelopmentAcceptanceReply']);
   const args={root:'/fixture',session_id:'founder',epoch:1,role:'engineer',task:'A bounded fixture assignment'};
   return {deps,engine,worker,main,args,intervals,launches,get state(){return state;},set now(v){now=v;},get now(){return now;},mutate:fn=>fn(state),tick:()=>{for(const fn of [...intervals])fn();},mismatch:()=>{matches=false;},revoke:()=>{scope=false;},before:fn=>{beforeTransaction=fn;},dispatch:settings=>engine.dispatch({...args,...settings},'codex')};

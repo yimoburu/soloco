@@ -21,7 +21,9 @@ export function validModelProcessTracking(v){
 function owned(job,invocation){if(!job||job.id!==invocation.job_id||job.instance_id!==invocation.instance_id||job.worker_pid!==invocation.worker_pid||job.host!==invocation.host)fail();}
 export function requestModelProcess(job,invocation){
  owned(job,invocation);if(!closed(invocation,['invocation_id','job_id','instance_id','worker_pid','host','requested_at'])||!text(invocation.invocation_id)||!time(invocation.requested_at))fail();
- const before=job.model_process_tracking;if(before&&!validModelProcessTracking(before))fail();if(before?.invocations.some(x=>x.invocation_id===invocation.invocation_id))fail();
+ // A later request cannot turn an earlier unobserved birth/close into free
+ // capacity. Native requests remain lineage within one assignment unit.
+ const before=job.model_process_tracking;if(before&&(!validModelProcessTracking(before)||before.invocations.some(x=>!x.birth||!x.closure)))fail();if(before?.invocations.some(x=>x.invocation_id===invocation.invocation_id))fail();
  job.model_process_tracking={version:1,current:invocation.invocation_id,invocations:[...(before?.invocations??[]),{...invocation,birth:null,closure:null}]};
 }
 export function recordModelProcessBirth(job,invocation,birth){
@@ -34,7 +36,7 @@ export function recordModelProcessClosure(job,invocation,birth,receipt){
 }
 export function modelProcessTransition(before,after,type){
  const a=before?.model_process_tracking,b=after?.model_process_tracking;if(!validModelProcessTracking(b))return false;
- if(type==='job.model_process.requested')return (!a||validModelProcessTracking(a))&&b.invocations.length===(a?.invocations.length??0)+1&&same(b.invocations.slice(0,-1),a?.invocations??[])&&b.invocations.at(-1).birth===null&&b.invocations.at(-1).closure===null;
+ if(type==='job.model_process.requested')return (!a||validModelProcessTracking(a)&&a.invocations.every(x=>x.birth&&x.closure))&&b.invocations.length===(a?.invocations.length??0)+1&&same(b.invocations.slice(0,-1),a?.invocations??[])&&b.invocations.at(-1).birth===null&&b.invocations.at(-1).closure===null;
  if(!validModelProcessTracking(a)||a.current!==b.current||a.invocations.length!==b.invocations.length)return false;
  let changed=0;
  for(let i=0;i<a.invocations.length;i++){

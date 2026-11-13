@@ -8,11 +8,17 @@ import {snapshotReference,resolveSnapshot,resolveSnapshotEntry,hasSnapshotRefere
 import {buildQualificationEvidence,knownModelCatalog} from './upgrade-evidence.mjs';
 import {validateQualificationExclusion,QUALIFICATION_PROTOCOL} from './context-qualification.mjs';
 import {NOTICE_SOURCES,isNoticeSourceId,isCanonicalNoticeSource,noticeSource,noticeSourceEntries,projectNotice} from './notice-sources.mjs';
+import {inspectOriginalWorkerAssignmentBookkeepingFrom,inspectOriginalExecutionOriginBookkeepingFrom} from './peers/prospective-local-worker-inventory-producer.mjs';
 const fields=['id','kind','author_role','recorded_by','content','status','action','previous_name','name','created_at'];
 const knownStateFields=new Set(['id','name','idea','owner','schema','runtime_version','plugin_version','revision','created_at','updated_at','paused','mode','phase','team_sha256','governance','governance_sha256','cos_instructions','roles','records','jobs','sessions','notices','messages','upgrade','upgrade_history','retired_sessions','context_classifications','context_last_plan','handover']);
 const proofJobFields=new Set(['code_review_window_minutes','code_review_reason','code_review_subject','delivered_record_reads','model_process_tracking','specialist','id','role','instance_id','session_key','native_id','host','epoch','status','artifact_id','review_of','inputs','context_format','context_scope','context_sha256','task','task_summary','next_handoff','model_selection','model_catalog','model_evidence','cli_version','requester','coordination','coordination_release','qualification_hold','expected_deliverable','supplemental_sources','retrieved_inputs','created_at','started_at','finished_at','worker_pid','timeout_policy_version','timeout_minutes','timeout_ms','timeout_reason','execution_started_at','execution_deadline_at','termination_deadline_at']);
 const keysOnly=(v,keys)=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).every(k=>keys.includes(k));
-export function proofJobSafe(job) {
+export function proofJobSafe(job,state=null) {
+  if(job&&Object.hasOwn(job,'original_execution_assignment')){
+    const proof=inspectOriginalWorkerAssignmentBookkeepingFrom(state,job);
+    if(!proof||proof.field!=='original_execution_assignment'||!(proof.historical_original===true||proof.active_original_snapshot===true))return false;
+    const {original_execution_assignment,...legacy}=job;job=legacy;
+  }
   if(job&&Object.hasOwn(job,'specialist')&&!validateSpecialistBindingShape(job.specialist))return false;
   if(Object.keys(job).some(k=>!proofJobFields.has(k)))return false;
   if(!validCodeReviewMetadata(job))return false;
@@ -51,7 +57,8 @@ export function currentExtensions(state) {
   // Prospective mechanical metadata is omitted only after exact receipt/index
   // validation. With no publication, frozen classification inputs are unchanged.
   if(Object.hasOwn(state,'operating_state'))validateOperatingIndex(state);
-  return Object.fromEntries(Object.entries(state).filter(([key])=>!knownStateFields.has(key)&&key!=='operating_state'));
+  const original=Object.hasOwn(state,'original_execution_origin')?inspectOriginalExecutionOriginBookkeepingFrom(state):null;
+  return Object.fromEntries(Object.entries(state).filter(([key])=>!knownStateFields.has(key)&&key!=='operating_state'&&!(key==='original_execution_origin'&&original?.field===key&&(original.historical_original===true||original.active_original_snapshot===true))));
 }
 // Only the supported runtime rename record shape is presentation-only. Unknown
 // fields/record producers remain conservative; no free-form status inference.
@@ -447,7 +454,7 @@ export function reviewedContext(state) {
       // Only the exact producing QA job, with recognized mechanical fields, is
       // part of the classification proof. An aliasing artifact_id, error or
       // unknown extension is independent evidence and stays compulsory.
-      if(job&&job.id===jobId&&job.artifact_id===c.review.id&&proofJobSafe(job))proofJobs.add(jobId);
+      if(job&&job.id===jobId&&job.artifact_id===c.review.id&&proofJobSafe(job,state))proofJobs.add(jobId);
       if(c.disposition==='represented')for(const ref of state.records[c.plan.id].context_classification_plan.counterparts){mandatory.add(ref.id);globalMandatory.add(ref.id);}
     }
   }

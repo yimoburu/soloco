@@ -11,6 +11,23 @@ import {inspectPeerPinnedTeamFrom} from './legacy-origin.mjs';
 import {ORIGIN_LIMITS,assertOriginActor,originSafeData,withOriginLegacyStore,validatePeerOriginMechanicalReview,validateSelectedPeerOriginMechanicalReviewAtEpoch,inspectLegacyLocalReleaseFrom,capturePeerOriginCut,originSidecars,originHash,originNeed as need,originSame as same,originCopy as copy,originRef as ref} from './origin-plan.mjs';
 
 export const ORIGIN_QUARANTINE_PROTOCOL='peer-origin-quarantine-v1';
+const retainedBackups=new WeakMap();
+// Diagnostic custody only. A provider's public property cannot attest which
+// backup this operation actually retained, and callers receive only a copy.
+export function retainedPeerOriginQuarantineBackupFrom(error){
+ const value=error&&(typeof error==='object'||typeof error==='function')?retainedBackups.get(error):null;
+ return value?copy(value):null;
+}
+function retainBackupFailure(error,backup){
+ if(!error||typeof error!=='object'&&typeof error!=='function')return;
+ const value=copy(backup);retainedBackups.set(error,value);
+ // Keep existing mutable Error diagnostics without invoking a provider's
+ // prototype setter or masking a frozen/nonextensible original failure.
+ try{
+  const old=Object.getOwnPropertyDescriptor(error,'retained_backup');
+  if(old?Object.hasOwn(old,'value')&&old.writable:Object.isExtensible(error))Object.defineProperty(error,'retained_backup',old?{value:copy(value)}:{value:copy(value),writable:true,enumerable:true,configurable:true});
+ }catch{}
+}
 const legacyTables=['company','events','state_entries','immutable_values','company_layout'];
 const normalized=sql=>sql.replace(/\s+/g,' ').trim().replace(/;$/,'');
 const fenceSQL=(table,op)=>`CREATE TRIGGER peer_origin_legacy_${table}_${op} BEFORE ${op.toUpperCase()} ON ${table} BEGIN SELECT RAISE(ABORT,'Original legacy writer retired: origin quarantine'); END`;
@@ -63,10 +80,11 @@ function quarantinePeerOriginSelected(root,actor,input,expected_epoch){
   const validate=()=>expected_epoch===undefined?validatePeerOriginMechanicalReview(store,{plan_id,review_ids},a):validateSelectedPeerOriginMechanicalReviewAtEpoch(store,{plan_id,review_ids},a,expected_epoch);
   const first=store.readSnapshot(validate);
   const backup=verifiedBackup(store,path.join(store.root,'.origin-quarantine-backups',randomUUID()),first.current);
-  store.db.exec('BEGIN IMMEDIATE');store.inTransaction=true;
+  let checkedPlan;
   try{
+  return store.peerLayoutTransition(()=>{
    const checked=validate();need(checked.current.sha256===backup.cut_sha256,'ORIGIN_CHANGED_DURING_BACKUP');
-   const {plan,current,observed}=checked,db=store.db,id='origin:'+peerDigest([plan_id,peerDigest(plan)]),{reservations,local_releases}=legacyReservations(db,current.snapshot);
+   const {plan,current,observed}=checked,db=store.db,id='origin:'+peerDigest([plan_id,peerDigest(plan)]),{reservations,local_releases}=legacyReservations(db,current.snapshot);checkedPlan=plan;
    need(!db.prepare("SELECT 1 FROM sqlite_master WHERE name GLOB 'peer_*' LIMIT 1").get(),'ORIGIN_PEER_SCHEMA_ALREADY_PRESENT');
    // Fence all existing data tables before any layout/schema-trigger effect.
    // The layout row is fenced immediately after the one exact 4 -> 5 update.
@@ -99,9 +117,13 @@ function quarantinePeerOriginSelected(root,actor,input,expected_epoch){
     }
     inspectPeerPinnedTeamFrom(tx,{company_id:plan.company_id});tx.event('origin.paused_quarantine_committed',{origin_ref,backup_sha256:backup.sha256,legacy_reservations_preserved:reservations.length,ordinary_authority:false});
    });
-   // No I/O or mutable callback follows the last expiry/fence checks before COMMIT.
-   assertPeerOriginLegacyFences(db);need(Date.parse(plan.expires_at)>Date.now(),'ORIGIN_PLAN_EXPIRED');db.exec('COMMIT');return {status:'quarantined',company_id:plan.company_id,origin_ref,backup,legacy_writers_fenced:true,execution_resumed:false};
-  }catch(error){if(store.db.isTransaction)store.db.exec('ROLLBACK');error.retained_backup=backup;throw error;}finally{store.inTransaction=false;}
+   return {status:'quarantined',company_id:plan.company_id,origin_ref,backup,legacy_writers_fenced:true,execution_resumed:false};
+  },{beforeCommit:db=>{
+   // Storage owns COMMIT and the genuine same-scope policy cutoff. All schema
+   // and writer-fence reads precede the last original plan expiry sample.
+   assertPeerOriginLegacyFences(db);need(Date.parse(checkedPlan.expires_at)>Date.now(),'ORIGIN_PLAN_EXPIRED');
+  }});
+  }catch(error){retainBackupFailure(error,backup);throw error;}
  });
 }
 

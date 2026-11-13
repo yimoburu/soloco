@@ -6,7 +6,7 @@ import path from 'node:path';
 import {EventEmitter} from 'node:events';
 import {createHash} from 'node:crypto';
 import {DatabaseSync} from 'node:sqlite';
-import {runModel} from '../plugins/soloco/runtime/adapters.mjs';
+import {createOriginalAdapterProcessFixture} from './original-adapter-process-fixture.mjs';
 import {PeerLedger,installPeerSchema,peerDigest,canonical} from '../plugins/soloco/runtime/peers/ledger.mjs';
 import {createObservationJournal,OBSERVATION_STATUS,OBSERVATION_PREFIX,OBSERVATION_PROTOCOL} from '../plugins/soloco/runtime/peers/observation-journal.mjs';
 import * as model from '../plugins/soloco/runtime/peers/model.mjs';
@@ -193,12 +193,22 @@ test('oversized native output is retained and held rather than truncated into su
   assert.deepEqual(result.result_evidence.persistence,{write_closed:true,readback_verified:true,file_fsync:process.permission?'unavailable_node_permission_model':'performed'});
 });
 
-test('real adapter lifecycle remains uncertain after escalation and observes later close separately',async t=>{
-  const f=fixture(t),child=new EventEmitter(),timers=new Map(),processes=[],closures=[];let clock=1000000,seq=0;
+test('conditional standalone adapter lifecycle remains uncertain after escalation and observes later close separately',async t=>{
+  // This dummy task has no P1 admission. The actual Original adapter lifecycle
+  // is conditional SOURCE mechanics only, never qualified Native peer execution.
+  const child=new EventEmitter(),timers=new Map(),processes=[],closures=[];let clock=1000000,seq=0,captureOriginalSpawn;
   child.pid=4242;child.stdout=new EventEmitter();child.stderr=new EventEmitter();child.stdin=new EventEmitter();child.stdin.end=()=>{};child.kill=()=>true;
+  const f=createOriginalAdapterProcessFixture({host:'codex',child,now:()=>clock,onLaunch:(...args)=>{
+    // The fixed executor observer receives the SAME child already selected by
+    // the standard Node CP mock. It creates no second process or permission.
+    assert.equal(typeof captureOriginalSpawn,'function');assert.equal(captureOriginalSpawn(...args),child);
+  }});t.after(()=>f.dispose());
   const executor=createNativeExecutor({cwd:f.root,evidence_dir:path.join(f.root,'evidence'),now:()=>clock,spawn_process:()=>child,
-    probe:async()=>({available:true,authenticated:true}),runner:(host,id,prompt,cwd,timeout,selection,options)=>runModel(host,id,prompt,cwd,timeout,selection,{...options,
-      resolveExecutable:()=>'/fictional/codex',now:()=>clock,setTimeout:(fn,delay)=>{const key=++seq;timers.set(key,{fn,at:clock+delay});return key;},clearTimeout:key=>timers.delete(key)})});
+    probe:async()=>({available:true,authenticated:true}),runner:(host,id,prompt,cwd,timeout,selection,options)=>{
+      const {spawn,...incoming}=options;captureOriginalSpawn=spawn;
+      return f.run(host,id,prompt,cwd,timeout,selection,{...incoming,resolveExecutable:()=>'/fictional/codex',now:()=>clock,
+        setTimeout:(fn,delay)=>{const key=++seq;timers.set(key,{fn,at:clock+delay});return key;},clearTimeout:key=>timers.delete(key)});
+    }});
   const resultPromise=executor.execute({task:{value:{role:'research'}},context:{text:'Exact fixture context'},onProcess:p=>processes.push(p),onClosure:p=>closures.push(p)});
   child.emit('spawn');assert.equal(processes[0].pid,4242);assert.ok(processes[0].execution_deadline_at);
   child.emit('error',new Error('Simulated process failure'));

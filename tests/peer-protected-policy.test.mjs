@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
-import {createPolicySupervisor,inspectOriginalCompiledCodexPlan,claimOriginalCompiledCodexPlan,originalCompiledPeerContextInterpreter} from '../plugins/soloco/runtime/peers/policy-supervisor.mjs';
+import {createPolicySupervisor,inspectOriginalCompiledCodexPlan,claimOriginalCompiledCodexPlan,originalCompiledPeerContextInterpreter,inspectOriginalCompiledBootstrapScope} from '../plugins/soloco/runtime/peers/policy-supervisor.mjs';
+import {isOriginalBootstrapMembershipInterpreter} from '../plugins/soloco/runtime/peers/protected-source-build-slot.mjs';
 
 // Pure policy DATA and rejection tests only. No selected interpreter, compiled
 // plan, original native capability, credential read, process or network exists.
@@ -88,4 +89,18 @@ test('an unprepared compile or forged interpreter cannot issue a companion plan'
 test('serialized plan DATA never replaces an original owner-bound handle',()=>{
   const owner=Symbol('source test owner'),fake=Object.freeze({protocol:'original-compiled-codex-plan-v1',launch_mode:'companion-v2',consumed:false});
   for(const handle of [fake,{},null,undefined])for(const operation of [inspectOriginalCompiledCodexPlan,claimOriginalCompiledCodexPlan,originalCompiledPeerContextInterpreter])assert.throws(()=>operation(owner,handle),code('SUPERVISOR_CODEX_PLAN_REQUIRED'));
+});
+
+test('copied bootstrap descriptor DATA cannot select the private interpreter brand or compile a plan',t=>{
+  const root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'soloco-policy-bootstrap-held-test-')));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const owner=Symbol('synthetic bootstrap policy owner'),supervisor=createPolicySupervisor({owner,directory:root}),p=profile(),request={kind:'codex-companion',cwd:p.cwd,read_paths:[],state_root:p.state_root,scratch_root:p.scratch_root,gateway_port:p.gateway_port};
+  const selection={protocol:'soloco-bootstrap-membership-context-contract-v1',contract_id:'bootstrap-membership-readonly3-whole-assignment-v1',resource_sha256:'cd1ce3adaad300721e47238292ce15dc41f7007b6e415b76c005e93419656ed4',context_encoding:'soloco-peer-context-frame-v2',scope_profile_id:'soloco-bootstrap-membership-readonly3-v1'};
+  for(const copied of [{},selection,JSON.parse(JSON.stringify(selection)),Object.freeze({selection,protocol:'soloco-bootstrap-membership-interpreter-binding-v1'})]){assert.equal(isOriginalBootstrapMembershipInterpreter(copied),false);assert.throws(()=>supervisor.compile(owner,request,{context_interpreter:copied}),code('CONTEXT_INTERPRETER_UNAVAILABLE'));}
+  assert.throws(()=>supervisor.compile(owner,request,{context_interpreter:{},scope_profile_id:selection.scope_profile_id}),code('SUPERVISOR_ARGUMENT'));
+  assert.throws(()=>supervisor.compile(owner,{...request,kind:'bootstrap-companion'},{context_interpreter:{}}),code('SUPERVISOR_ARGUMENT'));
+});
+
+test('bootstrap scope inspection requires the same original compiled plan rather than matching JSON',()=>{
+  const owner=Symbol('synthetic bootstrap plan owner');
+  for(const handle of [{},null,undefined,Object.freeze({protocol:'original-compiled-codex-plan-v1',context_interpreter:{scope_profile_id:'soloco-bootstrap-membership-readonly3-v1'},scope_root:'/SYNTHETIC/scope'})])assert.throws(()=>inspectOriginalCompiledBootstrapScope(owner,handle),code('SUPERVISOR_CODEX_PLAN_REQUIRED'));
 });

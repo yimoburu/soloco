@@ -12,6 +12,8 @@ import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {assertTestFixtureIdentity,prepareTestFixture,cleanupTestFixture,scratchIdentity,fixtureEnvironmentBindings} from './test-fixtures.mjs';
+import {withStore} from './store.mjs';
+import {prepareOriginalWorkerLaunchFrom,spawnOriginalWorkerLaunch,cleanupOriginalWorkerLaunchFailure} from './peers/prospective-local-worker-inventory-producer.mjs';
 
 export const ordinaryExecutionLifecycleProtocol='owned-scratch-close-v1';
 const BACKEND='macos-seatbelt-node';
@@ -255,7 +257,16 @@ export function ordinaryExecutionReceiptMatches(message,expected) {
     return true;
   }catch{return false;}
 }
-export async function runLocalTests({directory,test_paths,timeout_ms=30000,max_output_bytes=100000,signal,testFixture}={}) {
+// The descriptor identifies an existing assignment; it is never a launch token
+// or a caller assertion of capacity. Each process acquires its own opaque token
+// from the actual owning Store transaction at its concrete spawn boundary.
+function spawnDevelopmentExecution(originalExecution,command,args,options){
+  if(originalExecution===undefined)return spawn(command,args,options);
+  if(!closedObject(originalExecution,['root','job_id'])||typeof originalExecution.root!=='string'||!path.isAbsolute(originalExecution.root)||typeof originalExecution.job_id!=='string'||!originalExecution.job_id||originalExecution.job_id.length>200)throw Error('Original development assignment identity required');
+  try{return withStore(originalExecution.root,store=>{let launch;store.transaction('development.execution_launch_requested',state=>{launch=prepareOriginalWorkerLaunchFrom(store,state,{job_id:originalExecution.job_id,kind:'development'});return state;});return spawnOriginalWorkerLaunch(launch,command,args,options);});}
+  catch(error){cleanupOriginalWorkerLaunchFailure(error);throw error;}
+}
+export async function runLocalTests({directory,test_paths,timeout_ms=30000,max_output_bytes=100000,signal,testFixture,originalExecution}={}) {
   const root=checkDirectory(directory);
   if(!Array.isArray(test_paths) || !test_paths.length || test_paths.length>64 || new Set(test_paths).size!==test_paths.length)throw new Error('Supply 1 to 64 unique test paths');
   const paths=test_paths.map(file=>{
@@ -276,12 +287,12 @@ export async function runLocalTests({directory,test_paths,timeout_ms=30000,max_o
       {local_execution:unknownExecution(owned,binding,'No matching trusted closure receipt; remaining scratch is retained, but a live watchdog may later clean after close')})});
   try {
     owned=scratchIdentity(scratch);
-    const payload={root,scratch,paths,timeout_ms,max_output_bytes,scratch_identity:owned,...(fixture?{testFixture:fixture}:{})};
+    const payload={root,scratch,paths,timeout_ms,max_output_bytes,scratch_identity:owned,...(fixture?{testFixture:fixture}:{}),...(originalExecution===undefined?{}:{original_execution:originalExecution})};
     const request={protocol:ordinaryExecutionLifecycleProtocol,request_id:randomBytes(32).toString('hex'),
       runner_sha256:runnerSourceSha256(),request_sha256:cryptoHash(JSON.stringify(payload)),controller_pid:process.pid};
     return await new Promise(resolve=>{
       let done=false,sandboxPid=null,errorText='',fixtureSetup=null,ready=false;
-      const helper=spawn(node,[fileURLToPath(import.meta.url),'--watch-tests',JSON.stringify({request,payload})],{env:{PATH:'/usr/bin:/bin',OPENSSL_CONF:'/dev/null'},stdio:['ignore','ignore','pipe','ipc'],detached:true});
+      const helper=spawnDevelopmentExecution(originalExecution,node,[fileURLToPath(import.meta.url),'--watch-tests',JSON.stringify({request,payload})],{env:{PATH:'/usr/bin:/bin',OPENSSL_CONF:'/dev/null'},stdio:['ignore','ignore','pipe','ipc'],detached:true});
       binding={...request,watchdog_pid:helper.pid??null};
       const abort=()=>{try{if(helper.connected)helper.send({type:'abort',binding},()=>{});}catch{}};
       const finish=result=>{
@@ -316,7 +327,7 @@ export async function runLocalTests({directory,test_paths,timeout_ms=30000,max_o
   }catch(error){return failed(String(error.message));}
   // Deliberately no parent cleanup: even an error/timeout/exit is not child close.
 }
-async function executeTests({root,scratch,paths,timeout_ms,max_output_bytes,signal,onStart,onPrepared,testFixture,scratch_identity},binding) {
+async function executeTests({root,scratch,paths,timeout_ms,max_output_bytes,signal,onStart,onPrepared,testFixture,scratch_identity,original_execution},binding) {
   const started=Date.now(),childEvidence=emptyChild();
   let fixtureSetup=null,result;
   const baseError=error=>({status:'error',exit_code:null,signal:null,stdout:'',stderr:'',duration_ms:Date.now()-started,isolation:BACKEND,tests_executed:false,test_execution_attempted:childEvidence.launch_attempted,output_truncated:false,output_bytes:{captured:0,observed:0},error:String(error.message),limits:{timeout_ms,max_output_bytes}});
@@ -334,7 +345,7 @@ async function executeTests({root,scratch,paths,timeout_ms,max_output_bytes,sign
       result=await new Promise(resolve=>{
         let reason=null,size=0,out=[],err=[],done=false,exited=false,spawnError=null;
         childEvidence.launch_attempted=true;
-        const child=spawn('/usr/bin/sandbox-exec',args,{cwd:root,env,stdio:['ignore','pipe','pipe'],detached:true});
+        const child=spawnDevelopmentExecution(original_execution,'/usr/bin/sandbox-exec',args,{cwd:root,env,stdio:['ignore','pipe','pipe'],detached:true});
         const stop=why=>{if(done)return;if(!reason)reason=why;if(exited)return;
           try{if(positivePid(child.pid))process.kill(-child.pid,'SIGKILL');else child.kill('SIGKILL');}catch{try{child.kill('SIGKILL');}catch{}}};
         child.once('exit',()=>{exited=true;});
@@ -383,7 +394,7 @@ function watchdogRequest(value) {
   if(!closedObject(request,['protocol','request_id','runner_sha256','request_sha256','controller_pid'])||
     request.protocol!==ordinaryExecutionLifecycleProtocol||!hex64(request.request_id)||!positivePid(request.controller_pid)||request.controller_pid!==process.ppid||
     request.runner_sha256!==runnerSourceSha256()||request.request_sha256!==cryptoHash(JSON.stringify(payload)))throw Error('Watchdog request source or freshness binding mismatch');
-  const keys=['root','scratch','paths','timeout_ms','max_output_bytes','scratch_identity',...(Object.hasOwn(payload,'testFixture')?['testFixture']:[])];
+  const keys=['root','scratch','paths','timeout_ms','max_output_bytes','scratch_identity',...(Object.hasOwn(payload,'testFixture')?['testFixture']:[]),...(Object.hasOwn(payload,'original_execution')?['original_execution']:[])];
   if(!closedObject(payload,keys)||typeof payload.root!=='string'||!path.isAbsolute(payload.root)||fs.realpathSync(payload.root)!==payload.root||
     payload.scratch!==path.join(payload.root,'.scratch')||!closedObject(payload.scratch_identity,['path','dev','ino'])||
     payload.scratch_identity.path!==payload.scratch||!/^\d+$/.test(payload.scratch_identity.dev)||!/^\d+$/.test(payload.scratch_identity.ino)||
@@ -392,6 +403,7 @@ function watchdogRequest(value) {
     !Number.isInteger(payload.timeout_ms)||payload.timeout_ms<100||payload.timeout_ms>300000||
     !Number.isInteger(payload.max_output_bytes)||payload.max_output_bytes<1024||payload.max_output_bytes>1000000)throw Error('Malformed bounded watchdog payload');
   if(payload.testFixture!==undefined)assertTestFixtureIdentity(payload.testFixture);
+  if(payload.original_execution!==undefined&&(!closedObject(payload.original_execution,['root','job_id'])||typeof payload.original_execution.root!=='string'||!path.isAbsolute(payload.original_execution.root)||typeof payload.original_execution.job_id!=='string'||!payload.original_execution.job_id||payload.original_execution.job_id.length>200))throw Error('Original development assignment identity required');
   return {payload,binding:{...request,watchdog_pid:process.pid}};
 }
 if(process.argv[1] && path.resolve(process.argv[1])===fileURLToPath(import.meta.url) && process.argv[2]==='--watch-tests') {

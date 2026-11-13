@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {parseOriginalControlFrame,createOriginalControlTranscript} from '../plugins/soloco/runtime/peers/protected-context-channel.mjs';
+import {parseOriginalControlFrame,createOriginalControlTranscript,parseOriginalBootstrapControlFrame,createOriginalBootstrapControlTranscript} from '../plugins/soloco/runtime/peers/protected-context-channel.mjs';
 
 // Every identity and frame in this suite is SYNTHETIC transcript DATA. No child,
 // pipe, compiler, provider, original bootstrap, runtime capability or native
@@ -196,4 +196,34 @@ test('wrapped final-request parsing remains DATA for the separate domain validat
   const parsed=parseOriginalControlFrame(envelope(value));assert.deepEqual(parsed.observation,value);
   const channel=bootstrapped();rejects(()=>channel.acceptFrame(envelope(value)),'PROTECTED_CONTEXT_SEQUENCE');
   assert.equal(channel.inspect().context_permits_generated,0);
+});
+
+function bootstrapScoped(expected=bindings()){
+  return {...scoped(expected),context_contract_protocol:'soloco-bootstrap-membership-context-contract-v1',context_contract_id:'bootstrap-membership-readonly3-whole-assignment-v1',context_contract_sha256:'cd1ce3adaad300721e47238292ce15dc41f7007b6e415b76c005e93419656ed4',scope_profile_id:'soloco-bootstrap-membership-readonly3-v1'};
+}
+function bootstrapTranscript(){const channel=createOriginalBootstrapControlTranscript(bindings());channel.challengeBytes();channel.noteInitializeSent();channel.acceptFrame(line(bootstrap()));return channel;}
+
+test('fixed bootstrap transcript selects its own complete descriptor and raw observation binding',()=>{
+  const channel=createOriginalBootstrapControlTranscript(bindings()),challenge=JSON.parse(channel.challengeBytes());
+  assert.deepEqual(challenge.context_contract,{protocol:'soloco-bootstrap-membership-context-contract-v1',contract_id:'bootstrap-membership-readonly3-whole-assignment-v1',resource_sha256:'cd1ce3adaad300721e47238292ce15dc41f7007b6e415b76c005e93419656ed4',context_encoding:'soloco-peer-context-frame-v2',scope_profile_id:'soloco-bootstrap-membership-readonly3-v1'});
+  channel.noteInitializeSent();channel.acceptFrame(line(bootstrap()));const value=bootstrapScoped(),raw=JSON.stringify(value).replace('"slot_id":','"slot_id" : '),parsed=parseOriginalBootstrapControlFrame(envelope(value,raw));
+  assert.deepEqual(parsed.rawObservation,Buffer.from(raw));assert.notEqual(parsed.binding_sha256,sha(JSON.stringify(value)));
+  const accepted=channel.acceptFrame(envelope(value,raw)),permit=JSON.parse(accepted.permitBytes);assert.equal(permit.context_contract_sha256,challenge.context_contract.resource_sha256);assert.equal(permit.binding_sha256,sha(Buffer.from(raw)));channel.noteContextPermitSent();assert.equal(channel.inspect().phase,'CONTEXT_ACKNOWLEDGED');
+});
+
+test('ordinary and bootstrap transcript constructors cannot infer or accept the other profile',()=>{
+  rejects(()=>parseOriginalControlFrame(envelope(bootstrapScoped())),'PROTECTED_CONTEXT_FRAME_INVALID');rejects(()=>parseOriginalBootstrapControlFrame(envelope(scoped())),'PROTECTED_CONTEXT_FRAME_INVALID');
+  const ordinary=bootstrapped(),boot=bootstrapTranscript();rejects(()=>ordinary.acceptFrame(envelope(bootstrapScoped())),'PROTECTED_CONTEXT_FRAME_INVALID');rejects(()=>boot.acceptFrame(envelope(scoped())),'PROTECTED_CONTEXT_FRAME_INVALID');
+  assert.equal(ordinary.inspect().phase,'POISONED');assert.equal(boot.inspect().phase,'POISONED');
+  rejects(()=>createOriginalBootstrapControlTranscript(bindings(),scoped()),'PROTECTED_CONTEXT_EXPECTED_INVALID');
+  rejects(()=>parseOriginalBootstrapControlFrame(envelope(bootstrapScoped()),scoped()),'PROTECTED_CONTEXT_EXPECTED_INVALID');
+  rejects(()=>createOriginalBootstrapControlTranscript({...bindings(),context_contract:scoped()}),'PROTECTED_CONTEXT_EXPECTED_INVALID');
+});
+
+test('bootstrap raw duplicate selector binding mutation and permit replay remain terminal failures',()=>{
+  const value=bootstrapScoped(),raw=JSON.stringify(value),duplicate=raw.replace('"scope_profile_id":','"scope_\\u0070rofile_id":"soloco-bootstrap-membership-readonly3-v1","scope_profile_id":');
+  rejects(()=>parseOriginalBootstrapControlFrame(envelope(value,duplicate)),'PROTECTED_CONTEXT_FRAME_INVALID');
+  rejects(()=>parseOriginalBootstrapControlFrame(Buffer.from('{"binding_sha256":"'+sha('foreign')+'","observation":'+raw+'}\n')),'PROTECTED_CONTEXT_BINDING_MISMATCH');
+  const changed={...value,context_contract_sha256:'f'.repeat(64)};rejects(()=>parseOriginalBootstrapControlFrame(envelope(changed)),'PROTECTED_CONTEXT_FRAME_INVALID');
+  const channel=bootstrapTranscript();channel.acceptFrame(envelope(value));rejects(()=>channel.acceptFrame(envelope(value)),'PROTECTED_CONTEXT_SEQUENCE');assert.equal(channel.inspect().context_permits_generated,1);assert.equal(channel.inspect().phase,'POISONED');
 });

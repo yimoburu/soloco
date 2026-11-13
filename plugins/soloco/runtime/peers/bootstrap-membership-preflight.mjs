@@ -44,3 +44,9 @@ export function inspectOriginalBootstrapMembershipPreflight(plan){
  if(canonical(association(original.interpreter))!==original.association)fail('BOOTSTRAP_PREFLIGHT_INTERPRETER_CHANGED');
  return Object.freeze({...original.receipt});
 }
+// Internal original-handle joins. Inspection JSON and the pure formatter cannot
+// supply these values; every lookup rechecks the original source association.
+function originalPlan(plan){const original=plans.get(plan);if(!original)fail('BOOTSTRAP_PREFLIGHT_ORIGINAL_PLAN_REQUIRED');if(canonical(association(original.interpreter))!==original.association)fail('BOOTSTRAP_PREFLIGHT_INTERPRETER_CHANGED');return original;}
+export function originalBootstrapMembershipPreflightInterpreter(plan){return originalPlan(plan).interpreter;}
+export function originalBootstrapMembershipPreflightInput(plan){const original=originalPlan(plan);return Object.freeze(original.geometry.input.map(item=>Object.freeze({...item})));}
+export function assertOriginalBootstrapMembershipPreflightInput(plan,input){const original=originalPlan(plan);if(canonical(original.geometry.input)!==canonical(input))fail('BOOTSTRAP_PREFLIGHT_INPUT_CHANGED');return Object.freeze({...original.receipt});}

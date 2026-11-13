@@ -7,19 +7,20 @@ import * as deployment from './context-component-deployment.mjs';
 import * as domain from './protected-codex-domain.mjs';
 import {inspectPeerPinnedTeamFrom,legacyEncodedReplyBytes,legacyReadReplyHold} from './legacy-origin.mjs';
 import {originSidecars,assertOriginActor} from './origin-plan.mjs';
+import * as origin from './origin-quarantine.mjs';
 import {readPeerInputOriginArchiveBodyFrom} from './input-frontier-archive.mjs';
+import {assertOriginalPeerMaintenanceExecutionCapacityFrom as assertInventory,assertOriginalPeerMaintenanceExecutionCapacityInTransactionFrom as assertInventoryInTransaction,prepareOriginalPeerExecutionLaunchFrom as prepareInventoryLaunch} from './prospective-local-worker-inventory-producer.mjs';
 import {INPUT_FRONTIER,FRONTIER_CONTEXT,FRONTIER_LIMITS,FRONTIER_INSTRUCTION,capturePeerInputFrontierFrom,buildPeerInputFrontier,peerInputFrontierContext,peerInputArchiveGapSource,validatePeerInputFrontierOutput,isPeerInputFrontierValidationError,frontierCopy as copy,frontierSame as same,frontierRef as ref,frontierNeed as need,frontierData as data,frontierRows as rows,frontierHash as hash} from './input-frontier.mjs';
 // A fixed source dependency, never a caller validator. Missing source is a Hold
 // at use; importing this preparation module does not initialize a company.
 function fixedOptionalEntry(relative){const entry=fs.lstatSync(new URL(relative,import.meta.url),{throwIfNoEntry:false});if(entry===undefined)return false;need(entry.isFile()&&!entry.isSymbolicLink(),'FRONTIER_OPTIONAL_SOURCE_ENTRY_REQUIRED');return true;}
-let origin;
-if(fixedOptionalEntry('./origin-quarantine.mjs'))origin=await import('./origin-quarantine.mjs');
 let selectedAuthority;
 if(fixedOptionalEntry('./origin-maintenance-authority.mjs'))selectedAuthority=await import('./origin-maintenance-authority.mjs');
 const apis=new WeakMap(),caps=new WeakMap(),consumed=new WeakSet(),key=(f,id)=>canonical([f,id]);
 const custodyChecks=new WeakMap();
 const bytes=v=>Buffer.byteLength(canonical(v));
 const text=v=>typeof v==='string'&&v.trim()&&v.length<=4000&&!v.includes('\0');
+function readLive(r,fn){return r.s.ledger.read(raw=>{assertInventoryInTransaction(r.s.ledger,raw,{stage:'existing',admission_ref:r.admission_ref});return fn(raw);});}
 function exact(tx,r,kind){const row=tx.getVersion(r);need(row&&row.sha256===r.sha256&&peerDigest(row.value)===r.sha256&&(!kind||row.value.kind===kind),'FRONTIER_PROOF_CHANGED');return row;}
 function service(api){const s=apis.get(api);need(s,'FRONTIER_ORIGINAL_SERVICE_REQUIRED');return s;}
 function bound(s){for(const name of ['root','directory','company_id'])need(Object.getOwnPropertyDescriptor(s.ledger,name)?.value===s.connection[name],'FRONTIER_CONNECTION_CHANGED');}
@@ -49,8 +50,10 @@ function current(s,tx){
 // Read-first plan and terminal physical gate. Every namespace row is watched;
 // unrecognized/reentrant additions poison the snapshot rather than disappearing.
 function write(s,type,build,deadline=Date.now()+120000,principal='founder'){
- bound(s);let expected,sidecars,cutoff=deadline??Date.now()+120000;
+ bound(s);let expected,sidecars,inventoryRef,cutoff=deadline??Date.now()+120000;
+ const admitting=type==='input-frontier.admitted',inventoryChecked=admitting||['input-frontier.created','input-frontier.completed'].includes(type);
  return s.ledger.guardedWrite(type,principal,raw=>{
+  if(admitting)assertInventoryInTransaction(s.ledger,raw,{stage:'reserve'});
   if(principal==='founder'){const c=raw.get('control','company'),p=c&&raw.get('principals',c.value.founder_principal_id);need(p?.value.kind==='founder'&&p.value.status==='active'&&p.value.host===s.actor.host&&p.value.native_id===s.actor.native_id&&p.value.legacy_owner?.session_id===s.actor.session_id,'FRONTIER_OWNER_CHANGED');}
   sidecars=originSidecars(s.connection.directory);
   const cache=new Map(),changes=[],events=[];let count=0,total=0;
@@ -60,10 +63,10 @@ function write(s,type,build,deadline=Date.now()+120000,principal='founder'){
    getVersion(r){const found=cache.get(key(r.family,r.id))?.row;if(found&&same(ref(r.family,found),r))return {family:r.family,...copy(found)};return raw.getVersion(r);},
    list(f,{limit=100,cursor}={}){const list=[...cache.values()].filter(v=>v.family===f&&v.row).map(v=>v.row).sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0),n=cursor?Number(cursor):0;need(Number.isSafeInteger(n)&&n>=0,'FRONTIER_CURSOR');return {items:copy(list.slice(n,n+limit)),complete:n+limit>=list.length,next_cursor:n+limit<list.length?String(n+limit):null};},
    put(f,id,value,revision){const before=this.get(f,id);need(revision===(before?.revision??0),'FRONTIER_PLAN_CHANGED');const row={id,revision:(before?.revision??0)+1,sha256:peerDigest(value),created_seq:before?.created_seq??raw.sequence,value:copy(value)};changes.push({f,id,value:row.value,revision,row});cache.set(key(f,id),{family:f,id,row});return copy(row);},event(type,payload){events.push({type,payload:copy(payload)});},deadline(value){need(Number.isSafeInteger(value),'FRONTIER_DEADLINE');cutoff=Math.min(cutoff,value);}};
-  const result=build(tx);raw.getVersion(ref('control',control));expected=[...cache.values()];
+  const result=build(tx);if(inventoryChecked){const phases=changes.filter(c=>c.f==='work_items'&&c.value.kind==='input_frontier_phase');need(phases.length===1,'FRONTIER_EXECUTION_INVENTORY_ADMISSION_REQUIRED');inventoryRef=copy(phases[0].value.admission_ref);if(!admitting)assertInventoryInTransaction(s.ledger,raw,{stage:'existing',admission_ref:inventoryRef});}raw.getVersion(ref('control',control));expected=[...cache.values()];
   for(const c of changes){const row=raw.put(c.f,c.id,c.value,c.revision);need(same(row,c.row),'FRONTIER_PLAN_CHANGED');}
-  for(const e of events)raw.event(e.type,e.payload);need(typeof raw.sealWrites==='function','FRONTIER_PHYSICAL_COMMIT_REQUIRED');raw.sealWrites();for(const v of expected)need(same(raw.get(v.family,v.id),v.row),'FRONTIER_CURRENT_CHANGED');return copy(result===undefined?null:result);
- },view=>{bound(s);for(const v of expected)need(same(view.get(v.family,v.id),v.row),'FRONTIER_CURRENT_CHANGED');need(same(originSidecars(s.connection.directory),sidecars),'FRONTIER_LATE_SIDECAR_UNRECORDED');need(typeof origin?.assertPeerOriginLegacyFences==='function','FRONTIER_ORIGIN_SOURCE_REQUIRED');origin.assertPeerOriginLegacyFences(s.ledger.db);return cutoff;});
+  for(const e of events)raw.event(e.type,e.payload);if(admitting)prepareInventoryLaunch(s.ledger,raw,{admission_ref:inventoryRef});need(typeof raw.sealWrites==='function','FRONTIER_PHYSICAL_COMMIT_REQUIRED');raw.sealWrites();for(const v of expected)need(same(raw.get(v.family,v.id),v.row),'FRONTIER_CURRENT_CHANGED');return copy(result===undefined?null:result);
+ },view=>{bound(s);for(const v of expected)need(same(view.get(v.family,v.id),v.row),'FRONTIER_CURRENT_CHANGED');if(inventoryRef)assertInventoryInTransaction(s.ledger,view,{stage:'existing',admission_ref:inventoryRef});need(same(originSidecars(s.connection.directory),sidecars),'FRONTIER_LATE_SIDECAR_UNRECORDED');need(typeof origin?.assertPeerOriginLegacyFences==='function','FRONTIER_ORIGIN_SOURCE_REQUIRED');origin.assertPeerOriginLegacyFences(s.ledger.db);return cutoff;});
 }
 function sourceSupport(){need(typeof deployment.inspectOriginalInputFrontierSupport==='function','FRONTIER_NATIVE_SOURCE_UNAVAILABLE');const v=deployment.inspectOriginalInputFrontierSupport();need(v?.protocol===FRONTIER_CONTEXT&&/^[a-f0-9]{64}$/.test(v.bridge_sha256??'')&&v.creation_mode==='fresh-original-protected-thread','FRONTIER_NATIVE_SOURCE_UNAVAILABLE');return copy(v);}
 function preflight(context){
@@ -216,6 +219,7 @@ function proof(tx,f,node_id,stage){const matches=f.results.filter(v=>v.node_id==
 
 export function prepareOriginalPeerInputFrontier(api,input){
  const s=service(api),a=data(input,['operation_id','frontier_id','node_id','stage']);need(text(a.operation_id)&&['produce','review'].includes(a.stage),'FRONTIER_INPUT');const fingerprint=peerDigest(a),prior=s.operations.get(a.operation_id);if(prior){need(prior.fingerprint===fingerprint,'FRONTIER_REPLAY_MISMATCH');assertOriginalPeerInputFrontier(prior.cap,{stage:original(prior.cap).native?'execution':'reserved'});return prior.cap;}
+ assertInventory(s.ledger,{stage:'reserve'});
  const support=sourceSupport(),cap=Object.freeze({});let record,deadline;
  write(s,'input-frontier.admitted',tx=>{
   const {c,o,m,p,f,frontier,selected}=liveFrontier(s,tx,a.frontier_id),index=operationId(s,a.operation_id),persisted=tx.get('commands',index);if(persisted){need(persisted.value.kind==='input_frontier_operation'&&persisted.value.request_sha256===fingerprint&&persisted.value.operation==='admit','FRONTIER_REPLAY_MISMATCH');need(false,'FRONTIER_ORIGINAL_PROCESS_CONTINUATION_REQUIRED');}
@@ -251,19 +255,19 @@ export function prepareOriginalPeerInputFrontier(api,input){
 }
 export function inspectOriginalPeerInputFrontier(cap){const r=original(cap);return {...copy(r.binding),admission_ref:copy(r.admission_ref),native_id:r.native?.native_id??null};}
 export function originalPeerInputFrontierPreflight(cap){const r=original(cap);assertOriginalPeerInputFrontier(cap,{stage:r.native?'execution':'reserved'});deployment.inspectOriginalInputFrontierPreflight(r.wire.plan);return r.wire.plan;}
-export function assertOriginalPeerInputFrontier(cap,{ledger,stage='execution'}={}){const r=original(cap,{ledger});need(['execution','reserved'].includes(stage),'FRONTIER_INPUT');return r.s.ledger.read(tx=>{admitted(r,tx,{native:stage==='execution'});return inspectOriginalPeerInputFrontier(cap);});}
-export function prepareOriginalPeerInputFrontierContext(cap){const r=original(cap);return r.s.ledger.read(tx=>{const {context}=admitted(r,tx);return {text:context.value.text,sha256:context.value.sha256,utf8_bytes:Buffer.byteLength(context.value.text),context_ref:r.binding.context_ref,review_subject:r.binding.subject};});}
+export function assertOriginalPeerInputFrontier(cap,{ledger,stage='execution'}={}){const r=original(cap,{ledger});need(['execution','reserved'].includes(stage),'FRONTIER_INPUT');return readLive(r,tx=>{admitted(r,tx,{native:stage==='execution'});return inspectOriginalPeerInputFrontier(cap);});}
+export function prepareOriginalPeerInputFrontierContext(cap){const r=original(cap);return readLive(r,tx=>{const {context}=admitted(r,tx);return {text:context.value.text,sha256:context.value.sha256,utf8_bytes:Buffer.byteLength(context.value.text),context_ref:r.binding.context_ref,review_subject:r.binding.subject};});}
 export function bindOriginalPeerInputFrontierNative(cap,creationToken){
- const r=original(cap);need(!r.native&&!r.finished&&typeof domain.assertOriginalProtectedInputFrontierCreation==='function','FRONTIER_ORIGINAL_CREATION_REQUIRED');const facts=domain.assertOriginalProtectedInputFrontierCreation(creationToken,{ledger:r.s.ledger,admission_ref:r.admission_ref,context_sha256:r.binding.context_sha256,kind:r.binding.kind});
+ const r=original(cap);assertInventory(r.s.ledger,{stage:'existing',admission_ref:r.admission_ref});need(!r.native&&!r.finished&&typeof domain.assertOriginalProtectedInputFrontierCreation==='function','FRONTIER_ORIGINAL_CREATION_REQUIRED');const facts=domain.assertOriginalProtectedInputFrontierCreation(creationToken,{ledger:r.s.ledger,admission_ref:r.admission_ref,context_sha256:r.binding.context_sha256,kind:r.binding.kind});
  need(facts?.protocol==='peer-input-frontier-original-creation-v1'&&facts.profile_id==='soloco-input-frontier-readonly-v1'&&facts.kind===r.binding.kind&&same(facts.admission_ref,r.admission_ref)&&facts.context_sha256===r.binding.context_sha256&&/^[A-Za-z0-9_.:-]{1,300}$/.test(facts.native_id??'')&&facts.native_id===facts.thread_id&&facts.native_id!==r.s.actor.native_id,'FRONTIER_ORIGINAL_CREATION_REQUIRED');
  let creation_ref;write(r.s,'input-frontier.created',tx=>{const {f,phase,context,frontier}=admitted(r,tx);const prohibited=sourceNatives(frontier);for(const native of f.created_natives)prohibited.add(native);prohibited.add(r.s.actor.native_id);for(const child of context.value.body.children)for(const stage of ['produce','review'])for(const native of proof(tx,f,child.node_id,stage).contributors)prohibited.add(native);if(context.value.body.producer)for(const native of proof(tx,f,r.binding.node_id,'produce').contributors)prohibited.add(native);need(!prohibited.has(facts.native_id),'FRONTIER_REVIEW_INDEPENDENCE');f.created_natives.push(facts.native_id);
   const row=tx.put('work_items',r.execution_id+':creation',{kind:'input_frontier_creation',frontier_id:f.id,admission_ref:r.admission_ref,context_sha256:r.binding.context_sha256,facts:copy(facts)},0);creation_ref=ref('work_items',row);addOwn(f,'work_items',row.id);tx.put('work_items',phase.id,{...phase.value,status:'running',native_id:facts.native_id,creation_ref},phase.revision);store(r.s,tx,f.id,f);
  },r.binding.deadline_at_ms);r.native={...copy(facts),creation_ref};return inspectOriginalPeerInputFrontier(cap);
 }
 export function originalPeerInputFrontierChannel(cap){const r=original(cap);return Object.freeze({
- header(){return r.s.ledger.read(tx=>{const {context}=admitted(r,tx,{native:true});return {sha256:context.value.sha256,total_characters:context.value.text.length,utf8_bytes:Buffer.byteLength(context.value.text),context_ref:r.binding.context_ref,review_subject:r.binding.subject};});},
- read(input){const a=data(input,['sha256','offset','length']);return r.s.ledger.read(tx=>{const {context}=admitted(r,tx,{native:true}),body=context.value.text;need(a.sha256===context.value.sha256&&Number.isSafeInteger(a.offset)&&a.offset>=0&&Number.isSafeInteger(a.length)&&a.length>0&&a.length<=4096&&a.offset+a.length<=body.length,'FRONTIER_RANGE');for(const n of [a.offset,a.offset+a.length])need(!(n>0&&n<body.length&&/[\uD800-\uDBFF]/.test(body[n-1])&&/[\uDC00-\uDFFF]/.test(body[n])),'FRONTIER_RANGE');r.reads.push([a.offset,a.offset+a.length]);return {sha256:a.sha256,offset:a.offset,length:a.length,text:body.slice(a.offset,a.offset+a.length)};});},
- submit(input){const a=data(input,['sha256','content']);return r.s.ledger.read(tx=>{const {context}=admitted(r,tx,{native:true});need(a.sha256===context.value.sha256&&covered(r.reads,context.value.text.length),'FRONTIER_DELIVERY_INCOMPLETE');need(typeof a.content==='string'&&Buffer.byteLength(a.content)<=FRONTIER_LIMITS.output_bytes,'FRONTIER_OUTPUT_CAPACITY');need(r.submission===null||r.submission===a.content,'FRONTIER_OUTPUT_IMMUTABLE');r.submission=a.content;return {submitted:true,sha256:hash(a.content)};});}
+ header(){return readLive(r,tx=>{const {context}=admitted(r,tx,{native:true});return {sha256:context.value.sha256,total_characters:context.value.text.length,utf8_bytes:Buffer.byteLength(context.value.text),context_ref:r.binding.context_ref,review_subject:r.binding.subject};});},
+ read(input){const a=data(input,['sha256','offset','length']);return readLive(r,tx=>{const {context}=admitted(r,tx,{native:true}),body=context.value.text;need(a.sha256===context.value.sha256&&Number.isSafeInteger(a.offset)&&a.offset>=0&&Number.isSafeInteger(a.length)&&a.length>0&&a.length<=4096&&a.offset+a.length<=body.length,'FRONTIER_RANGE');for(const n of [a.offset,a.offset+a.length])need(!(n>0&&n<body.length&&/[\uD800-\uDBFF]/.test(body[n-1])&&/[\uDC00-\uDFFF]/.test(body[n])),'FRONTIER_RANGE');r.reads.push([a.offset,a.offset+a.length]);return {sha256:a.sha256,offset:a.offset,length:a.length,text:body.slice(a.offset,a.offset+a.length)};});},
+ submit(input){const a=data(input,['sha256','content']);return readLive(r,tx=>{const {context}=admitted(r,tx,{native:true});need(a.sha256===context.value.sha256&&covered(r.reads,context.value.text.length),'FRONTIER_DELIVERY_INCOMPLETE');need(typeof a.content==='string'&&Buffer.byteLength(a.content)<=FRONTIER_LIMITS.output_bytes,'FRONTIER_OUTPUT_CAPACITY');need(r.submission===null||r.submission===a.content,'FRONTIER_OUTPUT_IMMUTABLE');r.submission=a.content;return {submitted:true,sha256:hash(a.content)};});}
 });}
 export async function completeOriginalPeerInputFrontier(cap,drainToken){
  const r=original(cap);need(!r.finished&&r.native&&typeof domain.assertOriginalProtectedOwnedTaskDrain==='function'&&!consumed.has(drainToken),'FRONTIER_ORIGINAL_DRAIN_REQUIRED');const facts=domain.assertOriginalProtectedOwnedTaskDrain(drainToken,{ledger:r.s.ledger,admission_ref:r.admission_ref,context_sha256:r.binding.context_sha256,kind:r.binding.kind});

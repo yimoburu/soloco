@@ -17,26 +17,101 @@ const BOOTSTRAP_RESOURCE_SHA256:&str="cd1ce3adaad300721e47238292ce15dc41f7007b6e
 const BOOTSTRAP_PROTOCOL:&str="soloco-bootstrap-membership-context-contract-v1";
 const BOOTSTRAP_CORE_ID:&str="bootstrap-membership-readonly3-whole-assignment-v1";
 const BOOTSTRAP_PROFILE:&str="soloco-bootstrap-membership-readonly3-v1";
+const FRONTIER_RESOURCE:&[u8]=include_bytes!("input_frontier_readonly3_contract_v1.json");
+const FRONTIER_RESOURCE_SHA256:&str="b15ae178857196eac75123652817c1673a2e4941b409f6d5cbb72225800f7863";
+const FRONTIER_PROTOCOL:&str="soloco-input-frontier-context-contract-v1";
+const FRONTIER_CORE_ID:&str="input-frontier-readonly3-whole-assignment-v1";
+const FRONTIER_PROFILE:&str="soloco-input-frontier-readonly-v1";
+const ORIGIN_MAINTENANCE_RESOURCE:&[u8]=include_bytes!("origin_maintenance_readonly3_contract_v1.json");
+const ORIGIN_MAINTENANCE_RESOURCE_SHA256:&str="a7f744362c1404a1ae67ca6e5c3bf1b63c3c0fab99b9ad996db0f1265757c824";
+const ORIGIN_MAINTENANCE_PROTOCOL:&str="soloco-origin-maintenance-context-contract-v1";
+const ORIGIN_MAINTENANCE_CORE_ID:&str="origin-maintenance-readonly3-whole-assignment-v1";
+const ORIGIN_MAINTENANCE_PROFILE:&str="soloco-origin-maintenance-readonly-v1";
+const ORIGIN_FINAL_REVIEW_RESOURCE:&[u8]=include_bytes!("origin_final_review_readonly3_contract_v1.json");
+const ORIGIN_FINAL_REVIEW_RESOURCE_SHA256:&str="d7939b68fb44e4dee524ec7774e080b0d6f4b40c1493f37737eb67b1f1efa3fd";
+const ORIGIN_FINAL_REVIEW_PROTOCOL:&str="soloco-origin-final-review-context-contract-v1";
+const ORIGIN_FINAL_REVIEW_CORE_ID:&str="origin-final-review-readonly3-whole-assignment-v1";
+const ORIGIN_FINAL_REVIEW_PROFILE:&str="soloco-origin-final-review-readonly-v1";
+
 
 /// Fixed constructor selections, never inferred from payloads or a caller's
 /// arbitrary tool subset. The original startup retains exactly one selection.
 #[derive(Clone,Copy,PartialEq,Eq)]
-pub(super) enum OriginalToolProfile {OrdinaryFive,BootstrapReadonlyThree}
+pub(super) enum OriginalToolProfile {OrdinaryFive,BootstrapReadonlyThree,InputFrontierReadonlyThree,OriginMaintenanceReadonlyThree,OriginFinalReviewReadonlyThree}
 impl OriginalToolProfile {
     pub(super) fn resource_sha256(self)->String {match self {
         Self::OrdinaryFive=>hash(include_bytes!("../protected_peer_responses_tools.json")),
         Self::BootstrapReadonlyThree=>BOOTSTRAP_RESOURCE_SHA256.into(),
+        Self::InputFrontierReadonlyThree=>FRONTIER_RESOURCE_SHA256.into(),
+        Self::OriginMaintenanceReadonlyThree=>ORIGIN_MAINTENANCE_RESOURCE_SHA256.into(),
+        Self::OriginFinalReviewReadonlyThree=>ORIGIN_FINAL_REVIEW_RESOURCE_SHA256.into(),
     }}
     pub(super) fn offered_inventory(self)->Result<serde_json::Value,TransportError> {match self {
         Self::OrdinaryFive=>serde_json::from_slice(include_bytes!("../protected_peer_responses_tools.json"))
             .map_err(|_|hold("compiled ordinary tool resource")),
         Self::BootstrapReadonlyThree=>{
             let resource=bootstrap_source_resource()?;
-            Ok(serde_json::Value::Array(resource.tools.into_iter().map(|tool|serde_json::json!({
-                "type":tool.kind,"name":tool.name,"description":tool.description,
-                "parameters":tool.input_schema,"strict":false})).collect()))
+            let mut tools=Vec::with_capacity(resource.tools.len());
+            for tool in resource.tools {
+                let parameters=bootstrap_parameters(&tool.input_schema)?;
+                tools.push(serde_json::json!({"type":tool.kind,"name":tool.name,
+                    "description":tool.description,"parameters":parameters,"strict":false}));
+            }
+            Ok(serde_json::Value::Array(tools))
         }
+        Self::InputFrontierReadonlyThree=>{
+            let resource=frontier_source_resource()?;
+            let tools=resource.tools.into_iter().map(|tool|Ok(serde_json::json!({
+                "type":tool.kind,"name":tool.name,"description":tool.description,
+                "parameters":frontier_parameters(&tool.input_schema)?,"strict":false})))
+                .collect::<Result<Vec<_>,TransportError>>()?;
+            Ok(serde_json::Value::Array(tools))
+        }
+        Self::OriginMaintenanceReadonlyThree=>origin_inventory(origin_maintenance_source_resource()?),
+        Self::OriginFinalReviewReadonlyThree=>origin_inventory(origin_final_review_source_resource()?),
     }}
+}
+
+// Fixed c407 materialization of this pinned bootstrap resource only, not a
+// general schema converter. The actual dynamic-tool parser deserializes each
+// node into codex_tools::JsonSchema, which has no numeric minimum/maximum
+// fields. Keep those original bounds in the resource and channel callbacks;
+// they are absent only from the actual Responses parameters being compared.
+fn bootstrap_parameters(input:&serde_json::Value)->Result<serde_json::Value,TransportError> {
+    let schema=input.as_object().ok_or_else(||hold("closed bootstrap parameters"))?;
+    let kind=schema.get("type").and_then(serde_json::Value::as_str)
+        .ok_or_else(||hold("bootstrap parameter type"))?;
+    match kind {
+        "object"=>{
+            if schema.len()!=4||schema.keys().any(|key|!matches!(key.as_str(),"type"|"properties"|"required"|"additionalProperties"))
+                ||schema.get("additionalProperties")!=Some(&serde_json::Value::Bool(false)) {
+                return Err(hold("closed bootstrap object parameters"));
+            }
+            let properties=schema.get("properties").and_then(serde_json::Value::as_object)
+                .ok_or_else(||hold("bootstrap parameter properties"))?;
+            let required=schema.get("required").and_then(serde_json::Value::as_array)
+                .ok_or_else(||hold("bootstrap required parameters"))?;
+            let mut names=required.iter().map(serde_json::Value::as_str).collect::<Option<Vec<_>>>()
+                .ok_or_else(||hold("bootstrap required parameter names"))?;
+            names.sort_unstable();
+            let mut property_names=properties.keys().map(String::as_str).collect::<Vec<_>>();
+            property_names.sort_unstable();
+            if names!=property_names {return Err(hold("bootstrap required parameter set"));}
+            let mut projected=serde_json::Map::new();
+            for (name,value) in properties {projected.insert(name.clone(),bootstrap_parameters(value)?);}
+            Ok(serde_json::json!({"type":"object","properties":projected,
+                "required":required,"additionalProperties":false}))
+        }
+        "string" if schema.len()==1=>Ok(serde_json::json!({"type":"string"})),
+        "integer"=>{
+            if schema.keys().any(|key|!matches!(key.as_str(),"type"|"minimum"|"maximum"))
+                ||["minimum","maximum"].iter().any(|key|schema.get(*key).is_some_and(|value|value.as_u64().is_none())) {
+                return Err(hold("closed bootstrap integer parameters"));
+            }
+            Ok(serde_json::json!({"type":"integer"}))
+        }
+        _=>Err(hold("unsupported bootstrap parameter schema")),
+    }
 }
 
 #[derive(Deserialize)]
@@ -67,6 +142,114 @@ fn bootstrap_source_resource()->Result<BootstrapSourceResource,TransportError> {
         ||resource.limits.get("read_maximum_characters").and_then(serde_json::Value::as_u64)!=Some(4096)
     {return Err(hold("unsupported original bootstrap readonly3 resource"));}
     Ok(resource)
+}
+
+// The identical Node/Rust resource is a third closed SOURCE profile. Its exact
+// bytes, constructor tuple and whole-assignment form never alias bootstrap or
+// the first three members of an ordinary five-tool inventory.
+fn frontier_source_resource()->Result<BootstrapSourceResource,TransportError> {
+    if FRONTIER_RESOURCE.len()!=2697||hash(FRONTIER_RESOURCE)!=FRONTIER_RESOURCE_SHA256 {
+        return Err(hold("original input frontier context resource changed"));
+    }
+    let resource:BootstrapSourceResource=serde_json::from_slice(FRONTIER_RESOURCE)
+        .map_err(|_|hold("closed original input frontier context resource"))?;
+    if resource.protocol!=FRONTIER_PROTOCOL||resource.contract_id!=FRONTIER_CORE_ID
+        ||resource.scope_profile_id!=FRONTIER_PROFILE||resource.context_encoding!=ENCODING
+        ||resource.delivery!=serde_json::json!({"delivery_kind":"input-frontier-assignment",
+            "payload_protocol":"peer-input-frontier-assignment-v1","source_cut_protocol":null,
+            "kinds":["input-frontier-produce","input-frontier-review"]})
+        ||resource.tools.len()!=3||!resource.fresh_thread_required||resource.authority.is_empty()
+        ||resource.limits!=serde_json::json!({"frame_bytes":100000,"wire_bytes":4000000,
+            "policy_maximum_context_bytes":65536,"read_maximum_characters":4096,
+            "response_maximum_utf8_bytes":12000})
+    {return Err(hold("unsupported original input frontier readonly3 resource"));}
+    Ok(resource)
+}
+
+// These two independently pinned Source constructors enumerate only their
+// fixed delivery forms. Shared readonly tool syntax is not business authority.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct OriginSourceResource {
+    protocol:String,contract_id:String,scope_profile_id:String,context_encoding:String,
+    tools:Vec<BootstrapSourceTool>,limits:serde_json::Value,
+    fresh_thread_required:bool,authority:String,deliveries:Vec<serde_json::Value>,
+}
+fn origin_maintenance_source_resource()->Result<OriginSourceResource,TransportError> {
+    if ORIGIN_MAINTENANCE_RESOURCE.len()!=3122||hash(ORIGIN_MAINTENANCE_RESOURCE)!=ORIGIN_MAINTENANCE_RESOURCE_SHA256 {
+        return Err(hold("original origin maintenance source resource changed"));
+    }
+    let r:OriginSourceResource=serde_json::from_slice(ORIGIN_MAINTENANCE_RESOURCE)
+        .map_err(|_|hold("closed original origin maintenance source resource"))?;
+    if r.protocol!=ORIGIN_MAINTENANCE_PROTOCOL||r.contract_id!=ORIGIN_MAINTENANCE_CORE_ID
+        ||r.scope_profile_id!=ORIGIN_MAINTENANCE_PROFILE||r.context_encoding!=ENCODING
+        ||r.deliveries!=vec![serde_json::json!({"delivery_kind":"origin-maintenance-assignment",
+            "payload_protocol":"peer-origin-maintenance-context-v1","source_cut_protocol":null,
+            "kinds":["peer-origin-reconstruction","peer-origin-review"],
+            "read_maximum_characters":4096,"response_maximum_utf8_bytes":16384})]
+        ||r.limits!=serde_json::json!({"frame_bytes":100000,"wire_bytes":4000000,
+            "policy_maximum_context_bytes":65536,"read_maximum_characters":4096,"response_maximum_utf8_bytes":16384})
+        ||r.tools.len()!=3||!r.fresh_thread_required||r.authority.is_empty() {
+        return Err(hold("unsupported original origin maintenance readonly3 resource"));
+    }
+    Ok(r)
+}
+fn origin_final_review_source_resource()->Result<OriginSourceResource,TransportError> {
+    if ORIGIN_FINAL_REVIEW_RESOURCE.len()!=3476||hash(ORIGIN_FINAL_REVIEW_RESOURCE)!=ORIGIN_FINAL_REVIEW_RESOURCE_SHA256 {
+        return Err(hold("original origin final review source resource changed"));
+    }
+    let r:OriginSourceResource=serde_json::from_slice(ORIGIN_FINAL_REVIEW_RESOURCE)
+        .map_err(|_|hold("closed original origin final review source resource"))?;
+    if r.protocol!=ORIGIN_FINAL_REVIEW_PROTOCOL||r.contract_id!=ORIGIN_FINAL_REVIEW_CORE_ID
+        ||r.scope_profile_id!=ORIGIN_FINAL_REVIEW_PROFILE||r.context_encoding!=ENCODING
+        ||r.deliveries!=vec![serde_json::json!({"delivery_kind":"origin-frontier-seal-assignment",
+            "payload_protocol":"peer-origin-frontier-seal-context-v1","source_cut_protocol":null,
+            "kinds":["peer-origin-frontier-seal-review"],"read_maximum_characters":4096,"response_maximum_utf8_bytes":16384}),
+            serde_json::json!({"delivery_kind":"owner-maintenance-assignment",
+            "payload_protocol":"peer-owner-maintenance-assignment-v1","source_cut_protocol":null,
+            "kinds":["owner-handover-review"],"purpose":"peer-owner-maintenance-fresh-purpose-v1",
+            "read_maximum_characters":1024,"response_maximum_utf8_bytes":8192})]
+        ||r.limits!=serde_json::json!({"frame_bytes":100000,"wire_bytes":4000000,
+            "policy_maximum_context_bytes":65536,"read_maximum_characters":4096,"response_maximum_utf8_bytes":16384})
+        ||r.tools.len()!=3||!r.fresh_thread_required||r.authority.is_empty() {
+        return Err(hold("unsupported original origin final review readonly3 resource"));
+    }
+    Ok(r)
+}
+fn origin_inventory(resource:OriginSourceResource)->Result<serde_json::Value,TransportError> {
+    let tools=resource.tools.into_iter().map(|tool|Ok(serde_json::json!({
+        "type":tool.kind,"name":tool.name,"description":tool.description,
+        "parameters":frontier_parameters(&tool.input_schema)?,"strict":false})))
+        .collect::<Result<Vec<_>,TransportError>>()?;
+    Ok(serde_json::Value::Array(tools))
+}
+
+// EXACT c407 parse_tool_input_schema -> JsonSchema serde projection for this
+// fixed SOURCE resource, matching Node responses-gateway::parameters. The SDK
+// omits numeric minimum/maximum from Responses; the original raw dynamic-tool
+// schema and the owning Node read guard still enforce <=4096 characters.
+// No request-provided schema or generic caller-chosen catalogue reaches here.
+fn frontier_parameters(schema:&serde_json::Value)->Result<serde_json::Value,TransportError> {
+    let input=schema.as_object().ok_or_else(||hold("fixed frontier source schema"))?;
+    if input.keys().any(|key|!matches!(key.as_str(),"type"|"properties"|"required"|"additionalProperties"|"enum"|"minimum"|"maximum")) {
+        return Err(hold("fixed frontier source schema field"));
+    }
+    let kind=input.get("type").and_then(serde_json::Value::as_str)
+        .ok_or_else(||hold("fixed frontier source schema type"))?;
+    if !matches!(kind,"object"|"string"|"integer") {return Err(hold("fixed frontier source schema type"));}
+    let mut output=serde_json::Map::new();output.insert("type".into(),serde_json::json!(kind));
+    if let Some(value)=input.get("enum") {output.insert("enum".into(),value.clone());}
+    if kind=="object" {
+        let properties=input.get("properties").and_then(serde_json::Value::as_object)
+            .ok_or_else(||hold("fixed frontier source schema properties"))?;
+        let mut projected=serde_json::Map::new();
+        for (name,value) in properties {projected.insert(name.clone(),frontier_parameters(value)?);}
+        output.insert("properties".into(),serde_json::Value::Object(projected));
+    }
+    for key in ["required","additionalProperties"] {
+        if let Some(value)=input.get(key) {output.insert(key.into(),value.clone());}
+    }
+    Ok(serde_json::Value::Object(output))
 }
 
 /// Optional only for compatibility with the original raw-v1 control path.
@@ -139,6 +322,15 @@ pub(super) fn select_original_context_contract(
     }else if request.protocol==BOOTSTRAP_PROTOCOL&&request.contract_id==BOOTSTRAP_CORE_ID
         &&request.resource_sha256==BOOTSTRAP_RESOURCE_SHA256&&request.context_encoding==ENCODING&&request.scope_profile_id==BOOTSTRAP_PROFILE {
         bootstrap_source_resource()?;OriginalToolProfile::BootstrapReadonlyThree
+    }else if request.protocol==FRONTIER_PROTOCOL&&request.contract_id==FRONTIER_CORE_ID
+        &&request.resource_sha256==FRONTIER_RESOURCE_SHA256&&request.context_encoding==ENCODING&&request.scope_profile_id==FRONTIER_PROFILE {
+        frontier_source_resource()?;OriginalToolProfile::InputFrontierReadonlyThree
+    }else if request.protocol==ORIGIN_MAINTENANCE_PROTOCOL&&request.contract_id==ORIGIN_MAINTENANCE_CORE_ID
+        &&request.resource_sha256==ORIGIN_MAINTENANCE_RESOURCE_SHA256&&request.context_encoding==ENCODING&&request.scope_profile_id==ORIGIN_MAINTENANCE_PROFILE {
+        origin_maintenance_source_resource()?;OriginalToolProfile::OriginMaintenanceReadonlyThree
+    }else if request.protocol==ORIGIN_FINAL_REVIEW_PROTOCOL&&request.contract_id==ORIGIN_FINAL_REVIEW_CORE_ID
+        &&request.resource_sha256==ORIGIN_FINAL_REVIEW_RESOURCE_SHA256&&request.context_encoding==ENCODING&&request.scope_profile_id==ORIGIN_FINAL_REVIEW_PROFILE {
+        origin_final_review_source_resource()?;OriginalToolProfile::OriginFinalReviewReadonlyThree
     }else{return Err(hold("unsupported original CORE context selection"));};
     Ok(Some(OriginalContextSelection { request: request.clone(),profile }))
 }
@@ -315,6 +507,9 @@ fn validate_selected_turn_input(request: &serde_json::Value, selection: Option<&
         match selection.profile {
             OriginalToolProfile::OrdinaryFive=>{frame::decode_original_frame(text,&selection.request.resource_sha256,super::MAX_FRAME)?;}
             OriginalToolProfile::BootstrapReadonlyThree=>{frame::decode_bootstrap_frame(text,&selection.request.resource_sha256,super::MAX_FRAME)?;}
+            OriginalToolProfile::InputFrontierReadonlyThree=>{frame::decode_input_frontier_frame(text,&selection.request.resource_sha256,super::MAX_FRAME)?;}
+            OriginalToolProfile::OriginMaintenanceReadonlyThree=>{frame::decode_origin_maintenance_frame(text,&selection.request.resource_sha256,super::MAX_FRAME)?;}
+            OriginalToolProfile::OriginFinalReviewReadonlyThree=>{frame::decode_origin_final_review_frame(text,&selection.request.resource_sha256,super::MAX_FRAME)?;}
         }
     }
     if frames != 1 { return Err(hold("exactly one original context frame required")); }

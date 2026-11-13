@@ -37,10 +37,10 @@ function artifact(root,name,bytes){
 }
 async function fixture(t){
  const root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'soloco-producer-json-reader-')));
- // The exact source copy moves to a temporary directory. Resolve its three
- // fixed dependency URLs in the TEST COPY; production bytes stay untouched.
+ // The exact source copy moves to a temporary directory. Resolve its fixed
+ // dependency URLs in the TEST COPY; production bytes stay untouched.
  let testSource=originalSource.toString('utf8');
- const dependencies=[['./context-component-deployment.mjs',false],['./bootstrap-membership-delivery-frame.mjs',true],['./context-component-layout.mjs',true]];
+ const dependencies=[['./context-component-deployment.mjs',false],['./bootstrap-membership-delivery-frame.mjs',true],['./input-frontier-wire.mjs',true],['./origin-maintenance-wire.mjs',true],['./context-component-layout.mjs',true]];
  for(const [specifier,historicalOptional] of dependencies){
   const from="'"+specifier+"'",count=testSource.split(from).length-1;
   // Only the separately SHA-pinned historical failing-before source may omit
@@ -48,7 +48,9 @@ async function fixture(t){
   assert.ok(count===1||(override&&historicalOptional&&count===0),'Resolve the exact copied-module dependency: '+specifier);
   if(count===1){
    const target=pathToFileURL(path.join(REPO,'plugins/soloco/runtime/peers',specifier)).href;
-   testSource=testSource.replace(from,JSON.stringify(target));
+   const resolved=JSON.stringify(target);testSource=testSource.replace(from,resolved);
+   assert.equal(testSource.split(resolved).length-1,1,'The exact dependency URL must occur once: '+specifier);
+   assert.equal(testSource.split(from).length-1,0,'No unresolved moved dependency remains: '+specifier);
   }
  }
  const moduleRef=artifact(root,'reader-under-test.mjs',Buffer.from(testSource+ACCESS));

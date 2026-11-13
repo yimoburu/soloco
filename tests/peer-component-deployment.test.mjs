@@ -23,13 +23,15 @@ const ACCESS='\nexport const __syntheticFsDeploymentTestAccess=Object.freeze({re
 async function fixture(t){
   const root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'soloco-deployment-byte-test-')));
   const original=fs.readFileSync(SOURCE),modulePath=path.join(root,'deployment-under-test.mjs');
-  // Preserve production exactly except for resolving its three fixed relative
+  // Preserve production exactly except for resolving its fixed relative
   // dependencies from this moved TEST COPY and appending private byte-helper access.
   let text=original.toString('utf8');
-  for(const [specifier,url] of [['./context-build-component.mjs',COMPONENT],['./context-component-layout.mjs',LAYOUT],['./bootstrap-membership-preflight.mjs',BOOTSTRAP]]){
-    const from="'"+specifier+"'";
-    assert.equal(text.split(from).length-1,1,'Resolve the exact copied-module dependency: '+specifier);
-    text=text.replace(from,JSON.stringify(url));
+  for(const [specifier,url,count] of [['./context-build-component.mjs',COMPONENT,1],['./context-component-layout.mjs',LAYOUT,1],['./bootstrap-membership-preflight.mjs',BOOTSTRAP,1],['./input-frontier-wire.mjs',pathToFileURL(path.join(REPO,'plugins/soloco/runtime/peers/input-frontier-wire.mjs')).href,2],['./origin-maintenance-wire.mjs',pathToFileURL(path.join(REPO,'plugins/soloco/runtime/peers/origin-maintenance-wire.mjs')).href,2],['./protected-source-build-slot.mjs',pathToFileURL(path.join(REPO,'plugins/soloco/runtime/peers/protected-source-build-slot.mjs')).href,2]]){
+    const from="'"+specifier+"'",resolved=JSON.stringify(url);
+    assert.equal(text.split(from).length-1,count,'Resolve the exact copied-module dependency: '+specifier);
+    text=text.replaceAll(from,resolved);
+    assert.equal(text.split(resolved).length-1,count,'The exact dependency URL must preserve every occurrence: '+specifier);
+    assert.equal(text.split(from).length-1,0,'No unresolved moved dependency remains: '+specifier);
   }
   fs.writeFileSync(modulePath,text+ACCESS,{mode:0o444});
   const api=(await import(pathToFileURL(modulePath).href)).__syntheticFsDeploymentTestAccess;

@@ -157,16 +157,20 @@ function returned(result,args,extra={}){
 export async function preparePeerOriginMechanicalReviewRequest(request,host){
  const args=validatePeerOriginRequest(request,host);need(args.action==='mechanical_review','ORIGIN_PUBLIC_INPUT');requireCodexRootActor({host,session_id:args.session_id});
  return withPeerPublicStorage(args.root,true,async where=>{
-  need(where.kind==='legacy','ORIGIN_LAYOUT4_REQUIRED');where.db.exec('BEGIN');
-  const {plan:p,state}=legacyPlan(where.db,args,host,args.input.plan_id);need(state.paused===true&&Date.parse(p.expires_at)>Date.now(),'ORIGIN_PLAN_EXPIRED');
+  need(where.kind==='legacy','ORIGIN_LAYOUT4_REQUIRED');
+  // Loading a fixed source module may await. No original Store snapshot or
+  // private custody loan exists until it has completed.
   const source=await fixedModule(MECHANICAL_URL,'ORIGIN_MECHANICAL_QA_SOURCE_UNAVAILABLE');
   need(typeof source.preparePeerOriginMechanicalQaDispatchFrom==='function','ORIGIN_MECHANICAL_QA_SOURCE_UNAVAILABLE');
-  const prepared=source.preparePeerOriginMechanicalQaDispatchFrom(where.db,readNormalized(where.db),{expected_epoch:args.epoch,grant_ref:args.input.grant_ref});
+  return where.readSnapshot(store=>{
+  const {plan:p,state}=legacyPlan(store.db,args,host,args.input.plan_id);need(state.paused===true&&Date.parse(p.expires_at)>Date.now(),'ORIGIN_PLAN_EXPIRED');
+  const prepared=source.preparePeerOriginMechanicalQaDispatchFrom(store.db,store.read(),{expected_epoch:args.epoch,grant_ref:args.input.grant_ref});
   need(prepared.plan_ref?.id===p.plan_id,'ORIGIN_MECHANICAL_QA_PLAN_CHANGED');
   return bounded({protocol:'peer-origin-mechanical-dispatch-request-v1',planned_not_dispatched:true,plan_id:p.plan_id,plan_sha256:peerDigest(p),cut_sha256:p.cut_sha256,
    grant_ref:args.input.grant_ref,packet_ref:prepared.packet_ref,context_sha256:prepared.context.sha256,context_utf8_bytes:prepared.context.utf8_bytes,deadline_at_ms:prepared.deadline_at_ms,
    arguments:{root:args.root,session_id:args.session_id,epoch:args.epoch,input:{plan_id:p.plan_id,grant_ref:args.input.grant_ref}},
    required_dispatch_guard:'Revalidate the exact original decision, packet, grant and execution inventory inside the owning queue write; retain its original private reservation receipt for the LAST commit fence. This DATA alone cannot enqueue.'});
+  });
  });
 }
 
