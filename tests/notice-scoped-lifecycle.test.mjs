@@ -149,7 +149,11 @@ test('governing drift after bind stops the stale source worker before its model 
 test('format8 source worker retains an over-budget response as failure without output acceptance',async t=>{
   await withoutExternal(async()=>{
     const f=await qualifiedFixture(t),id=submit(f),q=queue(f,id),bound=queuedState(f,id,q);let callbacks=0;
-    await worker.work(f.root,q.job_id,async(_host,_native,prompt,_directory,ceiling,_selection,options)=>{callbacks++;assert(prompt.includes(bound.context.text));recordSpawn(ceiling,options);return {native_id:'synthetic-overflow-'+q.job_id,text:JSON.stringify({content:'OVER_BUDGET_UNKNOWN_ZERO_NO_RETRY '.repeat(3000),messages:[],notices:[],message_dispositions:[]})};});
+    const tail='EXACT_REJECTED_RESPONSE_TAIL_MUST_SURVIVE';
+    const returned=JSON.stringify({content:'OVER_BUDGET_UNKNOWN_ZERO_NO_RETRY '.repeat(3000)+tail,messages:[],notices:[],message_dispositions:[]});assert(returned.length>100000);
+    await worker.work(f.root,q.job_id,async(_host,_native,prompt,_directory,ceiling,_selection,options)=>{callbacks++;assert(prompt.includes(bound.context.text));recordSpawn(ceiling,options);return {native_id:'synthetic-overflow-'+q.job_id,text:returned};});
     const s=read(f),job=s.jobs[q.job_id];assert.equal(callbacks,1);assert.equal(job.status,'failed');assert.match(job.error,/cumulative visible task wire budget/);assert.equal(job.artifact_id,undefined);assert.equal(job.runtime_context_usage.budget_bytes,65536);assert(job.runtime_context_usage.visible_wire_bytes>65536);assert.equal(s.records[id].runtime_task.attempts.length,1);
+    const rejected=job.rejected_output;assert.equal(rejected.truncated,true);assert(rejected.original,'The complete rejected wire must remain retrievable from the immutable original');
+    assert.equal(snapshot.resolveSnapshot(s,rejected.original),returned);assert.equal(rejected.context_sha256,bound.context.hash);assert(!rejected.text.includes(tail),'The clipped preview cannot substitute for the exact retained tail');
   },{workerMonitor:true});
 });
