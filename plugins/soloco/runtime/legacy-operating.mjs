@@ -3,6 +3,7 @@ import {handoverSubject} from './handover.mjs';
 import {contextSource,classificationFor} from './current-state.mjs';
 import {bindSnapshots,snapshotReference,snapshotBytes,snapshotEntryReference,resolveSnapshotEntry,retainSnapshot,legacyHandoverSource} from './snapshot.mjs';
 import {captureScopedPlan,validateScopedApply,SCOPED_LIMITS,CORPUS_PARTITIONER} from './scoped-context.mjs';
+import {NOTICE_SOURCES,noticeSourceEntries,projectNotice} from './notice-sources.mjs';
 
 // Prospective byte-preservation contract only. Never an extraction or acceptance receipt.
 export const LEGACY_BOOTSTRAP_PROTOCOL='legacy-bootstrap-manifest-v1';
@@ -114,12 +115,13 @@ function decodeGraph(definitions){
   for(let i=0;i<definitions.length;i++)get(i);
   return get;
 }
-function sourceList(s){
+function sourceList(s,noticeSources=false){
   const list=[];
   for(const [key,r] of Object.entries(s.records??{})){if(key!==r.id)hold('ambiguous record identity '+key);list.push([key,r,'/records/'+pointer(key)]);}
   for(const [key,j] of Object.entries(s.jobs??{})){if(j.id!==key)hold('ambiguous job identity '+key);list.push(['job:'+key,j,'/jobs/'+pointer(key)]);}
   for(const [index,u] of (s.upgrade_history??[]).entries())list.push(['upgrade:'+u.id,resolveSnapshotEntry(s,u),'/upgrade_history/'+index]);
   if(s.upgrade)list.push(['upgrade:'+s.upgrade.id,resolveSnapshotEntry(s,s.upgrade),'/upgrade']);
+  if(noticeSources)for(const {id,index,original} of noticeSourceEntries(s))list.push([id,original,'/notices/'+index]);
   return list;
 }
 const ref=(v,id)=>({id,revision:v?.revision??null,sha256:hash(v)});
@@ -240,7 +242,7 @@ export function legacyOperatingFrontier(state){
 // NEW prospective extraction grammar. Existing manifests and scoped receipts keep
 // their original contracts. This planner never creates an acceptance receipt.
 export const LEGACY_COHERENT_PROTOCOL='legacy-coherent-extraction-v1';
-function coherentBuild(state,max_packet_bytes){
+function coherentBuild(state,max_packet_bytes,noticeSources=false){
   const {copy,raws}=isolated(state),{definitions,intern}=codec(true);
   const state_root=intern(copy),originals=[...raws.values()].map(({reference,raw})=>({reference,raw_root:intern(raw),typed_root:intern(JSON.parse(raw))}));
   const documents=[{kind:'state',root:state_root},...originals.map(o=>({kind:'snapshot-original',sha256:o.reference.immutable_snapshot.sha256,root:o.typed_root}))];
@@ -342,9 +344,9 @@ function coherentBuild(state,max_packet_bytes){
   }
   for(const d of documents)walk(d.root,d);
   const groups=[...groupByRoot].map(([root,id])=>({id,body_root:root,kind:'complete-local-section',section:section(root),status:'unreviewed'}));
-  const sources=sourceList(copy).map(([id,v,location])=>{const value=resolveSnapshotEntry(copy,v),root=intern(value);return {source:ref(value,id),location,body_root:root,group_id:groupByRoot.get(root)??null,producer_validation:'required-canonical-scoped-plan',receipt_reuse:false};});
+  const sources=sourceList(copy,noticeSources).map(([id,v,location])=>{const value=resolveSnapshotEntry(copy,v),root=intern(value);return {source:ref(noticeSources&&location.startsWith('/notices/')?projectNotice(value):value,id),location,body_root:root,group_id:groupByRoot.get(root)??null,producer_validation:'required-canonical-scoped-plan',receipt_reuse:false};});
   const collection_indexes=[...collections.values()].map(c=>({...c,ordered_members:c.ordered_members.map(([key,root])=>({key,body_root:root,group_id:groupByRoot.get(root)}))}));
-  const result={protocol:LEGACY_COHERENT_PROTOCOL,version:1,max_packet_bytes,baseline:{state_root,state_sha256:hash(copy),membership_sha256:hash(sources),owner:copy.owner??null},definitions,originals,documents,collection_indexes,groups,occurrences,snapshot_inbound:inbound,sources,semantic_acceptance:false};
+  const result={protocol:LEGACY_COHERENT_PROTOCOL,version:1,...(noticeSources?{notice_sources:NOTICE_SOURCES}:{}),max_packet_bytes,baseline:{state_root,state_sha256:hash(copy),membership_sha256:hash(sources),owner:copy.owner??null},definitions,originals,documents,collection_indexes,groups,occurrences,snapshot_inbound:inbound,sources,semantic_acceptance:false};
   // Measure reusable sections ONCE. Packet bytes below are additive JSON array
   // framing, not construction of every combination of baseline and body.
   const sectionSizes=new Map(groups.map(g=>[g.id,bytes({group_id:g.id,...g.section})]));
@@ -370,9 +372,10 @@ function coherentAdapterContract(){return {
   existing_source_path:'captureLegacyCanonicalSource -> captureScopedPlan -> createScopedTarget extract/applicability/integration -> native worker -> validateScopedApply; preserves existing lossless-ranges-v1 contract and costs',
   frontier_rule:'No coherent group or hash closes legacyOperatingFrontier. Canonical source proofs below close only their exact original source contract; root sections, snapshot contexts and unknown cross-group coupling remain Held.'
 };}
-export function buildLegacyCoherentPlan(state,{max_packet_bytes=SCOPED_LIMITS.input_bytes}={}){
+export function buildLegacyCoherentPlan(state,{max_packet_bytes=SCOPED_LIMITS.input_bytes,notice_sources}={}){
   if(!Number.isSafeInteger(max_packet_bytes)||max_packet_bytes<1||max_packet_bytes>SCOPED_LIMITS.input_bytes)hold('coherent cap must not exceed native scoped input cap');
-  return coherentBuild(state,max_packet_bytes);
+  if(notice_sources!==undefined&&notice_sources!==NOTICE_SOURCES)hold('unknown canonical notice source derivation');
+  return coherentBuild(state,max_packet_bytes,notice_sources===NOTICE_SOURCES);
 }
 export function decodeLegacyCoherentPlan(p){
   exact(p);const {plan_sha256,...body}=p;
@@ -380,7 +383,7 @@ export function decodeLegacyCoherentPlan(p){
   const get=decodeGraph(p.definitions),state=get(p.baseline.state_root),raws=new Map();
   for(const o of p.originals){const r=snapshotReference(o.reference),raw=get(o.raw_root);if(!r||typeof raw!=='string'||digest(raw)!==r.sha256||raw.length!==r.characters||!equal(JSON.parse(raw),get(o.typed_root)))hold('coherent original corruption');raws.set(r.sha256,raw);}
   bindSnapshots(state,sha=>raws.get(sha));
-  const rebuilt=buildLegacyCoherentPlan(state,{max_packet_bytes:p.max_packet_bytes});
+  const rebuilt=buildLegacyCoherentPlan(state,{max_packet_bytes:p.max_packet_bytes,notice_sources:p.notice_sources});
   if(!equal(rebuilt,p))hold('coherent coverage, ancestry, section or measurement changed');
   return {state,originals:p.originals.map(o=>({reference:o.reference,raw:get(o.raw_root)}))};
 }
@@ -400,7 +403,7 @@ export function openLegacyCoherentPlan(plan){
   });
 }
 export function validateLegacyCoherentPlan(state,plan){
-  decodeLegacyCoherentPlan(plan);if(!equal(buildLegacyCoherentPlan(state,{max_packet_bytes:plan.max_packet_bytes}),plan))hold('coherent baseline or provenance changed');
+  decodeLegacyCoherentPlan(plan);if(!equal(buildLegacyCoherentPlan(state,{max_packet_bytes:plan.max_packet_bytes,notice_sources:plan.notice_sources}),plan))hold('coherent baseline or provenance changed');
   return {valid:true,semantic_acceptance:false,plan_sha256:plan.plan_sha256};
 }
 export function captureLegacyCanonicalSource(state,coherent,{source_id,transaction,partitioner}={}){

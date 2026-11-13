@@ -6,12 +6,19 @@ import {normalizeTimeout} from './timeout.mjs';
 import {prepareSpecialistAssignment,validateSpecialistBindingShape} from './specialists.mjs';
 
 export const TASK_PROTOCOL='async-task-v1';
+// Prospective opt-in only. Omission preserves every existing format-7 task.
+export const PRESERVED_NOTICE_TASK_CONTEXT='async-task-context-v2';
+export function taskContextFormat(spec){
+  if(spec.context_protocol===undefined)return 7;
+  if(spec.context_protocol===PRESERVED_NOTICE_TASK_CONTEXT)return 8;
+  throw Error('Unsupported task context protocol');
+}
 export const TASK_STATES=['planned','queued','running','returned','accepted','needs_attention','cancelling','cancelled'];
 const taskKeys=['version','operation_id','command_sha256','owner','definition_revision','definition_sha256','spec','state','attempts','created_at','updated_at','previous_definition','attention','attention_code','input_bindings'];
 const recordKeys=['id','kind','status','author_role','author_instance','revision','content','created_at','updated_at','runtime_task'];
 const ownerKeys=['host','session_id','epoch'];
 const attemptKeys=['job_id','instance_id','definition_revision','definition_sha256','created_at','artifact_id','finished_at'];
-const specKeys=['role','task','input_ids','evidence_ids','peer_task_ids','resources','context_scope','expected_deliverable','acceptance','depends_on','review_task_id','model_selection','timeout_ms','timeout_reason','source_instruction','max_attempts','outcome','specialist_ref'];
+const specKeys=['role','task','input_ids','evidence_ids','peer_task_ids','resources','context_scope','expected_deliverable','acceptance','depends_on','review_task_id','model_selection','timeout_ms','timeout_reason','source_instruction','max_attempts','outcome','specialist_ref','context_protocol'];
 const allowed=(v,keys)=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).every(k=>keys.includes(k));
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const copy=v=>JSON.parse(JSON.stringify(v));
@@ -64,6 +71,8 @@ function normalizeSpec(value,state,source){
   const timeout=normalizeTimeout({timeout_ms:value.timeout_ms,timeout_reason:value.timeout_reason});
   const spec={role,task,input_ids,evidence_ids,peer_task_ids,resources,context_scope:requireText(value.context_scope??'*','context_scope',160),expected_deliverable,acceptance,depends_on:deps,review_task_id:value.review_task_id??null,timeout_ms:timeout.timeout_ms,source_instruction:requireText(source??value.source_instruction,'source_instruction',4000),max_attempts:1};
   if(timeout.timeout_reason!==undefined)spec.timeout_reason=timeout.timeout_reason;
+  taskContextFormat(value);
+  if(value.context_protocol!==undefined)spec.context_protocol=value.context_protocol;
   if(value.model_selection!==undefined){
     const m=value.model_selection;
     if(!selectionShape(m)||JSON.stringify(m).length>2000)throw Error('Invalid task model selection');
@@ -80,6 +89,7 @@ function assertInputBindings(state,record){
 }
 export const taskDefinitionHash=spec=>digest(JSON.stringify(spec));
 function validateSpec(spec){
+  taskContextFormat(spec);
   if(spec.specialist_ref!==undefined){
     const r=spec.specialist_ref;
     if(!allowed(r,['id','revision','sha256'])||Object.keys(r).length!==3||!identifier(r.id)||!Number.isSafeInteger(r.revision)||r.revision<1||!/^[a-f0-9]{64}$/.test(r.sha256??'')||spec.review_task_id!==null)throw Error('Invalid canonical specialist profile reference');
@@ -180,7 +190,7 @@ export function isTaskOutput(state,record,{own_job_id=null}={}){
     const marker=record.runtime_output,task=taskRecord(state,marker.task_id),t=task.runtime_task,job=currentAttempt(state,task);
     if(t.state==='needs_attention'&&!(own_job_id===job.id&&['Fail','Blocked'].includes(record.review?.verdict)))return false;
     if(own_job_id!==job.id)assertTaskPrerequisites(state,task);
-    if(!same(state.owner,t.owner)||marker.definition_revision!==t.definition_revision||marker.definition_sha256!==t.definition_sha256||job.id!==record.job_id||job.artifact_id!==record.id||job.status!=='completed'||job.context_format!==7||job.context_scope!==t.spec.context_scope||!/^[a-f0-9]{64}$/.test(job.context_sha256??'')||typeof job.native_id!=='string'||!job.native_id||job.native_id===t.owner.session_id||job.coordination_release?.termination_confirmed!==true||job.coordination_release.reason!=='model_process_closed'||record.author_role!==job.role||record.author_instance!==job.instance_id||!same(record.inputs,job.inputs)||!Array.isArray(record.inputs)||!same(record.review_of,job.review_of))return false;
+    if(!same(state.owner,t.owner)||marker.definition_revision!==t.definition_revision||marker.definition_sha256!==t.definition_sha256||job.id!==record.job_id||job.artifact_id!==record.id||job.status!=='completed'||job.context_format!==taskContextFormat(t.spec)||job.context_scope!==t.spec.context_scope||!/^[a-f0-9]{64}$/.test(job.context_sha256??'')||typeof job.native_id!=='string'||!job.native_id||job.native_id===t.owner.session_id||job.coordination_release?.termination_confirmed!==true||job.coordination_release.reason!=='model_process_closed'||record.author_role!==job.role||record.author_instance!==job.instance_id||!same(record.inputs,job.inputs)||!Array.isArray(record.inputs)||!same(record.review_of,job.review_of))return false;
     if(record.inputs.some(ref=>!allowed(ref,['id','revision'])||Object.keys(ref).length!==2||typeof ref.id!=='string'||!(ref.revision===null||Number.isSafeInteger(ref.revision)&&ref.revision>0)||!Object.hasOwn(state.records,ref.id)||(taskMessageInput(state,job,state.records[ref.id]).revision??null)!==ref.revision))return false;
     if(record.retrieved_inputs!==undefined&&(!Array.isArray(record.retrieved_inputs)||!same(record.retrieved_inputs,job.retrieved_inputs)||record.retrieved_inputs.some(ref=>!allowed(ref,['id','revision','sha256','offset','length','total_characters'])||typeof ref.id!=='string'||!/^[a-f0-9]{64}$/.test(ref.sha256??''))))return false;
     if(record.kind==='review'){
@@ -241,10 +251,11 @@ export function cancelTask(state,args,host){
 }
 export function taskView(record){
   validateTaskRecord(record);const t=record.runtime_task;
-  return {id:record.id,revision:record.revision,definition_revision:t.definition_revision,definition_sha256:t.definition_sha256,state:t.state,role:t.spec.role,task:t.spec.task,expected_deliverable:t.spec.expected_deliverable,acceptance:t.spec.acceptance,context_scope:t.spec.context_scope,resources:t.spec.resources,depends_on:t.spec.depends_on,peer_task_ids:t.spec.peer_task_ids,review_task_id:t.spec.review_task_id,attempts:t.attempts.map(copy),...(t.spec.outcome?{outcome:copy(t.spec.outcome),outcome_status:'hypothesis; observed impact requires separate evidence'}:{}),recovery:taskRecovery(t),attention:t.attention??null,updated_at:t.updated_at};
+  return {id:record.id,revision:record.revision,definition_revision:t.definition_revision,definition_sha256:t.definition_sha256,state:t.state,role:t.spec.role,task:t.spec.task,expected_deliverable:t.spec.expected_deliverable,acceptance:t.spec.acceptance,context_scope:t.spec.context_scope,...(t.spec.context_protocol===undefined?{}:{context_protocol:t.spec.context_protocol}),resources:t.spec.resources,depends_on:t.spec.depends_on,peer_task_ids:t.spec.peer_task_ids,review_task_id:t.spec.review_task_id,attempts:t.attempts.map(copy),...(t.spec.outcome?{outcome:copy(t.spec.outcome),outcome_status:'hypothesis; observed impact requires separate evidence'}:{}),recovery:taskRecovery(t),attention:t.attention??null,updated_at:t.updated_at};
 }
 function currentAttempt(state,record){
   const t=record.runtime_task,a=t.attempts[0],job=a&&state.jobs?.[a.job_id];
+  if(job&&job.context_format!==taskContextFormat(t.spec))throw Error('Task attempt context protocol changed');
   if(!a||!job||job.instance_id!==a.instance_id||a.definition_revision!==t.definition_revision||a.definition_sha256!==t.definition_sha256||job.epoch!==t.owner.epoch||!same(job.runtime_task,{id:record.id,definition_revision:a.definition_revision,definition_sha256:a.definition_sha256}))throw Error('Task attempt is missing, superseded or has changed identity');
   if(job.role!==t.spec.role||job.host!==t.owner.host||job.task!==t.spec.task||!same(job.coordination?.resources??[],t.spec.resources))throw Error('Task attempt purpose or resource scope changed');
   if(t.spec.review_task_id){
@@ -281,6 +292,7 @@ export function taskReady(state,record){
   }catch(error){return {ready:false,reason:error.message,recovery:schedulingRecovery(error)};}
 }
 export function bindTaskAttempt(state,record,job){
+  if(job?.context_format!==taskContextFormat(record.runtime_task.spec))throw Error('Queued job context protocol differs from the task definition');
   // The caller may insert the new queued job before binding it in the same
   // transaction. Its own claim is not a conflicting pre-existing claimant.
   if(job?.runtime_task&&!same(job.runtime_task,{id:record.id,definition_revision:record.runtime_task.definition_revision,definition_sha256:record.runtime_task.definition_sha256}))throw Error('Job is already bound to a different task');

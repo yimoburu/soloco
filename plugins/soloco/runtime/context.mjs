@@ -15,11 +15,14 @@ import {specialistContext} from './specialists.mjs';
 import {createOriginMechanicalQaWire} from './peers/origin-mechanical-qa-wire-contract.mjs';
 
 export const CONTEXT_LIMIT = 200000;
+// An immutable runtime task cannot select a legacy builder by changing its job
+// format. The task validator must reject that mismatch before any delivery.
+const hasTaskContext=job=>Object.hasOwn(job,'runtime_task')||[7,8].includes(job.context_format);
 const required = record => ['intent', 'decision', 'preference'].includes(record.kind)
   || ['Fail', 'Blocked'].includes(record.review?.verdict);
 
 export function contextBudgetForJob(state,job) {
-  if(job.context_format===7)return TASK_CONTEXT_BUDGET;
+  if(hasTaskContext(job))return TASK_CONTEXT_BUDGET;
   const target=state.records[job.review_of?.id];
   if(target?.scoped_context_target)return SCOPED_LIMITS.input_bytes;
   if(target?.context_qualification_target)return QUALIFICATION_LIMITS.input_bytes;
@@ -30,8 +33,8 @@ export function contextBudgetForJob(state,job) {
 
 // Every supplied fact is a dependency. Never silently trim a constraint or input.
 export function assignmentContext(state, job) {
-  if(job.specialist!==undefined&&(![3,5,6,7].includes(job.context_format)||job.review_of||job.prototype_id||job.development_id))throw Error('Specialist profile is unsupported for this assignment context');
-  if(job.context_format===7)return taskAssignmentContext(state,job);
+  if(job.specialist!==undefined&&(![3,5,6,7,8].includes(job.context_format)||job.review_of||job.prototype_id||job.development_id))throw Error('Specialist profile is unsupported for this assignment context');
+  if(hasTaskContext(job))return taskAssignmentContext(state,job);
   const specialist=job.specialist===undefined?{}:{specialist:specialistContext(state,job)};
   const operatingReview=operatingReviewContext(state,job);if(operatingReview)return operatingReview;
   if(job.context_format===6){
@@ -140,7 +143,7 @@ export function supplementalMatches(state, job) {
 
 export function contextMatches(state, job, hash) {
   try {
-    if(job.context_format===7)return taskContextMatches(state,job,hash);
+    if(hasTaskContext(job))return taskContextMatches(state,job,hash);
     if(isScopedJob(state,job))return scopedMatches(state,job,hash);
     if(state.records?.[job.review_of?.id]?.context_qualification_target)return qualificationMatches(state,job,hash);
     // A job's published notices/messages are outputs, not changes to its inputs.

@@ -102,3 +102,39 @@ binding an attempt, consuming an allowance or changing company state. Missing
 prerequisites, invalid qualification and unsupported specialist bindings Hold
 construction rather than inventing a partial complete packet. The task budget,
 unknown evidence, notices and all execution/currentness gates remain unchanged.
+
+## Prospective notice preservation
+
+A new task may explicitly set `spec.context_protocol: "async-task-context-v2"`.
+The immutable definition binds that choice; its queued job uses format 8. Omitted
+selection retains format 7 and `async-task-context-v1`. Existing task definitions,
+attempts, outputs and receipts are not converted or retried. Unknown protocols or
+a job format that differs from its task definition are rejected.
+
+The v2 consumer can replace a notice's raw semantic body only through the existing
+independent scoped/corpus preservation workflow for the genuine canonical notice
+source. Every represented notice names its exact source, occurrence, immutable
+original, qualification and current homes. Those homes must be delivered in full
+in the same packet; a hash or optional later read cannot replace them. A copied
+artifact, resolved label or writer assertion does not qualify the original notice.
+
+Canonical `notice:<notice-id>` sources use stable notice identities, separate from
+positional `@public:notices:<index>` raw reads. The semantic projection omits only
+top-level `deliveries` and `seen_at`. All other fields, including unknown fields,
+literal `seen`, nested fields, conditional resolutions, failures and UNKNOWNs,
+remain hash-bound. Exact raw originals remain retained and retrievable. Ambiguous
+identities cannot borrow another source's qualification.
+
+New, changed or unclassified sources and missing, stale, negative or uncertain
+qualification proofs retain complete raw/global evidence or Hold construction.
+A notice about a historical failure may have a valid preservation proof; all its
+continuing restrictions must survive in the accepted homes. Representation never
+acknowledges or resolves a notice, changes an original verdict, proves process
+closure, releases a reservation, replenishes an allowance or grants authority.
+
+Fresh notice-family corpus plans freeze their own source adapter version; old
+plans keep their original census and proof grammar. V2 retains the 64 KiB cumulative
+visible prompt/read/response guard and the worker's response reserve. Even a
+complete initial packet and passing synthetic tests do not establish provider fit
+or actual company semantic acceptance. Source support alone adopts no company
+policy, unpauses no work and performs no qualification.

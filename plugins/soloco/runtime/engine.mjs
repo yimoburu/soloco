@@ -9,6 +9,7 @@ import * as scoped from './scoped-context.mjs';
 import { currentView, upgradeView, publicPage, exactRead, mutationView, sourceReference, itemView, controlView, storageSourceId, fits, exactTextRead } from './public-response.mjs';
 import {backupCompany,restoreCompany} from './storage-transfer.mjs';
 import {contextPlan,validateContextPlan,applyContextQualification,recordReference,contextSource} from './current-state.mjs';
+import {isCanonicalNoticeSource} from './notice-sources.mjs';
 import {captureQualificationPlan,createQualificationTarget,qualificationPlanView,qualificationReadUnit,qualificationReadEvidence,validateQualificationApply,qualificationMaintenanceEligible,qualificationControlHash,qualificationWorkload,QualificationHold} from './context-qualification.mjs';
 import {bindOperatingIntake,inheritSnapshots,retainSnapshot,resolveSnapshotEntry,snapshotReference,snapshotBytes} from './snapshot.mjs';
 import fs from 'node:fs';
@@ -33,7 +34,7 @@ import {peerAdoptionRuntimeAction} from './peer-adoption-runtime.mjs';
 import {peerOwnerRuntimeAction,peerOwnerRoutingStorageKind,validatePeerOwnerRequest} from './peer-owner-runtime.mjs';
 import {peerOriginRuntimeAction,validatePeerOriginRequest} from './peer-origin-runtime.mjs';
 import {requireCodexRootActor} from './mcp-host-context.mjs';
-import {taskRecord,taskReady,bindTaskAttempt} from './tasks.mjs';
+import {taskRecord,taskReady,bindTaskAttempt,taskContextFormat} from './tasks.mjs';
 import {runtimeGrant,runtimeControlBinding} from './task-runtime-authority.mjs';
 import {readTaskState,updateTaskIndex} from './task-index.mjs';
 import {specialistAction,isSpecialistRecord,prepareSpecialistAssignment,specialistSessionKey,specialistContext} from './specialists.mjs';
@@ -513,7 +514,7 @@ export function queueRuntimeTask(root,taskId,{launch=launchWorker,check=readines
       requester:{role:'runtime',instance_id:grant.instance_id,task_id:taskId,owner_epoch:s.owner.epoch},
       runtime_task:{id:taskId,definition_revision:record.runtime_task.definition_revision,definition_sha256:record.runtime_task.definition_sha256},
       supplemental_sources:(spec.evidence_ids??[]).map(key=>recordReference(contextSource(s,key),key)),
-      coordination:ready.coordination,context_format:7,context_scope:spec.context_scope,expected_deliverable:spec.expected_deliverable,
+      coordination:ready.coordination,context_format:taskContextFormat(spec),context_scope:spec.context_scope,expected_deliverable:spec.expected_deliverable,
       inputs:ready.input_ids.map(key=>({id:key,revision:s.records[key].revision??null})),review_of:target?{id:target.id,revision:target.revision}:null,
       timeout_policy_version:TIMEOUT_POLICY_VERSION,...timeout,model_selection:selection,cli_version:readyHost.version??null,task_summary:spec.expected_deliverable,next_handoff:'Runtime validates the exact result and wakes eligible dependent tasks',created_at:stamp(),
       ...(inventory?{model_catalog:{source:inventory.source,model:inventory.models.find(m=>m.id===selection.model),speed_support:inventory.speed_support}}:{})};
@@ -629,12 +630,22 @@ function readPublicState(db,id) {
     if(['records','jobs','notices','messages','sessions','upgrade_history','context_classifications'].includes(family))return db.readSelected({rootKeys:[],entities:{[family]:[key]}});
     throw Error('Unknown public source');
   }
+  // Stable canonical notice identities need the complete notice ID census;
+  // first-match aliases and record precedence cannot establish uniqueness.
+  if(id.startsWith('notice:'))return db.readSelected({rootKeys:[],entities:{records:[id],notices:null}});
   if(id.startsWith('upgrade:'))return db.readSelected({rootKeys:[],entities:{records:[id],upgrade_history:null}});
   return db.readSelected({rootKeys:[],entities:{records:[id],...(id.startsWith('job:')?{jobs:[id.slice(4)]}:{})}});
 }
 function readPublicExact(db,args){return db.readSnapshot(()=>{
   const id=args.id;let location;
   if(typeof id!=='string')throw Error('Supply an exact source id');
+  if(id.startsWith('notice:')){
+    const state=readPublicState(db,id);
+    if(!Object.hasOwn(state.records??{},id)&&isCanonicalNoticeSource(state,id))return exactRead(state,args);
+    // A legacy record with this prefix retains its original raw read path when
+    // it owns the storage key. A new colliding notice's distinct semantic hash
+    // cannot borrow this raw record; explicit canonical selection still denies.
+  }
   if(id.startsWith('@public:')){
     const [,family,...tail]=id.split(':'),key=tail.join(':');
     if(['records','jobs','notices','messages','sessions','upgrade_history','context_classifications'].includes(family))location={family,key};

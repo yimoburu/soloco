@@ -25,7 +25,7 @@ function args(identity,operation_id,extra={}){return {...identity,operation_id,s
 function queue(state,record){
   const ready=taskReady(state,record);assert.equal(ready.ready,true,ready.reason);
   const t=record.runtime_task;
-  const job={id:id('job'),instance_id:id(t.spec.role),native_id:null,role:t.spec.role,host:t.owner.host,epoch:t.owner.epoch,status:'queued',task:t.spec.task,inputs:ready.input_ids.map(key=>({id:key,revision:state.records[key].revision??null})),review_of:ready.review_of?{id:ready.review_of,revision:state.records[ready.review_of].revision}:null,coordination:ready.coordination,created_at:stamp()};
+  const job={id:id('job'),instance_id:id(t.spec.role),native_id:null,role:t.spec.role,host:t.owner.host,epoch:t.owner.epoch,status:'queued',context_format:7,task:t.spec.task,inputs:ready.input_ids.map(key=>({id:key,revision:state.records[key].revision??null})),review_of:ready.review_of?{id:ready.review_of,revision:state.records[ready.review_of].revision}:null,coordination:ready.coordination,created_at:stamp()};
   state.jobs[job.id]=job;bindTaskAttempt(state,record,job);return job;
 }
 function finish(state,record,{verdict='Pass',native=id('native')}={}){
