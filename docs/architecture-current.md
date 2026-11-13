@@ -14,66 +14,28 @@ that authority by reading a repository or receiving a message.
 
 ```mermaid
 flowchart TB
-  F[Founder: intent, corrections, reserved decisions]
-  subgraph Agents[Agents and declared collaborators]
-    C1[CoS A]
-    C2[CoS B]
-    C3[CoS C]
-    W[Standalone specialists]
-    QA[Independent native QA]
-    I[Assigned integrator]
-    O[Declared handoff observer]
+  F[Founder: intent, corrections and reserved decisions]
+  P[Peer CoSes: intended equals]
+  L[Task lead: accountable for this task]
+  C[Consult only affected CoSes]
+  S[Specialists: scoped work and evidence]
+  R[Independent review: findings and unresolved holds]
+  D[Delivery: reviewed artifact and explicit evidence limits]
+  F <--> P
+  P -->|assign per task| L
+  L <-. consultation .-> C
+  L --> S --> R --> D
+  R -->|required repairs| L
+  subgraph Guards[Separate software boundary: current company writes]
+    G[Registered current owner; scope, source, expiry and capacity guards]
+    A[Applicable tests, independent review and owner acceptance gates]
+    E[(Company SQLite and immutable evidence)]
+    G --> A --> E
   end
-  F <--> C1
-  F <--> C2
-  F <--> C3
-  C1 <-. intended peer coordination .-> C2
-  C2 <-. intended peer coordination .-> C3
-  subgraph Runtime[Software: current company route]
-    H[Request-scoped root caller metadata, managed hooks and stdio MCP]
-    G[Registered owner, scope, source, expiry and capacity guards]
-    T[Frozen tasks and optional delivery contract]
-    S[Task supervisor and execution adapters]
-    P[Automatic retention-review geometry preflight]
-    K[Exact structural cache: geometry only]
-    A[Existing test, independent review and owner acceptance gates]
-    R[Canonical immutable acceptance report]
-    D[Attributed handoff chain and current receiver]
-    M[Read-only lifecycle observations and exact pages]
-    DB[(Company SQLite and immutable evidence)]
-  end
-  C1 & C2 & C3 --> H
-  H --> G
-  G --> T --> S
-  S <--> W
-  G --> P <--> K
-  P --> QA
-  W & QA --> A
-  A --> R --> D
-  D --> I
-  D --> O
-  G & T & S & A & R & D <--> DB
-  DB --> M --> H
-  subgraph Delivery[Separate delivery evidence]
-    GH[Draft PR, independent source review, required CI and auto-merge]
-    IN[Installation and host reload]
-    AD[Checked company rule adoption and continuity]
-  end
-  I --> GH --> IN
-  IN -->|when definitions or ownership change| AD
-  subgraph Peer[Implemented peer source route: native operation remains held]
-    OP[company_peers: canonical founder and checked layout-5 adoption]
-    BR[Fixed original provider, protected bridge and membership lifecycle]
-    PE[Peer model, scheduler, membership and protected observation journal]
-    RD[Bounded persisted inspect and read: no provider start]
-  end
-  H --> OP
-  OP --> RD
-  RD --> DB
-  OP -->|explicit start and qualified original recipe| BR
-  BR --> PE
-  PE <--> DB
-  OP -. current operator and final commit fences .-> G
+  L -. any company-write request .-> G
+  D -. delivery grants no write authority .-> G
+  N[Portable prototype only: no native qualification, owner transfer or company adoption; existing notices remain unresolved]
+  D --> N
 ```
 
 Preflight measures delivery geometry before an attempt; it cannot establish
