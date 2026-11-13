@@ -90,7 +90,7 @@ export function assertOriginalComponentJournalInitialization(h){
  assertOriginalComponentJournalWitnesses(h);
 }
 export function assertOriginalComponentJournalWitnesses(h){const s=state(h);if(s.kind!=='packaged-plugin-v1')return;inspectOriginalComponentLayout(h);const origin=readWorkspaceOrigin(h),claim=witness(h,'journal-init.claim'),expected={protocol:'soloco-context-component-journal-initialization-v1',workspace_origin:ref(origin.body),workspace:directory(s.paths.durable_root,{privateMode:true})};if(!same(claim.value,expected)||!claim.body.equals(Buffer.from(canonical(expected))))fail('COMPONENT_JOURNAL_CHANGED');}
-export function retainOriginalComponentJournalObservation(h){const s=state(h);s.observedJournal=true;assertOriginalComponentJournalWitnesses(h);} 
+export function retainOriginalComponentJournalObservation(h){const s=state(h);s.observedJournal=true;assertOriginalComponentJournalWitnesses(h);}
 export function syncOriginalComponentRootAncestry(h){
  const s=state(h),p=s.paths;if(s.kind==='developer-source-v1'){for(let at=p.durable_root;;at=path.dirname(at)){sync(at);if(at===p.source_root)break;if(at===path.dirname(at))fail('COMPONENT_LAYOUT_CHANGED');}return;}
  inspectOriginalComponentLayout(h);for(const at of [p.durable_root,path.dirname(p.durable_root),p.managed_data_root])sync(at);
