@@ -137,7 +137,7 @@ async function operating(f,{validUntil=null,homeExpires=null,dependencyExpires=n
     return result(queued,{review:{verdict:'Pass',reason:'FICTIONAL semantic judgment only.',permitted_action:'publish_operating_state',plan_sha256:hash(f.read().records[plan.id].operating_plan),preservation_complete:true,interaction_complete:true,authority_checked:true,blockers:[]}});
   });
   const done=f.read().jobs[queued.id];assert.equal(done.status,'completed',done.error);
-  await call('company_context',{...f.args,protocol:'operating-state-v1',action:'apply',plan_id:plan.id,review_id:done.artifact_id},'codex');
+  await call('company_context',{...f.args,protocol:'operating-state-v1',action:'apply',plan_id:plan.id,review_id:done.artifact_id,source_instruction:instruction},'codex');
   assert.doesNotThrow(()=>operatingContext(f.read(),{scope:'a'}));
   const job=engine.dispatch({...f.args,role:'engineer',task:'Use only the accepted fictional operating conditions.',context_scope:'a',timeout_ms:600000,timeout_reason:'Fictional operating monitor fixture.'},'codex',launch);
   assert.equal(f.read().jobs[job.id].context_format,6);return {job,plan};
@@ -173,7 +173,19 @@ async function monitoring(fn){
   try{return await fn(control);}finally{Store.prototype.read=originalRead;globalThis.setInterval=originalSet;globalThis.clearInterval=originalClear;for(const handle of handles)assert.equal(handle.active,false,'every actual worker monitor was cleared');}
 }
 async function controlled(f,job,control,invoke,{files,review}={}){
-  await work(f.args.root,job.id,async(_h,_n,_p,_d,timeout,_s,options)=>{spawn(timeout,options);control.tick();await invoke(options);return result(job,{...(files?{files}:{}),...(review?{review}: {})});});
+  let entered=false,completed=false,callbackFailed=false,callbackError;
+  await work(f.args.root,job.id,async(_h,_n,_p,_d,timeout,_s,options)=>{
+    try{
+      spawn(timeout,options);control.tick();
+      assert.equal(options.signal.aborted,false,'the worker must be healthy before the monitor stimulus');
+      entered=true;await invoke(options);completed=true;
+      return result(job,{...(files?{files}:{}),...(review?{review}: {})});
+    }catch(error){callbackFailed=true;callbackError=error;throw error;}
+  });
+  // work retains callback failures as failed attempts; assertions still fail this test.
+  if(callbackFailed)throw callbackError;
+  assert.equal(entered,true,'worker must reach the intended monitor stimulus');
+  assert.equal(completed,true,'every monitor stimulus assertion must complete');
   return f.read().jobs[job.id];
 }
 function held(f,job){const current=f.read().jobs[job.id];assert.notEqual(current.status,'completed',current.error);assert.equal(Object.values(f.read().records).filter(r=>r.job_id===job.id&&r.status==='Submitted').length,0);return current;}
@@ -195,6 +207,47 @@ for(const lane of ['ordinary','specialist','operating','operating-review'])test(
   },{domainInput:!lane.startsWith('operating')});
 });
 
+test('revisionless public controls retain exact nullable inputs through JSON, completion and review dispatch',{concurrency:false},async t=>{
+  t.mock.timers.enable({apis:['Date'],now:Date.now()});await fixture(async f=>{
+    const {job}=specialist(f),state=f.read(),controls=Object.values(state.records).filter(r=>r.kind==='decision'&&['pause','resume'].includes(r.action));
+    assert.equal(controls.length,2,'the real public pause/resume setup remains present');
+    for(const record of controls)assert.equal(Object.hasOwn(record,'revision'),false,'canonical public control rows remain revisionless');
+    const roundtrip=JSON.parse(JSON.stringify(state)),current=roundtrip.jobs[job.id],packet=assignmentContext(roundtrip,current);
+    assert.equal(packet.hash,current.context_sha256);assert.deepEqual(packet.inputs,current.inputs);
+    for(const input of current.inputs)assert.deepEqual(Object.keys(input).sort(),['id','revision'],'input DTOs have exactly two keys');
+    for(const record of controls)assert.deepEqual(current.inputs.find(ref=>ref.id===record.id),{id:record.id,revision:null});
+    assert.deepEqual(current.inputs.find(ref=>ref.id==='domain-input'),{id:'domain-input',revision:1});
+    for(const mode of ['missing-revision','wrong-revision','missing-record','extra-key']){
+      const changed=structuredClone(roundtrip),changedJob=changed.jobs[job.id],ref=changedJob.inputs.find(value=>value.id===controls[0].id);
+      if(mode==='missing-revision')delete ref.revision;
+      else if(mode==='wrong-revision')ref.revision=1;
+      else if(mode==='missing-record')delete changed.records[ref.id];
+      else ref.sha256='0'.repeat(64);
+      assert.throws(()=>assignmentContext(changed,changedJob),/job inputs missing|Assignment input version changed/,mode+' must remain rejected');
+    }
+    let done;
+    await monitoring(async control=>{done=await controlled(f,job,control,async options=>{assert.equal(options.signal.aborted,false);});assert.equal(done.status,'completed',done.error);assert.equal(control.live(),0);});
+    const review=engine.dispatch({...f.args,role:'qa',review_of:done.artifact_id,task:'Independently review the fictional specialist output without accepting it.'},'codex',launch);
+    const assertReviewInputs=selected=>{
+      const queued=f.read(),reviewJob=queued.jobs[selected.id],reviewPacket=assignmentContext(JSON.parse(JSON.stringify(queued)),JSON.parse(JSON.stringify(reviewJob)));
+      assert.equal(reviewPacket.hash,reviewJob.context_sha256);
+      for(const record of controls)assert.deepEqual(reviewJob.inputs.find(ref=>ref.id===record.id),{id:record.id,revision:null});
+      assert.equal(reviewJob.specialist,undefined,'generic comparison negatives must bypass specialist shape validation');
+      for(const mode of ['missing-revision','wrong-revision']){
+        const changed=JSON.parse(JSON.stringify(queued)),changedJob=changed.jobs[selected.id],ref=changedJob.inputs.find(value=>value.id===controls[0].id);
+        if(mode==='missing-revision')delete ref.revision;else ref.revision=1;
+        assert.throws(()=>assignmentContext(changed,changedJob),/Assignment input version changed/,mode+' must fail the generic canonical comparison');
+      }
+    };
+    const blocked={verdict:'Blocked',reason:'FICTIONAL judgment only; no semantic acceptance selected.',permitted_action:'hold',blockers:['The fictional output remains unaccepted.']};
+    assertReviewInputs(review);
+    await monitoring(async control=>{const finished=await controlled(f,review,control,async options=>{assert.equal(options.signal.aborted,false);},{review:blocked});assert.equal(finished.status,'completed',finished.error);assert.equal(control.live(),0);});
+    const controlReview=engine.dispatch({...f.args,role:'qa',review_of:controls[0].id,task:'Inspect the exact fictional public control record without accepting it.'},'codex',launch);
+    assertReviewInputs(controlReview);assert.deepEqual(f.read().jobs[controlReview.id].review_of,{id:controls[0].id,revision:null});
+    await monitoring(async control=>{const finished=await controlled(f,controlReview,control,async options=>{assert.equal(options.signal.aborted,false);},{review:blocked});assert.equal(finished.status,'completed',finished.error);assert.equal(control.live(),0);});
+  });
+});
+
 // 2. A supported canonical mutation invalidates all reused structural facts.
 test('changed event token hydrates once and a relevant source change aborts',{concurrency:false},async t=>{
   t.mock.timers.enable({apis:['Date'],now:Date.now()});await fixture(async f=>{
@@ -207,13 +260,18 @@ test('changed event token hydrates once and a relevant source change aborts',{co
     });
   });
 });
-test('a harmless canonical rename refreshes the token without cancelling disjoint work',{concurrency:false},async t=>{
+test('a disjoint canonical artifact save refreshes the token without cancelling work',{concurrency:false},async t=>{
   t.mock.timers.enable({apis:['Date'],now:Date.now()});await fixture(async f=>{
     const job=ordinary(f);
     await monitoring(async control=>{
       const done=await controlled(f,job,control,async options=>{
         const before=control.reads(f.args.root),name=f.read().name;
-        engine.control({root:f.args.root,session_id:f.args.session_id,expected_epoch:1,action:'rename',name:'Fictional renamed company',expected_name:name,source_instruction:'Rename the company to Fictional renamed company'},'codex');
+        // Public rename rejects active work and the ordinary context binds name.
+        assert.throws(()=>engine.control({...f.args,expected_epoch:1,action:'rename',name:'Fictional renamed company',expected_name:name,source_instruction:'Rename the company to Fictional renamed company'},'codex'),/Assignments are active/);
+        assert.equal(f.read().name,name);
+        // A new unrelated artifact is a supported write outside this job's inputs.
+        engine.save({...f.args,id:'unrelated-monitor-observation',kind:'artifact',content:'FICTIONAL unrelated observation only; no condition, permission or task input.'},'codex');
+        const current=f.read();assert.equal(assignmentContext(current,current.jobs[job.id]).hash,current.jobs[job.id].context_sha256);
         control.tick();assert.equal(control.reads(f.args.root),before+1);assert.equal(options.signal.aborted,false);
         control.tick();assert.equal(control.reads(f.args.root),before+1);
       });assert.equal(done.status,'completed',done.error);
@@ -364,12 +422,15 @@ test('two live workers keep separate root stamps, deadlines and timer cleanup',{
       const b=specialist(second,{profileExpires:new Date(start+120000).toISOString(),policyExpires:new Date(start+180000).toISOString()});
       await monitoring(async control=>{
         let releaseA,releaseB,readyA,readyB;const enteredA=new Promise(resolve=>{readyA=resolve;}),enteredB=new Promise(resolve=>{readyB=resolve;});
-        const runA=work(first.args.root,a.job.id,async(_h,_n,_p,_d,timeout,_s,options)=>{spawn(timeout,options);control.tick(0);readyA(options);await new Promise(resolve=>{releaseA=resolve;});return result(a.job);});
-        const optionsA=await enteredA;
-        const runB=work(second.args.root,b.job.id,async(_h,_n,_p,_d,timeout,_s,options)=>{spawn(timeout,options);control.tick(1);readyB(options);await new Promise(resolve=>{releaseB=resolve;});return result(b.job);});
-        const optionsB=await enteredB;
-        try{assert.equal(control.live(),2);t.mock.timers.tick(start+60000-Date.now());control.tick(0);control.tick(1);assert.equal(optionsA.signal.aborted,true);assert.equal(optionsB.signal.aborted,false);}
-        finally{releaseA();releaseB();await Promise.all([runA,runB]);}
+        let runA,runB;
+        try{
+          runA=work(first.args.root,a.job.id,async(_h,_n,_p,_d,timeout,_s,options)=>{spawn(timeout,options);control.tick(0);readyA(options);await new Promise(resolve=>{releaseA=resolve;});return result(a.job);});
+          const optionsA=await Promise.race([enteredA,runA.then(()=>null)]);assert.ok(optionsA,'first worker must enter its injected model');
+          runB=work(second.args.root,b.job.id,async(_h,_n,_p,_d,timeout,_s,options)=>{spawn(timeout,options);control.tick(1);readyB(options);await new Promise(resolve=>{releaseB=resolve;});return result(b.job);});
+          const optionsB=await Promise.race([enteredB,runB.then(()=>null)]);assert.ok(optionsB,'second worker must enter its injected model');
+          assert.equal(optionsA.signal.aborted,false);assert.equal(optionsB.signal.aborted,false);assert.equal(control.live(),2);
+          t.mock.timers.tick(start+60000-Date.now());control.tick(0);control.tick(1);assert.equal(optionsA.signal.aborted,true);assert.equal(optionsB.signal.aborted,false);
+        }finally{releaseA?.();releaseB?.();await Promise.all([runA,runB].filter(Boolean));}
         held(first,a.job);assert.equal(second.read().jobs[b.job.id].status,'completed');assert.equal(control.live(),0);
       });
     });
@@ -379,7 +440,9 @@ test('an injected model error still clears its actual monitor and retains a fail
   t.mock.timers.enable({apis:['Date'],now:Date.now()});await fixture(async f=>{
     const {job}=specialist(f);
     await monitoring(async control=>{
-      await work(f.args.root,job.id,async(_h,_n,_p,_d,timeout,_s,options)=>{spawn(timeout,options);control.tick();throw Error('FICTIONAL injected model error; closure unknown.');});
+      let entered=false;
+      await work(f.args.root,job.id,async(_h,_n,_p,_d,timeout,_s,options)=>{spawn(timeout,options);control.tick();assert.equal(options.signal.aborted,false);entered=true;throw Error('FICTIONAL injected model error; closure unknown.');});
+      assert.equal(entered,true,'the intended injected model error must actually be exercised');
       const stopped=held(f,job);assert.equal(stopped.status,'failed');assert.equal(control.live(),0);assert.match(stopped.error,/FICTIONAL injected model error/);
     });
   });
