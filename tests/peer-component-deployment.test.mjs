@@ -14,6 +14,7 @@ const REPO=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const SOURCE=path.join(REPO,'plugins/soloco/runtime/peers/context-component-deployment.mjs');
 const COMPONENT=pathToFileURL(path.join(REPO,'plugins/soloco/runtime/peers/context-build-component.mjs')).href;
 const LAYOUT=pathToFileURL(path.join(REPO,'plugins/soloco/runtime/peers/context-component-layout.mjs')).href;
+const BOOTSTRAP=pathToFileURL(path.join(REPO,'plugins/soloco/runtime/peers/bootstrap-membership-preflight.mjs')).href;
 const code=expected=>error=>error?.code===expected;
 const sha=bytes=>createHash('sha256').update(bytes).digest('hex');
 const reference=bytes=>({bytes:bytes.length,sha256:sha(bytes)});
@@ -22,9 +23,14 @@ const ACCESS='\nexport const __syntheticFsDeploymentTestAccess=Object.freeze({re
 async function fixture(t){
   const root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'soloco-deployment-byte-test-')));
   const original=fs.readFileSync(SOURCE),modulePath=path.join(root,'deployment-under-test.mjs');
-  // Preserve production exactly except for resolving its two fixed relative
-  // imports from this moved TEST COPY and appending private byte-helper access.
-  const text=original.toString('utf8').replace("'./context-build-component.mjs'",JSON.stringify(COMPONENT)).replace("'./context-component-layout.mjs'",JSON.stringify(LAYOUT));
+  // Preserve production exactly except for resolving its three fixed relative
+  // dependencies from this moved TEST COPY and appending private byte-helper access.
+  let text=original.toString('utf8');
+  for(const [specifier,url] of [['./context-build-component.mjs',COMPONENT],['./context-component-layout.mjs',LAYOUT],['./bootstrap-membership-preflight.mjs',BOOTSTRAP]]){
+    const from="'"+specifier+"'";
+    assert.equal(text.split(from).length-1,1,'Resolve the exact copied-module dependency: '+specifier);
+    text=text.replace(from,JSON.stringify(url));
+  }
   fs.writeFileSync(modulePath,text+ACCESS,{mode:0o444});
   const api=(await import(pathToFileURL(modulePath).href)).__syntheticFsDeploymentTestAccess;
   t.after(()=>{

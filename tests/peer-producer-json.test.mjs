@@ -37,10 +37,20 @@ function artifact(root,name,bytes){
 }
 async function fixture(t){
  const root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'soloco-producer-json-reader-')));
- // The exact source copy moves to a temporary directory. Rewrite only this
- // static dependency URL in the TEST COPY; production bytes stay untouched.
- const deploymentURL=pathToFileURL(path.join(REPO,'plugins/soloco/runtime/peers/context-component-deployment.mjs')).href;
- const testSource=originalSource.toString('utf8').replace("'./context-component-deployment.mjs'",JSON.stringify(deploymentURL));
+ // The exact source copy moves to a temporary directory. Resolve its three
+ // fixed dependency URLs in the TEST COPY; production bytes stay untouched.
+ let testSource=originalSource.toString('utf8');
+ const dependencies=[['./context-component-deployment.mjs',false],['./bootstrap-membership-delivery-frame.mjs',true],['./context-component-layout.mjs',true]];
+ for(const [specifier,historicalOptional] of dependencies){
+  const from="'"+specifier+"'",count=testSource.split(from).length-1;
+  // Only the separately SHA-pinned historical failing-before source may omit
+  // dependencies added later. Current source must contain each exactly once.
+  assert.ok(count===1||(override&&historicalOptional&&count===0),'Resolve the exact copied-module dependency: '+specifier);
+  if(count===1){
+   const target=pathToFileURL(path.join(REPO,'plugins/soloco/runtime/peers',specifier)).href;
+   testSource=testSource.replace(from,JSON.stringify(target));
+  }
+ }
  const moduleRef=artifact(root,'reader-under-test.mjs',Buffer.from(testSource+ACCESS));
  const api=await import(pathToFileURL(moduleRef.path).href);
  t.after(()=>{try{assert.ok(readStable(SOURCE).equals(originalSource));assert.ok(readStable(PACKAGE).equals(originalPackage));assert.equal(sha(readStable(moduleRef.path)),moduleRef.sha256);}finally{fs.rmSync(root,{recursive:true,force:true});}});
