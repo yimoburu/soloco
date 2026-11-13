@@ -179,3 +179,37 @@ test('actual catalog and maximum serialized-ID RPC frames fit without increasing
     const wire=presentation.rpcReply(id,{tools})+'\n',decoded=JSON.parse(wire);assert(bytes(wire)<=65536);assert.equal(decoded.id,id);assert.equal(decoded.error,undefined);assert.deepEqual(decoded.result,{tools});
   }
 });
+
+test('string-ID assignment retains other obligations and preserves currentness and overflow fences',async()=>withoutExternal(()=>{
+  const {s,id}=fixture(),jobId='fictional-admitted-job',control=runtimeAuthority.runtimeControlBinding(s);
+  const job={...previewJob(s,id),id:jobId,instance_id:'fictional-engineer-instance',host:s.owner.host,epoch:s.owner.epoch,
+    requester:{role:'runtime',instance_id:control.instance_id,task_id:id,owner_epoch:s.owner.epoch}};
+  s.notices=[{id:'notice-absent',kind:'must_know',summary:'Absent job remains required'},
+    {id:'notice-null',kind:'must_know',summary:'Null job remains required',job_id:null},
+    {id:'notice-own',kind:'must_know',summary:'Own job observation',job_id:jobId},
+    {id:'notice-other',kind:'decision_required',summary:'Other job remains required',job_id:'other-job'}];
+  s.messages=[{id:'message-absent',to:'engineer',content:'Absent job role message'},
+    {id:'message-null',to:'engineer',content:'Null job role message',job_id:null},
+    {id:'message-own',to:'engineer',content:'Own job message',job_id:jobId},
+    {id:'message-other',to:'engineer',content:'Other job role message',job_id:'other-job'},
+    {id:'message-other-role',to:'qa',content:'Another role',job_id:'other-job'}];
+  const result=taskAssignmentContext(s,job),packet=JSON.parse(result.text);
+  assert.equal(packet.assignment.job_id,jobId);assert.equal(packet.assignment.instance_id,job.instance_id);assert.deepEqual(packet.assignment.requester,job.requester);
+  assert.deepEqual(packet.notices.map(value=>value.id),['notice-absent','notice-null','notice-other']);
+  assert.deepEqual(packet.messages.map(value=>value.id),['message-absent','message-null','message-other']);
+  assert.deepEqual(packet.records.find(value=>value.source.id==='input'),{source:ref(s.records.input),value:s.records.input});
+  assert(result.inputs.some(value=>value.id==='input'&&value.revision===1));assert(result.required_sources.some(value=>JSON.stringify(value)===JSON.stringify(ref(s.records.input))));
+  assert.equal(result.hash,digest(result.text));assert.equal(result.context_bytes,bytes(result.text));assert.equal(taskContextMatches(s,job,result.hash),true);
+  s.notices.push({id:'notice-own-later',kind:'must_know',summary:'Irrelevant own job observation',job_id:jobId});
+  s.messages.push({id:'message-own-later',to:'engineer',content:'Irrelevant own job message',job_id:jobId});
+  assert.equal(taskContextMatches(s,job,result.hash),true,'Own-job observations remain outside this assignment context');
+  for(const mode of ['source','control','task']){
+    const changed=structuredClone(s);
+    if(mode==='source')changed.records.input.content+=' A changed material qualifier.';
+    if(mode==='control'){changed.records['async-runtime-control'].runtime_control.source_instruction+=' A changed control.';changed.records['async-runtime-control'].runtime_control.control_revision++;}
+    if(mode==='task')amendTask(changed,{...args,operation_id:'string-job-amend',task_id:id,expected_definition_revision:1,spec:{...changed.records[id].runtime_task.spec,task:'A changed assignment.'}},'codex');
+    assert.equal(taskContextMatches(changed,job,result.hash),false,mode);
+  }
+  s.records.large={id:'large',kind:'artifact',revision:1,content:'Required unclassified material. '.repeat(4000)};
+  assert.throws(()=>taskAssignmentContext(s,job),error=>error.constructor.name==='SchedulingHold'&&error.code==='CONTEXT_CAPACITY'&&/nothing was truncated/.test(error.message));
+}));
