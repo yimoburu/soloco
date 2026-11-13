@@ -199,3 +199,69 @@ async fn original_body_error_after_done_and_completed_is_preserved_not_replaced_
     }}
     assert!(original_error);assert!(!seen.unwrap().complete_original_response());
 }
+
+// AUTHORED_UNRUN Source-only terminal-custody controls. These exercise the
+// actual private parser claim and fixed event encoder, not an inherited FD3,
+// a qualified Native build, a live host, or company admission.
+fn terminal_payload(response_id:&str)->String {
+    json!({"type":"response.completed","response":{"id":response_id}}).to_string()
+}
+fn complete_terminal(f:&Fixture,response_id:&str)->String {
+    let payload=terminal_payload(response_id);
+    f.decoder.observe_terminal(&payload,"response.completed");
+    f.decoder.completed(response_id);f.decoder.local_eof();payload
+}
+#[tokio::test]
+async fn original_terminal_drained_claim_is_closed_exact_and_one_use() {
+    let f=fixture().await;let payload=complete_terminal(&f,"same-response");
+    let drained=f.decoder.take_terminal_drained().unwrap();let frame=drained.frame(7);
+    assert_eq!(frame,json!({"protocol":"soloco-protected-backend-permit-v2",
+        "kind":"original_response_terminal_drained","nonce":"same","pid":1,
+        "host_instance_id":"fixture","request_id":f.decoder.source.request_id,
+        "request_sha256":f.decoder.source.request_sha256,"sequence":7,"response_id":"same-response",
+        "terminal_logical_payload_sha256":super::super::hash(payload.as_bytes()),
+        "local_body_eof_observed":true,"remote_domain_closed":false}));
+    assert_eq!(frame.as_object().unwrap().len(),12);
+    assert!(f.decoder.take_terminal_drained().is_err());
+}
+#[tokio::test]
+async fn terminal_drained_requires_completed_same_body_eof_and_original_terminal_payload() {
+    let f=fixture().await;
+    assert!(f.decoder.take_terminal_drained().is_err());
+    f.decoder.local_eof();assert!(f.decoder.take_terminal_drained().is_err());
+    let f=fixture().await;let payload=terminal_payload("r");
+    f.decoder.observe_terminal(&payload,"response.completed");f.decoder.completed("r");
+    assert!(f.decoder.take_terminal_drained().is_err());
+    f.decoder.local_eof();assert!(f.decoder.take_terminal_drained().is_ok());
+    let f=fixture().await;f.decoder.completed("r");f.decoder.local_eof();
+    assert!(f.decoder.take_terminal_drained().is_err());
+}
+#[tokio::test]
+async fn terminal_drained_unknown_interrupted_duplicate_and_empty_completion_hold() {
+    let f=fixture().await;complete_terminal(&f,"r");f.decoder.unknown();
+    assert!(f.decoder.take_terminal_drained().is_err());
+    let f=fixture().await;f.decoder.observe_terminal("{\"type\":\"response.incomplete\"}","response.incomplete");
+    f.decoder.completed("r");f.decoder.local_eof();assert!(f.decoder.take_terminal_drained().is_err());
+    let f=fixture().await;let payload=complete_terminal(&f,"r");
+    f.decoder.observe_terminal(&payload,"response.completed");assert!(f.decoder.take_terminal_drained().is_err());
+    let f=fixture().await;complete_terminal(&f,"r");f.decoder.completed("r");
+    assert!(f.decoder.take_terminal_drained().is_err());
+    let f=fixture().await;complete_terminal(&f,"");assert!(f.decoder.take_terminal_drained().is_err());
+}
+#[tokio::test]
+async fn terminal_drained_private_claim_cannot_move_to_foreign_startup_request_or_hash() {
+    let f=fixture().await;complete_terminal(&f,"r");let drained=f.decoder.take_terminal_drained().unwrap();
+    assert!(drained.matches(&controlled_identity("same"),&f.decoder.source.request_id,&f.decoder.source.request_sha256));
+    assert!(!drained.matches(&controlled_identity("foreign"),&f.decoder.source.request_id,&f.decoder.source.request_sha256));
+    assert!(!drained.matches(&controlled_identity("same"),"foreign-request",&f.decoder.source.request_sha256));
+    assert!(!drained.matches(&controlled_identity("same"),&f.decoder.source.request_id,&"0".repeat(64)));
+}
+#[tokio::test]
+async fn original_terminal_payload_hash_preserves_exact_logical_bytes() {
+    let f=fixture().await;
+    let payload="{ \"type\": \"response.completed\", \"response\": {\"id\":\"r\"} }";
+    f.decoder.observe_terminal(payload,"response.completed");f.decoder.completed("r");f.decoder.local_eof();
+    let frame=f.decoder.take_terminal_drained().unwrap().frame(1);
+    assert_eq!(frame["terminal_logical_payload_sha256"],super::super::hash(payload.as_bytes()));
+    assert_ne!(frame["terminal_logical_payload_sha256"],super::super::hash(terminal_payload("r").as_bytes()));
+}

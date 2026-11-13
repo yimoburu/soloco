@@ -701,7 +701,7 @@ pub(crate) async fn process_sse_with_original(
                     (event,_,_)=>event,
                 };
                 let is_completed = matches!(event, ResponseEvent::Completed { .. });
-                if let (ResponseEvent::Completed {response_id,..},Some(source))=(&event,original.as_ref()) {
+                if let (ResponseEvent::Completed {response_id,..},Some(source))=(&event,original.as_mut()) {
                     source.completed(response_id);
                     // Protected continuation requires the actual same body to finish.
                     // Completed is not EOF, remote closure, or a substitute grant.
@@ -722,6 +722,9 @@ pub(crate) async fn process_sse_with_original(
                         Ok(Ok(()))=>source.local_eof(),
                         Ok(Err(error))=>{source.unknown();let _=tx_event.send(Err(error)).await;return;}
                         Err(_)=>{source.unknown();let _=tx_event.send(Err(ApiError::Stream("protected response body drain deadline HOLD".into()))).await;return;}
+                    }
+                    if let Err(error)=source.publish_terminal_drained().await {
+                        source.unknown();let _=tx_event.send(Err(ApiError::Transport(error))).await;return;
                     }
                 }
                 if tx_event.send(Ok(event)).await.is_err() {

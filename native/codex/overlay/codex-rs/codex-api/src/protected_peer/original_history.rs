@@ -32,6 +32,24 @@ struct ResponseTerminal {
     local_eof: bool,
     unknown: bool,
     interrupted:bool,terminal_payload:Option<Arc<[u8]>>,
+    drain_claimed:bool,
+}
+
+/// Private, one-use parser result. It cannot be restored from event JSON, a
+/// caller verdict, TurnCompleted, or app-server shutdown.
+pub(super) struct OriginalResponseTerminalDrained {
+    startup:super::original_native_decoder::OriginalStartupIdentity,
+    request_id:String,request_sha256:String,response_id:String,terminal_sha256:String,
+}
+impl OriginalResponseTerminalDrained {
+    pub(super) fn matches(&self,startup:&super::original_native_decoder::OriginalStartupIdentity,
+        request_id:&str,request_sha256:&str)->bool {
+        &self.startup==startup&&self.request_id==request_id&&self.request_sha256==request_sha256
+    }
+    pub(super) fn frame(&self,sequence:u64)->Value {
+        self.startup.terminal_drained_frame(&self.request_id,&self.request_sha256,sequence,
+            &self.response_id,&self.terminal_sha256)
+    }
 }
 
 /// Only protected_peer::stream constructs this after the concrete gateway returns.
@@ -40,6 +58,8 @@ pub(crate) struct OriginalResponseDecoder {
     source: Arc<ResponseSource>,
     ordinal: u64,
     retained_bytes: usize,
+    #[cfg(unix)]
+    drain_writer:Option<super::OriginalResponseDrainWriter>,
 }
 impl OriginalResponseDecoder {
     pub(super) fn returned(step: &SourceStep, body: &[u8], startup:super::original_native_decoder::OriginalStartupIdentity) -> Result<Self, TransportError> {
@@ -51,7 +71,17 @@ impl OriginalResponseDecoder {
         Ok(Self { source: Arc::new(ResponseSource {
             authority, startup, request_id: step.request_id.clone(), request_sha256: super::hash(body), offered,
             terminal: Mutex::new(ResponseTerminal::default()),
-        }), ordinal: 0, retained_bytes: 0 })
+        }), ordinal: 0, retained_bytes: 0,#[cfg(unix)] drain_writer:None })
+    }
+    #[cfg(unix)]
+    pub(super) fn returned_from_original_channel(step:&SourceStep,body:&[u8],
+        startup:super::original_native_decoder::OriginalStartupIdentity,
+        writer:super::OriginalResponseDrainWriter)->Result<Self,TransportError> {
+        let mut decoder=Self::returned(step,body,startup)?;
+        if !writer.matches(&decoder.source.startup,&decoder.source.request_id,&decoder.source.request_sha256) {
+            return Err(hold("response original drain writer binding"));
+        }
+        decoder.drain_writer=Some(writer);Ok(decoder)
     }
     pub(crate) fn observe_payload(&mut self, data: &str) -> Option<u64> {
         self.ordinal = match self.ordinal.checked_add(1) { Some(n)=>n, None=>{self.unknown();return None;} };
@@ -90,6 +120,38 @@ impl OriginalResponseDecoder {
     }
     pub(crate) fn local_eof(&self) { if let Ok(mut terminal)=self.source.terminal.lock(){terminal.local_eof=true;} }
     pub(crate) fn unknown(&self) { if let Ok(mut terminal)=self.source.terminal.lock(){terminal.unknown=true;} }
+    fn take_terminal_drained(&self)->Result<OriginalResponseTerminalDrained,TransportError> {
+        let mut terminal=self.source.terminal.lock().map_err(|_|hold("response terminal lock poisoned"))?;
+        if terminal.drain_claimed||!terminal.local_eof||terminal.unknown||terminal.interrupted {
+            return Err(hold("response original terminal drain incomplete/unknown/replayed"));
+        }
+        let response_id=terminal.completed.as_ref().filter(|id|!id.is_empty())
+            .ok_or_else(||hold("response original completion absent"))?.clone();
+        let payload=terminal.terminal_payload.as_deref().ok_or_else(||hold("response original terminal payload absent"))?;
+        let terminal_sha256=super::hash(payload);
+        terminal.drain_claimed=true;
+        Ok(OriginalResponseTerminalDrained {startup:self.source.startup.clone(),request_id:self.source.request_id.clone(),
+            request_sha256:self.source.request_sha256.clone(),response_id,terminal_sha256})
+    }
+    pub(crate) async fn publish_terminal_drained(&mut self)->Result<(),TransportError> {
+        // Existing parser/history Source fixtures have no inherited FD3. They
+        // exercise history semantics only and cannot publish a Native witness.
+        #[cfg(all(test,unix))]
+        if self.drain_writer.is_none(){return Ok(());}
+        #[cfg(unix)]
+        {
+            let result=match self.drain_writer.take() {
+                Some(writer)=>match self.take_terminal_drained() {
+                    Ok(drained)=>writer.publish(drained).await,
+                    Err(error)=>Err(error),
+                },
+                None=>Err(hold("response original drain writer absent/replayed")),
+            };
+            if result.is_err(){self.unknown();}result
+        }
+        #[cfg(not(unix))]
+        {self.unknown();Err(hold("response original drain unsupported host"))}
+    }
 }
 impl Drop for OriginalResponseDecoder {
     fn drop(&mut self) {
