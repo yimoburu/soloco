@@ -34,7 +34,7 @@ async function fixedCapabilityBoundary(fn){
   const methods=['spawn','spawnSync','exec','execSync','execFile','execFileSync','fork','ChildProcess','_forkChild'].filter(name=>Object.hasOwn(childProcess,name));
   const original=Object.fromEntries(methods.map(name=>[name,childProcess[name]])),effects=[],unexpected=[];
   const node=fs.realpathSync(process.execPath);
-  const reject=(method,args)=>{unexpected.push({method,command:String(args[0])});throw Error('FICTIONAL monitor boundary denies unknown child_process call: '+method);};
+  const reject=(method,args)=>{unexpected.push({method});throw Error('FICTIONAL monitor boundary denies unknown child_process call: '+method);};
   const environment=scratch=>({PATH:'/usr/bin:/bin',HOME:scratch,TMPDIR:scratch,TMP:scratch,TEMP:scratch,LANG:'C',LC_ALL:'C',OPENSSL_CONF:'/dev/null',NODE_DISABLE_COLORS:'1'});
   const optionKeys=(options,keys)=>assert.deepEqual(Object.keys(options).sort(),keys.slice().sort());
   for(const name of methods)childProcess[name]=function(...args){return reject(name,args);};
@@ -70,7 +70,7 @@ async function fixedCapabilityBoundary(fn){
         effects.push({kind:'SYNTHETIC fixed Seatbelt-startup capability probe',command,argument_count:args.length});
         return {status:0,signal:null,stdout:'TAP version 13\nSOLOCO_SANDBOX_READY\n',stderr:''};
       }
-    }catch(error){unexpected.push({method:'spawnSync',command:String(command),reason:error.message});throw error;}
+    }catch(error){unexpected.push({method:'spawnSync'});throw error;}
     return reject('spawnSync',invocation);
   };
   syncBuiltinESMExports();
