@@ -20519,3 +20519,831 @@ C3nLr=
 +        assert!(diagnostic.contains("<redacted>"));
 +    }
 +}
+--- a/codex-rs/codex-api/src/protected_peer/context_contract/frame.rs
++++ b/codex-rs/codex-api/src/protected_peer/context_contract/frame.rs
+@@ -110,0 +111,13 @@
++    decode_selected_frame(text,source_contract_sha256,maximum_frame_bytes,super::OriginalToolProfile::OrdinaryFive)
++}
++pub(super) fn decode_bootstrap_frame<'a>(text:&'a str,source_contract_sha256:&str,
++    maximum_frame_bytes:usize)->Result<DecodedOriginalFrame<'a>,TransportError> {
++    if source_contract_sha256!=super::BOOTSTRAP_RESOURCE_SHA256||maximum_frame_bytes==0
++        ||maximum_frame_bytes>super::super::MAX_FRAME {
++        return Err(hold("original bootstrap frame resource differs from fixed source"));
++    }
++    decode_selected_frame(text,source_contract_sha256,maximum_frame_bytes,super::OriginalToolProfile::BootstrapReadonlyThree)
++}
++fn decode_selected_frame<'a>(text:&'a str,source_contract_sha256:&str,maximum_frame_bytes:usize,
++    profile:super::OriginalToolProfile)->Result<DecodedOriginalFrame<'a>,TransportError> {
++    let bootstrap=profile==super::OriginalToolProfile::BootstrapReadonlyThree;
+@@ -117,0 +131,3 @@
++    }
++    if bootstrap!=(frame.delivery_kind=="bootstrap-membership-assignment") {
++        return Err(hold("original delivery kind differs from constructor profile"));
+@@ -131,0 +148,9 @@
++            }
++        }
++        "bootstrap-membership-assignment"=>{
++            if frame.payload_protocol!="peer-bootstrap-membership-assignment-v1"
++                ||frame.source_cut_protocol.as_deref()!=Some("peer-bootstrap-membership-context-v1")
++                ||!frame.source_cut_sha256.as_deref().is_some_and(sha)
++                ||!frame.source_cut_utf8_bytes.is_some_and(|n|n>0&&n<=frame.payload_utf8_bytes)
++                ||frame.payload_utf8_bytes>65_536 {
++                return Err(hold("original whole bootstrap membership delivery selector"));
+@@ -149 +174 @@
+-    let source_cut=if frame.delivery_kind=="membership-assignment" {
++    let source_cut=if matches!(frame.delivery_kind.as_str(),"membership-assignment"|"bootstrap-membership-assignment") {
+@@ -158,0 +184,8 @@
++        if bootstrap {
++            let meaning=*inner.get(&ascii_key("current_meaning"))
++                .ok_or_else(||hold("original bootstrap current meaning unavailable"))?;
++            let meaning=object_spans(meaning)?;
++            if selector(&meaning,"protocol")?!="peer-checked-input-current-meaning-v1" {
++                return Err(hold("original bootstrap current meaning protocol mismatch"));
++            }
++        }
+--- a/codex-rs/codex-api/src/protected_peer/context_contract/tests.rs
++++ b/codex-rs/codex-api/src/protected_peer/context_contract/tests.rs
+@@ -3,0 +4,160 @@
++
++// Additive bootstrap readonly3 Source controls: AUTHORED_UNRUN. These prove no
++// actual startup, typed company admission, Native build, model or profile QA.
++fn bootstrap_request_value()->Value {
++    json!({"protocol":BOOTSTRAP_PROTOCOL,"contract_id":BOOTSTRAP_CORE_ID,
++        "resource_sha256":BOOTSTRAP_RESOURCE_SHA256,"context_encoding":ENCODING,"scope_profile_id":BOOTSTRAP_PROFILE})
++}
++fn bootstrap_selection()->OriginalContextSelection {
++    select_original_context_contract(Some(&serde_json::from_value(bootstrap_request_value()).unwrap())).unwrap().unwrap()
++}
++fn bootstrap_assignment(inner:&str)->String {
++    format!("{{\"protocol\":\"peer-bootstrap-membership-assignment-v1\",\"kind\":\"peer-bootstrap-membership-reconstruction\",\"source_cut\":{inner},\"source_cut_sha256\":\"{}\",\"negative\":[false,null,\"UNKNOWN\"],\"raw_number\":9007199254740993}}",hash(inner.as_bytes()))
++}
++fn bootstrap_frame(payload:&str,inner:&str,contract:&str,kind:&str,protocol:&str)->String {
++    format!("{{\"protocol\":\"{ENCODING}\",\"contract_sha256\":\"{contract}\",\"delivery_kind\":\"{kind}\",\"payload_protocol\":\"{protocol}\",\"payload_sha256\":\"{}\",\"payload_utf8_bytes\":{},\"source_cut_protocol\":\"peer-bootstrap-membership-context-v1\",\"source_cut_sha256\":\"{}\",\"source_cut_utf8_bytes\":{},\"payload\":{payload}}}",hash(payload.as_bytes()),payload.len(),hash(inner.as_bytes()),inner.len())
++}
++fn bootstrap_wire(inner:&str)->(String,String) {
++    let payload=bootstrap_assignment(inner);
++    let framed=bootstrap_frame(&payload,inner,BOOTSTRAP_RESOURCE_SHA256,"bootstrap-membership-assignment","peer-bootstrap-membership-assignment-v1");
++    (payload,framed)
++}
++fn offered(value:Value,profile:OriginalToolProfile)->Result<Value,TransportError> {
++    super::super::validated_selected_offered_inventory(value.as_object().unwrap(),profile)
++}
++
++#[test]
++fn bootstrap_exact_resource_and_constructor_profile_are_additive_and_closed() {
++    assert_eq!(BOOTSTRAP_RESOURCE.len(),2427);assert_eq!(hash(BOOTSTRAP_RESOURCE),BOOTSTRAP_RESOURCE_SHA256);
++    let selected=bootstrap_selection();assert!(selected.profile==OriginalToolProfile::BootstrapReadonlyThree);
++    assert!(select_original_context_contract(Some(&request())).unwrap().unwrap().profile==OriginalToolProfile::OrdinaryFive);
++    assert!(select_original_context_contract(None).unwrap().is_none());
++    for key in ["protocol","contract_id","resource_sha256","context_encoding","scope_profile_id"] {
++        let mut value=bootstrap_request_value();value[key]=request_value()[key].clone();
++        // The shared encoding is intentionally equal; all other cross-profile
++        // substitutions must reject the closed original constructor tuple.
++        if key!="context_encoding"{assert!(select_original_context_contract(Some(&serde_json::from_value(value).unwrap())).is_err(),"{key}");}
++    }
++    let mut extra=bootstrap_request_value();extra["ready"]=json!(true);
++    assert!(serde_json::from_value::<ContextContractRequest>(extra).is_err());
++    let mut missing=bootstrap_request_value();missing.as_object_mut().unwrap().remove("scope_profile_id");
++    assert!(serde_json::from_value::<ContextContractRequest>(missing).is_err());
++    let mut encoding=bootstrap_request_value();encoding["context_encoding"]=json!("future-or-caller-codec");
++    assert!(select_original_context_contract(Some(&serde_json::from_value(encoding).unwrap())).is_err());
++}
++
++#[test]
++fn bootstrap_three_tools_are_literal_new_schemas_not_the_ordinary_first_three() {
++    let tools=OriginalToolProfile::BootstrapReadonlyThree.offered_inventory().unwrap();
++    assert_eq!(tools.as_array().unwrap().len(),3);
++    assert_eq!(tools[0]["name"],"soloco_context_header");assert_eq!(tools[1]["name"],"soloco_context_read");assert_eq!(tools[2]["name"],"soloco_context_submit");
++    assert_eq!(tools[0]["parameters"],json!({"type":"object","properties":{},"required":[],"additionalProperties":false}));
++    assert_eq!(tools[1]["parameters"]["properties"]["length"],json!({"type":"integer","minimum":1,"maximum":4096}));
++    assert_eq!(tools[2]["parameters"]["required"],json!(["sha256","content"]));
++    assert!(tools[2]["parameters"]["properties"].get("operation_id").is_none());
++    assert!(tools.as_array().unwrap().iter().all(|tool|tool["strict"]==false&&tool.get("inputSchema").is_none()));
++    let ordinary=OriginalToolProfile::OrdinaryFive.offered_inventory().unwrap();
++    let old_first_three=Value::Array(ordinary.as_array().unwrap()[..3].to_vec());
++    assert_ne!(tools,old_first_three);
++    assert!(offered(json!({"input":[],"tools":old_first_three}),OriginalToolProfile::BootstrapReadonlyThree).is_err());
++    assert_eq!(OriginalToolProfile::BootstrapReadonlyThree.resource_sha256(),BOOTSTRAP_RESOURCE_SHA256);
++}
++
++#[test]
++fn bootstrap_exact_catalog_accepts_both_original_forms_and_rejects_profile_inference() {
++    let tools=OriginalToolProfile::BootstrapReadonlyThree.offered_inventory().unwrap();
++    let root=json!({"input":[],"tools":tools.clone()});
++    assert_eq!(offered(root.clone(),OriginalToolProfile::BootstrapReadonlyThree).unwrap(),tools);
++    assert!(offered(root,OriginalToolProfile::OrdinaryFive).is_err());
++    let namespace=json!({"input":[{"type":"additional_tools","id":"at_source_fixture","role":"developer",
++        "tools":[{"type":"namespace","name":codex_protocol::DEFAULT_FUNCTION_NAMESPACE,"description":"","tools":tools.clone()}]}]});
++    assert_eq!(offered(namespace.clone(),OriginalToolProfile::BootstrapReadonlyThree).unwrap(),tools);
++    assert!(offered(namespace,OriginalToolProfile::OrdinaryFive).is_err());
++    let ordinary=OriginalToolProfile::OrdinaryFive.offered_inventory().unwrap();
++    assert!(offered(json!({"input":[],"tools":ordinary}),OriginalToolProfile::BootstrapReadonlyThree).is_err());
++    for change in ["missing","extra","order","read","operation_id"] {
++        let mut altered=tools.clone();match change {
++            "missing"=>{altered.as_array_mut().unwrap().pop();}
++            "extra"=>{let extra=altered[0].clone();altered.as_array_mut().unwrap().push(extra);}
++            "order"=>altered.as_array_mut().unwrap().swap(0,1),
++            "read"=>altered[1]["parameters"]["properties"]["length"]["maximum"]=json!(8192),
++            _=>altered[2]["parameters"]["properties"]["operation_id"]=json!({"type":"string"}),
++        }
++        assert!(offered(json!({"input":[],"tools":altered}),OriginalToolProfile::BootstrapReadonlyThree).is_err(),"{change}");
++    }
++}
++
++#[test]
++fn bootstrap_whole_assignment_and_inner_cut_are_exact_raw_utf8_distinct_subjects() {
++    let inner=r#"{"protocol":"peer-bootstrap-membership-context-v1","current_meaning":{"protocol":"peer-checked-input-current-meaning-v1","unknown":[false,null]},"large":9007199254740993,"lexeme":1.2300e+10,"unicode":"雪😀","surrogate":"\ud800","negative":[null,false,"UNKNOWN"]}"#;
++    let (payload,text)=bootstrap_wire(inner);
++    let decoded=frame::decode_bootstrap_frame(&text,BOOTSTRAP_RESOURCE_SHA256,100000).unwrap();
++    assert_eq!(decoded.payload.as_bytes(),payload.as_bytes());assert_eq!(decoded.source_cut,Some(inner));
++    assert_eq!(decoded.payload_utf8_bytes,payload.len());assert_eq!(decoded.source_cut_utf8_bytes,Some(inner.len()));
++    assert_eq!(decoded.payload_sha256,hash(payload.as_bytes()));assert_eq!(decoded.source_cut_sha256.as_deref(),Some(hash(inner.as_bytes()).as_str()));
++    assert_ne!(decoded.payload_sha256,decoded.source_cut_sha256.unwrap());
++    let request=json!({"method":"turn/start","params":{"input":[{"type":"text","text":text}]}});
++    assert!(validate_selected_turn_input(&request,Some(&bootstrap_selection())).is_ok());
++    assert!(validate_selected_turn_input(&request,None).is_err());
++}
++
++#[test]
++fn bootstrap_and_ordinary_membership_delivery_kinds_never_alias() {
++    let inner=r#"{"protocol":"peer-bootstrap-membership-context-v1","current_meaning":{"protocol":"peer-checked-input-current-meaning-v1"}}"#;
++    let (payload,text)=bootstrap_wire(inner);
++    assert!(frame::decode_original_frame(&text,BOOTSTRAP_RESOURCE_SHA256,100000).is_err());
++    let old_hash=bootstrap_frame(&payload,inner,RESOURCE_SHA256,"bootstrap-membership-assignment","peer-bootstrap-membership-assignment-v1");
++    assert!(frame::decode_original_frame(&old_hash,RESOURCE_SHA256,100000).is_err());
++    for (kind,protocol) in [("membership-assignment","peer-membership-assignment-v1"),("task-context","peer-task-context-v2")] {
++        let altered=bootstrap_frame(&payload,inner,BOOTSTRAP_RESOURCE_SHA256,kind,protocol);
++        assert!(frame::decode_bootstrap_frame(&altered,BOOTSTRAP_RESOURCE_SHA256,100000).is_err());
++    }
++    let turn=json!({"method":"turn/start","params":{"input":[{"type":"text","text":text}]}});
++    assert!(validate_selected_turn_input(&turn,select_original_context_contract(Some(&request())).unwrap().as_ref()).is_err());
++    assert!(frame::decode_bootstrap_frame(&old_hash,RESOURCE_SHA256,100000).is_err());
++}
++
++#[test]
++fn bootstrap_hash_counts_prefix_duplicates_and_inner_protocol_fail_closed() {
++    let inner=r#"{"protocol":"peer-bootstrap-membership-context-v1","current_meaning":{"protocol":"peer-checked-input-current-meaning-v1"},"raw":"雪"}"#;
++    let (_,text)=bootstrap_wire(inner);
++    assert!(frame::decode_bootstrap_frame(&text,BOOTSTRAP_RESOURCE_SHA256,text.len()-1).is_err());
++    assert!(frame::decode_bootstrap_frame(&text,BOOTSTRAP_RESOURCE_SHA256,0).is_err());
++    assert!(frame::decode_bootstrap_frame(&text,BOOTSTRAP_RESOURCE_SHA256,100001).is_err());
++    for altered in [text.replace("雪","雨"),text.replace("\"payload\":","\"extra\":null,\"payload\":"),
++        text.replace("\"payload\":","\"payload_utf8_bytes\":1,\"payload\":"),format!("{text} "),
++        text.replacen("{\"protocol\":","{ \"protocol\":",1)] {
++        assert!(frame::decode_bootstrap_frame(&altered,BOOTSTRAP_RESOURCE_SHA256,100000).is_err());
++    }
++    let wrong=r#"{"protocol":"peer-membership-context-v2"}"#;let (_,altered)=bootstrap_wire(wrong);
++    assert!(frame::decode_bootstrap_frame(&altered,BOOTSTRAP_RESOURCE_SHA256,100000).is_err());
++    let duplicate=r#"{"protocol":"peer-bootstrap-membership-context-v1","\u0070rotocol":"peer-bootstrap-membership-context-v1","current_meaning":{"protocol":"peer-checked-input-current-meaning-v1"}}"#;
++    let (_,altered)=bootstrap_wire(duplicate);assert!(frame::decode_bootstrap_frame(&altered,BOOTSTRAP_RESOURCE_SHA256,100000).is_err());
++}
++
++#[test]
++fn bootstrap_current_meaning_is_required_and_duplicate_decoded_keys_reject() {
++    for inner in [r#"{"protocol":"peer-bootstrap-membership-context-v1"}"#,
++        r#"{"protocol":"peer-bootstrap-membership-context-v1","current_meaning":null}"#,
++        r#"{"protocol":"peer-bootstrap-membership-context-v1","current_meaning":{"protocol":"generic-meaning-v1"}}"#,
++        r#"{"protocol":"peer-bootstrap-membership-context-v1","current_meaning":{"protocol":"peer-checked-input-current-meaning-v1","\u0070rotocol":"peer-checked-input-current-meaning-v1"}}"#,
++        r#"{"protocol":"peer-bootstrap-membership-context-v1","current_meaning":{"protocol":"peer-checked-input-current-meaning-v1"},"\u0063urrent_meaning":{"protocol":"peer-checked-input-current-meaning-v1"}}"#] {
++        let (_,text)=bootstrap_wire(inner);
++        assert!(frame::decode_bootstrap_frame(&text,BOOTSTRAP_RESOURCE_SHA256,100000).is_err());
++    }
++}
++
++#[test]
++fn bootstrap_policy_payload_cap_is_not_the_ordinary_payload_ceiling() {
++    let inner=format!("{{\"protocol\":\"peer-bootstrap-membership-context-v1\",\"current_meaning\":{{\"protocol\":\"peer-checked-input-current-meaning-v1\"}},\"opaque\":\"{}\"}}","x".repeat(65536));
++    let (_,text)=bootstrap_wire(&inner);assert!(text.len()<100000);
++    assert!(frame::decode_bootstrap_frame(&text,BOOTSTRAP_RESOURCE_SHA256,100000).is_err());
++}
++
++#[test]
++fn old_five_tool_and_context_resource_bytes_remain_the_original_pins() {
++    let old_tools=include_bytes!("../../protected_peer_responses_tools.json");
++    assert_eq!(old_tools.len(),2038);assert_eq!(hash(old_tools),"04811953467e598da671fb72aafe202ee716a10c10dcf5497bd81f51729da5f1");
++    assert_eq!(RESOURCE.len(),28656);assert_eq!(hash(RESOURCE),"832fdd1c965fa0e834c030f7c1e5636e2f32636b0df899ba8aa0fa940e9032fc");
++    assert_eq!(OriginalToolProfile::OrdinaryFive.resource_sha256(),hash(old_tools));
++}
+--- a/codex-rs/codex-api/src/protected_peer/context_contract.rs
++++ b/codex-rs/codex-api/src/protected_peer/context_contract.rs
+@@ -14,0 +15,56 @@
++const BOOTSTRAP_RESOURCE:&[u8]=include_bytes!("bootstrap_membership_readonly3_contract_v1.json");
++const BOOTSTRAP_RESOURCE_SHA256:&str="cd1ce3adaad300721e47238292ce15dc41f7007b6e415b76c005e93419656ed4";
++const BOOTSTRAP_PROTOCOL:&str="soloco-bootstrap-membership-context-contract-v1";
++const BOOTSTRAP_CORE_ID:&str="bootstrap-membership-readonly3-whole-assignment-v1";
++const BOOTSTRAP_PROFILE:&str="soloco-bootstrap-membership-readonly3-v1";
++
++/// Fixed constructor selections, never inferred from payloads or a caller's
++/// arbitrary tool subset. The original startup retains exactly one selection.
++#[derive(Clone,Copy,PartialEq,Eq)]
++pub(super) enum OriginalToolProfile {OrdinaryFive,BootstrapReadonlyThree}
++impl OriginalToolProfile {
++    pub(super) fn resource_sha256(self)->String {match self {
++        Self::OrdinaryFive=>hash(include_bytes!("../protected_peer_responses_tools.json")),
++        Self::BootstrapReadonlyThree=>BOOTSTRAP_RESOURCE_SHA256.into(),
++    }}
++    pub(super) fn offered_inventory(self)->Result<serde_json::Value,TransportError> {match self {
++        Self::OrdinaryFive=>serde_json::from_slice(include_bytes!("../protected_peer_responses_tools.json"))
++            .map_err(|_|hold("compiled ordinary tool resource")),
++        Self::BootstrapReadonlyThree=>{
++            let resource=bootstrap_source_resource()?;
++            Ok(serde_json::Value::Array(resource.tools.into_iter().map(|tool|serde_json::json!({
++                "type":tool.kind,"name":tool.name,"description":tool.description,
++                "parameters":tool.input_schema,"strict":false})).collect()))
++        }
++    }}
++}
++
++#[derive(Deserialize)]
++#[serde(deny_unknown_fields)]
++struct BootstrapSourceTool {
++    #[serde(rename="type")] kind:String,name:String,description:String,
++    #[serde(rename="inputSchema")] input_schema:serde_json::Value,
++}
++#[derive(Deserialize)]
++#[serde(deny_unknown_fields)]
++struct BootstrapSourceResource {
++    protocol:String,contract_id:String,scope_profile_id:String,context_encoding:String,
++    delivery:serde_json::Value,tools:Vec<BootstrapSourceTool>,limits:serde_json::Value,
++    fresh_thread_required:bool,authority:String,
++}
++fn bootstrap_source_resource()->Result<BootstrapSourceResource,TransportError> {
++    if BOOTSTRAP_RESOURCE.len()!=2427||hash(BOOTSTRAP_RESOURCE)!=BOOTSTRAP_RESOURCE_SHA256 {
++        return Err(hold("original bootstrap context resource changed"));
++    }
++    let resource:BootstrapSourceResource=serde_json::from_slice(BOOTSTRAP_RESOURCE)
++        .map_err(|_|hold("closed original bootstrap context resource"))?;
++    if resource.protocol!=BOOTSTRAP_PROTOCOL||resource.contract_id!=BOOTSTRAP_CORE_ID
++        ||resource.scope_profile_id!=BOOTSTRAP_PROFILE||resource.context_encoding!=ENCODING
++        ||resource.delivery.get("delivery_kind").and_then(serde_json::Value::as_str)!=Some("bootstrap-membership-assignment")
++        ||resource.delivery.get("payload_protocol").and_then(serde_json::Value::as_str)!=Some("peer-bootstrap-membership-assignment-v1")
++        ||resource.delivery.get("source_cut_protocol").and_then(serde_json::Value::as_str)!=Some("peer-bootstrap-membership-context-v1")
++        ||resource.tools.len()!=3||!resource.fresh_thread_required||resource.authority.is_empty()
++        ||resource.limits.get("read_maximum_characters").and_then(serde_json::Value::as_u64)!=Some(4096)
++    {return Err(hold("unsupported original bootstrap readonly3 resource"));}
++    Ok(resource)
++}
+@@ -47,0 +104 @@
++    profile:OriginalToolProfile,
+@@ -79,8 +136,8 @@
+-    source_resource()?;
+-    if request.protocol != CONTRACT_PROTOCOL || request.contract_id != CORE_ID
+-        || request.resource_sha256 != RESOURCE_SHA256 || request.context_encoding != ENCODING
+-        || request.scope_profile_id != PROFILE
+-    {
+-        return Err(hold("unsupported original CORE context selection"));
+-    }
+-    Ok(Some(OriginalContextSelection { request: request.clone() }))
++    let profile=if request.protocol==CONTRACT_PROTOCOL&&request.contract_id==CORE_ID
++        &&request.resource_sha256==RESOURCE_SHA256&&request.context_encoding==ENCODING&&request.scope_profile_id==PROFILE {
++        source_resource()?;OriginalToolProfile::OrdinaryFive
++    }else if request.protocol==BOOTSTRAP_PROTOCOL&&request.contract_id==BOOTSTRAP_CORE_ID
++        &&request.resource_sha256==BOOTSTRAP_RESOURCE_SHA256&&request.context_encoding==ENCODING&&request.scope_profile_id==BOOTSTRAP_PROFILE {
++        bootstrap_source_resource()?;OriginalToolProfile::BootstrapReadonlyThree
++    }else{return Err(hold("unsupported original CORE context selection"));};
++    Ok(Some(OriginalContextSelection { request: request.clone(),profile }))
+@@ -218,0 +276,6 @@
++pub(super) fn selected_original_tool_profile()->OriginalToolProfile {
++    // Legacy absence keeps the original five-tool protocol. It cannot select
++    // bootstrap merely because a request happens to contain three tools.
++    ORIGINAL_SELECTION.get().and_then(Option::as_ref).map(|selection|selection.profile)
++        .unwrap_or(OriginalToolProfile::OrdinaryFive)
++}
+@@ -252 +315,4 @@
+-        frame::decode_original_frame(text, &selection.request.resource_sha256, super::MAX_FRAME)?;
++        match selection.profile {
++            OriginalToolProfile::OrdinaryFive=>{frame::decode_original_frame(text,&selection.request.resource_sha256,super::MAX_FRAME)?;}
++            OriginalToolProfile::BootstrapReadonlyThree=>{frame::decode_bootstrap_frame(text,&selection.request.resource_sha256,super::MAX_FRAME)?;}
++        }
+--- a/codex-rs/codex-api/src/protected_peer/original_history.rs
++++ b/codex-rs/codex-api/src/protected_peer/original_history.rs
+@@ -34,0 +35,18 @@
++    drain_claimed:bool,
++}
++
++/// Private, one-use parser result. It cannot be restored from event JSON, a
++/// caller verdict, TurnCompleted, or app-server shutdown.
++pub(super) struct OriginalResponseTerminalDrained {
++    startup:super::original_native_decoder::OriginalStartupIdentity,
++    request_id:String,request_sha256:String,response_id:String,terminal_sha256:String,
++}
++impl OriginalResponseTerminalDrained {
++    pub(super) fn matches(&self,startup:&super::original_native_decoder::OriginalStartupIdentity,
++        request_id:&str,request_sha256:&str)->bool {
++        &self.startup==startup&&self.request_id==request_id&&self.request_sha256==request_sha256
++    }
++    pub(super) fn frame(&self,sequence:u64)->Value {
++        self.startup.terminal_drained_frame(&self.request_id,&self.request_sha256,sequence,
++            &self.response_id,&self.terminal_sha256)
++    }
+@@ -42,0 +61,4 @@
++    #[cfg(unix)]
++    drain_writer:Option<super::OriginalResponseDrainWriter>,
++    #[cfg(all(test,unix))]
++    history_fixture_without_fd3:bool,
+@@ -54 +76,15 @@
+-        }), ordinal: 0, retained_bytes: 0 })
++        }), ordinal: 0, retained_bytes: 0,#[cfg(unix)] drain_writer:None,
++            #[cfg(all(test,unix))] history_fixture_without_fd3:true })
++    }
++    #[cfg(unix)]
++    pub(super) fn returned_from_original_channel(step:&SourceStep,body:&[u8],
++        startup:super::original_native_decoder::OriginalStartupIdentity,
++        writer:super::OriginalResponseDrainWriter)->Result<Self,TransportError> {
++        let mut decoder=Self::returned(step,body,startup)?;
++        if !writer.matches(&decoder.source.startup,&decoder.source.request_id,&decoder.source.request_sha256) {
++            return Err(hold("response original drain writer binding"));
++        }
++        decoder.drain_writer=Some(writer);
++        #[cfg(test)]
++        {decoder.history_fixture_without_fd3=false;}
++        Ok(decoder)
+@@ -92,0 +129,32 @@
++    fn take_terminal_drained(&self)->Result<OriginalResponseTerminalDrained,TransportError> {
++        let mut terminal=self.source.terminal.lock().map_err(|_|hold("response terminal lock poisoned"))?;
++        if terminal.drain_claimed||!terminal.local_eof||terminal.unknown||terminal.interrupted {
++            return Err(hold("response original terminal drain incomplete/unknown/replayed"));
++        }
++        let response_id=terminal.completed.as_ref().filter(|id|!id.is_empty())
++            .ok_or_else(||hold("response original completion absent"))?.clone();
++        let payload=terminal.terminal_payload.as_deref().ok_or_else(||hold("response original terminal payload absent"))?;
++        let terminal_sha256=super::hash(payload);
++        terminal.drain_claimed=true;
++        Ok(OriginalResponseTerminalDrained {startup:self.source.startup.clone(),request_id:self.source.request_id.clone(),
++            request_sha256:self.source.request_sha256.clone(),response_id,terminal_sha256})
++    }
++    pub(crate) async fn publish_terminal_drained(&mut self)->Result<(),TransportError> {
++        // Existing parser/history Source fixtures have no inherited FD3. They
++        // exercise history semantics only and cannot publish a Native witness.
++        #[cfg(all(test,unix))]
++        if self.history_fixture_without_fd3&&self.drain_writer.is_none(){return Ok(());}
++        #[cfg(unix)]
++        {
++            let result=match self.drain_writer.take() {
++                Some(writer)=>match self.take_terminal_drained() {
++                    Ok(drained)=>writer.publish(drained).await,
++                    Err(error)=>Err(error),
++                },
++                None=>Err(hold("response original drain writer absent/replayed")),
++            };
++            if result.is_err(){self.unknown();}result
++        }
++        #[cfg(not(unix))]
++        {self.unknown();Err(hold("response original drain unsupported host"))}
++    }
+--- a/codex-rs/codex-api/src/protected_peer/original_history_tests.rs
++++ b/codex-rs/codex-api/src/protected_peer/original_history_tests.rs
+@@ -10 +10 @@
+-struct Fixture {runtime:SourceRuntime,ingress:OriginalSessionIngress,owner:Arc<Owner>,user:ResponseItemEnvelope,accepted:OriginalAcceptedInputWitness,decoder:OriginalResponseDecoder}
++struct Fixture {runtime:SourceRuntime,ingress:OriginalSessionIngress,owner:Arc<Owner>,user:ResponseItemEnvelope,accepted:OriginalAcceptedInputWitness,decoder:OriginalResponseDecoder,step:super::super::SourceStep,request_body:Vec<u8>}
+@@ -33,2 +33,3 @@
+-    let decoder=OriginalResponseDecoder::returned(&step,&body(input.serialized_input()),controlled_identity("same")).unwrap();
+-    Fixture{runtime,ingress,owner,user,accepted,decoder}
++    let request_body=body(input.serialized_input());
++    let decoder=OriginalResponseDecoder::returned(&step,&request_body,controlled_identity("same")).unwrap();
++    Fixture{runtime,ingress,owner,user,accepted,decoder,step,request_body}
+@@ -201,0 +203,286 @@
++
++// AUTHORED_UNRUN Source-only terminal-custody controls. These exercise the
++// actual private parser claim and fixed event encoder, not an inherited FD3,
++// a qualified Native build, a live host, or company admission.
++fn terminal_payload(response_id:&str)->String {
++    json!({"type":"response.completed","response":{"id":response_id}}).to_string()
++}
++fn complete_terminal(f:&Fixture,response_id:&str)->String {
++    let payload=terminal_payload(response_id);
++    f.decoder.observe_terminal(&payload,"response.completed");
++    f.decoder.completed(response_id);f.decoder.local_eof();payload
++}
++#[tokio::test]
++async fn original_terminal_drained_claim_is_closed_exact_and_one_use() {
++    let f=fixture().await;let payload=complete_terminal(&f,"same-response");
++    let drained=f.decoder.take_terminal_drained().unwrap();let frame=drained.frame(7);
++    assert_eq!(frame,json!({"protocol":"soloco-protected-backend-permit-v2",
++        "kind":"original_response_terminal_drained","nonce":"same","pid":1,
++        "host_instance_id":"fixture","request_id":f.decoder.source.request_id,
++        "request_sha256":f.decoder.source.request_sha256,"sequence":7,"response_id":"same-response",
++        "terminal_logical_payload_sha256":super::super::hash(payload.as_bytes()),
++        "local_body_eof_observed":true,"remote_domain_closed":false}));
++    assert_eq!(frame.as_object().unwrap().len(),12);
++    assert!(f.decoder.take_terminal_drained().is_err());
++}
++#[tokio::test]
++async fn terminal_drained_requires_completed_same_body_eof_and_original_terminal_payload() {
++    let f=fixture().await;
++    assert!(f.decoder.take_terminal_drained().is_err());
++    f.decoder.local_eof();assert!(f.decoder.take_terminal_drained().is_err());
++    let f=fixture().await;let payload=terminal_payload("r");
++    f.decoder.observe_terminal(&payload,"response.completed");f.decoder.completed("r");
++    assert!(f.decoder.take_terminal_drained().is_err());
++    f.decoder.local_eof();assert!(f.decoder.take_terminal_drained().is_ok());
++    let f=fixture().await;f.decoder.completed("r");f.decoder.local_eof();
++    assert!(f.decoder.take_terminal_drained().is_err());
++}
++#[tokio::test]
++async fn terminal_drained_unknown_interrupted_duplicate_and_empty_completion_hold() {
++    let f=fixture().await;complete_terminal(&f,"r");f.decoder.unknown();
++    assert!(f.decoder.take_terminal_drained().is_err());
++    let f=fixture().await;f.decoder.observe_terminal("{\"type\":\"response.incomplete\"}","response.incomplete");
++    f.decoder.completed("r");f.decoder.local_eof();assert!(f.decoder.take_terminal_drained().is_err());
++    let f=fixture().await;let payload=complete_terminal(&f,"r");
++    f.decoder.observe_terminal(&payload,"response.completed");assert!(f.decoder.take_terminal_drained().is_err());
++    let f=fixture().await;complete_terminal(&f,"r");f.decoder.completed("r");
++    assert!(f.decoder.take_terminal_drained().is_err());
++    let f=fixture().await;complete_terminal(&f,"");assert!(f.decoder.take_terminal_drained().is_err());
++    let f=fixture().await;f.decoder.observe_terminal(&"x".repeat(super::super::MAX_BODY+1),"response.completed");
++    f.decoder.completed("r");f.decoder.local_eof();assert!(f.decoder.take_terminal_drained().is_err());
++}
++#[tokio::test]
++async fn terminal_drained_private_claim_cannot_move_to_foreign_startup_request_or_hash() {
++    let f=fixture().await;complete_terminal(&f,"r");let drained=f.decoder.take_terminal_drained().unwrap();
++    assert!(drained.matches(&controlled_identity("same"),&f.decoder.source.request_id,&f.decoder.source.request_sha256));
++    assert!(!drained.matches(&controlled_identity("foreign"),&f.decoder.source.request_id,&f.decoder.source.request_sha256));
++    assert!(!drained.matches(&controlled_identity("same"),"foreign-request",&f.decoder.source.request_sha256));
++    assert!(!drained.matches(&controlled_identity("same"),&f.decoder.source.request_id,&"0".repeat(64)));
++}
++#[tokio::test]
++async fn original_terminal_payload_hash_preserves_exact_logical_bytes() {
++    let f=fixture().await;
++    let payload="{ \"type\": \"response.completed\", \"response\": {\"id\":\"r\"} }";
++    f.decoder.observe_terminal(payload,"response.completed");f.decoder.completed("r");f.decoder.local_eof();
++    let frame=f.decoder.take_terminal_drained().unwrap().frame(1);
++    assert_eq!(frame["terminal_logical_payload_sha256"],super::super::hash(payload.as_bytes()));
++    assert_ne!(frame["terminal_logical_payload_sha256"],super::super::hash(terminal_payload("r").as_bytes()));
++}
++
++#[cfg(unix)]
++mod concrete_fd3 {
++    // AUTHORED_UNRUN. Private cfg(test) fixture only: real Unix pipes feed the
++    // SAME concrete writer used by stream(). No new production constructor,
++    // alternate writer, callback proof, descriptor-3 takeover, or Native claim.
++    use super::*;
++    use super::super::super::{Channel,Challenge,OperationGuard,OriginalResponseDrainWriter,pipe};
++    use std::sync::atomic::{AtomicBool,Ordering};
++    use std::time::Duration;
++
++    struct Pipes {
++        inner:Fixture,
++        channel:&'static tokio::sync::Mutex<Channel>,
++        unknown:&'static AtomicBool,
++        reader:Option<pipe::Pipe>,
++        _control_peer:pipe::Pipe,
++        output_reader_fd:i32,
++        output_fd:i32,
++    }
++    fn pair()->(pipe::Pipe,pipe::Pipe,i32,i32) {
++        let mut descriptors=[-1;2];
++        assert_eq!(unsafe{libc::pipe(descriptors.as_mut_ptr())},0);
++        // Existing Pipe code owns each fresh descriptor exactly once and sets
++        // nonblocking/CLOEXEC. Fixed test channels never claim inherited 3/4.
++        let read=pipe::Pipe::inherited(descriptors[0]).unwrap();
++        let write=pipe::Pipe::inherited(descriptors[1]).unwrap();
++        (read,write,descriptors[0],descriptors[1])
++    }
++    async fn pipes()->Pipes {
++        let mut inner=fixture().await;
++        let (reader,outgoing,output_reader_fd,output_fd)=pair();let (incoming,control_peer,_,_)=pair();
++        // Fixed, bounded fixtures retain these allocations until this test
++        // process exits, matching the production Channel/guard static lifetime.
++        // Their private UNKNOWN never resets the production sticky UNKNOWN.
++        let unknown:&'static AtomicBool=Box::leak(Box::new(AtomicBool::new(false)));
++        let channel:&'static tokio::sync::Mutex<Channel>=Box::leak(Box::new(tokio::sync::Mutex::new(Channel {
++            incoming,outgoing,challenge:Some(Challenge {
++                protocol:super::super::super::PROTOCOL.into(),kind:"challenge".into(),nonce:"a".repeat(64),pid:std::process::id(),
++                upstream_url:"https://source-fixture.invalid/responses".into(),slot_id:"source-fixture-slot".into(),
++                executable_sha256:"b".repeat(64),source_manifest_sha256:"c".repeat(64),
++                state_root:"/source-fixture/state".into(),cwd:"/source-fixture/root".into(),original_home_sha256:None,
++                context_contract:None,loopback_proxy_port:None,
++            }),sequence:1,unresolved:Some(inner.step.request_id.clone()),poisoned:false,
++            host_observation:Some(json!({"host_instance_id":"source-fixture-original-host"})),
++            scope_context_receipt:None,scope_context_attempted:false,
++        })));
++        let startup={let state=channel.lock().await;super::super::super::original_native_decoder::OriginalStartupIdentity::observe(&state).unwrap()};
++        let writer=OriginalResponseDrainWriter {owner:channel,startup:startup.clone(),
++            request_id:inner.step.request_id.clone(),request_sha256:super::super::super::hash(&inner.request_body),
++            sequence:1,guard:OperationGuard {armed:true,unknown}};
++        inner.decoder=OriginalResponseDecoder::returned_from_original_channel(&inner.step,&inner.request_body,startup,writer).unwrap();
++        Pipes {inner,channel,unknown,reader:Some(reader),_control_peer:control_peer,output_reader_fd,output_fd}
++    }
++    async fn frame(reader:&pipe::Pipe)->Value {
++        tokio::time::timeout(Duration::from_secs(1),async {
++            let mut bytes=Vec::new();
++            loop {let byte=reader.read_byte().await.unwrap();if byte==b'\n'{break;}
++                assert!(bytes.len()<super::super::super::MAX_FRAME);bytes.push(byte);}
++            serde_json::from_slice(&bytes).unwrap()
++        }).await.unwrap()
++    }
++    async fn no_frame(reader:&pipe::Pipe) {
++        assert!(tokio::time::timeout(Duration::from_millis(10),reader.read_byte()).await.is_err());
++    }
++    fn fill_output(fd:i32)->usize {
++        let bytes=[0u8;4096];let mut blocked=false;let mut total=0;
++        for _ in 0..1024 {
++            let written=unsafe{libc::write(fd,bytes.as_ptr().cast(),bytes.len())};
++            if written<0 {
++                assert_eq!(std::io::Error::last_os_error().kind(),std::io::ErrorKind::WouldBlock);
++                blocked=true;break;
++            }
++            assert!(written>0);total+=written as usize;
++        }
++        assert!(blocked,"bounded test pipe did not reach backpressure");
++        total
++    }
++    fn read_exact_now(fd:i32,length:usize)->Vec<u8> {
++        assert!(length<=4*1024*1024);
++        let mut bytes=vec![0u8;length];let mut offset=0;
++        while offset<length {
++            let read=unsafe{libc::read(fd,bytes[offset..].as_mut_ptr().cast(),length-offset)};
++            assert!(read>0,"test pipe did not retain the observed bytes");offset+=read as usize;
++        }
++        bytes
++    }
++    #[tokio::test]
++    async fn actual_returned_channel_writer_emits_exact_frame_then_releases_only_its_request() {
++        let p=pipes().await;let payload=terminal_payload("original-response");
++        assert_eq!(p.channel.lock().await.unresolved.as_deref(),Some(p.inner.step.request_id.as_str()));
++        let wire=format!("data: {}\n\ndata: {payload}\n\n",function_payload());
++        let stream:codex_client::ByteStream=Box::pin(futures::stream::iter(vec![Ok(bytes::Bytes::from(wire))]));
++        let (tx,mut rx)=tokio::sync::mpsc::channel(16);
++        crate::sse::responses::process_sse_with_original(stream,tx,Duration::from_secs(1),None,
++            crate::common::SafetyBufferingTreatment::default(),Some(p.inner.decoder)).await;
++        let mut completed=false;while let Some(event)=rx.recv().await {
++            if matches!(event.unwrap(),crate::ResponseEvent::Completed{..}){completed=true;}
++        }
++        assert!(completed,"the actual SSE path must publish before forwarding Completed");
++        assert_eq!(frame(p.reader.as_ref().unwrap()).await,json!({"protocol":"soloco-protected-backend-permit-v2",
++            "kind":"original_response_terminal_drained","nonce":"a".repeat(64),"pid":std::process::id(),
++            "host_instance_id":"source-fixture-original-host","request_id":p.inner.step.request_id,
++            "request_sha256":super::super::super::hash(&p.inner.request_body),"sequence":1,"response_id":"original-response",
++            "terminal_logical_payload_sha256":super::super::super::hash(payload.as_bytes()),
++            "local_body_eof_observed":true,"remote_domain_closed":false}));
++        let state=p.channel.lock().await;assert!(state.unresolved.is_none());assert!(!state.poisoned);drop(state);
++        assert!(!p.unknown.load(Ordering::SeqCst));
++        assert!(!p.unknown.load(Ordering::SeqCst),"success must disarm the SAME operation guard");
++    }
++    #[tokio::test]
++    async fn actual_writer_duplicate_cannot_publish_again_or_clear_a_later_request() {
++        let mut p=pipes().await;complete_terminal(&p.inner,"r");p.inner.decoder.publish_terminal_drained().await.unwrap();
++        frame(p.reader.as_ref().unwrap()).await;
++        {let mut state=p.channel.lock().await;state.sequence=2;state.unresolved=Some("later-request".into());}
++        assert!(p.inner.decoder.publish_terminal_drained().await.is_err());
++        assert!(p.inner.decoder.source.terminal.lock().unwrap().unknown);
++        assert_eq!(p.channel.lock().await.unresolved.as_deref(),Some("later-request"));
++        no_frame(p.reader.as_ref().unwrap()).await;
++    }
++    #[tokio::test]
++    async fn actual_writer_refuses_foreign_sequence_startup_and_request_without_release() {
++        for changed in ["sequence","startup","request"] {
++            let mut p=pipes().await;complete_terminal(&p.inner,"r");
++            {let mut state=p.channel.lock().await;match changed {
++                "sequence"=>state.sequence+=1,
++                "startup"=>state.challenge.as_mut().unwrap().nonce="d".repeat(64),
++                _=>state.unresolved=Some("foreign-request".into()),
++            }}
++            assert!(p.inner.decoder.publish_terminal_drained().await.is_err());
++            let state=p.channel.lock().await;assert!(state.poisoned);assert!(state.unresolved.is_some());drop(state);
++            assert!(p.unknown.load(Ordering::SeqCst));no_frame(p.reader.as_ref().unwrap()).await;
++        }
++    }
++    #[tokio::test]
++    async fn actual_writer_missing_completion_eof_or_known_parser_cannot_write_or_release() {
++        for missing in ["completion","eof","known"] {
++            let mut p=pipes().await;
++            let payload=terminal_payload("r");p.inner.decoder.observe_terminal(&payload,"response.completed");
++            if missing!="completion"{p.inner.decoder.completed("r");}
++            if missing!="eof"{p.inner.decoder.local_eof();}
++            if missing=="known"{p.inner.decoder.unknown();}
++            assert!(p.inner.decoder.publish_terminal_drained().await.is_err());
++            assert_eq!(p.channel.lock().await.unresolved.as_deref(),Some(p.inner.step.request_id.as_str()));
++            assert!(p.unknown.load(Ordering::SeqCst));no_frame(p.reader.as_ref().unwrap()).await;
++        }
++    }
++    #[tokio::test]
++    async fn actual_fd3_closed_reader_write_failure_retains_reservation_and_unknown() {
++        let mut p=pipes().await;complete_terminal(&p.inner,"r");
++        // Rust's test process starts with SIGPIPE ignored; no process signal
++        // handler is changed by this fixture. The real pipe reports EPIPE.
++        drop(p.reader.take());
++        assert!(p.inner.decoder.publish_terminal_drained().await.is_err());
++        let state=p.channel.lock().await;assert!(state.poisoned);assert!(state.unresolved.is_some());drop(state);
++        assert!(p.unknown.load(Ordering::SeqCst));
++    }
++    #[tokio::test(start_paused=true)]
++    async fn actual_fd3_full_pipe_hits_fixed_write_deadline_and_retains_unknown() {
++        let mut p=pipes().await;complete_terminal(&p.inner,"r");fill_output(p.output_fd);
++        assert!(p.inner.decoder.publish_terminal_drained().await.is_err());
++        let state=p.channel.lock().await;assert!(state.poisoned);assert!(state.unresolved.is_some());drop(state);
++        assert!(p.unknown.load(Ordering::SeqCst));
++    }
++    #[tokio::test]
++    async fn actual_fd3_partial_frame_then_cancel_keeps_original_request_unknown() {
++        let mut p=pipes().await;
++        let pipe_buf=unsafe{libc::fpathconf(p.output_fd,libc::_PC_PIPE_BUF)};
++        assert!(pipe_buf>0&&(pipe_buf as usize)<super::super::super::MAX_FRAME/4);
++        // A large but valid original response ID makes this fixed closed frame
++        // non-atomic (> actual PIPE_BUF), still below both Native wire bounds.
++        // It is a writer-mechanics fixture, not a Node-admissible response ID.
++        let response_id="r".repeat(super::super::super::MAX_FRAME-2048);
++        let payload=complete_terminal(&p.inner,&response_id);
++        assert!(payload.len()<super::super::super::MAX_BODY);
++        let expected=p.inner.decoder.source.startup.terminal_drained_frame(&p.inner.step.request_id,
++            &super::super::super::hash(&p.inner.request_body),1,&response_id,&super::super::super::hash(payload.as_bytes()));
++        let mut expected=serde_json::to_vec(&expected).unwrap();
++        assert!(expected.len()<=super::super::super::MAX_FRAME&&expected.len()>pipe_buf as usize);expected.push(b'\n');
++        let filled=fill_output(p.output_fd);let freed=pipe_buf as usize;
++        assert!(filled>=freed);assert!(read_exact_now(p.output_reader_fd,freed).iter().all(|byte|*byte==0));
++        let remaining_fill=filled-freed;
++        let mut publication=Box::pin(p.inner.decoder.publish_terminal_drained());let mut observed=0usize;
++        for _ in 0..32 {
++            assert!(futures::poll!(publication.as_mut()).is_pending(),"fixture must not finish a whole frame");
++            let mut buffered=0i32;
++            assert_eq!(unsafe{libc::ioctl(p.output_reader_fd,libc::FIONREAD,&mut buffered)},0);
++            assert!(buffered>=0);observed=buffered as usize;
++            if observed>remaining_fill {break;}
++            tokio::time::sleep(Duration::from_millis(1)).await;
++        }
++        assert!(observed>remaining_fill,"must observe actual frame bytes, not infer a partial write from EAGAIN");
++        let prefix_written=observed-remaining_fill;
++        assert!(prefix_written>0&&prefix_written<expected.len());
++        // Cancel before consuming any further bytes: a reader must not create
++        // space that lets the writer finish and release its reservation.
++        drop(publication);
++        assert!(p.unknown.load(Ordering::SeqCst));
++        assert_eq!(p.channel.lock().await.unresolved.as_deref(),Some(p.inner.step.request_id.as_str()));
++        let bytes=read_exact_now(p.output_reader_fd,observed);
++        assert!(bytes[..remaining_fill].iter().all(|byte|*byte==0));
++        assert_eq!(&bytes[remaining_fill..],&expected[..prefix_written]);
++        assert!(!bytes[remaining_fill..].contains(&b'\n'));
++        assert!(serde_json::from_slice::<Value>(&bytes[remaining_fill..]).is_err());
++        let mut extra=0u8;
++        assert_eq!(unsafe{libc::read(p.output_reader_fd,(&mut extra as *mut u8).cast(),1)},-1);
++        assert_eq!(std::io::Error::last_os_error().kind(),std::io::ErrorKind::WouldBlock);
++    }
++    #[tokio::test]
++    async fn actual_writer_cancelled_while_fd3_backpressured_and_dropped_decoder_stay_unknown() {
++        let mut p=pipes().await;complete_terminal(&p.inner,"r");fill_output(p.output_fd);
++        let mut publication=Box::pin(p.inner.decoder.publish_terminal_drained());
++        assert!(futures::poll!(publication.as_mut()).is_pending());drop(publication);
++        assert!(p.unknown.load(Ordering::SeqCst));assert!(p.channel.lock().await.unresolved.is_some());
++        let p=pipes().await;drop(p.inner.decoder);
++        assert!(p.unknown.load(Ordering::SeqCst));assert!(p.channel.lock().await.unresolved.is_some());
++    }
++}
+--- a/codex-rs/codex-api/src/protected_peer/original_native_decoder.rs
++++ b/codex-rs/codex-api/src/protected_peer/original_native_decoder.rs
+@@ -26,0 +27,8 @@
++    }
++    pub(super) fn terminal_drained_frame(&self,request_id:&str,request_sha256:&str,sequence:u64,
++        response_id:&str,terminal_logical_payload_sha256:&str)->Value {
++        serde_json::json!({"protocol":super::PROTOCOL,"kind":"original_response_terminal_drained",
++            "nonce":self.nonce,"pid":self.pid,"host_instance_id":self.host,"request_id":request_id,
++            "request_sha256":request_sha256,"sequence":sequence,"response_id":response_id,
++            "terminal_logical_payload_sha256":terminal_logical_payload_sha256,
++            "local_body_eof_observed":true,"remote_domain_closed":false})
+--- a/codex-rs/codex-api/src/protected_peer.rs
++++ b/codex-rs/codex-api/src/protected_peer.rs
+@@ -307,2 +307,2 @@
+-/// Inventory equivalence is deliberately bounded to the same original five
+-/// complete schemas. Called only after the final original wire proof matches.
++/// Exact catalog equality follows the immutable original startup selection.
++/// A request body cannot select bootstrap or an arbitrary ordinary subset.
+@@ -310,2 +310,4 @@
+-    let expected: Value = serde_json::from_str(include_str!("protected_peer_responses_tools.json"))
+-        .map_err(|_| hold("compiled tool resource"))?;
++    validated_selected_offered_inventory(root,context_contract::selected_original_tool_profile())
++}
++fn validated_selected_offered_inventory(root:&serde_json::Map<String,Value>,profile:context_contract::OriginalToolProfile)->Result<Value,TransportError> {
++    let expected=profile.offered_inventory()?;
+@@ -317 +319 @@
+-            return Err(hold("full original five-tool/schema equality or deferred offered inventory"));
++            return Err(hold("full original selected tool/schema equality or deferred offered inventory"));
+@@ -329 +331 @@
+-            return Err(hold("full original RLite five-tool namespace/schema equality"));
++            return Err(hold("full original RLite selected tool namespace/schema equality"));
+@@ -447 +449 @@
+-        tool_resource_sha256: hash(include_bytes!("protected_peer_responses_tools.json")),
++        tool_resource_sha256: context_contract::selected_original_tool_profile().resource_sha256(),
+@@ -567,0 +570,31 @@
++    }
++}
++/// The concrete original FD3 writer is retained by the SAME response decoder.
++/// Raw byte EOF cannot release its request reservation or disarm cancellation.
++#[cfg(unix)]
++struct OriginalResponseDrainWriter {
++    owner:&'static tokio::sync::Mutex<Channel>,
++    startup:original_native_decoder::OriginalStartupIdentity,
++    request_id:String,request_sha256:String,sequence:u64,
++    guard:OperationGuard<'static>,
++}
++#[cfg(unix)]
++impl OriginalResponseDrainWriter {
++    fn matches(&self,startup:&original_native_decoder::OriginalStartupIdentity,request_id:&str,request_sha256:&str)->bool {
++        &self.startup==startup&&self.request_id==request_id&&self.request_sha256==request_sha256
++    }
++    async fn publish(mut self,drained:original_history::OriginalResponseTerminalDrained)->Result<(),TransportError> {
++        let mut state=lock_original_known(self.owner,self.guard.unknown).await?;
++        if state.poisoned||state.sequence!=self.sequence||state.unresolved.as_deref()!=Some(self.request_id.as_str())
++            ||original_native_decoder::OriginalStartupIdentity::observe(&state)?!=self.startup
++            ||!drained.matches(&self.startup,&self.request_id,&self.request_sha256) {
++            state.poisoned=true;return Err(hold("response original terminal drain channel changed"));
++        }
++        let frame=drained.frame(self.sequence);
++        let result=tokio::time::timeout(std::time::Duration::from_secs(5),state.write(&frame)).await;
++        if !matches!(result,Ok(Ok(()))) {
++            state.poisoned=true;return Err(hold("response original terminal drain witness write failed/deadline"));
++        }
++        // Only an authoritative parser+same-body drain written on the original
++        // inherited FD3 releases THIS request. Drop/error keeps UNKNOWN sticky.
++        state.unresolved=None;self.guard.armed=false;Ok(())
+@@ -637,3 +670,5 @@
+-        let startup_identity={let state=owner.lock().await;
+-            original_native_decoder::OriginalStartupIdentity::observe(&state)?};
+-        let original = original_history::OriginalResponseDecoder::returned(step, body, startup_identity)?;
++        let (startup_identity,sequence)={let state=owner.lock().await;
++            (original_native_decoder::OriginalStartupIdentity::observe(&state)?,state.sequence)};
++        let original = original_history::OriginalResponseDecoder::returned_from_original_channel(step,body,startup_identity.clone(),
++            OriginalResponseDrainWriter {owner,startup:startup_identity,request_id:step.request_id.clone(),
++                request_sha256:hash(body),sequence,guard})?;
+@@ -650,2 +685,3 @@
+-        // EOF is local observed transport-body closure, not remote model/backend-domain death.
+-        let bytes = futures::stream::unfold((bytes, owner, request_id, false, guard, live_auth, network_permit), |(mut bytes, owner, request_id, ended, mut guard, live_auth, network_permit)| async move {
++        // Raw EOF is only local transport bookkeeping. The original SSE decoder
++        // must observe Completed AND this same body drain before releasing it.
++        let bytes = futures::stream::unfold((bytes, owner, request_id, sequence, false, live_auth, network_permit), |(mut bytes, owner, request_id, sequence, ended, live_auth, network_permit)| async move {
+@@ -658,2 +694,2 @@
+-                Some(Ok(chunk)) => Some((Ok(chunk), (bytes, owner, request_id, false, guard, live_auth, network_permit))),
+-                Some(Err(error)) => { owner.lock().await.poisoned = true; Some((Err(error), (bytes, owner, request_id, true, guard, live_auth, network_permit))) },
++                Some(Ok(chunk)) => Some((Ok(chunk), (bytes, owner, request_id, sequence, false, live_auth, network_permit))),
++                Some(Err(error)) => { owner.lock().await.poisoned = true; Some((Err(error), (bytes, owner, request_id, sequence, true, live_auth, network_permit))) },
+@@ -662 +698 @@
+-                    if state.unresolved.as_ref() != Some(&request_id) { state.poisoned = true; return None; }
++                    if state.poisoned||state.sequence!=sequence||state.unresolved.as_ref()!=Some(&request_id) { state.poisoned = true; return None; }
+@@ -664 +700 @@
+-                        "sequence":state.sequence,"pid":std::process::id(),"remote_domain_closed":false});
++                        "sequence":sequence,"pid":std::process::id(),"remote_domain_closed":false});
+@@ -666,2 +702 @@
+-                    if matches!(result, Ok(Ok(()))) { state.unresolved = None; guard.armed = false; }
+-                    else { state.poisoned = true; }
++                    if !matches!(result, Ok(Ok(()))) { state.poisoned = true; }
+--- a/codex-rs/codex-api/src/sse/responses.rs
++++ b/codex-rs/codex-api/src/sse/responses.rs
+@@ -704 +704 @@
+-                if let (ResponseEvent::Completed {response_id,..},Some(source))=(&event,original.as_ref()) {
++                if let (ResponseEvent::Completed {response_id,..},Some(source))=(&event,original.as_mut()) {
+@@ -724,0 +725,3 @@
++                    }
++                    if let Err(error)=source.publish_terminal_drained().await {
++                        source.unknown();let _=tx_event.send(Err(ApiError::Transport(error))).await;return;
+--- /dev/null
++++ b/codex-rs/codex-api/src/protected_peer/bootstrap_membership_readonly3_contract_v1.json
+@@ -0,0 +1,50 @@
++{
++  "protocol": "soloco-bootstrap-membership-context-contract-v1",
++  "contract_id": "bootstrap-membership-readonly3-whole-assignment-v1",
++  "scope_profile_id": "soloco-bootstrap-membership-readonly3-v1",
++  "context_encoding": "soloco-peer-context-frame-v2",
++  "delivery": {
++    "delivery_kind": "bootstrap-membership-assignment",
++    "payload_protocol": "peer-bootstrap-membership-assignment-v1",
++    "source_cut_protocol": "peer-bootstrap-membership-context-v1",
++    "basis_protocol": "peer-checked-input-current-meaning-v1",
++    "kinds": ["peer-bootstrap-membership-reconstruction", "peer-bootstrap-membership-review"]
++  },
++  "tools": [
++    {
++      "type": "function",
++      "name": "soloco_context_header",
++      "description": "Private bootstrap membership context protocol; identity and authority are supplied only by the original protected composition.",
++      "inputSchema": {"type":"object","properties":{},"required":[],"additionalProperties":false}
++    },
++    {
++      "type": "function",
++      "name": "soloco_context_read",
++      "description": "Private bootstrap membership context protocol; identity and authority are supplied only by the original protected composition.",
++      "inputSchema": {
++        "type":"object",
++        "properties": {
++          "sha256":{"type":"string"},
++          "offset":{"type":"integer","minimum":0},
++          "length":{"type":"integer","minimum":1,"maximum":4096}
++        },
++        "required":["sha256","offset","length"],
++        "additionalProperties":false
++      }
++    },
++    {
++      "type": "function",
++      "name": "soloco_context_submit",
++      "description": "Private bootstrap membership context protocol; identity and authority are supplied only by the original protected composition.",
++      "inputSchema": {
++        "type":"object",
++        "properties":{"sha256":{"type":"string"},"content":{"type":"string"}},
++        "required":["sha256","content"],
++        "additionalProperties":false
++      }
++    }
++  ],
++  "limits": {"frame_bytes":100000,"wire_bytes":4000000,"policy_maximum_context_bytes":65536,"read_maximum_characters":4096,"response_maximum_utf8_bytes":12000},
++  "fresh_thread_required": true,
++  "authority": "Source mechanical delivery and constructor-selected catalogue only. No finite purpose, qualified context, launch, spending, membership activation, Native qualification or reservation release is supplied by this resource. Existing Holds remain."
++}

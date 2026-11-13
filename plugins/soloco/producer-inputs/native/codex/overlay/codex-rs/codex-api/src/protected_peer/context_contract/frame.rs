@@ -108,6 +108,19 @@ fn optional_string(value: Option<&str>) -> String { value.map(|v|format!("\"{v}\
 
 pub(super) fn decode_original_frame<'a>(text: &'a str, source_contract_sha256: &str,
     maximum_frame_bytes: usize) -> Result<DecodedOriginalFrame<'a>, TransportError> {
+    decode_selected_frame(text,source_contract_sha256,maximum_frame_bytes,super::OriginalToolProfile::OrdinaryFive)
+}
+pub(super) fn decode_bootstrap_frame<'a>(text:&'a str,source_contract_sha256:&str,
+    maximum_frame_bytes:usize)->Result<DecodedOriginalFrame<'a>,TransportError> {
+    if source_contract_sha256!=super::BOOTSTRAP_RESOURCE_SHA256||maximum_frame_bytes==0
+        ||maximum_frame_bytes>super::super::MAX_FRAME {
+        return Err(hold("original bootstrap frame resource differs from fixed source"));
+    }
+    decode_selected_frame(text,source_contract_sha256,maximum_frame_bytes,super::OriginalToolProfile::BootstrapReadonlyThree)
+}
+fn decode_selected_frame<'a>(text:&'a str,source_contract_sha256:&str,maximum_frame_bytes:usize,
+    profile:super::OriginalToolProfile)->Result<DecodedOriginalFrame<'a>,TransportError> {
+    let bootstrap=profile==super::OriginalToolProfile::BootstrapReadonlyThree;
     if maximum_frame_bytes==0||maximum_frame_bytes>MAX_PROFILE_FRAME_BYTES||text.len()>maximum_frame_bytes||!sha(source_contract_sha256) {
         return Err(hold("original whole delivery frame capacity"));
     }
@@ -115,6 +128,9 @@ pub(super) fn decode_original_frame<'a>(text: &'a str, source_contract_sha256: &
     if frame.protocol!=FRAME_PROTOCOL||frame.contract_sha256!=source_contract_sha256||!sha(&frame.payload_sha256)
         ||frame.payload_utf8_bytes==0||frame.payload_utf8_bytes>MAX_PAYLOAD_UTF8 {
         return Err(hold("original whole delivery frame binding"));
+    }
+    if bootstrap!=(frame.delivery_kind=="bootstrap-membership-assignment") {
+        return Err(hold("original delivery kind differs from constructor profile"));
     }
     match frame.delivery_kind.as_str() {
         "task-context"=>{
@@ -129,6 +145,15 @@ pub(super) fn decode_original_frame<'a>(text: &'a str, source_contract_sha256: &
                 ||!frame.source_cut_sha256.as_deref().is_some_and(sha)
                 ||!frame.source_cut_utf8_bytes.is_some_and(|n|n>0&&n<=frame.payload_utf8_bytes) {
                 return Err(hold("original whole membership delivery selector"));
+            }
+        }
+        "bootstrap-membership-assignment"=>{
+            if frame.payload_protocol!="peer-bootstrap-membership-assignment-v1"
+                ||frame.source_cut_protocol.as_deref()!=Some("peer-bootstrap-membership-context-v1")
+                ||!frame.source_cut_sha256.as_deref().is_some_and(sha)
+                ||!frame.source_cut_utf8_bytes.is_some_and(|n|n>0&&n<=frame.payload_utf8_bytes)
+                ||frame.payload_utf8_bytes>65_536 {
+                return Err(hold("original whole bootstrap membership delivery selector"));
             }
         }
         _=>return Err(hold("unsupported original delivery kind")),
@@ -146,7 +171,7 @@ pub(super) fn decode_original_frame<'a>(text: &'a str, source_contract_sha256: &
     if original.get()!=frame.payload.get() { return Err(hold("original whole payload boundary")); }
     let outer=object_spans(payload)?;
     if selector(&outer,"protocol")?!=frame.payload_protocol { return Err(hold("original whole payload protocol mismatch")); }
-    let source_cut=if frame.delivery_kind=="membership-assignment" {
+    let source_cut=if matches!(frame.delivery_kind.as_str(),"membership-assignment"|"bootstrap-membership-assignment") {
         let raw=*outer.get(&ascii_key("source_cut")).ok_or_else(||hold("original whole assignment source cut missing"))?;
         let expected_sha=frame.source_cut_sha256.as_deref().ok_or_else(||hold("original source cut digest unavailable"))?;
         if selector(&outer,"source_cut_sha256")?!=expected_sha||raw.len()!=frame.source_cut_utf8_bytes.unwrap_or(0)
@@ -155,6 +180,14 @@ pub(super) fn decode_original_frame<'a>(text: &'a str, source_contract_sha256: &
         let inner_protocol=selector(&inner,"protocol")?;
         if Some(inner_protocol.as_str())!=frame.source_cut_protocol.as_deref() {
             return Err(hold("original inner source cut protocol mismatch"));
+        }
+        if bootstrap {
+            let meaning=*inner.get(&ascii_key("current_meaning"))
+                .ok_or_else(||hold("original bootstrap current meaning unavailable"))?;
+            let meaning=object_spans(meaning)?;
+            if selector(&meaning,"protocol")?!="peer-checked-input-current-meaning-v1" {
+                return Err(hold("original bootstrap current meaning protocol mismatch"));
+            }
         }
         Some(raw)
     }else{None};
