@@ -13,7 +13,8 @@ import {captureQualificationPlan,createQualificationTarget,qualificationPlanView
 import {bindOperatingIntake,inheritSnapshots,retainSnapshot,resolveSnapshotEntry,snapshotReference,snapshotBytes} from './snapshot.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
+import {dataDir} from './plugin-data.mjs';
+export {dataDir} from './plugin-data.mjs';
 import { spawn } from 'node:child_process';
 import { PACKAGE, VERSION, stamp, id, digest, folder, noLink, withStore, owner, notice, requireText, SCHEMA, installedTeam, teamHash, upgradePending, compatibleRuntime } from './store.mjs';
 import { readiness, modelCatalog } from './adapters.mjs';
@@ -43,9 +44,6 @@ import {qaData,qaRef,qaNeed,qaText,qaSame,qaCopy} from './peers/origin-mechanica
 const busy = state => Object.values(state.jobs??{}).filter(j => ['queued','running'].includes(j?.status));
 // Terminal status does not prove that a started model process has closed.
 const occupiedJobs = state => Object.values(state.jobs??{}).filter(j=>['queued','running'].includes(j.status)||(j.runtime_task||j.started_at)&&['cancelled','interrupted','failed'].includes(j.status)&&j.coordination_release?.termination_confirmed!==true);
-export function dataDir() {
-  return process.env.COMPANY_PLUGIN_DATA || process.env.PLUGIN_DATA || process.env.CLAUDE_PLUGIN_DATA || path.join(os.homedir(),'.cache','soloco');
-}
 export function bind(root, session, host) {
   requireText(session,'session_id',200);
   const dir = path.join(dataDir(),'bindings');

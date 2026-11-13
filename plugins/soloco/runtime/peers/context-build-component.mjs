@@ -10,11 +10,15 @@ import {DatabaseSync} from 'node:sqlite';
 import {spawn} from 'node:child_process';
 import {formatContextBuildInputData,formatContextBuildOutputData,createContextBuildIntentData,advanceContextBuildIntentData,inspectContextBuildIntentData} from './context-build-data.mjs';
 
-const HERE=fileURLToPath(import.meta.url),REPO=path.resolve(fileURLToPath(new URL('../../../../',import.meta.url)));
-const ENTRY=path.join(REPO,'tools/build-peer-context.mjs'),NATIVE=path.join(REPO,'native/codex');
-const ROOT=path.join(REPO,'work/peer-context-component'),JOURNAL=path.join(ROOT,'journal.sqlite'),ANCHOR=path.join(ROOT,'journal-anchor.json');
+import {originalDeveloperComponentLayout,originalPackagedComponentLayout,originalComponentLayoutPaths,inspectOriginalComponentLayout,prepareOriginalPackagedComponentWorkspace,originalComponentNodePath,originalComponentNativePath,inspectOriginalPackagedRecipeInventory,inspectOriginalComponentNodeInventory,hasOriginalPackagedRecipeNamespace,syncOriginalComponentRootAncestry,assertOriginalComponentJournalInitialization,assertOriginalComponentJournalWitnesses,retainOriginalComponentJournalObservation,originalComponentLayoutErrorCode} from './context-component-layout.mjs';
+
+const HERE=fileURLToPath(import.meta.url),errors=new WeakMap();
+export const contextComponentErrorCode=e=>errors.get(e)??originalComponentLayoutErrorCode(e)??'COMPONENT_INTERNAL_ERROR';
+function createOriginalService(layout){
+ const layoutPaths=originalComponentLayoutPaths(layout),packaged=layoutPaths.kind==='packaged-plugin-v1';
+ const REPO=layoutPaths.source_root,ENTRY=layoutPaths.entry,NATIVE=layoutPaths.native_root,ROOT=layoutPaths.durable_root,JOURNAL=path.join(ROOT,'journal.sqlite'),ANCHOR=path.join(ROOT,'journal-anchor.json');
 const PACKAGE_SHA='c103b27a9c458c0989c7766a769ab1644e3663307e72274906c6d362fdd64c15';
-const DRIVER_SHA='99c1723444f39e73059b5eadc1f089751739832dfafba2a0a149cadf172298b5';
+const DRIVER_SHA='d5a0e487d25dba33366c3ec4eece557067032dc50fd52b6aeb49c1db68e2fa88';
 const DATA_SHA='64b3b0cd592956a1effc2971350c4d4b66a861b4de0eee361e1024d2418184c8';
 const COMMIT='c40729ea5cf8e947481b130c59807273eda2f8e9',TREE='078c14cecf94b522a2eff48b30996bf3f4d1bf7a';
 const TARGET='aarch64-apple-darwin',PYTHON='/usr/bin/python3',BUILD_SECONDS=1200;
@@ -23,13 +27,12 @@ const SIDECAR_FLAGS=['-std=c11','-O2','-Wall','-Wextra','-Werror','-target','arm
 const SELECTED_CLANG='/Applications/Xcode-26.3.0.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang';
 const SELECTED_SDK='/Applications/Xcode-26.3.0.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk';
 const MAX_FILE=128*1024*1024,MAX_NODE=64*1024*1024;
-const errors=new WeakMap(),pending=new Map();let issuer;
+const pending=new Map(),journals=new WeakMap();let issuer;
 // These handles identify inspected component DATA only, never executable support.
 const selectedDataHandles=new WeakMap(),SELECTED_COMPONENT_DATA=Object.freeze(Object.create(null));
 const sha=bytes=>createHash('sha256').update(bytes).digest('hex');
 const hash=v=>typeof v==='string'&&/^[a-f0-9]{64}$/.test(v);
 function fail(code){const e=Error(code);errors.set(e,code);throw e;}
-export const contextComponentErrorCode=e=>errors.get(e)??'COMPONENT_INTERNAL_ERROR';
 const object=v=>v!==null&&typeof v==='object'&&!Array.isArray(v)&&Object.getPrototypeOf(v)===Object.prototype;
 const exact=(v,keys)=>object(v)&&Object.keys(v).sort().join(',')===[...keys].sort().join(',');
 function canonical(value){const sort=v=>Array.isArray(v)?v.map(sort):object(v)?Object.fromEntries(Object.keys(v).sort().map(k=>[k,sort(v[k])])):v;return JSON.stringify(sort(value)).replace(/[\u007f-\uffff]/g,c=>'\\u'+c.charCodeAt(0).toString(16).padStart(4,'0'))+'\n';}
@@ -63,7 +66,8 @@ function readFixedPublicPython(){
 // Captured by this loaded original module, before any caller operation. The
 // trusted loader/source assumption is explicit; this is not an attestation
 // against a hostile runtime or a source editor racing Node's own module read.
-const STARTUP_IMPL=[HERE,ENTRY,path.join(path.dirname(HERE),'context-build-data.mjs')].map(file=>({file,sha256:sha(stableRead(file))}));
+const PLUGIN_DATA_SOURCE=path.resolve(path.dirname(HERE),'../plugin-data.mjs');
+const STARTUP_IMPL=[HERE,ENTRY,path.join(path.dirname(HERE),'context-build-data.mjs'),layoutPaths.layout_source,PLUGIN_DATA_SOURCE].map(file=>({file,sha256:sha(stableRead(file))}));
 function readPin(root,pin){if(!exact(pin,['path','bytes','sha256'])||!Number.isSafeInteger(pin.bytes)||pin.bytes<0||pin.bytes>MAX_FILE||!hash(pin.sha256))fail('COMPONENT_SOURCE_CHANGED');const bytes=stableRead(path.join(root,relative(pin.path)));if(bytes.length!==pin.bytes||sha(bytes)!==pin.sha256)fail('COMPONENT_SOURCE_CHANGED');return bytes;}
 function parse(bytes){try{const text=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(bytes);return JSON.parse(text);}catch{fail('COMPONENT_ARTIFACT_CHANGED');}}
 function rows(value,maximum=128*1024*1024){
@@ -83,7 +87,10 @@ function fixedIssuer(){
  const moduleBytes=stableRead(HERE),entryBytes=stableRead(ENTRY),dataBytes=stableRead(path.join(path.dirname(HERE),'context-build-data.mjs'));
  if(sha(dataBytes)!==DATA_SHA)fail('COMPONENT_SOURCE_CHANGED');
  noLinks(REPO);const realm=fs.lstatSync(REPO,{bigint:true});if(!realm.isDirectory())fail('COMPONENT_PATH_CHANGED');
- const identity=sha(canonical({module:ref(moduleBytes),entry:ref(entryBytes),data:ref(dataBytes),source_root:{path:REPO,dev:String(realm.dev),ino:String(realm.ino)}}));
+ const physical=inspectOriginalComponentLayout(layout),basis={module:ref(moduleBytes),entry:ref(entryBytes),data:ref(dataBytes),source_root:{path:REPO,dev:String(realm.dev),ino:String(realm.ino)}};
+ if(packaged){basis.layout=ref(stableRead(layoutPaths.layout_source));basis.plugin_data=ref(stableRead(PLUGIN_DATA_SOURCE));basis.durable_root={path:ROOT,dev:physical.durable_identity.dev,ino:physical.durable_identity.ino};}
+ // Raw source/physical facts ONLY: inputs/intent/output never feed owner back.
+ const identity=sha(canonical(basis));
  if(issuer&&issuer.owner_sha256!==identity)fail('COMPONENT_SOURCE_CHANGED');
  // Same pinned implementation has the SAME durable epoch on cold restart.
  // A fresh process/WeakMap identity must never reset one-use reservation keys.
@@ -98,19 +105,22 @@ function collectInputs(){
  for(const r of bindings)if(!r.path.startsWith('codex-rs/'))fail('COMPONENT_SOURCE_CHANGED');
  const compiledBytes=Buffer.from(canonical({schema:'soloco-compiled-native-inputs-v1',upstream:{commit:COMMIT,tree:TREE},source_package_sha256:PACKAGE_SHA,files_count:bindings.length,files:bindings}));
  for(const pin of [pkg.source_cut.handoff,pkg.source_cut.patch,pkg.upstream.inventory,...pkg.upstream.attribution,...pkg.overlay.map(v=>v.payload),pkg.cargo_lock,pkg.toolchain.official_manifest])readPin(NATIVE,pin);
- const sidecarSource=stableRead(path.join(REPO,SIDECAR)),helper=pkg.sidecar_capture;
+ const sidecarSource=stableRead(originalComponentNodePath(layout,SIDECAR)),helper=pkg.sidecar_capture;
  if(!exact(helper,['protocol','source','binary','arguments','target','flags'])||helper.protocol!=='soloco-origin-sidecar-source-build-v1'||!same(helper.source,{path:SIDECAR,...ref(sidecarSource)})||helper.binary!=='origin-sidecar-capture'||!same(helper.arguments,['origin-sidecar-capture-v1'])||helper.target!=='arm64-apple-macos11.0'||!same(helper.flags,SIDECAR_FLAGS))fail('COMPONENT_SOURCE_CHANGED');
- const nodeRows=treeRows(path.join(REPO,'plugins/soloco'),'plugins/soloco',MAX_NODE,MAX_NODE,true);nodeRows.push({path:'tools/build-peer-context.mjs',...ref(stableRead(ENTRY)),mode:'100644'});nodeRows.sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0);rows(nodeRows,MAX_NODE);
+ const nativeRecipe=(packaged||hasOriginalPackagedRecipeNamespace(layout))?inspectOriginalPackagedRecipeInventory(layout,packageBytes,driverBytes):null;
+ const nodeRows=inspectOriginalComponentNodeInventory(layout,nativeRecipe);rows(nodeRows,MAX_NODE);
  const nodeBytes=Buffer.from(canonical({schema:'soloco-node-peer-context-inputs-v1',files:nodeRows,roots:nodeRows.map(v=>v.path),edges:[]}));
  const codec=stableRead(path.join(path.dirname(HERE),'peer-delivery-frame.mjs')),resource=stableRead(path.join(path.dirname(HERE),'peer-context-contract-v2.json'));
  if(sha(codec)!=='e174dee61f38567b3c01ae4a2593612a664b8434a775478c091aae532ef30746'||sha(resource)!=='832fdd1c965fa0e834c030f7c1e5636e2f32636b0df899ba8aa0fa940e9032fc')fail('COMPONENT_SOURCE_CHANGED');
- const runtimeBytes=stableRead(fs.realpathSync(process.execPath),256*1024*1024),pythonBytes=readFixedPublicPython(),profileBytes=Buffer.from(canonical({protocol:'context-component-build-profile-v1',version:process.version,platform:process.platform,arch:process.arch,node:ref(runtimeBytes),exec_argv:process.execArgv,python:ref(pythonBytes),python_flags:['-I','-S'],entry:'tools/build-peer-context.mjs',target:TARGET,driver_timeout_seconds:BUILD_SECONDS}));
+ const runtimeBytes=stableRead(fs.realpathSync(process.execPath),256*1024*1024),pythonBytes=readFixedPublicPython(),profile={protocol:'context-component-build-profile-v1',version:process.version,platform:process.platform,arch:process.arch,node:ref(runtimeBytes),exec_argv:process.execArgv,python:ref(pythonBytes),python_flags:['-I','-S'],entry:packaged?'plugins/soloco/producer/build-peer-context.mjs':'tools/build-peer-context.mjs',target:TARGET,driver_timeout_seconds:BUILD_SECONDS};
+ const layoutRecord=inspectOriginalComponentLayout(layout);if(packaged)profile.layout=layoutRecord;if(nativeRecipe)profile.native_recipe_inventory=nativeRecipe.seal;
+ const profileBytes=Buffer.from(canonical(profile));
  const selectionBytes=Buffer.from(canonical({protocol:'context-component-selection-v1',entry:'codex-soloco-protected-host',target:TARGET,resource:ref(resource),result_kind:'COMPILED_COMPONENT',domain_closure:'unestablished'}));
  const inputs={protocol:'soloco-context-build-input-data-v1',owner_epoch:owner,native:{source_package:ref(packageBytes),compiled_manifest:ref(compiledBytes),cargo_lock:ref(readPin(NATIVE,pkg.cargo_lock)),toolchain_manifest:ref(readPin(NATIVE,pkg.toolchain.official_manifest)),build_driver:ref(driverBytes)},node:{manifest:ref(nodeBytes),executable:ref(runtimeBytes),codec:ref(codec),resource:ref(resource),profile:ref(profileBytes)},selection:ref(selectionBytes)};
- return {owner,inputs,commitment:formatContextBuildInputData(inputs),pkg,bindings,toolchain,compiledBytes,nodeBytes,nodeRows,profileBytes,selectionBytes,driver,python:ref(pythonBytes)};
+ return {owner,inputs,commitment:formatContextBuildInputData(inputs),pkg,bindings,toolchain,compiledBytes,nodeBytes,nodeRows,profileBytes,selectionBytes,driver,python:ref(pythonBytes),layoutRecord};
 }
 function preparedInputs(c){
- const prepared=path.join(ROOT,'inputs',PACKAGE_SHA,'prepared'),toolchain=path.join(ROOT,'toolchain'),cache=path.join(ROOT,'cargo-home');
+ const prepared=path.join(ROOT,'inputs',PACKAGE_SHA,'prepared'),toolchain=packaged?path.join(ROOT,'toolchain',c.pkg.toolchain.inventory.sha256):path.join(ROOT,'toolchain'),cache=packaged?path.join(ROOT,'cargo-home',PACKAGE_SHA+'-'+c.pkg.cargo_lock.sha256):path.join(ROOT,'cargo-home');
  try{
   const record=parse(stableRead(path.join(prepared,'prepared-source.json')));if(!same(record,{schema:'soloco-prepared-native-source-v1',manifest_sha256:PACKAGE_SHA,files:c.bindings,source_compiled:false,native_qualified:false}))fail('COMPONENT_SOURCE_CHANGED');
   verifyTree(path.join(prepared,'source'),c.bindings,128*1024*1024);verifyTree(toolchain,c.toolchain,2*1024*1024*1024);
@@ -119,30 +129,38 @@ function preparedInputs(c){
  return {prepared,toolchain,cache};
 }
 function privateDirectory(directory){
+ if(packaged){inspectOriginalComponentLayout(layout);if(directory!==ROOT&&!directory.startsWith(ROOT+path.sep))fail('COMPONENT_PRIVATE_ROOT_CHANGED');}
  noLinks(directory);const absent=[];for(let p=directory;!fs.existsSync(p);p=path.dirname(p))absent.push(p);
  for(const p of absent.reverse()){try{fs.mkdirSync(p,{mode:0o700});}catch(e){if(e.code!=='EEXIST')throw e;}if(!fs.lstatSync(p).isDirectory())fail('COMPONENT_PRIVATE_ROOT_CHANGED');fsyncDirectory(p);fsyncDirectory(path.dirname(p));}
  const st=fs.lstatSync(directory);if(!st.isDirectory()||(st.mode&0o077)!==0||st.uid!==process.getuid())fail('COMPONENT_PRIVATE_ROOT_CHANGED');return directory;
 }
 const fsyncDirectory=directory=>{const fd=fs.openSync(directory,fs.constants.O_RDONLY|fs.constants.O_NOFOLLOW);try{fs.fsyncSync(fd);}finally{fs.closeSync(fd);}};
-function syncRootAncestry(){for(let p=ROOT;;p=path.dirname(p)){fsyncDirectory(p);if(p===REPO)break;if(path.dirname(p)===p)fail('COMPONENT_PATH_CHANGED');}}
+function syncRootAncestry(){syncOriginalComponentRootAncestry(layout);}
 function syncDirectoryTree(root){let visited=0;function walk(p,depth){if(depth>32||++visited>40000)fail('COMPONENT_ARTIFACT_CHANGED');noLinks(p);for(const name of fs.readdirSync(p)){const child=path.join(p,name),st=fs.lstatSync(child);if(st.isDirectory())walk(child,depth+1);else if(!st.isFile()||st.isSymbolicLink()||st.nlink!==1)fail('COMPONENT_ARTIFACT_CHANGED');}fsyncDirectory(p);}walk(root,0);}
 function writeImmutable(file,bytes){privateDirectory(path.dirname(file));const fd=fs.openSync(file,fs.constants.O_WRONLY|fs.constants.O_CREAT|fs.constants.O_EXCL|fs.constants.O_NOFOLLOW,0o600);try{fs.writeFileSync(fd,bytes);fs.fchmodSync(fd,0o444);fs.fsyncSync(fd);}finally{fs.closeSync(fd);}fsyncDirectory(path.dirname(file));}
 function openJournal(mode='write'){
- const create=mode==='create',readOnly=mode==='read';
+ const create=mode==='create',readOnly=mode==='read';inspectOriginalComponentLayout(layout);
  if(!create&&!fs.existsSync(JOURNAL))fail('COMPONENT_NOT_PREPARED');
  if(readOnly){noLinks(ROOT);const st=fs.lstatSync(ROOT);if(!st.isDirectory()||(st.mode&0o077)!==0||st.uid!==process.getuid())fail('COMPONENT_PRIVATE_ROOT_CHANGED');}
  else{privateDirectory(ROOT);syncRootAncestry();}noLinks(JOURNAL);let created=false;
- if(!fs.existsSync(JOURNAL)){if(readOnly)fail('COMPONENT_NOT_PREPARED');if(fs.existsSync(ANCHOR))fail('COMPONENT_JOURNAL_CHANGED');const fd=fs.openSync(JOURNAL,fs.constants.O_CREAT|fs.constants.O_EXCL|fs.constants.O_WRONLY|fs.constants.O_NOFOLLOW,0o600);fs.fsyncSync(fd);fs.closeSync(fd);fsyncDirectory(ROOT);created=true;}
+ if(!fs.existsSync(JOURNAL)){if(readOnly)fail('COMPONENT_NOT_PREPARED');if(fs.existsSync(ANCHOR))fail('COMPONENT_JOURNAL_CHANGED');assertOriginalComponentJournalInitialization(layout);const fd=fs.openSync(JOURNAL,fs.constants.O_CREAT|fs.constants.O_EXCL|fs.constants.O_WRONLY|fs.constants.O_NOFOLLOW,0o600);fs.fsyncSync(fd);fs.closeSync(fd);fsyncDirectory(ROOT);created=true;}
  const st=fs.lstatSync(JOURNAL);if(!st.isFile()||st.nlink!==1||st.uid!==process.getuid()||(st.mode&0o077)!==0)fail('COMPONENT_PRIVATE_ROOT_CHANGED');
  const raw=fs.lstatSync(JOURNAL,{bigint:true}),identity={protocol:'context-component-journal-anchor-v1',dev:String(raw.dev),ino:String(raw.ino)};
  if(created)writeImmutable(ANCHOR,Buffer.from(canonical(identity)));else if(!fs.existsSync(ANCHOR)||!same(parse(stableRead(ANCHOR,4096)),identity))fail('COMPONENT_JOURNAL_CHANGED');
- const db=new DatabaseSync(JOURNAL,{readOnly});try{db.exec('PRAGMA busy_timeout=1000; PRAGMA trusted_schema=OFF;');
+ assertOriginalComponentJournalWitnesses(layout);
+ const journalFd=fs.openSync(JOURNAL,fs.constants.O_RDONLY|fs.constants.O_NOFOLLOW|fs.constants.O_NONBLOCK),original=fs.fstatSync(journalFd,{bigint:true}),fields=['dev','ino','mode','uid','gid','nlink','size','mtimeNs','ctimeNs'];let db;
+ try{const named=fs.lstatSync(JOURNAL,{bigint:true});if(fields.some(k=>named[k]!==original[k]))fail('COMPONENT_JOURNAL_CHANGED');db=new DatabaseSync(JOURNAL,{readOnly});
+  if([fs.fstatSync(journalFd,{bigint:true}),fs.lstatSync(JOURNAL,{bigint:true})].some(v=>fields.some(k=>v[k]!==original[k])))fail('COMPONENT_JOURNAL_CHANGED');
+  db.exec('PRAGMA busy_timeout=1000; PRAGMA trusted_schema=OFF;');
   if(!readOnly)db.exec('PRAGMA journal_mode=DELETE; PRAGMA synchronous=FULL;');
   if(create)db.exec('CREATE TABLE IF NOT EXISTS intents(intent_key TEXT PRIMARY KEY,owner_sha256 TEXT NOT NULL,generation INTEGER NOT NULL,input_key TEXT NOT NULL,revision INTEGER NOT NULL,record TEXT NOT NULL,record_sha256 TEXT NOT NULL,UNIQUE(owner_sha256,generation,input_key)); CREATE TABLE IF NOT EXISTS events(sequence INTEGER PRIMARY KEY AUTOINCREMENT,intent_key TEXT NOT NULL,kind TEXT NOT NULL,body TEXT NOT NULL);');
-  if(db.prepare("SELECT 1 FROM sqlite_schema WHERE type IN ('trigger','view') LIMIT 1").get())fail('COMPONENT_JOURNAL_CHANGED');return db;
- }catch(e){db.close();throw e;}
+  if(db.prepare("SELECT 1 FROM sqlite_schema WHERE type IN ('trigger','view') LIMIT 1").get())fail('COMPONENT_JOURNAL_CHANGED');journals.set(db,{fd:journalFd,original});retainOriginalComponentJournalObservation(layout);assertJournal(db);return db;
+ }catch(e){const cleanup=[];try{db?.close();}catch(x){cleanup.push(x);}try{fs.closeSync(journalFd);}catch(x){cleanup.push(x);}if(cleanup.length)throw new AggregateError([e,...cleanup],'Original component journal cleanup failed');throw e;}
 }
-function transaction(db,fn){db.exec('BEGIN IMMEDIATE');try{const value=fn();db.exec('COMMIT');return value;}catch(e){try{db.exec('ROLLBACK');}catch{}throw e;}}
+function assertJournal(db){
+ inspectOriginalComponentLayout(layout);assertOriginalComponentJournalWitnesses(layout);const r=journals.get(db);if(!r)fail('COMPONENT_JOURNAL_CHANGED');const named=fs.lstatSync(JOURNAL,{bigint:true}),held=fs.fstatSync(r.fd,{bigint:true});for(const k of ['dev','ino','mode','uid','gid','nlink'])if(named[k]!==r.original[k]||held[k]!==r.original[k])fail('COMPONENT_JOURNAL_CHANGED');if(!named.isFile()||named.nlink!==1n||!same(parse(stableRead(ANCHOR,4096)),{protocol:'context-component-journal-anchor-v1',dev:String(held.dev),ino:String(held.ino)}))fail('COMPONENT_JOURNAL_CHANGED');
+}
+function transaction(db,fn){assertJournal(db);db.exec('BEGIN IMMEDIATE');try{const value=fn();if(db.isTransaction!==true)fail('COMPONENT_JOURNAL_CHANGED');assertJournal(db);db.exec('COMMIT');return value;}catch(e){if(db.isTransaction)try{db.exec('ROLLBACK');}catch{}throw e;}}
 function rowState(row){if(!row)fail('COMPONENT_NOT_PREPARED');const state=parse(Buffer.from(row.record));const checked=inspectContextBuildIntentData(state);if(checked.encoded!==row.record||checked.sha256!==row.record_sha256||state.revision!==row.revision||state.intent_key!==row.intent_key||state.input_key!==row.input_key||state.inputs.owner_epoch.owner_sha256!==row.owner_sha256||state.inputs.owner_epoch.generation!==row.generation)fail('COMPONENT_JOURNAL_CHANGED');return checked.record;}
 function readState(db,key){return rowState(db.prepare('SELECT * FROM intents WHERE intent_key=?').get(key));}
 function event(db,key,kind,body){return Number(db.prepare('INSERT INTO events(intent_key,kind,body) VALUES(?,?,?)').run(key,kind,canonical(body)).lastInsertRowid);}
@@ -152,20 +170,21 @@ function prepareIntent(db,inputs){
 }
 function advance(db,state,operation,details){
  return transaction(db,()=>{
+  if(operation==='reserve-spawn'){for(const row of db.prepare('SELECT * FROM intents').iterate()){const retained=rowState(row);if(['SPAWN_RESERVED','BORN','UNKNOWN'].includes(retained.phase))fail('COMPONENT_OUTCOME_UNKNOWN');}}
   if(operation==='select-output')details={...details,selection_sequence:Number(db.prepare('SELECT COALESCE(MAX(sequence),0)+1 AS n FROM events').get().n)};
   const next=advanceContextBuildIntentData(state,{expected_revision:state.revision,operation,details}),cas=next.compare_and_swap,checked=inspectContextBuildIntentData(next.next);
   const changed=db.prepare('UPDATE intents SET revision=?,record=?,record_sha256=? WHERE intent_key=? AND input_key=? AND revision=? AND record_sha256=?').run(next.next.revision,checked.encoded,checked.sha256,cas.intent_key,cas.input_key,cas.expected_revision,cas.expected_sha256);if(Number(changed.changes)!==1)fail('COMPONENT_RESERVATION_LOST');
   const sequence=event(db,state.intent_key,operation,{revision:next.next.revision,record_sha256:checked.sha256});if(operation==='select-output'&&sequence!==next.next.selection_sequence)fail('COMPONENT_JOURNAL_CHANGED');return next.next;
  });
 }
-function withJournal(fn,mode='write'){const db=openJournal(mode);try{return fn(db);}finally{db.close();}}
+function withJournal(fn,mode='write'){const db=openJournal(mode);let result,error;try{assertJournal(db);result=fn(db);assertJournal(db);}catch(e){error=e;}const cleanup=[];try{db.close();}catch(e){cleanup.push(e);}const retained=journals.get(db);journals.delete(db);try{fs.closeSync(retained.fd);}catch(e){cleanup.push(e);}if(error){if(cleanup.length)throw new AggregateError([error,...cleanup],'Original component journal cleanup failed');throw error;}if(cleanup.length)throw cleanup.length===1?cleanup[0]:new AggregateError(cleanup,'Original component journal cleanup failed');return result;}
 function unknown(key){try{return withJournal(db=>{const s=readState(db,key);return ['SPAWN_RESERVED','BORN'].includes(s.phase)?advance(db,s,'record-unknown',{reason:s.phase==='BORN'?'PROCESS_OUTCOME_UNKNOWN':'BIRTH_UNOBSERVED'}):s;});}catch{return null;}}
 function audit(key,kind,body){try{withJournal(db=>transaction(db,()=>event(db,key,kind,body)));return true;}catch{return false;}}
 const held=state=>({protocol:'soloco-context-component-command-v1',status:'HELD',code:['SPAWN_RESERVED','BORN','UNKNOWN'].includes(state?.phase)?'COMPONENT_OUTCOME_UNKNOWN':'COMPONENT_RETAINED_WITHOUT_RETRY',intent_key:state?.intent_key??null,phase:state?.phase??'UNKNOWN',domain_closure:'unestablished'});
-function fixedRequest(c,paths,work){return {file:PYTHON,args:['-I','-S',c.driver,'build','--prepared',paths.prepared,'--toolchain',paths.toolchain,'--cargo-home',paths.cache,'--output',path.join(work,'compiler-output'),'--timeout',String(BUILD_SECONDS)],cwd:NATIVE,env:{PATH:'/usr/bin:/bin',LANG:'C',LC_ALL:'C',OPENSSL_CONF:'/dev/null'},shell:false};}
+function fixedRequest(c,paths,work){let args;if(packaged){const actual=inspectOriginalComponentLayout(layout);args=['-I','-S',c.driver,'build-packaged','--request',canonical({protocol:'soloco-packaged-context-build-request-v1',workspace:{path:ROOT,dev:actual.durable_identity.dev,ino:actual.durable_identity.ino},intent_key:c.commitment.intent_key})];}else args=['-I','-S',c.driver,'build','--prepared',paths.prepared,'--toolchain',paths.toolchain,'--cargo-home',paths.cache,'--output',path.join(work,'compiler-output'),'--timeout',String(BUILD_SECONDS)];return {file:PYTHON,args,cwd:NATIVE,env:{PATH:'/usr/bin:/bin',LANG:'C',LC_ALL:'C',OPENSSL_CONF:'/dev/null'},shell:false};}
 function persistIntentInputs(c,paths,state,work){
  const root=path.join(work,'intent-source');fs.mkdirSync(root,{mode:0o700});
- for(const row of c.nodeRows){const bytes=stableRead(path.join(REPO,row.path));if(!same(ref(bytes),{bytes:row.bytes,sha256:row.sha256}))fail('COMPONENT_SOURCE_CHANGED');writeImmutable(path.join(root,'node-source',row.path),bytes);}
+ for(const row of c.nodeRows){const bytes=stableRead(originalComponentNodePath(layout,row.path));if(!same(ref(bytes),{bytes:row.bytes,sha256:row.sha256}))fail('COMPONENT_SOURCE_CHANGED');writeImmutable(path.join(root,'node-source',row.path),bytes);}
  writeImmutable(path.join(root,'node-inputs.json'),c.nodeBytes);writeImmutable(path.join(root,'node-profile.json'),c.profileBytes);writeImmutable(path.join(root,'selection.json'),c.selectionBytes);writeImmutable(path.join(root,'expected-rust-inputs.json'),c.compiledBytes);
  const pkg=stableRead(path.join(NATIVE,'source-package.json')),driver=stableRead(c.driver);if(sha(pkg)!==PACKAGE_SHA||sha(driver)!==DRIVER_SHA)fail('COMPONENT_SOURCE_CHANGED');writeImmutable(path.join(root,'native-source-package.json'),pkg);writeImmutable(path.join(root,'native-build-driver.py'),driver);
  writeImmutable(path.join(root,'original-request.json'),Buffer.from(canonical({protocol:'context-component-original-request-v1',intent_key:state.intent_key,input_key:state.input_key,reservation_sha256:state.reservation_sha256,request:fixedRequest(c,paths,work),stdio:{stdin:'ignore',stdout:path.join(work,'driver-stdout.log'),stderr:path.join(work,'driver-stderr.log')},domain_closure:'unestablished'})));fsyncDirectory(root);fsyncDirectory(work);
@@ -204,7 +223,7 @@ function runDriver(c,paths,state,work){
 function verifyReceipt(receipt,output,manifestBytes,binaryBytes,helperBytes){
  const binary=path.join(output,'target',TARGET,'release/codex-soloco-protected-host');
  if(!object(receipt)||receipt.schema!=='soloco-native-source-build-receipt-v1'||receipt.status!=='compiled-source-only'||receipt.exit_code!==0||receipt.manifest_sha256!==PACKAGE_SHA||receipt.native_qualified!==false||receipt.source_slot_populated!==false||receipt.descendant_or_remote_closure!=='not established'||!same(receipt.compiled_source_manifest,{schema:'soloco-compiled-native-inputs-v1',path:path.join(output,'compiled-source-manifest.json'),...ref(manifestBytes)})||!same(receipt.binary,{path:binary,...ref(binaryBytes)}))fail('COMPONENT_BUILD_RECEIPT_CHANGED');
- const h=receipt.sidecar_capture,source=stableRead(path.join(REPO,SIDECAR)),helperBinary=path.join(output,'origin-sidecar-capture'),sourceCopy=path.join(output,'origin-sidecar-capture.c');
+ const h=receipt.sidecar_capture,source=stableRead(originalComponentNodePath(layout,SIDECAR)),helperBinary=path.join(output,'origin-sidecar-capture'),sourceCopy=path.join(output,'origin-sidecar-capture.c');
  if(!h||h.protocol!=='soloco-origin-sidecar-source-build-v1'||h.status!=='compiled-source-only'||h.exit_code!==0||h.native_qualified!==false||!same(h.source,{path:SIDECAR,...ref(source)})||h.source_copy!==sourceCopy||!same(h.arguments,['origin-sidecar-capture-v1'])||!same(h.compiler_argv,[SELECTED_CLANG,...SIDECAR_FLAGS,'-isysroot',SELECTED_SDK,sourceCopy,'-o',helperBinary])||!same(h.binary,{path:helperBinary,...ref(helperBytes),mode:'100555'})||receipt.selected_sdk?.compiler!==SELECTED_CLANG||receipt.selected_sdk?.sdk_root!==SELECTED_SDK)fail('COMPONENT_BUILD_RECEIPT_CHANGED');
 }
 function successfulReceipt(c,output){
@@ -222,11 +241,12 @@ function sealComponent(c,state,output){
  const executable=copy(built.binary,'native/executable',ref(built.binaryBytes));
  copy(path.join(output,'origin-sidecar-capture'),'native/origin-sidecar-capture',ref(built.helperBytes));
  copy(path.join(NATIVE,'source-package.json'),'native/source-package.json',c.inputs.native.source_package);copy(path.join(NATIVE,c.pkg.cargo_lock.path),'native/Cargo.lock',c.inputs.native.cargo_lock);copy(path.join(NATIVE,c.pkg.toolchain.official_manifest.path),'native/toolchain-manifest.toml',c.inputs.native.toolchain_manifest);
- for(const row of c.nodeRows)copy(path.join(REPO,row.path),'node-source/'+row.path,{bytes:row.bytes,sha256:row.sha256});
+ for(const row of c.nodeRows)copy(originalComponentNodePath(layout,row.path),'node-source/'+row.path,{bytes:row.bytes,sha256:row.sha256});
  writeImmutable(path.join(staging,'node-inputs.json'),c.nodeBytes);writeImmutable(path.join(staging,'node-profile.json'),c.profileBytes);writeImmutable(path.join(staging,'selection.json'),c.selectionBytes);
  const recipe={protocol:'soloco-context-component-copy-recipe-v1',result_kind:'COMPILED_COMPONENT',input_key:state.input_key,intent_key:state.intent_key,reservation_sha256:state.reservation_sha256,process_sha256:state.process_sha256,domain_closure:'unestablished',original_build_receipt:ref(built.receiptBytes),copies:mappings,node_manifest:c.inputs.node.manifest};
+ if(packaged)recipe.layout=c.layoutRecord;
  const recipeBytes=Buffer.from(canonical(recipe));writeImmutable(path.join(staging,'recipe.json'),recipeBytes);
- const files=treeRows(staging,'',256*1024*1024,512*1024*1024);rows(files,512*1024*1024);const capsule={protocol:'soloco-context-component-capsule-v1',input_key:state.input_key,intent_key:state.intent_key,result_kind:'COMPILED_COMPONENT',domain_closure:'unestablished',files};const capsuleBytes=Buffer.from(canonical(capsule));writeImmutable(path.join(staging,'capsule-manifest.json'),capsuleBytes);
+ const files=treeRows(staging,'',256*1024*1024,512*1024*1024);rows(files,512*1024*1024);const capsule={protocol:'soloco-context-component-capsule-v1',input_key:state.input_key,intent_key:state.intent_key,result_kind:'COMPILED_COMPONENT',domain_closure:'unestablished',files};if(packaged)capsule.layout=c.layoutRecord;const capsuleBytes=Buffer.from(canonical(capsule));writeImmutable(path.join(staging,'capsule-manifest.json'),capsuleBytes);
  const association={protocol:'soloco-context-build-output-data-v1',result_kind:'COMPILED_COMPONENT',input_key:state.input_key,intent_key:state.intent_key,reservation_sha256:state.reservation_sha256,process_sha256:state.process_sha256,compiled_manifest:manifest,node_manifest:c.inputs.node.manifest,executable,build_receipt:receipt,recipe:ref(recipeBytes),capsule_manifest:ref(capsuleBytes)};
  const formatted=formatContextBuildOutputData(c.inputs,association);writeImmutable(path.join(staging,'output.json'),Buffer.from(formatted.encoded));
  // Sealed path depends on PREEXISTING intent, never on output's own digest.
@@ -238,12 +258,12 @@ function lookupComponent(c,state,selection){
  if(state.phase!=='OUTPUT_SELECTED'||!same(state.inputs,c.inputs))fail('COMPONENT_NOT_SELECTED');const directory=path.join(ROOT,'sealed',state.intent_key),outputBytes=stableRead(path.join(directory,'output.json'),16*1024*1024),record=parse(outputBytes);
  const formatted=formatContextBuildOutputData(c.inputs,record);if(!same(record,state.output))fail('COMPONENT_ARTIFACT_CHANGED');
  const capsuleBytes=stableRead(path.join(directory,'capsule-manifest.json'),16*1024*1024);if(!same(ref(capsuleBytes),record.capsule_manifest))fail('COMPONENT_ARTIFACT_CHANGED');const capsule=parse(capsuleBytes);
- if(!exact(capsule,['protocol','input_key','intent_key','result_kind','domain_closure','files'])||capsule.protocol!=='soloco-context-component-capsule-v1'||capsule.input_key!==state.input_key||capsule.intent_key!==state.intent_key||capsule.result_kind!=='COMPILED_COMPONENT'||capsule.domain_closure!=='unestablished')fail('COMPONENT_ARTIFACT_CHANGED');rows(capsule.files,512*1024*1024);
+ if(!exact(capsule,['protocol','input_key','intent_key','result_kind','domain_closure','files',...(packaged?['layout']:[])])||(packaged&&!same(capsule.layout,c.layoutRecord))||capsule.protocol!=='soloco-context-component-capsule-v1'||capsule.input_key!==state.input_key||capsule.intent_key!==state.intent_key||capsule.result_kind!=='COMPILED_COMPONENT'||capsule.domain_closure!=='unestablished')fail('COMPONENT_ARTIFACT_CHANGED');rows(capsule.files,512*1024*1024);
  const expected=new Set([...capsule.files.map(v=>v.path),'capsule-manifest.json','output.json']);const actual=treeRows(directory,'',256*1024*1024,512*1024*1024);if(actual.length!==expected.size||actual.some(v=>!expected.has(v.path)||(fs.lstatSync(path.join(directory,v.path)).mode&0o777)!==0o444))fail('COMPONENT_ARTIFACT_CHANGED');for(const r of capsule.files){const bytes=stableRead(path.join(directory,r.path),256*1024*1024);if(!same(ref(bytes),{bytes:r.bytes,sha256:r.sha256}))fail('COMPONENT_ARTIFACT_CHANGED');}
  if(!stableRead(path.join(directory,'node-inputs.json'),16*1024*1024).equals(c.nodeBytes)||!stableRead(path.join(directory,'node-profile.json'),16*1024*1024).equals(c.profileBytes)||!stableRead(path.join(directory,'selection.json'),16*1024*1024).equals(c.selectionBytes))fail('COMPONENT_ARTIFACT_CHANGED');
  const recipeBytes=stableRead(path.join(directory,'recipe.json'),16*1024*1024);if(!same(ref(recipeBytes),record.recipe))fail('COMPONENT_ARTIFACT_CHANGED');const recipe=parse(recipeBytes);
- if(!exact(recipe,['protocol','result_kind','input_key','intent_key','reservation_sha256','process_sha256','domain_closure','original_build_receipt','copies','node_manifest'])||recipe.protocol!=='soloco-context-component-copy-recipe-v1'||recipe.result_kind!=='COMPILED_COMPONENT'||recipe.input_key!==state.input_key||recipe.intent_key!==state.intent_key||recipe.reservation_sha256!==state.reservation_sha256||recipe.process_sha256!==state.process_sha256||recipe.domain_closure!=='unestablished'||!same(recipe.node_manifest,c.inputs.node.manifest)||!Array.isArray(recipe.copies)||recipe.copies.length!==c.nodeRows.length+7)fail('COMPONENT_ARTIFACT_CHANGED');
- const originals=new Map([[path.join(ROOT,'operations',state.intent_key,'compiler-output/origin-sidecar-capture'),'native/origin-sidecar-capture'],[path.join(ROOT,'operations',state.intent_key,'compiler-output/compiled-source-manifest.json'),'native/compiled-source-manifest.json'],[path.join(ROOT,'operations',state.intent_key,'compiler-output/receipt.json'),'native/build-receipt.json'],[path.join(ROOT,'operations',state.intent_key,'compiler-output/target',TARGET,'release/codex-soloco-protected-host'),'native/executable'],[path.join(NATIVE,'source-package.json'),'native/source-package.json'],[path.join(NATIVE,c.pkg.cargo_lock.path),'native/Cargo.lock'],[path.join(NATIVE,c.pkg.toolchain.official_manifest.path),'native/toolchain-manifest.toml'],...c.nodeRows.map(v=>[path.join(REPO,v.path),'node-source/'+v.path])]);
+ if(!exact(recipe,['protocol','result_kind','input_key','intent_key','reservation_sha256','process_sha256','domain_closure','original_build_receipt','copies','node_manifest',...(packaged?['layout']:[])])||(packaged&&!same(recipe.layout,c.layoutRecord))||recipe.protocol!=='soloco-context-component-copy-recipe-v1'||recipe.result_kind!=='COMPILED_COMPONENT'||recipe.input_key!==state.input_key||recipe.intent_key!==state.intent_key||recipe.reservation_sha256!==state.reservation_sha256||recipe.process_sha256!==state.process_sha256||recipe.domain_closure!=='unestablished'||!same(recipe.node_manifest,c.inputs.node.manifest)||!Array.isArray(recipe.copies)||recipe.copies.length!==c.nodeRows.length+7)fail('COMPONENT_ARTIFACT_CHANGED');
+ const originals=new Map([[path.join(ROOT,'operations',state.intent_key,'compiler-output/origin-sidecar-capture'),'native/origin-sidecar-capture'],[path.join(ROOT,'operations',state.intent_key,'compiler-output/compiled-source-manifest.json'),'native/compiled-source-manifest.json'],[path.join(ROOT,'operations',state.intent_key,'compiler-output/receipt.json'),'native/build-receipt.json'],[path.join(ROOT,'operations',state.intent_key,'compiler-output/target',TARGET,'release/codex-soloco-protected-host'),'native/executable'],[path.join(NATIVE,'source-package.json'),'native/source-package.json'],[path.join(NATIVE,c.pkg.cargo_lock.path),'native/Cargo.lock'],[path.join(NATIVE,c.pkg.toolchain.official_manifest.path),'native/toolchain-manifest.toml'],...c.nodeRows.map(v=>[originalComponentNodePath(layout,v.path),'node-source/'+v.path])]);
  for(const mapping of recipe.copies){if(!exact(mapping,['original_path','sealed_path','bytes','sha256'])||originals.get(mapping.original_path)!==mapping.sealed_path)fail('COMPONENT_ARTIFACT_CHANGED');originals.delete(mapping.original_path);const b=stableRead(path.join(directory,relative(mapping.sealed_path)),256*1024*1024);if(!same(ref(b),{bytes:mapping.bytes,sha256:mapping.sha256}))fail('COMPONENT_ARTIFACT_CHANGED');}if(originals.size)fail('COMPONENT_ARTIFACT_CHANGED');
  const receiptBytes=stableRead(path.join(directory,'native/build-receipt.json'),16*1024*1024),receipt=parse(receiptBytes),manifestBytes=stableRead(path.join(directory,'native/compiled-source-manifest.json'),16*1024*1024),binaryBytes=stableRead(path.join(directory,'native/executable'),256*1024*1024);
  if(!same(ref(receiptBytes),record.build_receipt)||!same(recipe.original_build_receipt,record.build_receipt)||!same(ref(manifestBytes),record.compiled_manifest)||!manifestBytes.equals(c.compiledBytes)||!same(ref(binaryBytes),record.executable))fail('COMPONENT_ARTIFACT_CHANGED');verifyReceipt(receipt,path.join(ROOT,'operations',state.intent_key,'compiler-output'),manifestBytes,binaryBytes,stableRead(path.join(directory,'native/origin-sidecar-capture'),16*1024*1024));
@@ -253,7 +273,7 @@ function lookupComponent(c,state,selection){
   // data branch does not rewrite receipt paths, modes, Node closure or authority.
   if(!outputBytes.equals(Buffer.from(formatted.encoded))||sha(outputBytes)!==formatted.sha256)fail('COMPONENT_ARTIFACT_CHANGED');
   const document=(name,bytes,value)=>({path:path.join(directory,name),...ref(bytes),record:value});
-  return {protocol:'soloco-selected-context-component-data-v1',kind:'SELECTED_COMPILED_COMPONENT_DATA',command,owner_epoch:c.owner,input_key:state.input_key,intent_key:state.intent_key,journal_selection:{phase:state.phase,revision:state.revision,selection_sequence:state.selection_sequence,state_record_sha256:inspectContextBuildIntentData(state).sha256},component_root:directory,
+  return {...(packaged?{layout:c.layoutRecord}:{}),protocol:'soloco-selected-context-component-data-v1',kind:'SELECTED_COMPILED_COMPONENT_DATA',command,owner_epoch:c.owner,input_key:state.input_key,intent_key:state.intent_key,journal_selection:{phase:state.phase,revision:state.revision,selection_sequence:state.selection_sequence,state_record_sha256:inspectContextBuildIntentData(state).sha256},component_root:directory,
    output:document('output.json',outputBytes,record),recipe:document('recipe.json',recipeBytes,recipe),capsule:document('capsule-manifest.json',capsuleBytes,capsule),
    node_inputs:document('node-inputs.json',c.nodeBytes,parse(c.nodeBytes)),node_profile:document('node-profile.json',c.profileBytes,parse(c.profileBytes)),selection:document('selection.json',c.selectionBytes,parse(c.selectionBytes)),copies:recipe.copies,
    domain_closure:'unestablished',qualified_interpreter:'HELD',claims_released:false,native_qualified:false};
@@ -289,18 +309,18 @@ function currentSelectedComponentData(){
   return frozenSelectedData({...data,journal_identity:identity});
  },'read');
 }
-export function lookupOriginalSelectedContextComponentData(...args){
+function lookupOriginalSelectedContextComponentData(...args){
  if(args.length)fail('COMPONENT_NO_ARGUMENTS');
  const data=currentSelectedComponentData(),handle=Object.freeze(Object.create(null));
  selectedDataHandles.set(handle,{selection_sha256:sha(canonical(data))});return handle;
 }
-export function inspectOriginalSelectedContextComponentData(handle,...args){
+function inspectOriginalSelectedContextComponentData(handle,...args){
  if(args.length)fail('COMPONENT_NO_ARGUMENTS');const retained=selectedDataHandles.get(handle);if(!retained)fail('COMPONENT_DATA_HANDLE_REQUIRED');
  const data=currentSelectedComponentData();if(sha(canonical(data))!==retained.selection_sha256)fail('COMPONENT_SELECTED_DATA_CHANGED');return data;
 }
-export function inspectOriginalContextComponent(...args){if(args.length)fail('COMPONENT_NO_ARGUMENTS');const c=collectInputs();return withJournal(db=>{const s=readState(db,c.commitment.intent_key);return s.phase==='OUTPUT_SELECTED'?lookupComponent(c,s):held(s);},'read');}
-export async function buildOriginalContextComponent(...args){
- if(args.length)fail('COMPONENT_NO_ARGUMENTS');const c=collectInputs(),paths=preparedInputs(c);let state=withJournal(db=>prepareIntent(db,c.inputs),'create');
+function inspectOriginalContextComponent(...args){if(args.length)fail('COMPONENT_NO_ARGUMENTS');const c=collectInputs();return withJournal(db=>{const s=readState(db,c.commitment.intent_key);return s.phase==='OUTPUT_SELECTED'?lookupComponent(c,s):held(s);},'read');}
+async function buildOriginalContextComponent(...args){
+ if(args.length)fail('COMPONENT_NO_ARGUMENTS');if(packaged)prepareOriginalPackagedComponentWorkspace();const c=collectInputs(),paths=preparedInputs(c);let state=withJournal(db=>prepareIntent(db,c.inputs),'create');
  if(state.phase!=='PREPARED')return state.phase==='OUTPUT_SELECTED'?lookupComponent(c,state):held(state);
  state=withJournal(db=>advance(db,state,'reserve-spawn',{reservation_sha256:sha(randomBytes(32))}));
  let work;try{work=path.join(ROOT,'operations',state.intent_key);privateDirectory(path.dirname(work));fs.mkdirSync(work,{mode:0o700});fsyncDirectory(path.dirname(work));persistIntentInputs(c,paths,state,work);}catch{unknown(state.intent_key);return held(unknown(state.intent_key));}
@@ -311,3 +331,26 @@ export async function buildOriginalContextComponent(...args){
   return lookupComponent(c,state);
  }catch(e){audit(state.intent_key,'component-output-held',{code:contextComponentErrorCode(e)});return held(state);}
 }
+
+ return Object.freeze({lookupOriginalSelectedContextComponentData,inspectOriginalSelectedContextComponentData,inspectOriginalContextComponent,buildOriginalContextComponent,verifyReceipt,successfulReceipt,treeRows});
+}
+
+let developerService,packagedService,developerError,packagedError;
+// Capture source startup bytes at import, as before, but retain a missing fixed
+// service as a finite Hold. A package never falls back to a repository service.
+try{developerService=createOriginalService(originalDeveloperComponentLayout());}catch(e){developerError=e;}
+try{packagedService=createOriginalService(originalPackagedComponentLayout());}catch(e){packagedError=e;}
+function dev(){if(!developerService)throw developerError;return developerService;}
+function pkg(){if(!packagedService)throw packagedError;return packagedService;}
+export function lookupOriginalSelectedContextComponentData(...args){return dev().lookupOriginalSelectedContextComponentData(...args);}
+export function inspectOriginalSelectedContextComponentData(...args){return dev().inspectOriginalSelectedContextComponentData(...args);}
+export function inspectOriginalContextComponent(...args){return dev().inspectOriginalContextComponent(...args);}
+export async function buildOriginalContextComponent(...args){return dev().buildOriginalContextComponent(...args);}
+export function lookupOriginalSelectedPackagedContextComponentData(...args){return pkg().lookupOriginalSelectedContextComponentData(...args);}
+export function inspectOriginalSelectedPackagedContextComponentData(...args){return pkg().inspectOriginalSelectedContextComponentData(...args);}
+export function inspectOriginalPackagedContextComponent(...args){return pkg().inspectOriginalContextComponent(...args);}
+export async function buildOriginalPackagedContextComponent(...args){return pkg().buildOriginalContextComponent(...args);}
+// Private SOURCE test aliases preserve existing exact-body boundary fixtures.
+function verifyReceipt(...args){return dev().verifyReceipt(...args);}
+function successfulReceipt(...args){return dev().successfulReceipt(...args);}
+function treeRows(...args){return dev().treeRows(...args);}

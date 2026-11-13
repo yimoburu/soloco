@@ -325,6 +325,12 @@ def sidecar_source(root, manifest):
          "unsupported fixed sidecar helper recipe")
     need(isinstance(helper["source"], dict) and helper["source"].get("path") == SIDECAR_SOURCE,
          "sidecar helper source must be the fixed original module")
+    if packaged_driver_path():
+        package_root = packaged_original_root()
+        need(root == MANIFEST.parent, "packaged driver cannot select another recipe root")
+        pin = helper["source"]
+        need(exact(pin, {"path", "bytes", "sha256"}), "closed fixed helper pin required")
+        return read_pin(package_root, {**pin, "path": "helpers/origin-sidecar-capture.c"})
     return read_pin(root.parents[1], helper["source"])
 
 
@@ -620,6 +626,7 @@ def verify_compiled_source_manifest(path, expected_bytes):
 
 def build(args):
     require_build_domain()  # Missing/unsupported domain holds before any spawn.
+    packaged_build_fence(args)
     root, m, _, toolchain, expected = package(args.manifest)
     prepared = no_links(args.prepared)
     source = prepared / "source"
@@ -638,6 +645,7 @@ def build(args):
     need(1 <= args.timeout <= 1200, "source build timeout must be 1..1200 seconds")
     argv, env, profile = build_domain(source, prefix, cache, output)
     selected_sdk = validate_selected_sdk()
+    packaged_build_fence(args)
     compiled_manifest_bytes = compiled_source_manifest_bytes(expected)
     output.mkdir(mode=0o700)
     (output / "tmp").mkdir()
@@ -653,6 +661,7 @@ def build(args):
     write_json(output / "plan.json", {"argv": argv, "sidecar_capture": helper_plan, "environment": env, "manifest_sha256": MANIFEST_SHA256, "timeout_seconds": args.timeout, "build_domain_sha256": sha(profile.encode()), "network_containment": "required source-generated macOS Seatbelt network denial; source/toolchain read-only; exact output/cache-metadata writes", "system_openssl_config": {"path": str(OPENSSL_CONFIG), "bytes": OPENSSL_CONFIG_BYTES, "sha256": OPENSSL_CONFIG_SHA256}, "compiled_source_manifest": source_association, "selected_sdk": selected_sdk, "native_qualified": False})
     started = time.monotonic()
     deadline = started + args.timeout
+    packaged_build_fence(args)
     helper = build_sidecar(helper_argv, env, output, helper_plan, deadline)
     state, result = helper["status"], helper["exit_code"]
     with (output / "stdout.log").open("xb") as stdout, (output / "stderr.log").open("xb") as stderr:
@@ -660,6 +669,7 @@ def build(args):
             if time.monotonic() >= deadline:
                 result, state = -9, "timeout-held"
             else:
+                packaged_build_fence(args)
                 process = subprocess.Popen(argv, cwd=source / "codex-rs", env=env, stdin=subprocess.DEVNULL, stdout=stdout, stderr=stderr, start_new_session=True)
                 try:
                     result = process.wait(timeout=max(0.001, deadline - time.monotonic()))
@@ -673,6 +683,7 @@ def build(args):
                     state = "timeout-held"
     receipt = {"schema": "soloco-native-source-build-receipt-v1", "status": state, "manifest_sha256": MANIFEST_SHA256, "exit_code": result, "elapsed_seconds": time.monotonic() - started, "compiled_source_manifest": source_association, "selected_sdk": selected_sdk, "sidecar_capture": helper, "binary": None, "native_qualified": False, "source_slot_populated": False, "descendant_or_remote_closure": "not established"}
     try:
+        packaged_build_fence(args)
         need(sha(regular(args.manifest).read_bytes()) == MANIFEST_SHA256, "source-owned manifest changed during build")
         need(verify_compiled_source_manifest(compiled_manifest_path, compiled_manifest_bytes) == source_association, "compiled-source association changed during build")
         validate_openssl_config()
@@ -699,6 +710,91 @@ def build(args):
     return 0 if receipt["status"] == "compiled-source-only" else 1
 
 
+def packaged_driver_path():
+    # A physical suffix in the executing original module, never an environment
+    # or request selector. The developer command retains its original mapping.
+    return Path(os.path.abspath(__file__)).parts[-5:] == ("producer-inputs", "native", "codex", "tools", "protected_native.py")
+
+
+def packaged_original_root():
+    module = no_links(Path(os.path.abspath(__file__)))
+    need(packaged_driver_path(), "packaged command requires the original installed recipe driver")
+    root = module.parents[4]
+    need(module == root / "producer-inputs/native/codex/tools/protected_native.py"
+         and MANIFEST == root / "producer-inputs/native/codex/source-package.json",
+         "fixed packaged module/manifest layout required")
+    need(root.is_dir(), "original package root missing")
+    return root
+
+
+def packaged_directory_identity(directory):
+    state = packaged_directory_state(directory)
+    return {key: state[key] for key in ("path", "dev", "ino")}
+
+
+def packaged_directory_state(directory):
+    # Internal full physical state; the original Node IPC remains path/dev/ino.
+    info = no_links(directory).lstat()
+    need(stat.S_ISDIR(info.st_mode) and info.st_uid == os.getuid(), "original packaged directory required")
+    return {"path": str(directory), "dev": str(info.st_dev), "ino": str(info.st_ino),
+            "uid": info.st_uid, "mode": info.st_mode}
+
+
+def packaged_build_args(request):
+    # Original Node binds B after validating D/H. This closed IPC request is not
+    # an authority grant and never inherits D/H, sources, compilers or programs.
+    need(isinstance(request, str) and len(request.encode("utf-8")) <= 8192, "bounded packaged request required")
+    value = json.loads(request, object_pairs_hook=unique_object)
+    need(exact(value, {"protocol", "workspace", "intent_key"})
+         and value["protocol"] == "soloco-packaged-context-build-request-v1", "closed packaged request required")
+    binding = value["workspace"]
+    need(exact(binding, {"path", "dev", "ino"}) and isinstance(binding["path"], str)
+         and len(binding["path"]) <= 4096 and not any(ord(c) < 32 or ord(c) == 127 for c in binding["path"])
+         and all(isinstance(binding[k], str) and re.fullmatch("0|[1-9][0-9]*", binding[k]) for k in ("dev", "ino")),
+         "closed physical workspace binding required")
+    workspace = Path(binding["path"])
+    need(workspace.is_absolute() and str(workspace) == binding["path"] and str(Path(os.path.abspath(workspace))) == binding["path"]
+         and workspace.name == "v1" and workspace.parent.name == "peer-context-component", "fixed canonical workspace required")
+    package_root = packaged_original_root()
+    need(packaged_directory_identity(workspace) == binding, "original workspace identity changed")
+    for directory in (workspace, workspace.parent):
+        info = no_links(directory).lstat()
+        need(stat.S_ISDIR(info.st_mode) and info.st_uid == os.getuid() and stat.S_IMODE(info.st_mode) == 0o700,
+             "private packaged workspace chain required")
+    need(not paths_overlap(package_root, workspace), "packaged workspace must be outside the original package")
+    key = value["intent_key"]
+    need(isinstance(key, str) and re.fullmatch("[0-9a-f]{64}", key), "original intent key required")
+    physical = {"package": packaged_directory_state(package_root), "workspace": packaged_directory_state(workspace),
+                "parent": packaged_directory_state(workspace.parent),
+                "data": packaged_directory_state(workspace.parent.parent)}
+    need(not physical["data"]["mode"] & 0o022, "managed data directory must not be group/world writable")
+    _, manifest, _, _, _ = package(MANIFEST)
+    args = argparse.Namespace(manifest=MANIFEST,
+        prepared=workspace / "inputs" / MANIFEST_SHA256 / "prepared",
+        toolchain=workspace / "toolchain" / manifest["toolchain"]["inventory"]["sha256"],
+        cargo_home=workspace / "cargo-home" / (MANIFEST_SHA256 + "-" + manifest["cargo_lock"]["sha256"]),
+        output=workspace / "operations" / key / "compiler-output", timeout=1200)
+    args._packaged_binding = physical
+    packaged_build_fence(args)
+    return args
+
+
+def packaged_build_fence(args):
+    binding = getattr(args, "_packaged_binding", None)
+    if binding is None:
+        return  # Exact developer command keeps its original path/recipe law.
+    package_root = packaged_original_root()
+    workspace = Path(binding["workspace"]["path"])
+    current = {"package": packaged_directory_state(package_root), "workspace": packaged_directory_state(workspace),
+               "parent": packaged_directory_state(workspace.parent),
+               "data": packaged_directory_state(workspace.parent.parent)}
+    need(current == binding and not current["data"]["mode"] & 0o022, "packaged build root replaced or metadata changed")
+    for directory in (workspace, workspace.parent):
+        info = no_links(directory).lstat()
+        need(stat.S_ISDIR(info.st_mode) and info.st_uid == os.getuid() and stat.S_IMODE(info.st_mode) == 0o700,
+             "private packaged workspace chain changed")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="action", required=True)
@@ -710,12 +806,16 @@ def main():
     for name in ("prepared", "toolchain", "cargo-home", "output"):
         b.add_argument("--" + name, type=Path, required=True)
     b.add_argument("--timeout", type=int, default=1200)
+    packaged = sub.add_parser("build-packaged", help="fixed original packaged SOURCE build; no path or compiler selectors")
+    packaged.add_argument("--request", required=True)
     args = parser.parse_args()
     args.manifest = MANIFEST
     if args.action == "prepare":
         prepare(args)
     elif args.action == "build":
         return build(args)
+    elif args.action == "build-packaged":
+        return build(packaged_build_args(args.request))
     else:
         _, _, upstream, toolchain, composed = package(args.manifest)
         print(json.dumps({"status": "frozen-source-only", "upstream_files": len(upstream), "toolchain_files": len(toolchain), "composed_files": len(composed), "native_qualified": False}))

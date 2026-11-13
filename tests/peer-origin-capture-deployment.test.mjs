@@ -75,8 +75,11 @@ print(json.dumps({'argv':argv,'record':record,'subprocess_calls':len(calls)}))`;
  assert.equal(data.record.native_qualified,false);assert.equal(data.record.binary,null);assert.equal(data.subprocess_calls,0);
 });
 
+function layoutDependencies(root){
+ for(const name of ['plugins/soloco/runtime/peers/context-component-layout.mjs','plugins/soloco/runtime/plugin-data.mjs'])put(root,name,bytes(name));
+}
 async function receiptFixture(t){
- const root=temporary(t);put(root,SOURCE,bytes(SOURCE));put(root,'tools/build-peer-context.mjs','// Synthetic SOURCE fixture entry. Never invoked.\n');
+ const root=temporary(t);layoutDependencies(root);put(root,SOURCE,bytes(SOURCE));put(root,'tools/build-peer-context.mjs','// Synthetic SOURCE fixture entry. Never invoked.\n');
  put(root,'plugins/soloco/runtime/peers/context-build-data.mjs',bytes('plugins/soloco/runtime/peers/context-build-data.mjs'));
  // Additive private exports ONLY in this copied SOURCE namespace. Actual bodies,
  // imports and default guards remain unchanged. No journal/issuer is called.
@@ -104,7 +107,7 @@ async function deploymentFixture(t,{incomplete=false}={}){
  assert.equal(originalDeployment.split(homeSelector).length,2);
  const homeLiteral=JSON.stringify(home),deploymentSource=originalDeployment.replace(homeSelector,homeLiteral);
  assert.equal(deploymentSource.split(homeLiteral).length,2);assert.equal(deploymentSource.replace(homeLiteral,homeSelector),originalDeployment);
- const deploymentFile=put(root,DEPLOYMENT,deploymentSource);put(root,SOURCE,bytes(SOURCE));
+ const deploymentFile=put(root,DEPLOYMENT,deploymentSource);layoutDependencies(root);put(root,SOURCE,bytes(SOURCE));
  put(root,HOST,'export function createCodexTaskRuntime(){throw Error("SYNTHETIC HOST MUST NOT EXECUTE");}\n');
  put(root,INTERPRETER,'export function prepareOriginalPeerContextDelivery(){throw Error("SYNTHETIC INTERPRETER MUST NOT EXECUTE");}\n');
  const component=path.join(root,'fictional-sealed-component'),copies=[],files={executable:Buffer.from('NEVER-EXECUTED-HOST\n'),'origin-sidecar-capture':Buffer.from('NEVER-EXECUTED-CENSUS-HELPER\n'),'compiled-source-manifest.json':manifest(),'build-receipt.json':Buffer.from('SYNTHETIC-UNQUALIFIED\n'),'source-package.json':bytes('native/codex/source-package.json'),'Cargo.lock':Buffer.from('SYNTHETIC LOCK\n'),'toolchain-manifest.toml':Buffer.from('SYNTHETIC TOOLCHAIN\n')};
@@ -133,8 +136,11 @@ test('opaque selectors stay held until real deployment functions see the synthet
 test('original selection replacement and physical helper drift cannot renew a retained program handle',async t=>{
  const f=await deploymentFixture(t),m=f.module;await m.prepareOriginalSelectedContextDeployment();await m.loadOriginalSelectedPeerBridge();const h=m.prepareOriginalOriginSidecarCaptureProgram();
  f.producer.replaceOriginalForSourceTest();assert.throws(()=>m.inspectOriginalOriginSidecarCaptureProgram(h),code('ORIGIN_SIDECAR_PROGRAM_UNAVAILABLE'));
- await m.loadOriginalSelectedPeerBridge();assert.throws(()=>m.inspectOriginalOriginSidecarCaptureProgram(h),code('ORIGIN_SIDECAR_PROGRAM_CHANGED'));
- const fresh=m.prepareOriginalOriginSidecarCaptureProgram(),r=m.inspectOriginalOriginSidecarCaptureProgram(fresh);fs.chmodSync(r.executable.path,0o755);fs.writeFileSync(r.executable.path,'CHANGED');fs.chmodSync(r.executable.path,0o555);assert.throws(()=>m.inspectOriginalOriginSidecarCaptureProgram(fresh),code('ORIGIN_SIDECAR_PROGRAM_UNAVAILABLE'));
+ await assert.rejects(m.loadOriginalSelectedPeerBridge(),/SYNTHETIC_OLD_SELECTION/);assert.throws(()=>m.inspectOriginalOriginSidecarCaptureProgram(h),code('ORIGIN_SIDECAR_PROGRAM_UNAVAILABLE'));
+ // A loaded module never renews its first original selection. Exercise the
+ // independent physical-drift guard in a fresh fictional module instead.
+ const separate=await deploymentFixture(t),freshModule=separate.module;await freshModule.prepareOriginalSelectedContextDeployment();await freshModule.loadOriginalSelectedPeerBridge();
+ const fresh=freshModule.prepareOriginalOriginSidecarCaptureProgram(),r=freshModule.inspectOriginalOriginSidecarCaptureProgram(fresh);fs.chmodSync(r.executable.path,0o755);fs.writeFileSync(r.executable.path,'CHANGED');fs.chmodSync(r.executable.path,0o555);assert.throws(()=>freshModule.inspectOriginalOriginSidecarCaptureProgram(fresh),code('ORIGIN_SIDECAR_PROGRAM_UNAVAILABLE'));
 });
 test('an incomplete deployment is held without repair or promotion',async t=>{
  const f=await deploymentFixture(t,{incomplete:true}),directory=path.join(f.root,'work/peer-context-component/deployments',f.data.intent_key);await assert.rejects(f.module.prepareOriginalSelectedContextDeployment());assert.deepEqual(fs.readdirSync(directory),['sentinel']);assert.equal(fs.readFileSync(path.join(directory,'sentinel'),'utf8'),'INCOMPLETE');

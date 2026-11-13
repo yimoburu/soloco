@@ -35,7 +35,7 @@ async function copiedProvider(t,f){
  export {bindPeerProductionScheduler} from ${JSON.stringify(new URL('../plugins/soloco/runtime/peers/model.mjs',import.meta.url).href)};
  export const state={bridge:${JSON.stringify(bridge)},loads:0,inspections:0,policies:[],launches:[],runtimes:[],stops:[],runtimeFailure:null,runtimeHook:null,prepareHook:null,stopFailure:null};
  export function bindPeerTaskEffects(){throw Error('Synthetic marker must never execute');}
- export async function loadOriginalSelectedPeerBridge(){state.loads++;}
+ export async function loadOriginalSelectedPackagedPeerBridge(){state.loads++;}
  export function inspectOriginalLoadedPeerBridge(){state.inspections++;return structuredClone(state.bridge);}
  export function createPolicySupervisor(options){state.policies.push(options);return Object.freeze({synthetic:true});}
  export async function prepareOriginalProtectedPeerLaunch(owner,supervisor,input){const handle=Object.freeze({SYNTHETIC_ONLY:true});state.launches.push({owner,supervisor,input,handle});if(state.prepareHook)await state.prepareHook();return handle;}

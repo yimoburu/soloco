@@ -65,3 +65,49 @@ Actual Node deployment, private-FD bootstrap, provider/account continuation,
 process-domain closure and company adoption require their separate evidence and
 authority. Existing UNKNOWN outcomes, reservations and spent or expired grants
 remain unchanged. SPEC v0.21 and its single active company-owner rule are unchanged.
+
+
+## Fixed packaged original service (SOURCE implementation)
+
+The separate no-argument `buildOriginalPackagedContextComponent` and packaged
+lookup/descriptor/deployment operations use the actual package's one runtime
+module realm. Logical `plugins/soloco/...` Node keys map only to that package;
+Native recipe keys map only to its closed `producer-inputs/native/codex` tree.
+The unchanged pure input/intent schemas bind raw layout facts through the Node
+profile. Packaged recipes/capsules and selected DATA label that exact layout;
+developer records keep their original repository mapping. Neither service
+accepts a caller layout, root, provider or factory, and one loaded bridge cannot
+switch between the two services. The service is latched before the first await;
+a failed first load retains its Hold, and an active module cannot renew a
+different first selection. Sealed Node copies are evidence, never imports.
+
+The packaged workspace is the fixed managed data child
+`peer-context-component/v1`, outside the package. Lookup requires it and its
+original journal/anchor; lookup never creates directories, initializes a journal,
+provisions Native prerequisites or starts a build. Only the explicit Source
+workspace/build operation can create its private children. The existing managed
+data directory is never created, relocated or chmodded by that operation.
+
+A new workspace publication alone writes `workspace-origin.json`, binding its
+managed parent and original directory identities independently of package
+versions. After all prerequisites pass, `journal-init.claim` is published with
+exclusive creation and durable fsync **before** the first journal/anchor pair.
+Both witnesses are immutable and never reset. Existing B without its origin,
+missing claims for a retained pair, partial initialization, or a retained claim
+with both journal and anchor missing remain Holds. A workspace-only prerequisite
+Hold can continue on cold restart through the same original origin record.
+This is not same-UID anti-rollback attestation or proof of old process closure.
+
+Across package/source generations the same journal, history and selection
+sequence remain. The winning reserve transaction checks retained unresolved
+reservations from every generation before its CAS. Changed roots/hashes cannot
+waive UNKNOWN. Owner identity is raw source/physical P/B facts; complete inputs
+then derive input/intent keys, with no edge back from either key to the owner.
+The fixed Python request gets B from the original Node service, without adding
+home/data environment selectors. Original compiler/SDK/offline/timeout guards
+and the developer Source entry remain separate and unchanged in meaning.
+
+This source cut is not a selected compiled artifact, installation, original
+loaded host, executed-module closure or native qualification. Synthetic source
+fixtures and packaging checks cannot supply any of those facts or release
+company notices, UNKNOWN reservations, expired/spent scopes or owner Holds.
