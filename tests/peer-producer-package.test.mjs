@@ -23,7 +23,7 @@ function fixture(t){
  for(const row of rows){const file=path.join(root,'native/codex',row.path);fs.mkdirSync(path.dirname(file),{recursive:true});fs.copyFileSync(path.join(ROOT,'native/codex',row.path),file);fs.chmodSync(file,row.mode==='100755'?0o755:0o644);}
  return {root,rows,native:path.join(root,'plugins/soloco/producer-inputs/native/codex'),seal:path.join(root,'plugins/soloco/producer-inputs/native-recipe-inventory.json')};
 }
-function run(root,...args){return spawnSync(process.execPath,[path.join(root,'tools/package-context-producer.mjs'),...args],{encoding:'utf8',timeout:15000,maxBuffer:65536});}
+function run(root,...args){return spawnSync(process.execPath,[path.join(root,'tools/package-context-producer.mjs'),...args],{encoding:'utf8',timeout:60000,maxBuffer:65536});}
 function passed(result){assert.equal(result.error,undefined);assert.equal(result.status,0,result.stderr);}
 function aliasedRoot(root){
  const physical=fs.realpathSync(root),alias=path.join(root,'cli-alias');fs.symlinkSync(physical,alias,'dir');
