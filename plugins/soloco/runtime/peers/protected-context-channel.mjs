@@ -20,6 +20,7 @@ const SELECTION=Object.freeze({
 const INPUT_FRONTIER_SELECTION=Object.freeze({protocol:'soloco-input-frontier-context-contract-v1',contract_id:'input-frontier-readonly3-whole-assignment-v1',resource_sha256:'b15ae178857196eac75123652817c1673a2e4941b409f6d5cbb72225800f7863',context_encoding:'soloco-peer-context-frame-v2',scope_profile_id:'soloco-input-frontier-readonly-v1'});
 const ORIGIN_MAINTENANCE_SELECTION=Object.freeze({protocol:'soloco-origin-maintenance-context-contract-v1',contract_id:'origin-maintenance-readonly3-whole-assignment-v1',resource_sha256:'a7f744362c1404a1ae67ca6e5c3bf1b63c3c0fab99b9ad996db0f1265757c824',context_encoding:'soloco-peer-context-frame-v2',scope_profile_id:'soloco-origin-maintenance-readonly-v1'});
 const ORIGIN_FINAL_REVIEW_SELECTION=Object.freeze({protocol:'soloco-origin-final-review-context-contract-v1',contract_id:'origin-final-review-readonly3-whole-assignment-v1',resource_sha256:'d7939b68fb44e4dee524ec7774e080b0d6f4b40c1493f37737eb67b1f1efa3fd',context_encoding:'soloco-peer-context-frame-v2',scope_profile_id:'soloco-origin-final-review-readonly-v1'});
+const ORIGIN_ORDINARY_TASK_SELECTION=Object.freeze({protocol:'soloco-origin-ordinary-task-context-contract-v1',contract_id:'origin-ordinary-task-readonly3-whole-assignment-v1',resource_sha256:'0f0bc8b752176348c23ac6696cbd8f4ebe811fca45163f2d5baefcf6c5361d52',context_encoding:'soloco-peer-context-frame-v2',scope_profile_id:'soloco-origin-ordinary-task-readonly-v1'});
 const EVIDENCE='source-resource-and-whole-payload-source-cut-wire-compatibility-only';
 const EXPECTED=['nonce','pid','slot_id','executable_sha256','source_manifest_sha256','original_home_sha256','state_root','cwd','upstream_url'];
 const BOOTSTRAP=['protocol','kind','nonce','pid','slot_id','executable_sha256','source_manifest_sha256','original_home_sha256','state_root','cwd','host_instance_id','sources'];
@@ -117,7 +118,7 @@ function bootstrapShape(frame){
     &&Number.isSafeInteger(frame.sources.auth_revision)&&frame.sources.auth_revision>=0;
 }
 function scopedShape(frame,selection){
-  if(!selection)return scopedShape(frame,SELECTION)||scopedShape(frame,INPUT_FRONTIER_SELECTION)||scopedShape(frame,ORIGIN_MAINTENANCE_SELECTION)||scopedShape(frame,ORIGIN_FINAL_REVIEW_SELECTION);
+  if(!selection)return scopedShape(frame,SELECTION)||scopedShape(frame,INPUT_FRONTIER_SELECTION)||scopedShape(frame,ORIGIN_MAINTENANCE_SELECTION)||scopedShape(frame,ORIGIN_FINAL_REVIEW_SELECTION)||scopedShape(frame,ORIGIN_ORDINARY_TASK_SELECTION);
   return closed(frame,SCOPED)&&frame.protocol===PROTOCOL&&frame.kind==='scoped_context_contract'&&hash(frame.nonce)&&pid(frame.pid)&&slot(frame.slot_id)
     &&hash(frame.executable_sha256)&&hash(frame.source_manifest_sha256)&&uuid(frame.host_instance_id)&&uuid(frame.scope_instance_id)
     &&frame.context_contract_protocol===selection.protocol&&frame.context_contract_id===selection.contract_id
@@ -168,6 +169,7 @@ export function createOriginalBootstrapControlTranscript(input){if(arguments.len
 export function createOriginalInputFrontierControlTranscript(input){return createSelectedControlTranscript(input,INPUT_FRONTIER_SELECTION);}
 export function createOriginalOriginMaintenanceControlTranscript(input){return createSelectedControlTranscript(input,ORIGIN_MAINTENANCE_SELECTION);}
 export function createOriginalOriginFinalReviewControlTranscript(input){return createSelectedControlTranscript(input,ORIGIN_FINAL_REVIEW_SELECTION);}
+export function createOriginalOriginOrdinaryTaskControlTranscript(input){return createSelectedControlTranscript(input,ORIGIN_ORDINARY_TASK_SELECTION);}
 function createSelectedControlTranscript(input,selection){
   const expected=expectedBindings(input);
   let phase='PREPARED',reason=null,host=null,scope=null,binding=null,permits=0;

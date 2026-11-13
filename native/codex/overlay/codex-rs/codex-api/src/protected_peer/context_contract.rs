@@ -32,12 +32,17 @@ const ORIGIN_FINAL_REVIEW_RESOURCE_SHA256:&str="d7939b68fb44e4dee524ec7774e080b0
 const ORIGIN_FINAL_REVIEW_PROTOCOL:&str="soloco-origin-final-review-context-contract-v1";
 const ORIGIN_FINAL_REVIEW_CORE_ID:&str="origin-final-review-readonly3-whole-assignment-v1";
 const ORIGIN_FINAL_REVIEW_PROFILE:&str="soloco-origin-final-review-readonly-v1";
+const ORIGIN_ORDINARY_TASK_RESOURCE:&[u8]=include_bytes!("origin_ordinary_task_readonly3_contract_v1.json");
+const ORIGIN_ORDINARY_TASK_RESOURCE_SHA256:&str="0f0bc8b752176348c23ac6696cbd8f4ebe811fca45163f2d5baefcf6c5361d52";
+const ORIGIN_ORDINARY_TASK_PROTOCOL:&str="soloco-origin-ordinary-task-context-contract-v1";
+const ORIGIN_ORDINARY_TASK_CORE_ID:&str="origin-ordinary-task-readonly3-whole-assignment-v1";
+const ORIGIN_ORDINARY_TASK_PROFILE:&str="soloco-origin-ordinary-task-readonly-v1";
 
 
 /// Fixed constructor selections, never inferred from payloads or a caller's
 /// arbitrary tool subset. The original startup retains exactly one selection.
 #[derive(Clone,Copy,PartialEq,Eq)]
-pub(super) enum OriginalToolProfile {OrdinaryFive,BootstrapReadonlyThree,InputFrontierReadonlyThree,OriginMaintenanceReadonlyThree,OriginFinalReviewReadonlyThree}
+pub(super) enum OriginalToolProfile {OrdinaryFive,BootstrapReadonlyThree,InputFrontierReadonlyThree,OriginMaintenanceReadonlyThree,OriginFinalReviewReadonlyThree,OriginOrdinaryTaskReadonlyThree}
 impl OriginalToolProfile {
     pub(super) fn resource_sha256(self)->String {match self {
         Self::OrdinaryFive=>hash(include_bytes!("../protected_peer_responses_tools.json")),
@@ -45,6 +50,7 @@ impl OriginalToolProfile {
         Self::InputFrontierReadonlyThree=>FRONTIER_RESOURCE_SHA256.into(),
         Self::OriginMaintenanceReadonlyThree=>ORIGIN_MAINTENANCE_RESOURCE_SHA256.into(),
         Self::OriginFinalReviewReadonlyThree=>ORIGIN_FINAL_REVIEW_RESOURCE_SHA256.into(),
+        Self::OriginOrdinaryTaskReadonlyThree=>ORIGIN_ORDINARY_TASK_RESOURCE_SHA256.into(),
     }}
     pub(super) fn offered_inventory(self)->Result<serde_json::Value,TransportError> {match self {
         Self::OrdinaryFive=>serde_json::from_slice(include_bytes!("../protected_peer_responses_tools.json"))
@@ -69,6 +75,7 @@ impl OriginalToolProfile {
         }
         Self::OriginMaintenanceReadonlyThree=>origin_inventory(origin_maintenance_source_resource()?),
         Self::OriginFinalReviewReadonlyThree=>origin_inventory(origin_final_review_source_resource()?),
+        Self::OriginOrdinaryTaskReadonlyThree=>origin_inventory(origin_ordinary_task_source_resource()?),
     }}
 }
 
@@ -166,7 +173,7 @@ fn frontier_source_resource()->Result<BootstrapSourceResource,TransportError> {
     Ok(resource)
 }
 
-// These two independently pinned Source constructors enumerate only their
+// These independently pinned Source constructors enumerate only their
 // fixed delivery forms. Shared readonly tool syntax is not business authority.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -213,6 +220,26 @@ fn origin_final_review_source_resource()->Result<OriginSourceResource,TransportE
             "policy_maximum_context_bytes":65536,"read_maximum_characters":4096,"response_maximum_utf8_bytes":16384})
         ||r.tools.len()!=3||!r.fresh_thread_required||r.authority.is_empty() {
         return Err(hold("unsupported original origin final review readonly3 resource"));
+    }
+    Ok(r)
+}
+
+// Separate literal ordinary-purpose resource; this catalogue issues no authority.
+fn origin_ordinary_task_source_resource()->Result<OriginSourceResource,TransportError> {
+    if ORIGIN_ORDINARY_TASK_RESOURCE.len()!=3077||hash(ORIGIN_ORDINARY_TASK_RESOURCE)!=ORIGIN_ORDINARY_TASK_RESOURCE_SHA256 {
+        return Err(hold("original ordinary origin review source resource changed"));
+    }
+    let r:OriginSourceResource=serde_json::from_slice(ORIGIN_ORDINARY_TASK_RESOURCE)
+        .map_err(|_|hold("closed original ordinary origin review source resource"))?;
+    if r.protocol!=ORIGIN_ORDINARY_TASK_PROTOCOL||r.contract_id!=ORIGIN_ORDINARY_TASK_CORE_ID
+        ||r.scope_profile_id!=ORIGIN_ORDINARY_TASK_PROFILE||r.context_encoding!=ENCODING
+        ||r.deliveries!=vec![serde_json::json!({"delivery_kind":"origin-ordinary-task-assignment",
+            "payload_protocol":"peer-origin-ordinary-task-context-v1","source_cut_protocol":null,
+            "kinds":["peer-origin-ordinary-task-review"],"read_maximum_characters":4096,"response_maximum_utf8_bytes":16384})]
+        ||r.limits!=serde_json::json!({"frame_bytes":100000,"wire_bytes":4000000,
+            "policy_maximum_context_bytes":65536,"read_maximum_characters":4096,"response_maximum_utf8_bytes":16384})
+        ||r.tools.len()!=3||!r.fresh_thread_required||r.authority.is_empty() {
+        return Err(hold("unsupported original ordinary origin review readonly3 resource"));
     }
     Ok(r)
 }
@@ -331,6 +358,9 @@ pub(super) fn select_original_context_contract(
     }else if request.protocol==ORIGIN_FINAL_REVIEW_PROTOCOL&&request.contract_id==ORIGIN_FINAL_REVIEW_CORE_ID
         &&request.resource_sha256==ORIGIN_FINAL_REVIEW_RESOURCE_SHA256&&request.context_encoding==ENCODING&&request.scope_profile_id==ORIGIN_FINAL_REVIEW_PROFILE {
         origin_final_review_source_resource()?;OriginalToolProfile::OriginFinalReviewReadonlyThree
+    }else if request.protocol==ORIGIN_ORDINARY_TASK_PROTOCOL&&request.contract_id==ORIGIN_ORDINARY_TASK_CORE_ID
+        &&request.resource_sha256==ORIGIN_ORDINARY_TASK_RESOURCE_SHA256&&request.context_encoding==ENCODING&&request.scope_profile_id==ORIGIN_ORDINARY_TASK_PROFILE {
+        origin_ordinary_task_source_resource()?;OriginalToolProfile::OriginOrdinaryTaskReadonlyThree
     }else{return Err(hold("unsupported original CORE context selection"));};
     Ok(Some(OriginalContextSelection { request: request.clone(),profile }))
 }
@@ -510,6 +540,7 @@ fn validate_selected_turn_input(request: &serde_json::Value, selection: Option<&
             OriginalToolProfile::InputFrontierReadonlyThree=>{frame::decode_input_frontier_frame(text,&selection.request.resource_sha256,super::MAX_FRAME)?;}
             OriginalToolProfile::OriginMaintenanceReadonlyThree=>{frame::decode_origin_maintenance_frame(text,&selection.request.resource_sha256,super::MAX_FRAME)?;}
             OriginalToolProfile::OriginFinalReviewReadonlyThree=>{frame::decode_origin_final_review_frame(text,&selection.request.resource_sha256,super::MAX_FRAME)?;}
+            OriginalToolProfile::OriginOrdinaryTaskReadonlyThree=>{frame::decode_origin_ordinary_task_frame(text,&selection.request.resource_sha256,super::MAX_FRAME)?;}
         }
     }
     if frames != 1 { return Err(hold("exactly one original context frame required")); }

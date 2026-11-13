@@ -21,8 +21,10 @@ import * as originWire from './origin-maintenance-wire.mjs';
 import * as originMaintenance from './origin-maintenance.mjs';
 import * as originSeal from './origin-frontier-seal.mjs';
 import * as ownerMaintenance from './owner-handover.mjs';
+import * as ordinaryOrigin from './origin-ordinary-task.mjs';
+import {inspectOriginalOriginOrdinaryTaskSupport as inspectOrdinarySourceTuple} from './context-component-deployment.mjs';
 import {parseGatewayJSON} from './gateway-wire.mjs';
-import {createOriginalControlTranscript,createOriginalInputFrontierControlTranscript,createOriginalOriginMaintenanceControlTranscript,createOriginalOriginFinalReviewControlTranscript,parseOriginalControlFrame} from './protected-context-channel.mjs';
+import {createOriginalControlTranscript,createOriginalInputFrontierControlTranscript,createOriginalOriginMaintenanceControlTranscript,createOriginalOriginFinalReviewControlTranscript,createOriginalOriginOrdinaryTaskControlTranscript,parseOriginalControlFrame} from './protected-context-channel.mjs';
 import {createFixedConnectBroker} from './protected-connect-broker.mjs';
 import {stableTaskHostTools} from './host-protocol.mjs';
 import {expectedResponsesTools} from './responses-gateway.mjs';
@@ -42,18 +44,19 @@ const assertOriginalInputFrontierSlot=(h,s)=>frontierSlots.assertOriginalInputFr
 const frontierProfile=r=>isOriginalInputFrontierInterpreter(r.context_interpreter);
 const originRangeInterpreter=h=>frontierSlots.isOriginalOriginMaintenanceInterpreter?.(h)===true;
 const originFinalInterpreter=h=>frontierSlots.isOriginalOriginFinalReviewInterpreter?.(h)===true;
-const originProfile=r=>originRangeInterpreter(r.context_interpreter)||originFinalInterpreter(r.context_interpreter);
+const originOrdinaryInterpreter=h=>frontierSlots.isOriginalOriginOrdinaryTaskInterpreter?.(h)===true;
+const originProfile=r=>originRangeInterpreter(r.context_interpreter)||originFinalInterpreter(r.context_interpreter)||originOrdinaryInterpreter(r.context_interpreter);
 const readonlyAdmission=r=>r.origin_admission??r.frontier_admission;
 const currentReadonly=(r,stable=false)=>r.origin_admission?currentNativeOrigin(r,stable):currentNativeInputFrontier(r,stable);
-const selectedContext=r=>r.bootstrap?BOOTSTRAP_CONTEXT_SELECTION:originRangeInterpreter(r.context_interpreter)?originWire.ORIGIN_MAINTENANCE_CONTEXT_SELECTION:originFinalInterpreter(r.context_interpreter)?originWire.ORIGIN_FINAL_REVIEW_CONTEXT_SELECTION:frontierProfile(r)?INPUT_FRONTIER_CONTEXT_SELECTION:ORIGINAL_CONTEXT_SELECTION;
-const selectedTools=r=>r.bootstrap?bootstrapReadonly3Tools():originRangeInterpreter(r.context_interpreter)?originWire.originMaintenanceReadonly3Tools():originFinalInterpreter(r.context_interpreter)?originWire.originFinalReviewReadonly3Tools():frontierProfile(r)?inputFrontierReadonly3Tools():stableTaskHostTools();
-const selectedResponseTools=r=>r.bootstrap?bootstrapResponsesTools():originRangeInterpreter(r.context_interpreter)?originWire.originMaintenanceResponsesTools():originFinalInterpreter(r.context_interpreter)?originWire.originFinalReviewResponsesTools():frontierProfile(r)?inputFrontierResponsesTools():expectedResponsesTools();
-function originInterpreterName(h){return originRangeInterpreter(h)?'OriginMaintenance':originFinalInterpreter(h)?'OriginFinalReview':null;}
+const selectedContext=r=>r.bootstrap?BOOTSTRAP_CONTEXT_SELECTION:originRangeInterpreter(r.context_interpreter)?originWire.ORIGIN_MAINTENANCE_CONTEXT_SELECTION:originFinalInterpreter(r.context_interpreter)?originWire.ORIGIN_FINAL_REVIEW_CONTEXT_SELECTION:originOrdinaryInterpreter(r.context_interpreter)?originWire.ORIGIN_ORDINARY_TASK_CONTEXT_SELECTION:frontierProfile(r)?INPUT_FRONTIER_CONTEXT_SELECTION:ORIGINAL_CONTEXT_SELECTION;
+const selectedTools=r=>r.bootstrap?bootstrapReadonly3Tools():originRangeInterpreter(r.context_interpreter)?originWire.originMaintenanceReadonly3Tools():originFinalInterpreter(r.context_interpreter)?originWire.originFinalReviewReadonly3Tools():originOrdinaryInterpreter(r.context_interpreter)?originWire.originOrdinaryTaskReadonly3Tools():frontierProfile(r)?inputFrontierReadonly3Tools():stableTaskHostTools();
+const selectedResponseTools=r=>r.bootstrap?bootstrapResponsesTools():originRangeInterpreter(r.context_interpreter)?originWire.originMaintenanceResponsesTools():originFinalInterpreter(r.context_interpreter)?originWire.originFinalReviewResponsesTools():originOrdinaryInterpreter(r.context_interpreter)?originWire.originOrdinaryTaskResponsesTools():frontierProfile(r)?inputFrontierResponsesTools():expectedResponsesTools();
+function originInterpreterName(h){return originRangeInterpreter(h)?'OriginMaintenance':originFinalInterpreter(h)?'OriginFinalReview':originOrdinaryInterpreter(h)?'OriginOrdinaryTask':null;}
 function assertInterpreterFinal(r){if(r.bootstrap){assertOriginalBootstrapMembershipInterpreterFinal(r.context_interpreter);return;}const n=originInterpreterName(r.context_interpreter);if(n)frontierSlots['assertOriginal'+n+'InterpreterFinal'](r.context_interpreter);else if(frontierProfile(r))assertOriginalInputFrontierInterpreterFinal(r.context_interpreter);else assertOriginalPeerContextInterpreterFinal(r.context_interpreter);}
 function assertInterpreterSlot(interpreter,slot){if(isOriginalBootstrapMembershipInterpreter(interpreter)){assertOriginalBootstrapMembershipSlot(interpreter,slot);return;}const n=originInterpreterName(interpreter);if(n)frontierSlots['assertOriginal'+n+'Slot'](interpreter,slot);else if(isOriginalInputFrontierInterpreter(interpreter))assertOriginalInputFrontierSlot(interpreter,slot);else assertOriginalPeerContextSlot(interpreter,slot);}
 function inspectInterpreter(r){if(r.bootstrap)return inspectOriginalBootstrapMembershipInterpreter(r.context_interpreter);const n=originInterpreterName(r.context_interpreter);return n?frontierSlots['inspectOriginal'+n+'Interpreter'](r.context_interpreter):frontierProfile(r)?inspectOriginalInputFrontierInterpreter(r.context_interpreter):inspectOriginalPeerContextInterpreter(r.context_interpreter);}
-function originalContextInput(r,delivery){return r.origin_admission?(r.origin_admission.purpose==='range'?originWire.originalOriginMaintenancePreflightInput(delivery):originWire.originalOriginFinalReviewPreflightInput(delivery)):originalInputFrontierPreflightInput(delivery);}
-function originalContextInterpreter(r,delivery){return originProfile(r)?(originRangeInterpreter(r.context_interpreter)?originWire.originalOriginMaintenancePreflightInterpreter(delivery):originWire.originalOriginFinalReviewPreflightInterpreter(delivery)):frontierProfile(r)?originalInputFrontierPreflightInterpreter(delivery):originalPeerContextDeliveryInterpreter(delivery);}
+function originalContextInput(r,delivery){return r.origin_admission?(r.origin_admission.purpose==='range'?originWire.originalOriginMaintenancePreflightInput(delivery):r.origin_admission.purpose==='ordinary'?originWire.originalOriginOrdinaryTaskPreflightInput(delivery):originWire.originalOriginFinalReviewPreflightInput(delivery)):originalInputFrontierPreflightInput(delivery);}
+function originalContextInterpreter(r,delivery){return originProfile(r)?(originRangeInterpreter(r.context_interpreter)?originWire.originalOriginMaintenancePreflightInterpreter(delivery):originOrdinaryInterpreter(r.context_interpreter)?originWire.originalOriginOrdinaryTaskPreflightInterpreter(delivery):originWire.originalOriginFinalReviewPreflightInterpreter(delivery)):frontierProfile(r)?originalInputFrontierPreflightInterpreter(delivery):originalPeerContextDeliveryInterpreter(delivery);}
 
 // Fixed ORIGINAL readonly-family inventory namespace. Ordinary task/membership
 // paths use the central inventory import above; a missing readonly census can
@@ -107,7 +110,7 @@ function ownedExpected(token,expected,purpose){
  if(keys.length!==4||keys.some(k=>typeof k!=='string'||!['ledger','admission_ref','context_sha256','kind'].includes(k)||!descriptors[k].enumerable||!Object.hasOwn(descriptors[k],'value')))fail('PROTECTED_CODEX_OWNED_EXPECTED');
  const proof=ownedTokens.get(token),b=proof?.binding,f=b?.facts;
  if(!proof||proof.purpose!==purpose||!b||expected.ledger!==b.ledger||types.isProxy(expected.ledger)||Object.getPrototypeOf(expected.ledger)!==PeerLedger.prototype||expected.kind!==(f.kind??'task')||expected.context_sha256!==f.context_sha256||!same(connection(b.ledger),b.connection))fail('PROTECTED_CODEX_ORIGINAL_OWNED_CAP_REQUIRED');
- if(!same(ownedReference(expected.admission_ref,f.kind?.startsWith('input-frontier-')||['peer-origin-reconstruction','peer-origin-review','peer-origin-frontier-seal-review','owner-handover-review'].includes(f.kind)?'work_items':'commands'),f.admission_ref))fail('PROTECTED_CODEX_ORIGINAL_OWNED_CAP_REQUIRED');
+ if(!same(ownedReference(expected.admission_ref,f.kind?.startsWith('input-frontier-')||['peer-origin-reconstruction','peer-origin-review','peer-origin-frontier-seal-review','owner-handover-review','peer-origin-ordinary-task-review'].includes(f.kind)?'work_items':'commands'),f.admission_ref))fail('PROTECTED_CODEX_ORIGINAL_OWNED_CAP_REQUIRED');
  return proof;
 }
 function originalOwnedIdentity(r){
@@ -518,15 +521,15 @@ function originalExecutionBinding(r){
   if(!binding||binding.ledger!==ledger||!same(binding.facts.admission_ref,facts.admission_ref)||binding.facts.context_sha256!==facts.context_sha256||!['peer-bootstrap-membership-reconstruction','peer-bootstrap-membership-review'].includes(facts.kind))fail('PROTECTED_CODEX_ORIGINAL_LAUNCH_REQUIRED');
   return {ledger,admission_ref:facts.admission_ref,context_sha256:facts.context_sha256,deadline_at_ms:facts.deadline_at_ms};
  }
- // Only the three original origin service purposes can reach this arm.
+ // Only fixed original origin service purposes can reach this arm.
  // currentNativeOrigin authenticates the same service/cap/ledger and performs
  // the complete inventory read plus both original clock checks at its tail.
  if(r.origin_admission){
-  const a=r.origin_admission,range=a.purpose==='range',final=a.purpose==='seal'||a.purpose==='owner';
-  if(!range&&!final||typeof currentNativeOrigin!=='function'||!originProfile(r)
-   ||range!==originRangeInterpreter(r.context_interpreter)||final!==originFinalInterpreter(r.context_interpreter)
-   ||selectedContext(r).scope_profile_id!==(range?'soloco-origin-maintenance-readonly-v1':'soloco-origin-final-review-readonly-v1'))fail('PROTECTED_CODEX_ORIGINAL_LAUNCH_REQUIRED');
-  const facts=currentNativeOrigin(r,true),kinds=range?['peer-origin-reconstruction','peer-origin-review']:a.purpose==='seal'?['peer-origin-frontier-seal-review']:['owner-handover-review'];
+  const a=r.origin_admission,range=a.purpose==='range',final=a.purpose==='seal'||a.purpose==='owner',ordinary=a.purpose==='ordinary';
+  if(!range&&!final&&!ordinary||typeof currentNativeOrigin!=='function'||!originProfile(r)
+   ||range!==originRangeInterpreter(r.context_interpreter)||final!==originFinalInterpreter(r.context_interpreter)||ordinary!==originOrdinaryInterpreter(r.context_interpreter)
+   ||selectedContext(r).scope_profile_id!==(range?'soloco-origin-maintenance-readonly-v1':ordinary?'soloco-origin-ordinary-task-readonly-v1':'soloco-origin-final-review-readonly-v1'))fail('PROTECTED_CODEX_ORIGINAL_LAUNCH_REQUIRED');
+  const facts=currentNativeOrigin(r,true),kinds=range?['peer-origin-reconstruction','peer-origin-review']:a.purpose==='seal'?['peer-origin-frontier-seal-review']:a.purpose==='ordinary'?['peer-origin-ordinary-task-review']:['owner-handover-review'];
   if(!same(facts.admission_ref,a.reference)||facts.context_sha256!==a.context_sha256||facts.deadline_at_ms!==a.deadline_at_ms||facts.kind!==a.kind||!kinds.includes(facts.kind))fail('PROTECTED_CODEX_ORIGINAL_LAUNCH_REQUIRED');
   return {ledger:a.ledger,admission_ref:facts.admission_ref,context_sha256:facts.context_sha256,deadline_at_ms:facts.deadline_at_ms};
  }
@@ -713,7 +716,7 @@ export function spawnOriginalProtectedCodex(owner,handle){
    if(r.plan.launch_mode==='companion-v2'){
     if(!companionBuild(r))fail('PROTECTED_CODEX_BACKEND_BUILD_UNQUALIFIED');const slot=r.plan.companion_slot,c=slot.native_context_contract;
     if(!c||!hash(c.original_home_sha256)||typeof c.upstream_url!=='string')fail('PROTECTED_CODEX_NATIVE_HOST_ASSOCIATION_HELD');
-    if(r.context_interpreter){const route=slot.scope_policy==='V5_ORIGINAL_MANAGED_PRIVATE_FD'?{loopback_proxy_port:r.connect_broker?.port}:{};if(Object.hasOwn(route,'loopback_proxy_port')&&route.loopback_proxy_port!==plan.gateway_port)fail('PROTECTED_CODEX_NATIVE_GATEWAY_HELD');r.control_transcript=(r.bootstrap?createOriginalBootstrapControlTranscript:originRangeInterpreter(r.context_interpreter)?createOriginalOriginMaintenanceControlTranscript:originFinalInterpreter(r.context_interpreter)?createOriginalOriginFinalReviewControlTranscript:frontierProfile(r)?createOriginalInputFrontierControlTranscript:createOriginalControlTranscript)({nonce:r.nonce,pid:child.pid,slot_id:slot.slot_id,executable_sha256:slot.executable_sha256,source_manifest_sha256:slot.source_manifest_sha256,state_root:plan.state_root,cwd:plan.cwd,original_home_sha256:c.original_home_sha256,upstream_url:c.upstream_url,...route});child.stdio[4].write(r.control_transcript.challengeBytes());}
+    if(r.context_interpreter){const route=slot.scope_policy==='V5_ORIGINAL_MANAGED_PRIVATE_FD'?{loopback_proxy_port:r.connect_broker?.port}:{};if(Object.hasOwn(route,'loopback_proxy_port')&&route.loopback_proxy_port!==plan.gateway_port)fail('PROTECTED_CODEX_NATIVE_GATEWAY_HELD');r.control_transcript=(r.bootstrap?createOriginalBootstrapControlTranscript:originRangeInterpreter(r.context_interpreter)?createOriginalOriginMaintenanceControlTranscript:originFinalInterpreter(r.context_interpreter)?createOriginalOriginFinalReviewControlTranscript:originOrdinaryInterpreter(r.context_interpreter)?createOriginalOriginOrdinaryTaskControlTranscript:frontierProfile(r)?createOriginalInputFrontierControlTranscript:createOriginalControlTranscript)({nonce:r.nonce,pid:child.pid,slot_id:slot.slot_id,executable_sha256:slot.executable_sha256,source_manifest_sha256:slot.source_manifest_sha256,state_root:plan.state_root,cwd:plan.cwd,original_home_sha256:c.original_home_sha256,upstream_url:c.upstream_url,...route});child.stdio[4].write(r.control_transcript.challengeBytes());}
     else child.stdio[4].write(JSON.stringify({protocol:PERMIT_PROTOCOL,kind:'challenge',nonce:r.nonce,pid:child.pid,slot_id:slot.slot_id,executable_sha256:slot.executable_sha256,source_manifest_sha256:slot.source_manifest_sha256,state_root:plan.state_root,cwd:plan.cwd,original_home_sha256:c.original_home_sha256,upstream_url:c.upstream_url})+'\n');
    }else child.stdio[4].write(JSON.stringify({protocol:PROTOCOL,kind:'challenge',nonce:r.nonce,pid:child.pid})+'\n');facade.emit('spawn');
   }catch(error){hold(error);}});
@@ -856,14 +859,15 @@ function assertFrontierDeadlines(r){
 
 // Each entry below is fixed by original SOURCE reachability and its private
 // service WeakMap. No caller descriptor, validator or arbitrary profile exists.
-function originCreationProtocol(r){return r.origin_admission.purpose==='range'?'peer-origin-original-creation-v1':r.origin_admission.purpose==='seal'?'peer-origin-frontier-seal-original-creation-v1':'peer-owner-maintenance-original-creation-v1';}
-function originPlanReceipt(r,plan){return r.origin_admission.purpose==='range'?originWire.inspectOriginalOriginMaintenancePreflight(plan):r.origin_admission.purpose==='seal'?originWire.inspectOriginalOriginFrontierSealPreflight(plan):originWire.inspectOriginalOwnerMaintenanceFreshPreflight(plan);}
+function originCreationProtocol(r){return r.origin_admission.purpose==='range'?'peer-origin-original-creation-v1':r.origin_admission.purpose==='seal'?'peer-origin-frontier-seal-original-creation-v1':r.origin_admission.purpose==='ordinary'?'peer-origin-ordinary-task-original-creation-v1':'peer-owner-maintenance-original-creation-v1';}
+function originPlanReceipt(r,plan){return r.origin_admission.purpose==='range'?originWire.inspectOriginalOriginMaintenancePreflight(plan):r.origin_admission.purpose==='seal'?originWire.inspectOriginalOriginFrontierSealPreflight(plan):r.origin_admission.purpose==='ordinary'?originWire.inspectOriginalOriginOrdinaryTaskPreflight(plan):originWire.inspectOriginalOwnerMaintenanceFreshPreflight(plan);}
 function originSlotMatches(r){try{assertInterpreterSlot(r.context_interpreter,r.plan.companion_slot);return true;}catch{return false;}}
 function currentNativeOrigin(r,stable=false){
  const a=r.origin_admission;if(!a||Object.getPrototypeOf(a.ledger)!==PeerLedger.prototype)fail('PROTECTED_CODEX_ORIGINAL_ADMISSION_HELD');
  let facts;
  if(a.purpose==='range'){if(originMaintenance.originalPeerOriginMaintenanceLedger(a.api)!==a.ledger)fail('PROTECTED_CODEX_ORIGINAL_ADMISSION_HELD');const before=originMaintenance.inspectOriginalPeerOriginMaintenance(a.cap);facts=originMaintenance.assertOriginalPeerOriginMaintenance(a.cap,{ledger:a.ledger,stage:before.native_id?'execution':'reserved'});}
  else if(a.purpose==='seal'){if(originSeal.originalPeerOriginFrontierSealLedger(a.api)!==a.ledger)fail('PROTECTED_CODEX_ORIGINAL_ADMISSION_HELD');const before=originSeal.inspectOriginalPeerOriginFrontierSeal(a.cap);facts=originSeal.assertOriginalPeerOriginFrontierSeal(a.cap,{ledger:a.ledger,stage:before.native_id?'execution':'reserved'});}
+ else if(a.purpose==='ordinary'){if(ordinaryOrigin.originalPeerOrdinaryOriginLedger(a.api)!==a.ledger)fail('PROTECTED_CODEX_ORIGINAL_ADMISSION_HELD');const before=ordinaryOrigin.inspectOriginalPeerOrdinaryOriginReview(a.cap);facts=ordinaryOrigin.assertOriginalPeerOrdinaryOriginReview(a.cap,{ledger:a.ledger,stage:before.native_id?'execution':'reserved'});}
  else if(a.purpose==='owner'){if(ownerMaintenance.originalPeerOwnerLifecycleLedger(a.api)!==a.ledger)fail('PROTECTED_CODEX_ORIGINAL_ADMISSION_HELD');const before=ownerMaintenance.inspectOriginalPeerOwnerMaintenance(a.cap);facts=ownerMaintenance.assertOriginalPeerOwnerMaintenance(a.cap,{ledger:a.ledger,stage:before.native_id?'execution':'reserved'});if(facts.creation_mode!=='fresh-original-protected-thread'||facts.fresh_review_purpose!=='peer-owner-maintenance-fresh-purpose-v1')fail('PROTECTED_CODEX_OWNER_FRESH_PURPOSE_REQUIRED');}
  else fail('PROTECTED_CODEX_ORIGINAL_ADMISSION_HELD');
  if(!same(facts.admission_ref,a.reference)||facts.context_sha256!==a.context_sha256||facts.deadline_at_ms!==a.deadline_at_ms||facts.kind!==a.kind||facts.native_id&&facts.native_id!==r.native_thread)fail('PROTECTED_CODEX_ORIGINAL_ADMISSION_HELD');
@@ -873,9 +877,9 @@ function currentNativeOrigin(r,stable=false){
  // LAST provider may advance either ORIGINAL clock. Recheck both afterwards.
  assertFrontierDeadlines(r);const {native_id,...binding}=facts;return stable?binding:facts;
 }
-async function prepareOriginLaunch(owner,supervisor,input,preflight,range){
- const interpreter=(range?originWire.originalOriginMaintenancePreflightInterpreter:originWire.originalOriginFinalReviewPreflightInterpreter)(preflight);
- if(range?!originRangeInterpreter(interpreter):!originFinalInterpreter(interpreter))fail('PROTECTED_CODEX_ORIGINAL_PLAN_REQUIRED');
+async function prepareOriginLaunch(owner,supervisor,input,preflight,range,ordinary=false){
+ const interpreter=(range?originWire.originalOriginMaintenancePreflightInterpreter:ordinary?originWire.originalOriginOrdinaryTaskPreflightInterpreter:originWire.originalOriginFinalReviewPreflightInterpreter)(preflight);
+ if(range?!originRangeInterpreter(interpreter):ordinary?!originOrdinaryInterpreter(interpreter):!originFinalInterpreter(interpreter))fail('PROTECTED_CODEX_ORIGINAL_PLAN_REQUIRED');
  if(typeof owner!=='symbol'||typeof supervisor?.compile!=='function'||!plain(input)||Object.keys(input).some(k=>!['cwd','read_paths','state_root','scratch_root'].includes(k)))fail('PROTECTED_CODEX_ORIGINAL_PLAN_REQUIRED');
  const nonce=randomBytes(32).toString('hex'),brokerOwner=Object.freeze(Object.create(null));let r;
  const broker=await createFixedConnectBroker({owner:brokerOwner,token:nonce,deadline:Date.now()+115000,guard:(token,stage)=>{if(token!==brokerOwner)fail('PROTECTED_CODEX_DOMAIN_INACTIVE');if(stage==='listen'){const n=originInterpreterName(interpreter);frontierSlots['assertOriginal'+n+'InterpreterFinal'](interpreter);return;}if(!r||r.stopping||r.closed||r.failed)fail('PROTECTED_CODEX_DOMAIN_INACTIVE');currentNativeOrigin(r);}});
@@ -884,11 +888,13 @@ async function prepareOriginLaunch(owner,supervisor,input,preflight,range){
 export async function prepareOriginalProtectedOriginMaintenanceLaunch(owner,supervisor,input,preflight){return prepareOriginLaunch(owner,supervisor,input,preflight,true);}
 export async function prepareOriginalProtectedOriginFinalReviewLaunch(owner,supervisor,input,preflight){return prepareOriginLaunch(owner,supervisor,input,preflight,false);}
 function bindOrigin(owner,handle,api,cap,purpose){
- const r=record(owner,handle);if(r.consumed||r.bootstrap||r.bootstrap_claim||r.native_admission||r.membership_admission||readonlyAdmission(r)||!originProfile(r)||(purpose==='range')!==originRangeInterpreter(r.context_interpreter))fail('PROTECTED_CODEX_ORIGINAL_ADMISSION_HELD');
+ const r=record(owner,handle);if(r.consumed||r.bootstrap||r.bootstrap_claim||r.native_admission||r.membership_admission||readonlyAdmission(r)||!originProfile(r)||(purpose==='range')!==originRangeInterpreter(r.context_interpreter)||(purpose==='ordinary')!==originOrdinaryInterpreter(r.context_interpreter))fail('PROTECTED_CODEX_ORIGINAL_ADMISSION_HELD');
  let ledger,facts,plan;
  if(purpose==='range'){ledger=originMaintenance.originalPeerOriginMaintenanceLedger(api);facts=originMaintenance.assertOriginalPeerOriginMaintenance(cap,{ledger,stage:'reserved'});plan=originMaintenance.originalPeerOriginMaintenancePreflight(cap);}
  else if(purpose==='seal'){ledger=originSeal.originalPeerOriginFrontierSealLedger(api);facts=originSeal.assertOriginalPeerOriginFrontierSeal(cap,{ledger,stage:'reserved'});plan=originSeal.originalPeerOriginFrontierSealPreflight(cap);}
- else{ledger=ownerMaintenance.originalPeerOwnerLifecycleLedger(api);facts=ownerMaintenance.assertOriginalPeerOwnerMaintenance(cap,{ledger,stage:'reserved'});if(facts.creation_mode!=='fresh-original-protected-thread'||facts.fresh_review_purpose!=='peer-owner-maintenance-fresh-purpose-v1')fail('PROTECTED_CODEX_OWNER_FRESH_PURPOSE_REQUIRED');plan=ownerMaintenance.originalPeerOwnerMaintenanceWirePlan(cap);}
+ else if(purpose==='ordinary'){ledger=ordinaryOrigin.originalPeerOrdinaryOriginLedger(api);facts=ordinaryOrigin.assertOriginalPeerOrdinaryOriginReview(cap,{ledger,stage:'reserved'});plan=ordinaryOrigin.originalPeerOrdinaryOriginPreflight(cap);}
+ else if(purpose==='owner'){ledger=ownerMaintenance.originalPeerOwnerLifecycleLedger(api);facts=ownerMaintenance.assertOriginalPeerOwnerMaintenance(cap,{ledger,stage:'reserved'});if(facts.creation_mode!=='fresh-original-protected-thread'||facts.fresh_review_purpose!=='peer-owner-maintenance-fresh-purpose-v1')fail('PROTECTED_CODEX_OWNER_FRESH_PURPOSE_REQUIRED');plan=ownerMaintenance.originalPeerOwnerMaintenanceWirePlan(cap);}
+ else fail('PROTECTED_CODEX_ORIGINAL_ADMISSION_HELD');
  if(Object.getPrototypeOf(ledger)!==PeerLedger.prototype||facts.native_id!==null)fail('PROTECTED_CODEX_ORIGINAL_ADMISSION_HELD');
  r.origin_admission={ledger,api,cap,purpose,kind:facts.kind,reference:copy(facts.admission_ref),context_sha256:facts.context_sha256,deadline_at_ms:facts.deadline_at_ms};
  const interpreter=originalContextInterpreter(r,plan),wire=originPlanReceipt(r,plan);if(interpreter!==r.context_interpreter||wire.payload_sha256!==facts.context_sha256)fail('PROTECTED_CODEX_ORIGINAL_ADMISSION_HELD');
@@ -907,3 +913,11 @@ function assertOriginCreation(token,expected,purpose){
 export function assertOriginalProtectedOriginCreation(token,expected){return assertOriginCreation(token,expected,'range');}
 export function assertOriginalProtectedOriginFrontierSealCreation(token,expected){return assertOriginCreation(token,expected,'seal');}
 export function assertOriginalProtectedOwnerMaintenanceCreation(token,expected){return assertOriginCreation(token,expected,'owner');}
+
+export async function prepareOriginalProtectedOriginOrdinaryTaskLaunch(owner,supervisor,input,preflight){return prepareOriginLaunch(owner,supervisor,input,preflight,false,true);}
+export function bindOriginalProtectedOriginOrdinaryTaskAdmission(owner,handle,api,cap){bindOrigin(owner,handle,api,cap,'ordinary');}
+export function assertOriginalProtectedOriginOrdinaryTaskCreation(token,expected){return assertOriginCreation(token,expected,'ordinary');}
+
+// Fixed currentness DATA from the one original deployment source. This is
+// neither an admission/Native token nor independent qualification or consent.
+export function inspectOriginalProtectedOrdinaryOriginSourceTuple(){if(arguments.length!==0)fail('PROTECTED_CODEX_ORDINARY_SOURCE_INPUT');return inspectOrdinarySourceTuple();}

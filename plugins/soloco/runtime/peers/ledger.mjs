@@ -52,6 +52,16 @@ export function originalPeerExecutionCustodyFrom(ledger,handle){
   const assert=()=>{originalPeerExecutionLedgerFrom(ledger);loan.assert();};assert();return Object.freeze({...loan,assert});
 }
 
+
+// Identity only from an exact, still-live class-owned handle. This does not
+// expose its ledger, DB, pending journal, hooks or any write capability.
+export function inspectOriginalPeerTransactionIdentityFrom(handle){
+  const loan=originalExecutionTransactions.get(handle);
+  if(!loan)throw Object.assign(Error('Original peer transaction identity required'),{code:'ORIGINAL_EXECUTION_PEER_TRANSACTION_REQUIRED'});
+  const original=originalPeerExecutionCustodyFrom(loan.ledger,handle);
+  return Object.freeze({protocol:'peer-original-transaction-identity-v1',root:original.root,company_id:original.company_id,root_sha256:hash(original.root),assert:original.assert});
+}
+
 export const PEER_PROTOCOL='peer-cos-v1';
 export const PEER_LAYOUT=5;
 export const FAMILIES=Object.freeze(['control','principals','grants','commands','tasks','slots','claims','homes','proposals','reviews','effects','conflicts','notices','messages','deliveries','subscriptions','work_items']);

@@ -17,6 +17,7 @@ import * as maintenance from './peers/origin-maintenance.mjs';
 
 const MAX_REPLY=24576,MAX_REQUEST=100000;
 const FRONTIER_URL=new URL('./peers/input-frontier-maintenance.mjs',import.meta.url);
+const ORDINARY_URL=new URL('./peers/origin-ordinary-task.mjs',import.meta.url);
 const SEAL_URL=new URL('./peers/origin-frontier-seal.mjs',import.meta.url);
 const LAUNCH_URL=new URL('./peers/maintenance-launch.mjs',import.meta.url);
 const ENGINE_URL=new URL('./engine.mjs',import.meta.url);
@@ -46,9 +47,18 @@ const mechanicalLimits=object({max_attempts:{enum:[1]},max_native_calls:integer(
 const mechanicalModel=object({mode:{enum:['explicit']},model:{...str(128),pattern:'^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$'},reason:str(300),effort:{enum:['none','minimal','low','medium','high','xhigh','max','ultra']},speed:{enum:['host_default']}},['mode','model','reason']);
 const mechanicalPurpose=object({protocol:{enum:['peer-origin-mechanical-qa-purpose-v1']},purpose:{enum:['quarantine-transition-review-only']},decision_ref:legacyRef});
 const mechanicalActions=Object.freeze({mechanical_decision:'recordPeerOriginMechanicalQaDecisionAtEpoch',mechanical_packet:'preparePeerOriginMechanicalQaPacketAtEpoch',mechanical_grant:'grantPeerOriginMechanicalQaPacketAtEpoch',mechanical_packet_inspect:'inspectPeerOriginMechanicalQaPacketAtEpoch',mechanical_packet_read:'readPeerOriginMechanicalQaPacketAtEpoch'});
+const controlRef=object({family:{enum:['control']},id:str(2000),revision:integer(),sha256:sha});
+const ordinaryPurpose=object({protocol:{enum:['peer-origin-ordinary-task-purpose-v1']},purpose:{enum:['qualify-original-ordinary-tasks']},scope:str(160),resources:{type:'array',maxItems:32,items:{anyOf:[str(2000),{type:'object'}]}},max_reviews:integer(),expires_at:str(100)});
+const ordinaryMeaning=object({frontier_ref:ref,root_result_ref:ref});
+const ordinaryDataScope=object({protocol:{enum:['peer-origin-ordinary-native-data-scope-v1']},host:{enum:['codex']},model:{enum:['host_default']},subject_sha256:sha,expires_at:str(100)});
 const fields={
+ ordinary_task_preview:object({purpose:ordinaryPurpose,origin_seal_ref:ref,current_meaning_ref:ordinaryMeaning}),
+ ordinary_task_decision:object({operation_id:str(160),primary_human_message:primaryMessage,purpose:ordinaryPurpose,native_data_scope:ordinaryDataScope,expected_company_ref:controlRef,expected_origin_ref:controlRef,origin_seal_ref:ref,current_meaning_ref:ordinaryMeaning}),
+ ordinary_task_select:object({operation_id:str(160),decision_ref:ref,expected_company_ref:controlRef,expected_origin_ref:controlRef}),
+ ordinary_task_review:object({operation_id:str(160),origin_seal_ref:ref,current_meaning_ref:ordinaryMeaning,incidence_ref:ref,expires_at:str(100),source_instruction:str(4000)}),
+ ordinary_task_commit:object({operation_id:str(160),primary_human_message:primaryMessage,review_ref:ref,expected_company_ref:controlRef}),
  status:object({}),
- plan:object({expires_at:str(100),policy,maintenance:budgets,frontier,frontier_seal:frontierSeal,mechanical_qa:mechanicalPurpose},['expires_at','policy','maintenance']),
+ plan:object({expires_at:str(100),policy,maintenance:budgets,frontier,frontier_seal:frontierSeal,ordinary_tasks:ordinaryPurpose,mechanical_qa:mechanicalPurpose},['expires_at','policy','maintenance']),
  plan_inspect:object({plan_id:str(2000)}),plan_read:object({plan_id:str(2000),...range}),
  mechanical_decision:object({operation_id:str(160),primary_human_message:primaryMessage,expires_at:str(100),limits:mechanicalLimits,model_selection:mechanicalModel}),
  mechanical_packet:object({operation_id:str(160),plan_ref:legacyRef}),
@@ -243,6 +253,12 @@ export async function peerOriginRuntimeAction(request,host){
    if(args.action==='maintenance_operation')return returned(maintenance.inspectPeerOriginMaintenanceOperation(api,input),args);
    if(run)return returned(await run(api,input),args);
    return returned(maintenance.sealPeerOrigin(api,{...input,source_instruction:args.source_instruction}),args);
+  }
+  if(args.action.startsWith('ordinary_task_')){
+   const ordinary=await fixedModule(ORDINARY_URL,'ORIGIN_ORDINARY_TASK_SOURCE_UNAVAILABLE');need(typeof ordinary.loadPeerOrdinaryOriginCheckpointSupport==='function','ORIGIN_ORDINARY_TASK_CHECKPOINT_SOURCE_UNAVAILABLE');await ordinary.loadPeerOrdinaryOriginCheckpointSupport();
+   const api=ordinary.createPeerOrdinaryOrigin({ledger,actor});
+   if(args.action==='ordinary_task_review'){await selectedMaintenance(ledger,args,actor);const run=await fixedLaunch('runOriginalPeerOrdinaryOriginReview');return returned(await run(api,{...input,source_instruction:args.source_instruction}),args);}
+   const method={ordinary_task_preview:'previewPeerOrdinaryOriginDecision',ordinary_task_decision:'recordPeerOrdinaryOriginDecisionAtEpoch',ordinary_task_select:'selectPeerOrdinaryOriginPurposeAtEpoch',ordinary_task_commit:'commitPeerOrdinaryOriginAtEpoch'}[args.action];need(method&&typeof ordinary[method]==='function','ORIGIN_ORDINARY_TASK_ACTION_HELD');return returned(ordinary[method](api,{...input,epoch:args.epoch,...(args.action==='ordinary_task_preview'?{}:{source_instruction:args.source_instruction})}),args);
   }
   const isSeal=args.action.startsWith('final_seal_'),module=await fixedModule(isSeal?SEAL_URL:FRONTIER_URL,isSeal?'ORIGIN_FRONTIER_SEAL_SOURCE_UNAVAILABLE':'ORIGIN_INPUT_FRONTIER_SOURCE_UNAVAILABLE');
   if(isSeal){need(typeof module.loadPeerOriginFrontierSealCheckpointSupport==='function','ORIGIN_FRONTIER_SEAL_SOURCE_UNAVAILABLE');await module.loadPeerOriginFrontierSealCheckpointSupport();}

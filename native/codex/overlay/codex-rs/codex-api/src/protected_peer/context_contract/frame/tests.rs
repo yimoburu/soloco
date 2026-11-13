@@ -411,3 +411,59 @@ fn escaped_utf16_duplicate_outer_or_inner_selector_keys_are_rejected() {
     let inner=r#"{"protocol":"peer-membership-context-v2","x":1,"\u0078":2}"#;
     let (_,text)=member(inner,"peer-membership-context-v2");assert!(decode_original_frame(&text,RESOURCE_SHA256,100_000).is_err());
 }
+
+
+// Ordinary-origin raw wire cases, AUTHORED_UNRUN. Original business values
+// stay byte-exact DATA; none of these codec fixtures claims Native authority.
+fn ordinary_origin_framed(payload:&str)->String {
+    origin_framed(payload,"origin-ordinary-task-assignment","peer-origin-ordinary-task-context-v1",super::super::ORIGIN_ORDINARY_TASK_RESOURCE_SHA256,None)
+}
+#[test]
+fn ordinary_origin_frame_preserves_complete_opaque_raw_values() {
+    let payload=r#" {"pro\u0074ocol":"peer-origin-ordinary-task-context-v1","k\u0069nd":"peer-origin-ordinary-task-review","raw":{"n":9007199254740993,"lexeme":1.2300e+10,"unknown":"UNKNOWN","escaped":"\ud800","unicode":"雪😀"}} "#;
+    let text=ordinary_origin_framed(payload);let contract=super::super::ORIGIN_ORDINARY_TASK_RESOURCE_SHA256;
+    let decoded=decode_origin_ordinary_task_frame(&text,contract,100000).unwrap();
+    assert_eq!(decoded.payload,payload);assert_eq!(decoded.payload_utf8_bytes,payload.len());assert_eq!(decoded.payload_sha256,hash(payload.as_bytes()));
+    assert!(decoded.source_cut.is_none());assert!(decoded.source_cut_sha256.is_none());
+}
+#[test]
+fn ordinary_origin_frame_rejects_relabelled_old_purposes_and_inner_cuts() {
+    let contract=super::super::ORIGIN_ORDINARY_TASK_RESOURCE_SHA256;
+    for kind in ["peer-origin-frontier-seal-review","peer-origin-review","owner-handover-review","input-frontier-review","task"] {
+        let raw=format!(r#"{{"protocol":"peer-origin-ordinary-task-context-v1","kind":"{kind}"}}"#);
+        assert!(decode_origin_ordinary_task_frame(&ordinary_origin_framed(&raw),contract,100000).is_err());
+    }
+    for (delivery,protocol) in [("origin-frontier-seal-assignment","peer-origin-frontier-seal-context-v1"),("origin-maintenance-assignment","peer-origin-maintenance-context-v1"),("owner-maintenance-assignment","peer-owner-maintenance-assignment-v1")] {
+        let raw=format!(r#"{{"protocol":"{protocol}","kind":"peer-origin-ordinary-task-review"}}"#);
+        let text=origin_framed(&raw,delivery,protocol,contract,None);
+        assert!(decode_origin_ordinary_task_frame(&text,contract,100000).is_err());
+    }
+    let raw=r#"{"protocol":"peer-origin-ordinary-task-context-v1","kind":"peer-origin-ordinary-task-review"}"#;
+    let text=origin_framed(raw,"origin-ordinary-task-assignment","peer-origin-ordinary-task-context-v1",contract,Some((raw,"peer-origin-ordinary-task-context-v1")));
+    assert!(decode_origin_ordinary_task_frame(&text,contract,100000).is_err());
+}
+#[test]
+fn ordinary_origin_duplicate_selector_and_changed_body_or_envelope_hold() {
+    let contract=super::super::ORIGIN_ORDINARY_TASK_RESOURCE_SHA256;
+    for raw in [r#"{"protocol":"peer-origin-ordinary-task-context-v1","pro\u0074ocol":"peer-origin-ordinary-task-context-v1","kind":"peer-origin-ordinary-task-review"}"#,
+        r#"{"protocol":"peer-origin-ordinary-task-context-v1","kind":"peer-origin-ordinary-task-review","k\u0069nd":"peer-origin-ordinary-task-review"}"#] {
+        assert!(decode_origin_ordinary_task_frame(&ordinary_origin_framed(raw),contract,100000).is_err());
+    }
+    let raw=r#"{"protocol":"peer-origin-ordinary-task-context-v1","kind":"peer-origin-ordinary-task-review","value":1}"#;
+    let frame=ordinary_origin_framed(raw);
+    for changed in [frame.replace("\"value\":1","\"value\":2"),frame.replacen("\"source_cut_sha256\":null","\"source_cut_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"",1),format!("{frame} ")] {
+        assert!(decode_origin_ordinary_task_frame(&changed,contract,100000).is_err());
+    }
+    assert!(decode_origin_final_review_frame(&frame,contract,100000).is_err());
+}
+#[test]
+fn ordinary_origin_raw_capacity_and_frame_capacity_are_both_enforced() {
+    let contract=super::super::ORIGIN_ORDINARY_TASK_RESOURCE_SHA256;
+    let prefix=r#"{"protocol":"peer-origin-ordinary-task-context-v1","kind":"peer-origin-ordinary-task-review","raw":""#;let suffix="\"}";
+    for size in [65536,65537] {
+        let payload=format!("{prefix}{}{suffix}","x".repeat(size-prefix.len()-suffix.len()));let text=ordinary_origin_framed(&payload);
+        assert_eq!(decode_origin_ordinary_task_frame(&text,contract,100000).is_ok(),size==65536);
+        if size==65536 {assert!(decode_origin_ordinary_task_frame(&text,contract,text.len()).is_ok());assert!(decode_origin_ordinary_task_frame(&text,contract,text.len()-1).is_err());}
+        assert!(decode_origin_ordinary_task_frame(&text,contract,0).is_err());assert!(decode_origin_ordinary_task_frame(&text,contract,100001).is_err());
+    }
+}

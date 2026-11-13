@@ -42,7 +42,7 @@ const fields={
  pause:object(op),record_transfer_decision:object({...op,target,reviewer_principal_id:str(200),review_grant_id:str(200),review_grant_generation:integer(),expires_at:str(100),max_review_calls:integer(),primary_human_message:primary,basis:{enum:['explicit']}}),
  issue_transfer_intent:object({...op,decision_ref:ref}),revoke_transfer_intent:object({...op,intent_ref:ref}),inspect_transfer_intent:object({intent_ref:ref}),read_transfer_intent:object({intent_ref:ref,...range}),begin:object({...op,intent_ref:ref}),
  inspect:object({}),read_subject:object({...op,...range}),refresh_preview:object({}),read_refresh_preview:object({preview_sha256:sha,offset:integer(0),length:integer(1,1024)}),refresh_subject:object({...op,previous_subject_ref:ref,preview_sha256:sha}),read_previous_subject:object({subject_ref:ref,offset:integer(0),length:integer(1,1024)}),submit:object({...op,subject_sha256:sha,content:str(8192)}),
- recovery_header:object(range,[]),read_recovery:object({...op,...range}),recover:object({...op,subject_sha256:sha,recovery_sha256:sha,attempt_refs:attempts,content:str(8192)}),review:object(op),activate:object({...op,review_ref:ref}),resume:object(op),
+ recovery_header:object(range,[]),read_recovery:object({...op,...range}),recover:object({...op,subject_sha256:sha,recovery_sha256:sha,attempt_refs:attempts,content:str(8192)}),review:object(op),activate:object({...op,review_ref:ref}),resume:object({...op,qualification_ref:ref},Object.keys(op)),
  context_inspect:object({family:{enum:FAMILIES},status:str(1000),principal_id:str(1000),task_id:str(1000),scope:str(1000),limit:integer(1,50),cursor:str(16000)},['family']),context_read:object({...rowRef.properties,offset:integer(0),length:integer(1,4096)},['family','id','revision','sha256'])
 };
 const sourceActions=new Set(['pause','record_transfer_decision','issue_transfer_intent','revoke_transfer_intent','begin','refresh_subject','submit','recover','review','activate','resume']);
@@ -304,6 +304,6 @@ export async function peerOwnerRuntimeAction(request,host){
   if(args.action==='recovery_header')return headerRead(lifecycle.recoveryHeader({epoch:args.epoch}),input);
   const methods={pause:'pause',record_transfer_decision:'recordTransferDecision',issue_transfer_intent:'issueTransferIntent',revoke_transfer_intent:'revokeTransferIntent',inspect_transfer_intent:'inspectTransferIntent',read_transfer_intent:'readTransferIntent',begin:'beginFromIntent',read_subject:'read',refresh_preview:'previewSubjectRefresh',read_refresh_preview:'readSubjectRefresh',refresh_subject:'refreshSubject',read_previous_subject:'readPreviousSubject',submit:'submit',read_recovery:'readRecovery',recover:'recover',activate:'activate',resume:'resume'};
   const method=methods[args.action];need(method&&typeof lifecycle[method]==='function','OWNER_PUBLIC_ACTION_HELD');
-  return bounded(lifecycle[method]({...input,epoch:args.epoch,...(coreInstructionActions.has(args.action)?{source_instruction:args.source_instruction}:{})}));
+  return bounded(await lifecycle[method]({...input,epoch:args.epoch,...(coreInstructionActions.has(args.action)?{source_instruction:args.source_instruction}:{})}));
  });
 }

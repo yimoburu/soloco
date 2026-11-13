@@ -1,5 +1,5 @@
-// Fixed original range/seal/owner transport. A private SOURCE descriptor is
-// selected only by the three exported fixed wrappers, never caller JSON.
+// Fixed original range/seal/owner/ordinary transport. A private SOURCE descriptor is
+// selected only by exported fixed wrappers, never caller JSON.
 import {TextDecoder} from 'node:util';
 import {canonical} from './ledger.mjs';
 import {parseGatewayJSON} from './gateway-wire.mjs';
@@ -7,12 +7,14 @@ import * as wire from './origin-maintenance-wire.mjs';
 import * as range from './origin-maintenance.mjs';
 import * as seal from './origin-frontier-seal.mjs';
 import * as ownerReview from './owner-handover.mjs';
+import * as ordinaryReview from './origin-ordinary-task.mjs';
 import * as domain from './protected-codex-domain.mjs';
 export {prepareOriginalProtectedOriginMaintenanceLaunch,prepareOriginalProtectedOriginFinalReviewLaunch} from './protected-codex-domain.mjs';
 export {inspectOriginalOriginMaintenanceSupport,inspectOriginalOriginFrontierSealSupport,inspectOriginalOwnerMaintenanceFreshSupport} from './context-component-deployment.mjs';
 const RANGE=Object.freeze({purpose:'origin range',client:'soloco-origin-maintenance',instruction:wire.ORIGIN_MAINTENANCE_INSTRUCTION,readMaximum:4096,outputMaximum:16384,tools:wire.originMaintenanceReadonly3Tools,input:wire.originalOriginMaintenancePreflightInput,assert:range.assertOriginalPeerOriginMaintenance,inspect:range.inspectOriginalPeerOriginMaintenance,preflight:range.originalPeerOriginMaintenancePreflight,bindDomain:domain.bindOriginalProtectedOriginAdmission,bindNative:range.bindOriginalPeerOriginNative,channel:range.originalPeerOriginMaintenanceChannel});
 const SEAL=Object.freeze({purpose:'origin whole-frontier seal review',client:'soloco-origin-frontier-seal',instruction:wire.ORIGIN_FRONTIER_SEAL_INSTRUCTION,readMaximum:4096,outputMaximum:16384,tools:wire.originFinalReviewReadonly3Tools,input:wire.originalOriginFrontierSealPreflightInput,assert:seal.assertOriginalPeerOriginFrontierSeal,inspect:seal.inspectOriginalPeerOriginFrontierSeal,preflight:seal.originalPeerOriginFrontierSealPreflight,bindDomain:domain.bindOriginalProtectedOriginFrontierSealAdmission,bindNative:seal.bindOriginalPeerOriginFrontierSealNative,channel:seal.originalPeerOriginFrontierSealChannel});
 const OWNER=Object.freeze({purpose:'explicit new fresh-purpose owner handover review',client:'soloco-owner-fresh-review',instruction:wire.OWNER_MAINTENANCE_FRESH_INSTRUCTION,readMaximum:1024,outputMaximum:8192,tools:wire.originFinalReviewReadonly3Tools,input:wire.originalOwnerMaintenanceFreshPreflightInput,assert:ownerReview.assertOriginalPeerOwnerMaintenance,inspect:ownerReview.inspectOriginalPeerOwnerMaintenance,preflight:ownerReview.originalPeerOwnerMaintenanceWirePlan,bindDomain:domain.bindOriginalProtectedOwnerMaintenanceAdmission,bindNative:ownerReview.bindOriginalPeerOwnerMaintenanceNative,channel:ownerReview.originalPeerOwnerMaintenanceChannel});
+const ORDINARY=Object.freeze({purpose:'complete raw ordinary-origin independent review',client:'soloco-origin-ordinary-task',instruction:wire.ORIGIN_ORDINARY_TASK_INSTRUCTION,readMaximum:4096,outputMaximum:16384,tools:wire.originOrdinaryTaskReadonly3Tools,input:wire.originalOriginOrdinaryTaskPreflightInput,assert:ordinaryReview.assertOriginalPeerOrdinaryOriginReview,inspect:ordinaryReview.inspectOriginalPeerOrdinaryOriginReview,preflight:ordinaryReview.originalPeerOrdinaryOriginPreflight,bindDomain:domain.bindOriginalProtectedOriginOrdinaryTaskAdmission,bindNative:ordinaryReview.bindOriginalPeerOrdinaryOriginNative,channel:ordinaryReview.originalPeerOrdinaryOriginChannel});
 export const ORIGIN_NATIVE_PERMISSION_PROFILE=':read-only';
 const FRAME=100000,WIRE=4000000,COUNT=256;
 const fail=code=>{throw Object.assign(Error(code),{code});};
@@ -195,3 +197,6 @@ async function runHost(owner,launch,api,cap,fixed){
 export async function runOriginalOriginMaintenanceHost(owner,launch,api,cap){if(arguments.length!==4)fail('ORIGIN_HOST_INPUT');return runHost(owner,launch,api,cap,RANGE);}
 export async function runOriginalOriginFrontierSealHost(owner,launch,api,cap){if(arguments.length!==4)fail('ORIGIN_HOST_INPUT');return runHost(owner,launch,api,cap,SEAL);}
 export async function runOriginalOwnerMaintenanceFreshHost(owner,launch,lifecycle,cap){if(arguments.length!==4)fail('ORIGIN_HOST_INPUT');return runHost(owner,launch,lifecycle,cap,OWNER);}
+
+export function originalOriginOrdinaryTaskLaunchConfiguration(owner,launch){return configuration(owner,launch,ORDINARY);}
+export async function runOriginalOriginOrdinaryTaskHost(owner,launch,api,cap){if(arguments.length!==4)fail('ORIGIN_HOST_INPUT');return runHost(owner,launch,api,cap,ORDINARY);}

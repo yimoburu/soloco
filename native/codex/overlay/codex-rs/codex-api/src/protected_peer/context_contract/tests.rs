@@ -535,3 +535,64 @@ fn accepted_scope_is_bound_to_original_current_challenge_and_host() {
     let receipt=accept_original_context_permit(observation,&binding,permit).unwrap();
     assert!(require_original_scope_for_send(&fixture_challenge(),"other-host",Some(&receipt)).is_err());
 }
+
+
+// Additive ordinary-origin SOURCE cases. AUTHORED_UNRUN; these do not mint
+// Native creation/drain, human approval, task authority or typed resume.
+fn ordinary_origin_request_value()->Value {
+    json!({"protocol":ORIGIN_ORDINARY_TASK_PROTOCOL,"contract_id":ORIGIN_ORDINARY_TASK_CORE_ID,
+        "resource_sha256":ORIGIN_ORDINARY_TASK_RESOURCE_SHA256,"context_encoding":ENCODING,
+        "scope_profile_id":ORIGIN_ORDINARY_TASK_PROFILE})
+}
+fn ordinary_origin_selection()->OriginalContextSelection {
+    select_original_context_contract(Some(&serde_json::from_value(ordinary_origin_request_value()).unwrap())).unwrap().unwrap()
+}
+#[test]
+fn ordinary_origin_constructor_requires_its_entire_distinct_source_tuple() {
+    assert_eq!(ORIGIN_ORDINARY_TASK_RESOURCE.len(),3077);
+    assert_eq!(hash(ORIGIN_ORDINARY_TASK_RESOURCE),ORIGIN_ORDINARY_TASK_RESOURCE_SHA256);
+    assert!(ordinary_origin_selection().profile==OriginalToolProfile::OriginOrdinaryTaskReadonlyThree);
+    for other in [origin_request_value(false),origin_request_value(true),request_value(),bootstrap_request_value(),frontier_request_value()] {
+        for key in ["protocol","contract_id","resource_sha256","scope_profile_id"] {
+            let mut changed=ordinary_origin_request_value();changed[key]=other[key].clone();
+            assert!(select_original_context_contract(Some(&serde_json::from_value(changed).unwrap())).is_err(),"{key}");
+        }
+    }
+    for key in ["protocol","contract_id","resource_sha256","context_encoding","scope_profile_id"] {
+        let mut missing=ordinary_origin_request_value();missing.as_object_mut().unwrap().remove(key);
+        assert!(serde_json::from_value::<ContextContractRequest>(missing).is_err());
+    }
+    let mut extra=ordinary_origin_request_value();extra["ready"]=json!(true);
+    assert!(serde_json::from_value::<ContextContractRequest>(extra).is_err());
+}
+#[test]
+fn ordinary_origin_catalogue_uses_sdk_projection_and_retains_raw_bounds() {
+    let raw=origin_ordinary_task_source_resource().unwrap();assert_eq!(raw.deliveries.len(),1);
+    assert_eq!(raw.deliveries[0]["kinds"],json!(["peer-origin-ordinary-task-review"]));
+    assert_eq!(raw.tools[1].input_schema["properties"]["length"],json!({"type":"integer","minimum":1,"maximum":4096}));
+    let profile=OriginalToolProfile::OriginOrdinaryTaskReadonlyThree;
+    let tools=profile.offered_inventory().unwrap();assert_eq!(tools.as_array().unwrap().len(),3);
+    assert_eq!(tools[1]["parameters"]["properties"]["length"],json!({"type":"integer"}));
+    assert_eq!(offered(json!({"input":[],"tools":tools.clone()}),profile).unwrap(),tools);
+    let deferred=json!({"type":"additional_tools","role":"developer","tools":[{"type":"namespace","name":codex_protocol::DEFAULT_FUNCTION_NAMESPACE,"description":"","tools":tools.clone()}]});
+    assert_eq!(offered(json!({"input":[deferred.clone()]}),profile).unwrap(),tools);
+    assert!(offered(json!({"input":[deferred],"tools":tools.clone()}),profile).is_err());
+    for other in [OriginalToolProfile::OrdinaryFive,OriginalToolProfile::BootstrapReadonlyThree,OriginalToolProfile::InputFrontierReadonlyThree,OriginalToolProfile::OriginMaintenanceReadonlyThree,OriginalToolProfile::OriginFinalReviewReadonlyThree] {
+        assert!(offered(json!({"input":[],"tools":other.offered_inventory().unwrap()}),profile).is_err());
+    }
+    let mut changed=tools;changed[2]["parameters"]["properties"]["qualification_ref"]=json!({"type":"object"});
+    assert!(offered(json!({"input":[],"tools":changed}),profile).is_err());
+}
+#[test]
+fn ordinary_origin_whole_turn_requires_one_frame_and_original_selection() {
+    let raw=r#"{"protocol":"peer-origin-ordinary-task-context-v1","kind":"peer-origin-ordinary-task-review","raw":{"unsafe":9007199254740993,"opaque":"\ud800","status":"UNKNOWN"}}"#;
+    let frame=origin_wire(raw,"origin-ordinary-task-assignment","peer-origin-ordinary-task-context-v1",ORIGIN_ORDINARY_TASK_RESOURCE_SHA256);
+    let turn=json!({"method":"turn/start","params":{"input":[{"type":"text","text":"Fixed Source instruction"},{"type":"text","text":frame.clone()}]}});let original=turn.clone();
+    assert!(validate_selected_turn_input(&turn,Some(&ordinary_origin_selection())).is_ok());assert_eq!(turn,original);
+    assert!(validate_selected_turn_input(&turn,None).is_err());
+    for old in [origin_selection(false),origin_selection(true),frontier_selection(),bootstrap_selection()] {
+        assert!(validate_selected_turn_input(&turn,Some(&old)).is_err());
+    }
+    let duplicate=json!({"params":{"input":[{"type":"text","text":frame.clone()},{"type":"text","text":frame}]}});
+    assert!(validate_selected_turn_input(&duplicate,Some(&ordinary_origin_selection())).is_err());
+}

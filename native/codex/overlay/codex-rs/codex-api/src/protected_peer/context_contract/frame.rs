@@ -142,6 +142,14 @@ pub(super) fn decode_origin_final_review_frame<'a>(text:&'a str,source_contract_
     }
     decode_selected_frame(text,source_contract_sha256,maximum_frame_bytes,super::OriginalToolProfile::OriginFinalReviewReadonlyThree)
 }
+pub(super) fn decode_origin_ordinary_task_frame<'a>(text:&'a str,source_contract_sha256:&str,
+    maximum_frame_bytes:usize)->Result<DecodedOriginalFrame<'a>,TransportError> {
+    if source_contract_sha256!=super::ORIGIN_ORDINARY_TASK_RESOURCE_SHA256||maximum_frame_bytes==0
+        ||maximum_frame_bytes>super::super::MAX_FRAME {
+        return Err(hold("original ordinary origin review frame resource differs from fixed source"));
+    }
+    decode_selected_frame(text,source_contract_sha256,maximum_frame_bytes,super::OriginalToolProfile::OriginOrdinaryTaskReadonlyThree)
+}
 fn decode_selected_frame<'a>(text:&'a str,source_contract_sha256:&str,maximum_frame_bytes:usize,
     profile:super::OriginalToolProfile)->Result<DecodedOriginalFrame<'a>,TransportError> {
     let bootstrap=profile==super::OriginalToolProfile::BootstrapReadonlyThree;
@@ -159,6 +167,7 @@ fn decode_selected_frame<'a>(text:&'a str,source_contract_sha256:&str,maximum_fr
         super::OriginalToolProfile::InputFrontierReadonlyThree=>frame.delivery_kind=="input-frontier-assignment",
         super::OriginalToolProfile::OriginMaintenanceReadonlyThree=>frame.delivery_kind=="origin-maintenance-assignment",
         super::OriginalToolProfile::OriginFinalReviewReadonlyThree=>matches!(frame.delivery_kind.as_str(),"origin-frontier-seal-assignment"|"owner-maintenance-assignment"),
+        super::OriginalToolProfile::OriginOrdinaryTaskReadonlyThree=>frame.delivery_kind=="origin-ordinary-task-assignment",
     };
     if !selected_kind {return Err(hold("original delivery kind differs from constructor profile"));}
     match frame.delivery_kind.as_str() {
@@ -192,10 +201,11 @@ fn decode_selected_frame<'a>(text:&'a str,source_contract_sha256:&str,maximum_fr
                 return Err(hold("original whole input frontier delivery selector"));
             }
         }
-        "origin-maintenance-assignment"|"origin-frontier-seal-assignment"|"owner-maintenance-assignment"=>{
+        "origin-maintenance-assignment"|"origin-frontier-seal-assignment"|"owner-maintenance-assignment"|"origin-ordinary-task-assignment"=>{
             let protocol=match frame.delivery_kind.as_str() {
                 "origin-maintenance-assignment"=>"peer-origin-maintenance-context-v1",
                 "origin-frontier-seal-assignment"=>"peer-origin-frontier-seal-context-v1",
+                "origin-ordinary-task-assignment"=>"peer-origin-ordinary-task-context-v1",
                 _=>"peer-owner-maintenance-assignment-v1",
             };
             if frame.payload_protocol!=protocol||frame.source_cut_protocol.is_some()
@@ -230,6 +240,11 @@ fn decode_selected_frame<'a>(text:&'a str,source_contract_sha256:&str,maximum_fr
         "origin-frontier-seal-assignment"=>{
             if selector(&outer,"kind")?!="peer-origin-frontier-seal-review" {
                 return Err(hold("original origin frontier seal purpose selector"));
+            }
+        }
+        "origin-ordinary-task-assignment"=>{
+            if selector(&outer,"kind")?!="peer-origin-ordinary-task-review" {
+                return Err(hold("original ordinary origin purpose selector"));
             }
         }
         "owner-maintenance-assignment"=>{

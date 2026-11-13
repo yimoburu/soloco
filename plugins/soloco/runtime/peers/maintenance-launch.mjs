@@ -13,6 +13,9 @@ import * as originHost from './origin-maintenance-host.mjs';
 import * as originRange from './origin-maintenance.mjs';
 import * as originSeal from './origin-frontier-seal.mjs';
 import * as ownerReview from './owner-handover.mjs';
+import * as ordinaryReview from './origin-ordinary-task.mjs';
+import {inspectOriginalOriginOrdinaryTaskSupport as ordinaryOriginSupport} from './context-component-deployment.mjs';
+import {prepareOriginalProtectedOriginOrdinaryTaskLaunch} from './protected-codex-domain.mjs';
 
 const fail=code=>{throw Object.assign(Error(code),{code});};
 const plain=v=>v&&Object.getPrototypeOf(v)===Object.prototype;
@@ -76,6 +79,7 @@ export async function runOriginalPeerInputFrontier(api,input){
 const RANGE=Object.freeze({name:'origin-range',result:'peer-origin-maintenance-launch-result-v1',ledger:originRange.originalPeerOriginMaintenanceLedger,prepare:originRange.prepareOriginalPeerOriginMaintenance,inspect:originRange.inspectOriginalPeerOriginMaintenance,preflight:originRange.originalPeerOriginMaintenancePreflight,support:originHost.inspectOriginalOriginMaintenanceSupport,launch:originHost.prepareOriginalProtectedOriginMaintenanceLaunch,host:originHost.runOriginalOriginMaintenanceHost,complete:originRange.completeOriginalPeerOriginMaintenance,hold:originRange.holdOriginalPeerOriginMaintenance,late:originRange.recordOriginalPeerOriginLateEvidence});
 const SEAL=Object.freeze({name:'origin-frontier-seal',result:'peer-origin-frontier-seal-launch-result-v1',ledger:originSeal.originalPeerOriginFrontierSealLedger,prepare:originSeal.prepareOriginalPeerOriginFrontierSeal,inspect:originSeal.inspectOriginalPeerOriginFrontierSeal,preflight:originSeal.originalPeerOriginFrontierSealPreflight,support:originHost.inspectOriginalOriginFrontierSealSupport,launch:originHost.prepareOriginalProtectedOriginFinalReviewLaunch,host:originHost.runOriginalOriginFrontierSealHost,complete:originSeal.completeOriginalPeerOriginFrontierSeal,hold:originSeal.holdOriginalPeerOriginFrontierSeal,late:originSeal.recordOriginalPeerOriginFrontierSealLateEvidence});
 const OWNER=Object.freeze({name:'owner-fresh-review',result:'peer-owner-maintenance-fresh-launch-result-v1',ledger:ownerReview.originalPeerOwnerLifecycleLedger,prepare:ownerReview.prepareOriginalPeerOwnerMaintenanceFreshReview,inspect:ownerReview.inspectOriginalPeerOwnerMaintenance,preflight:ownerReview.originalPeerOwnerMaintenanceWirePlan,support:originHost.inspectOriginalOwnerMaintenanceFreshSupport,launch:originHost.prepareOriginalProtectedOriginFinalReviewLaunch,host:originHost.runOriginalOwnerMaintenanceFreshHost,complete:ownerReview.completeOriginalPeerOwnerMaintenance,hold:ownerReview.holdOriginalPeerOwnerMaintenance,late:ownerReview.recordOriginalPeerOwnerMaintenanceLateEvidence});
+const ORDINARY=Object.freeze({name:'origin-ordinary-task',result:'peer-origin-ordinary-task-launch-result-v1',ledger:ordinaryReview.originalPeerOrdinaryOriginLedger,prepare:ordinaryReview.prepareOriginalPeerOrdinaryOriginReview,inspect:ordinaryReview.inspectOriginalPeerOrdinaryOriginReview,preflight:ordinaryReview.originalPeerOrdinaryOriginPreflight,support:ordinaryOriginSupport,launch:prepareOriginalProtectedOriginOrdinaryTaskLaunch,host:originHost.runOriginalOriginOrdinaryTaskHost,complete:ordinaryReview.completeOriginalPeerOrdinaryOriginReview,hold:ordinaryReview.holdOriginalPeerOrdinaryOriginReview,late:ordinaryReview.recordOriginalPeerOrdinaryOriginLateEvidence});
 function launchInput(input,required,optional=[]){
  if(types.isProxy(input)||!plain(input))fail('ORIGIN_LAUNCH_INPUT');const ds=Object.getOwnPropertyDescriptors(input),keys=Reflect.ownKeys(ds);
  if(required.some(k=>!keys.includes(k))||keys.some(k=>typeof k!=='string'||![...required,...optional].includes(k)||!ds[k].enumerable||!Object.hasOwn(ds[k],'value')))fail('ORIGIN_LAUNCH_INPUT');return Object.fromEntries(keys.map(k=>[k,ds[k].value]));
@@ -117,4 +121,10 @@ export async function runOriginalPeerOriginFrontierSealReview(api,input){
 }
 export async function runOriginalPeerOwnerMaintenanceReview(lifecycle,input){
  if(arguments.length!==2)fail('ORIGIN_LAUNCH_INPUT');return runMaintenance(lifecycle,launchInput(input,['operation_id','epoch']),OWNER);
+}
+
+export async function runOriginalPeerOrdinaryOriginReview(api,input){
+ if(arguments.length!==2)fail('ORIGIN_LAUNCH_INPUT');input=launchInput(input,['operation_id','origin_seal_ref','current_meaning_ref','incidence_ref','expires_at','source_instruction']);
+ if(typeof ordinaryReview.loadPeerOrdinaryOriginCheckpointSupport!=='function')fail('ORIGIN_ORDINARY_TASK_CHECKPOINT_SOURCE_REQUIRED');
+ await ordinaryReview.loadPeerOrdinaryOriginCheckpointSupport();return runMaintenance(api,input,ORDINARY);
 }
