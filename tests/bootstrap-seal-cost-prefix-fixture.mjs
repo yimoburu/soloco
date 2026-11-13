@@ -53,6 +53,10 @@ export function stageSyntheticSealCostPrefix(f){
     const heads=FAMILIES.flatMap(family=>rows(family).map(row=>ref(family,row)));
     heads.sort((a,b)=>{const left=canonical([a.family,a.id]),right=canonical([b.family,b.id]);return left<right?-1:left>right?1:0;});
     const readset={heads,count:heads.length,sha256:peerDigest(heads)};
+    // Capture original collection snapshots before the first checkpoint write.
+    const reservations=rows('slots').filter(row=>['active','unknown'].includes(row.value.status)).map(row=>({reference:ref('slots',row),value:row.value}));
+    const notices=rows('notices').filter(row=>row.value.status!=='resolved').map(row=>({reference:ref('notices',row),value:row.value}));
+    const late_obligations=(origin.value.late_obligation_refs??[]).map(reference=>({reference,value:tx.getVersion(reference).value}));
     const previous=tx.events({after:Math.max(0,tx.sequence-2),limit:1}).items[0];
     assert.equal(previous.seq,tx.sequence-1);
     const checkpoint_body={protocol:'peer-input-frontier-checkpoint-preimage-v1',connection,purpose:'origin-frontier-seal',operation_id,command_id,frontier_ref,root_result_ref,
@@ -70,8 +74,6 @@ export function stageSyntheticSealCostPrefix(f){
     const checkpoint=tx.put('work_items',checkpoint_id,{kind:'input_frontier_checkpoint',protocol:'peer-input-frontier-checkpoint-v1',connection,purpose:'origin-frontier-seal',operation_id,command_id,
       expected_event_sequence:tx.sequence,baseline_sha256,body_sha256:baseline_sha256,characters:checkpoint_text.length,utf8_bytes:Buffer.byteLength(checkpoint_text),pages},0);
     const checkpoint_ref=ref('work_items',checkpoint);
-    const reservations=rows('slots').filter(row=>['active','unknown'].includes(row.value.status)).map(row=>({reference:ref('slots',row),value:row.value}));
-    const notices=rows('notices').filter(row=>row.value.status!=='resolved').map(row=>({reference:ref('notices',row),value:row.value}));
     const units={maintenance:m,global_usage:usage,original_legacy_units:'retained-without-conversion',legacy_unknown_reservations:origin.value.legacy_unknown_reservations??[]};
     const subject={protocol:'peer-origin-frontier-seal-subject-v1',company_id:ledger.company_id,root_sha256:connection.root_sha256,origin_id:origin.value.id,
       source_cut_sha256:origin.value.current_cut_sha256,legacy_source_cut_sha256:company.value.legacy_source_cut_sha256??origin.value.current_cut_sha256,
@@ -81,7 +83,7 @@ export function stageSyntheticSealCostPrefix(f){
       checkpoint:{protocol:'peer-input-frontier-checkpoint-v1',planned_ref:checkpoint_ref,baseline_sha256,contributors:[actor.native_id],deadline_at_ms,readset:{protocol:'peer-input-frontier-checkpoint-readset-v1',count:readset.count,sha256:readset.sha256}},
       checked_current_meaning:meaning,pinned_team:{reference:pins_ref,bundle_sha256,parts:[{SYNTHETIC_UNQUALIFIED_PIN_PREDECESSOR_DATA:true}],raw_consumption:'SYNTHETIC unqualified predecessor DATA; no original DAG is claimed'},
       authority:{owner:{reference:ref('principals',owner),value:owner.value},company:{reference:ref('control',company),value:company.value},origin:{reference:ref('control',origin),value:origin.value},peer_policy:company.value.policy,units},
-      mandatory_markers,reservations,notices,late_obligations:(origin.value.late_obligation_refs??[]).map(reference=>({reference,value:tx.getVersion(reference).value})),excluded_native_ids:[actor.native_id],response_contract:peerOriginFrontierSealResponseContract(subject)};
+      mandatory_markers,reservations,notices,late_obligations,excluded_native_ids:[actor.native_id],response_contract:peerOriginFrontierSealResponseContract(subject)};
     const text=canonical(body),context_sha256=sha(text),input_utf8_bytes=Buffer.byteLength(text)+Buffer.byteLength(ORIGIN_FRONTIER_SEAL_INSTRUCTION);
     const whole_rpc_utf8_bytes=input_utf8_bytes+1024;
     assert.ok(Buffer.byteLength(text)<=company.value.policy.max_context_bytes&&whole_rpc_utf8_bytes<=100000);

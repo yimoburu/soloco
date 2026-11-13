@@ -37,7 +37,12 @@ test('ordinary active reviewer labels and five-tool-shaped JSON are not original
 });
 function backendEntryFixture(t,body=null){
  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-bootstrap-profile-entry-')),source=fileURLToPath(new URL('../plugins/soloco/runtime/peers/bootstrap-reviewer-profile.mjs',import.meta.url)),peers=path.dirname(source),backend=path.join(directory,'origin-maintenance.mjs'),entry=path.join(directory,'profile.mjs');
- let content=fs.readFileSync(source,'utf8');content=content.replace(/from '([^']+)'/g,(all,spec)=>spec==='./origin-maintenance.mjs'?`from ${JSON.stringify(pathToFileURL(backend).href)}`:spec.startsWith('./')?`from ${JSON.stringify(pathToFileURL(path.resolve(peers,spec)).href)}`:all);content=content.replaceAll("'./origin-maintenance.mjs'",JSON.stringify(pathToFileURL(backend).href));fs.writeFileSync(entry,content);if(body!==null)fs.writeFileSync(backend,body);t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));return {directory,load:()=>import(pathToFileURL(entry).href)};
+ // Reuse this fixture's explicitly fictional historical accounting predecessor.
+ // The separate CURRENT purpose backend remains absent or throwing as selected.
+ const accounting=path.join(directory,'accounting.mjs'),accountingDependency="'./origin-paused-bootstrap-accounting.mjs'",accountingUrl=JSON.stringify(pathToFileURL(accounting).href);
+ fs.writeFileSync(accounting,`import {boundary} from ${JSON.stringify(new URL('./peer-bootstrap-membership-fixture.mjs',import.meta.url).href)};export const assertPeerOriginPausedBootstrapAccountingFrom=boundary.assertPeerOriginPausedBootstrapAccountingFrom;\n`);
+ const original=fs.readFileSync(source,'utf8');assert.equal(original.split(accountingDependency).length,2);let content=original.replace(accountingDependency,accountingUrl);assert.equal(content.replace(accountingUrl,accountingDependency),original);
+ content=content.replace(/from '([^']+)'/g,(all,spec)=>spec==='./origin-maintenance.mjs'?`from ${JSON.stringify(pathToFileURL(backend).href)}`:spec.startsWith('./')?`from ${JSON.stringify(pathToFileURL(path.resolve(peers,spec)).href)}`:all);content=content.replaceAll("'./origin-maintenance.mjs'",JSON.stringify(pathToFileURL(backend).href));fs.writeFileSync(entry,content);if(body!==null)fs.writeFileSync(backend,body);t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));return {directory,load:()=>import(pathToFileURL(entry).href)};
 }
 test('historical profile DATA does not import or depend on a missing or failing CURRENT purpose backend',async t=>{
  const r=await activated(t),expected=composed.assertOriginalPeerBootstrapReviewerProfile(r.f.ledger,r.binding);
