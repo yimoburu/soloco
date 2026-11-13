@@ -56,7 +56,7 @@ function job(s,id){
 function packet(s,id){return JSON.parse(taskAssignmentContext(s,job(s,id)).text);}
 function retainedOrHeld(s,id,expected){
   try{const value=packet(s,id);for(const original of expected)assert(value.notices.some(n=>JSON.stringify(n)===JSON.stringify(projected(original))),'Unqualified notice must remain complete raw evidence');return value;}
-  catch(error){if(error instanceof assert.AssertionError)throw error;assert.match(error.message,/hold|changed|missing|ambiguous|collision|duplicate|negative|invalid/i);return null;}
+  catch(error){if(error instanceof assert.AssertionError)throw error;assert.match(error.message,/^Task context Held: |hold|changed|missing|ambiguous|collision|duplicate|negative|invalid/i);return null;}
 }
 
 test('typed source identity survives reorder and omits only the two mechanical top-level fields',()=>withoutExternal(()=>{
@@ -247,7 +247,7 @@ test('legacy notice-prefix record precedence survives BOTH while explicit canoni
     const s=f.db.read(),j=job(s,f.id),expected=JSON.stringify(expectedV1(s,j,['input',key,'rule'])),actual=taskAssignmentContext(s,j);
     assert.deepEqual(current.contextSource(s,key),original);assert.equal(actual.text,expected);assert.equal(actual.hash,digest(expected));assert.equal(taskContextMatches(s,j,actual.hash),true);
     assert.deepEqual(await readAll(f,{id:key,sha256:sha(original)}),original);
-    const material=legacy.buildLegacyCoherentPlan(s),decoded=legacy.decodeLegacyCoherentPlan(material);assert.deepEqual(decoded.state.records[key],original);assert.equal(JSON.stringify(decoded.state.records[key]),JSON.stringify(original));assert.deepEqual(decoded.state.notices,s.notices);
+    const material=legacy.buildLegacyCoherentPlan(s),decoded=legacy.decodeLegacyCoherentPlan(material);assert.equal(Object.getPrototypeOf(decoded.state.records[key]),null,'Decoded object nodes retain the safe null prototype');assert.equal(JSON.stringify(decoded.state.records[key]),JSON.stringify(original));assert.equal(JSON.stringify(decoded.state.notices),JSON.stringify(s.notices));assert.equal(JSON.stringify(decoded.state),JSON.stringify(s),'The entire logical JSON state, field order and notice conditions survive the typed inverse');
     const plan=scoped.captureScopedPlan(s,{source_id:key}),capsule=snapshot.resolveSnapshot(s,plan.capsule);assert.deepEqual(plan.source,{id:key,revision:1,sha256:sha(original)});assert.deepEqual(snapshot.resolveSnapshot(s,capsule.original),original);
     f.db.transaction('fictional.prefix-and-notice',state=>{state.notices.push({id:'legacy-only',kind:'must_know',summary:'A real canonical notice now collides with the record.'});return state;});
     const ambiguous=f.db.read(),canonical=ambiguous.notices.find(n=>n.id==='legacy-only');

@@ -70,7 +70,8 @@ async function review(f,planId,args){
   const target=control(f,{action:'target',plan_id:planId,delivery_protocol:scoped.SCOPED_STREAM,...args});assert.equal(target.reused,undefined);
   const queued=engine.dispatch({root:f.root,...actor,role:'qa',review_of:target.id,task:'FICTIONAL canonical corpus currentness review.'},'codex',{check:()=>({available:true,authenticated:true,version:'fictional-source-adapter'}),launch:()=>({on(){},unref(){}})}),parts=[];
   await worker.work(f.root,queued.id,async(_host,_session,prompt,_dir,ceiling,_selection,options)=>{
-    options.onSpawn(timeout.executionTiming(Date.now(),{timeout_ms:ceiling}));
+    const start=Date.now(),remaining=Math.min(ceiling,options.executionDeadlineAt===undefined?ceiling:options.executionDeadlineAt-start);
+    options.onSpawn?.(timeout.executionTiming(start,{timeout_ms:remaining,timeout_reason:options.timeoutReason}));
     let packet=JSON.parse(prompt);
     if(packet.protocol===scoped.SCOPED_STREAM){parts.push(packet.text);if(!packet.final)return {native_id:'fictional-corpus-'+queued.id,text:JSON.stringify({scoped_stream_ack:{body_sha256:packet.body_sha256,sequence:packet.sequence,range_sha256:packet.range_sha256}})};packet=JSON.parse(parts.join(''));}
     return {native_id:'fictional-corpus-'+queued.id,text:JSON.stringify(judgment(packet))};
