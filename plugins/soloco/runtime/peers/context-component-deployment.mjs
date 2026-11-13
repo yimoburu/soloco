@@ -8,6 +8,7 @@ import os from 'node:os';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {createHash} from 'node:crypto';
 import {originalDeveloperComponentLayout,originalPackagedComponentLayout,originalComponentLayoutPaths,inspectOriginalComponentLayout,originalComponentNodePath} from './context-component-layout.mjs';
+export {preflightOriginalBootstrapMembershipContext,inspectOriginalBootstrapMembershipPreflight} from './bootstrap-membership-preflight.mjs';
 
 const REPO=fileURLToPath(new URL('../../../../',import.meta.url));
 const DEVELOPER=Object.freeze({lookup:'lookupOriginalSelectedContextComponentData',inspect:'inspectOriginalSelectedContextComponentData',layout:originalDeveloperComponentLayout}),PACKAGED=Object.freeze({lookup:'lookupOriginalSelectedPackagedContextComponentData',inspect:'inspectOriginalSelectedPackagedContextComponentData',layout:originalPackagedComponentLayout});

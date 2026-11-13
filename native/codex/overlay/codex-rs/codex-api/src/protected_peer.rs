@@ -304,17 +304,19 @@ fn generation(previous: &mut Option<String>, current: String, n: &mut u64) -> Re
     Ok(())
 }
 
-/// Inventory equivalence is deliberately bounded to the same original five
-/// complete schemas. Called only after the final original wire proof matches.
+/// Exact catalog equality follows the immutable original startup selection.
+/// A request body cannot select bootstrap or an arbitrary ordinary subset.
 fn validated_offered_inventory(root: &serde_json::Map<String, Value>) -> Result<Value, TransportError> {
-    let expected: Value = serde_json::from_str(include_str!("protected_peer_responses_tools.json"))
-        .map_err(|_| hold("compiled tool resource"))?;
+    validated_selected_offered_inventory(root,context_contract::selected_original_tool_profile())
+}
+fn validated_selected_offered_inventory(root:&serde_json::Map<String,Value>,profile:context_contract::OriginalToolProfile)->Result<Value,TransportError> {
+    let expected=profile.offered_inventory()?;
     let input = root.get("input").and_then(Value::as_array).ok_or_else(||hold("ordered input"))?;
     let additional: Vec<_> = input.iter().enumerate().filter(|(_,item)|
         item.get("type").and_then(Value::as_str)==Some("additional_tools")).collect();
     if let Some(tools) = root.get("tools") {
         if tools != &expected || !additional.is_empty() {
-            return Err(hold("full original five-tool/schema equality or deferred offered inventory"));
+            return Err(hold("full original selected tool/schema equality or deferred offered inventory"));
         }
     } else {
         let [(index, item)] = additional.as_slice() else {
@@ -326,7 +328,7 @@ fn validated_offered_inventory(root: &serde_json::Map<String, Value>) -> Result<
         let namespace = json!([{"type":"namespace", "name":codex_protocol::DEFAULT_FUNCTION_NAMESPACE,
             "description":"", "tools":expected.clone()}]);
         if item.get("tools") != Some(&namespace) {
-            return Err(hold("full original RLite five-tool namespace/schema equality"));
+            return Err(hold("full original RLite selected tool namespace/schema equality"));
         }
     }
     Ok(expected)
@@ -444,7 +446,7 @@ fn observation<'a>(request: &'a Request, body: &[u8], step: &'a SourceStep, gate
     Ok(FinalObservation { protocol: PROTOCOL, kind: "final_request", nonce: &challenge.nonce,
         pid: std::process::id(), sequence, source_commit: COMMIT,
         producer_module_sha256: hash(include_bytes!("protected_peer.rs")),
-        tool_resource_sha256: hash(include_bytes!("protected_peer_responses_tools.json")),
+        tool_resource_sha256: context_contract::selected_original_tool_profile().resource_sha256(),
         host_instance_id, runtime_generation: step.runtime.generation, profile_generation: *profile_generation,
         services_generation: *services_generation, instruction_generation: *instruction_generation,
         thread_id: &step.thread_id, turn_id, step_id: *next_step, auth_owner_generation: auth_owner,
