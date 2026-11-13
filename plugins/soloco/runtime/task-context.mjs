@@ -203,13 +203,13 @@ function peerTargets(state,task){
   });
 }
 
-export function taskAssignmentContext(state,job,{budget}={}){
-  const limit=checkBudget(budget,TASK_CONTEXT_BUDGET),record=taskForJob(state,job),task=record.runtime_task;
+function assignmentPacket(state,job,record){
+  const task=record.runtime_task;
   verifySupplemental(state,job);
   const source=requiredSources(state,job),extensions=currentExtensions(state);
   if(hasSnapshotReferences(extensions))fail('unknown referenced state extension requires qualification');
-  const notices=(state.notices??[]).filter(n=>n.job_id!==job.id).map(({deliveries,seen_at,...n})=>n);
-  const messages=(state.messages??[]).filter(m=>m.to===job.role&&m.job_id!==job.id);
+  const notices=(state.notices??[]).filter(n=>job.id===null||n.job_id!==job.id).map(({deliveries,seen_at,...n})=>n);
+  const messages=(state.messages??[]).filter(m=>m.to===job.role&&(job.id===null||m.job_id!==job.id));
   const packet={
     protocol:TASK_CONTEXT_PROTOCOL,controls:controls(state),runtime:runtimeControlBinding(state),governance:state.governance,charter:state.roles[job.role],
     ...(job.specialist?{specialist:specialistContext(state,job)}:{}),
@@ -222,7 +222,12 @@ export function taskAssignmentContext(state,job,{budget}={}){
       historical_meaning:'Original history remains retained. This task packet grants neither semantic classification of omitted history nor acceptance or permission.'},
     supplemental_evidence:{protocol:'record-reads-v1',available:true,sources:job.supplemental_sources??[],lookup:'company_context inspect/read',rule:'Exact known source IDs, revisions and hashes only. Missing evidence requires a bounded read or a Held result; native conversation memory is not current authority.'}
   };
-  const text=JSON.stringify(packet),size=bytes(text);
+  return {packet,source};
+}
+
+export function taskAssignmentContext(state,job,{budget}={}){
+  const limit=checkBudget(budget,TASK_CONTEXT_BUDGET),record=taskForJob(state,job);
+  const {packet,source}=assignmentPacket(state,job,record),text=JSON.stringify(packet),size=bytes(text);
   if(size>limit)throw new SchedulingHold('CONTEXT_CAPACITY',`Task context Held: required coherent packet exceeds ${limit} UTF-8bytes (actual ${size}); coverage incomplete; widen retrieval or split the task; nothing was truncated`);
   // Only already delivered bodies whose exact source still resolves can be
   // reread. Historical delivery projections never masquerade as current handles.
@@ -231,6 +236,97 @@ export function taskAssignmentContext(state,job,{budget}={}){
     return current&&recordReference(current,entry.source.id).sha256===entry.source.sha256;
   }).map(entry=>[entry.source.id+'\0'+entry.source.sha256,entry.source])).values()];
   return {text,hash:digest(text),inputs:source.records.filter(r=>state.records?.[r.source.id]).map(r=>({id:r.source.id,revision:r.source.revision})),required_sources,context_bytes:size,context_budget_bytes:limit,complete:true};
+}
+
+// A read-only construction diagnostic is not an admission preview. In
+// particular it mints no job/instance/grant and does not require a running
+// supervisor. Real execution still goes through taskForJob above unchanged.
+function capacityJob(state,record){
+  const task=record.runtime_task,spec=task.spec;
+  if(!equal(task.owner,state.owner))fail('diagnostic task owner or epoch changed');
+  if(!Object.hasOwn(state.roles??{},spec.role))fail('diagnostic role is not in the current catalog');
+  if(spec.specialist_ref!==undefined)fail('capacity diagnostic requires an original specialist assignment binding; profiled task was not measured');
+  let review_of=null;
+  if(spec.review_task_id){
+    const producer=canonicalTask(state,spec.review_task_id),prior=state.jobs?.[producer.runtime_task.attempts[0]?.job_id],target=state.records?.[prior?.artifact_id];
+    if(!target)fail('diagnostic reviewed subject is missing');
+    review_of={id:target.id,revision:target.revision};
+  }
+  const reference=id=>{
+    const value=contextSource(state,id);if(!value)fail('diagnostic declared source is missing');
+    return recordReference(value,id);
+  };
+  return {id:null,instance_id:null,requester:null,coordination:null,host:task.owner.host,epoch:task.owner.epoch,
+    role:spec.role,task:spec.task,context_scope:spec.context_scope,review_of,
+    runtime_task:taskDefinitionBinding(record),model_selection:spec.model_selection??{mode:'default'},
+    inputs:spec.input_ids.map(id=>{const r=reference(id);return {id:r.id,revision:r.revision};}),
+    supplemental_sources:spec.evidence_ids.map(reference)};
+}
+
+function capacityEntries(state,packet){
+  const fields=[];
+  for(const [name,value] of Object.entries(packet)){
+    const text=JSON.stringify(value);if(text===undefined)continue;
+    const overhead=bytes(JSON.stringify(name))+1+(fields.length?1:0),size=bytes(text);
+    fields.push({kind:'field',name,path:[name],ordinal:fields.length,json_utf8_bytes:size,json_utf16_characters:text.length,
+      overhead_utf8_bytes:overhead,packet_contribution_utf8_bytes:size+overhead});
+  }
+  const occurrences=[];
+  for(const field of ['records','mandatory_execution_evidence'])for(const [i,entry]of packet[field].entries())occurrences.push({path:[field,i],entry,original_delivery:false});
+  for(const [i,receipt]of packet.producer_evidence.entries())for(const field of ['inputs','supplemental_sources','retrieved_inputs']){
+    for(const [j,input]of (receipt[field]??[]).entries())if(input.original_delivery)occurrences.push({path:['producer_evidence',i,field,j,'original_delivery'],entry:input.original_delivery,original_delivery:true});
+  }
+  // Group by complete serialized equality, not by ID, a body excerpt or a
+  // semantic guess. Equal values retain every occurrence and attribution.
+  const groups=new Map();
+  const sources=occurrences.map(({path,entry,original_delivery},ordinal)=>{
+    const text=JSON.stringify(entry.value),wrapper=JSON.stringify(entry),size=bytes(text);
+    let group=groups.get(text);if(!group){group={count:0,bytes:size};groups.set(text,group);}group.count++;
+    const current=contextSource(state,entry.source.id),current_retrieval=!original_delivery&&Boolean(current&&equal(recordReference(current,entry.source.id),entry.source));
+    return {group,item:{kind:'source',path,ordinal,source:entry.source,value_utf8_bytes:size,value_utf16_characters:text.length,
+      wrapper_utf8_bytes:bytes(wrapper),wrapper_utf16_characters:wrapper.length,value_sha256:digest(text),current_retrieval,original_delivery}};
+  });
+  return {fields,sources:sources.map(({item,group})=>({...item,duplicate_occurrences:group.count,repeated_value_utf8_bytes:(group.count-1)*group.bytes}))};
+}
+
+const CAPACITY_PROTOCOL='async-task-context-capacity-v1';
+const CAPACITY_REPLY_BYTES=16000;
+function capacityCursor(cut,offset){
+  const value={version:1,cut,offset};
+  return Buffer.from(JSON.stringify({...value,sha256:sha(value)})).toString('base64url');
+}
+function capacityOffset(cursor,cut,total){
+  if(cursor===undefined)return 0;
+  if(typeof cursor!=='string'||cursor.length>2048||!/^[A-Za-z0-9_-]+$/.test(cursor))fail('invalid capacity cursor');
+  let parsed;try{parsed=JSON.parse(Buffer.from(cursor,'base64url').toString('utf8'));}catch{fail('invalid capacity cursor');}
+  if(!only(parsed,['version','cut','offset','sha256'])||Object.keys(parsed).length!==4)fail('invalid capacity cursor');
+  const {sha256,...value}=parsed;
+  if(value.version!==1||sha256!==sha(value)||!unsigned(value.offset)||value.offset>total)fail('invalid capacity cursor');
+  if(value.cut!==cut)fail('capacity cursor is stale; restart the diagnostic');
+  return value.offset;
+}
+export function taskCapacityContext(state,{task_id,limit=12,cursor}={}){
+  if(typeof task_id!=='string'||!task_id)fail('capacity requires an exact task_id');
+  if(!Number.isSafeInteger(limit)||limit<1||limit>100)fail('capacity limit must be1..100');
+  const record=canonicalTask(state,task_id),job=capacityJob(state,record),{packet}=assignmentPacket(state,job,record);
+  const text=JSON.stringify(packet),{fields,sources}=capacityEntries(state,packet),entries=[...fields,...sources];
+  const subject={kind:'new-prospective-diagnostic',envelope:'source-owned-nonexecuting-v1',task_source:recordReference(record),task_definition:taskDefinitionBinding(record),
+    owner:state.owner,controls_sha256:sha(packet.controls),source_membership_sha256:packet.coverage.source_membership_sha256};
+  const measurement={representation:'format7-JSON.stringify-nonexecuting-packet',packet_sha256:digest(text),context_utf8_bytes:bytes(text),context_utf16_characters:text.length,
+    task_budget_bytes:TASK_CONTEXT_BUDGET,semantic_classification:'NOT_ASSERTED',admission_or_readiness:'NOT_ASSERTED',
+    wire_scope:'Current nonexecuting context JSON only. Null job/instance/requester/coordination differ from an actual admission. Future RPC/model framing, provider context and physical fit are not measured. Not the historical failed packet. Source bytes are serialized JSON, not original storage bytes; field and source contributions overlap. Repeated-value counts are not semantic exclusion or achievable pool savings.'};
+  const cut=sha({subject,measurement,entries_sha256:sha(entries)}),offset=capacityOffset(cursor,cut,entries.length);
+  const result={protocol:CAPACITY_PROTOCOL,subject:{...subject,diagnostic_cut_sha256:cut},measurement,totals:{field_entries:fields.length,source_occurrences:sources.length},
+    items:[],total:entries.length,offset,returned:0,complete:offset===entries.length,next_cursor:null};
+  if(bytes(result)>CAPACITY_REPLY_BYTES)fail('capacity diagnostic header exceeds the bounded reply; no complete diagnostic delivered');
+  for(const item of entries.slice(offset,offset+limit)){
+    const items=[...result.items,item],complete=offset+items.length===entries.length;
+    const candidate={...result,items,returned:items.length,complete,next_cursor:complete?null:capacityCursor(cut,offset+items.length)};
+    if(bytes(candidate)>CAPACITY_REPLY_BYTES)break;
+    Object.assign(result,candidate);
+  }
+  if(!result.returned&&!result.complete)fail('capacity diagnostic metadata entry exceeds the bounded reply; no complete diagnostic delivered');
+  return result;
 }
 
 export function taskContextMatches(state,job,hash,options){

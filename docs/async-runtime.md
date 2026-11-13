@@ -84,3 +84,21 @@ explicitly supplied local measurements. Each input contains `metric`, `period`,
 `numerator`, `denominator`, and `source_reference`. The report retains exact file
 hashes and normalized rates, and makes no causal, customer-value or founder-time
 claim. Supply it through the existing artifact/input route for outcome review.
+## Read-only capacity diagnosis
+
+`company_tasks` with `action: "capacity"`, an exact `task_id`, and optional
+`limit`/`cursor` reports a bounded metadata stream about the current format-7
+context construction. Follow `next_cursor` until `complete`; a relevant change
+invalidates the cursor. Field entries account for the complete serialized packet;
+source entries identify every selected occurrence and its serialized size without
+returning its body. Field and source contributions overlap. Equal-value counts
+are mechanical duplication metrics, not semantic exclusions or achievable savings.
+
+This is a new nonexecuting diagnostic with explicit null job, instance, requester
+and coordination fields. It is not the historical failed admission, a future
+admission guarantee, or a measurement of native RPC framing/provider context.
+It can inspect a stopped or paused runtime without waking it, creating a grant,
+binding an attempt, consuming an allowance or changing company state. Missing
+prerequisites, invalid qualification and unsupported specialist bindings Hold
+construction rather than inventing a partial complete packet. The task budget,
+unknown evidence, notices and all execution/currentness gates remain unchanged.

@@ -6,7 +6,7 @@ import {withStore,owner,stamp,id,digest,PACKAGE,VERSION,folder,notice,requireTex
 import {taskKeys,taskCursor,messageKeys,installTaskIndex,readTaskState,updateTaskIndex,requireTaskStorage,TASK_ROOT_KEYS} from './task-index.mjs';
 import {RUNTIME_CONTROL_ID,runtimeControl,runtimeControlBinding,setRuntimeControl,runtimeGrant} from './task-runtime-authority.mjs';
 import {submitTask,amendTask,cancelTask,taskRecord,taskView,taskReady,reconcileTask,commandRecordId,sendTaskMessage,messagesForTask,disposeTaskMessage} from './tasks.mjs';
-import {portfolioContext,taskCheckpoint} from './task-context.mjs';
+import {portfolioContext,taskCheckpoint,taskCapacityContext} from './task-context.mjs';
 import {jobTimeoutState} from './timeout.mjs';
 import {contextMatches} from './context.mjs';
 import {inheritSnapshots} from './snapshot.mjs';
@@ -35,16 +35,20 @@ function extraRecords(db,state,args,host){
   return merged;
 }
 export function taskAction(args,host,{wake=ensureSupervisor}={}) {
-  const readOnly=['inspect','context','checkpoint','inbox'].includes(args.action);
+  const readOnly=['inspect','context','checkpoint','inbox','capacity'].includes(args.action);
+  if(args.action==='capacity'&&Object.keys(args).some(key=>!['root','session_id','action','task_id','limit','cursor'].includes(key)))throw Error('Capacity accepts only an exact task_id, limit and cursor; no mutation, scope, budget or job envelope');
+  if(args.action==='capacity'&&(typeof args.task_id!=='string'||!args.task_id))throw Error('Capacity requires an exact task_id');
   if(!readOnly)requireText(args.source_instruction,'source_instruction',4000);
   const result=withStore(args.root,db=>{
     requireTaskStorage(db);
-    if(!['submit','amend','cancel','inspect','context','checkpoint','message','inbox','dispose'].includes(args.action))throw Error('Unknown async task action');
+    if(!['submit','amend','cancel','inspect','context','checkpoint','message','inbox','dispose','capacity'].includes(args.action))throw Error('Unknown async task action');
     if(!readOnly&&!db.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='async_task_index'").get())throw Error('Initialize the runtime with company_runtime start before submitting tasks');
     return db.readSnapshot(()=>{
       const requested=[args.task_id,args.to_task_id,...(args.spec?.depends_on??[]).map(d=>d.task_id),args.spec?.review_task_id].filter(Boolean);
-      const loaded=readTaskState(db,{task_ids:requested,message_ids:args.message_id?[args.message_id]:[],include_messages:false,limit:Math.min(args.limit??12,100),cursor:args.action==='context'?'':args.cursor??'',semantic:args.action==='context'});
+      const semantic=['context','capacity'].includes(args.action);
+      const loaded=readTaskState(db,{task_ids:requested,message_ids:args.message_id?[args.message_id]:[],include_messages:false,limit:Math.min(args.limit??12,100),cursor:semantic?'':args.cursor??'',semantic});
       if(readOnly){
+        if(args.action==='capacity')return taskCapacityContext(loaded.state,{task_id:args.task_id,limit:args.limit??12,cursor:args.cursor});
         if(args.action==='context'){
           // Scope membership and its cursor belong to the same semantic
           // projection. Filtering one unrelated SQL page can otherwise emit a
