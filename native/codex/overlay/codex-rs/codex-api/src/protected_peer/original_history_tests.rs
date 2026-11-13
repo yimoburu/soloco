@@ -285,20 +285,21 @@ mod concrete_fd3 {
         unknown:&'static AtomicBool,
         reader:Option<pipe::Pipe>,
         _control_peer:pipe::Pipe,
+        output_reader_fd:i32,
         output_fd:i32,
     }
-    fn pair()->(pipe::Pipe,pipe::Pipe,i32) {
+    fn pair()->(pipe::Pipe,pipe::Pipe,i32,i32) {
         let mut descriptors=[-1;2];
         assert_eq!(unsafe{libc::pipe(descriptors.as_mut_ptr())},0);
         // Existing Pipe code owns each fresh descriptor exactly once and sets
         // nonblocking/CLOEXEC. Fixed test channels never claim inherited 3/4.
         let read=pipe::Pipe::inherited(descriptors[0]).unwrap();
         let write=pipe::Pipe::inherited(descriptors[1]).unwrap();
-        (read,write,descriptors[1])
+        (read,write,descriptors[0],descriptors[1])
     }
     async fn pipes()->Pipes {
         let mut inner=fixture().await;
-        let (reader,outgoing,output_fd)=pair();let (incoming,control_peer,_)=pair();
+        let (reader,outgoing,output_reader_fd,output_fd)=pair();let (incoming,control_peer,_,_)=pair();
         // Fixed, bounded fixtures retain these allocations until this test
         // process exits, matching the production Channel/guard static lifetime.
         // Their private UNKNOWN never resets the production sticky UNKNOWN.
@@ -319,7 +320,7 @@ mod concrete_fd3 {
             request_id:inner.step.request_id.clone(),request_sha256:super::super::super::hash(&inner.request_body),
             sequence:1,guard:OperationGuard {armed:true,unknown}};
         inner.decoder=OriginalResponseDecoder::returned_from_original_channel(&inner.step,&inner.request_body,startup,writer).unwrap();
-        Pipes {inner,channel,unknown,reader:Some(reader),_control_peer:control_peer,output_fd}
+        Pipes {inner,channel,unknown,reader:Some(reader),_control_peer:control_peer,output_reader_fd,output_fd}
     }
     async fn frame(reader:&pipe::Pipe)->Value {
         tokio::time::timeout(Duration::from_secs(1),async {
@@ -332,17 +333,27 @@ mod concrete_fd3 {
     async fn no_frame(reader:&pipe::Pipe) {
         assert!(tokio::time::timeout(Duration::from_millis(10),reader.read_byte()).await.is_err());
     }
-    fn fill_output(fd:i32) {
-        let bytes=[0u8;4096];let mut blocked=false;
+    fn fill_output(fd:i32)->usize {
+        let bytes=[0u8;4096];let mut blocked=false;let mut total=0;
         for _ in 0..1024 {
             let written=unsafe{libc::write(fd,bytes.as_ptr().cast(),bytes.len())};
             if written<0 {
                 assert_eq!(std::io::Error::last_os_error().kind(),std::io::ErrorKind::WouldBlock);
                 blocked=true;break;
             }
-            assert!(written>0);
+            assert!(written>0);total+=written as usize;
         }
         assert!(blocked,"bounded test pipe did not reach backpressure");
+        total
+    }
+    fn read_exact_now(fd:i32,length:usize)->Vec<u8> {
+        assert!(length<=4*1024*1024);
+        let mut bytes=vec![0u8;length];let mut offset=0;
+        while offset<length {
+            let read=unsafe{libc::read(fd,bytes[offset..].as_mut_ptr().cast(),length-offset)};
+            assert!(read>0,"test pipe did not retain the observed bytes");offset+=read as usize;
+        }
+        bytes
     }
     #[tokio::test]
     async fn actual_returned_channel_writer_emits_exact_frame_then_releases_only_its_request() {
@@ -420,6 +431,50 @@ mod concrete_fd3 {
         assert!(p.inner.decoder.publish_terminal_drained().await.is_err());
         let state=p.channel.lock().await;assert!(state.poisoned);assert!(state.unresolved.is_some());drop(state);
         assert!(p.unknown.load(Ordering::SeqCst));
+    }
+    #[tokio::test]
+    async fn actual_fd3_partial_frame_then_cancel_keeps_original_request_unknown() {
+        let mut p=pipes().await;
+        let pipe_buf=unsafe{libc::fpathconf(p.output_fd,libc::_PC_PIPE_BUF)};
+        assert!(pipe_buf>0&&(pipe_buf as usize)<super::super::super::MAX_FRAME/4);
+        // A large but valid original response ID makes this fixed closed frame
+        // non-atomic (> actual PIPE_BUF), still below both Native wire bounds.
+        // It is a writer-mechanics fixture, not a Node-admissible response ID.
+        let response_id="r".repeat(super::super::super::MAX_FRAME-2048);
+        let payload=complete_terminal(&p.inner,&response_id);
+        assert!(payload.len()<super::super::super::MAX_BODY);
+        let expected=p.inner.decoder.source.startup.terminal_drained_frame(&p.inner.step.request_id,
+            &super::super::super::hash(&p.inner.request_body),1,&response_id,&super::super::super::hash(payload.as_bytes()));
+        let mut expected=serde_json::to_vec(&expected).unwrap();
+        assert!(expected.len()<=super::super::super::MAX_FRAME&&expected.len()>pipe_buf as usize);expected.push(b'\n');
+        let filled=fill_output(p.output_fd);let freed=pipe_buf as usize;
+        assert!(filled>=freed);assert!(read_exact_now(p.output_reader_fd,freed).iter().all(|byte|*byte==0));
+        let remaining_fill=filled-freed;
+        let mut publication=Box::pin(p.inner.decoder.publish_terminal_drained());let mut observed=0usize;
+        for _ in 0..32 {
+            assert!(futures::poll!(publication.as_mut()).is_pending(),"fixture must not finish a whole frame");
+            let mut buffered=0i32;
+            assert_eq!(unsafe{libc::ioctl(p.output_reader_fd,libc::FIONREAD,&mut buffered)},0);
+            assert!(buffered>=0);observed=buffered as usize;
+            if observed>remaining_fill {break;}
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+        assert!(observed>remaining_fill,"must observe actual frame bytes, not infer a partial write from EAGAIN");
+        let prefix_written=observed-remaining_fill;
+        assert!(prefix_written>0&&prefix_written<expected.len());
+        // Cancel before consuming any further bytes: a reader must not create
+        // space that lets the writer finish and release its reservation.
+        drop(publication);
+        assert!(p.unknown.load(Ordering::SeqCst));
+        assert_eq!(p.channel.lock().await.unresolved.as_deref(),Some(p.inner.step.request_id.as_str()));
+        let bytes=read_exact_now(p.output_reader_fd,observed);
+        assert!(bytes[..remaining_fill].iter().all(|byte|*byte==0));
+        assert_eq!(&bytes[remaining_fill..],&expected[..prefix_written]);
+        assert!(!bytes[remaining_fill..].contains(&b'\n'));
+        assert!(serde_json::from_slice::<Value>(&bytes[remaining_fill..]).is_err());
+        let mut extra=0u8;
+        assert_eq!(unsafe{libc::read(p.output_reader_fd,(&mut extra as *mut u8).cast(),1)},-1);
+        assert_eq!(std::io::Error::last_os_error().kind(),std::io::ErrorKind::WouldBlock);
     }
     #[tokio::test]
     async fn actual_writer_cancelled_while_fd3_backpressured_and_dropped_decoder_stay_unknown() {

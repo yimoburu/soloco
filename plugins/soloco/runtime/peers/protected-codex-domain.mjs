@@ -91,7 +91,7 @@ function refreshOwned(r){
 }
 function observeOwnedServer(r,frame){
  const state=owned(r);if(!state.binding||!Object.hasOwn(frame,'method'))return;
- if(state.terminal&&['item/started','item/completed','item/agentMessage/delta','item/tool/call','turn/completed'].includes(frame.method))fail('PROTECTED_CODEX_OWNED_POST_TERMINAL');
+ if(state.terminal&&['thread/started','turn/started','item/started','item/completed','item/agentMessage/delta','item/tool/call','turn/completed'].includes(frame.method))fail('PROTECTED_CODEX_OWNED_POST_TERMINAL');
  const p=frame.params;
  if(frame.method==='item/completed'&&p?.item?.type==='agentMessage'&&p.item.phase==='final_answer'){
   if(p.threadId!==r.native_thread||p.turnId!==r.native_turn||typeof p.item.text!=='string'||!p.item.text.length||Buffer.byteLength(p.item.text)>MAX_FRAME||state.final!==null)fail('PROTECTED_CODEX_OWNED_FINAL_CHANGED');

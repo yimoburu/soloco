@@ -201,6 +201,21 @@ test('original FD3 terminal plus complete owned lifecycle creates only narrow ta
   assert.equal(typeof f.domain.assertOriginalProtectedBootstrapMembershipClosure,'undefined');
 });
 
+test('two sequential requests in one owned turn retain both exact terminal histories',{concurrency:false},async t=>{
+  const f=await fixture(t),before=f.ledger.snapshot(),first=f.request(1);
+  f.headers(first);f.eof(first);f.witness(first);assert.equal(f.tokens().drain,null);
+  const second=f.request(2);assert.notEqual(second.request_id,first.request_id);assert.notEqual(second.request_sha256,first.request_sha256);
+  const expectedRequests=[1,2].map(sequence=>({request_id:'00000000-0000-4000-8000-'+String(sequence).padStart(12,'0'),request_sha256:sha('SYNTHETIC request '+sequence),sequence,response_id:'SYNTHETIC-response-'+sequence,terminal_logical_payload_sha256:sha('SYNTHETIC Completed '+sequence)}));
+  assert.deepEqual(f.child.control.filter(frame=>frame.kind==='send_permit').map(frame=>({request_id:frame.request_id,request_sha256:frame.request_sha256,sequence:frame.sequence})),expectedRequests.map(({request_id,request_sha256,sequence})=>({request_id,request_sha256,sequence})));
+  f.headers(second);f.eof(second);f.witness(second);assert.equal(f.tokens().drain,null,'response completion alone is not owned lifecycle closure');
+  f.completed();assert.equal(f.tokens().drain,null);await f.child.close();
+  const caps=f.tokens();assert(caps.drain);assert.equal(caps.diagnostic,null);
+  const drain=f.domain.assertOriginalProtectedOwnedTaskDrain(caps.drain,f.expected);
+  assert.deepEqual(drain.requests,expectedRequests,'retain the first terminal request as well as the final request');
+  assert.equal(drain.output,OUTPUT);assert.equal(drain.output_sha256,sha(OUTPUT));assert.equal(drain.turn_id,'fictional-turn');
+  assert.equal(f.ledger.snapshot(),before);globalsRemainUnknown(f);assert.deepEqual(f.errors,[]);
+});
+
 for(const missing of ['raw-eof','terminal','turn'])test('missing '+missing+' cannot turn Completed/local EOF into drain',{concurrency:false},async t=>{
   const f=await fixture(t),before=f.ledger.snapshot(),facts=f.request();f.headers(facts);
   if(missing!=='raw-eof')f.eof(facts);
@@ -227,11 +242,13 @@ test('earlier unresolved response cannot be hidden by a later apparently good fi
   const {value}=diagnostic(f);assert(value.requests.some(request=>request.request_id===first.request_id&&!request.terminal_observed));assert.equal(f.ledger.snapshot(),before);
 });
 
-for(const variant of ['post-terminal','post-terminal-tool','post-terminal-request','failed-turn','interrupted-turn','cancel','timeout','child-error'])test(variant+' retains only original nonqualifying custody',{concurrency:false},async t=>{
+for(const variant of ['post-terminal','post-terminal-tool','post-terminal-request','post-terminal-turn-started','post-terminal-thread-started','failed-turn','interrupted-turn','cancel','timeout','child-error'])test(variant+' retains only original nonqualifying custody',{concurrency:false},async t=>{
   const f=await fixture(t),before=f.ledger.snapshot(),facts=f.request();f.headers(facts);f.eof(facts);f.witness(facts);
   f.completed(variant==='failed-turn'?'failed':variant==='interrupted-turn'?'interrupted':'completed');
   if(variant==='post-terminal')f.server({method:'item/agentMessage/delta',params:{threadId:'fictional-thread',turnId:'fictional-turn',delta:'late'}});
   if(variant==='post-terminal-tool')f.server({id:99,method:'item/tool/call',params:{threadId:'fictional-thread',turnId:'fictional-turn',tool:'soloco_context_header',arguments:{}}});
+  if(variant==='post-terminal-turn-started')f.server({method:'turn/started',params:{threadId:'fictional-thread',turn:{id:'fictional-turn'}}});
+  if(variant==='post-terminal-thread-started')f.server({method:'thread/started',params:{thread:{id:'fictional-thread'}}});
   if(variant==='post-terminal-request'){
     const beforePermits=f.child.control.filter(frame=>frame.kind==='send_permit').length;
     f.request(2);assert.equal(f.child.control.filter(frame=>frame.kind==='send_permit').length,beforePermits,'completed turn cannot grant another permit');
