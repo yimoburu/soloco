@@ -44,7 +44,7 @@ export const assertOriginalProtectedOwnedTaskDrain=(token,expected)=>check(drain
 export const assertOriginalProtectedOwnedTaskDiagnostic=(token,expected)=>check(diagnostics,token,expected);
 `);
 let maintenanceText=fs.readFileSync(path.join(peers,'origin-maintenance.mjs'),'utf8');
-for(const [name,target]of [['ledger',path.join(peers,'ledger.mjs')],['context-component-deployment',path.join(temp,'deployment.mjs')],['protected-codex-domain',path.join(temp,'domain.mjs')],['legacy-origin',path.join(peers,'legacy-origin.mjs')],['origin-maintenance-instruction',path.join(peers,'origin-maintenance-instruction.mjs')]])maintenanceText=maintenanceText.replaceAll(`'./${name}.mjs'`,JSON.stringify(url(target)));
+for(const [name,target]of [['ledger',path.join(peers,'ledger.mjs')],['context-component-deployment',path.join(temp,'deployment.mjs')],['protected-codex-domain',path.join(temp,'domain.mjs')],['legacy-origin',path.join(peers,'legacy-origin.mjs')],['origin-maintenance-instruction',path.join(peers,'origin-maintenance-instruction.mjs')],['origin-maintenance-authority',path.join(peers,'origin-maintenance-authority.mjs')],['origin-paused-bootstrap-accounting',path.join(peers,'origin-paused-bootstrap-accounting.mjs')]])maintenanceText=maintenanceText.replaceAll(`'./${name}.mjs'`,JSON.stringify(url(target)));
 fs.writeFileSync(path.join(temp,'origin-maintenance.mjs'),maintenanceText);
 const maintenance=await import(url(path.join(temp,'origin-maintenance.mjs'))),domain=await import(url(path.join(temp,'domain.mjs'))),wire=await import(url(path.join(temp,'deployment.mjs')));
 test.after(()=>fs.rmSync(temp,{recursive:true,force:true}));
