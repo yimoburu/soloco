@@ -59,7 +59,9 @@ export function packageContextProducer(check=false){
  need(read(SEAL,'100644').equals(Buffer.from(JSON.stringify(seal,null,2)+'\n')),'recipe inventory readback changed');
  return {files:rows.length,bytes:rows.reduce((n,v)=>n+v.bytes.length,0)};
 }
-if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
+// The loader resolves entry-path aliases; argv may retain their logical spelling.
+// Compare the same physical file so an explicit CLI call cannot silently no-op.
+if(process.argv[1]&&fs.realpathSync(path.resolve(process.argv[1]))===fs.realpathSync(fileURLToPath(import.meta.url))){
  need(process.argv.length===2||(process.argv.length===3&&process.argv[2]==='--check'),'only --check is supported');
  packageContextProducer(process.argv[2]==='--check');
 }

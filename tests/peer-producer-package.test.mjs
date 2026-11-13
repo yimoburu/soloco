@@ -25,16 +25,23 @@ function fixture(t){
 }
 function run(root,...args){return spawnSync(process.execPath,[path.join(root,'tools/package-context-producer.mjs'),...args],{encoding:'utf8',timeout:15000,maxBuffer:65536});}
 function passed(result){assert.equal(result.error,undefined);assert.equal(result.status,0,result.stderr);}
+function aliasedRoot(root){
+ const physical=fs.realpathSync(root),alias=path.join(root,'cli-alias');fs.symlinkSync(physical,alias,'dir');
+ const entry=path.join(alias,'tools/package-context-producer.mjs');
+ assert.notEqual(path.resolve(entry),fs.realpathSync(entry));
+ assert.equal(fs.realpathSync(entry),path.join(physical,'tools/package-context-producer.mjs'));
+ return alias;
+}
 
 test('fixed recipe packager reconstructs all 169 original assets with exact bytes modes and inventory',t=>{
- const f=fixture(t);passed(run(f.root));const seal=JSON.parse(fs.readFileSync(f.seal));
+ const f=fixture(t);passed(run(aliasedRoot(f.root)));const seal=JSON.parse(fs.readFileSync(f.seal));
  assert.deepEqual(Object.keys(seal).sort(),['build_driver','files','protocol','source_package']);
  assert.equal(seal.protocol,'soloco-packaged-native-recipe-v1');assert.equal(seal.files.length,169);
  const expected=f.rows.map(row=>{const bytes=fs.readFileSync(path.join(f.root,'native/codex',row.path));assert.deepEqual(fs.readFileSync(path.join(f.native,row.path)),bytes);assert.equal(fs.statSync(path.join(f.native,row.path)).mode&0o777,row.mode==='100755'?0o755:0o644);return {path:row.path,bytes:bytes.length,sha256:hash(bytes),mode:row.mode};});
  assert.deepEqual(seal.files,expected);
  for(const [key,name] of [['source_package','source-package.json'],['build_driver','tools/protected_native.py']]){const bytes=fs.readFileSync(path.join(f.native,name));assert.deepEqual(seal[key],{bytes:bytes.length,sha256:hash(bytes)});}
  assert.equal(seal.files.some(v=>v.path==='native-recipe-inventory.json'),false);
- const before=fs.readFileSync(f.seal);passed(run(f.root,'--check'));assert.deepEqual(fs.readFileSync(f.seal),before);
+ const before=fs.readFileSync(f.seal);passed(run(fs.realpathSync(f.root),'--check'));assert.deepEqual(fs.readFileSync(f.seal),before);
 });
 
 test('fixed recipe check rejects missing changed extra linked and mode-changed package assets',t=>{
@@ -51,7 +58,7 @@ test('fixed recipe check rejects missing changed extra linked and mode-changed p
 
 test('fixed packager validates the entire original recipe before creating package assets',t=>{
  const f=fixture(t),payload=f.rows.find(v=>v.path.startsWith('overlay/')),file=path.join(f.root,'native/codex',payload.path);
- fs.appendFileSync(file,'changed source');const result=run(f.root);assert.notEqual(result.status,0);assert.match(result.stderr,/declared payload changed/);assert.equal(fs.existsSync(path.join(f.root,'plugins/soloco/producer-inputs')),false);
+ fs.appendFileSync(file,'changed source');const result=run(aliasedRoot(f.root));assert.notEqual(result.status,0);assert.match(result.stderr,/declared payload changed/);assert.equal(fs.existsSync(path.join(f.root,'plugins/soloco/producer-inputs')),false);
 });
 
 test('normal build-plugin composes the fixed recipe check and preserves cache-rooted launcher',()=>{
