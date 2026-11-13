@@ -114,27 +114,55 @@ actual current owner/grant/purpose/capacity and native runtime/catalog/directory
 validation against the exact original typed birth; these DATA issue no live
 capability or new grant.
 
-Actual main at this component's base lacks the repaired original selected
-maintenance export, final seal/checkpoint/complete qualified source-cut and
-finite bootstrap-purpose producer joins. Their absence Holds before positive writes or
-charges. Missing fixed backend exports Hold; errors
-from a present module, its transitive imports or actual provider propagate
-unchanged. No positive JSON producer or installed-source fallback fills a gap.
-The later genuine selected QUALIFIED owner-begin producer is also missing;
-bootstrap qualification → selected owner begin → historical reviewer profile
-is therefore an explicit incomplete end-path. Raw owner begin and a synthetic
-selected begin are not substituted for that missing step.
-The genuine purpose's nested/original counter spend and stable semantic basis
-are also unjoined here. A future positive producer must not leave its counters
-at zero or infer that enrollment/global usage alone funded the purpose. Its
-fixed same-plan spend and closed counter normalization must preserve original
-limits, purpose, expiry, pause selection and complete current meaning. The
-current positive gate remains Held until that exact producer contract joins.
+## Current source checkpoint and remaining Native boundary
 
-Behavioral tests run the REAL new controller and model/membership joins on
-temporary real SQLite. ONLY the declared missing fixed-purpose/native/
-preflight/selected-unit closure boundaries are explicitly SYNTHETIC. Birth,
-coverage, result, review and activation rows come from the actual new writer,
-not seeded positive historical native claims. These tests establish SOURCE
-state-machine behavior, not real founder approval, full-pin/native semantics,
-host adoption, company action or a completed operational end-path.
+At merged source
+[`62928101`](https://github.com/yimoburu/soloco/commit/62928101c9b78dd91be2ce4699d46580a0dfef98)
+([PR #117](https://github.com/yimoburu/soloco/pull/117)), the selected-maintenance,
+finite-purpose, final-seal/checkpoint and qualified source-cut joins are
+implemented. `bootstrap-membership-context.mjs` validates the actual paused
+owner/custody, original purpose, sealed origin and complete checked checkpoint.
+Missing or stale evidence still Holds; the presence of those validators does
+not supply qualified meaning or permission for a live company.
+
+Enrollment spends one nested enrollment unit. Each admitted phase spends one
+nested model unit and the corresponding outer maintenance, global, principal
+and enrollment model units; review also spends one nested and outer review
+unit. Those writes belong to the same membership command. Exact duplicate
+operations do not spend again. Typed command
+and event replay authenticates each charge, the historical authority baseline
+and every supported namespace transition. Reconstruction and review retain the
+same checked semantic source cut; complete current observations and spending
+travel separately in the assignment's `bootstrap_accounting`. Limits, original
+expiry, pause selection, failures and UNKNOWN reservations remain binding.
+See [paused-bootstrap accounting](bootstrap-membership-accounting.md) and the
+[three-tool context codec](bootstrap-readonly3-context.md).
+
+The real missing boundary is fresh bootstrap Native creation and closure.
+`prepareOriginalPeerBootstrapMembership` checks for the original
+`inspectOriginalPeerBootstrapMembershipCreation` and
+`assertOriginalProtectedBootstrapMembershipClosure` exports before phase
+admission or charging. `protected-codex-domain.mjs` does not export them at this
+checkpoint. Its ordinary owned-task creation token explicitly records
+`fresh_bootstrap_creation:false`; neither it nor matching JSON can fill that
+gap. Missing fixed exports Hold; errors from a present module, its transitive
+imports or actual provider propagate unchanged. No installed-source fallback
+supplies an issuer.
+
+Bootstrap qualification, selected qualified owner begin and the historical
+reviewer profile remain distinct end-path requirements. Raw owner begin or a
+synthetic selected begin cannot substitute for the required original producer.
+Source integration does not establish actual Native creation, maintenance
+launch qualification, membership activation, company adoption or production
+readiness, and it releases no old UNKNOWN reservation.
+
+The earlier controller fixtures exercise the real controller and
+model/membership joins on temporary SQLite with explicitly synthetic
+accounting/native/preflight/selected-unit closure predecessors. Their birth,
+coverage, result, review and activation rows come from that writer, not seeded
+positive historical native claims. The later accounting and codec fixtures
+exercise the actual typed source joins with their own labelled predecessors;
+they do not create a Native issuer. These cases cover source state-machine
+behavior, not real founder approval, full-pin/native semantics, host adoption,
+company action or a completed operational end-path. This documentation update
+reports no new test execution.
