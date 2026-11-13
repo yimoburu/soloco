@@ -60,6 +60,8 @@ pub(crate) struct OriginalResponseDecoder {
     retained_bytes: usize,
     #[cfg(unix)]
     drain_writer:Option<super::OriginalResponseDrainWriter>,
+    #[cfg(all(test,unix))]
+    history_fixture_without_fd3:bool,
 }
 impl OriginalResponseDecoder {
     pub(super) fn returned(step: &SourceStep, body: &[u8], startup:super::original_native_decoder::OriginalStartupIdentity) -> Result<Self, TransportError> {
@@ -71,7 +73,8 @@ impl OriginalResponseDecoder {
         Ok(Self { source: Arc::new(ResponseSource {
             authority, startup, request_id: step.request_id.clone(), request_sha256: super::hash(body), offered,
             terminal: Mutex::new(ResponseTerminal::default()),
-        }), ordinal: 0, retained_bytes: 0,#[cfg(unix)] drain_writer:None })
+        }), ordinal: 0, retained_bytes: 0,#[cfg(unix)] drain_writer:None,
+            #[cfg(all(test,unix))] history_fixture_without_fd3:true })
     }
     #[cfg(unix)]
     pub(super) fn returned_from_original_channel(step:&SourceStep,body:&[u8],
@@ -81,7 +84,10 @@ impl OriginalResponseDecoder {
         if !writer.matches(&decoder.source.startup,&decoder.source.request_id,&decoder.source.request_sha256) {
             return Err(hold("response original drain writer binding"));
         }
-        decoder.drain_writer=Some(writer);Ok(decoder)
+        decoder.drain_writer=Some(writer);
+        #[cfg(test)]
+        {decoder.history_fixture_without_fd3=false;}
+        Ok(decoder)
     }
     pub(crate) fn observe_payload(&mut self, data: &str) -> Option<u64> {
         self.ordinal = match self.ordinal.checked_add(1) { Some(n)=>n, None=>{self.unknown();return None;} };
@@ -137,7 +143,7 @@ impl OriginalResponseDecoder {
         // Existing parser/history Source fixtures have no inherited FD3. They
         // exercise history semantics only and cannot publish a Native witness.
         #[cfg(all(test,unix))]
-        if self.drain_writer.is_none(){return Ok(());}
+        if self.history_fixture_without_fd3&&self.drain_writer.is_none(){return Ok(());}
         #[cfg(unix)]
         {
             let result=match self.drain_writer.take() {

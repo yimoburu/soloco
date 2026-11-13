@@ -582,7 +582,7 @@ impl OriginalResponseDrainWriter {
         &self.startup==startup&&self.request_id==request_id&&self.request_sha256==request_sha256
     }
     async fn publish(mut self,drained:original_history::OriginalResponseTerminalDrained)->Result<(),TransportError> {
-        let mut state=lock_original_known(self.owner,&UNKNOWN).await?;
+        let mut state=lock_original_known(self.owner,self.guard.unknown).await?;
         if state.poisoned||state.sequence!=self.sequence||state.unresolved.as_deref()!=Some(self.request_id.as_str())
             ||original_native_decoder::OriginalStartupIdentity::observe(&state)?!=self.startup
             ||!drained.matches(&self.startup,&self.request_id,&self.request_sha256) {
