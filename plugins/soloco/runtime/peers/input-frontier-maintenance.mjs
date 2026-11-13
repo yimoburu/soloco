@@ -89,6 +89,9 @@ function frontierFrom(tx,f){
  const rebuilt=buildPeerInputFrontier({connection:manifest.connection,heads:manifest.heads,pinned_team:manifest.pinned_team,sources});need(same(rebuilt.manifest,manifest),'FRONTIER_MANIFEST_CHANGED');return rebuilt;
 }
 function sourceNatives(frontier){const found=new Set(),visit=(value,name='')=>{if(typeof value==='string'&&/(native|session|thread|author_instance)/.test(name)){if(value)found.add(value);}else if(Array.isArray(value))for(const child of value)visit(child,name);else if(value&&typeof value==='object')for(const [key,child]of Object.entries(value))visit(child,key);};for(const source of frontier.sources){try{visit(JSON.parse(source.text));}catch{need(false,'FRONTIER_SOURCE_CHANGED');}}return found;}
+// Only a successful pure derivative of this invocation's private rebuilt
+// frontier is retained. Other proof keys are strings; this Set never escapes.
+function proofSourceNatives(frontier,memo){let found=memo.get(frontier);if(!found){found=sourceNatives(frontier);memo.set(frontier,found);}return found;}
 function currentFrontier(tx,f,manifest){
  validateFrontierBookkeeping(tx,f,manifest);
  const owned=new Set(f.own_keys.map(v=>canonical(v))),heads=[];
@@ -206,7 +209,7 @@ function originalResultFrom(tx,reference,{frontier_id,node_id,stage},visiting,me
   const output=validatePeerInputFrontierOutput(v.text,context.value.body);need(same(output,v.output),'FRONTIER_OUTPUT_CHANGED');
   const contributors=new Set();for(const child of context.value.body.children){const result=originalResultFrom(tx,child.result_ref,{frontier_id,node_id:child.node_id,stage:'produce'},visiting,memo),review=originalResultFrom(tx,child.review_ref,{frontier_id,node_id:child.node_id,stage:'review'},visiting,memo);need(result.output.verdict==='Pass'&&review.output.verdict==='Pass'&&same(result.output,child.output)&&same(review.context.producer.result_ref,child.result_ref),'FRONTIER_CHILDREN');for(const id of [...result.contributors,...review.contributors])contributors.add(id);}
   if(stage==='review'){const producer=context.value.body.producer,result=originalResultFrom(tx,producer.result_ref,{frontier_id,node_id,stage:'produce'},visiting,memo);need(result.native_id!==v.native_id&&same(result.output,producer.output)&&same(result.context.unit,context.value.body.unit)&&same(result.context.children,context.value.body.children),'FRONTIER_REVIEW_INDEPENDENCE');for(const id of result.contributors)contributors.add(id);}
-  need(!contributors.has(v.native_id)&&!sourceNatives(frontier).has(v.native_id),'FRONTIER_REVIEW_INDEPENDENCE');contributors.add(v.native_id);const checked={result_ref:reference,node_id,stage,native_id:v.native_id,contributors:[...contributors],output,context:context.value.body,accepted_at_ms:v.accepted_at_ms};memo.set(memoKey,checked);return checked;
+  need(!contributors.has(v.native_id)&&!proofSourceNatives(frontier,memo).has(v.native_id),'FRONTIER_REVIEW_INDEPENDENCE');contributors.add(v.native_id);const checked={result_ref:reference,node_id,stage,native_id:v.native_id,contributors:[...contributors],output,context:context.value.body,accepted_at_ms:v.accepted_at_ms};memo.set(memoKey,checked);return checked;
  }finally{visiting.delete(canonical(reference));}
 }
 function proof(tx,f,node_id,stage){const matches=f.results.filter(v=>v.node_id===node_id&&v.stage===stage);need(matches.length===1,'FRONTIER_RESULT_REQUIRED');return assertPeerInputFrontierResultFrom(tx,matches[0].result_ref,{frontier_id:f.id,node_id,stage});}
