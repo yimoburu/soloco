@@ -1,6 +1,18 @@
 # Current capability map
 
-The November 12, 2026 source checkpoint is merged main
+The later November 12, 2026 public source checkpoint is merged main
+[`b0097c3b86e7f500e35b70e391aa2beeb8f4b4cf`](https://github.com/yimoburu/soloco/commit/b0097c3b86e7f500e35b70e391aa2beeb8f4b4cf).
+Its [main Source CI](https://github.com/yimoburu/soloco/actions/runs/43326025667)
+passed all six jobs and 3,759 tests, with no failures, cancellations or skips.
+PR #104 delivered original frontier checkpoint/final-seal source APIs; PR #106
+added public pre-quarantine mechanical-QA controls and storage/catalog guards;
+PR #107 added the fixed lossless mechanical context; PR #108 changed routine CI
+placement to three shards. The guides linked below retain each interface's
+supported inputs and missing-producer Holds. This does not establish activation
+of an installed v0.7.8 runtime, native qualification, deployment, company adoption
+or durable continuity, and does not clear the three previously held notices.
+
+The earlier November 12, 2026 source checkpoint remains merged main
 `050d9b8a248314ffc02f371708fa69902f138d85` (through PR #94).
 The public peer route, request-scoped caller checks and owner operating gates
 are implemented in source. Actual host qualification, checked deployment,
@@ -37,6 +49,10 @@ judgment and local acceptance still requiring their own exact evidence.
 
 | Capability | Source | Executable evidence | Present boundary |
 |---|---|---|---|
+| Original frontier checkpoint and final-seal APIs | `peers/input-frontier-checkpoint.mjs`, `peers/origin-frontier-seal.mjs` | Checkpoint and final-seal roots included in the exact `b0097c3` source run above | Selected finite purpose, original maintenance generation, complete proof/currentness, private staging and full-context checks remain required. Ordinary membership/bootstrap, owner consumers and qualified native launch are separate joins; no marker, UNKNOWN or allowance is released. See [checkpoints](peer-input-frontier-checkpoint.md) and [final seals](peer-origin-frontier-seal.md). |
+| Public pre-quarantine mechanical QA and storage routing | `peer-origin-runtime.mjs`, `peers/origin-mechanical-qa.mjs`, `peer-owner-runtime.mjs` | Public mechanical-QA, dispatch, owner storage-routing and runtime roots | `company_origin` separates decision, packet, exact grant and queue admission under actual HOST/current-hook and original owner/epoch checks. Missing fixed helpers or execution inventory Hold. Retired sidecars remain rejected snapshots; bounded readonly routing never replays an operation. See [public mechanical QA](peer-origin-mechanical-qa-public.md) and [storage routing](peer-owner-storage-routing.md). |
+| Fixed lossless mechanical context | `peers/origin-mechanical-qa-wire-contract.mjs`, `context.mjs`, `worker.mjs` | Whole `peer-origin-mechanical-qa-wire.test.mjs` root | New packet-v2 removes only the fixed duplicate plan-content rendering; its inverse restores the exact original raw assignment. Complete prompt/context limits and all original source/authority/inventory checks remain. Old v1 grants stay v1; fictional fit does not qualify actual-company/native fit. See [lossless wire](origin-mechanical-qa-lossless-wire.md). |
+| Three-shard routine source CI | `tools/ci/shards.mjs`, `.github/workflows/ci.yml` | CI helper tests and exact `b0097c3` six-job main run above | Complete existing regression selection, two file workers per shard, twenty-minute jobs and required gates remain. Full qualification and Node 26 keep their separate settings. One passing run is not a portable timing, cost or native-qualification result. See [CI](ci.md). |
 | Public peer operator routing and persisted reads | `main.mjs`, `peer-runtime.mjs`, `peers/production-router.mjs`, `peers/production-host.mjs` | `peer-runtime.test.mjs`, `peer-production-authority.test.mjs`, production router/host/membership roots | `company_peers` composes the fixed provider, membership and scheduler in source. Bounded current-record reads need no provider start. Existing checked layout-5 adoption, the actual canonical founder, reviewed launch recipe and native qualification remain required; legacy-origin execution stays held. See [peer production routing](peer-production-runtime.md). |
 | Request-scoped MCP caller identity | `main.mjs`, `mcp-host-context.mjs`, `hooks.mjs` | `mcp-caller-transport.test.mjs`, `mcp-host-context.test.mjs` and peer-runtime roots | Every public peer operation requires actual supported Codex root metadata and a current managed hook record. Caller arguments, binding files and diagnostics confer no identity or authority. Source checks do not qualify the connected host; unsupported and legacy clients remain unqualified. See [MCP caller context](mcp-caller-identity.md). |
 | Owner operating gates for ordinary work | `peers/owner-operating-state.mjs`, `peers/model.mjs`, task and membership bindings | Owner operating-gate, context-pool, wire-preflight and subject-refresh roots | Immutable owner lifecycle proof precedes ordinary writes and cached replay; activation stays paused until dedicated resume. Source fixtures do not qualify deployed owner maintenance, renew a grant or release UNKNOWN reservations. See [owner handover](peer-owner-operating-gate.md). |
