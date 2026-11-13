@@ -248,4 +248,28 @@ test('genuine later founder pause fences original and fresh frontier authority w
 });
 test('missing original maintenance pause selection cannot adopt current generation or spend',t=>{const f=fixture(t,{selectedPause:false}),before=events(f);assert.throws(()=>f.capture(),e=>e.code==='ORIGIN_MAINTENANCE_SELECTED_PAUSE_REQUIRED');assert.deepEqual(events(f),before);assert.equal(get(f,'control','origin').value.maintenance.used_model_calls,0);});
 test('unsupported current authority pause rebinding does not synthesize an original selection',t=>{const f=fixture(t);executePeerModel(f.ledger,{principal_id:'founder'},'company/pause',{operation_id:'genuine-pause-before-unsupported-rebind',source_instruction:'SYNTHETIC genuinely new pause, no renewed maintenance selected.'});const old=get(f,'control','origin'),company=get(f,'control','company'),next=seed(f,'control','origin',{...old.value,maintenance:{...old.value.maintenance,pause_generation:company.value.pause_generation}});seed(f,'control','company',{...company.value,origin:ref('control',next)});const before=events(f);assert.throws(()=>f.capture(),e=>e.code==='ORIGIN_MAINTENANCE_SELECTION_CHANGED');assert.deepEqual(events(f),before);assert.equal(get(f,'control','origin').value.maintenance.used_model_calls,0);});
+
+// Exact source copy exposes only private pure helpers to these SOURCE tests;
+// production exports, providers, frontier inputs and proof-cache selectors stay closed.
+const nativeMemoPath=path.join(directory,'native-memo-source-test.mjs');
+fs.writeFileSync(nativeMemoPath,relocated+'\nexport {proofSourceNatives as sourceMemo,sourceNatives as sourceScan};\n');
+const nativeMemo=await import(url(nativeMemoPath));
+test('proof source-native derivative reuses only exact frontier identity within one private invocation memo',t=>{
+ const texts=[canonical({native_id:'source-native',nested:{thread_id:'source-thread',session_id:['session-a','session-b']},author_instance:'source-author'}),canonical({native_id:'second-native',unrelated:'not-an-identity'})],frontier={sources:texts.map(text=>({text}))};
+ const original=JSON.parse;let parses=0;t.mock.method(JSON,'parse',function(text,...rest){if(texts.includes(text))parses++;return original.call(this,text,...rest);});
+ const memo=new Map(),first=nativeMemo.sourceMemo(frontier,memo);assert.equal(parses,2);
+ for(let i=0;i<12;i++){const reused=nativeMemo.sourceMemo(frontier,memo);assert.strictEqual(reused,first);for(const id of ['source-native','source-thread','session-a','session-b','source-author','second-native'])assert.equal(reused.has(id),true);assert.equal(reused.has('not-an-identity'),false);assert.equal(reused.has('fresh-independent-native'),false);}
+ assert.equal(parses,2,'same private frontier does not reparse source JSON for later result nodes');
+ const equivalent={sources:texts.map(text=>({text}))};assert.deepEqual([...nativeMemo.sourceMemo(equivalent,memo)],[...first]);assert.equal(parses,4,'equal caller DATA is not the object identity key');
+ assert.deepEqual([...nativeMemo.sourceMemo(frontier,new Map())],[...first]);assert.equal(parses,6,'a fresh proof invocation extracts again');
+ assert.deepEqual([...nativeMemo.sourceScan(frontier)],[...first]);assert.equal(parses,8,'cached native exclusions equal the original full extractor');
+});
+test('failed source-native extraction stays branded and is never retained as a successful derivative',t=>{
+ const text='not JSON: original malformed source',frontier={sources:[{text}]},memo=new Map(),original=JSON.parse;let attempts=0;
+ t.mock.method(JSON,'parse',function(raw,...rest){if(raw===text)attempts++;return original.call(this,raw,...rest);});
+ for(let i=0;i<2;i++){assert.throws(()=>nativeMemo.sourceMemo(frontier,memo),error=>pure.isPeerInputFrontierValidationError(error)&&error.code==='FRONTIER_SOURCE_CHANGED');assert.equal(memo.has(frontier),false);}
+ assert.equal(attempts,2);const injected=Object.assign(Error('Original proof-row provider failure'),{code:'EIO'}),tx={getVersion(){throw injected;}};
+ assert.throws(()=>core.assertPeerInputFrontierResultFrom(tx,{family:'work_items',id:'missing',revision:1,sha256:'a'.repeat(64)},{frontier_id:'missing',node_id:'missing',stage:'produce'}),error=>error===injected);
+ assert.equal(attempts,2,'an earlier original provider failure is not replaced by source parsing');
+});
 test('actual fixed optional source absence remains a typed Hold before capture or charge',async t=>{for(const [name,code]of [['origin','FRONTIER_ORIGIN_SOURCE_REQUIRED'],['selected-authority','FRONTIER_SELECTED_AUTHORITY_SOURCE_REQUIRED']]){const original=name==='origin'?url(path.join(directory,'origin.mjs')):url(path.join(peers,'origin-maintenance-authority.mjs')),missing=url(path.join(directory,'ACTUALLY-ABSENT-'+name+'.mjs')),target=path.join(directory,'missing-source-'+name+'.mjs');fs.writeFileSync(target,relocated.replaceAll(JSON.stringify(original),JSON.stringify(missing)));const module=await import(url(target)),f=fixture(t,{module});unchanged(f,()=>f.capture(),code);assert.equal(get(f,'control','origin').value.maintenance.used_model_calls,0);}});

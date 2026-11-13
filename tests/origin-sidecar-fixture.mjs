@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import childProcess from 'node:child_process';
+import {performance} from 'node:perf_hooks';
 import {createHash} from 'node:crypto';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 const source=fileURLToPath(new URL('../plugins/soloco/helpers/origin-sidecar-capture.c',import.meta.url));
@@ -15,8 +16,12 @@ const temporary=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'soloco-sid
 let sequence=0;
 test.after(()=>fs.rmSync(temporary,{recursive:true,force:true}));
 export async function buildSidecarSourceFixture({header='',interposer=''}={}){
- const directory=path.join(temporary,String(++sequence));fs.mkdirSync(directory);const executable=path.join(directory,'origin-sidecar-capture'),found=process.platform==='darwin'?childProcess.spawnSync('/usr/bin/xcrun',['--find','clang'],{encoding:'utf8',timeout:5000}):null,compiler=found?found.stdout.trim():'/usr/bin/clang',args=['-std=c11','-O2','-Wall','-Wextra','-Werror'];if(found&&(found.error||found.status!==0||!path.isAbsolute(compiler)))throw found.error??Error('SOURCE fixture clang resolution unavailable');
- const sdk=found?childProcess.spawnSync('/usr/bin/xcrun',['--sdk','macosx','--show-sdk-path'],{encoding:'utf8',timeout:5000}):null;if(sdk){if(sdk.error||sdk.status!==0||!path.isAbsolute(sdk.stdout.trim()))throw sdk.error??Error('SOURCE fixture SDK unavailable');args.push('-isysroot',sdk.stdout.trim());}
+ const directory=path.join(temporary,String(++sequence));fs.mkdirSync(directory);
+ // Cold xcrun discovery shares one SOURCE-fixture allowance; compilation keeps
+ // its separate 30s bound. Neither lookup is retried or given a fresh budget.
+ const discoveryDeadline=performance.now()+30000,discoveryTimeout=()=>{const remaining=Math.floor(discoveryDeadline-performance.now());if(remaining<=0)throw Object.assign(Error('SOURCE fixture toolchain discovery deadline exceeded'),{code:'ETIMEDOUT'});return remaining;};
+ const executable=path.join(directory,'origin-sidecar-capture'),found=process.platform==='darwin'?childProcess.spawnSync('/usr/bin/xcrun',['--find','clang'],{encoding:'utf8',timeout:discoveryTimeout()}):null,compiler=found?found.stdout.trim():'/usr/bin/clang',args=['-std=c11','-O2','-Wall','-Wextra','-Werror'];if(found&&(found.error||found.status!==0||!path.isAbsolute(compiler)))throw found.error??Error('SOURCE fixture clang resolution unavailable');
+ const sdk=found?childProcess.spawnSync('/usr/bin/xcrun',['--sdk','macosx','--show-sdk-path'],{encoding:'utf8',timeout:discoveryTimeout()}):null;if(sdk){if(sdk.error||sdk.status!==0||!path.isAbsolute(sdk.stdout.trim()))throw sdk.error??Error('SOURCE fixture SDK unavailable');args.push('-isysroot',sdk.stdout.trim());}
  if(header){const p=path.join(directory,'interpose.h');fs.writeFileSync(p,header);args.push('-include',p);}
  args.push(source);if(interposer){const p=path.join(directory,'interpose.c');fs.writeFileSync(p,interposer);args.push(p);}args.push('-o',executable);
  const built=childProcess.spawnSync(compiler,args,{encoding:'utf8',env:{...process.env,TMPDIR:directory},timeout:30000,maxBuffer:1024*1024});if(built.error)throw built.error;if(built.status!==0)throw Error(built.stderr);fs.chmodSync(executable,0o555);

@@ -6,6 +6,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import childProcess from 'node:child_process';
+import {performance} from 'node:perf_hooks';
 import {captureOriginSidecarContents,originSidecars,buildSidecarSourceFixture,originalSidecarSourceFixture} from './origin-sidecar-fixture.mjs';
 import {originHash} from '../plugins/soloco/runtime/peers/origin-plan.mjs';
 import * as actual from '../plugins/soloco/runtime/peers/origin-sidecar-capture.mjs';
@@ -59,4 +61,41 @@ test('non-UTF8 pathname bytes in an actual helper frame Hold instead of becoming
 
 test('an actual completed helper with corrupt binary frame cannot supply accepted partial inventory',async t=>{
  const f=fixture(t),binary=await buildSidecarSourceFixture(hook('write','ssize_t source_test_write(int,const void *,size_t);',`ssize_t source_test_write(int fd,const void *body,size_t count){static int done=0;if(fd==STDOUT_FILENO&&!done++){char bad='X';if(write(fd,&bad,1)!=1)_exit(99);}return write(fd,body,count);}`));assert.throws(()=>captureOf(binary)(f.inside),e=>e.code==='ORIGIN_SIDECAR_FRAME');assert.equal(fs.readFileSync(f.target,'utf8'),'ORIGINAL');
+});
+
+test('cold clang lookup may exceed five seconds within shared discovery budget and still builds exact C frames',{skip:process.platform!=='darwin'},async t=>{
+ const original=childProcess.spawnSync,calls=[];
+ const delayed=`import {spawnSync} from 'node:child_process';setTimeout(()=>{const result=spawnSync('/usr/bin/xcrun',process.argv.slice(1),{stdio:'inherit'});if(result.error)throw result.error;process.exitCode=result.status??1;},6000);`;
+ t.mock.method(childProcess,'spawnSync',function(command,args,options){
+  if(command==='/usr/bin/xcrun'){
+   calls.push({args:[...args],timeout:options.timeout});
+   if(args[0]==='--find')return original(process.execPath,['--input-type=module','--eval',delayed,'--',...args],options);
+  }
+  return original(command,args,options);
+ });
+ const built=await buildSidecarSourceFixture(),f=fixture(t),captured=captureOf(built)(f.inside);
+ assert.deepEqual(calls.map(v=>v.args),[['--find','clang'],['--sdk','macosx','--show-sdk-path']]);
+ assert.ok(calls[1].timeout<calls[0].timeout-5000,'SDK receives only the remaining shared allowance after actual enforced delay');
+ assert.deepEqual(built.metadata.compiler,originalSidecarSourceFixture.metadata.compiler);assert.deepEqual(built.metadata.sdk,originalSidecarSourceFixture.metadata.sdk);
+ assert.equal(built.metadata.source_sha256,originalSidecarSourceFixture.metadata.source_sha256);assert.equal(built.metadata.native_qualified,false);
+ assert.equal(captured.length,1);assert.equal(captured[0].path,'sub/held.txt');assert.equal(captured[0].content.toString(),'ORIGINAL');assert.equal(captured[0].sha256,originHash('ORIGINAL'));
+});
+
+test('exhausted shared discovery allowance stops before SDK lookup or compiler launch',{skip:process.platform!=='darwin'},async t=>{
+ let clock=0;const calls=[];t.mock.method(performance,'now',()=>clock);
+ t.mock.method(childProcess,'spawnSync',(command,args)=>{calls.push([command,[...args]]);clock=30001;return {status:0,stdout:originalSidecarSourceFixture.metadata.compiler.path+'\n'};});
+ await assert.rejects(buildSidecarSourceFixture(),e=>e.code==='ETIMEDOUT');
+ assert.deepEqual(calls,[['/usr/bin/xcrun',['--find','clang']]]);
+});
+
+for(const failedLookup of ['clang','sdk'])test(`original ${failedLookup} discovery error retains identity without retry or compiler launch`,{skip:process.platform!=='darwin'},async t=>{
+ const original=childProcess.spawnSync,error=Object.assign(Error('Fictional original discovery failure'),{code:'EIO'}),calls=[];
+ t.mock.method(childProcess,'spawnSync',(command,args,options)=>{
+  calls.push([command,[...args]]);
+  if(command==='/usr/bin/xcrun'&&(failedLookup==='clang'||args[0]==='--sdk'))return {status:null,stdout:'',error};
+  return original(command,args,options);
+ });
+ await assert.rejects(buildSidecarSourceFixture(),e=>e===error);
+ assert.deepEqual(calls.map(([,args])=>args),failedLookup==='clang'?[['--find','clang']]:[['--find','clang'],['--sdk','macosx','--show-sdk-path']]);
+ assert.ok(calls.every(([command])=>command==='/usr/bin/xcrun'));
 });
