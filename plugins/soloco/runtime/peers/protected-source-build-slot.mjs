@@ -7,6 +7,7 @@ import {TextDecoder} from 'node:util';
 import {createHash} from 'node:crypto';
 import {inspectOriginalLoadedPeerBridge} from './context-component-deployment.mjs';
 import {BOOTSTRAP_CONTEXT_SELECTION,BOOTSTRAP_PROFILE} from './bootstrap-membership-delivery-frame.mjs';
+import {originalDeveloperComponentLayout,originalPackagedComponentLayout,originalComponentLayoutPaths,originalComponentNodePath,inspectOriginalComponentLayout} from './context-component-layout.mjs';
 const slots=Object.freeze([]);
 const fail=code=>{throw Object.assign(Error(code),{code});};
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
@@ -197,6 +198,8 @@ const bootstrapForms=Object.freeze([Object.freeze({delivery_kind:'bootstrap-memb
 function selectedBootstrapComponentAssociation(){
  const d=inspectOriginalLoadedPeerBridge(),files=d.files;
  if(d.layout){const packageRoot=fileURLToPath(new URL('../../',import.meta.url)).replace(/\/$/,'');if(d.layout.kind!=='packaged-plugin-v1'||d.layout.package_root!==packageRoot||d.layout.source_root!==packageRoot||d.node.root!==packageRoot)contextHold();}
+ const layout=d.layout?originalPackagedComponentLayout():originalDeveloperComponentLayout(),layoutPaths=originalComponentLayoutPaths(layout);
+ if(d.node.root!==layoutPaths.source_root||d.layout&&!sameContext(d.layout,inspectOriginalComponentLayout(layout)))contextHold();
  if(d.native_qualified!==false||d.claims_released!==false||d.executable.mode!=='100555'||d.node.profile!=='original-node-peer-context-interpreter-v1')contextHold();
  const m=files.compiled_manifest,manifest=contextDocument({path:m.path,bytes:m.bytes,sha256:m.sha256},d.original_component_root);
  const producer=manifest.files.find(r=>r.path==='codex-rs/codex-api/src/protected_peer.rs');
@@ -212,7 +215,7 @@ function selectedBootstrapComponentAssociation(){
  if(nodeManifest.schema!=='soloco-node-peer-context-inputs-v1'||!Array.isArray(nodeManifest.files))contextHold();
  const nodeRef=name=>{
   const relative='plugins/soloco/runtime/peers/'+name,p=fileURLToPath(new URL('./'+name,import.meta.url)),row=nodeManifest.files.find(r=>r.path===relative);
-  if(!row||p!==path.join(d.node.root,relative)||!Number.isSafeInteger(row.bytes)||row.bytes<1||row.bytes>1024*1024||!hash(row.sha256)||row.mode!=='100644')contextHold();
+  if(!row||p!==originalComponentNodePath(layout,relative)||!Number.isSafeInteger(row.bytes)||row.bytes<1||row.bytes>1024*1024||!hash(row.sha256)||row.mode!=='100644')contextHold();
   const named=fs.lstatSync(p);if(!named.isFile()||named.isSymbolicLink()||named.nlink!==1||named.size!==row.bytes||fs.realpathSync(p)!==p)contextHold();
   const fd=fs.openSync(p,fs.constants.O_RDONLY|(fs.constants.O_NOFOLLOW??0));let bytes;
   try{
