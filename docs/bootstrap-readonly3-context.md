@@ -44,10 +44,24 @@ original plan retains exact frame and RPC bytes privately and rechecks its
 source association on inspection. The receipt is descriptive commitment data,
 not permission or a launch capability.
 
-This increment supplies mechanical Source code and authored validation cases.
-It does not supply the missing finite-purpose producer, qualified bootstrap
-context, actual fresh Native creation, maintenance launch, legacy coverage,
-membership activation, spending permission or reservation release. The
-unconditional purpose and qualified-context Holds in
-`bootstrap-membership-context.mjs` remain. Compiler, Node and Native test
-execution and acceptance require their separately selected exact inputs.
+At source checkpoint
+[`62928101`](https://github.com/yimoburu/soloco/commit/62928101c9b78dd91be2ce4699d46580a0dfef98)
+([PR #117](https://github.com/yimoburu/soloco/pull/117)), the bootstrap context
+path joins selected maintenance, the finite original purpose, typed accounting,
+the final origin seal and the checked input-frontier checkpoint. These are
+positive source validations rather than unconditional purpose/context Holds.
+The stable source cut preserves the literal authenticated semantic baseline;
+the outer assignment separately retains complete current accounting and typed
+namespace replay. See [paused-bootstrap accounting](bootstrap-membership-accounting.md).
+
+The codec still does not create a fresh Native session.
+`prepareOriginalPeerBootstrapMembership` requires the original
+`inspectOriginalPeerBootstrapMembershipCreation` and
+`assertOriginalProtectedBootstrapMembershipClosure` exports, which remain
+absent from `protected-codex-domain.mjs` at this checkpoint. Preparation Holds
+before phase admission or charging. The ordinary owned-task creation token
+explicitly records `fresh_bootstrap_creation:false` and cannot substitute.
+Actual bootstrap creation, qualified launch, semantic acceptance and company
+adoption remain separate requirements. Compiler, Node and Native test execution
+and acceptance require their separately selected exact inputs; this document
+supplies no new execution result or permission.

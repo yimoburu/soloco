@@ -89,12 +89,20 @@ these ledger actions:
 - `message/send`: a scoped message to an active principal.
 - `notice/create`: an attributable required notice.
 - `home/propose`: a proposal for a resource declared by the admitted task.
+- `handoff/accept` and `handoff/reject`: a decision for the exact typed handoff
+  bound to the admitted task.
 
 Action scope/grant comes from the task. Caller-provided mismatches, identity,
 authority, lease and unsupported action fields are rejected. A home proposal
 retains all admitted explicit contributors, review and parent references even
 when the model omits them. Additional proposal references/dependencies must
 already be present in the admitted context.
+
+For a handoff decision, the client derives the handoff reference, scope, grant
+and resources from the admitted task. An optional caller-supplied `handoff_ref`
+must match that exact closed reference; it cannot select another handoff.
+The existing handoff receiver, evidence and currentness checks still apply.
+This does not add a general acknowledgement or publication endpoint.
 
 A new required notice changes compulsory context membership. Its own authorized
 transaction may commit, but the old task context is then stale: subsequent
