@@ -9,6 +9,7 @@ import {projectNotice} from './notice-sources.mjs';
 
 export const MODEL_MAX_BYTES=30000;
 export const REPLY_MAX_BYTES=65536;
+export const CATALOG_MAX_BYTES=131072;
 export const RESPONSE_FORMAT='soloco-current-v2';
 export const SPECIALIST_REPORTING='In the next founder-facing response, prominently highlight each newly summoned/resumed or materially changed specialist as **role/name**, with its assignment, actual status and next handoff. Distinguish same-role instances using observed identities. Attribute returned findings to specialists and Chief of Staff synthesis separately. Planned tasks and software test jobs are not specialist summons; returned work is not QA Pass or acceptance. Report failed/held summons honestly. Do not repeat an unchanged roster on unrelated replies. This reminder is not a delivery receipt or authority.';
 const jobCollection=collection=>['jobs','active_jobs','claimed_jobs'].includes(collection);
@@ -25,6 +26,14 @@ export function rpcReply(id,result,error) {
   let reply={jsonrpc:'2.0',id,...(error?{error}:{result})};
   if(bytes(JSON.stringify(reply))>REPLY_MAX_BYTES || result?.content?.some(c=>c.type==='text'&&bytes(c.text)>MODEL_MAX_BYTES))reply={jsonrpc:'2.0',id,result:{isError:true,content:[{type:'text',text:'Response exceeds public transport budget. Use company_context inspect/read pages.'}]}};
   return JSON.stringify(reply);
+}
+// Only the server's tools/list route uses this descriptor budget. Company
+// results continue through rpcReply, regardless of their JSON shape.
+export function toolCatalogReply(id,tools) {
+  if(!['string','number'].includes(typeof id)||bytes(JSON.stringify(id))>258)id=null;
+  const reply=JSON.stringify({jsonrpc:'2.0',id,result:{tools}});
+  if(bytes(reply)>CATALOG_MAX_BYTES)return JSON.stringify({jsonrpc:'2.0',id,error:{code:-32603,message:'Tool catalog exceeds supported transport budget'}});
+  return reply;
 }
 const cut=(s,n=180)=>typeof s==='string'?s.slice(0,n):(['number','boolean'].includes(typeof s)?s:null);
 // Identity/control fields are exact or explicitly withheld. A prefix must never

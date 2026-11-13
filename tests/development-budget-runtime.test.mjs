@@ -13,7 +13,8 @@ import {fileURLToPath} from 'node:url';
 import {DatabaseSync} from 'node:sqlite';
 import {Store,SCHEMA,VERSION,installedTeam,teamHash,digest,withStore} from '../plugins/soloco/runtime/store.mjs';
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
-import {call,toolListFor} from '../plugins/soloco/runtime/main.mjs';
+import {call,toolList,toolListFor} from '../plugins/soloco/runtime/main.mjs';
+import {CATALOG_MAX_BYTES,REPLY_MAX_BYTES,MODEL_MAX_BYTES,toolCatalogReply,rpcReply} from '../plugins/soloco/runtime/public-response.mjs';
 import {runWithMcpHostContext} from '../plugins/soloco/runtime/mcp-host-context.mjs';
 import {developmentLimits} from '../plugins/soloco/runtime/development-limits.mjs';
 import {developmentReviewAuthority,developmentAssignment} from '../plugins/soloco/runtime/develop.mjs';
@@ -246,4 +247,103 @@ test('actual MCP stdio forwards synthetic HOST metadata to budget inspection/pre
   const inspected=payload(await mcp.call(f.args('budget_inspect'),f.meta));assert.equal(inspected.status,'inspected');assert.equal(inspected.configuration.max_bytes_ceiling,100000);
   const measured=payload(await mcp.call(f.args('budget_preflight',f.preflight()),f.meta));assert.equal(measured.preflight.canonical_generation,false);assert.equal(measured.phases.sources.known,true);assert.equal(measured.phases.complete_candidate.known,false);
   denied(await mcp.call(f.args('budget_inspect'),{threadId:randomUUID(),sessionId:f.session}),/MCP_CODEX_ROOT_CALLER_REQUIRED/);assert.deepEqual(f.read(),before);
+});
+
+// Pure transport DATA over the actual registered catalog. These cases add no
+// company, filesystem, subprocess, server, provider or model operation.
+const CATALOG_TRANSPORT_IDS=[
+  {kind:'ASCII',id:'a'.repeat(256)},
+  {kind:'BMP UTF-8',id:'é'.repeat(128)},
+  {kind:'astral UTF-8',id:'😀'.repeat(64)},
+  {kind:'escaped quote',id:'"'.repeat(128)},
+  {kind:'escaped backslash',id:'\\'.repeat(128)},
+  {kind:'escaped control',id:'\u0000'.repeat(42)+'abcd'}
+];
+function catalogTransportTools(ceiling){
+  const tools=structuredClone(toolList);
+  tools.find(tool=>tool.name==='company_develop').inputSchema.properties.max_bytes.maximum=ceiling;
+  return tools;
+}
+const catalogJsonBytes=(id,tools)=>Buffer.byteLength(JSON.stringify({jsonrpc:'2.0',id,result:{tools}}),'utf8');
+
+test('catalog transport preserves all 25 actual tools and six budget actions for maximum encoded IDs and both ceilings',()=>{
+  assert.equal(CATALOG_MAX_BYTES,131072);assert.equal(REPLY_MAX_BYTES,65536);assert.equal(MODEL_MAX_BYTES,30000);
+  assert.equal(DEVELOPMENT_BUDGET_ACTIONS.length,6);
+  for(const ceiling of [100000,1000000]){
+    const tools=catalogTransportTools(ceiling),expected=structuredClone(tools),before=JSON.stringify(tools);
+    assert.equal(tools.length,25);assert.equal(new Set(tools.map(tool=>tool.name)).size,25);
+    const schema=tools.find(tool=>tool.name==='company_develop').inputSchema;
+    assert.equal(schema.properties.max_bytes.maximum,ceiling);
+    assert.deepEqual(schema.properties.budget_input,developmentBudgetInputSchema);
+    for(const action of DEVELOPMENT_BUDGET_ACTIONS)assert.ok(schema.properties.action.enum.includes(action));
+    for(const {kind,id}of CATALOG_TRANSPORT_IDS){
+      assert.equal(Buffer.byteLength(JSON.stringify(id),'utf8'),258,kind);
+      const text=toolCatalogReply(id,tools),reply=JSON.parse(text);
+      assert.ok(Buffer.byteLength(text,'utf8')<=CATALOG_MAX_BYTES,kind);
+      assert.deepEqual(reply,{jsonrpc:'2.0',id,result:{tools:expected}},kind+' at ceiling '+ceiling);
+      assert.equal(JSON.stringify(tools),before,'catalog serialization must not mutate actual schemas');
+    }
+  }
+});
+
+test('catalog JSON body accepts exactly 131072 bytes and rejects one more with no partial tool list',()=>{
+  for(const ceiling of [100000,1000000])for(const {kind,id}of CATALOG_TRANSPORT_IDS){
+    const tools=catalogTransportTools(ceiling),padding=CATALOG_MAX_BYTES-catalogJsonBytes(id,tools);
+    assert.ok(padding>=0,'the complete actual catalog must fit the selected catalog boundary');
+    tools.at(-1).description+='x'.repeat(padding);
+    const expected=structuredClone(tools),before=JSON.stringify(tools);
+    assert.equal(catalogJsonBytes(id,tools),131072);
+    const acceptedText=toolCatalogReply(id,tools),accepted=JSON.parse(acceptedText);
+    assert.equal(Buffer.byteLength(acceptedText,'utf8'),131072,kind);
+    assert.deepEqual(accepted,{jsonrpc:'2.0',id,result:{tools:expected}});
+    assert.equal(JSON.stringify(tools),before,'the exact-boundary serializer must preserve all input data');
+    tools.at(-1).description+='x';assert.equal(catalogJsonBytes(id,tools),131073);
+    const rejectedText=toolCatalogReply(id,tools),rejected=JSON.parse(rejectedText);
+    assert.ok(Buffer.byteLength(rejectedText,'utf8')<=REPLY_MAX_BYTES);
+    assert.deepEqual(Object.keys(rejected).sort(),['error','id','jsonrpc']);
+    assert.equal(rejected.jsonrpc,'2.0');assert.equal(rejected.id,id);assert.equal(rejected.error.code,-32603);
+    assert.equal(typeof rejected.error.message,'string');assert.ok(rejected.error.message.length>0);
+    assert.equal(Object.hasOwn(rejected,'result'),false);
+    assert.equal(rejectedText.includes('"tools":'),false,'overflow must not publish a shortened catalog');
+  }
+});
+
+test('catalog hostile IDs normalize to null without invoking caller getters, Proxy traps or coercion',()=>{
+  const tools=catalogTransportTools(1000000),expected=structuredClone(tools);let invoked=0;
+  const rejectInspection=()=>{invoked++;throw Error('Hostile catalog ID was inspected or coerced');};
+  const getter=Object.defineProperty({[Symbol.toPrimitive]:rejectInspection},'toJSON',{get:rejectInspection});
+  const proxy=new Proxy({},{get:rejectInspection,ownKeys:rejectInspection,getOwnPropertyDescriptor:rejectInspection,getPrototypeOf:rejectInspection});
+  const hostile=[
+    {kind:'oversized ASCII',id:'a'.repeat(257)},{kind:'oversized escaped quote',id:'"'.repeat(129)},
+    {kind:'oversized astral',id:'😀'.repeat(65)},{kind:'getter object',id:getter},{kind:'Proxy object',id:proxy},
+    {kind:'array',id:[]},{kind:'boolean',id:true},{kind:'undefined',id:undefined},{kind:'null',id:null},
+    {kind:'BigInt',id:1n},{kind:'Symbol',id:Symbol('fictional-id')},{kind:'function',id:rejectInspection},
+    {kind:'NaN',id:NaN},{kind:'positive infinity',id:Infinity},{kind:'negative infinity',id:-Infinity}
+  ];
+  for(const {kind,id}of hostile){
+    const text=toolCatalogReply(id,tools),reply=JSON.parse(text);
+    assert.ok(Buffer.byteLength(text,'utf8')<=CATALOG_MAX_BYTES);
+    assert.deepEqual(reply,{jsonrpc:'2.0',id:null,result:{tools:expected}},kind);
+  }
+  assert.equal(invoked,0);
+  for(const id of [0,17])assert.deepEqual(JSON.parse(toolCatalogReply(id,tools)),{jsonrpc:'2.0',id,result:{tools:expected}});
+});
+
+test('ordinary replies cannot obtain the catalog budget by shape and retain the 30000-byte text limit',()=>{
+  assert.equal(REPLY_MAX_BYTES,65536);assert.equal(MODEL_MAX_BYTES,30000);
+  for(const ceiling of [100000,1000000])for(const {id}of CATALOG_TRANSPORT_IDS){
+    const tools=catalogTransportTools(ceiling),bodyBytes=catalogJsonBytes(id,tools);
+    assert.ok(bodyBytes>REPLY_MAX_BYTES);assert.ok(bodyBytes<=CATALOG_MAX_BYTES);
+    assert.deepEqual(JSON.parse(toolCatalogReply(id,tools)),{jsonrpc:'2.0',id,result:{tools}});
+    const text=rpcReply(id,{tools}),reply=JSON.parse(text);
+    assert.ok(Buffer.byteLength(text,'utf8')<=REPLY_MAX_BYTES);
+    assert.equal(reply.id,id);assert.equal(reply.result.isError,true);assert.equal(reply.result.tools,undefined);
+  }
+  const exactText='é'.repeat(15000);assert.equal(Buffer.byteLength(exactText,'utf8'),30000);
+  const exact={content:[{type:'text',text:exactText}]};
+  assert.deepEqual(JSON.parse(rpcReply('ordinary-text',exact)),{jsonrpc:'2.0',id:'ordinary-text',result:exact});
+  const oversized={content:[{type:'text',text:exactText+'a'}]};assert.equal(Buffer.byteLength(oversized.content[0].text,'utf8'),30001);
+  const text=rpcReply('ordinary-text',oversized),reply=JSON.parse(text);
+  assert.ok(Buffer.byteLength(text,'utf8')<=REPLY_MAX_BYTES);
+  assert.equal(reply.result.isError,true);assert.notEqual(reply.result.content[0].text,oversized.content[0].text);
 });

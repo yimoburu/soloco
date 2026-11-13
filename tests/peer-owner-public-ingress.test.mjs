@@ -14,6 +14,7 @@ import {peerFixture} from './peer-fixture.mjs';
 import {canonical,peerDigest} from '../plugins/soloco/runtime/peers/ledger.mjs';
 import {captureLegacyPinnedTeam,legacySourceId} from '../plugins/soloco/runtime/peers/legacy-origin.mjs';
 import {PACKAGE,VERSION} from '../plugins/soloco/runtime/store.mjs';
+import {CATALOG_MAX_BYTES,REPLY_MAX_BYTES} from '../plugins/soloco/runtime/public-response.mjs';
 
 const ENTRY=fileURLToPath(new URL('../plugins/soloco/runtime/main.mjs',import.meta.url));
 const ROOT='11111111-1111-4111-8111-111111111111';
@@ -118,6 +119,7 @@ function noPrivateQueries(f){assert.deepEqual(f.queries(),[],'No private canonic
 
 test('real tools/list registers exactly one closed company_owner schema without opening private canonical rows',async t=>{
   const f=fixture(t),before=sqlState(f.db),s=await f.start(),reply=await s.request('tools/list',{});
+  assert.equal(REPLY_MAX_BYTES,65536);assert.equal(CATALOG_MAX_BYTES,131072);assert.equal(reply.error,undefined);assert(Buffer.byteLength(JSON.stringify(reply))<=CATALOG_MAX_BYTES);assert.equal(reply.result.tools.length,25);
   const tools=reply.result.tools.filter(tool=>tool.name==='company_owner');assert.equal(tools.length,1);
   const schema=tools[0].inputSchema;assert.equal(schema.additionalProperties,false);assert.equal(schema.properties.input.additionalProperties,false);
   assert.deepEqual(schema.required,['root','session_id','action']);

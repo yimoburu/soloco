@@ -1,3 +1,5 @@
+import * as developmentBudget from '../plugins/soloco/runtime/development-budget-runtime.mjs';
+import {toolCatalogReply} from '../plugins/soloco/runtime/public-response.mjs';
 import {outcomeSchema} from '../plugins/soloco/runtime/outcome.mjs';
 import {peerRuntimeFields} from '../plugins/soloco/runtime/peer-runtime.mjs';
 import {peerAdoptionToolSchema} from '../plugins/soloco/runtime/peer-adoption-runtime.mjs';
@@ -67,6 +69,14 @@ function load(name,deps,names) {
     assert.equal(typeof deps.dataDir,'function','engine VM needs its controlled data helper binding');
     source=source.replace(reexport,'');
   }
+  if(name==='main.mjs'||name==='engine.mjs') {
+    const names=name==='main.mjs'?['DEVELOPMENT_BUDGET_ACTIONS','developmentBudgetInputSchema','isDevelopmentBudgetRequest','validateDevelopmentBudgetRequest']:['isDevelopmentBudgetRequest','validateDevelopmentBudgetRequest','developmentBudgetRuntimeAction'];
+    const binding='import {'+names.join(',')+"} from './development-budget-runtime.mjs';";
+    assert.equal(source.split(binding).length,2,'VM must bind the exact current budget import once');
+    for(const key of names)assert.notEqual(developmentBudget[key],undefined,'Actual budget export must exist: '+key);
+    for(const key of names)assert.equal(deps[key],developmentBudget[key],'VM must use the actual budget export: '+key);
+    if(name==='main.mjs'){assert.equal(typeof toolCatalogReply,'function');assert.equal(deps.toolCatalogReply,toolCatalogReply,'VM must use the actual catalog reply export');}
+  }
   source=source.replace(/^import .*;\r?\n/gm,'');
   const entry=source.indexOf('if(process.argv[1]');
   if(entry>=0)source=source.slice(0,entry);
@@ -91,7 +101,7 @@ function harness(host='claude') {
     if(typeof value!=='string'||!value.trim()||value.length>max)throw new Error('Invalid '+label);
     return value;
   };
-  const deps={outcomeSchema,developmentDeliveryContractSchema,developmentDeliveryTransitionFields,boundedDevelopmentAcceptanceReply,scoped,...coordination,...retentionRepair,operatingMaintenanceEligible,reviewContinuationAssignment,codeReviewWindowSubject,
+  const deps={...developmentBudget,toolCatalogReply,outcomeSchema,developmentDeliveryContractSchema,developmentDeliveryTransitionFields,boundedDevelopmentAcceptanceReply,scoped,...coordination,...retentionRepair,operatingMaintenanceEligible,reviewContinuationAssignment,codeReviewWindowSubject,
     path,os:{homedir:()=>'/unused'},fs:{existsSync:()=>true},
     process:{cwd:()=>process.cwd(),env:{},execPath:'/unused/node',argv:[]},
     PACKAGE:'/unused',VERSION:'fixture',SCHEMA:2,
@@ -148,11 +158,14 @@ function harness(host='claude') {
   };
 }
 
-test('VM main binds the actual exported delivery schemas on both host selection paths',()=>{
+test('VM main binds the actual exported delivery schemas on both host selection paths',async()=>{
   for(const host of ['codex','claude']){
     const h=harness(host),schema=plain(h.main.toolList.find(tool=>tool.name==='company_develop').inputSchema);
     assert.equal(h.main.boundedDevelopmentAcceptanceReply,boundedDevelopmentAcceptanceReply);
     assert.deepEqual(schema.properties.delivery_contract,developmentDeliveryContractSchema);
+    assert.deepEqual(schema.properties.budget_input,plain(developmentBudget.developmentBudgetInputSchema));
+    for(const action of developmentBudget.DEVELOPMENT_BUDGET_ACTIONS)assert(schema.properties.action.enum.includes(action));
+    await assert.rejects(h.main.call('company_develop',{root:'/fixture',session_id:'founder',epoch:1,action:'budget_inspect',budget_input:{},max_bytes:1000},host),error=>error.code==='DEVELOPMENT_BUDGET_REQUEST');
     for(const [name,value]of Object.entries(developmentDeliveryTransitionFields))assert.deepEqual(schema.properties[name],value);
     assert.equal(h.launches.length,0);assert.equal(h.catalogs.length,0);
   }

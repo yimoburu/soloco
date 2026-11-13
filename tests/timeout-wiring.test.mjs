@@ -1,3 +1,4 @@
+import * as developmentBudget from '../plugins/soloco/runtime/development-budget-runtime.mjs';
 import * as reviewContinuation from '../plugins/soloco/runtime/development-review-continuation.mjs';
 import * as retentionRepair from '../plugins/soloco/runtime/development-retention-repair.mjs';
 import * as modelProcessClosure from '../plugins/soloco/runtime/model-process-closure.mjs';
@@ -34,6 +35,14 @@ function load(name,deps,names) {
     assert.equal(typeof deps.dataDir,'function','engine VM needs its controlled data helper binding');
     source=source.replace(reexport,'');
   }
+  if(name==='main.mjs'||name==='engine.mjs') {
+    const names=name==='main.mjs'?['DEVELOPMENT_BUDGET_ACTIONS','developmentBudgetInputSchema','isDevelopmentBudgetRequest','validateDevelopmentBudgetRequest']:['isDevelopmentBudgetRequest','validateDevelopmentBudgetRequest','developmentBudgetRuntimeAction'];
+    const binding='import {'+names.join(',')+"} from './development-budget-runtime.mjs';";
+    assert.equal(source.split(binding).length,2,'VM must bind the exact current budget import once');
+    for(const key of names)assert.notEqual(developmentBudget[key],undefined,'Actual budget export must exist: '+key);
+    for(const key of names)assert.equal(deps[key],developmentBudget[key],'VM must use the actual budget export: '+key);
+    if(name==='main.mjs'){assert.equal(typeof publicResponse.toolCatalogReply,'function');assert.equal(deps.toolCatalogReply,publicResponse.toolCatalogReply,'VM must use the actual catalog reply export');}
+  }
   source=source.replace(/^import .*;\r?\n/gm,'');
   const entry=source.indexOf('if(process.argv[1]');
   if(entry>=0)source=source.slice(0,entry);
@@ -45,7 +54,7 @@ function harness(publicOverrides={}) {
   let matches=true,scope=true,beforeTransaction;
   const intervals=new Set(),launches=[];
   const iso=()=>new Date(now).toISOString();
-  const deps={...reviewContinuation,...retentionRepair,...modelProcessClosure,requestModelProcess:(job,value)=>modelProcessClosure.requestModelProcess(job,structuredClone(value)),outcomeSchema,developmentDeliveryContractSchema,developmentDeliveryTransitionFields,boundedDevelopmentAcceptanceReply,renderDevelopmentReviewContext,Buffer,...scopedStream,scoped:{...scoped},...publicResponse,...coordination,...timeout,path,os:{homedir:()=>'/unused'},fs:{existsSync:()=>true,mkdirSync:()=>{}},process:{cwd:()=>process.cwd(),env:{},pid:42,execPath:'/unused/node',argv:[]},Date:class extends Date {static now(){return now;}},AbortController,
+  const deps={...developmentBudget,...reviewContinuation,...retentionRepair,...modelProcessClosure,requestModelProcess:(job,value)=>modelProcessClosure.requestModelProcess(job,structuredClone(value)),outcomeSchema,developmentDeliveryContractSchema,developmentDeliveryTransitionFields,boundedDevelopmentAcceptanceReply,renderDevelopmentReviewContext,Buffer,...scopedStream,scoped:{...scoped},...publicResponse,...coordination,...timeout,path,os:{homedir:()=>'/unused'},fs:{existsSync:()=>true,mkdirSync:()=>{}},process:{cwd:()=>process.cwd(),env:{},pid:42,execPath:'/unused/node',argv:[]},Date:class extends Date {static now(){return now;}},AbortController,
     PACKAGE:'/unused',VERSION:'test',SCHEMA:2,stamp:iso,id:p=>p+'-'+(++sequence),digest:()=> 'binding',folder:x=>x,noLink:()=>{},
     withStore:(root,fn)=>fn({readSnapshot:fn=>fn(),publicReconciliationState:()=>null,read:()=>structuredClone(state),transaction:(type,change)=>{if(beforeTransaction){const hook=beforeTransaction;beforeTransaction=undefined;hook(type);}const next=change(structuredClone(state));state=structuredClone(next);return structuredClone(state);}}),
     owner:(s,session,host,epoch)=>{if(s.owner.session_id!==session || s.owner.host!==host || (epoch!==undefined && s.owner.epoch!==epoch))throw new Error('Stale owner');},
@@ -81,6 +90,9 @@ const spawnAt=(h,options,limit,reason)=>options.onSpawn(timeout.executionTiming(
 test('VM main uses the actual exported delivery schemas alongside timeout policy',async()=>{
   const h=harness(),schema=h.main.toolList.find(t=>t.name==='company_develop').inputSchema;
   assert.equal(h.main.boundedDevelopmentAcceptanceReply,boundedDevelopmentAcceptanceReply);
+  assert.equal(JSON.stringify(schema.properties.budget_input),JSON.stringify(developmentBudget.developmentBudgetInputSchema));
+  for(const action of developmentBudget.DEVELOPMENT_BUDGET_ACTIONS)assert(schema.properties.action.enum.includes(action));
+  await assert.rejects(h.main.call('company_develop',{root:'/fixture',session_id:'founder',epoch:1,action:'budget_inspect',budget_input:{},max_bytes:1000},'codex'),error=>error.code==='DEVELOPMENT_BUDGET_REQUEST');
   assert.equal(JSON.stringify(schema.properties.delivery_contract),JSON.stringify(developmentDeliveryContractSchema));
   for(const [name,value]of Object.entries(developmentDeliveryTransitionFields))assert.equal(JSON.stringify(schema.properties[name]),JSON.stringify(value));
   assert.equal(schema.properties.timeout_ms.maximum,120000);

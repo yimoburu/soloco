@@ -1,5 +1,5 @@
 import {outcomeSchema} from './outcome.mjs';
-import { controlView, publicPage, doctorView, fits, toolResult, rpcReply } from './public-response.mjs';
+import { controlView, publicPage, doctorView, fits, toolResult, rpcReply, toolCatalogReply } from './public-response.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
@@ -266,7 +266,10 @@ async function serve(host) {
       let result;
       if(req.method==='initialize') result={protocolVersion:'2024-11-05',capabilities:{tools:{}},serverInfo:{name:'company',version:VERSION}};
       else if(req.method==='ping') result={};
-      else if(req.method==='tools/list') result={tools:toolListFor()};
+      else if(req.method==='tools/list') {
+        process.stdout.write(toolCatalogReply(req.id,toolListFor())+'\n');
+        continue;
+      }
       else if(req.method==='tools/call') {
         try {result=toolResult(await runWithMcpHostContext(host,req.params?._meta,()=>call(req.params.name,req.params.arguments??{},host)));}
         catch(error) {result=toolError(error);}

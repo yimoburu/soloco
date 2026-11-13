@@ -237,8 +237,14 @@ work and load all pending notice pages and exact summaries. Hook delivery does
 not acknowledge or resolve a notice. Existing companies retain pinned role
 instructions; this transport update grants no substitute role behavior.
 
-Model text is limited to 30,000 UTF-8 bytes and complete JSON-RPC replies to
-65,536 bytes, including JSON escaping. Exact reads may return a shorter range;
+Company tool results retain a 30,000-byte UTF-8 model-text limit and a
+65,536-byte complete JSON-RPC body limit, including JSON escaping. Only the
+server-owned `tools/list` descriptor catalog uses a separate 131,072-byte
+JSON-RPC body limit; the terminating newline is separate. Both routes retain
+the 258-byte serialized request-ID bound. An oversized catalog returns a
+bounded JSON-RPC error without a partial catalog. These descriptor limits
+grant no additional authority or company-data capacity.
+Exact reads may return a shorter range;
 follow `next_offset` until complete. Upgrade inspection preserves candidate hash,
 epoch and measured workload, with exact instruction sources. Oversized mutation
 results preserve attributable receipts and retrieval handles: a large response
