@@ -38,6 +38,19 @@ const inputSchemas={
 function freeze(value){if(value&&typeof value==='object'){for(const child of Object.values(value))freeze(child);Object.freeze(value);}return value;}
 export const developmentBudgetInputSchema=freeze({oneOf:Object.values(inputSchemas)});
 
+// Inspect the action descriptor without executing caller-supplied JavaScript.
+// MCP JSON cannot express these shapes, but direct Source callers must not run
+// a getter/proxy trap merely to select the new privileged routing branch.
+export function isDevelopmentBudgetRequest(args){
+  need(args!==null&&typeof args==='object','Expected a plain request');
+  need(!types.isProxy(args),'Proxy requests are unsupported');
+  need(!Array.isArray(args)&&[Object.prototype,null].includes(Object.getPrototypeOf(args)),'Expected a plain request');
+  const action=Object.getOwnPropertyDescriptor(args,'action');
+  if(action===undefined)return false;
+  need(action.enumerable&&Object.hasOwn(action,'value'),'Action must be an enumerable DATA field');
+  return DEVELOPMENT_BUDGET_ACTIONS.includes(action.value);
+}
+
 function fields(value,allowed,required=allowed){
   need(value&&typeof value==='object'&&!types.isProxy(value)&&!Array.isArray(value)&&[Object.prototype,null].includes(Object.getPrototypeOf(value)),'Expected a closed plain DATA object');
   const out={};

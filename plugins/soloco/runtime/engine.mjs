@@ -27,7 +27,7 @@ import {progressObservations} from './progress-observations.mjs';
 import { beginHandover, submitReconstruction, handoverReviewEligible, freshHandoverReviewEligible, verifyHandoverAcceptance, handoverSubject, inspectHandover, reconstructionReceipt, admitHandover } from './handover.mjs';
 import { assignmentContext, contextMatches } from './context.mjs';
 import { developmentAction, developmentCapability, developmentAssignment } from './develop.mjs';
-import {DEVELOPMENT_BUDGET_ACTIONS,validateDevelopmentBudgetRequest,developmentBudgetRuntimeAction} from './development-budget-runtime.mjs';
+import {isDevelopmentBudgetRequest,validateDevelopmentBudgetRequest,developmentBudgetRuntimeAction} from './development-budget-runtime.mjs';
 import { prototypeAction, prototypeCapability, prototypeAssignment } from './prototype.mjs';
 import { TIMEOUT_POLICY_VERSION, normalizeTimeout, normalizeHandoverReviewWindow, normalizeCodeReviewWindow, jobTimeoutState } from './timeout.mjs';
 import {taskAction,runtimeAction} from './task-runtime.mjs';
@@ -107,7 +107,7 @@ export function inspectionPage(args,host,collection) {
   binding(args,host);return withStore(args.root,db=>db.readSnapshot(()=>publicPage(db.publicState(),{collection})));
 }
 export function develop(args,host) {
-  if(DEVELOPMENT_BUDGET_ACTIONS.includes(args?.action)) {
+  if(isDevelopmentBudgetRequest(args)) {
     const checked=validateDevelopmentBudgetRequest(args);
     const actor=peerCallerActor(checked,host);
     return developmentBudgetRuntimeAction(checked,actor);

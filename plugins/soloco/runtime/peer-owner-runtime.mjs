@@ -124,7 +124,12 @@ function pinned(where){
    if(!directory){need(typeof actual.ctimeNs==='bigint'&&typeof actual.mtimeNs==='bigint','OWNER_STORAGE_UNSUPPORTED');sourceFile={fd,before:actual};}
   }
   stable(where);return {fds,sourceFile,rootDirectory};
- }catch(error){for(const fd of fds.reverse())try{fs.closeSync(fd);}catch{}throw error;}
+ }catch(error){
+  const cleanup=[];
+  for(const fd of fds.reverse())try{fs.closeSync(fd);}catch(failure){cleanup.push(failure);}
+  if(cleanup.length)throw new AggregateError([error,...cleanup],'Storage pin acquisition and descriptor cleanup failed',{cause:error});
+  throw error;
+ }
 }
 function openedOriginalFile(pin){
  // Retaining the original fd plus a restored pathname is insufficient: A can
@@ -155,7 +160,8 @@ function layout(db){
  need((version===null||[1,2,3,4].includes(version))&&names.has('company')&&names.has('events'),'OWNER_STORAGE_LAYOUT');return 'legacy';
 }
 function storagePreflight(root){
- const where=location(root);if(!where)return null;const pin=pinned(where);let db;
+ const where=location(root);if(!where)return null;const pin=pinned(where);let db,result,failure,failed=false;
+ const cleanup=[];
  try{
   stable(where);db=new DatabaseSync(where.file,{readOnly:true});stable(where);openedOriginalFile(pin);
   const actual=db.prepare('PRAGMA database_list').all().find(r=>r.name==='main');need(actual?.file&&fs.realpathSync(actual.file)===where.file,'OWNER_STORAGE_CHANGED');
@@ -163,8 +169,16 @@ function storagePreflight(root){
   // open/status and startup hooks use it before any actual caller is known.
   // Canonical peer rows and P1 proof reads belong after HOST authentication.
   const kind=layout(db);
-  stable(where);return {where,kind};
- }finally{db?.close();for(const fd of pin.fds.reverse())fs.closeSync(fd);}
+  stable(where);result={where,kind};
+ }catch(error){failed=true;failure=error;}
+ finally{
+  for(const close of [()=>db?.close(),...pin.fds.reverse().map(fd=>()=>fs.closeSync(fd))]){
+   try{close();}catch(error){cleanup.push(error);}
+  }
+ }
+ if(failed){if(cleanup.length)throw new AggregateError([failure,...cleanup],'Storage preflight and cleanup failed',{cause:failure});throw failure;}
+ if(cleanup.length)throw cleanup.length===1?cleanup[0]:new AggregateError(cleanup,'Storage preflight cleanup failed');
+ return result;
 }
 export function peerOwnerStorageKind(root){
  need(text(root,4000)&&path.isAbsolute(root),'OWNER_STORAGE_INPUT');

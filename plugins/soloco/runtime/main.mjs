@@ -10,7 +10,7 @@ import { hooks } from './hooks.mjs';
 import { upgrade, upgradeGuidance } from './upgrade.mjs';
 import { developmentCapability } from './develop.mjs';
 import { developmentLimits } from './development-limits.mjs';
-import {DEVELOPMENT_BUDGET_ACTIONS,developmentBudgetInputSchema,validateDevelopmentBudgetRequest} from './development-budget-runtime.mjs';
+import {DEVELOPMENT_BUDGET_ACTIONS,developmentBudgetInputSchema,isDevelopmentBudgetRequest,validateDevelopmentBudgetRequest} from './development-budget-runtime.mjs';
 import { normalizeTestFixture } from './test-fixtures.mjs';
 import { prototypeCapability } from './prototype.mjs';
 import { MIN_EXECUTION_TIMEOUT_MS, MAX_EXECUTION_TIMEOUT_MS } from './timeout.mjs';
@@ -91,7 +91,7 @@ export async function call(name,args,host) {
   if(!args || typeof args!=='object' || Array.isArray(args))throw new Error('Tool arguments must be an object');
   // Close budget DATA before legacy max_bytes validation can read a config.
   // Actual HOST/current-hook identity is then captured by engine.develop.
-  if(name==='company_develop'&&DEVELOPMENT_BUDGET_ACTIONS.includes(args.action))args=validateDevelopmentBudgetRequest(args);
+  if(name==='company_develop'&&isDevelopmentBudgetRequest(args))args=validateDevelopmentBudgetRequest(args);
   for(const key of Object.keys(args))if(!Object.hasOwn(def[2],key))throw new Error(`Unknown argument: ${key}`);
   for(const key of def[3])if(args[key]===undefined)throw new Error(`Missing argument: ${key}`);
   for(const [key,value] of Object.entries(args)) {

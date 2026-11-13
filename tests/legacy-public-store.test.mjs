@@ -258,3 +258,97 @@ test('escaped cached public reader callbacks are revoked before SQL or cache acc
     assert.equal(sqlCalls,0,'Revocation precedes native reads as well as warmed-cache access');
   }finally{DatabaseSync.prototype.prepare=prepare;db.close();}
 });
+
+test('readonly preflight preserves provider failure and attempts every DB/FD cleanup even when closing also fails',async t=>{
+  const scenarios=[
+    {primary:Object.assign(Error('SYNTHETIC preflight EIO'),{code:'EIO'}),dbFailure:false,fdFailure:false},
+    {primary:new AggregateError([Error('member')],'SYNTHETIC preflight provider group',{cause:Error('provider cause')}),dbFailure:false,fdFailure:false},
+    {primary:Object.assign(Error('SYNTHETIC preflight EIO'),{code:'EIO'}),dbFailure:true,fdFailure:false},
+    {primary:new AggregateError([Error('member')],'SYNTHETIC preflight provider group',{cause:Error('provider cause')}),dbFailure:true,fdFailure:false},
+    {primary:Object.assign(Error('SYNTHETIC preflight EIO'),{code:'EIO'}),dbFailure:true,fdFailure:true},
+    {primary:null,dbFailure:true,fdFailure:false},
+    {primary:null,dbFailure:true,fdFailure:true}
+  ];
+  for(const scenario of scenarios){
+    const f=fixture(t),before=sql(f.file),selected=new Set([f.root,path.dirname(f.file),f.file]),acquired=[],attempted=[];
+    const prepare=DatabaseSync.prototype.prepare,closeDb=DatabaseSync.prototype.close,openFd=fs.openSync,closeFd=fs.closeSync;
+    const dbError=Object.assign(Error('SYNTHETIC preflight DB close EIO'),{code:'EIO'}),fdError=Object.assign(Error('SYNTHETIC preflight FD close EIO'),{code:'EIO'});
+    let originalDb,preflightCalls=0,dbCloses=0,fdFailures=0,callbacks=0;
+    DatabaseSync.prototype.prepare=function(query,...args){
+      if(query==='PRAGMA database_list'){
+        preflightCalls++;originalDb=this;
+        if(scenario.primary)throw scenario.primary;
+      }
+      return Reflect.apply(prepare,this,[query,...args]);
+    };
+    DatabaseSync.prototype.close=function(...args){
+      const result=Reflect.apply(closeDb,this,args);
+      if(this===originalDb){dbCloses++;if(scenario.dbFailure)throw dbError;}
+      return result;
+    };
+    fs.openSync=function(file,...args){const fd=Reflect.apply(openFd,this,[file,...args]);if(selected.has(String(file)))acquired.push(fd);return fd;};
+    fs.closeSync=function(fd,...args){
+      if(acquired.includes(fd))attempted.push(fd);
+      const result=Reflect.apply(closeFd,this,[fd,...args]);
+      // Close the actual fixture descriptor before simulating acknowledgement
+      // failure. Remaining original descriptors must still receive an attempt.
+      if(acquired.includes(fd)&&scenario.fdFailure&&fdFailures++===0)throw fdError;
+      return result;
+    };
+    try{
+      await assert.rejects(withLegacyPublicStore(f.root,()=>{callbacks++;}),error=>{
+        const cleanup=[...(scenario.dbFailure?[dbError]:[]),...(scenario.fdFailure?[fdError]:[])];
+        if(scenario.primary&&cleanup.length){
+          assert.ok(error instanceof AggregateError);assert.strictEqual(error.cause,scenario.primary);assert.deepEqual(error.errors,[scenario.primary,...cleanup]);
+        }else if(scenario.primary)assert.strictEqual(error,scenario.primary);
+        else if(cleanup.length===1)assert.strictEqual(error,cleanup[0]);
+        else {assert.ok(error instanceof AggregateError);assert.equal(error.cause,undefined);assert.deepEqual(error.errors,cleanup);}
+        return true;
+      });
+      assert.equal(preflightCalls,1,'No alternate diagnosis or opener is attempted');assert.equal(callbacks,0);assert.equal(dbCloses,1);
+      assert.equal(acquired.length,3);assert.deepEqual(attempted,[...acquired].reverse());
+      for(const fd of acquired)assert.throws(()=>fs.fstatSync(fd),{code:'EBADF'});
+      assert.throws(()=>Reflect.apply(prepare,originalDb,['SELECT 1']),/not open|closed/i);
+    }finally{
+      DatabaseSync.prototype.prepare=prepare;DatabaseSync.prototype.close=closeDb;fs.openSync=openFd;fs.closeSync=closeFd;
+      // Keep a deliberately broken preimage from leaking fixture FDs when an
+      // assertion detects that its production finally skipped their cleanup.
+      for(const fd of acquired)try{closeFd(fd);}catch(error){if(error.code!=='EBADF')throw error;}
+    }
+    assert.equal(sql(f.file),before,'Preflight failures may not change SQL rows, schema or events');
+  }
+});
+
+test('partial pin acquisition retains its original open error and all descriptor-close failures',async t=>{
+  for(const grouped of [false,true])for(const failClosing of [false,true]){
+    const f=fixture(t),before=sql(f.file),selected=new Set([f.root,path.dirname(f.file)]),acquired=[],attempted=[],cleanup=[];
+    const openFd=fs.openSync,closeFd=fs.closeSync,prepare=DatabaseSync.prototype.prepare;
+    const original=grouped?new AggregateError([Error('member')],'SYNTHETIC partial-pin provider group',{cause:Error('provider cause')}):Object.assign(Error('SYNTHETIC partial-pin open EIO'),{code:'EIO'});
+    let opens=0,sqlCalls=0,callbacks=0;
+    fs.openSync=function(file,...args){
+      if(String(file)===f.file){opens++;throw original;}
+      const fd=Reflect.apply(openFd,this,[file,...args]);if(selected.has(String(file)))acquired.push(fd);return fd;
+    };
+    fs.closeSync=function(fd,...args){
+      if(acquired.includes(fd))attempted.push(fd);
+      const result=Reflect.apply(closeFd,this,[fd,...args]);
+      if(acquired.includes(fd)&&failClosing){const error=Object.assign(Error('SYNTHETIC partial-pin FD close EIO'),{code:'EIO'});cleanup.push(error);throw error;}
+      return result;
+    };
+    DatabaseSync.prototype.prepare=function(...args){sqlCalls++;return Reflect.apply(prepare,this,args);};
+    try{
+      await assert.rejects(withLegacyPublicStore(f.root,()=>{callbacks++;}),error=>{
+        if(failClosing){assert.ok(error instanceof AggregateError);assert.strictEqual(error.cause,original);assert.equal(cleanup.length,2);assert.deepEqual(error.errors,[original,...cleanup]);}
+        else assert.strictEqual(error,original);
+        return true;
+      });
+      assert.equal(opens,1);assert.equal(sqlCalls,0,'No database may open after failed original pin acquisition');assert.equal(callbacks,0);
+      assert.equal(acquired.length,2);assert.deepEqual(attempted,[...acquired].reverse());
+      for(const fd of acquired)assert.throws(()=>fs.fstatSync(fd),{code:'EBADF'});
+    }finally{
+      fs.openSync=openFd;fs.closeSync=closeFd;DatabaseSync.prototype.prepare=prepare;
+      for(const fd of acquired)try{closeFd(fd);}catch(error){if(error.code!=='EBADF')throw error;}
+    }
+    assert.equal(sql(f.file),before,'Partial pin failure must preserve SQL rows, schema and events');
+  }
+});

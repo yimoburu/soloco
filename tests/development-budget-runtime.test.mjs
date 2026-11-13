@@ -89,6 +89,19 @@ test('missing or descendant HOST metadata and closed-argument violations cannot 
   assert.equal(reads,0);undo();assert.equal(f.read()[KEY],undefined);
 });
 
+test('MCP and direct engine classify action DATA without invoking getters or Proxy traps',async t=>{
+  const f=fixture(t);let invoked=0,reads=0;
+  const undo=patch(t,fs,'lstatSync',()=>()=>{reads++;throw Error('Classification attempted filesystem access');});
+  try{
+    const getter=f.args('budget_inspect');Object.defineProperty(getter,'action',{enumerable:true,get(){invoked++;return 'budget_inspect';}});
+    const proxy=new Proxy(f.args('budget_inspect'),{get(){invoked++;throw Error('Proxy.get invoked');},getOwnPropertyDescriptor(){invoked++;throw Error('Proxy descriptor trap invoked');},ownKeys(){invoked++;throw Error('Proxy.ownKeys invoked');}});
+    for(const args of [getter,proxy])for(const invoke of [value=>call('company_develop',value,'codex'),value=>engine.develop(value,'codex')]){
+      await assert.rejects(async()=>invoke(args),code('DEVELOPMENT_BUDGET_REQUEST'));
+    }
+    assert.equal(invoked,0);assert.equal(reads,0);
+  }finally{undo();}
+});
+
 test('public controls retain current-hook, canonical owner and current epoch checks',async t=>{
   const f=fixture(t),before=f.read(),original=fs.readFileSync(f.binding);
   fs.writeFileSync(f.binding,JSON.stringify({...JSON.parse(original),plugin_version:'0.0.0'}));
@@ -124,6 +137,32 @@ test('public lowering preserves the original consumed grant and triggers its ori
   const state=f.read();assert.deepEqual(state.records.plan,original);
   assert.throws(()=>developmentAssignment(state,{id:'original-consumed',development_id:'plan',role:'engineer'},false,f.root),/ceiling was lowered/);
   await f.publicCall('budget_restore',{applied_ref:setting.operation_ref,expected_config:setting.configuration,source_instruction:INSTRUCTION});assert.deepEqual(f.read().records.plan,original);
+});
+
+test('public reconciliation observes a prepared COMMIT acknowledgement loss without repeating a file action',async t=>{
+  const f=fixture(t),before=f.read(),inspected=await f.publicCall('budget_inspect');
+  const proposal=await f.publicCall('budget_propose',{max_bytes_ceiling:400000,expected_config:inspected.configuration,source_instruction:INSTRUCTION,restoration_policy:POLICY});
+  let armed=false,injected=false;
+  const undoTransaction=patch(t,Store.prototype,'selectedTransaction',original=>function(type,...args){
+    if(type!=='development.budget.prepare')return Reflect.apply(original,this,[type,...args]);
+    armed=true;try{return Reflect.apply(original,this,[type,...args]);}finally{armed=false;}
+  });
+  const undoExec=patch(t,DatabaseSync.prototype,'exec',original=>function(sql,...args){
+    const returned=Reflect.apply(original,this,[sql,...args]);
+    if(armed&&!injected&&sql.trim().toUpperCase()==='COMMIT'){injected=true;throw Object.assign(Error('Fictional acknowledgement loss after actual SQLite COMMIT'),{code:'EIO'});}
+    return returned;
+  });
+  let uncertain;
+  try{uncertain=await f.publicCall('budget_apply',{proposal_ref:proposal.proposal_ref,source_instruction:INSTRUCTION});}
+  finally{undoExec();undoTransaction();}
+  assert.equal(injected,true);assert.equal(uncertain.status,'held');assert.equal(uncertain.code,'DEVELOPMENT_BUDGET_OUTCOME_UNCERTAIN');
+  assert.equal(uncertain.original_call_success_inferred,false);assert.equal(fs.existsSync(f.config),false);
+  const current=await f.publicCall('budget_inspect');assert.ok(current.active_intent);
+  const reconciled=await f.publicCall('budget_reconcile',{intent_ref:current.active_intent,source_instruction:INSTRUCTION});
+  assert.equal(reconciled.status,'reconciled');assert.equal(reconciled.observed_outcome,'not_applied');
+  assert.equal(reconciled.repeated_file_action,false);assert.equal(reconciled.original_call_success_inferred,false);
+  assert.equal((await f.publicCall('budget_inspect')).active_intent,null);assert.equal(fs.existsSync(f.config),false);
+  assert.deepEqual(withoutAudit(f.read()),withoutAudit(before));assert.equal(uncertain.status,'held','Reconciliation never regrades the failed original call');
 });
 
 test('layout5 never falls back into legacy budget storage or receives legacy tables',async t=>{
