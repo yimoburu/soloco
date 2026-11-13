@@ -2,9 +2,9 @@ import {SchedulingHold,taskRecovery} from './recovery.mjs';
 // Ordinary async-task working context. This is a derived view of canonical
 // records, not an applicability classifier, acceptance receipt or authority.
 import {digest,owner,upgradePending} from './store.mjs';
-import {recordReference,contextSource,currentRecords,currentExtensions,reviewedContext,mandatoryExecutionEvidence,currentExecutionEvidence,proofJobSafe} from './current-state.mjs';
+import {recordReference,contextSource,currentRecords,currentExtensions,reviewedContext,mandatoryExecutionEvidence,currentExecutionEvidence,proofJobSafe,projectedNoticeContext} from './current-state.mjs';
 import {hasSnapshotReferences,inheritSnapshots} from './snapshot.mjs';
-import {validateTaskRecord,isTaskBookkeeping,isTaskScopedMessage,isTaskOutput,isTaskOwnOutput,taskMessageInput,taskDefinitionHash} from './tasks.mjs';
+import {validateTaskRecord,isTaskBookkeeping,isTaskScopedMessage,isTaskOutput,isTaskOwnOutput,taskMessageInput,taskDefinitionHash,taskContextFormat,PRESERVED_NOTICE_TASK_CONTEXT} from './tasks.mjs';
 import {runtimeControlBinding,isRuntimeBookkeeping} from './task-runtime-authority.mjs';
 import {bindCoordination} from './coordination.mjs';
 import {normalizeTimeout} from './timeout.mjs';
@@ -32,8 +32,9 @@ function runtimeUsageSafe(value){
 // envelope. Unknown fields, failures, stale outputs and legacy jobs are evidence.
 function runtimeJobBookkeeping(state,job,currentJob){
   try{
-    if(state.jobs?.[job.id]!==job||!['queued','running','completed'].includes(job.status)||job.context_format!==7||!only(job.runtime_task,['id','definition_revision','definition_sha256'])||Object.keys(job.runtime_task).length!==3)return false;
+    if(state.jobs?.[job.id]!==job||!['queued','running','completed'].includes(job.status)||![7,8].includes(job.context_format)||!only(job.runtime_task,['id','definition_revision','definition_sha256'])||Object.keys(job.runtime_task).length!==3)return false;
     const record=canonicalTask(state,job.runtime_task.id),task=record.runtime_task,attempt=task.attempts[0],control=runtimeControlBinding(state);
+    if(job.context_format!==taskContextFormat(task.spec))return false;
     if(!equal(task.owner,state.owner)||!attempt||task.attempts.length!==1||attempt.job_id!==job.id||attempt.instance_id!==job.instance_id||attempt.definition_revision!==task.definition_revision||attempt.definition_sha256!==task.definition_sha256||!equal(job.runtime_task,taskDefinitionBinding(record)))return false;
     if(job.host!==task.owner.host||job.epoch!==task.owner.epoch||job.role!==task.spec.role||job.task!==task.spec.task||job.context_scope!==task.spec.context_scope||job.expected_deliverable!==task.spec.expected_deliverable||job.task_summary!==task.spec.expected_deliverable||job.next_handoff!=='Runtime validates the exact result and wakes eligible dependent tasks'||job.session_key!==job.role+':async:'+job.id)return false;
     if(!equal(job.requester,{role:'runtime',instance_id:control.instance_id,task_id:record.id,owner_epoch:task.owner.epoch})||!/^[a-f0-9]{64}$/.test(job.context_sha256??''))return false;
@@ -89,6 +90,7 @@ function taskForJob(state,job){
   const binding=job.runtime_task;
   if(!binding||typeof binding.id!=='string'||Object.keys(binding).some(k=>!['version','id','definition_revision','definition_sha256'].includes(k))||(binding.version!==undefined&&binding.version!==1))fail('runtime task binding required');
   const record=canonicalTask(state,binding.id),task=record.runtime_task;
+  if(job.context_format!==taskContextFormat(task.spec))fail('job context protocol differs from the immutable task definition');
   if(binding.definition_revision!==task.definition_revision||binding.definition_sha256!==task.definition_sha256)fail('task definition superseded');
   if(!equal(task.owner,state.owner)||job.epoch!==undefined&&job.epoch!==state.owner.epoch||job.host!==undefined&&job.host!==task.owner.host)fail('task owner epoch or host changed');
   if(job.role!==task.spec.role||job.task!==task.spec.task||(job.context_scope??'*')!==(task.spec.context_scope??'*'))fail('assignment does not match task definition');
@@ -206,17 +208,31 @@ function peerTargets(state,task){
 function assignmentPacket(state,job,record){
   const task=record.runtime_task;
   verifySupplemental(state,job);
-  const source=requiredSources(state,job),extensions=currentExtensions(state);
+  // V2 selects sources and notice homes from one identical input view. Own
+  // published outputs are excluded as outputs, never as new input authority.
+  const noticeState=inheritSnapshots(state,{...state,notices:(state.notices??[]).filter(n=>job.id===null||n.job_id!==job.id)});
+  const inputState=taskContextFormat(task.spec)===8?noticeState:state;
+  const source=requiredSources(inputState,job),extensions=currentExtensions(inputState);
   if(hasSnapshotReferences(extensions))fail('unknown referenced state extension requires qualification');
-  const notices=(state.notices??[]).filter(n=>job.id===null||n.job_id!==job.id).map(({deliveries,seen_at,...n})=>n);
+  const preserved=taskContextFormat(task.spec)===8?projectedNoticeContext(noticeState):null;
+  const notices=preserved?preserved.notices:noticeState.notices.map(({deliveries,seen_at,...n})=>n);
+  if(preserved){
+    // A reference is provenance only. Every substituted home's complete exact
+    // body must be in this same delivery, never available merely by later read.
+    const delivered=[...source.records,...source.execution];
+    for(const representation of preserved.representations)for(const home of representation.homes){
+      if(!delivered.some(entry=>equal(entry.source,home)&&sha(entry.value)===home.sha256))fail('represented notice home is not completely delivered: '+home.id);
+    }
+  }
   const messages=(state.messages??[]).filter(m=>m.to===job.role&&(job.id===null||m.job_id!==job.id));
   const packet={
-    protocol:TASK_CONTEXT_PROTOCOL,controls:controls(state),runtime:runtimeControlBinding(state),governance:state.governance,charter:state.roles[job.role],
+    protocol:preserved?PRESERVED_NOTICE_TASK_CONTEXT:TASK_CONTEXT_PROTOCOL,controls:controls(state),runtime:runtimeControlBinding(state),governance:state.governance,charter:state.roles[job.role],
     ...(job.specialist?{specialist:specialistContext(state,job)}:{}),
     task:{source:taskDefinitionBinding(record),owner:task.owner,spec:task.spec},
     peer_targets:peerTargets(state,task),
     assignment:{job_id:job.id??null,instance_id:job.instance_id??null,requester:job.requester??null,role:job.role,task:job.task,context_scope:task.spec.context_scope??'*',review_of:job.review_of??null,coordination:job.coordination??null,model_selection:job.model_selection??{mode:'default'}},
     records:source.records,producer_tasks:source.producer_tasks,producer_evidence:source.producer_evidence,mandatory_execution_evidence:source.execution,notices,messages,
+    ...(preserved?{notice_representations:preserved.representations}:{}),
     ...(Object.keys(extensions).length?{state_extensions:extensions}:{}),
     coverage:{contract:'conservative-current-records-v1',complete_for_declared_inputs:true,scope:task.spec.context_scope??'*',source_membership_sha256:sha({records:source.records.map(r=>r.source),execution:source.execution.map(r=>r.source)}),
       historical_meaning:'Original history remains retained. This task packet grants neither semantic classification of omitted history nor acceptance or permission.'},
@@ -226,7 +242,8 @@ function assignmentPacket(state,job,record){
 }
 
 export function taskAssignmentContext(state,job,{budget}={}){
-  const limit=checkBudget(budget,TASK_CONTEXT_BUDGET),record=taskForJob(state,job);
+  const record=taskForJob(state,job),requested=checkBudget(budget,TASK_CONTEXT_BUDGET);
+  const limit=taskContextFormat(record.runtime_task.spec)===8?Math.min(requested,TASK_CONTEXT_BUDGET):requested;
   const {packet,source}=assignmentPacket(state,job,record),text=JSON.stringify(packet),size=bytes(text);
   if(size>limit)throw new SchedulingHold('CONTEXT_CAPACITY',`Task context Held: required coherent packet exceeds ${limit} UTF-8bytes (actual ${size}); coverage incomplete; widen retrieval or split the task; nothing was truncated`);
   // Only already delivered bodies whose exact source still resolves can be
@@ -312,7 +329,7 @@ export function taskCapacityContext(state,{task_id,limit=12,cursor}={}){
   const text=JSON.stringify(packet),{fields,sources}=capacityEntries(state,packet),entries=[...fields,...sources];
   const subject={kind:'new-prospective-diagnostic',envelope:'source-owned-nonexecuting-v1',task_source:recordReference(record),task_definition:taskDefinitionBinding(record),
     owner:state.owner,controls_sha256:sha(packet.controls),source_membership_sha256:packet.coverage.source_membership_sha256};
-  const measurement={representation:'format7-JSON.stringify-nonexecuting-packet',packet_sha256:digest(text),context_utf8_bytes:bytes(text),context_utf16_characters:text.length,
+  const measurement={representation:`format${taskContextFormat(record.runtime_task.spec)}-JSON.stringify-nonexecuting-packet`,packet_sha256:digest(text),context_utf8_bytes:bytes(text),context_utf16_characters:text.length,
     task_budget_bytes:TASK_CONTEXT_BUDGET,semantic_classification:'NOT_ASSERTED',admission_or_readiness:'NOT_ASSERTED',
     wire_scope:'Current nonexecuting context JSON only. Null job/instance/requester/coordination differ from an actual admission. Future RPC/model framing, provider context and physical fit are not measured. Not the historical failed packet. Source bytes are serialized JSON, not original storage bytes; field and source contributions overlap. Repeated-value counts are not semantic exclusion or achievable pool savings.'};
   const cut=sha({subject,measurement,entries_sha256:sha(entries)}),offset=capacityOffset(cursor,cut,entries.length);

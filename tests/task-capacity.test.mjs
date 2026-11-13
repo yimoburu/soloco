@@ -45,7 +45,7 @@ function fixture(){
   const record=makeTask(s,'one');return {s,id:record.id};
 }
 function makeTask(s,operation_id,extra={}){return submitTask(s,{...args,operation_id,spec:{role:'engineer',task:'Assess the fictional input.',acceptance:'Preserve every unresolved condition.',expected_deliverable:'A fictional assessment',input_ids:['input'],model_selection:{mode:'default',reason:'Fictional source check; no provider selection.'},...extra}},'codex');}
-function previewJob(s,id){const record=s.records[id],spec=record.runtime_task.spec;return {id:null,instance_id:null,requester:null,role:spec.role,task:spec.task,context_scope:spec.context_scope,inputs:spec.input_ids.map(key=>({id:key,revision:s.records[key].revision??null})),review_of:null,coordination:null,model_selection:spec.model_selection,runtime_task:taskDefinitionBinding(record),supplemental_sources:[]};}
+function previewJob(s,id){const record=s.records[id],spec=record.runtime_task.spec;return {id:null,instance_id:null,requester:null,context_format:7,role:spec.role,task:spec.task,context_scope:spec.context_scope,inputs:spec.input_ids.map(key=>({id:key,revision:s.records[key].revision??null})),review_of:null,coordination:null,model_selection:spec.model_selection,runtime_task:taskDefinitionBinding(record),supplemental_sources:[]};}
 function collect(s,id,limit=3){
   const pages=[],items=[];let cursor;
   do{const page=taskCapacityContext(s,{task_id:id,limit,...(cursor?{cursor}:{})});

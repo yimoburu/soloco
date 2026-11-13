@@ -13,6 +13,7 @@ import {prepareOriginalSelectedContextDeployment,inspectOriginalSelectedContextD
 const REPO=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const SOURCE=path.join(REPO,'plugins/soloco/runtime/peers/context-component-deployment.mjs');
 const COMPONENT=pathToFileURL(path.join(REPO,'plugins/soloco/runtime/peers/context-build-component.mjs')).href;
+const LAYOUT=pathToFileURL(path.join(REPO,'plugins/soloco/runtime/peers/context-component-layout.mjs')).href;
 const code=expected=>error=>error?.code===expected;
 const sha=bytes=>createHash('sha256').update(bytes).digest('hex');
 const reference=bytes=>({bytes:bytes.length,sha256:sha(bytes)});
@@ -21,9 +22,9 @@ const ACCESS='\nexport const __syntheticFsDeploymentTestAccess=Object.freeze({re
 async function fixture(t){
   const root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'soloco-deployment-byte-test-')));
   const original=fs.readFileSync(SOURCE),modulePath=path.join(root,'deployment-under-test.mjs');
-  // Preserve production exactly except for resolving its one relative import
-  // from this moved TEST COPY and appending private byte-helper access.
-  const text=original.toString('utf8').replace("'./context-build-component.mjs'",JSON.stringify(COMPONENT));
+  // Preserve production exactly except for resolving its two fixed relative
+  // imports from this moved TEST COPY and appending private byte-helper access.
+  const text=original.toString('utf8').replace("'./context-build-component.mjs'",JSON.stringify(COMPONENT)).replace("'./context-component-layout.mjs'",JSON.stringify(LAYOUT));
   fs.writeFileSync(modulePath,text+ACCESS,{mode:0o444});
   const api=(await import(pathToFileURL(modulePath).href)).__syntheticFsDeploymentTestAccess;
   t.after(()=>{

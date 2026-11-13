@@ -7,6 +7,7 @@ import {validateSpecialistBindingShape} from './specialists.mjs';
 import {snapshotReference,resolveSnapshot,resolveSnapshotEntry,hasSnapshotReferences,legacyHandoverSource,inheritSnapshots} from './snapshot.mjs';
 import {buildQualificationEvidence,knownModelCatalog} from './upgrade-evidence.mjs';
 import {validateQualificationExclusion,QUALIFICATION_PROTOCOL} from './context-qualification.mjs';
+import {NOTICE_SOURCES,isNoticeSourceId,isCanonicalNoticeSource,noticeSource,noticeSourceEntries,projectNotice} from './notice-sources.mjs';
 const fields=['id','kind','author_role','recorded_by','content','status','action','previous_name','name','created_at'];
 const knownStateFields=new Set(['id','name','idea','owner','schema','runtime_version','plugin_version','revision','created_at','updated_at','paused','mode','phase','team_sha256','governance','governance_sha256','cos_instructions','roles','records','jobs','sessions','notices','messages','upgrade','upgrade_history','retired_sessions','context_classifications','context_last_plan','handover']);
 const proofJobFields=new Set(['code_review_window_minutes','code_review_reason','code_review_subject','delivered_record_reads','model_process_tracking','specialist','id','role','instance_id','session_key','native_id','host','epoch','status','artifact_id','review_of','inputs','context_format','context_scope','context_sha256','task','task_summary','next_handoff','model_selection','model_catalog','model_evidence','cli_version','requester','coordination','coordination_release','qualification_hold','expected_deliverable','supplemental_sources','retrieved_inputs','created_at','started_at','finished_at','worker_pid','timeout_policy_version','timeout_minutes','timeout_ms','timeout_reason','execution_started_at','execution_deadline_at','termination_deadline_at']);
@@ -67,7 +68,7 @@ export function presentationOnly(record) {
     &&typeof record.recorded_by==='string'&&typeof record.previous_name==='string'&&typeof record.name==='string'
     &&Object.keys(record).every(k=>fields.includes(k));
 }
-export function contextSource(state,id) {if(Object.hasOwn(state.records??{},id))return state.records[id];return id.startsWith('upgrade:')?(state.upgrade_history?.find(u=>u.id===id.slice(8))??(state.upgrade?.id===id.slice(8)?state.upgrade:undefined)):id.startsWith('job:')?state.jobs?.[id.slice(4)]:state.records?.[id];}
+export function contextSource(state,id) {if(Object.hasOwn(state.records??{},id))return state.records[id];if(isCanonicalNoticeSource(state,id))return noticeSource(state,id);return id.startsWith('upgrade:')?(state.upgrade_history?.find(u=>u.id===id.slice(8))??(state.upgrade?.id===id.slice(8)?state.upgrade:undefined)):id.startsWith('job:')?state.jobs?.[id.slice(4)]:state.records?.[id];}
 export function recordReference(record,id=record.id) {return {id,revision:record.revision??null,sha256:digest(JSON.stringify(record))};}
 // Rejected worker output is observed counterevidence even when an invalid
 // envelope prevented a Submitted review. Bind it to the exact reviewed revision.
@@ -224,7 +225,7 @@ export function qualificationProducers(state,plan) {
   for(const ref of [...plan.sources,...plan.counterparts]){
     const value=resolveSnapshotEntry(state,contextSource(state,ref.id));
     if(!value)throw Error('Qualification source missing: '+ref.id);
-    for(const producer of producerClosure(state,value)){
+    for(const producer of producerClosure(state,value,ref.id)){
       if(refs.has(producer.id)&&JSON.stringify(refs.get(producer.id))!==JSON.stringify(producer))throw Error('Ambiguous qualification producer: '+producer.id);
       refs.set(producer.id,producer);
     }
@@ -350,15 +351,64 @@ export function applyContextQualification(state,plan,review,{source_instruction,
   for(const source of p.sources)classifications[source.id]={source,disposition:p.disposition,roles:p.roles,scopes:p.scopes,plan:recordReference(plan),review:recordReference(review),qualification:qualificationReceipt(state,state.jobs[review.job_id],p,review),source_instruction,at:new Date().toISOString()};
   return classifications;
 }
+function priorNoticeHomes(state,id){
+  const homes=new Map();
+  for(const [key,c] of Object.entries(state.context_classifications??{})){
+    const p=c?.scoped_qualification;
+    if(key!==id&&!p?.selected_source_ids?.includes(id))continue;
+    if(!p)continue;
+    if(!Array.isArray(p.homes))throw Error('Notice preservation prior home closure is malformed: '+id);
+    for(const ref of p.homes){
+      if(typeof ref?.id!=='string')throw Error('Notice preservation prior home identity missing: '+id);
+      const value=resolveSnapshotEntry(state,contextSource(state,ref.id));
+      if(!value)throw Error('Notice preservation prior home missing: '+ref.id);
+      homes.set(ref.id,value);
+    }
+  }
+  return homes;
+}
+// A removed notice can retain prior mandatory homes. Identify that historical
+// family from the existing frozen original, never from a legacy record prefix.
+function frozenNoticeProofIds(state,c,{missingOnly=true}={}){
+  const proof=c?.scoped_qualification??c?.corpus_qualification;
+  if(![SCOPED_PROTOCOL,CORPUS_PRESERVATION].includes(proof?.protocol))return [];
+  try{
+    const ids=proof.protocol===CORPUS_PRESERVATION?proof.selected_source_ids:[proof.source?.id];
+    if(!Array.isArray(ids)||!ids.some(id=>isNoticeSourceId(id)&&(!missingOnly||!Object.hasOwn(state.records??{},id)&&!isCanonicalNoticeSource(state,id))))return [];
+    const record=resolveSnapshotEntry(state,state.records?.[proof.plan?.id]),plan=record?.scoped_context_plan;
+    if(!plan||JSON.stringify(recordReference(record,proof.plan.id))!==JSON.stringify(proof.plan))return [];
+    const capsule=resolveSnapshot(state,plan.capsule);
+    if(proof.protocol===CORPUS_PRESERVATION){
+      const material=resolveSnapshot(state,capsule.projection);
+      if(material?.notice_sources!==NOTICE_SOURCES)return [];
+      return material.sources.filter(source=>source.location.startsWith('/notices/')&&proof.selected_source_ids?.includes(source.source.id)).map(source=>source.source.id);
+    }
+    const original=resolveSnapshot(state,capsule.original),id=plan.source?.id;
+    return isNoticeSourceId(id)&&original?.id===id.slice(7)?[id]:[];
+  }catch{return [];}
+}
 export function reviewedContext(state) {
   const classifications=new Map(),mandatory=new Set(),proofs=new Set(),proofJobs=new Set(),scopedHomes=new Map(),globalMandatory=new Set();
   for(const r of Object.values(state.records??{}))if(r.bootstrap_home_provenance){mandatory.add(r.id);globalMandatory.add(r.id);scopedHomes.set(r.id,['*']);}
   const validation={corpus:new Set(),negativePlans:new Set(negativeInventory(state).map(({target})=>JSON.stringify([target.id,target.revision])))};
   const classifiedIds=new Set(Object.keys(state.context_classifications??{}));
   for(const c of Object.values(state.context_classifications??{}))if(c.scoped_qualification?.protocol===CORPUS_PRESERVATION)for(const id of c.scoped_qualification.selected_source_ids??[])classifiedIds.add(id);
+  const frozenNoticeFamilies=new Map(Object.values(state.context_classifications??{}).map(c=>[c,frozenNoticeProofIds(state,c)]));
+  const noticeFamily=id=>isCanonicalNoticeSource(state,id)||!Object.hasOwn(state.records??{},id)&&[...frozenNoticeFamilies.values()].some(ids=>ids.includes(id));
   for(const id of classifiedIds){
-    const source=contextSource(state,id);if(!source)throw Error('Context classification source is missing: '+id);
-    const c=classificationFor(state,source,id,validation);
+    const notice=noticeFamily(id),noticeVector=Object.values(state.context_classifications??{}).some(c=>c?.scoped_qualification?.protocol===CORPUS_PRESERVATION&&c.scoped_qualification.selected_source_ids?.includes(id)&&c.scoped_qualification.selected_source_ids.some(noticeFamily));let source,c;
+    if(notice||noticeVector){
+      // Invalid or stale notice proof restores the complete notice and keeps
+      // every previously declared home compulsory. It never clears obligations.
+      try{source=contextSource(state,id);c=source?classificationFor(state,source,id,validation):null;}catch{c=null;}
+      if(!c||c.disposition!=='represented'||!c.scoped_qualification&&!c.corpus_qualification){
+        for(const home of priorNoticeHomes(state,id).keys()){mandatory.add(home);globalMandatory.add(home);scopedHomes.set(home,['*']);}
+        continue;
+      }
+    }else{
+      source=contextSource(state,id);if(!source)throw Error('Context classification source is missing: '+id);
+      c=classificationFor(state,source,id,validation);
+    }
     if(!c){
       const stale=state.context_classifications[id];
       if(stale.disposition==='represented'){
@@ -379,7 +429,7 @@ export function reviewedContext(state) {
     }
     if(c.scoped_qualification){
       const p=c.scoped_qualification;
-      for(const {source,scopes} of p.home_scopes){mandatory.add(source.id);const prior=scopedHomes.get(source.id)??[];scopedHomes.set(source.id,[...new Set([...prior,...scopes])]);}
+      for(const {source,scopes} of p.home_scopes){mandatory.add(source.id);if(notice)globalMandatory.add(source.id);const prior=scopedHomes.get(source.id)??[];scopedHomes.set(source.id,[...new Set([...prior,...(notice?['*']:scopes)])]);}
       proofs.add(p.plan.id);
       for(const receipt of p.receipts){proofJobs.add(receipt.job.id.slice(4));proofs.add(receipt.review.id);proofs.add(receipt.target.id);const target=state.records[receipt.target.id]?.scoped_context_target;if(target)proofs.add(target.plan.id);}
       continue;
@@ -403,6 +453,30 @@ export function reviewedContext(state) {
   }
   for(const key of proofJobs)if(mandatory.has('job:'+key)||classifications.get('job:'+key)?.disposition==='current')proofJobs.delete(key);
   return {classifications,mandatory,proofs,proofJobs,scopedHomes,globalMandatory,excluded:id=>!mandatory.has(id)&&(['resolved','represented'].includes(classifications.get(id)?.disposition)||(!classifications.has(id)&&proofs.has(id)))};
+}
+// Opt-in ordinary consumers use only genuine current scoped/corpus preservation.
+// Homes are exact references here; the consumer must include their full bodies.
+export function projectedNoticeContext(state){
+  const projection=reviewedContext(state),representations=[];
+  let entries;try{entries=noticeSourceEntries(state);}catch{return {notices:(state.notices??[]).map(projectNotice),representations};}
+  const notices=[];
+  for(const entry of entries){
+    const c=projection.classifications.get(entry.id),proof=c?.corpus_qualification??c?.scoped_qualification;
+    if(!proof||c.disposition!=='represented'||JSON.stringify(c.source)!==JSON.stringify(recordReference(entry.value,entry.id))||!frozenNoticeProofIds(state,c,{missingOnly:false}).includes(entry.id)){notices.push(entry.value);continue;}
+    const plan=resolveSnapshotEntry(state,contextSource(state,proof.plan.id)),capture=plan?.scoped_context_plan;
+    const capsule=capture&&resolveSnapshot(state,capture.capsule);
+    if(!capsule?.original||!capsule.projection)throw Error('Notice preservation immutable original/projection missing: '+entry.id);
+    const homes=proof.homes.map(ref=>{
+      const value=resolveSnapshotEntry(state,contextSource(state,ref.id));
+      if(!value||JSON.stringify(recordReference(value,ref.id))!==JSON.stringify(ref)||!projection.globalMandatory.has(ref.id))throw Error('Notice preservation complete current home missing: '+ref.id);
+      return ref;
+    });
+    const frozen=resolveSnapshot(state,capsule.original),corpus=proof.protocol===CORPUS_PRESERVATION;
+    const frozenEntries=corpus?noticeSourceEntries(frozen):[{id:entry.id,index:null,original:frozen,value:projectNotice(frozen)}],original=frozenEntries.find(value=>value.id===entry.id);
+    if(!original||JSON.stringify(recordReference(original.value,entry.id))!==JSON.stringify(recordReference(entry.value,entry.id)))throw Error('Notice preservation frozen envelope/projection binding changed: '+entry.id);
+    representations.push({source:recordReference(entry.value,entry.id),occurrence:{collection:'notices',view:'supplied-state',index:entry.index,notice_id:entry.original.id},homes,provenance:{qualification:proof,capsule:capture.capsule,original:capsule.original,original_path:corpus?'/notices/'+original.index:'',original_source:{sha256:digest(JSON.stringify(original.original)),total_characters:JSON.stringify(original.original).length},projection:capsule.projection}});
+  }
+  return {notices,representations};
 }
 export function contextRead(state,{id,sha256,offset=0,length=16000}) {
   const record=contextSource(state,id);if(!record||digest(JSON.stringify(record))!==sha256)throw Error('Missing or changed supplemental source');

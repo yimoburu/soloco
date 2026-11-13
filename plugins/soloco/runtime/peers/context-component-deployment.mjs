@@ -7,14 +7,16 @@ import path from 'node:path';
 import os from 'node:os';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {createHash} from 'node:crypto';
+import {originalDeveloperComponentLayout,originalPackagedComponentLayout,originalComponentLayoutPaths,inspectOriginalComponentLayout,originalComponentNodePath} from './context-component-layout.mjs';
 
 const REPO=fileURLToPath(new URL('../../../../',import.meta.url));
-const ROOT=path.join(REPO,'work/peer-context-component/deployments');
+const DEVELOPER=Object.freeze({lookup:'lookupOriginalSelectedContextComponentData',inspect:'inspectOriginalSelectedContextComponentData',layout:originalDeveloperComponentLayout}),PACKAGED=Object.freeze({lookup:'lookupOriginalSelectedPackagedContextComponentData',inspect:'inspectOriginalSelectedPackagedContextComponentData',layout:originalPackagedComponentLayout});
+const deploymentRoot=service=>path.join(originalComponentLayoutPaths(service.layout()).durable_root,'deployments');
 const EXPECTED_PACKAGE='c103b27a9c458c0989c7766a769ab1644e3663307e72274906c6d362fdd64c15';
 const EXPECTED_MANIFEST='b43e9c06b7e67c7b5b19eb38b8b68101e4580a99cc9d4f7b65beb4de8a1ee12a';
 const HOST='plugins/soloco/runtime/peers/codex-task-host.mjs';
 const INTERPRETER='plugins/soloco/runtime/peers/peer-context-interpreter.mjs';
-const pins=new WeakMap(),sidecarPrograms=new WeakMap();let loaded=null,producer=null;
+const pins=new WeakMap(),sidecarPrograms=new WeakMap();let loaded=null,producer=null,loadService=null,loadPromise=null;
 // General P2 libraries also import the slot guard in installed plugins. Delay
 // the repository-only producer's eager entry/source reads until an explicit
 // original deployment/load operation; ordinary imports and Holds need no repo.
@@ -38,8 +40,10 @@ function pin(file,expected,mode,maximum=256*1024*1024){const b=read(file,maximum
 function sync(directory){const fd=fs.openSync(directory,fs.constants.O_RDONLY|fs.constants.O_NOFOLLOW);try{fs.fsyncSync(fd);}finally{fs.closeSync(fd);}}
 function mkdir(directory){noLinks(directory);try{fs.mkdirSync(directory,{mode:0o700});sync(path.dirname(directory));}catch(e){if(e.code!=='EEXIST')throw e;}const s=fs.lstatSync(directory);if(!s.isDirectory()||s.uid!==process.getuid()||(s.mode&0o077))fail('COMPONENT_DEPLOYMENT_PATH');}
 function immutable(file,b,mode){const fd=fs.openSync(file,fs.constants.O_WRONLY|fs.constants.O_CREAT|fs.constants.O_EXCL|fs.constants.O_NOFOLLOW,0o600);try{fs.writeFileSync(fd,b);fs.fchmodSync(fd,mode);fs.fsyncSync(fd);}finally{fs.closeSync(fd);}sync(path.dirname(file));}
-function selected(){if(!producer)fail('COMPONENT_DEPLOYMENT_NOT_LOADED');const h=producer.lookupOriginalSelectedContextComponentData();return {h,data:producer.inspectOriginalSelectedContextComponentData(h)};}
-function selection(data){
+function selected(service){if(!producer)fail('COMPONENT_DEPLOYMENT_NOT_LOADED');const h=producer[service.lookup]();return {h,data:producer[service.inspect](h)};}
+function selection(data,service){
+ const layout=service.layout(),paths=originalComponentLayoutPaths(layout),current=inspectOriginalComponentLayout(layout);
+ if(service===PACKAGED?!same(data.layout,current):data.layout!==undefined)fail('COMPONENT_DEPLOYMENT_LAYOUT_CHANGED');
  if(data.protocol!=='soloco-selected-context-component-data-v1'||data.kind!=='SELECTED_COMPILED_COMPONENT_DATA'||data.command.status!=='COMPILED_COMPONENT'||data.native_qualified!==false||data.claims_released!==false)fail('COMPONENT_DEPLOYMENT_ORIGINAL_REQUIRED');
  const copies=new Map(data.copies.map(r=>[r.sealed_path,r]));
  const native=name=>{const p=copies.get('native/'+name);if(!p||p.bytes<1)fail('COMPONENT_DEPLOYMENT_CHANGED');const location=path.join(data.component_root,p.sealed_path);pin(location,{bytes:p.bytes,sha256:p.sha256},0o444,name==='origin-sidecar-capture'?16*1024*1024:256*1024*1024);return {path:location,bytes:p.bytes,sha256:p.sha256,original_path:p.original_path};};
@@ -50,12 +54,12 @@ function selection(data){
  // The original producer already verifies the entire Node inventory/copy map.
  // These are actual original checkout modules used by the fixed loader below.
  for(const name of [HOST,INTERPRETER]){
-  const row=copies.get('node-source/'+name);if(!row||row.original_path!==path.join(REPO,name)||!same(ref(read(row.original_path)),{bytes:row.bytes,sha256:row.sha256}))fail('COMPONENT_DEPLOYMENT_NODE_CHANGED');
+  const row=copies.get('node-source/'+name);if(!row||row.original_path!==originalComponentNodePath(layout,name)||!same(ref(read(row.original_path)),{bytes:row.bytes,sha256:row.sha256}))fail('COMPONENT_DEPLOYMENT_NODE_CHANGED');
  }
- return {protocol:'soloco-original-component-deployment-v1',input_key:data.input_key,intent_key:data.intent_key,original_output_sha256:data.output.sha256,owner_epoch:data.owner_epoch,original_component_root:data.component_root,files,node_manifest_sha256:data.node_inputs.sha256,node_profile:data.node_profile.record,qualified_interpreter:'SOURCE_ASSOCIATED_ONLY',native_qualified:false,claims_released:false};
+ return {...(service===PACKAGED?{layout:current}:{}),protocol:'soloco-original-component-deployment-v1',input_key:data.input_key,intent_key:data.intent_key,original_output_sha256:data.output.sha256,owner_epoch:data.owner_epoch,original_component_root:data.component_root,files,node_manifest_sha256:data.node_inputs.sha256,node_profile:data.node_profile.record,qualified_interpreter:'SOURCE_ASSOCIATED_ONLY',native_qualified:false,claims_released:false};
 }
-function prepared(data){
- const s=selection(data),directory=path.join(ROOT,s.intent_key),file=path.join(directory,'deployment.json');noLinks(directory);
+function prepared(data,service){
+ const s=selection(data,service),directory=path.join(deploymentRoot(service),s.intent_key),file=path.join(directory,'deployment.json');noLinks(directory);
  const record=JSON.parse(read(file,1024*1024).toString('utf8'));
  const expected={...s,executable:{path:path.join(directory,'codex-soloco-protected-host'),bytes:s.files.executable.bytes,sha256:s.files.executable.sha256,mode:'100555'},sidecar_capture_executable:{path:path.join(directory,'origin-sidecar-capture'),bytes:s.files.sidecar_capture.bytes,sha256:s.files.sidecar_capture.sha256,mode:'100555'}};
  if(!same(record,expected)||!read(file,1024*1024).equals(Buffer.from(canonical(expected)))||(fs.lstatSync(file).mode&0o777)!==0o444||(fs.lstatSync(directory).mode&0o777)!==0o555)fail('COMPONENT_DEPLOYMENT_CHANGED');
@@ -64,10 +68,11 @@ function prepared(data){
 
 /** Explicit file preparation only. Fixed source-owned destination; no spawn. */
 export function prepareOriginalSelectedContextDeployment(...args){
- if(args.length)fail('COMPONENT_DEPLOYMENT_NO_ARGUMENTS');return prepareDeployment();
+ if(args.length)fail('COMPONENT_DEPLOYMENT_NO_ARGUMENTS');return prepareDeployment(DEVELOPER);
 }
-async function prepareDeployment(){
- await originalProducer();const {h,data}=selected(),s=selection(data),directory=path.join(ROOT,s.intent_key);
+export function prepareOriginalPackagedContextDeployment(...args){if(args.length)fail('COMPONENT_DEPLOYMENT_NO_ARGUMENTS');return prepareDeployment(PACKAGED);}
+async function prepareDeployment(service){
+ await originalProducer();const {h,data}=selected(service),s=selection(data,service),ROOT=deploymentRoot(service),directory=path.join(ROOT,s.intent_key);
  mkdir(ROOT);
  if(!fs.existsSync(directory)){
   mkdir(directory);const executable={path:path.join(directory,'codex-soloco-protected-host'),bytes:s.files.executable.bytes,sha256:s.files.executable.sha256,mode:'100555'},sidecar_capture_executable={path:path.join(directory,'origin-sidecar-capture'),bytes:s.files.sidecar_capture.bytes,sha256:s.files.sidecar_capture.sha256,mode:'100555'};
@@ -75,28 +80,38 @@ async function prepareDeployment(){
   // or promote it on retry; the complete exact recipe below must already exist.
   immutable(executable.path,read(s.files.executable.path),0o555);
   immutable(sidecar_capture_executable.path,read(s.files.sidecar_capture.path,16*1024*1024),0o555);
-  producer.inspectOriginalSelectedContextComponentData(h);
+  producer[service.inspect](h);
   immutable(path.join(directory,'deployment.json'),Buffer.from(canonical({...s,executable,sidecar_capture_executable})),0o444);
   fs.chmodSync(directory,0o555);sync(directory);sync(ROOT);
  }
- const record=prepared(producer.inspectOriginalSelectedContextComponentData(h)),handle=Object.freeze(Object.create(null));pins.set(handle,{original:h,record});return handle;
+ const record=prepared(producer[service.inspect](h),service),handle=Object.freeze(Object.create(null));pins.set(handle,{original:h,record,service});return handle;
 }
-export function inspectOriginalSelectedContextDeployment(handle){
- const r=pins.get(handle);if(!r)fail('COMPONENT_DEPLOYMENT_HANDLE_REQUIRED');const current=prepared(producer.inspectOriginalSelectedContextComponentData(r.original));if(!same(current,r.record))fail('COMPONENT_DEPLOYMENT_CHANGED');return Object.freeze(copy(current));
-}
+function inspectDeployment(handle,service){const r=pins.get(handle);if(!r||r.service!==service)fail('COMPONENT_DEPLOYMENT_HANDLE_REQUIRED');const current=prepared(producer[service.inspect](r.original),service);if(!same(current,r.record))fail('COMPONENT_DEPLOYMENT_CHANGED');return Object.freeze(copy(current));}
+export function inspectOriginalSelectedContextDeployment(handle){return inspectDeployment(handle,DEVELOPER);}
+export function inspectOriginalPackagedContextDeployment(handle){return inspectDeployment(handle,PACKAGED);}
 /** Load the actual fixed original module namespaces, under the existing trusted
  * source/runtime assumption. No caller namespace, callback or JSON enrolls one. */
-export async function loadOriginalSelectedPeerBridge(...args){
- if(args.length)fail('COMPONENT_DEPLOYMENT_NO_ARGUMENTS');await originalProducer();const {h,data}=selected(),record=prepared(data);
- const host=await import(pathToFileURL(path.join(REPO,HOST)).href),interpreter=await import(pathToFileURL(path.join(REPO,INTERPRETER)).href);
+export async function loadOriginalSelectedPeerBridge(...args){if(args.length)fail('COMPONENT_DEPLOYMENT_NO_ARGUMENTS');return loadBridge(DEVELOPER);}
+export async function loadOriginalSelectedPackagedPeerBridge(...args){if(args.length)fail('COMPONENT_DEPLOYMENT_NO_ARGUMENTS');return loadBridge(PACKAGED);}
+async function loadBridge(service){
+ // Latch before the first await: neither a competing service nor a failed
+ // first load can select another realm. Retain the one original load promise.
+ if(loadService&&loadService!==service)fail('COMPONENT_DEPLOYMENT_LAYOUT_MIXED');loadService??=service;
+ if(loaded)return inspectOriginalLoadedPeerBridge();
+ if(!loadPromise)loadPromise=loadBridgeOnce(service);return loadPromise;
+}
+async function loadBridgeOnce(service){
+ await originalProducer();if(loadService!==service)fail('COMPONENT_DEPLOYMENT_LAYOUT_MIXED');const {h,data}=selected(service),record=prepared(data,service),layout=service.layout();
+ const host=await import(pathToFileURL(originalComponentNodePath(layout,HOST)).href),interpreter=await import(pathToFileURL(originalComponentNodePath(layout,INTERPRETER)).href);
  if(typeof host.createCodexTaskRuntime!=='function'||typeof interpreter.prepareOriginalPeerContextDelivery!=='function')fail('COMPONENT_DEPLOYMENT_NODE_CHANGED');
- const after=prepared(producer.inspectOriginalSelectedContextComponentData(h));if(!same(after,record))fail('COMPONENT_DEPLOYMENT_CHANGED');
- loaded={original:h,record,host,interpreter};return inspectOriginalLoadedPeerBridge();
+ const after=prepared(producer[service.inspect](h),service);if(!same(after,record)||loadService!==service)fail('COMPONENT_DEPLOYMENT_CHANGED');
+ if(loaded){if(loaded.service!==service||!same(loaded.record,record))fail('COMPONENT_DEPLOYMENT_CHANGED');return inspectOriginalLoadedPeerBridge();}
+ loaded={original:h,record,host,interpreter,service,layout};return inspectOriginalLoadedPeerBridge();
 }
 export function inspectOriginalLoadedPeerBridge(...args){
- if(args.length||!loaded)fail('COMPONENT_DEPLOYMENT_NOT_LOADED');const current=prepared(producer.inspectOriginalSelectedContextComponentData(loaded.original));if(!same(current,loaded.record))fail('COMPONENT_DEPLOYMENT_CHANGED');
+ if(args.length||!loaded)fail('COMPONENT_DEPLOYMENT_NOT_LOADED');const current=prepared(producer[loaded.service.inspect](loaded.original),loaded.service);if(!same(current,loaded.record))fail('COMPONENT_DEPLOYMENT_CHANGED');
  const originalHome=fs.realpathSync(process.env.CODEX_HOME??path.join(os.homedir(),'.codex'));
- return Object.freeze({...copy(current),node:{root:REPO,executable:{path:process.execPath,...ref(read(fs.realpathSync(process.execPath)))},version:process.version,platform:process.platform,arch:process.arch,flags:[...process.execArgv],profile:'original-node-peer-context-interpreter-v1'},original_home:originalHome,original_home_sha256:digest(Buffer.from(originalHome))});
+ return Object.freeze({...copy(current),node:{root:originalComponentLayoutPaths(loaded.layout).source_root,executable:{path:process.execPath,...ref(read(fs.realpathSync(process.execPath)))},version:process.version,platform:process.platform,arch:process.arch,flags:[...process.execArgv],profile:'original-node-peer-context-interpreter-v1'},original_home:originalHome,original_home_sha256:digest(Buffer.from(originalHome))});
 }
 // The caller supplies normal trusted host composition inputs, never code,
 // interpreter namespaces or a source association. Admission stays with P2.
@@ -118,7 +133,7 @@ export function createOriginalLoadedProductionTaskRuntime(options){
 }
 
 function originalSidecarProgramRecord(){
- const bridge=inspectOriginalLoadedPeerBridge(),pkg=JSON.parse(read(bridge.files.source_package.path,16*1024*1024).toString('utf8')),sourcePath='plugins/soloco/helpers/origin-sidecar-capture.c',source=read(path.join(REPO,sourcePath),1024*1024);
+ const bridge=inspectOriginalLoadedPeerBridge(),pkg=JSON.parse(read(bridge.files.source_package.path,16*1024*1024).toString('utf8')),sourcePath='plugins/soloco/helpers/origin-sidecar-capture.c',source=read(originalComponentNodePath(loaded.layout,sourcePath),1024*1024);
  if(pkg.sidecar_capture?.protocol!=='soloco-origin-sidecar-source-build-v1'||!same(pkg.sidecar_capture.source,{path:sourcePath,...ref(source)})||!same(pkg.sidecar_capture.arguments,['origin-sidecar-capture-v1'])||!bridge.sidecar_capture_executable||bridge.sidecar_capture_executable.mode!=='100555')fail('ORIGIN_SIDECAR_PROGRAM_UNAVAILABLE');
  return {protocol:'soloco-original-origin-sidecar-capture-program-v1',executable:copy(bridge.sidecar_capture_executable),source_sha256:digest(source),source_package_sha256:bridge.files.source_package.sha256,compiled_manifest_sha256:bridge.files.compiled_manifest.sha256,component_intent_key:bridge.intent_key,argv:['origin-sidecar-capture-v1'],native_qualified:false};
 }

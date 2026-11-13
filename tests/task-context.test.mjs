@@ -31,7 +31,7 @@ function task(f,operation='one',scope='auth'){
   const record=change(f,s=>submitTask(s,{...f,operation_id:operation,spec:{role:'engineer',task:'Review the current fictional authentication input.',input_ids:['current-input'],resources:[],context_scope:scope,expected_deliverable:'A source-linked fictional assessment',acceptance:'Retain all conditions and unknown effects; no execution.'}},'codex'));
   return record.id;
 }
-function job(f,id){const s=read(f),r=s.records[id],spec=r.runtime_task.spec;return {id:'prospective-'+id,role:spec.role,task:spec.task,epoch:s.owner.epoch,context_scope:spec.context_scope,inputs:spec.input_ids.map(id=>({id,revision:s.records[id].revision})),review_of:null,runtime_task:{version:1,...taskDefinitionBinding(r)}};}
+function job(f,id){const s=read(f),r=s.records[id],spec=r.runtime_task.spec;return {id:'prospective-'+id,context_format:7,role:spec.role,task:spec.task,epoch:s.owner.epoch,context_scope:spec.context_scope,inputs:spec.input_ids.map(id=>({id,revision:s.records[id].revision})),review_of:null,runtime_task:{version:1,...taskDefinitionBinding(r)}};}
 
 // These are explicit fictional semantic judgments. The worker, SQLite, exact
 // source/review attribution and canonical qualification paths are real.

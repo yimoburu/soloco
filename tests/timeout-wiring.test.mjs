@@ -26,7 +26,15 @@ import {isOriginMechanicalQaTarget,workPeerOriginMechanicalQa} from '../plugins/
 // presentation helpers use their pure production implementations.
 const runtime=new URL('../plugins/soloco/runtime/',import.meta.url);
 function load(name,deps,names) {
-  let source=fs.readFileSync(new URL(name,runtime),'utf8').replace(/^import .*;\r?\n/gm,'');
+  let source=fs.readFileSync(new URL(name,runtime),'utf8');
+  if(name==='engine.mjs') {
+    const binding="import {dataDir} from './plugin-data.mjs';",reexport="export {dataDir} from './plugin-data.mjs';";
+    assert.equal(source.split(binding).length,2,'engine must import the exact shared data helper once');
+    assert.equal(source.split(reexport).length,2,'engine must re-export the exact shared data helper once');
+    assert.equal(typeof deps.dataDir,'function','engine VM needs its controlled data helper binding');
+    source=source.replace(reexport,'');
+  }
+  source=source.replace(/^import .*;\r?\n/gm,'');
   const entry=source.indexOf('if(process.argv[1]');
   if(entry>=0)source=source.slice(0,entry);
   source=source.replace(/\bexport (?=(?:async )?function|const|let|class)/g,'');
@@ -59,6 +67,7 @@ function harness(publicOverrides={}) {
     // target/queue/worker guards run in the dedicated real SQLite source suite.
     isOriginMechanicalQaWorker:()=>false,isOriginMechanicalQaTarget,workPeerOriginMechanicalQa,
     spawn:(...args)=>{launches.push(args);return {on:()=>{},unref:()=>{}};},hooks:()=>{},upgrade:()=>{},upgradeGuidance:'',peerRuntimeFields,peerAdoptionToolSchema,peerOwnerToolSchema,peerOriginToolSchema,mcpCallerDiagnostic};
+  Object.assign(deps,load('plugin-data.mjs',deps,['dataDir']));
   const engine=load('engine.mjs',deps,['dispatch','status','control','wait']);
   Object.assign(engine,publicOverrides);
   const worker=load('worker.mjs',deps,['work']);

@@ -7,7 +7,7 @@ import {types} from 'node:util';
 import {canonical,peerDigest} from './ledger.mjs';
 import {createMembershipLifecycle} from './membership.mjs';
 import * as model from './model.mjs';
-import {loadOriginalSelectedPeerBridge,inspectOriginalLoadedPeerBridge,createOriginalLoadedProductionTaskRuntime} from './context-component-deployment.mjs';
+import {loadOriginalSelectedPackagedPeerBridge,inspectOriginalLoadedPeerBridge,createOriginalLoadedProductionTaskRuntime} from './context-component-deployment.mjs';
 import {createPolicySupervisor} from './policy-supervisor.mjs';
 import {prepareOriginalProtectedPeerLaunch,originalProtectedPeerLaunchConfiguration,requestOriginalProtectedCodexStop} from './protected-codex-domain.mjs';
 
@@ -106,7 +106,7 @@ export function createOriginalPeerProductionProvider(options){
   return selected;
  };
  return Object.freeze({
-  async initialize(...args){if(args.length)fail('PEER_PRODUCTION_INPUT');recipe();effects();await loadOriginalSelectedPeerBridge();support();},
+  async initialize(...args){if(args.length)fail('PEER_PRODUCTION_INPUT');recipe();effects();await loadOriginalSelectedPackagedPeerBridge();support();},
   async readiness(input){
    let host;
    try{if(!closed(input,['host'],['task']))fail('PEER_PRODUCTION_INPUT');host=input.host;if(host!=='codex'){read(()=>undefined);fail('HOST_UNSUPPORTED');}support();return {host,available:true,authenticated:true,scope:'Original source composition only; task/native authority checked separately'};}

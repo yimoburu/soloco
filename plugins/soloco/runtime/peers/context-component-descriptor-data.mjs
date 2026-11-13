@@ -3,6 +3,8 @@ import path from 'node:path';
 import {
   lookupOriginalSelectedContextComponentData,
   inspectOriginalSelectedContextComponentData,
+  lookupOriginalSelectedPackagedContextComponentData,
+  inspectOriginalSelectedPackagedContextComponentData,
 } from './context-build-component.mjs';
 
 const PROTOCOL='soloco-context-component-descriptor-data-v1';
@@ -41,6 +43,7 @@ function pin(value){
   return value;
 }
 const samePin=(left,right)=>object(left)&&object(right)&&left.bytes===right.bytes&&left.sha256===right.sha256;
+const sameData=(left,right)=>{const sorted=v=>Array.isArray(v)?v.map(sorted):object(v)?Object.fromEntries(Object.keys(v).sort().map(k=>[k,sorted(v[k])])):v;return JSON.stringify(sorted(left))===JSON.stringify(sorted(right));};
 function reference(document){
   if(!object(document)||document.bytes<1)fail();absolute(document.path);pin({bytes:document.bytes,sha256:document.sha256});
   return {path:document.path,bytes:document.bytes,sha256:document.sha256};
@@ -51,14 +54,27 @@ function frozenCopy(value){
   return freeze(detached);
 }
 
+function packagedLayout(data){
+  if(data.layout===undefined)return null;
+  const v=own(data.layout,['protocol','kind','source_root','package_root','native_root','entry','durable_root','managed_data_root','layout_source','source_identity','package_identity','durable_identity','managed_identity']);
+  if(v.protocol!=='soloco-context-component-layout-v1'||v.kind!=='packaged-plugin-v1')fail();
+  for(const key of ['source_root','package_root','native_root','entry','durable_root','managed_data_root','layout_source'])absolute(v[key]);
+  if(v.source_root!==v.package_root||v.native_root!==path.join(v.package_root,'producer-inputs/native/codex')||v.entry!==path.join(v.package_root,'producer/build-peer-context.mjs')||v.layout_source!==path.join(v.package_root,'runtime/peers/context-component-layout.mjs')||v.durable_root!==path.join(v.managed_data_root,'peer-context-component/v1')||data.component_root!==path.join(v.durable_root,'sealed',data.intent_key))fail();
+  for(const [key,expected] of [['source_identity',v.source_root],['package_identity',v.package_root],['durable_identity',v.durable_root],['managed_identity',v.managed_data_root]]){const id=own(v[key],['path','dev','ino','uid','gid','mode']);if(id.path!==expected||!['dev','ino','uid','gid','mode'].every(k=>typeof id[k]==='string'&&/^[0-9]+$/.test(id[k])))fail();}
+  if(!sameData(v.source_identity,v.package_identity))fail();
+  return v;
+}
+
 // Private pure projection. Public callers cannot supply this DATA or a path.
 function projectSelectedContextComponentDescriptorData(data){
   if(!object(data)||data.protocol!=='soloco-selected-context-component-data-v1'||data.kind!=='SELECTED_COMPILED_COMPONENT_DATA'||data.domain_closure!=='unestablished'||data.qualified_interpreter!=='HELD'||data.native_qualified!==false||data.claims_released!==false)fail();
-  const root=absolute(data.component_root),command=data.command;
+  const root=absolute(data.component_root),command=data.command,layout=packagedLayout(data);
   if(!object(command)||command.protocol!=='soloco-context-component-command-v1'||command.status!=='COMPILED_COMPONENT'||command.result_kind!=='COMPILED_COMPONENT'||command.domain_closure!=='unestablished'||command.qualified_interpreter!=='HELD'||command.claims_released!==false||!hash(data.input_key)||!hash(data.intent_key)||command.input_key!==data.input_key||command.intent_key!==data.intent_key)fail();
   const output=reference(data.output),recipe=reference(data.recipe),capsule=reference(data.capsule);
   if(output.path!==path.join(root,'output.json')||recipe.path!==path.join(root,'recipe.json')||capsule.path!==path.join(root,'capsule-manifest.json')||output.sha256!==command.output_sha256)fail();
   const record=data.output.record,recipeRecord=data.recipe.record,capsuleRecord=data.capsule.record;
+  if(layout&&(!sameData(recipeRecord?.layout,layout)||!sameData(capsuleRecord?.layout,layout)||!sameData(data.node_profile?.record?.layout,layout)))fail();
+  if(!layout&&[recipeRecord,capsuleRecord,data.node_profile?.record].some(v=>object(v)&&Object.hasOwn(v,'layout')))fail();
   if(!object(record)||record.protocol!=='soloco-context-build-output-data-v1'||record.result_kind!=='COMPILED_COMPONENT'||record.input_key!==data.input_key||record.intent_key!==data.intent_key||!samePin(record.recipe,recipe)||!samePin(record.capsule_manifest,capsule))fail();
   if(!object(recipeRecord)||recipeRecord.protocol!=='soloco-context-component-copy-recipe-v1'||recipeRecord.input_key!==data.input_key||recipeRecord.intent_key!==data.intent_key||recipeRecord.result_kind!=='COMPILED_COMPONENT'||recipeRecord.domain_closure!=='unestablished'||!Array.isArray(recipeRecord.copies))fail();
   if(!hash(record.reservation_sha256)||!hash(record.process_sha256)||recipeRecord.reservation_sha256!==record.reservation_sha256||recipeRecord.process_sha256!==record.process_sha256)fail();
@@ -73,6 +89,7 @@ function projectSelectedContextComponentDescriptorData(data){
     const copy=own(data.copies[index],['original_path','sealed_path','bytes','sha256']);
     const original=own(recipeRecord.copies[index],['original_path','sealed_path','bytes','sha256']);
     absolute(copy.original_path);relative(copy.sealed_path);pin({bytes:copy.bytes,sha256:copy.sha256});
+    if(layout&&copy.sealed_path.startsWith('node-source/')){const logical=copy.sealed_path.slice('node-source/'.length);if(!logical.startsWith('plugins/soloco/')||copy.original_path!==path.join(layout.package_root,logical.slice('plugins/soloco/'.length)))fail();}
     if(copy.original_path!==original.original_path||copy.sealed_path!==original.sealed_path||!samePin(copy,original)||originals.has(copy.original_path)||sealed.has(copy.sealed_path))fail();
     if(copy.sealed_path.startsWith('native/')?!nativeNames.has(copy.sealed_path):!copy.sealed_path.startsWith('node-source/'))fail();
     const file=files.get(copy.sealed_path);if(!file||!samePin(file,copy))fail();
@@ -101,7 +118,7 @@ function projectSelectedContextComponentDescriptorData(data){
   for(const [name,ref] of [['recipe.json',recipe],['node-inputs.json',data.node_inputs],['node-profile.json',data.node_profile],['selection.json',data.selection]])if(!samePin(files.get(name),ref))fail();
   const nodeInputs=reference(data.node_inputs),nodeProfile=reference(data.node_profile),selection=reference(data.selection);
   if(nodeInputs.path!==path.join(root,'node-inputs.json')||nodeProfile.path!==path.join(root,'node-profile.json')||selection.path!==path.join(root,'selection.json')||!samePin(record.node_manifest,nodeInputs))fail();
-  return frozenCopy({protocol:PROTOCOL,result_kind:'COMPILED_COMPONENT',input_key:data.input_key,intent_key:data.intent_key,
+  return frozenCopy({...(layout?{layout}:{}),protocol:PROTOCOL,result_kind:'COMPILED_COMPONENT',input_key:data.input_key,intent_key:data.intent_key,
     owner_epoch:data.owner_epoch,journal:{identity:data.journal_identity,selection:data.journal_selection},component_root:root,
     original_output:{...output,record},original_recipe:recipe,original_capsule:capsule,
     node:{input_manifest:nodeInputs,runtime_profile:nodeProfile,selection},native,
@@ -112,4 +129,10 @@ export function inspectOriginalSelectedContextComponentDescriptorData(...args){
   if(args.length)fail('COMPONENT_DESCRIPTOR_DATA_NO_ARGUMENTS');
   const handle=lookupOriginalSelectedContextComponentData();
   return projectSelectedContextComponentDescriptorData(inspectOriginalSelectedContextComponentData(handle));
+}
+
+export function inspectOriginalSelectedPackagedContextComponentDescriptorData(...args){
+  if(args.length)fail('COMPONENT_DESCRIPTOR_DATA_NO_ARGUMENTS');
+  const handle=lookupOriginalSelectedPackagedContextComponentData();
+  return projectSelectedContextComponentDescriptorData(inspectOriginalSelectedPackagedContextComponentData(handle));
 }

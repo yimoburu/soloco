@@ -59,7 +59,15 @@ function selectionKey(value) {
 }
 const runtime=new URL('../plugins/soloco/runtime/',import.meta.url);
 function load(name,deps,names) {
-  let source=fs.readFileSync(new URL(name,runtime),'utf8').replace(/^import .*;\r?\n/gm,'');
+  let source=fs.readFileSync(new URL(name,runtime),'utf8');
+  if(name==='engine.mjs') {
+    const binding="import {dataDir} from './plugin-data.mjs';",reexport="export {dataDir} from './plugin-data.mjs';";
+    assert.equal(source.split(binding).length,2,'engine must import the exact shared data helper once');
+    assert.equal(source.split(reexport).length,2,'engine must re-export the exact shared data helper once');
+    assert.equal(typeof deps.dataDir,'function','engine VM needs its controlled data helper binding');
+    source=source.replace(reexport,'');
+  }
+  source=source.replace(/^import .*;\r?\n/gm,'');
   const entry=source.indexOf('if(process.argv[1]');
   if(entry>=0)source=source.slice(0,entry);
   source=source.replace(/\bexport (?=(?:async )?function|const|let|class)/g,'');
@@ -127,6 +135,7 @@ function harness(host='claude') {
     peerOwnerRoutingStorageKind:()=> 'legacy',
     hooks:()=>{},upgrade:()=>{},upgradeGuidance:'',peerRuntimeFields,peerAdoptionToolSchema,peerOwnerToolSchema,peerOriginToolSchema,mcpCallerDiagnostic
   };
+  Object.assign(deps,load('plugin-data.mjs',deps,['dataDir']));
   const engine=load('engine.mjs',deps,['dispatch']);
   const main=load('main.mjs',{...deps,engine},['toolList','call','boundedDevelopmentAcceptanceReply']);
   const args={root:'/fixture',session_id:'founder',epoch:1,role:'engineer',task:'A bounded fixture assignment'};

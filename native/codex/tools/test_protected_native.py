@@ -87,6 +87,146 @@ class TemporaryDataChecks(unittest.TestCase):
         with patch.object(TOOL, "build_sidecar", side_effect=helper) as build:
             yield build
 
+    @contextlib.contextmanager
+    def pure_packaged_fixture(self):
+        """Fictional package and workspace only; no copied recipe or build."""
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp).resolve()
+            package = base / "fictional-package"
+            driver = package / "producer-inputs/native/codex/tools/protected_native.py"
+            driver.parent.mkdir(parents=True)
+            driver.write_bytes(b"FICTIONAL ORIGINAL MODULE, NEVER EXECUTED")
+            manifest = driver.parent.parent / "source-package.json"
+            manifest.write_bytes(b"FICTIONAL MANIFEST, NOT A RECIPE")
+            data = base / "managed-data"
+            workspace = data / "peer-context-component/v1"
+            workspace.mkdir(parents=True)
+            workspace.chmod(0o700)
+            workspace.parent.chmod(0o700)
+            request = {"protocol": "soloco-packaged-context-build-request-v1",
+                       "workspace": TOOL.packaged_directory_identity(workspace), "intent_key": "a" * 64}
+            recipe = {"toolchain": {"inventory": {"sha256": "b" * 64}}, "cargo_lock": {"sha256": "c" * 64}}
+            with patch.object(TOOL, "__file__", str(driver)), patch.object(TOOL, "MANIFEST", manifest), patch.object(TOOL, "package", return_value=(manifest.parent, recipe, [], [], [])) as package_read, patch.object(TOOL.subprocess, "Popen") as spawn:
+                yield package, workspace, request, package_read, spawn
+                spawn.assert_not_called()
+
+    def test_packaged_request_derives_only_fixed_paths_and_timeout_without_environment(self):
+        with self.pure_packaged_fixture() as (package, workspace, request, package_read, _):
+            ambient = dict(vars(TOOL.os))
+            ambient["environ"] = {"COMPANY_PLUGIN_DATA": "/wrong/data", "CODEX_HOME": "/wrong/home", "MANIFEST": "/wrong/manifest", "CC": "/wrong/compiler"}
+            with patch.object(TOOL, "os", SimpleNamespace(**ambient)):
+                args = TOOL.packaged_build_args(json.dumps(request))
+            self.assertEqual(args.manifest, package / "producer-inputs/native/codex/source-package.json")
+            self.assertEqual(args.prepared, workspace / "inputs" / TOOL.MANIFEST_SHA256 / "prepared")
+            self.assertEqual(args.toolchain, workspace / "toolchain" / ("b" * 64))
+            self.assertEqual(args.cargo_home, workspace / "cargo-home" / (TOOL.MANIFEST_SHA256 + "-" + "c" * 64))
+            self.assertEqual(args.output, workspace / "operations" / ("a" * 64) / "compiler-output")
+            self.assertEqual(args.timeout, 1200)
+            TOOL.packaged_build_fence(args)
+            self.assertFalse((workspace / "operations").exists())
+            package_read.assert_called_once_with(args.manifest)
+
+    def test_packaged_request_rejects_duplicate_unknown_and_source_selector_fields(self):
+        with self.pure_packaged_fixture() as (_, _, request, package_read, _):
+            invalid = [{**request, key: "/caller-selected"} for key in ("manifest", "source", "compiler", "prepared", "toolchain", "cargo_home", "output", "timeout", "mode")]
+            invalid += [{**request, "workspace": {**request["workspace"], "home": "/caller-selected"}}]
+            for value in invalid:
+                with self.subTest(value=value), self.assertRaises(ValueError):
+                    TOOL.packaged_build_args(json.dumps(value))
+            with self.assertRaisesRegex(ValueError, "duplicate"):
+                TOOL.packaged_build_args(json.dumps(request)[:-1] + ', "intent_key":"' + "d" * 64 + '"}')
+            with self.assertRaisesRegex(ValueError, "bounded"):
+                TOOL.packaged_build_args(" " * 8193)
+            package_read.assert_not_called()
+
+    def test_packaged_request_rejects_stale_noncanonical_and_nonprivate_workspace(self):
+        with self.pure_packaged_fixture() as (_, workspace, request, package_read, _):
+            for fields in ({"ino": str(int(request["workspace"]["ino"]) + 1)}, {"dev": "01"}, {"path": str(workspace) + "/"}, {"path": str(workspace.parent / ".." / "peer-context-component/v1")}, {"path": "relative/peer-context-component/v1"}):
+                with self.subTest(fields=fields), self.assertRaises(ValueError):
+                    TOOL.packaged_build_args(json.dumps({**request, "workspace": {**request["workspace"], **fields}}))
+            workspace.chmod(0o755)
+            with self.assertRaisesRegex(ValueError, "private"):
+                TOOL.packaged_build_args(json.dumps(request))
+            package_read.assert_not_called()
+
+    def test_packaged_request_rejects_workspace_inside_package_and_linked_original(self):
+        with self.pure_packaged_fixture() as (package, workspace, request, package_read, _):
+            nested = package / "data/peer-context-component/v1"
+            nested.mkdir(parents=True)
+            nested.chmod(0o700)
+            nested.parent.chmod(0o700)
+            with self.assertRaisesRegex(ValueError, "outside"):
+                TOOL.packaged_build_args(json.dumps({**request, "workspace": TOOL.packaged_directory_identity(nested)}))
+            workspace.rename(workspace.with_name("retained"))
+            workspace.symlink_to(workspace.with_name("retained"), target_is_directory=True)
+            with self.assertRaisesRegex(ValueError, "symlink"):
+                TOOL.packaged_build_args(json.dumps(request))
+            package_read.assert_not_called()
+
+    def test_packaged_command_holds_outside_the_fixed_original_module(self):
+        with patch.object(TOOL.subprocess, "Popen") as spawn, self.assertRaisesRegex(ValueError, "original installed"):
+            TOOL.packaged_original_root()
+        spawn.assert_not_called()
+
+    def test_packaged_fence_preserves_original_package_workspace_and_parent_identities(self):
+        with self.pure_packaged_fixture() as (package, workspace, request, _, _):
+            args = TOOL.packaged_build_args(json.dumps(request))
+            for directory in (workspace, workspace.parent, workspace.parent.parent, package):
+                with self.subTest(directory=directory):
+                    retained = directory.with_name(directory.name + "-retained")
+                    directory.rename(retained)
+                    directory.mkdir(mode=0o700)
+                    with self.assertRaises((ValueError, OSError)):
+                        TOOL.packaged_build_fence(args)
+                    directory.rmdir()
+                    retained.rename(directory)
+                    TOOL.packaged_build_fence(args)
+
+    def test_packaged_request_holds_when_workspace_changes_during_original_recipe_read(self):
+        with self.pure_packaged_fixture() as (_, workspace, request, package_read, _):
+            recipe = package_read.return_value
+            def changed(_manifest):
+                workspace.rename(workspace.with_name("retained-before-recipe"))
+                workspace.mkdir(mode=0o700)
+                return recipe
+            package_read.side_effect = changed
+            with self.assertRaisesRegex(ValueError, "root replaced"):
+                TOOL.packaged_build_args(json.dumps(request))
+            self.assertFalse((workspace / "operations").exists())
+
+    def test_packaged_fence_holds_same_inode_data_mode_changes_without_chmod_or_provisioning(self):
+        with self.pure_packaged_fixture() as (_, workspace, request, _, _):
+            data = workspace.parent.parent
+            data.chmod(0o755)  # Existing supported D may be readable, never writable by others.
+            args = TOOL.packaged_build_args(json.dumps(request))
+            original = TOOL.packaged_directory_identity(data)
+            for mode in (0o750, 0o775):
+                data.chmod(mode)
+                self.assertEqual(TOOL.packaged_directory_identity(data), original)
+                with self.assertRaisesRegex(ValueError, "metadata changed"):
+                    TOOL.packaged_build_fence(args)
+                self.assertEqual(stat.S_IMODE(data.stat().st_mode), mode)
+            with self.assertRaisesRegex(ValueError, "group/world writable"):
+                TOOL.packaged_build_args(json.dumps(request))
+            self.assertFalse((workspace / "operations").exists())
+
+    def test_packaged_c_mapping_uses_only_canonical_package_helper(self):
+        with self.pure_packaged_fixture() as (package, _, _, _, _):
+            original = package / "helpers/origin-sidecar-capture.c"
+            original.parent.mkdir()
+            data = b"FICTIONAL C, NEVER COMPILED\n"
+            original.write_bytes(data)
+            manifest = {"sidecar_capture": {"protocol": "soloco-origin-sidecar-source-build-v1",
+                "source": {"path": TOOL.SIDECAR_SOURCE, "bytes": len(data), "sha256": TOOL.sha(data)},
+                "binary": "origin-sidecar-capture", "arguments": ["origin-sidecar-capture-v1"],
+                "target": "arm64-apple-macos11.0", "flags": list(TOOL.SIDECAR_FLAGS)}}
+            self.assertEqual(TOOL.sidecar_source(TOOL.MANIFEST.parent, manifest), data)
+            original.unlink()
+            with self.assertRaises(OSError):
+                TOOL.sidecar_source(TOOL.MANIFEST.parent, manifest)
+            with self.assertRaisesRegex(ValueError, "another recipe root"):
+                TOOL.sidecar_source(package, manifest)
+
     def test_duplicate_json_keys_are_rejected(self):
         with self.assertRaisesRegex(ValueError, "duplicate"):
             json.loads('{"status":"pending","status":"frozen-source-unqualified"}', object_pairs_hook=TOOL.unique_object)

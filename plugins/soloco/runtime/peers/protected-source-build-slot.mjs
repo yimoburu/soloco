@@ -167,6 +167,7 @@ export function assertOriginalPeerContextSlot(h,declared){if(!sameContext(origin
 // actually imported Node namespaces required by inspectOriginalLoadedPeerBridge.
 function selectedComponentAssociation(){
  const d=inspectOriginalLoadedPeerBridge(),files=d.files;
+ if(d.layout){const packageRoot=fileURLToPath(new URL('../../',import.meta.url)).replace(/\/$/,'');if(d.layout.kind!=='packaged-plugin-v1'||d.layout.package_root!==packageRoot||d.layout.source_root!==packageRoot||d.node.root!==packageRoot)contextHold();}
  if(d.native_qualified!==false||d.claims_released!==false||d.executable.mode!=='100555')contextHold();
  const m=files.compiled_manifest,manifest=contextDocument({path:m.path,bytes:m.bytes,sha256:m.sha256},d.original_component_root);
  const producer=manifest.files.find(r=>r.path==='codex-rs/codex-api/src/protected_peer.rs');
