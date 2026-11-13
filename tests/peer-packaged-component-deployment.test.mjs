@@ -48,7 +48,7 @@ test('packaged deployment loads only actual P modules and preserves same-P opaqu
 });
 
 test('packaged deployment rejects foreign layout DATA and retained physical drift',async t=>{
- const f=await fixture(t),original=clone(f.data);f.data.layout.package_root=path.join(f.root,'foreign-package');fs.chmodSync(f.dataFile,0o600);fs.writeFileSync(f.dataFile,JSON.stringify(f.data));await assert.rejects(f.module.prepareOriginalPackagedContextDeployment(),e=>e.code==='COMPONENT_DEPLOYMENT_LAYOUT_CHANGED');
+ const f=await fixture(t),original=clone(f.data),foreign=clone(original);foreign.layout.package_root=path.join(f.root,'foreign-package');fs.chmodSync(f.dataFile,0o600);fs.writeFileSync(f.dataFile,JSON.stringify(foreign));await assert.rejects(f.module.prepareOriginalPackagedContextDeployment(),e=>e.code==='COMPONENT_DEPLOYMENT_LAYOUT_CHANGED');
  fs.writeFileSync(f.dataFile,JSON.stringify(original));const h=await f.module.prepareOriginalPackagedContextDeployment();fs.chmodSync(f.managed,0o750);assert.throws(()=>f.module.inspectOriginalPackagedContextDeployment(h),e=>e.code==='COMPONENT_LAYOUT_CHANGED');
 });
 
