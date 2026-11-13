@@ -171,7 +171,7 @@ export function assertLaunchCounts(){const expected=${centralAvailable}?1:0;asse
 `);
  const producer=path.join(directory,'prospective-local-worker-inventory-producer.mjs'),producerURL=pathToFileURL(producer).href;
  fs.writeFileSync(producer,'export {assertOriginalPeerMaintenanceExecutionCapacityFrom,assertOriginalPeerMaintenanceExecutionCapacityInTransactionFrom,claimOriginalPeerExecutionLaunchFrom,bindOriginalPeerExecutionLaunchCutoffFrom,spawnOriginalPeerExecutionLaunch,originalWorkerFailedLaunchChild,cleanupOriginalWorkerLaunchFailure} from '+JSON.stringify(pathToFileURL(shim).href)+';\n');
- const original=fs.readFileSync(file,'utf8'),url=pathToFileURL(shim).href,expected=[
+ const original=fs.readFileSync(file,'utf8'),url=pathToFileURL(shim).href,expectedDomainImports=[
   ['./protected-source-build-slot.mjs','import {ORIGINAL_CONTEXT_SELECTION,resolveOriginalPeerContextInterpreter,assertOriginalPeerContextInterpreterFinal,assertOriginalPeerContextSlot,inspectOriginalPeerContextInterpreter}'],
   ['./ledger.mjs','import {canonical,PeerLedger}'],
   ['./prospective-local-worker-inventory-producer.mjs','import {assertOriginalPeerMaintenanceExecutionCapacityFrom as assertInventory,assertOriginalPeerMaintenanceExecutionCapacityInTransactionFrom as assertInventoryInTransaction,claimOriginalPeerExecutionLaunchFrom,bindOriginalPeerExecutionLaunchCutoffFrom,spawnOriginalPeerExecutionLaunch,originalWorkerFailedLaunchChild,cleanupOriginalWorkerLaunchFailure}'],
@@ -189,7 +189,7 @@ export function assertLaunchCounts(){const expected=${centralAvailable}?1:0;asse
   ['./policy-supervisor.mjs','import {inspectOriginalCompiledBootstrapScope}'],
   ['./protected-source-build-slot.mjs','import {isOriginalBootstrapMembershipInterpreter,assertOriginalBootstrapMembershipInterpreterFinal,inspectOriginalBootstrapMembershipInterpreter,assertOriginalBootstrapMembershipSlot,originalBootstrapCompanionSlotMatches}']
  ];
- assert.equal(expected.length,16);const relocated=relocateFixedPredecessors(original,file,url,expected,new Map([['./prospective-local-worker-inventory-producer.mjs',producerURL]]));
+ assert.equal(expectedDomainImports.length,16);const relocated=relocateFixedPredecessors(original,file,url,expectedDomainImports,new Map([['./prospective-local-worker-inventory-producer.mjs',producerURL]]));
  const body=s=>s.split('\n').filter(line=>!line.startsWith('import ')).join('\n');assert.equal(body(relocated),body(original));const copy=path.join(directory,'domain.mjs');fs.writeFileSync(copy,relocated);
  const domain=await import(pathToFileURL(copy).href),s=await import(url),w=await import(wireURL),owner=Symbol('SYNTHETIC original frontier owner');s.install(owner,domain);t.mock.timers.enable({apis:['setTimeout']});
  let facade;t.after(async()=>{try{await s.child.close();facade?.stdin.destroy();facade?.stdout.destroy();s.assertLaunchCounts();assert.equal(fs.readFileSync(file,'utf8'),original);}finally{t.mock.timers.reset();fs.rmSync(directory,{recursive:true,force:true});}});
