@@ -5,6 +5,9 @@ import os from 'node:os';
 import path from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {DatabaseSync} from 'node:sqlite';
+import childProcess from 'node:child_process';
+import {syncBuiltinESMExports} from 'node:module';
+import {fileURLToPath} from 'node:url';
 import {Store,SCHEMA,VERSION,installedTeam,teamHash,digest,withStore,id} from '../plugins/soloco/runtime/store.mjs';
 import {runWithMcpHostContext} from '../plugins/soloco/runtime/mcp-host-context.mjs';
 import {developmentLimits} from '../plugins/soloco/runtime/development-limits.mjs';
@@ -20,7 +23,7 @@ import {inspectLegacyDevelopmentBudget as inspect,proposeLegacyDevelopmentBudget
 // SOURCE fixtures only: HOST metadata, pinned owner and existing grant are
 // fictional. No genuine native, installed hook, model or business proof exists.
 const KEY='development_budget_control',instruction='Explicit fictional source-only project ceiling control; retain original bytes and grants.';
-function fixture(t,{raw}={}){
+function fixture(t,{raw,beforeCleanup}={}){
  const root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'soloco-budget-source-'))),session_id=randomUUID(),actor=Object.freeze({host:'codex',session_id,native_id:session_id});
  const s={...installedTeam(),schema:SCHEMA,runtime_version:VERSION,id:'fictional-'+randomUUID(),name:'Fictional budget fixture',idea:'No company execution',mode:'preparation',phase:'preparation',paused:true,revision:0,owner:{host:'codex',session_id,epoch:1},records:{},jobs:{},sessions:{},notices:[],messages:[],upgrade_history:[]};
  s.team_sha256=teamHash(s);s.records.intent={id:'intent',kind:'intent',revision:1,content:'Original binding intent'};s.records.decision={id:'decision',kind:'decision',revision:1,content:'Original finite standing authorization'};
@@ -29,11 +32,71 @@ function fixture(t,{raw}={}){
  s.records.plan.development.authorization.authority_sha256=developmentReviewAuthority(s,'plan');
  const store=new Store(root,true);store.transaction('fixture.source',()=>s);store.migrate();store.close();
  const config=path.join(root,'.company','development.json');if(raw!==undefined)fs.writeFileSync(config,raw,{mode:0o640});
- t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+ t.after(async()=>{await beforeCleanup?.();fs.rmSync(root,{recursive:true,force:true});});
  const rawCall=(fn,a)=>runWithMcpHostContext('codex',{threadId:session_id,sessionId:session_id},()=>fn(root,actor,a));
  const call=(fn,a={})=>rawCall(fn,{epoch:1,...a});
  return {root,actor,config,call,rawCall,read:()=>withStore(root,db=>db.read())};
 }
+// Observe only the original run call's returned child. This is a close barrier,
+// not descendant/group closure or native identity evidence; the execution
+// controller owns those checks.
+function observeOriginalDevelopmentWorker(f,plan,candidate) {
+ const originalSpawn=childProcess.spawn,entry=fileURLToPath(new URL('../plugins/soloco/runtime/develop.mjs',import.meta.url));
+ let calls=0,delegated=0,child,attached=false,spawned=false,closeEvidence=null,providerError,launchError,jobId,finishing;
+ let resolveClose;const closed=new Promise(resolve=>{resolveClose=resolve;});
+ const observedSpawn=function(file,argv,options){
+  calls++;
+  try{
+   assert.equal(calls,1,'Only the exact original development worker may be spawned');
+   assert.equal(file,process.execPath);assert.ok(Array.isArray(argv));assert.equal(argv.length,4);
+   assert.deepEqual(argv.slice(0,3),['--no-warnings',entry,f.root]);
+   assert.equal(typeof argv[3],'string');jobId=argv[3];
+   const j=f.read().jobs[jobId];
+   assert.ok(j&&j.id===jobId&&j.kind==='development_test'&&j.status==='queued'&&j.development_id===plan.id&&j.candidate_id===candidate.id&&j.session_id===f.actor.session_id&&j.host==='codex'&&j.epoch===1,'Exact reserved fictional test job required');
+   assert.deepEqual(Object.keys(options).sort(),['detached','env','stdio']);
+   assert.equal(options.detached,true);assert.equal(options.stdio,'ignore');
+   const expectedEnv={...process.env,COMPANY_WORKER:'1'},keys=Object.keys(expectedEnv);
+   assert.ok(options.env&&Object.keys(options.env).length===keys.length&&keys.every(key=>options.env[key]===expectedEnv[key]),'Original worker environment must pass through unchanged');
+   delegated++;child=Reflect.apply(originalSpawn,this,[file,argv,options]);
+   child.once('spawn',()=>{spawned=true;});
+   child.once('error',error=>{providerError??=error;});
+   child.once('close',(exit,signal)=>{closeEvidence=Object.freeze({exit,signal});resolveClose(closeEvidence);});
+   attached=true;return child;
+  }catch(error){if(delegated&&!attached)launchError??=error;else providerError??=error;throw error;}
+ };
+ const restore=()=>{
+  const changed=childProcess.spawn!==observedSpawn;
+  childProcess.spawn=originalSpawn;syncBuiltinESMExports();
+  assert.equal(changed,false,'Original worker observer binding changed while active');
+ };
+ childProcess.spawn=observedSpawn;
+ try{syncBuiltinESMExports();}catch(error){
+  childProcess.spawn=originalSpawn;
+  try{syncBuiltinESMExports();}catch(cleanup){throw new AggregateError([error,cleanup],'Original worker observer setup and restoration failed',{cause:error});}
+  throw error;
+ }
+ const finish=()=>finishing??=(async()=>{
+  let primary,timer;
+  try{
+   if(!calls)return Object.freeze({closure_basis:'never_started'});
+   if(launchError)throw Object.assign(Error('Original worker launch outcome is unknown; fixture retained',{cause:launchError}),{code:'SOURCE_WORKER_CLOSE_UNKNOWN'});
+   if(!delegated&&providerError)throw providerError;
+   assert.equal(delegated,1,'Exactly one original worker delegation required');
+   // A receipt/error/exit/PID is not close. A timeout never authorizes removal.
+   const evidence=closeEvidence??await Promise.race([closed,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Object.assign(Error('Original worker close was not observed within 10000ms; fixture retained'),{code:'SOURCE_WORKER_CLOSE_UNKNOWN'})),10000);})]);
+   if(providerError)throw providerError;
+   assert.equal(spawned,true,'Original worker spawn must be observed before close');
+   assert.equal(evidence.exit,0);assert.equal(evidence.signal,null);
+   return Object.freeze({closure_basis:'original_returned_child_close',exit:evidence.exit,signal:evidence.signal});
+  }catch(error){primary=error;throw error;}
+  finally{
+   clearTimeout(timer);
+   try{restore();}catch(cleanup){if(primary)throw new AggregateError([primary,cleanup],'Original worker close barrier and restoration failed',{cause:primary});throw cleanup;}
+  }
+ })();
+ return {finish,assertJob:job=>{assert.equal(calls,1);assert.equal(delegated,1);assert.equal(job.id,jobId);}};
+}
+
 const planned=async(f,max=400000)=>{const i=await f.call(inspect);return f.call(propose,{max_bytes_ceiling:max,expected_config:i.configuration,source_instruction:instruction,restoration_policy:'retain-original-explicit-cas-restore'});};
 const applied=async(f,max=400000)=>{const p=await planned(f,max);return f.call(apply,{proposal_ref:p.proposal_ref,source_instruction:instruction});};
 function patch(t,object,key,fn){const old=object[key];object[key]=fn(old);t.after(()=>{object[key]=old;});return ()=>{object[key]=old;};}
@@ -180,7 +243,7 @@ test('oversized exact audit records remain fully retrievable by hash-bound surro
 
 test('supported setter permits a complete over100K SOURCE candidate through real isolated tests and exact synthetic independent QA',async t=>{
  const capability=sandboxCapability();if(!capability.supported){t.skip('Actual isolated development executor unavailable: '+capability.blocker);return;}
- const f=fixture(t),prior=process.env.COMPANY_PLUGIN_DATA;process.env.COMPANY_PLUGIN_DATA=path.join(f.root,'fictional-host-data');t.after(()=>{if(prior===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=prior;});
+ let observation;const f=fixture(t,{beforeCleanup:()=>observation?.finish()}),prior=process.env.COMPANY_PLUGIN_DATA;process.env.COMPANY_PLUGIN_DATA=path.join(f.root,'fictional-host-data');t.after(()=>{if(prior===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=prior;});
  engine.bind(f.root,f.actor.session_id,'codex');withStore(f.root,db=>db.transaction('fixture.allow_source_test',s=>{s.paused=false;return s;}));
  const setting=await applied(f,400000);assert.equal(setting.status,'applied');
  const source='export const sum = values => 0;\n'+'// fictional selected complete source padding\n'.repeat(3500),changed=source.replace('=> 0','=> values.reduce((a,b)=>a+b,0)'),testSource="import test from 'node:test';import assert from 'node:assert/strict';import {sum} from './sum.mjs';test('exact generated sum',()=>assert.equal(sum([1,2,3]),6));\n";
@@ -191,9 +254,11 @@ test('supported setter permits a complete over100K SOURCE candidate through real
  const files=[{path:'sum.mjs',content:changed},{path:'sum.test.mjs',content:testSource}],generation=queue('engineer');
  await work(f.root,generation,async()=>({native_id:'fictional-engineer-'+randomUUID(),text:JSON.stringify({content:'Synthetic generator DATA only',messages:[],notices:[],files})}));
  const generated=f.read(),candidate=generated.records[generated.jobs[generation].artifact_id];assert.equal(candidate?.status,'Submitted');assert.ok(candidate.development.generation.candidate_bytes>100000);assert.deepEqual(candidate.development.files,files);
- const job=await engine.develop({...args,action:'run',plan_id:p.id,candidate_id:candidate.id},'codex');let receipt;const deadline=Date.now()+30000;
+ observation=observeOriginalDevelopmentWorker(f,p,candidate);
+ const job=await engine.develop({...args,action:'run',plan_id:p.id,candidate_id:candidate.id},'codex');observation.assertJob(job);let receipt;const deadline=Date.now()+30000;
  while(Date.now()<deadline){const s=f.read();receipt=s.records[s.jobs[job.id]?.artifact_id];if(receipt)break;await new Promise(resolve=>setTimeout(resolve,50));}
  assert.ok(receipt,'original test worker must retain actual terminal receipt');assert.equal(receipt.development.result.status,'passed');assert.equal(receipt.development.result.tests_executed,true);
+ await observation.finish(); // Physical direct-child close precedes QA and fixture removal.
  const qa=queue('qa',receipt);await work(f.root,qa,async(_host,_native,prompt)=>{assert.ok(prompt.includes(JSON.stringify(candidate.development.files)),'complete exact candidate reaches independent review');assert.ok(prompt.includes(candidate.development.candidate_sha256));assert.ok(prompt.includes(receipt.development.receipt_sha256));return {native_id:'fictional-independent-qa-'+randomUUID(),text:JSON.stringify({content:'Synthetic independent source assessment; actual runtime tests attributed to original controller',messages:[],notices:[],review:{verdict:'Pass',reason:'Exact full candidate/test/receipt inspected by SOURCE fixture',permitted_action:'accept_local_development',candidate_sha256:candidate.development.candidate_sha256,receipt_sha256:receipt.development.receipt_sha256,blockers:[]}})};});
  const state=f.read(),review=state.records[state.jobs[qa].artifact_id];assert.equal(review?.status,'Submitted');assert.notEqual(review.author_instance,candidate.author_instance);assert.notEqual(state.jobs[qa].native_id,state.jobs[generation].native_id);
  const accepted=await engine.develop({...args,action:'accept',plan_id:p.id,receipt_id:receipt.id,review_id:review.id,receipt_sha256:receipt.development.receipt_sha256},'codex');assert.equal(accepted.source_integrated,false);assert.equal(fs.readFileSync(path.join(f.root,'sum.mjs'),'utf8'),source);assert.equal(fs.existsSync(path.join(f.root,'sum.test.mjs')),false);
