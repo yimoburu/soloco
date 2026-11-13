@@ -30,6 +30,16 @@ counters. Equality of a descriptive normalized hash alone is insufficient.
 Unknown counter names and changes to authority, limits, policy or pause state
 are not exempted.
 
+Before the first bootstrap charge, every known outer counter is also compared
+with the immediately preceding origin revision. A later semantic capture cannot
+absorb a refund. Increases must match one of the existing origin maintenance,
+input-frontier or frontier-seal admission producers, including its retained
+record bindings and paired origin/company/global-usage updates. These checks
+count historical spending without requiring a completed Native result or
+renewing an expired purpose. Unretained original request spelling or raw-root
+preimages are not reconstructed from hashes, and cost replay supplies no Native
+or semantic qualification.
+
 The authority baseline is the literal historical company and origin before the
 first authenticated bootstrap charge. An enrollment pins that exact company
 reference as `bootstrap_authority_ref`. Admission uses the same reference as
