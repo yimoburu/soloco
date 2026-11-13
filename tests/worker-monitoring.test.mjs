@@ -38,7 +38,9 @@ async function fixedCapabilityBoundary(fn){
   const environment=scratch=>({PATH:'/usr/bin:/bin',HOME:scratch,TMPDIR:scratch,TMP:scratch,TEMP:scratch,LANG:'C',LC_ALL:'C',OPENSSL_CONF:'/dev/null',NODE_DISABLE_COLORS:'1'});
   const optionKeys=(options,keys)=>assert.deepEqual(Object.keys(options).sort(),keys.slice().sort());
   for(const name of methods)childProcess[name]=function(...args){return reject(name,args);};
-  childProcess.spawnSync=(command,args,options)=>{
+  childProcess.spawnSync=function(...invocation){
+    if(new.target)return reject('spawnSync:new',invocation);
+    const [command,args,options]=invocation;
     try{
       assert(Array.isArray(args));assert(options&&typeof options==='object');
       if(command==='/usr/bin/otool'){
@@ -69,7 +71,7 @@ async function fixedCapabilityBoundary(fn){
         return {status:0,signal:null,stdout:'TAP version 13\nSOLOCO_SANDBOX_READY\n',stderr:''};
       }
     }catch(error){unexpected.push({method:'spawnSync',command:String(command),reason:error.message});throw error;}
-    return reject('spawnSync',[command,args,options]);
+    return reject('spawnSync',invocation);
   };
   syncBuiltinESMExports();
   try{return await fn(effects);}
