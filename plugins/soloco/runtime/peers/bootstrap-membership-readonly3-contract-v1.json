@@ -1,0 +1,50 @@
+{
+  "protocol": "soloco-bootstrap-membership-context-contract-v1",
+  "contract_id": "bootstrap-membership-readonly3-whole-assignment-v1",
+  "scope_profile_id": "soloco-bootstrap-membership-readonly3-v1",
+  "context_encoding": "soloco-peer-context-frame-v2",
+  "delivery": {
+    "delivery_kind": "bootstrap-membership-assignment",
+    "payload_protocol": "peer-bootstrap-membership-assignment-v1",
+    "source_cut_protocol": "peer-bootstrap-membership-context-v1",
+    "basis_protocol": "peer-checked-input-current-meaning-v1",
+    "kinds": ["peer-bootstrap-membership-reconstruction", "peer-bootstrap-membership-review"]
+  },
+  "tools": [
+    {
+      "type": "function",
+      "name": "soloco_context_header",
+      "description": "Private bootstrap membership context protocol; identity and authority are supplied only by the original protected composition.",
+      "inputSchema": {"type":"object","properties":{},"required":[],"additionalProperties":false}
+    },
+    {
+      "type": "function",
+      "name": "soloco_context_read",
+      "description": "Private bootstrap membership context protocol; identity and authority are supplied only by the original protected composition.",
+      "inputSchema": {
+        "type":"object",
+        "properties": {
+          "sha256":{"type":"string"},
+          "offset":{"type":"integer","minimum":0},
+          "length":{"type":"integer","minimum":1,"maximum":4096}
+        },
+        "required":["sha256","offset","length"],
+        "additionalProperties":false
+      }
+    },
+    {
+      "type": "function",
+      "name": "soloco_context_submit",
+      "description": "Private bootstrap membership context protocol; identity and authority are supplied only by the original protected composition.",
+      "inputSchema": {
+        "type":"object",
+        "properties":{"sha256":{"type":"string"},"content":{"type":"string"}},
+        "required":["sha256","content"],
+        "additionalProperties":false
+      }
+    }
+  ],
+  "limits": {"frame_bytes":100000,"wire_bytes":4000000,"policy_maximum_context_bytes":65536,"read_maximum_characters":4096,"response_maximum_utf8_bytes":12000},
+  "fresh_thread_required": true,
+  "authority": "Source mechanical delivery and constructor-selected catalogue only. No finite purpose, qualified context, launch, spending, membership activation, Native qualification or reservation release is supplied by this resource. Existing Holds remain."
+}

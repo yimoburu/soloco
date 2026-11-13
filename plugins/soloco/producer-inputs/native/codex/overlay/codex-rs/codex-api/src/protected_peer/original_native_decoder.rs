@@ -25,6 +25,14 @@ impl OriginalStartupIdentity {
         self.nonce==claim.nonce&&self.pid==std::process::id()&&self.slot==claim.slot_id
             &&self.source==claim.source_manifest_sha256&&self.executable==claim.executable_sha256
     }
+    pub(super) fn terminal_drained_frame(&self,request_id:&str,request_sha256:&str,sequence:u64,
+        response_id:&str,terminal_logical_payload_sha256:&str)->Value {
+        serde_json::json!({"protocol":super::PROTOCOL,"kind":"original_response_terminal_drained",
+            "nonce":self.nonce,"pid":self.pid,"host_instance_id":self.host,"request_id":request_id,
+            "request_sha256":request_sha256,"sequence":sequence,"response_id":response_id,
+            "terminal_logical_payload_sha256":terminal_logical_payload_sha256,
+            "local_body_eof_observed":true,"remote_domain_closed":false})
+    }
 }
 struct DecoderOwner {identity:OriginalStartupIdentity}
 /// No public constructor, Clone, Deserialize, or writer accessor on an event.

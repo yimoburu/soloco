@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {canonical,peerDigest} from '../plugins/soloco/runtime/peers/ledger.mjs';
-import {recordOriginalPeerTaskLateEvidence as unavailable} from '../plugins/soloco/runtime/peers/task-late-evidence.mjs';
+import {recordOriginalPeerTaskLateEvidence as actualRecord} from '../plugins/soloco/runtime/peers/task-late-evidence.mjs';
 import {peerTaskEffectsFixture,logicalSQLState,reference} from './peer-task-effects-fixture.mjs';
 
 // Real temporary SQLite and genuine task/admit source commands. Only the
@@ -27,7 +27,10 @@ const relocated=fs.readFileSync(source,'utf8')
   .replace("'./ledger.mjs'",JSON.stringify(url(path.join(path.dirname(source),'ledger.mjs'))))
   .replace("'./protected-codex-domain.mjs'",JSON.stringify(url(path.join(directory,'domain.mjs'))));
 fs.writeFileSync(path.join(directory,'late.mjs'),relocated);
+fs.writeFileSync(path.join(directory,'missing-domain.mjs'),'export {};\n');
+fs.writeFileSync(path.join(directory,'missing-late.mjs'),relocated.replace(JSON.stringify(url(path.join(directory,'domain.mjs'))),JSON.stringify(url(path.join(directory,'missing-domain.mjs')))));
 const {recordOriginalPeerTaskLateEvidence:record}=await import(url(path.join(directory,'late.mjs')));
+const {recordOriginalPeerTaskLateEvidence:unavailable}=await import(url(path.join(directory,'missing-late.mjs')));
 const domain=await import(url(path.join(directory,'domain.mjs')));
 test.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
 
@@ -124,10 +127,11 @@ for(const variant of ['missing-native','discrepant-native','discrepant-process']
   assert.equal(notice.value.acceptance_authority,false);assert.equal(notice.value.reservation_release_authority,false);
 });
 
-test('non-admission commands and unavailable actual native producer cannot create evidence',async t=>{
+test('non-admission commands, unavailable producers and foreign native capabilities cannot create evidence',async t=>{
   const f=peerTaskEffectsFixture(t),a=f.start(),admission=original(f,a),d=diagnostic(f,a,admission);
   const before=logicalSQLState(f);
   await assert.rejects(unavailable(f.ledger,admission,d.token),e=>e.code==='TASK_LATE_SOURCE_UNAVAILABLE');
+  await assert.rejects(actualRecord(f.ledger,admission,d.token),e=>e.code==='PROTECTED_CODEX_ORIGINAL_OWNED_CAP_REQUIRED');
   const wrong=f.ledger.read(tx=>tx.list('commands',{limit:100}).items.find(row=>row.value.action==='task/submit'));
   await assert.rejects(record(f.ledger,reference('commands',wrong),d.token));assert.deepEqual(logicalSQLState(f),before);
 });

@@ -10,6 +10,11 @@ import {assertPeerOriginLegacyFences,ORIGIN_QUARANTINE_PROTOCOL} from './origin-
 import {assertOriginActor,originSafeData,originSidecars,ORIGIN_LIMITS,originHash,originNeed as need,originSame as same,originCopy as copy,originRef as ref} from './origin-plan.mjs';
 import {ORIGIN_MAINTENANCE_INSTRUCTION} from './origin-maintenance-instruction.mjs';
 
+// Fixed genuine readers for the bootstrap namespace. Re-exporting them does
+// not mint purpose, renew allowance or select a runner.
+export {assertPeerOriginSelectedMaintenanceFrom} from './origin-maintenance-authority.mjs';
+export {assertPeerOriginPausedBootstrapPurposeFrom} from './origin-paused-bootstrap-accounting.mjs';
+
 export const ORIGIN_MAINTENANCE_CONTEXT='peer-origin-maintenance-context-v1';
 const services=new WeakMap(),caps=new WeakMap(),consumed=new WeakSet(),outputFailures=new WeakSet();
 const kinds=['peer-origin-reconstruction','peer-origin-review'];

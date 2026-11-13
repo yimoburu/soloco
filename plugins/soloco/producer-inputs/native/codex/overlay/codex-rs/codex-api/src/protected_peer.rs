@@ -304,17 +304,19 @@ fn generation(previous: &mut Option<String>, current: String, n: &mut u64) -> Re
     Ok(())
 }
 
-/// Inventory equivalence is deliberately bounded to the same original five
-/// complete schemas. Called only after the final original wire proof matches.
+/// Exact catalog equality follows the immutable original startup selection.
+/// A request body cannot select bootstrap or an arbitrary ordinary subset.
 fn validated_offered_inventory(root: &serde_json::Map<String, Value>) -> Result<Value, TransportError> {
-    let expected: Value = serde_json::from_str(include_str!("protected_peer_responses_tools.json"))
-        .map_err(|_| hold("compiled tool resource"))?;
+    validated_selected_offered_inventory(root,context_contract::selected_original_tool_profile())
+}
+fn validated_selected_offered_inventory(root:&serde_json::Map<String,Value>,profile:context_contract::OriginalToolProfile)->Result<Value,TransportError> {
+    let expected=profile.offered_inventory()?;
     let input = root.get("input").and_then(Value::as_array).ok_or_else(||hold("ordered input"))?;
     let additional: Vec<_> = input.iter().enumerate().filter(|(_,item)|
         item.get("type").and_then(Value::as_str)==Some("additional_tools")).collect();
     if let Some(tools) = root.get("tools") {
         if tools != &expected || !additional.is_empty() {
-            return Err(hold("full original five-tool/schema equality or deferred offered inventory"));
+            return Err(hold("full original selected tool/schema equality or deferred offered inventory"));
         }
     } else {
         let [(index, item)] = additional.as_slice() else {
@@ -326,7 +328,7 @@ fn validated_offered_inventory(root: &serde_json::Map<String, Value>) -> Result<
         let namespace = json!([{"type":"namespace", "name":codex_protocol::DEFAULT_FUNCTION_NAMESPACE,
             "description":"", "tools":expected.clone()}]);
         if item.get("tools") != Some(&namespace) {
-            return Err(hold("full original RLite five-tool namespace/schema equality"));
+            return Err(hold("full original RLite selected tool namespace/schema equality"));
         }
     }
     Ok(expected)
@@ -444,7 +446,7 @@ fn observation<'a>(request: &'a Request, body: &[u8], step: &'a SourceStep, gate
     Ok(FinalObservation { protocol: PROTOCOL, kind: "final_request", nonce: &challenge.nonce,
         pid: std::process::id(), sequence, source_commit: COMMIT,
         producer_module_sha256: hash(include_bytes!("protected_peer.rs")),
-        tool_resource_sha256: hash(include_bytes!("protected_peer_responses_tools.json")),
+        tool_resource_sha256: context_contract::selected_original_tool_profile().resource_sha256(),
         host_instance_id, runtime_generation: step.runtime.generation, profile_generation: *profile_generation,
         services_generation: *services_generation, instruction_generation: *instruction_generation,
         thread_id: &step.thread_id, turn_id, step_id: *next_step, auth_owner_generation: auth_owner,
@@ -567,6 +569,37 @@ impl Channel {
         Ok(())
     }
 }
+/// The concrete original FD3 writer is retained by the SAME response decoder.
+/// Raw byte EOF cannot release its request reservation or disarm cancellation.
+#[cfg(unix)]
+struct OriginalResponseDrainWriter {
+    owner:&'static tokio::sync::Mutex<Channel>,
+    startup:original_native_decoder::OriginalStartupIdentity,
+    request_id:String,request_sha256:String,sequence:u64,
+    guard:OperationGuard<'static>,
+}
+#[cfg(unix)]
+impl OriginalResponseDrainWriter {
+    fn matches(&self,startup:&original_native_decoder::OriginalStartupIdentity,request_id:&str,request_sha256:&str)->bool {
+        &self.startup==startup&&self.request_id==request_id&&self.request_sha256==request_sha256
+    }
+    async fn publish(mut self,drained:original_history::OriginalResponseTerminalDrained)->Result<(),TransportError> {
+        let mut state=lock_original_known(self.owner,self.guard.unknown).await?;
+        if state.poisoned||state.sequence!=self.sequence||state.unresolved.as_deref()!=Some(self.request_id.as_str())
+            ||original_native_decoder::OriginalStartupIdentity::observe(&state)?!=self.startup
+            ||!drained.matches(&self.startup,&self.request_id,&self.request_sha256) {
+            state.poisoned=true;return Err(hold("response original terminal drain channel changed"));
+        }
+        let frame=drained.frame(self.sequence);
+        let result=tokio::time::timeout(std::time::Duration::from_secs(5),state.write(&frame)).await;
+        if !matches!(result,Ok(Ok(()))) {
+            state.poisoned=true;return Err(hold("response original terminal drain witness write failed/deadline"));
+        }
+        // Only an authoritative parser+same-body drain written on the original
+        // inherited FD3 releases THIS request. Drop/error keeps UNKNOWN sticky.
+        state.unresolved=None;self.guard.armed=false;Ok(())
+    }
+}
 #[cfg(unix)]
 static CHANNEL: tokio::sync::OnceCell<Result<tokio::sync::Mutex<Channel>, String>> = tokio::sync::OnceCell::const_new();
 #[cfg(unix)]
@@ -634,9 +667,11 @@ pub(crate) async fn stream<T: HttpTransport + 'static>(transport: &T, request: R
             Err(error) => { owner.lock().await.poisoned = true; return Err(error); }
             }
         };
-        let startup_identity={let state=owner.lock().await;
-            original_native_decoder::OriginalStartupIdentity::observe(&state)?};
-        let original = original_history::OriginalResponseDecoder::returned(step, body, startup_identity)?;
+        let (startup_identity,sequence)={let state=owner.lock().await;
+            (original_native_decoder::OriginalStartupIdentity::observe(&state)?,state.sequence)};
+        let original = original_history::OriginalResponseDecoder::returned_from_original_channel(step,body,startup_identity.clone(),
+            OriginalResponseDrainWriter {owner,startup:startup_identity,request_id:step.request_id.clone(),
+                request_sha256:hash(body),sequence,guard})?;
         let StreamResponse { status, headers, bytes } = response;
         {
             let state=owner.lock().await;
@@ -647,24 +682,24 @@ pub(crate) async fn stream<T: HttpTransport + 'static>(transport: &T, request: R
                 .map_err(|_|hold("actual transport header observation deadline"))??;
         }
         let request_id = step.request_id.clone();
-        // EOF is local observed transport-body closure, not remote model/backend-domain death.
-        let bytes = futures::stream::unfold((bytes, owner, request_id, false, guard, live_auth, network_permit), |(mut bytes, owner, request_id, ended, mut guard, live_auth, network_permit)| async move {
+        // Raw EOF is only local transport bookkeeping. The original SSE decoder
+        // must observe Completed AND this same body drain before releasing it.
+        let bytes = futures::stream::unfold((bytes, owner, request_id, sequence, false, live_auth, network_permit), |(mut bytes, owner, request_id, sequence, ended, live_auth, network_permit)| async move {
             if ended { return None; }
             let next = match live_auth.run(&network_permit, bytes.next()).await {
                 Ok(next) => next,
                 Err(_) => Some(Err(hold("original auth/policy revoked while response outstanding"))),
             };
             match next {
-                Some(Ok(chunk)) => Some((Ok(chunk), (bytes, owner, request_id, false, guard, live_auth, network_permit))),
-                Some(Err(error)) => { owner.lock().await.poisoned = true; Some((Err(error), (bytes, owner, request_id, true, guard, live_auth, network_permit))) },
+                Some(Ok(chunk)) => Some((Ok(chunk), (bytes, owner, request_id, sequence, false, live_auth, network_permit))),
+                Some(Err(error)) => { owner.lock().await.poisoned = true; Some((Err(error), (bytes, owner, request_id, sequence, true, live_auth, network_permit))) },
                 None => {
                     let mut state = owner.lock().await;
-                    if state.unresolved.as_ref() != Some(&request_id) { state.poisoned = true; return None; }
+                    if state.poisoned||state.sequence!=sequence||state.unresolved.as_ref()!=Some(&request_id) { state.poisoned = true; return None; }
                     let frame = json!({"protocol":PROTOCOL,"kind":"local_body_eof","request_id":request_id,
-                        "sequence":state.sequence,"pid":std::process::id(),"remote_domain_closed":false});
+                        "sequence":sequence,"pid":std::process::id(),"remote_domain_closed":false});
                     let result = tokio::time::timeout(std::time::Duration::from_secs(5), state.write(&frame)).await;
-                    if matches!(result, Ok(Ok(()))) { state.unresolved = None; guard.armed = false; }
-                    else { state.poisoned = true; }
+                    if !matches!(result, Ok(Ok(()))) { state.poisoned = true; }
                     None
                 }
             }

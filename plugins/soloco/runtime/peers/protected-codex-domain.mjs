@@ -8,7 +8,7 @@ import {spawn} from 'node:child_process';
 import {EventEmitter} from 'node:events';
 import {Writable,PassThrough} from 'node:stream';
 import {randomBytes,createHash} from 'node:crypto';
-import {TextDecoder} from 'node:util';
+import {TextDecoder,types} from 'node:util';
 import {canonical,PeerLedger} from './ledger.mjs';
 import * as model from './model.mjs';
 import {originalCompanionSlotMatches} from './protected-source-build-slot.mjs';
@@ -20,6 +20,7 @@ import {expectedResponsesTools} from './responses-gateway.mjs';
 import {inspectOriginalCompiledCodexPlan,claimOriginalCompiledCodexPlan,originalCompiledPeerContextInterpreter} from './policy-supervisor.mjs';
 
 const launches=new WeakMap(),facades=new WeakMap(),nativeMC23Proofs=new WeakMap();
+const ownedTokens=new WeakMap();
 const PROTOCOL='soloco-protected-backend-witness-v1';
 const PERMIT_PROTOCOL='soloco-protected-backend-permit-v2';
 // This is intentionally not a caller parameter or a child-provided flag.
@@ -39,6 +40,96 @@ const hash=value=>typeof value==='string'&&/^[a-f0-9]{64}$/.test(value);
 const text=value=>typeof value==='string'&&value.length>0&&value.length<=200&&!value.includes('\0');
 const idKey=value=>{if(!text(value)&&!(Number.isSafeInteger(value)&&value>=0))fail('PROTECTED_CODEX_RPC_ID');return canonical(value);};
 function record(owner,handle){const r=launches.get(handle);if(!r||r.owner!==owner||typeof owner!=='symbol')fail('PROTECTED_CODEX_ORIGINAL_PLAN_REQUIRED');return r;}
+function owned(r){return r.owned??=( {binding:null,requests:new Map(),creation:null,drain:null,diagnostic:null,thread:null,turn:null,turn_requested:false,final:null,terminal:null,fault:null,signalled:false} );}
+function connection(ledger){return {root:ledger.root,directory:ledger.directory,company_id:ledger.company_id};}
+function retainOwnedBinding(r,facts){
+ const state=owned(r),ledger=r.native_admission.ledger;
+ const binding={ledger,connection:connection(ledger),facts:copy(facts)};
+ if(state.binding&&(state.binding.ledger!==ledger||!same(state.binding.connection,binding.connection)||!same(state.binding.facts,binding.facts)))fail('PROTECTED_CODEX_OWNED_BINDING_CHANGED');
+ state.binding??=binding;
+}
+function ownedToken(r,purpose,body){const token=Object.freeze(Object.create(null));ownedTokens.set(token,{r,purpose,binding:owned(r).binding,body:copy(body)});return token;}
+function ownedReference(value){
+ if(types.isProxy(value)||!plain(value))fail('PROTECTED_CODEX_OWNED_EXPECTED');
+ const ds=Object.getOwnPropertyDescriptors(value),ks=Reflect.ownKeys(ds);
+ if(ks.length!==4||ks.some(k=>typeof k!=='string'||!['family','id','revision','sha256'].includes(k)||!ds[k].enumerable||!Object.hasOwn(ds[k],'value')))fail('PROTECTED_CODEX_OWNED_EXPECTED');
+ const r=Object.fromEntries(ks.map(k=>[k,ds[k].value]));
+ if(r.family!=='commands'||typeof r.id!=='string'||!r.id.length||r.id.length>2000||r.revision!==1||!hash(r.sha256))fail('PROTECTED_CODEX_OWNED_EXPECTED');
+ return r;
+}
+function ownedExpected(token,expected,purpose){
+ if(types.isProxy(expected)||!plain(expected))fail('PROTECTED_CODEX_OWNED_EXPECTED');
+ const descriptors=Object.getOwnPropertyDescriptors(expected),keys=Reflect.ownKeys(descriptors);
+ if(keys.length!==4||keys.some(k=>typeof k!=='string'||!['ledger','admission_ref','context_sha256','kind'].includes(k)||!descriptors[k].enumerable||!Object.hasOwn(descriptors[k],'value')))fail('PROTECTED_CODEX_OWNED_EXPECTED');
+ const proof=ownedTokens.get(token),b=proof?.binding,f=b?.facts;
+ if(!proof||proof.purpose!==purpose||!b||expected.ledger!==b.ledger||types.isProxy(expected.ledger)||Object.getPrototypeOf(expected.ledger)!==PeerLedger.prototype||expected.kind!=='task'||expected.context_sha256!==f.context_sha256||!same(connection(b.ledger),b.connection))fail('PROTECTED_CODEX_ORIGINAL_OWNED_CAP_REQUIRED');
+ if(!same(ownedReference(expected.admission_ref),f.admission_ref))fail('PROTECTED_CODEX_ORIGINAL_OWNED_CAP_REQUIRED');
+ return proof;
+}
+function originalOwnedIdentity(r){
+ const state=owned(r),b=state.binding,f=b?.facts;
+ if(!f||!r.birth||!r.backend.original_host||r.plan.launch_mode!=='companion-v2'||r.plan.companion_slot?.scope_policy!=='V5_ORIGINAL_MANAGED_PRIVATE_FD')return null;
+ if(r.native_thread!==f.native_id||state.thread!==r.native_thread||!text(r.native_turn)||state.turn!==r.native_turn)return null;
+ return {kind:'task',admission_ref:copy(f.admission_ref),context_sha256:f.context_sha256,task_id:f.task_id,attempt_id:f.attempt_id,principal_id:f.principal_id,generation:f.generation,enrollment_id:f.enrollment_id,native_id:r.native_thread,thread_id:r.native_thread,turn_id:r.native_turn,process:{pid:r.birth.pid,started_at:r.birth.at}};
+}
+function refreshOwned(r){
+ const state=owned(r),b=state.binding;if(!b)return;
+ const identity=originalOwnedIdentity(r);
+ if(identity&&!state.creation&&!state.fault&&!r.failed){
+  state.creation=ownedToken(r,'creation',{protocol:'peer-owned-task-creation-v1',...identity,creation_mode:'original-owned-task-thread-association',fresh_bootstrap_creation:false,authority_issued:false,group_absent:null,remote_domain_closed:false,whole_domain_qualified:false,prior_unknown_slots_released:false});
+ }
+ const broker=r.connect_broker_closure;
+ const requests=[...state.requests.values()];
+ const localClosed=Boolean(r.exit_observed&&r.close&&r.stdout_eof&&r.stderr_eof&&r.witness_eof&&r.child_stdin_closed&&r.control_closed);
+ const clean=identity&&!state.fault&&!state.signalled&&!r.failed&&!r.stopping&&r.close?.code===0&&r.close?.signal===null&&r.original_exit?.code===0&&r.original_exit?.signal===null&&localClosed&&broker?.phase==='CLOSED'&&broker.local_tcp_closure==='OBSERVED'&&broker.remote_domain_closed===false&&!r.pendingReplies.size&&!r.rpc?.size&&!r.backend.pending_final&&r.backend_operations===0&&requests.length>0&&requests.every(p=>p.raw_eof&&p.terminal&&p.headers?.status===200&&p.thread_id===state.thread&&p.turn_id===state.turn)&&state.terminal?.status==='completed'&&state.terminal.id===state.turn&&typeof state.final==='string';
+ if(clean&&!state.drain){
+  if(Date.now()>=r.execution_deadline_ms){state.fault??='PROTECTED_CODEX_OWNED_DEADLINE';return;}
+  let current;try{current=currentNativeTask(r,true);}catch(error){state.fault??=safeError(error);return;}
+  if(!same(current,b.facts)){state.fault??='PROTECTED_CODEX_OWNED_BINDING_CHANGED';return;}
+  state.drain=ownedToken(r,'drain',{protocol:'peer-owned-admitted-task-drain-v1',...identity,terminal_status:'completed',output:state.final,output_sha256:digest(Buffer.from(state.final)),requests:requests.map(p=>({request_id:p.request_id,request_sha256:p.request_sha256,sequence:p.sequence,response_id:p.terminal.response_id,terminal_logical_payload_sha256:p.terminal.terminal_logical_payload_sha256})),group_absent:null,remote_domain_closed:false,whole_domain_qualified:false,whole_domain_closed:false,prior_unknown_slots_released:false});
+ }
+}
+function observeOwnedServer(r,frame){
+ const state=owned(r);if(!state.binding||!Object.hasOwn(frame,'method'))return;
+ if(state.terminal&&['thread/started','turn/started','item/started','item/completed','item/agentMessage/delta','item/tool/call','turn/completed'].includes(frame.method))fail('PROTECTED_CODEX_OWNED_POST_TERMINAL');
+ const p=frame.params;
+ if(frame.method==='item/completed'&&p?.item?.type==='agentMessage'&&p.item.phase==='final_answer'){
+  if(p.threadId!==r.native_thread||p.turnId!==r.native_turn||typeof p.item.text!=='string'||!p.item.text.length||Buffer.byteLength(p.item.text)>MAX_FRAME||state.final!==null)fail('PROTECTED_CODEX_OWNED_FINAL_CHANGED');
+  state.final=p.item.text;
+ }
+ if(frame.method==='turn/completed'){
+  if(p?.threadId!==r.native_thread||p.turn?.id!==r.native_turn||!['completed','failed','interrupted'].includes(p.turn.status)||p.turn.status==='completed'&&(p.turn.error!==null||state.final===null))fail('PROTECTED_CODEX_OWNED_TERMINAL_CHANGED');
+  state.terminal=copy(p.turn);if(p.turn.status!=='completed')state.fault='ORIGINAL_TURN_'+p.turn.status.toUpperCase();
+ }
+ refreshOwned(r);
+}
+function ownedTerminalWitness(r,frame){
+ const keys=['protocol','kind','nonce','pid','host_instance_id','request_id','request_sha256','sequence','response_id','terminal_logical_payload_sha256','local_body_eof_observed','remote_domain_closed'];
+ if(!closed(frame,keys)||frame.protocol!==PERMIT_PROTOCOL||frame.nonce!==r.nonce||frame.pid!==r.birth?.pid||frame.host_instance_id!==r.backend.original_host?.host_instance_id||frame.local_body_eof_observed!==true||frame.remote_domain_closed!==false||!text(frame.response_id)||!hash(frame.terminal_logical_payload_sha256))fail('PROTECTED_CODEX_OWNED_TERMINAL_WITNESS');
+ const state=owned(r),request=state.requests.get(frame.request_id);
+ const thread=state.binding?state.thread:r.native_thread,turn=state.binding?state.turn:r.native_turn;
+ if(!request||request.terminal||!request.raw_eof||request.headers?.status!==200||request.request_sha256!==frame.request_sha256||request.sequence!==frame.sequence||request.thread_id!==thread||request.turn_id!==turn||!r.backend_operations)fail('PROTECTED_CODEX_OWNED_TERMINAL_REPLAY_OR_FOREIGN');
+ request.terminal=copy(frame);r.backend_operations--;refreshOwned(r);
+}
+/** Trusted original composition only. Returned values are private capabilities,
+ * never observations accepted back from JSON, inspectLaunch or a caller flag. */
+export function originalProtectedOwnedTaskTokens(owner,handle){
+ const r=record(owner,handle),state=owned(r);refreshOwned(r);
+ if(state.binding&&r.birth&&!state.diagnostic&&(state.fault||r.failed||r.stopping||r.exit_observed||r.close)&&!state.drain){
+  const f=state.binding.facts,body={protocol:'peer-owned-task-observation-v1',kind:'task',qualifies:false,admission_ref:copy(f.admission_ref),context_sha256:f.context_sha256,task_id:f.task_id,attempt_id:f.attempt_id,principal_id:f.principal_id,generation:f.generation,native_id:r.native_thread??null,thread_id:r.native_thread??null,turn_id:r.native_turn??null,process:{pid:r.birth.pid,started_at:r.birth.at,exit_observed:Boolean(r.exit_observed),exit_code:r.original_exit?.code??null,signal:r.original_exit?.signal??null},terminal:state.terminal?copy(state.terminal):null,output:state.final,error:state.fault??r.code??'OWNED_DRAIN_UNPROVED',requests:[...state.requests.values()].map(p=>({request_id:p.request_id,sequence:p.sequence,raw_eof:p.raw_eof,terminal_observed:Boolean(p.terminal)})),group_absent:null,remote_domain_closed:false,whole_domain_qualified:false,prior_unknown_slots_released:false};
+  state.diagnostic=ownedToken(r,'diagnostic',{...body,observation_sha256:digest(Buffer.from(canonical(body)))});
+ }
+ return Object.freeze({creation:state.creation,drain:state.drain,diagnostic:state.diagnostic});
+}
+export function inspectOriginalProtectedOwnedTaskCreation(token,expected){return copy(ownedExpected(token,expected,'creation').body);}
+export function assertOriginalProtectedOwnedTaskDrain(token,expected){
+ const proof=ownedExpected(token,expected,'drain'),state=owned(proof.r);
+ if(state.fault||state.signalled||proof.r.failed||proof.r.stopping||Date.now()>=proof.r.execution_deadline_ms)fail('PROTECTED_CODEX_OWNED_DRAIN_STALE');
+ let current;try{current=currentNativeTask(proof.r,true);}catch(error){state.fault??=safeError(error);throw error;}
+ if(!same(current,proof.binding.facts)){state.fault??='PROTECTED_CODEX_OWNED_BINDING_CHANGED';fail('PROTECTED_CODEX_OWNED_DRAIN_STALE');}
+ return copy(proof.body);
+}
+export function assertOriginalProtectedOwnedTaskDiagnostic(token,expected){return copy(ownedExpected(token,expected,'diagnostic').body);}
 function safeError(error){try{return typeof error?.code==='string'&&error.code.startsWith('PROTECTED_CODEX_')?error.code:'PROTECTED_CODEX_DOMAIN_UNKNOWN';}catch{return 'PROTECTED_CODEX_DOMAIN_UNKNOWN';}}
 function companionBuild(r){return r.plan.launch_mode==='companion-v2'&&originalCompanionSlotMatches(r.plan.companion_slot)&&r.plan.companion_slot.executable_sha256===r.plan.executable_pin.sha256;}
 function companionArmed(r){
@@ -87,7 +178,7 @@ export async function prepareOriginalProtectedPeerLaunch(owner,supervisor,input)
  try{
   if(!plain(input)||Object.keys(input).some(k=>!['cwd','read_paths','state_root','scratch_root'].includes(k)))fail('PROTECTED_CODEX_ORIGINAL_PLAN_REQUIRED');
   const compiled=supervisor.compile(owner,{kind:'codex-companion',...input,gateway_port:broker.port},{context_interpreter:interpreter});
-  const h=createOriginalProtectedCodexLaunch(owner,compiled);r=record(owner,h);r.nonce=nonce;r.connect_broker=broker;void broker.closed.then(data=>{r.connect_broker_closure=data;});return h;
+  const h=createOriginalProtectedCodexLaunch(owner,compiled);r=record(owner,h);r.nonce=nonce;r.connect_broker=broker;void broker.closed.then(data=>{r.connect_broker_closure=data;refreshOwned(r);});return h;
  }catch(error){await broker.close();throw error;}
 }
 export function isOriginalProtectedCompanionLaunch(owner,handle){return isOriginalProtectedCodexLaunch(owner,handle)&&record(owner,handle).plan.launch_mode==='companion-v2';}
@@ -149,6 +240,7 @@ function controlFrame(r,frame){
   if(frame.params.ephemeral!==false)fail('PROTECTED_CODEX_PERSISTENT_THREAD_REQUIRED');
  }
  if(frame.method==='thread/resume'&&['history','path','config'].some(key=>Object.hasOwn(frame.params,key)))fail('PROTECTED_CODEX_FOREIGN_RESUME');
+ if(frame.method==='turn/start'&&owned(r).binding){const state=owned(r);if(state.turn_requested||state.terminal)fail('PROTECTED_CODEX_OWNED_TURN_REPLAY');state.turn_requested=true;}
  if(Object.hasOwn(frame,'id')){r.rpc??=new Map();const key=idKey(frame.id);if(r.rpc.has(key))fail('PROTECTED_CODEX_RPC_ID');r.rpc.set(key,{method:frame.method,params:copy(frame.params)});}
  if(frame.method==='turn/start'){if(r.context_interpreter){assertOriginalPeerContextRuntime(r.owner,r.facade_handle,r.context_delivery,'final_model_send');if(!same(frame.params.input,r.context_input))fail('PROTECTED_CODEX_CONTEXT_WIRE_CHANGED');}r.native_turn_input_text_sha256s=frame.params.input.map(item=>{if(item?.type!=='text'||typeof item.text!=='string')fail('PROTECTED_CODEX_INPUT_SHAPE');return digest(Buffer.from(item.text));});if(r.plan.launch_mode==='companion-v2')companionArmed(r);else beforeModel(r);}
 }
@@ -156,14 +248,16 @@ function serverFrame(r,frame){
  if(!plain(frame))fail('PROTECTED_CODEX_SERVER_FRAME');
  if(!Object.hasOwn(frame,'method')&&Object.hasOwn(frame,'id')){
   const request=r.rpc?.get(idKey(frame.id));if(request){r.rpc.delete(idKey(frame.id));
-   if(!frame.error&&['thread/start','thread/resume'].includes(request.method)){const native=frame.result?.thread?.id;if(!text(native))fail('PROTECTED_CODEX_NATIVE_THREAD');r.native_thread=native;}
-   if(!frame.error&&request.method==='turn/start'){const turn=frame.result?.turn?.id;if(!text(turn))fail('PROTECTED_CODEX_NATIVE_TURN');r.native_turn=turn;maybeIssueNativePermit(r);}
-  }
+   if(frame.error&&owned(r).binding)owned(r).fault??='ORIGINAL_RPC_ERROR';
+   if(!frame.error&&['thread/start','thread/resume'].includes(request.method)){const native=frame.result?.thread?.id;if(!text(native))fail('PROTECTED_CODEX_NATIVE_THREAD');const state=owned(r);if(state.binding){if(state.thread!==null&&state.thread!==native)fail('PROTECTED_CODEX_OWNED_THREAD_CHANGED');state.thread??=native;}r.native_thread=native;}
+   if(!frame.error&&request.method==='turn/start'){const turn=frame.result?.turn?.id;if(!text(turn))fail('PROTECTED_CODEX_NATIVE_TURN');const state=owned(r);if(state.binding){if(state.turn!==null&&state.turn!==turn)fail('PROTECTED_CODEX_OWNED_TURN_CHANGED');state.turn??=turn;}r.native_turn=turn;maybeIssueNativePermit(r);}
+  }else if(owned(r).binding)fail('PROTECTED_CODEX_OWNED_UNMATCHED_RPC');
  }
  if(Object.hasOwn(frame,'method')&&Object.hasOwn(frame,'id')){
   if(frame.method!=='item/tool/call'||!plain(frame.params)||!toolNames.has(frame.params.tool))fail('PROTECTED_CODEX_UNEXPECTED_SERVER_CALL');
   const key=idKey(frame.id);if(r.pendingReplies.has(key))fail('PROTECTED_CODEX_TOOL_CALL_REPLAY');r.pendingReplies.add(key);r.original_native_tool_frames??=new Map();r.original_native_tool_frames.set(key,{frame:copy(frame),claimed:false});
  }
+ observeOwnedServer(r,frame);
 }
 function observedNativeFinalRequest(r,envelope,raw){
  const parsed=parseOriginalControlFrame(raw);if(parsed.kind!=='observation'||!same(parsed.observation,envelope.observation))fail('PROTECTED_CODEX_BACKEND_FRAME');
@@ -187,7 +281,7 @@ function observedNativeFinalRequest(r,envelope,raw){
  if(f.host_instance_id!==r.backend.original_host?.host_instance_id)fail('PROTECTED_CODEX_NATIVE_HOST_ASSOCIATION_HELD');
  r.backend.pending_final={facts:copy(f),binding:envelope.binding_sha256};maybeIssueNativePermit(r);
 }
-function currentNativeTask(r){
+function currentNativeTask(r,retainOwned=false){
  const a=r.native_admission;if(!a||Object.getPrototypeOf(a.ledger)!==PeerLedger.prototype)fail('PROTECTED_CODEX_ORIGINAL_ADMISSION_HELD');
  return Reflect.apply(PeerLedger.prototype.read,a.ledger,[tx=>{
   const task=tx.get('tasks',a.task_id),t=task?.value,attempt=t?.attempt,p=t&&tx.get('principals',t.owner_principal_id),slot=task&&tx.get('slots',task.id),effect=attempt&&tx.get('effects',attempt.effect_id);
@@ -197,7 +291,9 @@ function currentNativeTask(r){
   const c=changes[0],command=tx.getVersion({family:'commands',id:c.id,revision:c.revision,sha256:c.sha256}),result=command?.value?.result;
   if(command?.value?.action!=='task/admit'||command.value.principal_id!=='scheduler'||result?.admitted!==true||result.task.id!==task.id||result.task.value.attempt.id!==attempt.id||!same(result.context,a.context))fail('PROTECTED_CODEX_ORIGINAL_ADMISSION_HELD');
   const expiry=a.context.grant?.value?.expires_at;if(typeof expiry!=='string'||!Number.isFinite(Date.parse(expiry))||Date.parse(expiry)<=Date.now())fail('PROTECTED_CODEX_ADMISSION_EXPIRED');
-  return {task_id:task.id,scope:t.scope,attempt_id:attempt.id,native_id:p.value.native_id,generation:p.value.generation,enrollment_id:p.value.enrollment_id,context_sha256:attempt.context.sha256};
+  const facts={task_id:task.id,scope:t.scope,attempt_id:attempt.id,native_id:p.value.native_id,generation:p.value.generation,enrollment_id:p.value.enrollment_id,context_sha256:attempt.context.sha256};
+  if(retainOwned){const head=tx.get('commands',c.id);if(c.revision!==1||!hash(c.sha256)||!head||head.id!==c.id||head.revision!==c.revision||head.sha256!==c.sha256||!same(head.value,command.value))fail('PROTECTED_CODEX_ORIGINAL_ADMISSION_HELD');return {...facts,principal_id:p.id,admission_ref:{family:'commands',id:c.id,revision:c.revision,sha256:c.sha256}};}
+  return facts;
  }]);
 }
 export function claimOriginalNativeMC23Frame(owner,handle,frame){
@@ -209,7 +305,7 @@ export function claimOriginalNativeMC23Frame(owner,handle,frame){
 export function inspectOriginalNativeMC23Proof(owner,handle,proof){const r=nativeMC23Proofs.get(proof);if(!r||r.owner!==owner||r.launch!==handle)fail('MC23_ORIGINAL_NATIVE_PROOF_REQUIRED');return copy({frame:r.frame,frame_sha256:r.frame_sha256,binding:r.binding,process:r.process,model_request:r.model_request,actual_transport_headers:r.actual_transport_headers});}
 export function bindOriginalProtectedTaskAdmission(owner,handle,ledger,task_id,context){
  const r=record(owner,handle);if(Object.getPrototypeOf(ledger)!==PeerLedger.prototype||!text(task_id))fail('PROTECTED_CODEX_ORIGINAL_ADMISSION_HELD');
- const next={ledger,task_id,context:copy(context)};if(r.native_admission&&(r.native_admission.ledger!==ledger||r.native_admission.task_id!==task_id||!same(r.native_admission.context,context)))fail('PROTECTED_CODEX_ADMISSION_REUSED');r.native_admission=next;currentNativeTask(r);
+ const next={ledger,task_id,context:copy(context)};if(r.native_admission&&(r.native_admission.ledger!==ledger||r.native_admission.task_id!==task_id||!same(r.native_admission.context,context)))fail('PROTECTED_CODEX_ADMISSION_REUSED');r.native_admission=next;retainOwnedBinding(r,currentNativeTask(r,true));
 }
 // This producer is reachable only by the trusted TaskHost, after the ORIGINAL
 // launch has observed birth and correlated its native thread and turn. The
@@ -307,12 +403,16 @@ function maybeIssueNativePermit(r){
  const task=currentNativeAuthority(r);if(!r.native_turn){if([...r.rpc?.values()??[]].some(v=>v.method==='turn/start'))return;fail('PROTECTED_CODEX_NATIVE_TURN');}
  if(f.thread_id!==r.native_thread||f.thread_id!==task.native_id||f.turn_id!==r.native_turn||expected.mode!=='original-live-scoped-source'&&f.context_sha256!==expected.final_context_sha256)fail('PROTECTED_CODEX_NATIVE_TASK_BINDING');
  r.backend.used_requests??=new Set();if(r.backend.used_requests.has(f.request_id)||r.backend_operations)fail('PROTECTED_CODEX_SEND_REPLAY_OR_UNKNOWN');
+ const state=owned(r);if(state.binding&&state.terminal)fail('PROTECTED_CODEX_OWNED_POST_TERMINAL');if(state.requests.size>=MAX_FRAMES||state.requests.has(f.request_id)||[...state.requests.values()].some(p=>!p.terminal))fail('PROTECTED_CODEX_OWNED_REQUEST_UNRESOLVED');
+ if(state.binding&&(f.thread_id!==state.thread||f.turn_id!==state.turn))fail('PROTECTED_CODEX_OWNED_REQUEST_CHANGED');
+ state.requests.set(f.request_id,{request_id:f.request_id,request_sha256:f.request_sha256,sequence:f.sequence,gateway_instance_id:f.gateway_instance_id,thread_id:f.thread_id,turn_id:f.turn_id,headers:null,raw_eof:false,terminal:null});
  r.backend.used_requests.add(f.request_id);r.backend.pending_final=null;r.backend_operations++;r.backend.last_step={thread_id:f.thread_id,turn_id:f.turn_id,request_sha256:f.request_sha256,request_id:f.request_id,gateway_instance_id:f.gateway_instance_id,input_text_sha256s:copy(f.input_text_sha256s)};
  const permit={protocol:PERMIT_PROTOCOL,kind:'send_permit',nonce:r.nonce,pid:r.birth.pid,sequence:f.sequence,binding_sha256:pending.binding,request_sha256:f.request_sha256,request_id:f.request_id,gateway_instance_id:f.gateway_instance_id};
  // Reservation precedes the write; write failure cannot make this request reusable.
- r.child.stdio[4].write(JSON.stringify(permit)+'\n',error=>{if(error){r.unknown=true;r.code='PROTECTED_CODEX_PERMIT_WRITE_UNKNOWN';try{r.facade.kill('SIGTERM');}catch{}}});
+ r.child.stdio[4].write(JSON.stringify(permit)+'\n',error=>{if(error){owned(r).fault='PROTECTED_CODEX_PERMIT_WRITE_UNKNOWN';r.unknown=true;r.code='PROTECTED_CODEX_PERMIT_WRITE_UNKNOWN';try{r.facade.kill('SIGTERM');}catch{}}});
 }
 function backendFrame(r,frame,raw){
+ if(frame?.kind==='original_response_terminal_drained'){ownedTerminalWitness(r,frame);return;}
  if(frame?.kind==='host_bootstrap'){
   if(r.control_transcript)r.control_transcript.acceptFrame(raw);
   const keys=['protocol','kind','nonce','pid','slot_id','executable_sha256','source_manifest_sha256','original_home_sha256','state_root','cwd','host_instance_id','sources',...(r.plan.companion_slot?.scope_policy==='V5_ORIGINAL_MANAGED_PRIVATE_FD'?['loopback_proxy_port']:[])];
@@ -321,11 +421,13 @@ function backendFrame(r,frame,raw){
  }
  if(frame?.kind==='transport_headers'){
   if(!closed(frame,['protocol','kind','nonce','pid','sequence','request_id','gateway_instance_id','status'])||frame.protocol!==PERMIT_PROTOCOL||frame.nonce!==r.nonce||frame.pid!==r.birth?.pid||frame.request_id!==r.backend.last_step?.request_id||frame.gateway_instance_id!==r.backend.last_step?.gateway_instance_id||frame.sequence!==r.backend.native_final_observation?.sequence||!Number.isSafeInteger(frame.status)||frame.status<100||frame.status>599||!r.backend_operations)fail('PROTECTED_CODEX_TRANSPORT_OBSERVATION');
+  const request=owned(r).requests.get(frame.request_id);if(!request||request.headers||request.sequence!==frame.sequence||request.gateway_instance_id!==frame.gateway_instance_id)fail('PROTECTED_CODEX_TRANSPORT_OBSERVATION_REPLAY');request.headers=copy(frame);
   r.backend.transport_headers??=[];if(r.backend.transport_headers.some(h=>h.request_id===frame.request_id))fail('PROTECTED_CODEX_TRANSPORT_OBSERVATION_REPLAY');r.backend.transport_headers.push(copy(frame));r.release_original_stdout?.();return;
  }
  if(frame?.kind==='local_body_eof'){
   if(!closed(frame,['protocol','kind','request_id','sequence','pid','remote_domain_closed'])||frame.protocol!==PERMIT_PROTOCOL||frame.pid!==r.birth?.pid||frame.remote_domain_closed!==false||!r.backend_operations||frame.request_id!==r.backend.last_step?.request_id||frame.sequence!==r.backend.native_final_observation?.sequence)fail('PROTECTED_CODEX_BACKEND_CLOSE_REPLAY');
-  r.backend_operations--;r.backend.local_body_eof=copy(frame);return;
+  const request=owned(r).requests.get(frame.request_id);if(!request||request.raw_eof||request.sequence!==frame.sequence)fail('PROTECTED_CODEX_BACKEND_CLOSE_REPLAY');
+  request.raw_eof=true;r.backend.local_body_eof=copy(frame);return;
  }
  if(plain(frame)&&Object.hasOwn(frame,'observation')){if(frame.observation?.kind==='scoped_context_contract')return observedScopedContextContract(r,frame,raw);return observedNativeFinalRequest(r,frame,raw);}
  if(!plain(frame)||frame.protocol!==PROTOCOL||frame.nonce!==r.nonce||frame.pid!==r.birth?.pid)fail('PROTECTED_CODEX_BACKEND_BINDING');
@@ -358,21 +460,22 @@ export function spawnOriginalProtectedCodex(owner,handle){
  const clear=()=>{for(const timer of r.timers)clearTimeout(timer);r.timers.clear();};
  // Retain the original ChildProcess and latch exit. Never reacquire a numeric
  // process/group identity after leader exit or reap; group closure stays unknown.
- const signal=name=>{if(!r.child||r.close||r.exit_observed||Number.isInteger(r.child.exitCode)||typeof r.child.signalCode==='string')return;try{r.child.kill(name);}catch{r.code??='PROTECTED_CODEX_SIGNAL_UNKNOWN';}};
+ const signal=name=>{if(!r.child||r.close||r.exit_observed||Number.isInteger(r.child.exitCode)||typeof r.child.signalCode==='string')return;owned(r).signalled=true;try{r.child.kill(name);}catch{r.code??='PROTECTED_CODEX_SIGNAL_UNKNOWN';}};
  function stop(code='PROTECTED_CODEX_STOPPED'){
+  if(code!=='PROTECTED_CODEX_STOPPED')owned(r).fault??=code;
   if(r.stopping||r.closed)return;r.stopping=true;r.code??=code;
   try{r.control_transcript?.closeUnknown(code==='PROTECTED_CODEX_DEADLINE'?'timeout':'cancelled');}catch{}void r.connect_broker?.close();
   if(r.close)return;
   try{r.child?.stdin?.end();r.child?.stdio?.[4]?.end();}catch{r.code??='PROTECTED_CODEX_STDIN_UNKNOWN';}
   later(()=>{signal('SIGTERM');later(()=>{signal('SIGKILL');later(()=>{if(!r.close){r.state='unknown';r.unknown=true;facade.emit('error',Object.assign(Error('PROTECTED_CODEX_CLOSURE_UNKNOWN'),{code:'PROTECTED_CODEX_CLOSURE_UNKNOWN'}));}},KILL_MS);},TERM_MS);},GRACE_MS);
  }
- const hold=error=>{const code=safeError(error);r.failed=true;r.unknown=true;r.closed=false;if(r.close)r.state='unknown';stop(code);facade.emit('error',Object.assign(Error(code),{code}));};
+ const hold=error=>{const code=safeError(error);owned(r).fault??=code;r.failed=true;r.unknown=true;r.closed=false;if(r.close)r.state='unknown';stop(code);facade.emit('error',Object.assign(Error(code),{code}));};
  const originalClose=(code,exitSignal)=>{
   try{r.control_transcript?.closeUnknown('closed');}catch{}void r.connect_broker?.close();
   r.close={code:Number.isInteger(code)?code:null,signal:exitSignal??null};clear();
   r.local_process_closed=r.exit_observed&&r.stdout_eof&&r.stderr_eof&&r.witness_eof&&r.child_stdin_closed&&r.control_closed&&r.pendingReplies.size===0&&r.backend_operations===0;
   r.group_absent=null;r.closed=false;
-  r.unknown=!r.closed||!buildQualified(r);r.state=r.closed?'closed':'unknown';facade.emit('close',code,exitSignal);
+  r.unknown=!r.closed||!buildQualified(r);r.state=r.closed?'closed':'unknown';refreshOwned(r);facade.emit('close',code,exitSignal);
  };
  try{
   // No caller-supplied spawn, executable, argv, env, proof or stdio is used.
@@ -394,7 +497,7 @@ export function spawnOriginalProtectedCodex(owner,handle){
   if(forwarded)forwarded.on('error',hold);
   const originalFrames=[];let originalOutputEnded=false;
   function releaseOriginalStdout(){
-   if(!companion||r.failed||r.stopping)return;
+    if(!companion||r.failed||r.stopping)return;
    while(originalFrames.length){const first=originalFrames[0];
     // FD3 and stdout have independent delivery order. Wait for ORIGINAL observations,
     // retaining exact original JSONL bytes and FIFO; never infer a witness from output.
@@ -415,9 +518,9 @@ export function spawnOriginalProtectedCodex(owner,handle){
   facade.stdin=stdin;facade.stdout=forwarded??child.stdout;facade.stderr=child.stderr;
   facade.kill=name=>{if(!['SIGTERM','SIGKILL'].includes(name))fail('PROTECTED_CODEX_SIGNAL');stop('PROTECTED_CODEX_STOPPED');signal(name);return true;};
   Object.defineProperty(facade,'pid',{enumerable:true,get:()=>r.birth?.pid??child.pid});
-  child.stdin.on('close',()=>{r.child_stdin_closed=true;});child.stdout.on('data',chunk=>{try{output.data(chunk);}catch(error){hold(error);}});child.stderr.on('data',chunk=>{r.bytes.stderr+=chunk.length;if(r.bytes.stderr>MAX_WIRE)hold(Object.assign(Error('PROTECTED_CODEX_WIRE_CAPACITY'),{code:'PROTECTED_CODEX_WIRE_CAPACITY'}));});
-  child.stdout.on('end',()=>{try{output.end();r.stdout_eof=true;originalOutputEnded=true;releaseOriginalStdout();}catch(error){hold(error);}});child.stderr.on('end',()=>{r.stderr_eof=true;});
-  child.stdio[3].on('data',chunk=>{try{witness.data(chunk);}catch(error){hold(error);}});child.stdio[3].on('end',()=>{try{witness.end();r.witness_eof=true;}catch(error){hold(error);}});child.stdio[4].on('close',()=>{r.control_closed=true;});
+  child.stdin.on('close',()=>{r.child_stdin_closed=true;refreshOwned(r);});child.stdout.on('data',chunk=>{try{output.data(chunk);}catch(error){hold(error);}});child.stderr.on('data',chunk=>{r.bytes.stderr+=chunk.length;if(r.bytes.stderr>MAX_WIRE)hold(Object.assign(Error('PROTECTED_CODEX_WIRE_CAPACITY'),{code:'PROTECTED_CODEX_WIRE_CAPACITY'}));});
+  child.stdout.on('end',()=>{try{output.end();r.stdout_eof=true;originalOutputEnded=true;releaseOriginalStdout();refreshOwned(r);}catch(error){hold(error);}});child.stderr.on('end',()=>{r.stderr_eof=true;refreshOwned(r);});
+  child.stdio[3].on('data',chunk=>{try{witness.data(chunk);}catch(error){hold(error);}});child.stdio[3].on('end',()=>{try{witness.end();r.witness_eof=true;refreshOwned(r);}catch(error){hold(error);}});child.stdio[4].on('close',()=>{r.control_closed=true;refreshOwned(r);});
   child.once('spawn',()=>{try{
    if(!Number.isSafeInteger(child.pid)||child.pid<1)fail('PROTECTED_CODEX_BIRTH_UNKNOWN');
    r.birth={pid:child.pid,at:new Date().toISOString(),executable_sha256:plan.executable_pin.sha256,policy_sha256:plan.policy_sha256};r.state='born';

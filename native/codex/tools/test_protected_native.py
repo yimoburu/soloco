@@ -17,7 +17,7 @@ SPEC = importlib.util.spec_from_file_location("delivery_tool", Path(__file__).wi
 TOOL = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(TOOL)
 VALIDATE_OPENSSL_CONFIG = TOOL.validate_openssl_config
-COHERENT_SOURCE_FILES = 9309
+COHERENT_SOURCE_FILES = 9310
 VALIDATE_SELECTED_SDK = TOOL.validate_selected_sdk
 
 

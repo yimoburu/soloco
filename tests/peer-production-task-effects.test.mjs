@@ -21,7 +21,7 @@ const message=operation_id=>({operation_id,to_principal_id:'cos-b',content:'Comp
 // establish no native acceptance or physical closure. Private fixture exports
 // exist solely in a temporary exact-source copy, never in production.
 async function composed(t,{production=false}={}){
- const f=peerTaskEffectsFixture(t,{peerFixtureOptions:{principals:{founder:{legacy_owner:{host:'codex',session_id:'synthetic-owner-session',epoch:1}},'cos-a':{membership_qualification:{SYNTHETIC_ONLY:true}}}}});
+ const f=peerTaskEffectsFixture(t,{peerFixtureOptions:{principals:{founder:{legacy_owner:{host:'codex',session_id:'synthetic-owner-session',epoch:1}},'cos-a':{enrollment_id:'SYNTHETIC-composed-enrollment',membership_qualification:{SYNTHETIC_ONLY:true}}}}});
  const submitted=f.connection.execute('task/submit',{operation_id:'composed-submit',grant_id:'grant-cos-a',scope:'alpha',role:'engineer',instructions:'Inspect synthetic offline evidence.',acceptance:'Retain attributable scoped handoff.',resources:['home:fact']});
  f.connection.execute('task/claim',{operation_id:'composed-claim',task_id:submitted.id});
  const scheduler=production?model.bindPeerProductionScheduler(f.ledger):null;

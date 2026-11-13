@@ -47,14 +47,14 @@ function nativeRecipeFixture(f){
  specs.push({path:'source-package.json',body:packageBytes,mode:'100644'},{path:'tools/protected_native.py',body:driverBytes,mode:'100644'});
  for(const p of [pkg.source_cut.handoff,pkg.source_cut.bindings,pkg.source_cut.patch,pkg.upstream.inventory,...pkg.upstream.attribution,pkg.cargo_lock,pkg.toolchain.inventory,pkg.toolchain.official_manifest])add(p);
  for(const overlay of pkg.overlay)add(overlay.payload,overlay.mode);
- specs.sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0);assert.equal(specs.length,169);
+ specs.sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0);assert.equal(specs.length,170);
  const root=path.join(f.packageRoot,'producer-inputs/native/codex');for(const row of specs){const file=path.join(root,row.path);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,row.body);fs.chmodSync(file,row.mode==='100755'?0o755:0o644);}
  const ref=body=>({bytes:body.length,sha256:hash(body)}),files=specs.map(row=>({path:row.path,...ref(row.body),mode:row.mode}));fs.writeFileSync(path.join(f.packageRoot,'producer-inputs/native-recipe-inventory.json'),JSON.stringify({protocol:'soloco-packaged-native-recipe-v1',source_package:ref(packageBytes),build_driver:ref(driverBytes),files},null,2)+'\n');
  return {packageBytes,driverBytes,root,files};
 }
-test('closed 169-file Native recipe partition preserves executable overlay mode and complete ordinary Node rows',async t=>{
+test('closed 170-file Native recipe partition preserves executable overlay mode and complete ordinary Node rows',async t=>{
  const f=await packagedSourceFixture(t),input=nativeRecipeFixture(f),h=f.layout.originalPackagedComponentLayout(),recipe=f.layout.inspectOriginalPackagedRecipeInventory(h,input.packageBytes,input.driverBytes),rows=f.layout.inspectOriginalComponentNodeInventory(h,recipe);
- assert.equal(recipe.files.length,169);assert.ok(recipe.files.some(row=>row.mode==='100755'));assert.equal(rows.some(row=>row.path.includes('/producer-inputs/')),false);assert.ok(rows.some(row=>row.path==='plugins/soloco/runtime/peers/context-component-layout.mjs'));assert.ok(rows.some(row=>row.path==='plugins/soloco/producer/build-peer-context.mjs'));
+ assert.equal(recipe.files.length,170);assert.ok(recipe.files.some(row=>row.mode==='100755'));assert.equal(rows.some(row=>row.path.includes('/producer-inputs/')),false);assert.ok(rows.some(row=>row.path==='plugins/soloco/runtime/peers/context-component-layout.mjs'));assert.ok(rows.some(row=>row.path==='plugins/soloco/producer/build-peer-context.mjs'));
  const executable=input.files.find(row=>row.mode==='100755'),file=path.join(input.root,executable.path);fs.chmodSync(file,0o754);assert.throws(()=>f.layout.inspectOriginalPackagedRecipeInventory(h,input.packageBytes,input.driverBytes),e=>e.code==='COMPONENT_SOURCE_CHANGED');
 });
 test('unassigned Native-namespace siblings cannot become ordinary JSON or JS Node input',async t=>{

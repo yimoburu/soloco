@@ -17,7 +17,7 @@ function unchanged(f,fn,predicate=hold){const before=logicalSQLState(f);assert.t
 
 test('actual default constructor/getter are non-authorizing and missing original selection Holds before writes',t=>{
  const f=bootstrapFixture(t),api=actual.createPeerBootstrapMembership({ledger:f.ledger,actor});assert.equal(actual.originalPeerBootstrapMembershipLedger(api),f.ledger);assert.throws(()=>actual.originalPeerBootstrapMembershipLedger({}),hold);
- const input={operation_id:f.op(),epoch:7,enrollment_id:'never',principal_id:'never',role:'reviewer',host:'codex',scope:'alpha',input_refs:[],expires_at:new Date(Date.now()+1800000).toISOString(),max_model_calls:2,expected_generation:0,source_instruction:'SYNTHETIC input cannot select a missing producer.'};unchanged(f,()=>api.enroll(input),e=>e?.code==='BOOTSTRAP_ORIGINAL_SELECTION_SOURCE_REQUIRED');
+ const input={operation_id:f.op(),epoch:7,enrollment_id:'never',principal_id:'never',role:'reviewer',host:'codex',scope:'alpha',input_refs:[],expires_at:new Date(Date.now()+1800000).toISOString(),max_model_calls:2,expected_generation:0,source_instruction:'SYNTHETIC input cannot select a missing producer.'};unchanged(f,()=>api.enroll(input),e=>e?.code==='ORIGIN_MAINTENANCE_SELECTION_REQUIRED');
 });
 test('real paused controller/model/membership completes both original phases and activates only after exact independent Pass',async t=>{
  const f=bootstrapFixture(t);f.enroll();const reconstruction=await f.completePhase(),review=await f.completePhase('review'),activated=f.activate();

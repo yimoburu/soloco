@@ -1,6 +1,30 @@
 # Pinned SoloCo companion source
 
-## Executable bridge source successor
+## Current lifecycle and bootstrap Source increment (unrun)
+
+The frozen code cut `dc335333fed2a7d91ed3372e759041d5135036a4` follows canonical `39d431285fe4698d3e2ab4ea53947dad47ef2abc`.
+The complete expected source has 9,310 logical files, 92,118,117 bytes and
+159 overlays; source vector `f8b3d2f4162dfbcc2015d4a9db26c109004bae710458996ae2dbf553cd061b5e`.
+Package `b040811c46db685f647bfaf5bac3db26aa055035553ee83b8e2bc228f048f55c`, driver `36e1b6409a300fbdb064bc0912edab9aba1dd4c97528746df87887854b0a68f0`;
+expected compiled-input DATA `13b54fb0381f0deef62d47070feb3022177cbe003e60010333729313aebe956b`.
+These are source associations, not compiled output or Native qualification.
+
+There are 22 added Rust definitions: 13 in original history (25 in that
+module) and 9 in context contract (18 in that module). The current global
+authored total is UNKNOWN. The parent's reported counter of 180 remains
+historical only. The Python fixture root has 58 definitions. Checks for this
+new tuple remain unrun here; prior results retain their original association.
+
+The distinct bootstrap resource selects exactly header/read/submit with
+4096-character reads and sha256/content submission. Ordinary five-tool
+resources and codec bytes, C helper, lock and toolchain pins are unchanged.
+The exact 170 packaged recipe files plus one inventory seal remain stale
+until separately selected Source materialization. This refresh does not run it.
+Purpose and qualified-context Holds, qualified binary/runtime slots, company
+authority, Native qualification, global coverage and physical closure remain
+unchanged. No installation or host activation is inferred.
+
+## Historical parent executable bridge source successor
 
 The current source-only candidate adds an original fixed-loopback HTTP factory
 and bootstrap route for the [Node executable bridge](../../docs/protected-peer-bridge.md).
@@ -208,7 +232,7 @@ containment or native qualification. Actual compiler/tests, executable/runtime
 association, accepted auth/egress, cold handoff and complete descendant/backend/
 remote closure require separate evidence. Old failures remain historical.
 
-There are 49 pure Python checks. Temporary compiler outputs and successful exits
+There are 58 pure Python checks. Temporary compiler outputs and successful exits
 inside those tests are explicit mocks. The checks do not run Cargo, the compiler,
 OS controls, native/provider/account operations or installation. This package
 marks no MC acceptance row passed and grants no new attempt or allowance.

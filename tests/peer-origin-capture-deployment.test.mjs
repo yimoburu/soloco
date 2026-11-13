@@ -36,7 +36,7 @@ function manifest(){const pkg=JSON.parse(bytes('native/codex/source-package.json
 
 test('new fixed package/driver/builder/deployment tuple binds the unchanged complete native source cut',()=>{
  const p=bytes('native/codex/source-package.json'),pkg=JSON.parse(p),driver=bytes('native/codex/tools/protected_native.py').toString(),builder=bytes(BUILDER).toString(),deployment=bytes(DEPLOYMENT).toString();
- assert.equal(pkg.overlay.length,158);assert.equal(pkg.qualified_binary,null);
+ assert.equal(pkg.overlay.length,159);assert.equal(pkg.qualified_binary,null);
  assert.deepEqual(pkg.sidecar_capture,{protocol:'soloco-origin-sidecar-source-build-v1',source:{path:SOURCE,...ref(bytes(SOURCE))},binary:'origin-sidecar-capture',arguments:['origin-sidecar-capture-v1'],target:'arm64-apple-macos11.0',flags:FLAGS});
  assert.equal(driver.match(/MANIFEST_SHA256 = "([a-f0-9]{64})"/)[1],hash(p));
  assert.equal(constant(builder,'PACKAGE_SHA'),hash(p));assert.equal(constant(builder,'DRIVER_SHA'),hash(bytes('native/codex/tools/protected_native.py')));
@@ -105,8 +105,9 @@ async function deploymentFixture(t,{incomplete=false}={}){
  const root=temporary(t),home=path.join(root,'fictional-home');fs.mkdirSync(path.join(root,'work/peer-context-component'),{recursive:true,mode:0o700});fs.mkdirSync(home);
  const originalDeployment=bytes(DEPLOYMENT).toString(),homeSelector="process.env.CODEX_HOME??path.join(os.homedir(),'.codex')";
  assert.equal(originalDeployment.split(homeSelector).length,2);
- const homeLiteral=JSON.stringify(home),deploymentSource=originalDeployment.replace(homeSelector,homeLiteral);
- assert.equal(deploymentSource.split(homeLiteral).length,2);assert.equal(deploymentSource.replace(homeLiteral,homeSelector),originalDeployment);
+ const bootstrapDependency="'./bootstrap-membership-preflight.mjs'",bootstrapUrl=JSON.stringify(pathToFileURL(path.join(ROOT,'plugins/soloco/runtime/peers/bootstrap-membership-preflight.mjs')).href);assert.equal(originalDeployment.split(bootstrapDependency).length,2);
+ const homeLiteral=JSON.stringify(home),deploymentSource=originalDeployment.replace(homeSelector,homeLiteral).replace(bootstrapDependency,bootstrapUrl);
+ assert.equal(deploymentSource.split(homeLiteral).length,2);assert.equal(deploymentSource.replace(homeLiteral,homeSelector).replace(bootstrapUrl,bootstrapDependency),originalDeployment);
  const deploymentFile=put(root,DEPLOYMENT,deploymentSource);layoutDependencies(root);put(root,SOURCE,bytes(SOURCE));
  put(root,HOST,'export function createCodexTaskRuntime(){throw Error("SYNTHETIC HOST MUST NOT EXECUTE");}\n');
  put(root,INTERPRETER,'export function prepareOriginalPeerContextDelivery(){throw Error("SYNTHETIC INTERPRETER MUST NOT EXECUTE");}\n');

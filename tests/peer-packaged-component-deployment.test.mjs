@@ -6,7 +6,7 @@ import {fileURLToPath,pathToFileURL} from 'node:url';
 import {packagedSourceFixture,hash} from './packaged-component-source-fixture.mjs';
 
 // Synthetic selected DATA + opaque test-only producer. Actual fixed deployment
-// and DATA projection bodies are copied unchanged except one dependency URL.
+// and DATA projection bodies are copied with two fixed dependency URLs and the fictional home.
 // No native/compiled-positive evidence, provider or build is produced here.
 const REPO=fileURLToPath(new URL('../',import.meta.url));
 const DEPLOYMENT='runtime/peers/context-component-deployment.mjs';
@@ -32,7 +32,8 @@ async function fixture(t){
  const dataFile=path.join(f.root,'selected-data.json');put(dataFile,JSON.stringify(data));
  const producer=f.put('runtime/peers/synthetic-selected-producer.mjs',`import fs from 'node:fs';let h=Object.freeze({});export function replaceOriginalForSourceTest(){h=Object.freeze({});}export function lookupOriginalSelectedPackagedContextComponentData(){return h;}export function inspectOriginalSelectedPackagedContextComponentData(value){if(value!==h)throw Error('ORIGINAL_REQUIRED');return JSON.parse(fs.readFileSync(${JSON.stringify(dataFile)},'utf8'));}\n`);
  const original=fs.readFileSync(path.join(REPO,'plugins/soloco',DEPLOYMENT),'utf8'),dependency="'./context-build-component.mjs'",homeSelector="process.env.CODEX_HOME??path.join(os.homedir(),'.codex')";assert.equal(original.split(dependency).length,2);assert.equal(original.split(homeSelector).length,2);
- const source=original.replace(dependency,JSON.stringify(pathToFileURL(producer).href)).replace(homeSelector,JSON.stringify(f.home));assert.equal(source.replace(JSON.stringify(pathToFileURL(producer).href),dependency).replace(JSON.stringify(f.home),homeSelector),original);
+ const bootstrapDependency="'./bootstrap-membership-preflight.mjs'",bootstrapUrl=JSON.stringify(pathToFileURL(path.join(REPO,'plugins/soloco/runtime/peers/bootstrap-membership-preflight.mjs')).href);assert.equal(original.split(bootstrapDependency).length,2);
+ const source=original.replace(dependency,JSON.stringify(pathToFileURL(producer).href)).replace(bootstrapDependency,bootstrapUrl).replace(homeSelector,JSON.stringify(f.home));assert.equal(source.replace(JSON.stringify(pathToFileURL(producer).href),dependency).replace(bootstrapUrl,bootstrapDependency).replace(JSON.stringify(f.home),homeSelector),original);
  const file=f.put(DEPLOYMENT,source),module=await import(pathToFileURL(file).href),model=await import(pathToFileURL(path.join(f.packageRoot,'runtime/peers/model.mjs')).href);
  return {...f,module,model,data,dataFile,component,producer:await import(pathToFileURL(producer).href)};
 }

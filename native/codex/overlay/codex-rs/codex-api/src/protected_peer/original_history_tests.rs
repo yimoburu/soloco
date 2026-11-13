@@ -7,7 +7,7 @@ use codex_history::{OriginalInputCapture,ResponseItemEnvelope,OriginalItemReceip
 use codex_protocol::user_input::UserInput;
 use serde_json::json;
 type Owner=dyn std::any::Any+Send+Sync;
-struct Fixture {runtime:SourceRuntime,ingress:OriginalSessionIngress,owner:Arc<Owner>,user:ResponseItemEnvelope,accepted:OriginalAcceptedInputWitness,decoder:OriginalResponseDecoder}
+struct Fixture {runtime:SourceRuntime,ingress:OriginalSessionIngress,owner:Arc<Owner>,user:ResponseItemEnvelope,accepted:OriginalAcceptedInputWitness,decoder:OriginalResponseDecoder,step:super::super::SourceStep,request_body:Vec<u8>}
 fn capture(envelopes:&[ResponseItemEnvelope])->OriginalInputCapture {
     let mut envelopes=envelopes.to_vec();
     for e in &mut envelopes{e.observe_original_prompt_projection();}
@@ -30,8 +30,9 @@ async fn fixture()->Fixture {
     let input=capture(&[user.clone()]);let projection=ingress.seal_original_projection(&input,&[(0,accepted.clone())]).unwrap();
     let provenance=SourceProvenance::from_original_session_input_capture(&input,projection,json!({}),Vec::new());
     let step=runtime.step("fixture".into(),None,None,None,None,Some(Arc::new(provenance)));
-    let decoder=OriginalResponseDecoder::returned(&step,&body(input.serialized_input()),controlled_identity("same")).unwrap();
-    Fixture{runtime,ingress,owner,user,accepted,decoder}
+    let request_body=body(input.serialized_input());
+    let decoder=OriginalResponseDecoder::returned(&step,&request_body,controlled_identity("same")).unwrap();
+    Fixture{runtime,ingress,owner,user,accepted,decoder,step,request_body}
 }
 fn function_payload()->String {
     json!({"type":"response.output_item.done","item":{"type":"function_call","call_id":"call","name":"soloco_context_header","arguments":"{\"opaque\":9007199254740993,\"text\":\"雪\\n\"}"}}).to_string()
@@ -198,4 +199,290 @@ async fn original_body_error_after_done_and_completed_is_preserved_not_replaced_
         Ok(crate::ResponseEvent::Completed{..})=>panic!("actual body failure must remain a failure"),_=>{}
     }}
     assert!(original_error);assert!(!seen.unwrap().complete_original_response());
+}
+
+// AUTHORED_UNRUN Source-only terminal-custody controls. These exercise the
+// actual private parser claim and fixed event encoder, not an inherited FD3,
+// a qualified Native build, a live host, or company admission.
+fn terminal_payload(response_id:&str)->String {
+    json!({"type":"response.completed","response":{"id":response_id}}).to_string()
+}
+fn complete_terminal(f:&Fixture,response_id:&str)->String {
+    let payload=terminal_payload(response_id);
+    f.decoder.observe_terminal(&payload,"response.completed");
+    f.decoder.completed(response_id);f.decoder.local_eof();payload
+}
+#[tokio::test]
+async fn original_terminal_drained_claim_is_closed_exact_and_one_use() {
+    let f=fixture().await;let payload=complete_terminal(&f,"same-response");
+    let drained=f.decoder.take_terminal_drained().unwrap();let frame=drained.frame(7);
+    assert_eq!(frame,json!({"protocol":"soloco-protected-backend-permit-v2",
+        "kind":"original_response_terminal_drained","nonce":"same","pid":1,
+        "host_instance_id":"fixture","request_id":f.decoder.source.request_id,
+        "request_sha256":f.decoder.source.request_sha256,"sequence":7,"response_id":"same-response",
+        "terminal_logical_payload_sha256":super::super::hash(payload.as_bytes()),
+        "local_body_eof_observed":true,"remote_domain_closed":false}));
+    assert_eq!(frame.as_object().unwrap().len(),12);
+    assert!(f.decoder.take_terminal_drained().is_err());
+}
+#[tokio::test]
+async fn terminal_drained_requires_completed_same_body_eof_and_original_terminal_payload() {
+    let f=fixture().await;
+    assert!(f.decoder.take_terminal_drained().is_err());
+    f.decoder.local_eof();assert!(f.decoder.take_terminal_drained().is_err());
+    let f=fixture().await;let payload=terminal_payload("r");
+    f.decoder.observe_terminal(&payload,"response.completed");f.decoder.completed("r");
+    assert!(f.decoder.take_terminal_drained().is_err());
+    f.decoder.local_eof();assert!(f.decoder.take_terminal_drained().is_ok());
+    let f=fixture().await;f.decoder.completed("r");f.decoder.local_eof();
+    assert!(f.decoder.take_terminal_drained().is_err());
+}
+#[tokio::test]
+async fn terminal_drained_unknown_interrupted_duplicate_and_empty_completion_hold() {
+    let f=fixture().await;complete_terminal(&f,"r");f.decoder.unknown();
+    assert!(f.decoder.take_terminal_drained().is_err());
+    let f=fixture().await;f.decoder.observe_terminal("{\"type\":\"response.incomplete\"}","response.incomplete");
+    f.decoder.completed("r");f.decoder.local_eof();assert!(f.decoder.take_terminal_drained().is_err());
+    let f=fixture().await;let payload=complete_terminal(&f,"r");
+    f.decoder.observe_terminal(&payload,"response.completed");assert!(f.decoder.take_terminal_drained().is_err());
+    let f=fixture().await;complete_terminal(&f,"r");f.decoder.completed("r");
+    assert!(f.decoder.take_terminal_drained().is_err());
+    let f=fixture().await;complete_terminal(&f,"");assert!(f.decoder.take_terminal_drained().is_err());
+    let f=fixture().await;f.decoder.observe_terminal(&"x".repeat(super::super::MAX_BODY+1),"response.completed");
+    f.decoder.completed("r");f.decoder.local_eof();assert!(f.decoder.take_terminal_drained().is_err());
+}
+#[tokio::test]
+async fn terminal_drained_private_claim_cannot_move_to_foreign_startup_request_or_hash() {
+    let f=fixture().await;complete_terminal(&f,"r");let drained=f.decoder.take_terminal_drained().unwrap();
+    assert!(drained.matches(&controlled_identity("same"),&f.decoder.source.request_id,&f.decoder.source.request_sha256));
+    assert!(!drained.matches(&controlled_identity("foreign"),&f.decoder.source.request_id,&f.decoder.source.request_sha256));
+    assert!(!drained.matches(&controlled_identity("same"),"foreign-request",&f.decoder.source.request_sha256));
+    assert!(!drained.matches(&controlled_identity("same"),&f.decoder.source.request_id,&"0".repeat(64)));
+}
+#[tokio::test]
+async fn original_terminal_payload_hash_preserves_exact_logical_bytes() {
+    let f=fixture().await;
+    let payload="{ \"type\": \"response.completed\", \"response\": {\"id\":\"r\"} }";
+    f.decoder.observe_terminal(payload,"response.completed");f.decoder.completed("r");f.decoder.local_eof();
+    let frame=f.decoder.take_terminal_drained().unwrap().frame(1);
+    assert_eq!(frame["terminal_logical_payload_sha256"],super::super::hash(payload.as_bytes()));
+    assert_ne!(frame["terminal_logical_payload_sha256"],super::super::hash(terminal_payload("r").as_bytes()));
+}
+
+#[cfg(unix)]
+mod concrete_fd3 {
+    // AUTHORED_UNRUN. Private cfg(test) fixture only: real Unix pipes feed the
+    // SAME concrete writer used by stream(). No new production constructor,
+    // alternate writer, callback proof, descriptor-3 takeover, or Native claim.
+    use super::*;
+    use super::super::super::{Channel,Challenge,OperationGuard,OriginalResponseDrainWriter,pipe};
+    use std::sync::atomic::{AtomicBool,Ordering};
+    use std::time::Duration;
+
+    struct Pipes {
+        inner:Fixture,
+        channel:&'static tokio::sync::Mutex<Channel>,
+        unknown:&'static AtomicBool,
+        reader:Option<pipe::Pipe>,
+        _control_peer:pipe::Pipe,
+        output_reader_fd:i32,
+        output_fd:i32,
+    }
+    fn pair()->(pipe::Pipe,pipe::Pipe,i32,i32) {
+        let mut descriptors=[-1;2];
+        assert_eq!(unsafe{libc::pipe(descriptors.as_mut_ptr())},0);
+        // Existing Pipe code owns each fresh descriptor exactly once and sets
+        // nonblocking/CLOEXEC. Fixed test channels never claim inherited 3/4.
+        let read=pipe::Pipe::inherited(descriptors[0]).unwrap();
+        let write=pipe::Pipe::inherited(descriptors[1]).unwrap();
+        (read,write,descriptors[0],descriptors[1])
+    }
+    async fn pipes()->Pipes {
+        let mut inner=fixture().await;
+        let (reader,outgoing,output_reader_fd,output_fd)=pair();let (incoming,control_peer,_,_)=pair();
+        // Fixed, bounded fixtures retain these allocations until this test
+        // process exits, matching the production Channel/guard static lifetime.
+        // Their private UNKNOWN never resets the production sticky UNKNOWN.
+        let unknown:&'static AtomicBool=Box::leak(Box::new(AtomicBool::new(false)));
+        let channel:&'static tokio::sync::Mutex<Channel>=Box::leak(Box::new(tokio::sync::Mutex::new(Channel {
+            incoming,outgoing,challenge:Some(Challenge {
+                protocol:super::super::super::PROTOCOL.into(),kind:"challenge".into(),nonce:"a".repeat(64),pid:std::process::id(),
+                upstream_url:"https://source-fixture.invalid/responses".into(),slot_id:"source-fixture-slot".into(),
+                executable_sha256:"b".repeat(64),source_manifest_sha256:"c".repeat(64),
+                state_root:"/source-fixture/state".into(),cwd:"/source-fixture/root".into(),original_home_sha256:None,
+                context_contract:None,loopback_proxy_port:None,
+            }),sequence:1,unresolved:Some(inner.step.request_id.clone()),poisoned:false,
+            host_observation:Some(json!({"host_instance_id":"source-fixture-original-host"})),
+            scope_context_receipt:None,scope_context_attempted:false,
+        })));
+        let startup={let state=channel.lock().await;super::super::super::original_native_decoder::OriginalStartupIdentity::observe(&state).unwrap()};
+        let writer=OriginalResponseDrainWriter {owner:channel,startup:startup.clone(),
+            request_id:inner.step.request_id.clone(),request_sha256:super::super::super::hash(&inner.request_body),
+            sequence:1,guard:OperationGuard {armed:true,unknown}};
+        inner.decoder=OriginalResponseDecoder::returned_from_original_channel(&inner.step,&inner.request_body,startup,writer).unwrap();
+        Pipes {inner,channel,unknown,reader:Some(reader),_control_peer:control_peer,output_reader_fd,output_fd}
+    }
+    async fn frame(reader:&pipe::Pipe)->Value {
+        tokio::time::timeout(Duration::from_secs(1),async {
+            let mut bytes=Vec::new();
+            loop {let byte=reader.read_byte().await.unwrap();if byte==b'\n'{break;}
+                assert!(bytes.len()<super::super::super::MAX_FRAME);bytes.push(byte);}
+            serde_json::from_slice(&bytes).unwrap()
+        }).await.unwrap()
+    }
+    async fn no_frame(reader:&pipe::Pipe) {
+        assert!(tokio::time::timeout(Duration::from_millis(10),reader.read_byte()).await.is_err());
+    }
+    fn fill_output(fd:i32)->usize {
+        let bytes=[0u8;4096];let mut blocked=false;let mut total=0;
+        for _ in 0..1024 {
+            let written=unsafe{libc::write(fd,bytes.as_ptr().cast(),bytes.len())};
+            if written<0 {
+                assert_eq!(std::io::Error::last_os_error().kind(),std::io::ErrorKind::WouldBlock);
+                blocked=true;break;
+            }
+            assert!(written>0);total+=written as usize;
+        }
+        assert!(blocked,"bounded test pipe did not reach backpressure");
+        total
+    }
+    fn read_exact_now(fd:i32,length:usize)->Vec<u8> {
+        assert!(length<=4*1024*1024);
+        let mut bytes=vec![0u8;length];let mut offset=0;
+        while offset<length {
+            let read=unsafe{libc::read(fd,bytes[offset..].as_mut_ptr().cast(),length-offset)};
+            assert!(read>0,"test pipe did not retain the observed bytes");offset+=read as usize;
+        }
+        bytes
+    }
+    #[tokio::test]
+    async fn actual_returned_channel_writer_emits_exact_frame_then_releases_only_its_request() {
+        let p=pipes().await;let payload=terminal_payload("original-response");
+        assert_eq!(p.channel.lock().await.unresolved.as_deref(),Some(p.inner.step.request_id.as_str()));
+        let wire=format!("data: {}\n\ndata: {payload}\n\n",function_payload());
+        let stream:codex_client::ByteStream=Box::pin(futures::stream::iter(vec![Ok(bytes::Bytes::from(wire))]));
+        let (tx,mut rx)=tokio::sync::mpsc::channel(16);
+        crate::sse::responses::process_sse_with_original(stream,tx,Duration::from_secs(1),None,
+            crate::common::SafetyBufferingTreatment::default(),Some(p.inner.decoder)).await;
+        let mut completed=false;while let Some(event)=rx.recv().await {
+            if matches!(event.unwrap(),crate::ResponseEvent::Completed{..}){completed=true;}
+        }
+        assert!(completed,"the actual SSE path must publish before forwarding Completed");
+        assert_eq!(frame(p.reader.as_ref().unwrap()).await,json!({"protocol":"soloco-protected-backend-permit-v2",
+            "kind":"original_response_terminal_drained","nonce":"a".repeat(64),"pid":std::process::id(),
+            "host_instance_id":"source-fixture-original-host","request_id":p.inner.step.request_id,
+            "request_sha256":super::super::super::hash(&p.inner.request_body),"sequence":1,"response_id":"original-response",
+            "terminal_logical_payload_sha256":super::super::super::hash(payload.as_bytes()),
+            "local_body_eof_observed":true,"remote_domain_closed":false}));
+        let state=p.channel.lock().await;assert!(state.unresolved.is_none());assert!(!state.poisoned);drop(state);
+        assert!(!p.unknown.load(Ordering::SeqCst));
+        assert!(!p.unknown.load(Ordering::SeqCst),"success must disarm the SAME operation guard");
+    }
+    #[tokio::test]
+    async fn actual_writer_duplicate_cannot_publish_again_or_clear_a_later_request() {
+        let mut p=pipes().await;complete_terminal(&p.inner,"r");p.inner.decoder.publish_terminal_drained().await.unwrap();
+        frame(p.reader.as_ref().unwrap()).await;
+        {let mut state=p.channel.lock().await;state.sequence=2;state.unresolved=Some("later-request".into());}
+        assert!(p.inner.decoder.publish_terminal_drained().await.is_err());
+        assert!(p.inner.decoder.source.terminal.lock().unwrap().unknown);
+        assert_eq!(p.channel.lock().await.unresolved.as_deref(),Some("later-request"));
+        no_frame(p.reader.as_ref().unwrap()).await;
+    }
+    #[tokio::test]
+    async fn actual_writer_refuses_foreign_sequence_startup_and_request_without_release() {
+        for changed in ["sequence","startup","request"] {
+            let mut p=pipes().await;complete_terminal(&p.inner,"r");
+            {let mut state=p.channel.lock().await;match changed {
+                "sequence"=>state.sequence+=1,
+                "startup"=>state.challenge.as_mut().unwrap().nonce="d".repeat(64),
+                _=>state.unresolved=Some("foreign-request".into()),
+            }}
+            assert!(p.inner.decoder.publish_terminal_drained().await.is_err());
+            let state=p.channel.lock().await;assert!(state.poisoned);assert!(state.unresolved.is_some());drop(state);
+            assert!(p.unknown.load(Ordering::SeqCst));no_frame(p.reader.as_ref().unwrap()).await;
+        }
+    }
+    #[tokio::test]
+    async fn actual_writer_missing_completion_eof_or_known_parser_cannot_write_or_release() {
+        for missing in ["completion","eof","known"] {
+            let mut p=pipes().await;
+            let payload=terminal_payload("r");p.inner.decoder.observe_terminal(&payload,"response.completed");
+            if missing!="completion"{p.inner.decoder.completed("r");}
+            if missing!="eof"{p.inner.decoder.local_eof();}
+            if missing=="known"{p.inner.decoder.unknown();}
+            assert!(p.inner.decoder.publish_terminal_drained().await.is_err());
+            assert_eq!(p.channel.lock().await.unresolved.as_deref(),Some(p.inner.step.request_id.as_str()));
+            assert!(p.unknown.load(Ordering::SeqCst));no_frame(p.reader.as_ref().unwrap()).await;
+        }
+    }
+    #[tokio::test]
+    async fn actual_fd3_closed_reader_write_failure_retains_reservation_and_unknown() {
+        let mut p=pipes().await;complete_terminal(&p.inner,"r");
+        // Rust's test process starts with SIGPIPE ignored; no process signal
+        // handler is changed by this fixture. The real pipe reports EPIPE.
+        drop(p.reader.take());
+        assert!(p.inner.decoder.publish_terminal_drained().await.is_err());
+        let state=p.channel.lock().await;assert!(state.poisoned);assert!(state.unresolved.is_some());drop(state);
+        assert!(p.unknown.load(Ordering::SeqCst));
+    }
+    #[tokio::test(start_paused=true)]
+    async fn actual_fd3_full_pipe_hits_fixed_write_deadline_and_retains_unknown() {
+        let mut p=pipes().await;complete_terminal(&p.inner,"r");fill_output(p.output_fd);
+        assert!(p.inner.decoder.publish_terminal_drained().await.is_err());
+        let state=p.channel.lock().await;assert!(state.poisoned);assert!(state.unresolved.is_some());drop(state);
+        assert!(p.unknown.load(Ordering::SeqCst));
+    }
+    #[tokio::test]
+    async fn actual_fd3_partial_frame_then_cancel_keeps_original_request_unknown() {
+        let mut p=pipes().await;
+        let pipe_buf=unsafe{libc::fpathconf(p.output_fd,libc::_PC_PIPE_BUF)};
+        assert!(pipe_buf>0&&(pipe_buf as usize)<super::super::super::MAX_FRAME/4);
+        // A large but valid original response ID makes this fixed closed frame
+        // non-atomic (> actual PIPE_BUF), still below both Native wire bounds.
+        // It is a writer-mechanics fixture, not a Node-admissible response ID.
+        let response_id="r".repeat(super::super::super::MAX_FRAME-2048);
+        let payload=complete_terminal(&p.inner,&response_id);
+        assert!(payload.len()<super::super::super::MAX_BODY);
+        let expected=p.inner.decoder.source.startup.terminal_drained_frame(&p.inner.step.request_id,
+            &super::super::super::hash(&p.inner.request_body),1,&response_id,&super::super::super::hash(payload.as_bytes()));
+        let mut expected=serde_json::to_vec(&expected).unwrap();
+        assert!(expected.len()<=super::super::super::MAX_FRAME&&expected.len()>pipe_buf as usize);expected.push(b'\n');
+        let filled=fill_output(p.output_fd);let freed=pipe_buf as usize;
+        assert!(filled>=freed);assert!(read_exact_now(p.output_reader_fd,freed).iter().all(|byte|*byte==0));
+        let remaining_fill=filled-freed;
+        let mut publication=Box::pin(p.inner.decoder.publish_terminal_drained());let mut observed=0usize;
+        for _ in 0..32 {
+            assert!(futures::poll!(publication.as_mut()).is_pending(),"fixture must not finish a whole frame");
+            let mut buffered=0i32;
+            assert_eq!(unsafe{libc::ioctl(p.output_reader_fd,libc::FIONREAD,&mut buffered)},0);
+            assert!(buffered>=0);observed=buffered as usize;
+            if observed>remaining_fill {break;}
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+        assert!(observed>remaining_fill,"must observe actual frame bytes, not infer a partial write from EAGAIN");
+        let prefix_written=observed-remaining_fill;
+        assert!(prefix_written>0&&prefix_written<expected.len());
+        // Cancel before consuming any further bytes: a reader must not create
+        // space that lets the writer finish and release its reservation.
+        drop(publication);
+        assert!(p.unknown.load(Ordering::SeqCst));
+        assert_eq!(p.channel.lock().await.unresolved.as_deref(),Some(p.inner.step.request_id.as_str()));
+        let bytes=read_exact_now(p.output_reader_fd,observed);
+        assert!(bytes[..remaining_fill].iter().all(|byte|*byte==0));
+        assert_eq!(&bytes[remaining_fill..],&expected[..prefix_written]);
+        assert!(!bytes[remaining_fill..].contains(&b'\n'));
+        assert!(serde_json::from_slice::<Value>(&bytes[remaining_fill..]).is_err());
+        let mut extra=0u8;
+        assert_eq!(unsafe{libc::read(p.output_reader_fd,(&mut extra as *mut u8).cast(),1)},-1);
+        assert_eq!(std::io::Error::last_os_error().kind(),std::io::ErrorKind::WouldBlock);
+    }
+    #[tokio::test]
+    async fn actual_writer_cancelled_while_fd3_backpressured_and_dropped_decoder_stay_unknown() {
+        let mut p=pipes().await;complete_terminal(&p.inner,"r");fill_output(p.output_fd);
+        let mut publication=Box::pin(p.inner.decoder.publish_terminal_drained());
+        assert!(futures::poll!(publication.as_mut()).is_pending());drop(publication);
+        assert!(p.unknown.load(Ordering::SeqCst));assert!(p.channel.lock().await.unresolved.is_some());
+        let p=pipes().await;drop(p.inner.decoder);
+        assert!(p.unknown.load(Ordering::SeqCst));assert!(p.channel.lock().await.unresolved.is_some());
+    }
 }

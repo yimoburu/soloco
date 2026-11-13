@@ -12,6 +12,62 @@ const CORE_ID: &str = "peer-task-and-whole-membership-context-v2-delivery-frame-
 const ENCODING: &str = "soloco-peer-context-frame-v2";
 const PROFILE: &str = "protected_scoped_explicit_nonincremental_rlite_v1";
 const EVIDENCE_SCOPE: &str = "source-resource-and-whole-payload-source-cut-wire-compatibility-only";
+const BOOTSTRAP_RESOURCE:&[u8]=include_bytes!("bootstrap_membership_readonly3_contract_v1.json");
+const BOOTSTRAP_RESOURCE_SHA256:&str="cd1ce3adaad300721e47238292ce15dc41f7007b6e415b76c005e93419656ed4";
+const BOOTSTRAP_PROTOCOL:&str="soloco-bootstrap-membership-context-contract-v1";
+const BOOTSTRAP_CORE_ID:&str="bootstrap-membership-readonly3-whole-assignment-v1";
+const BOOTSTRAP_PROFILE:&str="soloco-bootstrap-membership-readonly3-v1";
+
+/// Fixed constructor selections, never inferred from payloads or a caller's
+/// arbitrary tool subset. The original startup retains exactly one selection.
+#[derive(Clone,Copy,PartialEq,Eq)]
+pub(super) enum OriginalToolProfile {OrdinaryFive,BootstrapReadonlyThree}
+impl OriginalToolProfile {
+    pub(super) fn resource_sha256(self)->String {match self {
+        Self::OrdinaryFive=>hash(include_bytes!("../protected_peer_responses_tools.json")),
+        Self::BootstrapReadonlyThree=>BOOTSTRAP_RESOURCE_SHA256.into(),
+    }}
+    pub(super) fn offered_inventory(self)->Result<serde_json::Value,TransportError> {match self {
+        Self::OrdinaryFive=>serde_json::from_slice(include_bytes!("../protected_peer_responses_tools.json"))
+            .map_err(|_|hold("compiled ordinary tool resource")),
+        Self::BootstrapReadonlyThree=>{
+            let resource=bootstrap_source_resource()?;
+            Ok(serde_json::Value::Array(resource.tools.into_iter().map(|tool|serde_json::json!({
+                "type":tool.kind,"name":tool.name,"description":tool.description,
+                "parameters":tool.input_schema,"strict":false})).collect()))
+        }
+    }}
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct BootstrapSourceTool {
+    #[serde(rename="type")] kind:String,name:String,description:String,
+    #[serde(rename="inputSchema")] input_schema:serde_json::Value,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct BootstrapSourceResource {
+    protocol:String,contract_id:String,scope_profile_id:String,context_encoding:String,
+    delivery:serde_json::Value,tools:Vec<BootstrapSourceTool>,limits:serde_json::Value,
+    fresh_thread_required:bool,authority:String,
+}
+fn bootstrap_source_resource()->Result<BootstrapSourceResource,TransportError> {
+    if BOOTSTRAP_RESOURCE.len()!=2427||hash(BOOTSTRAP_RESOURCE)!=BOOTSTRAP_RESOURCE_SHA256 {
+        return Err(hold("original bootstrap context resource changed"));
+    }
+    let resource:BootstrapSourceResource=serde_json::from_slice(BOOTSTRAP_RESOURCE)
+        .map_err(|_|hold("closed original bootstrap context resource"))?;
+    if resource.protocol!=BOOTSTRAP_PROTOCOL||resource.contract_id!=BOOTSTRAP_CORE_ID
+        ||resource.scope_profile_id!=BOOTSTRAP_PROFILE||resource.context_encoding!=ENCODING
+        ||resource.delivery.get("delivery_kind").and_then(serde_json::Value::as_str)!=Some("bootstrap-membership-assignment")
+        ||resource.delivery.get("payload_protocol").and_then(serde_json::Value::as_str)!=Some("peer-bootstrap-membership-assignment-v1")
+        ||resource.delivery.get("source_cut_protocol").and_then(serde_json::Value::as_str)!=Some("peer-bootstrap-membership-context-v1")
+        ||resource.tools.len()!=3||!resource.fresh_thread_required||resource.authority.is_empty()
+        ||resource.limits.get("read_maximum_characters").and_then(serde_json::Value::as_u64)!=Some(4096)
+    {return Err(hold("unsupported original bootstrap readonly3 resource"));}
+    Ok(resource)
+}
 
 /// Optional only for compatibility with the original raw-v1 control path.
 /// A new v2 caller must select the exact source-owned descriptor; it cannot
@@ -45,6 +101,7 @@ struct SourceResource {
 #[derive(Clone)]
 pub(super) struct OriginalContextSelection {
     request: ContextContractRequest,
+    profile:OriginalToolProfile,
 }
 
 fn source_resource() -> Result<SourceResource, TransportError> {
@@ -76,14 +133,14 @@ pub(super) fn select_original_context_contract(
     requested: Option<&ContextContractRequest>,
 ) -> Result<Option<OriginalContextSelection>, TransportError> {
     let Some(request) = requested else { return Ok(None); };
-    source_resource()?;
-    if request.protocol != CONTRACT_PROTOCOL || request.contract_id != CORE_ID
-        || request.resource_sha256 != RESOURCE_SHA256 || request.context_encoding != ENCODING
-        || request.scope_profile_id != PROFILE
-    {
-        return Err(hold("unsupported original CORE context selection"));
-    }
-    Ok(Some(OriginalContextSelection { request: request.clone() }))
+    let profile=if request.protocol==CONTRACT_PROTOCOL&&request.contract_id==CORE_ID
+        &&request.resource_sha256==RESOURCE_SHA256&&request.context_encoding==ENCODING&&request.scope_profile_id==PROFILE {
+        source_resource()?;OriginalToolProfile::OrdinaryFive
+    }else if request.protocol==BOOTSTRAP_PROTOCOL&&request.contract_id==BOOTSTRAP_CORE_ID
+        &&request.resource_sha256==BOOTSTRAP_RESOURCE_SHA256&&request.context_encoding==ENCODING&&request.scope_profile_id==BOOTSTRAP_PROFILE {
+        bootstrap_source_resource()?;OriginalToolProfile::BootstrapReadonlyThree
+    }else{return Err(hold("unsupported original CORE context selection"));};
+    Ok(Some(OriginalContextSelection { request: request.clone(),profile }))
 }
 
 #[derive(Clone, Serialize)]
@@ -216,6 +273,12 @@ mod frame;
 // its actual executable/source/scope association. This is immutable format
 // selection, not a ready/authority Boolean or a caller-constructible receipt.
 static ORIGINAL_SELECTION: std::sync::OnceLock<Option<OriginalContextSelection>> = std::sync::OnceLock::new();
+pub(super) fn selected_original_tool_profile()->OriginalToolProfile {
+    // Legacy absence keeps the original five-tool protocol. It cannot select
+    // bootstrap merely because a request happens to contain three tools.
+    ORIGINAL_SELECTION.get().and_then(Option::as_ref).map(|selection|selection.profile)
+        .unwrap_or(OriginalToolProfile::OrdinaryFive)
+}
 pub(super) fn retain_original_context_selection(selection: Option<OriginalContextSelection>) -> Result<(), TransportError> {
     ORIGINAL_SELECTION.set(selection).map_err(|_| hold("original context selection already retained"))
 }
@@ -249,7 +312,10 @@ fn validate_selected_turn_input(request: &serde_json::Value, selection: Option<&
         let Some(text) = item.get("text").and_then(serde_json::Value::as_str) else { continue; };
         if !text.starts_with("{\"protocol\":\"soloco-peer-context-frame-") { continue; }
         frames += 1;
-        frame::decode_original_frame(text, &selection.request.resource_sha256, super::MAX_FRAME)?;
+        match selection.profile {
+            OriginalToolProfile::OrdinaryFive=>{frame::decode_original_frame(text,&selection.request.resource_sha256,super::MAX_FRAME)?;}
+            OriginalToolProfile::BootstrapReadonlyThree=>{frame::decode_bootstrap_frame(text,&selection.request.resource_sha256,super::MAX_FRAME)?;}
+        }
     }
     if frames != 1 { return Err(hold("exactly one original context frame required")); }
     Ok(())
