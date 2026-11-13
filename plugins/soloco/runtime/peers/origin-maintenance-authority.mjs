@@ -2,11 +2,13 @@
 // no caller-selected generation, historical waiver or default for old origins.
 import {types} from 'node:util';
 import {canonical,peerDigest} from './ledger.mjs';
+import {peerOriginPausedBootstrapMaintenanceAuthoritySha256} from './origin-paused-bootstrap-contract.mjs';
+import {assertPeerOriginPausedBootstrapAccountingFrom} from './origin-paused-bootstrap-accounting.mjs';
 const need=(ok,code)=>{if(!ok)throw Object.assign(Error(code),{code});},same=(a,b)=>canonical(a)===canonical(b),ref=(family,row)=>({family,id:row.id,revision:row.revision,sha256:row.sha256});
 const record=value=>Boolean(value&&typeof value==='object'&&!types.isProxy(value)&&!Array.isArray(value)&&Object.getPrototypeOf(value)===Object.prototype);
 const exactRef=value=>record(value)&&typeof value.family==='string'&&typeof value.id==='string'&&Number.isSafeInteger(value.revision)&&value.revision>0&&/^[a-f0-9]{64}$/.test(value.sha256??'');
 const counters=Object.freeze(['used_model_calls','used_review_calls','used_frontier_calls','used_frontier_reviews','used_frontier_seal_reviews']);
-export function peerOriginSelectedMaintenanceAuthoritySha256(value){need(value&&typeof value==='object'&&!types.isProxy(value),'ORIGIN_MAINTENANCE_SELECTION_REQUIRED');return peerDigest(Object.fromEntries(Object.entries(value).filter(([key])=>!counters.includes(key))));}
+export function peerOriginSelectedMaintenanceAuthoritySha256(value){need(value&&typeof value==='object'&&!types.isProxy(value),'ORIGIN_MAINTENANCE_SELECTION_REQUIRED');if(Object.hasOwn(value,'paused_bootstrap'))return peerOriginPausedBootstrapMaintenanceAuthoritySha256(value);return peerDigest(Object.fromEntries(Object.entries(value).filter(([key])=>!counters.includes(key))));}
 export function assertPeerOriginSelectedMaintenanceFrom(tx,options={}){
  need(options&&Object.getPrototypeOf(options)===Object.prototype&&!types.isProxy(options),'ORIGIN_MAINTENANCE_SELECTION_REQUIRED');const descriptors=Object.getOwnPropertyDescriptors(options);need(Reflect.ownKeys(descriptors).every(key=>key==='company_id'&&descriptors[key].enumerable&&Object.hasOwn(descriptors[key],'value')),'ORIGIN_MAINTENANCE_SELECTION_REQUIRED');const expected=descriptors.company_id?.value;
  const company=tx.get('control','company'),origin=tx.get('control','origin'),m=origin?.value?.maintenance;
@@ -23,6 +25,9 @@ export function assertPeerOriginSelectedMaintenanceFrom(tx,options={}){
  const maxima={used_model_calls:'max_model_calls',used_review_calls:'max_review_calls',used_frontier_calls:'max_frontier_calls',used_frontier_reviews:'max_frontier_reviews',used_frontier_seal_reviews:'max_frontier_seal_reviews'};
  for(const key of counters){need(Object.hasOwn(m,key)===Object.hasOwn(selected,key),'ORIGIN_MAINTENANCE_SELECTION_CHANGED');if(Object.hasOwn(selected,key))need(Number.isSafeInteger(selected[key])&&selected[key]>=0&&Number.isSafeInteger(m[key])&&m[key]>=selected[key]&&Number.isSafeInteger(selected[maxima[key]])&&m[key]<=selected[maxima[key]],'ORIGIN_MAINTENANCE_SELECTION_CHANGED');}
  need(company.value.pause_generation===selected.pause_generation,'ORIGIN_MAINTENANCE_PAUSE_CHANGED');
+ // Normalizing known nested cost counters is descriptive only. The original
+ // committed typed command/event replay must independently prove every spend.
+ if(Object.hasOwn(selected,'paused_bootstrap'))assertPeerOriginPausedBootstrapAccountingFrom(tx,{company_id:origin.value.company_id});
  return {protocol:'peer-origin-selected-maintenance-v1',company_id:origin.value.company_id,origin_id:origin.value.id,origin_ref:ref('control',origin),company_ref:ref('control',company),selection_origin_ref,selection_company_ref,selection_event_ref:{sequence:event.seq,type:event.type,principal_id:event.principal_id,sha256:event.sha256,previous_sha256:event.previous_sha256},pause_generation:selected.pause_generation,maintenance_authority_sha256:peerOriginSelectedMaintenanceAuthoritySha256(selected),expires_at:selected.expires_at,authority_issued:false};
 }
 export const assertPeerOriginMaintenancePauseFrom=assertPeerOriginSelectedMaintenanceFrom;
