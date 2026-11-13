@@ -31,7 +31,7 @@ async function fixtureModule(t){
   return {project:projection.projectForTest,actual,producer};
 }
 
-function projectionFixture({nodeCopy=true}={}){
+function projectionFixture({nodeCopy=true,sidecarBytes=2048}={}){
   // Synthetic projection DATA only: these labels are not file hashes, a selected
   // handle, original producer evidence, an executable or a native-positive case.
   const root=path.join(os.tmpdir(),'synthetic-selected-component','sealed');
@@ -43,6 +43,7 @@ function projectionFixture({nodeCopy=true}={}){
     ['source_package','native/source-package.json','source-package.json',1000],
     ['cargo_lock','native/Cargo.lock','Cargo.lock',75],
     ['toolchain_manifest','native/toolchain-manifest.toml','toolchain-manifest.toml',90],
+    ['sidecar_capture','native/origin-sidecar-capture','origin-sidecar-capture',sidecarBytes],
     ['executable','native/executable','target/aarch64-apple-darwin/release/codex-soloco-protected-host',4096],
   ];
   const nativePins=Object.fromEntries(specs.map(([name,sealed,recorded,bytes])=>[name,{sealed,recorded:path.join(original,recorded),...pin(sealed,bytes)}]));
@@ -99,6 +100,7 @@ test('component descriptor DATA preserves recorded paths and reads different sea
   const {project}=await fixtureModule(t),{data,nativePins}=projectionFixture();
   const before=clone(data),result=project(data);
   assert.equal(result.protocol,'soloco-context-component-descriptor-data-v1');
+  assert.deepEqual(Object.keys(result.native).sort(),['build_receipt','cargo_lock','compiled_manifest','executable','sidecar_capture','source_package','toolchain_manifest']);
   for(const [name,expected] of Object.entries(nativePins)){
     assert.equal(result.native[name].original_path,expected.recorded);
     assert.equal(result.native[name].sealed_path,expected.sealed);
@@ -113,9 +115,11 @@ test('component descriptor DATA preserves recorded paths and reads different sea
 
 test('component descriptor DATA never promotes readonly bytes or Held claims to execution',async t=>{
   const {project}=await fixtureModule(t),{data}=projectionFixture(),result=project(data);
-  assert.equal(result.native.executable.usage,'READ_ONLY_COMPONENT_BYTES');
-  assert.equal(result.native.executable.executable,false);
-  assert.equal(result.native.executable.deployment_required,true);
+  for(const name of ['executable','sidecar_capture']){
+    assert.equal(result.native[name].usage,'READ_ONLY_COMPONENT_BYTES');
+    assert.equal(result.native[name].executable,false);
+    assert.equal(result.native[name].deployment_required,true);
+  }
   assert.equal(result.deployment_required,true);
   assert.equal(result.result_kind,'COMPILED_COMPONENT');
   assert.equal(result.domain_closure,'unestablished');
@@ -184,11 +188,40 @@ test('component descriptor DATA rejects pin, recipe and native-mode mismatches',
   ]){const {data}=projectionFixture();mutate(data);rejectsProjection(project,data,label);}
 });
 
+test('component descriptor DATA rejects missing, duplicate, extra and changed sidecar copies',async t=>{
+  const {project}=await fixtureModule(t),helper='native/origin-sidecar-capture';
+  for(const [label,mutate] of [
+    ['missing helper copy',data=>matchingCopies(data,rows=>rows.splice(rows.findIndex(row=>row.sealed_path===helper),1))],
+    ['missing helper capsule entry',data=>{data.capsule.record.files=data.capsule.record.files.filter(row=>row.path!==helper);}],
+    ['missing helper throughout',data=>{matchingCopies(data,rows=>rows.splice(rows.findIndex(row=>row.sealed_path===helper),1));data.capsule.record.files=data.capsule.record.files.filter(row=>row.path!==helper);}],
+    ['duplicate helper copy',data=>matchingCopies(data,rows=>rows.push(clone(rows.find(row=>row.sealed_path===helper))))],
+    ['duplicate helper capsule entry',data=>data.capsule.record.files.push(clone(data.capsule.record.files.find(row=>row.path===helper)))],
+    ['extra native helper name',data=>{matchingCopies(data,rows=>rows.push({original_path:path.join(os.tmpdir(),'extra-sidecar'),sealed_path:helper+'-extra',...pin('extra-sidecar',64)}));data.capsule.record.files.push({path:helper+'-extra',...pin('extra-sidecar',64),mode:'100644'});}],
+    ['helper differs from original recipe',data=>{data.copies.find(row=>row.sealed_path===helper).bytes++;}],
+    ['helper copies differ from capsule',data=>matchingCopies(data,rows=>{rows.find(row=>row.sealed_path===helper).sha256=digest('wrong-sidecar');})],
+    ['helper capsule pin differs',data=>{data.capsule.record.files.find(row=>row.path===helper).sha256=digest('wrong-sidecar-capsule');}],
+    ['helper mode promoted',data=>{data.capsule.record.files.find(row=>row.path===helper).mode='100755';}],
+  ]){const {data}=projectionFixture();mutate(data);rejectsProjection(project,data,label);}
+});
+
+test('component descriptor DATA requires positive sidecar bytes within the 16 MiB bound',async t=>{
+  const {project}=await fixtureModule(t);
+  for(const sidecarBytes of [1,16*1024*1024]){
+    const {data}=projectionFixture({sidecarBytes}),result=project(data);
+    assert.equal(result.native.sidecar_capture.bytes,sidecarBytes);
+    assert.equal(result.native.sidecar_capture.executable,false);
+  }
+  for(const sidecarBytes of [0,16*1024*1024+1]){
+    const {data}=projectionFixture({sidecarBytes});
+    rejectsProjection(project,data,'sidecar bytes '+sidecarBytes);
+  }
+});
+
 test('component descriptor projection permits no Node copies without claiming loaded closure',async t=>{
   const {project}=await fixtureModule(t),{data}=projectionFixture({nodeCopy:false});
   assert.equal(data.copies.some(row=>row.sealed_path.startsWith('node-source/')),false);
   const result=project(data);
-  assert.equal(Object.keys(result.native).length,6);
+  assert.equal(Object.keys(result.native).length,7);
   assert.deepEqual(result.node.input_manifest,{path:data.node_inputs.path,bytes:data.node_inputs.bytes,sha256:data.node_inputs.sha256});
   assert.equal(result.qualified_interpreter,'HELD');
   assert.equal(result.native_qualified,false);
