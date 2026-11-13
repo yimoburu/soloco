@@ -27,6 +27,7 @@ import {progressObservations} from './progress-observations.mjs';
 import { beginHandover, submitReconstruction, handoverReviewEligible, freshHandoverReviewEligible, verifyHandoverAcceptance, handoverSubject, inspectHandover, reconstructionReceipt, admitHandover } from './handover.mjs';
 import { assignmentContext, contextMatches } from './context.mjs';
 import { developmentAction, developmentCapability, developmentAssignment } from './develop.mjs';
+import {DEVELOPMENT_BUDGET_ACTIONS,validateDevelopmentBudgetRequest,developmentBudgetRuntimeAction} from './development-budget-runtime.mjs';
 import { prototypeAction, prototypeCapability, prototypeAssignment } from './prototype.mjs';
 import { TIMEOUT_POLICY_VERSION, normalizeTimeout, normalizeHandoverReviewWindow, normalizeCodeReviewWindow, jobTimeoutState } from './timeout.mjs';
 import {taskAction,runtimeAction} from './task-runtime.mjs';
@@ -105,7 +106,15 @@ export function operationReceipt(args,host,result,operation) {
 export function inspectionPage(args,host,collection) {
   binding(args,host);return withStore(args.root,db=>db.readSnapshot(()=>publicPage(db.publicState(),{collection})));
 }
-export function develop(args,host) { binding(args,host); return ['prepare_retention_review','authorize_retention_review'].includes(args.action)?retentionReviewAction(args,host):['prepare_review_continuation','authorize_review_continuation','accept_review_continuation'].includes(args.action)?developmentReviewContinuationAction(args,host):developmentAction(args,host); }
+export function develop(args,host) {
+  if(DEVELOPMENT_BUDGET_ACTIONS.includes(args?.action)) {
+    const checked=validateDevelopmentBudgetRequest(args);
+    const actor=peerCallerActor(checked,host);
+    return developmentBudgetRuntimeAction(checked,actor);
+  }
+  binding(args,host);
+  return ['prepare_retention_review','authorize_retention_review'].includes(args.action)?retentionReviewAction(args,host):['prepare_review_continuation','authorize_review_continuation','accept_review_continuation'].includes(args.action)?developmentReviewContinuationAction(args,host):developmentAction(args,host);
+}
 export function prototype(args,host) { binding(args,host); return prototypeAction(args,host); }
 export function tasks(args,host){binding(args,host);return taskAction(args,host);}
 export function runtime(args,host){binding(args,host);return runtimeAction(args,host);}

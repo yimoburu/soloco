@@ -9,7 +9,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { VERSION, V018_GOVERNANCE_SHA256, V019_GOVERNANCE_SHA256, V020_GOVERNANCE_SHA256, installedTeam, digest, id, stamp, requireText, withStore, owner, folder, noLink, notice } from './store.mjs';
 import { contextMatches, supplementalMatches } from './context.mjs';
 import { sandboxCapability, runLocalTests, validationEnvironment } from './local-sandbox.mjs';
-import { developmentLimits, assertByteBudget, developmentTransportBudget } from './development-limits.mjs';
+import { developmentLimits, assertByteBudget, developmentTransportBudget, MAX_DEVELOPMENT_BYTES } from './development-limits.mjs';
 import {developmentCandidateFiles} from './development-footprint.mjs';
 import { reconstructPatch, validText } from './development-patch.mjs';
 import {inheritSnapshots} from './snapshot.mjs';
@@ -27,6 +27,9 @@ export function developmentCapability(s,root=process.cwd()) {
     ? 'Explicitly adopt the installed development-capable team and compatible governance first' : null);
   return {supported:executor.supported,eligible:s ? !blocker : null,blocker,executor,
     output:'Retained, independently reviewable local candidate; original source is unchanged',
+    budget_control:{tool:'company_develop',actions:['budget_inspect','budget_propose','budget_apply','budget_restore','budget_reconcile','budget_preflight'],
+      supported_storage:'normalized-v4',supported_host:'codex',requires:'Actual root HOST/current managed hook and current owner/epoch; source reading also needs explicit source-sharing scope',
+      changes_existing_grants:false,hard_max_bytes:MAX_DEVELOPMENT_BYTES,configuration_and_task_authority:'Separate; a ceiling change never enlarges an immutable scope or renews work'},
     test_fixtures:{supported:executor.supported,selection_stage:'plan',selectors:[{protocol:'scratch-fixture-contract-v1',factory:'p5-transfer-two-real-links-v1'}],validation_reuse:false},
     limits:{test_runner:'Node built-in tests',network:false,package_installation:false,source_integration:false,
       max_files:32,max_bytes:configuration.max_bytes,per_file_max_bytes:configuration.per_file_max_bytes,max_attempts:10,max_test_ms:120000,configuration,context_admission_characters:configuration_error?null:developmentTransportBudget(configuration.max_bytes),model_context_fit:"unverified; host/model limits may be lower"},

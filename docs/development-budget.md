@@ -1,12 +1,57 @@
 # Legacy project development ceiling control
 
-This SOURCE backend supports only existing normalized layout-4 companies. It
-does not register a public tool. The fixed future router must first obtain the
-actual supported root HOST actor and current managed-hook binding through
-`engine.peerCallerActor`. Every backend entry independently requires the same
-active `requireCodexRootActor` observation before opening storage. Matching
-caller JSON, an old actor object or a startup file alone cannot replace it.
-This is source identity, not native qualification or business permission.
+The implemented source exposes these controls through `company_develop` for
+existing normalized layout-4 companies. The public route validates closed DATA,
+then obtains the actual supported root HOST actor and current managed-hook
+binding through `engine.peerCallerActor` before any backend or storage access.
+Every backend entry independently requires the same active
+`requireCodexRootActor` observation before opening storage. Matching caller
+JSON, an old actor object or a startup file alone cannot replace it. This is
+source identity, not native qualification or business permission. Installing
+or adopting this source is a separate operation.
+
+## Public actions and footprint preflight
+
+Budget calls use only `root`, `session_id`, the current `epoch`, `action` and
+closed `budget_input`. The ordinary development fields are not accepted on
+these calls. No caller actor, native ID, provider, callback, layout selector or
+proof is accepted. All controls use one fixed legacy backend; layout 5 and
+unknown or changed storage Hold without a fallback.
+
+| `company_develop` action | `budget_input` |
+| --- | --- |
+| `budget_inspect` | Optional exact operation `ref` and bounded range, or list `cursor`/`limit` |
+| `budget_propose` | `max_bytes_ceiling`, exact `expected_config` from inspection, `source_instruction`, `restoration_policy` |
+| `budget_apply` | Exact `proposal_ref`, `source_instruction` |
+| `budget_restore` | Exact `applied_ref`, current `expected_config`, `source_instruction` |
+| `budget_reconcile` | Current interrupted `intent_ref`, `source_instruction`; observe facts only |
+| `budget_preflight` | Explicit source-sharing instruction and policy, exact selected paths, output format, requested byte budget and finite headroom; optional complete supplied output |
+
+Preflight requires `source_instruction`, `model_data_approved:true` and
+`data_policy` before reading source. It accepts exact `read_paths`,
+`write_paths` and `test_paths`, `output_format` (`files` or `patches`),
+`requested_max_bytes`, `headroom_bytes`, and optional `output` in that format.
+Existing writable files must also be selected reads, every test must be in the
+selected read/write set, and the complete union has at most 32 paths. Private,
+undeclared or linked files are not inferred or read. The source path rules,
+finite implementation limits and exact candidate serializer remain binding.
+
+The response reports each selected file and the exact UTF-8/JSON sizes of
+known phases: source records, supplied generated output and the complete
+reconstructed candidate, including unchanged selected dependencies and tests.
+Supplied output is labelled a preview; it is not a canonical generation, test
+receipt or accepted candidate. Without complete output, future output and
+candidate sizes remain unknown. The recommendation is the maximum of known
+phase sizes plus explicitly requested finite headroom, not their sum. It
+identifies the configured, requested and hard ceilings that actually constrain
+a known measurement. Existing immutable scope budgets stay separate and
+unchanged. No future model/context fit,
+dependency completeness, tests, acceptance or permission is inferred.
+
+Preflight writes no plan, grant or configuration. It never selects a model or
+starts tests. The separate existing development plan and authorization remain
+necessary. Recorded source instructions describe the caller's stated
+authorization; software does not attest that a human authored or approved them.
 
 The five awaited source exports in `runtime/development-budget.mjs` are
 `inspectLegacyDevelopmentBudget`, `proposeLegacyDevelopmentBudget`,
