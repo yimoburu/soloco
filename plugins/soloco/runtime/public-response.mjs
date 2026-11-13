@@ -5,6 +5,7 @@ import {VERSION,publicTeam} from './team-source.mjs';
 export {publicTeam} from './team-source.mjs';
 import { contextSource } from './current-state.mjs';
 import { jobTimeoutState } from './timeout.mjs';
+import {projectNotice} from './notice-sources.mjs';
 
 export const MODEL_MAX_BYTES=30000;
 export const REPLY_MAX_BYTES=65536;
@@ -65,6 +66,10 @@ export function itemView(value,id,collection='records') {
   const ref=sourceReference(value,id),v=value??{};
   if(collection==='context_classifications'||id==='@public:pinned:context_classifications')return {stored_metadata:true,current_applicability:'Not validated by inspection; exact metadata can contain stale or invalid proofs',...pick(v,['disposition','at']),source:ref};
   const view={...pick(v,['id','revision','kind','role','status','author_role','author_instance','instance_id','native_id','host','epoch','created_at','updated_at','finished_at','artifact_id','to','from','at','seen_at']),source:ref,preview:true};
+  if(['notices','unresolved_notices'].includes(collection)){
+    if(typeof v.id==='string'&&v.id.trim())view.canonical_source={...sourceReference(projectNotice(v),'notice:'+v.id),projection:{omitted_top_level_fields:['deliveries','seen_at'],original:ref},identity_rule:'Unique canonical notice ID required; duplicate IDs or record-namespace collisions fail closed on canonical read. Positional raw source remains distinct.'};
+    else view.canonical_source_hold='Canonical notice ID missing; exact raw source remains available';
+  }
   // All excerpts explicitly remain previews; source provides exact missing fields.
   if(typeof value==='string')view.text=cut(value,240);
   if(v.content!==undefined)view.content=cut(v.content,240);
