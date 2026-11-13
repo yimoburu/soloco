@@ -551,7 +551,7 @@ for(const providerErrorKind of ['frozen','nonextensible'])test('real worker reta
   const transaction=f.storeModule.Store.prototype.transaction;let rejectionPending=true,failedBirths=0,modelCalls=0,received,modelToken,promptWrites=0,timingCallbacks=0,closed=false;
   modelChild.stdin.end=()=>{promptWrites++;};modelChild.once('close',()=>{closed=true;});
   t.mock.method(f.storeModule.Store.prototype,'transaction',function(type,fn,hooks={}){
-    if(this.root!==f.root||type!=='job.original_execution.born'||!rejectionPending)return Reflect.apply(transaction,this,[type,fn,hooks]);
+    if(this.root!==f.store.root||type!=='job.original_execution.born'||!rejectionPending)return Reflect.apply(transaction,this,[type,fn,hooks]);
     return Reflect.apply(transaction,this,[type,fn,{...hooks,beforeCommit:(db,next)=>{
       if(hooks.beforeCommit)assert.equal(hooks.beforeCommit(db,next),undefined);
       const launch=next.jobs[job.id]?.original_execution_assignment.launches.find(l=>l.kind==='model'&&l.birth?.pid===modelChild.pid);

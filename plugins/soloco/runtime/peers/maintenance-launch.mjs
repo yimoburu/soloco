@@ -111,7 +111,9 @@ export async function runOriginalPeerOriginMaintenance(api,input){
  if(arguments.length!==2)fail('ORIGIN_LAUNCH_INPUT');input=launchInput(input,['operation_id','kind','segments'],['reconstruction_ref']);if(!['peer-origin-reconstruction','peer-origin-review'].includes(input.kind))fail('ORIGIN_LAUNCH_INPUT');return runMaintenance(api,input,RANGE);
 }
 export async function runOriginalPeerOriginFrontierSealReview(api,input){
- if(arguments.length!==2)fail('ORIGIN_LAUNCH_INPUT');return runMaintenance(api,launchInput(input,['operation_id','frontier_ref','root_result_ref']),SEAL);
+ if(arguments.length!==2)fail('ORIGIN_LAUNCH_INPUT');input=launchInput(input,['operation_id','frontier_ref','root_result_ref']);
+ if(typeof originSeal.loadPeerOriginFrontierSealCheckpointSupport!=='function')fail('ORIGIN_FRONTIER_SEAL_CHECKPOINT_SOURCE_REQUIRED');
+ await originSeal.loadPeerOriginFrontierSealCheckpointSupport();return runMaintenance(api,input,SEAL);
 }
 export async function runOriginalPeerOwnerMaintenanceReview(lifecycle,input){
  if(arguments.length!==2)fail('ORIGIN_LAUNCH_INPUT');return runMaintenance(lifecycle,launchInput(input,['operation_id','epoch']),OWNER);

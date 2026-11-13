@@ -100,6 +100,16 @@ import * as seal from '../plugins/soloco/runtime/peers/origin-frontier-seal.mjs'
 import {peerFixture} from './peer-fixture.mjs';
 import {legacySourceId} from '../plugins/soloco/runtime/peers/legacy-origin.mjs';
 function relocateForSeal(name,overrides={}){const original=path.join(peers,name);return fs.readFileSync(original,'utf8').replace(/(['"])(\.\.?\/[^'"]+\.mjs)\1/g,(_match,_quote,relative)=>JSON.stringify(overrides[relative]??new URL(relative,url(original)).href));}
+// Whole production Seal source, with ONLY the existing fixed-relative URL
+// relocation. The controlled dependency is test DATA, never a loader fragment,
+// injected production provider, readiness grant or Native proof.
+function checkpointSourceCopy(name,body=null){
+ const directory=path.join(temp,name);fs.mkdirSync(directory);
+ const candidate=path.join(directory,'input-frontier-checkpoint.mjs'),module=path.join(directory,'seal.mjs');
+ if(body!==null)fs.writeFileSync(candidate,body);
+ fs.writeFileSync(module,relocateForSeal('origin-frontier-seal.mjs',{'./input-frontier-checkpoint.mjs':url(candidate)}));
+ return {directory,candidate,module};
+}
 const frontierSidecarsPath=path.join(temp,'frontier-sidecars.mjs'),frontierPurePath=path.join(temp,'frontier-pure.mjs'),frontierCorePath=path.join(temp,'frontier-core.mjs'),checkpointPath=path.join(temp,'input-frontier-checkpoint.mjs'),sealSourcePath=path.join(temp,'seal-source.mjs');
 fs.writeFileSync(frontierSidecarsPath,relocateForSeal('input-frontier-sidecars.mjs',{'./origin-plan.mjs':url(path.join(temp,'origin-plan.mjs'))}));
 fs.writeFileSync(frontierPurePath,relocateForSeal('input-frontier.mjs',{'./input-frontier-sidecars.mjs':url(frontierSidecarsPath)}));
@@ -107,6 +117,10 @@ fs.writeFileSync(frontierCorePath,relocateForSeal('input-frontier-maintenance.mj
 fs.writeFileSync(checkpointPath,relocateForSeal('input-frontier-checkpoint.mjs',{'./input-frontier-maintenance.mjs':url(frontierCorePath),'./input-frontier.mjs':url(frontierPurePath)}));
 fs.writeFileSync(sealSourcePath,relocateForSeal('origin-frontier-seal.mjs',{'./input-frontier-checkpoint.mjs':url(checkpointPath),'./input-frontier.mjs':url(frontierPurePath),'./origin-plan.mjs':url(path.join(temp,'origin-plan.mjs')),'./origin-quarantine.mjs':url(path.join(temp,'origin-quarantine.mjs')),'./context-component-deployment.mjs':url(path.join(temp,'deployment.mjs')),'./protected-codex-domain.mjs':url(path.join(temp,'domain.mjs'))}));
 const sourceFrontier=await import(url(frontierCorePath)),sourceSeal=await import(url(sealSourcePath)),frontierPure=await import(url(frontierPurePath));
+// Explicit support loading is Source initialization only; the original
+// admission, purpose, context, Native and private-capability guards still run.
+await seal.loadPeerOriginFrontierSealCheckpointSupport();
+await sourceSeal.loadPeerOriginFrontierSealCheckpointSupport();
 function frontierSourceOutput(context){
  const base={protocol:context.response_protocol,subject:context.subject,verdict:'Pass',reason:'SYNTHETIC exact source semantic review; no real native evidence.',blockers:[],exhaustive:true,boundaries_complete:true,permitted_action:context.subject.stage==='review'?'qualify_node':'continue'};
  if(context.subject.stage!=='review'){
@@ -142,8 +156,15 @@ test('invalid or broader final-seal purpose cannot create a plan or change the o
  const f=fixture(t,smallPins()),valid={protocol:'peer-origin-frontier-seal-purpose-v1',purpose:'bounded-preparation-bootstrap',max_reviews:1},before=raw(f);for(const value of [{...valid,max_reviews:0},{...valid,max_reviews:3},{...valid,max_reviews:1.5},{...valid,purpose:'ordinary-business'},{...valid,protocol:'caller-pass'},{...valid,new_allowance:true},null]){assert.throws(()=>plan.recordPeerOriginQuarantinePlan(f.root,actor,{...f.input,frontier_seal:value}),e=>e.code==='ORIGIN_FRONTIER_SEAL_PURPOSE_REQUIRED');assert.deepEqual(raw(f),before);}
 });
 test('missing explicit purpose and an explicitly absent checkpoint-source fixture are distinct Holds without a charge',async t=>{
- const missingPath=path.join(temp,'missing-checkpoint-source','input-frontier-checkpoint.mjs'),fixturePath=path.join(temp,'seal-missing-checkpoint.mjs');fs.writeFileSync(fixturePath,fs.readFileSync(path.join(peers,'origin-frontier-seal.mjs'),'utf8').replace(/(['\"])(\.\.?\/[^'\"]+\.mjs)\1/g,(_match,_quote,relative)=>JSON.stringify(relative==='./input-frontier-checkpoint.mjs'?url(missingPath):new URL(relative,url(path.join(peers,'origin-frontier-seal.mjs'))).href)));const missing=await import(url(fixturePath));
+ const copy=checkpointSourceCopy('missing-checkpoint-source'),missing=await import(url(copy.module));
  for(const purpose of [false,true]){const f=sealFixture(t,{purpose}),before=entireSql(f);f.ledger.read(tx=>assert.throws(()=>missing.preparePeerOriginFrontierSealContextFrom(tx,{ledger:f.ledger,actor,frontier_ref:{fictional:true},root_result_ref:{fictional:true},operation_id:'source-no-launch',command_id:'source-no-launch'}),e=>e.code===(purpose?'ORIGIN_FRONTIER_SEAL_CHECKPOINT_SOURCE_REQUIRED':'ORIGIN_FRONTIER_SEAL_PURPOSE_REQUIRED')));assert.equal(entireSql(f),before);}
+ const first=missing.loadPeerOriginFrontierSealCheckpointSupport();assert.strictEqual(missing.loadPeerOriginFrontierSealCheckpointSupport(),first);let failure;
+ await assert.rejects(first,error=>{failure=error;return error.code==='ORIGIN_FRONTIER_SEAL_CHECKPOINT_SOURCE_REQUIRED';});
+ // Creating support later cannot turn this namespace's absent initialization
+ // into an implicit retry or renew the original source/capability boundary.
+ fs.writeFileSync(copy.candidate,`export * from ${JSON.stringify(url(path.join(peers,'input-frontier-checkpoint.mjs')))};`);
+ assert.strictEqual(missing.loadPeerOriginFrontierSealCheckpointSupport(),first);await assert.rejects(first,error=>error===failure);
+ for(const purpose of [false,true]){const f=sealFixture(t,{purpose}),before=entireSql(f);f.ledger.read(tx=>assert.throws(()=>missing.preparePeerOriginFrontierSealContextFrom(tx,{ledger:f.ledger,actor,frontier_ref:{fictional:true},root_result_ref:{fictional:true},operation_id:'still-no-launch',command_id:'still-no-launch'}),e=>e.code===(purpose?'ORIGIN_FRONTIER_SEAL_CHECKPOINT_SOURCE_REQUIRED':'ORIGIN_FRONTIER_SEAL_PURPOSE_REQUIRED')));assert.equal(entireSql(f),before);}
 });
 test('closed final-seal grammar represents real negative forms and qualifies no action by itself',()=>{
  const context=pureContext(),contract=context.response_contract;assert.equal(contract.grammar_only_not_a_verdict,true);assert.equal(contract.authority_issued,false);assert.equal(contract.permitted_action_is_permission,false);assert.deepEqual(contract.optional_keys,[]);for(const verdict of ['Pass','Fail','Blocked']){const output=pureOutput(context,verdict);assert.deepEqual(seal.validatePeerOriginFrontierSealOutput(canonical(output),context),output);}assert.equal(Object.hasOwn(contract,'acceptance'),false);
@@ -220,8 +241,55 @@ test('fixed namespace envelope rejects unsafe revisions and unbounded producer I
 test('genuine later pause fences final seal service and preparation without renewing original purpose',t=>{
  const f=sealFixture(t),api=seal.createPeerOriginFrontierSeal({ledger:f.ledger,actor});assert.strictEqual(seal.originalPeerOriginFrontierSealLedger(api),f.ledger);modelExecute(f.ledger,{principal_id:'founder'},'company/pause',{operation_id:'source-final-seal-later-pause',source_instruction:'SYNTHETIC actual new pause generation.'});const before=entireSql(f),fresh=seal.createPeerOriginFrontierSeal({ledger:f.ledger,actor});for(const service of [api,fresh]){assert.throws(()=>seal.originalPeerOriginFrontierSealLedger(service),e=>e.code==='ORIGIN_MAINTENANCE_PAUSE_CHANGED');f.ledger.read(tx=>assert.throws(()=>seal.preparePeerOriginFrontierSealContextFrom(tx,{ledger:f.ledger,actor,frontier_ref:{fictional:true},root_result_ref:{fictional:true},operation_id:'new-id-cannot-renew',command_id:'source-only'}),e=>e.code==='ORIGIN_MAINTENANCE_PAUSE_CHANGED'));}assert.equal(entireSql(f),before);f.ledger.read(tx=>{assert.equal(tx.get('control','origin').value.maintenance.used_model_calls,0);assert.equal(tx.get('control','origin').value.maintenance.pause_generation,1);assert.equal(tx.get('control','company').value.pause_generation,2);assert.equal(tx.list('slots').items.find(row=>row.value.kind==='legacy_origin_reservation').value.status,'unknown');});
 });
-test('fixed optional source entry only Holds actual absence and propagates present module failures',async t=>{
+test('fixed checkpoint support rejects arguments before access and shares its zero-argument absence failure',async t=>{
+ const copy=checkpointSourceCopy('checkpoint-zero-argument'),module=await import(url(copy.module)),lstat=fs.lstatSync;let reads=0,touches=0;
+ const spy=t.mock.method(fs,'lstatSync',function(file,...args){if(String(file)===url(copy.candidate))reads++;return Reflect.apply(lstat,this,[file,...args]);});
+ try{
+  const hostile=new Proxy({},{get(){touches++;throw Error('SOURCE argument must not be inspected.');}});
+  for(const args of [[undefined],[null],[hostile],['./caller-checkpoint.mjs',true]])assert.throws(()=>module.loadPeerOriginFrontierSealCheckpointSupport(...args),e=>e.code==='ORIGIN_FRONTIER_SEAL_CHECKPOINT_SOURCE_ARGUMENT');
+  assert.equal(touches,0);assert.equal(reads,0);
+  const first=module.loadPeerOriginFrontierSealCheckpointSupport(),second=module.loadPeerOriginFrontierSealCheckpointSupport();assert.strictEqual(first,second);
+  let failure;await assert.rejects(first,e=>{failure=e;return e.code==='ORIGIN_FRONTIER_SEAL_CHECKPOINT_SOURCE_REQUIRED';});assert.equal(reads,1);
+  assert.strictEqual(module.loadPeerOriginFrontierSealCheckpointSupport(),first);await assert.rejects(first,e=>e===failure);assert.equal(reads,1);
+ }finally{spy.mock.restore();}
+});
+test('whole Seal Source waits once for fixed checkpoint support and cannot charge while pending',async t=>{
+ const copy=checkpointSourceCopy('checkpoint-pending',`import {wait} from './gate.mjs';
+export * from ${JSON.stringify(url(path.join(peers,'input-frontier-checkpoint.mjs')))};
+await wait();`),gatePath=path.join(copy.directory,'gate.mjs');
+ fs.writeFileSync(gatePath,`let release,entered;export let calls=0;
+export const started=new Promise(resolve=>{entered=resolve;});
+const pending=new Promise(resolve=>{release=resolve;});
+export function wait(){calls++;entered();return pending;}
+export function finish(){release();}`);
+ const module=await import(url(copy.module)),gate=await import(url(gatePath)),f=sealFixture(t),before=entireSql(f);
+ const first=module.loadPeerOriginFrontierSealCheckpointSupport(),second=module.loadPeerOriginFrontierSealCheckpointSupport();let settled=false;first.then(()=>{settled=true;},()=>{settled=true;});
+ try{
+  assert.strictEqual(first,second);await gate.started;assert.equal(gate.calls,1);assert.equal(settled,false);
+  f.ledger.read(tx=>assert.throws(()=>module.preparePeerOriginFrontierSealContextFrom(tx,{ledger:f.ledger,actor,frontier_ref:{fictional:true},root_result_ref:{fictional:true},operation_id:'pending-no-launch',command_id:'pending-no-launch'}),e=>e.code==='ORIGIN_FRONTIER_SEAL_CHECKPOINT_SOURCE_REQUIRED'));
+  assert.equal(entireSql(f),before);assert.strictEqual(module.loadPeerOriginFrontierSealCheckpointSupport(),first);assert.equal(gate.calls,1);
+ }finally{gate.finish();}
+ assert.equal(await first,undefined);assert.strictEqual(module.loadPeerOriginFrontierSealCheckpointSupport(),first);assert.equal(gate.calls,1);assert.equal(entireSql(f),before);
+});
+test('required checkpoint exports fail at explicit support while synchronous purpose precedence and no-charge Holds remain',async t=>{
+ const required=['preparePeerInputFrontierCheckpointFrom','stagePeerInputFrontierCheckpointFrom','assertPeerInputFrontierCheckpointFrom'];
+ for(const absent of required){
+  const body=required.filter(name=>name!==absent).map(name=>`export function ${name}(){throw Error('SYNTHETIC malformed support must never be published.');}`).join('\n');
+  const copy=checkpointSourceCopy('checkpoint-missing-export-'+absent,body),module=await import(url(copy.module)),first=module.loadPeerOriginFrontierSealCheckpointSupport();let failure;
+  await assert.rejects(first,e=>{failure=e;return e.code==='ORIGIN_FRONTIER_SEAL_CHECKPOINT_SOURCE_REQUIRED';});
+  for(const purpose of [false,true]){const f=sealFixture(t,{purpose}),before=entireSql(f);f.ledger.read(tx=>assert.throws(()=>module.preparePeerOriginFrontierSealContextFrom(tx,{ledger:f.ledger,actor,frontier_ref:{fictional:true},root_result_ref:{fictional:true},operation_id:'malformed-no-launch',command_id:'malformed-no-launch'}),e=>e.code===(purpose?'ORIGIN_FRONTIER_SEAL_CHECKPOINT_SOURCE_REQUIRED':'ORIGIN_FRONTIER_SEAL_PURPOSE_REQUIRED')));assert.equal(entireSql(f),before);}
+  fs.writeFileSync(copy.candidate,`export * from ${JSON.stringify(url(path.join(peers,'input-frontier-checkpoint.mjs')))};`);
+  assert.strictEqual(module.loadPeerOriginFrontierSealCheckpointSupport(),first);await assert.rejects(first,e=>e===failure);
+ }
+});
+test('fixed optional source failures retain their identity at explicit support rather than module import',async t=>{
  for(const mode of ['transitive','matching-error','symlink']){const directory=path.join(temp,'final-seal-optional-'+mode);fs.mkdirSync(directory);const candidate=path.join(directory,'input-frontier-checkpoint.mjs'),module=path.join(directory,'seal.mjs');if(mode==='symlink'){const target=path.join(directory,'target.mjs');fs.writeFileSync(target,'export const unrelated=true;');fs.symlinkSync(target,candidate);}else if(mode==='transitive')fs.writeFileSync(candidate,"import './genuinely-absent-child.mjs';");else fs.writeFileSync(candidate,`throw Object.assign(Error('SYNTHETIC present source failure'),{code:'ERR_MODULE_NOT_FOUND',url:import.meta.url});`);
- const body=fs.readFileSync(path.join(peers,'origin-frontier-seal.mjs'),'utf8').replace(/(['\"])(\.\.?\/[^'\"]+\.mjs)\1/g,(_all,_quote,relative)=>JSON.stringify(relative==='./input-frontier-checkpoint.mjs'?url(candidate):new URL(relative,url(path.join(peers,'origin-frontier-seal.mjs'))).href));fs.writeFileSync(module,body);await assert.rejects(import(url(module)),e=>mode==='symlink'?e.code==='ORIGIN_FRONTIER_SEAL_OPTIONAL_SOURCE_ENTRY_REQUIRED':mode==='matching-error'?e.message==='SYNTHETIC present source failure':e.code==='ERR_MODULE_NOT_FOUND'&&e.url.endsWith('/genuinely-absent-child.mjs'));
+ const body=relocateForSeal('origin-frontier-seal.mjs',{'./input-frontier-checkpoint.mjs':url(candidate)});fs.writeFileSync(module,body);
+ // Deliberate API change: importing Seal itself succeeds. Actual fixed source
+ // absence/import/symlink errors now belong to the awaited support boundary.
+ const namespace=await import(url(module)),first=namespace.loadPeerOriginFrontierSealCheckpointSupport();let failure;
+ await assert.rejects(first,e=>{failure=e;return mode==='symlink'?e.code==='ORIGIN_FRONTIER_SEAL_OPTIONAL_SOURCE_ENTRY_REQUIRED':mode==='matching-error'?e.message==='SYNTHETIC present source failure'&&e.code==='ERR_MODULE_NOT_FOUND'&&e.url===url(candidate):e.code==='ERR_MODULE_NOT_FOUND'&&e.url.endsWith('/genuinely-absent-child.mjs');});
+ if(mode==='symlink')fs.unlinkSync(candidate);fs.writeFileSync(candidate,`export * from ${JSON.stringify(url(path.join(peers,'input-frontier-checkpoint.mjs')))};`);
+ assert.strictEqual(namespace.loadPeerOriginFrontierSealCheckpointSupport(),first);await assert.rejects(first,e=>e===failure);
  }
 });

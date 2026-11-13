@@ -196,25 +196,20 @@ test('oversized native output is retained and held rather than truncated into su
 test('conditional standalone adapter lifecycle remains uncertain after escalation and observes later close separately',async t=>{
   // This dummy task has no P1 admission. The actual Original adapter lifecycle
   // is conditional SOURCE mechanics only, never qualified Native peer execution.
-  const child=new EventEmitter(),timers=new Map(),processes=[],closures=[];let clock=1000000,seq=0,captureOriginalSpawn;
+  const child=new EventEmitter(),timers=new Map(),processes=[],closures=[];let clock=1000000,seq=0;
   child.pid=4242;child.stdout=new EventEmitter();child.stderr=new EventEmitter();child.stdin=new EventEmitter();child.stdin.end=()=>{};child.kill=()=>true;
-  const f=createOriginalAdapterProcessFixture({host:'codex',child,now:()=>clock,onLaunch:(...args)=>{
-    // The fixed executor observer receives the SAME child already selected by
-    // the standard Node CP mock. It creates no second process or permission.
-    assert.equal(typeof captureOriginalSpawn,'function');assert.equal(captureOriginalSpawn(...args),child);
-  }});t.after(()=>f.dispose());
-  const executor=createNativeExecutor({cwd:f.root,evidence_dir:path.join(f.root,'evidence'),now:()=>clock,spawn_process:()=>child,
+  const f=createOriginalAdapterProcessFixture({host:'codex',child,now:()=>clock});t.after(()=>f.dispose());
+  const executor=createNativeExecutor({cwd:f.root,evidence_dir:path.join(f.root,'evidence'),now:()=>clock,
     probe:async()=>({available:true,authenticated:true}),runner:(host,id,prompt,cwd,timeout,selection,options)=>{
-      const {spawn,...incoming}=options;captureOriginalSpawn=spawn;
-      return f.run(host,id,prompt,cwd,timeout,selection,{...incoming,resolveExecutable:()=>'/fictional/codex',now:()=>clock,
+      return f.run(host,id,prompt,cwd,timeout,selection,{...options,resolveExecutable:()=>'/fictional/codex',now:()=>clock,
         setTimeout:(fn,delay)=>{const key=++seq;timers.set(key,{fn,at:clock+delay});return key;},clearTimeout:key=>timers.delete(key)});
     }});
   const resultPromise=executor.execute({task:{value:{role:'research'}},context:{text:'Exact fixture context'},onProcess:p=>processes.push(p),onClosure:p=>closures.push(p)});
-  child.emit('spawn');assert.equal(processes[0].pid,4242);assert.ok(processes[0].execution_deadline_at);
+  assert.equal(f.processCreated,true);child.emit('spawn');assert.equal(processes[0].pid,4242);assert.ok(processes[0].execution_deadline_at);
   child.emit('error',new Error('Simulated process failure'));
   const kill=[...timers.values()].sort((a,b)=>a.at-b.at)[0];clock=kill.at;kill.fn();
-  const result=await resultPromise;assert.equal(result.termination_confirmed,false);assert.equal(result.error.code,'ROLE_PROCESS_ERROR');assert.equal(closures.length,0);
-  child.emit('close',null);assert.equal(closures.length,1);assert.equal(closures[0].termination_confirmed,true);
+  const result=await resultPromise;assert.equal(result.termination_confirmed,false);assert.equal(result.error.code,'ROLE_PROCESS_ERROR');assert.equal(closures.length,0);assert.equal(f.processClosed,false);
+  child.emit('close',null);assert.equal(closures.length,1);assert.equal(closures[0].termination_confirmed,true);assert.equal(f.processClosed,true);
 });
 
 test('lost finish acknowledgement retries the same receipt without another execution',async t=>{

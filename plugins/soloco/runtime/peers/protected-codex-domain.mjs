@@ -11,6 +11,7 @@ import {randomBytes,createHash} from 'node:crypto';
 import {TextDecoder,types} from 'node:util';
 import {canonical,PeerLedger} from './ledger.mjs';
 import {assertOriginalPeerMaintenanceExecutionCapacityFrom as assertInventory,assertOriginalPeerMaintenanceExecutionCapacityInTransactionFrom as assertInventoryInTransaction,claimOriginalPeerExecutionLaunchFrom,bindOriginalPeerExecutionLaunchCutoffFrom,spawnOriginalPeerExecutionLaunch,originalWorkerFailedLaunchChild,cleanupOriginalWorkerLaunchFailure} from './prospective-local-worker-inventory-producer.mjs';
+import * as originalInventory from './prospective-local-worker-inventory-producer.mjs';
 import * as model from './model.mjs';
 import * as frontierSlots from './protected-source-build-slot.mjs';
 import * as originalExecutionDomain from './protected-codex-domain.mjs';
@@ -59,7 +60,7 @@ function originalContextInterpreter(r,delivery){return originProfile(r)?(originR
 // never become a fresh zero or a current-row-only launch-coverage substitute.
 let frontierInventory=null;
 const frontierInventoryEntry=fs.lstatSync(new URL('./prospective-local-worker-inventory-producer.mjs',import.meta.url),{throwIfNoEntry:false});
-if(frontierInventoryEntry!==undefined){if(!frontierInventoryEntry.isFile()||frontierInventoryEntry.isSymbolicLink())throw Object.assign(Error('PROTECTED_CODEX_FRONTIER_INVENTORY_SOURCE_REQUIRED'),{code:'PROTECTED_CODEX_FRONTIER_INVENTORY_SOURCE_REQUIRED'});frontierInventory=await import('./prospective-local-worker-inventory-producer.mjs');}
+if(frontierInventoryEntry!==undefined){if(!frontierInventoryEntry.isFile()||frontierInventoryEntry.isSymbolicLink())throw Object.assign(Error('PROTECTED_CODEX_FRONTIER_INVENTORY_SOURCE_REQUIRED'),{code:'PROTECTED_CODEX_FRONTIER_INVENTORY_SOURCE_REQUIRED'});frontierInventory=originalInventory;}
 
 const launches=new WeakMap(),facades=new WeakMap(),nativeMC23Proofs=new WeakMap();
 const ownedTokens=new WeakMap();
@@ -72,7 +73,6 @@ const QUALIFIED_BACKEND_BUILD=null;
 const MAX_FRAME=100000,MAX_WIRE=4000000,MAX_FRAMES=256,TOTAL_MS=120000;
 const GRACE_MS=250,TERM_MS=500,KILL_MS=1000;
 const controls=new Set(['initialize','initialized','config/read','configRequirements/read','permissionProfile/list','mcpServerStatus/list','app/installed','thread/start','thread/resume','turn/start','turn/interrupt']);
-const toolNames=new Set(stableTaskHostTools().map(tool=>tool.name));
 const fail=code=>{throw Object.assign(Error(code),{code});};
 const copy=value=>JSON.parse(canonical(value));
 const same=(a,b)=>canonical(a)===canonical(b);
@@ -363,7 +363,7 @@ function serverFrame(r,frame){
   }else if(owned(r).binding)fail('PROTECTED_CODEX_OWNED_UNMATCHED_RPC');
  }
  if(Object.hasOwn(frame,'method')&&Object.hasOwn(frame,'id')){
-  if(frame.method!=='item/tool/call'||!plain(frame.params)||!(r.bootstrap||readonlyAdmission(r)?new Set(selectedTools(r).map(t=>t.name)):toolNames).has(frame.params.tool))fail('PROTECTED_CODEX_UNEXPECTED_SERVER_CALL');
+  if(frame.method!=='item/tool/call'||!plain(frame.params)||!(r.bootstrap||readonlyAdmission(r)?new Set(selectedTools(r).map(t=>t.name)):new Set(stableTaskHostTools().map(tool=>tool.name))).has(frame.params.tool))fail('PROTECTED_CODEX_UNEXPECTED_SERVER_CALL');
   const key=idKey(frame.id);if(r.pendingReplies.has(key))fail('PROTECTED_CODEX_TOOL_CALL_REPLAY');r.pendingReplies.add(key);r.original_native_tool_frames??=new Map();r.original_native_tool_frames.set(key,{frame:copy(frame),claimed:false});
  }
  observeOwnedServer(r,frame);

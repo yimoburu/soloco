@@ -6,7 +6,21 @@ import fs from 'node:fs';
 import {PeerLedger,FAMILIES,canonical,peerDigest} from './ledger.mjs';
 import {inspectPeerPinnedTeamFrom,assertPeerOriginSelectedMaintenanceFrom} from './legacy-origin.mjs';
 function fixedOptionalEntry(relative){const entry=fs.lstatSync(new URL(relative,import.meta.url),{throwIfNoEntry:false});if(entry===undefined)return false;need(entry.isFile()&&!entry.isSymbolicLink(),'ORIGIN_FRONTIER_SEAL_OPTIONAL_SOURCE_ENTRY_REQUIRED');return true;}
-let frontier=null;if(fixedOptionalEntry('./input-frontier-checkpoint.mjs'))frontier=await import('./input-frontier-checkpoint.mjs');
+let frontier=null,checkpointSupport;
+// Checkpoint support is loaded explicitly before a caller enters its owning
+// synchronous snapshot/admission. Present-module errors now surface at this
+// awaited boundary, retaining the original error; loading grants no authority.
+export function loadPeerOriginFrontierSealCheckpointSupport(){
+ need(arguments.length===0,'ORIGIN_FRONTIER_SEAL_CHECKPOINT_SOURCE_ARGUMENT');
+ // Publish the one promise before any fixed-path read. Absence and failure are
+ // latched too: no caller URL, provider, ready flag, reset or automatic retry.
+ return checkpointSupport??=Promise.resolve().then(async()=>{
+  need(fixedOptionalEntry('./input-frontier-checkpoint.mjs'),'ORIGIN_FRONTIER_SEAL_CHECKPOINT_SOURCE_REQUIRED');
+  const loaded=await import('./input-frontier-checkpoint.mjs');
+  need(['preparePeerInputFrontierCheckpointFrom','stagePeerInputFrontierCheckpointFrom','assertPeerInputFrontierCheckpointFrom'].every(name=>typeof loaded[name]==='function'),'ORIGIN_FRONTIER_SEAL_CHECKPOINT_SOURCE_REQUIRED');
+  frontier=loaded;
+ });
+}
 import {buildPeerInputFrontier} from './input-frontier.mjs';
 let archive=null;if(fixedOptionalEntry('./input-frontier-archive.mjs'))archive=await import('./input-frontier-archive.mjs');
 import * as deployment from './context-component-deployment.mjs';

@@ -1,3 +1,4 @@
+export {STORE_PRECOMMIT_GUARD_VERSION} from './store-precommit-contract.mjs';
 import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -42,7 +43,6 @@ export function noLink(file) {
 }
 // Trusted synchronous final guard, immediately before issuing COMMIT after all
 // storage/event work. COMMIT completion latency is not a zero-time promise.
-export const STORE_PRECOMMIT_GUARD_VERSION=1;
 // Only these exact class-created objects can lend the original inventory its
 // current physical snapshot. Public properties alone are not a transaction.
 const originalStores=new WeakMap(),originalDatabases=new WeakMap();

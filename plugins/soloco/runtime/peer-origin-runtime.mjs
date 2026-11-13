@@ -245,6 +245,7 @@ export async function peerOriginRuntimeAction(request,host){
    return returned(maintenance.sealPeerOrigin(api,{...input,source_instruction:args.source_instruction}),args);
   }
   const isSeal=args.action.startsWith('final_seal_'),module=await fixedModule(isSeal?SEAL_URL:FRONTIER_URL,isSeal?'ORIGIN_FRONTIER_SEAL_SOURCE_UNAVAILABLE':'ORIGIN_INPUT_FRONTIER_SOURCE_UNAVAILABLE');
+  if(isSeal){need(typeof module.loadPeerOriginFrontierSealCheckpointSupport==='function','ORIGIN_FRONTIER_SEAL_SOURCE_UNAVAILABLE');await module.loadPeerOriginFrontierSealCheckpointSupport();}
   if(['frontier_sources','frontier_source_read','frontier_archive_read'].includes(args.action)){
    const name={frontier_sources:'inspectPeerInputFrontierSourcesFrom',frontier_source_read:'readPeerInputFrontierSourceFrom',frontier_archive_read:'readPeerInputLegacyArchiveFrom'}[args.action];need(typeof module[name]==='function','ORIGIN_INPUT_FRONTIER_SOURCE_UNAVAILABLE');
    return ledger.read(tx=>{peerOwner(tx,ledger,args,actor);return exactBoundedRead(selected=>module[name](tx,selected),input,args.action==='frontier_sources'?'limit':'length');});
