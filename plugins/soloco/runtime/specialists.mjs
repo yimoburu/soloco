@@ -101,6 +101,18 @@ export function assertSpecialistEligible(state,job,{historical=false}={}){
  return true;
 }
 export function specialistContext(state,job){if(job.specialist===undefined)return null;assertSpecialistEligible(state,job,{historical:true});const {profile,policy}=profileOf(state,job.specialist);return copy({version:1,profile:{source:reference(profile),definition:profile.specialist.definition,input_refs:profile.specialist.input_refs},policy:{source:reference(policy),policy:policy.specialist.policy,source_instruction:policy.specialist.source_instruction},base_charter:profile.specialist.base_charter,authority:'Bounded preparation specialization only; base-role authority and independent result review remain required. Creation is not competence certification.'});}
+// Only a specialist assignment and exact independent QA of its canonical output
+// share the specialist's explicit-null input protocol. Ordinary references keep
+// their original revision presence; this classification grants no acceptance.
+export function usesSpecialistInputRevisions(state,job){
+ if(job.specialist!==undefined)return true;
+ if(job.role!=='qa'||!job.review_of)return false;
+ const output=state.records?.[job.review_of.id],producer=state.jobs?.[output?.job_id];
+ if(producer?.specialist===undefined)return false;
+ if(!exact(job.review_of,['id','revision'])||!Object.hasOwn(state.records,job.review_of.id)||output.id!==job.review_of.id||output.revision!==job.review_of.revision||!Object.hasOwn(state.jobs,output.job_id)||producer.id!==output.job_id||producer.artifact_id!==output.id||output.kind!=='artifact'||output.status!=='Submitted'||output.author_role!==producer.role||output.author_instance!==producer.instance_id||output.review_of||output.review||output.prototype||output.development||output.handover||!same(output.inputs,producer.inputs))fail('specialist review target lacks its exact producer output binding');
+ assertSpecialistEligible(state,producer,{historical:true});
+ return true;
+}
 export function specialistName(state,job){if(job.specialist===undefined)return state.roles?.[job.role]?.name??job.role;const {profile}=profileOf(state,job.specialist);return profile.specialist.definition.charter.name;}
 export function specialistSessionKey(role,binding){if(binding===undefined||binding===null)return role;if(!validateSpecialistBindingShape(binding))fail('invalid session profile binding');return role+':specialist:'+binding.profile.id;}
 const commonArgs=['root','session_id','epoch','action','operation_id','source_instruction'];

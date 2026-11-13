@@ -228,23 +228,84 @@ test('revisionless public controls retain exact nullable inputs through JSON, co
     let done;
     await monitoring(async control=>{done=await controlled(f,job,control,async options=>{assert.equal(options.signal.aborted,false);});assert.equal(done.status,'completed',done.error);assert.equal(control.live(),0);});
     const review=engine.dispatch({...f.args,role:'qa',review_of:done.artifact_id,task:'Independently review the fictional specialist output without accepting it.'},'codex',launch);
-    const assertReviewInputs=selected=>{
+    const assertReviewInputs=(selected,nullableInputs)=>{
       const queued=f.read(),reviewJob=queued.jobs[selected.id],reviewPacket=assignmentContext(JSON.parse(JSON.stringify(queued)),JSON.parse(JSON.stringify(reviewJob)));
       assert.equal(reviewPacket.hash,reviewJob.context_sha256);
-      for(const record of controls)assert.deepEqual(reviewJob.inputs.find(ref=>ref.id===record.id),{id:record.id,revision:null});
-      assert.equal(reviewJob.specialist,undefined,'generic comparison negatives must bypass specialist shape validation');
-      for(const mode of ['missing-revision','wrong-revision']){
+      for(const record of controls){
+        const ref=reviewJob.inputs.find(value=>value.id===record.id);
+        assert.deepEqual(ref,nullableInputs?{id:record.id,revision:null}:{id:record.id});
+        assert.equal(Object.hasOwn(ref,'revision'),nullableInputs,'ordinary persisted references preserve missing revision');
+      }
+      assert.equal(reviewJob.specialist,undefined,'independent QA has no specialist assignment binding');
+      for(const mode of [nullableInputs?'missing-revision':'null-revision','wrong-revision']){
         const changed=JSON.parse(JSON.stringify(queued)),changedJob=changed.jobs[selected.id],ref=changedJob.inputs.find(value=>value.id===controls[0].id);
-        if(mode==='missing-revision')delete ref.revision;else ref.revision=1;
+        if(mode==='missing-revision')delete ref.revision;else ref.revision=mode==='null-revision'?null:1;
         assert.throws(()=>assignmentContext(changed,changedJob),/Assignment input version changed/,mode+' must fail the generic canonical comparison');
       }
     };
     const blocked={verdict:'Blocked',reason:'FICTIONAL judgment only; no semantic acceptance selected.',permitted_action:'hold',blockers:['The fictional output remains unaccepted.']};
-    assertReviewInputs(review);
+    assertReviewInputs(review,true);
     await monitoring(async control=>{const finished=await controlled(f,review,control,async options=>{assert.equal(options.signal.aborted,false);},{review:blocked});assert.equal(finished.status,'completed',finished.error);assert.equal(control.live(),0);});
     const controlReview=engine.dispatch({...f.args,role:'qa',review_of:controls[0].id,task:'Inspect the exact fictional public control record without accepting it.'},'codex',launch);
-    assertReviewInputs(controlReview);assert.deepEqual(f.read().jobs[controlReview.id].review_of,{id:controls[0].id,revision:null});
+    assertReviewInputs(controlReview,false);assert.deepEqual(f.read().jobs[controlReview.id].review_of,{id:controls[0].id});
+    const generic=f.read();
+    for(const [label,canonical,incoming,accepted]of [
+      ['missing/missing',undefined,undefined,true],['null/null',null,null,true],['1/1',1,1,true],
+      ['missing/null',undefined,null,false],['null/missing',null,undefined,false],
+      ['1/missing',1,undefined,false],['1/null',1,null,false],['1/2',1,2,false],
+      ['missing record','absent',1,false]
+    ]){
+      const changed=JSON.parse(JSON.stringify(generic)),changedJob=changed.jobs[controlReview.id],id='fictional-generic-revision-input';
+      const record={id,kind:'artifact',status:'Submitted',author_role:'runner',author_instance:f.args.session_id,content:'FICTIONAL generic revision matrix only.'},input={id};
+      if(canonical!=='absent'){if(canonical!==undefined)record.revision=canonical;changed.records[id]=record;}
+      if(incoming!==undefined)input.revision=incoming;
+      changedJob.inputs.push(input);
+      const roundtrip=JSON.parse(JSON.stringify(changed)),build=()=>assignmentContext(roundtrip,roundtrip.jobs[controlReview.id]);
+      if(accepted){const packet=build();assert.deepEqual(JSON.parse(JSON.stringify(packet.inputs.find(ref=>ref.id===id))),input,label+' retains exact raw revision presence');}
+      else assert.throws(build,/Assignment input version changed/,label+' remains rejected');
+    }
     await monitoring(async control=>{const finished=await controlled(f,controlReview,control,async options=>{assert.equal(options.signal.aborted,false);},{review:blocked});assert.equal(finished.status,'completed',finished.error);assert.equal(control.live(),0);});
+  });
+});
+
+test('fictional completed specialist output retains every exact input through independent QA and actual assessment',{concurrency:false},async t=>{
+  t.mock.timers.enable({apis:['Date'],now:Date.now()});await fixture(async f=>{
+    const {job,profile}=specialist(f);let producer,reviewer;
+    await monitoring(async control=>{
+      producer=await controlled(f,job,control,async options=>{assert.equal(options.signal.aborted,false);});
+      assert.equal(producer.status,'completed',producer.error);assert.equal(control.live(),0);
+    });
+    const review=engine.dispatch({...f.args,role:'qa',review_of:producer.artifact_id,task:'Independently assess this exact fictional preparation output.'},'codex',launch);
+    const queued=f.read(),reviewJob=queued.jobs[review.id],controls=Object.values(queued.records).filter(r=>r.kind==='decision'&&['pause','resume'].includes(r.action));
+    assert.equal(reviewJob.specialist,undefined,'QA remains a separate generic assignment');
+    assert.equal(controls.length,2);
+    for(const record of controls){assert.equal(Object.hasOwn(record,'revision'),false);assert.deepEqual(reviewJob.inputs.find(ref=>ref.id===record.id),{id:record.id,revision:null});}
+    for(const input of producer.inputs)assert.deepEqual(reviewJob.inputs.find(ref=>ref.id===input.id),input,'every original profile/data reference reaches the unchanged assessment equality check');
+    for(const [label,change]of [
+      ['output map key',(s,j,o,p)=>{o.id='fictional-wrong-output-id';}],
+      ['producer map key',(s,j,o,p)=>{p.id='fictional-wrong-producer-id';}],
+      ['producer artifact',(s,j,o,p)=>{p.artifact_id='fictional-wrong-artifact';}],
+      ['target revision',(s,j,o,p)=>{j.review_of.revision++;}],
+      ['output kind',(s,j,o,p)=>{o.kind='review';}],
+      ['output status',(s,j,o,p)=>{o.status='Draft';}],
+      ['output author role',(s,j,o,p)=>{o.author_role='qa';}],
+      ['output author instance',(s,j,o,p)=>{o.author_instance='fictional-wrong-author';}],
+      ['output inputs',(s,j,o,p)=>{o.inputs=[];}],
+      ['null specialist binding',(s,j,o,p)=>{p.specialist=null;}],
+      ['false specialist binding',(s,j,o,p)=>{p.specialist=false;}]
+    ]){
+      const changed=JSON.parse(JSON.stringify(queued)),j=changed.jobs[review.id],o=changed.records[producer.artifact_id],p=changed.jobs[producer.id];
+      change(changed,j,o,p);assert.throws(()=>assignmentContext(changed,j),/Specialist Held:/,label+' must not fall back to ordinary raw inputs');
+    }
+    const pass={verdict:'Pass',reason:'FICTIONAL injected independent judgment; no real Native acceptance.',permitted_action:'accept_specialist_output',blockers:[]};
+    await monitoring(async control=>{
+      reviewer=await controlled(f,review,control,async options=>{assert.equal(options.signal.aborted,false);},{review:pass});
+      assert.equal(reviewer.status,'completed',reviewer.error);assert.equal(control.live(),0);
+    });
+    const current=f.read(),outputRef=reference(current.records[producer.artifact_id]),reviewRef=reference(current.records[reviewer.artifact_id]);
+    const receipt=f.action('assess',{profile_ref:reference(current.records[profile.id]),output_ref:outputRef,review_ref:reviewRef}),assessment=f.read().records[receipt.id];
+    assert.equal(assessment.status,'Specialist:accepted_preparation');assert.equal(assessment.specialist.disposition,'accepted_preparation');
+    assert.deepEqual(assessment.specialist.output,outputRef);assert.deepEqual(assessment.specialist.review,reviewRef);
   });
 });
 
