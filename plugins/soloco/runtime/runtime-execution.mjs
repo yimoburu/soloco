@@ -249,6 +249,9 @@ export function prepareRuntimeModelRequestFrom(store,state,input){
   const requestInput=Object.freeze({...binding,prompt_utf16_sha256:createHash('sha256').update(input.prompt,'utf16le').digest('hex'),prompt_utf16_units:input.prompt.length});
   const requestPolicy=Object.freeze(normalizeTimeout({timeout_ms:job.timeout_ms,timeout_reason:job.timeout_reason}));
   const grantJob={...job};delete grantJob.execution_deadline_at;const requestAuthorityDeadline=authorityDeadline(state,grantJob,w.loan.root),requestExecutionTiming=modelRequestKnownExecution(job,clock());
+  // A new request cannot turn an erased overall window into another startup
+  // allowance. Use the actual durable preimage, not callback-supplied history.
+  if(requestExecutionTiming===null)need(!(old.model_process_tracking?.invocations??[]).some(prior=>prior.invocation_id!==input.invocation_id&&prior.birth!==null),'MODEL_OVERALL_DEADLINE_LOST');
   const {token,r}=makeCapability(w,job,{kind:'model',invocation_id:input.invocation_id,model_binding:binding});r.request=copy(entry);r.request_input_binding=requestInput;r.request_timeout_policy=requestPolicy;r.request_authority_deadline_at_ms=requestAuthorityDeadline;r.request_known_execution=requestExecutionTiming;return token;
 }
 function intendedJobs(w,state,{selected=false,before=null}={}){

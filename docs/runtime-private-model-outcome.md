@@ -66,6 +66,30 @@ before the public result can change. It is factual metadata and does not prove
 Native admission or model support. Thrown outcomes do not inspect an error to
 extract a native identity.
 
+`inspectRuntimeModelOutcomeCaptureFrom(capture)` authenticates an already
+consumed factual capture through the adapter's private map and returns that
+identical frozen capture. It reads no caller properties, performs no Store
+read or currentness check, and spends no eligibility attempt. Copies, proxies
+and foreign objects remain held. Inspection remains available after issuer
+closure or failed eligibility, so a consumer can retain genuine failure facts
+before separately deciding whether a returned result is eligible. It grants no
+new call, allowance or positive eligibility.
+The three-argument form
+`inspectRuntimeModelOutcomeCaptureFrom(capture, issuingStore, launch)` also
+requires the exact original Store and launch-token identities. A reopened Store
+at the same path and another genuine token cannot replace them. This remains a
+factual identity join, including after closure; no private references are added
+to the public capture. Only the one- and three-argument forms are supported.
+
+The capture also preserves a bounded, deeply frozen snapshot of the parser's
+`model_evidence`, including Source-applied launch controls, before the public
+result escapes. Caller mutation of that result cannot change these facts.
+Metadata beyond the snapshot's depth, node or character bounds holds capture
+instead of silently dropping fields. `cli_version` is null unless the actual
+Source result contains that scalar; the current adapters do not probe or return
+a CLI version. The worker retains the version already recorded on its queued
+job independently. An opaque rejection is never inspected for metadata.
+
 `assertRuntimeModelOutcomeEligible(capture)` separately checks a genuine
 returned capture against private process and canonical observations, the
 opt-in current-job checks, and actual Source execution timing. The eligibility
@@ -81,6 +105,18 @@ Model operation lifetime remains separate from the queue/startup creation
 cutoff. Dependency and clock overrides are unavailable in this entrypoint;
 ordinary naming work and canonical-observation callbacks retain their fixed
 Source roles and cannot authenticate an outcome.
+
+A later request whose actual durable preimage contains a prior canonical model
+birth must retain valid overall execution timing. If all three timing fields
+disappear, preparation holds before issuing another model launch capability;
+it cannot restore a startup window. A first request with no prior model birth
+may still establish its timing at the first actual Source spawn.
+
+The Source outcome fixtures mock only the exact private dummy `codex` path's
+`X_OK` metadata check, validating its real nonlinked regular file, executable
+permission bits and private directories. Other access checks delegate to the
+native function. Their process boundary remains controlled EventEmitters;
+these fixtures do not qualify a host executable or demonstrate OS isolation.
 
 ## Composition
 

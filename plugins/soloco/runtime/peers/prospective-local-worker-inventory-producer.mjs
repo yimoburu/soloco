@@ -397,6 +397,10 @@ export function prepareOriginalModelRequestFrom(store,state,input){
   const binding=requestInputBinding({host:input.host,native_id:input.native_id,prompt:input.prompt,cwd:input.cwd,selection:input.selection}),w=writeContext(store,state);
   need(w.type==='job.model_process.launch_requested'&&state.jobs?.[input.job_id]?.host===binding.host,'MODEL_REQUEST_INPUT_REQUIRED');
   const job=state.jobs[input.job_id],policy=Object.freeze(normalizeTimeout({timeout_ms:job.timeout_ms,timeout_reason:job.timeout_reason}));
+  // Authenticated Original launch history is nondeletable. A prior MODEL
+  // birth requires the existing overall timing; the current first-call birth
+  // is deliberately excluded and may precede its actual onSpawn recorder.
+  if(!['execution_started_at','execution_deadline_at','termination_deadline_at'].some(key=>own(job,key)))need(!(w.history?.jobs?.[job.id]?.original_execution_assignment?.launches??[]).some(prior=>prior.kind==='model'&&prior.invocation_id!==input.invocation_id&&prior.birth!==null),'MODEL_OVERALL_DEADLINE_LOST');
   const token=prepareOriginalWorkerLaunchFrom(store,state,{job_id:input.job_id,kind:'model',invocation_id:input.invocation_id});
   const r=launchTokens.get(token);r.request_input_binding=binding;r.request_timeout_policy=policy;
   r.request_authority=prepareRuntimeOriginalModelAuthorityFrom(store,state,job);r.request_assignment_sha256=modelRequestAssignment(job);return token;
