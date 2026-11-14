@@ -41,7 +41,7 @@ import {readTaskState,updateTaskIndex} from './task-index.mjs';
 import {specialistAction,isSpecialistRecord,prepareSpecialistAssignment,specialistSessionKey,specialistContext,usesSpecialistInputRevisions} from './specialists.mjs';
 import * as originMechanicalQa from './peers/origin-mechanical-qa-policy.mjs';
 import {qaData,qaRef,qaNeed,qaText,qaSame,qaCopy} from './peers/origin-mechanical-qa-contract.mjs';
-import {recordOriginalWorkerAssignmentFrom,cleanupOriginalWorkerLaunchFailure} from './peers/prospective-local-worker-inventory-producer.mjs';
+import {recordOriginalWorkerAssignmentFrom,cleanupOriginalWorkerLaunchFailure,reconcileOriginalWorkerNoBirthClosureFrom} from './peers/prospective-local-worker-inventory-producer.mjs';
 import {recordRuntimeWorkerAssignmentFrom,prepareRuntimeWorkerLaunchFrom,spawnRuntimeWorkerLaunch,cleanupLegacyRuntimeLaunchFailure,runtimeJobOccupied} from './runtime-execution.mjs';
 
 function cleanupRuntimeWorkerLaunchFailure(error){
@@ -607,7 +607,7 @@ export function control(args,host) {
   if(args.action==='reconcile_process_closure'){
     if(Object.keys(args).some(k=>!['root','session_id','action','expected_epoch','source_instruction','job_id'].includes(k)))throw Error('Closure reconciliation accepts only the existing job identity, never process/proof assertions');
     requireText(args.job_id,'job_id',200);
-    return withStore(args.root,db=>{let changed=false;const result=db.transaction('job.process_closure_reconciled',s=>{owner(s,args.session_id,host,args.expected_epoch);const job=s.jobs?.[args.job_id];changed=reconcileStoredModelProcessClosure(db,job);return s;});
+    return withStore(args.root,db=>{let changed=false;const result=db.transaction('job.process_closure_reconciled',s=>{owner(s,args.session_id,host,args.expected_epoch);const job=s.jobs?.[args.job_id];changed=Object.hasOwn(job??{},'original_execution_assignment')&&!Object.hasOwn(job,'model_process_tracking')?reconcileOriginalWorkerNoBirthClosureFrom(db,s,args.job_id):reconcileStoredModelProcessClosure(db,job);return s;});
       return {job_id:args.job_id,closure_reconciled:changed,termination_confirmed:result.jobs[args.job_id].coordination_release.termination_confirmed,status:result.jobs[args.job_id].status,original_failure:result.jobs[args.job_id].execution_failure??null,semantic_acceptance:false,execution_resumed:false,new_model_calls:0};});
   }
   if(args.job_id!==undefined)throw Error('job_id is only supported for process closure reconciliation');
