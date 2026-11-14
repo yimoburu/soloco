@@ -10,6 +10,8 @@ const requests=new AsyncLocalStorage();
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ROOT_CODE='MCP_CODEX_ROOT_CALLER_REQUIRED';
 const ROOT_MESSAGE=ROOT_CODE+': A supported Codex root HOST caller matching the session selector is required.';
+const HOOK_BOUND_CODE='MCP_CLAUDE_HOOK_BOUND_CALLER_REQUIRED';
+const HOOK_BOUND_MESSAGE=HOOK_BOUND_CODE+': An active Claude MCP invocation whose host and session selector match is required.';
 const plain=value=>value!==null&&typeof value==='object'&&!types.isProxy(value)&&!Array.isArray(value)&&[Object.prototype,null].includes(Object.getPrototypeOf(value));
 function ownData(value,key){
  if(!plain(value))return {present:false,data:false,value:undefined};
@@ -68,6 +70,7 @@ export function mcpCallerDiagnostic(input={}){
   identity_fields_data:Boolean(snapshot?.ownFields),
   observed:state.observed,
   root:state.root,
+  hook_bound_tier_eligible:state.active&&state.hostMatches&&state.selected.host==='claude'&&state.selected.session!==null,
   selector_observed:state.selected.session!==null,
   selector_matches:state.matches,
   authority_granted:false,
@@ -81,4 +84,18 @@ export function requireCodexRootActor(input){
  const state=current(input);
  if(!state.active||!state.supported||!state.observed||!state.root||!state.matches)throw Object.assign(new Error(ROOT_MESSAGE),{code:ROOT_CODE});
  return Object.freeze({host:'codex',session_id:state.record.snapshot.sessionId,native_id:state.record.snapshot.threadId});
+}
+
+/** WEAKER TIER. Claude supplies no host-observed thread/session identity, so this
+ * proves only that (a) the call runs inside the fixed main.serve invocation scope
+ * of the Claude server, (b) the selector host is 'claude' and (c) session_id is a
+ * well-formed UUID. It cannot distinguish a root chat from a descendant that knows
+ * the session ID. It is never native identity, never grants authority, and callers
+ * must additionally require the current managed hook record for the same actor and
+ * must restrict themselves to read-only operations. If the host ever supplies
+ * valid identity metadata naming a different session, the tier is refused. */
+export function requireClaudeHookBoundActor(input){
+ const state=current(input);
+ if(!state.active||!state.hostMatches||state.selected.host!=='claude'||state.selected.session===null||state.observed&&!state.matches)throw Object.assign(new Error(HOOK_BOUND_MESSAGE),{code:HOOK_BOUND_CODE});
+ return Object.freeze({host:'claude',session_id:state.selected.session,native_id:null,tier:'HOOK_BOUND'});
 }
