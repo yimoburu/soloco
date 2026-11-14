@@ -5,7 +5,15 @@ import {assertOriginalPeerMaintenanceExecutionCapacityFrom as assertInventory,as
 import fs from 'node:fs';
 import {PeerLedger,FAMILIES,canonical,peerDigest} from './ledger.mjs';
 import {inspectPeerPinnedTeamFrom,assertPeerOriginSelectedMaintenanceFrom} from './legacy-origin.mjs';
-function fixedOptionalEntry(relative){const entry=fs.lstatSync(new URL(relative,import.meta.url),{throwIfNoEntry:false});if(entry===undefined)return false;need(entry.isFile()&&!entry.isSymbolicLink(),'ORIGIN_FRONTIER_SEAL_OPTIONAL_SOURCE_ENTRY_REQUIRED');return true;}
+function fixedOptionalEntry(relative){
+ const entry=fs.lstatSync(new URL(relative,import.meta.url),{throwIfNoEntry:false});if(entry===undefined)return false;
+ // The archive check runs during cyclic module evaluation, before originNeed
+ // may be initialized. Preserve its exact fixed-entry failure locally.
+ if(!entry.isFile()||entry.isSymbolicLink()){
+  const code='ORIGIN_FRONTIER_SEAL_OPTIONAL_SOURCE_ENTRY_REQUIRED';throw Object.assign(Error(code),{code});
+ }
+ return true;
+}
 let frontier=null,checkpointSupport;
 // Checkpoint support is loaded explicitly before a caller enters its owning
 // synchronous snapshot/admission. Present-module errors now surface at this
