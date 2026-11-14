@@ -2,7 +2,7 @@
 
 Routine pull requests, main pushes and manual Source CI runs require two checks:
 
-- **Tests Node 22** aggregates three isolated macOS regression shards, including
+- **Tests Node 22** aggregates four isolated macOS regression shards, including
   authorization, cancellation, storage integrity and sandbox tests. Each shard
   runs complete test files; their exact union is the existing regression selection.
 - **Build and drift** checks generated package files and whitespace on Linux.
@@ -16,27 +16,30 @@ jobs still fail the gate. Branch protection on `main` requires `CI gate` and
 The two aggregate jobs use fail-closed shell checks without a checkout or Node
 setup. Every actual test shard still requires the real macOS Seatbelt backend.
 
-Routine regression uses three macOS shards with two Node test-file workers per shard; full Node 22
-qualification and Node 26 compatibility keep four. This scheduling choice aims
+Routine regression uses four macOS shards with two Node test-file workers per shard; full Node 22
+qualification and Node 26 compatibility keep four workers per shard. This scheduling choice aims
 to reduce overlapping fixture work. It changes no selected files, assertions,
 sandbox requirements, test/startup budgets or job timeouts; its effect on
 contention and elapsed time still requires current hosted-run evidence.
 
-Routine shard selection places `peer-input-frontier.test.mjs` and
-`peer-origin-frontier-seal.test.mjs` first in separate selected argument lists,
-then distributes all remaining files in lexical order. These two advisory
+Routine shard selection places `peer-input-frontier.test.mjs`,
+`peer-origin-frontier-seal.test.mjs`, `frozen-intake-publication.test.mjs` and
+`frozen-intake-handover.test.mjs` first in separate selected argument lists,
+then distributes all remaining files in lexical order. These four advisory
 priorities change placement only. The selected inventory and digest, automatic
 inclusion of new files, generic lexical partitions, and full-qualification cost
 hints are unchanged. Argument order does not establish actual Node start order
 or a wall-time improvement; a fresh hosted run must establish whether the
 unchanged twenty-minute job budget fits.
 
-Three regression runners replace two, requesting 50% more runner starts and
-potential concurrent runner capacity. Source CI now has six jobs: those three
-regression jobs, Tests Node 22, Build and drift, and CI gate. This is a scheduling
-tradeoff, not a measured speedup or monetary-cost estimate; fresh hosted results
-must establish elapsed time. Generic two-shard helper defaults, full
-qualification's two shards, and Node 26 compatibility remain unchanged.
+Four regression runners replace three, requesting one additional runner start
+and potential concurrent runner slot (about 33% more regression runner capacity).
+Source CI has seven jobs: those four regression jobs, Tests Node 22, Build and
+drift, and CI gate. This is a scheduling tradeoff, not a measured speedup or
+monetary-cost estimate. Additional parallel capacity cannot shorten a single
+test file; fresh hosted results must establish elapsed time. Generic two-shard
+helper defaults, full qualification's two shards, and Node 26 compatibility
+remain unchanged.
 
 ## Required auto-merge
 
@@ -136,9 +139,10 @@ node tools/ci/check.mjs build
 To run the same whole-file partitions separately:
 
 ```sh
-node tools/ci/check.mjs regression-22 --shard 1/3
-node tools/ci/check.mjs regression-22 --shard 2/3
-node tools/ci/check.mjs regression-22 --shard 3/3
+node tools/ci/check.mjs regression-22 --shard 1/4
+node tools/ci/check.mjs regression-22 --shard 2/4
+node tools/ci/check.mjs regression-22 --shard 3/4
+node tools/ci/check.mjs regression-22 --shard 4/4
 ```
 
 For explicit qualification, use Node 22 for the full suite or Node 26 for
