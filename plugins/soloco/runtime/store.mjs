@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import {types} from 'node:util';
-import {normalizedLayout,readNormalized,writeNormalized,migrateNormalized,writeNormalizedSelection,flushSnapshots,readImmutable,appendNormalizedJournal,LATEST_LAYOUT,readNormalizedValue,readPublicIndex,readPublicRows,readPublicHandle,readPublicAlias,captureStorageMetadata,captureStorageBaseline,insertStorageEvent,readStorageIntake} from './record-storage.mjs';
+import {normalizedLayout,readNormalized,writeNormalized,migrateNormalized,writeNormalizedSelection,flushSnapshots,readImmutable,appendNormalizedJournal,LATEST_LAYOUT,readNormalizedValue,readPublicIndex,readPublicRows,readPublicHandle,readPublicAlias,captureStorageMetadata,captureStorageBaseline,insertStorageEvent,readStorageIntake,ensureComparisonProofIndexes} from './record-storage.mjs';
 import {bindSnapshots,bindOperatingIntake} from './snapshot.mjs';
 import {bindPublicReader,PUBLIC_COLLECTIONS} from './state-projections.mjs';
 export {digest} from './state-projections.mjs';
@@ -393,6 +393,7 @@ export class Store {
       const metadata=captureStorageMetadata(this.db);
       const header=readNormalized(this.db,{rootKeys:['revision','owner'],entities:{upgrade:['id']}});
       if(header.upgrade?.id!==uid){this.db.exec('ROLLBACK');return false;}
+      ensureComparisonProofIndexes(this.db);
       assertComparisonUpgradeAppendSupportedFrom(this);
       appendNormalizedJournal(this.db,'calls',entry);
       const changes=[{family:'root',key:'revision',value:(header.revision??-1)+1},{family:'root',key:'updated_at',value:stamp()}];
@@ -412,6 +413,7 @@ export class Store {
     this.db.exec('BEGIN IMMEDIATE');this.inTransaction=true;
     const owned=originalScope(this,'write',type);
     try {
+      ensureComparisonProofIndexes(this.db);
       beginOriginalStoreExecutionWriteFrom(this,type);
       beginRuntimeExecutionWriteFrom(this,type);
       const metadata=captureStorageMetadata(this.db);
@@ -458,6 +460,7 @@ export class Store {
     this.db.exec('BEGIN IMMEDIATE');this.inTransaction=true;
     const owned=originalScope(this,'write',type);
     try {
+      ensureComparisonProofIndexes(this.db);
       beginOriginalStoreExecutionWriteFrom(this,type);
       beginRuntimeExecutionWriteFrom(this,type);
       const metadata=normalizedLayout(this.db)?captureStorageMetadata(this.db):null;

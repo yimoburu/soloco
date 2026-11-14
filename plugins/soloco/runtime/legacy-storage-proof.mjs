@@ -1,7 +1,7 @@
 import {createHash} from 'node:crypto';
 import {types} from 'node:util';
 import {originalStoreExecutionCustodyFrom} from './store.mjs';
-import {inspectLegacyV4HistoryFrom,inspectFrozenLegacyIntakeFrom} from './record-storage.mjs';
+import {inspectLegacyV4HistoryFrom,inspectFrozenLegacyIntakeFrom,COMPARISON_PROOF_INDEX_SQL} from './record-storage.mjs';
 import {validModelProcessTracking} from './model-process-closure.mjs';
 import {validateLegacyRuntimeJobShape} from './runtime-execution.mjs';
 import {pendingSnapshots} from './snapshot.mjs';
@@ -29,6 +29,9 @@ function need(ok,reason){if(!ok)throw Object.assign(Error('Unqualified runtime s
 const proofs=new WeakMap();
 const sqlNormal=value=>value.replace(/\s+/g,'').replace(/ifnotexists/gi,'').replace(/;$/,'').toLowerCase();
 const schemas=new Map(Object.entries({
+  // Each discardable lookup is independently optional for passive old readers.
+  // Presence checks/install policy remain in the fixed record-storage module.
+  ...COMPARISON_PROOF_INDEX_SQL,
   company:"CREATE TABLE company(id INTEGER PRIMARY KEY CHECK(id=1),value TEXT NOT NULL)",
   events:'CREATE TABLE events(seq INTEGER PRIMARY KEY,at TEXT NOT NULL,type TEXT NOT NULL,value TEXT NOT NULL)',
   company_layout:'CREATE TABLE company_layout(id INTEGER PRIMARY KEY CHECK(id=1),version INTEGER NOT NULL)',
@@ -113,7 +116,7 @@ function schema(r){
   const rows=r.query('SELECT type,name,tbl_name,sql FROM sqlite_master ORDER BY type,name','all'),names=new Set(rows.map(row=>row.name));
   for(const row of rows){
     if(row.name.startsWith('sqlite_')){need(row.sql===null||row.name==='sqlite_stat1'||row.name==='sqlite_stat4','SCHEMA_REQUIRED');continue;}
-    need(schemas.has(row.name)&&typeof row.sql==='string'&&sqlNormal(row.sql)===sqlNormal(schemas.get(row.name)),'SCHEMA_REQUIRED');
+    need(schemas.has(row.name)&&typeof row.sql==='string'&&(Object.hasOwn(COMPARISON_PROOF_INDEX_SQL,row.name)?row.sql.trim().replace(/;$/,'')===schemas.get(row.name):sqlNormal(row.sql)===sqlNormal(schemas.get(row.name))),'SCHEMA_REQUIRED');
   }
   need(names.has('company')&&names.has('events'),'SCHEMA_REQUIRED');
   for(const group of [

@@ -12,6 +12,48 @@ const sqlString=value=>"'"+value.replaceAll("'","''")+"'";
 // Only explicit migration changes an existing layout; ordinary writes use its
 // compatible representation or hold. New companies remain legacy until migrate.
 export const LATEST_LAYOUT = 4;
+// Discardable SQLite-maintained lookup keys, not public flags or authority.
+// Invalid JSON is indexed as a candidate without evaluating json_type on it.
+export const COMPARISON_PROOF_VALUE_PREDICATE="CASE WHEN json_valid(bytes) THEN (json_type(bytes,'$.runtime_wire_evidence') IS NOT NULL OR json_type(bytes,'$.runtime_candidate_test_guard') IS NOT NULL) ELSE 1 END";
+export const COMPARISON_PROOF_INDEX_SQL=Object.freeze({
+  public_read_issue18_proof_values:'CREATE INDEX public_read_issue18_proof_values ON immutable_values(sha256) WHERE '+COMPARISON_PROOF_VALUE_PREDICATE,
+  public_read_issue18_record_refs:"CREATE INDEX public_read_issue18_record_refs ON state_entries(sha256,key) WHERE family='records'"
+});
+// The fixed writer emits these exact definitions. Do not normalize inside SQL
+// string literals: JSON paths and the family discriminator are case-sensitive.
+const proofIndexSQL=text=>text.trim().replace(/;$/,'');
+const proofIndexHold=code=>{throw Object.assign(Error('Comparison proof lookup Hold: '+code),{code:'ISSUE18_PROOF_LOOKUP_'+code});};
+function proofIndexRows(db){
+  const rows=db.prepare("SELECT name,sql FROM sqlite_master WHERE type='index' AND name IN ('public_read_issue18_proof_values','public_read_issue18_record_refs') ORDER BY name").all();
+  for(const row of rows)if(typeof row.sql!=='string'||proofIndexSQL(row.sql)!==proofIndexSQL(COMPARISON_PROOF_INDEX_SQL[row.name]))proofIndexHold('SCHEMA_REQUIRED');return rows;
+}
+// Physical schema facts only. A missing lookup is not a negative proof census;
+// callers that require presence use readComparisonProofCandidates below.
+export function comparisonProofLookupIndexesFrom(db){
+  const names=new Set(proofIndexRows(db).map(row=>row.name));
+  return Object.freeze({proof_values:names.has('public_read_issue18_proof_values'),record_refs:names.has('public_read_issue18_record_refs')});
+}
+export function ensureComparisonProofIndexes(db){
+  if(!normalizedLayout(db))return false;
+  const rows=proofIndexRows(db);if(rows.length===2)return true;
+  if(db.isTransaction!==true)proofIndexHold('WRITABLE_TRANSACTION_REQUIRED');
+  // Creating an index copies every matching historical key. An old retained
+  // proof or malformed fragment has no selected index-copy allowance here.
+  // Stop before either CREATE; never infer permission from its current refs.
+  const old=db.prepare('SELECT COUNT(*) AS n FROM immutable_values WHERE '+COMPARISON_PROOF_VALUE_PREDICATE).get();
+  if(old.n!==0)proofIndexHold('INDEX_COPY_CUSTODY_REQUIRED');
+  const names=new Set(rows.map(row=>row.name));for(const [name,sql]of Object.entries(COMPARISON_PROOF_INDEX_SQL))if(!names.has(name))db.exec(sql);
+  return true;
+}
+export function readComparisonProofCandidates(db){
+  if(proofIndexRows(db).length!==2)proofIndexHold('INDEX_REQUIRED');
+  // The covering record-ref lookup also preserves missing-body detection. It
+  // reads key/hash metadata only; no unrelated canonical body is hydrated.
+  const missing=db.prepare("SELECT e.key,e.sha256 FROM state_entries e INDEXED BY public_read_issue18_record_refs LEFT JOIN immutable_values v ON v.sha256=e.sha256 WHERE e.family='records' AND v.sha256 IS NULL LIMIT 1").get();
+  if(missing)proofIndexHold('MISSING_IMMUTABLE_VALUE');
+  const predicate=COMPARISON_PROOF_VALUE_PREDICATE.replaceAll('bytes','v.bytes');
+  return db.prepare("SELECT e.key,e.sha256 FROM immutable_values v INDEXED BY public_read_issue18_proof_values CROSS JOIN state_entries e INDEXED BY public_read_issue18_record_refs WHERE "+predicate+" AND e.family='records' AND e.sha256=v.sha256 LIMIT 17").all();
+}
 const keyPrefix='~json:';
 const unsafeKey=key=>key.includes('\u0000')||/[\ud800-\udfff]/u.test(key);
 // Reuse only the fixed query plans, never a layout result. Every call executes
@@ -299,6 +341,7 @@ function publicIndexCompatible(family,value) {
   return family!=='jobs'||value===undefined||(value!==null&&(!value.coordination?.resources?.length||typeof value.coordination.resources[Symbol.iterator]==='function'));
 }
 function installPublicIndex(db) {
+  ensureComparisonProofIndexes(db);
   db.exec(`CREATE TABLE IF NOT EXISTS public_read_values(family TEXT NOT NULL,key TEXT NOT NULL,position INTEGER NOT NULL,bytes TEXT NOT NULL,value_id_sha256 TEXT,sha256 TEXT NOT NULL,PRIMARY KEY(family,key));
     CREATE INDEX IF NOT EXISTS public_read_value_ids ON public_read_values(family,value_id_sha256,position);
     CREATE TABLE IF NOT EXISTS public_read_rows(collection TEXT NOT NULL,ordinal INTEGER NOT NULL,key TEXT NOT NULL,id TEXT NOT NULL,sha256 TEXT NOT NULL,key_sha256 TEXT NOT NULL,PRIMARY KEY(collection,ordinal));

@@ -5,7 +5,7 @@ import path from 'node:path';
 import {createHash,randomUUID} from 'node:crypto';
 import {types} from 'node:util';
 import {Store,owner,originalStoreExecutionCustodyFrom} from '../../store.mjs';
-import {normalizedLayout,readImmutable} from '../../record-storage.mjs';
+import {normalizedLayout,readImmutable,comparisonProofLookupIndexesFrom} from '../../record-storage.mjs';
 import {classifyRuntimeStorageFrom} from '../../legacy-storage-proof.mjs';
 import {developmentAssignment,developmentReviewSubject,validTestExecution} from '../../develop.mjs';
 import {contextMatches} from '../../context.mjs';
@@ -123,7 +123,8 @@ function metadataRowBytes(db,recordSha,recordId,event){
   const projected=db.prepare("SELECT * FROM public_read_values WHERE family='records' AND value_id_sha256=?").all(digest(recordId));
   const rows=db.prepare('SELECT * FROM public_read_rows WHERE id=? OR key_sha256=?').all(JSON.stringify(recordId),digest(recordId));
   need(entries.length===1&&projected.length===1,'SELECTION_COPIES');
-  return [...immutable,...entries,...projected,...rows,...events].reduce((total,row)=>total+Buffer.byteLength(JSON.stringify(row)),0);
+  const indexCopies=comparisonProofLookupIndexesFrom(db).record_refs?entries.reduce((total,row)=>total+Buffer.byteLength(JSON.stringify([row.sha256,row.key]))+16,0):0;
+  return [...immutable,...entries,...projected,...rows,...events].reduce((total,row)=>total+Buffer.byteLength(JSON.stringify(row)),indexCopies);
 }
 /** A genuine canonical control is consumed by a new durable, closed selection.
  * Its deterministic key excludes run/path/job so a cold module cannot rekey it. */

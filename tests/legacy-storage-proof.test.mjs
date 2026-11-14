@@ -6,7 +6,7 @@ import path from 'node:path';
 import {DatabaseSync} from 'node:sqlite';
 import {createHash} from 'node:crypto';
 import {Store,VERSION,teamHash} from '../plugins/soloco/runtime/store.mjs';
-import {captureStorageBaseline} from '../plugins/soloco/runtime/record-storage.mjs';
+import {captureStorageBaseline,COMPARISON_PROOF_INDEX_SQL} from '../plugins/soloco/runtime/record-storage.mjs';
 import {retainSnapshot,retainSnapshotEntry,inheritSnapshots,pendingSnapshots,resolveSnapshot,resolveSnapshotEntry} from '../plugins/soloco/runtime/snapshot.mjs';
 import {createDevelopmentDeliveryContract,createDevelopmentAcceptanceReport,continuationAcceptanceFacts,developmentDeliveryAction} from '../plugins/soloco/runtime/development-delivery.mjs';
 import {captureQualificationPlan} from '../plugins/soloco/runtime/context-qualification.mjs';
@@ -111,6 +111,20 @@ test('unknown schema and excessive retained row count Hold before body acceptanc
     many.db.exec("WITH RECURSIVE ids(n) AS (SELECT 2 UNION ALL SELECT n+1 FROM ids WHERE n<100001) INSERT INTO events SELECT n,'2026-11-13T00:00:00.000Z','fixture.overflow','{}' FROM ids");
     holds(many,'LEGACY_RUNTIME_INVENTORY_CAPACITY');
   }finally{many.close();}
+});
+
+test('each exact comparison proof lookup is independently optional in passive legacy schema',()=>{
+  for(const absent of [[],['public_read_issue18_proof_values'],['public_read_issue18_record_refs'],Object.keys(COMPARISON_PROOF_INDEX_SQL)]){
+    const db=fixture();try{
+      db.migrate();for(const name of absent)db.db.exec('DROP INDEX '+name);
+      const before=db.changeToken(),present=db.db.prepare("SELECT name,sql FROM sqlite_master WHERE name LIKE 'public_read_issue18_%' ORDER BY name").all();
+      assert.equal(classify(db).lane,'legacy');assert.equal(db.changeToken(),before);assert.deepEqual(db.db.prepare("SELECT name,sql FROM sqlite_master WHERE name LIKE 'public_read_issue18_%' ORDER BY name").all(),present,'Passive classification must not install a lookup');
+    }finally{db.close();}
+  }
+  const db=fixture();try{
+    db.migrate();db.db.exec('DROP INDEX public_read_issue18_proof_values');db.db.exec(COMPARISON_PROOF_INDEX_SQL.public_read_issue18_proof_values.replace('$.runtime_wire_evidence','$.RUNTIME_WIRE_EVIDENCE'));
+    holds(db,'LEGACY_RUNTIME_SCHEMA_REQUIRED');
+  }finally{db.close();}
 });
 
 test('direct raw to v4 migration proves the same source and does not mint Original fields',()=>{

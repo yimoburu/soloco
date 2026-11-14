@@ -5,15 +5,17 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {DatabaseSync} from 'node:sqlite';
+import {createHash} from 'node:crypto';
 import {Store,withStore,VERSION,digest} from '../plugins/soloco/runtime/store.mjs';
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
 import {currentView,publicPage,publicCatalog,exactRead,PUBLIC_COLLECTIONS} from '../plugins/soloco/runtime/public-response.mjs';
-import {readPublicIndex} from '../plugins/soloco/runtime/record-storage.mjs';
+import {readPublicIndex,readComparisonProofCandidates,comparisonProofLookupIndexesFrom,COMPARISON_PROOF_INDEX_SQL} from '../plugins/soloco/runtime/record-storage.mjs';
 
 const base=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'indexed-public-')));
 process.env.COMPANY_PLUGIN_DATA=path.join(base,'bindings-data');
 test.after(()=>fs.rmSync(base,{recursive:true,force:true}));
 const now=Date.now(),recent=new Date(now-1000).toISOString(),old='2020-01-01T00:00:00Z';
+const bytesHash=bytes=>createHash('sha256').update(bytes).digest('hex');
 function seed(n=10,bodySize=1000) {
   const s={schema:2,id:'fictional-index',revision:1,name:'Fixture',idea:'Synthetic only',plugin_version:VERSION,runtime_version:VERSION,phase:'Frame',mode:'preparation',paused:true,owner:{host:'codex',session_id:'founder',epoch:1},governance:'Pinned limits',governance_sha256:'fixture',team_sha256:'fixture',cos_instructions:'Pinned instructions',roles:{engineer:{}},records:{},jobs:{},notices:[],messages:[],sessions:{},upgrade_history:[],context_classifications:{}};
   for(let i=0;i<n;i++) {
@@ -342,6 +344,66 @@ test('unavailable index and corrupt unrelated archive cannot roll back a native 
     assert.equal(retained.probe_native_id,'observed-native');
     assert.equal(readPublicIndex(db.db),null);
     assert.throws(()=>db.read(),/hash mismatch/,'Canonical integrity still holds on affected reads');
+  });
+});
+
+test('ordinary selected and late-return writes use sparse proof lookup without scanning archived bodies',()=>{
+  const measurements=[];
+  for(const count of [10,100,1000]){
+    const state=seed(count,1000);state.upgrade={id:'attempt',status:'checking',calls:[]};const args=fixture(state);
+    withStore(args.root,store=>{
+      // Accumulating valid immutable history must not turn each later receipt
+      // into a JSON/body scan. These unrelated values have no sparse keys.
+      for(let n=0;n<count;n++){const bytes=JSON.stringify({archived_core:'X'.repeat(1000),n});store.db.prepare('INSERT OR IGNORE INTO immutable_values VALUES(?,?)').run(bytesHash(bytes),bytes);}
+      const prepare=store.db.prepare.bind(store.db),seen=[];
+      store.db.prepare=function(sql,...rest){
+        const statement=prepare(sql,...rest);
+        assert(!/json_(?:valid|type)\(v\.bytes/.test(sql)||sql.includes('INDEXED BY public_read_issue18_proof_values'),'Unindexed body JSON discovery: '+sql);
+        if(!/public_read_issue18_(?:proof_values|record_refs)/.test(sql)||!/^SELECT/.test(sql))return statement;
+        return new Proxy(statement,{get(target,key){const method=Reflect.get(target,key,target);if(!['get','all'].includes(key))return typeof method==='function'?method.bind(target):method;return (...parameters)=>{
+          const value=method.apply(target,parameters);seen.push({sql,rows:key==='all'?value.length:Number(Boolean(value)),bytes:Buffer.byteLength(JSON.stringify(value??null)),plan:prepare('EXPLAIN QUERY PLAN '+sql).all(...parameters).map(row=>row.detail)});return value;
+        };}});
+      };
+      try{
+        store.selectedTransaction('fictional.indexed-proof-absence',{rootKeys:['revision','updated_at'],entities:{jobs:['active']}},s=>{s.jobs.active.receipt='Small independent Core result';});
+        assert.equal(store.appendUpgradeCall('attempt',{role:'qa',text:'Small independent late Core fact'}),true);
+      }finally{store.db.prepare=prepare;}
+      const sparse=seen.filter(row=>row.sql.includes('CROSS JOIN'));assert(sparse.length>=2,'Both ordinary write entry points must perform fresh canonical presence discovery');
+      for(const row of sparse){assert(row.plan.some(detail=>detail.includes('public_read_issue18_proof_values')),JSON.stringify(row));assert(row.plan.some(detail=>detail.includes('public_read_issue18_record_refs')),JSON.stringify(row));assert.equal(row.rows,0);}
+      measurements.push({count,lookup_queries:seen.length,returned_rows:seen.reduce((n,row)=>n+row.rows,0),returned_bytes:seen.reduce((n,row)=>n+row.bytes,0)});
+    });
+  }
+  for(const key of ['lookup_queries','returned_rows','returned_bytes'])assert.equal(new Set(measurements.map(row=>row[key])).size,1,key+' must not grow with valid Core/archive bodies');
+});
+
+test('missing proof lookups repair only in a writable transaction and never index retained proof or malformed history',()=>{
+  for(const retained of ['none','proof','malformed']){
+    const args=fixture(seed(2,10));withStore(args.root,store=>{
+      if(retained!=='none'){const bytes=retained==='proof'?JSON.stringify({id:'historical-only',runtime_wire_evidence:{historical_DATA:true}}):'not JSON';store.db.prepare('INSERT INTO immutable_values VALUES(?,?)').run(bytesHash(bytes),bytes);}
+      store.db.exec('DROP INDEX public_read_issue18_proof_values; DROP INDEX public_read_issue18_record_refs');
+      assert.deepEqual(comparisonProofLookupIndexesFrom(store.db),{proof_values:false,record_refs:false});
+      assert.throws(()=>readComparisonProofCandidates(store.db),error=>error.code==='ISSUE18_PROOF_LOOKUP_INDEX_REQUIRED');
+      const before=store.changeToken();let entered=false;
+      const write=()=>store.selectedTransaction('fictional.lookup-repair',{rootKeys:['revision','updated_at'],entities:{jobs:['active']}},s=>{entered=true;s.jobs.active.receipt='Independent result';});
+      if(retained==='none'){write();assert.equal(entered,true);assert.deepEqual(comparisonProofLookupIndexesFrom(store.db),{proof_values:true,record_refs:true});assert.deepEqual(readComparisonProofCandidates(store.db),[]);}
+      else{assert.throws(write,error=>error.code==='ISSUE18_PROOF_LOOKUP_INDEX_COPY_CUSTODY_REQUIRED');assert.equal(entered,false);assert.equal(store.changeToken(),before);assert.deepEqual(comparisonProofLookupIndexesFrom(store.db),{proof_values:false,record_refs:false});}
+    });
+  }
+});
+
+test('proof lookup keeps missing immutable references and wrong index definitions visible',()=>{
+  const args=fixture(seed(2,10));withStore(args.root,store=>{
+    const row=store.db.prepare("SELECT sha256 FROM state_entries WHERE family='records' AND key='archive0'").get();
+    const body=store.db.prepare('SELECT bytes FROM immutable_values WHERE sha256=?').get(row.sha256).bytes;
+    store.db.exec('PRAGMA foreign_keys=OFF');store.db.prepare('DELETE FROM immutable_values WHERE sha256=?').run(row.sha256);
+    assert.throws(()=>readComparisonProofCandidates(store.db),error=>error.code==='ISSUE18_PROOF_LOOKUP_MISSING_IMMUTABLE_VALUE');
+    store.db.prepare('INSERT INTO immutable_values VALUES(?,?)').run(row.sha256,body);store.db.exec('PRAGMA foreign_keys=ON');
+    store.db.exec('DROP INDEX public_read_issue18_record_refs; CREATE INDEX public_read_issue18_record_refs ON state_entries(key)');
+    assert.throws(()=>comparisonProofLookupIndexesFrom(store.db),error=>error.code==='ISSUE18_PROOF_LOOKUP_SCHEMA_REQUIRED');
+    store.db.exec('DROP INDEX public_read_issue18_record_refs');store.db.exec(COMPARISON_PROOF_INDEX_SQL.public_read_issue18_record_refs.replace("family='records'","family='RECORDS'"));
+    assert.throws(()=>comparisonProofLookupIndexesFrom(store.db),error=>error.code==='ISSUE18_PROOF_LOOKUP_SCHEMA_REQUIRED','A different string literal is a different partial index');
+    store.db.exec('DROP INDEX public_read_issue18_record_refs');store.db.exec(COMPARISON_PROOF_INDEX_SQL.public_read_issue18_record_refs);
+    assert.deepEqual(readComparisonProofCandidates(store.db),[]);
   });
 });
 

@@ -14,11 +14,15 @@ import {syncBuiltinESMExports} from 'node:module';
 import {DatabaseSync} from 'node:sqlite';
 import {createHash,randomUUID} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
-import {readNormalized,writeNormalized,writeNormalizedSelection} from '../plugins/soloco/runtime/record-storage.mjs';
+import {isDeepStrictEqual} from 'node:util';
+import {readNormalized,writeNormalized,writeNormalizedSelection,readComparisonProofCandidates,comparisonProofLookupIndexesFrom} from '../plugins/soloco/runtime/record-storage.mjs';
 import {publicIndexValue} from '../plugins/soloco/runtime/state-projections.mjs';
-import {inspectComparisonEvidenceAccountingFrom} from '../plugins/soloco/runtime/integrated-comparison-evidence.mjs';
+import {inspectComparisonEvidenceAccountingFrom,inspectComparisonRequestedHeaderFrom} from '../plugins/soloco/runtime/integrated-comparison-evidence.mjs';
 import {preexistingLegacyStore} from './preexisting-legacy-data-fixture.mjs';
-import {fixture as comparisonFixture,runningArm,admitted,commitRequest,optionalDarwin} from './issue18-comparison-fixture.mjs';
+import {fixture as comparisonFixture,runningArm,queuedArm,admitted,commitRequest,optionalDarwin} from './issue18-comparison-fixture.mjs';
+import {createComparisonWorkerPlanFrom} from '../plugins/soloco/runtime/integrated-comparison-worker.mjs';
+import {work} from '../plugins/soloco/runtime/worker.mjs';
+import {runRuntimeModel} from '../plugins/soloco/runtime/adapters.mjs';
 
 const filename=fileURLToPath(new URL('../plugins/soloco/runtime/integrated-comparison-evidence.mjs',import.meta.url));
 const source=fs.readFileSync(filename,'utf8');
@@ -39,10 +43,10 @@ function fixture(t){
     CREATE TRIGGER fence_legacy_insert BEFORE INSERT ON company BEGIN SELECT RAISE(ABORT,'Legacy writer fenced: normalized company storage'); END;`);
   let state={id:'SOURCE-only-accounting-company',name:'Disposable accounting rows',owner:{host:'codex',session_id:'fictional',epoch:1},revision:0,updated_at:'2026-11-14T00:00:00.000Z',
     records:{core:{id:'core',kind:'artifact',status:'Recorded',content:'Independent Core fixture; never a model result.',created_at:'2000-01-01T00:00:00.000Z'}},jobs:{engineer:{id:'engineer',role:'engineer',status:'running'}},sessions:{},notices:[],messages:[]};
-  writeNormalized(db,state);
+  db.exec('BEGIN IMMEDIATE');try{writeNormalized(db,state);db.exec('COMMIT');}catch(error){db.exec('ROLLBACK');throw error;}
   let scope=Object.freeze({}),mode='read',type='snapshot',charges=0,charged=0,scopeState=null;
   const io=Object.freeze({}),root='/SOURCE-only-accounting-root',store={root,db,read:()=>state,readSnapshot:operation=>operation()};
-  const deps={fs,fileURLToPath,createHash,randomUUID,Buffer,publicIndexValue,
+  const deps={fs,fileURLToPath,createHash,randomUUID,Buffer,publicIndexValue,isDeepStrictEqual,readComparisonProofCandidates,comparisonProofLookupIndexesFrom,
     originalStoreExecutionCustodyFrom(subject){assert.equal(subject,store,'Declared VM Store only');return {store,db,root,scope,state:scopeState??state,mode,type,assert(){}};},
     inspectComparisonEvidenceStorageFrom(handle){assert.equal(handle,io);return {phase:'engineer',accounting:{charged_bytes:charged,capacity_reserved_bytes:9975424}};},
     chargeComparisonEvidenceMetadata(handle,increment){assert.equal(handle,io);assert.equal(increment.pin_copy_bytes,0);charged+=increment.header_bytes+increment.event_bytes;charges++;},
@@ -156,6 +160,16 @@ test('copy encodings beyond the finite normalization budget Hold instead of fall
   for(let n=0;n<10;n++)content=content.replaceAll('\\','\\u005c');content='report: '+content;
   assert.throws(()=>f.transaction(view=>{view.records.copy={id:'copy',kind:'artifact',content};}),held('METADATA_COPY_CLASSIFICATION_ENCODING'));assert.equal(f.charges(),1);
 });
+test('issued error receipt components remain protected through prefixed and escaped JSON wrappers',t=>{
+  const f=fixture(t);f.first();
+  const receipt={receipt_id:'issue18-error-12345678-1234-4567-89ab-123456789abc',origin:'provider_or_adapter',thrown_kind:'unknown',live_identity:'original_value_and_cause_preserved_privately_not_reconstructable',diagnostic:{status:'not_inspected',text:null,original_utf16_units:null,truncated:false},cold_identity_claim:false};
+  for(const content of [JSON.stringify(receipt),'report: '+JSON.stringify(JSON.stringify(receipt)),JSON.stringify({receipt_id:receipt.receipt_id}),JSON.stringify({live_identity:receipt.live_identity})]){
+    assert.throws(()=>f.transaction(s=>{s.records.copy={id:'copy',kind:'artifact',content};}),held('METADATA_UNSELECTED_COPY_REPRESENTATION'));
+    assert.equal(f.state().records.copy,undefined);
+  }
+  f.transaction(s=>{s.records.diagnostic={id:'diagnostic',kind:'artifact',content:JSON.stringify({receipt_id:'ordinary-Core-error',origin:'independent_core',thrown_kind:'unknown',live_identity:'ordinary diagnostic only',diagnostic:{status:'failed',text:'Core test result'},cold_identity_claim:false})};});
+  assert.equal(JSON.parse(f.state().records.diagnostic.content).receipt_id,'ordinary-Core-error');assert.equal(f.charges(),1);
+});
 test('untouched independent Core text is not rebilled merely for mentioning an old proof protocol',t=>{
   const f=fixture(t);f.state().records.core.content=JSON.stringify({protocol:'issue18-runtime-wire-evidence-v1',historical_unselected_DATA:true});writeNormalized(f.db,f.state());
   f.first();const charged=f.charged();f.transaction(view=>{view.name='Independent metadata changed';});assert.equal(f.charged(),charged);assert.equal(f.charges(),1);
@@ -200,6 +214,14 @@ test('a selected SQL write cannot repoint an omitted current header to an old pr
   }}),held('METADATA_CANONICAL_REFERENCE'));
   assert.equal(f.db.prepare("SELECT sha256 FROM state_entries WHERE family='records' AND key=?").get(header.id).sha256,digest(current));assert.equal(f.charges(),1);
 });
+for(const mutation of ['ordinary Core body','deleted canonical row'])test('a selected SQL write cannot hide an omitted paid proof as '+mutation,t=>{
+  const f=fixture(t),{header}=f.first(),before=f.db.prepare("SELECT sha256 FROM state_entries WHERE family='records' AND key=?").get(header.id).sha256;
+  assert.throws(()=>f.transaction(view=>{view.records.core.content='Independent selected edit';},{selected:['core'],afterWrite:db=>{
+    if(mutation==='ordinary Core body'){const text=JSON.stringify({id:header.id,kind:'artifact',content:'A marker was removed after selected preparation'}),sha=hash(text);db.prepare('INSERT INTO immutable_values VALUES(?,?)').run(sha,text);db.prepare("UPDATE state_entries SET sha256=? WHERE family='records' AND key=?").run(sha,header.id);}
+    else db.prepare("DELETE FROM state_entries WHERE family='records' AND key=?").run(header.id);
+  }}),held('METADATA_CANONICAL_REFERENCE'));
+  assert.equal(f.db.prepare("SELECT sha256 FROM state_entries WHERE family='records' AND key=?").get(header.id).sha256,before);assert.equal(f.charges(),1);
+});
 test('the thirty-third future catalogue/reference rewrite Holds with no refundable capacity',t=>{
   const f=fixture(t);f.first();const reserved=f.charged();
   for(let n=0;n<32;n++)f.transaction(s=>{s.records.core.created_at=n%2?'2000-01-01T00:00:00.000Z':'2099-01-01T00:00:00.000Z';});
@@ -215,12 +237,44 @@ test('an extra proof-bearing event cannot hide behind an independent Core event 
 // These prospective cases use the actual Store and genuine requested-header
 // producer. The shared fixture controls only worker/capability CP forms; its
 // selected fixed Python storage helpers remain real. No model is invoked.
-async function requestedHeader(t,{upgrade=false}={}){
-  const f=comparisonFixture(t),run=f.initialize(),arms=f.enroll(run),store=arms['1-files'];
+async function requestedHeader(t,{upgrade=false,armId='1-files'}={}){
+  const f=comparisonFixture(t),run=f.initialize(),arms=f.enroll(run),store=arms[armId];
   if(upgrade)store.transaction('fictional.completed-upgrade-data',state=>{state.upgrade={id:'fictional-late-upgrade',status:'completed',calls:[]};return state;});
-  const a=await runningArm(t,f,run,store,'1-files'),admission=admitted(run,a);assert.equal(commitRequest(a,admission.armAdmission).entered,true);
+  const a=await runningArm(t,f,run,store,armId),admission=admitted(run,a);assert.equal(commitRequest(a,admission.armAdmission).entered,true);
   const headers=Object.values(store.read().records).filter(record=>record.runtime_wire_evidence);assert.equal(headers.length,1);return {f,run,a,store,header:headers[0]};
 }
+test('actual requested-header custody accepts reordered binding members but preserves values, types, arrays and exact wire hashes',optionalDarwin,async t=>{
+  const s=await requestedHeader(t,{armId:'3-files'}),original=JSON.stringify(s.a.binding),bindingHash=hash(original);
+  function reorder(value){if(Array.isArray(value))return value.map(reorder);if(value&&typeof value==='object')return Object.fromEntries(Object.keys(value).sort().map(key=>[key,reorder(value[key])]));return value;}
+  const reordered=reorder(s.a.binding);assert.notEqual(JSON.stringify(reordered),original);assert(isDeepStrictEqual(reordered,s.a.binding));
+  const stop=Object.freeze({fictional_source_rollback_after_binding_checks:true});
+  assert.throws(()=>s.store.transaction('fictional.binding-custody-oracles',state=>{
+    const positive=inspectComparisonRequestedHeaderFrom(s.store,state,reordered);assert.equal(positive.record_sha256,digest(s.header));
+    const mutations=[copy(reordered),copy(reordered),copy(reordered),copy(reordered)];
+    mutations[0].model.selection.effort='high';mutations[1].model.extra='unselected';mutations[2].model.native_id_requested='null';mutations[3].plan.write_paths.reverse();
+    assert.notDeepEqual(mutations[3].plan.write_paths,s.a.binding.plan.write_paths);
+    for(const changed of mutations)assert.throws(()=>inspectComparisonRequestedHeaderFrom(s.store,state,changed),held('REQUEST_HEADER_CUSTODY'));
+    throw stop;
+  }),error=>error===stop);
+  assert.equal(JSON.stringify(s.a.binding),original);assert.equal(hash(s.a.slot.binding_serialization.text),bindingHash);assert.equal(s.a.slot.binding_serialization.sha256,bindingHash);s.f.done();
+});
+
+test('actual committed primary error receipts cannot be copied as independent Core JSON while Core diagnostics remain writable',optionalDarwin,async t=>{
+  const f=comparisonFixture(t),run=f.initialize(),arms=f.enroll(run),a=await queuedArm(t,f,run,arms['1-files'],'1-files');
+  const plan=createComparisonWorkerPlanFrom(run,a.store,'1-files',a.job.id),model=f.modelFor(a.store,a.job),completion=work(a.store.root,a.job.id,runRuntimeModel,plan);completion.catch(()=>{});
+  try{
+    assert.equal(await Promise.race([model.ready,completion.then(()=>{throw Error('Worker completed before controlled model call');},error=>{throw error;})]),model);
+    model.answer('Fictional controlled adapter failure; never a provider response.',{exitCode:1});await assert.rejects(completion);
+    const header=Object.values(a.store.read().records).find(record=>record.job_id===a.job.id&&record.runtime_wire_evidence),receipt=header?.runtime_wire_evidence.outcome?.primary_error;
+    assert.equal(header.runtime_wire_evidence.state,'error_retained');assert.equal(header.revision,2);assert.match(receipt.receipt_id,/^issue18-error-[a-f0-9-]{36}$/);assert.equal(receipt.live_identity,'original_value_and_cause_preserved_privately_not_reconstructable');
+    const content=JSON.stringify(receipt);assert(!content.includes(header.id));assert(!content.includes(digest(header)));
+    const before=inspectComparisonEvidenceAccountingFrom(a.store,a.job.id),token=a.store.changeToken();
+    assert.throws(()=>a.store.selectedTransaction('fictional.copied-error-receipt',{rootKeys:['revision','owner'],entities:{records:['copied-error']}},state=>{state.records['copied-error']={id:'copied-error',kind:'artifact',revision:1,status:'Recorded',content};}),held('METADATA_UNSELECTED_COPY_REPRESENTATION'));
+    assert.equal(a.store.changeToken(),token);assert.equal(a.store.read().records['copied-error'],undefined);
+    a.store.selectedTransaction('fictional.independent-Core-diagnostic',{rootKeys:['revision','owner'],entities:{records:['Core-diagnostic']}},state=>{state.records['Core-diagnostic']={id:'Core-diagnostic',kind:'artifact',revision:1,status:'Recorded',content:JSON.stringify({receipt_id:'ordinary-Core-error',origin:'unit-test',thrown_kind:'unknown',diagnostic:{status:'failed',text:'Independent test failed'},cold_identity_claim:false})};});
+    assert.equal(JSON.parse(a.store.read().records['Core-diagnostic'].content).receipt_id,'ordinary-Core-error');assert.equal(inspectComparisonEvidenceAccountingFrom(a.store,a.job.id).quote.total_bytes,before.quote.total_bytes);assert.deepEqual(model.fixtureErrors,[]);f.done();
+  }finally{if(!model.child.closed)model.close(1,'SIGTERM');await completion.catch(()=>{});}
+});
 test('actual Store.selectedTransaction charges omitted warm proof references',optionalDarwin,async t=>{
   const s=await requestedHeader(t),before=inspectComparisonEvidenceAccountingFrom(s.store,s.a.job.id);let omitted=false;
   s.store.selectedTransaction('fictional.selected-core-record',{rootKeys:['revision','owner'],entities:{records:['fictional-new-core']}},state=>{

@@ -3,6 +3,7 @@
 import {createHash,randomUUID} from 'node:crypto';
 import fs from 'node:fs';
 import {fileURLToPath} from 'node:url';
+import {isDeepStrictEqual} from 'node:util';
 import {originalStoreExecutionCustodyFrom,inspectRuntimeStoreCommitWitnessFrom} from './store.mjs';
 import {inspectRuntimeModelRequestCommitFrom} from './runtime-execution.mjs';
 import {inspectRuntimeModelOutcomeCaptureFrom,assertRuntimeModelOutcomeEligible} from './adapters.mjs';
@@ -11,6 +12,7 @@ import {captureRawText,captureBytes,unavailableCapture,keepThrownValue,readThrow
 import {publishComparisonEvidenceBlob,pinComparisonEvidenceFrom,assertComparisonEvidencePin,releaseComparisonEvidencePin,inspectComparisonEvidenceStorageFrom,chargeComparisonEvidenceMetadata,closeComparisonEvidenceStorage} from './qualification/issue18/integrated-comparison-evidence-io.mjs';
 import {beginComparisonTestWriteFrom,prepareComparisonTestWriteFrom,comparisonTestEventFrom,bindComparisonTestBookkeepingFrom} from './integrated-comparison-test.mjs';
 import {publicIndexValue} from './state-projections.mjs';
+import {readComparisonProofCandidates,comparisonProofLookupIndexesFrom} from './record-storage.mjs';
 
 const captures=new WeakMap(),writes=new WeakMap(),bookkeeping=new WeakMap(),runCaptures=new WeakMap(),producedCalls=new Map(),commitPreparations=new WeakMap(),preimages=new WeakMap(),eventScopes=new WeakMap();
 const metadataPrepayments=new WeakMap(),metadataIOs=new WeakMap(),metadataJobs=new Map(),metadataRoots=new Map(),metadataScopes=new WeakMap();
@@ -41,6 +43,13 @@ function sqlRowBytes(table,row){
   // for each secondary/automatic key. This does not claim SQLite page, WAL or
   // allocator accounting. A new index is outside the closed schema below.
   const keys=table==='immutable_values'?[[row.sha256]]:table==='state_entries'?[[row.family,row.key],[row.family,row.position]]:table==='public_read_values'?[[row.family,row.key],[row.family,row.value_id_sha256,row.position]]:table==='public_read_rows'?[[row.collection,row.ordinal],[row.collection,row.key_sha256]]:[];
+  if(table==='immutable_values'){
+    // These are already bounded, known row postimages. The sparse index also
+    // retains malformed fragments; valid unrelated Core JSON has no such key.
+    let value,valid=true;try{value=JSON.parse(row.bytes);}catch{valid=false;}
+    if(!valid||value&&typeof value==='object'&&(Object.hasOwn(value,'runtime_wire_evidence')||Object.hasOwn(value,'runtime_candidate_test_guard')))keys.push([row.sha256]);
+  }
+  if(table==='state_entries'&&row.family==='records')keys.push([row.sha256,row.key]);
   return rowBytes(row)+keys.reduce((n,key)=>n+rowBytes(key)+16,0);
 }
 const sqlRowsBytes=(table,rows)=>rows.reduce((n,row)=>n+sqlRowBytes(table,row),0);
@@ -58,11 +67,18 @@ function canonicalProofRows(loan){
   const layout=loan.db.prepare("SELECT 1 AS present FROM sqlite_master WHERE type='table' AND name='company_layout'").get();
   if(!layout){const count=loan.db.prepare("SELECT COUNT(*) AS n FROM company c,json_tree(c.value,'$.records') j WHERE j.key IN ('runtime_wire_evidence','runtime_candidate_test_guard')").get();need(count.n===0,'METADATA_UNSUPPORTED_LEGACY_PROOF_STORAGE');return [];}
   const version=loan.db.prepare('SELECT version FROM company_layout WHERE id=1').get()?.version;
-  if(version!==4){const count=loan.db.prepare("SELECT COUNT(*) AS n FROM state_entries e JOIN immutable_values v USING(sha256) WHERE e.family='records' AND (json_type(v.bytes,'$.runtime_wire_evidence') IS NOT NULL OR json_type(v.bytes,'$.runtime_candidate_test_guard') IS NOT NULL)").get();need(count.n===0,'METADATA_UNSUPPORTED_LEGACY_PROOF_STORAGE');return [];}
-  const invalid=loan.db.prepare("SELECT COUNT(*) AS n FROM state_entries e LEFT JOIN immutable_values v USING(sha256) WHERE e.family='records' AND (v.bytes IS NULL OR NOT json_valid(v.bytes))").get();need(invalid.n===0,'METADATA_CANONICAL_JSON');
-  const where="e.family='records' AND (json_type(v.bytes,'$.runtime_wire_evidence') IS NOT NULL OR json_type(v.bytes,'$.runtime_candidate_test_guard') IS NOT NULL)";
-  const count=loan.db.prepare('SELECT COUNT(*) AS n FROM state_entries e JOIN immutable_values v USING(sha256) WHERE '+where).get();need(count.n<=16,'METADATA_CANONICAL_PROOF_CAPACITY');
-  const rows=loan.db.prepare("SELECT e.key,e.sha256,e.encoding,json_extract(v.bytes,'$.id') AS id,length(CAST(v.bytes AS BLOB)) AS bytes,json_type(v.bytes,'$.runtime_wire_evidence') AS wire_type,json_type(v.bytes,'$.runtime_candidate_test_guard') AS test_type FROM state_entries e JOIN immutable_values v USING(sha256) WHERE "+where+' ORDER BY e.key').all();
+  const candidates=readComparisonProofCandidates(loan.db);need(candidates.length<=16,'METADATA_CANONICAL_PROOF_CAPACITY');
+  need(version===4||candidates.length===0,'METADATA_UNSUPPORTED_LEGACY_PROOF_STORAGE');
+  const rows=candidates.map(candidate=>{
+    // Bound count and original body size before JSON validation/extraction. The
+    // sparse lookup touches no unrelated canonical/archive body on this path.
+    const size=loan.db.prepare('SELECT length(CAST(bytes AS BLOB)) AS bytes FROM immutable_values WHERE sha256=?').get(candidate.sha256);
+    need(size&&Number.isSafeInteger(size.bytes)&&size.bytes<=BODY_MAX,'METADATA_CANONICAL_PROOF_CAPACITY');
+    need(loan.db.prepare('SELECT json_valid(bytes) AS valid FROM immutable_values WHERE sha256=?').get(candidate.sha256)?.valid===1,'METADATA_CANONICAL_JSON');
+    const detail=loan.db.prepare("SELECT json_extract(bytes,'$.id') AS id,json_type(bytes,'$.runtime_wire_evidence') AS wire_type,json_type(bytes,'$.runtime_candidate_test_guard') AS test_type FROM immutable_values WHERE sha256=?").get(candidate.sha256);
+    const entry=loan.db.prepare("SELECT encoding FROM state_entries WHERE family='records' AND key=? AND sha256=?").get(candidate.key,candidate.sha256);need(entry,'METADATA_CANONICAL_PROOF_CAPACITY');
+    return {...candidate,...detail,encoding:entry.encoding,bytes:size.bytes};
+  }).sort((a,b)=>a.key<b.key?-1:a.key>b.key?1:0);
   loan.assert();return rows;
 }
 function requireProofCustody(rows,members,code,eventScope=null){
@@ -85,6 +101,7 @@ function proofRepresentation(serialized){
       // itself a proof payload. Unsupported deeper encodings Hold explicitly.
       if(COPY_KEY_TEXT.test(view))return true;
       if(/"(?:protocol|purpose)"\s*:\s*"issue18-[^"]+"/.test(view))return true;
+      if(/"receipt_id"\s*:\s*"issue18-error-[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}"/.test(view)||/"live_identity"\s*:\s*"original_value_and_cause_preserved_privately_not_reconstructable"/.test(view))return true;
       const next=view.replace(/\\+u([a-fA-F0-9]{4})/g,(_match,hex)=>String.fromCharCode(Number.parseInt(hex,16))).replace(/\\(["\\/])/g,(_match,escaped)=>escaped);
       if(next===view)return false;view=next;
     }
@@ -99,6 +116,7 @@ function proofRepresentation(serialized){
     if(!value||typeof value!=='object')return false;
     if(COPY_PROTOCOLS.has(value.protocol)||typeof value.purpose==='string'&&value.purpose==='issue18-integrated-comparison-budget-v1')return true;
     if(Object.keys(value).some(key=>COPY_KEYS.has(key)))return true;
+    if(typeof value.receipt_id==='string'&&/^issue18-error-[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(value.receipt_id)||value.live_identity==='original_value_and_cause_preserved_privately_not_reconstructable')return true;
     if(typeof value.object_name==='string'&&/^objects\/[a-f0-9]{64}\.blob$/.test(value.object_name)&&Object.hasOwn(value,'encoding')&&Object.hasOwn(value,'sha256')&&Object.hasOwn(value,'bytes'))return true;
     if(Object.hasOwn(value,'lower_cli_transport')&&Object.hasOwn(value,'lossless_blob'))return true;
     return Object.values(value).some(child=>visit(child,depth+1));
@@ -161,8 +179,8 @@ export function comparisonEvidenceMetadataReservation(phase){
   need(phase==='engineer'||phase==='qa','METADATA_PHASE');
   const records=phase==='engineer'?5:3;
   const inventory=[
-    {purpose:'whole immutable header SQL row/body envelope and automatic hash index key',kind:'header',maximum_bytes:SQL_CAPS.immutable,multiplicity:records},
-    {purpose:'whole canonical state_entries reference row, primary and order index keys',kind:'header',maximum_bytes:SQL_CAPS.entry,multiplicity:records},
+    {purpose:'whole immutable header SQL row/body envelope, automatic hash and sparse proof index keys',kind:'header',maximum_bytes:SQL_CAPS.immutable,multiplicity:records},
+    {purpose:'whole canonical state_entries reference row, primary, order and covering proof-reference index keys',kind:'header',maximum_bytes:SQL_CAPS.entry,multiplicity:records},
     {purpose:'whole public_read_values projection row, primary and value-id index keys',kind:'header',maximum_bytes:SQL_CAPS.projection,multiplicity:records},
     {purpose:'whole A-caused public_read_rows postimages, including ordinal rewrites and handles',kind:'header',maximum_bytes:SQL_CAPS.references,multiplicity:records},
     {purpose:'whole rewritten public_read_catalog row',kind:'header',maximum_bytes:SQL_CAPS.catalogue,multiplicity:records},
@@ -178,11 +196,13 @@ function sqlSchema(db){
   need(JSON.stringify(tables.map(row=>row.name))===JSON.stringify(Object.keys(SQL_COLUMNS).sort()),'METADATA_SCHEMA');
   for(const [table,columns]of Object.entries(SQL_COLUMNS))need(JSON.stringify(db.prepare('PRAGMA table_xinfo('+table+')').all().map(row=>row.name))===JSON.stringify(columns),'METADATA_SCHEMA');
   const indexes=db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name NOT GLOB 'sqlite_*' ORDER BY name").all();
-  need(JSON.stringify(indexes.map(row=>row.name))===JSON.stringify(['public_read_handles','public_read_value_ids','state_entries_order']),'METADATA_INDEX_SCHEMA');
-  const secondaryColumns={public_read_handles:['collection','key_sha256'],public_read_value_ids:['family','value_id_sha256','position'],state_entries_order:['family','position']},indexColumns={...secondaryColumns};
+  const secondaryColumns={public_read_handles:['collection','key_sha256'],public_read_issue18_proof_values:['sha256'],public_read_issue18_record_refs:['sha256','key'],public_read_value_ids:['family','value_id_sha256','position'],state_entries_order:['family','position']},indexColumns={...secondaryColumns};
+  need(JSON.stringify(indexes.map(row=>row.name))===JSON.stringify(Object.keys(secondaryColumns).sort()),'METADATA_INDEX_SCHEMA');
+  const secondaryTables={public_read_handles:'public_read_rows',public_read_issue18_proof_values:'immutable_values',public_read_issue18_record_refs:'state_entries',public_read_value_ids:'public_read_values',state_entries_order:'state_entries'};
+  const lookup=comparisonProofLookupIndexesFrom(db);need(lookup.proof_values&&lookup.record_refs,'METADATA_INDEX_SCHEMA');
   const primaryColumns={immutable_values:['sha256'],state_entries:['family','key'],public_read_values:['family','key'],public_read_rows:['collection','ordinal']};
   for(const table of Object.keys(SQL_COLUMNS)){
-    const expected=[...(primaryColumns[table]?['sqlite_autoindex_'+table+'_1']:[]),...Object.keys(secondaryColumns).filter(name=>name==='state_entries_order'?table==='state_entries':name==='public_read_handles'?table==='public_read_rows':table==='public_read_values')].sort();
+    const expected=[...(primaryColumns[table]?['sqlite_autoindex_'+table+'_1']:[]),...Object.keys(secondaryColumns).filter(name=>secondaryTables[name]===table)].sort();
     need(JSON.stringify(db.prepare('PRAGMA index_list('+table+')').all().map(row=>row.name).sort())===JSON.stringify(expected),'METADATA_INDEX_SCHEMA');
     if(primaryColumns[table])indexColumns['sqlite_autoindex_'+table+'_1']=primaryColumns[table];
   }
@@ -261,7 +281,7 @@ function metadataBegin(store,loan,state){
   if(!members.length)return;
   need(members.every(paid=>paid.schema===sqlSchema(loan.db)),'METADATA_SCHEMA_CHANGED');
   const ids=[...new Set(members.flatMap(paid=>[...paid.records.keys()]))];
-  metadataScopes.set(loan.scope,{store,db:loan.db,root:loan.root,members,before:metadataSQL(loan.db,ids),beforeEvent:tail(loan),copies:copyBaseline(loan.db),preparedBefore:new Map(preparedValues(state).map(row=>[row.identity,digest(row.value)]))});
+  metadataScopes.set(loan.scope,{store,db:loan.db,root:loan.root,members,proofs:records.map(row=>({id:row.id,key:row.key})),before:metadataSQL(loan.db,ids),beforeEvent:tail(loan),copies:copyBaseline(loan.db),preparedBefore:new Map(preparedValues(state).map(row=>[row.identity,digest(row.value)]))});
 }
 function metadataCopyCensus(loan,members){
   const known=new Map(),ids=[];for(const paid of members){for(const id of paid.records.keys())ids.push(id);for(const [sha,body]of paid.bodies)known.set(sha,{...body,paid});}
@@ -285,6 +305,10 @@ function validateMetadataCommit(store,loan,eventScope){
   const scope=metadataScopes.get(loan.scope);if(!scope)return;
   need(scope.store===store&&scope.db===loan.db&&scope.members.every(paid=>paid.schema===sqlSchema(loan.db)),'METADATA_COMMIT_SCOPE');
   const members=[...(metadataRoots.get(loan.root)??[])].filter(paid=>paid.ready&&paid.used),allIds=[...new Set(members.flatMap(paid=>[...paid.records.keys()]))],canonical=canonicalProofRows(loan),ids=canonical.map(row=>row.id);
+  // A previously committed proof cannot disappear by becoming an ordinary
+  // Core body (or losing its canonical row) in an omitted selected projection.
+  for(const prior of scope.proofs)need(canonical.some(row=>row.key===prior.key&&row.id===prior.id),'METADATA_CANONICAL_REFERENCE');
+  if(eventScope?.metadata){const produced=eventScope.metadata.bodies.get(eventScope.recordSha);need(produced&&canonical.some(row=>row.id===produced.id&&row.sha256===eventScope.recordSha),'METADATA_CANONICAL_REFERENCE');}
   for(const row of canonical)need(row.key===row.id,'METADATA_UNKNOWN_BODY_REFERENCE');
   requireProofCustody(canonical,members,'METADATA_CANONICAL_REFERENCE',eventScope);
   const actual=metadataSQL(loan.db,ids),copies=metadataCopyCensus(loan,members),owner=eventScope?.metadata??null;
@@ -377,7 +401,7 @@ export function stageComparisonRequestFrom(handle,state,slotCommit){
 }
 export function inspectComparisonRequestedHeaderFrom(store,state,binding){
   const c=active(producedCalls.get(store.root+'\0'+binding.job.id)),loan=originalStoreExecutionCustodyFrom(store);
-  loan.assert();need(c.store===store&&loan.state===state&&digest(c.binding)===digest(binding)&&c.requested&&digest(state.records?.[c.record.id])===digest(c.requested),'REQUEST_HEADER_CUSTODY');
+  loan.assert();need(c.store===store&&loan.state===state&&isDeepStrictEqual(c.binding,binding)&&c.requested&&digest(state.records?.[c.record.id])===digest(c.requested),'REQUEST_HEADER_CUSTODY');
   const pending=writes.get(c.requestScope);need(pending&&pending.store===store&&pending.record===c.requested,'REQUEST_HEADER_SCOPE');
   need(loan.scope===c.requestScope||pending.committed,'REQUEST_HEADER_COMMIT');
   return Object.freeze({record_id:c.requested.id,record_sha256:digest(c.requested),request_scope:c.requestScope,request_event_seq:c.requestSeq,request_event_type:'job.model_process.requested'});
@@ -492,6 +516,7 @@ function prepareHeader(c,record){
     text=JSON.stringify(record);const next=Buffer.byteLength(text);if(next===size)break;size=next;
   }
   need(size<=32768&&record.runtime_wire_evidence.counters.A_charged_evidence_bytes<=record.runtime_wire_evidence.request.A_capacity_reserved_bytes,'HEADER_CAPACITY');
+  need(sqlRowBytes('immutable_values',{sha256:hash(text),bytes:text})<=SQL_CAPS.immutable,'METADATA_IMMUTABLE_ALLOWANCE');
   const blob=captureBytes(Buffer.from(text,'utf8'),'closed-json-utf8-v1');publishComparisonEvidenceBlob(c.io,blob);
   c.blobs.push(blob);
   const charged=inspectComparisonEvidenceStorageFrom(c.io).accounting.charged_bytes;

@@ -12,8 +12,8 @@
     },
     {
       "path": "runtime/integrated-comparison-evidence.mjs",
-      "bytes": 72725,
-      "sha256": "0334ad26012b1f9c21857d2f158d185c72b56f4540d2b3efc44c0177fec03030",
+      "bytes": 75021,
+      "sha256": "6e8d096ecffb99fcec37ae58d70812339cb6957f0e985f9a0b0854433c6d333f",
       "mode": "100644"
     },
     {
@@ -78,8 +78,8 @@
     },
     {
       "path": "runtime/qualification/issue18/integrated-comparison-issuer.mjs",
-      "bytes": 47146,
-      "sha256": "9c9566b34ceb77a60a5d45c11f8e424a85ef9449008b6b903bad4e89132a6745",
+      "bytes": 47373,
+      "sha256": "1f441167d95223cfb5f1346ab0b3ad3e804796f66b50d1426a0df76bb668477c",
       "mode": "100644"
     },
     {
