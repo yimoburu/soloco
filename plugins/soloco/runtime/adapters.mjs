@@ -381,6 +381,7 @@ const outcomeNow=Date.now,outcomeSchedule=setTimeout,outcomeUnschedule=clearTime
 const outcomeMapGet=WeakMap.prototype.get,outcomeMapSet=WeakMap.prototype.set;
 const outcomeDescriptors=Object.getOwnPropertyDescriptors,outcomePrototype=Object.getPrototypeOf;
 const outcomeOwnKeys=Reflect.ownKeys,outcomeCreate=Object.create,outcomeThen=Promise.prototype.then;
+const outcomeDefine=Object.defineProperty;
 const outcomeSignalAdd=AbortSignal.prototype.addEventListener,outcomeSignalRemove=AbortSignal.prototype.removeEventListener;
 const outcomeGet=(map,key)=>outcomeApply(outcomeMapGet,map,[key]);
 const outcomeSet=(map,key,value)=>outcomeApply(outcomeMapSet,map,[key,value]);
@@ -420,6 +421,40 @@ function stageRuntimeOutcomeText(record,value,fallbackNativeId){
     record.nativeId=nativeId;
   }catch(captureError){outcomeFault(record,captureError);}
 }
+function stageRuntimeOutcomeMetadata(record,value){
+  if(!record)return;
+  try{
+    // Only the fixed parser's completed DATA result reaches this stage, after
+    // Source applied-controls enrichment and before any public result escapes.
+    // Bound recursive warning/usage metadata separately from primitive text.
+    let nodes=0,units=0;
+    const snapshot=(item,depth=0)=>{
+      outcomeNeed(++nodes<=100000&&depth<=32,'METADATA_LIMIT');
+      if(item===null||typeof item==='boolean')return item;
+      if(typeof item==='string'){units+=item.length;outcomeNeed(units<=record.finalized.max_output_characters+65536,'METADATA_LIMIT');return item;}
+      if(typeof item==='number'){outcomeNeed(Number.isFinite(item),'METADATA_UNAVAILABLE');return item;}
+      outcomeNeed(item&&typeof item==='object'&&!types.isProxy(item),'METADATA_UNAVAILABLE');
+      const array=Array.isArray(item),prototype=outcomePrototype(item);
+      outcomeNeed(array?prototype===Array.prototype:prototype===Object.prototype||prototype===null,'METADATA_UNAVAILABLE');
+      const descriptors=outcomeDescriptors(item),keys=outcomeOwnKeys(descriptors),copy=array?[]:outcomeCreate(prototype);
+      outcomeNeed(keys.length<=100000,'METADATA_LIMIT');
+      if(array)outcomeNeed(Number.isSafeInteger(descriptors.length?.value)&&descriptors.length.value>=0&&keys.length===descriptors.length.value+1,'METADATA_UNAVAILABLE');
+      for(const key of keys){
+        if(array&&key==='length')continue;
+        const descriptor=descriptors[key];outcomeNeed(typeof key==='string'&&descriptor.enumerable&&Object.hasOwn(descriptor,'value'),'METADATA_UNAVAILABLE');
+        if(array)outcomeNeed(/^(0|[1-9][0-9]*)$/.test(key)&&Number(key)<descriptors.length.value,'METADATA_UNAVAILABLE');
+        units+=key.length;outcomeNeed(units<=record.finalized.max_output_characters+65536,'METADATA_LIMIT');
+        outcomeDefine(copy,key,{value:snapshot(descriptor.value,depth+1),enumerable:true,writable:false,configurable:false});
+      }
+      return outcomeFreeze(copy);
+    };
+    const descriptors=outcomeDescriptors(value),evidence=descriptors.model_evidence,version=descriptors.cli_version;
+    outcomeNeed(evidence&&Object.hasOwn(evidence,'value'),'METADATA_UNAVAILABLE');
+    record.modelEvidence=snapshot(evidence.value);
+    outcomeNeed(!version||Object.hasOwn(version,'value')&&(version.value===null||typeof version.value==='string'&&version.value.length<=1024),'METADATA_UNAVAILABLE');
+    record.cliVersion=version?.value??null;
+  }catch(captureError){outcomeFault(record,captureError);}
+}
 function settleRuntimeOutcome(record,kind,value){
   if(record.captureAttempted){if(record.kind!==kind||!outcomeSame(record.value,value))outcomeFault(record,undefined);return;}
   // Set presence before any capture operation: undefined/null/false are real
@@ -453,7 +488,7 @@ export function runRuntimeModelWithOutcome(issuingStore,host,nativeId,prompt,cwd
   const request=inspectRuntimeModelRequestCommitFrom(token,issuingStore),binding=outcomeInput(host,nativeId,prompt,cwd,selected);
   outcomeNeed(request.store===issuingStore&&outcomeInputMatches(request.input_binding,binding),'INPUT_CHANGED');
   outcomeNeed(!outcomeGet(runtimeOutcomeLaunches,token),'CALL_ALREADY_ATTEMPTED');
-  const call=outcomeFreeze({}),record={call,store:issuingStore,token,request,binding,selection:selected,options:actualOptions,finalized:null,loan:null,physical:null,executionDeadline:null,textAttempted:false,textCaptured:false,captureAttempted:false,captured:false,captureFault:null,kind:null,value:undefined,text:null,nativeId:null,consumed:false,eligibleAttempted:false};
+  const call=outcomeFreeze({}),record={call,store:issuingStore,token,request,binding,selection:selected,options:actualOptions,finalized:null,loan:null,physical:null,executionDeadline:null,textAttempted:false,textCaptured:false,captureAttempted:false,captured:false,captureFault:null,kind:null,value:undefined,text:null,nativeId:null,modelEvidence:null,cliVersion:null,consumed:false,eligibleAttempted:false};
   outcomeSet(runtimeOutcomeCalls,call,record);
   outcomeSet(runtimeOutcomeLaunches,token,record); // No preflight-failure retry.
   // The private context is a lexical argument, never an options field. Source
@@ -473,8 +508,15 @@ export function consumeRuntimeModelOutcome(call,actualSettlementValue){
   // only this exact capture's private map can authorize the eligibility check.
   const request=record.request,provenance=outcomeFreeze({protocol:request.protocol,stage:request.stage,lane:request.lane,root_sha256:createHash('sha256').update(request.root).digest('hex'),type:request.type,job_id:request.job_id,instance_id:request.instance_id,invocation_id:request.invocation_id,input_binding:request.input_binding,timeout_policy:request.timeout_policy});
   const finalized=record.finalized?outcomeFreeze({...record.finalized,actual_operation_deadline_at_ms:record.executionDeadline}):null;
-  const capture=outcomeFreeze({protocol:'runtime-model-outcome-v1',kind:record.kind,text:record.kind==='returned'?record.text:null,native_id:record.kind==='returned'?record.nativeId:null,thrown:record.kind==='threw'?record.value:undefined,provenance,finalized,process:processFacts});
+  const capture=outcomeFreeze({protocol:'runtime-model-outcome-v1',kind:record.kind,text:record.kind==='returned'?record.text:null,native_id:record.kind==='returned'?record.nativeId:null,model_evidence:record.modelEvidence,cli_version:record.cliVersion,thrown:record.kind==='threw'?record.value:undefined,provenance,finalized,process:processFacts});
   outcomeSet(runtimeOutcomeCaptures,capture,record);return capture;
+}
+export function inspectRuntimeModelOutcomeCaptureFrom(capture,issuingStore,launch){
+  // Factual provenance survives a failed eligibility check or issuer closure.
+  // Do not inspect caller properties or spend any currentness/eligibility loan.
+  const record=outcomeGet(runtimeOutcomeCaptures,capture);
+  outcomeNeed(record&&(arguments.length===1||arguments.length===3&&record.store===issuingStore&&record.token===launch),'PRIVATE_CAPTURE_REQUIRED');
+  return capture;
 }
 export function assertRuntimeModelOutcomeEligible(capture){
   const record=outcomeGet(runtimeOutcomeCaptures,capture);outcomeNeed(record&&!record.eligibleAttempted,'PRIVATE_CAPTURE_REQUIRED');
@@ -789,6 +831,7 @@ function runModelLifecycle(host,nativeId,prompt,cwd,timeout,selection,options,le
         stageRuntimeOutcomeText(outcomeRecord,result,nativeId);
         if(nativeId && result.native_id!==nativeId)throw Object.assign(new Error(`${host==='codex'?'Codex resumed thread':'Claude resumed session'} identity changed`),{rejected_output:result});
         result.model_evidence.applied_controls=appliedControls(host,args);
+        stageRuntimeOutcomeMetadata(outcomeRecord,result);
         // Parsing also must not carry a completion across its deadline.
         if (expired()) return finish(failure);
         finish(null,{...result,native_id:result.native_id ?? nativeId});

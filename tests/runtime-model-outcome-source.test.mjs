@@ -16,12 +16,30 @@ import {Store} from '../plugins/soloco/runtime/store.mjs';
 import {normalizeTimeout} from '../plugins/soloco/runtime/timeout.mjs';
 import {recordRuntimeWorkerAssignmentFrom,prepareRuntimeWorkerLaunchFrom,spawnRuntimeWorkerLaunch,assertRuntimeWorkerStartedFrom,prepareRuntimeModelRequestFrom,approveRuntimeModelProcessObservationFrom} from '../plugins/soloco/runtime/runtime-execution.mjs';
 import {requestModelProcess,recordModelProcessBirth,recordModelProcessClosure} from '../plugins/soloco/runtime/model-process-closure.mjs';
-import {runRuntimeModelWithOutcome,consumeRuntimeModelOutcome,assertRuntimeModelOutcomeEligible} from '../plugins/soloco/runtime/adapters.mjs';
+import {runRuntimeModelWithOutcome,consumeRuntimeModelOutcome,inspectRuntimeModelOutcomeCaptureFrom,assertRuntimeModelOutcomeEligible} from '../plugins/soloco/runtime/adapters.mjs';
 import {prepareOriginalWorkerLaunchFrom,prepareOriginalModelRequestFrom,spawnOriginalWorkerLaunch} from '../plugins/soloco/runtime/peers/prospective-local-worker-inventory-producer.mjs';
 import {freshInventoryStore} from './original-global-worker-inventory-fixture.mjs';
 
 const roots=[];test.after(()=>{for(const root of roots)fs.rmSync(root,{recursive:true,force:true});});
 const code=expected=>error=>error?.code===expected;
+const nativeAccessSync=fs.accessSync,nativeLstatSync=fs.lstatSync;
+function dummyExecutableMetadata(t,root){
+  const bin=path.join(root,'bin'),file=path.join(bin,'codex');
+  fs.mkdirSync(bin,{mode:0o700});fs.writeFileSync(file,'Source fixture; never execute this file.\n',{mode:0o700});
+  // X_OK may be denied by the enclosing exec sandbox. Qualify only the
+  // resolver's exact private dummy metadata; no CLI/OS executability is proved.
+  // Restore with each fixture so sequential falsy-outcome fixtures never nest.
+  const access=t.mock.method(fs,'accessSync',function(...args){
+    if(args.length!==2||args[0]!==file||args[1]!==fs.constants.X_OK)return Reflect.apply(nativeAccessSync,fs,args);
+    for(const directory of [root,bin]){
+      Reflect.apply(nativeAccessSync,fs,[directory,fs.constants.F_OK]);
+      const info=nativeLstatSync(directory);assert.ok(info.isDirectory()&&!info.isSymbolicLink()&&(info.mode&0o077)===0,'private real fixture directory');
+    }
+    Reflect.apply(nativeAccessSync,fs,[file,fs.constants.F_OK]);
+    const info=nativeLstatSync(file);assert.ok(info.isFile()&&!info.isSymbolicLink()&&info.nlink===1&&(info.mode&0o111)!==0,'regular nonlinked executable-mode dummy');
+  });
+  return {bin,file,restore:()=>access.mock.restore()};
+}
 function child(pid){
   const value=new EventEmitter();value.pid=pid;value.stdin=new PassThrough();value.stdout=new PassThrough();value.stderr=new PassThrough();value.kills=[];value.closed=false;
   value.kill=signal=>{value.kills.push(signal);return true;};value.once('close',()=>{value.closed=true;});return value;
@@ -29,9 +47,8 @@ function child(pid){
 function close(value,exit=0,signal=null){if(!value.closed){value.emit('exit',exit,signal);value.emit('close',exit,signal);}}
 function fixture(t,{prompt='Fictional Source input \ud800',reason='Bounded fictional Source outcome fixture'}={}){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'runtime-model-outcome-source-'));roots.push(root);
-  const directory=path.join(root,'.company'),bin=path.join(root,'bin');fs.mkdirSync(directory,{mode:0o700});fs.mkdirSync(bin,{mode:0o700});
-  // Resolver metadata only. The mock below prevents this file being executed.
-  fs.writeFileSync(path.join(bin,'codex'),'Source fixture; never execute this file.\n',{mode:0o700});
+  const directory=path.join(root,'.company');fs.mkdirSync(directory,{mode:0o700});
+  const executableMetadata=dummyExecutableMetadata(t,root),bin=executableMetadata.bin;
   let disposed=false;
   const hadPath=Object.hasOwn(process.env,'PATH'),savedPath=process.env.PATH;process.env.PATH=bin;
   t.after(()=>{if(!disposed){if(hadPath)process.env.PATH=savedPath;else delete process.env.PATH;}});
@@ -48,7 +65,7 @@ function fixture(t,{prompt='Fictional Source input \ud800',reason='Bounded ficti
   const dispose=()=>{
     if(disposed)return;disposed=true;
     try{close(model,1,'SIGTERM');close(worker,1,'SIGTERM');}finally{
-      try{if(!store.closed)store.close();}finally{spawn.mock.restore();syncBuiltinESMExports();if(hadPath)process.env.PATH=savedPath;else delete process.env.PATH;}
+      try{if(!store.closed)store.close();}finally{spawn.mock.restore();executableMetadata.restore();syncBuiltinESMExports();if(hadPath)process.env.PATH=savedPath;else delete process.env.PATH;}
     }
   };t.after(dispose);
   store.transaction('job.queued',s=>{recordRuntimeWorkerAssignmentFrom(store,s,job);s.jobs[job.id]=job;return s;});let workerToken;
@@ -59,13 +76,13 @@ function fixture(t,{prompt='Fictional Source input \ud800',reason='Bounded ficti
   const observed=(field,birth,receipt)=>{const db=new Store(root);try{db.transaction(field==='birth'?'job.model_process.born':'job.model_process.closed',s=>{if(field==='birth')recordModelProcessBirth(s.jobs[job.id],invocation,birth);else recordModelProcessClosure(s.jobs[job.id],invocation,birth,receipt);approveRuntimeModelProcessObservationFrom(db,s,token,field,birth,receipt);return s;});}finally{db.close();}};
   const options={runtimeExecutionLaunch:token,timeoutReason:policy.timeout_reason,onModelProcess:birth=>observed('birth',birth),onModelClosure:(birth,receipt)=>observed('closure',birth,receipt),onSpawn:timing=>store.transaction('job.execution_started',s=>{Object.assign(s.jobs[job.id],timing);return s;})};
   const start=(overrides={},actualPrompt=prompt,timeout=policy.timeout_ms)=>runRuntimeModelWithOutcome(store,'codex',null,actualPrompt,root,timeout,null,{...options,...overrides});
-  const answer=text=>{
+  const answer=(text,{warnings=[]}={})=>{
     model.emit('spawn');
     const thread='fictional-source-thread',turn='fictional-source-turn';
-    model.stdout.end([{type:'thread.started',thread_id:thread},{type:'turn.started',thread_id:thread,turn_id:turn},{type:'item.completed',thread_id:thread,turn_id:turn,item:{id:'answer',type:'agent_message',phase:'final_answer',text}},{type:'turn.completed',thread_id:thread,turn_id:turn}].map(value=>JSON.stringify(value)+'\n').join(''));
+    model.stdout.end([{type:'thread.started',thread_id:thread},...warnings,{type:'turn.started',thread_id:thread,turn_id:turn},{type:'item.completed',thread_id:thread,turn_id:turn,item:{id:'answer',type:'agent_message',phase:'final_answer',text}},{type:'turn.completed',thread_id:thread,turn_id:turn}].map(value=>JSON.stringify(value)+'\n').join(''));
     close(model);
   };
-  return {root,store,policy,job,prompt,token,worker,model,options,start,answer,dispose,get calls(){return calls;}};
+  return {root,store,policy,job,prompt,token,workerToken,worker,model,options,start,answer,dispose,get calls(){return calls;}};
 }
 async function rejected(completion){let threw=false,value;try{await completion;}catch(reason){threw=true;value=reason;}assert.equal(threw,true);return {value};}
 
@@ -74,15 +91,36 @@ test('a committed actual Source call captures exact immutable text and uses priv
   assert.equal(createHash('sha256').update(f.prompt).digest('hex'),createHash('sha256').update(different).digest('hex'),'UTF8 alone aliases these two prepared inputs');
   assert.throws(()=>f.start({},different),code('RUNTIME_MODEL_OUTCOME_INPUT_CHANGED'));assert.equal(f.calls,1);
   const operation=f.start(),text='Exact Source answer \ud800\u0000 tail';f.answer(text);const result=await operation.completion;
-  result.text='caller mutation after public settlement';result.native_id='caller-mutated-session';
+  result.text='caller mutation after public settlement';result.native_id='caller-mutated-session';result.cli_version='caller-invented-version';
+  result.model_evidence.reported_models.push('caller-mutated-model');result.model_evidence.applied_controls.model='caller-mutated-control';
   const capture=consumeRuntimeModelOutcome(operation.call,result);
   assert.equal(capture.kind,'returned');assert.equal(capture.text,text);assert.equal(capture.process.closed,true);assert.equal(capture.process.birth.pid,f.model.pid);
   assert.equal(capture.native_id,'fictional-source-thread');assert.equal(capture.provenance.input_binding.native_id,null);
+  assert.deepEqual(capture.model_evidence.reported_models,[]);assert.equal(capture.model_evidence.applied_controls.model,null);assert.equal(capture.model_evidence.applied_controls.scope,'child_launch_argv');
+  assert.ok(Object.isFrozen(capture.model_evidence));assert.ok(Object.isFrozen(capture.model_evidence.reported_models));assert.ok(Object.isFrozen(capture.model_evidence.applied_controls));assert.equal(capture.cli_version,null,'the adapter does not invent a CLI version probe');
   assert.equal(capture.provenance.invocation_id,'fictional-outcome-invocation');assert.equal(capture.provenance.input_binding.prompt_utf16_units,f.prompt.length);
   assert.equal(Object.hasOwn(capture.provenance,'store'),false);assert.equal(Object.hasOwn(capture.provenance,'db'),false);assert.equal(Object.hasOwn(capture.provenance,'scope'),false);
+  assert.equal(inspectRuntimeModelOutcomeCaptureFrom(capture),capture);assert.equal(inspectRuntimeModelOutcomeCaptureFrom(capture),capture);
+  assert.equal(inspectRuntimeModelOutcomeCaptureFrom(capture,f.store,f.token),capture);
+  const reopened=new Store(f.root);try{assert.throws(()=>inspectRuntimeModelOutcomeCaptureFrom(capture,reopened,f.token),code('RUNTIME_MODEL_OUTCOME_PRIVATE_CAPTURE_REQUIRED'));}finally{reopened.close();}
+  for(const args of [[capture,f.store,f.workerToken],[capture,f.store,{...f.token}],[capture,f.store]])assert.throws(()=>inspectRuntimeModelOutcomeCaptureFrom(...args),code('RUNTIME_MODEL_OUTCOME_PRIVATE_CAPTURE_REQUIRED'));
+  let traps=0;const foreign=new Proxy(capture,{get(){traps++;throw Error('foreign capture property');},getPrototypeOf(){traps++;throw Error('foreign capture prototype');}});
+  for(const value of [{...capture},foreign,operation.call,undefined])assert.throws(()=>inspectRuntimeModelOutcomeCaptureFrom(value),code('RUNTIME_MODEL_OUTCOME_PRIVATE_CAPTURE_REQUIRED'));
+  assert.equal(traps,0);
   assert.equal(assertRuntimeModelOutcomeEligible(capture),true);
+  assert.equal(inspectRuntimeModelOutcomeCaptureFrom(capture),capture,'factual inspection does not rearm or require eligibility');
+  assert.equal(inspectRuntimeModelOutcomeCaptureFrom(capture,f.store,f.token),capture);
   assert.throws(()=>assertRuntimeModelOutcomeEligible(capture),code('RUNTIME_MODEL_OUTCOME_PRIVATE_CAPTURE_REQUIRED'));
   assert.throws(()=>assertRuntimeModelOutcomeEligible({...capture}),code('RUNTIME_MODEL_OUTCOME_PRIVATE_CAPTURE_REQUIRED'));
+  assert.throws(()=>consumeRuntimeModelOutcome(operation.call,result),code('RUNTIME_MODEL_OUTCOME_PRIVATE_CALL_REQUIRED'));
+  assert.throws(()=>f.start(),code('RUNTIME_MODEL_OUTCOME_CALL_ALREADY_ATTEMPTED'));assert.equal(f.calls,2);
+});
+
+test('oversized-depth Source metadata holds capture without silently dropping facts or repeating the model',async t=>{
+  const f=fixture(t),operation=f.start();let detail='Fictional nested diagnostic';for(let index=0;index<40;index++)detail={detail};
+  f.answer('Fictional completed answer with deep warning',{warnings:[{type:'error',message:'Fictional nonterminal diagnostic',detail}]});
+  const result=await operation.completion;assert.equal(result.text,'Fictional completed answer with deep warning');assert.equal(result.model_evidence.cli_warnings.length,1);
+  assert.throws(()=>consumeRuntimeModelOutcome(operation.call,result),code('RUNTIME_MODEL_OUTCOME_CAPTURE_UNAVAILABLE'));
   assert.throws(()=>consumeRuntimeModelOutcome(operation.call,result),code('RUNTIME_MODEL_OUTCOME_PRIVATE_CALL_REQUIRED'));
   assert.throws(()=>f.start(),code('RUNTIME_MODEL_OUTCOME_CALL_ALREADY_ATTEMPTED'));assert.equal(f.calls,2);
 });
@@ -98,7 +136,10 @@ test('wrong settlement consumption burns the private call without a second invoc
 test('prepared policy refusal is factual and cannot retry the same model request',async t=>{
   const f=fixture(t),operation=f.start({timeoutReason:'different from committed policy'}),failure=await rejected(operation.completion);
   const capture=consumeRuntimeModelOutcome(operation.call,failure.value);assert.equal(capture.kind,'threw');assert.equal(capture.thrown,failure.value);assert.equal(capture.process.entered,false);
+  assert.equal(capture.model_evidence,null);assert.equal(capture.cli_version,null);
+  assert.equal(inspectRuntimeModelOutcomeCaptureFrom(capture),capture);
   assert.throws(()=>assertRuntimeModelOutcomeEligible(capture),code('RUNTIME_MODEL_OUTCOME_NOT_ELIGIBLE'));
+  assert.equal(inspectRuntimeModelOutcomeCaptureFrom(capture),capture);
   assert.throws(()=>f.start(),code('RUNTIME_MODEL_OUTCOME_CALL_ALREADY_ATTEMPTED'));assert.equal(f.calls,1);
 });
 
@@ -168,18 +209,20 @@ test('factual failed late-close capture survives issuer close without becoming p
   close(f.model,1,'SIGTERM');const failure=await rejected(operation.completion);
   assert.equal(failure.value.code,'ROLE_ABORTED');const capture=consumeRuntimeModelOutcome(operation.call,failure.value);
   assert.equal(capture.kind,'threw');assert.equal(capture.process.closed,true);assert.equal(capture.process.receipt.signal,'SIGTERM');assert.equal(f.store.closed,true);
+  assert.equal(inspectRuntimeModelOutcomeCaptureFrom(capture,f.store,f.token),capture);
   assert.throws(()=>assertRuntimeModelOutcomeEligible(capture),code('RUNTIME_MODEL_OUTCOME_NOT_ELIGIBLE'));
+  assert.equal(inspectRuntimeModelOutcomeCaptureFrom(capture),capture);
   const read=new Store(f.root);try{assert.equal(read.read().jobs[f.job.id].status,'failed');}finally{read.close();}
   assert.equal(f.calls,2);
 });
 
 test('new committed Original request reaches the actual opt-in outcome and positive consumer path',async t=>{
-  const worker=child(process.pid),model=child(760002);let mock,savedPath,hadPath=false,pathInstalled=false;
+  const worker=child(process.pid),model=child(760002);let mock,executableMetadata,savedPath,hadPath=false,pathInstalled=false;
   // Close the controlled children before the helper disposes their real
   // fictional Store. Original provenance comes from its fresh Store producer.
-  t.after(()=>{try{close(model,1,'SIGTERM');close(worker,1,'SIGTERM');}finally{if(mock){mock.mock.restore();syncBuiltinESMExports();}if(pathInstalled){if(hadPath)process.env.PATH=savedPath;else delete process.env.PATH;}}});
+  t.after(()=>{try{close(model,1,'SIGTERM');close(worker,1,'SIGTERM');}finally{mock?.mock.restore();executableMetadata?.restore();syncBuiltinESMExports();if(pathInstalled){if(hadPath)process.env.PATH=savedPath;else delete process.env.PATH;}}});
   const f=await freshInventoryStore(t,{stateOptions:{extra:{paused:false}}}),policy=normalizeTimeout({timeout_ms:10000,timeout_reason:'Bounded genuine Original Source outcome fixture'}),job=f.queue(policy);
-  const bin=path.join(f.root,'bin');fs.mkdirSync(bin,{mode:0o700});fs.writeFileSync(path.join(bin,'codex'),'Source fixture; never execute this file.\n',{mode:0o700});hadPath=Object.hasOwn(process.env,'PATH');savedPath=process.env.PATH;process.env.PATH=bin;pathInstalled=true;
+  executableMetadata=dummyExecutableMetadata(t,f.root);const bin=executableMetadata.bin;hadPath=Object.hasOwn(process.env,'PATH');savedPath=process.env.PATH;process.env.PATH=bin;pathInstalled=true;
   let calls=0;mock=t.mock.method(childProcess,'spawn',()=>{calls++;assert.ok(calls<=2);return calls===1?worker:model;});syncBuiltinESMExports();
   let workerToken;f.store.transaction('job.worker_launch_requested',s=>{workerToken=prepareOriginalWorkerLaunchFrom(f.store,s,{job_id:job.id,kind:'worker'});return s;});spawnOriginalWorkerLaunch(workerToken,process.execPath,['SOURCE-controlled-worker'],{cwd:f.root,stdio:'ignore'});worker.emit('spawn');
   f.store.transaction('job.started',s=>{Object.assign(s.jobs[job.id],{status:'running',worker_pid:process.pid,started_at:new Date().toISOString()});return s;});

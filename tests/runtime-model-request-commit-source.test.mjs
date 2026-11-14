@@ -8,35 +8,39 @@ import os from 'node:os';
 import path from 'node:path';
 import {createHash,randomUUID} from 'node:crypto';
 import {DatabaseSync} from 'node:sqlite';
+import {PassThrough} from 'node:stream';
 import childProcess from 'node:child_process';
 import {syncBuiltinESMExports} from 'node:module';
 import {Store,originalStoreExecutionCustodyFrom} from '../plugins/soloco/runtime/store.mjs';
 import {
   recordRuntimeWorkerAssignmentFrom,prepareRuntimeWorkerLaunchFrom,spawnRuntimeWorkerLaunch,
   prepareRuntimeModelRequestFrom,inspectRuntimeModelRequestCommitFrom,assertRuntimeModelRequestCurrentFrom,
-  assertLegacyRuntimeModelLaunchFrom,assertRuntimeWorkerStartedFrom,commitRuntimeExecutionWriteFrom
+  assertLegacyRuntimeModelLaunchFrom,assertRuntimeWorkerStartedFrom,commitRuntimeExecutionWriteFrom,
+  approveRuntimeModelProcessObservationFrom,assertRuntimeModelProcessObservedFrom
 } from '../plugins/soloco/runtime/runtime-execution.mjs';
 import {
   prepareOriginalWorkerLaunchFrom,prepareOriginalModelRequestFrom,spawnOriginalWorkerLaunch,
   assertOriginalModelLaunchToken,retainOriginalModelRequestCommitFrom,inspectOriginalSourceGenerationFrom
 } from '../plugins/soloco/runtime/peers/prospective-local-worker-inventory-producer.mjs';
-import {requestModelProcess} from '../plugins/soloco/runtime/model-process-closure.mjs';
-import {executionTiming} from '../plugins/soloco/runtime/timeout.mjs';
+import {requestModelProcess,recordModelProcessBirth,recordModelProcessClosure} from '../plugins/soloco/runtime/model-process-closure.mjs';
+import {executionTiming,normalizeTimeout,STARTUP_TIMEOUT_MS} from '../plugins/soloco/runtime/timeout.mjs';
 import {specialistAction,reference,prepareSpecialistAssignment} from '../plugins/soloco/runtime/specialists.mjs';
-import {runRuntimeModel} from '../plugins/soloco/runtime/adapters.mjs';
+import {runRuntimeModel,runRuntimeModelWithOutcome,consumeRuntimeModelOutcome,assertRuntimeModelOutcomeEligible,assertRuntimeAdapterModelBirthFrom,assertRuntimeAdapterModelClosureFrom} from '../plugins/soloco/runtime/adapters.mjs';
 import {freshInventoryStore,controlledInventoryChild} from './original-global-worker-inventory-fixture.mjs';
 
 const sha=(text,encoding='utf8')=>createHash('sha256').update(text,encoding).digest('hex');
 const policy=Object.freeze({timeout_ms:60000,timeout_reason:'Fictional Source request commit proof; no model invocation selected.'});
+const expiryPolicy=Object.freeze({timeout_ms:10000,timeout_reason:'Fictional cross-request expiry oracle; controlled Source route only, no provider execution.'});
+const sourceNow=Date.now,sourceTimer=setTimeout,nativeAccessSync=fs.accessSync,nativeLstatSync=fs.lstatSync;
 const commitHeld=error=>/^(LEGACY_RUNTIME|ORIGINAL_EXECUTION)_MODEL_REQUEST_COMMIT_REQUIRED$/.test(error?.code??'');
 function controlledCreation(t){
-  const children=[],calls=[],control={children,calls,onCreate:null},mock=t.mock.method(childProcess,'spawn',(...args)=>{
+  const children=[],calls=[],control={children,calls,onCreate:null,resolverCleanup:[]},mock=t.mock.method(childProcess,'spawn',(...args)=>{
     calls.push(args);assert.ok(children.length,'no unselected subprocess may be created');const child=children.shift();control.onCreate?.(child,args);return child;
   });
-  syncBuiltinESMExports();t.after(()=>{mock.mock.restore();syncBuiltinESMExports();assert.equal(children.length,0);});
+  syncBuiltinESMExports();t.after(()=>{mock.mock.restore();for(const restore of control.resolverCleanup.reverse())restore();syncBuiltinESMExports();assert.equal(children.length,0);});
   return control;
 }
-async function runningFixture(t,lane,control,{scoped=false}={}){
+async function runningFixture(t,lane,control,{scoped=false,timeoutPolicy=policy}={}){
   const child=controlledInventoryChild(process.pid);let childClosed=false;
   // Register before database disposal so actual Source close observers still
   // have their fictional database. Disposal never supplies a model receipt.
@@ -45,7 +49,7 @@ async function runningFixture(t,lane,control,{scoped=false}={}){
   let root,store,job,scopedInfo=null;
   if(lane==='original'){
     const f=await freshInventoryStore(t,{stateOptions:{extra:{paused:false}}});root=f.root;store=f.store;
-    if(scoped){scopedInfo=prepareScopedSpecialist(store);job=f.queue({...policy,...scopedInfo.job});}else job=f.queue({...policy});
+    if(scoped){scopedInfo=prepareScopedSpecialist(store);job=f.queue({...timeoutPolicy,...scopedInfo.job});}else job=f.queue({...timeoutPolicy});
   }else{
     root=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-model-commit-LEGACY-SOURCE-'));
     const directory=path.join(root,'.company');fs.mkdirSync(directory,{mode:0o700});
@@ -58,7 +62,7 @@ async function runningFixture(t,lane,control,{scoped=false}={}){
       raw.prepare('INSERT INTO events VALUES(1,?,?,?)').run(at,'fictional.historical_unqualified',JSON.stringify({revision:0,owner:state.owner}));raw.exec('COMMIT');
     }finally{if(raw.isTransaction)raw.exec('ROLLBACK');raw.close();}
     store=new Store(root);t.after(()=>{try{if(!store.closed)store.close();}finally{fs.rmSync(root,{recursive:true,force:true});}});
-    job={id:'fictional-job',instance_id:'fictional-instance',role:'research',host:'codex',epoch:1,status:'queued',native_id:null,created_at:at,...policy};
+    job={id:'fictional-job',instance_id:'fictional-instance',role:'research',host:'codex',epoch:1,status:'queued',native_id:null,created_at:at,...timeoutPolicy};
     store.transaction('job.queued',s=>{recordRuntimeWorkerAssignmentFrom(store,s,job);s.jobs[job.id]=job;return s;});
   }
   let worker;
@@ -98,6 +102,63 @@ function request(f,prompt,{pending,options,unbound=false,rollback=false}={}){
   },options);
   return {write,get token(){return token;},get scope(){return scope;},input,invocation,type};
 }
+function sourceExecutableMetadata(t,f,control){
+  if(f.executableMetadata)return;
+  const root=f.root,bin=path.join(root,'bin'),file=path.join(bin,'codex');
+  fs.mkdirSync(bin,{mode:0o700});fs.writeFileSync(file,'Source fixture; never execute this file.\n',{mode:0o700});
+  // Exact resolver metadata only. Node creation remains controlled; this
+  // private dummy is never executed and does not attest OS executability.
+  const access=t.mock.method(fs,'accessSync',function(...args){
+    if(args.length!==2||args[0]!==file||args[1]!==fs.constants.X_OK)return Reflect.apply(nativeAccessSync,fs,args);
+    for(const directory of [root,bin]){Reflect.apply(nativeAccessSync,fs,[directory,fs.constants.F_OK]);const info=nativeLstatSync(directory);assert.ok(info.isDirectory()&&!info.isSymbolicLink()&&(info.mode&0o077)===0,'private real fixture directory');}
+    Reflect.apply(nativeAccessSync,fs,[file,fs.constants.F_OK]);const info=nativeLstatSync(file);assert.ok(info.isFile()&&!info.isSymbolicLink()&&info.nlink===1&&(info.mode&0o111)!==0,'regular nonlinked executable-mode dummy');
+  });
+  const hadPath=Object.hasOwn(process.env,'PATH'),savedPath=process.env.PATH;process.env.PATH=bin;
+  control.resolverCleanup.push(()=>{access.mock.restore();if(hadPath)process.env.PATH=savedPath;else delete process.env.PATH;});
+  f.executableMetadata={bin,file};syncBuiltinESMExports();
+}
+// Complete one actual private Source route, including canonical observers and
+// the first real adapter onSpawn timing. Only Node creation is controlled;
+// these emitters and fixed JSONL are not an OS/provider/Native execution.
+async function completeSourceInvocation(t,f,control,label){
+  sourceExecutableMetadata(t,f,control);
+  const job=f.store.read().jobs[f.job.id],callPolicy=normalizeTimeout({timeout_ms:job.timeout_ms,timeout_reason:job.timeout_reason});
+  const r=request(f,label);r.write();const model=controlledInventoryChild(process.pid+91000+control.calls.length);let closed=false,birth=null,receipt=null,timing=null;
+  model.stdin=new PassThrough();model.stdout=new PassThrough();model.stderr=new PassThrough();model.once('close',()=>{closed=true;});control.children.push(model);
+  const options={...(f.lane==='legacy'?{runtimeExecutionLaunch:r.token}:{originalExecutionLaunch:r.token}),timeoutReason:callPolicy.timeout_reason,
+    onModelProcess:value=>{
+      assertRuntimeAdapterModelBirthFrom(r.token,value);
+      f.store.transaction('job.model_process.born',state=>{recordModelProcessBirth(state.jobs[f.job.id],r.invocation,value);approveRuntimeModelProcessObservationFrom(f.store,state,r.token,'birth',value);return state;});birth=value;
+    },
+    onModelClosure:(value,close)=>{
+      assertRuntimeAdapterModelClosureFrom(r.token,value,close);
+      f.store.transaction('job.model_process.closed',state=>{recordModelProcessClosure(state.jobs[f.job.id],r.invocation,value,close);approveRuntimeModelProcessObservationFrom(f.store,state,r.token,'closure',value,close);return state;});receipt=close;
+    },
+    onSpawn:value=>{
+      timing=value;const current=f.store.read().jobs[f.job.id];
+      if(!Object.hasOwn(current,'execution_deadline_at'))f.store.transaction('job.execution_started',state=>{Object.assign(state.jobs[f.job.id],value);return state;});
+      else assert.ok(Date.parse(value.execution_deadline_at)<=Date.parse(current.execution_deadline_at),'a later call cannot replace the first overall deadline');
+    }
+  };
+  assert.equal(Object.hasOwn(options,'signal'),false,'no optional worker/controller signal protects this test');
+  const operation=runRuntimeModelWithOutcome(f.store,'codex',null,r.input.prompt,f.root,callPolicy.timeout_ms,r.input.selection,options);
+  const observed=operation.completion.then(value=>({value,failed:false}),error=>({error,failed:true}));
+  try{
+    assert.equal(control.calls.at(-1)[0],f.executableMetadata.file,'the actual facade resolved the exact private dummy, with no host CLI fallback');
+    model.emit('spawn');
+    const thread='fictional-cross-request-thread-'+r.invocation.invocation_id,turn='fictional-cross-request-turn';
+    model.stdout.end([{type:'thread.started',thread_id:thread},{type:'turn.started',thread_id:thread,turn_id:turn},{type:'item.completed',thread_id:thread,turn_id:turn,item:{id:'fictional-answer',type:'agent_message',phase:'final_answer',text:'Fictional complete Source answer.'}},{type:'turn.completed',thread_id:thread,turn_id:turn}].map(value=>JSON.stringify(value)+'\n').join(''));
+    model.emit('exit',0,null);model.emit('close',0,null);
+    const settled=await observed;if(settled.failed)throw settled.error;
+    assert.equal(settled.value.text,'Fictional complete Source answer.');assert.ok(birth);assert.ok(receipt);assert.ok(timing);
+    const capture=consumeRuntimeModelOutcome(operation.call,settled.value);assert.equal(capture.kind,'returned');assert.equal(capture.process.closed,true);assert.equal(assertRuntimeModelOutcomeEligible(capture),true,'A/B used the actual opt-in private eligibility route');
+    assert.equal(assertRuntimeModelProcessObservedFrom(r.token,birth,receipt),true,'A completed the genuine private and canonical Source guard');
+    const current=f.store.read().jobs[f.job.id],entry=current.model_process_tracking.invocations.find(value=>value.invocation_id===r.invocation.invocation_id);
+    assert.deepEqual(entry.birth,birth);assert.deepEqual(entry.closure,receipt);assert.equal(current.status,'running');
+    return {invocation_id:r.invocation.invocation_id,entry:JSON.parse(JSON.stringify(entry)),overall:current.execution_deadline_at,call_deadline_at_ms:Date.parse(timing.execution_deadline_at)};
+  }finally{if(!closed){model.emit('exit',1,null);model.emit('close',1,null);}await observed;}
+}
+function reopenIssuer(f){const previous=f.store;previous.close();f.store=new Store(f.root);return f.store;}
 function adapterInput(input){const {host,native_id,prompt,cwd,selection}=input;return {host,native_id,prompt,cwd,selection};}
 function assertActive(f,token,input){return f.lane==='legacy'?assertLegacyRuntimeModelLaunchFrom(token,adapterInput(input)):assertOriginalModelLaunchToken(token,adapterInput(input));}
 
@@ -260,3 +321,48 @@ for(const lane of ['legacy','original'])test(`${lane} prepared known overall tim
   assert.throws(()=>assertRuntimeModelRequestCurrentFrom(r.token,f.store),/MODEL_OVERALL_DEADLINE_CHANGED/);
   assert.equal(inspectRuntimeModelRequestCommitFrom(r.token,f.store).scope,r.scope);assert.equal(control.calls.length,1);
 });
+
+
+for(const lane of ['legacy','original']){
+  test(`${lane} a completed prior model cannot renew an erased overall bound in a fresh request`,async t=>{
+    const control=controlledCreation(t),f=await runningFixture(t,lane,control,{timeoutPolicy:expiryPolicy});
+    const a=await completeSourceInvocation(t,f,control,'Fictional completed A before erased overall timing');assert.equal(control.calls.length,2);assert.equal(typeof a.overall,'string');
+    const established=Date.parse(a.overall),startup=Date.parse(f.store.read().jobs[f.job.id].started_at)+STARTUP_TIMEOUT_MS;
+    assert.ok(established<startup,'the genuine A overall deadline precedes the existing worker startup cutoff');
+    const remaining=Math.max(0,established+1-sourceNow());assert.ok(remaining<=expiryPolicy.timeout_ms+1);
+    await new Promise(resolve=>sourceTimer(resolve,remaining));
+    const after=sourceNow();assert.ok(after>established,'A actual established execution deadline has expired');assert.ok(after<startup,'the otherwise-valid worker startup window remains live');
+    // Only durable DATA crosses this issuer boundary. No A token, adapter
+    // object, private result or cancellation signal is supplied to B.
+    const successor=reopenIssuer(f);
+    try{
+      successor.transaction('fictional.erase_completed_overall',state=>{const job=state.jobs[f.job.id];delete job.execution_started_at;delete job.execution_deadline_at;delete job.termination_deadline_at;return state;});
+      const ordinary=successor.read(),live=ordinary.jobs[f.job.id];assert.equal(ordinary.paused,false);assert.equal(live.status,'running');assert.equal(live.epoch,ordinary.owner.epoch);assert.equal(live.worker_pid,process.pid);
+      const b=request(f,'Fictional B with otherwise-current ordinary authority');
+      assert.throws(b.write,error=>error?.code===(lane==='legacy'?'LEGACY_RUNTIME_MODEL_OVERALL_DEADLINE_LOST':'ORIGINAL_EXECUTION_MODEL_OVERALL_DEADLINE_LOST'));
+      assert.equal(b.token,undefined,'no new model capability was issued');assert.equal(control.calls.length,2,'B was refused before any second model creation');
+      const current=successor.read().jobs[f.job.id];assert.deepEqual(current.model_process_tracking.invocations.find(value=>value.invocation_id===a.invocation_id),a.entry);
+      for(const key of ['execution_started_at','execution_deadline_at','termination_deadline_at'])assert.equal(Object.hasOwn(current,key),false,'the refusal does not reconstruct a new allowance');
+      if(lane==='original'){
+        assert.equal(current.original_execution_assignment.launches.some(value=>value.kind==='model'&&value.invocation_id===b.invocation.invocation_id),false);
+        const pending=current.model_process_tracking.invocations.find(value=>value.invocation_id===b.invocation.invocation_id);assert.ok(pending);assert.equal(pending.birth,null);assert.equal(pending.closure,null,'the separately persisted B request remains UNKNOWN/occupied');
+      }else assert.equal(current.model_process_tracking.current,a.invocation_id,'the unissued B request write rolled back');
+    }finally{successor.close();}
+  });
+  test(`${lane} a first unknown model request stays unknown without a new allowance`,async t=>{
+    const control=controlledCreation(t),f=await runningFixture(t,lane,control);let pending=request(f,'Fictional first unknown A');pending.write();const id=pending.invocation.invocation_id;pending=null;
+    const successor=reopenIssuer(f);
+    try{
+      assert.throws(()=>{const b=request(f,'Fictional B after unknown A');b.write();},error=>error?.code==='MODEL_PROCESS_CLOSURE_HELD');
+      const current=successor.read().jobs[f.job.id];assert.equal(current.model_process_tracking.current,id);assert.equal(current.model_process_tracking.invocations.length,1);assert.equal(current.model_process_tracking.invocations[0].birth,null);assert.equal(current.model_process_tracking.invocations[0].closure,null);assert.equal(control.calls.length,1,'neither model was created');
+    }finally{successor.close();}
+  });
+  test(`${lane} successive completed calls retain an intact first overall deadline across issuer reopen`,async t=>{
+    const control=controlledCreation(t),f=await runningFixture(t,lane,control),a=await completeSourceInvocation(t,f,control,'Fictional intact A');
+    const successor=reopenIssuer(f);
+    try{
+      const b=await completeSourceInvocation(t,f,control,'Fictional intact B');assert.equal(b.overall,a.overall);assert.ok(b.call_deadline_at_ms<=Date.parse(a.overall));assert.equal(control.calls.length,3,'one controlled worker and exactly A/B model creations');
+      const current=successor.read().jobs[f.job.id];assert.equal(current.model_process_tracking.invocations.length,2);assert.deepEqual(current.model_process_tracking.invocations[0],a.entry);assert.equal(current.model_process_tracking.current,b.invocation_id);assert.ok(current.model_process_tracking.invocations[1].birth);assert.ok(current.model_process_tracking.invocations[1].closure);
+    }finally{successor.close();}
+  });
+}
