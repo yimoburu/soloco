@@ -10,6 +10,8 @@ import {validateQualificationExclusion,QUALIFICATION_PROTOCOL} from './context-q
 import {NOTICE_SOURCES,isNoticeSourceId,isCanonicalNoticeSource,noticeSource,noticeSourceEntries,projectNotice} from './notice-sources.mjs';
 import {inspectOriginalWorkerAssignmentBookkeepingFrom,inspectOriginalExecutionOriginBookkeepingFrom} from './peers/prospective-local-worker-inventory-producer.mjs';
 import {inspectLegacyRuntimeBookkeepingFrom,validateLegacyRuntimeJobShape,runtimeJobOccupied} from './runtime-execution.mjs';
+import {inspectComparisonEvidenceRecordFrom} from './integrated-comparison-evidence.mjs';
+import {inspectComparisonTestRecordFrom} from './integrated-comparison-test.mjs';
 const fields=['id','kind','author_role','recorded_by','content','status','action','previous_name','name','created_at'];
 const knownStateFields=new Set(['id','name','idea','owner','schema','runtime_version','plugin_version','revision','created_at','updated_at','paused','mode','phase','team_sha256','governance','governance_sha256','cos_instructions','roles','records','jobs','sessions','notices','messages','upgrade','upgrade_history','retired_sessions','context_classifications','context_last_plan','handover']);
 const proofJobFields=new Set(['code_review_window_minutes','code_review_reason','code_review_subject','delivered_record_reads','model_process_tracking','specialist','id','role','instance_id','session_key','native_id','host','epoch','status','artifact_id','review_of','inputs','context_format','context_scope','context_sha256','task','task_summary','next_handoff','model_selection','model_catalog','model_evidence','cli_version','requester','coordination','coordination_release','qualification_hold','expected_deliverable','supplemental_sources','retrieved_inputs','created_at','started_at','finished_at','worker_pid','timeout_policy_version','timeout_minutes','timeout_ms','timeout_reason','execution_started_at','execution_deadline_at','termination_deadline_at']);
@@ -193,7 +195,22 @@ export function mandatoryExecutionEvidence(state,projection=reviewedContext(stat
 // category-based selection; format 5 includes every unqualified semantic record.
 export function currentRecords(state,job={},projection=reviewedContext(state)) {
   if(Object.entries(state.records).some(([key,r])=>key!==r.id))throw Error('Ambiguous record identity; exact source repair required');
-  return Object.values(state.records).filter(r=>!unrelatedScopedHome(projection,r.id,job)&&(!job.id||r.job_id!==job.id)&&(projection.mandatory.has(r.id)||(!projection.excluded(r.id)&&relevantRecord(state,r,job,projection.classifications.get(r.id)??null))));
+  return Object.values(state.records).filter(r=>{
+    if(unrelatedScopedHome(projection,r.id,job))return false;
+    const ownJob=Boolean(job.id&&r.job_id===job.id),classification=projection.classifications.get(r.id)??null;
+    // A public marker cannot borrow the ordinary own-output omission. Genuine
+    // bookkeeping keeps its real producer edge and private snapshot proof.
+    if(ownJob)for(const [field,inspect]of [['runtime_wire_evidence',inspectComparisonEvidenceRecordFrom],['runtime_candidate_test_guard',inspectComparisonTestRecordFrom]])if(Object.hasOwn(r,field)){
+      const proof=inspect(state,r);if(!proof||proof.recordSha!==digest(JSON.stringify(r))||proof.job_id!==r.job_id)throw Error('Comparison context record requires actual snapshot custody: '+r.id);
+    }
+    if(projection.mandatory.has(r.id))return true;
+    if(projection.excluded(r.id)||!relevantRecord(state,r,job,classification))return false;
+    // Current meaning and adverse evidence remain visible even if their
+    // producer happens to be this job. Only ordinary noncurrent own outputs
+    // are omitted to avoid changing an assignment with its own bookkeeping.
+    if(classification?.disposition==='current'||['intent','decision','preference'].includes(r.kind)||['Fail','Blocked'].includes(r.review?.verdict))return true;
+    return !ownJob;
+  });
 }
 export function currentExecutionEvidence(state,job={},projection=reviewedContext(state)) {
   const sources=[];

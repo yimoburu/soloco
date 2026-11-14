@@ -5,6 +5,8 @@ import {inspectLegacyV4HistoryFrom,inspectFrozenLegacyIntakeFrom} from './record
 import {validModelProcessTracking} from './model-process-closure.mjs';
 import {validateLegacyRuntimeJobShape} from './runtime-execution.mjs';
 import {pendingSnapshots} from './snapshot.mjs';
+import {validateStoredComparisonEvidenceFrom} from './integrated-comparison-evidence.mjs';
+import {validateStoredComparisonTestFrom} from './integrated-comparison-test.mjs';
 
 // This reader establishes only a bounded, positively unqualified storage lane.
 // A present Origin goes to its existing strict reader, even when its value is
@@ -125,6 +127,7 @@ function schema(r){
 
 function typedReader(r){
   const active=new WeakMap(),referenceMetadata=new Map(),jobImages=new Map(),historicalCompanies=new Map(),historicalProducers=new Map();let depth=0,collectPhysical=true,companyId=null;
+  const comparisonSeen=new Set(),comparisonBlobs=new Map();
   const marker=(value,key)=>need(!own(value,key),'RETAINED_ORIGINAL_EVIDENCE');
   const object=value=>{
     need(plain(value),'TYPED_BODY_REQUIRED');const descriptors=Object.getOwnPropertyDescriptors(value);
@@ -411,8 +414,46 @@ function typedReader(r){
       unknownReferences(value,['records','jobs','upgrade','upgrade_history','operating_checkpoint','proposal_admissions','proposal_delivered_sources']);
     });
   };
+  function comparisonRecord(value,env,test){
+    const key=(test?'test:':'wire:')+hash(JSON.stringify(value));if(comparisonSeen.has(key))return;
+    const validate=test?validateStoredComparisonTestFrom:validateStoredComparisonEvidenceFrom;
+    // Fixed Source validators use this classifier's genuine original DB/loan.
+    // DATA markers, caller predicates and inferred object paths grant nothing.
+    const proof=r.check(()=>validate(r.db,{records:env?.records??{}},value));
+    need(proof.recordSha===hash(JSON.stringify(value))&&proof.job_id===value.job_id,'COMPARISON_RECORD_CHANGED');
+    comparisonSeen.add(key);
+    if(!test){
+      need(proof.invocation_id===value.runtime_wire_evidence.binding.invocation_id,'COMPARISON_INVOCATION_CHANGED');
+      for(const reference of array(proof.references)){
+        need(closed(reference,['sha256','bytes','encoding','object_name'])&&hex(reference.sha256)&&nat(reference.bytes)&&reference.bytes<=9975424&&['utf8-scalar-text-v1','js-utf16le-code-units-v1','closed-json-utf8-v1'].includes(reference.encoding)&&reference.object_name==='objects/'+reference.sha256+'.blob','COMPARISON_BLOB_REFERENCE');
+        r.chargeWork(1);const name=reference.encoding+':'+reference.sha256,previous=comparisonBlobs.get(name);
+        need(!previous||same(previous.reference,reference),'COMPARISON_BLOB_COLLISION');
+        comparisonBlobs.set(name,{reference:copy(reference),record_sha256s:[...new Set([...(previous?.record_sha256s??[]),proof.recordSha])],physical_objects_verified:proof.physical_objects_verified===true&&(!previous||previous.physical_objects_verified)});
+      }
+    }
+    const references=array(test?proof.references:proof.record_references);
+    const required=test?[value.runtime_candidate_test_guard.candidate,value.runtime_candidate_test_guard.producer_evidence_record,...(value.runtime_candidate_test_guard.actual_receipt?[value.runtime_candidate_test_guard.actual_receipt]:[])]:[
+      {id:value.runtime_wire_evidence.binding.plan.id,revision:value.runtime_wire_evidence.binding.plan.revision,sha256:value.runtime_wire_evidence.binding.plan.record_sha256},...(value.runtime_wire_evidence.binding.job.review_of?[value.runtime_wire_evidence.binding.job.review_of]:[])];
+    need(required.every(reference=>references.some(actual=>same(actual,reference))),'COMPARISON_ORIGINAL_REFERENCE_MISSING');
+    for(const reference of references){
+      need(closed(reference,['id','revision','sha256'])&&text(reference.id)&&Number.isSafeInteger(reference.revision)&&reference.revision>=1&&hex(reference.sha256),'COMPARISON_RECORD_REFERENCE');r.chargeWork(1);
+      const current=env?.records?.[reference.id];let body;
+      // A pending original may not yet be in immutable_values. Only the fixed
+      // owning validator can establish that exact next-state exception.
+      if(current&&current.revision===reference.revision&&hash(JSON.stringify(current))===reference.sha256)body=current;
+      else{r.read(reference.sha256);body=r.decoded(reference.sha256);}
+      need(body&&body.id===reference.id&&body.revision===reference.revision&&hash(JSON.stringify(body))===reference.sha256,'COMPARISON_ORIGINAL_CHANGED');record(body,env);
+    }
+    for(const item of array(proof.history)){
+      need(text(item.id)&&item.id===value.id&&Number.isSafeInteger(item.revision)&&item.revision>=1&&item.revision<=value.revision&&hex(item.sha256)&&nat(item.bytes)&&item.bytes<=32768,'COMPARISON_HEADER_HISTORY');r.chargeWork(1);
+      if(item.sha256===proof.recordSha){need(item.bytes===Buffer.byteLength(JSON.stringify(value)),'COMPARISON_HEADER_HISTORY');continue;}
+      const raw=r.read(item.sha256,{max_bytes:32768}),body=r.decoded(item.sha256);need(Buffer.byteLength(raw)===item.bytes&&body.id===item.id&&body.revision===item.revision,'COMPARISON_HEADER_HISTORY');record(body,env);
+    }
+  }
   const record=(value,env)=>enter('record',value,()=>{
     need(text(value.id),'TYPED_IDENTITY_CHANGED');
+    if(own(value,'runtime_wire_evidence'))comparisonRecord(value,env,false);
+    if(own(value,'runtime_candidate_test_guard'))comparisonRecord(value,env,true);
     if(own(value,'operating_plan')){const plan=object(value.operating_plan);need(closed(plan,['protocol','version','snapshot','maintenance','source_instruction','valid_until'])&&plan.protocol==='operating-state-v1'&&plan.version===1,'UNKNOWN_OPERATING_SNAPSHOT');operating(plan.snapshot,env);}
     if(own(value,'handover')){const h=object(value.handover);
       if(own(h,'subject')){need(value.kind==='artifact'&&value.author_role==='runner'&&hex(h.subject_sha256)&&Array.isArray(h.input_refs)&&plain(h.incoming_owner)&&h.incoming_owner.session_id===value.author_instance,'UNKNOWN_HANDOVER_SUBJECT');
@@ -423,7 +464,7 @@ function typedReader(r){
     if(['context_partition_plan','context_originals','context_units'].some(key=>own(value,key))){need(['context_partition_plan','context_originals','context_units'].every(key=>own(value,key)),'UNKNOWN_CONTEXT_TREE');contextTreeRecord(value,env);}
     if(own(value,'scoped_context_plan'))contextScopedPlan(value,env);
     if(own(value,'scoped_context_target'))contextScopedTarget(value.scoped_context_target,env);
-    unknownReferences(value,['operating_plan','handover','development','context_partition_plan','context_originals','context_units','scoped_context_plan','scoped_context_target']);
+    unknownReferences(value,['operating_plan','handover','development','context_partition_plan','context_originals','context_units','scoped_context_plan','scoped_context_target','runtime_wire_evidence','runtime_candidate_test_guard']);
   });
   const company=(value,kind='company',outer=null)=>enter(kind,value,()=>{
     need(text(value.id)&&(companyId===null||value.id===companyId),'TYPED_IDENTITY_CHANGED');if(kind==='company'){need(nat(value.revision),'REVISION_REQUIRED');companyId=value.id;}marker(value,'original_execution_origin');
@@ -772,7 +813,7 @@ function typedReader(r){
       finish();
     }finally{collectPhysical=previous;}
   };
-  return {company,next,finish,jobImages:()=>Object.freeze([...jobImages.values()])};
+  return {company,next,finish,jobImages:()=>Object.freeze([...jobImages.values()]),comparisonReferences:()=>freeze([...comparisonBlobs.values()].map(copy))};
 }
 
 export function classifyRuntimeStorageFrom(store){
@@ -829,6 +870,14 @@ export function inspectRuntimeStorageProofFrom(value,store){
 export function inspectRuntimeStorageJobBookkeepingFrom(value,store){
   const facts=inspectRuntimeStorageProofFrom(value,store),record=proofs.get(value);
   return facts.lane==='legacy'?record.details.typed.jobImages():Object.freeze([]);
+}
+
+/** Passive reference census only. A cold entry explicitly lacks physical
+ * custody; neither these DATA nor a copied backup can recreate a live pin. */
+export function inspectRuntimeStorageComparisonReferencesFrom(value,store){
+  const facts=inspectRuntimeStorageProofFrom(value,store),record=proofs.get(value);
+  need(facts.lane==='legacy','COMPARISON_CENSUS_REQUIRES_LEGACY_READER');
+  return record.details.typed.comparisonReferences();
 }
 
 export function assertRuntimeStorageNextFrom(value,store,next,{selected=false}={}){

@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {DatabaseSync} from 'node:sqlite';
 import {runWithMcpHostContext} from '../plugins/soloco/runtime/mcp-host-context.mjs';
-import {peerOriginRuntimeAction,validatePeerOriginRequest,peerOriginToolSchema} from '../plugins/soloco/runtime/peer-origin-runtime.mjs';
+import {peerOriginRuntimeAction,preparePeerOriginMechanicalReviewRequest,validatePeerOriginRequest,peerOriginToolSchema} from '../plugins/soloco/runtime/peer-origin-runtime.mjs';
 import {qaRawHash,qaRecordRef} from '../plugins/soloco/runtime/peers/origin-mechanical-qa-contract.mjs';
 import {legacyEncodedReplyBytes} from '../plugins/soloco/runtime/peers/legacy-origin.mjs';
 import {SESSION,instruction,legacyFixture,preparePlan,mechanical,logicalState,relocatedOriginRuntime,disposeOriginPublicFixture} from './peer-origin-public-fixture.mjs';
@@ -82,15 +83,22 @@ test('original packet reads retain historical DATA after a new business row with
  const split=body.indexOf('😀')+1;assert(split>0);await unchanged(f,()=>invoke(req(f,'mechanical_packet_read',{packet_ref:f.packet.packet_ref,sha256:handle.context_sha256,offset:split,length:3}),runtime.peerOriginRuntimeAction),code('ORIGIN_MECHANICAL_QA_RANGE'));
 });
 
-test('public review honestly Holds when its readonly opener lacks actual Original Store custody before queue or spend',async t=>{
+test('public review preparation uses genuine readonly Store custody without queue or spend; a raw DB stays foreign',async t=>{
  const f=fixture(t),runtime=await f.runtime(),request=req(f,'mechanical_review',{plan_id:f.plan_id,grant_ref:f.grant_ref},{source_instruction:instruction});
  assert.equal(f.original_inventory,true);
- // Source limitation: preparePeerOriginMechanicalReviewRequest passes the
- // raw readonly DatabaseSync from withPeerPublicStorage to the fixed census.
- // Authentic original rows do not convert that different opener into a live
- // Store loan. Do not install a fake provider or advertise this as dispatch.
- await unchanged(f,()=>invoke(request),code('ORIGINAL_EXECUTION_STORE_REQUIRED'));
- await unchanged(f,()=>invoke(request,runtime.peerOriginRuntimeAction),code('ORIGINAL_EXECUTION_STORE_REQUIRED'));
+ // Preparation is a bounded read through the fixed Store-owned snapshot.
+ // Its DATA cannot enqueue and is not an actual review dispatch or QA verdict.
+ const before=logicalState(f);
+ for(const prepare of [preparePeerOriginMechanicalReviewRequest,runtime.preparePeerOriginMechanicalReviewRequest]){
+  const result=await invoke(request,prepare);
+  assert.equal(result.protocol,'peer-origin-mechanical-dispatch-request-v1');assert.equal(result.planned_not_dispatched,true);
+  assert.equal(result.plan_id,f.plan_id);assert.deepEqual(result.grant_ref,f.grant_ref);assert.deepEqual(result.packet_ref,f.packet.packet_ref);
+  assert.equal(result.context_sha256,f.packet.context_sha256);assert(result.context_utf8_bytes>0&&result.context_utf8_bytes<=200000);
+  assert.deepEqual(logicalState(f),before);
+ }
+ const raw=new DatabaseSync(path.join(f.root,'.company','company.sqlite'),{readOnly:true});
+ try{assert.throws(()=>f.policy.preparePeerOriginMechanicalQaDispatchFrom(raw,f.state(),{expected_epoch:9,grant_ref:f.grant_ref}),code('ORIGINAL_EXECUTION_STORE_REQUIRED'));}finally{raw.close();}
+ assert.deepEqual(logicalState(f),before);
  assert.equal(f.state().records[f.grant_ref.id].origin_mechanical_qa.used_attempts,0);
 });
 

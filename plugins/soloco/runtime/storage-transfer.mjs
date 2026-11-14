@@ -45,9 +45,16 @@ function copyTree(source,target){const stat=fs.lstatSync(source);if(stat.isSymbo
 function inventory(directory){const entries=[];function walk(dir,rel=''){for(const name of fs.readdirSync(dir)){const file=path.join(dir,name),key=rel?rel+'/'+name:name,st=fs.lstatSync(file);if(st.isSymbolicLink()||(!st.isDirectory()&&!st.isFile()))throw Error('Invalid transfer file');if(st.isDirectory())walk(file,key);else entries.push({path:key,bytes:st.size,sha256:hash(fs.readFileSync(file))});}}walk(directory);return entries.sort((a,b)=>a.path.localeCompare(b.path));}
 export function backupCompany(db,directory,{artifacts=[]}={}){
  if(!Array.isArray(artifacts)||artifacts.length>100)throw Error('At most 100 explicitly selected external artifacts');
+ const before=db.changeToken(),state=db.read();
+ const comparisonRecords=Object.values(state?.records??{}).filter(record=>Object.hasOwn(record,'runtime_wire_evidence')||Object.hasOwn(record,'runtime_candidate_test_guard'));
+ // These live objects are outside .company and B's nine-leaf directory. A
+ // caller artifact pathname/list is not the selected original-FD archive loan,
+ // complete prompt/raw/derived/header-chain census or duplicate-copy budget.
+ // Stop before fresh(), VACUUM or any copy; preserve every original run file.
+ if(comparisonRecords.length)throw Object.assign(Error('Backup held: issue18 external prompt/raw/derived/header-chain objects require selected archive custody and copy accounting; no backup output was created'),{code:'ISSUE18_ARCHIVE_CUSTODY_REQUIRED',details:{record_count:comparisonRecords.length,external_objects_copied:false,backup_complete:false}});
  const destination=prospective(directory);if(within(destination,fs.realpathSync(db.dir)))throw Error('Backup output cannot be inside company source');
  for(const a of artifacts){if(!a||!path.isAbsolute(a.source??'')||!safe(a.path))throw Error('External artifacts need explicit absolute source and portable path');const source=fs.realpathSync(a.source);if(fs.statSync(source).isDirectory()&&within(destination,source))throw Error('Backup output cannot be inside selected artifact source');}
- fresh(directory);const before=db.changeToken(),stateHash=hash(JSON.stringify(db.read()));
+ fresh(directory);const stateHash=hash(JSON.stringify(state));
  const company=path.join(directory,'.company');fs.mkdirSync(company,{mode:0o700});const target=path.join(company,'company.sqlite');
  db.db.exec("VACUUM INTO '"+target.replaceAll("'","''")+"'");
  // Runtime candidates and project-owned configuration travel with the database.

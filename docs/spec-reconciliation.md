@@ -29,6 +29,34 @@ contract or integration. A source or contract change requires affected-row revie
 
 ## Meaning of the assessments
 
+### Unreleased issue 18 composition — Source authored, checks unrun
+
+The [comparison integration](issue18-integrated-comparison.md) authors a private
+global budget issuer, descriptor-relative optional storage, complete prompt
+preparation before reservation, typed request/outcome records and a direct
+worker consumer of private adapter outcomes. A one-test guard joins the existing
+executor, QA prerequisites and live retention checks at owner acceptance.
+Repository tool entries re-export the packaged runtime modules. Version 0.7.10
+retains explicit 0.7.9 compatibility and does not adopt new company instructions.
+
+This is an unreleased Source composition, including inherited runtime/Native
+foundations whose scopes and evidence remain separate. Its newly authored
+checks have not run. The earlier private-outcome producer `b7ffad5` remains
+preserved after a concrete cross-request deadline-erasure finding. Its isolated
+Source repair `c51df5e` is composed here; its separately selected execution has
+its own receipts and cannot establish this composition's result. Fixed
+event/two-phase COMMIT hooks must still be integrated before the new consumer
+can execute. No earlier component Pass establishes this head's readiness.
+
+The explicit same-process qualification route does not transfer private brands
+to a new standalone process or adopt a cold run. Complete external-A archive
+portability is also unfinished: affected backups hold before destination
+effects with `ISSUE18_ARCHIVE_CUSTODY_REQUIRED`. GitHub #13/#16/#18/#30 retain
+their original Native, scale, coordinated outcome and continuity requirements.
+Founder time, interruptions and rebriefing remain unmeasured. Source delivery,
+Git merge, main CI, installation, host qualification and company adoption are
+distinct.
+
 The source follow-ups based on main through PR #74 add automatic retention-review
 admission, exact deterministic geometry reuse, optional frozen delivery contracts,
 one canonical local acceptance report, attributed receiver transitions and

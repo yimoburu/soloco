@@ -17,8 +17,8 @@ export const contextComponentErrorCode=e=>errors.get(e)??originalComponentLayout
 function createOriginalService(layout){
  const layoutPaths=originalComponentLayoutPaths(layout),packaged=layoutPaths.kind==='packaged-plugin-v1';
  const REPO=layoutPaths.source_root,ENTRY=layoutPaths.entry,NATIVE=layoutPaths.native_root,ROOT=layoutPaths.durable_root,JOURNAL=path.join(ROOT,'journal.sqlite'),ANCHOR=path.join(ROOT,'journal-anchor.json');
-const PACKAGE_SHA='b36d16a6c117e2130d5bf294b2989dfac9fba103fa568332c78ca0965f90ad13';
-const DRIVER_SHA='6f5bb3d81076f1620f29db27dd5b442c6a3e7fd7f69ee770590945fdc8d23300';
+const PACKAGE_SHA='acf70aa9f69ce34e4a514d35e870d8b92a26ae1c26f797dcfc2947abdccdef99';
+const DRIVER_SHA='d76c12db17bd934102feb80e782ab00c928e5954b8f4d8b975676d5726de12ac';
 const DATA_SHA='64b3b0cd592956a1effc2971350c4d4b66a861b4de0eee361e1024d2418184c8';
 const COMMIT='c40729ea5cf8e947481b130c59807273eda2f8e9',TREE='078c14cecf94b522a2eff48b30996bf3f4d1bf7a';
 const TARGET='aarch64-apple-darwin',PYTHON='/usr/bin/python3',BUILD_SECONDS=1200;

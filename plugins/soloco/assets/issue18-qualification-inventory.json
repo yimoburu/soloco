@@ -1,0 +1,98 @@
+{
+  "protocol": "soloco-issue18-qualification-package-v1",
+  "default_enabled": false,
+  "native_qualification": false,
+  "physical_source_checkout_required_for_selection": true,
+  "files": [
+    {
+      "path": "runtime/development-full-file-output.mjs",
+      "bytes": 19794,
+      "sha256": "907157b22b61cd9d542bebb5c9ec4c5d87e245de9dbdf117b9057fd45d98898b",
+      "mode": "100644"
+    },
+    {
+      "path": "runtime/integrated-comparison-evidence.mjs",
+      "bytes": 59913,
+      "sha256": "8629a51b4f9dc9fff8935f35e916c90488686c57c6f80e92b08fb95b93685744",
+      "mode": "100644"
+    },
+    {
+      "path": "runtime/integrated-comparison-source.mjs",
+      "bytes": 15442,
+      "sha256": "befaa2138bc87d3c9d2633b3f631e203d39258d3ff2f57d276dc2f4a59f7f344",
+      "mode": "100644"
+    },
+    {
+      "path": "runtime/integrated-comparison-test.mjs",
+      "bytes": 32161,
+      "sha256": "b36d51687195ca03e0f374448d8c12b51744d4ad3def0b05f6159c85196ae195",
+      "mode": "100644"
+    },
+    {
+      "path": "runtime/integrated-comparison-worker.mjs",
+      "bytes": 15922,
+      "sha256": "b9fa2bec0ca787e6e6da4c60bc4dcd9c6e17c8d9596992a5e609d0d08e673e50",
+      "mode": "100644"
+    },
+    {
+      "path": "runtime/qualification/issue18-ledger-storage.mjs",
+      "bytes": 13006,
+      "sha256": "f8669acc93c963a5b7c66a45a24646ad391ac42eebf360ccb1cefb34c85eb4a1",
+      "mode": "100644"
+    },
+    {
+      "path": "runtime/qualification/issue18-ledger-storage.py",
+      "bytes": 13406,
+      "sha256": "d925adb931c69af7627f76cfaa6c875a737fbc8697b8d35b40d88e4c2db19a4e",
+      "mode": "100644"
+    },
+    {
+      "path": "runtime/qualification/issue18/integrated-comparison-bootstrap.mjs",
+      "bytes": 15737,
+      "sha256": "2262dc934aaf27884b6fde9b124ce11dac3e5a213a0120f4e64df3bb85b4ac3d",
+      "mode": "100644"
+    },
+    {
+      "path": "runtime/qualification/issue18/integrated-comparison-bootstrap.py",
+      "bytes": 17672,
+      "sha256": "ce51a651759a1b0c868e6caccb911d413e83d329b1f9b5f5c41fc029eaab0b07",
+      "mode": "100644"
+    },
+    {
+      "path": "runtime/qualification/issue18/integrated-comparison-data.mjs",
+      "bytes": 17255,
+      "sha256": "ddb62c1aa71315a335421012f62966c2cadd1089ef14f8cb05403b64b02af42e",
+      "mode": "100644"
+    },
+    {
+      "path": "runtime/qualification/issue18/integrated-comparison-evidence-io.mjs",
+      "bytes": 17340,
+      "sha256": "713b10ce8cb991280ac54c4c7659176182ee65182389625da3b9a46a6a97129e",
+      "mode": "100644"
+    },
+    {
+      "path": "runtime/qualification/issue18/integrated-comparison-evidence-io.py",
+      "bytes": 18506,
+      "sha256": "cd7f7f90ff340ec151f0c3c1845c5369b6dada4a2a39415986ac4fe5258f167e",
+      "mode": "100644"
+    },
+    {
+      "path": "runtime/qualification/issue18/integrated-comparison-issuer.mjs",
+      "bytes": 47146,
+      "sha256": "9c9566b34ceb77a60a5d45c11f8e424a85ef9449008b6b903bad4e89132a6745",
+      "mode": "100644"
+    },
+    {
+      "path": "runtime/qualification/issue18/observed-outcome.mjs",
+      "bytes": 6269,
+      "sha256": "7aa57042202957b2a15c4e16dc16f1653af3f015a61e05482c7cc5e6d10fbe8f",
+      "mode": "100644"
+    },
+    {
+      "path": "runtime/qualification/issue18/typed-capture.mjs",
+      "bytes": 50834,
+      "sha256": "350d143c0267d0d7930209233dc9e1f8fdabc9a847085068bb73dcf49dcf901e",
+      "mode": "100644"
+    }
+  ]
+}

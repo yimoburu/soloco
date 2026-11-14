@@ -9,9 +9,9 @@ const REPO=fileURLToPath(new URL('../',import.meta.url));
 const SOURCE=path.join(REPO,'native/codex'),PACKAGE=path.join(REPO,'plugins/soloco');
 const OUTPUT=path.join(PACKAGE,'producer-inputs'),NATIVE=path.join(OUTPUT,'native/codex');
 const SEAL=path.join(OUTPUT,'native-recipe-inventory.json');
-const MANIFEST_SHA='b36d16a6c117e2130d5bf294b2989dfac9fba103fa568332c78ca0965f90ad13';
+const MANIFEST_SHA='acf70aa9f69ce34e4a514d35e870d8b92a26ae1c26f797dcfc2947abdccdef99';
 // Updated with the original source driver, never learned from package DATA.
-const DRIVER_SHA='6f5bb3d81076f1620f29db27dd5b442c6a3e7fd7f69ee770590945fdc8d23300';
+const DRIVER_SHA='d76c12db17bd934102feb80e782ab00c928e5954b8f4d8b975676d5726de12ac';
 const MAX_FILE=128*1024*1024,MAX_TOTAL=128*1024*1024;
 const sha=b=>createHash('sha256').update(b).digest('hex');
 const exact=(v,keys)=>v!==null&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).sort().join(',')===[...keys].sort().join(',');

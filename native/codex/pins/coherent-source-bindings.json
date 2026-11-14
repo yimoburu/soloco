@@ -13603,14 +13603,14 @@
   },
   {
     "path": "codex-rs/codex-api/src/protected_peer/context_contract/frame/tests.rs",
-    "bytes": 32697,
-    "sha256": "5118183cad8a048e55abdf316019f9276fa274910c5cc9f49943e6e98581bc23",
+    "bytes": 37697,
+    "sha256": "c55d91b0d80d09777b9fcfd03ecb5cd9cd42cb2564c9d3cf84eba5079f05af00",
     "mode": "100644"
   },
   {
     "path": "codex-rs/codex-api/src/protected_peer/context_contract/tests.rs",
-    "bytes": 44342,
-    "sha256": "7c92ca1fefb6f971283cb7868a777aa92eb3ba8bcc3ff95501f592feb84103c0",
+    "bytes": 48907,
+    "sha256": "19c546a312ec55e29db83935a4ca98f1e51820614f168672c1e19be2307b0c91",
     "mode": "100644"
   },
   {

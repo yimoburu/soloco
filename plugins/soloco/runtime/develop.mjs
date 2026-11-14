@@ -17,6 +17,21 @@ import { testFixtureIdentity, assertTestFixtureIdentity } from './test-fixtures.
 import {DEVELOPMENT_DELIVERY_ACTIONS,createDevelopmentDeliveryContract,validateDevelopmentDeliveryContract,createDevelopmentAcceptanceReport,developmentDeliveryAction} from './development-delivery.mjs';
 import {cleanupOriginalWorkerLaunchFailure} from './peers/prospective-local-worker-inventory-producer.mjs';
 import {recordRuntimeWorkerAssignmentFrom,prepareRuntimeWorkerLaunchFrom,spawnRuntimeWorkerLaunch,cleanupLegacyRuntimeLaunchFailure,runtimeJobOccupied,assertRuntimeWorkerStartedFrom,assertRuntimeDevelopmentProcessClosureFrom} from './runtime-execution.mjs';
+import {comparisonTestStoreFrom,stageComparisonTestReservationFrom,assertComparisonTestCommittedFrom,comparisonTestGuardAppliesFrom,stageComparisonTestTerminalFrom,assertComparisonAcceptanceFrom} from './integrated-comparison-test.mjs';
+
+// Only these lexical existing executor/failure sites can issue a terminal loan.
+// The optional producer cannot authenticate a supplied result or callback.
+const comparisonTestTerminals=new WeakMap();
+export function inspectComparisonDevelopmentTestTerminalFrom(token,store,state){
+  const facts=comparisonTestTerminals.get(token);comparisonTestTerminals.delete(token);const loan=originalStoreExecutionCustodyFrom(store);loan.assert();
+  if(!facts||facts.store!==store||facts.state!==state||facts.scope!==loan.scope||facts.receipt&&state.records[facts.receipt.id]!==facts.receipt)throw Object.assign(Error('Actual development terminal producer required'),{code:'ISSUE18_TEST_TERMINAL_CUSTODY'});
+  return Object.freeze({job_id:facts.job_id,receipt:facts.receipt});
+}
+function comparisonTestTerminal(store,state,job_id,receipt=null){
+  if(!comparisonTestGuardAppliesFrom(state,job_id))return;
+  const loan=originalStoreExecutionCustodyFrom(store),token=Object.freeze({});loan.assert();comparisonTestTerminals.set(token,{store,state,scope:loan.scope,job_id,receipt});
+  stageComparisonTestTerminalFrom(token,store,state);
+}
 
 function cleanupRuntimeWorkerLaunchFailure(error){
   const legacy=cleanupLegacyRuntimeLaunchFailure(error),original=cleanupOriginalWorkerLaunchFailure(error);
@@ -44,7 +59,7 @@ export function developmentCapability(s,root=process.cwd()) {
   let configuration,configuration_error=null;
   try{configuration=developmentLimits(root);}catch(error){configuration_error=error.message;configuration={max_bytes:0,per_file_max_bytes:0,source:'invalid'};}
   const executor=sandboxCapability();
-  const blocker=configuration_error??(!executor.supported ? executor.blocker : s && (!['0.5.0','0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7','0.6.8','0.6.9','0.6.10','0.6.11','0.6.12','0.6.13','0.7.0','0.7.1','0.7.2','0.7.3','0.7.4','0.7.5','0.7.6','0.7.7','0.7.8',VERSION].includes(s.plugin_version) || ![installedTeam().governance_sha256,V020_GOVERNANCE_SHA256,V019_GOVERNANCE_SHA256,V018_GOVERNANCE_SHA256].includes(s.governance_sha256))
+  const blocker=configuration_error??(!executor.supported ? executor.blocker : s && (!['0.5.0','0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7','0.6.8','0.6.9','0.6.10','0.6.11','0.6.12','0.6.13','0.7.0','0.7.1','0.7.2','0.7.3','0.7.4','0.7.5','0.7.6','0.7.7','0.7.8','0.7.9',VERSION].includes(s.plugin_version) || ![installedTeam().governance_sha256,V020_GOVERNANCE_SHA256,V019_GOVERNANCE_SHA256,V018_GOVERNANCE_SHA256].includes(s.governance_sha256))
     ? 'Explicitly adopt the installed development-capable team and compatible governance first' : null);
   return {supported:executor.supported,eligible:s ? !blocker : null,blocker,executor,
     output:'Retained, independently reviewable local candidate; original source is unchanged',
@@ -202,7 +217,7 @@ export async function developmentAction(a,host,internal={}) {
   if(a.action==='diagnose_preflight')return queueDiagnostic(a,host,internal);
   if(a.action==='recover_preflight')return queueRecovery(a,host,internal);
   if(a.action==='run')return queueRun(a,host,internal);
-  let result,retentionControl=null;
+  let result,retentionControl=null,comparisonAcceptance=null;
   withStore(a.root,db=>db.transaction(`development.${a.action}`,s=>{
     owner(s,a.session_id,host,a.epoch);capable(s,a.root);
     if(a.action==='plan') {
@@ -253,6 +268,7 @@ export async function developmentAction(a,host,internal={}) {
         if(retention)retentionControl=retention.control;
         if(Object.values(s.records).some(x=>x.kind==='review'&&x.status==='Submitted'&&x.review_of?.id===t.id&&['Fail','Blocked'].includes(x.review?.verdict)&&!retention?.clearedReviewIds.has(x.id)))throw new Error('This candidate has a failed/blocked review; repair under remaining scope');
         if(d.acceptance)throw new Error('Candidate was already accepted; inspect its receipt');
+        assertComparisonAcceptanceFrom(db,s,c.id,r.id);comparisonAcceptance={candidate:c.id,qa:r.id};
         const acceptedDirectory=candidateDir(a.root,p,c),acceptedAt=stamp();recoveryTime(p);
         const acceptance={at:acceptedAt,review_id:r.id,candidate_sha256:d.candidate_sha256,receipt_sha256:d.receipt_sha256,directory:acceptedDirectory,source_integrated:false,...(retention?{retention_repair:retention.binding}:{})};
         const report=createDevelopmentAcceptanceReport(s,p,c,t,r,j,acceptance,{storageFormat:db.storageInfo().format});
@@ -261,23 +277,27 @@ export async function developmentAction(a,host,internal={}) {
       } else throw new Error('Unknown development action');
     }
     s.runtime_version=VERSION;return s;
-  },{beforeCommit:(_db,next)=>{if(retentionControl){assertRetentionRepairCommit(next,retentionControl);retainDevelopmentCommitCutoff(_db,retentionControl);}}}));return result;
+  },{beforeCommit:(_db,next)=>{if(comparisonAcceptance)assertComparisonAcceptanceFrom(_db,next,comparisonAcceptance.candidate,comparisonAcceptance.qa);if(retentionControl){assertRetentionRepairCommit(next,retentionControl);retainDevelopmentCommitCutoff(_db,retentionControl);}}}));return result;
 }
 function queueRun(a,host,internal={}) {
   let p,c,jobId=id('test');
-  withStore(a.root,db=>db.transaction('development.test_reserved',s=>{
+  const comparisonPlan=internal.comparisonTestPlan,comparisonStore=comparisonPlan===undefined?null:comparisonTestStoreFrom(comparisonPlan,a.root,a.candidate_id);
+  const reserve=operation=>comparisonStore?operation(comparisonStore):withStore(a.root,operation);
+  reserve(db=>db.transaction('development.test_reserved',s=>{
     owner(s,a.session_id,host,a.epoch);p=planOf(s,a.plan_id);authorized(s,p,a.root);sourceMatches(a.root,p);c=candidateOf(s,p,a.candidate_id);
     if(p.development.scope.test_fixture!==undefined&&a.reuse_receipt_id!==undefined)throw Error('Validation reuse for fixture-bearing scopes is not qualified');
     if(Object.values(s.jobs).filter(j=>runtimeJobOccupied(j)||['queued','running'].includes(j.status)).length>=3)throw new Error('Three assignments already active; wait for a result');
     if(c.development.run)throw new Error('Candidate already has a test attempt; inspect it, never retry uncertain execution');
     if(Object.values(s.jobs).some(j=>j.development_id===p.id&&(runtimeJobOccupied(j)||['queued','running'].includes(j.status))))throw new Error('Scope already has active work');
     c.development.run={job_id:jobId,status:'queued'};
-    const job={id:jobId,kind:'development_test',role:'engineer',development_id:p.id,candidate_id:c.id,epoch:s.owner.epoch,session_id:a.session_id,host,...(a.reuse_receipt_id?{reuse_receipt_id:a.reuse_receipt_id}:{}),status:'queued',created_at:stamp(),inputs:[],native_id:null};recordRuntimeWorkerAssignmentFrom(db,s,job);s.jobs[jobId]=job;s.runtime_version=VERSION;return s;
+    const job={id:jobId,kind:'development_test',role:'engineer',development_id:p.id,candidate_id:c.id,epoch:s.owner.epoch,session_id:a.session_id,host,...(a.reuse_receipt_id?{reuse_receipt_id:a.reuse_receipt_id}:{}),status:'queued',created_at:stamp(),inputs:[],native_id:null};recordRuntimeWorkerAssignmentFrom(db,s,job);s.jobs[jobId]=job;
+    stageComparisonTestReservationFrom(comparisonPlan,db,s,job,c,p);s.runtime_version=VERSION;return s;
   }));
+  if(comparisonStore)assertComparisonTestCommittedFrom(comparisonPlan,comparisonStore);
   const failed=error=>withStore(a.root,db=>db.transaction('development.test_spawn_failed',s=>{
     s.jobs[jobId].status='failed';s.jobs[jobId].error=error.message;
     s.records[c.id].development.run.status='failed';
-    notice(s,'must_know','Local test worker could not start; inspect the retained attempt.',jobId);return s;
+    notice(s,'must_know','Local test worker could not start; inspect the retained attempt.',jobId);comparisonTestTerminal(db,s,jobId);return s;
   }));
   try {
     const child=launchDevelopmentWorker(a.root,jobId,{detached:true,stdio:'ignore',env:{...process.env,COMPANY_WORKER:'1'}},internal);
@@ -347,6 +367,7 @@ export async function executeDevelopmentTest(root,jobId,internal={}) {
     if(reuseSource)s.records[c.id].development.validation_directory_relative=c.development.validation_directory_relative;
     s.records[c.id].development.run={job_id:jobId,status:stale?'quarantined':'completed',receipt_id:key};
     Object.assign(s.jobs[jobId],{status:stale?'quarantined':'completed',finished_at:stamp(),artifact_id:key});
+    comparisonTestTerminal(db,s,jobId,receipt);
     if(stale)notice(s,'must_know','Local test outcome was retained but authority changed; no acceptance is granted.',key);
     return s;
   }));return receipt;
@@ -617,6 +638,7 @@ export async function executeDevelopmentWorker(root,jobId,internal={}) {
       j.status='failed';if(j.kind==='development_preflight'){j.error=diagnosticError(error);j.preflight_error=boundedPreflightError(error);}else j.error=error.message;j.finished_at=stamp();
       if(j.candidate_id)s.records[j.candidate_id].development.run.status='failed';
       notice(s,'must_know',j.kind==='development_preflight'?'Fingerprint diagnostic did not start; inspect retained typed failure metadata. No test was launched.':`Local test did not start: ${error.message}`,jobId);
+      comparisonTestTerminal(db,s,jobId);
     }return s;
   }));}
 }

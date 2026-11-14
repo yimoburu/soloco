@@ -4,13 +4,15 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {EventEmitter} from 'node:events';
-import {PassThrough} from 'node:stream';
+import childProcess from 'node:child_process';
+import {syncBuiltinESMExports} from 'node:module';
 import {createHash} from 'node:crypto';
 import {assembleFullFileOutput,createFullFileProducer,FULL_FILE_OUTPUT_PROTOCOL,FULL_FILE_INPUT_CODEC,prepareFullFileInput,normalizePreparedFullFileResult} from '../plugins/soloco/runtime/development-full-file-output.mjs';
 import {executionTiming} from '../plugins/soloco/runtime/timeout.mjs';
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
 import {withStore,id} from '../plugins/soloco/runtime/store.mjs';
 import {work} from '../plugins/soloco/runtime/worker.mjs';
+import {runRuntimeModel} from '../plugins/soloco/runtime/adapters.mjs';
 
 // Only controlled outputs/process events and disposable fictional companies.
 // No real model/CLI/account, installed state, canonical source or Git operation.
@@ -135,10 +137,24 @@ test('expiry during final evidence retention cannot return an assembled candidat
 test('request-recorder expiry or cancellation cannot start a provider invocation',async()=>{
  for(const mode of ['expiry','cancel']){let clock=1000,calls=0;const abort=new AbortController();const model=createFullFileProducer({binding:binding(['a.mjs']),now:()=>clock,record:e=>{if(e.stage==='request'){if(mode==='expiry')clock=11000;else abort.abort(Error('Recorder cancellation'));}},invoke:async()=>{calls++;}});await assert.rejects(model('codex',null,'complete source','/controlled',10000,null,{signal:abort.signal}),e=>mode==='expiry'?e.code==='FULL_FILE_DEADLINE':e===abort.signal.reason);assert.equal(calls,0);}
 });
-test('actual unchanged runModel parser waits for owned close; no CLI is launched',async()=>{
- const raw=wire([{path:'a.mjs',content:'full emitted body'}]);let child,settled=false;const events=[];const model=createFullFileProducer({binding:binding(['a.mjs']),record:e=>{events.push(e);}});
- const pending=model('codex',null,'complete canonical task','/controlled',10000,null,{timeoutReason:'Controlled actual adapter timing fixture.',resolveExecutable:()=>'/controlled/not-executed',spawn(){child=new EventEmitter();child.stdout=new PassThrough();child.stderr=new PassThrough();child.stdin={end(){queueMicrotask(()=>{child.emit('spawn');for(const e of [{type:'thread.started',thread_id:'controlled-native'},{type:'turn.started'},{type:'item.completed',item:{type:'agent_message',id:'final',phase:'final_answer',text:raw}},{type:'turn.completed'}])child.stdout.write(JSON.stringify(e)+'\n');});},on(){},removeListener(){}};child.kill=()=>true;return child;}}).then(x=>{settled=true;return x;});
- await new Promise(r=>setImmediate(r));assert.equal(settled,false);assert(!events.some(x=>x.stage==='response'));child.emit('close',0);const out=await pending;assert.equal(out.model_evidence.full_file_output.invoke_kind,'existing_runModel');assert.equal(events[2].original_model_text,raw);
+test('default strict adapter rejects caller spawn and missing launch custody before any child',async()=>{
+ for(const mode of ['spawn','missing']){
+  const events=[];let creates=0,resolves=0;const model=createFullFileProducer({binding:binding(['a.mjs']),record:e=>{events.push(e);}});
+  const options={timeoutReason:'Controlled strict adapter rejection fixture.',resolveExecutable(){resolves++;throw Error('No executable may be resolved');}};
+  if(mode==='spawn')options.spawn=()=>{creates++;throw Error('No child may be created');};
+  await assert.rejects(model('codex',null,'complete canonical task','/controlled',10000,null,options),code(mode==='spawn'?'ORIGINAL_EXECUTION_LAUNCH_GATE_REQUIRED':'ORIGINAL_EXECUTION_PRIVATE_LAUNCH_REQUIRED'));
+  assert.equal(creates,0);assert.equal(resolves,0);assert.deepEqual(events.map(e=>e.stage),['request']);
+ }
+});
+test('controlled codec invocation waits for synthetic close before raw retention; no runtime provenance claim',async()=>{
+ const emitted=[{path:'a.mjs',content:'full emitted body'}],raw=wire(emitted),child=new EventEmitter(),events=[];let settled=false,calls=0;
+ const model=createFullFileProducer({binding:binding(['a.mjs']),record:e=>{events.push(e);},invoke:async(_h,n,_p,_d,timeout,_s,options)=>{
+  calls++;options.onSpawn(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));
+  await new Promise(resolve=>child.once('close',resolve));return {native_id:n??'controlled-native',text:raw,model_evidence:{verification:'controlled_double_not_native'}};
+ }});
+ const pending=model('codex',null,'complete canonical task','/controlled',10000,null,{timeoutReason:'Controlled synthetic invocation timing fixture.'}).then(x=>{settled=true;return x;});
+ await new Promise(r=>setImmediate(r));assert.equal(calls,1);assert.equal(settled,false);assert.deepEqual(events.map(e=>e.stage),['request','spawn']);
+ child.emit('close',0);const out=await pending;assert.equal(out.model_evidence.full_file_output.invoke_kind,'INJECTED_CONTROLLED_INVOKE');assert.equal(out.model_evidence.full_file_output.native_authentication_or_semantic_fidelity_claim,false);assert.equal(events[2].original_model_text,raw);assert.deepEqual(JSON.parse(out.text).files,emitted);assert.deepEqual(events.map(e=>e.stage),['request','spawn','response','assembled']);
 });
 
 // Pure factoring controls add no filesystem, clock, recorder or model seam.
@@ -224,7 +240,57 @@ test('opt-in wrapper composes the pure codec with unchanged request raw-retentio
 const base=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-full-file-output-'));process.env.COMPANY_PLUGIN_DATA=path.join(base,'fictional-plugin-data');test.after(()=>fs.rmSync(base,{recursive:true,force:true}));
 const read=a=>withStore(a.root,db=>db.read());
 const catalog={supported:true,source:'controlled_double',models:[{id:'gpt-6.1-sol',supported_efforts:['high']}],speed_support:{host_default:true}};
-function queue(a,role,extra={}){return engine.dispatch({...a,role,task:'Controlled full-file transport/acceptance integration',model_selection:{mode:'explicit',model:'gpt-6.1-sol',effort:'high',reason:'Controlled fixture only'},timeout_ms:20000,timeout_reason:'Controlled integration fixture.',...extra},'codex',{launch:()=>({on(){},unref(){}}),check:()=>({available:true,authenticated:true,version:'controlled'}),catalog:()=>catalog});}
+// These six integration cases compose pure local codec DATA with the actual
+// existing consumer. They do not launch the full-file wire producer through
+// work(): its encoding instruction must be prepared BEFORE the Store binds the
+// exact model request, which needs a separate opt-in Source integration seam.
+// Only Node's ChildProcess boundary is controlled here. Queue/commit issuance,
+// exact launch descriptors, worker claims, adapter observers and Store guards
+// remain the real Source implementations; no public birth/close claim is used.
+let nextSourcePid=760000;
+function sourceChild(pid=++nextSourcePid){
+ const child=new EventEmitter();child.pid=pid;child.stdout=new EventEmitter();child.stderr=new EventEmitter();child.stdin=new EventEmitter();child.stdin.end=()=>{};child.kill=()=>true;child.unref=()=>child;return child;
+}
+function controlledNodeCreation(t,child,create){
+ let calls=0;
+ const replacement=t.mock.method(childProcess,'spawn',command=>{assert.equal(command,process.execPath,'The Source-selected descriptor reaches only the controlled Node boundary');assert.equal(++calls,1,'One exact Node creation per controlled Source scope');return child;});
+ syncBuiltinESMExports();
+ try {const result=create();assert.equal(calls,1,'The real Source producer must create its child');return result;}
+ finally {replacement.mock.restore();syncBuiltinESMExports();}
+}
+const sourceWorkers=new Map();
+function queue(t,a,role,extra={}){
+ const child=sourceChild(process.pid);
+ const job=controlledNodeCreation(t,child,()=>engine.dispatch({...a,role,task:'Controlled local codec DATA and existing consumer integration',model_selection:{mode:'explicit',model:'gpt-6.1-sol',effort:'high',reason:'Controlled fixture only'},timeout_ms:20000,timeout_reason:'Controlled integration fixture.',...extra},'codex',{check:()=>({available:true,authenticated:true,version:'controlled'}),catalog:()=>catalog}));
+ let closed=false;const close=()=>{if(closed)return;closed=true;child.emit('close',0,null);sourceWorkers.delete(job.id);};
+ sourceWorkers.set(job.id,{close});t.after(close);child.emit('spawn');return job;
+}
+function controlledConsumerAdapter(t,text,native,onPrompt=()=>{}){
+ let calls=0;
+ const model=(host,requested,prompt,cwd,timeout,selection,options)=>{
+  calls++;assert.equal(calls,1,'One adapter invocation for this controlled consumer');assert.equal(host,'codex');assert.equal(requested,null);
+  const child=sourceChild();
+  child.stdin.end=actual=>{
+   assert.equal(actual,prompt,'The real adapter receives the exact Store-bound canonical prompt');onPrompt(actual);
+   child.emit('spawn');
+   for(const event of [{type:'thread.started',thread_id:native},{type:'turn.started'},{type:'item.completed',item:{type:'agent_message',id:'final',phase:'final_answer',text}},{type:'turn.completed'}])child.stdout.emit('data',JSON.stringify(event)+'\n');
+   child.emit('close',0,null);
+  };
+  return controlledNodeCreation(t,child,()=>runRuntimeModel(host,requested,prompt,cwd,timeout,selection,{...options,resolveExecutable:()=>process.execPath,renameSession:()=>({status:'controlled_source_no_host_rename'})}));
+ };
+ return {model,get calls(){return calls;}};
+}
+async function consume(t,a,job,adapter){
+ try {await work(a.root,job.id,adapter.model);}
+ finally {sourceWorkers.get(job.id)?.close();}
+ const actual=read(a).jobs[job.id],tracking=actual.model_process_tracking;
+ assert.equal(actual.status,'completed',actual.error);assert.equal(adapter.calls,1);assert.equal(tracking.invocations.length,1);
+ const invocation=tracking.invocations[0];assert.equal(tracking.current,invocation.invocation_id);assert.equal(invocation.job_id,job.id);assert.equal(invocation.instance_id,job.instance_id);
+ assert(invocation.birth,'The actual adapter must observe its controlled Node child birth');assert(invocation.closure,'The actual adapter must observe that same child close');assert.equal(invocation.closure.birth_sha256,hash(JSON.stringify(invocation.birth)));
+ const carrier=actual.legacy_runtime?.worker??actual.original_execution_assignment?.launches.find(launch=>launch.kind==='worker');
+ assert.equal(carrier?.birth?.pid,process.pid,'The real Source queue must bind this controlled in-process worker');assert(carrier.closure,'The same controlled carrier must close before this consumer fixture returns');
+ assert.equal(actual.coordination_release.termination_confirmed,true);
+}
 async function integration(t,bad=false,originalCount=null){
  const original=originalCount===null?null:originalFixture(originalCount),pins=original?originalControlPins[originalCount]:null;
  if(original){
@@ -237,18 +303,25 @@ async function integration(t,bad=false,originalCount=null){
  const originals=original?original.sources:['a','b','c'].map((name,i)=>{const pre=(i===0?'\uFEFF':'')+'export const value = 0;\r\n/* unchanged 雪😀\r\n',end='*/\r\n',line='fixed fictional padding preserved exactly\r\n',n=32768-Buffer.byteLength(pre+end),padding=line.repeat(Math.floor(n/Buffer.byteLength(line)))+'x'.repeat(n%Buffer.byteLength(line));return {path:name+'.mjs',content:pre+padding+end};});assert(originals.every(f=>Buffer.byteLength(f.content)===32768));const expected=original?original.expected:originals.map(f=>({...f,content:f.content.replace('= 0;','= 1;')}));for(const f of originals)fs.writeFileSync(path.join(root,f.path),f.content);fs.writeFileSync(path.join(root,'private.txt'),'NOT_AUTHORIZED');
  const fixedTestName=original?.test.path??'fixed.test.mjs',fixedTest=original?original.test.content:"import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import {createHash} from 'node:crypto';\n"+expected.map((f,i)=>`import {value as v${i}} from './${f.path}';`).join('\n')+"\ntest('exact complete original-arm bytes',()=>{"+expected.map((f,i)=>`assert.equal(v${i},1);assert.equal(createHash('sha256').update(fs.readFileSync(new URL('./${f.path}',import.meta.url))).digest('hex'),'${hash(f.content)}');`).join('')+'});\n';fs.writeFileSync(path.join(root,fixedTestName),fixedTest);
  const p=await engine.develop({...a,action:'plan',read_paths:[...originals.map(f=>f.path),fixedTestName],write_paths:originals.map(f=>f.path),test_paths:[fixedTestName],output_format:'files',model_data_approved:true,data_policy:'Only disposable fictional exact-byte fixtures.',source_instruction:'Controlled fixture source sharing only.',acceptance:'Every output byte must match known complete postimage; actual fixed tests plus independent review required.',stop_conditions:'No retry/repair or original mutation.',max_attempts:1,max_bytes:200000,timeout_ms:10000,max_output_bytes:10000,expires_at:new Date(Date.now()+60000).toISOString()},'codex');await engine.develop({...a,action:'authorize',plan_id:p.id,scope_sha256:p.development.scope_sha256,source_instruction:'Fictional one-attempt scope only.',model_data_approved:true},'codex');
- const j=queue(a,'engineer',{development_id:p.id}),emitted=copy(expected);if(bad){const before=emitted[0].content;emitted[0].content=original?before.replace('fixed fictional','Fixed fictional'):before.replace('unchanged','unchangEd');assert.notEqual(emitted[0].content,before);assert.equal(Buffer.byteLength(emitted[0].content),Buffer.byteLength(before));}const raw=wire(emitted),recordFile=path.join(root,'runtime-wire-evidence.jsonl');let calls=0;
- const model=createFullFileProducer({binding:{...binding(originals.map(f=>f.path)),job_id:j.id,instance_id:j.instance_id,plan_id:p.id,scope_sha256:p.development.scope_sha256},record:e=>{fs.appendFileSync(recordFile,JSON.stringify(e)+'\n',{mode:0o600});},invoke:async(...args)=>{calls++;assert(!args[2].includes('NOT_AUTHORIZED'));return invokeText(raw)(...args);}});
- await work(root,j.id,model);let s=read(a),candidate=s.records[s.jobs[j.id].artifact_id];assert.equal(s.jobs[j.id].status,'completed',s.jobs[j.id].error);if(original){assert.equal(candidate.development.generation.candidate_bytes,pins.candidate_bytes);if(bad)assert.notEqual(candidate.development.candidate_sha256,pins.candidate_sha256);else assert.equal(candidate.development.candidate_sha256,pins.candidate_sha256);}else assert(candidate.development.generation.candidate_bytes>100000);assert.equal(candidate.development.generation.format,'files');assert.deepEqual(candidate.development.files.filter(f=>originals.some(x=>x.path===f.path)),emitted);assert.equal(calls,1);assert.equal(s.records[p.id].development.attempts.length,1);const captured=fs.readFileSync(recordFile,'utf8').trim().split('\n').map(JSON.parse);assert.equal(captured[2].original_model_text,raw);assert.equal(s.jobs[j.id].model_evidence.full_file_output.raw_model_text,raw);
+ const j=queue(t,a,'engineer',{development_id:p.id}),emitted=copy(expected);if(bad){const before=emitted[0].content;emitted[0].content=original?before.replace('fixed fictional','Fixed fictional'):before.replace('unchanged','unchangEd');assert.notEqual(emitted[0].content,before);assert.equal(Buffer.byteLength(emitted[0].content),Buffer.byteLength(before));}
+ const raw=wire(emitted),recordFile=path.join(root,'controlled-local-codec-evidence.jsonl');
+ const prepared=prepareFullFileInput({canonical_prompt:'Controlled local codec input DATA; not a Store-bound model invocation.',binding:{...binding(originals.map(f=>f.path)),job_id:j.id,instance_id:j.instance_id,plan_id:p.id,scope_sha256:p.development.scope_sha256}});
+ // Retain the complete supplied wire BEFORE parsing. These are local fixture
+ // bytes, not an adapter response or an assertion of physical process custody.
+ fs.appendFileSync(recordFile,JSON.stringify({stage:'local_codec_input',evidence_kind:'CONTROLLED_LOCAL_DATA_ONLY',original_output_text:raw,wire_sha256:hash(raw)})+'\n',{mode:0o600});
+ const normalized=normalizePreparedFullFileResult(prepared,raw);assert.equal(normalized.status,'ASSEMBLED');assert.deepEqual(normalized.artifact.files,emitted);
+ fs.appendFileSync(recordFile,JSON.stringify({stage:'local_codec_normalized',evidence_kind:'CONTROLLED_LOCAL_DATA_ONLY',accounting:normalized.accounting})+'\n',{mode:0o600});
+ const producer=controlledConsumerAdapter(t,JSON.stringify(normalized.artifact),'controlled-producer-'+j.id,prompt=>{assert(!prompt.includes('NOT_AUTHORIZED'));assert(!prompt.includes(prepared.encoding_instruction),'These consumer fixtures do not claim the separate full-file wire-prompt integration');});
+ await consume(t,a,j,producer);let s=read(a),candidate=s.records[s.jobs[j.id].artifact_id];if(original){assert.equal(candidate.development.generation.candidate_bytes,pins.candidate_bytes);if(bad)assert.notEqual(candidate.development.candidate_sha256,pins.candidate_sha256);else assert.equal(candidate.development.candidate_sha256,pins.candidate_sha256);}else assert(candidate.development.generation.candidate_bytes>100000);assert.equal(candidate.development.generation.format,'files');assert.deepEqual(candidate.development.files.filter(f=>originals.some(x=>x.path===f.path)),emitted);assert.equal(s.records[p.id].development.attempts.length,1);const captured=fs.readFileSync(recordFile,'utf8').trim().split('\n').map(JSON.parse);assert.deepEqual(captured.map(e=>e.stage),['local_codec_input','local_codec_normalized']);assert.equal(captured[0].original_output_text,raw);assert.equal(captured[0].wire_sha256,normalized.accounting.wire_sha256);assert.deepEqual(captured[1].accounting,normalized.accounting);assert.equal(s.jobs[j.id].model_evidence.full_file_output,undefined,'Local codec DATA must not become runtime producer evidence');
  const testJob=await engine.develop({...a,action:'run',plan_id:p.id,candidate_id:candidate.id},'codex');let receipt;const until=Date.now()+20000;while(Date.now()<until){s=read(a);if(s.jobs[testJob.id].artifact_id){receipt=s.records[s.jobs[testJob.id].artifact_id];break;}await new Promise(r=>setTimeout(r,25));}assert(receipt,'actual isolated test receipt required');assert.equal(receipt.development.result.tests_executed,true);
  for(const f of originals)assert.equal(fs.readFileSync(path.join(root,f.path),'utf8'),f.content);
  if(bad){assert.equal(receipt.development.result.status,'failed');assert.equal(receipt.development.acceptance,undefined);return;}
- assert.equal(receipt.development.result.status,'passed');const q=queue(a,'qa',{review_of:receipt.id});const qaText=JSON.stringify({content:'Controlled independent exact-candidate review; not native QA.',messages:[],notices:[],review:{verdict:'Pass',reason:'Verified complete fixture bytes and actual receipt.',permitted_action:'accept_local_development',candidate_sha256:candidate.development.candidate_sha256,receipt_sha256:receipt.development.receipt_sha256,blockers:[]}});await work(root,q.id,async(...args)=>({...await invokeText(qaText)(...args),native_id:'controlled-independent-qa'}));s=read(a);const review=s.records[s.jobs[q.id].artifact_id];assert.notEqual(s.jobs[q.id].native_id,s.jobs[j.id].native_id);const accepted=await engine.develop({...a,action:'accept',plan_id:p.id,receipt_id:receipt.id,review_id:review.id,receipt_sha256:receipt.development.receipt_sha256},'codex');assert.equal(accepted.source_integrated,false);
+ assert.equal(receipt.development.result.status,'passed');const q=queue(t,a,'qa',{review_of:receipt.id});const qaText=JSON.stringify({content:'Controlled independent exact-candidate review; not native QA.',messages:[],notices:[],review:{verdict:'Pass',reason:'Verified complete fixture bytes and actual receipt.',permitted_action:'accept_local_development',candidate_sha256:candidate.development.candidate_sha256,receipt_sha256:receipt.development.receipt_sha256,blockers:[]}});await consume(t,a,q,controlledConsumerAdapter(t,qaText,'controlled-independent-qa-'+q.id));s=read(a);const review=s.records[s.jobs[q.id].artifact_id];assert.notEqual(s.jobs[q.id].native_id,s.jobs[j.id].native_id);assert.notEqual(s.jobs[q.id].instance_id,s.jobs[j.id].instance_id);const accepted=await engine.develop({...a,action:'accept',plan_id:p.id,receipt_id:receipt.id,review_id:review.id,receipt_sha256:receipt.development.receipt_sha256},'codex');assert.equal(accepted.source_integrated,false);
 }
-test('actual worker/development/test/independent-review/accept path consumes emitted full files above100k',async t=>integration(t));
-test('declared output end cannot hide changed unchanged bytes: actual fixed tests fail without acceptance',async t=>integration(t,true));
+test('local codec DATA plus Store-born consumer/test/independent-review/accept path preserves full files above100k',async t=>integration(t));
+test('local codec output end cannot hide changed unchanged bytes: actual consumer fixed tests fail without acceptance',async t=>integration(t,true));
 
 for(const count of [1,3]){
- test(`preserved original ${count}-module 32KiB files pass literal emission and unchanged consumer with exact candidate bytes`,async t=>integration(t,false,count));
- test(`preserved original ${count}-module unchanged-byte corruption fails fixed tests with one consumed attempt`,async t=>integration(t,true,count));
+ test(`preserved original ${count}-module 32KiB files pass local codec and Store-born consumer with exact candidate bytes`,async t=>integration(t,false,count));
+ test(`preserved original ${count}-module local codec unchanged-byte corruption fails consumer fixed tests with one consumed attempt`,async t=>integration(t,true,count));
 }

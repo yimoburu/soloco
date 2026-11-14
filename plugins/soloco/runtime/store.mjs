@@ -15,10 +15,11 @@ import * as originalEngine from './engine.mjs';
 import * as originalWorker from './worker.mjs';
 import * as originalDevelopment from './develop.mjs';
 import {beginRuntimeExecutionWriteFrom,prepareRuntimeExecutionWriteFrom,validateRuntimeExecutionCommitFrom,runtimeExecutionCommitCutoffFrom,runtimeExecutionUsesNativeClockFrom,commitRuntimeExecutionWriteFrom,endRuntimeExecutionWriteFrom,bindRuntimeBookkeepingFrom} from './runtime-execution.mjs';
+import {beginComparisonEvidenceWriteFrom,prepareComparisonEvidenceWriteFrom,validateComparisonEvidenceCommitFrom,bindComparisonEvidenceBookkeepingFrom} from './integrated-comparison-evidence.mjs';
 export {PACKAGE,VERSION,skillBody,installedTeam,teamHash} from './team-source.mjs';
 
 // Explicitly tested state producers, not a blanket semver compatibility promise.
-export const COMPATIBLE_RUNTIME_VERSIONS = ['0.2.0', '0.2.1', '0.2.2', '0.3.0', '0.3.1', '0.4.0', '0.4.1', '0.5.0', '0.6.0', '0.6.1', '0.6.2', '0.6.3', '0.6.4', '0.6.5', '0.6.6', '0.6.7', '0.6.8', '0.6.9', '0.6.10', '0.6.11', '0.6.12', '0.6.13', '0.7.0', '0.7.1', '0.7.2', '0.7.3', '0.7.4', '0.7.5', '0.7.6', '0.7.7', '0.7.8', VERSION];
+export const COMPATIBLE_RUNTIME_VERSIONS = ['0.2.0', '0.2.1', '0.2.2', '0.3.0', '0.3.1', '0.4.0', '0.4.1', '0.5.0', '0.6.0', '0.6.1', '0.6.2', '0.6.3', '0.6.4', '0.6.5', '0.6.6', '0.6.7', '0.6.8', '0.6.9', '0.6.10', '0.6.11', '0.6.12', '0.6.13', '0.7.0', '0.7.1', '0.7.2', '0.7.3', '0.7.4', '0.7.5', '0.7.6', '0.7.7', '0.7.8', '0.7.9', VERSION];
 export const COMPATIBLE_TEAM_VERSIONS = ['0.1.0', ...COMPATIBLE_RUNTIME_VERSIONS];
 // Exact published v0.18/v0.19/v0.20 contracts; compatibility never adopts new instructions.
 export const V018_GOVERNANCE_SHA256 = '185933ddeafe9709bef44e9a6605ba7adb5faaa8bc43c1c64f1da3b03ae5f400';
@@ -314,6 +315,7 @@ export class Store {
     });
     bindOriginalWorkerAssignmentBookkeepingFrom(this,bound);
     bindRuntimeBookkeepingFrom(this,bound);
+    bindComparisonEvidenceBookkeepingFrom(this,bound);
     return bound;
   }
   readSelected(options) { return this.readSnapshot(()=>normalizedLayout(this.db)?this.snapshotState(readNormalized(this.db,options)):this.read()); }
@@ -413,8 +415,10 @@ export class Store {
       beginRuntimeExecutionWriteFrom(this,type);
       const metadata=captureStorageMetadata(this.db);
       const state=this.snapshotState(readNormalized(this.db,options)),before=JSON.stringify(state);
+      beginComparisonEvidenceWriteFrom(this,state);
       owned.state=state;const result=fn(state);
       checkAttached(this,true);
+      prepareComparisonEvidenceWriteFrom(this,state);
       prepareOriginalStoreExecutionWriteFrom(this,state,{selected:true,before:JSON.parse(before)});
       prepareRuntimeExecutionWriteFrom(this,state,{selected:true,before:JSON.parse(before)});
       state.revision=(state.revision??0)+1;state.updated_at=stamp();
@@ -432,6 +436,7 @@ export class Store {
       checkBeforeCommit(beforeCommit,this.db,state);
       validateOriginalStoreExecutionCommitFrom(this);
       validateRuntimeExecutionCommitFrom(this);
+      validateComparisonEvidenceCommitFrom(this);
       checkAttached(this,true);
       const nativeCommit=checkOriginalCommitCutoff(this);
       if(nativeCommit===null)this.db.exec('COMMIT');else nativeCommit();
@@ -456,8 +461,10 @@ export class Store {
       beginRuntimeExecutionWriteFrom(this,type);
       const metadata=normalizedLayout(this.db)?captureStorageMetadata(this.db):null;
       const state = this.read();
+      beginComparisonEvidenceWriteFrom(this,state);
       owned.state=state;const next = fn(state);owned.state=next;
       checkAttached(this,true);
+      prepareComparisonEvidenceWriteFrom(this,next);
       prepareOriginalStoreExecutionWriteFrom(this,next);
       prepareRuntimeExecutionWriteFrom(this,next);
       next.revision = (state?.revision ?? -1) + 1;
@@ -471,6 +478,7 @@ export class Store {
       checkBeforeCommit(beforeCommit,this.db,next);
       validateOriginalStoreExecutionCommitFrom(this);
       validateRuntimeExecutionCommitFrom(this);
+      validateComparisonEvidenceCommitFrom(this);
       checkAttached(this,true);
       const nativeCommit=checkOriginalCommitCutoff(this);
       if(nativeCommit===null)this.db.exec('COMMIT');else nativeCommit();

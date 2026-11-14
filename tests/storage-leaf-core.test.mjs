@@ -94,11 +94,26 @@ test('canonical digest and Store compatibility exports preserve identity and byt
   for(const value of ['', 'abc', 'é', 'e\u0301', '\ud800', '\0',Buffer.from([0,255,128,65])])assert.equal(digest(value),sha(value));
   assert.notEqual(digest('é'),digest('e\u0301'));
   assert.notEqual(digest('{"a":1,"b":2}'),digest('{"b":2,"a":1}'));
-  assert.equal(team.VERSION,'0.7.9');assert.equal(LATEST_LAYOUT,4);assert.equal(storage.SCHEMA,2);
+  assert.equal(team.VERSION,'0.7.10');assert.equal(LATEST_LAYOUT,4);assert.equal(storage.SCHEMA,2);
   assert.equal(team.PACKAGE,path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../plugins/soloco'));
   assert.throws(()=>storage.folder(team.PACKAGE),/outside the installed plugin/);
   const object={},reader={fixture:true};assert.equal(bindPublicReader(object,reader),object);assert.equal(publicReaderFor(object),reader);
   assert.equal(publicReaderFor({}),undefined);
+});
+
+test('0.7.10 reads and updates published 0.7.9 state without adopting a new pinned team',()=>{
+  const store=fixture();
+  try{
+    store.transaction('fictional.published-079',state=>{state.runtime_version='0.7.9';state.plugin_version='0.7.9';return state;});
+    const before=store.read(),pinned=team.publicTeam(before,'pinned'),hashBefore=team.teamHash(pinned);
+    assert.equal(storage.compatibleRuntime(before),true);
+    assert(storage.COMPATIBLE_RUNTIME_VERSIONS.includes('0.7.9'));
+    assert(storage.COMPATIBLE_TEAM_VERSIONS.includes('0.7.9'));
+    store.transaction('fictional.old-team-bookkeeping',state=>{state.fixture_counter=(state.fixture_counter??0)+1;return state;});
+    const after=store.read();
+    assert.equal(after.fixture_counter,1);assert.equal(after.runtime_version,'0.7.9');assert.equal(after.plugin_version,'0.7.9');
+    assert.deepEqual(team.publicTeam(after,'pinned'),pinned);assert.equal(team.teamHash(team.publicTeam(after,'pinned')),hashBefore);
+  }finally{store.close();}
 });
 
 test('real lazy team assets, policy selection, fallback and exact hash tuple survive extraction',()=>{
@@ -109,7 +124,7 @@ test('real lazy team assets, policy selection, fallback and exact hash tuple sur
     ['compat/company-0.1.0.md','bb6c3dbb6e7a03d033b7c39dccc59c31738369ffccc4fe6ff609d679e0eacc74']
   ];
   const texts=assets.map(([relative,expected])=>{const value=fs.readFileSync(path.join(team.PACKAGE,relative),'utf8');assert.equal(sha(value),expected);return value;});
-  const expected={plugin_version:'0.7.9',governance:texts[0],governance_sha256:sha(texts[0]),roles:JSON.parse(texts[1]),cos_instructions:texts[2].replace(/^---[\s\S]*?---\s*/,'')};
+  const expected={plugin_version:'0.7.10',governance:texts[0],governance_sha256:sha(texts[0]),roles:JSON.parse(texts[1]),cos_instructions:texts[2].replace(/^---[\s\S]*?---\s*/,'')};
   const read=fs.readFileSync,reads=[];
   fs.readFileSync=function(file,...args){reads.push(String(file));return Reflect.apply(read,this,[file,...args]);};
   try {

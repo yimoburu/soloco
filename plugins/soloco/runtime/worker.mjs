@@ -33,6 +33,22 @@ import {assertSpecialistEligible,specialistName} from './specialists.mjs';
 import {isOriginMechanicalQaWorker,workPeerOriginMechanicalQa} from './origin-mechanical-qa-worker.mjs';
 import {prepareOriginalWorkerLaunchFrom,cleanupOriginalWorkerLaunchFailure,originalWorkerFailedLaunchClosed} from './peers/prospective-local-worker-inventory-producer.mjs';
 import {prepareRuntimeModelRequestFrom,runtimeExecutionLaneFrom,isLegacyRuntimeModelCapabilityFrom,assertRuntimeModelProcessObservedFrom,assertRuntimeWorkerStartedFrom,approveRuntimeModelProcessObservationFrom,cleanupLegacyRuntimeLaunchFailure,legacyRuntimeFailedLaunchClosed} from './runtime-execution.mjs';
+import {prepareOriginalModelRequestFrom} from './peers/prospective-local-worker-inventory-producer.mjs';
+import {comparisonWorkerStoreFrom,prepareComparisonWorkerCallFrom,stageComparisonWorkerRequestFrom,stageComparisonWorkerObservationFrom,guardComparisonWorkerRequestFrom,bindComparisonWorkerRequestFrom,invokeComparisonWorkerCallFrom,assertComparisonWorkerPublicationFrom,comparisonWorkerProcessClosedFrom,closeComparisonWorkerCall} from './integrated-comparison-worker.mjs';
+
+// Only the actual worker template can mint this prompt loan. The public
+// inspector lends facts from this map; matching prompt/role/JSON is insufficient.
+const comparisonWorkerPrompts=new WeakMap();
+export function inspectComparisonWorkerPromptFrom(handle,actualStore){
+  const record=comparisonWorkerPrompts.get(handle);
+  if(!record||record.store!==actualStore||record.used)throw Error('Actual comparison worker prompt required');
+  record.used=true;
+  return actualStore.readSnapshot(()=>{
+    const loan=originalStoreExecutionCustodyFrom(actualStore),state=actualStore.read();loan.assert();
+    if(loan.root!==record.facts.root||digest(JSON.stringify(state.jobs?.[record.facts.job_id]))!==record.jobSha256)throw Error('Actual comparison worker subject changed');
+    loan.assert();return record.facts;
+  });
+}
 
 const originalWorkerCommitCutoffs=new WeakMap();
 export function inspectOriginalWorkerCommitCutoffFrom(proof,actualDb){
@@ -125,12 +141,15 @@ function workerMonitorFacts(state,current,grantExpiry,developmentMaxBytes) {
     development_max_bytes:developmentMaxBytes,bounds:Object.freeze(bounds)});
 }
 
-export async function work(root, jobId, model = runRuntimeModel) {
+export async function work(root, jobId, model = runRuntimeModel, comparisonPlan = null) {
+  if(comparisonPlan!==null&&model!==runRuntimeModel)throw Error('Comparison requires the fixed runtime adapter');
+  const selectedComparisonStore=comparisonPlan===null?null:comparisonWorkerStoreFrom(comparisonPlan,root,jobId);
   const mechanical=withStore(root,store=>store.readSnapshot(()=>{const state=store.read();return isOriginMechanicalQaWorker(state,state.jobs?.[jobId]);}));
+  if(mechanical&&comparisonPlan!==null)throw Error('Comparison does not support mechanical QA');
   if(mechanical)return workPeerOriginMechanicalQa(root,jobId,model===runRuntimeModel?runModel:model);
   const monitorStoreStamp=workerMonitorStoreStamp(root);
   let job, state, context, output, artifact, controller, monitor, claimed=false,spawned=false,invoked=false,lastGrantExpiry,lastDevelopmentMaxBytes,currentPhysicalCall=null;
-  let monitorCache=null,lastExecutionDeadline=null;
+  let monitorCache=null,lastExecutionDeadline=null,activeComparisonCall=null,activeComparisonDeadline=null;
   const supplemental=[],handoverReads=[];
   let deliveryLedger,pendingDelivery,partitionDelivery,scopedStreamLedger;
   let pendingRecordReads=[];
@@ -285,12 +304,26 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
       for(let round=0;frozenEvidence||context.stream||(repair?retentionPhase!=='done':round<=16);round++){
       let retentionEnvelope=null;
       if(repair){assertRetentionRepairCallBudget({native_calls:retentionCalls,history_rounds:retentionHistoryRounds,phase:retentionPhase});if(request.length>RETENTION_FRAME_CHARACTERS)throw Error('Complete retention initial/READ/final frame exceeds historical character bound');}
-      const remaining=lastExecutionDeadline?Math.min(timeout.timeout_ms,Date.parse(lastExecutionDeadline)-Date.now()):handoverDeadline?Math.min(timeout.timeout_ms,handoverDeadline-Date.now()):timeout.timeout_ms;
+      let remaining=lastExecutionDeadline?Math.min(timeout.timeout_ms,Date.parse(lastExecutionDeadline)-Date.now()):handoverDeadline?Math.min(timeout.timeout_ms,handoverDeadline-Date.now()):timeout.timeout_ms;
       if(remaining<1000)throw Error('Insufficient execution time for supplemental read');
       if(context.qualification&&Buffer.byteLength(request,'utf8')>(scopedContext(context)?scoped.SCOPED_LIMITS:context.qualification.limits).input_bytes)throw Error('Partition qualification request overflow; nothing was truncated');
       if(frozenEvidence&&request.length>200000)throw Error('Handover request exceeds 200000 characters; nothing was truncated');
       let callTiming;
       const callRequestedAt=Date.now();
+      const invocation={invocation_id:id('model-invocation'),job_id:job.id,instance_id:job.instance_id,worker_pid:process.pid,host:job.host,requested_at:new Date(callRequestedAt).toISOString()};
+      let comparisonCall=null,comparisonDeadline=null;
+      let callMaxOutputCharacters=context.qualification?(context.packet.profile?context.qualification.limits.output_wire_bytes*6+16384:100000):Math.max(2000000,contextBudgetForJob(state,job));
+      if(comparisonPlan!==null){
+        const overallDeadline=((job.handover_review_window_minutes||job.code_review_window_minutes||context.stream)&&overallTiming)||continuationGrantDeadline!==null?Math.min(overallTiming?Date.parse(overallTiming.execution_deadline_at):Infinity,continuationGrantDeadline??Infinity):null;
+        const loan=Object.freeze({});
+        selectedComparisonStore.readSnapshot(()=>{
+          const custody=originalStoreExecutionCustodyFrom(selectedComparisonStore),live=selectedComparisonStore.read(),current=eligibility(live);custody.assert();
+          comparisonWorkerPrompts.set(loan,{store:selectedComparisonStore,used:false,jobSha256:digest(JSON.stringify(current)),facts:Object.freeze({root:custody.root,job_id:jobId,invocation_id:invocation.invocation_id,requested_at:invocation.requested_at,round,native_id:session??null,prompt:request,cwd:dir,timeout_ms:remaining,timeout_reason:timeout.timeout_reason,max_output_characters:callMaxOutputCharacters,overall_deadline_at:overallDeadline,signal:controller.signal,stream:Boolean(context.stream),qualification:Boolean(context.qualification||frozenEvidence),continuation:Boolean(repair||target?.development?.type==='review_continuation'),supplemental:round!==0})});
+          custody.assert();
+        });
+        const prepared=prepareComparisonWorkerCallFrom(comparisonPlan,loan);
+        comparisonCall=prepared.call;activeComparisonCall=comparisonCall;comparisonDeadline=prepared.absolute_deadline_ms;activeComparisonDeadline=comparisonDeadline;request=prepared.prompt;remaining=prepared.timeout_ms;callMaxOutputCharacters=prepared.max_output_characters;
+      }
       if([7,8].includes(job.context_format)){
         const next=runtimeContextBytes+Buffer.byteLength(request,'utf8');
         if(next+2048>context.context_budget_bytes)throw Error('Task context Held: complete prompt and retrieval history exceed the task wire budget; split the task, nothing was truncated');
@@ -304,7 +337,6 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
       // A prior read round proves only that earlier process closed. Failure of
       // this invocation still needs its own termination evidence for release.
       output=undefined;
-      const invocation={invocation_id:id('model-invocation'),job_id:job.id,instance_id:job.instance_id,worker_pid:process.pid,host:job.host,requested_at:new Date(callRequestedAt).toISOString()};
       let originalProcessBirth=null,originalProcessReceipt=null;
       const retainModelBounds=(store,s)=>{
         const current=eligibility(s),bounds=[],timing=jobTimeoutState(current,Date.now());
@@ -322,12 +354,13 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
         }
         retainWorkerCommitCutoff(store.db,bounds);
       };
-      const invocationStore=new Store(root),physicalCall={token:null,birth:null,receipt:null,closed:false};
+      const invocationStore=selectedComparisonStore??new Store(root),physicalCall={token:null,birth:null,receipt:null,closed:false};
       currentPhysicalCall=physicalCall;
       let launch=null,legacyPrimaryRequested=false;
       try{
       invocationStore.transaction('job.model_process.requested',s=>{
         const current=eligibility(s);requestModelProcess(current,invocation);
+        if(comparisonCall!==null)stageComparisonWorkerRequestFrom(comparisonCall,s);
         if(repair&&retentionPhase==='final'&&runtimeExecutionLaneFrom(invocationStore,s)==='legacy'){
           // Freeze the actual final frame before issuing its one-use legacy
           // capability. Both history readers validate this exact joint change.
@@ -336,6 +369,7 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
         launch=prepareRuntimeModelRequestFrom(invocationStore,s,{job_id:jobId,invocation_id:invocation.invocation_id,host:job.host,native_id:session,prompt:request,cwd:dir,selection:job.model_selection??null});
         if(legacyPrimaryRequested&&!isLegacyRuntimeModelCapabilityFrom(launch))throw Error('Legacy final request capability unavailable');
         if(launch)retainModelBounds(invocationStore,s);
+        if(comparisonCall!==null&&launch)guardComparisonWorkerRequestFrom(comparisonCall,s);
         return s;
       },{beforeCommit:(_db,next)=>{if(legacyPrimaryRequested)retainWorkerRetentionCommit(_db,next,repair.control);}});
       if(repair&&retentionPhase==='final'&&!legacyPrimaryRequested)withStore(root,db=>db.transaction('job.retention_primary_requested',s=>{
@@ -345,7 +379,7 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
       const recordOriginalClose=(birth,receipt)=>{
         assertRuntimeAdapterModelClosureFrom(launch,birth,receipt);
         if(!originalProcessBirth||JSON.stringify(birth)!==JSON.stringify(originalProcessBirth))throw Error('Original model process identity changed');
-        withStore(root,db=>db.transaction('job.model_process.closed',s=>{recordModelProcessClosure(s.jobs[jobId],invocation,birth,receipt);approveRuntimeModelProcessObservationFrom(db,s,launch,'closure',birth,receipt);return s;}));
+        withStore(root,db=>db.transaction('job.model_process.closed',s=>{recordModelProcessClosure(s.jobs[jobId],invocation,birth,receipt);approveRuntimeModelProcessObservationFrom(db,s,launch,'closure',birth,receipt);if(comparisonCall!==null)stageComparisonWorkerObservationFrom(comparisonCall,db,s,'closure');return s;}));
         originalProcessReceipt=JSON.parse(JSON.stringify(receipt));physicalCall.receipt=originalProcessReceipt;
         // Receipt first, then a separate idempotent reconciliation. A failed
         // second write leaves evidence available for supported cold readback.
@@ -363,22 +397,25 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
       };
       if(!launch)invocationStore.transaction('job.model_process.launch_requested',s=>{
         retainModelBounds(invocationStore,s);
-        launch=prepareOriginalWorkerLaunchFrom(invocationStore,s,{job_id:jobId,kind:'model',invocation_id:invocation.invocation_id});return s;
+        launch=comparisonCall===null?prepareOriginalWorkerLaunchFrom(invocationStore,s,{job_id:jobId,kind:'model',invocation_id:invocation.invocation_id}):prepareOriginalModelRequestFrom(invocationStore,s,{job_id:jobId,invocation_id:invocation.invocation_id,host:job.host,native_id:session,prompt:request,cwd:dir,selection:job.model_selection??null});
+        if(comparisonCall!==null)guardComparisonWorkerRequestFrom(comparisonCall,s);
+        return s;
       });
+      if(comparisonCall!==null)bindComparisonWorkerRequestFrom(comparisonCall,launch);
       physicalCall.token=launch;
-      output=await model(job.host,session,request,dir,remaining,job.model_selection??null,{
+      const modelOptions={
         ...(isLegacyRuntimeModelCapabilityFrom(launch)?{runtimeExecutionLaunch:launch}:{originalExecutionLaunch:launch}),
         beforeOriginalSpawn:()=>withStore(root,current=>eligibility(current.read())),
-        sessionTitle:displayTitle,sessionNameDirectory:dir,
-        onModelProcess:birth=>{assertRuntimeAdapterModelBirthFrom(launch,birth);withStore(root,db=>db.transaction('job.model_process.born',s=>{recordModelProcessBirth(s.jobs[jobId],invocation,birth);approveRuntimeModelProcessObservationFrom(db,s,launch,'birth',birth);return s;}));originalProcessBirth=JSON.parse(JSON.stringify(birth));physicalCall.birth=originalProcessBirth;},
+        ...(comparisonCall===null?{sessionTitle:displayTitle,sessionNameDirectory:dir}:{}),
+        onModelProcess:birth=>{assertRuntimeAdapterModelBirthFrom(launch,birth);withStore(root,db=>db.transaction('job.model_process.born',s=>{recordModelProcessBirth(s.jobs[jobId],invocation,birth);approveRuntimeModelProcessObservationFrom(db,s,launch,'birth',birth);if(comparisonCall!==null)stageComparisonWorkerObservationFrom(comparisonCall,db,s,'birth');return s;}));originalProcessBirth=JSON.parse(JSON.stringify(birth));physicalCall.birth=originalProcessBirth;},
         onModelClosure:recordOriginalClose,
-        signal:controller.signal,timeoutReason:timeout.timeout_reason,maxOutputCharacters:context.qualification?(context.packet.profile?context.qualification.limits.output_wire_bytes*6+16384:100000):Math.max(2000000,contextBudgetForJob(state,job)),
+        signal:controller.signal,timeoutReason:timeout.timeout_reason,maxOutputCharacters:callMaxOutputCharacters,
         ...(((job.handover_review_window_minutes||job.code_review_window_minutes||context.stream)&&overallTiming)||continuationGrantDeadline!==null?{executionDeadlineAt:Math.min(overallTiming?Date.parse(overallTiming.execution_deadline_at):Infinity,continuationGrantDeadline??Infinity)}:{}),
         onSpawn:(job.handover_review_window_minutes||job.code_review_window_minutes||context.stream||round===0)?timing=>{
           if(controller.signal.aborted)throw controller.signal.reason;
           if(callTiming)throw new Error('Duplicate execution spawn callback');
           const start=Date.parse(timing?.execution_started_at);
-          const cap=Math.min((job.handover_review_window_minutes||job.code_review_window_minutes||context.stream)&&overallTiming?Math.min(remaining,Date.parse(overallTiming.execution_deadline_at)-start):remaining,continuationGrantDeadline===null?Infinity:continuationGrantDeadline-start);
+          const cap=Math.min((job.handover_review_window_minutes||job.code_review_window_minutes||context.stream)&&overallTiming?Math.min(remaining,Date.parse(overallTiming.execution_deadline_at)-start):remaining,continuationGrantDeadline===null?Infinity:continuationGrantDeadline-start,comparisonDeadline===null?Infinity:comparisonDeadline-start);
           const recorded=executionTiming(start,{...timeout,timeout_ms:cap});
           if(start<callRequestedAt||start>Date.now()||Object.keys(recorded).some(k=>timing?.[k]!==recorded[k]))throw new Error('Invalid adapter spawn timing');
           callTiming=recorded;
@@ -397,14 +434,16 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
           // Keep historical local defaults aligned with the observed start.
           if(job.timeout_policy_version===undefined)Object.assign(job,{timeout_policy_version:TIMEOUT_POLICY_VERSION,...timeout});
         }:undefined
-      });
-      assertRuntimeModelProcessObservedFrom(launch,originalProcessBirth,originalProcessReceipt);
+      };
+      output=comparisonCall===null?await model(job.host,session,request,dir,remaining,job.model_selection??null,modelOptions):await invokeComparisonWorkerCallFrom(comparisonCall,modelOptions);
+      if(comparisonCall===null)assertRuntimeModelProcessObservedFrom(launch,originalProcessBirth,originalProcessReceipt);
+      else if(!comparisonWorkerProcessClosedFrom(comparisonCall,originalProcessBirth,originalProcessReceipt))throw Error('Comparison physical closure remains unknown');
       physicalCall.closed=true;
       }finally{
         // withStore closes synchronously when passed a Promise. Keep this exact
         // issuer alive until forwarding adapters and private observations finish.
-        try{if(launch){assertRuntimeModelProcessObservedFrom(launch,originalProcessBirth,originalProcessReceipt);physicalCall.closed=true;}}catch{/* unobserved or failed-write invocation remains UNKNOWN */}
-        invocationStore.close();
+        try{if(launch){if(comparisonCall===null)assertRuntimeModelProcessObservedFrom(launch,originalProcessBirth,originalProcessReceipt);else if(!comparisonWorkerProcessClosedFrom(comparisonCall,originalProcessBirth,originalProcessReceipt))throw Error('Comparison physical closure remains unknown');physicalCall.closed=true;}}catch{/* unobserved or failed-write invocation remains UNKNOWN */}
+        if(selectedComparisonStore===null)invocationStore.close();
       }
       if([7,8].includes(job.context_format)){
         runtimeContextBytes+=Buffer.byteLength(output.text,'utf8');
@@ -620,7 +659,9 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
       }
       return s;
     },{afterWrite:job?.runtime_task?updateTaskIndex:undefined,beforeCommit:(_db,nextState)=>{
+      if(activeComparisonCall!==null)assertComparisonWorkerPublicationFrom(activeComparisonCall);
       const bounds=[],current=nextState.jobs[jobId];
+      if(activeComparisonCall!==null)bounds.push({at:activeComparisonDeadline,code:'ROLE_TIMEOUT',message:'Comparison final pre-COMMIT deadline reached'});
       if(job?.code_review_window_minutes){
         const cutoff=Date.parse(overallTiming?.execution_deadline_at??'');
         if(!Number.isSafeInteger(cutoff)||Date.now()>=cutoff)throw Object.assign(Error('Code review final pre-COMMIT deadline reached'),{code:'ROLE_TIMEOUT'});
@@ -635,9 +676,12 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
       }
       retainWorkerCommitCutoff(_db,bounds);
     }}));
-  } catch(error) {
+  } catch(originalError) {
+    // The comparison producer retains the opaque primary privately. Never run
+    // the ordinary diagnostic getters against a provider's thrown value.
+    const error=comparisonPlan===null?originalError:Error('Comparison failed; original outcome retained privately');
     if(!claimed&&error.code==='ORIGIN_MECHANICAL_QA_FIXED_WORKER_REQUIRED')throw error;
-    const originalEscaped=cleanupOriginalWorkerLaunchFailure(error),legacyEscaped=cleanupLegacyRuntimeLaunchFailure(error),escaped=originalEscaped||legacyEscaped;
+    const originalEscaped=cleanupOriginalWorkerLaunchFailure(originalError),legacyEscaped=cleanupLegacyRuntimeLaunchFailure(originalError),escaped=originalEscaped||legacyEscaped;
     const rejectedOutput=output??error.rejected_output;
     const unowned=Symbol('unowned worker');
     try {withStore(root,db=>db.transaction('job.failed',s=>{
@@ -655,7 +699,7 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
         // child observation may enter the canonical all-invocation reconciler.
         if(privateClose!==null||unprovenPhysical)current.coordination_release={termination_confirmed:false,reason:'original_process_closure_unknown',at:stamp()};
         else current.coordination_release={termination_confirmed:true,reason:invoked?'model_process_closed':'model_not_invoked',at:stamp()};
-        const cause=controller?.signal.aborted?controller.signal.reason:error;
+        const cause=comparisonPlan!==null?error:controller?.signal.aborted?controller.signal.reason:error;
         const evidence=failureEvidence(error),reason=failureEvidence(cause);
         if(privateClose!==null||unprovenPhysical)evidence.termination_confirmed=false;
         current.execution_failure={...evidence,...(context?.qualification&&reason.code==='ASSIGNMENT_INELIGIBLE'?{abort_kind:'eligibility_loss'}:{}),outcome:/TIMEOUT/.test(reason.code??evidence.code??'')?'timeout':controller?.signal.aborted?'cancellation':'failure',at:stamp(),...(controller?.signal.aborted?{abort:reason}:{})};
@@ -702,10 +746,12 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
         try{reconcileStoredModelProcessClosure(db,current);current.execution_failure.termination_confirmed=true;}catch{/* retain UNKNOWN */}
       }
       return s;
-    }));} catch(failure) {if(failure!==unowned)throw escaped?error:failure;}
+    }));} catch(failure) {if(comparisonPlan!==null)throw originalError;if(failure!==unowned)throw escaped?error:failure;}
+    if(comparisonPlan!==null)throw originalError;
   } finally {
     if(monitor!==undefined)clearInterval(monitor);
     monitorCache=null;lastExecutionDeadline=null;
+    if(activeComparisonCall!==null)closeComparisonWorkerCall(activeComparisonCall);
   }
 }
 if(process.argv[1] && path.resolve(process.argv[1])===fileURLToPath(import.meta.url))queueMicrotask(()=>{work(process.argv[2],process.argv[3]).catch(error=>{console.error(error);process.exitCode=1;});});

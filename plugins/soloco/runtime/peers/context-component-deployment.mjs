@@ -28,8 +28,8 @@ export function inspectOriginalOwnerMaintenanceFreshSupport(...args){if(args.len
 const REPO=fileURLToPath(new URL('../../../../',import.meta.url));
 const DEVELOPER=Object.freeze({lookup:'lookupOriginalSelectedContextComponentData',inspect:'inspectOriginalSelectedContextComponentData',layout:originalDeveloperComponentLayout}),PACKAGED=Object.freeze({lookup:'lookupOriginalSelectedPackagedContextComponentData',inspect:'inspectOriginalSelectedPackagedContextComponentData',layout:originalPackagedComponentLayout});
 const deploymentRoot=service=>path.join(originalComponentLayoutPaths(service.layout()).durable_root,'deployments');
-const EXPECTED_PACKAGE='b36d16a6c117e2130d5bf294b2989dfac9fba103fa568332c78ca0965f90ad13';
-const EXPECTED_MANIFEST='52776d3b8e1627de60e4334387120371cf1091585c94ead37d99910b10ce824d';
+const EXPECTED_PACKAGE='acf70aa9f69ce34e4a514d35e870d8b92a26ae1c26f797dcfc2947abdccdef99';
+const EXPECTED_MANIFEST='7cfddeed65c6825a5b767f80dbb283c24cf61820b91c8b577c24a81428bded4f';
 const HOST='plugins/soloco/runtime/peers/codex-task-host.mjs';
 const INTERPRETER='plugins/soloco/runtime/peers/peer-context-interpreter.mjs';
 const BOOTSTRAP_MEMBERSHIP='plugins/soloco/runtime/peers/bootstrap-membership.mjs';
