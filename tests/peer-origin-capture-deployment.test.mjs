@@ -17,6 +17,8 @@ const DEPLOYMENT='plugins/soloco/runtime/peers/context-component-deployment.mjs'
 const SOURCE='plugins/soloco/helpers/origin-sidecar-capture.c';
 const HOST='plugins/soloco/runtime/peers/codex-task-host.mjs';
 const INTERPRETER='plugins/soloco/runtime/peers/peer-context-interpreter.mjs';
+const BOOTSTRAP='plugins/soloco/runtime/peers/bootstrap-membership.mjs';
+const BOOTSTRAP_RUNNER='plugins/soloco/runtime/peers/bootstrap-membership-native-runner.mjs';
 const CLANG='/Applications/Xcode-26.3.0.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang';
 const SDK='/Applications/Xcode-26.3.0.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk';
 const FLAGS=['-std=c11','-O2','-Wall','-Wextra','-Werror','-target','arm64-apple-macos11.0'];
@@ -36,7 +38,10 @@ function manifest(){const pkg=JSON.parse(bytes('native/codex/source-package.json
 
 test('new fixed package/driver/builder/deployment tuple binds the unchanged complete native source cut',()=>{
  const p=bytes('native/codex/source-package.json'),pkg=JSON.parse(p),driver=bytes('native/codex/tools/protected_native.py').toString(),builder=bytes(BUILDER).toString(),deployment=bytes(DEPLOYMENT).toString();
- assert.equal(pkg.overlay.length,159);assert.equal(pkg.qualified_binary,null);
+ // Frozen package includes the four added readonly3 contract overlays from
+ // 1d441e31 (frontier, final review, maintenance and ordinary task).
+ assert.equal(hash(p),'acf70aa9f69ce34e4a514d35e870d8b92a26ae1c26f797dcfc2947abdccdef99');
+ assert.equal(pkg.overlay.length,163);assert.equal(pkg.qualified_binary,null);
  assert.deepEqual(pkg.sidecar_capture,{protocol:'soloco-origin-sidecar-source-build-v1',source:{path:SOURCE,...ref(bytes(SOURCE))},binary:'origin-sidecar-capture',arguments:['origin-sidecar-capture-v1'],target:'arm64-apple-macos11.0',flags:FLAGS});
  assert.equal(driver.match(/MANIFEST_SHA256 = "([a-f0-9]{64})"/)[1],hash(p));
  assert.equal(constant(builder,'PACKAGE_SHA'),hash(p));assert.equal(constant(builder,'DRIVER_SHA'),hash(bytes('native/codex/tools/protected_native.py')));
@@ -105,15 +110,28 @@ async function deploymentFixture(t,{incomplete=false}={}){
  const root=temporary(t),home=path.join(root,'fictional-home');fs.mkdirSync(path.join(root,'work/peer-context-component'),{recursive:true,mode:0o700});fs.mkdirSync(home);
  const originalDeployment=bytes(DEPLOYMENT).toString(),homeSelector="process.env.CODEX_HOME??path.join(os.homedir(),'.codex')";
  assert.equal(originalDeployment.split(homeSelector).length,2);
- const bootstrapDependency="'./bootstrap-membership-preflight.mjs'",bootstrapUrl=JSON.stringify(pathToFileURL(path.join(ROOT,'plugins/soloco/runtime/peers/bootstrap-membership-preflight.mjs')).href);assert.equal(originalDeployment.split(bootstrapDependency).length,2);
- const homeLiteral=JSON.stringify(home),deploymentSource=originalDeployment.replace(homeSelector,homeLiteral).replace(bootstrapDependency,bootstrapUrl);
- assert.equal(deploymentSource.split(homeLiteral).length,2);assert.equal(deploymentSource.replace(homeLiteral,homeSelector).replace(bootstrapUrl,bootstrapDependency),originalDeployment);
+ // Preserve the actual canonical wire/slot namespaces and their opaque
+ // identities instead of copying an incomplete transitive runtime graph.
+ const fixedDependencies=[['bootstrap-membership-preflight.mjs',1],['input-frontier-wire.mjs',2],['origin-maintenance-wire.mjs',3],['protected-source-build-slot.mjs',2]].map(([name,count])=>["'./"+name+"'",JSON.stringify(pathToFileURL(path.join(ROOT,'plugins/soloco/runtime/peers',name)).href),count]);
+ let deploymentSource=originalDeployment;
+ for(const [specifier,resolved,count] of fixedDependencies){
+  assert.equal(deploymentSource.split(specifier).length-1,count,'Every fixed dependency occurrence: '+specifier);assert.equal(deploymentSource.split(resolved).length-1,0);
+  deploymentSource=deploymentSource.replaceAll(specifier,resolved);
+  assert.equal(deploymentSource.split(resolved).length-1,count);assert.equal(deploymentSource.split(specifier).length-1,0);
+ }
+ const homeLiteral=JSON.stringify(home);deploymentSource=deploymentSource.replace(homeSelector,homeLiteral);
+ assert.equal(deploymentSource.split(homeLiteral).length,2);
+ let restored=deploymentSource.replace(homeLiteral,homeSelector);for(const [specifier,resolved] of [...fixedDependencies].reverse())restored=restored.replaceAll(resolved,specifier);assert.equal(restored,originalDeployment,'Only fixed dependency URLs and fictional home may change');
  const deploymentFile=put(root,DEPLOYMENT,deploymentSource);layoutDependencies(root);put(root,SOURCE,bytes(SOURCE));
  put(root,HOST,'export function createCodexTaskRuntime(){throw Error("SYNTHETIC HOST MUST NOT EXECUTE");}\n');
  put(root,INTERPRETER,'export function prepareOriginalPeerContextDelivery(){throw Error("SYNTHETIC INTERPRETER MUST NOT EXECUTE");}\n');
+ // Current deployment checks all four module interfaces. These two added
+ // placeholders only complete that package; no bootstrap issuer can execute.
+ put(root,BOOTSTRAP,'export function createPeerBootstrapMembership(){throw Error("SYNTHETIC BOOTSTRAP MUST NOT EXECUTE");}\nexport function prepareOriginalPeerBootstrapMembership(){throw Error("SYNTHETIC BOOTSTRAP MUST NOT EXECUTE");}\n');
+ put(root,BOOTSTRAP_RUNNER,'export function runOriginalPeerBootstrapMembership(){throw Error("SYNTHETIC BOOTSTRAP RUNNER MUST NOT EXECUTE");}\n');
  const component=path.join(root,'fictional-sealed-component'),copies=[],files={executable:Buffer.from('NEVER-EXECUTED-HOST\n'),'origin-sidecar-capture':Buffer.from('NEVER-EXECUTED-CENSUS-HELPER\n'),'compiled-source-manifest.json':manifest(),'build-receipt.json':Buffer.from('SYNTHETIC-UNQUALIFIED\n'),'source-package.json':bytes('native/codex/source-package.json'),'Cargo.lock':Buffer.from('SYNTHETIC LOCK\n'),'toolchain-manifest.toml':Buffer.from('SYNTHETIC TOOLCHAIN\n')};
  for(const [name,body] of Object.entries(files)){const file=put(component,'native/'+name,body);copies.push({sealed_path:'native/'+name,original_path:file,...ref(body)});}
- for(const name of [HOST,INTERPRETER])copies.push({sealed_path:'node-source/'+name,original_path:path.join(root,name),...ref(fs.readFileSync(path.join(root,name)))});
+ for(const name of [HOST,INTERPRETER,BOOTSTRAP,BOOTSTRAP_RUNNER])copies.push({sealed_path:'node-source/'+name,original_path:path.join(root,name),...ref(fs.readFileSync(path.join(root,name)))});
  const data={protocol:'soloco-selected-context-component-data-v1',kind:'SELECTED_COMPILED_COMPONENT_DATA',command:{status:'COMPILED_COMPONENT'},native_qualified:false,claims_released:false,copies,component_root:component,node_profile:{record:{version:process.version,platform:process.platform,arch:process.arch,exec_argv:[...process.execArgv],node:ref(fs.readFileSync(fs.realpathSync(process.execPath)))}},input_key:'SYNTHETIC-INPUT',intent_key:'SYNTHETIC-INTENT',output:{sha256:hash('SYNTHETIC-OUTPUT')},owner_epoch:{owner_sha256:hash('SYNTHETIC-OWNER'),generation:0},node_inputs:ref(Buffer.from('SYNTHETIC NODE INVENTORY'))};
  const dataFile=put(root,'fixture-data.json',JSON.stringify(data));
  const producerFile=put(root,BUILDER,`import fs from 'node:fs';let original=Object.freeze({});export function lookupOriginalSelectedContextComponentData(){return original;}export function inspectOriginalSelectedContextComponentData(h){if(h!==original)throw Error('SYNTHETIC_OLD_SELECTION');return JSON.parse(fs.readFileSync(${JSON.stringify(dataFile)},'utf8'));}export function replaceOriginalForSourceTest(){original=Object.freeze({});}\n`);
