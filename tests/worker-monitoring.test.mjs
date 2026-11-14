@@ -15,6 +15,8 @@ import {developmentAssignment} from '../plugins/soloco/runtime/develop.mjs';
 import {sandboxProfile} from '../plugins/soloco/runtime/local-sandbox.mjs';
 import {executionTiming} from '../plugins/soloco/runtime/timeout.mjs';
 import {work} from '../plugins/soloco/runtime/worker.mjs';
+import {recordOriginalWorkerAssignmentFrom} from '../plugins/soloco/runtime/peers/prospective-local-worker-inventory-producer.mjs';
+import {launchOriginalWorker,disposeOriginalProcessFixtures} from './original-worker-model-fixture.mjs';
 
 // These fixtures exercise real Engine, normalized Store, context and worker
 // transitions. All model outputs/semantic judgments are explicit fictional
@@ -88,7 +90,7 @@ async function fixture(fn,{domainInput=true}={}){
   process.env.COMPANY_PLUGIN_DATA=path.join(base,'bindings');
   const args={root:path.join(base,'company'),session_id:'fictional-monitor-founder',epoch:1};fs.mkdirSync(args.root);
   const f={base,args,effects,sequence:0,read:()=>withStore(args.root,db=>db.read())};
-  f.change=change=>withStore(args.root,db=>{let value;db.transaction('fictional.monitor.fixture',s=>{value=change(s);return s;});return value;});
+  f.change=(change,type='fictional.monitor.fixture')=>withStore(args.root,db=>{let value;db.transaction(type,s=>{value=change(s,db);return s;});return value;});
   f.action=(action,extra={})=>engine.specialists({...args,action,operation_id:'monitor-'+(++f.sequence),source_instruction:instruction,...extra},'codex');
   try{
     engine.bind(args.root,args.session_id,'codex');engine.open({...args,idea:'Fictional worker-monitor regression only'},'codex');
@@ -98,6 +100,7 @@ async function fixture(fn,{domainInput=true}={}){
     if(domainInput)engine.save({...args,id:'domain-input',kind:'artifact',content:'FICTIONAL unresolved condition; no measured benefit or permission.'},'codex');
     await fn(f);
   }finally{
+    disposeOriginalProcessFixtures(args.root);
     if(previous===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=previous;
     fs.rmSync(base,{recursive:true,force:true});
   }
@@ -150,7 +153,8 @@ async function development(f){
   // Match the existing real development-worker fixture: queue and bind through
   // the actual development admission, without launching a development test.
   const key='fictional-development-'+(++f.sequence),instance='fictional-instance-'+key;
-  f.change(s=>{const job={id:key,role:'engineer',instance_id:instance,session_key:instance,host:'codex',native_id:null,epoch:1,status:'queued',task:'Honor the complete fictional development scope.',inputs:[],review_of:null,development_id:plan.id,created_at:new Date().toISOString()};developmentAssignment(s,job,true,f.args.root);const context=assignmentContext(s,job);s.jobs[key]={...job,inputs:context.inputs,context_sha256:context.hash};s.sessions[instance]={instance_id:instance,role:'engineer',host:'codex',native_id:null};});
+  f.change((s,db)=>{const job={id:key,role:'engineer',instance_id:instance,session_key:instance,host:'codex',native_id:null,epoch:1,status:'queued',task:'Honor the complete fictional development scope.',inputs:[],review_of:null,development_id:plan.id,created_at:new Date().toISOString()};developmentAssignment(s,job,true,f.args.root);recordOriginalWorkerAssignmentFrom(db,s,job);const context=assignmentContext(s,job);s.jobs[key]={...job,inputs:context.inputs,context_sha256:context.hash};s.sessions[instance]={instance_id:instance,role:'engineer',host:'codex',native_id:null};},'job.queued');
+  launchOriginalWorker(f.args.root,key);
   return {job:{id:key},plan,files:[{path:'sum.mjs',content:'export const sum = values => values.reduce((a,b)=>a+b,0);\n'},{path:'sum.test.mjs',content:"import test from 'node:test';test('fictional source only',()=>{});\n"}]};
 }
 

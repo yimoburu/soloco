@@ -8,7 +8,8 @@ import { spawnSync } from 'node:child_process';
 import { id, withStore, teamHash, digest, installedTeam } from '../plugins/soloco/runtime/store.mjs';
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
 import { call, hook } from '../plugins/soloco/runtime/main.mjs';
-import { work } from '../plugins/soloco/runtime/worker.mjs';
+import { workOriginal as work, disposeCoreOriginalWorkerFixtures } from './core-original-worker-fixture.mjs';
+import { recordOriginalWorkerAssignmentFrom } from '../plugins/soloco/runtime/peers/prospective-local-worker-inventory-producer.mjs';
 import { prototypeAssignment, prototypeCapability } from '../plugins/soloco/runtime/prototype.mjs';
 import { assignmentContext } from '../plugins/soloco/runtime/context.mjs';
 import { upgrade, rehearse } from '../plugins/soloco/runtime/upgrade.mjs';
@@ -24,11 +25,14 @@ const v020Governance=fs.readFileSync(new URL('./fixtures/governance-v020.md',imp
 assert.equal(digest(v020Governance),'28f99838abc3794da94f97f7a2d234554811da3aef7b8ddb3742075caa78ec36');
 
 const base=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-prototype-test-'));
+const fixtureRoots=new Set();
 process.env.COMPANY_PLUGIN_DATA=path.join(base,'cache');
+test.afterEach(()=>{for(const root of fixtureRoots)disposeCoreOriginalWorkerFixtures(root);fixtureRoots.clear();});
 test.after(()=>fs.rmSync(base,{recursive:true,force:true}));
 const read=a=>withStore(a.root,db=>db.read());
 function setup(host='codex') {
   const root=fs.mkdtempSync(path.join(base,'company-'));
+  fixtureRoots.add(root);
   const a={root,session_id:id('founder'),epoch:1};
   engine.bind(root,a.session_id,host);engine.open({...a,idea:'An offline fictional calculator'},host);
   // Explicit synthetic fixture setup for later snapshot-based handover/upgrades.
@@ -43,9 +47,10 @@ function plan(a,host='codex',extra={}) {
 }
 function queue(a,{role='engineer',prototype_id,review_of}={}) {
   const jid=id('job'),instance=id(role);
-  withStore(a.root,db=>db.transaction('test.queue',s=>{
+  withStore(a.root,db=>db.transaction('job.queued',s=>{
     const target=s.records[review_of];
     const j={id:jid,role,instance_id:instance,session_key:instance,host:s.owner.host,native_id:null,epoch:s.owner.epoch,status:'queued',task:'Honor the exact permitted scope',inputs:[],review_of:target?{id:target.id,revision:target.revision}:null,...(prototype_id?{prototype_id}:{}),created_at:new Date().toISOString()};
+    recordOriginalWorkerAssignmentFrom(db,s,j);
     prototypeAssignment(s,j,true);
     const c=assignmentContext(s,j);s.jobs[jid]={...j,inputs:c.inputs,context_sha256:c.hash};
     s.sessions[instance]={instance_id:instance,role,host:s.owner.host,native_id:null};return s;

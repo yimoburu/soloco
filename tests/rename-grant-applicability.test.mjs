@@ -11,13 +11,17 @@ import {prototypeAssignment} from '../plugins/soloco/runtime/prototype.mjs';
 import {assignmentContext} from '../plugins/soloco/runtime/context.mjs';
 import {sandboxCapability} from '../plugins/soloco/runtime/local-sandbox.mjs';
 import {work} from '../plugins/soloco/runtime/worker.mjs';
+import {recordOriginalWorkerAssignmentFrom} from '../plugins/soloco/runtime/peers/prospective-local-worker-inventory-producer.mjs';
+import {launchOriginalWorker,startOriginalModel,disposeOriginalProcessFixtures} from './original-worker-model-fixture.mjs';
 
 const base=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-rename-applicability-'));
+const originalFixtureRoots=new Set();
 process.env.COMPANY_PLUGIN_DATA=path.join(base,'cache');
-test.after(()=>fs.rmSync(base,{recursive:true,force:true}));
+test.after(()=>{for(const root of originalFixtureRoots)disposeOriginalProcessFixtures(root);fs.rmSync(base,{recursive:true,force:true});});
 const read=a=>withStore(a.root,db=>db.read());
 function setup(){
   const root=fs.mkdtempSync(path.join(base,'company-')),a={root,session_id:id('founder'),epoch:1};
+  originalFixtureRoots.add(root);
   engine.bind(root,a.session_id,'codex');engine.open({...a,idea:'Disposable fictional rename regression',name:'A and B'},'codex');
   return a;
 }
@@ -54,11 +58,14 @@ async function prototypeGrant(a){
   const p=engine.prototype({...a,action:'plan',output_dir:'prototypes/demo',paths:['fixtures/input.json','sum.test.mjs'],test_paths:['sum.test.mjs'],fixtures:[{path:'fixtures/input.json',content:'[1,2,3]'}],
     fixture_source:'Supplied fictional numbers',acceptance:'Retain fictional prototype source without executing it.',stop_conditions:'Stop for external services or private data.',max_attempts:2,expires_at:new Date(Date.now()+60000).toISOString()},'codex');
   const jobId=id('qa-job'),instance=id('qa');
-  withStore(a.root,db=>db.transaction('test.queue_review',s=>{
+  withStore(a.root,db=>db.transaction('job.queued',s=>{
     const j={id:jobId,role:'qa',instance_id:instance,session_key:instance,host:'codex',native_id:null,epoch:1,status:'queued',task:'Review the exact fictional prototype scope',inputs:[],review_of:{id:p.id,revision:p.revision},created_at:new Date().toISOString()};
+    recordOriginalWorkerAssignmentFrom(db,s,j);
     const c=assignmentContext(s,j);s.jobs[jobId]={...j,inputs:c.inputs,context_sha256:c.hash};s.sessions[instance]={instance_id:instance,role:'qa',host:'codex',native_id:null};return s;
   }));
-  await work(a.root,jobId,async()=>({native_id:id('independent-native'),text:JSON.stringify({content:'Reviewed the exact fictional paths, fixtures, limits and non-execution boundary',messages:[],notices:[],review:{verdict:'Pass',reason:'Exact fictional file-only scope is bounded',permitted_action:'authorize_local_prototype',scope_sha256:p.prototype.scope_sha256,blockers:[],tests_executed:false}})}));
+  const carrier=launchOriginalWorker(a.root,jobId);let modelDirectory;
+  try{await work(a.root,jobId,(...args)=>{modelDirectory=args[3];args[6]={...args[6],sessionTitle:undefined,sessionNameDirectory:undefined};const model=startOriginalModel(args,{nativeId:id('independent-native')});model.respond(JSON.stringify({content:'Reviewed the exact fictional paths, fixtures, limits and non-execution boundary',messages:[],notices:[],review:{verdict:'Pass',reason:'Exact fictional file-only scope is bounded',permitted_action:'authorize_local_prototype',scope_sha256:p.prototype.scope_sha256,blockers:[],tests_executed:false}}));return model.promise;});}
+  finally{carrier.emit('close',0,null);if(modelDirectory&&modelDirectory!==a.root)disposeOriginalProcessFixtures(modelDirectory);disposeOriginalProcessFixtures(a.root);}
   const review=read(a).jobs[jobId].artifact_id;
   engine.prototype({...a,action:'authorize',plan_id:p.id,scope_sha256:p.prototype.scope_sha256,review_id:review,source_instruction:'Authorize this exact file-only fictional prototype.',fictional_fixtures_confirmed:true},'codex');
   return p;

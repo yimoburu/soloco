@@ -4,12 +4,24 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
-import {withStore,id,stamp} from '../plugins/soloco/runtime/store.mjs';
-import {submitTask,sendTaskMessage,disposeTaskMessage,bindTaskAttempt,reconcileTask,taskReady,isTaskOwnOutput,cancelTask} from '../plugins/soloco/runtime/tasks.mjs';
+import {withStore,id,stamp,teamHash} from '../plugins/soloco/runtime/store.mjs';
+import {submitTask,sendTaskMessage,disposeTaskMessage,bindTaskAttempt,reconcileTask,taskReady,taskContextFormat,isTaskOwnOutput,cancelTask} from '../plugins/soloco/runtime/tasks.mjs';
 import {installTaskIndex,updateTaskIndex,taskKeys,taskCursor,messageKeys,readTaskState,taskIndexAvailable} from '../plugins/soloco/runtime/task-index.mjs';
 import {backupCompany,restoreCompany} from '../plugins/soloco/runtime/storage-transfer.mjs';
+import {assignmentContext} from '../plugins/soloco/runtime/context.mjs';
+import {taskDefinitionBinding} from '../plugins/soloco/runtime/task-context.mjs';
+import {setRuntimeControl} from '../plugins/soloco/runtime/task-runtime-authority.mjs';
+import {TIMEOUT_POLICY_VERSION,normalizeTimeout} from '../plugins/soloco/runtime/timeout.mjs';
+import {recordOriginalWorkerAssignmentFrom} from '../plugins/soloco/runtime/peers/prospective-local-worker-inventory-producer.mjs';
+import {work} from '../plugins/soloco/runtime/worker.mjs';
+import {launchOriginalWorker,startOriginalModel,disposeOriginalProcessFixtures} from './original-worker-model-fixture.mjs';
+import childProcess from 'node:child_process';
+import {EventEmitter} from 'node:events';
+import {syncBuiltinESMExports} from 'node:module';
+import {upgrade,rehearse} from '../plugins/soloco/runtime/upgrade.mjs';
+import {contractModel} from './helpers/upgrade-incremental-model.mjs';
 
-function fixture(fn){
+async function fixture(fn){
   const home=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'soloco-task-index-'))),root=path.join(home,'source'),data=path.join(home,'data'),old=process.env.COMPANY_PLUGIN_DATA;
   fs.mkdirSync(root);fs.mkdirSync(data);process.env.COMPANY_PLUGIN_DATA=data;
   const identity={root,session_id:id('founder'),epoch:1};
@@ -17,9 +29,11 @@ function fixture(fn){
     engine.bind(root,identity.session_id,'codex');engine.open({...identity,idea:'Fictional canonical async index'},'codex');withStore(root,db=>db.migrate());
     const db=f=>withStore(root,f),write=(f,{indexed=true}={})=>{let result;db(d=>d.transaction('fixture.async-index',s=>{result=f(s);return s;},indexed?{afterWrite:updateTaskIndex}:{}));return result;};
     const create=operation_id=>write(s=>submitTask(s,{...identity,operation_id,source_instruction:'Prepare bounded fictional evidence.',role:'engineer',task:'Prepare fictional output '+operation_id,acceptance:'Fictional facts remain attributable',expected_deliverable:'One bounded fictional artifact'},'codex'));
-    fn({home,root,identity,db,write,create});
-  }finally{if(old===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=old;fs.rmSync(home,{recursive:true,force:true});}
+    await fn({home,root,identity,db,write,create});
+  }finally{disposeOriginalProcessFixtures(root);if(old===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=old;fs.rmSync(home,{recursive:true,force:true});}
 }
+// Session naming is a separate cosmetic CLI operation outside this fixture.
+const withoutSessionNaming=args=>[...args.slice(0,6),{...args[6],sessionTitle:undefined,sessionNameDirectory:undefined}];
 const initialize=db=>db(d=>installTaskIndex(d));
 
 test('read does not install a derived index; explicit rebuild verifies canonical task membership',()=>fixture(({db,create})=>{
@@ -108,22 +122,66 @@ test('unknown index versions and missing tables Hold instead of implying an empt
   db(d=>{d.db.prepare('UPDATE async_index_meta SET version=1 WHERE id=1').run();d.db.exec('DROP TABLE async_message_index');assert.throws(()=>taskKeys(d),/incomplete/);});
 }));
 
-test('targeted controls include normalized pending upgrade status; semantic reads retain unknown extensions',()=>fixture(({db,write})=>{
-  initialize(db);write(s=>{s.upgrade={id:'pending-upgrade',status:'checking'};s.unknown_new_extension={condition:'Unknown obligations remain compulsory'};});
-  db(d=>{const targeted=readTaskState(d).state;assert.equal(targeted.upgrade.status,'checking');const semantic=readTaskState(d,{semantic:true}).state;assert.equal(semantic.unknown_new_extension.condition,'Unknown obligations remain compulsory');});
+test('targeted controls include normalized pending upgrade status; semantic reads retain unknown extensions',t=>fixture(async({root,identity,db,write})=>{
+  initialize(db);write(s=>{s.plugin_version='0.7.7';s.team_sha256=teamHash(s);s.unknown_new_extension={condition:'Unknown obligations remain compulsory'};});
+  // The pending upgrade comes from its real admission and carrier observers.
+  // Only the standard Node child is controlled; no pending row is fabricated.
+  const child=new EventEmitter();child.pid=process.pid;child.unref=()=>child;child.kill=()=>true;
+  let carrierCreated=false;
+  const spawn=t.mock.method(childProcess,'spawn',(command,args)=>{
+    assert.equal(command,process.execPath);assert.ok(args[1].endsWith('/runtime/upgrade.mjs'));carrierCreated=true;return child;
+  });syncBuiltinESMExports();
+  let prepared,observed=0;const modelCwds=new Set(),answer=contractModel({proposalSize:100});
+  try{
+   try{
+    const candidate=upgrade({...identity,action:'inspect',context_mode:'full'},'codex');
+    prepared=upgrade({...identity,action:'prepare',expected_epoch:1,candidate_hash:candidate.candidate_hash,workflow:'incremental-v1',context_mode:'full',source_instruction:'SOURCE temporary pending-upgrade index control; no actual company authority.'},'codex',{check:()=>({available:true,authenticated:true})});
+    child.emit('spawn');
+     }finally{spawn.mock.restore();syncBuiltinESMExports();}
+    await rehearse(root,prepared.upgrade.id,async(...args)=>{
+      db(d=>{const targeted=readTaskState(d).state;assert.equal(targeted.upgrade.status,'checking');const semantic=readTaskState(d,{semantic:true}).state;assert.equal(semantic.unknown_new_extension.condition,'Unknown obligations remain compulsory');});observed++;
+      modelCwds.add(args[3]);const result=await answer(...args),model=startOriginalModel(withoutSessionNaming(args),{nativeId:result.native_id});model.respond(result.text);return model.promise;
+    },db(d=>d.read().upgrade.worker.token));
+    assert.ok(observed>0,'the targeted and semantic reads must execute during the genuine pending upgrade');
+    const current=db(d=>d.read().upgrade);assert.equal(current.status,'ready',current.error);
+  }finally{if(carrierCreated)child.emit('close',0,null);for(const cwd of modelCwds)disposeOriginalProcessFixtures(cwd);}
 }));
 
-function returnedOutput(state,task,{verdict='Pass'}={}){
-  const ready=taskReady(state,task);assert.equal(ready.ready,true,ready.reason);const t=task.runtime_task,target=ready.review_of&&state.records[ready.review_of];
-  const job={id:id('job'),instance_id:id('fictional-worker'),host:t.owner.host,epoch:t.owner.epoch,role:t.spec.role,task:t.spec.task,status:'queued',inputs:ready.input_ids.map(key=>({id:key,revision:state.records[key].revision??null})),review_of:target?{id:target.id,revision:target.revision}:null,coordination:ready.coordination,context_format:7,context_scope:t.spec.context_scope,context_sha256:'a'.repeat(64),created_at:stamp()};
-  state.jobs[job.id]=job;bindTaskAttempt(state,task,job);const key=id('artifact');
-  Object.assign(job,{status:'completed',native_id:id('fictional-native'),artifact_id:key,finished_at:stamp(),coordination_release:{termination_confirmed:true,reason:'model_process_closed'}});
-  state.records[key]={id:key,kind:target?'review':'artifact',content:'Complete retained fictional output '+verdict,author_role:job.role,author_instance:job.instance_id,revision:1,status:'Submitted',job_id:job.id,inputs:job.inputs,review_of:job.review_of,review:target?{verdict,reason:'Fictional exact review preserves its unresolved condition.',blockers:verdict==='Pass'?[]:['A fictional condition remains unresolved.']}:null,created_at:stamp(),runtime_output:{version:1,task_id:task.id,definition_revision:t.definition_revision,definition_sha256:t.definition_sha256}};
-  reconcileTask(state,task);return {job_id:job.id,artifact_id:key};
+async function returnedOutput(root,taskId,{verdict='Pass'}={}){
+  const jobId=id('job'),instance=id('fictional-worker');let reviewing=false;
+  withStore(root,db=>db.transaction('task.job_queued',state=>{
+    const task=state.records[taskId],ready=taskReady(state,task);assert.equal(ready.ready,true,ready.reason);
+    const t=task.runtime_task,target=ready.review_of&&state.records[ready.review_of];reviewing=Boolean(target);
+    // This enables only fixture metadata; no supervisor or OS process is started.
+    const control=setRuntimeControl(state,{...t.owner,action:'start',source_instruction:'Prepare controlled fictional task outputs for the Source index fixture.'},t.owner.host).runtime_control;
+    const sessionKey=t.spec.role+':async:'+jobId,selection=t.spec.model_selection??{mode:'default'};
+    const job={id:jobId,instance_id:instance,session_key:sessionKey,native_id:null,host:t.owner.host,epoch:t.owner.epoch,role:t.spec.role,task:t.spec.task,status:'queued',
+      requester:{role:'runtime',instance_id:control.instance_id,task_id:taskId,owner_epoch:t.owner.epoch},runtime_task:taskDefinitionBinding(task),
+      inputs:ready.input_ids.map(key=>({id:key,revision:state.records[key].revision??null})),review_of:target?{id:target.id,revision:target.revision}:null,coordination:ready.coordination,
+      context_format:taskContextFormat(t.spec),context_scope:t.spec.context_scope,expected_deliverable:t.spec.expected_deliverable,
+      timeout_policy_version:TIMEOUT_POLICY_VERSION,...normalizeTimeout({timeout_ms:t.spec.timeout_ms,timeout_reason:t.spec.timeout_reason}),model_selection:selection,
+      task_summary:t.spec.expected_deliverable,next_handoff:'Runtime validates the exact result and wakes eligible dependent tasks',created_at:stamp()};
+    recordOriginalWorkerAssignmentFrom(db,state,job);
+    state.sessions[sessionKey]={instance_id:instance,role:job.role,native_id:null,host:job.host,model_selection:selection};
+    const context=assignmentContext(state,job);job.inputs=context.inputs;job.context_sha256=context.hash;
+    bindTaskAttempt(state,task,job);state.jobs[job.id]=job;return state;
+  },{afterWrite:updateTaskIndex}));
+  const carrier=launchOriginalWorker(root,jobId),modelCwds=new Set();
+  try{await work(root,jobId,(...args)=>{
+    modelCwds.add(args[3]);const model=startOriginalModel(withoutSessionNaming(args),{nativeId:id('fictional-native')});
+    model.respond(JSON.stringify({content:'Complete retained fictional output '+verdict,messages:[],notices:[],message_dispositions:[],
+      ...(reviewing?{review:{verdict,reason:'Fictional exact review preserves its unresolved condition.',blockers:verdict==='Pass'?[]:['A fictional condition remains unresolved.']}}:{})}));
+    return model.promise;
+  });}finally{carrier.emit('close',0,null);for(const cwd of modelCwds)disposeOriginalProcessFixtures(cwd);disposeOriginalProcessFixtures(root);}
+  let result;
+  withStore(root,db=>db.transaction('fixture.async-index',state=>{
+    const job=state.jobs[jobId];assert.equal(job.status,'completed',job.error);reconcileTask(state,state.records[taskId]);result={job_id:job.id,artifact_id:job.artifact_id};return state;
+  },{afterWrite:updateTaskIndex}));
+  return result;
 }
 
-test('explicit terminal output inputs load exact producer provenance without a declared dependency',()=>fixture(({db,create,write,identity})=>{
-  initialize(db);const a=create('terminal-producer'),result=write(s=>returnedOutput(s,s.records[a.id]));
+test('explicit terminal output inputs load exact producer provenance without a declared dependency',()=>fixture(async({root,db,create,write,identity})=>{
+  initialize(db);const a=create('terminal-producer'),result=await returnedOutput(root,a.id);
   const b=write(s=>submitTask(s,{...identity,operation_id:'explicit-output-consumer',source_instruction:'Inspect only this exact fictional returned output.',role:'engineer',task:'Inspect the exact producer body with no readiness edge.',input_ids:[result.artifact_id],acceptance:'Preserve source attribution and conditions.',expected_deliverable:'One fictional assessment'},'codex'));
   const unrelated=create('unrelated-planned-task');
   db(d=>{const {state}=readTaskState(d,{task_ids:[b.id],active:true,limit:1});assert.equal(state.records[a.id].runtime_task.state,'returned');assert(state.jobs[result.job_id]);assert(state.records[result.artifact_id]);assert(!state.records[unrelated.id]);assert.equal(state.records[b.id].runtime_task.spec.depends_on.length,0);assert.equal(taskReady(state,state.records[b.id]).ready,true);});
@@ -131,10 +189,10 @@ test('explicit terminal output inputs load exact producer provenance without a d
   db(d=>{const {state}=readTaskState(d,{task_ids:[b.id],active:true,limit:1});assert(state.records[result.artifact_id]);assert.match(taskReady(state,state.records[b.id]).reason,/cancelled/);});
 }));
 
-test('explicit negative review inputs retain body and complete producer attribution in targeted state',()=>fixture(({db,create,write,identity})=>{
-  initialize(db);const a=create('negative-subject');write(s=>returnedOutput(s,s.records[a.id]));
+test('explicit negative review inputs retain body and complete producer attribution in targeted state',()=>fixture(async({root,db,create,write,identity})=>{
+  initialize(db);const a=create('negative-subject');await returnedOutput(root,a.id);
   const qa=write(s=>submitTask(s,{...identity,operation_id:'negative-reviewer',source_instruction:'Review only this exact fictional candidate.',role:'qa',task:'Preserve a fictional unresolved condition in an independent review.',review_task_id:a.id,acceptance:'Return an honest review without acceptance authority.',expected_deliverable:'One fictional negative review'},'codex'));
-  const result=write(s=>returnedOutput(s,s.records[qa.id],{verdict:'Blocked'}));
+  const result=await returnedOutput(root,qa.id,{verdict:'Blocked'});
   const b=write(s=>submitTask(s,{...identity,operation_id:'negative-evidence-consumer',source_instruction:'Read this exact negative evidence without treating it as readiness or permission.',role:'engineer',task:'Inspect the complete unresolved review.',input_ids:[result.artifact_id],acceptance:'Keep the condition unresolved.',expected_deliverable:'One fictional assessment'},'codex'));
   db(d=>{const {state}=readTaskState(d,{task_ids:[b.id],active:true,limit:1});assert.equal(state.records[result.artifact_id].review.verdict,'Blocked');assert.equal(state.records[qa.id].runtime_task.state,'needs_attention');assert(state.records[a.id]);assert(state.jobs[result.job_id]);assert.equal(isTaskOwnOutput(state,state.jobs[result.job_id],state.records[result.artifact_id]),true);assert.equal(taskReady(state,state.records[b.id]).ready,true);});
 }));

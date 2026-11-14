@@ -9,16 +9,21 @@ import {call,toolList} from '../plugins/soloco/runtime/main.mjs';
 import {withStore,id} from '../plugins/soloco/runtime/store.mjs';
 import {fits,rpcReply,toolResult} from '../plugins/soloco/runtime/public-response.mjs';
 import {developmentDeliveryContractSchema,developmentDeliveryTransitionFields} from '../plugins/soloco/runtime/development-delivery.mjs';
+import {stageOriginalHistoricalJob,disposeOriginalProcessFixtures} from './original-adapter-process-fixture.mjs';
 
 const base=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'followup-interface-')));
+const originalFixtureRoots=new Set();
 const previous=process.env.COMPANY_PLUGIN_DATA;process.env.COMPANY_PLUGIN_DATA=path.join(base,'cache');
-test.after(()=>{if(previous===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=previous;fs.rmSync(base,{recursive:true,force:true});});
+test.after(()=>{for(const root of originalFixtureRoots)disposeOriginalProcessFixtures(root);if(previous===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=previous;fs.rmSync(base,{recursive:true,force:true});});
 function fixture(normalized=false){
  const root=fs.mkdtempSync(path.join(base,'company-')),args={root,session_id:id('fixture-owner')};
+ originalFixtureRoots.add(root);
  engine.bind(root,args.session_id,'codex');engine.open({...args,idea:'Fictional lifecycle reporting interface'},'codex');
  if(normalized)withStore(root,db=>db.migrate());
  const change=fn=>withStore(root,db=>db.transaction('controlled.observations-fixture',s=>{fn(s);return s;}));
- change(s=>{for(let i=0;i<4;i++){const job='fixture-job-'+i;s.jobs[job]={id:job,role:'research',status:i===0?'failed':'completed',created_at:'2026-11-10T12:00:00.000Z',started_at:'2026-11-10T12:00:01.000Z',execution_started_at:'2026-11-10T12:00:02.000Z',finished_at:'2026-11-10T12:00:03.000Z',task:'PRIVATE_TASK_BODY',native_id:'fixture-native-'+i,coordination_release:{termination_confirmed:i!==0}};}
+ // Observe controlled Original launches; the failed job keeps UNKNOWN closure.
+ for(let i=0;i<4;i++){const job='fixture-job-'+i;stageOriginalHistoricalJob(root,{id:job,role:'research',status:i===0?'failed':'completed',created_at:'2026-11-10T12:00:00.000Z',started_at:'2026-11-10T12:00:01.000Z',execution_started_at:'2026-11-10T12:00:02.000Z',finished_at:'2026-11-10T12:00:03.000Z',task:'PRIVATE_TASK_BODY',native_id:'fixture-native-'+i,coordination_release:{termination_confirmed:i!==0}});}
+ change(s=>{
   s.notices.push({id:'fixture-notice',kind:'must_know',summary:'Fictional retained failure; do not clear.',created_at:'2026-11-10T12:00:03.000Z',deliveries:[],resolution:null});
  });return {args,change,read:()=>withStore(root,db=>db.read())};
 }
