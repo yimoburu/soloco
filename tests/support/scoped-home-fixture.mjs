@@ -21,7 +21,7 @@ const read=f=>withStore(f.root,db=>db.read());
 const mutate=(f,fn)=>withStore(f.root,db=>db.transaction('fictional.fixture',s=>{fn(s);return s;}));
 const save=(f,args)=>call('company_save',{root:f.root,session_id:f.session_id,epoch:f.epoch,...args},'codex');
 const context=(f,args)=>call('company_context',{...f,protocol:scoped.SCOPED_PROTOCOL,...args},'codex');
-async function fixture({dense=false,groups=61,bootstrap=true,frozenIntake=false}={}){
+async function fixture({dense=false,groups=61,bootstrap=true,frozenIntake=false,handoverBeforeFreeze=false}={}){
  const f={root:fs.mkdtempSync(path.join(tmp,'company-')),session_id:'fictional-owner',epoch:1,source_instruction:'FICTIONAL existing authorization: prepare proposed homes and read-only QA while paused; no execution.'};
  engine.bind(f.root,f.session_id,'codex');engine.open({...f,idea:'FICTIONAL mechanics only'},'codex');withStore(f.root,db=>db.migrate());
  mutate(f,s=>{s.paused=bootstrap;if(!bootstrap)s.records.home={id:'home',revision:1,kind:'artifact',content:'UNKNOWN; ZERO allowance; no execution.',context_obligations:{version:1,scope:'*'},operating_record:typed()};s.records.archive={id:'archive',kind:'artifact',revision:1,author_instance:'fictional-source-author',content:'UNKNOWN failed attempt. Remaining allowance ZERO. No execution; retain all negative outcomes.'};});
@@ -32,6 +32,11 @@ async function fixture({dense=false,groups=61,bootstrap=true,frozenIntake=false}
   const count=buildLegacyCoherentPlan(s).groups.length;
   for(let i=count;i<groups;i++)s.records['dense-'+i]={id:'dense-'+i,revision:1,kind:'artifact',content:'FICTIONAL complete clause '+i+'; UNKNOWN; no export; allowance ZERO.'};
  });
+ if(handoverBeforeFreeze){
+  const next='fictional-incoming';engine.bind(f.root,next,'codex');
+  engine.control({root:f.root,session_id:next,expected_epoch:f.epoch,action:'handover',source_instruction:'handover'},'codex');
+  f.session_id=next;f.epoch++;
+ }
  // Exercise the public discovery-parent route without rebuilding its frozen
  // manifest after the parent itself becomes a live record.
  if(frozenIntake)assert.equal(bootstrap,true);

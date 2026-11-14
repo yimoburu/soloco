@@ -570,10 +570,11 @@ export function control(args,host) {
     }
     else if(args.action==='handover') {
       if(busy(s).length) throw new Error('Assignments are active. Pause and reconcile them before handing over.');
+      if(s.operating_state&&!mechanicalOperatingControl(decision))throw Error('Operating state Held: DIRTY condition-bearing handover instruction');
       const previous={...s.owner};
       const prospective=inheritSnapshots(s,{...s,owner:{host,session_id:args.session_id,epoch:s.owner.epoch+1},paused:true,records:{...s.records,[decisionId]:decision}});
       beginHandover(prospective,previous);
-      const admission=admitHandover(prospective);
+      const admission=admitHandover(prospective,s);
       s.owner=prospective.owner;s.handover={...prospective.handover,admission};
       // Incoming role instances cold-start from records; old native histories remain attributable.
       s.retired_sessions=[...(s.retired_sessions??[]),...Object.values(s.sessions)]; s.sessions={};

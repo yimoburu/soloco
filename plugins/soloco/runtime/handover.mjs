@@ -1,4 +1,4 @@
-import {requireOperatingHandover} from './operating-state.mjs';
+import {requireOperatingHandover,operatingInspection,validateOperatingIndex} from './operating-state.mjs';
 import {buildEvidence,readEvidence} from './upgrade-evidence.mjs';
 import { digest, id, requireText, stamp } from './store.mjs';
 import {jobExecutionTiming} from './timeout.mjs';
@@ -64,14 +64,35 @@ export const handoverHash=state=>digest(JSON.stringify(handoverSubject(state)));
 // Inspection uses the same lossless evidence projection as QA. It never dumps
 // the retained full snapshot into a founder-chat tool response.
 export function inspectHandover(state,args={}) {
+  const h=state.handover,a=h?.admission;
+  if(a?.protocol==='operating-transfer-admission-v1'&&JSON.stringify(state.operating_state?.accepted_snapshot?.owner)!==JSON.stringify(state.owner)){
+    // A historical publication remains evidence, never current-owner authority.
+    validateOperatingIndex(state);
+    if(h.status!=='pending'||!state.paused||h.reconstruction_id!==undefined
+      ||JSON.stringify(h.incoming_owner)!==JSON.stringify(state.owner)
+      ||JSON.stringify(h.previous_owner)!==JSON.stringify(state.operating_state.accepted_snapshot.owner)
+      ||state.owner.epoch!==h.previous_owner.epoch+1
+      ||JSON.stringify(a.outgoing_plan)!==JSON.stringify(state.operating_state.plan))throw Error('Operating handover transfer boundary changed');
+    if(args.action==='read')throw Error('Incoming operating publication required before handover evidence reads');
+    const {status,reason}=operatingInspection(state);
+    if(status!=='Held')throw Error('Operating handover transition unexpectedly current');
+    const result={protocol:'ordinary-handover-inspect-v3',status,reason,owner:state.owner,paused:true,
+      handover:{id:h.id,status:h.status},admission:a,reconstruction_ready:false,
+      rule:'Incoming owner must use company_context protocol operating-state-v1: plan with maintenance:true, independent QA, then apply. The plan exposes the actual transfer delta. After acceptance, inspect/read current handover evidence, submit operating-handover-v4 reconstruction, obtain independent exact-state QA, then resume. This response supplies no reconstruction evidence or acceptance.'};
+    if(JSON.stringify(result).length>200000)throw Error('Operating handover hold exceeds bounded response');
+    return result;
+  }
   if(args.action==='read'&&typeof args.source_id!=='string')throw Error('Exact frozen source ID required');
+  const active=state.records?.[state.handover?.reconstruction_id];
+  const operating=args.protocol==='operating-handover-v4'||(active?active.handover?.evidence_protocol===4:Boolean(state.operating_state));
+  const operatingSubject=operating?requireOperatingHandover(state):null;
   // A failed active attempt is input to its successor, not hidden bookkeeping.
   const failed=state.handover&&Object.values(state.records??{}).some(r=>r.review_of?.id===state.handover.reconstruction_id&&['Fail','Blocked'].includes(r.review?.verdict));
-  const view=failed?inheritSnapshots(state,{...state,handover:{...state.handover,reconstruction_id:null}}):state;
-  const {subject_sha256,evidence,reads}=frozenProjection(state,{kind:'inspection',failed:Boolean(failed)},()=>{
-    const subject=handoverSubject(view),subject_sha256=digest(JSON.stringify(subject));
+  const view=failed&&!operating?inheritSnapshots(state,{...state,handover:{...state.handover,reconstruction_id:null}}):state;
+  const {subject_sha256,evidence,reads}=frozenProjection(state,{kind:'inspection',failed:Boolean(failed),operating},()=>{
+    const subject=operatingSubject??handoverSubject(view),subject_sha256=digest(JSON.stringify(subject));
     const {upgrade_history,upgrade,...current}=subject;
-    const evidence=buildEvidence(current,[...upgrade_history,...(upgrade?[upgrade]:[])],{wholeBodyAliases:false,currentState:true,checkpointContinuity:true,retainedHandoverRecords:state.records,snapshotState:state,contextState:state});
+    const evidence=buildEvidence(current,[...upgrade_history,...(upgrade?[upgrade]:[])],{wholeBodyAliases:false,currentState:!operating,checkpointContinuity:true,retainedHandoverRecords:state.records,snapshotState:state,contextState:state});
     // Pin the semantic stream, registry, entry points and requested original.
     // The full projection can be hundreds of MB due to overlapping originals;
     // retain its exact range sources rather than that complete transient graph.
@@ -118,9 +139,30 @@ export function reconstructionReceipt(record) {
   return receipt;
 }
 
-// Admission is atomic with transfer. Exercise worst-case allowed reconstruction
-// escaping and the real QA envelope before revoking the outgoing owner.
-export function admitHandover(state) {
+// Admission is atomic with transfer. Legacy admission exercises the real QA
+// envelope; an accepted operating transfer checks its outgoing envelope and
+// transition only. Incoming publication and v4 review remain separate gates.
+export function admitHandover(state,outgoing) {
+  if(outgoing?.operating_state){
+    // Check the real outgoing boundary before revoking it. Do not pretend that
+    // its frozen proof authorities have already been adopted by the successor.
+    const subject=requireOperatingHandover(outgoing),h=state.handover;
+    if(h?.status!=='pending'||!state.paused||h.reconstruction_id!==undefined
+      ||JSON.stringify(h.previous_owner)!==JSON.stringify(outgoing.owner)
+      ||JSON.stringify(h.incoming_owner)!==JSON.stringify(state.owner)
+      ||state.owner.epoch!==outgoing.owner.epoch+1
+      ||JSON.stringify(state.operating_state)!==JSON.stringify(outgoing.operating_state))throw Error('Operating handover prospective transition changed');
+    const inspection=inspectHandover(outgoing,{protocol:'operating-handover-v4'});
+    if(inspection.subject_sha256!==digest(JSON.stringify(subject)))throw Error('Operating handover admission must use the exact outgoing v4 subject');
+    const controls=Object.values(state.records).filter(r=>!Object.hasOwn(outgoing.records,r.id));
+    if(controls.length!==1||controls[0].action!=='handover'||controls[0].recorded_by!==state.owner.session_id)throw Error('Operating handover control record changed');
+    const transition={owner:state.owner,paused:true,handover:h,control:controls[0],retire_session_keys:Object.keys(outgoing.sessions??{})};
+    const characters=JSON.stringify({outgoing:inspection,transition,reconstruction:'\u0000'.repeat(20000)}).length;
+    if(characters+20000>200000)throw Error('Operating handover admission exceeds bounded request including worker reserve; outgoing ownership retained');
+    return {protocol:'operating-transfer-admission-v1',outgoing_plan:{...outgoing.operating_state.plan},outgoing_subject_sha256:inspection.subject_sha256,
+      incoming_publication_required:true,initial_packet_characters:characters,worker_reserve_characters:20000,request_limit:200000,context_fit_verified:false,
+      limitation:'Admission checks the exact outgoing v4 evidence envelope and proposed transfer only. Incoming current-owner operating publication and independent v4 handover QA remain required; their packet construction, completion, cumulative model fit and understanding are not established.'};
+  }
   const view=inheritSnapshots(state,{...state,records:{...state.records},handover:{...state.handover}});
   const target=submitReconstruction(view,{session_id:state.owner.session_id,content:'\u0000'.repeat(20000)});
   const context=handoverReviewContext(view,{role:'qa',task:'Preflight exact handover evidence',inputs:[],review_of:{id:target.id,revision:target.revision}});
@@ -137,12 +179,14 @@ export function submitReconstruction(state,args) {
   const h=state.handover;
   if(!h||h.status!=='pending'||!state.paused)throw new Error('No pending paused coordinator handover');
   if(h.incoming_owner.session_id!==args.session_id||h.incoming_owner.host!==state.owner.host||h.incoming_owner.epoch!==state.owner.epoch)throw new Error('Incoming coordinator changed');
+  // Require the incoming publication before any reconstruction protocol.
+  if(h.admission?.protocol==='operating-transfer-admission-v1')requireOperatingHandover(state);
   requireText(args.content,'reconstruction',20000);
   if(args.content.trim().length<100)throw new Error('Reconstruct objectives, rules, authority, pending work, uncertainty and next action substantively');
   if(Object.values(state.jobs).some(j=>['queued','running'].includes(j.status)))throw new Error('Review is active; reconcile it before replacing reconstruction');
   const key=id('handover-reconstruction');
   // Retain previous submissions, but do not hide them from later reconstructions.
-  const prospective=args.protocol==='operating-handover-v4';
+  const prospective=args.protocol==='operating-handover-v4'||h.admission?.protocol==='operating-transfer-admission-v1';
   if(!prospective)h.reconstruction_id=key;
   const subject=prospective?requireOperatingHandover(state):handoverSubject(state),subject_sha256=digest(JSON.stringify(subject));
   h.reconstruction_id=key;
@@ -199,7 +243,11 @@ export function handoverReviewContext(state,job) {
   const target=state.records?.[job.review_of?.id];
   if(!target?.handover)return null;
   if(!handoverReviewEligible(state,job)||target.revision!==job.review_of.revision)throw new Error('Handover review subject changed');
-  const projection=target.handover.evidence_protocol>=3?reviewedContext(state):null;
+  // V4 eligibility already validates the accepted checkpoint and every producer
+  // transition through operatingContext. Its frozen subject is current meaning;
+  // live legacy classification admission is not its review contract.
+  const operating=target.handover.evidence_protocol===4;
+  const projection=target.handover.evidence_protocol>=3&&!operating?reviewedContext(state):null;
   const prior_reviews=Object.values(state.records).filter(r=>r.kind==='review'&&!projection?.excluded(r.id)&&r.review_of?.id!==target.id&&state.records[r.review_of?.id]?.handover?.id===state.handover.id)
     .map(r=>({id:r.id,review_of:r.review_of,content:r.content,review:r.review,status:r.status,author_instance:r.author_instance}));
   // Older retained reconstructions retain their original review contract.
@@ -207,7 +255,7 @@ export function handoverReviewContext(state,job) {
   let evidence,initial_delivery;
   if(bounded){
     const {upgrade_history,upgrade,...current}=target.handover.subject;
-    evidence=frozenProjection(state,{kind:'review',target:target.id,revision:target.revision,job},()=>({evidence:buildEvidence(current,[...upgrade_history,...(upgrade?[upgrade]:[])],{wholeBodyAliases:false,currentState:target.handover.evidence_protocol>=3,checkpointContinuity:true,retainedHandoverRecords:state.records,snapshotState:state,contextState:state,reviewContext:{charter:state.roles[job.role],assignment:{...(job.coordination?{coordination:job.coordination}:{}),task:job.task,...(job.handover_review_window_minutes?{handover_review_window_minutes:job.handover_review_window_minutes,handover_review_reason:job.handover_review_reason}:{}),model_selection:job.model_selection??{mode:'default'},supplemental_sources:job.supplemental_sources??[]},prior_reviews}})})).evidence;
+    evidence=frozenProjection(state,{kind:'review',target:target.id,revision:target.revision,job},()=>({evidence:buildEvidence(current,[...upgrade_history,...(upgrade?[upgrade]:[])],{wholeBodyAliases:false,currentState:target.handover.evidence_protocol>=3&&!operating,checkpointContinuity:true,retainedHandoverRecords:state.records,snapshotState:state,contextState:state,reviewContext:{charter:state.roles[job.role],assignment:{...(job.coordination?{coordination:job.coordination}:{}),task:job.task,...(job.handover_review_window_minutes?{handover_review_window_minutes:job.handover_review_window_minutes,handover_review_reason:job.handover_review_reason}:{}),model_selection:job.model_selection??{mode:'default'},supplemental_sources:job.supplemental_sources??[]},prior_reviews}})})).evidence;
     // Bounded previews are entry points, never a replacement for compulsory reads.
     initial_delivery=evidence.handover.checkpoint.filter(f=>['idea','name','governance','cos_instructions','roles','owner','notices'].includes(f.key)).map(f=>{
       const source=evidence.sources[f.source.source_id];
@@ -220,11 +268,11 @@ export function handoverReviewContext(state,job) {
   const stream=bounded?evidence.sources[evidence.pages[0].source_id]:null;
   const registry=bounded?Object.values(evidence.sources).find(s=>s.kind==='source-index'):null;
   const ref=s=>({source_id:s.source_id,sha256:s.sha256,length:s.length,scope:s.scope,path:s.path});
-  const pack={protocol:projection?'ordinary-handover-review-v3':bounded?'ordinary-handover-review-v2':'ordinary-handover-review-v1',
+  const pack={protocol:projection||operating?'ordinary-handover-review-v3':bounded?'ordinary-handover-review-v2':'ordinary-handover-review-v1',
     ...(bounded?{review_context:ref(Object.values(evidence.sources).find(s=>s.kind==='review-context'))}:{charter:state.roles[job.role],assignment:{task:job.task,...(job.handover_review_window_minutes?{handover_review_window_minutes:job.handover_review_window_minutes,handover_review_reason:job.handover_review_reason}:{}),model_selection:job.model_selection??{mode:'default'},...(job.coordination?{coordination:job.coordination}:{})},prior_reviews}),
     reconstruction:{id:target.id,revision:target.revision,author_instance:target.author_instance,content:target.content,subject_sha256:target.handover.subject_sha256},
     frozen_subject:bounded?{required_semantics:ref(stream),registry:{source:ref(registry),length:registry.length},entry_points:initial_delivery}:target.handover.subject,
-    ...(bounded?{preservation:{subject_sha256:target.handover.subject_sha256,upgrade_history_sha256:digest(JSON.stringify(target.handover.subject.upgrade_history)),source_scopes:{checkpoint:'Frozen subject fields except upgrade and upgrade_history',history:'History indices 0..upgrade_history.length-1 map to /upgrade_history/<index>; final index maps to /upgrade when present',upgrade_history_length:target.handover.subject.upgrade_history.length,current_upgrade:Boolean(target.handover.subject.upgrade)}},evidence_protocol:{reads:'Return only {"reads":[{"source_id":"known frozen source","sha256":"exact source hash","offset":0,"length":16000}]}',range_limit:32768,ranges:'Half-open UTF-16; never split a surrogate pair. At most four ranges per request. Runtime execution deadline remains binding. If escaping exceeds the packet budget, only a prefix of requested ranges is delivered; request deferred ranges again.',citations:initial_delivery.map(({source_id,sha256,revision,offset,length,range_sha256})=>({source_id,sha256,...(revision!==undefined?{revision}:{}),offset,length,range_sha256})),rule:(projection?'Reviewed current-context protocol: exact independent classifications may move historical containers and their proofs to the retrievable archive; represented findings/failures/uncertainties/exhausted allowances remain mandatory through exact counterparts. A changed source, counterpart or proof revokes exclusion or holds. Completion alone never resolves a finding. ':'Legacy all-source protocol: ')+ 'Read the ENTIRE required_semantics source before Pass. All unqualified distinct semantic material is compulsory, including current objectives, pinned definitions, authority, unresolved notices, unknown legacy restrictions, old failures and dissent. Entry points are bounded previews; their total lengths show what remains to stream. same_as and repeated indexes prove exact equality with earlier compulsory projections, never resolution. The bounded-readable registry locates every original and its exact length; it is not embedded here. Payload originals are independently retrievable. Inventory/hash equality proves preservation only. Derivatives grant no authority. Final artifact requires nonempty citations copied from delivered ranges. Pass is rejected until every required semantic range has been delivered to this native session; Blocked may report incomplete delivery.'}}:{})};
+    ...(bounded?{preservation:{subject_sha256:target.handover.subject_sha256,upgrade_history_sha256:digest(JSON.stringify(target.handover.subject.upgrade_history)),source_scopes:{checkpoint:'Frozen subject fields except upgrade and upgrade_history',history:'History indices 0..upgrade_history.length-1 map to /upgrade_history/<index>; final index maps to /upgrade when present',upgrade_history_length:target.handover.subject.upgrade_history.length,current_upgrade:Boolean(target.handover.subject.upgrade)}},evidence_protocol:{reads:'Return only {"reads":[{"source_id":"known frozen source","sha256":"exact source hash","offset":0,"length":16000}]}',range_limit:32768,ranges:'Half-open UTF-16; never split a surrogate pair. At most four ranges per request. Runtime execution deadline remains binding. If escaping exceeds the packet budget, only a prefix of requested ranges is delivered; request deferred ranges again.',citations:initial_delivery.map(({source_id,sha256,revision,offset,length,range_sha256})=>({source_id,sha256,...(revision!==undefined?{revision}:{}),offset,length,range_sha256})),rule:(operating?'Accepted operating-context protocol: complete current homes, controls, communication and pending proposals are compulsory; immutable preservation receipts remain evidence and never renew authority. ':projection?'Reviewed current-context protocol: exact independent classifications may move historical containers and their proofs to the retrievable archive; represented findings/failures/uncertainties/exhausted allowances remain mandatory through exact counterparts. A changed source, counterpart or proof revokes exclusion or holds. Completion alone never resolves a finding. ':'Legacy all-source protocol: ')+ 'Read the ENTIRE required_semantics source before Pass. All unqualified distinct semantic material is compulsory, including current objectives, pinned definitions, authority, unresolved notices, unknown legacy restrictions, old failures and dissent. Entry points are bounded previews; their total lengths show what remains to stream. same_as and repeated indexes prove exact equality with earlier compulsory projections, never resolution. The bounded-readable registry locates every original and its exact length; it is not embedded here. Payload originals are independently retrievable. Inventory/hash equality proves preservation only. Derivatives grant no authority. Final artifact requires nonempty citations copied from delivered ranges. Pass is rejected until every required semantic range has been delivered to this native session; Blocked may report incomplete delivery.'}}:{})};
   const text=JSON.stringify(pack);
   if(text.length>200000)throw new Error('Handover review exceeds 200000 characters; bounded evidence delivery is required. Nothing was truncated');
   return {text,hash:digest(text),...(bounded?{handover_evidence:evidence,initial_delivery}:{}),inputs:[{id:target.id,revision:target.revision},...Object.values(target.handover.subject.records).filter(r=>!projection?.excluded(r.id)).map(r=>({id:r.id,revision:r.revision}))]};
