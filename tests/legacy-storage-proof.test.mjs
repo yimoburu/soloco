@@ -24,10 +24,17 @@ const state=()=>({id:'fictional-legacy-proof',revision:0,owner:{host:'codex',ses
 function fixture(change=()=>{},eventChange=()=>{}){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'legacy-storage-proof-'));roots.push(root);
   fs.mkdirSync(path.join(root,'.company'),{mode:0o700});const raw=new DatabaseSync(path.join(root,'.company/company.sqlite'));
-  raw.exec('CREATE TABLE company(id INTEGER PRIMARY KEY CHECK(id=1),value TEXT NOT NULL); CREATE TABLE events(seq INTEGER PRIMARY KEY,at TEXT NOT NULL,type TEXT NOT NULL,value TEXT NOT NULL);');
-  const value=state();change(value);const event={revision:0,owner:value.owner};eventChange(event);
-  raw.prepare('INSERT INTO company VALUES(1,?)').run(JSON.stringify(value));
-  raw.prepare('INSERT INTO events VALUES(1,?,?,?)').run(at,'fixture.historical_unqualified',JSON.stringify(event));raw.close();
+  // Commit the same preexisting raw DATA once, before opening the class Store.
+  try{
+    raw.exec('BEGIN IMMEDIATE');
+    raw.exec('CREATE TABLE company(id INTEGER PRIMARY KEY CHECK(id=1),value TEXT NOT NULL); CREATE TABLE events(seq INTEGER PRIMARY KEY,at TEXT NOT NULL,type TEXT NOT NULL,value TEXT NOT NULL);');
+    const value=state();change(value);const event={revision:0,owner:value.owner};eventChange(event);
+    raw.prepare('INSERT INTO company VALUES(1,?)').run(JSON.stringify(value));
+    raw.prepare('INSERT INTO events VALUES(1,?,?,?)').run(at,'fixture.historical_unqualified',JSON.stringify(event));
+    raw.exec('COMMIT');
+  }finally{
+    try{if(raw.isTransaction)raw.exec('ROLLBACK');}finally{raw.close();}
+  }
   return new Store(root);
 }
 const classify=db=>db.readSnapshot(()=>classifyRuntimeStorageFrom(db));
