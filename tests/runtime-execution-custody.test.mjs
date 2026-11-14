@@ -70,7 +70,9 @@ test('a committed request stays spent through reopen without becoming a new laun
 
 test('controlled Source child observations monotonically close the one fixed worker request',t=>{
   const f=fixture();t.after(()=>f.store.close());const token=reserve(f),child=controlledChild(740001);
-  const spawn=noRealSpawn(t,(command,args,options)=>{assert.equal(command,process.execPath);assert.equal(args.at(-2),f.root);assert.equal(args.at(-1),f.job.id);assert.equal(path.basename(args[1]),'worker.mjs');assert.equal(options.shell,undefined);return child;});
+  // Store custody binds the physical root, including macOS temp-path aliases.
+  const expectedRoot=fs.realpathSync(f.root);
+  const spawn=noRealSpawn(t,(command,args,options)=>{assert.equal(command,process.execPath);assert.equal(args.at(-2),expectedRoot);assert.equal(args.at(-1),f.job.id);assert.equal(path.basename(args[1]),'worker.mjs');assert.equal(options.shell,undefined);return child;});
   assert.equal(spawnRuntimeWorkerLaunch(token),child);
   const creation=f.store.read().jobs[f.job.id].legacy_runtime.worker.deadline_at_ms;
   assert.equal(creation,Date.parse(f.job.created_at)+STARTUP_TIMEOUT_MS);
