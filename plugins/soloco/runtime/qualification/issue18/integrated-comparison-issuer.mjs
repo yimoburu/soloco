@@ -35,7 +35,7 @@ const digest=value=>hash(JSON.stringify(value));
 const need=(ok,code)=>{if(!ok)throw Object.assign(Error('Issue18 issuer Hold: '+code),{code:'ISSUE18_ISSUER_'+code});};
 const freeze=value=>{if(value&&typeof value==='object'){for(const child of Object.values(value))freeze(child);Object.freeze(value);}return value;};
 function data(value,maximum=32768){return JSON.parse(encodeIssue18LedgerData(value,maximum).toString('utf8'));}
-const same=(a,b)=>encodeIssue18LedgerData(a).equals(encodeIssue18LedgerData(b));
+const same=(a,b)=>encodeIssue18LedgerData({value:a}).equals(encodeIssue18LedgerData({value:b}));
 function exact(value,keys){
   need(value&&typeof value==='object'&&!types.isProxy(value)&&Object.getPrototypeOf(value)===Object.prototype,'INPUT');
   const descriptors=Object.getOwnPropertyDescriptors(value),own=Reflect.ownKeys(value);
