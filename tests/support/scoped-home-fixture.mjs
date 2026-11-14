@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import * as engine from '../../plugins/soloco/runtime/engine.mjs';
 import {call} from '../../plugins/soloco/runtime/main.mjs';
-import {withStore,digest} from '../../plugins/soloco/runtime/store.mjs';
+import {withStore,digest,SCHEMA,VERSION,teamHash} from '../../plugins/soloco/runtime/store.mjs';
 import {work} from '../../plugins/soloco/runtime/worker.mjs';
 import {executionTiming} from '../../plugins/soloco/runtime/timeout.mjs';
 import {buildLegacyCoherentPlan} from '../../plugins/soloco/runtime/legacy-operating.mjs';
@@ -21,9 +21,17 @@ const read=f=>withStore(f.root,db=>db.read());
 const mutate=(f,fn)=>withStore(f.root,db=>db.transaction('fictional.fixture',s=>{fn(s);return s;}));
 const save=(f,args)=>call('company_save',{root:f.root,session_id:f.session_id,epoch:f.epoch,...args},'codex');
 const context=(f,args)=>call('company_context',{...f,protocol:scoped.SCOPED_PROTOCOL,...args},'codex');
-async function fixture({dense=false,groups=61,bootstrap=true,frozenIntake=false,handoverBeforeFreeze=false}={}){
+async function fixture({dense=false,groups=61,bootstrap=true,frozenIntake=false,handoverBeforeFreeze=false,fictionalTeam=false}={}){
  const f={root:fs.mkdtempSync(path.join(tmp,'company-')),session_id:'fictional-owner',epoch:1,source_instruction:'FICTIONAL existing authorization: prepare proposed homes and read-only QA while paused; no execution.'};
- engine.bind(f.root,f.session_id,'codex');engine.open({...f,idea:'FICTIONAL mechanics only'},'codex');withStore(f.root,db=>db.migrate());
+ engine.bind(f.root,f.session_id,'codex');
+ if(fictionalTeam){
+  // Seed the mechanical fixture before any capture. Do not inherit the growing
+  // installed instruction corpus or rewrite an already accepted checkpoint.
+  const governance='FICTIONAL: preserve UNKNOWN failed outcomes and ZERO allowance. No execution or retry. Independent exact review and closed workers are required; owner changes revoke outgoing authority.';
+  const s={schema:SCHEMA,runtime_version:VERSION,plugin_version:VERSION,id:'fictional-scoped-home-company',name:'Fictional scoped home',idea:'FICTIONAL mechanics only',phase:'Frame',mode:'preparation',paused:false,governance,governance_sha256:digest(governance),cos_instructions:'FICTIONAL: retain every condition, exception, failed result and uncertainty. No execution authority; reconstruct and independently review before resume.',roles:{runner:{name:'Fictional coordinator'},qa:{name:'Fictional independent QA'},engineer:{name:'Fictional proposal engineer'}},owner:{host:'codex',session_id:f.session_id,epoch:f.epoch},records:{},sessions:{},jobs:{},messages:[],notices:[],created_at:'2026-11-13T00:00:00.000Z'};
+  s.team_sha256=teamHash(s);withStore(f.root,db=>db.transaction('fictional.fixture.created',()=>s),true);
+ }
+ engine.open({...f,idea:'FICTIONAL mechanics only'},'codex');withStore(f.root,db=>db.migrate());
  mutate(f,s=>{s.paused=bootstrap;if(!bootstrap)s.records.home={id:'home',revision:1,kind:'artifact',content:'UNKNOWN; ZERO allowance; no execution.',context_obligations:{version:1,scope:'*'},operating_record:typed()};s.records.archive={id:'archive',kind:'artifact',revision:1,author_instance:'fictional-source-author',content:'UNKNOWN failed attempt. Remaining allowance ZERO. No execution; retain all negative outcomes.'};});
  if(dense)mutate(f,s=>{
   const original=retainSnapshot(s,{id:'shared-original',content:'UNKNOWN; allowance ZERO; incoming originals retain opposite qualifiers.'});

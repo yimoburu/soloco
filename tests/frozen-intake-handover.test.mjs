@@ -32,18 +32,23 @@ function forbidExternal(t){
 }
 const operating=(f,args)=>context(f,{protocol:'operating-state-v1',...args});
 const clone=s=>inheritSnapshots(s,structuredClone(s));
+function jobDiagnostic(job,details={}){
+ const short=value=>value==null?null:String(value).slice(0,800),failure=job.execution_failure;
+ return JSON.stringify({status:job.status,error:short(job.error),execution_failure:failure?{code:failure.code,message:short(failure.message),outcome:failure.outcome,at:failure.at}:null,timeout_ms:job.timeout_ms,execution_started_at:job.execution_started_at,execution_deadline_at:job.execution_deadline_at,finished_at:job.finished_at,termination_confirmed:job.coordination_release?.termination_confirmed,...details});
+}
 async function preserve(f){
  const es=await extraction(f);await home(f);
  const d=await review(f,domainArgs(es));assert.equal(d.job.status,'completed',d.job.error);
  await aggregate(f,es,d);
 }
-async function publish(f){
+async function publish(f,t,label){
  const p=await operating(f,{action:'plan',maintenance:true});assert.equal(p.held,false,JSON.stringify(p.frontier));
  const q=engine.dispatch({...f,role:'qa',review_of:p.id,task:'FICTIONAL scripted publication after exact frozen-parent preservation.'},'codex',{check:()=>({available:true,authenticated:true}),launch:()=>({on(){},unref(){}})});
- const s=read(f),assignment=assignmentContext(s,s.jobs[q.id]),evidence=assignment.operating_evidence??assignment.qualification_evidence;
+ const s=read(f),assignment=assignmentContext(s,s.jobs[q.id]),evidence=assignment.operating_evidence??assignment.qualification_evidence,planHash=sha(s.records[p.id].operating_plan);
  // Use the existing bounded range capacity and consume only actually delivered
  // ranges. Deferred ranges stay queued; no evidence or deadline is omitted.
  const stream=evidence?.sources[evidence.pages[0].source_id],reads=[];
+ if(label==='incoming'){assert.ok(assignment.operating_evidence,'Incoming publication must use the actual frozen operating protocol');assert.ok(stream.length>200000,'The deliberate pending proposal must exercise frozen publication delivery');}
  if(stream)for(let offset=0;offset<stream.length;){
   let length=Math.min(32768,stream.length-offset);
   const request=()=>({source_id:stream.source_id,sha256:stream.sha256,offset,length});
@@ -51,21 +56,23 @@ async function publish(f){
   reads.push(request());offset+=length;
  }
  else {const required=JSON.parse(assignment.text).required_evidence;for(const ref of required.sources.filter(ref=>!required.inline.some(x=>x.source.id===ref.id)))for(let offset=0;offset<ref.total_characters;offset+=16000)reads.push({id:ref.id,sha256:ref.sha256,offset,length:Math.min(16000,ref.total_characters-offset)});}
- let first=true;
+ const rangeCount=reads.length;let first=true,deliveredRanges=0;
  await work(f.root,q.id,async(_host,_session,_prompt,_dir,timeout,_selection,options)=>{
   if(first){first=false;options.onSpawn(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));}
   const native_id='fictional-publication-'+q.id;
   if(stream){
    const delivered=JSON.parse(_prompt);
    if(delivered.protocol==='handover-frozen-reads-v1'){
-    for(const range of delivered.reads){const expected=reads.shift();assert.ok(expected,'No unsolicited range');for(const key of ['source_id','sha256','offset','length'])assert.equal(range[key],expected[key]);}
+    for(const range of delivered.reads){const expected=reads.shift();assert.ok(expected,'No unsolicited range');for(const key of ['source_id','sha256','offset','length'])assert.equal(range[key],expected[key]);assert.equal(range.text,stream.raw.slice(expected.offset,expected.offset+expected.length),'Complete UTF-16 range reached the adapter');deliveredRanges++;}
     assert.deepEqual(delivered.deferred,reads.slice(0,delivered.deferred.length),'Deferred ranges must remain queued');
    }
    if(reads.length)return {native_id,text:JSON.stringify({reads:reads.slice(0,4)})};
   }else if(reads.length)return {native_id,text:JSON.stringify({reads:reads.splice(0,1)})};
-  return {native_id,text:JSON.stringify({content:'FICTIONAL scripted contract judgment; no native semantic QA.',messages:[],notices:[],review:{verdict:'Pass',reason:'FICTIONAL mechanics only; UNKNOWN, ZERO allowance and no execution retained.',permitted_action:'publish_operating_state',plan_sha256:sha(read(f).records[p.id].operating_plan),preservation_complete:true,interaction_complete:true,authority_checked:true,blockers:[]}})};
+  return {native_id,text:JSON.stringify({content:'FICTIONAL scripted contract judgment; no native semantic QA.',messages:[],notices:[],review:{verdict:'Pass',reason:'FICTIONAL mechanics only; UNKNOWN, ZERO allowance and no execution retained.',permitted_action:'publish_operating_state',plan_sha256:planHash,preservation_complete:true,interaction_complete:true,authority_checked:true,blockers:[]}})};
  });
- const job=read(f).jobs[q.id];assert.equal(job.status,'completed',job.error);
+ const job=read(f).jobs[q.id],diagnostic=jobDiagnostic(job,{phase:label,stream_characters:stream?.length??0,requested_ranges:rangeCount,delivered_ranges:deliveredRanges});
+ t.diagnostic(diagnostic);assert.equal(job.status,'completed',diagnostic);assert.equal(job.coordination_release.termination_confirmed,true,diagnostic);
+ if(stream){assert.equal(reads.length,0);assert.equal(deliveredRanges,rangeCount);if(label==='incoming')assert.ok(deliveredRanges>1,'Successor publication must consume multiple actual ranges');}
  assert.equal((await operating(f,{action:'apply',plan_id:p.id,review_id:job.artifact_id})).published,true);
 }
 
@@ -73,26 +80,27 @@ const launch={check:()=>({available:true,authenticated:true}),launch:()=>({on(){
 const reconstruct=f=>engine.handover({...f,action:'submit',protocol:'operating-handover-v4',content:'FICTIONAL reconstruction preserves complete accepted obligations, failed history and uncertainty. Remaining allowance ZERO. No execution or exposure authority. Independent exact review is required before preparation resumes.'},'codex');
 async function handoverPass(f,r){
  const q=engine.dispatch({...f,role:'qa',review_of:r.id,task:'FICTIONAL independent exact frozen-intake handover judgment.'},'codex',launch);
- const state=read(f),packet=assignmentContext(state,state.jobs[q.id]),stream=packet.handover_evidence.sources[packet.handover_evidence.pages[0].source_id];let offset=0,first=true;
+ const state=read(f),packet=assignmentContext(state,state.jobs[q.id]),stream=packet.handover_evidence.sources[packet.handover_evidence.pages[0].source_id],subjectHash=state.records[r.id].handover.subject_sha256;let offset=0,first=true,pending=null,deliveredCharacters=0;
  await work(f.root,q.id,async(_host,_session,_prompt,_dir,timeout,_selection,options)=>{
   if(first){first=false;options.onSpawn(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));}
-  if(offset<stream.length){const start=offset,length=Math.min(16000,stream.length-offset);offset+=length;return {native_id:'fictional-handover-'+q.id,text:JSON.stringify({reads:[{source_id:stream.source_id,sha256:stream.sha256,offset:start,length}]})};}
-  return {native_id:'fictional-handover-'+q.id,text:JSON.stringify({content:'FICTIONAL exact subject judgment; no native semantic acceptance.',messages:[],notices:[],citations:JSON.parse(packet.text).evidence_protocol.citations.slice(0,1),review:{verdict:'Pass',reason:'FICTIONAL complete conditions retained.',permitted_action:'resume_handover',subject_sha256:read(f).records[r.id].handover.subject_sha256,blockers:[]}})};
+  if(pending){const delivered=JSON.parse(_prompt);assert.equal(delivered.protocol,'handover-frozen-reads-v1');assert.equal(delivered.reads.length,1);assert.deepEqual(delivered.deferred,[]);const range=delivered.reads[0];for(const key of ['source_id','sha256','offset','length'])assert.equal(range[key],pending[key]);assert.equal(range.text,stream.raw.slice(pending.offset,pending.offset+pending.length));deliveredCharacters+=range.length;pending=null;}
+  if(offset<stream.length){const start=offset;let length=Math.min(16000,stream.length-offset);const last=stream.raw.charCodeAt(start+length-1);if(last>=0xd800&&last<=0xdbff)length--;offset+=length;pending={source_id:stream.source_id,sha256:stream.sha256,offset:start,length};return {native_id:'fictional-handover-'+q.id,text:JSON.stringify({reads:[pending]})};}
+  return {native_id:'fictional-handover-'+q.id,text:JSON.stringify({content:'FICTIONAL exact subject judgment; no native semantic acceptance.',messages:[],notices:[],citations:JSON.parse(packet.text).evidence_protocol.citations.slice(0,1),review:{verdict:'Pass',reason:'FICTIONAL complete conditions retained.',permitted_action:'resume_handover',subject_sha256:subjectHash,blockers:[]}})};
  });
- const done=read(f),job=done.jobs[q.id];assert.equal(job.status,'completed',job.error);assert.equal(job.coordination_release.termination_confirmed,true);assert.equal(done.records[job.artifact_id].handover_evidence.semantic_delivery_complete,true);return {job:q.id,review:job.artifact_id};
+ const done=read(f),job=done.jobs[q.id];assert.equal(job.status,'completed',jobDiagnostic(job,{stream_characters:stream.length,requested_characters:offset,delivered_characters:deliveredCharacters}));assert.equal(deliveredCharacters,stream.length);assert.equal(pending,null);assert.equal(job.coordination_release.termination_confirmed,true);assert.equal(done.records[job.artifact_id].handover_evidence.semantic_delivery_complete,true);return {job:q.id,review:job.artifact_id};
 }
 
-async function proposal(f,label,whileQueued=()=>{}){
+async function proposal(f,label,whileQueued=()=>{},content='FICTIONAL unaccepted proposal. UNKNOWN; ZERO allowance; no execution.'){
  const task=engine.dispatch({...f,role:'engineer',task:'FICTIONAL '+label+' proposal retaining UNKNOWN, ZERO allowance and no execution.',output_contract:'operating-proposal-v1',input_ids:['home']},'codex',launch);
  assert.equal(read(f).jobs[task.id].context_format,6);whileQueued();
- await work(f.root,task.id,async(_h,_n,_p,_d,timeout,_s,options)=>{options.onSpawn(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));return {native_id:'fictional-proposal-'+task.id,text:JSON.stringify({content:'FICTIONAL unaccepted proposal. UNKNOWN; ZERO allowance; no execution.',messages:[],notices:[]})};});
- const s=read(f),job=s.jobs[task.id];assert.equal(job.status,'completed',job.error);return {job,record:s.records[job.artifact_id]};
+ await work(f.root,task.id,async(_h,_n,_p,_d,timeout,_s,options)=>{options.onSpawn(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));return {native_id:'fictional-proposal-'+task.id,text:JSON.stringify({content,messages:[],notices:[]})};});
+ const s=read(f),job=s.jobs[task.id];assert.equal(job.status,'completed',jobDiagnostic(job));assert.equal(s.records[job.artifact_id].content,content);return {job,record:s.records[job.artifact_id]};
 }
 
 test('frozen-intake accepted checkpoint admits public v4 evidence and a successor transfer',async t=>{
  forbidExternal(t);
- const f=await fixture({frozenIntake:true,handoverBeforeFreeze:true});
- await preserve(f);await publish(f);
+ const f=await fixture({frozenIntake:true,handoverBeforeFreeze:true,fictionalTeam:true});
+ await preserve(f);await publish(f,t,'outgoing');
  const r=reconstruct(f);assert.equal(read(f).records[r.id].handover.evidence_protocol,4);
  await t.test('public inspect and exact read after v4 submission',()=>{
   const inspection=engine.handover({...f,action:'inspect'},'codex'),source=inspection.required_semantics;
@@ -129,7 +137,12 @@ test('frozen-intake accepted checkpoint admits public v4 evidence and a successo
  await t.test('next bound owner transfer and independent successor continuation',async()=>{
   const next={...f,session_id:'fictional-successor',epoch:f.epoch+1};engine.bind(next.root,next.session_id,'codex');
   const transfer=instruction=>engine.control({root:next.root,session_id:next.session_id,expected_epoch:f.epoch,action:'handover',source_instruction:instruction},'codex');
-  const pending=await proposal(f,'founder task',()=>assert.throws(()=>transfer('handover'),/Assignments are active/)),before=read(f);
+  // A legal <100000-character result deliberately exceeds the 200000-character
+  // JSON publication boundary. Escapes are inert fictional range/packet data;
+  // the complete original must still survive publication and successor review.
+  const pendingContent='FICTIONAL unaccepted proposal: UNKNOWN failed outcome; allowance ZERO; no execution or retry. The following JSON escapes are inert fixture data.\n'+'\u0001'.repeat(34000);
+  assert.ok(pendingContent.length<100000);assert.ok(JSON.stringify(pendingContent).length>200000);
+  const pending=await proposal(f,'founder task',()=>assert.throws(()=>transfer('handover'),/Assignments are active/),pendingContent),before=read(f);
   assert.throws(()=>engine.control({root:next.root,session_id:next.session_id,expected_epoch:f.epoch-1,action:'handover',source_instruction:'handover'},'codex'),/Stale/);
   assert.throws(()=>transfer('handover only after QA approves the outstanding restriction'),/DIRTY/);
   assert.equal(sha(read(f)),sha(before),'failed admission retains outgoing ownership and all state');
@@ -142,7 +155,7 @@ test('frozen-intake accepted checkpoint admits public v4 evidence and a successo
   assert.throws(()=>engine.control({root:next.root,session_id:next.session_id,expected_epoch:next.epoch,action:'resume',source_instruction:'resume'},'codex'),/Held/);
   assert.throws(()=>engine.dispatch({...next,role:'engineer',task:'Premature incoming assignment'},'codex',launch),/paused/);
   assert.throws(()=>engine.save({...f,id:'old-owner-write',kind:'artifact',content:'Stale outgoing write'},'codex'),/does not own/);
-  await publish(next);
+  await publish(next,t,'incoming');
   const successor=engine.handover({...next,action:'submit',content:r.content},'codex'),subject=read(next).records[successor.id].handover;assert.equal(subject.evidence_protocol,4);
   assert.deepEqual(subject.subject.records[pending.record.id],pending.record);assert.deepEqual(subject.subject.jobs[pending.job.id],pending.job);
   const inspection=engine.handover({...next,action:'inspect'},'codex'),source=inspection.required_semantics;
