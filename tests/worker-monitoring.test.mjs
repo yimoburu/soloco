@@ -8,7 +8,7 @@ import {syncBuiltinESMExports} from 'node:module';
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
 import {call} from '../plugins/soloco/runtime/main.mjs';
 import {Store,withStore,digest,teamHash} from '../plugins/soloco/runtime/store.mjs';
-import {reference} from '../plugins/soloco/runtime/specialists.mjs';
+import {reference,usesSpecialistInputRevisions} from '../plugins/soloco/runtime/specialists.mjs';
 import {assignmentContext} from '../plugins/soloco/runtime/context.mjs';
 import {operatingContext} from '../plugins/soloco/runtime/operating-state.mjs';
 import {developmentAssignment} from '../plugins/soloco/runtime/develop.mjs';
@@ -278,6 +278,7 @@ test('fictional completed specialist output retains every exact input through in
     const review=engine.dispatch({...f.args,role:'qa',review_of:producer.artifact_id,task:'Independently assess this exact fictional preparation output.'},'codex',launch);
     const queued=f.read(),reviewJob=queued.jobs[review.id],controls=Object.values(queued.records).filter(r=>r.kind==='decision'&&['pause','resume'].includes(r.action));
     assert.equal(reviewJob.specialist,undefined,'QA remains a separate generic assignment');
+    assert.equal(usesSpecialistInputRevisions(queued,reviewJob),true,'queued QA retains its canonical specialist-output lineage');
     assert.equal(controls.length,2);
     for(const record of controls){assert.equal(Object.hasOwn(record,'revision'),false);assert.deepEqual(reviewJob.inputs.find(ref=>ref.id===record.id),{id:record.id,revision:null});}
     for(const input of producer.inputs)assert.deepEqual(reviewJob.inputs.find(ref=>ref.id===input.id),input,'every original profile/data reference reaches the unchanged assessment equality check');
@@ -295,7 +296,11 @@ test('fictional completed specialist output retains every exact input through in
       ['false specialist binding',(s,j,o,p)=>{p.specialist=false;}]
     ]){
       const changed=JSON.parse(JSON.stringify(queued)),j=changed.jobs[review.id],o=changed.records[producer.artifact_id],p=changed.jobs[producer.id];
-      change(changed,j,o,p);assert.throws(()=>assignmentContext(changed,j),/Specialist Held:/,label+' must not fall back to ordinary raw inputs');
+      change(changed,j,o,p);
+      const held=['null specialist binding','false specialist binding'].includes(label)?'Specialist Held: invalid assignment binding':'Specialist Held: specialist review target lacks its exact producer output binding';
+      assert.throws(()=>usesSpecialistInputRevisions(changed,j),{message:held},label+' exact classifier rejection');
+      const contextHeld=label==='output map key'?'Qualification hold: source identity mismatch '+producer.artifact_id:held;
+      assert.throws(()=>assignmentContext(changed,j),{message:contextHeld},label+' exact full-context rejection');
     }
     const pass={verdict:'Pass',reason:'FICTIONAL injected independent judgment; no real Native acceptance.',permitted_action:'accept_specialist_output',blockers:[]};
     await monitoring(async control=>{
