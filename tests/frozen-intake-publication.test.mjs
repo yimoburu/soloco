@@ -2,6 +2,7 @@
 // no company exports, external execution, native semantic acceptance or fit claim.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import cp from 'node:child_process';
 import net from 'node:net';
 import {syncBuiltinESMExports} from 'node:module';
@@ -17,6 +18,9 @@ import {work} from '../plugins/soloco/runtime/worker.mjs';
 
 function forbidExternal(t){
  const attempts=[];
+ // Capability presentation is irrelevant to this fixture; model the local
+ // sandbox executable as absent so company_open cannot launch its OS probe.
+ const exists=fs.existsSync;t.mock.method(fs,'existsSync',file=>file==='/usr/bin/sandbox-exec'?false:exists(file));
  const deny=(object,key)=>t.mock.method(object,key,()=>{attempts.push(key);throw Error('Unexpected external execution: '+key);});
  for(const key of ['spawn','spawnSync','exec','execSync','execFile','execFileSync','fork'])deny(cp,key);
  for(const key of ['connect','createConnection','createServer'])deny(net,key);
