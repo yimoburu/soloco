@@ -48,8 +48,9 @@ checks have not run. The earlier private-outcome producer `b7ffad5` remains
 preserved after a concrete cross-request deadline-erasure finding. Its isolated
 Source repair `c51df5e` is composed here; its separately selected execution has
 its own receipts and cannot establish this composition's result. Fixed
-event/two-phase COMMIT hooks must still be integrated before the new consumer
-can execute. No earlier component Pass establishes this head's readiness.
+event/two-phase COMMIT hooks from `8a188a3` are now composed in Source. Their
+new checks and the combined consumer checks remain unrun. No earlier component
+Pass establishes this head's readiness.
 
 The explicit same-process qualification route does not transfer private brands
 to a new standalone process or adopt a cold run. Complete external-A archive

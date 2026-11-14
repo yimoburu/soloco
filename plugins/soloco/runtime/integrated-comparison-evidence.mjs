@@ -20,12 +20,15 @@ const copy=value=>JSON.parse(JSON.stringify(value));
 const freeze=value=>{if(value&&typeof value==='object'){for(const child of Object.values(value))freeze(child);Object.freeze(value);}return value;};
 const sourceHash=()=>hash(fs.readFileSync(fileURLToPath(import.meta.url)));
 const wire=r=>r?.runtime_wire_evidence;
-const metadataRecord=record=>Boolean(record&&typeof record==='object'&&(Object.hasOwn(record,'runtime_wire_evidence')||Object.hasOwn(record,'runtime_candidate_test_guard')));
 const eventTypes={requested:'job.model_process.requested',response_retained:'job.model_wire.response_retained',error_retained:'job.model_wire.error_retained',derived:'job.model_wire.derived_recorded'};
 const transition={requested:'request',response_retained:'response',error_retained:'error',derived:'derived'};
 const SQL_PROFILE='issue18-prepaid-sql-metadata-v1',BODY_MAX=32768,CONTROL_MAX=32;
 const SQL_CAPS=Object.freeze({immutable:65728,entry:960,projection:2048,references:16384,catalogue:4096,roots:4096,event:65536});
 const CONTROL_CAPS=Object.freeze({references:2048,catalogue:4096,roots:2048});
+const COPY_LIMITS=Object.freeze({immutable_rows:4096,new_rows:128,total_bytes:8000000,depth:32,nodes:100000,unicode_layers:8});
+const COPY_PROTOCOLS=new Set(['issue18-runtime-wire-evidence-v1','issue18-call-binding-v1','issue18-eight-slot-run-v2','issue18-eight-slot-consumption-v2','issue18-one-test-arm-guard-v1','issue18-wire-producer-transition-v1','issue18-one-test-producer-transition-v1','issue18-budget-selection-v1','issue18-budget-journal-v1','issue18-comparison-bootstrap-io-v1','issue18-comparison-evidence-io-v1','issue18-ledger-storage-io-v1','issue18-A-storage-init-v1']);
+const COPY_KEYS=new Set(['runtime_wire_evidence','runtime_candidate_test_guard','A_charged_evidence_bytes','A_capacity_reserved_bytes','B_slot_reserved_bytes','run_manifest_sha256','slot_commit_id','binding_serialization','private_outcome_custody_id','raw_lossless_sha256','tracking_entry_sha256','cancellation_binding_id','contract_A_manifest_sha256','contract_B_manifest_sha256']);
+const COPY_KEY_TEXT=new RegExp('"(?:'+[...COPY_KEYS].join('|')+')"\\s*:');
 const SQL_COLUMNS=Object.freeze({company:['id','value'],events:['seq','at','type','value'],company_layout:['id','version'],immutable_values:['sha256','bytes'],state_entries:['family','key','position','sha256','encoding'],public_read_values:['family','key','position','bytes','value_id_sha256','sha256'],public_read_rows:['collection','ordinal','key','id','sha256','key_sha256'],public_read_catalog:['id','version','sha256','bytes']});
 const SQL_TRIGGERS=Object.freeze(Object.fromEntries(['insert','update','delete'].flatMap(action=>[
   ['fence_legacy_'+action,"CREATE TRIGGER fence_legacy_"+action+" BEFORE "+action.toUpperCase()+" ON company BEGIN SELECT RAISE(ABORT,'Legacy writer fenced: normalized company storage'); END"],
@@ -48,6 +51,106 @@ const changedRows=(table,before,after)=>{const old=new Map(before.map(row=>[sqlI
 function boundSQLRows(db,table,columns,where,parameters,maximumRows,maximumRowBytes){
   const census=db.prepare('SELECT COUNT(*) AS n,COALESCE(MAX(length(CAST(json_array('+columns.join(',')+') AS BLOB))),0) AS largest FROM '+table+(where?' WHERE '+where:'')).get(...parameters);
   need(Number.isSafeInteger(census.n)&&census.n<=maximumRows&&census.largest<=maximumRowBytes,'METADATA_SQL_ROW_CAPACITY');
+}
+function canonicalProofRows(loan){
+  // The caller's selected projection is deliberately irrelevant. SQLite only
+  // returns metadata for the actual canonical proof rows, not unrelated bodies.
+  const layout=loan.db.prepare("SELECT 1 AS present FROM sqlite_master WHERE type='table' AND name='company_layout'").get();
+  if(!layout){const count=loan.db.prepare("SELECT COUNT(*) AS n FROM company c,json_tree(c.value,'$.records') j WHERE j.key IN ('runtime_wire_evidence','runtime_candidate_test_guard')").get();need(count.n===0,'METADATA_UNSUPPORTED_LEGACY_PROOF_STORAGE');return [];}
+  const version=loan.db.prepare('SELECT version FROM company_layout WHERE id=1').get()?.version;
+  if(version!==4){const count=loan.db.prepare("SELECT COUNT(*) AS n FROM state_entries e JOIN immutable_values v USING(sha256) WHERE e.family='records' AND (json_type(v.bytes,'$.runtime_wire_evidence') IS NOT NULL OR json_type(v.bytes,'$.runtime_candidate_test_guard') IS NOT NULL)").get();need(count.n===0,'METADATA_UNSUPPORTED_LEGACY_PROOF_STORAGE');return [];}
+  const invalid=loan.db.prepare("SELECT COUNT(*) AS n FROM state_entries e LEFT JOIN immutable_values v USING(sha256) WHERE e.family='records' AND (v.bytes IS NULL OR NOT json_valid(v.bytes))").get();need(invalid.n===0,'METADATA_CANONICAL_JSON');
+  const where="e.family='records' AND (json_type(v.bytes,'$.runtime_wire_evidence') IS NOT NULL OR json_type(v.bytes,'$.runtime_candidate_test_guard') IS NOT NULL)";
+  const count=loan.db.prepare('SELECT COUNT(*) AS n FROM state_entries e JOIN immutable_values v USING(sha256) WHERE '+where).get();need(count.n<=16,'METADATA_CANONICAL_PROOF_CAPACITY');
+  const rows=loan.db.prepare("SELECT e.key,e.sha256,e.encoding,json_extract(v.bytes,'$.id') AS id,length(CAST(v.bytes AS BLOB)) AS bytes,json_type(v.bytes,'$.runtime_wire_evidence') AS wire_type,json_type(v.bytes,'$.runtime_candidate_test_guard') AS test_type FROM state_entries e JOIN immutable_values v USING(sha256) WHERE "+where+' ORDER BY e.key').all();
+  loan.assert();return rows;
+}
+function requireProofCustody(rows,members,code,eventScope=null){
+  for(const row of rows)need(row.encoding==='json'&&row.key===row.id&&row.bytes<=BODY_MAX&&Boolean(row.wire_type)!==Boolean(row.test_type)&&members.some(paid=>{const body=paid.bodies.get(row.sha256),entry=paid.records.get(row.id),staged=eventScope?.metadata===paid&&eventScope.recordSha===row.sha256;return body?.id===row.id&&body.family===(row.wire_type?'wire':'test')&&(entry?.committedSha===row.sha256||staged);}),code);
+}
+function copyBaseline(db){
+  const count=db.prepare('SELECT COUNT(*) AS n FROM immutable_values').get();need(count.n<=COPY_LIMITS.immutable_rows,'METADATA_COPY_CENSUS_CAPACITY');
+  need(db.prepare('SELECT COUNT(*) AS n FROM state_entries').get().n<=1024&&db.prepare('SELECT COUNT(*) AS n FROM public_read_values').get().n<=256,'METADATA_COPY_CENSUS_CAPACITY');
+  return {immutable:new Set(db.prepare('SELECT sha256 FROM immutable_values').all().map(row=>row.sha256)),entries:db.prepare('SELECT family,key,sha256 FROM state_entries ORDER BY family,key').all(),public:db.prepare('SELECT family,key,sha256 FROM public_read_values ORDER BY family,key').all()};
+}
+function proofRepresentation(serialized){
+  need(typeof serialized==='string'&&Buffer.byteLength(serialized)<=COPY_LIMITS.total_bytes,'METADATA_COPY_CLASSIFICATION_CAPACITY');
+  let nodes=0,work=0;const seenStrings=new Set();
+  function textView(text){
+    let view=text;
+    for(let layer=0;layer<COPY_LIMITS.unicode_layers;layer++){
+      work+=view.length;need(work<=COPY_LIMITS.total_bytes,'METADATA_COPY_CLASSIFICATION_CAPACITY');
+      // Recognize embedded/encoded JSON even when a content wrapper removed the
+      // outer header identity. A plain mention without JSON field syntax is not
+      // itself a proof payload. Unsupported deeper encodings Hold explicitly.
+      if(COPY_KEY_TEXT.test(view))return true;
+      if(/"(?:protocol|purpose)"\s*:\s*"issue18-[^"]+"/.test(view))return true;
+      const next=view.replace(/\\+u([a-fA-F0-9]{4})/g,(_match,hex)=>String.fromCharCode(Number.parseInt(hex,16))).replace(/\\(["\\/])/g,(_match,escaped)=>escaped);
+      if(next===view)return false;view=next;
+    }
+    need(false,'METADATA_COPY_CLASSIFICATION_ENCODING');return false;
+  }
+  function visit(value,depth){
+    need(++nodes<=COPY_LIMITS.nodes&&depth<=COPY_LIMITS.depth,'METADATA_COPY_CLASSIFICATION_CAPACITY');
+    if(typeof value==='string'){
+      if(seenStrings.has(value))return false;seenStrings.add(value);if(textView(value))return true;
+      const trimmed=value.trim();if(trimmed[0]==='{'||trimmed[0]==='['||trimmed[0]==='"'){let nested;try{nested=JSON.parse(trimmed);}catch{return false;}return visit(nested,depth+1);}return false;
+    }
+    if(!value||typeof value!=='object')return false;
+    if(COPY_PROTOCOLS.has(value.protocol)||typeof value.purpose==='string'&&value.purpose==='issue18-integrated-comparison-budget-v1')return true;
+    if(Object.keys(value).some(key=>COPY_KEYS.has(key)))return true;
+    if(typeof value.object_name==='string'&&/^objects\/[a-f0-9]{64}\.blob$/.test(value.object_name)&&Object.hasOwn(value,'encoding')&&Object.hasOwn(value,'sha256')&&Object.hasOwn(value,'bytes'))return true;
+    if(Object.hasOwn(value,'lower_cli_transport')&&Object.hasOwn(value,'lossless_blob'))return true;
+    return Object.values(value).some(child=>visit(child,depth+1));
+  }
+  let value;try{value=JSON.parse(serialized);}catch{need(false,'METADATA_COPY_CLASSIFICATION_JSON');}return visit(value,0);
+}
+function knownBody(members,sha,text){return members.some(paid=>paid.bodies.get(sha)?.text===text);}
+const COPY_FAMILIES=new Set(['records','jobs','sessions','notices','messages','upgrade_history','retired_sessions','context_classifications','upgrade']);
+function preparedValues(state){
+  const rows=[];for(const [key,value]of Object.entries(state??{})){
+    if(COPY_FAMILIES.has(key)&&value&&typeof value==='object'){for(const [id,entry]of Object.entries(value))if(entry!==undefined)rows.push({identity:JSON.stringify([key,id]),value:entry});}
+    else if(value!==undefined)rows.push({identity:JSON.stringify(['root',key]),value});
+  }return rows;
+}
+function classifyPreparedCopies(loan,next){
+  const scope=metadataScopes.get(loan.scope);if(!scope)return;const members=scope.members;
+  // The fixed TestGuard guard has already authenticated its exact private
+  // pending write. Registering here makes the pre-SQL census independent of the
+  // later event callback; a public marker alone cannot reach this point.
+  for(const record of Object.values(next?.records??{}))if(record&&Object.hasOwn(record,'runtime_candidate_test_guard')){
+    const text=JSON.stringify(record);if(knownBody(members,hash(text),text))continue;
+    const producer=record.runtime_candidate_test_guard?.producer_evidence_record,paid=members.find(item=>item.phase==='engineer'&&item.records.has(producer?.id));need(paid,'METADATA_TEST_PREPAYMENT_REQUIRED');metadataRegister(paid,record,'test');
+  }
+  for(const row of preparedValues(next)){
+    const text=JSON.stringify(row.value);need(typeof text==='string','METADATA_COPY_CLASSIFICATION_JSON');const sha=hash(text);
+    if(scope.preparedBefore.get(row.identity)===sha)continue;
+    const registered=members.map(paid=>paid.bodies.get(sha)).find(body=>body?.text===text);
+    if(registered){need(row.identity===JSON.stringify(['records',registered.id]),'METADATA_UNSELECTED_COPY_REPRESENTATION');continue;}
+    need(!proofRepresentation(text),'METADATA_UNSELECTED_COPY_REPRESENTATION');
+  }
+}
+function classifyNewCopies(loan,scope,members,owner){
+  const current=copyBaseline(loan.db),fresh=[...current.immutable].filter(sha=>!scope.copies.immutable.has(sha));
+  need(fresh.length<=COPY_LIMITS.new_rows,'METADATA_COPY_CENSUS_CAPACITY');
+  const changed=changedRows('state_entries',scope.copies.entries,current.entries),changedPublic=changedRows('public_read_values',scope.copies.public,current.public),wanted=new Set([...fresh,...changed.map(row=>row.sha256)]);
+  let total=0;
+  for(const sha of wanted){
+    const size=loan.db.prepare('SELECT length(CAST(bytes AS BLOB)) AS bytes FROM immutable_values WHERE sha256=?').get(sha);need(size&&Number.isSafeInteger(size.bytes)&&size.bytes>=0&&(total+=size.bytes)<=COPY_LIMITS.total_bytes,'METADATA_COPY_CLASSIFICATION_CAPACITY');
+    const row=loan.db.prepare('SELECT bytes FROM immutable_values WHERE sha256=?').get(sha);need(typeof row?.bytes==='string'&&hash(row.bytes)===sha,'METADATA_COPY_CLASSIFICATION_HASH');
+    if(knownBody(members,sha,row.bytes))continue;
+    need(!proofRepresentation(row.bytes),'METADATA_UNSELECTED_COPY_REPRESENTATION');
+  }
+  for(const entry of changedPublic){
+    const size=loan.db.prepare('SELECT length(CAST(bytes AS BLOB)) AS bytes FROM public_read_values WHERE family=? AND key=?').get(entry.family,entry.key);need(size&&(total+=size.bytes)<=COPY_LIMITS.total_bytes,'METADATA_COPY_CLASSIFICATION_CAPACITY');
+    const row=loan.db.prepare('SELECT bytes FROM public_read_values WHERE family=? AND key=?').get(entry.family,entry.key);need(row&&!proofRepresentation(row.bytes),'METADATA_UNSELECTED_PUBLIC_COPY_REPRESENTATION');
+  }
+  if(!owner){const size=loan.db.prepare('SELECT COALESCE(SUM(length(CAST(value AS BLOB))),0) AS bytes FROM events WHERE seq>?').get(scope.beforeEvent);need((total+=size.bytes)<=COPY_LIMITS.total_bytes,'METADATA_COPY_CLASSIFICATION_CAPACITY');
+    for(const row of loan.db.prepare('SELECT value FROM events WHERE seq>? ORDER BY seq').all(scope.beforeEvent))need(!proofRepresentation(row.value),'METADATA_UNSELECTED_EVENT_COPY_REPRESENTATION');}
+  // Whole catalogue rows are already prepaid; a hidden payload in one still
+  // lies outside the closed projection and cannot borrow that allowance.
+  for(const row of loan.db.prepare('SELECT bytes FROM public_read_catalog').all())need(!proofRepresentation(row.bytes),'METADATA_UNSELECTED_PUBLIC_COPY_REPRESENTATION');
+  loan.assert();
 }
 
 /** A finite DATA quote, never a Store, SQL-write or model capability. Whole
@@ -102,8 +205,8 @@ function metadataSubject(store,input){
   need(input&&Object.keys(input).sort().join(',')==='job_id,phase','METADATA_INPUT');
   return snapshot(store,(state,loan)=>{const job=state.jobs?.[input.job_id];need(job?.status==='running'&&job.role===input.phase,'METADATA_JOB');
     const quote=comparisonEvidenceMetadataReservation(input.phase),schema=sqlSchema(loan.db),publicRows=sqlPublic(loan.db);
-    const prior=[...(metadataRoots.get(loan.root)??[])].filter(paid=>paid.ready&&paid.used),known=new Set(prior.flatMap(paid=>[...paid.records.keys()]));
-    for(const record of Object.values(state.records??{}))if(metadataRecord(record))need(known.has(record.id),'METADATA_EXISTING_PROOF_CUSTODY');
+    const prior=[...(metadataRoots.get(loan.root)??[])].filter(paid=>paid.ready&&paid.used);
+    requireProofCustody(canonicalProofRows(loan),prior,'METADATA_EXISTING_PROOF_CUSTODY');copyBaseline(loan.db);
     if(prior.length)metadataCopyCensus(loan,prior);
     // Leave room for the closed A/TestGuard family and the original Core
     // candidate/receipt/QA reference additions. Larger companies are unsupported
@@ -111,10 +214,18 @@ function metadataSubject(store,input){
     need(sqlRowsBytes('public_read_rows',publicRows.references)<=12288,'METADATA_REFERENCE_PREFLIGHT');return {quote,schema,root:loan.root,db:loan.db};});
 }
 export function preflightComparisonEvidenceMetadataFrom(store,input){return metadataSubject(store,input).quote;}
+/** The direct late-native journal route has no selected A copy/archive grant.
+ * It must report an explicit Hold before retaining any new journal/root/index
+ * representation. Metadata-free late returns keep their existing route. */
+export function assertComparisonUpgradeAppendSupportedFrom(store){
+  const loan=originalStoreExecutionCustodyFrom(store);need(loan.mode==='write'&&loan.type==='upgrade.native_returned','METADATA_UPGRADE_APPEND_SCOPE');
+  const rows=canonicalProofRows(loan),active=[...(metadataRoots.get(loan.root)??[])].some(paid=>paid.ready&&paid.used);
+  need(rows.length===0&&!active,'METADATA_UPGRADE_APPEND_CUSTODY_REQUIRED');loan.assert();
+}
 export function prepayComparisonEvidenceMetadataFrom(store,io,input){
   const facts=metadataSubject(store,input),storage=inspectComparisonEvidenceStorageFrom(io),key=metadataKey(facts.root,input.job_id);
   need(storage.phase===input.phase&&!metadataJobs.has(key),'METADATA_PREPAYMENT_SPENT');
-  const paid={...facts,store,io,jobId:input.job_id,phase:input.phase,used:false,ready:false,records:new Map(),bodies:new Map(),recordEvents:new Set(),controls:0,actual:{immutable:0,entry:0,projection:0,references:0,catalogue:0,roots:0,event:0,controls:0}};
+  const paid={...facts,store,io,jobId:input.job_id,phase:input.phase,used:false,ready:false,records:new Map(),bodies:new Map(),recordEvents:new Set(),controls:0,actual:{immutable:0,entry:0,projection:0,references:0,catalogue:0,roots:0,event:0,controls:0,control_references:0,control_catalogue:0,control_roots:0}};
   need(!metadataIOs.has(io),'METADATA_PREPAYMENT_SPENT');metadataJobs.set(key,paid);metadataIOs.set(io,paid);let members=metadataRoots.get(facts.root);if(!members){members=new Set();metadataRoots.set(facts.root,members);}members.add(paid);
   chargeComparisonEvidenceMetadata(io,{header_bytes:facts.quote.header_bytes,event_bytes:facts.quote.event_bytes,pin_copy_bytes:0});paid.ready=true;
   const token=Object.freeze({});metadataPrepayments.set(token,paid);return token;
@@ -128,7 +239,7 @@ export function assertComparisonEvidencePrepaymentFrom(io,input){
 function metadataRegister(paid,record,family){
   const text=JSON.stringify(record),sha=hash(text);need(Buffer.byteLength(text)<=BODY_MAX,'METADATA_HEADER_CAPACITY');
   const prior=paid.records.get(record.id);need(!prior||prior.family===family,'METADATA_FAMILY');
-  paid.records.set(record.id,{family,sha});paid.bodies.set(sha,{id:record.id,text,family});
+  if(prior)prior.sha=sha;else paid.records.set(record.id,{family,sha,committedSha:null});paid.bodies.set(sha,{id:record.id,text,family});
   need([...paid.bodies.values()].filter(body=>body.family==='wire').length<=paid.quote.header_revisions&&[...paid.bodies.values()].filter(body=>body.family==='test').length<=paid.quote.test_guard_revisions,'METADATA_HISTORY_ALLOWANCE');
 }
 function metadataSQL(db,ids){
@@ -142,15 +253,15 @@ function metadataSQL(db,ids){
   return {...publicRows,entries,projections,roots};
 }
 function metadataBegin(store,loan,state){
-  const members=[...(metadataRoots.get(loan.root)??[])].filter(paid=>paid.ready&&paid.used),records=Object.values(state?.records??{}).filter(metadataRecord);
+  const members=[...(metadataRoots.get(loan.root)??[])].filter(paid=>paid.ready&&paid.used),records=canonicalProofRows(loan);
   // A cold passive census is historical DATA, never reconstructed accounting
   // custody. Cold resume/archive writes are unsupported until a separately
   // selected custody protocol can account for their new representations.
-  for(const record of records)need(members.some(paid=>paid.records.has(record.id)&&paid.bodies.get(digest(record))?.id===record.id),'METADATA_COLD_REWRITE_CUSTODY_REQUIRED');
+  requireProofCustody(records,members,'METADATA_COLD_REWRITE_CUSTODY_REQUIRED');
   if(!members.length)return;
   need(members.every(paid=>paid.schema===sqlSchema(loan.db)),'METADATA_SCHEMA_CHANGED');
   const ids=[...new Set(members.flatMap(paid=>[...paid.records.keys()]))];
-  metadataScopes.set(loan.scope,{store,db:loan.db,root:loan.root,members,before:metadataSQL(loan.db,ids),beforeEvent:tail(loan)});
+  metadataScopes.set(loan.scope,{store,db:loan.db,root:loan.root,members,before:metadataSQL(loan.db,ids),beforeEvent:tail(loan),copies:copyBaseline(loan.db),preparedBefore:new Map(preparedValues(state).map(row=>[row.identity,digest(row.value)]))});
 }
 function metadataCopyCensus(loan,members){
   const known=new Map(),ids=[];for(const paid of members){for(const id of paid.records.keys())ids.push(id);for(const [sha,body]of paid.bodies)known.set(sha,{...body,paid});}
@@ -173,14 +284,18 @@ function metadataCopyCensus(loan,members){
 function validateMetadataCommit(store,loan,eventScope){
   const scope=metadataScopes.get(loan.scope);if(!scope)return;
   need(scope.store===store&&scope.db===loan.db&&scope.members.every(paid=>paid.schema===sqlSchema(loan.db)),'METADATA_COMMIT_SCOPE');
-  const members=[...(metadataRoots.get(loan.root)??[])].filter(paid=>paid.ready&&paid.used),allIds=[...new Set(members.flatMap(paid=>[...paid.records.keys()]))],ids=allIds.filter(id=>Object.hasOwn(loan.state?.records??{},id));
+  const members=[...(metadataRoots.get(loan.root)??[])].filter(paid=>paid.ready&&paid.used),allIds=[...new Set(members.flatMap(paid=>[...paid.records.keys()]))],canonical=canonicalProofRows(loan),ids=canonical.map(row=>row.id);
+  for(const row of canonical)need(row.key===row.id,'METADATA_UNKNOWN_BODY_REFERENCE');
+  requireProofCustody(canonical,members,'METADATA_CANONICAL_REFERENCE',eventScope);
   const actual=metadataSQL(loan.db,ids),copies=metadataCopyCensus(loan,members),owner=eventScope?.metadata??null;
   const newEvents=loan.db.prepare('SELECT COUNT(*) AS n FROM events WHERE seq>?').get(scope.beforeEvent);need(newEvents.n===1,'METADATA_EVENT_CARDINALITY');
   const needles=[...new Set([...allIds,...members.flatMap(paid=>[...paid.bodies.keys()])])];
   if(!owner&&needles.length){const count=loan.db.prepare('SELECT COUNT(*) AS n FROM events WHERE seq>? AND ('+needles.map(()=> 'instr(value,?)>0').join(' OR ')+')').get(scope.beforeEvent,...needles);need(count.n===0,'METADATA_UNKNOWN_EVENT_COPY');}
-  for(const row of actual.entries){const paid=members.find(item=>item.records.has(row.key)),body=paid?.bodies.get(row.sha256);need(body?.id===row.key&&digest(loan.state.records[row.key])===row.sha256&&row.encoding==='json'&&sqlRowBytes('state_entries',row)<=SQL_CAPS.entry,'METADATA_CANONICAL_REFERENCE');}
-  for(const row of actual.projections){const record=loan.state?.records?.[row.key];need(record&&row.bytes===JSON.stringify(publicIndexValue('records',record))&&row.value_id_sha256===digest(record.id)&&row.sha256===digest([row.family,row.key,row.position,row.bytes,row.value_id_sha256])&&sqlRowBytes('public_read_values',row)<=SQL_CAPS.projection,'METADATA_PUBLIC_PROJECTION');}
+  const bodies=new Map();
+  for(const row of actual.entries){const paid=members.find(item=>item.records.has(row.key)),body=paid?.bodies.get(row.sha256),projected=loan.state?.records?.[row.key];need(body?.id===row.key&&(!Object.hasOwn(loan.state?.records??{},row.key)||digest(projected)===row.sha256)&&row.encoding==='json'&&sqlRowBytes('state_entries',row)<=SQL_CAPS.entry,'METADATA_CANONICAL_REFERENCE');bodies.set(row.key,JSON.parse(body.text));}
+  for(const row of actual.projections){const record=bodies.get(row.key);need(record&&row.bytes===JSON.stringify(publicIndexValue('records',record))&&row.value_id_sha256===digest(record.id)&&row.sha256===digest([row.family,row.key,row.position,row.bytes,row.value_id_sha256])&&sqlRowBytes('public_read_values',row)<=SQL_CAPS.projection,'METADATA_PUBLIC_PROJECTION');}
   need(actual.entries.length===ids.length&&actual.projections.length===ids.length,'METADATA_MISSING_COPY');
+  classifyNewCopies(loan,scope,members,owner);
   const changedReferences=changedRows('public_read_rows',scope.before.references,actual.references),catalogueChanged=JSON.stringify(scope.before.catalogue)!==JSON.stringify(actual.catalogue),rootsChanged=JSON.stringify(scope.before.roots)!==JSON.stringify(actual.roots);
   if(owner){
     const body=owner.bodies.get(eventScope.recordSha);need(body&&!owner.recordEvents.has(eventScope.recordSha),'METADATA_RECORD_EVENT_SPENT');
@@ -194,7 +309,7 @@ function validateMetadataCommit(store,loan,eventScope){
     const paid=members.find(item=>item.controls<CONTROL_MAX);need(paid,'METADATA_CONTROL_ALLOWANCE');
     const costs={references:sqlRowsBytes('public_read_rows',proofReferences),catalogue:catalogueChanged?rowsBytes(actual.catalogue):0,roots:rootsChanged?rootRowsBytes(actual.roots):0};
     for(const [kind,n]of Object.entries(costs))need(n<=CONTROL_CAPS[kind],'METADATA_CONTROL_'+kind.toUpperCase()+'_ALLOWANCE');
-    paid.controls++;paid.actual.controls+=Object.values(costs).reduce((a,b)=>a+b,0);
+    paid.controls++;paid.actual.controls+=Object.values(costs).reduce((a,b)=>a+b,0);for(const [kind,bytes]of Object.entries(costs))paid.actual['control_'+kind]+=bytes;
   }
   // Historical whole header rows remain charged; no GC, rollback, deduplication
   // or later smaller projection returns any prepaid capacity.
@@ -232,7 +347,7 @@ export function prepareComparisonEvidenceFrom(store,run,binding,prompts,io,confi
     for(const item of related)need(item.ref.id===state.records?.[item.ref.id]?.id&&item.ref.revision===state.records[item.ref.id].revision&&digest(state.records[item.ref.id])===item.ref.sha256&&hash(item.text)===item.ref.sha256&&item.blob.ref.sha256===item.ref.sha256,'RELATED_RECORD_CUSTODY');
   });
   c.relatedRecords=new Map(related.map(item=>[item.ref.sha256,item.text]));
-  metadata.records.set(c.record.id,{family:'wire',sha:null});metadata.capture=c;
+  metadata.records.set(c.record.id,{family:'wire',sha:null,committedSha:null});metadata.capture=c;
   const handle=Object.freeze({});captures.set(handle,c);
   let members=runCaptures.get(run);if(!members){members=new Set();runCaptures.set(run,members);}need(members.size<8,'RUN_CAPTURE_LIMIT');members.add(handle);
   const key=store.root+'\0'+binding.job.id;need(!producedCalls.has(key),'JOB_CAPTURE_SPENT');producedCalls.set(key,handle);return handle;
@@ -286,6 +401,7 @@ export function prepareComparisonEvidenceWriteFrom(store,next){
     need(record&&pending&&pending.store===store&&pending.after===after&&pending.record.id===id&&pending.previous===old,'UNISSUED_HEADER_WRITE');
   }
   prepareComparisonTestWriteFrom(store,next);
+  classifyPreparedCopies(loan,next);
   loan.assert();
 }
 
@@ -326,16 +442,23 @@ export function validateComparisonEvidenceCommitFrom(store){
 /** Fixed E3 hook while the class-created post-COMMIT witness is live. This is
  * confirmation of the already committed write, never a COMMIT implementation. */
 export function prepareComparisonEvidenceCommitFrom(store,witness){
-  const facts=inspectRuntimeStoreCommitWitnessFrom(witness,store),pending=writes.get(facts.scope);if(!pending)return null;
+  const facts=inspectRuntimeStoreCommitWitnessFrom(witness,store),pending=writes.get(facts.scope),eventScope=eventScopes.get(facts.scope);
+  if(!pending){
+    if(!eventScope?.metadata)return null;
+    const body=eventScope.metadata.bodies.get(eventScope.recordSha),entry=body&&eventScope.metadata.records.get(body.id),row=body&&store.db.prepare("SELECT sha256 FROM state_entries WHERE family='records' AND key=?").get(body.id);
+    need(eventScope.store===store&&body?.family==='test'&&entry?.sha===eventScope.recordSha&&row?.sha256===eventScope.recordSha,'METADATA_COMMIT_CUSTODY');
+    const prepared=Object.freeze({});commitPreparations.set(prepared,{committed:false,metadataRecord:entry,after:eventScope.recordSha});return prepared;
+  }
   need(pending.store===store&&pending.root===facts.root&&pending.db===store.db&&pending.eventProduced&&!pending.committed&&digest(pending.state.records[pending.record.id])===pending.after,'COMMIT_SCOPE');
   const event=store.db.prepare('SELECT seq,at,type,value FROM events WHERE seq=?').get(pending.seq),proof=event&&JSON.parse(event.value).runtime_wire_evidence;
   need(event?.type===pending.type&&proof?.after_record_sha256===pending.after&&proof.actual_store_commit_id===pending.transactionId,'COMMIT_EVENT');
   const previous=bookkeeping.get(pending.state)??bookkeeping.get(pending.state.records),proofs=new Map(previous?.proofs??[]);
   proofs.set(pending.record.id,{recordSha:pending.after,job_id:pending.record.job_id,invocation_id:wire(pending.record).binding.invocation_id,registration:pending});
   const bound={proofs,store,scope:facts.scope};bookkeeping.set(pending.state,bound);bookkeeping.set(pending.state.records,bound);
+  pending.metadataRecord=pending.c.metadata.records.get(pending.record.id);need(pending.metadataRecord?.sha===pending.after,'METADATA_COMMIT_CUSTODY');
   const prepared=Object.freeze({});commitPreparations.set(prepared,pending);return prepared;
 }
-export function finalizeComparisonEvidenceCommitFrom(prepared){if(prepared===null)return;const pending=commitPreparations.get(prepared);if(!pending)return;pending.committed=true;}
+export function finalizeComparisonEvidenceCommitFrom(prepared){if(prepared===null)return;const pending=commitPreparations.get(prepared);if(!pending||pending.committed)return;pending.metadataRecord.committedSha=pending.after;pending.committed=true;}
 
 export function stageComparisonObservationFrom(handle,store,state,kind){
   const c=active(handle),loan=originalStoreExecutionCustodyFrom(store);loan.assert();

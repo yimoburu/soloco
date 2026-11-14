@@ -20,10 +20,10 @@ checks and have not run on this composition. They cannot establish Native model
 output fidelity or supported-host behavior.
 The current comparison caller requires normalized layout 4 and a fresh,
 bounded request job; unsupported layouts or proof-envelope capacity hold
-before A storage initialization or B slot consumption. The diagram describes
-the intended flow. The released consumer cut still needs E3's fixed event and
-two-phase COMMIT coupling before it can execute; the separate test-worker path
-also needs the accounting-custody extension described below.
+before A storage initialization or B slot consumption. E3's fixed event and
+two-phase COMMIT coupling is now composed in Source; the combined checks remain
+unrun. The diagram describes the intended flow. The separate test-worker path
+still needs the accounting-custody extension described below.
 
 ```mermaid
 flowchart TD
@@ -102,8 +102,8 @@ transaction remain separate. The issuer retains both the earlier A-header
 fact and the actual capability-issuance scope. ArmCommit's record hash names
 the A header; its event/transaction fields identify actual capability issuance.
 
-The required coupling sends only Store-owned lexical COMMIT confirmation to
-the fixed two-phase evidence/test hooks. Prepare performs all fallible validation and registration
+The fixed coupling sends only Store-owned lexical COMMIT confirmation to the
+two-phase evidence/test hooks. Prepare performs all fallible validation and registration
 while new handles remain unarmed. Finalizers perform direct private flag flips
 after all producer preparation succeeds. Event readback corroborates these
 facts and cannot manufacture the witness.

@@ -148,9 +148,9 @@ test('objects-name replacement after Source birth leaves raw durability unproved
     await assert.rejects(completion);assert.equal(moved,true);noCandidate(s);oneModel(s);assert.equal(wire(s).runtime_wire_evidence.state,'requested');assert.equal(fs.existsSync(path.join(objects+'-retained',hash(Buffer.from(text,'utf16le'))+'.blob')),false);assert.equal(fs.existsSync(objects),false);assert.equal(fs.existsSync(slotPath(s)),true);
     await assert.rejects(start(s),/PLAN_CUSTODY/);s.f.done();}finally{await joined(s,completion);}
 });
-test('authority mutation queued after genuine Source close preserves factual raw but blocks publication',optionalDarwin,async t=>{
+test('material plan mutation queued after genuine Source close preserves factual raw but blocks publication',optionalDarwin,async t=>{
   const s=await selected(t),text=JSON.stringify(artifact(s)),completion=start(s);let changed=false;
-  s.model.afterClose=()=>{s.a.store.transaction('fictional.authority-changed-after-close',state=>{state.records['fictional-B-policy'].content+=' changed governing condition';return state;});changed=true;};
+  s.model.afterClose=()=>{s.a.store.transaction('fictional.authority-changed-after-close',state=>{state.records[s.a.plan.id].content+=' changed governing condition';return state;});changed=true;};
   try{await entered(s,completion);s.model.spawn();s.model.answer(text);await assert.rejects(completion);assert.equal(changed,true);const record=rawExact(s,text);assert.equal(record.runtime_wire_evidence.state,'error_retained');assert.equal(record.runtime_wire_evidence.outcome.adapter_state,'returned');assert.equal(record.runtime_wire_evidence.outcome.primary_error,null);assert(record.runtime_wire_evidence.outcome.capture_error);noCandidate(s);oneModel(s);s.f.done();}finally{await joined(s,completion);}
 });
 test('produced evidence custody survives worker return and ends only at explicit run close, retaining immutable files',optionalDarwin,async t=>{

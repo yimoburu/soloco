@@ -15,7 +15,7 @@ import * as originalEngine from './engine.mjs';
 import * as originalWorker from './worker.mjs';
 import * as originalDevelopment from './develop.mjs';
 import {beginRuntimeExecutionWriteFrom,prepareRuntimeExecutionWriteFrom,validateRuntimeExecutionCommitFrom,runtimeExecutionCommitCutoffFrom,runtimeExecutionUsesNativeClockFrom,commitRuntimeExecutionWriteFrom,endRuntimeExecutionWriteFrom,bindRuntimeBookkeepingFrom} from './runtime-execution.mjs';
-import {beginComparisonEvidenceWriteFrom,prepareComparisonEvidenceWriteFrom,validateComparisonEvidenceCommitFrom,bindComparisonEvidenceBookkeepingFrom} from './integrated-comparison-evidence.mjs';
+import {beginComparisonEvidenceWriteFrom,prepareComparisonEvidenceWriteFrom,validateComparisonEvidenceCommitFrom,bindComparisonEvidenceBookkeepingFrom,assertComparisonUpgradeAppendSupportedFrom} from './integrated-comparison-evidence.mjs';
 export {PACKAGE,VERSION,skillBody,installedTeam,teamHash} from './team-source.mjs';
 
 // Explicitly tested state producers, not a blanket semver compatibility promise.
@@ -393,6 +393,7 @@ export class Store {
       const metadata=captureStorageMetadata(this.db);
       const header=readNormalized(this.db,{rootKeys:['revision','owner'],entities:{upgrade:['id']}});
       if(header.upgrade?.id!==uid){this.db.exec('ROLLBACK');return false;}
+      assertComparisonUpgradeAppendSupportedFrom(this);
       appendNormalizedJournal(this.db,'calls',entry);
       const changes=[{family:'root',key:'revision',value:(header.revision??-1)+1},{family:'root',key:'updated_at',value:stamp()}];
       if(entry.native_id)changes.push({family:'upgrade',key:entry.role==='cos'?'probe_native_id':'reviewer_native_id',value:entry.native_id});
