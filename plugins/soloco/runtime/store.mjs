@@ -186,16 +186,22 @@ export class Store {
       this.db=attached.connection;this.inTransaction=false;
       const previous=originalDatabases.get(this.db);
       if(previous&&!previous.store.closed)throw attachmentError('STORE_CONNECTION_INPUT');
+      // Reserve one live custodian before invoking any guard/provider callback.
+      const owned={store:this,db:this.db,root:this.root,fresh:false,readOnly:false,active:false,mode:null,type:null,state:null};
       attachedStores.set(this,attached);
+      originalStores.set(this,owned);originalDatabases.set(this.db,owned);
       try{
         checkAttached(this);
         if(this.db.isTransaction)throw attachmentError('STORE_CONNECTION_TRANSACTION');
         this.db.exec('PRAGMA busy_timeout=5000;');
         checkedAttachedLayout(this.db,file);checkedAttachedWritable(this);
-        const owned={store:this,db:this.db,root:this.root,fresh:false,readOnly:false,active:false,mode:null,type:null,state:null};
-        originalStores.set(this,owned);originalDatabases.set(this.db,owned);
         return;
-      }catch(error){attachedStores.delete(this);throw error;}
+      }catch(error){
+        if(originalDatabases.get(attached.connection)===owned)originalDatabases.delete(attached.connection);
+        if(originalStores.get(this)===owned)originalStores.delete(this);
+        if(attachedStores.get(this)===attached)attachedStores.delete(this);
+        throw error;
+      }
     }
     if(readOnly&&!fs.existsSync(file))throw new Error('No company here yet; call company_open');
     const absent=create===true&&!fs.existsSync(file);
