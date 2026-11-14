@@ -40,9 +40,9 @@ test('routine selection separates long pipelines without dropping current or fut
   const flattened=partition.flatMap(shard=>shard.files);
   assert.equal(new Set(flattened).size,selected.length);
   assert.deepEqual([...flattened].sort(),[...selected].sort());
-  assert.deepEqual(partition.slice(0,2).map(shard=>shard.files[0]),[
-    'tests/peer-input-frontier.test.mjs','tests/peer-origin-frontier-seal.test.mjs',
-  ],'the two advisory pipelines are first in separate selected argument lists');
+  assert.deepEqual(partition.map(shard=>shard.files[0]),[
+    'tests/peer-input-frontier.test.mjs','tests/peer-origin-frontier-seal.test.mjs','tests/frozen-intake-publication.test.mjs',
+  ],'the three advisory files are first in separate selected argument lists');
   for(const shard of partition){assert.equal(shard.inventory_sha256,partition[0].inventory_sha256);assert.equal(shard.selected_total,selected.length);}
   assert.ok(Math.max(...partition.map(shard=>shard.files.length))-Math.min(...partition.map(shard=>shard.files.length))<=1);
   validatePartition(selected,partition,routineRegressionShardCount);
