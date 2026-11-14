@@ -24,7 +24,10 @@ The nine fixed leaves are `RUN.json` and the four original arms times
 read back from the original directory, and fsync both retained directories.
 There are no temporary files, rename replacement, delete, repair or automatic
 retry paths. Partial files and uncertain outcomes remain in place. Live
-publishers retain each previous leaf's identity/hash; cold readers return DATA
+publishers retain each previous leaf's identity/hash/version. Each bounded census
+uses an independent directory description opened through fixed `.` relative to
+the original FD, avoiding shared-directory-offset interference across processes.
+Cold readers return DATA
 only and cannot adopt the original publishing session.
 
 This initial host adapter is deliberately limited to Darwin64, local writable
@@ -60,6 +63,20 @@ they confer no selected profile or Native authority. All tests are authored
 **UNRUN**. Darwin positives explicitly require the optional Python/libc/APFS
 backend; other hosts retain the pure tests and truthful platform exclusions.
 There is no syntax/import/probe/build execution in the authoring evidence.
+The actual two-process contention case has a fixed Source program, a shared
+ready/release barrier, finite child/output bounds and retained original child
+handles. It requires one successful O_EXCL publication and one held contender,
+with one exact immutable payload. Unexpected failures retain their fixture and
+child logs; only completed expected cases remove disposable data. Direct-child
+cleanup is recorded without claiming exhaustive descendant closure.
+
+Primary ABI references used for the unrun Darwin adapter are Apple's
+[ACL getter](https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/acl_get_fd.3.html),
+[Libc ACL getter implementation](https://github.com/apple-oss-distributions/Libc/blob/main/posix1e/acl_file.c),
+[ACL entry implementation](https://github.com/apple-oss-distributions/Libc/blob/main/posix1e/acl_entry.c),
+[ACL constants/types](https://github.com/apple-oss-distributions/Libc/blob/main/include/sys/acl.h)
+and [XNU statfs64 layout](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/sys/mount.h).
+These are Source references, not proof of the selected host ABI or filesystem.
 
 Default setup still promises Node-only operation: README23 and
 `plugins/soloco/skills/setup/SKILL.md`8 say no Python is needed;

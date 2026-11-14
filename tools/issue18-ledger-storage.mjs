@@ -7,7 +7,7 @@ import {fileURLToPath} from 'node:url';
 
 const PROTOCOL='issue18-ledger-storage-io-v1',PYTHON='/usr/bin/python3';
 const HELPER=fileURLToPath(new URL('./issue18-ledger-storage.py',import.meta.url));
-const HELPER_SHA256='cdd85747baf82b25215c95ef08e8104fb6a24e4ca2f1ecb07219377ced139b5b';
+const HELPER_SHA256='d925adb931c69af7627f76cfaa6c875a737fbc8697b8d35b40d88e4c2db19a4e';
 const ARMS=Object.freeze(['1-files','1-patches','3-files','3-patches']);
 export const ISSUE18_LEDGER_FILES=Object.freeze(['RUN.json',...ARMS.flatMap(a=>['engineer','qa'].map(p=>`slot-${a}-${p}.json`))]);
 const limits=name=>name==='RUN.json'?32768:16384;

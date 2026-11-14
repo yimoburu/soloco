@@ -6,18 +6,26 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
+import {spawn} from 'node:child_process';
 import {ISSUE18_LEDGER_FILES,encodeIssue18LedgerData,openIssue18LedgerStorage,initializeIssue18LedgerStorage,publishIssue18LedgerSlot,inspectIssue18LedgerStorage,readIssue18LedgerStorage,closeIssue18LedgerStorage} from '../tools/issue18-ledger-storage.mjs';
 
 const sha=b=>createHash('sha256').update(b).digest('hex');
 const onDarwin={skip:process.platform!=='darwin',timeout:60000};
 function fixture(){
   const parent=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-issue18-storage-'));fs.chmodSync(parent,0o700);
-  const name='run',directory=path.join(parent,name);fs.mkdirSync(directory,{mode:0o700});
-  const flags=fs.constants.O_RDONLY|fs.constants.O_DIRECTORY|fs.constants.O_NOFOLLOW;
-  const parentFd=fs.openSync(parent,flags),directoryFd=fs.openSync(directory,flags);
-  const policy={parentFd,directoryFd,directoryName:name,pythonSha256:sha(fs.readFileSync('/usr/bin/python3')),deadlineAtMs:Date.now()+60000};
-  const handles=[];
-  return {parent,directory,policy,open(){const h=openIssue18LedgerStorage(policy);handles.push(h);return h;},close(){for(const h of handles)closeIssue18LedgerStorage(h);fs.closeSync(directoryFd);fs.closeSync(parentFd);fs.rmSync(parent,{recursive:true,force:true});}};
+  const handles=[],fds=[];let complete=false;
+  const preserved=reason=>process.stderr.write(JSON.stringify({fixture_preserved:parent,reason})+'\n');
+  try{
+    const name='run',directory=path.join(parent,name);fs.mkdirSync(directory,{mode:0o700});
+    const flags=fs.constants.O_RDONLY|fs.constants.O_DIRECTORY|fs.constants.O_NOFOLLOW;
+    const parentFd=fs.openSync(parent,flags);fds.push(parentFd);const directoryFd=fs.openSync(directory,flags);fds.push(directoryFd);
+    const policy={parentFd,directoryFd,directoryName:name,pythonSha256:sha(fs.readFileSync('/usr/bin/python3')),deadlineAtMs:Date.now()+60000};
+    return {parent,directory,policy,open(){const h=openIssue18LedgerStorage(policy);handles.push(h);return h;},done(){complete=true;},close({preserve=false}={}){
+      const errors=[];for(const h of handles)try{closeIssue18LedgerStorage(h);}catch(e){errors.push(e);}for(const fd of fds.reverse())try{fs.closeSync(fd);}catch(e){errors.push(e);}
+      if(!complete||preserve||errors.length){preserved(errors.length?'descriptor cleanup failed':'unexpected qualification failure or uncertain child cleanup');if(errors.length)throw new AggregateError(errors,'Fixture preserved after cleanup failure');return;}
+      try{fs.rmSync(parent,{recursive:true,force:true});}catch(e){preserved('completed case cleanup failed; cleanup may be partial');throw e;}
+    }};
+  }catch(e){for(const fd of fds.reverse())try{fs.closeSync(fd);}catch{}preserved('fixture setup failed');throw e;}
 }
 const manifest={fixture:'synthetic storage metadata; not a selected profile',kind:'manifest'};
 const slot=(arm,phase)=>({arm,phase,fixture:'synthetic finite storage DATA; no grant'});
@@ -51,6 +59,7 @@ test('actual optional helper publishes and reads all nine immutable leaves with 
     const measured=ISSUE18_LEDGER_FILES.reduce((n,name)=>{const bytes=fs.readFileSync(path.join(f.directory,name));const s=fs.lstatSync(path.join(f.directory,name));assert.equal(s.mode&0o777,0o400);assert.equal(s.nlink,1);assert.equal(report.rows.find(r=>r.name===name).sha256,sha(bytes));return n+bytes.length;},0);
     assert.equal(report.accounting.file_payload_bytes,measured);assert.equal(report.accounting.total_reserved_or_observed_bytes,measured+32768);
     assert.deepEqual(readIssue18LedgerStorage(h,'RUN.json').value,manifest);
+    f.done();
   }finally{f.close();}
 });
 test('same-session duplicate, foreign handle and rekey attempts never overwrite or add a tenth leaf',onDarwin,()=>{
@@ -59,6 +68,7 @@ test('same-session duplicate, foreign handle and rekey attempts never overwrite 
     assert.throws(()=>publishIssue18LedgerSlot(h,'1-files','engineer',{replacement:true}),{code:'ISSUE18_STORAGE_SPENT'});
     assert.throws(()=>publishIssue18LedgerSlot(h,'other','engineer',{}),{code:'ISSUE18_STORAGE_SLOT'});assert.throws(()=>publishIssue18LedgerSlot({...h},'1-files','qa',{}),{code:'ISSUE18_STORAGE_FOREIGN_HANDLE'});
     assert.ok(fs.readFileSync(path.join(f.directory,'slot-1-files-engineer.json')).equals(before));assert.equal(fs.readdirSync(f.directory).length,2);
+    f.done();
   }finally{f.close();}
 });
 test('cold read audits retained files but cannot adopt the original publishing session',onDarwin,()=>{
@@ -67,6 +77,7 @@ test('cold read audits retained files but cannot adopt the original publishing s
     assert.throws(()=>publishIssue18LedgerSlot(cold,'1-files','engineer',{}),{code:'ISSUE18_STORAGE_SPENT'});
     assert.throws(()=>initializeIssue18LedgerStorage(cold,manifest),{code:'ISSUE18_STORAGE_OUTCOME_UNCERTAIN'});
     assert.equal(fs.readdirSync(f.directory).length,1);
+    f.done();
   }finally{f.close();}
 });
 test('a partial preexisting manifest is preserved and cannot be repaired or reinitialized',onDarwin,()=>{
@@ -74,6 +85,7 @@ test('a partial preexisting manifest is preserved and cannot be repaired or rein
     const file=path.join(f.directory,'RUN.json');fs.writeFileSync(file,'{"partial":',{mode:0o600});const before=fs.readFileSync(file);
     const h=f.open();assert.throws(()=>initializeIssue18LedgerStorage(h,manifest),{code:'ISSUE18_STORAGE_OUTCOME_UNCERTAIN'});assert.ok(fs.readFileSync(file).equals(before));
     assert.throws(()=>publishIssue18LedgerSlot(h,'1-files','engineer',{}),{code:'ISSUE18_STORAGE_SPENT'});
+    f.done();
   }finally{f.close();}
 });
 test('actual symlink hardlink nonfile and changed-mode leaves hold without replacement',onDarwin,()=>{
@@ -83,6 +95,7 @@ test('actual symlink hardlink nonfile and changed-mode leaves hold without repla
       if(kind==='symlink')fs.symlinkSync(external,name);else if(kind==='hardlink')fs.linkSync(external,name);else if(kind==='directory')fs.mkdirSync(name);else fs.writeFileSync(name,'{}\n',{mode:0o600});
       assert.throws(()=>publishIssue18LedgerSlot(h,'1-files','engineer',slot('1-files','engineer')),{code:'ISSUE18_STORAGE_OUTCOME_UNCERTAIN'});assert.equal(fs.readFileSync(external,'utf8'),'unchanged');
       assert.equal(fs.readdirSync(f.directory).length,2);
+      f.done();
     }finally{f.close();}
   }
 });
@@ -90,6 +103,7 @@ test('original directory FDs do not permit publishing through a replaced parent 
   const f=fixture();try{
     const h=initialized(f);fs.renameSync(f.directory,path.join(f.parent,'retired'));fs.mkdirSync(f.directory,{mode:0o700});
     assert.throws(()=>publishIssue18LedgerSlot(h,'1-files','engineer',{}),{code:'ISSUE18_STORAGE_OUTCOME_UNCERTAIN'});assert.equal(fs.readdirSync(f.directory).length,0);assert.deepEqual(fs.readdirSync(path.join(f.parent,'retired')),['RUN.json']);
+    f.done();
   }finally{f.close();}
 });
 test('changed prior payload and an unexpected tenth-name candidate poison later publication',onDarwin,()=>{
@@ -100,6 +114,7 @@ test('changed prior payload and an unexpected tenth-name candidate poison later 
         publishIssue18LedgerSlot(h,'1-files','engineer',slot('1-files','engineer'));const file=path.join(f.directory,'slot-1-files-engineer.json'),before=fs.readFileSync(file);fs.chmodSync(file,0o600);fs.writeFileSync(file,'{}\n');fs.writeFileSync(file,before);fs.chmodSync(file,0o400);
       }
       const phase=mode==='mutate-restore-slot'?'qa':'engineer';assert.throws(()=>publishIssue18LedgerSlot(h,'1-files',phase,{}),{code:'ISSUE18_STORAGE_OUTCOME_UNCERTAIN'});assert.equal(fs.existsSync(path.join(f.directory,`slot-1-files-${phase}.json`)),false);
+      f.done();
     }finally{f.close();}
   }
 });
@@ -108,5 +123,75 @@ test('interpreter pin, explicit descriptor policy and closed storage lifetime ca
     assert.throws(()=>openIssue18LedgerStorage({...f.policy,pythonSha256:'0'.repeat(64)}),{code:'ISSUE18_STORAGE_PROGRAM'});
     assert.throws(()=>openIssue18LedgerStorage({...f.policy,callerProgram:'anything'}),{code:'ISSUE18_STORAGE_DATA'});
     const h=f.open();closeIssue18LedgerStorage(h);assert.throws(()=>inspectIssue18LedgerStorage(h),{code:'ISSUE18_STORAGE_CLOSED_OR_EXPIRED'});assert.equal(fs.readdirSync(f.directory).length,0);
+    f.done();
   }finally{f.close();}
+});
+
+const contenderSource=`
+import {openIssue18LedgerStorage,initializeIssue18LedgerStorage,closeIssue18LedgerStorage} from ${JSON.stringify(new URL('../tools/issue18-ledger-storage.mjs',import.meta.url).href)};
+const supplied=JSON.parse(process.argv[1]),tag=process.argv[2];
+const handle=openIssue18LedgerStorage({...supplied,parentFd:3,directoryFd:4,deadlineAtMs:Date.now()+20000});
+process.stdout.write('READY\\n');
+let command='';process.stdin.on('data',b=>{command+=b.toString();if(command.length>16)process.exitCode=3;});
+process.stdin.on('end',()=>{
+  try{
+    if(command!=='GO\\n')throw Error('fixed barrier command required');
+    const receipt=initializeIssue18LedgerStorage(handle,{contender:tag,fixture:'two-process synthetic storage-only contention'});
+    process.stdout.write('RESULT '+JSON.stringify({status:receipt.status,authority_claim:receipt.authority_claim})+'\\n');
+  }catch(error){process.stdout.write('RESULT '+JSON.stringify({status:'held',code:error.code??'UNEXPECTED',receipt:error.receipt??null})+'\\n');process.exitCode=2;}
+  finally{closeIssue18LedgerStorage(handle);}
+});
+`;
+function bounded(promise,milliseconds){
+  return new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('Source contention child bound exceeded')),milliseconds);promise.then(v=>{clearTimeout(timer);resolve(v);},e=>{clearTimeout(timer);reject(e);});});
+}
+function contender(f,tag){
+  const supplied={parentFd:3,directoryFd:4,directoryName:f.policy.directoryName,pythonSha256:f.policy.pythonSha256,deadlineAtMs:f.policy.deadlineAtMs};
+  const env=Object.fromEntries(['PATH','TMPDIR','TMP','TEMP'].filter(k=>typeof process.env[k]==='string').map(k=>[k,process.env[k]]));
+  const child=spawn(process.execPath,['--no-warnings','--input-type=module','-e',contenderSource,JSON.stringify(supplied),tag],{env,stdio:['pipe','pipe','pipe',f.policy.parentFd,f.policy.directoryFd]});
+  const state={child,stdout:Buffer.alloc(0),stderr:Buffer.alloc(0),overflow:false,terminal:null};let readyResolve,readyReject;
+  state.ready=new Promise((resolve,reject)=>{readyResolve=resolve;readyReject=reject;});
+  child.stdin.on('error',e=>{state.stdinError=e.code;});
+  for(const [stream,key] of [[child.stdout,'stdout'],[child.stderr,'stderr']])stream.on('data',b=>{
+    if(state.stdout.length+state.stderr.length+b.length>16384){state.overflow=true;if(child.exitCode===null&&child.signalCode===null)child.kill('SIGTERM');return;}
+    state[key]=Buffer.concat([state[key],b]);if(state.stdout.toString().includes('READY\n'))readyResolve();
+  });
+  state.closed=new Promise((resolve,reject)=>{child.once('error',e=>{readyReject(e);reject(e);});child.once('close',(code,signal)=>{state.terminal={code,signal};if(!state.stdout.toString().includes('READY\n'))readyReject(Error('Source contender did not reach fixed barrier'));resolve(state.terminal);});});
+  // Attach immediately, including while the other contender starts. The parent
+  // still observes every rejection via the bounded awaits below.
+  state.closed.catch(()=>{});state.ready.catch(()=>{});return state;
+}
+async function stopContender(state){
+  const c=state.child;if(c.exitCode===null&&c.signalCode===null)c.kill('SIGTERM');
+  try{await bounded(state.closed,1000);}catch{
+    if(c.exitCode===null&&c.signalCode===null)c.kill('SIGKILL');
+    await bounded(state.closed,1000);
+  }
+}
+test('two real Source processes contend for one O_EXCL manifest and retain exactly one immutable payload',onDarwin,async()=>{
+  const f=fixture(),children=[];
+  try{
+    children.push(contender(f,'first'));children.push(contender(f,'second'));
+    await bounded(Promise.all(children.map(c=>c.ready)),10000);
+    for(const c of children)c.child.stdin.end('GO\n');
+    await bounded(Promise.all(children.map(c=>c.closed)),25000);
+    const results=children.map(c=>{
+      assert.equal(c.overflow,false);assert.equal(c.terminal.signal,null);assert.equal(c.stderr.length,0);
+      const lines=c.stdout.toString().trimEnd().split('\n');assert.equal(lines[0],'READY');assert.equal(lines.length,2);assert.ok(lines[1].startsWith('RESULT '));return JSON.parse(lines[1].slice(7));
+    });
+    assert.equal(results.filter(r=>r.status==='committed'&&r.authority_claim===false).length,1);
+    assert.equal(results.filter(r=>r.status==='held').length,1);assert.deepEqual(children.map(c=>c.terminal.code).sort(),[0,2]);
+    assert.deepEqual(fs.readdirSync(f.directory),['RUN.json']);const actual=fs.readFileSync(path.join(f.directory,'RUN.json'));
+    const winner=results.findIndex(r=>r.status==='committed');assert.ok(actual.equals(encodeIssue18LedgerData({contender:winner===0?'first':'second',fixture:'two-process synthetic storage-only contention'})));
+    const s=fs.lstatSync(path.join(f.directory,'RUN.json'));assert.equal(s.nlink,1);assert.equal(s.mode&0o777,0o400);f.done();
+  }finally{
+    const cleanup=await Promise.allSettled(children.map(stopContender));
+    const errors=cleanup.filter(r=>r.status==='rejected').map(r=>r.reason);
+    try{for(let i=0;i<children.length;i++){
+      const c=children[i];fs.writeFileSync(path.join(f.parent,`contender-${i}.stdout.log`),c.stdout,{mode:0o600});fs.writeFileSync(path.join(f.parent,`contender-${i}.stderr.log`),c.stderr,{mode:0o600});
+      fs.writeFileSync(path.join(f.parent,`contender-${i}.terminal.json`),JSON.stringify({pid:c.child.pid??null,terminal:c.terminal,overflow:c.overflow,cleanup:cleanup[i].status,descendant_closure:'not claimed'})+'\n',{mode:0o600});
+    }}catch(e){errors.push(e);}
+    f.close({preserve:errors.length>0});
+    if(errors.length)throw new AggregateError(errors,'Source contender cleanup/evidence incomplete; fixture preserved');
+  }
 });

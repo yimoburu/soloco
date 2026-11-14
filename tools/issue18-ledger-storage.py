@@ -188,13 +188,17 @@ def read_leaf(request, name):
 def census(request):
     guard(request)
     names = []
-    # Inherited/duplicated directory FDs share an open-file-description offset.
-    # Rewind the actual original FD; never reopen a directory pathname.
-    os.lseek(DIRECTORY, 0, os.SEEK_SET)
-    with os.scandir(DIRECTORY) as entries:
-        for entry in entries:
-            need(len(names) < 9 and entry.name in NAMES, "NAMESPACE_CHANGED")
-            names.append(entry.name)
+    # dup/inherited FDs share a seek offset. Open only fixed '.' relative to the
+    # original FD, obtaining an independent directory description for this scan.
+    scan = os.open(".", os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=DIRECTORY)
+    try:
+        need(identity(os.fstat(scan)) == request["directory_identity"], "DIRECTORY_CHANGED")
+        with os.scandir(scan) as entries:
+            for entry in entries:
+                need(len(names) < 9 and entry.name in NAMES, "NAMESPACE_CHANGED")
+                names.append(entry.name)
+    finally:
+        os.close(scan)
     need(not names or "RUN.json" in names, "MANIFEST_MISSING")
     rows = []
     for name in sorted(names):
