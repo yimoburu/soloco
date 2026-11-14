@@ -55,7 +55,14 @@ function prepareOrdinaryPhysicalGuard(ledger,raw,proofs,changes=[],events=[]){
  for(const {family,row,previous}of changes){const k=canonical([family,row.id]),before=previous?ref(family,previous):null;if(!same(heads.get(k)??null,before))hold('ORIGIN_ORDINARY_TASK_CURRENT_CHANGED','Planned change differs from full original namespace');if(previous)versions.set(canonical(before),{family,...previous});versions.set(canonical(ref(family,row)),{family,...row});heads.set(k,ref(family,row));}
  // This is a prospective Source write-plan check, not fabricated committed
  // history or Native evidence. The final guard compares the actual journal.
- if(expected.length||events.length){const view={get:(f,id)=>raw.get(f,id),getVersion:r=>versions.get(canonical(r))??raw.getVersion(r)};for(const proof of proofs)assertPeerOrdinaryTaskEventFrom(view,{type:loan.type,principal_id:loan.principal,payload:{changes:expected,events}},proof.qualification_ref);}
+ if(expected.length||events.length){
+  // The cold grammar sees this exact owning write's projected postimage and
+  // original immutable predecessors. All history reads finish before puts;
+  // neither this view nor a copied event supplies a runtime capability.
+  const projected=new Map(changes.map(({family,row})=>[canonical([family,row.id]),row]));
+  const view={get:(f,id)=>projected.get(canonical([f,id]))??raw.get(f,id),getVersion:r=>versions.get(canonical(r))??raw.getVersion(r),events:options=>raw.events(options)};
+  for(const proof of proofs)assertPeerOrdinaryTaskEventFrom(view,{seq:loan.sequence,type:loan.type,principal_id:loan.principal,payload:{changes:expected,events}},proof.qualification_ref);
+ }
  if(!Number.isSafeInteger(deadline))hold('ORIGIN_ORDINARY_TASK_EXPIRED','Finite original qualification deadline required');
  const token=Object.freeze({});ordinaryPhysicalGuards.set(token,{ledger,sequence:loan.sequence,type:loan.type,principal:loan.principal,previous_sha256:pending.previous_sha256,changes:expected,events:copy(events),heads:[...heads.values()],proofs,deadline});return token;
 }
