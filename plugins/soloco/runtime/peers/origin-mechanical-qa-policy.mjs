@@ -174,7 +174,11 @@ function originalPacketState(db,packet){
  const decode=row=>{const value=raw(row);if(row.encoding==='json')return value;need(row.encoding==='journal-array'&&value?.version===1&&typeof value.family==='string'&&Number.isSafeInteger(value.length)&&value.length>=0,'ORIGIN_MECHANICAL_QA_CONTEXT_SOURCE_CHANGED');const children=entries.filter(r=>r.family===value.family).sort((a,b)=>a.position-b.position);need(children.length===value.length&&children.every((r,i)=>r.key===String(i)&&r.position===i&&r.encoding==='json'),'ORIGIN_MECHANICAL_QA_CONTEXT_SOURCE_CHANGED');return children.map(raw);};
  for(const row of entries.filter(r=>['root','shape'].includes(r.family)).sort((a,b)=>a.position-b.position)){if(row.family==='root')define(state,row.key,decode(row));else{const shape=decode(row);need(['array','object'].includes(shape),'ORIGIN_MECHANICAL_QA_CONTEXT_SOURCE_CHANGED');const collection=shape==='array'?[]:{};define(state,row.key,collection);for(const item of entries.filter(r=>r.family===row.key).sort((a,b)=>a.position-b.position))define(collection,item.key,decode(item));}}
  bindSnapshots(state,sha=>readImmutable(db,sha),db);
- executionInventory.bindOriginalHistoricalWorkerAssignmentBookkeepingFrom(db,state,basis);
+ // Layout transitions own a write snapshot without ordinary writer history.
+ // Its context proof must expire with the scope, even when the cut is staged.
+ const loan=originalStoreExecutionCustodyFrom(db);
+ if(loan.mode==='write')executionInventory.bindOriginalScopedHistoricalWorkerAssignmentBookkeepingFrom(db,state,basis);
+ else executionInventory.bindOriginalHistoricalWorkerAssignmentBookkeepingFrom(db,state,basis);
  return state;
 }
 export function prepareOriginalPeerOriginMechanicalQaContextFrom(db,state,{job_id}){

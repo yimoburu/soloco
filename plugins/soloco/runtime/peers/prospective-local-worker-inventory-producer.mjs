@@ -240,6 +240,9 @@ function bindBookkeeping(state,origin,jobs,lease=null){
   const proof={company_id:origin.company_id,source_generation_sha256:origin.source_generation_sha256,origin:copy(origin),stamps,lease};bookkeeping.set(state,proof);if(state.records&&typeof state.records==='object')bookkeepingBuckets.set(state.records,proof);
 }
 function bookkeepingLive(proof){if(!proof)return false;if(!proof.lease)return true;if(proof.lease.status==='committed')return true;if(proof.lease.status!=='pending')return false;try{proof.lease.assert();return true;}catch{return false;}}
+// A layout write has actual Store custody but no ordinary issuance lifecycle.
+// This lease expires with that exact scope and can never become historical.
+function scopedBookkeepingLease(loan){return Object.freeze({status:'pending',assert:loan.assert});}
 export function bindOriginalWorkerAssignmentBookkeepingFrom(store,state){
   // Absence is raw fallback, not an alternate issuer or an exception that can
   // accidentally skip the ordinary context-preservation obligations.
@@ -250,7 +253,7 @@ export function bindOriginalWorkerAssignmentBookkeepingFrom(store,state){
     // present null/invalid values still take the existing full projection path.
     const normalized=query(loan,"SELECT 1 FROM sqlite_master WHERE type='table' AND name='state_entries'",'get');
     if(normalized&&!query(loan,"SELECT 1 FROM state_entries WHERE family='root' AND key='original_execution_origin'",'get'))return null;
-    const p=storedProjection(loan);if(!p?.origin)return null;const history=originalHistory(loan,{current:p});bindBookkeeping(state,history.origin,history.jobs,writes.get(store)?.lease??null);return true;
+    const p=storedProjection(loan);if(!p?.origin)return null;const history=originalHistory(loan,{current:p}),lease=writes.get(store)?.lease??(loan.mode==='write'?scopedBookkeepingLease(loan):null);bindBookkeeping(state,history.origin,history.jobs,lease);return true;
   }catch{return null;}
 }
 function historicalBaselineData(input){
@@ -298,6 +301,24 @@ export function bindOriginalHistoricalWorkerAssignmentBookkeepingFrom(actualDb,s
       {id:history.id,origin:history.origin,jobs:history.jobs,upgrades:history.upgrades}),'HISTORICAL_STATE_CHANGED');
     // Factual metadata only: no live write lease, reservation or launch token.
     bindBookkeeping(state,history.origin,history.jobs,null);return true;
+  });
+}
+export function bindOriginalScopedHistoricalWorkerAssignmentBookkeepingFrom(actualDb,state,basis){
+  const loan=originalStoreExecutionCustodyFrom(actualDb);
+  need(loan.mode==='write','HISTORICAL_WRITE_SCOPE_REQUIRED');
+  const baseline=historicalBaselineData(basis);
+  return check(loan,()=>{
+    readStorageIntake(loan.db,baseline);
+    need(state&&typeof state==='object'&&!Array.isArray(state),'HISTORICAL_STATE_CHANGED');
+    const originalAtCut=baseline.entries.some(row=>row.family==='root'&&row.key==='original_execution_origin');
+    need(own(state,'original_execution_origin')===originalAtCut,'HISTORICAL_STATE_CHANGED');
+    if(!originalAtCut)return null;
+    const history=originalHistory(loan,{historicalCut:baseline});
+    need(same({id:state.id,origin:state.original_execution_origin,jobs:state.jobs??{},upgrades:upgradeProjection(state)},
+      {id:history.id,origin:history.origin,jobs:history.jobs,upgrades:history.upgrades}),'HISTORICAL_STATE_CHANGED');
+    // Reconstruct context inside this write only. Even a valid staged cut must
+    // lose its bookkeeping after COMMIT or ROLLBACK, never inherit w.lease.
+    bindBookkeeping(state,history.origin,history.jobs,scopedBookkeepingLease(loan));return true;
   });
 }
 export function inheritOriginalWorkerAssignmentBookkeepingFrom(source,derived){const proof=bookkeepingFor(source);if(!bookkeepingLive(proof)||!derived||typeof derived!=='object'||derived.id!==proof.company_id)return null;bookkeeping.set(derived,proof);return true;}
