@@ -57,7 +57,11 @@ test('format-3 supplemental failure keeps exclusive resources until that invocat
   });
   let state=withStore(root,db=>db.read());assert.equal(calls,2);assert.equal(state.jobs[key].status,'failed');assert.equal(state.jobs[key].retrieved_inputs.length,1);
   assert.equal(state.jobs[key].execution_failure.termination_confirmed,false);assert.equal(state.jobs[key].model_process_tracking.invocations.length,2);assert.ok(state.jobs[key].model_process_tracking.invocations[0].closure);assert.equal(state.jobs[key].model_process_tracking.invocations[1].closure,null);
-  assert.equal(state.jobs[key].coordination_release,undefined);assert.deepEqual(resourceClaims(state).map(c=>c.resource),['shared-read-output']);
+  // UNKNOWN is an explicit negative receipt; it cannot release the claim or
+  // create a replacement assignment while the second invocation stays open.
+  const release=state.jobs[key].coordination_release;
+  assert.deepEqual(release,{termination_confirmed:false,reason:'original_process_closure_unknown',at:release?.at});assert.ok(typeof release.at==='string'&&Number.isFinite(Date.parse(release.at)));
+  assert.equal(Object.keys(state.jobs).length,1);assert.deepEqual(resourceClaims(state).map(c=>c.resource),['shared-read-output']);
  } finally {disposeOriginalProcessFixtures(root);if(old===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=old;fs.rmSync(root,{recursive:true,force:true});fs.rmSync(cache,{recursive:true,force:true});}
 });
 
