@@ -16,7 +16,7 @@ function temp(t){const root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir()
 const seed=()=>({id:'fictional-SOURCE',name:'Original',idea:'Original source only',phase:'Frame',mode:'preparation',owner:{host:'codex',session_id:'source-founder',epoch:7},paused:true,governance:'Fictional rules',cos_instructions:'Fictional instructions',roles:{qa:{}},records:{},jobs:{},sessions:{},notices:[],messages:[],upgrade_history:[]});
 function fixture(t,{normalized=true}={}){
   const root=temp(t),store=new Store(root,true);
-  try{store.transaction('SOURCE.seed',()=>seed());if(normalized)store.migrate();}finally{store.close();}
+  try{store.transaction('company.created',()=>seed());if(normalized)store.migrate();}finally{store.close();}
   return {root,file:path.join(root,'.company','company.sqlite')};
 }
 function sql(file){const db=new DatabaseSync(file,{readOnly:true});try{
