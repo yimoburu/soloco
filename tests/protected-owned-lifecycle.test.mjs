@@ -55,6 +55,97 @@ function denyExternal(){
   return {calls,restore(){for(const restore of restores.reverse())restore();syncBuiltinESMExports();}};
 }
 
+// Conditional predecessor DATA only: these tokens do not attest real inventory,
+// admission, Native custody or capacity. The relocated production domain still
+// owns the actual cutoff loan, AbortSignal, lifecycle and capability decisions.
+const SYNTHETIC_EXECUTION_PREDECESSORS=String.raw`
+const syntheticTransactions=new WeakMap(),syntheticLaunchToken=Object.freeze(Object.create(null));
+let actualDomain,syntheticBinding,syntheticCutoff,syntheticInstalled=false,syntheticLaunchConsumed=false;
+const syntheticLaunchCounts={installs:0,claims:0,cutoffs:0,spawns:0};
+function closedSynthetic(value,keys){
+ assert.ok(value!==null&&typeof value==='object');assert.equal(types.isProxy(value),false);assert.equal(Object.getPrototypeOf(value),Object.prototype);
+ const descriptors=Object.getOwnPropertyDescriptors(value);assert.deepEqual(Reflect.ownKeys(descriptors).sort(),[...keys].sort());
+ for(const descriptor of Object.values(descriptors)){assert.equal(descriptor.enumerable,true);assert.equal(Object.hasOwn(descriptor,'value'),true);}return value;
+}
+function syntheticRead(actual,tx,fn){
+ assert.equal(typeof fn,'function');assert.equal(syntheticTransactions.has(tx),false);syntheticTransactions.set(tx,actual);
+ try{return fn(tx);}finally{syntheticTransactions.delete(tx);}
+}
+export function install(actual,process,domain,actualLedger,reference){
+ assert.equal(syntheticInstalled,false);assert.equal(Object.getPrototypeOf(actualLedger),PeerLedger.prototype);
+ closedSynthetic(reference,['family','id','revision','sha256']);const admission=syntheticAdmission(actualLedger);assert.deepEqual(reference,admission.admission_ref);
+ assert.equal(Number.isSafeInteger(admission.deadline_at_ms),true);assert.ok(admission.deadline_at_ms>Date.now());
+ assert.equal(Number.isSafeInteger(admission.execution_deadline_ms),true);assert.ok(admission.execution_deadline_ms>Date.now());
+ assert.equal(typeof domain.bindOriginalProtectedExecutionLaunch,'function');assert.equal(typeof domain.inspectOriginalProtectedExecutionCutoffFrom,'function');
+ owner=actual;child=process;actualDomain=domain;syntheticBinding=Object.freeze({ledger:actualLedger,admission_ref:Object.freeze({...reference}),deadline_at_ms:admission.deadline_at_ms,execution_deadline_ms:Math.min(admission.execution_deadline_ms,Date.now()+120000)});
+ syntheticInstalled=true;syntheticLaunchCounts.installs++;
+}
+function syntheticInventoryBinding(actual,options){
+ assert.equal(syntheticInstalled,true);assert.equal(actual,syntheticBinding.ledger);assert.equal(Object.getPrototypeOf(actual),PeerLedger.prototype);
+ closedSynthetic(options,['stage','admission_ref']);assert.equal(options.stage,'existing');closedSynthetic(options.admission_ref,['family','id','revision','sha256']);assert.deepEqual(options.admission_ref,syntheticBinding.admission_ref);
+}
+export function assertOriginalPeerMaintenanceExecutionCapacityInTransactionFrom(actual,tx,options){
+ syntheticInventoryBinding(actual,options);assert.equal(syntheticTransactions.get(tx),actual,'only this ledger\'s active read transaction is a synthetic predecessor');
+ return Object.freeze({protocol:'original-local-execution-inventory-v1',SYNTHETIC_CONDITIONAL_PREDECESSOR:true,retained_row_census_complete:true,admission_launch_coverage_complete:true,cardinality_known:true,occupied:1,remaining:0});
+}
+export function assertOriginalPeerMaintenanceExecutionCapacityFrom(actual,options){
+ syntheticInventoryBinding(actual,options);return Reflect.apply(PeerLedger.prototype.read,actual,[tx=>assertOriginalPeerMaintenanceExecutionCapacityInTransactionFrom(actual,tx,options)]);
+}
+export function claimOriginalPeerExecutionLaunchFrom(actual,options){
+ assert.equal(syntheticInstalled,true);assert.equal(actual,syntheticBinding.ledger);closedSynthetic(options,['admission_ref']);closedSynthetic(options.admission_ref,['family','id','revision','sha256']);assert.deepEqual(options.admission_ref,syntheticBinding.admission_ref);
+ assert.equal(syntheticLaunchCounts.claims,0);assert.equal(syntheticLaunchConsumed,false);assert.ok(Date.now()<syntheticBinding.deadline_at_ms);syntheticLaunchCounts.claims++;return syntheticLaunchToken;
+}
+export function bindOriginalPeerExecutionLaunchCutoffFrom(token,loan){
+ assert.equal(token,syntheticLaunchToken);assert.equal(syntheticLaunchCounts.claims,1);assert.equal(syntheticLaunchCounts.cutoffs,0);assert.equal(syntheticLaunchConsumed,false);
+ assert.equal(types.isProxy(loan),false);assert.equal(Object.getPrototypeOf(loan),null);assert.equal(Object.isFrozen(loan),true);assert.deepEqual(Reflect.ownKeys(loan),[]);
+ const facts=actualDomain.inspectOriginalProtectedExecutionCutoffFrom(loan,token);closedSynthetic(facts,['deadline_at_ms','signal']);assert.equal(Number.isSafeInteger(facts.deadline_at_ms),true);
+ assert.ok(facts.deadline_at_ms>Date.now()&&facts.deadline_at_ms<=syntheticBinding.deadline_at_ms&&facts.deadline_at_ms<=syntheticBinding.execution_deadline_ms);
+ assert.ok(facts.signal instanceof AbortSignal);assert.equal(facts.signal.aborted,false);syntheticCutoff=Object.freeze({loan,facts});syntheticLaunchCounts.cutoffs++;
+}
+export function spawnOriginalPeerExecutionLaunch(token,command,args,options){
+ assert.equal(token,syntheticLaunchToken);assert.equal(syntheticLaunchCounts.claims,1);assert.equal(syntheticLaunchCounts.cutoffs,1);assert.equal(syntheticLaunchConsumed,false);
+ assert.equal(command,plan.sandbox_executable);assert.deepEqual(args,['-p',plan.sbpl,plan.executable,...plan.argv]);closedSynthetic(options,['cwd','env','stdio','shell','detached']);closedSynthetic(options.env,[]);
+ assert.deepEqual(options,{cwd:plan.cwd,env:{},stdio:['pipe','pipe','pipe','pipe','pipe'],shell:false,detached:true});
+ const facts=actualDomain.inspectOriginalProtectedExecutionCutoffFrom(syntheticCutoff.loan,token);assert.equal(facts.deadline_at_ms,syntheticCutoff.facts.deadline_at_ms);assert.equal(facts.signal,syntheticCutoff.facts.signal);assert.equal(facts.signal.aborted,false);assert.ok(Date.now()<facts.deadline_at_ms);
+ syntheticLaunchConsumed=true;syntheticLaunchCounts.spawns++;spawnCalls.push([command,args,options]);return child;
+}
+// No failed producer child is registered by these fixtures. An arbitrary error
+// cannot acquire the retained child or authorize the producer's cleanup path.
+export function originalWorkerFailedLaunchChild(){return null;}
+export function cleanupOriginalWorkerLaunchFailure(){throw Error('SYNTHETIC_UNREGISTERED_FAILED_LAUNCH_CLEANUP');}
+export function assertSyntheticLaunchCounts(){assert.deepEqual(syntheticLaunchCounts,{installs:1,claims:1,cutoffs:1,spawns:1});assert.equal(syntheticLaunchConsumed,true);}
+`;
+
+function relocateLifecycleDomain(original,directory,shimURL,bootstrap=false){
+  const producerFile=path.join(directory,'prospective-local-worker-inventory-producer.mjs'),producerURL=pathToFileURL(producerFile).href;
+  fs.writeFileSync(producerFile,'export {assertOriginalPeerMaintenanceExecutionCapacityFrom,assertOriginalPeerMaintenanceExecutionCapacityInTransactionFrom,claimOriginalPeerExecutionLaunchFrom,bindOriginalPeerExecutionLaunchCutoffFrom,spawnOriginalPeerExecutionLaunch,originalWorkerFailedLaunchChild,cleanupOriginalWorkerLaunchFailure} from '+JSON.stringify(shimURL)+';\n');
+  const expectedImports=[
+    ['./protected-source-build-slot.mjs','import {ORIGINAL_CONTEXT_SELECTION,resolveOriginalPeerContextInterpreter,assertOriginalPeerContextInterpreterFinal,assertOriginalPeerContextSlot,inspectOriginalPeerContextInterpreter}'],
+    ['./ledger.mjs','import {canonical,PeerLedger}'],
+    ['./prospective-local-worker-inventory-producer.mjs','import {assertOriginalPeerMaintenanceExecutionCapacityFrom as assertInventory,assertOriginalPeerMaintenanceExecutionCapacityInTransactionFrom as assertInventoryInTransaction,claimOriginalPeerExecutionLaunchFrom,bindOriginalPeerExecutionLaunchCutoffFrom,spawnOriginalPeerExecutionLaunch,originalWorkerFailedLaunchChild,cleanupOriginalWorkerLaunchFailure}'],
+    ['./prospective-local-worker-inventory-producer.mjs','import * as originalInventory'],
+    ['./model.mjs','import * as model'],
+    ['./protected-source-build-slot.mjs','import * as frontierSlots'],
+    ['./protected-connect-broker.mjs','import {createFixedConnectBroker}'],
+    ['./policy-supervisor.mjs','import {inspectOriginalCompiledCodexPlan,claimOriginalCompiledCodexPlan,originalCompiledPeerContextInterpreter}'],
+    ['./policy-supervisor.mjs','import {inspectOriginalCompiledBootstrapScope}'],
+    ['./protected-source-build-slot.mjs','import {isOriginalBootstrapMembershipInterpreter,assertOriginalBootstrapMembershipInterpreterFinal,inspectOriginalBootstrapMembershipInterpreter,assertOriginalBootstrapMembershipSlot,originalBootstrapCompanionSlotMatches}'],
+    ...(bootstrap?[
+      ['./bootstrap-membership-preflight.mjs','import {originalBootstrapMembershipPreflightInterpreter,originalBootstrapMembershipPreflightInput,assertOriginalBootstrapMembershipPreflightInput,inspectOriginalBootstrapMembershipPreflight}'],
+      ['./bootstrap-membership.mjs','import {assertOriginalPeerBootstrapMembershipRunner,originalPeerBootstrapMembershipRunnerDeadline,originalPeerBootstrapMembershipRunnerLedger,originalPeerBootstrapMembershipRunnerPreflight}']
+    ]:[])
+  ];
+  assert.equal(expectedImports.length,bootstrap?12:10);
+  const replacements=new Set(expectedImports.map(([specifier])=>specifier)),seen=[];
+  const relocated=original.split('\n').map(line=>{
+    const match=line.match(/^(import .* from )'([^']+)';$/);assert.ok(match||!line.startsWith('import '),'domain import syntax must remain explicit');if(!match)return line;
+    const [,prefix,specifier]=match;
+    if(replacements.has(specifier)){seen.push([specifier,prefix.slice(0,-6)]);return prefix+JSON.stringify(specifier==='./prospective-local-worker-inventory-producer.mjs'?producerURL:shimURL)+';';}
+    return specifier.startsWith('./')?prefix+JSON.stringify(new URL(specifier,pathToFileURL(MODULE)).href)+';':line;
+  }).join('\n');
+  assert.deepEqual(seen,expectedImports,'only the exact fixed synthetic predecessor import bindings change');return relocated;
+}
+
 async function fixture(t){
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-owned-source-test-'));
   const external=denyExternal();let child,facade,original,timers=false;
@@ -69,7 +160,9 @@ async function fixture(t){
   original=fs.readFileSync(MODULE,'utf8');
   const shimFile=path.join(directory,'fictional-predecessors.mjs');
   fs.writeFileSync(shimFile,`// TEST-ONLY fixed fictional predecessor DATA; no original proof issuer.
+import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
+import {types} from 'node:util';
 export const canonical=value=>JSON.stringify((function visit(v){return v&&typeof v==='object'?Array.isArray(v)?v.map(visit):Object.fromEntries(Object.keys(v).sort().map(k=>[k,visit(v[k])])):v;})(value));
 export const ORIGINAL_CONTEXT_SELECTION=Object.freeze({synthetic:true});
 export const compiledPlan=Object.freeze({SYNTHETIC_OWNED_LIFECYCLE_ONLY:true});
@@ -79,7 +172,6 @@ const interpreter=Object.freeze({SYNTHETIC_UNUSED_INTERPRETER:true});
 export const slot=Object.freeze({slot_id:'SYNTHETIC-owned-lifecycle-only',scope_policy:'V5_ORIGINAL_MANAGED_PRIVATE_FD',executable_sha256:'a'.repeat(64),source_manifest_sha256:'b'.repeat(64),native_context_contract:{original_home_sha256:'c'.repeat(64),upstream_url:'https://example.invalid/responses',final_request_contract:{mode:'original-live-scoped-source',producer_module_sha256:'d'.repeat(64),tool_resource_sha256:'e'.repeat(64)}}});
 const plan={launch_mode:'companion-v2',companion_slot:slot,executable_pin:{sha256:'a'.repeat(64)},sandbox_executable:'/SYNTHETIC/sandbox',executable:'/SYNTHETIC/companion',argv:['--source-only'],sbpl:'SYNTHETIC inert policy',cwd:'/SYNTHETIC-project',state_root:'/SYNTHETIC-state',scratch_root:'/SYNTHETIC-scratch',gateway_port:43123,policy_sha256:'f'.repeat(64),environment:{}};
 const check=(actual,handle)=>{if(actual!==owner||handle!==compiledPlan)throw Error('wrong fictional predecessor');};
-export function install(actual,process){owner=actual;child=process;}
 export function inspectOriginalCompiledCodexPlan(actual,handle){check(actual,handle);return {...plan,consumed:claimed};}
 export function claimOriginalCompiledCodexPlan(actual,handle){check(actual,handle);if(claimed)throw Error('fictional plan replay');claimed=true;return {...plan,consumed:true};}
 // The delivery interpreter is outside this conditional lifecycle fixture. The
@@ -96,7 +188,7 @@ export function isOriginalBootstrapMembershipInterpreter(){return false;}
 export function originalBootstrapCompanionSlotMatches(){return false;}
 const unusedBootstrap=()=>{throw Error('unused fictional bootstrap predecessor');};
 export {unusedBootstrap as assertOriginalBootstrapMembershipInterpreterFinal,unusedBootstrap as inspectOriginalBootstrapMembershipInterpreter,unusedBootstrap as assertOriginalBootstrapMembershipSlot,unusedBootstrap as inspectOriginalCompiledBootstrapScope};
-export function spawn(...args){spawnCalls.push(args);return child;}
+${SYNTHETIC_EXECUTION_PREDECESSORS}
 export function setBrokerMode(value){brokerMode=value;}
 export async function createFixedConnectBroker(){
  const closed=new Promise(resolve=>{settleBroker=resolve;});
@@ -109,7 +201,7 @@ export class PeerLedger {
   this.root='/SYNTHETIC/'+label;this.directory=this.root+'/ledger';this.company_id='SYNTHETIC-'+label;
   this.context={protocol:'peer-task-context-v2',sha256:'1'.repeat(64),grant:{value:{expires_at:new Date(Date.now()+3600000).toISOString()}}};
   const principal={id:'fictional-cos',value:{status:'active',membership_qualification:{synthetic:true},native_id:'fictional-thread',generation:7,enrollment_id:'fictional-enrollment'}};
-  const task={id:'fictional-task',value:{status:'running',scope:'fictional-scope',owner_principal_id:principal.id,attempt:{id:'fictional-attempt',effect_id:'fictional-effect',request_sha256:'2'.repeat(64),context:this.context}}};
+  const task={id:'fictional-task',value:{status:'running',scope:'fictional-scope',owner_principal_id:principal.id,attempt:{id:'fictional-attempt',effect_id:'fictional-effect',request_sha256:'2'.repeat(64),context:this.context,effect_authority:{protocol:'peer-task-effect-authority-v1',expires_at:this.context.grant.value.expires_at}}}};
   const effect={id:'fictional-effect',created_seq:10,value:{kind:'native',task_id:task.id,request_sha256:'2'.repeat(64),status:'reserved'}};
   this.rows=new Map([['tasks:'+task.id,task],['principals:'+principal.id,principal],['slots:'+task.id,{id:task.id,value:{status:'active',attempt_id:task.value.attempt.id}}],['effects:'+effect.id,effect]]);
   this.command={id:'fictional-admit-command',revision:1,sha256:'3'.repeat(64),value:{action:'task/admit',principal_id:'scheduler',result:{admitted:true,task:structuredClone(task),context:structuredClone(this.context)}}};
@@ -119,31 +211,25 @@ export class PeerLedger {
   this.originalCommand=freeze(structuredClone(this.command));this.rows.set('commands:'+this.command.id,this.command);
   this.event={type:'task/admit',principal_id:'scheduler',payload:{changes:[{family:'commands',id:this.command.id,revision:1,sha256:this.command.sha256}]}};
  }
- read(fn){return fn({get:(family,id)=>this.rows.get(family+':'+id)??null,getVersion:ref=>ref.family==='commands'&&ref.id===this.originalCommand.id&&ref.revision===1&&ref.sha256===this.originalCommand.sha256?this.originalCommand:null,events:()=>({items:[this.event]})});}
+ read(fn){return syntheticRead(this,{get:(family,id)=>this.rows.get(family+':'+id)??null,getVersion:ref=>ref.family==='commands'&&ref.id===this.originalCommand.id&&ref.revision===1&&ref.sha256===this.originalCommand.sha256?this.originalCommand:null,events:()=>({items:[this.event]})},fn);}
  snapshot(){return canonical({rows:[...this.rows],originalCommand:this.originalCommand,event:this.event});}
 }
+function syntheticAdmission(actual){const command=actual.originalCommand,attempt=command.value.result.task.value.attempt;return {admission_ref:{family:'commands',id:command.id,revision:command.revision,sha256:command.sha256},deadline_at_ms:Math.min(Date.parse(command.value.result.context.grant.value.expires_at),Date.parse(attempt.effect_authority.expires_at)),execution_deadline_ms:Date.now()+120000};}
 export function validateContext(tx,context){return tx.get('tasks','fictional-task')?.value.attempt.context.sha256===context.sha256&&tx.get('tasks','fictional-task')?.value.attempt.context.protocol===context.protocol;}
 `);
   const shimURL=pathToFileURL(shimFile).href;
-  const replacements=new Set(['node:child_process','./protected-source-build-slot.mjs','./policy-supervisor.mjs','./ledger.mjs','./model.mjs','./protected-connect-broker.mjs']);
-  let count=0;
-  const relocated=original.split('\n').map(line=>{
-    const match=line.match(/^(import .* from )'([^']+)';$/);if(!match)return line;
-    const [,prefix,specifier]=match;
-    if(replacements.has(specifier)){count++;return prefix+JSON.stringify(shimURL)+';';}
-    return specifier.startsWith('./')?prefix+JSON.stringify(new URL(specifier,pathToFileURL(MODULE)).href)+';':line;
-  }).join('\n');
-  assert.equal(count,9,'only fixed spawn/slot/supervisor/ledger/model/broker predecessor imports change, including the explicit denying bootstrap slot/scope imports');
+  const relocated=relocateLifecycleDomain(original,directory,shimURL);
   const body=value=>value.split('\n').filter(line=>!line.startsWith('import ')).join('\n');
   assert.equal(body(relocated),body(original),'custody, private tokens, parser dispatch and lifecycle body remain byte-identical');
   const copy=path.join(directory,'domain.mjs');fs.writeFileSync(copy,relocated);
   const domain=await import(pathToFileURL(copy).href),shim=await import(shimURL);
   const {stableTaskHostTools}=await import(new URL('../plugins/soloco/runtime/peers/host-protocol.mjs',import.meta.url));
   const {expectedResponsesTools}=await import(new URL('../plugins/soloco/runtime/peers/responses-gateway.mjs',import.meta.url));
-  child=new SyntheticChild();const owner=Symbol('SYNTHETIC original owner');shim.install(owner,child);
+  child=new SyntheticChild();const owner=Symbol('SYNTHETIC original owner');
   let clock=Date.now();t.mock.method(Date,'now',()=>clock);
   const ledger=new shim.PeerLedger(),context=structuredClone(ledger.context);
   const expected={ledger,admission_ref:{family:'commands',id:ledger.command.id,revision:1,sha256:ledger.command.sha256},context_sha256:context.sha256,kind:'task'};
+  shim.install(owner,child,domain,ledger,expected.admission_ref);
   t.mock.timers.enable({apis:['setTimeout']});timers=true;
   const supervisor={compile(actual,input){assert.equal(actual,owner);assert.equal(input.gateway_port,43123);return shim.compiledPlan;}};
   const handle=await domain.prepareOriginalProtectedPeerLaunch(owner,supervisor,{cwd:'/SYNTHETIC-project',read_paths:[],state_root:'/SYNTHETIC-state',scratch_root:'/SYNTHETIC-scratch'});
@@ -152,6 +238,7 @@ export function validateContext(tx,context){return tx.get('tasks','fictional-tas
   domain.bindOriginalProtectedCodexLaunch(owner,handle,launch);
   facade=domain.spawnOriginalProtectedCodex(owner,handle);facade.stdout.resume();const errors=[];facade.on('error',error=>errors.push(error));facade.stdin.on('error',error=>errors.push(error));
   child.emit('spawn');assert.equal(shim.spawnCalls.length,1);assert.deepEqual(shim.spawnCalls[0][2].stdio,['pipe','pipe','pipe','pipe','pipe']);
+  shim.assertSyntheticLaunchCounts();
   const challenge=child.control.find(frame=>frame.kind==='challenge');assert(challenge,'challenge is captured only from original FD4');
   const wire=frame=>child.stdio[3].write(JSON.stringify(frame)+'\n');
   const server=frame=>child.stdout.write(JSON.stringify(frame)+'\n');
@@ -206,6 +293,8 @@ async function bootstrapFixture(t){
   const geometry=formatBootstrapMembershipFirstRpcGeometry(assignment),shimFile=path.join(directory,'fictional-bootstrap-predecessors.mjs');
   fs.writeFileSync(shimFile,`// TEST-ONLY cap/capacity/interpreter/preflight/compiler/Native predecessors.
 // No actual admission, spend, private Native issuer or accepted meaning exists.
+import assert from 'node:assert/strict';
+import {types} from 'node:util';
 export const canonical=value=>JSON.stringify((function visit(v){return v&&typeof v==='object'?Array.isArray(v)?v.map(visit):Object.fromEntries(Object.keys(v).sort().map(k=>[k,visit(v[k])])):v;})(value));
 const copy=value=>JSON.parse(canonical(value));
 const fail=code=>{throw Object.assign(Error(code),{code});};
@@ -214,15 +303,15 @@ export const compiledPlan=Object.freeze({SYNTHETIC_bootstrap_compiler_predecesso
 const interpreter=Object.freeze({SYNTHETIC_private_bootstrap_interpreter:true});
 export const spawnCalls=[],checks={capacity:0},ledgerUnits={existing_admissions:1,model_calls:1,new_admissions:0,new_charges:0,released:0};
 let owner,child,consumed=false,native=null,capacity=true,brokerMode='closed',settleBroker,afterScope=null,afterAssertion=null;
-export class PeerLedger {constructor(label='bootstrap'){this.root='/SYNTHETIC/'+label;this.directory=this.root+'/.company';this.company_id='SYNTHETIC-'+label;}snapshot(){return canonical({connection:{root:this.root,directory:this.directory,company_id:this.company_id},units:ledgerUnits});}}
+export class PeerLedger {constructor(label='bootstrap'){this.root='/SYNTHETIC/'+label;this.directory=this.root+'/.company';this.company_id='SYNTHETIC-'+label;}read(fn){return syntheticRead(this,Object.freeze({}),fn);}snapshot(){return canonical({connection:{root:this.root,directory:this.directory,company_id:this.company_id},units:ledgerUnits});}}
 export const ledger=new PeerLedger(),admission_ref=Object.freeze({family:'work_items',id:'membership-admission:SYNTHETIC-existing-attempt',revision:1,sha256:'3'.repeat(64)}),deadline_at_ms=Date.now()+3600000,execution_deadline_ms=Date.now()+120000;
+function syntheticAdmission(actual){assert.equal(actual,ledger);return {admission_ref,deadline_at_ms,execution_deadline_ms};}
 const invariant={protocol:'peer-bootstrap-membership-admission-v1',kind:'peer-bootstrap-membership-reconstruction',admission_ref,context_sha256:${JSON.stringify(sha(assignment))},deadline_at_ms};
 const input=${JSON.stringify(geometry.input)},frame_sha256=${JSON.stringify(geometry.frame.sha256)},recipe_sha256='4'.repeat(64);
 export const slot=Object.freeze({slot_id:'SYNTHETIC-bootstrap-owned-only',scope_policy:'V5_ORIGINAL_MANAGED_PRIVATE_FD',executable_sha256:'a'.repeat(64),source_manifest_sha256:'b'.repeat(64),native_context_contract:{original_home_sha256:'c'.repeat(64),upstream_url:'https://example.invalid/responses',final_request_contract:{mode:'original-live-scoped-source',producer_module_sha256:'d'.repeat(64),tool_resource_sha256:${JSON.stringify(BOOTSTRAP_CONTEXT_SELECTION.resource_sha256)}}}});
 const plan={launch_mode:'companion-v2',companion_slot:slot,executable_pin:{sha256:'a'.repeat(64)},sandbox_executable:'/SYNTHETIC/sandbox',executable:'/SYNTHETIC/companion',argv:['--source-only'],sbpl:'SYNTHETIC inert bootstrap policy',cwd:'/SYNTHETIC-bootstrap-project',state_root:'/SYNTHETIC-bootstrap-state',scratch_root:'/SYNTHETIC-bootstrap-scratch',gateway_port:43123,policy_sha256:'f'.repeat(64),scope_root:'/SYNTHETIC-bootstrap-scope',environment:{}};
 const check=(actual,handle)=>{if(actual!==owner||handle!==compiledPlan)fail('SYNTHETIC_COMPILER_PREDECESSOR_CHANGED');};
 const cap=(handle,actual)=>{if(handle!==claim||actual!==owner)fail('SYNTHETIC_CAP_PREDECESSOR_CHANGED');};
-export function install(actual,process){owner=actual;child=process;}
 export function inspectOriginalCompiledCodexPlan(actual,handle){check(actual,handle);return {...plan,consumed};}
 export function claimOriginalCompiledCodexPlan(actual,handle){check(actual,handle);if(consumed)fail('SYNTHETIC_COMPILER_REPLAY');consumed=true;return {...plan,consumed};}
 export function originalCompiledPeerContextInterpreter(actual,handle){check(actual,handle);return interpreter;}
@@ -247,21 +336,22 @@ export function setAfterAssertion(value){afterAssertion=value;}
 const unused=()=>{throw Error('ordinary interpreter predecessor is outside the conditional bootstrap fixture');};
 export {unused as resolveOriginalPeerContextInterpreter,unused as assertOriginalPeerContextInterpreterFinal,unused as assertOriginalPeerContextSlot,unused as inspectOriginalPeerContextInterpreter};
 export function originalCompanionSlotMatches(){return false;}
-export function spawn(...args){spawnCalls.push(args);return child;}
+${SYNTHETIC_EXECUTION_PREDECESSORS}
 export function setBrokerMode(value){brokerMode=value;}
 export async function createFixedConnectBroker(){const closed=new Promise(resolve=>{settleBroker=resolve;});return Object.freeze({port:43123,closed,inspect:()=>({phase:'LISTENING',remote_domain_closed:false}),async close(){if(brokerMode!=='pending')settleBroker({phase:brokerMode==='closed'?'CLOSED':'UNKNOWN',local_tcp_closure:brokerMode==='closed'?'OBSERVED':'UNKNOWN',remote_domain_closed:false});}});}
 export function settle(){settleBroker({phase:'CLOSED',local_tcp_closure:'OBSERVED',remote_domain_closed:false});}
 `);
-  const shimURL=pathToFileURL(shimFile).href,replacements=new Set(['node:child_process','./protected-source-build-slot.mjs','./policy-supervisor.mjs','./ledger.mjs','./model.mjs','./protected-connect-broker.mjs','./bootstrap-membership.mjs','./bootstrap-membership-preflight.mjs']);let count=0;
-  const relocated=original.split('\n').map(line=>{const match=line.match(/^(import .* from )'([^']+)';$/);if(!match)return line;const [,prefix,specifier]=match;if(replacements.has(specifier)){count++;return prefix+JSON.stringify(shimURL)+';';}return specifier.startsWith('./')?prefix+JSON.stringify(new URL(specifier,pathToFileURL(MODULE)).href)+';':line;}).join('\n');
-  assert.equal(count,11,'only fixed explicitly synthetic bootstrap predecessor imports change');const body=value=>value.split('\n').filter(line=>!line.startsWith('import ')).join('\n');assert.equal(body(relocated),body(original),'actual bootstrap domain body and token/closure logic remain exact');
+  const shimURL=pathToFileURL(shimFile).href,relocated=relocateLifecycleDomain(original,directory,shimURL,true);
+  const body=value=>value.split('\n').filter(line=>!line.startsWith('import ')).join('\n');assert.equal(body(relocated),body(original),'actual bootstrap domain body and token/closure logic remain exact');
   const file=path.join(directory,'bootstrap-domain.mjs');fs.writeFileSync(file,relocated);const domain=await import(pathToFileURL(file).href),shim=await import(shimURL);
-  child=new SyntheticChild();const owner=Symbol('SYNTHETIC conditional bootstrap owner');shim.install(owner,child);let clock=Date.now();t.mock.method(Date,'now',()=>clock);t.mock.timers.enable({apis:['setTimeout']});timers=true;
+  child=new SyntheticChild();const owner=Symbol('SYNTHETIC conditional bootstrap owner');let clock=Date.now();t.mock.method(Date,'now',()=>clock);shim.install(owner,child,domain,shim.ledger,shim.admission_ref);t.mock.timers.enable({apis:['setTimeout']});timers=true;
   const supervisor={compile(actual,request,privateBinding){assert.equal(actual,owner);assert.equal(request.gateway_port,43123);assert.equal(shim.isOriginalBootstrapMembershipInterpreter(privateBinding.context_interpreter),true);return shim.compiledPlan;}};
   const scope={cwd:'/SYNTHETIC-bootstrap-project',read_paths:[],state_root:'/SYNTHETIC-bootstrap-state',scratch_root:'/SYNTHETIC-bootstrap-scratch'},handle=await domain.prepareOriginalProtectedBootstrapLaunch(owner,supervisor,shim.claim,scope);
+  domain.bindOriginalProtectedExecutionLaunch(owner,handle,shim.ledger,shim.admission_ref);
   const launch={cwd:scope.cwd,profile_id:':read-only',instruction_sources:[],base_instructions:'SYNTHETIC bootstrap base',developer_instructions:'SYNTHETIC bootstrap developer',environment:{}};domain.bindOriginalProtectedCodexLaunch(owner,handle,launch);
   facade=domain.spawnOriginalProtectedCodex(owner,handle);facade.stdout.resume();const errors=[];facade.on('error',error=>errors.push(error));facade.stdin.on('error',error=>errors.push(error));child.emit('spawn');
   assert.equal(shim.spawnCalls.length,1);const challenge=child.control.find(frame=>frame.kind==='challenge');assert(challenge);assert.deepEqual(challenge.context_contract,BOOTSTRAP_CONTEXT_SELECTION);
+  shim.assertSyntheticLaunchCounts();
   const wire=frame=>child.stdio[3].write(JSON.stringify(frame)+'\n'),server=frame=>child.stdout.write(JSON.stringify(frame)+'\n'),send=frame=>new Promise((resolve,reject)=>facade.stdin.write(JSON.stringify(frame)+'\n',error=>error?reject(error):resolve()));
   await send({id:'soloco-peer-1',method:'initialize',params:{}});
   const host='11111111-1111-4111-8111-111111111111',native='33333333-3333-7333-8333-333333333333',session='44444444-4444-7444-8444-444444444444',turn='SYNTHETIC-bootstrap-turn';
