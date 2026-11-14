@@ -11,6 +11,15 @@ import {ISSUE18_LEDGER_FILES,encodeIssue18LedgerData,openIssue18LedgerStorage,in
 
 const sha=b=>createHash('sha256').update(b).digest('hex');
 const onDarwin={skip:process.platform!=='darwin',timeout:60000};
+function fixturePythonSha(){
+  const fd=fs.openSync('/usr/bin/python3',fs.constants.O_RDONLY|fs.constants.O_NOFOLLOW),end=Date.now()+10000;
+  try{
+    const before=fs.fstatSync(fd,{bigint:true});assert.ok(before.isFile()&&before.nlink===1n&&before.uid===0n&&before.size>0n&&before.size<=150000000n);
+    const digest=createHash('sha256'),buffer=Buffer.allocUnsafe(65536);let offset=0;
+    while(offset<Number(before.size)){assert.ok(Date.now()<end,'bounded fixture interpreter hash');const n=fs.readSync(fd,buffer,0,Math.min(buffer.length,Number(before.size)-offset),offset);assert.ok(n>0);digest.update(buffer.subarray(0,n));offset+=n;}
+    const after=fs.fstatSync(fd,{bigint:true});for(const k of ['dev','ino','mode','uid','gid','nlink','size','mtimeNs','ctimeNs'])assert.equal(after[k],before[k]);assert.ok(Date.now()<end);return digest.digest('hex');
+  }finally{fs.closeSync(fd);}
+}
 function fixture(){
   const parent=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-issue18-storage-'));fs.chmodSync(parent,0o700);
   const handles=[],fds=[];let complete=false;
@@ -19,7 +28,7 @@ function fixture(){
     const name='run',directory=path.join(parent,name);fs.mkdirSync(directory,{mode:0o700});
     const flags=fs.constants.O_RDONLY|fs.constants.O_DIRECTORY|fs.constants.O_NOFOLLOW;
     const parentFd=fs.openSync(parent,flags);fds.push(parentFd);const directoryFd=fs.openSync(directory,flags);fds.push(directoryFd);
-    const policy={parentFd,directoryFd,directoryName:name,pythonSha256:sha(fs.readFileSync('/usr/bin/python3')),deadlineAtMs:Date.now()+60000};
+    const policy={parentFd,directoryFd,directoryName:name,pythonSha256:fixturePythonSha(),deadlineAtMs:Date.now()+60000};
     return {parent,directory,policy,open(){const h=openIssue18LedgerStorage(policy);handles.push(h);return h;},done(){complete=true;},close({preserve=false}={}){
       const errors=[];for(const h of handles)try{closeIssue18LedgerStorage(h);}catch(e){errors.push(e);}for(const fd of fds.reverse())try{fs.closeSync(fd);}catch(e){errors.push(e);}
       if(!complete||preserve||errors.length){preserved(errors.length?'descriptor cleanup failed':'unexpected qualification failure or uncertain child cleanup');if(errors.length)throw new AggregateError(errors,'Fixture preserved after cleanup failure');return;}
@@ -138,7 +147,10 @@ process.stdin.on('end',()=>{
     if(command!=='GO\\n')throw Error('fixed barrier command required');
     const receipt=initializeIssue18LedgerStorage(handle,{contender:tag,fixture:'two-process synthetic storage-only contention'});
     process.stdout.write('RESULT '+JSON.stringify({status:receipt.status,authority_claim:receipt.authority_claim})+'\\n');
-  }catch(error){process.stdout.write('RESULT '+JSON.stringify({status:'held',code:error.code??'UNEXPECTED',receipt:error.receipt??null})+'\\n');process.exitCode=2;}
+  }catch(error){
+    const expected=error.code==='ISSUE18_STORAGE_OUTCOME_UNCERTAIN'&&error.receipt?.authority_claim===false;
+    process.stdout.write('RESULT '+JSON.stringify({status:expected?'held':'unexpected_error',code:error.code??'UNEXPECTED',receipt:error.receipt??null,name:error.name??null,message:typeof error.message==='string'?error.message.slice(0,1024):null})+'\\n');process.exitCode=expected?2:3;
+  }
   finally{closeIssue18LedgerStorage(handle);}
 });
 `;
@@ -181,6 +193,11 @@ test('two real Source processes contend for one O_EXCL manifest and retain exact
     });
     assert.equal(results.filter(r=>r.status==='committed'&&r.authority_claim===false).length,1);
     assert.equal(results.filter(r=>r.status==='held').length,1);assert.deepEqual(children.map(c=>c.terminal.code).sort(),[0,2]);
+    const loser=results.find(r=>r.status==='held');assert.equal(loser.code,'ISSUE18_STORAGE_OUTCOME_UNCERTAIN');assert.equal(loser.receipt?.code,'ISSUE18_STORAGE_OUTCOME_UNCERTAIN');
+    assert.equal(loser.receipt?.status,'held');assert.equal(loser.receipt.authority_claim,false);assert.equal(loser.receipt.child_status,2);assert.equal(loser.receipt.child_signal,null);assert.equal(loser.receipt.child_error_code,null);
+    // Complete manifest observed, transient create->write->0400 mode, or the
+    // actual losing O_EXCL syscall. Pin/ABI/deadline/ReferenceError is NOT this.
+    assert.ok((['EXISTING_NAMESPACE','LEAF_TYPE_LINK_MODE'].includes(loser.receipt.helper_code)&&loser.receipt.errno===null)||(loser.receipt.helper_code==='OS_IO_OR_PROTOCOL'&&loser.receipt.errno===17),JSON.stringify(loser));
     assert.deepEqual(fs.readdirSync(f.directory),['RUN.json']);const actual=fs.readFileSync(path.join(f.directory,'RUN.json'));
     const winner=results.findIndex(r=>r.status==='committed');assert.ok(actual.equals(encodeIssue18LedgerData({contender:winner===0?'first':'second',fixture:'two-process synthetic storage-only contention'})));
     const s=fs.lstatSync(path.join(f.directory,'RUN.json'));assert.equal(s.nlink,1);assert.equal(s.mode&0o777,0o400);f.done();

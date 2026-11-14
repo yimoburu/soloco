@@ -54,16 +54,31 @@ function identity(fd){
   return Object.fromEntries(['dev','ino','mode','uid','gid'].map(k=>[k,String(s[k])]));
 }
 const equal=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
-function program(file,expected,system=false){
+function program(file,expected,system,deadlineAtMs){
+  const began=process.hrtime.bigint(),available=deadlineAtMs-Date.now();
+  need(Number.isSafeInteger(available)&&available>0,'ISSUE18_STORAGE_DEADLINE');
+  const check=()=>need(Date.now()<deadlineAtMs&&process.hrtime.bigint()-began<BigInt(available)*1000000n,'ISSUE18_STORAGE_DEADLINE');
+  check();
   const before=fs.lstatSync(file,{bigint:true});
-  need(before.isFile()&&!before.isSymbolicLink()&&before.nlink===1n&&before.size>0n&&before.size<=150000000n,'ISSUE18_STORAGE_PROGRAM');
+  const maximum=system?150000000n:65536n;
+  need(before.isFile()&&!before.isSymbolicLink()&&before.nlink===1n&&before.size>0n&&before.size<=maximum,'ISSUE18_STORAGE_PROGRAM');
   if(system)need(before.uid===0n&&(before.mode&0o022n)===0n,'ISSUE18_STORAGE_PROGRAM');
+  check();
   const fd=fs.openSync(file,fs.constants.O_RDONLY|fs.constants.O_NOFOLLOW|fs.constants.O_NONBLOCK);
   try{
     const fields=['dev','ino','mode','uid','gid','nlink','size','mtimeNs','ctimeNs'];
     const same=s=>fields.every(k=>s[k]===before[k]);need(same(fs.fstatSync(fd,{bigint:true})),'ISSUE18_STORAGE_PROGRAM');
-    const bytes=fs.readFileSync(fd);need(same(fs.fstatSync(fd,{bigint:true}))&&same(fs.lstatSync(file,{bigint:true}))&&hash(bytes)===expected,'ISSUE18_STORAGE_PROGRAM');return bytes;
-  }finally{fs.closeSync(fd);}
+    const size=Number(before.size),buffer=Buffer.allocUnsafe(Math.min(size,65536)),digest=createHash('sha256'),retained=[];let offset=0;
+    while(offset<size){
+      check();const count=Math.min(buffer.length,size-offset),n=fs.readSync(fd,buffer,0,count,offset);
+      need(Number.isInteger(n)&&n>0&&n<=count,'ISSUE18_STORAGE_PROGRAM');check();
+      const chunk=buffer.subarray(0,n);digest.update(chunk);if(!system)retained.push(Buffer.from(chunk));offset+=n;
+    }
+    check();need(same(fs.fstatSync(fd,{bigint:true}))&&same(fs.lstatSync(file,{bigint:true}))&&digest.digest('hex')===expected,'ISSUE18_STORAGE_PROGRAM');check();
+    // Interpreter bytes are streamed into the digest, never retained. Only the
+    // separately capped helper Source is returned for the fixed by-value call.
+    return system?null:Buffer.concat(retained,size);
+  }finally{fs.closeSync(fd);check();}
 }
 function current(s){
   need(!s.closed&&Date.now()<s.deadlineAtMs,'ISSUE18_STORAGE_CLOSED_OR_EXPIRED');
@@ -75,7 +90,7 @@ function rows(value){
   need(value.reduce((n,r)=>n+r.bytes,0)<=163840,'ISSUE18_STORAGE_CAPACITY');return value;
 }
 function invoke(s,operation,name=null,body=null){
-  current(s);program(PYTHON,s.pythonSha256,true);
+  current(s);program(PYTHON,s.pythonSha256,true,s.deadlineAtMs);
   const request={protocol:PROTOCOL,operation,name,directory_name:s.directoryName,parent_identity:s.parent,directory_identity:s.directory,deadline_at_ms:s.deadlineAtMs,body_base64:body?.toString('base64')??null,body_sha256:body?hash(body):null,manifest_sha256:s.manifestSha256,expected_rows:s.initialized?s.retainedRows:null};
   const input=Buffer.from(JSON.stringify(request));need(input.length<=65536,'ISSUE18_STORAGE_REQUEST_LIMIT');
   const remaining=Math.min(30000,s.deadlineAtMs-Date.now());need(remaining>0,'ISSUE18_STORAGE_DEADLINE');
@@ -104,7 +119,7 @@ export function openIssue18LedgerStorage(policy){
   need([policy.parentFd,policy.directoryFd].every(v=>Number.isSafeInteger(v)&&v>=0)&&policy.parentFd!==policy.directoryFd,'ISSUE18_STORAGE_FD');
   need(typeof policy.directoryName==='string'&&/^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/.test(policy.directoryName)&&/^[a-f0-9]{64}$/.test(policy.pythonSha256),'ISSUE18_STORAGE_POLICY');
   need(Number.isSafeInteger(policy.deadlineAtMs)&&policy.deadlineAtMs>Date.now(),'ISSUE18_STORAGE_DEADLINE');
-  program(PYTHON,policy.pythonSha256,true);const helper=program(HELPER,HELPER_SHA256).toString('utf8');
+  program(PYTHON,policy.pythonSha256,true,policy.deadlineAtMs);const helper=program(HELPER,HELPER_SHA256,false,policy.deadlineAtMs).toString('utf8');
   const s={...policy,parent:identity(policy.parentFd),directory:identity(policy.directoryFd),helper,initialized:false,manifestSha256:null,retainedRows:[],spent:new Set(),poisoned:false,closed:false};
   const handle=Object.freeze({});sessions.set(handle,s);return handle;
 }
