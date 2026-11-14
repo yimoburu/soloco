@@ -82,8 +82,18 @@ async function fixture({recovery=true,legacy=true}={}) {
     const r=s.records.recovery.development;r.subject.job_sha256=hash(s.jobs[oldController.id]);
     if(legacy)r.proof.legacy.producer_sha256=hash(s.jobs['legacy-qa-job']);
   });
+  // Bind the final stored JSON, not the insertion order retained by Object.assign
+  // on the original semantic DATA. Later staging must leave the exact UNKNOWN
+  // failure evidence and its genuinely observed, unclosed model unit unchanged.
+  const retainedState=read(a),retainedPrior=retainedState.jobs[oldQA.id];
+  assert.equal(JSON.stringify(retainedPrior),JSON.stringify(JSON.parse(retainedState.records['failure-home'].content).canonical_public_terminal_job.complete_data.value));
+  assert.equal(retainedPrior.status,'failed');
+  assert.equal(retainedPrior.execution_failure.termination_confirmed,false);
+  assert.notEqual(retainedPrior.coordination_release?.termination_confirmed,true);
+  const unknownModels=retainedPrior.original_execution_assignment.launches.filter(launch=>launch.kind==='model');
+  assert.equal(unknownModels.length,1);assert.ok(unknownModels[0].birth);assert.equal(unknownModels[0].closure,null);
   const reviewStart=Date.parse(scope.expires_at)+1000;
-  return {...a,reviewStart,plan_id:p.id,candidate_id:c.id,receipt_id:t.id,receipt_sha256:t.development.receipt_sha256,prior_job_id:oldQA.id,prior_job_sha256:hash(oldQA),failure_evidence_id:failureHome.id,source_instruction:'CONTROLLED NEW HUMAN PRIMARY FIXTURE: one read-only review and local acceptance, explicit old UNKNOWN reservation retained.',approval_reference:id('controlled-primary-approval'),model_data_approved:true,unknown_prior_replacement_approved:true,expires_at:new Date(reviewStart+3600000).toISOString(),code_review_window_minutes:30};
+  return {...a,reviewStart,plan_id:p.id,candidate_id:c.id,receipt_id:t.id,receipt_sha256:t.development.receipt_sha256,prior_job_id:oldQA.id,prior_job_sha256:hash(retainedPrior),failure_evidence_id:failureHome.id,source_instruction:'CONTROLLED NEW HUMAN PRIMARY FIXTURE: one read-only review and local acceptance, explicit old UNKNOWN reservation retained.',approval_reference:id('controlled-primary-approval'),model_data_approved:true,unknown_prior_replacement_approved:true,expires_at:new Date(reviewStart+3600000).toISOString(),code_review_window_minutes:30};
   }finally{globalThis.Date=RealDate;}
 }
 function authorized(a) {const proposal=prepareReviewContinuation(read(a),a,a.root);let t;change(a,s=>{t=authorizeReviewContinuation(s,{...a,proposal_sha256:hash(proposal)},a.root);});return t;}
