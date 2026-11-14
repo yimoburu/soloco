@@ -54,11 +54,12 @@ export function capturePeerOriginCut(db){
 export function validatePeerOriginMechanicalReview(){throw Object.assign(Error('SYNTHETIC_NATIVE_QA_PRODUCER_UNAVAILABLE'),{code:'SYNTHETIC_NATIVE_QA_PRODUCER_UNAVAILABLE'});}
 `;
 function installOccupancyPlanSourceFixture(root,setup){
-  const current=path.join(root,'SOURCE-plugin/runtime'),legacy=path.join(root,'LEGACY-SOURCE/runtime');
-  phase(setup,'copy.begin');
-  try{fs.mkdirSync(path.dirname(current),{recursive:true});fs.cpSync(runtime,current,{recursive:true});}
-  catch(error){phase(setup,'copy.throw');throw error;}
-  phase(setup,'copy.end');phase(setup,'legacy.begin');
+  phase(setup,'runtime.bind.begin');
+  // Reuse the actual unchanged current graph, preserving its Store class and
+  // private capability maps. Each legacy cut and optional companion stays in
+  // its own root; only the shared current modules use their canonical URLs.
+  const current=runtime,legacy=path.join(root,'LEGACY-SOURCE/runtime');
+  phase(setup,'runtime.bind.end');phase(setup,'legacy.begin');
   try{
   fs.mkdirSync(path.join(legacy,'peers'),{recursive:true});
   // Preserve the exact archived recipe leaves without replacing the current
