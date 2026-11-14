@@ -124,7 +124,9 @@ test('historical bookkeeping rejects raw databases, foreign Stores, changed comp
  const raw=new DatabaseSync(f.file,{readOnly:true});try{assert.throws(()=>bindOriginalHistoricalWorkerAssignmentBookkeepingFrom(raw,copy(frozen),basis),code('ORIGINAL_EXECUTION_STORE_REQUIRED'));}finally{raw.close();}
  withStore(foreign.root,store=>store.readSnapshot(()=>assert.throws(()=>bindOriginalHistoricalWorkerAssignmentBookkeepingFrom(store.db,copy(frozen),basis))));
  withStore(f.root,store=>store.readSnapshot(()=>{
-  const wrongCompany=copy(frozen);wrongCompany.id='SYNTHETIC-other-company';assert.throws(()=>bindOriginalHistoricalWorkerAssignmentBookkeepingFrom(store.db,wrongCompany,basis),code('ORIGINAL_EXECUTION_HISTORICAL_STATE_CHANGED'));
+  for(const mutate of [s=>{s.id='SYNTHETIC-other-company';},s=>{delete s.original_execution_origin;},s=>{s.original_execution_origin=null;}]){
+   const wrong=copy(frozen);mutate(wrong);assert.throws(()=>bindOriginalHistoricalWorkerAssignmentBookkeepingFrom(store.db,wrong,basis),code('ORIGINAL_EXECUTION_HISTORICAL_STATE_CHANGED'));
+  }
   for(const mutate of [b=>{b.seq++;},b=>{b.event_sha256='0'.repeat(64);}]){
    const wrong=copy(basis);mutate(wrong);const {sha256,...body}=wrong;wrong.sha256=qaRawHash(JSON.stringify(body));
    assert.throws(()=>bindOriginalHistoricalWorkerAssignmentBookkeepingFrom(store.db,copy(frozen),wrong));

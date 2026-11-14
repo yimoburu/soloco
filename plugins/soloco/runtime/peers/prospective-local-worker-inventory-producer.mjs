@@ -251,7 +251,9 @@ export function bindOriginalHistoricalWorkerAssignmentBookkeepingFrom(actualDb,s
     // this actual Store. Caller JSON alone never establishes provenance.
     readStorageIntake(loan.db,basis);
     need(state&&typeof state==='object'&&!Array.isArray(state),'HISTORICAL_STATE_CHANGED');
-    if(!own(state,'original_execution_origin'))return null;
+    const originalAtCut=basis.entries.some(row=>row.family==='root'&&row.key==='original_execution_origin');
+    need(own(state,'original_execution_origin')===originalAtCut,'HISTORICAL_STATE_CHANGED');
+    if(!originalAtCut)return null;
     // The immutable cut must precede this write. An uncommitted tail could
     // otherwise acquire a lease-free historical proof and survive rollback.
     if(loan.mode==='write'){
