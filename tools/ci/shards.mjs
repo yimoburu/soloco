@@ -1,13 +1,30 @@
 import {createHash} from 'node:crypto';
+import fs from 'node:fs';
 import {requireThat} from './evidence.mjs';
 
 export const regressionShardCount=2;
 // Source CI requests four shards explicitly; generic two-shard defaults stay compatible.
 export const routineRegressionShardCount=4;
-// Advisory placement only: keep the two long pipelines and frozen-intake
-// publication/handover fixtures in separate routine shards. Argument order is not
-// a measured Node start order or timing guarantee.
+// Preserve the existing separation of known long files; costs place companions.
 const regressionPriority=['tests/peer-input-frontier.test.mjs','tests/peer-origin-frontier-seal.test.mjs','tests/frozen-intake-publication.test.mjs','tests/frozen-intake-handover.test.mjs'];
+const isolatedRoutineFile='tests/peer-origin-frontier-seal.test.mjs';
+const costBytes=fs.readFileSync(new URL('./regression-costs.json',import.meta.url));
+export const regressionCosts=Object.freeze(JSON.parse(costBytes));
+const fileName=file=>typeof file==='string'&&/^tests\/[^/\\\0\r\n]+\.test\.mjs$/.test(file);
+requireThat(regressionCosts.protocol==='regression-file-cost-hints-v1'
+  &&Number.isSafeInteger(regressionCosts.unknown_cost_ms)&&regressionCosts.unknown_cost_ms>0
+  &&regressionCosts.sources&&typeof regressionCosts.sources==='object'&&!Array.isArray(regressionCosts.sources)
+  &&Object.values(regressionCosts.sources).every(source=>source&&/^[a-f0-9]{40}$/.test(source.commit)
+    &&Number.isSafeInteger(source.run)&&source.run>0&&['success','failure'].includes(source.outcome)
+    &&Array.isArray(source.jobs)&&source.jobs.length>0&&source.jobs.every(job=>Number.isSafeInteger(job)&&job>0))
+  &&regressionCosts.costs&&typeof regressionCosts.costs==='object'&&!Array.isArray(regressionCosts.costs)
+  &&Object.entries(regressionCosts.costs).every(([file,row])=>fileName(file)&&row
+    &&Number.isSafeInteger(row.ms)&&row.ms>0&&Number.isSafeInteger(row.matched_outer_cases)&&row.matched_outer_cases>0
+    &&Object.hasOwn(regressionCosts.sources,row.source)),'invalid regression cost hints');
+for(const source of Object.values(regressionCosts.sources)){Object.freeze(source.jobs);Object.freeze(source);}
+for(const row of Object.values(regressionCosts.costs))Object.freeze(row);
+Object.freeze(regressionCosts.sources);Object.freeze(regressionCosts.costs);
+export const regressionCostHash=createHash('sha256').update(costBytes).digest('hex');
 
 function testFiles(files) {
   requireThat(Array.isArray(files)&&files.length>0,'no tests selected');
@@ -51,10 +68,29 @@ export function partitionTests(files,total=regressionShardCount) {
   return partitionOrdered(testFiles(files),total);
 }
 
+function partitionRoutine(ordered) {
+  requireThat(ordered.length>=routineRegressionShardCount,'invalid shard count');
+  const weight=file=>regressionCosts.costs[file]?.ms??regressionCosts.unknown_cost_ms;
+  const bins=Array.from({length:routineRegressionShardCount},(_,i)=>({index:i+1,total:routineRegressionShardCount,files:[],hint_weight_ms:0,unknown_cost_files:[]}));
+  const place=(bin,file)=>{bin.files.push(file);bin.hint_weight_ms+=weight(file);if(!Object.hasOwn(regressionCosts.costs,file))bin.unknown_cost_files.push(file);};
+  const seeded=new Set();
+  regressionPriority.forEach((file,index)=>{if(ordered.includes(file)){place(bins[index],file);seeded.add(file);}});
+  const isolated=seeded.has(isolatedRoutineFile)?bins[1]:null;
+  const available=bins.filter(bin=>bin!==isolated);
+  const remaining=ordered.filter(file=>!seeded.has(file)).sort((a,b)=>weight(b)-weight(a)||(a<b?-1:a>b?1:0));
+  for(const file of remaining){
+    const bin=available.reduce((best,next)=>next.hint_weight_ms<best.hint_weight_ms?next:best);
+    place(bin,file);
+  }
+  return validatePartition(ordered,bins,routineRegressionShardCount);
+}
+
 export function selectShard(files,value) {
   const {index,total}=parseShard(value);
   const ordered=testFiles(files);
   const priority=[...regressionPriority.filter(file=>ordered.includes(file)),...ordered.filter(file=>!regressionPriority.includes(file))];
-  const partition=partitionOrdered(priority,total);
-  return {...partition[index-1],inventory_sha256:createHash('sha256').update(JSON.stringify(ordered)).digest('hex'),selected_total:files.length};
+  const routine=total===routineRegressionShardCount;
+  const partition=routine?partitionRoutine(ordered):partitionOrdered(priority,total);
+  return {...partition[index-1],inventory_sha256:createHash('sha256').update(JSON.stringify(ordered)).digest('hex'),selected_total:files.length,
+    ...(routine?{cost_hints_sha256:regressionCostHash}:{})};
 }

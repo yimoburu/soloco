@@ -7,7 +7,7 @@ import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
 import {check} from '../tools/ci/check.mjs';
 import {inventory,qualificationTests,selectedTests} from '../tools/ci/evidence.mjs';
-import {parseShard,partitionTests,regressionShardCount,routineRegressionShardCount,selectShard,validatePartition} from '../tools/ci/shards.mjs';
+import {parseShard,partitionTests,regressionShardCount,routineRegressionShardCount,regressionCosts,regressionCostHash,selectShard,validatePartition} from '../tools/ci/shards.mjs';
 import {partitionQualification,selectQualificationShard,qualificationPrelude,qualificationSummary,collectQualification} from '../tools/ci/qualification-shards.mjs';
 import qualificationReporter from '../tools/ci/qualification-reporter.mjs';
 
@@ -42,18 +42,56 @@ test('routine selection separates long pipelines without dropping current or fut
   assert.deepEqual([...flattened].sort(),[...selected].sort());
   assert.deepEqual(partition.map(shard=>shard.files[0]),[
     'tests/peer-input-frontier.test.mjs','tests/peer-origin-frontier-seal.test.mjs','tests/frozen-intake-publication.test.mjs','tests/frozen-intake-handover.test.mjs',
-  ],'the four advisory files are first in separate selected argument lists');
-  for(const shard of partition){assert.equal(shard.inventory_sha256,partition[0].inventory_sha256);assert.equal(shard.selected_total,selected.length);}
-  assert.ok(Math.max(...partition.map(shard=>shard.files.length))-Math.min(...partition.map(shard=>shard.files.length))<=1);
+  ],'the four advisory files remain first in separate selected argument lists');
+  assert.deepEqual(partition[1].files,['tests/peer-origin-frontier-seal.test.mjs'],'the measured whole-DAG seal file has no competing file in its shard');
+  for(const shard of partition){
+    assert.equal(shard.inventory_sha256,partition[0].inventory_sha256);assert.equal(shard.selected_total,selected.length);
+    assert.equal(shard.cost_hints_sha256,regressionCostHash);assert.ok(Number.isSafeInteger(shard.hint_weight_ms)&&shard.hint_weight_ms>0);
+  }
+  // Unequal file counts are intentional: observed long files receive space,
+  // while every remaining whole file is balanced across the other three jobs.
+  const companions=partition.filter(shard=>shard.index!==2);
+  assert.ok(companions.every(shard=>shard.files.length>0));
+  const largestCompanion=Math.max(...companions.flatMap(shard=>shard.files).map(file=>regressionCosts.costs[file]?.ms??regressionCosts.unknown_cost_ms));
+  assert.ok(Math.max(...companions.map(shard=>shard.hint_weight_ms))-Math.min(...companions.map(shard=>shard.hint_weight_ms))<=largestCompanion,'remaining advisory loads differ by at most one indivisible file');
   validatePartition(selected,partition,routineRegressionShardCount);
   const future='tests/future-unmeasured-pipeline.test.mjs';
   const expanded=values.map(value=>selectShard([...selected,future],value));
   assert.deepEqual(expanded.flatMap(shard=>shard.files).sort(),[...selected,future].sort());
   assert.equal(expanded.flatMap(shard=>shard.files).filter(file=>file===future).length,1);
+  assert.equal(expanded.flatMap(shard=>shard.unknown_cost_files).filter(file=>file===future).length,1);
   for(const total of [1,2,3,4])validatePartition(selected,Array.from({length:total},(_,i)=>selectShard(selected,`${i+1}/${total}`)),total);
   // Generic lexical partitions remain the input to full qualification. With no
   // advisory pipelines present, routine fixture selection keeps that behavior.
   for(const [i,value]of ['1/2','2/2'].entries())assert.deepEqual(selectShard(files,value).files,partitionTests(files)[i].files);
+});
+
+test('routine cost placement separates measured heavy companions and keeps future files required',()=>{
+  const seal='tests/peer-origin-frontier-seal.test.mjs',heavy=[
+    'tests/issue18-integrated-comparison-worker.test.mjs','tests/peer-input-frontier.test.mjs','tests/peer-model-capacity-scale.test.mjs',
+  ],future=['tests/unmeasured-a.test.mjs','tests/unmeasured-b.test.mjs','tests/unmeasured-c.test.mjs'];
+  const selected=[seal,...heavy,...future],values=['1/4','2/4','3/4','4/4'],partition=values.map(value=>selectShard(selected,value));
+  assert.deepEqual(partition,values.map(value=>selectShard([...selected].reverse(),value)));
+  assert.deepEqual(partition[1].files,[seal]);
+  const destinations=heavy.map(file=>partition.find(shard=>shard.files.includes(file)).index);
+  assert.equal(new Set(destinations).size,heavy.length,'measured expensive companions do not share the dedicated seal job or each other');
+  assert.equal(destinations.includes(2),false);
+  assert.deepEqual(partition.flatMap(shard=>shard.files).sort(),[...selected].sort());
+  assert.deepEqual(partition.flatMap(shard=>shard.unknown_cost_files).sort(),future);
+  assert.equal(new Set(partition.flatMap(shard=>shard.files)).size,selected.length);
+  assert.equal(regressionCosts.sources['27c'].outcome,'failure','failed-source costs remain descriptive, never a passing qualification');
+  assert.ok(regressionCosts.unknown_cost_ms>0);
+});
+
+test('routine placement handles missing long files, small complete inventories and invalid input',()=>{
+  const values=['1/4','2/4','3/4','4/4'],unknown=['tests/a.test.mjs','tests/b.test.mjs','tests/c.test.mjs','tests/d.test.mjs'];
+  const partition=values.map(value=>selectShard(unknown,value));
+  validatePartition(unknown,partition,4);
+  assert.ok(partition.every(shard=>shard.files.length===1));
+  assert.deepEqual(partition.flatMap(shard=>shard.unknown_cost_files).sort(),unknown);
+  const withSeal=[...unknown.slice(0,3),'tests/peer-origin-frontier-seal.test.mjs'];
+  validatePartition(withSeal,values.map(value=>selectShard(withSeal,value)),4);
+  for(const selected of [unknown.slice(0,3),[...unknown,unknown[0]],[],['../outside.test.mjs',...unknown]])assert.throws(()=>selectShard(selected,'1/4'));
 });
 
 test('missing, duplicate, empty and wrong-identity shards cannot certify coverage',()=>{
