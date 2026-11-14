@@ -284,15 +284,17 @@ test('actual Store.selectedTransaction charges omitted warm proof references',op
 });
 test('actual cold selected/append routes explicitly Hold without retaining new representations',optionalDarwin,async t=>{
   const s=await requestedHeader(t,{upgrade:true}),storeURL=new URL('../plugins/soloco/runtime/store.mjs',import.meta.url).href;
-  const script=`import assert from 'node:assert/strict';import {Store} from ${JSON.stringify(storeURL)};
-const store=new Store(process.argv[1]);
+  const script=`import assert from 'node:assert/strict';
+const phase=name=>process.stderr.write('SOURCE cold SQL phase: '+name+'\\n');
+phase('before_store_import');const {Store}=await import(${JSON.stringify(storeURL)});phase('after_store_import');
+phase('before_store_open');const store=new Store(process.argv[1]);phase('after_store_open');
 const mark=()=>JSON.stringify({immutable:store.db.prepare('SELECT COUNT(*) AS n FROM immutable_values').get().n,event:store.db.prepare('SELECT COALESCE(MAX(seq),0) AS n FROM events').get().n,entries:store.db.prepare('SELECT family,key,sha256 FROM state_entries ORDER BY family,key').all(),catalogue:store.db.prepare('SELECT * FROM public_read_catalog').all()});
-try{const before=mark();let entered=false;
+try{const before=mark();let entered=false;phase('before_selected_hold');
 assert.throws(()=>store.selectedTransaction('fictional.cold-selected',{rootKeys:['revision','owner'],entities:{records:['cold-new']}},state=>{entered=true;state.records['cold-new']={id:'cold-new',content:'must remain unretained'};return state;}),error=>error.code==='ISSUE18_EVIDENCE_METADATA_COLD_REWRITE_CUSTODY_REQUIRED');
-assert.equal(entered,false);assert.equal(mark(),before);
+phase('after_selected_hold');assert.equal(entered,false);assert.equal(mark(),before);phase('before_append_hold');
 assert.throws(()=>store.appendUpgradeCall('fictional-late-upgrade',{role:'qa',text:'Fictional late fact remains explicitly unretained under this unsupported custody profile.'}),error=>error.code==='ISSUE18_EVIDENCE_METADATA_UPGRADE_APPEND_CUSTODY_REQUIRED');
-assert.equal(mark(),before);assert.equal(store.readSelected({rootKeys:['id'],entities:{records:[]}}).id,${JSON.stringify(s.store.read().id)});
-process.stdout.write(JSON.stringify({selected_held:true,append_held:true,callback_entered:entered,retention_changed:false}));}finally{store.close();}`;
+phase('after_append_hold');assert.equal(mark(),before);phase('before_final_selected_read');assert.equal(store.readSelected({rootKeys:['id'],entities:{records:[]}}).id,${JSON.stringify(s.store.read().id)});phase('after_final_selected_read');
+process.stdout.write(JSON.stringify({selected_held:true,append_held:true,callback_entered:entered,retention_changed:false}));}finally{phase('before_store_close');store.close();phase('after_store_close');}`;
   // Explicitly allow exactly this new Source SQL-only Node child. All other
   // forms still use the fixture census, and the original methods are restored
   // before its final all-effects assertion. This is not a capability probe.
@@ -303,11 +305,22 @@ process.stdout.write(JSON.stringify({selected_held:true,append_held:true,callbac
     effects.push({kind:'actual fixed Source cold SQL child'});assert.deepEqual(invocation[1],args);assert.deepEqual(invocation[2],{env,encoding:'utf8',timeout:30000,maxBuffer:65536,killSignal:'SIGKILL',stdio:['ignore','pipe','pipe']});return Reflect.apply(sourceNodeExec,childProcess,invocation);
   };
   syncBuiltinESMExports();
-  try{const result=JSON.parse(childProcess.execFileSync(process.execPath,args,{env,encoding:'utf8',timeout:30000,maxBuffer:65536,killSignal:'SIGKILL',stdio:['ignore','pipe','pipe']}));assert.deepEqual(result,{selected_held:true,append_held:true,callback_entered:false,retention_changed:false});assert.equal(effects.length,1);s.f.done();}
+  let stdout;
+  try{stdout=childProcess.execFileSync(process.execPath,args,{env,encoding:'utf8',timeout:30000,maxBuffer:65536,killSignal:'SIGKILL',stdio:['ignore','pipe','pipe']});const result=JSON.parse(stdout);assert.deepEqual(result,{selected_held:true,append_held:true,callback_entered:false,retention_changed:false});assert.equal(effects.length,1);s.f.done();}
+  catch(problem){
+    // Keep the same finite child deadline and the original thrown identity.
+    // At most4096 UTF16 units per stream become diagnostic DATA (worst-case
+    // JSON escaping <50KiB combined), including the first/last phase marks.
+    try{
+      const bounded=value=>{const text=typeof value==='string'?value:Buffer.isBuffer(value)?value.toString('utf8'):'';return {utf16_units:text.length,head:text.slice(0,2048),tail:text.length>2048?text.slice(Math.max(2048,text.length-2048)):'',truncated:text.length>4096};};
+      t.diagnostic(JSON.stringify({protocol:'issue18-cold-sql-fixture-diagnostic-v1',timeout_ms:30000,max_buffer_bytes:65536,pid:Number.isSafeInteger(problem?.pid)?problem.pid:null,status:Number.isSafeInteger(problem?.status)?problem.status:null,signal:typeof problem?.signal==='string'?problem.signal.slice(0,64):null,code:typeof problem?.code==='string'?problem.code.slice(0,64):null,stdout:bounded(problem?.stdout??stdout),stderr:bounded(problem?.stderr)}));
+    }catch{/* Diagnostics cannot replace the original cold-child failure. */}
+    throw problem;
+  }
   finally{childProcess.execFileSync=original;syncBuiltinESMExports();}
 });
 test('actual metadata-free late append retains facts and preserves the original provider error identity',t=>{
-  const root=fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()),'issue18-core-append-')),store=preexistingLegacyStore(root,'fictional.legacy-core',()=>({id:'fictional-core-append',owner:{session_id:'fictional',epoch:1},records:{core:{id:'core',content:'Independent Core'}},messages:[],upgrade:{id:'late',status:'completed',calls:[]}}));
+  const root=fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()),'issue18-core-append-')),store=preexistingLegacyStore(root,'fictional.legacy-core',()=>({id:'fictional-core-append',owner:{session_id:'fictional',epoch:1},records:{core:{id:'core',content:'Independent Core'}},jobs:{},messages:[],upgrade:{id:'late',status:'completed',calls:[]}}));
   try{store.transaction('fictional.metadata-free-legacy',state=>{state.records.core.content='Independent legacy Core write remains supported';return state;});assert.equal(store.read().records.core.content,'Independent legacy Core write remains supported');store.migrate();assert.equal(store.appendUpgradeCall('late',{role:'qa',text:'Fictional late Core fact'}),true);assert.equal(store.read().upgrade.calls.length,1);
     const original=store.db.prepare,problem=Object.freeze({source_only_original_provider_problem:true});store.db.prepare=function(sql,...rest){if(sql.startsWith('INSERT INTO events'))throw problem;return Reflect.apply(original,this,[sql,...rest]);};
     try{assert.throws(()=>store.appendUpgradeCall('late',{role:'qa',text:'This failed transaction must not claim retention'}),error=>error===problem);}finally{store.db.prepare=original;}

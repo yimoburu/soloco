@@ -15,7 +15,7 @@ import * as engine from '../plugins/soloco/runtime/engine.mjs';
 import {Store,SCHEMA,VERSION,installedTeam,teamHash,originalStoreExecutionCustodyFrom} from '../plugins/soloco/runtime/store.mjs';
 import {assignmentContext} from '../plugins/soloco/runtime/context.mjs';
 import {developmentAssignment} from '../plugins/soloco/runtime/develop.mjs';
-import {normalizeTimeout} from '../plugins/soloco/runtime/timeout.mjs';
+import {normalizeTimeout,TIMEOUT_POLICY_VERSION} from '../plugins/soloco/runtime/timeout.mjs';
 import {sandboxProfile} from '../plugins/soloco/runtime/local-sandbox.mjs';
 import {recordRuntimeWorkerAssignmentFrom,prepareRuntimeWorkerLaunchFrom,spawnRuntimeWorkerLaunch,
   assertRuntimeWorkerStartedFrom,prepareRuntimeModelRequestFrom} from '../plugins/soloco/runtime/runtime-execution.mjs';
@@ -190,11 +190,11 @@ export async function queuedArm(t,f,run,store,armId='1-files'){
   await engine.develop({...args,action:'authorize',plan_id:plan.id,scope_sha256:plan.development.scope_sha256,model_data_approved:true,source_instruction:'Authorize this exact disposable Source scope; no real comparison or Native permission is selected.'},'codex');
   const id='fictional-composed-'+randomUUID(),instance='fictional-instance-'+randomUUID(),selection={reason:'FICTIONAL Source mechanics only',mode:'explicit',model:'gpt-6.1-sol',effort:'medium',speed:'host_default'};
   const job={id,role:'engineer',instance_id:instance,session_key:instance,host:'codex',epoch:1,status:'queued',native_id:null,task:'Change each scoped exported value from zero to one and preserve the complete remaining bytes.',inputs:[],review_of:null,development_id:plan.id,model_selection:selection,
-    model_catalog:{source:'FICTIONAL controlled canonical catalog DATA; not provider/Native qualification.',models:[{id:'gpt-6.1-sol'}],speed_support:{source:'fictional',supported:[]}},created_at:new Date().toISOString(),...normalizeTimeout({timeout_ms:300000,timeout_reason:'Fixed controlled Source comparison call.'})};
+    model_catalog:{source:'FICTIONAL controlled canonical catalog DATA; not provider/Native qualification.',models:[{id:'gpt-6.1-sol'}],speed_support:{source:'fictional',supported:[]}},created_at:new Date().toISOString(),timeout_policy_version:TIMEOUT_POLICY_VERSION,...normalizeTimeout({timeout_ms:300000,timeout_reason:'Fixed controlled Source comparison call.'})};
   store.transaction('job.queued',state=>{developmentAssignment(state,job,true,store.root);const context=assignmentContext(state,job);Object.assign(job,{inputs:context.inputs,context_sha256:context.hash});recordRuntimeWorkerAssignmentFrom(store,state,job);state.jobs[id]=job;state.sessions[instance]={instance_id:instance,role:'engineer',host:'codex',native_id:null,model_selection:selection};return state;});
   const worker=f.boundary.worker(store.root,id,{controlledStop:true});f.children.push(worker);let launch;
   store.transaction('job.worker_launch_requested',state=>{launch=prepareRuntimeWorkerLaunchFrom(store,state,{job_id:id,kind:'worker'});return state;});spawnRuntimeWorkerLaunch(launch);worker.emit('spawn');
-  assert.equal(store.read().jobs[id].status,'queued','Only the real work() entry may claim this assignment');return {store,job:store.read().jobs[id],plan:store.read().records[plan.id],armId,files,testSource};
+  const queued=store.read().jobs[id];assert.equal(queued.status,'queued','Only the real work() entry may claim this assignment');assert.equal(queued.timeout_policy_version,TIMEOUT_POLICY_VERSION,'The worker must use the explicit recorded custom timeout policy');return {store,job:queued,plan:store.read().records[plan.id],armId,files,testSource};
 }
 export async function runningArm(t,f,run,store,armId='1-files'){
   const args={root:store.root,session_id:'fictional-founder',epoch:1},paths=armId.startsWith('3')?['module-0.mjs','module-1.mjs','module-2.mjs']:['module-0.mjs'];
