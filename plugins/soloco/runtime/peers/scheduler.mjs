@@ -1,9 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {createHash, randomUUID} from 'node:crypto';
-import {spawn} from 'node:child_process';
 import {Worker} from 'node:worker_threads';
 import {runModel} from '../adapters.mjs';
+import * as originalLaunchInventory from './prospective-local-worker-inventory-producer.mjs';
+import {claimOriginalPeerModelLaunchFrom} from './prospective-local-worker-inventory-producer.mjs';
 import {canonical,peerDigest} from './ledger.mjs';
 import {digest} from './model.mjs';
 import {createObservationJournal} from './observation-journal.mjs';
@@ -103,29 +104,28 @@ ${context.text}`;
 
 /** Internal constructor. Dependencies are injectable by trusted local tests,
  * never by a task/MCP argument. Every production call starts with nativeId=null. */
-export function createNativeExecutor({cwd=process.cwd(),evidence_dir=path.join(cwd,'.peer-evidence'),timeout_ms=180000,
-  max_result_bytes=MAX_RESULT_BYTES,probe=threadedReadiness,runner=runModel,spawn_process=spawn,now=Date.now}={}) {
+export function createNativeExecutor({ledger=null,cwd=ledger?.root??process.cwd(),evidence_dir=path.join(cwd,'.peer-evidence'),timeout_ms=180000,
+  max_result_bytes=MAX_RESULT_BYTES,probe=threadedReadiness,runner=runModel,now=Date.now}={}) {
   positive(max_result_bytes,'max_result_bytes',1024,MAX_RESULT_BYTES);
-  if(typeof runner!=='function'||typeof probe!=='function'||typeof spawn_process!=='function')throw new TypeError('Invalid native executor dependency');
+  if(typeof runner!=='function'||typeof probe!=='function')throw new TypeError('Invalid native executor dependency');
   return {
     probe:({host})=>probe(host),
-    async execute({task,context,signal,onProcess=()=>{},onClosure=()=>{}}) {
+    async execute({task,context,admission_ref,signal,onProcess=()=>{},onClosure=()=>{}}) {
       const host=hostFor(task);
       if(!['codex','claude'].includes(host))throw Object.assign(new Error('Unsupported native host'),{termination_confirmed:true});
       if(typeof context?.text!=='string'||!context.text)throw Object.assign(new Error('Missing exact native context'),{termination_confirmed:true});
-      let childCreated=false,closed=false,processInfo=null,nativeChild=null;
-      const captureSpawn=(...args)=>{
-        if(signal?.aborted)throw Object.assign(new Error('Stopped before native process creation'),{code:'NATIVE_NOT_STARTED',termination_confirmed:true});
-        const child=spawn_process(...args);nativeChild=child;childCreated=true;
-        processInfo={pid:Number.isSafeInteger(child.pid)?child.pid:null,observed_at:new Date(now()).toISOString(),termination_scope:'native_cli_process'};
-        child.once('close',()=>{closed=true;onClosure({...processInfo,closed_at:new Date(now()).toISOString(),close_observed:true,termination_confirmed:true});});
-        return child;
-      };
+      let childCreated=false,closed=false,processInfo=null,publishedProcess=false;
+      const publishProcess=()=>{if(processInfo&&!publishedProcess){publishedProcess=true;onProcess({...processInfo});}};
+      const processBorn=birth=>{childCreated=true;processInfo={pid:birth.pid,started_at:birth.spawned_at,observed_at:birth.spawned_at,termination_scope:'native_cli_process'};};
+      const processClosed=(_birth,receipt)=>{closed=true;publishProcess();onClosure({...processInfo,closed_at:receipt.closed_at,close_observed:true,termination_confirmed:true});};
       let result,evidence;
       try {
         if(signal?.aborted)throw Object.assign(new Error('Stopped before native preparation'),{code:'NATIVE_NOT_STARTED',termination_confirmed:true});
-        result=await runner(host,null,nativePrompt(task,context),cwd,value(task).timeout_ms??timeout_ms,value(task).selection??null,{
-          signal,spawn:captureSpawn,onSpawn:timing=>{processInfo={...processInfo,pid:nativeChild?.pid??processInfo?.pid,...timing};onProcess({...processInfo});},
+        const prompt=nativePrompt(task,context);
+        const originalExecutionLaunch=ledger?claimOriginalPeerModelLaunchFrom(ledger,{admission_ref,task,context,prompt,cwd,selection:value(task).selection??null}):null;
+        if(runner===runModel&&!originalExecutionLaunch)throw failure('ORIGINAL_EXECUTION_PEER_ADMISSION_REQUIRED','The default model launcher requires its original ledger and committed admission');
+        result=await runner(host,null,prompt,cwd,value(task).timeout_ms??timeout_ms,value(task).selection??null,{
+          signal,originalExecutionLaunch,onModelProcess:processBorn,onModelClosure:processClosed,onSpawn:timing=>{const {execution_started_at,...rest}=timing;processInfo={...processInfo,...rest};publishProcess();},
           timeoutReason:value(task).timeout_reason
         });
         if(typeof result?.native_id!=='string'||!result.native_id.trim()||result.native_id.length>200)throw new Error('Native runner returned no observed session identity');
@@ -136,6 +136,9 @@ export function createNativeExecutor({cwd=process.cwd(),evidence_dir=path.join(c
         return {native_id:result.native_id,output:result.text,model_evidence:result.model_evidence,
           result_evidence:evidence,observed_process:{...processInfo,close_observed:closed},termination_confirmed:true};
       } catch(error) {
+        const failedChild=originalLaunchInventory.originalWorkerFailedLaunchChild?.(error)??originalLaunchInventory.originalModelFailedLaunchChild(error);
+        if(failedChild)childCreated=true;
+        publishProcess();
         const raw=error?.rejected_output?.text;
         evidence=error.result_evidence??evidence;
         let retention_error;
@@ -145,7 +148,7 @@ export function createNativeExecutor({cwd=process.cwd(),evidence_dir=path.join(c
           original_error:error,original_result:result,original_rejected_output:error?.rejected_output,
           ...(retention_error?{retention_error}:{}),raw_output:raw??result?.text,
           model_evidence:error?.rejected_output?.model_evidence??result?.model_evidence,observed_process:processInfo?{...processInfo,close_observed:closed}:null,
-          termination_confirmed:error.termination_confirmed===true||closed||!childCreated};
+          termination_confirmed:failedChild?closed:error.termination_confirmed===true||closed||!childCreated};
       }
     }
   };
@@ -197,12 +200,13 @@ function reviewEvidence(task,context,result) {
 /** Trusted software composition. observer, model and executors are host-owned
  * constructor dependencies, never selectable by task fields or model tools. */
 export class PeerScheduler {
-  constructor({ledger,principal_id,observer,executor=createNativeExecutor(),model=null,now=Date.now,
+  constructor({ledger,principal_id,observer,executor=null,model=null,now=Date.now,
     poll_ms=500,reconcile_ms=5000,readiness_ms=30000,event_limit=100,
     journal_limits={},evidence_dir=ledger&&path.join(ledger.directory,'evidence','peer-runtime')}={}) {
     if(!ledger||typeof ledger.read!=='function'||typeof ledger.write!=='function')throw new TypeError('Peer ledger required');
     if(typeof principal_id!=='string'||!principal_id)throw new TypeError('Scheduler principal required');
     if(!observer||typeof observer.record!=='function')throw new TypeError('Protected host observer required');
+    executor??=createNativeExecutor({ledger});
     if(typeof executor?.execute!=='function'||typeof executor?.probe!=='function')throw new TypeError('Native executor required');
     this.ledger=ledger;this.actor={principal_id};this.executor=executor;this.model=model;this.now=now;
     this.journal=createObservationJournal({ledger,principal_id,observer,limits:{...DEFAULT_JOURNAL_LIMITS,...journal_limits}});
@@ -333,7 +337,7 @@ export class PeerScheduler {
           !event.payload.events.some(x=>x.type==='dispatch_admitted'&&x.payload.task_id===task.id&&x.payload.attempt_id===a.id&&x.payload.effect_id===a.effect_id))
           throw failure('ADMISSION_RECEIPT','Admission native reservation binding differs');
       } else if(c.result?.admitted!==false)throw failure('ADMISSION_RECEIPT','Invalid admission outcome');
-      return c.result;
+      return {result:c.result,admission_ref:{family:'commands',id:row.id,revision:row.revision,sha256:row.sha256}};
     });
   }
   async _admit(api,request,generation) {
@@ -347,7 +351,7 @@ export class PeerScheduler {
       committed=this._admissionReceipt(request);
     }
     if(!committed)throw thrown??failure('ADMISSION_RECEIPT','No committed admission receipt');
-    if(returned!==undefined&&canonical(returned)!==canonical(committed))throw failure('ADMISSION_RECEIPT','Returned admission differs from the original command');
+    if(returned!==undefined&&canonical(returned)!==canonical(committed.result))throw failure('ADMISSION_RECEIPT','Returned admission differs from the original command');
     return committed;
   }
   async _tick(generation) {
@@ -380,7 +384,7 @@ export class PeerScheduler {
       if(!ready?.available||ready.authenticated!==true){excluded.push(peek.task.id);continue;}
       const request=JSON.parse(canonical({operation_id:'scheduler-admit-'+this.instance_id+'-'+randomUUID(),
         task_id:peek.task.id,exclude_task_ids:[...excluded]}));
-      const admission=await this._admit(api,request,generation);
+      const selectedAdmission=await this._admit(api,request,generation),admission=selectedAdmission.result;
       if(!admission.admitted) {
         if(['CAPACITY','CAPACITY_BUSY','PAUSED'].includes(admission.code))break;
         excluded.push(peek.task.id);
@@ -411,7 +415,7 @@ export class PeerScheduler {
         continue;
       }
       if(!this._alive(generation))break;
-      this._launch(task,attempt,admission.context,admission.host??host);launched++;
+      this._launch(task,attempt,admission.context,admission.host??host,selectedAdmission.admission_ref);launched++;
     }
     return {admitted,launched,event_cursor:this.cursor};
   }
@@ -513,14 +517,14 @@ export class PeerScheduler {
       this.inflight.delete(entry.attempt.id);this.wake();
     }
   }
-  _launch(task,attempt,context,host) {
+  _launch(task,attempt,context,host,admission_ref) {
     const entry={task:{...task,value:{...value(task),host}},attempt,context,controller:new AbortController(),
       phase:'running',settled:false,chain:Promise.resolve(),operations:[],errors:[],pendingMetadata:[],identity:null,closePacket:null};
     this.inflight.set(attempt.id,entry);
     entry.promise=(async()=>{
       let result;
       try {
-        result=await this.executor.execute({task:entry.task,context,signal:entry.controller.signal,
+        result=await this.executor.execute({task:entry.task,context,admission_ref,signal:entry.controller.signal,
           onProcess:metadata=>{entry.pendingMetadata.push({kind:'process',payload:diagnostic(metadata)});void this._queue(entry,()=>{});},
           onClosure:metadata=>{entry.pendingMetadata.push({kind:'closure',payload:diagnostic(metadata)});void this._queue(entry,()=>{});}});
       }catch(error){this._error(error,entry);result={error,original_error:error,termination_confirmed:false,observed_process:entry.identity};}

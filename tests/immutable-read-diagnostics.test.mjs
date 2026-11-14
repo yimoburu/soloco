@@ -9,11 +9,10 @@ import {readImmutable} from '../plugins/soloco/runtime/record-storage.mjs';
 import cp from 'node:child_process';
 import net from 'node:net';
 import {syncBuiltinESMExports} from 'node:module';
-import {executionTiming} from '../plugins/soloco/runtime/timeout.mjs';
-import {assignmentContext} from '../plugins/soloco/runtime/context.mjs';
-import {work} from '../plugins/soloco/runtime/worker.mjs';
 import {Store,VERSION,teamHash} from '../plugins/soloco/runtime/store.mjs';
 import {retainSnapshot} from '../plugins/soloco/runtime/snapshot.mjs';
+import {proposeOperatingState,operatingReviewContext,OPERATING_PROTOCOL} from '../plugins/soloco/runtime/operating-state.mjs';
+import {recordReference} from '../plugins/soloco/runtime/current-state.mjs';
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
 import {call} from '../plugins/soloco/runtime/main.mjs';
 import {toolError} from '../plugins/soloco/runtime/tool-error.mjs';
@@ -100,6 +99,20 @@ const seed=()=>({schema:2,id:'immutable-diagnostic-fixture',revision:1,plugin_ve
   owner:{host:'codex',session_id:'diagnostic-fixture-owner',epoch:1},team_sha256:'fictional-team',
   governance:'Do not change authority or repair missing originals',cos_instructions:'Preserve failures and restrictions',roles:{qa:{name:'QA'}},
   records:{},jobs:{},messages:[],notices:[],sessions:{},upgrade_history:[]});
+// PREEXISTING unqualified legacy DATA, never fresh Original genesis. Reopen
+// after the raw seed so migration and all subsequent reads use the real Store.
+function preexistingDiagnosticStore(root){
+  const directory=path.join(root,'.company');fs.mkdirSync(directory,{mode:0o700});
+  const legacy=new DatabaseSync(path.join(directory,'company.sqlite')),at=new Date().toISOString(),state={...seed(),revision:0,updated_at:at};
+  try{
+    legacy.exec('CREATE TABLE company(id INTEGER PRIMARY KEY CHECK(id=1),value TEXT NOT NULL); CREATE TABLE events(seq INTEGER PRIMARY KEY,at TEXT NOT NULL,type TEXT NOT NULL,value TEXT NOT NULL);');
+    legacy.prepare('INSERT INTO company VALUES(1,?)').run(JSON.stringify(state));
+    legacy.prepare('INSERT INTO events VALUES(1,?,?,?)').run(at,'fixture.historical_unqualified',JSON.stringify({revision:0,owner:state.owner}));
+  }finally{legacy.close();}
+  const db=new Store(root);
+  try{db.migrate();assert.equal(db.read().original_execution_origin,undefined);return db;}
+  catch(error){db.close();throw error;}
+}
 function storedImage(db){
   return ['company','events','company_layout','state_entries','immutable_values'].map(table=>({
     table,rows:db.prepare('SELECT * FROM '+table+' ORDER BY rowid').all()
@@ -127,33 +140,50 @@ function forbidExternal(t){
   deny(net.Socket.prototype,'connect');deny(net.Server.prototype,'listen');deny(globalThis,'fetch');syncBuiltinESMExports();
   t.after(()=>{t.mock.restoreAll();syncBuiltinESMExports();assert.deepEqual(attempts,[]);});
 }
-// Real public plan/review/apply and worker closure; the independent judgment is
-// a fictional contract double, never native semantic acceptance or company data.
-async function publishDiagnosticCheckpoint(root,db){
-  const f={root,session_id:'diagnostic-fixture-owner',epoch:1};
-  db.transaction('fictional typed home',state=>{
+// Historical accepted-checkpoint DATA for diagnostic consumer reads only.
+// The legacy Pass/closed fields below are fixed fictional records, not a new
+// review, observed process closure, Native qualification or execution grant.
+// No dispatch/work/publication API or Original issuer/assignment is invoked.
+function historicalDiagnosticCheckpointData(root,db){
+  db.transaction('fixture.historical_typed_home',state=>{
     state.team_sha256=teamHash(state);
-    state.records.home={id:'home',kind:'artifact',revision:1,status:'Draft',author_role:'runner',author_instance:f.session_id,
+    state.records.home={id:'home',kind:'artifact',revision:1,status:'Draft',author_role:'runner',author_instance:'diagnostic-fixture-owner',
       content:'PRIVATE_FICTIONAL_ORIGINAL: no export or retry without authority.',
       operating_record:{version:1,kind:'obligation',scope:'*',owner:'runner',conditions:'Always',exceptions:'None',clearing:'Independent exact closure',expires_at:null,dependencies:[],authority_refs:[],evidence_refs:['home']}};
     return state;
   });
-  const context=args=>call('company_context',{...f,protocol:'operating-state-v1',source_instruction:'FICTIONAL read-only publication review; no external execution.',...args},'codex');
-  const p=await context({action:'plan'});assert.equal(p.held,false);assert.deepEqual(p.frontier,[]);
-  const q=engine.dispatch({...f,role:'qa',review_of:p.id,task:'FICTIONAL independent complete current-meaning and authority review.'},'codex',{check:()=>({available:true,authenticated:true}),launch:()=>({on(){},unref(){}})});
-  const state=db.read(),packet=assignmentContext(state,state.jobs[q.id]);
-  assert.equal(packet.operating_evidence,undefined,'This diagnostic fixture must remain small and completely inline');
-  const required=JSON.parse(packet.text).required_evidence;
-  assert.ok(required.sources.every(ref=>required.inline.some(item=>item.source.id===ref.id)),'Every required original must be in the actual worker prompt');
-  await work(root,q.id,async(_host,_session,prompt,_dir,timeout,_selection,options)=>{
-    assert.ok(prompt.includes(packet.text),'The complete inline context must reach the worker inside its ordinary prompt wrapper');
-    options.onSpawn(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));
-    return {native_id:'fictional-diagnostic-qa-'+q.id,text:JSON.stringify({content:'FICTIONAL contract judgment; all fixture conditions retained.',messages:[],notices:[],review:{verdict:'Pass',reason:'FICTIONAL complete inline evidence and authority check.',permitted_action:'publish_operating_state',plan_sha256:digest(JSON.stringify(db.read().records[p.id].operating_plan)),preservation_complete:true,interaction_complete:true,authority_checked:true,blockers:[]}})};
+  let p,reviewId,preservation;
+  // Canonical legacy bookkeeping names retain the actual normalized intake
+  // grammar; their payloads remain historical fixture DATA, never Original proof.
+  db.transaction('operating.plan',state=>{
+    p=proposeOperatingState(state,{source_instruction:'PREEXISTING FICTIONAL checkpoint DATA only; no fresh acceptance or external execution.'});
+    assert.equal(p.held,false);assert.deepEqual(p.frontier,[]);return state;
   });
-  const job=db.read().jobs[q.id];assert.equal(job.status,'completed',job.error);assert.equal(job.coordination_release.termination_confirmed,true);
-  assert.equal((await context({action:'apply',plan_id:p.id,review_id:job.artifact_id})).published,true);
-  const accepted=db.read();assert.equal(accepted.operating_state.plan.id,p.id);assert.equal(accepted.operating_state.review.id,job.artifact_id);
-  return accepted.operating_state.accepted_snapshot.preservation;
+  db.transaction('job.completed',state=>{
+    const target=state.records[p.id],at=new Date().toISOString(),job={id:'historical-diagnostic-qa-'+p.id,role:'qa',instance_id:'historical-diagnostic-instance-'+p.id,
+      native_id:'FICTIONAL_UNQUALIFIED_HISTORICAL_QA_'+p.id,host:'codex',epoch:state.owner.epoch,status:'running',task:'FICTIONAL historical complete current-meaning and authority judgment DATA.',
+      review_of:{id:p.id,revision:1},inputs:[],context_format:3};
+    const packet=operatingReviewContext(state,job);
+    assert.equal(packet.operating_evidence,undefined,'This diagnostic fixture must remain small and completely inline');
+    const required=JSON.parse(packet.text).required_evidence;
+    assert.ok(required.sources.every(ref=>required.inline.some(item=>item.source.id===ref.id)),'Every required original must be present in the historical inline context DATA');
+    job.inputs=packet.inputs;job.context_sha256=packet.hash;
+    const review={id:'historical-diagnostic-review-'+p.id,kind:'review',revision:1,status:'Submitted',author_role:'qa',author_instance:job.instance_id,job_id:job.id,review_of:job.review_of,created_at:at,
+      content:'PREEXISTING FICTIONAL legacy judgment DATA; no new review or semantic acceptance.',
+      review:{verdict:'Pass',reason:'FICTIONAL historical complete inline evidence and authority judgment DATA.',permitted_action:'publish_operating_state',plan_sha256:digest(JSON.stringify(target.operating_plan)),preservation_complete:true,interaction_complete:true,authority_checked:true,blockers:[]}};
+    Object.assign(job,{status:'completed',artifact_id:review.id,finished_at:at,coordination_release:{termination_confirmed:true,reason:'model_process_closed',at}});
+    state.jobs[job.id]=job;state.records[review.id]=review;reviewId=review.id;
+    assert.equal(state.original_execution_origin,undefined);assert.equal(job.original_execution_assignment,undefined);return state;
+  });
+  db.transaction('operating.apply',state=>{
+    const target=state.records[p.id],review=state.records[reviewId],job=state.jobs[review.job_id],at=new Date().toISOString();
+    const receipts=[recordReference(target),recordReference(review),recordReference(job,'job:'+job.id)];
+    state.operating_state={protocol:OPERATING_PROTOCOL,version:1,plan:receipts[0],review:receipts[1],receipts,accepted_snapshot:structuredClone(target.operating_plan.snapshot),valid_until:target.operating_plan.valid_until,at};
+    assert.equal(state.operating_state.plan.id,p.id);assert.equal(state.operating_state.review.id,review.id);
+    assert.equal(state.original_execution_origin,undefined);assert.equal(job.original_execution_assignment,undefined);
+    preservation=state.operating_state.accepted_snapshot.preservation;return state;
+  });
+  return preservation;
 }
 
 test('legacy public handover retains the bounded locator and leaves missing/corrupt originals unchanged',async()=>{
@@ -164,9 +194,8 @@ test('legacy public handover retains the bounded locator and leaves missing/corr
     for(const reason of ['missing','hash_mismatch']){
       const root=fs.mkdtempSync(path.join(temporary,'fictional-company-'));
       engine.bind(root,'diagnostic-fixture-owner','codex');
-      const db=new Store(root,true);
+      const db=preexistingDiagnosticStore(root);
       try{
-        db.transaction('fictional seed',()=>seed());db.migrate();
         let ref;
         db.transaction('retain fictional original',state=>{
           ref=retainSnapshot(state,{restriction:'PRIVATE_FICTIONAL_ORIGINAL: keep original failure'});
@@ -188,9 +217,9 @@ test('explicit v4 inspection without an accepted checkpoint holds without legacy
   const temporary=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'immutable-v4-prerequisite-'))),previous=process.env.COMPANY_PLUGIN_DATA;
   process.env.COMPANY_PLUGIN_DATA=path.join(temporary,'plugin-data');
   const root=fs.mkdtempSync(path.join(temporary,'fictional-company-'));engine.bind(root,'diagnostic-fixture-owner','codex');
-  const db=new Store(root,true);
+  const db=preexistingDiagnosticStore(root);
   try{
-    db.transaction('fictional seed',()=>seed());db.migrate();const before=storedImage(db.db);
+    const before=storedImage(db.db);
     await assert.rejects(call('company_handover',{root,session_id:'diagnostic-fixture-owner',action:'inspect',protocol:'operating-handover-v4'},'codex'),error=>{
       assert.equal(error.message,'Operating state Held: no accepted prospective checkpoint');return true;
     });
@@ -205,10 +234,9 @@ test('accepted v4 handover retains exact bounded missing/corrupt preservation di
   try{
     for(const reason of ['missing','hash_mismatch']){
       const root=fs.mkdtempSync(path.join(temporary,'fictional-company-'));engine.bind(root,'diagnostic-fixture-owner','codex');
-      const db=new Store(root,true);
+      const db=preexistingDiagnosticStore(root);
       try{
-        db.transaction('fictional seed',()=>seed());db.migrate();
-        const ref=await publishDiagnosticCheckpoint(root,db),sha=ref.immutable_snapshot.sha256;
+        const ref=historicalDiagnosticCheckpointData(root,db),sha=ref.immutable_snapshot.sha256;
         // Prime both healthy inspection forms before damaging a required original.
         // Neither an old projection cache nor a legacy fallback may mask corruption.
         for(const protocol of [undefined,'operating-handover-v4']){

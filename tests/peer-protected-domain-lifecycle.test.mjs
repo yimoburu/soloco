@@ -77,9 +77,11 @@ export function inspectOriginalCompiledCodexPlan(actualOwner,handle){check(actua
 export function claimOriginalCompiledCodexPlan(actualOwner,handle){check(actualOwner,handle);if(claimed)throw Error('synthetic plan replay');claimed=true;return {...plan,consumed:true};}
 export function originalCompiledPeerContextInterpreter(actualOwner,handle){check(actualOwner,handle);return null;}
 export function originalCompanionSlotMatches(value){return value===slot;}
+export function isOriginalBootstrapMembershipInterpreter(){return false;}
+export function originalBootstrapCompanionSlotMatches(){return false;}
 export function spawn(...args){if(!child)throw Error('synthetic child absent');spawnCalls.push(args);return child;}
 const unavailable=()=>{throw Error('unused synthetic interpreter predecessor');};
-export {unavailable as resolveOriginalPeerContextInterpreter,unavailable as assertOriginalPeerContextInterpreterFinal,unavailable as assertOriginalPeerContextSlot,unavailable as inspectOriginalPeerContextInterpreter};
+export {unavailable as resolveOriginalPeerContextInterpreter,unavailable as assertOriginalPeerContextInterpreterFinal,unavailable as assertOriginalPeerContextSlot,unavailable as inspectOriginalPeerContextInterpreter,unavailable as assertOriginalBootstrapMembershipInterpreterFinal,unavailable as inspectOriginalBootstrapMembershipInterpreter,unavailable as assertOriginalBootstrapMembershipSlot,unavailable as inspectOriginalCompiledBootstrapScope};
 `);
   const shimURL=pathToFileURL(shimFile).href;
   let predecessorImports=0,spawnImports=0;
@@ -93,7 +95,7 @@ export {unavailable as resolveOriginalPeerContextInterpreter,unavailable as asse
     }
     return specifier.startsWith('./')?prefix+JSON.stringify(new URL(specifier,pathToFileURL(MODULE)).href)+';':line;
   }).join('\n');
-  assert.equal(predecessorImports,3,'exactly the original slot and plan predecessor imports are synthetic');
+  assert.equal(predecessorImports,5,'exactly the original slot and plan predecessor imports, including unused denying bootstrap joins, are synthetic');
   assert.equal(spawnImports,1,'only the original child_process spawn import is replaced');
   const body=text=>text.split('\n').filter(line=>!line.startsWith('import ')).join('\n');
   assert.equal(body(relocated),body(original),'all production lifecycle code and timing constants stay exact');

@@ -1,11 +1,12 @@
+import {legacyRuntimeJobTransition,legacyRuntimeJobPhase,inheritRuntimeBookkeepingFrom} from './runtime-execution.mjs';
 import {recordReadDeliveryPhase,recordReadDeliveryAdvance} from './record-read-delivery.mjs';
-import {modelProcessTransition,modelProcessPhase} from './model-process-closure.mjs';
+import {modelProcessTransition,modelProcessProducerTransition,modelProcessPhase} from './model-process-closure.mjs';
 // Prospective only. Canonical classifications remain the preservation authority.
 import {producerClosure,scopedPlanView,CORPUS_PARTITIONER} from './scoped-context.mjs';
 import {retainSnapshot,captureSnapshotDependencies,validateSnapshotDependencies,operatingIntake,inheritSnapshots,hasSnapshotReferences,snapshotReference,snapshotEntryReference,resolveSnapshot,resolveSnapshotEntry,legacyHandoverSource} from './snapshot.mjs';
 import {buildEvidence,readEvidence,validateSemanticDelivery} from './upgrade-evidence.mjs';
 import {digest,id,stamp} from './store.mjs';
-import {reviewedContext,recordReference,contextSource,currentExtensions,proofJobSafe,rejectedJobIdentities,canonicalEvidenceNodes} from './current-state.mjs';
+import {reviewedContext,recordReference,contextSource,currentExtensions,proofJobSafe,runtimeReceiptClosed,rejectedJobIdentities,canonicalEvidenceNodes} from './current-state.mjs';
 import {mechanicalOperatingControl} from './operating-control.mjs';
 import {specialistContext,validateSpecialistBindingShape} from './specialists.mjs';
 const sha=v=>digest(JSON.stringify(v));
@@ -61,10 +62,10 @@ function currentUpgrade(s){
 function controls(s,frozen){const {operating_state,...rest}=s;return {company_id:s.id,idea:s.idea,team_sha256:s.team_sha256,governance:s.governance,cos_instructions:s.cos_instructions,roles:s.roles,mode:s.mode,phase:s.phase,upgrade:frozen?(same(frozen.upgrade_source,s.upgrade?recordReference(s.upgrade,'upgrade:'+s.upgrade.id):null)?frozen.controls.upgrade:s.upgrade??null):currentUpgrade(s),extensions:currentExtensions(rest)};}
 function exact(s,r){const v=contextSource(s,r.id);if(!v||!same(recordReference(v,r.id),r))fail('source/receipt changed: '+r.id);return v;}
 const closed=(v,keys)=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).every(k=>keys.includes(k));
-function reviewJobSafe(j,handover=false){
+function reviewJobSafe(s,j,handover=false){
   const {handover_reads,operating_delivery,...base}=j;
   if(operating_delivery!==undefined){try{if(handover)return false;validateFrozenOperatingDelivery(j,operating_delivery);}catch{return false;}}
-  if(!proofJobSafe(base))return false;
+  if(!proofJobSafe(base,s))return false;
   if(handover_reads!==undefined&&(!handover||!Array.isArray(handover_reads)||!handover_reads.every(r=>closed(r,['session_id','source_id','sha256','offset','end','total','range_sha256','subject_sha256'])&&Object.values(r).every(v=>typeof v==='string'||Number.isSafeInteger(v)))))return false;
   return j.role==='qa'&&['queued','running','completed'].includes(j.status);
 }
@@ -83,7 +84,7 @@ function bookkeeping(s,planId){
   const add=p=>{
     const t=s.records?.[p];if(!t)return;ids.add(p);
     const handover=t.handover?.evidence_protocol===4;
-    const candidates=Object.values(s.jobs??{}).filter(j=>j.epoch===s.owner.epoch&&same(j.review_of,{id:t.id,revision:t.revision})&&reviewJobSafe(j,handover));
+    const candidates=Object.values(s.jobs??{}).filter(j=>j.epoch===s.owner.epoch&&same(j.review_of,{id:t.id,revision:t.revision})&&reviewJobSafe(s,j,handover));
     // Only a single current execution may be mechanically self-referential.
     const active=candidates.filter(j=>['queued','running'].includes(j.status));
     if(active.length===1&&((p===planId&&p!==s.operating_state?.plan.id)||(handover&&s.handover?.status==='pending')))jobs.add(active[0].id);
@@ -99,7 +100,7 @@ function bookkeeping(s,planId){
     const a=h.acceptance;
     if(!closed(a,['reconstruction_id','review_id','subject_sha256','incoming_owner','at','receipts'])||a.reconstruction_id!==t.id||a.subject_sha256!==t.handover.subject_sha256||!same(a.incoming_owner,t.handover.incoming_owner)||!Number.isFinite(Date.parse(a.at))||!Array.isArray(a.receipts)||a.receipts.length!==3)fail('historical handover acceptance changed');
     const [target,review,job]=a.receipts.map(ref=>exact(s,ref));
-    if(target.id!==t.id||review.id!==a.review_id||job.epoch!==a.incoming_owner.epoch||!same(a.receipts,[recordReference(t),recordReference(review),recordReference(job,'job:'+job.id)])||!reviewJobSafe(job,true)||!reviewRecordSafe(review,job,t,true))fail('historical handover receipt changed');
+    if(target.id!==t.id||review.id!==a.review_id||job.epoch!==a.incoming_owner.epoch||!same(a.receipts,[recordReference(t),recordReference(review),recordReference(job,'job:'+job.id)])||!reviewJobSafe(s,job,true)||!reviewRecordSafe(review,job,t,true))fail('historical handover receipt changed');
     ids.add(t.id);ids.add(review.id);jobs.add(job.id);
   }
   const a=s.operating_state;
@@ -298,7 +299,7 @@ function negatives(s){
   return {reviews:collect(s.records,false),rejected:collect(s.jobs,true)};
 }
 function boundary(s,frozen){return {owner:s.owner,paused:s.paused,controls:controls(s,frozen),communication:{notices:s.notices??[],messages:s.messages??[]},classifications:s.context_classifications??{},negative_findings:negatives(s)};}
-function frozenState(s,entries){const v=inheritSnapshots(s,{...s,records:Object.create(null),jobs:Object.create(null),upgrade:null,upgrade_history:[]});for(const {source,value} of envelopes(s,entries)){if(source.id.startsWith('job:'))v.jobs[source.id.slice(4)]=value;else if(source.id.startsWith('upgrade:'))v.upgrade_history.push(value);else v.records[source.id]=value;}return v;}
+function frozenState(s,entries){const v=inheritSnapshots(s,{...s,records:Object.create(null),jobs:Object.create(null),upgrade:null,upgrade_history:[]});for(const {source,value} of envelopes(s,entries)){if(source.id.startsWith('job:'))v.jobs[source.id.slice(4)]=value;else if(source.id.startsWith('upgrade:'))v.upgrade_history.push(value);else v.records[source.id]=value;}inheritRuntimeBookkeepingFrom(s,v);return v;}
 function capture(s,plan_id){
   let f,evidence,preservation;
   if(!s.operating_state){
@@ -328,7 +329,7 @@ export function proposeOperatingState(s,args){
 }
 // Runtime-owned bounded preparation assignment. The immutable admission binds
 // every static field and exact input body; lifecycle metadata grants no authority.
-const assignmentMutable=['delivered_record_reads','model_process_tracking','native_id','status','worker_pid','started_at','finished_at','execution_started_at','execution_deadline_at','termination_deadline_at','model_evidence','retrieved_inputs','proposal_reads','artifact_id','coordination_release'];
+const assignmentMutable=['legacy_runtime','delivered_record_reads','model_process_tracking','native_id','status','worker_pid','started_at','finished_at','execution_started_at','execution_deadline_at','termination_deadline_at','model_evidence','retrieved_inputs','proposal_reads','artifact_id','coordination_release'];
 const assignmentStatic=j=>Object.fromEntries(Object.entries(j).filter(([k])=>!assignmentMutable.includes(k)&&k!=='operating_admission'));
 export function admitOperatingAssignment(s,j){
   operatingContext(s);
@@ -340,7 +341,7 @@ function assignmentSafe(s,j){
     if(j.specialist!==undefined)specialistContext(s,j);
     const {operating_admission,output_contract,proposal_reads,...base}=j,a=resolveSnapshot(s,operating_admission);
     const producer=output_contract===undefined?'runtime-bounded-read-only-v1':output_contract==='operating-proposal-v1'?'runtime-bounded-proposal-v1':null;
-    if(!closed(a,['producer','checkpoint','owner','assignment','inputs','authority',...(output_contract==='operating-proposal-v1'?['input_bodies']:[])])||(!producer||a.producer!==producer)||a.authority!=='preparation only; native tools disabled; no spending or exposure authority'||!same(a.checkpoint,s.operating_state?.plan)||!same(a.owner,s.owner)||!same(a.assignment,assignmentStatic(j))||!proofJobSafe(base)||j.context_format!==6||j.review_of!==null||!['queued','running','completed'].includes(j.status)||s.mode!=='preparation')return false;
+    if(!closed(a,['producer','checkpoint','owner','assignment','inputs','authority',...(output_contract==='operating-proposal-v1'?['input_bodies']:[])])||(!producer||a.producer!==producer)||a.authority!=='preparation only; native tools disabled; no spending or exposure authority'||!same(a.checkpoint,s.operating_state?.plan)||!same(a.owner,s.owner)||!same(a.assignment,assignmentStatic(j))||!proofJobSafe(base,s)||j.context_format!==6||j.review_of!==null||!['queued','running','completed'].includes(j.status)||s.mode!=='preparation')return false;
     if(!same(a.inputs,j.inputs.map(r=>recordReference(s.records[r.id]))))return false;
     if(output_contract==='operating-proposal-v1'&&!same(a.input_bodies,j.inputs.map(r=>s.records[r.id])))return false;
     if(proposal_reads!==undefined&&(output_contract!=='operating-proposal-v1'||!Array.isArray(proposal_reads)||proposal_reads.some(r=>!closed(r,['id','sha256','body'])||sha(resolveSnapshot(s,r.body))!==r.sha256||!j.retrieved_inputs?.some(ref=>ref.id===r.id&&ref.sha256===r.sha256))))return false;
@@ -407,8 +408,15 @@ function inputUnchanged(s,snapshot,planId){
   const ordinary=new Set(Object.values(s.jobs??{}).filter(j=>assignmentSafe(s,j)&&intake.events.some(event=>event.type==='job.queued'&&event.changes.some(c=>!c.before&&c.after?.family==='jobs'&&c.after.key===j.id&&same(JSON.parse(c.after.raw).operating_admission,j.operating_admission)&&assignmentSafe(s,JSON.parse(c.after.raw))))).map(j=>j.id));
   for(const event of intake.events)for(const change of event.changes){
     const ref=change.after??change.before;
-    if(ref?.family==='jobs'&&b.jobs.has(ref.key)&&event.payload?.storage_delta&&!['job.queued','job.started','job.execution_started','job.model_process.requested','job.model_process.born','job.model_process.closed','job.record_reads_delivered','job.evidence_read','job.evidence_delivered','job.operating_evidence_delivered','job.completed'].includes(event.type))fail('DIRTY unsupported proof metadata producer');
-    if(ref?.family==='jobs'&&event.type.startsWith('job.model_process.')){const before=change.before?JSON.parse(change.before.raw):null,after=change.after?JSON.parse(change.after.raw):null;if(!modelProcessTransition(before,after,event.type)||!same(Object.fromEntries(Object.entries(before??{}).filter(([k])=>k!=='model_process_tracking')),Object.fromEntries(Object.entries(after??{}).filter(([k])=>k!=='model_process_tracking'))))fail('DIRTY original model process producer changed');}
+    if(ref?.family==='jobs'&&b.jobs.has(ref.key)&&event.payload?.storage_delta&&!['job.queued','job.worker_launch_requested','job.legacy_runtime.born','job.legacy_runtime.closed','job.started','job.execution_started','job.model_process.requested','job.model_process.born','job.model_process.closed','job.record_reads_delivered','job.evidence_read','job.evidence_delivered','job.operating_evidence_delivered','job.completed'].includes(event.type))fail('DIRTY unsupported proof metadata producer');
+    if(ref?.family==='jobs'){
+      const prior=change.before?JSON.parse(change.before.raw):null,next=change.after?JSON.parse(change.after.raw):null;
+      if((Object.hasOwn(prior??{},'legacy_runtime')||Object.hasOwn(next??{},'legacy_runtime'))&&!legacyRuntimeJobTransition(prior,next,event.type))fail('DIRTY unqualified runtime process producer changed');
+      if(['job.worker_launch_requested','job.legacy_runtime.born','job.legacy_runtime.closed'].includes(event.type)){
+        if(!prior||!next||!Object.hasOwn(next,'legacy_runtime')||!same(Object.fromEntries(Object.entries(prior).filter(([k])=>k!=='legacy_runtime')),Object.fromEntries(Object.entries(next).filter(([k])=>k!=='legacy_runtime'))))fail('DIRTY unqualified runtime process event changed business metadata');
+      }
+    }
+    if(ref?.family==='jobs'&&event.type.startsWith('job.model_process.')){const before=change.before?JSON.parse(change.before.raw):null,after=change.after?JSON.parse(change.after.raw):null;if(!modelProcessProducerTransition(before,after,event.type))fail('DIRTY original model process producer changed');}
     if(ref?.family==='jobs'&&event.type==='job.record_reads_delivered'){
       const before=change.before?JSON.parse(change.before.raw):null,after=change.after?JSON.parse(change.after.raw):null;
       if(!before||!after||!recordReadDeliveryAdvance(before.delivered_record_reads,after.delivered_record_reads)||!same(Object.fromEntries(Object.entries(before).filter(([k])=>k!=='delivered_record_reads')),Object.fromEntries(Object.entries(after).filter(([k])=>k!=='delivered_record_reads'))))fail('DIRTY record READ delivery producer changed');
@@ -417,6 +425,9 @@ function inputUnchanged(s,snapshot,planId){
     const before=change.before?JSON.parse(change.before.raw):null,after=change.after?JSON.parse(change.after.raw):null;
     const fields={
       'job.queued':null,
+      'job.worker_launch_requested':['legacy_runtime'],
+      'job.legacy_runtime.born':['legacy_runtime'],
+      'job.legacy_runtime.closed':['legacy_runtime'],
       'job.started':['status','started_at','worker_pid'],
       'job.model_process.requested':['model_process_tracking'],
       'job.model_process.born':['model_process_tracking'],
@@ -432,7 +443,8 @@ function inputUnchanged(s,snapshot,planId){
     }else{
       const keys=fields[event.type];
       if(!before||!same(Object.fromEntries(Object.entries(before).filter(([k])=>!keys.includes(k))),Object.fromEntries(Object.entries(after).filter(([k])=>!keys.includes(k)))))fail('DIRTY assignment phase changed bound metadata');
-      if(event.type==='job.started'?(before.status!=='queued'||after.status!=='running'):event.type==='job.completed'?(before.status!=='running'||after.status!=='completed'):before.status!=='running'||after.status!=='running')fail('DIRTY assignment phase changed');
+      const mechanical=['job.worker_launch_requested','job.legacy_runtime.born','job.legacy_runtime.closed'].includes(event.type);
+      if(mechanical?before.status!==after.status:event.type==='job.started'?(before.status!=='queued'||after.status!=='running'):event.type==='job.completed'?(before.status!=='running'||after.status!=='completed'):before.status!=='running'||after.status!=='running')fail('DIRTY assignment phase changed');
     }
   }
   const proposals=new Set();
@@ -449,6 +461,7 @@ function inputUnchanged(s,snapshot,planId){
       if(key==='native_id'&&value[key]===null)continue;
       if(key==='delivered_record_reads'){if(!recordReadDeliveryPhase(value[key],current[key]))return false;continue;}
       if(key==='model_process_tracking'){if(!modelProcessPhase(value[key],current[key]))return false;continue;}
+      if(key==='legacy_runtime'){if(!legacyRuntimeJobPhase(value,current))return false;continue;}
       if(['retrieved_inputs','handover_reads','proposal_reads'].includes(key)){
         if(!Array.isArray(value[key])||!Array.isArray(current[key])||!value[key].every((v,i)=>same(v,current[key][i])))return false;
       }else if(!same(value[key],current[key]))return false;
@@ -457,7 +470,7 @@ function inputUnchanged(s,snapshot,planId){
   };
   const allowed=(family,key,value)=>{
     if(family==='records')return (b.ids.has(key)||commands.has(key)||proposals.has(key))&&same(value,s.records[key]);
-    if(family==='jobs')return (b.jobs.has(key)&&reviewJobSafe(value,Boolean(s.records[value.review_of?.id]?.handover))||ordinary.has(key)&&assignmentSafe(s,value))&&same(stable(value),stable(s.jobs[key]))&&phaseSafe(value,s.jobs[key]);
+    if(family==='jobs')return (b.jobs.has(key)&&reviewJobSafe(s,value,Boolean(s.records[value.review_of?.id]?.handover))||ordinary.has(key)&&assignmentSafe(s,value))&&same(stable(value),stable(s.jobs[key]))&&phaseSafe(value,s.jobs[key]);
     if(family==='sessions')return Object.values(s.jobs??{}).some(j=>(b.jobs.has(j.id)||ordinary.has(j.id))&&j.session_key===key&&closed(value,['instance_id','role','native_id','host','model_selection','specialist'])&&(value.specialist===undefined?j.specialist===undefined:validateSpecialistBindingShape(value.specialist)&&same(value.specialist,j.specialist))&&value.instance_id===j.instance_id&&value.role===j.role&&value.host===j.host&&same(value.model_selection,j.model_selection)&&[null,j.native_id].includes(value.native_id));
     if(family==='root'&&roots.has(key))return roots.get(key).some(v=>same(v,value));
     if(family==='root'&&key==='operating_state')return sha(value)===snapshot.base||same(value,s.operating_state);
@@ -608,7 +621,7 @@ export function publishOperatingState(s,{plan_id,review_id}){
   const target=s.records[plan_id],p=livePlan(s,target),r=s.records[review_id],j=s.jobs[r?.job_id],v=r?.review;
   for(const h of envelopes(s,p.snapshot.home_envelopes))validTime(h.value.operating_record.expires_at);
   if(p.snapshot.frontier.length)fail('legacy frontier coverage incomplete: '+p.snapshot.frontier.length+' DIRTY entries');
-  if(!r||r.status!=='Submitted'||r.author_role!=='qa'||r.review_of?.id!==target.id||r.review_of.revision!==target.revision||j?.status!=='completed'||j.role!=='qa'||j.epoch!==s.owner.epoch||j.artifact_id!==r.id||j.review_of?.id!==target.id||j.review_of.revision!==target.revision||!j.native_id||r.author_instance!==j.instance_id||[target.author_instance,s.owner.session_id].includes(j.native_id)||r.author_instance===target.author_instance||j.coordination_release?.termination_confirmed!==true||j.context_sha256!==operatingReviewContext(s,j).hash||v?.verdict!=='Pass'||v.permitted_action!=='publish_operating_state'||v.plan_sha256!==sha(p)||v.preservation_complete!==true||v.interaction_complete!==true||v.authority_checked!==true||!Array.isArray(v.blockers)||v.blockers.length)fail('exact independent current-source publication Pass and execution closure required');
+  if(!r||!runtimeReceiptClosed(s,j)||r.status!=='Submitted'||r.author_role!=='qa'||r.review_of?.id!==target.id||r.review_of.revision!==target.revision||j?.status!=='completed'||j.role!=='qa'||j.epoch!==s.owner.epoch||j.artifact_id!==r.id||j.review_of?.id!==target.id||j.review_of.revision!==target.revision||!j.native_id||r.author_instance!==j.instance_id||[target.author_instance,s.owner.session_id].includes(j.native_id)||r.author_instance===target.author_instance||j.coordination_release?.termination_confirmed!==true||j.context_sha256!==operatingReviewContext(s,j).hash||v?.verdict!=='Pass'||v.permitted_action!=='publish_operating_state'||v.plan_sha256!==sha(p)||v.preservation_complete!==true||v.interaction_complete!==true||v.authority_checked!==true||!Array.isArray(v.blockers)||v.blockers.length)fail('exact independent current-source publication Pass and execution closure required');
   validateOperatingDelivery(s,j);
   const frozenSources=frozenState(s,p.snapshot.census);
   for(const {value:source} of envelopes(s,p.snapshot.census)){if(ownsOriginal(frozenSources,source,j))fail('reviewer owns current home');}
@@ -620,7 +633,7 @@ export function publishOperatingState(s,{plan_id,review_id}){
 }
 function validateAcceptedReceipt(s,a){
   const t=exact(s,a.plan),r=exact(s,a.review),j=s.jobs[r.job_id],v=r.review;
-  if(!j||!same(a.receipts,[recordReference(t),recordReference(r),recordReference(j,'job:'+j.id)])||r.status!=='Submitted'||r.author_role!=='qa'||j.role!=='qa'||j.status!=='completed'||j.artifact_id!==r.id||j.coordination_release?.termination_confirmed!==true||!j.native_id||j.native_id===t.author_instance||j.instance_id===t.author_instance||r.author_instance!==j.instance_id||v?.verdict!=='Pass'||v.permitted_action!=='publish_operating_state'||v.plan_sha256!==sha(t.operating_plan)||v.preservation_complete!==true||v.interaction_complete!==true||v.authority_checked!==true||!Array.isArray(v.blockers)||v.blockers.length)fail('accepted receipt invalid');
+  if(!j||!runtimeReceiptClosed(s,j)||!same(a.receipts,[recordReference(t),recordReference(r),recordReference(j,'job:'+j.id)])||r.status!=='Submitted'||r.author_role!=='qa'||j.role!=='qa'||j.status!=='completed'||j.artifact_id!==r.id||j.coordination_release?.termination_confirmed!==true||!j.native_id||j.native_id===t.author_instance||j.instance_id===t.author_instance||r.author_instance!==j.instance_id||v?.verdict!=='Pass'||v.permitted_action!=='publish_operating_state'||v.plan_sha256!==sha(t.operating_plan)||v.preservation_complete!==true||v.interaction_complete!==true||v.authority_checked!==true||!Array.isArray(v.blockers)||v.blockers.length)fail('accepted receipt invalid');
   // This validates the immutable historical acceptance fact. New negative
   // evidence holds ordinary use through inputUnchanged, while remaining fully
   // available to independent repair QA; it must not deadlock that repair.
@@ -631,7 +644,7 @@ export function validateOperatingIndex(s){
   const a=s.operating_state;
   if(!closed(a,['protocol','version','plan','review','receipts','accepted_snapshot','valid_until','at'])||a.protocol!==OPERATING_PROTOCOL||a.version!==1||!text(a.at)||!Array.isArray(a.receipts))fail('invalid mechanical publication index');
   const t=exact(s,a.plan),r=exact(s,a.review),j=s.jobs[r.job_id];
-  if(!same(a.accepted_snapshot,t.operating_plan?.snapshot)||a.valid_until!==t.operating_plan?.valid_until||!j||!reviewJobSafe(j)||!reviewRecordSafe(r,j,t,false))fail('mechanical publication index changed');
+  if(!same(a.accepted_snapshot,t.operating_plan?.snapshot)||a.valid_until!==t.operating_plan?.valid_until||!j||!reviewJobSafe(s,j)||!reviewRecordSafe(r,j,t,false))fail('mechanical publication index changed');
   validateAcceptedReceipt(s,a);
   archiveCheck(s,a.accepted_snapshot);
   return true;

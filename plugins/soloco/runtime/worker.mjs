@@ -15,8 +15,8 @@ import {requestModelProcess,recordModelProcessBirth,recordModelProcessClosure,re
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { withStore, stamp, id, digest, notice, noLink, upgradePending, compatibleRuntime } from './store.mjs';
-import { runModel, parseArtifact } from './adapters.mjs';
+import { Store, withStore, stamp, id, digest, notice, noLink, upgradePending, compatibleRuntime, originalStoreExecutionCustodyFrom, retainOriginalStoreCommitCutoffFrom } from './store.mjs';
+import { runModel, runRuntimeModel, parseArtifact, assertRuntimeAdapterModelBirthFrom, assertRuntimeAdapterModelClosureFrom } from './adapters.mjs';
 import {sessionTitle} from './session-naming.mjs';
 import { assignmentContext, contextMatches, contextBudgetForJob } from './context.mjs';
 import { handoverReviewEligible, completedWithinReviewWindow } from './handover.mjs';
@@ -31,6 +31,28 @@ import {updateTaskIndex} from './task-index.mjs';
 import { TIMEOUT_POLICY_VERSION, normalizeTimeout, executionTiming, jobExecutionTiming, jobTimeoutState } from './timeout.mjs';
 import {assertSpecialistEligible,specialistName} from './specialists.mjs';
 import {isOriginMechanicalQaWorker,workPeerOriginMechanicalQa} from './origin-mechanical-qa-worker.mjs';
+import {prepareOriginalWorkerLaunchFrom,cleanupOriginalWorkerLaunchFailure,originalWorkerFailedLaunchClosed} from './peers/prospective-local-worker-inventory-producer.mjs';
+import {prepareRuntimeModelRequestFrom,runtimeExecutionLaneFrom,isLegacyRuntimeModelCapabilityFrom,assertRuntimeModelProcessObservedFrom,assertRuntimeWorkerStartedFrom,approveRuntimeModelProcessObservationFrom,cleanupLegacyRuntimeLaunchFailure,legacyRuntimeFailedLaunchClosed} from './runtime-execution.mjs';
+
+const originalWorkerCommitCutoffs=new WeakMap();
+export function inspectOriginalWorkerCommitCutoffFrom(proof,actualDb){
+  const record=originalWorkerCommitCutoffs.get(proof),loan=originalStoreExecutionCustodyFrom(actualDb);
+  if(!record||record.db!==loan.db||record.scope!==loan.scope||loan.mode!=='write')throw Error('Original worker commit cutoff custody required');
+  return record.facts;
+}
+function retainWorkerCommitCutoff(actualDb,bounds){
+  if(!bounds.length)return;
+  const loan=originalStoreExecutionCustodyFrom(actualDb);if(loan.mode!=='write')throw Error('Original worker write required');
+  const candidates=bounds.map(({at,code=null,message})=>{const deadline=typeof at==='number'?at:Date.parse(at);if(!Number.isSafeInteger(deadline)||deadline<0||deadline>8640000000000000)throw Object.assign(Error(message),code===null?{}:{code});return {deadline_at_ms:deadline,code,message};});
+  const facts=Object.freeze(candidates.reduce((a,b)=>a.deadline_at_ms<=b.deadline_at_ms?a:b)),proof=Object.freeze({});
+  originalWorkerCommitCutoffs.set(proof,{db:loan.db,scope:loan.scope,facts});retainOriginalStoreCommitCutoffFrom(actualDb,proof,'worker');
+}
+function retentionCommitBounds(control){
+  const bounds=[{at:control.expires_at,message:'Original retention-review authority expired'}];
+  if(control.qa_deadline_at!==null&&control.qa_deadline_at!==undefined)bounds.push({at:control.qa_deadline_at,message:'Retention-review QA cutoff reached before COMMIT'});
+  return bounds;
+}
+function retainWorkerRetentionCommit(actualDb,state,control){assertRetentionRepairCommit(state,control);retainWorkerCommitCutoff(actualDb,retentionCommitBounds(control));}
 
 const scopedContext=a=>a?.qualification?.protocol===scoped.SCOPED_PROTOCOL;
 const maintenanceEligible=(s,j)=>qualificationMaintenanceEligible(s,j)||scoped.scopedMaintenanceEligible(s,j)||operatingMaintenanceEligible(s,j);
@@ -53,7 +75,9 @@ function validateEnvelope(artifact,roles) {
 function failureEvidence(error) {
   const evidence={message:String(error?.message??'Unknown execution failure').slice(0,1000)};
   if(typeof error?.code==='string')evidence.code=error.code.slice(0,100);
-  if(typeof error?.termination_confirmed==='boolean')evidence.termination_confirmed=error.termination_confirmed;
+  const privateClose=originalWorkerFailedLaunchClosed(error)??legacyRuntimeFailedLaunchClosed(error);
+  if(privateClose!==null)evidence.termination_confirmed=privateClose;
+  else if(typeof error?.termination_confirmed==='boolean')evidence.termination_confirmed=error.termination_confirmed;
   return evidence;
 }
 
@@ -101,11 +125,11 @@ function workerMonitorFacts(state,current,grantExpiry,developmentMaxBytes) {
     development_max_bytes:developmentMaxBytes,bounds:Object.freeze(bounds)});
 }
 
-export async function work(root, jobId, model = runModel) {
+export async function work(root, jobId, model = runRuntimeModel) {
   const mechanical=withStore(root,store=>store.readSnapshot(()=>{const state=store.read();return isOriginMechanicalQaWorker(state,state.jobs?.[jobId]);}));
-  if(mechanical)return workPeerOriginMechanicalQa(root,jobId,model);
+  if(mechanical)return workPeerOriginMechanicalQa(root,jobId,model===runRuntimeModel?runModel:model);
   const monitorStoreStamp=workerMonitorStoreStamp(root);
-  let job, state, context, output, artifact, controller, monitor, claimed=false,spawned=false,invoked=false,lastGrantExpiry,lastDevelopmentMaxBytes;
+  let job, state, context, output, artifact, controller, monitor, claimed=false,spawned=false,invoked=false,lastGrantExpiry,lastDevelopmentMaxBytes,currentPhysicalCall=null;
   let monitorCache=null,lastExecutionDeadline=null;
   const supplemental=[],handoverReads=[];
   let deliveryLedger,pendingDelivery,partitionDelivery,scopedStreamLedger;
@@ -180,6 +204,7 @@ export async function work(root, jobId, model = runModel) {
       // Non-authorizing startup classification may race. An ACTUAL mechanical
       // target can never fall through into the ordinary claim/context path.
       if(isOriginMechanicalQaWorker(s,job))throw Object.assign(Error('Use original fixed mechanical QA worker'),{code:'ORIGIN_MECHANICAL_QA_FIXED_WORKER_REQUIRED'});
+      assertRuntimeWorkerStartedFrom(db,s,jobId);
       if(!compatibleRuntime(s) || upgradePending(s) || !job || job.status!=='queued' || job.epoch!==s.owner.epoch || (s.paused&&!handoverReviewEligible(s,job)&&!maintenanceEligible(s,job))) throw new Error('Assignment is no longer eligible');
       coordinationEligible(s,job);
       prototypeAssignment(s,job);developmentAssignment(s,job,false,root);if(s.records[job.review_of?.id]?.development?.type==='review_continuation')reviewContinuationAssignment(s,job,{root});
@@ -281,15 +306,47 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
       output=undefined;
       const invocation={invocation_id:id('model-invocation'),job_id:job.id,instance_id:job.instance_id,worker_pid:process.pid,host:job.host,requested_at:new Date(callRequestedAt).toISOString()};
       let originalProcessBirth=null,originalProcessReceipt=null;
-      withStore(root,db=>db.transaction('job.model_process.requested',s=>{requestModelProcess(eligibility(s),invocation);return s;}));
-      if(repair&&retentionPhase==='final')withStore(root,db=>db.transaction('job.retention_primary_requested',s=>{
+      const retainModelBounds=(store,s)=>{
+        const current=eligibility(s),bounds=[],timing=jobTimeoutState(current,Date.now());
+        if(!['waiting','executing'].includes(timing.state))throw Object.assign(Error('Assignment deadline reached'),{code:'ROLE_TIMEOUT'});
+        bounds.push({at:timing.deadline_at,code:'ROLE_TIMEOUT',message:'Assignment deadline reached'});
+        const target=s.records[current.review_of?.id],grant=s.records[current.development_id??current.prototype_id];
+        const scopedGrant=Boolean(repair||target?.development?.type==='review_continuation'||current.development_id||current.prototype_id);
+        if(scopedGrant){
+          const expires=repair?.proposal?.expires_at??target?.development?.proposal?.expires_at??grant?.development?.scope?.expires_at??grant?.prototype?.scope?.expires_at;
+          bounds.push({at:expires,code:'SCOPE_EXPIRED',message:'Scoped authorization expired'});
+          if(current.execution_started_at===undefined&&current.code_review_window_minutes!==undefined){
+            const window=current.code_review_window_minutes*60000;if(!Number.isSafeInteger(window)||window<=0)throw Object.assign(Error('Invalid complete code review window'),{code:'SCOPE_WINDOW_UNAVAILABLE'});
+            bounds.push({at:Date.parse(expires)-window+1,code:'SCOPE_WINDOW_UNAVAILABLE',message:'Complete code review window exceeds its new authorization deadline'});
+          }
+        }
+        retainWorkerCommitCutoff(store.db,bounds);
+      };
+      const invocationStore=new Store(root),physicalCall={token:null,birth:null,receipt:null,closed:false};
+      currentPhysicalCall=physicalCall;
+      let launch=null,legacyPrimaryRequested=false;
+      try{
+      invocationStore.transaction('job.model_process.requested',s=>{
+        const current=eligibility(s);requestModelProcess(current,invocation);
+        if(repair&&retentionPhase==='final'&&runtimeExecutionLaneFrom(invocationStore,s)==='legacy'){
+          // Freeze the actual final frame before issuing its one-use legacy
+          // capability. Both history readers validate this exact joint change.
+          beginRetentionPrimaryDelivery(current,{native_id:session,request,frame:retentionFinalFrame,invocation_id:invocation.invocation_id});legacyPrimaryRequested=true;
+        }
+        launch=prepareRuntimeModelRequestFrom(invocationStore,s,{job_id:jobId,invocation_id:invocation.invocation_id,host:job.host,native_id:session,prompt:request,cwd:dir,selection:job.model_selection??null});
+        if(legacyPrimaryRequested&&!isLegacyRuntimeModelCapabilityFrom(launch))throw Error('Legacy final request capability unavailable');
+        if(launch)retainModelBounds(invocationStore,s);
+        return s;
+      },{beforeCommit:(_db,next)=>{if(legacyPrimaryRequested)retainWorkerRetentionCommit(_db,next,repair.control);}});
+      if(repair&&retentionPhase==='final'&&!legacyPrimaryRequested)withStore(root,db=>db.transaction('job.retention_primary_requested',s=>{
         const current=eligibility(s);beginRetentionPrimaryDelivery(current,{native_id:session,request,frame:retentionFinalFrame,invocation_id:invocation.invocation_id});return s;
-      },{beforeCommit:(_db,next)=>assertRetentionRepairCommit(next,repair.control)}));
+      },{beforeCommit:(_db,next)=>retainWorkerRetentionCommit(_db,next,repair.control)}));
       if(repair)retentionCalls++;
       const recordOriginalClose=(birth,receipt)=>{
+        assertRuntimeAdapterModelClosureFrom(launch,birth,receipt);
         if(!originalProcessBirth||JSON.stringify(birth)!==JSON.stringify(originalProcessBirth))throw Error('Original model process identity changed');
-        withStore(root,db=>db.transaction('job.model_process.closed',s=>{recordModelProcessClosure(s.jobs[jobId],invocation,birth,receipt);return s;}));
-        originalProcessReceipt=JSON.parse(JSON.stringify(receipt));
+        withStore(root,db=>db.transaction('job.model_process.closed',s=>{recordModelProcessClosure(s.jobs[jobId],invocation,birth,receipt);approveRuntimeModelProcessObservationFrom(db,s,launch,'closure',birth,receipt);return s;}));
+        originalProcessReceipt=JSON.parse(JSON.stringify(receipt));physicalCall.receipt=originalProcessReceipt;
         // Receipt first, then a separate idempotent reconciliation. A failed
         // second write leaves evidence available for supported cold readback.
         withStore(root,db=>{const current=db.read().jobs[jobId];if(!['failed','cancelled','interrupted'].includes(current?.status))return;
@@ -304,9 +361,16 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
           });
         });
       };
+      if(!launch)invocationStore.transaction('job.model_process.launch_requested',s=>{
+        retainModelBounds(invocationStore,s);
+        launch=prepareOriginalWorkerLaunchFrom(invocationStore,s,{job_id:jobId,kind:'model',invocation_id:invocation.invocation_id});return s;
+      });
+      physicalCall.token=launch;
       output=await model(job.host,session,request,dir,remaining,job.model_selection??null,{
+        ...(isLegacyRuntimeModelCapabilityFrom(launch)?{runtimeExecutionLaunch:launch}:{originalExecutionLaunch:launch}),
+        beforeOriginalSpawn:()=>withStore(root,current=>eligibility(current.read())),
         sessionTitle:displayTitle,sessionNameDirectory:dir,
-        onModelProcess:birth=>{withStore(root,db=>db.transaction('job.model_process.born',s=>{recordModelProcessBirth(s.jobs[jobId],invocation,birth);return s;}));originalProcessBirth=JSON.parse(JSON.stringify(birth));},
+        onModelProcess:birth=>{assertRuntimeAdapterModelBirthFrom(launch,birth);withStore(root,db=>db.transaction('job.model_process.born',s=>{recordModelProcessBirth(s.jobs[jobId],invocation,birth);approveRuntimeModelProcessObservationFrom(db,s,launch,'birth',birth);return s;}));originalProcessBirth=JSON.parse(JSON.stringify(birth));physicalCall.birth=originalProcessBirth;},
         onModelClosure:recordOriginalClose,
         signal:controller.signal,timeoutReason:timeout.timeout_reason,maxOutputCharacters:context.qualification?(context.packet.profile?context.qualification.limits.output_wire_bytes*6+16384:100000):Math.max(2000000,contextBudgetForJob(state,job)),
         ...(((job.handover_review_window_minutes||job.code_review_window_minutes||context.stream)&&overallTiming)||continuationGrantDeadline!==null?{executionDeadlineAt:Math.min(overallTiming?Date.parse(overallTiming.execution_deadline_at):Infinity,continuationGrantDeadline??Infinity)}:{}),
@@ -322,19 +386,26 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
           withStore(root,db=>db.transaction('job.execution_started',s=>{
             const current=eligibility(s);
             if(current.execution_started_at!=null || current.execution_deadline_at!=null)throw new Error('Execution timing already recorded');
-            // Legacy injected models may omit this callback. A real callback upgrades
-            // their timing to the same explicit policy used by new dispatches.
+            // An observed start upgrades historical timing to the explicit policy
+            // used by new dispatches; callback omission never proves closure.
             overallTiming=jobExecutionTiming(timing.execution_started_at,{...job,...timeout,timeout_policy_version:TIMEOUT_POLICY_VERSION});
             if(continuationGrantDeadline!==null&&Date.parse(overallTiming.execution_deadline_at)>continuationGrantDeadline)throw Object.assign(Error('Complete code review window exceeds its new authorization deadline'),{code:'SCOPE_WINDOW_UNAVAILABLE'});
             Object.assign(current,overallTiming);
             return s;
-          },continuationGrantDeadline===null?{}:{beforeCommit:(_db,nextState)=>{if(repair)assertRetentionRepairCommit(nextState,repair.control);else assertReviewContinuationCommit(nextState,{owner:target.development.proposal.owner,expires_at:target.development.proposal.expires_at});}}));
+          },continuationGrantDeadline===null?{}:{beforeCommit:(_db,nextState)=>{if(repair)retainWorkerRetentionCommit(_db,nextState,repair.control);else{assertReviewContinuationCommit(nextState,{owner:target.development.proposal.owner,expires_at:target.development.proposal.expires_at});retainWorkerCommitCutoff(_db,[{at:target.development.proposal.expires_at,message:'Explicit prospective continuation deadline is missing or expired'}]);}}}));
           spawned=true;
-          // Keep the immutable local policy in step only for legacy callback upgrades.
+          // Keep historical local defaults aligned with the observed start.
           if(job.timeout_policy_version===undefined)Object.assign(job,{timeout_policy_version:TIMEOUT_POLICY_VERSION,...timeout});
         }:undefined
       });
-      if(model===runModel&&(!originalProcessBirth||!originalProcessReceipt))throw Object.assign(Error('Actual model process birth was not retained'),{code:'MODEL_PROCESS_CLOSURE_HELD'});
+      assertRuntimeModelProcessObservedFrom(launch,originalProcessBirth,originalProcessReceipt);
+      physicalCall.closed=true;
+      }finally{
+        // withStore closes synchronously when passed a Promise. Keep this exact
+        // issuer alive until forwarding adapters and private observations finish.
+        try{if(launch){assertRuntimeModelProcessObservedFrom(launch,originalProcessBirth,originalProcessReceipt);physicalCall.closed=true;}}catch{/* unobserved or failed-write invocation remains UNKNOWN */}
+        invocationStore.close();
+      }
       if([7,8].includes(job.context_format)){
         runtimeContextBytes+=Buffer.byteLength(output.text,'utf8');
         Object.assign(runtimeRequestUsage.at(-1),{response_utf8_bytes:Buffer.byteLength(output.text,'utf8'),response_utf16_characters:output.text.length});
@@ -369,7 +440,7 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
             const current=eligibility(s),fresh=retentionRepairPrimarySnapshot(s,current,{root,contextText:context.text});
             if(buildRetentionRepairFinal(fresh,current).text!==request)throw Error('Final primary/current controls changed before successful delivery');
             confirmRetentionPrimaryDelivery(current,{native_id:output.native_id,request,invocation_id:invocation.invocation_id,delivered_at:stamp()});validateRetentionPrimaryDelivery(current,fresh);return s;
-          },{beforeCommit:(_db,next)=>assertRetentionRepairCommit(next,repair.control)}));
+          },{beforeCommit:(_db,next)=>retainWorkerRetentionCommit(_db,next,repair.control)}));
           retentionFinalArtifact=finalArtifact;retentionPhase='done';break;
         }
         if(response.kind==='ready'){
@@ -548,18 +619,30 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
         notice(s,'must_know','A late or stale result was quarantined; it grants no approval.',artifactId);
       }
       return s;
-    },{afterWrite:job?.runtime_task?updateTaskIndex:undefined,beforeCommit:job?.code_review_window_minutes?(_db,nextState)=>{
-      const cutoff=Date.parse(overallTiming?.execution_deadline_at??'');
-      if(!Number.isFinite(cutoff)||Date.now()>=cutoff)throw Object.assign(Error('Code review final pre-COMMIT deadline reached'),{code:'ROLE_TIMEOUT'});
-      if(repair)assertRetentionRepairCommit(nextState,retentionPublicationControl??repair.control);
-      const target=nextState.records[job.review_of?.id];if(target?.development?.type==='review_continuation')assertReviewContinuationCommit(nextState,{owner:target.development.proposal.owner,expires_at:target.development.proposal.expires_at});
-    }:undefined}));
+    },{afterWrite:job?.runtime_task?updateTaskIndex:undefined,beforeCommit:(_db,nextState)=>{
+      const bounds=[],current=nextState.jobs[jobId];
+      if(job?.code_review_window_minutes){
+        const cutoff=Date.parse(overallTiming?.execution_deadline_at??'');
+        if(!Number.isSafeInteger(cutoff)||Date.now()>=cutoff)throw Object.assign(Error('Code review final pre-COMMIT deadline reached'),{code:'ROLE_TIMEOUT'});
+        bounds.push({at:cutoff,code:'ROLE_TIMEOUT',message:'Code review final pre-COMMIT deadline reached'});
+        if(repair){const control=retentionPublicationControl??repair.control;assertRetentionRepairCommit(nextState,control);bounds.push(...retentionCommitBounds(control));}
+        const target=nextState.records[job.review_of?.id];if(target?.development?.type==='review_continuation'){assertReviewContinuationCommit(nextState,{owner:target.development.proposal.owner,expires_at:target.development.proposal.expires_at});bounds.push({at:target.development.proposal.expires_at,message:'Explicit prospective continuation deadline is missing or expired'});}
+      }
+      if(current?.status==='completed'&&['started_at','created_at','timeout_policy_version','timeout_ms','execution_started_at','execution_deadline_at','termination_deadline_at'].some(key=>Object.hasOwn(current,key))){
+        const timing=jobTimeoutState({...current,status:'running'},Date.now());
+        if(!['waiting','executing'].includes(timing.state))throw Object.assign(Error('Assignment final pre-COMMIT deadline reached'),{code:'ROLE_TIMEOUT'});
+        bounds.push({at:timing.deadline_at,code:'ROLE_TIMEOUT',message:'Assignment final pre-COMMIT deadline reached'});
+      }
+      retainWorkerCommitCutoff(_db,bounds);
+    }}));
   } catch(error) {
     if(!claimed&&error.code==='ORIGIN_MECHANICAL_QA_FIXED_WORKER_REQUIRED')throw error;
+    const originalEscaped=cleanupOriginalWorkerLaunchFailure(error),legacyEscaped=cleanupLegacyRuntimeLaunchFailure(error),escaped=originalEscaped||legacyEscaped;
     const rejectedOutput=output??error.rejected_output;
     const unowned=Symbol('unowned worker');
     try {withStore(root,db=>db.transaction('job.failed',s=>{
       const current=s.jobs[jobId];
+      const privateClose=originalWorkerFailedLaunchClosed(error)??legacyRuntimeFailedLaunchClosed(error),unprovenPhysical=invoked&&currentPhysicalCall?.closed!==true;
       // Recheck under the write lock: another worker may have claimed after
       // startup validation failed. Only persistent never-started queue evidence
       // permits an unclaimed worker to close a cancelled assignment.
@@ -567,9 +650,14 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
         ['started_at','worker_pid','execution_started_at','execution_deadline_at','termination_deadline_at','finished_at'].some(k=>current[k]!=null)))throw unowned;
       if(claimed&&(!current||current.instance_id!==job?.instance_id||current.worker_pid!==process.pid))throw unowned;
       if(current) {
-        if(!invoked || output || error.termination_confirmed===true)current.coordination_release={termination_confirmed:true,reason:invoked?'model_process_closed':'model_not_invoked',at:stamp()};
+        // A failed physical write can retain an immutable provider Error whose
+        // public flag or earlier output says closed. Only the original private
+        // child observation may enter the canonical all-invocation reconciler.
+        if(privateClose!==null||unprovenPhysical)current.coordination_release={termination_confirmed:false,reason:'original_process_closure_unknown',at:stamp()};
+        else current.coordination_release={termination_confirmed:true,reason:invoked?'model_process_closed':'model_not_invoked',at:stamp()};
         const cause=controller?.signal.aborted?controller.signal.reason:error;
         const evidence=failureEvidence(error),reason=failureEvidence(cause);
+        if(privateClose!==null||unprovenPhysical)evidence.termination_confirmed=false;
         current.execution_failure={...evidence,...(context?.qualification&&reason.code==='ASSIGNMENT_INELIGIBLE'?{abort_kind:'eligibility_loss'}:{}),outcome:/TIMEOUT/.test(reason.code??evidence.code??'')?'timeout':controller?.signal.aborted?'cancellation':'failure',at:stamp(),...(controller?.signal.aborted?{abort:reason}:{})};
       }
       if(current && ['queued','running','cancelled','interrupted'].includes(current.status)) {
@@ -608,11 +696,16 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
         }
         notice(s,'must_know',`Specialist ${current.role} could not finish: ${current.error}`,jobId);
       }
+      if(current&&privateClose===true){
+        // Closure of this child cannot erase an earlier UNKNOWN invocation or
+        // replace the exact ordinary request/birth/close producer history.
+        try{reconcileStoredModelProcessClosure(db,current);current.execution_failure.termination_confirmed=true;}catch{/* retain UNKNOWN */}
+      }
       return s;
-    }));} catch(failure) {if(failure!==unowned)throw failure;}
+    }));} catch(failure) {if(failure!==unowned)throw escaped?error:failure;}
   } finally {
     if(monitor!==undefined)clearInterval(monitor);
     monitorCache=null;lastExecutionDeadline=null;
   }
 }
-if(process.argv[1] && path.resolve(process.argv[1])===fileURLToPath(import.meta.url)) await work(process.argv[2],process.argv[3]);
+if(process.argv[1] && path.resolve(process.argv[1])===fileURLToPath(import.meta.url))queueMicrotask(()=>{work(process.argv[2],process.argv[3]).catch(error=>{console.error(error);process.exitCode=1;});});

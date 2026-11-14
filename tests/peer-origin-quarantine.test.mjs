@@ -1,5 +1,6 @@
 // Fictional SQLite SOURCE tests. No real company, host binding, native/model,
 // provider, migration qualification or human authority is exercised here.
+import {seedPreexistingLegacyData} from './preexisting-legacy-data-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -7,9 +8,10 @@ import os from 'node:os';
 import path from 'node:path';
 import {pathToFileURL,fileURLToPath} from 'node:url';
 import {DatabaseSync} from 'node:sqlite';
-import {Store,withStore,installedTeam,teamHash,digest} from '../plugins/soloco/runtime/store.mjs';
+import {Store,withStore,installedTeam,teamHash,digest,originalStoreExecutionCustodyFrom} from '../plugins/soloco/runtime/store.mjs';
+import {freshInventoryStore} from './original-global-worker-inventory-fixture.mjs';
 import {requestModelProcess,recordModelProcessBirth,recordModelProcessClosure} from '../plugins/soloco/runtime/model-process-closure.mjs';
-import {PeerLedger,canonical,peerDigest} from '../plugins/soloco/runtime/peers/ledger.mjs';
+import {PeerLedger,canonical,peerDigest,installPeerSchema} from '../plugins/soloco/runtime/peers/ledger.mjs';
 import * as actualPlan from '../plugins/soloco/runtime/peers/origin-plan.mjs';
 import * as actualMaintenance from '../plugins/soloco/runtime/peers/origin-maintenance.mjs';
 import {assertPeerLegacyOriginReady} from '../plugins/soloco/runtime/peers/model.mjs';
@@ -49,9 +51,49 @@ fs.writeFileSync(path.join(temp,'origin-maintenance.mjs'),maintenanceText);
 const maintenance=await import(url(path.join(temp,'origin-maintenance.mjs'))),domain=await import(url(path.join(temp,'domain.mjs'))),wire=await import(url(path.join(temp,'deployment.mjs')));
 test.after(()=>fs.rmSync(temp,{recursive:true,force:true}));
 const actor={host:'codex',session_id:'fictional-root',native_id:'fictional-root'};
+
+// AUTHORED_UNRUN: genuine fresh Store/transaction controls for the storage
+// primitive only. A minimal schema transition is not a qualified quarantine,
+// Native review or permission. Full old quarantine positives below still need
+// the separately reviewed genuine legacy/mechanical fixture integration.
+async function transitionFixture(t){const f=await freshInventoryStore(t);f.store.migrate();return {...f,db:fn=>fn(f.store.db)};}
+function transitionSchema(store){installPeerSchema(store.db,{company_id:'SYNTHETIC-storage-primitive-only',legacy_snapshot_sha256:'a'.repeat(64)});assert.equal(store.db.prepare('UPDATE company_layout SET version=5 WHERE id=1 AND version=4').run().changes,1);}
+const transitionCode=code=>error=>error?.code===code;
+
+test('peer layout transition owns one real Store write scope without legacy serialization or ordinary launch issuance',async t=>{
+ const f=await transitionFixture(t),before=raw(f),marker=Object.freeze({storage_only:true});let loan,guards=0;
+ const returned=f.store.peerLayoutTransition(store=>{
+  assert.equal(store,f.store);loan=originalStoreExecutionCustodyFrom(store.db);assert.equal(loan.mode,'write');assert.equal(loan.type,'origin.quarantined');loan.assert();
+  assert.throws(()=>f.producer.prepareOriginalWorkerLaunchFrom(store,store.read(),{job_id:'SYNTHETIC-no-worker',kind:'worker'}),transitionCode('ORIGINAL_EXECUTION_WRITE_REQUIRED'));
+  transitionSchema(store);return marker;
+ },{beforeCommit:(db,result)=>{guards++;assert.equal(db,f.store.db);assert.equal(result,marker);loan.assert();assert.equal(db.prepare('SELECT version FROM company_layout WHERE id=1').get().version,5);}});
+ assert.equal(returned,marker);assert.equal(guards,1);assert.equal(f.store.inTransaction,false);assert.equal(f.store.db.isTransaction,false);assert.throws(()=>loan.assert(),transitionCode('ORIGINAL_EXECUTION_STORE_EXPIRED'));
+ const after=raw(f);assert.deepEqual(after.entries,before.entries);assert.deepEqual(after.vault,before.vault);assert.deepEqual(after.events,before.events);assert.equal(after.layout[0].version,5);
+});
+
+test('peer layout transition rolls back all schema work and expires custody on its final synchronous guard failure',async t=>{
+ const f=await transitionFixture(t),before=raw(f),member=Object.freeze(new TypeError('SYNTHETIC final guard member')),failure=Object.freeze(new AggregateError([member],'SYNTHETIC final guard failure',{cause:member}));let loan;
+ assert.throws(()=>f.store.peerLayoutTransition(store=>{loan=originalStoreExecutionCustodyFrom(store);transitionSchema(store);return {};},{beforeCommit:()=>{loan.assert();throw failure;}}),error=>error===failure);
+ assert.deepEqual(raw(f),before);assert.equal(f.store.db.isTransaction,false);assert.equal(f.store.inTransaction,false);assert.throws(()=>loan.assert(),transitionCode('ORIGINAL_EXECUTION_STORE_EXPIRED'));assert.equal(failure.cause,member);assert.equal(failure.errors[0],member);
+ assert.equal(f.store.db.prepare("SELECT count(*) AS n FROM sqlite_master WHERE name GLOB 'peer_*'").get().n,0);
+});
+
+test('peer layout transition rejects nested and asynchronous loans without exposing a later original scope',async t=>{
+ const f=await transitionFixture(t),before=raw(f);let release,continuation,loan,continued=false;const gate=new Promise(resolve=>{release=resolve;});
+ assert.throws(()=>f.store.readSnapshot(()=>f.store.peerLayoutTransition(()=>{})),transitionCode('STORE_PEER_TRANSITION_REQUIRED'));
+ assert.throws(()=>f.store.peerLayoutTransition(store=>{loan=originalStoreExecutionCustodyFrom(store);continuation=(async()=>{await gate;assert.throws(()=>loan.assert(),transitionCode('ORIGINAL_EXECUTION_STORE_EXPIRED'));continued=true;})();return continuation;}),transitionCode('STORE_PEER_TRANSITION_ASYNC'));
+ release();await continuation;assert.equal(continued,true);assert.deepEqual(raw(f),before);assert.equal(f.store.inTransaction,false);
+});
+
+test('peer layout transition cannot commit an incomplete layout or use a prototype-shaped Store',async t=>{
+ const f=await transitionFixture(t),before=raw(f);
+ assert.throws(()=>f.store.peerLayoutTransition(()=>{}),transitionCode('STORE_PEER_TRANSITION_REQUIRED'));
+ const fake=Object.assign(Object.create(Store.prototype),{root:f.root,db:f.store.db,inTransaction:false});
+ assert.throws(()=>fake.peerLayoutTransition(()=>{}),transitionCode('STORE_PEER_TRANSITION_REQUIRED'));assert.equal(f.store.db.isTransaction,false);assert.deepEqual(raw(f),before);
+});
 function fixture(t,changes={}){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-origin-company-')),team=installedTeam(),s=new Store(root,true);
- try{s.transaction('fixture.genesis',()=>({schema:2,id:'fictional-origin-company',name:'Source only',idea:'Retain unknowns.',runtime_version:'0.7.8',...team,team_sha256:teamHash(team),owner:{host:'codex',session_id:actor.session_id,epoch:9},paused:true,records:{original:{id:'original',kind:'artifact',status:'Draft',revision:1,content:'Never erase the old failure.'}},jobs:{old:{id:'old',status:'failed',native_id:'old-unknown',coordination_release:{termination_confirmed:false}}},sessions:{},messages:[],notices:[{id:'n-original',kind:'decision_required',summary:'Original UNKNOWN; exhausted grant remains expired.',resolution:null}],original_grant:{max_attempts:2,used_attempts:2,expires_at:'2020-01-01T00:00:00.000Z'},...changes}));s.migrate();}finally{s.close();}
+ try{seedPreexistingLegacyData(s,'fixture.genesis',()=>({schema:2,id:'fictional-origin-company',name:'Source only',idea:'Retain unknowns.',runtime_version:'0.7.8',...team,team_sha256:teamHash(team),owner:{host:'codex',session_id:actor.session_id,epoch:9},paused:true,records:{original:{id:'original',kind:'artifact',status:'Draft',revision:1,content:'Never erase the old failure.'}},jobs:{old:{id:'old',status:'failed',native_id:'old-unknown',coordination_release:{termination_confirmed:false}}},sessions:{},messages:[],notices:[{id:'n-original',kind:'decision_required',summary:'Original UNKNOWN; exhausted grant remains expired.',resolution:null}],original_grant:{max_attempts:2,used_attempts:2,expires_at:'2020-01-01T00:00:00.000Z'},...changes}));s.migrate();}finally{s.close();}
  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));const file=path.join(root,'.company','company.sqlite');
  const input={source_instruction:'Fictional exact mechanical quarantine authority only.',expires_at:new Date(Date.now()+3600000).toISOString(),policy:{worker_cap:3,queue_limit:1000,principal_queue_limit:100,max_context_bytes:65536,max_model_calls:10},maintenance:{scope:'*',source_instruction:'Fictional separate finite read-only origin maintenance, no old grant conversion.',max_model_calls:4,max_review_calls:2}};
  return {root,file,input,write:(type,fn)=>withStore(root,s=>s.transaction(type,fn)),state:()=>withStore(root,s=>s.read()),db:fn=>{const d=new DatabaseSync(file);try{return fn(d);}finally{d.close();}}};
@@ -186,6 +228,16 @@ test('expired original work can be recorded UNKNOWN without a new charge or rese
 });
 test('failed layout trigger rolls back every new schema/fence row and retains verified backup',t=>{
  const f=fixture(t);f.db(db=>db.exec("CREATE TRIGGER fictional_layout_abort BEFORE UPDATE ON company_layout BEGIN SELECT RAISE(ABORT,'SYNTHETIC layout fault'); END"));const p=reviewed(f),before=raw(f);let error;try{apply(f,p);}catch(e){error=e;}assert.match(error.message,/SYNTHETIC layout fault/);assert.ok(error.retained_backup?.file);assert.ok(fs.existsSync(error.retained_backup.file));assert.deepEqual(raw(f),before);f.db(db=>{assert.equal(db.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE name GLOB 'peer_*'").get().n,0);});f.write('fixture.after_rollback',s=>s);assert.equal(raw(f).layout[0].version,4);
+});
+test('quarantine retains its actual backup privately without replacing a frozen provider Error or trusting its public backup flag',t=>{
+ const f=fixture(t),p=reviewed(f),before=raw(f),member=Object.freeze(new TypeError('SYNTHETIC original quarantine provider member'));
+ const forged=Object.freeze({file:'SYNTHETIC-public-property-is-not-a-receipt'}),failure=new AggregateError([member],'SYNTHETIC frozen quarantine provider failure',{cause:member});Object.defineProperty(failure,'retained_backup',{value:forged,writable:false});Object.freeze(failure);
+ const exec=DatabaseSync.prototype.exec;let reached=0,caught;
+ DatabaseSync.prototype.exec=function(sql,...args){if(/^CREATE TRIGGER peer_origin_legacy_/.test(sql)&&this.prepare('PRAGMA database_list').all().some(row=>row.name==='main'&&row.file===f.file)){reached++;throw failure;}return Reflect.apply(exec,this,[sql,...args]);};
+ try{apply(f,p);}catch(error){caught=error;}finally{DatabaseSync.prototype.exec=exec;}
+ assert.equal(reached,1);assert.equal(caught,failure);assert.equal(caught.cause,member);assert.equal(caught.errors[0],member);assert.equal(caught.retained_backup,forged);
+ const retained=quarantine.retainedPeerOriginQuarantineBackupFrom(caught);assert.ok(retained?.file);assert.notEqual(retained.file,forged.file);assert.ok(fs.existsSync(retained.file));assert.match(retained.cut_sha256,/^[a-f0-9]{64}$/);assert.equal(retained.sha256,digest(fs.readFileSync(retained.file)));
+ retained.file='Changed returned DATA';assert.notEqual(quarantine.retainedPeerOriginQuarantineBackupFrom(caught).file,retained.file);assert.equal(quarantine.retainedPeerOriginQuarantineBackupFrom({retained_backup:forged}),null);assert.deepEqual(raw(f),before);
 });
 test('layout trigger cannot inject new peer authority while schema transitions',t=>{
  const f=fixture(t);f.db(db=>db.exec("CREATE TRIGGER fictional_peer_injection AFTER UPDATE ON company_layout BEGIN UPDATE peer_meta SET last_event_sha256='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'; END"));const p=reviewed(f),before=raw(f);let error;try{apply(f,p);}catch(e){error=e;}assert.equal(error.code,'ORIGIN_LAYOUT_TRIGGER_CHANGED_PEER_STATE');assert.ok(error.retained_backup);assert.deepEqual(raw(f),before);f.db(db=>assert.equal(db.prepare("SELECT 1 FROM sqlite_master WHERE name='peer_meta'").get(),undefined));

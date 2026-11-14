@@ -1,6 +1,7 @@
 // Public read-only preparation through the actual registered transport.
 // Fictional normalized-v4 SQLite only: no native/model/provider/network work,
 // adoption application, new authority or semantic qualification is established.
+import {seedPreexistingLegacyData} from './preexisting-legacy-data-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -50,7 +51,7 @@ function fixture(t,{changes={},bound=true}={}){
  process.env.COMPANY_PLUGIN_DATA=path.join(root,'transport-cache');
  const team=installedTeam(),initial={schema:2,id:'fictional-public-adoption-company',name:'Fictional public preparation',idea:'Read-only preservation of current unknown obligations.',runtime_version:team.plugin_version,plugin_version:team.plugin_version,governance:team.governance,governance_sha256:team.governance_sha256,roles:team.roles,cos_instructions:team.cos_instructions,team_sha256:teamHash(team),owner:{host:'codex',session_id:SESSION,epoch:EPOCH},paused:true,records:{held:{id:'held',kind:'artifact',revision:1,status:'Draft',content:'FAILED; no retry; allowance remains ZERO.'}},jobs:{},sessions:{},notices:[],messages:[],context_classifications:{},unknown_future:{attempts_used:4,max_attempts:4,expiry:'2020-01-01T00:00:00.000Z',uncertain:true},...changes};
  const store=new Store(root,true);
- try{store.transaction('fictional.public-fixture',()=>initial);store.migrate();}finally{store.close();}
+ try{seedPreexistingLegacyData(store,'fictional.public-fixture',()=>initial);store.migrate();}finally{store.close();}
  const file=path.join(root,'.company','company.sqlite'),db=new DatabaseSync(file);
  t.after(()=>{db.close();if(previous===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=previous;fs.rmSync(root,{recursive:true,force:true});});
  if(bound)bind(root,SESSION,'codex');

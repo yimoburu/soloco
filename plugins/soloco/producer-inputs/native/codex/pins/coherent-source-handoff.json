@@ -8,8 +8,8 @@
   "original_backend_source_handoff_sha256": "5a43acb85656aa2f2dc6a52b91ab5d88741d69bf27bd1c0368ec1d59664e9a61",
   "rust_tests_authored": null,
   "rust_tests_status": "CURRENT_GLOBAL_TOTAL_UNKNOWN__NEW22_AUTHORED_UNRUN",
-  "complete_logical_files": 9310,
-  "overlay_files": 159,
+  "complete_logical_files": 9314,
+  "overlay_files": 163,
   "ordered_source_composition": [
     {
       "order": 1,
@@ -207,7 +207,7 @@
   "format_source_cut_sha256": "3b0e077cc3e4a38e521c0d268efadaa7df309612622c951bf38fb229989db37d",
   "format_source_bindings_sha256": "536e8668778d2de23fba9a98a4772d15ef864069e66a3e1d3811399b60cee0b3",
   "format_source_materialization_sha256": "50297a1849fb5b6bf0539360088d81ef3db3e8beeea631d7b142b77dea858476",
-  "source_graph_vector_sha256": "f8b3d2f4162dfbcc2015d4a9db26c109004bae710458996ae2dbf553cd061b5e",
+  "source_graph_vector_sha256": "e53b191fdf12cd98b65482c30b5080fe9b81fbacc5a174e3c98eb2ea22e93333",
   "source_format_delta": {
     "parent_portable_handoff_sha256": "c75ee77de8458c672622363bd02656e0a2075f67bdf5c2ba89aef40b7565edb4",
     "parent_coherent_handoff_sha256": "67ad9bf2fe5e16cc671a520b0af737b1dbfc430d3f2ed8d2f9184bf5b3524a23",
@@ -215,7 +215,7 @@
     "removed_ASCII_EOL_spaces": 18,
     "scope": "Only source-code trailing whitespace outside literals/comments; source-byte associations change and need their own qualification"
   },
-  "source_graph_bytes": 92118117,
+  "source_graph_bytes": 92198679,
   "eof_source_handoff_sha256": "db544a4699e562d8af4a1f128ac2769ef7b25813783a049933e1f35811765517",
   "lifetime_source_handoff_sha256": "34392507e7d695b4ef42bd74d422f48a213e302ef35dbc34e647c500ed5ae4b8",
   "lifetime_source_cut_sha256": "6e2764f7d19ee0e530fdd4aa08c4a9a0dfb2d35535cebff8e5d0a581d614d1a7",
@@ -567,5 +567,38 @@
     "remote_domain_closed": false,
     "whole_domain_qualified": false,
     "qualification": "No test/build/Native result, actual company authority or global launch-coverage assertion is produced by this Source refresh."
+  },
+  "ordinary_origin_complete_source_increment": {
+    "protocol": "complete-source-derived-metadata-increment-v1",
+    "subject": {
+      "head": "74f640754a846a71473fd9b3c2a8360c33cb34f1",
+      "tree": "c04ab753e9a6535aca51fd9839ce504d18867d52"
+    },
+    "parent_handoff": {
+      "bytes": 32701,
+      "sha256": "799056376dbd2234c11d233a085a2f7b5623a1e8e1be4e3130ee0edb6c6d73f0"
+    },
+    "parent_package": {
+      "bytes": 64802,
+      "sha256": "b040811c46db685f647bfaf5bac3db26aa055035553ee83b8e2bc228f048f55c"
+    },
+    "source_bindings": {
+      "bytes": 1954991,
+      "sha256": "2de2a61c385defdf77eee2de1b3c78cf0368b09ee52163bdc52c7a97db0b178c"
+    },
+    "complete_patch": {
+      "bytes": 983688,
+      "sha256": "6c9ae7279a1a1089bef0a1adde566bf87ee644d2ea6cb6acd7d27bf3e1896a03"
+    },
+    "source_graph_vector_sha256": "e53b191fdf12cd98b65482c30b5080fe9b81fbacc5a174e3c98eb2ea22e93333",
+    "complete_logical_files": 9314,
+    "logical_bytes": 92198679,
+    "overlay_files": 163,
+    "status": "SOURCE_METADATA_GENERATED_REQUIRES_INDEPENDENT_REVIEW",
+    "tests_executed": false,
+    "native_qualified": false,
+    "compiled_artifact_created": false,
+    "runtime_slot": null,
+    "historical_nested_claims": "Preserved unchanged; no prior failure/test/qualification regrade."
   }
 }

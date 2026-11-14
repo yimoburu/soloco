@@ -1,6 +1,7 @@
 // Real temporary normalized-v4/P1 SQLite and the exact historical writer.
 // Draft adoption labels/native records below are SYNTHETIC INPUT, NOT protected
 // host/QA/P8 permission. This suite qualifies only the physical SQL row fence.
+import {seedPreexistingLegacyData} from './preexisting-legacy-data-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -21,7 +22,7 @@ function unchanged(db,fn,expected=fence){const before=archive(db);assert.throws(
 function fixture(t,{uncertain=false}={}){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-legacy-fence-')),team=installedTeam(),store=new Store(root,true);
  const initial={schema:2,id:'fictional-normalized-company',name:'Mechanical fence fixture',idea:'Synthetic exact legacy data',runtime_version:'0.7.7',plugin_version:team.plugin_version,governance:team.governance,governance_sha256:team.governance_sha256,roles:team.roles,cos_instructions:team.cos_instructions,team_sha256:teamHash(team),owner:{epoch:11,session_id:'synthetic-owner-native',host:'codex'},paused:true,selection_usage:{model_calls:100,max_model_calls:100,exhausted:true,unknown:{carry_forward:'not qualified by this component'}},records:{retained:{id:'retained',kind:'artifact',status:'Held',revision:1,content:'Preserve unknown failure and exhausted attempts.',unknown:{failure:'still held',required_bytes:78772,limit:65536,attempts:0}}},jobs:{author:{id:'author',status:'completed',role:'engineer',instance_id:'synthetic-author-instance',native_id:'synthetic-author-native',coordination_release:{termination_confirmed:true}},failure:{id:'failure',status:'failed',native_id:'synthetic-old-native',attempts:4,max_attempts:4,coordination:{resources:['repo:fictional/repo']},coordination_release:{termination_confirmed:!uncertain},unknown:{keep:'full'}}},sessions:{legacy:{id:'legacy',role:'cos',native_id:'synthetic-retired-native'}},notices:[],messages:[],future_contract:{unknown:true,ordered:[3,1,2],unicode:'雪😀'},['unknown\u0000key']:{literal:'full original key/value'}};
- try{store.transaction('fixture.genesis',()=>initial);store.migrate();}finally{store.close();}
+ try{seedPreexistingLegacyData(store,'fixture.genesis',()=>initial);store.migrate();}finally{store.close();}
  const file=path.join(root,'.company','company.sqlite'),old=new DatabaseSync(file);old.exec('PRAGMA busy_timeout=5000');t.after(()=>{old.close();fs.rmSync(root,{recursive:true,force:true});});
  assert.equal(old.prepare('SELECT version FROM company_layout WHERE id=1').get().version,4);
  const f={root,file,old,initial,prepared:{delete:old.prepare("DELETE FROM state_entries WHERE family='root' AND key='name'"),insert:old.prepare('INSERT OR IGNORE INTO immutable_values VALUES(?,?)')},backups:()=>{const dir=path.join(root,'.company','backups');return fs.existsSync(dir)?fs.readdirSync(dir).filter(n=>n.startsWith('peer-')).map(n=>path.join(dir,n)):[];}};

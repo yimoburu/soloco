@@ -8,11 +8,12 @@ import {DatabaseSync} from 'node:sqlite';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {FAMILIES,PeerLedger,canonical,peerDigest} from '../plugins/soloco/runtime/peers/ledger.mjs';
 import {captureLegacyPinnedTeam,legacySourceId} from '../plugins/soloco/runtime/peers/legacy-origin.mjs';
-import {Store} from '../plugins/soloco/runtime/store.mjs';
+import {Store,originalStoreExecutionCustodyFrom} from '../plugins/soloco/runtime/store.mjs';
+import {freshInventoryStore} from './original-global-worker-inventory-fixture.mjs';
 import {open as openCompany} from '../plugins/soloco/runtime/engine.mjs';
 import {peerFixture} from './peer-fixture.mjs';
 import {runWithMcpHostContext} from '../plugins/soloco/runtime/mcp-host-context.mjs';
-import {peerOwnerToolSchema,validatePeerOwnerRequest,peerOwnerStorageKind,peerOwnerRuntimeAction} from '../plugins/soloco/runtime/peer-owner-runtime.mjs';
+import {peerOwnerToolSchema,validatePeerOwnerRequest,peerOwnerStorageKind,peerOwnerRuntimeAction,withPeerPublicStorage} from '../plugins/soloco/runtime/peer-owner-runtime.mjs';
 import {logicalSQLState} from './peer-task-effects-fixture.mjs';
 import {ownerGateFixture,disposeOwnerGateFixture,core} from './peer-owner-operating-gate-fixture.mjs';
 
@@ -52,6 +53,96 @@ async function unchanged(f,operation,predicate=typedHold){const before=logicalSQ
 function temp(t,prefix='soloco-owner-public-'){const root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),prefix)));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));return root;}
 function database(t,sql){const root=temp(t);fs.mkdirSync(path.join(root,'.company'));const file=path.join(root,'.company','company.sqlite'),db=new DatabaseSync(file);db.exec(sql);db.close();return {root,file};}
 const selector=(source,extra={})=>({family:source.family,id:source.id,revision:source.revision,sha256:source.sha256,...extra});
+
+// AUTHORED_UNRUN Source controls for the actual canonical readonly Store.
+// Fresh company.created proves only this fictional software history. It is
+// not a Native issuer, actual company adoption or historical-prefix recovery.
+test('legacy public read snapshot lends only its actual canonical readonly Store and current Source history',async t=>{
+  const f=await freshInventoryStore(t),before=f.state();let loan,store;
+  await withPeerPublicStorage(f.root,true,async where=>{
+    assert.equal(where.kind,'legacy');assert.equal(where.db.isTransaction,false);
+    assert.throws(()=>originalStoreExecutionCustodyFrom(where.db),code('ORIGINAL_EXECUTION_STORE_EXPIRED'));
+    await Promise.resolve();
+    const facts=where.readSnapshot(actual=>{
+      store=actual;assert.equal(Object.getPrototypeOf(actual),Store.prototype);assert.equal(actual.readOnly,true);assert.equal(actual.db,where.db);
+      loan=originalStoreExecutionCustodyFrom(actual.db);assert.equal(loan.store,actual);assert.equal(loan.mode,'read');assert.equal(loan.root,f.root);loan.assert();
+      assert.equal(actual.readSnapshot(()=>originalStoreExecutionCustodyFrom(actual).scope),loan.scope);
+      return f.producer.inspectOriginalLocalExecutionInventoryFrom(actual.db);
+    });
+    assert.equal(facts.protocol,'original-local-execution-inventory-v1');assert.equal(facts.admission_launch_coverage_complete,true);assert.equal(facts.cardinality_known,true);
+    assert.equal(where.db.isTransaction,false);assert.throws(()=>loan.assert(),code('ORIGINAL_EXECUTION_STORE_EXPIRED'));
+  });
+  assert.equal(store.closed,true);assert.throws(()=>loan.assert(),code('ORIGINAL_EXECUTION_STORE_EXPIRED'));assert.deepEqual(f.state(),before);
+});
+
+test('a raw readonly connection to the same real file cannot substitute for original Store custody',async t=>{
+  const f=await freshInventoryStore(t),before=f.state(),raw=new DatabaseSync(f.file,{readOnly:true});
+  try{raw.exec('BEGIN');assert.throws(()=>f.producer.inspectOriginalLocalExecutionInventoryFrom(raw),code('ORIGINAL_EXECUTION_STORE_REQUIRED'));}
+  finally{if(raw.isTransaction)raw.exec('ROLLBACK');raw.close();}
+  await withPeerPublicStorage(f.root,true,where=>where.readSnapshot(store=>assert.equal(f.producer.inspectOriginalLocalExecutionInventoryFrom(store.db).cardinality_known,true)));
+  assert.deepEqual(f.state(),before);
+});
+
+test('an expired original Store loan cannot revive in the next real snapshot on the same connection',async t=>{
+  const f=await freshInventoryStore(t);let old;
+  await withPeerPublicStorage(f.root,true,async where=>{
+    where.readSnapshot(store=>{old=originalStoreExecutionCustodyFrom(store);old.assert();});
+    await Promise.resolve();
+    where.readSnapshot(store=>{const current=originalStoreExecutionCustodyFrom(store);assert.equal(current.db,old.db);assert.notEqual(current.scope,old.scope);assert.throws(()=>old.assert(),code('ORIGINAL_EXECUTION_STORE_EXPIRED'));current.assert();});
+  });
+  assert.throws(()=>old.assert(),code('ORIGINAL_EXECUTION_STORE_EXPIRED'));
+});
+
+test('readonly Store rejects every write entry before callback and remains OS readonly after public flag changes',async t=>{
+  const f=await freshInventoryStore(t),before=f.state();let callbacks=0;
+  await withPeerPublicStorage(f.root,true,where=>where.readSnapshot(store=>{
+    Object.defineProperty(store,'readOnly',{value:false});
+    for(const action of [()=>store.migrate(),()=>store.peerLayoutTransition(()=>{callbacks++;}),()=>store.appendUpgradeCall('not-an-attempt',{}),()=>store.selectedTransaction('not-a-writer',{},()=>{callbacks++;}),()=>store.transaction('not-a-writer',()=>{callbacks++;})])assert.throws(action,code('STORE_READONLY_WRITE_FORBIDDEN'));
+    store.db.exec('PRAGMA query_only=OFF;');
+    assert.throws(()=>store.db.exec('CREATE TABLE forbidden_readonly_write(value TEXT)'));
+    assert.throws(()=>store.db.prepare('UPDATE company SET value=? WHERE id=1').run('{}'));
+  }));
+  assert.equal(callbacks,0);assert.deepEqual(f.state(),before);
+});
+
+test('readonly Store rejects a promise snapshot and expires its real loan before asynchronous continuation',async t=>{
+  const f=await freshInventoryStore(t);let release,continuation,loan,finished=false;const gate=new Promise(resolve=>{release=resolve;});
+  await withPeerPublicStorage(f.root,true,async where=>{
+    assert.throws(()=>where.readSnapshot(store=>{
+      loan=originalStoreExecutionCustodyFrom(store);
+      continuation=(async()=>{await gate;assert.throws(()=>loan.assert(),code('ORIGINAL_EXECUTION_STORE_EXPIRED'));finished=true;})();return continuation;
+    }),code('STORE_READONLY_SNAPSHOT_ASYNC'));
+    assert.equal(where.db.isTransaction,false);assert.throws(()=>loan.assert(),code('ORIGINAL_EXECUTION_STORE_EXPIRED'));release();await continuation;
+  });
+  assert.equal(finished,true);
+});
+
+test('readonly public snapshot preserves original frozen provider Error and AggregateError identity',async t=>{
+  const f=await freshInventoryStore(t),before=f.state(),member=Object.freeze(new TypeError('SYNTHETIC readonly provider member')),failure=Object.freeze(new AggregateError([member],'SYNTHETIC readonly provider failure',{cause:member}));let loan;
+  await assert.rejects(withPeerPublicStorage(f.root,true,where=>where.readSnapshot(store=>{loan=originalStoreExecutionCustodyFrom(store);throw failure;})),error=>error===failure);
+  assert.equal(failure.cause,member);assert.equal(failure.errors[0],member);assert.throws(()=>loan.assert(),code('ORIGINAL_EXECUTION_STORE_EXPIRED'));assert.deepEqual(f.state(),before);
+});
+
+test('readonly Store does not create absent storage or run legacy setup and migration SQL',async t=>{
+  const absent=temp(t),dir=path.join(absent,'.company');fs.mkdirSync(dir);const names=fs.readdirSync(dir);
+  assert.throws(()=>new Store(absent,false,{readOnly:true}));assert.throws(()=>new Store(absent,true,{readOnly:true}),code('STORE_READONLY_WRITE_FORBIDDEN'));assert.deepEqual(fs.readdirSync(dir),names);
+  const legacy=database(t,"CREATE TABLE company(id INTEGER PRIMARY KEY,value TEXT); INSERT INTO company VALUES(1,'{}'); CREATE TABLE events(seq INTEGER PRIMARY KEY,at TEXT,type TEXT,value TEXT);"),before=hash(fs.readFileSync(legacy.file)),exec=DatabaseSync.prototype.exec,sql=[];
+  DatabaseSync.prototype.exec=function(text,...args){sql.push(String(text));return Reflect.apply(exec,this,[text,...args]);};
+  try{await withPeerPublicStorage(legacy.root,true,where=>where.readSnapshot(store=>{assert.equal(store.readOnly,true);assert.equal(store.storageInfo().migration_required,true);assert.equal(store.db.prepare('SELECT count(*) AS n FROM company').get().n,1);}));}
+  finally{DatabaseSync.prototype.exec=exec;}
+  assert.equal(sql.some(text=>/CREATE|ALTER|INSERT|UPDATE|DELETE|journal_mode|synchronous\s*=/i.test(text)),false);assert.equal(hash(fs.readFileSync(legacy.file)),before);
+});
+
+test('legacy public snapshot rechecks original pathname after an await before lending Store custody',async t=>{
+  const f=await freshInventoryStore(t),file=f.file,held=path.join(f.root,'.company','held-original.sqlite'),other=path.join(f.root,'.company','replacement.sqlite');
+  const replacement=new DatabaseSync(other);replacement.exec('CREATE TABLE unrelated(value TEXT)');replacement.close();let callbacks=0;
+  await withPeerPublicStorage(f.root,true,async where=>{
+    await Promise.resolve();fs.renameSync(file,held);fs.renameSync(other,file);
+    try{assert.throws(()=>where.readSnapshot(()=>{callbacks++;}),code('OWNER_STORAGE_CHANGED'));assert.equal(where.db.isTransaction,false);}
+    finally{fs.renameSync(file,other);fs.renameSync(held,file);}
+  });
+  assert.equal(callbacks,0);
+});
 
 test('public schema and pure request validation accept closed DATA without retaining caller objects',()=>{
   assert.equal(peerOwnerToolSchema.name,'company_owner');assert.equal(peerOwnerToolSchema.inputSchema.additionalProperties,false);assert.equal(peerOwnerToolSchema.inputSchema.properties.input.additionalProperties,false);
@@ -293,4 +384,103 @@ test('an existing fixed launch module retains the original grouped provider fail
   const runtime=await runtimeWithLaunch(t,"throw globalThis[Symbol.for('soloco-owner-runtime-SYNTHETIC-launch-error')];\n");
   await unchanged(f,()=>invoke(req(f,'review',{who:IN,epoch:8,source_instruction:instruction,input:{operation_id:f.op()}}),runtime.peerOwnerRuntimeAction),error=>{assert.equal(error,failure);assert.equal(error.cause,cause);assert.equal(error.errors[0],member);return true;});
   assert.equal(f.get('grants','owner-review-grant').value.used_model_calls,0);assert.equal(f.get('control','usage'),null);
+});
+
+
+// Additive fresh-purpose public SOURCE controls, AUTHORED_UNRUN. The public
+// schema stays unchanged; only exact original grant/decision/intent records
+// select the fixed new constructor. Native/provider execution remains unproved.
+const FRESH_OWNER_ACTION='owner/handover-fresh-review-v1';
+async function publicFreshTransfer(t,{actions=[FRESH_OWNER_ACTION],runtime=peerOwnerRuntimeAction}={}){
+ const f=fixture(t),grant_id='public-fresh-owner-grant';
+ f.run('founder','grant/create',{grant_id,to_principal_id:'reviewer',scope:'*',actions,resources:[],expires_at:new Date(Date.now()+3600000).toISOString(),max_model_calls:3,source_instruction:instruction});f.pause();
+ const quote='SYNTHETIC exact founder instruction for a new bounded fresh owner review; retain all original limits and obligations.';
+ const input={operation_id:f.op(),target:actor(IN),reviewer_principal_id:'reviewer',review_grant_id:grant_id,review_grant_generation:1,expires_at:new Date(Date.now()+1800000).toISOString(),max_review_calls:2,primary_human_message:{host:'codex',chat_id:OUT,turn_id:OTHER,message_id:'55555555-5555-4555-8555-555555555555',content_sha256:hash(quote),quote},basis:'explicit'};
+ const decision=await invoke(req(f,'record_transfer_decision',{source_instruction:instruction,input}),runtime);
+ const intent=await invoke(req(f,'issue_transfer_intent',{source_instruction:instruction,input:{operation_id:f.op(),decision_ref:decision.decision_ref}}),runtime);
+ return {f,decision,intent,input,grant_id};
+}
+
+// This fixture relocates only the fixed owner SOURCE module and high-level
+// launch seam. Its wire plan is a synthetic private issuer, never Native proof.
+async function runtimeWithFreshOwnerSource(t){
+ const directory=temp(t,'soloco-public-fresh-owner-source-'),runtimeFile=fileURLToPath(new URL('../plugins/soloco/runtime/peer-owner-runtime.mjs',import.meta.url)),runtimeDirectory=path.dirname(runtimeFile),ownerFile=path.join(runtimeDirectory,'peers','owner-handover.mjs'),ownerDirectory=path.dirname(ownerFile),deploymentFile=path.join(directory,'deployment.mjs'),copy=path.join(directory,'owner.mjs'),launcher=path.join(directory,'maintenance-launch.mjs');
+ const pool=pathToFileURL(path.join(ownerDirectory,'owner-context-pool.mjs')).href;
+ fs.writeFileSync(deploymentFile,String.raw`import {createHash} from 'node:crypto';
+import {PEER_OWNER_CONTEXT_POOL_INSTRUCTION} from ${JSON.stringify(pool)};
+const hash=v=>createHash('sha256').update(v).digest('hex'),plans=new WeakMap();
+export const OWNER_MAINTENANCE_FRESH_INSTRUCTION='SYNTHETIC public fresh owner wire. '+PEER_OWNER_CONTEXT_POOL_INSTRUCTION;
+export function inspectOriginalOwnerMaintenanceFreshSupport(){return {protocol:'peer-owner-maintenance-fresh-purpose-v1',context_protocol:'peer-owner-maintenance-assignment-v1',creation_mode:'fresh-original-protected-thread',bridge_sha256:'b'.repeat(64),synthetic_source_test:true};}
+export function preflightOriginalOwnerMaintenanceFreshContext(text){const body=JSON.parse(text),input=OWNER_MAINTENANCE_FRESH_INSTRUCTION+'\n'+text,frame=JSON.stringify({SYNTHETIC:true,input}),rpc=JSON.stringify({id:1,method:'turn/start',params:{threadId:'ffffffff-ffff-7fff-bfff-ffffffffffff',input}}),plan=Object.freeze(Object.create(null));plans.set(plan,{protocol:'peer-owner-maintenance-fresh-first-rpc-v1',context_sha256:hash(text),payload_sha256:hash(text),native_identity:'UNOBSERVED_GEOMETRY_ONLY',instruction_sha256:hash(OWNER_MAINTENANCE_FRESH_INSTRUCTION),frame_sha256:hash(frame),recipe_sha256:hash('SYNTHETIC public fresh owner recipe'),frame_bytes:100000,wire_bytes:4000000,context_utf8_bytes:Buffer.byteLength(text),policy_maximum_context_bytes:body.authority.peer_policy.max_context_bytes,input_utf8_bytes:Buffer.byteLength(input),whole_rpc_utf8_bytes:Buffer.byteLength(rpc)});return plan;}
+export function inspectOriginalOwnerMaintenanceFreshPreflight(plan){if(!plans.has(plan))throw Error('SYNTHETIC original fresh wire plan required');return structuredClone(plans.get(plan));}
+`);
+ let ownerSource=fs.readFileSync(ownerFile,'utf8');
+ ownerSource=ownerSource.replace(/(['"])(\.\/[^'"]+\.mjs)\1/g,(_match,_quote,relative)=>JSON.stringify(pathToFileURL(relative==='./context-component-deployment.mjs'?deploymentFile:path.resolve(ownerDirectory,relative)).href));
+ fs.writeFileSync(copy,ownerSource);
+ fs.writeFileSync(launcher,`import {prepareOriginalPeerOwnerMaintenanceFreshReview,inspectOriginalPeerOwnerMaintenance} from ${JSON.stringify(pathToFileURL(copy).href)};
+export async function runOriginalPeerOwnerMaintenanceReview(lifecycle,args){const cap=prepareOriginalPeerOwnerMaintenanceFreshReview(lifecycle,args);return {protocol:'SYNTHETIC-public-fresh-owner-admission',binding:inspectOriginalPeerOwnerMaintenance(cap),native_executed:false,owner_activated:false};}
+`);
+ let source=fs.readFileSync(runtimeFile,'utf8');const marker="new URL('./peers/maintenance-launch.mjs',import.meta.url)";assert(source.includes(marker));source=source.replace(marker,`new URL(${JSON.stringify(pathToFileURL(launcher).href)})`);
+ source=source.replace(/(['"])(\.{1,2}\/[^'"]+\.mjs)\1/g,(_match,_quote,relative)=>JSON.stringify(pathToFileURL(relative==='./peers/owner-handover.mjs'?copy:path.resolve(runtimeDirectory,relative)).href));
+ const file=path.join(directory,'runtime.mjs');fs.writeFileSync(file,source);return (await import(pathToFileURL(file).href)).peerOwnerRuntimeAction;
+}
+
+test('actual public runtime selects the literal fresh grant through original decision and typed intent',async t=>{
+ const {f,decision,intent,grant_id}=await publicFreshTransfer(t),d=f.get('work_items',decision.decision_ref.id),i=f.get('work_items',intent.intent_ref.id),before=logicalSQLState(f);
+ assert.deepEqual(d.value.review_grant_ref,i.value.review_grant_ref);assert.equal(d.value.review_grant_ref.id,grant_id);assert.deepEqual(f.get('grants',grant_id).value.actions,[FRESH_OWNER_ACTION]);
+ const header=await invoke(req(f,'inspect_transfer_intent',{who:IN,input:{intent_ref:intent.intent_ref}}));assert.equal(header.status,'issued');
+ const part=await invoke(req(f,'read_transfer_intent',{who:IN,input:{intent_ref:intent.intent_ref,sha256:header.sha256,offset:0,length:Math.min(1024,header.total_characters)}}));assert.equal(part.sha256,header.sha256);assert.deepEqual(logicalSQLState(f),before);
+ await unchanged(f,()=>invoke(req(f,'begin',{who:IN,source_instruction:instruction,input:{operation_id:f.op(),intent_ref:intent.intent_ref}})),code('OWNER_FRESH_SOURCE_UNAVAILABLE'));
+ assert.equal(f.get('principals','founder').value.status,'active');assert.equal(f.get('grants',grant_id).value.used_model_calls,0);
+});
+
+test('public wildcard and old grant actions keep their legacy Hold rather than converting to fresh purpose',async t=>{
+ for(const actions of [['*'],['owner/handover-review']]){
+  const {f,intent,grant_id}=await publicFreshTransfer(t,{actions});
+  await unchanged(f,()=>invoke(req(f,'begin',{who:IN,source_instruction:instruction,input:{operation_id:f.op(),intent_ref:intent.intent_ref}})),code('OWNER_REVIEW_SOURCE_UNAVAILABLE'));
+  assert.equal(f.get('principals','founder').value.status,'active');assert.equal(f.get('grants',grant_id).value.used_model_calls,0);
+ }
+});
+
+test('public fresh selection still rejects a foreign actual HOST and stale original grant',async t=>{
+ const {f,intent,grant_id,input}=await publicFreshTransfer(t);
+ await unchanged(f,()=>invoke(req(f,'record_transfer_decision',{who:OTHER,source_instruction:instruction,input:{...input,operation_id:f.op()}})),code('OWNER_CHANGED'));
+ f.run('founder','grant/revoke',{grant_id});
+ await unchanged(f,()=>invoke(req(f,'begin',{who:IN,source_instruction:instruction,input:{operation_id:f.op(),intent_ref:intent.intent_ref}})),code('OWNER_REVIEW_GRANT_REQUIRED'));
+ assert.equal(f.get('work_items',intent.intent_ref.id).value.status,'issued');assert.equal(f.get('control','usage'),null);
+});
+
+test('public fresh selection authenticates the original decision and rejects a foreign typed intent',async t=>{
+ const a=await publicFreshTransfer(t),b=fixture(t);
+ await unchanged(b,()=>invoke(req(b,'issue_transfer_intent',{source_instruction:instruction,input:{operation_id:b.op(),decision_ref:a.decision.decision_ref}})),error=>error instanceof Error);
+ await unchanged(b,()=>invoke(req(b,'inspect_transfer_intent',{who:IN,input:{intent_ref:a.intent.intent_ref}})),error=>error instanceof Error);
+ assert.equal(b.get('principals','founder').value.status,'active');assert.equal(b.get('control','usage'),null);
+});
+
+test('synthetic fixed Source composition routes public fresh begin reconstruction and opaque review admission',async t=>{
+ const runtime=await runtimeWithFreshOwnerSource(t),{f,intent,grant_id}=await publicFreshTransfer(t,{runtime});
+ const begun=await invoke(req(f,'begin',{who:IN,source_instruction:instruction,input:{operation_id:f.op(),intent_ref:intent.intent_ref}}),runtime);
+ assert.equal(begun.status,'pending');const h=f.get('work_items',begun.handover_id);assert.equal(h.value.fresh_review_purpose,'peer-owner-maintenance-fresh-purpose-v1');assert.equal(h.value.creation_mode,'fresh-original-protected-thread');assert(h.value.public_transfer_binding);
+ const info=await invoke(req(f,'inspect',{who:IN,epoch:8}),runtime);let delivered='';
+ for(let offset=0;offset<info.total_characters;offset+=1024){const part=await invoke(req(f,'read_subject',{who:IN,epoch:8,input:{operation_id:f.op(),sha256:info.subject_sha256,offset,length:Math.min(1024,info.total_characters-offset)}}),runtime);delivered+=part.text;}
+ assert.equal(peerDigest(JSON.parse(delivered)),info.subject_sha256);
+ await invoke(req(f,'submit',{who:IN,epoch:8,source_instruction:instruction,input:{operation_id:f.op(),subject_sha256:info.subject_sha256,content:'SYNTHETIC full public reconstruction preserves original typed intent, complete source, failed obligations, deadlines and remaining limits.'}}),runtime);
+ const reviewed=await invoke(req(f,'review',{who:IN,epoch:8,source_instruction:instruction,input:{operation_id:f.op()}}),runtime);
+ assert.equal(reviewed.protocol,'SYNTHETIC-public-fresh-owner-admission');assert.equal(reviewed.binding.fresh_review_purpose,'peer-owner-maintenance-fresh-purpose-v1');assert.equal(reviewed.binding.native_id,null);assert.equal(reviewed.binding.reviewer_native_id,'reviewer-native');assert.equal(reviewed.native_executed,false);assert.equal(reviewed.owner_activated,false);
+ assert.equal(f.get('grants',grant_id).value.used_model_calls,1);assert.equal(f.get('control','usage').value.model_calls,1);assert.equal(f.get('control','usage:reviewer').value.model_calls,1);assert.equal(f.get('principals','founder').value.status,'pending');assert.equal(f.get('control','company').value.paused,true);
+});
+
+
+test('public ongoing fresh selection rejects current purpose drift from the original begin',async t=>{
+ const runtime=await runtimeWithFreshOwnerSource(t),{f,intent,grant_id}=await publicFreshTransfer(t,{runtime});
+ const begun=await invoke(req(f,'begin',{who:IN,source_instruction:instruction,input:{operation_id:f.op(),intent_ref:intent.intent_ref}}),runtime),h=f.get('work_items',begun.handover_id);
+ const changed={...h.value};delete changed.fresh_review_purpose;f.seed('work_items',h.id,changed);
+ await unchanged(f,()=>invoke(req(f,'inspect',{who:IN,epoch:8}),runtime),code('OWNER_FRESH_REVIEW_PURPOSE_REQUIRED'));
+ await unchanged(f,()=>invoke(req(f,'activate',{who:IN,epoch:8,source_instruction:instruction,input:{operation_id:f.op(),review_ref:{family:'work_items',id:'unqualified',revision:1,sha256:'0'.repeat(64)}}}),runtime),code('OWNER_FRESH_REVIEW_PURPOSE_REQUIRED'));
+ assert.equal(f.get('principals','founder').value.status,'pending');assert.equal(f.get('grants',grant_id).value.used_model_calls,0);
+});
+
+test('fresh public routing adds no caller-selected lifecycle purpose profile or readiness flag',()=>{
+ const base={root:'/SYNTHETIC-owner-root',session_id:OUT,action:'review',epoch:8,source_instruction:instruction,input:{operation_id:'SYNTHETIC'}};
+ for(const key of ['freshReview','fresh_review_purpose','purpose','profile','ready'])assert.throws(()=>validatePeerOwnerRequest({...base,input:{...base.input,[key]:true}},'codex'),inputError);
 });

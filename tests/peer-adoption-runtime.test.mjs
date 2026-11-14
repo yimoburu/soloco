@@ -1,5 +1,6 @@
 // Actual temporary normalized-v4 SQLite; all identities/data are fictional.
 // No fixture is a native review, execution permission or migration qualification.
+import {seedPreexistingLegacyData} from './preexisting-legacy-data-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -20,7 +21,7 @@ const code=expected=>error=>error.code===expected;
 function fixture(t,changes={}){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-adoption-read-')),team=installedTeam(),store=new Store(root,true);
  const initial={schema:2,id:'fictional-adoption-v2',name:'Fictional preparation only',idea:'Preserve full unknown obligations.',runtime_version:'0.7.8',plugin_version:team.plugin_version,governance:team.governance,governance_sha256:team.governance_sha256,roles:team.roles,cos_instructions:team.cos_instructions,team_sha256:teamHash(team),owner:{host:'codex',session_id:'fictional-owner',epoch:9},paused:true,records:{held:{id:'held',kind:'artifact',revision:1,status:'Draft',content:'Old failure remains OPEN; no retry or new grant.'}},jobs:{},sessions:{},notices:[],messages:[],context_classifications:{},unknown_future:{attempts_used:4,max_attempts:4,expiry:'2020-01-01T00:00:00.000Z',uncertain:true},...changes};
- try{store.transaction('fixture.genesis',()=>initial);store.migrate();}finally{store.close();}
+ try{seedPreexistingLegacyData(store,'fixture.genesis',()=>initial);store.migrate();}finally{store.close();}
  const file=path.join(root,'.company','company.sqlite'),db=new DatabaseSync(file);
  t.after(()=>{db.close();fs.rmSync(root,{recursive:true,force:true});});
  const request=(action,input={},extra={})=>({root,session_id:'fictional-owner',epoch:9,action,input,...extra});

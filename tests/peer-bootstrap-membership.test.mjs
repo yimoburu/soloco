@@ -70,7 +70,13 @@ test('closed nested DATA rejects getters/callbacks before any provider read or s
  f.ledger.query=function(...args){reads++;return Reflect.apply(query,this,args);};try{assert.throws(()=>f.enroll({input_refs:[bad]}),e=>e?.code==='BOOTSTRAP_INPUT');assert.throws(()=>f.enroll({input_refs:[{callback(){}}]}),e=>e?.code==='BOOTSTRAP_INPUT');}finally{f.ledger.query=query;}assert.equal(reads,0);assert.equal(getters,0);
 });
 test('ordinary model and bootstrap modules import without a top-level-await dependency cycle',async()=>{
- const {spawnSync}=await import('node:child_process');const result=spawnSync(process.execPath,['--input-type=module','-e','const m=await import(\"./plugins/soloco/runtime/peers/bootstrap-membership.mjs\");process.stdout.write(String(typeof m.createPeerBootstrapMembership));'],{cwd:new URL('..',import.meta.url),encoding:'utf8',timeout:10000});assert.equal(result.status,0,result.stderr);assert.equal(result.stdout,'function');
+ const {spawnSync}=await import('node:child_process');
+ const started=performance.now(),timeout_ms=60000;
+ const result=spawnSync(process.execPath,['--input-type=module','-e','const m=await import("./plugins/soloco/runtime/peers/bootstrap-membership.mjs");process.stdout.write(String(typeof m.createPeerBootstrapMembership));'],{cwd:new URL('..',import.meta.url),encoding:'utf8',timeout:timeout_ms,maxBuffer:65536});
+ const diagnostic=JSON.stringify({elapsed_ms:performance.now()-started,timeout_ms,status:result.status,signal:result.signal,error:result.error?{name:result.error.name,code:result.error.code,message:result.error.message}:null,stdout:result.stdout,stderr:result.stderr});
+ // A null status alone cannot distinguish a timeout, signal or failed import.
+ // Allow bounded cold startup while retaining the actual failure cause.
+ assert.equal(result.error,undefined,diagnostic);assert.equal(result.signal,null,diagnostic);assert.equal(result.status,0,diagnostic);assert.equal(result.stdout,'function',diagnostic);
 });
 for(const condition of ['expired','later-pause'])test('genuine negative diagnostic custody survives '+condition+' while old positive caps stay fenced',async t=>{
  const f=bootstrapFixture(t);f.enroll();const cap=f.prepare();f.birth(cap);const submitted=f.submit(cap),b=core.inspectOriginalPeerBootstrapMembership(cap),usage=f.get('control','usage');

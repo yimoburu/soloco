@@ -1,3 +1,4 @@
+import {assertPeerOrdinaryOriginJournalEventFrom} from './origin-ordinary-task-transition.mjs';
 // Source-owned administrative checkpoint. It grants no execution, output
 // acceptance, closure or allowance. Original semantic/native proofs stay intact.
 import {types} from 'node:util';
@@ -124,6 +125,8 @@ function bootstrapCommand(tx,event,changes,proof,ledger){
  changes.delete(canonical(['commands',command.after.id]));return {row:command.after,input:w.input,action:w.action,result:v.result};
 }
 function bootstrapValidateEvent(tx,event,changed,proof,charge,view,ledger,afterHeads,contexts,prefix){
+ if(event.type.startsWith('origin.ordinary-task.')){const ordinary=assertPeerOrdinaryOriginJournalEventFrom(tx,event);need(!['unknown','late_evidence','resumed'].includes(ordinary.step),'BOOTSTRAP_ORDINARY_TRANSITION_HELD');if(ordinary.step==='completed'){const result=event.payload.changes.filter(c=>c.family==='work_items').map(c=>bootstrapAfter(tx,c)).find(r=>r.value.kind==='origin_ordinary_task_result');need(result?.value.status==='returned'&&result.value.output?.verdict==='Pass','BOOTSTRAP_ORDINARY_TRANSITION_HELD');}changed.clear();return;}
+
  need(BOOTSTRAP_EVENTS.has(event.type)&&Array.isArray(event.payload?.events),'BOOTSTRAP_CHECKPOINT_UNSUPPORTED_TRANSITION');
  const producer=event.type.startsWith('membership/')?view.get('principals',proof.authority_company_value.founder_principal_id)?.value.legacy_owner?.session_id:'source-observer:bootstrap-membership';
  need(typeof producer==='string'&&producer.length&&event.principal_id===producer,'BOOTSTRAP_CHECKPOINT_PRODUCER_CHANGED');
@@ -209,3 +212,9 @@ export function assertPeerBootstrapInputFrontierCheckpointFrom(tx,input){
  for(const c of contexts){const expected={...source_base,scope:c.scope,input_refs:c.input_refs};need(same(c.assignment.source_cut,expected)&&hash(canonical(expected))===c.sha256&&same(c.contributors.natives,stored.body.contributors)&&Array.isArray(c.contributors.principals)&&c.contributors.principals.every(id=>typeof id==='string'&&tx.get('principals',id))&&same(c.contributors.principals,[...new Set(c.contributors.principals)].sort()),'BOOTSTRAP_CHECKPOINT_QUALIFICATION_CHANGED');}
  return {current_meaning:meaning,source_base,deadline_at_ms,contributors:copy(stored.body.contributors),authority_company_ref:copy(proof.authority_company_ref),authority_origin_ref:copy(proof.authority_origin_ref),replay:{protocol:'peer-bootstrap-checkpoint-typed-replay-v1',baseline_event:copy(proof.baseline_event),observed_through:copy(cut),namespace:{count:actual.count,sha256:actual.sha256},events:copy(observed),authority_issued:false}};
 }
+
+// New purpose reader reuses authentic existing semantic checkpoint producers;
+// it does not relabel their authority or permit an ordinary Native family.
+export function inspectPeerOrdinaryOriginMeaningFrom(tx,{ledger,current_meaning_ref}){const o=tx.get('control','origin'),seal=o&&tx.getVersion(o.value.seal_ref);need(seal?.value.kind==='origin_frontier_obligation_seal'&&seal.value.checkpoint_ref,'ORIGIN_ORDINARY_TASK_SEAL_REQUIRED');const checked=o.value.maintenance?.paused_bootstrap?assertPeerBootstrapInputFrontierCheckpointFrom(tx,{ledger,checkpoint_ref:seal.value.checkpoint_ref}).current_meaning:assertPeerInputFrontierCheckpointFrom(tx,{ledger,checkpoint_ref:seal.value.checkpoint_ref,purpose:'origin-frontier-seal'});need(same(checked.frontier_ref,current_meaning_ref.frontier_ref)&&same(checked.qualification.root_result_ref,current_meaning_ref.root_result_ref),'ORIGIN_ORDINARY_TASK_MEANING_CHANGED');return checked;}
+
+export function inspectPeerOrdinaryOriginEvidenceFrom(tx,{ledger,current_meaning_ref}){return inspectOriginalPeerInputFrontierCheckpointEvidenceFrom(tx,current_meaning_ref,{ledger});}

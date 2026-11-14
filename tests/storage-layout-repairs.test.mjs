@@ -1,3 +1,4 @@
+import {preexistingLegacyStore} from './preexisting-legacy-data-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -14,7 +15,7 @@ import {backupCompany,restoreCompany} from '../plugins/soloco/runtime/storage-tr
 const temporary=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'storage-repairs-')));
 test.after(()=>fs.rmSync(temporary,{recursive:true,force:true}));
 const seed=()=>({id:'fictional',name:'Fixture',idea:'Preserve exact evidence',team_sha256:'team',phase:'Frame',mode:'preparation',owner:{host:'codex',session_id:'incoming',epoch:2},paused:true,governance:'rules',cos_instructions:'instructions',roles:{qa:{}},records:{},jobs:{},notices:[],messages:[],upgrade_history:[]});
-function fixture(state=seed()){const root=fs.mkdtempSync(path.join(temporary,'company-'));const db=new Store(root,true);db.transaction('seed',()=>state);return {root,db};}
+function fixture(state=seed()){const root=fs.mkdtempSync(path.join(temporary,'company-'));const db=preexistingLegacyStore(root,'seed',()=>state);return {root,db};}
 // Known old layouts with exact unencoded keys and monolithic journal arrays.
 function oldLayout(version,state=seed()){
   const f=fixture(state),db=f.db.db,raw=JSON.stringify(f.db.read());

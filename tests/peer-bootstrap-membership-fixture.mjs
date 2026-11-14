@@ -5,12 +5,15 @@ import {pathToFileURL,fileURLToPath} from 'node:url';
 import {randomUUID} from 'node:crypto';
 import {PeerLedger,canonical,peerDigest} from '../plugins/soloco/runtime/peers/ledger.mjs';
 import {peerFixture} from './peer-fixture.mjs';
+import {registerSyntheticBootstrapInventoryLedger} from './peer-bootstrap-synthetic-inventory-fixture.mjs';
 
 // Real controller + membership + model joins. ONLY the explicitly MISSING
-// selected-purpose/accounting/native/preflight/closure sources below are SYNTHETIC. They
+// selected-purpose/accounting/inventory/native/preflight/closure sources below are SYNTHETIC. They
 // qualify no actual host, full-pin semantics, human approval or historical run.
 // Real typed accounting has separate Source controls. This historical fixture
-// retains its fictional predecessor rather than fabricating an origin event.
+// retains its fictional predecessors rather than fabricating an origin event.
+// Original capacity/origin rejection is covered separately by the unchanged
+// original-global-worker-inventory-peer-hold negative suite.
 const directory=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-bootstrap-source-'));
 const peers=fileURLToPath(new URL('../plugins/soloco/runtime/peers/',import.meta.url)),url=p=>pathToFileURL(p).href;
 const imports={ledger:url(path.join(peers,'ledger.mjs')),contract:url(path.join(peers,'bootstrap-membership-contract.mjs'))};
@@ -43,24 +46,82 @@ export function inspectBootstrapMembershipPreflight(plan,text){const p=plans.get
 export function captureBootstrapMembershipObservationFrom(tx,{ledger}){const c=tx.get('control','company');need(c?.value.protocol==='peer-cos-v1','BOOTSTRAP_OBSERVATION_CHANGED');return {control_ref:ref('control',c)};}
 export function assertBootstrapMembershipObservationPhysicalFrom(tx,{ledger,physical}){need(same(ref('control',tx.get('control','company')),physical.control_ref),'BOOTSTRAP_OBSERVATION_PHYSICAL_CHANGED');}
 `);
-const targets=[['model','model.mjs'],['membership','membership.mjs'],['bootstrap-membership','bootstrap-membership.mjs']];
-for(const [name,file]of targets){
- let content=fs.readFileSync(path.join(peers,file),'utf8');
- content=content.replace(/from '([^']+)'/g,(all,spec)=>{
-  if(['./bootstrap-membership-context.mjs','./origin-paused-bootstrap-accounting.mjs'].includes(spec))return `from ${JSON.stringify(url(path.join(directory,'boundary.mjs')))}`;
-  if(spec==='./protected-codex-domain.mjs')return `from ${JSON.stringify(url(path.join(directory,'native.mjs')))}`;
-  if(['./model.mjs','./membership.mjs'].includes(spec))return `from ${JSON.stringify(url(path.join(directory,path.basename(spec))))}`;
-  return spec.startsWith('./')?`from ${JSON.stringify(url(path.resolve(peers,spec)))}`:all;
- });fs.writeFileSync(path.join(directory,file),content);
+// Fixed import occurrence inventories keep production operation bodies exact.
+// Offset-based reversal also preserves the original spelling when several
+// distinct dependencies deliberately share the one SYNTHETIC boundary module.
+const expectedImports=Object.freeze({
+ "model.mjs": {
+  "./bootstrap-membership-context.mjs": 1,
+  "./bootstrap-membership-contract.mjs": 1,
+  "./executor-incarnation.mjs": 1,
+  "./handoff.mjs": 1,
+  "./ledger.mjs": 1,
+  "./origin-ordinary-task-contract.mjs": 1,
+  "./origin-ordinary-task-transition.mjs": 1,
+  "./owner-operating-state.mjs": 1,
+  "./peer-context-interpreter.mjs": 1,
+  "./prospective-local-worker-inventory-producer.mjs": 2,
+  "./review-selection.mjs": 1,
+  "node:crypto": 1
+ },
+ "membership.mjs": {
+  "./bootstrap-membership-context.mjs": 1,
+  "./bootstrap-membership-contract.mjs": 1,
+  "./ledger.mjs": 1,
+  "./model.mjs": 1,
+  "./origin-paused-bootstrap-accounting.mjs": 1,
+  "./peer-context-interpreter.mjs": 1,
+  "./review-selection.mjs": 1
+ },
+ "bootstrap-membership.mjs": {
+  "./bootstrap-membership-context.mjs": 1,
+  "./bootstrap-membership-contract.mjs": 1,
+  "./ledger.mjs": 1,
+  "./membership.mjs": 1,
+  "./model.mjs": 1,
+  "./origin-maintenance.mjs": 1,
+  "./origin-paused-bootstrap-accounting.mjs": 1,
+  "./prospective-local-worker-inventory-producer.mjs": 1,
+  "./protected-codex-domain.mjs": 1
+ },
+ "bootstrap-reviewer-profile.mjs": {
+  "./bootstrap-membership-contract.mjs": 1,
+  "./ledger.mjs": 1,
+  "./origin-paused-bootstrap-accounting.mjs": 1,
+  "node:crypto": 1,
+  "node:util": 1
+ }
+});
+function relocateSource(file){
+ const original=fs.readFileSync(path.join(peers,file),'utf8'),counts=new Map(),edits=[];let delta=0;
+ const content=original.replace(/from '([^']+)'/g,(before,spec,offset)=>{
+  counts.set(spec,(counts.get(spec)??0)+1);let destination;
+  if(['./bootstrap-membership-context.mjs','./origin-paused-bootstrap-accounting.mjs'].includes(spec))destination=url(path.join(directory,'boundary.mjs'));
+  else if(spec==='./prospective-local-worker-inventory-producer.mjs'||file==='bootstrap-membership.mjs'&&spec==='./origin-maintenance.mjs')destination=new URL('./peer-bootstrap-synthetic-inventory-fixture.mjs',import.meta.url).href;
+  else if(spec==='./protected-codex-domain.mjs')destination=url(path.join(directory,'native.mjs'));
+  else if(['./model.mjs','./membership.mjs'].includes(spec))destination=url(path.join(directory,path.basename(spec)));
+  else if(spec.startsWith('./'))destination=url(path.resolve(peers,spec));
+  const after=destination?'from '+JSON.stringify(destination):before;
+  if(after!==before){edits.push({offset:offset+delta,before,after});delta+=after.length-before.length;}
+  return after;
+ });
+ if(canonical(Object.fromEntries([...counts].sort(([a],[b])=>a<b?-1:a>b?1:0)))!==canonical(expectedImports[file]))throw Error('Exact bootstrap fixture import occurrence inventory changed: '+file);
+ let inverse=content;for(const edit of [...edits].reverse()){
+  if(inverse.slice(edit.offset,edit.offset+edit.after.length)!==edit.after)throw Error('Bootstrap fixture inverse import span changed: '+file);
+  inverse=inverse.slice(0,edit.offset)+edit.before+inverse.slice(edit.offset+edit.after.length);
+ }
+ if(inverse!==original)throw Error('Bootstrap fixture changed an actual production body: '+file);
+ return content;
 }
+for(const file of ['model.mjs','membership.mjs','bootstrap-membership.mjs'])fs.writeFileSync(path.join(directory,file),relocateSource(file));
 export const core=await import(url(path.join(directory,'bootstrap-membership.mjs'))),model=await import(url(path.join(directory,'model.mjs'))),native=await import(url(path.join(directory,'native.mjs'))),boundary=await import(url(path.join(directory,'boundary.mjs')));
-export function loadBootstrapProfile(){const file='bootstrap-reviewer-profile.mjs';let content=fs.readFileSync(path.join(peers,file),'utf8');content=content.replaceAll("'./origin-maintenance.mjs'",JSON.stringify(url(path.join(directory,'boundary.mjs'))));content=content.replace(/from '([^']+)'/g,(all,spec)=>['./origin-maintenance.mjs','./origin-paused-bootstrap-accounting.mjs'].includes(spec)?`from ${JSON.stringify(url(path.join(directory,'boundary.mjs')))}`:spec.startsWith('./')?`from ${JSON.stringify(url(path.resolve(peers,spec)))}`:all);fs.writeFileSync(path.join(directory,file),content);return import(url(path.join(directory,file)));}
+export function loadBootstrapProfile(){const file='bootstrap-reviewer-profile.mjs';fs.writeFileSync(path.join(directory,file),relocateSource(file));return import(url(path.join(directory,file)));}
 export const disposeBootstrapFixture=()=>fs.rmSync(directory,{recursive:true,force:true});
 export const actor={host:'codex',session_id:'SYNTHETIC-bootstrap-owner',native_id:'founder-native'};
 export const reference=(family,row)=>({family,id:row.id,revision:row.revision,sha256:row.sha256});
 const current=(f,family,id)=>f.ledger.read(tx=>tx.get(family,id));
 export function bootstrapFixture(t){
- const f=peerFixture({control:{paused:true,bootstrap_test_nonce:randomUUID()},principals:{founder:{legacy_owner:{host:actor.host,session_id:actor.session_id,epoch:7}},scheduler:{status:'held'},publisher:{status:'held'}}});t.after(()=>f.close());f.n=0;f.op=()=>`bootstrap-${++f.n}`;f.get=(family,id)=>current(f,family,id);f.seed=(family,id,value)=>f.ledger.write('SYNTHETIC-fixture','founder',tx=>{const old=tx.get(family,id);return tx.put(family,id,value,old?.revision??0);});
+ const f=peerFixture({control:{paused:true,bootstrap_test_nonce:randomUUID()},principals:{founder:{legacy_owner:{host:actor.host,session_id:actor.session_id,epoch:7}},scheduler:{status:'held'},publisher:{status:'held'}}});registerSyntheticBootstrapInventoryLedger(f.ledger);t.after(()=>f.close());f.n=0;f.op=()=>`bootstrap-${++f.n}`;f.get=(family,id)=>current(f,family,id);f.seed=(family,id,value)=>f.ledger.write('SYNTHETIC-fixture','founder',tx=>{const old=tx.get(family,id);return tx.put(family,id,value,old?.revision??0);});
  const c=f.get('control','company'),owner=f.get('principals','founder');f.seed('work_items','SYNTHETIC-bootstrap-purpose',{protocol:'SYNTHETIC-selected-bootstrap-purpose-v1',company_id:f.ledger.company_id,root_sha256:model.digest(f.ledger.root),control_ref:reference('control',c),owner_ref:reference('principals',owner),pause_generation:c.value.pause_generation,deadline_at_ms:Date.now()+3600000,complete_fictional_meaning:{rules:['Paused only; ordinary scheduler and publisher remain held.','Two original private phases; independent exact reconstruction review.','No ordinary/owner-QA grant issuance.','No old UNKNOWN release, retry, allowance refund or renewal.'],source:'SYNTHETIC full selected-purpose/qualified-meaning boundary; no actual native or source semantic qualification.'},full_fictional_pins:{protocol:'SYNTHETIC-full-pin-meaning-v1',governance:'Preserve all original finite limits and UNKNOWN.',cos_instructions:'Reconstruct complete fictional source, then seek exact independent review.',roles:{reviewer:'Independently verify whole original reconstruction and all negative facts.'},original_archive:'SYNTHETIC original source custody only.'},mandatory_frontier:[]});
  f.api=core.createPeerBootstrapMembership({ledger:f.ledger,actor});
  f.enroll=(extra={})=>f.api.enroll({operation_id:f.op(),epoch:7,enrollment_id:'SYNTHETIC-reviewer-enrollment',principal_id:'SYNTHETIC-new-reviewer',role:'reviewer',host:'codex',scope:'alpha',input_refs:[],expires_at:new Date(Date.now()+1800000).toISOString(),max_model_calls:2,expected_generation:0,source_instruction:'SYNTHETIC original finite bootstrap selection.',...extra});

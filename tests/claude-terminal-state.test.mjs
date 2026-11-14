@@ -4,26 +4,31 @@ import {EventEmitter} from 'node:events';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {parseOutput,runModel} from '../plugins/soloco/runtime/adapters.mjs';
+import {parseOutput} from '../plugins/soloco/runtime/adapters.mjs';
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
 import {withStore} from '../plugins/soloco/runtime/store.mjs';
 import {work} from '../plugins/soloco/runtime/worker.mjs';
+import {createOriginalAdapterProcessFixture,runOriginalAdapterWithMock,stageOriginalWorker,disposeOriginalProcessFixtures} from './original-adapter-process-fixture.mjs';
 
 const negative=JSON.stringify({content:'Fictional unresolved condition.',messages:[],notices:[],review:{verdict:'Blocked',reason:'Evidence is incomplete.'}});
 const result=(extra={})=>({type:'result',subtype:'success',session_id:'fictional-native',result:negative,...extra});
 // Synthetic original-child identity; no OS process or PID observation.
 let nextSyntheticPid=732000;
 function adapter(value,{code=0,limit}={}) {
-  return (host,native,prompt,cwd,timeout,selection,options={})=>runModel(host,native,prompt,cwd,timeout,selection,{
-    ...options,sessionTitle:undefined,...(limit?{maxOutputCharacters:limit}:{}),resolveExecutable:()=>'/fictional/claude',spawn:()=>{
-      const child=new EventEmitter();child.pid=++nextSyntheticPid;child.stdin=new EventEmitter();child.stdout=new EventEmitter();child.stderr=new EventEmitter();
-      child.kill=()=>{queueMicrotask(()=>child.emit('close',null));return true;};
-      child.stdin.end=()=>queueMicrotask(()=>{child.emit('spawn');child.stdout.emit('data',JSON.stringify(value));child.emit('close',code);});
-      return child;
-    }
-  });
+  return (host,native,prompt,cwd,timeout,selection,options={})=>{
+    const child=terminalChild(value,code),{spawn:oldSpawn,...incoming}=options;
+    return runOriginalAdapterWithMock(host,native,prompt,cwd,timeout,selection,{...incoming,sessionTitle:undefined,...(limit?{maxOutputCharacters:limit}:{}),resolveExecutable:()=>'/fictional/claude'},{child});
+  };
 }
-const invoke=(value,options,native=null)=>adapter(value,options)('claude',native,'Fictional supplied evidence only','/tmp',180000);
+function terminalChild(value,code=0){
+  const child=new EventEmitter();child.pid=++nextSyntheticPid;child.stdin=new EventEmitter();child.stdout=new EventEmitter();child.stderr=new EventEmitter();
+  child.kill=()=>{queueMicrotask(()=>child.emit('close',null));return true;};
+  child.stdin.end=()=>queueMicrotask(()=>{child.emit('spawn');child.stdout.emit('data',JSON.stringify(value));child.emit('close',code);});return child;
+}
+const invoke=(value,{code=0,limit}={},native=null)=>{
+  const child=terminalChild(value,code),fixture=createOriginalAdapterProcessFixture({host:'claude',child});
+  return fixture.run('claude',native,'Fictional supplied evidence only','/tmp',180000,null,{sessionTitle:undefined,...(limit?{maxOutputCharacters:limit}:{}),resolveExecutable:()=>'/fictional/claude'}).finally(()=>fixture.dispose());
+};
 test('Claude success requires a native identity and a nonempty text artifact',async()=>{
   for(const value of [null,[],42,result({session_id:undefined}),result({session_id:' '}),result({result:''}),result({result:{}})])
     assert.throws(()=>parseOutput('claude',JSON.stringify(value)),/Claude/);
@@ -60,6 +65,7 @@ test('failed Claude qualification worker retains its rejected review without acc
     const plan=engine.contextControl({...a,action:'plan',protocol:'scoped-context-v1',source_id:subject.id},'claude');
     const target=engine.contextControl({...a,action:'target',plan_id:plan.id,phase:'extract',unit_id:plan.units[0].id},'claude');
     const job=engine.dispatch({...a,role:'qa',review_of:target.id,task:'Review this fictional proposal only.'},'claude',{check:()=>({available:true,authenticated:true}),launch:()=>({on(){},unref(){}})});
+    stageOriginalWorker(root,job.id);
     await work(root,job.id,adapter(result(),{code:7}));
     const state=withStore(root,db=>db.read()),stored=state.jobs[job.id];
     assert.equal(stored.status,'failed');assert.equal(stored.artifact_id,undefined);
@@ -71,6 +77,7 @@ test('failed Claude qualification worker retains its rejected review without acc
     assert.equal(state.sessions[job.session_key].native_id,null);
   } finally {
     if(previous===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=previous;
+    disposeOriginalProcessFixtures(path.join(base,'company'));
     fs.rmSync(base,{recursive:true,force:true});
   }
 });

@@ -120,15 +120,16 @@ export function createCodexTaskRuntime({owner,ledger,membership,launch,qualifica
         const contextDelivery=interpreter?prepareOriginalPeerContextDelivery(interpreter,{delivery_kind:'task-context',payload_protocol:args.context.protocol,payload_text:args.context.text,payload_sha256:args.context.sha256,payload_utf8_bytes:args.context.utf8_bytes,source_cut_protocol:null,source_cut_sha256:null,source_cut_utf8_bytes:null}):null;if(contextDelivery)bindOriginalProtectedPeerContext(owner,protected_launch,contextDelivery,taskInstruction(admitted.receipt.task,args.context));
         if(protected_launch!==undefined&&isOriginalProtectedCompanionLaunch(owner,protected_launch))bindOriginalProtectedTaskAdmission(owner,protected_launch,ledger,args.task.id,args.context);
         checks('before_spawn',{task_id:args.task.id,binding:admitted.binding});
-        report=await activeTurn({owner,launch:config,admitted,context:args.context,signal:args.signal,spawn:options.spawn,protectedLaunch:protected_launch,now,limits:bound,
+        report=await activeTurn({owner,launch:config,admitted,context:args.context,signal:args.signal,spawn:spawn_child,protectedLaunch:protected_launch,now,limits:bound,
           checks:(stage,extra,which)=>checks(stage,{task_id:args.task.id,binding:admitted.binding,...extra},which),
           current:()=>{const fresh=admission(args.task,args.context);if(!same(fresh.binding,admitted.binding))fail('HOST_ACTIVE_BINDING_HELD');},
           software_prepare,contextDelivery,callbackRestriction:callback_restriction,effectSource,bind:()=>membership.host.activeClient({enrollment_id:admitted.binding.enrollment_id}),
+          onModelProcess:options.onModelProcess,onModelClosure:options.onModelClosure,
           onSpawn:process=>options.onSpawn({...process}),onQualifiedClose:()=>{qualifiedClose=true;if(rawClose)args.onClosure?.(rawClose);}});
         if(report.error)throw Object.assign(Error(report.error.message),{code:report.error.code,rejected_output:{native_id:report.native_id,text:report.output??''},termination_confirmed:qualifiedClose});
         return {native_id:report.native_id,text:report.output};
       };
-      const leaf=createNativeExecutor({cwd:config.cwd,evidence_dir:evidence_dir??path.join(ledger.directory,'evidence','p8e-codex-task'),runner,probe:()=>({available:false,authenticated:false}),spawn_process:spawn_child,now});
+      const leaf=createNativeExecutor({cwd:config.cwd,evidence_dir:evidence_dir??path.join(ledger.directory,'evidence','p8e-codex-task'),runner,probe:()=>({available:false,authenticated:false}),now});
       const result=await leaf.execute({...args,onClosure:packet=>{rawClose=packet;if(qualifiedClose)args.onClosure?.(packet);}});
       closed=result.observed_process;reports.push({task_id:args.task.id,attempt_id:args.task.value.attempt?.id,report,result});
       return {...result,transport_report:report,termination_confirmed:qualifiedClose,observed_process:closed?{...closed,close_observed:qualifiedClose}:null,...(!qualifiedClose&&!result.error?{error:{code:'HOST_CLOSURE_UNQUALIFIED',message:'Complete private process closure remains unqualified'}}:{})};
@@ -144,12 +145,15 @@ export function createCodexTaskRuntime({owner,ledger,membership,launch,qualifica
   });
 }
 
-async function activeTurn({owner,launch,admitted,context,signal,spawn,protectedLaunch,now,limits,checks,current,bind,onSpawn,onQualifiedClose,software_prepare,contextDelivery,callbackRestriction,effectSource}){
+async function activeTurn({owner,launch,admitted,context,signal,spawn,protectedLaunch,now,limits,checks,current,bind,onSpawn,onModelProcess,onModelClosure,onQualifiedClose,software_prepare,contextDelivery,callbackRestriction,effectSource}){
+  const observeProcess=onModelProcess!==undefined||onModelClosure!==undefined;
+  if(observeProcess&&(typeof onModelProcess!=='function'||typeof onModelClosure!=='function'))fail('HOST_PROCESS_OBSERVERS_REQUIRED');
   const effectDeadline=Date.now()+limits.total_ms;
   let incarnation=null,effectClient=null;
   let softwareOutstanding=0,cliQualified=false;const softwareOperations=[];
-  const combinedClose=()=>{if(cliQualified&&softwareOutstanding===0&&!physicalQualified){physicalQualified=true;onQualifiedClose();}};
+  const combinedClose=()=>{if(process&&cliQualified&&softwareOutstanding===0&&!physicalQualified){physicalQualified=true;onQualifiedClose();}};
   let child,process,protocol,callbacks,threadRequest,buffer='',physicalQualified=false,ended=false,closing=false,done=false,error=null,result=null,wireBytes=0,retained=0;
+  let observedBirth=null,rawClosed=false;
   const transcript=[],decoder=new TextDecoder('utf-8',{fatal:true}),timers=new Set();let resolve;
   const promise=new Promise(r=>{resolve=r;});
   const timer=(fn,ms)=>{const t=setTimeout(()=>{timers.delete(t);fn();},ms);timers.add(t);};
@@ -184,13 +188,22 @@ async function activeTurn({owner,launch,admitted,context,signal,spawn,protectedL
     child.on('error',hold);child.stdin.on?.('error',hold);child.stdout.on('data',b=>data(b));child.stderr.on('data',b=>data(b,true));
     child.stdout.on('end',()=>{try{buffer+=decoder.decode();ended=true;if(buffer.length)fail('WIRE_UNTERMINATED_FRAME');}catch(e){hold(e);}});
     child.once('close',(code,exitSignal)=>{
-      try{if(!ended){buffer+=decoder.decode();if(buffer.length)fail('WIRE_UNTERMINATED_FRAME');}checks('physical_close',{process,code,signal:exitSignal},['closure']);cliQualified=true;combinedClose();
+      try{
+        // This exact original emitter remains observed after finish() returned
+        // UNKNOWN. Raw CLI close is separate from whole-scope qualification;
+        // decoder/provider failures must not erase that physical observation.
+        if(observedBirth&&!rawClosed){rawClosed=true;onModelClosure(observedBirth,Object.freeze({closed_at:new Date(protectedLaunch===undefined?now():Date.now()).toISOString()}));}
+        if(!ended){buffer+=decoder.decode();if(buffer.length)fail('WIRE_UNTERMINATED_FRAME');}checks('physical_close',{process,code,signal:exitSignal},['closure']);cliQualified=true;combinedClose();
         if(softwareOutstanding)remember(Object.assign(Error('Software preparation closure remains unknown'),{code:'HOST_PREPARATION_UNKNOWN'}));
         if(!error&&protocol?.snapshot(owner).state==='terminal'){result=callbacks.close({...process,close_observed:true,...(Number.isInteger(code)?{exit_code:code}:{})});if(result.error)remember(Object.assign(Error(result.error.message),{code:result.error.code}));if(exitSignal||!Number.isInteger(code))remember(Object.assign(Error('Signal or unknown exit cannot accept output'),{code:'HOST_EXIT_UNKNOWN'}));}
         else if(!error)remember(Object.assign(Error('Physical close had no logical terminal'),{code:'HOST_TERMINAL_UNKNOWN'}));
       }catch(e){remember(e);}finish();
     });
-    child.once('spawn',()=>{try{if(!Number.isSafeInteger(child.pid)||child.pid<1)fail('HOST_PROCESS_UNOBSERVED');const birth=protectedLaunch===undefined?null:inspectOriginalProtectedCodexLaunch(owner,protectedLaunch).birth;if(birth&&birth.pid!==child.pid)fail('HOST_PROCESS_UNOBSERVED');process={pid:child.pid,started_at:birth?.at??new Date(now()).toISOString()};onSpawn(process);checks('child_spawned',{process});
+    child.once('spawn',()=>{try{if(!Number.isSafeInteger(child.pid)||child.pid<1)fail('HOST_PROCESS_UNOBSERVED');const birth=protectedLaunch===undefined?null:inspectOriginalProtectedCodexLaunch(owner,protectedLaunch).birth;if(protectedLaunch!==undefined&&(!birth||birth.pid!==child.pid||typeof birth.at!=='string'||!Number.isFinite(Date.parse(birth.at))))fail('HOST_PROCESS_UNOBSERVED');process={pid:child.pid,started_at:birth?.at??new Date(now()).toISOString()};
+      // Minimal private executor projection, not an ordinary-model journal or
+      // a caller-authored process/closure credential.
+      if(observeProcess){observedBirth=Object.freeze({pid:process.pid,spawned_at:process.started_at});const returned=onModelProcess(observedBirth);if(returned&&typeof returned.then==='function'){Promise.resolve(returned).catch(()=>{});fail('HOST_PROCESS_OBSERVER_ASYNC');}}
+      onSpawn(process);checks('child_spawned',{process});
       protocol=createPeerHostProtocol({transport,owner,process,mode:'peer',resume_native_id:admitted.binding.native_id,admit:()=>admitted.receipt,...(contextDelivery?{context_delivery:contextDelivery}:{}),
         ...(software_prepare?{software_prepare:async args=>{
           preparationArgs(args);checks('before_software_prepare');current();

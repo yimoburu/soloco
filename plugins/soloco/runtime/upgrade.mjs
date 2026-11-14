@@ -2,9 +2,9 @@ import { upgradeInspectionView } from './public-response.mjs';
 import fs from 'node:fs';
 import {sessionTitle} from './session-naming.mjs';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import {prepareOriginalUpgradeCarrierLaunchFrom,assertOriginalUpgradeWorkerFrom,prepareOriginalUpgradeModelLaunchFrom,bindOriginalUpgradeLaunchCutoffFrom,spawnOriginalUpgradeCarrierLaunch,cleanupOriginalModelLaunchFailure} from './peers/prospective-local-worker-inventory-producer.mjs';
 import { fileURLToPath } from 'node:url';
-import { PACKAGE, VERSION, SCHEMA, stamp, id, digest, withStore, requireText, teamHash, installedTeam, skillBody, upgradePending, noLink, notice, COMPATIBLE_TEAM_VERSIONS, compatibleRuntime } from './store.mjs';
+import { PACKAGE, VERSION, SCHEMA, stamp, id, digest, Store, originalStoreExecutionCustodyFrom, withStore, requireText, teamHash, installedTeam, skillBody, upgradePending, noLink, notice, COMPATIBLE_TEAM_VERSIONS, compatibleRuntime } from './store.mjs';
 import { binding, dataDir, upgradeSummary } from './engine.mjs';
 import { readiness, modelCatalog, runModel, parseArtifact } from './adapters.mjs';
 import { normalizeSelection } from './selection.mjs';
@@ -12,6 +12,27 @@ import {shallowSnapshotState,shallowSnapshotHistory,resolveSnapshotEntry,retainS
 import {operatingContext} from './operating-state.mjs';
 
 import { buildEvidence, projectionPreview, evidencePage, readEvidence, createDeliveryLedger, recordDelivery, validateCitations, validateSemanticDelivery, admitPrompt, recordResponse, boundedReplayBatches, RESPONSE_RESERVE } from './upgrade-evidence.mjs';
+
+// Canonical Source-private cutoff loans. A serialized step, caller callback or
+// copied deadline cannot issue one. Models have the original finite call cap;
+// an explicitly absent overall carrier deadline is preserved as null.
+const originalUpgradeCutoffs=new WeakMap();
+function originalUpgradeCutoff(u,{kind,call_id=null,role=null,started_at_ms,signal=null,current_guard=null}) {
+  const overall=deadline(u),at=kind==='model'?Math.min(started_at_ms+callMinutes(u)*60000,overall):overall;
+  if(!Number.isSafeInteger(started_at_ms)||kind==='model'&&!Number.isSafeInteger(at))throw Error('Invalid original upgrade call cutoff');
+  const loan=Object.freeze({});originalUpgradeCutoffs.set(loan,{uid:u.id,worker_token:u.worker.token,call_id,role,started_at_ms,deadline_at_ms:Number.isFinite(at)?at:null,signal,kind,current_guard,store:null,token:null,fault:false});return loan;
+}
+function joinOriginalUpgradeCutoff(loan,store,token) {
+  const r=originalUpgradeCutoffs.get(loan);if(!r||r.store||r.token||!(store instanceof Store))throw Error('Original upgrade cutoff already joined');r.store=store;r.token=token;bindOriginalUpgradeLaunchCutoffFrom(token,loan);
+}
+export function inspectOriginalUpgradeLaunchCutoffFrom(loan,token) {
+  const r=originalUpgradeCutoffs.get(loan);if(!r||r.token!==token||!r.store||r.store.closed)throw Error('Original upgrade cutoff required');
+  const current=()=>{const owned=originalStoreExecutionCustodyFrom(r.store),state=owned.mode==='write'?owned.state:r.store.read();owned.assert();if(state?.upgrade?.id!==r.uid||state.upgrade.worker?.token!==r.worker_token)throw Error('Original upgrade current scope changed');if(r.kind==='carrier')continuationGuard(state,state.upgrade);else {if(typeof r.current_guard!=='function')throw Error('Original upgrade call guard missing');r.current_guard(state);}owned.assert();};
+  try{if(r.store.inTransaction)current();else r.store.readSnapshot(current);}catch(error){r.fault=true;throw error;}
+  if(r.signal?.aborted||r.deadline_at_ms!==null&&Date.now()>=r.deadline_at_ms)r.fault=true;
+  if(r.fault)throw Object.assign(Error('Original upgrade cutoff expired or cancelled'),{code:'ORIGINAL_EXECUTION_UPGRADE_DEADLINE'});
+  return Object.freeze({store:r.store,uid:r.uid,worker_token:r.worker_token,call_id:r.call_id,role:r.role,deadline_at_ms:r.deadline_at_ms,signal:r.signal});
+}
 
 export const INCREMENTAL_WORKFLOW = 'incremental-v1';
 export const INCREMENTAL_V2 = 'incremental-v2';
@@ -247,7 +268,8 @@ export function upgrade(a,host,{launch=launchUpgrade,check=readiness,catalog=mod
     const selection=a.model_selection===undefined?null:normalized;
     const checkResult=check(host);
     if (!checkResult.available || checkResult.authenticated!==true) throw new Error('Selected CLI must be available and signed in for independent upgrade checks');
-    const s=withStore(a.root,db=>db.transaction('upgrade.prepared',s=>{
+    const issuingStore=new Store(a.root);let carrierLaunch;
+    try {const s=issuingStore.transaction('upgrade.prepared',s=>{
       compatible(s);
       if (s.owner.session_id!==a.session_id || s.owner.host!==host) {
         requireText(a.takeover_instruction,'explicit takeover_instruction for this founder chat');
@@ -280,14 +302,19 @@ export function upgrade(a,host,{launch=launchUpgrade,check=readiness,catalog=mod
         u.evidence.workflow_contract_sha256=workflowContract(u);
       }
       if(workflow==='incremental-v2')s.upgrade.timings={preparation_ms:Math.max(0,performance.now()-prepareStarted)};
+      const u=s.upgrade;u.worker={token:id('upgrade-worker'),state:'reserved',pid:process.pid,requested_at:stamp()};
+      const cutoff=originalUpgradeCutoff(u,{kind:'carrier',started_at_ms:Date.parse(u.worker.requested_at)});
+      carrierLaunch=prepareOriginalUpgradeCarrierLaunchFrom(issuingStore,s);joinOriginalUpgradeCutoff(cutoff,issuingStore,carrierLaunch);
       return s;
-    }));
-    try {launch(a.root,s.upgrade.id);} catch(error) {failUpgrade(a.root,s.upgrade.id,error);}
+    });
+    try {launch(a.root,s.upgrade.id,s.upgrade.worker.token,carrierLaunch);} catch(error) {cleanupOriginalModelLaunchFailure(error);failUpgrade(a.root,s.upgrade.id,error);}
     return withStore(a.root,db=>report(db.read()));
+    } finally {issuingStore.close();}
   }
   if (a.action==='resume') {
     requireText(a.source_instruction,'explicit source_instruction for upgrade resume');
-    const s=withStore(a.root,db=>db.transaction('upgrade.resumed',s=>{
+    const issuingStore=new Store(a.root);let carrierLaunch;
+    try {const s=issuingStore.transaction('upgrade.resumed',s=>{
       const u=current(s,a,host);
       if(!incremental(u))throw Error('Legacy upgrade workflow cannot resume');
       if(!['queued','checking'].includes(u.status))throw Error('Only interrupted nonfailed attempts may resume; recover this held attempt');
@@ -297,12 +324,15 @@ export function upgrade(a,host,{launch=launchUpgrade,check=readiness,catalog=mod
       if(!stopped(u.worker))throw Error('Rehearsal worker is still running or unknown');
       if((u.steps??[]).some(step=>step.state!=='returned'))throw Error('Ambiguous interrupted call; closure must be proved, never retry automatically');
       validateIncrementalReceipts(u);
-      u.status='queued';u.worker={token:id('upgrade-worker'),state:'reserved',pid:process.pid};
-      (u.continuations??=[]).push({at:stamp(),source_instruction:a.source_instruction,owner:structuredClone(s.owner),worker_token:u.worker.token});
+      const previous_worker=structuredClone(u.worker);u.status='queued';u.worker={token:id('upgrade-worker'),state:'reserved',pid:process.pid,requested_at:stamp()};
+      (u.continuations??=[]).push({at:stamp(),source_instruction:a.source_instruction,owner:structuredClone(s.owner),worker_token:u.worker.token,previous_worker});
+      const cutoff=originalUpgradeCutoff(u,{kind:'carrier',started_at_ms:Date.parse(u.worker.requested_at)});
+      carrierLaunch=prepareOriginalUpgradeCarrierLaunchFrom(issuingStore,s);joinOriginalUpgradeCutoff(cutoff,issuingStore,carrierLaunch);
       return s;
-    }));
-    try {launch(a.root,s.upgrade.id,s.upgrade.worker.token);} catch(error) {failUpgrade(a.root,s.upgrade.id,error);}
+    });
+    try {launch(a.root,s.upgrade.id,s.upgrade.worker.token,carrierLaunch);} catch(error) {cleanupOriginalModelLaunchFailure(error);failUpgrade(a.root,s.upgrade.id,error);}
     return withStore(a.root,db=>report(db.read()));
+    } finally {issuingStore.close();}
   }
   if (!['apply','verify','recover'].includes(a.action)) throw new Error('Unknown upgrade action');
   return withStore(a.root,db=>report(db.transaction(`upgrade.${a.action}`,s=>{
@@ -370,8 +400,8 @@ function recordUpgradeFailure(s,uid,error) {
 export function failUpgrade(root,uid,error) {
   withStore(root,db=>db.transaction('upgrade.failed',s=>recordUpgradeFailure(s,uid,error)));
 }
-function launchUpgrade(root,uid,token='') {
-  const child=spawn(process.execPath,['--no-warnings',path.join(PACKAGE,'runtime/upgrade.mjs'),root,uid,token],{detached:true,stdio:'ignore',env:{...process.env,COMPANY_WORKER:'1'}});
+function launchUpgrade(root,uid,token='',originalExecutionLaunch) {
+  const child=spawnOriginalUpgradeCarrierLaunch(originalExecutionLaunch,process.execPath,['--no-warnings',path.join(PACKAGE,'runtime/upgrade.mjs'),root,uid,token],{detached:true,stdio:'ignore',env:{...process.env,COMPANY_WORKER:'1'}});
   child.on('error',e=>failUpgrade(root,uid,e));child.unref();
 }
 function validateCoverage(value,u,subject,ledger) {
@@ -499,11 +529,12 @@ export async function rehearse(root,uid,model=runModel,workerToken='') {
   let token,startupHeld=false;
   try {withStore(root,db=>db.transaction('upgrade.worker_claimed',s=>{
     const u=s.upgrade;if(u?.id!==uid)throw Error('Upgrade ID does not match');
+    assertOriginalUpgradeWorkerFrom(db,s,{uid,worker_token:workerToken});
     if(u.workflow===undefined && u.workflow_rules_sha256===undefined && u.evidence?.workflow===undefined && u.evidence?.workflow_contract_sha256===undefined)return s;
     if(u.status!=='queued' || (u.worker && (u.worker.state!=='reserved' || u.worker.token!==workerToken)))throw Error('Upgrade worker already claimed; explicit resume required');
     // Record a genuine startup hold atomically, after excluding competing workers.
     try {continuationGuard(s,u);} catch(error) {startupHeld=true;return recordUpgradeFailure(s,uid,error);}
-    token=workerToken||id('upgrade-worker');u.worker={token,pid:process.pid,state:'running',started_at:stamp()};return s;
+    token=workerToken;u.worker={...u.worker,token,pid:process.pid,state:'running',started_at:stamp()};return s;
   }));} catch {return;}
   if(startupHeld)return;
   try {
@@ -628,21 +659,30 @@ Protocol: Return JSON only matching response_contract.required_json_shape for th
         const requested=structuredClone(u.model_selection??null);
         const unknownEvidence={reported_models:[],reported_effort:null,reported_service_tier:null,applied_controls:null,verification:'unverified',source:'not_reported',scope:'unknown'};
         let eligibilityError;
-        let modelStarted,modelElapsed;
+        let modelStarted,modelElapsed,callStore=null,originalExecutionLaunch=null;
+        const originalCallStarted=Date.now();
+        const callCutoff=!prior?originalUpgradeCutoff({...u,worker:{token}},{kind:'model',call_id:callId,role,started_at_ms:originalCallStarted,signal:controller.signal,current_guard:guard}):null;
         const poll=modern&&!prior?setInterval(()=>{try{check();}catch(error){eligibilityError=error;controller.abort(error);}},100):null;
         try {
           if(prior) {
             output=u.calls.find(call=>call.call_id===callId);
             if(!output || prior.state!=='returned' || digest(output.text)!==prior.output_sha256)throw Error('Missing canonical completed call receipt');
           } else {
-            if(modern)publish('upgrade.call_started',a=>a.steps.push({id:callId,role,phase:task.phase,input_sha256:inputHash,...(u.operating_input?{operating_input_sha256:u.operating_input.immutable_snapshot.sha256}:{}),...proposalBinding,budget,requested_native_id:session.native,state:'started',started_at:stamp(),worker_token:token}));
+            if(!modern)throw Error('Legacy upgrade calls have no fresh original launch authority');
+            check();callStore=new Store(root);
+            callStore.transaction('upgrade.call_started',state=>{
+              guard(state);const a=state.upgrade;
+              a.steps.push({id:callId,role,phase:task.phase,input_sha256:inputHash,...(u.operating_input?{operating_input_sha256:u.operating_input.immutable_snapshot.sha256}:{}),...proposalBinding,budget,requested_native_id:session.native,state:'started',started_at:new Date(originalCallStarted).toISOString(),worker_token:token});
+              originalExecutionLaunch=prepareOriginalUpgradeModelLaunchFrom(callStore,state,{call_id:callId});joinOriginalUpgradeCutoff(callCutoff,callStore,originalExecutionLaunch);return state;
+            });
+            check();
             modelStarted=performance.now();
-            output=await model(u.host,session.native,prompt,dir,remaining,structuredClone(requested),{sessionTitle:sessionTitle(role==='cos'?'Upgrade CoS':'Upgrade QA',session.instance),sessionNameDirectory:dir,...(Number.isFinite(deadline(u))?{executionDeadlineAt:deadline(u)}:{}),timeoutContext:'upgrade-call',timeoutReason:'Runtime execution ceiling capped by remaining immutable upgrade rehearsal deadline',signal:controller.signal});
+            output=await model(u.host,session.native,prompt,dir,remaining,structuredClone(requested),{sessionTitle:sessionTitle(role==='cos'?'Upgrade CoS':'Upgrade QA',session.instance),sessionNameDirectory:dir,...(Number.isFinite(deadline(u))?{executionDeadlineAt:deadline(u)}:{}),originalExecutionLaunch,timeoutContext:'upgrade-call',timeoutReason:'Runtime execution ceiling capped by remaining immutable upgrade rehearsal deadline',signal:controller.signal});
             modelElapsed=Math.max(0,performance.now()-modelStarted);
           }
         }
         catch(error) {if(!prior)retain(role,{...(modern?{call_id:callId,input_sha256:inputHash}:{}),phase:task.phase,model_selection:requested,model_evidence:unknownEvidence,error:error.message,...(error.code?{error_code:error.code}:{}),...(error.rejected_output?{rejected_output:error.rejected_output}:{}),...(accelerated(u)&&modelStarted!==undefined?{elapsed_ms:Math.max(0,performance.now()-modelStarted)}:{}),budget,completed_at:stamp()});throw error;}
-        finally {controllers.delete(controller);if(timer!==null)clearTimeout(timer);if(poll!==null)clearInterval(poll);}
+        finally {controllers.delete(controller);if(timer!==null)clearTimeout(timer);if(poll!==null)clearInterval(poll);if(callStore)callStore.close();}
         const completedAt=prior?output.completed_at:stamp();
         if(!prior)retain(role,{...(modern?{call_id:callId,input_sha256:inputHash,...proposalBinding}:{}),phase:task.phase,model_selection:requested,model_evidence:output.model_evidence??unknownEvidence,native_id:output.native_id??null,text:output.text,budget,response_characters:typeof output.text==='string'?output.text.length:null,estimated_response_tokens:typeof output.text==='string'?Math.ceil(output.text.length/4):null,...(accelerated(u)?{elapsed_ms:modelElapsed}:{}),completed_at:completedAt});
         if(eligibilityError)throw eligibilityError;

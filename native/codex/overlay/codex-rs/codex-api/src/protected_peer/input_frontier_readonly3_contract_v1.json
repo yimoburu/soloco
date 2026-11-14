@@ -1,0 +1,86 @@
+{
+  "protocol": "soloco-input-frontier-context-contract-v1",
+  "contract_id": "input-frontier-readonly3-whole-assignment-v1",
+  "scope_profile_id": "soloco-input-frontier-readonly-v1",
+  "context_encoding": "soloco-peer-context-frame-v2",
+  "delivery": {
+    "delivery_kind": "input-frontier-assignment",
+    "payload_protocol": "peer-input-frontier-assignment-v1",
+    "source_cut_protocol": null,
+    "kinds": [
+      "input-frontier-produce",
+      "input-frontier-review"
+    ]
+  },
+  "tools": [
+    {
+      "type": "function",
+      "name": "soloco_context_header",
+      "description": "Private input-frontier context protocol; identity and authority are supplied only by the original protected composition.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "function",
+      "name": "soloco_context_read",
+      "description": "Private input-frontier context protocol; identity and authority are supplied only by the original protected composition.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sha256": {
+            "type": "string"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "length": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4096
+          }
+        },
+        "required": [
+          "sha256",
+          "offset",
+          "length"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "function",
+      "name": "soloco_context_submit",
+      "description": "Private input-frontier context protocol; identity and authority are supplied only by the original protected composition.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sha256": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sha256",
+          "content"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ],
+  "limits": {
+    "frame_bytes": 100000,
+    "wire_bytes": 4000000,
+    "policy_maximum_context_bytes": 65536,
+    "read_maximum_characters": 4096,
+    "response_maximum_utf8_bytes": 12000
+  },
+  "fresh_thread_required": true,
+  "authority": "Source mechanical whole-assignment delivery and constructor-selected catalogue only. No finite purpose, qualified meaning, launch, spending, Native qualification or reservation release is supplied by this resource. Original pins, failures, UNKNOWN occupancy and expired or spent allowances remain unchanged."
+}

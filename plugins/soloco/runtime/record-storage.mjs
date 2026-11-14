@@ -552,3 +552,154 @@ export function readStorageIntake(db,baseline,{values=false}={}) {
   if(!same(metadata,current)||previous!==end.event_sha256)intakeHold('current end state mismatch');
   return {baseline_sha256:sha256,cut:{version:end.version,layout:end.layout,seq:end.seq,event_sha256:end.event_sha256,root:end.root},events:intake};
 }
+
+function legacyMetadataState(metadata,read,chargeWork){
+  chargeWork(metadata.entries.length);
+  const state={},define=(object,key,value)=>Object.defineProperty(object,key,{value,enumerable:true,writable:true,configurable:true});
+  const byFamily=new Map();for(const row of metadata.entries){if(!byFamily.has(row.family))byFamily.set(row.family,[]);byFamily.get(row.family).push(row);}
+  const decodeValue=row=>{
+    const bytes=read(row.sha256,{job:row.family==='jobs'}),value=JSON.parse(bytes);
+    if(row.encoding==='json')return value;
+    const descriptor=journalDescriptor({...row,bytes});
+    const children=(byFamily.get(descriptor.family)??[]).slice().sort((a,b)=>a.position-b.position);
+    if(children.length!==descriptor.length||children.some((child,n)=>child.key!==String(n)||child.position!==n||child.encoding!=='json'))intakeHold('legacy journal boundary changed');
+    return children.map(decodeValue);
+  };
+  const roots=[...(byFamily.get('root')??[]),...(byFamily.get('shape')??[])].sort((a,b)=>a.position-b.position);
+  for(const row of roots){
+    if(row.family==='root'){define(state,row.key,decodeValue(row));continue;}
+    const shape=decodeValue(row);if(!['object','array'].includes(shape))intakeHold('legacy collection shape required');
+    const value=shape==='array'?[]:{};
+    for(const child of (byFamily.get(row.key)??[]).slice().sort((a,b)=>a.position-b.position))define(value,child.key,decodeValue(child));
+    define(state,row.key,value);
+  }
+  return state;
+}
+
+// Read-only legacy routing evidence. A caller must already own an actual Store
+// snapshot and bound the rows and immutable reader before entering this helper.
+// Unlike an intake beginning at today's baseline, this checks the complete v4
+// suffix against the retained raw migration source. It issues no execution or
+// Original provenance and deliberately cannot repair an older migration line.
+export function inspectLegacyV4HistoryFrom(db,source,events,{readValue,visitState,chargeWork,assertCurrent}={}) {
+  if(layoutVersion(db)!==4||!source||typeof source!=='object'||Array.isArray(source)||!Array.isArray(events)||!events.length
+    ||[readValue,visitState,chargeWork,assertCurrent].some(fn=>typeof fn!=='function'))intakeHold('complete legacy v4 source proof required');
+  const checked=operation=>{assertCurrent();const value=operation();assertCurrent();return value;};
+  const read=(sha,options)=>checked(()=>readValue(sha,options));
+  const verify=row=>read(row.sha256,{job:row.family==='jobs'});
+  const valid=metadata=>{chargeWork(metadata.entries.length);checked(()=>validateMetadata(db,metadata,verify,read));};
+  const current=checked(()=>captureStorageMetadata(db));valid(current);
+  const decodeState=metadata=>legacyMetadataState(metadata,read,chargeWork);
+  const checkRevision=(metadata,event)=>{
+    const row=metadata.entries.find(row=>row.family==='root'&&row.key==='revision');
+    const revision=row&&JSON.parse(read(row.sha256));
+    if(!Number.isSafeInteger(revision)||revision<0||event.payload.revision!==revision)intakeHold('legacy revision boundary changed');
+  };
+  const first=events.findIndex(event=>Object.hasOwn(event.payload,'storage_delta'));
+  const boundary=first<0?events.length:first;
+  if(boundary<1||source.revision!==events[boundary-1].payload.revision)intakeHold('raw migration event anchor required');
+  for(let n=0;n<boundary;n++)if(events[n].payload.revision!==n)intakeHold('unsupported raw revision history');
+  for(let n=boundary;n<events.length;n++)if(!Object.hasOwn(events[n].payload,'storage_delta'))intakeHold('uncovered normalized legacy writer');
+  let metadata=current;
+  visitState(decodeState(current),{kind:'current',sequence:events.at(-1).seq});
+  checkRevision(current,events.at(-1));
+  const deltaFor=n=>{
+    const event=events[n],delta=event.payload.storage_delta;
+    if(!delta||typeof delta!=='object'||Array.isArray(delta)||Object.keys(delta).sort().join(',')!=='after_root,before_root,changes,layout,previous_event_sha256,sha256,version'
+      ||delta.version!==1||!same(delta.layout,current.layout)||!Array.isArray(delta.changes))intakeHold('unsupported legacy v4 delta');
+    const {sha256:seal,...body}=delta;
+    if(seal!==hash(JSON.stringify([event.seq,event.at,event.type,{...event.payload,storage_delta:body}]))||delta.previous_event_sha256!==eventHash(events[n-1]))intakeHold('legacy delta event chain changed');
+    return delta;
+  };
+  const apply=(before,delta,reverse)=>{
+    const required=reverse?'after':'before',replacement=reverse?'before':'after';
+    if(before.root!==delta[required+'_root'])intakeHold('legacy delta root changed');
+    const rows=new Map(before.entries.map(row=>[metadataId(row),row])),seen=new Set();
+    chargeWork(delta.changes.length);
+    for(const change of delta.changes){
+      if(!change||typeof change!=='object'||Array.isArray(change)||Object.keys(change).sort().join(',')!=='after,before'||(!change.before&&!change.after)
+        ||change.before&&change.after&&metadataId(change.before)!==metadataId(change.after))intakeHold('legacy delta identity changed');
+      const identity=metadataId(change.before??change.after),old=change[required],next=change[replacement];
+      if(seen.has(identity)||!same(rows.get(identity)??null,old)||same(old,next))intakeHold('legacy delta row changed');
+      seen.add(identity);if(next)rows.set(identity,next);else rows.delete(identity);
+    }
+    const next={layout:current.layout,entries:[...rows.values()].sort(metadataSort),root:delta[replacement+'_root']};valid(next);return next;
+  };
+  for(let n=events.length-1;n>=boundary;n--){
+    const delta=deltaFor(n);metadata=apply(metadata,delta,true);
+    if(n>boundary)checkRevision(metadata,events[n-1]);
+    visitState(decodeState(metadata),{kind:'retained',sequence:events[n-1].seq});
+  }
+  // Reuse the writer's own split/key/journal rules, without installing a layout,
+  // inserting an immutable value, or otherwise mutating the actual database.
+  const entries=checked(()=>split(db,source)).map(([family,key,position,value,encoding='json'])=>({family,key:String(key),position,sha256:hash(JSON.stringify(value)),encoding})).sort(metadataSort);
+  const anchor={layout:current.layout,entries,root:metadataRoot(current.layout,entries)};
+  if(!same(anchor,metadata))intakeHold('retained raw source does not prove this v4 boundary');
+  let forward=anchor;
+  for(let n=boundary;n<events.length;n++){forward=apply(forward,deltaFor(n),false);checkRevision(forward,events[n]);}
+  if(!same(forward,current))intakeHold('legacy current metadata changed');
+  assertCurrent();
+  return {layout:4,raw_prefix_events:boundary,event_sequence:events.at(-1).seq,event_sha256:eventHash(events.at(-1)),current:decodeState(current)};
+}
+
+// Frozen operating intake is a different shape from live SQL events. Validate
+// its exact materialized envelopes, chain and metadata before visiting either
+// side of an event. No caller-provided raw field becomes a body or authority.
+export function inspectFrozenLegacyIntakeFrom(db,{intake,baseline,current,expectedCut},{readValue,visitState,chargeWork,assertCurrent}={}){
+  const plain=value=>value&&typeof value==='object'&&!Array.isArray(value);
+  const closed=(value,keys)=>plain(value)&&Object.keys(value).sort().join(',')===[...keys].sort().join(',');
+  const hex=value=>typeof value==='string'&&/^[a-f0-9]{64}$/.test(value);
+  const natural=value=>Number.isSafeInteger(value)&&value>=0;
+  const fail=reason=>intakeHold('frozen legacy intake '+reason);
+  if([readValue,visitState,chargeWork,assertCurrent].some(fn=>typeof fn!=='function'))fail('reader required');
+  const checked=operation=>{assertCurrent();const value=operation();assertCurrent();return value;};
+  const read=(sha,options)=>checked(()=>readValue(sha,options));
+  const layout=value=>closed(value,['version','identity'])&&value.version===4&&hex(value.identity);
+  const pointer=value=>closed(value,['encoding','family','key','position','sha256'])&&['json','journal-array'].includes(value.encoding)&&typeof value.family==='string'&&typeof value.key==='string'&&natural(value.position)&&hex(value.sha256);
+  const cut=value=>closed(value,['version','layout','seq','event_sha256','root'])&&value.version===1&&layout(value.layout)&&natural(value.seq)&&(value.seq===0?value.event_sha256===null:hex(value.event_sha256))&&hex(value.root);
+  const metadata=value=>({layout:value.layout,entries:value.entries,root:value.root});
+  const validate=value=>{
+    chargeWork(value.entries.length);
+    checked(()=>validateMetadata(db,value,row=>read(row.sha256,{job:row.family==='jobs'}),read));
+  };
+  const baselineValue=value=>{
+    if(!closed(value,['version','layout','entries','root','seq','event_sha256','sha256'])||!Array.isArray(value.entries)||!value.entries.every(pointer)||!cut({version:value.version,layout:value.layout,seq:value.seq,event_sha256:value.event_sha256,root:value.root}))fail('baseline shape');
+    const {sha256,...body}=value;if(!hex(sha256)||sha256!==hash(JSON.stringify(body)))fail('baseline seal');validate(metadata(value));
+  };
+  if(!closed(intake,['baseline_sha256','cut','events'])||!hex(intake.baseline_sha256)||!cut(intake.cut)||!Array.isArray(intake.events)||!cut(expectedCut))fail('shape');
+  baselineValue(baseline);baselineValue(current);
+  if(intake.baseline_sha256!==baseline.sha256||!same(intake.cut,expectedCut)||!same(baseline.layout,current.layout)||!same(intake.cut,{version:current.version,layout:current.layout,seq:current.seq,event_sha256:current.event_sha256,root:current.root})||current.seq!==baseline.seq+intake.events.length)fail('endpoint binding');
+  let state=metadata(baseline),previous=baseline.event_sha256,sequence=baseline.seq;
+  visitState(legacyMetadataState(state,read,chargeWork),{sequence,phase:'baseline'});
+  const materialized=(actual,expected)=>{
+    if(expected===null){if(actual!==null)fail('null reference mismatch');return;}
+    if(!pointer(expected)||!closed(actual,['encoding','family','key','position','sha256','raw'])||typeof actual.raw!=='string')fail('reference shape');
+    const {raw,...body}=actual;if(!same(body,expected)||hash(raw)!==expected.sha256||read(expected.sha256,{job:expected.family==='jobs'})!==raw)fail('reference body mismatch');
+  };
+  for(const event of intake.events){
+    if(!closed(event,['seq','at','type','payload','changes'])||event.seq!==++sequence||typeof event.at!=='string'||event.at.length>64||!Number.isFinite(Date.parse(event.at))||typeof event.type!=='string'||event.type.length<1||event.type.length>2000||!Array.isArray(event.changes))fail('event shape');
+    const payload=event.payload;
+    if(!closed(payload,['revision','owner','storage_delta'])||!natural(payload.revision)||!closed(payload.owner,['host','session_id','epoch'])||!['codex','claude'].includes(payload.owner.host)||typeof payload.owner.session_id!=='string'||!payload.owner.session_id||!Number.isSafeInteger(payload.owner.epoch)||payload.owner.epoch<1)fail('payload shape');
+    const delta=payload.storage_delta;
+    if(!closed(delta,['version','layout','before_root','after_root','previous_event_sha256','changes','sha256'])||delta.version!==1||!same(delta.layout,state.layout)||delta.before_root!==state.root||!hex(delta.after_root)||delta.previous_event_sha256!==previous||!Array.isArray(delta.changes)||delta.changes.length!==event.changes.length)fail('delta shape or chain');
+    const {sha256:seal,...unsigned}=delta;
+    if(!hex(seal)||seal!==hash(JSON.stringify([event.seq,event.at,event.type,{...payload,storage_delta:unsigned}])))fail('event seal');
+    visitState(legacyMetadataState(state,read,chargeWork),{sequence:event.seq,phase:'before'});
+    const rows=new Map(state.entries.map(row=>[metadataId(row),row])),seen=new Set();chargeWork(delta.changes.length);
+    for(let n=0;n<delta.changes.length;n++){
+      const change=delta.changes[n],actual=event.changes[n];
+      if(!closed(change,['before','after'])||!closed(actual,['before','after'])||(!change.before&&!change.after)||change.before!==null&&!pointer(change.before)||change.after!==null&&!pointer(change.after)||change.before&&change.after&&metadataId(change.before)!==metadataId(change.after))fail('change shape');
+      materialized(actual.before,change.before);materialized(actual.after,change.after);
+      const identity=metadataId(change.before??change.after);
+      if(seen.has(identity)||!same(rows.get(identity)??null,change.before)||same(change.before,change.after))fail('change coverage');
+      seen.add(identity);if(change.after)rows.set(identity,change.after);else rows.delete(identity);
+    }
+    state={layout:state.layout,entries:[...rows.values()].sort(metadataSort),root:delta.after_root};validate(state);
+    const revision=state.entries.find(row=>row.family==='root'&&row.key==='revision');
+    if(!revision||JSON.parse(read(revision.sha256))!==payload.revision)fail('revision binding');
+    visitState(legacyMetadataState(state,read,chargeWork),{sequence:event.seq,phase:'after'});
+    previous=hash(JSON.stringify([event.seq,event.at,event.type,JSON.stringify(payload)]));
+  }
+  if(!same(state,metadata(current))||sequence!==intake.cut.seq||previous!==intake.cut.event_sha256)fail('current endpoint mismatch');
+  assertCurrent();return {events:intake.events.length,cut:intake.cut};
+}

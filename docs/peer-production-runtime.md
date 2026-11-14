@@ -122,3 +122,32 @@ They establish source routing and transaction behavior only. They grant no
 fresh model invocation, retry, allowance, continuity acceptance or permission
 to clear a notice. Real native qualification, exact-head QA, company owner
 acceptance and integration remain separate requirements.
+
+
+### Prospective ordinary tasks with complete raw input
+
+The ordinary-origin Source path is a distinct finite purpose. It preserves legacy markers, backups, all old UNKNOWN reservations and spent or expired allowances. A new supported Root HOST operation records consent externally verified by the owning CoS; software does not authenticate the human. A separately produced exact grant supplies scope, resources, data exposure, review limits and expiry inside the applicable original maintenance totals. Old bootstrap, transfer and final-seal approvals cannot be converted.
+
+The fixed `company_origin` actions are `ordinary_task_preview`, `ordinary_task_decision`, `ordinary_task_select`, `ordinary_task_review` and `ordinary_task_commit`. The review has its own readonly3 Native family and genuine private creation/drain tokens. Commit stays paused. `company_owner resume` takes the exact `qualification_ref`, consumes its selected pause generation once, and preserves the independent owner handover gates. Missing or inapplicable parent authority Holds, including a handover that invalidated the original maintenance selection; this Source slice creates no replacement parent authority.
+
+Task creation captures the qualification reference internally in its immutable definition. Context, claim, admission and effects use that exact reference, original scope and expiry. Later pause, policy, ownership, material input or Source/Native tuple change invalidates it. Membership, publication and GitHub retain separate gates. Exact replay returns the original receipt and spends nothing.
+
+This first slice carries complete originals and incidence as compulsory raw input through unchanged context limits. Overflow Holds before a model attempt. It does not implement large-company semantic home mapping, manufacture historical launch coverage or release old reservations. Source authoring and synthetic grammar cases are not Native qualification or activation; genuine Native positives require the separately reviewed real producer chain. The default unqualified backend remains unqualified.
+
+The ordinary preview resolves resources with the existing P1 canonical resource parser. A subsequent decision must carry that exact returned canonical purpose; raw resource aliases cannot silently change an approved scope.
+
+Every ordinary worker context contains the qualification’s complete original RAW and incidence in an immutable `ordinary_origin` block, including global, nonselected and UNKNOWN inputs. This block participates in the existing full-context byte limit and context hash before admission spends a call; it is never filtered to the task scope. Physical terminal guards consume only the invocation’s original prewrite proof, exact projected heads/journal, current Source tuple and earliest deadline.
+
+Qualification commit and typed resume carry their already-checked Source/native tuple through private write metadata. Their final physical guard compares that exact tuple after all SQL, inventory, fence and sidecar reads, then returns the original deadline for the ledger’s last clock check. Late-tuple rollback cases remain pending a genuine original Native issuer.
+
+The execution generation vector contains Node files relative to the runtime package. Native code and resources are pinned through the actual full Native recipe and package inventory; Node generation does not reach through repository ancestor paths.
+
+The pre-ordinary generated Native recipe is stale. The new family remains held until separate fresh Native recipe, complete overlay/binding inventory, compiled manifest, counts and seals are prepared and independently accepted; Source review supplies none of those execution or qualification gates.
+
+The task journal grammar accepts one exact `dispatch_admitted` payload only for successful task admission, bound to the same task, attempt, effect and pause/policy generations. Denied admission, reads, unchanged receipts and other ordinary task mutations accept no nested custom events.
+
+Journal producers are limited to task submit, assign, claim, admit, cancel, process, finish and closure. Consumer/helper names do not grant task-write recipes. Empty read guards produce no peer event and are not historical exemptions.
+
+Ordinary task admission stores the earliest of the original task-bound qualification deadline, task grant expiry and existing 120-second effect lease. The compulsory context retains that same immutable qualification cutoff. Existing original launch, spawn, Native permit and broker clocks inherit the shortened stored lease; a currentness check before later reads cannot extend it.
+
+Trial limitation: the existing task host requests its own callback budget (normally 60 seconds). If the original qualification has less time remaining, callback incarnation binding can conservatively Hold while the qualification is still live. This v6 cutoff repair adds no host-budget exception; a genuine trial needs an applicable remaining window or separately reviewed budget handling.

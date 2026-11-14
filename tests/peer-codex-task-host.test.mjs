@@ -6,6 +6,7 @@ import path from 'node:path';
 import {EventEmitter} from 'node:events';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {createCodexTaskRuntime,STABLE_TOOL_SHA256} from '../plugins/soloco/runtime/peers/codex-task-host.mjs';
+import {createNativeExecutor} from '../plugins/soloco/runtime/peers/scheduler.mjs';
 import {createCodexMembershipHost,decodeHostFrame} from '../plugins/soloco/runtime/peers/codex-host.mjs';
 import {stableTaskHostTools} from '../plugins/soloco/runtime/peers/host-protocol.mjs';
 import {peerDigest} from '../plugins/soloco/runtime/peers/ledger.mjs';
@@ -257,4 +258,82 @@ test('admission callback data and Promises cannot replace the original receipt o
     assert.deepEqual(f.order,['admit','on_admission']);assert.equal(f.callbackCount,1);assert.equal(f.spawnCount,0);
     assert.equal(f.ledger.read(tx=>tx.get('control','usage')).value.model_calls,1);
   });
+});
+
+// AUTHORED_UNRUN. These controls use the real executor observer implementation
+// and an exact TEST COPY of the private activeTurn body. An in-process emitter
+// is not a native child. Every turn stops before protocol/admission/binding;
+// no admitted JSON, original issuer or ordinary-ready fixture is supplied.
+// The full constructor -> genuine admission -> activeTurn positive remains
+// PLANNED until the independently reviewed fresh Source pipeline is available.
+async function observerTurnFixture(t,{close_on_end=false,qualify=false,partial_frame=false,emit_spawn=true,missing_protected_birth=false}={}){
+  const root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'soloco-task-observer-SOURCE-')));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const production=fileURLToPath(new URL('../plugins/soloco/runtime/peers/codex-task-host.mjs',import.meta.url)),original=fs.readFileSync(production,'utf8'),peers=path.dirname(production);
+  let domain;
+  if(missing_protected_birth){
+    domain=path.join(root,'missing-birth-TEST-domain.mjs');
+    fs.writeFileSync(domain,'export * from '+JSON.stringify(pathToFileURL(path.join(peers,'protected-codex-domain.mjs')).href)+';\nexport const probe={child:null};\nexport function spawnOriginalProtectedCodex(){queueMicrotask(()=>probe.child.emit("spawn"));return probe.child;}\nexport function inspectOriginalProtectedCodexLaunch(){return {birth:null};}\n');
+  }
+  const source=original.replace(/from '(\.\/[^']+)'/g,(_whole,specifier)=>'from '+JSON.stringify(pathToFileURL(domain&&specifier==='./protected-codex-domain.mjs'?domain:path.resolve(peers,specifier)).href));
+  const file=path.join(root,'task-observer-TEST-copy.mjs');fs.writeFileSync(file,source+'\nexport {activeTurn as __testOnlyActiveTurn};\n');
+  const {__testOnlyActiveTurn:turn}=await import(pathToFileURL(file).href);
+  const child=new EventEmitter(),births=[],pairs=[],processes=[],closures=[],reports=[],signals=[],stages=[];let spawns=0,qualified=0,writes=0;
+  child.pid=54323;child.stdout=new EventEmitter();child.stderr=new EventEmitter();child.stdin=new EventEmitter();
+  const close=()=>{child.stdout.emit('end');child.emit('close',0,null);};
+  child.stdin.write=()=>{writes++;assert.fail('Observer component control must stop before wire/protocol work');};
+  child.stdin.end=()=>{if(close_on_end)queueMicrotask(close);};child.kill=name=>{signals.push(name);return true;};
+  if(domain)(await import(pathToFileURL(domain).href)).probe.child=child;
+  const executor=createNativeExecutor({cwd:root,evidence_dir:path.join(root,'evidence'),probe:()=>({available:false,authenticated:false}),
+    runner:async(_host,_native,_prompt,_cwd,_timeout,_selection,options)=>{
+      const report=await turn({owner:Symbol('SOURCE observer owner'),launch,context:{},now:()=>1000000,
+        ...(missing_protected_birth?{protectedLaunch:{TEST_COPY_ONLY:true}}:{}),
+        limits:{total_ms:30,grace_ms:1,term_ms:1,kill_ms:1,frame_bytes:1000,wire_bytes:2000,transcript_bytes:2000},
+        spawn(){spawns++;queueMicrotask(()=>emit_spawn?child.emit('spawn'):close());return child;},
+        checks(stage){stages.push(stage);if(stage==='child_spawned'){if(partial_frame)child.stdout.emit('data','{');throw Object.assign(Error('SOURCE stop before protocol/admission'),{code:'SOURCE_OBSERVER_STOP'});}if(stage==='physical_close'&&!qualify)throw Object.assign(Error('SOURCE closure qualification held'),{code:'SOURCE_CLOSURE_HELD'});},
+        current(){},bind(){assert.fail('No admission/client binding is supplied');},
+        onModelProcess:birth=>{births.push(birth);return options.onModelProcess(birth);},
+        onModelClosure:(birth,receipt)=>{pairs.push({birth,receipt});return options.onModelClosure(birth,receipt);},
+        onSpawn:options.onSpawn,onQualifiedClose(){qualified++;}});
+      reports.push(report);assert.ok(report.error,'This component control cannot accept native output');
+      throw Object.assign(Error(report.error.message),{code:report.error.code,termination_confirmed:report.qualified_close});
+    }});
+  const promise=executor.execute({task:{value:{role:'research'}},context:{text:'SOURCE observer plumbing only; no P1 admission.'},onProcess:packet=>processes.push(packet),onClosure:packet=>closures.push(packet)});
+  return {child,close,promise,births,pairs,processes,closures,reports,signals,stages,get spawns(){return spawns;},get qualified(){return qualified;},get writes(){return writes;}};
+}
+
+test('unqualified actual TaskHost executor holds before spawn or lifecycle callbacks without changing its ledger',async t=>{
+  const f=fixture(t),before=f.history(),usage=f.ledger.read(tx=>tx.get('control','usage')),runtime=createCodexTaskRuntime(f.args),processes=[],closures=[];
+  const result=await runtime.executor.execute({task:{id:'SOURCE-absent-admission',value:{role:'research'}},context:{text:'Negative Source input; no admission is claimed.'},onProcess:packet=>processes.push(packet),onClosure:packet=>closures.push(packet)});
+  assert.equal(result.error.code,'HOST_LEASE_CHANGED');assert.equal(result.observed_process,null);assert.equal(result.termination_confirmed,false);
+  assert.deepEqual(processes,[]);assert.deepEqual(closures,[]);assert.deepEqual(f.counts,{admit:0,spawn:0,active:0});assert.deepEqual(f.history(),before);assert.deepEqual(f.ledger.read(tx=>tx.get('control','usage')),usage);
+});
+
+test('private TaskHost original emitter observations reach the real leaf before a closure qualifier throws',async t=>{
+  const f=await observerTurnFixture(t,{close_on_end:true}),result=await f.promise;
+  assert.equal(f.spawns,1);assert.equal(f.writes,0);assert.equal(f.births.length,1);assert.equal(f.pairs.length,1);assert.equal(f.pairs[0].birth,f.births[0]);assert.ok(Object.isFrozen(f.births[0]));assert.ok(Object.isFrozen(f.pairs[0].receipt));
+  assert.deepEqual(f.births[0],{pid:54323,spawned_at:new Date(1000000).toISOString()});assert.equal(f.processes[0].pid,54323);assert.equal(f.closures.length,1);assert.equal(f.closures[0].close_observed,true);
+  assert.equal(f.stages.filter(stage=>stage==='physical_close').length,1);assert.equal(f.qualified,0);assert.equal(f.reports[0].qualified_close,false);assert.equal(result.error.code,'SOURCE_OBSERVER_STOP');assert.equal(result.output,undefined);
+  // The leaf's raw child close is not TaskHost whole-scope qualification.
+});
+
+test('private TaskHost raw close survives final decoder failure without claiming qualified closure',async t=>{
+  const f=await observerTurnFixture(t,{close_on_end:true,partial_frame:true}),result=await f.promise;
+  assert.equal(f.pairs.length,1);assert.equal(f.pairs[0].birth,f.births[0]);assert.equal(f.closures.length,1);assert.equal(f.stages.includes('physical_close'),false);assert.equal(f.qualified,0);assert.equal(f.reports[0].qualified_close,false);assert.equal(result.error.code,'SOURCE_OBSERVER_STOP');assert.equal(result.output,undefined);
+});
+
+test('private TaskHost retains the original close listener after UNKNOWN without rewriting its first executor result',async t=>{
+  const f=await observerTurnFixture(t,{qualify:true});f.child.emit('exit',0,null);const result=await f.promise,first={...result,observed_process:{...result.observed_process}};
+  assert.equal(f.spawns,1);assert.equal(f.births.length,1);assert.deepEqual(f.signals,['SIGTERM','SIGKILL']);assert.equal(f.qualified,0);assert.equal(f.pairs.length,0);assert.equal(f.closures.length,0);assert.equal(result.termination_confirmed,false);assert.equal(result.observed_process.close_observed,false);
+  f.close();assert.equal(f.pairs.length,1);assert.equal(f.pairs[0].birth,f.births[0]);assert.equal(f.closures.length,1);assert.equal(f.qualified,1);assert.deepEqual(result,first);assert.equal(f.reports[0].qualified_close,false);
+  f.close();assert.equal(f.pairs.length,1);assert.equal(f.closures.length,1);assert.equal(f.qualified,1);assert.deepEqual(result,first);
+});
+
+test('private TaskHost close without an observed birth cannot manufacture a process or qualification',async t=>{
+  const f=await observerTurnFixture(t,{emit_spawn:false,qualify:true});await f.promise;
+  assert.equal(f.spawns,1);assert.deepEqual(f.births,[]);assert.deepEqual(f.pairs,[]);assert.deepEqual(f.processes,[]);assert.deepEqual(f.closures,[]);assert.equal(f.qualified,0);assert.equal(f.reports[0].process,undefined);assert.equal(f.reports[0].qualified_close,false);assert.equal(f.writes,0);
+});
+
+test('private protected TaskHost missing facade birth remains UNKNOWN without a controlled spawn fallback',async t=>{
+  const f=await observerTurnFixture(t,{missing_protected_birth:true,close_on_end:true}),result=await f.promise;
+  assert.equal(f.spawns,0);assert.deepEqual(f.births,[]);assert.deepEqual(f.pairs,[]);assert.deepEqual(f.processes,[]);assert.deepEqual(f.closures,[]);assert.equal(f.qualified,0);assert.equal(f.reports[0].qualified_close,false);assert.equal(result.error.code,'HOST_PROCESS_UNOBSERVED');assert.equal(f.writes,0);
 });
