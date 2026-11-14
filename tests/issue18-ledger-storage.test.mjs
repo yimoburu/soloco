@@ -14,7 +14,7 @@ const onDarwin={skip:process.platform!=='darwin',timeout:60000};
 function fixturePythonSha(){
   const fd=fs.openSync('/usr/bin/python3',fs.constants.O_RDONLY|fs.constants.O_NOFOLLOW),end=Date.now()+10000;
   try{
-    const before=fs.fstatSync(fd,{bigint:true});assert.ok(before.isFile()&&before.nlink===1n&&before.uid===0n&&before.size>0n&&before.size<=150000000n);
+    const before=fs.fstatSync(fd,{bigint:true});assert.ok(before.isFile()&&before.nlink>0n&&before.uid===0n&&(before.mode&0o022n)===0n&&before.size>0n&&before.size<=150000000n);
     const digest=createHash('sha256'),buffer=Buffer.allocUnsafe(65536);let offset=0;
     while(offset<Number(before.size)){assert.ok(Date.now()<end,'bounded fixture interpreter hash');const n=fs.readSync(fd,buffer,0,Math.min(buffer.length,Number(before.size)-offset),offset);assert.ok(n>0);digest.update(buffer.subarray(0,n));offset+=n;}
     const after=fs.fstatSync(fd,{bigint:true});for(const k of ['dev','ino','mode','uid','gid','nlink','size','mtimeNs','ctimeNs'])assert.equal(after[k],before[k]);assert.ok(Date.now()<end);return digest.digest('hex');

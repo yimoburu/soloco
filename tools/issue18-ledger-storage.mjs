@@ -61,8 +61,11 @@ function program(file,expected,system,deadlineAtMs){
   check();
   const before=fs.lstatSync(file,{bigint:true});
   const maximum=system?150000000n:65536n;
-  need(before.isFile()&&!before.isSymbolicLink()&&before.nlink===1n&&before.size>0n&&before.size<=maximum,'ISSUE18_STORAGE_PROGRAM');
-  if(system)need(before.uid===0n&&(before.mode&0o022n)===0n,'ISSUE18_STORAGE_PROGRAM');
+  need(before.isFile()&&!before.isSymbolicLink()&&before.size>0n&&before.size<=maximum,'ISSUE18_STORAGE_PROGRAM');
+  // Only this fixed root-owned system launcher may have multiple stable links.
+  // The complete version tuple below includes nlink; helper Source stays1.
+  if(system)need(file===PYTHON&&before.nlink>0n&&before.uid===0n&&(before.mode&0o022n)===0n,'ISSUE18_STORAGE_PROGRAM');
+  else need(before.nlink===1n,'ISSUE18_STORAGE_PROGRAM');
   check();
   const fd=fs.openSync(file,fs.constants.O_RDONLY|fs.constants.O_NOFOLLOW|fs.constants.O_NONBLOCK);
   try{

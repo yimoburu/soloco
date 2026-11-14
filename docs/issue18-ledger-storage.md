@@ -33,6 +33,13 @@ only and cannot adopt the original publishing session.
 This initial host adapter is deliberately limited to Darwin64, local writable
 APFS/HFS and an empty extended ACL. It checks owner/mode/link/type, retained
 directory/name identity, the Darwin `fstatfs64` ABI and libc ACL retrieval.
+Only the fixed root-owned, non-group/world-writable `/usr/bin/python3` system
+launcher may have a positive stable multi-link count. Its complete original-FD
+and named version tuple, including exact link count, plus SHA must stay equal
+before/after each bounded read. Helper Source still requires a single link and
+a separate64KiB cap. The launcher SHA does **not** prove which interpreter,
+stdlib or libc is loaded, nor same-handle execution; actual host qualification
+and explicit optional-dependency disclosure remain necessary.
 Python support, the exact ABI, binary pin, filesystem behavior and actual fsync
 acknowledgements must be qualified on the selected host. A missing symbol,
 unsupported host/filesystem/ACL retrieval or uncertain IO Holds; no pathname or
