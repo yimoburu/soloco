@@ -23,7 +23,7 @@ function fixture({clock=Date}={}){
   const original=Object.freeze({}),legacy=Object.freeze({});
   const calls={original:0,legacy:0,original_assert:0,legacy_assert:0,original_bind:0,legacy_bind:0,time_spawn:0,time_close:0};
   const eventTimes=new WeakMap(),nativeNow=Date.now;
-  let api,lastLoan,lastDescriptor,child;
+  let api,lastLoan,lastDescriptor,lastOriginalLoan,child;
   const syntheticChild=()=>{
     const value=new EventEmitter();value.pid=41001;value.stdin=new PassThrough();value.stdout=new PassThrough();value.stderr=new PassThrough();value.kill=()=>true;
     // The synthetic boundary records its event clock BEFORE observers run.
@@ -40,7 +40,7 @@ function fixture({clock=Date}={}){
     claudeNameSupport:()=>false,nameCodexSession:unavailable,writeNamingReceipt:unavailable,
     assertOriginalModelLaunchToken:token=>{calls.original_assert++;if(token!==original)throw Object.assign(Error('Original token required'),{code:'ORIGINAL_EXECUTION_PRIVATE_LAUNCH_REQUIRED'});return {deadline_at_ms:null};},
     bindOriginalModelAdapterCutoffFrom:()=>false,
-    bindOriginalAdapterLaunchCutoffFrom:(token,loan)=>{assert.equal(token,original);api.inspectOriginalAdapterLaunchCutoffFrom(loan,token);calls.original_bind++;},
+    bindOriginalAdapterLaunchCutoffFrom:(token,loan)=>{assert.equal(token,original);api.inspectOriginalAdapterLaunchCutoffFrom(loan,token);lastOriginalLoan=loan;calls.original_bind++;},
     spawnOriginalModelLaunch:token=>{assert.equal(token,original);calls.original++;return syntheticChild();},
     originalWorkerFailedLaunchChild:()=>null,originalModelFailedLaunchChild:()=>null,cleanupOriginalWorkerLaunchFailure:()=>false,cleanupOriginalModelLaunchFailure:()=>false,
     isLegacyRuntimeModelCapabilityFrom:token=>token===legacy,
@@ -54,11 +54,11 @@ function fixture({clock=Date}={}){
       calls['time_'+event]++;return time;
     }
   };
-  const names=['runModel','runRuntimeModel','commandArgs','inspectLegacyRuntimeAdapterLoanFrom','assertRuntimeAdapterModelBirthFrom','assertRuntimeAdapterModelClosureFrom'];
+  const names=['runModel','runRuntimeModel','commandArgs','inspectOriginalAdapterLaunchCutoffFrom','inspectLegacyRuntimeAdapterLoanFrom','assertRuntimeAdapterModelBirthFrom','assertRuntimeAdapterModelClosureFrom'];
   api=vm.runInNewContext(body('adapters.mjs')+'\n;({'+names.join(',')+'});',deps,{filename:'actual-adapter-source.mjs',timeout:1000});
   const options=token=>({...(token===legacy?{runtimeExecutionLaunch:token}:{originalExecutionLaunch:token}),timeoutReason:executionTimeoutReason,resolveExecutable:()=>'/synthetic/codex'});
   const invoke=(fn,opts)=>fn('codex',null,'SOURCE-only fixture prompt','/synthetic/work',executionTimeoutMs,null,opts);
-  return {api,original,legacy,calls,options,invoke,get loan(){return lastLoan;},get descriptor(){return lastDescriptor;},get child(){return child;},get observedTimes(){const value=eventTimes.get(child);return value?{...value}:null;}};
+  return {api,original,legacy,calls,options,invoke,get loan(){return lastLoan;},get originalLoan(){return lastOriginalLoan;},get descriptor(){return lastDescriptor;},get child(){return child;},get observedTimes(){const value=eventTimes.get(child);return value?{...value}:null;}};
 }
 const isCode=code=>error=>error?.code===code;
 
@@ -97,6 +97,10 @@ test('forwarding wrappers retain the strict Original route through the ordinary 
   const forwarding=async(...args)=>{await Promise.resolve();return f.api.runRuntimeModel(...args);};
   await assert.rejects(f.invoke(forwarding,f.options(f.original)),isCode('ROLE_EXIT_ERROR'));
   assert.equal(f.calls.original,1);assert.equal(f.calls.original_bind,1);assert.equal(f.calls.legacy,0);assert.equal(f.calls.time_spawn+f.calls.time_close,0);
+  const cutoff=f.api.inspectOriginalAdapterLaunchCutoffFrom(f.originalLoan,f.original);
+  assert.equal(Object.isFrozen(cutoff),true);assert.ok(Number.isSafeInteger(cutoff.deadline_at_ms)&&cutoff.deadline_at_ms>Date.now());assert.equal(cutoff.signal,null);
+  assert.throws(()=>f.api.inspectOriginalAdapterLaunchCutoffFrom({...f.originalLoan},f.original),isCode('ORIGINAL_EXECUTION_ADAPTER_CUTOFF_REQUIRED'));
+  assert.throws(()=>f.api.inspectOriginalAdapterLaunchCutoffFrom(f.originalLoan,f.legacy),isCode('ORIGINAL_EXECUTION_ADAPTER_CUTOFF_REQUIRED'));
 });
 
 test('injected lifecycle clock cannot extend the private real-clock startup cutoff',async()=>{
