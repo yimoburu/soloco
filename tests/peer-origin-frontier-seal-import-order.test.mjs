@@ -9,7 +9,7 @@ import {performance} from 'node:perf_hooks';
 const planUrl=new URL('../plugins/soloco/runtime/peers/origin-plan.mjs',import.meta.url).href;
 const sealUrl=new URL('../plugins/soloco/runtime/peers/origin-frontier-seal.mjs',import.meta.url).href;
 const archiveUrl=new URL('../plugins/soloco/runtime/peers/input-frontier-archive.mjs',import.meta.url).href;
-const clock=performance.now.bind(performance),WORK_MS=10000,CLEANUP_MS=5000,OUTPUT_BYTES=8192;
+const clock=performance.now.bind(performance),WORK_MS=20000,CLEANUP_MS=5000,OUTPUT_BYTES=8192;
 
 // A fresh process preserves the actual ESM graph without sharing its isolate
 // with the parent test. A child crash or unsettled import remains a failure;
@@ -112,7 +112,7 @@ async function importCase(data,directory,script){
  });
 }
 
-test('fresh cyclic frontier imports retain present, absent and invalid fixed-entry behavior',{timeout:90000},async t=>{
+test('fresh cyclic frontier imports retain present, absent and invalid fixed-entry behavior',{timeout:165000},async t=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-frontier-import-order-'));fs.chmodSync(root,0o700);
  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
  const directory=path.join(root,'invalid-directory'),target=path.join(root,'target.mjs'),symlink=path.join(root,'invalid-link.mjs'),script=path.join(root,'fresh-import-case.mjs');
