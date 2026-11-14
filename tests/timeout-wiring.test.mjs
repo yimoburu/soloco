@@ -362,9 +362,17 @@ test('startup expiry aborts without inventing spawn timing and launch errors ret
   assert.equal(h.state.jobs[job.id].execution_failure.outcome,'timeout');assert.equal(h.intervals.size,0);
   const f=harness(),failed=f.dispatch();
   await f.worker.work('/fixture',failed.id,async()=>{throw Object.assign(new Error('Spawn failed'),{code:'ENOENT'});});
-  assert.equal(f.state.jobs[failed.id].execution_started_at,undefined);
-  assert.equal(f.state.jobs[failed.id].execution_failure.code,'ENOENT');
-  assert.equal(f.state.jobs[failed.id].execution_failure.termination_confirmed,undefined);assert.equal(f.intervals.size,0);
+  const current=f.state.jobs[failed.id],invocations=current.model_process_tracking.invocations;
+  assert.equal(current.execution_started_at,undefined);assert.equal(current.status,'failed');
+  assert.equal(current.execution_failure.code,'ENOENT');assert.equal(current.execution_failure.message,'Spawn failed');assert.equal(current.execution_failure.outcome,'failure');
+  // This VM records a synthetic model birth before invoking the runner. An
+  // ENOENT label without a close receipt cannot prove that child never existed
+  // or release its claim; the original failure and UNKNOWN closure both remain.
+  assert.equal(invocations.length,1);assert.ok(invocations[0].birth);assert.equal(invocations[0].closure,null);
+  assert.equal(current.execution_failure.termination_confirmed,false);
+  assert.equal(current.coordination_release.termination_confirmed,false);assert.equal(current.coordination_release.reason,'original_process_closure_unknown');
+  assert.equal(current.artifact_id,undefined);assert.equal(Object.values(f.state.records).some(record=>record.job_id===failed.id),false);
+  assert.equal(f.intervals.size,0);
 });
 
 test('coordination dispatch binds prerequisite evidence, admits disjoint resources and rejects premature/conflicting work',async()=>{

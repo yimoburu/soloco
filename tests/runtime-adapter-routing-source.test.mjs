@@ -13,6 +13,7 @@ import {PassThrough} from 'node:stream';
 // complete synthetic dependency graph. The fake child is not a real process,
 // a Store witness, Original custody, Native qualification or provider evidence.
 const directory=new URL('../plugins/soloco/runtime/',import.meta.url);
+const executionTimeoutMs=1000,executionTimeoutReason='Bounded SOURCE-only synthetic adapter lifecycle';
 function body(name){
   let source=fs.readFileSync(new URL(name,directory),'utf8').replace(/^import .*;\r?\n/gm,'');
   const entry=source.indexOf('if(process.argv[1]');if(entry>=0)source=source.slice(0,entry);
@@ -55,8 +56,8 @@ function fixture({clock=Date}={}){
   };
   const names=['runModel','runRuntimeModel','commandArgs','inspectLegacyRuntimeAdapterLoanFrom','assertRuntimeAdapterModelBirthFrom','assertRuntimeAdapterModelClosureFrom'];
   api=vm.runInNewContext(body('adapters.mjs')+'\n;({'+names.join(',')+'});',deps,{filename:'actual-adapter-source.mjs',timeout:1000});
-  const options=token=>({...(token===legacy?{runtimeExecutionLaunch:token}:{originalExecutionLaunch:token}),resolveExecutable:()=>'/synthetic/codex'});
-  const invoke=(fn,opts)=>fn('codex',null,'SOURCE-only fixture prompt','/synthetic/work',1000,null,opts);
+  const options=token=>({...(token===legacy?{runtimeExecutionLaunch:token}:{originalExecutionLaunch:token}),timeoutReason:executionTimeoutReason,resolveExecutable:()=>'/synthetic/codex'});
+  const invoke=(fn,opts)=>fn('codex',null,'SOURCE-only fixture prompt','/synthetic/work',executionTimeoutMs,null,opts);
   return {api,original,legacy,calls,options,invoke,get loan(){return lastLoan;},get descriptor(){return lastDescriptor;},get child(){return child;},get observedTimes(){const value=eventTimes.get(child);return value?{...value}:null;}};
 }
 const isCode=code=>error=>error?.code===code;
@@ -65,6 +66,8 @@ test('strict runModel rejects a genuine legacy capability and does not enter the
   const f=fixture();
   await assert.rejects(f.invoke(f.api.runModel,f.options(f.legacy)),isCode('ORIGINAL_EXECUTION_LAUNCH_GATE_REQUIRED'));
   await assert.rejects(f.invoke(f.api.runModel,{...f.options(f.original),originalExecutionLaunch:f.legacy}),isCode('ORIGINAL_EXECUTION_PRIVATE_LAUNCH_REQUIRED'));
+  const unreasoned=f.options(f.original);delete unreasoned.timeoutReason;
+  await assert.rejects(f.invoke(f.api.runModel,unreasoned),/A custom execution timeout requires a reason/);
   assert.equal(f.calls.legacy,0);assert.equal(f.calls.legacy_assert,0);assert.equal(f.calls.original,0);
 });
 
@@ -72,15 +75,18 @@ test('ordinary facade rejects forged and mixed capability fields before creation
   const f=fixture();
   await assert.rejects(f.invoke(f.api.runRuntimeModel,{...f.options(f.legacy),runtimeExecutionLaunch:{}}),isCode('RUNTIME_EXECUTION_MODEL_CAPABILITY_REQUIRED'));
   await assert.rejects(f.invoke(f.api.runRuntimeModel,{...f.options(f.legacy),originalExecutionLaunch:f.original}),isCode('RUNTIME_EXECUTION_MODEL_CAPABILITY_REQUIRED'));
+  const unreasoned=f.options(f.legacy);delete unreasoned.timeoutReason;
+  await assert.rejects(f.invoke(f.api.runRuntimeModel,unreasoned),/A custom execution timeout requires a reason/);
   assert.equal(f.calls.original+f.calls.legacy,0);
 });
 
 test('legacy facade binds final Source descriptor and private observations without Original issuance',async()=>{
-  const f=fixture();let birth,receipt;
-  await assert.rejects(f.invoke(f.api.runRuntimeModel,{...f.options(f.legacy),onModelProcess:value=>{f.api.assertRuntimeAdapterModelBirthFrom(f.legacy,value);birth=value;},onModelClosure:(value,close)=>{f.api.assertRuntimeAdapterModelClosureFrom(f.legacy,value,close);receipt=close;}}),isCode('ROLE_EXIT_ERROR'));
+  const f=fixture();let birth,receipt,timing;
+  await assert.rejects(f.invoke(f.api.runRuntimeModel,{...f.options(f.legacy),onModelProcess:value=>{f.api.assertRuntimeAdapterModelBirthFrom(f.legacy,value);birth=value;},onModelClosure:(value,close)=>{f.api.assertRuntimeAdapterModelClosureFrom(f.legacy,value,close);receipt=close;},onSpawn:value=>{timing=value;}}),isCode('ROLE_EXIT_ERROR'));
   assert.equal(f.calls.legacy,1);assert.equal(f.calls.legacy_bind,1);assert.equal(f.calls.original_assert,0);assert.equal(f.calls.original,0);
   assert.equal(f.descriptor.command,'/synthetic/codex');assert.deepEqual([...f.descriptor.args],[...f.api.commandArgs('codex',null,null)]);
   assert.equal(f.descriptor.options.cwd,'/synthetic/work');assert.deepEqual([...f.descriptor.options.stdio],['pipe','pipe','pipe']);
+  assert.equal(f.descriptor.execution_timeout_ms,executionTimeoutMs);assert.equal(timing.timeout_ms,executionTimeoutMs);assert.equal(timing.timeout_reason,executionTimeoutReason);
   assert.equal(Object.isFrozen(f.descriptor),true);assert.equal(Object.isFrozen(f.descriptor.args),true);assert.equal(Object.isFrozen(f.descriptor.options.env),true);
   assert.equal(birth.pid,f.child.pid);assert.equal(receipt.exit_code,1);
   assert.throws(()=>f.api.inspectLegacyRuntimeAdapterLoanFrom(f.loan,{}),isCode('RUNTIME_EXECUTION_ADAPTER_REQUIRED'));
