@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {gradeSummary,expected,assess,runScale,contractModel} from '../tools/context-reuse-outcome-eval.mjs';
 import {sandboxCapability} from '../plugins/soloco/runtime/local-sandbox.mjs';
+import {workOriginal,disposeCoreOriginalWorkerFixtures} from './core-original-worker-fixture.mjs';
 const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-context-reuse-eval-test-'));
 test.after(()=>fs.rmSync(tmp,{recursive:true,force:true}));
 test('frozen semantic grader rejects omitted, permissive and malformed reconstruction',()=>{
@@ -19,9 +20,11 @@ test('assessment cannot promote missing scales, changed source or unexecuted cou
  assert.equal(assess(scales,{passed:false}).passed,false);
  scales[2].arms[2].receipt.tests_executed=true;assert.equal(assess(scales,{passed:true}).passed,false);
 });
-test('real worker, sandbox, native provenance contracts and fresh receiving QA accept executed and reused outcomes',{skip:sandboxCapability().supported?false:sandboxCapability().blocker},async()=>{
+test('Source Original worker and sandbox accept controlled executed and reused outcomes with fresh receiving QA DATA',{skip:sandboxCapability().supported?false:sandboxCapability().blocker},async t=>{
+ const previous=process.env.COMPANY_PLUGIN_DATA;
+ t.after(()=>{disposeCoreOriginalWorkerFixtures(path.join(tmp,'scale-1'));if(previous===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=previous;});
  process.env.COMPANY_PLUGIN_DATA=path.join(tmp,'plugin-data');
- const r=await runScale({directory:tmp,scale:1,model:contractModel()});
+ const r=await runScale({directory:tmp,scale:1,model:contractModel({reportSpawn:false}),worker:workOriginal});
  assert.equal(r.accepted,true,JSON.stringify(r.errors));assert.equal(r.arms.length,3);
  assert.deepEqual(r.arms.map(a=>a.receipt.tests_executed),[true,true,false]);
  assert.deepEqual(r.arms.map(a=>a.receipt.reused),[false,false,true]);
