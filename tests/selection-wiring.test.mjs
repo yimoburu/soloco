@@ -194,7 +194,7 @@ test('upgrade reuses the optional dispatch selection schema with unchanged requi
   assert.deepEqual(schema.properties.action.enum,['inspect','prepare','resume','apply','verify','recover']);
 });
 
-for(const version of ['0.7.6','0.7.7'])test(`compatible patch preserves explicit model-selection dispatch for a pinned ${version} team`,async()=>{
+for(const version of ['0.7.6','0.7.7','0.7.8'])test(`compatible patch preserves explicit model-selection dispatch for a pinned ${version} team`,async()=>{
   const h=harness('codex');h.mutate(s=>{s.plugin_version=version;s.runtime_version=version;});
   const job=await h.call({model_selection:{mode:'default',reason:'Retain the supported pinned team'}});
   assert.equal(job.status,'queued');assert.equal(h.launches.length,1);

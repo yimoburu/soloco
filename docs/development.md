@@ -14,7 +14,7 @@ v0.7.3 packages the accepted proactive CoS behavior and SPEC v0.20 alongside the
 
 v0.7.3 packages the proactive CoS instructions and SPEC v0.20, with explicit published v0.7.2 compatibility. See [release validation](release-v0.7.3-validation.md). Existing company pins remain unchanged until checked adoption.
 
-The current v0.7.8 source carries SPEC v0.21. Its notice, follow-through and
+The current v0.7.9 source carries SPEC v0.21. Its notice, follow-through and
 current-meaning clarifications have separate contract identity; exact published
 v0.20 remains eligible for the existing local development/prototype workflows.
 The frozen v0.20 fixture and both explicit capability allowlists prevent a source
@@ -23,8 +23,11 @@ original scope. See [founder-benefit acceptance](founder-benefit-acceptance.md)
 for prospective outcome measurements and [SPEC reconciliation](spec-reconciliation.md)
 for current claim/evidence boundaries.
 
-v0.7.8 packages the current runtime under a distinct version and retains explicit
-v0.7.7 runtime, pinned-team and capability compatibility. Publish changed runtime
+v0.7.9 packages the merged runtime, including frozen context intake and bounded
+development-budget controls, under a distinct version. It retains explicit
+v0.7.8 runtime, pinned-team and capability compatibility, including companies
+pinned to v0.7.5 and exact published v0.20 governance. Existing grants and native
+qualification holds retain their scope; installation does not adopt definitions. Publish changed runtime
 payloads with a new package version so installation uses a distinct cache
 directory and generated Codex MCP launch path. Replacing files under an unchanged
 version can leave an existing MCP process using its previously imported modules.
@@ -90,7 +93,7 @@ Notices track presentation attempts, seen status, and resolution separately. Sta
 
 `company_develop` provides `inspect`, `plan`, `authorize`, `run`, `accept` and `revoke`. New development needs a supported adopted team and source v0.21 or exact published v0.20/v0.19/v0.18 governance; installation does not adopt them. Company mode stays preparation: authority is attached to the specific standing local scope, never to a global unrestricted mode. Separate company objectives, source/data choices, expiry and attempt/time/output limits from framework identity, integrity and independent-review enforcement.
 
-The retained published v0.18 SHA-256 is `185933ddeafe9709bef44e9a6605ba7adb5faaa8bc43c1c64f1da3b03ae5f400`. Both local capability gates explicitly accept it alongside the installed governance hash; prototype also retains the exact v0.17 hash. Development retains adopted supported v0.5.0, v0.6.0–v0.6.13 and v0.7.0–v0.7.8 teams, including v0.7.6, v0.7.7 and v0.7.8; prototype additionally retains v0.4.0/v0.4.1 teams. These are the current explicit source allowlists, not a general compatibility promise. Unknown/modified governance and unsupported teams hold affected workflows. Compatibility preserves pinned governance, instructions, team hash and existing grant records; it grants no new authority and does not bypass expiry, changed constraints, review, ownership or sandbox checks. The unchanged CoS skill already defers to pinned governance and describes standing scope and exact-output review, so this reconciliation requires no procedure amendment.
+The retained published v0.18 SHA-256 is `185933ddeafe9709bef44e9a6605ba7adb5faaa8bc43c1c64f1da3b03ae5f400`. Both local capability gates explicitly accept it alongside the installed governance hash; prototype also retains the exact v0.17 hash. Development retains adopted supported v0.5.0, v0.6.0–v0.6.13 and v0.7.0–v0.7.9 teams, including v0.7.6, v0.7.7 and v0.7.8; prototype additionally retains v0.4.0/v0.4.1 teams. These are the current explicit source allowlists, not a general compatibility promise. Unknown/modified governance and unsupported teams hold affected workflows. Compatibility preserves pinned governance, instructions, team hash and existing grant records; it grants no new authority and does not bypass expiry, changed constraints, review, ownership or sandbox checks. The unchanged CoS skill already defers to pinned governance and describes standing scope and exact-output review, so this reconciliation requires no procedure amendment.
 
 A scope snapshots explicitly selected UTF-8 source files and hashes, exact editable/new paths and Node test paths, acceptance, stop conditions and data policy. Planning requires the founder's source instruction and `model_data_approved: true` before reading or returning source contents; later authorization records the exact work scope. Do not defer source-sharing consent until after the bytes have reached a model. Current capability ceilings are 32 paths, a project-configured development byte ceiling (100,000 bytes by default; documented below), 10 generation attempts, 120 seconds per test run, 100,000 test-output bytes and thirty days. Company choices may be narrower. Source sharing with the configured model host is explicit; no synthetic-only rule applies here. Data classification and semantic acceptance require founder/reviewer judgment.
 
