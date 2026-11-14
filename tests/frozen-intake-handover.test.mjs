@@ -78,16 +78,48 @@ async function publish(f,t,label){
 
 const launch={check:()=>({available:true,authenticated:true}),launch:()=>({on(){},unref(){}})};
 const reconstruct=f=>engine.handover({...f,action:'submit',protocol:'operating-handover-v4',content:'FICTIONAL reconstruction preserves complete accepted obligations, failed history and uncertainty. Remaining allowance ZERO. No execution or exposure authority. Independent exact review is required before preparation resumes.'},'codex');
-async function handoverPass(f,r){
+async function handoverPass(f,r,t,label){
  const q=engine.dispatch({...f,role:'qa',review_of:r.id,task:'FICTIONAL independent exact frozen-intake handover judgment.'},'codex',launch);
- const state=read(f),packet=assignmentContext(state,state.jobs[q.id]),stream=packet.handover_evidence.sources[packet.handover_evidence.pages[0].source_id],subjectHash=state.records[r.id].handover.subject_sha256;let offset=0,first=true,pending=null,deliveredCharacters=0;
+ const state=read(f),packet=assignmentContext(state,state.jobs[q.id]),stream=packet.handover_evidence.sources[packet.handover_evidence.pages[0].source_id],subjectHash=state.records[r.id].handover.subject_sha256,reads=[];
+ if(label==='incoming')assert.ok(stream.length>200000,'Successor handover must retain the complete oversized semantic stream');
+ // Use the protocol's bounded range capacity, as publication above does. These
+ // planning reads are not delivery; only exact adapter packets drain the queue.
+ for(let offset=0;offset<stream.length;){
+  let length=Math.min(32768,stream.length-offset);
+  const request=()=>({source_id:stream.source_id,sha256:stream.sha256,offset,length});
+  for(;;){
+   assert.ok(length>0,'A complete range must fit without truncation');
+   const last=stream.raw.charCodeAt(offset+length-1),next=stream.raw.charCodeAt(offset+length);
+   if(last>=0xd800&&last<=0xdbff&&next>=0xdc00&&next<=0xdfff)length--;
+   assert.ok(length>0,'A complete surrogate pair must fit without splitting');
+   if(JSON.stringify(readEvidence(packet.handover_evidence,request())).length<=180000)break;
+   length=Math.floor(length/2);
+  }
+  reads.push(request());offset+=length;
+ }
+ const rangeCount=reads.length;let first=true,pending=null,requestedCharacters=0,deliveredCharacters=0,deliveredRanges=0,deliveryRounds=0,adapterCalls=0,maximumRequestedRanges=0,maximumDeliveredRanges=0;
  await work(f.root,q.id,async(_host,_session,_prompt,_dir,timeout,_selection,options)=>{
+  adapterCalls++;
   if(first){first=false;options.onSpawn(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));}
-  if(pending){const delivered=JSON.parse(_prompt);assert.equal(delivered.protocol,'handover-frozen-reads-v1');assert.equal(delivered.reads.length,1);assert.deepEqual(delivered.deferred,[]);const range=delivered.reads[0];for(const key of ['source_id','sha256','offset','length'])assert.equal(range[key],pending[key]);assert.equal(range.text,stream.raw.slice(pending.offset,pending.offset+pending.length));deliveredCharacters+=range.length;pending=null;}
-  if(offset<stream.length){const start=offset;let length=Math.min(16000,stream.length-offset);const last=stream.raw.charCodeAt(start+length-1);if(last>=0xd800&&last<=0xdbff)length--;offset+=length;pending={source_id:stream.source_id,sha256:stream.sha256,offset:start,length};return {native_id:'fictional-handover-'+q.id,text:JSON.stringify({reads:[pending]})};}
+  if(pending){
+   const delivered=JSON.parse(_prompt);assert.equal(delivered.protocol,'handover-frozen-reads-v1');assert.ok(delivered.reads.length>0&&delivered.reads.length<=pending.length);
+   for(const [index,range] of delivered.reads.entries()){
+    const expected=reads.shift();assert.deepEqual(expected,pending[index]);
+    for(const key of ['source_id','sha256','offset','length'])assert.equal(range[key],expected[key]);
+    assert.equal(expected.offset,deliveredCharacters,'Delivery must be contiguous and never duplicated');
+    assert.equal(range.text,stream.raw.slice(expected.offset,expected.offset+expected.length),'Complete UTF-16 range reached the adapter');
+    deliveredCharacters+=range.length;deliveredRanges++;
+   }
+   assert.deepEqual(delivered.deferred,pending.slice(delivered.reads.length),'Deferred ranges must stay queued');
+   maximumDeliveredRanges=Math.max(maximumDeliveredRanges,delivered.reads.length);deliveryRounds++;pending=null;
+  }
+  if(reads.length){pending=reads.slice(0,4);maximumRequestedRanges=Math.max(maximumRequestedRanges,pending.length);requestedCharacters=Math.max(requestedCharacters,...pending.map(range=>range.offset+range.length));return {native_id:'fictional-handover-'+q.id,text:JSON.stringify({reads:pending})};}
   return {native_id:'fictional-handover-'+q.id,text:JSON.stringify({content:'FICTIONAL exact subject judgment; no native semantic acceptance.',messages:[],notices:[],citations:JSON.parse(packet.text).evidence_protocol.citations.slice(0,1),review:{verdict:'Pass',reason:'FICTIONAL complete conditions retained.',permitted_action:'resume_handover',subject_sha256:subjectHash,blockers:[]}})};
  });
- const done=read(f),job=done.jobs[q.id];assert.equal(job.status,'completed',jobDiagnostic(job,{stream_characters:stream.length,requested_characters:offset,delivered_characters:deliveredCharacters}));assert.equal(deliveredCharacters,stream.length);assert.equal(pending,null);assert.equal(job.coordination_release.termination_confirmed,true);assert.equal(done.records[job.artifact_id].handover_evidence.semantic_delivery_complete,true);return {job:q.id,review:job.artifact_id};
+ const done=read(f),job=done.jobs[q.id],diagnostic=jobDiagnostic(job,{phase:'handover-'+label,stream_characters:stream.length,requested_characters:requestedCharacters,delivered_characters:deliveredCharacters,planned_ranges:rangeCount,delivered_ranges:deliveredRanges,delivery_rounds:deliveryRounds,adapter_calls:adapterCalls,maximum_requested_ranges:maximumRequestedRanges,maximum_delivered_ranges:maximumDeliveredRanges});
+ t.diagnostic(diagnostic);assert.equal(job.status,'completed',diagnostic);assert.equal(requestedCharacters,stream.length);assert.equal(deliveredCharacters,stream.length);assert.equal(deliveredRanges,rangeCount);assert.equal(reads.length,0);assert.equal(pending,null);
+ if(label==='incoming'){assert.ok(maximumDeliveredRanges>1,'Large handover must consume actual batched ranges');assert.ok(deliveryRounds>1,'Large handover must consume multiple actual adapter packets');}
+ assert.equal(job.coordination_release.termination_confirmed,true);assert.equal(done.records[job.artifact_id].handover_evidence.semantic_delivery_complete,true);return {job:q.id,review:job.artifact_id};
 }
 
 async function proposal(f,label,whileQueued=()=>{},content='FICTIONAL unaccepted proposal. UNKNOWN; ZERO allowance; no execution.'){
@@ -109,7 +141,7 @@ test('frozen-intake accepted checkpoint admits public v4 evidence and a successo
  });
  await t.test('independent complete v4 QA and resume',async()=>{
   assert.throws(()=>engine.control({root:f.root,session_id:f.session_id,expected_epoch:f.epoch,action:'resume',source_instruction:'resume'},'codex'),/QA/);
-  const proof=await handoverPass(f,r),accepted=read(f);
+  const proof=await handoverPass(f,r,t,'outgoing'),accepted=read(f);
   for(const [label,change] of [
    ['closure',s=>{s.jobs[proof.job].coordination_release.termination_confirmed=false;}],
    ['identity',s=>{s.jobs[proof.job].native_id=f.session_id;}],
@@ -160,7 +192,7 @@ test('frozen-intake accepted checkpoint admits public v4 evidence and a successo
   assert.deepEqual(subject.subject.records[pending.record.id],pending.record);assert.deepEqual(subject.subject.jobs[pending.job.id],pending.job);
   const inspection=engine.handover({...next,action:'inspect'},'codex'),source=inspection.required_semantics;
   assert.ok(engine.handover({...next,action:'read',subject_sha256:inspection.subject_sha256,source_id:source.source_id,sha256:source.sha256,offset:0,length:Math.min(16000,source.length)},'codex').text.length);
-  await handoverPass(next,successor);
+  await handoverPass(next,successor,t,'incoming');
   engine.control({root:next.root,session_id:next.session_id,expected_epoch:next.epoch,action:'resume',source_instruction:'resume'},'codex');
   const task=await proposal(next,'successor');
   const completed=read(next);assert.equal(completed.jobs[task.job.id].status,'completed',completed.jobs[task.job.id].error);assert.equal(completed.paused,false);assert.equal(operatingContext(completed).owner.epoch,next.epoch);
