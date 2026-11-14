@@ -7,7 +7,9 @@ import path from 'node:path';
 import {Store,digest} from '../plugins/soloco/runtime/store.mjs';
 import {assignmentContext,contextMatches} from '../plugins/soloco/runtime/context.mjs';
 import {recordReference,presentationOnly,contextPlan,contextRead} from '../plugins/soloco/runtime/current-state.mjs';
-const tmp=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'scalable-state-')));test.after(()=>fs.rmSync(tmp,{recursive:true,force:true}));
+import {recordOriginalWorkerAssignmentFrom} from '../plugins/soloco/runtime/peers/prospective-local-worker-inventory-producer.mjs';
+import {stageOriginalHistoricalJob,launchOriginalWorker,startOriginalModel,disposeOriginalProcessFixtures} from './original-worker-model-fixture.mjs';
+const tmp=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'scalable-state-'))),originalFixtureRoots=new Set();test.after(()=>{for(const root of originalFixtureRoots)disposeOriginalProcessFixtures(root);fs.rmSync(tmp,{recursive:true,force:true});});
 const seed=()=>({id:'fixture',name:'A',revision:1,roles:{engineer:{name:'Engineer'}},records:{},jobs:{},sessions:{},messages:[],notices:[],governance:'limits',owner:{epoch:1},extension:{'__proto__':'literal',raw:'preserve exact \\n wording'}});
 function classified(s,r,disposition='resolved',scopes=[]) {
  s.records[r.id]=r;const p={id:'p-'+r.id,kind:'plan',revision:1,author_instance:'cos',context_classification_plan:contextPlan(s,{record_ids:[r.id],disposition,scopes})};
@@ -123,12 +125,15 @@ import {id,withStore} from '../plugins/soloco/runtime/store.mjs';
 import {work} from '../plugins/soloco/runtime/worker.mjs';
 async function contextFixture({negative=false,sameNative=false}={}) {
  const root=fs.mkdtempSync(path.join(tmp,'public-context-')),a={root,session_id:'founder-'+id('f'),epoch:1};
+ originalFixtureRoots.add(root);
  process.env.COMPANY_PLUGIN_DATA=path.join(tmp,'cache');engine.bind(root,a.session_id,'codex');engine.open({...a,idea:'Fictional current-state protocol'},'codex');
  const source=engine.save({...a,id:'old-decision',kind:'decision',content:'Resolved historical fixture; original remains retained'},'codex');
  const plan=engine.contextControl({...a,action:'plan',record_ids:[source.id],disposition:'resolved',source_instruction:'Propose this exact historical disposition'},'codex');
  const key=id('review-job'),instance=id('qa');
- withStore(root,db=>db.transaction('test.queue',s=>{const j={id:key,role:'qa',instance_id:instance,session_key:instance,host:'codex',native_id:null,epoch:1,status:'queued',task:'Review exact context classification',context_format:3,inputs:[],review_of:{id:plan.id,revision:plan.revision},created_at:new Date().toISOString()};const c=assignmentContext(s,j);s.jobs[key]={...j,inputs:c.inputs,context_sha256:c.hash};s.sessions[instance]={instance_id:instance,role:'qa',host:'codex',native_id:null};return s;}));
- await work(root,key,async()=>({native_id:sameNative?a.session_id:id('native'),text:JSON.stringify({content:'Independently reviewed original source and exact proposed disposition',messages:[],notices:[],review:{verdict:'Pass',reason:'Exact historical source is reviewed and traceable',permitted_action:'apply_context_classification',plan_sha256:digest(JSON.stringify(plan.context_classification_plan)),blockers:[]}})}));
+ withStore(root,db=>db.transaction('job.queued',s=>{const j={id:key,role:'qa',instance_id:instance,session_key:instance,host:'codex',native_id:null,epoch:1,status:'queued',task:'Review exact context classification',context_format:3,inputs:[],review_of:{id:plan.id,revision:plan.revision},created_at:new Date().toISOString()};recordOriginalWorkerAssignmentFrom(db,s,j);const c=assignmentContext(s,j);s.jobs[key]={...j,inputs:c.inputs,context_sha256:c.hash};s.sessions[instance]={instance_id:instance,role:'qa',host:'codex',native_id:null};return s;}));
+ const carrier=launchOriginalWorker(root,key);let modelDirectory;
+ try{await work(root,key,(...args)=>{modelDirectory=args[3];args[6]={...args[6],sessionTitle:undefined,sessionNameDirectory:undefined};const model=startOriginalModel(args,{nativeId:sameNative?a.session_id:id('native')});model.respond(JSON.stringify({content:'Independently reviewed original source and exact proposed disposition',messages:[],notices:[],review:{verdict:'Pass',reason:'Exact historical source is reviewed and traceable',permitted_action:'apply_context_classification',plan_sha256:digest(JSON.stringify(plan.context_classification_plan)),blockers:[]}}));return model.promise;});}
+ finally{carrier.emit('close',0,null);if(modelDirectory&&modelDirectory!==root)disposeOriginalProcessFixtures(modelDirectory);disposeOriginalProcessFixtures(root);}
  const state=withStore(root,db=>db.read()),review=state.jobs[key].artifact_id;
  if(negative)withStore(root,db=>db.transaction('test.negative',s=>{s.records.failed={id:'failed',kind:'review',status:'Submitted',review_of:{id:plan.id,revision:plan.revision},review:{verdict:'Fail',reason:'Outstanding contradiction'}};return s;}));
  return {a,source,plan,review};
@@ -148,8 +153,10 @@ test('classification rejects coordinator-native review and retained same-plan ne
 });
 test('public migration holds unfinished cancelled workers and requires explicit paused authority',()=>{
  const root=fs.mkdtempSync(path.join(tmp,'migration-guard-')),a={root,session_id:id('founder'),epoch:1};process.env.COMPANY_PLUGIN_DATA=path.join(tmp,'cache');engine.bind(root,a.session_id,'codex');engine.open({...a,idea:'Fixture'},'codex');
+ originalFixtureRoots.add(root);
  assert.throws(()=>engine.storageControl({...a,action:'migrate',source_instruction:'Migrate'},'codex'),/Pause/);
- withStore(root,db=>db.transaction('test.cancelled',s=>{s.paused=true;s.jobs.uncertain={id:'uncertain',status:'cancelled'};return s;}));
+ stageOriginalHistoricalJob(root,{id:'uncertain',status:'cancelled'});
+ withStore(root,db=>db.transaction('test.cancelled',s=>{s.paused=true;return s;}));
  assert.throws(()=>engine.storageControl({...a,action:'migrate',source_instruction:'Migrate'},'codex'),/Uncertain worker/);
 });
 test('targeted root deletion persists and absent immutable values never silently disappear',()=>{
