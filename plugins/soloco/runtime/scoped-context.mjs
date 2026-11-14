@@ -138,6 +138,38 @@ function manifest(raw){const units=[];let start=0;while(start<raw.length){let lo
 // including candidate generation and deterministic-reuse provenance.
 export function producerClosure(s,original,sourceId=original.id){
   const closure=new Map(),seen=new Set(),active=new Set();
+  function runtimeRun(r,j,c,p){
+    const d=c.development,run=d?.run,history=d?.run_history;
+    if(history!==undefined){
+      if(!Array.isArray(history)||history.length!==1)fail('ambiguous runtime test history '+r.id);
+      const prior=history[0];closed(prior,['job_id','receipt_id','status'],'runtime test history');
+      if(!text(prior.job_id)||!text(prior.receipt_id)||prior.status!=='completed'||prior.job_id===run?.job_id||prior.receipt_id===run?.receipt_id)fail('conflicting runtime test history '+r.id);
+    }
+    if(run?.job_id===j.id&&run.receipt_id===r.id)return run;
+    const prior=history?.[0];
+    if(!prior||prior.job_id!==j.id||prior.receipt_id!==r.id||prior.status!==j.status||!text(d.preflight_recovery))fail('broken historical runtime test closure '+r.id);
+    const result=r.development.result;
+    if(r.kind!=='artifact'||r.status!=='Submitted'||r.revision!==1||j.reuse_receipt_id!==undefined||r.development.reused_from!==undefined||result?.reused!==undefined||result?.status!=='failed'||result.exit_code!==null||result.tests_executed!==false||!text(result.directory)||!same(result.test_paths,p.development?.scope?.test_paths)||result.timeout_ms!==p.development?.scope?.timeout_ms||result.max_output_bytes!==p.development?.scope?.max_output_bytes)fail('invalid historical runtime failure '+r.id);
+    const request=source(s,d.preflight_recovery),recovery=request.development,subject=recovery?.subject;
+    if(request.kind!=='artifact'||request.author_role!=='human_founder'||request.status!=='Recorded'||recovery?.type!=='preflight_recovery_request'||recovery.protocol!=='original-grant-validation-recovery-v1'||recovery.status!=='consumed'||recovery.generation_permission!==false||recovery.allowance_reset!==false)fail('broken runtime recovery provenance '+r.id);
+    closed(subject,['plan_id','scope_sha256','candidate_id','candidate_sha256','receipt_id','receipt_sha256','receipt_record_sha256','job_id','job_sha256'],'runtime recovery subject');
+    if(d.type!=='candidate'||d.plan_id!==p.id||p.development?.type!=='plan'||!text(d.candidate_sha256)||!text(p.development.scope_sha256)||subject.plan_id!==p.id||subject.candidate_id!==c.id||d.scope_sha256!==p.development.scope_sha256||sha(p.development.scope)!==p.development.scope_sha256||subject.scope_sha256!==p.development.scope_sha256||subject.candidate_sha256!==d.candidate_sha256||subject.receipt_id!==r.id||subject.receipt_sha256!==r.development.receipt_sha256||subject.receipt_record_sha256!==sha(r)||subject.job_id!==j.id||subject.job_sha256!==sha(j)||!text(recovery.expires_at)||recovery.expires_at!==p.development.scope?.expires_at||!text(recovery.job_id)||recovery.job_id!==run?.job_id)fail('changed runtime recovery subject '+r.id);
+    const replacement=source(s,'job:'+recovery.job_id),owner=recovery.owner;
+    if(!text(owner?.host)||!text(owner?.session_id)||!Number.isSafeInteger(owner?.epoch)||owner.epoch<1||request.recorded_by!==owner.session_id||replacement.host!==owner.host||replacement.session_id!==owner.session_id||replacement.epoch!==owner.epoch)fail('changed runtime recovery actors '+r.id);
+    const terminal=['completed','quarantined'].includes(run.status)&&replacement.status===run.status;
+    const pending=run.status==='queued'&&['queued','running','cancelled'].includes(replacement.status),failed=run.status==='failed'&&replacement.status==='failed';
+    if(replacement.kind!=='development_test'||replacement.candidate_id!==c.id||replacement.development_id!==p.id||replacement.preflight_recovery_id!==request.id||replacement.reuse_receipt_id!==undefined||!(terminal||pending||failed)||(terminal?!text(run.receipt_id)||replacement.artifact_id!==run.receipt_id:run.receipt_id!==undefined||replacement.artifact_id!==undefined))fail('broken runtime recovery replacement '+r.id);
+    // Historical provenance preserves the failed receipt; it grants no new
+    // execution, reuse, review acceptance or present-time authority.
+    closure.set(request.id,scopedReference(request));record(request);
+    closure.set('job:'+replacement.id,scopedReference(replacement,'job:'+replacement.id));
+    if(terminal){
+      const receipt=source(s,run.receipt_id),test=receipt.development;
+      if(receipt.kind!=='artifact'||receipt.revision!==1||receipt.status!==(run.status==='completed'?'Submitted':'Quarantined')||receipt.author_role!=='runtime'||receipt.author_instance!==replacement.id||test?.type!=='test'||test.preflight_recovery_id!==request.id||['reused_from','reuse_qualification','reuse_qualification_producer','reuse_candidate_producer'].some(key=>test[key]!==undefined)||test.result?.reused===true||test.result?.reused_from!==undefined)fail('broken runtime recovery terminal receipt '+r.id);
+      closure.set(receipt.id,scopedReference(receipt));record(receipt);
+    }
+    return prior;
+  }
   function record(r,notice=false){
     if(active.has(r.id))fail('cyclic producer closure '+r.id);
     if(seen.has(r.id))return;active.add(r.id);
@@ -155,7 +187,8 @@ export function producerClosure(s,original,sourceId=original.id){
       closure.set('job:'+jobId,scopedReference(j,'job:'+jobId));
       if(runtime){
         const d=r.development,c=source(s,d.candidate_id),p=source(s,d.plan_id);
-        if(j.candidate_id!==c.id||j.development_id!==p.id||c.development?.run?.job_id!==j.id||c.development.run.receipt_id!==r.id||c.development.run.status!==j.status||d.candidate_sha256!==c.development.candidate_sha256||d.receipt_sha256!==sha(d.result)||r.content!==json(d.result))fail('broken runtime test closure '+r.id);
+        const run=runtimeRun(r,j,c,p);
+        if(j.candidate_id!==c.id||j.development_id!==p.id||run.status!==j.status||d.candidate_sha256!==c.development.candidate_sha256||d.receipt_sha256!==sha(d.result)||r.content!==json(d.result))fail('broken runtime test closure '+r.id);
         for(const v of [c,p])closure.set(v.id,scopedReference(v));record(c);
         if(d.reused_from){const origin=source(s,d.reused_from),qa=exact(s,d.reuse_qualification);if(origin.id===r.id||origin.development?.type!=='test'||qa.kind!=='review'||qa.author_role!=='qa'||qa.review_of?.id!==origin.id||qa.review_of.revision!==origin.revision)fail('broken runtime reuse closure '+r.id);closure.set(origin.id,scopedReference(origin));record(origin);closure.set(qa.id,scopedReference(qa));record(qa);}
       }

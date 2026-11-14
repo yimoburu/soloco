@@ -20,8 +20,11 @@ Resume now checks a prospective view containing its own new audit before
 unpausing. A condition-bearing resume is rejected atomically; no successful
 resume is reported and no company mutation occurs. Record and independently
 accept new conditions through the existing preservation/publication APIs before
-issuing a literal resume. Conditional pause and handover audits remain durable,
-visible DIRTY frontier entries until independently accepted. Public tool argument
+issuing a literal resume. Conditional pause audits and previously retained
+conditional handover audits remain durable, visible DIRTY frontier entries until
+independently accepted. A new conditional handover with an accepted checkpoint
+is rejected without persisting its audit; record and accept its conditions
+separately before issuing a literal handover. Public tool argument
 validation continues to reject unknown request fields. Unknown legacy records
 remain held on first pass.
 
@@ -51,3 +54,33 @@ it is not independent QA, native semantic acceptance, or a live-company Pass.
 The next assignment after an ordinary result still requires that result's
 consequential content/outcome to satisfy the existing preservation contract.
 No version change, installation, release, network operation or host change.
+
+Frozen-intake handover continuity (exact 0.7.9 candidate base `65df29f`)
+
+V4 inspection and QA use the exact independently accepted operating subject
+after validating its current owner, immutable preservation, expiry and complete
+producer intake. They do not rerun live legacy corpus classification against
+the newly submitted reconstruction. Changed current meaning, forged producer
+bookkeeping and unresolved new negatives still hold; failed v4 inspection never
+falls back to the legacy projection. Legacy reconstruction contracts are retained.
+
+Transfer with an accepted checkpoint requires the existing exact mechanical
+handover command; a condition-bearing instruction holds atomically until its
+conditions are independently accepted. It validates the genuine outgoing boundary
+and bounds its evidence envelope plus the proposed transfer. It does not claim
+that the incoming owner's publication or handover QA fits or is accepted. The
+incoming owner is paused and receives a bounded publication-required response;
+handover reads and all reconstruction protocols hold until existing operating
+plan / independent QA / apply accepts the actual incoming delta. A marked
+operating transfer then uses v4 reconstruction, including when the optional
+protocol is omitted. Exact independent v4 QA and confirmed closure still precede
+resume. Historical frozen-parent authority is not renewed for the new owner.
+
+This reconciles the implementation with repository SPEC v0.21 §§6–8: usable current
+context, retained history and failures, checked replacement, and disclosed
+capability limits. It changes no governing principle or public tool argument.
+The focused synthetic regression covers frozen intake through successor
+publication, independent handover and a useful preparation proposal. Its scripted
+judgments establish mechanics only; native semantic acceptance and live-company
+capacity remain unqualified. Original failing outcomes remain in the validation
+handoff rather than being rewritten as successful attempts.

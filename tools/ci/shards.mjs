@@ -2,11 +2,12 @@ import {createHash} from 'node:crypto';
 import {requireThat} from './evidence.mjs';
 
 export const regressionShardCount=2;
-// Source CI requests three shards explicitly; generic two-shard defaults stay compatible.
-export const routineRegressionShardCount=3;
-// Advisory placement only: keep the two long pipeline files in separate routine
-// shards. Argument order is not a measured Node start order or timing guarantee.
-const regressionPriority=['tests/peer-input-frontier.test.mjs','tests/peer-origin-frontier-seal.test.mjs'];
+// Source CI requests four shards explicitly; generic two-shard defaults stay compatible.
+export const routineRegressionShardCount=4;
+// Advisory placement only: keep the two long pipelines and frozen-intake
+// publication/handover fixtures in separate routine shards. Argument order is not
+// a measured Node start order or timing guarantee.
+const regressionPriority=['tests/peer-input-frontier.test.mjs','tests/peer-origin-frontier-seal.test.mjs','tests/frozen-intake-publication.test.mjs','tests/frozen-intake-handover.test.mjs'];
 
 function testFiles(files) {
   requireThat(Array.isArray(files)&&files.length>0,'no tests selected');

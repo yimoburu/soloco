@@ -298,7 +298,7 @@ test('installed development capability does not silently authorize older teams o
   assert.equal(developmentCapability(team).eligible,true);
   for(const changed of [{...team,plugin_version:'0.4.1'},{...team,governance_sha256:digest('changed rules')}])assert.equal(developmentCapability(changed).eligible,false);
 });
-for(const version of ['0.7.6','0.7.7'])test(`retained v${version} team can authorize a new fixed fixture without adopting current runtime definitions`,live,async()=>{
+for(const version of ['0.7.6','0.7.7','0.7.8'])test(`retained v${version} team can authorize a new fixed fixture without adopting current runtime definitions`,live,async()=>{
   const a=setup();withStore(a.root,db=>db.transaction('test.retain_compatible_development_team',s=>{
     s.plugin_version=version;s.runtime_version=version;s.cos_instructions=`Retained v${version} company instructions`;s.team_sha256=teamHash(s);return s;
   }));
@@ -574,7 +574,7 @@ test('a generic-only QA Pass stays inspectable but cannot accept; a complete fre
 
 test('exact published development compatibility retains sandbox and team restrictions',()=>{
   for(const governance of [v018Governance,v019Governance,v020Governance,installedTeam().governance])
-  for(const plugin_version of ['0.5.0','0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7','0.7.1','0.7.2','0.7.3','0.7.4','0.7.7',installedTeam().plugin_version]) {
+  for(const plugin_version of ['0.5.0','0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7','0.7.1','0.7.2','0.7.3','0.7.4','0.7.7','0.7.8',installedTeam().plugin_version]) {
     const s={...installedTeam(),plugin_version,governance,governance_sha256:digest(governance)};
     const before=structuredClone(s),c=developmentCapability(s);
     assert.equal(c.eligible,capability.supported);

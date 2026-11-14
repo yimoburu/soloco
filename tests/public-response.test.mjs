@@ -45,7 +45,7 @@ function allItems(state,collection) {
 }
 
 test('current capability preserves published 0.7.0 model-selection compatibility and rejects unpublished teams',()=>{
- for(const version of ['0.6.2','0.7.0','0.7.1','0.7.2','0.7.6','0.7.7',VERSION])assert.equal(currentView({...seed(),plugin_version:version}).capabilities.model_selection.eligible,true,version);
+ for(const version of ['0.6.2','0.7.0','0.7.1','0.7.2','0.7.6','0.7.7','0.7.8',VERSION])assert.equal(currentView({...seed(),plugin_version:version}).capabilities.model_selection.eligible,true,version);
  for(const version of ['0.6.14','999.0.0','unknown'])assert.equal(currentView({...seed(),plugin_version:version}).capabilities.model_selection.eligible,false,version);
 });
 

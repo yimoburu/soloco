@@ -4,7 +4,7 @@ import {fileURLToPath} from 'node:url';
 import {digest} from './state-projections.mjs';
 
 export const PACKAGE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-export const VERSION = '0.7.8';
+export const VERSION = '0.7.9';
 export const skillBody = text => text.replace(/^---[\s\S]*?---\s*/, '');
 export function installedTeam() {
   const governance = fs.readFileSync(path.join(PACKAGE,'assets/governance.md'),'utf8');

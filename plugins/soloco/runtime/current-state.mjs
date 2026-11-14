@@ -1,6 +1,6 @@
 import {validCodeReviewMetadata} from './code-review-metadata.mjs';
 import {validModelProcessTracking} from './model-process-closure.mjs';
-import {validateScopedExclusion,validateCorpusExclusion,CORPUS_PRESERVATION,SCOPED_PROTOCOL,producerClosure} from './scoped-context.mjs';
+import {validateScopedExclusion,validateCorpusExclusion,CORPUS_PRESERVATION,SCOPED_PROTOCOL,FROZEN_INITIAL_INTAKE,producerClosure} from './scoped-context.mjs';
 import {validateOperatingIndex} from './operating-state.mjs';
 import {digest,requireText} from './store.mjs';
 import {validateSpecialistBindingShape} from './specialists.mjs';
@@ -424,6 +424,12 @@ export function reviewedContext(state) {
     if(c.corpus_qualification){
       const p=c.corpus_qualification;
       for(const h of p.homes){mandatory.add(h.id);globalMandatory.add(h.id);scopedHomes.set(h.id,['*']);}
+      const plan=resolveSnapshotEntry(state,state.records[p.plan.id]).scoped_context_plan;
+      if(plan.frozen_intake===FROZEN_INITIAL_INTAKE){
+        // Canonical corpus validation already checked this exact parent and its
+        // frozen material. Its record was created after its own captured census.
+        proofs.add(resolveSnapshot(state,plan.capsule).frozen_intake.parent.id);
+      }
       proofs.add(p.plan.id);for(const receipt of p.receipts){proofJobs.add(receipt.job.id.slice(4));proofs.add(receipt.review.id);proofs.add(receipt.target.id);const target=state.records[receipt.target.id]?.scoped_context_target;if(target)proofs.add(target.plan.id);}
       continue;
     }

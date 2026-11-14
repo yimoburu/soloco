@@ -395,7 +395,7 @@ export function dispatch(args,host,{launch=launchWorker,check=readiness,catalog=
   binding(args,host);
   if(reviewWindow)withStore(args.root,db=>{const s=db.read();owner(s,args.session_id,host,args.epoch);if(!freshHandoverReviewEligible(s,args))throw Error('Review window is only for a fresh current paused streamed handover QA');});
   if(codeWindow)withStore(args.root,db=>{const s=db.read();owner(s,args.session_id,host,args.epoch);codeReviewWindowSubject(s,args,{root:args.root});});
-  withStore(args.root,db=>{const s=db.read();owner(s,args.session_id,host,args.epoch);if(s.records?.[args.review_of]?.origin_quarantine_plan)throw Object.assign(Error('Use company_origin mechanical_review with the exact original grant'),{code:'ORIGIN_MECHANICAL_QA_FIXED_DISPATCH_REQUIRED'});if(args.model_selection!==undefined&&!['0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7','0.6.8','0.6.9','0.6.10','0.6.11','0.6.12','0.6.13','0.7.0','0.7.1','0.7.2','0.7.3','0.7.4','0.7.5','0.7.6','0.7.7',VERSION].includes(s.plugin_version))throw new Error('Explicitly adopt the model-selection team before using model_selection');});
+  withStore(args.root,db=>{const s=db.read();owner(s,args.session_id,host,args.epoch);if(s.records?.[args.review_of]?.origin_quarantine_plan)throw Object.assign(Error('Use company_origin mechanical_review with the exact original grant'),{code:'ORIGIN_MECHANICAL_QA_FIXED_DISPATCH_REQUIRED'});if(args.model_selection!==undefined&&!['0.6.0','0.6.1','0.6.2','0.6.3','0.6.4','0.6.5','0.6.6','0.6.7','0.6.8','0.6.9','0.6.10','0.6.11','0.6.12','0.6.13','0.7.0','0.7.1','0.7.2','0.7.3','0.7.4','0.7.5','0.7.6','0.7.7','0.7.8',VERSION].includes(s.plugin_version))throw new Error('Explicitly adopt the model-selection team before using model_selection');});
   const inventory=args.model_selection?.mode==='explicit' || args.model_selection?.speed==='fast_disabled'?catalog(host):null;
   const selection=normalizeSelection(args.model_selection,host,inventory);
   const ready=check(host);
@@ -570,10 +570,11 @@ export function control(args,host) {
     }
     else if(args.action==='handover') {
       if(busy(s).length) throw new Error('Assignments are active. Pause and reconcile them before handing over.');
+      if(s.operating_state&&!mechanicalOperatingControl(decision))throw Error('Operating state Held: DIRTY condition-bearing handover instruction');
       const previous={...s.owner};
       const prospective=inheritSnapshots(s,{...s,owner:{host,session_id:args.session_id,epoch:s.owner.epoch+1},paused:true,records:{...s.records,[decisionId]:decision}});
       beginHandover(prospective,previous);
-      const admission=admitHandover(prospective);
+      const admission=admitHandover(prospective,s);
       s.owner=prospective.owner;s.handover={...prospective.handover,admission};
       // Incoming role instances cold-start from records; old native histories remain attributable.
       s.retired_sessions=[...(s.retired_sessions??[]),...Object.values(s.sessions)]; s.sessions={};
