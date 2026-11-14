@@ -12,6 +12,7 @@ import * as scoped from '../plugins/soloco/runtime/scoped-context.mjs';
 import {inspectHandover,verifyHandoverAcceptance,admitHandover,beginHandover} from '../plugins/soloco/runtime/handover.mjs';
 import {assignmentContext} from '../plugins/soloco/runtime/context.mjs';
 import {reviewedContext} from '../plugins/soloco/runtime/current-state.mjs';
+import {readEvidence} from '../plugins/soloco/runtime/upgrade-evidence.mjs';
 import {operatingContext,operatingFrontier,validateOperatingIndex} from '../plugins/soloco/runtime/operating-state.mjs';
 import {inheritSnapshots,resolveSnapshot} from '../plugins/soloco/runtime/snapshot.mjs';
 import {executionTiming} from '../plugins/soloco/runtime/timeout.mjs';
@@ -40,16 +41,28 @@ async function publish(f){
  const p=await operating(f,{action:'plan',maintenance:true});assert.equal(p.held,false,JSON.stringify(p.frontier));
  const q=engine.dispatch({...f,role:'qa',review_of:p.id,task:'FICTIONAL scripted publication after exact frozen-parent preservation.'},'codex',{check:()=>({available:true,authenticated:true}),launch:()=>({on(){},unref(){}})});
  const s=read(f),assignment=assignmentContext(s,s.jobs[q.id]),evidence=assignment.operating_evidence??assignment.qualification_evidence;
- // Request one complete bounded range at a time so response framing cannot defer
- // a range that this fictional adapter has already removed from its queue.
+ // Use the existing bounded range capacity and consume only actually delivered
+ // ranges. Deferred ranges stay queued; no evidence or deadline is omitted.
  const stream=evidence?.sources[evidence.pages[0].source_id],reads=[];
- if(stream)for(let offset=0;offset<stream.length;){let length=Math.min(16000,stream.length-offset);if(/[\uD800-\uDBFF]/.test(stream.raw[offset+length-1]))length--;reads.push({source_id:stream.source_id,sha256:stream.sha256,offset,length});offset+=length;}
+ if(stream)for(let offset=0;offset<stream.length;){
+  let length=Math.min(32768,stream.length-offset);
+  const request=()=>({source_id:stream.source_id,sha256:stream.sha256,offset,length});
+  for(;;){const last=stream.raw.charCodeAt(offset+length-1);if(last>=0xd800&&last<=0xdbff)length--;if(JSON.stringify(readEvidence(evidence,request())).length<=180000)break;length=Math.floor(length/2);}
+  reads.push(request());offset+=length;
+ }
  else {const required=JSON.parse(assignment.text).required_evidence;for(const ref of required.sources.filter(ref=>!required.inline.some(x=>x.source.id===ref.id)))for(let offset=0;offset<ref.total_characters;offset+=16000)reads.push({id:ref.id,sha256:ref.sha256,offset,length:Math.min(16000,ref.total_characters-offset)});}
  let first=true;
  await work(f.root,q.id,async(_host,_session,_prompt,_dir,timeout,_selection,options)=>{
   if(first){first=false;options.onSpawn(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));}
   const native_id='fictional-publication-'+q.id;
-  if(reads.length)return {native_id,text:JSON.stringify({reads:reads.splice(0,1)})};
+  if(stream){
+   const delivered=JSON.parse(_prompt);
+   if(delivered.protocol==='handover-frozen-reads-v1'){
+    for(const range of delivered.reads){const expected=reads.shift();assert.ok(expected,'No unsolicited range');for(const key of ['source_id','sha256','offset','length'])assert.equal(range[key],expected[key]);}
+    assert.deepEqual(delivered.deferred,reads.slice(0,delivered.deferred.length),'Deferred ranges must remain queued');
+   }
+   if(reads.length)return {native_id,text:JSON.stringify({reads:reads.slice(0,4)})};
+  }else if(reads.length)return {native_id,text:JSON.stringify({reads:reads.splice(0,1)})};
   return {native_id,text:JSON.stringify({content:'FICTIONAL scripted contract judgment; no native semantic QA.',messages:[],notices:[],review:{verdict:'Pass',reason:'FICTIONAL mechanics only; UNKNOWN, ZERO allowance and no execution retained.',permitted_action:'publish_operating_state',plan_sha256:sha(read(f).records[p.id].operating_plan),preservation_complete:true,interaction_complete:true,authority_checked:true,blockers:[]}})};
  });
  const job=read(f).jobs[q.id];assert.equal(job.status,'completed',job.error);
