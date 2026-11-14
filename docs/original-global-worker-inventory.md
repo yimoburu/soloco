@@ -78,9 +78,10 @@ that DATA. Source-owned job bookkeeping can be projected out of task meaning
 only through the original Store's active snapshot and authenticated event
 replay. An unfamiliar field or an unbound copy cannot obtain that projection.
 
-The old default peer scheduler and upgrade adapter calls do not carry these
-original launch tokens and remain Held before creating a model child. Updating
-their test fixtures does not qualify those product paths. Existing role-reuse
+The earlier scheduler and upgrade paths lacked these original launch tokens.
+The current Source authors their token joins in the scheduler and upgrade
+adapters; qualification of the final composition remains separate. Updating
+test fixtures alone does not qualify those product paths. Existing role-reuse
 checks can also remain conservative after a genuinely never-started child until
 supported reconciliation recognizes that evidence; an error alone frees
 nothing.

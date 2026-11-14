@@ -15,11 +15,15 @@ does not initialize a comparison, read Python helper Source or start a helper.
 The qualification route exercises the actual worker template and existing
 candidate consumer. It does not implement private-brand transfer to a fresh
 standalone worker, a production multi-process broker, cold run adoption or host
-lifecycle recovery. Controlled child-process fixtures prove Source mechanics;
-they cannot establish Native model output fidelity or supported-host behavior.
+lifecycle recovery. The controlled child-process fixtures are prospective Source
+checks and have not run on this composition. They cannot establish Native model
+output fidelity or supported-host behavior.
 The current comparison caller requires normalized layout 4 and a fresh,
 bounded request job; unsupported layouts or proof-envelope capacity hold
-before A storage initialization or B slot consumption.
+before A storage initialization or B slot consumption. The diagram describes
+the intended flow. The released consumer cut still needs E3's fixed event and
+two-phase COMMIT coupling before it can execute; the separate test-worker path
+also needs the accounting-custody extension described below.
 
 ```mermaid
 flowchart TD
@@ -40,13 +44,15 @@ flowchart TD
   E[One current eligibility check before changing requested header]
   H[Commit response or error evidence and retain live pin]
   D[Decode then use existing candidate consumer]
-  X[One actual test reservation and result]
+  X[One actual test reservation]
+  Y[Test worker and runtime result: custody extension required]
   Q[Independent QA slot and original receipt]
   V[Current pin and authority checks at owner acceptance]
   S --> B --> R --> W --> P --> F --> G --> A --> O
   O --> L --> C
   O --> N --> C
-  C --> I --> T --> E --> H --> D --> X --> Q --> V
+  C --> I --> T --> E --> H --> D --> X
+  X -. pending custody .-> Y -.-> Q -.-> V
 ```
 
 ## Selection and global accounting
@@ -96,8 +102,8 @@ transaction remain separate. The issuer retains both the earlier A-header
 fact and the actual capability-issuance scope. ArmCommit's record hash names
 the A header; its event/transaction fields identify actual capability issuance.
 
-Only Store-owned lexical COMMIT confirmation reaches the fixed two-phase
-evidence/test hooks. Prepare performs all fallible validation and registration
+The required coupling sends only Store-owned lexical COMMIT confirmation to
+the fixed two-phase evidence/test hooks. Prepare performs all fallible validation and registration
 while new handles remain unarmed. Finalizers perform direct private flag flips
 after all producer preparation succeeds. Event readback corroborates these
 facts and cannot manufacture the witness.
@@ -142,10 +148,14 @@ Untouched Core state is not charged again. Independently bounded candidate,
 test and ordinary model diagnostics keep their original Core accounting when
 referenced without a new A/B payload copy; new proof copies and wrappers count.
 
-Testing uses the existing development worker and executor. Its one global
+Test reservation uses the existing development queue. Its one global
 test spend precedes arm SQL; its typed guard is written with the actual test
-job and arms only through the real Store witness. The existing runtime result
-producer supplies terminal facts. QA checks the genuine non-reused receipt,
+job and arms only through the real Store witness. An actual separate development
+worker does not inherit private accounting custody and currently holds before
+its first write. Completing executor, receipt, QA and acceptance requires a
+supported custody protocol; the composed worker fixtures exercise reservation
+with a controlled child, not that complete flow. The authored terminal hook
+accepts facts only from the existing runtime result producer. QA requires the genuine non-reused receipt,
 candidate, immutable original reservation, producer and selected independence
 policy. Existing generation/test/QA/acceptance semantics continue to apply.
 

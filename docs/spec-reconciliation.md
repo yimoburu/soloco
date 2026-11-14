@@ -34,8 +34,11 @@ contract or integration. A source or contract change requires affected-row revie
 The [comparison integration](issue18-integrated-comparison.md) authors a private
 global budget issuer, descriptor-relative optional storage, complete prompt
 preparation before reservation, typed request/outcome records and a direct
-worker consumer of private adapter outcomes. A one-test guard joins the existing
-executor, QA prerequisites and live retention checks at owner acceptance.
+worker consumer of private adapter outcomes. A one-test guard authors the
+reservation, runtime-terminal, QA-prerequisite and live-retention interfaces.
+The actual separate test worker lacks transferred accounting custody and
+currently holds before its first write, so the complete executor-through-
+acceptance comparison flow remains unfinished.
 Repository tool entries re-export the packaged runtime modules. Version 0.7.10
 retains explicit 0.7.9 compatibility and does not adopt new company instructions.
 
