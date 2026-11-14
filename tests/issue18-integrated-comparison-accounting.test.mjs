@@ -311,8 +311,11 @@ process.stdout.write(JSON.stringify({selected_held:true,append_held:true,callbac
     // Keep the same finite child deadline and the original thrown identity.
     // At most4096 UTF16 units per stream become diagnostic DATA (worst-case
     // JSON escaping <50KiB combined), including the first/last phase marks.
-    const bounded=value=>{const text=typeof value==='string'?value:Buffer.isBuffer(value)?value.toString('utf8'):'';return {utf16_units:text.length,head:text.slice(0,2048),tail:text.length>2048?text.slice(Math.max(2048,text.length-2048)):'',truncated:text.length>4096};};
-    t.diagnostic(JSON.stringify({protocol:'issue18-cold-sql-fixture-diagnostic-v1',timeout_ms:30000,max_buffer_bytes:65536,pid:Number.isSafeInteger(problem?.pid)?problem.pid:null,status:Number.isSafeInteger(problem?.status)?problem.status:null,signal:typeof problem?.signal==='string'?problem.signal.slice(0,64):null,code:typeof problem?.code==='string'?problem.code.slice(0,64):null,stdout:bounded(problem?.stdout??stdout),stderr:bounded(problem?.stderr)}));throw problem;
+    try{
+      const bounded=value=>{const text=typeof value==='string'?value:Buffer.isBuffer(value)?value.toString('utf8'):'';return {utf16_units:text.length,head:text.slice(0,2048),tail:text.length>2048?text.slice(Math.max(2048,text.length-2048)):'',truncated:text.length>4096};};
+      t.diagnostic(JSON.stringify({protocol:'issue18-cold-sql-fixture-diagnostic-v1',timeout_ms:30000,max_buffer_bytes:65536,pid:Number.isSafeInteger(problem?.pid)?problem.pid:null,status:Number.isSafeInteger(problem?.status)?problem.status:null,signal:typeof problem?.signal==='string'?problem.signal.slice(0,64):null,code:typeof problem?.code==='string'?problem.code.slice(0,64):null,stdout:bounded(problem?.stdout??stdout),stderr:bounded(problem?.stderr)}));
+    }catch{/* Diagnostics cannot replace the original cold-child failure. */}
+    throw problem;
   }
   finally{childProcess.execFileSync=original;syncBuiltinESMExports();}
 });
