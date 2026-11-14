@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {DatabaseSync} from 'node:sqlite';
-import {canonical,peerDigest} from '../plugins/soloco/runtime/peers/ledger.mjs';
+import {canonical,peerDigest,installPeerSchema} from '../plugins/soloco/runtime/peers/ledger.mjs';
 import {qaRecordRef,qaRawHash} from '../plugins/soloco/runtime/peers/origin-mechanical-qa-contract.mjs';
 import {Store,withStore} from '../plugins/soloco/runtime/store.mjs';
 import {assignmentContext} from '../plugins/soloco/runtime/context.mjs';
@@ -15,8 +15,19 @@ import {ORIGIN_MECHANICAL_QA_WIRE as WIRE,ORIGIN_MECHANICAL_QA_RAW_CONTEXT as RA
 import {wireFixture,actor} from './peer-origin-mechanical-qa-wire-fixture.mjs';
 import {syntheticMechanicalModel} from './origin-mechanical-qa-dispatch-fixture.mjs';
 import {stageOriginalWorker} from './original-adapter-process-fixture.mjs';
-import {inspectOriginalLocalExecutionInventoryFrom,recordOriginalWorkerAssignmentFrom,bindOriginalHistoricalWorkerAssignmentBookkeepingFrom,inspectOriginalWorkerAssignmentBookkeepingFrom} from '../plugins/soloco/runtime/peers/prospective-local-worker-inventory-producer.mjs';
+import {inspectOriginalLocalExecutionInventoryFrom,recordOriginalWorkerAssignmentFrom,bindOriginalHistoricalWorkerAssignmentBookkeepingFrom,bindOriginalScopedHistoricalWorkerAssignmentBookkeepingFrom,inheritOriginalWorkerAssignmentBookkeepingFrom,inspectOriginalWorkerAssignmentBookkeepingFrom,inspectOriginalExecutionOriginBookkeepingFrom} from '../plugins/soloco/runtime/peers/prospective-local-worker-inventory-producer.mjs';
 const copy=v=>JSON.parse(JSON.stringify(v));
+function bookkeepingViews(state){
+ const inherited=copy(state);assert.equal(inheritOriginalWorkerAssignmentBookkeepingFrom(state,inherited),true);
+ return [state,inherited,{...state}]; // Last view reaches only the records-bucket binding.
+}
+function assertScopedBookkeeping(views,jobId,live){
+ for(const state of views){
+  const assignment=inspectOriginalWorkerAssignmentBookkeepingFrom(state,state.jobs[jobId]),origin=inspectOriginalExecutionOriginBookkeepingFrom(state);
+  if(live){for(const proof of [assignment,origin]){assert.ok(proof);assert.equal(proof.historical_original,false);assert.equal(proof.active_original_snapshot,true);}}
+  else{assert.equal(assignment,null);assert.equal(origin,null);assert.equal(inheritOriginalWorkerAssignmentBookkeepingFrom(state,copy(state)),null);}
+ }
+}
 function purePack(extra=''){
  const plan={protocol:'peer-origin-quarantine-plan-v1',plan_id:'plan-one',cut_sha256:'a'.repeat(64),owner:{host:'codex',session_id:'SOURCE-owner'},cut:{governance:'Original governance 🌍',roles_json:'{"qa":{"instructions":"Original full QA."}}',cos_instructions:'Original CoS instructions.',unknown:'Retain original UNKNOWN.'},source_instruction:'SOURCE only',execution_resumed:false};
  const row={id:plan.plan_id,kind:'plan',revision:1,status:'Draft',content:canonical(plan),origin_quarantine_plan:plan};
@@ -145,6 +156,7 @@ test('historical packet replay authenticates later Original history even when st
  try{
   withStore(f.root,store=>store.readSnapshot(()=>assert.doesNotThrow(()=>readStorageIntake(store.db,basis))));
   const before=f.raw();assert.throws(()=>f.plan.inspectPeerOriginMechanicalQaPacketAtEpoch(f.root,actor,9,{packet_ref:f.packet.packet_ref}),code('ORIGINAL_EXECUTION_HISTORY_REQUIRED'));assert.equal(f.raw(),before);
+  withStore(f.root,store=>assert.throws(()=>store.peerLayoutTransition(()=>actualPolicy.inspectPeerOriginMechanicalQaPacketFrom(store,actor,9,{packet_ref:f.packet.packet_ref})),code('ORIGINAL_EXECUTION_HISTORY_REQUIRED')));assert.equal(f.raw(),before);
  }finally{const restore=new DatabaseSync(f.file);try{restore.prepare('UPDATE events SET value=? WHERE seq=?').run(tail.value,tail.seq);}finally{restore.close();}}
  assert.equal(f.plan.inspectPeerOriginMechanicalQaPacketAtEpoch(f.root,actor,9,{packet_ref:f.packet.packet_ref}).execution_authority,false);
 });
@@ -156,6 +168,60 @@ test('an uncommitted baseline cannot mint historical bookkeeping that survives r
   throw rollback;
  }}),e=>e===rollback));
  assert.equal(f.raw(),before);assert.equal(inspectOriginalWorkerAssignmentBookkeepingFrom(attempted,attempted.jobs.old),null);
+});
+test('layout-write packet replay preserves v1/v2 context while current and cut bookkeeping expire on rollback',async t=>{
+ for(const legacyV1 of [false,true]){
+  const f=await wireFixture(t,{legacyV1}),frozen=copy(f.state());f.prepare();const packet=f.state().records[f.packet.packet_ref.id].origin_mechanical_qa,before=f.raw(),rollback=Error('SYNTHETIC layout context rollback');let currentViews,cutViews;
+  withStore(f.root,store=>{
+   store.readSnapshot(()=>assert.throws(()=>bindOriginalScopedHistoricalWorkerAssignmentBookkeepingFrom(store.db,copy(frozen),packet.context_basis),code('ORIGINAL_EXECUTION_HISTORICAL_WRITE_SCOPE_REQUIRED')));
+   assert.throws(()=>store.peerLayoutTransition(()=>{
+    const current=store.read();currentViews=bookkeepingViews(current);assertScopedBookkeeping(currentViews,'old',true);
+    const cut=copy(frozen);assert.throws(()=>bindOriginalHistoricalWorkerAssignmentBookkeepingFrom(store.db,cut,packet.context_basis),code('ORIGINAL_EXECUTION_HISTORICAL_CUT_UNCOMMITTED'));
+    assert.equal(bindOriginalScopedHistoricalWorkerAssignmentBookkeepingFrom(store.db,cut,packet.context_basis),true);cutViews=bookkeepingViews(cut);assertScopedBookkeeping(cutViews,'old',true);
+    const handle=actualPolicy.inspectPeerOriginMechanicalQaPacketFrom(store,actor,9,{packet_ref:f.packet.packet_ref});assert.equal(handle.context_sha256,packet.context.sha256);assert.equal(handle.execution_authority,false);
+    const part=actualPolicy.readPeerOriginMechanicalQaPacketFrom(store,actor,9,{packet_ref:f.packet.packet_ref,sha256:packet.context.sha256,offset:0,length:4096});assert.equal(part.text,packet.context.text.slice(0,part.length));
+    throw rollback;
+   }),error=>error===rollback);
+   assertScopedBookkeeping(currentViews,'old',false);assertScopedBookkeeping(cutViews,'old',false);
+   store.readSnapshot(()=>{assertScopedBookkeeping(currentViews,'old',false);assertScopedBookkeeping(cutViews,'old',false);});
+  });
+  assert.equal(f.raw(),before);
+ }
+});
+test('successful layout COMMIT expires current and historical-cut snapshot proofs without ordinary issuance',async t=>{
+ const f=await wireFixture(t),frozen=copy(f.state());f.prepare();const packet=f.state().records[f.packet.packet_ref.id].origin_mechanical_qa,before=JSON.parse(f.raw());let currentViews,cutViews;
+ withStore(f.root,store=>{
+  const marker=Object.freeze({storage_primitive_only:true});
+  assert.equal(store.peerLayoutTransition(()=>{
+   const current=store.read();currentViews=bookkeepingViews(current);assertScopedBookkeeping(currentViews,'old',true);
+   const cut=copy(frozen);assert.equal(bindOriginalScopedHistoricalWorkerAssignmentBookkeepingFrom(store.db,cut,packet.context_basis),true);cutViews=bookkeepingViews(cut);assertScopedBookkeeping(cutViews,'old',true);
+   // Fixed storage primitive only: no origin records, quarantine acceptance,
+   // Native review or permission are manufactured by this schema transition.
+   installPeerSchema(store.db,{company_id:current.id});assert.equal(store.db.prepare('UPDATE company_layout SET version=5 WHERE id=1 AND version=4').run().changes,1);return marker;
+  },{beforeCommit:()=>{assertScopedBookkeeping(currentViews,'old',true);assertScopedBookkeeping(cutViews,'old',true);}}),marker);
+  assert.equal(store.db.isTransaction,false);assertScopedBookkeeping(currentViews,'old',false);assertScopedBookkeeping(cutViews,'old',false);
+ });
+ const after=JSON.parse(f.raw());assert.equal(after.rows.company_layout[0].version,5);
+ for(const [name,rows]of Object.entries(before.rows))if(name!=='company_layout')assert.deepEqual(after.rows[name],rows);
+});
+for(const commit of [false,true])test('staged Original assignment cut stays scoped and expires after '+(commit?'COMMIT':'ROLLBACK'),async t=>{
+ const f=await wireFixture(t),before=f.raw(),id='SYNTHETIC-scoped-assignment',rollback=Error('SYNTHETIC staged cut rollback');let views;
+ withStore(f.root,store=>{
+  const committed=store.readSnapshot(()=>captureStorageBaseline(store.db));
+  const write=()=>store.transaction('job.queued',state=>{
+   const job={id,instance_id:'SYNTHETIC-scoped-instance',role:'qa',host:'codex',status:'queued',native_id:null,created_at:new Date().toISOString()};recordOriginalWorkerAssignmentFrom(store,state,job);state.jobs[id]=job;return state;
+  },{beforeCommit:(db,next)=>{
+   const basis=captureStorageBaseline(db),cut=copy(next);assert(basis.seq>committed.seq);
+   assert.throws(()=>bindOriginalHistoricalWorkerAssignmentBookkeepingFrom(db,cut,basis),code('ORIGINAL_EXECUTION_HISTORICAL_CUT_UNCOMMITTED'));
+   const wrong=copy(cut);wrong.id+='-changed';assert.throws(()=>bindOriginalScopedHistoricalWorkerAssignmentBookkeepingFrom(db,wrong,basis),code('ORIGINAL_EXECUTION_HISTORICAL_STATE_CHANGED'));assert.equal(inspectOriginalExecutionOriginBookkeepingFrom(wrong),null);
+   assert.equal(bindOriginalScopedHistoricalWorkerAssignmentBookkeepingFrom(db,cut,basis),true);views=bookkeepingViews(cut);assertScopedBookkeeping(views,id,true);
+   if(!commit)throw rollback;
+  }});
+  if(commit)write();else assert.throws(write,error=>error===rollback);
+  assertScopedBookkeeping(views,id,false);store.readSnapshot(()=>assertScopedBookkeeping(views,id,false));
+ });
+ if(commit){const current=f.state();assert.ok(current.jobs[id]);assert.equal(inspectOriginalWorkerAssignmentBookkeepingFrom(current,current.jobs[id]).historical_original,true);}
+ else assert.equal(f.raw(),before);
 });
 test('a same-sequence replacement cannot substitute for the private pre-write history anchor',async t=>{
  const f=await wireFixture(t),before=f.raw(),rollback=Error('SYNTHETIC anchor rollback');let attempted;
@@ -199,7 +265,7 @@ test('executable baseline views cannot switch to an uncommitted cut or retain bo
     b=>{b.entries=new Proxy(b.entries,{get(){calls++;throw Error('Nested caller proxy must not run');}});return b;},
     b=>{b.toJSON=()=>{calls++;return staged;};return b;}
    ];
-   for(const variant of variants){const attempted=copy(next),basis=variant(copy(committed));attempts.push(attempted);assert.throws(()=>bindOriginalHistoricalWorkerAssignmentBookkeepingFrom(db,attempted,basis),code('ORIGINAL_EXECUTION_HISTORICAL_BASIS_DATA_REQUIRED'));assert.equal(calls,0);}
+   for(const bind of [bindOriginalHistoricalWorkerAssignmentBookkeepingFrom,bindOriginalScopedHistoricalWorkerAssignmentBookkeepingFrom])for(const variant of variants){const attempted=copy(next),basis=variant(copy(committed));attempts.push(attempted);assert.throws(()=>bind(db,attempted,basis),code('ORIGINAL_EXECUTION_HISTORICAL_BASIS_DATA_REQUIRED'));assert.equal(calls,0);}
    throw rollback;
   }}),error=>error===rollback);
  });
