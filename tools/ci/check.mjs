@@ -20,6 +20,7 @@ export function check(lane,root=process.cwd(),probe=sandboxCapability,{shard}={}
     if(lane==='tests-22')fullSelection=selected;
     tests=selected.files;
     console.log(lane==='tests-22'?qualificationPrelude(selected):`CI shard ${selected.index}/${selected.total}: ${tests.length}/${selected.selected_total} whole test files; selected inventory sha256=${selected.inventory_sha256}`);
+    if(lane==='regression-22'&&selected.cost_hints_sha256)console.log(`CI advisory placement: costs sha256=${selected.cost_hints_sha256}; partial cost weight=${selected.hint_weight_ms}ms; unhinted files=${selected.unknown_cost_files.length}; no elapsed-time estimate`);
   }
   if(lane!=='build') {
     const capability=probe();

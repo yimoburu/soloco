@@ -1,0 +1,176 @@
+{
+  "protocol": "regression-file-cost-hints-v1",
+  "scope": "Advisory placement only: partial sums of uniquely source-mapped outer TAP durations, not file wall time, an ETA or qualification. Failed-source observations remain failed; no results transfer. Unhinted and future files remain required.",
+  "unknown_cost_ms": 30000,
+  "sources": {
+    "596": {
+      "commit": "596b003a61afbc9b07a32d24f97437711f7d209b",
+      "run": 43631894252,
+      "jobs": [
+        132560120843,
+        132560121102,
+        132560121125,
+        132560121108
+      ],
+      "outcome": "success"
+    },
+    "27c": {
+      "commit": "27c559a56bf0b176c4fdd41230873cd59f38d821",
+      "run": 43633148034,
+      "jobs": [
+        132564009278,
+        132564009185,
+        132564009010,
+        132564009389
+      ],
+      "outcome": "failure"
+    }
+  },
+  "costs": {
+    "tests/accepted-workflow-eval.test.mjs": {
+      "ms": 42023,
+      "source": "596",
+      "matched_outer_cases": 7
+    },
+    "tests/candidate-format-qualification.test.mjs": {
+      "ms": 51334,
+      "source": "596",
+      "matched_outer_cases": 6
+    },
+    "tests/code-review-inline-reread.test.mjs": {
+      "ms": 115423,
+      "source": "27c",
+      "matched_outer_cases": 2
+    },
+    "tests/corpus-output-selectors.test.mjs": {
+      "ms": 43248,
+      "source": "596",
+      "matched_outer_cases": 3
+    },
+    "tests/development-delivery.test.mjs": {
+      "ms": 87221,
+      "source": "596",
+      "matched_outer_cases": 15
+    },
+    "tests/dynamic-specialists-integration.test.mjs": {
+      "ms": 343101,
+      "source": "27c",
+      "matched_outer_cases": 19
+    },
+    "tests/handover-review-window.test.mjs": {
+      "ms": 37828,
+      "source": "596",
+      "matched_outer_cases": 10
+    },
+    "tests/issue18-integrated-comparison-worker.test.mjs": {
+      "ms": 854258,
+      "source": "27c",
+      "matched_outer_cases": 16
+    },
+    "tests/operating-upgrade.test.mjs": {
+      "ms": 129308,
+      "source": "596",
+      "matched_outer_cases": 7
+    },
+    "tests/origin-mechanical-qa-dispatch.test.mjs": {
+      "ms": 39324,
+      "source": "596",
+      "matched_outer_cases": 16
+    },
+    "tests/peer-adoption-runtime.test.mjs": {
+      "ms": 77008,
+      "source": "596",
+      "matched_outer_cases": 23
+    },
+    "tests/peer-input-frontier.test.mjs": {
+      "ms": 464027,
+      "source": "596",
+      "matched_outer_cases": 57
+    },
+    "tests/peer-ledger.test.mjs": {
+      "ms": 165693,
+      "source": "596",
+      "matched_outer_cases": 100
+    },
+    "tests/peer-membership.test.mjs": {
+      "ms": 46616,
+      "source": "596",
+      "matched_outer_cases": 47
+    },
+    "tests/peer-model-capacity-context.test.mjs": {
+      "ms": 184284,
+      "source": "596",
+      "matched_outer_cases": 4
+    },
+    "tests/peer-model-capacity-scale.test.mjs": {
+      "ms": 298348,
+      "source": "596",
+      "matched_outer_cases": 2
+    },
+    "tests/peer-model.test.mjs": {
+      "ms": 85037,
+      "source": "596",
+      "matched_outer_cases": 95
+    },
+    "tests/peer-origin-frontier-seal.test.mjs": {
+      "ms": 924599,
+      "source": "596",
+      "matched_outer_cases": 18
+    },
+    "tests/peer-origin-quarantine.test.mjs": {
+      "ms": 42538,
+      "source": "596",
+      "matched_outer_cases": 42
+    },
+    "tests/peer-owner-handover.test.mjs": {
+      "ms": 72758,
+      "source": "596",
+      "matched_outer_cases": 34
+    },
+    "tests/peer-owner-operating-gate.test.mjs": {
+      "ms": 39459,
+      "source": "596",
+      "matched_outer_cases": 8
+    },
+    "tests/peer-owner-subject-refresh.test.mjs": {
+      "ms": 106709,
+      "source": "596",
+      "matched_outer_cases": 12
+    },
+    "tests/peer-scheduler.test.mjs": {
+      "ms": 43191,
+      "source": "596",
+      "matched_outer_cases": 44
+    },
+    "tests/performance-historical-negative.test.mjs": {
+      "ms": 48061,
+      "source": "596",
+      "matched_outer_cases": 1
+    },
+    "tests/plugin.test.mjs": {
+      "ms": 38034,
+      "source": "596",
+      "matched_outer_cases": 47
+    },
+    "tests/public-represented-v2.test.mjs": {
+      "ms": 69661,
+      "source": "596",
+      "matched_outer_cases": 16
+    },
+    "tests/qualification-unit-storage.test.mjs": {
+      "ms": 201583,
+      "source": "27c",
+      "matched_outer_cases": 1
+    },
+    "tests/repeated-workflow-eval.test.mjs": {
+      "ms": 55534,
+      "source": "596",
+      "matched_outer_cases": 4
+    },
+    "tests/scoped-coherent-runtime.test.mjs": {
+      "ms": 30705,
+      "source": "596",
+      "matched_outer_cases": 8
+    }
+  }
+}
