@@ -167,16 +167,16 @@ test('public capacity reads preserve every logical row, event, attempt, grant an
   const state=f.db.read();assert.deepEqual(state.records[f.id].runtime_task.attempts,[]);assert.equal(state.records['async-runtime-control'].runtime_control.enabled,false);assert.equal(state.paused,true);
 });
 
-test('actual catalog and maximum serialized-ID RPC frames fit without increasing caps',async()=>{
+test('actual catalog and maximum serialized-ID RPC frames fit the dedicated discovery cap',async()=>{
   const oldDescription='Persist bounded background preparation tasks/exact prerequisites. Runtime is software, no AI supervisor. submit/amend/cancel/message/dispose require actual owner/epoch, source_instruction and replay-safe operation_id. Pause/scope/review/one-attempt limits stay. inspect/context/checkpoint/inbox use bounded pages; incomplete context gives no permission. Planned tasks have no native session.';
   const baseline=structuredClone(main.toolList),prior=baseline.find(tool=>tool.name==='company_tasks');prior.description=oldDescription;prior.inputSchema.properties.action.enum=prior.inputSchema.properties.action.enum.filter(action=>action!=='capacity');
-  assert.equal(bytes(main.toolList)-bytes(baseline),-60);assert.equal(main.toolList.length,baseline.length);assert.equal(presentation.REPLY_MAX_BYTES,65536);
+  assert.equal(bytes(main.toolList)-bytes(baseline),-60);assert.equal(main.toolList.length,baseline.length);assert.equal(presentation.REPLY_MAX_BYTES,65536);assert.equal(presentation.CATALOG_MAX_BYTES,131072);
   const tool=main.toolList.find(tool=>tool.name==='company_tasks');assert(tool.inputSchema.properties.action.enum.includes('capacity'));assert.equal(tool.inputSchema.properties.section,undefined);
   const ids=['x'.repeat(256),'\\'.repeat(128),'"'.repeat(128),'\n'.repeat(128),'\0'.repeat(42)+'xxxx','é'.repeat(128),'😀'.repeat(64)];
   for(const id of ids)assert.equal(bytes(JSON.stringify(id)),258);
   for(const ceiling of [100000,1000000])for(const id of ids){
     const tools=structuredClone(main.toolList);tools.find(tool=>tool.name==='company_develop').inputSchema.properties.max_bytes.maximum=ceiling;
-    const wire=presentation.rpcReply(id,{tools})+'\n',decoded=JSON.parse(wire);assert(bytes(wire)<=65536);assert.equal(decoded.id,id);assert.equal(decoded.error,undefined);assert.deepEqual(decoded.result,{tools});
+    const body=presentation.toolCatalogReply(id,tools),wire=body+'\n',decoded=JSON.parse(wire);assert(bytes(body)<=presentation.CATALOG_MAX_BYTES);assert(bytes(wire)<=presentation.CATALOG_MAX_BYTES+1);assert.equal(decoded.id,id);assert.equal(decoded.error,undefined);assert.deepEqual(decoded.result,{tools});
   }
 });
 

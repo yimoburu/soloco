@@ -152,10 +152,10 @@ test('public normalized range reads keep typed semantic and raw positional notic
 });
 
 test('actual source catalog retains bounded maximum-ID JSON-RPC across task version exposure',()=>withoutExternal(()=>{
-  assert.equal(presentation.REPLY_MAX_BYTES,65536);const tool=main.toolList.find(t=>t.name==='company_tasks');assert.deepEqual(tool.inputSchema.properties.spec.properties.context_protocol.enum,[v2]);
+  assert.equal(presentation.REPLY_MAX_BYTES,65536);assert.equal(presentation.CATALOG_MAX_BYTES,131072);const tool=main.toolList.find(t=>t.name==='company_tasks');assert.deepEqual(tool.inputSchema.properties.spec.properties.context_protocol.enum,[v2]);
   const ids=['x'.repeat(256),'\\'.repeat(128),'"'.repeat(128),'\0'.repeat(42)+'xxxx','é'.repeat(128),'😀'.repeat(64)];
   for(const id of ids)assert.equal(bytes(JSON.stringify(id)),258);
-  for(const ceiling of [100000,1000000])for(const id of ids){const tools=structuredClone(main.toolList);tools.find(t=>t.name==='company_develop').inputSchema.properties.max_bytes.maximum=ceiling;const wire=presentation.rpcReply(id,{tools})+'\n',decoded=JSON.parse(wire);assert(bytes(wire)<=65536);assert.equal(decoded.id,id);assert.deepEqual(decoded.result,{tools});}
+  for(const ceiling of [100000,1000000])for(const id of ids){const tools=structuredClone(main.toolList);tools.find(t=>t.name==='company_develop').inputSchema.properties.max_bytes.maximum=ceiling;const body=presentation.toolCatalogReply(id,tools),wire=body+'\n',decoded=JSON.parse(wire);assert(bytes(body)<=presentation.CATALOG_MAX_BYTES);assert(bytes(wire)<=presentation.CATALOG_MAX_BYTES+1);assert.equal(decoded.id,id);assert.deepEqual(decoded.result,{tools});}
 }));
 
 const sourceCall=(f,input)=>main.call('company_context',{root:f.root,...args,...input},'codex');

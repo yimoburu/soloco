@@ -11,6 +11,7 @@ import {createPeerPublicOwnerLifecycle,assertPeerPublicOwnerCustody} from './pee
 import {inspectPeerOwnerOperatingState} from './peers/owner-operating-state.mjs';
 import {inspectPeerPublicContextFrom,readPeerPublicContextFrom,inspectPeerPublicPinsFrom,readPeerPublicPinsFrom} from './peer-public-context.mjs';
 import {legacyEncodedReplyBytes} from './peers/legacy-origin.mjs';
+import {Store} from './store.mjs';
 
 const MAINTENANCE_URL=new URL('./peers/maintenance-launch.mjs',import.meta.url);
 const MAX_REPLY=24576,MAX_REQUEST=100000;
@@ -123,7 +124,12 @@ function pinned(where){
    if(!directory){need(typeof actual.ctimeNs==='bigint'&&typeof actual.mtimeNs==='bigint','OWNER_STORAGE_UNSUPPORTED');sourceFile={fd,before:actual};}
   }
   stable(where);return {fds,sourceFile,rootDirectory};
- }catch(error){for(const fd of fds.reverse())try{fs.closeSync(fd);}catch{}throw error;}
+ }catch(error){
+  const cleanup=[];
+  for(const fd of fds.reverse())try{fs.closeSync(fd);}catch(failure){cleanup.push(failure);}
+  if(cleanup.length)throw new AggregateError([error,...cleanup],'Storage pin acquisition and descriptor cleanup failed',{cause:error});
+  throw error;
+ }
 }
 function openedOriginalFile(pin){
  // Retaining the original fd plus a restored pathname is insufficient: A can
@@ -154,7 +160,8 @@ function layout(db){
  need((version===null||[1,2,3,4].includes(version))&&names.has('company')&&names.has('events'),'OWNER_STORAGE_LAYOUT');return 'legacy';
 }
 function storagePreflight(root){
- const where=location(root);if(!where)return null;const pin=pinned(where);let db;
+ const where=location(root);if(!where)return null;const pin=pinned(where);let db,result,failure,failed=false;
+ const cleanup=[];
  try{
   stable(where);db=new DatabaseSync(where.file,{readOnly:true});stable(where);openedOriginalFile(pin);
   const actual=db.prepare('PRAGMA database_list').all().find(r=>r.name==='main');need(actual?.file&&fs.realpathSync(actual.file)===where.file,'OWNER_STORAGE_CHANGED');
@@ -162,8 +169,16 @@ function storagePreflight(root){
   // open/status and startup hooks use it before any actual caller is known.
   // Canonical peer rows and P1 proof reads belong after HOST authentication.
   const kind=layout(db);
-  stable(where);return {where,kind};
- }finally{db?.close();for(const fd of pin.fds.reverse())fs.closeSync(fd);}
+  stable(where);result={where,kind};
+ }catch(error){failed=true;failure=error;}
+ finally{
+  for(const close of [()=>db?.close(),...pin.fds.reverse().map(fd=>()=>fs.closeSync(fd))]){
+   try{close();}catch(error){cleanup.push(error);}
+  }
+ }
+ if(failed){if(cleanup.length)throw new AggregateError([failure,...cleanup],'Storage preflight and cleanup failed',{cause:failure});throw failure;}
+ if(cleanup.length)throw cleanup.length===1?cleanup[0]:new AggregateError(cleanup,'Storage preflight cleanup failed');
+ return result;
 }
 export function peerOwnerStorageKind(root){
  need(text(root,4000)&&path.isAbsolute(root),'OWNER_STORAGE_INPUT');
@@ -212,6 +227,36 @@ export async function withPeerPublicStorage(root,readOnly,invoke){
   const actual=db.prepare('PRAGMA database_list').all().find(row=>row.name==='main');need(actual?.file&&fs.realpathSync(actual.file)===where.file,'OWNER_STORAGE_CHANGED');
   const result=await invoke({kind:'legacy',db,root:where.root});stable(where);return result;
  }finally{if(db?.isTransaction)db.exec('ROLLBACK');db?.close();for(const fd of pin.fds.reverse())fs.closeSync(fd);}
+}
+// Fixed SOURCE writer seam, not a public operation or owner authorization.
+// Keep legacy selection distinct: a peer rejection never falls back here.
+export async function withLegacyPublicStore(root,invoke){
+ need(typeof invoke==='function','OWNER_STORAGE_INPUT');
+ const found=storagePreflight(root);need(found?.kind==='legacy','OWNER_LEGACY_LAYOUT4_REQUIRED');
+ const {where}=found,pin=pinned(where);let db,store,result,failure,failed=false,active=true;
+ const cleanup=[];
+ const guard=()=>{
+  need(active,'OWNER_STORAGE_CALLBACK_EXPIRED');stable(where);
+  need(layout(db)==='legacy','OWNER_STORAGE_LAYOUT');
+  need(stat(where.file)?.nlink===1n,'OWNER_STORAGE_LINK');
+  need(db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='company_layout'").get(),'OWNER_LEGACY_LAYOUT4_REQUIRED');
+  const rows=db.prepare('SELECT id,version FROM company_layout').all();need(rows.length===1&&rows[0].id===1&&rows[0].version===4,'OWNER_LEGACY_LAYOUT4_REQUIRED');
+  const actual=db.prepare('PRAGMA database_list').all().find(row=>row.name==='main');need(actual?.file&&fs.realpathSync(actual.file)===where.file,'OWNER_STORAGE_CHANGED');stable(where);
+ };
+ try{
+  stable(where);db=new DatabaseSync(where.file);stable(where);openedOriginalFile(pin);guard();
+  store=new Store(where.root,false,{connection:db,connectionGuard:guard});
+  result=await invoke(store);guard();need(!db.isTransaction,'OWNER_STORAGE_TRANSACTION_OPEN');
+ }catch(error){failed=true;failure=error;}
+ finally{
+  active=false;
+  for(const close of [()=>store?.close(),()=>{if(db?.isTransaction)db.exec('ROLLBACK');},()=>db?.close(),...pin.fds.reverse().map(fd=>()=>fs.closeSync(fd))]){
+   try{close();}catch(error){cleanup.push(error);}
+  }
+ }
+ if(failed){if(cleanup.length)throw new AggregateError([failure,...cleanup],'Legacy Store operation and cleanup failed',{cause:failure});throw failure;}
+ if(cleanup.length)throw cleanup.length===1?cleanup[0]:new AggregateError(cleanup,'Legacy Store cleanup failed');
+ return result;
 }
 const connection=ledger=>({root:ledger.root,company_id:ledger.company_id,directory:ledger.directory});
 function canonicalCaller(tx,actor,args,ledger,{privateContext=false}={}){

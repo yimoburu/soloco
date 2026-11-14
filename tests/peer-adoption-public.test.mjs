@@ -12,7 +12,7 @@ import {Store,installedTeam,teamHash} from '../plugins/soloco/runtime/store.mjs'
 import {bind} from '../plugins/soloco/runtime/engine.mjs';
 import {call,toolListFor} from '../plugins/soloco/runtime/main.mjs';
 import {peerDigest} from '../plugins/soloco/runtime/peers/ledger.mjs';
-import {fits,toolResult,rpcReply,MODEL_MAX_BYTES,REPLY_MAX_BYTES} from '../plugins/soloco/runtime/public-response.mjs';
+import {fits,toolResult,rpcReply,toolCatalogReply,MODEL_MAX_BYTES,REPLY_MAX_BYTES,CATALOG_MAX_BYTES} from '../plugins/soloco/runtime/public-response.mjs';
 
 const TOOL='company_peer_adoption',SESSION='fictional-public-adoption-owner',EPOCH=9;
 const INSTRUCTION='Fictional read-only preparation only; preserve all failures, spent attempts and unknown closure. No execution or adoption.';
@@ -115,8 +115,8 @@ async function followExactSourcePointer(f,guidance){
 
 test('public discovery and actual dispatch expose preparation only, with hook and canonical owner gates',async t=>{
  const f=fixture(t,{bound:false}),schema=publicSchema(f.root),before=fingerprint(f.db);
- const listed={tools:toolListFor(f.root)},wire=rpcReply('i'.repeat(256),listed),discovery=JSON.parse(wire);
- assert(Buffer.byteLength(wire)<=REPLY_MAX_BYTES);assert.deepEqual(discovery.result,listed,'The full tools/list RPC must not become an overflow error');assert(discovery.result.tools.some(tool=>tool.name===TOOL));
+ const listed={tools:toolListFor(f.root)},wire=toolCatalogReply('i'.repeat(256),listed.tools),discovery=JSON.parse(wire);
+ assert.equal(REPLY_MAX_BYTES,65536);assert.equal(CATALOG_MAX_BYTES,131072);assert(Buffer.byteLength(wire)<=CATALOG_MAX_BYTES);assert.deepEqual(discovery.result,listed,'The full tools/list RPC must not become an overflow error');assert(discovery.result.tools.some(tool=>tool.name===TOOL));
  assert.equal(schema.additionalProperties,false);assert.equal(schema.properties.input.additionalProperties,false);
  for(const forbidden of ['apply','adopt','start','resume'])assert.equal(schema.properties.action.enum.includes(forbidden),false);
  await assert.rejects(f.run('readiness'),/No startup-hook binding/);
