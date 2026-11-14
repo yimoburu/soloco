@@ -6,7 +6,13 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {DatabaseSync} from 'node:sqlite';
 import {readImmutable} from '../plugins/soloco/runtime/record-storage.mjs';
-import {Store,VERSION} from '../plugins/soloco/runtime/store.mjs';
+import cp from 'node:child_process';
+import net from 'node:net';
+import {syncBuiltinESMExports} from 'node:module';
+import {executionTiming} from '../plugins/soloco/runtime/timeout.mjs';
+import {assignmentContext} from '../plugins/soloco/runtime/context.mjs';
+import {work} from '../plugins/soloco/runtime/worker.mjs';
+import {Store,VERSION,teamHash} from '../plugins/soloco/runtime/store.mjs';
 import {retainSnapshot} from '../plugins/soloco/runtime/snapshot.mjs';
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
 import {call} from '../plugins/soloco/runtime/main.mjs';
@@ -100,7 +106,57 @@ function storedImage(db){
   }));
 }
 
-test('both public handover protocols retain the same bounded locator and leave missing/corrupt originals unchanged',async()=>{
+async function assertPublicDiagnostic(root,db,protocol,details){
+  const before=storedImage(db.db);let observed;
+  await assert.rejects(call('company_handover',{root,session_id:'diagnostic-fixture-owner',action:'inspect',...(protocol?{protocol}:{})},'codex'),error=>{
+    observed=error;assertDiagnostic(error,details);return true;
+  });
+  // The stdio handler uses these exact presentation/serialization functions.
+  const reply=JSON.parse(rpcReply('fictional-diagnostic',toolError(observed)));
+  assert.equal(reply.result.isError,true);assert.equal(reply.result.content[0].text,observed.message);
+  assert.doesNotMatch(JSON.stringify(reply),/PRIVATE_FICTIONAL_ORIGINAL|PRIVATE_FICTIONAL_CORRUPT_BODY/);
+  assert.ok(Buffer.byteLength(JSON.stringify(reply))<1024);
+  assert.deepEqual(storedImage(db.db),before,'Inspection must neither repair, remove, nor rewrite failed evidence');
+}
+function forbidExternal(t){
+  const attempts=[],exists=fs.existsSync;
+  t.mock.method(fs,'existsSync',file=>file==='/usr/bin/sandbox-exec'?false:exists(file));
+  const deny=(object,key)=>t.mock.method(object,key,()=>{attempts.push(key);throw Error('Unexpected external execution: '+key);});
+  for(const key of ['spawn','spawnSync','exec','execSync','execFile','execFileSync','fork'])deny(cp,key);
+  for(const key of ['connect','createConnection','createServer'])deny(net,key);
+  deny(net.Socket.prototype,'connect');deny(net.Server.prototype,'listen');deny(globalThis,'fetch');syncBuiltinESMExports();
+  t.after(()=>{t.mock.restoreAll();syncBuiltinESMExports();assert.deepEqual(attempts,[]);});
+}
+// Real public plan/review/apply and worker closure; the independent judgment is
+// a fictional contract double, never native semantic acceptance or company data.
+async function publishDiagnosticCheckpoint(root,db){
+  const f={root,session_id:'diagnostic-fixture-owner',epoch:1};
+  db.transaction('fictional typed home',state=>{
+    state.team_sha256=teamHash(state);
+    state.records.home={id:'home',kind:'artifact',revision:1,status:'Draft',author_role:'runner',author_instance:f.session_id,
+      content:'PRIVATE_FICTIONAL_ORIGINAL: no export or retry without authority.',
+      operating_record:{version:1,kind:'obligation',scope:'*',owner:'runner',conditions:'Always',exceptions:'None',clearing:'Independent exact closure',expires_at:null,dependencies:[],authority_refs:[],evidence_refs:['home']}};
+    return state;
+  });
+  const context=args=>call('company_context',{...f,protocol:'operating-state-v1',source_instruction:'FICTIONAL read-only publication review; no external execution.',...args},'codex');
+  const p=await context({action:'plan'});assert.equal(p.held,false);assert.deepEqual(p.frontier,[]);
+  const q=engine.dispatch({...f,role:'qa',review_of:p.id,task:'FICTIONAL independent complete current-meaning and authority review.'},'codex',{check:()=>({available:true,authenticated:true}),launch:()=>({on(){},unref(){}})});
+  const state=db.read(),packet=assignmentContext(state,state.jobs[q.id]);
+  assert.equal(packet.operating_evidence,undefined,'This diagnostic fixture must remain small and completely inline');
+  const required=JSON.parse(packet.text).required_evidence;
+  assert.ok(required.sources.every(ref=>required.inline.some(item=>item.source.id===ref.id)),'Every required original must be in the actual worker prompt');
+  await work(root,q.id,async(_host,_session,prompt,_dir,timeout,_selection,options)=>{
+    assert.ok(prompt.includes(packet.text),'The complete inline context must reach the worker inside its ordinary prompt wrapper');
+    options.onSpawn(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));
+    return {native_id:'fictional-diagnostic-qa-'+q.id,text:JSON.stringify({content:'FICTIONAL contract judgment; all fixture conditions retained.',messages:[],notices:[],review:{verdict:'Pass',reason:'FICTIONAL complete inline evidence and authority check.',permitted_action:'publish_operating_state',plan_sha256:digest(JSON.stringify(db.read().records[p.id].operating_plan)),preservation_complete:true,interaction_complete:true,authority_checked:true,blockers:[]}})};
+  });
+  const job=db.read().jobs[q.id];assert.equal(job.status,'completed',job.error);assert.equal(job.coordination_release.termination_confirmed,true);
+  assert.equal((await context({action:'apply',plan_id:p.id,review_id:job.artifact_id})).published,true);
+  const accepted=db.read();assert.equal(accepted.operating_state.plan.id,p.id);assert.equal(accepted.operating_state.review.id,job.artifact_id);
+  return accepted.operating_state.accepted_snapshot.preservation;
+}
+
+test('legacy public handover retains the bounded locator and leaves missing/corrupt originals unchanged',async()=>{
   const temporary=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'immutable-diagnostic-')));
   const previous=process.env.COMPANY_PLUGIN_DATA;
   process.env.COMPANY_PLUGIN_DATA=path.join(temporary,'plugin-data');
@@ -119,26 +175,51 @@ test('both public handover protocols retain the same bounded locator and leave m
         const sha=ref.immutable_snapshot.sha256,corrupt='PRIVATE_FICTIONAL_CORRUPT_BODY';
         if(reason==='missing')db.db.prepare('DELETE FROM immutable_values WHERE sha256=?').run(sha);
         else db.db.prepare('UPDATE immutable_values SET bytes=? WHERE sha256=?').run(corrupt,sha);
-        const before=storedImage(db.db);
-        for(const protocol of [undefined,'operating-handover-v4']){
-          let observed;
-          await assert.rejects(call('company_handover',{root,session_id:'diagnostic-fixture-owner',action:'inspect',...(protocol?{protocol}:{})},'codex'),error=>{
-            observed=error;
-            assertDiagnostic(error,{reason,sha256:sha,...(reason==='hash_mismatch'?{actual_sha256:digest(corrupt)}:{})});
-            return true;
-          });
-          // The stdio handler uses these exact presentation/serialization functions.
-          const reply=JSON.parse(rpcReply('fictional-diagnostic',toolError(observed)));
-          assert.equal(reply.result.isError,true);
-          assert.equal(reply.result.content[0].text,observed.message);
-          assert.doesNotMatch(JSON.stringify(reply),/PRIVATE_FICTIONAL_ORIGINAL|PRIVATE_FICTIONAL_CORRUPT_BODY/);
-          assert.ok(Buffer.byteLength(JSON.stringify(reply))<1024);
-          assert.deepEqual(storedImage(db.db),before,'Inspection must neither repair, remove, nor rewrite failed evidence');
-        }
+        await assertPublicDiagnostic(root,db,undefined,{reason,sha256:sha,...(reason==='hash_mismatch'?{actual_sha256:digest(corrupt)}:{})});
       }finally{db.close();}
     }
   }finally{
     if(previous===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=previous;
     fs.rmSync(temporary,{recursive:true,force:true});
   }
+});
+
+test('explicit v4 inspection without an accepted checkpoint holds without legacy fallback or writes',async()=>{
+  const temporary=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'immutable-v4-prerequisite-'))),previous=process.env.COMPANY_PLUGIN_DATA;
+  process.env.COMPANY_PLUGIN_DATA=path.join(temporary,'plugin-data');
+  const root=fs.mkdtempSync(path.join(temporary,'fictional-company-'));engine.bind(root,'diagnostic-fixture-owner','codex');
+  const db=new Store(root,true);
+  try{
+    db.transaction('fictional seed',()=>seed());db.migrate();const before=storedImage(db.db);
+    await assert.rejects(call('company_handover',{root,session_id:'diagnostic-fixture-owner',action:'inspect',protocol:'operating-handover-v4'},'codex'),error=>{
+      assert.equal(error.message,'Operating state Held: no accepted prospective checkpoint');return true;
+    });
+    assert.deepEqual(storedImage(db.db),before);
+  }finally{db.close();if(previous===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=previous;fs.rmSync(temporary,{recursive:true,force:true});}
+});
+
+test('accepted v4 handover retains exact bounded missing/corrupt preservation diagnostics without writes',async t=>{
+  forbidExternal(t);
+  const temporary=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'immutable-accepted-v4-'))),previous=process.env.COMPANY_PLUGIN_DATA;
+  process.env.COMPANY_PLUGIN_DATA=path.join(temporary,'plugin-data');
+  try{
+    for(const reason of ['missing','hash_mismatch']){
+      const root=fs.mkdtempSync(path.join(temporary,'fictional-company-'));engine.bind(root,'diagnostic-fixture-owner','codex');
+      const db=new Store(root,true);
+      try{
+        db.transaction('fictional seed',()=>seed());db.migrate();
+        const ref=await publishDiagnosticCheckpoint(root,db),sha=ref.immutable_snapshot.sha256;
+        // Prime both healthy inspection forms before damaging a required original.
+        // Neither an old projection cache nor a legacy fallback may mask corruption.
+        for(const protocol of [undefined,'operating-handover-v4']){
+          const healthy=await call('company_handover',{root,session_id:'diagnostic-fixture-owner',action:'inspect',...(protocol?{protocol}:{})},'codex');
+          assert.match(healthy.subject_sha256,/^[a-f0-9]{64}$/);assert.ok(healthy.required_semantics.length>0);
+        }
+        const corrupt='PRIVATE_FICTIONAL_CORRUPT_BODY';
+        if(reason==='missing')db.db.prepare('DELETE FROM immutable_values WHERE sha256=?').run(sha);
+        else db.db.prepare('UPDATE immutable_values SET bytes=? WHERE sha256=?').run(corrupt,sha);
+        for(const protocol of [undefined,'operating-handover-v4'])await assertPublicDiagnostic(root,db,protocol,{reason,sha256:sha,...(reason==='hash_mismatch'?{actual_sha256:digest(corrupt)}:{})});
+      }finally{db.close();}
+    }
+  }finally{if(previous===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=previous;fs.rmSync(temporary,{recursive:true,force:true});}
 });
