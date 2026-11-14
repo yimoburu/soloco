@@ -279,7 +279,9 @@ async function observerTurnFixture(t,{close_on_end=false,qualify=false,partial_f
   const {__testOnlyActiveTurn:turn}=await import(pathToFileURL(file).href);
   const child=new EventEmitter(),births=[],pairs=[],processes=[],closures=[],reports=[],signals=[],stages=[];let spawns=0,qualified=0,writes=0;
   child.pid=54323;child.stdout=new EventEmitter();child.stderr=new EventEmitter();child.stdin=new EventEmitter();
-  const close=()=>{child.stdout.emit('end');child.emit('close',0,null);};
+  let stdoutEnded=false;
+  const end=()=>{if(stdoutEnded)return;stdoutEnded=true;child.stdout.emit('end');};
+  const close=()=>{end();child.emit('close',0,null);};
   child.stdin.write=()=>{writes++;assert.fail('Observer component control must stop before wire/protocol work');};
   child.stdin.end=()=>{if(close_on_end)queueMicrotask(close);};child.kill=name=>{signals.push(name);return true;};
   if(domain)(await import(pathToFileURL(domain).href)).probe.child=child;
@@ -289,7 +291,16 @@ async function observerTurnFixture(t,{close_on_end=false,qualify=false,partial_f
         ...(missing_protected_birth?{protectedLaunch:{TEST_COPY_ONLY:true}}:{}),
         limits:{total_ms:30,grace_ms:1,term_ms:1,kill_ms:1,frame_bytes:1000,wire_bytes:2000,transcript_bytes:2000},
         spawn(){spawns++;queueMicrotask(()=>emit_spawn?child.emit('spawn'):close());return child;},
-        checks(stage){stages.push(stage);if(stage==='child_spawned'){if(partial_frame)child.stdout.emit('data','{');throw Object.assign(Error('SOURCE stop before protocol/admission'),{code:'SOURCE_OBSERVER_STOP'});}if(stage==='physical_close'&&!qualify)throw Object.assign(Error('SOURCE closure qualification held'),{code:'SOURCE_CLOSURE_HELD'});},
+        checks(stage){
+          stages.push(stage);
+          if(stage==='child_spawned'){
+            // Make decoder rejection the first retained error in this case;
+            // the fallback stop still prevents protocol/admission work.
+            if(partial_frame){child.stdout.emit('data','{');end();}
+            throw Object.assign(Error('SOURCE stop before protocol/admission'),{code:'SOURCE_OBSERVER_STOP'});
+          }
+          if(stage==='physical_close'&&!qualify)throw Object.assign(Error('SOURCE closure qualification held'),{code:'SOURCE_CLOSURE_HELD'});
+        },
         current(){},bind(){assert.fail('No admission/client binding is supplied');},
         onModelProcess:birth=>{births.push(birth);return options.onModelProcess(birth);},
         onModelClosure:(birth,receipt)=>{pairs.push({birth,receipt});return options.onModelClosure(birth,receipt);},
@@ -318,7 +329,16 @@ test('private TaskHost original emitter observations reach the real leaf before 
 
 test('private TaskHost raw close survives final decoder failure without claiming qualified closure',async t=>{
   const f=await observerTurnFixture(t,{close_on_end:true,partial_frame:true}),result=await f.promise;
-  assert.equal(f.pairs.length,1);assert.equal(f.pairs[0].birth,f.births[0]);assert.equal(f.closures.length,1);assert.equal(f.stages.includes('physical_close'),false);assert.equal(f.qualified,0);assert.equal(f.reports[0].qualified_close,false);assert.equal(result.error.code,'SOURCE_OBSERVER_STOP');assert.equal(result.output,undefined);
+  assert.equal(f.spawns,1);assert.equal(f.writes,0);assert.equal(f.births.length,1);
+  assert.equal(f.pairs.length,1);assert.equal(f.pairs[0].birth,f.births[0]);assert.equal(f.closures.length,1);
+  assert.equal(f.closures[0].close_observed,true);assert.equal(result.observed_process.close_observed,true);
+  assert.equal(f.stages.filter(stage=>stage==='physical_close').length,1);assert.equal(f.qualified,0);
+  assert.equal(f.reports[0].error.code,'WIRE_UNTERMINATED_FRAME');assert.equal(f.reports[0].qualified_close,false);
+  assert.equal(f.reports[0].native_id,null);assert.equal(f.reports[0].output,null);
+  assert.equal(result.error.code,'WIRE_UNTERMINATED_FRAME');assert.equal(result.output,undefined);assert.equal(result.result_evidence,undefined);
+  // Raw leaf termination survives; it is neither accepted malformed output
+  // nor TaskHost whole-scope qualification, which the private qualifier holds.
+  assert.equal(result.termination_confirmed,true);
 });
 
 test('private TaskHost retains the original close listener after UNKNOWN without rewriting its first executor result',async t=>{
