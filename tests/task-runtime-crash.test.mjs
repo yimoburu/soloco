@@ -8,17 +8,19 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
-import {withStore,id} from '../plugins/soloco/runtime/store.mjs';
+import {Store,withStore,id} from '../plugins/soloco/runtime/store.mjs';
 import {taskAction,runtimeAction,tickRuntime} from '../plugins/soloco/runtime/task-runtime.mjs';
 import {resourceClaims} from '../plugins/soloco/runtime/coordination.mjs';
 import {work} from '../plugins/soloco/runtime/worker.mjs';
 import {taskAssignmentContext} from '../plugins/soloco/runtime/task-context.mjs';
+import {prepareOriginalWorkerLaunchFrom,spawnOriginalWorkerLaunch,cleanupOriginalWorkerLaunchFailure,originalWorkerFailedLaunchChild,originalWorkerFailedLaunchClosed} from '../plugins/soloco/runtime/peers/prospective-local-worker-inventory-producer.mjs';
 
 const source_instruction='Prepare only supplied fictional facts; preserve uncertainty and no external effects.';
 const child=()=>({on(){return this;},unref(){}});
 const wake=()=>({started:false,reason:'fictional crash driver'});
 function fixture(){
   const home=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-async-crash-')),root=path.join(home,'company'),data=path.join(home,'plugin-data'),previous=process.env.COMPANY_PLUGIN_DATA;
+  let retainHome=false;
   fs.mkdirSync(root);process.env.COMPANY_PLUGIN_DATA=data;
   const args={root,session_id:id('fictional-founder'),epoch:1};
   engine.bind(root,args.session_id,'codex');engine.open({...args,idea:'Fictional bounded runtime crash acceptance'},'codex');
@@ -31,13 +33,45 @@ function fixture(){
   const read=()=>withStore(root,db=>db.read());
   const events=type=>withStore(root,db=>db.db.prepare('SELECT COUNT(*) AS n FROM events WHERE type=?').get(type).n);
   const queue=task_id=>engine.queueRuntimeTask(root,task_id,{check:()=>({available:true,authenticated:true,version:'fictional-crash-adapter'}),launch:child});
+  async function crashWorker(value,request){
+    // The parent survives the kill point and observes the actual worker child.
+    // A controlled carrier inside that child could not report its own SIGKILL.
+    const issuer=new Store(root);let token,timer;
+    try{
+      issuer.transaction('job.worker_launch_requested',state=>{token=prepareOriginalWorkerLaunchFrom(issuer,state,{job_id:value.job_id,kind:'worker'});return state;});
+      let worker;
+      try{worker=spawnOriginalWorkerLaunch(token,process.execPath,['--no-warnings',fileURLToPath(new URL('./fixtures/task-runtime-crash-child.mjs',import.meta.url)),request],{cwd:root,stdio:['ignore','pipe','pipe'],env:{...process.env,COMPANY_PLUGIN_DATA:data}});}
+      catch(error){
+        // A cleanup request is not a close witness. Retain this exact fixture
+        // if a failed write let the original child escape without observed close.
+        if(originalWorkerFailedLaunchChild(error)&&originalWorkerFailedLaunchClosed(error)!==true)retainHome=true;
+        cleanupOriginalWorkerLaunchFailure(error);throw error;
+      }
+      let stdout='',stderr='',error,timedOut=false;
+      worker.stdout.setEncoding('utf8');worker.stderr.setEncoding('utf8');
+      worker.stdout.on('data',chunk=>stdout+=chunk);worker.stderr.on('data',chunk=>stderr+=chunk);
+      const result=await new Promise(resolve=>{
+        worker.on('error',value=>{error=value;});
+        worker.once('close',(status,signal)=>resolve({status,signal}));
+        timer=setTimeout(()=>{timedOut=true;worker.kill('SIGKILL');},15000);
+      });
+      clearTimeout(timer);
+      assert.equal(timedOut,false,'the original 15s watchdog must not supply the expected crash');
+      assert.equal(error,undefined,error?.message);assert.equal(result.signal,'SIGKILL',stderr);assert.equal(result.status,null);
+      assert.deepEqual(JSON.parse(stdout),{cut:value.cut,phase:value.phase},'the child reached the intended real transaction cut');
+      const observed=read().jobs[value.job_id].original_execution_assignment.launches.find(launch=>launch.kind==='worker');
+      assert.equal(observed.birth.pid,worker.pid);assert.equal(observed.closure.pid,worker.pid);
+      assert.equal(observed.closure.code,null);assert.equal(observed.closure.signal,'SIGKILL');assert.equal(observed.closure.never_started,false);
+    }finally{clearTimeout(timer);issuer.close();}
+  }
   function crash(value){
     const request=path.join(home,'cut.json');fs.writeFileSync(request,JSON.stringify({args,...value}));
+    if(value.action==='work')return crashWorker(value,request);
     const result=spawnSync(process.execPath,['--no-warnings',fileURLToPath(new URL('./fixtures/task-runtime-crash-child.mjs',import.meta.url)),request],{encoding:'utf8',timeout:15000,env:{...process.env,COMPANY_PLUGIN_DATA:data}});
     assert.equal(result.error,undefined,result.error?.message);assert.equal(result.signal,'SIGKILL',result.stderr);assert.equal(result.status,null);
     assert.deepEqual(JSON.parse(result.stdout),{cut:value.cut,phase:value.phase},'the child reached the intended real transaction cut');
   }
-  return {args,spec,command,task,submit,read,events,queue,crash,close:()=>{if(previous===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=previous;fs.rmSync(home,{recursive:true,force:true});}};
+  return {args,spec,command,task,submit,read,events,queue,crash,close:()=>{if(previous===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=previous;if(retainHome)process.stderr.write('Retained Source crash fixture after escaped launch failure: '+home+'\n');else fs.rmSync(home,{recursive:true,force:true});}};
 }
 function expireQueue(f,job_id){
   withStore(f.args.root,db=>db.transaction('fictional.expire_queue',state=>{state.jobs[job_id].created_at=new Date(Date.now()-600000).toISOString();return state;}));
@@ -79,7 +113,7 @@ for(const phase of ['before','uncommitted','committed'])test(`SIGKILL ${phase} d
 for(const phase of ['before','uncommitted','committed'])test(`SIGKILL ${phase} result commit keeps artifact, message action and acknowledgment atomic`,async()=>{
   const f=fixture();try{
     const receiver=f.submit(),message=f.task(f.command('message','durable-restriction',{to_task_id:receiver.id,content:'Exact fictional restriction: no external effects.'})),queued=f.queue(receiver.id);
-    f.crash({action:'work',job_id:queued.job_id,message_id:message.id,cut:'job.completed',phase});
+    await f.crash({action:'work',job_id:queued.job_id,message_id:message.id,cut:'job.completed',phase});
     let state=f.read(),job=state.jobs[queued.job_id];
     assert.equal(job.status,phase==='committed'?'completed':'running');
     assert.equal(state.records[message.id].runtime_message.state,phase==='committed'?'processed':'pending');
@@ -127,11 +161,11 @@ test('lost message response replays its original envelope after receiver amendme
   }finally{f.close();}
 });
 
-for(const phase of ['before','uncommitted','committed'])test(`SIGKILL ${phase} next-event reconciliation resumes once from the committed result`,()=>{
+for(const phase of ['before','uncommitted','committed'])test(`SIGKILL ${phase} next-event reconciliation resumes once from the committed result`,async()=>{
   const f=fixture();try{
     const receiver=f.submit(),message=f.task(f.command('message','event-restriction',{to_task_id:receiver.id,content:'Keep the exact fictional event restriction.'})),queued=f.queue(receiver.id);
     const dependent=f.submit('next-event-consumer',{role:'pm',depends_on:[{task_id:receiver.id,gate:'output'}],resources:['fictional/downstream']});
-    f.crash({action:'work',job_id:queued.job_id,message_id:message.id,cut:'job.completed',phase:'committed'});
+    await f.crash({action:'work',job_id:queued.job_id,message_id:message.id,cut:'job.completed',phase:'committed'});
     f.crash({action:'reconcile',cut:'runtime.reconciled',phase});
     let state=f.read();assert.equal(state.records[receiver.id].runtime_task.state,phase==='committed'?'returned':'queued');
     assert.equal(f.events('runtime.reconciled'),phase==='committed'?1:0);
