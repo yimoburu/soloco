@@ -25,7 +25,13 @@ export function controlledOriginalWorker(root){
       // the outer entry is still unwinding. Neither entry owns an early close.
       holder.users++;
       try{return await work(root,jobId,(...args)=>{
-        directories.add(args[3]);const model=startOriginalModel(args,{nativeId});
+        directories.add(args[3]);
+        // Cosmetic naming can schedule a second Codex process outside this
+        // controlled launch. Suppress it only for the actual adapter call;
+        // the callback still receives the worker's original seven arguments.
+        const adapterArgs=[...args];
+        adapterArgs[6]={...args[6],sessionTitle:undefined,sessionNameDirectory:undefined,sessionNameSupport:false};
+        const model=startOriginalModel(adapterArgs,{nativeId});
         let invocations=models.get(jobId);if(!invocations)models.set(jobId,invocations=[]);invocations.push(model);
         // Unknown children retain their actual observers for an explicit late
         // close. Controlled timers create no wall-clock wait or automatic close.
