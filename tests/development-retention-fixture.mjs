@@ -51,6 +51,22 @@ export async function fixture({bodyCopies=100,expiresAt=new Date(Date.now()+2*36
   await developmentAction({...a,action:'authorize',plan_id:p.id,scope_sha256:p.development.scope_sha256,model_data_approved:true,source_instruction:'Controlled fictional Source fixture: authorize this exact initially-live carrier scope only; no candidate execution, real model or Native acceptance.'},'codex');
   for(const job of Object.values(jobs))Object.assign(job,job.kind==='development_test'?stageOriginalReviewController(root,{jobId:job.id,planId:p.id,candidateId:candidate.id,receiptId:job.artifact_id}):stageOriginalHistoricalJob(root,job));
   change(a,s=>{
+    const completedProducer=s.jobs[producer.id],calls=completedProducer.model_process_tracking?.invocations,
+      launches=completedProducer.original_execution_assignment.launches.filter(launch=>launch.kind==='model');
+    assert.equal(calls?.length,1,'the fixture producer has one actual observed model invocation');assert.equal(launches.length,1);
+    const call=calls[0],original=launches[0];
+    assert.ok(call.birth&&call.closure&&original.birth&&original.closure,'derive chronology only after both Original observer pairs exist');
+    assert.equal(call.job_id,completedProducer.id);assert.equal(call.instance_id,completedProducer.instance_id);assert.equal(call.host,completedProducer.host);
+    assert.equal(call.worker_pid,completedProducer.worker_pid);assert.equal(call.birth.worker_pid,completedProducer.worker_pid);
+    assert.equal(original.invocation_id,call.invocation_id);assert.equal(original.controller_pid,completedProducer.worker_pid);
+    assert.equal(original.birth.pid,call.birth.pid);assert.equal(original.closure.pid,call.birth.pid);
+    assert.equal(original.closure.launch_id,original.launch_id);assert.equal(original.closure.never_started,false);
+    assert.equal(original.closure.code,0);assert.equal(call.closure.exit_code,original.closure.code);assert.equal(call.closure.signal,original.closure.signal);
+    assert.equal(call.closure.birth_sha256,hash(call.birth));assert.ok(Number.isFinite(Date.parse(call.closure.closed_at)));
+    assert.equal(completedProducer.coordination_release.termination_confirmed,true);assert.equal(completedProducer.coordination_release.reason,'model_process_closed');
+    // These terminal timestamps describe the already observed producer close.
+    // They grant no new closure, deadline, attempt, release or QA allowance.
+    completedProducer.finished_at=call.closure.closed_at;completedProducer.coordination_release.at=call.closure.closed_at;
     const j=s.jobs[prior.id],observed=j.model_process_tracking?.invocations.at(-1);
     assert.ok(observed?.birth&&observed.closure,'the original adapter observed both controlled lifecycle events');
     assert.equal(j.worker_pid,observed.worker_pid);assert.equal(observed.closure.exit_code,0);
