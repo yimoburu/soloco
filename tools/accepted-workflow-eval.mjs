@@ -29,8 +29,9 @@ export function workflowSelections(modelId='gpt-6.1-sol') {
  if(typeof modelId!=='string'||!modelId.trim())throw Error('Choose one exact host-catalog model; no fallback is permitted');
  return {research:{mode:'explicit',model:modelId,effort:'low',speed:'host_default',reason:'Exact fictional extraction with deterministic acceptance; same choice in both matched schedules.'},engineer:{mode:'explicit',model:modelId,effort:'medium',speed:'host_default',reason:'Bounded pure parser repair with immutable executed tests; same choice in both schedules.'},qa:{mode:'explicit',model:modelId,effort:'high',speed:'host_default',reason:'Independent exact-candidate acceptance and seeded boundary review; same choice in both schedules.'}};
 }
-export function contractModel({badFirst=false,qaVerdict='Pass',throwFor=null}={}) {let generation=0;return async ({job,target},host,native,prompt,cwd,timeout,selection,options)=>{
- options.onSpawn(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));
+export function contractModel({badFirst=false,qaVerdict='Pass',throwFor=null,reportSpawn=true}={}) {let generation=0;return async ({job,target},host,native,prompt,cwd,timeout,selection,options)=>{
+ // An opt-in Source worker supplies the original adapter's spawn observation.
+ if(reportSpawn)options.onSpawn(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));
  if(throwFor===job.role)throw Object.assign(Error('Injected uncertain provider failure'),{termination_confirmed:false});
  const envelope={content:'Contract double only; not native model evidence.',messages:[],notices:[]};
  if(job.role==='research')envelope.content=JSON.stringify({criteria});
@@ -39,7 +40,7 @@ export function contractModel({badFirst=false,qaVerdict='Pass',throwFor=null}={}
  await new Promise(r=>setTimeout(r,10));
  return {native_id:id('contract-double'),text:JSON.stringify(envelope),model_evidence:{verification:'synthetic_contract_double'}};
 };}
-export async function runArm({directory,mode,native=false,model=contractModel(),modelId='gpt-6.1-sol',sharedBudget={calls:0},maxCalls=protocol.criteria.max_native_calls_total,runtimeReady,runtimeCatalog}){
+export async function runArm({directory,mode,native=false,model=contractModel(),modelId='gpt-6.1-sol',sharedBudget={calls:0},maxCalls=protocol.criteria.max_native_calls_total,runtimeReady,runtimeCatalog,worker}){
  if(!['serial','concurrent'].includes(mode))throw Error('Choose serial or concurrent');
  const root=path.join(directory,mode);fs.mkdirSync(root,{recursive:true});
  const args={root,session_id:id('fictional-founder'),epoch:1};
@@ -56,7 +57,7 @@ export async function runArm({directory,mode,native=false,model=contractModel(),
  const started=performance.now();
  const event=(type,extra={})=>{const v={type,at_ms:elapsed(started),...extra};report.events.push(v);return v;};
  const checkpoint=()=>fs.writeFileSync(path.join(root,'workflow-local.json'),JSON.stringify(report,null,2)+'\n');
- const {dispatch}=createWorkflow({args,report,started,native,model,sharedBudget,maxCalls,runtimeReady,runtimeCatalog,checkpoint,selections,taskByRole:role=>role==='research'?'Extract these exact fictional criteria in order. Return content as a JSON string containing {"criteria":[...]}. Preserve exact text. Brief: '+JSON.stringify(criteria):role==='engineer'?'Repair parsePort in the exact supplied scope. The original test failure is supplied. Preserve the read-only acceptance tests; return only port.mjs in files.':'Independently inspect exact candidate, immutable tests, actual runtime receipt and extracted criteria. Pass only when all criteria and actual passing execution are evidenced. Return exact required candidate and receipt hashes. No execution claims.'});
+ const {dispatch}=createWorkflow({args,report,started,native,model,sharedBudget,maxCalls,runtimeReady,runtimeCatalog,checkpoint,selections,worker,taskByRole:role=>role==='research'?'Extract these exact fictional criteria in order. Return content as a JSON string containing {"criteria":[...]}. Preserve exact text. Brief: '+JSON.stringify(criteria):role==='engineer'?'Repair parsePort in the exact supplied scope. The original test failure is supplied. Preserve the read-only acceptance tests; return only port.mjs in files.':'Independently inspect exact candidate, immutable tests, actual runtime receipt and extracted criteria. Pass only when all criteria and actual passing execution are evidenced. Return exact required candidate and receipt hashes. No execution claims.'});
  try {
   let extraction,generation;
   if(mode==='serial'){extraction=await dispatch('research');generation=await dispatch('engineer',{development_id:plan.id,input_ids:[failure.id]});}
