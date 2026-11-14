@@ -169,6 +169,8 @@ test('a callback cannot use mutable Date.now to commit a launch after its actual
 });
 
 test('an actual Source callback can retain a controlled late model close after cancellation and issuer close',async t=>{
+  // Four fixed fixture-stage lines, 162 bytes total; no process/outcome proof.
+  fs.writeSync(2,'SOURCE_CUSTODY_CLOSE_STAGE_V1 entered\n');
   const policy=normalizeTimeout({timeout_ms:1000,timeout_reason:'Bounded fictional late-close Source callback'}),f=fixture(policy);t.after(()=>{if(!f.store.closed)f.store.close();});
   const worker=controlledChild(process.pid),model=controlledChild(750003);model.stdin=new PassThrough();model.stdout=new PassThrough();model.stderr=new PassThrough();let calls=0;
   let workerClosed=false,modelClosed=false;worker.once('close',()=>{workerClosed=true;});model.once('close',()=>{modelClosed=true;});
@@ -191,10 +193,28 @@ test('an actual Source callback can retain a controlled late model close after c
     // assert.rejects promise. Draining never turns a failed assertion into Pass.
     drained=pending.then(()=>undefined,()=>undefined);
     model.emit('spawn');assert.ok(birth);assert.ok(timing);assert.equal(calls,2);
-    controller.abort();await assert.rejects(pending,/cancelled|aborted|Role/i);
-    f.store.transaction('job.failed',s=>{s.jobs[f.job.id].status='failed';return s;});f.store.close();assert.equal(f.store.closed,true);
+    controller.abort();assert.equal(controller.signal.aborted,true);
+    assert.equal(modelClosed,false);assert.equal(receipt,undefined);assert.ok(model.kills.includes('SIGTERM'));
+    fs.writeSync(2,'SOURCE_CUSTODY_CLOSE_STAGE_V1 model-born\n');
+    f.store.transaction('job.failed',s=>{
+      const job=s.jobs[f.job.id];job.status='failed';
+      assert.equal(job.model_process_tracking.invocations.at(-1).closure,null);
+      assert.equal(job.legacy_runtime.worker.closure,null);assert.equal(runtimeJobOccupied(job),true);
+      assert.notEqual(job.coordination_release?.termination_confirmed,true);return s;
+    });f.store.close();assert.equal(f.store.closed,true);
+    fs.writeSync(2,'SOURCE_CUSTODY_CLOSE_STAGE_V1 issuer-closed\n');
+    // Cancellation is already requested and the issuer is closed. Supply the
+    // existing controlled close before awaiting the facade, rather than making
+    // this fixture wait for its finite TERM/KILL escalation to settle first.
     model.emit('exit',1,'SIGTERM');model.emit('close',1,'SIGTERM');assert.ok(receipt);
-    const read=new Store(f.root);try{const job=read.read().jobs[f.job.id];assert.equal(job.status,'failed');assert.deepEqual(job.model_process_tracking.invocations.at(-1).closure,receipt);}finally{read.close();}
+    await assert.rejects(pending,error=>error?.code==='ROLE_ABORTED'&&error.termination_confirmed===true);
+    assert.throws(()=>assertRuntimeModelProcessObservedFrom(token,birth,receipt),error=>error?.code==='LEGACY_RUNTIME_MODEL_LAUNCH_FAILED');
+    const read=new Store(f.root);try{
+      const job=read.read().jobs[f.job.id];assert.equal(job.status,'failed');assert.deepEqual(job.model_process_tracking.invocations.at(-1).closure,receipt);
+      assert.equal(job.legacy_runtime.worker.closure,null);assert.equal(runtimeJobOccupied(job),true);
+      assert.notEqual(job.coordination_release?.termination_confirmed,true);
+    }finally{read.close();}
+    fs.writeSync(2,'SOURCE_CUSTODY_CLOSE_STAGE_V1 readback\n');
     worker.emit('exit',1,'SIGTERM');worker.emit('close',1,'SIGTERM');
   }finally{
     controller.abort();

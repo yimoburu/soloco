@@ -316,7 +316,7 @@ test('rejected originals reject nonstrings, changed prefixes and untruncated cla
 });
 
 test('Source report captures preserve missing/null revision and reject metadata substitutions',()=>{
-  for(const mutate of [({report})=>{report.qa_job.revision_present=true;},({report})=>{report.qa_job.snapshot.immutable_snapshot.characters++;},({report})=>{report.receipt_before_acceptance.id='different-receipt';}]){
+  for(const mutate of [({report})=>{report.qa_job.revision_present=true;},({report})=>{const ref=report.qa_job.snapshot.immutable_snapshot;report.qa_job.snapshot={immutable_snapshot:{...ref,characters:ref.characters+1}};},({report})=>{report.receipt_before_acceptance.id='different-receipt';}]){
     const {db,write}=reportProducerFixture({mutate});try{assert.throws(write,/DELIVERY_CAPTURE_CHANGED|SNAPSHOT_CHANGED/);}finally{db.close();}
   }
 });
@@ -372,14 +372,25 @@ test('all inline operating job roles share the sixteen MiB job inventory',()=>{
   });try{assert.throws(write,/JOB_INVENTORY_CAPACITY/);}finally{db.close();}
 });
 
-function contextProducerFixture({tree=false,profile,partitioner,notice=false,sourceKind,content,mutate=()=>{},target=false}={}){
+function contextProducerFixture({tree=false,profile,partitioner,notice=false,sourceKind,unsupportedTreeJobSnapshot=false,content,mutate=()=>{},target=false}={}){
   const db=fixture();db.migrate();
   const write=()=>db.transaction('fixture.actual_context_capture',s=>{
     Object.assign(s,{schema:2,runtime_version:VERSION,plugin_version:VERSION,governance:'Fictional exact-source read only.',roles:{qa:{name:'QA'},engineer:{name:'Engineer'}},cos_instructions:'Preserve historical failure and unknown effects.',sessions:{},paused:false});s.team_sha256=teamHash(s);
     const old={id:'context-old',kind:'artifact',revision:1,content:content??'Historical fictional source: preserve each exact original.'};
     s.records[old.id]=old;s.records['context-current']={id:'context-current',kind:'decision',revision:1,content:'Current fictional constraint: retain unknown effects.'};
     let source_id=old.id;
-    if(sourceKind==='job'){const original={id:'context-job',role:'qa',status:'failed',proposal_reads:[{id:old.id,sha256:sha(old),body:retainSnapshot(s,old)}]};s.jobs[original.id]=original;source_id='job:'+original.id;}
+    if(sourceKind==='job'){
+      let input=old,body;
+      if(tree&&!unsupportedTreeJobSnapshot){
+        // Tree evidence resolves typed handover subjects, not an arbitrary
+        // proposal_reads.body SnapshotRef. Keep the canonical input inline and
+        // exercise the supported nested subject through the actual resolver.
+        const subject={company_id:s.id,owner:{...s.owner},records:{[old.id]:old},jobs:{},messages:[],notices:[]},author='fictional-tree-input';
+        input={id:'context-job-input',kind:'artifact',revision:1,status:'Submitted',author_role:'runner',author_instance:author,handover:{id:'fictional-tree-input-handover',incoming_owner:{...s.owner,session_id:author},input_refs:[{id:old.id,revision:old.revision,sha256:sha(old)}],subject_sha256:sha(subject),subject:retainSnapshot(s,subject)}};
+        s.records[input.id]=input;body=input;
+      }else body=retainSnapshot(s,old);
+      const original={id:'context-job',role:'qa',status:'failed',proposal_reads:[{id:input.id,sha256:sha(input),body}]};s.jobs[original.id]=original;source_id='job:'+original.id;
+    }
     if(sourceKind==='upgrade'){const checkpoint={id:s.id,revision:0,records:{[old.id]:old},jobs:{},messages:[],notices:[]},original={id:'context-upgrade',status:'recovered',worker:null,continuations:[],steps:[],checkpoint:retainSnapshot(s,checkpoint),checkpoint_sha256:sha(checkpoint)};s.upgrade_history.push(original);source_id='upgrade:'+original.id;}
     if(notice){s.notices.push({id:'context-notice',kind:'model-observation',summary:'Historical notice; this fixture grants no authority.',reference:old.id,deliveries:[],seen_at:null});source_id='notice:context-notice';}
     let record;
@@ -401,7 +412,17 @@ test('actual Source tree capsule producers support original v1 and large-v2 prof
 });
 
 test('actual Source tree job originals retain known job roles before parsing their input snapshots',()=>{
-  const {db,write}=contextProducerFixture({tree:true,sourceKind:'job'});try{write();assert.equal(classify(db).lane,'legacy');}finally{db.close();}
+  const unsupported=contextProducerFixture({tree:true,sourceKind:'job',unsupportedTreeJobSnapshot:true});
+  try{assert.throws(unsupported.write,/Qualification hold: snapshot-aware upgrade-evidence API\/resolver required for job:context-job/);}finally{unsupported.db.close();}
+  const {db,write}=contextProducerFixture({tree:true,sourceKind:'job'});try{
+    write();assert.equal(classify(db).lane,'legacy');
+    const value=db.read(),job=value.jobs['context-job'],plan=value.records['context-plan'],input=value.records['context-job-input'];
+    assert.equal(plan.context_partition_plan.source.id,'job:context-job');assert.equal(plan.context_originals.source.immutable_snapshot.sha256,sha(job));
+    assert.deepEqual(job.proposal_reads[0],{id:input.id,sha256:sha(input),body:input});
+    assert.equal(input.handover.subject.immutable_snapshot.sha256,input.handover.subject_sha256);
+    assert.equal(input.author_instance,input.handover.incoming_owner.session_id);
+    assert.deepEqual(input.handover.input_refs,[{id:'context-old',revision:1,sha256:sha(value.records['context-old'])}]);
+  }finally{db.close();}
 });
 
 test('tree unit header byte limits reject oversized declared units before resolving unit bodies',()=>{
@@ -413,7 +434,7 @@ test('tree unit header byte limits reject oversized declared units before resolv
 test('tree Source unit limits preflight actual bytes before parsing a correctly hashed blob with false characters',()=>{
   const {db,write}=contextProducerFixture({tree:true,mutate:({s,record})=>{
     const plan=record.context_partition_plan,capsule=resolveSnapshot(s,record.context_units),body={id:plan.units[0].id,domain:plan.units[0].domain,padding:'x'.repeat(1024*1024)};
-    capsule.units[0].snapshot=retainSnapshot(s,body);capsule.units[0].snapshot.immutable_snapshot.characters=1000;plan.units[0].bytes=10000;plan.units[0].sha256=sha(body);plan.coverage_sha256=sha(plan.units);capsule.plan=retainSnapshot(s,plan);record.context_units=retainSnapshot(s,capsule);
+    const retained=retainSnapshot(s,body);capsule.units[0].snapshot={immutable_snapshot:{...retained.immutable_snapshot,characters:1000}};plan.units[0].bytes=10000;plan.units[0].sha256=sha(body);plan.coverage_sha256=sha(plan.units);capsule.plan=retainSnapshot(s,plan);record.context_units=retainSnapshot(s,capsule);
   }});try{assert.throws(write,/CONTEXT_UNIT_CAPACITY/);}finally{db.close();}
 });
 
