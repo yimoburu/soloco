@@ -11,16 +11,17 @@ import {assignmentContext,contextMatches} from '../plugins/soloco/runtime/contex
 import {taskAssignmentContext,taskContextMatches} from '../plugins/soloco/runtime/task-context.mjs';
 import {setRuntimeControl} from '../plugins/soloco/runtime/task-runtime-authority.mjs';
 import {submitTask,taskDefinitionHash} from '../plugins/soloco/runtime/tasks.mjs';
-import {work} from '../plugins/soloco/runtime/worker.mjs';
+import {workOriginal as work,disposeCoreOriginalWorkerFixtures} from './core-original-worker-fixture.mjs';
 import {sessionTitle} from '../plugins/soloco/runtime/session-naming.mjs';
-import {executionTiming} from '../plugins/soloco/runtime/timeout.mjs';
 import {operatingContext} from '../plugins/soloco/runtime/operating-state.mjs';
 import {resolveSnapshot} from '../plugins/soloco/runtime/snapshot.mjs';
 import {installTaskIndex} from '../plugins/soloco/runtime/task-index.mjs';
 
-// Only the engine, store, worker, context and validation paths are real. Native
-// outputs and judgments below are explicit injected fixtures, never models or
+// Source queue, carrier and adapter observers are real; ChildProcess events,
+// native outputs and judgments are controlled fixtures, never models or
 // evidence of specialist competence, host qualification or company adoption.
+// Dispatch records the assignment; workOriginal owns its controlled carrier
+// only while the worker runs. Scheduling alone does not prove a process birth.
 const launch={check:()=>({available:true,authenticated:true,version:'fictional-specialist-adapter'}),launch:()=>({on(){return this;},unref(){}})};
 const instruction='Founder authorizes only this bounded fictional preparation; no execution, spending, publication or new tools.';
 const future=(milliseconds=86400000)=>new Date(Date.now()+milliseconds).toISOString();
@@ -40,6 +41,7 @@ async function fixture(host,fn){
     engine.save({...args,id:'domain-input',kind:'artifact',content:'Fictional SQLite observation: unresolved writer contention; no measured throughput.'},host);
     await fn(f);
   }finally{
+    disposeCoreOriginalWorkerFixtures(args.root);
     if(previous===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=previous;
     fs.rmSync(base,{recursive:true,force:true});
   }
@@ -58,7 +60,6 @@ function queue(f,profile,extra={}){
 }
 async function finish(f,queued,{native_id='fictional-native-'+queued.id,content='FICTIONAL observed contention remains unresolved; throughput is unknown.',review,invoke}={}){
   await work(f.args.root,queued.id,async(host,native,prompt,directory,timeout,selection,options)=>{
-    options.onSpawn?.(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));
     await invoke?.({host,native,prompt,directory,timeout,selection,options});
     return {native_id,text:JSON.stringify({content,messages:[],notices:[],...(review?{review}:{})})};
   });
@@ -210,7 +211,7 @@ test('one bounded assignment may retain its existing exact supplemental-read con
   await work(f.args.root,queued.id,async(_host,native,_prompt,_directory,timeout,_selection,options)=>{
     calls++;
     if(calls===1){
-      assert.equal(native,null);options.onSpawn?.(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));
+      assert.equal(native,null);
       return {native_id:'fictional-profile-retrieval',text:JSON.stringify({reads:[{id:source.id,sha256:reference(source).sha256,offset:0,length:JSON.stringify(source).length}]})};
     }
     assert.equal(native,'fictional-profile-retrieval');
@@ -289,13 +290,23 @@ for(const target of ['profile','policy'])test(`${target} revocation during a nat
   assert.throws(()=>queue(f,profile),/revok|inactive|held/i);
 }));
 
-test('actual expiry during a native invocation quarantines output without erasing the definition',()=>fixture('codex',async f=>{
+test('observed expiry abort during a native invocation fails publication without erasing the definition',()=>fixture('codex',async f=>{
   const policy=authorize(f),expires_at=future(5000),profile=create(f,policy,{expires_at}),queued=queue(f,profile);
-  const completed=await finish(f,queued,{invoke:async()=>{
-    await new Promise(resolve=>setTimeout(resolve,Math.max(1,Date.parse(expires_at)-Date.now()+30)));
+  let observedAbort;
+  const failed=await finish(f,queued,{invoke:async({options})=>{
+    const signal=options.signal;assert.equal(signal.aborted,false);
+    observedAbort=await new Promise((resolve,reject)=>{
+      const onAbort=()=>{clearTimeout(guard);resolve(signal.reason);};
+      const guard=setTimeout(()=>{signal.removeEventListener('abort',onAbort);reject(Error('Expected the actual specialist expiry abort within the bounded observation wait.'));},Math.max(1,Date.parse(expires_at)-Date.now())+2000);
+      signal.addEventListener('abort',onAbort,{once:true});
+      if(signal.aborted){signal.removeEventListener('abort',onAbort);onAbort();}
+    });
   }});
-  assert.equal(completed.status,'quarantined',completed.error);
-  assert.equal(f.read().records[completed.artifact_id].status,'Quarantined');
+  assert.ok(observedAbort,'the worker monitor must actually abort the invocation');
+  assert.match(observedAbort.message,/expir/i);
+  assert.equal(failed.status,'failed',failed.error);assert.equal(failed.execution_failure.code,'ROLE_ABORTED');
+  assert.equal(failed.artifact_id,undefined);
+  assert.equal(Object.values(f.read().records).filter(record=>record.job_id===queued.id&&record.status==='Submitted').length,0);
   assert.deepEqual(f.read().records[profile.record.id],profile.record);
   assert.throws(()=>queue(f,profile),/expir|inactive|held/i);
 }));
@@ -311,7 +322,6 @@ for(const mode of ['ordinary','durable'])test(`${mode}: final publication fence 
   const originalNow=Date.now;let observedCut=false;
   try{
     await work(f.args.root,queued.id,async(_host,_native,_prompt,_directory,timeout,_selection,options)=>{
-      options.onSpawn?.(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));
       return {native_id:'fictional-late-publication-'+queued.id,text:JSON.stringify({content:'FICTIONAL result prepared before final expiry cut.',messages:[],notices:[]}),get model_evidence(){
         observedCut=true;Date.now=()=>Date.parse(profile.definition.expires_at)+1;
         return {source:'fictional-late-expiry-getter',verification:'unverified'};
@@ -392,7 +402,6 @@ test('an observed exact-subject negative in a rejected native QA envelope cannot
   const rejected=engine.dispatch({...f.args,role:'qa',review_of:output.id,task:'Independently review the exact profile output; preserve every negative finding.'},f.host,launch);
   const raw=JSON.stringify({content:'FICTIONAL original negative: the claimed throughput has no measured source.',review:{verdict:'Fail',reason:'UNRESOLVED-ORIGINAL-NEGATIVE: measured throughput is missing.',permitted_action:'hold',blockers:['No measured throughput source.']},messages:[{to:'not-a-real-role',content:'A separate routing typo must not erase this negative judgment.'}],notices:[]});
   await work(f.args.root,rejected.id,async(_host,_native,_prompt,_directory,timeout,_selection,options)=>{
-    options.onSpawn?.(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));
     return {native_id:'fictional-rejected-negative-qa',text:raw};
   });
   const failed=f.read().jobs[rejected.id];
@@ -410,7 +419,6 @@ for(const oversized of [false,true])test(`unreadable ${oversized?'oversized':'in
   const rejected=engine.dispatch({...f.args,role:'qa',review_of:output.id,task:'Review the exact specialist output; malformed wire must remain inspectable.'},f.host,launch);
   const raw='{"content":"'+(oversized?'x'.repeat(110000):'Incomplete native wire')+'","review":{"verdict":"Fail","reason":"UNREADABLE-NEGATIVE-TAIL';
   await work(f.args.root,rejected.id,async(_host,_native,_prompt,_directory,timeout,_selection,options)=>{
-    options.onSpawn?.(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));
     return {native_id:'fictional-unreadable-profile-qa',text:raw};
   });
   const failed=f.read().jobs[rejected.id];
@@ -493,10 +501,8 @@ async function publishOperating(f,{onPrompt}={}){
     }
     return result;
   }):[];
-  let first=true;
   await work(f.args.root,queued.id,async(_host,_native,prompt,_directory,timeout,_selection,options)=>{
     onPrompt?.(prompt);
-    if(first){options.onSpawn?.(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));first=false;}
     const native_id='fictional-operating-contract-qa-'+proposal.id;
     if(ranges.length)return {native_id,text:JSON.stringify({reads:ranges.splice(0,4)})};
     return {native_id,text:JSON.stringify({content:'FICTIONAL CONTRACT DOUBLE: complete supplied operating meaning checked; no native competence qualification.',messages:[],notices:[],review:{verdict:'Pass',reason:'Fictional complete preservation, conditions and interaction judgment.',permitted_action:'publish_operating_state',plan_sha256:digest(JSON.stringify(f.read().records[proposal.id].operating_plan)),preservation_complete:true,interaction_complete:true,authority_checked:true,blockers:[]}})};
@@ -540,7 +546,6 @@ test('parsed but rejected specialist QA judgments remain held when unreadable or
     const review=variant==='missing-review'?undefined:{verdict:variant==='unknown-verdict'?'Unknown':'Pass',reason:'FICTIONAL missing evidence.',...(variant==='pass-with-blockers'?{blockers:['Required evidence is missing.']}:variant==='pass-with-malformed-blockers'?{blockers:'Required evidence is missing.'}:{})};
     const raw=JSON.stringify({content:'FICTIONAL cannot determine this judgment from supplied evidence.',...(review?{review}:{})});
     await work(f.args.root,queued.id,async(_host,_native,_prompt,_directory,timeout,_selection,options)=>{
-      options.onSpawn?.(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));
       return {native_id:'fictional-parsed-rejected-'+variant,text:raw};
     });
     const failed=f.read().jobs[queued.id];
