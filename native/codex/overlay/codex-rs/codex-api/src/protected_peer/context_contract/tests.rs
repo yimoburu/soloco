@@ -596,3 +596,80 @@ fn ordinary_origin_whole_turn_requires_one_frame_and_original_selection() {
     let duplicate=json!({"params":{"input":[{"type":"text","text":frame.clone()},{"type":"text","text":frame}]}});
     assert!(validate_selected_turn_input(&duplicate,Some(&ordinary_origin_selection())).is_err());
 }
+
+// Additive focused regressions, AUTHORED_UNRUN. These use the original
+// in-process acknowledgement path; they establish no live Native admission.
+#[test]
+fn ordinary_origin_present_wrong_context_encoding_is_rejected() {
+    let original = ordinary_origin_request_value();
+    let request = serde_json::from_value(original.clone()).unwrap();
+    assert!(select_original_context_contract(Some(&request)).unwrap().is_some());
+    for encoding in ["soloco-peer-context-frame-v1", "caller-codec", ""] {
+        let mut changed = original.clone();
+        changed["context_encoding"] = json!(encoding);
+        for key in ["protocol", "contract_id", "resource_sha256", "scope_profile_id"] {
+            assert_eq!(changed[key], original[key]);
+        }
+        // The field remains present and deserializes as a string. Selection,
+        // rather than missing-field or type parsing, must refuse the codec.
+        let request = serde_json::from_value(changed).unwrap();
+        match select_original_context_contract(Some(&request)) {
+            Err(TransportError::Build(reason)) => assert_eq!(
+                reason, "protected peer HOLD: unsupported original CORE context selection", "{encoding}",
+            ),
+            Err(_) => panic!("wrong ordinary-origin encoding stopped outside selection"),
+            Ok(_) => panic!("wrong ordinary-origin encoding selected a context capability"),
+        }
+    }
+}
+
+#[test]
+fn accepted_receipt_rejects_each_changed_context_field_across_profiles() {
+    let profiles = [
+        request_value(), bootstrap_request_value(), frontier_request_value(),
+        origin_request_value(false), origin_request_value(true), ordinary_origin_request_value(),
+    ];
+    for original in &profiles {
+        let request: ContextContractRequest = serde_json::from_value((*original).clone()).unwrap();
+        assert!(select_original_context_contract(Some(&request)).unwrap().is_some());
+        let mut observation = fixture_observation();
+        observation.context_contract_protocol = request.protocol.clone();
+        observation.context_contract_id = request.contract_id.clone();
+        observation.context_contract_sha256 = request.resource_sha256.clone();
+        observation.context_encoding = request.context_encoding.clone();
+        observation.scope_profile_id = request.scope_profile_id.clone();
+        let binding = fixture_binding(&observation);
+        let permit = serde_json::from_value(fixture_permit(&observation, &binding)).unwrap();
+        let receipt = accept_original_context_permit(observation, &binding, permit).unwrap();
+        let mut current = fixture_challenge();
+        current.context_contract = Some(request);
+        assert!(require_original_scope_for_send(&current, "fixture-host", Some(&receipt)).is_ok());
+
+        for key in ["protocol", "contract_id", "resource_sha256", "context_encoding", "scope_profile_id"] {
+            // Change exactly one current challenge field after the genuine
+            // receipt acknowledgement; the accepted observation stays intact.
+            let mut changed = (*original).clone();
+            changed[key] = json!("changed-after-acknowledgement");
+            let mut challenge = fixture_challenge();
+            challenge.context_contract = Some(serde_json::from_value(changed).unwrap());
+            match require_original_scope_for_send(&challenge, "fixture-host", Some(&receipt)) {
+                Err(TransportError::Build(reason)) => assert_eq!(
+                    reason, "protected peer HOLD: original context capability changed before send", "{key}",
+                ),
+                Err(_) => panic!("changed challenge stopped outside receipt currentness"),
+                Ok(()) => panic!("accepted receipt ignored changed context field {key}"),
+            }
+        }
+        // A coherent, independently supported different profile is also a
+        // changed current challenge, never a use for the old profile receipt.
+        for target in &profiles {
+            if target == original { continue; }
+            let target_request = serde_json::from_value((*target).clone()).unwrap();
+            assert!(select_original_context_contract(Some(&target_request)).unwrap().is_some());
+            let mut challenge = fixture_challenge();
+            challenge.context_contract = Some(target_request);
+            assert!(require_original_scope_for_send(&challenge, "fixture-host", Some(&receipt)).is_err());
+        }
+        assert!(require_original_scope_for_send(&current, "fixture-host", Some(&receipt)).is_ok());
+    }
+}

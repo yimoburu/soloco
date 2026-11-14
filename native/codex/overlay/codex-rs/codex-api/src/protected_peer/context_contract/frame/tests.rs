@@ -467,3 +467,80 @@ fn ordinary_origin_raw_capacity_and_frame_capacity_are_both_enforced() {
         assert!(decode_origin_ordinary_task_frame(&text,contract,0).is_err());assert!(decode_origin_ordinary_task_frame(&text,contract,100001).is_err());
     }
 }
+
+// Additive focused regressions, AUTHORED_UNRUN. Rebinding the outer digest
+// must reach the constructor-family guard, not an earlier resource mismatch.
+#[test]
+fn wrong_family_frame_rebound_to_target_hash_reaches_the_family_guard() {
+    use super::super::{
+        BOOTSTRAP_CORE_ID, BOOTSTRAP_PROFILE, BOOTSTRAP_PROTOCOL, BOOTSTRAP_RESOURCE_SHA256,
+        CONTRACT_PROTOCOL, CORE_ID, ENCODING, PROFILE,
+        FRONTIER_CORE_ID, FRONTIER_PROFILE, FRONTIER_PROTOCOL, FRONTIER_RESOURCE_SHA256,
+        ORIGIN_FINAL_REVIEW_CORE_ID, ORIGIN_FINAL_REVIEW_PROFILE, ORIGIN_FINAL_REVIEW_PROTOCOL,
+        ORIGIN_FINAL_REVIEW_RESOURCE_SHA256, ORIGIN_MAINTENANCE_CORE_ID,
+        ORIGIN_MAINTENANCE_PROFILE, ORIGIN_MAINTENANCE_PROTOCOL, ORIGIN_MAINTENANCE_RESOURCE_SHA256,
+        ORIGIN_ORDINARY_TASK_CORE_ID, ORIGIN_ORDINARY_TASK_PROFILE, ORIGIN_ORDINARY_TASK_PROTOCOL,
+        ORIGIN_ORDINARY_TASK_RESOURCE_SHA256,
+    };
+    let inner = r#"{"protocol":"peer-bootstrap-membership-context-v1","current_meaning":{"protocol":"peer-checked-input-current-meaning-v1"}}"#;
+    let bootstrap = format!(
+        r#"{{"protocol":"peer-bootstrap-membership-assignment-v1","kind":"peer-bootstrap-membership-reconstruction","source_cut":{inner},"source_cut_sha256":"{}"}}"#,
+        hash(inner.as_bytes()),
+    );
+    let range = origin_payload("peer-origin-review");
+    let ordinary = r#"{"protocol":"peer-origin-ordinary-task-context-v1","kind":"peer-origin-ordinary-task-review"}"#;
+    let cases = [
+        (CONTRACT_PROTOCOL, CORE_ID, RESOURCE_SHA256, PROFILE,
+            encode(payload(), "peer-task-context-v2")),
+        (BOOTSTRAP_PROTOCOL, BOOTSTRAP_CORE_ID, BOOTSTRAP_RESOURCE_SHA256, BOOTSTRAP_PROFILE,
+            origin_framed(&bootstrap, "bootstrap-membership-assignment",
+                "peer-bootstrap-membership-assignment-v1", BOOTSTRAP_RESOURCE_SHA256,
+                Some((inner, "peer-bootstrap-membership-context-v1")))),
+        // The actual Node frontier shape intentionally has no root kind.
+        (FRONTIER_PROTOCOL, FRONTIER_CORE_ID, FRONTIER_RESOURCE_SHA256, FRONTIER_PROFILE,
+            frontier_framed(frontier_payload(), "peer-input-frontier-assignment-v1", None)),
+        (ORIGIN_MAINTENANCE_PROTOCOL, ORIGIN_MAINTENANCE_CORE_ID,
+            ORIGIN_MAINTENANCE_RESOURCE_SHA256, ORIGIN_MAINTENANCE_PROFILE,
+            origin_framed(&range, "origin-maintenance-assignment",
+                "peer-origin-maintenance-context-v1", ORIGIN_MAINTENANCE_RESOURCE_SHA256, None)),
+        (ORIGIN_FINAL_REVIEW_PROTOCOL, ORIGIN_FINAL_REVIEW_CORE_ID,
+            ORIGIN_FINAL_REVIEW_RESOURCE_SHA256, ORIGIN_FINAL_REVIEW_PROFILE,
+            origin_framed(owner_payload(), "owner-maintenance-assignment",
+                "peer-owner-maintenance-assignment-v1", ORIGIN_FINAL_REVIEW_RESOURCE_SHA256, None)),
+        (ORIGIN_ORDINARY_TASK_PROTOCOL, ORIGIN_ORDINARY_TASK_CORE_ID,
+            ORIGIN_ORDINARY_TASK_RESOURCE_SHA256, ORIGIN_ORDINARY_TASK_PROFILE,
+            ordinary_origin_framed(ordinary)),
+    ];
+    let selected = |protocol: &str, contract_id: &str, resource_sha256: &str, scope_profile_id: &str| {
+        let request = serde_json::from_value(json!({
+            "protocol": protocol, "contract_id": contract_id, "resource_sha256": resource_sha256,
+            "context_encoding": ENCODING, "scope_profile_id": scope_profile_id,
+        })).unwrap();
+        select_original_context_contract(Some(&request)).unwrap().unwrap()
+    };
+    for (protocol, contract_id, source_hash, profile, original) in &cases {
+        let selection = selected(protocol, contract_id, source_hash, profile);
+        let turn = json!({"method":"turn/start","params":{"input":[{"type":"text","text":original}]}});
+        let unchanged = turn.clone();
+        assert!(validate_selected_turn_input(&turn, Some(&selection)).is_ok());
+        assert_eq!(turn, unchanged);
+        for (target_protocol, target_id, target_hash, target_profile, _) in &cases {
+            if source_hash == target_hash { continue; }
+            let selection = selected(target_protocol, target_id, target_hash, target_profile);
+            let rebound = original.replacen(
+                &format!("\"contract_sha256\":\"{source_hash}\""),
+                &format!("\"contract_sha256\":\"{target_hash}\""), 1,
+            );
+            assert_ne!(&rebound, original);
+            let turn = json!({"method":"turn/start","params":{"input":[{"type":"text","text":rebound}]}});
+            match validate_selected_turn_input(&turn, Some(&selection)) {
+                Err(TransportError::Build(reason)) => assert_eq!(
+                    reason, "protected peer HOLD: original delivery kind differs from constructor profile",
+                    "{source_hash} -> {target_hash}",
+                ),
+                Err(_) => panic!("wrong-family frame stopped outside the family guard"),
+                Ok(()) => panic!("wrong-family frame accepted under the rebound target hash"),
+            }
+        }
+    }
+}
