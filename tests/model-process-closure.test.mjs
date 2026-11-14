@@ -35,7 +35,9 @@ async function awaitOriginalObservationTime(clock){
   const remaining=maximum-(performance.now()-started);
   assert.ok(remaining>0,'Original observation clock did not catch up within its fixed bound');
   await new Promise(resolve=>setTimeout(resolve,Math.min(clock.time-Date.now(),remaining)));
+  assert.ok(performance.now()-started<=maximum,'Original observation timer exceeded its fixed catch-up bound');
  }
+ assert.ok(performance.now()-started<=maximum,'Original observation exceeded its fixed catch-up bound');
 }
 function fixture(){
  const root=fs.mkdtempSync(path.join(base,'company-')),session_id='synthetic-original-owner';engine.bind(root,session_id,'codex');engine.open({root,session_id,idea:'Controlled original late-close lifecycle'},'codex');withStore(root,db=>db.migrate());
