@@ -1,17 +1,43 @@
 # Fresh paused-bootstrap runner
 
-`runOriginalPeerBootstrapMembership(cap, options)` is an unrouted trusted Source
+`runOriginalPeerBootstrapMembership(cap, options)` is a trusted Source
 composition. It consumes an already original admitted bootstrap cap and its
 opaque preflight exactly once. It accepts existing scope directories and an
 optional cancellation signal. It accepts no enrollment request, operation ID,
 phase selection, model, profile, native ID, spawn hook or replacement transport.
 It does not call admission again or charge another unit.
 
+The loaded-component entry is
+`createOriginalLoadedBootstrapMembershipRuntime(options)` in
+`context-component-deployment.mjs`. Its closed options contain the original
+`ledger` and `actor`, plus fixed `scope_root`, `cwd`, `read_paths`, `state_root`
+and `scratch_root` directories. The selected loader verifies and imports the
+original membership and runner modules from the same component source realm.
+The returned frozen facade exposes `enroll`, `inspect`, `activate`, `revoke`
+and `run(phaseArgs)`. Each call rechecks the original loaded component. `run`
+prepares the admission through that membership service, rechecks the component,
+then passes the original opaque cap directly to the existing runner. It exposes
+no cap, replacement namespace, callback, transport, spawn hook or profile.
+Factory creation does not enroll, admit, activate or launch work. This internal
+composition supplies no new founder authority or Native qualification.
+
+The protected operator consumer is the existing `company_origin` tool. Its
+closed `bootstrap_enroll`, `bootstrap_inspect`, `bootstrap_run`,
+`bootstrap_activate` and `bootstrap_revoke` actions pass through actual HOST,
+current-owner and custody checks in `peer-origin-runtime.mjs`. The fixed
+`runOriginalPeerBootstrapMembershipOperation` helper in `maintenance-launch.mjs`
+checks the existing paused bootstrap purpose, seal and checkpoint, loads the
+selected packaged component, derives private directories, creates the loaded
+facade and invokes its corresponding method. `bootstrap_run` reaches the
+original runner through `facade.run`; public input selects no actor, ledger,
+path, namespace, capability, transport, spawn hook or profile. See
+[public origin routing](peer-public-origin-routing.md#paused-bootstrap-operator).
+
 Before claiming/loading the runner and at each current capability check, the
 fixed synchronous maintenance-capacity assertion must accept this exact
 existing `work_items` bootstrap admission, including its already charged
-reservation. Its Source export is absent on the authoring base, which remains
-a Hold. This join does not grandfather an old census, implement another global
+reservation. A missing original assertion remains a Hold. This join does not
+grandfather an old census, implement another global
 inventory, omit legacy coverage or charge another unit. The independent
 inventory producer and its applicable owning scope must be supplied separately.
 After the original bootstrap binding and before spawning, the runner calls the

@@ -904,6 +904,23 @@ private-FD adapter was still missing. Original native startup/continuation, acco
 continuity and company adoption remain unproved; qualified executable/runtime
 slots stay NULL. Normative SPEC v0.21 and its governance commitment above, and adopted v0.20, remain unchanged.
 
+### Paused-bootstrap operator composition
+
+The existing `company_origin` ingress now has closed bootstrap operator actions
+and exposes the existing finite paused-bootstrap plan purpose. Its protected
+HOST/current-owner/custody path calls the fixed maintenance launcher, which
+loads the original selected bootstrap module realm and calls the existing
+runner through its private-cap facade. The ordinary provider's pause guard is
+unchanged. The exact schema and call chain are documented in
+[public origin routing](peer-public-origin-routing.md#paused-bootstrap-operator).
+
+This implements the existing founder authority, enforcement and bounded
+evidence requirements in SPEC sections 2, 4 and 5. SPEC remains the enduring
+company contract; no company rules are adopted by editing this Source.
+Packaging, original Native execution, independent review and receiver
+acceptance remain distinct. Synthetic routing coverage is not Native proof,
+and previously failed or timed-out checks retain their original results.
+
 ### Executable peer bridge source successor
 
 The [executable bridge](protected-peer-bridge.md) joins the original selected

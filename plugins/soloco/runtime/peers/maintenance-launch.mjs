@@ -3,8 +3,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {types} from 'node:util';
-import {canonical,peerDigest} from './ledger.mjs';
-import {loadOriginalSelectedPackagedPeerBridge,inspectOriginalInputFrontierSupport} from './context-component-deployment.mjs';
+import {canonical,peerDigest,PeerLedger} from './ledger.mjs';
+import {loadOriginalSelectedPackagedPeerBridge,inspectOriginalInputFrontierSupport,createOriginalLoadedBootstrapMembershipRuntime} from './context-component-deployment.mjs';
 import {createPolicySupervisor} from './policy-supervisor.mjs';
 import {prepareOriginalProtectedInputFrontierLaunch,requestOriginalProtectedCodexStop} from './protected-codex-domain.mjs';
 import {originalPeerInputFrontierMaintenanceLedger,prepareOriginalPeerInputFrontier,inspectOriginalPeerInputFrontier,originalPeerInputFrontierPreflight,completeOriginalPeerInputFrontier,holdOriginalPeerInputFrontier,recordOriginalPeerInputFrontierLateEvidence} from './input-frontier-maintenance.mjs';
@@ -16,6 +16,8 @@ import * as ownerReview from './owner-handover.mjs';
 import * as ordinaryReview from './origin-ordinary-task.mjs';
 import {inspectOriginalOriginOrdinaryTaskSupport as ordinaryOriginSupport} from './context-component-deployment.mjs';
 import {prepareOriginalProtectedOriginOrdinaryTaskLaunch} from './protected-codex-domain.mjs';
+import {closed as bootstrapClosed,bootstrapActor,bootstrapPhaseInput,text as bootstrapText} from './bootstrap-membership-contract.mjs';
+import {assertPeerBootstrapOperationFrom} from './bootstrap-membership-context.mjs';
 
 const fail=code=>{throw Object.assign(Error(code),{code});};
 const plain=v=>v&&Object.getPrototypeOf(v)===Object.prototype;
@@ -127,4 +129,36 @@ export async function runOriginalPeerOrdinaryOriginReview(api,input){
  if(arguments.length!==2)fail('ORIGIN_LAUNCH_INPUT');input=launchInput(input,['operation_id','origin_seal_ref','current_meaning_ref','incidence_ref','expires_at','source_instruction']);
  if(typeof ordinaryReview.loadPeerOrdinaryOriginCheckpointSupport!=='function')fail('ORIGIN_ORDINARY_TASK_CHECKPOINT_SOURCE_REQUIRED');
  await ordinaryReview.loadPeerOrdinaryOriginCheckpointSupport();return runMaintenance(api,input,ORDINARY);
+}
+
+const BOOTSTRAP_OPERATIONS=Object.freeze({
+ bootstrap_enroll:Object.freeze({method:'enroll',guard:'membership/enroll'}),
+ bootstrap_inspect:Object.freeze({method:'inspect',guard:'membership/bootstrap'}),
+ bootstrap_run:Object.freeze({method:'run',guard:'membership/admit'}),
+ bootstrap_activate:Object.freeze({method:'activate',guard:'membership/activate'}),
+ bootstrap_revoke:Object.freeze({method:'revoke',guard:'membership/revoke'})
+});
+/** The public origin adapter supplies the actual HOST actor and owner epoch.
+ * Paths and original capabilities stay inside this fixed loaded composition. */
+export async function runOriginalPeerBootstrapMembershipOperation(ledger,actor,action,input){
+ if(arguments.length!==4||!ledger||typeof ledger!=='object'||types.isProxy(ledger)||Object.getPrototypeOf(ledger)!==PeerLedger.prototype||typeof action!=='string'||!Object.hasOwn(BOOTSTRAP_OPERATIONS,action))fail('BOOTSTRAP_LAUNCH_INPUT');
+ const selected=BOOTSTRAP_OPERATIONS[action],a=bootstrapActor(actor);
+ const request=action==='bootstrap_run'?bootstrapPhaseInput(input):bootstrapClosed(input,action==='bootstrap_enroll'?['operation_id','epoch','enrollment_id','principal_id','role','host','scope','input_refs','expires_at','max_model_calls','expected_generation','source_instruction']:action==='bootstrap_inspect'?['epoch','enrollment_id']:['operation_id','epoch','enrollment_id','source_instruction']);
+ if(!Number.isSafeInteger(request.epoch)||request.epoch<1||!bootstrapText(request.enrollment_id,200)||action!=='bootstrap_inspect'&&!bootstrapText(request.operation_id,160))fail('BOOTSTRAP_LAUNCH_INPUT');
+ const connection={};for(const key of ['root','directory','company_id']){const d=Object.getOwnPropertyDescriptor(ledger,key);if(!d||!Object.hasOwn(d,'value')||!bootstrapText(d.value,4096))fail('BOOTSTRAP_LAUNCH_INPUT');connection[key]=d.value;}
+ if(!path.isAbsolute(connection.root)||path.resolve(connection.root)!==connection.root||connection.directory!==path.join(connection.root,'.company'))fail('BOOTSTRAP_LAUNCH_INPUT');
+ const current=()=>{
+  for(const key of Object.keys(connection)){const d=Object.getOwnPropertyDescriptor(ledger,key);if(!d||!Object.hasOwn(d,'value')||d.value!==connection[key])fail('BOOTSTRAP_LAUNCH_INPUT');}
+  return ledger.read(tx=>assertPeerBootstrapOperationFrom(tx,{ledger,actor:a,input:request,action:selected.guard}));
+ };
+ // Current paused purpose, exact seal/checkpoint and original custody are
+ // observed before loading and before any directory write or admission.
+ current();await loadOriginalSelectedPackagedPeerBridge();current();
+ const base=path.join(connection.directory,'peer-execution'),family=path.join(base,'bootstrap-membership'),own=path.join(family,peerDigest({epoch:request.epoch,enrollment_id:request.enrollment_id,phase:request.phase??null,operation_id:request.operation_id??null})),state=path.join(own,'state'),scratch=path.join(own,'scratch');
+ if([own,state,scratch].some(value=>value.length>4096))fail('BOOTSTRAP_LAUNCH_INPUT');
+ if(action==='bootstrap_run'){directory(base);directory(family);directory(own,true);directory(state,true);directory(scratch,true);current();}
+ const runtime=createOriginalLoadedBootstrapMembershipRuntime({ledger,actor:a,scope_root:own,cwd:connection.root,read_paths:[],state_root:state,scratch_root:scratch});
+ // run performs the sole original prepare/charge and retains its opaque cap.
+ // Errors, UNKNOWN and partial directories remain evidence; never retry here.
+ return await runtime[selected.method](request);
 }

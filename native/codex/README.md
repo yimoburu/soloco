@@ -1,6 +1,32 @@
 # Pinned SoloCo companion source
 
-## Current lifecycle and bootstrap Source increment (unrun)
+## Current Source bindings and loaded bootstrap caller (unrun)
+
+The Native input bytes use the independently accepted Source74 graph: 9,314
+logical files, 92,198,679 bytes and 163 overlays. Its source vector is
+`e53b191fdf12cd98b65482c30b5080fe9b81fbacc5a174e3c98eb2ea22e93333`.
+The accepted handoff, bindings and complete patch are copied without alteration.
+Package `b36d16a6c117e2130d5bf294b2989dfac9fba103fa568332c78ca0965f90ad13` and driver
+`6f5bb3d81076f1620f29db27dd5b442c6a3e7fd7f69ee770590945fdc8d23300` bind those exact Source bytes.
+Expected compiled-input DATA is `52776d3b8e1627de60e4334387120371cf1091585c94ead37d99910b10ce824d`;
+this is an in-memory association, not a compiled manifest or Native result.
+
+The loaded bootstrap membership caller and its original runner remain separate
+from compiler, SDK, deployment, provider and company acceptance. The final Node
+recipe/profile and complete Source map must bind the final caller and consumer
+bytes. All six Node/Native context resource pairs remain exact, including the
+ordinary-task readonly3 resource. The source package remains
+`frozen-source-unqualified`, its qualified binary is null, and its source-cut
+review state remains `independent-review-required`.
+
+This authoring updates the exact 174 recipe assets plus one inventory seal
+contract. It does not generate or check those 175 packaged files; that requires
+fresh selection of the standalone packager and its check invocation. Tests for
+this new tuple remain unrun here. Earlier test/QA results retain their original
+association, failed/spent attempts remain preserved, and no UNKNOWN occupancy,
+whole-domain closure, installation or host activation is inferred.
+
+## Historical dc335333 lifecycle and bootstrap Source increment (unrun)
 
 The frozen code cut `dc335333fed2a7d91ed3372e759041d5135036a4` follows canonical `39d431285fe4698d3e2ab4ea53947dad47ef2abc`.
 The complete expected source has 9,310 logical files, 92,118,117 bytes and

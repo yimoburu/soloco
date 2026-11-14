@@ -1,4 +1,4 @@
-// Unrouted trusted Source composition. Source authoring is not enrollment,
+// Trusted Source composition. Source authoring is not enrollment,
 // launch selection, Native QA, model permission or company acceptance.
 import {TextDecoder,types} from 'node:util';
 import {canonical} from './ledger.mjs';

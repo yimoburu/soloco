@@ -19,6 +19,47 @@ Every request includes an absolute `root`, `session_id`, current positive
 require `source_instruction`. Inputs cannot choose a callback, provider,
 ledger, module, launch recipe, authority, qualification or readiness flag.
 
+## Paused bootstrap operator
+
+The existing `plan` action accepts the already defined `paused_bootstrap`
+purpose: `protocol: "peer-origin-paused-bootstrap-purpose-v1"`,
+`purpose: "membership-qualification-only"`, and positive `max_enrollments`,
+`max_model_calls` and `max_review_calls`. The original plan producer still
+checks these limits against maintenance authority; this DATA selects no new
+permission by itself.
+
+| Action | Closed input, in addition to the outer current owner/epoch |
+| --- | --- |
+| `bootstrap_enroll` | `operation_id`, `enrollment_id`, `principal_id`, `role`, `host: "codex"`, `scope`, `input_refs`, `expires_at`, `max_model_calls`, `expected_generation` |
+| `bootstrap_inspect` | `enrollment_id` |
+| `bootstrap_run` | `operation_id`, `enrollment_id`, `phase`; `reviewer_principal_id` is required only for `review` |
+| `bootstrap_activate`, `bootstrap_revoke` | `operation_id`, `enrollment_id` |
+
+All mutating actions require the outer `source_instruction`. The adapter
+derives the actual HOST actor, injects the validated epoch, and supplies that
+instruction only where the original enrollment/activation/revocation contract
+requires it. Phase execution retains the existing enrollment authority; a new
+instruction cannot renew its budget or deadline.
+
+The actual call path is `main.mjs`/engine `company_origin` ingress →
+`peerOriginRuntimeAction` → the fixed
+`runOriginalPeerBootstrapMembershipOperation` in `maintenance-launch.mjs` →
+the selected packaged component's loaded bootstrap facade → its `run` method
+→ the original bootstrap runner. Both sides of the module await recheck the
+current owner. The helper checks original paused purpose, typed custody,
+sealed origin and authenticated checkpoint before directory writes or
+admission. It derives all directories; inspect/enrollment/activation/revocation
+do not create runner directories. No public paths, callbacks, profiles,
+providers, module namespaces or capabilities are accepted.
+
+This route keeps the ordinary provider's pause rejection intact. Original
+membership, capacity, admission, creation and closure guards still decide the
+operation; UNKNOWN reservations, spent attempts and earlier failures remain.
+Source wiring and synthetic composition tests establish neither an installed
+route nor Native qualification, deployment, founder permission or acceptance.
+The existing [company contract](../SPEC.md), especially sections 2, 4 and 5,
+continues to govern. This procedure introduces no new constitutional authority.
+
 ## Storage and ownership
 
 The trusted internal `withPeerPublicStorage(root, readOnly, invoke)` export

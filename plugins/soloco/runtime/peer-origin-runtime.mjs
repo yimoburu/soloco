@@ -25,6 +25,7 @@ const AUTHORITY_URL=new URL('./peers/origin-maintenance-authority.mjs',import.me
 const MECHANICAL_URL=new URL('./peers/origin-mechanical-qa-policy.mjs',import.meta.url);
 const fail=(code,message=code)=>{throw Object.assign(Error(message),{code});};
 const need=(value,code,message)=>{if(!value)fail(code,message);};
+const copy=value=>JSON.parse(canonical(value));
 const same=(a,b)=>canonical(a)===canonical(b);
 const hash=text=>createHash('sha256').update(text,'utf8').digest('hex');
 const text=(v,max)=>typeof v==='string'&&v.trim()&&v.length<=max&&!v.includes('\0')&&Buffer.from(v).toString('utf8')===v;
@@ -49,6 +50,8 @@ const mechanicalPurpose=object({protocol:{enum:['peer-origin-mechanical-qa-purpo
 const mechanicalActions=Object.freeze({mechanical_decision:'recordPeerOriginMechanicalQaDecisionAtEpoch',mechanical_packet:'preparePeerOriginMechanicalQaPacketAtEpoch',mechanical_grant:'grantPeerOriginMechanicalQaPacketAtEpoch',mechanical_packet_inspect:'inspectPeerOriginMechanicalQaPacketAtEpoch',mechanical_packet_read:'readPeerOriginMechanicalQaPacketAtEpoch'});
 const controlRef=object({family:{enum:['control']},id:str(2000),revision:integer(),sha256:sha});
 const ordinaryPurpose=object({protocol:{enum:['peer-origin-ordinary-task-purpose-v1']},purpose:{enum:['qualify-original-ordinary-tasks']},scope:str(160),resources:{type:'array',maxItems:32,items:{anyOf:[str(2000),{type:'object'}]}},max_reviews:integer(),expires_at:str(100)});
+const pausedBootstrapPurpose=object({protocol:{enum:['peer-origin-paused-bootstrap-purpose-v1']},purpose:{enum:['membership-qualification-only']},max_enrollments:integer(),max_model_calls:integer(),max_review_calls:integer()});
+const bootstrapInputRef=object({...ref.properties,family:{enum:['tasks','homes','proposals','reviews','conflicts','notices','messages','deliveries']}});
 const ordinaryMeaning=object({frontier_ref:ref,root_result_ref:ref});
 const ordinaryDataScope=object({protocol:{enum:['peer-origin-ordinary-native-data-scope-v1']},host:{enum:['codex']},model:{enum:['host_default']},subject_sha256:sha,expires_at:str(100)});
 const fields={
@@ -58,7 +61,12 @@ const fields={
  ordinary_task_review:object({operation_id:str(160),origin_seal_ref:ref,current_meaning_ref:ordinaryMeaning,incidence_ref:ref,expires_at:str(100),source_instruction:str(4000)}),
  ordinary_task_commit:object({operation_id:str(160),primary_human_message:primaryMessage,review_ref:ref,expected_company_ref:controlRef}),
  status:object({}),
- plan:object({expires_at:str(100),policy,maintenance:budgets,frontier,frontier_seal:frontierSeal,ordinary_tasks:ordinaryPurpose,mechanical_qa:mechanicalPurpose},['expires_at','policy','maintenance']),
+ plan:object({expires_at:str(100),policy,maintenance:budgets,frontier,frontier_seal:frontierSeal,ordinary_tasks:ordinaryPurpose,mechanical_qa:mechanicalPurpose,paused_bootstrap:pausedBootstrapPurpose},['expires_at','policy','maintenance']),
+ bootstrap_enroll:object({operation_id:str(160),enrollment_id:str(200),principal_id:str(200),role:str(100),host:{enum:['codex']},scope:str(160),input_refs:{type:'array',maxItems:100,items:bootstrapInputRef},expires_at:str(100),max_model_calls:integer(),expected_generation:integer(0)}),
+ bootstrap_inspect:object({enrollment_id:str(200)}),
+ bootstrap_run:object({operation_id:str(160),enrollment_id:str(200),phase:{enum:['reconstruction','review']},reviewer_principal_id:str(200)},['operation_id','enrollment_id','phase']),
+ bootstrap_activate:object({operation_id:str(160),enrollment_id:str(200)}),
+ bootstrap_revoke:object({operation_id:str(160),enrollment_id:str(200)}),
  plan_inspect:object({plan_id:str(2000)}),plan_read:object({plan_id:str(2000),...range}),
  mechanical_decision:object({operation_id:str(160),primary_human_message:primaryMessage,expires_at:str(100),limits:mechanicalLimits,model_selection:mechanicalModel}),
  mechanical_packet:object({operation_id:str(160),plan_ref:legacyRef}),
@@ -78,8 +86,8 @@ const fields={
  frontier_archive_read:object({frontier_ref:ref,...range}),
  final_seal_review:object({operation_id:str(160),frontier_ref:ref,root_result_ref:ref}),final_seal_apply:object({review_ref:ref})
 };
-const sourceActions=new Set(['plan','mechanical_decision','mechanical_packet','mechanical_grant','mechanical_review','quarantine','observe_sidecars','maintenance_run','range_seal','frontier_capture','frontier_run','final_seal_review','final_seal_apply']);
-const mutatingPeerActions=new Set(['observe_sidecars','maintenance_run','range_seal','frontier_capture','frontier_run','final_seal_review','final_seal_apply']);
+const sourceActions=new Set(['plan','mechanical_decision','mechanical_packet','mechanical_grant','mechanical_review','quarantine','observe_sidecars','maintenance_run','range_seal','frontier_capture','frontier_run','final_seal_review','final_seal_apply','bootstrap_enroll','bootstrap_run','bootstrap_activate','bootstrap_revoke']);
+const mutatingPeerActions=new Set(['observe_sidecars','maintenance_run','range_seal','frontier_capture','frontier_run','final_seal_review','final_seal_apply','bootstrap_enroll','bootstrap_run','bootstrap_activate','bootstrap_revoke']);
 const union=Object.assign({},...Object.values(fields).map(s=>s.properties));
 export const peerOriginToolSchema=Object.freeze({name:'company_origin',description:'Checked original origin plan/mechanical review/quarantine and bounded peer-origin retrieval through the actual root HOST caller and current managed-hook. Original current owner/epoch, typed custody, genuine review, fixed native source, finite purpose, context and physical fences remain required. No caller actor/provider/launch/native proof/readiness flag. Missing supported producers Hold before admission; reading never selects a policy or grants authority.',inputSchema:object({root:str(4000),session_id:str(200),epoch:integer(),action:{enum:Object.keys(fields)},source_instruction:str(4000),input:object(union,[])},['root','session_id','epoch','action'])});
 function rule(value,schema){
@@ -95,6 +103,7 @@ export function validatePeerOriginRequest(request,host){
  need(['codex','claude'].includes(host)&&rule(args,peerOriginToolSchema.inputSchema)&&path.isAbsolute(args.root),'ORIGIN_PUBLIC_INPUT');
  need(rule(args.input??{},fields[args.action]),'ORIGIN_PUBLIC_INPUT');
  need(!sourceActions.has(args.action)||text(args.source_instruction,4000),'ORIGIN_PUBLIC_INSTRUCTION_REQUIRED');
+ if(args.action==='bootstrap_run')need(args.input.phase==='review'?Object.hasOwn(args.input,'reviewer_principal_id'):!Object.hasOwn(args.input,'reviewer_principal_id'),'ORIGIN_PUBLIC_INPUT');
  need(!args.input?.operation_id||args.input.operation_id===args.input.operation_id.trim(),'ORIGIN_PUBLIC_INPUT');
  need(Buffer.byteLength(canonical(args))<=MAX_REQUEST,'ORIGIN_PUBLIC_INPUT');return args;
 }
@@ -159,7 +168,8 @@ function exactBoundedRead(read,input,key='length'){
 }
 function returned(result,args,extra={}){
  if(legacyEncodedReplyBytes(result)<=MAX_REPLY)return result;
- return bounded({protocol:'peer-origin-operation-returned-v1',action:args.action,operation_returned:true,result_not_inlined:true,...(args.input?.operation_id?{operation_id:args.input.operation_id}:{}),...extra,retrieval:{tool:'company_origin',action:'status',epoch:args.epoch},note:'Inspect persisted origin state; do not repeat a mutation or native admission for presentation. This receipt establishes no acceptance or authority.'});
+ const retrieval=args.action.startsWith('bootstrap_')?{tool:'company_origin',action:'bootstrap_inspect',epoch:args.epoch,input:{enrollment_id:args.input.enrollment_id}}:{tool:'company_origin',action:'status',epoch:args.epoch};
+ return bounded({protocol:'peer-origin-operation-returned-v1',action:args.action,operation_returned:true,result_not_inlined:true,...(args.input?.operation_id?{operation_id:args.input.operation_id}:{}),...extra,retrieval,note:'Inspect persisted origin state; do not repeat a mutation or native admission for presentation. This receipt establishes no acceptance or authority.'});
 }
 
 // Fixed request DATA only; no dispatch happened. The engine's dedicated source
@@ -244,6 +254,15 @@ export async function peerOriginRuntimeAction(request,host){
    return bounded({protocol:'peer-origin-manifest-source-v1',origin_ref:value.origin_ref,section:value.section,page:value.page,total_items:value.total_items,next_page:value.next_page,sha256,total_characters:body.length,utf8_bytes:Buffer.byteLength(body),read:{tool:'company_origin',action:'manifest_read',input:{section:value.section,page:value.page,sha256,offset:0,length:4096}},qualification_by_read:false});
   });
   if(args.action==='observe_sidecars')return returned(quarantine.observePeerOriginSidecars(ledger,actor),args);
+  if(args.action.startsWith('bootstrap_')){
+   // Select only the fixed original operator composition. The public request
+   // supplies bounded DATA, never the actor, ledger, paths, runner or a cap.
+   const selected=copy(args),operation={...selected.input,epoch:selected.epoch};
+   if(['bootstrap_enroll','bootstrap_activate','bootstrap_revoke'].includes(selected.action))operation.source_instruction=selected.source_instruction;
+   const run=await fixedLaunch('runOriginalPeerBootstrapMembershipOperation');
+   ledger.read(tx=>peerOwner(tx,ledger,selected,actor));
+   return returned(await run(ledger,actor,selected.action,operation),selected);
+  }
   if(['maintenance_status','maintenance_operation','maintenance_run','range_seal'].includes(args.action)){
    const run=args.action==='maintenance_run'?await fixedLaunch('runOriginalPeerOriginMaintenance'):null;
    if(run)need(typeof maintenance.originalPeerOriginMaintenanceLedger==='function','ORIGIN_ORIGINAL_API_LEDGER_UNAVAILABLE');

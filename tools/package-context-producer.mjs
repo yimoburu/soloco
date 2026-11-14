@@ -9,9 +9,9 @@ const REPO=fileURLToPath(new URL('../',import.meta.url));
 const SOURCE=path.join(REPO,'native/codex'),PACKAGE=path.join(REPO,'plugins/soloco');
 const OUTPUT=path.join(PACKAGE,'producer-inputs'),NATIVE=path.join(OUTPUT,'native/codex');
 const SEAL=path.join(OUTPUT,'native-recipe-inventory.json');
-const MANIFEST_SHA='b040811c46db685f647bfaf5bac3db26aa055035553ee83b8e2bc228f048f55c';
+const MANIFEST_SHA='b36d16a6c117e2130d5bf294b2989dfac9fba103fa568332c78ca0965f90ad13';
 // Updated with the original source driver, never learned from package DATA.
-const DRIVER_SHA='36e1b6409a300fbdb064bc0912edab9aba1dd4c97528746df87887854b0a68f0';
+const DRIVER_SHA='6f5bb3d81076f1620f29db27dd5b442c6a3e7fd7f69ee770590945fdc8d23300';
 const MAX_FILE=128*1024*1024,MAX_TOTAL=128*1024*1024;
 const sha=b=>createHash('sha256').update(b).digest('hex');
 const exact=(v,keys)=>v!==null&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).sort().join(',')===[...keys].sort().join(',');
@@ -28,12 +28,12 @@ function sourceRows(){
  const manifest=read(path.join(SOURCE,'source-package.json'),'100644'),driver=read(path.join(SOURCE,'tools/protected_native.py'),'100644');
  need(sha(manifest)===MANIFEST_SHA&&sha(driver)===DRIVER_SHA,'original manifest or driver changed');
  const pkg=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(manifest));
- need(pkg.schema==='soloco-protected-native-source-package-v1'&&pkg.status==='frozen-source-unqualified'&&pkg.qualified_binary===null&&pkg.overlay.length===159,'original source recipe required');
+ need(pkg.schema==='soloco-protected-native-source-package-v1'&&pkg.status==='frozen-source-unqualified'&&pkg.qualified_binary===null&&pkg.overlay.length===163,'original source recipe required');
  const pins=[...['handoff','bindings','patch'].map(k=>[pkg.source_cut[k],'100644']),[pkg.upstream.inventory,'100644'],...pkg.upstream.attribution.map(v=>[v,'100644']),...pkg.overlay.map(v=>[v.payload,v.mode]),[pkg.cargo_lock,'100644'],[pkg.toolchain.inventory,'100644'],[pkg.toolchain.official_manifest,'100644']];
- need(pins.length===168,'exact 168 declared payloads required');
+ need(pins.length===172,'exact 172 declared payloads required');
  const rows=[{path:'source-package.json',bytes:manifest,mode:'100644'},{path:'tools/protected_native.py',bytes:driver,mode:'100644'}],seen=new Set(rows.map(v=>v.path));
  for(const [pin,mode] of pins){need(exact(pin,['path','bytes','sha256'])&&Number.isSafeInteger(pin.bytes)&&pin.bytes>=0&&pin.bytes<=MAX_FILE&&/^[a-f0-9]{64}$/.test(pin.sha256)&&['100644','100755'].includes(mode),'closed payload pin required');const key=relative(pin.path);need(!seen.has(key),'duplicate recipe destination');seen.add(key);const bytes=read(path.join(SOURCE,key),mode);need(bytes.length===pin.bytes&&sha(bytes)===pin.sha256,'declared payload changed: '+key);rows.push({path:key,bytes,mode});}
- rows.sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0);need(rows.length===170&&rows.reduce((n,v)=>n+v.bytes.length,0)<=MAX_TOTAL,'bounded exact recipe required');
+ rows.sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0);need(rows.length===174&&rows.reduce((n,v)=>n+v.bytes.length,0)<=MAX_TOTAL,'bounded exact recipe required');
  return {rows,seal:{protocol:'soloco-packaged-native-recipe-v1',source_package:{bytes:manifest.length,sha256:sha(manifest)},build_driver:{bytes:driver.length,sha256:sha(driver)},files:rows.map(v=>({path:v.path,bytes:v.bytes.length,sha256:sha(v.bytes),mode:v.mode}))}};
 }
 function allowedDirectories(rows){const dirs=new Set(['native','native/codex']);for(const row of rows){for(let p=path.posix.dirname('native/codex/'+row.path);p!=='.';p=path.posix.dirname(p))dirs.add(p);}return dirs;}

@@ -26,7 +26,7 @@ async function fixture(t){
   // Preserve production exactly except for resolving its fixed relative
   // dependencies from this moved TEST COPY and appending private byte-helper access.
   let text=original.toString('utf8');
-  for(const [specifier,url,count] of [['./context-build-component.mjs',COMPONENT,1],['./context-component-layout.mjs',LAYOUT,1],['./bootstrap-membership-preflight.mjs',BOOTSTRAP,1],['./input-frontier-wire.mjs',pathToFileURL(path.join(REPO,'plugins/soloco/runtime/peers/input-frontier-wire.mjs')).href,2],['./origin-maintenance-wire.mjs',pathToFileURL(path.join(REPO,'plugins/soloco/runtime/peers/origin-maintenance-wire.mjs')).href,2],['./protected-source-build-slot.mjs',pathToFileURL(path.join(REPO,'plugins/soloco/runtime/peers/protected-source-build-slot.mjs')).href,2]]){
+  for(const [specifier,url,count] of [['./context-build-component.mjs',COMPONENT,1],['./context-component-layout.mjs',LAYOUT,1],['./bootstrap-membership-preflight.mjs',BOOTSTRAP,1],['./input-frontier-wire.mjs',pathToFileURL(path.join(REPO,'plugins/soloco/runtime/peers/input-frontier-wire.mjs')).href,2],['./origin-maintenance-wire.mjs',pathToFileURL(path.join(REPO,'plugins/soloco/runtime/peers/origin-maintenance-wire.mjs')).href,3],['./protected-source-build-slot.mjs',pathToFileURL(path.join(REPO,'plugins/soloco/runtime/peers/protected-source-build-slot.mjs')).href,2]]){
     const from="'"+specifier+"'",resolved=JSON.stringify(url);
     assert.equal(text.split(from).length-1,count,'Resolve the exact copied-module dependency: '+specifier);
     text=text.replaceAll(from,resolved);

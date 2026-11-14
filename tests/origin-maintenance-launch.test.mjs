@@ -51,13 +51,14 @@ export function originalProtectedOwnedTaskTokens(){return {creation:creationRead
 export function requestOriginalProtectedCodexStop(){counts.stop++;child.close(null,'SIGTERM');}
 const ledger={root:'/SYNTHETIC',directory:'/SYNTHETIC/.company',company_id:'SYNTHETIC'};function service(a){if(a!==api)throw Error('SYNTHETIC_API');counts.ledger++;return ledger;}function prepare(){counts.prepare++;return cap;}function unavailable(){throw Error('SYNTHETIC_UNSELECTED');}
 export {service as originalPeerOriginMaintenanceLedger,service as originalPeerOriginFrontierSealLedger,service as originalPeerOwnerLifecycleLedger,prepare as prepareOriginalPeerOriginMaintenance,prepare as prepareOriginalPeerOriginFrontierSeal,prepare as prepareOriginalPeerOwnerMaintenanceFreshReview,unavailable as prepareOriginalProtectedOriginMaintenanceLaunch,unavailable as prepareOriginalProtectedOriginFinalReviewLaunch,unavailable as completeOriginalPeerOriginMaintenance,unavailable as completeOriginalPeerOriginFrontierSeal,unavailable as completeOriginalPeerOwnerMaintenance,unavailable as holdOriginalPeerOriginMaintenance,unavailable as holdOriginalPeerOriginFrontierSeal,unavailable as holdOriginalPeerOwnerMaintenance,unavailable as recordOriginalPeerOriginLateEvidence,unavailable as recordOriginalPeerOriginFrontierSealLateEvidence,unavailable as recordOriginalPeerOwnerMaintenanceLateEvidence,unavailable as createPolicySupervisor,unavailable as runOriginalOriginMaintenanceHost,unavailable as runOriginalOriginFrontierSealHost,unavailable as runOriginalOwnerMaintenanceFreshHost};
-export function loadOriginalSelectedPackagedPeerBridge(){counts.load++;}export function inspectOriginalOriginMaintenanceSupport(){}export function inspectOriginalOriginFrontierSealSupport(){}export function inspectOriginalOwnerMaintenanceFreshSupport(){}
+export function loadOriginalSelectedPackagedPeerBridge(){counts.load++;}export {unavailable as createOriginalLoadedBootstrapMembershipRuntime};export function inspectOriginalOriginMaintenanceSupport(){}export function inspectOriginalOriginFrontierSealSupport(){}export function inspectOriginalOwnerMaintenanceFreshSupport(){}
 export {unavailable as inspectOriginalOriginOrdinaryTaskSupport,unavailable as prepareOriginalProtectedOriginOrdinaryTaskLaunch};
 export {service as originalPeerInputFrontierMaintenanceLedger,prepare as prepareOriginalPeerInputFrontier,inspect as inspectOriginalPeerInputFrontier,plan as originalPeerInputFrontierPreflight,unavailable as completeOriginalPeerInputFrontier,unavailable as holdOriginalPeerInputFrontier,unavailable as recordOriginalPeerInputFrontierLateEvidence,unavailable as prepareOriginalProtectedInputFrontierLaunch,unavailable as runOriginalInputFrontierHost};export function inspectOriginalInputFrontierSupport(){}
 `);
  const file=entry?ENTRY:HOST,original=fs.readFileSync(file,'utf8'),shimURL=pathToFileURL(shim).href;
   const expected=entry?[
-   ['./context-component-deployment.mjs','import {loadOriginalSelectedPackagedPeerBridge,inspectOriginalInputFrontierSupport}'],
+   ['./ledger.mjs','import {canonical,peerDigest,PeerLedger}'],
+   ['./context-component-deployment.mjs','import {loadOriginalSelectedPackagedPeerBridge,inspectOriginalInputFrontierSupport,createOriginalLoadedBootstrapMembershipRuntime}'],
    ['./policy-supervisor.mjs','import {createPolicySupervisor}'],
    ['./protected-codex-domain.mjs','import {prepareOriginalProtectedInputFrontierLaunch,requestOriginalProtectedCodexStop}'],
    ['./input-frontier-maintenance.mjs','import {originalPeerInputFrontierMaintenanceLedger,prepareOriginalPeerInputFrontier,inspectOriginalPeerInputFrontier,originalPeerInputFrontierPreflight,completeOriginalPeerInputFrontier,holdOriginalPeerInputFrontier,recordOriginalPeerInputFrontierLateEvidence}'],
@@ -67,7 +68,9 @@ export {service as originalPeerInputFrontierMaintenanceLedger,prepare as prepare
    ['./origin-frontier-seal.mjs','import * as originSeal'],
    ['./owner-handover.mjs','import * as ownerReview'],
    ['./context-component-deployment.mjs','import {inspectOriginalOriginOrdinaryTaskSupport as ordinaryOriginSupport}'],
-   ['./protected-codex-domain.mjs','import {prepareOriginalProtectedOriginOrdinaryTaskLaunch}']
+   ['./protected-codex-domain.mjs','import {prepareOriginalProtectedOriginOrdinaryTaskLaunch}'],
+   ['./bootstrap-membership-contract.mjs','import {closed as bootstrapClosed,bootstrapActor,bootstrapPhaseInput,text as bootstrapText}'],
+   ['./bootstrap-membership-context.mjs','import {assertPeerBootstrapOperationFrom}']
   ]:[
    ['./origin-maintenance-wire.mjs','import * as wire'],
    ['./origin-maintenance.mjs','import * as range'],
@@ -77,7 +80,7 @@ export {service as originalPeerInputFrontierMaintenanceLedger,prepare as prepare
    ['./protected-codex-domain.mjs','export {prepareOriginalProtectedOriginMaintenanceLaunch,prepareOriginalProtectedOriginFinalReviewLaunch}'],
    ['./context-component-deployment.mjs','export {inspectOriginalOriginMaintenanceSupport,inspectOriginalOriginFrontierSealSupport,inspectOriginalOwnerMaintenanceFreshSupport}']
   ];
-  assert.equal(expected.length,entry?11:7);const relocated=relocateFixedPredecessors(original,file,shimURL,expected);
+  assert.equal(expected.length,entry?14:7);const fixedOriginals=new Map(entry?['./ledger.mjs','./bootstrap-membership-contract.mjs','./bootstrap-membership-context.mjs'].map(name=>[name,new URL(name,pathToFileURL(ENTRY)).href]):[]),relocated=relocateFixedPredecessors(original,file,shimURL,expected,fixedOriginals);
   const body=s=>s.split('\n').filter(l=>!l.startsWith('import ')&&!l.startsWith('export {')).join('\n');assert.equal(body(relocated),body(original));
  const copy=path.join(directory,entry?'entry.mjs':'host.mjs');fs.writeFileSync(copy,relocated);const module=await import(pathToFileURL(copy).href),s=await import(shimURL);t.after(()=>s.child.close(null,'SIGTERM'));
  const selected=purposes.find(p=>p[1]===kind);return {module,s,start(){return module[selected[2]](Symbol('SYNTHETIC owner'),s.launch,s.api,s.cap);}};
@@ -227,3 +230,87 @@ for(const [purpose,kind]of [['range','peer-origin-review'],['final','peer-origin
 }
 test('new actual domain refuses absent E7 central once binder before any child birth',async t=>{await assert.rejects(originDomainFixture(t,'peer-origin-review',{centralAvailable:false}),{code:'PROTECTED_CODEX_ORIGINAL_EXECUTION_LAUNCH_SOURCE_REQUIRED'});});
 test('new actual domain rechecks genuine admission-launch coverage before drain without freeing UNKNOWN',async t=>{const f=await originDomainFixture(t,'peer-origin-frontier-seal-review');f.terminalWitness();f.complete();f.s.setCapacity(false);await f.s.child.close();assert.equal(f.tokens().drain,null);const diagnostic=f.domain.assertOriginalProtectedOwnedTaskDiagnostic(f.tokens().diagnostic,f.expected);assert.equal(diagnostic.qualifies,false);assert.equal(diagnostic.prior_unknown_slots_released,false);});
+
+
+// Bootstrap entry tests exercise the unchanged actual helper body with three
+// explicitly fictional predecessors: PeerLedger brand, current-purpose guard,
+// and loaded-runtime factory. The DATA grammar remains the real fixed module.
+// No original issuer, company, Native child or provider is present here.
+async function bootstrapOperationFixture(t,{deferLoad=false}={}){
+ const root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'soloco-bootstrap-operation-source-'))),company=path.join(root,'.company');fs.mkdirSync(company,{mode:0o700});
+ t.after(()=>fs.rmSync(root,{recursive:true,force:true}));const shim=path.join(root,'SYNTHETIC-bootstrap-predecessors.mjs'),ledgerURL=new URL('../plugins/soloco/runtime/peers/ledger.mjs',import.meta.url).href;
+ fs.writeFileSync(shim,`import assert from 'node:assert/strict';import path from 'node:path';export {canonical,peerDigest} from ${JSON.stringify(ledgerURL)};
+export const observed={trace:[],guards:[],loads:0,factories:[],methods:[]};
+export const guardFailure=Object.freeze(Object.assign(new TypeError('SYNTHETIC original purpose changed'),{code:'SYNTHETIC_BOOTSTRAP_PURPOSE_CHANGED'})),member=Object.freeze(new TypeError('SYNTHETIC original provider member')),methodFailure=Object.freeze(new AggregateError([member],'SYNTHETIC original helper provider',{cause:member}));
+export const control={rejectGuardAt:0,methodFailure:null,result:Object.freeze({status:'unknown',accepted:false,authority_issued:false,old_reservations_released:false})};
+let resolveLoad,rejectLoad;const loadPromise=${deferLoad?'new Promise((resolve,reject)=>{resolveLoad=resolve;rejectLoad=reject;})':'Promise.resolve()'};
+export function settleLoad(error){if(error)rejectLoad(error);else resolveLoad();}
+export class PeerLedger {constructor(root){this.root=root;this.directory=path.join(root,'.company');this.company_id='SYNTHETIC-bootstrap-company';}read(fn){observed.trace.push('read');return fn(Object.freeze({SYNTHETIC_original_read:true}));}}
+export function assertPeerBootstrapOperationFrom(tx,options){assert.equal(tx.SYNTHETIC_original_read,true);assert.equal(options.ledger instanceof PeerLedger,true);observed.trace.push('guard');observed.guards.push(options);if(observed.guards.length===control.rejectGuardAt)throw guardFailure;return {SYNTHETIC_authority_probe_only:true};}
+export async function loadOriginalSelectedPackagedPeerBridge(){observed.trace.push('load');observed.loads++;await loadPromise;observed.trace.push('loaded');}
+export function inspectOriginalInputFrontierSupport(){throw Error('SYNTHETIC nonbootstrap branch');}export function inspectOriginalOriginOrdinaryTaskSupport(){throw Error('SYNTHETIC nonbootstrap branch');}
+export function createOriginalLoadedBootstrapMembershipRuntime(options){observed.trace.push('factory');observed.factories.push(options);return Object.freeze(Object.fromEntries(['enroll','inspect','activate','revoke','run'].map(method=>[method,input=>{observed.trace.push(method);observed.methods.push({method,input,options});if(control.methodFailure)throw control.methodFailure;return control.result;}])));}
+`);
+ const original=fs.readFileSync(ENTRY,'utf8'),url=pathToFileURL(shim).href,expected=[
+  ['./ledger.mjs','import {canonical,peerDigest,PeerLedger}'],
+  ['./context-component-deployment.mjs','import {loadOriginalSelectedPackagedPeerBridge,inspectOriginalInputFrontierSupport,createOriginalLoadedBootstrapMembershipRuntime}'],
+  ['./context-component-deployment.mjs','import {inspectOriginalOriginOrdinaryTaskSupport as ordinaryOriginSupport}'],
+  ['./bootstrap-membership-contract.mjs','import {closed as bootstrapClosed,bootstrapActor,bootstrapPhaseInput,text as bootstrapText}'],
+  ['./bootstrap-membership-context.mjs','import {assertPeerBootstrapOperationFrom}']
+ ],destinations=new Map([['./bootstrap-membership-contract.mjs',new URL('./bootstrap-membership-contract.mjs',pathToFileURL(ENTRY)).href]]);
+ const relocated=relocateFixedPredecessors(original,ENTRY,url,expected,destinations),body=value=>value.split('\n').filter(line=>!line.startsWith('import ')).join('\n');assert.equal(body(relocated),body(original),'entire actual bootstrap operation body retained');
+ const file=path.join(root,'maintenance-launch.mjs');fs.writeFileSync(file,relocated);const module=await import(pathToFileURL(file).href),s=await import(url),ledger=new s.PeerLedger(root),actor={host:'codex',session_id:'SYNTHETIC-bootstrap-owner',native_id:'SYNTHETIC-bootstrap-owner'};
+ t.after(()=>assert.equal(fs.readFileSync(ENTRY,'utf8'),original));return {root,company,module,s,ledger,actor,call(action,input){return module.runOriginalPeerBootstrapMembershipOperation(ledger,actor,action,input);}};
+}
+const bootstrapPhase=()=>({operation_id:'SYNTHETIC-one-phase',epoch:9,enrollment_id:'SYNTHETIC-enrollment',phase:'reconstruction'});
+const bootstrapControls=()=>({
+ bootstrap_enroll:{operation_id:'SYNTHETIC-enroll',epoch:9,enrollment_id:'SYNTHETIC-enrollment',principal_id:'SYNTHETIC-reviewer',role:'reviewer',host:'codex',scope:'alpha',input_refs:[],expires_at:new Date(Date.now()+60000).toISOString(),max_model_calls:2,expected_generation:0,source_instruction:'SYNTHETIC finite enrollment only'},
+ bootstrap_inspect:{epoch:9,enrollment_id:'SYNTHETIC-enrollment'},
+ bootstrap_activate:{operation_id:'SYNTHETIC-activate',epoch:9,enrollment_id:'SYNTHETIC-enrollment',source_instruction:'SYNTHETIC explicit activation only'},
+ bootstrap_revoke:{operation_id:'SYNTHETIC-revoke',epoch:9,enrollment_id:'SYNTHETIC-enrollment',source_instruction:'SYNTHETIC explicit revocation only'}
+});
+
+test('bootstrap fixed entry checks its original purpose before load or any directory factory or admission',async t=>{
+ const f=await bootstrapOperationFixture(t);f.s.control.rejectGuardAt=1;await assert.rejects(()=>f.call('bootstrap_run',bootstrapPhase()),error=>error===f.s.guardFailure);
+ assert.deepEqual(f.s.observed.trace,['read','guard']);assert.equal(f.s.observed.loads,0);assert.equal(f.s.observed.factories.length,0);assert.equal(f.s.observed.methods.length,0);assert.deepEqual(fs.readdirSync(f.company),[]);
+});
+
+test('bootstrap fixed entry awaits its selected bridge and rechecks original purpose before directory writes',async t=>{
+ const f=await bootstrapOperationFixture(t,{deferLoad:true});f.s.control.rejectGuardAt=2;const pending=f.call('bootstrap_run',bootstrapPhase());pending.catch(()=>{});await flush();
+ assert.deepEqual(f.s.observed.trace,['read','guard','load']);assert.deepEqual(fs.readdirSync(f.company),[]);assert.equal(f.s.observed.factories.length,0);
+ f.s.settleLoad();await assert.rejects(pending,error=>error===f.s.guardFailure);assert.deepEqual(f.s.observed.trace,['read','guard','load','loaded','read','guard']);assert.deepEqual(fs.readdirSync(f.company),[]);assert.equal(f.s.observed.methods.length,0);
+});
+
+test('bootstrap fixed entry derives private paths and performs exactly one original runtime run',async t=>{
+ const f=await bootstrapOperationFixture(t),input=bootstrapPhase(),result=await f.call('bootstrap_run',input),seen=f.s.observed,own=path.join(f.company,'peer-execution','bootstrap-membership',f.s.peerDigest({epoch:input.epoch,enrollment_id:input.enrollment_id,phase:input.phase,operation_id:input.operation_id}));
+ assert.equal(result,f.s.control.result);assert.equal(seen.loads,1);assert.equal(seen.guards.length,3);assert.equal(seen.factories.length,1);assert.equal(seen.methods.length,1);assert.equal(seen.methods[0].method,'run');assert.deepEqual(seen.methods[0].input,input);
+ assert.equal(seen.factories[0].ledger,f.ledger);assert.deepEqual(seen.factories[0].actor,f.actor);assert.equal(seen.factories[0].actor,seen.guards[0].actor);
+ assert.deepEqual(seen.factories[0],{ledger:f.ledger,actor:seen.guards[0].actor,scope_root:own,cwd:f.root,read_paths:[],state_root:path.join(own,'state'),scratch_root:path.join(own,'scratch')});
+ for(const directory of [path.join(f.company,'peer-execution'),path.join(f.company,'peer-execution','bootstrap-membership'),own,path.join(own,'state'),path.join(own,'scratch')])assert.equal(fs.lstatSync(directory).mode&0o777,0o700);
+ assert.deepEqual(seen.trace,['read','guard','load','loaded','read','guard','read','guard','factory','run']);assert.equal(seen.methods.some(value=>value.method==='activate'),false);
+});
+
+test('bootstrap fixed nonrun operations never create directories or invoke another phase',async t=>{
+ const f=await bootstrapOperationFixture(t);
+ for(const [action,input]of Object.entries(bootstrapControls())){const count=f.s.observed.methods.length;assert.equal(await f.call(action,input),f.s.control.result);assert.equal(f.s.observed.methods.length,count+1);assert.equal(f.s.observed.methods.at(-1).method,action.slice('bootstrap_'.length));assert.deepEqual(f.s.observed.methods.at(-1).input,input);assert.deepEqual(fs.readdirSync(f.company),[]);}
+ assert.equal(f.s.observed.loads,4);assert.equal(f.s.observed.factories.length,4);assert.equal(f.s.observed.guards.length,8);assert.equal(f.s.observed.methods.some(value=>value.method==='run'),false);
+});
+
+test('bootstrap fixed entry rejects copied ledgers proxies getters and path or callback escape before its guard',async t=>{
+ const f=await bootstrapOperationFixture(t);let touched=0;
+ const input=bootstrapPhase(),getter={...input};Object.defineProperty(getter,'phase',{enumerable:true,get(){touched++;throw Error('SYNTHETIC getter must not run');}});
+ const proxy=new Proxy(input,{getPrototypeOf(){touched++;throw Error('SYNTHETIC proxy must not run');},ownKeys(){touched++;throw Error('SYNTHETIC proxy must not run');}}),ledgerProxy=new Proxy(f.ledger,{getPrototypeOf(){touched++;throw Error('SYNTHETIC ledger proxy must not run');}});
+ const cases=[()=>f.module.runOriginalPeerBootstrapMembershipOperation({...f.ledger},f.actor,'bootstrap_run',input),()=>f.module.runOriginalPeerBootstrapMembershipOperation(ledgerProxy,f.actor,'bootstrap_run',input),()=>f.call('bootstrap_run',getter),()=>f.call('bootstrap_run',proxy),()=>f.call('bootstrap_run',{...input,phase:'review'}),()=>f.call('bootstrap_run',{...input,source_instruction:'SYNTHETIC phase may not take instruction'}),...['scope_root','cwd','state_root','scratch_root','read_paths','cap','provider','profile','callback','spawn','actor'].map(key=>()=>f.call('bootstrap_run',{...input,[key]:key==='callback'?()=>{touched++;}:'/SYNTHETIC/injected'}))];
+ for(const operation of cases)await assert.rejects(operation,error=>['BOOTSTRAP_INPUT','BOOTSTRAP_LAUNCH_INPUT'].includes(error?.code));
+ assert.equal(touched,0);assert.deepEqual(f.s.observed.trace,[]);assert.deepEqual(fs.readdirSync(f.company),[]);
+});
+
+test('bootstrap fixed postdirectory currentness Hold leaves partial paths and never calls the runtime',async t=>{
+ const f=await bootstrapOperationFixture(t);f.s.control.rejectGuardAt=3;await assert.rejects(()=>f.call('bootstrap_run',bootstrapPhase()),error=>error===f.s.guardFailure);assert.equal(f.s.observed.loads,1);assert.equal(f.s.observed.guards.length,3);assert.equal(f.s.observed.factories.length,0);assert.equal(f.s.observed.methods.length,0);assert.deepEqual(fs.readdirSync(f.company),['peer-execution']);
+});
+
+test('bootstrap fixed entry preserves provider failures and UNKNOWN without retry activation or reservation release',async t=>{
+ const f=await bootstrapOperationFixture(t),input=bootstrapControls().bootstrap_inspect,unknown=Object.freeze({status:'unknown',accepted:false,old_reservations_released:false,authority_issued:false,SYNTHETIC_evidence:'retained'});f.s.control.result=unknown;
+ assert.equal(await f.call('bootstrap_inspect',input),unknown);assert.equal(f.s.observed.methods.length,1);f.s.control.methodFailure=f.s.methodFailure;
+ await assert.rejects(()=>f.call('bootstrap_inspect',input),error=>error===f.s.methodFailure);assert.equal(f.s.observed.methods.length,2);assert.equal(f.s.methodFailure.cause,f.s.member);assert.equal(f.s.methodFailure.errors[0],f.s.member);assert.equal(f.s.observed.methods.some(value=>value.method==='run'||value.method==='activate'),false);assert.deepEqual(fs.readdirSync(f.company),[]);
+});
