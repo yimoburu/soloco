@@ -1,21 +1,33 @@
 // Synthetic, controlled source fixtures in REAL temporary Stores. Constructing
-// these historical test results does not execute source or claim actual P8 proof.
+// these historical results executes no candidate or model and claims no P8 proof.
+// The genuine authorizer may run its fixed cached sandbox readiness probe
+// (5s/10KB). No public HOST boundary or actual-company authority is established.
+import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {digest,id,installedTeam,teamHash,VERSION,withStore} from '../plugins/soloco/runtime/store.mjs';
 import {validationManifest} from '../plugins/soloco/runtime/validation-cache.mjs';
-import {developmentReviewAuthority} from '../plugins/soloco/runtime/develop.mjs';
+import {developmentAction} from '../plugins/soloco/runtime/develop.mjs';
 import {assignmentContext} from '../plugins/soloco/runtime/context.mjs';
 import {requestModelProcess,recordModelProcessBirth,recordModelProcessClosure} from '../plugins/soloco/runtime/model-process-closure.mjs';
 import {beginRecordReadDelivery} from '../plugins/soloco/runtime/record-read-delivery.mjs';
 import {prepareRetentionReview,authorizeRetentionReview,resolveRetentionRepair,retentionRepairSessionKey,retentionRepairPrimarySnapshot,validateRetentionRepairPublication} from '../plugins/soloco/runtime/development-retention-repair.mjs';
 import {buildRetentionRepairFinal,beginRetentionPrimaryDelivery,confirmRetentionPrimaryDelivery} from '../plugins/soloco/runtime/retention-primary-transport.mjs';
+import {recordOriginalWorkerAssignmentFrom} from '../plugins/soloco/runtime/peers/prospective-local-worker-inventory-producer.mjs';
+import {stageOriginalHistoricalJob,stageOriginalWorker,disposeOriginalProcessFixtures} from './original-adapter-process-fixture.mjs';
+import {stageOriginalReviewController} from './original-worker-model-fixture.mjs';
+import {TIMEOUT_POLICY_VERSION} from '../plugins/soloco/runtime/timeout.mjs';
+import {codeReviewWindowSubject} from '../plugins/soloco/runtime/code-review-window.mjs';
 export const hash=x=>digest(JSON.stringify(x));
 export const read=a=>withStore(a.root,db=>db.read());
 export const change=(a,fn)=>withStore(a.root,db=>db.transaction('controlled.retention-fixture',s=>{fn(s);return s;}));
-export function fixture({bodyCopies=100,expiresAt=new Date(Date.now()+2*3600000).toISOString()}={}) {
-  const root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'soloco-retention-repair-')));
+export async function fixture({bodyCopies=100,expiresAt=new Date(Date.now()+2*3600000).toISOString()}={}) {
+  const RealDate=Date,stagingTime=RealDate.now();
+  let root=null;
+  globalThis.Date=class extends RealDate{constructor(...v){super(...(v.length?v:[stagingTime]));}static now(){return stagingTime;}};
+  try{
+  root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'soloco-retention-repair-')));
   const a={root,session_id:id('owner'),host:'codex',epoch:1},team=installedTeam();
   const valuePrefix='// UTF16 🌍 exact prefix\r\n'.repeat(3),valueTail='// Whole unchanged native suffix.\r\n'.repeat(100);
   const originals=[{path:'helper.mjs',content:'// Whole Unicode 🌍 source.\r\n'.repeat(bodyCopies)+'export const helper=1;\n'},{path:'value.mjs',content:valuePrefix+'export const value=0;\n'+valueTail},{path:'value.test.mjs',content:'// Controlled historical source, never executed by fixture construction.\n'},...Array.from({length:6},(_,i)=>({path:`frozen-${i}.mjs`,content:`export const frozen${i}=${i};\n`}))].sort((a,b)=>a.path.localeCompare(b.path));
@@ -32,23 +44,55 @@ export function fixture({bodyCopies=100,expiresAt=new Date(Date.now()+2*3600000)
   const receipt={id:'receipt',kind:'artifact',revision:1,status:'Submitted',author_role:'runtime',author_instance:'controller',content:JSON.stringify(result),development:{type:'test',plan_id:p.id,candidate_id:candidate.id,candidate_sha256:candidate.development.candidate_sha256,result,receipt_sha256:hash(result),validation_manifest:manifest,validation_fingerprint:manifest.validation_fingerprint}};
   const controller={id:'controller',kind:'development_test',status:'completed',artifact_id:receipt.id,candidate_id:candidate.id,development_id:p.id};
   const contract={id:'contract',kind:'artifact',revision:1,status:'Draft',content:'Complete immutable history/contract '+'z'.repeat(90)};
-  const prior={id:'prior-blocked-job',role:'qa',instance_id:'qa-original',native_id:'native-prior-qa',host:'codex',epoch:1,status:'completed',artifact_id:'prior-blocked',session_key:'qa:review:receipt:1',review_of:{id:receipt.id,revision:1},context_format:3,task:'Whole controlled assessment',inputs:[{id:'contract',revision:1},{id:'mandatory-control',revision:1}],supplemental_sources:[],execution_started_at:new Date(Date.now()-1000).toISOString(),execution_deadline_at:new Date(Date.now()+1800000).toISOString(),finished_at:new Date().toISOString(),coordination_release:{termination_confirmed:true,reason:'model_process_closed',at:new Date().toISOString()}};
-  prior.coordination_release.at=prior.finished_at;prior.worker_pid=723001;
-  const oldInvocation={invocation_id:'controlled-prior-original',job_id:prior.id,instance_id:prior.instance_id,worker_pid:prior.worker_pid,host:'codex',requested_at:prior.execution_started_at};
-  requestModelProcess(prior,oldInvocation);const oldBirth={protocol:'ordinary-model-process-birth-v1',launch_id:'controlled-prior-launch',host:'codex',pid:723002,worker_pid:prior.worker_pid,spawned_at:prior.execution_started_at,command_sha256:digest('controlled-old-command'),argv_sha256:digest('controlled-old-argv'),cwd_sha256:digest(root)};recordModelProcessBirth(prior,oldInvocation,oldBirth);recordModelProcessClosure(prior,oldInvocation,oldBirth,{protocol:'ordinary-model-process-close-v1',birth_sha256:hash(oldBirth),closed_at:prior.finished_at,exit_code:0,signal:null,observation:'original-child-close'});
+  const prior={id:'prior-blocked-job',role:'qa',instance_id:'qa-original',native_id:'native-prior-qa',host:'codex',epoch:1,status:'completed',artifact_id:'prior-blocked',session_key:'qa:review:receipt:1',review_of:{id:receipt.id,revision:1},context_format:3,task:'Whole controlled assessment',inputs:[{id:'contract',revision:1},{id:'mandatory-control',revision:1}],supplemental_sources:[],coordination_release:{termination_confirmed:true,reason:'model_process_closed'}};
   const blocked={id:'prior-blocked',kind:'review',revision:1,status:'Submitted',author_role:'qa',author_instance:prior.instance_id,job_id:prior.id,review_of:prior.review_of,content:'Complete initial primary evidence was lost after compaction. This is an evidence limitation, no demonstrated code defect. Whole assessment remains uncertain.',review:{verdict:'Blocked',reason:'Compaction lost complete original sources, governing scope and current receipt. Whole assessment is uncertain.',permitted_action:'hold',candidate_sha256:candidate.development.candidate_sha256,receipt_sha256:receipt.development.receipt_sha256,blockers:['QA_RETENTION_LOSS: Complete primary evidence was lost; whole assessment remains uncertain. No retry or waiver authorized.']}};
   const records={plan:p,candidate,receipt,contract,'mandatory-control':{id:'mandatory-control',kind:'artifact',revision:1,status:'Recorded',content:'UNCLASSIFIED CURRENT CONTROL: no source integration, migration or new generation. Preserve this entire artifact even though its kind is not intent/decision/preference.',unknown_control:{whole:true,unicode:'🌍'}},'prior-blocked':blocked},jobs={producer,controller,[prior.id]:prior};
-  withStore(root,db=>db.transaction('controlled.company.created',()=>({schema:2,runtime_version:VERSION,id:id('company'),name:'Controlled retention repair source test',idea:'No product authority',phase:'Frame',mode:'preparation',paused:false,...team,team_sha256:teamHash(team),owner:{host:'codex',session_id:a.session_id,epoch:1},records,sessions:{[prior.session_key]:{instance_id:prior.instance_id,native_id:prior.native_id}},jobs,messages:[],notices:[],created_at:new Date().toISOString()})),true);
-  change(a,s=>{s.records.plan.development.authorization={decision_id:'original-authorization',authority_sha256:developmentReviewAuthority(s,p.id)};const c=assignmentContext(s,s.jobs[prior.id]);s.jobs[prior.id].inputs=c.inputs;s.jobs[prior.id].context_sha256=c.hash;});
+  withStore(root,db=>db.transaction('company.created',()=>({schema:2,runtime_version:VERSION,id:id('company'),name:'Controlled retention repair source test',idea:'No product authority',phase:'Frame',mode:'preparation',paused:false,...team,team_sha256:teamHash(team),owner:{host:'codex',session_id:a.session_id,epoch:1},records,sessions:{[prior.session_key]:{instance_id:prior.instance_id,native_id:prior.native_id}},jobs:{},messages:[],notices:[],created_at:new Date().toISOString()})),true);
+  await developmentAction({...a,action:'authorize',plan_id:p.id,scope_sha256:p.development.scope_sha256,model_data_approved:true,source_instruction:'Controlled fictional Source fixture: authorize this exact initially-live carrier scope only; no candidate execution, real model or Native acceptance.'},'codex');
+  for(const job of Object.values(jobs))Object.assign(job,job.kind==='development_test'?stageOriginalReviewController(root,{jobId:job.id,planId:p.id,candidateId:candidate.id,receiptId:job.artifact_id}):stageOriginalHistoricalJob(root,job));
+  change(a,s=>{
+    const completedProducer=s.jobs[producer.id],calls=completedProducer.model_process_tracking?.invocations,
+      launches=completedProducer.original_execution_assignment.launches.filter(launch=>launch.kind==='model');
+    assert.equal(calls?.length,1,'the fixture producer has one actual observed model invocation');assert.equal(launches.length,1);
+    const call=calls[0],original=launches[0];
+    assert.ok(call.birth&&call.closure&&original.birth&&original.closure,'derive chronology only after both Original observer pairs exist');
+    assert.equal(call.job_id,completedProducer.id);assert.equal(call.instance_id,completedProducer.instance_id);assert.equal(call.host,completedProducer.host);
+    assert.equal(call.worker_pid,completedProducer.worker_pid);assert.equal(call.birth.worker_pid,completedProducer.worker_pid);
+    assert.equal(original.invocation_id,call.invocation_id);assert.equal(original.controller_pid,completedProducer.worker_pid);
+    assert.equal(original.birth.pid,call.birth.pid);assert.equal(original.closure.pid,call.birth.pid);
+    assert.equal(original.closure.launch_id,original.launch_id);assert.equal(original.closure.never_started,false);
+    assert.equal(original.closure.code,0);assert.equal(call.closure.exit_code,original.closure.code);assert.equal(call.closure.signal,original.closure.signal);
+    assert.equal(call.closure.birth_sha256,hash(call.birth));assert.ok(Number.isFinite(Date.parse(call.closure.closed_at)));
+    assert.equal(completedProducer.coordination_release.termination_confirmed,true);assert.equal(completedProducer.coordination_release.reason,'model_process_closed');
+    // These terminal timestamps describe the already observed producer close.
+    // They grant no new closure, deadline, attempt, release or QA allowance.
+    completedProducer.finished_at=call.closure.closed_at;completedProducer.coordination_release.at=call.closure.closed_at;
+    const j=s.jobs[prior.id],observed=j.model_process_tracking?.invocations.at(-1);
+    assert.ok(observed?.birth&&observed.closure,'the original adapter observed both controlled lifecycle events');
+    assert.equal(j.worker_pid,observed.worker_pid);assert.equal(observed.closure.exit_code,0);
+    // Public chronology is derived from the actual controlled observer records,
+    // never from a handwritten replacement for its private Source provenance.
+    j.execution_started_at=observed.birth.spawned_at;j.execution_deadline_at=new Date(Date.parse(j.execution_started_at)+1800000).toISOString();
+    j.finished_at=observed.closure.closed_at;j.coordination_release.at=j.finished_at;
+    const c=assignmentContext(s,j);j.inputs=c.inputs;j.context_sha256=c.hash;
+  });
   const state=read(a);
-  return {...a,plan_id:p.id,candidate_id:candidate.id,receipt_id:receipt.id,receipt_sha256:receipt.development.receipt_sha256,prior_job_id:prior.id,prior_job_sha256:hash(state.jobs[prior.id]),prior_review_id:blocked.id,prior_review_sha256:hash(state.records[blocked.id]),code_review_window_minutes:30,cleanup:()=>fs.rmSync(root,{recursive:true,force:true})};
+  return {...a,plan_id:p.id,candidate_id:candidate.id,receipt_id:receipt.id,receipt_sha256:receipt.development.receipt_sha256,prior_job_id:prior.id,prior_job_sha256:hash(state.jobs[prior.id]),prior_review_id:blocked.id,prior_review_sha256:hash(state.records[blocked.id]),code_review_window_minutes:30,cleanup:()=>{disposeOriginalProcessFixtures(root);fs.rmSync(root,{recursive:true,force:true});}};
+  }catch(error){
+    // A rejected genuine authorizer must not strand a partially constructed
+    // disposable fixture before its caller can register the returned cleanup.
+    if(root!==null){disposeOriginalProcessFixtures(root);fs.rmSync(root,{recursive:true,force:true});}
+    throw error;
+  }finally{globalThis.Date=RealDate;}
 }
 
 export function authorized(a){const proposal=prepareRetentionReview(read(a),a,a.root);let ticket;change(a,s=>{ticket=authorizeRetentionReview(s,{...a,proposal_sha256:hash(proposal),model_data_approved:true,source_instruction:'Controlled standing source repair approval; no extra generation/test/reset/expiry.',approval_reference:'controlled-primary-source'},a.root);});return ticket;}
 export function queued(a,ticket,{deferContract=false}={}){
  const s=read(a),j={id:id('controlled-retention-qa'),role:'qa',instance_id:id('controlled-retention-instance'),native_id:null,host:'codex',epoch:1,status:'queued',retention_repair_id:ticket.id,review_of:{id:a.receipt_id,revision:1},session_key:retentionRepairSessionKey(ticket),code_review_window_minutes:30,timeout_ms:600000,context_format:3,task:'Controlled independent whole-code retention repair.',inputs:Object.values(s.records).filter(r=>!deferContract||r.id!=='contract').map(r=>({id:r.id,revision:r.revision})),supplemental_sources:deferContract?[{id:'contract',revision:1,sha256:hash(s.records.contract),total_characters:JSON.stringify(s.records.contract).length}]:[]};
+ j.created_at=new Date().toISOString();j.timeout_policy_version=TIMEOUT_POLICY_VERSION;j.timeout_reason='Controlled finite Source review invocation';j.code_review_reason='Controlled complete Source review window';
+ const {id:unusedId,...request}=j;j.code_review_subject=codeReviewWindowSubject(s,{...request,review_of:j.review_of.id},{root:a.root});
  resolveRetentionRepair(s,j,{root:a.root,reserve:true});const context=assignmentContext(s,j);j.inputs=context.inputs;j.context_sha256=context.hash;
- change(a,state=>{state.jobs[j.id]=j;state.sessions[j.session_key]={instance_id:j.instance_id,native_id:null,role:'qa',host:'codex'};});return j.id;
+ withStore(a.root,store=>store.transaction('job.queued',state=>{recordOriginalWorkerAssignmentFrom(store,state,j);state.jobs[j.id]=j;state.sessions[j.session_key]={instance_id:j.instance_id,native_id:null,role:'qa',host:'codex'};return state;}));stageOriginalWorker(a.root,j.id);return j.id;
 }
 export function completed(a,key){
  const s=read(a),j=structuredClone(s.jobs[key]),ticket=s.records[j.retention_repair_id];

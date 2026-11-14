@@ -2,6 +2,232 @@
 use super::*;
 use serde_json::{Value, json};
 
+// Two new fixed Source catalogue families: AUTHORED_UNRUN. These conditional
+// mechanical cases prove no live Native permission, company grant or model run.
+fn origin_request_value(final_review:bool)->Value {
+    if final_review {json!({"protocol":ORIGIN_FINAL_REVIEW_PROTOCOL,"contract_id":ORIGIN_FINAL_REVIEW_CORE_ID,
+        "resource_sha256":ORIGIN_FINAL_REVIEW_RESOURCE_SHA256,"context_encoding":ENCODING,"scope_profile_id":ORIGIN_FINAL_REVIEW_PROFILE})}
+    else {json!({"protocol":ORIGIN_MAINTENANCE_PROTOCOL,"contract_id":ORIGIN_MAINTENANCE_CORE_ID,
+        "resource_sha256":ORIGIN_MAINTENANCE_RESOURCE_SHA256,"context_encoding":ENCODING,"scope_profile_id":ORIGIN_MAINTENANCE_PROFILE})}
+}
+fn origin_selection(final_review:bool)->OriginalContextSelection {
+    select_original_context_contract(Some(&serde_json::from_value(origin_request_value(final_review)).unwrap())).unwrap().unwrap()
+}
+fn origin_wire(payload:&str,delivery:&str,protocol:&str,contract:&str)->String {
+    format!("{{\"protocol\":\"{ENCODING}\",\"contract_sha256\":\"{contract}\",\"delivery_kind\":\"{delivery}\",\"payload_protocol\":\"{protocol}\",\"payload_sha256\":\"{}\",\"payload_utf8_bytes\":{},\"source_cut_protocol\":null,\"source_cut_sha256\":null,\"source_cut_utf8_bytes\":null,\"payload\":{payload}}}",hash(payload.as_bytes()),payload.len())
+}
+#[test]
+fn origin_two_exact_resource_tuples_select_distinct_compiled_families() {
+    assert_eq!(ORIGIN_MAINTENANCE_RESOURCE.len(),3122);assert_eq!(hash(ORIGIN_MAINTENANCE_RESOURCE),ORIGIN_MAINTENANCE_RESOURCE_SHA256);
+    assert_eq!(ORIGIN_FINAL_REVIEW_RESOURCE.len(),3476);assert_eq!(hash(ORIGIN_FINAL_REVIEW_RESOURCE),ORIGIN_FINAL_REVIEW_RESOURCE_SHA256);
+    assert!(origin_selection(false).profile==OriginalToolProfile::OriginMaintenanceReadonlyThree);
+    assert!(origin_selection(true).profile==OriginalToolProfile::OriginFinalReviewReadonlyThree);
+    for final_review in [false,true] {
+        let expected=origin_request_value(final_review);
+        for other in [origin_request_value(!final_review),request_value(),bootstrap_request_value(),frontier_request_value()] {
+            for key in ["protocol","contract_id","resource_sha256","scope_profile_id"] {
+                let mut changed=expected.clone();changed[key]=other[key].clone();
+                assert!(select_original_context_contract(Some(&serde_json::from_value(changed).unwrap())).is_err(),"{key}");
+            }
+        }
+        let mut changed=expected;changed["context_encoding"]=json!("caller-codec");
+        assert!(select_original_context_contract(Some(&serde_json::from_value(changed).unwrap())).is_err());
+    }
+}
+#[test]
+fn origin_constructor_shapes_cannot_accept_a_ready_flag_or_missing_field() {
+    for final_review in [false,true] {
+        for key in ["protocol","contract_id","resource_sha256","context_encoding","scope_profile_id"] {
+            let mut value=origin_request_value(final_review);value.as_object_mut().unwrap().remove(key);
+            assert!(serde_json::from_value::<ContextContractRequest>(value).is_err(),"{key}");
+        }
+        let mut extra=origin_request_value(final_review);extra["ready"]=json!(true);
+        assert!(serde_json::from_value::<ContextContractRequest>(extra).is_err());
+        let text=serde_json::to_string(&origin_request_value(final_review)).unwrap();
+        let duplicate=format!("{{\"\\u0070rotocol\":\"duplicate\",{}",&text[1..]);
+        assert!(serde_json::from_str::<ContextContractRequest>(&duplicate).is_err());
+    }
+}
+#[test]
+fn origin_resources_enumerate_closed_purposes_and_keep_owner_bounds_narrow() {
+    let range=origin_maintenance_source_resource().unwrap();let review=origin_final_review_source_resource().unwrap();
+    assert_eq!(range.deliveries.len(),1);assert_eq!(review.deliveries.len(),2);
+    assert_eq!(range.deliveries[0]["kinds"],json!(["peer-origin-reconstruction","peer-origin-review"]));
+    assert_eq!(review.deliveries[0]["payload_protocol"],"peer-origin-frontier-seal-context-v1");
+    assert_eq!(review.deliveries[0]["kinds"],json!(["peer-origin-frontier-seal-review"]));
+    assert_eq!(review.deliveries[1]["payload_protocol"],"peer-owner-maintenance-assignment-v1");
+    assert_eq!(review.deliveries[1]["purpose"],"peer-owner-maintenance-fresh-purpose-v1");
+    assert_eq!(review.deliveries[1]["read_maximum_characters"],1024);
+    assert_eq!(review.deliveries[1]["response_maximum_utf8_bytes"],8192);
+    assert_eq!(review.deliveries[0]["read_maximum_characters"],4096);
+    assert_eq!(range.limits["response_maximum_utf8_bytes"],16384);
+}
+#[test]
+fn origin_fixed_catalogues_match_sdk_projection_without_erasing_raw_read_bounds() {
+    for (profile,raw) in [(OriginalToolProfile::OriginMaintenanceReadonlyThree,origin_maintenance_source_resource().unwrap()),
+        (OriginalToolProfile::OriginFinalReviewReadonlyThree,origin_final_review_source_resource().unwrap())] {
+        let tools=profile.offered_inventory().unwrap();assert_eq!(tools.as_array().unwrap().len(),3);
+        assert_eq!(tools[0]["name"],"soloco_context_header");assert_eq!(tools[1]["name"],"soloco_context_read");assert_eq!(tools[2]["name"],"soloco_context_submit");
+        assert_eq!(tools[0]["parameters"],json!({"type":"object","properties":{},"required":[],"additionalProperties":false}));
+        assert_eq!(tools[1]["parameters"],json!({"type":"object","properties":{"sha256":{"type":"string"},"offset":{"type":"integer"},"length":{"type":"integer"}},"required":["sha256","offset","length"],"additionalProperties":false}));
+        assert_eq!(tools[2]["parameters"],json!({"type":"object","properties":{"sha256":{"type":"string"},"content":{"type":"string"}},"required":["sha256","content"],"additionalProperties":false}));
+        assert_eq!(raw.tools[1].input_schema["properties"]["length"],json!({"type":"integer","minimum":1,"maximum":4096}));
+        assert_eq!(raw.tools[1].input_schema["properties"]["offset"],json!({"type":"integer","minimum":0}));
+        assert_eq!(tools[0]["strict"],false);assert_eq!(tools[1]["strict"],false);assert_eq!(tools[2]["strict"],false);
+    }
+}
+#[test]
+fn origin_selected_catalogues_accept_direct_or_deferred_and_reject_cross_family() {
+    for profile in [OriginalToolProfile::OriginMaintenanceReadonlyThree,OriginalToolProfile::OriginFinalReviewReadonlyThree] {
+        let tools=profile.offered_inventory().unwrap();
+        assert_eq!(offered(json!({"input":[],"tools":tools.clone()}),profile).unwrap(),tools);
+        let deferred=json!({"type":"additional_tools","role":"developer","tools":[{"type":"namespace","name":codex_protocol::DEFAULT_FUNCTION_NAMESPACE,"description":"","tools":tools.clone()}]});
+        assert_eq!(offered(json!({"input":[deferred.clone()]}),profile).unwrap(),tools);
+        assert!(offered(json!({"input":[deferred],"tools":tools.clone()}),profile).is_err());
+        for other in [OriginalToolProfile::OrdinaryFive,OriginalToolProfile::BootstrapReadonlyThree,OriginalToolProfile::InputFrontierReadonlyThree,OriginalToolProfile::OriginMaintenanceReadonlyThree,OriginalToolProfile::OriginFinalReviewReadonlyThree] {
+            if other!=profile {assert!(offered(json!({"input":[],"tools":other.offered_inventory().unwrap()}),profile).is_err());}
+        }
+        for mutation in ["missing","reorder","extra","wide-read","operation_id","description"] {
+            let mut changed=tools.clone();match mutation {
+                "missing"=>{changed.as_array_mut().unwrap().pop();}
+                "reorder"=>changed.as_array_mut().unwrap().swap(0,1),
+                "extra"=>{let extra=changed[0].clone();changed.as_array_mut().unwrap().push(extra);}
+                "wide-read"=>changed[1]["parameters"]["properties"]["length"]["maximum"]=json!(8192),
+                "operation_id"=>changed[2]["parameters"]["properties"]["operation_id"]=json!({"type":"string"}),
+                _=>changed[0]["description"]=json!("equivalent-looking caller catalogue"),
+            }
+            assert!(offered(json!({"input":[],"tools":changed}),profile).is_err(),"{mutation}");
+        }
+    }
+}
+#[test]
+fn origin_actual_selected_turn_validator_joins_each_whole_delivery_to_its_family() {
+    for (final_review,delivery,protocol,payload) in [
+        (false,"origin-maintenance-assignment","peer-origin-maintenance-context-v1",r#"{"protocol":"peer-origin-maintenance-context-v1","kind":"peer-origin-reconstruction","opaque":"\ud800","number":9007199254740993}"#),
+        (false,"origin-maintenance-assignment","peer-origin-maintenance-context-v1",r#"{"protocol":"peer-origin-maintenance-context-v1","kind":"peer-origin-review"}"#),
+        (true,"origin-frontier-seal-assignment","peer-origin-frontier-seal-context-v1",r#"{"protocol":"peer-origin-frontier-seal-context-v1","kind":"peer-origin-frontier-seal-review"}"#),
+        (true,"owner-maintenance-assignment","peer-owner-maintenance-assignment-v1",r#"{"protocol":"peer-owner-maintenance-assignment-v1","kind":"owner-handover-review","fresh_review_purpose":"peer-owner-maintenance-fresh-purpose-v1"}"#)] {
+        let contract=if final_review {ORIGIN_FINAL_REVIEW_RESOURCE_SHA256}else{ORIGIN_MAINTENANCE_RESOURCE_SHA256};
+        let frame=origin_wire(payload,delivery,protocol,contract);let turn=json!({"method":"turn/start","params":{"input":[{"type":"text","text":"Fixed Source instruction"},{"type":"text","text":frame.clone()}]}});
+        let original=turn.clone();assert!(validate_selected_turn_input(&turn,Some(&origin_selection(final_review))).is_ok());assert_eq!(turn,original);
+        assert!(validate_selected_turn_input(&turn,Some(&origin_selection(!final_review))).is_err());assert!(validate_selected_turn_input(&turn,None).is_err());
+        for old in [frontier_selection(),bootstrap_selection(),select_original_context_contract(Some(&request())).unwrap().unwrap()] {
+            assert!(validate_selected_turn_input(&turn,Some(&old)).is_err());
+        }
+        let mut duplicated=turn.clone();duplicated["params"]["input"]=json!([{"type":"text","text":frame.clone()},{"type":"text","text":frame}]);
+        assert!(validate_selected_turn_input(&duplicated,Some(&origin_selection(final_review))).is_err());
+    }
+}
+
+// Distinct frontier SOURCE cases, AUTHORED_UNRUN. Conditional codec/catalogue
+// controls do not prove a running interpreter, Native profile or real admission.
+fn frontier_request_value()->Value {
+    json!({"protocol":FRONTIER_PROTOCOL,"contract_id":FRONTIER_CORE_ID,
+        "resource_sha256":FRONTIER_RESOURCE_SHA256,"context_encoding":ENCODING,
+        "scope_profile_id":FRONTIER_PROFILE})
+}
+fn frontier_selection()->OriginalContextSelection {
+    select_original_context_contract(Some(&serde_json::from_value(frontier_request_value()).unwrap())).unwrap().unwrap()
+}
+fn frontier_wire(payload:&str)->String {
+    format!("{{\"protocol\":\"{ENCODING}\",\"contract_sha256\":\"{FRONTIER_RESOURCE_SHA256}\",\"delivery_kind\":\"input-frontier-assignment\",\"payload_protocol\":\"peer-input-frontier-assignment-v1\",\"payload_sha256\":\"{}\",\"payload_utf8_bytes\":{},\"source_cut_protocol\":null,\"source_cut_sha256\":null,\"source_cut_utf8_bytes\":null,\"payload\":{payload}}}",hash(payload.as_bytes()),payload.len())
+}
+
+#[test]
+fn frontier_constructor_selects_exact_distinct_five_field_source_tuple() {
+    assert_eq!(FRONTIER_RESOURCE.len(),2697);assert_eq!(hash(FRONTIER_RESOURCE),FRONTIER_RESOURCE_SHA256);
+    assert!(frontier_selection().profile==OriginalToolProfile::InputFrontierReadonlyThree);
+    assert_eq!(frontier_source_resource().unwrap().scope_profile_id,"soloco-input-frontier-readonly-v1");
+    for source in [request_value(),bootstrap_request_value()] {
+        for key in ["protocol","contract_id","resource_sha256","scope_profile_id"] {
+            let mut value=frontier_request_value();value[key]=source[key].clone();
+            assert!(select_original_context_contract(Some(&serde_json::from_value(value).unwrap())).is_err(),"{key}");
+        }
+    }
+    let mut wrong=frontier_request_value();wrong["context_encoding"]=json!("caller-codec");
+    assert!(select_original_context_contract(Some(&serde_json::from_value(wrong).unwrap())).is_err());
+    assert!(select_original_context_contract(None).unwrap().is_none());
+}
+
+#[test]
+fn frontier_constructor_rejects_missing_extra_and_duplicate_decoded_fields() {
+    for key in ["protocol","contract_id","resource_sha256","context_encoding","scope_profile_id"] {
+        let mut value=frontier_request_value();value.as_object_mut().unwrap().remove(key);
+        assert!(serde_json::from_value::<ContextContractRequest>(value).is_err(),"{key}");
+    }
+    let mut value=frontier_request_value();value["approved"]=json!(true);
+    assert!(serde_json::from_value::<ContextContractRequest>(value).is_err());
+    let text=serde_json::to_string(&frontier_request_value()).unwrap();
+    let duplicate=format!("{{\"\\u0070rotocol\":\"{FRONTIER_PROTOCOL}\",{}",&text[1..]);
+    assert!(serde_json::from_str::<ContextContractRequest>(&duplicate).is_err());
+}
+
+#[test]
+fn frontier_fixed_readonly_three_schemas_do_not_alias_bootstrap_or_ordinary() {
+    let profile=OriginalToolProfile::InputFrontierReadonlyThree;
+    let tools=profile.offered_inventory().unwrap();assert_eq!(tools.as_array().unwrap().len(),3);
+    assert_eq!(tools[0]["name"],"soloco_context_header");
+    assert_eq!(tools[0]["parameters"],json!({"type":"object","properties":{},"required":[],"additionalProperties":false}));
+    assert_eq!(tools[1]["name"],"soloco_context_read");
+    assert_eq!(tools[1]["parameters"],json!({"type":"object","properties":{
+        "sha256":{"type":"string"},"offset":{"type":"integer"},
+        "length":{"type":"integer"}},
+        "required":["sha256","offset","length"],"additionalProperties":false}));
+    let raw=frontier_source_resource().unwrap();
+    assert_eq!(raw.tools[1].input_schema["properties"]["length"],json!({"type":"integer","minimum":1,"maximum":4096}));
+    assert_eq!(raw.tools[1].input_schema["properties"]["offset"],json!({"type":"integer","minimum":0}));
+    assert_eq!(tools[2]["name"],"soloco_context_submit");
+    assert_eq!(tools[2]["parameters"],json!({"type":"object","properties":{
+        "sha256":{"type":"string"},"content":{"type":"string"}},
+        "required":["sha256","content"],"additionalProperties":false}));
+    assert_eq!(profile.resource_sha256(),FRONTIER_RESOURCE_SHA256);
+    for other in [OriginalToolProfile::OrdinaryFive,OriginalToolProfile::BootstrapReadonlyThree] {
+        let other_tools=other.offered_inventory().unwrap();assert_ne!(tools,other_tools);
+        assert!(offered(json!({"input":[],"tools":other_tools}),profile).is_err());
+        assert!(offered(json!({"input":[],"tools":tools.clone()}),other).is_err());
+    }
+}
+
+#[test]
+fn frontier_catalogue_accepts_only_literal_selected_direct_or_deferred_inventory() {
+    let profile=OriginalToolProfile::InputFrontierReadonlyThree;
+    let tools=profile.offered_inventory().unwrap();
+    assert_eq!(offered(json!({"input":[],"tools":tools.clone()}),profile).unwrap(),tools);
+    let deferred=json!({"type":"additional_tools","role":"developer","tools":[{
+        "type":"namespace","name":codex_protocol::DEFAULT_FUNCTION_NAMESPACE,"description":"","tools":tools.clone()}]});
+    assert_eq!(offered(json!({"input":[deferred.clone()]}),profile).unwrap(),tools);
+    assert!(offered(json!({"input":[deferred.clone()],"tools":tools.clone()}),profile).is_err());
+    assert!(offered(json!({"input":[{"type":"message"},deferred]}),profile).is_err());
+    for change in ["missing","extra","order","wide-read","operation_id","description"] {
+        let mut value=tools.clone();match change {
+            "missing"=>{value.as_array_mut().unwrap().pop();}
+            "extra"=>{let tool=value[0].clone();value.as_array_mut().unwrap().push(tool);}
+            "order"=>value.as_array_mut().unwrap().swap(0,1),
+            "wide-read"=>value[1]["parameters"]["properties"]["length"]["maximum"]=json!(8192),
+            "operation_id"=>value[2]["parameters"]["properties"]["operation_id"]=json!({"type":"string"}),
+            _=>value[0]["description"]=json!("looks equivalent"),
+        }
+        assert!(offered(json!({"input":[],"tools":value}),profile).is_err(),"{change}");
+    }
+}
+
+#[test]
+fn frontier_whole_turn_input_requires_its_original_selection_and_one_frame() {
+    let payload=r#"{"protocol":"peer-input-frontier-assignment-v1","subject":{"stage":"produce"},"negative":[false,null,"UNKNOWN"]}"#;
+    let frame=frontier_wire(payload);let original=json!({"method":"turn/start","params":{
+        "input":[{"type":"text","text":"Original frontier instruction"},{"type":"text","text":frame.clone()}]}});
+    let turn=original.clone();assert!(validate_selected_turn_input(&turn,Some(&frontier_selection())).is_ok());
+    assert_eq!(turn,original);
+    assert!(validate_selected_turn_input(&turn,None).is_err());
+    assert!(validate_selected_turn_input(&turn,Some(&bootstrap_selection())).is_err());
+    let ordinary=select_original_context_contract(Some(&request())).unwrap().unwrap();
+    assert!(validate_selected_turn_input(&original,Some(&ordinary)).is_err());
+    for input in [json!([]),json!([{"type":"text","text":frame.clone()},{"type":"text","text":frame.clone()}])] {
+        let turn=json!({"method":"turn/start","params":{"input":input}});
+        assert!(validate_selected_turn_input(&turn,Some(&frontier_selection())).is_err());
+    }
+}
+
 // Additive bootstrap readonly3 Source controls: AUTHORED_UNRUN. These prove no
 // actual startup, typed company admission, Native build, model or profile QA.
 fn bootstrap_request_value()->Value {
@@ -49,13 +275,30 @@ fn bootstrap_exact_resource_and_constructor_profile_are_additive_and_closed() {
 #[test]
 fn bootstrap_three_tools_are_literal_new_schemas_not_the_ordinary_first_three() {
     let tools=OriginalToolProfile::BootstrapReadonlyThree.offered_inventory().unwrap();
-    assert_eq!(tools.as_array().unwrap().len(),3);
-    assert_eq!(tools[0]["name"],"soloco_context_header");assert_eq!(tools[1]["name"],"soloco_context_read");assert_eq!(tools[2]["name"],"soloco_context_submit");
-    assert_eq!(tools[0]["parameters"],json!({"type":"object","properties":{},"required":[],"additionalProperties":false}));
-    assert_eq!(tools[1]["parameters"]["properties"]["length"],json!({"type":"integer","minimum":1,"maximum":4096}));
-    assert_eq!(tools[2]["parameters"]["required"],json!(["sha256","content"]));
-    assert!(tools[2]["parameters"]["properties"].get("operation_id").is_none());
-    assert!(tools.as_array().unwrap().iter().all(|tool|tool["strict"]==false&&tool.get("inputSchema").is_none()));
+    let description="Private bootstrap membership context protocol; identity and authority are supplied only by the original protected composition.";
+    // Independently literal c407 Responses schemas, not output manufactured by
+    // the production mapper. Numeric bounds remain in the original resource.
+    assert_eq!(tools,json!([
+        {"type":"function","name":"soloco_context_header","description":description,"strict":false,
+            "parameters":{"type":"object","properties":{},"required":[],"additionalProperties":false}},
+        {"type":"function","name":"soloco_context_read","description":description,"strict":false,
+            "parameters":{"type":"object","properties":{"sha256":{"type":"string"},"offset":{"type":"integer"},"length":{"type":"integer"}},"required":["sha256","offset","length"],"additionalProperties":false}},
+        {"type":"function","name":"soloco_context_submit","description":description,"strict":false,
+            "parameters":{"type":"object","properties":{"sha256":{"type":"string"},"content":{"type":"string"}},"required":["sha256","content"],"additionalProperties":false}}
+    ]));
+    let resource:Value=serde_json::from_slice(BOOTSTRAP_RESOURCE).unwrap();
+    assert_eq!(resource["tools"][1]["inputSchema"]["properties"]["offset"],json!({"type":"integer","minimum":0}));
+    assert_eq!(resource["tools"][1]["inputSchema"]["properties"]["length"],json!({"type":"integer","minimum":1,"maximum":4096}));
+    let mut unmaterialized=tools.clone();
+    unmaterialized[1]["parameters"]["properties"]["offset"]=json!({"type":"integer","minimum":0});
+    unmaterialized[1]["parameters"]["properties"]["length"]=json!({"type":"integer","minimum":1,"maximum":4096});
+    assert!(offered(json!({"input":[],"tools":unmaterialized}),OriginalToolProfile::BootstrapReadonlyThree).is_err(),
+        "input-schema spelling is not the actual SDK Responses schema");
+    for unsupported in [json!({"type":"number"}),json!({"type":"integer","maximum":1.5}),
+        json!({"type":"string","format":"uri"}),json!({"type":"object","properties":{},"required":[],"additionalProperties":true}),
+        json!({"type":"object","properties":{"sha256":{"type":"string"}},"required":[],"additionalProperties":false})] {
+        assert!(bootstrap_parameters(&unsupported).is_err());
+    }
     let ordinary=OriginalToolProfile::OrdinaryFive.offered_inventory().unwrap();
     let old_first_three=Value::Array(ordinary.as_array().unwrap()[..3].to_vec());
     assert_ne!(tools,old_first_three);
@@ -291,4 +534,142 @@ fn accepted_scope_is_bound_to_original_current_challenge_and_host() {
     let permit=serde_json::from_value(fixture_permit(&observation,&binding)).unwrap();
     let receipt=accept_original_context_permit(observation,&binding,permit).unwrap();
     assert!(require_original_scope_for_send(&fixture_challenge(),"other-host",Some(&receipt)).is_err());
+}
+
+
+// Additive ordinary-origin SOURCE cases. AUTHORED_UNRUN; these do not mint
+// Native creation/drain, human approval, task authority or typed resume.
+fn ordinary_origin_request_value()->Value {
+    json!({"protocol":ORIGIN_ORDINARY_TASK_PROTOCOL,"contract_id":ORIGIN_ORDINARY_TASK_CORE_ID,
+        "resource_sha256":ORIGIN_ORDINARY_TASK_RESOURCE_SHA256,"context_encoding":ENCODING,
+        "scope_profile_id":ORIGIN_ORDINARY_TASK_PROFILE})
+}
+fn ordinary_origin_selection()->OriginalContextSelection {
+    select_original_context_contract(Some(&serde_json::from_value(ordinary_origin_request_value()).unwrap())).unwrap().unwrap()
+}
+#[test]
+fn ordinary_origin_constructor_requires_its_entire_distinct_source_tuple() {
+    assert_eq!(ORIGIN_ORDINARY_TASK_RESOURCE.len(),3077);
+    assert_eq!(hash(ORIGIN_ORDINARY_TASK_RESOURCE),ORIGIN_ORDINARY_TASK_RESOURCE_SHA256);
+    assert!(ordinary_origin_selection().profile==OriginalToolProfile::OriginOrdinaryTaskReadonlyThree);
+    for other in [origin_request_value(false),origin_request_value(true),request_value(),bootstrap_request_value(),frontier_request_value()] {
+        for key in ["protocol","contract_id","resource_sha256","scope_profile_id"] {
+            let mut changed=ordinary_origin_request_value();changed[key]=other[key].clone();
+            assert!(select_original_context_contract(Some(&serde_json::from_value(changed).unwrap())).is_err(),"{key}");
+        }
+    }
+    for key in ["protocol","contract_id","resource_sha256","context_encoding","scope_profile_id"] {
+        let mut missing=ordinary_origin_request_value();missing.as_object_mut().unwrap().remove(key);
+        assert!(serde_json::from_value::<ContextContractRequest>(missing).is_err());
+    }
+    let mut extra=ordinary_origin_request_value();extra["ready"]=json!(true);
+    assert!(serde_json::from_value::<ContextContractRequest>(extra).is_err());
+}
+#[test]
+fn ordinary_origin_catalogue_uses_sdk_projection_and_retains_raw_bounds() {
+    let raw=origin_ordinary_task_source_resource().unwrap();assert_eq!(raw.deliveries.len(),1);
+    assert_eq!(raw.deliveries[0]["kinds"],json!(["peer-origin-ordinary-task-review"]));
+    assert_eq!(raw.tools[1].input_schema["properties"]["length"],json!({"type":"integer","minimum":1,"maximum":4096}));
+    let profile=OriginalToolProfile::OriginOrdinaryTaskReadonlyThree;
+    let tools=profile.offered_inventory().unwrap();assert_eq!(tools.as_array().unwrap().len(),3);
+    assert_eq!(tools[1]["parameters"]["properties"]["length"],json!({"type":"integer"}));
+    assert_eq!(offered(json!({"input":[],"tools":tools.clone()}),profile).unwrap(),tools);
+    let deferred=json!({"type":"additional_tools","role":"developer","tools":[{"type":"namespace","name":codex_protocol::DEFAULT_FUNCTION_NAMESPACE,"description":"","tools":tools.clone()}]});
+    assert_eq!(offered(json!({"input":[deferred.clone()]}),profile).unwrap(),tools);
+    assert!(offered(json!({"input":[deferred],"tools":tools.clone()}),profile).is_err());
+    for other in [OriginalToolProfile::OrdinaryFive,OriginalToolProfile::BootstrapReadonlyThree,OriginalToolProfile::InputFrontierReadonlyThree,OriginalToolProfile::OriginMaintenanceReadonlyThree,OriginalToolProfile::OriginFinalReviewReadonlyThree] {
+        assert!(offered(json!({"input":[],"tools":other.offered_inventory().unwrap()}),profile).is_err());
+    }
+    let mut changed=tools;changed[2]["parameters"]["properties"]["qualification_ref"]=json!({"type":"object"});
+    assert!(offered(json!({"input":[],"tools":changed}),profile).is_err());
+}
+#[test]
+fn ordinary_origin_whole_turn_requires_one_frame_and_original_selection() {
+    let raw=r#"{"protocol":"peer-origin-ordinary-task-context-v1","kind":"peer-origin-ordinary-task-review","raw":{"unsafe":9007199254740993,"opaque":"\ud800","status":"UNKNOWN"}}"#;
+    let frame=origin_wire(raw,"origin-ordinary-task-assignment","peer-origin-ordinary-task-context-v1",ORIGIN_ORDINARY_TASK_RESOURCE_SHA256);
+    let turn=json!({"method":"turn/start","params":{"input":[{"type":"text","text":"Fixed Source instruction"},{"type":"text","text":frame.clone()}]}});let original=turn.clone();
+    assert!(validate_selected_turn_input(&turn,Some(&ordinary_origin_selection())).is_ok());assert_eq!(turn,original);
+    assert!(validate_selected_turn_input(&turn,None).is_err());
+    for old in [origin_selection(false),origin_selection(true),frontier_selection(),bootstrap_selection()] {
+        assert!(validate_selected_turn_input(&turn,Some(&old)).is_err());
+    }
+    let duplicate=json!({"params":{"input":[{"type":"text","text":frame.clone()},{"type":"text","text":frame}]}});
+    assert!(validate_selected_turn_input(&duplicate,Some(&ordinary_origin_selection())).is_err());
+}
+
+// Additive focused regressions, AUTHORED_UNRUN. These use the original
+// in-process acknowledgement path; they establish no live Native admission.
+#[test]
+fn ordinary_origin_present_wrong_context_encoding_is_rejected() {
+    let original = ordinary_origin_request_value();
+    let request = serde_json::from_value(original.clone()).unwrap();
+    assert!(select_original_context_contract(Some(&request)).unwrap().is_some());
+    for encoding in ["soloco-peer-context-frame-v1", "caller-codec", ""] {
+        let mut changed = original.clone();
+        changed["context_encoding"] = json!(encoding);
+        for key in ["protocol", "contract_id", "resource_sha256", "scope_profile_id"] {
+            assert_eq!(changed[key], original[key]);
+        }
+        // The field remains present and deserializes as a string. Selection,
+        // rather than missing-field or type parsing, must refuse the codec.
+        let request = serde_json::from_value(changed).unwrap();
+        match select_original_context_contract(Some(&request)) {
+            Err(TransportError::Build(reason)) => assert_eq!(
+                reason, "protected peer HOLD: unsupported original CORE context selection", "{encoding}",
+            ),
+            Err(_) => panic!("wrong ordinary-origin encoding stopped outside selection"),
+            Ok(_) => panic!("wrong ordinary-origin encoding selected a context capability"),
+        }
+    }
+}
+
+#[test]
+fn accepted_receipt_rejects_each_changed_context_field_across_profiles() {
+    let profiles = [
+        request_value(), bootstrap_request_value(), frontier_request_value(),
+        origin_request_value(false), origin_request_value(true), ordinary_origin_request_value(),
+    ];
+    for original in &profiles {
+        let request: ContextContractRequest = serde_json::from_value((*original).clone()).unwrap();
+        assert!(select_original_context_contract(Some(&request)).unwrap().is_some());
+        let mut observation = fixture_observation();
+        observation.context_contract_protocol = request.protocol.clone();
+        observation.context_contract_id = request.contract_id.clone();
+        observation.context_contract_sha256 = request.resource_sha256.clone();
+        observation.context_encoding = request.context_encoding.clone();
+        observation.scope_profile_id = request.scope_profile_id.clone();
+        let binding = fixture_binding(&observation);
+        let permit = serde_json::from_value(fixture_permit(&observation, &binding)).unwrap();
+        let receipt = accept_original_context_permit(observation, &binding, permit).unwrap();
+        let mut current = fixture_challenge();
+        current.context_contract = Some(request);
+        assert!(require_original_scope_for_send(&current, "fixture-host", Some(&receipt)).is_ok());
+
+        for key in ["protocol", "contract_id", "resource_sha256", "context_encoding", "scope_profile_id"] {
+            // Change exactly one current challenge field after the genuine
+            // receipt acknowledgement; the accepted observation stays intact.
+            let mut changed = (*original).clone();
+            changed[key] = json!("changed-after-acknowledgement");
+            let mut challenge = fixture_challenge();
+            challenge.context_contract = Some(serde_json::from_value(changed).unwrap());
+            match require_original_scope_for_send(&challenge, "fixture-host", Some(&receipt)) {
+                Err(TransportError::Build(reason)) => assert_eq!(
+                    reason, "protected peer HOLD: original context capability changed before send", "{key}",
+                ),
+                Err(_) => panic!("changed challenge stopped outside receipt currentness"),
+                Ok(()) => panic!("accepted receipt ignored changed context field {key}"),
+            }
+        }
+        // A coherent, independently supported different profile is also a
+        // changed current challenge, never a use for the old profile receipt.
+        for target in &profiles {
+            if target == original { continue; }
+            let target_request = serde_json::from_value((*target).clone()).unwrap();
+            assert!(select_original_context_contract(Some(&target_request)).unwrap().is_some());
+            let mut challenge = fixture_challenge();
+            challenge.context_contract = Some(target_request);
+            assert!(require_original_scope_for_send(&challenge, "fixture-host", Some(&receipt)).is_err());
+        }
+        assert!(require_original_scope_for_send(&current, "fixture-host", Some(&receipt)).is_ok());
+    }
 }

@@ -103,7 +103,7 @@ export function inspectOriginalPackagedRecipeInventory(h,packageBytes,driverByte
  add({path:'source-package.json',...ref(packageBytes)});add({path:'tools/protected_native.py',...ref(driverBytes)});
  for(const pin of [pkg.source_cut.handoff,pkg.source_cut.bindings,pkg.source_cut.patch,pkg.upstream.inventory,...pkg.upstream.attribution,pkg.cargo_lock,pkg.toolchain.inventory,pkg.toolchain.official_manifest])add(pin);
  for(const overlay of pkg.overlay)add(overlay.payload,overlay.mode);
- const files=[...expected.values()].sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0);if(files.length!==170)fail('COMPONENT_SOURCE_CHANGED');
+ const files=[...expected.values()].sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0);if(files.length!==174)fail('COMPONENT_SOURCE_CHANGED');
  const sealPath=path.join(PACKAGE,SEAL),sealBytes=read(sealPath,16*1024*1024),seal=JSON.parse(sealBytes.toString('utf8'));if((fs.lstatSync(sealPath).mode&0o777)!==0o644)fail('COMPONENT_SOURCE_CHANGED');
  if(!exact(seal,['protocol','source_package','build_driver','files'])||seal.protocol!=='soloco-packaged-native-recipe-v1'||!same(seal.source_package,ref(packageBytes))||!same(seal.build_driver,ref(driverBytes))||!same(seal.files,files))fail('COMPONENT_SOURCE_CHANGED');
  const actual=[];let visited=0,total=0;
@@ -117,7 +117,7 @@ export function inspectOriginalComponentNodeInventory(h,recipe){
  for(const name of excluded){for(let at=path.posix.dirname(name);at!=='.';at=path.posix.dirname(at))assignedDirectories.add(at);}
  // A generated Native namespace is NEVER an unchecked ignore glob, even for
  // the developer service sharing this package source tree.
- if((s.kind==='packaged-plugin-v1'||recipe)&&excluded.size!==171)fail('COMPONENT_SOURCE_CHANGED');
+ if((s.kind==='packaged-plugin-v1'||recipe)&&excluded.size!==175)fail('COMPONENT_SOURCE_CHANGED');
  function walk(dir,prefix='',depth=0){if(depth>32)fail('COMPONENT_SOURCE_CHANGED');noLinks(dir);for(const name of fs.readdirSync(dir).sort()){if(++visited>40000)fail('COMPONENT_SOURCE_CHANGED');relative(name);const file=path.join(dir,name),key=prefix?prefix+'/'+name:name,st=fs.lstatSync(file);
   if(st.isDirectory()){if((key==='producer-inputs'||key.startsWith('producer-inputs/'))&&!assignedDirectories.has(key))fail('COMPONENT_SOURCE_CHANGED');if(name.startsWith('.')&&!['.codex-plugin','.claude-plugin'].includes(name))fail('COMPONENT_INPUT_COMPOSITION_UNAVAILABLE');walk(file,key,depth+1);continue;}
   if(!st.isFile()||st.isSymbolicLink()||st.nlink!==1)fail('COMPONENT_SOURCE_CHANGED');if(key.startsWith('producer-inputs/')&&!excluded.has(key))fail('COMPONENT_SOURCE_CHANGED');if(excluded.delete(key))continue;

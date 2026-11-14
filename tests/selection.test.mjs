@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { normalizeSelection, selectionKey, activityFor } from '../plugins/soloco/runtime/selection.mjs';
-import { commandArgs, parseOutput, runModel, sanitizeCodexModel, claudeFastOffSupport } from '../plugins/soloco/runtime/adapters.mjs';
+import { commandArgs, parseOutput, sanitizeCodexModel, claudeFastOffSupport } from '../plugins/soloco/runtime/adapters.mjs';
+import {createOriginalAdapterProcessFixture} from './original-adapter-process-fixture.mjs';
 
 const catalog={supported:true,source:'host_catalog',models:[
   {id:'test-small',supported_efforts:['low','medium'],default_effort:'low'},
@@ -176,8 +177,8 @@ async function syntheticRun(host,selection,nativeId) {
     child.stdout.emit('data',host==='codex'?[{type:'thread.started',thread_id:nativeId??'synthetic-native'},{type:'turn.started'},{type:'item.completed',item:{type:'agent_message',text:'ok'}},{type:'turn.completed'}].map(e=>JSON.stringify(e)).join('\n'):JSON.stringify({subtype:'success',session_id:'synthetic-native',result:'ok'}));
     child.emit('close',0);
   };
-  const result=await runModel(host,nativeId,'test prompt','/synthetic',180000,selection,{
-    spawn:(command,args,options)=>{assert.equal(command,'synthetic-cli');argv=args;launch=options;return child;},
+  const original=createOriginalAdapterProcessFixture({host,child,now:()=>1000,onLaunch:(command,args,options)=>{assert.equal(command,'synthetic-cli');argv=args;launch=options;}});
+  const result=await original.run(host,nativeId,'test prompt','/synthetic',180000,selection,{
     resolveExecutable:()=> 'synthetic-cli',now:()=>1000,
     setTimeout:fn=>{const id=++nextTimer;timers.set(id,fn);return id;},clearTimeout:id=>timers.delete(id),
     onSpawn:record=>{timing=record;},
@@ -185,6 +186,7 @@ async function syntheticRun(host,selection,nativeId) {
   assert.equal(timers.size,0);
   assert.deepEqual(Object.keys(timing).sort(),['timeout_policy_version','timeout_ms','timeout_reason','execution_started_at','execution_deadline_at','termination_deadline_at'].sort());
   assert.equal(launch.env.COMPANY_WORKER,'1');assert.equal(launch.env.CLAUDECODE,undefined);
+  original.dispose();
   return {result,argv};
 }
 

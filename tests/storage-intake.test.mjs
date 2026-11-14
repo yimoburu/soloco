@@ -1,3 +1,4 @@
+import {seedPreexistingLegacyData} from './preexisting-legacy-data-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -10,7 +11,7 @@ const temporary=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'storage-in
 test.after(()=>fs.rmSync(temporary,{recursive:true,force:true}));
 function fixture(normalized=true) {
   const root=fs.mkdtempSync(path.join(temporary,'synthetic-')),store=new Store(root,true);
-  store.transaction('seed',()=>({owner:{session_id:'synthetic',epoch:1},records:{a:{id:'a',text:'old'},unrelated:{id:'unrelated',text:'historical '.repeat(1000)}},messages:[{text:'first'},{text:'second'}],upgrade:{id:'u',calls:[{text:'prior native report'}]},unknown:{restriction:'retain this'},['exact\0\ud800']:{unknown:true}}));
+  seedPreexistingLegacyData(store,'seed',()=>({owner:{session_id:'synthetic',epoch:1},records:{a:{id:'a',text:'old'},unrelated:{id:'unrelated',text:'historical '.repeat(1000)}},messages:[{text:'first'},{text:'second'}],upgrade:{id:'u',calls:[{text:'prior native report'}]},unknown:{restriction:'retain this'},['exact\0\ud800']:{unknown:true}}));
   if(normalized)store.migrate();
   return store;
 }

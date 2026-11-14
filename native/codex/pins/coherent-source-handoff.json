@@ -8,8 +8,8 @@
   "original_backend_source_handoff_sha256": "5a43acb85656aa2f2dc6a52b91ab5d88741d69bf27bd1c0368ec1d59664e9a61",
   "rust_tests_authored": null,
   "rust_tests_status": "CURRENT_GLOBAL_TOTAL_UNKNOWN__NEW22_AUTHORED_UNRUN",
-  "complete_logical_files": 9310,
-  "overlay_files": 159,
+  "complete_logical_files": 9314,
+  "overlay_files": 163,
   "ordered_source_composition": [
     {
       "order": 1,
@@ -207,7 +207,7 @@
   "format_source_cut_sha256": "3b0e077cc3e4a38e521c0d268efadaa7df309612622c951bf38fb229989db37d",
   "format_source_bindings_sha256": "536e8668778d2de23fba9a98a4772d15ef864069e66a3e1d3811399b60cee0b3",
   "format_source_materialization_sha256": "50297a1849fb5b6bf0539360088d81ef3db3e8beeea631d7b142b77dea858476",
-  "source_graph_vector_sha256": "f8b3d2f4162dfbcc2015d4a9db26c109004bae710458996ae2dbf553cd061b5e",
+  "source_graph_vector_sha256": "e53b191fdf12cd98b65482c30b5080fe9b81fbacc5a174e3c98eb2ea22e93333",
   "source_format_delta": {
     "parent_portable_handoff_sha256": "c75ee77de8458c672622363bd02656e0a2075f67bdf5c2ba89aef40b7565edb4",
     "parent_coherent_handoff_sha256": "67ad9bf2fe5e16cc671a520b0af737b1dbfc430d3f2ed8d2f9184bf5b3524a23",
@@ -215,7 +215,7 @@
     "removed_ASCII_EOL_spaces": 18,
     "scope": "Only source-code trailing whitespace outside literals/comments; source-byte associations change and need their own qualification"
   },
-  "source_graph_bytes": 92118117,
+  "source_graph_bytes": 92198679,
   "eof_source_handoff_sha256": "db544a4699e562d8af4a1f128ac2769ef7b25813783a049933e1f35811765517",
   "lifetime_source_handoff_sha256": "34392507e7d695b4ef42bd74d422f48a213e302ef35dbc34e647c500ed5ae4b8",
   "lifetime_source_cut_sha256": "6e2764f7d19ee0e530fdd4aa08c4a9a0dfb2d35535cebff8e5d0a581d614d1a7",
@@ -567,5 +567,132 @@
     "remote_domain_closed": false,
     "whole_domain_qualified": false,
     "qualification": "No test/build/Native result, actual company authority or global launch-coverage assertion is produced by this Source refresh."
+  },
+  "ordinary_origin_complete_source_increment": {
+    "protocol": "complete-source-derived-metadata-increment-v1",
+    "subject": {
+      "head": "74f640754a846a71473fd9b3c2a8360c33cb34f1",
+      "tree": "c04ab753e9a6535aca51fd9839ce504d18867d52"
+    },
+    "parent_handoff": {
+      "bytes": 32701,
+      "sha256": "799056376dbd2234c11d233a085a2f7b5623a1e8e1be4e3130ee0edb6c6d73f0"
+    },
+    "parent_package": {
+      "bytes": 64802,
+      "sha256": "b040811c46db685f647bfaf5bac3db26aa055035553ee83b8e2bc228f048f55c"
+    },
+    "source_bindings": {
+      "bytes": 1954991,
+      "sha256": "2de2a61c385defdf77eee2de1b3c78cf0368b09ee52163bdc52c7a97db0b178c"
+    },
+    "complete_patch": {
+      "bytes": 983688,
+      "sha256": "6c9ae7279a1a1089bef0a1adde566bf87ee644d2ea6cb6acd7d27bf3e1896a03"
+    },
+    "source_graph_vector_sha256": "e53b191fdf12cd98b65482c30b5080fe9b81fbacc5a174e3c98eb2ea22e93333",
+    "complete_logical_files": 9314,
+    "logical_bytes": 92198679,
+    "overlay_files": 163,
+    "status": "SOURCE_METADATA_GENERATED_REQUIRES_INDEPENDENT_REVIEW",
+    "tests_executed": false,
+    "native_qualified": false,
+    "compiled_artifact_created": false,
+    "runtime_slot": null,
+    "historical_nested_claims": "Preserved unchanged; no prior failure/test/qualification regrade."
+  },
+  "focused_native_test_source_increment": {
+    "protocol": "focused-native-tests-source-package-increment-v1",
+    "subject": {
+      "head": "4679b2b5b3edc643dac326c7ad77b59314364fd8",
+      "tree": "a594d1d9aecae308ed95650d705509a9c4607462",
+      "sole_parent": "18faf66da781df137b89ba47e969782fb78ee689"
+    },
+    "parent_package": {
+      "bytes": 66459,
+      "sha256": "b36d16a6c117e2130d5bf294b2989dfac9fba103fa568332c78ca0965f90ad13"
+    },
+    "parent_portable_handoff": {
+      "bytes": 33999,
+      "sha256": "b5a498884cf3a948b7e6b4d319625f23a78e152f5315d068fd4c8d61c17401ba"
+    },
+    "parent_complete_bindings": {
+      "bytes": 1954991,
+      "sha256": "2de2a61c385defdf77eee2de1b3c78cf0368b09ee52163bdc52c7a97db0b178c",
+      "rows": 9314
+    },
+    "component_handoff": {
+      "path": "validation/approval-followup-20261114/native-overlay-focused-regressions-source-v1/HANDOFF.DATA.json",
+      "bytes": 10005,
+      "sha256": "9f1afebed652d3047922b3e28fe8ca95056febfed521f12c0f07f98f0636734a"
+    },
+    "owner_source_acceptance": {
+      "path": "validation/founder-workflow-milestone-20261113/native-focused-tests-4679b2b-source-component-acceptance.json",
+      "bytes": 5318,
+      "sha256": "45c0a06c2880ec1768e5d0358310f260305e06bf71a928e60a215552cf18b3fd",
+      "verdict": "SOURCE_TEST_COMPONENT_ACCEPTED_FOR_COMPOSITION"
+    },
+    "current_complete_bindings": {
+      "path": "pins/coherent-source-bindings.json",
+      "bytes": 1954991,
+      "sha256": "028d1624b35a41764bdd7ef5d36c6bcb04f8a17adac6dc591e4fa4e2366662d8",
+      "rows": 9314
+    },
+    "current_graph_bytes": 92208244,
+    "current_overlay_files": 163,
+    "changed_targets": [
+      {
+        "target": "codex-rs/codex-api/src/protected_peer/context_contract/frame/tests.rs",
+        "mode": "100644",
+        "before": {
+          "blob": "effdbb8c85208681985c3a04264bff94f903e244",
+          "bytes": 32697,
+          "sha256": "5118183cad8a048e55abdf316019f9276fa274910c5cc9f49943e6e98581bc23"
+        },
+        "after": {
+          "blob": "598c565827fc9729a5ca3733929ea28d9ad5d566",
+          "bytes": 37697,
+          "sha256": "c55d91b0d80d09777b9fcfd03ecb5cd9cd42cb2564c9d3cf84eba5079f05af00"
+        }
+      },
+      {
+        "target": "codex-rs/codex-api/src/protected_peer/context_contract/tests.rs",
+        "mode": "100644",
+        "before": {
+          "blob": "be79f6a8ac2deb727a9d68ead467519ccfde7880",
+          "bytes": 44342,
+          "sha256": "7c92ca1fefb6f971283cb7868a777aa92eb3ba8bcc3ff95501f592feb84103c0"
+        },
+        "after": {
+          "blob": "69008f3428a8d6a2d24718be6f49d8dc25c74052",
+          "bytes": 48907,
+          "sha256": "19c546a312ec55e29db83935a4ca98f1e51820614f168672c1e19be2307b0c91"
+        }
+      }
+    ],
+    "unchanged_other_binding_rows": 9312,
+    "unchanged_other_overlay_payloads": 161,
+    "source_delta": {
+      "files": 2,
+      "insertions": 154,
+      "deletions": 0
+    },
+    "selected_authored_definitions": {
+      "prior": 68,
+      "current": 71,
+      "added": 3,
+      "status": "ALL_AUTHORED_UNRUN",
+      "global_total": null
+    },
+    "status": "SOURCE_METADATA_GENERATED_REQUIRES_INDEPENDENT_REVIEW",
+    "tests_executed": false,
+    "rust_syntax_or_compiler_checked": false,
+    "compiled_artifact_created": false,
+    "native_qualified": false,
+    "qualified_binary": null,
+    "runtime_slot": null,
+    "historical_source_vector": "Existing source_graph_vector_sha256 fields retain their original cuts; current complete binding bytes are separately pinned above.",
+    "historical_patch": "The unchanged review patch retains its original cut and omits these appended test suffixes; current complete overlays and bindings include them.",
+    "historical_handoff_fields": "Every prior field and nested value is preserved unchanged. Prior Pass, failure, Hold, UNKNOWN, qualification and allowance attribution is not transferred or regraded."
   }
 }

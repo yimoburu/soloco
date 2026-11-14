@@ -4,12 +4,12 @@ import {EventEmitter} from 'node:events';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {runModel} from '../plugins/soloco/runtime/adapters.mjs';
 import {work} from '../plugins/soloco/runtime/worker.mjs';
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
 import {withStore,teamHash} from '../plugins/soloco/runtime/store.mjs';
 import {snapshotBytes} from '../plugins/soloco/runtime/snapshot.mjs';
 import * as scoped from '../plugins/soloco/runtime/scoped-context.mjs';
+import {createOriginalAdapterProcessFixture,runOriginalAdapterWithMock,stageOriginalWorker,disposeOriginalProcessFixtures} from './original-adapter-process-fixture.mjs';
 
 // Actual adapter/worker seams, event-only CLI double, disposable normalized
 // stores. No native/provider calls or semantic/source acceptance claims.
@@ -23,16 +23,20 @@ const negative=(verdict='Blocked',content='Fictional unresolved negative')=>JSON
 // Synthetic original-child identity; no OS process or PID observation.
 let nextSyntheticPid=731000;
 function adapter(events,{code=0,limit}={}) {
- return (host,native,prompt,cwd,timeout,selection,options={})=>runModel(host,native,prompt,cwd,timeout,selection,{
-  ...options,sessionTitle:undefined,...(limit?{maxOutputCharacters:limit}:{}),resolveExecutable:()=>'/fictional/codex',spawn:()=>{
-   const child=new EventEmitter();child.pid=++nextSyntheticPid;child.stdin=new EventEmitter();child.stdout=new EventEmitter();child.stderr=new EventEmitter();
-   child.kill=()=>{queueMicrotask(()=>child.emit('close',null));return true;};
-   child.stdin.end=()=>queueMicrotask(()=>{child.emit('spawn');child.stdout.emit('data',wire(typeof events==='function'?events(prompt):events));child.emit('close',code);});
-   return child;
-  }
- });
+ return (host,native,prompt,cwd,timeout,selection,options={})=>{
+  const child=terminalChild(events,prompt,code),{spawn:oldSpawn,...incoming}=options;
+  return runOriginalAdapterWithMock(host,native,prompt,cwd,timeout,selection,{...incoming,sessionTitle:undefined,...(limit?{maxOutputCharacters:limit}:{}),resolveExecutable:()=>'/fictional/codex'},{child});
+ };
 }
-const invoke=(events,options)=>adapter(events,options)('codex',null,'fictional prompt','/tmp',180000);
+function terminalChild(events,prompt,code=0){
+ const child=new EventEmitter();child.pid=++nextSyntheticPid;child.stdin=new EventEmitter();child.stdout=new EventEmitter();child.stderr=new EventEmitter();
+ child.kill=()=>{queueMicrotask(()=>child.emit('close',null));return true;};
+ child.stdin.end=()=>queueMicrotask(()=>{child.emit('spawn');child.stdout.emit('data',wire(typeof events==='function'?events(prompt):events));child.emit('close',code);});return child;
+}
+const invoke=(events,{code=0,limit}={},native=null)=>{
+ const child=terminalChild(events,'fictional prompt',code),fixture=createOriginalAdapterProcessFixture({host:'codex',child});
+ return fixture.run('codex',native,'fictional prompt','/tmp',180000,null,{sessionTitle:undefined,...(limit?{maxOutputCharacters:limit}:{}),resolveExecutable:()=>'/fictional/codex'}).finally(()=>fixture.dispose());
+};
 const diagnostic=(id='diagnostic')=>({type:'item.completed',item:{id,type:'error',message:'Fictional optional feature is unavailable'}});
 for(const type of ['item.started','item.updated','item.completed'])test(type+' cannot reuse a completed diagnostic identity',async()=>{
  await assert.rejects(invoke([thread,start,diagnostic('same'),{type,item:{id:'same',type:'agent_message',text:negative('Pass')}},message(negative()),done]),/diagnostic item cannot be reused/);
@@ -90,7 +94,7 @@ test('a late Pass cannot erase an earlier observed negative on terminal rejectio
 test('exit status and resumed native identity fence otherwise complete messages',async()=>{
  const events=[thread,start,message(negative('Pass')),done];
  await assert.rejects(invoke(events,{code:7}),e=>e.code==='ROLE_EXIT_ERROR'&&e.rejected_output.text===negative('Pass'));
- await assert.rejects(adapter(events)('codex','old-native','fictional','/tmp',180000),/identity changed/);
+ await assert.rejects(invoke(events,{},'old-native'),/identity changed/);
 });
 
 for(const verdict of ['Blocked','Fail'])for(const code of [0,7])for(const laterTurn of [false,true])test(`observed ${verdict} survives later Pass, exit ${code}, new turn ${laterTurn}`,async()=>{
@@ -129,17 +133,20 @@ test('distinct negatives remain rejected evidence together',async()=>{
 });
 
 const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-terminal-repair-'));
+const originalRoots=[];
 const previous=process.env.COMPANY_PLUGIN_DATA;
 process.env.COMPANY_PLUGIN_DATA=path.join(tmp,'fixture-data');
-test.after(()=>{if(previous===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=previous;fs.rmSync(tmp,{recursive:true,force:true});});
+test.after(()=>{if(previous===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=previous;for(const root of originalRoots)disposeOriginalProcessFixtures(root);fs.rmSync(tmp,{recursive:true,force:true});});
 const read=f=>withStore(f.root,db=>db.read());
 function fixture(){
  const f={root:fs.mkdtempSync(path.join(tmp,'fictional-')),session_id:'fictional-founder',epoch:1,source_instruction:'Fictional source repair fixture; preserve failures and no execution authority.'};
+ originalRoots.push(f.root);
  engine.bind(f.root,f.session_id,'codex');engine.open({...f,idea:'Fictional terminal-state fixture'},'codex');withStore(f.root,db=>db.migrate());
  withStore(f.root,db=>db.transaction('fixture.roles',s=>{s.roles={qa:{name:'QA'}};s.team_sha256=teamHash(s);s.records.old={id:'old',kind:'artifact',revision:1,content:'Fictional exhausted allowance; no retry.'};s.records.home={id:'home',kind:'artifact',revision:1,content:'Fictional exhausted allowance; no retry.',context_obligations:{version:1,scope:'*'}};return s;}));
  const plan=engine.contextControl({...f,action:'plan',protocol:scoped.SCOPED_PROTOCOL,source_id:'old'},'codex');
  const target=engine.contextControl({...f,action:'target',plan_id:plan.id,phase:'extract',unit_id:plan.units[0].id},'codex');
  const job=engine.dispatch({...f,role:'qa',review_of:target.id,task:'Fictional independent read-only review'},'codex',{check:()=>({available:true,authenticated:true}),launch:()=>({on(){},unref(){}})});
+ stageOriginalWorker(f.root,job.id);
  return {...f,plan,target,job};
 }
 function boundEnvelope(prompt,verdict){
@@ -180,6 +187,7 @@ for(const mode of ['recovered-final','missing-final-completion','early-negative'
  withStore(f.root,db=>db.transaction('fixture.large-global',s=>{s.cos_instructions='Fictional compulsory global rule: no retry. '.repeat(4000);s.team_sha256=teamHash(s);return s;}));
  const target=engine.contextControl({...f,action:'target',plan_id:f.plan.id,phase:'applicability',delivery_protocol:scoped.SCOPED_STREAM,extraction_review_ids:[extraction.artifact_id],counterpart_ids:['home'],context_scope:'*'},'codex');
  const q=engine.dispatch({...f,role:'qa',review_of:target.id,task:'Fictional streamed review'},'codex',{check:()=>({available:true,authenticated:true}),launch:()=>({on(){},unref(){}})});
+ stageOriginalWorker(f.root,q.id);
  const parts=[];let finalRaw,calls=0;
  await work(f.root,q.id,adapter(prompt=>{
   calls++;const page=JSON.parse(prompt);parts.push(page.text);

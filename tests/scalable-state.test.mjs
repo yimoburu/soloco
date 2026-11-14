@@ -1,3 +1,4 @@
+import {seedPreexistingLegacyData} from './preexisting-legacy-data-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -6,7 +7,9 @@ import path from 'node:path';
 import {Store,digest} from '../plugins/soloco/runtime/store.mjs';
 import {assignmentContext,contextMatches} from '../plugins/soloco/runtime/context.mjs';
 import {recordReference,presentationOnly,contextPlan,contextRead} from '../plugins/soloco/runtime/current-state.mjs';
-const tmp=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'scalable-state-')));test.after(()=>fs.rmSync(tmp,{recursive:true,force:true}));
+import {recordOriginalWorkerAssignmentFrom} from '../plugins/soloco/runtime/peers/prospective-local-worker-inventory-producer.mjs';
+import {stageOriginalHistoricalJob,launchOriginalWorker,startOriginalModel,disposeOriginalProcessFixtures} from './original-worker-model-fixture.mjs';
+const tmp=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'scalable-state-'))),originalFixtureRoots=new Set();test.after(()=>{for(const root of originalFixtureRoots)disposeOriginalProcessFixtures(root);fs.rmSync(tmp,{recursive:true,force:true});});
 const seed=()=>({id:'fixture',name:'A',revision:1,roles:{engineer:{name:'Engineer'}},records:{},jobs:{},sessions:{},messages:[],notices:[],governance:'limits',owner:{epoch:1},extension:{'__proto__':'literal',raw:'preserve exact \\n wording'}});
 function classified(s,r,disposition='resolved',scopes=[]) {
  s.records[r.id]=r;const p={id:'p-'+r.id,kind:'plan',revision:1,author_instance:'cos',context_classification_plan:contextPlan(s,{record_ids:[r.id],disposition,scopes})};
@@ -40,7 +43,7 @@ test('presentation-only rename detection rejects unknown effects and producers',
 });
 test('explicit normalized migration backs up, round-trips unknown values and fences legacy writes',()=>{
  const root=fs.mkdtempSync(path.join(tmp,'db-'));const db=new Store(root,true),s=seed();s.records.a={id:'a',kind:'artifact',content:'large '.repeat(10000)};
- db.transaction('seed',()=>s);const before=JSON.stringify(db.read()),token=db.changeToken();
+ seedPreexistingLegacyData(db,'seed',()=>s);const before=JSON.stringify(db.read()),token=db.changeToken();
  const receipt=db.migrate();assert.ok(fs.existsSync(receipt.backup));assert.equal(JSON.stringify(db.read()),before);assert.equal(db.changeToken(),token);
  assert.throws(()=>db.db.prepare('UPDATE company SET value=? WHERE id=1').run('{}'),/Legacy writer fenced/);
  const archiveRow=db.db.prepare("SELECT sha256 FROM state_entries WHERE family='records' AND key='a'").get();
@@ -51,7 +54,7 @@ test('explicit normalized migration backs up, round-trips unknown values and fen
  const backup=new Store(restored);assert.equal(JSON.stringify(backup.read()),before);backup.close();
 });
 test('immutable corruption is detected and transactions rollback without dropping archive',()=>{
- const root=fs.mkdtempSync(path.join(tmp,'integrity-')),db=new Store(root,true);db.transaction('seed',()=>seed());db.migrate();const before=JSON.stringify(db.read());
+ const root=fs.mkdtempSync(path.join(tmp,'integrity-')),db=new Store(root,true);seedPreexistingLegacyData(db,'seed',()=>seed());db.migrate();const before=JSON.stringify(db.read());
  assert.throws(()=>db.selectedTransaction('fail',{rootKeys:['revision','owner'],entities:{records:['x']}},s=>{s.records.x={id:'x'};throw Error('interrupted');}),/interrupted/);
  assert.equal(JSON.stringify(db.read()),before);
  db.db.prepare('UPDATE immutable_values SET bytes=? WHERE sha256=(SELECT sha256 FROM state_entries WHERE family=?)').run('"tampered"','root');
@@ -102,7 +105,7 @@ test('archived job entries retain their exact typed classification provenance',(
 });
 import {backupCompany,restoreCompany} from '../plugins/soloco/runtime/storage-transfer.mjs';
 test('portable backup inventories project configuration/candidates and explicit artifacts; tampering holds restore',()=>{
- const root=fs.mkdtempSync(path.join(tmp,'portable-')),db=new Store(root,true);db.transaction('seed',()=>seed());db.migrate();
+ const root=fs.mkdtempSync(path.join(tmp,'portable-')),db=new Store(root,true);seedPreexistingLegacyData(db,'seed',()=>seed());db.migrate();
  fs.writeFileSync(path.join(root,'.company','development.json'),'{"max_bytes_ceiling":200000}');fs.mkdirSync(path.join(root,'.company','development'));fs.writeFileSync(path.join(root,'.company','development','candidate.mjs'),'fixture source');
  const external=path.join(tmp,'explicit-evidence.txt');fs.writeFileSync(external,'Required external fixture evidence');
  const backup=path.join(tmp,'portable-backup'),m=backupCompany(db,backup,{artifacts:[{source:external,path:'evidence.txt'}]});assert.equal(m.files.length,4);
@@ -122,12 +125,15 @@ import {id,withStore} from '../plugins/soloco/runtime/store.mjs';
 import {work} from '../plugins/soloco/runtime/worker.mjs';
 async function contextFixture({negative=false,sameNative=false}={}) {
  const root=fs.mkdtempSync(path.join(tmp,'public-context-')),a={root,session_id:'founder-'+id('f'),epoch:1};
+ originalFixtureRoots.add(root);
  process.env.COMPANY_PLUGIN_DATA=path.join(tmp,'cache');engine.bind(root,a.session_id,'codex');engine.open({...a,idea:'Fictional current-state protocol'},'codex');
  const source=engine.save({...a,id:'old-decision',kind:'decision',content:'Resolved historical fixture; original remains retained'},'codex');
  const plan=engine.contextControl({...a,action:'plan',record_ids:[source.id],disposition:'resolved',source_instruction:'Propose this exact historical disposition'},'codex');
  const key=id('review-job'),instance=id('qa');
- withStore(root,db=>db.transaction('test.queue',s=>{const j={id:key,role:'qa',instance_id:instance,session_key:instance,host:'codex',native_id:null,epoch:1,status:'queued',task:'Review exact context classification',context_format:3,inputs:[],review_of:{id:plan.id,revision:plan.revision},created_at:new Date().toISOString()};const c=assignmentContext(s,j);s.jobs[key]={...j,inputs:c.inputs,context_sha256:c.hash};s.sessions[instance]={instance_id:instance,role:'qa',host:'codex',native_id:null};return s;}));
- await work(root,key,async()=>({native_id:sameNative?a.session_id:id('native'),text:JSON.stringify({content:'Independently reviewed original source and exact proposed disposition',messages:[],notices:[],review:{verdict:'Pass',reason:'Exact historical source is reviewed and traceable',permitted_action:'apply_context_classification',plan_sha256:digest(JSON.stringify(plan.context_classification_plan)),blockers:[]}})}));
+ withStore(root,db=>db.transaction('job.queued',s=>{const j={id:key,role:'qa',instance_id:instance,session_key:instance,host:'codex',native_id:null,epoch:1,status:'queued',task:'Review exact context classification',context_format:3,inputs:[],review_of:{id:plan.id,revision:plan.revision},created_at:new Date().toISOString()};recordOriginalWorkerAssignmentFrom(db,s,j);const c=assignmentContext(s,j);s.jobs[key]={...j,inputs:c.inputs,context_sha256:c.hash};s.sessions[instance]={instance_id:instance,role:'qa',host:'codex',native_id:null};return s;}));
+ const carrier=launchOriginalWorker(root,key);let modelDirectory;
+ try{await work(root,key,(...args)=>{modelDirectory=args[3];args[6]={...args[6],sessionTitle:undefined,sessionNameDirectory:undefined};const model=startOriginalModel(args,{nativeId:sameNative?a.session_id:id('native')});model.respond(JSON.stringify({content:'Independently reviewed original source and exact proposed disposition',messages:[],notices:[],review:{verdict:'Pass',reason:'Exact historical source is reviewed and traceable',permitted_action:'apply_context_classification',plan_sha256:digest(JSON.stringify(plan.context_classification_plan)),blockers:[]}}));return model.promise;});}
+ finally{carrier.emit('close',0,null);if(modelDirectory&&modelDirectory!==root)disposeOriginalProcessFixtures(modelDirectory);disposeOriginalProcessFixtures(root);}
  const state=withStore(root,db=>db.read()),review=state.jobs[key].artifact_id;
  if(negative)withStore(root,db=>db.transaction('test.negative',s=>{s.records.failed={id:'failed',kind:'review',status:'Submitted',review_of:{id:plan.id,revision:plan.revision},review:{verdict:'Fail',reason:'Outstanding contradiction'}};return s;}));
  return {a,source,plan,review};
@@ -147,18 +153,20 @@ test('classification rejects coordinator-native review and retained same-plan ne
 });
 test('public migration holds unfinished cancelled workers and requires explicit paused authority',()=>{
  const root=fs.mkdtempSync(path.join(tmp,'migration-guard-')),a={root,session_id:id('founder'),epoch:1};process.env.COMPANY_PLUGIN_DATA=path.join(tmp,'cache');engine.bind(root,a.session_id,'codex');engine.open({...a,idea:'Fixture'},'codex');
+ originalFixtureRoots.add(root);
  assert.throws(()=>engine.storageControl({...a,action:'migrate',source_instruction:'Migrate'},'codex'),/Pause/);
- withStore(root,db=>db.transaction('test.cancelled',s=>{s.paused=true;s.jobs.uncertain={id:'uncertain',status:'cancelled'};return s;}));
+ stageOriginalHistoricalJob(root,{id:'uncertain',status:'cancelled'});
+ withStore(root,db=>db.transaction('test.cancelled',s=>{s.paused=true;return s;}));
  assert.throws(()=>engine.storageControl({...a,action:'migrate',source_instruction:'Migrate'},'codex'),/Uncertain worker/);
 });
 test('targeted root deletion persists and absent immutable values never silently disappear',()=>{
- const root=fs.mkdtempSync(path.join(tmp,'delete-')),db=new Store(root,true);db.transaction('seed',()=>seed());db.migrate();
+ const root=fs.mkdtempSync(path.join(tmp,'delete-')),db=new Store(root,true);seedPreexistingLegacyData(db,'seed',()=>seed());db.migrate();
  db.selectedTransaction('delete',{rootKeys:['revision','owner','extension'],entities:{}},s=>{delete s.extension;return s;});assert.equal(Object.hasOwn(db.read(),'extension'),false);
  const sha=db.db.prepare("SELECT sha256 FROM state_entries WHERE family='root' AND key='name'").get().sha256;
  db.db.exec('PRAGMA foreign_keys=OFF');db.db.prepare('DELETE FROM immutable_values WHERE sha256=?').run(sha);assert.throws(()=>db.read(),/hash mismatch/);db.close();
 });
 test('transfers reject self-copy through company or selected artifact ancestors before creating output',()=>{
- const root=fs.mkdtempSync(path.join(tmp,'recursive-')),db=new Store(root,true);db.transaction('seed',()=>seed());
+ const root=fs.mkdtempSync(path.join(tmp,'recursive-')),db=new Store(root,true);seedPreexistingLegacyData(db,'seed',()=>seed());
  const nested=path.join(db.dir,'backup');assert.throws(()=>backupCompany(db,nested),/inside company/);assert.equal(fs.existsSync(nested),false);
  const external=fs.mkdtempSync(path.join(tmp,'artifact-tree-')),destination=path.join(external,'copy');
  assert.throws(()=>backupCompany(db,destination,{artifacts:[{source:external,path:'tree'}]}),/inside selected artifact/);assert.equal(fs.existsSync(destination),false);db.close();

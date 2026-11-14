@@ -29,6 +29,38 @@ contract or integration. A source or contract change requires affected-row revie
 
 ## Meaning of the assessments
 
+### Unreleased issue 18 composition — Source authored, checks unrun
+
+The [comparison integration](issue18-integrated-comparison.md) authors a private
+global budget issuer, descriptor-relative optional storage, complete prompt
+preparation before reservation, typed request/outcome records and a direct
+worker consumer of private adapter outcomes. A one-test guard authors the
+reservation, runtime-terminal, QA-prerequisite and live-retention interfaces.
+The actual separate test worker lacks transferred accounting custody and
+currently holds before its first write, so the complete executor-through-
+acceptance comparison flow remains unfinished.
+Repository tool entries re-export the packaged runtime modules. Version 0.7.10
+retains explicit 0.7.9 compatibility and does not adopt new company instructions.
+
+This is an unreleased Source composition, including inherited runtime/Native
+foundations whose scopes and evidence remain separate. Its newly authored
+checks have not run. The earlier private-outcome producer `b7ffad5` remains
+preserved after a concrete cross-request deadline-erasure finding. Its isolated
+Source repair `c51df5e` is composed here; its separately selected execution has
+its own receipts and cannot establish this composition's result. Fixed
+event/two-phase COMMIT hooks from `8a188a3` are now composed in Source. Their
+new checks and the combined consumer checks remain unrun. No earlier component
+Pass establishes this head's readiness.
+
+The explicit same-process qualification route does not transfer private brands
+to a new standalone process or adopt a cold run. Complete external-A archive
+portability is also unfinished: affected backups hold before destination
+effects with `ISSUE18_ARCHIVE_CUSTODY_REQUIRED`. GitHub #13/#16/#18/#30 retain
+their original Native, scale, coordinated outcome and continuity requirements.
+Founder time, interruptions and rebriefing remain unmeasured. Source delivery,
+Git merge, main CI, installation, host qualification and company adoption are
+distinct.
+
 The source follow-ups based on main through PR #74 add automatic retention-review
 admission, exact deterministic geometry reuse, optional frozen delivery contracts,
 one canonical local acceptance report, attributed receiver transitions and
@@ -903,6 +935,23 @@ At this parent checkpoint the matching Node TaskHost/frame/static build-descript
 private-FD adapter was still missing. Original native startup/continuation, account/corpus acceptance,
 continuity and company adoption remain unproved; qualified executable/runtime
 slots stay NULL. Normative SPEC v0.21 and its governance commitment above, and adopted v0.20, remain unchanged.
+
+### Paused-bootstrap operator composition
+
+The existing `company_origin` ingress now has closed bootstrap operator actions
+and exposes the existing finite paused-bootstrap plan purpose. Its protected
+HOST/current-owner/custody path calls the fixed maintenance launcher, which
+loads the original selected bootstrap module realm and calls the existing
+runner through its private-cap facade. The ordinary provider's pause guard is
+unchanged. The exact schema and call chain are documented in
+[public origin routing](peer-public-origin-routing.md#paused-bootstrap-operator).
+
+This implements the existing founder authority, enforcement and bounded
+evidence requirements in SPEC sections 2, 4 and 5. SPEC remains the enduring
+company contract; no company rules are adopted by editing this Source.
+Packaging, original Native execution, independent review and receiver
+acceptance remain distinct. Synthetic routing coverage is not Native proof,
+and previously failed or timed-out checks retain their original results.
 
 ### Executable peer bridge source successor
 

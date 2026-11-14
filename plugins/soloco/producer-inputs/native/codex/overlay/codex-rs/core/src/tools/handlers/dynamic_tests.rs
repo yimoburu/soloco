@@ -9,6 +9,32 @@ use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;
 
+// AUTHORED_UNRUN Source witness through the ACTUAL SDK handler/converter. This
+// creates no Session, child, protected issuer, company admission or Native QA.
+#[test]
+fn bootstrap_readonly3_materializes_the_literal_responses_catalogue() {
+    let resource:Value=serde_json::from_slice(include_bytes!(
+        "../../../../codex-api/src/protected_peer/bootstrap_membership_readonly3_contract_v1.json"
+    )).unwrap();
+    let mut actual=Vec::new();
+    for input in resource["tools"].as_array().unwrap() {
+        let spec:codex_protocol::dynamic_tools::DynamicToolSpec=serde_json::from_value(input.clone()).unwrap();
+        let codex_protocol::dynamic_tools::DynamicToolSpec::Function(tool)=spec else {panic!("fixed bootstrap function required");};
+        let handler=DynamicToolHandler::new(&tool).expect("actual fixed bootstrap SDK conversion");
+        actual.push(serde_json::to_value(handler.spec()).unwrap());
+    }
+    let description="Private bootstrap membership context protocol; identity and authority are supplied only by the original protected composition.";
+    assert_eq!(Value::Array(actual),json!([
+        {"type":"function","name":"soloco_context_header","description":description,"strict":false,
+            "parameters":{"type":"object","properties":{},"required":[],"additionalProperties":false}},
+        {"type":"function","name":"soloco_context_read","description":description,"strict":false,
+            "parameters":{"type":"object","properties":{"sha256":{"type":"string"},"offset":{"type":"integer"},"length":{"type":"integer"}},"required":["sha256","offset","length"],"additionalProperties":false}},
+        {"type":"function","name":"soloco_context_submit","description":description,"strict":false,
+            "parameters":{"type":"object","properties":{"sha256":{"type":"string"},"content":{"type":"string"}},"required":["sha256","content"],"additionalProperties":false}}
+    ]));
+    assert_eq!(resource["tools"][1]["inputSchema"]["properties"]["length"],json!({"type":"integer","minimum":1,"maximum":4096}));
+}
+
 async fn next_item(receiver: &async_channel::Receiver<Event>) -> DynamicToolCallItem {
     tokio::time::timeout(Duration::from_secs(10), async {
         loop {

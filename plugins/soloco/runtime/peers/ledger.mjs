@@ -38,6 +38,30 @@ import path from 'node:path';
 import {createHash,randomUUID} from 'node:crypto';
 import {REVIEW_SELECTION_RECIPE,REVIEW_PRODUCER_RECIPE,extractReviewSelection,reviewReference,reviewScope} from './review-selection.mjs';
 
+const originalExecutionLedgers=new WeakMap(),originalExecutionTransactions=new WeakMap();
+export function originalPeerExecutionLedgerFrom(ledger){
+  const owner=originalExecutionLedgers.get(ledger);
+  if(!owner||ledger.db!==owner.db||ledger.root!==owner.root||ledger.company_id!==owner.company_id)throw Object.assign(Error('Original execution requires an unchanged original PeerLedger'),{code:'ORIGINAL_EXECUTION_PEER_REQUIRED'});
+  return owner;
+}
+// A physical reader loan, not an ambient/provider interface. Only the exact
+// class-owned raw handle or final physical view can acquire it while alive.
+export function originalPeerExecutionCustodyFrom(ledger,handle){
+  const owner=originalPeerExecutionLedgerFrom(ledger),loan=originalExecutionTransactions.get(handle);
+  if(!owner||!loan||loan.ledger!==ledger||loan.db!==owner.db)throw Object.assign(Error('Original execution requires the owning PeerLedger transaction'),{code:'ORIGINAL_EXECUTION_PEER_TRANSACTION_REQUIRED'});
+  const assert=()=>{originalPeerExecutionLedgerFrom(ledger);loan.assert();};assert();return Object.freeze({...loan,assert});
+}
+
+
+// Identity only from an exact, still-live class-owned handle. This does not
+// expose its ledger, DB, pending journal, hooks or any write capability.
+export function inspectOriginalPeerTransactionIdentityFrom(handle){
+  const loan=originalExecutionTransactions.get(handle);
+  if(!loan)throw Object.assign(Error('Original peer transaction identity required'),{code:'ORIGINAL_EXECUTION_PEER_TRANSACTION_REQUIRED'});
+  const original=originalPeerExecutionCustodyFrom(loan.ledger,handle);
+  return Object.freeze({protocol:'peer-original-transaction-identity-v1',root:original.root,company_id:original.company_id,root_sha256:hash(original.root),assert:original.assert});
+}
+
 export const PEER_PROTOCOL='peer-cos-v1';
 export const PEER_LAYOUT=5;
 export const FAMILIES=Object.freeze(['control','principals','grants','commands','tasks','slots','claims','homes','proposals','reviews','effects','conflicts','notices','messages','deliveries','subscriptions','work_items']);
@@ -229,6 +253,7 @@ export class PeerLedger{
       if(layout!==PEER_LAYOUT||meta?.protocol!==PEER_PROTOCOL)throw Error('Checked peer adoption and physical legacy-writer fence required');
       exact(meta.company_id,'company identity');digest(meta.last_event_sha256);
       this.company_id=meta.company_id;
+      originalExecutionLedgers.set(this,Object.freeze({db:this.db,root:this.root,company_id:this.company_id}));
     }catch(e){if(this.ownsDb)this.db.close();throw e;}
   }
   query(sql,...parameters){this.onQuery?.({sql,parameters:parameters.length});return this.db.prepare(sql);}
@@ -494,6 +519,7 @@ export class PeerLedger{
     if(write){exact(type,'event type');exact(principal,'principal identity');}
     const db=this.db,fence=this.#fence,token=fence.claim();
     let begun=false,active=false,safe=true,startAttempted=false;
+    const originalCommit=[],originalRollback=[];
     this.inTransaction=true;
     try{
       const outer=db.isTransaction;
@@ -762,6 +788,10 @@ export class PeerLedger{
           events.push({type:kind,payload:normalized});
         }
       });
+      originalExecutionTransactions.set(tx,Object.freeze({ledger:this,db,root:this.root,company_id:this.company_id,phase:'raw',sequence,type,principal,external,write,assert:guard,
+        pending:()=>{guard();return structuredClone({changes,events,previous_sha256:head.sha256});},
+        onCommit:fn=>{guard();if(!write||external||typeof fn!=='function')throw Error('Original launch requires an owning physical write');originalCommit.push(fn);},
+        onRollback:fn=>{guard();if(!write||external||typeof fn!=='function')throw Error('Original launch requires an owning physical write');originalRollback.push(fn);}}));
       let result=fn(tx);
       if(result&&typeof result.then==='function'){
         if(result instanceof Promise)Promise.prototype.then.call(result,undefined,()=>{});
@@ -819,6 +849,8 @@ export class PeerLedger{
           reading=true;
           try{return this.#get(f,id,checked);}finally{reading=false;}
         }});
+        originalExecutionTransactions.set(view,Object.freeze({ledger:this,db,root:this.root,company_id:this.company_id,phase:'terminal',sequence,type,principal,external,write,assert:usable,
+          pending:()=>{usable();return structuredClone({changes,events,previous_sha256:head.sha256});}}));
         try{
           deadline=terminalGuard(view);
           if(deadline&&typeof deadline.then==='function'){
@@ -837,8 +869,9 @@ export class PeerLedger{
       db.exec(external?'RELEASE peer_migration_write':'COMMIT');
       safe=external?db.isTransaction===true:peerConnectionEnded(db);
       if(!safe)throw Error('Peer transaction completion state is uncertain');
-      begun=false;return result;
+      begun=false;for(const committed of originalCommit)committed();return result;
     }catch(error){
+      for(const rolledBack of originalRollback)rolledBack();
       active=false;
       if(begun){
         try{

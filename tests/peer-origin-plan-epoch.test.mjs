@@ -1,4 +1,5 @@
 // Disposable SQLite/C SOURCE fixtures only; no live company, native or model calls.
+import {seedPreexistingLegacyData} from './preexisting-legacy-data-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -19,7 +20,7 @@ const actor={host:'codex',session_id:'fictional-root',native_id:'fictional-root'
 function fixture(t){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-origin-epoch-company-')),store=new Store(root,true);
  const team={plugin_version:'0.7.8',governance:'Fictional complete governance; preserve old UNKNOWN.',governance_sha256:digest('Fictional complete governance; preserve old UNKNOWN.'),roles:{cos:{instructions:'Fictional coordinator.'},qa:{instructions:'Independent SOURCE fixture.'}},cos_instructions:'Fictional original instructions.'};
- try{store.transaction('fixture.genesis',()=>({schema:2,id:'fictional-epoch',name:'SOURCE only',idea:'Retain old failure.',runtime_version:'0.7.8',...team,team_sha256:teamHash(team),owner:{host:'codex',session_id:actor.session_id,epoch:9},paused:true,records:{},jobs:{old:{id:'old',status:'failed',native_id:'old-unknown',coordination_release:{termination_confirmed:false}}},sessions:{},messages:[],notices:[{id:'original-notice',resolution:null,summary:'Original UNKNOWN.'}],original_grant:{max_attempts:1,used_attempts:1,expires_at:'2020-01-01T00:00:00.000Z'}}));store.migrate();}finally{store.close();}
+ try{seedPreexistingLegacyData(store,'fixture.genesis',()=>({schema:2,id:'fictional-epoch',name:'SOURCE only',idea:'Retain old failure.',runtime_version:'0.7.8',...team,team_sha256:teamHash(team),owner:{host:'codex',session_id:actor.session_id,epoch:9},paused:true,records:{},jobs:{old:{id:'old',status:'failed',native_id:'old-unknown',coordination_release:{termination_confirmed:false}}},sessions:{},messages:[],notices:[{id:'original-notice',resolution:null,summary:'Original UNKNOWN.'}],original_grant:{max_attempts:1,used_attempts:1,expires_at:'2020-01-01T00:00:00.000Z'}}));store.migrate();}finally{store.close();}
  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));const file=path.join(root,'.company','company.sqlite');
  return {root,file,write:(type,fn)=>withStore(root,s=>s.transaction(type,fn)),state:()=>withStore(root,s=>s.read()),input:{source_instruction:'Fictional exact mechanical plan only.',expires_at:new Date(Date.now()+3600000).toISOString(),policy:{worker_cap:3,queue_limit:1000,principal_queue_limit:100,max_context_bytes:65536,max_model_calls:10},maintenance:{scope:'*',source_instruction:'Fictional separate finite original maintenance.',max_model_calls:4,max_review_calls:2}}};
 }

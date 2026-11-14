@@ -7,16 +7,33 @@ import path from 'node:path';
 import os from 'node:os';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {createHash} from 'node:crypto';
+import {types} from 'node:util';
 import {originalDeveloperComponentLayout,originalPackagedComponentLayout,originalComponentLayoutPaths,inspectOriginalComponentLayout,originalComponentNodePath} from './context-component-layout.mjs';
 export {preflightOriginalBootstrapMembershipContext,inspectOriginalBootstrapMembershipPreflight} from './bootstrap-membership-preflight.mjs';
+export {preflightOriginalInputFrontierContext,inspectOriginalInputFrontierPreflight} from './input-frontier-wire.mjs';
+import {INPUT_FRONTIER_CONTEXT_SELECTION} from './input-frontier-wire.mjs';
+import {resolveOriginalInputFrontierInterpreter,inspectOriginalInputFrontierInterpreter} from './protected-source-build-slot.mjs';
+export function inspectOriginalInputFrontierSupport(...args){if(args.length)throw Object.assign(Error('FRONTIER_NATIVE_SOURCE_UNAVAILABLE'),{code:'FRONTIER_NATIVE_SOURCE_UNAVAILABLE'});const h=resolveOriginalInputFrontierInterpreter(),v=inspectOriginalInputFrontierInterpreter(h);return Object.freeze({protocol:'peer-input-frontier-assignment-v1',bridge_sha256:v.recipe_sha256,creation_mode:'fresh-original-protected-thread',selection:INPUT_FRONTIER_CONTEXT_SELECTION,native_qualified:false});}
+
+export {preflightOriginalOriginMaintenanceContext,inspectOriginalOriginMaintenancePreflight,preflightOriginalOriginFrontierSealContext,inspectOriginalOriginFrontierSealPreflight,preflightOriginalOwnerMaintenanceContext,inspectOriginalOwnerMaintenancePreflight,preflightOriginalOwnerMaintenanceFreshContext,inspectOriginalOwnerMaintenanceFreshPreflight,OWNER_MAINTENANCE_INSTRUCTION,OWNER_MAINTENANCE_FRESH_INSTRUCTION} from './origin-maintenance-wire.mjs';
+import {ORIGIN_MAINTENANCE_CONTEXT_SELECTION,ORIGIN_FINAL_REVIEW_CONTEXT_SELECTION,ORIGIN_ORDINARY_TASK_CONTEXT_SELECTION} from './origin-maintenance-wire.mjs';
+import {resolveOriginalOriginMaintenanceInterpreter,inspectOriginalOriginMaintenanceInterpreter,resolveOriginalOriginFinalReviewInterpreter,inspectOriginalOriginFinalReviewInterpreter,resolveOriginalOriginOrdinaryTaskInterpreter,inspectOriginalOriginOrdinaryTaskInterpreter,isOriginalContextInterpreterUnavailable} from './protected-source-build-slot.mjs';
+export function inspectOriginalOriginMaintenanceSupport(...args){if(args.length)throw Object.assign(Error('ORIGIN_NATIVE_SOURCE_UNAVAILABLE'),{code:'ORIGIN_NATIVE_SOURCE_UNAVAILABLE'});try{const h=resolveOriginalOriginMaintenanceInterpreter(),v=inspectOriginalOriginMaintenanceInterpreter(h);return Object.freeze({protocol:'peer-origin-maintenance-assignment-v1',bridge_sha256:v.recipe_sha256,creation_mode:'fresh-original-protected-thread',selection:ORIGIN_MAINTENANCE_CONTEXT_SELECTION,native_qualified:false});}catch(error){if(!isOriginalContextInterpreterUnavailable(error))throw error;throw Object.assign(Error('ORIGIN_NATIVE_SOURCE_UNAVAILABLE'),{code:'ORIGIN_NATIVE_SOURCE_UNAVAILABLE'});}}
+export function inspectOriginalOriginFrontierSealSupport(...args){if(args.length)throw Object.assign(Error('ORIGIN_FINAL_SOURCE_UNAVAILABLE'),{code:'ORIGIN_FINAL_SOURCE_UNAVAILABLE'});try{const h=resolveOriginalOriginFinalReviewInterpreter(),v=inspectOriginalOriginFinalReviewInterpreter(h);return Object.freeze({protocol:'peer-origin-frontier-seal-assignment-v1',bridge_sha256:v.recipe_sha256,creation_mode:'fresh-original-protected-thread',selection:ORIGIN_FINAL_REVIEW_CONTEXT_SELECTION,native_qualified:false});}catch(error){if(!isOriginalContextInterpreterUnavailable(error))throw error;throw Object.assign(Error('ORIGIN_FRONTIER_SEAL_NATIVE_SOURCE_REQUIRED'),{code:'ORIGIN_FRONTIER_SEAL_NATIVE_SOURCE_REQUIRED'});}}
+// No legacy owner Native route was selected. Keep old begin held even after
+// the new final-review component is qualified; its geometry is not authority.
+export function inspectOriginalOwnerMaintenanceSupport(...args){throw Object.assign(Error('OWNER_REVIEW_SOURCE_UNAVAILABLE'),{code:'OWNER_REVIEW_SOURCE_UNAVAILABLE'});}
+export function inspectOriginalOwnerMaintenanceFreshSupport(...args){if(args.length)throw Object.assign(Error('OWNER_FRESH_SOURCE_UNAVAILABLE'),{code:'OWNER_FRESH_SOURCE_UNAVAILABLE'});try{const h=resolveOriginalOriginFinalReviewInterpreter(),v=inspectOriginalOriginFinalReviewInterpreter(h);return Object.freeze({protocol:'peer-owner-maintenance-fresh-purpose-v1',context_protocol:'peer-owner-maintenance-assignment-v1',bridge_sha256:v.recipe_sha256,creation_mode:'fresh-original-protected-thread',selection:ORIGIN_FINAL_REVIEW_CONTEXT_SELECTION,native_qualified:false});}catch(error){if(!isOriginalContextInterpreterUnavailable(error))throw error;throw Object.assign(Error('OWNER_FRESH_SOURCE_UNAVAILABLE'),{code:'OWNER_FRESH_SOURCE_UNAVAILABLE'});}}
 
 const REPO=fileURLToPath(new URL('../../../../',import.meta.url));
 const DEVELOPER=Object.freeze({lookup:'lookupOriginalSelectedContextComponentData',inspect:'inspectOriginalSelectedContextComponentData',layout:originalDeveloperComponentLayout}),PACKAGED=Object.freeze({lookup:'lookupOriginalSelectedPackagedContextComponentData',inspect:'inspectOriginalSelectedPackagedContextComponentData',layout:originalPackagedComponentLayout});
 const deploymentRoot=service=>path.join(originalComponentLayoutPaths(service.layout()).durable_root,'deployments');
-const EXPECTED_PACKAGE='b040811c46db685f647bfaf5bac3db26aa055035553ee83b8e2bc228f048f55c';
-const EXPECTED_MANIFEST='13b54fb0381f0deef62d47070feb3022177cbe003e60010333729313aebe956b';
+const EXPECTED_PACKAGE='acf70aa9f69ce34e4a514d35e870d8b92a26ae1c26f797dcfc2947abdccdef99';
+const EXPECTED_MANIFEST='7cfddeed65c6825a5b767f80dbb283c24cf61820b91c8b577c24a81428bded4f';
 const HOST='plugins/soloco/runtime/peers/codex-task-host.mjs';
 const INTERPRETER='plugins/soloco/runtime/peers/peer-context-interpreter.mjs';
+const BOOTSTRAP_MEMBERSHIP='plugins/soloco/runtime/peers/bootstrap-membership.mjs';
+const BOOTSTRAP_RUNNER='plugins/soloco/runtime/peers/bootstrap-membership-native-runner.mjs';
 const pins=new WeakMap(),sidecarPrograms=new WeakMap();let loaded=null,producer=null,loadService=null,loadPromise=null;
 // General P2 libraries also import the slot guard in installed plugins. Delay
 // the repository-only producer's eager entry/source reads until an explicit
@@ -54,7 +71,7 @@ function selection(data,service){
  if(profile.version!==process.version||profile.platform!==process.platform||profile.arch!==process.arch||!same(profile.exec_argv,process.execArgv)||!same(profile.node,ref(read(fs.realpathSync(process.execPath)))))fail('COMPONENT_DEPLOYMENT_NODE_CHANGED');
  // The original producer already verifies the entire Node inventory/copy map.
  // These are actual original checkout modules used by the fixed loader below.
- for(const name of [HOST,INTERPRETER]){
+ for(const name of [HOST,INTERPRETER,BOOTSTRAP_MEMBERSHIP,BOOTSTRAP_RUNNER]){
   const row=copies.get('node-source/'+name);if(!row||row.original_path!==originalComponentNodePath(layout,name)||!same(ref(read(row.original_path)),{bytes:row.bytes,sha256:row.sha256}))fail('COMPONENT_DEPLOYMENT_NODE_CHANGED');
  }
  return {...(service===PACKAGED?{layout:current}:{}),protocol:'soloco-original-component-deployment-v1',input_key:data.input_key,intent_key:data.intent_key,original_output_sha256:data.output.sha256,owner_epoch:data.owner_epoch,original_component_root:data.component_root,files,node_manifest_sha256:data.node_inputs.sha256,node_profile:data.node_profile.record,qualified_interpreter:'SOURCE_ASSOCIATED_ONLY',native_qualified:false,claims_released:false};
@@ -104,13 +121,16 @@ async function loadBridge(service){
 async function loadBridgeOnce(service){
  await originalProducer();if(loadService!==service)fail('COMPONENT_DEPLOYMENT_LAYOUT_MIXED');const {h,data}=selected(service),record=prepared(data,service),layout=service.layout();
  const host=await import(pathToFileURL(originalComponentNodePath(layout,HOST)).href),interpreter=await import(pathToFileURL(originalComponentNodePath(layout,INTERPRETER)).href);
- if(typeof host.createCodexTaskRuntime!=='function'||typeof interpreter.prepareOriginalPeerContextDelivery!=='function')fail('COMPONENT_DEPLOYMENT_NODE_CHANGED');
+ const bootstrap=await import(pathToFileURL(originalComponentNodePath(layout,BOOTSTRAP_MEMBERSHIP)).href),bootstrapRunner=await import(pathToFileURL(originalComponentNodePath(layout,BOOTSTRAP_RUNNER)).href);
+ if(typeof host.createCodexTaskRuntime!=='function'||typeof interpreter.prepareOriginalPeerContextDelivery!=='function'||typeof bootstrap.createPeerBootstrapMembership!=='function'||typeof bootstrap.prepareOriginalPeerBootstrapMembership!=='function'||typeof bootstrapRunner.runOriginalPeerBootstrapMembership!=='function')fail('COMPONENT_DEPLOYMENT_NODE_CHANGED');
  const after=prepared(producer[service.inspect](h),service);if(!same(after,record)||loadService!==service)fail('COMPONENT_DEPLOYMENT_CHANGED');
  if(loaded){if(loaded.service!==service||!same(loaded.record,record))fail('COMPONENT_DEPLOYMENT_CHANGED');return inspectOriginalLoadedPeerBridge();}
- loaded={original:h,record,host,interpreter,service,layout};return inspectOriginalLoadedPeerBridge();
+ loaded={original:h,record,host,interpreter,bootstrap,bootstrapRunner,service,layout};return inspectOriginalLoadedPeerBridge();
 }
+const originalBridgeUnavailable=new WeakSet();
+export const isOriginalLoadedPeerBridgeUnavailable=error=>Boolean(error&&typeof error==='object'&&originalBridgeUnavailable.has(error));
 export function inspectOriginalLoadedPeerBridge(...args){
- if(args.length||!loaded)fail('COMPONENT_DEPLOYMENT_NOT_LOADED');const current=prepared(producer[loaded.service.inspect](loaded.original),loaded.service);if(!same(current,loaded.record))fail('COMPONENT_DEPLOYMENT_CHANGED');
+ if(args.length)fail('COMPONENT_DEPLOYMENT_NOT_LOADED');if(!loaded){const error=Object.assign(Error('COMPONENT_DEPLOYMENT_NOT_LOADED'),{code:'COMPONENT_DEPLOYMENT_NOT_LOADED'});originalBridgeUnavailable.add(error);throw error;}const current=prepared(producer[loaded.service.inspect](loaded.original),loaded.service);if(!same(current,loaded.record))fail('COMPONENT_DEPLOYMENT_CHANGED');
  const originalHome=fs.realpathSync(process.env.CODEX_HOME??path.join(os.homedir(),'.codex'));
  return Object.freeze({...copy(current),node:{root:originalComponentLayoutPaths(loaded.layout).source_root,executable:{path:process.execPath,...ref(read(fs.realpathSync(process.execPath)))},version:process.version,platform:process.platform,arch:process.arch,flags:[...process.execArgv],profile:'original-node-peer-context-interpreter-v1'},original_home:originalHome,original_home_sha256:digest(Buffer.from(originalHome))});
 }
@@ -133,6 +153,42 @@ export function createOriginalLoadedProductionTaskRuntime(options){
  return loaded.host.createCodexTaskRuntime({...options,callback_restriction:'task-bound-effects'});
 }
 
+function bootstrapData(value,keys){
+ if(!value||typeof value!=='object'||types.isProxy(value)||Object.getPrototypeOf(value)!==Object.prototype)fail('COMPONENT_DEPLOYMENT_BOOTSTRAP_ARGUMENT');
+ const descriptors=Object.getOwnPropertyDescriptors(value),found=Reflect.ownKeys(descriptors);
+ if(found.length!==keys.length||found.some(key=>typeof key!=='string'||!keys.includes(key)||!descriptors[key].enumerable||!Object.hasOwn(descriptors[key],'value')))fail('COMPONENT_DEPLOYMENT_BOOTSTRAP_ARGUMENT');
+ return Object.fromEntries(keys.map(key=>[key,descriptors[key].value]));
+}
+function bootstrapPath(value){
+ if(typeof value!=='string'||!value.length||value.length>4096||!path.isAbsolute(value)||path.resolve(value)!==value||/[\x00-\x1f\x7f"\\]/.test(value)||Buffer.from(value).toString('utf8')!==value)fail('COMPONENT_DEPLOYMENT_BOOTSTRAP_ARGUMENT');return value;
+}
+function bootstrapOptions(value){
+ const a=bootstrapData(value,['ledger','actor','scope_root','cwd','read_paths','state_root','scratch_root']);
+ if(!a.ledger||typeof a.ledger!=='object'||types.isProxy(a.ledger))fail('COMPONENT_DEPLOYMENT_BOOTSTRAP_ARGUMENT');
+ const actor=bootstrapData(a.actor,['host','session_id','native_id']);if(Object.values(actor).some(v=>typeof v!=='string'))fail('COMPONENT_DEPLOYMENT_BOOTSTRAP_ARGUMENT');
+ const paths=a.read_paths;if(types.isProxy(paths)||!Array.isArray(paths)||Object.getPrototypeOf(paths)!==Array.prototype)fail('COMPONENT_DEPLOYMENT_BOOTSTRAP_ARGUMENT');
+ const descriptors=Object.getOwnPropertyDescriptors(paths),length=descriptors.length.value;
+ if(length>32||Reflect.ownKeys(descriptors).length!==length+1)fail('COMPONENT_DEPLOYMENT_BOOTSTRAP_ARGUMENT');
+ const reads=[];for(let index=0;index<length;index++){const d=descriptors[String(index)];if(!d?.enumerable||!Object.hasOwn(d,'value'))fail('COMPONENT_DEPLOYMENT_BOOTSTRAP_ARGUMENT');reads.push(bootstrapPath(d.value));}
+ if(new Set(reads).size!==reads.length)fail('COMPONENT_DEPLOYMENT_BOOTSTRAP_ARGUMENT');
+ return {ledger:a.ledger,actor:Object.freeze(actor),launch:Object.freeze({scope_root:bootstrapPath(a.scope_root),cwd:bootstrapPath(a.cwd),read_paths:Object.freeze(reads),state_root:bootstrapPath(a.state_root),scratch_root:bootstrapPath(a.scratch_root)})};
+}
+/** Fixed loaded composition. Original admission, opaque caps and their runner
+ * stay in the same selected module realm; every operation retains its authority. */
+export function createOriginalLoadedBootstrapMembershipRuntime(options){
+ if(arguments.length!==1)fail('COMPONENT_DEPLOYMENT_BOOTSTRAP_ARGUMENT');
+ const a=bootstrapOptions(options);inspectOriginalLoadedPeerBridge();const component=loaded,service=component.bootstrap.createPeerBootstrapMembership({ledger:a.ledger,actor:a.actor});
+ const current=()=>{inspectOriginalLoadedPeerBridge();if(loaded!==component)fail('COMPONENT_DEPLOYMENT_CHANGED');};
+ const invoke=(name,args)=>{if(args.length!==1)fail('COMPONENT_DEPLOYMENT_BOOTSTRAP_ARGUMENT');current();return service[name](args[0]);};
+ return Object.freeze({
+  enroll(...args){return invoke('enroll',args);},
+  inspect(...args){return invoke('inspect',args);},
+  activate(...args){return invoke('activate',args);},
+  revoke(...args){return invoke('revoke',args);},
+  async run(...args){if(args.length!==1)fail('COMPONENT_DEPLOYMENT_BOOTSTRAP_ARGUMENT');current();const cap=component.bootstrap.prepareOriginalPeerBootstrapMembership(service,args[0]);current();return await component.bootstrapRunner.runOriginalPeerBootstrapMembership(cap,a.launch);}
+ });
+}
+
 function originalSidecarProgramRecord(){
  const bridge=inspectOriginalLoadedPeerBridge(),pkg=JSON.parse(read(bridge.files.source_package.path,16*1024*1024).toString('utf8')),sourcePath='plugins/soloco/helpers/origin-sidecar-capture.c',source=read(originalComponentNodePath(loaded.layout,sourcePath),1024*1024);
  if(pkg.sidecar_capture?.protocol!=='soloco-origin-sidecar-source-build-v1'||!same(pkg.sidecar_capture.source,{path:sourcePath,...ref(source)})||!same(pkg.sidecar_capture.arguments,['origin-sidecar-capture-v1'])||!bridge.sidecar_capture_executable||bridge.sidecar_capture_executable.mode!=='100555')fail('ORIGIN_SIDECAR_PROGRAM_UNAVAILABLE');
@@ -150,3 +206,6 @@ export function inspectOriginalOriginSidecarCaptureProgram(h,...args){
  let current;try{current=originalSidecarProgramRecord();}catch{fail('ORIGIN_SIDECAR_PROGRAM_UNAVAILABLE');}
  if(loaded.original!==r.original||!same(current,r.record))fail('ORIGIN_SIDECAR_PROGRAM_CHANGED');return Object.freeze(copy(r.record));
 }
+
+export {preflightOriginalOriginOrdinaryTaskContext,inspectOriginalOriginOrdinaryTaskPreflight} from './origin-maintenance-wire.mjs';
+export function inspectOriginalOriginOrdinaryTaskSupport(...args){if(args.length)throw Object.assign(Error('ORIGIN_ORDINARY_NATIVE_SOURCE_REQUIRED'),{code:'ORIGIN_ORDINARY_NATIVE_SOURCE_REQUIRED'});try{const h=resolveOriginalOriginOrdinaryTaskInterpreter(),v=inspectOriginalOriginOrdinaryTaskInterpreter(h);return Object.freeze({protocol:'peer-origin-ordinary-task-assignment-v1',bridge_sha256:v.recipe_sha256,creation_mode:'fresh-original-protected-thread',selection:ORIGIN_ORDINARY_TASK_CONTEXT_SELECTION,native_qualified:false});}catch(error){if(!isOriginalContextInterpreterUnavailable(error))throw error;throw Object.assign(Error('ORIGIN_ORDINARY_NATIVE_SOURCE_REQUIRED'),{code:'ORIGIN_ORDINARY_NATIVE_SOURCE_REQUIRED'});}}

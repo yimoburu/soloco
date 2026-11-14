@@ -1,18 +1,27 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {EventEmitter} from 'node:events';
-import {runModel, commandArgs, parseOutput, parseArtifact} from '../plugins/soloco/runtime/adapters.mjs';
+import {commandArgs, parseOutput, parseArtifact} from '../plugins/soloco/runtime/adapters.mjs';
+import {createOriginalAdapterProcessFixture} from './original-adapter-process-fixture.mjs';
 import {
   normalizeTimeout, executionTiming, deadlinePhase, jobTimeoutState,
   DEFAULT_EXECUTION_TIMEOUT_MS, MIN_EXECUTION_TIMEOUT_MS,
   MAX_EXECUTION_TIMEOUT_MS, STARTUP_TIMEOUT_MS, TERMINATION_GRACE_MS
 } from '../plugins/soloco/runtime/timeout.mjs';
 
-// All dependencies below are local fakes: no child process, CLI discovery,
-// real timer, network, account access or paid model invocation is needed.
+// Process events and lifecycle scheduling below are local fakes; cancellation
+// uses a native AbortSignal. No child process, CLI discovery, real timer,
+// network, account access or paid model invocation is needed.
 class Clock {
-  constructor() {this.time=1000000; this.next=1; this.timers=new Map();}
-  now=()=>this.time;
+  constructor(start) {
+    this.time=start===undefined?1000000:start;
+    // Keep deterministic logical positions while giving Original admission a
+    // current wall epoch. Explicit absolute/overflow clocks stay unchanged.
+    this.offset=start===undefined?Date.now()-this.time:0;
+    this.next=1;this.timers=new Map();
+  }
+  timestamp=at=>this.offset+at;
+  now=()=>this.timestamp(this.time);
   set=(fn, delay)=>{
     assert.ok(Number.isFinite(delay) && delay>=0);
     const id=this.next++;
@@ -36,15 +45,17 @@ class Clock {
     this.time=to;
   }
 }
-class Signal {
-  constructor() {this.aborted=false; this.handlers=new Set();}
-  addEventListener(event, handler) {assert.equal(event,'abort'); this.handlers.add(handler);}
-  removeEventListener(event, handler) {assert.equal(event,'abort'); this.handlers.delete(handler);}
-  abort() {
-    if (this.aborted) return;
-    this.aborted=true;
-    for (const handler of [...this.handlers]) handler();
-  }
+function trackedAbortSignal() {
+  const controller=new AbortController(),signal=controller.signal,handlers=new Set();
+  const add=signal.addEventListener,remove=signal.removeEventListener;
+  // Keep the native AbortSignal brand/getter and native event dispatch. These
+  // hooks observe listener cleanup; they supply no cancellation authority.
+  Object.defineProperties(signal,{
+    handlers:{value:handlers},abort:{value:reason=>controller.abort(reason)},
+    addEventListener:{value:function(event,handler,options){assert.equal(event,'abort');handlers.add(handler);return Reflect.apply(add,this,[event,handler,options]);}},
+    removeEventListener:{value:function(event,handler,options){assert.equal(event,'abort');handlers.delete(handler);return Reflect.apply(remove,this,[event,handler,options]);}}
+  });
+  return signal;
 }
 class Child extends EventEmitter {
   constructor({closeOnTerm=false, closeOnKill=false}={}) {
@@ -64,9 +75,8 @@ class Child extends EventEmitter {
   }
 }
 const codexOutput = text => JSON.stringify({type:'thread.started',thread_id:'native-fictional'})+'\n'+JSON.stringify({type:'turn.started'})+'\n'+JSON.stringify({type:'item.completed',item:{type:'agent_message',text}})+'\n'+JSON.stringify({type:'turn.completed'})+'\n';
-function harness({child=new Child(), signal=new Signal(), onSpawn, timeout=1000, timeoutReason='Small deterministic fixture', host='codex', nativeId=null, selection=null, spawnHook, resolveHook, timeoutContext, clockStart, executionDeadlineAt}={}) {
-  const clock=new Clock();
-  if(clockStart!==undefined)clock.time=clockStart;
+function harness({child=new Child(), signal=trackedAbortSignal(), onSpawn, timeout=1000, timeoutReason='Small deterministic fixture', host='codex', nativeId=null, selection=null, spawnHook, resolveHook, timeoutContext, clockStart, executionDeadlineAt}={}) {
+  const clock=new Clock(clockStart);
   const calls=[];
   const receipts=[];
   let resolves=0;
@@ -74,21 +84,29 @@ function harness({child=new Child(), signal=new Signal(), onSpawn, timeout=1000,
     signal, timeoutReason, timeoutContext, executionDeadlineAt,
     now:clock.now, setTimeout:clock.set, clearTimeout:clock.clear,
     resolveExecutable:host=>{resolves++; resolveHook?.(); return `/fictional/${host}`;},
-    spawn:(...args)=>{calls.push(args); spawnHook?.(); return child;},
     onSpawn:record=>{receipts.push(record); return onSpawn?.(record);}
   };
-  const promise=runModel(host,nativeId,'fictional prompt','/fictional/work',timeout,selection,options);
-  const result=promise.then(value=>({value}),error=>({error}));
-  return {clock,child,signal,calls,receipts,result,get resolves(){return resolves;}};
+  const original=createOriginalAdapterProcessFixture({host,child,now:clock.now,onLaunch:(...args)=>{calls.push(args);spawnHook?.();}});
+  const promise=original.run(host,nativeId,'fictional prompt','/fictional/work',timeout,selection,options);
+  let outcome;const result=promise.then(value=>(outcome={value}),error=>(outcome={error}));
+  return {clock,child,signal,calls,receipts,result,original,get outcome(){return outcome;},get resolves(){return resolves;}};
 }
 function clean(h) {
+  if(h.original.processCreated&&!h.original.processClosed){
+    // The settled timeout/error remains uncertain until this explicit late
+    // controlled close. Do not strip the new original producer's observers.
+    const outcome=h.outcome,termination=outcome?.error?.termination_confirmed;
+    assert.ok(h.child.listenerCount('close')>0);h.child.emit('close',null);
+    assert.equal(h.outcome,outcome);assert.equal(outcome?.error?.termination_confirmed,termination);
+  }
   assert.equal(h.clock.timers.size,0,'all lifecycle timers removed');
   assert.equal(h.signal.handlers.size,0,'abort listener removed');
   for (const emitter of [h.child,h.child.stdout,h.child.stderr,h.child.stdin]) assert.deepEqual(emitter.eventNames(),[],'adapter listeners removed');
+  h.original.dispose();
 }
 test('absolute review deadline clamps actual delayed spawn and its watchdog',async()=>{
- const end=1080000,h=harness({timeout:80000,executionDeadlineAt:end});
- h.clock.move(1030000,false);h.child.emit('spawn');
+ const base=Date.now(),end=base+80000,h=harness({timeout:80000,executionDeadlineAt:end,clockStart:base});
+ h.clock.move(base+30000,false);h.child.emit('spawn');
  assert.equal(h.receipts.length,1);assert.equal(h.receipts[0].timeout_ms,50000);
  assert.equal(Date.parse(h.receipts[0].execution_deadline_at),end);
  assert.equal(Date.parse(h.receipts[0].termination_deadline_at),end+3000);
@@ -97,8 +115,8 @@ test('absolute review deadline clamps actual delayed spawn and its watchdog',asy
 });
 
 test('absolute expiry before spawn prevents timing credit and cannot accept late success',async()=>{
- const h=harness({timeout:600000,executionDeadlineAt:1002000,child:new Child({closeOnTerm:true})});
- h.clock.move(1002000,false);h.child.emit('spawn');
+ const base=Date.now(),end=base+2000,h=harness({timeout:600000,executionDeadlineAt:end,clockStart:base,child:new Child({closeOnTerm:true})});
+ h.clock.move(end,false);h.child.emit('spawn');
  assert.equal(h.receipts.length,0);assert.equal((await h.result).error.code,'ROLE_TIMEOUT');clean(h);
  for(const executionDeadlineAt of [NaN,Infinity,'1080000',-1]){
   const bad=harness({executionDeadlineAt});assert.match((await bad.result).error.message,/absolute execution deadline/);assert.equal(bad.calls.length,0);clean(bad);
@@ -187,8 +205,8 @@ test('normal completion starts allowance at spawn and preserves isolation and se
   assert.equal(h.receipts.length,0);
   h.child.emit('spawn');
   assert.equal(h.receipts.length,1);
-  assert.equal(Date.parse(h.receipts[0].execution_started_at),1239999);
-  assert.equal(Date.parse(h.receipts[0].execution_deadline_at),1240999);
+  assert.equal(Date.parse(h.receipts[0].execution_started_at),h.clock.timestamp(1239999));
+  assert.equal(Date.parse(h.receipts[0].execution_deadline_at),h.clock.timestamp(1240999));
   assert.deepEqual(h.calls[0][1],commandArgs('codex','native-fictional',selection));
   assert.equal(h.calls[0][2].env.COMPANY_WORKER,'1');
   assert.equal(Object.hasOwn(h.calls[0][2].env,'CLAUDECODE'),false);
@@ -299,14 +317,14 @@ test('output arriving at deadline triggers timeout even with delayed timer',asyn
 });
 
 test('pre-abort and abort during command resolution never start child',async()=>{
-  const signal=new Signal();
+  const signal=trackedAbortSignal();
   signal.abort();
   const h=harness({signal});
   assert.equal((await h.result).error.code,'ROLE_ABORTED');
   assert.equal(h.calls.length,0);
   assert.equal(h.resolves,0);
   clean(h);
-  const resolvingSignal=new Signal();
+  const resolvingSignal=trackedAbortSignal();
   const r=harness({signal:resolvingSignal,resolveHook:()=>resolvingSignal.abort()});
   assert.equal((await r.result).error.code,'ROLE_ABORTED');
   assert.equal(r.calls.length,0);
@@ -314,7 +332,7 @@ test('pre-abort and abort during command resolution never start child',async()=>
 });
 
 test('abort in spawn/listener gap stops child and prevents sending prompt',async()=>{
-  const signal=new Signal();
+  const signal=trackedAbortSignal();
   const h=harness({signal,spawnHook:()=>signal.abort()});
   assert.equal(h.child.prompt,undefined);
   assert.deepEqual(h.child.signals,['SIGTERM']);
@@ -506,9 +524,9 @@ test('internal upgrade context wires a 30-minute spawn receipt and real executio
   h.child.emit('spawn');
   assert.equal(h.receipts.length,1);
   assert.equal(h.receipts[0].timeout_ms,1800000);
-  assert.equal(Date.parse(h.receipts[0].execution_started_at),1100000);
-  assert.equal(Date.parse(h.receipts[0].execution_deadline_at),2900000);
-  assert.equal(Date.parse(h.receipts[0].termination_deadline_at),2903000);
+  assert.equal(Date.parse(h.receipts[0].execution_started_at),h.clock.timestamp(1100000));
+  assert.equal(Date.parse(h.receipts[0].execution_deadline_at),h.clock.timestamp(2900000));
+  assert.equal(Date.parse(h.receipts[0].termination_deadline_at),h.clock.timestamp(2903000));
   assert.deepEqual([...h.clock.timers.values()].map(t=>t.at),[2900000]);
   h.clock.move(2899999);
   assert.deepEqual(h.child.signals,[]);

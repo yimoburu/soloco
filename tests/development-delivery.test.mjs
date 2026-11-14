@@ -11,7 +11,10 @@ import {fits,rpcReply,toolResult} from '../plugins/soloco/runtime/public-respons
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
 import {developmentAssignment} from '../plugins/soloco/runtime/develop.mjs';
 import {assignmentContext} from '../plugins/soloco/runtime/context.mjs';
-import {work} from '../plugins/soloco/runtime/worker.mjs';
+import {work as unclosedWork} from '../plugins/soloco/runtime/worker.mjs';
+import {workOriginal as work,disposeCoreOriginalWorkerFixtures} from './core-original-worker-fixture.mjs';
+import {recordOriginalWorkerAssignmentFrom} from '../plugins/soloco/runtime/peers/prospective-local-worker-inventory-producer.mjs';
+import {launchOriginalWorker,startOriginalModel,stageOriginalHistoricalJob} from './original-worker-model-fixture.mjs';
 import * as historicalStorage from './fixtures/record-storage-v0610.mjs';
 import {DEVELOPMENT_DELIVERY_CONTRACT_PROTOCOL,DEVELOPMENT_ACCEPTANCE_REPORT_PROTOCOL,developmentDeliverySnapshotValue} from '../plugins/soloco/runtime/development-delivery.mjs';
 
@@ -19,13 +22,15 @@ const hash=value=>digest(JSON.stringify(value));
 const home=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'soloco-development-delivery-'))),oldData=process.env.COMPANY_PLUGIN_DATA;
 process.env.COMPANY_PLUGIN_DATA=path.join(home,'isolated-registry');
 test.after(()=>{if(oldData===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=oldData;fs.rmSync(home,{recursive:true,force:true});});
+const fixtureRoots=new Set();
+test.afterEach(()=>{for(const root of fixtureRoots)disposeCoreOriginalWorkerFixtures(root);fixtureRoots.clear();});
 const read=a=>withStore(a.root,db=>db.read());
 async function publicReport(a,source){let text='',offset=0;do{const page=await call('company_context',{root:a.root,session_id:a.session_id,epoch:a.epoch,action:'read',id:source.record.id,sha256:source.record.sha256,offset,length:16000},'codex');assert.equal(page.offset,text.length);assert.equal(page.sha256,source.record.sha256);text+=page.text;offset=page.next_offset;}while(offset!==null);assert.equal(digest(text),source.record.sha256);const report=source.path_in_record.reduce((value,key)=>value[key],JSON.parse(text));assert.equal(hash(report),source.sha256);return report;}
-const change=(a,fn)=>withStore(a.root,db=>db.transaction('controlled.delivery-fixture',s=>{fn(s);return s;}));
+const change=(a,fn,type='controlled.delivery-fixture')=>withStore(a.root,db=>db.transaction(type,s=>{fn(s,db);return s;}));
 const ref=value=>({id:value.id,revision:value.revision??null,sha256:hash(value)});
 const contact=name=>({host:'codex',session_id:'controlled-'+name,name});
 function setup({normalized=false,layoutVersion}={}){
- const root=fs.mkdtempSync(path.join(home,'company-')),a={root,session_id:id('owner'),epoch:1};engine.bind(root,a.session_id,'codex');engine.open({...a,idea:'Controlled delivery evidence fixture'},'codex');
+ const root=fs.mkdtempSync(path.join(home,'company-')),a={root,session_id:id('owner'),epoch:1};fixtureRoots.add(root);engine.bind(root,a.session_id,'codex');engine.open({...a,idea:'Controlled delivery evidence fixture'},'codex');
  fs.writeFileSync(path.join(root,'value.mjs'),'export const value=0;\n');
  fs.writeFileSync(path.join(root,'value.test.mjs'),"import test from 'node:test';import assert from 'node:assert/strict';import {value} from './value.mjs';test('value',()=>assert.equal(value,42));\n");
  change(a,s=>{s.records.dependency={id:'dependency',kind:'artifact',revision:1,status:'Submitted',content:'Complete dependency body 🌍 and interface contract.'};});
@@ -35,7 +40,7 @@ function setup({normalized=false,layoutVersion}={}){
 function contract(a,extra={}){return {protocol:DEVELOPMENT_DELIVERY_CONTRACT_PROTOCOL,interfaces:[{id:'value-interface',description:'Export value=42; preserve the complete test.\nNo external effects.',paths:['value.mjs','value.test.mjs']}],dependency_refs:[ref(read(a).records.dependency)],required_test_roots:['value.test.mjs'],integrator:contact('integrator'),observer:contact('observer'),installer:contact('installer'),...extra};}
 function plan(a,extra={}){return engine.develop({...a,action:'plan',model_data_approved:true,read_paths:['value.mjs','value.test.mjs'],write_paths:['value.mjs'],test_paths:['value.test.mjs'],max_attempts:2,timeout_ms:3000,max_output_bytes:10000,max_bytes:20000,expires_at:new Date(Date.now()+3600000).toISOString(),acceptance:'Complete local candidate exports42.',stop_conditions:'No network, installs, integration or unspecified files.',data_policy:'Only selected source and declared complete dependencies.',source_instruction:'Prepare bounded local source and retained delivery evidence.',delivery_contract:contract(a),...extra},'codex');}
 const authorize=(a,p)=>engine.develop({...a,action:'authorize',plan_id:p.id,scope_sha256:p.development.scope_sha256,model_data_approved:true,source_instruction:'Authorize exact local scope, source and complete delivery contract.'},'codex');
-function queue(a,{role='engineer',plan_id,review_id}={}){const key=id('controlled-job'),instance=id(role);change(a,s=>{const target=s.records[review_id],j={id:key,role,instance_id:instance,session_key:instance,host:'codex',epoch:a.epoch,status:'queued',native_id:null,created_at:new Date().toISOString(),context_format:3,task:'Controlled complete source delivery and independent judgement.',inputs:[],review_of:target?{id:target.id,revision:target.revision}:null,...(plan_id?{development_id:plan_id}:{})};developmentAssignment(s,j,true,a.root);const context=assignmentContext(s,j);s.jobs[key]={...j,inputs:context.inputs,context_sha256:context.hash};s.sessions[instance]={instance_id:instance,role,host:'codex',native_id:null};});return key;}
+function queue(a,{role='engineer',plan_id,review_id}={}){const key=id('controlled-job'),instance=id(role);change(a,(s,db)=>{const target=s.records[review_id],j={id:key,role,instance_id:instance,session_key:instance,host:'codex',epoch:a.epoch,status:'queued',native_id:null,created_at:new Date().toISOString(),context_format:3,task:'Controlled complete source delivery and independent judgement.',inputs:[],review_of:target?{id:target.id,revision:target.revision}:null,...(plan_id?{development_id:plan_id}:{})};developmentAssignment(s,j,true,a.root);recordOriginalWorkerAssignmentFrom(db,s,j);const context=assignmentContext(s,j);s.jobs[key]={...j,inputs:context.inputs,context_sha256:context.hash};s.sessions[instance]={instance_id:instance,role,host:'codex',native_id:null};},'job.queued');return key;}
 async function candidate(a,p){const key=queue(a,{plan_id:p.id});await work(a.root,key,async(_h,_n,prompt)=>{assert.match(prompt,/development-delivery-contract-v1/);assert.match(prompt,/Complete dependency body/);return {native_id:'controlled-engineer-'+key,text:JSON.stringify({content:'Controlled specialist candidate; no actual native execution.',files:[{path:'value.mjs',content:'export const value=42;\n'}],messages:[],notices:[]})};});const s=read(a);assert.equal(s.jobs[key].status,'completed',JSON.stringify(s.jobs[key]));return s.records[s.jobs[key].artifact_id];}
 async function receipt(a,p,c){const queued=await engine.develop({...a,action:'run',plan_id:p.id,candidate_id:c.id},'codex');const deadline=Date.now()+20000;while(Date.now()<deadline){const s=read(a),j=s.jobs[queued.id];if(!['queued','running'].includes(j.status)){assert.equal(j.status,'completed',JSON.stringify(j));const result=s.records[j.artifact_id];assert.equal(result.development.result.status,'passed',JSON.stringify(result.development.result));return result;}await new Promise(r=>setTimeout(r,20));}throw Error('Controlled test worker did not complete');}
 async function review(a,t,{verdict='Pass',native}={}){const key=queue(a,{role:'qa',review_id:t.id});await work(a.root,key,async(_h,_n,prompt)=>{assert.match(prompt,/actual runtime test receipt/);assert.match(prompt,/development-delivery-contract-v1/);return {native_id:native??'controlled-qa-'+key,text:JSON.stringify({content:'Controlled independent judgement; not actual native QA qualification.',messages:[],notices:[],review:{verdict,reason:'Controlled exact-source and canonical local test assessment.',permitted_action:verdict==='Pass'?'accept_local_development':'hold',candidate_sha256:t.development.candidate_sha256,receipt_sha256:t.development.receipt_sha256,blockers:verdict==='Pass'?[]:['Retained actual blocker.']}})};});const s=read(a);return s.records[s.jobs[key].artifact_id]??s.jobs[key];}
@@ -68,9 +73,25 @@ test('actual guarded local acceptance alone creates one immutable preimage-bound
  assert.equal(report.protocol,DEVELOPMENT_ACCEPTANCE_REPORT_PROTOCOL);assert.equal(acceptance.report_sha256,hash(report));assert.equal(report.receipt_before_acceptance.sha256,hash(before.records[t.id]));
  assert.deepEqual(developmentDeliverySnapshotValue(s,report.receipt_before_acceptance),before.records[t.id]);assert.equal(developmentDeliverySnapshotValue(s,report.receipt_before_acceptance).development.acceptance,undefined);assert.equal(report.candidate_snapshot_sha256,c.development.candidate_sha256);assert.equal(report.qa_record.sha256,hash(before.records[r.id]));
  assert.deepEqual(developmentDeliverySnapshotValue(s,report.test_evidence.validation_manifest),before.records[t.id].development.validation_manifest);assert.equal(report.native_identities.qa.native_id,before.jobs[r.job_id].native_id);assert.notEqual(report.native_identities.qa.native_id,report.native_identities.candidate.native_id);
- assert.equal(report.qa_evidence.original_process_journal,'held','controlled legacy model output has only a requested journal; it supplies no actual CLI birth/closure proof');assert.equal(report.source_integration,false);assert.equal(report.external_actions_authorized,false);assert.equal(s.records[t.id].development.delivery,undefined);
+ assert.equal(report.qa_evidence.original_process_journal,'observed','the Original adapter observers recorded the controlled model birth and close');assert.equal(report.source_integration,false);assert.equal(report.external_actions_authorized,false);assert.equal(s.records[t.id].development.delivery,undefined);
  const observed=await inspect(a,p,t,'acceptance_report');assert.equal(observed.status,'observed');assert.equal(observed.report_sha256,acceptance.report_sha256);assert.equal(observed.current_receiver.stage,'owner');assert.equal(observed.contacts_authenticated,false);
  const prior=read(a);await assert.rejects(accept(a,p,t,r));assert.deepEqual(read(a),prior,'replayed acceptance cannot append a report');
+});
+
+test('Original QA birth without close holds publication and local acceptance',async()=>{
+ const a=setup(),p=await plan(a);await authorize(a,p);const c=await candidate(a,p),t=await receipt(a,p,c),key=queue(a,{role:'qa',review_id:t.id});
+ launchOriginalWorker(a.root,key);let model;
+ await unclosedWork(a.root,key,async(...args)=>{
+  fixtureRoots.add(args[3]);model=startOriginalModel([...args.slice(0,6),{...args[6],sessionTitle:undefined,sessionNameDirectory:undefined}],{nativeId:'controlled-unclosed-qa'});model.promise.catch(()=>{});
+  // Returning plausible QA DATA cannot replace this adapter's missing close.
+  return {native_id:'controlled-unclosed-qa',text:JSON.stringify({content:'Controlled withheld closure.',messages:[],notices:[],review:{verdict:'Pass',reason:'Plausible DATA still lacks Original closure.',permitted_action:'accept_local_development',candidate_sha256:t.development.candidate_sha256,receipt_sha256:t.development.receipt_sha256,blockers:[]}})};
+ });
+ assert.ok(model,'the actual Original adapter must reach its controlled birth');
+ const s=read(a),job=s.jobs[key],invocation=job.model_process_tracking.invocations.at(-1),launch=job.original_execution_assignment.launches.filter(value=>value.kind==='model').at(-1);
+ assert.ok(invocation.birth);assert.equal(invocation.closure,null);assert.ok(launch.birth);assert.equal(launch.closure,null);
+ assert.equal(job.status,'failed');assert.equal(job.coordination_release.termination_confirmed,false);assert.equal(job.coordination_release.reason,'original_process_closure_unknown');
+ assert.equal(job.artifact_id,undefined);assert.equal(Object.values(s.records).filter(value=>value.job_id===key&&value.status==='Submitted').length,0);
+ const before=read(a);await assert.rejects(accept(a,p,t,{id:key}));assert.deepEqual(read(a),before);assert.equal(read(a).records[t.id].development.acceptance,undefined);
 });
 
 test('normalized acceptance retains native immutable snapshot handles without changing evidence',async()=>{
@@ -137,7 +158,7 @@ test('handoff CAS/order/evidence/owner checks hold and exact replay appends noth
 });
 
 test('failed/unknown observations preserve receiver, expiry and uncertain claims',async()=>{
- const {a,p,t}=await accepted();change(a,s=>{s.records[p.id].development.scope.expires_at='2000-01-01T00:00:00.000Z';s.jobs.uncertain={id:'uncertain',status:'failed',started_at:'2000-01-01T00:00:00.000Z',coordination:{resources:['exclusive-test']}};});
+ const {a,p,t}=await accepted();stageOriginalHistoricalJob(a.root,{id:'uncertain',status:'failed',started_at:'2000-01-01T00:00:00.000Z',coordination:{resources:['exclusive-test']}});change(a,s=>{s.records[p.id].development.scope.expires_at='2000-01-01T00:00:00.000Z';});
  for(const [reported_outcome,status] of [['unknown','unobserved'],['failed','held']]){const before=read(a),current=await inspect(a,p,t),result=await engine.develop(transition(a,p,t,current,{reported_outcome,evidence_refs:[]}), 'codex');assert.equal(result.status,status);assert.equal(result.current_receiver.stage,'owner');assert.deepEqual(read(a).jobs.uncertain,before.jobs.uncertain);assert.equal(read(a).records[p.id].development.scope.expires_at,'2000-01-01T00:00:00.000Z');assert.equal(result.external_actions_authorized,false);const request=transition(a,p,t,result,{reported_outcome,evidence_refs:[]});await engine.develop(request,'codex');const replayBefore=read(a),replay=await engine.develop(request,'codex');assert.equal(replay.status,status);assert.deepEqual(read(a),replayBefore);}
 });
 

@@ -1,11 +1,34 @@
 // Distinct original whole-frontier final review. No ordinary membership/task
 // authority, caller JSON proof, old range-cap relabel or legacy marker removal.
 import {randomUUID} from 'node:crypto';
+import {assertOriginalPeerMaintenanceExecutionCapacityFrom as assertInventory,assertOriginalPeerMaintenanceExecutionCapacityInTransactionFrom as assertInventoryInTransaction,prepareOriginalPeerExecutionLaunchFrom as prepareInventoryLaunch} from './prospective-local-worker-inventory-producer.mjs';
 import fs from 'node:fs';
 import {PeerLedger,FAMILIES,canonical,peerDigest} from './ledger.mjs';
 import {inspectPeerPinnedTeamFrom,assertPeerOriginSelectedMaintenanceFrom} from './legacy-origin.mjs';
-function fixedOptionalEntry(relative){const entry=fs.lstatSync(new URL(relative,import.meta.url),{throwIfNoEntry:false});if(entry===undefined)return false;need(entry.isFile()&&!entry.isSymbolicLink(),'ORIGIN_FRONTIER_SEAL_OPTIONAL_SOURCE_ENTRY_REQUIRED');return true;}
-let frontier=null;if(fixedOptionalEntry('./input-frontier-checkpoint.mjs'))frontier=await import('./input-frontier-checkpoint.mjs');
+function fixedOptionalEntry(relative){
+ const entry=fs.lstatSync(new URL(relative,import.meta.url),{throwIfNoEntry:false});if(entry===undefined)return false;
+ // The archive check runs during cyclic module evaluation, before originNeed
+ // may be initialized. Preserve its exact fixed-entry failure locally.
+ if(!entry.isFile()||entry.isSymbolicLink()){
+  const code='ORIGIN_FRONTIER_SEAL_OPTIONAL_SOURCE_ENTRY_REQUIRED';throw Object.assign(Error(code),{code});
+ }
+ return true;
+}
+let frontier=null,checkpointSupport;
+// Checkpoint support is loaded explicitly before a caller enters its owning
+// synchronous snapshot/admission. Present-module errors now surface at this
+// awaited boundary, retaining the original error; loading grants no authority.
+export function loadPeerOriginFrontierSealCheckpointSupport(){
+ need(arguments.length===0,'ORIGIN_FRONTIER_SEAL_CHECKPOINT_SOURCE_ARGUMENT');
+ // Publish the one promise before any fixed-path read. Absence and failure are
+ // latched too: no caller URL, provider, ready flag, reset or automatic retry.
+ return checkpointSupport??=Promise.resolve().then(async()=>{
+  need(fixedOptionalEntry('./input-frontier-checkpoint.mjs'),'ORIGIN_FRONTIER_SEAL_CHECKPOINT_SOURCE_REQUIRED');
+  const loaded=await import('./input-frontier-checkpoint.mjs');
+  need(['preparePeerInputFrontierCheckpointFrom','stagePeerInputFrontierCheckpointFrom','assertPeerInputFrontierCheckpointFrom'].every(name=>typeof loaded[name]==='function'),'ORIGIN_FRONTIER_SEAL_CHECKPOINT_SOURCE_REQUIRED');
+  frontier=loaded;
+ });
+}
 import {buildPeerInputFrontier} from './input-frontier.mjs';
 let archive=null;if(fixedOptionalEntry('./input-frontier-archive.mjs'))archive=await import('./input-frontier-archive.mjs');
 import * as deployment from './context-component-deployment.mjs';
@@ -23,6 +46,7 @@ const services=new WeakMap(),caps=new WeakMap(),consumed=new WeakSet();
 const text=(v,max=4000)=>typeof v==='string'&&v.trim().length>0&&v.length<=max&&!v.includes('\0')&&Buffer.from(v).toString('utf8')===v;
 const bytes=v=>Buffer.byteLength(canonical(v));
 function data(value,keys){value=originSafeData(value);need(value&&typeof value==='object'&&!Array.isArray(value)&&Object.getPrototypeOf(value)===Object.prototype&&Object.keys(value).length===keys.length&&keys.every(k=>Object.hasOwn(value,k)),'ORIGIN_FRONTIER_SEAL_INPUT');return value;}
+function readLive(r,fn){return r.s.ledger.read(raw=>{assertInventoryInTransaction(r.s.ledger,raw,{stage:'existing',admission_ref:r.admission_ref});return fn(raw);});}
 function exact(tx,r,kind){const row=tx.getVersion(r);need(row&&(!kind||row.value.kind===kind),'ORIGIN_FRONTIER_SEAL_PROOF_CHANGED');return row;}
 function rows(tx,family){const out=[];let cursor;for(;;){const p=tx.list(family,{limit:100,...(cursor?{cursor}:{})});out.push(...p.items);need(out.length<=10000,'ORIGIN_FRONTIER_SEAL_STATE_CAPACITY');if(p.complete)return out;need(p.next_cursor&&p.next_cursor!==cursor,'ORIGIN_FRONTIER_SEAL_STATE_INCOMPLETE');cursor=p.next_cursor;}}
 function purposeFrom(o){const m=o.value.maintenance;need(m?.protocol==='peer-origin-maintenance-authority-v1'&&m.status==='active'&&m.frontier_seal_protocol===ORIGIN_FRONTIER_SEAL_PURPOSE&&m.frontier_seal_purpose===PURPOSE&&['max_model_calls','max_review_calls','used_model_calls','used_review_calls'].every(k=>Number.isSafeInteger(m[k])&&m[k]>=0)&&m.max_model_calls>0&&m.max_review_calls>0&&m.used_model_calls<=m.max_model_calls&&m.used_review_calls<=m.max_review_calls&&m.units==='new-origin-maintenance-model-invocation'&&m.old_allowance_conversion==='none'&&Number.isSafeInteger(m.max_frontier_seal_reviews)&&m.max_frontier_seal_reviews>0&&m.max_frontier_seal_reviews<=m.max_model_calls&&m.max_frontier_seal_reviews<=m.max_review_calls&&Number.isSafeInteger(m.used_frontier_seal_reviews)&&m.used_frontier_seal_reviews>=0&&m.used_frontier_seal_reviews<=m.max_frontier_seal_reviews,'ORIGIN_FRONTIER_SEAL_PURPOSE_REQUIRED');return m;}
@@ -62,8 +86,10 @@ function wireCurrent(r,context){const receipt=assertPeerOriginFrontierSealWireRe
 // Fixed original stage uses this same private prewrite facade. All provider
 // reads/planning precede real puts; final head guards are get-only after sealing.
 function write(s,type,principal,build,deadlineOf){
- bound(s);let expected,sidecars,deadline=Date.now()+120000;
+ bound(s);let expected,sidecars,inventoryRef,deadline=Date.now()+120000;
+ const admitting=type==='origin.frontier-seal.admitted',inventoryChecked=admitting||['origin.frontier-seal.native_created','origin.frontier-seal.completed'].includes(type);
  return s.ledger.guardedWrite(type,principal,raw=>{
+  if(admitting)assertInventoryInTransaction(s.ledger,raw,{stage:'reserve'});
   const cache=new Map(),changes=[],events=[],k=(f,id)=>canonical([f,id]);let size=0,count=0;
   for(const family of FAMILIES)for(const row of rows(raw,family)){size+=bytes(row);need(++count<=30000&&size<=192*1024*1024,'ORIGIN_FRONTIER_SEAL_STATE_CAPACITY');cache.set(k(family,row.id),{family,id:row.id,row});}
   const initial=raw.get('control','company'),tx={...raw,
@@ -71,15 +97,16 @@ function write(s,type,principal,build,deadlineOf){
    getVersion(r){const staged=cache.get(k(r.family,r.id))?.row;if(staged&&same(ref(r.family,staged),r))return {family:r.family,...copy(staged)};return raw.getVersion(r);},
    list(f,{limit=100,cursor}={}){const all=[...cache.values()].filter(r=>r.family===f&&r.row).map(r=>r.row).sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0),offset=cursor?Number(cursor):0;need(Number.isSafeInteger(offset)&&offset>=0,'ORIGIN_FRONTIER_SEAL_CURSOR');return {items:copy(all.slice(offset,offset+limit)),complete:offset+limit>=all.length,next_cursor:offset+limit<all.length?String(offset+limit):null};},
    put(f,id,value,revision){const before=this.get(f,id);need(revision===(before?.revision??0),'ORIGIN_FRONTIER_SEAL_PLAN_CHANGED');const v=copy(value),row={id,revision:(before?.revision??0)+1,sha256:peerDigest(v),created_seq:before?.created_seq??raw.sequence,value:v};changes.push({family:f,id,value:v,expected:revision,row});cache.set(k(f,id),{family:f,id,row});return copy(row);},event(type,payload){events.push({type,payload:copy(payload)});}};
-  const result=build(tx);raw.getVersion(ref('control',initial));expected=[...cache.values()];sidecars=tx.get('control','origin').value.sidecar_frontier;
-  for(const c of changes)need(same(raw.put(c.family,c.id,c.value,c.expected),c.row),'ORIGIN_FRONTIER_SEAL_PLAN_CHANGED');for(const e of events)raw.event(e.type,e.payload);need(typeof raw.sealWrites==='function','ORIGIN_FRONTIER_SEAL_PHYSICAL_REQUIRED');raw.sealWrites();for(const r of expected)need(same(raw.get(r.family,r.id),r.row),'ORIGIN_FRONTIER_SEAL_CURRENT_CHANGED');return copy(result);
- },view=>{bound(s);for(const r of expected)need(same(view.get(r.family,r.id),r.row),'ORIGIN_FRONTIER_SEAL_CURRENT_CHANGED');assertPeerOriginLegacyFences(s.ledger.db);need(same(originSidecars(s.connection.directory),sidecars),'ORIGIN_LATE_SIDECAR_UNRECORDED');const end=deadlineOf?.(view);if(end!==undefined){need(Number.isFinite(end),'ORIGIN_FRONTIER_SEAL_PHYSICAL_REQUIRED');deadline=Math.min(deadline,end);}return deadline;});
+  const result=build(tx);if(inventoryChecked){const phases=changes.filter(c=>c.family==='work_items'&&c.value.kind==='origin_frontier_seal_phase');need(phases.length===1,'ORIGIN_FRONTIER_SEAL_EXECUTION_INVENTORY_ADMISSION_REQUIRED');inventoryRef=copy(phases[0].value.admission_ref);if(!admitting)assertInventoryInTransaction(s.ledger,raw,{stage:'existing',admission_ref:inventoryRef});}raw.getVersion(ref('control',initial));expected=[...cache.values()];sidecars=tx.get('control','origin').value.sidecar_frontier;
+  for(const c of changes)need(same(raw.put(c.family,c.id,c.value,c.expected),c.row),'ORIGIN_FRONTIER_SEAL_PLAN_CHANGED');for(const e of events)raw.event(e.type,e.payload);if(admitting)prepareInventoryLaunch(s.ledger,raw,{admission_ref:inventoryRef});need(typeof raw.sealWrites==='function','ORIGIN_FRONTIER_SEAL_PHYSICAL_REQUIRED');raw.sealWrites();for(const r of expected)need(same(raw.get(r.family,r.id),r.row),'ORIGIN_FRONTIER_SEAL_CURRENT_CHANGED');return copy(result);
+ },view=>{bound(s);for(const r of expected)need(same(view.get(r.family,r.id),r.row),'ORIGIN_FRONTIER_SEAL_CURRENT_CHANGED');if(inventoryRef)assertInventoryInTransaction(s.ledger,view,{stage:'existing',admission_ref:inventoryRef});assertPeerOriginLegacyFences(s.ledger.db);need(same(originSidecars(s.connection.directory),sidecars),'ORIGIN_LATE_SIDECAR_UNRECORDED');const end=deadlineOf?.(view);if(end!==undefined){need(Number.isFinite(end),'ORIGIN_FRONTIER_SEAL_PHYSICAL_REQUIRED');deadline=Math.min(deadline,end);}return deadline;});
 }
 function journal(tx,command_ref,checkpoint_ref){tx.event('origin.frontier-seal.journal',{protocol:'peer-origin-frontier-seal-journal-v1',original_command_ref:command_ref,checkpoint_ref});}
 export function createPeerOriginFrontierSeal({ledger,actor}){need(Object.getPrototypeOf(ledger)===PeerLedger.prototype,'ORIGIN_LEDGER_REQUIRED');const s={ledger,actor:assertOriginActor(actor),connection:{root:ledger.root,directory:ledger.directory,company_id:ledger.company_id},operations:new Map()},api=Object.freeze({});services.set(api,s);return api;}
 export function originalPeerOriginFrontierSealLedger(api){need(arguments.length===1,'ORIGIN_FRONTIER_SEAL_SERVICE_REQUIRED');const s=service(api);s.ledger.read(tx=>currentFrom(tx,{ledger:s.ledger,actor:s.actor}));return s.ledger;}
 export function prepareOriginalPeerOriginFrontierSeal(api,input){
  const s=service(api),a=data(input,['operation_id','frontier_ref','root_result_ref']);need(text(a.operation_id,160),'ORIGIN_FRONTIER_SEAL_INPUT');const request=peerDigest(a),previous=s.operations.get(a.operation_id);if(previous){need(previous.request===request,'ORIGIN_FRONTIER_SEAL_REPLAY_MISMATCH');assertOriginalPeerOriginFrontierSeal(previous.cap,{stage:original(previous.cap).native?'execution':'reserved'});return previous.cap;}
+ assertInventory(s.ledger,{stage:'reserve'});
  const source=support(),cap=Object.freeze({});s.ledger.read(tx=>currentFrom(tx,{ledger:s.ledger,actor:s.actor}));let record,deadline;
  write(s,'origin.frontier-seal.admitted','founder',tx=>{
   const command_id='origin-frontier-seal-operation:'+peerDigest([s.connection.company_id,s.actor,a.operation_id]),old=tx.get('commands',command_id);if(old){need(old.value.request_sha256===request,'ORIGIN_FRONTIER_SEAL_REPLAY_MISMATCH');need(false,'ORIGIN_FRONTIER_SEAL_ORIGINAL_CONTINUATION_REQUIRED');}
@@ -105,12 +132,12 @@ function admitted(r,tx,{native=false}={}){
  need(typeof frontier?.assertPeerInputFrontierCheckpointFrom==='function','ORIGIN_FRONTIER_SEAL_CHECKPOINT_SOURCE_REQUIRED');const checkpoint=frontier.assertPeerInputFrontierCheckpointFrom(tx,{ledger:r.s.ledger,checkpoint_ref:r.binding.checkpoint_ref,purpose:'origin-frontier-seal'});need(checkpoint.checkpoint?.baseline_sha256===r.binding.baseline_sha256,'ORIGIN_FRONTIER_SEAL_CHECKPOINT_CHANGED');wireCurrent(r,context);return {c,o,m,pins,transition,phase,context,checkpoint};
 }
 export function inspectOriginalPeerOriginFrontierSeal(cap){const r=original(cap);return {...copy(r.binding),admission_ref:copy(r.admission_ref),original_command_ref:copy(r.command_ref),native_id:r.native?.native_id??null};}
-export function assertOriginalPeerOriginFrontierSeal(cap,{ledger,stage='execution'}={}){const r=original(cap,{ledger});need(['reserved','execution'].includes(stage),'ORIGIN_FRONTIER_SEAL_INPUT');return r.s.ledger.read(tx=>{admitted(r,tx,{native:stage==='execution'});if(stage==='reserved')need(!r.native,'ORIGIN_FRONTIER_SEAL_NATIVE_REQUIRED');return inspectOriginalPeerOriginFrontierSeal(cap);});}
-export function originalPeerOriginFrontierSealPreflight(cap){const r=original(cap);return r.s.ledger.read(tx=>{const {context}=admitted(r,tx,{native:Boolean(r.native)});return wireCurrent(r,context);});}
-export function prepareOriginalPeerOriginFrontierSealContext(cap){const r=original(cap);return r.s.ledger.read(tx=>{const {context}=admitted(r,tx,{native:Boolean(r.native)});return {text:context.value.text,sha256:context.value.sha256,utf8_bytes:Buffer.byteLength(context.value.text),context_ref:r.binding.context_ref,review_subject:r.binding.subject};});}
+export function assertOriginalPeerOriginFrontierSeal(cap,{ledger,stage='execution'}={}){const r=original(cap,{ledger});need(['reserved','execution'].includes(stage),'ORIGIN_FRONTIER_SEAL_INPUT');return readLive(r,tx=>{admitted(r,tx,{native:stage==='execution'});if(stage==='reserved')need(!r.native,'ORIGIN_FRONTIER_SEAL_NATIVE_REQUIRED');return inspectOriginalPeerOriginFrontierSeal(cap);});}
+export function originalPeerOriginFrontierSealPreflight(cap){const r=original(cap);return readLive(r,tx=>{const {context}=admitted(r,tx,{native:Boolean(r.native)});return wireCurrent(r,context);});}
+export function prepareOriginalPeerOriginFrontierSealContext(cap){const r=original(cap);return readLive(r,tx=>{const {context}=admitted(r,tx,{native:Boolean(r.native)});return {text:context.value.text,sha256:context.value.sha256,utf8_bytes:Buffer.byteLength(context.value.text),context_ref:r.binding.context_ref,review_subject:r.binding.subject};});}
 export function bindOriginalPeerOriginFrontierSealNative(cap,creationToken){
- const r=original(cap);need(!r.native&&!r.finished&&typeof domain.assertOriginalProtectedOriginFrontierSealCreation==='function','ORIGIN_FRONTIER_SEAL_CREATION_SOURCE_REQUIRED');const facts=domain.assertOriginalProtectedOriginFrontierSealCreation(creationToken,{ledger:r.s.ledger,admission_ref:r.admission_ref,context_sha256:r.binding.context_sha256,kind:ORIGIN_FRONTIER_SEAL_KIND});
- need(facts?.protocol==='peer-origin-frontier-seal-original-creation-v1'&&facts.kind===ORIGIN_FRONTIER_SEAL_KIND&&same(facts.admission_ref,r.admission_ref)&&facts.context_sha256===r.binding.context_sha256&&text(facts.native_id,300)&&facts.native_id===facts.thread_id&&facts.profile_id==='soloco-origin-frontier-seal-readonly-v1','ORIGIN_FRONTIER_SEAL_CREATION_REQUIRED');let creation_ref;
+ const r=original(cap);assertInventory(r.s.ledger,{stage:'existing',admission_ref:r.admission_ref});need(!r.native&&!r.finished&&typeof domain.assertOriginalProtectedOriginFrontierSealCreation==='function','ORIGIN_FRONTIER_SEAL_CREATION_SOURCE_REQUIRED');const facts=domain.assertOriginalProtectedOriginFrontierSealCreation(creationToken,{ledger:r.s.ledger,admission_ref:r.admission_ref,context_sha256:r.binding.context_sha256,kind:ORIGIN_FRONTIER_SEAL_KIND});
+ need(facts?.protocol==='peer-origin-frontier-seal-original-creation-v1'&&facts.kind===ORIGIN_FRONTIER_SEAL_KIND&&same(facts.admission_ref,r.admission_ref)&&facts.context_sha256===r.binding.context_sha256&&text(facts.native_id,300)&&facts.native_id===facts.thread_id&&facts.profile_id==='soloco-origin-final-review-readonly-v1','ORIGIN_FRONTIER_SEAL_CREATION_REQUIRED');let creation_ref;
  write(r.s,'origin.frontier-seal.native_created','founder',tx=>{const {phase,context}=admitted(r,tx);const excluded=new Set(context.value.body.excluded_native_ids);for(const row of rows(tx,'work_items'))if(row.value.kind==='origin_frontier_seal_creation')excluded.add(row.value.facts.native_id);need(!excluded.has(facts.native_id),'ORIGIN_FRONTIER_SEAL_INDEPENDENCE');
   const row=tx.put('work_items',r.execution_id+':creation',{kind:'origin_frontier_seal_creation',protocol:'peer-origin-frontier-seal-creation-record-v1',admission_ref:r.admission_ref,facts:copy(facts),created_at_ms:Date.now()},0);creation_ref=ref('work_items',row);tx.put('work_items',phase.id,{...phase.value,status:'running',native_id:facts.native_id,creation_ref},phase.revision);const participant=tx.get('work_items',r.participant_id);tx.put('work_items',participant.id,{...participant.value,status:'running',native_id:facts.native_id,creation_ref},participant.revision);journal(tx,r.command_ref,r.binding.checkpoint_ref);return null;
  },()=>r.binding.deadline_at_ms);r.native={native_id:facts.native_id,creation_ref};return inspectOriginalPeerOriginFrontierSeal(cap);
@@ -118,9 +145,9 @@ export function bindOriginalPeerOriginFrontierSealNative(cap,creationToken){
 function range(text,offset,length){need(Number.isSafeInteger(offset)&&offset>=0&&offset<text.length&&Number.isSafeInteger(length)&&length>0&&length<=4096,'ORIGIN_FRONTIER_SEAL_RANGE');const split=i=>i>0&&i<text.length&&/[\uD800-\uDBFF]/.test(text[i-1])&&/[\uDC00-\uDFFF]/.test(text[i]);need(!split(offset),'ORIGIN_FRONTIER_SEAL_RANGE');let end=Math.min(text.length,offset+length);if(split(end))end--;need(end>offset,'ORIGIN_FRONTIER_SEAL_RANGE');return {offset,length:end-offset,text:text.slice(offset,end),total_characters:text.length};}
 function covered(reads,total){let end=0;for(const [start,to]of reads.slice().sort((a,b)=>a[0]-b[0])){if(start>end)return false;end=Math.max(end,to);}return end===total;}
 export function originalPeerOriginFrontierSealChannel(cap){const r=original(cap);return Object.freeze({
- header:()=>r.s.ledger.read(tx=>{const {context}=admitted(r,tx,{native:true});return {protocol:ORIGIN_FRONTIER_SEAL_CONTEXT,sha256:r.binding.context_sha256,total_characters:context.value.text.length,review_subject:r.binding.subject,coverage:copy(r.reads)};}),
- read:input=>{const a=data(input,['sha256','offset','length']);return r.s.ledger.read(tx=>{const {context}=admitted(r,tx,{native:true});need(a.sha256===r.binding.context_sha256,'ORIGIN_FRONTIER_SEAL_CONTEXT_CHANGED');const part=range(context.value.text,a.offset,a.length);r.reads.push([part.offset,part.offset+part.length]);return {sha256:a.sha256,...part};});},
- submit:input=>{const a=data(input,['sha256','content']);return r.s.ledger.read(tx=>{const {context}=admitted(r,tx,{native:true});need(a.sha256===r.binding.context_sha256&&covered(r.reads,context.value.text.length)&&typeof a.content==='string'&&Buffer.byteLength(a.content)<=16384,'ORIGIN_FRONTIER_SEAL_DELIVERY_INCOMPLETE');need(r.submission===null||r.submission===a.content,'ORIGIN_FRONTIER_SEAL_FIRST_SUBMISSION_REQUIRED');r.submission=a.content;return {sha256:a.sha256,accepted_for_original_validation:true,semantic_qualification:false};});}
+ header:()=>readLive(r,tx=>{const {context}=admitted(r,tx,{native:true});return {protocol:ORIGIN_FRONTIER_SEAL_CONTEXT,sha256:r.binding.context_sha256,total_characters:context.value.text.length,review_subject:r.binding.subject,coverage:copy(r.reads)};}),
+ read:input=>{const a=data(input,['sha256','offset','length']);return readLive(r,tx=>{const {context}=admitted(r,tx,{native:true});need(a.sha256===r.binding.context_sha256,'ORIGIN_FRONTIER_SEAL_CONTEXT_CHANGED');const part=range(context.value.text,a.offset,a.length);r.reads.push([part.offset,part.offset+part.length]);return {sha256:a.sha256,...part};});},
+ submit:input=>{const a=data(input,['sha256','content']);return readLive(r,tx=>{const {context}=admitted(r,tx,{native:true});need(a.sha256===r.binding.context_sha256&&covered(r.reads,context.value.text.length)&&typeof a.content==='string'&&Buffer.byteLength(a.content)<=16384,'ORIGIN_FRONTIER_SEAL_DELIVERY_INCOMPLETE');need(r.submission===null||r.submission===a.content,'ORIGIN_FRONTIER_SEAL_FIRST_SUBMISSION_REQUIRED');r.submission=a.content;return {sha256:a.sha256,accepted_for_original_validation:true,semantic_qualification:false};});}
  });}
 export async function completeOriginalPeerOriginFrontierSeal(cap,drainToken){
  const r=original(cap);need(!r.finished&&r.native&&!consumed.has(drainToken)&&typeof domain.assertOriginalProtectedOwnedTaskDrain==='function','ORIGIN_FRONTIER_SEAL_DRAIN_REQUIRED');const facts=domain.assertOriginalProtectedOwnedTaskDrain(drainToken,{ledger:r.s.ledger,admission_ref:r.admission_ref,context_sha256:r.binding.context_sha256,kind:ORIGIN_FRONTIER_SEAL_KIND});

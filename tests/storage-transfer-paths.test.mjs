@@ -1,3 +1,4 @@
+import {preexistingLegacyStore} from './preexisting-legacy-data-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -12,8 +13,7 @@ let sequence=0;
 function fixture(){
   const directory=path.join(temporary,String(++sequence));fs.mkdirSync(directory);
   const root=path.join(directory,'company');fs.mkdirSync(root);
-  const store=new Store(root,true);
-  store.transaction('fictional.paths',()=>({id:'fictional-path-contract',schema:2,paused:true,
+  const store=preexistingLegacyStore(root,'fictional.paths',()=>({id:'fictional-path-contract',schema:2,paused:true,
     owner:{host:'fictional',session_id:'fixture-only',epoch:1},records:{},jobs:{},notices:[]}));
   return {directory,store};
 }

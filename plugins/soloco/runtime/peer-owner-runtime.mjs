@@ -5,13 +5,14 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {types} from 'node:util';
 import {DatabaseSync} from 'node:sqlite';
+import {Store} from './store.mjs';
 import {PeerLedger,FAMILIES,PEER_LAYOUT,PEER_PROTOCOL,canonical,peerDigest} from './peers/ledger.mjs';
 import {requireCodexRootActor} from './mcp-host-context.mjs';
-import {createPeerPublicOwnerLifecycle,assertPeerPublicOwnerCustody} from './peers/owner-handover.mjs';
+import {createPeerPublicOwnerLifecycle,createPeerPublicOwnerFreshReviewLifecycle,PEER_OWNER_MAINTENANCE_FRESH_ACTION,PEER_OWNER_MAINTENANCE_FRESH_PURPOSE,assertPeerPublicOwnerCustody} from './peers/owner-handover.mjs';
+import {loadOriginalPeerOwnerTransferDecision,loadOriginalPeerOwnerTransferIntent} from './peers/owner-transfer-intent.mjs';
 import {inspectPeerOwnerOperatingState} from './peers/owner-operating-state.mjs';
 import {inspectPeerPublicContextFrom,readPeerPublicContextFrom,inspectPeerPublicPinsFrom,readPeerPublicPinsFrom} from './peer-public-context.mjs';
 import {legacyEncodedReplyBytes} from './peers/legacy-origin.mjs';
-import {Store} from './store.mjs';
 
 const MAINTENANCE_URL=new URL('./peers/maintenance-launch.mjs',import.meta.url);
 const MAX_REPLY=24576,MAX_REQUEST=100000;
@@ -41,7 +42,7 @@ const fields={
  pause:object(op),record_transfer_decision:object({...op,target,reviewer_principal_id:str(200),review_grant_id:str(200),review_grant_generation:integer(),expires_at:str(100),max_review_calls:integer(),primary_human_message:primary,basis:{enum:['explicit']}}),
  issue_transfer_intent:object({...op,decision_ref:ref}),revoke_transfer_intent:object({...op,intent_ref:ref}),inspect_transfer_intent:object({intent_ref:ref}),read_transfer_intent:object({intent_ref:ref,...range}),begin:object({...op,intent_ref:ref}),
  inspect:object({}),read_subject:object({...op,...range}),refresh_preview:object({}),read_refresh_preview:object({preview_sha256:sha,offset:integer(0),length:integer(1,1024)}),refresh_subject:object({...op,previous_subject_ref:ref,preview_sha256:sha}),read_previous_subject:object({subject_ref:ref,offset:integer(0),length:integer(1,1024)}),submit:object({...op,subject_sha256:sha,content:str(8192)}),
- recovery_header:object(range,[]),read_recovery:object({...op,...range}),recover:object({...op,subject_sha256:sha,recovery_sha256:sha,attempt_refs:attempts,content:str(8192)}),review:object(op),activate:object({...op,review_ref:ref}),resume:object(op),
+ recovery_header:object(range,[]),read_recovery:object({...op,...range}),recover:object({...op,subject_sha256:sha,recovery_sha256:sha,attempt_refs:attempts,content:str(8192)}),review:object(op),activate:object({...op,review_ref:ref}),resume:object({...op,qualification_ref:ref},Object.keys(op)),
  context_inspect:object({family:{enum:FAMILIES},status:str(1000),principal_id:str(1000),task_id:str(1000),scope:str(1000),limit:integer(1,50),cursor:str(16000)},['family']),context_read:object({...rowRef.properties,offset:integer(0),length:integer(1,4096)},['family','id','revision','sha256'])
 };
 const sourceActions=new Set(['pause','record_transfer_decision','issue_transfer_intent','revoke_transfer_intent','begin','refresh_subject','submit','recover','review','activate','resume']);
@@ -220,13 +221,14 @@ export async function withPeerPublicStorage(root,readOnly,invoke){
  const found=storagePreflight(root);need(found,'OWNER_EXISTING_STORAGE_REQUIRED');
  if(found.kind==='peer')return withLedger(root,readOnly,ledger=>invoke({kind:'peer',ledger,db:ledger.db,root:ledger.root}));
  need(readOnly===true,'OWNER_LEGACY_READONLY_REQUIRED');
- const {where}=found,pin=pinned(where);let db;
+ const {where}=found,pin=pinned(where);let db,store;
  try{
-  stable(where);db=new DatabaseSync(where.file,{readOnly:true});stable(where);openedOriginalFile(pin);
+  stable(where);store=new Store(where.root,false,{readOnly:true});db=store.db;stable(where);openedOriginalFile(pin);
   need(layout(db)==='legacy','OWNER_STORAGE_LAYOUT');
   const actual=db.prepare('PRAGMA database_list').all().find(row=>row.name==='main');need(actual?.file&&fs.realpathSync(actual.file)===where.file,'OWNER_STORAGE_CHANGED');
-  const result=await invoke({kind:'legacy',db,root:where.root});stable(where);return result;
- }finally{if(db?.isTransaction)db.exec('ROLLBACK');db?.close();for(const fd of pin.fds.reverse())fs.closeSync(fd);}
+  const readSnapshot=fn=>{stable(where);return store.readSnapshot(()=>{stable(where);const result=fn(store);stable(where);return result;});};
+  const result=await invoke({kind:'legacy',db,root:where.root,readSnapshot});stable(where);return result;
+ }finally{if(db?.isTransaction)db.exec('ROLLBACK');store?.close();for(const fd of pin.fds.reverse())fs.closeSync(fd);}
 }
 // Fixed SOURCE writer seam, not a public operation or owner authorization.
 // Keep legacy selection distinct: a peer rejection never falls back here.
@@ -292,6 +294,37 @@ async function review(lifecycle,args,input){
  return bounded({protocol:'peer-owner-review-returned-v1',returned:true,result_not_inlined:true,retrieval:{tool:'company_owner',action:'inspect'},qualification:'Review returned; inspect exact persisted owner records before any next action. This receipt does not establish owner acceptance, activation or closure. Do not repeat the review.'});
 }
 
+// Fixed host selection from original authority records only. No public mode,
+// profile or purpose flag is added. Selection itself grants no authority; the
+// original lifecycle revalidates actor, grant, intent and original begin.
+function freshReviewLifecycleFrom(ledger,args,input){
+ return ledger.read(tx=>{
+  const literal=grant=>Array.isArray(grant?.value?.actions)&&grant.value.actions.includes(PEER_OWNER_MAINTENANCE_FRESH_ACTION);
+  if(args.action==='record_transfer_decision'){
+   const grant=tx.get('grants',input.review_grant_id);
+   return grant?.value.status==='active'&&grant.value.generation===input.review_grant_generation&&literal(grant);
+  }
+  if(args.action==='issue_transfer_intent'){
+   const decision=loadOriginalPeerOwnerTransferDecision(tx,connection(ledger),input.decision_ref);
+   return literal(tx.getVersion(decision.row.value.review_grant_ref));
+  }
+  if(['revoke_transfer_intent','inspect_transfer_intent','read_transfer_intent','begin'].includes(args.action)){
+   const intent=loadOriginalPeerOwnerTransferIntent(tx,connection(ledger),input.intent_ref);
+   return literal(tx.getVersion(intent.row.value.review_grant_ref));
+  }
+  const c=tx.get('control','company'),h=c?.value.owner_handover&&tx.get('work_items',c.value.owner_handover.id);
+  if(!h)return false;
+  // Authenticate typed public custody and its original immutable begin before
+  // examining purpose. A current-row label cannot convert an old handover.
+  assertPeerPublicOwnerCustody({...tx,connection:connection(ledger)});
+  const event=tx.events({after:h.created_seq-1,limit:1}).items[0],changes=event?.payload?.changes?.filter(change=>change.family==='work_items'&&change.id===h.id&&change.revision===1);
+  need(event?.seq===h.created_seq&&event.type==='owner/handover.begin'&&changes?.length===1,'OWNER_TRANSFER_PRODUCER_REQUIRED');
+  const first=tx.getVersion({family:'work_items',id:h.id,revision:1,sha256:changes[0].sha256});need(first?.value,'OWNER_TRANSFER_PRODUCER_REQUIRED');
+  need(h.value.fresh_review_purpose===first.value.fresh_review_purpose&&h.value.creation_mode===first.value.creation_mode&&same(h.value.review_grant,first.value.review_grant),'OWNER_FRESH_REVIEW_PURPOSE_REQUIRED');
+  return first.value.fresh_review_purpose===PEER_OWNER_MAINTENANCE_FRESH_PURPOSE&&first.value.creation_mode==='fresh-original-protected-thread'&&literal(tx.getVersion(first.value.review_grant));
+ });
+}
+
 export async function peerOwnerRuntimeAction(request,host){
  const args=validatePeerOwnerRequest(request,host),actor=requireCodexRootActor({host,session_id:args.session_id}),input=args.input??{};
  if(['read_subject','read_recovery'].includes(args.action))coveragePreflight(input.length);
@@ -303,7 +336,7 @@ export async function peerOwnerRuntimeAction(request,host){
   });
   if(args.action==='pinned_inspect'||args.action==='pinned_read')return ledger.read(tx=>{canonicalCaller(tx,actor,args,ledger);return args.action==='pinned_inspect'?inspectPeerPublicPinsFrom(tx,{company_id:ledger.company_id}):readPeerPublicPinsFrom(tx,input,{company_id:ledger.company_id});});
   if(args.action==='context_inspect'||args.action==='context_read')return ledger.read(tx=>{canonicalCaller(tx,actor,args,ledger,{privateContext:true});return args.action==='context_inspect'?inspectPeerPublicContextFrom(tx,{company_id:ledger.company_id,...input}):readPeerPublicContextFrom(tx,{company_id:ledger.company_id,...input});});
-  const lifecycle=createPeerPublicOwnerLifecycle({ledger,actor});
+  const lifecycle=(freshReviewLifecycleFrom(ledger,args,input)?createPeerPublicOwnerFreshReviewLifecycle:createPeerPublicOwnerLifecycle)({ledger,actor});
   if(args.action==='inspect'){
    const value=lifecycle.inspect({epoch:args.epoch});
    return ledger.read(tx=>{
@@ -315,6 +348,6 @@ export async function peerOwnerRuntimeAction(request,host){
   if(args.action==='recovery_header')return headerRead(lifecycle.recoveryHeader({epoch:args.epoch}),input);
   const methods={pause:'pause',record_transfer_decision:'recordTransferDecision',issue_transfer_intent:'issueTransferIntent',revoke_transfer_intent:'revokeTransferIntent',inspect_transfer_intent:'inspectTransferIntent',read_transfer_intent:'readTransferIntent',begin:'beginFromIntent',read_subject:'read',refresh_preview:'previewSubjectRefresh',read_refresh_preview:'readSubjectRefresh',refresh_subject:'refreshSubject',read_previous_subject:'readPreviousSubject',submit:'submit',read_recovery:'readRecovery',recover:'recover',activate:'activate',resume:'resume'};
   const method=methods[args.action];need(method&&typeof lifecycle[method]==='function','OWNER_PUBLIC_ACTION_HELD');
-  return bounded(lifecycle[method]({...input,epoch:args.epoch,...(coreInstructionActions.has(args.action)?{source_instruction:args.source_instruction}:{})}));
+  return bounded(await lifecycle[method]({...input,epoch:args.epoch,...(coreInstructionActions.has(args.action)?{source_instruction:args.source_instruction}:{})}));
  });
 }

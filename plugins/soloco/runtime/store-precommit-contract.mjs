@@ -1,0 +1,1 @@
+export const STORE_PRECOMMIT_GUARD_VERSION=1;

@@ -78,13 +78,27 @@ function noCandidateList(f,operation,predicate='INTAKE_CURSOR_INVALID'){
   try{unchanged(f,operation,predicate);}finally{f.ledger.query=original;}
   assert.deepEqual(seen,[],'the receiver/source cursor must be checked before tx.list');
 }
+// Explicitly SYNTHETIC returned-row DATA for informational selectors only.
+// Real ledger writes retain canonical bytes, indexes, generations and cursors;
+// these rows provide no admission, execution, observation or Native proof.
+function seedSyntheticReturnedTask(f,who='cos-a'){
+  assert(['cos-a','cos-b'].includes(who),'SYNTHETIC selector owner must be a fixture CoS');
+  return f.ledger.write('fixture.synthetic-handoff-selector-data','founder',tx=>{
+    assert.equal(tx.get('principals',who)?.value.status,'active');
+    return tx.put('tasks',f.op('synthetic-returned-selector'),{
+      kind:'SYNTHETIC_RETURNED_TASK_SELECTOR_DATA',status:'returned',scope:'alpha',owner_principal_id:who,
+      result:{output:'SYNTHETIC returned selector output: 雪😀'},
+      limitations:'Informational selector DATA only; no task execution, observation, review, reservation or Native provenance.'
+    },0);
+  });
+}
 function cursorCandidates(f,family){
   if(family==='work_items'){f.send();f.send();return 'cos-b';}
   if(family==='messages'){
     for(let n=0;n<3;n++)f.exec('cos-a','message/send',{grant_id:'handoff-grant-cos-a',scope:'alpha',to_principal_id:n%2?'cos-a':'cos-b',content:`Fictional receiver cursor message ${n}.`});
     return 'cos-b';
   }
-  if(family==='tasks'){for(const who of ['cos-a','cos-b'])f.finish(f.start(who));return 'cos-a';}
+  if(family==='tasks'){for(const who of ['cos-a','cos-b'])seedSyntheticReturnedTask(f,who);return 'cos-a';}
   return 'cos-a'; // The fixture already contains two authored proposals.
 }
 function commandFor(f,who,operation_id){
@@ -284,7 +298,7 @@ test('a genuine negative QA verdict cannot be laundered through receiver accepta
 });
 
 test('returned own output and unpublished own proposals are informational intake without receiver obligations',t=>{
-  const f=fixture(t),admitted=f.start(),finished=f.finish(admitted),before=logicalSQLState(f);
+  const f=fixture(t),finished={task:seedSyntheticReturnedTask(f)},before=logicalSQLState(f);
   const tasks=f.pending('cos-a',{family:'tasks'}),proposals=f.pending('cos-a',{family:'proposals'});
   const returned=tasks.items.find(item=>item.id===finished.task.id);assert(returned);assertDescriptor(returned,'tasks',finished.task);
   assert.notEqual(returned.intake_kind,'handoff');assert(proposals.items.some(item=>item.id===f.subject.id));

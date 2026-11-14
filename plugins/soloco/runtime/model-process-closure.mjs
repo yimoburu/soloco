@@ -2,6 +2,7 @@
 // ChildProcess.close proves this original CLI child closed, not descendants,
 // native success, QA acceptance, fresh permission, refund or an extended scope.
 import {createHash} from 'node:crypto';
+import {validateLegacyRuntimeJobShape} from './runtime-execution-shapes.mjs';
 const hash=b=>createHash('sha256').update(b).digest('hex');
 const sha=v=>hash(JSON.stringify(v)),same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const closed=(v,k)=>v&&Object.getPrototypeOf(v)===Object.prototype&&Object.keys(v).sort().join(',')===[...k].sort().join(',');
@@ -21,7 +22,9 @@ export function validModelProcessTracking(v){
 function owned(job,invocation){if(!job||job.id!==invocation.job_id||job.instance_id!==invocation.instance_id||job.worker_pid!==invocation.worker_pid||job.host!==invocation.host)fail();}
 export function requestModelProcess(job,invocation){
  owned(job,invocation);if(!closed(invocation,['invocation_id','job_id','instance_id','worker_pid','host','requested_at'])||!text(invocation.invocation_id)||!time(invocation.requested_at))fail();
- const before=job.model_process_tracking;if(before&&!validModelProcessTracking(before))fail();if(before?.invocations.some(x=>x.invocation_id===invocation.invocation_id))fail();
+ // A later request cannot turn an earlier unobserved birth/close into free
+ // capacity. Native requests remain lineage within one assignment unit.
+ const before=job.model_process_tracking;if(before&&(!validModelProcessTracking(before)||before.invocations.some(x=>!x.birth||!x.closure)))fail();if(before?.invocations.some(x=>x.invocation_id===invocation.invocation_id))fail();
  job.model_process_tracking={version:1,current:invocation.invocation_id,invocations:[...(before?.invocations??[]),{...invocation,birth:null,closure:null}]};
 }
 export function recordModelProcessBirth(job,invocation,birth){
@@ -34,7 +37,7 @@ export function recordModelProcessClosure(job,invocation,birth,receipt){
 }
 export function modelProcessTransition(before,after,type){
  const a=before?.model_process_tracking,b=after?.model_process_tracking;if(!validModelProcessTracking(b))return false;
- if(type==='job.model_process.requested')return (!a||validModelProcessTracking(a))&&b.invocations.length===(a?.invocations.length??0)+1&&same(b.invocations.slice(0,-1),a?.invocations??[])&&b.invocations.at(-1).birth===null&&b.invocations.at(-1).closure===null;
+ if(type==='job.model_process.requested')return (!a||validModelProcessTracking(a)&&a.invocations.every(x=>x.birth&&x.closure))&&b.invocations.length===(a?.invocations.length??0)+1&&same(b.invocations.slice(0,-1),a?.invocations??[])&&b.invocations.at(-1).birth===null&&b.invocations.at(-1).closure===null;
  if(!validModelProcessTracking(a)||a.current!==b.current||a.invocations.length!==b.invocations.length)return false;
  let changed=0;
  for(let i=0;i<a.invocations.length;i++){
@@ -44,6 +47,22 @@ export function modelProcessTransition(before,after,type){
   else return false;
  }
  return changed===1;
+}
+// Structural history grammar only. Actual permission, custody and prompt/frame
+// binding remain in the Store-owned legacy issuer. Original requests keep their
+// existing tracking-only transition and separate retention delivery event.
+export function legacyRetentionModelRequestTransition(before,after){
+  if(!before||!after||before.status!=='running'||after.status!=='running'||before.role!=='qa'||after.role!=='qa'||Object.hasOwn(before,'original_execution_assignment')||Object.hasOwn(after,'original_execution_assignment')||!validateLegacyRuntimeJobShape(before)||!validateLegacyRuntimeJobShape(after)||!text(after.retention_repair_id)||Object.hasOwn(before,'retention_primary_delivery')||!modelProcessTransition(before,after,'job.model_process.requested'))return false;
+  const worker=after.legacy_runtime.worker,entry=after.model_process_tracking.invocations.at(-1),delivery=after.retention_primary_delivery;
+  if(!worker?.birth||worker.closure!==null||worker.birth.pid!==after.worker_pid||entry.job_id!==after.id||entry.instance_id!==after.instance_id||entry.worker_pid!==after.worker_pid||entry.host!==after.host||after.model_process_tracking.invocations.length>17)return false;
+  if(!closed(delivery,['version','protocol','state','native_id','frame_sha256','canonical_primary_sha256','snapshot_sha256','requested_invocation_id'])||delivery.version!==1||delivery.protocol!=='development-retention-primary-delivery-v1'||delivery.state!=='pending'||!text(delivery.native_id)||delivery.native_id!==after.native_id||!['frame_sha256','canonical_primary_sha256','snapshot_sha256'].every(key=>hex(delivery[key]))||delivery.requested_invocation_id!==entry.invocation_id||delivery.requested_invocation_id!==after.model_process_tracking.current)return false;
+  const rest=job=>Object.fromEntries(Object.entries(job).filter(([key])=>!['model_process_tracking','retention_primary_delivery'].includes(key)));
+  return same(rest(before),rest(after));
+}
+export function modelProcessProducerTransition(before,after,type){
+  if(!modelProcessTransition(before,after,type))return false;
+  const rest=job=>Object.fromEntries(Object.entries(job??{}).filter(([key])=>key!=='model_process_tracking'));
+  return same(rest(before),rest(after))||type==='job.model_process.requested'&&legacyRetentionModelRequestTransition(before,after);
 }
 // Earlier actual intake boundaries may precede later read-round births/closes.
 // Only monotone null-to-observation changes commute; producer transitions are
@@ -68,7 +87,7 @@ function producedTracking(store,job){
   for(const change of delta.changes){
    if(change.after?.family!=='jobs'||change.after.key!==job.id)continue;
    const before=change.before?rawJSON(store.db,change.before):null,after=rawJSON(store.db,change.after);
-   if(after.id!==job.id||after.instance_id!==job.instance_id||after.worker_pid!==job.worker_pid||!modelProcessTransition(before,after,event.type)||!same(Object.fromEntries(Object.entries(before??{}).filter(([k])=>k!=='model_process_tracking')),Object.fromEntries(Object.entries(after??{}).filter(([k])=>k!=='model_process_tracking'))))fail();
+   if(after.id!==job.id||after.instance_id!==job.instance_id||after.worker_pid!==job.worker_pid||!modelProcessProducerTransition(before,after,event.type))fail();
    const field=event.type.split('.').at(-1);
    for(const entry of after.model_process_tracking.invocations){
     const old=before?.model_process_tracking?.invocations.find(x=>x.invocation_id===entry.invocation_id);

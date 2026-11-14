@@ -22,15 +22,27 @@ to reduce overlapping fixture work. It changes no selected files, assertions,
 sandbox requirements, test/startup budgets or job timeouts; its effect on
 contention and elapsed time still requires current hosted-run evidence.
 
-Routine shard selection places `peer-input-frontier.test.mjs`,
-`peer-origin-frontier-seal.test.mjs`, `frozen-intake-publication.test.mjs` and
-`frozen-intake-handover.test.mjs` first in separate selected argument lists,
-then distributes all remaining files in lexical order. These four advisory
-priorities change placement only. The selected inventory and digest, automatic
-inclusion of new files, generic lexical partitions, and full-qualification cost
-hints are unchanged. Argument order does not establish actual Node start order
-or a wall-time improvement; a fresh hosted run must establish whether the
-unchanged twenty-minute job budget fits.
+Routine four-shard selection gives `peer-origin-frontier-seal.test.mjs` its own
+shard and balances every other whole file using the advisory costs in
+`tools/ci/regression-costs.json`. The existing frontier, frozen-intake publication
+and frozen-intake handover priorities remain separated in the other three jobs.
+That file records the exact public runs and
+source heads behind partial outer-case duration sums, including a failed head
+whose results remain failed. Files without a useful cost hint receive a positive
+30-second placement weight and remain required. This weight is neither a test
+timeout nor an upper bound or elapsed-time estimate. Unequal file counts are
+intentional; deterministic selection still validates the exact disjoint union
+against the current inventory, including newly added files. No fixed historical
+216-file count is required. The command prints the cost-table hash and unhinted
+file count alongside the unchanged selected-inventory hash.
+
+In [run 43631894252](https://github.com/yimoburu/soloco/actions/runs/43631894252),
+one whole-DAG/seal case took 907.5 seconds inside a 1,107-second shard. Separating
+competing files does not split that oracle: if its observed cost persists, about
+15 minutes remains. No speedup or ETA is claimed before a fresh hosted run.
+Generic lexical partitions, other shard totals, full-qualification cost hints,
+test assertions, dependencies, concurrency, timeouts and required gates stay
+unchanged.
 
 Four regression runners replace three, requesting one additional runner start
 and potential concurrent runner slot (about 33% more regression runner capacity).
@@ -175,7 +187,7 @@ a historical whole-suite macOS receipt. See [implementation workflow and timing]
 ### Pinned companion source checks
 
 The required Build and drift job also verifies the source-owned
-`native/codex/` manifest and all pinned payload bytes, then runs its 49 pure
+`native/codex/` manifest and all pinned payload bytes, then runs its pure
 Python temporary-data checks. These checks do not download upstream source,
 compile Rust, invoke the sandbox executor, install a toolchain or start a
 native/model session. The explicit macOS offline build and native qualification

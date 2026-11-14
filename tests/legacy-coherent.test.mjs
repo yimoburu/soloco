@@ -1,3 +1,4 @@
+import {preexistingLegacyStore} from './preexisting-legacy-data-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -155,7 +156,7 @@ test('linear unique section work for repeated snapshots; byte forecast without c
 test('existing canonical source adapter uses runtime test author_instance and rejects invalid producer/candidate closure',()=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'legacy-coherent-canonical-'));let db;
   try{
-    db=new Store(dir,true);db.transaction('fixture',()=>fixture());db.migrate();
+    db=preexistingLegacyStore(dir,'fixture',()=>fixture());db.migrate();
     // A canonical runtime test has NO new job_id field. Candidate/plan/run edges
     // are exactly the existing scoped-context producer contract.
     db.transaction('fixture.runtime',s=>{

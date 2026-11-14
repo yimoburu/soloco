@@ -13591,26 +13591,50 @@
   },
   {
     "path": "codex-rs/codex-api/src/protected_peer/context_contract.rs",
-    "bytes": 17191,
-    "sha256": "b52cc2af30a011f52b4cc3e4ccddd49031374eca0852615e0a5663f0d11ef8b0",
+    "bytes": 33952,
+    "sha256": "13736af4f9417946725092811846a45a2558281a7beee1dafb7e52c39273bcba",
     "mode": "100644"
   },
   {
     "path": "codex-rs/codex-api/src/protected_peer/context_contract/frame.rs",
-    "bytes": 11945,
-    "sha256": "7a05c9f17acb7f8c847dae2379c4eae034220deab4e4c78f9d2c850b17a147e8",
+    "bytes": 17497,
+    "sha256": "778b9105093e500345ec3ced92dac15bda70c0f6109949fceb279dab59c02bee",
     "mode": "100644"
   },
   {
     "path": "codex-rs/codex-api/src/protected_peer/context_contract/frame/tests.rs",
-    "bytes": 12543,
-    "sha256": "0519ab77e0eb541e2035967697b5e729d2a255c85a6d08ec0cc1c7553d174252",
+    "bytes": 37697,
+    "sha256": "c55d91b0d80d09777b9fcfd03ecb5cd9cd42cb2564c9d3cf84eba5079f05af00",
     "mode": "100644"
   },
   {
     "path": "codex-rs/codex-api/src/protected_peer/context_contract/tests.rs",
-    "bytes": 20669,
-    "sha256": "2e8366236b4f31303e6c803e383f0db39f6d991890298f1d8fa5d42831b480cb",
+    "bytes": 48907,
+    "sha256": "19c546a312ec55e29db83935a4ca98f1e51820614f168672c1e19be2307b0c91",
+    "mode": "100644"
+  },
+  {
+    "path": "codex-rs/codex-api/src/protected_peer/input_frontier_readonly3_contract_v1.json",
+    "bytes": 2697,
+    "sha256": "b15ae178857196eac75123652817c1673a2e4941b409f6d5cbb72225800f7863",
+    "mode": "100644"
+  },
+  {
+    "path": "codex-rs/codex-api/src/protected_peer/origin_final_review_readonly3_contract_v1.json",
+    "bytes": 3476,
+    "sha256": "d7939b68fb44e4dee524ec7774e080b0d6f4b40c1493f37737eb67b1f1efa3fd",
+    "mode": "100644"
+  },
+  {
+    "path": "codex-rs/codex-api/src/protected_peer/origin_maintenance_readonly3_contract_v1.json",
+    "bytes": 3122,
+    "sha256": "a7f744362c1404a1ae67ca6e5c3bf1b63c3c0fab99b9ad996db0f1265757c824",
+    "mode": "100644"
+  },
+  {
+    "path": "codex-rs/codex-api/src/protected_peer/origin_ordinary_task_readonly3_contract_v1.json",
+    "bytes": 3077,
+    "sha256": "0f0bc8b752176348c23ac6696cbd8f4ebe811fca45163f2d5baefcf6c5361d52",
     "mode": "100644"
   },
   {
@@ -19153,8 +19177,8 @@
   },
   {
     "path": "codex-rs/core/src/tools/handlers/dynamic_tests.rs",
-    "bytes": 2556,
-    "sha256": "8d6f2797de06cce2ed5c832faabe87bdb0f546b13f43cd4a2ee7e624fa9f967d",
+    "bytes": 4606,
+    "sha256": "7de86ed9cf928de0a03fbce06a437659a87579bfdd0a345788570d31631729a6",
     "mode": "100644"
   },
   {

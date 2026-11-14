@@ -1,3 +1,4 @@
+import {seedPreexistingLegacyData} from './preexisting-legacy-data-fixture.mjs';
 // SOURCE fixtures only. All companies, HOST metadata, bindings, grants and
 // supplied output below are fictional. Execution evidence belongs to its test
 // receipt; API mechanics never establish native or installed-host qualification.
@@ -33,7 +34,7 @@ function fixture(t,{raw,paused=true}={}){
   state.records.plan={id:'plan',kind:'artifact',revision:1,development:{type:'plan',scope:{max_bytes:20000,max_attempts:3,timeout_ms:3000,max_output_bytes:10000,expires_at:'2099-01-01T00:00:00.000Z'},attempts:['original-consumed'],authorization:{decision_id:'decision'}}};
   state.records.plan.development.scope_sha256=digest(JSON.stringify(state.records.plan.development.scope));
   state.records.plan.development.authorization.authority_sha256=developmentReviewAuthority(state,'plan');
-  const store=new Store(root,true);try{store.transaction('fictional.public-budget-genesis',()=>state);store.migrate();}finally{store.close();}
+  const store=new Store(root,true);try{seedPreexistingLegacyData(store,'fictional.public-budget-genesis',()=>state);store.migrate();}finally{store.close();}
   const config=path.join(root,'.company','development.json');if(raw!==undefined)fs.writeFileSync(config,raw);
   engine.bind(root,session,'codex');const binding=path.join(cache,'bindings',digest(JSON.stringify([root,'codex',session]))+'.json');
   const closers=[];t.after(async()=>{try{for(const close of closers)await close();}finally{if(prior===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=prior;fs.rmSync(temporary,{recursive:true,force:true});}});

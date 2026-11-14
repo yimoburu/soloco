@@ -3,16 +3,18 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {DatabaseSync} from 'node:sqlite';
 import {runWithMcpHostContext} from '../plugins/soloco/runtime/mcp-host-context.mjs';
-import {peerOriginRuntimeAction,validatePeerOriginRequest,peerOriginToolSchema} from '../plugins/soloco/runtime/peer-origin-runtime.mjs';
+import {peerOriginRuntimeAction,preparePeerOriginMechanicalReviewRequest,validatePeerOriginRequest,peerOriginToolSchema} from '../plugins/soloco/runtime/peer-origin-runtime.mjs';
 import {qaRawHash,qaRecordRef} from '../plugins/soloco/runtime/peers/origin-mechanical-qa-contract.mjs';
 import {legacyEncodedReplyBytes} from '../plugins/soloco/runtime/peers/legacy-origin.mjs';
 import {SESSION,instruction,legacyFixture,preparePlan,mechanical,logicalState,relocatedOriginRuntime,disposeOriginPublicFixture} from './peer-origin-public-fixture.mjs';
-import {fixture,unselectedFixture,inventory,policySourceSha256,disposeMechanicalPublicFixture} from './peer-origin-mechanical-public-fixture.mjs';
+import {fixture,unselectedFixture,policySourceSha256,disposeMechanicalPublicFixture} from './peer-origin-mechanical-public-fixture.mjs';
 
 // Actual public source, original SQLite journals and complete fictional team.
-// HOST metadata, attribution and execution census are explicitly SYNTHETIC.
-// No native/company execution, human authenticity or real capacity is proved.
+// Original census custody is genuine Source history in a temporary company.
+// HOST metadata, attribution and Node child events are controlled. No actual
+// Native/company execution, human authenticity or production capacity is proved.
 test.after(disposeMechanicalPublicFixture);
 test.after(disposeOriginPublicFixture);
 const code=expected=>error=>error?.code===expected;
@@ -43,8 +45,9 @@ test('new selection actions require original root HOST before inspecting or crea
 });
 
 test('actual public decision then plan then original packet then separate grant preserves old spend and launches nothing',async t=>{
- t.diagnostic('Actual source policy SHA256='+policySourceSha256+'; execution inventory is explicitly SYNTHETIC, not real cardinality proof.');
+ t.diagnostic('Actual source policy SHA256='+policySourceSha256+'; genuine fresh Original Source history with controlled Node child observations, no Native qualification.');
  const f=unselectedFixture(t),runtime=await f.runtime(),original=f.state(),selected=choice();
+ assert.equal(f.original_inventory,true);
  const decision=await invoke(req(f,'mechanical_decision',selected,{source_instruction:instruction}),runtime.peerOriginRuntimeAction);
  assert.equal(decision.authority_issued,false);assert.equal(decision.human_producer_authenticity,'not mechanically established');
  const planned=await invoke(req(f,'plan',{...f.input,mechanical_qa:{protocol:'peer-origin-mechanical-qa-purpose-v1',purpose:'quarantine-transition-review-only',decision_ref:decision.decision_ref}},{source_instruction:instruction}),runtime.peerOriginRuntimeAction);
@@ -80,11 +83,22 @@ test('original packet reads retain historical DATA after a new business row with
  const split=body.indexOf('😀')+1;assert(split>0);await unchanged(f,()=>invoke(req(f,'mechanical_packet_read',{packet_ref:f.packet.packet_ref,sha256:handle.context_sha256,offset:split,length:3}),runtime.peerOriginRuntimeAction),code('ORIGIN_MECHANICAL_QA_RANGE'));
 });
 
-test('missing actual inventory and UNKNOWN synthetic census both Hold public review before queue or spend',async t=>{
+test('public review preparation uses genuine readonly Store custody without queue or spend; a raw DB stays foreign',async t=>{
  const f=fixture(t),runtime=await f.runtime(),request=req(f,'mechanical_review',{plan_id:f.plan_id,grant_ref:f.grant_ref},{source_instruction:instruction});
- await unchanged(f,()=>invoke(request),code('ORIGIN_MECHANICAL_QA_EXECUTION_INVENTORY_SOURCE_REQUIRED'));
- inventory.setSyntheticCardinality(false);
- try{await unchanged(f,()=>invoke(request,runtime.peerOriginRuntimeAction),code('ORIGIN_MECHANICAL_QA_EXECUTION_CARDINALITY_UNKNOWN'));}finally{inventory.setSyntheticCardinality(true);}
+ assert.equal(f.original_inventory,true);
+ // Preparation is a bounded read through the fixed Store-owned snapshot.
+ // Its DATA cannot enqueue and is not an actual review dispatch or QA verdict.
+ const before=logicalState(f);
+ for(const prepare of [preparePeerOriginMechanicalReviewRequest,runtime.preparePeerOriginMechanicalReviewRequest]){
+  const result=await invoke(request,prepare);
+  assert.equal(result.protocol,'peer-origin-mechanical-dispatch-request-v1');assert.equal(result.planned_not_dispatched,true);
+  assert.equal(result.plan_id,f.plan_id);assert.deepEqual(result.grant_ref,f.grant_ref);assert.deepEqual(result.packet_ref,f.packet.packet_ref);
+  assert.equal(result.context_sha256,f.packet.context_sha256);assert(result.context_utf8_bytes>0&&result.context_utf8_bytes<=200000);
+  assert.deepEqual(logicalState(f),before);
+ }
+ const raw=new DatabaseSync(path.join(f.root,'.company','company.sqlite'),{readOnly:true});
+ try{assert.throws(()=>f.policy.preparePeerOriginMechanicalQaDispatchFrom(raw,f.state(),{expected_epoch:9,grant_ref:f.grant_ref}),code('ORIGINAL_EXECUTION_STORE_REQUIRED'));}finally{raw.close();}
+ assert.deepEqual(logicalState(f),before);
  assert.equal(f.state().records[f.grant_ref.id].origin_mechanical_qa.used_attempts,0);
 });
 

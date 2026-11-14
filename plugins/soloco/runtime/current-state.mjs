@@ -8,11 +8,25 @@ import {snapshotReference,resolveSnapshot,resolveSnapshotEntry,hasSnapshotRefere
 import {buildQualificationEvidence,knownModelCatalog} from './upgrade-evidence.mjs';
 import {validateQualificationExclusion,QUALIFICATION_PROTOCOL} from './context-qualification.mjs';
 import {NOTICE_SOURCES,isNoticeSourceId,isCanonicalNoticeSource,noticeSource,noticeSourceEntries,projectNotice} from './notice-sources.mjs';
+import {inspectOriginalWorkerAssignmentBookkeepingFrom,inspectOriginalExecutionOriginBookkeepingFrom} from './peers/prospective-local-worker-inventory-producer.mjs';
+import {inspectLegacyRuntimeBookkeepingFrom,validateLegacyRuntimeJobShape,runtimeJobOccupied} from './runtime-execution.mjs';
+import {inspectComparisonEvidenceRecordFrom} from './integrated-comparison-evidence.mjs';
+import {inspectComparisonTestRecordFrom} from './integrated-comparison-test.mjs';
 const fields=['id','kind','author_role','recorded_by','content','status','action','previous_name','name','created_at'];
 const knownStateFields=new Set(['id','name','idea','owner','schema','runtime_version','plugin_version','revision','created_at','updated_at','paused','mode','phase','team_sha256','governance','governance_sha256','cos_instructions','roles','records','jobs','sessions','notices','messages','upgrade','upgrade_history','retired_sessions','context_classifications','context_last_plan','handover']);
 const proofJobFields=new Set(['code_review_window_minutes','code_review_reason','code_review_subject','delivered_record_reads','model_process_tracking','specialist','id','role','instance_id','session_key','native_id','host','epoch','status','artifact_id','review_of','inputs','context_format','context_scope','context_sha256','task','task_summary','next_handoff','model_selection','model_catalog','model_evidence','cli_version','requester','coordination','coordination_release','qualification_hold','expected_deliverable','supplemental_sources','retrieved_inputs','created_at','started_at','finished_at','worker_pid','timeout_policy_version','timeout_minutes','timeout_ms','timeout_reason','execution_started_at','execution_deadline_at','termination_deadline_at']);
 const keysOnly=(v,keys)=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).every(k=>keys.includes(k));
-export function proofJobSafe(job) {
+export function proofJobSafe(job,state=null) {
+  if(job&&Object.hasOwn(job,'original_execution_assignment')){
+    const proof=inspectOriginalWorkerAssignmentBookkeepingFrom(state,job);
+    if(!proof||proof.field!=='original_execution_assignment'||!(proof.historical_original===true||proof.active_original_snapshot===true))return false;
+    const {original_execution_assignment,...legacy}=job;job=legacy;
+  }
+  if(job&&Object.hasOwn(job,'legacy_runtime')){
+    const proof=inspectLegacyRuntimeBookkeepingFrom(state,job);
+    if(!proof||proof.field!=='legacy_runtime'||!(proof.historical_unqualified===true||proof.active_unqualified_snapshot===true)||JSON.stringify(proof.projection)!==JSON.stringify(job.legacy_runtime))return false;
+    const {legacy_runtime,...business}=job;job=business;
+  }
   if(job&&Object.hasOwn(job,'specialist')&&!validateSpecialistBindingShape(job.specialist))return false;
   if(Object.keys(job).some(k=>!proofJobFields.has(k)))return false;
   if(!validCodeReviewMetadata(job))return false;
@@ -47,11 +61,23 @@ export function proofJobSafe(job) {
   }
   return true;
 }
+// Acceptance stores a full immutable job reference. A guarded worker may still
+// close after publishing its result, so wait at acceptance (not context reads)
+// until its physical mechanical fields can no longer change that reference.
+export function runtimeReceiptClosed(state,job){
+  if(!job||typeof job!=='object'||Array.isArray(job))return false;
+  if(!Object.hasOwn(job,'legacy_runtime'))return true;
+  const proof=inspectLegacyRuntimeBookkeepingFrom(state,job);
+  if(!proof||proof.field!=='legacy_runtime'||!(proof.historical_unqualified===true||proof.active_unqualified_snapshot===true)||JSON.stringify(proof.projection)!==JSON.stringify(job.legacy_runtime)||!validateLegacyRuntimeJobShape(job))return false;
+  const worker=job.legacy_runtime.worker;
+  return Boolean(worker?.birth&&worker.closure&&!runtimeJobOccupied(job));
+}
 export function currentExtensions(state) {
   // Prospective mechanical metadata is omitted only after exact receipt/index
   // validation. With no publication, frozen classification inputs are unchanged.
   if(Object.hasOwn(state,'operating_state'))validateOperatingIndex(state);
-  return Object.fromEntries(Object.entries(state).filter(([key])=>!knownStateFields.has(key)&&key!=='operating_state'));
+  const original=Object.hasOwn(state,'original_execution_origin')?inspectOriginalExecutionOriginBookkeepingFrom(state):null;
+  return Object.fromEntries(Object.entries(state).filter(([key])=>!knownStateFields.has(key)&&key!=='operating_state'&&!(key==='original_execution_origin'&&original?.field===key&&(original.historical_original===true||original.active_original_snapshot===true))));
 }
 // Only the supported runtime rename record shape is presentation-only. Unknown
 // fields/record producers remain conservative; no free-form status inference.
@@ -169,7 +195,22 @@ export function mandatoryExecutionEvidence(state,projection=reviewedContext(stat
 // category-based selection; format 5 includes every unqualified semantic record.
 export function currentRecords(state,job={},projection=reviewedContext(state)) {
   if(Object.entries(state.records).some(([key,r])=>key!==r.id))throw Error('Ambiguous record identity; exact source repair required');
-  return Object.values(state.records).filter(r=>!unrelatedScopedHome(projection,r.id,job)&&(!job.id||r.job_id!==job.id)&&(projection.mandatory.has(r.id)||(!projection.excluded(r.id)&&relevantRecord(state,r,job,projection.classifications.get(r.id)??null))));
+  return Object.values(state.records).filter(r=>{
+    if(unrelatedScopedHome(projection,r.id,job))return false;
+    const ownJob=Boolean(job.id&&r.job_id===job.id),classification=projection.classifications.get(r.id)??null;
+    // A public marker cannot borrow the ordinary own-output omission. Genuine
+    // bookkeeping keeps its real producer edge and private snapshot proof.
+    if(ownJob)for(const [field,inspect]of [['runtime_wire_evidence',inspectComparisonEvidenceRecordFrom],['runtime_candidate_test_guard',inspectComparisonTestRecordFrom]])if(Object.hasOwn(r,field)){
+      const proof=inspect(state,r);if(!proof||proof.recordSha!==digest(JSON.stringify(r))||proof.job_id!==r.job_id)throw Error('Comparison context record requires actual snapshot custody: '+r.id);
+    }
+    if(projection.mandatory.has(r.id))return true;
+    if(projection.excluded(r.id)||!relevantRecord(state,r,job,classification))return false;
+    // Current meaning and adverse evidence remain visible even if their
+    // producer happens to be this job. Only ordinary noncurrent own outputs
+    // are omitted to avoid changing an assignment with its own bookkeeping.
+    if(classification?.disposition==='current'||['intent','decision','preference'].includes(r.kind)||['Fail','Blocked'].includes(r.review?.verdict))return true;
+    return !ownJob;
+  });
 }
 export function currentExecutionEvidence(state,job={},projection=reviewedContext(state)) {
   const sources=[];
@@ -453,7 +494,7 @@ export function reviewedContext(state) {
       // Only the exact producing QA job, with recognized mechanical fields, is
       // part of the classification proof. An aliasing artifact_id, error or
       // unknown extension is independent evidence and stays compulsory.
-      if(job&&job.id===jobId&&job.artifact_id===c.review.id&&proofJobSafe(job))proofJobs.add(jobId);
+      if(job&&job.id===jobId&&job.artifact_id===c.review.id&&proofJobSafe(job,state))proofJobs.add(jobId);
       if(c.disposition==='represented')for(const ref of state.records[c.plan.id].context_classification_plan.counterparts){mandatory.add(ref.id);globalMandatory.add(ref.id);}
     }
   }

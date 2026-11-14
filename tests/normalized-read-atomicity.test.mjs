@@ -1,3 +1,4 @@
+import {preexistingLegacyStore} from './preexisting-legacy-data-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -11,8 +12,7 @@ test.after(()=>fs.rmSync(temporary,{recursive:true,force:true}));
 
 function fixture() {
   const root=fs.mkdtempSync(path.join(temporary,'company-'));
-  const reader=new Store(root,true);
-  reader.transaction('fixture.seed',()=>({
+  const reader=preexistingLegacyStore(root,'fixture.seed',()=>({
     id:'fictional-read-atomicity',commit_marker:'before',owner:{epoch:1},
     records:{evidence:{id:'evidence',revision:1,content:'before'}},
     jobs:{work:{id:'work',epoch:1,status:'queued'}},

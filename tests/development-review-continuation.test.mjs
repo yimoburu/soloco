@@ -1,3 +1,4 @@
+import {seedPreexistingLegacyData} from './preexisting-legacy-data-fixture.mjs';
 // Controlled source fixtures in REAL temporary Stores. These tests invoke no
 // model, child executor, product company or canonical validation API. The small
 // synthetic historical receipt is test data, never actual P4/326 evidence.
@@ -43,7 +44,7 @@ function fixture({recovery=true,legacy=true,delivery=false}={}) {
   const oldQA={id:'prior-unknown',role:'qa',instance_id:'qa-old',native_id:'native-old-unknown',status:'failed',started_at:'2001-01-01T00:00:00.000Z',session_key:'qa:review:receipt:1',review_of:{id:t.id,revision:1},inputs:[{id:'contract',revision:1}],supplemental_sources:[],execution_failure:{termination_confirmed:false,outcome:'timeout',code:'ROLE_TIMEOUT'}};
   const failureHome={id:'failure-home',kind:'artifact',revision:1,status:'Draft',content:JSON.stringify({canonical_public_terminal_job:{complete_data:{value:oldQA}}})};
   const records={plan:p,candidate:c,receipt:t,contract,'failure-home':failureHome},jobs={producer,'controller':controller,'prior-unknown':oldQA};
-  withStore(root,db=>db.transaction('controlled.company.created',()=>({schema:2,runtime_version:VERSION,id:id('company'),name:'Controlled continuation source test',idea:'No product authority',phase:'Frame',mode:'preparation',paused:false,...team,team_sha256:teamHash(team),owner:{host:'codex',session_id:a.session_id,epoch:1},records,sessions:{[oldQA.session_key]:{instance_id:oldQA.instance_id,native_id:oldQA.native_id}},jobs,messages:[],notices:[],created_at:new Date().toISOString()})),true);
+  withStore(root,db=>seedPreexistingLegacyData(db,'controlled.company.created',()=>({schema:2,runtime_version:VERSION,id:id('company'),name:'Controlled continuation source test',idea:'No product authority',phase:'Frame',mode:'preparation',paused:false,...team,team_sha256:teamHash(team),owner:{host:'codex',session_id:a.session_id,epoch:1},records,sessions:{[oldQA.session_key]:{instance_id:oldQA.instance_id,native_id:oldQA.native_id}},jobs,messages:[],notices:[],created_at:new Date().toISOString()})),true);
   change(a,s=>{
     p.development.authorization={decision_id:'old-authorization',authority_sha256:developmentReviewAuthority(s,p.id)};
     s.records[p.id]=p;

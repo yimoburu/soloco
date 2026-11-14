@@ -1,6 +1,7 @@
 // Pure shared reader for the canonical succession records. No factory, model,
 // native producer, ledger transaction or authority-issuing operation is here.
 import {canonical,peerDigest} from './ledger.mjs';
+import {assertPeerOrdinaryOriginOwnerResumeReceiptFrom} from './origin-ordinary-task-transition.mjs';
 
 const fail=code=>{throw Object.assign(Error(code),{code});};
 const need=(yes,code='OWNER_OPERATING_STATE_INVALID')=>{if(!yes)fail(code);};
@@ -72,8 +73,17 @@ export function inspectPeerOwnerOperatingState(tx){
   need(activation.handover_id===h.id&&activation.status==='activated'&&activation.epoch===v.epoch&&activation.paused===true&&same(activation.principal,ref('principals',p))&&same(activation.acceptance,p.value.owner_acceptance));
  }
  if(v.status==='resumed'){
+  const command=exact(tx,v.resume_command_ref,'commands');
+  if(command.value.kind==='origin_ordinary_task_command'){
+   // A fixed cold reader proves the original typed operation and historical
+   // postimage. Current ordinary authority is checked separately by consumers.
+   const resumed=assertPeerOrdinaryOriginOwnerResumeReceiptFrom(tx,{handover:h,principal:p,company:c}),control=exact(tx,v.resume_control_ref,'control');
+   need(same(resumed.control_ref,v.resume_control_ref)&&resumed.epoch===v.epoch);
+   need(control.id==='company'&&control.value.paused===false&&same(control.value.owner_handover,pointer));
+  }else{
   const resumed=receipt(tx,v.resume_command_ref,'resume',v.incoming.session_id),control=exact(tx,v.resume_control_ref,'control');
   need(control.id==='company'&&control.value.paused===false&&same(control.value.owner_handover,pointer)&&resumed.paused===false&&resumed.epoch===v.epoch&&same(resumed.control,v.resume_control_ref));
+  }
  }else need(c.value.paused===true);
  return {protocol:'peer-owner-operating-state-v1',controlled:true,handover_id:h.id,epoch:v.epoch,status:v.status,ordinary_allowed:v.status==='resumed',generic_resume_allowed:false};
 }

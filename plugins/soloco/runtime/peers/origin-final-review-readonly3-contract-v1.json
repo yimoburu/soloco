@@ -1,0 +1,100 @@
+{
+  "protocol": "soloco-origin-final-review-context-contract-v1",
+  "contract_id": "origin-final-review-readonly3-whole-assignment-v1",
+  "scope_profile_id": "soloco-origin-final-review-readonly-v1",
+  "context_encoding": "soloco-peer-context-frame-v2",
+  "tools": [
+    {
+      "type": "function",
+      "name": "soloco_context_header",
+      "description": "Private origin-final-review readonly context protocol; the original Source capsule enforces its exact purpose, read and output bounds. No business action authority.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "function",
+      "name": "soloco_context_read",
+      "description": "Private origin-final-review readonly context protocol; the original Source capsule enforces its exact purpose, read and output bounds. No business action authority.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sha256": {
+            "type": "string"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "length": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4096
+          }
+        },
+        "required": [
+          "sha256",
+          "offset",
+          "length"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "function",
+      "name": "soloco_context_submit",
+      "description": "Private origin-final-review readonly context protocol; the original Source capsule enforces its exact purpose, read and output bounds. No business action authority.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sha256": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sha256",
+          "content"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ],
+  "limits": {
+    "frame_bytes": 100000,
+    "wire_bytes": 4000000,
+    "policy_maximum_context_bytes": 65536,
+    "read_maximum_characters": 4096,
+    "response_maximum_utf8_bytes": 16384
+  },
+  "fresh_thread_required": true,
+  "authority": "Fixed Source constructor catalogue and whole-assignment framing only. Every listed delivery form requires its own genuine original admission, current authority and independent fresh creation. Owner review additionally requires a new explicit fresh-purpose handover and versioned grant action; no old grant/native/allowance conversion. No Native qualification, launch, spending, semantic acceptance, group/remote closure or old reservation release follows from this resource.",
+  "deliveries": [
+    {
+      "delivery_kind": "origin-frontier-seal-assignment",
+      "payload_protocol": "peer-origin-frontier-seal-context-v1",
+      "source_cut_protocol": null,
+      "kinds": [
+        "peer-origin-frontier-seal-review"
+      ],
+      "read_maximum_characters": 4096,
+      "response_maximum_utf8_bytes": 16384
+    },
+    {
+      "delivery_kind": "owner-maintenance-assignment",
+      "payload_protocol": "peer-owner-maintenance-assignment-v1",
+      "source_cut_protocol": null,
+      "kinds": [
+        "owner-handover-review"
+      ],
+      "purpose": "peer-owner-maintenance-fresh-purpose-v1",
+      "read_maximum_characters": 1024,
+      "response_maximum_utf8_bytes": 8192
+    }
+  ]
+}

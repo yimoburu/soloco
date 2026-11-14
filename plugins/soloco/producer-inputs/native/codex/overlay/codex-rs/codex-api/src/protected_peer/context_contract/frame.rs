@@ -118,6 +118,38 @@ pub(super) fn decode_bootstrap_frame<'a>(text:&'a str,source_contract_sha256:&st
     }
     decode_selected_frame(text,source_contract_sha256,maximum_frame_bytes,super::OriginalToolProfile::BootstrapReadonlyThree)
 }
+pub(super) fn decode_input_frontier_frame<'a>(text:&'a str,source_contract_sha256:&str,
+    maximum_frame_bytes:usize)->Result<DecodedOriginalFrame<'a>,TransportError> {
+    if source_contract_sha256!=super::FRONTIER_RESOURCE_SHA256||maximum_frame_bytes==0
+        ||maximum_frame_bytes>super::super::MAX_FRAME {
+        return Err(hold("original input frontier frame resource differs from fixed source"));
+    }
+    decode_selected_frame(text,source_contract_sha256,maximum_frame_bytes,super::OriginalToolProfile::InputFrontierReadonlyThree)
+}
+pub(super) fn decode_origin_maintenance_frame<'a>(text:&'a str,source_contract_sha256:&str,
+    maximum_frame_bytes:usize)->Result<DecodedOriginalFrame<'a>,TransportError> {
+    if source_contract_sha256!=super::ORIGIN_MAINTENANCE_RESOURCE_SHA256||maximum_frame_bytes==0
+        ||maximum_frame_bytes>super::super::MAX_FRAME {
+        return Err(hold("original origin maintenance frame resource differs from fixed source"));
+    }
+    decode_selected_frame(text,source_contract_sha256,maximum_frame_bytes,super::OriginalToolProfile::OriginMaintenanceReadonlyThree)
+}
+pub(super) fn decode_origin_final_review_frame<'a>(text:&'a str,source_contract_sha256:&str,
+    maximum_frame_bytes:usize)->Result<DecodedOriginalFrame<'a>,TransportError> {
+    if source_contract_sha256!=super::ORIGIN_FINAL_REVIEW_RESOURCE_SHA256||maximum_frame_bytes==0
+        ||maximum_frame_bytes>super::super::MAX_FRAME {
+        return Err(hold("original origin final review frame resource differs from fixed source"));
+    }
+    decode_selected_frame(text,source_contract_sha256,maximum_frame_bytes,super::OriginalToolProfile::OriginFinalReviewReadonlyThree)
+}
+pub(super) fn decode_origin_ordinary_task_frame<'a>(text:&'a str,source_contract_sha256:&str,
+    maximum_frame_bytes:usize)->Result<DecodedOriginalFrame<'a>,TransportError> {
+    if source_contract_sha256!=super::ORIGIN_ORDINARY_TASK_RESOURCE_SHA256||maximum_frame_bytes==0
+        ||maximum_frame_bytes>super::super::MAX_FRAME {
+        return Err(hold("original ordinary origin review frame resource differs from fixed source"));
+    }
+    decode_selected_frame(text,source_contract_sha256,maximum_frame_bytes,super::OriginalToolProfile::OriginOrdinaryTaskReadonlyThree)
+}
 fn decode_selected_frame<'a>(text:&'a str,source_contract_sha256:&str,maximum_frame_bytes:usize,
     profile:super::OriginalToolProfile)->Result<DecodedOriginalFrame<'a>,TransportError> {
     let bootstrap=profile==super::OriginalToolProfile::BootstrapReadonlyThree;
@@ -129,9 +161,15 @@ fn decode_selected_frame<'a>(text:&'a str,source_contract_sha256:&str,maximum_fr
         ||frame.payload_utf8_bytes==0||frame.payload_utf8_bytes>MAX_PAYLOAD_UTF8 {
         return Err(hold("original whole delivery frame binding"));
     }
-    if bootstrap!=(frame.delivery_kind=="bootstrap-membership-assignment") {
-        return Err(hold("original delivery kind differs from constructor profile"));
-    }
+    let selected_kind=match profile {
+        super::OriginalToolProfile::OrdinaryFive=>matches!(frame.delivery_kind.as_str(),"task-context"|"membership-assignment"),
+        super::OriginalToolProfile::BootstrapReadonlyThree=>frame.delivery_kind=="bootstrap-membership-assignment",
+        super::OriginalToolProfile::InputFrontierReadonlyThree=>frame.delivery_kind=="input-frontier-assignment",
+        super::OriginalToolProfile::OriginMaintenanceReadonlyThree=>frame.delivery_kind=="origin-maintenance-assignment",
+        super::OriginalToolProfile::OriginFinalReviewReadonlyThree=>matches!(frame.delivery_kind.as_str(),"origin-frontier-seal-assignment"|"owner-maintenance-assignment"),
+        super::OriginalToolProfile::OriginOrdinaryTaskReadonlyThree=>frame.delivery_kind=="origin-ordinary-task-assignment",
+    };
+    if !selected_kind {return Err(hold("original delivery kind differs from constructor profile"));}
     match frame.delivery_kind.as_str() {
         "task-context"=>{
             if !matches!(frame.payload_protocol.as_str(),"peer-task-context-v1"|"peer-task-context-v2")
@@ -156,6 +194,26 @@ fn decode_selected_frame<'a>(text:&'a str,source_contract_sha256:&str,maximum_fr
                 return Err(hold("original whole bootstrap membership delivery selector"));
             }
         }
+        "input-frontier-assignment"=>{
+            if frame.payload_protocol!="peer-input-frontier-assignment-v1"
+                ||frame.source_cut_protocol.is_some()||frame.source_cut_sha256.is_some()
+                ||frame.source_cut_utf8_bytes.is_some()||frame.payload_utf8_bytes>65_536 {
+                return Err(hold("original whole input frontier delivery selector"));
+            }
+        }
+        "origin-maintenance-assignment"|"origin-frontier-seal-assignment"|"owner-maintenance-assignment"|"origin-ordinary-task-assignment"=>{
+            let protocol=match frame.delivery_kind.as_str() {
+                "origin-maintenance-assignment"=>"peer-origin-maintenance-context-v1",
+                "origin-frontier-seal-assignment"=>"peer-origin-frontier-seal-context-v1",
+                "origin-ordinary-task-assignment"=>"peer-origin-ordinary-task-context-v1",
+                _=>"peer-owner-maintenance-assignment-v1",
+            };
+            if frame.payload_protocol!=protocol||frame.source_cut_protocol.is_some()
+                ||frame.source_cut_sha256.is_some()||frame.source_cut_utf8_bytes.is_some()
+                ||frame.payload_utf8_bytes>65_536 {
+                return Err(hold("original whole maintenance delivery selector"));
+            }
+        }
         _=>return Err(hold("unsupported original delivery kind")),
     }
     let prefix=format!("{{\"protocol\":\"{FRAME_PROTOCOL}\",\"contract_sha256\":\"{}\",\"delivery_kind\":\"{}\",\"payload_protocol\":\"{}\",\"payload_sha256\":\"{}\",\"payload_utf8_bytes\":{},\"source_cut_protocol\":{},\"source_cut_sha256\":{},\"source_cut_utf8_bytes\":{},\"payload\":",
@@ -171,6 +229,32 @@ fn decode_selected_frame<'a>(text:&'a str,source_contract_sha256:&str,maximum_fr
     if original.get()!=frame.payload.get() { return Err(hold("original whole payload boundary")); }
     let outer=object_spans(payload)?;
     if selector(&outer,"protocol")?!=frame.payload_protocol { return Err(hold("original whole payload protocol mismatch")); }
+    // Only the fixed SOURCE-selected family's exact delivery selectors are
+    // decoded. All business values retain their original opaque raw bytes.
+    match frame.delivery_kind.as_str() {
+        "origin-maintenance-assignment"=>{
+            if !matches!(selector(&outer,"kind")?.as_str(),"peer-origin-reconstruction"|"peer-origin-review") {
+                return Err(hold("original origin maintenance purpose selector"));
+            }
+        }
+        "origin-frontier-seal-assignment"=>{
+            if selector(&outer,"kind")?!="peer-origin-frontier-seal-review" {
+                return Err(hold("original origin frontier seal purpose selector"));
+            }
+        }
+        "origin-ordinary-task-assignment"=>{
+            if selector(&outer,"kind")?!="peer-origin-ordinary-task-review" {
+                return Err(hold("original ordinary origin purpose selector"));
+            }
+        }
+        "owner-maintenance-assignment"=>{
+            if selector(&outer,"kind")?!="owner-handover-review"
+                ||selector(&outer,"fresh_review_purpose")?!="peer-owner-maintenance-fresh-purpose-v1" {
+                return Err(hold("original owner fresh maintenance purpose selector"));
+            }
+        }
+        _=>{}
+    }
     let source_cut=if matches!(frame.delivery_kind.as_str(),"membership-assignment"|"bootstrap-membership-assignment") {
         let raw=*outer.get(&ascii_key("source_cut")).ok_or_else(||hold("original whole assignment source cut missing"))?;
         let expected_sha=frame.source_cut_sha256.as_deref().ok_or_else(||hold("original source cut digest unavailable"))?;

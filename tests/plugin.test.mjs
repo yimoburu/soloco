@@ -9,7 +9,9 @@ import { spawn } from 'node:child_process';
 import { withStore, id, VERSION, teamHash, digest } from '../plugins/soloco/runtime/store.mjs';
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
 import { hook, call } from '../plugins/soloco/runtime/main.mjs';
-import { work } from '../plugins/soloco/runtime/worker.mjs';
+import { workOriginal as work, disposeCoreOriginalWorkerFixtures } from './core-original-worker-fixture.mjs';
+import { recordOriginalWorkerAssignmentFrom } from '../plugins/soloco/runtime/peers/prospective-local-worker-inventory-producer.mjs';
+import { stageOriginalHistoricalJob, stageOriginalReviewController } from './original-worker-model-fixture.mjs';
 import { assignmentContext, contextMatches } from '../plugins/soloco/runtime/context.mjs';
 import { developmentAssignment, developmentCapability } from '../plugins/soloco/runtime/develop.mjs';
 import { commandArgs, parseOutput, modelCatalog } from '../plugins/soloco/runtime/adapters.mjs';
@@ -22,10 +24,13 @@ function completeStatus(a,host) {
   return view;
 }
 const base=fs.mkdtempSync(path.join(os.tmpdir(),'company-test-'));
+const fixtureRoots=new Set();
 process.env.COMPANY_PLUGIN_DATA=path.join(base,'cache');
+test.afterEach(()=>{for(const root of fixtureRoots)disposeCoreOriginalWorkerFixtures(root);fixtureRoots.clear();});
 test.after(()=>fs.rmSync(base,{recursive:true,force:true}));
 function setup(host='codex') {
   const root=fs.mkdtempSync(path.join(base,'venture-'));
+  fixtureRoots.add(root);
   const a={root,session_id:id('founder'),epoch:1,idea:'Help freelancers collect project briefs'};
   engine.bind(root,a.session_id,host);
   engine.open(a,host);
@@ -35,9 +40,10 @@ function setup(host='codex') {
 function migrated(a){withStore(a.root,db=>db.migrate());return a;}
 function queued(a,{role='pm',review_of=null,inputs=[]}={}) {
   const jid=id('job'), instance=id(role);
-  withStore(a.root,db=>db.transaction('test.queue',s=>{
+  withStore(a.root,db=>db.transaction('job.queued',s=>{
     s.sessions[instance]={instance_id:instance,role,native_id:null,host:s.owner.host};
-    s.jobs[jid]={id:jid,role,session_key:instance,instance_id:instance,host:s.owner.host,epoch:s.owner.epoch,status:'queued',task:'Prepare a bounded experiment.',inputs,review_of,created_at:new Date().toISOString()};return s;
+    const job={id:jid,role,session_key:instance,instance_id:instance,native_id:null,host:s.owner.host,epoch:s.owner.epoch,status:'queued',task:'Prepare a bounded experiment.',inputs,review_of,created_at:new Date().toISOString()};
+    recordOriginalWorkerAssignmentFrom(db,s,job);s.jobs[jid]=job;return s;
   }));return jid;
 }
 const result=(content='A bounded experiment.',extra={})=>({native_id:id('native'),text:JSON.stringify({content,messages:[],notices:[],...extra})});
@@ -666,12 +672,13 @@ test('progress follows actual local controller candidate, software tests, indepe
   await call('company_develop',{...a,action:'authorize',plan_id:plan.id,scope_sha256:plan.development.scope_sha256,model_data_approved:true,source_instruction:'Authorize this exact synthetic scope.'},'codex');
   function controllerQueue({role,review_of=null,...details}) {
     const jid=id('job'),instance=id(role);
-    withStore(root,db=>db.transaction('test.controller_queue',s=>{
+    withStore(root,db=>db.transaction('job.queued',s=>{
       s.sessions[instance]={instance_id:instance,role,native_id:null,host:s.owner.host};
       const job={id:jid,role,session_key:instance,instance_id:instance,native_id:null,host:s.owner.host,epoch:s.owner.epoch,
         requester:{role:'runner',session_id:s.owner.session_id,host:s.owner.host,epoch:s.owner.epoch},context_format:2,
         status:'queued',task:'Prepare a bounded synthetic development deliverable.',inputs:[],review_of,created_at:new Date().toISOString(),...details};
       // Match dispatch: reserve before insertion, then capture the authorized context.
+      recordOriginalWorkerAssignmentFrom(db,s,job);
       developmentAssignment(s,job,true);
       const context=assignmentContext(s,job);
       s.jobs[jid]={...job,inputs:context.inputs,context_sha256:context.hash};return s;
@@ -733,22 +740,30 @@ test('progress follows actual local controller candidate, software tests, indepe
 });
 
 test('company_progress observes successive synthetic parallel/candidate/test/QA/acceptance snapshots without replay',async()=>{
-  const {root,session_id}=setup(),args={root,session_id},at='2026-01-01T00:00:00Z';
+  const a=setup(),{root,session_id}=a,args={root,session_id},at='2026-01-01T00:00:00Z';
+  fs.writeFileSync(path.join(root,'scope-source.mjs'),'export const value = 1;\n');
+  const plan=await engine.develop({...a,action:'plan',read_paths:['scope-source.mjs'],write_paths:['scope-source.mjs','scope-source.test.mjs'],test_paths:['scope-source.test.mjs'],
+    acceptance:'Inspect synthetic progress records only.',stop_conditions:'No provider, network or real test invocation.',data_policy:'Synthetic local fixture only.',source_instruction:'Prepare this exact finite Source fixture scope.',model_data_approved:true,
+    max_attempts:1,timeout_ms:1000,max_output_bytes:10000,max_bytes:20000,expires_at:new Date(Date.now()+60000).toISOString()},'codex');
+  await engine.develop({...a,action:'authorize',plan_id:plan.id,scope_sha256:plan.development.scope_sha256,model_data_approved:true,source_instruction:'Authorize the displayed finite synthetic Source fixture scope.'},'codex');
   const baseJob={status:'completed',created_at:at,inputs:[],task:'PRIVATE instructions',task_summary:'Concrete synthetic task'};
+  stageOriginalHistoricalJob(root,{...baseJob,id:'build',role:'engineer',instance_id:'eng',native_id:'native-eng',artifact_id:'candidate'});
+  stageOriginalHistoricalJob(root,{...baseJob,id:'parallel',role:'research',status:'running',next_handoff:'QA awaits output; not summoned'});
   withStore(root,db=>db.transaction('test.synthetic_progress_chain',s=>{
-    s.jobs={build:{...baseJob,id:'build',role:'engineer',instance_id:'eng',native_id:'native-eng',artifact_id:'candidate'},
-      parallel:{...baseJob,id:'parallel',role:'research',status:'running',next_handoff:'QA awaits output; not summoned'},
-      test:{...baseJob,id:'test',kind:'development_test',candidate_id:'candidate',development_id:'plan',artifact_id:'receipt'}};
-    s.records={candidate:{id:'candidate',job_id:'build',revision:1,kind:'artifact',status:'Submitted',created_at:at,development:{type:'candidate',plan_id:'plan',candidate_sha256:'hash',run:{job_id:'test',receipt_id:'receipt'}}},
-      receipt:{id:'receipt',revision:1,kind:'artifact',status:'Submitted',author_role:'runtime',author_instance:'test',created_at:at,development:{type:'test',plan_id:'plan',candidate_id:'candidate',candidate_sha256:'hash',receipt_sha256:'receipt-hash',result:{tests_executed:true,status:'passed',exit_code:0}}}};
+    // These historical business records stay synthetic DATA. Their claimed
+    // test result is not evidence that the controlled child executed tests.
+    s.records={...s.records,candidate:{id:'candidate',job_id:'build',revision:1,kind:'artifact',status:'Submitted',created_at:at,development:{type:'candidate',plan_id:plan.id,candidate_sha256:'hash',run:{job_id:'test',receipt_id:'receipt'}}},
+      receipt:{id:'receipt',revision:1,kind:'artifact',status:'Submitted',author_role:'runtime',author_instance:'test',created_at:at,development:{type:'test',plan_id:plan.id,candidate_id:'candidate',candidate_sha256:'hash',receipt_sha256:'receipt-hash',result:{tests_executed:true,status:'passed',exit_code:0}}}};
     return s;
   }));
+  stageOriginalReviewController(root,{jobId:'test',planId:plan.id,candidateId:'candidate',receiptId:'receipt'});
+  withStore(root,db=>db.transaction('test.synthetic_progress_data',s=>{Object.assign(s.jobs.test,baseJob);return s;}));
   const returned=await call('company_progress',args,'codex');
   assert.deepEqual(returned.graph.edges.map(e=>[e.from,e.to,e.type]),[['build','test','candidate']]);
   assert.equal(returned.nodes.some(n=>n.role==='qa'),false);
   assert.equal(returned.evidence.find(r=>r.id==='receipt').acceptance,null);
+  stageOriginalHistoricalJob(root,{...baseJob,id:'qa',role:'qa',instance_id:'qa-instance',native_id:'native-qa',artifact_id:'review',review_of:{id:'receipt',revision:1}});
   withStore(root,db=>db.transaction('test.synthetic_qa_return',s=>{
-    s.jobs.qa={...baseJob,id:'qa',role:'qa',instance_id:'qa-instance',native_id:'native-qa',artifact_id:'review',review_of:{id:'receipt',revision:1}};
     s.records.review={id:'review',job_id:'qa',revision:1,kind:'review',status:'Submitted',created_at:at,review_of:{id:'receipt',revision:1},review:{verdict:'Pass',candidate_sha256:'hash',receipt_sha256:'receipt-hash'}};
     return s;
   }));

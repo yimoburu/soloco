@@ -3,7 +3,7 @@ import {buildEvidence,readEvidence} from './upgrade-evidence.mjs';
 import { digest, id, requireText, stamp } from './store.mjs';
 import {jobExecutionTiming} from './timeout.mjs';
 import {shallowSnapshotState,inheritSnapshots,snapshotScope,captureSnapshotDependencies,validateSnapshotDependencies,pinFrozenText,readFrozenText} from './snapshot.mjs';
-import {reviewedContext,currentExtensions,recordReference} from './current-state.mjs';
+import {reviewedContext,currentExtensions,recordReference,runtimeReceiptClosed} from './current-state.mjs';
 
 // Two frozen sequences, capped at 128M UTF-16 source units in total. Entries
 // contain exact frozen evidence only; they never carry a QA/authority decision.
@@ -219,7 +219,12 @@ export function completedWithinReviewWindow(job,artifact) {
   }catch{return false;}
 }
 export function verifyHandoverAcceptance(state) {
-  const h=state.handover;if(!h||h.status==='completed')return null;
+  const h=state.handover;if(!h)return null;
+  if(h.status==='completed'){
+    const accepted=state.records[h.acceptance?.review_id],job=state.jobs[accepted?.job_id];
+    if(job&&Object.hasOwn(job,'legacy_runtime')&&!runtimeReceiptClosed(state,job))throw new Error('Accepted handover worker closure is unconfirmed');
+    return null;
+  }
   const target=state.records[h.reconstruction_id];
   if(!target||target.handover?.subject_sha256!==handoverHash(state)||digest(JSON.stringify(target.handover.subject))!==target.handover.subject_sha256)throw new Error('Handover reconstruction missing or stale; submit current understanding and obtain independent QA');
   const candidates=Object.values(state.records).filter(r=>r.kind==='review'&&r.review_of?.id===target.id);
@@ -227,7 +232,7 @@ export function verifyHandoverAcceptance(state) {
   const review=candidates.find(r=>{
     const j=state.jobs[r.job_id],v=r.review;
     return r.status==='Submitted'&&r.author_role==='qa'&&r.review_of.revision===target.revision&&
-      j?.status==='completed'&&(target.handover.evidence_protocol!==4||j.coordination_release?.termination_confirmed===true)&&completedWithinReviewWindow(j,r)&&j.epoch===state.owner.epoch&&j.artifact_id===r.id&&j.review_of?.id===target.id&&j.review_of.revision===target.revision&&
+      j?.status==='completed'&&runtimeReceiptClosed(state,j)&&(target.handover.evidence_protocol!==4||j.coordination_release?.termination_confirmed===true)&&completedWithinReviewWindow(j,r)&&j.epoch===state.owner.epoch&&j.artifact_id===r.id&&j.review_of?.id===target.id&&j.review_of.revision===target.revision&&
       r.author_instance===j.instance_id&&j.native_id&&j.native_id!==target.author_instance&&r.author_instance!==target.author_instance&&
       (!(target.handover.evidence_protocol>=2)||handoverReviewContext(state,j).hash===j.context_sha256)&&
       (!(target.handover.evidence_protocol>=2)||(r.handover_evidence?.semantic_delivery_complete===true&&r.handover_evidence?.subject_sha256===target.handover.subject_sha256&&r.handover_evidence.reconstruction_sha256===digest(JSON.stringify(target))&&r.handover_evidence.native_id===j.native_id))&&

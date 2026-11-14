@@ -6,6 +6,7 @@ import path from 'node:path';
 import * as engine from '../../plugins/soloco/runtime/engine.mjs';
 import {call} from '../../plugins/soloco/runtime/main.mjs';
 import {withStore,digest,SCHEMA,VERSION,teamHash} from '../../plugins/soloco/runtime/store.mjs';
+import {seedPreexistingLegacyData} from '../preexisting-legacy-data-fixture.mjs';
 import {work} from '../../plugins/soloco/runtime/worker.mjs';
 import {executionTiming} from '../../plugins/soloco/runtime/timeout.mjs';
 import {buildLegacyCoherentPlan} from '../../plugins/soloco/runtime/legacy-operating.mjs';
@@ -27,9 +28,11 @@ async function fixture({dense=false,groups=61,bootstrap=true,frozenIntake=false,
  if(fictionalTeam){
   // Seed the mechanical fixture before any capture. Do not inherit the growing
   // installed instruction corpus or rewrite an already accepted checkpoint.
+  // PREEXISTING UNQUALIFIED legacy DATA only: the semantic stubs below supply
+  // no Original origin, assignment, model birth/closure or Native proof.
   const governance='FICTIONAL: preserve UNKNOWN failed outcomes and ZERO allowance. No execution or retry. Independent exact review and closed workers are required; owner changes revoke outgoing authority.';
   const s={schema:SCHEMA,runtime_version:VERSION,plugin_version:VERSION,id:'fictional-scoped-home-company',name:'Fictional scoped home',idea:'FICTIONAL mechanics only',phase:'Frame',mode:'preparation',paused:false,governance,governance_sha256:digest(governance),cos_instructions:'FICTIONAL: retain every condition, exception, failed result and uncertainty. No execution authority; reconstruct and independently review before resume.',roles:{runner:{name:'Fictional coordinator'},qa:{name:'Fictional independent QA'},engineer:{name:'Fictional proposal engineer'}},owner:{host:'codex',session_id:f.session_id,epoch:f.epoch},records:{},sessions:{},jobs:{},messages:[],notices:[],created_at:'2026-11-13T00:00:00.000Z'};
-  s.team_sha256=teamHash(s);withStore(f.root,db=>db.transaction('fictional.fixture.created',()=>s),true);
+  s.team_sha256=teamHash(s);withStore(f.root,db=>seedPreexistingLegacyData(db,'fictional.fixture.created',()=>s),true);
  }
  engine.open({...f,idea:'FICTIONAL mechanics only'},'codex');withStore(f.root,db=>db.migrate());
  mutate(f,s=>{s.paused=bootstrap;if(!bootstrap)s.records.home={id:'home',revision:1,kind:'artifact',content:'UNKNOWN; ZERO allowance; no execution.',context_obligations:{version:1,scope:'*'},operating_record:typed()};s.records.archive={id:'archive',kind:'artifact',revision:1,author_instance:'fictional-source-author',content:'UNKNOWN failed attempt. Remaining allowance ZERO. No execution; retain all negative outcomes.'};});

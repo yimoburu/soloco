@@ -1,18 +1,23 @@
+import {seedPreexistingLegacyData,preexistingLegacyStore} from './preexisting-legacy-data-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {DatabaseSync} from 'node:sqlite';
+import {createHash} from 'node:crypto';
 import {Store,withStore,VERSION,digest} from '../plugins/soloco/runtime/store.mjs';
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
 import {currentView,publicPage,publicCatalog,exactRead,PUBLIC_COLLECTIONS} from '../plugins/soloco/runtime/public-response.mjs';
-import {readPublicIndex} from '../plugins/soloco/runtime/record-storage.mjs';
+import {readPublicIndex,readComparisonProofCandidates,comparisonProofLookupIndexesFrom,COMPARISON_PROOF_INDEX_SQL} from '../plugins/soloco/runtime/record-storage.mjs';
+import {classifyRuntimeStorageFrom} from '../plugins/soloco/runtime/legacy-storage-proof.mjs';
+import {bindOriginalWorkerAssignmentBookkeepingFrom} from '../plugins/soloco/runtime/peers/prospective-local-worker-inventory-producer.mjs';
 
 const base=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'indexed-public-')));
 process.env.COMPANY_PLUGIN_DATA=path.join(base,'bindings-data');
 test.after(()=>fs.rmSync(base,{recursive:true,force:true}));
 const now=Date.now(),recent=new Date(now-1000).toISOString(),old='2020-01-01T00:00:00Z';
+const bytesHash=bytes=>createHash('sha256').update(bytes).digest('hex');
 function seed(n=10,bodySize=1000) {
   const s={schema:2,id:'fictional-index',revision:1,name:'Fixture',idea:'Synthetic only',plugin_version:VERSION,runtime_version:VERSION,phase:'Frame',mode:'preparation',paused:true,owner:{host:'codex',session_id:'founder',epoch:1},governance:'Pinned limits',governance_sha256:'fixture',team_sha256:'fixture',cos_instructions:'Pinned instructions',roles:{engineer:{}},records:{},jobs:{},notices:[],messages:[],sessions:{},upgrade_history:[],context_classifications:{}};
   for(let i=0;i<n;i++) {
@@ -21,7 +26,8 @@ function seed(n=10,bodySize=1000) {
     s.notices.push({id:'archive'+i,summary:'x'.repeat(bodySize),resolution:{text:'resolved'}});
     s.messages.push({id:'archive'+i,content:'x'.repeat(bodySize),at:old});
     s.sessions['archive'+i]={id:'archive'+i,history:'x'.repeat(bodySize)};
-    s.upgrade_history.push({id:'archive'+i,checkpoint:{content:'x'.repeat(bodySize)},created_at:old});
+    const checkpoint={id:s.id,revision:0,records:{['payload'+i]:{id:'payload'+i,content:'x'.repeat(bodySize)}},jobs:{}};
+    s.upgrade_history.push({id:'archive'+i,checkpoint,checkpoint_sha256:bytesHash(JSON.stringify(checkpoint)),created_at:old});
   }
   // The active assignment is deliberately older than every recent completed job.
   s.jobs.active={id:'active',status:'running',started_at:recent,created_at:old};
@@ -37,7 +43,7 @@ function seed(n=10,bodySize=1000) {
 function fixture(state=seed()) {
   const root=fs.mkdtempSync(path.join(base,'fixture-')),args={root,session_id:'founder'};
   engine.bind(root,'founder','codex');
-  withStore(root,db=>{db.transaction('synthetic.seed',()=>state);db.migrate();},true);
+  withStore(root,db=>{seedPreexistingLegacyData(db,'synthetic.seed',()=>state);db.migrate();},true);
   return args;
 }
 const inspect=(args,options={})=>engine.contextControl({...args,action:'inspect',...options},'codex');
@@ -177,12 +183,26 @@ test('status still reconciles archived active jobs and writing exports through c
 test('delivered and reconciliation sources fail closed on corruption; consequential writes retain full integrity checks',()=>{
   for(const [family,key,operation] of [['records','recent2',inspect],['jobs','active',engine.status],['records','archive0',null]]) {
     const args=fixture();
-    withStore(args.root,db=>{const row=db.db.prepare('SELECT sha256 FROM state_entries WHERE family=? AND key=?').get(family,key);db.db.prepare('UPDATE immutable_values SET bytes=? WHERE sha256=?').run('{"corrupt":true}',row.sha256);});
+    withStore(args.root,db=>{db.readSnapshot(()=>assert.equal(classifyRuntimeStorageFrom(db).lane,'legacy','The uncorrupted fixture must reach its positive storage lane'));const row=db.db.prepare('SELECT sha256 FROM state_entries WHERE family=? AND key=?').get(family,key);db.db.prepare('UPDATE immutable_values SET bytes=? WHERE sha256=?').run('{"corrupt":true}',row.sha256);});
     if(operation)assert.throws(()=>operation(args,'codex'),/hash mismatch/);
     else {
       // Unrelated corrupt archive bytes need not be read for an idle view.
       assert.doesNotThrow(()=>engine.current(args,'codex'));
-      withStore(args.root,db=>assert.throws(()=>db.transaction('synthetic.consequential',s=>{s.paused=false;return s;}),/hash mismatch/));
+      withStore(args.root,db=>{
+        assert.throws(()=>db.read(),/hash mismatch/,'An explicit canonical read must still detect the corrupted archive');
+        const physical=()=>JSON.stringify([
+          db.db.prepare('SELECT * FROM company ORDER BY id').all(),
+          db.db.prepare('SELECT * FROM state_entries ORDER BY family,key').all(),
+          db.db.prepare('SELECT * FROM immutable_values ORDER BY sha256').all(),
+          db.db.prepare('SELECT * FROM events ORDER BY seq').all(),
+          db.db.prepare('SELECT type,name,tbl_name,sql FROM sqlite_master ORDER BY type,name').all()
+        ]);
+        const before=db.changeToken(),retained=physical();let entered=false;
+        assert.throws(()=>db.transaction('synthetic.consequential',s=>{entered=true;s.paused=false;return s;}),error=>error.code==='LEGACY_RUNTIME_SNAPSHOT_CHANGED');
+        assert.equal(entered,false,'The physical legacy integrity fence must reject corruption before the callback');
+        assert.equal(db.changeToken(),before,'A rejected consequential write must not retain a new revision or event');
+        assert.equal(physical(),retained,'The early integrity Hold must not repair or alter the retained physical state');
+      });
     }
   }
   for(const kind of ['version','unknown','unknown-usage','catalog','row','reordered','missing-active']) {
@@ -311,14 +331,14 @@ test('repair of multiple missing objects rolls back with the authorized write',(
     const canonical=db.read();
     db.db.exec(`DROP TABLE public_read_catalog;
       DROP TABLE public_read_values;
-      DROP TRIGGER public_read_insert;
-      CREATE TRIGGER reject_repair_event BEFORE INSERT ON events BEGIN SELECT RAISE(ABORT,'Synthetic write rejected'); END;`);
+      DROP TRIGGER public_read_insert;`);
     const schema=db.db.prepare('SELECT type,name,sql FROM sqlite_master ORDER BY type,name').all();
-    const write=()=>db.selectedTransaction('synthetic.repair',{rootKeys:['revision','updated_at'],entities:{records:['recent0']}},s=>{s.records.recent0.content='Authorized edit';return s;});
-    assert.throws(write,/Synthetic write rejected/);
+    const write=beforeCommit=>db.selectedTransaction('synthetic.repair',{rootKeys:['revision','updated_at'],entities:{records:['recent0']}},s=>{s.records.recent0.content='Authorized edit';return s;},{beforeCommit});
+    const rejected=Error('Synthetic write rejected');let reachedCommit=false;
+    assert.throws(()=>write(()=>{reachedCommit=true;throw rejected;}),error=>error===rejected);
+    assert.equal(reachedCommit,true,'The fault must follow the real repair/write path, rather than an earlier schema Hold');
     assert.deepEqual(db.read(),canonical);
     assert.deepEqual(db.db.prepare('SELECT type,name,sql FROM sqlite_master ORDER BY type,name').all(),schema);
-    db.db.exec('DROP TRIGGER reject_repair_event');
     write();
     assert.equal(readPublicIndex(db.db),null);
     db.transaction('synthetic.full_rebuild',s=>s);
@@ -341,6 +361,66 @@ test('unavailable index and corrupt unrelated archive cannot roll back a native 
     assert.equal(retained.probe_native_id,'observed-native');
     assert.equal(readPublicIndex(db.db),null);
     assert.throws(()=>db.read(),/hash mismatch/,'Canonical integrity still holds on affected reads');
+  });
+});
+
+test('ordinary selected and late-return writes use sparse proof lookup without scanning archived bodies',()=>{
+  const measurements=[];
+  for(const count of [10,100,1000]){
+    const state=seed(count,1000);state.upgrade={id:'attempt',status:'checking',calls:[]};const args=fixture(state);
+    withStore(args.root,store=>{
+      // Accumulating valid immutable history must not turn each later receipt
+      // into a JSON/body scan. These unrelated values have no sparse keys.
+      for(let n=0;n<count;n++){const bytes=JSON.stringify({archived_core:'X'.repeat(1000),n});store.db.prepare('INSERT OR IGNORE INTO immutable_values VALUES(?,?)').run(bytesHash(bytes),bytes);}
+      const prepare=store.db.prepare.bind(store.db),seen=[];
+      store.db.prepare=function(sql,...rest){
+        const statement=prepare(sql,...rest);
+        assert(!/json_(?:valid|type)\(v\.bytes/.test(sql)||sql.includes('INDEXED BY public_read_issue18_proof_values'),'Unindexed body JSON discovery: '+sql);
+        if(!/public_read_issue18_(?:proof_values|record_refs)/.test(sql)||!/^SELECT/.test(sql))return statement;
+        return new Proxy(statement,{get(target,key){const method=Reflect.get(target,key,target);if(!['get','all'].includes(key))return typeof method==='function'?method.bind(target):method;return (...parameters)=>{
+          const value=method.apply(target,parameters);seen.push({sql,rows:key==='all'?value.length:Number(Boolean(value)),bytes:Buffer.byteLength(JSON.stringify(value??null)),plan:prepare('EXPLAIN QUERY PLAN '+sql).all(...parameters).map(row=>row.detail)});return value;
+        };}});
+      };
+      try{
+        store.selectedTransaction('fictional.indexed-proof-absence',{rootKeys:['revision','updated_at'],entities:{jobs:['active']}},s=>{s.jobs.active.receipt='Small independent Core result';});
+        assert.equal(store.appendUpgradeCall('attempt',{role:'qa',text:'Small independent late Core fact'}),true);
+      }finally{store.db.prepare=prepare;}
+      const sparse=seen.filter(row=>row.sql.includes('CROSS JOIN'));assert(sparse.length>=2,'Both ordinary write entry points must perform fresh canonical presence discovery');
+      for(const row of sparse){assert(row.plan.some(detail=>detail.includes('public_read_issue18_proof_values')),JSON.stringify(row));assert(row.plan.some(detail=>detail.includes('public_read_issue18_record_refs')),JSON.stringify(row));assert.equal(row.rows,0);}
+      measurements.push({count,lookup_queries:seen.length,returned_rows:seen.reduce((n,row)=>n+row.rows,0),returned_bytes:seen.reduce((n,row)=>n+row.bytes,0)});
+    });
+  }
+  for(const key of ['lookup_queries','returned_rows','returned_bytes'])assert.equal(new Set(measurements.map(row=>row[key])).size,1,key+' must not grow with valid Core/archive bodies');
+});
+
+test('missing proof lookups repair only in a writable transaction and never index retained proof or malformed history',()=>{
+  for(const retained of ['none','proof','malformed']){
+    const args=fixture(seed(2,10));withStore(args.root,store=>{
+      if(retained!=='none'){const bytes=retained==='proof'?JSON.stringify({id:'historical-only',runtime_wire_evidence:{historical_DATA:true}}):'not JSON';store.db.prepare('INSERT INTO immutable_values VALUES(?,?)').run(bytesHash(bytes),bytes);}
+      store.db.exec('DROP INDEX public_read_issue18_proof_values; DROP INDEX public_read_issue18_record_refs');
+      assert.deepEqual(comparisonProofLookupIndexesFrom(store.db),{proof_values:false,record_refs:false});
+      assert.throws(()=>readComparisonProofCandidates(store.db),error=>error.code==='ISSUE18_PROOF_LOOKUP_INDEX_REQUIRED');
+      const before=store.changeToken();let entered=false;
+      const write=()=>store.selectedTransaction('fictional.lookup-repair',{rootKeys:['revision','updated_at'],entities:{jobs:['active']}},s=>{entered=true;s.jobs.active.receipt='Independent result';});
+      if(retained==='none'){write();assert.equal(entered,true);assert.deepEqual(comparisonProofLookupIndexesFrom(store.db),{proof_values:true,record_refs:true});assert.deepEqual(readComparisonProofCandidates(store.db),[]);}
+      else{assert.throws(write,error=>error.code==='ISSUE18_PROOF_LOOKUP_INDEX_COPY_CUSTODY_REQUIRED');assert.equal(entered,false);assert.equal(store.changeToken(),before);assert.deepEqual(comparisonProofLookupIndexesFrom(store.db),{proof_values:false,record_refs:false});}
+    });
+  }
+});
+
+test('proof lookup keeps missing immutable references and wrong index definitions visible',()=>{
+  const args=fixture(seed(2,10));withStore(args.root,store=>{
+    const row=store.db.prepare("SELECT sha256 FROM state_entries WHERE family='records' AND key='archive0'").get();
+    const body=store.db.prepare('SELECT bytes FROM immutable_values WHERE sha256=?').get(row.sha256).bytes;
+    store.db.exec('PRAGMA foreign_keys=OFF');store.db.prepare('DELETE FROM immutable_values WHERE sha256=?').run(row.sha256);
+    assert.throws(()=>readComparisonProofCandidates(store.db),error=>error.code==='ISSUE18_PROOF_LOOKUP_MISSING_IMMUTABLE_VALUE');
+    store.db.prepare('INSERT INTO immutable_values VALUES(?,?)').run(row.sha256,body);store.db.exec('PRAGMA foreign_keys=ON');
+    store.db.exec('DROP INDEX public_read_issue18_record_refs; CREATE INDEX public_read_issue18_record_refs ON state_entries(key)');
+    assert.throws(()=>comparisonProofLookupIndexesFrom(store.db),error=>error.code==='ISSUE18_PROOF_LOOKUP_SCHEMA_REQUIRED');
+    store.db.exec('DROP INDEX public_read_issue18_record_refs');store.db.exec(COMPARISON_PROOF_INDEX_SQL.public_read_issue18_record_refs.replace("family='records'","family='RECORDS'"));
+    assert.throws(()=>comparisonProofLookupIndexesFrom(store.db),error=>error.code==='ISSUE18_PROOF_LOOKUP_SCHEMA_REQUIRED','A different string literal is a different partial index');
+    store.db.exec('DROP INDEX public_read_issue18_record_refs');store.db.exec(COMPARISON_PROOF_INDEX_SQL.public_read_issue18_record_refs);
+    assert.deepEqual(readComparisonProofCandidates(store.db),[]);
   });
 });
 
@@ -367,5 +447,74 @@ test('selected receipt-only writes preserve exact catalog without rebuilding unr
     const after=publicCatalog(store.read());after.exports=0;for(const info of Object.values(after.collections))delete info.rows;
     assert.deepEqual(readPublicIndex(store.db),after);
     assert.equal(after.collections.active_jobs.total,0);
+  });
+});
+
+test('a complete normalized legacy layout survives loss of the entire discardable public group',()=>{
+  const args=fixture(seed(2,10));
+  withStore(args.root,store=>{
+    const before=store.read();
+    store.db.exec(`DROP TRIGGER public_read_insert; DROP TRIGGER public_read_update; DROP TRIGGER public_read_delete;
+      DROP INDEX public_read_value_ids; DROP INDEX public_read_handles;
+      DROP TABLE public_read_catalog; DROP TABLE public_read_values; DROP TABLE public_read_rows;`);
+    store.readSnapshot(()=>assert.equal(classifyRuntimeStorageFrom(store).lane,'legacy'));
+    assert.equal(readPublicIndex(store.db),null);
+    store.transaction('synthetic.closed-public-repair',state=>state);
+    const after=store.read(),expected={...before,revision:after.revision,updated_at:after.updated_at};
+    assert.deepEqual(after,expected,'Repair must preserve canonical history and body bytes');
+    assert.ok(readPublicIndex(store.db));
+    store.readSnapshot(()=>assert.equal(classifyRuntimeStorageFrom(store).lane,'legacy'));
+    assert.deepEqual(inspect(args),publicPage(after));
+  });
+});
+
+test('known public-derived orphans cannot qualify layoutless legacy storage',()=>{
+  for(const ddl of [
+    'CREATE TABLE public_read_catalog(id INTEGER PRIMARY KEY CHECK(id=1),version INTEGER NOT NULL,sha256 TEXT NOT NULL,bytes TEXT NOT NULL)',
+    'CREATE TABLE public_read_rows(collection TEXT NOT NULL,ordinal INTEGER NOT NULL,key TEXT NOT NULL,id TEXT NOT NULL,sha256 TEXT NOT NULL,key_sha256 TEXT NOT NULL,PRIMARY KEY(collection,ordinal))'
+  ]){
+    const root=fs.mkdtempSync(path.join(base,'orphan-')),store=preexistingLegacyStore(root,'synthetic.raw-orphan-baseline',()=>seed(1,10));
+    try{
+      store.readSnapshot(()=>assert.equal(classifyRuntimeStorageFrom(store).lane,'legacy','The raw fixture must qualify before introducing an orphan'));
+      store.db.exec(ddl);const before=store.changeToken();let entered=false;
+      store.readSnapshot(()=>assert.throws(()=>classifyRuntimeStorageFrom(store),error=>error.code==='LEGACY_RUNTIME_SCHEMA_REQUIRED'));
+      assert.throws(()=>store.transaction('synthetic.orphan-repair',state=>{entered=true;return state;}),error=>error.code==='LEGACY_RUNTIME_SCHEMA_REQUIRED');
+      assert.equal(entered,false);assert.equal(store.changeToken(),before);
+    }finally{store.close();}
+  }
+});
+
+test('altered present definitions and unknown public names stay held before write callbacks',()=>{
+  for(const ddl of [
+    'DROP INDEX public_read_handles; CREATE INDEX public_read_handles ON public_read_rows(key_sha256)',
+    'CREATE TABLE public_read_unrecognized(value TEXT)'
+  ]){
+    const args=fixture(seed(2,10));
+    withStore(args.root,store=>{
+      store.readSnapshot(()=>assert.equal(classifyRuntimeStorageFrom(store).lane,'legacy'));
+      store.db.exec(ddl);const before=store.changeToken();let entered=false;
+      assert.throws(()=>store.selectedTransaction('synthetic.invalid-public-schema',{rootKeys:['revision'],entities:{records:['recent0']}},state=>{entered=true;return state;}),error=>error.code==='LEGACY_RUNTIME_SCHEMA_REQUIRED');
+      assert.equal(entered,false);assert.equal(store.changeToken(),before);
+    });
+  }
+});
+
+test('passive Original bookkeeping uses physical presence rather than projected Origin hints',()=>{
+  const args=fixture(seed(8,2048));
+  withStore(args.root,store=>{
+    const hinted={id:'fictional-index',records:{},jobs:{},original_execution_origin:{untrusted_projected_hint:true}};
+    const absent=trace(()=>store.readSnapshot(()=>bindOriginalWorkerAssignmentBookkeepingFrom(store,hinted)));
+    assert.equal(absent.result,null);
+    assert.ok(absent.metrics.bytes<1000,'Physically absent Origin must not hydrate archive job/history bodies');
+    for(const value of [null,{invalid_origin_DATA:true}]){
+      const bytes=JSON.stringify(value),sha=bytesHash(bytes),position=store.db.prepare("SELECT COALESCE(MAX(position),-1)+1 AS n FROM state_entries WHERE family IN ('root','shape')").get().n;
+      store.db.prepare('INSERT OR IGNORE INTO immutable_values VALUES(?,?)').run(sha,bytes);
+      store.db.prepare("INSERT INTO state_entries(family,key,position,sha256,encoding) VALUES('root','original_execution_origin',?,?,'json') ON CONFLICT(family,key) DO UPDATE SET sha256=excluded.sha256").run(position,sha);
+      store.readSnapshot(()=>assert.equal(classifyRuntimeStorageFrom(store).lane,'original','Present invalid/null Origin must retain its strict route'));
+      const projected={id:'fictional-index',records:{},jobs:{}};
+      const present=trace(()=>store.readSnapshot(()=>bindOriginalWorkerAssignmentBookkeepingFrom(store,projected)));
+      assert.equal(present.result,null,'Invalid DATA must not acquire bookkeeping custody');
+      assert.ok(present.metrics.bytes>2048,'Omitting Origin from projected DATA must not skip its existing full physical path');
+    }
   });
 });

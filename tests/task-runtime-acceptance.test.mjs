@@ -1,5 +1,5 @@
-// Explicit fictional model adapters exercise the real public API, Store,
-// worker and supervisor. Actual MCP/native process lifecycle is separate evidence.
+// Controlled Source processes exercise the real public API, Store, Original
+// worker and adapter. Callback DATA does not establish Native qualification.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -13,10 +13,10 @@ import {runtimeAction,claimSupervisor,tickRuntime} from '../plugins/soloco/runti
 import {updateTaskIndex} from '../plugins/soloco/runtime/task-index.mjs';
 import {taskReady} from '../plugins/soloco/runtime/tasks.mjs';
 import {supervise} from '../plugins/soloco/runtime/supervisor.mjs';
-import {work} from '../plugins/soloco/runtime/worker.mjs';
-import {executionTiming} from '../plugins/soloco/runtime/timeout.mjs';
+import {workOriginal as work,disposeCoreOriginalWorkerFixtures} from './core-original-worker-fixture.mjs';
 import {taskAssignmentContext,taskContextMatches} from '../plugins/soloco/runtime/task-context.mjs';
 import {isTaskOutput,isTaskOwnOutput} from '../plugins/soloco/runtime/tasks.mjs';
+import {inheritOriginalWorkerAssignmentBookkeepingFrom} from '../plugins/soloco/runtime/peers/prospective-local-worker-inventory-producer.mjs';
 
 const inertChild=()=>({on(){return this;},unref(){}});
 const source_instruction='Prepare only the exact fictional supplied facts; no external execution or extra attempts.';
@@ -34,12 +34,11 @@ function fixture(){
   const spec=patch=>({role:'research',task:'Prepare one source-grounded fictional finding.',acceptance:'Preserve supplied restrictions and uncertainty.',expected_deliverable:'One attributable fictional finding',context_scope:'fixture',...patch});
   const submit=(operation_id,patch={})=>api('company_tasks',{action:'submit',epoch:1,operation_id,source_instruction,spec:spec(patch)});
   const queue=task_id=>engine.queueRuntimeTask(root,task_id,{check:()=>({available:true,authenticated:true,version:'fictional-contract-adapter'}),launch:inertChild});
-  return {root,args,control,api,spec,submit,queue,read:()=>withStore(root,db=>db.read()),change:fn=>withStore(root,db=>db.transaction('fixture.acceptance-change',s=>{fn(s);return s;},{afterWrite:updateTaskIndex})),close:()=>{if(previous===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=previous;fs.rmSync(home,{recursive:true,force:true});}};
+  return {root,args,control,api,spec,submit,queue,read:()=>withStore(root,db=>db.read()),change:fn=>withStore(root,db=>db.transaction('fixture.acceptance-change',s=>{fn(s);return s;},{afterWrite:updateTaskIndex})),close:()=>{disposeCoreOriginalWorkerFixtures(root);if(previous===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=previous;fs.rmSync(home,{recursive:true,force:true});}};
 }
 const envelope=content=>({content,messages:[],notices:[]});
 function immediate(native,artifact){return async(_host,prior,_prompt,_dir,timeout,_selection,options)=>{
   assert.equal(prior,null,'each fixture task starts a fresh native identity');
-  options.onSpawn(executionTiming(Date.now(),{timeout_ms:timeout}));
   return {native_id:native,text:JSON.stringify(artifact)};
 };}
 async function until(check,ms=5000){const deadline=Date.now()+ms;while(Date.now()<deadline){if(check())return;await new Promise(resolve=>setTimeout(resolve,10));}throw Error('Fictional acceptance state did not arrive before its declared5s test timeout');}
@@ -81,10 +80,10 @@ test('public submit and bounded status complete while two model promises remain 
     for(const [n,role] of ['research','engineer'].entries()){
       const task=await f.submit('slow-'+n,{role,context_scope:'slow-'+n,resources:['slow/'+n]}),job=f.queue(task.id);
       workers.push(work(f.root,job.job_id,async(_h,_n,_p,_d,timeout,_s,options)=>{
-        options.onSpawn(executionTiming(Date.now(),{timeout_ms:timeout}));
         return new Promise(resolve=>releases.push(()=>{completed++;resolve({native_id:'fictional-slow-'+role,text:JSON.stringify(envelope('Fictional independently attributable result.'))});}));
       }));
     }
+    await until(()=>releases.length===2);
     assert.equal(releases.length,2);const status_ms=[],submitStart=performance.now();
     const newTask=await f.submit('new-during-slow',{role:'pm',context_scope:'new',resources:['new/output']});
     const submit_ms=performance.now()-submitStart;
@@ -102,9 +101,9 @@ test('task amendment, pause, owner change and runtime revocation fence slow late
     try{
       const a=await f.submit('producer'),qa=await f.submit('qa',{role:'qa',review_task_id:a.id}),b=await f.submit('dependent',{role:'pm',depends_on:[{task_id:qa.id,gate:'accepted'}]}),queued=f.queue(a.id);
       worker=work(f.root,queued.job_id,async(_h,_n,_p,_d,timeout,_s,options)=>{
-        options.onSpawn(executionTiming(Date.now(),{timeout_ms:timeout}));
         return new Promise(resolve=>release=()=>resolve({native_id:'fictional-late-'+fence,text:JSON.stringify(envelope('LATE FICTIONAL RESULT '+fence+' must remain evidence without acceptance.'))}));
       });
+      await until(()=>typeof release==='function');
       assert(release);assert.equal(f.read().jobs[queued.job_id].status,'running');
       if(fence==='amend')await f.api('company_tasks',{action:'amend',epoch:1,operation_id:'amend-live',task_id:a.id,expected_definition_revision:1,source_instruction,spec:f.spec({task:'A changed fictional objective.'})});
       if(fence==='pause')await f.api('company_control',{action:'pause',expected_epoch:1,source_instruction:'Pause this fictional acceptance fixture now.'});
@@ -114,7 +113,7 @@ test('task amendment, pause, owner change and runtime revocation fence slow late
       const state=f.read(),job=state.jobs[queued.job_id],artifact=state.records[job.artifact_id];
       assert.notEqual(job.status,'completed');assert.notEqual(artifact?.status,'Submitted');
       assert.match(JSON.stringify(job.rejected_output??artifact??{}),new RegExp('LATE FICTIONAL RESULT '+fence));
-      assert.equal(job.coordination_release?.termination_confirmed,true,'the fixture adapter returned, so this invocation has actual closure evidence');
+      assert.equal(job.coordination_release?.termination_confirmed,true,'the Original adapter observed the controlled model close');
       assert.equal(state.records[a.id].runtime_task.attempts.length,1);assert.equal(state.records[b.id].runtime_task.attempts.length,0);
       assert.equal(taskReady(state,state.records[b.id]).ready,false);assert.equal(Object.keys(state.jobs).length,1);
     }finally{release?.();await worker;f.close();}
@@ -200,16 +199,21 @@ for(const explicit of [false,true])test(`public pause, storage migration and res
     tickRuntime(root,{dispatch:false});const state=read(),receiver=state.jobs[jobs[2]];
     assert.equal(state.records[a.id].runtime_task.state,'returned');assert.equal(state.records[qa.id].runtime_task.state,'accepted');assert.equal(state.records[b.id].runtime_task.state,'returned');
     assert.equal(new Set(jobs.map(id=>state.jobs[id].native_id)).size,3);
-    const missing=structuredClone(state);delete missing.records[sourceIds[0]];
+    // Keep passive bookkeeping from this exact observed Source snapshot so the
+    // negative cases exercise their changed input, not a missing proof.
+    const clone=()=>{const derived=structuredClone(state);assert.equal(inheritOriginalWorkerAssignmentBookkeepingFrom(state,derived),true);return derived;};
+    const intact=clone();assert.equal(taskContextMatches(intact,intact.jobs[receiver.id],receiver.context_sha256),true);
+    assert.equal(isTaskOutput(intact,intact.records[receiver.artifact_id]),true);
+    const missing=clone();delete missing.records[sourceIds[0]];
     assert.equal(taskContextMatches(missing,receiver,receiver.context_sha256),false,'a missing source cannot match a null reference');
     assert.equal(isTaskOutput(missing,missing.records[receiver.artifact_id]),false);
     for(const revision of [undefined,0,'1']){
-      const malformed=structuredClone(state);malformed.jobs[receiver.id].inputs.find(ref=>ref.id===sourceIds[0]).revision=revision;
+      const malformed=clone();malformed.jobs[receiver.id].inputs.find(ref=>ref.id===sourceIds[0]).revision=revision;
       assert.equal(taskContextMatches(malformed,malformed.jobs[receiver.id],receiver.context_sha256),false,'expected references must contain canonical null or a positive integer');
     }
-    const changed=structuredClone(state);changed.records[sourceIds[0]].content+=' A new unresolved condition.';
+    const changed=clone();changed.records[sourceIds[0]].content+=' A new unresolved condition.';
     assert.equal(taskContextMatches(changed,receiver,receiver.context_sha256),false,'null revision does not weaken exact source hash binding');
-  }finally{if(previous===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=previous;fs.rmSync(home,{recursive:true,force:true});}
+  }finally{disposeCoreOriginalWorkerFixtures(root);if(previous===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=previous;fs.rmSync(home,{recursive:true,force:true});}
 });
 
 test('cancelling committed producer or review evidence revokes readiness without rewriting its completed job',async t=>{
@@ -249,7 +253,8 @@ test('cancelling producer or accepted reviewer fences an already-running depende
       const aj=f.queue(a.id);await work(f.root,aj.job_id,immediate('fictional-running-cancel-author',envelope('Retained fictional candidate.')));
       const qj=f.queue(qa.id);await work(f.root,qj.job_id,immediate('fictional-running-cancel-review',{...envelope('Exact fictional review.'),review:{verdict:'Pass',reason:'The exact fictional candidate meets its stated criterion.',blockers:[]}}));
       tickRuntime(f.root,{dispatch:false});assert.equal(f.read().records[qa.id].runtime_task.state,'accepted');
-      const bj=f.queue(b.id);worker=work(f.root,bj.job_id,async(_h,_n,_p,_d,timeout,_s,options)=>{options.onSpawn(executionTiming(Date.now(),{timeout_ms:timeout}));return new Promise(resolve=>release=()=>resolve({native_id:'fictional-late-dependent-'+cancel,text:JSON.stringify(envelope('LATE DEPENDENT AFTER CANCEL '+cancel))}));});
+      const bj=f.queue(b.id);worker=work(f.root,bj.job_id,async(_h,_n,_p,_d,timeout,_s,options)=>{return new Promise(resolve=>release=()=>resolve({native_id:'fictional-late-dependent-'+cancel,text:JSON.stringify(envelope('LATE DEPENDENT AFTER CANCEL '+cancel))}));});
+      await until(()=>typeof release==='function');
       assert(release);const target=cancel==='producer'?a:qa;
       await f.api('company_tasks',{action:'cancel',epoch:1,operation_id:'cancel-upstream',task_id:target.id,expected_definition_revision:1,source_instruction:'Revoke this exact fictional prerequisite while its dependent is running.'});
       release();await worker;tickRuntime(f.root,{dispatch:false});

@@ -9,11 +9,13 @@ import {inspectPeerPinnedTeamFrom,assertPeerOriginSelectedMaintenanceFrom} from 
 import {assertPeerOriginLegacyFences,ORIGIN_QUARANTINE_PROTOCOL} from './origin-quarantine.mjs';
 import {assertOriginActor,originSafeData,originSidecars,ORIGIN_LIMITS,originHash,originNeed as need,originSame as same,originCopy as copy,originRef as ref} from './origin-plan.mjs';
 import {ORIGIN_MAINTENANCE_INSTRUCTION} from './origin-maintenance-instruction.mjs';
+import {assertOriginalPeerMaintenanceExecutionCapacityFrom as assertInventory,assertOriginalPeerMaintenanceExecutionCapacityInTransactionFrom as assertInventoryInTransaction,prepareOriginalPeerExecutionLaunchFrom as prepareInventoryLaunch} from './prospective-local-worker-inventory-producer.mjs';
 
 // Fixed genuine readers for the bootstrap namespace. Re-exporting them does
 // not mint purpose, renew allowance or select a runner.
 export {assertPeerOriginSelectedMaintenanceFrom} from './origin-maintenance-authority.mjs';
 export {assertPeerOriginPausedBootstrapPurposeFrom} from './origin-paused-bootstrap-accounting.mjs';
+export {assertOriginalPeerMaintenanceExecutionCapacityFrom} from './prospective-local-worker-inventory-producer.mjs';
 
 export const ORIGIN_MAINTENANCE_CONTEXT='peer-origin-maintenance-context-v1';
 const services=new WeakMap(),caps=new WeakMap(),consumed=new WeakSet(),outputFailures=new WeakSet();
@@ -24,6 +26,7 @@ const dispositions=Object.freeze(['retain-global','legacy-represented']),verdict
 const wireKeys=Object.freeze(['protocol','payload_sha256','instruction_sha256','frame_sha256','recipe_sha256','input_utf8_bytes','whole_rpc_utf8_bytes','frame_bytes','wire_bytes','context_utf8_bytes','policy_maximum_context_bytes','native_identity']);
 function data(value,required,optional=[]){value=originSafeData(value);need(value&&typeof value==='object'&&!types.isProxy(value)&&Object.getPrototypeOf(value)===Object.prototype,'ORIGIN_INPUT');const descriptors=Object.getOwnPropertyDescriptors(value),keys=Reflect.ownKeys(descriptors);need(required.every(k=>keys.includes(k))&&keys.every(k=>typeof k==='string'&&[...required,...optional].includes(k)&&descriptors[k].enumerable&&Object.hasOwn(descriptors[k],'value')),'ORIGIN_INPUT');return copy(value);}
 const text=(v,max=4000)=>typeof v==='string'&&v.trim().length>0&&v.length<=max&&!v.includes('\0');
+function readLive(r,fn){return r.s.ledger.read(raw=>{assertInventoryInTransaction(r.s.ledger,raw,{stage:'existing',admission_ref:r.admission_ref});return fn(raw);});}
 function exact(tx,r,kind){const row=tx.getVersion(r);need(row&&(!kind||row.value.kind===kind),'ORIGIN_PROOF_CHANGED');return row;}
 function all(tx,family){let cursor;const out=[];do{const p=tx.list(family,{limit:100,...(cursor?{cursor}:{})});out.push(...p.items);need(out.length<=10000,'ORIGIN_STATE_CAPACITY');cursor=p.next_cursor;if(p.complete)break;need(cursor,'ORIGIN_STATE_INCOMPLETE');}while(cursor);return out;}
 function service(api){const s=services.get(api);need(s,'ORIGIN_ORIGINAL_SERVICE_REQUIRED');return s;}
@@ -41,8 +44,10 @@ function terminal(s,deadline){assertPeerOriginLegacyFences(s.ledger.db);return d
 // then compare actual heads again at the physical terminal cutoff. No source
 // validator is injected by a model and no getVersion/list follows a real put.
 function write(s,type,principal,build,physical){
- bound(s);let expected,sidecars,deadline=Date.now()+120000;
+ bound(s);let expected,sidecars,inventoryRef,deadline=Date.now()+120000;
+ const admitting=type==='origin.maintenance.admitted',inventoryChecked=admitting||['origin.maintenance.native_created','origin.maintenance.completed'].includes(type);
  return s.ledger.guardedWrite(type,principal,raw=>{
+  if(admitting)assertInventoryInTransaction(s.ledger,raw,{stage:'reserve'});
   const cache=new Map(),changes=[],events=[],checks=[],k=(f,id)=>canonical([f,id]);let volume=0,count=0;
   for(const family of FAMILIES)for(const row of all(raw,family)){volume+=contextBytes(row);need(++count<=30000&&volume<=192*1024*1024,'ORIGIN_STATE_CAPACITY');cache.set(k(family,row.id),{family,id:row.id,row});}
   const snapshot=raw.get('control','company');
@@ -52,12 +57,14 @@ function write(s,type,principal,build,physical){
    put(f,id,value,revision){const before=this.get(f,id);need(revision===(before?.revision??0),'ORIGIN_PLAN_CHANGED');const v=copy(value),row={id,revision:(before?.revision??0)+1,sha256:peerDigest(v),created_seq:before?.created_seq??raw.sequence,value:v};changes.push({family:f,id,value:v,expected:before?.revision??0,row});cache.set(k(f,id),{family:f,id,row});return copy(row);},
    event(type,payload){events.push({type,payload:copy(payload)});},finalCheck(check){checks.push(check);}};
   const result=build(tx);for(const check of checks)check(tx);
+  if(inventoryChecked){const phases=changes.filter(c=>c.family==='work_items'&&c.value.kind==='origin_maintenance_phase');need(phases.length===1,'ORIGIN_EXECUTION_INVENTORY_ADMISSION_REQUIRED');inventoryRef=copy(phases[0].value.admission_ref);if(!admitting)assertInventoryInTransaction(s.ledger,raw,{stage:'existing',admission_ref:inventoryRef});}
   // This historical probe also rejects a modifying reentrant write during
   // source planning on the current P1 implementation.
   raw.getVersion(ref('control',snapshot));expected=[...cache.values()];sidecars=tx.get('control','origin')?.value.sidecar_frontier;
   for(const c of changes){const actual=raw.put(c.family,c.id,c.value,c.expected);need(same(actual,c.row),'ORIGIN_PLAN_CHANGED');}for(const e of events)raw.event(e.type,e.payload);
+  if(admitting)prepareInventoryLaunch(s.ledger,raw,{admission_ref:inventoryRef});
   need(typeof raw.sealWrites==='function','ORIGIN_PHYSICAL_COMMIT_REQUIRED');raw.sealWrites();for(const r of expected)need(same(raw.get(r.family,r.id),r.row),'ORIGIN_CURRENT_CHANGED');return result===undefined?null:copy(result);
- },view=>{bound(s);for(const r of expected)need(same(view.get(r.family,r.id),r.row),'ORIGIN_CURRENT_CHANGED');assertPeerOriginLegacyFences(s.ledger.db);if(sidecars)need(same(originSidecars(s.connection.directory),sidecars),'ORIGIN_LATE_SIDECAR_UNRECORDED');const exactDeadline=physical?.(view);if(exactDeadline!==undefined){need(typeof exactDeadline==='number'&&Number.isFinite(exactDeadline),'ORIGIN_PHYSICAL_COMMIT_REQUIRED');deadline=Math.min(deadline,exactDeadline);}return deadline;});
+ },view=>{bound(s);for(const r of expected)need(same(view.get(r.family,r.id),r.row),'ORIGIN_CURRENT_CHANGED');if(inventoryRef)assertInventoryInTransaction(s.ledger,view,{stage:'existing',admission_ref:inventoryRef});assertPeerOriginLegacyFences(s.ledger.db);if(sidecars)need(same(originSidecars(s.connection.directory),sidecars),'ORIGIN_LATE_SIDECAR_UNRECORDED');const exactDeadline=physical?.(view);if(exactDeadline!==undefined){need(typeof exactDeadline==='number'&&Number.isFinite(exactDeadline),'ORIGIN_PHYSICAL_COMMIT_REQUIRED');deadline=Math.min(deadline,exactDeadline);}return deadline;});
 }
 function support(){need(typeof deployment.inspectOriginalOriginMaintenanceSupport==='function','ORIGIN_NATIVE_SOURCE_UNAVAILABLE');const value=deployment.inspectOriginalOriginMaintenanceSupport();need(value?.protocol==='peer-origin-maintenance-assignment-v1'&&/^[a-f0-9]{64}$/.test(value.bridge_sha256??'')&&value.creation_mode==='fresh-original-protected-thread','ORIGIN_NATIVE_SOURCE_UNAVAILABLE');return copy(value);}
 function checkedWireReceipt(value,text,policy){
@@ -133,7 +140,8 @@ export function createPeerOriginMaintenance({ledger,actor}){
 export function originalPeerOriginMaintenanceLedger(api){need(arguments.length===1,'ORIGIN_ORIGINAL_SERVICE_REQUIRED');const s=service(api);bound(s);s.ledger.read(tx=>current(s,tx));return s.ledger;}
 export function prepareOriginalPeerOriginMaintenance(api,input){
  const s=service(api),a=data(input,['operation_id','kind','segments'],['reconstruction_ref']);need(text(a.operation_id,160)&&Array.isArray(a.segments)&&a.segments.length>0&&a.segments.length<=64&&kinds.includes(a.kind)&&(a.kind==='peer-origin-review')===Boolean(a.reconstruction_ref),'ORIGIN_INPUT');
- const hash=peerDigest(a),prior=s.operations.get(a.operation_id);if(prior){need(prior.hash===hash,'ORIGIN_REPLAY_MISMATCH');const old=original(prior.cap);s.ledger.read(tx=>admitted(old,tx,{native:Boolean(old.native)}));return prior.cap;}
+ const hash=peerDigest(a),prior=s.operations.get(a.operation_id);if(prior){need(prior.hash===hash,'ORIGIN_REPLAY_MISMATCH');const old=original(prior.cap);readLive(old,tx=>admitted(old,tx,{native:Boolean(old.native)}));return prior.cap;}
+ assertInventory(s.ledger,{stage:'reserve'});
  const sourceSupport=support(),cap=Object.freeze({});need(typeof deployment.preflightOriginalOriginMaintenanceContext==='function'&&typeof deployment.inspectOriginalOriginMaintenancePreflight==='function','ORIGIN_WIRE_SOURCE_UNAVAILABLE');let record,deadline;
  s.ledger.read(tx=>current(s,tx));
  write(s,'origin.maintenance.admitted','founder',tx=>{
@@ -164,12 +172,12 @@ export function prepareOriginalPeerOriginMaintenance(api,input){
 export function inspectPeerOriginMaintenanceOperation(api,{operation_id}){const s=service(api);need(text(operation_id,160),'ORIGIN_INPUT');return s.ledger.read(tx=>{current(s,tx);const row=tx.get('commands','origin-maintenance-operation:'+peerDigest([s.connection.company_id,s.actor,operation_id]));if(!row)return {found:false};const phase=tx.get('work_items',row.value.phase_id);need(row.value.kind==='origin_maintenance_command'&&phase?.value.kind==='origin_maintenance_phase','ORIGIN_PROOF_CHANGED');return {found:true,operation_ref:ref('commands',row),admission_ref:row.value.admission_ref,status:phase.value.status,result_ref:phase.value.result_ref??null,native_id:phase.value.native_id,private_capability_reconstructable:false};});}
 export function inspectOriginalPeerOriginMaintenance(cap){const r=original(cap);return {...copy(r.binding),admission_ref:copy(r.admission_ref),native_id:r.native?.native_id??null};}
 export function assertOriginalPeerOriginMaintenance(cap,{ledger,stage='execution'}={}){
- const r=original(cap,{ledger});need(['reserved','execution'].includes(stage),'ORIGIN_INPUT');return r.s.ledger.read(tx=>{const {phase}=admitted(r,tx,{native:stage==='execution'});if(stage==='reserved')need(!r.native&&phase.value.status==='reserved','ORIGIN_NATIVE_CREATION_REQUIRED');return inspectOriginalPeerOriginMaintenance(cap);});
+ const r=original(cap,{ledger});need(['reserved','execution'].includes(stage),'ORIGIN_INPUT');return readLive(r,tx=>{const {phase}=admitted(r,tx,{native:stage==='execution'});if(stage==='reserved')need(!r.native&&phase.value.status==='reserved','ORIGIN_NATIVE_CREATION_REQUIRED');return inspectOriginalPeerOriginMaintenance(cap);});
 }
-export function originalPeerOriginMaintenancePreflight(cap){const r=original(cap);return r.s.ledger.read(tx=>{const {context}=admitted(r,tx,{native:Boolean(r.native)});return checkedOriginalWire(r,context);});}
-export function prepareOriginalPeerOriginMaintenanceContext(cap){const r=original(cap);return r.s.ledger.read(tx=>{const {context}=admitted(r,tx);return {text:context.value.text,sha256:context.value.sha256,utf8_bytes:Buffer.byteLength(context.value.text),context_ref:r.binding.context_ref,review_subject:r.binding.subject};});}
+export function originalPeerOriginMaintenancePreflight(cap){const r=original(cap);return readLive(r,tx=>{const {context}=admitted(r,tx,{native:Boolean(r.native)});return checkedOriginalWire(r,context);});}
+export function prepareOriginalPeerOriginMaintenanceContext(cap){const r=original(cap);return readLive(r,tx=>{const {context}=admitted(r,tx);return {text:context.value.text,sha256:context.value.sha256,utf8_bytes:Buffer.byteLength(context.value.text),context_ref:r.binding.context_ref,review_subject:r.binding.subject};});}
 export function bindOriginalPeerOriginNative(cap,creationToken){
- const r=original(cap);need(!r.native&&!r.finished&&typeof domain.assertOriginalProtectedOriginCreation==='function','ORIGIN_NATIVE_CREATION_UNAVAILABLE');const facts=domain.assertOriginalProtectedOriginCreation(creationToken,{ledger:r.s.ledger,admission_ref:r.admission_ref,context_sha256:r.binding.context_sha256,kind:r.binding.kind});
+ const r=original(cap);assertInventory(r.s.ledger,{stage:'existing',admission_ref:r.admission_ref});need(!r.native&&!r.finished&&typeof domain.assertOriginalProtectedOriginCreation==='function','ORIGIN_NATIVE_CREATION_UNAVAILABLE');const facts=domain.assertOriginalProtectedOriginCreation(creationToken,{ledger:r.s.ledger,admission_ref:r.admission_ref,context_sha256:r.binding.context_sha256,kind:r.binding.kind});
  need(facts?.protocol==='peer-origin-original-creation-v1'&&facts.kind===r.binding.kind&&same(facts.admission_ref,r.admission_ref)&&facts.context_sha256===r.binding.context_sha256&&text(facts.native_id,300)&&facts.native_id===facts.thread_id&&facts.profile_id==='soloco-origin-maintenance-readonly-v1'&&facts.native_id!==r.s.actor.native_id,'ORIGIN_NATIVE_CREATION_REQUIRED');
  let creation_ref;write(r.s,'origin.maintenance.native_created','founder',tx=>{const {phase,o}=admitted(r,tx);const excluded=new Set([...(o.value.legacy_native_aliases??[]),...o.value.mechanical_reviews.map(v=>v.native_id)]);if(r.binding.reconstruction_ref)excluded.add(resultFrom(tx,r.binding.reconstruction_ref,'peer-origin-reconstruction').row.value.native_id);for(const p of all(tx,'principals'))if(p.value.native_id)excluded.add(p.value.native_id);for(const p of all(tx,'work_items'))if(p.value.kind==='origin_maintenance_creation')excluded.add(p.value.facts.native_id);need(!excluded.has(facts.native_id),'ORIGIN_REVIEW_INDEPENDENCE');
   const row=tx.put('work_items',r.execution_id+':creation',{kind:'origin_maintenance_creation',protocol:'peer-origin-original-creation-record-v1',admission_ref:r.admission_ref,context_sha256:r.binding.context_sha256,facts:copy(facts),authority_issued:false},0);creation_ref=ref('work_items',row);tx.put('work_items',phase.id,{...phase.value,status:'running',native_id:facts.native_id,creation_ref},phase.revision);const participant=tx.get('work_items',r.binding.participant_id);tx.put('work_items',participant.id,{...participant.value,status:'running',native_id:facts.native_id,creation_ref},participant.revision);tx.finalCheck(provider=>{admitted(r,provider);});
@@ -177,9 +185,9 @@ export function bindOriginalPeerOriginNative(cap,creationToken){
 }
 function covered(reads,total){const sorted=reads.slice().sort((a,b)=>a[0]-b[0]);let offset=0;for(const [start,end]of sorted){if(start>offset)return false;offset=Math.max(offset,end);}return offset>=total;}
 export function originalPeerOriginMaintenanceChannel(cap){const r=original(cap);return Object.freeze({
- header:()=>r.s.ledger.read(tx=>{const {context}=admitted(r,tx,{native:true});return {protocol:ORIGIN_MAINTENANCE_CONTEXT,sha256:r.binding.context_sha256,total_characters:context.value.text.length,review_subject:r.binding.subject,coverage:copy(r.reads)};}),
- read:input=>{const a=data(input,['sha256','offset','length']);return r.s.ledger.read(tx=>{const {context}=admitted(r,tx,{native:true});need(a.sha256===r.binding.context_sha256,'ORIGIN_CONTEXT_CHANGED');const part=range(context.value.text,a.offset,a.length);r.reads.push([part.offset,part.offset+part.length]);return {sha256:a.sha256,...part};});},
- submit:input=>{const a=data(input,['sha256','content']);return r.s.ledger.read(tx=>{const {context}=admitted(r,tx,{native:true});need(a.sha256===r.binding.context_sha256&&covered(r.reads,context.value.text.length),'ORIGIN_DELIVERY_INCOMPLETE');need(text(a.content,16384)&&Buffer.byteLength(a.content)<=16384,'ORIGIN_OUTPUT_CAPACITY');need(r.submission===null||r.submission===a.content,'ORIGIN_OUTPUT_IMMUTABLE');r.submission=a.content;return {submitted:true,sha256:originHash(a.content)};});}
+ header:()=>readLive(r,tx=>{const {context}=admitted(r,tx,{native:true});return {protocol:ORIGIN_MAINTENANCE_CONTEXT,sha256:r.binding.context_sha256,total_characters:context.value.text.length,review_subject:r.binding.subject,coverage:copy(r.reads)};}),
+ read:input=>{const a=data(input,['sha256','offset','length']);return readLive(r,tx=>{const {context}=admitted(r,tx,{native:true});need(a.sha256===r.binding.context_sha256,'ORIGIN_CONTEXT_CHANGED');const part=range(context.value.text,a.offset,a.length);r.reads.push([part.offset,part.offset+part.length]);return {sha256:a.sha256,...part};});},
+ submit:input=>{const a=data(input,['sha256','content']);return readLive(r,tx=>{const {context}=admitted(r,tx,{native:true});need(a.sha256===r.binding.context_sha256&&covered(r.reads,context.value.text.length),'ORIGIN_DELIVERY_INCOMPLETE');need(text(a.content,16384)&&Buffer.byteLength(a.content)<=16384,'ORIGIN_OUTPUT_CAPACITY');need(r.submission===null||r.submission===a.content,'ORIGIN_OUTPUT_IMMUTABLE');r.submission=a.content;return {submitted:true,sha256:originHash(a.content)};});}
 });}
 // Only failures created by these pure model-JSON checks may be recorded as a
 // rejected output. Provider/current/pin/manifest/proof errors retain their exact

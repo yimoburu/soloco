@@ -12,6 +12,24 @@ import {createHash} from 'node:crypto';
 import {installLegacyWorkerRecipeSourceFixture} from './legacy-worker-recipe-fixture.mjs';
 
 const runtime=fileURLToPath(new URL('../plugins/soloco/runtime/',import.meta.url)),hash=v=>createHash('sha256').update(v).digest('hex');
+// Unbuffered progress only: no payload, absolute path or inspected error DATA.
+// The 19 fixed setups emit at most493 normal markers; hard ceilings also bound
+// unexpected paths without changing a fixture's original result or failure.
+const phaseStart=process.hrtime.bigint(),MAX_PHASE_MARKS=512,MAX_PHASE_BYTES=65536;
+let setupSequence=0,phaseSequence=0,phaseBytes=0,phaseLimited=false;
+function phase(setup,step,entry='-'){
+  try{
+    if(phaseLimited)return;
+    const line=`SOLOCO_OCC_PHASE ${phaseSequence+1} ${setup} ${step} ${entry} ${process.hrtime.bigint()-phaseStart}\n`,bytes=Buffer.byteLength(line);
+    if(phaseSequence>=MAX_PHASE_MARKS-1||phaseBytes+bytes>MAX_PHASE_BYTES-32){phaseLimited=true;fs.writeSync(2,'SOLOCO_OCC_PHASE_LIMIT\n');return;}
+    phaseSequence++;phaseBytes+=bytes;fs.writeSync(2,line);
+  }catch{/* Diagnostic failure cannot replace the original Source result. */}
+}
+function beginSetup(){const setup=++setupSequence;phase(setup,'setup.begin');return setup;}
+function loadSource(setup,entry,url){
+  phase(setup,'import.begin',entry);
+  return import(url).then(value=>{phase(setup,'import.end',entry);return value;},error=>{phase(setup,'import.throw',entry);throw error;});
+}
 const required=['.claude-plugin/plugin.json','runtime/adapters.mjs','runtime/coordination.mjs','runtime/develop.mjs','runtime/engine.mjs','runtime/model-process-closure.mjs','runtime/record-storage.mjs','runtime/state-projections.mjs','runtime/store.mjs','runtime/team-source.mjs','runtime/worker.mjs'];
 const companion=`// SYNTHETIC SOURCE CUT ONLY. NO ACCEPTED NATIVE OR POLICY PRODUCER.
 import {readNormalized,captureStorageBaseline} from '../record-storage.mjs';
@@ -35,19 +53,45 @@ export function capturePeerOriginCut(db){
 }
 export function validatePeerOriginMechanicalReview(){throw Object.assign(Error('SYNTHETIC_NATIVE_QA_PRODUCER_UNAVAILABLE'),{code:'SYNTHETIC_NATIVE_QA_PRODUCER_UNAVAILABLE'});}
 `;
+function installOccupancyPlanSourceFixture(root,setup){
+  phase(setup,'runtime.bind.begin');
+  // Reuse the actual unchanged current graph, preserving its Store class and
+  // private capability maps. Each legacy cut and optional companion stays in
+  // its own root; only the shared current modules use their canonical URLs.
+  const current=runtime,legacy=path.join(root,'LEGACY-SOURCE/runtime');
+  phase(setup,'runtime.bind.end');phase(setup,'legacy.begin');
+  try{
+  fs.mkdirSync(path.join(legacy,'peers'),{recursive:true});
+  // Preserve the exact archived recipe leaves without replacing the current
+  // Store's worker dependency graph. Only this isolated observer reads them.
+  installLegacyWorkerRecipeSourceFixture(legacy);
+  for(const name of ['peers/legacy-occupancy-plan.mjs','peers/legacy-worker-occupancy.mjs'])fs.copyFileSync(path.join(current,name),path.join(legacy,name));
+  // Re-export genuine current modules: Store class identity, policy capabilities
+  // and storage/ledger behavior remain shared, with no substitute guards.
+  for(const name of ['store.mjs','record-storage.mjs','peers/ledger.mjs','peers/legacy-occupancy-policy.mjs']){
+    fs.writeFileSync(path.join(legacy,name),`export * from ${JSON.stringify(pathToFileURL(path.join(current,name)).href)};\n`);
+  }
+  }catch(error){phase(setup,'legacy.throw');throw error;}
+  phase(setup,'legacy.end');
+  return legacy;
+}
 async function fixture(t,{missingBackend=false}={}){
-  const root=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-FICTIONAL-occupancy-plan-')),runtimeCopy=path.join(root,'SOURCE-plugin/runtime'),company=path.join(root,'FICTIONAL-company');
+  const setup=beginSetup();
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-FICTIONAL-occupancy-plan-')),company=path.join(root,'FICTIONAL-company');
   let store;t.after(()=>{if(store&&!store.closed)store.close();fs.rmSync(root,{recursive:true,force:true});});
-  fs.mkdirSync(path.dirname(runtimeCopy));fs.cpSync(runtime,runtimeCopy,{recursive:true});installLegacyWorkerRecipeSourceFixture(runtimeCopy);const backendFile=path.join(runtimeCopy,'peers/origin-plan.mjs');if(missingBackend)fs.rmSync(backendFile,{force:true});else fs.writeFileSync(backendFile,companion);fs.mkdirSync(path.join(company,'.company'),{recursive:true});
-  const load=relative=>import(pathToFileURL(path.join(runtimeCopy,relative)).href),[api,source,storage,storeModule,models,ledger]=await Promise.all(['peers/legacy-occupancy-plan.mjs','peers/legacy-occupancy-policy.mjs','record-storage.mjs','store.mjs','model-process-closure.mjs','peers/ledger.mjs'].map(load)),backend=missingBackend?null:await load('peers/origin-plan.mjs');
+  const runtimeCopy=installOccupancyPlanSourceFixture(root,setup),backendFile=path.join(runtimeCopy,'peers/origin-plan.mjs');if(missingBackend)fs.rmSync(backendFile,{force:true});else fs.writeFileSync(backendFile,companion);fs.mkdirSync(path.join(company,'.company'),{recursive:true});
+  const load=relative=>loadSource(setup,relative,pathToFileURL(path.join(runtimeCopy,relative)).href),[api,source,storage,storeModule,models,ledger]=await Promise.all(['peers/legacy-occupancy-plan.mjs','peers/legacy-occupancy-policy.mjs','record-storage.mjs','store.mjs','model-process-closure.mjs','peers/ledger.mjs'].map(load)),backend=missingBackend?null:await load('peers/origin-plan.mjs');
+  phase(setup,'imports.end');phase(setup,'sqlite.begin');
   const actor={host:'codex',native_id:'SYNTHETIC-founder',session_id:'SYNTHETIC-founder'},db=new DatabaseSync(path.join(company,'.company/company.sqlite'));
   db.exec("CREATE TABLE company(id INTEGER PRIMARY KEY CHECK(id=1),value TEXT); CREATE TABLE events(seq INTEGER PRIMARY KEY,at TEXT,type TEXT,value TEXT); CREATE TABLE company_layout(id INTEGER PRIMARY KEY CHECK(id=1),version INTEGER NOT NULL); INSERT INTO company_layout VALUES(1,4); CREATE TABLE immutable_values(sha256 TEXT PRIMARY KEY,bytes TEXT NOT NULL); CREATE TABLE state_entries(family TEXT NOT NULL,key TEXT NOT NULL,position INTEGER NOT NULL,sha256 TEXT NOT NULL,encoding TEXT NOT NULL DEFAULT 'json',PRIMARY KEY(family,key));");
   const initial={schema:2,runtime_version:'0.7.8',plugin_version:'0.7.8',governance:'SYNTHETIC governance fixture only',roles:{},cos_instructions:'SYNTHETIC instructions fixture only',id:'FICTIONAL-company',paused:true,owner:{host:actor.host,session_id:actor.session_id,epoch:1},revision:0,jobs:{},records:{'SYNTHETIC-old':{status:'expired',used_attempts:7}},notices:[{id:'SYNTHETIC-notice',status:'pending'}]};initial.team_sha256=storeModule.teamHash(initial);
-  storage.writeNormalized(db,initial);db.prepare('INSERT INTO company VALUES(1,?)').run(JSON.stringify({layout:4}));db.close();
-  store=new storeModule.Store(company);
+  db.exec('BEGIN IMMEDIATE');try{storage.writeNormalized(db,initial);db.prepare('INSERT INTO company VALUES(1,?)').run(JSON.stringify({layout:4}));db.exec('COMMIT');}catch(error){db.exec('ROLLBACK');throw error;}db.close();
+  phase(setup,'sqlite.end');phase(setup,'store.begin');store=new storeModule.Store(company);
   const write=(type,change)=>store.transaction(type,s=>{change(s);return s;});write('SYNTHETIC.fixture.created',()=>{});
+  phase(setup,'store.end');phase(setup,'archive.begin');
   const archive={protocol:'legacy-original-policy-source-archive-v1',runtime_version:'0.7.8',files:required.map(name=>{const content=name==='.claude-plugin/plugin.json'?JSON.stringify({name:'soloco',version:'0.7.8'}):'// SYNTHETIC source bytes only '+name+'\n';return {path:name,sha256:hash(content),content};})},file=path.join(root,'SYNTHETIC-source-archive.json');fs.writeFileSync(file,JSON.stringify(archive)+'\n');
   const sourceCap=source.captureOriginalLegacyOccupancyPolicySourceFrom(file),prepare=()=>store.readSnapshot(()=>api.prepareLegacyOccupancyMechanicalPlanFrom(store,sourceCap,actor));
+  phase(setup,'archive.end');
   const addClosedFailure=id=>{
     write('job.started',s=>{s.jobs[id]={id,instance_id:'SYNTHETIC-instance-'+id,host:'codex',worker_pid:123456,status:'running',native_id:'SYNTHETIC-native-'+id,started_at:new Date().toISOString()};});
     const invocation={invocation_id:'SYNTHETIC-invocation-'+id,job_id:id,instance_id:'SYNTHETIC-instance-'+id,host:'codex',worker_pid:123456,requested_at:new Date().toISOString()};
@@ -66,10 +110,12 @@ async function fixture(t,{missingBackend=false}={}){
     const p=plan.legacy_occupancy_component,output=change({protocol:'peer-origin-mechanical-review-v1',permitted_action:'quarantine_peer_origin',plan_sha256:ledger.peerDigest(plan),cut_sha256:plan.cut_sha256,legacy_authority:'retired-without-conversion',execution_resumed:false,legacy_occupancy:{protocol:'legacy-occupancy-mechanical-review-binding-v1',component_sha256:ledger.peerDigest(p),policy_archive_sha256:p.policy_source.archive_sha256,source_cut_sha256:plan.cut_sha256,partition_sha256:p.partition_sha256,original_policy_association:'UNPROVED',original_policy_witness:null,release_authority:false,whole_domain_qualified:false}});
     write('SYNTHETIC.review.DATA.only',s=>{s.records['SYNTHETIC-review']={id:'SYNTHETIC-review',kind:'review',content:JSON.stringify(output),revision:1};});return output;
   };
+  phase(setup,'setup.end');
   return {root,store,api,actor,source,sourceCap,ledger,backend,prepare,write,addClosedFailure,recordPlan,recordReview,validate:()=>store.readSnapshot(()=>api.validateOriginalLegacyOccupancyMechanicalReviewFrom(store,'SYNTHETIC-plan','SYNTHETIC-review',actor))};
 }
 function snapshot(db){return JSON.stringify(db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all().map(({name})=>({name,rows:db.prepare('SELECT * FROM "'+name+'" ORDER BY rowid').all()})));}
 
+phase(0,'module.ready');
 test('fixed original backend is absent in this source composition; shaped stores and Pass DATA cannot substitute',async t=>{
   const f=await fixture(t,{missingBackend:true});
   for(const value of [{},new Proxy({},{get(){throw Error('Must not invoke proxy');}})])assert.throws(()=>f.api.prepareLegacyOccupancyMechanicalPlanFrom(value,{},f.actor),e=>e.code==='LEGACY_OCCUPANCY_OWNING_STORE_SNAPSHOT_REQUIRED');
@@ -77,17 +123,19 @@ test('fixed original backend is absent in this source composition; shaped stores
   f.store.readSnapshot(()=>assert.throws(()=>f.api.prepareLegacyOccupancyMechanicalPlanFrom(f.store,f.sourceCap,f.actor),e=>e.code==='LEGACY_OCCUPANCY_ORIGINAL_BACKEND_UNAVAILABLE'));
 });
 test('present fixed backend import preserves AggregateError identity despite missing-module code and canonical URL',async t=>{
+  const setup=beginSetup();
   const root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'soloco-SYNTHETIC-plan-import-')));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
-  const runtimeCopy=path.join(root,'runtime');fs.cpSync(runtime,runtimeCopy,{recursive:true});installLegacyWorkerRecipeSourceFixture(runtimeCopy);
+  const runtimeCopy=installOccupancyPlanSourceFixture(root,setup);
   const backendFile=path.join(runtimeCopy,'peers/origin-plan.mjs'),key='SYNTHETIC-plan-import-'+path.basename(root),cause=Error('SYNTHETIC original cause'),member=Error('SYNTHETIC original member');
   const sentinel=Object.assign(new AggregateError([member],'SYNTHETIC present backend import failure',{cause}),{code:'ERR_MODULE_NOT_FOUND',url:pathToFileURL(backendFile).href});
   globalThis[key]=sentinel;t.after(()=>delete globalThis[key]);
   fs.writeFileSync(backendFile,`throw globalThis[${JSON.stringify(key)}];\n`);
   assert.ok(fs.statSync(backendFile).isFile());
-  await assert.rejects(import(pathToFileURL(path.join(runtimeCopy,'peers/legacy-occupancy-plan.mjs')).href),error=>{
+  await assert.rejects(loadSource(setup,'peers/legacy-occupancy-plan.mjs',pathToFileURL(path.join(runtimeCopy,'peers/legacy-occupancy-plan.mjs')).href),error=>{
     assert.strictEqual(error,sentinel);assert.strictEqual(error.cause,cause);assert.strictEqual(error.errors[0],member);return true;
   });
+  phase(setup,'setup.end');
 });
 test('source plan retains every actual fictional vault/event/binary sidecar byte and changes no database row',async t=>{
   const f=await fixture(t);f.addClosedFailure('SYNTHETIC-old-failure');const before=snapshot(f.store.db),cap=f.prepare(),p=f.api.inspectOriginalLegacyOccupancyMechanicalPlan(cap).component;assert.equal(snapshot(f.store.db),before);

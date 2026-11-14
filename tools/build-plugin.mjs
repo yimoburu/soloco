@@ -1,10 +1,12 @@
 import fs from 'node:fs';
 import {packageContextProducer} from './package-context-producer.mjs';
+import {packageComparisonQualification} from './package-comparison-qualification.mjs';
 
 // Governance and release-derived packaging. Roles remain authored in assets/roles.json.
 const check = process.argv.includes('--check');
 // Validate/copy the closed original recipe; no preparation or build is run.
 packageContextProducer(check);
+packageComparisonQualification(check);
 function publish(relative, content) {
   const file = new URL(relative, import.meta.url);
   if (check) {

@@ -11,6 +11,8 @@ import {SCOPED_STREAM,buildScopedStream,validateScopedStreamDelivery} from './sc
 export {SCOPED_STREAM} from './scoped-stream.mjs';
 import {buildLegacyCoherentPlan,decodeLegacyCoherentPlan} from './legacy-operating.mjs';
 import {NOTICE_SOURCES,hasCanonicalNoticeSource,isCanonicalNoticeSource,noticeSource,noticeSourceEntries,projectNotice} from './notice-sources.mjs';
+import {inspectComparisonEvidenceRecordFrom} from './integrated-comparison-evidence.mjs';
+import {inspectComparisonTestRecordFrom} from './integrated-comparison-test.mjs';
 
 // Explicit prospective source-closure contract; old range identities stay exact.
 export const COHERENT_PARTITIONER='coherent-source-v1';
@@ -174,6 +176,38 @@ export function producerClosure(s,original,sourceId=original.id){
     if(active.has(r.id))fail('cyclic producer closure '+r.id);
     if(seen.has(r.id))return;active.add(r.id);
     try{
+      if(Object.hasOwn(r,'runtime_wire_evidence')){
+        const proof=inspectComparisonEvidenceRecordFrom(s,r),e=r.runtime_wire_evidence;
+        if(!proof||proof.recordSha!==sha(r)||proof.job_id!==r.job_id||proof.invocation_id!==e?.binding?.invocation_id)fail('changed comparison evidence producer '+r.id);
+        const j=source(s,'job:'+r.job_id),invocation=j.model_process_tracking?.invocations?.find(item=>item.invocation_id===proof.invocation_id);
+        if(r.author_instance!==j.instance_id||e.binding.job.id!==j.id||e.binding.job.instance_id!==j.instance_id||!invocation||invocation.job_id!==j.id||invocation.instance_id!==j.instance_id)fail('broken comparison invocation producer '+r.id);
+        closure.set('job:'+j.id,scopedReference(j,'job:'+j.id));
+        // The invocation binds immutable preimages. Their actual SQL originals
+        // are checked by the owning typed reader; a later revoke/accept does
+        // not relabel those hashes or erase historical provenance. Retain the
+        // separate current source closure for qualification of current meaning.
+        const plan=source(s,e.binding.plan.id);
+        closure.set(plan.id,scopedReference(plan));record(plan);
+        if(e.binding.job.review_of){const target=source(s,e.binding.job.review_of.id);closure.set(target.id,scopedReference(target));record(target);}
+        // This is an attributable invocation record, not the job's final
+        // artifact. Keep its actual job_id and exact source dependencies.
+        return;
+      }
+      if(Object.hasOwn(r,'runtime_candidate_test_guard')){
+        const proof=inspectComparisonTestRecordFrom(s,r),g=r.runtime_candidate_test_guard;
+        if(!proof||proof.recordSha!==sha(r)||proof.job_id!==r.job_id||g?.test_job_id!==r.job_id)fail('changed comparison test producer '+r.id);
+        const j=source(s,'job:'+r.job_id);
+        if(j.kind!=='development_test'||r.author_instance!==j.id||j.candidate_id!==g.candidate.id||j.development_id!==g.plan_id)fail('broken comparison test controller '+r.id);
+        closure.set('job:'+j.id,scopedReference(j,'job:'+j.id));
+        // The guard also binds the immutable PRE-test candidate. Its owning
+        // typed reader verifies that original; the current candidate closure
+        // retains the later run/receipt lifecycle without relabeling hashes.
+        const candidate=source(s,g.candidate.id),plan=source(s,g.plan_id),evidence=exact(s,g.producer_evidence_record);
+        if(candidate.development?.candidate_sha256!==g.candidate_sha256||candidate.development?.plan_id!==plan.id)fail('broken comparison test dependencies '+r.id);
+        for(const value of [candidate,plan,evidence]){closure.set(value.id,scopedReference(value));record(value);}
+        if(g.actual_receipt){const receipt=source(s,g.actual_receipt.id);if(receipt.author_instance!==j.id||j.artifact_id!==receipt.id)fail('broken comparison terminal receipt '+r.id);closure.set(receipt.id,scopedReference(receipt));record(receipt);}
+        return;
+      }
       const runtime=r.development?.type==='test',jobId=runtime?r.author_instance:r.job_id;
       if(runtime&&(r.author_role!=='runtime'||!text(jobId)))fail('broken runtime producer edge '+r.id);
       if(!jobId)return;
@@ -466,7 +500,7 @@ function corpusLive(s,c,m){
   const known=new Set(m.sources.map(r=>r.source.id)),operating=operatingProofOccurrences(s),proposed=proposedBootstrapHomes(s,c,m);
   for(const r of proposed)if(operating.ids.has(r.id))fail('typed proposed home cannot be proof bookkeeping');
   for(const [id,r] of Object.entries(s.records??{}))if(!known.has(id)&&!proposed.some(h=>h.id===id)&&!operating.ids.has(id)&&!corpusRuntimeRecord(s,r))fail('corpus current membership added '+id);
-  for(const [id,j] of Object.entries(s.jobs??{}))if(!known.has('job:'+id)&&!operating.jobs.has(id)&&(!s.records[j.review_of?.id]?.scoped_context_target||!proofJobSafe(Object.fromEntries(Object.entries(j).filter(([k])=>!['qualification_delivery','error','execution_failure','rejected_output','rejected_native_ids','rejected_native_id'].includes(k))))))fail('corpus current job membership added '+id);
+  for(const [id,j] of Object.entries(s.jobs??{}))if(!known.has('job:'+id)&&!operating.jobs.has(id)&&(!s.records[j.review_of?.id]?.scoped_context_target||!proofJobSafe(Object.fromEntries(Object.entries(j).filter(([k])=>!['qualification_delivery','error','execution_failure','rejected_output','rejected_native_ids','rejected_native_id'].includes(k))),s)))fail('corpus current job membership added '+id);
   for(const u of [s.upgrade,...(s.upgrade_history??[])].filter(Boolean))if(!known.has('upgrade:'+u.id))fail('corpus upgrade membership added');
 }
 function captureCorpus(s,{source_id,corpus_plan_id,selected_source_ids,semantic_partition,batching_policy,home_intake_policy,maintenance,source_instruction,frozen_intake}){

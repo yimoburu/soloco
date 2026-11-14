@@ -1,3 +1,4 @@
+import {seedPreexistingLegacyData} from './preexisting-legacy-data-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -30,7 +31,7 @@ function fixture(t,{raw,beforeCleanup}={}){
  s.records.plan={id:'plan',kind:'artifact',revision:1,development:{type:'plan',scope:{max_bytes:20000,max_attempts:3,timeout_ms:3000,max_output_bytes:10000,expires_at:'2099-01-01T00:00:00.000Z'},attempts:['original-consumed'],authorization:{decision_id:'decision'}}};
  s.records.plan.development.scope_sha256=digest(JSON.stringify(s.records.plan.development.scope));
  s.records.plan.development.authorization.authority_sha256=developmentReviewAuthority(s,'plan');
- const store=new Store(root,true);store.transaction('fixture.source',()=>s);store.migrate();store.close();
+ const store=new Store(root,true);seedPreexistingLegacyData(store,'fixture.source',()=>s);store.migrate();store.close();
  const config=path.join(root,'.company','development.json');if(raw!==undefined)fs.writeFileSync(config,raw,{mode:0o640});
  t.after(async()=>{await beforeCleanup?.();fs.rmSync(root,{recursive:true,force:true});});
  const rawCall=(fn,a)=>runWithMcpHostContext('codex',{threadId:session_id,sessionId:session_id},()=>fn(root,actor,a));

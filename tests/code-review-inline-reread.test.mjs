@@ -7,11 +7,11 @@ import path from 'node:path';
 import {EventEmitter} from 'node:events';
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
 import {proofJobSafe} from '../plugins/soloco/runtime/current-state.mjs';
-import {runModel} from '../plugins/soloco/runtime/adapters.mjs';
 import {work} from '../plugins/soloco/runtime/worker.mjs';
 import {reviewContinuationRequiredEvidence} from '../plugins/soloco/runtime/development-review-continuation.mjs';
 import {restoreContinuationReviewContext,CONTINUATION_REVIEW_TRANSPORT} from '../plugins/soloco/runtime/continuation-review-transport.mjs';
 import {fixture,authorized,read,change,hash,base} from './review-continuation-central-fixture.mjs';
+import {runOriginalAdapterWithMock,stageOriginalWorker} from './original-adapter-process-fixture.mjs';
 
 const priorData=process.env.COMPANY_PLUGIN_DATA;
 process.env.COMPANY_PLUGIN_DATA=path.join(base,'inline-reread-controlled-data');
@@ -19,18 +19,20 @@ test.after(()=>{if(priorData===undefined)delete process.env.COMPANY_PLUGIN_DATA;
 const reason='Controlled optional re-delivery of exact initial code-review inputs.';
 
 async function exercise({inlineID='candidate',mode='success'}={}){
-  const a=fixture();
+  const RealDate=Date;let clock=RealDate.now()+1000,calls=0,sawInitial=false;
+  const children=[],delivered=[],limits=[];
+  globalThis.Date=class extends RealDate{constructor(...v){super(...(v.length?v:[clock]));}static now(){return clock;}};
+  try{
+  const a=await fixture();clock=a.reviewStart;
+  assert(Date.now()>Date.parse(read(a).records.plan.development.scope.expires_at));
   change(a,s=>{s.records['not-supplied']={id:'not-supplied',revision:1,kind:'artifact',content:'This unrelated controlled record is not assignment evidence.'};});
   const target=authorized(a),before=read(a),required=reviewContinuationRequiredEvidence(before,target,{root:a.root});
   engine.bind(a.root,a.session_id,'codex');
   const q=engine.dispatch({...a,role:'qa',task:'Independently review every supplied whole source. Optional exact reread does not renew any allowance.',review_of:target.id,input_ids:required.filter(r=>r.id!=='contract').map(r=>r.id),evidence_ids:['contract'],timeout_ms:600000,timeout_reason:reason,code_review_window_minutes:30,code_review_reason:reason},'codex',{check:()=>({available:true,authenticated:true,version:'controlled-no-CLI'}),launch:()=>({on(){},unref(){}})});
-  const RealDate=Date;let clock=RealDate.now()+1000,calls=0,sawInitial=false;
-  const children=[],delivered=[],limits=[];
-  globalThis.Date=class extends RealDate{constructor(...v){super(...(v.length?v:[clock]));}static now(){return clock;}};
+  stageOriginalWorker(a.root,q.id);
   const inline=before.records[inlineID],inlineText=JSON.stringify(inline);
   const source=mode==='unlisted'?before.records['not-supplied']:inline;
   const request={id:source.id,sha256:mode==='wrong-hash'?'0'.repeat(64):hash(source),offset:0,length:mode==='oversize-range'?32769:JSON.stringify(source).length};
-  try{
     await work(a.root,q.id,(host,native,prompt,cwd,limit,selection,options)=>{
       calls++;limits.push(limit);
       if(calls===1){
@@ -66,7 +68,8 @@ async function exercise({inlineID='candidate',mode='success'}={}){
         child.stdout.emit('data',JSON.stringify({type:'thread.started',thread_id:nativeID})+'\n'+JSON.stringify({type:'turn.started'})+'\n'+JSON.stringify({type:'item.completed',item:{type:'agent_message',text:JSON.stringify(artifact)}})+'\n'+JSON.stringify({type:'turn.completed'})+'\n');
         child.emit('close',0,null);
       });children.push(child);
-      return runModel(host,native,prompt,cwd,limit,selection,{...options,sessionTitle:undefined,resolveExecutable:()=>'/controlled/codex',spawn:()=>child,now:()=>clock});
+      const {spawn:oldSpawn,...incoming}=options;
+      return runOriginalAdapterWithMock(host,native,prompt,cwd,limit,selection,{...incoming,sessionTitle:undefined,resolveExecutable:()=>'/controlled/codex',now:()=>clock},{child});
     });
     const after=read(a),job=after.jobs[q.id];
     assert.equal(sawInitial,true);assert(limits.every(v=>v<=600000));
@@ -88,7 +91,7 @@ for(const inlineID of ['candidate','plan','receipt'])test('exact initial '+inlin
   assert.equal(r.job.delivered_record_reads.initial_delivery.assignment_context_sha256,r.job.context_sha256);
   assert.equal(r.job.model_process_tracking.invocations.length,3);assert(r.job.model_process_tracking.invocations.every(x=>x.birth&&x.closure));
   assert.equal(Date.parse(r.job.execution_deadline_at)-Date.parse(r.job.execution_started_at),30*60000);
-  assert.equal(proofJobSafe(r.job),true);
+  assert.equal(proofJobSafe(r.job,r.after),true);
 });
 for(const mode of ['wrong-hash','unlisted','changed-inline','changed-revision','changed-native','too-many-ranges','oversize-range'])test('optional inline reread holds '+mode,async()=>{
   const r=await exercise({mode});assert.notEqual(r.job.status,'completed');

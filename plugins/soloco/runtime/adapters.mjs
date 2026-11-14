@@ -4,8 +4,65 @@ import path from 'node:path';
 import os from 'node:os';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import {types} from 'node:util';
 import { normalizeTimeout, executionTiming, MIN_EXECUTION_TIMEOUT_MS, STARTUP_TIMEOUT_MS, TERMINATION_GRACE_MS } from './timeout.mjs';
 import {claudeNameSupport,nameCodexSession,writeNamingReceipt} from './session-naming.mjs';
+import {bindOriginalAdapterLaunchCutoffFrom,originalWorkerFailedLaunchChild,cleanupOriginalWorkerLaunchFailure,assertOriginalModelLaunchToken,spawnOriginalModelLaunch,bindOriginalModelAdapterCutoffFrom,originalModelFailedLaunchChild,cleanupOriginalModelLaunchFailure} from './peers/prospective-local-worker-inventory-producer.mjs';
+import {isLegacyRuntimeModelCapabilityFrom,assertLegacyRuntimeModelLaunchFrom,bindLegacyRuntimeModelAdapterFrom,spawnLegacyRuntimeModelLaunch,legacyRuntimeFailedLaunchChild,cleanupLegacyRuntimeLaunchFailure,runtimeExecutionObservationTimeFrom,inspectRuntimeModelRequestCommitFrom,assertRuntimeModelRequestCurrentFrom,assertRuntimeModelProcessObservedFrom} from './runtime-execution.mjs';
+
+// Both fixed producer routes inspect this same actual adapter's private loan.
+// Neither a public deadline nor a copied token can create cutoff custody.
+const originalModelCutoffs=new WeakMap(),originalSignalAborted=Object.getOwnPropertyDescriptor(AbortSignal.prototype,'aborted').get;
+function originalModelCutoff(token,deadline_at_ms,signal) {
+  if(!Number.isSafeInteger(deadline_at_ms)||deadline_at_ms<0)throw Error('Original finite model cutoff required');
+  if(signal!==undefined&&signal!==null)try{Reflect.apply(originalSignalAborted,signal,[]);}catch{throw Error('Original model AbortSignal required');}
+  const loan=Object.freeze({});originalModelCutoffs.set(loan,{token,deadline_at_ms,signal:signal??null,fault:false});return loan;
+}
+export function inspectOriginalAdapterModelCutoffFrom(loan,token) {
+  const r=originalModelCutoffs.get(loan);if(!r||r.token!==token)throw Error('Canonical original model cutoff required');
+  const now=Date.now();
+  if(r.signal!==null&&Reflect.apply(originalSignalAborted,r.signal,[])||!Number.isSafeInteger(now)||now<0||now>=r.deadline_at_ms)r.fault=true;
+  if(r.fault)throw Object.assign(Error('Original model cutoff expired or cancelled'),{code:'ORIGINAL_EXECUTION_MODEL_DEADLINE'});
+  return Object.freeze({deadline_at_ms:r.deadline_at_ms,signal:r.signal});
+}
+// The corrected base consumes this same actual adapter loan. The two names
+// are one private loan inventory, not alternate caller-supplied credentials.
+export function inspectOriginalAdapterLaunchCutoffFrom(loan,token){
+  const record=originalModelCutoffs.get(loan);
+  if(!record||record.token!==token)throw Object.assign(Error('Original adapter cutoff custody required'),{code:'ORIGINAL_EXECUTION_ADAPTER_CUTOFF_REQUIRED'});
+  return Object.freeze({deadline_at_ms:record.deadline_at_ms,signal:record.signal});
+}
+
+// Only this adapter can bind a legacy model capability to its final Source-built
+// command. The loan is not a caller-provided launch descriptor or a new issuer.
+const legacyRuntimeAdapterLoans=new WeakMap();
+const runtimeModelObservations=new WeakMap();
+const sameObservation=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+export function assertRuntimeAdapterModelBirthFrom(token,birth){
+  const record=runtimeModelObservations.get(token);
+  if(!record?.child||!record.birth||!sameObservation(record.birth,birth)||record.birth.pid!==record.child.pid)throw Object.assign(Error('Private adapter model birth observation required'),{code:'MODEL_PROCESS_CLOSURE_HELD'});
+  return true;
+}
+export function assertRuntimeAdapterModelClosureFrom(token,birth,receipt){
+  const record=runtimeModelObservations.get(token);
+  assertRuntimeAdapterModelBirthFrom(token,birth);
+  if(!record.closed||!record.receipt||!sameObservation(record.receipt,receipt))throw Object.assign(Error('Private adapter model close observation required'),{code:'MODEL_PROCESS_CLOSURE_HELD'});
+  return true;
+}
+function legacyRuntimeAdapterLoan(token,command,args,options,deadline_at_ms,signal,execution_timeout_ms,execution_deadline_at_ms){
+  const loan=Object.freeze({});
+  const descriptor=Object.freeze({command,args:Object.freeze([...args]),options:Object.freeze({cwd:options.cwd,env:Object.freeze({...options.env}),stdio:Object.freeze([...options.stdio])}),deadline_at_ms,signal:signal??null,execution_timeout_ms,execution_deadline_at_ms:execution_deadline_at_ms??null});
+  legacyRuntimeAdapterLoans.set(loan,{token,descriptor,fault:false});return loan;
+}
+export function inspectLegacyRuntimeAdapterLoanFrom(loan,token){
+  const record=legacyRuntimeAdapterLoans.get(loan);
+  if(!record||record.token!==token)throw Object.assign(Error('Private runtime adapter descriptor required'),{code:'RUNTIME_EXECUTION_ADAPTER_REQUIRED'});
+  const now=Date.now(),{deadline_at_ms,signal}=record.descriptor;
+  if(!Number.isSafeInteger(deadline_at_ms)||deadline_at_ms<0||!Number.isSafeInteger(now)||now<0||now>=deadline_at_ms)record.fault=true;
+  if(signal!==null&&Reflect.apply(originalSignalAborted,signal,[]))record.fault=true;
+  if(record.fault)throw Object.assign(Error('Runtime model cutoff expired or cancelled'),{code:'RUNTIME_EXECUTION_MODEL_DEADLINE'});
+  return record.descriptor;
+}
 
 const ownFile=fileURLToPath(import.meta.url);
 const modelId=value=>typeof value==='string' && /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/.test(value);
@@ -295,7 +352,7 @@ export function parseOutput(host, stdout) {
 
 // Existing positional calls remain valid. options is an internal dependency
 // seam, not an agent-controlled permission or a tool/API schema:
-// {signal, onSpawn(record), timeoutReason, spawn, resolveExecutable,
+// {signal, onSpawn(record), timeoutReason, resolveExecutable,
 //  now, setTimeout, clearTimeout, timeoutContext}. The internal upgrade-call
 // context permits at most 30 minutes; it supplies no business authority.
 // onSpawn is synchronous; a thrown recording
@@ -303,18 +360,202 @@ export function parseOutput(host, stdout) {
 // performed by this adapter. Worker eligibility and durable recording remain
 // the caller's responsibilities.
 export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selection=null, options={}) {
+  return runModelLifecycle(host,nativeId,prompt,cwd,timeout,selection,options,false);
+}
+
+// Ordinary legacy execution has its own private capability. The existing
+// runModel contract stays strict for Original, peer and upgrade callers.
+export function runRuntimeModel(host,nativeId,prompt,cwd,timeout=180000,selection=null,options={}){
+  if(options&&typeof options==='object'&&Object.hasOwn(options,'runtimeExecutionLaunch')){
+    if(!isLegacyRuntimeModelCapabilityFrom(options.runtimeExecutionLaunch)||options.originalExecutionLaunch!==undefined)return Promise.reject(Object.assign(Error('Private runtime model capability required'),{code:'RUNTIME_EXECUTION_MODEL_CAPABILITY_REQUIRED'}));
+    return runModelLifecycle(host,nativeId,prompt,cwd,timeout,selection,options,true);
+  }
+  return runModel(host,nativeId,prompt,cwd,timeout,selection,options);
+}
+
+// This opt-in entry owns the invocation itself. Neither a supplied invoke/
+// recorder nor output-shaped DATA can manufacture these one-call handles.
+const runtimeOutcomeCalls=new WeakMap(),runtimeOutcomeCaptures=new WeakMap(),runtimeOutcomeLaunches=new WeakMap();
+const outcomeApply=Reflect.apply,outcomeSame=Object.is,outcomeFreeze=Object.freeze,outcomeParse=Date.parse;
+const outcomeNow=Date.now,outcomeSchedule=setTimeout,outcomeUnschedule=clearTimeout;
+const outcomeMapGet=WeakMap.prototype.get,outcomeMapSet=WeakMap.prototype.set;
+const outcomeDescriptors=Object.getOwnPropertyDescriptors,outcomePrototype=Object.getPrototypeOf;
+const outcomeOwnKeys=Reflect.ownKeys,outcomeCreate=Object.create,outcomeThen=Promise.prototype.then;
+const outcomeDefine=Object.defineProperty;
+const outcomeSignalAdd=AbortSignal.prototype.addEventListener,outcomeSignalRemove=AbortSignal.prototype.removeEventListener;
+const outcomeGet=(map,key)=>outcomeApply(outcomeMapGet,map,[key]);
+const outcomeSet=(map,key,value)=>outcomeApply(outcomeMapSet,map,[key,value]);
+const outcomeNeed=(ok,code)=>{if(!ok)throw Object.assign(Error('Runtime outcome Hold: '+code),{code:'RUNTIME_MODEL_OUTCOME_'+code});};
+function outcomeData(value,allowed){
+  outcomeNeed(value&&typeof value==='object'&&!types.isProxy(value)&&!Array.isArray(value),'INPUT');
+  const prototype=outcomePrototype(value);outcomeNeed(prototype===Object.prototype||prototype===null,'INPUT');
+  const descriptors=outcomeDescriptors(value),keys=outcomeOwnKeys(descriptors),copy=outcomeCreate(null);
+  outcomeNeed(keys.length<=64&&keys.every(key=>typeof key==='string'&&(!allowed||allowed.includes(key))),'INPUT');
+  for(const key of keys){const descriptor=descriptors[key];outcomeNeed(descriptor.enumerable&&Object.hasOwn(descriptor,'value'),'INPUT_ACCESSOR');copy[key]=descriptor.value;}
+  return outcomeFreeze(copy);
+}
+function outcomeInput(host,nativeId,prompt,cwd,selection){
+  outcomeNeed(['codex','claude'].includes(host)&&(nativeId===null||typeof nativeId==='string')&&typeof prompt==='string'&&typeof cwd==='string'&&path.isAbsolute(cwd),'INPUT');
+  return outcomeFreeze({host,native_id:nativeId,prompt_sha256:createHash('sha256').update(prompt).digest('hex'),prompt_utf16_sha256:createHash('sha256').update(prompt,'utf16le').digest('hex'),prompt_utf16_units:prompt.length,cwd:path.resolve(cwd),selection_sha256:createHash('sha256').update(JSON.stringify(selection)).digest('hex')});
+}
+function outcomeInputMatches(a,b){return Boolean(a&&b&&['host','native_id','prompt_sha256','prompt_utf16_sha256','prompt_utf16_units','cwd','selection_sha256'].every(key=>a[key]===b[key]));}
+function outcomeBoundDeadline(bounds){
+  outcomeNeed(bounds&&typeof bounds==='object','BOUNDS_REQUIRED');
+  const values=[bounds.authority_deadline_at_ms,bounds.execution_deadline_at_ms];
+  outcomeNeed(values.every(value=>value===null||Number.isSafeInteger(value)&&value>=0),'BOUNDS_REQUIRED');
+  return Math.min(...values.filter(value=>value!==null));
+}
+function outcomeFault(record,value){if(record.captureFault===null)record.captureFault={value};}
+function stageRuntimeOutcomeText(record,value,fallbackNativeId){
+  if(!record)return;
+  if(record.textAttempted){outcomeFault(record,undefined);return;}
+  record.textAttempted=true;
+  try{
+    outcomeNeed(value&&typeof value==='object'&&!types.isProxy(value),'TEXT_UNAVAILABLE');
+    const descriptors=outcomeDescriptors(value),descriptor=descriptors.text,nativeDescriptor=descriptors.native_id;
+    outcomeNeed(descriptor&&Object.hasOwn(descriptor,'value')&&typeof descriptor.value==='string','TEXT_UNAVAILABLE');
+    record.text=descriptor.value;record.textCaptured=true;
+    outcomeNeed(!nativeDescriptor||Object.hasOwn(nativeDescriptor,'value'),'IDENTITY_UNAVAILABLE');
+    const nativeId=nativeDescriptor?.value??fallbackNativeId;
+    outcomeNeed(nativeId===null||typeof nativeId==='string','IDENTITY_UNAVAILABLE');
+    record.nativeId=nativeId;
+  }catch(captureError){outcomeFault(record,captureError);}
+}
+function stageRuntimeOutcomeMetadata(record,value){
+  if(!record)return;
+  try{
+    // Only the fixed parser's completed DATA result reaches this stage, after
+    // Source applied-controls enrichment and before any public result escapes.
+    // Bound recursive warning/usage metadata separately from primitive text.
+    let nodes=0,units=0;
+    const snapshot=(item,depth=0)=>{
+      outcomeNeed(++nodes<=100000&&depth<=32,'METADATA_LIMIT');
+      if(item===null||typeof item==='boolean')return item;
+      if(typeof item==='string'){units+=item.length;outcomeNeed(units<=record.finalized.max_output_characters+65536,'METADATA_LIMIT');return item;}
+      if(typeof item==='number'){outcomeNeed(Number.isFinite(item),'METADATA_UNAVAILABLE');return item;}
+      outcomeNeed(item&&typeof item==='object'&&!types.isProxy(item),'METADATA_UNAVAILABLE');
+      const array=Array.isArray(item),prototype=outcomePrototype(item);
+      outcomeNeed(array?prototype===Array.prototype:prototype===Object.prototype||prototype===null,'METADATA_UNAVAILABLE');
+      const descriptors=outcomeDescriptors(item),keys=outcomeOwnKeys(descriptors),copy=array?[]:outcomeCreate(prototype);
+      outcomeNeed(keys.length<=100000,'METADATA_LIMIT');
+      if(array)outcomeNeed(Number.isSafeInteger(descriptors.length?.value)&&descriptors.length.value>=0&&keys.length===descriptors.length.value+1,'METADATA_UNAVAILABLE');
+      for(const key of keys){
+        if(array&&key==='length')continue;
+        const descriptor=descriptors[key];outcomeNeed(typeof key==='string'&&descriptor.enumerable&&Object.hasOwn(descriptor,'value'),'METADATA_UNAVAILABLE');
+        if(array)outcomeNeed(/^(0|[1-9][0-9]*)$/.test(key)&&Number(key)<descriptors.length.value,'METADATA_UNAVAILABLE');
+        units+=key.length;outcomeNeed(units<=record.finalized.max_output_characters+65536,'METADATA_LIMIT');
+        outcomeDefine(copy,key,{value:snapshot(descriptor.value,depth+1),enumerable:true,writable:false,configurable:false});
+      }
+      return outcomeFreeze(copy);
+    };
+    const descriptors=outcomeDescriptors(value),evidence=descriptors.model_evidence,version=descriptors.cli_version;
+    outcomeNeed(evidence&&Object.hasOwn(evidence,'value'),'METADATA_UNAVAILABLE');
+    record.modelEvidence=snapshot(evidence.value);
+    outcomeNeed(!version||Object.hasOwn(version,'value')&&(version.value===null||typeof version.value==='string'&&version.value.length<=1024),'METADATA_UNAVAILABLE');
+    record.cliVersion=version?.value??null;
+  }catch(captureError){outcomeFault(record,captureError);}
+}
+function settleRuntimeOutcome(record,kind,value){
+  if(record.captureAttempted){if(record.kind!==kind||!outcomeSame(record.value,value))outcomeFault(record,undefined);return;}
+  // Set presence before any capture operation: undefined/null/false are real
+  // original rejection values, not an absent error or a success indication.
+  record.captureAttempted=true;record.kind=kind;record.value=value;
+  try{
+    if(kind==='returned'){
+      outcomeNeed(record.textCaptured,'TEXT_UNAVAILABLE');
+    }
+    record.captured=true;
+  }catch(captureError){outcomeFault(record,captureError);}
+}
+function finalizeRuntimeOutcome(record,{host,nativeId,prompt,cwd,selection,policy,command,args,env,cutoff,absoluteDeadline,outputLimit,signal,loan}){
+  if(!record)return;
+  outcomeNeed(outcomeInputMatches(record.request.input_binding,outcomeInput(host,nativeId,prompt,cwd,selection)),'INPUT_CHANGED');
+  const approved=record.request.timeout_policy;
+  outcomeNeed(approved&&Number.isSafeInteger(approved.timeout_ms)&&policy.timeout_ms<=approved.timeout_ms&&policy.timeout_reason===approved.timeout_reason,'POLICY_CHANGED');
+  // These are the final actual Source variables also handed to the existing
+  // private adapter loan/binding and spawn, never a caller descriptor receipt.
+  record.loan=loan;record.finalized=outcomeFreeze({timeout_ms:policy.timeout_ms,timeout_reason:policy.timeout_reason,creation_deadline_at_ms:cutoff,execution_deadline_at_ms:absoluteDeadline??null,max_output_characters:outputLimit,signal_bound:signal!==undefined&&signal!==null,command_sha256:createHash('sha256').update(command).digest('hex'),argv_sha256:createHash('sha256').update(JSON.stringify(args)).digest('hex'),cwd_sha256:createHash('sha256').update(cwd).digest('hex'),environment_sha256:createHash('sha256').update(JSON.stringify(env)).digest('hex')});
+}
+export function runRuntimeModelWithOutcome(issuingStore,host,nativeId,prompt,cwd,timeout=180000,selection=null,options={}){
+  const selected=selection===null?null:outcomeData(selection,['mode','model','effort','speed','reason']);
+  if(selected)outcomeNeed(Object.values(selected).every(value=>value===undefined||typeof value==='string'),'INPUT');
+  const actualOptions=outcomeData(options),legacy=Object.hasOwn(actualOptions,'runtimeExecutionLaunch');
+  outcomeNeed(['spawn','resolveExecutable','now','setTimeout','clearTimeout','renameSession','probeSessionName'].every(key=>!Object.hasOwn(actualOptions,key)),'DEPENDENCY_OVERRIDE');
+  outcomeNeed(Object.keys(actualOptions).every(key=>['runtimeExecutionLaunch','originalExecutionLaunch','beforeOriginalSpawn','timeoutReason','maxOutputCharacters','timeoutContext','onSpawn','onModelProcess','onModelClosure','sessionTitle','sessionNameDirectory','sessionNameSupport','signal','executionDeadlineAt'].includes(key)),'OPTIONS');
+  outcomeNeed(!(legacy&&Object.hasOwn(actualOptions,'originalExecutionLaunch')),'MIXED_LAUNCH');
+  const token=legacy?actualOptions.runtimeExecutionLaunch:actualOptions.originalExecutionLaunch;
+  if(legacy)outcomeNeed(isLegacyRuntimeModelCapabilityFrom(token),'LAUNCH_REQUIRED');
+  const request=inspectRuntimeModelRequestCommitFrom(token,issuingStore),binding=outcomeInput(host,nativeId,prompt,cwd,selected);
+  outcomeNeed(request.store===issuingStore&&outcomeInputMatches(request.input_binding,binding),'INPUT_CHANGED');
+  outcomeNeed(!outcomeGet(runtimeOutcomeLaunches,token),'CALL_ALREADY_ATTEMPTED');
+  const call=outcomeFreeze({}),record={call,store:issuingStore,token,request,binding,selection:selected,options:actualOptions,finalized:null,loan:null,physical:null,executionDeadline:null,textAttempted:false,textCaptured:false,captureAttempted:false,captured:false,captureFault:null,kind:null,value:undefined,text:null,nativeId:null,modelEvidence:null,cliVersion:null,consumed:false,eligibleAttempted:false};
+  outcomeSet(runtimeOutcomeCalls,call,record);
+  outcomeSet(runtimeOutcomeLaunches,token,record); // No preflight-failure retry.
+  // The private context is a lexical argument, never an options field. Source
+  // executor/preflight throws are captured by the genuine Promise settlement.
+  const actual=runModelLifecycle(host,nativeId,prompt,cwd,timeout,selected,actualOptions,legacy,record);
+  const completion=outcomeApply(outcomeThen,actual,[value=>{settleRuntimeOutcome(record,'returned',value);return value;},value=>{settleRuntimeOutcome(record,'threw',value);throw value;}]);
+  return outcomeFreeze({call,completion});
+}
+export function consumeRuntimeModelOutcome(call,actualSettlementValue){
+  const record=outcomeGet(runtimeOutcomeCalls,call);outcomeNeed(record&&!record.consumed,'PRIVATE_CALL_REQUIRED');
+  record.consumed=true; // Outside SQL rollback, including a premature/wrong take.
+  outcomeNeed(record.captureAttempted&&record.captured&&record.captureFault===null,'CAPTURE_UNAVAILABLE');
+  outcomeNeed(outcomeSame(record.value,actualSettlementValue),'VALUE_CHANGED');
+  const physical=record.physical;
+  const processFacts=outcomeFreeze({entered:physical!==null,birth:physical?.birth??null,receipt:physical?.receipt??null,closed:physical?.closed===true});
+  // Actual Store/db/scope references stay private. This projection is DATA;
+  // only this exact capture's private map can authorize the eligibility check.
+  const request=record.request,provenance=outcomeFreeze({protocol:request.protocol,stage:request.stage,lane:request.lane,root_sha256:createHash('sha256').update(request.root).digest('hex'),type:request.type,job_id:request.job_id,instance_id:request.instance_id,invocation_id:request.invocation_id,input_binding:request.input_binding,timeout_policy:request.timeout_policy});
+  const finalized=record.finalized?outcomeFreeze({...record.finalized,actual_operation_deadline_at_ms:record.executionDeadline}):null;
+  const capture=outcomeFreeze({protocol:'runtime-model-outcome-v1',kind:record.kind,text:record.kind==='returned'?record.text:null,native_id:record.kind==='returned'?record.nativeId:null,model_evidence:record.modelEvidence,cli_version:record.cliVersion,thrown:record.kind==='threw'?record.value:undefined,provenance,finalized,process:processFacts});
+  outcomeSet(runtimeOutcomeCaptures,capture,record);return capture;
+}
+export function inspectRuntimeModelOutcomeCaptureFrom(capture,issuingStore,launch){
+  // Factual provenance survives a failed eligibility check or issuer closure.
+  // Do not inspect caller properties or spend any currentness/eligibility loan.
+  const record=outcomeGet(runtimeOutcomeCaptures,capture);
+  outcomeNeed(record&&(arguments.length===1||arguments.length===3&&record.store===issuingStore&&record.token===launch),'PRIVATE_CAPTURE_REQUIRED');
+  return capture;
+}
+export function assertRuntimeModelOutcomeEligible(capture){
+  const record=outcomeGet(runtimeOutcomeCaptures,capture);outcomeNeed(record&&!record.eligibleAttempted,'PRIVATE_CAPTURE_REQUIRED');
+  record.eligibleAttempted=true;
+  outcomeNeed(record.kind==='returned'&&record.captureFault===null&&record.finalized&&record.physical?.birth&&record.physical?.receipt&&record.physical.closed,'NOT_ELIGIBLE');
+  if(record.options.signal!==undefined)outcomeNeed(!outcomeApply(originalSignalAborted,record.options.signal,[]),'NOT_ELIGIBLE');
+  const closedAt=outcomeParse(record.physical.receipt.closed_at);
+  outcomeNeed(Number.isSafeInteger(record.executionDeadline)&&Number.isSafeInteger(closedAt)&&closedAt<record.executionDeadline,'NOT_ELIGIBLE');
+  return record.store.readSnapshot(()=>{
+    // The fixed currentness and physical/canonical inspectors reuse this same
+    // actual snapshot. Eligibility is only this point-in-time read, never a
+    // permit for a later publication or another caller's effect.
+    const bounds=assertRuntimeModelRequestCurrentFrom(record.token,record.store),deadline=Math.min(record.executionDeadline,outcomeBoundDeadline(bounds));
+    outcomeNeed(closedAt<deadline,'NOT_ELIGIBLE');
+    assertRuntimeModelProcessObservedFrom(record.token,record.physical.birth,record.physical.receipt);
+    if(record.options.signal!==undefined)outcomeNeed(!outcomeApply(originalSignalAborted,record.options.signal,[]),'NOT_ELIGIBLE');
+    const current=outcomeNow();
+    outcomeNeed(Number.isSafeInteger(current)&&current>=0&&current<deadline,'NOT_ELIGIBLE');return true;
+  });
+}
+
+function runModelLifecycle(host,nativeId,prompt,cwd,timeout,selection,options,legacyRuntime,outcomeRecord=null){
   return new Promise((resolve, reject) => {
     if (!options || typeof options !== 'object' || Array.isArray(options)) throw new Error('Invalid lifecycle options');
+    if(options.spawn!==undefined)throw Object.assign(Error('Caller spawn overrides cannot create an original assignment process'),{code:'ORIGINAL_EXECUTION_LAUNCH_GATE_REQUIRED'});
+    if(!legacyRuntime&&Object.hasOwn(options,'runtimeExecutionLaunch'))throw Object.assign(Error('Original model launch capability required'),{code:'ORIGINAL_EXECUTION_LAUNCH_GATE_REQUIRED'});
+    const launchToken=legacyRuntime?options.runtimeExecutionLaunch:options.originalExecutionLaunch;
+    const originalLaunch=legacyRuntime?assertLegacyRuntimeModelLaunchFrom(launchToken,{host,native_id:nativeId,prompt,cwd,selection}):assertOriginalModelLaunchToken(launchToken,{host,native_id:nativeId,prompt,cwd,selection});
+    let sourceBounds=outcomeRecord?assertRuntimeModelRequestCurrentFrom(launchToken,outcomeRecord.store):null;
+    if(options.beforeOriginalSpawn!==undefined&&typeof options.beforeOriginalSpawn!=='function')throw Error('Invalid original launch eligibility check');
     const policy = normalizeTimeout({timeout_ms:timeout, timeout_reason:options.timeoutReason}, options.timeoutContext);
     const outputLimit=options.maxOutputCharacters??2000000;
     if(!Number.isSafeInteger(outputLimit)||outputLimit<100000||outputLimit>10000000)throw new Error('Invalid role output character limit');
     const args = commandArgs(host,nativeId,selection);
-    const startProcess = options.spawn ?? spawn;
     const resolveCommand = options.resolveExecutable ?? executable;
-    const now = options.now ?? Date.now;
-    const schedule = options.setTimeout ?? setTimeout;
-    const unschedule = options.clearTimeout ?? clearTimeout;
-    for (const fn of [startProcess, resolveCommand, now, schedule, unschedule]) if (typeof fn !== 'function') throw new Error('Invalid lifecycle dependency');
+    const now = outcomeRecord?outcomeNow:options.now ?? Date.now;
+    const schedule = outcomeRecord?outcomeSchedule:options.setTimeout ?? setTimeout;
+    const unschedule = outcomeRecord?outcomeUnschedule:options.clearTimeout ?? clearTimeout;
+    for (const fn of [resolveCommand, now, schedule, unschedule]) if (typeof fn !== 'function') throw new Error('Invalid lifecycle dependency');
     if (options.onSpawn !== undefined && typeof options.onSpawn !== 'function') throw new Error('Invalid onSpawn callback');
     const observeProcess=options.onModelProcess!==undefined||options.onModelClosure!==undefined;
     if(observeProcess&&(typeof options.onModelProcess!=='function'||typeof options.onModelClosure!=='function'))throw Error('Paired private model process observers required');
@@ -324,18 +565,30 @@ export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selectio
     if(options.renameSession!==undefined&&typeof options.renameSession!=='function')throw Error('Invalid session naming dependency');
     if(options.probeSessionName!==undefined&&typeof options.probeSessionName!=='function')throw Error('Invalid session naming capability probe');
     const signal = options.signal;
-    if (signal !== undefined && (!signal || typeof signal.aborted !== 'boolean' || typeof signal.addEventListener !== 'function' || typeof signal.removeEventListener !== 'function')) throw new Error('Invalid cancellation signal');
+    if(outcomeRecord){if(signal!==undefined)outcomeApply(originalSignalAborted,signal,[]);}
+    else if (signal !== undefined && (!signal || typeof signal.aborted !== 'boolean' || typeof signal.addEventListener !== 'function' || typeof signal.removeEventListener !== 'function')) throw new Error('Invalid cancellation signal');
+    const isAborted=()=>outcomeRecord?signal!==undefined&&outcomeApply(originalSignalAborted,signal,[]):signal?.aborted;
     const errorFor = (message, code) => Object.assign(new Error(message), {code});
-    if (signal?.aborted) throw errorFor('Role session cancelled before launch', 'ROLE_ABORTED');
+    if (isAborted()) throw errorFor('Role session cancelled before launch', 'ROLE_ABORTED');
     const readNow = () => {
       const value = now();
       if (!Number.isSafeInteger(value) || value < 0 || value > 8640000000000000 - Math.max(1000000, policy.timeout_ms + TERMINATION_GRACE_MS)) throw new Error('Invalid lifecycle clock');
       return value;
     };
-    const absoluteDeadline=options.executionDeadlineAt;
+    const requestedDeadline=options.executionDeadlineAt;
+    if(outcomeRecord)outcomeNeed(requestedDeadline===undefined||Number.isSafeInteger(requestedDeadline)&&requestedDeadline>=0&&requestedDeadline<=8640000000000000-TERMINATION_GRACE_MS,'DEADLINE_REQUIRED');
+    const sourceOperationBound=outcomeRecord?outcomeBoundDeadline(sourceBounds):Infinity;
+    // A request/queue startup cutoff is a creation gate, not an operation
+    // lifetime. New opt-in calls use actual non-operation/overall Source bounds.
+    let absoluteDeadline=outcomeRecord?Math.min(sourceOperationBound,requestedDeadline??Infinity):originalLaunch.deadline_at_ms===null?requestedDeadline:Math.min(originalLaunch.deadline_at_ms,requestedDeadline??Infinity);
+    if(outcomeRecord&&absoluteDeadline===Infinity)absoluteDeadline=undefined;
     if(absoluteDeadline!==undefined&&(!Number.isSafeInteger(absoluteDeadline)||absoluteDeadline<0||absoluteDeadline>8640000000000000-TERMINATION_GRACE_MS))throw Error('Invalid absolute execution deadline');
     if(absoluteDeadline!==undefined&&readNow()>=absoluteDeadline)throw errorFor('Role review deadline reached before launch','ROLE_TIMEOUT');
-    const startupDeadline = Math.min(readNow() + STARTUP_TIMEOUT_MS,absoluteDeadline??Infinity);
+    let startupDeadline = Math.min(readNow() + STARTUP_TIMEOUT_MS,absoluteDeadline??Infinity,...(outcomeRecord?[originalLaunch.deadline_at_ms??Infinity]:[]));
+    const originalStartupAt=outcomeRecord?readNow():Date.now();
+    if(!Number.isSafeInteger(originalStartupAt)||originalStartupAt<0||originalStartupAt>8640000000000000-STARTUP_TIMEOUT_MS)throw Error('Invalid original adapter clock');
+    let originalDeadline=Math.min(originalStartupAt+STARTUP_TIMEOUT_MS,absoluteDeadline??Infinity,...(outcomeRecord?[originalLaunch.deadline_at_ms??Infinity]:[]));
+    if(signal!==undefined)originalSignalAborted.call(signal); // native AbortSignal brand, not a caller Boolean
     const env = {...process.env, COMPANY_WORKER:'1'};
     delete env.CLAUDECODE; // A new standalone process, not a nested Claude agent.
     const command = resolveCommand(host);
@@ -346,9 +599,32 @@ export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selectio
     if(absoluteDeadline!==undefined&&readNow()>=absoluteDeadline)throw Object.assign(errorFor('Role review deadline reached before launch','ROLE_TIMEOUT'),{termination_confirmed:true});
     if(readNow()>=startupDeadline)throw Object.assign(errorFor('Role startup deadline reached before launch','ROLE_STARTUP_TIMEOUT'),{termination_confirmed:true});
     // Resolution can invoke a supplied synchronous dependency that cancels.
-    if (signal?.aborted) throw errorFor('Role session cancelled before launch', 'ROLE_ABORTED');
-    const child = startProcess(command, args, {cwd,env,stdio:['pipe','pipe','pipe']});
-    let stdout='', stderr='', failure=null, settled=false, closed=false;
+    if (isAborted()) throw errorFor('Role session cancelled before launch', 'ROLE_ABORTED');
+    options.beforeOriginalSpawn?.();
+    if(outcomeRecord){
+      sourceBounds=assertRuntimeModelRequestCurrentFrom(launchToken,outcomeRecord.store);
+      const tightened=Math.min(absoluteDeadline??Infinity,outcomeBoundDeadline(sourceBounds));
+      absoluteDeadline=tightened===Infinity?undefined:tightened;
+      startupDeadline=Math.min(startupDeadline,tightened);originalDeadline=Math.min(originalDeadline,tightened);
+    }
+    if(isAborted())throw errorFor('Role session cancelled before launch','ROLE_ABORTED');
+    if(absoluteDeadline!==undefined&&readNow()>=absoluteDeadline)throw Object.assign(errorFor('Role review deadline reached before launch','ROLE_TIMEOUT'),{termination_confirmed:true});
+    if(readNow()>=startupDeadline)throw Object.assign(errorFor('Role startup deadline reached before launch','ROLE_STARTUP_TIMEOUT'),{termination_confirmed:true});
+    const cutoff=Math.min(originalDeadline,startupDeadline,absoluteDeadline??Infinity);
+    if(legacyRuntime){
+      const loan=legacyRuntimeAdapterLoan(launchToken,command,args,{cwd,env,stdio:['pipe','pipe','pipe']},cutoff,signal,policy.timeout_ms,absoluteDeadline??null);
+      bindLegacyRuntimeModelAdapterFrom(launchToken,loan);
+      finalizeRuntimeOutcome(outcomeRecord,{host,nativeId,prompt,cwd,selection,policy,command,args,env,cutoff,absoluteDeadline,outputLimit,signal,loan});
+    }else{
+      const cutoffLoan=originalModelCutoff(launchToken,cutoff,signal);
+      if(!bindOriginalModelAdapterCutoffFrom(launchToken,cutoffLoan))bindOriginalAdapterLaunchCutoffFrom(launchToken,cutoffLoan);
+      finalizeRuntimeOutcome(outcomeRecord,{host,nativeId,prompt,cwd,selection,policy,command,args,env,cutoff,absoluteDeadline,outputLimit,signal,loan:cutoffLoan});
+    }
+    let child,launchFailure=null;
+    try{child=legacyRuntime?spawnLegacyRuntimeModelLaunch(launchToken):spawnOriginalModelLaunch(launchToken,command,args,{cwd,env,stdio:['pipe','pipe','pipe']});}
+    catch(error){child=legacyRuntimeFailedLaunchChild(error)??originalWorkerFailedLaunchChild(error)??originalModelFailedLaunchChild(error);if(!child)throw error;launchFailure=error;}
+    let stdout='', stderr='', failure=null, failureSeen=false, settled=false, closed=false;
+    const hasFailure=()=>outcomeRecord?failureSeen:Boolean(failure);
     const named=new Set();let namingBuffer='';
     const observedName=id=>{
       if(!title||typeof id!=='string'||!id.trim()||named.has(id)||(nativeId&&id!==nativeId))return;
@@ -357,18 +633,23 @@ export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selectio
     let spawned=false, executionDeadline=null;
     let startupTimer=null, executionTimer=null, killTimer=null;
     let processBirth=null,processClosure=false;
+    const physicalObservation={child,birth:null,receipt:null,closed:false};
+    runtimeModelObservations.set(launchToken,physicalObservation);
+    if(outcomeRecord)outcomeRecord.physical=physicalObservation;
     const processHash=value=>createHash('sha256').update(value).digest('hex');
-    const observeBirth=()=>{
+    const observeBirth=observedAt=>{
       if(!observeProcess||processBirth)return;
       if(!Number.isSafeInteger(child.pid)||child.pid<=0)throw Error('Actual model process PID unavailable');
-      const birth={protocol:'ordinary-model-process-birth-v1',launch_id:randomUUID(),host,pid:child.pid,worker_pid:process.pid,spawned_at:new Date(readNow()).toISOString(),command_sha256:processHash(command),argv_sha256:processHash(JSON.stringify(args)),cwd_sha256:processHash(cwd)};
+      const birth={protocol:'ordinary-model-process-birth-v1',launch_id:randomUUID(),host,pid:child.pid,worker_pid:process.pid,spawned_at:new Date(observedAt??(legacyRuntime?runtimeExecutionObservationTimeFrom(child,'spawn'):readNow())).toISOString(),command_sha256:processHash(command),argv_sha256:processHash(JSON.stringify(args)),cwd_sha256:processHash(cwd)};
+      physicalObservation.birth=Object.freeze({...birth});
       const returned=options.onModelProcess(birth);
       if(returned&&typeof returned.then==='function')throw Error('Model process birth must be durably synchronous');
-      processBirth=Object.freeze(birth);
+      processBirth=outcomeRecord?physicalObservation.birth:Object.freeze(birth);
     };
     const observeClose=(code,signal)=>{
       if(!observeProcess||processClosure||!processBirth)return;processClosure=true;
-      const receipt={protocol:'ordinary-model-process-close-v1',birth_sha256:processHash(JSON.stringify(processBirth)),closed_at:new Date(readNow()).toISOString(),exit_code:Number.isInteger(code)?code:null,signal:typeof signal==='string'?signal:null,observation:'original-child-close'};
+      const receipt={protocol:'ordinary-model-process-close-v1',birth_sha256:processHash(JSON.stringify(processBirth)),closed_at:new Date(legacyRuntime?runtimeExecutionObservationTimeFrom(child,'close'):readNow()).toISOString(),exit_code:Number.isInteger(code)?code:null,signal:typeof signal==='string'?signal:null,observation:'original-child-close'};
+      physicalObservation.receipt=Object.freeze({...receipt});
       // Observation failure leaves durable uncertainty; it never changes the
       // already-settled timeout/result or invents a public success response.
       try{const returned=options.onModelClosure(processBirth,receipt);if(returned&&typeof returned.then==='function')returned.catch(()=>{});}catch{}
@@ -393,22 +674,35 @@ export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selectio
       }
       if(observeProcess&&!closed){child.stdout.resume?.();child.stderr.resume?.();}
       if(!observeProcess||closed)listeners.length=0;
-      signal?.removeEventListener('abort', onAbort);
+      if(outcomeRecord){if(signal!==undefined)outcomeApply(outcomeSignalRemove,signal,['abort',onAbort]);}
+      else signal?.removeEventListener('abort', onAbort);
     };
-    const finish = (error, result) => {
+    function finish(error, result) {
       if (settled) return;
       settled=true;
+      if(outcomeRecord){
+        const rejected=arguments.length===1;
+        settleRuntimeOutcome(outcomeRecord,rejected?'threw':'returned',rejected?error:result);
+        // Capture is already complete before our cleanup, cosmetic naming,
+        // public settlement or downstream consumer can run. Never inspect or
+        // mutate an opaque primary rejection, even false/null/undefined.
+        try{cleanup();}catch(cleanupError){outcomeFault(outcomeRecord,cleanupError);}
+        if(rejected){reject(error);return;}
+        try{observedName(result?.native_id);}catch(namingError){outcomeFault(outcomeRecord,namingError);}
+        resolve(result);return;
+      }
       cleanup();
       if (error) {
         if(stdout && !error.rejected_output) {
           try {error.rejected_output=parseOutput(host,stdout);}
           catch(parseError) {error.rejected_output=parseError.rejected_output;}
         }
-        error.termination_confirmed=closed;
+        if(error===launchFailure){try{error.termination_confirmed=closed;}catch{/* retain the original failed-write error */}}
+        else error.termination_confirmed=closed;
         if(host==='claude')observedName(error.rejected_output?.native_id);
         reject(error);
       } else {observedName(result?.native_id);resolve(result);}
-    };
+    }
     const send = name => {
       if (closed || settled) return;
       try {child.kill(name);} catch {
@@ -417,8 +711,8 @@ export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selectio
       }
     };
     const stop = (error, escalationAt) => {
-      if (settled || failure) return;
-      failure=error;
+      if (settled || hasFailure()) return;
+      failure=error;failureSeen=true;
       clear('startup'); clear('execution');
       // Arm before TERM: a synchronous close during kill must clean this up.
       killTimer=schedule(() => {
@@ -433,7 +727,7 @@ export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selectio
     const timeoutFailure = () => errorFor('Role session timed out; held for inspection, not automatically retried', 'ROLE_TIMEOUT');
     const startupFailure = () => errorFor('Role session startup timed out; held for inspection, not automatically retried', 'ROLE_STARTUP_TIMEOUT');
     const expired = () => {
-      if (failure || settled) return Boolean(failure || settled);
+      if (hasFailure() || settled) return true;
       const current=readNow();
       if (spawned && current >= executionDeadline) {
         stop(timeoutFailure(), executionDeadline+TERMINATION_GRACE_MS);
@@ -446,28 +740,34 @@ export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selectio
       return false;
     };
     function onAbort() {
-      if (settled || failure) return;
+      if (settled || hasFailure()) return;
       if (expired()) return;
       stop(errorFor('Role session cancelled; held for inspection, not automatically retried', 'ROLE_ABORTED'), readNow()+TERMINATION_GRACE_MS);
     }
     const onProcessError = error => {
-      if (settled || failure || expired()) return;
+      if (settled || hasFailure() || expired()) return;
+      if(outcomeRecord){stop(error,readNow()+TERMINATION_GRACE_MS);return;}
       stop(errorFor(`Role process error: ${String(error.message ?? error).slice(0,500)}`, 'ROLE_PROCESS_ERROR'), readNow()+TERMINATION_GRACE_MS);
     };
     listen(child, 'error', onProcessError);
     listen(child, 'spawn', () => {
-      try{observeBirth();}catch(error){if(!settled)stop(error,readNow()+TERMINATION_GRACE_MS);return;}
-      if (settled || failure || spawned || expired()) return;
-      const at=readNow();
+      // Source observes the operation's start before the synchronous recorder
+      // can delay or mutate its public birth argument. Defaults retain their
+      // existing callback timing; opt-in timing uses this private instant.
+      const observedAt=outcomeRecord?(legacyRuntime?runtimeExecutionObservationTimeFrom(child,'spawn'):readNow()):undefined;
+      try{observeBirth(observedAt);}catch(error){if(!settled)stop(error,readNow()+TERMINATION_GRACE_MS);return;}
+      if (settled || hasFailure() || spawned || expired()) return;
+      const at=outcomeRecord?observedAt:legacyRuntime?runtimeExecutionObservationTimeFrom(child,'spawn'):readNow();
       const duration=Math.min(policy.timeout_ms,absoluteDeadline===undefined?policy.timeout_ms:absoluteDeadline-at);
       if(duration<MIN_EXECUTION_TIMEOUT_MS){stop(timeoutFailure(),absoluteDeadline+TERMINATION_GRACE_MS);return;}
       const timing=executionTiming(at,{...policy,timeout_ms:duration},options.timeoutContext);
       spawned=true;
-      executionDeadline=Date.parse(timing.execution_deadline_at);
+      executionDeadline=outcomeRecord?outcomeParse(timing.execution_deadline_at):Date.parse(timing.execution_deadline_at);
+      if(outcomeRecord)outcomeRecord.executionDeadline=executionDeadline;
       clear('startup');
       executionTimer=schedule(() => {
         executionTimer=null;
-        if (!expired() && !settled && !failure) {
+        if (!expired() && !settled && !hasFailure()) {
           // Protect against an injected scheduler firing early.
           executionTimer=schedule(() => {executionTimer=null; expired();}, Math.max(0,executionDeadline-readNow()));
         }
@@ -481,14 +781,14 @@ export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selectio
           throw new Error('onSpawn must be synchronous');
         }
       } catch (error) {onProcessError(error);}
-      if (signal?.aborted) onAbort();
+      if (isAborted()) onAbort();
     });
     listen(child.stdout, 'data', chunk => {
-      if (settled || failure || expired()) return;
+      if (settled || hasFailure() || expired()) return;
       stdout += chunk;
       // Observe only host-issued identities; final stream validation remains
       // unchanged. Naming never consumes, rewrites or accepts an artifact.
-      if(title&&host==='codex'&&!named.size) {
+      if(title&&host==='codex'&&!named.size&&!outcomeRecord) {
         namingBuffer+=chunk;
         let newline;
         while((newline=namingBuffer.indexOf('\n'))>=0) {
@@ -500,21 +800,23 @@ export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selectio
       if (stdout.length > outputLimit) stop(errorFor('Role output exceeded limit', 'ROLE_OUTPUT_LIMIT'), readNow()+TERMINATION_GRACE_MS);
     });
     listen(child.stderr, 'data', chunk => {
-      if (settled || failure || expired()) return;
+      if (settled || hasFailure() || expired()) return;
       stderr=(stderr+chunk).slice(-2000);
     });
     listen(child.stdout, 'error', onProcessError);
     listen(child.stderr, 'error', onProcessError);
     listen(child.stdin, 'error', onProcessError);
     listen(child, 'close', (code,signal) => {
-      closed=true;observeClose(code,signal);
+      closed=true;physicalObservation.closed=true;observeClose(code,signal);
       // Actual close ends all original child and pipe observations, including
       // harmless errors retained while the timed-out pipes drained.
-      cleanup();
+      if(outcomeRecord){
+        if(settled)try{cleanup();}catch(cleanupError){outcomeFault(outcomeRecord,cleanupError);}
+      }else cleanup();
       if (settled) return;
       // Clock checks fence late success even if timer callbacks were delayed.
       expired();
-      if (failure) return finish(failure);
+      if (hasFailure()) return finish(failure);
       if (!spawned) return finish(errorFor('Role process closed before spawn', 'ROLE_SPAWN_ERROR'));
       if (code !== 0) {
         const safeDetail=value=>String(value).replaceAll(prompt,'[prompt omitted]').replace(/Bearer\s+[^\s"']+|sk-[A-Za-z0-9_-]+/gi,'[credential omitted]').slice(-800);
@@ -524,23 +826,44 @@ export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selectio
       }
       try {
         const result=parseOutput(host,stdout);
+        // Retain the exact primitive before our own enrichment, naming,
+        // spreading into the public result, or any downstream parser.
+        stageRuntimeOutcomeText(outcomeRecord,result,nativeId);
         if(nativeId && result.native_id!==nativeId)throw Object.assign(new Error(`${host==='codex'?'Codex resumed thread':'Claude resumed session'} identity changed`),{rejected_output:result});
         result.model_evidence.applied_controls=appliedControls(host,args);
+        stageRuntimeOutcomeMetadata(outcomeRecord,result);
         // Parsing also must not carry a completion across its deadline.
         if (expired()) return finish(failure);
         finish(null,{...result,native_id:result.native_id ?? nativeId});
       } catch(error) {finish(error);}
     });
+    if(launchFailure){
+      // A real child escaped a failed physical write. Keep its original model
+      // observers alive, but never send a prompt or publish execution timing.
+      failure=launchFailure;failureSeen=true;
+      if(outcomeRecord)settleRuntimeOutcome(outcomeRecord,'threw',launchFailure);
+      try{observeBirth();}catch{/* failed observation remains UNKNOWN */}
+      if(outcomeRecord){
+        try{cleanupOriginalWorkerLaunchFailure(launchFailure);cleanupOriginalModelLaunchFailure(launchFailure);cleanupLegacyRuntimeLaunchFailure(launchFailure);}catch(cleanupError){outcomeFault(outcomeRecord,cleanupError);}
+      }else{
+        cleanupOriginalWorkerLaunchFailure(launchFailure);
+        cleanupOriginalModelLaunchFailure(launchFailure);
+        cleanupLegacyRuntimeLaunchFailure(launchFailure);
+      }
+      finish(launchFailure);
+      return;
+    }
     startupTimer=schedule(() => {
       startupTimer=null;
-      if (!expired() && !settled && !failure && !spawned) {
+      if (!expired() && !settled && !hasFailure() && !spawned) {
         startupTimer=schedule(() => {startupTimer=null; expired();}, Math.max(0,startupDeadline-readNow()));
       }
     }, Math.max(0,startupDeadline-readNow()));
-    signal?.addEventListener('abort',onAbort);
+    if(outcomeRecord){if(signal!==undefined)outcomeApply(outcomeSignalAdd,signal,['abort',onAbort]);}
+    else signal?.addEventListener('abort',onAbort);
     // Close the check/listener race and handle cancellation inside spawn().
-    if (signal?.aborted) onAbort();
-    if (!failure && !settled && !expired()) {
+    if (isAborted()) onAbort();
+    if (!hasFailure() && !settled && !expired()) {
       try {child.stdin.end(prompt);} catch(error) {onProcessError(error);}
     }
   });
