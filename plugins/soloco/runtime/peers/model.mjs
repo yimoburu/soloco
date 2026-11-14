@@ -1518,11 +1518,13 @@ export function bindPeerProductionScheduler(ledger){
         assertPeerProductionAuthority(tx,production,ledger);return true;
       }catch(error){if(readFailure(tx,error))throw error;return false;}
     },
-    membershipWrite(type,principal,fn){
-      if(!['membership/enroll','membership/admit','membership/activate','membership/revoke'].includes(type)||principal!=='operator'||typeof fn!=='function')hold('PRODUCTION_ACTION_HELD','Trusted membership operator write required');
+    membershipWrite(type,channel,fn){
+      if(!['membership/enroll','membership/admit','membership/activate','membership/revoke'].includes(type)||channel!=='operator'||typeof fn!=='function')hold('PRODUCTION_ACTION_HELD','Trusted membership operator write required');
       const deadline=Date.now()+TASK_EFFECT_LEASE_MS;
       let ownerBindings=null;
-      return plannedWrite(ledger,type,principal,tx=>{
+      // Membership supplies a role channel. Planning and the event actor bind
+      // the canonical founder captured by this original production scheduler.
+      return plannedWrite(ledger,type,production.founder.id,tx=>{
         assertPeerProductionAuthority(tx,production,ledger);
         ownerBindings=ownerOperatingBinding(tx,type).bindings;
         const result=fn(tx);
