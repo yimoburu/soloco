@@ -3,8 +3,9 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {createHash,randomUUID} from 'node:crypto';
 import {spawn} from 'node:child_process';
+import {types} from 'node:util';
 import {Store,originalStoreExecutionCustodyFrom,originalStoreRetainedCommitCutoffFrom,inspectRuntimeStoreCommitWitnessFrom,retainOriginalStoreCommitCutoffFrom as retainStoreCutoff} from '../store.mjs';
-import {readNormalized} from '../record-storage.mjs';
+import {readNormalized,readStorageIntake} from '../record-storage.mjs';
 import {prepareRuntimeOriginalModelAuthorityFrom,assertRuntimeOriginalModelAuthorityFrom} from '../runtime-execution.mjs';
 import {comparisonEvidenceEventFrom} from '../integrated-comparison-evidence.mjs';
 import {bindSnapshots,resolveSnapshotEntry} from '../snapshot.mjs';
@@ -150,10 +151,11 @@ function assignmentTransition(before,after,type){
   }
   need(changed===1,'LAUNCH_CHANGED');
 }
-function originalHistory(loan,{current=storedProjection(loan),verifyCurrent=true}={}){
+function originalHistory(loan,{current=storedProjection(loan),verifyCurrent=true,historicalCut=null}={}){
   need(current,'ORIGIN_REQUIRED');validOrigin(current.origin,loan,current.id);
+  if(historicalCut!==null)need(verifyCurrent&&positive(historicalCut.seq)&&hex(historicalCut.event_sha256),'HISTORICAL_CUT_REQUIRED');
   const aggregate=bounded(loan,'events','value');need(aggregate.n>0,'HISTORY_REQUIRED');
-  const rows=query(loan,'SELECT seq,at,type,value FROM events ORDER BY seq','all');let previous=null,last=null,jobs={},upgrades={},origin=null,id=null;
+  const rows=query(loan,'SELECT seq,at,type,value FROM events ORDER BY seq','all');let previous=null,last=null,jobs={},upgrades={},origin=null,id=null,historical=null;
   for(let i=0;i<rows.length;i++){
     const row=rows[i];need(row.seq===i+1&&typeof row.value==='string','HISTORY_REQUIRED');let payload;try{payload=JSON.parse(row.value);}catch{need(false,'HISTORY_REQUIRED');}
     const w=payload.original_execution;
@@ -168,9 +170,16 @@ function originalHistory(loan,{current=storedProjection(loan),verifyCurrent=true
     }
     const upgraded=new Set();for(const c of w.upgrade_changes){need(closed(c,['id','before_sha256','after'])&&text(c.id)&&!upgraded.has(c.id),'UPGRADE_HISTORY_CHANGED');upgraded.add(c.id);const old=upgrades[c.id]??null;need(c.before_sha256===(old===null?null:digest(old))&&c.after?.id===c.id,'UPGRADE_HISTORY_CHANGED');validUpgrade(c.after,origin);upgradeTransition(old,c.after,row.type);upgrades[c.id]=copy(c.after);}
     need(w.after_sha256===projectionHash({id,origin,jobs,upgrades}),'HISTORY_CHANGED');previous=hash(JSON.stringify([row.seq,row.at,row.type,row.value]));last=row;
+    if(historicalCut?.seq===row.seq){
+      need(historicalCut.event_sha256===previous,'HISTORICAL_CUT_CHANGED');
+      historical=copy({id,origin,jobs,upgrades,event_sequence:row.seq,event_sha256:previous});
+    }
   }
   if(verifyCurrent)need(same({id,origin,jobs,upgrades},current),'PHYSICAL_STATE_CHANGED');
   for(const [jobId,job]of Object.entries(jobs)){need(jobId===job.id,'ASSIGNMENT_REQUIRED');validAssignment(job,origin);}
+  // A historical projection never skips the later journal or today's physical
+  // equality check. Execution/inventory callers retain the current default.
+  if(historicalCut!==null){need(historical,'HISTORICAL_CUT_REQUIRED');return historical;}
   return {id,origin,jobs,upgrades,event_sequence:last.seq,event_sha256:previous};
 }
 function assignmentOccupied(job){
@@ -243,6 +252,53 @@ export function bindOriginalWorkerAssignmentBookkeepingFrom(store,state){
     if(normalized&&!query(loan,"SELECT 1 FROM state_entries WHERE family='root' AND key='original_execution_origin'",'get'))return null;
     const p=storedProjection(loan);if(!p?.origin)return null;const history=originalHistory(loan,{current:p});bindBookkeeping(state,history.origin,history.jobs,writes.get(store)?.lease??null);return true;
   }catch{return null;}
+}
+function historicalBaselineData(input){
+  const valid=ok=>need(ok,'HISTORICAL_BASIS_DATA_REQUIRED');
+  const scalar=value=>{valid(value===null||typeof value==='string'||typeof value==='boolean'||typeof value==='number'&&Number.isFinite(value)&&!Object.is(value,-0));return value;};
+  const object=(value,fields,children={})=>{
+    valid(value&&typeof value==='object'&&!types.isProxy(value)&&!Array.isArray(value)&&[Object.prototype,null].includes(Object.getPrototypeOf(value)));
+    const descriptors=Object.getOwnPropertyDescriptors(value),keys=Reflect.ownKeys(descriptors);
+    valid(keys.length===fields.length&&keys.every(key=>typeof key==='string'&&fields.includes(key)&&descriptors[key].enumerable&&own(descriptors[key],'value')));
+    // Iterate the original member order: baseline seals authenticate JSON
+    // bytes. Reading descriptor values never invokes caller getters/toJSON.
+    return Object.fromEntries(keys.map(key=>[key,own(children,key)?children[key](descriptors[key].value):scalar(descriptors[key].value)]));
+  };
+  const entries=value=>{
+    valid(value&&typeof value==='object'&&!types.isProxy(value)&&Array.isArray(value)&&Object.getPrototypeOf(value)===Array.prototype);
+    const descriptors=Object.getOwnPropertyDescriptors(value),keys=Reflect.ownKeys(descriptors),length=descriptors.length?.value;
+    valid(nat(length)&&length<=MAX_ROWS&&keys.length===length+1&&keys.every(key=>key==='length'||typeof key==='string'&&/^(0|[1-9][0-9]*)$/.test(key)&&Number(key)<length&&descriptors[key].enumerable&&own(descriptors[key],'value')));
+    return Array.from({length},(_,index)=>object(descriptors[String(index)].value,['family','key','position','sha256','encoding']));
+  };
+  return object(input,['version','layout','entries','root','seq','event_sha256','sha256'],{layout:value=>object(value,['version','identity']),entries});
+}
+export function bindOriginalHistoricalWorkerAssignmentBookkeepingFrom(actualDb,state,basis){
+  const loan=originalStoreExecutionCustodyFrom(actualDb);
+  // One inert snapshot is used by every later guard. Freezing a caller object
+  // would still let its accessors switch from a committed cut to a staged one.
+  const baseline=historicalBaselineData(basis);
+  return check(loan,()=>{
+    // Authenticate the complete immutable baseline and its continuation in
+    // this actual Store. Caller JSON alone never establishes provenance.
+    readStorageIntake(loan.db,baseline);
+    need(state&&typeof state==='object'&&!Array.isArray(state),'HISTORICAL_STATE_CHANGED');
+    const originalAtCut=baseline.entries.some(row=>row.family==='root'&&row.key==='original_execution_origin');
+    need(own(state,'original_execution_origin')===originalAtCut,'HISTORICAL_STATE_CHANGED');
+    if(!originalAtCut)return null;
+    // The immutable cut must precede this write. An uncommitted tail could
+    // otherwise acquire a lease-free historical proof and survive rollback.
+    if(loan.mode==='write'){
+      const writing=writes.get(loan.store);
+      need(writing?.history&&baseline.seq<=writing.history.event_sequence,'HISTORICAL_CUT_UNCOMMITTED');
+      const anchor=query(loan,'SELECT seq,at,type,value FROM events WHERE seq=?','get',writing.history.event_sequence);
+      need(anchor&&hash(JSON.stringify([anchor.seq,anchor.at,anchor.type,anchor.value]))===writing.history.event_sha256,'HISTORICAL_CUT_CHANGED');
+    }
+    const history=originalHistory(loan,{historicalCut:baseline});
+    need(same({id:state.id,origin:state.original_execution_origin,jobs:state.jobs??{},upgrades:upgradeProjection(state)},
+      {id:history.id,origin:history.origin,jobs:history.jobs,upgrades:history.upgrades}),'HISTORICAL_STATE_CHANGED');
+    // Factual metadata only: no live write lease, reservation or launch token.
+    bindBookkeeping(state,history.origin,history.jobs,null);return true;
+  });
 }
 export function inheritOriginalWorkerAssignmentBookkeepingFrom(source,derived){const proof=bookkeepingFor(source);if(!bookkeepingLive(proof)||!derived||typeof derived!=='object'||derived.id!==proof.company_id)return null;bookkeeping.set(derived,proof);return true;}
 export function inspectOriginalWorkerAssignmentBookkeepingFrom(state,job){

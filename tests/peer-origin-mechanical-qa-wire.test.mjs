@@ -9,11 +9,13 @@ import {canonical,peerDigest} from '../plugins/soloco/runtime/peers/ledger.mjs';
 import {qaRecordRef,qaRawHash} from '../plugins/soloco/runtime/peers/origin-mechanical-qa-contract.mjs';
 import {Store,withStore} from '../plugins/soloco/runtime/store.mjs';
 import {assignmentContext} from '../plugins/soloco/runtime/context.mjs';
+import {readStorageIntake,captureStorageBaseline} from '../plugins/soloco/runtime/record-storage.mjs';
 import * as actualPolicy from '../plugins/soloco/runtime/peers/origin-mechanical-qa-policy.mjs';
 import {ORIGIN_MECHANICAL_QA_WIRE as WIRE,ORIGIN_MECHANICAL_QA_RAW_CONTEXT as RAW,ORIGIN_MECHANICAL_REVIEW_INSTRUCTION,createOriginMechanicalQaWire,assertOriginMechanicalQaWire,originMechanicalQaPrompt,assertOriginMechanicalQaPromptFits} from '../plugins/soloco/runtime/peers/origin-mechanical-qa-wire-contract.mjs';
 import {wireFixture,actor} from './peer-origin-mechanical-qa-wire-fixture.mjs';
 import {syntheticMechanicalModel} from './origin-mechanical-qa-dispatch-fixture.mjs';
-import {inspectOriginalLocalExecutionInventoryFrom} from '../plugins/soloco/runtime/peers/prospective-local-worker-inventory-producer.mjs';
+import {stageOriginalWorker} from './original-adapter-process-fixture.mjs';
+import {inspectOriginalLocalExecutionInventoryFrom,recordOriginalWorkerAssignmentFrom,bindOriginalHistoricalWorkerAssignmentBookkeepingFrom,inspectOriginalWorkerAssignmentBookkeepingFrom} from '../plugins/soloco/runtime/peers/prospective-local-worker-inventory-producer.mjs';
 const copy=v=>JSON.parse(JSON.stringify(v));
 function purePack(extra=''){
  const plan={protocol:'peer-origin-quarantine-plan-v1',plan_id:'plan-one',cut_sha256:'a'.repeat(64),owner:{host:'codex',session_id:'SOURCE-owner'},cut:{governance:'Original governance 🌍',roles_json:'{"qa":{"instructions":"Original full QA."}}',cos_instructions:'Original CoS instructions.',unknown:'Retain original UNKNOWN.'},source_instruction:'SOURCE only',execution_resumed:false};
@@ -90,6 +92,118 @@ test('legacy packet-v1 replay/grant/job/readback and exact old frame preserve or
 });
 test('packet-v2 replay keeps immutable context/ref/expiry without new selection or counter reset',async t=>{
  const f=await wireFixture(t);f.prepare();const old=f.state().records[f.packet.packet_ref.id],before=qaRecordRef(old);f.prepare();assert.deepEqual(f.packet.packet_ref,before);assert.deepEqual(f.state().records[before.id],old);f.grant();await f.loadWorker();f.queue();const raw=f.raw();assert.throws(()=>f.queue());assert.equal(f.raw(),raw);assert.equal(f.state().records[f.grantReceipt.grant_ref.id].origin_mechanical_qa.used_attempts,1);
+});
+test('v1/v2 frozen packet replay uses past assignment stamps after a later original close without current grant authority',async t=>{
+ for(const legacyV1 of [false,true]){
+  const id='SYNTHETIC-late-close';let carrier;
+  const f=await wireFixture(t,{legacyV1,beforePlan:source=>{
+   source.write('job.queued',(s,store)=>{
+    const job={id,instance_id:'SYNTHETIC-late-close-instance',role:'qa',host:'codex',status:'queued',native_id:null,created_at:new Date().toISOString(),timeout_policy_version:1,timeout_ms:180000,timeout_reason:'SOURCE historical cut only'};
+    recordOriginalWorkerAssignmentFrom(store,s,job);s.jobs[job.id]=job;return s;
+   });
+   carrier=stageOriginalWorker(source.root,id);
+   source.write('job.failed',s=>{s.jobs[id].status='failed';s.jobs[id].coordination_release={termination_confirmed:false};return s;});
+  }}),frozen=copy(f.state());f.prepare();const packet=copy(f.state().records[f.packet.packet_ref.id]),v=packet.origin_mechanical_qa;
+  // The existing standard Node child mock delivers an actual late close to
+  // the Original observer. No fabricated journal/closure or Native result.
+  carrier.child.emit('close',0,null);
+  const current=f.state(),before=f.raw();assert.equal(frozen.jobs[id].original_execution_assignment.launches.length,1);assert.equal(current.jobs[id].original_execution_assignment.launches.length,1);assert.ok(frozen.jobs[id].original_execution_assignment.launches[0].birth);assert.equal(frozen.jobs[id].original_execution_assignment.launches[0].closure,null);assert.equal(current.jobs[id].original_execution_assignment.launches[0].closure.never_started,false);
+  withStore(f.root,store=>store.readSnapshot(()=>{
+   const historical=copy(frozen);assert.equal(bindOriginalHistoricalWorkerAssignmentBookkeepingFrom(store.db,historical,v.context_basis),true);
+   const proof=inspectOriginalWorkerAssignmentBookkeepingFrom(historical,historical.jobs[id]);assert.equal(proof.historical_original,true);assert.equal(proof.active_original_snapshot,false);
+   assert.equal(inspectOriginalWorkerAssignmentBookkeepingFrom(historical,current.jobs[id]),null);
+   const wrong=copy(frozen);wrong.jobs[id]=copy(current.jobs[id]);assert.throws(()=>bindOriginalHistoricalWorkerAssignmentBookkeepingFrom(store.db,wrong,v.context_basis),code('ORIGINAL_EXECUTION_HISTORICAL_STATE_CHANGED'));
+  }));
+  const handle=f.plan.inspectPeerOriginMechanicalQaPacketAtEpoch(f.root,actor,9,{packet_ref:f.packet.packet_ref});assert.equal(handle.context_sha256,v.context.sha256);assert.equal(handle.historical_original,true);assert.equal(handle.execution_authority,false);assert.equal(handle.current_eligibility,'not asserted');
+  const read=f.plan.readPeerOriginMechanicalQaPacketAtEpoch(f.root,actor,9,{packet_ref:f.packet.packet_ref,sha256:v.context.sha256,offset:0,length:4096});assert.equal(read.text,v.context.text.slice(0,read.length));assert.equal(read.execution_authority,false);
+  assert.throws(()=>f.grant(),code('ORIGIN_MECHANICAL_QA_JOURNAL_CHANGED'));assert.equal(f.raw(),before);assert.deepEqual(f.state().records[packet.id],packet);assert.deepEqual(f.state().jobs.old,frozen.jobs.old);assert.deepEqual(f.state().original_grant,frozen.original_grant);assert.equal(f.state().paused,true);
+ }
+});
+test('historical bookkeeping rejects raw databases, foreign Stores, changed company and wrong cut/hash',async t=>{
+ const f=await wireFixture(t),frozen=copy(f.state());f.prepare();const basis=f.state().records[f.packet.packet_ref.id].origin_mechanical_qa.context_basis,foreign=await wireFixture(t),before=f.raw();
+ const raw=new DatabaseSync(f.file,{readOnly:true});try{assert.throws(()=>bindOriginalHistoricalWorkerAssignmentBookkeepingFrom(raw,copy(frozen),basis),code('ORIGINAL_EXECUTION_STORE_REQUIRED'));}finally{raw.close();}
+ withStore(foreign.root,store=>store.readSnapshot(()=>assert.throws(()=>bindOriginalHistoricalWorkerAssignmentBookkeepingFrom(store.db,copy(frozen),basis))));
+ withStore(f.root,store=>store.readSnapshot(()=>{
+  for(const mutate of [s=>{s.id='SYNTHETIC-other-company';},s=>{delete s.original_execution_origin;},s=>{s.original_execution_origin=null;}]){
+   const wrong=copy(frozen);mutate(wrong);assert.throws(()=>bindOriginalHistoricalWorkerAssignmentBookkeepingFrom(store.db,wrong,basis),code('ORIGINAL_EXECUTION_HISTORICAL_STATE_CHANGED'));
+  }
+  for(const mutate of [b=>{b.seq++;},b=>{b.event_sha256='0'.repeat(64);}]){
+   const wrong=copy(basis);mutate(wrong);const {sha256,...body}=wrong;wrong.sha256=qaRawHash(JSON.stringify(body));
+   assert.throws(()=>bindOriginalHistoricalWorkerAssignmentBookkeepingFrom(store.db,copy(frozen),wrong));
+  }
+ }));assert.equal(f.raw(),before);
+});
+test('historical packet replay authenticates later Original history even when storage intake still validates',async t=>{
+ const f=await wireFixture(t);f.prepare();const basis=f.state().records[f.packet.packet_ref.id].origin_mechanical_qa.context_basis;
+ f.write('SYNTHETIC later journal',s=>s);const db=new DatabaseSync(f.file);let tail;
+ try{
+  tail=db.prepare('SELECT seq,at,type,value FROM events ORDER BY seq DESC LIMIT 1').get();assert(tail.seq>basis.seq);
+  const payload=JSON.parse(tail.value);delete payload.original_execution;
+  const {sha256,...body}=payload.storage_delta;payload.storage_delta={...body,sha256:qaRawHash(JSON.stringify([tail.seq,tail.at,tail.type,{...payload,storage_delta:body}]))};
+  db.prepare('UPDATE events SET value=? WHERE seq=?').run(JSON.stringify(payload),tail.seq);
+ }finally{db.close();}
+ try{
+  withStore(f.root,store=>store.readSnapshot(()=>assert.doesNotThrow(()=>readStorageIntake(store.db,basis))));
+  const before=f.raw();assert.throws(()=>f.plan.inspectPeerOriginMechanicalQaPacketAtEpoch(f.root,actor,9,{packet_ref:f.packet.packet_ref}),code('ORIGINAL_EXECUTION_HISTORY_REQUIRED'));assert.equal(f.raw(),before);
+ }finally{const restore=new DatabaseSync(f.file);try{restore.prepare('UPDATE events SET value=? WHERE seq=?').run(tail.value,tail.seq);}finally{restore.close();}}
+ assert.equal(f.plan.inspectPeerOriginMechanicalQaPacketAtEpoch(f.root,actor,9,{packet_ref:f.packet.packet_ref}).execution_authority,false);
+});
+test('an uncommitted baseline cannot mint historical bookkeeping that survives rollback',async t=>{
+ const f=await wireFixture(t),before=f.raw(),rollback=Error('SYNTHETIC rollback');let attempted;
+ withStore(f.root,store=>assert.throws(()=>store.transaction('SYNTHETIC uncommitted historical cut',s=>s,{beforeCommit:db=>{
+  const basis=captureStorageBaseline(db);attempted=copy(store.read());
+  assert.throws(()=>bindOriginalHistoricalWorkerAssignmentBookkeepingFrom(db,attempted,basis),code('ORIGINAL_EXECUTION_HISTORICAL_CUT_UNCOMMITTED'));
+  throw rollback;
+ }}),e=>e===rollback));
+ assert.equal(f.raw(),before);assert.equal(inspectOriginalWorkerAssignmentBookkeepingFrom(attempted,attempted.jobs.old),null);
+});
+test('a same-sequence replacement cannot substitute for the private pre-write history anchor',async t=>{
+ const f=await wireFixture(t),before=f.raw(),rollback=Error('SYNTHETIC anchor rollback');let attempted;
+ withStore(f.root,store=>assert.throws(()=>store.transaction('SYNTHETIC replaced historical anchor',s=>{
+  const tail=store.db.prepare('SELECT seq,at,type,value FROM events ORDER BY seq DESC LIMIT 1').get(),payload=JSON.parse(tail.value);payload.synthetic_replacement=true;
+  const {sha256,...body}=payload.storage_delta;payload.storage_delta={...body,sha256:qaRawHash(JSON.stringify([tail.seq,tail.at,tail.type,{...payload,storage_delta:body}]))};
+  store.db.prepare('UPDATE events SET value=? WHERE seq=?').run(JSON.stringify(payload),tail.seq);
+  const basis=captureStorageBaseline(store.db);attempted=copy(s);assert.equal(basis.seq,tail.seq);assert.doesNotThrow(()=>readStorageIntake(store.db,basis));
+  assert.throws(()=>bindOriginalHistoricalWorkerAssignmentBookkeepingFrom(store.db,attempted,basis),code('ORIGINAL_EXECUTION_HISTORICAL_CUT_CHANGED'));
+  throw rollback;
+ }),e=>e===rollback));
+ assert.equal(f.raw(),before);assert.equal(inspectOriginalWorkerAssignmentBookkeepingFrom(attempted,attempted.jobs.old),null);
+});
+test('historical baseline snapshot preserves authenticated member order and accepts deeply frozen inert data',async t=>{
+ const f=await wireFixture(t),historical=copy(f.state());f.prepare();const original=copy(f.state().records[f.packet.packet_ref.id].origin_mechanical_qa.context_basis),reordered=Object.fromEntries(Object.entries(copy(original)).reverse()),before=f.raw();
+ const {sha256,...unsigned}=reordered;reordered.sha256=qaRawHash(JSON.stringify(unsigned));assert.notDeepEqual(Object.keys(reordered),Object.keys(original));
+ const freeze=value=>{if(value&&typeof value==='object'){for(const child of Object.values(value))freeze(child);Object.freeze(value);}return value;};
+ for(const basis of [original,reordered]){
+  const bytes=JSON.stringify(basis);freeze(basis);
+  withStore(f.root,store=>store.readSnapshot(()=>{
+   assert.doesNotThrow(()=>readStorageIntake(store.db,basis));assert.equal(bindOriginalHistoricalWorkerAssignmentBookkeepingFrom(store.db,historical,basis),true);
+   assert.equal(inspectOriginalWorkerAssignmentBookkeepingFrom(historical,historical.jobs.old).historical_original,true);
+  }));assert.equal(JSON.stringify(basis),bytes);
+ }assert.equal(f.raw(),before);
+});
+test('executable baseline views cannot switch to an uncommitted cut or retain bookkeeping after rollback',async t=>{
+ const f=await wireFixture(t),before=f.raw(),rollback=Error('SYNTHETIC accessor rollback'),attempts=[],id='SYNTHETIC-uncommitted-assignment';let calls=0;
+ withStore(f.root,store=>{
+  const committed=store.readSnapshot(()=>captureStorageBaseline(store.db));
+  assert.throws(()=>store.transaction('job.queued',s=>{
+   const job={id,instance_id:'SYNTHETIC-uncommitted-instance',role:'qa',host:'codex',status:'queued',native_id:null,created_at:new Date().toISOString()};recordOriginalWorkerAssignmentFrom(store,s,job);s.jobs[id]=job;return s;
+  },{beforeCommit:(db,next)=>{
+   const staged=captureStorageBaseline(db);assert(staged.seq>committed.seq);
+   const getter=(target,key,first,second)=>Object.defineProperty(target,key,{enumerable:true,configurable:true,get(){calls++;return calls%2?first:second;}});
+   const variants=[
+    b=>{getter(b,'seq',committed.seq,staged.seq);getter(b,'event_sha256',committed.event_sha256,staged.event_sha256);return Object.freeze(b);},
+    b=>{getter(b.layout,'version',b.layout.version,staged.layout.version);return b;},
+    b=>{getter(b.entries,'0',b.entries[0],staged.entries[0]);return b;},
+    b=>{getter(b.entries[0],'sha256',b.entries[0].sha256,staged.entries[0].sha256);return b;},
+    b=>new Proxy(b,{ownKeys(){calls++;throw Error('Caller proxy must not run');}}),
+    b=>{b.entries=new Proxy(b.entries,{get(){calls++;throw Error('Nested caller proxy must not run');}});return b;},
+    b=>{b.toJSON=()=>{calls++;return staged;};return b;}
+   ];
+   for(const variant of variants){const attempted=copy(next),basis=variant(copy(committed));attempts.push(attempted);assert.throws(()=>bindOriginalHistoricalWorkerAssignmentBookkeepingFrom(db,attempted,basis),code('ORIGINAL_EXECUTION_HISTORICAL_BASIS_DATA_REQUIRED'));assert.equal(calls,0);}
+   throw rollback;
+  }}),error=>error===rollback);
+ });
+ assert.equal(f.raw(),before);assert.equal(calls,0);for(const attempted of attempts)assert.equal(inspectOriginalWorkerAssignmentBookkeepingFrom(attempted,attempted.jobs[id]),null);
 });
 test('complete unique oversize and selected UTF8 Hold before packet, grant, queue or spend',async t=>{
  for(const options of [{utf8Limit:512},{changes:{mandatory_unique_semantics:'retain every UNKNOWN '.repeat(12000)}}]){
