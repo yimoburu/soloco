@@ -21,7 +21,7 @@ const read=f=>withStore(f.root,db=>db.read());
 const mutate=(f,fn)=>withStore(f.root,db=>db.transaction('fictional.fixture',s=>{fn(s);return s;}));
 const save=(f,args)=>call('company_save',{root:f.root,session_id:f.session_id,epoch:f.epoch,...args},'codex');
 const context=(f,args)=>call('company_context',{...f,protocol:scoped.SCOPED_PROTOCOL,...args},'codex');
-async function fixture({dense=false,groups=61,bootstrap=true}={}){
+async function fixture({dense=false,groups=61,bootstrap=true,frozenIntake=false}={}){
  const f={root:fs.mkdtempSync(path.join(tmp,'company-')),session_id:'fictional-owner',epoch:1,source_instruction:'FICTIONAL existing authorization: prepare proposed homes and read-only QA while paused; no execution.'};
  engine.bind(f.root,f.session_id,'codex');engine.open({...f,idea:'FICTIONAL mechanics only'},'codex');withStore(f.root,db=>db.migrate());
  mutate(f,s=>{s.paused=bootstrap;if(!bootstrap)s.records.home={id:'home',revision:1,kind:'artifact',content:'UNKNOWN; ZERO allowance; no execution.',context_obligations:{version:1,scope:'*'},operating_record:typed()};s.records.archive={id:'archive',kind:'artifact',revision:1,author_instance:'fictional-source-author',content:'UNKNOWN failed attempt. Remaining allowance ZERO. No execution; retain all negative outcomes.'};});
@@ -32,9 +32,13 @@ async function fixture({dense=false,groups=61,bootstrap=true}={}){
   const count=buildLegacyCoherentPlan(s).groups.length;
   for(let i=count;i<groups;i++)s.records['dense-'+i]={id:'dense-'+i,revision:1,kind:'artifact',content:'FICTIONAL complete clause '+i+'; UNKNOWN; no export; allowance ZERO.'};
  });
- const m=buildLegacyCoherentPlan(read(f));if(dense)assert.equal(m.groups.length,groups);
+ // Exercise the public discovery-parent route without rebuilding its frozen
+ // manifest after the parent itself becomes a live record.
+ if(frozenIntake)assert.equal(bootstrap,true);
+ const parent=frozenIntake?await context(f,{action:'plan',source_id:'archive',selected_source_ids:['archive'],partitioner:scoped.CORPUS_PARTITIONER,batching_policy:scoped.CORPUS_INTRINSIC_BATCHING,maintenance:true}):null;
+ const s=read(f),m=parent?resolveSnapshot(s,resolveSnapshot(s,s.records[parent.id].scoped_context_plan.capsule).projection):buildLegacyCoherentPlan(s);if(dense)assert.equal(m.groups.length,groups);
  const partition={plan_sha256:m.plan_sha256,context_policy:scoped.CORPUS_PHYSICAL_CONTEXT,shared_selection_ids:['all'],selections:[{id:'all',scope:'*',occurrence_ids:m.occurrences.map(o=>o.id),incident_ids:[]}]};
- const p=await context(f,{action:'plan',source_id:'archive',selected_source_ids:['archive'],partitioner:scoped.CORPUS_PARTITIONER,semantic_partition:partition,batching_policy:scoped.CORPUS_INTRINSIC_BATCHING,...(bootstrap?{home_intake_policy:scoped.INITIAL_PROPOSED_HOMES,maintenance:true}:{})});
+ const p=await context(f,{action:'plan',source_id:'archive',selected_source_ids:['archive'],partitioner:scoped.CORPUS_PARTITIONER,semantic_partition:partition,batching_policy:scoped.CORPUS_INTRINSIC_BATCHING,...(bootstrap?{home_intake_policy:scoped.INITIAL_PROPOSED_HOMES,maintenance:true}:{}),...(parent?{corpus_plan_id:parent.id,frozen_intake:'initial-v1'}:{})});
  f.plan_id=p.id;return f;
 }
 // Deliberately tiny FICTIONAL test language. This is not extraction of arbitrary
