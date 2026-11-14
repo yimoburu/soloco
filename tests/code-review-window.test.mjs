@@ -11,13 +11,14 @@ import {digest,withStore,id,Store} from '../plugins/soloco/runtime/store.mjs';
 import {work} from '../plugins/soloco/runtime/worker.mjs';
 import {normalizeCodeReviewWindow} from '../plugins/soloco/runtime/timeout.mjs';
 import {proofJobSafe} from '../plugins/soloco/runtime/current-state.mjs';
+import {developmentAction} from '../plugins/soloco/runtime/develop.mjs';
 import {ControlledClock,launchOriginalWorker,startOriginalModel,stageOriginalHistoricalJob,stageOriginalReviewController,disposeOriginalProcessFixtures} from './original-worker-model-fixture.mjs';
 
 const base=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-code-window-'));
 const previousPluginData=process.env.COMPANY_PLUGIN_DATA,originalRoots=[];
 process.env.COMPANY_PLUGIN_DATA=path.join(base,'plugin-data');test.after(()=>{for(const root of originalRoots)disposeOriginalProcessFixtures(root);if(previousPluginData===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=previousPluginData;fs.rmSync(base,{recursive:true,force:true});});
 const reason='Controlled source fixture: complete independent review needs multiple bounded calls.';
-function fixture(){
+async function fixture(){
   const root=fs.mkdtempSync(path.join(base,'case-')),session_id=id('owner');engine.bind(root,session_id,'codex');engine.open({root,session_id,idea:'Controlled source-only review timing'},'codex');
   originalRoots.push(root);
   withStore(root,db=>db.transaction('fixture.runtime-lineage',s=>{
@@ -34,7 +35,9 @@ function fixture(){
   // The supported owner action authorizes the exact initially-live fictional
   // scope; its existing capability check can run one cached local Node probe.
   // The controlled historical carrier executes no candidate tests or model.
-  engine.develop({...owner,action:'authorize',plan_id:'plan',scope_sha256:plan.development.scope_sha256,model_data_approved:true,source_instruction:'Controlled fictional Source fixture: authorize only this exact local carrier scope; no real test or Native acceptance.'},'codex');
+  // Component entry retains owner/capability/source/expiry/decision guards.
+  // This setup does not qualify the public tool's separate HOST boundary.
+  await developmentAction({...owner,action:'authorize',plan_id:'plan',scope_sha256:plan.development.scope_sha256,model_data_approved:true,source_instruction:'Controlled fictional Source fixture: authorize only this exact local carrier scope; no real test or Native acceptance.'},'codex');
   stageOriginalHistoricalJob(root,{id:'engineer-job',role:'engineer',instance_id:'fixture-engineer',host:'codex',epoch:1,status:'completed',native_id:'fixture-author-native',artifact_id:'candidate',coordination_release:{termination_confirmed:true}});
   stageOriginalReviewController(root,{jobId:'test-controller',planId:'plan',candidateId:'candidate',receiptId:'receipt'});
   // The review starts after the unchanged old grant has expired. This clock
@@ -66,7 +69,7 @@ async function simulate(f,key,{tamper=false,longCall=false,expire=false,latePubl
   }finally{globalThis.Date=RealDate;Store.prototype.transaction=originalTransaction;}
 }
 test('a fixed fresh window permits complete multi-call QA past ten minutes, leaving old scope unchanged',async t=>{
-  for(const window of [null,30]){const f=fixture(),before=withStore(f.root,db=>db.read().records.plan),queued=dispatch(f,window),r=await simulate(f,queued.id),j=r.state.jobs[queued.id];
+  for(const window of [null,30]){const f=await fixture(),before=withStore(f.root,db=>db.read().records.plan),queued=dispatch(f,window),r=await simulate(f,queued.id),j=r.state.jobs[queued.id];
     t.diagnostic(JSON.stringify({window,calls:r.calls,status:j.status,error:j.error??null}));
     assert(r.limits.every(v=>v<=600000));assert.deepEqual(r.state.records.plan,before);
     if(window===null){assert.notEqual(j.status,'completed');assert.equal(r.calls,2);}
@@ -74,10 +77,10 @@ test('a fixed fresh window permits complete multi-call QA past ten minutes, leav
   }
 });
 test('tampering, overlong single calls and the exact overall deadline cannot publish Pass',async()=>{
-  for(const options of [{tamper:true},{longCall:true},{expire:true}]){const f=fixture(),queued=dispatch(f),r=await simulate(f,queued.id,options);assert(r.calls>0,'The controlled model path must be reached');assert.notEqual(r.state.jobs[queued.id].status,'completed');assert.equal(r.state.records.receipt.development.acceptance,undefined);}
+  for(const options of [{tamper:true},{longCall:true},{expire:true}]){const f=await fixture(),queued=dispatch(f),r=await simulate(f,queued.id,options);assert(r.calls>0,'The controlled model path must be reached');assert.notEqual(r.state.jobs[queued.id].status,'completed');assert.equal(r.state.records.receipt.development.acceptance,undefined);}
 });
-test('ordinary roles, forged runtime lineage and an existing uncertain review session are rejected before queueing',()=>{
-  for(const variant of ['engineer','forged','uncertain']){const f=fixture();
+test('ordinary roles, forged runtime lineage and an existing uncertain review session are rejected before queueing',async()=>{
+  for(const variant of ['engineer','forged','uncertain']){const f=await fixture();
     if(variant==='forged')withStore(f.root,db=>db.transaction('fixture.bad-receipt',s=>{s.jobs['test-controller'].artifact_id='some-other-artifact';return s;}));
     if(variant==='uncertain'){stageOriginalHistoricalJob(f.root,{id:'old',role:'qa',host:'codex',epoch:1,status:'failed',started_at:'2001-01-01T00:00:00Z',instance_id:'old-qa',native_id:'old-unknown-native',execution_failure:{termination_confirmed:false}});withStore(f.root,db=>db.transaction('fixture.old-unknown',s=>{s.sessions['qa:review:receipt:1']={instance_id:'old-qa',role:'qa',host:'codex',native_id:'old-unknown-native'};return s;}));}
     const before=withStore(f.root,db=>db.read());assert.throws(()=>dispatch(f,30,variant==='engineer'?{role:'engineer'}:{}));const after=withStore(f.root,db=>db.read());assert.deepEqual(after.jobs,before.jobs);assert.deepEqual(after.sessions,before.sessions);
@@ -87,17 +90,17 @@ test('window selection is explicit and finite, with no change to a legacy job',(
   assert.equal(normalizeCodeReviewWindow({}),null);for(const minutes of [0,10,60,null,'30'])assert.throws(()=>normalizeCodeReviewWindow({code_review_window_minutes:minutes,code_review_reason:reason}));
 });
 test('crossing the overall deadline during final publication cannot publish an eligible Pass',async()=>{
-  const f=fixture(),queued=dispatch(f),r=await simulate(f,queued.id,{latePublication:true}),j=r.state.jobs[queued.id];assert.equal(r.calls,3);assert.equal(r.crossedPublicationBoundary,true);assert.notEqual(j.status,'completed');assert.equal(Object.values(r.state.records).some(x=>x.job_id===j.id&&x.status==='Submitted'&&x.review?.verdict==='Pass'),false);assert.equal(j.execution_failure.code,'ROLE_TIMEOUT');
+  const f=await fixture(),queued=dispatch(f),r=await simulate(f,queued.id,{latePublication:true}),j=r.state.jobs[queued.id];assert.equal(r.calls,3);assert.equal(r.crossedPublicationBoundary,true);assert.notEqual(j.status,'completed');assert.equal(Object.values(r.state.records).some(x=>x.job_id===j.id&&x.status==='Submitted'&&x.review?.verdict==='Pass'),false);assert.equal(j.execution_failure.code,'ROLE_TIMEOUT');
 });
 test('retrieval before a failed invocation cannot become delivered evidence or release uncertainty',async()=>{
-  const f=fixture(),queued=dispatch(f),r=await simulate(f,queued.id,{failPending:true}),j=r.state.jobs[queued.id];assert.equal(r.calls,2);assert.equal(j.status,'failed');assert.equal(j.retrieved_inputs.length,1);assert.equal(j.delivered_record_reads.ranges.length,0);assert.equal(j.coordination_release,undefined);assert.equal(j.execution_failure.termination_confirmed,false);
+  const f=await fixture(),queued=dispatch(f),r=await simulate(f,queued.id,{failPending:true}),j=r.state.jobs[queued.id];assert.equal(r.calls,2);assert.equal(j.status,'failed');assert.equal(j.retrieved_inputs.length,1);assert.equal(j.delivered_record_reads.ranges.length,0);assert.equal(j.coordination_release,undefined);assert.equal(j.execution_failure.termination_confirmed,false);
 });
 test('a closed all-inline response creates an empty-range initial delivery marker',async()=>{
-  const f=fixture(),queued=dispatch(f,30,{evidence_ids:[]}),r=await simulate(f,queued.id,{inlineOnly:true}),j=r.state.jobs[queued.id];assert.equal(r.calls,1);assert.equal(j.status,'completed');assert.equal(j.delivered_record_reads.ranges.length,0);assert.equal(j.delivered_record_reads.native_id,'fixture-independent-reviewer');assert.equal(j.delivered_record_reads.initial_delivery.assignment_context_sha256,j.context_sha256);
+  const f=await fixture(),queued=dispatch(f,30,{evidence_ids:[]}),r=await simulate(f,queued.id,{inlineOnly:true}),j=r.state.jobs[queued.id];assert.equal(r.calls,1);assert.equal(j.status,'completed');assert.equal(j.delivered_record_reads.ranges.length,0);assert.equal(j.delivered_record_reads.native_id,'fixture-independent-reviewer');assert.equal(j.delivered_record_reads.initial_delivery.assignment_context_sha256,j.context_sha256);
 });
 test('a Pass that omits a declared non-inline supplemental source cannot publish',async()=>{
-  const f=fixture(),queued=dispatch(f),r=await simulate(f,queued.id,{inlineOnly:true}),j=r.state.jobs[queued.id];assert.equal(r.calls,1);assert.notEqual(j.status,'completed');assert.match(j.error,/complete delivered supplemental/);assert.equal(r.state.records.receipt.development.acceptance,undefined);
+  const f=await fixture(),queued=dispatch(f),r=await simulate(f,queued.id,{inlineOnly:true}),j=r.state.jobs[queued.id];assert.equal(r.calls,1);assert.notEqual(j.status,'completed');assert.match(j.error,/complete delivered supplemental/);assert.equal(r.state.records.receipt.development.acceptance,undefined);
 });
 test('deadline crossing after actual SQL writes rolls back eligible publication in either layout',async t=>{
-  for(const normalized of [false,true])await t.test(normalized?'normalized-v4':'legacy-json',async()=>{const f=fixture();if(normalized)withStore(f.root,db=>db.migrate());const queued=dispatch(f),r=await simulate(f,queued.id,{latePersistence:true}),j=r.state.jobs[queued.id];assert.equal(r.calls,3);assert.equal(r.crossedPublicationBoundary,true);assert.notEqual(j.status,'completed');assert.equal(Object.values(r.state.records).some(x=>x.job_id===j.id&&x.status==='Submitted'&&x.review?.verdict==='Pass'),false);});
+  for(const normalized of [false,true])await t.test(normalized?'normalized-v4':'legacy-json',async()=>{const f=await fixture();if(normalized)withStore(f.root,db=>db.migrate());const queued=dispatch(f),r=await simulate(f,queued.id,{latePersistence:true}),j=r.state.jobs[queued.id];assert.equal(r.calls,3);assert.equal(r.crossedPublicationBoundary,true);assert.notEqual(j.status,'completed');assert.equal(Object.values(r.state.records).some(x=>x.job_id===j.id&&x.status==='Submitted'&&x.review?.verdict==='Pass'),false);});
 });
