@@ -1,12 +1,13 @@
 // FICTIONAL contract doubles only: real public APIs, storage and worker receipts;
 // no company exports, external execution, native semantic acceptance or fit claim.
-import test from 'node:test';
+import test,{mock} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import cp from 'node:child_process';
 import net from 'node:net';
+import {EventEmitter} from 'node:events';
 import {syncBuiltinESMExports} from 'node:module';
-import {fixture,read,context,review,home,extraction,domainArgs,aggregate,sha} from './support/scoped-home-fixture.mjs';
+import {fixture,read,context,home,domainArgs,sha} from './support/scoped-home-fixture.mjs';
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
 import * as scoped from '../plugins/soloco/runtime/scoped-context.mjs';
 import {inspectHandover,verifyHandoverAcceptance,admitHandover,beginHandover} from '../plugins/soloco/runtime/handover.mjs';
@@ -15,11 +16,15 @@ import {reviewedContext} from '../plugins/soloco/runtime/current-state.mjs';
 import {readEvidence} from '../plugins/soloco/runtime/upgrade-evidence.mjs';
 import {operatingContext,operatingFrontier,validateOperatingIndex} from '../plugins/soloco/runtime/operating-state.mjs';
 import {inheritSnapshots,resolveSnapshot} from '../plugins/soloco/runtime/snapshot.mjs';
-import {executionTiming} from '../plugins/soloco/runtime/timeout.mjs';
+import {runRuntimeModel} from '../plugins/soloco/runtime/adapters.mjs';
 import {work} from '../plugins/soloco/runtime/worker.mjs';
 
 function forbidExternal(t){
- const attempts=[];
+ const attempts=[],priorCarriers=new Set(carriers.keys());
+ // Dispose only this test's newly selected controlled carriers, including a
+ // dispatch whose later setup assertion fails before observedWork starts.
+ // These are prospective Source children; no historical UNKNOWN is released.
+ t.after(()=>{for(const [id,child] of carriers)if(!priorCarriers.has(id)){try{child.emit('exit',0,null);child.emit('close',0,null);}finally{carriers.delete(id);}}});
  // Capability presentation is irrelevant to this fixture; model the local
  // sandbox executable as absent so company_open cannot launch its OS probe.
  const exists=fs.existsSync;t.mock.method(fs,'existsSync',file=>file==='/usr/bin/sandbox-exec'?false:exists(file));
@@ -30,6 +35,77 @@ function forbidExternal(t){
  syncBuiltinESMExports();
  t.after(()=>{t.mock.restoreAll();syncBuiltinESMExports();assert.deepEqual(attempts,[]);});
 }
+// This subject intentionally remains preexisting legacy DATA. The real public
+// dispatcher and runtime adapter issue its private capabilities; only Node's
+// child boundary is controlled. These observations prove no Native execution.
+const carriers=new Map();let modelPid=780000;
+function controlledChild(pid){
+ const child=new EventEmitter();child.pid=pid;child.stdout=new EventEmitter();child.stderr=new EventEmitter();child.stdin=new EventEmitter();child.stdin.end=()=>{};
+ child.kill=()=>true;child.unref=()=>child;return child;
+}
+function withChild(child,check,run){
+ let launches=0;
+ const replacement=mock.method(cp,'spawn',(command,args,options)=>{assert.equal(++launches,1,'one creation for the selected private capability');check(command,args,options);return child;});syncBuiltinESMExports();
+ try{const result=run();assert.equal(launches,1,'the actual producer must reach the controlled Node boundary');return result;}
+ finally{replacement.mock.restore();syncBuiltinESMExports();}
+}
+function dispatch(f,args){
+ const child=controlledChild(process.pid);
+ const q=withChild(child,(command,argv,options)=>{
+  assert.equal(command,process.execPath);assert.equal(argv.at(-2),f.root);assert.ok(argv[1].endsWith('/worker.mjs'));assert.equal(options.shell,undefined);
+  carriers.set(argv.at(-1),child);
+ },()=>engine.dispatch({...f,...args},'codex',{check:()=>({available:true,authenticated:true})}));
+ assert.ok(read(f).jobs[q.id].legacy_runtime,'the existing legacy subject must retain its runtime lane');
+ assert.equal(carriers.get(q.id),child);child.emit('spawn');
+ const queued=read(f).jobs[q.id];assert.equal(queued.status,'queued');assert.equal(queued.legacy_runtime.worker.birth.pid,process.pid);
+ return q;
+}
+async function observedWork(f,id,answer){
+ const carrier=carriers.get(id);assert.ok(carrier,'the public dispatch must precede work');
+ try{await work(f.root,id,async(...args)=>{
+  const scripted=await answer(...args),[host,native,prompt,cwd,timeout,selection,options]=args,child=controlledChild(++modelPid);
+  assert.ok(options.runtimeExecutionLaunch);assert.equal(options.originalExecutionLaunch,undefined);
+  const result=withChild(child,(command,_argv,spawnOptions)=>{
+   assert.equal(command,'/SOURCE-controlled-not-qualified/codex');assert.equal(spawnOptions.cwd,cwd);assert.deepEqual(spawnOptions.stdio,['pipe','pipe','pipe']);
+  },()=>runRuntimeModel(host,native,prompt,cwd,timeout,selection,{...options,sessionTitle:undefined,sessionNameDirectory:undefined,resolveExecutable:()=>'/SOURCE-controlled-not-qualified/codex',sessionNameSupport:false}));
+  child.emit('spawn');
+  child.stdout.emit('data',[{type:'thread.started',thread_id:scripted.native_id},{type:'turn.started'},{type:'item.completed',item:{type:'agent_message',text:scripted.text}},{type:'turn.completed'}].map(JSON.stringify).join('\n')+'\n');
+  child.emit('exit',0,null);child.emit('close',0,null);
+  return await result;
+ });}finally{carrier.emit('exit',0,null);carrier.emit('close',0,null);carriers.delete(id);}
+ const job=read(f).jobs[id];assert.ok(job.legacy_runtime.worker.closure,'the producer must observe carrier closure before acceptance');
+ const calls=job.model_process_tracking?.invocations??[];assert.ok(calls.length>0,jobDiagnostic(job));for(const call of calls){assert.ok(call.birth);assert.ok(call.closure);assert.equal(call.closure.exit_code,0);}
+}
+// Preserve the same fictional phase judgment used by scoped-home-fixture. Only
+// its execution plumbing differs, so no stored verdict or terminal row is seeded.
+function judgment(p){
+ const r={...p.response_shape,verdict:'Pass',reason:'FICTIONAL SCRIPT: mechanics only; no native semantic QA.',permitted_action:p.phase==='integration'?'apply_scoped_context':'continue',preservation_complete:true,interfaces_complete:true,authority_checked:true,scope_complete:true,blockers:[]};
+ if(p.phase==='extract'){
+  const b=p.reviewed_unit_bundle;r.unit_id=b.primary.id;r.unit_sha256=sha(b.primary);r.reviewed_unit_bundle_sha256=sha(b);
+  assert.equal(p.unit_selection_schema,undefined,'this unchanged fixture exercises whole-unit extraction');
+  r.items=[{id:'coherent-occurrence',kind:'boundary',text:'UNKNOWN; failed outcome; ZERO allowance; no execution.',scope:'*',provenance:b.provenance_sha256,interfaces:[b.primary.required_interface]}];
+ }else if(p.phase==='applicability'){
+  r.summary='FICTIONAL: full unknown and exhausted conditions retained; no permission.';
+  r.mappings=p.item_keys.map(item=>({item,selection_ids:p.mapping_selection_ids,source_set:p.mapping_sets.source_set,occurrence_set:p.mapping_sets.occurrence_set,context_sha256:p.mapping_context_sha256,typed_homes:p.typed_homes,conditions:'No execution; allowance ZERO.',unresolved_outcomes:'UNKNOWN failed outcome remains OPEN.',status:'represented',homes:p.homes.map(h=>h.source.id),reason:'FICTIONAL preservation judgment.'}));
+  r.interfaces=p.interface_keys.length?[]:p.extractions.flatMap(e=>e.result.items.map(i=>({key:e.review.id+'/'+i.id,item:i}))).filter(i=>p.item_keys.includes(i.key)).flatMap(({key,item})=>item.interfaces.map(i=>({key:key+'/'+i.id,item:key,scope:item.scope,...i})));
+  r.reviewed_interfaces=p.interface_keys;
+ }else{r.summary='FICTIONAL independent aggregate; no execution.';r.unreviewed_interfaces=[];}
+ return {content:r.reason,messages:[],notices:[],review:{verdict:r.verdict,reason:r.reason,permitted_action:r.permitted_action},qualification_result:r};
+}
+async function review(f,args){
+ const target=await context(f,{action:'target',plan_id:f.plan_id,...args});assert.notEqual(target.reused,true,'each selected review target must be fresh');
+ const q=dispatch(f,{role:'qa',review_of:target.id,task:'FICTIONAL scripted contract review'}),chunks=[];
+ await observedWork(f,q.id,async(_host,_session,prompt)=>{
+  let p=JSON.parse(prompt);const native_id='fictional-independent-'+q.id;
+  if(p.protocol===scoped.SCOPED_STREAM){chunks.push(p.text);if(!p.final)return {native_id,text:JSON.stringify({scoped_stream_ack:{body_sha256:p.body_sha256,sequence:p.sequence,range_sha256:p.range_sha256}})};p=JSON.parse(chunks.join(''));}
+  if(p.protocol==='corpus-readable-structure-v1')p=scoped.expandCorpusStructure(p);
+  return {native_id,text:JSON.stringify(judgment(p))};
+ });
+ const s=read(f),job=s.jobs[q.id];return {target,job,record:s.records[job.artifact_id]};
+}
+async function extraction(f){const v=read(f).records[f.plan_id].scoped_context_plan,es=[];for(const u of v.units){const e=await review(f,{phase:'extract',unit_id:u.id,delivery_protocol:scoped.SCOPED_STREAM});assert.equal(e.job.status,'completed',e.job.error);es.push(e);}return es;}
+async function aggregate(f,es,d){const a=domainArgs(es),i=await review(f,{...a,domain_review_ids:[d.record.id],interface_keys:d.record.qualification_result.interfaces.map(i=>i.key)});assert.equal(i.job.status,'completed',i.job.error);const final=await review(f,{phase:'integration',delivery_schema:scoped.CORPUS_PHASED_DELIVERY,delivery_protocol:scoped.SCOPED_STREAM,domain_review_ids:[d.record.id],interface_review_ids:[i.record.id]});assert.equal(final.job.status,'completed',final.job.error);await context(f,{action:'apply',integration_review_id:final.record.id});return final;}
+
 const operating=(f,args)=>context(f,{protocol:'operating-state-v1',...args});
 const clone=s=>inheritSnapshots(s,structuredClone(s));
 function jobDiagnostic(job,details={}){
@@ -43,7 +119,7 @@ async function preserve(f){
 }
 async function publish(f,t,label){
  const p=await operating(f,{action:'plan',maintenance:true});assert.equal(p.held,false,JSON.stringify(p.frontier));
- const q=engine.dispatch({...f,role:'qa',review_of:p.id,task:'FICTIONAL scripted publication after exact frozen-parent preservation.'},'codex',{check:()=>({available:true,authenticated:true}),launch:()=>({on(){},unref(){}})});
+ const q=dispatch(f,{role:'qa',review_of:p.id,task:'FICTIONAL scripted publication after exact frozen-parent preservation.'});
  const s=read(f),assignment=assignmentContext(s,s.jobs[q.id]),evidence=assignment.operating_evidence??assignment.qualification_evidence,planHash=sha(s.records[p.id].operating_plan);
  // Use the existing bounded range capacity and consume only actually delivered
  // ranges. Deferred ranges stay queued; no evidence or deadline is omitted.
@@ -56,9 +132,8 @@ async function publish(f,t,label){
   reads.push(request());offset+=length;
  }
  else {const required=JSON.parse(assignment.text).required_evidence;for(const ref of required.sources.filter(ref=>!required.inline.some(x=>x.source.id===ref.id)))for(let offset=0;offset<ref.total_characters;offset+=16000)reads.push({id:ref.id,sha256:ref.sha256,offset,length:Math.min(16000,ref.total_characters-offset)});}
- const rangeCount=reads.length;let first=true,deliveredRanges=0;
- await work(f.root,q.id,async(_host,_session,_prompt,_dir,timeout,_selection,options)=>{
-  if(first){first=false;options.onSpawn(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));}
+ const rangeCount=reads.length;let deliveredRanges=0;
+ await observedWork(f,q.id,async(_host,_session,_prompt,_dir,timeout,_selection,options)=>{
   const native_id='fictional-publication-'+q.id;
   if(stream){
    const delivered=JSON.parse(_prompt);
@@ -76,10 +151,10 @@ async function publish(f,t,label){
  assert.equal((await operating(f,{action:'apply',plan_id:p.id,review_id:job.artifact_id})).published,true);
 }
 
-const launch={check:()=>({available:true,authenticated:true}),launch:()=>({on(){},unref(){}})};
+const launch={check:()=>({available:true,authenticated:true}),launch:()=>assert.fail('Unexpected carrier creation for a rejected assignment')};
 const reconstruct=f=>engine.handover({...f,action:'submit',protocol:'operating-handover-v4',content:'FICTIONAL reconstruction preserves complete accepted obligations, failed history and uncertainty. Remaining allowance ZERO. No execution or exposure authority. Independent exact review is required before preparation resumes.'},'codex');
 async function handoverPass(f,r,t,label){
- const q=engine.dispatch({...f,role:'qa',review_of:r.id,task:'FICTIONAL independent exact frozen-intake handover judgment.'},'codex',launch);
+ const q=dispatch(f,{role:'qa',review_of:r.id,task:'FICTIONAL independent exact frozen-intake handover judgment.'});
  const state=read(f),packet=assignmentContext(state,state.jobs[q.id]),stream=packet.handover_evidence.sources[packet.handover_evidence.pages[0].source_id],subjectHash=state.records[r.id].handover.subject_sha256,reads=[];
  if(label==='incoming')assert.ok(stream.length>200000,'Successor handover must retain the complete oversized semantic stream');
  // Use the protocol's bounded range capacity, as publication above does. These
@@ -97,10 +172,9 @@ async function handoverPass(f,r,t,label){
   }
   reads.push(request());offset+=length;
  }
- const rangeCount=reads.length;let first=true,pending=null,requestedCharacters=0,deliveredCharacters=0,deliveredRanges=0,deliveryRounds=0,adapterCalls=0,maximumRequestedRanges=0,maximumDeliveredRanges=0;
- await work(f.root,q.id,async(_host,_session,_prompt,_dir,timeout,_selection,options)=>{
+ const rangeCount=reads.length;let pending=null,requestedCharacters=0,deliveredCharacters=0,deliveredRanges=0,deliveryRounds=0,adapterCalls=0,maximumRequestedRanges=0,maximumDeliveredRanges=0;
+ await observedWork(f,q.id,async(_host,_session,_prompt,_dir,timeout,_selection,options)=>{
   adapterCalls++;
-  if(first){first=false;options.onSpawn(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));}
   if(pending){
    const delivered=JSON.parse(_prompt);assert.equal(delivered.protocol,'handover-frozen-reads-v1');assert.ok(delivered.reads.length>0&&delivered.reads.length<=pending.length);
    for(const [index,range] of delivered.reads.entries()){
@@ -123,9 +197,9 @@ async function handoverPass(f,r,t,label){
 }
 
 async function proposal(f,label,whileQueued=()=>{},content='FICTIONAL unaccepted proposal. UNKNOWN; ZERO allowance; no execution.'){
- const task=engine.dispatch({...f,role:'engineer',task:'FICTIONAL '+label+' proposal retaining UNKNOWN, ZERO allowance and no execution.',output_contract:'operating-proposal-v1',input_ids:['home']},'codex',launch);
+ const task=dispatch(f,{role:'engineer',task:'FICTIONAL '+label+' proposal retaining UNKNOWN, ZERO allowance and no execution.',output_contract:'operating-proposal-v1',input_ids:['home']});
  assert.equal(read(f).jobs[task.id].context_format,6);whileQueued();
- await work(f.root,task.id,async(_h,_n,_p,_d,timeout,_s,options)=>{options.onSpawn(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));return {native_id:'fictional-proposal-'+task.id,text:JSON.stringify({content,messages:[],notices:[]})};});
+ await observedWork(f,task.id,async()=>{return {native_id:'fictional-proposal-'+task.id,text:JSON.stringify({content,messages:[],notices:[]})};});
  const s=read(f),job=s.jobs[task.id];assert.equal(job.status,'completed',jobDiagnostic(job));assert.equal(s.records[job.artifact_id].content,content);return {job,record:s.records[job.artifact_id]};
 }
 
