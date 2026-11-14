@@ -13,6 +13,7 @@ import {peerOriginToolSchema,validatePeerOriginRequest,peerOriginRuntimeAction,p
 import {legacyEncodedReplyBytes} from '../plugins/soloco/runtime/peers/legacy-origin.mjs';
 import {SESSION,OTHER,actor,instruction,legacyFixture,logicalState,preparePlan,mechanical,quarantine,relocatedOriginRuntime,sourceFile,missingSourceFile,disposeOriginPublicFixture} from './peer-origin-public-fixture.mjs';
 import {fixture as selectedFixture,completeReview,disposeMechanicalPublicFixture} from './peer-origin-mechanical-public-fixture.mjs';
+import {freshInventoryStore} from './original-global-worker-inventory-fixture.mjs';
 
 // All databases, HOST metadata, context witnesses, closure journals and source
 // selection below are explicitly SYNTHETIC. No real company, native provider,
@@ -31,6 +32,32 @@ async function applied(t,changes={},prepare=()=>{}){
  const receipt=await invoke(req(f,'quarantine',{plan_id:p.plan_id,review_ids},{source_instruction:instruction}),runtime.peerOriginRuntimeAction);
  assert.equal(receipt.protocol,'peer-origin-applied-receipt-v1');return {...f,p,review_ids,runtime,receipt};
 }
+
+// Conditional routing DATA only: the deliberately incomplete plan below can
+// reach a TEST policy probe, never the actual mechanical policy/grant. The
+// actual canonical Store/SQLite/fresh Source prefix and HOST adapter are used.
+async function readonlyRouteFixture(t){
+ const f=await freshInventoryStore(t,{stateOptions:{extra:{owner:{host:'codex',session_id:SESSION,epoch:9}}}});f.store.migrate();
+ const plan_id='SYNTHETIC-readonly-route-plan',p={protocol:'peer-origin-quarantine-plan-v1',plan_id,company_id:f.state().id,owner:{host:'codex',session_id:SESSION,epoch:9},actor:{host:'codex',session_id:SESSION,native_id:SESSION},expires_at:new Date(Date.now()+60000).toISOString(),cut_sha256:'a'.repeat(64)};
+ f.store.transaction('fixture.conditional-route-data',state=>{state.records[plan_id]={id:plan_id,kind:'plan',status:'Draft',revision:1,author_role:'cos',author_instance:SESSION,content:canonical(p),origin_quarantine_plan:p};return state;});
+ return {...f,plan_id,grant_ref:{id:'SYNTHETIC-never-issued-grant',revision:1,sha256:'b'.repeat(64)}};
+}
+
+test('public mechanical routing reaches its fixed policy inside one actual readonly Store snapshot',async t=>{
+ const f=await readonlyRouteFixture(t),storeUrl=new URL('../plugins/soloco/runtime/store.mjs',import.meta.url).href;
+ const probe=sourceFile('readonly-custody-probe',`import {originalStoreExecutionCustodyFrom} from ${JSON.stringify(storeUrl)};export const observed={calls:0};export const failure=Object.freeze(new TypeError('SYNTHETIC conditional policy probe only'));export function preparePeerOriginMechanicalQaDispatchFrom(db,state){const loan=originalStoreExecutionCustodyFrom(db);if(loan.mode!=='read'||loan.store.readOnly!==true||loan.db!==db||state.id!==${JSON.stringify(f.state().id)})throw Error('Wrong actual readonly Store snapshot');observed.calls++;observed.loan=loan;throw failure;}`),policy=await import(pathToFileURL(probe).href),runtime=await relocatedOriginRuntime({mechanical:probe}),before=f.state(),exec=DatabaseSync.prototype.exec,begins=[];
+ DatabaseSync.prototype.exec=function(sql,...args){if(/^BEGIN/.test(sql))begins.push(String(sql));return Reflect.apply(exec,this,[sql,...args]);};
+ try{await assert.rejects(invoke(req(f,'mechanical_review',{plan_id:f.plan_id,grant_ref:f.grant_ref},{source_instruction:instruction}),runtime.preparePeerOriginMechanicalReviewRequest),error=>error===policy.failure);}
+ finally{DatabaseSync.prototype.exec=exec;}
+ assert.equal(policy.observed.calls,1);assert.deepEqual(begins,['BEGIN']);assert.throws(()=>policy.observed.loan.assert(),code('ORIGINAL_EXECUTION_STORE_EXPIRED'));assert.deepEqual(f.state(),before);
+});
+
+test('public mechanical routing revalidates the owner after module await before entering its Store snapshot',async t=>{
+ const f=await readonlyRouteFixture(t),storeUrl=new URL('../plugins/soloco/runtime/store.mjs',import.meta.url).href;
+ const probe=sourceFile('readonly-owner-change-at-load',`import {withStore} from ${JSON.stringify(storeUrl)};withStore(${JSON.stringify(f.root)},store=>store.transaction('fixture.original-owner-change',state=>{state.owner.epoch=10;return state;}));export let calls=0;export function preparePeerOriginMechanicalQaDispatchFrom(){calls++;throw Error('Changed owner must stop before policy');}`),runtime=await relocatedOriginRuntime({mechanical:probe});
+ await assert.rejects(invoke(req(f,'mechanical_review',{plan_id:f.plan_id,grant_ref:f.grant_ref},{source_instruction:instruction}),runtime.preparePeerOriginMechanicalReviewRequest));
+ const policy=await import(pathToFileURL(probe).href);assert.equal(policy.calls,0);assert.equal(f.state().owner.epoch,10);assert.equal(Object.keys(f.state().jobs).length,0);assert.equal(f.state().records[f.plan_id].origin_quarantine_plan.owner.epoch,9);
+});
 
 test('public maintenance status uses the original inspection API and preserves producer Holds',async t=>{
  const f=await applied(t),before=logicalState(f);
@@ -156,6 +183,33 @@ test('missing direct native/frontier/final entries Hold before any original prep
  const f=await applied(t),runtime=await relocatedOriginRuntime({launch:missingSourceFile(),frontier:missingSourceFile(),seal:missingSourceFile()}),ref={family:'work_items',id:'fictional',revision:1,sha256:'a'.repeat(64)};
  for(const [action,input,error]of [['maintenance_run',{operation_id:'source-only',kind:'peer-origin-reconstruction',segments:[{source_id:'fictional',sha256:'a'.repeat(64),offset:0,length:1}]},'ORIGIN_NATIVE_LAUNCH_SOURCE_UNAVAILABLE'],['frontier_capture',{operation_id:'source-only'},'ORIGIN_INPUT_FRONTIER_SOURCE_UNAVAILABLE'],['final_seal_review',{operation_id:'source-only',frontier_ref:ref,root_result_ref:ref},'ORIGIN_FRONTIER_SEAL_SOURCE_UNAVAILABLE']])await unchanged(f,()=>invoke(req(f,action,input,{source_instruction:instruction}),runtime.peerOriginRuntimeAction),code(error));
 });
+
+// Conditional routing predecessors only. The actual HOST/public storage path
+// must await the SAME fixed zero-argument Seal API before any positive route.
+async function fixedSealSupportRoute(t){
+ const f=await applied(t),entry=sourceFile('fixed-seal-support-route',`
+export const trace=[];let resolve,reject,ready=false;const supportPromise=new Promise((yes,no)=>{resolve=yes;reject=no;}).then(()=>{ready=true;trace.push('support-ready');});
+export const member=Object.freeze(new TypeError('SYNTHETIC original checkpoint member')),failure=Object.freeze(new AggregateError([member],'SYNTHETIC original checkpoint provider',{cause:member})),absent=Object.freeze(Object.assign(Error('SYNTHETIC checkpoint absent'),{code:'ORIGIN_FRONTIER_SEAL_CHECKPOINT_SOURCE_REQUIRED'}));
+export function loadPeerOriginFrontierSealCheckpointSupport(...args){if(args.length)throw Error('SYNTHETIC fixed zero-argument support');trace.push('support');return supportPromise;}
+export function settle(error){if(error)reject(error);else resolve();}
+const mark=name=>{if(!ready)throw Error('SYNTHETIC support was not awaited');trace.push(name);};const api=Object.freeze({});
+export function assertPeerOriginSelectedMaintenanceFrom(){mark('selected');return {};}
+export function createPeerOriginFrontierSeal(){mark('factory');return api;}
+export function runOriginalPeerOriginFrontierSealReview(value){if(value!==api)throw Error('SYNTHETIC exact API');mark('review');return {protocol:'SYNTHETIC routing-only',authority_issued:false};}
+export function sealPeerOriginFromCheckedFrontier(value){if(value!==api)throw Error('SYNTHETIC exact API');mark('apply');return {protocol:'SYNTHETIC routing-only',authority_issued:false};}
+`),support=await import(pathToFileURL(entry).href),runtime=await relocatedOriginRuntime({seal:entry,authority:entry,launch:entry}),reference={family:'work_items',id:'SYNTHETIC-unqualified-result',revision:1,sha256:'a'.repeat(64)};
+ return {...f,support,runtime,args(action){return req(f,action,action==='final_seal_apply'?{review_ref:reference}:{operation_id:'SYNTHETIC-route',frontier_ref:reference,root_result_ref:reference},{source_instruction:instruction});}};
+}
+for(const action of ['final_seal_review','final_seal_apply']){
+ test(action+' public ingress awaits fixed Seal support before selected authority factory or dispatch',async t=>{
+  const f=await fixedSealSupportRoute(t),before=logicalState(f),pending=invoke(f.args(action),f.runtime.peerOriginRuntimeAction);pending.catch(()=>{});await new Promise(resolve=>setImmediate(resolve));assert.deepEqual(f.support.trace,['support']);assert.deepEqual(logicalState(f),before);
+  f.support.settle();const result=await pending;assert.equal(result.authority_issued,false);assert.deepEqual(f.support.trace,['support','support-ready','selected','factory',action==='final_seal_apply'?'apply':'review']);assert.deepEqual(logicalState(f),before);
+ });
+ for(const failureKind of ['absent','provider'])test(action+' fixed support '+failureKind+' retains exact failure with no selected authority or charge',async t=>{
+  const f=await fixedSealSupportRoute(t),before=logicalState(f),pending=invoke(f.args(action),f.runtime.peerOriginRuntimeAction);pending.catch(()=>{});await new Promise(resolve=>setImmediate(resolve));assert.deepEqual(f.support.trace,['support']);const failure=failureKind==='absent'?f.support.absent:f.support.failure;f.support.settle(failure);await assert.rejects(pending,error=>error===failure);assert.deepEqual(f.support.trace,['support']);assert.deepEqual(logicalState(f),before);
+  if(failureKind==='provider'){assert.equal(failure.cause,f.support.member);assert.equal(failure.errors[0],f.support.member);}else assert.equal(failure.code,'ORIGIN_FRONTIER_SEAL_CHECKPOINT_SOURCE_REQUIRED');
+ });
+}
 
 test('a PRESENT fixed native entry error retains exact AggregateError/cause/member identity despite missing-module code/url lookalikes',async t=>{
  const f=await applied(t),provider=sourceFile('throwing-provider',`export const child=Object.assign(new TypeError('SYNTHETIC original child'),{code:'ERR_MODULE_NOT_FOUND'});export const failure=new AggregateError([child],'SYNTHETIC original provider',{cause:child});export function setUrl(url){failure.code='ERR_MODULE_NOT_FOUND';failure.url=url;}`),providerModule=await import(pathToFileURL(provider).href),entry=sourceFile('present-native-entry',`import {failure,setUrl} from ${JSON.stringify(pathToFileURL(provider).href)};setUrl(import.meta.url);throw failure;`),runtime=await relocatedOriginRuntime({launch:entry});

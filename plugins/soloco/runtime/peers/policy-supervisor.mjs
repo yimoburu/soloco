@@ -6,7 +6,17 @@ import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {createHash} from 'node:crypto';
-import {assertOriginalPeerContextInterpreterFinal,inspectOriginalPeerContextInterpreter,inspectOriginalPeerContextSlot,assertOriginalPeerContextSlot,originalCompanionSlotMatches} from './protected-source-build-slot.mjs';
+import {assertOriginalPeerContextInterpreterFinal,inspectOriginalPeerContextInterpreter,inspectOriginalPeerContextSlot,assertOriginalPeerContextSlot,originalCompanionSlotMatches,isOriginalInputFrontierInterpreter,assertOriginalInputFrontierInterpreterFinal,inspectOriginalInputFrontierInterpreter,inspectOriginalInputFrontierSlot,assertOriginalInputFrontierSlot} from './protected-source-build-slot.mjs';
+import {isOriginalBootstrapMembershipInterpreter,assertOriginalBootstrapMembershipInterpreterFinal,inspectOriginalBootstrapMembershipInterpreter,inspectOriginalBootstrapMembershipSlot,assertOriginalBootstrapMembershipSlot,originalBootstrapCompanionSlotMatches} from './protected-source-build-slot.mjs';
+import * as maintenanceSlots from './protected-source-build-slot.mjs';
+const maintenanceInterpreter=h=>maintenanceSlots.isOriginalOriginMaintenanceInterpreter?.(h)===true?'OriginMaintenance':maintenanceSlots.isOriginalOriginFinalReviewInterpreter?.(h)===true?'OriginFinalReview':maintenanceSlots.isOriginalOriginOrdinaryTaskInterpreter?.(h)===true?'OriginOrdinaryTask':null;
+const originalInterpreter={
+ inspect:h=>{const n=maintenanceInterpreter(h);return n?maintenanceSlots['inspectOriginal'+n+'Interpreter'](h):isOriginalInputFrontierInterpreter(h)?inspectOriginalInputFrontierInterpreter(h):inspectOriginalPeerContextInterpreter(h);},
+ slot:h=>{const n=maintenanceInterpreter(h);return n?maintenanceSlots['inspectOriginal'+n+'Slot'](h):isOriginalInputFrontierInterpreter(h)?inspectOriginalInputFrontierSlot(h):inspectOriginalPeerContextSlot(h);},
+ final:h=>{const n=maintenanceInterpreter(h);return n?maintenanceSlots['assertOriginal'+n+'InterpreterFinal'](h):isOriginalInputFrontierInterpreter(h)?assertOriginalInputFrontierInterpreterFinal(h):assertOriginalPeerContextInterpreterFinal(h);},
+ assert:(h,s)=>{const n=maintenanceInterpreter(h);return n?maintenanceSlots['assertOriginal'+n+'Slot'](h,s):isOriginalInputFrontierInterpreter(h)?assertOriginalInputFrontierSlot(h,s):assertOriginalPeerContextSlot(h,s);},
+ matches:(h,s)=>{const n=maintenanceInterpreter(h);return n?JSON.stringify(maintenanceSlots['inspectOriginal'+n+'Slot'](h))===JSON.stringify(s):isOriginalInputFrontierInterpreter(h)?JSON.stringify(inspectOriginalInputFrontierSlot(h))===JSON.stringify(s):originalCompanionSlotMatches(s);}
+};
 
 const SELF=fileURLToPath(import.meta.url),SANDBOX='/usr/bin/sandbox-exec';
 const MAX_FILE=256*1024*1024,plans=new WeakMap();
@@ -71,9 +81,14 @@ function managedContext(slot){
  if(slot.scope_policy!=='V5_ORIGINAL_MANAGED_PRIVATE_FD'||context?.mode!=='original-selected-source-managed-host'||context.scope_policy!==slot.scope_policy||context.upstream_url!=='https://chatgpt.com/backend-api/codex/responses'||typeof context.original_home!=='string'||digest(Buffer.from(context.original_home))!==context.original_home_sha256)fail('SUPERVISOR_ORIGINAL_HOST_CONTEXT_HELD');
  directoryPin(context.original_home);return context;
 }
+// Fixed original brands, never a caller profile name or copied descriptor.
+function interpreterSource(interpreter){
+ if(isOriginalBootstrapMembershipInterpreter(interpreter))return {assert:assertOriginalBootstrapMembershipInterpreterFinal,inspect:inspectOriginalBootstrapMembershipInterpreter,slot:inspectOriginalBootstrapMembershipSlot,assertSlot:assertOriginalBootstrapMembershipSlot,matches:originalBootstrapCompanionSlotMatches};
+ return {assert:originalInterpreter.final,inspect:originalInterpreter.inspect,slot:originalInterpreter.slot,assertSlot:originalInterpreter.assert,matches:slot=>originalInterpreter.matches(interpreter,slot)};
+}
 function validatePlan(record){
- const p=record.p;assertOriginalPeerContextInterpreterFinal(p.context_interpreter);assertOriginalPeerContextSlot(p.context_interpreter,p.companion_slot);
- if(!originalCompanionSlotMatches(p.companion_slot)||!same(inspectOriginalPeerContextInterpreter(p.context_interpreter),p.association))fail('SUPERVISOR_SOURCE_BUILD_UNQUALIFIED');
+ const p=record.p,source=interpreterSource(p.context_interpreter);source.assert(p.context_interpreter);source.assertSlot(p.context_interpreter,p.companion_slot);
+ if(!source.matches(p.companion_slot)||!same(source.inspect(p.context_interpreter),p.association))fail('SUPERVISOR_SOURCE_BUILD_UNQUALIFIED');
  const context=managedContext(p.companion_slot);
  if(!same(filePin(SELF,100000),p.source)||!same(p.source,LOADED_SOURCE)||!same(fixedArgv(p.state_root,p.cwd),p.argv)||!same(fixedEnvironment(fs.realpathSync(os.homedir()),context.original_home,p.scratch_root),p.environment))fail('SUPERVISOR_PLAN_CHANGED');
  for(const pin of [p.executable_pin,p.sandbox_pin,...p.runtime])if(!same(filePin(pin.path,pin.path===p.executable?p.companion_slot.executable_bytes:MAX_FILE),pin))fail('SUPERVISOR_PLAN_CHANGED');
@@ -88,6 +103,7 @@ function declaration(record){
  const p=record.p;return freeze(copy({protocol:'original-compiled-codex-plan-v1',executable:p.executable,executable_pin:p.executable_pin,sandbox_executable:p.sandbox_pin.path,sandbox_pin:p.sandbox_pin,argv:p.argv,environment:p.environment,cwd:p.cwd,state_root:p.state_root,scratch_root:p.scratch_root,sbpl:p.sbpl,policy_sha256:p.policy_sha256,source:p.source,gateway_port:p.gateway_port,consumed:record.consumed,scope_root:p.root_pin.path,launch_mode:'companion-v2',companion_slot:p.companion_slot,native_auth_context:'original files read in place; native authentication remains unqualified',backend_build_qualification:'unqualified',whole_native_domain_qualification:'unqualified'}));
 }
 export function originalCompiledPeerContextInterpreter(owner,handle){const record=originalPlan(owner,handle);validatePlan(record);return record.p.context_interpreter;}
+export function inspectOriginalCompiledBootstrapScope(owner,handle){const record=originalPlan(owner,handle);validatePlan(record);const p=record.p;if(!isOriginalBootstrapMembershipInterpreter(p.context_interpreter))fail('SUPERVISOR_BOOTSTRAP_PLAN_REQUIRED');return freeze(copy({scope_root:p.root_pin.path,state_root:p.state_root,scratch_root:p.scratch_root,launch:declaration(record),directory_pins:{scope:p.root_pin,state:p.state_pin,scratch:p.scratch_pin,cwd:p.cwd_pin},read_paths:p.reads}));}
 export function inspectOriginalCompiledCodexPlan(owner,handle){const record=originalPlan(owner,handle);validatePlan(record);return declaration(record);}
 export function claimOriginalCompiledCodexPlan(owner,handle){
  const record=originalPlan(owner,handle);if(record.consumed)fail('SUPERVISOR_PLAN_CONSUMED');record.consumed=true;validatePlan(record);return declaration(record);
@@ -98,7 +114,7 @@ export function createPolicySupervisor(options={}){
  return Object.freeze({compile(token,input,privateBindings){
   if(token!==owner)fail('SUPERVISOR_OWNER');const request=validateRequest(input);
   if(privateBindings===undefined)fail('SUPERVISOR_CONTEXT_INTERPRETER_REQUIRED');const binding=own(privateBindings,['context_interpreter']),interpreter=binding.context_interpreter;
-  const association=inspectOriginalPeerContextInterpreter(interpreter),slot=inspectOriginalPeerContextSlot(interpreter);assertOriginalPeerContextSlot(interpreter,slot);const context=managedContext(slot);
+  const source=interpreterSource(interpreter),association=source.inspect(interpreter),slot=source.slot(interpreter);source.assertSlot(interpreter,slot);const context=managedContext(slot);
   if(process.platform!=='darwin')fail('SUPERVISOR_PLATFORM_HELD');
   const cwd=directoryPin(request.cwd),state=directoryPin(request.state_root,true),scratch=directoryPin(request.scratch_root,true),home=fs.realpathSync(os.homedir()),originalHome=context.original_home;
   if(cwd.path===path.parse(cwd.path).root||cwd.path===home||!within(state.path,root)||!within(scratch.path,root)||state.path===root||scratch.path===root||within(state.path,scratch.path)||within(scratch.path,state.path)||within(cwd.path,state.path)||within(cwd.path,scratch.path)||within(state.path,originalHome)||within(scratch.path,originalHome))fail('SUPERVISOR_PATH');

@@ -27,22 +27,72 @@
   "source_cut": {
     "handoff": {
       "path": "pins/coherent-source-handoff.json",
-      "bytes": 32701,
-      "sha256": "799056376dbd2234c11d233a085a2f7b5623a1e8e1be4e3130ee0edb6c6d73f0"
+      "bytes": 33999,
+      "sha256": "b5a498884cf3a948b7e6b4d319625f23a78e152f5315d068fd4c8d61c17401ba"
     },
     "bindings": {
       "path": "pins/coherent-source-bindings.json",
-      "bytes": 1954072,
-      "sha256": "d3cc0fe642cab4a462c406b84b6b4f08c8253b9422a7f46620cabbed8c81327a"
+      "bytes": 1954991,
+      "sha256": "2de2a61c385defdf77eee2de1b3c78cf0368b09ee52163bdc52c7a97db0b178c"
     },
     "patch": {
       "path": "patches/c407-coherent-original-provenance.patch",
-      "bytes": 1237245,
-      "sha256": "e1ea4f935941f1b7bc15eedd1874a10f3d878ab4b59b7381a95b5328386296e7"
+      "bytes": 983688,
+      "sha256": "6c9ae7279a1a1089bef0a1adde566bf87ee644d2ea6cb6acd7d27bf3e1896a03"
     },
     "review_state": "independent-review-required"
   },
   "overlay": [
+    {
+      "target": "codex-rs/app-server-client/Cargo.toml",
+      "before_sha256": "9f941218c5bc7932bf1d675cbea2715820a563a41e5d871dd45207e1c285ba3e",
+      "payload": {
+        "path": "overlay/codex-rs/app-server-client/Cargo.toml",
+        "bytes": 1422,
+        "sha256": "bc77f4e4d93015b8e20a9fe0178862cc5043955d3e470044a1882c06f0e6b725"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/app-server-client/src/bin/soloco_protected_host.rs",
+      "before_sha256": null,
+      "payload": {
+        "path": "overlay/codex-rs/app-server-client/src/bin/soloco_protected_host.rs",
+        "bytes": 20249,
+        "sha256": "91fda386362b7e6a565a9526432b59c6ed5c04ca907222fdbd96d24951f6a3a7"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/app-server-client/src/lib.rs",
+      "before_sha256": "3ab3d894c169989ba9319fb4c7fb9daf09a9de53a2ff80b739ff38abde0f2f75",
+      "payload": {
+        "path": "overlay/codex-rs/app-server-client/src/lib.rs",
+        "bytes": 90784,
+        "sha256": "5bbc0f8cfa27ad8a98a52c747da0de255ed665920d78f60c5c6795c2f7b7a316"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/app-server-protocol/schema/precomputed/app-server-exports-stable.json.zst",
+      "before_sha256": "5a93be76c2f389899b3a201bb470d69e48ac01ddc5233a431613bbff5a634a7f",
+      "payload": {
+        "path": "overlay/codex-rs/app-server-protocol/schema/precomputed/app-server-exports-stable.json.zst",
+        "bytes": 163907,
+        "sha256": "77c581894f3beba5585e1af5b4c2f822a9a10f878b5c971a447cf48c0971896b"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/app-server-protocol/src/protocol/v2/tests.rs",
+      "before_sha256": "fde785961c2dbb56fa82b1397a818a3106cbd51c5a03a4a995a20978544a2581",
+      "payload": {
+        "path": "overlay/codex-rs/app-server-protocol/src/protocol/v2/tests.rs",
+        "bytes": 182126,
+        "sha256": "1a2a23e6ba07efe42872ae29c489739f719cbfc32594d06636771783fd808cd1"
+      },
+      "mode": "100644"
+    },
     {
       "target": "codex-rs/app-server/Cargo.toml",
       "before_sha256": "cceb3af7ee41633a33b14f55f1193b32fc75afb830c0dfa22393cf24af3d6f3d",
@@ -184,56 +234,6 @@
       "mode": "100644"
     },
     {
-      "target": "codex-rs/app-server-client/Cargo.toml",
-      "before_sha256": "9f941218c5bc7932bf1d675cbea2715820a563a41e5d871dd45207e1c285ba3e",
-      "payload": {
-        "path": "overlay/codex-rs/app-server-client/Cargo.toml",
-        "bytes": 1422,
-        "sha256": "bc77f4e4d93015b8e20a9fe0178862cc5043955d3e470044a1882c06f0e6b725"
-      },
-      "mode": "100644"
-    },
-    {
-      "target": "codex-rs/app-server-client/src/bin/soloco_protected_host.rs",
-      "before_sha256": null,
-      "payload": {
-        "path": "overlay/codex-rs/app-server-client/src/bin/soloco_protected_host.rs",
-        "bytes": 20249,
-        "sha256": "91fda386362b7e6a565a9526432b59c6ed5c04ca907222fdbd96d24951f6a3a7"
-      },
-      "mode": "100644"
-    },
-    {
-      "target": "codex-rs/app-server-client/src/lib.rs",
-      "before_sha256": "3ab3d894c169989ba9319fb4c7fb9daf09a9de53a2ff80b739ff38abde0f2f75",
-      "payload": {
-        "path": "overlay/codex-rs/app-server-client/src/lib.rs",
-        "bytes": 90784,
-        "sha256": "5bbc0f8cfa27ad8a98a52c747da0de255ed665920d78f60c5c6795c2f7b7a316"
-      },
-      "mode": "100644"
-    },
-    {
-      "target": "codex-rs/app-server-protocol/schema/precomputed/app-server-exports-stable.json.zst",
-      "before_sha256": "5a93be76c2f389899b3a201bb470d69e48ac01ddc5233a431613bbff5a634a7f",
-      "payload": {
-        "path": "overlay/codex-rs/app-server-protocol/schema/precomputed/app-server-exports-stable.json.zst",
-        "bytes": 163907,
-        "sha256": "77c581894f3beba5585e1af5b4c2f822a9a10f878b5c971a447cf48c0971896b"
-      },
-      "mode": "100644"
-    },
-    {
-      "target": "codex-rs/app-server-protocol/src/protocol/v2/tests.rs",
-      "before_sha256": "fde785961c2dbb56fa82b1397a818a3106cbd51c5a03a4a995a20978544a2581",
-      "payload": {
-        "path": "overlay/codex-rs/app-server-protocol/src/protocol/v2/tests.rs",
-        "bytes": 182126,
-        "sha256": "1a2a23e6ba07efe42872ae29c489739f719cbfc32594d06636771783fd808cd1"
-      },
-      "mode": "100644"
-    },
-    {
       "target": "codex-rs/codex-api/Cargo.toml",
       "before_sha256": "f836d8b371da62849dee27b70c352b63fded2ad473b95a72ea66892580b704c5",
       "payload": {
@@ -304,22 +304,22 @@
       "mode": "100644"
     },
     {
-      "target": "codex-rs/codex-api/src/endpoint/responses_websocket/connector.rs",
-      "before_sha256": "6ba68aa7e9495768bd90bcac2271c4a81dc6880606412405e25131df76e2425d",
-      "payload": {
-        "path": "overlay/codex-rs/codex-api/src/endpoint/responses_websocket/connector.rs",
-        "bytes": 2204,
-        "sha256": "d876c4eb8ef4c1c32a8da297c904f4032c2053e2822055550c6a94c420f86f64"
-      },
-      "mode": "100644"
-    },
-    {
       "target": "codex-rs/codex-api/src/endpoint/responses_websocket.rs",
       "before_sha256": "454f4282f7b935e8eff1ad6a744c6b95d7c50a078db9747a157eb8b439e72393",
       "payload": {
         "path": "overlay/codex-rs/codex-api/src/endpoint/responses_websocket.rs",
         "bytes": 56125,
         "sha256": "7f9fae726ef43eadbf411916f49a5dc33dfbfbed4b38bd8ef2aa4c0d58a37174"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/codex-api/src/endpoint/responses_websocket/connector.rs",
+      "before_sha256": "6ba68aa7e9495768bd90bcac2271c4a81dc6880606412405e25131df76e2425d",
+      "payload": {
+        "path": "overlay/codex-rs/codex-api/src/endpoint/responses_websocket/connector.rs",
+        "bytes": 2204,
+        "sha256": "d876c4eb8ef4c1c32a8da297c904f4032c2053e2822055550c6a94c420f86f64"
       },
       "mode": "100644"
     },
@@ -354,32 +354,22 @@
       "mode": "100644"
     },
     {
-      "target": "codex-rs/codex-api/src/protected_peer/context_contract/frame/tests.rs",
+      "target": "codex-rs/codex-api/src/protected_peer.rs",
       "before_sha256": null,
       "payload": {
-        "path": "overlay/codex-rs/codex-api/src/protected_peer/context_contract/frame/tests.rs",
-        "bytes": 12543,
-        "sha256": "0519ab77e0eb541e2035967697b5e729d2a255c85a6d08ec0cc1c7553d174252"
+        "path": "overlay/codex-rs/codex-api/src/protected_peer.rs",
+        "bytes": 44951,
+        "sha256": "654c56e6bf8f3696483f9edb4fbd95274b56a092060209b0e5b79a576c6843f5"
       },
       "mode": "100644"
     },
     {
-      "target": "codex-rs/codex-api/src/protected_peer/context_contract/frame.rs",
+      "target": "codex-rs/codex-api/src/protected_peer/bootstrap_membership_readonly3_contract_v1.json",
       "before_sha256": null,
       "payload": {
-        "path": "overlay/codex-rs/codex-api/src/protected_peer/context_contract/frame.rs",
-        "bytes": 11945,
-        "sha256": "7a05c9f17acb7f8c847dae2379c4eae034220deab4e4c78f9d2c850b17a147e8"
-      },
-      "mode": "100644"
-    },
-    {
-      "target": "codex-rs/codex-api/src/protected_peer/context_contract/tests.rs",
-      "before_sha256": null,
-      "payload": {
-        "path": "overlay/codex-rs/codex-api/src/protected_peer/context_contract/tests.rs",
-        "bytes": 20669,
-        "sha256": "2e8366236b4f31303e6c803e383f0db39f6d991890298f1d8fa5d42831b480cb"
+        "path": "overlay/codex-rs/codex-api/src/protected_peer/bootstrap_membership_readonly3_contract_v1.json",
+        "bytes": 2427,
+        "sha256": "cd1ce3adaad300721e47238292ce15dc41f7007b6e415b76c005e93419656ed4"
       },
       "mode": "100644"
     },
@@ -388,8 +378,78 @@
       "before_sha256": null,
       "payload": {
         "path": "overlay/codex-rs/codex-api/src/protected_peer/context_contract.rs",
-        "bytes": 17191,
-        "sha256": "b52cc2af30a011f52b4cc3e4ccddd49031374eca0852615e0a5663f0d11ef8b0"
+        "bytes": 33952,
+        "sha256": "13736af4f9417946725092811846a45a2558281a7beee1dafb7e52c39273bcba"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/codex-api/src/protected_peer/context_contract/frame.rs",
+      "before_sha256": null,
+      "payload": {
+        "path": "overlay/codex-rs/codex-api/src/protected_peer/context_contract/frame.rs",
+        "bytes": 17497,
+        "sha256": "778b9105093e500345ec3ced92dac15bda70c0f6109949fceb279dab59c02bee"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/codex-api/src/protected_peer/context_contract/frame/tests.rs",
+      "before_sha256": null,
+      "payload": {
+        "path": "overlay/codex-rs/codex-api/src/protected_peer/context_contract/frame/tests.rs",
+        "bytes": 32697,
+        "sha256": "5118183cad8a048e55abdf316019f9276fa274910c5cc9f49943e6e98581bc23"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/codex-api/src/protected_peer/context_contract/tests.rs",
+      "before_sha256": null,
+      "payload": {
+        "path": "overlay/codex-rs/codex-api/src/protected_peer/context_contract/tests.rs",
+        "bytes": 44342,
+        "sha256": "7c92ca1fefb6f971283cb7868a777aa92eb3ba8bcc3ff95501f592feb84103c0"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/codex-api/src/protected_peer/input_frontier_readonly3_contract_v1.json",
+      "before_sha256": null,
+      "payload": {
+        "path": "overlay/codex-rs/codex-api/src/protected_peer/input_frontier_readonly3_contract_v1.json",
+        "bytes": 2697,
+        "sha256": "b15ae178857196eac75123652817c1673a2e4941b409f6d5cbb72225800f7863"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/codex-api/src/protected_peer/origin_final_review_readonly3_contract_v1.json",
+      "before_sha256": null,
+      "payload": {
+        "path": "overlay/codex-rs/codex-api/src/protected_peer/origin_final_review_readonly3_contract_v1.json",
+        "bytes": 3476,
+        "sha256": "d7939b68fb44e4dee524ec7774e080b0d6f4b40c1493f37737eb67b1f1efa3fd"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/codex-api/src/protected_peer/origin_maintenance_readonly3_contract_v1.json",
+      "before_sha256": null,
+      "payload": {
+        "path": "overlay/codex-rs/codex-api/src/protected_peer/origin_maintenance_readonly3_contract_v1.json",
+        "bytes": 3122,
+        "sha256": "a7f744362c1404a1ae67ca6e5c3bf1b63c3c0fab99b9ad996db0f1265757c824"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/codex-api/src/protected_peer/origin_ordinary_task_readonly3_contract_v1.json",
+      "before_sha256": null,
+      "payload": {
+        "path": "overlay/codex-rs/codex-api/src/protected_peer/origin_ordinary_task_readonly3_contract_v1.json",
+        "bytes": 3077,
+        "sha256": "0f0bc8b752176348c23ac6696cbd8f4ebe811fca45163f2d5baefcf6c5361d52"
       },
       "mode": "100644"
     },
@@ -500,16 +560,6 @@
         "path": "overlay/codex-rs/codex-api/src/protected_peer/startup_loopback_tests.rs",
         "bytes": 3588,
         "sha256": "e5a367b52011825a7ea4ebd1ff65ed43f7be147c5f33283e21191af1cdea2de0"
-      },
-      "mode": "100644"
-    },
-    {
-      "target": "codex-rs/codex-api/src/protected_peer.rs",
-      "before_sha256": null,
-      "payload": {
-        "path": "overlay/codex-rs/codex-api/src/protected_peer.rs",
-        "bytes": 44951,
-        "sha256": "654c56e6bf8f3696483f9edb4fbd95274b56a092060209b0e5b79a576c6843f5"
       },
       "mode": "100644"
     },
@@ -914,22 +964,22 @@
       "mode": "100644"
     },
     {
-      "target": "codex-rs/core/src/session/original_ingress/tests.rs",
-      "before_sha256": null,
-      "payload": {
-        "path": "overlay/codex-rs/core/src/session/original_ingress/tests.rs",
-        "bytes": 6041,
-        "sha256": "5605ed6b3c30c039b9ad7bbfdab96758d04d97daff10eabd65cc1b62b79e5c30"
-      },
-      "mode": "100644"
-    },
-    {
       "target": "codex-rs/core/src/session/original_ingress.rs",
       "before_sha256": null,
       "payload": {
         "path": "overlay/codex-rs/core/src/session/original_ingress.rs",
         "bytes": 6421,
         "sha256": "d4f2f82bd04e2df0bda0efbdb913f1d8ea09261d336d619affbf91fe7a35f977"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/core/src/session/original_ingress/tests.rs",
+      "before_sha256": null,
+      "payload": {
+        "path": "overlay/codex-rs/core/src/session/original_ingress/tests.rs",
+        "bytes": 6041,
+        "sha256": "5605ed6b3c30c039b9ad7bbfdab96758d04d97daff10eabd65cc1b62b79e5c30"
       },
       "mode": "100644"
     },
@@ -974,22 +1024,22 @@
       "mode": "100644"
     },
     {
-      "target": "codex-rs/core/src/session/tests/original_provenance_join.rs",
-      "before_sha256": null,
-      "payload": {
-        "path": "overlay/codex-rs/core/src/session/tests/original_provenance_join.rs",
-        "bytes": 8959,
-        "sha256": "e5826e949da729598ba02970ad687f1a890fdeb96856d4e442989275730fb958"
-      },
-      "mode": "100644"
-    },
-    {
       "target": "codex-rs/core/src/session/tests.rs",
       "before_sha256": "266946661b53302d0ec6a88114e07470ee7b42381883151739cfb580cbdd667e",
       "payload": {
         "path": "overlay/codex-rs/core/src/session/tests.rs",
         "bytes": 504966,
         "sha256": "5f569b870f53021dcbb7813a3cc12d0e7cd9a48f778589915b07c79623071804"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/core/src/session/tests/original_provenance_join.rs",
+      "before_sha256": null,
+      "payload": {
+        "path": "overlay/codex-rs/core/src/session/tests/original_provenance_join.rs",
+        "bytes": 8959,
+        "sha256": "e5826e949da729598ba02970ad687f1a890fdeb96856d4e442989275730fb958"
       },
       "mode": "100644"
     },
@@ -1098,8 +1148,8 @@
       "before_sha256": "94818a0f4902f74dd68ddc37e3ac7a5e313326b86e786cc3d9df477dd0e576d6",
       "payload": {
         "path": "overlay/codex-rs/core/src/tools/handlers/dynamic_tests.rs",
-        "bytes": 2556,
-        "sha256": "8d6f2797de06cce2ed5c832faabe87bdb0f546b13f43cd4a2ee7e624fa9f967d"
+        "bytes": 4606,
+        "sha256": "7de86ed9cf928de0a03fbce06a437659a87579bfdd0a345788570d31631729a6"
       },
       "mode": "100644"
     },
@@ -1254,22 +1304,22 @@
       "mode": "100644"
     },
     {
-      "target": "codex-rs/history/src/original_provenance/tests.rs",
-      "before_sha256": null,
-      "payload": {
-        "path": "overlay/codex-rs/history/src/original_provenance/tests.rs",
-        "bytes": 8679,
-        "sha256": "2b54f0254320f21dcdecf852e9048652f1397ea132d067249e4a28052ab4eda5"
-      },
-      "mode": "100644"
-    },
-    {
       "target": "codex-rs/history/src/original_provenance.rs",
       "before_sha256": null,
       "payload": {
         "path": "overlay/codex-rs/history/src/original_provenance.rs",
         "bytes": 12042,
         "sha256": "e2009bbfef53e037d769bb61e9f89b34fc5f8896a4aa8dfcef92ecd4a6b6d1bc"
+      },
+      "mode": "100644"
+    },
+    {
+      "target": "codex-rs/history/src/original_provenance/tests.rs",
+      "before_sha256": null,
+      "payload": {
+        "path": "overlay/codex-rs/history/src/original_provenance/tests.rs",
+        "bytes": 8679,
+        "sha256": "2b54f0254320f21dcdecf852e9048652f1397ea132d067249e4a28052ab4eda5"
       },
       "mode": "100644"
     },
@@ -1504,6 +1554,16 @@
       "mode": "100644"
     },
     {
+      "target": "codex-rs/protocol/src/dynamic_tools.rs",
+      "before_sha256": "d73d51aa0cd0e6318d6fc1faa890a3524301af0c3ba2b2dc0d071728b2caa402",
+      "payload": {
+        "path": "overlay/codex-rs/protocol/src/dynamic_tools.rs",
+        "bytes": 6019,
+        "sha256": "4b8c4c3b95a7899602331ee22e3c8ce369f8c4151d5f7bc3e746a98b7d4946d6"
+      },
+      "mode": "100644"
+    },
+    {
       "target": "codex-rs/protocol/src/dynamic_tools/original_exchange.rs",
       "before_sha256": null,
       "payload": {
@@ -1520,16 +1580,6 @@
         "path": "overlay/codex-rs/protocol/src/dynamic_tools/original_exchange_tests.rs",
         "bytes": 2209,
         "sha256": "7993b48bbbf1be7dce4f68a2c62bf8edd7c868b9cc9a47a8c308d48e1254dcd5"
-      },
-      "mode": "100644"
-    },
-    {
-      "target": "codex-rs/protocol/src/dynamic_tools.rs",
-      "before_sha256": "d73d51aa0cd0e6318d6fc1faa890a3524301af0c3ba2b2dc0d071728b2caa402",
-      "payload": {
-        "path": "overlay/codex-rs/protocol/src/dynamic_tools.rs",
-        "bytes": 6019,
-        "sha256": "4b8c4c3b95a7899602331ee22e3c8ce369f8c4151d5f7bc3e746a98b7d4946d6"
       },
       "mode": "100644"
     },
@@ -1622,16 +1672,6 @@
         "sha256": "c3e6e64da0472614494ed97d2b2d98db7cf5ee750edc22b47edb1dc30cab7cf5"
       },
       "mode": "100644"
-    },
-    {
-      "target": "codex-rs/codex-api/src/protected_peer/bootstrap_membership_readonly3_contract_v1.json",
-      "mode": "100644",
-      "before_sha256": null,
-      "payload": {
-        "path": "overlay/codex-rs/codex-api/src/protected_peer/bootstrap_membership_readonly3_contract_v1.json",
-        "bytes": 2427,
-        "sha256": "cd1ce3adaad300721e47238292ce15dc41f7007b6e415b76c005e93419656ed4"
-      }
     }
   ],
   "cargo_lock": {

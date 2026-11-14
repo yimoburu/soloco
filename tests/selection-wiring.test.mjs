@@ -97,6 +97,9 @@ function harness(host='claude') {
   let state={schema:2,plugin_version:'fixture',runtime_version:'fixture',owner:{epoch:1,session_id:'founder',host},paused:false,roles:{engineer:{name:'Engineer'}},records:{},jobs:{},sessions:{},notices:[],messages:[]};
   const catalogs=[],launches=[],contexts=[],normalizations=[],transactions=[];
   let readinessCalls=0;
+  // Conditional VM boundaries only: these sentinels are not canonical producer
+  // capabilities and establish no Original inventory or process qualification.
+  const vmLaunches=new WeakMap();
   const requireText=(value,label,max=20000)=>{
     if(typeof value!=='string'||!value.trim()||value.length>max)throw new Error('Invalid '+label);
     return value;
@@ -139,6 +142,9 @@ function harness(host='claude') {
     // Timeout is an unchanged boundary in this focused wiring test.
     normalizeTimeout:({timeout_ms,timeout_reason})=>({timeout_ms:timeout_ms??180000,timeout_reason:timeout_reason??'Fixture default'}),normalizeHandoverReviewWindow,normalizeCodeReviewWindow,
     jobTimeoutState:()=>({state:'terminal'}),
+    recordOriginalWorkerAssignmentFrom:(_store,_state,job)=>job,
+    prepareOriginalWorkerLaunchFrom:(_store,_state,input)=>{const token=Object.freeze({SYNTHETIC_VM_ONLY:true});vmLaunches.set(token,{kind:input.kind,used:false});return token;},
+    spawnOriginalWorkerLaunch:(token,...args)=>{const launch=vmLaunches.get(token);assert.ok(launch&&!launch.used&&launch.kind==='worker');launch.used=true;return deps.spawn(...args);},
     spawn:(...args)=>{launches.push(args);return {on:()=>{},unref:()=>{}};},
     // This VM supplies a synthetic legacy Store; peer routing/storage behavior
     // is covered by the actual SQLite and root-ingress suites.

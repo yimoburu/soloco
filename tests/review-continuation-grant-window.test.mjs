@@ -5,11 +5,11 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import {EventEmitter} from 'node:events';
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
-import {runModel} from '../plugins/soloco/runtime/adapters.mjs';
 import {work} from '../plugins/soloco/runtime/worker.mjs';
 import {proofJobSafe} from '../plugins/soloco/runtime/current-state.mjs';
 import {reviewContinuationRequiredEvidence} from '../plugins/soloco/runtime/development-review-continuation.mjs';
 import {fixture,authorized,read,hash,base} from './review-continuation-central-fixture.mjs';
+import {runOriginalAdapterWithMock,stageOriginalWorker} from './original-adapter-process-fixture.mjs';
 
 const priorData=process.env.COMPANY_PLUGIN_DATA;
 process.env.COMPANY_PLUGIN_DATA=path.join(base,'grant-window-plugin-data');
@@ -31,6 +31,7 @@ function prepare(clock,{grantMs=3600000}={}){
 function queue(state){
   let launches=0;
   const job=engine.dispatch(state.dispatchArgs,'codex',{check:()=>({available:true,authenticated:true,version:'controlled-no-CLI'}),launch:()=>{launches++;const child=new EventEmitter();child.unref=()=>child;return child;}});
+  stageOriginalWorker(state.args.root,job.id);
   assert.equal(launches,1);return job;
 }
 function preserved(state,after){
@@ -59,7 +60,8 @@ function controlledModel(state,clock,{lateSpawnMs=0,positive=false}={}){
       child.stdout.emit('data',JSON.stringify({type:'thread.started',thread_id:'controlled-grant-window-independent'})+'\n'+JSON.stringify({type:'turn.started'})+'\n'+JSON.stringify({type:'item.completed',item:{type:'agent_message',text:JSON.stringify(artifact)}})+'\n'+JSON.stringify({type:'turn.completed'})+'\n');close();
     });
     observed.children.push(child);
-    return runModel(host,native,prompt,cwd,limit,selection,{...options,sessionTitle:undefined,resolveExecutable:()=>'/controlled/codex',spawn:()=>child,now:clock.now});
+    const {spawn:oldSpawn,...incoming}=options;
+    return runOriginalAdapterWithMock(host,native,prompt,cwd,limit,selection,{...incoming,sessionTitle:undefined,resolveExecutable:()=>'/controlled/codex',now:clock.now},{child});
   };
   return {observed,model};
 }
@@ -96,8 +98,8 @@ test('actual closed two-invocation one-READ continuation metadata is accepted wh
   const after=read(state.args),job=after.jobs[queued.id],review=after.records[job.artifact_id];
   assert.equal(job.status,'completed',JSON.stringify({status:job.status,error:job.error,execution_failure:job.execution_failure}));assert.equal(review.review.verdict,'Pass');
   assert.equal(fake.observed.calls,2);assert.equal(job.delivered_record_reads.ranges.length,1);assert.equal(job.model_process_tracking.invocations.length,2);assert(job.model_process_tracking.invocations.every(x=>x.birth&&x.closure));assert.deepEqual(fake.observed.signals,[]);closedChildren(fake.observed);
-  assert.equal(proofJobSafe(job),true);
+  assert.equal(proofJobSafe(job,after),true);
   const variants=[['unknown top-level metadata',j=>j.unknown_metadata={restriction:'Retain unknown evidence'}],['extra nested subject field',j=>j.code_review_subject.unknown='Retain unknown evidence'],['delivery-native mismatch',j=>j.delivered_record_reads.native_id='different-controlled-native'],['initial-context mismatch',j=>j.delivered_record_reads.initial_delivery.assignment_context_sha256='0'.repeat(64)]];
-  for(const [name,mutate] of variants){const clone=structuredClone(job);mutate(clone);assert.equal(proofJobSafe(clone),false,name);}
+  for(const [name,mutate] of variants){const clone=structuredClone(job);mutate(clone);assert.equal(proofJobSafe(clone,after),false,name);}
   preserved(state,after);
 }));

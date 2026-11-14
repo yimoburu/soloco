@@ -19,7 +19,7 @@ function fixture(t){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-recipe-package-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
  fs.mkdirSync(path.join(root,'tools'));fs.mkdirSync(path.join(root,'plugins/soloco'),{recursive:true});
  fs.copyFileSync(path.join(ROOT,'tools/package-context-producer.mjs'),path.join(root,'tools/package-context-producer.mjs'));
- const rows=declared();assert.equal(rows.length,170);
+ const rows=declared();assert.equal(rows.length,174);
  for(const row of rows){const file=path.join(root,'native/codex',row.path);fs.mkdirSync(path.dirname(file),{recursive:true});fs.copyFileSync(path.join(ROOT,'native/codex',row.path),file);fs.chmodSync(file,row.mode==='100755'?0o755:0o644);}
  return {root,rows,native:path.join(root,'plugins/soloco/producer-inputs/native/codex'),seal:path.join(root,'plugins/soloco/producer-inputs/native-recipe-inventory.json')};
 }
@@ -33,14 +33,14 @@ function aliasedRoot(root){
  return alias;
 }
 
-test('fixed recipe packager reconstructs all 170 original assets with exact bytes modes and inventory',t=>{
+test('fixed recipe packager reconstructs all 174 original assets with exact bytes modes and inventory',t=>{
  const f=fixture(t),missing=path.join(f.root,'missing-non-main-entry');
  const importOnly=`if(process.argv[1]!==${JSON.stringify(missing)})throw Error('IMPORT_FIXTURE_ARGUMENT');const p=await import(${JSON.stringify(pathToFileURL(path.join(f.root,'tools/package-context-producer.mjs')).href)});if(typeof p.packageContextProducer!=='function')throw Error('IMPORT_EXPORT_MISSING');process.stdout.write('IMPORTED_ONLY\\n');`;
  const imported=spawnSync(process.execPath,['--input-type=module','--eval',importOnly,missing],{encoding:'utf8',timeout:5000,maxBuffer:65536});
  passed(imported);assert.equal(imported.stdout,'IMPORTED_ONLY\n');assert.equal(fs.existsSync(f.seal),false);
  passed(run(aliasedRoot(f.root)));const seal=JSON.parse(fs.readFileSync(f.seal));
  assert.deepEqual(Object.keys(seal).sort(),['build_driver','files','protocol','source_package']);
- assert.equal(seal.protocol,'soloco-packaged-native-recipe-v1');assert.equal(seal.files.length,170);
+ assert.equal(seal.protocol,'soloco-packaged-native-recipe-v1');assert.equal(seal.files.length,174);
  const expected=f.rows.map(row=>{const bytes=fs.readFileSync(path.join(f.root,'native/codex',row.path));assert.deepEqual(fs.readFileSync(path.join(f.native,row.path)),bytes);assert.equal(fs.statSync(path.join(f.native,row.path)).mode&0o777,row.mode==='100755'?0o755:0o644);return {path:row.path,bytes:bytes.length,sha256:hash(bytes),mode:row.mode};});
  assert.deepEqual(seal.files,expected);
  for(const [key,name] of [['source_package','source-package.json'],['build_driver','tools/protected_native.py']]){const bytes=fs.readFileSync(path.join(f.native,name));assert.deepEqual(seal[key],{bytes:bytes.length,sha256:hash(bytes)});}

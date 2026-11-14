@@ -6,6 +6,30 @@ import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { normalizeTimeout, executionTiming, MIN_EXECUTION_TIMEOUT_MS, STARTUP_TIMEOUT_MS, TERMINATION_GRACE_MS } from './timeout.mjs';
 import {claudeNameSupport,nameCodexSession,writeNamingReceipt} from './session-naming.mjs';
+import {bindOriginalAdapterLaunchCutoffFrom,originalWorkerFailedLaunchChild,cleanupOriginalWorkerLaunchFailure,assertOriginalModelLaunchToken,spawnOriginalModelLaunch,bindOriginalModelAdapterCutoffFrom,originalModelFailedLaunchChild,cleanupOriginalModelLaunchFailure} from './peers/prospective-local-worker-inventory-producer.mjs';
+
+// Both fixed producer routes inspect this same actual adapter's private loan.
+// Neither a public deadline nor a copied token can create cutoff custody.
+const originalModelCutoffs=new WeakMap(),originalSignalAborted=Object.getOwnPropertyDescriptor(AbortSignal.prototype,'aborted').get;
+function originalModelCutoff(token,deadline_at_ms,signal) {
+  if(!Number.isSafeInteger(deadline_at_ms)||deadline_at_ms<0)throw Error('Original finite model cutoff required');
+  if(signal!==undefined&&signal!==null)try{Reflect.apply(originalSignalAborted,signal,[]);}catch{throw Error('Original model AbortSignal required');}
+  const loan=Object.freeze({});originalModelCutoffs.set(loan,{token,deadline_at_ms,signal:signal??null,fault:false});return loan;
+}
+export function inspectOriginalAdapterModelCutoffFrom(loan,token) {
+  const r=originalModelCutoffs.get(loan);if(!r||r.token!==token)throw Error('Canonical original model cutoff required');
+  const now=Date.now();
+  if(r.signal!==null&&Reflect.apply(originalSignalAborted,r.signal,[])||!Number.isSafeInteger(now)||now<0||now>=r.deadline_at_ms)r.fault=true;
+  if(r.fault)throw Object.assign(Error('Original model cutoff expired or cancelled'),{code:'ORIGINAL_EXECUTION_MODEL_DEADLINE'});
+  return Object.freeze({deadline_at_ms:r.deadline_at_ms,signal:r.signal});
+}
+// The corrected base consumes this same actual adapter loan. The two names
+// are one private loan inventory, not alternate caller-supplied credentials.
+export function inspectOriginalAdapterLaunchCutoffFrom(loan,token){
+  const record=originalModelCutoffs.get(loan);
+  if(!record||record.token!==token)throw Object.assign(Error('Original adapter cutoff custody required'),{code:'ORIGINAL_EXECUTION_ADAPTER_CUTOFF_REQUIRED'});
+  return Object.freeze({deadline_at_ms:record.deadline_at_ms,signal:record.signal});
+}
 
 const ownFile=fileURLToPath(import.meta.url);
 const modelId=value=>typeof value==='string' && /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/.test(value);
@@ -305,16 +329,18 @@ export function parseOutput(host, stdout) {
 export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selection=null, options={}) {
   return new Promise((resolve, reject) => {
     if (!options || typeof options !== 'object' || Array.isArray(options)) throw new Error('Invalid lifecycle options');
+    if(options.spawn!==undefined)throw Object.assign(Error('Caller spawn overrides cannot create an original assignment process'),{code:'ORIGINAL_EXECUTION_LAUNCH_GATE_REQUIRED'});
+    const originalLaunch=assertOriginalModelLaunchToken(options.originalExecutionLaunch,{host,native_id:nativeId,prompt,cwd,selection});
+    if(options.beforeOriginalSpawn!==undefined&&typeof options.beforeOriginalSpawn!=='function')throw Error('Invalid original launch eligibility check');
     const policy = normalizeTimeout({timeout_ms:timeout, timeout_reason:options.timeoutReason}, options.timeoutContext);
     const outputLimit=options.maxOutputCharacters??2000000;
     if(!Number.isSafeInteger(outputLimit)||outputLimit<100000||outputLimit>10000000)throw new Error('Invalid role output character limit');
     const args = commandArgs(host,nativeId,selection);
-    const startProcess = options.spawn ?? spawn;
     const resolveCommand = options.resolveExecutable ?? executable;
     const now = options.now ?? Date.now;
     const schedule = options.setTimeout ?? setTimeout;
     const unschedule = options.clearTimeout ?? clearTimeout;
-    for (const fn of [startProcess, resolveCommand, now, schedule, unschedule]) if (typeof fn !== 'function') throw new Error('Invalid lifecycle dependency');
+    for (const fn of [resolveCommand, now, schedule, unschedule]) if (typeof fn !== 'function') throw new Error('Invalid lifecycle dependency');
     if (options.onSpawn !== undefined && typeof options.onSpawn !== 'function') throw new Error('Invalid onSpawn callback');
     const observeProcess=options.onModelProcess!==undefined||options.onModelClosure!==undefined;
     if(observeProcess&&(typeof options.onModelProcess!=='function'||typeof options.onModelClosure!=='function'))throw Error('Paired private model process observers required');
@@ -332,10 +358,15 @@ export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selectio
       if (!Number.isSafeInteger(value) || value < 0 || value > 8640000000000000 - Math.max(1000000, policy.timeout_ms + TERMINATION_GRACE_MS)) throw new Error('Invalid lifecycle clock');
       return value;
     };
-    const absoluteDeadline=options.executionDeadlineAt;
+    const requestedDeadline=options.executionDeadlineAt;
+    const absoluteDeadline=originalLaunch.deadline_at_ms===null?requestedDeadline:Math.min(originalLaunch.deadline_at_ms,requestedDeadline??Infinity);
     if(absoluteDeadline!==undefined&&(!Number.isSafeInteger(absoluteDeadline)||absoluteDeadline<0||absoluteDeadline>8640000000000000-TERMINATION_GRACE_MS))throw Error('Invalid absolute execution deadline');
     if(absoluteDeadline!==undefined&&readNow()>=absoluteDeadline)throw errorFor('Role review deadline reached before launch','ROLE_TIMEOUT');
     const startupDeadline = Math.min(readNow() + STARTUP_TIMEOUT_MS,absoluteDeadline??Infinity);
+    const originalStartupAt=Date.now();
+    if(!Number.isSafeInteger(originalStartupAt)||originalStartupAt<0||originalStartupAt>8640000000000000-STARTUP_TIMEOUT_MS)throw Error('Invalid original adapter clock');
+    const originalDeadline=Math.min(originalStartupAt+STARTUP_TIMEOUT_MS,absoluteDeadline??Infinity);
+    if(signal!==undefined)originalSignalAborted.call(signal); // native AbortSignal brand, not a caller Boolean
     const env = {...process.env, COMPANY_WORKER:'1'};
     delete env.CLAUDECODE; // A new standalone process, not a nested Claude agent.
     const command = resolveCommand(host);
@@ -347,7 +378,15 @@ export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selectio
     if(readNow()>=startupDeadline)throw Object.assign(errorFor('Role startup deadline reached before launch','ROLE_STARTUP_TIMEOUT'),{termination_confirmed:true});
     // Resolution can invoke a supplied synchronous dependency that cancels.
     if (signal?.aborted) throw errorFor('Role session cancelled before launch', 'ROLE_ABORTED');
-    const child = startProcess(command, args, {cwd,env,stdio:['pipe','pipe','pipe']});
+    options.beforeOriginalSpawn?.();
+    if(signal?.aborted)throw errorFor('Role session cancelled before launch','ROLE_ABORTED');
+    if(absoluteDeadline!==undefined&&readNow()>=absoluteDeadline)throw Object.assign(errorFor('Role review deadline reached before launch','ROLE_TIMEOUT'),{termination_confirmed:true});
+    if(readNow()>=startupDeadline)throw Object.assign(errorFor('Role startup deadline reached before launch','ROLE_STARTUP_TIMEOUT'),{termination_confirmed:true});
+    const cutoffLoan=originalModelCutoff(options.originalExecutionLaunch,Math.min(originalDeadline,startupDeadline,absoluteDeadline??Infinity),signal);
+    if(!bindOriginalModelAdapterCutoffFrom(options.originalExecutionLaunch,cutoffLoan))bindOriginalAdapterLaunchCutoffFrom(options.originalExecutionLaunch,cutoffLoan);
+    let child,launchFailure=null;
+    try{child=spawnOriginalModelLaunch(options.originalExecutionLaunch,command,args,{cwd,env,stdio:['pipe','pipe','pipe']});}
+    catch(error){child=originalWorkerFailedLaunchChild(error)??originalModelFailedLaunchChild(error);if(!child)throw error;launchFailure=error;}
     let stdout='', stderr='', failure=null, settled=false, closed=false;
     const named=new Set();let namingBuffer='';
     const observedName=id=>{
@@ -404,7 +443,8 @@ export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selectio
           try {error.rejected_output=parseOutput(host,stdout);}
           catch(parseError) {error.rejected_output=parseError.rejected_output;}
         }
-        error.termination_confirmed=closed;
+        if(error===launchFailure){try{error.termination_confirmed=closed;}catch{/* retain the original failed-write error */}}
+        else error.termination_confirmed=closed;
         if(host==='claude')observedName(error.rejected_output?.native_id);
         reject(error);
       } else {observedName(result?.native_id);resolve(result);}
@@ -531,6 +571,16 @@ export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selectio
         finish(null,{...result,native_id:result.native_id ?? nativeId});
       } catch(error) {finish(error);}
     });
+    if(launchFailure){
+      // A real child escaped a failed physical write. Keep its original model
+      // observers alive, but never send a prompt or publish execution timing.
+      failure=launchFailure;
+      try{observeBirth();}catch{/* failed observation remains UNKNOWN */}
+      cleanupOriginalWorkerLaunchFailure(launchFailure);
+      cleanupOriginalModelLaunchFailure(launchFailure);
+      finish(launchFailure);
+      return;
+    }
     startupTimer=schedule(() => {
       startupTimer=null;
       if (!expired() && !settled && !failure && !spawned) {

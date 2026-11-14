@@ -167,3 +167,15 @@ test('same-owner generic pause/resume behavior and original legacy origin hold a
   f.ledger.write('synthetic-original-origin-input','founder',tx=>{const c=tx.get('control','company');tx.put('control','company',{...c.value,legacy_source_cut_sha256:digest('still-unqualified-origin')},c.revision);});
   unchanged(f,()=>execute(f.ledger,{principal_id:'founder'},'company/resume',{operation_id:'new-origin-held-resume',source_instruction:'No origin waiver.'}),'AUTHORITY_CHANGED');
 });
+
+
+// A malicious SOURCE fixture may write plausible DATA; it still supplies no
+// original typed resume event, human approval, qualification or Native proof.
+test('a typed-looking ordinary resume receipt cannot replace the original owner producer',async t=>{
+ const f=ownerGateFixture(t);await resumeOwnerGate(f);
+ f.ledger.write('SYNTHETIC-forged-ordinary-owner-receipt','founder',tx=>{
+  const c=tx.get('control','company'),h=tx.get('work_items',c.value.owner_handover.id),cmd=tx.put('commands','SYNTHETIC-forged-new-resume',{kind:'origin_ordinary_task_command',action:'resumed',actor:h.value.incoming,request:{epoch:h.value.epoch,qualification_ref:{family:'work_items',id:'not-issued',revision:1,sha256:'a'.repeat(64)}},result:{paused:false,epoch:h.value.epoch,control:h.value.resume_control_ref}},0);
+  tx.put('work_items',h.id,{...h.value,resume_command_ref:{family:'commands',id:cmd.id,revision:cmd.revision,sha256:cmd.sha256}},h.revision);
+ });
+ assert.throws(()=>f.ledger.read(inspectPeerOwnerOperatingState));
+});

@@ -3,10 +3,9 @@ import {validationManifest,validationManifestMatches,validateReusableReceipt,con
 import {presentationOnly,relevantRecord} from './current-state.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
-import { VERSION, V018_GOVERNANCE_SHA256, V019_GOVERNANCE_SHA256, V020_GOVERNANCE_SHA256, installedTeam, digest, id, stamp, requireText, withStore, owner, folder, noLink, notice } from './store.mjs';
+import { VERSION, V018_GOVERNANCE_SHA256, V019_GOVERNANCE_SHA256, V020_GOVERNANCE_SHA256, installedTeam, digest, id, stamp, requireText, withStore, owner, folder, noLink, notice, originalStoreExecutionCustodyFrom, retainOriginalStoreCommitCutoffFrom } from './store.mjs';
 import { contextMatches, supplementalMatches } from './context.mjs';
 import { sandboxCapability, runLocalTests, validationEnvironment } from './local-sandbox.mjs';
 import { developmentLimits, assertByteBudget, developmentTransportBudget, MAX_DEVELOPMENT_BYTES } from './development-limits.mjs';
@@ -16,6 +15,22 @@ import {inheritSnapshots} from './snapshot.mjs';
 import {resourceClaims} from './state-projections.mjs';
 import { testFixtureIdentity, assertTestFixtureIdentity } from './test-fixtures.mjs';
 import {DEVELOPMENT_DELIVERY_ACTIONS,createDevelopmentDeliveryContract,validateDevelopmentDeliveryContract,createDevelopmentAcceptanceReport,developmentDeliveryAction} from './development-delivery.mjs';
+import {recordOriginalWorkerAssignmentFrom,prepareOriginalWorkerLaunchFrom,spawnOriginalWorkerLaunch,cleanupOriginalWorkerLaunchFailure} from './peers/prospective-local-worker-inventory-producer.mjs';
+
+const originalDevelopmentCommitCutoffs=new WeakMap();
+export function inspectOriginalDevelopmentCommitCutoffFrom(proof,actualDb){
+  const record=originalDevelopmentCommitCutoffs.get(proof),loan=originalStoreExecutionCustodyFrom(actualDb);
+  if(!record||record.db!==loan.db||record.scope!==loan.scope||loan.mode!=='write')throw Error('Original development commit cutoff custody required');
+  return record.facts;
+}
+function retainDevelopmentCommitCutoff(actualDb,control){
+  const loan=originalStoreExecutionCustodyFrom(actualDb);if(loan.mode!=='write')throw Error('Original development write required');
+  const bounds=[{at:control.expires_at,message:'Original retention-review authority expired'}];
+  if(control.qa_deadline_at!==null&&control.qa_deadline_at!==undefined)bounds.push({at:control.qa_deadline_at,message:'Retention-review QA cutoff reached before COMMIT'});
+  const candidates=bounds.map(({at,message})=>{const deadline=Date.parse(at);if(!Number.isSafeInteger(deadline)||deadline<0||deadline>8640000000000000)throw Error(message);return {deadline_at_ms:deadline,code:null,message};});
+  const facts=Object.freeze(candidates.reduce((a,b)=>a.deadline_at_ms<=b.deadline_at_ms?a:b)),proof=Object.freeze({});
+  originalDevelopmentCommitCutoffs.set(proof,{db:loan.db,scope:loan.scope,facts});retainOriginalStoreCommitCutoffFrom(actualDb,proof,'development');
+}
 
 // A supported local executor, not a general permission to operate a business.
 // Preserve exact v0.18/v0.19/v0.20 contracts without adopting the installed instructions.
@@ -240,7 +255,7 @@ export async function developmentAction(a,host,internal={}) {
       } else throw new Error('Unknown development action');
     }
     s.runtime_version=VERSION;return s;
-  },{beforeCommit:(_db,next)=>{if(retentionControl)assertRetentionRepairCommit(next,retentionControl);}}));return result;
+  },{beforeCommit:(_db,next)=>{if(retentionControl){assertRetentionRepairCommit(next,retentionControl);retainDevelopmentCommitCutoff(_db,retentionControl);}}}));return result;
 }
 function queueRun(a,host,internal={}) {
   let p,c,jobId=id('test');
@@ -251,7 +266,7 @@ function queueRun(a,host,internal={}) {
     if(c.development.run)throw new Error('Candidate already has a test attempt; inspect it, never retry uncertain execution');
     if(Object.values(s.jobs).some(j=>j.development_id===p.id&&['queued','running'].includes(j.status)))throw new Error('Scope already has active work');
     c.development.run={job_id:jobId,status:'queued'};
-    s.jobs[jobId]={id:jobId,kind:'development_test',role:'engineer',development_id:p.id,candidate_id:c.id,epoch:s.owner.epoch,session_id:a.session_id,host,...(a.reuse_receipt_id?{reuse_receipt_id:a.reuse_receipt_id}:{}),status:'queued',created_at:stamp(),inputs:[],native_id:null};s.runtime_version=VERSION;return s;
+    const job={id:jobId,kind:'development_test',role:'engineer',development_id:p.id,candidate_id:c.id,epoch:s.owner.epoch,session_id:a.session_id,host,...(a.reuse_receipt_id?{reuse_receipt_id:a.reuse_receipt_id}:{}),status:'queued',created_at:stamp(),inputs:[],native_id:null};recordOriginalWorkerAssignmentFrom(db,s,job);s.jobs[jobId]=job;s.runtime_version=VERSION;return s;
   }));
   const failed=error=>withStore(a.root,db=>db.transaction('development.test_spawn_failed',s=>{
     s.jobs[jobId].status='failed';s.jobs[jobId].error=error.message;
@@ -259,9 +274,9 @@ function queueRun(a,host,internal={}) {
     notice(s,'must_know','Local test worker could not start; inspect the retained attempt.',jobId);return s;
   }));
   try {
-    const child=(internal.spawnWorker??spawn)(process.execPath,['--no-warnings',fileURLToPath(import.meta.url),a.root,jobId],{detached:true,stdio:'ignore',env:{...process.env,COMPANY_WORKER:'1'}});
+    const child=launchDevelopmentWorker(a.root,jobId,{detached:true,stdio:'ignore',env:{...process.env,COMPANY_WORKER:'1'}},internal);
     child.on('error',failed);child.unref();
-  } catch(error) {failed(error);throw error;}
+  } catch(error) {const escaped=cleanupOriginalWorkerLaunchFailure(error);try{failed(error);}catch(failure){if(!escaped)throw failure;}throw error;}
   return withStore(a.root,db=>db.read().jobs[jobId]);
 }
 export async function executeDevelopmentTest(root,jobId,internal={}) {
@@ -301,7 +316,7 @@ export async function executeDevelopmentTest(root,jobId,internal={}) {
     timer=setInterval(()=>{try{eligible();}catch{stale=true;abort.abort();}},100);
     if(reuseSource){if(!validateReusableReceipt(reuseSource,validationFingerprint))throw Error('Reuse fingerprint or successful execution evidence does not match');
       result={...reuseSource.development.result,tests_executed:false,reused:true,reused_from:reuseSource.id,original_tests_executed:true};
-    }else {phase('launch_intent',true);result=await (internal.runLocalTests??runLocalTests)({directory,test_paths:p.development.scope.test_paths,timeout_ms:p.development.scope.timeout_ms,max_output_bytes:p.development.scope.max_output_bytes,signal:abort.signal,...(p.development.scope.test_fixture!==undefined?{testFixture:p.development.scope.test_fixture}:{})});}
+    }else {phase('launch_intent',true);result=await (internal.runLocalTests??runLocalTests)({directory,test_paths:p.development.scope.test_paths,timeout_ms:p.development.scope.timeout_ms,max_output_bytes:p.development.scope.max_output_bytes,signal:abort.signal,originalExecution:{root,job_id:jobId},...(p.development.scope.test_fixture!==undefined?{testFixture:p.development.scope.test_fixture}:{})});}
     phase('postflight');verifyCandidate(a.root,p,c);
     // Fresh library discovery and byte reads bind both actual execution and the
     // no-execution reuse path. A changed/unknown environment never emits Pass.
@@ -526,10 +541,15 @@ function recoveryAuthorized(s,p,grant,root,phase) {
   if(phase==='reserve')diagnosticOf(s,{diagnostic_id:g.diagnostic_id,diagnostic_sha256:g.diagnostic_sha256});
   return c;
 }
+function launchDevelopmentWorker(root,jobId,options,internal={}){
+  if(internal.spawnWorker)return internal.spawnWorker(process.execPath,['--no-warnings',fileURLToPath(import.meta.url),root,jobId],options);
+  try{return withStore(root,store=>{let launch;store.transaction('job.worker_launch_requested',s=>{launch=prepareOriginalWorkerLaunchFrom(store,s,{job_id:jobId,kind:'worker'});return s;});return spawnOriginalWorkerLaunch(launch,process.execPath,['--no-warnings',fileURLToPath(import.meta.url),root,jobId],options);});}
+  catch(error){cleanupOriginalWorkerLaunchFailure(error);throw error;}
+}
 function launchMaintenance(a,job,internal={}) {
   const failed=error=>withStore(a.root,db=>db.transaction('development.maintenance_spawn_failed',s=>{const j=s.jobs[job.id];if(j.status!=='queued')return s;j.status='failed';if(j.kind==='development_preflight'){j.error=diagnosticError(error);j.preflight_error=boundedPreflightError(error);}else j.error=String(error.message).slice(0,500);j.finished_at=stamp();if(j.candidate_id)s.records[j.candidate_id].development.run.status='failed';notice(s,'must_know',j.kind==='development_preflight'?'Fingerprint diagnostic worker could not start; inspect retained typed failure metadata. No test was launched.':'Maintenance worker did not start; retained authorization is consumed and no automatic retry is allowed.',j.id);return s;}));
-  try{const child=(internal.spawnWorker??spawn)(process.execPath,['--no-warnings',fileURLToPath(import.meta.url),a.root,job.id],{detached:true,stdio:'ignore',env:{...process.env,COMPANY_WORKER:'1'},...(job.kind==='development_preflight'?{timeout:45000,killSignal:'SIGKILL'}:{})});child.on('error',failed);child.unref();}
-  catch(error){failed(error);if(job.kind==='development_preflight')throw Object.assign(new Error('Fingerprint diagnostic worker could not start; inspect retained typed failure metadata.'),{code:'PREFLIGHT_DIAGNOSTIC_START_FAILED'});throw error;}
+  try{const child=launchDevelopmentWorker(a.root,job.id,{detached:true,stdio:'ignore',env:{...process.env,COMPANY_WORKER:'1'},...(job.kind==='development_preflight'?{timeout:45000,killSignal:'SIGKILL'}:{})},internal);child.on('error',failed);child.unref();}
+  catch(error){const escaped=cleanupOriginalWorkerLaunchFailure(error);try{failed(error);}catch(failure){if(!escaped)throw failure;}if(job.kind==='development_preflight'&&!escaped)throw Object.assign(new Error('Fingerprint diagnostic worker could not start; inspect retained typed failure metadata.'),{code:'PREFLIGHT_DIAGNOSTIC_START_FAILED'});throw error;}
   return withStore(a.root,db=>db.read().jobs[job.id]);
 }
 function queueRecovery(a,host,internal) {
@@ -547,7 +567,7 @@ function queueRecovery(a,host,internal) {
     s.records[requestId]={id:requestId,kind:'artifact',author_role:'human_founder',recorded_by:a.session_id,revision:1,status:'Recorded',created_at:stamp(),content:a.source_instruction,development:{type:'preflight_recovery_request',protocol:'original-grant-validation-recovery-v1',subject,proof,diagnostic_id:diagnostic.id,diagnostic_sha256:diagnostic.development.receipt_sha256,authority_sha256:authority(s,p.id),owner:{...s.owner},expires_at:p.development.scope.expires_at,status:'consumed',job_id:key,generation_permission:false,allowance_reset:false}};
     c.development.preflight_recovery=requestId;c.development.run_history=[...(c.development.run_history??[]),{...c.development.run}];
     c.development.run={job_id:key,status:'queued'};
-    job=s.jobs[key]={id:key,kind:'development_test',role:'engineer',development_id:p.id,candidate_id:c.id,preflight_recovery_id:requestId,epoch:s.owner.epoch,session_id:a.session_id,host,status:'queued',created_at:stamp(),inputs:[],native_id:null};return s;
+    job={id:key,kind:'development_test',role:'engineer',development_id:p.id,candidate_id:c.id,preflight_recovery_id:requestId,epoch:s.owner.epoch,session_id:a.session_id,host,status:'queued',created_at:stamp(),inputs:[],native_id:null};recordOriginalWorkerAssignmentFrom(db,s,job);s.jobs[key]=job;return s;
   }));return launchMaintenance(a,job,internal);
 }
 function queueDiagnostic(a,host,internal) {
@@ -556,7 +576,7 @@ function queueDiagnostic(a,host,internal) {
     if(s.paused)throw Error('Company is paused');
     if(['candidate_id','plan_id','receipt_id','reuse_receipt_id','preflight_recovery_id'].some(key=>a[key]!==undefined))throw Error('Fingerprint diagnostic is candidate-free');
     if(Object.values(s.jobs).filter(j=>['queued','running'].includes(j.status)).length>=3)throw Error('Three assignments already active');
-    const key=id('preflight');job=s.jobs[key]={id:key,kind:'development_preflight',role:'runtime',status:'queued',epoch:s.owner.epoch,session_id:a.session_id,host,created_at:stamp(),inputs:[],native_id:null,source_instruction:a.source_instruction,authority_sha256:authority(s,null)};return s;
+    const key=id('preflight');job={id:key,kind:'development_preflight',role:'runtime',status:'queued',epoch:s.owner.epoch,session_id:a.session_id,host,created_at:stamp(),inputs:[],native_id:null,source_instruction:a.source_instruction,authority_sha256:authority(s,null)};recordOriginalWorkerAssignmentFrom(db,s,job);s.jobs[key]=job;return s;
   }));return launchMaintenance(a,job,internal);
 }
 export async function executePreflightDiagnostic(root,jobId,internal={}) {
@@ -591,5 +611,5 @@ export async function executeDevelopmentWorker(root,jobId,internal={}) {
 }
 
 if(process.argv[1] && path.resolve(process.argv[1])===fileURLToPath(import.meta.url)) {
-  const [root,jobId]=process.argv.slice(2);await executeDevelopmentWorker(root,jobId);
+  const [root,jobId]=process.argv.slice(2);queueMicrotask(()=>{executeDevelopmentWorker(root,jobId).catch(error=>{console.error(error);process.exitCode=1;});});
 }

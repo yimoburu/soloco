@@ -12,13 +12,19 @@ import {validationManifest} from '../plugins/soloco/runtime/validation-cache.mjs
 import {developmentReviewAuthority,developmentReviewSubject} from '../plugins/soloco/runtime/develop.mjs';
 import {assignmentContext} from '../plugins/soloco/runtime/context.mjs';
 import {prepareReviewContinuation,authorizeReviewContinuation,reviewContinuationSubject,reviewContinuationAssignment,reviewContinuationContextInputs,reviewContinuationCandidate,reviewContinuationRequiredEvidence,validateReviewContinuationPublication,acceptReviewContinuation,developmentReviewContinuationAction} from '../plugins/soloco/runtime/development-review-continuation.mjs';
+import {recordOriginalWorkerAssignmentFrom} from '../plugins/soloco/runtime/peers/prospective-local-worker-inventory-producer.mjs';
+import {stageOriginalHistoricalJob,stageOriginalWorker,disposeOriginalProcessFixtures} from './original-adapter-process-fixture.mjs';
+import {TIMEOUT_POLICY_VERSION} from '../plugins/soloco/runtime/timeout.mjs';
+import {codeReviewWindowSubject} from '../plugins/soloco/runtime/code-review-window.mjs';
 
 const base=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-review-continuation-'));
-test.after(()=>fs.rmSync(base,{recursive:true,force:true}));
+const originalRoots=[];
+test.after(()=>{for(const root of originalRoots)disposeOriginalProcessFixtures(root);fs.rmSync(base,{recursive:true,force:true});});
 const hash=x=>digest(JSON.stringify(x)),read=a=>withStore(a.root,db=>db.read());
 const change=(a,fn)=>withStore(a.root,db=>db.transaction('controlled.continuation-fixture',s=>{fn(s);return s;}));
 function fixture({recovery=true,legacy=true}={}) {
   const root=fs.realpathSync(fs.mkdtempSync(path.join(base,'case-'))),a={root,session_id:id('owner'),host:'codex',epoch:1},team=installedTeam();
+  originalRoots.push(root);
   const originals=[{path:'helper.mjs',content:'export const helper=1;\n'+'// Whole preserved controlled helper body.\n'.repeat(120)},{path:'value.mjs',content:'export const value=0;\n'},{path:'value.test.mjs',content:'// Controlled historical test source, never executed by this fixture.\n'}],files=structuredClone(originals);files[1].content='export const value=42;\n';
   for(const f of originals)fs.writeFileSync(path.join(root,f.path),f.content);
   const scope={read_paths:originals.map(f=>f.path),write_paths:['value.mjs'],test_paths:['value.test.mjs'],sources:originals.map(f=>({...f,sha256:digest(f.content)})),max_bytes:20000,max_attempts:2,timeout_ms:1000,max_output_bytes:10000,transport_max_characters:360000,expires_at:'2001-01-01T00:00:00.000Z',acceptance:'All scoped controlled code and strong assertions.',stop_conditions:'No execution or integration rights from review.',data_policy:'Synthetic controlled fixtures only.',output_format:'patches'};
@@ -37,25 +43,37 @@ function fixture({recovery=true,legacy=true}={}) {
   const oldQA={id:'prior-unknown',role:'qa',instance_id:'qa-old',native_id:'native-old-unknown',status:'failed',started_at:'2001-01-01T00:00:00.000Z',session_key:'qa:review:receipt:1',review_of:{id:t.id,revision:1},inputs:[{id:'contract',revision:1}],supplemental_sources:[],execution_failure:{termination_confirmed:false,outcome:'timeout',code:'ROLE_TIMEOUT'}};
   const failureHome={id:'failure-home',kind:'artifact',revision:1,status:'Draft',content:JSON.stringify({canonical_public_terminal_job:{complete_data:{value:oldQA}}})};
   const records={plan:p,candidate:c,receipt:t,contract,'failure-home':failureHome},jobs={producer,'controller':controller,'prior-unknown':oldQA};
-  withStore(root,db=>db.transaction('controlled.company.created',()=>({schema:2,runtime_version:VERSION,id:id('company'),name:'Controlled continuation source test',idea:'No product authority',phase:'Frame',mode:'preparation',paused:false,...team,team_sha256:teamHash(team),owner:{host:'codex',session_id:a.session_id,epoch:1},records,sessions:{[oldQA.session_key]:{instance_id:oldQA.instance_id,native_id:oldQA.native_id}},jobs,messages:[],notices:[],created_at:new Date().toISOString()})),true);
+  withStore(root,db=>db.transaction('company.created',()=>({schema:2,runtime_version:VERSION,id:id('company'),name:'Controlled continuation source test',idea:'No product authority',phase:'Frame',mode:'preparation',paused:false,...team,team_sha256:teamHash(team),owner:{host:'codex',session_id:a.session_id,epoch:1},records,sessions:{[oldQA.session_key]:{instance_id:oldQA.instance_id,native_id:oldQA.native_id}},jobs:{},messages:[],notices:[],created_at:new Date().toISOString()})),true);
+  // The business history remains fictional DATA. Each operational carrier is
+  // newly staged through the actual Original writer, never backfilled onto an
+  // existing prefix. In particular the old failed/UNKNOWN unit stays occupied.
+  for(const job of Object.values(jobs))Object.assign(job,stageOriginalHistoricalJob(root,job));
+  const pendingHistorical=[];
   change(a,s=>{
+    s.records['failure-home'].content=JSON.stringify({canonical_public_terminal_job:{complete_data:{value:s.jobs[oldQA.id]}}});
     p.development.authorization={decision_id:'old-authorization',authority_sha256:developmentReviewAuthority(s,p.id)};
     s.records[p.id]=p;
     if(recovery) {
       const diagResult={status:'passed',tests_executed:false,launch_intent:false},diag={id:'diagnostic',kind:'artifact',revision:1,status:'Submitted',author_role:'runtime',author_instance:'diagnostic-controller',content:JSON.stringify(diagResult),development:{type:'preflight_diagnostic',result:diagResult,receipt_sha256:hash(diagResult)}};
-      s.records[old.id]=old;s.jobs[oldController.id]=oldController;s.records[diag.id]=diag;s.jobs[diag.author_instance]={id:diag.author_instance,kind:'development_preflight',status:'completed',artifact_id:diag.id};
+      s.records[old.id]=old;s.records[diag.id]=diag;
+      pendingHistorical.push(oldController,{id:diag.author_instance,kind:'development_preflight',status:'completed',artifact_id:diag.id});
       const originalCandidate=structuredClone(s.records.candidate);originalCandidate.development.run={job_id:oldController.id,status:'completed',receipt_id:old.id};
       const proof=legacy?{legacy:{id:'legacy-qa',revision:1,sha256:null,producer_sha256:null,evidence:[],input_records:[],context_sha256:digest('historical-context'),candidate_record_sha256:hash(originalCandidate),candidate_run:originalCandidate.development.run}}:{execution_provenance:{protocol:'controlled-zero-launch'}};
       if(legacy) {
         const target={id:'legacy-target',kind:'artifact',revision:1,status:'Submitted',content:'Controlled complete historical qualification target'};
         const qj={id:'legacy-qa-job',role:'qa',instance_id:'legacy-reviewer',native_id:'legacy-native',status:'completed',artifact_id:'legacy-qa',coordination_release:{termination_confirmed:true},context_sha256:proof.legacy.context_sha256};
         const q={id:'legacy-qa',kind:'review',revision:1,status:'Submitted',author_role:'qa',author_instance:qj.instance_id,job_id:qj.id,review_of:{id:target.id,revision:1},review:{verdict:'Pass',permitted_action:'qualify_preflight_recovery',blockers:[],preflight_recovery:{receipt_sha256:old.development.receipt_sha256,candidate_sha256:c.development.candidate_sha256,target_sha256:hash(target),basis:'qualified-exact-source-first-fingerprint-inference',uncertainty:'historical-launch-not-attested'}}};
-        s.records[target.id]=target;s.records[q.id]=q;s.jobs[qj.id]=qj;proof.legacy.sha256=hash(q);proof.legacy.producer_sha256=hash(qj);
+        s.records[target.id]=target;s.records[q.id]=q;proof.legacy.sha256=hash(q);proof.legacy.producer_sha256=hash(qj);pendingHistorical.push(qj);
       } else old.development.result.execution_provenance=proof.execution_provenance;
       const r={type:'preflight_recovery_request',protocol:'original-grant-validation-recovery-v1',subject:{plan_id:p.id,scope_sha256:p.development.scope_sha256,candidate_id:c.id,candidate_sha256:c.development.candidate_sha256,receipt_id:old.id,receipt_sha256:old.development.receipt_sha256,receipt_record_sha256:hash(old),job_id:oldController.id,job_sha256:hash(oldController)},proof,diagnostic_id:diag.id,diagnostic_sha256:diag.development.receipt_sha256,authority_sha256:p.development.authorization.authority_sha256,expires_at:scope.expires_at,status:'consumed',job_id:controller.id,generation_permission:false,allowance_reset:false};
       s.records.recovery={id:'recovery',kind:'artifact',revision:1,status:'Recorded',author_role:'human_founder',content:'Controlled historical consumed recovery',development:r};
       s.records.receipt.development.preflight_recovery_id='recovery';s.records.candidate.development.preflight_recovery='recovery';s.records.candidate.development.run_history=[originalCandidate.development.run];
     }
+  });
+  for(const job of pendingHistorical)Object.assign(job,stageOriginalHistoricalJob(root,job));
+  if(recovery)change(a,s=>{
+    const r=s.records.recovery.development;r.subject.job_sha256=hash(s.jobs[oldController.id]);
+    if(legacy)r.proof.legacy.producer_sha256=hash(s.jobs['legacy-qa-job']);
   });
   return {...a,plan_id:p.id,candidate_id:c.id,receipt_id:t.id,receipt_sha256:t.development.receipt_sha256,prior_job_id:oldQA.id,prior_job_sha256:hash(oldQA),failure_evidence_id:failureHome.id,source_instruction:'CONTROLLED NEW HUMAN PRIMARY FIXTURE: one read-only review and local acceptance, explicit old UNKNOWN reservation retained.',approval_reference:id('controlled-primary-approval'),model_data_approved:true,unknown_prior_replacement_approved:true,expires_at:new Date(Date.now()+3600000).toISOString(),code_review_window_minutes:30};
 }
@@ -63,9 +81,11 @@ function authorized(a) {const proposal=prepareReviewContinuation(read(a),a,a.roo
 function queued(a,t,{defer=true}={}) {
   const state=read(a),required=reviewContinuationRequiredEvidence(state,t,{root:a.root});
   const job={id:id('controlled-qa'),role:'qa',instance_id:id('controlled-qa-instance'),native_id:null,host:'codex',epoch:1,status:'queued',review_of:{id:t.id,revision:t.revision},session_key:`qa:review:${t.id}:${t.revision}`,code_review_window_minutes:30,timeout_ms:600000,task:'Controlled complete code review, no tools or actual model.',context_format:3,inputs:required.filter(r=>!defer||r.id!=='contract').map(r=>({id:r.id,revision:r.revision})),supplemental_sources:defer?[required.find(r=>r.id==='contract')]:[]};
+  job.created_at=new Date().toISOString();job.timeout_policy_version=TIMEOUT_POLICY_VERSION;job.timeout_reason='Controlled finite Source review invocation';job.code_review_reason='Controlled complete Source review window';
+  const {id:unusedId,...request}=job;job.code_review_subject=codeReviewWindowSubject(state,{...request,review_of:job.review_of.id},{root:a.root});
   reviewContinuationAssignment(state,job,{reserve:true,root:a.root});
   const context=assignmentContext(state,job);job.inputs=context.inputs;job.context_sha256=context.hash;
-  change(a,s=>{s.jobs[job.id]=job;s.sessions[job.session_key]={instance_id:job.instance_id,native_id:null};});return job.id;
+  withStore(a.root,store=>store.transaction('job.queued',s=>{recordOriginalWorkerAssignmentFrom(store,s,job);s.jobs[job.id]=job;s.sessions[job.session_key]={instance_id:job.instance_id,native_id:null};return s;}));stageOriginalWorker(a.root,job.id);return job.id;
 }
 function closedPair(a,key,{defer=true}={}) {
   const s=read(a),j=structuredClone(s.jobs[key]),target=s.records[j.review_of.id],p=target.development.proposal,native='controlled-new-independent-native';

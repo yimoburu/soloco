@@ -4,7 +4,7 @@ import {EventEmitter} from 'node:events';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {runModel} from '../plugins/soloco/runtime/adapters.mjs';
+import {createOriginalAdapterProcessFixture} from './original-adapter-process-fixture.mjs';
 
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 const title='SoloCo — QA & Eval · fictional';
@@ -12,7 +12,8 @@ function harness(host,{native=null,supported=true,displayTitle=title,renameSessi
   const child=new EventEmitter();child.stdin=new EventEmitter();child.stdout=new EventEmitter();child.stderr=new EventEmitter();child.stdin.end=()=>{};child.kill=()=>true;
   const directory=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'soloco-name-adapter-')));
   let args;
-  const result=runModel(host,native,'Fictional prompt','/tmp',180000,null,{sessionTitle:displayTitle,sessionNameDirectory:directory,sessionNameSupport:supported,renameSession,resolveExecutable:()=>'/fictional/'+host,spawn:(_command,argv)=>{args=argv;return child;}});
+  const original=createOriginalAdapterProcessFixture({host,child,onLaunch:(_command,argv)=>{args=argv;}});
+  const result=original.run(host,native,'Fictional prompt','/tmp',180000,null,{sessionTitle:displayTitle,sessionNameDirectory:directory,sessionNameSupport:supported,renameSession,resolveExecutable:()=>'/fictional/'+host});
   child.emit('spawn');
   const complete=(id=native??'fictional-native')=>{
     const output=host==='claude'?JSON.stringify({subtype:'success',session_id:id,result:'Fictional result'}):[
@@ -20,7 +21,7 @@ function harness(host,{native=null,supported=true,displayTitle=title,renameSessi
     ].map(JSON.stringify).join('\n')+'\n';
     child.stdout.emit('data',output);child.emit('close',0);
   };
-  return {child,result,args,complete,directory,close:()=>fs.rmSync(directory,{recursive:true,force:true})};
+  return {child,result,args,complete,directory,close:()=>{original.dispose();fs.rmSync(directory,{recursive:true,force:true});}};
 }
 
 test('Codex names an observed native early without waiting for naming completion or changing model evidence',async()=>{
@@ -45,12 +46,14 @@ test('Codex naming failure stays cosmetic and resumed identity mismatches never 
   try{wrong.complete('unexpected-native');await assert.rejects(wrong.result,/identity changed/);await tick();assert.equal(calls.length,0);}finally{wrong.close();}
 });
 test('synchronous optional naming preflight cannot launch a model after its absolute deadline',async()=>{
-  let now=1000,spawns=0;
-  await assert.rejects(runModel('claude',null,'fictional','/tmp',1000,null,{
-    sessionTitle:title,timeoutReason:'Fictional absolute deadline check.',executionDeadlineAt:2000,now:()=>now,
-    resolveExecutable:()=>'/fictional/claude',probeSessionName:()=>{now=2500;return true;},spawn:()=>{spawns++;throw Error('must not spawn');}
+  const base=Date.now();let now=base,spawns=0;
+  const original=createOriginalAdapterProcessFixture({host:'claude',child:new EventEmitter(),now:()=>now,onLaunch:()=>{spawns++;throw Error('must not spawn');}});
+  await assert.rejects(original.run('claude',null,'fictional','/tmp',1000,null,{
+    sessionTitle:title,timeoutReason:'Fictional absolute deadline check.',executionDeadlineAt:base+1000,now:()=>now,
+    resolveExecutable:()=>'/fictional/claude',probeSessionName:()=>{now=base+1500;return true;}
   }),error=>error.code==='ROLE_TIMEOUT'&&error.termination_confirmed===true);
   assert.equal(spawns,0);
+  original.dispose();
 });
 
 for(const native of [null,'fictional-native'])for(const supported of [true,false])test(`Claude fresh/resume ${native??'fresh'} applies names only when supported=${supported}`,async()=>{

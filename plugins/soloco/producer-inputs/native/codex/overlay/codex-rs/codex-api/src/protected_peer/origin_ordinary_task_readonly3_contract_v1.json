@@ -1,0 +1,89 @@
+{
+  "protocol": "soloco-origin-ordinary-task-context-contract-v1",
+  "contract_id": "origin-ordinary-task-readonly3-whole-assignment-v1",
+  "scope_profile_id": "soloco-origin-ordinary-task-readonly-v1",
+  "context_encoding": "soloco-peer-context-frame-v2",
+  "tools": [
+    {
+      "type": "function",
+      "name": "soloco_context_header",
+      "description": "Private ordinary-origin readonly review context; the original Source capsule enforces complete raw inputs and exact read/output bounds. No task, resume or business action authority.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "function",
+      "name": "soloco_context_read",
+      "description": "Private ordinary-origin readonly review context; the original Source capsule enforces complete raw inputs and exact read/output bounds. No task, resume or business action authority.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sha256": {
+            "type": "string"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "length": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4096
+          }
+        },
+        "required": [
+          "sha256",
+          "offset",
+          "length"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "type": "function",
+      "name": "soloco_context_submit",
+      "description": "Private ordinary-origin readonly review context; the original Source capsule enforces complete raw inputs and exact read/output bounds. No task, resume or business action authority.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sha256": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sha256",
+          "content"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ],
+  "limits": {
+    "frame_bytes": 100000,
+    "wire_bytes": 4000000,
+    "policy_maximum_context_bytes": 65536,
+    "read_maximum_characters": 4096,
+    "response_maximum_utf8_bytes": 16384
+  },
+  "fresh_thread_required": true,
+  "authority": "Distinct fixed ordinary-origin independent review only. Genuine original admission, fresh private Native creation and complete owned drain are separate prerequisites. Recorded consent is attributed by the owning CoS; software does not establish human authenticity. No grant, ordinary-task qualification, typed resume, reservation release or Native qualification follows from this resource.",
+  "deliveries": [
+    {
+      "delivery_kind": "origin-ordinary-task-assignment",
+      "payload_protocol": "peer-origin-ordinary-task-context-v1",
+      "source_cut_protocol": null,
+      "kinds": [
+        "peer-origin-ordinary-task-review"
+      ],
+      "read_maximum_characters": 4096,
+      "response_maximum_utf8_bytes": 16384
+    }
+  ]
+}

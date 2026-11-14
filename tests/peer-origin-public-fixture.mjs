@@ -11,6 +11,7 @@ import {Store,withStore,installedTeam,teamHash,digest} from '../plugins/soloco/r
 import {requestModelProcess,recordModelProcessBirth,recordModelProcessClosure} from '../plugins/soloco/runtime/model-process-closure.mjs';
 import {canonical} from '../plugins/soloco/runtime/peers/ledger.mjs';
 import {sidecarCaptureModulePath} from './origin-sidecar-fixture.mjs';
+import {stageOriginalHistoricalJob,disposeOriginalProcessFixtures} from './original-adapter-process-fixture.mjs';
 
 export const SESSION='11111111-1111-4111-8111-111111111111',OTHER='22222222-2222-4222-8222-222222222222';
 export const actor={host:'codex',session_id:SESSION,native_id:SESSION};
@@ -46,13 +47,28 @@ export async function relocatedOriginRuntime({launch,frontier,seal,engine,author
 export function sourceFile(name,body){const file=path.join(directory,`${++sequence}-${name}.mjs`);fs.writeFileSync(file,body);return file;}
 export const missingSourceFile=()=>path.join(directory,'absent-'+(++sequence)+'.mjs');
 
-export function legacyFixture(t,changes={}){
- const root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'soloco-origin-public-company-'))),team=installedTeam(),store=new Store(root,true);
- try{store.transaction('fixture.genesis',()=>({schema:2,id:'fictional-origin-public-company',name:'SOURCE only',idea:'Preserve original UNKNOWN.',runtime_version:'0.7.8',...team,team_sha256:teamHash(team),owner:{host:'codex',session_id:SESSION,epoch:9},paused:true,records:{original:{id:'original',kind:'artifact',status:'Draft',revision:1,content:'Original failed history remains exact.'}},jobs:{old:{id:'old',status:'failed',native_id:'fictional-old-unknown',coordination_release:{termination_confirmed:false}}},sessions:{},messages:[],notices:[{id:'n-original',kind:'decision_required',summary:'Original UNKNOWN and spent old grant.',resolution:null}],original_grant:{max_attempts:2,used_attempts:2,expires_at:'2020-01-01T00:00:00.000Z'},...changes}));store.migrate();}finally{store.close();}
- t.after(()=>fs.rmSync(root,{recursive:true,force:true}));const file=path.join(root,'.company','company.sqlite');
+function companyData(changes){const team=installedTeam();return {schema:2,id:'fictional-origin-public-company',name:'SOURCE only',idea:'Preserve original UNKNOWN.',runtime_version:'0.7.8',...team,team_sha256:teamHash(team),owner:{host:'codex',session_id:SESSION,epoch:9},paused:true,records:{original:{id:'original',kind:'artifact',status:'Draft',revision:1,content:'Original failed history remains exact.'}},jobs:{old:{id:'old',status:'failed',native_id:'fictional-old-unknown',coordination_release:{termination_confirmed:false}}},sessions:{},messages:[],notices:[{id:'n-original',kind:'decision_required',summary:'Original UNKNOWN and spent old grant.',resolution:null}],original_grant:{max_attempts:2,used_attempts:2,expires_at:'2020-01-01T00:00:00.000Z'},...changes};}
+function sourceFixture(t,changes,genuine){
+ const root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'soloco-origin-public-company-'))),state=companyData(changes);
+ if(genuine){
+  const jobs=state.jobs;state.jobs={};const store=new Store(root,true);
+  try{store.transaction('company.created',()=>state);}finally{store.close();}
+  // Each fictional retained UNKNOWN has actual Original queue/launch history;
+  // the shared standard-Node child mock supplies no Native qualification.
+  for(const job of Object.values(jobs??{}))stageOriginalHistoricalJob(root,job);
+ }else{
+  // Deliberately pre-existing historical DATA, never a fresh zero baseline or
+  // an Original issuer. The missing prefix must remain unqualified.
+  const directory=path.join(root,'.company');fs.mkdirSync(directory,{mode:0o700});const db=new DatabaseSync(path.join(directory,'company.sqlite'));
+  try{db.exec('CREATE TABLE company(id INTEGER PRIMARY KEY CHECK(id=1),value TEXT NOT NULL); CREATE TABLE events(seq INTEGER PRIMARY KEY,at TEXT NOT NULL,type TEXT NOT NULL,value TEXT NOT NULL);');db.prepare('INSERT INTO company VALUES(1,?)').run(JSON.stringify({...state,revision:0,updated_at:new Date().toISOString()}));db.prepare('INSERT INTO events VALUES(1,?,?,?)').run(new Date().toISOString(),'fixture.historical_unqualified',JSON.stringify({revision:0,owner:state.owner}));}finally{db.close();}
+ }
+ const store=new Store(root);try{store.migrate();}finally{store.close();}
+ t.after(()=>{disposeOriginalProcessFixtures(root);fs.rmSync(root,{recursive:true,force:true});});const file=path.join(root,'.company','company.sqlite');
  const input={expires_at:new Date(Date.now()+3600000).toISOString(),policy:{worker_cap:3,queue_limit:1000,principal_queue_limit:100,max_context_bytes:65536,max_model_calls:10},maintenance:{scope:'*',source_instruction:instruction,max_model_calls:4,max_review_calls:2}};
- return {root,file,input,write:(type,fn)=>withStore(root,s=>s.transaction(type,fn)),state:()=>withStore(root,s=>s.read()),db:fn=>{const db=new DatabaseSync(file);try{return fn(db);}finally{db.close();}}};
+ return {root,file,input,original_inventory:genuine,write:(type,fn)=>withStore(root,s=>s.transaction(type,state=>fn(state,s))),state:()=>withStore(root,s=>s.read()),db:fn=>{const db=new DatabaseSync(file);try{return fn(db);}finally{db.close();}}};
 }
+export const legacyFixture=(t,changes={})=>sourceFixture(t,changes,false);
+export const originalInventoryFixture=(t,changes={})=>sourceFixture(t,changes,true);
 export function logicalState(f){return f.db(db=>{const schema=db.prepare("SELECT type,name,tbl_name,sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY type,name").all(),rows={};for(const s of schema)if(s.type==='table')rows[s.name]=db.prepare('SELECT * FROM "'+s.name.replaceAll('"','""')+'"').all().map(canonical).sort();return {schema,rows};});}
 export const preparePlan=f=>plan.recordPeerOriginQuarantinePlan(f.root,actor,{...f.input,source_instruction:instruction});
 export function mechanical(f,p){

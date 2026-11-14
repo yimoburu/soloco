@@ -2,21 +2,22 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
-import { runModel, commandArgs } from '../plugins/soloco/runtime/adapters.mjs';
+import { commandArgs } from '../plugins/soloco/runtime/adapters.mjs';
+import {createOriginalAdapterProcessFixture} from './original-adapter-process-fixture.mjs';
 
 test('nonzero native exit preserves bounded stderr instead of replacing it with an artifact parse error',async()=>{
   const child=new EventEmitter();
   child.stdin=new PassThrough();child.stdout=new PassThrough();child.stderr=new PassThrough();child.kill=()=>true;
-  const promise=runModel('codex',null,'private prompt never included','/tmp',180000,null,{
-    resolveExecutable:()=>'/mock/codex',spawn:()=>{
-      process.nextTick(()=>{child.emit('spawn');child.stderr.write('x'.repeat(4000)+' input_too_large: Input exceeds maximum1048576 characters, actual2254398');child.emit('close',1);});return child;
-    }
-  });
+  const original=createOriginalAdapterProcessFixture({host:'codex',child,onLaunch:()=>{
+    process.nextTick(()=>{child.emit('spawn');child.stderr.write('x'.repeat(4000)+' input_too_large: Input exceeds maximum1048576 characters, actual2254398');child.emit('close',1);});
+  }});
+  const promise=original.run('codex',null,'private prompt never included','/tmp',180000,null,{resolveExecutable:()=>'/mock/codex'});
   await assert.rejects(promise,error=>{
     assert.match(error.message,/input_too_large.*maximum1048576/);
     assert.doesNotMatch(error.message,/private prompt|no completed artifact/);
     assert.ok(error.message.length<1000);return true;
   });
+  original.dispose();
 });
 
 test('real adapter resumes existing native IDs with model tools disabled for both hosts',()=>{
@@ -35,8 +36,7 @@ test('selected upgrade calls apply identical launch and resume flags while obser
     const child=new EventEmitter();
     child.stdin=new PassThrough();child.stdout=new PassThrough();child.stderr=new PassThrough();child.kill=()=>true;
     let launched;
-    const result=await runModel(host,native,'fictional upgrade prompt','/tmp',180000,selection,{
-      resolveExecutable:()=>`/mock/${host}`,spawn:(command,args)=>{
+    const original=createOriginalAdapterProcessFixture({host,child,onLaunch:(_command,args)=>{
         launched=args;
         process.nextTick(()=>{
           child.emit('spawn');
@@ -50,9 +50,8 @@ test('selected upgrade calls apply identical launch and resume flags while obser
           else child.stdout.write(JSON.stringify({subtype:'success',session_id:`native-${host}`,result:text,modelUsage:{'fixture-model':{inputTokens:10}}}));
           child.emit('close',0);
         });
-        return child;
-      }
-    });
+    }});
+    const result=await original.run(host,native,'fictional upgrade prompt','/tmp',180000,selection,{resolveExecutable:()=>`/mock/${host}`});
     assert.deepEqual(launched,commandArgs(host,native,selection));
     assert.equal(launched[launched.indexOf('--model')+1],selection.model);
     const evidence=result.model_evidence;
@@ -64,6 +63,7 @@ test('selected upgrade calls apply identical launch and resume flags while obser
     assert.deepEqual(evidence.reported_models,host==='codex'?[]:['fixture-model']);
     assert.equal(evidence.verification,host==='codex'?'unverified':'host_reported');
     if(host==='claude')assert.equal(evidence.scope,'session_cumulative_including_internal_calls');
+    original.dispose();
   }
 });
 
@@ -73,14 +73,13 @@ test('selected native timeout does not manufacture applied or effective model ev
   child.kill=()=>{process.nextTick(()=>child.emit('close',null));return true;};
   let now=1000;const timers=[];
   const selection={mode:'explicit',model:'fixture-model',effort:'high',reason:'Synthetic timeout'};
-  const pending=runModel('codex',null,'fictional prompt','/tmp',1000,selection,{
+  const original=createOriginalAdapterProcessFixture({host:'codex',child,now:()=>now,onLaunch:()=>{process.nextTick(()=>{
+    child.emit('spawn');now=2000;timers.find(timer=>timer.ms===1000).fn();
+  });}});
+  const pending=original.run('codex',null,'fictional prompt','/tmp',1000,selection,{
     timeoutReason:'Synthetic bounded timeout check',
     resolveExecutable:()=>'/mock/codex',now:()=>now,
-    setTimeout:(fn,ms)=>{const timer={fn,ms};timers.push(timer);return timer;},clearTimeout:()=>{},
-    spawn:()=>{process.nextTick(()=>{
-      child.emit('spawn');now=2000;
-      timers.find(timer=>timer.ms===1000).fn();
-    });return child;}
+    setTimeout:(fn,ms)=>{const timer={fn,ms};timers.push(timer);return timer;},clearTimeout:()=>{}
   });
   await assert.rejects(pending,error=>{
     assert.match(error.message,/timed out/);
@@ -88,6 +87,7 @@ test('selected native timeout does not manufacture applied or effective model ev
     assert.equal(error.applied_controls,undefined);
     return true;
   });
+  original.dispose();
 });
 
 test('upgrade adapter schedules the selected or remaining cap for both hosts and resumed calls',async()=>{
@@ -97,9 +97,10 @@ test('upgrade adapter schedules the selected or remaining cap for both hosts and
     const signals=[];child.kill=signal=>{signals.push(signal);return true;};
     let now=1000000,receipt;
     const timers=new Set();
-    const pending=runModel(host,native,'Synthetic upgrade timer fixture','/tmp',cap,null,{
+    const original=createOriginalAdapterProcessFixture({host,child,now:()=>now});
+    const pending=original.run(host,native,'Synthetic upgrade timer fixture','/tmp',cap,null,{
       timeoutContext:'upgrade-call',timeoutReason:'Selected ceiling capped by remaining overall window',
-      resolveExecutable:()=>`/mock/${host}`,spawn:()=>child,now:()=>now,
+      resolveExecutable:()=>`/mock/${host}`,now:()=>now,
       setTimeout:(fn,ms)=>{const timer={fn,ms};timers.add(timer);return timer;},
       clearTimeout:timer=>timers.delete(timer),onSpawn:timing=>{receipt=timing;}
     });
@@ -117,5 +118,6 @@ test('upgrade adapter schedules the selected or remaining cap for both hosts and
     child.emit('close',null);
     await assert.rejects(pending,error=>error.code==='ROLE_TIMEOUT' && error.termination_confirmed===true);
     assert.equal(timers.size,0);
+    original.dispose();
   }
 });

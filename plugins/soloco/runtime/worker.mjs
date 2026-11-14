@@ -15,7 +15,7 @@ import {requestModelProcess,recordModelProcessBirth,recordModelProcessClosure,re
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { withStore, stamp, id, digest, notice, noLink, upgradePending, compatibleRuntime } from './store.mjs';
+import { withStore, stamp, id, digest, notice, noLink, upgradePending, compatibleRuntime, originalStoreExecutionCustodyFrom, retainOriginalStoreCommitCutoffFrom } from './store.mjs';
 import { runModel, parseArtifact } from './adapters.mjs';
 import {sessionTitle} from './session-naming.mjs';
 import { assignmentContext, contextMatches, contextBudgetForJob } from './context.mjs';
@@ -31,6 +31,27 @@ import {updateTaskIndex} from './task-index.mjs';
 import { TIMEOUT_POLICY_VERSION, normalizeTimeout, executionTiming, jobExecutionTiming, jobTimeoutState } from './timeout.mjs';
 import {assertSpecialistEligible,specialistName} from './specialists.mjs';
 import {isOriginMechanicalQaWorker,workPeerOriginMechanicalQa} from './origin-mechanical-qa-worker.mjs';
+import {prepareOriginalWorkerLaunchFrom,cleanupOriginalWorkerLaunchFailure,originalWorkerFailedLaunchClosed} from './peers/prospective-local-worker-inventory-producer.mjs';
+
+const originalWorkerCommitCutoffs=new WeakMap();
+export function inspectOriginalWorkerCommitCutoffFrom(proof,actualDb){
+  const record=originalWorkerCommitCutoffs.get(proof),loan=originalStoreExecutionCustodyFrom(actualDb);
+  if(!record||record.db!==loan.db||record.scope!==loan.scope||loan.mode!=='write')throw Error('Original worker commit cutoff custody required');
+  return record.facts;
+}
+function retainWorkerCommitCutoff(actualDb,bounds){
+  if(!bounds.length)return;
+  const loan=originalStoreExecutionCustodyFrom(actualDb);if(loan.mode!=='write')throw Error('Original worker write required');
+  const candidates=bounds.map(({at,code=null,message})=>{const deadline=typeof at==='number'?at:Date.parse(at);if(!Number.isSafeInteger(deadline)||deadline<0||deadline>8640000000000000)throw Object.assign(Error(message),code===null?{}:{code});return {deadline_at_ms:deadline,code,message};});
+  const facts=Object.freeze(candidates.reduce((a,b)=>a.deadline_at_ms<=b.deadline_at_ms?a:b)),proof=Object.freeze({});
+  originalWorkerCommitCutoffs.set(proof,{db:loan.db,scope:loan.scope,facts});retainOriginalStoreCommitCutoffFrom(actualDb,proof,'worker');
+}
+function retentionCommitBounds(control){
+  const bounds=[{at:control.expires_at,message:'Original retention-review authority expired'}];
+  if(control.qa_deadline_at!==null&&control.qa_deadline_at!==undefined)bounds.push({at:control.qa_deadline_at,message:'Retention-review QA cutoff reached before COMMIT'});
+  return bounds;
+}
+function retainWorkerRetentionCommit(actualDb,state,control){assertRetentionRepairCommit(state,control);retainWorkerCommitCutoff(actualDb,retentionCommitBounds(control));}
 
 const scopedContext=a=>a?.qualification?.protocol===scoped.SCOPED_PROTOCOL;
 const maintenanceEligible=(s,j)=>qualificationMaintenanceEligible(s,j)||scoped.scopedMaintenanceEligible(s,j)||operatingMaintenanceEligible(s,j);
@@ -53,7 +74,9 @@ function validateEnvelope(artifact,roles) {
 function failureEvidence(error) {
   const evidence={message:String(error?.message??'Unknown execution failure').slice(0,1000)};
   if(typeof error?.code==='string')evidence.code=error.code.slice(0,100);
-  if(typeof error?.termination_confirmed==='boolean')evidence.termination_confirmed=error.termination_confirmed;
+  const privateClose=originalWorkerFailedLaunchClosed(error);
+  if(privateClose!==null)evidence.termination_confirmed=privateClose;
+  else if(typeof error?.termination_confirmed==='boolean')evidence.termination_confirmed=error.termination_confirmed;
   return evidence;
 }
 
@@ -284,7 +307,7 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
       withStore(root,db=>db.transaction('job.model_process.requested',s=>{requestModelProcess(eligibility(s),invocation);return s;}));
       if(repair&&retentionPhase==='final')withStore(root,db=>db.transaction('job.retention_primary_requested',s=>{
         const current=eligibility(s);beginRetentionPrimaryDelivery(current,{native_id:session,request,frame:retentionFinalFrame,invocation_id:invocation.invocation_id});return s;
-      },{beforeCommit:(_db,next)=>assertRetentionRepairCommit(next,repair.control)}));
+      },{beforeCommit:(_db,next)=>retainWorkerRetentionCommit(_db,next,repair.control)}));
       if(repair)retentionCalls++;
       const recordOriginalClose=(birth,receipt)=>{
         if(!originalProcessBirth||JSON.stringify(birth)!==JSON.stringify(originalProcessBirth))throw Error('Original model process identity changed');
@@ -304,7 +327,26 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
           });
         });
       };
-      output=await model(job.host,session,request,dir,remaining,job.model_selection??null,{
+      output=await withStore(root,store=>{
+        let launch;store.transaction('job.model_process.launch_requested',s=>{
+          const current=eligibility(s),bounds=[],timing=jobTimeoutState(current,Date.now());
+          if(!['waiting','executing'].includes(timing.state))throw Object.assign(Error('Assignment deadline reached'),{code:'ROLE_TIMEOUT'});
+          bounds.push({at:timing.deadline_at,code:'ROLE_TIMEOUT',message:'Assignment deadline reached'});
+          const target=s.records[current.review_of?.id],grant=s.records[current.development_id??current.prototype_id];
+          const scopedGrant=Boolean(repair||target?.development?.type==='review_continuation'||current.development_id||current.prototype_id);
+          if(scopedGrant){
+            const expires=repair?.proposal?.expires_at??target?.development?.proposal?.expires_at??grant?.development?.scope?.expires_at??grant?.prototype?.scope?.expires_at;
+            bounds.push({at:expires,code:'SCOPE_EXPIRED',message:'Scoped authorization expired'});
+            if(current.execution_started_at===undefined&&current.code_review_window_minutes!==undefined){
+              const window=current.code_review_window_minutes*60000;if(!Number.isSafeInteger(window)||window<=0)throw Object.assign(Error('Invalid complete code review window'),{code:'SCOPE_WINDOW_UNAVAILABLE'});
+              bounds.push({at:Date.parse(expires)-window+1,code:'SCOPE_WINDOW_UNAVAILABLE',message:'Complete code review window exceeds its new authorization deadline'});
+            }
+          }
+          retainWorkerCommitCutoff(store.db,bounds);launch=prepareOriginalWorkerLaunchFrom(store,s,{job_id:jobId,kind:'model',invocation_id:invocation.invocation_id});return s;
+        });
+        return model(job.host,session,request,dir,remaining,job.model_selection??null,{
+        originalExecutionLaunch:launch,
+        beforeOriginalSpawn:()=>withStore(root,current=>eligibility(current.read())),
         sessionTitle:displayTitle,sessionNameDirectory:dir,
         onModelProcess:birth=>{withStore(root,db=>db.transaction('job.model_process.born',s=>{recordModelProcessBirth(s.jobs[jobId],invocation,birth);return s;}));originalProcessBirth=JSON.parse(JSON.stringify(birth));},
         onModelClosure:recordOriginalClose,
@@ -328,12 +370,12 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
             if(continuationGrantDeadline!==null&&Date.parse(overallTiming.execution_deadline_at)>continuationGrantDeadline)throw Object.assign(Error('Complete code review window exceeds its new authorization deadline'),{code:'SCOPE_WINDOW_UNAVAILABLE'});
             Object.assign(current,overallTiming);
             return s;
-          },continuationGrantDeadline===null?{}:{beforeCommit:(_db,nextState)=>{if(repair)assertRetentionRepairCommit(nextState,repair.control);else assertReviewContinuationCommit(nextState,{owner:target.development.proposal.owner,expires_at:target.development.proposal.expires_at});}}));
+          },continuationGrantDeadline===null?{}:{beforeCommit:(_db,nextState)=>{if(repair)retainWorkerRetentionCommit(_db,nextState,repair.control);else{assertReviewContinuationCommit(nextState,{owner:target.development.proposal.owner,expires_at:target.development.proposal.expires_at});retainWorkerCommitCutoff(_db,[{at:target.development.proposal.expires_at,message:'Explicit prospective continuation deadline is missing or expired'}]);}}}));
           spawned=true;
           // Keep the immutable local policy in step only for legacy callback upgrades.
           if(job.timeout_policy_version===undefined)Object.assign(job,{timeout_policy_version:TIMEOUT_POLICY_VERSION,...timeout});
         }:undefined
-      });
+      });});
       if(model===runModel&&(!originalProcessBirth||!originalProcessReceipt))throw Object.assign(Error('Actual model process birth was not retained'),{code:'MODEL_PROCESS_CLOSURE_HELD'});
       if([7,8].includes(job.context_format)){
         runtimeContextBytes+=Buffer.byteLength(output.text,'utf8');
@@ -369,7 +411,7 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
             const current=eligibility(s),fresh=retentionRepairPrimarySnapshot(s,current,{root,contextText:context.text});
             if(buildRetentionRepairFinal(fresh,current).text!==request)throw Error('Final primary/current controls changed before successful delivery');
             confirmRetentionPrimaryDelivery(current,{native_id:output.native_id,request,invocation_id:invocation.invocation_id,delivered_at:stamp()});validateRetentionPrimaryDelivery(current,fresh);return s;
-          },{beforeCommit:(_db,next)=>assertRetentionRepairCommit(next,repair.control)}));
+          },{beforeCommit:(_db,next)=>retainWorkerRetentionCommit(_db,next,repair.control)}));
           retentionFinalArtifact=finalArtifact;retentionPhase='done';break;
         }
         if(response.kind==='ready'){
@@ -548,18 +590,30 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
         notice(s,'must_know','A late or stale result was quarantined; it grants no approval.',artifactId);
       }
       return s;
-    },{afterWrite:job?.runtime_task?updateTaskIndex:undefined,beforeCommit:job?.code_review_window_minutes?(_db,nextState)=>{
-      const cutoff=Date.parse(overallTiming?.execution_deadline_at??'');
-      if(!Number.isFinite(cutoff)||Date.now()>=cutoff)throw Object.assign(Error('Code review final pre-COMMIT deadline reached'),{code:'ROLE_TIMEOUT'});
-      if(repair)assertRetentionRepairCommit(nextState,retentionPublicationControl??repair.control);
-      const target=nextState.records[job.review_of?.id];if(target?.development?.type==='review_continuation')assertReviewContinuationCommit(nextState,{owner:target.development.proposal.owner,expires_at:target.development.proposal.expires_at});
-    }:undefined}));
+    },{afterWrite:job?.runtime_task?updateTaskIndex:undefined,beforeCommit:(_db,nextState)=>{
+      const bounds=[],current=nextState.jobs[jobId];
+      if(job?.code_review_window_minutes){
+        const cutoff=Date.parse(overallTiming?.execution_deadline_at??'');
+        if(!Number.isSafeInteger(cutoff)||Date.now()>=cutoff)throw Object.assign(Error('Code review final pre-COMMIT deadline reached'),{code:'ROLE_TIMEOUT'});
+        bounds.push({at:cutoff,code:'ROLE_TIMEOUT',message:'Code review final pre-COMMIT deadline reached'});
+        if(repair){const control=retentionPublicationControl??repair.control;assertRetentionRepairCommit(nextState,control);bounds.push(...retentionCommitBounds(control));}
+        const target=nextState.records[job.review_of?.id];if(target?.development?.type==='review_continuation'){assertReviewContinuationCommit(nextState,{owner:target.development.proposal.owner,expires_at:target.development.proposal.expires_at});bounds.push({at:target.development.proposal.expires_at,message:'Explicit prospective continuation deadline is missing or expired'});}
+      }
+      if(current?.status==='completed'&&['started_at','created_at','timeout_policy_version','timeout_ms','execution_started_at','execution_deadline_at','termination_deadline_at'].some(key=>Object.hasOwn(current,key))){
+        const timing=jobTimeoutState({...current,status:'running'},Date.now());
+        if(!['waiting','executing'].includes(timing.state))throw Object.assign(Error('Assignment final pre-COMMIT deadline reached'),{code:'ROLE_TIMEOUT'});
+        bounds.push({at:timing.deadline_at,code:'ROLE_TIMEOUT',message:'Assignment final pre-COMMIT deadline reached'});
+      }
+      retainWorkerCommitCutoff(_db,bounds);
+    }}));
   } catch(error) {
     if(!claimed&&error.code==='ORIGIN_MECHANICAL_QA_FIXED_WORKER_REQUIRED')throw error;
+    const escaped=cleanupOriginalWorkerLaunchFailure(error);
     const rejectedOutput=output??error.rejected_output;
     const unowned=Symbol('unowned worker');
     try {withStore(root,db=>db.transaction('job.failed',s=>{
       const current=s.jobs[jobId];
+      const privateClose=originalWorkerFailedLaunchClosed(error);
       // Recheck under the write lock: another worker may have claimed after
       // startup validation failed. Only persistent never-started queue evidence
       // permits an unclaimed worker to close a cancelled assignment.
@@ -567,9 +621,14 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
         ['started_at','worker_pid','execution_started_at','execution_deadline_at','termination_deadline_at','finished_at'].some(k=>current[k]!=null)))throw unowned;
       if(claimed&&(!current||current.instance_id!==job?.instance_id||current.worker_pid!==process.pid))throw unowned;
       if(current) {
-        if(!invoked || output || error.termination_confirmed===true)current.coordination_release={termination_confirmed:true,reason:invoked?'model_process_closed':'model_not_invoked',at:stamp()};
+        // A failed physical write can retain an immutable provider Error whose
+        // public flag or earlier output says closed. Only the original private
+        // child observation may enter the canonical all-invocation reconciler.
+        if(privateClose!==null)current.coordination_release={termination_confirmed:false,reason:'original_process_closure_unknown',at:stamp()};
+        else if(!invoked || output || error.termination_confirmed===true)current.coordination_release={termination_confirmed:true,reason:invoked?'model_process_closed':'model_not_invoked',at:stamp()};
         const cause=controller?.signal.aborted?controller.signal.reason:error;
         const evidence=failureEvidence(error),reason=failureEvidence(cause);
+        if(privateClose!==null)evidence.termination_confirmed=false;
         current.execution_failure={...evidence,...(context?.qualification&&reason.code==='ASSIGNMENT_INELIGIBLE'?{abort_kind:'eligibility_loss'}:{}),outcome:/TIMEOUT/.test(reason.code??evidence.code??'')?'timeout':controller?.signal.aborted?'cancellation':'failure',at:stamp(),...(controller?.signal.aborted?{abort:reason}:{})};
       }
       if(current && ['queued','running','cancelled','interrupted'].includes(current.status)) {
@@ -608,11 +667,16 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
         }
         notice(s,'must_know',`Specialist ${current.role} could not finish: ${current.error}`,jobId);
       }
+      if(current&&privateClose===true){
+        // Closure of this child cannot erase an earlier UNKNOWN invocation or
+        // replace the exact ordinary request/birth/close producer history.
+        try{reconcileStoredModelProcessClosure(db,current);current.execution_failure.termination_confirmed=true;}catch{/* retain UNKNOWN */}
+      }
       return s;
-    }));} catch(failure) {if(failure!==unowned)throw failure;}
+    }));} catch(failure) {if(failure!==unowned)throw escaped?error:failure;}
   } finally {
     if(monitor!==undefined)clearInterval(monitor);
     monitorCache=null;lastExecutionDeadline=null;
   }
 }
-if(process.argv[1] && path.resolve(process.argv[1])===fileURLToPath(import.meta.url)) await work(process.argv[2],process.argv[3]);
+if(process.argv[1] && path.resolve(process.argv[1])===fileURLToPath(import.meta.url))queueMicrotask(()=>{work(process.argv[2],process.argv[3]).catch(error=>{console.error(error);process.exitCode=1;});});

@@ -53,9 +53,11 @@ export function inspectOriginalCompiledCodexPlan(o,h){check(o,h);return {...plan
 export function claimOriginalCompiledCodexPlan(o,h){check(o,h);if(claimed)throw Error('Synthetic consumed');claimed=true;return {...plan,consumed:true};}
 export function originalCompiledPeerContextInterpreter(o,h){check(o,h);return null;}
 export function originalCompanionSlotMatches(s){return s===slot;}
+export function isOriginalBootstrapMembershipInterpreter(){return false;}
+export function originalBootstrapCompanionSlotMatches(){return false;}
 export function spawn(){return child;}
 const unavailable=()=>{throw Error('Unused synthetic predecessor');};
-export {unavailable as resolveOriginalPeerContextInterpreter,unavailable as assertOriginalPeerContextInterpreterFinal,unavailable as assertOriginalPeerContextSlot,unavailable as inspectOriginalPeerContextInterpreter};
+export {unavailable as resolveOriginalPeerContextInterpreter,unavailable as assertOriginalPeerContextInterpreterFinal,unavailable as assertOriginalPeerContextSlot,unavailable as inspectOriginalPeerContextInterpreter,unavailable as assertOriginalBootstrapMembershipInterpreterFinal,unavailable as inspectOriginalBootstrapMembershipInterpreter,unavailable as assertOriginalBootstrapMembershipSlot,unavailable as inspectOriginalCompiledBootstrapScope};
 `);
  const shimURL=pathToFileURL(shimFile).href;
  const relocated=original.split('\n').map(line=>{

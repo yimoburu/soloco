@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {DatabaseSync} from 'node:sqlite';
 import {canonical,peerDigest} from '../plugins/soloco/runtime/peers/ledger.mjs';
 import {qaRecordRef,qaRawHash} from '../plugins/soloco/runtime/peers/origin-mechanical-qa-contract.mjs';
 import {Store,withStore} from '../plugins/soloco/runtime/store.mjs';
@@ -12,6 +13,7 @@ import * as actualPolicy from '../plugins/soloco/runtime/peers/origin-mechanical
 import {ORIGIN_MECHANICAL_QA_WIRE as WIRE,ORIGIN_MECHANICAL_QA_RAW_CONTEXT as RAW,ORIGIN_MECHANICAL_REVIEW_INSTRUCTION,createOriginMechanicalQaWire,assertOriginMechanicalQaWire,originMechanicalQaPrompt,assertOriginMechanicalQaPromptFits} from '../plugins/soloco/runtime/peers/origin-mechanical-qa-wire-contract.mjs';
 import {wireFixture,actor} from './peer-origin-mechanical-qa-wire-fixture.mjs';
 import {syntheticMechanicalModel} from './origin-mechanical-qa-dispatch-fixture.mjs';
+import {inspectOriginalLocalExecutionInventoryFrom} from '../plugins/soloco/runtime/peers/prospective-local-worker-inventory-producer.mjs';
 const copy=v=>JSON.parse(JSON.stringify(v));
 function purePack(extra=''){
  const plan={protocol:'peer-origin-quarantine-plan-v1',plan_id:'plan-one',cut_sha256:'a'.repeat(64),owner:{host:'codex',session_id:'SOURCE-owner'},cut:{governance:'Original governance 🌍',roles_json:'{"qa":{"instructions":"Original full QA."}}',cos_instructions:'Original CoS instructions.',unknown:'Retain original UNKNOWN.'},source_instruction:'SOURCE only',execution_resumed:false};
@@ -21,6 +23,11 @@ function purePack(extra=''){
 }
 function alterWire(context,fn){const c=copy(context),wire=JSON.parse(c.text);fn(wire);c.text=JSON.stringify(wire);c.characters=c.text.length;c.utf8_bytes=Buffer.byteLength(c.text);c.sha256=qaRawHash(c.text);return c;}
 const code=expected=>e=>e.code===expected;
+function loseOriginalHistory(f){
+ const db=new DatabaseSync(f.file);let original;
+ try{original=db.prepare('SELECT seq,value FROM events ORDER BY seq LIMIT 1').get();const payload=JSON.parse(original.value);delete payload.original_execution;db.prepare('UPDATE events SET value=? WHERE seq=?').run(JSON.stringify(payload),original.seq);}finally{db.close();}
+ return ()=>{const restored=new DatabaseSync(f.file);try{restored.prepare('UPDATE events SET value=? WHERE seq=?').run(original.value,original.seq);}finally{restored.close();}};
+}
 const cache=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-wire-SYNTHETIC-cache-')),prior=process.env.COMPANY_PLUGIN_DATA;process.env.COMPANY_PLUGIN_DATA=cache;
 test.after(()=>{if(prior===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=prior;fs.rmSync(cache,{recursive:true,force:true});});
 
@@ -71,7 +78,7 @@ test('NEW complete installed-team oversize fixture produces packet-v2, exact inv
  f.grant();await f.loadWorker();const id=f.queue();withStore(f.root,store=>store.readSnapshot(()=>{const read=f.policy.prepareOriginalPeerOriginMechanicalQaContextFrom(store.db,store.read(),{job_id:id});assert.equal(read.protocol,'peer-origin-mechanical-qa-context-readback-v2');assert.equal(read.text,c.text);assert.equal(read.context_protocol,WIRE);}));
  let sent;const script=syntheticMechanicalModel(f,{beforeBirth:({prompt})=>{sent=prompt;assert(prompt.includes(c.text));assert(!prompt.includes(raw));assert(Buffer.byteLength(prompt)<=200000);}}),result=await f.worker.work(f.root,id,script.model);
  assert.equal(result.verdict,'Pass');assert.equal(script.calls,1);assert.equal(f.launches,1);const after=f.state();assert.equal(after.records[f.grantReceipt.grant_ref.id].origin_mechanical_qa.used_attempts,1);assert.deepEqual(after.jobs.old,before.jobs.old);assert.deepEqual(after.original_grant,before.original_grant);assert.equal(after.paused,true);
- t.diagnostic(JSON.stringify({scope:'NEW fictional installed-team SOURCE fixture only; native observations/inventory SYNTHETIC',raw_characters:raw.length,raw_utf8_bytes:Buffer.byteLength(raw),wire_characters:c.characters,wire_utf8_bytes:c.utf8_bytes,prompt_utf8_bytes:Buffer.byteLength(sent),real_company_fit:'UNMEASURED'}));
+ t.diagnostic(JSON.stringify({scope:'NEW fictional installed-team SOURCE fixture; genuine Original journal with standard Node child mocks; no Native qualification',raw_characters:raw.length,raw_utf8_bytes:Buffer.byteLength(raw),wire_characters:c.characters,wire_utf8_bytes:c.utf8_bytes,prompt_utf8_bytes:Buffer.byteLength(sent),real_company_fit:'UNMEASURED'}));
 });
 test('legacy packet-v1 replay/grant/job/readback and exact old frame preserve original identity',async t=>{
  const f=await wireFixture(t,{legacyV1:true});f.prepare();const packet=copy(f.state().records[f.packet.packet_ref.id]),beforeRef=qaRecordRef(packet),context=packet.origin_mechanical_qa.context;
@@ -101,8 +108,9 @@ test('bounded v2 range reads are exact and Unicode-safe, stale hashes and mixed 
  for(const input of [{sha256:'0'.repeat(64),offset:0,length:1},{sha256:c.sha256,offset:0,length:4097}])assert.throws(()=>f.plan.readPeerOriginMechanicalQaPacketAtEpoch(f.root,actor,9,{packet_ref:ref,...input}),code('ORIGIN_MECHANICAL_QA_RANGE'));
  const raw=f.raw();f.write('SYNTHETIC mixed packet shape',s=>{s.records[ref.id].origin_mechanical_qa.context.unrecognized_semantics=true;return s;});assert.throws(()=>f.plan.inspectPeerOriginMechanicalQaPacketAtEpoch(f.root,actor,9,{packet_ref:qaRecordRef(f.state().records[ref.id])}));assert.notEqual(f.raw(),raw);
 });
-test('actual missing inventory still Holds before queue charge or worker launch for v2',async t=>{
- const f=await wireFixture(t);f.prepare();f.grant();const before=f.raw();assert.throws(()=>withStore(f.root,store=>store.transaction('job.queued',s=>{const job={...s.records[f.packet.packet_ref.id].origin_mechanical_qa.job,created_at:new Date().toISOString()};actualPolicy.reservePeerOriginMechanicalQaFrom(store,s,job,{expected_epoch:9,grant_ref:f.grantReceipt.grant_ref});return s;})),code('ORIGIN_MECHANICAL_QA_EXECUTION_INVENTORY_SOURCE_REQUIRED'));assert.equal(f.raw(),before);assert.equal(f.state().records[f.grantReceipt.grant_ref.id].origin_mechanical_qa.used_attempts,0);
+test('missing genuine Original history Holds globally before v2 queue charge or worker launch',async t=>{
+ const f=await wireFixture(t);f.prepare();f.grant();await f.loadWorker();const restore=loseOriginalHistory(f),before=f.raw();
+ try{withStore(f.root,store=>store.readSnapshot(()=>assert.throws(()=>inspectOriginalLocalExecutionInventoryFrom(store.db),code('ORIGINAL_EXECUTION_HISTORY_REQUIRED'))));assert.throws(()=>f.queue(),code('ORIGINAL_EXECUTION_HISTORY_REQUIRED'));assert.equal(f.raw(),before);assert.equal(f.state().records[f.grantReceipt.grant_ref.id].origin_mechanical_qa.used_attempts,0);assert.equal(f.launches,undefined);}finally{restore();}
 });
 test('packet terminal provider errors preserve original Error/TypeError/AggregateError and rollback',async t=>{
  const f=await wireFixture(t),before=f.raw(),transaction=Store.prototype.transaction,cause=Error('SOURCE provider original cause');
@@ -117,13 +125,18 @@ test('expiry after the last successful packet provider read rolls back every new
  try{assert.throws(()=>f.prepare(),code('ORIGIN_MECHANICAL_QA_EXPIRED'));}finally{Store.prototype.transaction=transaction;Date.now=now;}assert.equal(hit,1);assert.equal(f.raw(),before);
 });
 test('v2 worker authority loss retains original rejected output and spent UNKNOWN without new work',async t=>{
- const f=await wireFixture(t);f.prepare();f.grant();await f.loadWorker();const id=f.queue(),old=f.state().jobs.old,script=syntheticMechanicalModel(f,{beforeReturn:()=>{f.inventory.setKnown(false);}});
- try{await assert.rejects(()=>f.worker.work(f.root,id,script.model),code('ORIGIN_MECHANICAL_QA_EXECUTION_CARDINALITY_UNKNOWN'));}finally{f.inventory.setKnown(true);}const s=f.state();assert.equal(script.calls,1);assert.equal(s.jobs[id].status,'failed');assert.equal(s.jobs[id].rejected_output.accepted,false);assert.equal(JSON.parse(s.jobs[id].rejected_output.text).review.verdict,'Pass');assert.deepEqual(s.jobs.old,old);assert.equal(s.records[f.grantReceipt.grant_ref.id].origin_mechanical_qa.used_attempts,1);
+ const f=await wireFixture(t);f.prepare();f.grant();await f.loadWorker();const id=f.queue(),old=f.state().jobs.old,readSnapshot=Store.prototype.readSnapshot;let restore=null,originalFailure=null,abortReason=null;
+ // Restore only after the real failed Source read has ended. Its exact error
+ // remains the signal reason; the adapter reports its own ROLE_ABORTED error.
+ Store.prototype.readSnapshot=function(...args){try{return Reflect.apply(readSnapshot,this,args);}catch(error){if(restore&&this.inTransaction===false&&error.code==='ORIGINAL_EXECUTION_HISTORY_REQUIRED'){originalFailure??=error;const undo=restore;restore=null;undo();}throw error;}};
+ const script=syntheticMechanicalModel(f,{beforeReturn:async({options})=>{restore=loseOriginalHistory(f);await new Promise(resolve=>{if(options.signal.aborted)resolve();else options.signal.addEventListener('abort',resolve,{once:true});});abortReason=options.signal.reason;}});
+ try{await assert.rejects(()=>f.worker.work(f.root,id,script.model),code('ROLE_ABORTED'));}finally{Store.prototype.readSnapshot=readSnapshot;restore?.();}assert.ok(originalFailure);assert.strictEqual(abortReason,originalFailure);assert.equal(abortReason.code,'ORIGINAL_EXECUTION_HISTORY_REQUIRED');const s=f.state();assert.equal(script.calls,1);assert.equal(s.jobs[id].status,'failed');assert.equal(s.jobs[id].rejected_output.accepted,false);assert.equal(JSON.parse(s.jobs[id].rejected_output.text).review.verdict,'Pass');assert.deepEqual(s.jobs.old,old);assert.equal(s.records[f.grantReceipt.grant_ref.id].origin_mechanical_qa.used_attempts,1);
 });
 test('exact full prompt can Hold while its wire alone fits, before any packet or grant row',async t=>{
- // Measured compact fixture wire is about30k and its complete prompt about33k.
- // The asserted error specifically distinguishes the actual full-frame check.
- const f=await wireFixture(t,{utf8Limit:31500}),before=f.raw();assert.throws(()=>f.prepare(),code('ORIGIN_MECHANICAL_QA_PROMPT_CAPACITY'));assert.equal(f.raw(),before);assert.equal(Object.values(f.state().records).filter(r=>r.origin_mechanical_qa?.protocol==='peer-origin-mechanical-qa-packet-v2').length,0);assert.equal(f.state().original_grant.used_attempts,2);
+ const probe=await wireFixture(t);probe.prepare();const context=probe.context(),task=probe.state().records[probe.packet.packet_ref.id].origin_mechanical_qa.job.task,promptBytes=Buffer.byteLength(originMechanicalQaPrompt(task,context.text,WIRE));assert(promptBytes>context.utf8_bytes);const selectedBytes=Math.floor((context.utf8_bytes+promptBytes)/2);
+ // The complete Source-generated wire fits this selected limit; its full
+ // original prompt does not. No fixture-size snapshot substitutes for bytes.
+ const f=await wireFixture(t,{utf8Limit:selectedBytes}),before=f.raw();assert.throws(()=>f.prepare(),code('ORIGIN_MECHANICAL_QA_PROMPT_CAPACITY'));assert.equal(f.raw(),before);assert.equal(Object.values(f.state().records).filter(r=>r.origin_mechanical_qa?.protocol==='peer-origin-mechanical-qa-packet-v2').length,0);assert.equal(f.state().original_grant.used_attempts,2);
 });
 test('last-read publication expiry keeps exact rejected raw custody without review, refund or old UNKNOWN release',async t=>{
  const f=await wireFixture(t);f.prepare();f.grant();await f.loadWorker();const id=f.queue(),old=f.state().jobs.old,transaction=Store.prototype.transaction,read=Store.prototype.read,now=Date.now,deadline=Date.parse(f.input.expires_at);let terminal=null,cutoff=null,hit=0;
