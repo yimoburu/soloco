@@ -146,7 +146,19 @@ The pre-ordinary generated Native recipe is stale. The new family remains held u
 
 The task journal grammar accepts one exact `dispatch_admitted` payload only for successful task admission, bound to the same task, attempt, effect and pause/policy generations. Denied admission, reads, unchanged receipts and other ordinary task mutations accept no nested custom events.
 
-Journal producers are limited to task submit, assign, claim, admit, cancel, process, finish and closure. Consumer/helper names do not grant task-write recipes. Empty read guards produce no peer event and are not historical exemptions.
+Task mutation journal producers are limited to submit, assign, claim, admit,
+cancel, process, finish and closure. The existing private task-effect writer
+has separate exact recipes for `message/send`, `notice/create`, `home/propose`,
+`handoff/accept` and `handoff/reject`: one new task-namespaced command and its
+exact new result, with original admission/qualification lineage and no task,
+accounting, reservation or unrelated row mutation. These recipes apply both to
+the owning prewrite postimage and subsequent history validation. They do not
+authorize an effect from public `task_effect` DATA; the original private client,
+executor, current context, scope, finite authority and final commit guard are
+still required. A notice may make the old task context stale, preserving the
+subsequent action/output hold. Publication, GitHub, transfer and administrative
+writes retain their separate gates. Consumer/helper names do not grant write
+recipes; empty reads and exact replay produce no event or historical exemption.
 
 Ordinary task admission stores the earliest of the original task-bound qualification deadline, task grant expiry and existing 120-second effect lease. The compulsory context retains that same immutable qualification cutoff. Existing original launch, spawn, Native permit and broker clocks inherit the shortened stored lease; a currentness check before later reads cannot extend it.
 

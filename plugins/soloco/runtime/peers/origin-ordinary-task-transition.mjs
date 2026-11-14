@@ -2,7 +2,7 @@
 // authority import. Original journal lineage is necessary; DATA recreates no
 // private Native token. Current physical/source checks remain with fixed callers.
 import {FAMILIES,canonical,peerDigest,inspectOriginalPeerTransactionIdentityFrom,originalPeerExecutionLedgerFrom} from './ledger.mjs';
-import {ordinaryNeed as need,ordinarySame as same,ordinaryCopy as copy,ordinaryRef as ref,ordinaryReference as reference,ordinaryData as data,ordinaryHash as hash,ordinaryPrimaryApproval,ordinaryPurpose,ordinaryNativeDataScope,ORDINARY_ACTIONS,ORIGIN_ORDINARY_TASK_KIND,ORIGIN_ORDINARY_TASK_CONTEXT,validatePeerOrdinaryOriginOutput} from './origin-ordinary-task-contract.mjs';
+import {ordinaryNeed as need,ordinarySame as same,ordinaryCopy as copy,ordinaryRef as ref,ordinaryReference as reference,ordinaryData as data,ordinaryHash as hash,ordinaryText,ordinaryPrimaryApproval,ordinaryPurpose,ordinaryNativeDataScope,ORDINARY_ACTIONS,ORIGIN_ORDINARY_TASK_KIND,ORIGIN_ORDINARY_TASK_CONTEXT,validatePeerOrdinaryOriginOutput} from './origin-ordinary-task-contract.mjs';
 const key=(family,id)=>canonical([family,id]),STEPS=Object.freeze(['decision_recorded','grant_selected','admitted','native_created','completed','unknown','late_evidence','committed','resumed']);
 export function ordinaryRowsFrom(tx,family){const all=[];let cursor;for(;;){const p=tx.list(family,{limit:100,...(cursor?{cursor}:{})});need(p&&Array.isArray(p.items),'ORIGIN_ORDINARY_TASK_NAMESPACE');all.push(...p.items);need(all.length<=10000,'ORIGIN_ORDINARY_TASK_CAPACITY');if(p.complete)return all;need(p.next_cursor&&p.next_cursor!==cursor,'ORIGIN_ORDINARY_TASK_NAMESPACE');cursor=p.next_cursor;}}
 export function ordinaryExactFrom(tx,r,kind){r=reference(r);const row=tx.getVersion(r);need(row&&row.id===r.id&&row.revision===r.revision&&row.sha256===r.sha256&&peerDigest(row.value)===r.sha256&&(!kind||row.value.kind===kind),'ORIGIN_ORDINARY_TASK_PROVENANCE');return {...row,created_seq:tx.get(r.family,r.id)?.created_seq};}
@@ -40,6 +40,7 @@ export function assertPeerOrdinaryOriginJournalEventFrom(tx,e){
  return {protocol:'peer-origin-ordinary-task-transition-v1',event_ref:ordinaryEventRef(e),step,operation_ref:j.operation_ref,original_command_ref:j.original_command_ref,changes:j.changes};
 }
 export function assertPeerOrdinaryTaskEventFrom(tx,e,qualification_ref){
+ if(ORDINARY_EFFECT_ACTIONS.includes(e.type))return assertOrdinaryEffectEventFrom(tx,e,qualification_ref);
  // Consumer action names are not journal producers. The fixed model writes
  // task rows only through these eight selected operations; read-only guards
  // with no rows/custom events produce no committed peer event at all.
@@ -85,3 +86,117 @@ export function assertPeerOrdinaryOriginReadyFrom(tx,{ledger=null,action,subject
 // transformation, not a namespace exclusion, owner factory or current grant.
 export function peerOrdinaryOriginOwnerResumePostimageFrom(tx,h,{transitions,changes,command_ref,control_after}){const v=copy(h.value),own=new Set(v.own_keys.map(([f,id])=>key(f,id)));need(v.status==='activated'&&Array.isArray(v.expected_overrides),'ORIGIN_ORDINARY_TASK_OWNER_CHANGED');for(const c of [...transitions.flatMap(t=>t.changes),...changes]){if(c.family==='work_items'&&c.id===h.id)continue;const k=key(c.family,c.id);if(own.has(k))continue;if(c.before_ref===null){own.add(k);v.own_keys.push([c.family,c.id]);continue;}const after=ordinaryExactFrom(tx,c.after_ref),before=ordinaryExactFrom(tx,c.before_ref);let entry=v.expected_overrides.find(r=>r.family===c.family&&r.id===c.id);if(!entry){entry={family:c.family,id:c.id,original:c.before_ref,current:c.after_ref};v.expected_overrides.push(entry);}else{need(same(entry.current,c.before_ref),'ORIGIN_ORDINARY_TASK_OWNER_SUBJECT_CHANGED');entry.current=c.after_ref;}need(before.id===after.id&&after.revision===before.revision+1,'ORIGIN_ORDINARY_TASK_OWNER_SUBJECT_CHANGED');}v.status='resumed';v.resume_command_ref=reference(command_ref,'commands');v.resume_control_ref=reference(control_after,'control');return v;}
 export function assertPeerOrdinaryOriginOwnerResumeReceiptFrom(tx,{handover,principal,company}){const h=handover,v=h.value,cmd=ordinaryExactFrom(tx,v.resume_command_ref,'origin_ordinary_task_command');need(cmd.revision===1&&cmd.value.action==='resumed'&&cmd.value.actor.native_id===principal.value.native_id&&cmd.value.actor.host===principal.value.host&&cmd.value.request.epoch===v.epoch,'ORIGIN_ORDINARY_TASK_OWNER_CHANGED');const e=tx.events({after:cmd.created_seq-1,limit:1}).items[0];need(e?.seq===cmd.created_seq&&e.type==='origin.ordinary-task.resumed','ORIGIN_ORDINARY_TASK_RESUME_CHANGED');const proof=assertPeerOrdinaryOriginJournalEventFrom(tx,e),control=ordinaryExactFrom(tx,v.resume_control_ref),q=ordinaryExactFrom(tx,cmd.value.request.qualification_ref,'origin_ordinary_task_qualification');need(same(proof.operation_ref,v.resume_command_ref)&&same(cmd.value.result.control,v.resume_control_ref)&&same(cmd.value.result.qualification_ref,ref('work_items',q))&&cmd.value.result.paused===false&&control.value.paused===false&&control.value.pause_generation===q.value.pause_generation+1&&same(control.value.owner_handover,company.value.owner_handover)&&same(q.value.owner_ref,ref('principals',principal))&&same(v.incoming,{host:cmd.value.actor.host,session_id:cmd.value.actor.session_id,native_id:cmd.value.actor.native_id}),'ORIGIN_ORDINARY_TASK_OWNER_CHANGED');return {control_ref:v.resume_control_ref,qualification_ref:ref('work_items',q),epoch:v.epoch};}
+
+// Cold journal recipes for the existing private task-effect writer. These
+// assertions issue no readiness, executor, grant or commit capability. The
+// live writer still checks its original task client and executor, exact current
+// qualification/context, scope, authority and final deadline before COMMIT.
+const ORDINARY_EFFECT_ACTIONS=Object.freeze(['message/send','notice/create','home/propose','handoff/accept','handoff/reject']);
+const EFFECT_NAMESPACE_KEYS=['protocol','task_id','attempt_id','authority_epoch','context_sha256','admission_producer','executor_incarnation_id','runtime_generation'];
+const EFFECT_ATTRIBUTION_KEYS=['task_id','attempt_id','task_effect'];
+const effectNeed=ok=>need(ok,'ORIGIN_ORDINARY_TASK_EFFECT_CHANGED');
+const effectHex=v=>typeof v==='string'&&/^[a-f0-9]{64}$/.test(v);
+// Match the existing model writer, including JSON-escaped lone surrogates.
+// Handoff text separately retains its producer's scalar-text restriction.
+const effectText=(v,max)=>typeof v==='string'&&v.trim().length>0&&v.length<=max&&!v.includes('\0');
+const effectClosed=(v,keys)=>Boolean(v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).length===keys.length&&keys.every(k=>Object.hasOwn(v,k)));
+const effectRow=r=>({id:r.id,revision:r.revision,sha256:r.sha256,created_seq:r.created_seq,value:r.value});
+function effectTime(value){const ms=typeof value==='string'?Date.parse(value):NaN;effectNeed(Number.isSafeInteger(ms)&&new Date(ms).toISOString()===value);return ms;}
+function effectEventHash(e){return peerDigest({seq:e.seq,type:e.type,principal_id:e.principal_id,payload:e.payload,previous_sha256:e.previous_sha256});}
+
+function effectAdmissionFrom(tx,e,namespace,qualification_ref){
+ const producer=namespace.admission_producer;
+ effectNeed(effectClosed(producer,['command','event_seq','event_sha256'])&&Number.isSafeInteger(producer.event_seq)&&producer.event_seq>0&&producer.event_seq<e.seq&&effectHex(producer.event_sha256));
+ const commandRef=reference(producer.command,'commands'),command=ordinaryExactFrom(tx,commandRef),v=command.value;
+ effectNeed(command.revision===1&&command.created_seq===producer.event_seq&&v.action==='task/admit'&&effectText(v.operation_id,160)&&effectHex(v.request_sha256)&&command.id===peerDigest(['peer-command-v1',v.principal_id,v.operation_id]));
+ const admittedEvent=tx.events({after:producer.event_seq-1,limit:1}).items[0];
+ effectNeed(admittedEvent?.seq===producer.event_seq&&admittedEvent.type==='task/admit'&&admittedEvent.principal_id===v.principal_id&&admittedEvent.sha256===producer.event_sha256&&effectEventHash(admittedEvent)===admittedEvent.sha256);
+ const commands=admittedEvent.payload.changes.filter(c=>c.family==='commands');
+ effectNeed(commands.length===1&&same(ref('commands',commands[0]),commandRef)&&commands[0].previous_sha256===null);
+ const receipt=v.result,admitted=receipt?.task;
+ effectNeed(receipt?.admitted===true&&admitted?.id===namespace.task_id&&admitted.value?.owner_principal_id===e.principal_id&&admitted.value.principal_id===e.principal_id);
+ let task=ordinaryExactFrom(tx,ref('tasks',admitted));
+ effectNeed(same(effectRow(task),admitted)&&admittedEvent.payload.changes.filter(c=>c.family==='tasks'&&same(ref('tasks',c),ref('tasks',task))).length===1);
+ effectNeed(same(receipt.context,task.value.attempt?.context));
+
+ // Recover the task immediately before this effect. A later genuine terminal
+ // result must not invalidate an earlier effect's historical provenance, while
+ // an effect AFTER cancellation or closure cannot reuse its admission stamp.
+ let after=producer.event_seq,previous=producer.event_sha256,count=0,bytes=0;
+ while(after<e.seq-1){
+  const page=tx.events({after,limit:Math.min(100,e.seq-1-after)});
+  effectNeed(page&&Array.isArray(page.items)&&page.items.length>0);
+  for(const event of page.items){
+   effectNeed(event.seq===after+1&&event.seq<e.seq&&event.previous_sha256===previous&&effectEventHash(event)===event.sha256);
+   bytes+=Buffer.byteLength(canonical(event));effectNeed(++count<=10000&&bytes<=64*1024*1024);
+   for(const change of event.payload.changes)if(change.family==='tasks'&&change.id===task.id){
+    effectNeed(change.previous_sha256===task.sha256&&change.revision===task.revision+1);
+    task=ordinaryExactFrom(tx,ref('tasks',change));
+   }
+   after=event.seq;previous=event.sha256;
+  }
+ }
+ const t=task.value,a=t.attempt,ctx=a?.context,authority=a?.effect_authority;
+ effectNeed(t.status==='running'&&!Object.hasOwn(t,'result')&&!Object.hasOwn(t,'closure')&&a?.termination_confirmed===false&&t.owner_principal_id===e.principal_id&&t.principal_id===e.principal_id);
+ // While authority remains live, the only supported task postimage change is
+ // its one original process observation; immutable purpose/resources cannot drift.
+ const {process:observedProcess,process_observation:processObservation,...attemptBody}=a;
+ effectNeed(same({...t,attempt:attemptBody},admitted.value));
+ effectNeed(t.authority_epoch===namespace.authority_epoch&&t.authority_event_seq===producer.event_seq&&a.id===namespace.attempt_id&&authority?.epoch===namespace.authority_epoch&&authority.protocol==='peer-task-effect-authority-v1');
+ effectNeed(same(t.definition,admitted.value.definition)&&peerDigest(t.definition)===t.definition_sha256&&same(t.origin_qualification_ref,qualification_ref)&&same(t.definition.origin_qualification_ref,qualification_ref));
+ effectNeed(ctx?.sha256===namespace.context_sha256&&same(ctx,receipt.context)&&same(ctx.ordinary_origin?.qualification_ref,qualification_ref));
+ const q=ordinaryExactFrom(tx,qualification_ref,'origin_ordinary_task_qualification'),cutoff=q.value.deadline_at_ms;
+ const issued=effectTime(authority.issued_at),expires=effectTime(authority.expires_at);
+ effectNeed(q.revision===1&&Number.isSafeInteger(cutoff)&&ctx.ordinary_origin.deadline_at_ms===cutoff&&expires>issued&&expires<=cutoff&&expires-issued<=120000&&a.admitted_at===authority.issued_at);
+ return {task,context:ctx};
+}
+
+function assertOrdinaryEffectEventFrom(tx,e,qualification_ref){
+ effectNeed(Number.isSafeInteger(e.seq)&&e.seq>1&&effectText(e.principal_id,200)&&e.payload?.changes?.length===2&&Array.isArray(e.payload.events)&&e.payload.events.length===0);
+ effectNeed(e.payload.changes.every(change=>effectClosed(change,['family','id','revision','sha256','previous_sha256'])&&change.revision===1&&change.previous_sha256===null));
+ const rows=eventRows(tx,e);
+ effectNeed(rows.every(r=>!r.before&&r.after.revision===1&&r.after.created_seq===e.seq));
+ const commandRows=rows.filter(r=>r.family==='commands');effectNeed(commandRows.length===1);
+ const command=commandRows[0].after,v=command.value,namespace=v.task_effect;
+ effectNeed(effectClosed(v,['principal_id','operation_id','action','request_sha256',...EFFECT_ATTRIBUTION_KEYS,'result','created_at']));
+ effectNeed(effectClosed(namespace,EFFECT_NAMESPACE_KEYS)&&namespace.protocol==='peer-task-effect-binding-v1'&&effectText(namespace.task_id,2000)&&effectText(namespace.attempt_id,2000)&&effectText(namespace.executor_incarnation_id,2000)&&Number.isSafeInteger(namespace.authority_epoch)&&namespace.authority_epoch>0&&Number.isSafeInteger(namespace.runtime_generation)&&namespace.runtime_generation>0&&effectHex(namespace.context_sha256));
+ effectNeed(v.action===e.type&&v.principal_id===e.principal_id&&effectText(v.operation_id,160)&&effectHex(v.request_sha256)&&v.task_id===namespace.task_id&&v.attempt_id===namespace.attempt_id);
+ effectNeed(command.id===peerDigest(['peer-task-command-v1',e.principal_id,namespace,v.operation_id]));
+ const result=rows.find(r=>r.family!=='commands'),r=result.after,value=r.value;
+ effectNeed(same(v.result,effectRow(r))&&value.principal_id===e.principal_id&&value.task_id===namespace.task_id&&value.attempt_id===namespace.attempt_id&&same(value.task_effect,namespace));
+ const {task,context}=effectAdmissionFrom(tx,e,namespace,qualification_ref),t=task.value;
+ // Display timestamps are not an authority clock. The original private writer
+ // checks expiry at the physical commit boundary; history does not renew it.
+ effectTime(value.created_at);effectTime(v.created_at);effectNeed(value.scope===t.scope);
+ const operation=peerDigest(['peer-task-operation-v1',namespace,v.operation_id]);
+ const common=['status','scope','principal_id',...EFFECT_ATTRIBUTION_KEYS,'created_at'];
+ if(e.type==='message/send'||e.type==='notice/create'){
+  const message=e.type==='message/send',family=message?'messages':'notices';
+  effectNeed(result.family===family&&effectClosed(value,[...common,'content','kind',...(message?['to_principal_id']:[])])&&value.status==='pending'&&r.id===peerDigest([family,e.principal_id,operation])&&effectText(value.content,12000));
+  // Message kind is arbitrary canonical DATA in the existing writer. The
+  // notice enum is intentionally narrower and retains its context effect.
+  effectNeed(message?effectText(value.to_principal_id,200):['must_know','decision_required'].includes(value.kind));
+  return;
+ }
+ if(e.type==='home/propose'){
+  effectNeed(result.family==='proposals'&&effectClosed(value,[...common,'home_id','base','content','dependencies','readset','membership'])&&value.status==='proposed'&&effectText(value.home_id,200)&&r.id===peerDigest(['proposal',e.principal_id,operation]));
+  effectNeed(Array.isArray(t.resources)&&t.resources.some(resource=>resource.kind==='home'&&resource.id===value.home_id&&resource.key==='home:'+value.home_id));
+  effectNeed(Buffer.byteLength(canonical(value.content))<=64000&&Array.isArray(value.dependencies)&&value.dependencies.length<=100&&Array.isArray(context.sources));
+  const supplied=context.sources.map(source=>ref(source.family,source)),base=supplied.find(source=>source.family==='homes'&&source.id===value.home_id)??null;
+  effectNeed(same(value.base,base)&&same(value.readset,supplied)&&same(value.membership,context.membership));
+  for(const dependency of value.dependencies){reference(dependency,'homes');effectNeed(supplied.some(source=>same(source,dependency)));}
+  return;
+ }
+ // The disposition preserves exactly the handoff frozen into this task. Its
+ // source producer and all current subject/receiver checks remain in handoff.mjs.
+ effectNeed(result.family==='work_items'&&effectClosed(value,['kind',...common,'operation_id','handoff_ref','sender','receiver','subject_ref','governing_refs','evidence_refs','reason','source_instruction','authority_control']));
+ const envelope=t.handoff_envelope,handoff=t.handoff_ref;
+ effectNeed(handoff&&envelope?.protocol==='peer-task-handoff-envelope-v1'&&same(handoff,t.definition.handoff_ref)&&same(envelope,t.definition.handoff_envelope)&&same(envelope.handoff_ref,handoff));
+ const original=ordinaryExactFrom(tx,reference(handoff,'work_items')),h=original.value;
+ effectNeed(same(h,envelope.value)&&h.kind==='peer_handoff_v1'&&h.status==='pending'&&h.scope===t.scope&&h.receiver?.id===e.principal_id);
+ effectNeed(value.kind==='peer_handoff_disposition_v1'&&value.status===(e.type==='handoff/accept'?'accepted':'rejected')&&value.operation_id===operation&&r.id===peerDigest(['peer-handoff-disposition-v1',handoff,h.receiver])&&same(value.handoff_ref,handoff));
+ for(const field of ['sender','receiver','subject_ref','governing_refs','evidence_refs'])effectNeed(same(value[field],h[field]));
+ effectNeed(ordinaryText(value.reason,4000)&&ordinaryText(value.source_instruction,4000));
+ const company=ordinaryExactFrom(tx,reference(value.authority_control,'control'));
+ effectNeed(company.id==='company'&&company.value.paused===false&&company.value.policy_generation===t.attempt.policy_generation&&company.value.pause_generation===t.attempt.pause_generation&&same(company.value.ordinary_origin_qualification_ref,qualification_ref));
+}
