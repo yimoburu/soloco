@@ -39,6 +39,24 @@ release a reservation. Unsupported clients, malformed/missing metadata,
 descendants and mismatched selectors Hold before peer access. Claude has no
 reviewed equivalent identity contract for these new routes.
 
+### Claude hook-bound tier (weaker, read-only)
+
+Claude supplies no host-observed thread/session identity. A separate
+`requireClaudeHookBoundActor` admits only `company_peers` `status`, `inspect` and
+`read` on Claude when all of these hold: an active fixed `main.serve` Claude
+invocation, selector host `claude`, a well-formed `session_id`, and a current
+managed hook record matching root, host, session, plugin version/root and data
+directory. The actor is `{host:'claude',native_id:null,tier:'HOOK_BOUND'}`.
+
+This tier is **not** native identity. It cannot tell a root chat from a subagent
+or descendant that knows the session ID, because Claude exposes no descendant
+marker. It never satisfies `requireCodexRootActor`, `native_identity_proof` and
+`native_qualification` stay false, and the canonical founder, owner epoch and
+operator checks inside the peer runtime still apply. Every mutating or
+provider-starting peer action, the owner and origin lifecycle routes and the
+development budget remain Codex-root only. `company_doctor.caller_identity`
+reports `hook_bound_tier_eligible` as data only.
+
 `company_doctor.caller_identity` reports bounded observations without exposing
 thread/session IDs. `authority_granted` and `native_qualification` remain false.
 These diagnostics are not tokens and cannot be submitted to obtain authority.

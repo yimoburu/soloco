@@ -144,9 +144,12 @@ test('current managed hook fields are checked independently of valid HOST identi
  assert.equal(payload(await server.call('company_peers',f.args('status'),rootMeta(ROOT))).started,false);unchanged(f.db,before);
 });
 
-test('Claude cannot use new private peer routes even with matching metadata and an actual Claude binding',async t=>{
+test('Claude hook-bound tier reaches only read routes and still needs the canonical founder; mutations keep the Codex root Hold',async t=>{
  const f=fixture(t),before=sqlState(f.db);f.bindSession(ROOT,'claude');const server=await f.start('claude');
- denied(await server.call('company_peers',f.args('status'),rootMeta(ROOT)),ROOT_HOLD);unchanged(f.db,before);
+ // Weaker tier admits the read caller, but the Codex founder principal is not this Claude operator.
+ denied(await server.call('company_peers',f.args('status'),rootMeta(ROOT)),/Current canonical founder operator/);
+ for(const action of ['start','tick','stop'])denied(await server.call('company_peers',f.args(action),rootMeta(ROOT)),ROOT_HOLD);
+ unchanged(f.db,before);
 });
 
 for(const host of ['codex','claude'])test('legacy '+host+' read-only adoption stays logically compatible and explicitly unqualified without root metadata',async t=>{

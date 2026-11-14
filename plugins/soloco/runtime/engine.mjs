@@ -34,7 +34,7 @@ import {peerRuntimeAction} from './peer-runtime.mjs';
 import {peerAdoptionRuntimeAction} from './peer-adoption-runtime.mjs';
 import {peerOwnerRuntimeAction,peerOwnerRoutingStorageKind,validatePeerOwnerRequest} from './peer-owner-runtime.mjs';
 import {peerOriginRuntimeAction,validatePeerOriginRequest} from './peer-origin-runtime.mjs';
-import {requireCodexRootActor} from './mcp-host-context.mjs';
+import {requireCodexRootActor,requireClaudeHookBoundActor} from './mcp-host-context.mjs';
 import {taskRecord,taskReady,bindTaskAttempt,taskContextFormat} from './tasks.mjs';
 import {runtimeGrant,runtimeControlBinding} from './task-runtime-authority.mjs';
 import {readTaskState,updateTaskIndex} from './task-index.mjs';
@@ -112,8 +112,10 @@ export function runtime(args,host){binding(args,host);return runtimeAction(args,
 // New peer authority never falls back to a caller-selected session or a legacy
 // binding file. The fixed MCP ingress supplies identity; the current binding is
 // an additional lifecycle/source consistency check, not a native proof.
-export function peerCallerActor(args,host){
-  const actor=requireCodexRootActor({host,session_id:args.session_id});
+// hookBound admits the weaker Claude tier for read-only callers only; every other
+// route keeps the Codex root-actor requirement unchanged.
+export function peerCallerActor(args,host,{hookBound=false}={}){
+  const actor=hookBound&&host==='claude'?requireClaudeHookBoundActor({host,session_id:args.session_id}):requireCodexRootActor({host,session_id:args.session_id});
   const fail=()=>{throw Object.assign(Error('PEER_CURRENT_HOOK_REQUIRED: New peer access requires a current matching managed startup-hook record; a legacy binding is not caller identity.'),{code:'PEER_CURRENT_HOOK_REQUIRED'});};
   const sameNode=(a,b)=>a.dev===b.dev&&a.ino===b.ino&&a.mode===b.mode;
   const stableFile=(a,b)=>sameNode(a,b)&&a.size===b.size&&a.nlink===b.nlink&&a.mtimeNs===b.mtimeNs&&a.ctimeNs===b.ctimeNs;
@@ -152,7 +154,8 @@ export function peerCallerActor(args,host){
   if(!current||Array.isArray(current)||current.root!==root||current.host!==actor.host||current.session_id!==actor.session_id||current.plugin_version!==VERSION||current.plugin_root!==PACKAGE||current.data_directory!==directory||typeof current.at!=='string'||!Number.isFinite(Date.parse(current.at)))fail();
   return actor;
 }
-export function peers(args,host){peerCallerActor(args,host);return peerRuntimeAction(args,host);}
+export const PEER_HOOK_BOUND_READ_ACTIONS=Object.freeze(['status','inspect','read']);
+export function peers(args,host){peerCallerActor(args,host,{hookBound:PEER_HOOK_BOUND_READ_ACTIONS.includes(args?.action)});return peerRuntimeAction(args,host);}
 export function ownerLifecycle(args,host){
   const checked=validatePeerOwnerRequest(args,host);
   peerCallerActor(checked,host);
