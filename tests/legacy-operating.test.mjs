@@ -1,3 +1,4 @@
+import {preexistingLegacyStore} from './preexisting-legacy-data-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -98,7 +99,7 @@ test('overcapacity holds whole uncertain coupling and never implies global fit',
 test('capture uses existing SQLite transaction/vault; rollback does not publish capsule',()=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'legacy-bootstrap-contract-'));let db;
   try{
-    db=new Store(dir,true);db.transaction('fixture',()=>fixture());db.migrate();
+    db=preexistingLegacyStore(dir,'fixture',()=>fixture());db.migrate();
     const s=db.read(),m=build(s);assert.throws(()=>legacy.captureLegacyBootstrap(s,m),/transaction/);
     assert.throws(()=>legacy.captureLegacyBootstrap(s,m,{transaction:{inTransaction:true,transaction(){},read(){}}}),/transaction/);
     let capsule;db.transaction('fixture.capture',state=>{capsule=legacy.captureLegacyBootstrap(state,m,{transaction:db});state.bootstrap_fixture=capsule;return state;});

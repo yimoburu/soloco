@@ -24,6 +24,7 @@ const [store,snapshot,scoped,qualification,main,engine,worker,timeout,presentati
   import('../plugins/soloco/runtime/store.mjs'),import('../plugins/soloco/runtime/snapshot.mjs'),import('../plugins/soloco/runtime/scoped-context.mjs'),import('../plugins/soloco/runtime/context-qualification.mjs'),
   import('../plugins/soloco/runtime/main.mjs'),import('../plugins/soloco/runtime/engine.mjs'),import('../plugins/soloco/runtime/worker.mjs'),import('../plugins/soloco/runtime/timeout.mjs'),import('../plugins/soloco/runtime/public-response.mjs')
 ]));
+const {seedPreexistingLegacyData}=await withoutExternal(()=>import('./preexisting-legacy-data-fixture.mjs'));
 const {Store,SCHEMA,VERSION,digest,teamHash}=store,sha=value=>digest(JSON.stringify(value));
 const owner={host:'codex',session_id:'synthetic-frozen-intake-owner',epoch:1};
 const sourceInstruction='SYNTHETIC paused read-only corpus preservation. UNKNOWN, ZERO allowance and no retry remain binding. No execution authority.';
@@ -41,7 +42,7 @@ function fixture(t,{typedHome=false}={}){
   const directory=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'soloco-frozen-intake-'))),root=path.join(directory,'attached'),data=path.join(directory,'plugin-data');fs.mkdirSync(root);fs.mkdirSync(data);
   const previous=process.env.COMPANY_PLUGIN_DATA;process.env.COMPANY_PLUGIN_DATA=data;
   const s=state();if(typedHome)s.records.home={id:'home',revision:1,kind:'artifact',content:'Existing typed global obligation.',operating_record:{version:1,kind:'obligation',scope:'*',owner:'runner',conditions:'UNKNOWN remains',exceptions:'None',clearing:'Independent evidence',expires_at:null,dependencies:[],authority_refs:[],evidence_refs:['archive']}};
-  const db=new Store(root,true);db.transaction('synthetic.frozen-intake.seed',()=>s);db.migrate();
+  const db=new Store(root,true);seedPreexistingLegacyData(db,'synthetic.frozen-intake.seed',()=>s);db.migrate();
   const bindings=path.join(data,'bindings');fs.mkdirSync(bindings);fs.writeFileSync(path.join(bindings,digest(JSON.stringify([root,'codex',owner.session_id]))+'.json'),JSON.stringify({root,host:'codex',session_id:owner.session_id}));
   let closed=false;const close=()=>{if(closed)return;closed=true;db.close();if(process.env.COMPANY_PLUGIN_DATA===data){if(previous===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=previous;}fs.rmSync(directory,{recursive:true,force:true});};t.after(close);
   return {root,db,close};

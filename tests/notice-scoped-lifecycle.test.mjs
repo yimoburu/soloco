@@ -26,6 +26,7 @@ const [store,tasks,authority,index,engine,main,worker,timeout,context,current,sc
   import('../plugins/soloco/runtime/engine.mjs'),import('../plugins/soloco/runtime/main.mjs'),import('../plugins/soloco/runtime/worker.mjs'),import('../plugins/soloco/runtime/timeout.mjs'),
   import('../plugins/soloco/runtime/task-context.mjs'),import('../plugins/soloco/runtime/current-state.mjs'),import('../plugins/soloco/runtime/scoped-context.mjs'),import('../plugins/soloco/runtime/snapshot.mjs'),import('../plugins/soloco/runtime/context.mjs')
 ]));
+const {seedPreexistingLegacyData}=await withoutExternal(()=>import('./preexisting-legacy-data-fixture.mjs'));
 const {Store,SCHEMA,VERSION,digest,teamHash}=store,sha=value=>digest(JSON.stringify(value)),bytes=value=>Buffer.byteLength(typeof value==='string'?value:JSON.stringify(value));
 const owner={host:'codex',session_id:'synthetic-scoped-lifecycle-owner',epoch:1};
 const sourceInstruction='SYNTHETIC bounded preparation only. Preserve UNKNOWN, ZERO allowance and NO RETRY. No execution authority.';
@@ -50,7 +51,7 @@ function fixture(t){
   s.records['notice-home']={id:'notice-home',revision:1,kind:'artifact',content:JSON.stringify(project(notice)),context_obligations:{version:1,scope:'*'}};
   s.records['notice-dependency']={id:'notice-dependency',revision:1,kind:'artifact',content:dependency,context_obligations:{version:1,scope:'*'}};
   authority.setRuntimeControl(s,{...common,action:'start'},'codex');
-  const db=new Store(root,true);db.transaction('synthetic.lifecycle.seed',()=>s);db.migrate();index.installTaskIndex(db);
+  const db=new Store(root,true);seedPreexistingLegacyData(db,'synthetic.lifecycle.seed',()=>s);db.migrate();index.installTaskIndex(db);
   const bindings=path.join(data,'bindings');fs.mkdirSync(bindings);fs.writeFileSync(path.join(bindings,digest(JSON.stringify([root,'codex',owner.session_id]))+'.json'),JSON.stringify({root,host:'codex',session_id:owner.session_id}));
   let closed=false;const close=()=>{if(closed)return;closed=true;db.close();if(process.env.COMPANY_PLUGIN_DATA===data){if(previous===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=previous;}fs.rmSync(directory,{recursive:true,force:true});};t.after(close);
   return {root,db,close,notice,meaning:JSON.stringify(project(notice))};

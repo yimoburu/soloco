@@ -1,3 +1,4 @@
+import {seedPreexistingLegacyData} from './preexisting-legacy-data-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -40,7 +41,7 @@ test('presentation-only rename detection rejects unknown effects and producers',
 });
 test('explicit normalized migration backs up, round-trips unknown values and fences legacy writes',()=>{
  const root=fs.mkdtempSync(path.join(tmp,'db-'));const db=new Store(root,true),s=seed();s.records.a={id:'a',kind:'artifact',content:'large '.repeat(10000)};
- db.transaction('seed',()=>s);const before=JSON.stringify(db.read()),token=db.changeToken();
+ seedPreexistingLegacyData(db,'seed',()=>s);const before=JSON.stringify(db.read()),token=db.changeToken();
  const receipt=db.migrate();assert.ok(fs.existsSync(receipt.backup));assert.equal(JSON.stringify(db.read()),before);assert.equal(db.changeToken(),token);
  assert.throws(()=>db.db.prepare('UPDATE company SET value=? WHERE id=1').run('{}'),/Legacy writer fenced/);
  const archiveRow=db.db.prepare("SELECT sha256 FROM state_entries WHERE family='records' AND key='a'").get();
@@ -51,7 +52,7 @@ test('explicit normalized migration backs up, round-trips unknown values and fen
  const backup=new Store(restored);assert.equal(JSON.stringify(backup.read()),before);backup.close();
 });
 test('immutable corruption is detected and transactions rollback without dropping archive',()=>{
- const root=fs.mkdtempSync(path.join(tmp,'integrity-')),db=new Store(root,true);db.transaction('seed',()=>seed());db.migrate();const before=JSON.stringify(db.read());
+ const root=fs.mkdtempSync(path.join(tmp,'integrity-')),db=new Store(root,true);seedPreexistingLegacyData(db,'seed',()=>seed());db.migrate();const before=JSON.stringify(db.read());
  assert.throws(()=>db.selectedTransaction('fail',{rootKeys:['revision','owner'],entities:{records:['x']}},s=>{s.records.x={id:'x'};throw Error('interrupted');}),/interrupted/);
  assert.equal(JSON.stringify(db.read()),before);
  db.db.prepare('UPDATE immutable_values SET bytes=? WHERE sha256=(SELECT sha256 FROM state_entries WHERE family=?)').run('"tampered"','root');
@@ -102,7 +103,7 @@ test('archived job entries retain their exact typed classification provenance',(
 });
 import {backupCompany,restoreCompany} from '../plugins/soloco/runtime/storage-transfer.mjs';
 test('portable backup inventories project configuration/candidates and explicit artifacts; tampering holds restore',()=>{
- const root=fs.mkdtempSync(path.join(tmp,'portable-')),db=new Store(root,true);db.transaction('seed',()=>seed());db.migrate();
+ const root=fs.mkdtempSync(path.join(tmp,'portable-')),db=new Store(root,true);seedPreexistingLegacyData(db,'seed',()=>seed());db.migrate();
  fs.writeFileSync(path.join(root,'.company','development.json'),'{"max_bytes_ceiling":200000}');fs.mkdirSync(path.join(root,'.company','development'));fs.writeFileSync(path.join(root,'.company','development','candidate.mjs'),'fixture source');
  const external=path.join(tmp,'explicit-evidence.txt');fs.writeFileSync(external,'Required external fixture evidence');
  const backup=path.join(tmp,'portable-backup'),m=backupCompany(db,backup,{artifacts:[{source:external,path:'evidence.txt'}]});assert.equal(m.files.length,4);
@@ -152,13 +153,13 @@ test('public migration holds unfinished cancelled workers and requires explicit 
  assert.throws(()=>engine.storageControl({...a,action:'migrate',source_instruction:'Migrate'},'codex'),/Uncertain worker/);
 });
 test('targeted root deletion persists and absent immutable values never silently disappear',()=>{
- const root=fs.mkdtempSync(path.join(tmp,'delete-')),db=new Store(root,true);db.transaction('seed',()=>seed());db.migrate();
+ const root=fs.mkdtempSync(path.join(tmp,'delete-')),db=new Store(root,true);seedPreexistingLegacyData(db,'seed',()=>seed());db.migrate();
  db.selectedTransaction('delete',{rootKeys:['revision','owner','extension'],entities:{}},s=>{delete s.extension;return s;});assert.equal(Object.hasOwn(db.read(),'extension'),false);
  const sha=db.db.prepare("SELECT sha256 FROM state_entries WHERE family='root' AND key='name'").get().sha256;
  db.db.exec('PRAGMA foreign_keys=OFF');db.db.prepare('DELETE FROM immutable_values WHERE sha256=?').run(sha);assert.throws(()=>db.read(),/hash mismatch/);db.close();
 });
 test('transfers reject self-copy through company or selected artifact ancestors before creating output',()=>{
- const root=fs.mkdtempSync(path.join(tmp,'recursive-')),db=new Store(root,true);db.transaction('seed',()=>seed());
+ const root=fs.mkdtempSync(path.join(tmp,'recursive-')),db=new Store(root,true);seedPreexistingLegacyData(db,'seed',()=>seed());
  const nested=path.join(db.dir,'backup');assert.throws(()=>backupCompany(db,nested),/inside company/);assert.equal(fs.existsSync(nested),false);
  const external=fs.mkdtempSync(path.join(tmp,'artifact-tree-')),destination=path.join(external,'copy');
  assert.throws(()=>backupCompany(db,destination,{artifacts:[{source:external,path:'tree'}]}),/inside selected artifact/);assert.equal(fs.existsSync(destination),false);db.close();

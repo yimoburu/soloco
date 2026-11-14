@@ -1,3 +1,4 @@
+import {seedPreexistingLegacyData} from './preexisting-legacy-data-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -37,7 +38,7 @@ function seed(n=10,bodySize=1000) {
 function fixture(state=seed()) {
   const root=fs.mkdtempSync(path.join(base,'fixture-')),args={root,session_id:'founder'};
   engine.bind(root,'founder','codex');
-  withStore(root,db=>{db.transaction('synthetic.seed',()=>state);db.migrate();},true);
+  withStore(root,db=>{seedPreexistingLegacyData(db,'synthetic.seed',()=>state);db.migrate();},true);
   return args;
 }
 const inspect=(args,options={})=>engine.contextControl({...args,action:'inspect',...options},'codex');

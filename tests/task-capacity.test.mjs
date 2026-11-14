@@ -28,6 +28,7 @@ const [context,store,tasks,runtimeAuthority,index,runtime,main,presentation]=awa
   import('../plugins/soloco/runtime/main.mjs'),import('../plugins/soloco/runtime/public-response.mjs')
 ]));
 const {taskCapacityContext,taskAssignmentContext,taskContextMatches,taskDefinitionBinding}=context;
+const {seedPreexistingLegacyData}=await withoutExternal(()=>import('./preexisting-legacy-data-fixture.mjs'));
 const {Store,VERSION,SCHEMA,digest,teamHash}=store;
 const {submitTask,amendTask,taskDefinitionHash}=tasks;
 const {setRuntimeControl}=runtimeAuthority;
@@ -149,7 +150,7 @@ function logicalState(db){
 function storedFixture(t){
   const temporary=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'soloco-capacity-'))),root=path.join(temporary,'attached'),data=path.join(temporary,'plugin-data');fs.mkdirSync(root);fs.mkdirSync(data);
   const previous=process.env.COMPANY_PLUGIN_DATA;process.env.COMPANY_PLUGIN_DATA=data;
-  const {s,id}=fixture(),db=new Store(root,true);db.transaction('fictional.capacity.setup',()=>s);db.migrate();index.installTaskIndex(db);
+  const {s,id}=fixture(),db=new Store(root,true);seedPreexistingLegacyData(db,'fictional.capacity.setup',()=>s);db.migrate();index.installTaskIndex(db);
   const directory=path.join(data,'bindings');fs.mkdirSync(directory);const binding=path.join(directory,digest(JSON.stringify([root,'codex',args.session_id]))+'.json');fs.writeFileSync(binding,JSON.stringify({root,host:'codex',session_id:args.session_id}));
   t.after(()=>{db.close();if(previous===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=previous;fs.rmSync(temporary,{recursive:true,force:true});});
   return {root,id,db,binding};

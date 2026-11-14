@@ -1,3 +1,4 @@
+import {seedPreexistingLegacyData} from './preexisting-legacy-data-fixture.mjs';
 // Transparent synthetic intake/native fixtures. These verify consumer mechanics;
 // neither this event provider nor these judgments are production storage/native QA.
 import test from 'node:test';
@@ -14,7 +15,7 @@ const args={maintenance:true,source_instruction:'Synthetic explicit read-only pr
 const home=(id='home',revision=1)=>({id,revision,kind:'artifact',status:'Draft',author_role:'runner',author_instance:'owner',content:'Complete envelope including retained history',previous:[{condition:'Never export'}],operating_record:{version:1,kind:'obligation',scope:'*',owner:'runner',conditions:'Read-only; never export',exceptions:'None',clearing:'Independent current authority',expires_at:null,dependencies:[],authority_refs:[],evidence_refs:[id]}});
 function fixture(){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'checkpoint-synthetic-'));const store=new Store(root,true);
- store.transaction('synthetic.create',()=>({id:'synthetic',name:'Synthetic',idea:'No operations',schema:2,owner:{session_id:'owner',host:'codex',epoch:1},paused:true,governance:'No export',cos_instructions:'Preserve negatives',roles:{qa:{name:'QA'}},mode:'preparation',phase:'Frame',team_sha256:'synthetic',records:{home:home()},jobs:{},sessions:{},notices:[],messages:[],upgrade:null,upgrade_history:[]}));store.migrate();
+ seedPreexistingLegacyData(store,'synthetic.create',()=>({id:'synthetic',name:'Synthetic',idea:'No operations',schema:2,owner:{session_id:'owner',host:'codex',epoch:1},paused:true,governance:'No export',cos_instructions:'Preserve negatives',roles:{qa:{name:'QA'}},mode:'preparation',phase:'Frame',team_sha256:'synthetic',records:{home:home()},jobs:{},sessions:{},notices:[],messages:[],upgrade:null,upgrade_history:[]}));store.migrate();
  const s=store.read(),vault=new Map(),events=[],baselines=new Map();let last=structuredClone(s),seq=0;
  // Explicitly synthetic event provider on a real normalized Store handle. No
  // production checksum/coverage claim: storage owner verifies that separately.

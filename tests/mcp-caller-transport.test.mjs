@@ -1,6 +1,7 @@
 // Actual Node MCP stdio/source integration with fictional temporary SQLite.
 // _meta is SYNTHETIC HOST input here: this proves forwarding/guards only, never
 // installed-host provenance, native qualification or execution permission.
+import {seedPreexistingLegacyData} from './preexisting-legacy-data-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -75,7 +76,7 @@ function fixture(t,{legacyHost=null}={}){
  if(legacyHost){
   host=legacyHost;session='legacy-'+host+'-logical-owner';root=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-caller-legacy-'));file=path.join(root,'.company','company.sqlite');
   const team=installedTeam(),store=new Store(root,true);
-  try{store.transaction('fictional.transport-genesis',()=>({schema:2,id:'fictional-legacy-caller-company',name:'Fictional legacy preparation',idea:'No execution or adoption.',runtime_version:team.plugin_version,...team,team_sha256:teamHash(team),owner:{host,session_id:session,epoch:7},paused:true,records:{held:{id:'held',kind:'artifact',revision:1,content:'FAILED; ZERO allowance; no automatic retry.'}},jobs:{},sessions:{},notices:[],messages:[],context_classifications:{},unknown_future:{attempts_used:4,max_attempts:4}}));store.migrate();}finally{store.close();}
+  try{seedPreexistingLegacyData(store,'fictional.transport-genesis',()=>({schema:2,id:'fictional-legacy-caller-company',name:'Fictional legacy preparation',idea:'No execution or adoption.',runtime_version:team.plugin_version,...team,team_sha256:teamHash(team),owner:{host,session_id:session,epoch:7},paused:true,records:{held:{id:'held',kind:'artifact',revision:1,content:'FAILED; ZERO allowance; no automatic retry.'}},jobs:{},sessions:{},notices:[],messages:[],context_classifications:{},unknown_future:{attempts_used:4,max_attempts:4}}));store.migrate();}finally{store.close();}
   db=new DatabaseSync(file);
  }else{
   peer=peerFixture({principals:{founder:{native_id:ROOT,session_id:ROOT,legacy_owner:{host:'codex',session_id:ROOT,epoch:7}}}});({root,file}=peer);db=peer.ledger.db;

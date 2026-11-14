@@ -2,6 +2,7 @@
 // fixture prefix; original native/host seams are explicitly SYNTHETIC.
 // Fictional SQLite SOURCE tests. No real company, host binding, native/model,
 // provider, migration qualification or human authority is exercised here.
+import {seedPreexistingLegacyData} from './preexisting-legacy-data-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -68,7 +69,7 @@ test.after(()=>fs.rmSync(temp,{recursive:true,force:true}));
 const actor={host:'codex',session_id:'fictional-root',native_id:'fictional-root'};
 function fixture(t,changes={}){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-origin-company-')),team=installedTeam(),s=new Store(root,true);
- try{s.transaction('fixture.genesis',()=>({schema:2,id:'fictional-origin-company',name:'Source only',idea:'Retain unknowns.',runtime_version:'0.7.8',...team,team_sha256:teamHash(team),owner:{host:'codex',session_id:actor.session_id,epoch:9},paused:true,records:{original:{id:'original',kind:'artifact',status:'Draft',revision:1,content:'Never erase the old failure.'}},jobs:{old:{id:'old',status:'failed',native_id:'old-unknown',coordination_release:{termination_confirmed:false}}},sessions:{},messages:[],notices:[{id:'n-original',kind:'decision_required',summary:'Original UNKNOWN; exhausted grant remains expired.',resolution:null}],original_grant:{max_attempts:2,used_attempts:2,expires_at:'2020-01-01T00:00:00.000Z'},...changes}));s.migrate();}finally{s.close();}
+ try{seedPreexistingLegacyData(s,'fixture.genesis',()=>({schema:2,id:'fictional-origin-company',name:'Source only',idea:'Retain unknowns.',runtime_version:'0.7.8',...team,team_sha256:teamHash(team),owner:{host:'codex',session_id:actor.session_id,epoch:9},paused:true,records:{original:{id:'original',kind:'artifact',status:'Draft',revision:1,content:'Never erase the old failure.'}},jobs:{old:{id:'old',status:'failed',native_id:'old-unknown',coordination_release:{termination_confirmed:false}}},sessions:{},messages:[],notices:[{id:'n-original',kind:'decision_required',summary:'Original UNKNOWN; exhausted grant remains expired.',resolution:null}],original_grant:{max_attempts:2,used_attempts:2,expires_at:'2020-01-01T00:00:00.000Z'},...changes}));s.migrate();}finally{s.close();}
  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));const file=path.join(root,'.company','company.sqlite');
  const input={source_instruction:'Fictional exact mechanical quarantine authority only.',expires_at:new Date(Date.now()+3600000).toISOString(),policy:{worker_cap:3,queue_limit:1000,principal_queue_limit:100,max_context_bytes:65536,max_model_calls:10},maintenance:{scope:'*',source_instruction:'Fictional separate finite read-only origin maintenance, no old grant conversion.',max_model_calls:4,max_review_calls:2}};
  return {root,file,input,write:(type,fn)=>withStore(root,s=>s.transaction(type,fn)),state:()=>withStore(root,s=>s.read()),db:fn=>{const d=new DatabaseSync(file);try{return fn(d);}finally{d.close();}}};

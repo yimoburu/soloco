@@ -27,6 +27,7 @@ const [store,tasks,context,authority,current,notices,presentation,assignment,mai
   import('../plugins/soloco/runtime/public-response.mjs'),import('../plugins/soloco/runtime/context.mjs'),import('../plugins/soloco/runtime/main.mjs'),
   import('../plugins/soloco/runtime/engine.mjs'),import('../plugins/soloco/runtime/worker.mjs'),import('../plugins/soloco/runtime/timeout.mjs'),import('../plugins/soloco/runtime/snapshot.mjs'),import('../plugins/soloco/runtime/scoped-context.mjs'),import('../plugins/soloco/runtime/legacy-operating.mjs')
 ]));
+const {seedPreexistingLegacyData}=await withoutExternal(()=>import('./preexisting-legacy-data-fixture.mjs'));
 const {Store,VERSION,SCHEMA,digest,teamHash}=store;
 const {taskAssignmentContext,taskContextMatches,taskDefinitionBinding}=context;
 const owner={host:'codex',session_id:'fictional-notice-owner',epoch:1};
@@ -129,7 +130,7 @@ test('format8 keeps the actual 64KiB cap even when a caller requests a larger co
 function storedFixture(t,protocol){
   const temp=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'soloco-notice-source-'))),root=path.join(temp,'attached'),data=path.join(temp,'plugin-data');fs.mkdirSync(root);fs.mkdirSync(data);
   const previous=process.env.COMPANY_PLUGIN_DATA;process.env.COMPANY_PLUGIN_DATA=data;
-  const {s,id}=arguments.length>1?fixture(protocol):fixture(),db=new Store(root,true);db.transaction('fictional.notice.setup',()=>s);db.migrate();
+  const {s,id}=arguments.length>1?fixture(protocol):fixture(),db=new Store(root,true);seedPreexistingLegacyData(db,'fictional.notice.setup',()=>s);db.migrate();
   const dir=path.join(data,'bindings');fs.mkdirSync(dir);const binding=path.join(dir,digest(JSON.stringify([root,'codex',owner.session_id]))+'.json');fs.writeFileSync(binding,JSON.stringify({root,host:'codex',session_id:owner.session_id}));
   t.after(()=>{db.close();if(previous===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=previous;fs.rmSync(temp,{recursive:true,force:true});});
   return {root,db,id,binding};

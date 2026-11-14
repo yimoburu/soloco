@@ -1,3 +1,4 @@
+import {seedPreexistingLegacyData} from './preexisting-legacy-data-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -174,7 +175,7 @@ test('ordinary format 5 holds all unknown semantic material and typed failures w
 
 test('alternating handover/upgrade/retry snapshots grow compositionally and exact originals round-trip through immutable_values',t=>{
   const root=fs.mkdtempSync(path.join(tmp,'growth-')),db=new Store(root,true),s=seed();
-  s.records.source={id:'source',kind:'artifact',revision:1,content:'exact original 🧪 '.repeat(3000)};db.transaction('seed',()=>s);db.migrate();
+  s.records.source={id:'source',kind:'artifact',revision:1,content:'exact original 🧪 '.repeat(3000)};seedPreexistingLegacyData(db,'seed',()=>s);db.migrate();
   const sizes=[],originals=new Map();
   for(let i=0;i<12;i++){
     db.transaction('synthetic.alternate',state=>{
@@ -211,7 +212,7 @@ test('alternating handover/upgrade/retry snapshots grow compositionally and exac
 
 test('missing/corrupt immutable snapshots and malformed shape hold after reopen, without deleting history',()=>{
   for(const mode of ['missing','corrupt','shape']){
-    const root=fs.mkdtempSync(path.join(tmp,'corrupt-')),db=new Store(root,true);db.transaction('seed',()=>seed());db.migrate();
+    const root=fs.mkdtempSync(path.join(tmp,'corrupt-')),db=new Store(root,true);seedPreexistingLegacyData(db,'seed',()=>seed());db.migrate();
     let ref;db.transaction('retain',s=>{ref=retainSnapshot(s,{exact:'original',extension:[1,'🧪']});s.retained_fixture=ref;return s;});
     const state=db.read();assert.deepEqual(resolveSnapshot(state,ref),{exact:'original',extension:[1,'🧪']});
     const raw=snapshotBytes(state,ref),unicode=raw.indexOf('🧪');
@@ -226,7 +227,7 @@ test('missing/corrupt immutable snapshots and malformed shape hold after reopen,
 
 test('v4 portable restore retains exact ref bodies, origin provenance, unknown root keys and rollback integrity',()=>{
   const root=fs.mkdtempSync(path.join(tmp,'portable-')),db=new Store(root,true),s=seed();
-  Object.defineProperty(s,'__proto__',{value:{unknown_obligation:'Retain literal key'},enumerable:true});db.transaction('seed',()=>s);
+  Object.defineProperty(s,'__proto__',{value:{unknown_obligation:'Retain literal key'},enumerable:true});seedPreexistingLegacyData(db,'seed',()=>s);
   const before=JSON.stringify(db.read());db.migrate();let ref;
   db.transaction('snapshot',state=>{ref=retainSnapshot(state,JSON.parse(before));state.retained_fixture=ref;return state;});
   assert.equal(db.storageInfo().format,'normalized-v4');assert.equal(db.storageInfo().retained_source_state.sha256,digest(before));
@@ -315,7 +316,7 @@ test('legacy retained-handover locators bring their complete originals into new 
 test('native journal appends retain exact negative returns with linear storage and no full-state read',t=>{
   const root=fs.mkdtempSync(path.join(tmp,'journal-')),db=new Store(root,true),s=seed();
   s.upgrade={id:'attempt',status:'checking',calls:[],cos_pages:[],qa_pages:[],replays:[],deliveries:[],unknown:'Keep this field'};
-  db.transaction('seed',()=>s);assert.equal(db.migrate().format,'normalized-v4');
+  seedPreexistingLegacyData(db,'seed',()=>s);assert.equal(db.migrate().format,'normalized-v4');
   const body='Unique negative diagnostic evidence 🧪. '.repeat(300),sizes=[];
   const read=db.read;db.read=()=>{throw Error('Full company hydration is forbidden for native append');};
   for(let i=0;i<100;i++){
