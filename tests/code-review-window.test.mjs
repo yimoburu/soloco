@@ -1,5 +1,6 @@
-// Actual dispatch/Store/worker; model timing/output are controlled. No native,
-// tests, provider, company acceptance or renewed human authority is exercised.
+// Actual dispatch/Store/worker; child/clock/output are controlled. The supported
+// authorizer may run its fixed local sandbox readiness probe once; no candidate
+// tests, host model/provider, company acceptance or renewed human authority.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -8,44 +9,59 @@ import path from 'node:path';
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
 import {digest,withStore,id,Store} from '../plugins/soloco/runtime/store.mjs';
 import {work} from '../plugins/soloco/runtime/worker.mjs';
-import {executionTiming,normalizeCodeReviewWindow} from '../plugins/soloco/runtime/timeout.mjs';
+import {normalizeCodeReviewWindow} from '../plugins/soloco/runtime/timeout.mjs';
 import {proofJobSafe} from '../plugins/soloco/runtime/current-state.mjs';
+import {ControlledClock,launchOriginalWorker,startOriginalModel,stageOriginalHistoricalJob,stageOriginalReviewController,disposeOriginalProcessFixtures} from './original-worker-model-fixture.mjs';
 
 const base=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-code-window-'));
-process.env.COMPANY_PLUGIN_DATA=path.join(base,'plugin-data');test.after(()=>fs.rmSync(base,{recursive:true,force:true}));
+const previousPluginData=process.env.COMPANY_PLUGIN_DATA,originalRoots=[];
+process.env.COMPANY_PLUGIN_DATA=path.join(base,'plugin-data');test.after(()=>{for(const root of originalRoots)disposeOriginalProcessFixtures(root);if(previousPluginData===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=previousPluginData;fs.rmSync(base,{recursive:true,force:true});});
 const reason='Controlled source fixture: complete independent review needs multiple bounded calls.';
 function fixture(){
   const root=fs.mkdtempSync(path.join(base,'case-')),session_id=id('owner');engine.bind(root,session_id,'codex');engine.open({root,session_id,idea:'Controlled source-only review timing'},'codex');
+  originalRoots.push(root);
   withStore(root,db=>db.transaction('fixture.runtime-lineage',s=>{
     const result={status:'passed',exit_code:0,tests_executed:true},files=[{path:'sample.test.mjs',content:'// Controlled source body; no test is executed by this fixture.\n'}],candidate_sha256=digest(JSON.stringify(files));
-    const scope={expires_at:'2001-01-01T00:00:00.000Z',sources:files.map(f=>({...f,sha256:digest(f.content)})),test_paths:['sample.test.mjs']},scope_sha256=digest(JSON.stringify(scope));
+    const scope={expires_at:new Date(Date.now()+600000).toISOString(),read_paths:['sample.test.mjs'],write_paths:['sample.test.mjs'],sources:files.map(f=>({...f,sha256:digest(f.content)})),test_paths:['sample.test.mjs'],max_bytes:20000,max_attempts:2,timeout_ms:10000,max_output_bytes:10000},scope_sha256=digest(JSON.stringify(scope));
+    fs.writeFileSync(path.join(root,'sample.test.mjs'),files[0].content);
     s.records.plan={id:'plan',revision:1,kind:'artifact',content:'Original scope, expiry and spent counters remain unchanged',development:{type:'plan',scope,scope_sha256,attempts:2}};
     s.records.candidate={id:'candidate',revision:1,kind:'artifact',status:'Submitted',author_role:'engineer',author_instance:'fixture-engineer',job_id:'engineer-job',content:'Controlled candidate',development:{type:'candidate',plan_id:'plan',scope_sha256,candidate_sha256,files,run:{job_id:'test-controller',receipt_id:'receipt',status:'passed'}}};
     s.records.receipt={id:'receipt',revision:1,kind:'artifact',status:'Submitted',author_role:'runtime',author_instance:'test-controller',content:JSON.stringify(result),development:{type:'test',plan_id:'plan',candidate_id:'candidate',candidate_sha256,result,receipt_sha256:digest(JSON.stringify(result))}};
     s.records.supplemental={id:'supplemental',revision:1,kind:'artifact',content:'Whole controlled evidence '+('x'.repeat(60000))};
-    s.jobs['test-controller']={id:'test-controller',kind:'development_test',status:'completed',artifact_id:'receipt',candidate_id:'candidate',development_id:'plan'};
-    s.jobs['engineer-job']={id:'engineer-job',status:'completed',native_id:'fixture-author-native',coordination_release:{termination_confirmed:true}};
     return s;
-  }));return {root,session_id,epoch:1};
+  }));
+  const owner={root,session_id,epoch:1},plan=withStore(root,db=>db.read().records.plan);
+  // The supported owner action authorizes the exact initially-live fictional
+  // scope; its existing capability check can run one cached local Node probe.
+  // The controlled historical carrier executes no candidate tests or model.
+  engine.develop({...owner,action:'authorize',plan_id:'plan',scope_sha256:plan.development.scope_sha256,model_data_approved:true,source_instruction:'Controlled fictional Source fixture: authorize only this exact local carrier scope; no real test or Native acceptance.'},'codex');
+  stageOriginalHistoricalJob(root,{id:'engineer-job',role:'engineer',instance_id:'fixture-engineer',host:'codex',epoch:1,status:'completed',native_id:'fixture-author-native',artifact_id:'candidate',coordination_release:{termination_confirmed:true}});
+  stageOriginalReviewController(root,{jobId:'test-controller',planId:'plan',candidateId:'candidate',receiptId:'receipt'});
+  // The review starts after the unchanged old grant has expired. This clock
+  // transition never rewrites its original expiry, receipt or spent attempts.
+  return {...owner,reviewStart:Date.parse(plan.development.scope.expires_at)+1000};
 }
 function dispatch(f,window=30,extra={}){
-  return engine.dispatch({...f,role:'qa',task:'Read the complete exact supplemental source and independently review the runtime test receipt. This fixture does not authorize acceptance.',review_of:'receipt',evidence_ids:['supplemental'],timeout_ms:600000,timeout_reason:reason,...(window===null?{}:{code_review_window_minutes:window,code_review_reason:reason}),...extra},'codex',{launch:()=>({on(){},unref(){}}),check:()=>({available:true,authenticated:true,version:'controlled-source-host'})});
+  const {reviewStart,...owner}=f,RealDate=Date;
+  globalThis.Date=class extends RealDate{constructor(...a){super(...(a.length?a:[reviewStart]));}static now(){return reviewStart;}};
+  try{return engine.dispatch({...owner,role:'qa',task:'Read the complete exact supplemental source and independently review the runtime test receipt. This fixture does not authorize acceptance.',review_of:'receipt',evidence_ids:['supplemental'],timeout_ms:600000,timeout_reason:reason,...(window===null?{}:{code_review_window_minutes:window,code_review_reason:reason}),...extra},'codex',{launch:launchOriginalWorker,check:()=>({available:true,authenticated:true,version:'controlled-source-host'})});}
+  finally{globalThis.Date=RealDate;}
 }
 async function simulate(f,key,{tamper=false,longCall=false,expire=false,latePublication=false,latePersistence=false,failPending=false,inlineOnly=false}={}){
-  const RealDate=Date,originalTransaction=Store.prototype.transaction;let now=RealDate.now()+1000,calls=0,crossedPublicationBoundary=false;const limits=[];
-  globalThis.Date=class extends RealDate{constructor(...a){super(...(a.length?a:[now]));}static now(){return now;}};
-  if(latePublication)Store.prototype.transaction=function(type,fn,...rest){return originalTransaction.call(this,type,type==='job.completed'?s=>{s.records=new Proxy(s.records,{set(target,property,value){if(value?.job_id===key&&value?.author_role==='qa'){now=Date.parse(s.jobs[key].execution_deadline_at);crossedPublicationBoundary=true;}return Reflect.set(target,property,value);}});return fn(s);}:fn,...rest);};
-  if(latePersistence)Store.prototype.transaction=function(type,fn,options={}){return originalTransaction.call(this,type,fn,type==='job.completed'?{...options,afterWrite(db,state){options.afterWrite?.(db,state);now=Date.parse(state.jobs[key].execution_deadline_at);crossedPublicationBoundary=true;}}:options);};
+  const RealDate=Date,originalTransaction=Store.prototype.transaction,clock=new ControlledClock(f.reviewStart+1000);let calls=0,crossedPublicationBoundary=false;const limits=[];
+  globalThis.Date=class extends RealDate{constructor(...a){super(...(a.length?a:[clock.time]));}static now(){return clock.time;}};
+  if(latePublication)Store.prototype.transaction=function(type,fn,...rest){return originalTransaction.call(this,type,type==='job.completed'?s=>{s.records=new Proxy(s.records,{set(target,property,value){if(value?.job_id===key&&value?.author_role==='qa'){clock.move(Date.parse(s.jobs[key].execution_deadline_at));crossedPublicationBoundary=true;}return Reflect.set(target,property,value);}});return fn(s);}:fn,...rest);};
+  if(latePersistence)Store.prototype.transaction=function(type,fn,options={}){return originalTransaction.call(this,type,fn,type==='job.completed'?{...options,afterWrite(db,state){options.afterWrite?.(db,state);clock.move(Date.parse(state.jobs[key].execution_deadline_at));crossedPublicationBoundary=true;}}:options);};
   try{
     const original=withStore(f.root,db=>db.read()),source=original.records.supplemental,text=JSON.stringify(source),sha256=digest(text);
     await work(f.root,key,async(host,native,prompt,cwd,limit,selection,options)=>{
-      calls++;limits.push(limit);options.onSpawn?.(executionTiming(now,{timeout_ms:limit,timeout_reason:reason}));
-      if(failPending&&calls===2)throw Object.assign(Error('Controlled missing transport response'),{code:'CONTROLLED_NO_RESPONSE',termination_confirmed:false});
-      now+=longCall?600001:360000;
+      calls++;limits.push(limit);const call=startOriginalModel([host,native,prompt,cwd,limit,selection,options],{nativeId:'fixture-independent-reviewer',clock});
+      if(failPending&&calls===2){call.error(Object.assign(Error('Controlled missing transport response'),{code:'CONTROLLED_NO_RESPONSE'}));clock.move(clock.time+3000);return call.promise;}
+      clock.move(clock.time+(longCall?600001:360000));
       if(tamper&&calls===1)withStore(f.root,db=>db.transaction('fixture.policy-tamper',s=>{s.jobs[key].code_review_window_minutes=45;return s;}));
-      if(expire&&calls===3)now=Date.parse(withStore(f.root,db=>db.read().jobs[key]).execution_deadline_at);
-      if(!inlineOnly&&calls<=2){const offset=calls===1?0:32768;return {native_id:'fixture-independent-reviewer',text:JSON.stringify({reads:[{id:source.id,sha256,offset,length:Math.min(32768,text.length-offset)}]})};}
-      return {native_id:'fixture-independent-reviewer',text:JSON.stringify({content:'Controlled complete review; no actual native qualification or acceptance.',review:{verdict:'Pass',reason:'Both complete source ranges supplied in this controlled transport.',permitted_action:'accept_local_development',candidate_sha256:original.records.receipt.development.candidate_sha256,receipt_sha256:original.records.receipt.development.receipt_sha256,blockers:[]}})};
+      if(expire&&calls===3)clock.move(Date.parse(withStore(f.root,db=>db.read().jobs[key]).execution_deadline_at));
+      if(!inlineOnly&&calls<=2){const offset=calls===1?0:32768;call.respond(JSON.stringify({reads:[{id:source.id,sha256,offset,length:Math.min(32768,text.length-offset)}]}));return call.promise;}
+      call.respond(JSON.stringify({content:'Controlled complete review; no actual native qualification or acceptance.',review:{verdict:'Pass',reason:'Both complete source ranges supplied in this controlled transport.',permitted_action:'accept_local_development',candidate_sha256:original.records.receipt.development.candidate_sha256,receipt_sha256:original.records.receipt.development.receipt_sha256,blockers:[]}}));return call.promise;
     });return {calls,limits,crossedPublicationBoundary,state:withStore(f.root,db=>db.read())};
   }finally{globalThis.Date=RealDate;Store.prototype.transaction=originalTransaction;}
 }
@@ -63,7 +79,7 @@ test('tampering, overlong single calls and the exact overall deadline cannot pub
 test('ordinary roles, forged runtime lineage and an existing uncertain review session are rejected before queueing',()=>{
   for(const variant of ['engineer','forged','uncertain']){const f=fixture();
     if(variant==='forged')withStore(f.root,db=>db.transaction('fixture.bad-receipt',s=>{s.jobs['test-controller'].artifact_id='some-other-artifact';return s;}));
-    if(variant==='uncertain')withStore(f.root,db=>db.transaction('fixture.old-unknown',s=>{s.sessions['qa:review:receipt:1']={instance_id:'old-qa',role:'qa',host:'codex',native_id:'old-unknown-native'};s.jobs.old={id:'old',role:'qa',status:'failed',started_at:'2001-01-01T00:00:00Z',instance_id:'old-qa',execution_failure:{termination_confirmed:false}};return s;}));
+    if(variant==='uncertain'){stageOriginalHistoricalJob(f.root,{id:'old',role:'qa',host:'codex',epoch:1,status:'failed',started_at:'2001-01-01T00:00:00Z',instance_id:'old-qa',native_id:'old-unknown-native',execution_failure:{termination_confirmed:false}});withStore(f.root,db=>db.transaction('fixture.old-unknown',s=>{s.sessions['qa:review:receipt:1']={instance_id:'old-qa',role:'qa',host:'codex',native_id:'old-unknown-native'};return s;}));}
     const before=withStore(f.root,db=>db.read());assert.throws(()=>dispatch(f,30,variant==='engineer'?{role:'engineer'}:{}));const after=withStore(f.root,db=>db.read());assert.deepEqual(after.jobs,before.jobs);assert.deepEqual(after.sessions,before.sessions);
   }
 });
