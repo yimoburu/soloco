@@ -119,12 +119,18 @@ function schema(r){
     need(schemas.has(row.name)&&typeof row.sql==='string'&&(Object.hasOwn(COMPARISON_PROOF_INDEX_SQL,row.name)?row.sql.trim().replace(/;$/,'')===schemas.get(row.name):sqlNormal(row.sql)===sqlNormal(schemas.get(row.name))),'SCHEMA_REQUIRED');
   }
   need(names.has('company')&&names.has('events'),'SCHEMA_REQUIRED');
+  const normalized=['company_layout','immutable_values','state_entries','state_entries_order','fence_legacy_update','fence_legacy_delete','fence_legacy_insert'];
+  const publicDerived=['public_read_values','public_read_value_ids','public_read_rows','public_read_handles','public_read_catalog','public_read_insert','public_read_update','public_read_delete'];
   for(const group of [
-    ['company_layout','immutable_values','state_entries','state_entries_order','fence_legacy_update','fence_legacy_delete','fence_legacy_insert'],
-    ['public_read_values','public_read_value_ids','public_read_rows','public_read_handles','public_read_catalog','public_read_insert','public_read_update','public_read_delete'],
+    normalized,
     ['async_task_index','async_task_states','async_message_index','async_message_recipient','async_index_meta','async_runtime_lease']
   ])if(group.some(name=>names.has(name)))need(group.every(name=>names.has(name)),'SCHEMA_REQUIRED');
-  if(!names.has('company_layout')){need(!names.has('public_read_values')&&!names.has('async_task_index'),'LAYOUT_REQUIRED');return 0;}
+  // Only this closed discardable group may be incomplete. Every present
+  // definition was checked above, and ANY surviving member requires the whole
+  // canonical normalized layout. Actual repair stays in the authorized writer,
+  // after its unchanged comparison accounting/custody guards.
+  if(publicDerived.some(name=>names.has(name)))need(normalized.every(name=>names.has(name)),'SCHEMA_REQUIRED');
+  if(!names.has('company_layout')){need(!publicDerived.some(name=>names.has(name))&&!names.has('async_task_index'),'LAYOUT_REQUIRED');return 0;}
   const layout=r.query('SELECT id,version FROM company_layout ORDER BY id','all');need(layout.length===1&&layout[0].id===1&&layout[0].version===4,'LAYOUT_REQUIRED');return 4;
 }
 

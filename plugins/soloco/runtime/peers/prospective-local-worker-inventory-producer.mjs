@@ -234,7 +234,15 @@ function bookkeepingLive(proof){if(!proof)return false;if(!proof.lease)return tr
 export function bindOriginalWorkerAssignmentBookkeepingFrom(store,state){
   // Absence is raw fallback, not an alternate issuer or an exception that can
   // accidentally skip the ordinary context-preservation obligations.
-  try{const loan=originalStoreExecutionCustodyFrom(store),p=storedProjection(loan);if(!p?.origin)return null;const history=originalHistory(loan,{current:p});bindBookkeeping(state,history.origin,history.jobs,writes.get(store)?.lease??null);return true;}catch{return null;}
+  try{
+    const loan=originalStoreExecutionCustodyFrom(store);
+    // A projected public state may omit a physically present Origin. Only this
+    // owning snapshot's normalized root-key presence can skip passive binding;
+    // present null/invalid values still take the existing full projection path.
+    const normalized=query(loan,"SELECT 1 FROM sqlite_master WHERE type='table' AND name='state_entries'",'get');
+    if(normalized&&!query(loan,"SELECT 1 FROM state_entries WHERE family='root' AND key='original_execution_origin'",'get'))return null;
+    const p=storedProjection(loan);if(!p?.origin)return null;const history=originalHistory(loan,{current:p});bindBookkeeping(state,history.origin,history.jobs,writes.get(store)?.lease??null);return true;
+  }catch{return null;}
 }
 export function inheritOriginalWorkerAssignmentBookkeepingFrom(source,derived){const proof=bookkeepingFor(source);if(!bookkeepingLive(proof)||!derived||typeof derived!=='object'||derived.id!==proof.company_id)return null;bookkeeping.set(derived,proof);return true;}
 export function inspectOriginalWorkerAssignmentBookkeepingFrom(state,job){
